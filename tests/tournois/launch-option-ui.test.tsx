@@ -485,13 +485,55 @@ describe("fiches hors Overwatch : BattleTag absent", () => {
         selfManaged={false}
         phase="LAUNCHED"
         onCopy={noop}
-        battletagNote="À inviter dans la partie"
+        battletagNote="À ajouter en ami"
       />,
     );
 
     expect(html).toContain("Juge");
     expect(html).not.toContain("BattleTag");
     expect(html).not.toContain("À inviter");
+  });
+
+  it("RefereeCard_discordTagSent_rendersDiscordLineWithCopyButton", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard
+        referee={{ userId: 77, pseudo: "Juge", discordTag: "juge", battletag: "Juge#3333", battletagVerified: true, ready: false, isViewer: false }}
+        selfManaged={false}
+        phase="LAUNCHED"
+        onCopy={noop}
+      />,
+    );
+
+    expect(html).toContain(">Discord<");
+    expect(html).toContain(">juge<");
+    expect(html).toContain('aria-label="Copier le Discord juge"');
+    expect(html.indexOf(">juge<")).toBeLessThan(html.indexOf("Juge#3333"));
+  });
+
+  it("RefereeCard_discordTagNotSent_noDiscordLine", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard
+        referee={{ userId: 77, pseudo: "Juge", battletag: "Juge#3333", battletagVerified: true, ready: false, isViewer: false }}
+        selfManaged={false}
+        phase="LAUNCHED"
+        onCopy={noop}
+      />,
+    );
+
+    expect(html).not.toContain(">Discord<");
+  });
+
+  it("RefereeCard_ownCard_noDiscordLine", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard
+        referee={{ userId: 77, pseudo: "Juge", discordTag: "juge", ready: false, isViewer: true }}
+        selfManaged={false}
+        phase="LAUNCHED"
+        onCopy={noop}
+      />,
+    );
+
+    expect(html).not.toContain(">juge<");
   });
 
   it("RefereeCard_selfManaged_noteWithoutNamedRegion", () => {
@@ -511,11 +553,11 @@ describe("fiches hors Overwatch : BattleTag absent", () => {
         selfManaged={false}
         phase="LAUNCHED"
         onCopy={noop}
-        battletagNote="À inviter dans la partie"
+        battletagNote="À ajouter en ami"
       />,
     );
 
-    expect(html.indexOf("Juge#3333")).toBeLessThan(html.indexOf("À inviter dans la partie"));
-    expect(html.indexOf(">Copier<")).toBeLessThan(html.indexOf("À inviter dans la partie"));
+    expect(html.indexOf("Juge#3333")).toBeLessThan(html.indexOf("À ajouter en ami"));
+    expect(html.indexOf(">Copier<")).toBeLessThan(html.indexOf("À ajouter en ami"));
   });
 });

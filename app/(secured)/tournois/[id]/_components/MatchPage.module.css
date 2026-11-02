@@ -315,6 +315,11 @@
   overflow-wrap: anywhere;
 }
 
+.connection {
+  display: grid;
+  gap: 10px;
+}
+
 .castContacts {
   margin-top: 14px;
   display: grid;

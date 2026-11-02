@@ -371,6 +371,21 @@ type LaunchContext = {
    * ce drapeau porte seul la décision pour le caster.
    */
   exposesCaster: boolean;
+  /**
+   * Tag Discord certifié **de l'arbitre désigné** (`MATCH_PAGE_CONNECT.md`) :
+   * par la carte (`GET /api/matches/[id]/contacts`, page du match et fenêtre
+   * « Contacts ») et aux seules parties du match — joueurs, casters, l'arbitre
+   * lui-même —, jamais à un arbitre sans rôle sur le match (rôle `REFEREE`) ni
+   * dans la modale de lancement. Suit `exposes`, comme son BattleTag.
+   */
+  refereeDiscord: boolean;
+  /**
+   * Rôle du lecteur sur le match : un caster (staff compris, qui lit pourtant
+   * les contacts des équipes dès que les adversaires sont connus) ne lit ceux
+   * de l'arbitre que le temps du match (`refereeContactsOpen`), comme le dit
+   * le texte de certification (« ses casters le temps du match seulement »).
+   */
+  viewerRole: MatchLaunchViewerRole;
 };
 
 
@@ -634,35 +649,72 @@ function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: L
 }
 
 /**
+ * Les contacts de l'arbitre (tag Discord certifié, BattleTag) sont-ils ouverts
+ * à ce lecteur ? Hors de la fenêtre des contacts (`ctx.exposes`), jamais. Un
+ * arbitre qui caste aussi le match suit la règle des casters : ses contacts
+ * attendent le départ (`ctx.exposesCaster`), comme sur sa carte de caster —
+ * sinon sa fiche d'arbitre livrerait avant l'heure ce que sa carte retient.
+ * Un lecteur caster (`ctx.viewerRole`), staff compris, les lit lui aussi le
+ * temps du match seulement (texte de certification).
+ */
+function refereeContactsOpen(user: UserRow, ctx: LaunchContext): boolean {
+  if (!ctx.exposes) return false;
+  const casts = ctx.casters.some((caster) => caster.userId === Number(user.id));
+  // Un lecteur caster, même staff, attend aussi le départ.
+  return (!casts && ctx.viewerRole !== "CASTER") || ctx.exposesCaster;
+}
+
+/**
+ * Tag Discord certifié de l'arbitre pour ce lecteur : tu hors de ses contacts
+ * ouverts (`refereeContactsOpen`) et sur sa propre fiche, qui n'a rien à lui dire.
+ */
+function refereeDiscordTag(user: UserRow, isViewer: boolean, ctx: LaunchContext): string | null {
+  if (isViewer || !refereeContactsOpen(user, ctx)) return null;
+  const verified = user.discord_verified_at !== null;
+  return visibleDiscordTag(verified ? user.discord_pseudo : null, ctx.viewer, {
+    userId: Number(user.id),
+    verified,
+    sharesMatchLobby: true,
+  });
+}
+
+/**
  * L'arbitre désigné tel que les parties du match le lisent : pseudo et, en
  * Overwatch seulement (`withGameBattletag`), BattleTag (`visibleBattletag`,
- * clause `sharesLiveMatch`), jamais son tag Discord. `null` sans arbitre ou
- * arbitre inéligible.
+ * clause `sharesLiveMatch`) ; son tag Discord certifié par la carte seulement,
+ * aux parties du match (`ctx.refereeDiscord`) — le champ est absent ailleurs.
+ * `null` sans arbitre ou arbitre inéligible.
  */
 function buildLaunchReferee(row: CandidateRow, ctx: LaunchContext): LaunchReferee | null {
   if (!row.refereeEligible || row.referee_user_id === null) return null;
   const user = ctx.users.get(Number(row.referee_user_id));
   if (!user || Number(user.is_deleted) !== 0) return null;
+  const isViewer = Number(user.id) === ctx.viewer.id;
+  const open = refereeContactsOpen(user, ctx);
+  const discord = ctx.refereeDiscord ? { discordTag: refereeDiscordTag(user, isViewer, ctx) } : {};
   return withGameBattletag(
     row.tournament_game,
     {
       userId: Number(user.id),
       pseudo: user.pseudo,
+      ...discord,
       ready: ctx.readiness.referee?.ready ?? false,
-      isViewer: Number(user.id) === ctx.viewer.id,
+      isViewer,
     },
     {
       // Le BattleTag suit la fenêtre des contacts du match (`ctx.exposes`) : les
       // parties le lisent dès que les deux adversaires sont connus (le temps du
-      // match pour un caster), comme les contacts des engagées.
-      battletag: ctx.exposes
+      // match pour un caster), comme les contacts des engagées ; un arbitre qui
+      // caste aussi le match attend le départ (`refereeContactsOpen`).
+      battletag: open
         ? visibleBattletag(user.overwatch_battletag, ctx.viewer, {
             userId: Number(user.id),
             visible: Number(user.visible_overwatch) === 1,
             sharesLiveMatch: true,
           })
         : null,
-      battletagVerified: battletagFromBlizzard(user),
+      // Le lien Battle.net se tait avec le BattleTag, comme sur une carte de caster.
+      battletagVerified: open && battletagFromBlizzard(user),
     },
   );
 }
@@ -816,6 +868,8 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
           // elle est vraie, `exposes` l'est aussi ; le `exposes &&` n'est
           // qu'un filet : jamais le caster sans le match.
           exposesCaster: exposes && exposesCasterContacts(phase, party.role),
+          refereeDiscord: forCard && party.role !== "REFEREE",
+          viewerRole: party.role,
         }),
       );
     }

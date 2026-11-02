@@ -91,10 +91,10 @@ describe("textes joueur et règles — mêmes lecteurs que le code", () => {
     // Fiche du titulaire : la liste partagée, derrière le « i ».
     expect(readSource("messages/fr/players.json")).toContain("si tu es présenté comme contact (fenêtres « Contacts » et de lancement) : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match ;");
     expect(readSource("messages/fr/players.json")).toContain("si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;");
-    expect(readSource("messages/fr/players.json")).toContain("la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné ; la page du match reprend le BattleTag de ses casters et de son arbitre désigné, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts ».");
+    expect(readSource("messages/fr/players.json")).toContain("la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné ; la page du match reprend le BattleTag de ses contacts d'équipe (aux seules parties du match), de ses casters et de son arbitre désigné, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts ».");
     expect(readSource("messages/en/players.json")).toContain("if you're shown as a contact (“Contacts” and launch windows): the members of both teams, referees and administrators, from the moment the opponents are known until the end of the match, and the casters while the match is being played;");
     expect(readSource("messages/en/players.json")).toContain("if you cast a match: both its teams and its other casters while the match is being played, and referees and administrators from the moment its opponents are known until its end;");
-    expect(readSource("messages/en/players.json")).toContain("the launch window only opens for both teams, the casters and the assigned referee; the match page repeats the BattleTag of its casters and its assigned referee, to the same people at the same times as the “Contacts” window.");
+    expect(readSource("messages/en/players.json")).toContain("the launch window only opens for both teams, the casters and the assigned referee; the match page repeats the BattleTag of its team contacts (to the parties to the match alone), its casters and its assigned referee, to the same people at the same times as the “Contacts” window.");
   });
 
   it("la règle « Lancement d'un match » renvoie au bouton « Contacts » ouvert dès que les adversaires sont connus", () => {
@@ -109,8 +109,13 @@ describe("tag Discord d'un caster et BattleTag masqué dans l'avis", () => {
     expect(readSource("lib/shared/discord-identity.ts")).toContain("Si tu castes un match, ses deux équipes, ses autres casters et son arbitre désigné voient le tien le temps du match seulement, dans les fenêtres « Contacts » et de lancement du match et sur sa page, et les autres arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page.");
     expect(frProfile.verify.exposure.match).toContain("Si tu castes un match, ses deux équipes, ses autres casters et son arbitre désigné voient le tien le temps du match seulement, dans les fenêtres « Contacts » et de lancement du match et sur sa page, et les autres arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page.");
     expect(enProfile.verify.exposure.match).toContain("If you cast a match, both its teams, its other casters and its assigned referee see yours only while the match is being played, in the match's “Contacts” and launch windows and on its page, and the other referees from the moment both its opponents are known until its end, in its “Contacts” window and on its page.");
-    expect(readSource("lib/shared/rgpd-policy.ts")).toContain("ses casters le temps du match seulement (et, si tu castes un match, ses deux équipes, ses autres casters et son arbitre désigné le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et les autres arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page) ;");
-    expect(readSource("lib/shared/rgpd-policy-en.ts")).toContain("its casters only while the match is being played (and, if you cast a match, both its teams, its other casters and its assigned referee while the match is being played, in its “Contacts” and launch windows and on its page, and the other referees from the moment both its opponents are known until its end, in its “Contacts” window and on its page);");
+    expect(readSource("lib/shared/rgpd-policy.ts")).toContain("ses casters le temps du match seulement (et, si tu castes un match, ses deux équipes, ses autres casters et son arbitre désigné le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et les autres arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page ;");
+    expect(readSource("lib/shared/rgpd-policy-en.ts")).toContain("its casters only while the match is being played (and, if you cast a match, both its teams, its other casters and its assigned referee while the match is being played, in its “Contacts” and launch windows and on its page, and the other referees from the moment both its opponents are known until its end, in its “Contacts” window and on its page;");
+  });
+
+  it("les textes de certification disent qui voit le tag de l'arbitre désigné (FR et EN)", () => {
+    expect(frProfile.verify.exposure.match).toContain("Si tu es l'arbitre désigné d'un match, ses deux équipes voient le tien dès que ses deux adversaires sont connus et jusqu'à sa fin, ses casters le temps du match seulement, dans sa fenêtre « Contacts » et sur sa page");
+    expect(enProfile.verify.exposure.match).toContain("If you are a match's assigned referee, both its teams see yours from the moment both its opponents are known until its end, and its casters only while the match is being played, in its “Contacts” window and on its page");
   });
 
   it("l'avis de changement dit que le BattleTag présenté peut être masqué (FR et EN)", () => {
@@ -260,10 +265,10 @@ describe("BattleTag masqué — arbitre désigné", () => {
       const fr = load("fr", ns).audience.battletag;
       const en = load("en", ns).audience.battletag;
       expect(fr.asReferee).toBe(
-        "si tu es l'arbitre désigné d'un match : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match (tu peux te retirer d'un match à tout moment ; effacer ton BattleTag te retirerait l'arbitrage, qui demande celui de Battle.net) ;",
+        "si tu es l'arbitre désigné d'un match : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match — ses deux équipes le temps du match seulement si tu le castes aussi (tu peux te retirer d'un match à tout moment ; effacer ton BattleTag te retirerait l'arbitrage, qui demande celui de Battle.net) ;",
       );
       expect(en.asReferee).toBe(
-        "if you are the assigned referee of a match: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played (you can withdraw from a match at any time; erasing your BattleTag would remove your refereeing, which requires the one from Battle.net);",
+        "if you are the assigned referee of a match: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played — both its teams only while the match is being played if you also cast it (you can withdraw from a match at any time; erasing your BattleTag would remove your refereeing, which requires the one from Battle.net);",
       );
       expect(Object.keys(fr)).toEqual(["title", "match", "asCaster", "asReferee", "launch", "footer"]);
       expect(Object.keys(en)).toEqual(Object.keys(fr));
@@ -359,10 +364,10 @@ describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", (
     const index = DONNEES_PROFIL.findIndex((d) => d.donnee === "Pseudo Overwatch");
     const en = DONNEES_PROFIL_EN[index]?.finalite ?? "";
     expect(fr).toContain(
-      "si tu es l'arbitre désigné d'un match, de ses deux équipes et des arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin et de ses casters le temps du match (voir « Arbitre désigné d'un match »)",
+      "si tu es l'arbitre désigné d'un match, de ses deux équipes et des arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin et de ses casters le temps du match — de ses deux équipes le temps du match seulement si tu le castes aussi — (voir « Arbitre désigné d'un match »)",
     );
     expect(en).toContain(
-      "if you are the assigned referee of a match, by both its teams and the referees from the moment both its opponents are known until its end and by its casters while the match is being played (see “Assigned referee of a match”)",
+      "if you are the assigned referee of a match, by both its teams and the referees from the moment both its opponents are known until its end and by its casters while the match is being played — by both its teams only while the match is being played if you also cast it — (see “Assigned referee of a match”)",
     );
   });
 
@@ -413,15 +418,15 @@ describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", (
   it("garde l'opposition de l'arbitre tant qu'il n'a pas accepté la version 7, le contrat ensuite (FR et EN)", () => {
     const objectFr = DROITS.find((d) => d.title === "Droit d'opposition")?.text ?? "";
     const objectEn = DROITS_EN.find((d) => d.title === "Right to object")?.text ?? "";
-    expect(objectFr).toContain("ainsi que la présentation de l'arbitre désigné aux parties de ses matchs tant qu'il n'a pas accepté la version 7 des conditions d'utilisation ou une version suivante, par le formulaire de signalement");
-    expect(objectEn).toContain("as well as the presentation of the assigned referee to the parties to their matches as long as they have not accepted version 7 of the terms of use or a later version, through the report form");
+    expect(objectFr).toContain("la présentation de l'arbitre désigné aux parties de ses matchs tant qu'il n'a pas accepté la version 7 des conditions d'utilisation ou une version suivante, ainsi que la présentation de son tag Discord certifié aux deux équipes et aux casters de ses matchs, par le formulaire de signalement");
+    expect(objectEn).toContain("the presentation of the assigned referee to the parties to their matches as long as they have not accepted version 7 of the terms of use or a later version, as well as the presentation of their certified Discord tag to both teams and the casters of their matches, through the report form");
     const row = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch");
     expect(row?.extraBases).toContainEqual({ base: "Exécution du contrat", scope: REFEREE_BATTLETAG_SCOPE });
     expect(row?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: REFEREE_BATTLETAG_BEFORE_V7_SCOPE });
     const index = DONNEES_PROFIL.findIndex((d) => d.donnee === "Pseudo Overwatch");
     expect(DONNEES_PROFIL_EN[index]?.extraBases?.map((b) => b.scope)).toEqual(
       expect.arrayContaining([
-        "the BattleTag of the assigned referee of a match in an Overwatch tournament (never in Marvel Rivals), even when hidden, in its “Contacts” and launch windows and on the match page: read by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played (the launch window, at the start of the match, only opens for both teams, the casters and the assigned referee); withdrawal from a match at any time, the staff being able to assign that match to them again, without notice (terms of use, “Match contacts”, once the referee has accepted their version 7 or a later one)",
+        "the BattleTag of the assigned referee of a match in an Overwatch tournament (never in Marvel Rivals), even when hidden, in its “Contacts” and launch windows and on the match page: read by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played — by both its teams only while the match is being played if they also cast it — (the launch window, at the start of the match, only opens for both teams, the casters and the assigned referee); withdrawal from a match at any time, the staff being able to assign that match to them again, without notice (terms of use, “Match contacts”, once the referee has accepted their version 7 or a later one)",
         "the same presentation of the assigned referee's BattleTag, as long as that referee has not accepted version 7 of the terms of use or a later version — objection through the report form, GDPR category (once upheld, they are removed from all their unfinished matches and can no longer take or be assigned one until it is lifted — at their request only —, even once version 7 or a later one is accepted)",
       ]),
     );

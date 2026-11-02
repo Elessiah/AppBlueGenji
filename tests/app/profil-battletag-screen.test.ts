@@ -170,7 +170,7 @@ describe("modale de visibilité du BattleTag", () => {
     // Décision du 2026-10-19 : l'arbitrage n'a plus d'accès propre, seule la
     // fenêtre « Contacts » d'un match ouvre un BattleTag masqué.
     expect(notice).toContain("pas même pour les arbitres et les administrateurs");
-    expect(notice).toContain("dans la fenêtre « Contacts » d'un match et dans sa fenêtre de lancement, au départ du match — et, si tu castes ou arbitres le match, aussi sur sa page");
+    expect(notice).toContain("dans la fenêtre « Contacts » d'un match et dans sa fenêtre de lancement, au départ du match — et aussi sur la page du match");
     expect(notice).not.toContain("tant que tu es inscrit à un");
   });
 

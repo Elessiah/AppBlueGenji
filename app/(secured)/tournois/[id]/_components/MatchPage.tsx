@@ -9,11 +9,16 @@ import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { KeyFacts, type KeyFact } from "@/components/cyber/KeyFacts";
-import { CasterCards, RefereeCard } from "@/components/match-launch/LaunchContactCards";
+import { CasterCards, RefereeCard, SideCard } from "@/components/match-launch/LaunchContactCards";
 import { useMatchContacts } from "@/components/match-launch/MatchContactsDialog";
 import { useLaunchText } from "@/components/match-launch/launch-text";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
-import { MATCH_LAUNCH_REFRESH_EVENT, type MatchLaunchInfo, type MatchLaunchPhase } from "@/lib/shared/match-launch";
+import {
+  MATCH_LAUNCH_REFRESH_EVENT,
+  connectionReader,
+  type MatchLaunchInfo,
+  type MatchLaunchPhase,
+} from "@/lib/shared/match-launch";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import {
   firstMapFieldFollows,
@@ -612,6 +617,44 @@ function MapsSection({
 }
 
 /**
+ * Infos de connexion du match (`docs/features/MATCH_PAGE_CONNECT.md`) : les
+ * fiches des deux engagées, avec leurs contacts comme dans la fenêtre
+ * « Contacts » (qui garde l'ordre du tableau ; la page met l'hôte en tête),
+ * aux seules **parties** du match (joueurs des deux engagées,
+ * casters, arbitre désigné : `connectionReader`), jamais à un arbitre sans
+ * rôle sur le match, qui garde la fenêtre « Contacts ». Les données viennent
+ * de la lecture d'un match (`useMatchContacts`), propre au lecteur : rien
+ * dans l'instantané diffusé à tous.
+ */
+function ConnectionSection({
+  launch,
+  onCopy,
+}: Readonly<{ launch: MatchLaunchInfo | null; onCopy: (value: string, label: string) => Promise<void> }>) {
+  const page = useMatchPageText();
+  const titleId = useId();
+  if (!launch || !connectionReader(launch)) return null;
+  const hostSecond = launch.hostTeamId !== null && launch.hostTeamId === launch.team2.teamId;
+  const ordered = hostSecond ? [launch.team2, launch.team1] : [launch.team1, launch.team2];
+  return (
+    <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
+      <SectionTitle id={titleId}>{page.t("sections.connection")}</SectionTitle>
+      <div className={styles.connection}>
+        {ordered.map((side) => (
+          <SideCard
+            key={side.teamId}
+            side={side}
+            isHost={launch.hostTeamId === side.teamId}
+            phase={launch.phase}
+            onCopy={onCopy}
+            linkNames
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/**
  * Arbitrage, en détail : la fiche de l'arbitre (aux lecteurs que sert la
  * lecture des contacts) ou l'aide-mémoire de l'autogestion. La décision
  * elle-même se lit dans les faits clés.
@@ -917,6 +960,7 @@ function MatchPageContent({ detail, match, adminResolvable, scoreLocked, onOpenA
           />
         </div>
         <div className={styles.column}>
+          <ConnectionSection launch={shownLaunch} onCopy={onCopy} />
           <OfficiatingSection
             match={match}
             game={detail.card.game}

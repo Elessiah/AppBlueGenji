@@ -51,7 +51,7 @@ describe("contacts du lancement d'un match — base légale", () => {
       expect(entry?.finalite).not.toMatch(/non sur ce consentement/);
     }
     expect(MATCH_CONTACTS_SCOPE).toBe(
-      "présentation (le BattleTag, des contacts d'équipe comme des casters, dans les seuls tournois Overwatch), dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses casters le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) ; les contacts de chaque caster aux deux équipes et aux autres casters du match le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin — contacts que la page du match reprend aussi, aux mêmes lecteurs et aux mêmes moments que la fenêtre « Contacts » — (conditions d'utilisation, « Contacts de match »)",
+      "présentation (le BattleTag, des contacts d'équipe comme des casters, dans les seuls tournois Overwatch), dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses casters le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) ; les contacts de chaque caster aux deux équipes et aux autres casters du match le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin — contacts que la page du match reprend aussi, aux mêmes lecteurs et aux mêmes moments que la fenêtre « Contacts », comme ceux des deux équipes, aux seules parties du match (jamais aux arbitres sans rôle sur ce match) — (conditions d'utilisation, « Contacts de match »)",
     );
   });
 
@@ -68,7 +68,7 @@ describe("contacts du lancement d'un match — base légale", () => {
   // tes matchs au titre du service, pas du consentement (le réglage n'y peut rien).
   it("fonde la lecture du BattleTag masqué par les parties d'un match sur le contrat, pas le consentement", () => {
     expect(BATTLETAG_MATCH_SCOPE).toMatch(
-      /^lecture, même masqué, dans un tournoi Overwatch seulement \(jamais en Marvel Rivals\) : présenté comme contact d'un match, dans sa fenêtre « Contacts » et dans sa fenêtre de lancement seulement/,
+      /^lecture, même masqué, dans un tournoi Overwatch seulement \(jamais en Marvel Rivals\) : présenté comme contact d'un match, dans sa fenêtre « Contacts », dans sa fenêtre de lancement et, pour les seules parties du match, sur sa page seulement/,
     );
     expect(BATTLETAG_MATCH_SCOPE).toMatch(/arbitres et administrateurs n'y ont pas d'autre accès \(conditions d'utilisation, « Contacts de match »\)$/);
   });
