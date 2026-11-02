@@ -15,6 +15,7 @@ import {
   flushRefereeChanges,
   queueRefereeChange,
   refereeLogChange,
+  refereeLogCategory,
   refereeReleaseNotice,
   type RefereeChange,
 } from "@/lib/server/tournaments/referee-notices";
@@ -64,9 +65,9 @@ beforeEach(() => {
     .mockResolvedValue({ discord: { sent: 0, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 1 });
 });
 
-function loggedLine(): string {
+function loggedLine(category = "referees"): string {
   expect(sendBotLog).toHaveBeenCalledTimes(1);
-  expect(jest.mocked(sendBotLog).mock.calls[0][1]).toMatchObject({ category: "referees" });
+  expect(jest.mocked(sendBotLog).mock.calls[0][1]).toMatchObject({ category });
   return jest.mocked(sendBotLog).mock.calls[0][0];
 }
 
@@ -93,6 +94,44 @@ describe("refereeLogChange / refereeReleaseNotice", () => {
   ])("%j → journal %s", (change, log, notice) => {
     expect(refereeLogChange(change)).toBe(log);
     expect(refereeReleaseNotice(change)).toEqual(notice);
+  });
+});
+
+describe("refereeLogCategory — un retrait alerte, le reste reste une trace", () => {
+  it.each<[RefereeChange, string]>([
+    [{ kind: "TAKEN", matchId: 1 }, "referees"],
+    [{ kind: "ASSIGNED", matchId: 1, replacedRefereeId: null }, "referees"],
+    [{ kind: "ASSIGNED", matchId: 1, replacedRefereeId: 5 }, "staff-removal"],
+    [{ kind: "RELEASED", matchId: 1, refereeId: 5, byStaff: false }, "staff-removal"],
+    [{ kind: "RELEASED", matchId: 1, refereeId: 5, byStaff: true }, "staff-removal"],
+    [{ kind: "OBJECTION_RELEASED", matchId: 1, refereeId: 5 }, "staff-removal"],
+    [{ kind: "AUTO_RELEASED", matchId: 1, refereeId: 5, reason: "INELIGIBLE" }, "staff-removal"],
+    [{ kind: "AUTO_RELEASED", matchId: 1, refereeId: 5, reason: "JOINED_TEAM" }, "staff-removal"],
+    [{ kind: "SELF_MANAGED", matchId: 1, enabled: true, replacedRefereeId: null }, "referees"],
+    [{ kind: "SELF_MANAGED", matchId: 1, enabled: true, replacedRefereeId: 5 }, "staff-removal"],
+    [{ kind: "SELF_MANAGED", matchId: 1, enabled: false, replacedRefereeId: null }, "referees"],
+    [{ kind: "FIRST_MAP", matchId: 1, set: true }, "referees"],
+    [{ kind: "MAP_PICK", matchId: 1, set: true, byTeam: false }, "referees"],
+  ])("%j → %s", (change, category) => {
+    expect(refereeLogCategory(change)).toBe(category);
+  });
+
+  it.each<[RefereeChange]>([
+    [{ kind: "RELEASED", matchId: 42, refereeId: REFEREE, byStaff: false }],
+    [{ kind: "RELEASED", matchId: 42, refereeId: REFEREE, byStaff: true }],
+    [{ kind: "ASSIGNED", matchId: 42, replacedRefereeId: REFEREE }],
+    [{ kind: "AUTO_RELEASED", matchId: 42, refereeId: REFEREE, reason: "INELIGIBLE" }],
+    [{ kind: "SELF_MANAGED", matchId: 42, enabled: true, replacedRefereeId: REFEREE }],
+  ])("deliverRefereeChange %j envoie la ligne dans staff-removal, sans nom", async (change) => {
+    mockMatch(matchRow());
+    await deliverRefereeChange(change);
+    expect(loggedLine("staff-removal")).not.toContain("ArbitrePseudo");
+  });
+
+  it("deliverRefereeChange_assignmentWithoutReplacement_staysInReferees", async () => {
+    mockMatch(matchRow());
+    await deliverRefereeChange({ kind: "ASSIGNED", matchId: 42, replacedRefereeId: null });
+    loggedLine("referees");
   });
 });
 
@@ -126,7 +165,7 @@ describe("deliverRefereeChange", () => {
   it("prévient par push seul, avec le motif, l'arbitre retiré par le staff", async () => {
     mockMatch(matchRow());
     await deliverRefereeChange({ kind: "RELEASED", matchId: 42, refereeId: REFEREE, byStaff: true });
-    const line = loggedLine();
+    const line = loggedLine("staff-removal");
     expect(line).toContain("Arbitre retiré");
     expect(line).toContain("le staff");
     expect(line).not.toContain("ArbitrePseudo");
@@ -154,7 +193,7 @@ describe("deliverRefereeChange", () => {
     mockMatch(matchRow({ participant_type: "SOLO", team1_name: "PseudoA", team2_name: "PseudoB" }));
     await deliverRefereeChange({ kind: "AUTO_RELEASED", matchId: 42, refereeId: REFEREE, reason: "JOINED_TEAM" });
     const sent = notification();
-    for (const text of [loggedLine(), resolvePush(sent.push, "fr").body, resolvePush(sent.push, "en").body]) {
+    for (const text of [loggedLine("staff-removal"), resolvePush(sent.push, "fr").body, resolvePush(sent.push, "en").body]) {
       expect(text).not.toContain("PseudoA");
       expect(text).not.toContain("PseudoB");
     }

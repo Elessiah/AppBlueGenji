@@ -1219,7 +1219,12 @@ export async function setRoundSelfManaged(
   );
   if (changed.length === 0) return 0;
   publishMatchUpdatedEvent(tournamentId);
-  void announceRoundSelfManagement(changed[0].matchId, enabled, changed.length);
+  void announceRoundSelfManagement(
+    changed[0].matchId,
+    enabled,
+    changed.length,
+    changed.some((entry) => entry.replacedRefereeId !== null),
+  );
   for (const entry of changed) {
     if (entry.replacedRefereeId === null) continue;
     announceRefereeChange(
@@ -1231,7 +1236,7 @@ export async function setRoundSelfManaged(
 }
 
 /** La ligne du journal d'une manche passée (ou sortie) en autogestion. Ne lève jamais. */
-async function announceRoundSelfManagement(sampleMatchId: number, enabled: boolean, count: number): Promise<void> {
+async function announceRoundSelfManagement(sampleMatchId: number, enabled: boolean, count: number, removedReferee: boolean): Promise<void> {
   try {
     const row = await loadMatchLogRow(sampleMatchId);
     if (!row) return;
@@ -1243,7 +1248,8 @@ async function announceRoundSelfManagement(sampleMatchId: number, enabled: boole
         enabled,
         count,
       }),
-      { tournamentId: match.tournament.id, category: "referees" },
+      // Un arbitre écarté par le geste : retrait, donc alerte.
+      { tournamentId: match.tournament.id, category: removedReferee ? "staff-removal" : "referees" },
     );
   } catch (error) {
     console.error("[referee] autogestion de manche non annoncée", error);

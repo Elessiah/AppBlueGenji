@@ -101,12 +101,12 @@ describe("kind et catégories", () => {
   });
 
   it("sendBotLog_everyOtherCategory_postsKindLog", async () => {
-    const alerts = ["referee-digest", "referee-self-action"];
+    const alerts = ["referee-digest", "referee-self-action", "staff-removal"];
     for (const category of BOT_LOG_CATEGORIES.filter((name) => !alerts.includes(name))) {
       await sendBotLog(category, { category });
     }
     await flushAllBotLogBatches();
-    expect(postedBodies().map((body) => body.kind)).toEqual(Array(BOT_LOG_CATEGORIES.length - 2).fill("log"));
+    expect(postedBodies().map((body) => body.kind)).toEqual(Array(BOT_LOG_CATEGORIES.length - 3).fill("log"));
   });
 
   it("sendBotLog_sameTournamentTwoCategories_twoMessagesNeverMixed", async () => {

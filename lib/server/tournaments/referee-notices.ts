@@ -18,6 +18,7 @@
 import type { PoolConnection } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
+import type { BotLogCategory } from "@/lib/shared/bot-log-category";
 import { formatRefereeChangeLog, type RefereeLogChange } from "@/lib/shared/bot-logs";
 import { refereeReleasedPush, type RefereeReleaseReason } from "@/lib/shared/push-messages";
 import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
@@ -68,6 +69,26 @@ export function refereeLogChange(change: RefereeChange): RefereeLogChange {
   }
 }
 
+/**
+ * Catégorie de la ligne de journal : `staff-removal` (alerte) quand un arbitre
+ * est retiré du match — retrait, remplacement, retrait d'office, autogestion
+ * qui l'écarte —, `referees` (trace) sinon.
+ */
+export function refereeLogCategory(change: RefereeChange): BotLogCategory {
+  switch (change.kind) {
+    case "RELEASED":
+    case "OBJECTION_RELEASED":
+    case "AUTO_RELEASED":
+      return "staff-removal";
+    case "ASSIGNED":
+      return change.replacedRefereeId === null ? "referees" : "staff-removal";
+    case "SELF_MANAGED":
+      return change.replacedRefereeId === null ? "referees" : "staff-removal";
+    default:
+      return "referees";
+  }
+}
+
 /** L'arbitre à prévenir et son motif ; `null` quand personne n'a à l'être. */
 export function refereeReleaseNotice(
   change: RefereeChange,
@@ -110,7 +131,7 @@ export async function deliverRefereeChange(change: RefereeChange, options: Refer
       team2: match.team2,
       change: refereeLogChange(change),
     }),
-    { tournamentId: match.tournament.id, category: "referees" },
+    { tournamentId: match.tournament.id, category: refereeLogCategory(change) },
   );
   const notice = refereeReleaseNotice(change);
   if (!notice) {

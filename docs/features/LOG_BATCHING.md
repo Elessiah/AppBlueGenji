@@ -59,6 +59,7 @@ fixe, jamais un nom ni un `#id` de joueur ; il compte dans la limite de
 | `referees` | Arbitrage | désignations et retraits (`referee-notices.ts`), autogestion d'une manche (`match-launch.ts`), objection, planification par l'arbitrage | `log` |
 | `referee-digest` | Matchs à arbitrer | relevé des matchs à venir sans arbitre (`referee-digest.ts`) | `alert` |
 | `referee-self-action` | Arbitrage à vérifier | un membre du staff a tranché (ou mis en pause, forfait…) un match qu'il joue (`dispute-self-resolution.ts`) : les autres vérifient | `alert` |
+| `staff-removal` | Retrait d'arbitre ou de caster | un arbitre ou un caster retiré d'un match : retrait volontaire ou par le staff, remplacement, retrait d'office, autogestion qui écarte l'arbitre, opposition retenue (`referee-notices.ts`, `cast-notices.ts`, `match-launch.ts`, route d'opposition). Les désignations et inscriptions restent en `referees` / `casts` | `alert` |
 | `casts` | Casts | `cast-notices.ts` | `log` |
 | `results` | Résultats | résultat d'un match, pénalités d'endurance (`bot-logs.ts`) | `log` |
 | `tournament` | Tournoi | création, lancement, fin, tournoi sous-rempli (`bot-logs.ts`) | `log` |
@@ -81,7 +82,7 @@ Tout `POST /internal/log` porte `kind: "log" | "alert"`, **déduit de la
 catégorie** (`botLogKind`) — jamais choisi par l'appelant, pour qu'une
 catégorie ne soit pas tantôt trace, tantôt alerte. Le bot poste `log` en
 `@silent` ; `alert` notifie ; un `kind` absent vaut `alert` (un site plus
-ancien reste notifiant). Deux catégories sont des alertes : `referee-digest`
+ancien reste notifiant). Trois catégories sont des alertes : `staff-removal` appelle le staff à repourvoir le créneau d'un arbitre ou d'un caster retiré (la suppression d'un compte n'écrit aucune ligne Discord), `referee-digest`
 appelle un arbitre à se positionner, `referee-self-action` appelle le staff à
 vérifier le geste d'un arbitre qui joue le match. Tout le reste est une trace. **Déployer le bot
 avant le site.** Le canal arbitre (`/internal/notify/referees`) n'est pas

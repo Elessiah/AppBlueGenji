@@ -13,14 +13,17 @@ const ROOT = process.cwd();
 const read = (file: string) => readFileSync(join(ROOT, file), "utf8");
 
 const SEND_BOT_LOG: Record<string, BotLogCategory[]> = {
-  "lib/server/tournaments/cast-notices.ts": ["casts"],
-  "lib/server/tournaments/referee-notices.ts": ["referees"],
-  "lib/server/tournaments/match-launch.ts": ["referees"],
   "lib/server/tournaments/referee-digest.ts": ["referee-digest"],
   "lib/server/tournaments/round-maps-notice.ts": ["maps"],
   "lib/server/tournaments/round-maps.ts": ["maps"],
   "lib/server/tournaments/staff-action-logs.ts": ["admin"],
   "lib/server/users/sign-in.ts": ["signups"],
+};
+
+/** Retraits d'arbitre ou de caster : la catégorie se décide par `…LogCategory(change)` (alerte `staff-removal`). */
+const REMOVAL_ROUTED: Record<string, string> = {
+  "lib/server/tournaments/cast-notices.ts": "category: castLogCategory(change)",
+  "lib/server/tournaments/referee-notices.ts": "category: refereeLogCategory(change)",
 };
 
 const PUBLISH_STAFF_ACTION: Record<string, BotLogCategory> = {
@@ -51,6 +54,21 @@ describe("catégories des appelants du journal", () => {
     const tagged = source.split(`"${category}"`).length - 1;
     expect(calls).toBeGreaterThan(0);
     expect(tagged).toBeGreaterThanOrEqual(calls);
+  });
+
+  it.each(Object.entries(REMOVAL_ROUTED))("%s route ses lignes par la catégorie du changement", (file, call) => {
+    const source = read(file);
+    expect(source).toContain(call);
+    expect(source).not.toContain('category: "casts"');
+    expect(source).not.toContain('category: "referees"');
+  });
+
+  it("match-launch classe en staff-removal la ligne d'une manche qui écarte un arbitre", () => {
+    expect(read("lib/server/tournaments/match-launch.ts")).toContain('removedReferee ? "staff-removal" : "referees"');
+  });
+
+  it("la route d'opposition publie en staff-removal quand l'opposition est retenue", () => {
+    expect(read("app/api/admin/referees/[userId]/objection/route.ts")).toContain('upheld ? "staff-removal" : "referees"');
   });
 
   it("bot-logs range chaque évènement du journal par sa table de catégories", () => {

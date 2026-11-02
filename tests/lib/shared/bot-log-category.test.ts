@@ -13,7 +13,7 @@ import { BOT_EVENT_LOG_CATEGORIES } from "@/lib/shared/referee-alerts";
 describe("catégories du journal", () => {
   it("botLogKind_everyCategory_logExceptTheCallsToAct", () => {
     const alerts = BOT_LOG_CATEGORIES.filter((category) => botLogKind(category) === "alert");
-    expect(alerts).toEqual(["referee-digest", "referee-self-action"]);
+    expect(alerts).toEqual(["referee-digest", "referee-self-action", "staff-removal"]);
     for (const category of BOT_LOG_CATEGORIES) expect(["log", "alert"]).toContain(BOT_LOG_CATEGORY_KINDS[category]);
   });
 
@@ -22,6 +22,11 @@ describe("catégories du journal", () => {
     expect(new Set(headers).size).toBe(BOT_LOG_CATEGORIES.length);
     for (const header of headers) expect(header.trim().length).toBeGreaterThan(0);
     expect(Object.keys(BOT_LOG_CATEGORY_HEADERS).sort()).toEqual([...BOT_LOG_CATEGORIES].sort());
+  });
+
+  it("botLogKind_staffRemoval_isAlertWithAFixedFrenchHeader", () => {
+    expect(botLogKind("staff-removal")).toBe("alert");
+    expect(botLogHeader("staff-removal")).toBe("⚠️ Retrait d'arbitre ou de caster");
   });
 
   it("botLogKind_refereeSelfAction_isAlert", () => {
