@@ -2350,4 +2350,24 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     expect(t18En.retention[0]).toContain("7 days");
     expect(REGISTER_UPDATED_AT).toBe("2026-11-04");
   });
+
+  it("processingRegister_t18_declaresBotMemoryPresenceAndBotRecordFrAndEn", () => {
+    const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
+    const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
+    expect(t18.dataCategories.join(" ")).toContain("tenue en mémoire par le bot pour compter, jamais enregistrée");
+    expect(t18En.dataCategories.join(" ")).toContain("held in memory by the bot to count, never recorded");
+    expect(t18.retention.join(" ")).toContain("oubliée 96 heures après sa création");
+    expect(t18En.retention.join(" ")).toContain("forgotten 96 hours after its creation");
+    expect(t18.dataSubjects).toHaveLength(t18En.dataSubjects.length);
+    expect(t18.retention).toHaveLength(t18En.retention.length);
+  });
+
+  it("processingRegister_t18_releaseIncludesPairingAndHoldIsStatedFrAndEn", () => {
+    const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
+    const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
+    expect(t18.subPurposes.join(" ")).toContain("quand l'équipe sort de l'appariement");
+    expect(t18En.subPurposes.join(" ")).toContain("when the team leaves the pairing");
+    expect(t18.legalBasis).toContain("le match attend que l'arbitrage force son lancement");
+    expect(t18En.legalBasis).toContain("the match waits for referees to force its launch");
+  });
 });
