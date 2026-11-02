@@ -9,11 +9,11 @@
  */
 import { nextPowerOfTwo } from "./bracket-seeds";
 import { PLAYOFF_ROUND_OFFSET, tournamentMatchFormat } from "./bg-survie/rounds";
-import { matchMaxMaps, type MatchFormat } from "./match-format";
-import { ROUND_MAP_SLOTS_MAX, roundKeysOf, type RoundKey } from "./round-maps";
+import { isBestOfThree, matchMaxMaps, type MatchFormat } from "./match-format";
+import { ROUND_MAP_SLOTS_MAX, roundKeysOf, type RoundKey, type RoundTiebreak } from "./round-maps";
 import { computeRecommendedRounds } from "./swiss";
 import { resolvePhaseQualifiers } from "./tournament-phases";
-import type { TournamentFormat, TournamentPhase, TournamentState } from "./types";
+import type { PhaseFormat, TournamentFormat, TournamentPhase, TournamentState } from "./types";
 
 /** Ce que le plan lit du tournoi (carte et métadonnées de l'instantané). */
 export type RoundPlanInput = {
@@ -184,4 +184,57 @@ export function roundMaxMaps(
     roundNumber,
   );
   return format ? Math.min(ROUND_MAP_SLOTS_MAX, matchMaxMaps(format)) : null;
+}
+
+/** Ce que l'éligibilité d'une map de départage lit du tournoi (carte de l'instantané). */
+export type TiebreakTournament = {
+  format: TournamentFormat;
+  matchFormat: MatchFormat | null;
+  endurancePlayoffFormat: MatchFormat | null;
+  phases: ReadonlyArray<Pick<TournamentPhase, "id" | "format">> | null;
+};
+
+const ELIMINATION_FORMATS: ReadonlySet<TournamentFormat | PhaseFormat> = new Set(["SINGLE", "DOUBLE"]);
+
+/**
+ * Tour de **play-offs** : un tour d'élimination (simple ou double, petite
+ * finale comprise), l'arbre final de BlueGenji Survie (`PLAYOFF_ROUND_OFFSET`),
+ * ou une phase à élimination d'un multi-phases. Jamais une ronde suisse, une
+ * manche de survie ni une manche qualificative.
+ */
+export function isPlayoffRound(
+  tournament: Pick<TiebreakTournament, "format" | "phases">,
+  round: RoundKey,
+): boolean {
+  if (tournament.format === "MULTI") {
+    const phase = tournament.phases?.find((item) => item.id === round.phaseId);
+    return phase !== undefined && ELIMINATION_FORMATS.has(phase.format);
+  }
+  if (round.phaseId !== 0) return false;
+  if (tournament.format === "BG_SURVIE") return round.roundNumber >= PLAYOFF_ROUND_OFFSET;
+  return ELIMINATION_FORMATS.has(tournament.format);
+}
+
+/**
+ * Une map de départage se règle-t-elle sur ce tour ? Tour de play-offs **et**
+ * format de match du tour en vrai best of 3 (`isBestOfThree` : ni FT 3, ni
+ * score libre, ni égalités ouvertes). Le serveur et l'écran lisent cette règle.
+ */
+export function roundAllowsTiebreak(tournament: TiebreakTournament, round: RoundKey): boolean {
+  if (!isPlayoffRound(tournament, round)) return false;
+  return isBestOfThree(
+    tournamentMatchFormat(tournament.format, tournament.matchFormat, tournament.endurancePlayoffFormat, round.roundNumber),
+  );
+}
+
+/**
+ * Les maps de départage qui s'appliquent : celles des tours éligibles. Un
+ * réglage resté d'un format changé depuis (FT 3, phase devenue suisse) est
+ * gardé en base mais n'est ni montré ni joué.
+ */
+export function applicableTiebreaks(
+  tiebreaks: readonly RoundTiebreak[],
+  tournament: TiebreakTournament,
+): RoundTiebreak[] {
+  return tiebreaks.filter((round) => roundAllowsTiebreak(tournament, round));
 }

@@ -73,6 +73,8 @@ interface AdminScoreDialogProps {
   onRefreshProposals?: () => void | Promise<unknown>;
   /** Nom des cartes fixées du match (`matchMapNames`) : « Map 1 : Ilios ». */
   mapNames?: ReadonlyArray<string | null>;
+  /** Map de départage du tour (vrai best of 3), `null` sans réglage. */
+  tiebreakMap?: string | null;
   onClose: () => void;
   onSubmitted: () => void;
 }
@@ -265,6 +267,7 @@ export function AdminScoreDialog({
   proposals = NO_PROPOSALS,
   onRefreshProposals = NO_REFRESH,
   mapNames,
+  tiebreakMap = null,
   onClose,
   onSubmitted,
 }: Readonly<AdminScoreDialogProps>) {
@@ -582,6 +585,7 @@ export function AdminScoreDialog({
               team2Id={match.team2Id}
               replayCodeOptional
               mapNames={mapNames}
+              tiebreakMap={tiebreakMap}
               disabled={form.submitting}
               fieldErrors={mapFieldErrors}
             />

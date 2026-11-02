@@ -17,7 +17,7 @@ import { toParticipantType } from "@/lib/shared/participants";
 import { remainingSlots } from "@/lib/shared/ghost-registration";
 import { useToast } from "@/components/ui/toast";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
-import { matchMapNames } from "@/lib/shared/round-maps";
+import { matchMapNames, roundTiebreakOf } from "@/lib/shared/round-maps";
 import { CyberButton } from "@/components/cyber";
 import { useSpectatorView } from "@/components/spectator-view";
 import { SPECTATOR_NOT_FOUND_RECHECK_MINUTES } from "@/lib/shared/spectator-view";
@@ -1360,6 +1360,7 @@ function TournamentSheetView({
           proposals={detail.matchProposals}
           onRefreshProposals={refreshProposals}
           mapNames={matchMapNames(detail.mapRules.rounds, matchForAdminScore)}
+          tiebreakMap={roundTiebreakOf(detail.mapRules.tiebreaks, matchForAdminScore)}
           onClose={() => setSelectedMatchForAdminId(null)}
           onSubmitted={() => {
             setSelectedMatchForAdminId(null);
@@ -1378,6 +1379,7 @@ function TournamentSheetView({
           canForfeit={detail.canRegisterEntrant}
           proposals={detail.matchProposals}
           mapNames={matchMapNames(detail.mapRules.rounds, matchForPlayerScore)}
+          tiebreakMap={roundTiebreakOf(detail.mapRules.tiebreaks, matchForPlayerScore)}
           onClose={() => setPlayerScoreMatchId(null)}
           onSubmitted={() => void refresh()}
           onRefresh={refreshProposals}

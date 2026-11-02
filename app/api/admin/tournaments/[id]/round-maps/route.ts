@@ -1,9 +1,5 @@
-import { getCurrentUser } from "@/lib/server/auth";
-import { fail, ok } from "@/lib/server/http";
-import { readJsonBody } from "@/lib/server/request-body";
-import { launchFailure, parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
 import { parseRoundKey, parseRoundKeys, setRoundsMaps } from "@/lib/server/tournaments/round-maps";
-import { can } from "@/lib/shared/permissions";
+import { roundMapsStaffPut } from "@/lib/server/tournaments/round-maps-routes";
 
 const STATUSES: Readonly<Record<string, number>> = {
   INVALID_ROUND: 400,
@@ -22,25 +18,8 @@ const STATUSES: Readonly<Record<string, number>> = {
  * tout arbitre la porte, `refereeBlockReason`).
  */
 export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return fail("UNAUTHORIZED", 401);
-  if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
-
-  const tournamentId = parseMatchIdParam((await context.params).id);
-  if (tournamentId === null) return fail("INVALID_TOURNAMENT_ID", 400);
-
-  const body = (await readJsonBody(req).catch(() => ({}))) as {
-    phaseId?: unknown;
-    bracket?: unknown;
-    roundNumber?: unknown;
-    rounds?: unknown;
-    slots?: unknown;
-  };
-  try {
+  return roundMapsStaffPut(req, context, STATUSES, "ROUND_MAPS_FAILED", async (tournamentId, body) => {
     const rounds = body.rounds === undefined ? [parseRoundKey(body)] : parseRoundKeys(body.rounds);
-    const slots = await setRoundsMaps(tournamentId, rounds, body.slots);
-    return ok({ slots });
-  } catch (error) {
-    return launchFailure(error, STATUSES, "ROUND_MAPS_FAILED");
-  }
+    return { slots: await setRoundsMaps(tournamentId, rounds, body.slots) };
+  });
 }

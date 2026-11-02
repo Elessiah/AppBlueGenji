@@ -16,7 +16,7 @@
  * (`requireReplayCode: false`) — replay perdu, partie hors client.
  */
 
-import { checkMatchScores, matchAllowsDraw, matchMaxMaps, matchWinsRequired } from "./match-format";
+import { checkMatchScores, isBestOfThree, matchAllowsDraw, matchMaxMaps, matchWinsRequired } from "./match-format";
 import type { MatchFormat, MatchScoreViolation } from "./match-format";
 import type { TournamentGame } from "./types";
 
@@ -99,6 +99,30 @@ export function mapWinnerSide(map: Pick<MatchMapInput, "team1Score" | "team2Scor
   if (!Number.isFinite(map.team1Score) || !Number.isFinite(map.team2Score)) return null;
   if (map.team1Score === map.team2Score) return null;
   return map.team1Score > map.team2Score ? 1 : 2;
+}
+
+/**
+ * Ligne (index 0 = map 1) où se joue la **map de départage** d'un vrai best of
+ * 3 (`docs/features/ROUND_MAPS.md`) : la première ligne jouée **au-delà des
+ * trois maps régulières** alors que la série est à **1-1** — celle dont le
+ * vainqueur emporte la série. `null` ailleurs — série acquise ou encore
+ * déséquilibrée (une map nulle se rejoue, règle inchangée), 0-0 après trois
+ * maps nulles (la map ne déciderait rien), autre format, ou aucune map de
+ * départage réglée. Le score se dérive comme toujours : la map de départage
+ * vaut un point à qui la gagne, le vainqueur doit atteindre deux maps.
+ */
+export function tiebreakRowIndex(
+  format: MatchFormat | null,
+  maps: ReadonlyArray<Pick<MatchMapInput, "team1Score" | "team2Score">>,
+  tiebreakMap: string | null | undefined,
+): number | null {
+  if (!tiebreakMap || !isBestOfThree(format) || format === null) return null;
+  const decider = matchWinsRequired(format) - 1;
+  for (let index = matchMaxMaps(format); index < maps.length; index += 1) {
+    const score = deriveMatchScore(maps.slice(0, index));
+    if (score.team1 === decider && score.team2 === decider) return index;
+  }
+  return null;
 }
 
 /** Score du match dérivé de ses maps : une map gagnée = un point, une nulle = rien. */

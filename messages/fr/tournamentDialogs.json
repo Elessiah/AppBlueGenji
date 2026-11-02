@@ -47,7 +47,9 @@
         "tooManyWon": "Trop de maps gagnées pour le format du match.",
         "below": "Score incomplet : le vainqueur doit gagner {wins, plural, one {# map} other {# maps}}.",
         "belowFree": "Score incomplet."
-      }
+      },
+      "tiebreakNamed": "Map de départage : {name}",
+      "tiebreakNamedPrefix": "Map de départage : {name}, "
     },
     "admin": {
       "title": "Score du match",

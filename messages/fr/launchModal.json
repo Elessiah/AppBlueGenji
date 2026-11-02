@@ -49,6 +49,8 @@
     "INVALID_ROUND": "Tour du tournoi invalide.",
     "INVALID_ROUND_MAPS": "Cartes invalides : 9 cartes au plus par tour, 20 au plus par pool, 64 caractères par nom.",
     "INVALID_MAP_RULES": "Règle de ban invalide.",
+    "INVALID_TIEBREAK_MAP": "Nom de map de départage invalide (64 caractères au plus).",
+    "TIEBREAK_NOT_ALLOWED": "La map de départage ne se règle que sur un tour de play-offs en vrai Bo3 (premier à 2 maps).",
     "INVALID_MAP_PICK": "Cette carte ne fait pas partie du pool du tour.",
     "NOT_MAP_PICKER": "Seuls l'arbitrage et, en autogestion, les équipes du match choisissent la carte.",
     "ROUND_MAPS_SET": "Les cartes de ce tour sont réglées pour tout le tour : réinitialise le tour pour saisir la carte match par match.",

@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import { InfoHint } from "@/components/ui/info-hint";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { MATCH_LAUNCH_REFRESH_EVENT } from "@/lib/shared/match-launch";
-import { resolveMatchMaps, roundMapsOf, type ResolvedMapSlot } from "@/lib/shared/round-maps";
+import { resolveMatchMaps, roundMapsOf, roundTiebreakOf, type ResolvedMapSlot } from "@/lib/shared/round-maps";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useRoundMapsText } from "../_lib/round-maps-text";
@@ -132,8 +132,11 @@ export function MatchRoundMaps({
   const rules = detail.mapRules;
   const round = roundMapsOf(rules.rounds, match);
   const slots = round ? resolveMatchMaps(round.slots, match.firstMap, match.mapPicks) : [];
+  // Map de départage du tour (play-offs en vrai best of 3) : l'instantané ne
+  // porte que celles des tours éligibles.
+  const tiebreak = roundTiebreakOf(rules.tiebreaks, match);
   const titleId = useId();
-  if (slots.length === 0 && !staff) return null;
+  if (slots.length === 0 && tiebreak === null && !staff) return null;
   const reset = async (): Promise<boolean> => {
     try {
       const response = await fetch(`/api/admin/tournaments/${detail.card.id}/round-maps`, {
@@ -153,17 +156,28 @@ export function MatchRoundMaps({
   };
   return (
     <div className={styles.roundMaps}>
+      {(slots.length > 0 || tiebreak !== null) && (
+        <h3 id={titleId} className={styles.subTitle}>
+          {t("page.mapsTitle")}
+        </h3>
+      )}
       {slots.length > 0 && (
-        <>
-          <h3 id={titleId} className={styles.subTitle}>
-            {t("page.mapsTitle")}
-          </h3>
-          <ol className={styles.mapSlots} aria-labelledby={titleId}>
-            {slots.map((slot) => (
-              <MapSlotLine key={slot.number} match={match} slot={slot} canPick={canPick} />
-            ))}
-          </ol>
-        </>
+        <ol className={styles.mapSlots} aria-labelledby={titleId}>
+          {slots.map((slot) => (
+            <MapSlotLine key={slot.number} match={match} slot={slot} canPick={canPick} />
+          ))}
+        </ol>
+      )}
+      {tiebreak !== null && (
+        <div className={`${styles.mapSlot} ${styles.tiebreakLine}`}>
+          <span className={styles.mapNumber}>{t("page.tiebreak")}</span>
+          <span className={styles.mapValue}>
+            <strong>{tiebreak}</strong>{" "}
+            <InfoHint id={`${titleId}-tiebreak`} subject={t("page.tiebreak")}>
+              {t("page.tiebreakHint")}
+            </InfoHint>
+          </span>
+        </div>
       )}
       {staff && (
         <div className={styles.roundMapsActions}>

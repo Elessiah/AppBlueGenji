@@ -41,7 +41,8 @@ import {
   matchPositionText,
   versusText,
 } from "@/lib/shared/tournament-page-text";
-import { canPickMatchMap, firstBanOrder, roundMapsOf } from "@/lib/shared/round-maps";
+import { visibleText } from "@/lib/shared/visible-text";
+import { canPickMatchMap, firstBanOrder, roundMapsOf, roundTiebreakOf } from "@/lib/shared/round-maps";
 import { roundMaxMaps } from "@/lib/shared/round-plan";
 import type { BracketMatch, TournamentDetail, TournamentGame } from "@/lib/shared/types";
 import { useLiveControls } from "../_lib/live-context";
@@ -383,6 +384,11 @@ function useOfficiatingFact(match: BracketMatch, decision: ReturnType<typeof mat
   return null;
 }
 
+/** Fait « Map de départage » : seulement quand le tour en règle une. */
+function tiebreakFacts(tiebreak: string | null, label: string, detail: string): KeyFact[] {
+  return tiebreak === null ? [] : [{ id: "tiebreak", label, value: visibleText(tiebreak), detail }];
+}
+
 /** Maps du tour dans les faits clés : « Map 1 : Ilios · imposée », ou pool à choisir. */
 function MapFactList({ mapFacts }: Readonly<{ mapFacts: readonly MatchPageMapFact[] }>) {
   const page = useMatchPageText();
@@ -435,6 +441,8 @@ function MatchKeyFacts({
   const banSide = sides.find((side) => side.firstBan) ?? null;
   const decision = matchPageDecision(match, staff);
   const mapFacts = matchPageMapFacts(detail.mapRules, match);
+  const roundMapsText = useRoundMapsText();
+  const tiebreak = roundTiebreakOf(detail.mapRules.tiebreaks, match);
   const pending = <Muted>{t("matchPage.opponentsPending")}</Muted>;
   // « Adversaires à venir » seulement quand une case attend encore son engagé ;
   // deux adversaires connus sans hôte désigné (lancement sans phase, exemption,
@@ -475,6 +483,9 @@ function MatchKeyFacts({
       value: match.firstMap ?? <Muted>{t("matchPage.firstMapUnset")}</Muted>,
     });
   }
+  // Map de départage du tour (play-offs en vrai Bo3) : lisible de tous, pas
+  // seulement du staff ou de qui choisit dans un pool.
+  facts.push(...tiebreakFacts(tiebreak, roundMapsText.t("page.tiebreak"), roundMapsText.t("page.tiebreakHint")));
   facts.push({
     id: "format",
     label: page.t("facts.format"),

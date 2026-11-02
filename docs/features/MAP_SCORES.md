@@ -79,6 +79,12 @@ avoir joué toutes ses maps : un 2-2 en BO5 n'est accepté qu'avec une cinquièm
 map nulle, sinon `MAP_LIST_INCOMPLETE` (contrôle décisif seulement — un
 enregistrement intermédiaire de l'arbitrage reste libre).
 
+**Map de départage** (`ROUND_MAPS.md`) : sur un tour de play-offs en vrai Bo3,
+la première ligne jouée au-delà de trois alors que la série est à 1-1 est libellée « Map de
+départage : {nom} » (`tiebreakRowIndex`). Ce n'est qu'un libellé : les plafonds
+et le score dérivé ci-dessus ne changent pas, le vainqueur doit toujours gagner
+deux maps.
+
 Une ligne après la fin acquise (un camp a atteint l'objectif, ou toutes les maps
 d'un BO sans tiebreaker sont jouées) est refusée (`MAP_AFTER_DECISION`) : elle
 n'a pas eu lieu. L'affichage progressif n'ouvre plus de ligne à ce moment-là.

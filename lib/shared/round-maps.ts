@@ -81,13 +81,24 @@ export type TournamentMapRules = {
   nextBan: NextBanRule;
   nextPick: NextPickRule;
   rounds: RoundMapConfig[];
+  /**
+   * Map de départage des tours de play-offs en vrai best of 3 (une par tour au
+   * plus, imposée) : jouée seulement si la série est à égalité après les trois
+   * maps régulières. L'instantané ne porte que celles de tours **éligibles**
+   * (`applicableTiebreaks`, `round-plan.ts`).
+   */
+  tiebreaks: RoundTiebreak[];
 };
+
+/** Map de départage d'un tour du tournoi (`bg_tournament_round_maps.tiebreak_map`). */
+export type RoundTiebreak = RoundKey & { map: string };
 
 export const EMPTY_MAP_RULES: TournamentMapRules = {
   firstBan: DEFAULT_FIRST_BAN_RULE,
   nextBan: DEFAULT_NEXT_BAN_RULE,
   nextPick: DEFAULT_NEXT_PICK_RULE,
   rounds: [],
+  tiebreaks: [],
 };
 
 export function parseFirstBanRule(raw: unknown): FirstBanRule {
@@ -137,6 +148,40 @@ export function normalizeRoundMapSlots(raw: unknown): string[][] {
   }
   if (slots.length > ROUND_MAP_SLOTS_MAX) throw new Error("INVALID_ROUND_MAPS");
   return slots;
+}
+
+/**
+ * Map de départage saisie par le staff : nom affichable (`visibleText`, 64
+ * caractères au plus) ; vide ou `null` la retire.
+ *
+ * @throws `INVALID_TIEBREAK_MAP` — forme invalide ou nom trop long.
+ */
+export function normalizeTiebreakMap(raw: unknown): string | null {
+  if (raw === null || raw === undefined) return null;
+  const name = normalizeMapName(raw, "INVALID_TIEBREAK_MAP");
+  return name === "" ? null : name;
+}
+
+/** Map de départage relue en base ; tolérant : illisible vaut « aucune ». */
+export function parseStoredTiebreak(raw: string | null | undefined): string | null {
+  try {
+    return normalizeTiebreakMap(raw ?? null);
+  } catch {
+    return null;
+  }
+}
+
+/** La map de départage du tour d'un match, `null` sans réglage. */
+export function roundTiebreakOf(
+  tiebreaks: readonly RoundTiebreak[] | undefined,
+  match: { phaseId: number; bracket: string; roundNumber: number },
+): string | null {
+  return (
+    tiebreaks?.find(
+      (round) =>
+        round.phaseId === match.phaseId && round.bracket === match.bracket && round.roundNumber === match.roundNumber,
+    )?.map ?? null
+  );
 }
 
 /** Créneaux relus en base ; tolérant : une valeur illisible vaut « aucun réglage ». */

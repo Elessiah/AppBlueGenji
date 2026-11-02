@@ -292,6 +292,8 @@ export async function createTournamentTables(db: Pool): Promise<void> {
   // créneaux, chacun une liste de cartes candidates (une seule = imposée,
   // plusieurs = pool où l'on choisit). Manche = (phase, tableau, numéro), comme
   // l'autogestion groupée ; posable avant que ses matchs existent.
+  // `tiebreak_map` : map de départage d'un tour de play-offs en vrai best of 3
+  // (une ligne qui ne porte qu'elle a `slots_json = '[]'`).
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_tournament_round_maps (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -300,6 +302,7 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       bracket VARCHAR(16) NOT NULL,
       round_number INT NOT NULL,
       slots_json TEXT NOT NULL,
+      tiebreak_map VARCHAR(64) NULL,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       UNIQUE KEY uq_bg_round_maps_round (tournament_id, phase_id, bracket, round_number),
       CONSTRAINT fk_bg_round_maps_tournament FOREIGN KEY (tournament_id)

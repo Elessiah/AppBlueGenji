@@ -100,6 +100,17 @@ export function naturalMaxMaps(format: MatchFormat): number {
   return matchWinsRequired(format) * 2 - 1;
 }
 
+/**
+ * Vrai best of 3 : premier à deux maps, trois maps décisives au plus, sans
+ * égalité possible — notation BO 3 ou FT 2, la même course. Seul format où une
+ * map de départage se règle (`docs/features/ROUND_MAPS.md`) ; un FT 3, un
+ * plafond abaissé ou un format à égalités ouvertes n'en ont pas.
+ */
+export function isBestOfThree(format: MatchFormat | null | undefined): boolean {
+  if (!format || format.drawsAllowed === true) return false;
+  return matchWinsRequired(format) === 2 && matchMaxMaps(format) === 3;
+}
+
 /** Le format tolère-t-il un match sans vainqueur ? (`null` = non : score libre) */
 export function matchAllowsDraw(format: MatchFormat | null | undefined): boolean {
   return format?.drawsAllowed === true;

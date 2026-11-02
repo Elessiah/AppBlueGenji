@@ -12,11 +12,13 @@ import { sendBotLog } from "@/lib/server/bot-integration";
 import { formatMapRulesLog } from "@/lib/shared/bot-logs";
 import {
   normalizeRoundMapSlots,
+  normalizeTiebreakMap,
   parseFirstBanRule,
   parseNextBanRule,
   parseNextPickRule,
   parseMapPicks,
   parseStoredSlots,
+  parseStoredTiebreak,
   validateMapPick,
   FIRST_BAN_RULES,
   NEXT_BAN_RULES,
@@ -29,8 +31,12 @@ import {
   type NextPickRule,
   type RoundKey,
   type RoundMapConfig,
+  type RoundTiebreak,
   type TournamentMapRules,
 } from "@/lib/shared/round-maps";
+import { parseMatchFormat } from "@/lib/shared/match-format";
+import { roundAllowsTiebreak } from "@/lib/shared/round-plan";
+import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { resolveMatchParty } from "./match-launch";
 import { publishMatchUpdatedEvent } from "./notifications";
@@ -56,6 +62,7 @@ type RoundMapsRow = RowDataPacket & {
   bracket: string;
   round_number: number;
   slots_json: string | null;
+  tiebreak_map: string | null;
 };
 
 /**
@@ -81,26 +88,28 @@ export async function loadMapRules(
     rules = ruleRows[0];
   }
   const [rows] = await connection.execute<RoundMapsRow[]>(
-    `SELECT phase_id, bracket, round_number, slots_json FROM bg_tournament_round_maps
+    `SELECT phase_id, bracket, round_number, slots_json, tiebreak_map FROM bg_tournament_round_maps
       WHERE tournament_id = ? ORDER BY phase_id, bracket, round_number`,
     [tournamentId],
   );
   const rounds: RoundMapConfig[] = [];
+  // Maps de départage telles que stockées : l'instantané n'en garde que celles
+  // des tours éligibles (`applicableTiebreaks`), le format pouvant avoir changé.
+  const tiebreaks: RoundTiebreak[] = [];
   for (const row of rows) {
+    const key = { phaseId: Number(row.phase_id), bracket: String(row.bracket), roundNumber: Number(row.round_number) };
+    const tiebreak = parseStoredTiebreak(row.tiebreak_map);
+    if (tiebreak !== null) tiebreaks.push({ ...key, map: tiebreak });
     const slots = parseStoredSlots(row.slots_json);
     if (slots.length === 0) continue;
-    rounds.push({
-      phaseId: Number(row.phase_id),
-      bracket: String(row.bracket),
-      roundNumber: Number(row.round_number),
-      slots,
-    });
+    rounds.push({ ...key, slots });
   }
   return {
     firstBan: parseFirstBanRule(rules?.first_ban_rule),
     nextBan: parseNextBanRule(rules?.next_ban_rule),
     nextPick: parseNextPickRule(rules?.next_pick_rule),
     rounds,
+    tiebreaks,
   };
 }
 
@@ -203,8 +212,14 @@ async function writeRoundSlots(
   const before = await loadRoundSlots(connection, tournamentId, round);
   if (JSON.stringify(before) === JSON.stringify(slots)) return false;
   if (slots.length === 0) {
+    // Une map de départage réglée garde la ligne : seules ses cartes partent.
     await connection.execute(
       `DELETE FROM bg_tournament_round_maps
+        WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? AND tiebreak_map IS NULL`,
+      [tournamentId, round.phaseId, round.bracket, round.roundNumber],
+    );
+    await connection.execute(
+      `UPDATE bg_tournament_round_maps SET slots_json = '[]'
         WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ?`,
       [tournamentId, round.phaseId, round.bracket, round.roundNumber],
     );
@@ -262,6 +277,115 @@ export async function setRoundsMaps(
 /** Les cartes d'une seule manche (`setRoundsMaps`). */
 export async function setRoundMaps(tournamentId: number, round: RoundKey, rawSlots: unknown): Promise<string[][]> {
   return setRoundsMaps(tournamentId, [round], rawSlots);
+}
+
+type TiebreakTournamentRow = RowDataPacket & {
+  format: TournamentFormat;
+  match_format_type: "BO" | "FT" | null;
+  match_format_value: number | null;
+  match_format_max_maps: number | null;
+  match_format_draws: number | null;
+  endurance_playoff_format_type: "BO" | "FT" | null;
+  endurance_playoff_format_value: number | null;
+};
+
+/**
+ * Le tour peut-il porter une map de départage ? Formats relus **sous le verrou**
+ * du tournoi (ligne et phases), règle pure partagée avec l'écran
+ * (`roundAllowsTiebreak`).
+ */
+async function tiebreakAllowedUnderLock(
+  connection: PoolConnection,
+  tournamentId: number,
+  round: RoundKey,
+): Promise<boolean> {
+  const [rows] = await connection.execute<TiebreakTournamentRow[]>(
+    `SELECT format, match_format_type, match_format_value, match_format_max_maps, match_format_draws,
+            endurance_playoff_format_type, endurance_playoff_format_value
+       FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  const row = rows[0];
+  if (!row) throw new Error("TOURNAMENT_NOT_FOUND");
+  let phases: { id: number; format: PhaseFormat }[] | null = null;
+  if (row.format === "MULTI") {
+    const [phaseRows] = await connection.execute<(RowDataPacket & { id: number; format: PhaseFormat })[]>(
+      `SELECT id, format FROM bg_tournament_phases WHERE tournament_id = ?`,
+      [tournamentId],
+    );
+    phases = phaseRows.map((phase) => ({ id: Number(phase.id), format: phase.format }));
+  }
+  return roundAllowsTiebreak(
+    {
+      format: row.format,
+      matchFormat: parseMatchFormat(
+        row.match_format_type,
+        row.match_format_value,
+        row.match_format_max_maps,
+        row.match_format_draws,
+      ),
+      endurancePlayoffFormat: parseMatchFormat(row.endurance_playoff_format_type, row.endurance_playoff_format_value),
+      phases,
+    },
+    round,
+  );
+}
+
+/**
+ * Pose (ou retire, `null` / vide) la **map de départage** d'un tour de
+ * play-offs en vrai best of 3 (`docs/features/ROUND_MAPS.md`) : jouée
+ * seulement si la série est à égalité après les trois maps régulières. Une
+ * carte, imposée ; les cartes du tour et leurs choix ne changent pas. Réservé
+ * à l'arbitrage (permission `tournaments`, vérifiée par la route). Verrou du
+ * tournoi en première instruction, format relu dessous ; retirer est permis
+ * sur toute clé (un réglage resté d'un format changé doit pouvoir partir).
+ *
+ * @returns la map retenue (`null` = retirée).
+ * @throws `INVALID_TIEBREAK_MAP` | `INVALID_ROUND` | `TIEBREAK_NOT_ALLOWED` | `TOURNAMENT_NOT_FOUND`
+ */
+export async function setRoundTiebreak(tournamentId: number, round: RoundKey, rawMap: unknown): Promise<string | null> {
+  const map = normalizeTiebreakMap(rawMap);
+  const changed = await inTransaction(async (connection) => {
+    const tournament = await lockTournament(connection, tournamentId);
+    if (map !== null) {
+      const [owned] = await roundsOfTournament(connection, tournament, [round]);
+      if (!owned) throw new Error("INVALID_ROUND");
+      if (!(await tiebreakAllowedUnderLock(connection, tournamentId, round))) throw new Error("TIEBREAK_NOT_ALLOWED");
+    }
+    const [rows] = await connection.execute<(RowDataPacket & { tiebreak_map: string | null })[]>(
+      `SELECT tiebreak_map FROM bg_tournament_round_maps
+        WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? LIMIT 1`,
+      [tournamentId, round.phaseId, round.bracket, round.roundNumber],
+    );
+    if (parseStoredTiebreak(rows[0]?.tiebreak_map) === map) return false;
+    if (map === null) {
+      await connection.execute(
+        `UPDATE bg_tournament_round_maps SET tiebreak_map = NULL
+          WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ?`,
+        [tournamentId, round.phaseId, round.bracket, round.roundNumber],
+      );
+      // Une ligne qui ne portait que la map de départage n'a plus lieu d'être.
+      await connection.execute(
+        `DELETE FROM bg_tournament_round_maps
+          WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? AND slots_json = '[]'`,
+        [tournamentId, round.phaseId, round.bracket, round.roundNumber],
+      );
+    } else {
+      await connection.execute(
+        `INSERT INTO bg_tournament_round_maps (tournament_id, phase_id, bracket, round_number, slots_json, tiebreak_map)
+         VALUES (?, ?, ?, ?, '[]', ?)
+         ON DUPLICATE KEY UPDATE tiebreak_map = VALUES(tiebreak_map)`,
+        [tournamentId, round.phaseId, round.bracket, round.roundNumber, map],
+      );
+    }
+    await queueRoundMapsNotice(connection, tournamentId, [round]);
+    return true;
+  });
+  if (changed) {
+    publishMatchUpdatedEvent(tournamentId);
+    scheduleRoundMapsNotice();
+  }
+  return map;
 }
 
 export type MapRulesInput = { firstBan: FirstBanRule; nextBan: NextBanRule; nextPick: NextPickRule };

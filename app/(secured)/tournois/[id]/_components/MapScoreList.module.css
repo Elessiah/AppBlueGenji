@@ -60,7 +60,7 @@
   font-size: 12px;
   font-weight: 700;
   color: var(--ink, #e6edf5);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .code,

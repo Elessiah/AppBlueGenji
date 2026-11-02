@@ -102,6 +102,52 @@ match (route `first-map`) : la permission `tournaments` suffit, comme pour tout
 réglage du tournoi. Seul le **choix dans un pool** de son match suit la règle
 des joueurs (ci-dessous).
 
+## Map de départage (play-offs en vrai Bo3)
+
+Un tour de **play-offs** en **vrai best of 3** (trois maps, premier à 2 :
+`BO3` ou `FT2`, égalités fermées, `isBestOfThree`) peut porter **une** map de
+départage (« Map de départage », EN « Tiebreak map ») : jouée **seulement** si la
+série est à égalité après les trois maps régulières, sinon inutilisée.
+
+- **Tours éligibles** (`roundAllowsTiebreak`, `lib/shared/round-plan.ts`, règle
+  pure commune à l'écran, au serveur et au brief) : `SINGLE` / `DOUBLE` (phase 0,
+  tous tableaux, petite finale comprise), une phase `SINGLE` / `DOUBLE` d'un
+  `MULTI`, les play-offs de BG Survie (`roundNumber ≥ PLAYOFF_ROUND_OFFSET`, format
+  des play-offs). Jamais en suisse, en qualification, en `SURVIVAL`, en FT3 ni en
+  format à égalités ouvertes. Le format est celui du tour
+  (`tournamentMatchFormat`).
+- **Stockage** : colonne `bg_tournament_round_maps.tiebreak_map` (64 caractères,
+  `visibleText`) ; une ligne qui ne porte que la map de départage a
+  `slots_json = '[]'`. Retirer les cartes d'un tour garde la ligne si elle porte
+  une map de départage (`DELETE … AND tiebreak_map IS NULL`, sinon `slots_json`
+  remis à `'[]'`) ; retirer la map de départage efface une ligne restée vide.
+- **Instantané** : `mapRules.tiebreaks` (liste séparée de `mapRules.rounds`, dont
+  le sens ne change pas), filtrée par l'éligibilité courante
+  (`applicableTiebreaks`) : un format changé depuis masque le réglage sans
+  l'effacer.
+- **Écran** : section « Map de départage » de `RoundMapsDialog` (formulaire à
+  part, liste d'Overwatch suggérée, saisie libre, « Enregistrer » / « Retirer »),
+  visible seulement sur un tour éligible ; le sélecteur de tours la signale. La
+  page du match (`MatchRoundMaps`) l'affiche avec une bulle « i ». Elle figure aussi dans les **faits clés** de la page (`tiebreakFacts`),
+  lisibles de tous (public, joueurs), pas seulement du staff ou de qui choisit.
+- **Saisie du score** (`MapScoreList`, `tiebreakRowIndex`) : la première ligne
+  jouée au-delà des trois maps régulières alors que la série est à **1-1** est
+  libellée « Map de départage : {nom} » (jamais à 0-0 après trois maps nulles :
+  elle ne déciderait rien). **Aucune règle de score ne change** (`MAP_SCORES.md`) :
+  cette ligne existait déjà (map nulle rejouée) et le vainqueur doit toujours atteindre deux
+  maps ; les rejeux des classements sont intacts.
+- **Brief du salon** : ligne « Map de départage (jouée seulement si la série est à
+  égalité après les 3 maps) : « … » » (FR / EN, `briefTiebreakMap`), sans pseudo.
+- **Bans** (choix documenté, règlement §10 inchangé) : la map de départage suit
+  la règle des cartes suivantes du tournoi (`next_ban_rule`, par défaut le
+  perdant de la map précédente bannit en premier ; sur une map nulle, même ordre
+  que la map précédente). Elle est **imposée** : aucun choix de carte du perdant
+  ne s'y applique.
+- **Non repris, volontairement** : « Appliquer à tous » et la copie d'un tour ne
+  recopient pas la map de départage (réglage par tour, explicite) ; la fenêtre
+  « Arbitrage » ne l'affiche pas (la page du match et la saisie du score le font).
+- Marvel Rivals : le minimum (champ libre, sans liste de cartes).
+
 ## Préséance
 
 - Une carte 1 **imposée** l'emporte sur `first_map` à l'affichage
@@ -131,6 +177,7 @@ des joueurs (ci-dessous).
 | Route | Droit | Refus |
 |---|---|---|
 | `PUT /api/admin/tournaments/[id]/round-maps` `{phaseId, bracket, roundNumber, slots}` ou `{rounds: [{phaseId, bracket, roundNumber}…], slots}` (1 à 128 tours, `ROUND_MAPS_BULK_MAX` ; `slots: []` retire ; numéro de 1 à `ROUND_NUMBER_MAX` = 2000 ; cartes posées seulement sur un tour **de ce** tournoi — phase 0 sans phases, sinon une de ses phases, vérifiée sous verrou ; les autres clés d'une copie sont écartées, `INVALID_ROUND` si aucune ne reste ; retirer est permis sur toute clé, pour qu'une ligne restée d'une phase supprimée puisse partir) | `can(user, "tournaments")` | 401, 403 `FORBIDDEN`, 400 `INVALID_ROUND` / `INVALID_ROUND_MAPS`, 404 `TOURNAMENT_NOT_FOUND` |
+| `PUT /api/admin/tournaments/[id]/round-tiebreak` `{phaseId, bracket, roundNumber, map}` (`map: null` ou vide retire ; poser exige un tour **de ce** tournoi et éligible, format relu sous `lockTournamentRow` en première instruction ; retirer est permis sur toute clé) | `can(user, "tournaments")` | 401, 403 `FORBIDDEN`, 400 `INVALID_TOURNAMENT_ID` / `INVALID_ROUND` / `INVALID_TIEBREAK_MAP` / `TIEBREAK_NOT_ALLOWED`, 404 `TOURNAMENT_NOT_FOUND`, 500 `ROUND_TIEBREAK_FAILED` |
 | `PUT /api/admin/tournaments/[id]/map-rules` `{firstBan, nextBan, nextPick}` | `can(user, "tournaments")` | 401, 403, 400 `INVALID_MAP_RULES`, 404 |
 | `PUT /api/admin/matches/[matchId]/first-map` (existante) | `can(user, "tournaments")` | en plus : 409 `ROUND_MAPS_SET` quand le tour a des cartes |
 | `PUT /api/matches/[matchId]/map-pick` `{slot, map \| null}` | staff, ou équipe du match en autogestion | 401, 400 `INVALID_MAP_PICK`, 403 `NOT_MAP_PICKER`, 404, 409 `MATCH_ALREADY_COMPLETED` / `CONCURRENT_UPDATE_RETRY`, 429 `TOO_MANY_REQUESTS` (`MAP_PICK_WRITE_RULE` : 120 par compte en 5 min) |
@@ -192,7 +239,9 @@ au pool.
 
 Tables `bg_round_maps_notices` (annonce en attente, une ligne par tournoi, `CASCADE`) et `bg_tournament_round_maps` (clé unique `(tournament_id, phase_id, bracket,
 round_number)`, `CASCADE` avec le tournoi) ; colonnes `bg_tournaments.first_ban_rule`,
-`next_ban_rule`, `next_pick_rule`, `bg_matches.map_picks` (`DATABASE_SCHEMA.md`).
+`next_ban_rule`, `next_pick_rule`, `bg_matches.map_picks`,
+`bg_tournament_round_maps.tiebreak_map` (`VARCHAR(64) NULL`, dans le `CREATE TABLE`
+et dans `RECENT_SCHEMA_CHANGES`) (`DATABASE_SCHEMA.md`).
 
 ## Seed
 
@@ -200,6 +249,8 @@ Deux premiers tournois à lancement (`SEED_ROUND_MAP_CASES`,
 `lib/server/seed/match-states.ts`) : une manche à cinq cartes imposées (carte 1
 qui l'emporte sur la première carte de l'arbitre), une manche à pools en
 autogestion avec la carte 2 déjà choisie.
+« Test - BO3 Élimination » (vrai Bo3 en arbre) : map de départage « Busan » sur
+le tour 1 du tableau principal (`SEED_TIEBREAK_CASE`, `applyTiebreakCase`).
 
 ## Tests
 
@@ -211,4 +262,7 @@ round et bans, réinitialisation), `tests/lib/server/match-launch.test.ts`
 (`ROUND_MAPS_SET`, verrou en tête), `tests/lib/server/referee-panel.test.ts`
 (`roundSlots`), `tests/lib/shared/lobby-brief.test.ts` (ligne coupée),
 `tests/lib/server/tournament-transaction.test.ts` (rollback en échec),
-`tests/tournois/round-maps-dialog.test.ts` (`resyncSlots`).
+`tests/tournois/round-maps-dialog.test.ts` (`resyncSlots`). Map de départage :
+`tests/lib/shared/round-tiebreak.test.ts` (éligibilité, ligne de saisie, brief),
+`tests/lib/server/round-maps.test.ts` (`setRoundTiebreak`, `loadMapRules`,
+`briefTiebreakMap`), `tests/app/api/round-tiebreak-route.test.ts`.

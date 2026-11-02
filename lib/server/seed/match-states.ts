@@ -285,6 +285,22 @@ export const SEED_ROUND_MAP_CASES: readonly (readonly (readonly string[])[] | un
   [["King's Row"], ["Lijiang Tower"], ["Numbani"], ["Eichenwalde"], ["Oasis"]],
   [["Ilios", "Nepal", "Busan"], ["King's Row", "Eichenwalde"], ["Numbani"], ["Oasis", "Lijiang Tower"], ["Dorado"]],
 ];
+/**
+ * Map de départage seedée (`docs/features/ROUND_MAPS.md`) : tour 1 du tableau
+ * principal du tournoi en vrai Bo3 nommé ici, sans cartes de tour.
+ */
+export const SEED_TIEBREAK_CASE = { tournamentName: "Test - BO3 Élimination", map: "Busan" } as const;
+
+/** Pose la map de départage seedée (`SEED_TIEBREAK_CASE`). */
+export async function applyTiebreakCase(db: Pool): Promise<void> {
+  await db.execute(
+    `INSERT INTO bg_tournament_round_maps (tournament_id, phase_id, bracket, round_number, slots_json, tiebreak_map)
+     SELECT id, 0, 'UPPER', 1, '[]', ? FROM bg_tournaments WHERE name = ?
+     ON DUPLICATE KEY UPDATE tiebreak_map = VALUES(tiebreak_map)`,
+    [SEED_TIEBREAK_CASE.map, SEED_TIEBREAK_CASE.tournamentName],
+  );
+}
+
 /** Choix seedé dans le pool de la carte 2 de la manche à pools. */
 export const SEED_ROUND_MAP_PICK = "Eichenwalde";
 
