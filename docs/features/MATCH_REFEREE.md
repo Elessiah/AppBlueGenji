@@ -112,9 +112,18 @@ n'arrête pas les autres ; il est compté, et la route répond 500
 (`REFEREE_OBJECTION_FAILED`) **après** le journal. `releaseObjectingReferee`
 relit l'opposition sous le verrou du match (ordre match puis compte, celui de
 `writeReferee`) : levée pendant le balayage, elle ne retire plus rien.
-L'instantané et la lecture de la modale (`refereeKept`, `keepEligibleReferees`)
-ne relisent pas l'opposition : seul un balayage resté incomplet y laisserait
-l'arbitre visible (consigné dans `ERREUR.txt`).
+L'instantané (`refereeKept`, jointure `referee_objection_at`), la lecture de la
+modale (`keepEligibleReferees`) et le brief du salon (`loadEligibleRefereeIds`)
+relisent aussi l'opposition : un balayage resté incomplet ne laisse pas
+l'arbitre visible d'un match à jouer — ni rôle `MATCH_REFEREE`, ni contacts
+des casters, ni nom aux parties —, et la lecture de la modale rattrape le
+retrait (`releaseObjectingReferee`, lancé compris). Une reprise du match par un
+autre arbitre (« Je prends ce match ») ou ce rattrapage ne sont pas le balayage :
+la ligne du match part dans `staff-removal`, au motif générique « condition
+d'arbitrage » (`INELIGIBLE`, `takenOver`), qui ne dit pas l'opposition ; l'avis
+à l'arbitre garde le motif `OBJECTION`. Un retrait en série ne remet ses matchs
+partis sans arbitre (`undecided`) qu'une fois chaque transaction validée : une
+tentative défaite n'est pas signalée.
 
 ## « Prêt » : une quatrième partie
 
@@ -248,8 +257,9 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
   - manche mixte : chaque match planifié a la sienne, les autres sont groupés ;
   - une alerte de suite qui ne réserve **qu'un** match prend le texte et
     l'étiquette push d'un match ; un match listé disparu entre la file et
-    l'envoi rend sa réservation, et le total « et N autres » ne compte que les
-    matchs encore à jouer ;
+    l'envoi — joué, arbitré ou passé en autogestion entre-temps — rend sa
+    réservation, et le total « et N autres » ne compte que les matchs encore à
+    jouer sans arbitre ni autogestion (les autres rendent aussi la leur) ;
   - jamais sans phase de lancement (le match part à la passe qui le verrait)
     ni contre une équipe fantôme ; les réservations déjà posées se lisent en
     une requête par passe (`withoutReservedAlerts`) ;
