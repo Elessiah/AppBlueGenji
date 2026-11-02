@@ -642,15 +642,24 @@ function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: L
 }
 
 /**
- * Tag Discord certifié de l'arbitre pour ce lecteur : tu hors de la fenêtre
- * des contacts (`ctx.exposes`) et sur sa propre fiche, qui n'a rien à lui dire.
- * Un arbitre qui caste aussi le match suit la règle des casters : son tag
- * attend le départ (`ctx.exposesCaster`), comme sur sa carte de caster.
+ * Les contacts de l'arbitre (tag Discord certifié, BattleTag) sont-ils ouverts
+ * à ce lecteur ? Hors de la fenêtre des contacts (`ctx.exposes`), jamais. Un
+ * arbitre qui caste aussi le match suit la règle des casters : ses contacts
+ * attendent le départ (`ctx.exposesCaster`), comme sur sa carte de caster —
+ * sinon sa fiche d'arbitre livrerait avant l'heure ce que sa carte retient.
+ */
+function refereeContactsOpen(user: UserRow, ctx: LaunchContext): boolean {
+  if (!ctx.exposes) return false;
+  const casts = ctx.casters.some((caster) => caster.userId === Number(user.id));
+  return !casts || ctx.exposesCaster;
+}
+
+/**
+ * Tag Discord certifié de l'arbitre pour ce lecteur : tu hors de ses contacts
+ * ouverts (`refereeContactsOpen`) et sur sa propre fiche, qui n'a rien à lui dire.
  */
 function refereeDiscordTag(user: UserRow, isViewer: boolean, ctx: LaunchContext): string | null {
-  if (!ctx.exposes || isViewer) return null;
-  const casts = ctx.casters.some((caster) => caster.userId === Number(user.id));
-  if (casts && !ctx.exposesCaster) return null;
+  if (isViewer || !refereeContactsOpen(user, ctx)) return null;
   const verified = user.discord_verified_at !== null;
   return visibleDiscordTag(verified ? user.discord_pseudo : null, ctx.viewer, {
     userId: Number(user.id),
@@ -684,8 +693,9 @@ function buildLaunchReferee(row: CandidateRow, ctx: LaunchContext): LaunchRefere
     {
       // Le BattleTag suit la fenêtre des contacts du match (`ctx.exposes`) : les
       // parties le lisent dès que les deux adversaires sont connus (le temps du
-      // match pour un caster), comme les contacts des engagées.
-      battletag: ctx.exposes
+      // match pour un caster), comme les contacts des engagées ; un arbitre qui
+      // caste aussi le match attend le départ (`refereeContactsOpen`).
+      battletag: refereeContactsOpen(user, ctx)
         ? visibleBattletag(user.overwatch_battletag, ctx.viewer, {
             userId: Number(user.id),
             visible: Number(user.visible_overwatch) === 1,
