@@ -599,6 +599,16 @@ describe("setMatchReady — appariement réécrit sur place", () => {
     expect(state.writes).toContain("DELETE FROM bg_match_start_notices WHERE match_id = ? [42]");
   });
 
+  it("adoptCurrentPairing_firstAdoption_noStartNoticeDelete", async () => {
+    // Empreinte vide : aucune réservation possible, pas de verrou d'intervalle inutile.
+    state.match = matchState({ launch_pairing: null });
+
+    await setMatchReady(42, 1, true);
+
+    expect(state.writes.some((write) => write.includes("SET launch_pairing = ?"))).toBe(true);
+    expect(state.writes.some((write) => write.startsWith("DELETE FROM bg_match_start_notices"))).toBe(false);
+  });
+
   it("adoptCurrentPairing_samePairing_startNoticeClaimsKept", async () => {
     state.match = matchState({ launch_pairing: `${TEAM1}:${TEAM2}` });
 

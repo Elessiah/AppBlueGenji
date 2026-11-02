@@ -259,6 +259,19 @@ describe("dispatchLobbyBriefs", () => {
     error.mockRestore();
   });
 
+  it("dispatchLobbyBriefs_noSideCanBeBriefed_castersAndRefereesNotRead", async () => {
+    jest.mocked(loadEntrantManagerIds).mockResolvedValue(new Map());
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const { execute } = mockDb([{ ...MATCH, referee_user_id: 9 }]);
+
+    expect(await dispatchLobbyBriefs()).toBe(0);
+
+    expect(execute).not.toHaveBeenCalled();
+    expect(readMatchCasters).toHaveBeenCalledWith(expect.anything(), []);
+    expect(loadEligibleRefereeIds).not.toHaveBeenCalled();
+    jest.mocked(console.error).mockRestore();
+  });
+
   it("en tournoi individuel, le joueur reçoit le brief sans aucun pseudo", async () => {
     jest.mocked(loadEntrantManagerIds).mockResolvedValue(
       new Map([
