@@ -62,7 +62,7 @@ export const BATTLETAG_MATCH_SCOPE =
  * match.
  */
 export const REFEREE_BATTLETAG_SCOPE =
-  "BattleTag de l'arbitre désigné d'un match d'un tournoi Overwatch (jamais en Marvel Rivals), même masqué, dans ses fenêtres « Contacts » et de lancement et sur la page du match : lu par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) ; retrait d'un match à tout moment, le staff pouvant lui confier de nouveau ce match, sans avis (conditions d'utilisation, « Contacts de match », une fois leur version 7 ou une suivante acceptée par l'arbitre)";
+  "BattleTag de l'arbitre désigné d'un match d'un tournoi Overwatch (jamais en Marvel Rivals), même masqué, dans ses fenêtres « Contacts » et de lancement et sur la page du match : lu par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match — par ses deux équipes le temps du match seulement s'il caste aussi le match — (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) ; retrait d'un match à tout moment, le staff pouvant lui confier de nouveau ce match, sans avis (conditions d'utilisation, « Contacts de match », une fois leur version 7 ou une suivante acceptée par l'arbitre)";
 
 /**
  * Même présentation, pour un arbitre qui n'a pas encore accepté la version 7
@@ -99,7 +99,7 @@ export const REFEREE_USERNAME_MEMBERS_SCOPE =
  * présentation aux parties.
  */
 export const REFEREE_DISCORD_SCOPE =
-  "si tu es l'arbitre désigné d'un match, ton tag Discord certifié, dans sa fenêtre « Contacts » et sur sa page, lu par ses deux équipes dès que ses deux adversaires sont connus et jusqu'à sa fin et par ses casters le temps du match (jamais par les arbitres sans rôle sur ce match ni dans la fenêtre de lancement ; le temps du match seulement pour tous si tu le castes aussi), pour qu'ils puissent te joindre — opposition par le formulaire de signalement, catégorie RGPD, avec le même effet qu'une opposition à ta présentation aux parties (retrait de tes matchs non terminés)";
+  "si tu es l'arbitre désigné d'un match, ton tag Discord certifié, dans sa fenêtre « Contacts » et sur sa page, lu par ses deux équipes dès que ses deux adversaires sont connus et jusqu'à sa fin et par ses casters le temps du match (jamais par les arbitres sans rôle sur ce match ni dans la fenêtre de lancement ; si tu le castes aussi, la règle des casters : le temps du match pour ses parties, fenêtre de lancement comprise, et dès que ses deux adversaires sont connus pour les autres arbitres), pour qu'ils puissent te joindre — opposition par le formulaire de signalement, catégorie RGPD, avec le même effet qu'une opposition à ta présentation aux parties (retrait de tes matchs non terminés)";
 
 /**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré
