@@ -21,6 +21,7 @@ export const BOT_LOG_CATEGORIES = [
   "referees",
   "referee-digest",
   "referee-self-action",
+  "staff-removal",
   "casts",
   "results",
   "tournament",
@@ -46,6 +47,10 @@ export const BOT_LOG_CATEGORY_KINDS: Record<BotLogCategory, BotLogKind> = {
   // Un arbitre a tranché un match qu'il joue : les autres membres du staff
   // doivent vérifier la décision (`dispute-self-resolution.ts`).
   "referee-self-action": "alert",
+  // Un arbitre ou un caster a été retiré d'un match (retrait, remplacement,
+  // retrait d'office, opposition retenue) : un créneau se libère, le staff
+  // doit le voir et, au besoin, le repourvoir.
+  "staff-removal": "alert",
   casts: "log",
   results: "log",
   tournament: "log",
@@ -63,6 +68,7 @@ export const BOT_LOG_CATEGORY_HEADERS: Record<BotLogCategory, string> = {
   referees: "🧑‍⚖️ Arbitrage",
   "referee-digest": "🔔 Matchs à arbitrer",
   "referee-self-action": "⚠️ Arbitrage à vérifier",
+  "staff-removal": "⚠️ Retrait d'arbitre ou de caster",
   casts: "🎙️ Casts",
   results: "🏁 Résultats",
   tournament: "🏆 Tournoi",

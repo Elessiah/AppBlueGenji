@@ -19,6 +19,7 @@ import type { PoolConnection } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import { siteCanonicalBase } from "@/lib/server/site-url";
+import type { BotLogCategory } from "@/lib/shared/bot-log-category";
 import { formatCastChangeLog, type CastLogChange } from "@/lib/shared/bot-logs";
 import { formatCastReleasedNotice, type CastReleaseReason, type CastReleasedMatch } from "@/lib/shared/cast-notices";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
@@ -44,6 +45,16 @@ export function castLogChange(change: CastChange): CastLogChange {
     case "AUTO_RELEASED":
       return change.reason;
   }
+}
+
+/**
+ * Catégorie de la ligne de journal : `staff-removal` (alerte) quand un caster
+ * est retiré du match — retrait, remplacement, retrait d'office —, `casts`
+ * (trace) pour une simple inscription.
+ */
+export function castLogCategory(change: CastChange): BotLogCategory {
+  if (change.kind === "CLAIMED") return change.replacedCasterId === null ? "casts" : "staff-removal";
+  return "staff-removal";
 }
 
 /** Le caster à prévenir et son motif ; `null` quand personne n'a à l'être (il s'est retiré lui-même, ou rien n'est retiré). */
@@ -74,7 +85,7 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
       team2: match.team2,
       change: castLogChange(change),
     }),
-    { tournamentId: match.tournament.id, category: "casts" },
+    { tournamentId: match.tournament.id, category: castLogCategory(change) },
   );
 
   const notice = castReleaseNotice(change);

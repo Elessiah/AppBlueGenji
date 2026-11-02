@@ -42,7 +42,7 @@ export async function PUT(req: Request, context: { params: Promise<{ userId: str
         ? "🛡 Opposition d'un arbitre retenue par le staff : il est retiré de ses matchs non terminés."
         : "🛡 Opposition d'un arbitre levée par le staff.";
       const pm2Detail = upheld ? ` Matchs retirés : ${result.released}.` : "";
-      publishStaffAction(discordLine, { id: user.id, pseudo: user.pseudo }, `${discordLine} Arbitre : #${refereeId}.${pm2Detail}`, "referees");
+      publishStaffAction(discordLine, { id: user.id, pseudo: user.pseudo }, `${discordLine} Arbitre : #${refereeId}.${pm2Detail}`, upheld && result.released > 0 ? "staff-removal" : "referees");
     }
     if (result.failed > 0) return fail("REFEREE_OBJECTION_FAILED", 500);
     return ok({ upheld, changed: result.changed, released: result.released });

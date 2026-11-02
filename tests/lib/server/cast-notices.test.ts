@@ -11,6 +11,7 @@ import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import {
   announceCastChange,
   castLogChange,
+  castLogCategory,
   castReleaseNotice,
   deliverCastChange,
   discardCastChanges,
@@ -58,9 +59,9 @@ beforeEach(() => {
     .mockResolvedValue({ discord: { sent: 1, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 1 });
 });
 
-function loggedLine(): string {
+function loggedLine(category = "casts"): string {
   expect(sendBotLog).toHaveBeenCalledTimes(1);
-  expect(jest.mocked(sendBotLog).mock.calls[0][1]).toMatchObject({ category: "casts" });
+  expect(jest.mocked(sendBotLog).mock.calls[0][1]).toMatchObject({ category });
   return jest.mocked(sendBotLog).mock.calls[0][0];
 }
 
@@ -83,6 +84,31 @@ describe("castLogChange / castReleaseNotice", () => {
   });
 });
 
+describe("castLogCategory — un retrait alerte, une inscription reste une trace", () => {
+  it.each<[CastChange, string]>([
+    [{ kind: "CLAIMED", matchId: 1, replacedCasterId: null }, "casts"],
+    [{ kind: "CLAIMED", matchId: 1, replacedCasterId: 5 }, "staff-removal"],
+    [{ kind: "RELEASED", matchId: 1, casterId: 5, byStaff: false }, "staff-removal"],
+    [{ kind: "RELEASED", matchId: 1, casterId: 5, byStaff: true }, "staff-removal"],
+    [{ kind: "AUTO_RELEASED", matchId: 1, casterId: 5, reason: "INELIGIBLE" }, "staff-removal"],
+    [{ kind: "AUTO_RELEASED", matchId: 1, casterId: 5, reason: "JOINED_TEAM" }, "staff-removal"],
+  ])("%j → %s", (change, category) => {
+    expect(castLogCategory(change)).toBe(category);
+  });
+
+  it.each<[CastChange]>([
+    [{ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: false }],
+    [{ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true }],
+    [{ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "JOINED_TEAM" }],
+    [{ kind: "CLAIMED", matchId: 42, replacedCasterId: CASTER }],
+  ])("deliverCastChange %j envoie la ligne dans staff-removal, sans nom", async (change) => {
+    mockMatch(matchRow());
+    await deliverCastChange(change);
+    const line = loggedLine("staff-removal");
+    expect(line).not.toContain("CasterPseudo");
+  });
+});
+
 describe("deliverCastChange", () => {
   it("journalise une inscription sans prévenir personne, sans nommer le caster", async () => {
     mockMatch(matchRow());
@@ -99,14 +125,14 @@ describe("deliverCastChange", () => {
   it("journalise un retrait volontaire sans avis au caster", async () => {
     mockMatch(matchRow());
     await deliverCastChange({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: false });
-    expect(loggedLine()).toContain("Cast libéré");
+    expect(loggedLine("staff-removal")).toContain("Cast libéré");
     expect(notifyUsers).not.toHaveBeenCalled();
   });
 
   it("prévient le caster retiré par le staff, en message privé et en push, avec le motif", async () => {
     mockMatch(matchRow());
     await deliverCastChange({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true });
-    const line = loggedLine();
+    const line = loggedLine("staff-removal");
     expect(line).toContain("Cast retiré");
     expect(line).toContain("par le staff");
     expect(line).not.toContain("CasterPseudo");
@@ -135,7 +161,7 @@ describe("deliverCastChange", () => {
   it("prévient le titulaire évincé par un autre caster", async () => {
     mockMatch(matchRow());
     await deliverCastChange({ kind: "CLAIMED", matchId: 42, replacedCasterId: 901 });
-    expect(loggedLine()).toContain("Cast repris");
+    expect(loggedLine("staff-removal")).toContain("Cast repris");
     expect(loadNotificationRecipients).toHaveBeenCalledWith([901], "certified", { matchDm: true });
     expect(notification().discord?.message("fr")).toContain("un autre caster a pris le match");
   });
@@ -143,7 +169,7 @@ describe("deliverCastChange", () => {
   it("en tournoi individuel, ne nomme aucun joueur, ni au journal ni au caster", async () => {
     mockMatch(matchRow({ participant_type: "SOLO", team1_name: "PseudoA", team2_name: "PseudoB" }));
     await deliverCastChange({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "JOINED_TEAM" });
-    const line = loggedLine();
+    const line = loggedLine("staff-removal");
     expect(line).toContain("un joueur vs un joueur");
     expect(line).toContain("le caster joue désormais ce match");
     const sent = notification();
@@ -165,7 +191,7 @@ describe("deliverCastChange", () => {
   it("une place encore vide se lit « TBD »", async () => {
     mockMatch(matchRow({ team2_name: null }));
     await deliverCastChange({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "INELIGIBLE" });
-    expect(loggedLine()).toContain("Renards vs TBD");
+    expect(loggedLine("staff-removal")).toContain("Renards vs TBD");
     expect(notification().discord?.message("fr")).toContain("« Renards » contre TBD");
   });
 
@@ -199,7 +225,7 @@ describe("queueCastChange — annonce après le commit", () => {
     expect(sendBotLog).not.toHaveBeenCalled();
     flushCastChanges(connection);
     await settle();
-    expect(loggedLine()).toContain("le caster joue désormais ce match");
+    expect(loggedLine("staff-removal")).toContain("le caster joue désormais ce match");
     expect(notification().topic).toBe("CAST_RELEASED");
     // La file est vidée : un second flush ne répète rien.
     flushCastChanges(connection);
