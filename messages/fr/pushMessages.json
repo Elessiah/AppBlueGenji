@@ -9,13 +9,15 @@
   },
   "lobbyBrief": {
     "title": "Salon ouvert : réglages du match",
+    "titleLaunched": "Match lancé : réglages de la partie",
     "body": "Gauche (hôte) : {left} · Droite (1er ban) : {right} · 1re carte : {map}.",
     "bodyCast": "Match casté : trie les joueurs par rôle. Gauche (hôte) : {left} · Droite (1er ban) : {right} · 1re carte : {map}.",
     "bodyHostBans": "Gauche (hôte, 1er ban) : {left} · Droite : {right} · 1re carte : {map}.",
     "bodyCastHostBans": "Match casté : trie les joueurs par rôle. Gauche (hôte, 1er ban) : {left} · Droite : {right} · 1re carte : {map}.",
     "noMap": "pas encore fixée",
     "own": "toi",
-    "other": "ton adversaire"
+    "other": "ton adversaire",
+    "quoted": "« {name} »"
   },
   "matchReminder": {
     "title": "Match dans {offset}",

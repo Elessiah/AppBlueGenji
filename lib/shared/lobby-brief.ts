@@ -16,15 +16,13 @@
  * individuel, où le nom d'un engagé **est** un pseudo, le message dit « toi » et
  * « ton adversaire ».
  *
- * **Serveur seulement** malgré son dossier : il atteint `push-messages.ts`, qui
- * embarque les deux langues.
+ * Ce module ne garde que ce qui est commun aux deux canaux (le type d'un côté,
+ * les noms par place) : il n'importe rien de lourd et reste importable partout.
+ * Le message privé se rédige côté serveur (`lib/server/tournaments/lobby-brief-dm.ts`),
+ * qui atteint `push-messages.ts` et ses deux langues.
  */
-import { discordInline } from "./discord-text";
-import { localizedSiteUrl } from "./dm-language";
 import type { Locale } from "./locales";
-import { battletagRelevantFor } from "./certification-prompt";
 import type { RefereeDecision } from "./match-referee";
-import { pushRoundLabel } from "./push-messages";
 import type { NextBanRule, ResolvedMapSlot } from "./round-maps";
 import type { TournamentGame } from "./types";
 
@@ -43,6 +41,16 @@ export type LobbyBriefSide = {
   /** L'engagée du destinataire. */
   teamName: string;
   opponentName: string;
+  /**
+   * L'adversaire est une équipe fantôme (aucun membre) : personne en face pour
+   * s'inviter, la ligne d'autogestion « entre managers » n'est pas écrite.
+   */
+  opponentGhost?: boolean;
+  /**
+   * Le match est déjà lancé (lancement forcé, ou tous « Prêt » avant le
+   * balayage) : le brief le dit, et garde les réglages, utiles pour créer la partie.
+   */
+  launched?: boolean;
   /** L'engagée du destinataire héberge-t-elle (gauche) ? */
   hosting: boolean;
   /** L'engagée du destinataire bannit-elle la première sur la carte 1 (règle du tournoi) ? */
@@ -58,10 +66,6 @@ export type LobbyBriefSide = {
   cast: boolean;
   decision: RefereeDecision;
 };
-
-function quoted(value: string, locale: Locale): string {
-  return locale === "en" ? `“${discordInline(value)}”` : `« ${discordInline(value)} »`;
-}
 
 /**
  * Les noms à écrire, par place : les équipes entre guillemets, « toi » / « ton
@@ -90,157 +94,3 @@ export function lobbyBriefNames(
   return side.banFirst ? { ...seats, ban: own, banNext: other } : { ...seats, ban: other, banNext: own };
 }
 
-type DecisionLine = "REFEREE" | "REFEREE_NO_BATTLETAG" | "SELF_MANAGED_TEAM" | "SELF_MANAGED_SOLO";
-
-const DECISION_LINES: Readonly<Record<Locale, Readonly<Record<DecisionLine, string>>>> = {
-  fr: {
-    REFEREE: "Arbitre désigné : ajoute-le en jeu, il invitera les joueurs dans le salon.",
-    REFEREE_NO_BATTLETAG: "Arbitre désigné : il invitera les joueurs dans le salon.",
-    SELF_MANAGED_TEAM:
-      "Autogestion : l'équipe hôte crée la partie, les managers des deux équipes s'invitent mutuellement, puis invitent les casters.",
-    SELF_MANAGED_SOLO: "Autogestion : l'hôte crée la partie et invite son adversaire, puis les casters.",
-  },
-  en: {
-    REFEREE: "Assigned referee: add them in game, they will invite the players to the lobby.",
-    REFEREE_NO_BATTLETAG: "Assigned referee: they will invite the players to the lobby.",
-    SELF_MANAGED_TEAM:
-      "Self-managed: the host team creates the game, the managers of both teams invite each other, then invite the casters.",
-    SELF_MANAGED_SOLO: "Self-managed: the host creates the game and invites their opponent, then the casters.",
-  },
-};
-
-/** La ligne de la décision d'arbitrage ; `null` sans décision (le staff en est averti à part). */
-function decisionLine(side: LobbyBriefSide, locale: Locale): string | null {
-  if (side.decision === "REFEREE") {
-    return DECISION_LINES[locale][battletagRelevantFor(side.game) ? "REFEREE" : "REFEREE_NO_BATTLETAG"];
-  }
-  if (side.decision === "SELF_MANAGED") {
-    return DECISION_LINES[locale][side.solo ? "SELF_MANAGED_SOLO" : "SELF_MANAGED_TEAM"];
-  }
-  return null;
-}
-
-const DM_TEXT: Readonly<
-  Record<
-    Locale,
-    {
-      opening: (subject: string, round: string, tournament: string) => string;
-      subject: (side: LobbyBriefSide, quote: (name: string) => string) => string;
-      left: string;
-      right: string;
-      firstMap: string;
-      noFirstMap: string;
-      firstBan: (first: string, then: string) => string;
-      nextBans: Readonly<Record<NextBanRule, string>>;
-      maps: string;
-      tiebreak: string;
-      toChoose: (pool: string) => string;
-      /** Fin d'une ligne des cartes coupée (`MAPS_LINE_MAX`). */
-      moreMaps: string;
-      cast: string;
-      link: string;
-      linkNoBattletag: string;
-    }
-  >
-> = {
-  fr: {
-    opening: (subject, round, tournament) => `🎮 BlueGenji — Le salon de ${subject} est ouvert (${round}, ${tournament}).`,
-    subject: (side, quote) =>
-      side.solo ? "ton match" : `ton match ${quote(side.teamName)} contre ${quote(side.opponentName)}`,
-    left: "Gauche (hôte) : ",
-    right: "Droite : ",
-    firstMap: "Première carte : ",
-    noFirstMap: "pas encore fixée",
-    firstBan: (first, then) => `Bans de la carte 1 : ${first} d'abord, puis ${then}`,
-    nextBans: {
-      LOSER:
-        "Cartes suivantes : l'équipe qui a perdu la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
-      WINNER:
-        "Cartes suivantes : l'équipe qui a gagné la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
-    },
-    maps: "Cartes : ",
-    tiebreak: "Map de départage (jouée seulement si la série est à égalité après les 3 maps) : ",
-    toChoose: (pool) => `à choisir parmi ${pool}`,
-    moreMaps: "… (suite sur la page du match)",
-    cast: "Match casté : trie les joueurs par rôle dans le salon.",
-    link: "BattleTags à inviter et réglages à jour : ",
-    linkNoBattletag: "Réglages à jour : ",
-  },
-  en: {
-    opening: (subject, round, tournament) => `🎮 BlueGenji — The lobby of ${subject} is open (${round}, ${tournament}).`,
-    subject: (side, quote) => (side.solo ? "your match" : `your match ${quote(side.teamName)} vs ${quote(side.opponentName)}`),
-    left: "Left (host): ",
-    right: "Right: ",
-    firstMap: "First map: ",
-    noFirstMap: "not set yet",
-    firstBan: (first, then) => `Map 1 bans: ${first} first, then ${then}`,
-    nextBans: {
-      LOSER: "Next maps: the team that lost the previous map bans first; on a draw, same order as on the previous map.",
-      WINNER: "Next maps: the team that won the previous map bans first; on a draw, same order as on the previous map.",
-    },
-    maps: "Maps: ",
-    tiebreak: "Tiebreak map (played only if the series is level after the 3 maps): ",
-    toChoose: (pool) => `to choose from ${pool}`,
-    moreMaps: "… (more on the match page)",
-    cast: "Cast match: sort the players by role in the lobby.",
-    link: "BattleTags to invite and up-to-date settings: ",
-    linkNoBattletag: "Up-to-date settings: ",
-  },
-};
-
-/**
- * Longueur au plus de la ligne des cartes : 9 créneaux de 20 cartes de 64
- * caractères dépasseraient les 2 000 caractères d'un message Discord, qui ne
- * serait pas remis. Au-delà, la ligne s'arrête à un créneau entier et renvoie
- * à la page du match (le lien suit).
- */
-export const MAPS_LINE_MAX = 700;
-
-/** Les cartes de la manche, dans l'ordre : « 1. « Ilios » · 2. à choisir parmi … ». */
-function mapsLine(side: LobbyBriefSide, locale: Locale, quote: (name: string) => string): string {
-  const text = DM_TEXT[locale];
-  const parts = side.maps.map((slot) => {
-    const shown = slot.map === null ? text.toChoose(slot.candidates.map(quote).join(", ")) : quote(slot.map);
-    return `${slot.number}. ${shown}`;
-  });
-  let line = "";
-  for (const part of parts) {
-    const next = line === "" ? part : `${line} · ${part}`;
-    // Coupé à un créneau entier : jamais au milieu d'un nom cité.
-    if (next.length > MAPS_LINE_MAX) return line === "" ? text.moreMaps : `${line} · ${text.moreMaps}`;
-    line = next;
-  }
-  return line;
-}
-
-/** Ligne des cartes : celles du round s'il est réglé, sinon la première carte. */
-function mapsOrFirstMapLine(side: LobbyBriefSide, locale: Locale, quote: (name: string) => string): string {
-  const text = DM_TEXT[locale];
-  if (side.maps.length > 0) return `• ${text.maps}${mapsLine(side, locale, quote)}`;
-  const firstMap = side.firstMap === null ? text.noFirstMap : quote(side.firstMap);
-  return `• ${text.firstMap}${firstMap}`;
-}
-
-/**
- * Le message privé Discord. `url` : la page du match, adresse absolue en
- * français (`localizedSiteUrl` la passe sous `/en` pour un compte anglais).
- */
-export function formatLobbyBriefDm(side: LobbyBriefSide, url: string, locale: Locale = "fr"): string {
-  const text = DM_TEXT[locale];
-  const quote = (name: string) => quoted(name, locale);
-  const names = lobbyBriefNames(side, locale, quote);
-  const decision = decisionLine(side, locale);
-  const round = pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss);
-  return [
-    text.opening(text.subject(side, quote), round, quote(side.tournamentName)),
-    `• ${text.left}${names.left}`,
-    `• ${text.right}${names.right}`,
-    mapsOrFirstMapLine(side, locale, quote),
-    `• ${text.firstBan(names.ban, names.banNext)}`,
-    `• ${text.nextBans[side.nextBan]}`,
-    ...(side.tiebreakMap ? [`• ${text.tiebreak}${quote(side.tiebreakMap)}`] : []),
-    ...(side.cast ? [`• ${text.cast}`] : []),
-    ...(decision === null ? [] : [`• ${decision}`]),
-    `${battletagRelevantFor(side.game) ? text.link : text.linkNoBattletag}${localizedSiteUrl(url, locale)}`,
-  ].join("\n");
-}

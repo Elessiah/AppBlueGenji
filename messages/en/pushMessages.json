@@ -9,13 +9,15 @@
   },
   "lobbyBrief": {
     "title": "Lobby open: match settings",
+    "titleLaunched": "Match started: game settings",
     "body": "Left (host): {left} · Right (1st ban): {right} · 1st map: {map}.",
     "bodyCast": "Cast match: sort the players by role. Left (host): {left} · Right (1st ban): {right} · 1st map: {map}.",
     "bodyHostBans": "Left (host, 1st ban): {left} · Right: {right} · 1st map: {map}.",
     "bodyCastHostBans": "Cast match: sort the players by role. Left (host, 1st ban): {left} · Right: {right} · 1st map: {map}.",
     "noMap": "not set yet",
     "own": "you",
-    "other": "your opponent"
+    "other": "your opponent",
+    "quoted": "“{name}”"
   },
   "matchReminder": {
     "title": "Match in {offset}",

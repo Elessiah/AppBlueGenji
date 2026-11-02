@@ -46,7 +46,8 @@ import { DEFAULT_LOCALE, INTL_LOCALE, localeHref, type Locale } from "./locales"
 import { scopedText, type Leaves, type ScopedText } from "./scoped-text";
 import { clipPushText, PUSH_BODY_MAX, type PushContent } from "./push-notifications";
 import type { CastReleasedMatch } from "./cast-notices";
-import type { LobbyBriefSide } from "./lobby-brief";
+import { lobbyBriefNames, type LobbyBriefSide } from "./lobby-brief";
+import { visibleText } from "./visible-text";
 
 type PushText = ScopedText<Leaves<typeof frPush>>;
 
@@ -70,9 +71,20 @@ type MatchSide = {
   solo?: boolean;
 };
 
+/**
+ * Un nom saisi (équipe, tournoi) tel qu'un écran verrouillé peut l'afficher :
+ * sans contrôle ni commande de direction. Un nom ancien gardant U+202E
+ * (laissé par `cleanStoredNames`) retournerait sinon la ligne entière.
+ */
+function shownName(name: string): string {
+  return visibleText(name);
+}
+
 /** « Renards contre Nova », ou « Ton match » quand les engagés sont des joueurs. */
 function pairing(side: MatchSide, text: PushText): string {
-  return side.solo ? text.t("pairingSolo") : text.t("pairing", { team: side.teamName, opponent: side.opponentName });
+  return side.solo
+    ? text.t("pairingSolo")
+    : text.t("pairing", { team: shownName(side.teamName), opponent: shownName(side.opponentName) });
 }
 
 /** Étiquette d'un match : les notifications d'un même match se remplacent. */
@@ -88,7 +100,7 @@ function matchTag(matchId: number): string {
  */
 export function matchStartPush(side: MatchSide, phase: "LOBBY" | "LAUNCHED", locale: Locale = DEFAULT_LOCALE): PushContent {
   const text = TEXT[locale];
-  const values = { pairing: pairing(side, text), tournament: side.tournamentName };
+  const values = { pairing: pairing(side, text), tournament: shownName(side.tournamentName) };
   return {
     title: phase === "LOBBY" ? text.t("matchStart.titleLobby") : text.t("matchStart.titleLaunched"),
     body: phase === "LOBBY" ? text.t("matchStart.bodyLobby", values) : text.t("matchStart.bodyLaunched", values),
@@ -105,24 +117,32 @@ export function matchStartPush(side: MatchSide, phase: "LOBBY" | "LAUNCHED", loc
  */
 export function lobbyBriefPush(side: LobbyBriefSide, locale: Locale = DEFAULT_LOCALE): PushContent {
   const text = TEXT[locale];
-  const own = side.solo ? text.t("lobbyBrief.own") : side.teamName;
-  const other = side.solo ? text.t("lobbyBrief.other") : side.opponentName;
+  // Les places et l'ordre des bans du message privé (`lobbyBriefNames`) ; les
+  // noms d'équipe entre guillemets, comme dans le message privé : un nom qui
+  // contient « · » ne se confond pas avec le séparateur.
+  const quote = (name: string) => text.t("lobbyBrief.quoted", { name: shownName(name) });
+  const soloSide = { ...side, teamName: text.t("lobbyBrief.own"), opponentName: text.t("lobbyBrief.other") };
+  const names = side.solo ? lobbyBriefNames(soloSide, locale, (name) => name) : lobbyBriefNames(side, locale, quote);
   // Ni l'appariement ni la manche : gauche et droite nomment déjà les deux
   // engagées ; le « 1er ban » se pose sur le côté que la règle du tournoi
   // désigne (`ROUND_MAPS.md` : la droite, qui n'héberge pas, par défaut), donc
-  // aucun nom n'est répété. Le rappel du tri par rôle vient en tête et la carte
-  // (texte libre) en dernier : la coupe à `PUSH_BODY_MAX` ne retire qu'elle.
+  // aucun nom n'est répété. La carte (texte libre) vient en dernier, sans sa
+  // ponctuation finale : le gabarit pose son propre point.
   const values = {
-    left: side.hosting ? own : other,
-    right: side.hosting ? other : own,
-    map: side.firstMap ?? text.t("lobbyBrief.noMap"),
+    left: names.left,
+    right: names.right,
+    map: side.firstMap === null ? text.t("lobbyBrief.noMap") : side.firstMap.replace(/[\s.!?…。]+$/u, "") || side.firstMap,
   };
   const hostBans = side.banFirst === side.hosting;
-  const castKey = hostBans ? "lobbyBrief.bodyCastHostBans" : "lobbyBrief.bodyCast";
-  const plainKey = hostBans ? "lobbyBrief.bodyHostBans" : "lobbyBrief.body";
+  const plain = text.t(hostBans ? "lobbyBrief.bodyHostBans" : "lobbyBrief.body", values);
+  const withCast = text.t(hostBans ? "lobbyBrief.bodyCastHostBans" : "lobbyBrief.bodyCast", values);
+  // Le rappel du tri par rôle cède sa place quand le corps dépasserait la
+  // borne : la coupe retirerait sinon la carte sans le dire (le message privé
+  // et la page du match portent le rappel).
+  const body = side.cast && charCount(withCast) <= PUSH_BODY_MAX ? withCast : plain;
   return {
-    title: text.t("lobbyBrief.title"),
-    body: text.t(side.cast ? castKey : plainKey, values),
+    title: text.t(side.launched ? "lobbyBrief.titleLaunched" : "lobbyBrief.title"),
+    body,
     url: localeHref(matchPageHref(side.tournamentId, side.matchId), locale),
     tag: `${matchTag(side.matchId)}-salon`,
   };
