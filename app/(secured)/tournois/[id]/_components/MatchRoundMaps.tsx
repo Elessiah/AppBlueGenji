@@ -169,7 +169,7 @@ export function MatchRoundMaps({
         </ol>
       )}
       {tiebreak !== null && (
-        <p className={`${styles.mapSlot} ${styles.tiebreakLine}`}>
+        <div className={`${styles.mapSlot} ${styles.tiebreakLine}`}>
           <span className={styles.mapNumber}>{t("page.tiebreak")}</span>
           <span className={styles.mapValue}>
             <strong>{tiebreak}</strong>{" "}
@@ -177,7 +177,7 @@ export function MatchRoundMaps({
               {t("page.tiebreakHint")}
             </InfoHint>
           </span>
-        </p>
+        </div>
       )}
       {staff && (
         <div className={styles.roundMapsActions}>

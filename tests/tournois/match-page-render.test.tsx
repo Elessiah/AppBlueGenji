@@ -351,6 +351,23 @@ describe("page d'un match — cartes du round et bans", () => {
     expect(visible(render(match(), "staff", false, "fr", rules([["Ilios"]])))).toContain("Réinitialiser le tour");
   });
 
+  it("render_tiebreakSet_publicReadsItInTheKeyFacts", () => {
+    const tiebreaks = { tiebreaks: [{ phaseId: 0, bracket: "UPPER", roundNumber: 2, map: "Busan" }] };
+    expect(visible(render(match(), "public", false, "fr", rules([], tiebreaks)))).toContain("Map de départage Busan");
+    expect(visible(render(match(), "public", false, "en", rules([], tiebreaks)))).toContain("Tiebreak map Busan");
+  });
+
+  it("render_noTiebreak_noTiebreakFact", () => {
+    expect(visible(render(match(), "public", false, "fr", rules([])))).not.toContain("Map de départage");
+  });
+
+  it("render_staffTiebreakLine_hintNotInsideParagraph", () => {
+    const tiebreaks = { tiebreaks: [{ phaseId: 0, bracket: "UPPER", roundNumber: 2, map: "Busan" }] };
+    const html = render(match(), "staff", false, "fr", rules([], tiebreaks));
+    expect(html).not.toMatch(/<p[^>]*mapSlot[^>]*>(?:(?!<\/p>).)*<div/);
+    expect(html).toContain("Busan");
+  });
+
   it("render_staffOnUnsetRound_hidesRoundReset", () => {
     expect(visible(render(match(), "staff", false, "fr", rules([])))).not.toContain("Réinitialiser le tour");
   });

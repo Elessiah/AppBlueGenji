@@ -128,7 +128,8 @@ série est à égalité après les trois maps régulières, sinon inutilisée.
 - **Écran** : section « Map de départage » de `RoundMapsDialog` (formulaire à
   part, liste d'Overwatch suggérée, saisie libre, « Enregistrer » / « Retirer »),
   visible seulement sur un tour éligible ; le sélecteur de tours la signale. La
-  page du match (`MatchRoundMaps`) l'affiche avec une bulle « i ».
+  page du match (`MatchRoundMaps`) l'affiche avec une bulle « i ». Elle figure aussi dans les **faits clés** de la page (`tiebreakFacts`),
+  lisibles de tous (public, joueurs), pas seulement du staff ou de qui choisit.
 - **Saisie du score** (`MapScoreList`, `tiebreakRowIndex`) : la première ligne
   jouée au-delà des trois maps régulières alors que la série est à **1-1** est
   libellée « Map de départage : {nom} » (jamais à 0-0 après trois maps nulles :
