@@ -25,7 +25,7 @@ const battletag = [HIDDEN_BATTLETAG_AUDIENCE.title, ...HIDDEN_BATTLETAG_AUDIENCE
 
 describe("DISCORD_TAG_AUDIENCE", () => {
   it("nomme chaque public, un par ligne", () => {
-    expect(DISCORD_TAG_AUDIENCE.items).toHaveLength(5);
+    expect(DISCORD_TAG_AUDIENCE.items).toHaveLength(6);
     expect(DISCORD_TAG_AUDIENCE.items[0]).toMatch(/^les administrateurs, à tout moment/);
     expect(DISCORD_TAG_AUDIENCE.items[1]).toMatch(/^les arbitres/);
   });

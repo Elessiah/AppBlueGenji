@@ -8,7 +8,7 @@
  */
 import type { IdentityAudience } from "@/lib/shared/identity-sharing";
 
-const DISCORD_ITEMS = ["admins", "referees", "match", "asCaster", "players"] as const;
+const DISCORD_ITEMS = ["admins", "referees", "match", "asCaster", "asReferee", "players"] as const;
 const BATTLETAG_ITEMS = ["match", "asCaster", "asReferee", "launch"] as const;
 
 export type DiscordAudienceKey = `audience.discord.${"title" | "footer" | (typeof DISCORD_ITEMS)[number]}`;
