@@ -8,6 +8,12 @@
 /** Silence attendu après la dernière ligne d'un lot avant de l'envoyer (5 min). */
 export const BOT_LOG_BATCH_WINDOW_MS = 5 * 60 * 1000;
 
+/**
+ * Âge maximal d'un lot : il part au plus tard 10 min après sa première ligne,
+ * quoi que dise le silence (un filet de lignes espacées ne le repousse pas).
+ */
+export const BOT_LOG_BATCH_MAX_AGE_MS = 10 * 60 * 1000;
+
 /** Lignes au-delà desquelles un lot part sans attendre la fin du silence. */
 export const BOT_LOG_BATCH_MAX_LINES = 5;
 

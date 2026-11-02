@@ -12,9 +12,12 @@ ligne du journal (`sendBotLog` → `POST /internal/log`) rejoint désormais un
   relance le silence à 5 minutes.
 - À **5 lignes** (`BOT_LOG_BATCH_MAX_LINES`), le lot part tout de suite ; la
   ligne suivante ouvre un nouveau lot.
-- Délai : 5 minutes après la dernière ligne. Comme chaque ligne relance le
-  silence, une ligne attend **au pire environ 20 minutes** (quatre lignes
-  espacées de 4 min 59 s) : c'est la règle demandée, sans âge maximal.
+- **Âge maximal : 10 minutes** (`BOT_LOG_BATCH_MAX_AGE_MS`). Un lot part au
+  plus tard 10 minutes après sa **première** ligne, quoi que dise le silence :
+  un filet de lignes espacées de 4 minutes ne le repousse pas. Ce délai ne
+  repart qu'avec la première ligne du lot suivant. Une ligne attend donc au
+  pire **10 minutes** ; un lot part plus tôt à 5 lignes ou après 5 minutes de
+  silence.
 - Un lot = un message, une ligne par rangée, dans l'ordre d'arrivée. Il n'est
   découpé que si Discord l'impose : 1 900 caractères par message
   (`BOT_LOG_MESSAGE_MAX_CHARS` — 2 000 chez Discord, moins le préfixe
@@ -74,7 +77,7 @@ terminé » ne passe donc pas devant le résultat de sa finale).
   (un crash pendant l'envoi reste un crash pour pm2). Si personne
   d'autre n'écoute le signal, le module termine lui-même le processus.
 - **Arrêt brutal** : perd les lots en attente (au plus 4 lignes par clé, jusqu'à
-  une vingtaine de minutes de journal dans le pire cas). Rien n'est persisté : le journal n'est pas une
+  10 minutes de journal dans le pire cas). Rien n'est persisté : le journal n'est pas une
   donnée de référence (pm2 garde la trace d'audit).
 
 ## Cartes de manche
@@ -89,6 +92,6 @@ du tournoi tout de suite (`flushBotLogBatch`).
 ## Tests
 
 `tests/lib/shared/bot-log-batch.test.ts`, `tests/lib/server/bot-log-batcher.test.ts`
-(silence relancé, plafond 5, isolation des clés, découpage, erreurs),
+(silence relancé, âge maximal, plafond 5, isolation des clés, découpage, erreurs),
 `tests/lib/server/bot-log-sending.test.ts` (`sendBotLog` → `/internal/log`),
 `tests/lib/server/bot-log-shutdown.test.ts`, `tests/lib/server/round-maps-notice.test.ts`.
