@@ -75,7 +75,7 @@ Ajouter le trailer avec `git commit --trailer 'Co-authored-by: <modèle> <norepl
 1. **Branche de feature** : `git checkout -b feature/<short-name>`
 2. **Commits libres** : autant qu'utile, souvent un seul — message ≤ 5 mots, impératif minuscule (`add swiss pairing`), *avec Co-Authored-By*. Aucun ordre ni découpage imposé (code, docs, tests, finitions) : ne pas trier les changements par commit. La PR, elle, doit contenir le code, **ses tests** (voir « Tests ») et **sa doc** (`docs/features/`, README, JSDoc limitée à ce qui a été construit). Tout problème d'accessibilité repéré pendant la tâche et **non réglé** dans la PR s'ajoute à `ACCESSIBILITE.md` par un commit poussé directement sur `main` (voir « Accessibilité » plus haut).
 3. **Push** : `git push -u origin feature/<short-name>`
-4. **Revue de PR** : ouvrir la PR (`gh pr create`), puis lancer les revues avec `/code-review --comment` pour poster les retours en **commentaires inline** sur la PR. Règles complètes : `docs/REVIEW_CYCLES.md` — en bref :
+4. **Revue de PR** : ouvrir la PR (`gh pr create`), puis lancer les revues avec `/code-review` (sans `--comment` : aucun finding n'est posté sur la PR ; ils vont au compte rendu, aux correctifs et à `ERREUR.txt`). Règles complètes : `docs/REVIEW_CYCLES.md` — en bref :
    - boucle standard, puis cycles thématiques UI/UX (si la PR touche un écran), performance et sécurité ; texte légal seul → un cycle juridique à la place ; doc de processus ou renommage seul → boucle standard seule ;
    - un **agent neuf par type de revue** ; chaque boucle s'arrête au **premier cycle propre**, changements critiques compris ;
    - un finding **mineur** se consigne dans `ERREUR.txt` sans être corrigé ; un cycle qui n'en remonte que de mineurs compte pour propre.
