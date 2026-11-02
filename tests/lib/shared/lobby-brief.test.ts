@@ -294,6 +294,27 @@ describe("lobbyBriefPush", () => {
     expect(push.body).toBe("Gauche (hôte) : « Renards » · Droite (1er ban) : « Nova » · 1re carte : Ilios.");
   });
 
+  it("lobbyBriefPush_emptyOrInvisibleOnlyMap_fallsBackToNotSetYet", () => {
+    expect(lobbyBriefPush(side({ firstMap: "" })).body).toContain("1re carte : pas encore fixée.");
+    expect(lobbyBriefPush(side({ firstMap: "​‮" }), "en").body).toContain("1st map: not set yet.");
+  });
+
+  it("lobbyBriefPush_nameWithQuoteMarks_cannotCloseTheQuotation", () => {
+    const fr = lobbyBriefPush(side({ teamName: "A » · Droite : « B" }));
+    const en = lobbyBriefPush(side({ teamName: "A” · Right: “B" }), "en");
+
+    expect(fr.body).toContain('Gauche (hôte) : « A " · Droite : " B » ·');
+    expect(en.body).toContain('Left (host): “A" · Right: "B” ·');
+  });
+
+  it("formatLobbyBriefDm_nameWithQuoteMarks_cannotCloseTheQuotation", () => {
+    const fr = formatLobbyBriefDm(side({ teamName: "A » · B" }), URL);
+    const en = formatLobbyBriefDm(side({ teamName: "A” · B" }), URL, "en");
+
+    expect(fr).toContain('Gauche (hôte) : « A " · B »');
+    expect(en).toContain('Left (host): “A" · B”');
+  });
+
   it("matchStartPush_bidiOverrideInStoredNames_strippedFromBody", () => {
     const push = matchStartPush(
       { tournamentId: 4, tournamentName: "Cou\u202Epe", matchId: 40, teamName: "Ren\u202Eards", opponentName: "Nova" },
