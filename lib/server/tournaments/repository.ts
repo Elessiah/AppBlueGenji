@@ -352,6 +352,7 @@ export async function getMatchRows(
       ru.is_deleted AS referee_is_deleted,
       ru.is_admin AS referee_is_admin,
       ru.platform_roles_json AS referee_platform_roles_json,
+      ru.referee_objection_at AS referee_objection_at,
       (m.referee_user_id IS NOT NULL AND ${playsMatchSql("m.referee_user_id", "m.team1_id", "m.team2_id", "r")}) AS referee_plays_match,
       es1.\`rank\` AS team1_seed,
       es2.\`rank\` AS team2_seed,

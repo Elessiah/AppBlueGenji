@@ -56,6 +56,7 @@ import {
   releaseIneligibleCast,
   queueDeferredNoRefereeAlerts,
   releaseIneligibleReferee,
+  releaseObjectingReferee,
   rowLaunchState,
   rowReadiness,
   toLaunchInput,
@@ -124,7 +125,12 @@ type UserRow = RowDataPacket & {
   is_deleted: number;
   is_admin: number;
   platform_roles_json: unknown;
+  /** Opposition retenue à l'arbitrage (`referee-objection.ts`). */
+  referee_objection_at: Date | string | null;
 };
+
+/** Arbitre désigné à retirer après la lecture ; `objection` : son opposition est retenue. */
+type RevokedReferee = { matchId: number; refereeId: number; objection: boolean };
 
 type ViewerTeams = Map<number, { roles: TeamRole[]; solo: boolean }>;
 
@@ -468,7 +474,8 @@ async function loadUsers(connection: PoolConnection, userIds: Set<number>): Prom
   const ids = [...userIds];
   const [found] = await connection.execute<UserRow[]>(
     `SELECT id, pseudo, discord_pseudo, discord_verified_at, overwatch_battletag, blizzard_sub,
-            overwatch_battletag_typed, visible_overwatch, is_deleted, is_admin, platform_roles_json
+            overwatch_battletag_typed, visible_overwatch, is_deleted, is_admin, platform_roles_json,
+            referee_objection_at
      FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})`,
     ids,
   );
@@ -522,15 +529,18 @@ function keepEligibleCasters(
 
 /**
  * L'arbitre désigné n'est une partie du match que tant qu'il remplit la
- * condition d'arbitrage (`refereeEligibilityBlock`) et ne le joue pas : rejouée
- * à chaque lecture, comme celle des casters. Avant le lancement, un arbitre
- * qui ne la remplit plus est rangé dans `revokedReferees` (retrait d'office
- * sous verrou, `releaseIneligibleReferee`) ; un match lancé le garde, tu.
+ * condition d'arbitrage (`refereeEligibilityBlock`), n'a pas d'opposition
+ * retenue et ne le joue pas — comme au verrou du lancement (`lockLaunchMatch`) :
+ * rejouée à chaque lecture, comme celle des casters. Avant le lancement, un
+ * arbitre qui ne la remplit plus est rangé dans `revokedReferees` (retrait
+ * d'office sous verrou, `releaseIneligibleReferee`) ; un match lancé le garde,
+ * tu. Une opposition retenue l'en retire à tout moment avant le résultat
+ * (`releaseObjectingReferee`) : la lecture rattrape un retrait en série manqué.
  */
 function keepEligibleReferees(
   visible: readonly VisibleLaunch[],
   users: Map<number, UserRow>,
-  revokedReferees: { matchId: number; refereeId: number }[],
+  revokedReferees: RevokedReferee[],
   plays: (row: CandidateRow, userId: number) => boolean,
 ): void {
   const now = Date.now();
@@ -539,8 +549,12 @@ function keepEligibleReferees(
     const refereeId = Number(row.referee_user_id);
     const recorded = matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, now);
     const playsMatch = recorded !== "LAUNCHED" && plays(row, refereeId);
-    row.refereeEligible = refereeEligibilityBlock(users.get(refereeId)) === null && !playsMatch;
-    if (!row.refereeEligible && recorded !== "LAUNCHED") revokedReferees.push({ matchId: Number(row.id), refereeId });
+    const user = users.get(refereeId);
+    const objection = (user?.referee_objection_at ?? null) !== null;
+    row.refereeEligible = refereeEligibilityBlock(user) === null && !objection && !playsMatch;
+    if (objection || (!row.refereeEligible && recorded !== "LAUNCHED")) {
+      revokedReferees.push({ matchId: Number(row.id), refereeId, objection });
+    }
   }
 }
 
@@ -804,7 +818,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
   const referee = forCard && staff;
 
   const revokedCasts: { matchId: number; casterId: number }[] = [];
-  const revokedReferees: { matchId: number; refereeId: number }[] = [];
+  const revokedReferees: RevokedReferee[] = [];
   const launches = await withConnection(async (connection) => {
     let rows = await loadCandidates(connection, viewer.id, matchId, referee);
     if (rows.length === 0) return [];
@@ -894,7 +908,8 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
   const undecided: NoRefereeCandidate[] = [];
   for (const entry of revokedReferees) {
     try {
-      await releaseIneligibleReferee(entry.matchId, entry.refereeId, undecided);
+      if (entry.objection) await releaseObjectingReferee(entry.matchId, entry.refereeId, undecided);
+      else await releaseIneligibleReferee(entry.matchId, entry.refereeId, undecided);
     } catch (error) {
       console.error("[match-launch] retrait d'un arbitre non éligible impossible", error);
     }

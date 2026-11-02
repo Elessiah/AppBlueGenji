@@ -93,12 +93,13 @@ export async function loadRefereePanel(matchId: number, viewerUserId: number): P
     // rejouée ici (`refereeEligibilityBlock`), jamais prise d'une session.
     // Un rôle retiré laisse `'[]'`, pas `NULL` (`users/roles.ts`) : ces comptes
     // sont écartés en SQL plutôt que décodés un à un à chaque ouverture.
+    // `JSON_LENGTH` : MySQL comparerait `<> '[]'` à une chaîne JSON (toujours vrai).
     const [staff] = await connection.execute<StaffRow[]>(
       `SELECT id, pseudo, discord_verified_at, discord_pseudo, blizzard_sub, overwatch_battletag,
               overwatch_battletag_typed, is_deleted, is_admin, platform_roles_json, referee_objection_at
          FROM bg_users
         WHERE is_deleted = 0
-          AND (is_admin = 1 OR (platform_roles_json IS NOT NULL AND platform_roles_json <> '[]')
+          AND (is_admin = 1 OR JSON_LENGTH(platform_roles_json) > 0
                OR id IN (?, ?) OR referee_objection_at IS NOT NULL)`,
       [match.referee_user_id ?? 0, viewerUserId],
     );

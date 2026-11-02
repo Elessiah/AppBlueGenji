@@ -1153,12 +1153,12 @@ async function writeReferee(connection: PoolConnection, row: LaunchMatchRow, ref
 
 /**
  * L'avis à l'arbitre qu'un autre reprend : le motif lu par le verrou, dans
- * l'ordre de `releaseIneligibleReferee` — une opposition retenue (retrait par
- * le staff, sans ligne par match), puis la condition d'arbitrage, puis
+ * l'ordre de `releaseIneligibleReferee` — une opposition retenue (motif
+ * `OBJECTION` à l'arbitre, ligne du match au motif générique `INELIGIBLE`), puis la condition d'arbitrage, puis
  * l'équipe rejointe.
  */
 function takenOverChange(row: LaunchMatchRow, matchId: number, refereeId: number): RefereeChange {
-  if (row.refereeStanding?.objection) return { kind: "OBJECTION_RELEASED", matchId, refereeId };
+  if (row.refereeStanding?.objection) return { kind: "OBJECTION_RELEASED", matchId, refereeId, takenOver: true };
   const reason = row.refereeStanding?.block === null && row.refereeStanding.plays === true ? "JOINED_TEAM" : "INELIGIBLE";
   return { kind: "AUTO_RELEASED", matchId, refereeId, reason };
 }
@@ -1550,11 +1550,16 @@ export async function releaseIneligibleReferee(
 ): Promise<boolean> {
   let tournamentId: number | null = null;
   let change: RefereeChange | null = null;
+  // Matchs partis sans arbitre dans **cette** tentative : remis à l'appelant
+  // seulement une fois la transaction validée — un lancement défait (tentative
+  // rejouée, échec) ne doit pas être signalé.
+  let launched: NoRefereeCandidate[] = [];
   await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       // Une tentative rejouée après un interblocage repart de zéro.
       tournamentId = null;
       change = null;
+      launched = [];
       const row = await lockLaunchMatch(connection, matchId);
       if (!row || nullableId(row.referee_user_id) !== refereeId || row.status === "COMPLETED") return;
       const phase = matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, Date.now());
@@ -1568,10 +1573,13 @@ export async function releaseIneligibleReferee(
       await connection.execute(`UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL WHERE id = ?`, [
         matchId,
       ]);
-      if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId, false, undefined, undecided);
+      if (row.tournament_state === "RUNNING") {
+        await launchIfAllReady(connection, matchId, false, undefined, undecided ? launched : undefined);
+      }
       tournamentId = Number(row.tournament_id);
     }),
   );
+  undecided?.push(...launched);
   if (tournamentId === null || change === null) return false;
   publishMatchUpdatedEvent(tournamentId);
   announceRefereeChange(change);
@@ -1593,8 +1601,11 @@ export async function releaseObjectingReferee(
   refereeId: number,
   undecided?: NoRefereeCandidate[],
 ): Promise<boolean> {
+  // Comme `releaseIneligibleReferee` : remis à l'appelant après validation seulement.
+  let launched: NoRefereeCandidate[] = [];
   const tournamentId = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
+      launched = [];
       const row = await lockLaunchMatch(connection, matchId);
       if (!row || nullableId(row.referee_user_id) !== refereeId || row.status === "COMPLETED") return null;
       // Relue sous le verrou du match (même ordre que `writeReferee` : match
@@ -1603,11 +1614,14 @@ export async function releaseObjectingReferee(
       await connection.execute(`UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL WHERE id = ?`, [
         matchId,
       ]);
-      if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId, false, undefined, undecided);
+      if (row.tournament_state === "RUNNING") {
+        await launchIfAllReady(connection, matchId, false, undefined, undecided ? launched : undefined);
+      }
       queueRefereeChange(connection, { kind: "OBJECTION_RELEASED", matchId, refereeId });
       return Number(row.tournament_id);
     }),
   );
+  undecided?.push(...launched);
   if (tournamentId === null) return false;
   publishMatchUpdatedEvent(tournamentId);
   return true;

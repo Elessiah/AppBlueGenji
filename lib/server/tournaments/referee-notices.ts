@@ -38,8 +38,12 @@ export type RefereeChange =
    * Arbitrage retiré parce que l'opposition de l'arbitre est retenue par le
    * staff : aucune ligne de journal par match (la route en écrit une seule,
    * anonyme et sans nombre), l'avis à l'arbitre en donne le motif.
+   * `takenOver` : retiré hors de ce retrait en série (reprise du match par un
+   * autre arbitre, lecture des contacts) — la ligne du match part alors, sous
+   * le motif générique « condition d'arbitrage » (`INELIGIBLE`), qui ne dit
+   * pas l'opposition.
    */
-  | { kind: "OBJECTION_RELEASED"; matchId: number; refereeId: number }
+  | { kind: "OBJECTION_RELEASED"; matchId: number; refereeId: number; takenOver?: boolean }
   /** Arbitrage retiré d'office. */
   | { kind: "AUTO_RELEASED"; matchId: number; refereeId: number; reason: "INELIGIBLE" | "JOINED_TEAM" }
   /** Autogestion allumée ou éteinte ; allumée, elle retire l'arbitre (`replacedRefereeId`), l'auteur `actorId`. */
@@ -59,7 +63,7 @@ export function refereeLogChange(change: RefereeChange): RefereeLogChange {
     case "RELEASED":
       return change.byStaff ? "RELEASED_BY_STAFF" : "RELEASED";
     case "OBJECTION_RELEASED":
-      return "RELEASED_BY_STAFF";
+      return change.takenOver ? "INELIGIBLE" : "RELEASED_BY_STAFF";
     case "AUTO_RELEASED":
       return change.reason;
     case "SELF_MANAGED":
@@ -128,7 +132,8 @@ export async function deliverRefereeChange(change: RefereeChange, options: Refer
   // Opposition retenue : aucune ligne par match — N matchs nommés juste avant
   // la ligne anonyme de la route désigneraient leur arbitre comme celui qui
   // s'oppose ; seule cette ligne, sans nombre, part sur Discord.
-  const silent = options.log === false || change.kind === "OBJECTION_RELEASED";
+  // Hors de ce retrait en série (`takenOver`), la ligne du match part, motif générique.
+  const silent = options.log === false || (change.kind === "OBJECTION_RELEASED" && !change.takenOver);
   const log = silent ? Promise.resolve() : sendBotLog(
     formatRefereeChangeLog({
       tournament: match.tournament,

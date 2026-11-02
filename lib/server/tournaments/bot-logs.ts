@@ -972,6 +972,8 @@ type MatchLogRow = RowDataPacket & {
   double_forfeit: number | null;
   is_bye: number | null;
   status?: string | null;
+  referee_user_id?: number | null;
+  self_managed?: number | null;
   team1_name: string | null;
   team2_name: string | null;
   tournament_id: number;
@@ -993,6 +995,8 @@ async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
         m.double_forfeit,
         m.is_bye,
         m.status,
+        m.referee_user_id,
+        m.self_managed,
         t1.name AS team1_name,
         t2.name AS team2_name,
         tr.id AS tournament_id,
@@ -1019,9 +1023,9 @@ async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
 async function loadRefereeAlertContext(matchId: number, openOnly = false): Promise<RefereeAlertContext | null> {
   const match = await loadMatch(matchId);
   if (!match?.team1_name || !match.team2_name) return null;
-  // Alerte « sans arbitre » d'une manche : un match joué entre la file et
-  // l'envoi n'est plus à arbitrer — ni listé, ni compté.
-  if (openOnly && match.status === "COMPLETED") return null;
+  // Alerte « sans arbitre » d'une manche : un match joué, arbitré ou passé en
+  // autogestion entre la file et l'envoi n'est plus sans arbitre — ni listé, ni compté.
+  if (openOnly && !stillWithoutReferee(match)) return null;
   const participantType = toParticipantType(match.participant_type);
   return {
     tournament: { id: Number(match.tournament_id), name: match.tournament_name },
@@ -1166,8 +1170,9 @@ async function resolveNoRefereeLog(
  * L'alerte d'une manche sans horaire : une ligne qui liste ses matchs, le push
  * mène au premier. Un match relu sans ses deux engagées sort de la liste (et
  * du compte) — sa réservation est rendue (`droppedMatchIds`) ; sans aucun,
- * rien ne part. Les matchs au-delà de la liste sont recomptés en base : un
- * match tranché ou supprimé avant l'envoi ne compte plus.
+ * rien ne part. Les matchs au-delà de la liste sont relus en base : un match
+ * tranché, supprimé, arbitré ou passé en autogestion avant l'envoi ne compte
+ * plus, et rend lui aussi sa réservation.
  */
 async function resolveRoundNoRefereeLog(matchIds: readonly number[]): Promise<ResolvedRefereeLine | null> {
   const listed = matchIds.slice(0, ROUND_ALERT_LISTED_MATCHES);
@@ -1175,8 +1180,13 @@ async function resolveRoundNoRefereeLog(matchIds: readonly number[]): Promise<Re
   const found = contexts.filter((context): context is RefereeAlertContext => context !== null);
   const first = found[0];
   if (!first) return null;
-  const droppedMatchIds = listed.filter((_matchId, index) => contexts[index] === null);
-  const total = found.length + (await countOpenMatches(matchIds.slice(ROUND_ALERT_LISTED_MATCHES)));
+  const beyond = matchIds.slice(ROUND_ALERT_LISTED_MATCHES);
+  const openBeyond = await openMatchIds(beyond);
+  const droppedMatchIds = [
+    ...listed.filter((_matchId, index) => contexts[index] === null),
+    ...beyond.filter((matchId) => !openBeyond.has(matchId)),
+  ];
+  const total = found.length + openBeyond.size;
   return {
     message: formatRoundNoRefereeAlert({
       tournament: first.tournament,
@@ -1192,15 +1202,26 @@ async function resolveRoundNoRefereeLog(matchIds: readonly number[]): Promise<Re
   };
 }
 
-/** Combien de ces matchs existent encore et restent à jouer (alerte d'une manche, au-delà de la liste). */
-async function countOpenMatches(matchIds: readonly number[]): Promise<number> {
-  if (matchIds.length === 0) return 0;
+/** Le match relu est-il encore à jouer, sans arbitre ni autogestion ? (alerte d'une manche) */
+function stillWithoutReferee(match: MatchLogRow): boolean {
+  return match.status !== "COMPLETED" && (match.referee_user_id ?? null) === null && Number(match.self_managed ?? 0) !== 1;
+}
+
+/**
+ * Ceux de ces matchs qui existent encore, restent à jouer et sont toujours sans
+ * arbitre ni autogestion (alerte d'une manche, au-delà de la liste) ; les
+ * autres sortent du compte et rendent leur réservation.
+ */
+async function openMatchIds(matchIds: readonly number[]): Promise<Set<number>> {
+  if (matchIds.length === 0) return new Set();
   const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { open_count: number })[]>(
-    `SELECT COUNT(*) AS open_count FROM bg_matches WHERE id IN (${sqlPlaceholders(matchIds.length)}) AND status <> 'COMPLETED'`,
+  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_matches
+      WHERE id IN (${sqlPlaceholders(matchIds.length)}) AND status <> 'COMPLETED'
+        AND referee_user_id IS NULL AND self_managed = 0`,
     [...matchIds],
   );
-  return Number(rows[0]?.open_count ?? 0);
+  return new Set(rows.map((row) => Number(row.id)));
 }
 
 async function resolveTournamentStartedLog(

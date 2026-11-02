@@ -123,7 +123,10 @@ export async function loadRefereeEligibility(
   return refereeEligibilityBlock(rows[0]);
 }
 
-/** Les comptes de la liste qui remplissent encore la condition d'arbitrage, en une lecture. */
+/**
+ * Les comptes de la liste qui remplissent encore la condition d'arbitrage et
+ * n'ont pas d'opposition retenue (`referee-objection.ts`), en une lecture.
+ */
 export async function loadEligibleRefereeIds(
   executor: Executor,
   userIds: readonly number[],
@@ -131,7 +134,8 @@ export async function loadEligibleRefereeIds(
   const ids = [...new Set(userIds)];
   if (ids.length === 0) return new Set();
   const [rows] = await executor.execute<(CastEligibilityRow & { id: number })[]>(
-    `SELECT id, ${CAST_ELIGIBILITY_COLUMNS} FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})`,
+    `SELECT id, ${CAST_ELIGIBILITY_COLUMNS} FROM bg_users
+      WHERE id IN (${ids.map(() => "?").join(", ")}) AND referee_objection_at IS NULL`,
     ids,
   );
   return new Set(rows.filter((row) => refereeEligibilityBlock(row) === null).map((row) => Number(row.id)));
