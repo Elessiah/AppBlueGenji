@@ -342,16 +342,21 @@ export function lobbyBriefSides(
 /**
  * Relit les réglages du match juste réservé : hôte, cartes, arbitre et
  * autogestion ont pu changer entre la lecture des candidats et la réservation.
- * Une relecture vide (salon refermé dans l'intervalle) ou en panne garde la
- * lecture des candidats — la page du match, liée, porte les réglages à jour.
+ * Une relecture en panne garde la lecture des candidats — la page du match,
+ * liée, porte les réglages à jour.
+ *
+ * @returns `null` si le salon s'est refermé depuis la réservation (lancement
+ *   défait, réappariement) : rien ne part, la réservation est rendue — sinon
+ *   le brief partirait pour un salon fermé, puis une seconde fois à la
+ *   réouverture du même appariement.
  */
-async function rereadBriefRow(db: Db, row: LobbyBriefRow): Promise<LobbyBriefRow> {
+async function rereadBriefRow(db: Db, row: LobbyBriefRow): Promise<LobbyBriefRow | null> {
   try {
     const [rows] = await db.query<LobbyBriefRow[]>(
       `SELECT ${BRIEF_COLUMNS} ${BRIEF_FROM} WHERE m.id = ? AND m.launch_pairing = ? AND ${OPEN_LOBBY_SQL}`,
       [Number(row.id), String(row.launch_pairing)],
     );
-    return rows[0] ?? row;
+    return rows[0] ?? null;
   } catch (error) {
     console.error(`[lobby-brief] réglages du match ${Number(row.id)} non relus, brief sur la lecture des candidats`, error);
     return row;
@@ -443,6 +448,36 @@ type SweepContext = {
 };
 
 /**
+ * Gestionnaires d'un côté : `null` pour une vraie équipe sans gestionnaire —
+ * pas de réservation, un manager ajouté dans la fenêtre sera briefé au
+ * balayage suivant (pm2 le dit une fois).
+ */
+function sideManagers(
+  row: LobbyBriefRow,
+  slot: LobbyBriefSlot,
+  context: SweepContext,
+): { ghost: boolean; userIds: number[] } | null {
+  const teamId = Number(slot === 1 ? row.team1_id : row.team2_id);
+  const ghost = Number((slot === 1 ? row.team1_ghost : row.team2_ghost) ?? 0) === 1;
+  const userIds = context.managers.get(teamId) ?? [];
+  if (!ghost && userIds.length === 0) {
+    logNoManager(row, slot);
+    return null;
+  }
+  return { ghost, userIds };
+}
+
+/** Les deux côtés du match relu ; `null` si son salon s'est refermé depuis la réservation. */
+async function freshSides(
+  db: Db,
+  row: LobbyBriefRow,
+  context: SweepContext,
+): Promise<{ teamId: number; side: LobbyBriefSide }[] | null> {
+  const fresh = await rereadBriefRow(db, row);
+  return fresh === null ? null : context.briefSides(fresh);
+}
+
+/**
  * Brief des deux côtés d'un match, **côté par côté** : réservation, relecture
  * des réglages (une fois par match), envoi. Rend le nombre de côtés briefés ;
  * les réservations à rendre (rien n'est parti) vont dans `toRelease` au fil
@@ -450,26 +485,24 @@ type SweepContext = {
  */
 async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext, toRelease: number[]): Promise<number> {
   let sent = 0;
-  let sides: { teamId: number; side: LobbyBriefSide }[] | null = null;
+  let sides: { teamId: number; side: LobbyBriefSide }[] | null | undefined;
   for (const slot of [1, 2] as const) {
-    const teamId = Number(slot === 1 ? row.team1_id : row.team2_id);
-    const ghost = Number((slot === 1 ? row.team1_ghost : row.team2_ghost) ?? 0) === 1;
-    const userIds = context.managers.get(teamId) ?? [];
-    // Vraie équipe sans gestionnaire : pas de réservation, un manager
-    // ajouté dans la fenêtre sera briefé au balayage suivant.
-    if (!ghost && userIds.length === 0) {
-      logNoManager(row, slot);
-      continue;
-    }
+    const managers = sideManagers(row, slot, context);
+    if (managers === null) continue;
     const claimId = await claimLobbyBrief(db, row, slot);
     // Fantôme : personne à briefer, la réservation reste.
-    if (claimId === null || ghost) continue;
+    if (claimId === null || managers.ghost) continue;
     let outcome: SideOutcome;
     try {
-      sides ??= await context.briefSides(await rereadBriefRow(db, row));
+      sides ??= await freshSides(db, row, context);
+      // Salon refermé depuis la réservation : rien ne part de ce match.
+      if (sides === null) {
+        toRelease.push(claimId);
+        return sent;
+      }
       outcome = await sendSideBrief(
         Number(row.id),
-        context.recipients.filter((recipient) => userIds.includes(recipient.userId)),
+        context.recipients.filter((recipient) => managers.userIds.includes(recipient.userId)),
         sides[slot - 1].side,
         siteUrl(matchPageHref(Number(row.tournament_id), Number(row.id))),
       );
@@ -496,14 +529,26 @@ async function runLobbyBriefSweep(): Promise<number> {
       ORDER BY m.id`,
     [LOBBY_BRIEF_WINDOW_MINUTES, lobbyBriefPhase(1), lobbyBriefPhase(2)],
   );
-  if (rows.length === 0) return 0;
+  if (rows.length === 0) {
+    // Lecture commune réussie : la panne qui avait armé une relance est passée.
+    retries.delete(SWEEP_RETRY_KEY);
+    return 0;
+  }
 
   // Destinataires de tous les côtés en deux lectures, **avant** toute
   // réservation : une panne ici ne réserve rien, et arme le balayage suivant
   // (`onError`, dans la limite des relances).
-  const managers = await loadEntrantManagerIds(rows.flatMap((row) => [Number(row.team1_id), Number(row.team2_id)]));
-  const recipients = await loadNotificationRecipients([...managers.values()].flat(), "certified", { matchDm: true });
+  const memberships = await loadEntrantManagerIds(rows.flatMap((row) => [Number(row.team1_id), Number(row.team2_id)]));
+  const recipients = await loadNotificationRecipients([...memberships.values()].flat(), "certified", { matchDm: true });
   retries.delete(SWEEP_RETRY_KEY);
+  // Gestionnaires dont le compte vit encore : un compte supprimé (anonymisé)
+  // garde son appartenance mais ne reçoit plus rien — une équipe qui n'a que
+  // lui reste « sans gestionnaire », non réservée, pour qu'un manager ajouté
+  // dans la fenêtre soit briefé.
+  const live = new Set(recipients.map((recipient) => recipient.userId));
+  const managers = new Map(
+    [...memberships].map(([teamId, userIds]) => [teamId, userIds.filter((userId) => live.has(userId))]),
+  );
   // Un match dont aucun côté n'a de quoi partir (vraies équipes sans
   // gestionnaire, seules à attendre) ne coûte ni casteurs ni arbitres : il
   // reste candidat toute la fenêtre, et ces lectures seraient refaites à
