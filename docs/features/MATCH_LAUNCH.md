@@ -583,6 +583,15 @@ La cadence d'interrogation, elle, n'a pas changé : l'espacer pour les non-engag
 retarderait la modale au moment précis où un tournoi démarre, et l'appel à vide
 ne coûte plus qu'une lecture de session.
 
+## Salons vocaux d'équipe
+
+Avec l'option « Salons vocaux d'équipe » (`MATCH_VOICE.md`), le lancement attend
+que les salons vocaux des deux équipes soient pleins : avec la phase de lancement,
+« Prêt » et le lancement d'office après 15 min sont retenus (`voiceGateBlocksLaunch`) ;
+sans elle, `matchLaunchPhase` reste `SCHEDULED` après l'heure tant que le verrou
+attend (`voice.pending`). Le lancement forcé par l'arbitrage passe toujours, et une
+panne du bot lève le verrou.
+
 ## Notes reprises de CLAUDE.md
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
