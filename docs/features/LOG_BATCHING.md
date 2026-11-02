@@ -19,7 +19,11 @@ ligne du journal (`sendBotLog` → `POST /internal/log`) rejoint désormais un
   découpé que si Discord l'impose : 1 900 caractères par message
   (`BOT_LOG_MESSAGE_MAX_CHARS` — 2 000 chez Discord, moins le préfixe
   `[AppBlueGenji] ` du bot) ; une ligne seule plus longue est coupée
-  (`packBotLogLines`, `lib/shared/bot-log-batch.ts`).
+  (`packBotLogLines`, `lib/shared/bot-log-batch.ts`) : entre ses rangées
+  d'abord, puis caractère par caractère, **jamais** entre une barre oblique
+  inverse et le caractère qu'elle échappe (le morceau suivant ouvre un nouveau
+  message : un `<@&rôle>` désamorcé par `discordInline` y redeviendrait actif) ;
+  une rangée citée (`> `, `discordQuote`) garde sa marque dans chaque morceau.
 
 ## Clé d'un lot
 
@@ -60,7 +64,9 @@ terminé » ne passe donc pas devant le résultat de sa finale).
   (`lib/server/bot-log-shutdown.ts`) envoie les lots sur `SIGINT` / `SIGTERM`,
   borné à 1,2 s (pm2 tue après `kill_timeout`, 1,6 s par défaut). Next ferme
   le serveur sur le même signal et appelle `process.exit(0)` sans attendre :
-  `holdExitUntil` retient cet appel jusqu'à la fin de l'envoi. Si personne
+  `holdExitUntil` retient cet appel jusqu'à la fin de l'envoi ; un appel
+  suivant ne relance rien, mais un code d'échec l'emporte sur le `0` retenu
+  (un crash pendant l'envoi reste un crash pour pm2). Si personne
   d'autre n'écoute le signal, le module termine lui-même le processus.
 - **Arrêt brutal** : perd les lots en attente (au plus 4 lignes par clé, jusqu'à
   une vingtaine de minutes de journal dans le pire cas). Rien n'est persisté : le journal n'est pas une

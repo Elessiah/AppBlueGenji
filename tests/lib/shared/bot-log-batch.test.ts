@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { botLogBatchKey, packBotLogLines } from "@/lib/shared/bot-log-batch";
+import { discordInline } from "@/lib/shared/discord-text";
 
 /** Mise en messages d'un lot du journal Discord (`docs/features/LOG_BATCHING.md`). */
 describe("packBotLogLines", () => {
@@ -34,6 +35,32 @@ describe("packBotLogLines", () => {
   it("packBotLogLines_defaultLimit_staysUnderDiscordLimitWithBotPrefix", () => {
     const messages = packBotLogLines(Array.from({ length: 5 }, () => "x".repeat(600)));
     expect(messages.map((message) => message.length)).toEqual([1802, 1201]);
+  });
+  it("packBotLogLines_multiRowEntryOverLimit_splitBetweenRows", () => {
+    expect(packBotLogLines(["aaaa\nbbbb\ncccc"], 9)).toEqual(["aaaa\nbbbb", "cccc"]);
+  });
+
+  it("packBotLogLines_cutFallsRightAfterEscapeBackslash_backslashCarriedToNextPiece", () => {
+    expect(packBotLogLines(["abc\\<@&1>"], 4)).toEqual(["abc", "\\<@&", "1>"]);
+  });
+
+  it("packBotLogLines_evenBackslashRunAtCut_cutWithoutCarry", () => {
+    expect(packBotLogLines(["ab\\\\cd"], 4)).toEqual(["ab\\\\", "cd"]);
+  });
+
+  it("packBotLogLines_escapedRoleMentionAtTheDefaultCut_nextMessageStaysEscaped", () => {
+    const mention = discordInline("<@&123>");
+    const messages = packBotLogLines(["x".repeat(1899) + mention]);
+    expect(messages).toEqual(["x".repeat(1899), mention]);
+    expect(mention.startsWith("\\<")).toBe(true);
+  });
+
+  it("packBotLogLines_quotedRowOverLimit_eachContinuationQuoted", () => {
+    expect(packBotLogLines(["> " + "y".repeat(20)], 10)).toEqual(["> yyyyyyyy", "> yyyyyyyy", "> yyyy"]);
+  });
+
+  it("packBotLogLines_quotedRowWithTinyLimit_plainCutWithoutPrefix", () => {
+    expect(packBotLogLines(["> abcdef"], 4)).toEqual(["> ab", "cdef"]);
   });
 });
 

@@ -18,16 +18,66 @@ export const BOT_LOG_BATCH_MAX_LINES = 5;
  */
 export const BOT_LOG_MESSAGE_MAX_CHARS = 1900;
 
-/** Découpe une ligne trop longue en morceaux d'au plus `maxChars`, sans couper un caractère. */
-function splitLongLine(line: string, maxChars: number): string[] {
+/** Marque de citation de `discordQuote` : une rangée qui la porte est un texte d'utilisateur. */
+const QUOTE_PREFIX = "> ";
+
+/** Barre oblique inverse, qui échappe le caractère qu'elle suit. */
+const BACKSLASH = String.fromCodePoint(92);
+
+/** Vrai quand `text` finit par une barre oblique inverse qui échappe encore le caractère suivant. */
+function endsWithOpenEscape(text: string): boolean {
+  let count = 0;
+  for (let index = text.length - 1; index >= 0 && text[index] === BACKSLASH; index -= 1) count += 1;
+  return count % 2 === 1;
+}
+
+/**
+ * Coupe une rangée trop longue en morceaux d'au plus `maxChars`, sans couper un
+ * caractère **ni une séquence d'échappement** : la barre oblique inverse qui
+ * neutralise `<`, `*` ou `` ` `` (`discordInline`, `discordQuote`) reste collée
+ * au caractère qu'elle échappe — sinon le morceau suivant, qui ouvre un nouveau
+ * message, commencerait par un `<@&rôle>` actif. Une rangée citée (`> `) reste
+ * citée dans chacun de ses morceaux.
+ */
+function splitLongRow(row: string, maxChars: number): string[] {
+  const prefix = row.startsWith(QUOTE_PREFIX) && maxChars > QUOTE_PREFIX.length + 2 ? QUOTE_PREFIX : "";
   const pieces: string[] = [];
   let current = "";
-  for (const char of line) {
+  for (const char of row) {
     if (current.length + char.length > maxChars) {
+      let carry = "";
+      if (endsWithOpenEscape(current) && current.length > prefix.length + 1) {
+        carry = BACKSLASH;
+        current = current.slice(0, -1);
+      }
       pieces.push(current);
-      current = "";
+      current = prefix + carry;
     }
     current += char;
+  }
+  if (current && current !== prefix) pieces.push(current);
+  return pieces;
+}
+
+/**
+ * Coupe une entrée trop longue : d'abord entre ses rangées (le relevé des
+ * arbitres, un texte cité sur plusieurs lignes), qui se regroupent tant que la
+ * limite le permet ; une rangée qui dépasse seule la limite passe par
+ * {@link splitLongRow}.
+ */
+function splitLongEntry(entry: string, maxChars: number): string[] {
+  const pieces: string[] = [];
+  let current = "";
+  for (const row of entry.split("\n")) {
+    const parts = row.length <= maxChars ? [row] : splitLongRow(row, maxChars);
+    for (const part of parts) {
+      if (!current) current = part;
+      else if (current.length + 1 + part.length <= maxChars) current += `\n${part}`;
+      else {
+        pieces.push(current);
+        current = part;
+      }
+    }
   }
   if (current) pieces.push(current);
   return pieces;
@@ -36,7 +86,8 @@ function splitLongLine(line: string, maxChars: number): string[] {
 /**
  * Met les lignes d'un lot en messages : dans l'ordre, une ligne par rangée,
  * autant de lignes par message que la limite le permet. Une ligne n'est coupée
- * que si elle dépasse seule la limite. Les lignes vides sont ignorées.
+ * que si elle dépasse seule la limite — entre ses rangées d'abord, jamais au
+ * milieu d'une séquence d'échappement. Les lignes vides sont ignorées.
  */
 export function packBotLogLines(lines: readonly string[], maxChars: number = BOT_LOG_MESSAGE_MAX_CHARS): string[] {
   const limit = Math.max(2, Math.floor(maxChars));
@@ -56,7 +107,7 @@ export function packBotLogLines(lines: readonly string[], maxChars: number = BOT
     const line = raw.trim();
     if (!line) continue;
     if (line.length <= limit) push(line);
-    else for (const piece of splitLongLine(line, limit)) push(piece);
+    else for (const piece of splitLongEntry(line, limit)) push(piece);
   }
   if (current) messages.push(current);
   return messages;

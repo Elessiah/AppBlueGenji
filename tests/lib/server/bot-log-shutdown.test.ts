@@ -77,6 +77,35 @@ describe("holdExitUntil", () => {
     expect(process.exit).toBe(exit);
     expect(exit).not.toHaveBeenCalled();
   });
+  it("holdExitUntil_failureAfterHeldSuccess_exitsWithTheFailureCode", async () => {
+    const exit = jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    holdExitUntil(Promise.resolve());
+    process.exit(0);
+    process.exit(1);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(1);
+  });
+
+  it("holdExitUntil_successAfterHeldFailure_keepsTheFailureCode", async () => {
+    const exit = jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    holdExitUntil(Promise.resolve());
+    process.exit(1);
+    process.exit(0);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(1);
+  });
+
+  it("holdExitUntil_noCodeThenFailure_exitsWithTheFailureCode", async () => {
+    const exit = jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    holdExitUntil(Promise.resolve());
+    process.exit();
+    process.exit(2);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(2);
+  });
 });
 
 describe("installBotLogShutdownFlush", () => {

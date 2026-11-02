@@ -33,19 +33,33 @@ export async function flushBotLogsBeforeExit(timeoutMs: number = SHUTDOWN_FLUSH_
   }
 }
 
+/** Un code de sortie qui signale un échec (tout sauf l'absence de code et `0`). */
+function isFailureCode(code: number | string | null | undefined): boolean {
+  return code !== undefined && code !== null && Number(code) !== 0;
+}
+
 /**
  * Retient `process.exit` jusqu'à `done` : un appel pendant l'envoi est rejoué
- * avec son code une fois l'envoi fini. `process.exit` est rendu ensuite.
+ * une fois l'envoi fini. Un appel suivant ne relance rien, mais un code
+ * d'**échec** l'emporte sur un code de succès déjà retenu — un gestionnaire
+ * fatal qui appelle `process.exit(1)` après le `process.exit(0)` de Next ne
+ * se change pas en sortie propre aux yeux de pm2. `process.exit` est rendu
+ * ensuite.
  */
 export function holdExitUntil(done: Promise<void>): void {
   const originalExit = process.exit;
   let requested = false;
+  let exitCode: number | string | null | undefined;
   const held = ((code?: number | string | null) => {
-    if (requested) return undefined as never;
+    if (requested) {
+      if (isFailureCode(code) && !isFailureCode(exitCode)) exitCode = code;
+      return undefined as never;
+    }
     requested = true;
+    exitCode = code;
     void done.finally(() => {
       if (process.exit === held) process.exit = originalExit;
-      originalExit.call(process, code);
+      originalExit.call(process, exitCode);
     });
     return undefined as never;
   }) as typeof process.exit;
