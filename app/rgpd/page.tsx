@@ -1090,11 +1090,11 @@ function RgpdFr({
             dont le nom serait un pseudo. Le match ne se lance qu&apos;une fois les deux salons pleins (l&apos;arbitrage peut le forcer ; si le
             bot ne répond pas, le match n&apos;attend pas). Pour le savoir, le bot compte les personnes présentes dans chaque salon : il tient pour
             cela en mémoire, sans jamais l&apos;enregistrer, l&apos;état vocal (dans quel salon se trouve chacun, micro ou son coupés, partage d&apos;écran ou caméra actifs) des membres du serveur Discord de
-            l&apos;association, telle que Discord la lui transmet — celle des autres serveurs où il est présent lui parvient aussi, mais il
-            ne la garde pas ; le site ne reçoit et ne garde que l&apos;identifiant du salon, ce <strong>nombre</strong> (« Salon vocal : 3/5 », affiché aux parties du match et au staff, et lisible par tout membre connecté qui suit le tournoi)
-            et l&apos;heure du comptage (ou d&apos;une panne du bot), jamais qui. Le salon est rendu au bot quand le match est joué, annulé,
+            l&apos;association, tel que Discord le lui transmet — celui des autres serveurs où il est présent lui parvient aussi, mais il
+            ne le garde pas ; le site ne reçoit et ne garde que l&apos;identifiant du salon, les numéros du match et de l&apos;équipe, ce <strong>nombre</strong> (« Salon vocal : 3/5 », affiché aux parties du match et au staff, et lisible par tout membre connecté qui suit le tournoi ; un visiteur sans compte voit seulement si le match attend ses salons)
+            et les heures du comptage (ou d&apos;une panne du bot), de création et de rendu, jamais qui. Le salon est rendu au bot quand le match est joué, annulé,
             retombé en attente ou sorti du programme, quand l&apos;équipe sort de l&apos;appariement, ou quand le tournoi se termine ou éteint
-            l&apos;option ; le bot le supprime dès qu&apos;il est vide (au plus tard 24 heures et demie après son rendu, même occupé ; un salon jamais rendu,
+            l&apos;option ; le bot le supprime dès qu&apos;il est vide (au plus tard 24 heures et demie après son rendu, même occupé, sauf si Discord l&apos;en empêche — il réessaie alors à chaque balayage ; un salon jamais rendu,
             s&apos;il est vide 48 heures après sa création ou sa reprise ; déplacé hors de la catégorie des matchs, le bot cesse de le
             suivre sans le supprimer et il relève de la modération du serveur), et le site efface sa ligne une semaine plus tard (hors les
             copies de sauvegarde chiffrées). Le bot garde de chaque salon une fiche sans nom (identifiant du salon, numéros du match et de
@@ -1132,6 +1132,7 @@ function RgpdFr({
               l&apos;annonce des matchs diffusés dans le salon #live, qui ne portent aucun pseudo de joueur
               — sauf cette annonce en tournoi individuel, qui nomme les joueurs par leur pseudo public, et
               l&apos;alerte AutoMod qu&apos;elle peut faire parvenir au salon d&apos;alertes des modérateurs ;
+              les salons vocaux d&apos;équipe d&apos;un match, au nom de l&apos;équipe, dans les tournois qui en ont l&apos;option ;
               et la connexion par Discord, si vous la choisissez.
             </li>
             <li>

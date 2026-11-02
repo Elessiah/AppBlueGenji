@@ -799,7 +799,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Members of the association's Discord server present in one of its voice channels, whose presence the bot holds in memory to count",
     ],
     dataCategories: [
-      "Discord identifier of each team's channel for a match, number of people present at the last count and the time of that count, time of any bot outage — never who is present",
+      "Discord identifier of each team's channel for a match, numbers of the match and team, number of people present at the last count and the time of that count, time of any bot outage, creation and hand-back times of the channel — never who is present",
       "Team name, sent to the bot to name the channel",
       "Voice state (which channel each person is in, microphone or sound muted, screen sharing or camera on) of the members of the association's Discord server, held in memory by the bot to count, never recorded nor sent to the site",
       "The bot's record of the channel: channel identifier, key of the match and team (numbers, no name), creation and hand-back times",
@@ -807,13 +807,13 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     sensitiveData: "None",
     retention: [
       `The channel's record on the site (identifier, number of people): until the channel is handed back to the bot, then ${VOICE_ROW_RETENTION_DAYS} days, erased by the next sweep, apart from the encrypted backup copies (T09, ${BACKUP_RETENTION_DAYS} days at most)`,
-      "Channel on Discord: deleted by the bot as soon as it is empty once handed back, within 24 and a half hours of being handed back at the latest even if occupied (sweep every 30 minutes); a channel never handed back is deleted by the bot if it is empty 48 hours after its creation or its reuse, and stays while it is occupied; moved out of the match category, the bot stops tracking it without deleting it (it then falls to the server's moderation)",
-      "Voice presence: held in memory by the bot, kept up to date with what Discord sends it, and lost when it stops; never recorded by the bot nor sent to the site — that of the other servers it is on is not kept",
-      "The bot's record of the channel: erased with the channel; forgotten 96 hours after its creation or its reuse if the bot no longer sees the channel",
+      "Channel on Discord: deleted by the bot as soon as it is empty once handed back, within 24 and a half hours of being handed back at the latest even if occupied (sweep every 30 minutes), unless Discord prevents it (permission removed, error): it then retries at every sweep; a channel never handed back is deleted by the bot if it is empty 48 hours after its creation or its reuse, and stays while it is occupied; moved out of the match category, the bot stops tracking it without deleting it (it then falls to the server's moderation)",
+      "Voice state: held in memory by the bot, kept up to date with what Discord sends it, and lost when it stops; never recorded by the bot nor sent to the site — that of the other servers it is on is not kept",
+      "The bot's record of the channel: erased with the channel; forgotten 96 hours after its creation or its reuse if the bot no longer has access to the channel; kept while Discord answers with another error",
     ],
     recipients: [
       "Members of both teams of a match, its casters and staff, to whom the match page displays the number of people in each channel",
-      "Other signed-in members following the tournament, who can read that number in the tournament's data — never a visitor without an account",
+      "Other signed-in members following the tournament, who can read that number in the tournament's data — a visitor without an account only reads there whether the match is still waiting for its channels, never the number",
       "Members of the association's Discord server allowed in the match category, who see the channel and its occupants on Discord",
       "Discord (execution platform)",
     ],
@@ -821,7 +821,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     security: [
       ...COMMON_SECURITY_EN,
       "A number only: neither the identifier nor the username of the people present is requested from the bot, received or logged by the site",
-      "A channel's count is only requested from the bot by the server's sweep, at most once every ten seconds, never for each viewer",
+      "A channel's count is only requested from the bot by the server's sweep, at most once every ten seconds (immediately when referees change the option), never for each viewer",
     ],
   },
 ];

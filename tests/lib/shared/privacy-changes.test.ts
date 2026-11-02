@@ -2373,6 +2373,13 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     expect(t18En.retention[1]).toContain("moved out of the match category");
   });
 
+  it("privacyChanges_matchVoice_statesRightToObjectFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((c) => c.title.includes("vocaux"))!;
+    const en = PRIVACY_CHANGES_EN[fr.id];
+    expect(fr.details.join(" ")).toContain("Vous pouvez vous opposer à ce traitement");
+    expect(en.details.join(" ")).toContain("You can object to this processing");
+  });
+
   it("processingRegister_t08_pointsVoiceChannelsToT18FrAndEn", () => {
     const t08 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T08")!;
     const t08En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T08")!;
