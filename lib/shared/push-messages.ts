@@ -47,7 +47,7 @@ import { scopedText, type Leaves, type ScopedText } from "./scoped-text";
 import { clipPushText, PUSH_BODY_MAX, type PushContent } from "./push-notifications";
 import type { CastReleasedMatch } from "./cast-notices";
 import { lobbyBriefNames, type LobbyBriefSide } from "./lobby-brief";
-import { visibleText } from "./visible-text";
+import { withoutInvisibles } from "./visible-text";
 
 type PushText = ScopedText<Leaves<typeof frPush>>;
 
@@ -71,20 +71,13 @@ type MatchSide = {
   solo?: boolean;
 };
 
-/**
- * Un nom saisi (équipe, tournoi) tel qu'un écran verrouillé peut l'afficher :
- * sans contrôle ni commande de direction. Un nom ancien gardant U+202E
- * (laissé par `cleanStoredNames`) retournerait sinon la ligne entière.
- */
-function shownName(name: string): string {
-  return visibleText(name);
-}
-
 /** « Renards contre Nova », ou « Ton match » quand les engagés sont des joueurs. */
 function pairing(side: MatchSide, text: PushText): string {
   return side.solo
     ? text.t("pairingSolo")
-    : text.t("pairing", { team: shownName(side.teamName), opponent: shownName(side.opponentName) });
+    : // Sans contrôle ni commande de direction : un nom ancien gardant U+202E
+      // (laissé par `cleanStoredNames`) retournerait sinon la ligne entière.
+      text.t("pairing", { team: withoutInvisibles(side.teamName), opponent: withoutInvisibles(side.opponentName) });
 }
 
 /** Étiquette d'un match : les notifications d'un même match se remplacent. */
@@ -100,7 +93,7 @@ function matchTag(matchId: number): string {
  */
 export function matchStartPush(side: MatchSide, phase: "LOBBY" | "LAUNCHED", locale: Locale = DEFAULT_LOCALE): PushContent {
   const text = TEXT[locale];
-  const values = { pairing: pairing(side, text), tournament: shownName(side.tournamentName) };
+  const values = { pairing: pairing(side, text), tournament: withoutInvisibles(side.tournamentName) };
   return {
     title: phase === "LOBBY" ? text.t("matchStart.titleLobby") : text.t("matchStart.titleLaunched"),
     body: phase === "LOBBY" ? text.t("matchStart.bodyLobby", values) : text.t("matchStart.bodyLaunched", values),
@@ -120,18 +113,20 @@ export function lobbyBriefPush(side: LobbyBriefSide, locale: Locale = DEFAULT_LO
   // Les places et l'ordre des bans du message privé (`lobbyBriefNames`) ; les
   // noms d'équipe entre guillemets, comme dans le message privé : un nom qui
   // contient « · » ne se confond pas avec le séparateur.
-  const quote = (name: string) => text.t("lobbyBrief.quoted", { name: shownName(name) });
-  const soloSide = { ...side, teamName: text.t("lobbyBrief.own"), opponentName: text.t("lobbyBrief.other") };
-  const names = side.solo ? lobbyBriefNames(soloSide, locale, (name) => name) : lobbyBriefNames(side, locale, quote);
+  // Sans contrôle ni commande de direction (`withoutInvisibles`) : un nom
+  // ancien gardant U+202E retournerait sinon la ligne. En individuel,
+  // `lobbyBriefNames` écrit « toi » / « ton adversaire ».
+  const quote = (name: string) => text.t("lobbyBrief.quoted", { name: withoutInvisibles(name) });
+  const names = lobbyBriefNames(side, locale, quote);
   // Ni l'appariement ni la manche : gauche et droite nomment déjà les deux
   // engagées ; le « 1er ban » se pose sur le côté que la règle du tournoi
   // désigne (`ROUND_MAPS.md` : la droite, qui n'héberge pas, par défaut), donc
-  // aucun nom n'est répété. La carte (texte libre) vient en dernier, sans sa
-  // ponctuation finale : le gabarit pose son propre point.
+  // aucun nom n'est répété. La carte (texte libre, nettoyée comme les noms)
+  // vient en dernier, sans sa ponctuation finale : le gabarit pose son point.
   const values = {
     left: names.left,
     right: names.right,
-    map: side.firstMap === null ? text.t("lobbyBrief.noMap") : side.firstMap.replace(/[\s.!?…。]+$/u, "") || side.firstMap,
+    map: side.firstMap === null ? text.t("lobbyBrief.noMap") : pushMapName(side.firstMap),
   };
   const hostBans = side.banFirst === side.hosting;
   const plain = text.t(hostBans ? "lobbyBrief.bodyHostBans" : "lobbyBrief.body", values);
@@ -147,6 +142,17 @@ export function lobbyBriefPush(side: LobbyBriefSide, locale: Locale = DEFAULT_LO
     tag: `${matchTag(side.matchId)}-salon`,
   };
 }
+
+/** Carte du push : sans invisible ni ponctuation finale (une carte faite de ponctuation seule reste écrite). */
+function pushMapName(map: string): string {
+  const shown = withoutInvisibles(map);
+  // Boucle plutôt qu'une expression `[…]+$` (retour arrière quadratique).
+  let end = shown.length;
+  while (end > 0 && TRAILING_MAP_PUNCTUATION.has(shown[end - 1])) end -= 1;
+  return shown.slice(0, end) || shown;
+}
+
+const TRAILING_MAP_PUNCTUATION = new Set([" ", "\t", "\n", "\u00a0", ".", "!", "?", "…", "。"]);
 
 /** Palier d'un rappel (`MATCH_REMINDER_OFFSETS`), par sa clé. */
 export type { MatchReminderOffsetKey } from "./discord-notifications";

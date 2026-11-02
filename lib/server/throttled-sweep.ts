@@ -22,6 +22,11 @@ export function throttledSweep(options: {
   throttleMs: number;
   sweep: () => Promise<number>;
   onError: (error: unknown) => void;
+  /**
+   * Garde relue à **chaque** passage, relève comprise : faux, rien ne part
+   * (ni balayage ni minuteur) et l'appel rend `0`.
+   */
+  enabled?: () => boolean;
 }): ThrottledSweep {
   let lastSweepAt = 0;
   let pending: Promise<number> | null = null;
@@ -37,6 +42,7 @@ export function throttledSweep(options: {
   }
 
   async function run(): Promise<number> {
+    if (options.enabled && !options.enabled()) return 0;
     if (pending) {
       schedule(options.throttleMs);
       return pending;

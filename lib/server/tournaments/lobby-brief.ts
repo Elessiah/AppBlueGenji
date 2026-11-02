@@ -64,7 +64,7 @@ import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { loadEligibleRefereeIds } from "./cast-eligibility";
 import { formatLobbyBriefDm } from "./lobby-brief-dm";
 import { seedJoins } from "./match-host-seeds";
-import { activeMemberSql } from "./match-players";
+import { playsMatchSql } from "./match-players";
 import { readMatchCasters } from "./player-pushes";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
@@ -178,10 +178,7 @@ const BRIEF_COLUMNS = `m.id, m.tournament_id, t.name AS tournament_name, t.parti
             m.launch_pairing, m.launched_at, m.host_team_id, es1.rank AS team1_seed, es2.rank AS team2_seed,
             m.first_map, m.self_managed, m.referee_user_id, m.map_picks,
             (m.referee_user_id IS NOT NULL
-              AND (m.referee_user_id IN (t1.solo_user_id, t2.solo_user_id)
-                OR EXISTS (SELECT 1 FROM bg_team_members tm
-                            WHERE tm.user_id = m.referee_user_id AND tm.team_id IN (m.team1_id, m.team2_id)
-                              AND ${activeMemberSql("tm")}))) AS referee_plays,
+              AND ${playsMatchSql("m.referee_user_id", "m.team1_id", "m.team2_id", "rp")}) AS referee_plays,
             t.first_ban_rule, t.next_ban_rule,
             (SELECT rm.slots_json FROM bg_tournament_round_maps rm
               WHERE rm.tournament_id = m.tournament_id AND rm.phase_id = m.phase_id
@@ -467,13 +464,21 @@ async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext, toR
     const claimId = await claimLobbyBrief(db, row, slot);
     // Fantôme : personne à briefer, la réservation reste.
     if (claimId === null || ghost) continue;
-    sides ??= await context.briefSides(await rereadBriefRow(db, row));
-    const outcome = await sendSideBrief(
-      Number(row.id),
-      context.recipients.filter((recipient) => userIds.includes(recipient.userId)),
-      sides[slot - 1].side,
-      siteUrl(matchPageHref(Number(row.tournament_id), Number(row.id))),
-    );
+    let outcome: SideOutcome;
+    try {
+      sides ??= await context.briefSides(await rereadBriefRow(db, row));
+      outcome = await sendSideBrief(
+        Number(row.id),
+        context.recipients.filter((recipient) => userIds.includes(recipient.userId)),
+        sides[slot - 1].side,
+        siteUrl(matchPageHref(Number(row.tournament_id), Number(row.id))),
+      );
+    } catch (error) {
+      // Réglages illisibles (créneaux, cartes) après la réservation : rien
+      // n'est parti, la réservation est rendue avec les autres.
+      toRelease.push(claimId);
+      throw error;
+    }
     if (outcome === "sent") sent += 1;
     else if (outcome === "retry") toRelease.push(claimId);
   }
@@ -494,9 +499,11 @@ async function runLobbyBriefSweep(): Promise<number> {
   if (rows.length === 0) return 0;
 
   // Destinataires de tous les côtés en deux lectures, **avant** toute
-  // réservation : une panne ici ne réserve rien, le balayage suivant réessaie.
+  // réservation : une panne ici ne réserve rien, et arme le balayage suivant
+  // (`onError`, dans la limite des relances).
   const managers = await loadEntrantManagerIds(rows.flatMap((row) => [Number(row.team1_id), Number(row.team2_id)]));
   const recipients = await loadNotificationRecipients([...managers.values()].flat(), "certified", { matchDm: true });
+  retries.delete(SWEEP_RETRY_KEY);
   // Ces lectures ne lèvent pas : une panne envoie le brief sans la ligne.
   const castersByMatch = await readMatchCasters(db, rows.map((row) => Number(row.id)));
   const refereeIdsOf = (list: readonly LobbyBriefRow[]) =>
@@ -518,48 +525,72 @@ async function runLobbyBriefSweep(): Promise<number> {
 
   let sent = 0;
   const toRelease: number[] = [];
-  try {
-    for (const row of rows) {
+  const toRetry: string[] = [];
+  for (const row of rows) {
+    const released = toRelease.length;
+    try {
       sent += await briefMatch(db, row, { managers, recipients, briefSides }, toRelease);
+    } catch (error) {
+      // Un match en échec (réservation interrompue, réglages illisibles)
+      // n'empêche pas les suivants ; il est rejoué au balayage suivant.
+      console.error(`[lobby-brief] brief du match ${Number(row.id)} interrompu, repris au balayage suivant`, error);
+      toRetry.push(matchRetryKey(row));
+      continue;
     }
-  } finally {
-    // Rien n'est parti pour ces côtés : leurs réservations sont rendues en un
-    // lot, et le balayage suivant est armé (dans la limite des relances).
-    if (toRelease.length > 0 && (await releaseQuietly(db, toRelease))) {
-      console.error(`[lobby-brief] ${toRelease.length} brief(s) remis au balayage suivant`);
-      scheduleRetrySweep();
-    } else if (toRelease.length === 0) {
-      retryStreak = 0;
-    }
+    if (toRelease.length > released) toRetry.push(matchRetryKey(row));
+    else retries.delete(matchRetryKey(row));
   }
+  // Rien n'est parti pour ces côtés : leurs réservations sont rendues en un
+  // lot ; pm2 ne dit « remis » qu'une fois le rendu fait.
+  if (toRelease.length > 0 && (await releaseQuietly(db, toRelease))) {
+    console.error(`[lobby-brief] ${toRelease.length} brief(s) remis au balayage suivant`);
+  }
+  scheduleRetrySweep(toRetry);
   return sent;
 }
 
 /** Étranglement : celui des départs de match (dix secondes). */
 const LOBBY_BRIEF_THROTTLE_MS = 10_000;
 /**
- * Relances armées d'affilée après un rendu : au-delà, le brief attend un autre
- * déclencheur (une panne durable ne relance pas toutes les dix secondes).
+ * Relances armées d'affilée **pour un même match** (ou pour le balayage
+ * entier, quand ses lectures communes échouent) : au-delà, il attend un autre
+ * déclencheur — une panne durable ne relance pas toutes les dix secondes, et
+ * un match qui échoue toujours n'épuise pas les relances des autres.
  */
 const LOBBY_BRIEF_MAX_RETRIES = 3;
-let retryStreak = 0;
+const RETRIES_MAX_KEYS = 1000;
+const SWEEP_RETRY_KEY = "sweep";
+const retries = new Map<string, number>();
+
+function matchRetryKey(row: LobbyBriefRow): string {
+  return `${Number(row.id)}:${String(row.launch_pairing)}`;
+}
 
 const sweeps = throttledSweep({
   throttleMs: LOBBY_BRIEF_THROTTLE_MS,
   sweep: runLobbyBriefSweep,
   onError: (error) => {
-    if (!isMissingTableError(error)) console.error("[lobby-brief] briefs du salon non envoyés", error);
+    if (isMissingTableError(error)) return;
+    console.error("[lobby-brief] briefs du salon non envoyés", error);
+    scheduleRetrySweep([SWEEP_RETRY_KEY]);
   },
 });
 
-/** Une réservation rendue arme le balayage suivant, sans attendre un autre déclencheur. */
-function scheduleRetrySweep(): void {
-  if (retryStreak >= LOBBY_BRIEF_MAX_RETRIES) {
-    console.error("[lobby-brief] relances épuisées, brief en attente du prochain évènement du tournoi");
-    return;
+/**
+ * Arme le balayage suivant pour ces matchs, sans attendre un autre
+ * déclencheur, tant que l'un d'eux n'a pas épuisé ses relances.
+ */
+function scheduleRetrySweep(keys: readonly string[]): void {
+  if (keys.length === 0) return;
+  if (retries.size >= RETRIES_MAX_KEYS) retries.clear();
+  let armed = false;
+  for (const key of keys) {
+    const count = (retries.get(key) ?? 0) + 1;
+    retries.set(key, count);
+    if (count <= LOBBY_BRIEF_MAX_RETRIES) armed = true;
   }
-  retryStreak += 1;
-  sweeps.schedule(LOBBY_BRIEF_THROTTLE_MS);
+  if (armed) sweeps.schedule(LOBBY_BRIEF_THROTTLE_MS);
+  else console.error("[lobby-brief] relances épuisées, brief en attente du prochain évènement du tournoi");
 }
 
 /**
@@ -575,6 +606,6 @@ export async function dispatchLobbyBriefs(): Promise<number> {
 /** Remet l'étranglement à zéro. Réservé aux tests. */
 export function resetLobbyBriefThrottle(): void {
   sweeps.reset();
-  retryStreak = 0;
+  retries.clear();
   NO_MANAGER_LOGGED.clear();
 }

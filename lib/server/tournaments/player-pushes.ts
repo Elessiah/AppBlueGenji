@@ -254,9 +254,15 @@ const PURGE_INTERVAL_MS = 60 * 60_000;
 
 let lastPurgeAt = 0;
 
-/** Étranglement à relève partagé (`throttledSweep`). */
+/**
+ * Étranglement à relève partagé (`throttledSweep`). Push éteint (clés
+ * absentes) : rien à annoncer, et surtout rien à **réserver** — une annonce
+ * réservée sans canal serait perdue pour de bon. La garde est relue à chaque
+ * passage, relève comprise.
+ */
 const sweeps = throttledSweep({
   throttleMs: MATCH_START_SWEEP_THROTTLE_MS,
+  enabled: () => webPushConfig() !== null,
   sweep: async () => {
     if (Date.now() - lastPurgeAt >= PURGE_INTERVAL_MS) {
       lastPurgeAt = Date.now();
@@ -274,9 +280,6 @@ const sweeps = throttledSweep({
  * l'appelant est une écriture déjà faite ou une lecture de page.
  */
 export async function dispatchMatchStartNotices(): Promise<number> {
-  // Push éteint (clés absentes) : rien à annoncer, et surtout rien à
-  // **réserver** — une annonce réservée sans canal serait perdue pour de bon.
-  if (!webPushConfig()) return 0;
   return sweeps.run();
 }
 

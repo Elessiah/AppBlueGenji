@@ -15,8 +15,6 @@
     "bodyHostBans": "Left (host, 1st ban): {left} · Right: {right} · 1st map: {map}.",
     "bodyCastHostBans": "Cast match: sort the players by role. Left (host, 1st ban): {left} · Right: {right} · 1st map: {map}.",
     "noMap": "not set yet",
-    "own": "you",
-    "other": "your opponent",
     "quoted": "“{name}”"
   },
   "matchReminder": {
