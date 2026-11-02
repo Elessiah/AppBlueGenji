@@ -71,6 +71,28 @@ describe("throttledSweep", () => {
     expect(sweep).toHaveBeenCalledTimes(1);
   });
 
+  it("run_disabled_returnsZeroWithoutSweeping", async () => {
+    const sweep = jest.fn(async () => 3);
+    const sweeps = throttledSweep({ throttleMs: 10_000, sweep, onError: jest.fn(), enabled: () => false });
+
+    expect(await sweeps.run()).toBe(0);
+
+    expect(sweep).not.toHaveBeenCalled();
+  });
+
+  it("schedule_disabledBeforeTheTimerFires_trailingSweepSkipped", async () => {
+    let enabled = true;
+    const sweep = jest.fn(async () => 3);
+    const sweeps = throttledSweep({ throttleMs: 10_000, sweep, onError: jest.fn(), enabled: () => enabled });
+    await sweeps.run();
+    await sweeps.run();
+
+    enabled = false;
+    await jest.advanceTimersByTimeAsync(10_000);
+
+    expect(sweep).toHaveBeenCalledTimes(1);
+  });
+
   it("reset_afterASweep_nextCallRunsAtOnceAndPendingTimerIsCancelled", async () => {
     const { sweeps, sweep } = sweeper();
     await sweeps.run();

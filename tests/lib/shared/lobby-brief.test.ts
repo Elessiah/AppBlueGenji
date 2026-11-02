@@ -288,6 +288,12 @@ describe("lobbyBriefPush", () => {
     expect(push.body).toBe("Gauche (hôte) : « Renards » · Droite (1er ban) : « Nova » · 1re carte : Ilios.");
   });
 
+  it("lobbyBriefPush_invisibleCharactersInMap_strippedFromBody", () => {
+    const push = lobbyBriefPush(side({ firstMap: "Il\u202Eios\u200B." }));
+
+    expect(push.body).toBe("Gauche (hôte) : « Renards » · Droite (1er ban) : « Nova » · 1re carte : Ilios.");
+  });
+
   it("matchStartPush_bidiOverrideInStoredNames_strippedFromBody", () => {
     const push = matchStartPush(
       { tournamentId: 4, tournamentName: "Cou\u202Epe", matchId: 40, teamName: "Ren\u202Eards", opponentName: "Nova" },

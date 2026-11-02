@@ -4,9 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.unmock("@/lib/server/tournaments/lobby-brief");
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/notify");
-const siteRoot: { value: string | null } = { value: "https://bluegenji.test" };
+const siteRoot: { value: string | null; failFor: string | null } = { value: "https://bluegenji.test", failFor: null };
 jest.mock("@/lib/server/site-url", () => ({
-  siteUrl: (path: string) => (siteRoot.value === null ? null : `${siteRoot.value}${path}`),
+  siteUrl: (path: string) => {
+    if (siteRoot.failFor !== null && path.includes(siteRoot.failFor)) throw new Error("SITE_URL");
+    return siteRoot.value === null ? null : `${siteRoot.value}${path}`;
+  },
 }));
 // Le vrai rédacteur, épiable : un test le fait lever pour un côté.
 jest.mock("@/lib/server/tournaments/lobby-brief-dm", () => {
@@ -105,6 +108,7 @@ function sends() {
 beforeEach(() => {
   jest.clearAllMocks();
   resetLobbyBriefThrottle();
+  siteRoot.failFor = null;
   jest.mocked(loadEntrantManagerIds).mockResolvedValue(
     new Map([
       [1, [10, 11]],
@@ -312,8 +316,10 @@ describe("dispatchLobbyBriefs", () => {
 
     await dispatchLobbyBriefs();
 
-    expect(query.mock.calls[0][0]).toMatch(/m\.referee_user_id IN \(t1\.solo_user_id, t2\.solo_user_id\)/);
-    expect(query.mock.calls[0][0]).toMatch(/tm\.team_id IN \(m\.team1_id, m\.team2_id\)/);
+    // Même règle que l'éligibilité des matchs (`playsMatchSql`) : membre actif ou joueur solo.
+    expect(query.mock.calls[0][0]).toMatch(/rptm\.user_id = m\.referee_user_id/);
+    expect(query.mock.calls[0][0]).toMatch(/rptm\.team_id IN \(m\.team1_id, m\.team2_id\)/);
+    expect(query.mock.calls[0][0]).toMatch(/rpst\.solo_user_id = m\.referee_user_id AND rpst\.id IN \(m\.team1_id, m\.team2_id\)/);
     expect(sends()[0].dm()).not.toContain("Arbitre");
   });
 
@@ -418,7 +424,7 @@ describe("dispatchLobbyBriefs", () => {
     error.mockRestore();
   });
 
-  it("dispatchLobbyBriefs_claimThrowsMidway_inFlightSideReleasedByKeyAndSweepStops", async () => {
+  it("dispatchLobbyBriefs_claimThrowsOnFirstMatch_releasedByKeyAndNextMatchStillBriefed", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const { execute } = mockDb([MATCH, { ...MATCH, id: 41 }]);
     const base = execute.getMockImplementation()!;
@@ -426,20 +432,56 @@ describe("dispatchLobbyBriefs", () => {
     execute.mockImplementation(async (sql, params) => {
       if (sql.startsWith("INSERT IGNORE")) {
         inserts += 1;
-        if (inserts === 3) throw new Error("CONNECTION_LOST");
+        if (inserts === 1) throw new Error("CONNECTION_LOST");
       }
       return base(sql, params);
     });
 
-    expect(await dispatchLobbyBriefs()).toBe(0);
+    expect(await dispatchLobbyBriefs()).toBe(2);
 
-    // Les deux côtés du match 40 sont partis ; le côté interrompu du 41 est rendu par sa clé.
-    expect(notifyUsers).toHaveBeenCalledTimes(2);
+    // Le côté interrompu du 40 est rendu par sa clé ; le 41 part quand même.
     expect(releases(execute).map(([sql, params]) => [sql, params])).toEqual([
-      ["DELETE FROM bg_match_start_notices WHERE match_id = ? AND pairing = ? AND phase = ?", [41, "1:2", "LOBBY_BRIEF_1"]],
+      ["DELETE FROM bg_match_start_notices WHERE match_id = ? AND pairing = ? AND phase = ?", [40, "1:2", "LOBBY_BRIEF_1"]],
     ]);
-    expect(logged(error, "briefs du salon non envoyés")).toBe(true);
+    expect(notifyUsers).toHaveBeenCalledTimes(2);
+    expect(logged(error, "brief du match 40 interrompu")).toBe(true);
     error.mockRestore();
+  });
+
+  it("dispatchLobbyBriefs_linkThrowsAfterClaim_claimReleasedByIdAndNextMatchStillBriefed", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    siteRoot.failFor = "/matchs/40";
+    const { execute } = mockDb([MATCH, { ...MATCH, id: 41 }]);
+
+    expect(await dispatchLobbyBriefs()).toBe(2);
+
+    // Rien n'est parti pour le 40 : sa réservation (id 100) est rendue par son id.
+    expect(releases(execute).map(([sql, params]) => [sql, params])).toEqual([
+      ["DELETE FROM bg_match_start_notices WHERE id IN (?)", [100]],
+    ]);
+    expect(notifyUsers).toHaveBeenCalledTimes(2);
+    expect(logged(error, "brief du match 40 interrompu")).toBe(true);
+    error.mockRestore();
+  });
+
+  it("dispatchLobbyBriefs_recipientsUnreadable_nothingClaimedAndTrailingSweepBriefs", async () => {
+    jest.useFakeTimers();
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      jest.mocked(loadNotificationRecipients).mockRejectedValueOnce(new Error("DB_DOWN"));
+      const { execute } = mockDb([MATCH]);
+
+      expect(await dispatchLobbyBriefs()).toBe(0);
+      expect(execute).not.toHaveBeenCalled();
+      expect(logged(error, "briefs du salon non envoyés")).toBe(true);
+
+      // La relance armée par l'échec briefe sans autre déclencheur.
+      await jest.advanceTimersByTimeAsync(10_000);
+      expect(notifyUsers).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+      error.mockRestore();
+    }
   });
 
   it("dispatchLobbyBriefs_briefNotRendered_releasedByIdAndOnlyThatSideRebriefedNextSweep", async () => {
@@ -487,6 +529,30 @@ describe("dispatchLobbyBriefs", () => {
       // Le balayage initial puis trois relances au plus.
       expect(query.mock.calls.filter(([sql]) => !/WHERE m\.id = \?/.test(sql))).toHaveLength(4);
       expect(logged(error, "relances épuisées")).toBe(true);
+    } finally {
+      jest.mocked(formatLobbyBriefDm).mockImplementation(actualDm.formatLobbyBriefDm);
+      jest.useRealTimers();
+      error.mockRestore();
+    }
+  });
+
+  it("dispatchLobbyBriefs_oneMatchExhaustedItsRetries_anotherMatchFailingStillArmsARetry", async () => {
+    jest.useFakeTimers();
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      jest.mocked(formatLobbyBriefDm).mockImplementation(() => {
+        throw new Error("RENDER");
+      });
+      mockDb([MATCH]);
+      await dispatchLobbyBriefs();
+      for (let i = 0; i < 6; i += 1) await jest.advanceTimersByTimeAsync(10_000);
+
+      // Le match 40 a épuisé ses relances ; le 41 échoue à son tour, il a les siennes.
+      const { query } = mockDb([{ ...MATCH, id: 41 }]);
+      await dispatchLobbyBriefs();
+      await jest.advanceTimersByTimeAsync(10_000);
+
+      expect(query.mock.calls.filter(([sql]) => !/WHERE m\.id = \?/.test(sql))).toHaveLength(2);
     } finally {
       jest.mocked(formatLobbyBriefDm).mockImplementation(actualDm.formatLobbyBriefDm);
       jest.useRealTimers();
