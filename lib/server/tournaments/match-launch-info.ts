@@ -379,6 +379,13 @@ type LaunchContext = {
    * dans la modale de lancement. Suit `exposes`, comme son BattleTag.
    */
   refereeDiscord: boolean;
+  /**
+   * Rôle du lecteur sur le match : un caster (staff compris, qui lit pourtant
+   * les contacts des équipes dès que les adversaires sont connus) ne lit ceux
+   * de l'arbitre que le temps du match (`refereeContactsOpen`), comme le dit
+   * le texte de certification (« ses casters le temps du match seulement »).
+   */
+  viewerRole: MatchLaunchViewerRole;
 };
 
 
@@ -647,11 +654,14 @@ function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: L
  * arbitre qui caste aussi le match suit la règle des casters : ses contacts
  * attendent le départ (`ctx.exposesCaster`), comme sur sa carte de caster —
  * sinon sa fiche d'arbitre livrerait avant l'heure ce que sa carte retient.
+ * Un lecteur caster (`ctx.viewerRole`), staff compris, les lit lui aussi le
+ * temps du match seulement (texte de certification).
  */
 function refereeContactsOpen(user: UserRow, ctx: LaunchContext): boolean {
   if (!ctx.exposes) return false;
   const casts = ctx.casters.some((caster) => caster.userId === Number(user.id));
-  return !casts || ctx.exposesCaster;
+  // Un lecteur caster, même staff, attend aussi le départ.
+  return (!casts && ctx.viewerRole !== "CASTER") || ctx.exposesCaster;
 }
 
 /**
@@ -857,6 +867,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
           // qu'un filet : jamais le caster sans le match.
           exposesCaster: exposes && exposesCasterContacts(phase, party.role),
           refereeDiscord: forCard && party.role !== "REFEREE",
+          viewerRole: party.role,
         }),
       );
     }

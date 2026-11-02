@@ -39,7 +39,10 @@ lecture d'**un** match (`loadViewerMatchContacts`, `GET /api/matches/[id]/contac
 la fenêtre des contacts (`ctx.exposes`), comme le BattleTag, et passe par
 `visibleDiscordTag` (`sharesMatchLobby`) — seul un tag certifié sort. Un
 arbitre qui caste aussi le match suit la règle des casters : son tag **et
-son BattleTag** attendent le départ (`ctx.exposesCaster`, `refereeContactsOpen`). Le texte de certification (`DISCORD_VERIFICATION_EXPOSURE`,
+son BattleTag** attendent le départ (`ctx.exposesCaster`, `refereeContactsOpen`). Un lecteur
+caster, **staff compris** (qui lit pourtant les contacts des équipes dès que
+les adversaires sont connus), ne lit les contacts de l'arbitre que le temps
+du match (`ctx.viewerRole`), comme le dit le texte de certification. Le texte de certification (`DISCORD_VERIFICATION_EXPOSURE`,
 `verify.exposure.match` FR et EN) nomme ces lecteurs.
 `RefereeCard` dessine la ligne « Discord » avec « Copier » quand le champ est
 présent : sur la page du match comme dans la fenêtre « Contacts », qui lit la

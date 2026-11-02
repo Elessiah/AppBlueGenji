@@ -1257,6 +1257,34 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
       expect(info?.referee).toMatchObject({ battletag: "Arbitre#1", discordTag: "juge" });
     });
 
+    it("loadViewerMatchContacts_staffCasterScheduledMatch_withholdsRefereeContactsUntilKickoff", async () => {
+      const later = new Date(Date.now() + 3 * 3_600_000).toISOString();
+      state.viewerMemberships = [];
+      state.candidates = [
+        candidate({ match_launch_phase: 0, start_at: later, lobby_opened_at: null, referee_user_id: REFEREE, caster_user_id: VIEWER, self_managed: 0 }),
+      ];
+      state.users = [casterUser(VIEWER, { platform_roles_json: JSON.stringify(["ARBITRE"]) }), juge()];
+
+      const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"] }, 42);
+
+      expect(info?.viewer.role).toBe("CASTER");
+      expect(info?.phase).toBe("SCHEDULED");
+      expect(info?.referee).toMatchObject({ discordTag: null, battletag: null });
+      expect(JSON.stringify(info?.referee)).not.toContain("juge");
+      expect(JSON.stringify(info?.referee)).not.toContain("Arbitre#1");
+    });
+
+    it("loadViewerMatchContacts_staffCasterOpenedMatch_sendsRefereeContacts", async () => {
+      state.viewerMemberships = [];
+      state.candidates = [candidate({ referee_user_id: REFEREE, caster_user_id: VIEWER, self_managed: 0 })];
+      state.users = [casterUser(VIEWER, { platform_roles_json: JSON.stringify(["ARBITRE"]) }), juge()];
+
+      const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"] }, 42);
+
+      expect(info?.viewer.role).toBe("CASTER");
+      expect(info?.referee).toMatchObject({ discordTag: "juge", battletag: "Arbitre#1" });
+    });
+
     it("loadViewerMatchContacts_marvelRivals_sendsDiscordTagWithoutBattletag", async () => {
       state.candidates = [candidate({ tournament_game: "MR", referee_user_id: REFEREE, self_managed: 0 })];
       state.users = [juge()];
