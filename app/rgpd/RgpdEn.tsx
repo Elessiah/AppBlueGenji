@@ -357,7 +357,7 @@ export function RgpdEn({
           to preserve: it is erased entirely, with no remaining row — with three exceptions, where its row
           remains because it is the holder of something that survives: if it has <strong>organized</strong> a
           tournament, if it is the <strong>owner of a team</strong> (transferring or disbanding the team before
-          deletion restores complete erasure), or if it is an entrant in a
+          deletion restores complete erasure), or if it is an entrant in a{" "}
           <strong>solo tournament</strong> that has already started or ended, whose entry bears its name. A registration for a solo tournament
           that has not started yet, where it played no match, does not keep the row on its own: if nothing else keeps it, the registration is
           withdrawn from the tournament with the account; otherwise, it stays under the borrowed username.

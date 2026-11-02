@@ -748,7 +748,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     details: [
       "Solo registrations: a registration for a solo tournament that hasn't started yet, where you played no match, no longer keeps your account under a borrowed username — if nothing else keeps it (a match played, a team owned, a tournament organized, an entry in a solo tournament that has already started or ended), it is erased entirely and the registration withdrawn from the tournament; otherwise, the registration stays, under a borrowed username. Once the tournament has started or ended, the entrant stays, under a borrowed username, as before.",
       "Player page: a deleted account's page, under its borrowed username, is now kept only if it played at least one match (its statistics also belong to its opponents); otherwise the page is not found, and its name is shown without a link.",
-      "What doesn't change: nothing new is collected; the traces left after any deletion (encrypted backups, deletion log, connection data, audience measurement) are the same.",
+      "What doesn't change: nothing new is collected; the traces left after any deletion (including encrypted backups, deletion log, connection data, audience measurement) are the same.",
     ],
   },
 };

@@ -361,3 +361,14 @@ describe("/rgpd : base légale de la conservation du choix des messages de match
     expect(en).not.toContain("in your legitimate interest (that is what lets it honour the choice)");
   });
 });
+
+describe("/rgpd : retrait d'une inscription solo à venir à la suppression (D12)", () => {
+  it("rgpd_soloWithdrawal_isConditionalOnNothingElseKeepingTheAccountFrAndEn", async () => {
+    const fr = legalPageText(await render(PrivacyPage, "fr"));
+    expect(fr).toContain("ne retient pas la ligne à elle seule : si rien d'autre ne la retient, elle est retirée du tournoi avec le compte ; sinon, elle reste sous le pseudo d'emprunt.");
+    const en = legalPageText(await render(PrivacyPage, "en"));
+    expect(en).toContain("or if it is an entrant in a solo tournament that has already started or ended");
+    expect(en).toContain("does not keep the row on its own: if nothing else keeps it, the registration is withdrawn from the tournament with the account; otherwise, it stays under the borrowed username.");
+    expect(en).not.toContain("in asolo");
+  });
+});

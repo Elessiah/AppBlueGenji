@@ -1453,7 +1453,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "Inscriptions individuelles : une inscription à un tournoi individuel pas encore commencé, où tu n'as disputé aucun match, ne garde plus ton compte sous un pseudo d'emprunt — si rien d'autre ne le retient (match joué, équipe possédée, tournoi organisé, engagement dans un tournoi individuel déjà commencé ou terminé), il est effacé entièrement et l'inscription retirée du tournoi ; sinon, l'inscription reste, sous un pseudo d'emprunt. Une fois le tournoi commencé ou terminé, l'engagé reste, sous un pseudo d'emprunt, comme avant.",
       "Fiche du joueur : la fiche d'un compte supprimé, sous son pseudo d'emprunt, n'est plus gardée que s'il a joué au moins un match (ses statistiques appartiennent aussi à ses adversaires) ; sinon la page est introuvable, et son nom s'affiche sans lien.",
-      "Ce qui ne change pas : rien de nouveau n'est collecté ; les traces qui restent après toute suppression (sauvegardes chiffrées, journal des suppressions, données de connexion, mesure d'audience) sont les mêmes.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté ; les traces qui restent après toute suppression (notamment sauvegardes chiffrées, journal des suppressions, données de connexion, mesure d'audience) sont les mêmes.",
     ],
   },
 ];
