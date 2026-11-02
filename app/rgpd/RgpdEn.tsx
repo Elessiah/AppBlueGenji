@@ -262,9 +262,10 @@ export function RgpdEn({
           </tbody>
         </table>
         <p style={{ marginTop: 16, ...NOTE_STYLE }}>
-          * An account that has played no match, organized no tournament, owns no team and is registered for no
-          solo tournament is <strong>entirely erased</strong> when it is deleted, apart from connection data
-          (***). Otherwise, its profile data is erased immediately and its username replaced by a borrowed
+          * An account that has played no match, organized no tournament, owns no team and is an entrant in no
+          solo tournament that has started is <strong>entirely erased</strong> when it is deleted, apart from
+          connection data (***); its registrations for solo tournaments that have not started yet are withdrawn
+          with it. Otherwise, its profile data is erased immediately and its username replaced by a borrowed
           username. Sessions (<code>__Host-bg_session</code> cookie) expire 30 days after login.
         </p>
         <p style={{ marginTop: 8, ...NOTE_STYLE }}>
@@ -351,12 +352,15 @@ export function RgpdEn({
           the person is erased (Discord and game tags, login accounts, avatar, adulthood, roles — the only
           exception being the replay codes described above) and the username is replaced by a randomly drawn{" "}
           <strong>borrowed username</strong>: the record remains under this false name, and the player&apos;s
-          page states that the account has been deleted. An account that has never played a match has no record
+          page, kept only if they played at least one match, states that the account has been deleted; with no
+          match played, the page is gone (page not found) and their name no longer leads anywhere. An account that has never played a match has no record
           to preserve: it is erased entirely, with no remaining row — with three exceptions, where its row
           remains because it is the holder of something that survives: if it has <strong>organized</strong> a
           tournament, if it is the <strong>owner of a team</strong> (transferring or disbanding the team before
-          deletion restores complete erasure), or if it is registered for a <strong>solo tournament</strong>,
-          whose entry bears its name.
+          deletion restores complete erasure), or if it is an entrant in a
+          <strong>solo tournament</strong> that has already started or ended, whose entry bears its name. A registration for a solo tournament
+          that has not started yet, where it played no match, does not keep the row: it is withdrawn from the
+          tournament with the account.
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>
           <p>

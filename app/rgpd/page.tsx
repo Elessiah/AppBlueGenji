@@ -366,8 +366,9 @@ function RgpdFr({
         </table>
         <p style={{ marginTop: 16, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
           * Un compte qui n'a joué aucun match, n'a organisé aucun tournoi, n'est
-          propriétaire d'aucune équipe et n'est inscrit à aucun tournoi individuel est{" "}
-          <strong>entièrement effacé</strong> à sa suppression, hors données de connexion (***).
+          propriétaire d'aucune équipe et n'est engagé dans aucun tournoi individuel commencé est{" "}
+          <strong>entièrement effacé</strong> à sa suppression, hors données de connexion (***) ;
+          ses inscriptions à des tournois individuels pas encore commencés sont retirées avec lui.
           Sinon, ses données de profil sont effacées immédiatement et son pseudo remplacé par un
           pseudo d'emprunt. Les sessions
           (cookie <code>__Host-bg_session</code>) expirent 30 jours après la connexion.
@@ -468,14 +469,19 @@ function RgpdFr({
           (tags Discord et de jeu, comptes de connexion, avatar, majorité, rôles — seule réserve,
           les codes de replay décrits ci-dessus) et le pseudo
           est remplacé par un <strong>pseudo d'emprunt</strong> tiré au hasard : le palmarès
-          subsiste sous ce faux nom, et la fiche du joueur indique que le compte a été supprimé.
+          subsiste sous ce faux nom, et la fiche du joueur, gardée seulement s&apos;il a joué au moins un
+          match, indique que le compte a été supprimé ; sans match joué, la fiche disparaît (page
+          introuvable) et son nom ne mène plus nulle part.
           Un compte qui n'a jamais disputé de match n'a, lui, aucun palmarès à préserver : il est effacé
           entièrement, sans ligne résiduelle — à trois réserves près, où sa ligne reste parce
           qu'elle est le titulaire de quelque chose qui survit : s'il a{" "}
           <strong>organisé</strong> un tournoi, s'il est{" "}
           <strong>propriétaire d'une équipe</strong> (transférer ou
           dissoudre l'équipe avant la suppression rétablit l'effacement complet), ou s'il est
-          inscrit à un <strong>tournoi individuel</strong>, dont l'engagé porte son nom.
+          engagé dans un <strong>tournoi individuel</strong> déjà commencé ou terminé, dont l'engagé
+          porte son nom. Une inscription à un tournoi individuel qui n'a pas encore commencé, et
+          où il n'a disputé aucun match, ne retient pas la ligne : elle est retirée du tournoi avec
+          le compte.
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>
           <p>

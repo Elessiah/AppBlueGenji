@@ -1437,6 +1437,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui est traité : pour compter, le bot tient en mémoire en permanence (option allumée ou non), sans jamais l'enregistrer, l'état vocal (identifiant Discord du membre et de sa session vocale, salon où il se trouve, micro ou son coupés par lui ou par la modération, partage d'écran ou caméra actifs, demande de parole et mise en sourdine de scène), avec la fiche de membre que Discord y joint, des membres du serveur Discord de l'association, et garde de chaque salon une fiche sans nom (identifiant, numéros du match et de l'équipe, heures) ; le site ne reçoit et ne garde que l'identifiant du salon, les numéros du match et de l'équipe, ce nombre et les heures du comptage (ou d'une panne du bot), de création et de rendu, effacés une semaine après que le salon a été rendu (match terminé, score validé, annulé, retombé en attente ou sorti du programme, équipe sortie de l'appariement, tournoi terminé ou option éteinte). Le bot supprime le salon dès qu'il se vide une fois rendu, au plus tard 24 heures et demie après (bot en marche, sauf si Discord l'en empêche : il réessaie à chaque balayage). C'est au titre de l'intérêt légitime (bon déroulement des tournois) ; rejoindre un salon reste un choix, mais tant que les deux ne sont pas pleins, le match attend que l'arbitrage force son lancement. Vous pouvez vous opposer à ce traitement (section « Vos droits » de la page RGPD).",
     ],
   },
+  {
+    // ERASURE-FOLLOWUP (2026-11-02, décisions D12 et D13 de l'utilisateur) :
+    // une inscription à un tournoi individuel pas encore commencé, sans match,
+    // ne retient plus le compte (effacement complet, inscription retirée), et
+    // la fiche d'un compte supprimé n'est gardée que s'il a joué. Pour tous les
+    // comptes. Datée du lendemain de la mise en ligne (fusion attendue le
+    // 2026-11-03, déploiement la nuit suivante au plus tôt).
+    id: "2026-11-suppression-inscription-solo-et-fiche",
+    publishedAt: "2026-11-05",
+    title: "Suppression du compte : inscriptions individuelles à venir et fiche du joueur",
+    links: [{ href: "/rgpd#donnees-connexion", label: "Lire ce que la suppression emporte" }],
+    summary:
+      "Supprimer ton compte l'efface désormais entièrement même si tu es inscrit à un tournoi individuel qui n'a pas encore commencé : l'inscription est retirée avec lui. Et la fiche d'un compte supprimé ne reste visible que s'il a joué au moins un match.",
+    details: [
+      "Inscriptions individuelles : une inscription à un tournoi individuel pas encore commencé, où tu n'as disputé aucun match, ne garde plus ton compte sous un pseudo d'emprunt — si rien d'autre ne le retient (match joué, équipe possédée, tournoi organisé), il est effacé entièrement et l'inscription retirée du tournoi. Une fois le tournoi commencé ou terminé, l'engagé reste, sous un pseudo d'emprunt, comme avant.",
+      "Fiche du joueur : la fiche d'un compte supprimé, sous son pseudo d'emprunt, n'est plus gardée que s'il a joué au moins un match (ses statistiques appartiennent aussi à ses adversaires) ; sinon la page est introuvable, et son nom s'affiche sans lien.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté ; les traces qui restent après toute suppression (sauvegardes chiffrées, journal des suppressions, données de connexion, mesure d'audience) sont les mêmes.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

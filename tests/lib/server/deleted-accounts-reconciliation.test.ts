@@ -384,11 +384,11 @@ describe("la politique publiée annonce l'exception de l'entrée solo", () => {
     const entry = PRIVACY_CHANGES.find((change) => change.id === "2026-09-suppression-pseudo-emprunt")!;
     expect(entry.details.join(" ")).toContain("tournoi individuel");
     const rgpd = readFileSync(join(__dirname, "..", "..", "..", "app", "rgpd", "page.tsx"), "utf8");
-    expect(rgpd).toContain("inscrit à aucun tournoi individuel");
+    expect(rgpd).toContain("engagé dans aucun tournoi individuel commencé");
     const register = readFileSync(
       join(__dirname, "..", "..", "..", "lib", "shared", "processing-register.ts"),
       "utf8",
     );
-    expect(register).toContain("aucune inscription en tournoi individuel");
+    expect(register).toContain("aucun engagement dans un tournoi individuel commencé");
   });
 });
