@@ -9,6 +9,7 @@
  * Serveur seulement.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
 /** Condition d'appartenance en cours d'un membre d'équipe (`bg_team_members`, alias `alias`). */
 export function activeMemberSql(alias: string): string {
@@ -35,7 +36,7 @@ export async function loadMatchPlayerIds(
 ): Promise<Set<number>> {
   const teamIds = [match.team1_id, match.team2_id].filter((id): id is number => id !== null).map(Number);
   if (teamIds.length === 0) return new Set();
-  const placeholders = teamIds.map(() => "?").join(", ");
+  const placeholders = sqlPlaceholders(teamIds.length);
   const [rows] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
     `SELECT user_id FROM bg_team_members tm WHERE ${activeMemberSql("tm")} AND team_id IN (${placeholders})
      UNION

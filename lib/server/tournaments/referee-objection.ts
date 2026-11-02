@@ -27,7 +27,8 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { loadRefereeEligibility } from "./cast-eligibility";
-import { releaseObjectingReferee } from "./match-launch";
+import { queueDeferredNoRefereeAlerts, releaseObjectingReferee } from "./match-launch";
+import type { NoRefereeCandidate } from "@/lib/shared/match-referee";
 
 /**
  * Ce que le geste a fait : `changed` faux s'il était déjà dans cet état ;
@@ -91,13 +92,16 @@ async function releaseFromUnfinishedMatches(refereeId: number): Promise<{ releas
   }
   let released = 0;
   let failed = 0;
+  // Les matchs qui partent sans arbitre sont signalés ensemble, par manche.
+  const undecided: NoRefereeCandidate[] = [];
   for (const match of matches) {
     try {
-      if (await releaseObjectingReferee(Number(match.id), refereeId)) released += 1;
+      if (await releaseObjectingReferee(Number(match.id), refereeId, undecided)) released += 1;
     } catch (error) {
       failed += 1;
       console.error(`[referee-objection] retrait du match #${match.id} impossible :`, error);
     }
   }
+  await queueDeferredNoRefereeAlerts(undecided);
   return { released, failed };
 }

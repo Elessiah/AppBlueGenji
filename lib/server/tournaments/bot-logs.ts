@@ -971,6 +971,7 @@ type MatchLogRow = RowDataPacket & {
   forfeit_team_id: number | null;
   double_forfeit: number | null;
   is_bye: number | null;
+  status?: string | null;
   team1_name: string | null;
   team2_name: string | null;
   tournament_id: number;
@@ -991,6 +992,7 @@ async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
         m.forfeit_team_id,
         m.double_forfeit,
         m.is_bye,
+        m.status,
         t1.name AS team1_name,
         t2.name AS team2_name,
         tr.id AS tournament_id,
@@ -1014,9 +1016,12 @@ async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
  * rien à arbitrer entre une équipe et une case vide, et le message ne saurait
  * pas quoi nommer.
  */
-async function loadRefereeAlertContext(matchId: number): Promise<RefereeAlertContext | null> {
+async function loadRefereeAlertContext(matchId: number, openOnly = false): Promise<RefereeAlertContext | null> {
   const match = await loadMatch(matchId);
   if (!match?.team1_name || !match.team2_name) return null;
+  // Alerte « sans arbitre » d'une manche : un match joué entre la file et
+  // l'envoi n'est plus à arbitrer — ni listé, ni compté.
+  if (openOnly && match.status === "COMPLETED") return null;
   const participantType = toParticipantType(match.participant_type);
   return {
     tournament: { id: Number(match.tournament_id), name: match.tournament_name },
@@ -1166,7 +1171,7 @@ async function resolveNoRefereeLog(
  */
 async function resolveRoundNoRefereeLog(matchIds: readonly number[]): Promise<ResolvedRefereeLine | null> {
   const listed = matchIds.slice(0, ROUND_ALERT_LISTED_MATCHES);
-  const contexts = await Promise.all(listed.map((matchId) => loadRefereeAlertContext(matchId)));
+  const contexts = await Promise.all(listed.map((matchId) => loadRefereeAlertContext(matchId, true)));
   const found = contexts.filter((context): context is RefereeAlertContext => context !== null);
   const first = found[0];
   if (!first) return null;

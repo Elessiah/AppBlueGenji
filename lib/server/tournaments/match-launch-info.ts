@@ -54,6 +54,7 @@ import { localUploadUrl } from "@/lib/shared/uploads";
 import {
   maintainMatchLaunches,
   releaseIneligibleCast,
+  queueDeferredNoRefereeAlerts,
   releaseIneligibleReferee,
   rowLaunchState,
   rowReadiness,
@@ -61,7 +62,7 @@ import {
   type LaunchMatchBaseRow,
 } from "./match-launch";
 import { castEligibilityBlock, refereeEligibilityBlock } from "./cast-eligibility";
-import { matchHostTeamId } from "@/lib/shared/match-referee";
+import { matchHostTeamId, type NoRefereeCandidate } from "@/lib/shared/match-referee";
 import { seedJoins } from "./match-host-seeds";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { cachedTournamentList } from "./list-cache";
@@ -890,13 +891,16 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
       console.error("[match-launch] retrait d'un caster non éligible impossible", error);
     }
   }
+  const undecided: NoRefereeCandidate[] = [];
   for (const entry of revokedReferees) {
     try {
-      await releaseIneligibleReferee(entry.matchId, entry.refereeId);
+      await releaseIneligibleReferee(entry.matchId, entry.refereeId, undecided);
     } catch (error) {
       console.error("[match-launch] retrait d'un arbitre non éligible impossible", error);
     }
   }
+  // Les matchs partis sans arbitre sont signalés ensemble, par manche.
+  await queueDeferredNoRefereeAlerts(undecided);
   return launches;
 }
 

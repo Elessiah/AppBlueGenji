@@ -98,11 +98,14 @@ export async function matchPageMetadata(
   const position =
     matchId === null || tournamentId === null || granted === null
       ? null
-      : await getMatchPagePosition(tournamentId, matchId).catch(() => null);
+      : // `undefined` : lecture en échec — la page existe peut-être, sa canonique reste la sienne.
+        await getMatchPagePosition(tournamentId, matchId).catch(() => undefined);
   const tournamentPath = spectator ? spectatorTournamentPath : memberTournamentPath;
+  // Seul un match **connu absent** prend la canonique du tournoi.
+  const missing = position === null && granted !== null && tournamentId !== null;
   const metadata = await tournamentPageMetadata(
     rawTournamentId,
-    (id) => (position === null || matchId === null ? tournamentPath(id) : matchPagePath(id, matchId, spectator)),
+    (id) => (missing || matchId === null ? tournamentPath(id) : matchPagePath(id, matchId, spectator)),
     async () => granted,
     loadCard,
   );
