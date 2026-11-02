@@ -3,7 +3,7 @@ import { createBotLogBatcher, type BotLogBatcher } from "@/lib/server/bot-log-ba
 
 /**
  * Lots du journal Discord (`docs/features/LOG_BATCHING.md`) : silence de 5 min
- * relancé par chaque ligne, envoi immédiat à 5 lignes, un message par lot.
+ * relancé par chaque ligne (âge maximal 10 min), envoi immédiat à 5 lignes, un message par lot.
  */
 const WINDOW = 5 * 60 * 1000;
 
@@ -186,5 +186,128 @@ describe("reset", () => {
     jest.advanceTimersByTime(WINDOW);
     await settle();
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Âge maximal (`BOT_LOG_BATCH_MAX_AGE_MS`) : un lot part au plus tard 10 min
+ * après sa première ligne, même si chaque ligne relance le silence.
+ */
+const MAX_AGE = 10 * 60 * 1000;
+const FOUR_MIN = 4 * 60 * 1000;
+
+describe("maxAge", () => {
+  it("maxAge_lineEveryFourMinutes_sentTenMinutesAfterTheFirst", async () => {
+    batcher.add("k", "un");
+    jest.advanceTimersByTime(FOUR_MIN);
+    batcher.add("k", "deux");
+    jest.advanceTimersByTime(FOUR_MIN);
+    batcher.add("k", "trois");
+    jest.advanceTimersByTime(MAX_AGE - 2 * FOUR_MIN - 1);
+    await settle();
+    expect(send).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1);
+    await settle();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith("un\ndeux\ntrois");
+    expect(batcher.pending().size).toBe(0);
+  });
+
+  it("maxAge_flushedByAge_nextLineStartsAFreshAgeAndWindow", async () => {
+    batcher.add("k", "un");
+    jest.advanceTimersByTime(FOUR_MIN);
+    batcher.add("k", "deux");
+    jest.advanceTimersByTime(MAX_AGE - FOUR_MIN);
+    await settle();
+    expect(send).toHaveBeenCalledTimes(1);
+    batcher.add("k", "trois");
+    jest.advanceTimersByTime(FOUR_MIN);
+    batcher.add("k", "quatre");
+    jest.advanceTimersByTime(FOUR_MIN);
+    batcher.add("k", "cinq");
+    jest.advanceTimersByTime(MAX_AGE - 2 * FOUR_MIN - 1);
+    await settle();
+    expect(send).toHaveBeenCalledTimes(1);
+    jest.advanceTimersByTime(1);
+    await settle();
+    expect(send).toHaveBeenLastCalledWith("trois\nquatre\ncinq");
+  });
+
+  it("maxAge_quietWindowBeforeTheAge_stillFlushesAtFiveMinutes", async () => {
+    batcher.add("k", "un");
+    jest.advanceTimersByTime(WINDOW);
+    await settle();
+    expect(send).toHaveBeenCalledTimes(1);
+    jest.advanceTimersByTime(MAX_AGE);
+    await settle();
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("maxAge_capOfFiveLines_stillImmediateAndStaleAgeDoesNotFireLater", async () => {
+    batcher.add("k", "1");
+    jest.advanceTimersByTime(FOUR_MIN);
+    for (const line of ["2", "3", "4", "5"]) batcher.add("k", line);
+    await settle();
+    expect(send).toHaveBeenCalledTimes(1);
+    batcher.add("k", "6");
+    jest.advanceTimersByTime(FOUR_MIN);
+    batcher.add("k", "7");
+    // t = 10,5 min : l'âge du premier lot (10 min) est échu, pas celui du suivant.
+    jest.advanceTimersByTime(MAX_AGE - 2 * FOUR_MIN + FOUR_MIN / 2 + 1000);
+    await settle();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(batcher.pending().get("k")).toBe(2);
+  });
+
+  it("maxAge_differentKeys_ageCountedPerKey", async () => {
+    const TWO_MIN = 2 * 60 * 1000;
+    batcher.add("a", "a1");
+    jest.advanceTimersByTime(TWO_MIN);
+    batcher.add("b", "b1");
+    jest.advanceTimersByTime(TWO_MIN);
+    batcher.add("a", "a2");
+    jest.advanceTimersByTime(TWO_MIN);
+    batcher.add("b", "b2");
+    jest.advanceTimersByTime(TWO_MIN);
+    batcher.add("a", "a3");
+    jest.advanceTimersByTime(MAX_AGE - 4 * TWO_MIN);
+    await settle();
+    expect(send.mock.calls.map(([message]) => message)).toEqual(["a1\na2\na3"]);
+    expect(batcher.pending().get("b")).toBe(2);
+  });
+
+  it("maxAge_flushAll_clearsBothTimers", async () => {
+    batcher.add("k", "un");
+    await batcher.flushAll();
+    expect(jest.getTimerCount()).toBe(0);
+    jest.advanceTimersByTime(MAX_AGE);
+    await settle();
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("maxAge_reset_clearsBothTimers", () => {
+    batcher.add("k", "un");
+    expect(jest.getTimerCount()).toBe(2);
+    batcher.reset();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it("maxAge_customLimit_overridesTheDefault", async () => {
+    const short = createBotLogBatcher({ send, maxAgeMs: 1000, windowMs: 5000 });
+    short.add("k", "un");
+    jest.advanceTimersByTime(1000);
+    await settle();
+    expect(send).toHaveBeenCalledWith("un");
+    short.reset();
+  });
+
+  it("maxAge_timer_unrefedSoItNeverHoldsTheProcess", () => {
+    jest.useRealTimers();
+    const unref = jest.fn();
+    const timer = { unref } as unknown as ReturnType<typeof setTimeout>;
+    jest.spyOn(globalThis, "setTimeout").mockReturnValue(timer);
+    jest.spyOn(globalThis, "clearTimeout").mockImplementation(() => undefined);
+    batcher.add("k", "ligne");
+    expect(unref).toHaveBeenCalledTimes(2);
   });
 });
