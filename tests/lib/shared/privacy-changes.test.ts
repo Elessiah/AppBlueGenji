@@ -2441,6 +2441,11 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     expect(t18.recipients).toHaveLength(t18En.recipients.length);
   });
 
+  it("processingRegister_staffJournal_listsVoiceOptionToggleFrAndEn", () => {
+    expect(PROCESSING_ACTIVITIES.map((a) => a.subPurposes.join(" ")).join(" ")).toContain("option « Salons vocaux d'équipe » allumée ou éteinte");
+    expect(PROCESSING_ACTIVITIES_EN.map((a) => a.subPurposes.join(" ")).join(" ")).toContain("“Team voice channels” option turned on or off");
+  });
+
   it("processingRegister_t08_pointsVoiceChannelsToT18FrAndEn", () => {
     const t08 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T08")!;
     const t08En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T08")!;
