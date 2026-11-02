@@ -218,8 +218,10 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
   joueur » en tournoi individuel). L'autogestion d'une manche fait **une
   ligne** (`formatRoundSelfManagementLog`), pas une par match — « Manche N »
   sans tableau quand elle touche plusieurs tableaux. Elle verrouille le tournoi
-  puis lit ses matchs en une requête verrouillée, et ses avis partent l'un
-  après l'autre (`announceRefereeChanges`).
+  puis verrouille ses matchs par clé primaire (identifiants lus d'abord, sans
+  verrou : aucun intervalle d'index pris aux autres manches), et ses avis
+  partent l'un après l'autre (`announceRefereeChanges`). Un match listé déjà
+  joué à l'envoi n'est ni listé ni compté.
 - **Avis à l'arbitre retiré** par un autre que lui : sujet push
   `REFEREE_RELEASED` (audience `tournaments`), **push seul**, jamais de message
   privé, avec le motif (`STAFF`, `REPLACED`, `SELF_MANAGED`, `OBJECTION`, `INELIGIBLE`,
@@ -252,7 +254,11 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
     ni contre une équipe fantôme ; les réservations déjà posées se lisent en
     une requête par passe (`withoutReservedAlerts`) ;
   - un match qui part sans arbitre parce qu'on vient de le retirer avertit de
-    même (`launchIfAllReady`).
+    même (`launchIfAllReady`) ; un retrait en série (opposition retenue,
+    lecture des contacts) recueille ces matchs et les signale ensemble à la
+    fin, regroupés par manche (`queueDeferredNoRefereeAlerts`) ;
+  - une lecture des réservations en échec (table absente, verrou dépassé) ne
+    défait pas le geste : la réservation tranche.
   Noms d'équipe sur Discord, « un joueur » pour une entrée solo.
 
 ## Seed

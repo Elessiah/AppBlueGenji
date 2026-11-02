@@ -27,7 +27,8 @@ d'équipe et du pool de maps : des sections, sans emplacement vide.
   du match ; la page sans compte reste `noindex`. Même place sous le titre de la
   page. Une session illisible (base injoignable) n'est pas un 404. Un match
   introuvable garde l'encart **et la canonique** du tournoi (`/suivre/…` sans
-  compte), jamais celle d'une page en 404. Carte du tournoi et place du match
+  compte), jamais celle d'une page en 404 ; une lecture en échec (base
+  injoignable) garde la canonique du match. Carte du tournoi et place du match
   sont lues une fois par requête (`requestCache`, `lib/server/request-cache.ts` :
   `cache` de React, identité sous Jest).
 - **Contacts** : la modale « Contacts » ouverte depuis la page reprend la
