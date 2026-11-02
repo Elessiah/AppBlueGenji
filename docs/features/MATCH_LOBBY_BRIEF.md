@@ -78,8 +78,9 @@ ouvre un lancement, lecture de la liste des tournois).
   ni brief aux anciennes équipes, ni réservation qui ferait taire la
   réouverture), **côté par côté** : réservation, relecture des réglages du
   match (hôte, cartes, arbitre, autogestion — un changement entre la lecture
-  des candidats et la réservation est repris ; relecture vide ou en panne : la
-  lecture des candidats), envoi, puis le côté suivant — un arrêt du processus
+  des candidats et la réservation est repris ; relecture en panne : la
+  lecture des candidats ; relecture vide, le salon s'est refermé depuis la
+  réservation : rien ne part, la réservation est rendue), envoi, puis le côté suivant — un arrêt du processus
   ne laisse au plus qu'une réservation sans envoi. Un match reste candidat tant
   qu'un côté est libre. Un réappariement est un autre appariement (nouveau
   brief) ; un lancement défait (horaire changé, retour à planifier) **ou un
@@ -92,8 +93,9 @@ ouvre un lancement, lecture de la liste des tournois).
   solo — puis `loadNotificationRecipients(…, "certified", { matchDm: true })` :
   message privé au seul tag certifié, coupé par « Messages privés Discord de
   mes matchs » ; le push garde son sujet. Une **fantôme** (`is_ghost`) est
-  réservée sans envoi ; une vraie équipe **sans gestionnaire actif** n'est pas
-  réservée (pm2 le dit une fois par appariement) : un manager ajouté dans la
+  réservée sans envoi ; une vraie équipe **sans gestionnaire actif** (compte
+  supprimé compris : il garde son appartenance mais n'est plus destinataire)
+  n'est pas réservée (pm2 le dit une fois par appariement) : un manager ajouté dans la
   fenêtre est briefé au balayage suivant. Un match dont aucun côté n'a de quoi
   partir (sans gestionnaire, sans fantôme) ne déclenche ni lecture des casteurs
   ni des arbitres.
@@ -109,7 +111,8 @@ ouvre un lancement, lecture de la liste des tournois).
   puis le prochain évènement du tournoi ; un match qui échoue toujours
   n'épuise pas celles des autres). Une panne après la réservation (réglages,
   lien) rend de même la réservation, et une lecture des destinataires en
-  panne arme aussi la relance. Une réservation dont l'instruction lève (la
+  panne arme aussi la relance (compteur remis à zéro par le premier balayage
+  dont la lecture des candidats réussit, même sans candidat). Une réservation dont l'instruction lève (la
   connexion a pu tomber après l'écriture) est rendue par sa clé ; dans les deux cas, les
   matchs suivants du balayage partent quand même. Un envoi qui lève garde la sienne (le push et le message
   privé partent ensemble, une partie a pu partir) : jamais deux fois. Un côté
