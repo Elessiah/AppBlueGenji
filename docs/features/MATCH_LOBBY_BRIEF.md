@@ -94,7 +94,9 @@ ouvre un lancement, lecture de la liste des tournois).
   mes matchs » ; le push garde son sujet. Une **fantôme** (`is_ghost`) est
   réservée sans envoi ; une vraie équipe **sans gestionnaire actif** n'est pas
   réservée (pm2 le dit une fois par appariement) : un manager ajouté dans la
-  fenêtre est briefé au balayage suivant.
+  fenêtre est briefé au balayage suivant. Un match dont aucun côté n'a de quoi
+  partir (sans gestionnaire, sans fantôme) ne déclenche ni lecture des casteurs
+  ni des arbitres.
 - **Indépendant du push** (pas de garde `webPushConfig`). Bot injoignable : le
   push part, pm2 dit combien de comptes n'ont pas reçu le message
   (`[lobby-brief] bot injoignable`), **sans nouvel essai**. Une panne de lecture
