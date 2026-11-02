@@ -38,7 +38,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
         result.enabled
           ? `🗓 Planification par l'arbitrage activée sur « ${discordInline(result.tournamentName)} » par le staff.`
           : `🗓 Planification par l'arbitrage désactivée sur « ${discordInline(result.tournamentName)} » par le staff.`,
-        { id: user.id, pseudo: user.pseudo },
+        { id: user.id, pseudo: user.pseudo }, undefined, "referees",
       );
     }
     return ok({

@@ -30,24 +30,59 @@ ligne du journal (`sendBotLog` → `POST /internal/log`) rejoint désormais un
   Un message qui poursuit une ligne coupée s'ouvre sur la rangée `(suite)`
   (`BOT_LOG_CONTINUATION_LEAD`) : le bot préfixe chaque message de
   `[AppBlueGenji] `, et sans elle un texte d'utilisateur ouvrirait le message
-  comme une ligne du site (une citation y perdrait même sa marque).
+  comme une ligne du site (une citation y perdrait même sa marque). Elle suit
+  l'en-tête de catégorie.
 
 ## Clé d'un lot
 
-`botLogBatchKey(salon, tournoi)` : **le salon de destination**, puis **le
-tournoi** quand la ligne en relève (`sendBotLog(ligne, { tournamentId })`). Deux
-salons ne se mêlent jamais ; deux tournois non plus, pour qu'un message du
-journal parle d'un seul tournoi. Une ligne sans tournoi (inscription d'un
-joueur au site, programme d'arbitrage, gestes de modération par
-`publishStaffAction`) rejoint le lot commun du salon (`log:global`).
+`botLogBatchKey(salon, tournoi, catégorie)` : **le salon de destination**, puis
+**le tournoi** quand la ligne en relève (`sendBotLog(ligne, { tournamentId })`),
+puis la **catégorie** du geste (`sendBotLog(ligne, { category })`, absente :
+`general`) — `log:tournament:7:referees`, `log:global:admin`. Deux salons ne se
+mêlent jamais, deux tournois non plus, **deux types de ligne non plus** : un
+message du journal parle d'un seul tournoi et d'un seul type de geste. Plafond
+de 5 lignes, silence de 5 minutes et âge maximal de 10 minutes s'appliquent
+**par clé** : un lot d'arbitrage plein ne fait pas partir le lot des casts.
+Une ligne sans tournoi (inscription d'un joueur au site, gestes de modération
+par `publishStaffAction`) rejoint le lot commun de sa catégorie.
 
-Rattachées à leur tournoi : désignations et retraits d'arbitre
-(`referee-notices.ts`), casts (`cast-notices.ts`), autogestion d'une manche
-(`match-launch.ts`), gestes du staff (`staff-action-logs.ts`), cartes et règles
-de ban (`round-maps.ts`, `round-maps-notice.ts`), évènements d'un tournoi
-(`bot-logs.ts` : création, inscription, abandon, lancement, fin, pénalités, et
-résultat d'un match, rattaché au tournoi relu avec le match — un « tournoi
-terminé » ne passe donc pas devant le résultat de sa finale).
+Chaque message du lot s'ouvre sur l'**en-tête français** de sa catégorie
+(`BOT_LOG_CATEGORY_HEADERS`, `lib/shared/bot-log-category.ts`) — un libellé
+fixe, jamais un nom ni un `#id` de joueur ; il compte dans la limite de
+1 900 caractères.
+
+### Catégories
+
+| Catégorie | En-tête | Lignes | `kind` |
+|---|---|---|---|
+| `referees` | Arbitrage | désignations et retraits (`referee-notices.ts`), autogestion d'une manche (`match-launch.ts`), objection, planification par l'arbitrage, arbitre qui joue (`dispute-self-resolution.ts`) | `log` |
+| `referee-digest` | Matchs à arbitrer | relevé des matchs à venir sans arbitre (`referee-digest.ts`) | `alert` |
+| `casts` | Casts | `cast-notices.ts` | `log` |
+| `results` | Résultats | résultat d'un match, pénalités d'endurance (`bot-logs.ts`) | `log` |
+| `tournament` | Tournoi | création, lancement, fin, tournoi sous-rempli (`bot-logs.ts`) | `log` |
+| `registrations` | Inscriptions | inscription, abandon (`bot-logs.ts`), retrait d'engagée, abandon annulé (routes admin) | `log` |
+| `schedule` | Programme | horaires posés, changés, retirés (`schedule-notices.ts`) | `log` |
+| `maps` | Cartes | règles de ban, résumé de cartes de manche (`round-maps.ts`, `round-maps-notice.ts`) | `log` |
+| `admin` | Administration | gestes du staff sur un match ou un tournoi (`staff-action-logs.ts`), suppression d'un tournoi, retour en arrière d'une manche, rôles de plateforme — défaut de `publishStaffAction` | `log` |
+| `moderation` | Modération | logos, avatars, suspensions, signalements (`logo-quarantine.ts`, `account-suspensions.ts`, `content-reports.ts`) | `log` |
+| `signups` | Nouveaux comptes | inscription d'un joueur au site (`sign-in.ts`) | `log` |
+| `general` | Journal | repli d'une ligne sans catégorie | `log` |
+
+Ajouter une catégorie : l'ajouter à `BOT_LOG_CATEGORIES`, à ses tables de
+nature et d'en-tête (`Record` exhaustifs : cela ne compile pas sinon), puis à
+ce tableau. Les évènements de `bot-logs.ts` se rangent par
+`BOT_EVENT_LOG_CATEGORIES` (`lib/shared/referee-alerts.ts`, exhaustive).
+
+## Nature de l'appel (`kind`)
+
+Tout `POST /internal/log` porte `kind: "log" | "alert"`, **déduit de la
+catégorie** (`botLogKind`) — jamais choisi par l'appelant, pour qu'une
+catégorie ne soit pas tantôt trace, tantôt alerte. Le bot poste `log` en
+`@silent` ; `alert` notifie ; un `kind` absent vaut `alert` (un site plus
+ancien reste notifiant). Seule `referee-digest` est une alerte : elle appelle
+un arbitre à se positionner. Tout le reste est une trace. **Déployer le bot
+avant le site.** Le canal arbitre (`/internal/notify/referees`) n'est pas
+concerné : le bot y gère lui-même la trace.
 
 ## Ce qui ne change pas
 
@@ -57,7 +92,7 @@ terminé » ne passe donc pas devant le résultat de sa finale).
 - **pm2** : `publishStaffAction` écrit la ligne nominative **avant** et sans
   attendre ; seule la moitié Discord, anonyme, attend dans le lot.
 - **Vie privée** : le lot transmet les lignes telles que rédigées, sans rien y
-  ajouter (`RGPD_LOGS_AND_VISITS.md`, `UNTRUSTED_NAMES.md`) — ni pseudo, ni
+  ajouter (hormis l'en-tête de catégorie, libellé fixe) (`RGPD_LOGS_AND_VISITS.md`, `UNTRUSTED_NAMES.md`) — ni pseudo, ni
   `#id` de joueur, staff anonyme. Ni nouvelle donnée, ni nouveau lecteur, ni
   durée de garde nouvelle : pas d'entrée `PRIVACY_CHANGES`.
 - **Bot injoignable** : même dégradation qu'avant (`postBotLog`, coupe-circuit
@@ -85,13 +120,15 @@ terminé » ne passe donc pas devant le résultat de sa finale).
 L'annonce des cartes (`ROUND_MAPS.md`) garde sa fusion en base (une ligne par
 tournoi, les manches modifiées réunies, 60 s de silence) : elle seule sait
 fusionner deux réglages de la même manche et survivre à un redémarrage. Sa
-ligne résumée entre ensuite dans le lot du tournoi, comme toute autre. La
+ligne résumée entre ensuite dans le lot `maps` du tournoi (catégorie `maps`), comme toute autre. La
 fermeture de l'écran (`POST …/round-maps/flush`) envoie le résumé **et** le lot
-du tournoi tout de suite (`flushBotLogBatch`).
+`maps` du tournoi tout de suite (`flushBotLogBatch({ tournamentId, category })` ;
+sans catégorie, tous les lots du tournoi partent).
 
 ## Tests
 
 `tests/lib/shared/bot-log-batch.test.ts`, `tests/lib/server/bot-log-batcher.test.ts`
 (silence relancé, âge maximal, plafond 5, isolation des clés, découpage, erreurs),
-`tests/lib/server/bot-log-sending.test.ts` (`sendBotLog` → `/internal/log`),
+`tests/lib/server/bot-log-sending.test.ts` (`sendBotLog` → `/internal/log`, `kind`, en-têtes, catégories jamais mêlées),
+`tests/lib/shared/bot-log-category.test.ts`, `tests/lib/server/bot-log-categories-wiring.test.ts` (chaque appelant dans sa catégorie),
 `tests/lib/server/bot-log-shutdown.test.ts`, `tests/lib/server/round-maps-notice.test.ts`.

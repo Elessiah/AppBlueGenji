@@ -17,7 +17,7 @@ describe("staff-audit", () => {
     const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
     publishStaffAction("ligne par le staff.", ACTOR);
     expect(info).toHaveBeenCalledWith("[staff-audit] ligne par le staff. — auteur : ArbitreZelé (#9)");
-    expect(sendBotLog).toHaveBeenCalledWith("ligne par le staff.");
+    expect(sendBotLog).toHaveBeenCalledWith("ligne par le staff.", { category: "admin" });
     info.mockRestore();
   });
 
@@ -25,7 +25,7 @@ describe("staff-audit", () => {
     const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
     publishStaffAction("geste par le staff.", ACTOR, "geste par le staff, manche 2 : 2 – 1.");
     expect(info).toHaveBeenCalledWith("[staff-audit] geste par le staff, manche 2 : 2 – 1. — auteur : ArbitreZelé (#9)");
-    expect(sendBotLog).toHaveBeenCalledWith("geste par le staff.");
+    expect(sendBotLog).toHaveBeenCalledWith("geste par le staff.", { category: "admin" });
     info.mockRestore();
   });
 

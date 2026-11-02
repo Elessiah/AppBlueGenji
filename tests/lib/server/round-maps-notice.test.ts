@@ -100,7 +100,7 @@ describe("dispatchDueRoundMapsNotices", () => {
   it("dispatchDueRoundMapsNotices_dueRow_queuesTheSummaryInItsTournamentBatch", async () => {
     pool([dueRow([R2])]);
     await dispatchDueRoundMapsNotices();
-    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 7 });
+    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 7, category: "maps" });
     expect(flushBotLogBatch).not.toHaveBeenCalled();
   });
 
@@ -172,8 +172,8 @@ describe("flushRoundMapsNotice", () => {
   it("flushRoundMapsNotice_summarySent_flushesTheTournamentLogBatchAtOnce", async () => {
     pool([dueRow([R2])]);
     await flushRoundMapsNotice(7);
-    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 7 });
-    expect(flushBotLogBatch).toHaveBeenCalledWith({ tournamentId: 7 });
+    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 7, category: "maps" });
+    expect(flushBotLogBatch).toHaveBeenCalledWith({ tournamentId: 7, category: "maps" });
   });
 
   it("flushRoundMapsNotice_sweepAlreadyClaimedIt_returnsFalse", async () => {

@@ -56,7 +56,7 @@ export async function deliverStaffMatchAction(
       author,
       withoutMatch: options.withoutMatch,
     }),
-    { tournamentId: match.tournament.id },
+    { tournamentId: match.tournament.id, category: "admin" },
   );
 }
 
@@ -76,7 +76,7 @@ export async function deliverStaffTournamentAction(
   if (!tournament) return;
   await sendBotLog(
     formatStaffTournamentActionLog({ tournament: { id: Number(tournament.id), name: tournament.name }, action, count }),
-    { tournamentId: Number(tournament.id) },
+    { tournamentId: Number(tournament.id), category: "admin" },
   );
 }
 

@@ -107,7 +107,7 @@ describe("file par transaction", () => {
     flushBotLogs(connection);
     await new Promise((resolve) => setImmediate(resolve));
 
-    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 12 });
+    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 12, category: "tournament" });
   });
 
   it("flushBotLogs_matchResult_queuedInTheTournamentBatchReadFromTheMatch", async () => {
@@ -118,7 +118,7 @@ describe("file par transaction", () => {
     flushBotLogs(connection);
     await new Promise((resolve) => setImmediate(resolve));
 
-    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: Number(MATCH_ROW.tournament_id) });
+    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: Number(MATCH_ROW.tournament_id), category: "results" });
   });
 
   it("ne vide la file qu'une fois : deux flushs ne dupliquent pas la ligne", async () => {

@@ -424,6 +424,7 @@ export async function setTournamentMapRules(tournamentId: number, rules: MapRule
   publishMatchUpdatedEvent(tournamentId);
   void sendBotLog(formatMapRulesLog({ tournament: { id: Number(tournament.id), name: tournament.name } }), {
     tournamentId: Number(tournament.id),
+    category: "maps",
   }).catch(
     (error: unknown) => console.error("[round-maps] journal non envoyé", error),
   );

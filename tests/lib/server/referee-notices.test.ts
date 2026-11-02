@@ -66,6 +66,7 @@ beforeEach(() => {
 
 function loggedLine(): string {
   expect(sendBotLog).toHaveBeenCalledTimes(1);
+  expect(jest.mocked(sendBotLog).mock.calls[0][1]).toMatchObject({ category: "referees" });
   return jest.mocked(sendBotLog).mock.calls[0][0];
 }
 

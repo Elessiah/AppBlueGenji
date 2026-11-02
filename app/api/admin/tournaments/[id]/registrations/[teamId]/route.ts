@@ -53,7 +53,7 @@ export async function DELETE(
         registeredTeams: removed.registeredTeams,
         maxTeams: removed.maxTeams,
       }),
-      { id: user.id, pseudo: user.pseudo },
+      { id: user.id, pseudo: user.pseudo }, undefined, "registrations",
     );
 
     return ok({ removed });

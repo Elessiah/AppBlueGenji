@@ -65,6 +65,7 @@ import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { staffAuditLine, type LogEntrant } from "@/lib/shared/log-privacy";
 import { toParticipantType } from "@/lib/shared/participants";
 import {
+  BOT_EVENT_LOG_CATEGORIES,
   botEventChannel,
   formatNoRefereeAlert,
   formatRoundNoRefereeAlert,
@@ -382,7 +383,10 @@ export function flushBotLogs(connection: PoolConnection): void {
         // Lot du tournoi : celui de l'entrée, ou celui relu pour un résultat de
         // match — jamais le lot commun, pour qu'un « tournoi terminé » ne passe
         // pas devant le résultat de sa finale.
-        await sendBotLog(message, { tournamentId: tournamentId ?? ("tournamentId" in entry ? entry.tournamentId : null) });
+        await sendBotLog(message, {
+          tournamentId: tournamentId ?? ("tournamentId" in entry ? entry.tournamentId : null),
+          category: BOT_EVENT_LOG_CATEGORIES[entry.kind],
+        });
         // Le coup d'envoi est une ligne de journal pour le staff, et une
         // notification pour les joueurs engagés — la seule qui n'ait pas de
         // message privé Discord : elle naît au même point de passage unique.

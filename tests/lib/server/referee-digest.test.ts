@@ -74,6 +74,7 @@ function mockDb(
 async function publishedLine(): Promise<string> {
   const notification = jest.mocked(notifyStaff).mock.calls[0][0];
   await notification.discord?.();
+  expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ category: "referee-digest" });
   return jest.mocked(sendBotLog).mock.calls[0][0];
 }
 

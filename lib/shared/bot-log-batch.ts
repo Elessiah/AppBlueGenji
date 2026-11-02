@@ -4,6 +4,7 @@
  * Module pur : les constantes du regroupement et la mise en messages d'un lot.
  * Le minuteur et l'envoi vivent côté serveur (`lib/server/bot-log-batcher.ts`).
  */
+import { DEFAULT_BOT_LOG_CATEGORY, type BotLogCategory } from "./bot-log-category";
 
 /** Silence attendu après la dernière ligne d'un lot avant de l'envoyer (5 min). */
 export const BOT_LOG_BATCH_WINDOW_MS = 5 * 60 * 1000;
@@ -140,9 +141,18 @@ export function packBotLogLines(lines: readonly string[], maxChars: number = BOT
   return messages;
 }
 
-/** Clé d'un lot : le salon de destination, puis le tournoi quand la ligne en relève. */
-export function botLogBatchKey(channel: string, tournamentId?: number | null): string {
-  return typeof tournamentId === "number" && Number.isInteger(tournamentId) && tournamentId > 0
-    ? `${channel}:tournament:${tournamentId}`
-    : `${channel}:global`;
+/**
+ * Clé d'un lot : le salon de destination, le tournoi quand la ligne en relève,
+ * puis la **catégorie** du geste — un lot ne mêle jamais deux types de ligne.
+ */
+export function botLogBatchKey(
+  channel: string,
+  tournamentId?: number | null,
+  category: BotLogCategory = DEFAULT_BOT_LOG_CATEGORY,
+): string {
+  const scope =
+    typeof tournamentId === "number" && Number.isInteger(tournamentId) && tournamentId > 0
+      ? `${channel}:tournament:${tournamentId}`
+      : `${channel}:global`;
+  return `${scope}:${category}`;
 }

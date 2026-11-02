@@ -46,7 +46,7 @@ export async function DELETE(
         tournament: { id: cancelled.tournamentId, name: cancelled.tournamentName },
         entrant: { name: cancelled.entrantName, participantType: cancelled.participantType },
       }),
-      { id: user.id, pseudo: user.pseudo },
+      { id: user.id, pseudo: user.pseudo }, undefined, "registrations",
     );
 
     return ok({ cancelled });

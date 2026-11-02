@@ -1236,7 +1236,7 @@ export async function applyReportAction(
   // besoin d'apprendre : l'alerte qu'ils ont reçue est close. Les autres gestes
   // restent dans les journaux du serveur.
   const line = `Signalement #${reportId} ${ACTION_AUDIT_LABELS[action]} par le staff.`;
-  if (action === "RESOLVE") publishStaffAction(`✅ ${line}`, { id: actor.userId, pseudo: actor.pseudo });
+  if (action === "RESOLVE") publishStaffAction(`✅ ${line}`, { id: actor.userId, pseudo: actor.pseudo }, undefined, "moderation");
   else console.info(`[staff-audit] ${line} — auteur : ${actor.pseudo} (#${actor.userId})`);
 }
 
