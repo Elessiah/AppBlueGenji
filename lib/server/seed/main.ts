@@ -11,7 +11,7 @@ import { NamedLockUnavailableError } from "../named-lock";
 import { TOURNAMENTS, type SeedFormat, type TournamentDef } from "./cases";
 import { clearDatabase } from "./cleanup";
 import { SEED_LOCK_TIMEOUT_SECONDS, withSeedLock } from "./lock";
-import { applyMatchLaunchCases } from "./match-states";
+import { applyMatchLaunchCases, applyTiebreakCase } from "./match-states";
 import {
   FICTIONAL_ABOUT_STATS,
   FICTIONAL_BUREAU,
@@ -129,6 +129,7 @@ async function seed(db: Pool): Promise<void> {
     specialUserIds.get("CoCaster") ?? null,
     specialUserIds.get("Arbitre") ?? null,
   );
+  await applyTiebreakCase(db);
   await attachDeletedAccountToPlayedTeam(db, specialUserIds.get("CompteSupprime") ?? null);
   await acceptTermsForSeededAccounts(db);
 

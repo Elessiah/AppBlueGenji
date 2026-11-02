@@ -131,6 +131,7 @@ describe("loadMapRules", () => {
       nextBan: "WINNER",
       nextPick: "FREE",
       rounds: [{ phaseId: 0, bracket: "UPPER", roundNumber: 1, slots: [["Ilios"]] }],
+      tiebreaks: [],
     });
   });
 
@@ -162,6 +163,7 @@ describe("loadMapRules", () => {
       nextBan: "LOSER",
       nextPick: "LOSER",
       rounds: [],
+      tiebreaks: [],
     });
   });
 });

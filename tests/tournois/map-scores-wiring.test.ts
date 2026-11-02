@@ -136,7 +136,11 @@ describe("détail map par map — noms accessibles", () => {
     // Lot 8b : « Map N, » / « Map N, score de » passent par les messages.
     expect(list.match(/<span className="sr-only">\{t\("score\.maps\.scoreOf", \{ index: index \+ 1 \}\)\}<\/span>/g)).toHaveLength(2);
     // Le code de replay nomme sa map, avec le nom de la carte quand il est fixé (« Map 1 : Ilios, »).
-    expect(list).toMatch(/t\("score\.maps\.mapNamedPrefix", \{ index: index \+ 1, name: mapName \}\)\s*: t\("score\.maps\.mapPrefix", \{ index: index \+ 1 \}\)/);
+    expect(list).toMatch(/prefix: t\("score\.maps\.mapNamedPrefix", \{ index: index \+ 1, name: mapName \}\)/);
+    expect(list).toMatch(/prefix: t\("score\.maps\.mapPrefix", \{ index: index \+ 1 \}\)/);
+    // La map de départage d'un vrai best of 3 se nomme comme telle (« Map de départage : Ilios, »).
+    expect(list).toMatch(/prefix: t\("score\.maps\.tiebreakNamedPrefix", \{ name: tiebreak \}\)/);
+    expect(list).toContain('<span className="sr-only">{labels.prefix}</span>');
     expect(FR_SCORE.maps.mapPrefix).toBe("Map {index}, ");
     expect(FR_SCORE.maps.scoreOf).toBe("Map {index}, score de ");
     expect(list).not.toMatch(/<FieldErrorText[^>]*\/>\s*<\/label>/);
