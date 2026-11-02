@@ -1421,7 +1421,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   },
   {
     id: "2026-11-salons-vocaux-equipe",
-    publishedAt: "2026-11-05",
+    publishedAt: "2026-11-04",
     title: "Salons vocaux d'équipe avant les matchs",
     links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }],
     summary:

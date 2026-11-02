@@ -2323,11 +2323,11 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
   const entry = PRIVACY_CHANGES.find((c) => c.id === id)!;
   const english = PRIVACY_CHANGES_EN[id];
 
-  it("privacyChanges_teamVoice_closesListDated1105ForAllAccounts", () => {
+  it("privacyChanges_teamVoice_closesListDated1104ForAllAccounts", () => {
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
     expectStandaloneEntry(entry, english, {
       fromEnd: 1,
-      publishedAt: "2026-11-05",
+      publishedAt: "2026-11-04",
       audience: undefined,
       links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }],
     });
@@ -2348,6 +2348,6 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     expect(t18En.dataCategories.join(" ")).toContain("never who is present");
     expect(t18.retention[0]).toContain("7 jours");
     expect(t18En.retention[0]).toContain("7 days");
-    expect(REGISTER_UPDATED_AT).toBe("2026-11-05");
+    expect(REGISTER_UPDATED_AT).toBe("2026-11-04");
   });
 });
