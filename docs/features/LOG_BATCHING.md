@@ -12,7 +12,7 @@ ligne du journal (`sendBotLog` → `POST /internal/log`) rejoint désormais un
   relance le silence à 5 minutes.
 - À **5 lignes** (`BOT_LOG_BATCH_MAX_LINES`), le lot part tout de suite ; la
   ligne suivante ouvre un nouveau lot.
-- **Âge maximal : 10 minutes** (`BOT_LOG_BATCH_MAX_AGE_MS`). Un lot part au
+- **Âge maximal : 10 minutes** (`BOT_LOG_BATCH_MAX_AGE_MS`, option `maxAgeMs`). Un lot part au
   plus tard 10 minutes après sa **première** ligne, quoi que dise le silence :
   un filet de lignes espacées de 4 minutes ne le repousse pas. Ce délai ne
   repart qu'avec la première ligne du lot suivant. Une ligne attend donc au
