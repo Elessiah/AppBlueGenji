@@ -7,6 +7,7 @@ import {
   voiceChannelKey,
   voiceChannelsDue,
   voiceGatePending,
+  voiceObservationFresh,
   voiceTracked,
   type VoiceGateInput,
 } from "@/lib/shared/match-voice";
@@ -32,6 +33,30 @@ function gate(overrides: Partial<VoiceGateInput> = {}): VoiceGateInput {
     ...overrides,
   };
 }
+
+describe("voiceObservationFresh", () => {
+  const now = Date.parse("2026-11-05T20:00:00.000Z");
+
+  it("voiceObservationFresh_justObserved_returnsTrue", () => {
+    expect(voiceObservationFresh("2026-11-05T20:00:00.000Z", now)).toBe(true);
+  });
+
+  it("voiceObservationFresh_exactlyFiveMinutes_returnsTrue", () => {
+    expect(voiceObservationFresh("2026-11-05T19:55:00.000Z", now)).toBe(true);
+  });
+
+  it("voiceObservationFresh_justOverFiveMinutes_returnsFalse", () => {
+    expect(voiceObservationFresh("2026-11-05T19:54:59.999Z", now)).toBe(false);
+  });
+
+  it("voiceObservationFresh_null_returnsFalse", () => {
+    expect(voiceObservationFresh(null, now)).toBe(false);
+  });
+
+  it("voiceObservationFresh_unreadable_returnsFalse", () => {
+    expect(voiceObservationFresh("garbage", now)).toBe(false);
+  });
+});
 
 describe("voiceChannelKey", () => {
   it("voiceChannelKey_ids_returnsMatchTeamKey", () => {

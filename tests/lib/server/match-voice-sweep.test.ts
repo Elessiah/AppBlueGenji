@@ -150,7 +150,7 @@ describe("dispatchMatchVoiceChannels — création et comptage", () => {
   it("dispatchMatchVoiceChannels_stateChanged_maintainsAndPublishesTournament", async () => {
     database({
       due: [dueMatch],
-      voiceRowsAfterWrite: [{ match_id: 42, team_id: 1, channel_id: "900", members: 3, failed_at: null, released_at: null }],
+      voiceRowsAfterWrite: [{ match_id: 42, team_id: 1, channel_id: "900", members: 3, counted_at: new Date().toISOString(), failed_at: null, released_at: null }],
     });
     jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "900" });
     jest.mocked(countVoiceChannel).mockResolvedValue({ kind: "ok", value: 3 });
@@ -297,6 +297,43 @@ describe("voiceGateBlocksLaunch", () => {
     expect(connection.execute).toHaveBeenCalledTimes(1);
   });
 
+  const enabledContext = [[{ enabled: 1, team1_solo: 0, team2_solo: 0 }], []] as const;
+  const voiceRow = (teamId: number, members: number, countedAt: string | null, failedAt: string | null = null) => ({
+    match_id: 42,
+    team_id: teamId,
+    channel_id: `90${teamId}`,
+    members,
+    counted_at: countedAt,
+    failed_at: failedAt,
+    released_at: null,
+  });
+  const sixMinutesAgo = () => new Date(Date.now() - 6 * 60_000).toISOString();
+
+  it("voiceGateBlocksLaunch_bothFullFreshCount_returnsFalse", async () => {
+    const connection = connectionMock();
+    const now = new Date().toISOString();
+    connection.execute
+      .mockResolvedValueOnce([...enabledContext])
+      .mockResolvedValueOnce([[voiceRow(1, 5, now), voiceRow(2, 5, now)], []]);
+    await expect(voiceGateBlocksLaunch(fakeConnection(connection), match)).resolves.toBe(false);
+  });
+
+  it("voiceGateBlocksLaunch_bothFullStaleCount_returnsTrue", async () => {
+    const connection = connectionMock();
+    connection.execute
+      .mockResolvedValueOnce([...enabledContext])
+      .mockResolvedValueOnce([[voiceRow(1, 5, sixMinutesAgo()), voiceRow(2, 5, sixMinutesAgo())], []]);
+    await expect(voiceGateBlocksLaunch(fakeConnection(connection), match)).resolves.toBe(true);
+  });
+
+  it("voiceGateBlocksLaunch_staleFailure_returnsTrue", async () => {
+    const connection = connectionMock();
+    connection.execute
+      .mockResolvedValueOnce([...enabledContext])
+      .mockResolvedValueOnce([[voiceRow(1, 0, null, sixMinutesAgo()), voiceRow(2, 0, null)], []]);
+    await expect(voiceGateBlocksLaunch(fakeConnection(connection), match)).resolves.toBe(true);
+  });
+
   it("voiceGateBlocksLaunch_unscheduledMatch_returnsFalseWithoutQuery", async () => {
     const connection = connectionMock();
     await expect(voiceGateBlocksLaunch(fakeConnection(connection), { ...match, start_at: null })).resolves.toBe(false);
@@ -323,14 +360,30 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
     connection.execute
       .mockResolvedValueOnce([
         [
-          { match_id: 42, team_id: 1, channel_id: "901", members: 3, failed_at: null, released_at: null },
-          { match_id: 42, team_id: 2, channel_id: "902", members: 5, failed_at: null, released_at: null },
+          { match_id: 42, team_id: 1, channel_id: "901", members: 3, counted_at: new Date().toISOString(), failed_at: null, released_at: null },
+          { match_id: 42, team_id: 2, channel_id: "902", members: 5, counted_at: new Date().toISOString(), failed_at: null, released_at: null },
         ],
         [],
       ])
       .mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
     expect(infos.get(42)).toEqual({ team1Members: 3, team2Members: 5, pending: true });
+  });
+
+  it("loadMatchVoiceInfos_staleCount_showsZeroAndPending", async () => {
+    const connection = connectionMock();
+    const stale = new Date(Date.now() - 6 * 60_000).toISOString();
+    connection.execute
+      .mockResolvedValueOnce([
+        [
+          { match_id: 42, team_id: 1, channel_id: "901", members: 5, counted_at: stale, failed_at: null, released_at: null },
+          { match_id: 42, team_id: 2, channel_id: "902", members: 5, counted_at: stale, failed_at: null, released_at: null },
+        ],
+        [],
+      ])
+      .mockResolvedValueOnce([teams, []]);
+    const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
+    expect(infos.get(42)).toEqual({ team1Members: 0, team2Members: 0, pending: true });
   });
 
   it("loadMatchVoiceInfos_dueMatchWithoutRows_showsPendingLikeTheGate", async () => {

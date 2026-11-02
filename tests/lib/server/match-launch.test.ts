@@ -101,7 +101,13 @@ type World = {
   voice?: {
     enabled: boolean;
     team1Solo?: boolean;
-    rows: { team_id: number; channel_id: string | null; members: number | null; failed_at: string | null }[];
+    rows: {
+      team_id: number;
+      channel_id: string | null;
+      members: number | null;
+      counted_at: string | null;
+      failed_at: string | null;
+    }[];
   };
 };
 
@@ -1788,11 +1794,14 @@ describe("releaseMatchCast / claimMatchCast : gardes et publications (EF-29)", (
 describe("verrou des salons vocaux d'équipe (`MATCH_VOICE.md`)", () => {
   const connection = () => connectionFor(state);
   const past = () => new Date(Date.now() - 60_000).toISOString();
-  const channel = (teamId: number, members: number | null, failed = false) => ({
+  const fresh = () => new Date().toISOString();
+  const stale = () => new Date(Date.now() - 6 * 60_000).toISOString();
+  const channel = (teamId: number, members: number | null, failed = false, at: () => string = fresh) => ({
     team_id: teamId,
     channel_id: members === null && failed ? null : `c${teamId}`,
     members,
-    failed_at: failed ? STAMP : null,
+    counted_at: members === null ? null : at(),
+    failed_at: failed ? at() : null,
   });
 
   it("maintainMatchLaunches_phaseOffStartReachedChannelsNotFull_doesNotLaunch", async () => {
@@ -1821,6 +1830,20 @@ describe("verrou des salons vocaux d'équipe (`MATCH_VOICE.md`)", () => {
     state.voice = { enabled: true, rows: [channel(TEAM1, null, true), channel(TEAM2, 0)] };
     await maintainMatchLaunches(connection(), 7);
     expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("maintainMatchLaunches_phaseOffChannelsFullButStale_doesNotLaunch", async () => {
+    state.match = matchState({ match_launch_phase: 0, start_at: past() });
+    state.voice = { enabled: true, rows: [channel(TEAM1, 5, false, stale), channel(TEAM2, 5, false, stale)] };
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.match?.launched_at).toBeNull();
+  });
+
+  it("maintainMatchLaunches_staleBotFailure_doesNotLaunch", async () => {
+    state.match = matchState({ match_launch_phase: 0, start_at: past() });
+    state.voice = { enabled: true, rows: [channel(TEAM1, null, true, stale), channel(TEAM2, 0)] };
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.match?.launched_at).toBeNull();
   });
 
   it("maintainMatchLaunches_optionOff_launchesWithoutChannels", async () => {

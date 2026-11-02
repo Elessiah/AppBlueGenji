@@ -32,6 +32,7 @@ import {
   voiceChannelKey,
   voiceChannelsDue,
   voiceGatePending,
+  voiceObservationFresh,
   type MatchVoiceInfo,
   type VoiceChannelState,
 } from "@/lib/shared/match-voice";
@@ -43,16 +44,24 @@ type VoiceRow = RowDataPacket & {
   team_id: number;
   channel_id: string | null;
   members: number | null;
+  counted_at: Date | string | null;
   failed_at: Date | string | null;
   released_at: Date | string | null;
 };
 
-function channelState(row: VoiceRow | undefined): VoiceChannelState | null {
+/**
+ * État d'un salon tel que le verrou et l'instantané le lisent. Seule une
+ * observation récente du bot compte (`voiceObservationFresh`) : un comptage
+ * ancien ne vaut rien (le match attend le suivant), une panne ancienne ne
+ * lève plus le verrou.
+ */
+function channelState(row: VoiceRow | undefined, now: number): VoiceChannelState | null {
   if (!row || row.released_at !== null) return null;
+  const counted = row.members !== null && voiceObservationFresh(toIso(row.counted_at), now);
   return {
     channelId: row.channel_id ?? null,
-    members: row.members === null ? null : Number(row.members),
-    failed: row.failed_at !== null,
+    members: counted ? Number(row.members) : null,
+    failed: row.failed_at !== null && voiceObservationFresh(toIso(row.failed_at), now),
   };
 }
 
@@ -60,7 +69,7 @@ async function loadVoiceRows(connection: PoolConnection, matchIds: readonly numb
   if (matchIds.length === 0) return [];
   try {
     const [rows] = await connection.execute<VoiceRow[]>(
-      `SELECT match_id, team_id, channel_id, members, failed_at, released_at
+      `SELECT match_id, team_id, channel_id, members, counted_at, failed_at, released_at
        FROM bg_match_voice_channels WHERE match_id IN (${sqlPlaceholders(matchIds.length)})`,
       [...matchIds],
     );
@@ -106,13 +115,14 @@ export async function voiceGateBlocksLaunch(connection: PoolConnection, match: V
   );
   if (Number(context[0]?.enabled ?? 0) !== 1) return false;
   const rows = await loadVoiceRows(connection, [Number(match.id)]);
+  const now = Date.now();
   return voiceGatePending({
     enabled: true,
     startAt: toIso(match.start_at),
     team1: { isSolo: Number(context[0]?.team1_solo ?? 0) === 1, isGhost: Number(match.team1_is_ghost ?? 0) === 1 },
     team2: { isSolo: Number(context[0]?.team2_solo ?? 0) === 1, isGhost: Number(match.team2_is_ghost ?? 0) === 1 },
-    team1Channel: channelState(rowFor(rows, Number(match.id), Number(match.team1_id))),
-    team2Channel: channelState(rowFor(rows, Number(match.id), Number(match.team2_id))),
+    team1Channel: channelState(rowFor(rows, Number(match.id), Number(match.team1_id)), now),
+    team2Channel: channelState(rowFor(rows, Number(match.id), Number(match.team2_id)), now),
   });
 }
 
@@ -157,7 +167,7 @@ export async function loadMatchVoiceInfos(
   let rows: VoiceRow[];
   try {
     [rows] = await connection.execute<VoiceRow[]>(
-      `SELECT v.match_id, v.team_id, v.channel_id, v.members, v.failed_at, v.released_at
+      `SELECT v.match_id, v.team_id, v.channel_id, v.members, v.counted_at, v.failed_at, v.released_at
        FROM bg_match_voice_channels v
        JOIN bg_matches m ON m.id = v.match_id
        WHERE m.tournament_id = ? AND m.status = 'READY' AND v.released_at IS NULL`,
@@ -182,8 +192,8 @@ export async function loadMatchVoiceInfos(
       startAt: match.startAt,
       team1: team(match.team1Id),
       team2: team(match.team2Id),
-      team1Channel: channelState(rowFor(rows, match.id, match.team1Id)),
-      team2Channel: channelState(rowFor(rows, match.id, match.team2Id)),
+      team1Channel: channelState(rowFor(rows, match.id, match.team1Id), now),
+      team2Channel: channelState(rowFor(rows, match.id, match.team2Id), now),
     });
     if (info) result.set(match.id, info);
   }
@@ -397,7 +407,7 @@ async function runSweep(): Promise<Set<number>> {
         const before = rowFor(rows, matchId, teamId);
         await refreshTeamChannel(connection, matchId, teamId, teamName, before);
         const [after] = await connection.execute<VoiceRow[]>(
-          `SELECT match_id, team_id, channel_id, members, failed_at, released_at
+          `SELECT match_id, team_id, channel_id, members, counted_at, failed_at, released_at
            FROM bg_match_voice_channels WHERE match_id = ? AND team_id = ?`,
           [matchId, teamId],
         );

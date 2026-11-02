@@ -33,6 +33,13 @@ salons pleins.
   toutes les 10 s, déclenché par le trafic — listes de tournois et
   `/api/me/match-launches`) parle au bot, hors transaction. Un compte `gone`
   (`VOICE_CHANNEL_NOT_FOUND`) redemande le salon par sa clé, une fois.
+- **Fraîcheur** : le verrou et l'instantané ne croient qu'une observation du bot de
+  moins de 5 minutes (`VOICE_OBSERVATION_FRESH_MINUTES`, `counted_at` / `failed_at`) :
+  un « 5/5 » ancien (match reporté hors du quart d'heure puis revenu) ne lance rien
+  et une panne ancienne ne lève plus le verrou — le balayage suivant tranche.
+- **Côté client** : `useMatchLaunchPhase` relaie `voice.pending` à `matchLaunchPhase`,
+  si bien qu'un match retenu sans phase de lancement reste « programmé » (pas de
+  formulaire de score, bouton « Forcer le lancement » pour l'arbitrage).
 - **Rendu** : le balayage rend les salons d'un match terminé, forfait, annulé, d'un
   tournoi terminé ou qui a éteint l'option. `VOICE_CHANNEL_NOT_TRACKED` = déjà fait.
   Une ligne rendue est effacée 7 jours après.

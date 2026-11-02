@@ -18,6 +18,21 @@ export const VOICE_CHANNEL_LEAD_MINUTES = 15;
 export const VOICE_CHANNEL_CAPACITY = 5;
 
 /**
+ * Âge maximal d'une observation du bot (comptage ou panne) que le verrou croit
+ * encore (minutes). Au-delà — match reporté hors du quart d'heure puis revenu,
+ * file du balayage en retard — le dernier nombre ne dit plus rien de la salle :
+ * le verrou attend un nouveau comptage plutôt que de lancer sur un « 5/5 » ou
+ * de lever sur une panne d'hier.
+ */
+export const VOICE_OBSERVATION_FRESH_MINUTES = 5;
+
+/** L'observation datée `at` (ISO) est-elle assez récente à l'instant `now` (ms) ? */
+export function voiceObservationFresh(at: string | null, now: number): boolean {
+  const time = isoTime(at);
+  return time !== null && now - time <= VOICE_OBSERVATION_FRESH_MINUTES * 60_000;
+}
+
+/**
  * Durée de garde d'une ligne de `bg_match_voice_channels` une fois le salon
  * rendu au bot (jours) — déclarée au registre des traitements (T18).
  */
