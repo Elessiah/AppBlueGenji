@@ -504,11 +504,20 @@ async function runLobbyBriefSweep(): Promise<number> {
   const managers = await loadEntrantManagerIds(rows.flatMap((row) => [Number(row.team1_id), Number(row.team2_id)]));
   const recipients = await loadNotificationRecipients([...managers.values()].flat(), "certified", { matchDm: true });
   retries.delete(SWEEP_RETRY_KEY);
+  // Un match dont aucun côté n'a de quoi partir (vraies équipes sans
+  // gestionnaire, seules à attendre) ne coûte ni casteurs ni arbitres : il
+  // reste candidat toute la fenêtre, et ces lectures seraient refaites à
+  // chaque balayage pour rien.
+  const hasRecipients = (teamId: number, ghost: number | null | undefined) =>
+    Number(ghost ?? 0) === 1 || (managers.get(teamId) ?? []).length > 0;
+  const briefable = rows.filter(
+    (row) => hasRecipients(Number(row.team1_id), row.team1_ghost) || hasRecipients(Number(row.team2_id), row.team2_ghost),
+  );
   // Ces lectures ne lèvent pas : une panne envoie le brief sans la ligne.
-  const castersByMatch = await readMatchCasters(db, rows.map((row) => Number(row.id)));
+  const castersByMatch = await readMatchCasters(db, briefable.map((row) => Number(row.id)));
   const refereeIdsOf = (list: readonly LobbyBriefRow[]) =>
     list.flatMap((row) => (row.referee_user_id === null ? [] : [Number(row.referee_user_id)]));
-  const checkedReferees = new Set(refereeIdsOf(rows));
+  const checkedReferees = new Set(refereeIdsOf(briefable));
   const eligibleReferees = await readEligibleReferees(db, [...checkedReferees]);
 
   /** Les deux côtés d'un match relu ; un arbitre désigné depuis la première lecture est lu à part. */
