@@ -1269,7 +1269,7 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
 
       expect(info?.viewer.role).toBe("CASTER");
       expect(info?.phase).toBe("SCHEDULED");
-      expect(info?.referee).toMatchObject({ discordTag: null, battletag: null });
+      expect(info?.referee).toMatchObject({ discordTag: null, battletag: null, battletagVerified: false });
       expect(JSON.stringify(info?.referee)).not.toContain("juge");
       expect(JSON.stringify(info?.referee)).not.toContain("Arbitre#1");
     });

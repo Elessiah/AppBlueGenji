@@ -690,6 +690,7 @@ function buildLaunchReferee(row: CandidateRow, ctx: LaunchContext): LaunchRefere
   const user = ctx.users.get(Number(row.referee_user_id));
   if (!user || Number(user.is_deleted) !== 0) return null;
   const isViewer = Number(user.id) === ctx.viewer.id;
+  const open = refereeContactsOpen(user, ctx);
   const discord = ctx.refereeDiscord ? { discordTag: refereeDiscordTag(user, isViewer, ctx) } : {};
   return withGameBattletag(
     row.tournament_game,
@@ -705,14 +706,15 @@ function buildLaunchReferee(row: CandidateRow, ctx: LaunchContext): LaunchRefere
       // parties le lisent dès que les deux adversaires sont connus (le temps du
       // match pour un caster), comme les contacts des engagées ; un arbitre qui
       // caste aussi le match attend le départ (`refereeContactsOpen`).
-      battletag: refereeContactsOpen(user, ctx)
+      battletag: open
         ? visibleBattletag(user.overwatch_battletag, ctx.viewer, {
             userId: Number(user.id),
             visible: Number(user.visible_overwatch) === 1,
             sharesLiveMatch: true,
           })
         : null,
-      battletagVerified: battletagFromBlizzard(user),
+      // Le lien Battle.net se tait avec le BattleTag, comme sur une carte de caster.
+      battletagVerified: open && battletagFromBlizzard(user),
     },
   );
 }
