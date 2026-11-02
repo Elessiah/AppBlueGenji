@@ -9,12 +9,13 @@
  * du lecteur : l'instantané ne dit que « Arbitre désigné », et un nom glissé
  * dans le contexte resterait périmé jusqu'à la reconnexion du flux.
  */
-import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import type { RefereeIneligibility } from "@/lib/shared/match-referee";
 import { parseStoredSlots } from "@/lib/shared/round-maps";
 import { visibleText } from "@/lib/shared/visible-text";
 import { refereeEligibilityBlock, type CastEligibilityRow } from "./cast-eligibility";
+import { loadMatchPlayerIds } from "./match-players";
 
 /** Un compte de l'arbitrage, tel que la fenêtre le nomme. */
 export type RefereePanelUser = { userId: number; pseudo: string };
@@ -90,16 +91,19 @@ export async function loadRefereePanel(matchId: number, viewerUserId: number): P
     if (!match) return null;
     // Le staff tient en quelques comptes : rôles relus en base, condition
     // rejouée ici (`refereeEligibilityBlock`), jamais prise d'une session.
+    // Un rôle retiré laisse `'[]'`, pas `NULL` (`users/roles.ts`) : ces comptes
+    // sont écartés en SQL plutôt que décodés un à un à chaque ouverture.
     const [staff] = await connection.execute<StaffRow[]>(
       `SELECT id, pseudo, discord_verified_at, discord_pseudo, blizzard_sub, overwatch_battletag,
               overwatch_battletag_typed, is_deleted, is_admin, platform_roles_json, referee_objection_at
          FROM bg_users
         WHERE is_deleted = 0
-          AND (is_admin = 1 OR platform_roles_json IS NOT NULL OR id IN (?, ?) OR referee_objection_at IS NOT NULL)`,
+          AND (is_admin = 1 OR (platform_roles_json IS NOT NULL AND platform_roles_json <> '[]')
+               OR id IN (?, ?) OR referee_objection_at IS NOT NULL)`,
       [match.referee_user_id ?? 0, viewerUserId],
     );
     const byId = new Map(staff.map((row) => [Number(row.id), row]));
-    const players = await loadMatchPlayers(connection, match);
+    const players = await loadMatchPlayerIds(connection, match);
     const [roundRows] = await connection.execute<(RowDataPacket & { slots_json: string | null })[]>(
       `SELECT slots_json FROM bg_tournament_round_maps
         WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? LIMIT 1`,
@@ -171,21 +175,4 @@ export async function loadRefereePanel(matchId: number, viewerUserId: number): P
       objectable: referees.map(panelUser).sort(byPseudo),
     };
   });
-}
-
-/** Comptes qui jouent le match : membres actifs des deux engagées, ou l'engagé solo. */
-async function loadMatchPlayers(
-  connection: PoolConnection,
-  match: Pick<PanelMatchRow, "team1_id" | "team2_id">,
-): Promise<Set<number>> {
-  const teamIds = [match.team1_id, match.team2_id].filter((id): id is number => id !== null).map(Number);
-  if (teamIds.length === 0) return new Set();
-  const placeholders = teamIds.map(() => "?").join(", ");
-  const [rows] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
-    `SELECT user_id FROM bg_team_members WHERE left_at IS NULL AND team_id IN (${placeholders})
-     UNION
-     SELECT solo_user_id AS user_id FROM bg_teams WHERE solo_user_id IS NOT NULL AND id IN (${placeholders})`,
-    [...teamIds, ...teamIds],
-  );
-  return new Set(rows.map((row) => Number(row.user_id)));
 }

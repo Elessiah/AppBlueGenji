@@ -14,6 +14,7 @@ const STATUSES: Readonly<Record<string, number>> = {
   REFEREE_IDENTITY_REQUIRED: 409,
   REFEREE_OBJECTION: 409,
   REFEREE_IS_PLAYER: 409,
+  REFEREE_CHANGED: 409,
 };
 
 /**
@@ -42,7 +43,9 @@ export async function GET(_req: Request, context: { params: Promise<{ matchId: s
  * Désigne l'arbitre du match, le remplace ou le retire. Corps :
  * `{ userId: number | null }`. Le compte désigné doit remplir la condition
  * d'arbitrage (409 `NOT_REFEREE` / `REFEREE_IDENTITY_REQUIRED`) et ne
- * pas avoir d'opposition retenue (409 `REFEREE_OBJECTION`).
+ * pas avoir d'opposition retenue (409 `REFEREE_OBJECTION`). `expectedUserId`
+ * (facultatif, nombre ou `null`) : l'arbitre que la fenêtre montrait ; s'il a
+ * changé depuis, rien ne change (409 `REFEREE_CHANGED`).
  */
 export async function PUT(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -52,12 +55,14 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as { userId?: unknown };
+  const body = (await readJsonBody(req).catch(() => ({}))) as { userId?: unknown; expectedUserId?: unknown };
   const refereeId = body.userId ?? null;
   if (refereeId !== null && !isPositiveId(refereeId)) return fail("INVALID_USER_ID", 400);
+  const expected = body.expectedUserId;
+  if (expected !== undefined && expected !== null && !isPositiveId(expected)) return fail("INVALID_USER_ID", 400);
 
   try {
-    await assignMatchReferee(matchId, user.id, refereeId);
+    await assignMatchReferee(matchId, user.id, refereeId, expected);
     return ok({ refereeAssigned: refereeId !== null });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_REFEREE_ASSIGN_FAILED");

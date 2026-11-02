@@ -407,8 +407,10 @@ function rowSide(row: CandidateRow, index: 1 | 2) {
 }
 
 /**
- * Comptes et rosters à lire : les casters de tout match présenté, et les
- * joueurs des seuls matchs dont les contacts sont exposés.
+ * Comptes et rosters à lire : les casters de tout match présenté, les joueurs
+ * des matchs dont les contacts sont exposés, et les rosters des matchs à
+ * arbitre désigné — « l'arbitre joue-t-il le match » s'y lit
+ * (`keepEligibleReferees`), même hors fenêtre, comme le verrou du lancement.
  */
 function collectContactIds(visible: readonly VisibleLaunch[]): {
   rosterTeamIds: Set<number>;
@@ -421,7 +423,8 @@ function collectContactIds(visible: readonly VisibleLaunch[]): {
     for (const caster of row.casters) userIds.add(caster.userId);
     if (row.referee_user_id !== null) userIds.add(Number(row.referee_user_id));
   }
-  for (const { row } of exposed) {
+  const refereed = visible.filter(({ row, exposes }) => !exposes && row.referee_user_id !== null);
+  for (const { row } of [...exposed, ...refereed]) {
     for (const index of [1, 2] as const) {
       const { teamId, isGhost, soloUserId } = rowSide(row, index);
       if (teamId === null || isGhost) continue;

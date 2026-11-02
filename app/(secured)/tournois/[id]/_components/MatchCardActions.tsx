@@ -48,7 +48,6 @@ import {
 } from "../_lib/match-card-actions";
 import { orReload } from "@/lib/shared/lazy-component";
 import type { CastClaimOutcome } from "./CastClaimDialog";
-import { RefereeDialog } from "./RefereeDialog";
 import type { CastClaimBody } from "../_lib/cast-claim";
 import styles from "./MatchCardActions.module.css";
 
@@ -58,6 +57,12 @@ const MatchContactsDialog = dynamic(
   () => orReload(import("@/components/match-launch/MatchContactsDialog").then((m) => m.MatchContactsDialog)),
   { ssr: false },
 );
+
+// Chargée au premier clic sur « Arbitrage » : seul le staff `tournaments`
+// l'ouvre, et elle embarque sa confirmation, ses erreurs de champ et son CSS.
+const RefereeDialog = dynamic(() => orReload(import("./RefereeDialog").then((m) => m.RefereeDialog)), {
+  ssr: false,
+});
 
 // Chargée au premier clic sur « Caster » : seul le staff `live` l'ouvre, et elle
 // embarque son CSS et ses aides d'erreur de champ.

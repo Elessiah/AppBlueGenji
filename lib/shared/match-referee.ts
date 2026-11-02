@@ -123,8 +123,13 @@ export type NoRefereeCandidate = {
   roundNumber: number;
 };
 
-/** Une manche sans horaire dont des matchs entrent en lancement sans décision. */
-export type NoRefereeRound = { phaseId: number; bracket: string; roundNumber: number; matchIds: number[] };
+/** Une manche sans horaire dont des matchs entrent en lancement sans décision, chacun avec son appariement. */
+export type NoRefereeRound = {
+  phaseId: number;
+  bracket: string;
+  roundNumber: number;
+  matches: { matchId: number; pairing: string }[];
+};
 
 /**
  * Regroupe les alertes « sans arbitre ni autogestion » (décision de
@@ -145,13 +150,14 @@ export function groupNoRefereeAlerts(candidates: readonly NoRefereeCandidate[]):
     if (candidate.scheduled) continue;
     const key = `${candidate.phaseId}:${candidate.bracket}:${candidate.roundNumber}`;
     const round = rounds.get(key);
-    if (round) round.matchIds.push(candidate.matchId);
+    const match = { matchId: candidate.matchId, pairing: candidate.pairing };
+    if (round) round.matches.push(match);
     else {
       rounds.set(key, {
         phaseId: candidate.phaseId,
         bracket: candidate.bracket,
         roundNumber: candidate.roundNumber,
-        matchIds: [candidate.matchId],
+        matches: [match],
       });
     }
   }

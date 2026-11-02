@@ -137,6 +137,28 @@ export async function loadEligibleRefereeIds(
   return new Set(rows.filter((row) => refereeEligibilityBlock(row) === null).map((row) => Number(row.id)));
 }
 
+/** Ce que le verrou du lancement lit de l'arbitre désigné : sa condition d'arbitrage et son opposition. */
+export type RefereeStanding = { block: RefereeBlock | null; objection: boolean };
+
+/**
+ * Condition d'arbitrage **et** opposition retenue de `userId`, en une seule
+ * lecture de sa ligne (`lockLaunchMatch` lisait les deux séparément à chaque
+ * verrou). Sans la colonne `referee_objection_at` (base pas encore migrée),
+ * repli sur la seule condition, sans opposition — comme `refereeObjectionUpheld`.
+ */
+export async function loadRefereeStanding(executor: Executor, userId: number): Promise<RefereeStanding> {
+  try {
+    const [rows] = await executor.execute<(CastEligibilityRow & { referee_objection_at: Date | string | null })[]>(
+      `SELECT ${CAST_ELIGIBILITY_COLUMNS}, referee_objection_at FROM bg_users WHERE id = ? LIMIT 1`,
+      [userId],
+    );
+    return { block: refereeEligibilityBlock(rows[0]), objection: (rows[0]?.referee_objection_at ?? null) !== null };
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+    return { block: await loadRefereeEligibility(executor, userId), objection: false };
+  }
+}
+
 /**
  * L'opposition d'arbitre de ce compte est-elle retenue
  * (`bg_users.referee_objection_at`, `docs/features/MATCH_REFEREE.md`) ? Elle

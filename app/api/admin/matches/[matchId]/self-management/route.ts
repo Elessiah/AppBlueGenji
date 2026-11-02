@@ -28,7 +28,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   if (typeof body.enabled !== "boolean") return fail("INVALID_SELF_MANAGEMENT", 400);
 
   try {
-    await setMatchSelfManaged(matchId, body.enabled);
+    await setMatchSelfManaged(matchId, body.enabled, user.id);
     return ok({ selfManaged: body.enabled });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_SELF_MANAGEMENT_FAILED");

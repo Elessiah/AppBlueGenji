@@ -10,13 +10,15 @@ const STATUSES: Readonly<Record<string, number>> = {
   ROUND_MAPS_SET: 409,
   MATCH_NOT_FOUND: 404,
   MATCH_ALREADY_COMPLETED: 409,
+  MATCH_NOT_LAUNCHABLE: 409,
 };
 
 /**
  * Fixe la première carte du match (`docs/features/MATCH_REFEREE.md`). Corps :
  * `{ map: string | null }` — `null` ou vide la retire. Réservé à l'arbitrage.
  * Fermée (409 `ROUND_MAPS_SET`) quand la manche porte des cartes réglées au
- * tour (`docs/features/ROUND_MAPS.md`).
+ * tour (`docs/features/ROUND_MAPS.md`) ; refusée sur une exemption (409
+ * `MATCH_NOT_LAUNCHABLE`).
  */
 export async function PUT(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();

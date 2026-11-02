@@ -44,8 +44,10 @@ import {
   loadCastEligibility,
   loadEligibleCasterIds,
   loadRefereeEligibility,
+  loadRefereeStanding,
   refereeObjectionUpheld,
   type CasterIdentityRow,
+  type RefereeStanding,
 } from "./cast-eligibility";
 import { announceCastChange, queueCastChange } from "./cast-notices";
 import {
@@ -57,9 +59,10 @@ import {
 } from "./match-casters";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { lockTournamentRow } from "./registration";
-import { announceRefereeChange, queueRefereeChange } from "./referee-notices";
+import { announceRefereeChange, announceRefereeChanges, queueRefereeChange, type RefereeChange } from "./referee-notices";
 import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
-import { queueRefereeAlert, queueRoundNoRefereeAlert } from "./bot-logs";
+import { noRefereeAlertKey, queueRefereeAlert, queueRoundNoRefereeAlert } from "./bot-logs";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { loadRoundSlots } from "./round-map-slots";
 import { inTransaction } from "./transaction";
@@ -109,6 +112,13 @@ export type LaunchMatchRow = LaunchMatchBaseRow & {
    * inéligible n'est plus une partie : son « Prêt » n'est pas attendu.
    */
   refereeEligible: boolean;
+  /**
+   * Ce que le verrou a lu de l'arbitre désigné (`lockLaunchMatch`) : sa
+   * condition, son opposition, et s'il joue le match (`null` : non calculé, match
+   * déjà lancé ou arbitre déjà écarté). Absent hors verrou (lecture par lot de la
+   * modale) : les gestes qui en ont besoin le relisent.
+   */
+  refereeStanding?: (RefereeStanding & { plays: boolean | null }) | null;
 };
 
 const LAUNCH_MATCH_COLUMNS = `
@@ -161,7 +171,10 @@ export function toLaunchInput(row: LaunchMatchBaseRow): MatchLaunchInput {
 }
 
 /** Colonne « prêt » de chaque partie de la ligne du match (les casters ont la leur, `bg_match_casters.ready_at`). */
-const READY_AT_COLUMNS: Record<Exclude<LaunchViewerRole, "CASTER">, string> = {
+const READY_AT_COLUMNS: Record<
+  Exclude<LaunchViewerRole, "CASTER">,
+  "team1_ready_at" | "team2_ready_at" | "referee_ready_at"
+> = {
   TEAM1: "team1_ready_at",
   TEAM2: "team2_ready_at",
   MATCH_REFEREE: "referee_ready_at",
@@ -216,7 +229,9 @@ async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchR
   row.team2_ready_at = null;
   row.referee_ready_at = null;
   // L'arbitre désigné qui joue l'appariement qui arrive ne peut plus l'arbitrer.
-  if (row.referee_user_id !== null && (await resolveTeamParty(connection, row, Number(row.referee_user_id)))) {
+  // Le verrou vient de poser la même question sur les mêmes équipes : sa
+  // réponse est reprise (relue seulement quand il ne l'a pas calculée).
+  if (row.referee_user_id !== null && (await refereePlaysMatch(connection, row))) {
     const refereeId = Number(row.referee_user_id);
     await connection.execute(`UPDATE bg_matches SET referee_user_id = NULL WHERE id = ?`, [row.id]);
     row.referee_user_id = null;
@@ -247,6 +262,13 @@ async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchR
     // `flushBotLogs` pour l'entretien.
     queueCastChange(connection, { kind: "AUTO_RELEASED", matchId: Number(row.id), casterId, reason: "JOINED_TEAM" });
   }
+}
+
+/** L'arbitre désigné joue-t-il le match ? Réponse du verrou quand il l'a calculée. */
+async function refereePlaysMatch(connection: PoolConnection, row: LaunchMatchRow): Promise<boolean> {
+  const known = row.refereeStanding?.plays;
+  if (known !== undefined && known !== null) return known;
+  return (await resolveTeamParty(connection, row, Number(row.referee_user_id))) !== null;
 }
 
 /** Colonnes propres à la ligne du match, relues sous verrou par `lockLaunchMatch`. */
@@ -322,18 +344,31 @@ async function lockLaunchMatch(
   // Avant le départ, un arbitre qui joue désormais le match (roster rejoint
   // sans changer d'appariement) ne compte plus : sinon le lancement attendrait
   // un « Prêt » d'arbitre qu'il ne peut plus donner (il clique en joueur).
+  //
+  // Condition et opposition se lisent en une seule requête sur sa ligne
+  // (`loadRefereeStanding`). Une opposition retenue ferme l'arbitrage : un
+  // arbitre que le balayage n'aurait pas retiré (échec en cours de route) ne
+  // compte plus, comme un inéligible — le lancement ne l'attend pas, un autre
+  // peut prendre le match.
   const refereeId = nullableId(base.referee_user_id);
+  let refereeStanding: LaunchMatchRow["refereeStanding"] = null;
+  if (refereeId !== null) {
+    const standing = await loadRefereeStanding(connection, refereeId);
+    const plays =
+      standing.block === null && !standing.objection && base.launched_at === null
+        ? (await resolveTeamParty(connection, base, refereeId)) !== null
+        : null;
+    refereeStanding = { ...standing, plays };
+  }
   const refereeEligible =
-    refereeId !== null &&
-    (await loadRefereeEligibility(connection, refereeId)) === null &&
-    // Une opposition retenue ferme l'arbitrage : un arbitre que le balayage
-    // n'aurait pas retiré (échec en cours de route) ne compte plus, comme un
-    // inéligible — le lancement ne l'attend pas, un autre peut prendre le match.
-    !(await refereeObjectionUpheld(connection, refereeId)) &&
-    (base.launched_at !== null || (await resolveTeamParty(connection, base, refereeId)) === null);
+    refereeStanding !== null &&
+    refereeStanding.block === null &&
+    !refereeStanding.objection &&
+    refereeStanding.plays !== true;
   const row: LaunchMatchRow = Object.assign(base, {
     casters: await lockMatchCasters(connection, matchId, !snapshotBeforeLock),
     refereeEligible,
+    refereeStanding,
   });
   row.tournament_state = tournamentState;
   row.referee_scheduling = context[0]?.referee_scheduling ?? 0;
@@ -423,15 +458,23 @@ async function resolveTeamParty(
  * (autogestion d'une manche) — casters et éligibilité se relisent alors en
  * lecture courante, sinon un caster inscrit depuis l'instantané ne serait pas
  * attendu (`lockLaunchMatch`, `releaseIneligibleCasters`).
+ *
+ * `locked` : la ligne que l'appelant tient déjà sous verrou, à jour de ce qu'il
+ * vient d'écrire (`setMatchReady`) — elle n'est pas verrouillée une seconde fois.
+ *
+ * Un match qui part ainsi sans arbitre ni autogestion — l'arbitre vient d'être
+ * retiré, par exemple — avertit le staff comme un départ de l'entretien
+ * (`queueNoRefereeAlerts`, une seule alerte par appariement).
  */
 async function launchIfAllReady(
   connection: PoolConnection,
   matchId: number,
   snapshotBeforeLock = false,
+  locked?: LaunchMatchRow,
 ): Promise<boolean> {
-  const row = await lockLaunchMatch(connection, matchId, snapshotBeforeLock);
+  const row = locked ?? (await lockLaunchMatch(connection, matchId, snapshotBeforeLock));
   if (!row) return false;
-  await adoptCurrentPairing(connection, row);
+  if (!locked) await adoptCurrentPairing(connection, row);
   if (matchLaunchPhase(toLaunchInput(row), Date.now()) !== "LOBBY") return false;
   // Un caster devenu inéligible ne donnera plus son « Prêt » : il est retiré
   // avant le décompte, sinon le match l'attendrait jusqu'au lancement d'office.
@@ -441,6 +484,8 @@ async function launchIfAllReady(
   // suffit pas tant que les deux salons ne sont pas pleins.
   if (await voiceGateBlocksLaunch(connection, row)) return false;
   await connection.execute(`UPDATE bg_matches SET launched_at = NOW() WHERE id = ?`, [matchId]);
+  const undecided = undecidedCandidate(row);
+  if (undecided) await queueNoRefereeAlerts(connection, [undecided]);
   return true;
 }
 
@@ -459,7 +504,10 @@ async function writeCasterReady(
     Number(row.id),
     userId,
   ]);
+  const readyAt = ready ? new Date() : null;
+  for (const caster of row.casters) if (caster.userId === userId) caster.readyAt = readyAt;
   const alsoReferee = row.refereeEligible && Number(row.referee_user_id) === userId;
+  if (alsoReferee) row.referee_ready_at = readyAt;
   const refereeReady = alsoReferee ? `, referee_ready_at = ${stamp}` : "";
   await connection.execute(
     `UPDATE bg_matches SET lobby_opened_at = COALESCE(lobby_opened_at, NOW())${refereeReady} WHERE id = ?`,
@@ -504,8 +552,12 @@ export async function setMatchReady(
          WHERE id = ?`,
         [matchId],
       );
+      row[column] = ready ? new Date() : null;
     }
-    const launchedNow = ready ? await launchIfAllReady(connection, matchId) : false;
+    row.lobby_opened_at ??= new Date();
+    // La ligne est tenue sous verrou depuis le début et à jour de l'écriture :
+    // le décompte la reprend sans la reverrouiller.
+    const launchedNow = ready ? await launchIfAllReady(connection, matchId, false, row) : false;
     return { tournamentId: Number(row.tournament_id), launched: launchedNow };
   });
   publishMatchUpdatedEvent(tournamentId, { landingLive: true });
@@ -847,6 +899,11 @@ export async function setMatchHost(matchId: number, teamId: number | null): Prom
  * d'autogestion d'office (décision de l'utilisateur, 2026-10-26).
  */
 function undecidedCandidate(row: LaunchMatchRow): NoRefereeCandidate | null {
+  // Sans phase de lancement, le match part à la passe qui le verrait : personne
+  // n'aurait le temps de désigner un arbitre, et l'alerte ne ferait que remplir
+  // la file. Contre une fantôme, il n'y a rien à arbitrer.
+  if (Number(row.match_launch_phase ?? 0) !== 1) return null;
+  if (Number(row.team1_is_ghost ?? 0) === 1 || Number(row.team2_is_ghost ?? 0) === 1) return null;
   const decision = refereeDecision({
     refereeAssigned: row.referee_user_id !== null && row.refereeEligible,
     selfManaged: Number(row.self_managed ?? 0) === 1,
@@ -882,17 +939,33 @@ export async function queueNoRefereeAlerts(
   connection: PoolConnection,
   candidates: readonly NoRefereeCandidate[],
 ): Promise<void> {
-  const { perMatch, perRound } = groupNoRefereeAlerts(candidates);
+  const fresh = await withoutReservedAlerts(connection, candidates);
+  const { perMatch, perRound } = groupNoRefereeAlerts(fresh);
   for (const match of perMatch) {
     await queueRefereeAlert(connection, { kind: "match_no_referee", matchId: match.matchId, pairing: match.pairing });
   }
-  const pairingOf = new Map(candidates.map((candidate) => [candidate.matchId, candidate.pairing]));
-  for (const round of perRound) {
-    await queueRoundNoRefereeAlert(
-      connection,
-      round.matchIds.map((matchId) => ({ matchId, pairing: pairingOf.get(matchId) ?? "" })),
-    );
-  }
+  for (const round of perRound) await queueRoundNoRefereeAlert(connection, round.matches);
+}
+
+/**
+ * Écarte, en **une** lecture, les candidats dont l'alerte est déjà réservée :
+ * un match resté en lancement sans décision est revu à chaque passe de
+ * l'entretien, et sa réservation ne se relit plus match par match. Simple
+ * filtre : la réservation elle-même (`claimRefereeAlert`) tranche toujours une
+ * course entre deux passes.
+ */
+async function withoutReservedAlerts(
+  connection: PoolConnection,
+  candidates: readonly NoRefereeCandidate[],
+): Promise<NoRefereeCandidate[]> {
+  if (candidates.length === 0) return [];
+  const ids = [...new Set(candidates.map((candidate) => candidate.matchId))];
+  const [rows] = await connection.execute<(RowDataPacket & { match_id: number; alert_key: string })[]>(
+    `SELECT match_id, alert_key FROM bg_referee_alerts WHERE match_id IN (${sqlPlaceholders(ids.length)})`,
+    ids,
+  );
+  const reserved = new Set(rows.map((row) => `${Number(row.match_id)}:${row.alert_key}`));
+  return candidates.filter((candidate) => !reserved.has(`${candidate.matchId}:${noRefereeAlertKey(candidate.pairing)}`));
 }
 
 /**
@@ -1009,6 +1082,14 @@ export async function maintainMatchLaunches(
 
 /** Refus communs à toute désignation : match absent, joué, ou exemption. */
 function assertRefereeable(row: LaunchMatchRow | null): asserts row is LaunchMatchRow {
+  assertOpenMatch(row ?? undefined);
+}
+
+/**
+ * Refus communs aux gestes du staff sur un match (désignation, première carte) :
+ * match absent, joué, ou exemption — qui n'a ni lancement ni carte.
+ */
+function assertOpenMatch(row: { status: string; is_bye: number } | undefined): void {
   if (!row) throw new Error("MATCH_NOT_FOUND");
   if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
   if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
@@ -1041,6 +1122,18 @@ async function writeReferee(connection: PoolConnection, row: LaunchMatchRow, ref
 }
 
 /**
+ * L'avis à l'arbitre qu'un autre reprend : le motif lu par le verrou, dans
+ * l'ordre de `releaseIneligibleReferee` — une opposition retenue (retrait par
+ * le staff, sans ligne par match), puis la condition d'arbitrage, puis
+ * l'équipe rejointe.
+ */
+function takenOverChange(row: LaunchMatchRow, matchId: number, refereeId: number): RefereeChange {
+  if (row.refereeStanding?.objection) return { kind: "OBJECTION_RELEASED", matchId, refereeId };
+  const reason = row.refereeStanding?.block === null && row.refereeStanding.plays === true ? "JOINED_TEAM" : "INELIGIBLE";
+  return { kind: "AUTO_RELEASED", matchId, refereeId, reason };
+}
+
+/**
  * « Je prends ce match » : le lecteur devient l'arbitre désigné. Un match qui
  * a déjà un arbitre éligible est refusé ; celui d'un arbitre devenu
  * inéligible est repris (l'ancien est prévenu, retrait d'office).
@@ -1061,9 +1154,7 @@ export async function takeMatchReferee(matchId: number, userId: number): Promise
       }
       if (current !== null && row.refereeEligible) throw new Error("MATCH_ALREADY_REFEREED");
       await writeReferee(connection, row, userId);
-      if (current !== null) {
-        queueRefereeChange(connection, { kind: "AUTO_RELEASED", matchId, refereeId: current, reason: "INELIGIBLE" });
-      }
+      if (current !== null) queueRefereeChange(connection, takenOverChange(row, matchId, current));
       queueRefereeChange(connection, { kind: "TAKEN", matchId });
       return Number(row.tournament_id);
     }),
@@ -1078,16 +1169,25 @@ export async function takeMatchReferee(matchId: number, userId: number): Promise
  *
  * Un match joué ou exempt garde son arbitre : l'histoire ne se réécrit pas.
  *
+ * `expected` (staff) : l'arbitre que la fenêtre montrait ; s'il a changé
+ * depuis, rien n'est retiré (`REFEREE_CHANGED`).
+ *
  * @throws `MATCH_NOT_FOUND` | `MATCH_ALREADY_COMPLETED` | `MATCH_NOT_LAUNCHABLE`
- *   | `NOT_MATCH_REFEREE`
+ *   | `NOT_MATCH_REFEREE` | `REFEREE_CHANGED`
  */
-export async function releaseMatchReferee(matchId: number, userId: number, canManage: boolean): Promise<void> {
+export async function releaseMatchReferee(
+  matchId: number,
+  userId: number,
+  canManage: boolean,
+  expected?: number | null,
+): Promise<void> {
   const tournamentId = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       const row = await lockLaunchMatch(connection, matchId);
       assertRefereeable(row);
       const current = nullableId(row.referee_user_id);
       if (current !== userId && !canManage) throw new Error("NOT_MATCH_REFEREE");
+      assertExpectedReferee(current, expected);
       if (current === null) return null;
       await connection.execute(`UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL WHERE id = ?`, [
         matchId,
@@ -1101,19 +1201,33 @@ export async function releaseMatchReferee(matchId: number, userId: number, canMa
 }
 
 /**
+ * La fenêtre du staff n'est relue qu'à l'ouverture et après ses propres gestes :
+ * un geste qui dit quel arbitre il croyait remplacer (`expected`, `null` pour
+ * aucun) est refusé si un autre membre du staff l'a changé entre-temps, sans
+ * quoi il remplacerait sans le savoir l'arbitre tout juste désigné.
+ * `undefined` : pas de contrôle (appel sans fenêtre).
+ */
+function assertExpectedReferee(current: number | null, expected: number | null | undefined): void {
+  if (expected !== undefined && expected !== current) throw new Error("REFEREE_CHANGED");
+}
+
+/**
  * Le staff désigne l'arbitre du match (`refereeId`), en remplace un, ou le
- * retire (`null`). Désigner éteint l'autogestion ; l'arbitre remplacé est prévenu.
+ * retire (`null`). Désigner éteint l'autogestion ; l'arbitre remplacé est
+ * prévenu — sauf s'il est l'auteur du geste (`staffUserId`).
  *
  * @throws `MATCH_NOT_FOUND` | `MATCH_ALREADY_COMPLETED` | `MATCH_NOT_LAUNCHABLE`
  *   | `NOT_REFEREE` | `REFEREE_IDENTITY_REQUIRED` | `REFEREE_OBJECTION` | `REFEREE_IS_PLAYER`
+ *   | `REFEREE_CHANGED`
  */
 export async function assignMatchReferee(
   matchId: number,
   staffUserId: number,
   refereeId: number | null,
+  expected?: number | null,
 ): Promise<void> {
   if (refereeId === null) {
-    await releaseMatchReferee(matchId, staffUserId, true);
+    await releaseMatchReferee(matchId, staffUserId, true, expected);
     return;
   }
   const tournamentId = await retryOnDeadlock(() =>
@@ -1125,13 +1239,17 @@ export async function assignMatchReferee(
         if (await refereeObjectionUpheld(connection, refereeId, true)) throw new Error("REFEREE_OBJECTION");
         return null;
       }
+      assertExpectedReferee(current, expected);
       await writeReferee(connection, row, refereeId);
-      queueRefereeChange(connection, { kind: "ASSIGNED", matchId, replacedRefereeId: current });
+      queueRefereeChange(connection, { kind: "ASSIGNED", matchId, replacedRefereeId: current, actorId: staffUserId });
       return Number(row.tournament_id);
     }),
   );
   if (tournamentId !== null) publishMatchUpdatedEvent(tournamentId);
 }
+
+/** Ce que l'autogestion lit du match verrouillé. */
+type SelfManagedRow = Pick<LaunchMatchBaseRow, "id" | "self_managed" | "referee_user_id" | "tournament_state">;
 
 /**
  * Autogestion du match verrouillé : l'allumer retire l'arbitre (rendu à
@@ -1141,7 +1259,7 @@ export async function assignMatchReferee(
  */
 async function writeSelfManaged(
   connection: PoolConnection,
-  row: LaunchMatchRow,
+  row: SelfManagedRow,
   enabled: boolean,
   snapshotBeforeLock = false,
 ): Promise<{ replacedRefereeId: number | null } | undefined> {
@@ -1162,10 +1280,11 @@ async function writeSelfManaged(
 /**
  * Le staff passe un match en autogestion, ou l'en sort. Jamais d'office : sans
  * arbitre ni autogestion, le staff est seulement averti au lancement.
+ * `actorId` : l'auteur du geste — l'arbitre qui s'écarte lui-même n'est pas prévenu.
  *
  * @throws `MATCH_NOT_FOUND` | `MATCH_ALREADY_COMPLETED` | `MATCH_NOT_LAUNCHABLE`
  */
-export async function setMatchSelfManaged(matchId: number, enabled: boolean): Promise<void> {
+export async function setMatchSelfManaged(matchId: number, enabled: boolean, actorId?: number): Promise<void> {
   const tournamentId = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       const row = await lockLaunchMatch(connection, matchId);
@@ -1177,6 +1296,7 @@ export async function setMatchSelfManaged(matchId: number, enabled: boolean): Pr
         matchId,
         enabled,
         replacedRefereeId: written.replacedRefereeId,
+        actorId,
       });
       return Number(row.tournament_id);
     }),
@@ -1188,10 +1308,14 @@ export async function setMatchSelfManaged(matchId: number, enabled: boolean): Pr
 export type RoundSelector = { phaseId: number; roundNumber: number; bracket: string | null };
 
 /**
- * Autogestion de toute une manche, d'un geste : chaque match encore à jouer
- * (exemptions exclues) est verrouillé par identifiant croissant — l'ordre de
- * l'entretien —, puis écrit comme par `setMatchSelfManaged`. Une seule ligne
- * au journal pour la manche ; chaque arbitre retiré est prévenu.
+ * Autogestion de toute une manche, d'un geste. Le tournoi est verrouillé en
+ * **première instruction** (une lecture ordinaire avant les verrous figeait
+ * l'instantané `REPEATABLE READ` de la transaction), puis les matchs encore à
+ * jouer de la manche (exemptions exclues) en **une** lecture verrouillante,
+ * par identifiant croissant — l'ordre de l'entretien —, réduite aux colonnes
+ * que l'autogestion lit ; chacun est écrit comme par `setMatchSelfManaged`.
+ * Une seule ligne au journal pour la manche ; chaque arbitre retiré est
+ * prévenu — sauf l'auteur du geste (`actorId`) —, les avis l'un après l'autre.
  *
  * @returns le nombre de matchs changés.
  * @throws `TOURNAMENT_NOT_FOUND`
@@ -1200,30 +1324,36 @@ export async function setRoundSelfManaged(
   tournamentId: number,
   round: RoundSelector,
   enabled: boolean,
+  actorId?: number,
 ): Promise<number> {
   const changed = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
-      const [tournament] = await connection.execute<(RowDataPacket & { id: number })[]>(
-        `SELECT id FROM bg_tournaments WHERE id = ? LIMIT 1`,
+      const [tournament] = await connection.execute<(RowDataPacket & { id: number; state: string })[]>(
+        `SELECT id, state FROM bg_tournaments WHERE id = ? FOR UPDATE`,
         [tournamentId],
       );
       if (tournament.length === 0) throw new Error("TOURNAMENT_NOT_FOUND");
+      const tournamentState = String(tournament[0].state);
       const bracketFilter = round.bracket === null ? "" : "AND bracket = ?";
-      const [candidates] = await connection.execute<(RowDataPacket & { id: number })[]>(
-        `SELECT id FROM bg_matches
+      // Une seule table, sans jointure : verrou de ces seules lignes (MariaDB).
+      const [rows] = await connection.execute<
+        (RowDataPacket & { id: number; bracket: string; self_managed: number | null; referee_user_id: number | null })[]
+      >(
+        `SELECT id, bracket, self_managed, referee_user_id FROM bg_matches
           WHERE tournament_id = ? AND phase_id = ? AND round_number = ? ${bracketFilter}
             AND status <> 'COMPLETED' AND is_bye = 0
-          ORDER BY id`,
+          ORDER BY id
+          FOR UPDATE`,
         round.bracket === null
           ? [tournamentId, round.phaseId, round.roundNumber]
           : [tournamentId, round.phaseId, round.roundNumber, round.bracket],
       );
-      const written: { matchId: number; replacedRefereeId: number | null }[] = [];
-      for (const candidate of candidates) {
-        const row = await lockLaunchMatch(connection, Number(candidate.id), true);
-        if (row?.status === "COMPLETED" || !row || Number(row.is_bye) === 1) continue;
-        const result = await writeSelfManaged(connection, row, enabled, true);
-        if (result) written.push({ matchId: Number(row.id), replacedRefereeId: result.replacedRefereeId });
+      const written: { matchId: number; bracket: string; replacedRefereeId: number | null }[] = [];
+      for (const row of rows) {
+        const result = await writeSelfManaged(connection, { ...row, tournament_state: tournamentState }, enabled, true);
+        if (result) {
+          written.push({ matchId: Number(row.id), bracket: String(row.bracket), replacedRefereeId: result.replacedRefereeId });
+        }
       }
       return written;
     }),
@@ -1235,19 +1365,29 @@ export async function setRoundSelfManaged(
     enabled,
     changed.length,
     changed.some((entry) => entry.replacedRefereeId !== null),
+    new Set(changed.map((entry) => entry.bracket)).size > 1,
   );
-  for (const entry of changed) {
-    if (entry.replacedRefereeId === null) continue;
-    announceRefereeChange(
-      { kind: "SELF_MANAGED", matchId: entry.matchId, enabled, replacedRefereeId: entry.replacedRefereeId },
-      { log: false },
-    );
-  }
+  const notices: RefereeChange[] = changed.flatMap((entry) =>
+    entry.replacedRefereeId === null
+      ? []
+      : [{ kind: "SELF_MANAGED", matchId: entry.matchId, enabled, replacedRefereeId: entry.replacedRefereeId, actorId }],
+  );
+  announceRefereeChanges(notices, { log: false });
   return changed.length;
 }
 
-/** La ligne du journal d'une manche passée (ou sortie) en autogestion. Ne lève jamais. */
-async function announceRoundSelfManagement(sampleMatchId: number, enabled: boolean, count: number, removedReferee: boolean): Promise<void> {
+/**
+ * La ligne du journal d'une manche passée (ou sortie) en autogestion. Ne lève
+ * jamais. `mixedBrackets` : plusieurs tableaux changés (tous les tableaux de la
+ * manche) — la ligne dit « Manche N » sans nommer le tableau du premier match.
+ */
+async function announceRoundSelfManagement(
+  sampleMatchId: number,
+  enabled: boolean,
+  count: number,
+  removedReferee: boolean,
+  mixedBrackets: boolean,
+): Promise<void> {
   try {
     const row = await loadMatchLogRow(sampleMatchId);
     if (!row) return;
@@ -1255,7 +1395,7 @@ async function announceRoundSelfManagement(sampleMatchId: number, enabled: boole
     await sendBotLog(
       formatRoundSelfManagementLog({
         tournament: match.tournament,
-        roundLabel: matchRoundLabel(match.bracket, match.roundNumber, match.swiss),
+        roundLabel: matchRoundLabel(mixedBrackets ? "" : match.bracket, match.roundNumber, match.swiss),
         enabled,
         count,
       }),
@@ -1270,13 +1410,19 @@ async function announceRoundSelfManagement(sampleMatchId: number, enabled: boole
 type FirstMapRow = RowDataPacket & {
   tournament_id: number;
   status: MatchStatus;
+  is_bye: number;
   first_map: string | null;
   phase_id: number;
   bracket: string;
   round_number: number;
 };
 
-const FIRST_MAP_SELECT = `SELECT tournament_id, status, first_map, phase_id, bracket, round_number FROM bg_matches WHERE id = ? LIMIT 1`;
+const FIRST_MAP_SELECT = `SELECT tournament_id, status, is_bye, first_map, phase_id, bracket, round_number FROM bg_matches WHERE id = ? LIMIT 1`;
+
+/** Refus de la première carte : match absent, joué, ou exemption. */
+function assertFirstMapSettable(row: FirstMapRow | undefined): asserts row is FirstMapRow {
+  assertOpenMatch(row);
+}
 
 /**
  * Première carte du match, saisie par le staff ; `null` (ou vide) la retire.
@@ -1289,7 +1435,11 @@ const FIRST_MAP_SELECT = `SELECT tournament_id, status, first_map, phase_id, bra
  * instant. Le match est lu avant, hors transaction (lecture autonome), pour
  * connaître son tournoi ; tout est relu sous verrou.
  *
+ * Une exemption n'a pas de carte : refusée (`MATCH_NOT_LAUNCHABLE`) comme par
+ * tout autre geste d'arbitrage (`assertRefereeable`).
+ *
  * @throws `INVALID_FIRST_MAP` | `ROUND_MAPS_SET` | `MATCH_NOT_FOUND` | `MATCH_ALREADY_COMPLETED`
+ *   | `MATCH_NOT_LAUNCHABLE`
  */
 export async function setMatchFirstMap(matchId: number, rawMap: unknown): Promise<void> {
   const typed = normalizeFirstMap(rawMap);
@@ -1297,8 +1447,7 @@ export async function setMatchFirstMap(matchId: number, rawMap: unknown): Promis
     const [rows] = await connection.execute<FirstMapRow[]>(FIRST_MAP_SELECT, [matchId]);
     return rows[0];
   });
-  if (!pre) throw new Error("MATCH_NOT_FOUND");
-  if (pre.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+  assertFirstMapSettable(pre);
   const ownerId = Number(pre.tournament_id);
   // Rejouée sur interblocage : le verrou tournoi puis match croise les
   // écritures d'arbitrage qui prennent le match puis le tournoi.
@@ -1307,8 +1456,7 @@ export async function setMatchFirstMap(matchId: number, rawMap: unknown): Promis
       await lockTournamentRow(connection, ownerId);
       const [rows] = await connection.execute<FirstMapRow[]>(`${FIRST_MAP_SELECT} FOR UPDATE`, [matchId]);
       const row = rows[0];
-      if (!row) throw new Error("MATCH_NOT_FOUND");
-      if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+      assertFirstMapSettable(row);
       const slots = await loadRoundSlots(connection, ownerId, {
         phaseId: Number(row.phase_id),
         bracket: String(row.bracket),
@@ -1349,7 +1497,7 @@ export async function releaseIneligibleReferee(matchId: number, refereeId: numbe
       // avant le départ : rien à faire tant qu'il compte. Le motif dit
       // d'abord les conditions d'arbitrage, l'équipe ensuite.
       if (row.refereeEligible) return;
-      if ((await loadRefereeEligibility(connection, refereeId)) === null) reason = "JOINED_TEAM";
+      if (row.refereeStanding?.block === null) reason = "JOINED_TEAM";
       await connection.execute(`UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL WHERE id = ?`, [
         matchId,
       ]);

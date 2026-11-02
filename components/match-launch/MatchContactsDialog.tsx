@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useContext, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { useToast } from "@/components/ui/toast";
@@ -15,6 +15,7 @@ import {
 } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 import { CasterCards, RefereeCard, SideCard } from "./LaunchContactCards";
+import { SharedMatchContactsContext } from "./shared-match-contacts";
 import { useLaunchText, type LaunchText } from "./launch-text";
 import launchStyles from "./MatchLaunchCenter.module.css";
 import styles from "./MatchContactsDialog.module.css";
@@ -421,7 +422,12 @@ export function MatchContactsDialog({
   const { showError, showSuccess } = useToast();
   const titleId = useId();
   const [mounted, setMounted] = useState(false);
-  const { state, launch } = useMatchContacts(matchId, card);
+  // Ouverte depuis la page du match qui lit déjà ces contacts : sa lecture
+  // suffit, la modale n'en lance pas une seconde.
+  const shared = useContext(SharedMatchContactsContext);
+  const sharedRead = shared?.matchId === matchId ? shared : null;
+  const own = useMatchContacts(matchId, card, sharedRead === null);
+  const { state, launch } = sharedRead ?? own;
   // À la fermeture, la modale de lancement relit ses matchs : une ouverture
   // d'office retenue pendant que « Contacts » était ouverte part alors. Pas
   // pour un arbitre : la modale de lancement ne lui présente rien.

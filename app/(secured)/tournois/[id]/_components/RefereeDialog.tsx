@@ -153,6 +153,9 @@ export function RefereeDialog({
       const message = errorText(code);
       fieldErrors.report(code, message);
       showError(message);
+      // Un autre membre du staff a changé l'arbitre : la fenêtre se relit
+      // pour montrer celui qui est désigné maintenant.
+      if (code === "REFEREE_CHANGED") await load(false);
       return false;
     } finally {
       setBusy(false);
@@ -167,7 +170,7 @@ export function RefereeDialog({
   const assign = (event: FormEvent) => {
     event.preventDefault();
     if (!pickOffered) return;
-    void run(() => send(`${base}/referee`, "PUT", { userId: Number(pick) }), t("cardActions.refereeDialog.assigned")).then(
+    void run(() => send(`${base}/referee`, "PUT", { userId: Number(pick), expectedUserId: panel?.referee?.userId ?? null }), t("cardActions.refereeDialog.assigned")).then(
       (done) => {
         if (done) setPick("");
       },
@@ -197,7 +200,7 @@ export function RefereeDialog({
       title: t("cardActions.refereeDialog.removeConfirm.title", { match: matchLabel }),
       body: t("cardActions.refereeDialog.removeConfirm.body"),
       confirm: t("cardActions.refereeDialog.removeConfirm.confirm"),
-      action: () => run(() => send(`${base}/referee`, "PUT", { userId: null }), t("cardActions.refereeDialog.removed")),
+      action: () => run(() => send(`${base}/referee`, "PUT", { userId: null, expectedUserId: panel?.referee?.userId ?? null }), t("cardActions.refereeDialog.removed")),
     },
     selfOn: {
       title: t("cardActions.refereeDialog.selfOnConfirm.title", { match: matchLabel }),

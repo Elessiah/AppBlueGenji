@@ -27,8 +27,11 @@ import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
 export type RefereeChange =
   /** Un arbitre prend le match lui-même. */
   | { kind: "TAKEN"; matchId: number }
-  /** Le staff désigne un arbitre ; `replacedRefereeId` : celui qu'il remplace. */
-  | { kind: "ASSIGNED"; matchId: number; replacedRefereeId: number | null }
+  /**
+   * Le staff désigne un arbitre ; `replacedRefereeId` : celui qu'il remplace ;
+   * `actorId` : l'auteur du geste (l'arbitre qui se remplace n'est pas prévenu).
+   */
+  | { kind: "ASSIGNED"; matchId: number; replacedRefereeId: number | null; actorId?: number }
   /** Arbitrage retiré par son arbitre (`byStaff: false`) ou par le staff. */
   | { kind: "RELEASED"; matchId: number; refereeId: number; byStaff: boolean }
   /**
@@ -39,8 +42,8 @@ export type RefereeChange =
   | { kind: "OBJECTION_RELEASED"; matchId: number; refereeId: number }
   /** Arbitrage retiré d'office. */
   | { kind: "AUTO_RELEASED"; matchId: number; refereeId: number; reason: "INELIGIBLE" | "JOINED_TEAM" }
-  /** Autogestion allumée ou éteinte ; allumée, elle retire l'arbitre (`replacedRefereeId`). */
-  | { kind: "SELF_MANAGED"; matchId: number; enabled: boolean; replacedRefereeId: number | null }
+  /** Autogestion allumée ou éteinte ; allumée, elle retire l'arbitre (`replacedRefereeId`), l'auteur `actorId`. */
+  | { kind: "SELF_MANAGED"; matchId: number; enabled: boolean; replacedRefereeId: number | null; actorId?: number }
   /** Première carte posée ou retirée. */
   | { kind: "FIRST_MAP"; matchId: number; set: boolean }
   /** Carte choisie (ou retirée) dans le pool de la manche, par l'arbitrage ou une équipe (`byTeam`). */
@@ -89,13 +92,18 @@ export function refereeLogCategory(change: RefereeChange): BotLogCategory {
   }
 }
 
-/** L'arbitre à prévenir et son motif ; `null` quand personne n'a à l'être. */
+/**
+ * L'arbitre à prévenir et son motif ; `null` quand personne n'a à l'être —
+ * notamment quand il est lui-même l'auteur du geste (il se remplace, ou passe
+ * son match en autogestion) : seul un retrait par un autre que lui est annoncé.
+ */
 export function refereeReleaseNotice(
   change: RefereeChange,
 ): { refereeId: number; reason: RefereeReleaseReason } | null {
   switch (change.kind) {
     case "ASSIGNED":
-      return change.replacedRefereeId === null ? null : { refereeId: change.replacedRefereeId, reason: "REPLACED" };
+      if (change.replacedRefereeId === null || change.replacedRefereeId === change.actorId) return null;
+      return { refereeId: change.replacedRefereeId, reason: "REPLACED" };
     case "RELEASED":
       return change.byStaff ? { refereeId: change.refereeId, reason: "STAFF" } : null;
     case "OBJECTION_RELEASED":
@@ -103,7 +111,8 @@ export function refereeReleaseNotice(
     case "AUTO_RELEASED":
       return { refereeId: change.refereeId, reason: change.reason };
     case "SELF_MANAGED":
-      return change.replacedRefereeId === null ? null : { refereeId: change.replacedRefereeId, reason: "SELF_MANAGED" };
+      if (change.replacedRefereeId === null || change.replacedRefereeId === change.actorId) return null;
+      return { refereeId: change.replacedRefereeId, reason: "SELF_MANAGED" };
     default:
       return null;
   }
@@ -169,6 +178,23 @@ export type RefereeAnnounceOptions = { log?: boolean };
 /** Annonce un changement d'arbitrage, sans attendre ; ne lève jamais. */
 export function announceRefereeChange(change: RefereeChange, options: RefereeAnnounceOptions = {}): void {
   void deliverRefereeChange(change, options).catch((error) => console.error("[referee] changement d'arbitrage non annoncé", error));
+}
+
+/**
+ * Annonce plusieurs changements **l'un après l'autre**, sans attendre l'appelant
+ * (autogestion d'une manche) : chaque avis relit son match et son destinataire,
+ * et seize avis lancés ensemble occupaient le pool d'une trentaine de requêtes
+ * simultanées. Ne lève jamais.
+ */
+export function announceRefereeChanges(changes: readonly RefereeChange[], options: RefereeAnnounceOptions = {}): void {
+  if (changes.length === 0) return;
+  void (async () => {
+    for (const change of changes) {
+      await deliverRefereeChange(change, options).catch((error) =>
+        console.error("[referee] changement d'arbitrage non annoncé", error),
+      );
+    }
+  })();
 }
 
 /** Changements constatés au fond d'une transaction, annoncés après son commit (`./cast-notices`, même cycle). */

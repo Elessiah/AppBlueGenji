@@ -3,14 +3,16 @@ import type { RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
+import { requestCache } from "@/lib/server/request-cache";
 import {
+  loadVisibleTournamentCard,
   tournamentPageMetadata,
   type TournamentMetadataCardLoader,
   type TournamentMetadataRights,
 } from "@/lib/server/tournament-metadata";
-import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
 import { parseEntityPageId } from "@/lib/shared/entity-page-titles";
 import { matchPagePath } from "@/lib/shared/match-page";
+import { memberTournamentPath, spectatorTournamentPath } from "@/lib/shared/spectator-view";
 import type { BracketType } from "@/lib/shared/types";
 import { matchPositionText, tournamentPageMessages, tournamentPageText } from "@/lib/shared/tournament-page-text";
 
@@ -28,9 +30,12 @@ type PositionRow = RowDataPacket & { bracket: BracketType; round_number: number;
 
 /**
  * La manche et le numéro du match, `null` s'il n'appartient pas à ce tournoi :
- * une lecture par clé primaire, faite par la mise en page (404) et par l'encart.
+ * une lecture par clé primaire, partagée pour la requête (`requestCache`) par la
+ * mise en page (404) et par l'encart.
  */
-export async function getMatchPagePosition(tournamentId: number, matchId: number): Promise<MatchPagePosition | null> {
+export const getMatchPagePosition = requestCache(readMatchPagePosition);
+
+async function readMatchPagePosition(tournamentId: number, matchId: number): Promise<MatchPagePosition | null> {
   const [rows] = await withConnection((connection) =>
     connection.query<PositionRow[]>(
       "SELECT bracket, round_number, match_number FROM bg_matches WHERE id = ? AND tournament_id = ? LIMIT 1",
@@ -57,7 +62,7 @@ export async function matchPageExists(
   const matchId = parseEntityPageId(rawMatchId);
   if (tournamentId === null || matchId === null) return false;
   try {
-    const card = await getVisibleTournamentCard(tournamentId, rights);
+    const card = await loadVisibleTournamentCard(tournamentId, rights);
     if (!card) return false;
     return (await getMatchPagePosition(tournamentId, matchId)) !== null;
   } catch {
@@ -76,7 +81,9 @@ function prefixedTitle(title: Metadata["title"], prefix: string): string {
 /**
  * Encart d'un lien de page de match : celui du tournoi (`tournamentPageMetadata`,
  * mêmes droits), adresse canonique sur la page du match et titre précédé de
- * sa manche et de son numéro. Un match introuvable garde l'encart du tournoi.
+ * sa manche et de son numéro. Un match introuvable (identifiant illisible, ou
+ * match d'un autre tournoi) garde l'encart du tournoi **et sa canonique** —
+ * celle de la vue lue (`/suivre/…` sans compte), jamais une page en 404.
  */
 export async function matchPageMetadata(
   rawTournamentId: string,
@@ -88,14 +95,17 @@ export async function matchPageMetadata(
   const matchId = parseEntityPageId(rawMatchId);
   const tournamentId = parseEntityPageId(rawTournamentId);
   const granted = await rights().catch(() => null);
+  const position =
+    matchId === null || tournamentId === null || granted === null
+      ? null
+      : await getMatchPagePosition(tournamentId, matchId).catch(() => null);
+  const tournamentPath = spectator ? spectatorTournamentPath : memberTournamentPath;
   const metadata = await tournamentPageMetadata(
     rawTournamentId,
-    (id) => (matchId === null ? `/tournois/${id}` : matchPagePath(id, matchId, spectator)),
+    (id) => (position === null || matchId === null ? tournamentPath(id) : matchPagePath(id, matchId, spectator)),
     async () => granted,
     loadCard,
   );
-  if (matchId === null || tournamentId === null || granted === null) return metadata;
-  const position = await getMatchPagePosition(tournamentId, matchId).catch(() => null);
   if (!position || metadata.alternates === undefined) return metadata;
   const locale = await requestLocale();
   const text = tournamentPageText(locale, tournamentPageMessages(messagesFor(locale)));
