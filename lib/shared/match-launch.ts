@@ -300,22 +300,6 @@ export function canDeclareTeamReady(roles: readonly TeamRole[] | null | undefine
 }
 
 /**
- * Équipe qui héberge la partie (crée le salon en jeu). L'arbitrage peut la
- * désigner ; à défaut — ou si la valeur stockée ne désigne plus une des deux
- * engagées, après une correction qui a changé l'appariement — c'est l'équipe 1.
- */
-export function resolveHostTeamId(
-  storedHostTeamId: number | null,
-  team1Id: number | null,
-  team2Id: number | null,
-): number | null {
-  if (storedHostTeamId !== null && (storedHostTeamId === team1Id || storedHostTeamId === team2Id)) {
-    return storedHostTeamId;
-  }
-  return team1Id;
-}
-
-/**
  * Pour caster un match, il faut pouvoir être joint **et** retrouvé en jeu : tag
  * Discord certifié et compte Battle.net rattaché. Un caster se présente aux
  * deux équipes dans la modale de lancement ; un tag saisi à la main ne dirait
@@ -639,8 +623,10 @@ export function readsContactsEarly(reader: { playsMatch: boolean; referee: boole
 /**
  * Les contacts **du caster** sont-ils rendus à ce lecteur ? Le temps du match
  * (lancement ouvert, ou lancé), et à un arbitre dès que les deux adversaires
- * sont connus — rôle `REFEREE` : un arbitre qui joue le match lit en joueur
- * (décision de l'utilisateur, 2026-10-21). Jamais hors phase (`NONE` : match
+ * sont connus — rôle `REFEREE`, ou `MATCH_REFEREE` (l'arbitre désigné, qui les
+ * lit comme les autres arbitres, comme le disent l'annonce et le registre T04) :
+ * un arbitre qui joue le match lit en joueur (décision de l'utilisateur,
+ * 2026-10-21). Jamais hors phase (`NONE` : match
  * terminé ou adversaire manquant), même si un appelant l'oubliait.
  *
  * Lue par le serveur seul (`exposesCaster`) : les deux modales n'en lisent que
@@ -648,7 +634,7 @@ export function readsContactsEarly(reader: { playsMatch: boolean; referee: boole
  * copies dériveraient, et la fiche montrerait deux « — » ou une note à tort.
  */
 export function exposesCasterContacts(phase: MatchLaunchPhase, role: MatchLaunchViewerRole): boolean {
-  return matchUnderway(phase) || (phase !== "NONE" && role === "REFEREE");
+  return matchUnderway(phase) || (phase !== "NONE" && (role === "REFEREE" || role === "MATCH_REFEREE"));
 }
 
 /**
@@ -767,6 +753,7 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_REFEREE_OBJECTION: "Choix invalide pour l'opposition de l'arbitre.",
   USER_NOT_FOUND: "Compte introuvable.",
   MATCH_ALREADY_REFEREED: "Ce match a déjà un arbitre.",
+  REFEREE_CHANGED: "L'arbitre de ce match vient de changer : vérifie qui est désigné avant de recommencer.",
   NOT_MATCH_REFEREE: "Tu n'arbitres pas ce match.",
   INVALID_FIRST_MAP: "Nom de carte invalide (64 caractères au plus).",
   INVALID_ROUND: "Tour du tournoi invalide.",

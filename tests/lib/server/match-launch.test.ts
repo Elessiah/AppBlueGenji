@@ -6,6 +6,7 @@ jest.mock("@/lib/server/tournaments/cast-notices");
 jest.mock("@/lib/server/tournaments/referee-notices");
 
 import type { PoolConnection } from "mysql2/promise";
+import type { NoRefereeCandidate } from "@/lib/shared/match-referee";
 import { withConnection } from "@/lib/server/database";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import {
@@ -14,7 +15,7 @@ import {
   flushCastChanges,
   queueCastChange,
 } from "@/lib/server/tournaments/cast-notices";
-import { announceRefereeChange, queueRefereeChange } from "@/lib/server/tournaments/referee-notices";
+import { announceRefereeChange, announceRefereeChanges, queueRefereeChange } from "@/lib/server/tournaments/referee-notices";
 import {
   assignMatchReferee,
   claimMatchCast,
@@ -22,6 +23,8 @@ import {
   loadViewerCastBlock,
   maintainMatchLaunches,
   releaseIneligibleCast,
+  queueDeferredNoRefereeAlerts,
+  queueNoRefereeAlerts,
   releaseIneligibleReferee,
   releaseMatchCast,
   releaseMatchReferee,
@@ -286,7 +289,7 @@ function readCastRows(state: World, sql: string): unknown[] | null {
 
 /** Lectures de la première carte et des cartes de la manche (`ROUND_MAPS.md`), `null` pour les autres requêtes. */
 function readFirstMapRows(state: World, sql: string): [unknown, unknown[]] | null {
-  if (sql.startsWith("SELECT tournament_id, status, first_map, phase_id, bracket, round_number FROM bg_matches")) {
+  if (sql.startsWith("SELECT tournament_id, status, is_bye, first_map, phase_id, bracket, round_number FROM bg_matches")) {
     return [state.match ? [{ ...state.match }] : [], []];
   }
   if (sql.startsWith("SELECT slots_json FROM bg_tournament_round_maps")) {
@@ -297,6 +300,11 @@ function readFirstMapRows(state: World, sql: string): [unknown, unknown[]] | nul
 
 /** Lectures et réservations du bloc « arbitre désigné », `null` pour les autres requêtes. */
 function readRefereeRows(state: World, sql: string, params: unknown[]): [unknown, unknown[]] | null {
+  return readAlertRows(state, sql, params) ?? readFirstMapRows(state, sql) ?? readRoundRows(state, sql);
+}
+
+/** Réservations d'alerte d'arbitrage (`bg_referee_alerts`), `null` pour les autres requêtes. */
+function readAlertRows(state: World, sql: string, params: unknown[]): [unknown, unknown[]] | null {
   if (sql.startsWith("SELECT 1 FROM bg_referee_alerts")) {
     return [(state.alerts ?? []).includes(`${params[0]}:${params[1]}`) ? [{ 1: 1 }] : [], []];
   }
@@ -304,8 +312,34 @@ function readRefereeRows(state: World, sql: string, params: unknown[]): [unknown
     state.alerts = [...(state.alerts ?? []), `${params[0]}:${params[1]}`];
     return [{ affectedRows: 1, insertId: state.alerts.length }, []];
   }
-  const mapRows = readFirstMapRows(state, sql);
-  if (mapRows) return mapRows;
+  if (sql.startsWith("SELECT match_id, alert_key FROM bg_referee_alerts WHERE match_id IN (")) {
+    const ids = new Set(params.map(String));
+    const rows = (state.alerts ?? []).flatMap((entry) => {
+      const [matchId, ...key] = entry.split(":");
+      return ids.has(matchId) ? [{ match_id: Number(matchId), alert_key: key.join(":") }] : [];
+    });
+    return [rows, []];
+  }
+  return null;
+}
+
+/** Tournoi et matchs d'une manche, verrouillés par les gestes du staff ; `null` pour les autres requêtes. */
+function readRoundRows(state: World, sql: string): [unknown, unknown[]] | null {
+  if (sql.startsWith("SELECT state FROM bg_tournaments")) {
+    return [state.match ? [{ state: state.match.tournament_state }] : [], []];
+  }
+  if (sql.startsWith("SELECT id, bracket, self_managed, referee_user_id, status, is_bye FROM bg_matches WHERE id IN")) {
+    const match = state.match;
+    const row = match && {
+      id: match.id,
+      bracket: "UPPER",
+      self_managed: match.self_managed,
+      referee_user_id: match.referee_user_id,
+      status: match.status,
+      is_bye: match.is_bye,
+    };
+    return [row ? [row] : [], []];
+  }
   if (sql.startsWith("SELECT id FROM bg_tournaments")) {
     return [state.match ? [{ id: state.match.tournament_id }] : [], []];
   }
@@ -1309,6 +1343,7 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
       kind: "ASSIGNED",
       matchId: 42,
       replacedRefereeId: REFEREE,
+      actorId: 1,
     });
     jest.mocked(queueRefereeChange).mockClear();
     await assignMatchReferee(42, 1, OTHER_REFEREE);
@@ -1339,8 +1374,8 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     state.match = matchState({ referee_user_id: REFEREE });
     expect(await setRoundSelfManaged(7, { phaseId: 0, roundNumber: 1, bracket: null }, true)).toBe(1);
     expect(state.match?.self_managed).toBe(1);
-    expect(announceRefereeChange).toHaveBeenCalledWith(
-      { kind: "SELF_MANAGED", matchId: 42, enabled: true, replacedRefereeId: REFEREE },
+    expect(announceRefereeChanges).toHaveBeenCalledWith(
+      [{ kind: "SELF_MANAGED", matchId: 42, enabled: true, replacedRefereeId: REFEREE, actorId: undefined }],
       { log: false },
     );
     expect(await setRoundSelfManaged(7, { phaseId: 0, roundNumber: 1, bracket: "UPPER" }, true)).toBe(0);
@@ -1903,5 +1938,328 @@ describe("verrou des salons vocaux d'équipe (`MATCH_VOICE.md`)", () => {
     state.voice = { enabled: true, rows: [channel(TEAM1, 0), channel(TEAM2, 0)] };
     await forceLaunchMatch(42);
     expect(state.match?.launched_at).toBe(STAMP);
+  });
+});
+
+describe("règles serveur de l'arbitrage (EF-31)", () => {
+  const REFEREE = 950;
+  const OTHER_REFEREE = 951;
+  const refereeUser = {
+    discord_verified_at: STAMP,
+    discord_pseudo: "arbitre",
+    blizzard_sub: "sub",
+    overwatch_battletag: "Arbitre#1",
+    is_deleted: 0,
+    is_admin: 0,
+    platform_roles_json: JSON.stringify(["ARBITRE"]),
+  };
+
+  beforeEach(() => {
+    state.users[REFEREE] = { ...refereeUser };
+    state.users[OTHER_REFEREE] = { ...refereeUser };
+  });
+
+  it("setMatchFirstMap_byeMatch_throwsMatchNotLaunchable", async () => {
+    state.match = matchState({ is_bye: 1, team2_id: null });
+
+    await expect(setMatchFirstMap(42, "Ilios")).rejects.toThrow("MATCH_NOT_LAUNCHABLE");
+
+    expect(state.match?.first_map).toBeNull();
+  });
+
+  it("assignMatchReferee_expectedDiffersFromCurrent_throwsRefereeChanged", async () => {
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    await expect(assignMatchReferee(42, 1, OTHER_REFEREE, OTHER_REFEREE)).rejects.toThrow("REFEREE_CHANGED");
+
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+  });
+
+  it("assignMatchReferee_expectedNoneButRefereeSet_throwsRefereeChanged", async () => {
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    await expect(assignMatchReferee(42, 1, null, null)).rejects.toThrow("REFEREE_CHANGED");
+
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+  });
+
+  it("assignMatchReferee_expectedMatchesCurrent_replacesAndNamesActor", async () => {
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    await assignMatchReferee(42, 1, OTHER_REFEREE, REFEREE);
+
+    expect(state.match?.referee_user_id).toBe(OTHER_REFEREE);
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), {
+      kind: "ASSIGNED",
+      matchId: 42,
+      replacedRefereeId: REFEREE,
+      actorId: 1,
+    });
+  });
+
+  it("releaseMatchReferee_expectedDiffers_throwsRefereeChanged", async () => {
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    await expect(releaseMatchReferee(42, 1, true, OTHER_REFEREE)).rejects.toThrow("REFEREE_CHANGED");
+
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+  });
+
+  it("takeMatchReferee_currentRefereeHasObjection_announcesTakenOverObjection", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    await takeMatchReferee(42, OTHER_REFEREE);
+
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), {
+      kind: "OBJECTION_RELEASED",
+      matchId: 42,
+      refereeId: REFEREE,
+      takenOver: true,
+    });
+  });
+
+  it("takeMatchReferee_currentRefereeJoinedTeam_announcesJoinedTeam", async () => {
+    state.memberships.push({ userId: REFEREE, teamId: TEAM2, roles: ["DPS"] });
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    await takeMatchReferee(42, OTHER_REFEREE);
+
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), {
+      kind: "AUTO_RELEASED",
+      matchId: 42,
+      refereeId: REFEREE,
+      reason: "JOINED_TEAM",
+    });
+  });
+
+  it("setRoundSelfManaged_anyRound_locksTournamentBeforeOneMatchRead", async () => {
+    state.match = matchState({ referee_user_id: REFEREE });
+    state.issued = [];
+
+    await setRoundSelfManaged(7, { phaseId: 0, roundNumber: 1, bracket: null }, true, 3);
+
+    const tournamentLock = state.issued.findIndex((sql) => /^SELECT id FROM bg_tournaments WHERE id = \? FOR UPDATE$/.test(sql));
+    const matchLocks = state.issued.filter((sql) => sql.startsWith("SELECT id, bracket, self_managed"));
+    expect(tournamentLock).toBe(0);
+    // Une seule lecture verrouillée, par clé primaire (pas d'intervalles d'index).
+    expect(matchLocks).toHaveLength(1);
+    expect(matchLocks[0]).toMatch(/WHERE id IN \(\?\) ORDER BY id FOR UPDATE$/);
+  });
+
+  it("setRoundSelfManaged_refereeReplaced_noticeCarriesActor", async () => {
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    await setRoundSelfManaged(7, { phaseId: 0, roundNumber: 1, bracket: null }, true, 3);
+
+    expect(announceRefereeChanges).toHaveBeenCalledWith(
+      [{ kind: "SELF_MANAGED", matchId: 42, enabled: true, replacedRefereeId: REFEREE, actorId: 3 }],
+      { log: false },
+    );
+  });
+
+  it("setMatchSelfManaged_withActor_noticeCarriesActor", async () => {
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    await setMatchSelfManaged(42, true, 3);
+
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), {
+      kind: "SELF_MANAGED",
+      matchId: 42,
+      enabled: true,
+      replacedRefereeId: REFEREE,
+      actorId: 3,
+    });
+  });
+
+  it("maintainMatchLaunches_ghostOpponent_queuesNoNoRefereeAlert", async () => {
+    state.match = matchState({ team2_is_ghost: 1 });
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    expect(state.alerts ?? []).toEqual([]);
+  });
+
+  it("maintainMatchLaunches_alertAlreadyReserved_skipsReservationInsert", async () => {
+    state.alerts = [`42:NO_REFEREE:${TEAM1}:${TEAM2}`];
+    state.issued = [];
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    expect(state.issued.some((sql) => sql.startsWith("INSERT IGNORE INTO bg_referee_alerts"))).toBe(false);
+    expect(state.issued.filter((sql) => sql.startsWith("SELECT match_id, alert_key FROM bg_referee_alerts"))).toHaveLength(1);
+  });
+
+  it("releaseMatchReferee_lastAwaitedReferee_launchesAndQueuesNoRefereeAlert", async () => {
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+
+    await releaseMatchReferee(42, REFEREE, false);
+
+    expect(state.match?.launched_at).toBe(STAMP);
+    expect(state.alerts).toEqual([`42:NO_REFEREE:${TEAM1}:${TEAM2}`]);
+  });
+
+  it("setMatchReady_refereeAssigned_readsRefereeAccountOnce", async () => {
+    state.match = matchState({ referee_user_id: REFEREE });
+    state.issued = [];
+
+    await setMatchReady(42, 1, true);
+
+    expect(state.issued.filter((sql) => sql.includes("FROM bg_users WHERE id = ?"))).toHaveLength(1);
+  });
+});
+
+describe("retraits en série et alertes regroupées (EF-31, revue)", () => {
+  const REFEREE = 950;
+  const refereeUser = {
+    discord_verified_at: STAMP,
+    discord_pseudo: "arbitre",
+    blizzard_sub: "sub",
+    overwatch_battletag: "Arbitre#1",
+    is_deleted: 0,
+    is_admin: 0,
+    platform_roles_json: JSON.stringify(["ARBITRE"]),
+  };
+
+  it("releaseIneligibleReferee_objectionUpheld_announcesTakenOverObjection", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    expect(await releaseIneligibleReferee(42, REFEREE)).toBe(true);
+
+    expect(announceRefereeChange).toHaveBeenCalledWith({
+      kind: "OBJECTION_RELEASED",
+      matchId: 42,
+      refereeId: REFEREE,
+      takenOver: true,
+    });
+  });
+
+  /** La validation de la première tentative échoue sur un interblocage ; la suivante passe. */
+  function deadlockFirstCommit(): void {
+    let commits = 0;
+    jest.mocked(withConnection).mockImplementation((run) =>
+      run(
+        fakeConnection({
+          execute: executeFor(state),
+          beginTransaction: async () => undefined,
+          commit: async () => {
+            commits += 1;
+            if (commits === 1) throw Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK" });
+          },
+          rollback: async () => undefined,
+        }),
+      ),
+    );
+  }
+
+  it("releaseIneligibleReferee_launchRolledBackThenRetried_reportsNoStaleCandidate", async () => {
+    state.users[REFEREE] = { ...refereeUser, platform_roles_json: null };
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    deadlockFirstCommit();
+    const undecided: NoRefereeCandidate[] = [];
+
+    await releaseIneligibleReferee(42, REFEREE, undecided);
+
+    // Le double en mémoire garde l'écriture de la tentative défaite : la
+    // seconde ne trouve plus l'arbitre et ne lance rien — rien à signaler.
+    expect(undecided).toEqual([]);
+  });
+
+  it("releaseIneligibleReferee_transactionFails_reportsNothing", async () => {
+    state.users[REFEREE] = { ...refereeUser, platform_roles_json: null };
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    jest.mocked(withConnection).mockImplementation((run) =>
+      run(
+        fakeConnection({
+          execute: executeFor(state),
+          beginTransaction: async () => undefined,
+          commit: async () => {
+            throw new Error("connexion perdue");
+          },
+          rollback: async () => undefined,
+        }),
+      ),
+    );
+    const undecided: NoRefereeCandidate[] = [];
+
+    await expect(releaseIneligibleReferee(42, REFEREE, undecided)).rejects.toThrow("connexion perdue");
+
+    expect(undecided).toEqual([]);
+  });
+
+  it("releaseObjectingReferee_launchRolledBackThenRetried_reportsNoStaleCandidate", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    deadlockFirstCommit();
+    const undecided: NoRefereeCandidate[] = [];
+
+    await releaseObjectingReferee(42, REFEREE, undecided);
+
+    expect(undecided).toEqual([]);
+  });
+
+  it("releaseObjectingReferee_withSink_collectsCandidateAfterCommit", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    const undecided: NoRefereeCandidate[] = [];
+
+    await releaseObjectingReferee(42, REFEREE, undecided);
+
+    expect(undecided.map((candidate) => candidate.matchId)).toEqual([42]);
+  });
+
+  it("releaseIneligibleReferee_withSink_collectsAlertInsteadOfQueueing", async () => {
+    state.users[REFEREE] = { ...refereeUser, platform_roles_json: null };
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    const undecided: NoRefereeCandidate[] = [];
+
+    await releaseIneligibleReferee(42, REFEREE, undecided);
+
+    expect(state.match?.launched_at).toBe(STAMP);
+    expect(undecided.map((candidate) => candidate.matchId)).toEqual([42]);
+    expect(state.alerts ?? []).toEqual([]);
+  });
+
+  it("queueDeferredNoRefereeAlerts_collectedCandidates_reservesThemInOneTransaction", async () => {
+    state.match = matchState();
+    const candidate: NoRefereeCandidate = {
+      matchId: 42,
+      pairing: `${TEAM1}:${TEAM2}`,
+      scheduled: true,
+      phaseId: 0,
+      bracket: "UPPER",
+      roundNumber: 1,
+    };
+
+    await queueDeferredNoRefereeAlerts([candidate]);
+
+    expect(state.alerts).toEqual([`42:NO_REFEREE:${TEAM1}:${TEAM2}`]);
+  });
+
+  it("queueDeferredNoRefereeAlerts_emptyList_opensNoTransaction", async () => {
+    await queueDeferredNoRefereeAlerts([]);
+
+    expect(withConnection).not.toHaveBeenCalled();
+  });
+
+  it("queueNoRefereeAlerts_reservationTableUnreadable_keepsCallerTransaction", async () => {
+    const execute = executeFor(state);
+    const failing = fakeConnection({
+      execute: async (sql: string, params?: unknown[]) => {
+        if (sql.startsWith("SELECT match_id, alert_key FROM bg_referee_alerts")) throw new Error("ER_NO_SUCH_TABLE");
+        return execute(sql, params);
+      },
+    });
+    const candidate: NoRefereeCandidate = {
+      matchId: 42,
+      pairing: `${TEAM1}:${TEAM2}`,
+      scheduled: true,
+      phaseId: 0,
+      bracket: "UPPER",
+      roundNumber: 1,
+    };
+
+    await expect(queueNoRefereeAlerts(failing, [candidate])).resolves.toBeUndefined();
   });
 });

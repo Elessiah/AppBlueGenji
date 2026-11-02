@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
+import { requestCache } from "@/lib/server/request-cache";
 import type { TournamentCard } from "@/lib/shared/types";
 import { SITE_DESCRIPTION, SITE_NAME, tournamentShareTitle } from "@/lib/shared/share-metadata";
 import { messagesFor } from "@/lib/server/i18n-messages";
@@ -16,6 +17,19 @@ export type TournamentMetadataCardLoader = (
   tournamentId: number,
   rights: TournamentMetadataRights,
 ) => Promise<TournamentCard | null>;
+
+/**
+ * La carte visible du tournoi, lue **une fois par requête** et par droits : la
+ * mise en page du tournoi, celle d'une page de match et son contrôle 404 la
+ * lisaient chacune (`docs/features/MATCH_PAGE.md`).
+ */
+const visibleCardForRequest = requestCache((tournamentId: number, canManage: boolean) =>
+  getVisibleTournamentCard(tournamentId, { canManage }),
+);
+
+/** Lecteur par défaut de la carte : `getVisibleTournamentCard`, mémoïsé pour la requête. */
+export const loadVisibleTournamentCard: TournamentMetadataCardLoader = (tournamentId, rights) =>
+  visibleCardForRequest(tournamentId, rights.canManage);
 
 /**
  * Ce qu'un lien de tournoi raconte là où on le colle — titre, description,
@@ -44,7 +58,8 @@ export type TournamentMetadataCardLoader = (
  * @param rights Droits du lecteur, lus seulement pour un identifiant valide ;
  *   `null` : la page ne sera pas servie à ce lecteur (redirection), l'encart du
  *   site suffit et la base n'est pas interrogée.
- * @param loadCard Lecture de la carte : par défaut `getVisibleTournamentCard`.
+ * @param loadCard Lecture de la carte : par défaut `getVisibleTournamentCard`,
+ *   mémoïsée pour la requête (`loadVisibleTournamentCard`).
  *   La page sans compte lit celle de la réponse publique mutualisée
  *   (`publicTournamentSnapshot`) : une rafale de F5 ou une annonce Discord ne
  *   coûte plus une requête par vue.
@@ -53,7 +68,7 @@ export async function tournamentPageMetadata(
   rawId: string,
   pathOf: (tournamentId: number) => string,
   rights: () => Promise<TournamentMetadataRights | null>,
-  loadCard: TournamentMetadataCardLoader = getVisibleTournamentCard,
+  loadCard: TournamentMetadataCardLoader = loadVisibleTournamentCard,
 ): Promise<Metadata> {
   const locale = await requestLocale();
   const messages = messagesFor(locale);

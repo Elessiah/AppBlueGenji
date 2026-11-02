@@ -187,10 +187,15 @@ describe("encart du lien partagé", () => {
   it("match introuvable ou base en panne : l'encart du tournoi, sans préfixe", async () => {
     const missing = await matchPageMetadata("12", "35", true, async () => ({ canManage: false }));
     expect(missing.title).toEqual({ absolute: expect.not.stringMatching(/^Manche/) });
-    expect(missing.alternates?.canonical).toBe("/suivre/tournois/12/matchs/35");
+    // Canonique de la vue du tournoi, jamais celle d'une page en 404 (EF-31).
+    expect(missing.alternates?.canonical).toBe("/suivre/tournois/12");
     connection.query.mockRejectedValueOnce(new Error("down"));
     const down = await matchPageMetadata("12", "34", true, async () => ({ canManage: false }));
     expect(down.title).toEqual({ absolute: expect.not.stringMatching(/^Manche/) });
+    // Base en panne : la page existe peut-être, sa canonique reste la sienne.
+    expect(down.alternates?.canonical).toBe("/suivre/tournois/12/matchs/34");
+    const memberMissing = await matchPageMetadata("12", "35", false, async () => ({ canManage: false }));
+    expect(memberMissing.alternates?.canonical).toBe("/tournois/12");
   });
 
   it("tournoi invisible, droits refusés ou identifiant de match invalide : l'encart du site", async () => {

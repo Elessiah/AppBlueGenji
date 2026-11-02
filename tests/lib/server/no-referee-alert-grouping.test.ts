@@ -7,6 +7,7 @@ jest.mock("@/lib/server/tournaments/referee-notices");
 jest.mock("@/lib/server/tournaments/bot-logs", () => ({
   queueRefereeAlert: jest.fn(async () => true),
   queueRoundNoRefereeAlert: jest.fn(async () => true),
+  noRefereeAlertKey: (pairing: string) => `NO_REFEREE:${pairing}`,
   flushBotLogs: jest.fn(),
   discardBotLogs: jest.fn(),
 }));
@@ -22,9 +23,11 @@ import type { NoRefereeCandidate } from "@/lib/shared/match-referee";
  * horaire → une alerte par manche, qui les liste — chacun y garde sa
  * réservation par appariement (`queueRoundNoRefereeAlert`).
  */
-function connection(): PoolConnection {
+function connection(reserved: { match_id: number; alert_key: string }[] = []): PoolConnection {
   return {
     execute: async (sql: string) => {
+      // Seule lecture permise : les réservations déjà posées, en un lot (EF-31).
+      if (sql.startsWith("SELECT match_id, alert_key FROM bg_referee_alerts WHERE match_id IN (")) return [reserved, []];
       throw new Error(`requête inattendue : ${sql}`);
     },
   } as unknown as PoolConnection;

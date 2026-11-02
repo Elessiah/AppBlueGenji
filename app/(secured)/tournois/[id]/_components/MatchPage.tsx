@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { PlayerLink } from "@/components/entity-link";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
@@ -11,6 +11,7 @@ import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { KeyFacts, type KeyFact } from "@/components/cyber/KeyFacts";
 import { CasterCards, RefereeCard, SideCard } from "@/components/match-launch/LaunchContactCards";
 import { useMatchContacts } from "@/components/match-launch/MatchContactsDialog";
+import { SharedMatchContactsContext } from "@/components/match-launch/shared-match-contacts";
 import { useLaunchText } from "@/components/match-launch/launch-text";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { useClock } from "@/lib/shared/hooks/useClock";
@@ -966,8 +967,13 @@ function MatchPageContent({ detail, match, adminResolvable, scoreLocked, onOpenA
   const readsContacts = !spectator && !frozen && model.launch.showContacts;
   const playsMatch = myTeamId !== null && (match.team1Id === myTeamId || match.team2Id === myTeamId);
   const organizes = !spectator && (canSchedule || model.launch.isCaster || playsMatch);
-  const { launch } = useMatchContacts(match.id, match, readsContacts);
+  const { state: contactsState, launch } = useMatchContacts(match.id, match, readsContacts);
   const shownLaunch = readsContacts ? launch : null;
+  // La modale « Contacts » de la carte reprend cette lecture (une seule par match).
+  const sharedContacts = useMemo(
+    () => (readsContacts ? { matchId: match.id, state: contactsState, launch } : null),
+    [readsContacts, match.id, contactsState, launch],
+  );
   const onCopy = useCopy();
   const sides = pageSides(match);
   const team1 = match.team1Name ?? localizedPlaceholder(text, match.team1Placeholder) ?? t("match.tbd");
@@ -1006,18 +1012,20 @@ function MatchPageContent({ detail, match, adminResolvable, scoreLocked, onOpenA
             <section className={`ds-block ${styles.block} ${styles.actions}`} aria-labelledby={actionsId}>
               <SectionTitle id={actionsId}>{page.t("sections.actions")}</SectionTitle>
               {model.actions.length > 0 && (
-                <MatchCardActions
-                  match={match}
-                  phase={model.launchPhase}
-                  actions={model.actions}
-                  matchLabel={matchLabel}
-                  isCaster={model.launch.isCaster}
-                  releasesOthers={model.launch.releasesOthers}
-                  onAir={liveState === "LIVE"}
-                  onPlayerScore={model.openPlayerScore}
-                  onAdminScore={() => onOpenAdminModal(match)}
-                  onReport={model.openReport}
-                />
+                <SharedMatchContactsContext.Provider value={sharedContacts}>
+                  <MatchCardActions
+                    match={match}
+                    phase={model.launchPhase}
+                    actions={model.actions}
+                    matchLabel={matchLabel}
+                    isCaster={model.launch.isCaster}
+                    releasesOthers={model.launch.releasesOthers}
+                    onAir={liveState === "LIVE"}
+                    onPlayerScore={model.openPlayerScore}
+                    onAdminScore={() => onOpenAdminModal(match)}
+                    onReport={model.openReport}
+                  />
+                </SharedMatchContactsContext.Provider>
               )}
               {locked && (
                 <p className={styles.locked} title={actionText.t("cardActions.lockedTitle")}>

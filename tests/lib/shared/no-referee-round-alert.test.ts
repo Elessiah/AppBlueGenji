@@ -30,12 +30,24 @@ describe("groupNoRefereeAlerts", () => {
 
   it("groupe les matchs sans horaire d'une manche en une seule alerte, triés", () => {
     const { perMatch, perRound } = groupNoRefereeAlerts([
-      candidate({ matchId: 9 }),
-      candidate({ matchId: 4 }),
-      candidate({ matchId: 7 }),
+      candidate({ matchId: 9, pairing: "5:6" }),
+      candidate({ matchId: 4, pairing: "1:2" }),
+      candidate({ matchId: 7, pairing: "3:4" }),
     ]);
     expect(perMatch).toEqual([]);
-    expect(perRound).toEqual([{ phaseId: 0, bracket: "UPPER", roundNumber: 1, matchIds: [4, 7, 9] }]);
+    // Chaque match garde son appariement : la clé de réservation en dépend.
+    expect(perRound).toEqual([
+      {
+        phaseId: 0,
+        bracket: "UPPER",
+        roundNumber: 1,
+        matches: [
+          { matchId: 4, pairing: "1:2" },
+          { matchId: 7, pairing: "3:4" },
+          { matchId: 9, pairing: "5:6" },
+        ],
+      },
+    ]);
   });
 
   it("manche mixte : le planifié à part, les sans horaire ensemble", () => {
@@ -45,7 +57,17 @@ describe("groupNoRefereeAlerts", () => {
       candidate({ matchId: 3 }),
     ]);
     expect(perMatch.map((m) => m.matchId)).toEqual([1]);
-    expect(perRound).toEqual([{ phaseId: 0, bracket: "UPPER", roundNumber: 1, matchIds: [2, 3] }]);
+    expect(perRound).toEqual([
+      {
+        phaseId: 0,
+        bracket: "UPPER",
+        roundNumber: 1,
+        matches: [
+          { matchId: 2, pairing: "10:20" },
+          { matchId: 3, pairing: "10:20" },
+        ],
+      },
+    ]);
   });
 
   it("sépare les manches par phase, tableau et numéro", () => {
@@ -56,7 +78,7 @@ describe("groupNoRefereeAlerts", () => {
       candidate({ matchId: 4, phaseId: 8 }),
       candidate({ matchId: 5 }),
     ]);
-    expect(perRound.map((round) => round.matchIds)).toEqual([[1, 5], [2], [3], [4]]);
+    expect(perRound.map((round) => round.matches.map((match) => match.matchId))).toEqual([[1, 5], [2], [3], [4]]);
   });
 
   it("ne rend rien sans candidat", () => {

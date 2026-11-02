@@ -123,7 +123,10 @@ export async function loadRefereeEligibility(
   return refereeEligibilityBlock(rows[0]);
 }
 
-/** Les comptes de la liste qui remplissent encore la condition d'arbitrage, en une lecture. */
+/**
+ * Les comptes de la liste qui remplissent encore la condition d'arbitrage et
+ * n'ont pas d'opposition retenue (`referee-objection.ts`), en une lecture.
+ */
 export async function loadEligibleRefereeIds(
   executor: Executor,
   userIds: readonly number[],
@@ -131,10 +134,33 @@ export async function loadEligibleRefereeIds(
   const ids = [...new Set(userIds)];
   if (ids.length === 0) return new Set();
   const [rows] = await executor.execute<(CastEligibilityRow & { id: number })[]>(
-    `SELECT id, ${CAST_ELIGIBILITY_COLUMNS} FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})`,
+    `SELECT id, ${CAST_ELIGIBILITY_COLUMNS} FROM bg_users
+      WHERE id IN (${ids.map(() => "?").join(", ")}) AND referee_objection_at IS NULL`,
     ids,
   );
   return new Set(rows.filter((row) => refereeEligibilityBlock(row) === null).map((row) => Number(row.id)));
+}
+
+/** Ce que le verrou du lancement lit de l'arbitre désigné : sa condition d'arbitrage et son opposition. */
+export type RefereeStanding = { block: RefereeBlock | null; objection: boolean };
+
+/**
+ * Condition d'arbitrage **et** opposition retenue de `userId`, en une seule
+ * lecture de sa ligne (`lockLaunchMatch` lisait les deux séparément à chaque
+ * verrou). Sans la colonne `referee_objection_at` (base pas encore migrée),
+ * repli sur la seule condition, sans opposition — comme `refereeObjectionUpheld`.
+ */
+export async function loadRefereeStanding(executor: Executor, userId: number): Promise<RefereeStanding> {
+  try {
+    const [rows] = await executor.execute<(CastEligibilityRow & { referee_objection_at: Date | string | null })[]>(
+      `SELECT ${CAST_ELIGIBILITY_COLUMNS}, referee_objection_at FROM bg_users WHERE id = ? LIMIT 1`,
+      [userId],
+    );
+    return { block: refereeEligibilityBlock(rows[0]), objection: (rows[0]?.referee_objection_at ?? null) !== null };
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+    return { block: await loadRefereeEligibility(executor, userId), objection: false };
+  }
 }
 
 /**

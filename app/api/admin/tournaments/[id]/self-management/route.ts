@@ -42,7 +42,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
   if (typeof body.enabled !== "boolean") return fail("INVALID_SELF_MANAGEMENT", 400);
 
   try {
-    const changed = await setRoundSelfManaged(tournamentId, { phaseId, roundNumber, bracket }, body.enabled);
+    const changed = await setRoundSelfManaged(tournamentId, { phaseId, roundNumber, bracket }, body.enabled, user.id);
     return ok({ changed });
   } catch (error) {
     return launchFailure(error, STATUSES, "ROUND_SELF_MANAGEMENT_FAILED");

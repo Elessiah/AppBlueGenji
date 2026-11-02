@@ -7,6 +7,7 @@ import {
   connectionReader,
   castBlockReason,
   currentLaunchState,
+  exposesCasterContacts,
   isAutoLaunchDue,
   LAUNCH_AUTO_DELAY_MINUTES,
   LAUNCH_ERROR_MESSAGES,
@@ -23,7 +24,6 @@ import {
   SCORE_ENTRY_CLOSED_PHASES,
   pickLaunchContacts,
   readyCount,
-  resolveHostTeamId,
   type ContactCandidate,
   type MatchLaunchInfo,
   type MatchLaunchInput,
@@ -325,26 +325,6 @@ describe("canDeclareTeamReady", () => {
   });
 });
 
-describe("resolveHostTeamId", () => {
-  it("retombe sur l'équipe 1 sans désignation", () => {
-    expect(resolveHostTeamId(null, 10, 20)).toBe(10);
-  });
-
-  it("garde l'équipe désignée par l'arbitrage", () => {
-    expect(resolveHostTeamId(20, 10, 20)).toBe(20);
-    expect(resolveHostTeamId(10, 10, 20)).toBe(10);
-  });
-
-  it("ignore une désignation qui ne vise plus une des deux engagées", () => {
-    // Un appariement corrigé a pu remplacer l'équipe désignée.
-    expect(resolveHostTeamId(99, 10, 20)).toBe(10);
-  });
-
-  it("n'a pas d'hôte sans équipe 1", () => {
-    expect(resolveHostTeamId(null, null, 20)).toBeNull();
-  });
-});
-
 describe("castBlockReason", () => {
   const verified = { discordVerified: true, blizzardLinked: true };
 
@@ -581,5 +561,27 @@ describe("connectionReader", () => {
 
   it("connectionReader_refereeWithoutRoleOnMatch_false", () => {
     expect(connectionReader(reader({ role: "REFEREE", canDeclareReady: false }))).toBe(false);
+  });
+});
+
+describe("exposesCasterContacts (EF-31)", () => {
+  it("exposesCasterContacts_matchRefereeBeforeLobby_true", () => {
+    expect(exposesCasterContacts("SCHEDULED", "MATCH_REFEREE")).toBe(true);
+  });
+
+  it("exposesCasterContacts_platformRefereeBeforeLobby_true", () => {
+    expect(exposesCasterContacts("TO_PLAN", "REFEREE")).toBe(true);
+  });
+
+  it("exposesCasterContacts_matchRefereeWithoutLaunchPhase_false", () => {
+    expect(exposesCasterContacts("NONE", "MATCH_REFEREE")).toBe(false);
+  });
+
+  it("exposesCasterContacts_teamBeforeLobby_false", () => {
+    expect(exposesCasterContacts("SCHEDULED", "TEAM1")).toBe(false);
+  });
+
+  it("exposesCasterContacts_anyRoleInLobby_true", () => {
+    expect(exposesCasterContacts("LOBBY", "TEAM1")).toBe(true);
   });
 });

@@ -743,6 +743,82 @@ describe("alerte « sans arbitre » d'une manche sans horaire", () => {
   });
 });
 
+describe("alerte d'une manche : matchs disparus ou au-delà de la liste (EF-31)", () => {
+  async function flushRound(connection: PoolConnection, roundMatchIds: number[], roundClaimIds: number[]) {
+    queueBotLog(connection, { kind: "match_no_referee", matchId: roundMatchIds[0], pairing: "10:20", roundMatchIds, roundClaimIds });
+    flushBotLogs(connection);
+    for (let tick = 0; tick < 5; tick += 1) await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  it("flushBotLogs_listedMatchGoneMeanwhile_releasesOnlyItsClaim", async () => {
+    const execute = mockDb([[MATCH_ROW], []]);
+
+    await flushRound(fakeConnection(), [31, 32], [8, 9]);
+
+    const released = execute.mock.calls
+      .filter(([sql]) => String(sql).startsWith("DELETE FROM bg_referee_alerts WHERE id = ?"))
+      .map(([, params]) => params);
+    expect(released).toEqual([[9]]);
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it("flushBotLogs_listedMatchPlayedMeanwhile_neitherListedNorCounted", async () => {
+    const execute = mockDb([[MATCH_ROW], [{ ...MATCH_ROW, id: 32, status: "COMPLETED" }]]);
+
+    await flushRound(fakeConnection(), [31, 32], [8, 9]);
+
+    const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
+    expect(message).not.toContain("(match #32)");
+    const released = execute.mock.calls
+      .filter(([sql]) => String(sql).startsWith("DELETE FROM bg_referee_alerts WHERE id = ?"))
+      .map(([, params]) => params);
+    expect(released).toEqual([[9]]);
+  });
+
+  it("flushBotLogs_listedMatchRefereedMeanwhile_droppedAndClaimReleased", async () => {
+    const execute = mockDb([[MATCH_ROW], [{ ...MATCH_ROW, id: 32, referee_user_id: 950 }]]);
+
+    await flushRound(fakeConnection(), [31, 32], [8, 9]);
+
+    const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
+    expect(message).not.toContain("(match #32)");
+    const released = execute.mock.calls
+      .filter(([sql]) => String(sql).startsWith("DELETE FROM bg_referee_alerts WHERE id = ?"))
+      .map(([, params]) => params);
+    expect(released).toEqual([[9]]);
+  });
+
+  it("flushBotLogs_listedMatchSelfManagedMeanwhile_droppedAndClaimReleased", async () => {
+    const execute = mockDb([[MATCH_ROW], [{ ...MATCH_ROW, id: 32, self_managed: 1 }]]);
+
+    await flushRound(fakeConnection(), [31, 32], [8, 9]);
+
+    const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
+    expect(message).not.toContain("(match #32)");
+    const released = execute.mock.calls
+      .filter(([sql]) => String(sql).startsWith("DELETE FROM bg_referee_alerts WHERE id = ?"))
+      .map(([, params]) => params);
+    expect(released).toEqual([[9]]);
+  });
+
+  it("resolveRoundNoRefereeLog_matchesBeyondList_countsOnlyOpenOnesAndReleasesOthers", async () => {
+    const ids = [31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44];
+    const execute = mockDb([...ids.slice(0, 12).map((id) => [{ ...MATCH_ROW, id }]), [{ id: 43 }]]);
+
+    await flushRound(fakeConnection(), ids, ids.map((id) => id + 100));
+
+    const openRead = execute.mock.calls.find(([sql]) => String(sql).startsWith("SELECT id FROM bg_matches"));
+    expect(openRead?.[1]).toEqual([43, 44]);
+    expect(String(openRead?.[0])).toContain("referee_user_id IS NULL AND self_managed = 0");
+    const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
+    expect(message).toContain("13 matchs en lancement");
+    const released = execute.mock.calls
+      .filter(([sql]) => String(sql).startsWith("DELETE FROM bg_referee_alerts WHERE id = ?"))
+      .map(([, params]) => params);
+    expect(released).toEqual([[144]]);
+  });
+});
+
 /**
  * `queueRoundNoRefereeAlert` (revue de #487) : chaque match d'une manche sans
  * horaire garde sa réservation par appariement — sur sa propre ligne —, si
@@ -802,7 +878,9 @@ describe("queueRoundNoRefereeAlert", () => {
     expect(messages).toHaveLength(1);
     expect(messages[0]).toContain("Charlie vs Delta (match #33)");
     expect(messages[0]).not.toContain("(match #31)");
-    expect(messages[0]).toContain("1 match en lancement");
+    // Un seul match réservé : le texte d'un match, pas celui d'une manche (EF-31).
+    expect(messages[0]).toContain("match en lancement sans arbitre ni autogestion");
+    expect(messages[0]).not.toContain("1 match en lancement");
   });
 
   it("se tait quand tous les matchs sont déjà signalés", async () => {
@@ -818,7 +896,9 @@ describe("queueRoundNoRefereeAlert", () => {
     expect(await queueRoundNoRefereeAlert(connection, roundOf(31, 32, 33))).toBe(true);
     expect(state.rows).toEqual(["31:NO_REFEREE:310:311"]);
     const messages = await flushedMessages(connection);
-    expect(messages[0]).toContain("1 match en lancement");
+    // Un seul match réservé : le texte d'un match, pas celui d'une manche (EF-31).
+    expect(messages[0]).toContain("match en lancement sans arbitre ni autogestion");
+    expect(messages[0]).not.toContain("1 match en lancement");
   });
 
   it("un interblocage remonte : la transaction de l'entretien est défaite", async () => {

@@ -150,6 +150,12 @@ export interface ResolvedBotLog {
   /** Manche d'une alerte arbitre : le push la nomme et y mène (lot 9-3). */
   refereeMatch?: RefereeAlertMatch;
   /**
+   * Alerte d'une manche : matchs listés qui ne se relisent plus (sortis de
+   * l'alerte). Leur réservation est rendue même si l'alerte part — sinon ils ne
+   * seraient jamais signalés.
+   */
+  droppedMatchIds?: number[];
+  /**
    * Tournoi relu d'une entrée de match (résultat) : sa ligne rejoint le lot du
    * journal de son tournoi (`LOG_BATCHING.md`), pas le lot commun.
    */
@@ -159,8 +165,8 @@ export interface ResolvedBotLog {
 /** Ligne de journal d'une entrée de match, avec le tournoi relu. */
 type ResolvedMatchLine = { message: string; tournamentId: number };
 
-/** Ligne d'une alerte arbitre, avec sa manche relue. */
-type ResolvedRefereeLine = { message: string; refereeMatch: RefereeAlertMatch };
+/** Ligne d'une alerte arbitre, avec sa manche relue (et, pour une manche, ses matchs sortis). */
+type ResolvedRefereeLine = { message: string; refereeMatch: RefereeAlertMatch; droppedMatchIds?: number[] };
 
 /**
  * Clés de réservation des alertes arbitre, par nature d'évènement.
@@ -449,7 +455,12 @@ export function flushBotLogs(connection: PoolConnection): void {
       if (entry.kind === "score_conflict") announcedConflicts.add(entry.matchId);
     }
 
-    for (const resolved of await resolveBotLogs(rest)) await deliver(resolved);
+    /** Réservations des matchs sortis d'une alerte de manche pourtant remise. */
+    const droppedClaims: number[] = [];
+    for (const resolved of await resolveBotLogs(rest)) {
+      await deliver(resolved);
+      if (delivered.has(entryKey(resolved.entry))) droppedClaims.push(...droppedClaimIds(resolved));
+    }
 
     for (const resolved of await resolveBotLogs(escalations)) {
       // Le téléphone de l'arbitre vient de sonner pour cette manche : un second
@@ -471,6 +482,7 @@ export function flushBotLogs(connection: PoolConnection): void {
       if (delivered.has(entryKey(entry))) continue;
       for (const claimId of refereeAlertClaimIds(entry)) await releaseRefereeAlertOnPool(claimId);
     }
+    for (const claimId of droppedClaims) await releaseRefereeAlertOnPool(claimId);
 
     // La manche est tranchée : ses réservations n'ont plus d'objet, et un
     // désaccord qui renaîtrait après arbitrage doit pouvoir alerter de nouveau.
@@ -506,6 +518,18 @@ function refereeAlertClaimIds(entry: PendingBotLog): number[] {
     default:
       return [];
   }
+}
+
+/** Réservations des matchs qu'une alerte de manche a dû taire (`droppedMatchIds`). */
+function droppedClaimIds(resolved: ResolvedBotLog): number[] {
+  const { entry, droppedMatchIds } = resolved;
+  if (entry.kind !== "match_no_referee" || !droppedMatchIds?.length || !entry.roundMatchIds || !entry.roundClaimIds) {
+    return [];
+  }
+  const claims = entry.roundClaimIds;
+  return entry.roundMatchIds.flatMap((matchId, index) =>
+    droppedMatchIds.includes(matchId) && claims[index] !== undefined ? [claims[index]] : [],
+  );
 }
 
 /**
@@ -769,6 +793,35 @@ export async function queueRoundNoRefereeAlert(
   matches: readonly { matchId: number; pairing: string }[],
 ): Promise<boolean> {
   if (matches.length === 0 || isBotCircuitOpen()) return false;
+  const claimed = await claimRoundAlerts(connection, matches);
+  const first = claimed[0];
+  if (!first) return false;
+  const roundClaimIds = claimed.map((match) => match.claimId);
+  // Un seul match réservé (alerte de suite, ou manche d'un seul match) : son
+  // texte et son étiquette push sont ceux d'un match, pas d'une manche.
+  const entry: PendingBotLog =
+    claimed.length === 1
+      ? { kind: "match_no_referee", matchId: first.matchId, pairing: first.pairing, claimId: first.claimId }
+      : {
+          kind: "match_no_referee",
+          matchId: first.matchId,
+          pairing: first.pairing,
+          roundMatchIds: claimed.map((match) => match.matchId),
+          roundClaimIds,
+        };
+  if (queueBotLog(connection, entry)) return true;
+  await releaseRoundClaims(connection, roundClaimIds);
+  return false;
+}
+
+/**
+ * Réserve l'alerte de chaque match, dans l'ordre : un match déjà alerté est
+ * sauté, une erreur arrête la liste à ce qui est réservé, un interblocage remonte.
+ */
+async function claimRoundAlerts(
+  connection: PoolConnection,
+  matches: readonly { matchId: number; pairing: string }[],
+): Promise<{ matchId: number; pairing: string; claimId: number }[]> {
   const claimed: { matchId: number; pairing: string; claimId: number }[] = [];
   for (const match of matches) {
     const alertKey = noRefereeAlertKey(match.pairing);
@@ -781,23 +834,23 @@ export async function queueRoundNoRefereeAlert(
       break;
     }
   }
-  const first = claimed[0];
-  if (!first) return false;
-  const roundClaimIds = claimed.map((match) => match.claimId);
-  const entry: PendingBotLog = {
-    kind: "match_no_referee",
-    matchId: first.matchId,
-    pairing: first.pairing,
-    roundMatchIds: claimed.map((match) => match.matchId),
-    roundClaimIds,
-  };
-  if (queueBotLog(connection, entry)) return true;
-  try {
-    for (const claimId of roundClaimIds) await releaseRefereeAlert(connection, claimId);
-  } catch {
-    // Meilleur effort : au pire, ces matchs n'auront pas leur alerte.
+  return claimed;
+}
+
+/**
+ * File pleine : chaque réservation est rendue, une erreur sur l'une n'empêche
+ * pas les suivantes ; un interblocage, lui, remonte (la transaction de
+ * l'appelant est défaite).
+ */
+async function releaseRoundClaims(connection: PoolConnection, claimIds: readonly number[]): Promise<void> {
+  for (const claimId of claimIds) {
+    try {
+      await releaseRefereeAlert(connection, claimId);
+    } catch (error) {
+      if (isTransactionAborted(error)) throw error;
+      // Meilleur effort : au pire, ce match n'aura pas son alerte.
+    }
   }
-  return false;
 }
 
 /**
@@ -918,6 +971,9 @@ type MatchLogRow = RowDataPacket & {
   forfeit_team_id: number | null;
   double_forfeit: number | null;
   is_bye: number | null;
+  status?: string | null;
+  referee_user_id?: number | null;
+  self_managed?: number | null;
   team1_name: string | null;
   team2_name: string | null;
   tournament_id: number;
@@ -938,6 +994,9 @@ async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
         m.forfeit_team_id,
         m.double_forfeit,
         m.is_bye,
+        m.status,
+        m.referee_user_id,
+        m.self_managed,
         t1.name AS team1_name,
         t2.name AS team2_name,
         tr.id AS tournament_id,
@@ -961,9 +1020,12 @@ async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
  * rien à arbitrer entre une équipe et une case vide, et le message ne saurait
  * pas quoi nommer.
  */
-async function loadRefereeAlertContext(matchId: number): Promise<RefereeAlertContext | null> {
+async function loadRefereeAlertContext(matchId: number, openOnly = false): Promise<RefereeAlertContext | null> {
   const match = await loadMatch(matchId);
   if (!match?.team1_name || !match.team2_name) return null;
+  // Alerte « sans arbitre » d'une manche : un match joué, arbitré ou passé en
+  // autogestion entre la file et l'envoi n'est plus sans arbitre — ni listé, ni compté.
+  if (openOnly && !stillWithoutReferee(match)) return null;
   const participantType = toParticipantType(match.participant_type);
   return {
     tournament: { id: Number(match.tournament_id), name: match.tournament_name },
@@ -1107,15 +1169,24 @@ async function resolveNoRefereeLog(
 /**
  * L'alerte d'une manche sans horaire : une ligne qui liste ses matchs, le push
  * mène au premier. Un match relu sans ses deux engagées sort de la liste (et
- * du compte) ; sans aucun, rien ne part.
+ * du compte) — sa réservation est rendue (`droppedMatchIds`) ; sans aucun,
+ * rien ne part. Les matchs au-delà de la liste sont relus en base : un match
+ * tranché, supprimé, arbitré ou passé en autogestion avant l'envoi ne compte
+ * plus, et rend lui aussi sa réservation.
  */
 async function resolveRoundNoRefereeLog(matchIds: readonly number[]): Promise<ResolvedRefereeLine | null> {
   const listed = matchIds.slice(0, ROUND_ALERT_LISTED_MATCHES);
-  const contexts = await Promise.all(listed.map((matchId) => loadRefereeAlertContext(matchId)));
+  const contexts = await Promise.all(listed.map((matchId) => loadRefereeAlertContext(matchId, true)));
   const found = contexts.filter((context): context is RefereeAlertContext => context !== null);
   const first = found[0];
   if (!first) return null;
-  const total = matchIds.length - (listed.length - found.length);
+  const beyond = matchIds.slice(ROUND_ALERT_LISTED_MATCHES);
+  const openBeyond = await openMatchIds(beyond);
+  const droppedMatchIds = [
+    ...listed.filter((_matchId, index) => contexts[index] === null),
+    ...beyond.filter((matchId) => !openBeyond.has(matchId)),
+  ];
+  const total = found.length + openBeyond.size;
   return {
     message: formatRoundNoRefereeAlert({
       tournament: first.tournament,
@@ -1127,7 +1198,30 @@ async function resolveRoundNoRefereeLog(matchIds: readonly number[]): Promise<Re
       total,
     }),
     refereeMatch: { ...refereeMatchOf(first), matchCount: total },
+    ...(droppedMatchIds.length > 0 ? { droppedMatchIds } : {}),
   };
+}
+
+/** Le match relu est-il encore à jouer, sans arbitre ni autogestion ? (alerte d'une manche) */
+function stillWithoutReferee(match: MatchLogRow): boolean {
+  return match.status !== "COMPLETED" && (match.referee_user_id ?? null) === null && Number(match.self_managed ?? 0) !== 1;
+}
+
+/**
+ * Ceux de ces matchs qui existent encore, restent à jouer et sont toujours sans
+ * arbitre ni autogestion (alerte d'une manche, au-delà de la liste) ; les
+ * autres sortent du compte et rendent leur réservation.
+ */
+async function openMatchIds(matchIds: readonly number[]): Promise<Set<number>> {
+  if (matchIds.length === 0) return new Set();
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_matches
+      WHERE id IN (${sqlPlaceholders(matchIds.length)}) AND status <> 'COMPLETED'
+        AND referee_user_id IS NULL AND self_managed = 0`,
+    [...matchIds],
+  );
+  return new Set(rows.map((row) => Number(row.id)));
 }
 
 async function resolveTournamentStartedLog(

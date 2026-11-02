@@ -175,6 +175,14 @@ describe("loadRefereePanel", () => {
     expect(sql).toContain("OR referee_objection_at IS NOT NULL");
   });
 
+  it("loadRefereePanel_staffQuery_filtersEmptyRolesWithJsonLength", async () => {
+    await loadRefereePanel(42, VIEWER);
+    const [sql] = execute.mock.calls.find(([query]) => query.includes("FROM bg_users")) ?? [""];
+    // `<> '[]'` comparerait le JSON à une chaîne sous MySQL : toujours vrai.
+    expect(sql).toContain("JSON_LENGTH(platform_roles_json) > 0");
+    expect(sql).not.toContain("<> '[]'");
+  });
+
   it("loadRefereePanel_currentRefereeObjected_notEligible", async () => {
     match = { ...match, referee_user_id: 4 };
     users = [staffUser(4, "Ana", { referee_objection_at: STAMP })];

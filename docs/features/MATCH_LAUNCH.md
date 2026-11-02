@@ -251,9 +251,10 @@ côté arbitrage) ; le forfait reste ouvert. Voir `MATCH_PLANNING.md`.
   `adoptCurrentPairing` l'efface en base avant d'écrire l'empreinte neuve. Le
   caster, lui, reste : il s'est inscrit sur le match, pas sur un appariement.
 
-- `host_team_id` `NULL` = équipe 1 ; une valeur qui ne désigne plus une des deux
-  engagées (appariement corrigé) retombe aussi sur l'équipe 1
-  (`resolveHostTeamId`).
+- `host_team_id` `NULL` = équipe la mieux classée (tête de série), sinon
+  équipe 1 ; une valeur qui ne désigne plus une des deux engagées (appariement
+  corrigé) retombe sur cette même règle (`matchHostTeamId`,
+  `lib/shared/match-referee.ts`).
 - `lobby_opened_at` est posé à la **première observation** du lancement
   (entretien du tournoi, premier « Prêt », ou lecture de la modale) : c'est
   l'origine du délai de lancement d'office.

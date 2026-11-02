@@ -44,6 +44,7 @@
     "INVALID_REFEREE_OBJECTION": "Invalid choice for the referee's objection.",
     "USER_NOT_FOUND": "Account not found.",
     "MATCH_ALREADY_REFEREED": "This match already has a referee.",
+    "REFEREE_CHANGED": "This match's referee has just changed: check who is assigned before trying again.",
     "NOT_MATCH_REFEREE": "You are not refereeing this match.",
     "INVALID_FIRST_MAP": "Invalid map name (64 characters at most).",
     "INVALID_ROUND": "Invalid tournament round.",

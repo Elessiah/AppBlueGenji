@@ -5,6 +5,7 @@
  */
 import { exposesMatchContacts, matchUnderway, readsContactsEarly, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { refereeDecision, type RefereeDecision } from "@/lib/shared/match-referee";
+import { isByeMatch } from "@/lib/shared/match-page";
 import type { BracketMatch } from "@/lib/shared/types";
 
 type StripMatch = Pick<
@@ -84,7 +85,8 @@ export function launchStripControls(
   const open = match.status !== "COMPLETED";
   // Inscription comme caster : sur un match à jouer, jamais sur un bye (un
   // engagé connu en face d'une case vide), et jamais par un joueur du match.
-  const isByeLike = (match.team1Id === null) !== (match.team2Id === null) && match.status !== "PENDING";
+  // Exemption : la règle partagée de la page du match (`isByeMatch`).
+  const isByeLike = isByeMatch(match);
   const castable = open && !isByeLike && !isPlayer;
   const showHost = phase !== "NONE";
   // `canSchedule` : la permission `tournaments`, celle de l'arbitre au serveur.

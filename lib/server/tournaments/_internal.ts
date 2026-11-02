@@ -173,6 +173,8 @@ export type MatchRow = RowDataPacket & {
   referee_is_deleted?: number | null;
   referee_is_admin?: number | null;
   referee_platform_roles_json?: unknown;
+  /** Opposition retenue de l'arbitre désigné (`referee-objection.ts`) : il ne compte plus. */
+  referee_objection_at?: Date | string | null;
   /** `1` si l'arbitre désigné joue l'un des deux engagés (membre en cours ou entrée solo). */
   referee_plays_match?: number | null;
   /** Rang d'endurance des engagées (BlueGenji Survie, phase finale ; `./match-host-seeds`). */
@@ -450,7 +452,8 @@ function casterWithdrawn(row: MatchRow, caster: MatchCasterRow): boolean {
 
 /**
  * L'arbitre désigné compte-t-il encore ? Il remplit la condition d'arbitrage
- * (relue sur la jointure de l'instantané) ; sinon l'instantané le tait, comme
+ * (relue sur la jointure de l'instantané) et, sur un match à jouer, n'a pas
+ * d'opposition retenue ; sinon l'instantané le tait, comme
  * un caster inéligible, et la lecture de la modale le retire avant le lancement.
  */
 function refereeKept(row: MatchRow): boolean {
@@ -459,6 +462,9 @@ function refereeKept(row: MatchRow): boolean {
   // même règle que le verrou du lancement (`lockLaunchMatch`).
   const beforeStart = row.status !== "COMPLETED" && (row.launched_at ?? null) === null;
   if (beforeStart && Number(row.referee_plays_match ?? 0) === 1) return false;
+  // Opposition retenue : plus montré sur un match à jouer, même si un retrait
+  // en série l'a manqué (un match joué garde son arbitre, comme en base).
+  if (row.status !== "COMPLETED" && (row.referee_objection_at ?? null) !== null) return false;
   return (
     refereeEligibilityBlock({
       discord_verified_at: row.referee_discord_verified_at ?? null,

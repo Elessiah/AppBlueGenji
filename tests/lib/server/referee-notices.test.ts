@@ -17,6 +17,7 @@ import {
   refereeLogChange,
   refereeLogCategory,
   refereeReleaseNotice,
+  announceRefereeChanges,
   type RefereeChange,
 } from "@/lib/server/tournaments/referee-notices";
 import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
@@ -84,6 +85,7 @@ describe("refereeLogChange / refereeReleaseNotice", () => {
     [{ kind: "RELEASED", matchId: 1, refereeId: 5, byStaff: false }, "RELEASED", null],
     [{ kind: "RELEASED", matchId: 1, refereeId: 5, byStaff: true }, "RELEASED_BY_STAFF", { refereeId: 5, reason: "STAFF" }],
     [{ kind: "OBJECTION_RELEASED", matchId: 1, refereeId: 5 }, "RELEASED_BY_STAFF", { refereeId: 5, reason: "OBJECTION" }],
+    [{ kind: "OBJECTION_RELEASED", matchId: 1, refereeId: 5, takenOver: true }, "INELIGIBLE", { refereeId: 5, reason: "OBJECTION" }],
     [{ kind: "AUTO_RELEASED", matchId: 1, refereeId: 5, reason: "INELIGIBLE" }, "INELIGIBLE", { refereeId: 5, reason: "INELIGIBLE" }],
     [{ kind: "AUTO_RELEASED", matchId: 1, refereeId: 5, reason: "JOINED_TEAM" }, "JOINED_TEAM", { refereeId: 5, reason: "JOINED_TEAM" }],
     [{ kind: "SELF_MANAGED", matchId: 1, enabled: true, replacedRefereeId: null }, "SELF_MANAGED_ON", null],
@@ -141,6 +143,17 @@ describe("deliverRefereeChange", () => {
     await deliverRefereeChange({ kind: "OBJECTION_RELEASED", matchId: 42, refereeId: REFEREE });
     expect(sendBotLog).not.toHaveBeenCalled();
     expect(loadNotificationRecipients).toHaveBeenCalledWith([REFEREE], "certified");
+    expect(notification().topic).toBe("REFEREE_RELEASED");
+  });
+
+  it("deliverRefereeChange_objectionTakenOver_postsGenericStaffRemovalLineAndNotifies", async () => {
+    mockMatch(matchRow());
+
+    await deliverRefereeChange({ kind: "OBJECTION_RELEASED", matchId: 42, refereeId: REFEREE, takenOver: true });
+
+    const line = loggedLine("staff-removal");
+    expect(line).not.toContain("ArbitrePseudo");
+    expect(line.toLowerCase()).not.toContain("opposition");
     expect(notification().topic).toBe("REFEREE_RELEASED");
   });
 
@@ -239,5 +252,57 @@ describe("announceRefereeChange et file d'après commit", () => {
     flushRefereeChanges(connection);
     await settle();
     expect(sendBotLog).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("avis à l'arbitre remplacé par lui-même, annonces d'une manche (EF-31)", () => {
+  it("refereeReleaseNotice_assignedByReplacedReferee_returnsNull", () => {
+    expect(refereeReleaseNotice({ kind: "ASSIGNED", matchId: 1, replacedRefereeId: 5, actorId: 5 })).toBeNull();
+  });
+
+  it("refereeReleaseNotice_assignedByOtherStaff_notifiesReplaced", () => {
+    expect(refereeReleaseNotice({ kind: "ASSIGNED", matchId: 1, replacedRefereeId: 5, actorId: 6 })).toEqual({
+      refereeId: 5,
+      reason: "REPLACED",
+    });
+  });
+
+  it("refereeReleaseNotice_selfManagedByReplacedReferee_returnsNull", () => {
+    expect(
+      refereeReleaseNotice({ kind: "SELF_MANAGED", matchId: 1, enabled: true, replacedRefereeId: 5, actorId: 5 }),
+    ).toBeNull();
+  });
+
+  it("announceRefereeChanges_severalChanges_readsOneMatchAtATime", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const execute = jest.fn<SqlQuery>(async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await settle();
+      inFlight -= 1;
+      return [[matchRow()], []];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    announceRefereeChanges(
+      [
+        { kind: "SELF_MANAGED", matchId: 42, enabled: true, replacedRefereeId: REFEREE },
+        { kind: "SELF_MANAGED", matchId: 43, enabled: true, replacedRefereeId: REFEREE },
+      ],
+      { log: false },
+    );
+    for (let tick = 0; tick < 10; tick += 1) await settle();
+
+    expect(peak).toBe(1);
+    expect(notifyUsers).toHaveBeenCalledTimes(2);
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("announceRefereeChanges_emptyList_readsNothing", async () => {
+    announceRefereeChanges([]);
+    await settle();
+
+    expect(getDatabase).not.toHaveBeenCalled();
   });
 });
