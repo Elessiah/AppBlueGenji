@@ -143,13 +143,31 @@ describe("GET / PUT /api/admin/matches/[matchId]/referee", () => {
     expect((await panelGet(jsonRequest("GET"), params("42"))).status).toBe(404);
   });
 
+  it("PUT_expectedUserIdGiven_forwardsItToTheWrite", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(assignMatchReferee).mockResolvedValue();
+
+    expect((await refereePut(jsonRequest("PUT", { userId: 9, expectedUserId: 7 }), params("42"))).status).toBe(200);
+    expect(assignMatchReferee).toHaveBeenLastCalledWith(42, 3, 9, 7);
+    expect((await refereePut(jsonRequest("PUT", { userId: 9, expectedUserId: null }), params("42"))).status).toBe(200);
+    expect(assignMatchReferee).toHaveBeenLastCalledWith(42, 3, 9, null);
+  });
+
+  it("PUT_expectedUserIdMalformed_returns400", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+
+    expect((await refereePut(jsonRequest("PUT", { userId: 9, expectedUserId: "7" }), params("42"))).status).toBe(400);
+    expect((await refereePut(jsonRequest("PUT", { userId: 9, expectedUserId: 0 }), params("42"))).status).toBe(400);
+    expect(assignMatchReferee).not.toHaveBeenCalled();
+  });
+
   it("désigne, retire sur `null`, refuse un identifiant mal formé", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     jest.mocked(assignMatchReferee).mockResolvedValue();
     expect((await refereePut(jsonRequest("PUT", { userId: 9 }), params("42"))).status).toBe(200);
-    expect(assignMatchReferee).toHaveBeenLastCalledWith(42, 3, 9);
+    expect(assignMatchReferee).toHaveBeenLastCalledWith(42, 3, 9, undefined);
     expect((await refereePut(jsonRequest("PUT", { userId: null }), params("42"))).status).toBe(200);
-    expect(assignMatchReferee).toHaveBeenLastCalledWith(42, 3, null);
+    expect(assignMatchReferee).toHaveBeenLastCalledWith(42, 3, null, undefined);
     expect((await refereePut(jsonRequest("PUT", { userId: "9" }), params("42"))).status).toBe(400);
     expect((await refereePut(jsonRequest("PUT", { userId: -1 }), params("42"))).status).toBe(400);
     expect(assignMatchReferee).toHaveBeenCalledTimes(2);
@@ -160,6 +178,7 @@ describe("GET / PUT /api/admin/matches/[matchId]/referee", () => {
     ["REFEREE_IDENTITY_REQUIRED", 409],
     ["REFEREE_IS_PLAYER", 409],
     ["MATCH_NOT_FOUND", 404],
+    ["REFEREE_CHANGED", 409],
   ])("désignation refusée : %s en %i", async (code, status) => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     jest.mocked(assignMatchReferee).mockRejectedValue(new Error(code));
@@ -188,7 +207,7 @@ describe("PUT autogestion et première carte", () => {
     jest.mocked(setMatchSelfManaged).mockResolvedValue();
     expect((await selfManagementPut(jsonRequest("PUT", { enabled: "oui" }), params("42"))).status).toBe(400);
     expect((await selfManagementPut(jsonRequest("PUT", { enabled: true }), params("42"))).status).toBe(200);
-    expect(setMatchSelfManaged).toHaveBeenCalledWith(42, true);
+    expect(setMatchSelfManaged).toHaveBeenCalledWith(42, true, 3);
     jest.mocked(setMatchSelfManaged).mockRejectedValue(new Error("MATCH_ALREADY_COMPLETED"));
     expect((await selfManagementPut(jsonRequest("PUT", { enabled: false }), params("42"))).status).toBe(409);
   });
@@ -204,7 +223,7 @@ describe("PUT autogestion et première carte", () => {
     const res = await put({ phaseId: 0, roundNumber: 2, bracket: "LOWER", enabled: true });
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ changed: 3 });
-    expect(setRoundSelfManaged).toHaveBeenCalledWith(7, { phaseId: 0, roundNumber: 2, bracket: "LOWER" }, true);
+    expect(setRoundSelfManaged).toHaveBeenCalledWith(7, { phaseId: 0, roundNumber: 2, bracket: "LOWER" }, true, 3);
     jest.mocked(setRoundSelfManaged).mockRejectedValue(new Error("TOURNAMENT_NOT_FOUND"));
     expect((await put({ phaseId: 0, roundNumber: 2, enabled: false })).status).toBe(404);
   });
@@ -226,5 +245,15 @@ describe("PUT autogestion et première carte", () => {
     const res = await firstMapPut(jsonRequest("PUT", { map: "Busan" }), params("42"));
     expect(res.status).toBe(409);
     await expect(res.json()).resolves.toEqual({ error: "ROUND_MAPS_SET" });
+  });
+
+  it("PUT first-map_byeMatch_returns409", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchFirstMap).mockRejectedValue(new Error("MATCH_NOT_LAUNCHABLE"));
+
+    const res = await firstMapPut(jsonRequest("PUT", { map: "Busan" }), params("42"));
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ error: "MATCH_NOT_LAUNCHABLE" });
   });
 });

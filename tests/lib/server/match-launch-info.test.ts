@@ -154,7 +154,10 @@ function castersOf(c: Candidate) {
 
 /** Lectures des streams (aucun ici) et des casters des candidats. */
 function readCastRows(world: World, sql: string, params: unknown[]): unknown[] | null {
-  if (sql.includes("FROM bg_match_streams")) return [[], []];
+  // Flux et réservations d'alerte « sans arbitre » déjà posées (EF-31) : aucun.
+  if (sql.includes("FROM bg_match_streams") || sql.startsWith("SELECT match_id, alert_key FROM bg_referee_alerts")) {
+    return [[], []];
+  }
   if (!sql.startsWith("SELECT match_id, user_id, stream_id, ready_at FROM bg_match_casters")) return null;
   const ids = new Set(params.map(Number));
   return [world.candidates.filter((c) => ids.has(Number(c.id))).flatMap(castersOf), []];
@@ -1114,6 +1117,23 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
     const [info] = await listViewerMatchLaunches({ id: VIEWER, roles: ["ARBITRE"] });
     expect(info.viewer).toMatchObject({ role: "MATCH_REFEREE", canDeclareReady: true, isReferee: true, ready: true });
     expect(info.referee).toMatchObject({ isViewer: true, ready: true });
+  });
+
+  it("listViewerMatchLaunches_refereeJoinedTeamBeforeContactsWindow_isHiddenAndReleased", async () => {
+    // Contacts pas encore exposés (début dans 30 min) : les rosters sont lus
+    // quand même, pour voir que l'arbitre joue désormais le match (EF-31).
+    state.candidates = [
+      candidate({ referee_user_id: REFEREE, start_at: new Date(Date.now() + 30 * 60_000).toISOString() }),
+    ];
+    state.users = [refereeUser()];
+    state.members = [member(TEAM2, REFEREE)];
+
+    const [info] = await listViewerMatchLaunches(viewer);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(info.referee).toBeNull();
+    expect(state.reads.some((sql) => sql.includes("FROM bg_team_members tm"))).toBe(true);
+    expect(state.writes.some((sql) => sql.includes("referee_user_id = NULL"))).toBe(true);
   });
 
   it("un arbitre devenu inéligible n'est plus montré, et il est retiré avant le lancement", async () => {

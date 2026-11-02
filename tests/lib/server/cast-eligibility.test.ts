@@ -3,6 +3,7 @@ import { mapMatch } from "@/lib/server/tournaments/_internal";
 import {
   castEligibilityBlock,
   loadRefereeEligibility,
+  loadRefereeStanding,
   refereeObjectionUpheld,
   type CastEligibilityFields,
 } from "@/lib/server/tournaments/cast-eligibility";
@@ -281,5 +282,46 @@ describe("loadRefereeEligibility", () => {
     await loadRefereeEligibility(connectionWith(execute), 950);
 
     expect(execute.mock.calls[0][0]).not.toContain("LOCK IN SHARE MODE");
+  });
+});
+
+describe("loadRefereeStanding (EF-31)", () => {
+  const connectionWith = (execute: jest.Mock<SqlQuery>) => fakeConnection({ execute });
+  const referee: CastEligibilityFields = { ...ELIGIBLE, platform_roles_json: JSON.stringify(["ARBITRE"]) };
+
+  it("loadRefereeStanding_eligibleWithoutObjection_oneRead", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...referee, referee_objection_at: null }], []]);
+
+    await expect(loadRefereeStanding(connectionWith(execute), 950)).resolves.toEqual({ block: null, objection: false });
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0][0]).toContain("referee_objection_at FROM bg_users WHERE id = ? LIMIT 1");
+  });
+
+  it("loadRefereeStanding_objectionSet_returnsObjectionTrue", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...referee, referee_objection_at: "2026-10-28 20:00:00" }], []]);
+
+    await expect(loadRefereeStanding(connectionWith(execute), 950)).resolves.toEqual({ block: null, objection: true });
+  });
+
+  it("loadRefereeStanding_noRole_returnsBlock", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...ELIGIBLE, platform_roles_json: null, referee_objection_at: null }], []]);
+
+    const standing = await loadRefereeStanding(connectionWith(execute), 950);
+
+    expect(standing.block).not.toBeNull();
+  });
+
+  it("loadRefereeStanding_unknownColumn_fallsBackWithoutObjection", async () => {
+    const unknownColumn = Object.assign(new Error("Unknown column 'referee_objection_at'"), { code: "ER_BAD_FIELD_ERROR" });
+    const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(unknownColumn).mockResolvedValue([[referee], []]);
+
+    await expect(loadRefereeStanding(connectionWith(execute), 950)).resolves.toEqual({ block: null, objection: false });
+  });
+
+  it("loadRefereeStanding_otherError_rethrows", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("ER_LOCK_WAIT_TIMEOUT"));
+
+    await expect(loadRefereeStanding(connectionWith(execute), 950)).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
   });
 });

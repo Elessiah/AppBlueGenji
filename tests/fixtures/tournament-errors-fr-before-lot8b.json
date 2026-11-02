@@ -1,5 +1,5 @@
 {
-  "count": 193,
+  "count": 194,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "CERTIFY_PROMPT_OTHER_ACCOUNT": "Un autre compte est connecté dans ce navigateur : « Ne plus voir » n'a pas été enregistré.",
@@ -176,6 +176,7 @@
     "FORFEIT_CANCEL_FAILED": "Erreur lors de l'annulation de l'abandon.",
     "FORFEIT_ROUND_PASSED": "Une manche a été jouée depuis l'abandon : remettre l'équipe en lice lui épargnerait les manches qu'elle a manquées. Reviens d'abord en arrière.",
     "NOT_REFEREE": "Arbitrer un match demande le rôle arbitre.",
+    "REFEREE_CHANGED": "L'arbitre de ce match vient de changer : vérifie qui est désigné avant de recommencer.",
     "REFEREE_IDENTITY_REQUIRED": "Pour arbitrer un match, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.",
     "REFEREE_IS_PLAYER": "Ce compte joue ce match : il ne peut pas l'arbitrer.",
     "MATCH_ALREADY_REFEREED": "Ce match a déjà un arbitre.",
