@@ -867,3 +867,40 @@ describe("page d'un match — sous /en", () => {
     expect(keys(messagesFor("en").matchPage).sort()).toEqual(keys(messagesFor("fr").matchPage).sort());
   });
 });
+
+describe("page d'un match — salons vocaux d'équipe", () => {
+  const held = { team1Members: 3, team2Members: 5, pending: true };
+
+  it("render_voiceHeld_staffReadsCountsAndWaitingNoteAnnounced", () => {
+    const html = render(match({ voice: held }), "staff");
+    expect(visible(html)).toContain("Salon vocal : 3/5");
+    expect(visible(html)).toContain("Salon vocal : 5/5");
+    expect(visible(html)).toContain("Le match se lance quand les deux salons sont pleins.");
+    // Le remplissage change sans que la personne touche à rien : annoncé.
+    expect(html).toContain('aria-live="polite"');
+    expect(html).toMatch(/aria-live="polite">Le match se lance quand/);
+  });
+
+  it("render_voiceNotCreated_saysOpeningSoon", () => {
+    const html = render(match({ voice: { team1Members: null, team2Members: null, pending: true } }), "staff");
+    expect(visible(html)).toContain("Salon vocal : bientôt ouvert");
+  });
+
+  it("render_voiceReleased_noWaitingNote", () => {
+    const html = render(match({ voice: { team1Members: 5, team2Members: 5, pending: false } }), "player");
+    expect(visible(html)).toContain("Salon vocal : 5/5");
+    expect(visible(html)).not.toContain("se lance quand");
+  });
+
+  it("render_voiceForSpectatorOrFrozenOrNoOption_sectionAbsent", () => {
+    expect(visible(render(match({ voice: held }), "public"))).not.toContain("Salon vocal");
+    expect(visible(render(match({ voice: held }), "staff", true))).not.toContain("Salon vocal");
+    expect(visible(render(match(), "staff"))).not.toContain("Salon vocal");
+  });
+
+  it("render_voiceEnglish_readsVoiceChannel", () => {
+    const html = render(match({ voice: held }), "staff", false, "en");
+    expect(visible(html)).toContain("Voice channel: 3/5");
+    expect(visible(html)).toContain("The match launches once both channels are full.");
+  });
+});

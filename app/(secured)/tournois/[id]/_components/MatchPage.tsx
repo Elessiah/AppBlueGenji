@@ -718,13 +718,13 @@ function VoiceSection({ match, sides }: Readonly<{ match: BracketMatch; sides: [
           <p>{page.t("voice.hint", { capacity: VOICE_CHANNEL_CAPACITY })}</p>
         </InfoHint>
       </InfoHintRow>
-      <ul className={styles.voiceList}>
+      <ul className={styles.voiceList} aria-live="polite">
         {sides.map((side) => {
           const count = members(side.slot);
           return (
             <li key={side.slot} className={styles.voiceRow}>
               <SideName side={side} logoSize={20} truncate />
-              <span className={count !== null && count >= VOICE_CHANNEL_CAPACITY ? styles.ok : styles.factNote}>
+              <span className={`${styles.voiceCount} ${count !== null && count >= VOICE_CHANNEL_CAPACITY ? styles.ok : styles.factNote}`}>
                 {count === null
                   ? page.t("voice.notCreated")
                   : page.t("voice.count", { count, capacity: VOICE_CHANNEL_CAPACITY })}
@@ -733,7 +733,11 @@ function VoiceSection({ match, sides }: Readonly<{ match: BracketMatch; sides: [
           );
         })}
       </ul>
-      {voice.pending && <p className={styles.factNote}>{page.t("voice.waiting")}</p>}
+      {voice.pending && (
+        <p className={styles.factNote} aria-live="polite">
+          {page.t("voice.waiting")}
+        </p>
+      )}
     </section>
   );
 }

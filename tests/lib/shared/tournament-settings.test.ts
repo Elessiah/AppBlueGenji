@@ -68,7 +68,13 @@ describe("tournamentSettingsGroups — réglages généraux", () => {
       "Format des matchs": "FT3",
       "Ordre de départ": "Fixé par l'arbitrage",
       "Phase de lancement des matchs": "Oui",
+      "Salons vocaux d'équipe": "Non",
     });
+  });
+
+  it("annonce les salons vocaux d'équipe quand l'option est allumée", () => {
+    const groups = tournamentSettingsGroups(input({ card: tournamentCard({ teamVoiceChannels: true }) }));
+    expect(group(groups, "Tournoi")["Salons vocaux d'équipe"]).toBe("Oui");
   });
 
   it("parle de joueurs en individuel et n'y annonce pas d'effectif minimal", () => {

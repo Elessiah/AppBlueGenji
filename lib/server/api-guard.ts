@@ -99,15 +99,15 @@ export const MATCH_LAUNCH_READ_RULE: RateLimitRule = {
  * modale comme sur les contacts). Trente par minute couvrent largement un
  * usage humain.
  */
-/** Compteur des salons vocaux d'un match, relu toutes les 10 s par sa page tant que le verrou tient. */
-export const MATCH_VOICE_READ_RULE: RateLimitRule = {
-  name: "match-voice-read",
+export const MATCH_CONTACTS_READ_RULE: RateLimitRule = {
+  name: "match-contacts-read",
   limit: 30,
   windowMs: 60_000,
 };
 
-export const MATCH_CONTACTS_READ_RULE: RateLimitRule = {
-  name: "match-contacts-read",
+/** Compteur des salons vocaux d'un match, relu toutes les 10 s par sa page tant que le verrou tient. */
+export const MATCH_VOICE_READ_RULE: RateLimitRule = {
+  name: "match-voice-read",
   limit: 30,
   windowMs: 60_000,
 };
