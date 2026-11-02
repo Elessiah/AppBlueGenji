@@ -1,3 +1,9 @@
+import {
+  VOICE_BOT_ABANDONED_MAX_HOURS,
+  VOICE_BOT_RELEASED_MAX_HOURS,
+  VOICE_BOT_SWEEP_MINUTES,
+  VOICE_BOT_UNRELEASED_MAX_HOURS,
+} from "@/lib/shared/match-voice";
 import { TERMS_FREE_PATHS } from "@/lib/shared/global-modals";
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
@@ -2336,8 +2342,8 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
 
   it("privacyChanges_teamVoice_statesCountOnlyFrAndEn", () => {
     expectEntryTexts(entry, english, {
-      fr: ["le site n'en garde que le nombre, jamais qui", "jamais pour une entrée en tournoi individuel", "intérêt légitime"],
-      en: ["the site only keeps the number, never who", "never for a solo entry", "legitimate interest"],
+      fr: ["le site garde le salon, son nombre et ses heures, jamais qui", "jamais pour une entrée en tournoi individuel", "intérêt légitime"],
+      en: ["the site keeps the channel, its number and its times, never who", "never for a solo entry", "legitimate interest"],
     });
   });
 
@@ -2385,6 +2391,16 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
     expect(t18.legalBasis).not.toContain("règlement");
     expect(t18En.legalBasis).not.toContain("rulebook");
+  });
+
+  it("processingRegister_t18_botDurationsComeFromTheirConstantsFrAndEn", () => {
+    const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
+    const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
+    expect(t18.retention[1]).toContain(`${VOICE_BOT_RELEASED_MAX_HOURS} heures et ${VOICE_BOT_SWEEP_MINUTES} minutes après son rendu`);
+    expect(t18En.retention[1]).toContain(`${VOICE_BOT_RELEASED_MAX_HOURS} hours and ${VOICE_BOT_SWEEP_MINUTES} minutes of being handed back`);
+    expect(t18.retention[1]).toContain(`vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création`);
+    expect(t18.retention[3]).toContain(`oubliée ${VOICE_BOT_ABANDONED_MAX_HOURS} heures après`);
+    expect(t18En.retention[3]).toContain(`forgotten ${VOICE_BOT_ABANDONED_MAX_HOURS} hours after`);
   });
 
   it("processingRegister_t08_pointsVoiceChannelsToT18FrAndEn", () => {

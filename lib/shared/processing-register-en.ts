@@ -41,7 +41,16 @@ import {
 } from "@/lib/shared/processing-register";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { SITE_HOST } from "@/lib/shared/site-host";
-import { VOICE_CHANNEL_CAPACITY, VOICE_CHANNEL_LEAD_MINUTES, VOICE_ROW_RETENTION_DAYS } from "@/lib/shared/match-voice";
+import {
+  VOICE_BOT_ABANDONED_MAX_HOURS,
+  VOICE_BOT_RELEASED_MAX_HOURS,
+  VOICE_BOT_SWEEP_MINUTES,
+  VOICE_BOT_UNRELEASED_MAX_HOURS,
+  VOICE_CHANNEL_CAPACITY,
+  VOICE_CHANNEL_LEAD_MINUTES,
+  VOICE_ROW_RETENTION_DAYS,
+  VOICE_SWEEP_THROTTLE_SECONDS,
+} from "@/lib/shared/match-voice";
 import {
   SITE_VISIT_DETAIL_RETENTION_DAYS,
   SITE_VISIT_WINDOW_MINUTES,
@@ -807,9 +816,9 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     sensitiveData: "None",
     retention: [
       `The channel's record on the site (identifier, number of people): until the channel is handed back to the bot, then ${VOICE_ROW_RETENTION_DAYS} days, erased by the next sweep, apart from the encrypted backup copies (T09, ${BACKUP_RETENTION_DAYS} days at most)`,
-      "Channel on Discord: deleted by the bot as soon as it is empty once handed back, within 24 and a half hours of being handed back at the latest even if occupied (sweep every 30 minutes, while the bot is running), unless Discord prevents it (permission removed, error): it then retries at every sweep; a channel never handed back is deleted by the bot if it is empty 48 hours after its creation or its reuse, and stays while it is occupied; moved out of the match category, the bot stops tracking it without deleting it (it then falls to the server's moderation)",
+      `Channel on Discord: deleted by the bot as soon as it is empty once handed back, within ${VOICE_BOT_RELEASED_MAX_HOURS} hours and ${VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest even if occupied (sweep every ${VOICE_BOT_SWEEP_MINUTES} minutes, while the bot is running), unless Discord prevents it (permission removed, error): it then retries at every sweep; a channel never handed back is deleted by the bot if it is empty ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation or its reuse, and stays while it is occupied; moved out of the match category, the bot stops tracking it without deleting it (it then falls to the server's moderation)`,
       "Voice state: held in memory by the bot, kept up to date with what Discord sends it, and lost when it stops; never recorded by the bot nor sent to the site — that of the other servers it is on is not kept",
-      "The bot's record of the channel: erased with the channel; forgotten 96 hours after its creation or its reuse if the bot no longer has access to the channel; kept while Discord answers with another error",
+      `The bot's record of the channel: erased with the channel; forgotten ${VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation or its reuse if the bot no longer has access to the channel; kept while Discord answers with another error`,
     ],
     recipients: [
       "Members of both teams of a match, its casters and staff, to whom the match page displays the number of people in each channel",
@@ -821,7 +830,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     security: [
       ...COMMON_SECURITY_EN,
       "A number only: neither the identifier nor the username of the people present is requested from the bot, received or logged by the site",
-      "A channel's count is only requested from the bot by the server's sweep, at most once every ten seconds (immediately when referees change the option), never for each viewer",
+      `A channel's count is only requested from the bot by the server's sweep, at most once every ${VOICE_SWEEP_THROTTLE_SECONDS} seconds (immediately when referees change the option), never for each viewer`,
     ],
   },
 ];

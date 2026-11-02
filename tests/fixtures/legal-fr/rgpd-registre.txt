@@ -685,7 +685,7 @@ Données sensibles
 Aucune
 Conservation
 Ligne du salon sur le site (identifiant, nombre de personnes) : jusqu'à ce que le salon soit rendu au bot, puis 7 jours, effacée par le balayage suivant, hors les copies de sauvegarde chiffrées (T09, 30 jours au plus)
-Salon sur Discord : supprimé par le bot dès qu'il est vide une fois rendu, au plus tard 24 heures et demie après son rendu même occupé (balayage toutes les 30 minutes, bot en marche), sauf si Discord l'en empêche (droit retiré, erreur) : il réessaie alors à chaque balayage ; un salon jamais rendu est supprimé par le bot s'il est vide 48 heures après sa création ou sa reprise, et reste tant qu'il est occupé ; déplacé hors de la catégorie des matchs, le bot cesse de le suivre sans le supprimer (il relève alors de la modération du serveur)
+Salon sur Discord : supprimé par le bot dès qu'il est vide une fois rendu, au plus tard 24 heures et 30 minutes après son rendu même occupé (balayage toutes les 30 minutes, bot en marche), sauf si Discord l'en empêche (droit retiré, erreur) : il réessaie alors à chaque balayage ; un salon jamais rendu est supprimé par le bot s'il est vide 48 heures après sa création ou sa reprise, et reste tant qu'il est occupé ; déplacé hors de la catégorie des matchs, le bot cesse de le suivre sans le supprimer (il relève alors de la modération du serveur)
 État vocal : tenu en mémoire par le bot, à jour de ce que Discord lui transmet, et perdu à son arrêt ; jamais enregistré par le bot ni transmis au site — celui des autres serveurs où il est présent n'est pas gardé
 Fiche du salon chez le bot : effacée avec le salon ; oubliée 96 heures après sa création ou sa reprise si le bot n'a plus accès au salon ; gardée tant que Discord répond par une autre erreur
 Destinataires
@@ -700,4 +700,4 @@ Accès au serveur réservé au responsable technique (authentification par clé 
 Chiffrement des échanges (HTTPS)
 Droits d'administration par rôle, limités à ce que chaque mission exige
 Un nombre seulement : ni identifiant ni pseudo des personnes présentes n'est demandé au bot, reçu ou journalisé par le site
-Le compte d'un salon n'est demandé au bot que par le balayage du serveur, au plus une fois toutes les dix secondes (aussitôt quand l'arbitrage change l'option), jamais pour chaque lecteur
+Le compte d'un salon n'est demandé au bot que par le balayage du serveur, au plus une fois toutes les 10 secondes (aussitôt quand l'arbitrage change l'option), jamais pour chaque lecteur

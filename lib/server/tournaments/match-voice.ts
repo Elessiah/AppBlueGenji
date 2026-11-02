@@ -29,6 +29,7 @@ import { visibleText } from "@/lib/shared/visible-text";
 import {
   VOICE_CHANNEL_LEAD_MINUTES,
   VOICE_ROW_RETENTION_DAYS,
+  VOICE_SWEEP_THROTTLE_SECONDS,
   matchVoiceInfo,
   voiceChannelKey,
   voiceChannelsDue,
@@ -218,7 +219,7 @@ export async function loadMatchVoiceInfos(
 /* ── Balayage ─────────────────────────────────────────────────────────────── */
 
 /** Une passe au plus toutes les dix secondes : le comptage suit sans harceler le bot. */
-const VOICE_SWEEP_THROTTLE_MS = 10_000;
+const VOICE_SWEEP_THROTTLE_MS = VOICE_SWEEP_THROTTLE_SECONDS * 1000;
 /** Au plus tant de matchs par passe : le reste attend la suivante. */
 const VOICE_SWEEP_BATCH = 40;
 

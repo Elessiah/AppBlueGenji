@@ -38,6 +38,28 @@ export function voiceObservationFresh(at: string | null, now: number): boolean {
  */
 export const VOICE_ROW_RETENTION_DAYS = 7;
 
+/** Étranglement du balayage du site : au plus un passage par ce délai (secondes). */
+export const VOICE_SWEEP_THROTTLE_SECONDS = 10;
+
+/**
+ * Durées appliquées par le **bot**, qui vit dans un autre dépôt : aucune
+ * importation ne peut les tenir alignées, elles sont recopiées ici avec leur
+ * source (`blueGenjiBot/src/voice/matchVoice.ts`) pour `/rgpd` et le registre
+ * (T18). Changer l'une sans l'autre rend ces pages fausses.
+ *
+ * - `VOICE_BOT_RELEASED_MAX_HOURS` : `RELEASED_MAX_AGE_MS` — un salon rendu
+ *   mais occupé est supprimé quand même au-delà.
+ * - `VOICE_BOT_SWEEP_MINUTES` : `VOICE_SWEEP_CRON` — intervalle du balayage.
+ * - `VOICE_BOT_UNRELEASED_MAX_HOURS` : `UNRELEASED_MAX_AGE_MS` — un salon
+ *   jamais rendu est supprimé s'il est vide au-delà.
+ * - `VOICE_BOT_ABANDONED_MAX_HOURS` : `ABANDONED_MAX_AGE_MS` — la fiche d'un
+ *   salon auquel le bot n'a plus accès est oubliée au-delà.
+ */
+export const VOICE_BOT_RELEASED_MAX_HOURS = 24;
+export const VOICE_BOT_SWEEP_MINUTES = 30;
+export const VOICE_BOT_UNRELEASED_MAX_HOURS = 48;
+export const VOICE_BOT_ABANDONED_MAX_HOURS = 96;
+
 /**
  * Clé d'idempotence d'un salon côté bot : la même clé rend le même salon, si
  * bien qu'une création rejouée (réponse perdue, deux balayages) n'en double

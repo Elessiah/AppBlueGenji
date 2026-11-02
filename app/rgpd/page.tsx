@@ -35,6 +35,14 @@ import {
 } from "@/lib/shared/account-deletion-journal";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import {
+  VOICE_BOT_RELEASED_MAX_HOURS,
+  VOICE_BOT_SWEEP_MINUTES,
+  VOICE_BOT_UNRELEASED_MAX_HOURS,
+  VOICE_CHANNEL_CAPACITY,
+  VOICE_CHANNEL_LEAD_MINUTES,
+  VOICE_ROW_RETENTION_DAYS,
+} from "@/lib/shared/match-voice";
+import {
   ALL_TRANSFER_RECIPIENTS,
   HETZNER_BACKUP_FRAMEWORK,
   SPICEWORKS_PROCESSOR_FRAMEWORK,
@@ -1085,18 +1093,19 @@ function RgpdFr({
           </p>
           <p id="salons-vocaux">
             <strong>Salons vocaux d&apos;équipe.</strong> Dans un tournoi qui a l&apos;option « Salons vocaux d&apos;équipe »
-            (éteinte par défaut), le bot Discord de l&apos;association ouvre, un quart d&apos;heure avant l&apos;heure d&apos;un match, un salon
-            vocal de 5 places pour chacune de ses deux équipes, au nom de l&apos;équipe — jamais pour une entrée en tournoi individuel,
-            dont le nom serait un pseudo. Le match ne se lance qu&apos;une fois les deux salons pleins (l&apos;arbitrage peut le forcer ; si le
+            (éteinte par défaut), le bot Discord de l&apos;association ouvre, à partir de {VOICE_CHANNEL_LEAD_MINUTES} minutes avant l&apos;heure d&apos;un
+            match (au premier passage du site dans ce délai), un salon vocal de {VOICE_CHANNEL_CAPACITY} places pour chacune de ses deux
+            équipes, au nom de l&apos;équipe — jamais pour une entrée en tournoi individuel, dont le nom serait un pseudo, ni pour un
+            match contre une équipe fantôme. Le match ne se lance qu&apos;une fois les deux salons pleins (l&apos;arbitrage peut le forcer ; si le
             bot ne répond pas, le match n&apos;attend pas). Pour le savoir, le bot compte les personnes présentes dans chaque salon : il tient pour
             cela en mémoire, sans jamais l&apos;enregistrer, l&apos;état vocal (identifiant Discord du membre et de sa session vocale, salon où il se trouve, micro ou son coupés par lui ou par la modération, partage d&apos;écran ou caméra actifs, demande de parole) des membres du serveur Discord de
             l&apos;association, tel que Discord le lui transmet — celui des autres serveurs où il est présent lui parvient aussi, mais il
             ne le garde pas ; le site ne reçoit et ne garde que l&apos;identifiant du salon, les numéros du match et de l&apos;équipe, ce <strong>nombre</strong> (« Salon vocal : 3/5 », affiché aux parties du match et au staff, et lisible par tout membre connecté ; un visiteur sans compte voit seulement si le match attend ses salons)
             et les heures du comptage (ou d&apos;une panne du bot), de création et de rendu, jamais qui. Le salon est rendu au bot quand le match est joué, annulé,
             retombé en attente ou sorti du programme, quand l&apos;équipe sort de l&apos;appariement, ou quand le tournoi se termine ou éteint
-            l&apos;option ; le bot le supprime dès qu&apos;il est vide (au plus tard 24 heures et demie après son rendu, même occupé, bot en marche, sauf si Discord l&apos;en empêche — il réessaie alors à chaque balayage ; un salon jamais rendu,
-            s&apos;il est vide 48 heures après sa création ou sa reprise ; déplacé hors de la catégorie des matchs, le bot cesse de le
-            suivre sans le supprimer et il relève de la modération du serveur), et le site efface sa ligne une semaine après le rendu (hors les
+            l&apos;option ; le bot le supprime dès qu&apos;il est vide (au plus tard {VOICE_BOT_RELEASED_MAX_HOURS} heures et {VOICE_BOT_SWEEP_MINUTES} minutes après son rendu, même occupé, bot en marche, sauf si Discord l&apos;en empêche — il réessaie alors à chaque balayage ; un salon jamais rendu,
+            s&apos;il est vide {VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise ; déplacé hors de la catégorie des matchs, le bot cesse de le
+            suivre sans le supprimer et il relève de la modération du serveur), et le site efface sa ligne {VOICE_ROW_RETENTION_DAYS} jours après le rendu (hors les
             copies de sauvegarde chiffrées). Le bot garde de chaque salon une fiche sans nom (identifiant du salon, numéros du match et de
             l&apos;équipe, heures de création et de rendu), effacée avec le salon. Ce comptage relève de l&apos;<strong>intérêt légitime</strong> (bon déroulement des tournois : réunir
             chaque équipe avant son match) ; rejoindre un salon reste un choix — mais tant que les deux ne sont pas pleins, le match attend

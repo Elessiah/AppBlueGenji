@@ -28,7 +28,16 @@ import {
   SITE_VISITOR_RETENTION_MONTHS,
 } from "@/lib/shared/site-visits";
 import { SITE_HOST } from "@/lib/shared/site-host";
-import { VOICE_CHANNEL_CAPACITY, VOICE_CHANNEL_LEAD_MINUTES, VOICE_ROW_RETENTION_DAYS } from "@/lib/shared/match-voice";
+import {
+  VOICE_BOT_ABANDONED_MAX_HOURS,
+  VOICE_BOT_RELEASED_MAX_HOURS,
+  VOICE_BOT_SWEEP_MINUTES,
+  VOICE_BOT_UNRELEASED_MAX_HOURS,
+  VOICE_CHANNEL_CAPACITY,
+  VOICE_CHANNEL_LEAD_MINUTES,
+  VOICE_ROW_RETENTION_DAYS,
+  VOICE_SWEEP_THROTTLE_SECONDS,
+} from "@/lib/shared/match-voice";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION, copyrightNoticeElementsText } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
@@ -990,9 +999,9 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       `Ligne du salon sur le site (identifiant, nombre de personnes) : jusqu'à ce que le salon soit rendu au bot, puis ${VOICE_ROW_RETENTION_DAYS} jours, effacée par le balayage suivant, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus)`,
-      "Salon sur Discord : supprimé par le bot dès qu'il est vide une fois rendu, au plus tard 24 heures et demie après son rendu même occupé (balayage toutes les 30 minutes, bot en marche), sauf si Discord l'en empêche (droit retiré, erreur) : il réessaie alors à chaque balayage ; un salon jamais rendu est supprimé par le bot s'il est vide 48 heures après sa création ou sa reprise, et reste tant qu'il est occupé ; déplacé hors de la catégorie des matchs, le bot cesse de le suivre sans le supprimer (il relève alors de la modération du serveur)",
+      `Salon sur Discord : supprimé par le bot dès qu'il est vide une fois rendu, au plus tard ${VOICE_BOT_RELEASED_MAX_HOURS} heures et ${VOICE_BOT_SWEEP_MINUTES} minutes après son rendu même occupé (balayage toutes les ${VOICE_BOT_SWEEP_MINUTES} minutes, bot en marche), sauf si Discord l'en empêche (droit retiré, erreur) : il réessaie alors à chaque balayage ; un salon jamais rendu est supprimé par le bot s'il est vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise, et reste tant qu'il est occupé ; déplacé hors de la catégorie des matchs, le bot cesse de le suivre sans le supprimer (il relève alors de la modération du serveur)`,
       "État vocal : tenu en mémoire par le bot, à jour de ce que Discord lui transmet, et perdu à son arrêt ; jamais enregistré par le bot ni transmis au site — celui des autres serveurs où il est présent n'est pas gardé",
-      "Fiche du salon chez le bot : effacée avec le salon ; oubliée 96 heures après sa création ou sa reprise si le bot n'a plus accès au salon ; gardée tant que Discord répond par une autre erreur",
+      `Fiche du salon chez le bot : effacée avec le salon ; oubliée ${VOICE_BOT_ABANDONED_MAX_HOURS} heures après sa création ou sa reprise si le bot n'a plus accès au salon ; gardée tant que Discord répond par une autre erreur`,
     ],
     recipients: [
       "Membres des deux équipes d'un match, ses casters et le staff, à qui la page du match affiche le nombre de personnes de chaque salon",
@@ -1004,7 +1013,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     security: [
       ...COMMON_SECURITY,
       "Un nombre seulement : ni identifiant ni pseudo des personnes présentes n'est demandé au bot, reçu ou journalisé par le site",
-      "Le compte d'un salon n'est demandé au bot que par le balayage du serveur, au plus une fois toutes les dix secondes (aussitôt quand l'arbitrage change l'option), jamais pour chaque lecteur",
+      `Le compte d'un salon n'est demandé au bot que par le balayage du serveur, au plus une fois toutes les ${VOICE_SWEEP_THROTTLE_SECONDS} secondes (aussitôt quand l'arbitrage change l'option), jamais pour chaque lecteur`,
     ],
   },
 ];
