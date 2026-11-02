@@ -132,7 +132,9 @@ describe("alertSelfResolvedDispute", () => {
     await alertSelfResolvedDispute(dispute, actor);
 
     expect(publishStaffAction).toHaveBeenCalledTimes(1);
-    const [line, author, audit] = jest.mocked(publishStaffAction).mock.calls[0];
+    const [line, author, audit, category] = jest.mocked(publishStaffAction).mock.calls[0];
+    // Appel au staff à vérifier : une alerte qui notifie, jamais une trace silencieuse.
+    expect(category).toBe("referee-self-action");
     // Discord : le tournoi et la nature du geste, ni manche, ni issue, ni nom d'équipe.
     expect(line).toBe("⚠️ Litige tranché par un membre du staff qui joue ce match · « Coupe d'hiver ».");
     expect(line).not.toMatch(/Sifflet|Alpha|Bravo|Manche/);

@@ -76,6 +76,7 @@
  * Module pur (`lib/shared`) : aucune base, aucun réseau. Le déclenchement et la
  * résolution des noms vivent dans `lib/server/tournaments/bot-logs.ts`.
  */
+import type { BotLogCategory } from "./bot-log-category";
 import type { BotEventKind, BotLogTournament } from "./bot-logs";
 import { matchRoundLabel } from "./discord-notifications";
 import { entrantLabel, type LogEntrant } from "./log-privacy";
@@ -111,6 +112,26 @@ export const BOT_EVENT_CHANNELS: Record<BotEventKind, BotEventChannel> = {
   score_conflict: "REFEREE",
   score_report_stalled: "REFEREE",
   match_no_referee: "REFEREE",
+};
+
+/**
+ * Catégorie de journal de chaque évènement (`bot-log-category.ts`) : le lot
+ * Discord où sa ligne se range, jamais mêlé à un autre type. Exhaustive comme
+ * {@link BOT_EVENT_CHANNELS}.
+ */
+export const BOT_EVENT_LOG_CATEGORIES: Record<BotEventKind, BotLogCategory> = {
+  tournament_created: "tournament",
+  registration: "registrations",
+  forfeit: "registrations",
+  match_finished: "results",
+  tournament_started: "tournament",
+  tournament_finished: "tournament",
+  tournament_underfilled: "tournament",
+  endurance_penalty: "results",
+  endurance_penalty_lifted: "results",
+  score_conflict: "referees",
+  score_report_stalled: "referees",
+  match_no_referee: "referees",
 };
 
 /**

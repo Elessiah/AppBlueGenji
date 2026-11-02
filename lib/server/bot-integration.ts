@@ -9,6 +9,7 @@ import type {
 import { normalizeBotServersPayload, normalizeBotStats } from "@/lib/shared/bot-message-window";
 import type { LiveMentionTarget } from "@/lib/shared/live-announcements";
 import type { Locale } from "@/lib/shared/locales";
+import { BOT_LOG_CATEGORIES, botLogHeader, botLogKind, DEFAULT_BOT_LOG_CATEGORY, type BotLogCategory } from "@/lib/shared/bot-log-category";
 import { botLogBatchKey } from "@/lib/shared/bot-log-batch";
 import { createBotLogBatcher, type BotLogBatcher } from "@/lib/server/bot-log-batcher";
 
@@ -261,7 +262,7 @@ export async function sendDiscordLoginCode(discordId: string, code: string, loca
  * effort, ne lève jamais. Les appelants passent par {@link sendBotLog}, qui
  * regroupe ; seul le lot (`bot-log-batcher.ts`) appelle celui-ci.
  */
-async function postBotLog(message: string): Promise<void> {
+async function postBotLog(message: string, category: BotLogCategory): Promise<void> {
   if (isCircuitOpen()) return; // best-effort : on skip silencieusement
 
   const baseUrl = resolveBotInternalUrl();
@@ -273,7 +274,7 @@ async function postBotLog(message: string): Promise<void> {
         "content-type": "application/json",
         ...getInternalHeaders(),
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, kind: botLogKind(category) }),
       cache: "no-store",
       signal: AbortSignal.timeout(BOT_FETCH_TIMEOUT_MS),
     });
@@ -292,12 +293,18 @@ const BOT_LOG_CHANNEL = "log";
 // une fois par bundle (routes, `instrumentation.ts`), et l'arrêt propre doit
 // voir les mêmes lots que les routes qui les remplissent.
 const batcherState = globalThis as typeof globalThis & { __bgBotLogBatcher?: BotLogBatcher };
-const botLogBatcher = (batcherState.__bgBotLogBatcher ??= createBotLogBatcher({ send: postBotLog }));
+const botLogBatcher = (batcherState.__bgBotLogBatcher ??= createBotLogBatcher({ send: postBotLog, header: botLogHeader }));
 
 /** Rattachement d'une ligne du journal, pour la ranger dans le bon lot. */
 export type BotLogScope = {
   /** Tournoi dont la ligne relève : un lot par tournoi, jamais mêlé à un autre. */
   tournamentId?: number | null;
+  /**
+   * Type du geste : un lot ne mêle jamais deux catégories, et la catégorie
+   * décide de la nature de l'appel (`log` silencieux, `alert` qui notifie).
+   * Absente : `general`.
+   */
+  category?: BotLogCategory;
 };
 
 /**
@@ -309,12 +316,17 @@ export type BotLogScope = {
  * jamais : le bot reste optionnel.
  */
 export async function sendBotLog(message: string, scope: BotLogScope = {}): Promise<void> {
-  botLogBatcher.add(botLogBatchKey(BOT_LOG_CHANNEL, scope.tournamentId), message);
+  const category = scope.category ?? DEFAULT_BOT_LOG_CATEGORY;
+  botLogBatcher.add(botLogBatchKey(BOT_LOG_CHANNEL, scope.tournamentId, category), message, category);
 }
 
-/** Envoie tout de suite le lot du journal d'un tournoi (écran des cartes fermé, par exemple). */
-export function flushBotLogBatch(scope: BotLogScope = {}): Promise<void> {
-  return botLogBatcher.flush(botLogBatchKey(BOT_LOG_CHANNEL, scope.tournamentId));
+/**
+ * Envoie tout de suite le lot du journal d'un tournoi (écran des cartes fermé,
+ * par exemple) : celui de la catégorie demandée, sinon tous ceux du tournoi.
+ */
+export async function flushBotLogBatch(scope: BotLogScope = {}): Promise<void> {
+  const categories = scope.category ? [scope.category] : BOT_LOG_CATEGORIES;
+  await Promise.all(categories.map((category) => botLogBatcher.flush(botLogBatchKey(BOT_LOG_CHANNEL, scope.tournamentId, category))));
 }
 
 /** Envoie tous les lots du journal en attente : arrêt propre du serveur. */

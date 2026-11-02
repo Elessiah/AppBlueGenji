@@ -151,7 +151,7 @@ async function sendClaimed(rows: readonly NoticeRow[]): Promise<number> {
         roundLabels,
         listed: ROUND_MAPS_NOTICE_LISTED,
       }),
-      { tournamentId: Number(row.tournament_id) },
+      { tournamentId: Number(row.tournament_id), category: "maps" },
     ).catch((error: unknown) => console.error("[round-maps] journal non envoyé", error));
     sent += 1;
   }
@@ -206,7 +206,7 @@ export async function flushRoundMapsNotice(tournamentId: number): Promise<boolea
     sent = (await sendClaimed(rows)) > 0;
     // L'écran fermé demande un envoi immédiat : le résumé ne reste pas dans le
     // lot du journal du tournoi (`LOG_BATCHING.md`), qui part avec lui.
-    if (sent) await flushBotLogBatch({ tournamentId });
+    if (sent) await flushBotLogBatch({ tournamentId, category: "maps" });
     return sent;
   } finally {
     if (!sent && lastFlushAt.get(tournamentId) === now) lastFlushAt.delete(tournamentId);

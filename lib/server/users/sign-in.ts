@@ -60,7 +60,7 @@ export type GoogleProfilePayload = {
 function announcePlayerSignup(provider: PlayerSignupProvider): void {
   // Ni pseudo ni identifiant : le canal Discord ne nomme aucun joueur
   // (`lib/shared/log-privacy.ts`).
-  void sendBotLog(formatPlayerSignupLog({ provider })).catch(() => undefined);
+  void sendBotLog(formatPlayerSignupLog({ provider }), { category: "signups" }).catch(() => undefined);
 }
 
 /**

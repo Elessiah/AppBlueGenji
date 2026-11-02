@@ -53,7 +53,7 @@ describe("deliverStaffMatchAction", () => {
     expect(execute.mock.calls[0][1]).toEqual([42]);
     expect(sendBotLog).toHaveBeenCalledWith(
       "🛠️ Lancement forcé — « Coupe d'hiver » (#7) : Manche 2 — Renards vs Nova (#42), par le staff.",
-      { tournamentId: 7 },
+      { tournamentId: 7, category: "admin" },
     );
   });
 
@@ -91,7 +91,7 @@ describe("deliverStaffTournamentAction", () => {
     const execute = mockRows({ id: 7, name: "Coupe d'hiver" });
     await deliverStaffTournamentAction(7, "GHOST_TEAMS_REGISTERED", 2);
     expect(execute.mock.calls[0][1]).toEqual([7]);
-    expect(sendBotLog).toHaveBeenCalledWith("🛠️ Équipes fantômes inscrites — « Coupe d'hiver » (#7) (2), par le staff.", { tournamentId: 7 });
+    expect(sendBotLog).toHaveBeenCalledWith("🛠️ Équipes fantômes inscrites — « Coupe d'hiver » (#7) (2), par le staff.", { tournamentId: 7, category: "admin" });
   });
 
   it("n'écrit rien pour un tournoi disparu", async () => {
@@ -105,14 +105,14 @@ describe("deliverStaffMatchAction — sans désigner le match", () => {
   it("n'envoie que le tournoi avec withoutMatch", async () => {
     mockRows(matchRow());
     await deliverStaffMatchAction(42, "SCORES_SAVED", "STAFF", { withoutMatch: true });
-    expect(sendBotLog).toHaveBeenCalledWith("🛠️ Score enregistré — « Coupe d'hiver » (#7), par le staff.", { tournamentId: 7 });
+    expect(sendBotLog).toHaveBeenCalledWith("🛠️ Score enregistré — « Coupe d'hiver » (#7), par le staff.", { tournamentId: 7, category: "admin" });
   });
 
   it("transmet l'option depuis announceStaffMatchAction", async () => {
     mockRows(matchRow());
     announceStaffMatchAction(42, "SCORES_SAVED", "STAFF", { withoutMatch: true });
     await settle();
-    expect(sendBotLog).toHaveBeenCalledWith("🛠️ Score enregistré — « Coupe d'hiver » (#7), par le staff.", { tournamentId: 7 });
+    expect(sendBotLog).toHaveBeenCalledWith("🛠️ Score enregistré — « Coupe d'hiver » (#7), par le staff.", { tournamentId: 7, category: "admin" });
   });
 });
 

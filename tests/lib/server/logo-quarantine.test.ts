@@ -170,7 +170,7 @@ describe("deleteTeamLogoForReport", () => {
     expect(message).toContain("« Alpha »");
     expect(message).toContain("https://site.test/signalements/12");
     expect(recipients).toHaveLength(1);
-    expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("sans délai"), { id: 1, pseudo: "Admin" });
+    expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("sans délai"), { id: 1, pseudo: "Admin" }, undefined, "moderation");
     // Logo lu par le podium, les cartes d'aperçu et la vitrine : tous oubliés.
     expect(invalidateTeamIdentityViews).toHaveBeenCalledTimes(1);
   });
@@ -356,7 +356,7 @@ describe("hideTeamLogo", () => {
     );
     expect(view.purgeAfter).toBe(logoQuarantinePurgeDate(new Date(view.hiddenAt)).toISOString());
 
-    expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("« Alpha » masqué"), { id: 1, pseudo: "Admin" });
+    expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("« Alpha » masqué"), { id: 1, pseudo: "Admin" }, undefined, "moderation");
     const [message, recipients, context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(context).toBe("logo-hidden");
     expect(message).toContain("https://site.test/signalements/12");
@@ -696,7 +696,7 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("supprimé définitivement par le staff"), {
       id: 1,
       pseudo: "Admin",
-    });
+    }, undefined, "moderation");
   });
 
   it("prévient l'équipe d'une suppression décidée avant l'échéance, lien du signalement compris", async () => {

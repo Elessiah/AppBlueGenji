@@ -412,7 +412,7 @@ describe("DELETE /api/admin/teams/[id]/logo", () => {
     const res = await removeTeamLogo(withReason(), params("4"));
     expect(res.status).toBe(200);
     expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/teams/4-a.webp");
-    expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("« Alpha »"), { id: 1, pseudo: "Admin" });
+    expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("« Alpha »"), { id: 1, pseudo: "Admin" }, undefined, "moderation");
     // Hors de tout signalement : l'équipe est prévenue, sans lien de contestation.
     // Le motif saisi part avec lui, comme faits retenus ; jamais au journal Discord.
     expect(notifyTeamLogoRemoved).toHaveBeenCalledWith(4, "Alpha", null, REASON);
@@ -471,7 +471,7 @@ describe("DELETE /api/admin/users/[id]/avatar", () => {
     expect(res.status).toBe(200);
     expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/avatars/9-a.webp");
     // Jamais le pseudo du joueur sur Discord (lib/shared/log-privacy.ts).
-    expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("un joueur"), { id: 1, pseudo: "Admin" });
+    expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("un joueur"), { id: 1, pseudo: "Admin" }, undefined, "moderation");
     expect(publishStaffAction).not.toHaveBeenCalledWith(expect.stringContaining("Nova"), expect.anything());
     // Hors de tout signalement : le joueur est prévenu, sans lien de contestation.
     expect(notifyUserAvatarRemoved).toHaveBeenCalledWith(9, null, REASON);

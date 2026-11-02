@@ -86,22 +86,22 @@ describe("packBotLogLines", () => {
 
 describe("botLogBatchKey", () => {
   it("botLogBatchKey_tournamentId_scopedToChannelAndTournament", () => {
-    expect(botLogBatchKey("log", 12)).toBe("log:tournament:12");
+    expect(botLogBatchKey("log", 12)).toBe("log:tournament:12:general");
   });
 
   it("botLogBatchKey_noTournament_globalKeyOfTheChannel", () => {
-    expect(botLogBatchKey("log")).toBe("log:global");
+    expect(botLogBatchKey("log")).toBe("log:global:general");
   });
 
   it("botLogBatchKey_nullTournament_globalKeyOfTheChannel", () => {
-    expect(botLogBatchKey("log", null)).toBe("log:global");
+    expect(botLogBatchKey("log", null)).toBe("log:global:general");
   });
 
   it("botLogBatchKey_zeroTournamentId_globalKey", () => {
-    expect(botLogBatchKey("log", 0)).toBe("log:global");
+    expect(botLogBatchKey("log", 0)).toBe("log:global:general");
   });
 
   it("botLogBatchKey_fractionalTournamentId_globalKey", () => {
-    expect(botLogBatchKey("log", 1.5)).toBe("log:global");
+    expect(botLogBatchKey("log", 1.5)).toBe("log:global:general");
   });
 });

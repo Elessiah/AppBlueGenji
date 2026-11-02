@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import type { BotLogCategory } from "@/lib/shared/bot-log-category";
 import { createBotLogBatcher, type BotLogBatcher } from "@/lib/server/bot-log-batcher";
+import { botLogHeader } from "@/lib/shared/bot-log-category";
+import { REFEREE_DIGEST_LOG_MAX_LENGTH } from "@/lib/shared/bot-logs";
 
 /**
  * Lots du journal Discord (`docs/features/LOG_BATCHING.md`) : silence de 5 min
@@ -7,7 +10,7 @@ import { createBotLogBatcher, type BotLogBatcher } from "@/lib/server/bot-log-ba
  */
 const WINDOW = 5 * 60 * 1000;
 
-type Send = (message: string) => Promise<void>;
+type Send = (message: string, category: BotLogCategory) => Promise<void>;
 
 let send: jest.Mock<Send>;
 let batcher: BotLogBatcher;
@@ -41,7 +44,7 @@ describe("add", () => {
     batcher.add("k", "ligne");
     jest.advanceTimersByTime(WINDOW);
     await settle();
-    expect(send).toHaveBeenCalledWith("ligne");
+    expect(send).toHaveBeenCalledWith("ligne", "general");
   });
 
   it("add_newLineBeforeWindowEnds_restartsTheTimer", async () => {
@@ -60,7 +63,7 @@ describe("add", () => {
     jest.advanceTimersByTime(WINDOW);
     await settle();
     expect(send).toHaveBeenCalledTimes(1);
-    expect(send).toHaveBeenCalledWith("un\ndeux");
+    expect(send).toHaveBeenCalledWith("un\ndeux", "general");
   });
 
   it("add_fourthLine_stillWaits", async () => {
@@ -74,7 +77,7 @@ describe("add", () => {
     for (const line of ["1", "2", "3", "4", "5"]) batcher.add("k", line);
     await settle();
     expect(send).toHaveBeenCalledTimes(1);
-    expect(send).toHaveBeenCalledWith("1\n2\n3\n4\n5");
+    expect(send).toHaveBeenCalledWith("1\n2\n3\n4\n5", "general");
     expect(batcher.pending().size).toBe(0);
   });
 
@@ -91,7 +94,7 @@ describe("add", () => {
     batcher.add("a", "5");
     await settle();
     expect(send).toHaveBeenCalledTimes(1);
-    expect(send).toHaveBeenCalledWith("1\n2\n3\n4\n5");
+    expect(send).toHaveBeenCalledWith("1\n2\n3\n4\n5", "general");
     expect(batcher.pending()).toEqual(new Map([["b", 1]]));
   });
 
@@ -131,13 +134,13 @@ describe("add", () => {
     await batcher.flush("a");
     batcher.add("b", "suivante");
     await batcher.flush("b");
-    expect(send).toHaveBeenLastCalledWith("suivante");
+    expect(send).toHaveBeenLastCalledWith("suivante", "general");
   });
 
   it("add_renderedLine_sentVerbatimWithNothingAdded", async () => {
     batcher.add("k", "🛠️ Arbitre désigné par le staff");
     await batcher.flush("k");
-    expect(send).toHaveBeenCalledWith("🛠️ Arbitre désigné par le staff");
+    expect(send).toHaveBeenCalledWith("🛠️ Arbitre désigné par le staff", "general");
   });
 });
 
@@ -209,7 +212,7 @@ describe("maxAge", () => {
     jest.advanceTimersByTime(1);
     await settle();
     expect(send).toHaveBeenCalledTimes(1);
-    expect(send).toHaveBeenCalledWith("un\ndeux\ntrois");
+    expect(send).toHaveBeenCalledWith("un\ndeux\ntrois", "general");
     expect(batcher.pending().size).toBe(0);
   });
 
@@ -230,7 +233,7 @@ describe("maxAge", () => {
     expect(send).toHaveBeenCalledTimes(1);
     jest.advanceTimersByTime(1);
     await settle();
-    expect(send).toHaveBeenLastCalledWith("trois\nquatre\ncinq");
+    expect(send).toHaveBeenLastCalledWith("trois\nquatre\ncinq", "general");
   });
 
   it("maxAge_quietWindowBeforeTheAge_stillFlushesAtFiveMinutes", async () => {
@@ -297,7 +300,7 @@ describe("maxAge", () => {
     short.add("k", "un");
     jest.advanceTimersByTime(1000);
     await settle();
-    expect(send).toHaveBeenCalledWith("un");
+    expect(send).toHaveBeenCalledWith("un", "general");
     short.reset();
   });
 
@@ -309,5 +312,78 @@ describe("maxAge", () => {
     jest.spyOn(globalThis, "clearTimeout").mockImplementation(() => undefined);
     batcher.add("k", "ligne");
     expect(unref).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("catégories", () => {
+  it("category_sentWithTheBatch_andNeverMixedBetweenKeys", async () => {
+    batcher.add("t:referees", "arbitre", "referees");
+    batcher.add("t:casts", "cast", "casts");
+    batcher.add("t:referees", "arbitre bis", "referees");
+    jest.advanceTimersByTime(WINDOW);
+    await settle();
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls).toContainEqual(["arbitre\narbitre bis", "referees"]);
+    expect(send.mock.calls).toContainEqual(["cast", "casts"]);
+  });
+
+  it("category_capPerKey_otherCategoryKeepsItsOwnCount", async () => {
+    for (const line of ["1", "2", "3", "4"]) batcher.add("t:referees", line, "referees");
+    batcher.add("t:casts", "c", "casts");
+    batcher.add("t:referees", "5", "referees");
+    await settle();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith("1\n2\n3\n4\n5", "referees");
+    expect(batcher.pending().get("t:casts")).toBe(1);
+  });
+
+  it("category_maxAgePerKey_eachCategoryCountsItsOwnAge", async () => {
+    const MIN = 60 * 1000;
+    batcher.add("a", "un", "maps");
+    jest.advanceTimersByTime(4 * MIN);
+    batcher.add("a", "deux", "maps");
+    jest.advanceTimersByTime(4 * MIN);
+    batcher.add("a", "trois", "maps");
+    batcher.add("b", "autre", "schedule");
+    jest.advanceTimersByTime(2 * MIN);
+    await settle();
+    expect(send.mock.calls).toEqual([["un\ndeux\ntrois", "maps"]]);
+    jest.advanceTimersByTime(3 * MIN);
+    await settle();
+    expect(send.mock.calls).toEqual([["un\ndeux\ntrois", "maps"], ["autre", "schedule"]]);
+  });
+
+  it("category_flushAll_sendsEachCategoryInItsOwnMessage", async () => {
+    batcher.add("a", "x", "results");
+    batcher.add("b", "y", "admin");
+    await batcher.flushAll();
+    expect(send.mock.calls).toEqual([["x", "results"], ["y", "admin"]]);
+  });
+
+  it("category_noneGiven_general", async () => {
+    batcher.add("k", "ligne");
+    await batcher.flush("k");
+    expect(send).toHaveBeenCalledWith("ligne", "general");
+  });
+
+  it("header_option_opensEveryMessageAndCountsInTheLimit", async () => {
+    const headed = createBotLogBatcher({ send, header: (category) => `# ${category}`, maxChars: 40 });
+    headed.add("k", "a".repeat(20), "maps");
+    headed.add("k", "b".repeat(20), "maps");
+    await headed.flush("k");
+    const messages = send.mock.calls.map(([message]) => message);
+    expect(messages).toEqual([`# maps\n${"a".repeat(20)}`, `# maps\n${"b".repeat(20)}`]);
+    for (const message of messages) expect(message.length).toBeLessThanOrEqual(40);
+    headed.reset();
+  });
+
+  it("dispatch_fullLengthDigest_sentAsSingleAlertMessage", async () => {
+    const headed = createBotLogBatcher({ send, header: botLogHeader });
+    const digest = "d".repeat(REFEREE_DIGEST_LOG_MAX_LENGTH);
+    headed.add("k", digest, "referee-digest");
+    await headed.flush("k");
+    // Un programme complet, en-tête compris, part en une seule alerte.
+    expect(send.mock.calls).toEqual([[`🔔 Matchs à arbitrer\n${digest}`, "referee-digest"]]);
+    headed.reset();
   });
 });

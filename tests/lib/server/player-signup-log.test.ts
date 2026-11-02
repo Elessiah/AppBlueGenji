@@ -77,7 +77,10 @@ function fakeDb(rows: Row[]) {
   return { execute };
 }
 
-const lines = () => jest.mocked(sendBotLog).mock.calls.map((call) => String(call[0]));
+const lines = () => {
+  for (const call of jest.mocked(sendBotLog).mock.calls) expect(call[1]).toEqual({ category: "signups" });
+  return jest.mocked(sendBotLog).mock.calls.map((call) => String(call[0]));
+};
 
 beforeEach(() => {
   jest.clearAllMocks();

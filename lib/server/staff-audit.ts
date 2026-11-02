@@ -1,4 +1,5 @@
 import { sendBotLog } from "@/lib/server/bot-integration";
+import type { BotLogCategory } from "@/lib/shared/bot-log-category";
 import { staffAuditLine, type StaffActor } from "@/lib/shared/log-privacy";
 
 /**
@@ -13,12 +14,20 @@ import { staffAuditLine, type StaffActor } from "@/lib/shared/log-privacy";
  * geste dont le détail (manche, issue) n'a pas sa place sur Discord y reste
  * vague, et le détail ne vit que dans pm2.
  *
+ * `category` range la ligne dans son lot Discord (`admin` par défaut ; un lot ne
+ * mêle jamais deux catégories).
+ *
  * L'audit est écrit **avant** l'envoi et sans l'attendre : le bot est optionnel,
  * la trace de modération ne l'est pas. L'envoi Discord reste au meilleur effort.
  */
-export function publishStaffAction(discordLine: string, actor: StaffActor, auditLine: string = discordLine): void {
+export function publishStaffAction(
+  discordLine: string,
+  actor: StaffActor,
+  auditLine: string = discordLine,
+  category: BotLogCategory = "admin",
+): void {
   console.info(staffAuditLine(auditLine, actor));
-  void sendBotLog(discordLine).catch(() => undefined);
+  void sendBotLog(discordLine, { category }).catch(() => undefined);
 }
 
 /**

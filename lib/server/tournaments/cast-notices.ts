@@ -74,7 +74,7 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
       team2: match.team2,
       change: castLogChange(change),
     }),
-    { tournamentId: match.tournament.id },
+    { tournamentId: match.tournament.id, category: "casts" },
   );
 
   const notice = castReleaseNotice(change);

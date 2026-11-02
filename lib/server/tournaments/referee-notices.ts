@@ -110,7 +110,7 @@ export async function deliverRefereeChange(change: RefereeChange, options: Refer
       team2: match.team2,
       change: refereeLogChange(change),
     }),
-    { tournamentId: match.tournament.id },
+    { tournamentId: match.tournament.id, category: "referees" },
   );
   const notice = refereeReleaseNotice(change);
   if (!notice) {

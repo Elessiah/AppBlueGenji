@@ -218,7 +218,7 @@ async function notifyReferees(
     previousStartAt: change.previousStartAt,
     rescheduled: announcement.rescheduled,
   });
-  if (change.actor) publishStaffAction(line, change.actor);
+  if (change.actor) publishStaffAction(line, change.actor, undefined, "schedule");
   // Un match joué ne se rejouera pas : la date est une correction d'archive,
   // tracée au journal mais annoncée à personne (les joueurs non plus).
   if (!push || isPlayedMatchStatus(row.status)) return 0;
@@ -283,7 +283,7 @@ async function logScheduleCleared(
         ...logEntrants(row),
         previousStartAt: change.previousStartAt,
       }),
-      change.actor,
+      change.actor, undefined, "schedule",
     );
   }
   // Les arbitres avaient reçu « Match programmé » pour cet horaire : l'avis de

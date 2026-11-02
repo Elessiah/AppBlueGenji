@@ -42,6 +42,8 @@ import { ANONYMOUS_STAFF_LABEL, entrantLabel, type LogEntrant } from "./log-priv
 import { formatLabel, gameLabel } from "./tournament-labels";
 import type { TournamentFormat, TournamentGame } from "./types";
 import { discordInline } from "./discord-text";
+import { BOT_LOG_MESSAGE_MAX_CHARS } from "./bot-log-batch";
+import { botLogHeader } from "./bot-log-category";
 
 /** Tournoi désigné dans une ligne de journal. */
 export interface BotLogTournament {
@@ -316,9 +318,12 @@ export const REFEREE_DIGEST_LOG_ENTRIES = 12;
  * Longueur que la ligne du programme ne dépasse jamais. Discord refuse un
  * message de plus de 2 000 caractères — et le bot l'envoie tel quel, préfixé
  * (`[AppBlueGenji] `) : refusé, le programme serait perdu, ses marques déjà
- * posées. La marge couvre le préfixe.
+ * posées. La marge couvre le préfixe. Le lot du journal ouvre le message sur
+ * l'en-tête de la catégorie (`bot-log-category.ts`) : sa place (et le saut de
+ * ligne) est retirée ici, sans quoi un programme complet partirait en deux
+ * alertes.
  */
-export const REFEREE_DIGEST_LOG_MAX_LENGTH = 1900;
+export const REFEREE_DIGEST_LOG_MAX_LENGTH = BOT_LOG_MESSAGE_MAX_CHARS - botLogHeader("referee-digest").length - 1;
 
 let digestTimeFormat: Intl.DateTimeFormat | null = null;
 
