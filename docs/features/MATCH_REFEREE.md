@@ -53,11 +53,11 @@ première instruction ; un match joué (`MATCH_ALREADY_COMPLETED`) ou exempt
 | `POST /api/matches/[id]/referee` | « Je prends ce match » (`MATCH_ALREADY_REFEREED` si un arbitre éligible le tient ; celui d'un arbitre devenu inéligible est repris) | arbitre éligible |
 | `DELETE /api/matches/[id]/referee` | se retirer (`NOT_MATCH_REFEREE`) | l'arbitre lui-même |
 | `GET /api/admin/matches/[id]/referee` | fenêtre « Arbitrage » : arbitre nommé, candidats, autogestion, carte, manche | `can(user, "tournaments")` |
-| `PUT /api/admin/matches/[id]/referee` | désigner `{ userId }` ou retirer `{ userId: null }` | `tournaments` |
+| `PUT /api/admin/matches/[id]/referee` | désigner `{ userId }` ou retirer `{ userId: null }` ; `expectedUserId` (l'arbitre que la fenêtre affichait, `null` : aucun) refuse en 409 `REFEREE_CHANGED` un match changé entre-temps — la fenêtre se relit | `tournaments` |
 | `PUT /api/admin/matches/[id]/self-management` | autogestion du match `{ enabled }` | `tournaments` |
 | `PUT /api/admin/tournaments/[id]/self-management` | autogestion d'une manche entière `{ phaseId, roundNumber, bracket, enabled }` (`INVALID_ROUND`) | `tournaments` |
 | `PUT /api/admin/referees/[userId]/objection` | retenir `{ upheld: true }` ou lever `{ upheld: false }` l'opposition d'un arbitre (`INVALID_REFEREE_OBJECTION`, 404 `USER_NOT_FOUND`, 409 `NOT_REFEREE`) — voir « Opposition retenue » | `tournaments` |
-| `PUT /api/admin/matches/[id]/first-map` | première carte `{ map }`, vide = retirer (`INVALID_FIRST_MAP`, rattaché au champ ; 409 `ROUND_MAPS_SET` quand le tour a des cartes — la fenêtre les montre alors en lecture seule, `ROUND_MAPS.md`) | `tournaments` |
+| `PUT /api/admin/matches/[id]/first-map` | première carte `{ map }`, vide = retirer (`INVALID_FIRST_MAP`, rattaché au champ ; 409 `MATCH_NOT_LAUNCHABLE` sur une exemption ; 409 `ROUND_MAPS_SET` quand le tour a des cartes — la fenêtre les montre alors en lecture seule, `ROUND_MAPS.md`) | `tournaments` |
 
 Désigner un arbitre éteint l'autogestion ; l'allumer retire l'arbitre (prévenu,
 motif `SELF_MANAGED`). Les erreurs ne portent qu'un code (`fail`), traduites en
@@ -179,7 +179,9 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
   `refereeContactsOpen`). Son tag Discord certifié, par la lecture d'**un** match
   seulement (fenêtre « Contacts », page du match) et aux seules parties du
   match — jamais au rôle `REFEREE` ni dans la modale de lancement
-  (`MATCH_PAGE_CONNECT.md`). Carte `RefereeCard`
+  (`MATCH_PAGE_CONNECT.md`). L'arbitre désigné (`MATCH_REFEREE`) lit les
+  contacts des casters dès la phase de lancement, comme l'arbitre de plateforme
+  (`exposesCasterContacts`). Carte `RefereeCard`
   (`LaunchContactCards.tsx`), dans la modale de lancement et la fenêtre
   « Contacts ».
 - **Staff** : la fenêtre « Arbitrage » (action « Arbitrage » de la carte,
@@ -214,11 +216,17 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
   remplacement, retrait (par lui-même, par le staff, d'office), autogestion,
   première carte — **sans nommer l'arbitre ni le staff**, noms d'équipe (« un
   joueur » en tournoi individuel). L'autogestion d'une manche fait **une
-  ligne** (`formatRoundSelfManagementLog`), pas une par match.
+  ligne** (`formatRoundSelfManagementLog`), pas une par match — « Manche N »
+  sans tableau quand elle touche plusieurs tableaux. Elle verrouille le tournoi
+  puis lit ses matchs en une requête verrouillée, et ses avis partent l'un
+  après l'autre (`announceRefereeChanges`).
 - **Avis à l'arbitre retiré** par un autre que lui : sujet push
   `REFEREE_RELEASED` (audience `tournaments`), **push seul**, jamais de message
   privé, avec le motif (`STAFF`, `REPLACED`, `SELF_MANAGED`, `OBJECTION`, `INELIGIBLE`,
-  `JOINED_TEAM`). File d'après commit `queueRefereeChange` /
+  `JOINED_TEAM`). L'auteur du geste n'est jamais prévenu de son propre
+  retrait (`actorId` : un arbitre-staff qui se remplace ou passe son match en
+  autogestion). Une reprise par « Je prends ce match » donne le vrai motif :
+  `OBJECTION`, `JOINED_TEAM` ou `INELIGIBLE`. File d'après commit `queueRefereeChange` /
   `flushRefereeChanges`, vidée par `flushBotLogs` et jetée par `discardBotLogs`.
 - **Sans arbitre ni autogestion** à l'entrée en lancement : alerte
   `match_no_referee` au canal des arbitres et en push `REFEREE_ALERT`
@@ -235,7 +243,16 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
     plus puis « et N autres »), une ligne de journal et un push — un match de
     la manche entré en lancement plus tard (tableau à élimination) part dans
     une alerte de suite qui ne liste que lui, jamais ceux déjà signalés ;
-  - manche mixte : chaque match planifié a la sienne, les autres sont groupés.
+  - manche mixte : chaque match planifié a la sienne, les autres sont groupés ;
+  - une alerte de suite qui ne réserve **qu'un** match prend le texte et
+    l'étiquette push d'un match ; un match listé disparu entre la file et
+    l'envoi rend sa réservation, et le total « et N autres » ne compte que les
+    matchs encore à jouer ;
+  - jamais sans phase de lancement (le match part à la passe qui le verrait)
+    ni contre une équipe fantôme ; les réservations déjà posées se lisent en
+    une requête par passe (`withoutReservedAlerts`) ;
+  - un match qui part sans arbitre parce qu'on vient de le retirer avertit de
+    même (`launchIfAllReady`).
   Noms d'équipe sur Discord, « un joueur » pour une entrée solo.
 
 ## Seed

@@ -25,7 +25,13 @@ d'équipe et du pool de maps : des sections, sans emplacement vide.
   match (`matchPositionText` : « Manche R · Match N », précédé du tableau hors
   du tableau principal — « Tableau perdants · … »), adresse canonique sur la page
   du match ; la page sans compte reste `noindex`. Même place sous le titre de la
-  page. Une session illisible (base injoignable) n'est pas un 404.
+  page. Une session illisible (base injoignable) n'est pas un 404. Un match
+  introuvable garde l'encart **et la canonique** du tournoi (`/suivre/…` sans
+  compte), jamais celle d'une page en 404. Carte du tournoi et place du match
+  sont lues une fois par requête (`requestCache`, `lib/server/request-cache.ts` :
+  `cache` de React, identité sous Jest).
+- **Contacts** : la modale « Contacts » ouverte depuis la page reprend la
+  lecture de la page (`SharedMatchContactsContext`), sans seconde lecture.
 
 La page est rendue **dans la fiche** (`TournamentSheet`, prop `matchId`) : même
 flux temps réel (`useTournamentLive`, ou la relecture publique sans compte),
