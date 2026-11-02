@@ -367,7 +367,8 @@
       "maxLabel": "Effectif maximal",
       "matchFormat": "Format des matchs",
       "seeding": "Ordre de départ",
-      "launchPhase": "Phase de lancement des matchs"
+      "launchPhase": "Phase de lancement des matchs",
+      "teamVoice": "Salons vocaux d'équipe"
     },
     "conditions": {
       "minRoster": "Effectif minimal du roster",

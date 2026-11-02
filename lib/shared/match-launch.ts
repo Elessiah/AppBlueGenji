@@ -70,6 +70,13 @@ export type MatchLaunchInput = {
    * (`maintainMatchLaunches`) referme aussitôt en posant `launched_at`.
    */
   launchPhase?: boolean;
+  /**
+   * Salons vocaux d'équipe (`TournamentMatch.voice`, `docs/features/MATCH_VOICE.md`).
+   * Sans phase de lancement, un match dont le verrou tient (`pending`) n'est
+   * pas parti à son heure : il reste « en attente de départ ». Phase allumée,
+   * il reste en lancement — `launched_at` en décide déjà.
+   */
+  voice?: { pending: boolean } | null;
 };
 
 function isoTime(iso: string | null | undefined): number | null {
@@ -93,7 +100,8 @@ export function matchLaunchPhase(match: MatchLaunchInput, now: number): MatchLau
   const start = isoTime(match.startAt);
   if (start === null && match.refereeScheduling) return "TO_PLAN";
   if (start !== null && start > now) return "SCHEDULED";
-  return match.launchPhase === false ? "LAUNCHED" : "LOBBY";
+  if (match.launchPhase === false) return match.voice?.pending === true ? "SCHEDULED" : "LAUNCHED";
+  return "LOBBY";
 }
 
 /**
@@ -103,7 +111,11 @@ export function matchLaunchPhase(match: MatchLaunchInput, now: number): MatchLau
  * `TO_PLAN`, qui n'arrive que par la date que l'arbitrage pose.
  */
 export function nextLaunchPhaseChangeAt(match: MatchLaunchInput, now: number): number | null {
-  return matchLaunchPhase(match, now) === "SCHEDULED" ? isoTime(match.startAt) : null;
+  if (matchLaunchPhase(match, now) !== "SCHEDULED") return null;
+  // Retenu par ses salons vocaux, l'heure passée : c'est une écriture (salons
+  // pleins, lancement) qui le fera partir, et le flux l'annoncera.
+  const start = isoTime(match.startAt);
+  return start !== null && start > now ? start : null;
 }
 
 /**

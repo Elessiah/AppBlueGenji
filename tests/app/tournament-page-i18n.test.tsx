@@ -710,6 +710,23 @@ describe("français inchangé — les messages égalent les tables d'origine", (
     }
   });
 
+  it("réglages des règles : les salons vocaux d'équipe, dans les deux langues", () => {
+    for (const teamVoiceChannels of [false, true]) {
+      const input: TournamentSettingsInput = {
+        card: tournamentCard({ format: "SINGLE", teamVoiceChannels }),
+        phases: null,
+        swiss: null,
+        endurance: null,
+        seedingSource: "RANKING",
+      };
+      const fr = settingsGroupsFrom(input, "fr", messagesFor("fr"));
+      expect(fr).toEqual(tournamentSettingsGroups(input));
+      expect(JSON.stringify(fr)).toContain(`"Salons vocaux d'équipe","value":"${teamVoiceChannels ? "Oui" : "Non"}"`);
+      const en = JSON.stringify(localizedTournamentSettingsGroups(input, "en", messagesFor("en")));
+      expect(en).toContain(`"Team voice channels","value":"${teamVoiceChannels ? "Yes" : "No"}"`);
+    }
+  });
+
   it("réglages des règles : la sortie anticipée de BG Survie, sous plafond, dans les deux langues", () => {
     for (const earlyExit of [false, true]) {
       const input: TournamentSettingsInput = {

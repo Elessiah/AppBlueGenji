@@ -224,6 +224,16 @@ describe("Schéma — la règle des deux endroits", () => {
     );
   });
 
+  // Salons vocaux d'équipe (`MATCH_VOICE.md`) : éteints sur tout tournoi existant.
+  it("schema_teamVoiceChannels_addedOffInBothPlacesWithItsTable", () => {
+    expect(table("bg_tournaments")).toMatch(/team_voice_channels TINYINT\(1\) NOT NULL DEFAULT 0/);
+    expect(migrations).toMatch(
+      /ALTER TABLE bg_tournaments ADD COLUMN team_voice_channels TINYINT\(1\) NOT NULL DEFAULT 0/,
+    );
+    expect(table("bg_match_voice_channels")).toMatch(/PRIMARY KEY \(match_id, team_id\)/);
+    expect(table("bg_match_voice_channels")).toMatch(/members TINYINT UNSIGNED NULL/);
+  });
+
   // Facultative : `NULL` reprend la valeur française sous `/en`, rien à remplir.
   it("ajoute la valeur anglaise des chiffres de l'association, aux deux endroits", () => {
     expect(table("bg_about_stats")).toMatch(/value_en VARCHAR\(40\) NULL/);

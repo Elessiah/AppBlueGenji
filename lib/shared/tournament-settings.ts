@@ -43,6 +43,7 @@ export type TournamentSettingsInput = {
     | "endurancePlayoffFormat"
     | "registrationFilters"
     | "launchPhase"
+    | "teamVoiceChannels"
   >;
   phases: TournamentPhase[] | null;
   swiss: Pick<SwissMeta, "totalRounds" | "pointsForWin" | "pointsForDraw" | "pointsForLoss" | "pointsForBye"> | null;
@@ -189,6 +190,7 @@ export function tournamentSettingsGroups(input: TournamentSettingsInput): Tourna
     { label: "Format des matchs", value: matchFormatSettingLabel(card.matchFormat) },
     { label: "Ordre de départ", value: SEEDING_LABELS[input.seedingSource] },
     { label: "Phase de lancement des matchs", value: yesNo(card.launchPhase) },
+    { label: "Salons vocaux d'équipe", value: yesNo(card.teamVoiceChannels) },
   ];
 
   const conditions: TournamentSetting[] = [];

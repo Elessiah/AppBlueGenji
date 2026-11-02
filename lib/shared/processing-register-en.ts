@@ -42,6 +42,16 @@ import {
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { SITE_HOST } from "@/lib/shared/site-host";
 import {
+  VOICE_BOT_ABANDONED_MAX_HOURS,
+  VOICE_BOT_RELEASED_MAX_HOURS,
+  VOICE_BOT_SWEEP_MINUTES,
+  VOICE_BOT_UNRELEASED_MAX_HOURS,
+  VOICE_CHANNEL_CAPACITY,
+  VOICE_CHANNEL_LEAD_MINUTES,
+  VOICE_ROW_RETENTION_DAYS,
+  VOICE_SWEEP_THROTTLE_SECONDS,
+} from "@/lib/shared/match-voice";
+import {
   SITE_VISIT_DETAIL_RETENTION_DAYS,
   SITE_VISIT_WINDOW_MINUTES,
   SITE_VISITOR_RETENTION_MONTHS,
@@ -327,7 +337,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Refereeing schedule: about 10 hours ahead, the upcoming matches (times, tournaments, team names; “a player” in a solo tournament)",
       "Match casts: a caster's registration for a match and its removal (by themselves, by the staff or automatically, with the reason), without naming the caster or the staff — and without any trace in the server logs",
       "Match refereeing: an assigned referee taking a match, being assigned it by the staff or removed from it (by themselves, by the staff or automatically, with the reason), self-management of a match or of a whole round (one line per round), first map set or cleared, map picked from the round pool or pick cleared — without naming the referee or the staff; a referee's objection upheld or lifted by the staff: a single line, naming no one nor the matches they are removed from (no line per match)",
-      "Other staff actions on matches and tournaments: result confirmed or score saved by the referees, forced launch, lobby host set or removed, a match's broadcast settings, putting on air or taking off air, replay link, tournament edited, seeding order, next stage brought forward, ghost teams registered (their number), a tournament's image and broadcast link — the action, the tournament and the match (the tournament alone for a score that pauses the automatic confirmation), without naming its author (“the staff”, or “a caster” for a broadcast action by someone who only holds that permission) or the link set; this line adds nothing to the server logs (a dispute settled or a result corrected keeps there the short named trace described in the first line (traceability of refereeing actions), as does a paused automatic confirmation), except, when it could not be composed, the action and the match or tournament number, without its author",
+      "Other staff actions on matches and tournaments: result confirmed or score saved by the referees, forced launch, lobby host set or removed, a match's broadcast settings, putting on air or taking off air, replay link, tournament edited, “Team voice channels” option turned on or off, seeding order, next stage brought forward, ghost teams registered (their number), a tournament's image and broadcast link — the action, the tournament and the match (the tournament alone for a score that pauses the automatic confirmation), without naming its author (“the staff”, or “a caster” for a broadcast action by someone who only holds that permission) or the link set; this line adds nothing to the server logs (a dispute settled or a result corrected keeps there the short named trace described in the first line (traceability of refereeing actions), as does a paused automatic confirmation), except, when it could not be composed, the action and the match or tournament number, without its author",
       "Platform roles: an administrator granting or removing a role (administrator, referee, caster, community manager, recruiter), including on their own account, where they cannot remove their own administration — one line naming no one; in the server logs, its author, the identifier of the account concerned and the roles saved",
     ],
     legalBasis:
@@ -419,8 +429,9 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Activity statistics (/stats command, which shows each person only their own activity; the bot's dashboard)",
       "Confirming memberships of the association and scheduled reminders on its servers",
       "Delivering the site's messages: codes (written by the bot in the account language the site sends it), match times and reminders, notices of removal from a match (“Match retiré”), the lobby settings of a match sent to those who manage its entrants and the notice sent to a caster whose registration for a match is removed by someone else (these match messages to certified Discord tags only), moderation notices (report naming the person, logo hidden, removed or deleted, avatar hidden, removed or restored, suspension of the account and its lifting), requests to join a team and information about data by direct message, without being kept by the bot; refereeing alerts, reports and the site's activity log (without player usernames) posted in the staff's private log channel, refereeing alerts also sent to the members of the refereeing role of each server that has set one; announcement of the streamed matches posted in the #live channel of the association's server, in one message per evening edited at each match start and end, with an @everyone mention for the official channel or a mention of the StreamViewer role only for any other channel (team names or, in a solo tournament, the players' public BlueGenji username — processing activity T16)",
+      "Team voice channels for matches, in tournaments with that option: creation named after the team, count of the people present (a number, never who) and deletion; to count, voice presence of the members of the association's server held in memory only (processing activity T18, which gives its data and periods)",
     ],
-    legalBasis: "Legitimate interest (operating, moderating and measuring the relay between partner servers); the site's messages fall under the basis of their original processing",
+    legalBasis: "Legitimate interest (operating, moderating and measuring the relay between partner servers); the site's messages fall under the basis of their original processing; team voice channels fall under T18",
     dataSubjects: [
       "Discord users of the servers where the bot is installed",
       "Administrators and moderators of these servers",
@@ -777,6 +788,53 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     security: [
       ...COMMON_SECURITY_EN,
       "Logs readable only by the server's administrator, never exposed by the site",
+    ],
+  },
+  {
+    ref: "T18",
+    name: "Team voice channels for matches",
+    purpose:
+      "Gathering each team of a match in a dedicated Discord voice channel before it starts, and only launching the match once those channels are full, in tournaments with the “Team voice channels” option only (off by default)",
+    subPurposes: [
+      `Asking the association's Discord bot, from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before a match's time (or as soon as the option is turned on, for a match already within that window), for a ${VOICE_CHANNEL_CAPACITY}-seat voice channel per team in its server's match category, named after the team — never for a solo entry (its name would be a username) nor for a match against a ghost team`,
+      `Having the bot count the people present in each channel, to hold the match's launch until both are full (referees can force it; if the bot doesn't answer, the match doesn't wait), and showing “Voice channel: n/${VOICE_CHANNEL_CAPACITY}” to the match's parties (members of both teams, casters) and to staff`,
+      "Handing the channels back to the bot when the match is finished (score confirmed), cancelled, back to waiting or taken off the schedule, when the team leaves the pairing, or when the tournament ends or turns the option off; the bot deletes a channel as soon as it is empty",
+    ],
+    legalBasis:
+      "Legitimate interest (smooth running of tournaments: gathering each team before its match); joining a channel remains a choice — but until both are full, the match waits for referees to force its launch —, and only the presence of those who join it is counted",
+    dataSubjects: [
+      "Members of the teams playing a match",
+      "Anyone who joins a team voice channel on the association's Discord server",
+      "Members of the association's Discord server present in one of its voice channels, whose presence the bot holds in memory to count",
+      "Members of the other servers the bot is on, present in one of their voice channels: only the member profile attached to their voice state is kept in memory",
+    ],
+    dataCategories: [
+      "Discord identifier of each team's channel for a match, numbers of the match and team, number of people present at the last count and the time of that count, time of any bot outage, creation and hand-back times of the channel — never who is present",
+      "Team name, sent to the bot to name the channel",
+      "Voice state (Discord identifier of the member and of their voice session, channel they are in, microphone or sound muted by them or by moderation, screen sharing or camera on, request to speak and stage suppression), with the member profile Discord attaches to it (their profile on the server, including username, nickname, avatar, roles, join and boost dates, timeout), of the members of the association's Discord server, held in memory by the bot to count, never recorded nor sent to the site",
+      "The bot's record of the channel: channel identifier, key of the match and team (numbers, no name), creation and hand-back times",
+    ],
+    sensitiveData: "None",
+    retention: [
+      `The channel's record on the site (identifier, numbers, number of people and times): until the channel is handed back to the bot, then ${VOICE_ROW_RETENTION_DAYS} days, erased by the next sweep, apart from the encrypted backup copies (T09, ${BACKUP_RETENTION_DAYS} days at most)`,
+      `Channel on Discord: deleted by the bot as soon as it is empty once handed back, within ${VOICE_BOT_RELEASED_MAX_HOURS} hours and ${VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest even if occupied (sweep every ${VOICE_BOT_SWEEP_MINUTES} minutes, while the bot is running), unless Discord prevents it (permission removed, error): it then retries at every sweep, and if it forgets the channel (record below), the channel stays until the server's moderation deletes it; a channel never handed back is deleted by the bot if it is empty ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation or its reuse, and stays while it is occupied; moved out of the match category, the bot stops tracking it without deleting it (it then falls to the server's moderation, and a new channel is opened for the team if its match has not launched yet, as after a deletion by moderation or the bot forgetting it); a rescheduled match keeps its channels until they are handed back`,
+      "Voice state: held in memory by the bot at all times, whether or not a tournament has the option on, kept up to date with what Discord sends it, and lost when it stops; never recorded by the bot nor sent to the site — that of the other servers it is on is not kept (the attached member profile is, in memory only, kept up to date by Discord and lost when it stops)",
+      `The bot's record of the channel: erased with the channel; forgotten ${VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation or its reuse if the bot can no longer read the channel; kept with no limit while the channel, never handed back, stays occupied, or while it reads it without being able to delete it or while Discord answers with another error; apart from the encrypted backup copies (T09, ${BACKUP_RETENTION_DAYS} days at most)`,
+      `The bot's other periods (apart from the ceiling of a handed-back channel, which includes it): each holds to within one sweep (at most ${VOICE_BOT_SWEEP_MINUTES} minutes more)`,
+      "The server's audit log on Discord: creation and deletion of each channel, with its name, for the period Discord sets",
+    ],
+    recipients: [
+      "Members of both teams of a match, its casters and staff, to whom the match page displays the number of people in each channel",
+      "Other signed-in members, who can read that number in the tournament's data — a visitor without an account only reads there whether the match is still waiting for its channels, never the number",
+      "Members of the association's Discord server allowed in the match category, who see the channel and its occupants on Discord",
+      "Administration of the association's Discord server, which reads in Discord's audit log the creation and deletion of each channel, with its name",
+      "Discord (execution platform)",
+    ],
+    transfers: [`United States: Discord — ${transferBasisEn(["DISCORD"])}`],
+    security: [
+      ...COMMON_SECURITY_EN,
+      "A number only: neither the identifier nor the username of the people present is requested from the bot, received or logged by the site",
+      `A channel's count is only requested from the bot by the server's sweep, at most once every ${VOICE_SWEEP_THROTTLE_SECONDS} seconds (immediately when referees change the option), never for each viewer`,
     ],
   },
 ];

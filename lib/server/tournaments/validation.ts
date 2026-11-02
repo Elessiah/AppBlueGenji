@@ -189,6 +189,8 @@ export type TournamentInputBody = {
   refereeScheduling?: boolean | null;
   /** Phase de lancement des matchs ; absente = option éteinte (le défaut). */
   launchPhase?: boolean | null;
+  /** Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) ; absent = éteint. */
+  teamVoiceChannels?: boolean | null;
 };
 
 export type ValidatedTournamentInput = {
@@ -242,6 +244,8 @@ export type ValidatedTournamentInput = {
   refereeScheduling: boolean;
   /** Phase de lancement des matchs — « Prêt », modale (`docs/features/MATCH_LAUNCH.md`). */
   launchPhase: boolean;
+  /** Salons vocaux d'équipe avant chaque match (`docs/features/MATCH_VOICE.md`). */
+  teamVoiceChannels: boolean;
 };
 
 /** Issue d'un contrôle : un code d'erreur, ou la valeur validée. */
@@ -322,6 +326,7 @@ export function validateTournamentInput(
       registrationFilters: registration.value,
       refereeScheduling: body.refereeScheduling === true,
       launchPhase: body.launchPhase === true,
+      teamVoiceChannels: body.teamVoiceChannels === true,
       // Les phases ne concernent que le format MULTI : on ne les transmet pas
       // aux autres formats, même si le client en a envoyé. Voir le
       // commentaire du champ `phases` de `ValidatedTournamentInput` ci-dessus :
@@ -462,6 +467,13 @@ function validateRegistrationSettings(body: TournamentInputBody): Checked<Regist
   }
   if (body.launchPhase !== undefined && body.launchPhase !== null && typeof body.launchPhase !== "boolean") {
     return { error: "INVALID_LAUNCH_PHASE" };
+  }
+  if (
+    body.teamVoiceChannels !== undefined &&
+    body.teamVoiceChannels !== null &&
+    typeof body.teamVoiceChannels !== "boolean"
+  ) {
+    return { error: "INVALID_TEAM_VOICE_CHANNELS" };
   }
   const registrationFilters: RegistrationFilters = {
     discordRequirement: isPlayerRequirement(body.registrationDiscordRequirement)

@@ -40,7 +40,7 @@ export function editLockNotice(
 ): string | null {
   if (reason === null) return null;
   if (reason === "STARTED") {
-    return "Le tournoi est en cours : seule la planification des matchs par l'arbitrage reste modifiable.";
+    return "Le tournoi est en cours : seules la planification des matchs par l'arbitrage et les salons vocaux d'équipe restent modifiables.";
   }
   return `Le tournoi est visible depuis le ${formatLocalDateTime(startVisibilityAt)} — le format, le jeu et les réglages ne sont plus modifiables.`;
 }

@@ -105,6 +105,13 @@ export const MATCH_CONTACTS_READ_RULE: RateLimitRule = {
   windowMs: 60_000,
 };
 
+/** Compteur des salons vocaux d'un match, relu toutes les 10 s par sa page tant que le verrou tient. */
+export const MATCH_VOICE_READ_RULE: RateLimitRule = {
+  name: "match-voice-read",
+  limit: 30,
+  windowMs: 60_000,
+};
+
 /**
  * Horaires de match posés, changés ou retirés par un arbitre : chaque geste
  * écrit aux joueurs des deux engagées (message privé Discord, push) et pousse

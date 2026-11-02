@@ -99,7 +99,8 @@ async function loadEditRow(
       match_format_max_maps, match_format_draws,
       endurance_playoff_format_type, endurance_playoff_format_value,
       registration_discord_requirement, registration_blizzard_requirement,
-      registration_min_players, referee_scheduling, match_launch_phase
+      registration_min_players, referee_scheduling, match_launch_phase,
+      team_voice_channels
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
@@ -207,6 +208,8 @@ export type EditableTournamentLoad = {
   values: EditableTournamentValues;
   state: TournamentState;
   refereeScheduling: boolean;
+  /** Salons vocaux d'équipe — route dédiée `voice-channels`, comme la planification. */
+  teamVoiceChannels: boolean;
 };
 
 export async function loadEditableTournament(
@@ -232,6 +235,7 @@ export async function loadEditableTournament(
       values,
       state: row.state as TournamentState,
       refereeScheduling: Boolean(row.referee_scheduling),
+      teamVoiceChannels: Number(row.team_voice_channels) === 1,
     };
   } finally {
     connection.release();

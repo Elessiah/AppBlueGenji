@@ -41,11 +41,12 @@ describe("TournamentForm — tournoi lancé", () => {
   });
 
   it.each<[TournamentFormat]>([["SINGLE"], ["DOUBLE"], ["SWISS"], ["SURVIVAL"], ["BG_SURVIE"], ["MULTI"]])(
-    "ne laisse que la case de planification modifiable (%s)",
+    "ne laisse que les cases de planification et de salons vocaux modifiables (%s)",
     (format) => {
       const enabled = enabledFields(renderLocked(format));
-      expect(enabled).toHaveLength(1);
+      expect(enabled).toHaveLength(2);
       expect(enabled[0]).toContain('id="referee-scheduling"');
+      expect(enabled[1]).toContain('id="team-voice-channels"');
     },
   );
 

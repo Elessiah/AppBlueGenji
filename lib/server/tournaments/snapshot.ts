@@ -65,6 +65,7 @@ import { applyMapRules } from "@/lib/shared/round-maps";
 import { loadMapRules } from "./round-maps";
 import { applicableTiebreaks } from "@/lib/shared/round-plan";
 import { withoutRefereeKeys } from "./referee-names";
+import { loadMatchVoiceInfos } from "./match-voice";
 
 /**
  * Durée de vie d'un instantané. Volontairement courte : elle ne sert qu'à
@@ -504,6 +505,13 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
       ), mapRules),
       await loadMapsByMatch(connection, matchIds),
     );
+    // Salons vocaux d'équipe : une lecture pour tout le plateau, aucune
+    // option éteinte (`docs/features/MATCH_VOICE.md`). Dans l'instantané
+    // commun — un nombre de personnes, jamais qui —, servi par les deux portes.
+    const voiceByMatch = await loadMatchVoiceInfos(connection, tournamentId, card.teamVoiceChannels, mappedMatches);
+    if (voiceByMatch.size > 0) {
+      for (const match of mappedMatches) match.voice = voiceByMatch.get(match.id) ?? null;
+    }
     const phases = phasesDetail?.phases ?? null;
     const currentPhaseId = phasesDetail?.currentPhaseId ?? null;
 

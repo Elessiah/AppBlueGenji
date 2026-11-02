@@ -28,6 +28,16 @@ import {
   SITE_VISITOR_RETENTION_MONTHS,
 } from "@/lib/shared/site-visits";
 import { SITE_HOST } from "@/lib/shared/site-host";
+import {
+  VOICE_BOT_ABANDONED_MAX_HOURS,
+  VOICE_BOT_RELEASED_MAX_HOURS,
+  VOICE_BOT_SWEEP_MINUTES,
+  VOICE_BOT_UNRELEASED_MAX_HOURS,
+  VOICE_CHANNEL_CAPACITY,
+  VOICE_CHANNEL_LEAD_MINUTES,
+  VOICE_ROW_RETENTION_DAYS,
+  VOICE_SWEEP_THROTTLE_SECONDS,
+} from "@/lib/shared/match-voice";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION, copyrightNoticeElementsText } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
@@ -504,7 +514,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Programme d'arbitrage : environ 10 h à l'avance, les matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel)",
       "Casts des matchs : l'inscription d'un caster sur un match et son retrait (par lui-même, par le staff ou d'office, avec le motif), sans nommer le caster ni le staff — et sans trace dans les journaux du serveur",
       "Arbitrage des matchs : arbitre désigné qui prend un match, à qui le staff le confie ou qui en est retiré (par lui-même, par le staff ou d'office, avec le motif), autogestion d'un match ou d'une manche entière (une ligne par manche), première carte posée ou retirée, carte choisie dans le pool de la manche ou choix retiré — sans nommer l'arbitre ni le staff ; l'opposition d'un arbitre retenue ou levée par le staff : une seule ligne, sans nommer personne ni les matchs dont il est retiré (aucune ligne par match)",
-      "Autres gestes du staff sur les matchs et tournois : résultat validé ou score enregistré par l'arbitrage, lancement forcé, hôte du salon désigné ou retiré, réglage de la diffusion d'un match, mise à l'antenne ou retrait, lien de rediffusion, modification d'un tournoi, ordre des têtes de série, étape suivante avancée, équipes fantômes inscrites (leur nombre), image et lien de diffusion d'un tournoi — le geste, le tournoi et le match (le tournoi seul pour un score qui suspend la validation automatique), sans nommer son auteur (« le staff », ou « un caster » pour un geste de diffusion de qui n'a que cette permission) ni le lien posé ; cette ligne n'ajoute rien aux journaux du serveur (un litige tranché ou un résultat corrigé y garde la trace courte nominative décrite à la première ligne (traçabilité des gestes d'arbitrage), comme une validation automatique suspendue), sauf, quand elle n'a pu être rédigée, le geste et le numéro du match ou du tournoi, sans auteur",
+      "Autres gestes du staff sur les matchs et tournois : résultat validé ou score enregistré par l'arbitrage, lancement forcé, hôte du salon désigné ou retiré, réglage de la diffusion d'un match, mise à l'antenne ou retrait, lien de rediffusion, modification d'un tournoi, option « Salons vocaux d'équipe » allumée ou éteinte, ordre des têtes de série, étape suivante avancée, équipes fantômes inscrites (leur nombre), image et lien de diffusion d'un tournoi — le geste, le tournoi et le match (le tournoi seul pour un score qui suspend la validation automatique), sans nommer son auteur (« le staff », ou « un caster » pour un geste de diffusion de qui n'a que cette permission) ni le lien posé ; cette ligne n'ajoute rien aux journaux du serveur (un litige tranché ou un résultat corrigé y garde la trace courte nominative décrite à la première ligne (traçabilité des gestes d'arbitrage), comme une validation automatique suspendue), sauf, quand elle n'a pu être rédigée, le geste et le numéro du match ou du tournoi, sans auteur",
       "Rôles de plateforme : attribution ou retrait d'un rôle (administrateur, arbitre, caster, community manager, recruteur) par un administrateur, y compris sur son propre compte, où il ne peut pas se retirer l'administration — une ligne sans nommer personne ; dans les journaux du serveur, son auteur, l'identifiant du compte visé et les rôles enregistrés",
     ],
     legalBasis:
@@ -596,8 +606,9 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Statistiques d'activité (commande /stats, qui ne montre à chacun que sa propre activité ; tableau de bord du bot)",
       "Confirmation des adhésions à l'association et rappels programmés sur ses serveurs",
       "Remise des messages du site : codes (rédigés par le bot dans la langue du compte que le site lui transmet), horaires et rappels de match, avis de retrait d'un match (« Match retiré »), réglages du salon d'un match envoyés à ceux qui gèrent ses engagées et avis envoyé à un caster dont l'inscription est retirée par un autre que lui (ces messages de match aux seuls tags Discord certifiés), avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé, avatar masqué, retiré ou rétabli, suspension du compte et sa levée), demandes d'adhésion à une équipe et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un ; annonce des matchs diffusés publiée dans le salon #live du serveur de l'association, en un message par soirée modifié à chaque début et fin de match, avec une mention @everyone pour la chaîne officielle ou du seul rôle StreamViewer pour toute autre chaîne (noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs — traitement T16)",
+      "Salons vocaux d'équipe des matchs, dans les tournois qui en ont l'option : création au nom de l'équipe, comptage des personnes présentes (un nombre, jamais qui) et suppression ; pour compter, présence vocale des membres du serveur de l'association tenue en mémoire seulement (traitement T18, qui en donne les données et les durées)",
     ],
-    legalBasis: "Intérêt légitime (faire fonctionner, modérer et mesurer le relais entre serveurs partenaires) ; les messages du site relèvent de la base de leur traitement d'origine",
+    legalBasis: "Intérêt légitime (faire fonctionner, modérer et mesurer le relais entre serveurs partenaires) ; les messages du site relèvent de la base de leur traitement d'origine ; les salons vocaux d'équipe relèvent de T18",
     dataSubjects: [
       "Utilisateurs Discord des serveurs où le bot est installé",
       "Administrateurs et modérateurs de ces serveurs",
@@ -960,6 +971,53 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     security: [
       ...COMMON_SECURITY,
       "Journaux lisibles du seul administrateur du serveur, jamais exposés par le site",
+    ],
+  },
+  {
+    ref: "T18",
+    name: "Salons vocaux d'équipe des matchs",
+    purpose:
+      "Réunir chaque équipe d'un match dans un salon vocal Discord dédié avant son départ, et ne lancer le match qu'une fois ces salons pleins, dans les seuls tournois qui ont l'option « Salons vocaux d'équipe » (éteinte par défaut)",
+    subPurposes: [
+      `Demander au bot Discord de l'association, à partir de ${VOICE_CHANNEL_LEAD_MINUTES} minutes avant l'heure d'un match (ou dès l'option allumée, pour un match déjà dans ce délai), un salon vocal de ${VOICE_CHANNEL_CAPACITY} places par équipe dans la catégorie des matchs de son serveur, au nom de l'équipe — jamais pour une entrée en tournoi individuel (son nom serait un pseudo) ni pour un match contre une équipe fantôme`,
+      `Faire compter par le bot le nombre de personnes présentes dans chaque salon, pour retenir le lancement du match jusqu'à ce que les deux soient pleins (l'arbitrage peut le forcer ; si le bot ne répond pas, le match n'attend pas), et montrer « Salon vocal : n/${VOICE_CHANNEL_CAPACITY} » aux parties du match (membres des deux équipes, casters) et au staff`,
+      "Rendre les salons au bot quand le match est terminé (score validé), annulé, retombé en attente ou sorti du programme, quand l'équipe sort de l'appariement, ou quand le tournoi se termine ou éteint l'option ; le bot supprime un salon dès qu'il est vide",
+    ],
+    legalBasis:
+      "Intérêt légitime (bon déroulement des tournois : réunir chaque équipe avant son match) ; rejoindre un salon reste un choix — mais tant que les deux ne sont pas pleins, le match attend que l'arbitrage force son lancement —, et seule la présence de qui le rejoint est comptée",
+    dataSubjects: [
+      "Membres des équipes engagées dans un match",
+      "Toute personne qui rejoint un salon vocal d'équipe sur le serveur Discord de l'association",
+      "Membres du serveur Discord de l'association présents dans l'un de ses salons vocaux, dont le bot tient la présence en mémoire pour compter",
+      "Membres des autres serveurs où le bot est présent, présents dans l'un de leurs salons vocaux : seule la fiche de membre jointe à leur état vocal est gardée en mémoire",
+    ],
+    dataCategories: [
+      "Identifiant Discord du salon de chaque équipe d'un match, numéros du match et de l'équipe, nombre de personnes présentes au dernier comptage et heure de ce comptage, heure d'une éventuelle panne du bot, heures de création et de rendu du salon — jamais qui est présent",
+      "Nom de l'équipe, transmis au bot pour nommer le salon",
+      "État vocal (identifiant Discord du membre et de sa session vocale, salon où il se trouve, micro ou son coupés par lui ou par la modération, partage d'écran ou caméra actifs, demande de parole et mise en sourdine de scène), avec la fiche de membre que Discord y joint (sa fiche sur le serveur, dont pseudo, surnom, avatar, rôles, dates d'arrivée et de boost, exclusion temporaire), des membres du serveur Discord de l'association, tenu en mémoire par le bot pour compter, jamais enregistré ni transmis au site",
+      "Fiche du salon chez le bot : identifiant du salon, clé du match et de l'équipe (des numéros, aucun nom), heures de création et de rendu",
+    ],
+    sensitiveData: "Aucune",
+    retention: [
+      `Ligne du salon sur le site (identifiant, numéros, nombre de personnes et heures) : jusqu'à ce que le salon soit rendu au bot, puis ${VOICE_ROW_RETENTION_DAYS} jours, effacée par le balayage suivant, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus)`,
+      `Salon sur Discord : supprimé par le bot dès qu'il est vide une fois rendu, au plus tard ${VOICE_BOT_RELEASED_MAX_HOURS} heures et ${VOICE_BOT_SWEEP_MINUTES} minutes après son rendu même occupé (balayage toutes les ${VOICE_BOT_SWEEP_MINUTES} minutes, bot en marche), sauf si Discord l'en empêche (droit retiré, erreur) : il réessaie alors à chaque balayage, et s'il oublie le salon (fiche ci-dessous), celui-ci reste jusqu'à ce que la modération du serveur le supprime ; un salon jamais rendu est supprimé par le bot s'il est vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise, et reste tant qu'il est occupé ; déplacé hors de la catégorie des matchs, le bot cesse de le suivre sans le supprimer (il relève alors de la modération du serveur, et un nouveau salon est ouvert à l'équipe si son match n'est pas encore lancé, comme après une suppression par la modération ou un oubli par le bot) ; un match reporté garde ses salons jusqu'à leur rendu`,
+      "État vocal : tenu en mémoire par le bot en permanence, que l'option soit allumée ou non dans un tournoi, à jour de ce que Discord lui transmet, et perdu à son arrêt ; jamais enregistré par le bot ni transmis au site — celui des autres serveurs où il est présent n'est pas gardé (la fiche de membre jointe l'est, en mémoire seulement, à jour de Discord et perdue à son arrêt)",
+      `Fiche du salon chez le bot : effacée avec le salon ; oubliée ${VOICE_BOT_ABANDONED_MAX_HOURS} heures après sa création ou sa reprise si le bot ne peut plus lire le salon ; gardée sans limite tant que le salon, jamais rendu, reste occupé, ou qu'il le lit sans pouvoir le supprimer ou que Discord répond par une autre erreur ; hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus)`,
+      `Autres délais du bot (hors le plafond d'un salon rendu, qui l'inclut) : chacun s'entend à un balayage près (au plus ${VOICE_BOT_SWEEP_MINUTES} minutes de plus)`,
+      "Journal d'audit du serveur sur Discord : création et suppression de chaque salon, avec son nom, pour la durée que Discord fixe",
+    ],
+    recipients: [
+      "Membres des deux équipes d'un match, ses casters et le staff, à qui la page du match affiche le nombre de personnes de chaque salon",
+      "Autres membres connectés, qui peuvent lire ce nombre dans les données du tournoi — un visiteur sans compte n'y lit que si le match attend encore ses salons, jamais le nombre",
+      "Membres du serveur Discord de l'association autorisés dans la catégorie des matchs, qui voient le salon et ses occupants sur Discord",
+      "Administration du serveur Discord de l'association, qui lit dans le journal d'audit de Discord la création et la suppression de chaque salon, avec son nom",
+      "Discord (plateforme d'exécution)",
+    ],
+    transfers: [`États-Unis : Discord — ${transferBasis(["DISCORD"])}`],
+    security: [
+      ...COMMON_SECURITY,
+      "Un nombre seulement : ni identifiant ni pseudo des personnes présentes n'est demandé au bot, reçu ou journalisé par le site",
+      `Le compte d'un salon n'est demandé au bot que par le balayage du serveur, au plus une fois toutes les ${VOICE_SWEEP_THROTTLE_SECONDS} secondes (aussitôt quand l'arbitrage change l'option), jamais pour chaque lecteur`,
     ],
   },
 ];

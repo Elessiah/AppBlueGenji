@@ -730,6 +730,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: nothing new is collected, and none of this enters what the site broadcasts to every viewer of a tournament.",
     ],
   },
+  "2026-11-salons-vocaux-equipe": {
+    linkLabels: ["Read the “Team voice channels” paragraph"],
+    title: "Team voice channels before matches",
+    summary:
+      "A tournament can now open, from fifteen minutes before each match, a 5-seat Discord voice channel per team, and only launch the match once both channels are full: the bot counts the people present, and the site keeps the channel, its number and its times, never who.",
+    details: [
+      "What changes: in a tournament with the “Team voice channels” option (off by default), the association's bot creates a voice channel named after each team of a match, from 15 minutes before its time — never for a solo entry nor for a match against a ghost team. The match waits until both channels are full (referees can force it; if the bot doesn't answer, it doesn't wait), and its page shows “Voice channel: 3/5” to its teams, its casters and staff (any signed-in member can also read that number; a visitor without an account only sees whether the match is waiting for its channels).",
+      "What is processed: to count, the bot holds in memory at all times (option on or not), without ever recording it, the voice state (Discord identifier of the member and of their voice session, channel they are in, microphone or sound muted by them or by moderation, screen sharing or camera on, request to speak and stage suppression), with the member profile Discord attaches to it, of the members of the association's Discord server, and keeps for each channel a record with no name (identifier, numbers of the match and team, times); the site only receives and keeps the channel's identifier, the numbers of the match and team, that number and the times of the count (or of a bot outage), of creation and of hand-back, erased a week after the channel was handed back (match finished, score confirmed, cancelled, back to waiting or taken off the schedule, team out of the pairing, tournament ended or option turned off). The bot deletes the channel as soon as it empties once handed back, within 24 and a half hours at the latest (while the bot is running, unless Discord prevents it: it retries at every sweep). This rests on legitimate interest (smooth running of tournaments); joining a channel remains a choice, but until both are full, the match waits for referees to force its launch. You can object to this processing (section “Your rights” of the privacy page).",
+    ],
+  },
 };
 
 /**

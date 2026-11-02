@@ -61,6 +61,7 @@ const loaded: EditableTournamentLoad = {
   values,
   state: "UPCOMING",
   refereeScheduling: false,
+  teamVoiceChannels: false,
 };
 
 beforeEach(() => {

@@ -284,6 +284,13 @@ describe("ce que lit le visiteur sans compte", () => {
     expect(played.replayUrl).toBe(url);
   });
 
+  it("spectatorSnapshot_voice_stripsCountsKeepsPending", () => {
+    const snapshot = tournamentSnapshot({
+      matches: [bracketMatch({ id: 1, voice: { team1Members: 3, team2Members: 5, pending: true } })],
+    });
+    expect(spectatorSnapshot(snapshot).matches[0].voice).toEqual({ team1Members: null, team2Members: null, pending: true });
+  });
+
   it("retire les codes de replay, réservés aux membres connectés", () => {
     const snapshot = tournamentSnapshot({
       matches: [bracketMatch({ id: 1, maps, team1Report: report, team2Report: null })],
@@ -526,6 +533,8 @@ const MATCH_FIELDS = {
   team2Score: "public",
   tournamentId: "public",
   updatedAt: "public",
+  // Salons vocaux (MATCH_VOICE.md) : le verrou part, le remplissage est retiré.
+  voice: "parcouru",
   winnerTeamId: "public",
 } as const satisfies Record<keyof BracketMatch, Disposition>;
 
@@ -608,6 +617,7 @@ const CARD_FIELDS = {
   state: "public",
   survivalRoundsBeforeFirstCut: "public",
   survivalRoundsPerCut: "public",
+  teamVoiceChannels: "public",
 } as const satisfies Record<keyof TournamentCard, Disposition>;
 
 const PHASE_FIELDS = {

@@ -185,6 +185,7 @@ import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
+import { dispatchMatchVoiceChannels } from "./match-voice";
 import { dispatchDueRoundMapsNotices } from "./round-maps-notice";
 import { dispatchMatchStartNotices, notifyScoreToConfirm } from "./player-pushes";
 import { dispatchLobbyBriefs } from "./lobby-brief";
@@ -362,6 +363,8 @@ export async function createTournament(
     refereeScheduling?: boolean | null;
     /** Phase de lancement des matchs ; absente = option éteinte (le défaut). */
     launchPhase?: boolean | null;
+    /** Salons vocaux d'équipe ; absents = option éteinte (le défaut). */
+    teamVoiceChannels?: boolean | null;
   },
 ): Promise<number> {
   const db = await getDatabase();
@@ -491,8 +494,9 @@ export async function createTournament(
         registration_blizzard_requirement,
         registration_min_players,
         referee_scheduling,
-        match_launch_phase
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        match_launch_phase,
+        team_voice_channels
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         organizerUserId,
         payload.name.trim(),
@@ -539,6 +543,7 @@ export async function createTournament(
         registrationFilters.minPlayers,
         Number(payload.refereeScheduling === true),
         Number(payload.launchPhase === true),
+        Number(payload.teamVoiceChannels === true),
       ],
     );
 
@@ -654,6 +659,9 @@ export async function listTournamentBuckets(
   void dispatchDueRoundMapsNotices().catch(() => undefined);
   // Et le brief du salon des managers (`./lobby-brief`), ouvert au même moment.
   void dispatchLobbyBriefs().catch(() => undefined);
+  // Et les salons vocaux d'équipe (`./match-voice`) : création à T−15, comptage
+  // des salons qui retiennent un lancement, libération après le score.
+  void dispatchMatchVoiceChannels();
   // Et pour l'annonce des lives : le mode `START_TIME` passe à l'antenne à
   // l'heure dite, sans aucune écriture.
   void dispatchLiveAnnouncements().catch(() => undefined);
@@ -758,6 +766,7 @@ async function loadTournamentBuckets(
       t.registration_min_players,
       t.referee_scheduling,
       t.match_launch_phase,
+      t.team_voice_channels,
       t.live_url,
       t.image_url,
       t.image_fit,
@@ -799,6 +808,7 @@ async function loadTournamentBuckets(
       t.registration_min_players,
       t.referee_scheduling,
       t.match_launch_phase,
+      t.team_voice_channels,
       t.live_url,
       t.image_url,
       t.image_fit,

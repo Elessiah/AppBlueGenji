@@ -367,7 +367,8 @@
       "maxLabel": "Maximum entrants",
       "matchFormat": "Match format",
       "seeding": "Starting order",
-      "launchPhase": "Match launch phase"
+      "launchPhase": "Match launch phase",
+      "teamVoice": "Team voice channels"
     },
     "conditions": {
       "minRoster": "Minimum roster size",
