@@ -138,7 +138,7 @@
     "recruitmentTitle": "Recruitment",
     "openToOffers": "Open to team offers",
     "recruitmentHint": "Ticked, you show up in the directory's “Free agents” filter, marked “FREE AGENT”, as long as you have no team. Unticked by default.",
-    "battletagNotice": "Unticked, your BattleTag stays readable, in an Overwatch tournament, in the “Contacts” window of your matches, in their launch window and, if you cast or referee a match, on its page."
+    "battletagNotice": "Unticked, your BattleTag stays readable, in an Overwatch tournament, in the “Contacts” window of your matches, in their launch window and on the match page (to its parties)."
   },
   "save": "Save",
   "saved": "Profile updated.",
@@ -475,11 +475,11 @@
       "footer": "Nobody else."
     },
     "battletag": {
-      "title": "Hidden, your BattleTag can only be read in the “Contacts” window of your Overwatch matches, in their launch window and, if you cast or referee an Overwatch match, on its page:",
+      "title": "Hidden, your BattleTag can only be read in the “Contacts” window of your Overwatch matches, in their launch window and on the match page:",
       "match": "if you're shown as a contact (“Contacts” and launch windows): the members of both teams, referees and administrators, from the moment the opponents are known until the end of the match, and the casters while the match is being played;",
       "asCaster": "if you cast a match: both its teams and its other casters while the match is being played, and referees and administrators from the moment its opponents are known until its end;",
-      "asReferee": "if you are the assigned referee of a match: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played (you can withdraw from a match at any time; erasing your BattleTag would remove your refereeing, which requires the one from Battle.net);",
-      "launch": "the launch window only opens for both teams, the casters and the assigned referee; the match page repeats the BattleTag of its casters and its assigned referee, to the same people at the same times as the “Contacts” window.",
+      "asReferee": "if you are the assigned referee of a match: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played — both its teams only while the match is being played if you also cast it (you can withdraw from a match at any time; erasing your BattleTag would remove your refereeing, which requires the one from Battle.net);",
+      "launch": "the launch window only opens for both teams, the casters and the assigned referee; the match page repeats the BattleTag of its team contacts (to the parties to the match alone), its casters and its assigned referee, to the same people at the same times as the “Contacts” window.",
       "footer": "To stop sharing it entirely, clear it from your profile (if it comes from Battle.net, unlink Battle.net first, after adding another way to log in if it is your only one)."
     }
   }

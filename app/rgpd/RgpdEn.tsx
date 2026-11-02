@@ -879,7 +879,7 @@ export function RgpdEn({
             contacts: to both teams and to the referees as soon as both its opponents are known until its end, to
             its casters while the match is being played; the username alone appears there as soon as the launch
             window shows the match. Their certified Discord tag is also presented, in the “Contacts” window and on the match page, to the parties to the match alone (both its teams, its casters), at the same times as their BattleTag — never to referees with no role in that match nor in the launch window (if they also
-            cast the match, their caster contacts follow the casters&apos; rule). The staff who manage tournaments read at any time, in a match&apos;s “Refereeing” window, the username of its assigned referee and of the accounts that can referee. Any signed-in member also reads their username alone (never their BattleTag) on the card and
+            cast the match, their tag and BattleTag follow the casters&apos; rule: both its teams and its casters read them only while the match is being played). The staff who manage tournaments read at any time, in a match&apos;s “Refereeing” window, the username of its assigned referee and of the accounts that can referee. Any signed-in member also reads their username alone (never their BattleTag) on the card and
             page of a match, until its score is reported or the tournament ends; visitors without an account only read “Referee assigned”. Their “Ready” is
             expected like those of the teams and casters; only the parties to the match and the referees read it, in the
             “Contacts” and launch windows. If they no longer meet these requirements or become

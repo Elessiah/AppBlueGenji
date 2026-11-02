@@ -58,7 +58,7 @@ describe("HIDDEN_BATTLETAG_AUDIENCE", () => {
   // lisait comme un lieu de plus ; le qualificatif porte sur les matchs.
   it("hiddenBattletagAudience_title_namesOverwatchMatchesNotAPlace", () => {
     expect(HIDDEN_BATTLETAG_AUDIENCE.title).toContain("fenêtre « Contacts » de tes matchs Overwatch");
-    expect(HIDDEN_BATTLETAG_AUDIENCE.title).toContain("si tu castes ou arbitres un match Overwatch");
+    expect(HIDDEN_BATTLETAG_AUDIENCE.title).toContain("sur la page du match");
     expect(HIDDEN_BATTLETAG_AUDIENCE.title).not.toContain("ne se lit plus que dans un tournoi Overwatch,");
   });
 

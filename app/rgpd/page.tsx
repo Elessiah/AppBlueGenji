@@ -1063,7 +1063,7 @@ function RgpdFr({
             contacts du match : aux deux équipes et aux arbitres dès que ses deux adversaires sont connus et
             jusqu&apos;à sa fin, à ses casters le temps du match ; le pseudo seul y paraît dès que la fenêtre de
             lancement montre le match. Son tag Discord certifié est aussi présenté, dans la fenêtre « Contacts » et sur la page du match, aux seules parties du match (ses deux équipes, ses casters), aux mêmes moments que son BattleTag — jamais aux arbitres sans rôle sur ce match ni dans la fenêtre de lancement (s&apos;il caste aussi le
-            match, ses contacts de caster suivent la règle des casters). Le staff qui gère les tournois lit à tout moment, dans la fenêtre « Arbitrage » d&apos;un match, le pseudo de son arbitre désigné et des comptes qui peuvent arbitrer. Tout membre connecté lit aussi son pseudo seul (jamais son BattleTag) sur la carte et la page
+            match, son tag et son BattleTag suivent la règle des casters : ses deux équipes comme ses casters ne les lisent que le temps du match). Le staff qui gère les tournois lit à tout moment, dans la fenêtre « Arbitrage » d&apos;un match, le pseudo de son arbitre désigné et des comptes qui peuvent arbitrer. Tout membre connecté lit aussi son pseudo seul (jamais son BattleTag) sur la carte et la page
             d&apos;un match, jusqu&apos;à la déclaration de son score ou la fin du tournoi ; les visiteurs sans compte ne lisent que « Arbitre désigné ». Son
             « Prêt » est attendu comme celui des équipes et des casters ; seuls les parties du match et les arbitres le lisent, dans les
             fenêtres « Contacts » et de lancement. S&apos;il ne remplit plus ces conditions ou
