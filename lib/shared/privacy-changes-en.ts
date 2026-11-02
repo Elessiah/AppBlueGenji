@@ -740,6 +740,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What is processed: to count, the bot holds in memory at all times (option on or not), without ever recording it, the voice state (Discord identifier of the member and of their voice session, channel they are in, microphone or sound muted by them or by moderation, screen sharing or camera on, request to speak and stage suppression), with the member profile Discord attaches to it, of the members of the association's Discord server, and keeps for each channel a record with no name (identifier, numbers of the match and team, times); the site only receives and keeps the channel's identifier, the numbers of the match and team, that number and the times of the count (or of a bot outage), of creation and of hand-back, erased a week after the channel was handed back (match finished, score confirmed, cancelled, back to waiting or taken off the schedule, team out of the pairing, tournament ended or option turned off). The bot deletes the channel as soon as it empties once handed back, within 24 and a half hours at the latest (while the bot is running, unless Discord prevents it: it retries at every sweep). This rests on legitimate interest (smooth running of tournaments); joining a channel remains a choice, but until both are full, the match waits for referees to force its launch. You can object to this processing (section “Your rights” of the privacy page).",
     ],
   },
+  "2026-11-suppression-inscription-solo-et-fiche": {
+    linkLabels: ["Read what deletion removes"],
+    title: "Account deletion: upcoming solo registrations and the player page",
+    summary:
+      "If nothing else keeps it, deleting your account now erases it entirely even if you're registered for a solo tournament that hasn't started yet: the registration is withdrawn with it. And a deleted account's page only stays visible if it played at least one match.",
+    details: [
+      "Solo registrations: a registration for a solo tournament that hasn't started yet, where you played no match, no longer keeps your account under a borrowed username — if nothing else keeps it (a match played, a team owned, a tournament organized, an entry in a solo tournament that has already started or ended), it is erased entirely and the registration withdrawn from the tournament; otherwise, the registration stays, under a borrowed username. Once the tournament has started or ended, the entrant stays, under a borrowed username, as before.",
+      "Player page: a deleted account's page, under its borrowed username, is now kept only if it played at least one match (its statistics also belong to its opponents); otherwise the page is not found, and its name is shown without a link.",
+      "What doesn't change: nothing new is collected; the traces left after any deletion (including encrypted backups, deletion log, connection data, audience measurement) are the same.",
+    ],
+  },
 };
 
 /**

@@ -230,10 +230,10 @@
     "ownedTeamsFromTerms": "Depuis cette fenêtre, transférer ou dissoudre ton équipe demande d'abord d'accepter les conditions d'utilisation. Sans les accepter, tu peux demander à l'association un effacement complet (« Exercer vos droits », dans la politique de confidentialité).",
     "consequences": {
       "TOURNAMENTS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées.",
-      "SOLO_REGISTRATIONS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es inscrit à un tournoi individuel, où ton pseudo sert de nom d'engagé et sera remplacé par ce pseudo d'emprunt.",
+      "SOLO_REGISTRATIONS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es engagé dans un tournoi individuel déjà commencé ou terminé, où ton pseudo sert de nom d'engagé et sera remplacé par ce pseudo d'emprunt.",
       "ORGANIZED_TOURNAMENTS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es l'organisateur de tournois qui doivent garder un titulaire.",
       "OWNED_TEAMS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet.",
-      "NONE": "Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte et ton profil seront effacés entièrement.",
+      "NONE": "Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte et ton profil seront effacés entièrement, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées.",
       "UNKNOWN": "Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, inscription à un tournoi individuel, équipe possédée, tournoi organisé), il sera rendu anonyme ou effacé entièrement."
     },
     "outcome": {
@@ -241,7 +241,7 @@
       "SOLO_REGISTRATIONS": "Compte supprimé. Tes inscriptions en tournoi individuel portent désormais un pseudo d'emprunt.",
       "ORGANIZED_TOURNAMENTS": "Compte supprimé. Tes tournois gardent un organisateur anonyme.",
       "OWNED_TEAMS": "Compte supprimé. Ton équipe garde un propriétaire anonyme.",
-      "NONE": "Compte effacé. Ton compte et ton profil ont disparu du site ; seules restent les traces décrites par la politique de confidentialité et son registre (sauvegardes, journal des suppressions, mesure d'audience).",
+      "NONE": "Compte effacé. Ton compte, ton profil et tes éventuelles inscriptions à venir en tournoi individuel ont disparu du site ; seules restent les traces décrites par la politique de confidentialité et son registre (sauvegardes, journal des suppressions, mesure d'audience).",
       "UNKNOWN": "Compte supprimé."
     },
     "errors": {

@@ -177,6 +177,11 @@ Détail, données et apparence : `PODIUM_TIERS.md`.
   `team_id` derrière.
 - **Le ticker** de l'accueil : des chaînes de caractères composées côté serveur.
 
+**Compte supprimé sans fiche (D13)** : `PlayerLink` et `EntrantLink` (entrée
+solo) rendent le nom en texte quand le compte supprimé n'a joué aucun match —
+sa fiche répond 404. La liste vient du layout racine
+(`ProfilelessPlayersProvider`, `useHasPlayerPage`) → `ACCOUNT_DELETION.md`.
+
 ## Fichiers
 
 | Rôle | Fichier |

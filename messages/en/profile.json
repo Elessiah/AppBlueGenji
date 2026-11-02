@@ -230,10 +230,10 @@
     "ownedTeamsFromTerms": "From this window, transferring or disbanding your team first requires accepting the terms of use. Without accepting them, you can ask the association for a complete erasure (“Exercising your rights”, in the privacy policy).",
     "consequences": {
       "TOURNAMENTS": "Your personal information will be erased and your username replaced with a placeholder one, but your tournament statistics will be kept — they also belong to the teams you played against.",
-      "SOLO_REGISTRATIONS": "Your personal information will be erased and your username replaced with a placeholder one, but your record will remain: you're registered for a solo tournament, where your username serves as the entrant's name and will be replaced by that placeholder.",
+      "SOLO_REGISTRATIONS": "Your personal information will be erased and your username replaced with a placeholder one, but your record will remain: you're an entrant in a solo tournament that has already started or ended, where your username serves as the entrant's name and will be replaced by that placeholder.",
       "ORGANIZED_TOURNAMENTS": "Your personal information will be erased and your username replaced with a placeholder one, but your record will remain: you're the organizer of tournaments that must keep an owner.",
       "OWNED_TEAMS": "Your personal information will be erased and your username replaced with a placeholder one, but your record will remain: you own a team that nobody could manage without you. Transfer or disband it first for a complete erasure.",
-      "NONE": "You haven't played any match and you manage no team or tournament: your account and profile will be erased entirely.",
+      "NONE": "You haven't played any match and you manage no team or tournament: your account and profile will be erased entirely, and any registrations you have for solo tournaments that haven't started yet will be withdrawn.",
       "UNKNOWN": "The site couldn't tell what will remain: depending on what you left behind (a match played, a solo tournament registration, a team owned, a tournament organized), it will be anonymized or erased entirely."
     },
     "outcome": {
@@ -241,7 +241,7 @@
       "SOLO_REGISTRATIONS": "Account deleted. Your solo tournament registrations now carry a placeholder username.",
       "ORGANIZED_TOURNAMENTS": "Account deleted. Your tournaments keep an anonymous organizer.",
       "OWNED_TEAMS": "Account deleted. Your team keeps an anonymous owner.",
-      "NONE": "Account erased. Your account and profile are gone from the site; only the traces described in the privacy policy and its register remain (backups, deletion log, audience measurement).",
+      "NONE": "Account erased. Your account, profile and any upcoming solo tournament registrations are gone from the site; only the traces described in the privacy policy and its register remain (backups, deletion log, audience measurement).",
       "UNKNOWN": "Account deleted."
     },
     "errors": {

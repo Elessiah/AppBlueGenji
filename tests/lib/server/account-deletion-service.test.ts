@@ -10,7 +10,7 @@ import { deleteOwnAccount, getAccountDeletionPlan } from "@/lib/server/users/acc
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
-import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { fakePool } from "../../helpers/sql-double";
 import { clearCache } from "@/lib/server/cache";
 import { LANDING_STATS_KEY, LANDING_TICKER_KEY, LANDING_TTL_MS, cachedLanding } from "@/lib/server/landing-cache";
@@ -29,6 +29,46 @@ import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
 type Query = { sql: string; params: unknown[] };
 
 type Trace = { played: number; solo_registered: number; organized: number; owned: number };
+
+/** Une inscription de l'entrée solo, telle que `loadSoloRegistrations` la lit. */
+type SoloRegistrationRow = {
+  tournament_id: number;
+  team_id: number;
+  state: "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
+  finished_at: string | null;
+  registration_open_at: string;
+  registration_close_at: string;
+  start_at: string;
+  has_match: number;
+};
+
+/** Inscriptions ouvertes, tournoi dans dix jours : la fenêtre de retrait d'un engagé. */
+const UPCOMING_REGISTRATION: SoloRegistrationRow = {
+  tournament_id: 40,
+  team_id: 900,
+  state: "REGISTRATION",
+  finished_at: null,
+  registration_open_at: new Date(Date.now() - 86_400_000).toISOString(),
+  registration_close_at: new Date(Date.now() + 9 * 86_400_000).toISOString(),
+  start_at: new Date(Date.now() + 10 * 86_400_000).toISOString(),
+  has_match: 0,
+};
+
+/** Tournoi en cours : le plateau est tiré, l'inscription retient la ligne. */
+const STARTED_REGISTRATION: SoloRegistrationRow = {
+  ...UPCOMING_REGISTRATION,
+  tournament_id: 41,
+  state: "RUNNING",
+  registration_open_at: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+  registration_close_at: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+  start_at: new Date(Date.now() - 86_400_000).toISOString(),
+};
+
+/**
+ * Les instructions de la **transaction** : sans le relevé des tournois de
+ * l'entrée solo, lu sur le pool avant elle (le double partage `execute`).
+ */
+const inTransaction = (queries: Query[]) => queries.filter((q) => !q.sql.startsWith("SELECT DISTINCT r.tournament_id"));
 
 /**
  * La base, et la transaction qui la porte.
@@ -49,8 +89,17 @@ function fakeDb(
     duplicatePseudos?: string[];
     /** Matchs que le compte arbitre (`withdrawUserCasts`), avec leur tournoi. */
     refereed?: { matchId: number; tournamentId: number }[];
+    /**
+     * Inscriptions de l'entrée solo (`loadSoloRegistrations`). Par défaut, une
+     * inscription à un tournoi **commencé** quand la trace dit `solo_registered`
+     * — celle qui retient la ligne —, aucune sinon.
+     */
+    soloRegistrations?: SoloRegistrationRow[];
+    /** Tournois rendus par le relevé d'avant la transaction ; par défaut, ceux des inscriptions. */
+    listedTournaments?: number[];
   } = {},
 ) {
+  const soloRegistrations = options.soloRegistrations ?? (trace.solo_registered ? [STARTED_REGISTRATION] : []);
   const queries: Query[] = [];
   const avatarUrl = options.avatarUrl ?? null;
 
@@ -68,6 +117,11 @@ function fakeDb(
       }
     }
     if (q.includes("AS played")) return [[trace]];
+    if (q.startsWith("SELECT DISTINCT r.tournament_id")) {
+      const listed = options.listedTournaments ?? [...new Set(soloRegistrations.map((row) => row.tournament_id))];
+      return [listed.map((id) => ({ tournament_id: id }))];
+    }
+    if (q.startsWith("SELECT r.tournament_id, r.team_id, t.state")) return [soloRegistrations];
     if (q.startsWith("SELECT id AS match_id FROM bg_matches WHERE referee_user_id = ?")) {
       return [(options.refereed ?? []).map((match) => ({ match_id: match.matchId }))];
     }
@@ -147,7 +201,7 @@ describe("deleteOwnAccount — effacement complet", () => {
 describe("deleteOwnAccount — traces qui retiennent la ligne", () => {
   it.each([
     ["un tournoi joué", { ...EMPTY, played: 1 }, "TOURNAMENTS"],
-    ["une inscription solo jamais jouée", { ...EMPTY, solo_registered: 1 }, "SOLO_REGISTRATIONS"],
+    ["une inscription solo à un tournoi commencé", { ...EMPTY, solo_registered: 1 }, "SOLO_REGISTRATIONS"],
     ["un tournoi organisé", { ...EMPTY, organized: 1 }, "ORGANIZED_TOURNAMENTS"],
     ["une équipe possédée", { ...EMPTY, owned: 1 }, "OWNED_TEAMS"],
   ])("anonymise sur %s, et le dit", async (_label, trace, reason) => {
@@ -241,9 +295,10 @@ describe("deleteOwnAccount — les défis de connexion par message privé", () =
     // La lecture verrouillante rend l'identifiant en même temps que l'avatar :
     // une seconde lecture, après l'écriture, ne trouverait plus rien — la ligne
     // est partie (effacement) ou vidée de son `discord_id` (anonymisation).
-    const locked = queries.findIndex((q) => q.sql.includes("FOR UPDATE"));
+    const tx = inTransaction(queries);
+    const locked = tx.findIndex((q) => q.sql.includes("FOR UPDATE"));
     expect(locked).toBe(0);
-    expect(queries[0].sql).toContain("discord_id");
+    expect(tx[0].sql).toContain("discord_id");
   });
 
   it("n'écrit rien quand le compte n'a jamais eu de Discord", async () => {
@@ -484,8 +539,9 @@ describe("loadAccountTrace — ce qu'on interroge", () => {
 
     await deleteOwnAccount(7);
 
-    const lock = queries.findIndex((q) => q.sql.includes("FOR UPDATE"));
-    const trace = queries.findIndex((q) => q.sql.includes("AS played"));
+    const tx = inTransaction(queries);
+    const lock = tx.findIndex((q) => q.sql.includes("FOR UPDATE"));
+    const trace = tx.findIndex((q) => q.sql.includes("AS played"));
     expect(lock).toBe(0);
     expect(trace).toBeGreaterThan(lock);
   });
@@ -507,8 +563,9 @@ describe("deleteOwnAccount — transaction et verrou", () => {
     await deleteOwnAccount(7);
 
     expect(connection.beginTransaction).toHaveBeenCalled();
-    expect(queries[0].sql).toContain("FOR UPDATE");
-    expect(queries[0].sql).toContain("FROM bg_users");
+    const tx = inTransaction(queries);
+    expect(tx[0].sql).toContain("FOR UPDATE");
+    expect(tx[0].sql).toContain("FROM bg_users");
     expect(connection.commit).toHaveBeenCalled();
     expect(connection.rollback).not.toHaveBeenCalled();
     expect(connection.release).toHaveBeenCalled();
@@ -697,5 +754,99 @@ describe("deleteOwnAccount — les matchs qui le nommaient sont rafraîchis", ()
     fakeDb({ ...EMPTY, played: 1 }, { refereed: [{ matchId: 5, tournamentId: 3 }], failOn: "UPDATE bg_users SET pseudo" });
     await expect(deleteOwnAccount(7)).rejects.toThrow();
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+});
+
+// D12 : l'inscription solo jamais jouée à un tournoi pas encore commencé part
+// avec le compte, sous le verrou des tournois concernés.
+describe("deleteOwnAccount — inscription solo à un tournoi pas encore commencé (D12)", () => {
+  const SOLO_ONLY = { ...EMPTY, solo_registered: 1 };
+
+  it("deleteOwnAccount_onlyUpcomingSoloRegistration_erasesAndWithdrawsRegistration", async () => {
+    const { queries } = fakeDb(SOLO_ONLY, { soloRegistrations: [UPCOMING_REGISTRATION] });
+
+    const plan = await deleteOwnAccount(7);
+
+    expect(plan).toEqual({ mode: "ERASE", reason: null });
+    const withdrawal = queries.find((q) => q.sql.startsWith("DELETE FROM bg_tournament_registrations"));
+    expect(withdrawal?.params).toEqual([40, 900]);
+    expect(has(queries, "SELECT r.team_id, t.name AS team_name, r.seed")).toBe(true);
+    expect(has(queries, "DELETE FROM bg_users WHERE id = ?")).toBe(true);
+    expect(has(queries, "UPDATE bg_users SET pseudo = ?")).toBe(false);
+  });
+
+  it("deleteOwnAccount_soloTournaments_locksTournamentRowsFirstInIdOrderThenAccount", async () => {
+    const { queries } = fakeDb(SOLO_ONLY, {
+      soloRegistrations: [UPCOMING_REGISTRATION, { ...UPCOMING_REGISTRATION, tournament_id: 42 }],
+    });
+
+    await deleteOwnAccount(7);
+
+    const tx = inTransaction(queries);
+    expect(tx[0]).toEqual({ sql: "SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE", params: [40] });
+    expect(tx[1]).toEqual({ sql: "SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE", params: [42] });
+    expect(tx[2].sql).toContain("FROM bg_users WHERE id = ? FOR UPDATE");
+    expect(tx[3].sql).toContain("AS played");
+  });
+
+  it("deleteOwnAccount_registrationInUnlockedTournament_anonymizes", async () => {
+    // Relevé : tournoi 40 seulement ; sous le verrou, une inscription au 43 est
+    // apparue entre-temps — son tournoi n'est pas tenu.
+    const { queries } = fakeDb(SOLO_ONLY, {
+      soloRegistrations: [UPCOMING_REGISTRATION, { ...UPCOMING_REGISTRATION, tournament_id: 43 }],
+      listedTournaments: [40],
+    });
+
+    const plan = await deleteOwnAccount(7);
+
+    expect(plan).toEqual({ mode: "ANONYMIZE", reason: "SOLO_REGISTRATIONS" });
+    expect(has(queries, "DELETE FROM bg_tournament_registrations")).toBe(false);
+  });
+
+  it("deleteOwnAccount_startedSoloRegistration_anonymizesAndKeepsRegistration", async () => {
+    const { queries } = fakeDb(SOLO_ONLY, { soloRegistrations: [STARTED_REGISTRATION] });
+
+    expect(await deleteOwnAccount(7)).toEqual({ mode: "ANONYMIZE", reason: "SOLO_REGISTRATIONS" });
+    expect(has(queries, "DELETE FROM bg_tournament_registrations")).toBe(false);
+  });
+
+  it("deleteOwnAccount_upcomingSoloButPlayedMatches_anonymizesAndKeepsRegistration", async () => {
+    const { queries } = fakeDb({ ...SOLO_ONLY, played: 1 }, { soloRegistrations: [UPCOMING_REGISTRATION] });
+
+    expect(await deleteOwnAccount(7)).toEqual({ mode: "ANONYMIZE", reason: "TOURNAMENTS" });
+    expect(has(queries, "DELETE FROM bg_tournament_registrations")).toBe(false);
+  });
+
+  it("deleteOwnAccount_upcomingSoloAndOwnedTeam_anonymizesAndKeepsRegistration", async () => {
+    const { queries } = fakeDb({ ...SOLO_ONLY, owned: 1 }, { soloRegistrations: [UPCOMING_REGISTRATION] });
+
+    expect(await deleteOwnAccount(7)).toEqual({ mode: "ANONYMIZE", reason: "OWNED_TEAMS" });
+    expect(has(queries, "DELETE FROM bg_tournament_registrations")).toBe(false);
+  });
+
+  it("deleteOwnAccount_withdrawnRegistration_publishesTournamentUpdateAfterCommit", async () => {
+    const { connection } = fakeDb(SOLO_ONLY, { soloRegistrations: [UPCOMING_REGISTRATION] });
+    jest.mocked(publishUpdatedEvent).mockImplementation(() => {
+      expect(connection.commit).toHaveBeenCalled();
+    });
+
+    await deleteOwnAccount(7);
+
+    expect(jest.mocked(publishUpdatedEvent).mock.calls).toEqual([[40]]);
+  });
+
+  it("deleteOwnAccount_rolledBackWithdrawal_publishesNothing", async () => {
+    fakeDb(SOLO_ONLY, { soloRegistrations: [UPCOMING_REGISTRATION], failOn: "DELETE FROM bg_users" });
+
+    await expect(deleteOwnAccount(7)).rejects.toThrow("DB_DOWN");
+
+    expect(publishUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("getAccountDeletionPlan_onlyUpcomingSoloRegistration_returnsEraseWithoutWriting", async () => {
+    const { queries } = fakeDb(SOLO_ONLY, { soloRegistrations: [UPCOMING_REGISTRATION] });
+
+    expect(await getAccountDeletionPlan(7)).toEqual({ mode: "ERASE", reason: null });
+    expect(queries.every((q) => q.sql.startsWith("SELECT"))).toBe(true);
   });
 });

@@ -95,6 +95,7 @@ describe("users-service admin management", () => {
       const execute = jest
         .fn<SqlQuery>()
         .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 0, is_deleted: 1, platform_roles_json: null })]])
+        .mockResolvedValueOnce([[{ played: 1 }]]) // D13 : il a joué, sa fiche reste
         .mockResolvedValueOnce([[]])
         .mockResolvedValueOnce([[]])
         .mockResolvedValueOnce([[]]);

@@ -77,6 +77,7 @@ describe("deleteOwnAccount — journal des suppressions", () => {
   it("ne consigne rien pour un compte introuvable", async () => {
     fakeDb();
     jest.mocked(getDatabase).mockResolvedValue(fakePool({
+      execute: jest.fn(async () => [[]]),
       getConnection: jest.fn(async () => ({
         execute: jest.fn(async () => [[]]),
         beginTransaction: jest.fn(async () => {}),

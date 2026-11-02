@@ -14,6 +14,7 @@ import type { FullProfileResponse, PublicUserProfile, UserTeamTimeline } from "@
 import { applyVisibility, mapPublicUser, type UserRow } from "./players";
 import { accountLocaleFromRow } from "./account-locale";
 import { matchDmEnabled } from "./match-dm-preference";
+import { deletedAccountHasStats } from "./profileless-players";
 
 /*
  * Fiche complète d'un joueur telle que la voit son lecteur — lui-même, le
@@ -74,6 +75,9 @@ export async function getPlayerPageIdentity(userId: number): Promise<PlayerPageI
     [userId],
   );
   if (rows.length === 0) return null;
+  // Un compte supprimé sans statistiques n'a plus de fiche (D13) : l'onglet ne
+  // le nomme pas davantage que la page.
+  if (Boolean(rows[0].is_deleted) && !(await deletedAccountHasStats(userId))) return null;
   return { pseudo: withoutInvisibles(rows[0].pseudo), isDeleted: Boolean(rows[0].is_deleted) };
 }
 
@@ -90,6 +94,11 @@ export type ProfileViewer = {
  */
 function ownerOnlyColumns(isSelf: boolean): string {
   return isSelf ? "match_dm_enabled," : "";
+}
+
+/** Vrai pour un compte supprimé qui n'a joué aucun match : il n'a plus de fiche (D13). */
+async function hasNoPlayerPage(isDeleted: boolean, userId: number): Promise<boolean> {
+  return isDeleted && !(await deletedAccountHasStats(userId));
 }
 
 export async function getFullProfile(
@@ -137,6 +146,11 @@ export async function getFullProfile(
 
   const isSelf = viewerId === targetUserId;
   const isDeleted = Boolean(userRows[0].is_deleted);
+  // La fiche d'un compte supprimé ne reste que s'il a joué (décision D13) : ses
+  // statistiques appartiennent aussi à ses adversaires. Sinon elle répond comme
+  // un compte inconnu (404), et les liens qui y menaient sont du texte
+  // (`profileless-players`).
+  if (await hasNoPlayerPage(isDeleted, targetUserId)) return null;
   // Un compte supprimé n'a plus de titre de staff à afficher : l'anonymisation
   // les efface en base, et `reconcileDeletedAccounts` rattrape les comptes
   // supprimés avant la règle — la lecture n'a pas de cas particulier à tenir.
