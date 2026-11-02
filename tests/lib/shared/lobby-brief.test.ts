@@ -315,6 +315,28 @@ describe("lobbyBriefPush", () => {
     expect(en).toContain('Left (host): “A" · B”');
   });
 
+  it("lobbyBriefPush_whitespaceOnlyMap_fallsBackToNotSetYet", () => {
+    expect(lobbyBriefPush(side({ firstMap: "   " })).body).toContain("1re carte : pas encore fixée.");
+    expect(lobbyBriefPush(side({ firstMap: "  	" }), "en").body).toContain("1st map: not set yet.");
+  });
+
+  it("lobbyBriefPush_nameWithOtherQuoteMarks_cannotCloseTheQuotation", () => {
+    const push = lobbyBriefPush(side({ teamName: "A„ B‟ C‹ D›" }));
+
+    expect(push.body).toContain('Gauche (hôte) : « A" B" C" D" » ·');
+  });
+
+  it("formatLobbyBriefDm_blankOrInvisibleFirstMap_fallsBackToNotSetYet", () => {
+    expect(formatLobbyBriefDm(side({ firstMap: "" }), URL)).toContain("Première carte : pas encore fixée");
+    expect(formatLobbyBriefDm(side({ firstMap: "​‮ " }), URL, "en")).toContain("First map: not set yet");
+  });
+
+  it("formatLobbyBriefDm_nameWithOtherQuoteMarks_cannotCloseTheQuotation", () => {
+    const dm = formatLobbyBriefDm(side({ teamName: "A„ B‹ C›" }), URL);
+
+    expect(dm).toContain('Gauche (hôte) : « A" B" C" »');
+  });
+
   it("matchStartPush_bidiOverrideInStoredNames_strippedFromBody", () => {
     const push = matchStartPush(
       { tournamentId: 4, tournamentName: "Cou\u202Epe", matchId: 40, teamName: "Ren\u202Eards", opponentName: "Nova" },

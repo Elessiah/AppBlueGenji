@@ -7,14 +7,15 @@
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { discordInline } from "@/lib/shared/discord-text";
 import { localizedSiteUrl } from "@/lib/shared/dm-language";
-import { lobbyBriefNames, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
+import { lobbyBriefNames, neutralizeQuotes, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
 import type { Locale } from "@/lib/shared/locales";
 import { pushRoundLabel } from "@/lib/shared/push-messages";
 import type { NextBanRule } from "@/lib/shared/round-maps";
+import { withoutInvisibles } from "@/lib/shared/visible-text";
 
 function quoted(value: string, locale: Locale): string {
-  // Les guillemets d'un nom deviennent des « " » droits : ils ne ferment pas la citation.
-  const name = discordInline(value).replace(/[“”«»]/g, '"');
+  // Guillemets neutralisés d'abord, `discordInline` en dernier : rien n'est écrit après son nettoyage.
+  const name = discordInline(neutralizeQuotes(value));
   return locale === "en" ? `“${name}”` : `« ${name} »`;
 }
 
@@ -161,7 +162,9 @@ function mapsLine(side: LobbyBriefSide, locale: Locale, quote: (name: string) =>
 function mapsOrFirstMapLine(side: LobbyBriefSide, locale: Locale, quote: (name: string) => string): string {
   const text = DM_TEXT[locale];
   if (side.maps.length > 0) return `• ${text.maps}${mapsLine(side, locale, quote)}`;
-  const firstMap = side.firstMap === null ? text.noFirstMap : quote(side.firstMap);
+  // Une carte vide ou faite d'invisibles retombe sur le même repli que la notification.
+  const firstMap =
+    side.firstMap === null || withoutInvisibles(side.firstMap).trim() === "" ? text.noFirstMap : quote(side.firstMap);
   return `• ${text.firstMap}${firstMap}`;
 }
 

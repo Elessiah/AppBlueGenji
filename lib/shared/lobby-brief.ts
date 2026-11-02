@@ -68,6 +68,14 @@ export type LobbyBriefSide = {
 };
 
 /**
+ * Les guillemets d'un nom (« » “ ” „ ‟ ‹ ›) deviennent des « " » droits : ils ne
+ * ferment pas la citation où le nom est posé (message privé et notification).
+ */
+export function neutralizeQuotes(name: string): string {
+  return name.replace(/[“”„‟«»‹›]/g, '"');
+}
+
+/**
  * Les noms à écrire, par place : les équipes entre guillemets, « toi » / « ton
  * adversaire » en individuel. `ban` bannit en premier sur la carte 1, `banNext` ensuite.
  */

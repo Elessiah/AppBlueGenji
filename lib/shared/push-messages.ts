@@ -46,7 +46,7 @@ import { DEFAULT_LOCALE, INTL_LOCALE, localeHref, type Locale } from "./locales"
 import { scopedText, type Leaves, type ScopedText } from "./scoped-text";
 import { clipPushText, PUSH_BODY_MAX, type PushContent } from "./push-notifications";
 import type { CastReleasedMatch } from "./cast-notices";
-import { lobbyBriefNames, type LobbyBriefSide } from "./lobby-brief";
+import { lobbyBriefNames, neutralizeQuotes, type LobbyBriefSide } from "./lobby-brief";
 import { withoutInvisibles } from "./visible-text";
 
 type PushText = ScopedText<Leaves<typeof frPush>>;
@@ -117,7 +117,7 @@ export function lobbyBriefPush(side: LobbyBriefSide, locale: Locale = DEFAULT_LO
   // ancien gardant U+202E retournerait sinon la ligne. En individuel,
   // `lobbyBriefNames` écrit « toi » / « ton adversaire ».
   // Les guillemets d'un nom deviennent des « " » droits : ils ne ferment pas la citation.
-  const quote = (name: string) => text.t("lobbyBrief.quoted", { name: withoutInvisibles(name).replace(/[“”«»]/g, '"') });
+  const quote = (name: string) => text.t("lobbyBrief.quoted", { name: neutralizeQuotes(withoutInvisibles(name)) });
   const names = lobbyBriefNames(side, locale, quote);
   // Ni l'appariement ni la manche : gauche et droite nomment déjà les deux
   // engagées ; le « 1er ban » se pose sur le côté que la règle du tournoi
@@ -151,7 +151,8 @@ function pushMapName(map: string): string {
   // Boucle plutôt qu'une expression `[…]+$` (retour arrière quadratique).
   let end = shown.length;
   while (end > 0 && TRAILING_MAP_PUNCTUATION.has(shown[end - 1])) end -= 1;
-  return shown.slice(0, end) || shown;
+  // Une carte blanche (espaces seuls) n'est pas une carte : le repli « pas encore fixée » la remplace.
+  return shown.slice(0, end) || (shown.trim() === "" ? "" : shown);
 }
 
 const TRAILING_MAP_PUNCTUATION = new Set([" ", "\t", "\n", "\u00a0", ".", "!", "?", "…", "。"]);
