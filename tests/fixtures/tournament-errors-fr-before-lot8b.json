@@ -1,5 +1,5 @@
 {
-  "count": 190,
+  "count": 192,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "CERTIFY_PROMPT_OTHER_ACCOUNT": "Un autre compte est connecté dans ce navigateur : « Ne plus voir » n'a pas été enregistré.",
@@ -191,6 +191,8 @@
     "REFEREE_OBJECTION": "Ce compte a une opposition retenue à l'arbitrage : il ne peut plus arbitrer de match.",
     "REFEREE_OBJECTION_FAILED": "L'opposition est retenue, mais l'arbitre n'a pas pu être retiré de tous ses matchs : retiens-la de nouveau pour réessayer.",
     "MATCH_NOT_CASTABLE": "Ce match ne peut plus être diffusé.",
-    "INVALID_ORGANISATION_LINK": "Le choix « lien de l'organisation » est invalide."
+    "INVALID_ORGANISATION_LINK": "Le choix « lien de l'organisation » est invalide.",
+    "INVALID_TIEBREAK_MAP": "Nom de map de départage invalide (64 caractères au plus).",
+    "TIEBREAK_NOT_ALLOWED": "La map de départage ne se règle que sur un tour de play-offs en vrai Bo3 (premier à 2 maps)."
   }
 }

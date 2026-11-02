@@ -103,12 +103,13 @@ export function mapWinnerSide(map: Pick<MatchMapInput, "team1Score" | "team2Scor
 
 /**
  * Ligne (index 0 = map 1) où se joue la **map de départage** d'un vrai best of
- * 3 (`docs/features/ROUND_MAPS.md`) : la quatrième, quand elle existe et que
- * les trois maps régulières laissent la série à égalité (1-1 avec une map
- * nulle, ou 0-0). `null` ailleurs — série déjà acquise, déséquilibrée après des
- * maps nulles (0-1 : la map nulle se rejoue, règle inchangée), autre format, ou
- * aucune map de départage réglée. Le score se dérive comme toujours : la map de
- * départage vaut un point à qui la gagne, le vainqueur doit atteindre deux maps.
+ * 3 (`docs/features/ROUND_MAPS.md`) : la première ligne jouée **au-delà des
+ * trois maps régulières** alors que la série est à **1-1** — celle dont le
+ * vainqueur emporte la série. `null` ailleurs — série acquise ou encore
+ * déséquilibrée (une map nulle se rejoue, règle inchangée), 0-0 après trois
+ * maps nulles (la map ne déciderait rien), autre format, ou aucune map de
+ * départage réglée. Le score se dérive comme toujours : la map de départage
+ * vaut un point à qui la gagne, le vainqueur doit atteindre deux maps.
  */
 export function tiebreakRowIndex(
   format: MatchFormat | null,
@@ -116,10 +117,12 @@ export function tiebreakRowIndex(
   tiebreakMap: string | null | undefined,
 ): number | null {
   if (!tiebreakMap || !isBestOfThree(format) || format === null) return null;
-  const regular = matchMaxMaps(format);
-  if (maps.length <= regular) return null;
-  const score = deriveMatchScore(maps.slice(0, regular));
-  return score.team1 === score.team2 ? regular : null;
+  const decider = matchWinsRequired(format) - 1;
+  for (let index = matchMaxMaps(format); index < maps.length; index += 1) {
+    const score = deriveMatchScore(maps.slice(0, index));
+    if (score.team1 === decider && score.team2 === decider) return index;
+  }
+  return null;
 }
 
 /** Score du match dérivé de ses maps : une map gagnée = un point, une nulle = rien. */

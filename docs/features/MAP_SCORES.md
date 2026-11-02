@@ -80,7 +80,7 @@ map nulle, sinon `MAP_LIST_INCOMPLETE` (contrôle décisif seulement — un
 enregistrement intermédiaire de l'arbitrage reste libre).
 
 **Map de départage** (`ROUND_MAPS.md`) : sur un tour de play-offs en vrai Bo3,
-la 4e ligne d'une série à égalité après trois lignes est libellée « Map de
+la première ligne jouée au-delà de trois alors que la série est à 1-1 est libellée « Map de
 départage : {nom} » (`tiebreakRowIndex`). Ce n'est qu'un libellé : les plafonds
 et le score dérivé ci-dessus ne changent pas, le vainqueur doit toujours gagner
 deux maps.

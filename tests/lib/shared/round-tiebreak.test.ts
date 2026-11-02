@@ -54,8 +54,16 @@ describe("tiebreakRowIndex", () => {
     expect(tiebreakRowIndex(BO3, [map(3, 1), map(0, 2), map(2, 2), map(0, 0)], "Ilios")).toBe(3);
   });
 
-  it("tiebreakRowIndex_threeDrawnMapsWithFourthRow_returnsThree", () => {
-    expect(tiebreakRowIndex(BO3, [map(1, 1), map(2, 2), map(0, 0), map(1, 0)], "Ilios")).toBe(3);
+  it("tiebreakRowIndex_threeDrawnMapsWithFourthRow_returnsNull", () => {
+    expect(tiebreakRowIndex(BO3, [map(1, 1), map(2, 2), map(0, 0), map(1, 0)], "Ilios")).toBeNull();
+  });
+
+  it("tiebreakRowIndex_levelOneAllOnlyAfterFourthRow_returnsFour", () => {
+    expect(tiebreakRowIndex(BO3, [map(1, 1), map(2, 0), map(0, 0), map(0, 2), map(1, 0)], "Ilios")).toBe(4);
+  });
+
+  it("tiebreakRowIndex_levelOneAllAfterFourthRowWithoutFifthRow_returnsNull", () => {
+    expect(tiebreakRowIndex(BO3, [map(1, 1), map(2, 0), map(0, 0), map(0, 2)], "Ilios")).toBeNull();
   });
 
   it("tiebreakRowIndex_unevenAfterDraws_returnsNull", () => {

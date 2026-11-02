@@ -129,10 +129,11 @@ série est à égalité après les trois maps régulières, sinon inutilisée.
   part, liste d'Overwatch suggérée, saisie libre, « Enregistrer » / « Retirer »),
   visible seulement sur un tour éligible ; le sélecteur de tours la signale. La
   page du match (`MatchRoundMaps`) l'affiche avec une bulle « i ».
-- **Saisie du score** (`MapScoreList`, `tiebreakRowIndex`) : la 4e ligne est
-  libellée « Map de départage : {nom} » quand le score est à égalité après trois
-  lignes. **Aucune règle de score ne change** (`MAP_SCORES.md`) : la 4e ligne
-  existait déjà (map nulle rejouée) et le vainqueur doit toujours atteindre deux
+- **Saisie du score** (`MapScoreList`, `tiebreakRowIndex`) : la première ligne
+  jouée au-delà des trois maps régulières alors que la série est à **1-1** est
+  libellée « Map de départage : {nom} » (jamais à 0-0 après trois maps nulles :
+  elle ne déciderait rien). **Aucune règle de score ne change** (`MAP_SCORES.md`) :
+  cette ligne existait déjà (map nulle rejouée) et le vainqueur doit toujours atteindre deux
   maps ; les rejeux des classements sont intacts.
 - **Brief du salon** : ligne « Map de départage (jouée seulement si la série est à
   égalité après les 3 maps) : « … » » (FR / EN, `briefTiebreakMap`), sans pseudo.
@@ -262,5 +263,5 @@ round et bans, réinitialisation), `tests/lib/server/match-launch.test.ts`
 `tests/lib/server/tournament-transaction.test.ts` (rollback en échec),
 `tests/tournois/round-maps-dialog.test.ts` (`resyncSlots`). Map de départage :
 `tests/lib/shared/round-tiebreak.test.ts` (éligibilité, ligne de saisie, brief),
-`tests/lib/server/round-tiebreak.test.ts` (`setRoundTiebreak`, `loadMapRules`,
+`tests/lib/server/round-maps.test.ts` (`setRoundTiebreak`, `loadMapRules`,
 `briefTiebreakMap`), `tests/app/api/round-tiebreak-route.test.ts`.
