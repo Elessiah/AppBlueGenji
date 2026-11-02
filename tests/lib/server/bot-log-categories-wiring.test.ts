@@ -68,7 +68,7 @@ describe("catégories des appelants du journal", () => {
   });
 
   it("la route d'opposition publie en staff-removal quand l'opposition est retenue", () => {
-    expect(read("app/api/admin/referees/[userId]/objection/route.ts")).toContain('upheld ? "staff-removal" : "referees"');
+    expect(read("app/api/admin/referees/[userId]/objection/route.ts")).toContain('upheld && result.released > 0 ? "staff-removal" : "referees"');
   });
 
   it("bot-logs range chaque évènement du journal par sa table de catégories", () => {
