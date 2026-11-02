@@ -1811,6 +1811,20 @@ describe("verrou des salons vocaux d'équipe (`MATCH_VOICE.md`)", () => {
     expect(state.match?.launched_at).toBeNull();
   });
 
+  it("maintainMatchLaunches_phaseOffHeldByChannels_opensNoLobby", async () => {
+    state.match = matchState({ match_launch_phase: 0, start_at: past() });
+    state.voice = { enabled: true, rows: [channel(TEAM1, 5), channel(TEAM2, 4)] };
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.match?.lobby_opened_at).toBeNull();
+  });
+
+  it("maintainMatchLaunches_phaseOnHeldByChannels_opensLobby", async () => {
+    state.match = matchState({ start_at: past() });
+    state.voice = { enabled: true, rows: [channel(TEAM1, 5), channel(TEAM2, 4)] };
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.match?.lobby_opened_at).toBe(STAMP);
+  });
+
   it("maintainMatchLaunches_phaseOffChannelsFull_launches", async () => {
     state.match = matchState({ match_launch_phase: 0, start_at: past() });
     state.voice = { enabled: true, rows: [channel(TEAM1, 5), channel(TEAM2, 5)] };

@@ -25,6 +25,7 @@ jest.mock("@/components/match-launch/MatchContactsDialog", () => ({
 }));
 
 import { renderToStaticMarkup } from "react-dom/server";
+import { readSource } from "../helpers/read-source";
 import type { ReactNode } from "react";
 import { MatchPageScope } from "@/app/(secured)/tournois/[id]/_lib/match-page-context";
 import { MatchFormatProvider } from "@/app/(secured)/tournois/[id]/_lib/match-format-context";
@@ -890,6 +891,14 @@ describe("page d'un match — salons vocaux d'équipe", () => {
     const html = render(match({ voice: { team1Members: 5, team2Members: 5, pending: false } }), "player");
     expect(visible(html)).toContain("Salon vocal : 5/5");
     expect(visible(html)).not.toContain("se lance quand");
+  });
+
+  it("voiceSection_trackedButNotPending_stillPollsRestDoor", () => {
+    // Un comptage frais (verrou levé) vieillit sans écriture : la page relit la
+    // porte REST tant que le match suit ses salons, pas seulement tant qu'il attend.
+    const source = readSource("app/(secured)/tournois/[id]/_components/MatchPage.tsx");
+    expect(source).toContain("const tracked = streamed !== null;");
+    expect(source).toContain("useClock(VOICE_POLL_MS, tracked)");
   });
 
   it("render_voiceForSpectatorOrFrozenOrNoOption_sectionAbsent", () => {

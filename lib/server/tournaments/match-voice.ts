@@ -303,10 +303,21 @@ async function writeChannel(
   );
 }
 
+/**
+ * Panne sur le salon d'une équipe : `failed_at` lève le verrou. Une ligne déjà
+ * rendue (match sorti du programme puis revenu) est **rouverte** sans salon —
+ * fermée, le verrou l'ignorerait et attendrait un salon que le bot ne peut pas
+ * ouvrir. Les colonnes se lisent avant que `released_at` ne soit remis à `NULL`
+ * (affectations de gauche à droite).
+ */
 async function writeFailure(connection: PoolConnection, matchId: number, teamId: number): Promise<void> {
   await connection.execute(
     `INSERT INTO bg_match_voice_channels (match_id, team_id, failed_at) VALUES (?, ?, NOW())
-     ON DUPLICATE KEY UPDATE failed_at = NOW()`,
+     ON DUPLICATE KEY UPDATE
+       channel_id = IF(released_at IS NULL, channel_id, NULL),
+       members = IF(released_at IS NULL, members, NULL),
+       counted_at = IF(released_at IS NULL, counted_at, NULL),
+       failed_at = NOW(), released_at = NULL`,
     [matchId, teamId],
   );
 }

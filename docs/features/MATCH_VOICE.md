@@ -24,11 +24,14 @@ salons pleins.
 - **Verrou du lancement** : avec la phase de lancement, « Prêt » et le lancement
   d'office attendent les deux salons à 5/5 ; sans elle, le match se lance quand
   l'heure est passée **et** les deux salons pleins (affiché `SCHEDULED` d'ici là).
+  Sans phase, un match retenu n'ouvre aucun lancement (`lobby_opened_at` reste vide :
+  ni appel aux « Prêt », ni brief du salon).
   Le lancement forcé par l'arbitrage passe toujours.
 - **Panne du bot** : le verrou se lève (`failed_at`), une ligne pm2 sans donnée de
   joueur (`[match-voice] match <id> : bot indisponible (<code>) — verrou du lancement levé`),
   une seule par panne. Le contournement n'est pas définitif : un comptage réussi
-  remet le verrou.
+  remet le verrou. Une panne sur une ligne déjà rendue (match sorti du programme puis
+  revenu) la rouvre sans salon, pour que le verrou la voie.
 - **Comptage** : le verrou ne lit que l'état stocké ; seul le balayage (au plus
   toutes les 10 s, déclenché par le trafic — listes de tournois et
   `/api/me/match-launches`) parle au bot, hors transaction. Un compte `gone`
@@ -39,6 +42,9 @@ salons pleins.
   puis revenu) ne lance rien et une panne ancienne ne lève plus le verrou — le
   balayage suivant tranche. L'affichage garde le dernier nombre compté. Un comptage
   redevenu frais compte comme un changement (publication + entretien rejoué).
+- **Relecture de la page du match** : tant que l'instantané porte `voice` (match dû,
+  pas encore lancé), verrou tenu ou non — un comptage qui vieillit n'est annoncé par
+  aucune écriture, la relecture relance le balayage qui le rafraîchit.
 - **Côté client** : `useMatchLaunchPhase` relaie `voice.pending` à `matchLaunchPhase`,
   si bien qu'un match retenu sans phase de lancement reste « programmé » (pas de
   formulaire de score, bouton « Forcer le lancement » pour l'arbitrage).

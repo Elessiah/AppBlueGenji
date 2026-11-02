@@ -983,7 +983,10 @@ export async function maintainMatchLaunches(
         [row.id],
       );
       changed += 1;
-    } else if (row.lobby_opened_at === null) {
+    } else if (row.lobby_opened_at === null && Number(row.match_launch_phase ?? 0) === 1) {
+      // Sans phase de lancement, un match que ses salons vocaux retiennent
+      // n'ouvre aucun lancement : ni appel aux « Prêt » (`player-pushes`), ni
+      // brief du salon, pour un tournoi qui n'a pas de bouton « Prêt ».
       await connection.execute(
         `UPDATE bg_matches SET lobby_opened_at = NOW() WHERE id = ? AND lobby_opened_at IS NULL`,
         [row.id],

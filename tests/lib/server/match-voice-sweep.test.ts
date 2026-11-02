@@ -109,6 +109,21 @@ describe("dispatchMatchVoiceChannels — création et comptage", () => {
     expect(logged.join(" ")).not.toContain("Alpha");
   });
 
+  it("dispatchMatchVoiceChannels_ensureFailsOnReleasedRow_reopensRowAsFailed", async () => {
+    const db = database({
+      due: [dueMatch],
+      voiceRows: [
+        { match_id: 42, team_id: 1, channel_id: "901", members: 5, counted_at: null, failed_at: null, released_at: "2026-11-05T19:00:00.000Z" },
+      ],
+    });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "DISCORD_NOT_READY" });
+
+    await dispatchMatchVoiceChannels();
+
+    const failure = db.writes.find((w) => w.sql.includes("failed_at = NOW()"))?.sql ?? "";
+    expect(failure).toMatch(/channel_id = IF\(released_at IS NULL, channel_id, NULL\)[\s\S]*failed_at = NOW\(\), released_at = NULL/);
+  });
+
   it("dispatchMatchVoiceChannels_countGone_recreatesByKey", async () => {
     database({
       due: [dueMatch],

@@ -676,8 +676,9 @@ const VOICE_POLL_MS = 10_000;
  *
  * Deux portes (`REALTIME_REFRESH.md`) : le nombre arrive dans l'instantané
  * (`BracketMatch.voice`, poussé par le flux à chaque comptage) ; tant que le
- * verrou tient, la page relit aussi `GET /api/matches/[id]/voice` toutes les
- * dix secondes — cette lecture relance le balayage (étranglé côté serveur, le
+ * match suit ses salons (dû, pas encore lancé — verrou tenu ou non : un
+ * comptage vieilli le fait retomber), la page relit aussi
+ * `GET /api/matches/[id]/voice` toutes les dix secondes — cette lecture relance le balayage (étranglé côté serveur, le
  * bot n'est jamais sollicité par lecteur) et sert de secours si le flux tombe.
  * L'horloge suit le régime de charge (`useClock`) : onglet caché, aucune relecture.
  */
@@ -686,10 +687,11 @@ function VoiceSection({ match, sides }: Readonly<{ match: BracketMatch; sides: [
   const titleId = useId();
   const [polled, setPolled] = useState<{ matchId: number; voice: MatchVoiceInfo | null } | null>(null);
   const streamed = match.voice ?? null;
-  const tick = useClock(VOICE_POLL_MS, streamed?.pending === true);
+  const tracked = streamed !== null;
+  const tick = useClock(VOICE_POLL_MS, tracked);
 
   useEffect(() => {
-    if (tick === null || streamed?.pending !== true) return;
+    if (tick === null || !tracked) return;
     const controller = new AbortController();
     fetch(`/api/matches/${match.id}/voice`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
@@ -699,7 +701,7 @@ function VoiceSection({ match, sides }: Readonly<{ match: BracketMatch; sides: [
       })
       .catch(() => undefined);
     return () => controller.abort();
-  }, [tick, match.id, streamed?.pending]);
+  }, [tick, match.id, tracked]);
 
   // La source la plus récente fait foi : un instantané reçu efface la
   // dernière relecture (le flux publie chaque comptage), une relecture plus
