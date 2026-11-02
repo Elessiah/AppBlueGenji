@@ -106,6 +106,18 @@ describe("holdExitUntil", () => {
     expect(exit).toHaveBeenCalledTimes(1);
     expect(exit).toHaveBeenCalledWith(2);
   });
+  it("holdExitUntil_noCodeWithFailingExitCodeAfterHeldSuccess_exitsWithTheExitCode", async () => {
+    const exit = jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    const previousExitCode = process.exitCode;
+    holdExitUntil(Promise.resolve());
+    process.exit(0);
+    process.exitCode = 3;
+    process.exit();
+    process.exitCode = previousExitCode;
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(3);
+  });
 });
 
 describe("installBotLogShutdownFlush", () => {

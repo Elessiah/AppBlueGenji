@@ -52,7 +52,9 @@ export function holdExitUntil(done: Promise<void>): void {
   let exitCode: number | string | null | undefined;
   const held = ((code?: number | string | null) => {
     if (requested) {
-      if (isFailureCode(code) && !isFailureCode(exitCode)) exitCode = code;
+      // `process.exit()` sans argument sort avec `process.exitCode`.
+      const requestedCode = code ?? process.exitCode;
+      if (isFailureCode(requestedCode) && !isFailureCode(exitCode)) exitCode = requestedCode;
       return undefined as never;
     }
     requested = true;

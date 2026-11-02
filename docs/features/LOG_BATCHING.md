@@ -24,6 +24,10 @@ ligne du journal (`sendBotLog` → `POST /internal/log`) rejoint désormais un
   inverse et le caractère qu'elle échappe (le morceau suivant ouvre un nouveau
   message : un `<@&rôle>` désamorcé par `discordInline` y redeviendrait actif) ;
   une rangée citée (`> `, `discordQuote`) garde sa marque dans chaque morceau.
+  Un message qui poursuit une ligne coupée s'ouvre sur la rangée `(suite)`
+  (`BOT_LOG_CONTINUATION_LEAD`) : le bot préfixe chaque message de
+  `[AppBlueGenji] `, et sans elle un texte d'utilisateur ouvrirait le message
+  comme une ligne du site (une citation y perdrait même sa marque).
 
 ## Clé d'un lot
 
@@ -65,7 +69,8 @@ terminé » ne passe donc pas devant le résultat de sa finale).
   borné à 1,2 s (pm2 tue après `kill_timeout`, 1,6 s par défaut). Next ferme
   le serveur sur le même signal et appelle `process.exit(0)` sans attendre :
   `holdExitUntil` retient cet appel jusqu'à la fin de l'envoi ; un appel
-  suivant ne relance rien, mais un code d'échec l'emporte sur le `0` retenu
+  suivant ne relance rien, mais un code d'échec (argument ou `process.exitCode`)
+  l'emporte sur le `0` retenu
   (un crash pendant l'envoi reste un crash pour pm2). Si personne
   d'autre n'écoute le signal, le module termine lui-même le processus.
 - **Arrêt brutal** : perd les lots en attente (au plus 4 lignes par clé, jusqu'à

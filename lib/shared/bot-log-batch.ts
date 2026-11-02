@@ -84,30 +84,51 @@ function splitLongEntry(entry: string, maxChars: number): string[] {
 }
 
 /**
+ * Rangée de tête d'un message qui poursuit une ligne coupée. Le bot préfixe
+ * chaque message de `[AppBlueGenji] ` : sans cette rangée, la suite d'une ligne
+ * ouvrirait le message juste après ce préfixe, et un texte d'utilisateur — une
+ * rangée citée de `discordQuote`, dont la marque `> ` ne serait plus en début
+ * de ligne, ou le milieu d'un nom — s'y lirait comme une ligne écrite par le site.
+ */
+export const BOT_LOG_CONTINUATION_LEAD = "(suite)";
+
+/**
  * Met les lignes d'un lot en messages : dans l'ordre, une ligne par rangée,
  * autant de lignes par message que la limite le permet. Une ligne n'est coupée
  * que si elle dépasse seule la limite — entre ses rangées d'abord, jamais au
- * milieu d'une séquence d'échappement. Les lignes vides sont ignorées.
+ * milieu d'une séquence d'échappement — et chaque message qui en poursuit une
+ * s'ouvre sur {@link BOT_LOG_CONTINUATION_LEAD}. Les lignes vides sont ignorées.
  */
 export function packBotLogLines(lines: readonly string[], maxChars: number = BOT_LOG_MESSAGE_MAX_CHARS): string[] {
   const limit = Math.max(2, Math.floor(maxChars));
+  // La rangée de tête ne se pose que si la limite lui laisse la place (toujours
+  // en production) ; les morceaux sont alors taillés pour la recevoir.
+  const leadRoom = limit - BOT_LOG_CONTINUATION_LEAD.length - 1;
+  const withLead = leadRoom >= 16;
+  const pieceLimit = withLead ? leadRoom : limit;
   const messages: string[] = [];
   let current = "";
-  const push = (piece: string) => {
+  const open = (piece: string, continued: boolean) => {
+    current = continued && withLead ? `${BOT_LOG_CONTINUATION_LEAD}\n${piece}` : piece;
+  };
+  const push = (piece: string, continued: boolean) => {
     if (!current) {
-      current = piece;
+      open(piece, continued);
     } else if (current.length + 1 + piece.length <= limit) {
       current += `\n${piece}`;
     } else {
       messages.push(current);
-      current = piece;
+      open(piece, continued);
     }
   };
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
-    if (line.length <= limit) push(line);
-    else for (const piece of splitLongEntry(line, limit)) push(piece);
+    if (line.length <= limit) {
+      push(line, false);
+      continue;
+    }
+    splitLongEntry(line, pieceLimit).forEach((piece, index) => push(piece, index > 0));
   }
   if (current) messages.push(current);
   return messages;

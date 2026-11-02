@@ -50,9 +50,29 @@ describe("packBotLogLines", () => {
 
   it("packBotLogLines_escapedRoleMentionAtTheDefaultCut_nextMessageStaysEscaped", () => {
     const mention = discordInline("<@&123>");
-    const messages = packBotLogLines(["x".repeat(1899) + mention]);
-    expect(messages).toEqual(["x".repeat(1899), mention]);
+    const messages = packBotLogLines(["x".repeat(1891) + mention]);
+    expect(messages).toEqual(["x".repeat(1891), `(suite)\n${mention}`]);
     expect(mention.startsWith("\\<")).toBe(true);
+  });
+
+  it("packBotLogLines_quotedRowsSplitAtTheDefaultLimit_continuationOpensOnTheLead", () => {
+    const quoted = "> " + "y".repeat(1000);
+    const messages = packBotLogLines([`🚩 Signalement :\n${quoted}\n${quoted}`]);
+    expect(messages).toEqual([`🚩 Signalement :\n${quoted}`, `(suite)\n${quoted}`]);
+  });
+
+  it("packBotLogLines_hardCutAtTheDefaultLimit_everyContinuationOpensOnTheLead", () => {
+    const messages = packBotLogLines(["z".repeat(4000)]);
+    expect(messages).toEqual(["z".repeat(1892), `(suite)\n${"z".repeat(1892)}`, `(suite)\n${"z".repeat(216)}`]);
+  });
+
+  it("packBotLogLines_lineAfterASplitLine_joinsTheContinuationMessage", () => {
+    const messages = packBotLogLines(["z".repeat(1901), "ok"]);
+    expect(messages).toEqual(["z".repeat(1892), "(suite)\nzzzzzzzzz\nok"]);
+  });
+
+  it("packBotLogLines_lineAtExactlyTheDefaultLimit_sentWholeWithoutLead", () => {
+    expect(packBotLogLines(["z".repeat(1900)])).toEqual(["z".repeat(1900)]);
   });
 
   it("packBotLogLines_quotedRowOverLimit_eachContinuationQuoted", () => {
