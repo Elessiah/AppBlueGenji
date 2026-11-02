@@ -903,14 +903,17 @@ export function RgpdEn({
             association&apos;s Discord bot opens, fifteen minutes before a match&apos;s time, a 5-seat voice channel for each of its two
             teams, named after the team — never for a solo entry, whose name would be a username. The match only launches once both
             channels are full (referees can force it; if the bot doesn&apos;t answer, the match doesn&apos;t wait). To know this, the bot
-            counts the people present in each channel: to do so it holds in memory, without ever recording it, the voice presence (who is
-            in which channel) of the members of the association&apos;s Discord server, as Discord sends it — that of the other servers it is
+            counts the people present in each channel: to do so it holds in memory, without ever recording it, the voice state (which channel each person is in, microphone or sound muted, screen sharing or camera on) of the members of the association&apos;s Discord server, as Discord sends it — that of the other servers it is
             on reaches it too, but it does not keep it; the site only receives and keeps the channel&apos;s identifier, that <strong>number</strong> (“Voice channel: 3/5”,
             displayed to the match&apos;s parties and to staff, and readable by any signed-in member following the tournament) and the time of the count (or of a bot outage), never who. The channel is handed back to the bot when the match is played,
             cancelled, back to waiting or taken off the schedule, when the team leaves the pairing, or when the tournament ends or turns the option off; the bot deletes it as soon as it is
-            empty (within 24 and a half hours at the latest, even if occupied), and the site erases its record a week later. This count rests on
+            empty (within 24 and a half hours of being handed back at the latest, even if occupied; a channel never handed back, if it is
+            empty 48 hours after its creation or its reuse; moved out of the match category, the bot stops tracking it without deleting it
+            and it falls to the server&apos;s moderation), and the site erases its record a week later (apart from the encrypted backup
+            copies). The bot keeps for each channel a record with no name (channel identifier, numbers of the match and team, creation
+            and hand-back times), erased with the channel. This count rests on
             <strong> legitimate interest</strong> (smooth running of tournaments: gathering each team before its match); joining a
-            channel remains a choice — but until both are full, the match waits for referees to force its launch —, and only the presence of those who join it is counted (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
+            channel remains a choice — but until both are full, the match waits for referees to force its launch —, and only the presence of those who join it is counted; you can object to this processing (section “Your rights”) (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
           </p>
         </div>
       </section>

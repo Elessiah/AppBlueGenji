@@ -2354,12 +2354,30 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
   it("processingRegister_t18_declaresBotMemoryPresenceAndBotRecordFrAndEn", () => {
     const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
     const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
-    expect(t18.dataCategories.join(" ")).toContain("tenue en mémoire par le bot pour compter, jamais enregistrée");
+    expect(t18.dataCategories.join(" ")).toContain("tenu en mémoire par le bot pour compter, jamais enregistré");
     expect(t18En.dataCategories.join(" ")).toContain("held in memory by the bot to count, never recorded");
     expect(t18.retention.join(" ")).toContain("oubliée 96 heures après sa création");
     expect(t18En.retention.join(" ")).toContain("forgotten 96 hours after its creation");
     expect(t18.dataSubjects).toHaveLength(t18En.dataSubjects.length);
     expect(t18.retention).toHaveLength(t18En.retention.length);
+  });
+
+  it("processingRegister_t18_declaresFullVoiceStateAndBackupsFrAndEn", () => {
+    const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
+    const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
+    expect(t18.dataCategories.join(" ")).toContain("micro ou son coupés, partage d'écran ou caméra actifs");
+    expect(t18En.dataCategories.join(" ")).toContain("microphone or sound muted, screen sharing or camera on");
+    expect(t18.retention[0]).toContain("copies de sauvegarde chiffrées (T09");
+    expect(t18En.retention[0]).toContain("encrypted backup copies (T09");
+    expect(t18.retention[1]).toContain("déplacé hors de la catégorie des matchs");
+    expect(t18En.retention[1]).toContain("moved out of the match category");
+  });
+
+  it("processingRegister_t08_pointsVoiceChannelsToT18FrAndEn", () => {
+    const t08 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T08")!;
+    const t08En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T08")!;
+    expect(t08.legalBasis).toContain("les salons vocaux d'équipe relèvent de T18");
+    expect(t08En.legalBasis).toContain("team voice channels fall under T18");
   });
 
   it("processingRegister_t18_releaseIncludesPairingAndHoldIsStatedFrAndEn", () => {

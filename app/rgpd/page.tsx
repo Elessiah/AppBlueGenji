@@ -1089,15 +1089,18 @@ function RgpdFr({
             vocal de 5 places pour chacune de ses deux équipes, au nom de l&apos;équipe — jamais pour une entrée en tournoi individuel,
             dont le nom serait un pseudo. Le match ne se lance qu&apos;une fois les deux salons pleins (l&apos;arbitrage peut le forcer ; si le
             bot ne répond pas, le match n&apos;attend pas). Pour le savoir, le bot compte les personnes présentes dans chaque salon : il tient pour
-            cela en mémoire, sans jamais l&apos;enregistrer, la présence vocale (qui est dans quel salon) des membres du serveur Discord de
+            cela en mémoire, sans jamais l&apos;enregistrer, l&apos;état vocal (dans quel salon se trouve chacun, micro ou son coupés, partage d&apos;écran ou caméra actifs) des membres du serveur Discord de
             l&apos;association, telle que Discord la lui transmet — celle des autres serveurs où il est présent lui parvient aussi, mais il
             ne la garde pas ; le site ne reçoit et ne garde que l&apos;identifiant du salon, ce <strong>nombre</strong> (« Salon vocal : 3/5 », affiché aux parties du match et au staff, et lisible par tout membre connecté qui suit le tournoi)
             et l&apos;heure du comptage (ou d&apos;une panne du bot), jamais qui. Le salon est rendu au bot quand le match est joué, annulé,
             retombé en attente ou sorti du programme, quand l&apos;équipe sort de l&apos;appariement, ou quand le tournoi se termine ou éteint
-            l&apos;option ; le bot le supprime dès qu&apos;il est vide (au plus tard 24 heures et demie après, même occupé), et le site efface sa ligne
-            une semaine plus tard. Ce comptage relève de l&apos;<strong>intérêt légitime</strong> (bon déroulement des tournois : réunir
+            l&apos;option ; le bot le supprime dès qu&apos;il est vide (au plus tard 24 heures et demie après son rendu, même occupé ; un salon jamais rendu,
+            s&apos;il est vide 48 heures après sa création ou sa reprise ; déplacé hors de la catégorie des matchs, le bot cesse de le
+            suivre sans le supprimer et il relève de la modération du serveur), et le site efface sa ligne une semaine plus tard (hors les
+            copies de sauvegarde chiffrées). Le bot garde de chaque salon une fiche sans nom (identifiant du salon, numéros du match et de
+            l&apos;équipe, heures de création et de rendu), effacée avec le salon. Ce comptage relève de l&apos;<strong>intérêt légitime</strong> (bon déroulement des tournois : réunir
             chaque équipe avant son match) ; rejoindre un salon reste un choix — mais tant que les deux ne sont pas pleins, le match attend
-            que l&apos;arbitrage force son lancement —, et seule la présence de qui le rejoint est comptée (<Link href="/rgpd/registre#t18">registre, T18</Link>).
+            que l&apos;arbitrage force son lancement —, et seule la présence de qui le rejoint est comptée ; vous pouvez vous opposer à ce traitement (section « Vos droits ») (<Link href="/rgpd/registre#t18">registre, T18</Link>).
           </p>
         </div>
       </section>

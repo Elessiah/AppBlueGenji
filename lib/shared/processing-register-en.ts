@@ -422,7 +422,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Delivering the site's messages: codes (written by the bot in the account language the site sends it), match times and reminders, notices of removal from a match (“Match retiré”), the lobby settings of a match sent to those who manage its entrants and the notice sent to a caster whose registration for a match is removed by someone else (these match messages to certified Discord tags only), moderation notices (report naming the person, logo hidden, removed or deleted, avatar hidden, removed or restored, suspension of the account and its lifting), requests to join a team and information about data by direct message, without being kept by the bot; refereeing alerts, reports and the site's activity log (without player usernames) posted in the staff's private log channel, refereeing alerts also sent to the members of the refereeing role of each server that has set one; announcement of the streamed matches posted in the #live channel of the association's server, in one message per evening edited at each match start and end, with an @everyone mention for the official channel or a mention of the StreamViewer role only for any other channel (team names or, in a solo tournament, the players' public BlueGenji username — processing activity T16)",
       "Team voice channels for matches, in tournaments with that option: creation named after the team, count of the people present (a number, never who) and deletion; to count, voice presence of the members of the association's server held in memory only (processing activity T18, which gives its data and periods)",
     ],
-    legalBasis: "Legitimate interest (operating, moderating and measuring the relay between partner servers); the site's messages fall under the basis of their original processing",
+    legalBasis: "Legitimate interest (operating, moderating and measuring the relay between partner servers); the site's messages fall under the basis of their original processing; team voice channels fall under T18",
     dataSubjects: [
       "Discord users of the servers where the bot is installed",
       "Administrators and moderators of these servers",
@@ -801,15 +801,15 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     dataCategories: [
       "Discord identifier of each team's channel for a match, number of people present at the last count and the time of that count, time of any bot outage — never who is present",
       "Team name, sent to the bot to name the channel",
-      "Voice presence (who is in which channel) of the members of the association's Discord server, held in memory by the bot to count, never recorded nor sent to the site",
+      "Voice state (which channel each person is in, microphone or sound muted, screen sharing or camera on) of the members of the association's Discord server, held in memory by the bot to count, never recorded nor sent to the site",
       "The bot's record of the channel: channel identifier, key of the match and team (numbers, no name), creation and hand-back times",
     ],
     sensitiveData: "None",
     retention: [
-      `The channel's record on the site (identifier, number of people): until the channel is handed back to the bot, then ${VOICE_ROW_RETENTION_DAYS} days, erased by the next sweep`,
-      "Channel on Discord: deleted by the bot as soon as it is empty once handed back, within 24 and a half hours at the latest even if occupied (sweep every 30 minutes); a channel never handed back is deleted by the bot if it is empty 48 hours after its creation",
+      `The channel's record on the site (identifier, number of people): until the channel is handed back to the bot, then ${VOICE_ROW_RETENTION_DAYS} days, erased by the next sweep, apart from the encrypted backup copies (T09, ${BACKUP_RETENTION_DAYS} days at most)`,
+      "Channel on Discord: deleted by the bot as soon as it is empty once handed back, within 24 and a half hours of being handed back at the latest even if occupied (sweep every 30 minutes); a channel never handed back is deleted by the bot if it is empty 48 hours after its creation or its reuse, and stays while it is occupied; moved out of the match category, the bot stops tracking it without deleting it (it then falls to the server's moderation)",
       "Voice presence: held in memory by the bot, kept up to date with what Discord sends it, and lost when it stops; never recorded by the bot nor sent to the site — that of the other servers it is on is not kept",
-      "The bot's record of the channel: erased with the channel; forgotten 96 hours after its creation if the bot no longer sees the channel",
+      "The bot's record of the channel: erased with the channel; forgotten 96 hours after its creation or its reuse if the bot no longer sees the channel",
     ],
     recipients: [
       "Members of both teams of a match, its casters and staff, to whom the match page displays the number of people in each channel",

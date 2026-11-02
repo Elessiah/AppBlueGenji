@@ -599,7 +599,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Remise des messages du site : codes (rédigés par le bot dans la langue du compte que le site lui transmet), horaires et rappels de match, avis de retrait d'un match (« Match retiré »), réglages du salon d'un match envoyés à ceux qui gèrent ses engagées et avis envoyé à un caster dont l'inscription est retirée par un autre que lui (ces messages de match aux seuls tags Discord certifiés), avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé, avatar masqué, retiré ou rétabli, suspension du compte et sa levée), demandes d'adhésion à une équipe et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un ; annonce des matchs diffusés publiée dans le salon #live du serveur de l'association, en un message par soirée modifié à chaque début et fin de match, avec une mention @everyone pour la chaîne officielle ou du seul rôle StreamViewer pour toute autre chaîne (noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs — traitement T16)",
       "Salons vocaux d'équipe des matchs, dans les tournois qui en ont l'option : création au nom de l'équipe, comptage des personnes présentes (un nombre, jamais qui) et suppression ; pour compter, présence vocale des membres du serveur de l'association tenue en mémoire seulement (traitement T18, qui en donne les données et les durées)",
     ],
-    legalBasis: "Intérêt légitime (faire fonctionner, modérer et mesurer le relais entre serveurs partenaires) ; les messages du site relèvent de la base de leur traitement d'origine",
+    legalBasis: "Intérêt légitime (faire fonctionner, modérer et mesurer le relais entre serveurs partenaires) ; les messages du site relèvent de la base de leur traitement d'origine ; les salons vocaux d'équipe relèvent de T18",
     dataSubjects: [
       "Utilisateurs Discord des serveurs où le bot est installé",
       "Administrateurs et modérateurs de ces serveurs",
@@ -984,15 +984,15 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     dataCategories: [
       "Identifiant Discord du salon de chaque équipe d'un match, nombre de personnes présentes au dernier comptage et heure de ce comptage, heure d'une éventuelle panne du bot — jamais qui est présent",
       "Nom de l'équipe, transmis au bot pour nommer le salon",
-      "Présence vocale (qui est dans quel salon) des membres du serveur Discord de l'association, tenue en mémoire par le bot pour compter, jamais enregistrée ni transmise au site",
+      "État vocal (dans quel salon se trouve chacun, micro ou son coupés, partage d'écran ou caméra actifs) des membres du serveur Discord de l'association, tenu en mémoire par le bot pour compter, jamais enregistré ni transmis au site",
       "Fiche du salon chez le bot : identifiant du salon, clé du match et de l'équipe (des numéros, aucun nom), heures de création et de rendu",
     ],
     sensitiveData: "Aucune",
     retention: [
-      `Ligne du salon sur le site (identifiant, nombre de personnes) : jusqu'à ce que le salon soit rendu au bot, puis ${VOICE_ROW_RETENTION_DAYS} jours, effacée par le balayage suivant`,
-      "Salon sur Discord : supprimé par le bot dès qu'il est vide une fois rendu, au plus tard 24 heures et demie après même occupé (balayage toutes les 30 minutes) ; un salon jamais rendu est supprimé par le bot s'il est vide 48 heures après sa création",
+      `Ligne du salon sur le site (identifiant, nombre de personnes) : jusqu'à ce que le salon soit rendu au bot, puis ${VOICE_ROW_RETENTION_DAYS} jours, effacée par le balayage suivant, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus)`,
+      "Salon sur Discord : supprimé par le bot dès qu'il est vide une fois rendu, au plus tard 24 heures et demie après son rendu même occupé (balayage toutes les 30 minutes) ; un salon jamais rendu est supprimé par le bot s'il est vide 48 heures après sa création ou sa reprise, et reste tant qu'il est occupé ; déplacé hors de la catégorie des matchs, le bot cesse de le suivre sans le supprimer (il relève alors de la modération du serveur)",
       "Présence vocale : tenue en mémoire par le bot, à jour de ce que Discord lui transmet, et perdue à son arrêt ; jamais enregistrée par le bot ni transmise au site — celle des autres serveurs où il est présent n'est pas gardée",
-      "Fiche du salon chez le bot : effacée avec le salon ; oubliée 96 heures après sa création si le bot ne voit plus le salon",
+      "Fiche du salon chez le bot : effacée avec le salon ; oubliée 96 heures après sa création ou sa reprise si le bot ne voit plus le salon",
     ],
     recipients: [
       "Membres des deux équipes d'un match, ses casters et le staff, à qui la page du match affiche le nombre de personnes de chaque salon",
