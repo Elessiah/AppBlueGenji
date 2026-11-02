@@ -17,6 +17,7 @@ import {
   dispatchMatchVoiceChannels,
   resetVoiceSweepForTests,
   loadMatchVoiceInfos,
+  maintainVoiceLaunches,
   setTeamVoiceChannels,
   voiceGateBlocksLaunch,
 } from "@/lib/server/tournaments/match-voice";
@@ -293,6 +294,26 @@ describe("dispatchMatchVoiceChannels — libération", () => {
     const db = database({});
     await dispatchMatchVoiceChannels();
     expect(db.writes.some((w) => w.sql.includes("DELETE FROM bg_match_voice_channels"))).toBe(true);
+  });
+});
+
+describe("maintainVoiceLaunches", () => {
+  function tournamentIn(state: string) {
+    const connection = connectionMock();
+    connection.execute.mockResolvedValue([[{ state }], []]);
+    jest.mocked(inTransaction).mockImplementation(async (run) => run(fakeConnection(connection)));
+  }
+
+  it("maintainVoiceLaunches_runningTournament_maintainsLaunches", async () => {
+    tournamentIn("RUNNING");
+    await maintainVoiceLaunches(7);
+    expect(jest.mocked(maintainMatchLaunches).mock.calls[0][1]).toBe(7);
+  });
+
+  it("maintainVoiceLaunches_finishedTournament_launchesNothing", async () => {
+    tournamentIn("FINISHED");
+    await maintainVoiceLaunches(7);
+    expect(maintainMatchLaunches).not.toHaveBeenCalled();
   });
 });
 

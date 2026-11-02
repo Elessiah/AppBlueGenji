@@ -54,7 +54,8 @@ salons pleins.
   Une ligne rendue est effacée 7 jours après.
 - **Bascule en cours de tournoi** : allumer ouvre les salons au balayage suivant
   (aussitôt si le match est à moins de 15 min) ; éteindre lève le verrou aussitôt
-  (`maintainMatchLaunches` rejoué, tournoi en cours seulement). Transaction par
+  (`maintainMatchLaunches` rejoué — par la bascule comme par le balayage, tournoi en
+  cours seulement). Transaction par
   `inTransaction`, `lockTournamentRow` en première instruction.
 - **Nom du salon** : le nom d'équipe passe par `visibleText` avant d'aller au bot
   (`UNTRUSTED_NAMES.md`), qui le nettoie encore.

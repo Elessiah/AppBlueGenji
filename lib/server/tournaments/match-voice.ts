@@ -465,11 +465,21 @@ async function runSweep(): Promise<Set<number>> {
 /**
  * Rejoue l'entretien des lancements d'un tournoi : un verrou qui vient de se
  * lever (salons pleins, bot en panne, option éteinte) laisse partir le match
- * sans attendre la passe suivante.
+ * sans attendre la passe suivante. **Tournoi en cours seulement** : le
+ * balayage touche aussi un tournoi terminé (rendu de ses salons), et
+ * `maintainMatchLaunches` poserait `launched_at` sur un match resté jouable
+ * qui ne se jouera pas.
  */
 export async function maintainVoiceLaunches(tournamentId: number): Promise<void> {
   const { maintainMatchLaunches } = await import("./match-launch");
-  await inTransaction((connection) => maintainMatchLaunches(connection, tournamentId));
+  await inTransaction(async (connection) => {
+    const [rows] = await connection.execute<(RowDataPacket & { state: string })[]>(
+      `SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1`,
+      [tournamentId],
+    );
+    if (rows[0]?.state !== "RUNNING") return 0;
+    return maintainMatchLaunches(connection, tournamentId);
+  });
 }
 
 /**
