@@ -37,7 +37,7 @@
  * et se contente du log.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { isBotCircuitOpen, pushRefereeAlert, sendBotLog } from "@/lib/server/bot-integration";
+import { flushBotLogBatch, isBotCircuitOpen, pushRefereeAlert, sendBotLog } from "@/lib/server/bot-integration";
 import { notifyStaff } from "@/lib/server/notify";
 import { refereeAlertPush, type RefereeAlertKind, type RefereeAlertMatch } from "@/lib/shared/push-messages";
 import { discordInline } from "@/lib/shared/discord-text";
@@ -382,9 +382,13 @@ export function flushBotLogs(connection: PoolConnection): void {
       if (channel !== "REFEREE") {
         // Lot du tournoi : celui de l'entrée, ou celui relu pour un résultat de
         // match — jamais le lot commun, pour qu'un « tournoi terminé » ne passe
-        // pas devant le résultat de sa finale.
+        // pas devant le résultat de sa finale. Les catégories ont des lots (et des
+        // minuteurs) séparés : le lot des résultats part donc d'abord, pour que
+        // le résultat de la finale précède toujours la fin du tournoi.
+        const batchTournamentId = tournamentId ?? ("tournamentId" in entry ? entry.tournamentId : null);
+        if (entry.kind === "tournament_finished") await flushBotLogBatch({ tournamentId: batchTournamentId, category: "results" });
         await sendBotLog(message, {
-          tournamentId: tournamentId ?? ("tournamentId" in entry ? entry.tournamentId : null),
+          tournamentId: batchTournamentId,
           category: BOT_EVENT_LOG_CATEGORIES[entry.kind],
         });
         // Le coup d'envoi est une ligne de journal pour le staff, et une

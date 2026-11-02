@@ -4,6 +4,7 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 
 import type { PoolConnection } from "mysql2/promise";
+import { flushBotLogBatch } from "@/lib/server/bot-integration";
 import {
   discardBotLogs,
   flushBotLogs,
@@ -97,6 +98,36 @@ describe("file par transaction", () => {
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
     expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("Coup d'envoi");
+  });
+
+  it("flushBotLogs_tournamentFinished_flushesTheResultsBatchFirst", async () => {
+    const connection = fakeConnection();
+    mockDb([[TOURNAMENT_ROW]]);
+    const order: string[] = [];
+    jest.mocked(flushBotLogBatch).mockImplementation(async () => {
+      order.push("flush-results");
+    });
+    jest.mocked(sendBotLog).mockImplementation(async () => {
+      order.push("send");
+    });
+
+    queueBotLog(connection, { kind: "tournament_finished", tournamentId: 12 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(flushBotLogBatch).toHaveBeenCalledWith({ tournamentId: 12, category: "results" });
+    expect(order).toEqual(["flush-results", "send"]);
+  });
+
+  it("flushBotLogs_tournamentStarted_noResultsFlush", async () => {
+    const connection = fakeConnection();
+    mockDb([[TOURNAMENT_ROW]]);
+
+    queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(flushBotLogBatch).not.toHaveBeenCalled();
   });
 
   it("flushBotLogs_tournamentEntry_queuedInItsTournamentBatch", async () => {

@@ -43,6 +43,7 @@ mêlent jamais, deux tournois non plus, **deux types de ligne non plus** : un
 message du journal parle d'un seul tournoi et d'un seul type de geste. Plafond
 de 5 lignes, silence de 5 minutes et âge maximal de 10 minutes s'appliquent
 **par clé** : un lot d'arbitrage plein ne fait pas partir le lot des casts.
+Les lots ayant chacun leur minuteur, un « tournoi terminé » fait partir d'abord le lot `results` du tournoi (`bot-logs.ts`) : le résultat de la finale précède toujours la fin.
 Une ligne sans tournoi (inscription d'un joueur au site, gestes de modération
 par `publishStaffAction`) rejoint le lot commun de sa catégorie.
 
