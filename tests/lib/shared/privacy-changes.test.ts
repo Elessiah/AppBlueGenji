@@ -2365,8 +2365,8 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
   it("processingRegister_t18_declaresFullVoiceStateAndBackupsFrAndEn", () => {
     const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
     const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
-    expect(t18.dataCategories.join(" ")).toContain("micro ou son coupés, partage d'écran ou caméra actifs");
-    expect(t18En.dataCategories.join(" ")).toContain("microphone or sound muted, screen sharing or camera on");
+    expect(t18.dataCategories.join(" ")).toContain("identifiant Discord du membre et de sa session vocale");
+    expect(t18En.dataCategories.join(" ")).toContain("Discord identifier of the member and of their voice session");
     expect(t18.retention[0]).toContain("copies de sauvegarde chiffrées (T09");
     expect(t18En.retention[0]).toContain("encrypted backup copies (T09");
     expect(t18.retention[1]).toContain("déplacé hors de la catégorie des matchs");
@@ -2378,6 +2378,13 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     const en = PRIVACY_CHANGES_EN[fr.id];
     expect(fr.details.join(" ")).toContain("Vous pouvez vous opposer à ce traitement");
     expect(en.details.join(" ")).toContain("You can object to this processing");
+  });
+
+  it("processingRegister_t18_legalBasisClaimsNoRulebookRequirementFrAndEn", () => {
+    const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
+    const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
+    expect(t18.legalBasis).not.toContain("règlement");
+    expect(t18En.legalBasis).not.toContain("rulebook");
   });
 
   it("processingRegister_t08_pointsVoiceChannelsToT18FrAndEn", () => {
