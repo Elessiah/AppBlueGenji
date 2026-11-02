@@ -37,7 +37,10 @@ lecture d'**un** match (`loadViewerMatchContacts`, `GET /api/matches/[id]/contac
 **et** rôle de partie (`party.role !== "REFEREE"`). La modale de lancement
 (`listViewerMatchLaunches`) ne l'envoie pas, et le champ y est absent. Il suit
 la fenêtre des contacts (`ctx.exposes`), comme le BattleTag, et passe par
-`visibleDiscordTag` (`sharesMatchLobby`) — seul un tag certifié sort.
+`visibleDiscordTag` (`sharesMatchLobby`) — seul un tag certifié sort. Un
+arbitre qui caste aussi le match suit la règle des casters : son tag attend
+le départ (`ctx.exposesCaster`). Le texte de certification (`DISCORD_VERIFICATION_EXPOSURE`,
+`verify.exposure.match` FR et EN) nomme ces lecteurs.
 `RefereeCard` dessine la ligne « Discord » avec « Copier » quand le champ est
 présent : sur la page du match comme dans la fenêtre « Contacts », qui lit la
 même route.

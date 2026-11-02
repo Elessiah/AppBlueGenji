@@ -274,6 +274,12 @@ describe("les textes de consentement", () => {
     expect(joined).toContain("dès que ses deux adversaires sont connus et jusqu'à sa fin, ses casters le temps du match seulement");
   });
 
+  it("nomment les lecteurs du tag de l'arbitre désigné et la durée de l'exposition", () => {
+    const joined = DISCORD_VERIFICATION_EXPOSURE.join(" ").toLowerCase();
+    expect(joined).toContain("si tu es l'arbitre désigné d'un match, ses deux équipes voient le tien dès que ses deux adversaires sont connus et jusqu'à sa fin, ses casters le temps du match seulement");
+    expect(joined).toContain("le temps du match seulement pour tous si tu le castes aussi");
+  });
+
   it("disent que rien n'est public", () => {
     const joined = DISCORD_VERIFICATION_EXPOSURE.join(" ").toLowerCase();
     expect(joined).toContain("publique");

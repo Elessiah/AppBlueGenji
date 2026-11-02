@@ -618,8 +618,9 @@ function MapsSection({
 
 /**
  * Infos de connexion du match (`docs/features/MATCH_PAGE_CONNECT.md`) : les
- * fiches des deux engagées — hôte en tête, contacts, comme la fenêtre
- * « Contacts » — aux seules **parties** du match (joueurs des deux engagées,
+ * fiches des deux engagées, avec leurs contacts comme dans la fenêtre
+ * « Contacts » (qui garde l'ordre du tableau ; la page met l'hôte en tête),
+ * aux seules **parties** du match (joueurs des deux engagées,
  * casters, arbitre désigné : `connectionReader`), jamais à un arbitre sans
  * rôle sur le match, qui garde la fenêtre « Contacts ». Les données viennent
  * de la lecture d'un match (`useMatchContacts`), propre au lecteur : rien

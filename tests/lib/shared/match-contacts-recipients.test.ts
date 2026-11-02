@@ -113,6 +113,11 @@ describe("tag Discord d'un caster et BattleTag masqué dans l'avis", () => {
     expect(readSource("lib/shared/rgpd-policy-en.ts")).toContain("its casters only while the match is being played (and, if you cast a match, both its teams, its other casters and its assigned referee while the match is being played, in its “Contacts” and launch windows and on its page, and the other referees from the moment both its opponents are known until its end, in its “Contacts” window and on its page);");
   });
 
+  it("les textes de certification disent qui voit le tag de l'arbitre désigné (FR et EN)", () => {
+    expect(frProfile.verify.exposure.match).toContain("Si tu es l'arbitre désigné d'un match, ses deux équipes voient le tien dès que ses deux adversaires sont connus et jusqu'à sa fin, ses casters le temps du match seulement, dans sa fenêtre « Contacts » et sur sa page");
+    expect(enProfile.verify.exposure.match).toContain("If you are a match's assigned referee, both its teams see yours from the moment both its opponents are known until its end, and its casters only while the match is being played, in its “Contacts” window and on its page");
+  });
+
   it("l'avis de changement dit que le BattleTag présenté peut être masqué (FR et EN)", () => {
     expect(PRIVACY_CHANGES.find((c) => c.id === ENTRY_ID)?.details.join("\n")).toContain("le BattleTag, même masqué, d'un ou deux membres");
     expect(PRIVACY_CHANGES_EN[ENTRY_ID]?.details.join("\n")).toContain("the BattleTag, even if hidden, of one or two members");

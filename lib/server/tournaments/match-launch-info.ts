@@ -642,18 +642,15 @@ function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: L
 }
 
 /**
- * L'arbitre désigné tel que les parties du match le lisent : pseudo et, en
- * Overwatch seulement (`withGameBattletag`), BattleTag (`visibleBattletag`,
- * clause `sharesLiveMatch`) ; son tag Discord certifié par la carte seulement,
- * aux parties du match (`ctx.refereeDiscord`) — le champ est absent ailleurs.
- * `null` sans arbitre ou arbitre inéligible.
- */
-/**
  * Tag Discord certifié de l'arbitre pour ce lecteur : tu hors de la fenêtre
  * des contacts (`ctx.exposes`) et sur sa propre fiche, qui n'a rien à lui dire.
+ * Un arbitre qui caste aussi le match suit la règle des casters : son tag
+ * attend le départ (`ctx.exposesCaster`), comme sur sa carte de caster.
  */
 function refereeDiscordTag(user: UserRow, isViewer: boolean, ctx: LaunchContext): string | null {
   if (!ctx.exposes || isViewer) return null;
+  const casts = ctx.casters.some((caster) => caster.userId === Number(user.id));
+  if (casts && !ctx.exposesCaster) return null;
   const verified = user.discord_verified_at !== null;
   return visibleDiscordTag(verified ? user.discord_pseudo : null, ctx.viewer, {
     userId: Number(user.id),
@@ -662,6 +659,13 @@ function refereeDiscordTag(user: UserRow, isViewer: boolean, ctx: LaunchContext)
   });
 }
 
+/**
+ * L'arbitre désigné tel que les parties du match le lisent : pseudo et, en
+ * Overwatch seulement (`withGameBattletag`), BattleTag (`visibleBattletag`,
+ * clause `sharesLiveMatch`) ; son tag Discord certifié par la carte seulement,
+ * aux parties du match (`ctx.refereeDiscord`) — le champ est absent ailleurs.
+ * `null` sans arbitre ou arbitre inéligible.
+ */
 function buildLaunchReferee(row: CandidateRow, ctx: LaunchContext): LaunchReferee | null {
   if (!row.refereeEligible || row.referee_user_id === null) return null;
   const user = ctx.users.get(Number(row.referee_user_id));

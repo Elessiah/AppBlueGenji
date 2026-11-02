@@ -1185,6 +1185,29 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
       expect(JSON.stringify(info)).not.toContain("juge");
     });
 
+    it("loadViewerMatchContacts_refereeAlsoCastsScheduledMatch_withholdsDiscordTagUntilKickoff", async () => {
+      const later = new Date(Date.now() + 3 * 3_600_000).toISOString();
+      state.candidates = [
+        candidate({ match_launch_phase: 0, start_at: later, lobby_opened_at: null, referee_user_id: REFEREE, caster_user_id: REFEREE, self_managed: 0 }),
+      ];
+      state.users = [juge()];
+
+      const info = await loadViewerMatchContacts(viewer, 42);
+
+      expect(info?.phase).toBe("SCHEDULED");
+      expect(info?.referee?.discordTag).toBeNull();
+      expect(JSON.stringify(info)).not.toContain("juge");
+    });
+
+    it("loadViewerMatchContacts_refereeAlsoCastsOpenedMatch_sendsDiscordTag", async () => {
+      state.candidates = [candidate({ referee_user_id: REFEREE, caster_user_id: REFEREE, self_managed: 0 })];
+      state.users = [juge()];
+
+      const info = await loadViewerMatchContacts(viewer, 42);
+
+      expect(info?.referee?.discordTag).toBe("juge");
+    });
+
     it("loadViewerMatchContacts_marvelRivals_sendsDiscordTagWithoutBattletag", async () => {
       state.candidates = [candidate({ tournament_game: "MR", referee_user_id: REFEREE, self_managed: 0 })];
       state.users = [juge()];
