@@ -1285,6 +1285,18 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
       expect(info?.referee).toMatchObject({ discordTag: "juge", battletag: "Arbitre#1" });
     });
 
+    // Un arbitre sans Discord certifié n'est pas éligible : jamais présenté, son
+    // tag non certifié ne sort donc d'aucune façon.
+    it("loadViewerMatchContacts_uncertifiedRefereeDiscord_neverSendsTag", async () => {
+      state.candidates = [candidate({ referee_user_id: REFEREE, self_managed: 0 })];
+      state.users = [refereeUser({ discord_pseudo: "juge", discord_verified_at: null })];
+
+      const info = await loadViewerMatchContacts(viewer, 42);
+
+      expect(info?.referee).toBeNull();
+      expect(JSON.stringify(info)).not.toContain("juge");
+    });
+
     it("loadViewerMatchContacts_marvelRivals_sendsDiscordTagWithoutBattletag", async () => {
       state.candidates = [candidate({ tournament_game: "MR", referee_user_id: REFEREE, self_managed: 0 })];
       state.users = [juge()];

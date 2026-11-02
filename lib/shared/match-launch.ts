@@ -669,6 +669,21 @@ export function casterContactsPending(launch: {
   return launch.casters.some(casterCardPending);
 }
 
+/**
+ * Les contacts de l'arbitre désigné attendent-ils le départ pour ce lecteur ?
+ * Un lecteur caster (rôle `CASTER`, staff compris) ne les lit que le temps du
+ * match (`refereeContactsOpen`, serveur) : avant, la lecture doit se refaire
+ * au départ, même si aucune fiche de caster n'attend (`casterRereadDelay`).
+ */
+export function refereeContactsPending(launch: Pick<MatchLaunchInfo, "referee" | "viewer" | "phase">): boolean {
+  return (
+    launch.viewer.role === "CASTER" &&
+    launch.referee !== null &&
+    !launch.referee.isViewer &&
+    !matchUnderway(launch.phase)
+  );
+}
+
 /** Le caster a-t-il au moins un contact à montrer (tag Discord ou BattleTag, absent hors Overwatch) ? */
 export function casterHasContacts(caster: Pick<LaunchCaster, "discordTag" | "battletag">): boolean {
   return caster.discordTag !== null || (caster.battletag ?? null) !== null;

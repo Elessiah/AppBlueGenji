@@ -10,6 +10,7 @@ import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 import {
   MATCH_LAUNCH_REFRESH_EVENT,
   casterContactsPending,
+  refereeContactsPending,
   type MatchLaunchInfo,
 } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
@@ -104,13 +105,14 @@ const MAX_TIMER_MS = 2_147_483_647;
 
 /**
  * Attente avant de relire une modale ouverte dont les contacts du caster
- * attendent le départ, `null` sans relecture : jusqu'à l'heure de départ **du
+ * (ou ceux de l'arbitre, pour un lecteur caster) attendent le départ, `null` sans relecture : jusqu'à l'heure de départ **du
  * serveur** (en-tête `Date` de la réponse), plus une seconde — l'en-tête est
  * tronqué à la seconde, et l'horloge du navigateur peut avancer. Sans caster,
  * sans heure ou départ déjà passé au serveur, rien n'est relu.
  */
 export function casterRereadDelay(launch: MatchLaunchInfo, serverDate: string | null): number | null {
-  if (!casterContactsPending(launch) || launch.phase !== "SCHEDULED") return null;
+  const pending = casterContactsPending(launch) || refereeContactsPending(launch);
+  if (!pending || launch.phase !== "SCHEDULED") return null;
   if (launch.startAt === null || serverDate === null) return null;
   const start = Date.parse(launch.startAt);
   const server = Date.parse(serverDate);
