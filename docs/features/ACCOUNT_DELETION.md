@@ -32,7 +32,7 @@ survivre ?** Quatre traces le disent, et aucune n'est décorative.
 | Trace | Pourquoi elle retient la ligne |
 | --- | --- |
 | `playedMatches` | Il a **joué** : un match compté (`playedMatchSql` — ni exemption, ni match fantôme, ni double forfait) d'une équipe dont il était membre pendant le tournoi (la fenêtre d'appartenance des statistiques), ou de son entrée solo. C'est la trace qui porte des statistiques, donc la seule qui justifie de garder la ligne sous un faux nom. Être au roster d'une équipe engagée ne suffit plus. |
-| `soloRegistrations` | Son **entrée solo est inscrite** à un tournoi, jouée ou non : son nom d'engagé est le pseudo du joueur, l'effacement la laisserait nommer quelqu'un qui n'existe plus. Trace à part de `playedMatches` parce que sa phrase l'est : une inscription jamais jouée ne laisse aucune statistique, la confirmation (motif `SOLO_REGISTRATIONS`) n'en promet donc pas. |
+| `soloRegistrations` | Son **entrée solo est engagée** dans un tournoi déjà commencé ou terminé : son nom d'engagé est le pseudo du joueur, l'effacement la laisserait nommer quelqu'un qui n'existe plus. Depuis la décision D12 (2026-11-02), une inscription à un tournoi **pas encore commencé** (`entrantRemovalBlockReason` nul), sans aucune ligne `bg_matches`, ne retient plus la ligne : elle est **retirée** avec le compte (`withdrawableSoloRegistrations`, `loadAccountDeletionFacts`) — mais seulement si **toutes** les inscriptions solo du compte le sont, sinon il est anonymisé comme avant. Trace à part de `playedMatches` parce que sa phrase l'est : une inscription jamais jouée ne laisse aucune statistique, la confirmation (motif `SOLO_REGISTRATIONS`) n'en promet donc pas. |
 | `organizedTournaments` | Il a **créé** un tournoi. `bg_tournaments.organizer_user_id` est `NOT NULL` en `ON DELETE RESTRICT` : la base refuserait l'effacement, et un tournoi sans organisateur n'aurait plus de titulaire. |
 | `ownedTeams` | Il est `OWNER` d'une équipe vivante. `bg_team_members` s'efface en cascade : l'effacer laisserait une équipe que personne ne peut plus renommer, dissoudre ni engager. |
 
@@ -116,6 +116,22 @@ verrou** sur la ligne du compte avant de créer l'entrée : ou bien l'inscriptio
 passe la première et la suppression *voit* l'entrée solo (donc anonymise), ou
 bien la suppression passe la première et l'inscription ne trouve plus personne
 (`USER_NOT_FOUND`).
+
+**Le retrait d'une inscription solo (D12) prend d'abord les tournois.**
+`deleteOwnAccount` relève, hors transaction, les tournois où l'entrée solo est
+inscrite (`listSoloRegistrationTournamentIds`), puis ouvre la transaction par
+`lockTournamentRow` sur chacun, dans l'ordre des identifiants, **avant** le
+verrou du compte : c'est l'ordre de l'inscription solo
+(`registerCurrentUserTeam` puis `ensureSoloEntry`), donc pas d'interblocage.
+Une inscription apparue entre le relevé et les verrous porte sur un tournoi non
+tenu : elle n'est pas retirée et le compte est anonymisé (conservateur). Le
+retrait supprime la ligne `bg_tournament_registrations`, renumérote les têtes de
+série (`resequenceSeeds`) puis laisse l'effacement emporter l'entrée solo ;
+après le `COMMIT` seulement, `publishUpdatedEvent` prévient chaque tournoi
+touché et `invalidateTeamIdentityViews` vide classements et accueil. Aucune
+annonce Discord : la suppression d'un compte reste silencieuse. Le rattrapage
+des comptes déjà supprimés garde, lui, la règle conservatrice (inscription solo
+= anonymisation).
 
 ## Ce que le joueur lit
 
@@ -307,6 +323,27 @@ refuse un compte supprimé). `displayRoles` est vide, même pour un compte
 supprimé avant la règle qui aurait gardé ses rôles. Aucune teinte chaude : un
 compte supprimé n'est pas une alerte.
 
+**La fiche n'est gardée que s'il a joué (décision D13, 2026-11-02).** Un compte
+supprimé sans match compté (`accountTraceSql().played`, la trace
+`playedMatches`) n'a plus de fiche : `getFullProfile` et `getPlayerPageIdentity`
+rendent `null` (`deletedAccountHasStats`, `lib/server/users/profileless-players.ts`),
+donc `/api/players/[id]` répond `404 PLAYER_NOT_FOUND` et la page la carte
+« introuvable » (FR et EN), titre neutre compris. Ses statistiques n'existent
+pas ; celles d'un compte qui a joué appartiennent aussi à ses adversaires.
+
+Son nom, lui, reste un **nom sans lien** partout où il s'affiche :
+`loadProfilelessPlayerIds` (cache de classement `list:profileless-players`,
+vidé à chaque score et à chaque suppression par `invalidateTeamIdentityViews`)
+est lu par le layout racine pour un visiteur connecté et transmis à
+`ProfilelessPlayersProvider` ; `PlayerLink` et `EntrantLink` lisent
+`useHasPlayerPage` et rendent `<span class="entity-name">`. Les liens se rendant
+côté client, les deux portes du direct (flux SSE et REST de secours) sont
+couvertes sans toucher au `TournamentSnapshot`. La carte du direct de l'accueil
+(`entrantHrefFor`) nulle aussi le lien d'une entrée solo sans fiche. Le layout
+racine n'étant pas rejoué à la navigation client, la liste peut dater d'avant
+une suppression jusqu'au prochain chargement : au pire, un lien mène à la page
+introuvable.
+
 ## Les comptes déjà supprimés
 
 La règle a changé sous des comptes qui l'avaient déjà subie, et un joueur parti
@@ -353,8 +390,9 @@ Un compte supprimé n'y porte **ni identifiant ni date de création**
 est l'adresse de sa fiche, qu'un ancien lien suffisait à rapprocher de la
 ligne anonymisée. Sa carte n'ouvre donc aucune fiche (pas de plaque
 `.cardOverlay`), et « Plus récents » le range en fin de liste, par pseudo
-(`compareNewestFirst`). La fiche `/joueurs/<id>` elle-même répond toujours
-pour un compte supprimé (brackets et feuilles de match y mènent).
+(`compareNewestFirst`). La fiche `/joueurs/<id>` elle-même ne répond plus que
+pour un compte supprimé qui a joué (brackets et feuilles de match y mènent) ;
+sans match, elle est introuvable (voir « La fiche d'un compte supprimé »).
 
 ## Matchs d'un compte supprimé
 
