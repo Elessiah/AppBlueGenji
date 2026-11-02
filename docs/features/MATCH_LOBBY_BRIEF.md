@@ -22,7 +22,7 @@ Vu de l'engagée du destinataire (« ton match « A » contre « B » ») :
   ou autogestion — l'hôte crée la partie, les managers s'invitent puis invitent
   les casters ; rien sans décision (le staff en est averti à part). Un arbitre
   devenu membre actif (ou joueur solo) d'une des deux engagées n'est pas annoncé
-  (`referee_plays`). Contre une **fantôme**, la ligne d'autogestion n'est pas
+  (`referee_plays`, bâti par `playsMatchSql` comme l'éligibilité). Contre une **fantôme**, la ligne d'autogestion n'est pas
   écrite (personne en face pour s'inviter) ;
 - le lien de la **page du match** (`/tournois/[id]/matchs/[matchId]`,
   `matchPageHref`, sous `/en` pour un compte anglais une fois la route traduite
@@ -51,8 +51,8 @@ deux lisent les places et l'ordre des bans dans `lobbyBriefNames`
 (`lib/shared/lobby-brief.ts`, avec le type `LobbyBriefSide`, sans dépendance
 lourde). Le push cite les noms d'équipe (« » / “ ”, comme le message privé :
 un nom contenant « · » ne se confond pas avec le séparateur), passés par
-`visibleText` (un ancien nom gardant U+202E ne retourne pas la ligne — de même
-dans `matchStartPush`), et ôte la ponctuation finale de la carte (le gabarit
+`withoutInvisibles` (un ancien nom gardant U+202E ne retourne pas la ligne — de même
+dans `matchStartPush` ; la carte aussi), et ôte la ponctuation finale de la carte (le gabarit
 pose son point). Il tient sous `PUSH_BODY_MAX` : « Droite (1er ban) » (aucun nom
 répété), carte en dernier ; le rappel du tri par rôle, en tête, **cède sa
 place** quand le corps dépasserait la borne (le message privé et la page le
@@ -103,10 +103,13 @@ ouvre un lancement, lecture de la liste des tournois).
   rien, la réservation du côté est rendue — **par son id** (avec deux
   processus, jamais celle que l'autre a reprise), en un lot après la boucle,
   pm2 ne disant « remis au balayage suivant » qu'une fois le rendu fait — et
-  le balayage suivant est armé (trois relances d'affilée au plus, puis le
-  prochain évènement du tournoi). Une réservation dont l'instruction lève (la
-  connexion a pu tomber après l'écriture) est rendue par sa clé, puis le
-  balayage s'arrête. Un envoi qui lève garde la sienne (le push et le message
+  le balayage suivant est armé (trois relances d'affilée **par match** au plus,
+  puis le prochain évènement du tournoi ; un match qui échoue toujours
+  n'épuise pas celles des autres). Une panne après la réservation (réglages,
+  lien) rend de même la réservation, et une lecture des destinataires en
+  panne arme aussi la relance. Une réservation dont l'instruction lève (la
+  connexion a pu tomber après l'écriture) est rendue par sa clé ; dans les deux cas, les
+  matchs suivants du balayage partent quand même. Un envoi qui lève garde la sienne (le push et le message
   privé partent ensemble, une partie a pu partir) : jamais deux fois. Un côté
   que **personne** n'a reçu (messages privés coupés, tag non certifié, push
   éteint : `report.discord.sent` + `report.pushed` nuls) n'est pas compté comme
