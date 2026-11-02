@@ -72,11 +72,16 @@ anciennes clés `tournament.matchPage.*` restant pour les sections.
    sans réglage du tour, liste outillée du tour (`MatchRoundMaps`) au staff et
    aux équipes qui choisissent — le public lit les maps dans les faits clés —,
    rappel « triez les joueurs par rôle » d'un match casté.
-5. **Arbitrage** (colonne de droite, `matchPageDecision`) : « Arbitre désigné » aux visiteurs sans
+5. **Infos de connexion** (colonne de droite, en tête) : les fiches des
+   deux engagées — hôte en tête, contacts —, aux seules parties du match
+   (`connectionReader`) ; voir `MATCH_PAGE_CONNECT.md`.
+6. **Arbitrage** (colonne de droite, `matchPageDecision`) : « Arbitre désigné » aux visiteurs sans
    compte — son explication derrière le « i » —, « Arbitre : <pseudo> » à
    tout membre connecté jusqu'à la déclaration de son score ou la fin du
-   tournoi (#507, conditions v8), son pseudo et — en Overwatch seulement — son BattleTag (« À inviter
-   dans la partie ») aux seuls lecteurs que sert la lecture des contacts ; ou l'aide-mémoire de l'**autogestion**,
+   tournoi (#507, conditions v8), son pseudo et — en Overwatch seulement — son BattleTag (« À ajouter en
+   ami ») aux seuls lecteurs que sert la lecture des contacts, et son tag
+   Discord certifié (« Copier ») aux seules parties du match
+   (`MATCH_PAGE_CONNECT.md`) ; ou l'aide-mémoire de l'**autogestion**,
    à l'impératif, aux seuls lecteurs qui organisent le match (joueur, caster
    inscrit, staff — les autres, spectateurs de /suivre compris, lisent
    l'autogestion dans les faits clés) (l'hôte crée la partie, les managers s'invitent, les paramètres, les casters
@@ -89,7 +94,7 @@ anciennes clés `tournament.matchPage.*` restant pour les sections.
    **staff seul**, « Aucune décision ». Rien sur un match terminé ou une
    exemption. Prendre, rendre ou confier l'arbitrage reste le geste de la carte
    (`MATCH_REFEREE.md`).
-6. **Casts** (`matchPageStreams`) : **tous** les streams du match, chacun avec
+7. **Casts** (`matchPageStreams`) : **tous** les streams du match, chacun avec
    son lien et ses casters (co-cast compris, chacun par `PlayerLink` — sans compte, pseudo seul : l'identifiant y est masqué), le
    premier lien des vues compactes en tête — gardé même quand aucun stream
    visible ne le porte, comme sur la carte. Deux liens au même texte prennent
@@ -117,8 +122,8 @@ la fenêtre « Contacts » (`GET /api/matches/[id]/contacts`, hook partagé
 `useMatchContacts`), demandée aux mêmes lecteurs que le bouton de la carte
 (`launchStripControls` : `showContacts` / `showOpen`) — jamais sans compte, ni
 sur une fiche figée. Le serveur décide seul de ce qu'il rend
-(`AUTHORIZATION_RULES.md`). Les contacts des deux équipes ne sont pas repris :
-ils restent dans la fenêtre « Contacts ». Le registre et `/rgpd` nomment la page
+(`AUTHORIZATION_RULES.md`). Les contacts des deux équipes sont repris dans la section **« Infos de
+connexion »**, aux seules parties du match (`MATCH_PAGE_CONNECT.md`). Le registre et `/rgpd` nomment la page
 parmi les lieux où ces contacts paraissent, avec leur base
 (registre T01, T04 ; tableau de `/rgpd` par `rgpd-policy.ts`) : contrat pour les
 contacts des casters et, une fois que l'arbitre a accepté la version 7 des

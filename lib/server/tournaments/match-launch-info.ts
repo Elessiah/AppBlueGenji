@@ -371,6 +371,14 @@ type LaunchContext = {
    * ce drapeau porte seul la décision pour le caster.
    */
   exposesCaster: boolean;
+  /**
+   * Tag Discord certifié **de l'arbitre désigné** (`MATCH_PAGE_CONNECT.md`) :
+   * par la carte (`GET /api/matches/[id]/contacts`, page du match et fenêtre
+   * « Contacts ») et aux seules parties du match — joueurs, casters, l'arbitre
+   * lui-même —, jamais à un arbitre sans rôle sur le match (rôle `REFEREE`) ni
+   * dans la modale de lancement. Suit `exposes`, comme son BattleTag.
+   */
+  refereeDiscord: boolean;
 };
 
 
@@ -636,20 +644,38 @@ function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: L
 /**
  * L'arbitre désigné tel que les parties du match le lisent : pseudo et, en
  * Overwatch seulement (`withGameBattletag`), BattleTag (`visibleBattletag`,
- * clause `sharesLiveMatch`), jamais son tag Discord. `null` sans arbitre ou
- * arbitre inéligible.
+ * clause `sharesLiveMatch`) ; son tag Discord certifié par la carte seulement,
+ * aux parties du match (`ctx.refereeDiscord`) — le champ est absent ailleurs.
+ * `null` sans arbitre ou arbitre inéligible.
  */
+/**
+ * Tag Discord certifié de l'arbitre pour ce lecteur : tu hors de la fenêtre
+ * des contacts (`ctx.exposes`) et sur sa propre fiche, qui n'a rien à lui dire.
+ */
+function refereeDiscordTag(user: UserRow, isViewer: boolean, ctx: LaunchContext): string | null {
+  if (!ctx.exposes || isViewer) return null;
+  const verified = user.discord_verified_at !== null;
+  return visibleDiscordTag(verified ? user.discord_pseudo : null, ctx.viewer, {
+    userId: Number(user.id),
+    verified,
+    sharesMatchLobby: true,
+  });
+}
+
 function buildLaunchReferee(row: CandidateRow, ctx: LaunchContext): LaunchReferee | null {
   if (!row.refereeEligible || row.referee_user_id === null) return null;
   const user = ctx.users.get(Number(row.referee_user_id));
   if (!user || Number(user.is_deleted) !== 0) return null;
+  const isViewer = Number(user.id) === ctx.viewer.id;
+  const discord = ctx.refereeDiscord ? { discordTag: refereeDiscordTag(user, isViewer, ctx) } : {};
   return withGameBattletag(
     row.tournament_game,
     {
       userId: Number(user.id),
       pseudo: user.pseudo,
+      ...discord,
       ready: ctx.readiness.referee?.ready ?? false,
-      isViewer: Number(user.id) === ctx.viewer.id,
+      isViewer,
     },
     {
       // Le BattleTag suit la fenêtre des contacts du match (`ctx.exposes`) : les
@@ -816,6 +842,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
           // elle est vraie, `exposes` l'est aussi ; le `exposes &&` n'est
           // qu'un filet : jamais le caster sans le match.
           exposesCaster: exposes && exposesCasterContacts(phase, party.role),
+          refereeDiscord: forCard && party.role !== "REFEREE",
         }),
       );
     }

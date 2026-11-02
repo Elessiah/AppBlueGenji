@@ -53,6 +53,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `TOURNAMENT_HEADER.md` — En-tête de la fiche : outils du lecteur, identité, faits, actions.
 - `TOURNAMENT_PAGE_PATH.md` — Arrivée, retour et confirmations de la fiche tournoi.
 - `MATCH_PAGE.md` — Page d'un match (`/tournois/[id]/matchs/[matchId]`) : hôte, première map, arbitrage ou autogestion, tous les streams et leurs casters ; BattleTag (contacts des équipes, casters, arbitre) en Overwatch seulement.
+- `MATCH_PAGE_CONNECT.md` — Infos de connexion de la page du match (contacts des deux équipes, tag Discord certifié de l'arbitre désigné avec « Copier », BattleTag de l'arbitre « À ajouter en ami ») aux seules parties du match — joueurs, casters, arbitre désigné —, jamais à un arbitre sans rôle sur le match.
 - `SPECTATOR_VIEW.md` — Suivi d'un tournoi sans compte (`/suivre/tournois/[id]`) : redirections entre espaces, fiche commune, relecture réglée par la charge du serveur, prix des reconstructions (seau à jetons par réseau, copie périmée bornée).
 - `ADMIN_CONFIRMATIONS.md` — Audit des gestes du staff qui défont quelque chose, et quand ils se font confirmer.
 - `TOURNAMENT_PROGRESS.md` — Frise de progression, de masqué à terminé.

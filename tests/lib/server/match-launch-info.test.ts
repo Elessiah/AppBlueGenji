@@ -1126,6 +1126,75 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
     expect(state.writes.some((sql) => sql.includes("referee_user_id = NULL"))).toBe(true);
   });
 
+  // MATCH-PAGE-CONNECT : son tag Discord certifié, par la lecture d'un match,
+  // aux seules parties du match (`docs/features/MATCH_PAGE_CONNECT.md`).
+  describe("tag Discord de l'arbitre", () => {
+    const juge = () => refereeUser({ discord_pseudo: "juge" });
+
+    it("loadViewerMatchContacts_playerReader_sendsRefereeCertifiedDiscordTag", async () => {
+      state.candidates = [candidate({ referee_user_id: REFEREE, self_managed: 0 })];
+      state.users = [juge()];
+
+      const info = await loadViewerMatchContacts(viewer, 42);
+
+      expect(info?.referee).toMatchObject({ pseudo: "Arbitre", discordTag: "juge", battletag: "Arbitre#1" });
+    });
+
+    it("loadViewerMatchContacts_casterReader_sendsRefereeCertifiedDiscordTag", async () => {
+      state.viewerMemberships = [];
+      state.candidates = [candidate({ referee_user_id: REFEREE, caster_user_id: VIEWER, self_managed: 0 })];
+      state.users = [casterUser(VIEWER), juge()];
+
+      const info = await loadViewerMatchContacts(viewer, 42);
+
+      expect(info?.viewer.role).toBe("CASTER");
+      expect(info?.referee?.discordTag).toBe("juge");
+    });
+
+    it("loadViewerMatchContacts_staffWithoutRoleOnMatch_omitsRefereeDiscordField", async () => {
+      state.viewerMemberships = [];
+      state.candidates = [candidate({ referee_user_id: REFEREE, self_managed: 0 })];
+      state.users = [juge()];
+
+      const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"] }, 42);
+
+      expect(info?.viewer.role).toBe("REFEREE");
+      expect(info?.referee).toBeDefined();
+      expect(info?.referee).not.toHaveProperty("discordTag");
+      expect(JSON.stringify(info?.referee)).not.toContain("juge");
+    });
+
+    it("loadViewerMatchContacts_refereeReadsOwnMatch_ownDiscordTagNull", async () => {
+      state.viewerMemberships = [];
+      state.candidates = [candidate({ referee_user_id: VIEWER, self_managed: 0 })];
+      state.users = [casterUser(VIEWER, { discord_pseudo: "moi", platform_roles_json: JSON.stringify(["ARBITRE"]) })];
+
+      const info = await loadViewerMatchContacts({ id: VIEWER, roles: ["ARBITRE"] }, 42);
+
+      expect(info?.viewer).toMatchObject({ role: "MATCH_REFEREE", isReferee: true });
+      expect(info?.referee).toMatchObject({ isViewer: true, discordTag: null });
+    });
+
+    it("listViewerMatchLaunches_launchModal_omitsRefereeDiscordField", async () => {
+      state.candidates = [candidate({ referee_user_id: REFEREE, self_managed: 0 })];
+      state.users = [juge()];
+
+      const [info] = await listViewerMatchLaunches(viewer);
+
+      expect(info.referee).not.toHaveProperty("discordTag");
+      expect(JSON.stringify(info)).not.toContain("juge");
+    });
+
+    it("loadViewerMatchContacts_marvelRivals_sendsDiscordTagWithoutBattletag", async () => {
+      state.candidates = [candidate({ tournament_game: "MR", referee_user_id: REFEREE, self_managed: 0 })];
+      state.users = [juge()];
+
+      const info = await loadViewerMatchContacts(viewer, 42);
+
+      expect(info?.referee).toEqual({ userId: REFEREE, pseudo: "Arbitre", discordTag: "juge", ready: false, isViewer: false });
+    });
+  });
+
   it("autogestion : aucun arbitre, la note suit", async () => {
     state.candidates = [candidate({ self_managed: 1 })];
     const [info] = await listViewerMatchLaunches(viewer);

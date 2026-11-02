@@ -376,9 +376,11 @@ export function CasterCard({
 }
 
 /**
- * Fiche de l'arbitre désigné (`docs/features/MATCH_REFEREE.md`) : son pseudo et,
- * en Overwatch seulement, son BattleTag — exposés par le serveur aux deux engagées, aux casters du
- * match et au staff seulement. Sans arbitre, la note d'autogestion, ou rien.
+ * Fiche de l'arbitre désigné (`docs/features/MATCH_REFEREE.md`) : son pseudo,
+ * en Overwatch seulement son BattleTag — exposés par le serveur aux deux engagées, aux casters du
+ * match et au staff seulement —, et son tag Discord certifié quand le serveur
+ * l'envoie (lecture d'un match, parties du match seulement :
+ * `MATCH_PAGE_CONNECT.md`). Sans arbitre, la note d'autogestion, ou rien.
  */
 export function RefereeCard({
   referee,
@@ -393,7 +395,7 @@ export function RefereeCard({
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
   linkNames?: boolean;
-  /** Note posée sur le BattleTag (page du match : « À ajouter en jeu »). */
+  /** Note posée sur le BattleTag (page du match : « À ajouter en ami »). */
   battletagNote?: string;
 }>) {
   const { t } = useLaunchText();
@@ -420,15 +422,22 @@ export function RefereeCard({
         </span>
         <ReadyChip ready={referee.ready} phase={phase} />
       </div>
-      {!referee.isViewer && referee.battletag != null && (
+      {!referee.isViewer && (referee.discordTag != null || referee.battletag != null) && (
         <div className={styles.casterIds}>
-          <IdentityLine
-            kind="BattleTag"
-            value={referee.battletag}
-            verified={referee.battletagVerified === true}
-            onCopy={onCopy}
-            note={battletagNote}
-          />
+          {/* Tag Discord certifié : le serveur ne l'envoie qu'aux parties du
+              match, par la lecture d'un match (page, fenêtre « Contacts »). */}
+          {referee.discordTag != null && (
+            <IdentityLine kind="Discord" value={referee.discordTag} verified onCopy={onCopy} />
+          )}
+          {referee.battletag != null && (
+            <IdentityLine
+              kind="BattleTag"
+              value={referee.battletag}
+              verified={referee.battletagVerified === true}
+              onCopy={onCopy}
+              note={battletagNote}
+            />
+          )}
         </div>
       )}
     </section>

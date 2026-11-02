@@ -4,6 +4,7 @@ import {
   autoLaunchAt,
   canDeclareTeamReady,
   canPlayersReportScore,
+  connectionReader,
   castBlockReason,
   currentLaunchState,
   isAutoLaunchDue,
@@ -24,6 +25,7 @@ import {
   readyCount,
   resolveHostTeamId,
   type ContactCandidate,
+  type MatchLaunchInfo,
   type MatchLaunchInput,
 } from "@/lib/shared/match-launch";
 
@@ -555,4 +557,29 @@ describe("launchErrorMessage", () => {
       expect(message).toMatch(/Réessaie/);
     },
   );
+});
+
+// MATCH-PAGE-CONNECT : les infos de connexion de la page du match aux seules
+// parties du match, jamais à un arbitre sans rôle sur lui.
+describe("connectionReader", () => {
+  const reader = (overrides: Partial<MatchLaunchInfo["viewer"]>): Pick<MatchLaunchInfo, "viewer"> => ({
+    viewer: { role: "TEAM1", canDeclareReady: true, isReferee: false, isCaster: false, earlyContacts: true, ready: false, ...overrides },
+  });
+
+  it("connectionReader_playerOfEitherTeam_true", () => {
+    expect(connectionReader(reader({ role: "TEAM1" }))).toBe(true);
+    expect(connectionReader(reader({ role: "TEAM2" }))).toBe(true);
+  });
+
+  it("connectionReader_registeredCaster_true", () => {
+    expect(connectionReader(reader({ role: "CASTER", isCaster: true, earlyContacts: false }))).toBe(true);
+  });
+
+  it("connectionReader_assignedReferee_true", () => {
+    expect(connectionReader(reader({ role: "MATCH_REFEREE", isReferee: true }))).toBe(true);
+  });
+
+  it("connectionReader_refereeWithoutRoleOnMatch_false", () => {
+    expect(connectionReader(reader({ role: "REFEREE", canDeclareReady: false }))).toBe(false);
+  });
 });

@@ -477,7 +477,7 @@ describe("bases légales : le registre et la politique disent la même chose", (
 
   it("fonde les contacts du lancement d'un match sur l'exécution des conditions d'utilisation", () => {
     expect(byRef("T04").legalBasis).toMatch(
-      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation, section « Contacts de match »\) pour la présentation des contacts aux parties d'un match dans sa fenêtre « Contacts » et dans sa fenêtre de lancement — et, pour les contacts des casters, sur la page du match — \(à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, à ses casters le temps du match, et ceux de chaque caster — service qu'il demande en s'inscrivant sur le match — à ses deux équipes et aux autres casters du match le temps du match et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin ; la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné\), BattleTag masqué compris dans les seuls tournois Overwatch — arbitres et administrateurs n'y ont pas d'autre accès, sur la même base —,/,
+      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation, section « Contacts de match »\) pour la présentation des contacts aux parties d'un match dans sa fenêtre « Contacts » et dans sa fenêtre de lancement — et, sur la page du match, pour les contacts des casters et, aux seules parties du match, ceux des deux équipes — \(à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, à ses casters le temps du match, et ceux de chaque caster — service qu'il demande en s'inscrivant sur le match — à ses deux équipes et aux autres casters du match le temps du match et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin ; la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné\), BattleTag masqué compris dans les seuls tournois Overwatch — arbitres et administrateurs n'y ont pas d'autre accès, sur la même base —,/,
     );
   });
 
@@ -697,7 +697,9 @@ describe("T04 / T05 — arbitre désigné d'un match (MATCH-REFEREE MR-2, FR et 
   const t05En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!;
 
   it("déclare qui lit l'arbitre, ce qui est montré, l'avis push et ce qui est gardé", () => {
-    expect(t04.subPurposes.join(" ")).toContain("jamais son tag Discord");
+    // MATCH-PAGE-CONNECT : son tag Discord certifié aux seules parties du match.
+    expect(t04.subPurposes.join(" ")).toContain("son tag Discord certifié aussi, dans la fenêtre « Contacts » et sur la page du match, aux seules parties du match");
+    expect(t04.legalBasis).toContain("intérêt légitime (que les parties du match puissent joindre son arbitre) pour la présentation de son tag Discord certifié");
     // MATCH-UI-NAMES (décisions 47 et 52) : pseudo seul aux membres connectés, « Prêt » aux seules parties.
     expect(t04.subPurposes.join(" ")).toContain("montrer aussi son pseudo seul à tout membre connecté, sur la carte et la page d'un match, jusqu'à la déclaration de son score ou la fin du tournoi (les visiteurs sans compte ne lisent que « Arbitre désigné »)");
     expect(t04.subPurposes.join(" ")).toContain("que seules ses parties et les arbitres lisent");
@@ -717,7 +719,8 @@ describe("T04 / T05 — arbitre désigné d'un match (MATCH-REFEREE MR-2, FR et 
     expect(t04En.retention).toHaveLength(t04.retention.length);
     expect(t04En.recipients).toHaveLength(t04.recipients.length);
     expect(t05En.subPurposes).toHaveLength(t05.subPurposes.length);
-    expect(t04En.subPurposes.join(" ")).toContain("never their Discord tag");
+    expect(t04En.subPurposes.join(" ")).toContain("their certified Discord tag as well, in the “Contacts” window and on the match page, for the parties to the match alone");
+    expect(t04En.legalBasis).toContain("legitimate interest (the parties to the match being able to reach its referee) for presenting their certified Discord tag");
     expect(t04En.subPurposes.join(" ")).toContain("by push only (never by direct message)");
     expect(t04En.subPurposes.join(" ")).toContain("also showing their username alone to any signed-in member, on the card and page of a match, until its score is reported or the tournament ends (visitors without an account only read “Referee assigned”)");
     expect(t04En.legalBasis).toContain("legitimate interest (members knowing who referees a match) for showing their username to any signed-in member");

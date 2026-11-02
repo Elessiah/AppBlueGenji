@@ -1397,6 +1397,26 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui change : dans la fenêtre de diffusion d'un match, un membre de l'organisation (permission de gérer les tournois) coche « Ce lien est celui de l'organisation » — décoché par défaut — pour dire que le lien est celui de l'organisation, ou le laisse décoché si c'est sa propre chaîne. Coché, le lien reste au match quoi qu'il arrive à son compte, même s'il caste ce match ; décoché, il lui est rattaché et part à la suppression de son compte, matchs joués compris, comme celui d'un caster. Un compte sans cette permission pose toujours sa propre chaîne.",
       "Ce qui ne change pas : un lien déjà enregistré garde son auteur d'alors ; réenregistrer le même lien n'en change pas l'auteur ; le lien qu'un caster ouvre à part et celui posé avant que le site n'enregistre qui le fournit sont traités comme avant.",
     ],
+  },  {
+    // MATCH-PAGE-CONNECT (2026-11-02, demande de l'utilisateur) : la page du
+    // match montre aux seules parties du match (joueurs des deux équipes,
+    // casters, arbitre désigné) les infos de connexion — les contacts des deux
+    // équipes, jusqu'ici dans la seule fenêtre « Contacts » —, et le tag
+    // Discord certifié de l'arbitre désigné, nouveau lecteur (intérêt
+    // légitime : les conditions v8 ne le prévoient pas). Pour tous les
+    // comptes : pas de public. Datée du lendemain de la mise en ligne
+    // (déploiement de la nuit du 2 au 3 novembre au plus tôt).
+    id: "2026-11-page-du-match-infos-de-connexion",
+    publishedAt: "2026-11-04",
+    title: "Page du match : infos de connexion et tag Discord de l'arbitre",
+    links: [{ href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" }],
+    summary:
+      "La page d'un match montre désormais à ses seules parties — joueurs des deux équipes, casters, arbitre désigné — les contacts des deux équipes, comme la fenêtre « Contacts », et le tag Discord certifié de l'arbitre désigné, pour qu'on puisse le joindre.",
+    details: [
+      "Infos de connexion : les contacts présentés de chaque équipe (tag Discord certifié et, en Overwatch, BattleTag, même masqué, avec le rôle d'équipe) paraissent aussi sur la page du match, aux mêmes moments que dans la fenêtre « Contacts » — dès que les deux adversaires sont connus si tu joues, le temps du match si tu castes —, et seulement aux parties du match : ni aux autres membres, ni aux visiteurs, ni aux arbitres sans rôle sur ce match (qui gardent la fenêtre « Contacts »).",
+      "Arbitre désigné : son tag Discord certifié est maintenant présenté, dans la fenêtre « Contacts » et sur la page du match, à ses deux équipes et à ses casters, aux mêmes moments que son BattleTag — jamais dans la fenêtre de lancement ni aux arbitres sans rôle sur ce match. Les conditions d'utilisation ne le prévoyant pas, c'est au titre de l'intérêt légitime (que les parties puissent joindre leur arbitre) : l'arbitre peut s'y opposer par le formulaire de signalement (catégorie RGPD), avec le même effet qu'une opposition à sa présentation aux parties (retrait de ses matchs non terminés).",
+      "Ce qui ne change pas : rien de nouveau n'est collecté, et rien de cela n'entre dans ce que le site diffuse à tous les spectateurs d'un tournoi.",
+    ],
   },
 ];
 

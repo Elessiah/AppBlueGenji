@@ -497,13 +497,20 @@ export type LaunchCaster = {
 
 /**
  * L'arbitre désigné tel que la modale le présente : pseudo et, en Overwatch
- * seulement, BattleTag (à ajouter en jeu), jamais son tag Discord. Rendu aux seules parties du match
+ * seulement, BattleTag (à ajouter en ami). Rendu aux seules parties du match
  * (équipes, casters) et à l'arbitrage — le public ne lit que « Arbitre
  * désigné » (`BracketMatch.refereeAssigned`).
  */
 export type LaunchReferee = {
   userId: number;
   pseudo: string;
+  /**
+   * Tag Discord certifié : par la lecture d'**un** match (page du match,
+   * fenêtre « Contacts ») et aux seules parties du match — joueurs, casters,
+   * l'arbitre lui-même (toujours `null` pour lui) —, champ **absent** pour un
+   * arbitre sans rôle sur le match et dans la modale de lancement.
+   */
+  discordTag?: string | null;
   /** Absent hors Overwatch, comme celui d'un caster (`LaunchCaster.battletag`). */
   battletag?: string | null;
   battletagVerified?: boolean;
@@ -594,6 +601,18 @@ export function matchUnderway(phase: MatchLaunchPhase): boolean {
  */
 export function exposesMatchContacts(phase: MatchLaunchPhase, earlyReader: boolean): boolean {
   return matchUnderway(phase) || (earlyReader && (phase === "SCHEDULED" || phase === "TO_PLAN"));
+}
+
+/**
+ * Le lecteur est-il une **partie** du match — joueur d'une des deux engagées,
+ * caster inscrit ou arbitre désigné — plutôt qu'un arbitre sans rôle sur lui
+ * (rôle `REFEREE`, permission `tournaments`) ? Les infos de connexion de la
+ * page du match ne s'adressent qu'aux parties (`MATCH_PAGE_CONNECT.md`) ; le
+ * tag Discord de l'arbitre suit la même règle, au serveur (`refereeDiscord`).
+ */
+export function connectionReader(launch: Pick<MatchLaunchInfo, "viewer">): boolean {
+  const { viewer } = launch;
+  return viewer.role !== "REFEREE" || viewer.isReferee || viewer.isCaster;
 }
 
 /**

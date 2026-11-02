@@ -409,7 +409,8 @@ describe("page d'un match — arbitrage × lecteur", () => {
       const html = render(page, viewer);
       expect(visible(html)).toContain("Arbitre désigné");
       expect(html).toContain("Juge#3333");
-      expect(visible(html)).toContain("À inviter dans la partie");
+      expect(visible(html)).toContain("À ajouter en ami");
+      expect(html).not.toContain("À inviter dans la partie");
       expect(html).not.toContain("Killcam");
     }
   });
@@ -623,19 +624,115 @@ describe("page d'un match — contacts : qui les demande", () => {
     expect(mockEnabled).toEqual([false, false, false]);
   });
 
-  it("les lit pour un joueur du match et le staff, sans reprendre les contacts des équipes (fenêtre « Contacts »)", () => {
+  it("les lit pour un joueur du match et le staff", () => {
     mockLaunch = launch();
-    const html = render(match(), "player");
+    render(match(), "player");
     render(match(), "staff");
     expect(mockEnabled).toEqual([true, true]);
-    expect(html).not.toContain("Bravo#1111");
-    expect(html).not.toContain("Alpha#1111");
   });
 
   it("un caster ne les lit que le temps du match", () => {
     const page = match({ casters: [matchCaster({ userId: 900 })] });
     render({ ...page, startAt: "2099-01-01T00:00:00.000Z" }, "caster");
     expect(mockEnabled).toEqual([false]);
+  });
+});
+
+// MATCH-PAGE-CONNECT : infos de connexion et tag Discord de l'arbitre aux
+// seules parties du match (`docs/features/MATCH_PAGE_CONNECT.md`).
+describe("page d'un match — infos de connexion", () => {
+  const juge = { userId: 77, pseudo: "Juge", discordTag: "juge", battletag: "Juge#3333", battletagVerified: true, ready: false, isViewer: false };
+  const staffOnly = { role: "REFEREE", canDeclareReady: false, isReferee: false, isCaster: false, earlyContacts: true, ready: false } as const;
+
+  it("render_playerOfMatch_connectionSectionWithBothTeamsContacts", () => {
+    mockLaunch = launch();
+
+    const html = render(match(), "player");
+
+    expect(visible(html)).toContain("Infos de connexion");
+    expect(html).toContain("Alpha#1111");
+    expect(html).toContain("Bravo#1111");
+  });
+
+  it("render_playerOfOtherSide_connectionSectionShown", () => {
+    mockLaunch = launch({ viewer: { role: "TEAM2", canDeclareReady: true, isReferee: false, isCaster: false, earlyContacts: true, ready: false } });
+
+    const html = render(match(), "player");
+
+    expect(visible(html)).toContain("Infos de connexion");
+  });
+
+  it("render_connectionSection_hostTeamFirst", () => {
+    mockLaunch = launch({ hostTeamId: BRAVO });
+
+    const html = render(match(), "player");
+
+    expect(html.indexOf("Bravo#1111")).toBeLessThan(html.indexOf("Alpha#1111"));
+  });
+
+  it("render_registeredCaster_connectionSectionShown", () => {
+    mockLaunch = launch({ viewer: { role: "CASTER", canDeclareReady: true, isReferee: false, isCaster: true, earlyContacts: false, ready: false } });
+    const page = match({ casters: [matchCaster({ userId: 900 })] });
+
+    const html = render(page, "caster");
+
+    expect(visible(html)).toContain("Infos de connexion");
+    expect(html).toContain("Alpha#1111");
+  });
+
+  it("render_assignedReferee_connectionSectionShown", () => {
+    mockLaunch = launch({ viewer: { role: "MATCH_REFEREE", canDeclareReady: true, isReferee: true, isCaster: false, earlyContacts: true, ready: false } });
+
+    const html = render(match({ refereeAssigned: true }), "staff");
+
+    expect(visible(html)).toContain("Infos de connexion");
+    expect(html).toContain("Bravo#1111");
+  });
+
+  it("render_staffWithoutRoleOnMatch_noConnectionSection", () => {
+    mockLaunch = launch({ viewer: staffOnly });
+
+    const html = render(match(), "staff");
+
+    expect(visible(html)).not.toContain("Infos de connexion");
+    expect(html).not.toContain("Alpha#1111");
+    expect(html).not.toContain("Bravo#1111");
+  });
+
+  it("render_publicOtherOrFrozen_noConnectionSection", () => {
+    mockLaunch = launch();
+    for (const html of [render(match(), "public"), render(match(), "other"), render(match(), "player", true)]) {
+      expect(visible(html)).not.toContain("Infos de connexion");
+      expect(html).not.toContain("Alpha#1111");
+    }
+  });
+
+  it("render_english_connectionSectionTitleAndFriendNote", () => {
+    mockLaunch = launch({ referee: juge });
+
+    const html = visible(render(match({ refereeAssigned: true }), "player", false, "en"));
+
+    expect(html).toContain("Connection info");
+    expect(html).toContain("Add as a friend");
+  });
+
+  it("render_refereeDiscordTagSent_shownWithCopyButton", () => {
+    mockLaunch = launch({ referee: juge });
+
+    const html = render(match({ refereeAssigned: true }), "player");
+
+    expect(html).toContain(">juge<");
+    expect(html).toContain('aria-label="Copier le Discord juge"');
+  });
+
+  it("render_refereeDiscordTagNotSent_noDiscordLineOnRefereeCard", () => {
+    const { discordTag: _omitted, ...withoutDiscord } = juge;
+    mockLaunch = launch({ referee: withoutDiscord, viewer: staffOnly });
+
+    const html = render(match({ refereeAssigned: true }), "staff");
+
+    expect(html).toContain("Juge#3333");
+    expect(html).not.toContain(">juge<");
   });
 });
 

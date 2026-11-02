@@ -39,7 +39,7 @@ export const AUTOMOD_ALERT_SCOPE = "alerte AutoMod d'une telle annonce bloquée 
  * (`lib/shared/match-launch.ts`, `exposesCasterContacts`).
  */
 export const MATCH_CONTACTS_SCOPE =
-  "présentation (le BattleTag, des contacts d'équipe comme des casters, dans les seuls tournois Overwatch), dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses casters le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) ; les contacts de chaque caster aux deux équipes et aux autres casters du match le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin — contacts que la page du match reprend aussi, aux mêmes lecteurs et aux mêmes moments que la fenêtre « Contacts » — (conditions d'utilisation, « Contacts de match »)";
+  "présentation (le BattleTag, des contacts d'équipe comme des casters, dans les seuls tournois Overwatch), dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses casters le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) ; les contacts de chaque caster aux deux équipes et aux autres casters du match le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin — contacts que la page du match reprend aussi, aux mêmes lecteurs et aux mêmes moments que la fenêtre « Contacts », comme ceux des deux équipes, aux seules parties du match (jamais aux arbitres sans rôle sur ce match) — (conditions d'utilisation, « Contacts de match »)";
 
 /**
  * BattleTag masqué : le masquer ne le retire pas des parties de tes matchs
@@ -48,7 +48,7 @@ export const MATCH_CONTACTS_SCOPE =
  * 2026-10-19), prévue par les conditions d'utilisation.
  */
 export const BATTLETAG_MATCH_SCOPE =
-  "lecture, même masqué, dans un tournoi Overwatch seulement (jamais en Marvel Rivals) : présenté comme contact d'un match, dans sa fenêtre « Contacts » et dans sa fenêtre de lancement seulement, par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match ; celui d'un caster, dans ces fenêtres et aussi sur la page du match, par les deux équipes et les autres casters du match le temps du match et par les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
+  "lecture, même masqué, dans un tournoi Overwatch seulement (jamais en Marvel Rivals) : présenté comme contact d'un match, dans sa fenêtre « Contacts », dans sa fenêtre de lancement et, pour les seules parties du match, sur sa page seulement, par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match ; celui d'un caster, dans ces fenêtres et aussi sur la page du match, par les deux équipes et les autres casters du match le temps du match et par les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
 
 /**
  * BattleTag de l'arbitre désigné d'un match, même masqué, présenté aux parties
@@ -89,6 +89,17 @@ export const REFEREE_USERNAME_BEFORE_V7_SCOPE =
  */
 export const REFEREE_USERNAME_MEMBERS_SCOPE =
   "pseudo seul de l'arbitre désigné d'un match, sur la carte et la page du match jusqu'à la déclaration de son score ou la fin du tournoi, lu par tout membre connecté (jamais par un visiteur sans compte, qui lit « Arbitre désigné ») — opposition par le formulaire de signalement, catégorie RGPD, avec le même effet qu'une opposition à sa présentation aux parties (retrait de ses matchs non terminés)";
+
+/**
+ * Tag Discord certifié de l'arbitre désigné, présenté aux seules parties du
+ * match — membres de ses deux équipes, ses casters — dans la fenêtre
+ * « Contacts » et sur la page du match (lot MATCH-PAGE-CONNECT,
+ * `MATCH_PAGE_CONNECT.md`) : les conditions d'utilisation (version 8) ne le
+ * prévoyant pas, l'intérêt légitime, avec le même droit d'opposition que sa
+ * présentation aux parties.
+ */
+export const REFEREE_DISCORD_SCOPE =
+  "si tu es l'arbitre désigné d'un match, ton tag Discord certifié, dans sa fenêtre « Contacts » et sur sa page, lu par ses deux équipes dès que ses deux adversaires sont connus et jusqu'à sa fin et par ses casters le temps du match (jamais par les arbitres sans rôle sur ce match ni dans la fenêtre de lancement), pour qu'ils puissent te joindre — opposition par le formulaire de signalement, catégorie RGPD, avec le même effet qu'une opposition à ta présentation aux parties (retrait de tes matchs non terminés)";
 
 /**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré
@@ -234,6 +245,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
       { base: "Exécution du contrat", scope: MATCH_CONTACTS_SCOPE },
       { base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE },
       { base: "Intérêt légitime", scope: VERIFIED_BADGE_SCOPE },
+      { base: "Intérêt légitime", scope: REFEREE_DISCORD_SCOPE },
     ],
     duree: "Jusqu'au retrait ou au changement du tag, ou durée du compte",
   },

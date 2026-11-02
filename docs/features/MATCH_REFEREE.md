@@ -175,7 +175,10 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
   (`withGameBattletag`, décision 35) — BattleTag (même masqué, `sharesLiveMatch`) **seulement
   quand les contacts du match sont ouverts** (`ctx.exposes` : dès que les deux
   adversaires sont connus pour les équipes et le staff, le temps du match pour
-  les casters). Jamais son tag Discord. Carte `RefereeCard`
+  les casters). Son tag Discord certifié, par la lecture d'**un** match
+  seulement (fenêtre « Contacts », page du match) et aux seules parties du
+  match — jamais au rôle `REFEREE` ni dans la modale de lancement
+  (`MATCH_PAGE_CONNECT.md`). Carte `RefereeCard`
   (`LaunchContactCards.tsx`), dans la modale de lancement et la fenêtre
   « Contacts ».
 - **Staff** : la fenêtre « Arbitrage » (action « Arbitrage » de la carte,
