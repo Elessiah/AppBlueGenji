@@ -116,7 +116,8 @@ export function lobbyBriefPush(side: LobbyBriefSide, locale: Locale = DEFAULT_LO
   // Sans contrôle ni commande de direction (`withoutInvisibles`) : un nom
   // ancien gardant U+202E retournerait sinon la ligne. En individuel,
   // `lobbyBriefNames` écrit « toi » / « ton adversaire ».
-  const quote = (name: string) => text.t("lobbyBrief.quoted", { name: withoutInvisibles(name) });
+  // Les guillemets d'un nom deviennent des « " » droits : ils ne ferment pas la citation.
+  const quote = (name: string) => text.t("lobbyBrief.quoted", { name: withoutInvisibles(name).replace(/[“”«»]/g, '"') });
   const names = lobbyBriefNames(side, locale, quote);
   // Ni l'appariement ni la manche : gauche et droite nomment déjà les deux
   // engagées ; le « 1er ban » se pose sur le côté que la règle du tournoi
@@ -126,7 +127,8 @@ export function lobbyBriefPush(side: LobbyBriefSide, locale: Locale = DEFAULT_LO
   const values = {
     left: names.left,
     right: names.right,
-    map: side.firstMap === null ? text.t("lobbyBrief.noMap") : pushMapName(side.firstMap),
+    // Une carte vide ou faite d'invisibles retombe sur « pas encore fixée ».
+    map: (side.firstMap === null ? "" : pushMapName(side.firstMap)) || text.t("lobbyBrief.noMap"),
   };
   const hostBans = side.banFirst === side.hosting;
   const plain = text.t(hostBans ? "lobbyBrief.bodyHostBans" : "lobbyBrief.body", values);

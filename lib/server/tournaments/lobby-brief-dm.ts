@@ -13,7 +13,9 @@ import { pushRoundLabel } from "@/lib/shared/push-messages";
 import type { NextBanRule } from "@/lib/shared/round-maps";
 
 function quoted(value: string, locale: Locale): string {
-  return locale === "en" ? `“${discordInline(value)}”` : `« ${discordInline(value)} »`;
+  // Les guillemets d'un nom deviennent des « " » droits : ils ne ferment pas la citation.
+  const name = discordInline(value).replace(/[“”«»]/g, '"');
+  return locale === "en" ? `“${name}”` : `« ${name} »`;
 }
 
 type DecisionLine = "REFEREE" | "REFEREE_NO_BATTLETAG" | "SELF_MANAGED_TEAM" | "SELF_MANAGED_SOLO";
