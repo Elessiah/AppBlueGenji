@@ -386,6 +386,10 @@ function executeFor(state: World) {
       applyUpdate(state, sql, params);
       return [{ affectedRows: 1 }, []];
     }
+    if (sql.startsWith("DELETE FROM bg_match_start_notices")) {
+      state.writes.push(`${sql} ${JSON.stringify(params)}`);
+      return [{ affectedRows: 1 }, []];
+    }
     const userResult = readUserRows(state, sql, params);
     if (userResult) return userResult;
     const voiceResult = readVoiceRows(state, sql);
@@ -583,6 +587,24 @@ describe("setMatchReady — appariement réécrit sur place", () => {
     state.match = matchState({ launch_pairing: `${TEAM1}:30`, launched_at: STAMP });
     await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: false });
     expect(state.match?.launched_at).toBeNull();
+  });
+
+  it("adoptCurrentPairing_pairingChanged_startNoticeClaimsOfTheMatchDeleted", async () => {
+    // A:B → A:C → A:B : les réservations de l'appariement qui revient ne doivent
+    // pas faire taire l'appel aux « Prêt » ni le brief du salon.
+    state.match = matchState({ launch_pairing: `${TEAM1}:30` });
+
+    await setMatchReady(42, 1, true);
+
+    expect(state.writes).toContain("DELETE FROM bg_match_start_notices WHERE match_id = ? [42]");
+  });
+
+  it("adoptCurrentPairing_samePairing_startNoticeClaimsKept", async () => {
+    state.match = matchState({ launch_pairing: `${TEAM1}:${TEAM2}` });
+
+    await setMatchReady(42, 1, true);
+
+    expect(state.writes.some((write) => write.startsWith("DELETE FROM bg_match_start_notices"))).toBe(false);
   });
 });
 

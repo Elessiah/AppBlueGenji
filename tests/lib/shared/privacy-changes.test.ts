@@ -23,7 +23,7 @@ import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 import { SITE_MINIMUM_AGE, TERMS_PATH, TERMS_UPDATED_AT, TERMS_VERSION, formatTermsDate } from "@/lib/shared/terms-of-use";
 import { PUSH_TOPICS } from "@/lib/shared/push-notifications";
 import { MATCH_REMINDER_LOOKAHEAD_MS } from "@/lib/shared/discord-notifications";
-import { PRIVACY_CHANGES_EN, localizedPrivacyChanges } from "@/lib/shared/privacy-changes-en";
+import { PRIVACY_CHANGES_EN, localizedPrivacyChanges, type PrivacyChangeTranslation } from "@/lib/shared/privacy-changes-en";
 import enPush from "@/messages/en/push.json";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
@@ -73,6 +73,17 @@ const TODAY = "2099-01-01";
  * sont le garde-fou de ce geste. Une entrée mal formée ne casserait rien de
  * visible — elle ferait simplement réapparaître, ou disparaître, un changement.
  */
+
+/**
+ * L'entrée suit immédiatement `previousId` : l'ordre se dit par la voisine,
+ * pas par une place comptée depuis la fin (qui se décalait à chaque entrée ajoutée).
+ */
+function expectEntryAfter(entry: PrivacyChange, previousId: string): void {
+  const index = PRIVACY_CHANGES.indexOf(entry);
+  expect(index).toBeGreaterThan(0);
+  expect(PRIVACY_CHANGES[index - 1].id).toBe(previousId);
+}
+
 describe("PRIVACY_CHANGES — intégrité du registre", () => {
   it("n'est pas vide : la mise en production doit présenter le récapitulatif", () => {
     expect(PRIVACY_CHANGES.length).toBeGreaterThan(0);
@@ -659,7 +670,7 @@ describe("PRIVACY_CHANGES — mesure d'audience, opposition et durée", () => {
   it("précède l'entrée du contact données, datée du même jour que les rectificatifs, pour tous les comptes", () => {
     // Suivie de l'entrée du contact données, de celle des suspensions puis de
     // celle du registre complété, publiées le même jour.
-    expect(PRIVACY_CHANGES.at(-46)?.id).toBe(entry.id);
+    expectEntryAfter(entry, "2026-10-rectificatifs-information");
     expect(entry.publishedAt).toBe(rectificatifs.publishedAt);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
@@ -686,7 +697,7 @@ describe("PRIVACY_CHANGES — personne à contacter pour les données", () => {
 
   it("précède l'entrée des suspensions, publiée le même jour que les rectificatifs, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-45)?.id).toBe(entry.id);
+    expectEntryAfter(entry, "2026-10-mesure-audience-opposition");
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -720,7 +731,7 @@ describe("PRIVACY_CHANGES — suspension d'un compte", () => {
 
   it("précède l'entrée du registre complété, publiée le lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-44)?.id).toBe(entry.id);
+    expectEntryAfter(entry, "2026-10-contact-donnees");
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -745,7 +756,7 @@ describe("PRIVACY_CHANGES — registre complété (support, retransmission, cour
 
   it("précède l'entrée des sauvegardes chez Hetzner, datée du 1er octobre 2026, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-43)?.id).toBe(entry.id);
+    expectEntryAfter(entry, "2026-10-suspension-comptes");
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -785,7 +796,7 @@ describe("PRIVACY_CHANGES — sauvegardes chez Hetzner (changement de sous-trait
 
   it("précède l'entrée des durées du bot, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-42)?.id).toBe(entry.id);
+    expectEntryAfter(entry, "2026-10-registre-complete");
     expect(entry.publishedAt).toBe("2026-10-02");
     expect(entry.audience).toBeUndefined();
   });
@@ -819,7 +830,7 @@ describe("PRIVACY_CHANGES — durées du bot (fil d'activité, journal du staff,
 
   it("précède l'entrée des scores map par map, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-41)?.id).toBe(entry.id);
+    expectEntryAfter(entry, "2026-10-sauvegardes-hetzner");
     expect(entry.publishedAt).toBe("2026-10-02");
     expect(entry.audience).toBeUndefined();
   });
@@ -845,7 +856,7 @@ describe("PRIVACY_CHANGES — scores map par map (codes de replay)", () => {
 
   it("précède l'entrée du code de replay facultatif, datée de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-40)?.id).toBe(entry.id);
+    expectEntryAfter(entry, "2026-10-bot-durees-journaux");
     expect(entry.publishedAt).toBe("2026-10-06");
     expect(entry.audience).toBeUndefined();
   });
@@ -868,7 +879,7 @@ describe("PRIVACY_CHANGES — code de replay facultatif pour l'arbitrage", () =>
 
   it("précède l'entrée du suivi sans compte, datée de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-39)?.id).toBe(entry.id);
+    expectEntryAfter(entry, "2026-10-scores-map-par-map");
     expect(entry.publishedAt).toBe("2026-10-08");
     expect(entry.audience).toBeUndefined();
   });
@@ -892,7 +903,7 @@ describe("PRIVACY_CHANGES — suivi d'un tournoi sans compte", () => {
 
   it("précède l'entrée de la langue du compte, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-38)?.id).toBe(entry.id);
+    expectEntryAfter(entry, "2026-10-code-replay-facultatif-arbitrage");
     expect(entry.publishedAt).toBe("2026-10-09");
     expect(entry.audience).toBeUndefined();
   });
@@ -930,7 +941,7 @@ describe("PRIVACY_CHANGES — langue du compte (lot i18n 9-3)", () => {
 
   it("précède l'entrée des horaires de match, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-37)?.id).toBe(entry.id);
+    expectEntryAfter(entry, "2026-10-suivi-tournoi-sans-compte");
     expect(entry.publishedAt).toBe("2026-10-14");
     expect(entry.audience).toBeUndefined();
   });
@@ -965,7 +976,7 @@ describe("PRIVACY_CHANGES — horaires de match annoncés, changés ou retirés 
 
   it("précède l'entrée de l'annonce des matchs diffusés, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-36)?.id).toBe(entry.id);
+    expectEntryAfter(entry, "2026-10-langue-du-compte");
     expect(entry.publishedAt).toBe("2026-10-15");
     expect(entry.audience).toBeUndefined();
   });
@@ -1027,7 +1038,7 @@ describe("PRIVACY_CHANGES — matchs diffusés annoncés sur Discord (#442)", ()
 
   it("précède l'entrée du rappel de check-in, datée du lendemain de sa mise en ligne prévue, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-35)?.id).toBe(entry.id);
+    expectEntryAfter(entry, "2026-10-horaires-de-match");
     expect(entry.publishedAt).toBe("2026-10-15");
     expect(entry.audience).toBeUndefined();
   });
@@ -1061,7 +1072,7 @@ describe("PRIVACY_CHANGES — rappel de check-in et programme d'arbitrage (#443)
 
   it("précède l'entrée du pseudo #live et des messages de match, datée du lendemain de sa mise en ligne prévue, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-33)?.id).toBe(entry.id);
+    expectEntryAfter(entry, "2026-10-base-pseudo-live-et-automod");
     expect(entry.publishedAt).toBe("2026-10-16");
     expect(entry.audience).toBeUndefined();
   });
@@ -1097,7 +1108,7 @@ describe("PRIVACY_CHANGES — messages privés de match aux seuls tags certifié
 
   it("précède l'entrée des contacts de match : datée du 19 octobre 2026 (jour de la fusion), pour tous les comptes, et tient seule dans un message privé", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 31);
+    expectEntryAfter(entry, "2026-10-pseudo-live-et-messages-de-match");
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-19", undefined]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
   });
@@ -1137,7 +1148,7 @@ describe("PRIVACY_CHANGES — pseudo dans l'annonce #live et messages privés de
 
   it("précède l'entrée des tags certifiés : datée du 16 octobre 2026, pour tous les comptes, et tient seule dans un message privé", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 32);
+    expectEntryAfter(entry, "2026-10-rappel-de-check-in");
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-16", undefined]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
   });
@@ -1252,7 +1263,7 @@ describe("PRIVACY_CHANGES — contacts de match dès que les adversaires sont co
 
   it("précède l'entrée du caster et des conditions v5 : datée du 19 octobre 2026, pour tous les comptes, et tient seule dans un message privé", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 30);
+    expectEntryAfter(entry, "2026-10-messages-de-match-tags-certifies");
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-19", undefined]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
   });
@@ -1275,7 +1286,7 @@ describe("PRIVACY_CHANGES — caster le temps du match, BattleTag masqué et con
 
   it("précède l'entrée des conditions v6 : datée du 19 octobre 2026, pour tous les comptes, et tient seule dans un message privé", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 29);
+    expectEntryAfter(entry, "2026-10-contacts-de-match-avant-le-depart");
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-19", undefined]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
   });
@@ -1309,7 +1320,7 @@ describe("PRIVACY_CHANGES — conditions v6 : acceptation par chaque compte (CON
 
   it("précède l'entrée des annonces #live par soirée : datée du jour d'entrée en vigueur, pour tous les comptes, et tient seule dans un message privé", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 28);
+    expectEntryAfter(entry, "2026-10-contacts-de-match-caster-et-conditions-v5");
     // Datée du jour d'entrée en vigueur de la version 6 (19 octobre 2026) ; la
     // version 7 a depuis sa propre entrée, celle-ci ne se réécrit pas.
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-19", undefined]);
@@ -1354,7 +1365,7 @@ describe("PRIVACY_CHANGES — annonces #live par soirée (LIVE-EVENING)", () => 
 
   it("précède l'entrée du « Ne plus afficher » du recrutement : datée du 20 octobre 2026, pour tous les comptes, et tient seule dans un message privé", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 27);
+    expectEntryAfter(entry, "2026-10-conditions-v6-acceptation-pour-tous");
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-20", undefined]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
   });
@@ -1380,7 +1391,7 @@ describe("PRIVACY_CHANGES — « Ne plus afficher » de la fenêtre de recruteme
 
   it("précède l'entrée de l'arbitre qui joue : datée du 20 octobre 2026, pour tous les comptes, et tient seule dans un message privé", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 26);
+    expectEntryAfter(entry, "2026-10-annonces-live-par-soiree");
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-20", undefined]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
   });
@@ -1416,7 +1427,7 @@ describe("PRIVACY_CHANGES — arbitre qui joue le match (DISPUTE-FOLLOWUP, #456)
 
   it("précède l'entrée de la pastille BattleTag : datée du jour de la fusion, pour tous les comptes, et tient seule dans un message privé", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 25);
+    expectEntryAfter(entry, "2026-10-recrutement-ne-plus-afficher");
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-20", undefined]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
   });
@@ -1450,7 +1461,7 @@ describe("PRIVACY_CHANGES — pastille « BattleTag vérifié » sur la fiche (P
 
   it("précède l'entrée de la certification proposée à la connexion : datée du 21 octobre 2026, pour tous les comptes, et tient seule dans un message privé", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 24);
+    expectEntryAfter(entry, "2026-10-arbitre-qui-joue-le-match");
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-21", undefined]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
   });
@@ -1477,7 +1488,7 @@ describe("PRIVACY_CHANGES — certification du tag Discord proposée à la conne
 
   it("précède l'entrée des contacts du caster aux arbitres : datée du 21 octobre 2026, pour tous les comptes, et tient seule dans un message privé", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 23);
+    expectEntryAfter(entry, "2026-10-pastille-battletag-fiche");
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-21", undefined]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
   });
@@ -1505,7 +1516,7 @@ describe("PRIVACY_CHANGES — contacts du caster aux arbitres (CASTER-CONTACTS-R
 
   it("précède l'entrée des messages Discord dans ta langue : datée du 21 octobre 2026, pour les seuls comptes qui peuvent caster, et tient seule dans un message privé", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 22);
+    expectEntryAfter(entry, "2026-10-proposition-certification-discord");
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-21", "LIVE_STAFF"]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
   });
@@ -1533,7 +1544,7 @@ describe("PRIVACY_CHANGES — messages privés Discord dans la langue du compte 
 
   it("avant-dernière (puis LEGAL-OPTOUT-BASIS) : datée du lendemain de la fusion prévue, pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 21);
+    expectEntryAfter(entry, "2026-10-contacts-du-caster-aux-arbitres");
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-27", undefined]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
     const [englishEntry] = localizedPrivacyChanges([entry], "en");
@@ -1568,9 +1579,9 @@ describe("PRIVACY_CHANGES — base légale de la conservation du choix des messa
   it("précède l'entrée des sauvegardes deux fois par semaine : datée du 27 octobre (mise en ligne groupée), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
     expect(entry).toBeDefined();
     expect(english).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 20);
+    expectEntryAfter(entry, "2026-10-messages-discord-dans-ta-langue");
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-27", undefined]);
-    expect(PRIVACY_CHANGES.at(-21)!.publishedAt <= entry.publishedAt).toBe(true);
+    expect(PRIVACY_CHANGES[PRIVACY_CHANGES.indexOf(entry) - 1].publishedAt <= entry.publishedAt).toBe(true);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
     const [englishEntry] = localizedPrivacyChanges([entry], "en");
     expect(buildPrivacyChangesMessage([englishEntry], "https://site.test", "en").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
@@ -1609,9 +1620,9 @@ describe("PRIVACY_CHANGES — sauvegardes deux fois par semaine, entrée rectifi
   it("précède l'entrée de l'avis de retrait du cast : datée du 27 octobre (mise en ligne groupée), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
     expect(entry).toBeDefined();
     expect(english).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 19);
+    expectEntryAfter(entry, "2026-10-base-du-choix-des-messages-de-match");
     expect([entry.publishedAt, entry.audience, entry.links]).toEqual(["2026-10-27", undefined, undefined]);
-    expect(PRIVACY_CHANGES.at(-20)!.publishedAt <= entry.publishedAt).toBe(true);
+    expect(PRIVACY_CHANGES[PRIVACY_CHANGES.indexOf(entry) - 1].publishedAt <= entry.publishedAt).toBe(true);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
     const [englishEntry] = localizedPrivacyChanges([entry], "en");
     expect(buildPrivacyChangesMessage([englishEntry], "https://site.test", "en").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
@@ -1639,14 +1650,14 @@ describe("PRIVACY_CHANGES — sauvegardes deux fois par semaine, entrée rectifi
 /** Entrée du groupe MATCH-REFEREE / LOGS-NOTIFS : place, date, public, lien, et tient seule dans un message privé (FR et EN). */
 function expectStandaloneEntry(
   entry: PrivacyChange,
-  english: unknown,
-  expected: { fromEnd: number; publishedAt: string; audience: PrivacyChange["audience"]; links: PrivacyChange["links"] },
+  english: PrivacyChangeTranslation | undefined,
+  expected: { after: string; publishedAt: string; audience: PrivacyChange["audience"]; links: PrivacyChange["links"] },
 ): void {
   expect(entry).toBeDefined();
   expect(english).toBeDefined();
-  expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - expected.fromEnd);
+  expectEntryAfter(entry, expected.after);
   expect([entry.publishedAt, entry.audience]).toEqual([expected.publishedAt, expected.audience]);
-  expect(PRIVACY_CHANGES.at(-(expected.fromEnd + 1))!.publishedAt <= entry.publishedAt).toBe(true);
+  expect(PRIVACY_CHANGES[PRIVACY_CHANGES.indexOf(entry) - 1].publishedAt <= entry.publishedAt).toBe(true);
   expect(entry.links).toEqual(expected.links);
   expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
   const [englishEntry] = localizedPrivacyChanges([entry], "en");
@@ -1671,12 +1682,12 @@ describe("PRIVACY_CHANGES — avis de retrait du cast (LOGS-NOTIFS ln-1)", () =>
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-avis-de-retrait-du-cast")!;
   const english = PRIVACY_CHANGES_EN["2026-10-avis-de-retrait-du-cast"];
 
-  it("ferme la liste : datée du 29 octobre (lendemain de la mise en ligne prévue), pour les seuls casters, et tient seule dans un message privé (FR et EN)", () => {
+  it("suit l'entrée précédente : datée du 29 octobre (lendemain de la mise en ligne prévue), pour les seuls casters, et tient seule dans un message privé (FR et EN)", () => {
     expect(entry).toBeDefined();
     expect(english).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 18);
+    expectEntryAfter(entry, "2026-10-sauvegardes-deux-fois-par-semaine");
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-29", "LIVE_STAFF"]);
-    expect(PRIVACY_CHANGES.at(-19)!.publishedAt <= entry.publishedAt).toBe(true);
+    expect(PRIVACY_CHANGES[PRIVACY_CHANGES.indexOf(entry) - 1].publishedAt <= entry.publishedAt).toBe(true);
     expect(entry.links).toEqual([{ href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" }]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
     const [englishEntry] = localizedPrivacyChanges([entry], "en");
@@ -1707,9 +1718,9 @@ describe("PRIVACY_CHANGES — plusieurs casters par match (MATCH-REFEREE MR-1)",
   it("précède l'entrée de l'arbitre désigné : datée comme l'entrée précédente (mise en ligne groupée), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
     expect(entry).toBeDefined();
     expect(english).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 17);
+    expectEntryAfter(entry, "2026-10-avis-de-retrait-du-cast");
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-29", undefined]);
-    expect(PRIVACY_CHANGES.at(-18)!.publishedAt <= entry.publishedAt).toBe(true);
+    expect(PRIVACY_CHANGES[PRIVACY_CHANGES.indexOf(entry) - 1].publishedAt <= entry.publishedAt).toBe(true);
     expect(entry.links).toEqual([{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
     const [englishEntry] = localizedPrivacyChanges([entry], "en");
@@ -1745,9 +1756,9 @@ describe("PRIVACY_CHANGES — arbitre désigné des matchs (MATCH-REFEREE MR-2)"
   it("précède l'entrée des réglages du salon : datée comme l'entrée précédente (mise en ligne groupée), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
     expect(entry).toBeDefined();
     expect(english).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 16);
+    expectEntryAfter(entry, "2026-10-plusieurs-casters-par-match");
     expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-29", undefined]);
-    expect(PRIVACY_CHANGES.at(-17)!.publishedAt <= entry.publishedAt).toBe(true);
+    expect(PRIVACY_CHANGES[PRIVACY_CHANGES.indexOf(entry) - 1].publishedAt <= entry.publishedAt).toBe(true);
     expect(entry.links).toEqual([{ href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" }]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
     const [englishEntry] = localizedPrivacyChanges([entry], "en");
@@ -1778,7 +1789,7 @@ describe("PRIVACY_CHANGES — réglages du salon envoyés aux managers (MATCH-RE
   const english = PRIVACY_CHANGES_EN["2026-10-reglages-du-salon-aux-managers"];
 
   it("précède l'entrée des conditions v7 : datée comme elle, lendemain de la mise en ligne (§ Dates corrigées), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
-    expectStandaloneEntry(entry, english, { fromEnd: 15, publishedAt: "2026-10-29", audience: undefined, links: [
+    expectStandaloneEntry(entry, english, { after: "2026-10-arbitre-designe-des-matchs", publishedAt: "2026-10-29", audience: undefined, links: [
       { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
     ] });
   });
@@ -1813,7 +1824,7 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
 
   it("précède l'entrée EF-04 : datée du jour d'entrée en vigueur de la version 7 (mise en ligne groupée), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
     expectStandaloneEntry(entry, english, {
-      fromEnd: 14,
+      after: "2026-10-reglages-du-salon-aux-managers",
       publishedAt: "2026-10-29",
       audience: undefined,
       links: [
@@ -1892,7 +1903,7 @@ describe("PRIVACY_CHANGES — « Ne plus voir » de l'invitation à certifier su
 
   it("précède l'entrée rectificative EF-05, datée comme l'entrée précédente, pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
     expectStandaloneEntry(entry, english, {
-      fromEnd: 13,
+      after: "2026-10-conditions-v7-casters-et-arbitre",
       publishedAt: "2026-10-29",
       audience: undefined,
       links: [{ href: "/rgpd#cookies", label: "Lire la section « Cookies & traceurs »" }],
@@ -1947,7 +1958,7 @@ describe("PRIVACY_CHANGES — marque de session de la proposition de certificati
 
   it("précède l'entrée du BattleTag hors Overwatch, datée comme l'entrée précédente, pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
     expectStandaloneEntry(entry, english, {
-      fromEnd: 12,
+      after: "2026-10-ne-plus-voir-invitation-certification-sur-le-compte",
       publishedAt: "2026-10-29",
       audience: undefined,
       links: [{ href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" }],
@@ -1993,7 +2004,7 @@ describe("PRIVACY_CHANGES — BattleTag des matchs en Overwatch seulement (déci
 
   it("privacyChanges_battletagMatchesOverwatchOnly_closesListDated1030ForAllAccounts", () => {
     expectStandaloneEntry(entry, english, {
-      fromEnd: 11,
+      after: "2026-10-proposition-certification-discord-marque-de-session",
       publishedAt: "2026-10-30",
       audience: undefined,
       links: [
@@ -2054,7 +2065,7 @@ describe("PRIVACY_CHANGES — pseudo de l'arbitre lu par les membres connectés 
 
   it("privacyChanges_refereeUsernameToMembers_closesListDated1031ForAllAccounts", () => {
     expectStandaloneEntry(entry, english, {
-      fromEnd: 9,
+      after: "2026-10-opposition-arbitre-retrait-des-matchs",
       publishedAt: "2026-10-31",
       audience: undefined,
       links: [{ href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" }],
@@ -2100,7 +2111,7 @@ describe("PRIVACY_CHANGES — rôles de plateforme au journal du staff (ADMIN-SE
     expect(english).toMatchObject({ linkLabels: ["Read entry T05 of the register"] });
     expect([english.details.length, id.length <= PRIVACY_CHANGE_ID_MAX_LENGTH]).toEqual([entry.details.length, true]);
     expectStandaloneEntry(entry, english, {
-      fromEnd: 8,
+      after: "2026-10-pseudo-arbitre-aux-membres",
       publishedAt: entry.publishedAt,
       audience: entry.audience,
       links: entry.links,
@@ -2149,7 +2160,7 @@ describe("PRIVACY_CHANGES — BattleTag tapé gardé, jamais vérifié (D3)", ()
     expect(PRIVACY_CHANGES.at(-8)?.id).toBe("2026-10-roles-de-plateforme-journal-du-staff");
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
     expectStandaloneEntry(entry, english, {
-      fromEnd: 7,
+      after: "2026-10-roles-de-plateforme-journal-du-staff",
       publishedAt: "2026-10-31",
       audience: undefined,
       links: [{ href: "/rgpd#donnees-collectees", label: "Lire « Données collectées »" }],
@@ -2205,7 +2216,7 @@ describe("PRIVACY_CHANGES — conditions v8 : arbitre désigné et BattleTag tap
   it("privacyChanges_termsV8_closesListDatedAfterGoLiveForAllAccounts", () => {
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
     expectStandaloneEntry(entry, english, {
-      fromEnd: 6,
+      after: "2026-10-battletag-tape-garde-non-verifie",
       publishedAt: "2026-10-31",
       audience: undefined,
       links: [
@@ -2247,7 +2258,7 @@ describe("PRIVACY_CHANGES — suppression de compte et export (EF-21, décision 
   it("privacyChanges_accountDeletionExport_closesListDated1031ForAllAccounts", () => {
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
     expectStandaloneEntry(entry, english, {
-      fromEnd: 5,
+      after: "2026-10-conditions-v8-arbitre-et-battletag",
       publishedAt: "2026-10-31",
       audience: undefined,
       links: [{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }],
@@ -2285,7 +2296,7 @@ describe("PRIVACY_CHANGES — lien de l'organisation choisi, non déduit (EF-29,
   it("privacyChanges_organisationLinkChoice_closesListDated1031ForLiveStaff", () => {
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
     expectStandaloneEntry(entry, english, {
-      fromEnd: 4,
+      after: "2026-10-suppression-compte-et-export",
       publishedAt: "2026-10-31",
       audience: "LIVE_STAFF",
       links: [{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }],
@@ -2332,7 +2343,7 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
   it("privacyChanges_teamVoice_closesListDated1104ForAllAccounts", () => {
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
     expectStandaloneEntry(entry, english, {
-      fromEnd: 2,
+      after: "2026-11-page-du-match-infos-de-connexion",
       publishedAt: "2026-11-04",
       audience: undefined,
       links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }],
@@ -2471,7 +2482,7 @@ describe("PRIVACY_CHANGES — inscriptions individuelles à venir et fiche du jo
   it("privacyChanges_soloWithdrawalAndPlayerPage_closesListDated1104ForAllAccounts", () => {
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
     expectStandaloneEntry(entry, english, {
-      fromEnd: 1,
+      after: "2026-11-salons-vocaux-equipe",
       publishedAt: "2026-11-04",
       audience: undefined,
       links: [{ href: "/rgpd#donnees-connexion", label: "Lire ce que la suppression emporte" }],

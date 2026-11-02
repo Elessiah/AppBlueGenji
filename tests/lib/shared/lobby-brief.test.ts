@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
-import { formatLobbyBriefDm, MAPS_LINE_MAX, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
+import { formatLobbyBriefDm, MAPS_LINE_MAX } from "@/lib/server/tournaments/lobby-brief-dm";
+import type { LobbyBriefSide } from "@/lib/shared/lobby-brief";
 import { localizedSiteUrl } from "@/lib/shared/dm-language";
 import { localeHref } from "@/lib/shared/locales";
 import { matchPageHref } from "@/lib/shared/match-anchor";
@@ -42,7 +43,7 @@ describe("formatLobbyBriefDm", () => {
       [
         "🎮 BlueGenji — Le salon de ton match « Renards » contre « Nova » est ouvert (Manche 2, « Coupe »).",
         "• Gauche (hôte) : « Renards »",
-        "• Droite : « Nova »",
+        "• Droite (1er ban) : « Nova »",
         "• Première carte : « Ilios »",
         "• Bans de la carte 1 : « Nova » d'abord, puis « Renards »",
         "• Cartes suivantes : l'équipe qui a perdu la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
@@ -54,7 +55,7 @@ describe("formatLobbyBriefDm", () => {
   it("vu du côté qui n'héberge pas : l'adversaire à gauche, ton équipe à droite et au premier ban", () => {
     const text = formatLobbyBriefDm(side({ hosting: false, banFirst: true }), URL);
     expect(text).toContain("• Gauche (hôte) : « Nova »");
-    expect(text).toContain("• Droite : « Renards »");
+    expect(text).toContain("• Droite (1er ban) : « Renards »");
     expect(text).toContain("• Bans de la carte 1 : « Renards » d'abord, puis « Nova »");
   });
 
@@ -76,7 +77,7 @@ describe("formatLobbyBriefDm", () => {
       [
         "🎮 BlueGenji — The lobby of your match “Renards” vs “Nova” is open (Round 2, “Coupe”).",
         "• Left (host): “Renards”",
-        "• Right: “Nova”",
+        "• Right (1st ban): “Nova”",
         "• First map: not set yet",
         "• Map 1 bans: “Nova” first, then “Renards”",
         "• Next maps: the team that lost the previous map bans first; on a draw, same order as on the previous map.",
@@ -184,12 +185,51 @@ describe("formatLobbyBriefDm — cartes du round", () => {
   });
 });
 
+describe("formatLobbyBriefDm — EF-32", () => {
+  it("formatLobbyBriefDm_hostBansFirst_banMarkOnTheLeftLikeThePush", () => {
+    const text = formatLobbyBriefDm(side({ hosting: true, banFirst: true }), URL);
+
+    expect(text).toContain("• Gauche (hôte, 1er ban) : « Renards »");
+    expect(text).toContain("• Droite : « Nova »");
+    expect(formatLobbyBriefDm(side({ hosting: true, banFirst: true }), URL, "en")).toContain(
+      "• Left (host, 1st ban): “Renards”\n• Right: “Nova”",
+    );
+  });
+
+  it("formatLobbyBriefDm_launchedMatch_opensWithLaunched", () => {
+    expect(formatLobbyBriefDm(side({ launched: true }), URL).split("\n")[0]).toBe(
+      "🎮 BlueGenji — Ton match « Renards » contre « Nova » est lancé (Manche 2, « Coupe »).",
+    );
+    expect(formatLobbyBriefDm(side({ launched: true, solo: true }), URL, "en").split("\n")[0]).toBe(
+      "🎮 BlueGenji — Your match has started (Round 2, “Coupe”).",
+    );
+    // Les réglages restent : ils servent à créer la partie.
+    expect(formatLobbyBriefDm(side({ launched: true }), URL)).toContain("• Première carte : « Ilios »");
+  });
+
+  it("formatLobbyBriefDm_selfManagedAgainstGhost_noMutualInviteLine", () => {
+    const text = formatLobbyBriefDm(side({ decision: "SELF_MANAGED", opponentGhost: true }), URL);
+
+    expect(text).not.toContain("Autogestion");
+    expect(formatLobbyBriefDm(side({ decision: "REFEREE", opponentGhost: true }), URL)).toContain("Arbitre désigné");
+  });
+
+  it("formatLobbyBriefDm_siteRootUnknown_noLinkLine", () => {
+    const text = formatLobbyBriefDm(side(), null);
+
+    expect(text.split("\n").at(-1)).toBe(
+      "• Cartes suivantes : l'équipe qui a perdu la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
+    );
+    expect(text).not.toContain("BattleTags à inviter");
+  });
+});
+
 describe("lobbyBriefPush", () => {
   it("résume les réglages, vers la page du match, sans remplacer l'appel aux « Prêt »", () => {
     const push = lobbyBriefPush(side({ cast: true }));
     expect(push.title).toBe("Salon ouvert : réglages du match");
     expect(push.body).toBe(
-      "Match casté : trie les joueurs par rôle. Gauche (hôte) : Renards · Droite (1er ban) : Nova · 1re carte : Ilios.",
+      "Match casté : trie les joueurs par rôle. Gauche (hôte) : « Renards » · Droite (1er ban) : « Nova » · 1re carte : Ilios.",
     );
     expect(push.url).toBe(localeHref(matchPageHref(4, 40), "fr"));
     expect(push.url).toBe("/tournois/4/matchs/40");
@@ -200,19 +240,68 @@ describe("lobbyBriefPush", () => {
   it("en anglais, et en individuel sans pseudo", () => {
     const en = lobbyBriefPush(side({ hosting: false, banFirst: true, firstMap: null }), "en");
     expect(en.title).toBe("Lobby open: match settings");
-    expect(en.body).toBe("Left (host): Nova · Right (1st ban): Renards · 1st map: not set yet.");
+    expect(en.body).toBe("Left (host): “Nova” · Right (1st ban): “Renards” · 1st map: not set yet.");
     expect(en.url).toBe(localeHref(matchPageHref(4, 40), "en"));
     const solo = lobbyBriefPush(side({ solo: true, teamName: "PseudoA", opponentName: "PseudoB" }));
     expect(solo.body).not.toMatch(/PseudoA|PseudoB/);
     expect(solo.body).toBe("Gauche (hôte) : toi · Droite (1er ban) : ton adversaire · 1re carte : Ilios.");
   });
 
-  it("aux noms et à la carte les plus longs, la coupe ne retire que la fin de la carte", () => {
-    const long = "N".repeat(60);
-    const push = lobbyBriefPush(side({ cast: true, teamName: long, opponentName: "M".repeat(60), firstMap: "C".repeat(64) }));
-    const shown = clipPushText(push.body, PUSH_BODY_MAX);
-    expect(shown.startsWith("Match casté : trie les joueurs par rôle.")).toBe(true);
-    expect(shown).toContain(`Droite (1er ban) : ${"M".repeat(60)} · 1re carte : C`);
+  it("lobbyBriefPush_longestNamesAndMap_castReminderGivesWayAndMapIsKept", () => {
+    const push = lobbyBriefPush(
+      side({ cast: true, teamName: "N".repeat(50), opponentName: "M".repeat(50), firstMap: "C".repeat(64) }),
+    );
+
+    expect(push.body).toBe(
+      `Gauche (hôte) : « ${"N".repeat(50)} » · Droite (1er ban) : « ${"M".repeat(50)} » · 1re carte : ${"C".repeat(64)}.`,
+    );
+    expect(clipPushText(push.body, PUSH_BODY_MAX)).toBe(push.body);
+  });
+
+  it("lobbyBriefPush_shortNamesCastMatch_keepsCastReminder", () => {
+    const push = lobbyBriefPush(side({ cast: true, teamName: "N".repeat(30), opponentName: "M".repeat(30) }));
+
+    expect(push.body.startsWith("Match casté : trie les joueurs par rôle.")).toBe(true);
+    expect(Array.from(push.body).length).toBeLessThanOrEqual(PUSH_BODY_MAX);
+  });
+
+  it("lobbyBriefPush_mapEndingWithPunctuation_singleFinalPeriod", () => {
+    expect(lobbyBriefPush(side({ firstMap: "Ilios." })).body).toBe(
+      "Gauche (hôte) : « Renards » · Droite (1er ban) : « Nova » · 1re carte : Ilios.",
+    );
+    expect(lobbyBriefPush(side({ firstMap: "Ilios !… " }), "en").body).toBe(
+      "Left (host): “Renards” · Right (1st ban): “Nova” · 1st map: Ilios.",
+    );
+    // Une carte faite de ponctuation seule reste écrite.
+    expect(lobbyBriefPush(side({ firstMap: "..." })).body).toContain("1re carte : ....");
+  });
+
+  it("lobbyBriefPush_nameWithSeparator_quotedSoTheBodyStaysReadable", () => {
+    const push = lobbyBriefPush(side({ teamName: "A · B" }));
+
+    expect(push.body).toBe("Gauche (hôte) : « A · B » · Droite (1er ban) : « Nova » · 1re carte : Ilios.");
+  });
+
+  it("lobbyBriefPush_bidiOverrideInStoredName_strippedFromBody", () => {
+    const push = lobbyBriefPush(side({ teamName: "Ren\u202Eards", opponentName: "No\u200Bva" }));
+
+    expect(push.body).toBe("Gauche (hôte) : « Renards » · Droite (1er ban) : « Nova » · 1re carte : Ilios.");
+  });
+
+  it("matchStartPush_bidiOverrideInStoredNames_strippedFromBody", () => {
+    const push = matchStartPush(
+      { tournamentId: 4, tournamentName: "Cou\u202Epe", matchId: 40, teamName: "Ren\u202Eards", opponentName: "Nova" },
+      "LOBBY",
+    );
+
+    expect(push.body).not.toMatch(/\u202E/u);
+    expect(push.body).toContain("Renards");
+    expect(push.body).toContain("Coupe");
+  });
+
+  it("lobbyBriefPush_launchedMatch_saysLaunchedInBothLanguages", () => {
+    expect(lobbyBriefPush(side({ launched: true })).title).toBe("Match lancé : réglages de la partie");
+    expect(lobbyBriefPush(side({ launched: true }), "en").title).toBe("Match started: game settings");
   });
 
   it("a son sujet, ouvert à tous, juste après le départ de match, libellé en français et en anglais", () => {
