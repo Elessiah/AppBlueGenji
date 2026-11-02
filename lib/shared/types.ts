@@ -6,6 +6,7 @@ import type { ConnectionMethod } from "./account-connections";
 import type { MatchFormat } from "./match-format";
 import type { MatchLiveTrigger } from "./live-streams";
 import type { CastBlock } from "./match-launch";
+import type { MatchVoiceInfo } from "./match-voice";
 import type { CertificationPrompt } from "./certification-prompt";
 import type { ParticipantType } from "./participants";
 import type { TournamentMapRules } from "./round-maps";
@@ -484,6 +485,12 @@ export type TournamentCard = {
    */
   launchPhase: boolean;
   /**
+   * Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) : allumée, le bot
+   * crée un salon par équipe un quart d'heure avant chaque match et le
+   * lancement attend qu'ils soient pleins. Éteinte par défaut ; publique.
+   */
+  teamVoiceChannels: boolean;
+  /**
    * Chaîne officielle du tournoi (Twitch, YouTube, Kick). `null` = pas de
    * diffusion annoncée. Les matchs n'en héritent jamais (`lib/shared/live-streams.ts`).
    */
@@ -704,6 +711,13 @@ export type BracketMatch = {
   lobbyOpenedAt: string | null;
   /** Lancement du match (ISO) ; `null` = pas encore lancé. */
   launchedAt: string | null;
+  /**
+   * Salons vocaux d'équipe du match (`docs/features/MATCH_VOICE.md`) : nombre
+   * de personnes de chaque côté et verrou du lancement. Absent ou `null` :
+   * aucun salon suivi (option éteinte, match lancé, entrée solo, fantôme).
+   * Un nombre, jamais qui.
+   */
+  voice?: MatchVoiceInfo | null;
   /** « Prêt » de chaque partie ; une fantôme est prête d'office. */
   team1Ready: boolean;
   team2Ready: boolean;

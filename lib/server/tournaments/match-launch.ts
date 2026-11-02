@@ -63,6 +63,7 @@ import { queueRefereeAlert, queueRoundNoRefereeAlert } from "./bot-logs";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { loadRoundSlots } from "./round-map-slots";
 import { inTransaction } from "./transaction";
+import { voiceGateBlocksLaunch } from "./match-voice";
 
 /** La ligne d'un match telle que le lancement la lit, sans ses casters. */
 export type LaunchMatchBaseRow = RowDataPacket & {
@@ -436,6 +437,9 @@ async function launchIfAllReady(
   // avant le décompte, sinon le match l'attendrait jusqu'au lancement d'office.
   await releaseIneligibleCasters(connection, row, snapshotBeforeLock);
   if (!allPartiesReady(rowReadiness(row))) return false;
+  // Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) : tous prêts ne
+  // suffit pas tant que les deux salons ne sont pas pleins.
+  if (await voiceGateBlocksLaunch(connection, row)) return false;
   await connection.execute(`UPDATE bg_matches SET launched_at = NOW() WHERE id = ?`, [matchId]);
   return true;
 }
@@ -963,10 +967,14 @@ export async function maintainMatchLaunches(
     const released = await releaseIneligibleCasters(connection, row, true);
     const undecidedMatch = undecidedCandidate(row);
     if (undecidedMatch) undecided.push(undecidedMatch);
+    // Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) : départ à
+    // l'heure, « Prêt » ou lancement d'office attendent aussi que les deux
+    // salons soient pleins — lu en base seulement, jamais au bot sous verrou.
     const launch =
-      Number(row.match_launch_phase ?? 0) !== 1 ||
-      allPartiesReady(rowReadiness(row)) ||
-      isAutoLaunchDue(toIso(row.lobby_opened_at), now);
+      (Number(row.match_launch_phase ?? 0) !== 1 ||
+        allPartiesReady(rowReadiness(row)) ||
+        isAutoLaunchDue(toIso(row.lobby_opened_at), now)) &&
+      !(await voiceGateBlocksLaunch(connection, row));
     if (launch) {
       await connection.execute(
         `UPDATE bg_matches

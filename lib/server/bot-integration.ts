@@ -955,3 +955,95 @@ async function postLiveAnnouncement(body: Record<string, unknown>): Promise<Live
     return outcome(failedBeforeSending(error) ? "unavailable" : "interrupted");
   }
 }
+
+/*
+ * ── Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) ─────────────────
+ * Contrat du bot : `doc/internal-api.md` § « Salons vocaux d'équipe des matchs ».
+ * Le site ne demande jamais que des **nombres** : aucun identifiant ni pseudo
+ * de membre ne transite, rien n'est journalisé de ce qui est compté.
+ */
+
+/** Délai d'un appel « salon vocal » : création et suppression passent par Discord. */
+const BOT_VOICE_FETCH_TIMEOUT_MS = 5000;
+
+/**
+ * Issue d'un appel « salon vocal ».
+ *
+ * - `ok` : réponse attendue (`channelId`, `members`, ou libération faite) ;
+ * - `gone` : le bot ne suit plus ce salon (`404`) — supprimé à la main, sorti
+ *   de la catégorie, ou déjà libéré puis effacé ;
+ * - `failed` : bot injoignable, coupe-circuit ouvert, permission refusée,
+ *   Discord indisponible, réponse illisible — le verrou du lancement est levé.
+ */
+export type VoiceCallOutcome<T> =
+  | { kind: "ok"; value: T }
+  | { kind: "gone"; code: string }
+  | { kind: "failed"; code: string };
+
+async function voiceCall<T>(
+  method: "GET" | "POST",
+  path: string,
+  body: unknown,
+  read: (payload: unknown) => T | null,
+): Promise<VoiceCallOutcome<T>> {
+  if (isCircuitOpen()) return { kind: "failed", code: "BOT_CIRCUIT_OPEN" };
+  try {
+    const response = await fetch(`${resolveBotInternalUrl()}${path}`, {
+      method,
+      headers: body === undefined ? getInternalHeaders() : { "content-type": "application/json", ...getInternalHeaders() },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache: "no-store",
+      signal: AbortSignal.timeout(BOT_VOICE_FETCH_TIMEOUT_MS),
+    });
+    if (response.status === 404) {
+      recordSuccess();
+      return { kind: "gone", code: await safeReadError(response) };
+    }
+    if (!response.ok) {
+      // Un refus du bot lui-même (permission, catégorie, Discord) n'est pas une
+      // panne du canal interne : seul un 5xx de transport compte au coupe-circuit.
+      const code = await safeReadError(response);
+      if (response.status >= 500 && !code.startsWith("VOICE_") && code !== "DISCORD_NOT_READY") recordFailure();
+      return { kind: "failed", code };
+    }
+    const value = read(await response.json().catch(() => null));
+    if (value === null) return { kind: "failed", code: "BOT_VOICE_BAD_RESPONSE" };
+    recordSuccess();
+    return { kind: "ok", value };
+  } catch (error) {
+    recordFailure();
+    return { kind: "failed", code: isTimeoutError(error) ? "BOT_VOICE_TIMEOUT" : "BOT_INTERNAL_UNREACHABLE" };
+  }
+}
+
+/** Identifiant Discord tel que le bot le rend : chiffres seulement. */
+function readChannelId(payload: unknown): string | null {
+  const id = (payload as { channelId?: unknown } | null)?.channelId;
+  return typeof id === "string" && /^\d{5,32}$/.test(id) ? id : null;
+}
+
+/**
+ * Crée (ou retrouve, même `key`) le salon vocal d'une équipe. `name` : le nom
+ * de l'équipe seulement — jamais un pseudo (aucun salon pour une entrée solo).
+ */
+export function ensureVoiceChannel(key: string, name: string): Promise<VoiceCallOutcome<string>> {
+  return voiceCall("POST", "/internal/voice/channels", { key, name }, readChannelId);
+}
+
+/** Nombre de personnes dans un salon suivi par le bot. */
+export function countVoiceChannel(channelId: string): Promise<VoiceCallOutcome<number>> {
+  return voiceCall("GET", `/internal/voice/channels/${encodeURIComponent(channelId)}/count`, undefined, (payload) => {
+    const members = (payload as { members?: unknown } | null)?.members;
+    return typeof members === "number" && Number.isInteger(members) && members >= 0 ? members : null;
+  });
+}
+
+/**
+ * Rend un salon au bot : supprimé s'il est vide, sinon dès qu'il se vide.
+ * `gone` (`404 VOICE_CHANNEL_NOT_TRACKED`) vaut « déjà fait ».
+ */
+export function releaseVoiceChannel(channelId: string): Promise<VoiceCallOutcome<true>> {
+  return voiceCall("POST", `/internal/voice/channels/${encodeURIComponent(channelId)}/release`, {}, (payload) =>
+    (payload as { released?: unknown } | null)?.released === true ? true : null,
+  );
+}

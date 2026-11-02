@@ -185,6 +185,7 @@ import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
+import { dispatchMatchVoiceChannels } from "./match-voice";
 import { dispatchDueRoundMapsNotices } from "./round-maps-notice";
 import { dispatchMatchStartNotices, notifyScoreToConfirm } from "./player-pushes";
 import { dispatchLobbyBriefs } from "./lobby-brief";
@@ -654,6 +655,9 @@ export async function listTournamentBuckets(
   void dispatchDueRoundMapsNotices().catch(() => undefined);
   // Et le brief du salon des managers (`./lobby-brief`), ouvert au même moment.
   void dispatchLobbyBriefs().catch(() => undefined);
+  // Et les salons vocaux d'équipe (`./match-voice`) : création à T−15, comptage
+  // des salons qui retiennent un lancement, libération après le score.
+  void dispatchMatchVoiceChannels();
   // Et pour l'annonce des lives : le mode `START_TIME` passe à l'antenne à
   // l'heure dite, sans aucune écriture.
   void dispatchLiveAnnouncements().catch(() => undefined);
@@ -758,6 +762,7 @@ async function loadTournamentBuckets(
       t.registration_min_players,
       t.referee_scheduling,
       t.match_launch_phase,
+      t.team_voice_channels,
       t.live_url,
       t.image_url,
       t.image_fit,
@@ -799,6 +804,7 @@ async function loadTournamentBuckets(
       t.registration_min_players,
       t.referee_scheduling,
       t.match_launch_phase,
+      t.team_voice_channels,
       t.live_url,
       t.image_url,
       t.image_fit,

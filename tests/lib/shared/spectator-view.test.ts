@@ -526,6 +526,8 @@ const MATCH_FIELDS = {
   team2Score: "public",
   tournamentId: "public",
   updatedAt: "public",
+  // Salons vocaux (MATCH_VOICE.md) : le verrou part, le remplissage est retiré.
+  voice: "parcouru",
   winnerTeamId: "public",
 } as const satisfies Record<keyof BracketMatch, Disposition>;
 
@@ -608,6 +610,7 @@ const CARD_FIELDS = {
   state: "public",
   survivalRoundsBeforeFirstCut: "public",
   survivalRoundsPerCut: "public",
+  teamVoiceChannels: "public",
 } as const satisfies Record<keyof TournamentCard, Disposition>;
 
 const PHASE_FIELDS = {

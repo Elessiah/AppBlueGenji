@@ -41,6 +41,9 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       -- Phase de lancement des matchs (« Prêt », modale) : option éteinte par
       -- défaut (\`docs/features/MATCH_LAUNCH.md\`).
       match_launch_phase TINYINT(1) NOT NULL DEFAULT 0,
+      -- Salons vocaux d'équipe créés par le bot avant chaque match, et lancement
+      -- tenu à leur remplissage : option éteinte par défaut (\`docs/features/MATCH_VOICE.md\`).
+      team_voice_channels TINYINT(1) NOT NULL DEFAULT 0,
       match_format_type ENUM('BO', 'FT') NULL,
       match_format_value INT NULL,
       match_format_max_maps INT NULL,
@@ -240,6 +243,28 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       INDEX idx_bg_match_streams_link_user (link_user_id),
       CONSTRAINT fk_bg_match_streams_match FOREIGN KEY (match_id)
         REFERENCES bg_matches(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // Salons vocaux d'équipe d'un match (`docs/features/MATCH_VOICE.md`) : une
+  // ligne par (match, équipe), l'identifiant du salon que le bot a créé et le
+  // **nombre** de personnes qu'il y comptait — jamais qui. `failed_at` : le
+  // dernier appel au bot pour ce salon a échoué (le verrou du lancement est
+  // alors levé) ; `released_at` : le salon a été rendu au bot. Sans clé
+  // étrangère : un match effacé laisse sa ligne, que le balayage rend au bot
+  // (sinon le salon resterait sur Discord jusqu'au filet de 48 h du bot).
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_match_voice_channels (
+      match_id BIGINT NOT NULL,
+      team_id BIGINT NOT NULL,
+      channel_id VARCHAR(32) NULL,
+      members TINYINT UNSIGNED NULL,
+      counted_at DATETIME NULL,
+      failed_at DATETIME NULL,
+      released_at DATETIME NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (match_id, team_id),
+      INDEX idx_bg_match_voice_channels_open (released_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 

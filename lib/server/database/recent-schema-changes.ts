@@ -383,6 +383,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
        AFTER overwatch_battletag`,
     // Map de départage d'un tour de play-offs en vrai best of 3 (`ROUND_MAPS.md`).
     `ALTER TABLE bg_tournament_round_maps ADD COLUMN tiebreak_map VARCHAR(64) NULL AFTER slots_json`,
+    // Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) : option éteinte par
+    // défaut ; la table `bg_match_voice_channels` est neuve, son `CREATE TABLE` suffit.
+    `ALTER TABLE bg_tournaments ADD COLUMN team_voice_channels TINYINT(1) NOT NULL DEFAULT 0
+       AFTER match_launch_phase`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

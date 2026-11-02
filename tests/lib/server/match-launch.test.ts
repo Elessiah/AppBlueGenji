@@ -97,6 +97,12 @@ type World = {
   alerts?: string[];
   /** Cartes réglées de la manche du match (`bg_tournament_round_maps.slots_json`), aucune par défaut. */
   roundSlots?: string;
+  /** Salons vocaux d'équipe (`MATCH_VOICE.md`) : option éteinte sans cette clé. */
+  voice?: {
+    enabled: boolean;
+    team1Solo?: boolean;
+    rows: { team_id: number; channel_id: string | null; members: number | null; failed_at: string | null }[];
+  };
 };
 
 const STAMP = "2026-09-24 20:00:00";
@@ -331,6 +337,13 @@ function executeFor(state: World) {
     }
     const userResult = readUserRows(state, sql, params);
     if (userResult) return userResult;
+    if (sql.includes("AS enabled") && sql.includes("team_voice_channels")) {
+      return [[{ enabled: state.voice?.enabled ? 1 : 0, team1_solo: state.voice?.team1Solo ? 1 : 0, team2_solo: 0 }], []];
+    }
+    if (sql.includes("FROM bg_match_voice_channels")) {
+      const rows = (state.voice?.rows ?? []).map((row) => ({ match_id: 42, released_at: null, ...row }));
+      return [rows, []];
+    }
     if (sql.includes("solo_user_id = ?")) {
       const userId = Number(params[0]);
       const ids = params.slice(1).map(Number);

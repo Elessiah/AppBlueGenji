@@ -52,6 +52,7 @@ export function bracketMatch(overrides: Partial<BracketMatch> = {}): BracketMatc
     casters: [],
     lobbyOpenedAt: null,
     launchedAt: null,
+    voice: null,
     team1Ready: false,
     team2Ready: false,
     replayUrl: null,
