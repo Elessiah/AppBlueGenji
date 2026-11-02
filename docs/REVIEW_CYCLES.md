@@ -5,13 +5,15 @@ Règle posée le 2026-10-01, une fois les deux projets arrivés à une version s
 ## 1. Règles communes à tous les cycles
 
 - **Un cycle propre suffit** : chaque boucle (standard, thématique, juridique) s'arrête au **premier** cycle sans finding majeur, changements critiques compris. Aucun plafond de passes tant que des findings majeurs remontent.
-- **Majeur ou mineur** : est **majeur** un vrai bug, un problème de sécurité ou juridique, une promesse faite à l'utilisateur non tenue, un coût de performance net. Le reste est **mineur** (formulation, style, préférence, détail sans effet observable) : il est consigné dans `ERREUR.txt` (format habituel, sans doublon) — dans `ACCESSIBILITE.md` s'il touche l'accessibilité — et **n'est pas corrigé** dans la PR. Un finding majeur se corrige dans la PR, même s'il préexiste, dès qu'il porte sur le code ou les routes que la PR touche ; hors de cette zone, il va dans `ERREUR.txt`. Un cycle qui ne remonte **que** des findings mineurs compte pour propre : on les consigne et la boucle s'arrête.
+- **Majeur ou mineur** : est **majeur** un vrai bug, un problème de sécurité ou juridique, une promesse faite à l'utilisateur non tenue, un coût de performance net. Le reste est **mineur** (formulation, style, préférence, détail sans effet observable) : il est consigné dans `ERREUR.txt` (format habituel, sans doublon) — dans `ACCESSIBILITE.md` s'il touche l'accessibilité — et **n'est pas corrigé** dans la PR. Un finding majeur se corrige dans la PR, même s'il préexiste, dès qu'il porte sur le code ou les routes que la PR touche ; hors de cette zone, il va dans `ERREUR.txt`. Un cycle qui ne remonte **que** des findings mineurs compte pour propre : on les consigne et la boucle s'arrête. **Exception — lot de correction d'`ERREUR.txt`** (depuis le 2026-11-02) : ses propres revues **corrigent** aussi les findings mineurs de la zone touchée, pour que le lot réduise réellement le fichier ; seul ce qui est hors zone y est consigné, et un cycle n'est propre que s'il ne laisse aucun finding de la zone non corrigé.
 - **Un agent neuf par type de revue** quand le lot est confié à des agents, lancés l'un après l'autre (standard, puis UI/UX, performance, sécurité, juridique s'il y a lieu) : aucun relecteur ne porte le contexte ni le biais des passes précédentes, et le relecteur ne réimplémente pas. L'implémentation est faite par un autre agent. Une petite PR menée dans une seule session (correctif d'une ligne, doc seule) enchaîne ses cycles dans la session, sans agent supplémentaire.
 - Une correction faite dans un cycle est vérifiée par le cycle suivant **du même type** ; elle ne relance pas la boucle standard ni les autres thèmes.
 
 ## 2. Boucle standard
 
-`/code-review --comment` en boucle : corriger les findings majeurs, commiter, pousser, relancer une revue **complète**, jusqu'au premier cycle propre.
+**Aucun commentaire sur la PR** : une revue ne passe jamais `--comment` et ne poste aucun finding, ni en ligne ni en commentaire général. Les findings vont au compte rendu de l'agent, aux correctifs et à `ERREUR.txt` (mineurs).
+
+`/code-review` en boucle : corriger les findings majeurs, commiter, pousser, relancer une revue **complète**, jusqu'au premier cycle propre.
 
 ## 3. Cycles thématiques — PR qui ajoute ou modifie une fonctionnalité
 
@@ -24,10 +26,10 @@ Une fois la boucle standard propre, un cycle par thème, **jamais fusionnés en 
 Un cycle thématique se lance avec le skill `code-review` et des arguments qui **nomment le thème**, par exemple :
 
 ```
-/code-review --comment focus: security review — authz, input validation, injection, secrets, data exposure, rate limits, CSRF/redirects
+/code-review focus: security review — authz, input validation, injection, secrets, data exposure, rate limits, CSRF/redirects
 ```
 
-Le thème voyage en **texte libre** dans les arguments du skill, après `--comment` : ne compter un cycle thématique comme fait que si son compte rendu traite bien du thème nommé — une revue revenue généraliste ne vaut pas cycle thématique et se relance.
+Le thème voyage en **texte libre** dans les arguments du skill : ne compter un cycle thématique comme fait que si son compte rendu traite bien du thème nommé — une revue revenue généraliste ne vaut pas cycle thématique et se relance.
 
 ## 4. Exceptions
 
@@ -36,5 +38,5 @@ Le thème voyage en **texte libre** dans les arguments du skill, après `--comme
 - **Textes légaux** (pages légales, `/rgpd`, registre, `PRIVACY_CHANGES`, conditions, déclaration d'accessibilité, pages légales du bot) : la boucle standard, puis **un cycle orienté juridique** à la place des cycles thématiques, relancé jusqu'à revenir propre — RGPD, LCEN/DSA, recommandations CNIL, cohérence avec `/rgpd`, le registre des traitements (`lib/shared/processing-register.ts`, `REGISTER_UPDATED_AT` avancée) et `PRIVACY_CHANGES`, toute date ou version affichée d'un texte modifié avancée avec lui (par exemple `TERMS_VERSION` **et** `TERMS_UPDATED_AT` pour les conditions d'utilisation, `ACCESSIBILITY_STATEMENT_DATE` pour la déclaration d'accessibilité, les dates françaises et anglaises des pages légales du bot dans `lib/shared/bot-legal-content.ts`), aucune donnée personnelle ni aucun secret publié. Seul le **fond** compte comme finding (traitement, destinataire, donnée, durée ou base légale non déclarés, entrée de registre ou `PRIVACY_CHANGES` manquante, contradiction FR/EN ou texte/code) ; la formulation n'en est jamais un. Exemple :
 
   ```
-  /code-review --comment focus: legal review — GDPR/RGPD, LCEN/DSA, CNIL, consistency with /rgpd, processing register, PRIVACY_CHANGES, no personal data or secrets published
+  /code-review focus: legal review — GDPR/RGPD, LCEN/DSA, CNIL, consistency with /rgpd, processing register, PRIVACY_CHANGES, no personal data or secrets published
   ```
