@@ -23,7 +23,7 @@
  * repart pour une nouvelle fenêtre au lieu d'être perdue.
  */
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import { sendBotLog } from "@/lib/server/bot-integration";
+import { flushBotLogBatch, sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import { formatRoundMapsSummaryLog } from "@/lib/shared/bot-logs";
 import { matchRoundLabel } from "@/lib/shared/discord-notifications";
@@ -151,6 +151,7 @@ async function sendClaimed(rows: readonly NoticeRow[]): Promise<number> {
         roundLabels,
         listed: ROUND_MAPS_NOTICE_LISTED,
       }),
+      { tournamentId: Number(row.tournament_id) },
     ).catch((error: unknown) => console.error("[round-maps] journal non envoyé", error));
     sent += 1;
   }
@@ -203,6 +204,9 @@ export async function flushRoundMapsNotice(tournamentId: number): Promise<boolea
     const db = await getDatabase();
     const [rows] = await db.execute<NoticeRow[]>(`${NOTICE_SELECT} WHERE n.tournament_id = ?`, [tournamentId]);
     sent = (await sendClaimed(rows)) > 0;
+    // L'écran fermé demande un envoi immédiat : le résumé ne reste pas dans le
+    // lot du journal du tournoi (`LOG_BATCHING.md`), qui part avec lui.
+    if (sent) await flushBotLogBatch({ tournamentId });
     return sent;
   } finally {
     if (!sent && lastFlushAt.get(tournamentId) === now) lastFlushAt.delete(tournamentId);

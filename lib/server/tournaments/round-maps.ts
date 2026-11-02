@@ -298,7 +298,9 @@ export async function setTournamentMapRules(tournamentId: number, rules: MapRule
   });
   if (tournament === null) return;
   publishMatchUpdatedEvent(tournamentId);
-  void sendBotLog(formatMapRulesLog({ tournament: { id: Number(tournament.id), name: tournament.name } })).catch(
+  void sendBotLog(formatMapRulesLog({ tournament: { id: Number(tournament.id), name: tournament.name } }), {
+    tournamentId: Number(tournament.id),
+  }).catch(
     (error: unknown) => console.error("[round-maps] journal non envoyé", error),
   );
 }

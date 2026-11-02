@@ -4,7 +4,7 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 
 import { getDatabase } from "@/lib/server/database";
-import { sendBotLog } from "@/lib/server/bot-integration";
+import { flushBotLogBatch, sendBotLog } from "@/lib/server/bot-integration";
 import {
   dispatchDueRoundMapsNotices,
   flushRoundMapsNotice,
@@ -97,6 +97,13 @@ describe("dispatchDueRoundMapsNotices", () => {
     expect(message).toContain("par le staff");
   });
 
+  it("dispatchDueRoundMapsNotices_dueRow_queuesTheSummaryInItsTournamentBatch", async () => {
+    pool([dueRow([R2])]);
+    await dispatchDueRoundMapsNotices();
+    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 7 });
+    expect(flushBotLogBatch).not.toHaveBeenCalled();
+  });
+
   it("dispatchDueRoundMapsNotices_windowNotElapsed_sendsNothing", async () => {
     pool([]);
     await expect(dispatchDueRoundMapsNotices()).resolves.toBe(0);
@@ -159,6 +166,14 @@ describe("flushRoundMapsNotice", () => {
     pool([]);
     await expect(flushRoundMapsNotice(7)).resolves.toBe(false);
     expect(sendBotLog).not.toHaveBeenCalled();
+    expect(flushBotLogBatch).not.toHaveBeenCalled();
+  });
+
+  it("flushRoundMapsNotice_summarySent_flushesTheTournamentLogBatchAtOnce", async () => {
+    pool([dueRow([R2])]);
+    await flushRoundMapsNotice(7);
+    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 7 });
+    expect(flushBotLogBatch).toHaveBeenCalledWith({ tournamentId: 7 });
   });
 
   it("flushRoundMapsNotice_sweepAlreadyClaimedIt_returnsFalse", async () => {

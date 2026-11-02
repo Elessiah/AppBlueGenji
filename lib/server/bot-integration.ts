@@ -9,6 +9,8 @@ import type {
 import { normalizeBotServersPayload, normalizeBotStats } from "@/lib/shared/bot-message-window";
 import type { LiveMentionTarget } from "@/lib/shared/live-announcements";
 import type { Locale } from "@/lib/shared/locales";
+import { botLogBatchKey } from "@/lib/shared/bot-log-batch";
+import { createBotLogBatcher, type BotLogBatcher } from "@/lib/server/bot-log-batcher";
 
 const DEFAULT_BOT_INTERNAL_HOST = "127.0.0.1";
 const DEFAULT_BOT_INTERNAL_PORT = "4400";
@@ -254,7 +256,12 @@ export async function sendDiscordLoginCode(discordId: string, code: string, loca
   throw new Error(upstreamError);
 }
 
-export async function sendBotLog(message: string): Promise<void> {
+/**
+ * Transport brut du journal : un message, un `POST /internal/log`. Meilleur
+ * effort, ne lève jamais. Les appelants passent par {@link sendBotLog}, qui
+ * regroupe ; seul le lot (`bot-log-batcher.ts`) appelle celui-ci.
+ */
+async function postBotLog(message: string): Promise<void> {
   if (isCircuitOpen()) return; // best-effort : on skip silencieusement
 
   const baseUrl = resolveBotInternalUrl();
@@ -276,6 +283,53 @@ export async function sendBotLog(message: string): Promise<void> {
     recordFailure();
     // Best-effort : on ne propage pas l'erreur.
   }
+}
+
+/** Salon de destination de {@link sendBotLog} : le journal du bot (`INFO_SERV`). */
+const BOT_LOG_CHANNEL = "log";
+
+// Le lot vit sur `globalThis`, pas dans ce module : Next peut charger le module
+// une fois par bundle (routes, `instrumentation.ts`), et l'arrêt propre doit
+// voir les mêmes lots que les routes qui les remplissent.
+const batcherState = globalThis as typeof globalThis & { __bgBotLogBatcher?: BotLogBatcher };
+const botLogBatcher = (batcherState.__bgBotLogBatcher ??= createBotLogBatcher({ send: postBotLog }));
+
+/** Rattachement d'une ligne du journal, pour la ranger dans le bon lot. */
+export type BotLogScope = {
+  /** Tournoi dont la ligne relève : un lot par tournoi, jamais mêlé à un autre. */
+  tournamentId?: number | null;
+};
+
+/**
+ * Demande une ligne au journal Discord du bot.
+ *
+ * Elle ne part **pas** tout de suite : elle rejoint le lot de son salon et de
+ * son tournoi, envoyé en un message après 5 min sans nouvelle ligne ou dès
+ * 5 lignes (`docs/features/LOG_BATCHING.md`). Se résout aussitôt, ne lève
+ * jamais : le bot reste optionnel.
+ */
+export async function sendBotLog(message: string, scope: BotLogScope = {}): Promise<void> {
+  botLogBatcher.add(botLogBatchKey(BOT_LOG_CHANNEL, scope.tournamentId), message);
+}
+
+/** Envoie tout de suite le lot du journal d'un tournoi (écran des cartes fermé, par exemple). */
+export function flushBotLogBatch(scope: BotLogScope = {}): Promise<void> {
+  return botLogBatcher.flush(botLogBatchKey(BOT_LOG_CHANNEL, scope.tournamentId));
+}
+
+/** Envoie tous les lots du journal en attente : arrêt propre du serveur. */
+export function flushAllBotLogBatches(): Promise<void> {
+  return botLogBatcher.flushAll();
+}
+
+/** Lignes du journal en attente, par lot. Réservé aux tests et au diagnostic. */
+export function pendingBotLogBatches(): Map<string, number> {
+  return botLogBatcher.pending();
+}
+
+/** Abandonne les lots du journal en attente. Réservé aux tests. */
+export function resetBotLogBatches(): void {
+  botLogBatcher.reset();
 }
 
 /**

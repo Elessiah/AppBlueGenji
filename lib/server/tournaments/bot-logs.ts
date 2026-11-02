@@ -371,7 +371,9 @@ export function flushBotLogs(connection: PoolConnection): void {
     /** Envoie une ligne déjà rédigée, et dit si les arbitres l'ont reçue. */
     async function deliver({ entry, channel, message, refereeMatch }: ResolvedBotLog): Promise<void> {
       if (channel !== "REFEREE") {
-        await sendBotLog(message);
+        // Lot du tournoi quand l'entrée en porte un ; les entrées d'un match
+        // (résultat, conflit…) rejoignent le lot commun du salon.
+        await sendBotLog(message, { tournamentId: "tournamentId" in entry ? entry.tournamentId : null });
         // Le coup d'envoi est une ligne de journal pour le staff, et une
         // notification pour les joueurs engagés — la seule qui n'ait pas de
         // message privé Discord : elle naît au même point de passage unique.

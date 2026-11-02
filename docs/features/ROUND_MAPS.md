@@ -164,12 +164,14 @@ au pool.
   `bg_round_maps_notices` (une ligne par tournoi, écrite dans la transaction) et
   repousse l'envoi de 60 s après le dernier changement
   (`ROUND_MAPS_NOTICE_WINDOW_SECONDS`) ; une seule ligne
-  (`formatRoundMapsSummaryLog`, 8 manches nommées, le reste compté) part ensuite.
+  (`formatRoundMapsSummaryLog`, 8 manches nommées, le reste compté) rejoint
+  ensuite le lot du journal du tournoi (`LOG_BATCHING.md`).
   L'état est en base, donc survit à un redémarrage : le trafic l'envoie
   (`dispatchDueRoundMapsNotices`, appelé par la liste des tournois, étranglé à
   15 s), un minuteur de processus n'est qu'un accélérateur. La fermeture de
   l'écran appelle `POST /api/admin/tournaments/[id]/round-maps/flush` (permission
-  `tournaments`) pour envoyer tout de suite — au plus un envoi anticipé par
+  `tournaments`) pour envoyer tout de suite, lot du journal du tournoi compris
+  (`flushBotLogBatch`) — au plus un envoi anticipé par
   tournoi et par fenêtre de 60 s (au-delà, la fenêtre de silence enverra), et
   jamais le seul déclencheur : un onglet fermé n'y perd rien. Un multi-phases
   préfixe la phase (« Phase 2 · Manche 1 ») et prend le format suisse de la

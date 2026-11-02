@@ -176,6 +176,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 ## Bot, Discord et diffusion
 
 - `BOT_INTEGRATION.md` — Appels app → bot, flux d'activité anonymisé.
+- `LOG_BATCHING.md` — Journal Discord par lots : 5 min de silence relancées par chaque ligne, envoi immédiat à 5 lignes, un message par lot (salon, puis tournoi) ; arrêt propre qui vide les lots.
 - `BOT_DM_LANGUAGE.md` — Langue des messages privés Discord : celle du compte, sinon un message bilingue (FR puis EN) ; salons en français.
 - `BOT_PAGE.md` — Pages `/bot` et `/bot/docs`.
 - `BOT_FEATURES_NEEDED.md` — Fonctionnalités à développer côté bot.
