@@ -4,7 +4,7 @@ import { accountDeletionPlan } from "@/lib/shared/account-deletion";
 import { isLegacyDeletedPseudo } from "@/lib/shared/anonymous-pseudos";
 import { accountTraceSql, loadAccountTrace } from "./account-deletion";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
-import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
+import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 
 /** Ce que le rattrapage des comptes supprimés a fait. */
@@ -146,7 +146,7 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
 
   // Même raison que la suppression elle-même (`deleteOwnAccount`) : les vues
   // de l'accueil qui nomment une entrée solo ne gardent pas l'ancien pseudo.
-  if (outcome.erased + outcome.renamed > 0) invalidateLandingTeamViews();
+  if (outcome.erased + outcome.renamed > 0) invalidateTeamIdentityViews();
   // Et les matchs qui le nommaient (caster, lien, arbitre), comme `deleteOwnAccount`.
   for (const tournamentId of touchedTournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   return outcome;

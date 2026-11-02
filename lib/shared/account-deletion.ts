@@ -24,6 +24,8 @@
  * complète là où le serveur anonymise.
  */
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
+import { entrantRemovalBlockReason } from "@/lib/shared/entrant-removal";
+import type { TournamentStateInput } from "@/lib/shared/tournament-state";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
   BACKUP_RETENTION_DAYS,
@@ -39,11 +41,15 @@ import {
  *   fenêtre d'appartenance des statistiques, `stats-service`). C'est la trace
  *   qui porte des statistiques : un joueur dont l'équipe a été engagée mais
  *   qui n'a jamais disputé une rencontre n'a rien à préserver.
- * - `soloRegistrations` — son **entrée solo est inscrite** à un tournoi, jouée
- *   ou non : elle porte le pseudo du joueur comme nom d'engagé, et l'effacement
- *   la laisserait nommer quelqu'un qui n'existe plus. Trace distincte de la
- *   précédente parce que sa phrase l'est : une inscription jamais jouée ne
- *   laisse **aucune** statistique, et la confirmation ne doit pas en promettre.
+ * - `soloRegistrations` — son **entrée solo est engagée** dans un tournoi
+ *   individuel qui a commencé (ou fini), ou figure sur un match : elle porte le
+ *   pseudo du joueur comme nom d'engagé, sur un plateau qui ne se réécrit plus,
+ *   et l'effacement la laisserait nommer quelqu'un qui n'existe plus. Trace
+ *   distincte de la précédente parce que sa phrase l'est : une inscription
+ *   jamais jouée ne laisse **aucune** statistique, et la confirmation ne doit
+ *   pas en promettre. Une inscription à un tournoi **pas encore commencé**,
+ *   sans match, ne retient plus la ligne (décision D12) : elle est retirée avec
+ *   le compte (`withdrawableSoloRegistrations`).
  * - `organizedTournaments` — il a **créé** un tournoi. `bg_tournaments`
  *   .`organizer_user_id` est `NOT NULL` en `ON DELETE RESTRICT` : la base
  *   refuserait l'effacement, et un tournoi sans organisateur n'aurait de toute
@@ -62,6 +68,49 @@ export type AccountTrace = {
   organizedTournaments: boolean;
   ownedTeams: boolean;
 };
+
+/**
+ * Une inscription de l'entrée solo du compte, telle que la suppression la lit :
+ * le tournoi (ses dates, pour la fenêtre de retrait d'un engagé) et la présence
+ * d'un match qui nomme l'entrée.
+ */
+export type SoloRegistrationFact = TournamentStateInput & {
+  tournamentId: number;
+  teamId: number;
+  /** Un match (`bg_matches`, n'importe quel côté) désigne l'entrée. */
+  hasMatch: boolean;
+};
+
+/**
+ * Les inscriptions solo que la suppression **retire** pour effacer le compte
+ * (décision D12), ou `null` si l'une d'elles retient la ligne.
+ *
+ * Une inscription jamais jouée ne laisse rien à préserver tant que le tournoi
+ * n'a pas commencé : c'est la fenêtre où le staff peut lui-même retirer un
+ * engagé (`entrantRemovalBlockReason`), où aucun match, classement ni phase
+ * n'existe encore. Après le coup d'envoi, le plateau est tiré — l'entrée y
+ * figure, exemptions et forfaits compris — et l'effacer le réécrirait :
+ * l'anonymisation reste la règle. Un match qui nomme l'entrée la retient
+ * aussi, quel que soit l'état lu.
+ *
+ * `locked` est l'ensemble des tournois dont la transaction tient la ligne
+ * (`lockTournamentRow`) : une inscription faite dans un autre tournoi pendant
+ * la suppression n'est pas couverte par le verrou, elle retient la ligne
+ * (règle conservatrice). `null` pour l'aperçu, qui n'écrit rien.
+ */
+export function withdrawableSoloRegistrations(
+  registrations: readonly SoloRegistrationFact[],
+  locked: ReadonlySet<number> | null,
+  now: number = Date.now(),
+): readonly SoloRegistrationFact[] | null {
+  const withdrawable = registrations.every(
+    (registration) =>
+      !registration.hasMatch &&
+      (locked === null || locked.has(registration.tournamentId)) &&
+      entrantRemovalBlockReason(registration, now) === null,
+  );
+  return withdrawable ? registrations : null;
+}
 
 /** Ce que la suppression fait réellement. */
 export type AccountDeletionMode = "ERASE" | "ANONYMIZE";
@@ -176,13 +225,13 @@ export function accountDeletionConfirmation(
     case "TOURNAMENTS":
       return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées. ${residual} ${irreversible}`;
     case "SOLO_REGISTRATIONS":
-      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es inscrit à un tournoi individuel, où ton pseudo sert de nom d'engagé et sera remplacé par ce pseudo d'emprunt. ${residual} ${irreversible}`;
+      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es engagé dans un tournoi individuel déjà commencé ou terminé, où ton pseudo sert de nom d'engagé et sera remplacé par ce pseudo d'emprunt. ${residual} ${irreversible}`;
     case "ORGANIZED_TOURNAMENTS":
       return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es l'organisateur de tournois qui doivent garder un titulaire. ${residual} ${irreversible}`;
     case "OWNED_TEAMS":
       return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet. ${residual} ${irreversible}`;
     case null:
-      return `Supprimer définitivement ton compte ? Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte et ton profil seront effacés entièrement. ${residual} ${irreversible}`;
+      return `Supprimer définitivement ton compte ? Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte et ton profil seront effacés entièrement, et tes inscriptions à des tournois individuels pas encore commencés seront retirées. ${residual} ${irreversible}`;
     default:
       return `Supprimer définitivement ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, inscription à un tournoi individuel, équipe possédée, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${residual} ${irreversible}`;
   }
@@ -211,7 +260,7 @@ export function accountDeletionOutcome(
     case "OWNED_TEAMS":
       return "Compte supprimé. Ton équipe garde un propriétaire anonyme.";
     case null:
-      return "Compte effacé. Ton compte et ton profil ont disparu du site ; seules restent les traces décrites par la politique de confidentialité et son registre (sauvegardes, journal des suppressions, mesure d'audience).";
+      return "Compte effacé. Ton compte, ton profil et tes inscriptions à venir en tournoi individuel ont disparu du site ; seules restent les traces décrites par la politique de confidentialité et son registre (sauvegardes, journal des suppressions, mesure d'audience).";
     default:
       return "Compte supprimé.";
   }

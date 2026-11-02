@@ -4,6 +4,8 @@ import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { type MatchWithdrawal, withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
 import { ANONYMOUS_PSEUDOS, pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
+import type { SoloRegistrationFact } from "@/lib/shared/account-deletion";
+import { resequenceSeeds } from "@/lib/server/tournaments/seeding";
 
 /**
  * L'effacement pur et simple, sous le verrou de `deleteOwnAccount`.
@@ -14,11 +16,28 @@ import { DEFAULT_LOCALE } from "@/lib/shared/locales";
  * restant l'acte de l'équipe. Les visites n'ont rien à suivre : elles ne
  * désignent aucun compte.
  *
+ * Les inscriptions solo jamais jouées à un tournoi pas encore commencé
+ * (`soloWithdrawals`, décision D12) sont retirées d'abord, comme le retrait
+ * d'un engagé par le staff (`registration-removal.ts`) : ligne effacée, rangs
+ * refermés. L'appelant tient déjà la ligne de chacun de ces tournois.
+ *
  * Rend les matchs touchés (casts, liens, arbitrages) : l'appelant prévient
  * leurs tournois après le commit.
  */
-export async function eraseAccount(connection: PoolConnection, userId: number): Promise<MatchWithdrawal> {
-  // Une entrée solo jamais inscrite ni jouée part avec le compte : elle n'a pas
+export async function eraseAccount(
+  connection: PoolConnection,
+  userId: number,
+  soloWithdrawals: readonly SoloRegistrationFact[] = [],
+): Promise<MatchWithdrawal> {
+  for (const registration of soloWithdrawals) {
+    await connection.execute(
+      `DELETE FROM bg_tournament_registrations WHERE tournament_id = ? AND team_id = ?`,
+      [registration.tournamentId, registration.teamId],
+    );
+    await resequenceSeeds(connection, registration.tournamentId);
+  }
+  // Une entrée solo sans inscription (jamais inscrite, ou ses inscriptions
+  // retirées ci-dessus) ni match part avec le compte : elle n'a pas
   // de clé étrangère, et son nom d'engagé est le pseudo du joueur — laissée en
   // place, elle le nommerait encore. Les deux `NOT EXISTS` ne sont pas une
   // redite de la trace : ils gardent l'entrée qu'une inscription aurait reprise

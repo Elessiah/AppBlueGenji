@@ -4,15 +4,18 @@ import {
   type AccountDeletionPlan,
   accountDeletionPlan,
   type AccountTrace,
+  type SoloRegistrationFact,
+  withdrawableSoloRegistrations,
 } from "@/lib/shared/account-deletion";
 import { isReferencedRowError } from "@/lib/server/mysql-errors";
 import { closeUserStreams } from "@/lib/server/session-streams";
-import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
+import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { playedMatchSql } from "@/lib/shared/ranking";
-import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 
 /*
@@ -148,6 +151,88 @@ export async function loadAccountTrace(
 }
 
 /**
+ * Les tournois où l'entrée solo du compte est inscrite, par id croissant : ceux
+ * dont la suppression verrouille la ligne avant de décider (`deleteOwnAccount`).
+ */
+export async function listSoloRegistrationTournamentIds(runner: SqlRunner, userId: number): Promise<number[]> {
+  const [rows] = await runner.execute<(RowDataPacket & { tournament_id: number })[]>(
+    `SELECT DISTINCT r.tournament_id
+       FROM bg_teams s
+       JOIN bg_tournament_registrations r ON r.team_id = s.id
+      WHERE s.solo_user_id = ?
+      ORDER BY r.tournament_id`,
+    [userId],
+  );
+  return rows.map((row) => Number(row.tournament_id));
+}
+
+/**
+ * Les inscriptions de l'entrée solo du compte, avec ce qui décide de leur sort
+ * (`withdrawableSoloRegistrations`) : les dates du tournoi et la présence d'un
+ * match qui nomme l'entrée.
+ */
+export async function loadSoloRegistrations(runner: SqlRunner, userId: number): Promise<SoloRegistrationFact[]> {
+  const [rows] = await runner.execute<(RowDataPacket & {
+    tournament_id: number;
+    team_id: number;
+    state: SoloRegistrationFact["state"];
+    finished_at: Date | string | null;
+    registration_open_at: Date | string;
+    registration_close_at: Date | string;
+    start_at: Date | string;
+    has_match: number;
+  })[]>(
+    `SELECT r.tournament_id, r.team_id, t.state, t.finished_at,
+            t.registration_open_at, t.registration_close_at, t.start_at,
+            (EXISTS (SELECT 1 FROM bg_matches m WHERE m.team1_id = s.id)
+              OR EXISTS (SELECT 1 FROM bg_matches m WHERE m.team2_id = s.id)) AS has_match
+       FROM bg_teams s
+       JOIN bg_tournament_registrations r ON r.team_id = s.id
+       JOIN bg_tournaments t ON t.id = r.tournament_id
+      WHERE s.solo_user_id = ?
+      ORDER BY r.tournament_id`,
+    [userId],
+  );
+  return rows.map((row) => ({
+    tournamentId: Number(row.tournament_id),
+    teamId: Number(row.team_id),
+    state: row.state,
+    finishedAt: row.finished_at,
+    registrationOpenAt: row.registration_open_at,
+    registrationCloseAt: row.registration_close_at,
+    startAt: row.start_at,
+    hasMatch: Boolean(Number(row.has_match)),
+  }));
+}
+
+/** Les traces du compte, et les inscriptions solo que l'effacement retirera. */
+export type AccountDeletionFacts = {
+  trace: AccountTrace;
+  /** Vide si rien n'est à retirer — ou si la ligne est retenue par ailleurs. */
+  soloWithdrawals: readonly SoloRegistrationFact[];
+};
+
+/**
+ * Les traces du compte, l'inscription solo **jamais jouée à un tournoi pas
+ * encore commencé** mise à part (décision D12) : elle ne retient plus la ligne,
+ * elle part avec le compte. Toute autre inscription solo la retient toujours.
+ *
+ * `locked` : les tournois verrouillés par la transaction (`null` pour
+ * l'aperçu) — voir `withdrawableSoloRegistrations`.
+ */
+export async function loadAccountDeletionFacts(
+  runner: SqlRunner,
+  userId: number,
+  locked: ReadonlySet<number> | null,
+): Promise<AccountDeletionFacts> {
+  const trace = await loadAccountTrace(runner, userId);
+  if (!trace.soloRegistrations) return { trace, soloWithdrawals: [] };
+  const withdrawals = withdrawableSoloRegistrations(await loadSoloRegistrations(runner, userId), locked);
+  if (withdrawals === null) return { trace, soloWithdrawals: [] };
+  return { trace: { ...trace, soloRegistrations: false }, soloWithdrawals: withdrawals };
+}
+
+/**
  * Ce que la suppression **ferait** à ce compte, sans rien écrire.
  *
  * L'écran doit annoncer le geste avant le clic : une confirmation qui promet la
@@ -162,7 +247,7 @@ export async function loadAccountTrace(
  */
 export async function getAccountDeletionPlan(userId: number): Promise<AccountDeletionPlan> {
   const db = await getDatabase();
-  return accountDeletionPlan(await loadAccountTrace(db, userId));
+  return accountDeletionPlan((await loadAccountDeletionFacts(db, userId, null)).trace);
 }
 
 /**
@@ -206,11 +291,28 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
   // Les tournois dont un match nommait le compte (caster, lien, arbitre) :
   // prévenus après le commit.
   let touchedTournaments: number[] = [];
+  // Les tournois dont une inscription solo part avec le compte (D12) :
+  // instantanés et aperçus à relire après le commit.
+  let withdrawnFrom: number[] = [];
 
   try {
+    // Les tournois où l'entrée solo est inscrite, relevés **avant** la
+    // transaction : leurs lignes s'y verrouillent en premier (ci-dessous). Une
+    // inscription faite entre ce relevé et le verrou tombe dans un tournoi non
+    // verrouillé, et retient alors la ligne (`withdrawableSoloRegistrations`).
+    const soloTournaments = await listSoloRegistrationTournamentIds(db, userId);
+
     await connection.beginTransaction();
 
-    // Verrou en **toute première instruction**, et lecture des traces juste
+    // Les tournois d'abord, par id croissant, **avant toute lecture** : la
+    // transaction peut retirer une inscription (D12), elle lit puis écrit les
+    // inscrites et prend donc `lockTournamentRow` en tête, comme le retrait
+    // d'un engagé. Même ordre que l'inscription en tournoi individuel
+    // (tournoi, puis compte dans `ensureSoloEntry`) : deux verrous pris dans le
+    // même ordre ne s'attendent pas l'un l'autre.
+    for (const tournamentId of soloTournaments) await lockTournamentRow(connection, tournamentId);
+
+    // Verrou du compte avant toute lecture ordinaire, et lecture des traces juste
     // après : sous `REPEATABLE READ`, c'est la première lecture *ordinaire* qui
     // fige l'instantané, si bien qu'une trace lue avant le verrou daterait
     // d'avant l'attente. Le compte est ici la ressource disputée, et une
@@ -239,15 +341,17 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
     orphanedAvatar = toDiskUploadPath(locked[0].avatar_url);
     accountCreatedAt = String(locked[0].created_at);
 
-    plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
+    const facts = await loadAccountDeletionFacts(connection, userId, new Set(soloTournaments));
+    plan = accountDeletionPlan(facts.trace);
 
     // Les visites n'ont rien à détacher : `bg_site_visits` ne garde aucun lien
     // vers un compte, seulement une empreinte salée qu'on ne sait pas renverser
     // (`lib/server/site-visits-service.ts`).
 
     const withdrawal = plan.mode === "ERASE"
-      ? await eraseAccount(connection, userId)
+      ? await eraseAccount(connection, userId, facts.soloWithdrawals)
       : await anonymizeAccount(connection, userId);
+    if (plan.mode === "ERASE") withdrawnFrom = facts.soloWithdrawals.map((registration) => registration.tournamentId);
     touchedTournaments = withdrawal.tournamentIds;
 
     // Les signalements qui le visent gardent leur cible — ils restent à
@@ -306,11 +410,17 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
   // #live de la soirée (`publishMatchUpdatedEvent`), qui portait ce lien.
   for (const tournamentId of touchedTournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
 
+  // Le plateau des tournois dont l'inscription solo est partie (D12) : la liste
+  // des engagés, l'aperçu du tirage et les instantanés ouverts.
+  for (const tournamentId of withdrawnFrom) publishUpdatedEvent(tournamentId);
+
   // L'accueil, lu sans compte, garde en cache des vues qui nomment l'entrée
   // solo du compte (bandeau, mini-arbre, leaderboard) et le compteur de
-  // joueurs : sans cela, le pseudo d'un compte supprimé y resterait servi
-  // jusqu'à l'échéance de ces caches.
-  invalidateLandingTeamViews();
+  // joueurs, le classement ses identités (nom et logo de l'entrée solo
+  // anonymisée) et la liste des fiches de comptes supprimés sans statistiques
+  // (`profileless-players.ts`) : sans cela, le pseudo d'un compte supprimé y
+  // resterait servi jusqu'à l'échéance de ces caches.
+  invalidateTeamIdentityViews();
 
   // Les deux modes effacent la photo : l'un fait disparaître la ligne, l'autre
   // met `avatar_url` à `NULL` — dans les deux cas le fichier resterait servi
