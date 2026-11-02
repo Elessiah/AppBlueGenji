@@ -239,6 +239,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     sensitiveData: "None",
     retention: [
       "Results and achievements: no defined retention period, kept as long as the site exists; anonymized when the account is deleted (borrowed username)",
+      "Registrations for a solo tournament that has not started yet, with no match: withdrawn from the tournament when the account is deleted and nothing else keeps it (complete erasure, T01); otherwise kept under the borrowed username",
       "Replay codes: kept with the result they document (a detail that no longer explains it is erased); the link to the account that entered them is erased when the account is deleted, the codes remain (the game is kept by the game's publisher)",
       "Right to object available on request",
       "IP address of a visitor without an account: in memory, for the read cap's window (one minute), never stored",

@@ -120,6 +120,7 @@ Données sensibles
 Aucune
 Conservation
 Résultats et palmarès : aucune durée de conservation définie, conservés tant que le site existe ; anonymisés à la suppression du compte (pseudo d'emprunt)
+Inscriptions à un tournoi individuel pas encore commencé, sans match : retirées du tournoi à la suppression du compte quand rien d'autre ne le retient (effacement complet, T01) ; sinon gardées sous le pseudo d'emprunt
 Codes de replay : gardés avec le résultat qu'ils documentent (un détail qui ne l'explique plus est effacé) ; le lien vers le compte qui les a saisis est effacé à la suppression du compte, les codes restent (la partie est conservée par l'éditeur du jeu)
 Droit d'opposition ouvert sur demande
 Adresse IP d'un visiteur sans compte : en mémoire, le temps de la fenêtre du plafond de lecture (une minute), jamais conservée

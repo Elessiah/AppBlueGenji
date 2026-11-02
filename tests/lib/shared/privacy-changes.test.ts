@@ -2504,4 +2504,12 @@ describe("Registre — suppression du compte (D12, D13)", () => {
     expect(JSON.stringify(t01En)).toContain("its player page only if it played at least one match");
     expect(REGISTER_UPDATED_AT).toBe("2026-11-04");
   });
+
+  it("processingRegister_t03_statesSoloWithdrawalFrAndEn", () => {
+    const t03 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T03")!;
+    const t03En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T03")!;
+    expect(t03.retention).toHaveLength(t03En.retention.length);
+    expect(t03.retention.join(" ")).toContain("retirées du tournoi à la suppression du compte quand rien d'autre ne le retient");
+    expect(t03En.retention.join(" ")).toContain("withdrawn from the tournament when the account is deleted and nothing else keeps it");
+  });
 });
