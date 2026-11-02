@@ -5,11 +5,14 @@ jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/transaction");
 jest.mock("@/lib/server/tournaments/match-launch");
+jest.mock("@/lib/server/tournaments/registration");
 
-import { getDatabase, withConnection } from "@/lib/server/database";
+import { getDatabase } from "@/lib/server/database";
 import { countVoiceChannel, ensureVoiceChannel, releaseVoiceChannel } from "@/lib/server/bot-integration";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { inTransaction } from "@/lib/server/tournaments/transaction";
+import { maintainMatchLaunches } from "@/lib/server/tournaments/match-launch";
+import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import {
   dispatchMatchVoiceChannels,
   resetVoiceSweepForTests,
@@ -161,6 +164,50 @@ describe("dispatchMatchVoiceChannels — création et comptage", () => {
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
+  it("dispatchMatchVoiceChannels_staleCountRecountedSame_maintainsAndPublishes", async () => {
+    const stale = new Date(Date.now() - 6 * 60_000).toISOString();
+    const fresh = new Date().toISOString();
+    database({
+      due: [dueMatch],
+      voiceRows: [
+        { match_id: 42, team_id: 1, channel_id: "901", members: 5, counted_at: stale, failed_at: null, released_at: null },
+        { match_id: 42, team_id: 2, channel_id: "902", members: 5, counted_at: stale, failed_at: null, released_at: null },
+      ],
+      voiceRowsAfterWrite: [
+        { match_id: 42, team_id: 1, channel_id: "901", members: 5, counted_at: fresh, failed_at: null, released_at: null },
+      ],
+    });
+    jest.mocked(countVoiceChannel).mockResolvedValue({ kind: "ok", value: 5 });
+
+    await dispatchMatchVoiceChannels();
+
+    expect(inTransaction).toHaveBeenCalledTimes(1);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("dispatchMatchVoiceChannels_freshCountUnchanged_publishesNothing", async () => {
+    const fresh = new Date().toISOString();
+    const row = (teamId: number) => ({
+      match_id: 42, team_id: teamId, channel_id: "900", members: 3, counted_at: fresh, failed_at: null, released_at: null,
+    });
+    database({ due: [dueMatch], voiceRows: [row(1), row(2)] });
+    jest.mocked(countVoiceChannel).mockResolvedValue({ kind: "ok", value: 3 });
+
+    await dispatchMatchVoiceChannels();
+
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("dispatchMatchVoiceChannels_teamNameWithInvisibles_sendsVisibleText", async () => {
+    database({ due: [{ ...dueMatch, team1_name: "Al\u200Bpha\u202E" }] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "900" });
+    jest.mocked(countVoiceChannel).mockResolvedValue({ kind: "ok", value: 0 });
+
+    await dispatchMatchVoiceChannels();
+
+    expect(jest.mocked(ensureVoiceChannel).mock.calls[0]).toEqual(["match:42:team:1", "Alpha"]);
+  });
+
   it("dispatchMatchVoiceChannels_calledTwiceWithinThrottle_runsOnce", async () => {
     const db = database({ due: [] });
     await dispatchMatchVoiceChannels();
@@ -209,6 +256,15 @@ describe("dispatchMatchVoiceChannels — libération", () => {
     expect(releasableSql).toContain("ORDER BY v.failed_at IS NOT NULL, v.failed_at");
   });
 
+  it("dispatchMatchVoiceChannels_releasableQuery_includesUnscheduledMatch", async () => {
+    const db = database({});
+
+    await dispatchMatchVoiceChannels();
+
+    const releasableSql = db.execute.mock.calls.map(([sql]) => sql).find((sql) => sql.includes("LEFT JOIN")) ?? "";
+    expect(releasableSql).toContain("OR m.start_at IS NULL");
+  });
+
   it("dispatchMatchVoiceChannels_rowWithoutChannel_closesWithoutBotCall", async () => {
     const db = database({ releasable: [{ match_id: 42, team_id: 1, channel_id: null, tournament_id: 7 }] });
 
@@ -228,32 +284,31 @@ describe("dispatchMatchVoiceChannels — libération", () => {
 describe("setTeamVoiceChannels", () => {
   function connectionWith(tournament: Row | undefined) {
     const connection = connectionMock();
-    connection.beginTransaction.mockResolvedValue(undefined);
-    connection.commit.mockResolvedValue(undefined);
-    connection.rollback.mockResolvedValue(undefined);
     connection.execute.mockImplementation(async (sql) => {
-      if (sql.includes("FOR UPDATE")) return [tournament ? [tournament] : [], []];
+      if (sql.includes("FROM bg_tournaments WHERE id = ? LIMIT 1")) return [tournament ? [tournament] : [], []];
       return [{ affectedRows: 1 }, []];
     });
-    jest.mocked(withConnection).mockImplementation((run) => run(fakeConnection(connection)));
+    jest.mocked(inTransaction).mockImplementation(async (run) => run(fakeConnection(connection)));
     database({});
     return connection;
   }
 
   it("setTeamVoiceChannels_unknownTournament_throwsNotFound", async () => {
-    const connection = connectionWith(undefined);
+    connectionWith(undefined);
     await expect(setTeamVoiceChannels(7, true)).rejects.toThrow("TOURNAMENT_NOT_FOUND");
-    expect(connection.rollback).toHaveBeenCalled();
   });
 
   it("setTeamVoiceChannels_firstStatement_locksTournamentRow", async () => {
-    const connection = connectionWith({ name: "Coupe", team_voice_channels: 0 });
+    const connection = connectionWith({ name: "Coupe", state: "RUNNING", team_voice_channels: 0 });
+    jest.mocked(lockTournamentRow).mockImplementation(async () => {
+      expect(connection.execute).not.toHaveBeenCalled();
+    });
     await setTeamVoiceChannels(7, true);
-    expect(connection.execute.mock.calls[0][0]).toContain("FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE");
+    expect(jest.mocked(lockTournamentRow).mock.calls[0][1]).toBe(7);
   });
 
   it("setTeamVoiceChannels_sameValue_returnsUnchangedWithoutWrite", async () => {
-    const connection = connectionWith({ name: "Coupe", team_voice_channels: 1 });
+    const connection = connectionWith({ name: "Coupe", state: "RUNNING", team_voice_channels: 1 });
     await expect(setTeamVoiceChannels(7, true)).resolves.toEqual({
       tournamentId: 7,
       tournamentName: "Coupe",
@@ -265,17 +320,23 @@ describe("setTeamVoiceChannels", () => {
   });
 
   it("setTeamVoiceChannels_turnOnMidTournament_writesAndPublishes", async () => {
-    const connection = connectionWith({ name: "Coupe", team_voice_channels: 0 });
+    const connection = connectionWith({ name: "Coupe", state: "RUNNING", team_voice_channels: 0 });
     await expect(setTeamVoiceChannels(7, true)).resolves.toMatchObject({ enabled: true, changed: true });
     expect(connection.execute).toHaveBeenCalledWith("UPDATE bg_tournaments SET team_voice_channels = ? WHERE id = ?", [1, 7]);
     expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
-    expect(inTransaction).not.toHaveBeenCalled();
+    expect(maintainMatchLaunches).not.toHaveBeenCalled();
   });
 
-  it("setTeamVoiceChannels_turnOff_maintainsLaunchesAtOnce", async () => {
-    connectionWith({ name: "Coupe", team_voice_channels: 1 });
+  it("setTeamVoiceChannels_turnOffRunning_maintainsLaunchesAtOnce", async () => {
+    connectionWith({ name: "Coupe", state: "RUNNING", team_voice_channels: 1 });
     await setTeamVoiceChannels(7, false);
-    expect(inTransaction).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(maintainMatchLaunches).mock.calls[0][1]).toBe(7);
+  });
+
+  it("setTeamVoiceChannels_turnOffFinished_doesNotMaintainLaunches", async () => {
+    connectionWith({ name: "Coupe", state: "FINISHED", team_voice_channels: 1 });
+    await expect(setTeamVoiceChannels(7, false)).resolves.toMatchObject({ enabled: false, changed: true });
+    expect(maintainMatchLaunches).not.toHaveBeenCalled();
   });
 });
 
@@ -370,7 +431,7 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
     expect(infos.get(42)).toEqual({ team1Members: 3, team2Members: 5, pending: true });
   });
 
-  it("loadMatchVoiceInfos_staleCount_showsZeroAndPending", async () => {
+  it("loadMatchVoiceInfos_staleCount_showsLastCountButPending", async () => {
     const connection = connectionMock();
     const stale = new Date(Date.now() - 6 * 60_000).toISOString();
     connection.execute
@@ -383,7 +444,7 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
       ])
       .mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
-    expect(infos.get(42)).toEqual({ team1Members: 0, team2Members: 0, pending: true });
+    expect(infos.get(42)).toEqual({ team1Members: 5, team2Members: 5, pending: true });
   });
 
   it("loadMatchVoiceInfos_dueMatchWithoutRows_showsPendingLikeTheGate", async () => {

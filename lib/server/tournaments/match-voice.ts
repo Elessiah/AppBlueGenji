@@ -25,6 +25,7 @@ import { countVoiceChannel, ensureVoiceChannel, releaseVoiceChannel } from "@/li
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { toIso } from "@/lib/server/serialization";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
+import { visibleText } from "@/lib/shared/visible-text";
 import {
   VOICE_CHANNEL_LEAD_MINUTES,
   VOICE_ROW_RETENTION_DAYS,
@@ -37,6 +38,7 @@ import {
   type VoiceChannelState,
 } from "@/lib/shared/match-voice";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
+import { lockTournamentRow } from "./registration";
 import { inTransaction } from "./transaction";
 
 type VoiceRow = RowDataPacket & {
@@ -62,6 +64,20 @@ function channelState(row: VoiceRow | undefined, now: number): VoiceChannelState
     channelId: row.channel_id ?? null,
     members: counted ? Number(row.members) : null,
     failed: row.failed_at !== null && voiceObservationFresh(toIso(row.failed_at), now),
+  };
+}
+
+/**
+ * État **affiché** d'un salon : le dernier nombre compté, même ancien — un
+ * « 0/5 » sur un salon plein dont le comptage date tromperait la page. Seul le
+ * verrou (`pending`) suit la fraîcheur.
+ */
+function shownChannelState(row: VoiceRow | undefined): VoiceChannelState | null {
+  if (!row || row.released_at !== null) return null;
+  return {
+    channelId: row.channel_id ?? null,
+    members: row.members === null ? null : Number(row.members),
+    failed: row.failed_at !== null,
   };
 }
 
@@ -187,15 +203,14 @@ export async function loadMatchVoiceInfos(
     return { isSolo: Number(row?.solo ?? 0) === 1, isGhost: Number(row?.ghost ?? 0) === 1 };
   };
   for (const match of candidates) {
-    const info = matchVoiceInfo({
-      enabled,
-      startAt: match.startAt,
-      team1: team(match.team1Id),
-      team2: team(match.team2Id),
-      team1Channel: channelState(rowFor(rows, match.id, match.team1Id), now),
-      team2Channel: channelState(rowFor(rows, match.id, match.team2Id), now),
-    });
-    if (info) result.set(match.id, info);
+    const row1 = rowFor(rows, match.id, match.team1Id);
+    const row2 = rowFor(rows, match.id, match.team2Id);
+    const base = { enabled, startAt: match.startAt, team1: team(match.team1Id), team2: team(match.team2Id) };
+    const info = matchVoiceInfo({ ...base, team1Channel: shownChannelState(row1), team2Channel: shownChannelState(row2) });
+    if (!info) continue;
+    // Le verrou se lit comme au lancement (`voiceGateBlocksLaunch`) : observations récentes seules.
+    const pending = voiceGatePending({ ...base, team1Channel: channelState(row1, now), team2Channel: channelState(row2, now) });
+    result.set(match.id, { ...info, pending });
   }
   return result;
 }
@@ -245,7 +260,7 @@ const DUE_CHANNELS_SQL = `SELECT m.id, m.tournament_id, m.team1_id, m.team2_id,
 
 /**
  * Salons à rendre au bot : match joué (score confirmé) ou disparu, match
- * retombé en attente, équipe sortie de l'appariement, tournoi terminé ou
+ * retombé en attente ou sorti du programme (heure retirée), équipe sortie de l'appariement, tournoi terminé ou
  * option éteinte. Le bot supprime le salon s'il est vide, sinon dès qu'il se
  * vide (et ses balayages font filet).
  */
@@ -255,7 +270,7 @@ const RELEASABLE_SQL = `SELECT v.match_id, v.team_id, v.channel_id, m.tournament
   LEFT JOIN bg_tournaments t ON t.id = m.tournament_id
  WHERE v.released_at IS NULL
    AND (m.id IS NULL OR t.id IS NULL
-        OR m.status IN ('COMPLETED', 'PENDING')
+        OR m.status IN ('COMPLETED', 'PENDING') OR m.start_at IS NULL
         OR t.state = 'FINISHED' OR t.team_voice_channels = 0
         OR NOT (v.team_id <=> m.team1_id OR v.team_id <=> m.team2_id))
  ORDER BY v.failed_at IS NOT NULL, v.failed_at, v.match_id, v.team_id
@@ -309,10 +324,16 @@ async function writeCount(
   );
 }
 
-/** Empreinte de ce qu'un lecteur voit d'un salon : un changement se publie. */
-function stateKey(row: VoiceRow | undefined): string {
-  if (!row || row.released_at !== null) return "none";
-  return `${row.channel_id ?? "-"}:${row.members ?? "-"}:${row.failed_at === null ? 0 : 1}`;
+/**
+ * Empreinte de ce qu'un lecteur voit d'un salon **et de ce que le verrou en
+ * croit** : un changement se publie et rejoue l'entretien des lancements. Un
+ * comptage identique mais redevenu frais (5/5 ancien recompté 5/5) lève le
+ * verrou : il compte comme un changement.
+ */
+function stateKey(row: VoiceRow | undefined, now: number): string {
+  const gate = channelState(row, now);
+  if (!row || gate === null) return "none";
+  return `${row.channel_id ?? "-"}:${row.members ?? "-"}:${gate.members === null ? 0 : 1}:${gate.failed ? 1 : 0}`;
 }
 
 /**
@@ -401,17 +422,19 @@ async function runSweep(): Promise<Set<number>> {
     for (const match of candidates) {
       const matchId = Number(match.id);
       for (const [teamId, teamName] of [
-        [Number(match.team1_id), String(match.team1_name)],
-        [Number(match.team2_id), String(match.team2_name)],
+        // Nom saisi librement, vers Discord : forme affichable d'abord (`UNTRUSTED_NAMES.md`).
+        [Number(match.team1_id), visibleText(String(match.team1_name))],
+        [Number(match.team2_id), visibleText(String(match.team2_name))],
       ] as const) {
         const before = rowFor(rows, matchId, teamId);
+        const beforeKey = stateKey(before, Date.now());
         await refreshTeamChannel(connection, matchId, teamId, teamName, before);
         const [after] = await connection.execute<VoiceRow[]>(
           `SELECT match_id, team_id, channel_id, members, counted_at, failed_at, released_at
            FROM bg_match_voice_channels WHERE match_id = ? AND team_id = ?`,
           [matchId, teamId],
         );
-        if (stateKey(before) !== stateKey(after[0])) touched.add(Number(match.tournament_id));
+        if (beforeKey !== stateKey(after[0], Date.now())) touched.add(Number(match.tournament_id));
       }
     }
     await releaseChannels(connection, touched);
@@ -496,32 +519,28 @@ export type TeamVoiceChannelsResult = {
  * @throws `TOURNAMENT_NOT_FOUND`
  */
 export async function setTeamVoiceChannels(tournamentId: number, enabled: boolean): Promise<TeamVoiceChannelsResult> {
-  const result = await withConnection(async (connection) => {
-    await connection.beginTransaction();
-    try {
-      // Verrou en toute première instruction (piège `REPEATABLE READ`).
-      const [rows] = await connection.execute<
-        (RowDataPacket & { name: string; team_voice_channels: number | null })[]
-      >(`SELECT name, team_voice_channels FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`, [tournamentId]);
-      const tournament = rows[0];
-      if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
-      const changed = (Number(tournament.team_voice_channels ?? 0) === 1) !== enabled;
-      if (changed) {
-        await connection.execute(`UPDATE bg_tournaments SET team_voice_channels = ? WHERE id = ?`, [
-          enabled ? 1 : 0,
-          tournamentId,
-        ]);
-      }
-      await connection.commit();
-      return { tournamentName: tournament.name, changed };
-    } catch (error) {
-      await connection.rollback().catch(() => undefined);
-      throw error;
+  const result = await inTransaction(async (connection) => {
+    // Verrou en toute première instruction (piège `REPEATABLE READ`).
+    await lockTournamentRow(connection, tournamentId);
+    const [rows] = await connection.execute<
+      (RowDataPacket & { name: string; state: string; team_voice_channels: number | null })[]
+    >(`SELECT name, state, team_voice_channels FROM bg_tournaments WHERE id = ? LIMIT 1`, [tournamentId]);
+    const tournament = rows[0];
+    if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
+    const changed = (Number(tournament.team_voice_channels ?? 0) === 1) !== enabled;
+    if (changed) {
+      await connection.execute(`UPDATE bg_tournaments SET team_voice_channels = ? WHERE id = ?`, [
+        enabled ? 1 : 0,
+        tournamentId,
+      ]);
     }
+    return { tournamentName: tournament.name, running: tournament.state === "RUNNING", changed };
   });
 
   if (result.changed) {
-    if (!enabled) {
+    // Seul un tournoi en cours a des lancements à entretenir : ailleurs,
+    // l'entretien poserait `launched_at` sur des matchs qui ne se jouent pas.
+    if (!enabled && result.running) {
       // Le verrou tombe : un tournoi sans phase de lancement part à l'heure.
       await maintainVoiceLaunches(tournamentId).catch((error: unknown) => {
         console.error("[match-voice] entretien des lancements impossible", error);
@@ -532,7 +551,7 @@ export async function setTeamVoiceChannels(tournamentId: number, enabled: boolea
     sweep.lastAt = 0;
     void dispatchMatchVoiceChannels();
   }
-  return { tournamentId, enabled, ...result };
+  return { tournamentId, enabled, tournamentName: result.tournamentName, changed: result.changed };
 }
 
 /* ── Lecture d'un match (page du match) ───────────────────────────────────── */
