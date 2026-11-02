@@ -12,6 +12,9 @@ ligne du journal (`sendBotLog` → `POST /internal/log`) rejoint désormais un
   relance le silence à 5 minutes.
 - À **5 lignes** (`BOT_LOG_BATCH_MAX_LINES`), le lot part tout de suite ; la
   ligne suivante ouvre un nouveau lot.
+- Délai : 5 minutes après la dernière ligne. Comme chaque ligne relance le
+  silence, une ligne attend **au pire environ 20 minutes** (quatre lignes
+  espacées de 4 min 59 s) : c'est la règle demandée, sans âge maximal.
 - Un lot = un message, une ligne par rangée, dans l'ordre d'arrivée. Il n'est
   découpé que si Discord l'impose : 1 900 caractères par message
   (`BOT_LOG_MESSAGE_MAX_CHARS` — 2 000 chez Discord, moins le préfixe
@@ -25,14 +28,15 @@ tournoi** quand la ligne en relève (`sendBotLog(ligne, { tournamentId })`). Deu
 salons ne se mêlent jamais ; deux tournois non plus, pour qu'un message du
 journal parle d'un seul tournoi. Une ligne sans tournoi (inscription d'un
 joueur au site, programme d'arbitrage, gestes de modération par
-`publishStaffAction`, évènements d'un match dans `bot-logs.ts` — résultat,
-conflit) rejoint le lot commun du salon (`log:global`).
+`publishStaffAction`) rejoint le lot commun du salon (`log:global`).
 
 Rattachées à leur tournoi : désignations et retraits d'arbitre
 (`referee-notices.ts`), casts (`cast-notices.ts`), autogestion d'une manche
 (`match-launch.ts`), gestes du staff (`staff-action-logs.ts`), cartes et règles
 de ban (`round-maps.ts`, `round-maps-notice.ts`), évènements d'un tournoi
-(`bot-logs.ts` : création, inscription, abandon, lancement, fin, pénalités).
+(`bot-logs.ts` : création, inscription, abandon, lancement, fin, pénalités, et
+résultat d'un match, rattaché au tournoi relu avec le match — un « tournoi
+terminé » ne passe donc pas devant le résultat de sa finale).
 
 ## Ce qui ne change pas
 
@@ -54,10 +58,12 @@ de ban (`round-maps.ts`, `round-maps-notice.ts`), évènements d'un tournoi
   copies ; l'arrêt doit voir les lots des routes). Minuteurs `unref()`.
 - **Arrêt propre** : `instrumentation.ts` → `installBotLogShutdownFlush`
   (`lib/server/bot-log-shutdown.ts`) envoie les lots sur `SIGINT` / `SIGTERM`,
-  borné à 1,2 s (pm2 tue après `kill_timeout`, 1,6 s par défaut). Si personne
+  borné à 1,2 s (pm2 tue après `kill_timeout`, 1,6 s par défaut). Next ferme
+  le serveur sur le même signal et appelle `process.exit(0)` sans attendre :
+  `holdExitUntil` retient cet appel jusqu'à la fin de l'envoi. Si personne
   d'autre n'écoute le signal, le module termine lui-même le processus.
-- **Arrêt brutal** : perd au plus les lots en attente (5 lignes par clé, au
-  plus 5 minutes de journal). Rien n'est persisté : le journal n'est pas une
+- **Arrêt brutal** : perd les lots en attente (au plus 4 lignes par clé, jusqu'à
+  une vingtaine de minutes de journal dans le pire cas). Rien n'est persisté : le journal n'est pas une
   donnée de référence (pm2 garde la trace d'audit).
 
 ## Cartes de manche

@@ -3,8 +3,11 @@
  * avant la fin du processus (`docs/features/LOG_BATCHING.md`).
  *
  * pm2 envoie `SIGINT` puis tue le processus après `kill_timeout` (1,6 s par
- * défaut) ; Next ferme le serveur sur le même signal. L'envoi est donc borné à
- * {@link SHUTDOWN_FLUSH_TIMEOUT_MS} et ne retient jamais l'arrêt. Quand
+ * défaut) ; Next ferme le serveur sur le même signal, puis appelle
+ * `process.exit(0)` sans nous attendre. Pendant l'envoi, `process.exit` est
+ * donc **retenu** ({@link holdExitUntil}) : l'appel de Next ne prend effet
+ * qu'une fois les lots partis. L'envoi est borné à
+ * {@link SHUTDOWN_FLUSH_TIMEOUT_MS}, sous le délai de pm2. Quand
  * personne d'autre n'écoute le signal (Next lancé avec
  * `NEXT_MANUAL_SIG_HANDLE`), ce module termine lui-même le processus : écouter
  * un signal retire le comportement par défaut de Node.
@@ -30,13 +33,37 @@ export async function flushBotLogsBeforeExit(timeoutMs: number = SHUTDOWN_FLUSH_
   }
 }
 
+/**
+ * Retient `process.exit` jusqu'à `done` : un appel pendant l'envoi est rejoué
+ * avec son code une fois l'envoi fini. `process.exit` est rendu ensuite.
+ */
+export function holdExitUntil(done: Promise<void>): void {
+  const originalExit = process.exit;
+  let requested = false;
+  const held = ((code?: number | string | null) => {
+    if (requested) return undefined as never;
+    requested = true;
+    void done.finally(() => {
+      if (process.exit === held) process.exit = originalExit;
+      originalExit.call(process, code);
+    });
+    return undefined as never;
+  }) as typeof process.exit;
+  process.exit = held;
+  void done.finally(() => {
+    if (!requested && process.exit === held) process.exit = originalExit;
+  });
+}
+
 /** Branche l'envoi des lots sur les signaux d'arrêt ; une seule fois par processus. */
 export function installBotLogShutdownFlush(): void {
   if (installed) return;
   installed = true;
   for (const signal of SIGNALS) {
     process.once(signal, () => {
-      void flushBotLogsBeforeExit().then(() => {
+      const done = flushBotLogsBeforeExit();
+      holdExitUntil(done);
+      void done.then(() => {
         if (process.listenerCount(signal) === 0) process.exit(0);
       });
     });

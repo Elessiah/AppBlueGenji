@@ -5,6 +5,7 @@ jest.mock("@/lib/server/bot-integration");
 import { flushAllBotLogBatches } from "@/lib/server/bot-integration";
 import {
   flushBotLogsBeforeExit,
+  holdExitUntil,
   installBotLogShutdownFlush,
   resetBotLogShutdownState,
 } from "@/lib/server/bot-log-shutdown";
@@ -49,6 +50,32 @@ describe("flushBotLogsBeforeExit", () => {
   it("flushBotLogsBeforeExit_flushRejects_neverThrows", async () => {
     jest.mocked(flushAllBotLogBatches).mockRejectedValue(new Error("bot"));
     await expect(flushBotLogsBeforeExit()).resolves.toBeUndefined();
+  });
+});
+
+describe("holdExitUntil", () => {
+  it("holdExitUntil_exitCalledDuringTheFlush_deferredUntilItEnds", async () => {
+    const exit = jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    let finish: () => void = () => undefined;
+    const done = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    holdExitUntil(done);
+    process.exit(0);
+    await Promise.resolve();
+    expect(exit).not.toHaveBeenCalled();
+
+    finish();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(exit).toHaveBeenCalledWith(0);
+  });
+
+  it("holdExitUntil_noExitDuringTheFlush_exitRestoredUntouched", async () => {
+    const exit = jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    holdExitUntil(Promise.resolve());
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(process.exit).toBe(exit);
+    expect(exit).not.toHaveBeenCalled();
   });
 });
 

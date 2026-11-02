@@ -148,7 +148,15 @@ export interface ResolvedBotLog {
   message: string;
   /** Manche d'une alerte arbitre : le push la nomme et y mène (lot 9-3). */
   refereeMatch?: RefereeAlertMatch;
+  /**
+   * Tournoi relu d'une entrée de match (résultat) : sa ligne rejoint le lot du
+   * journal de son tournoi (`LOG_BATCHING.md`), pas le lot commun.
+   */
+  tournamentId?: number;
 }
+
+/** Ligne de journal d'une entrée de match, avec le tournoi relu. */
+type ResolvedMatchLine = { message: string; tournamentId: number };
 
 /** Ligne d'une alerte arbitre, avec sa manche relue. */
 type ResolvedRefereeLine = { message: string; refereeMatch: RefereeAlertMatch };
@@ -369,11 +377,12 @@ export function flushBotLogs(connection: PoolConnection): void {
     const announcedConflicts = new Set<number>();
 
     /** Envoie une ligne déjà rédigée, et dit si les arbitres l'ont reçue. */
-    async function deliver({ entry, channel, message, refereeMatch }: ResolvedBotLog): Promise<void> {
+    async function deliver({ entry, channel, message, refereeMatch, tournamentId }: ResolvedBotLog): Promise<void> {
       if (channel !== "REFEREE") {
-        // Lot du tournoi quand l'entrée en porte un ; les entrées d'un match
-        // (résultat, conflit…) rejoignent le lot commun du salon.
-        await sendBotLog(message, { tournamentId: "tournamentId" in entry ? entry.tournamentId : null });
+        // Lot du tournoi : celui de l'entrée, ou celui relu pour un résultat de
+        // match — jamais le lot commun, pour qu'un « tournoi terminé » ne passe
+        // pas devant le résultat de sa finale.
+        await sendBotLog(message, { tournamentId: tournamentId ?? ("tournamentId" in entry ? entry.tournamentId : null) });
         // Le coup d'envoi est une ligne de journal pour le staff, et une
         // notification pour les joueurs engagés — la seule qui n'ait pas de
         // message privé Discord : elle naît au même point de passage unique.
@@ -1018,7 +1027,7 @@ async function resolveForfeitLog(
 
 async function resolveMatchFinishedLog(
   entry: Extract<PendingBotLog, { kind: "match_finished" }>,
-): Promise<string | null> {
+): Promise<ResolvedMatchLine | null> {
   const match = await loadMatch(entry.matchId);
   // Un bye ou un match fantôme porte un score posé par le moteur, pas saisi
   // par une équipe : il n'a rien à raconter (et il y en a autant que
@@ -1033,7 +1042,7 @@ async function resolveMatchFinishedLog(
   if (!forfeit && !doubleForfeit && (match.team1_score === null || match.team2_score === null)) {
     return null;
   }
-  return formatMatchResultLog({
+  const message = formatMatchResultLog({
     tournament: { id: Number(match.tournament_id), name: match.tournament_name },
     bracket: String(match.bracket),
     roundNumber: Number(match.round_number),
@@ -1045,6 +1054,7 @@ async function resolveMatchFinishedLog(
     forfeit,
     doubleForfeit,
   });
+  return { message, tournamentId: Number(match.tournament_id) };
 }
 
 /** La manche d'une alerte, telle que le push la nomme. */
@@ -1180,7 +1190,7 @@ async function resolveEndurancePenaltyLiftedLog(
   });
 }
 
-async function resolveOne(entry: PendingBotLog): Promise<string | ResolvedRefereeLine | null> {
+async function resolveOne(entry: PendingBotLog): Promise<string | ResolvedRefereeLine | ResolvedMatchLine | null> {
   switch (entry.kind) {
     case "tournament_created":
       return resolveTournamentCreatedLog(entry);
