@@ -59,7 +59,7 @@ import {
 } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-11-05";
+export const REGISTER_UPDATED_AT = "2026-11-04";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et

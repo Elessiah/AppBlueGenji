@@ -359,8 +359,8 @@ export function RgpdEn({
           tournament, if it is the <strong>owner of a team</strong> (transferring or disbanding the team before
           deletion restores complete erasure), or if it is an entrant in a
           <strong>solo tournament</strong> that has already started or ended, whose entry bears its name. A registration for a solo tournament
-          that has not started yet, where it played no match, does not keep the row: it is withdrawn from the
-          tournament with the account.
+          that has not started yet, where it played no match, does not keep the row on its own: if nothing else keeps it, the registration is
+          withdrawn from the tournament with the account; otherwise, it stays under the borrowed username.
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>
           <p>

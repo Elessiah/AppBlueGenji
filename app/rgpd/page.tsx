@@ -480,8 +480,9 @@ function RgpdFr({
           dissoudre l'équipe avant la suppression rétablit l'effacement complet), ou s'il est
           engagé dans un <strong>tournoi individuel</strong> déjà commencé ou terminé, dont l'engagé
           porte son nom. Une inscription à un tournoi individuel qui n'a pas encore commencé, et
-          où il n'a disputé aucun match, ne retient pas la ligne : elle est retirée du tournoi avec
-          le compte.
+          où il n'a disputé aucun match, ne retient pas la ligne à elle seule : si rien d&apos;autre ne la
+          retient, elle est retirée du tournoi avec le compte ; sinon, elle reste sous le pseudo
+          d&apos;emprunt.
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>
           <p>

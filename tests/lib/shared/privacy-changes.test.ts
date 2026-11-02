@@ -2354,7 +2354,7 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     expect(t18En.dataCategories.join(" ")).toContain("never who is present");
     expect(t18.retention[0]).toContain("7 jours");
     expect(t18En.retention[0]).toContain("7 days");
-    expect(REGISTER_UPDATED_AT).toBe("2026-11-05");
+    expect(REGISTER_UPDATED_AT).toBe("2026-11-04");
   });
 
   it("processingRegister_t18_declaresBotMemoryPresenceAndBotRecordFrAndEn", () => {
@@ -2468,11 +2468,11 @@ describe("PRIVACY_CHANGES — inscriptions individuelles à venir et fiche du jo
   const entry = PRIVACY_CHANGES.find((c) => c.id === id)!;
   const english = PRIVACY_CHANGES_EN[id];
 
-  it("privacyChanges_soloWithdrawalAndPlayerPage_closesListDated1105ForAllAccounts", () => {
+  it("privacyChanges_soloWithdrawalAndPlayerPage_closesListDated1104ForAllAccounts", () => {
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
     expectStandaloneEntry(entry, english, {
       fromEnd: 1,
-      publishedAt: "2026-11-05",
+      publishedAt: "2026-11-04",
       audience: undefined,
       links: [{ href: "/rgpd#donnees-connexion", label: "Lire ce que la suppression emporte" }],
     });
@@ -2483,8 +2483,8 @@ describe("PRIVACY_CHANGES — inscriptions individuelles à venir et fiche du jo
 
   it("privacyChanges_soloWithdrawalAndPlayerPage_statesBothRulesFrAndEn", () => {
     expectEntryTexts(entry, english, {
-      fr: ["l'inscription est retirée avec lui", "n'est plus gardée que s'il a joué au moins un match", "son nom s'affiche sans lien", "rien de nouveau n'est collecté"],
-      en: ["the registration is withdrawn with it", "is now kept only if it played at least one match", "its name is shown without a link", "nothing new is collected"],
+      fr: ["Si rien d'autre ne le retient", "engagement dans un tournoi individuel déjà commencé ou terminé", "sinon, l'inscription reste, sous un pseudo d'emprunt", "l'inscription est retirée avec lui", "n'est plus gardée que s'il a joué au moins un match", "son nom s'affiche sans lien", "rien de nouveau n'est collecté"],
+      en: ["If nothing else keeps it", "an entry in a solo tournament that has already started or ended", "otherwise, the registration stays, under a borrowed username", "the registration is withdrawn with it", "is now kept only if it played at least one match", "its name is shown without a link", "nothing new is collected"],
     });
   });
 
@@ -2502,6 +2502,6 @@ describe("Registre — suppression du compte (D12, D13)", () => {
     expect(JSON.stringify(t01)).toContain("sa fiche de joueur seulement s'il a joué au moins un match");
     expect(JSON.stringify(t01En)).toContain("its registrations for solo tournaments that have not started yet, with no match, are then withdrawn with it");
     expect(JSON.stringify(t01En)).toContain("its player page only if it played at least one match");
-    expect(REGISTER_UPDATED_AT).toBe("2026-11-05");
+    expect(REGISTER_UPDATED_AT).toBe("2026-11-04");
   });
 });

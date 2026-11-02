@@ -1442,16 +1442,16 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // une inscription à un tournoi individuel pas encore commencé, sans match,
     // ne retient plus le compte (effacement complet, inscription retirée), et
     // la fiche d'un compte supprimé n'est gardée que s'il a joué. Pour tous les
-    // comptes. Datée du lendemain de la mise en ligne (fusion attendue le
-    // 2026-11-03, déploiement la nuit suivante au plus tôt).
+    // comptes. Datée du lendemain de la mise en ligne (fusion le 2026-11-02 au soir,
+    // déploiement la nuit même).
     id: "2026-11-suppression-inscription-solo-et-fiche",
-    publishedAt: "2026-11-05",
+    publishedAt: "2026-11-04",
     title: "Suppression du compte : inscriptions individuelles à venir et fiche du joueur",
     links: [{ href: "/rgpd#donnees-connexion", label: "Lire ce que la suppression emporte" }],
     summary:
-      "Supprimer ton compte l'efface désormais entièrement même si tu es inscrit à un tournoi individuel qui n'a pas encore commencé : l'inscription est retirée avec lui. Et la fiche d'un compte supprimé ne reste visible que s'il a joué au moins un match.",
+      "Si rien d'autre ne le retient, supprimer ton compte l'efface désormais entièrement même si tu es inscrit à un tournoi individuel qui n'a pas encore commencé : l'inscription est retirée avec lui. Et la fiche d'un compte supprimé ne reste visible que s'il a joué au moins un match.",
     details: [
-      "Inscriptions individuelles : une inscription à un tournoi individuel pas encore commencé, où tu n'as disputé aucun match, ne garde plus ton compte sous un pseudo d'emprunt — si rien d'autre ne le retient (match joué, équipe possédée, tournoi organisé), il est effacé entièrement et l'inscription retirée du tournoi. Une fois le tournoi commencé ou terminé, l'engagé reste, sous un pseudo d'emprunt, comme avant.",
+      "Inscriptions individuelles : une inscription à un tournoi individuel pas encore commencé, où tu n'as disputé aucun match, ne garde plus ton compte sous un pseudo d'emprunt — si rien d'autre ne le retient (match joué, équipe possédée, tournoi organisé, engagement dans un tournoi individuel déjà commencé ou terminé), il est effacé entièrement et l'inscription retirée du tournoi ; sinon, l'inscription reste, sous un pseudo d'emprunt. Une fois le tournoi commencé ou terminé, l'engagé reste, sous un pseudo d'emprunt, comme avant.",
       "Fiche du joueur : la fiche d'un compte supprimé, sous son pseudo d'emprunt, n'est plus gardée que s'il a joué au moins un match (ses statistiques appartiennent aussi à ses adversaires) ; sinon la page est introuvable, et son nom s'affiche sans lien.",
       "Ce qui ne change pas : rien de nouveau n'est collecté ; les traces qui restent après toute suppression (sauvegardes chiffrées, journal des suppressions, données de connexion, mesure d'audience) sont les mêmes.",
     ],
