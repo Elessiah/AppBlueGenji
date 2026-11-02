@@ -118,8 +118,15 @@ describe("fiche de joueur", () => {
   });
 
   it("annonce un compte anonymisé sans son pseudo d'emprunt", async () => {
-    execute.mockResolvedValue([[{ pseudo: "Renard_Discret", is_deleted: 1 }]]);
+    execute.mockResolvedValue([[{ pseudo: "Renard_Discret", is_deleted: 1, played: 1 }]]);
     expect(await playerMetadata(params("5"))).toMatchObject({ title: "Compte supprimé · Joueur" });
+  });
+
+  it("playerMetadata_deletedWithoutStats_usesNeutralTitle", async () => {
+    // D13 : sans match joué, la fiche d'un compte supprimé n'existe plus ;
+    // l'onglet ne l'annonce pas davantage.
+    execute.mockResolvedValue([[{ pseudo: "Renard_Discret", is_deleted: 1, played: 0 }]]);
+    expect(await playerMetadata(params("5"))).toMatchObject({ title: "Joueur" });
   });
 
   it("ne nomme personne à un lecteur non connecté, et ne lit pas la base", async () => {
@@ -151,7 +158,7 @@ describe("fiches en anglais (lot 9)", () => {
 
   it("un compte anonymisé s'annonce « Deleted account »", async () => {
     mockLocale = "en";
-    execute.mockResolvedValue([[{ pseudo: "Renard_Discret", is_deleted: 1 }]]);
+    execute.mockResolvedValue([[{ pseudo: "Renard_Discret", is_deleted: 1, played: 1 }]]);
     const metadata = await playerMetadata(params("5"));
     expect(metadata).toMatchObject({ title: "Deleted account · Player" });
     expect(metadata.alternates).toMatchObject({ canonical: "/en/joueurs/5" });

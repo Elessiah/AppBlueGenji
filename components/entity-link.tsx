@@ -3,6 +3,7 @@
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { PodiumPaint, useMemberPodiumTier, useTeamPodiumTier } from "@/components/podium-tiers";
 import { useSpectatorView } from "@/components/spectator-view";
+import { useHasPlayerPage } from "@/components/profileless-players";
 import { entityTruncateClass, joinClasses } from "@/lib/shared/class-names";
 import { podiumTierClass, podiumTierFamily, type PodiumTier, type PodiumTierKind } from "@/lib/shared/podium-tiers";
 import type { CSSProperties, ReactNode } from "react";
@@ -41,6 +42,9 @@ import type { CSSProperties, ReactNode } from "react";
  * un nom : les fiches d'équipe et de joueur sont dans l'espace connecté, un
  * lien n'y mènerait qu'à la carte « Connexion requise ». La marche du podium,
  * elle, reste.
+ *
+ * **Compte supprimé sans fiche** (décision D13, `useHasPlayerPage`) : même
+ * rendu en texte — sa fiche répond 404, le lien serait mort.
  */
 export interface EntityLinkProps {
   children: ReactNode;
@@ -84,9 +88,16 @@ export function EntityLink({
   className,
   podium,
   truncate = false,
+  linked = true,
   ...rest
-}: Readonly<EntityLinkProps & { href: string; /** Marche peinte sur le nom. */ podium?: EntityPodium }>) {
-  const spectator = useSpectatorView();
+}: Readonly<EntityLinkProps & {
+  href: string;
+  /** Marche peinte sur le nom. */
+  podium?: EntityPodium;
+  /** `false` : la destination n'existe pas (compte supprimé sans fiche), le nom reste un nom. */
+  linked?: boolean;
+}>) {
+  const spectator = useSpectatorView() || !linked;
   const name = <PodiumPaint className={podium && podiumTierClass(podium.tier, podium.kind)}>{children}</PodiumPaint>;
   // Repère posé sur le lien, lu par la feuille sans `:has()` : la famille de la
   // marche peinte dedans (`podium-tier` / `podium-member`).
@@ -125,7 +136,8 @@ export function PlayerLink({
   ...rest
 }: Readonly<EntityLinkProps & PodiumTierOverride & { userId: number }>) {
   const podium = linkPodium(podiumTier, useMemberPodiumTier(userId), "member");
-  return <EntityLink href={`/joueurs/${userId}`} podium={podium} {...rest} />;
+  const linked = useHasPlayerPage(userId);
+  return <EntityLink href={`/joueurs/${userId}`} podium={podium} linked={linked} {...rest} />;
 }
 
 /**

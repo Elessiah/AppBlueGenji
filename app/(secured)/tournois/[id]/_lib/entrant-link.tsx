@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { EntityLink, useEntrantPodium, type EntityLinkProps } from "@/components/entity-link";
+import { useHasPlayerPage } from "@/components/profileless-players";
 import { entrantHref, participantWording, type ParticipantType } from "@/lib/shared/participants";
 import { entrantLogoUrl, type EntrantLogoMap } from "@/lib/shared/entrant-logos";
 import type { SeedMap } from "@/lib/shared/match-sections";
@@ -95,5 +96,7 @@ export function EntrantLink({
   const { soloUserIds } = useContext(EntrantContext);
   const entrantLink = useEntrantLink();
   const podium = useEntrantPodium(teamId, soloUserIds[teamId]);
-  return <EntityLink href={entrantLink(teamId)} podium={podium} {...rest} />;
+  // Une entrée solo d'un compte supprimé sans fiche (D13) : le nom, sans lien.
+  const linked = useHasPlayerPage(soloUserIds[teamId]);
+  return <EntityLink href={entrantLink(teamId)} podium={podium} linked={linked} {...rest} />;
 }

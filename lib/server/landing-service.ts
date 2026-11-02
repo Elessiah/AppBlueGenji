@@ -45,6 +45,7 @@ import {
 } from "@/lib/shared/live-streams";
 import { loadTeamRanking } from "@/lib/server/ranking-service";
 import { entrantHref } from "@/lib/shared/participants";
+import { loadProfilelessPlayerIds } from "@/lib/server/users/profileless-players";
 import { seedingSource } from "@/lib/shared/seeding";
 import { loadFrozenRankingSeeds } from "@/lib/server/tournaments/frozen-seeds";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
@@ -159,8 +160,14 @@ type LiveMatchRow = RowDataPacket & {
  * règle que sur la page de tournoi, une entrée solo menant au profil du joueur
  * et non à une fiche d'équipe qui n'existe pas.
  */
-function entrantHrefFor(teamId: number | null, soloUserId: number | null): string | null {
+function entrantHrefFor(
+  teamId: number | null,
+  soloUserId: number | null,
+  profileless: ReadonlySet<number>,
+): string | null {
   if (teamId === null) return null;
+  // Entrée solo d'un compte supprimé sans fiche (D13) : le nom, sans lien.
+  if (soloUserId !== null && profileless.has(Number(soloUserId))) return null;
   return entrantHref(Number(teamId), soloUserId === null ? null : { [Number(teamId)]: Number(soloUserId) });
 }
 
@@ -328,6 +335,7 @@ async function loadLandingLive(): Promise<LandingLive | null> {
       return teamId === null ? null : (frozenSeeds.get(Number(teamId)) ?? null);
     };
 
+    const profileless = new Set(await loadProfilelessPlayerIds());
     const toLandingMatch = (index: number): LandingLiveMatch => {
       const row = rows[index];
       // Un match à l'antenne se joue, quelle que soit sa phase de lancement : la
@@ -343,8 +351,8 @@ async function loadLandingLive(): Promise<LandingLive | null> {
         // Un nom qui ne garde rien retombe sur le libellé « Équipe 1 / 2 » de la carte.
         team1Name: shownEntrantName(row.team1_name),
         team2Name: shownEntrantName(row.team2_name),
-        team1Href: entrantHrefFor(row.team1_id, row.team1_solo_user_id),
-        team2Href: entrantHrefFor(row.team2_id, row.team2_solo_user_id),
+        team1Href: entrantHrefFor(row.team1_id, row.team1_solo_user_id, profileless),
+        team2Href: entrantHrefFor(row.team2_id, row.team2_solo_user_id, profileless),
         // Filtré à la sortie comme partout : la vitrine est lue sans compte,
         // et `next/image` lèverait sur une origine étrangère.
         team1LogoUrl: localUploadUrl(row.team1_logo_url),
