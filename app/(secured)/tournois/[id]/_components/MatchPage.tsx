@@ -385,8 +385,8 @@ function useOfficiatingFact(match: BracketMatch, decision: ReturnType<typeof mat
 }
 
 /** Fait « Map de départage » : seulement quand le tour en règle une. */
-function tiebreakFacts(tiebreak: string | null, label: string): KeyFact[] {
-  return tiebreak === null ? [] : [{ id: "tiebreak", label, value: visibleText(tiebreak) }];
+function tiebreakFacts(tiebreak: string | null, label: string, detail: string): KeyFact[] {
+  return tiebreak === null ? [] : [{ id: "tiebreak", label, value: visibleText(tiebreak), detail }];
 }
 
 /** Maps du tour dans les faits clés : « Map 1 : Ilios · imposée », ou pool à choisir. */
@@ -485,7 +485,7 @@ function MatchKeyFacts({
   }
   // Map de départage du tour (play-offs en vrai Bo3) : lisible de tous, pas
   // seulement du staff ou de qui choisit dans un pool.
-  facts.push(...tiebreakFacts(tiebreak, roundMapsText.t("page.tiebreak")));
+  facts.push(...tiebreakFacts(tiebreak, roundMapsText.t("page.tiebreak"), roundMapsText.t("page.tiebreakHint")));
   facts.push({
     id: "format",
     label: page.t("facts.format"),
