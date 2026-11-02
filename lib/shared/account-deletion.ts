@@ -231,7 +231,7 @@ export function accountDeletionConfirmation(
     case "OWNED_TEAMS":
       return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet. ${residual} ${irreversible}`;
     case null:
-      return `Supprimer définitivement ton compte ? Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte et ton profil seront effacés entièrement, et tes inscriptions à des tournois individuels pas encore commencés seront retirées. ${residual} ${irreversible}`;
+      return `Supprimer définitivement ton compte ? Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte et ton profil seront effacés entièrement, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées. ${residual} ${irreversible}`;
     default:
       return `Supprimer définitivement ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, inscription à un tournoi individuel, équipe possédée, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${residual} ${irreversible}`;
   }
@@ -260,7 +260,7 @@ export function accountDeletionOutcome(
     case "OWNED_TEAMS":
       return "Compte supprimé. Ton équipe garde un propriétaire anonyme.";
     case null:
-      return "Compte effacé. Ton compte, ton profil et tes inscriptions à venir en tournoi individuel ont disparu du site ; seules restent les traces décrites par la politique de confidentialité et son registre (sauvegardes, journal des suppressions, mesure d'audience).";
+      return "Compte effacé. Ton compte, ton profil et tes éventuelles inscriptions à venir en tournoi individuel ont disparu du site ; seules restent les traces décrites par la politique de confidentialité et son registre (sauvegardes, journal des suppressions, mesure d'audience).";
     default:
       return "Compte supprimé.";
   }

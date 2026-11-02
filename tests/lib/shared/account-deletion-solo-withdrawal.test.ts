@@ -87,12 +87,12 @@ describe("withdrawableSoloRegistrations", () => {
 describe("textes de l'effacement complet — D12", () => {
   it("accountDeletionConfirmation_null_mentionsWithdrawnSoloRegistrations", () => {
     expect(accountDeletionConfirmation(null)).toContain(
-      "tes inscriptions à des tournois individuels pas encore commencés seront retirées",
+      "tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées",
     );
   });
 
   it("accountDeletionOutcome_null_mentionsUpcomingSoloRegistrations", () => {
-    expect(accountDeletionOutcome(null)).toContain("tes inscriptions à venir en tournoi individuel");
+    expect(accountDeletionOutcome(null)).toContain("tes éventuelles inscriptions à venir en tournoi individuel");
   });
 
   it("accountDeletionConfirmation_soloRegistrations_saysStartedTournament", () => {
