@@ -2412,6 +2412,14 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     expect(t18En.retention[3]).toContain("encrypted backup copies (T09");
   });
 
+  it("rgpdPages_voiceConstants_neverGluedToThePreviousWordFrAndEn", () => {
+    for (const file of ["page.tsx", "RgpdEn.tsx"]) {
+      const source = readFileSync(join(process.cwd(), "app", "rgpd", file), "utf8");
+      // JSX drops the line break before an expression: "depuis" then "{X}" on the next line renders "depuisX".
+      expect(source).not.toMatch(/[\p{L};,]\r?\n\s*\{VOICE_/u);
+    }
+  });
+
   it("processingRegister_t08_pointsVoiceChannelsToT18FrAndEn", () => {
     const t08 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T08")!;
     const t08En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T08")!;

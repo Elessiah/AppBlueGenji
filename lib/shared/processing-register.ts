@@ -979,7 +979,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     purpose:
       "Réunir chaque équipe d'un match dans un salon vocal Discord dédié avant son départ, et ne lancer le match qu'une fois ces salons pleins, dans les seuls tournois qui ont l'option « Salons vocaux d'équipe » (éteinte par défaut)",
     subPurposes: [
-      `Demander au bot Discord de l'association, ${VOICE_CHANNEL_LEAD_MINUTES} minutes avant l'heure d'un match, un salon vocal de ${VOICE_CHANNEL_CAPACITY} places par équipe dans la catégorie des matchs de son serveur, au nom de l'équipe — jamais pour une entrée en tournoi individuel (son nom serait un pseudo) ni pour une équipe fantôme`,
+      `Demander au bot Discord de l'association, à partir de ${VOICE_CHANNEL_LEAD_MINUTES} minutes avant l'heure d'un match (aussitôt si l'option est allumée plus tard), un salon vocal de ${VOICE_CHANNEL_CAPACITY} places par équipe dans la catégorie des matchs de son serveur, au nom de l'équipe — jamais pour une entrée en tournoi individuel (son nom serait un pseudo) ni pour une équipe fantôme`,
       `Faire compter par le bot le nombre de personnes présentes dans chaque salon, pour retenir le lancement du match jusqu'à ce que les deux soient pleins (l'arbitrage peut le forcer ; si le bot ne répond pas, le match n'attend pas), et montrer « Salon vocal : n/${VOICE_CHANNEL_CAPACITY} » aux parties du match (membres des deux équipes, casters) et au staff`,
       "Rendre les salons au bot quand le match est joué, annulé, retombé en attente ou sorti du programme, quand l'équipe sort de l'appariement, ou quand le tournoi se termine ou éteint l'option ; le bot supprime un salon dès qu'il est vide",
     ],
@@ -998,9 +998,9 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     sensitiveData: "Aucune",
     retention: [
-      `Ligne du salon sur le site (identifiant, nombre de personnes) : jusqu'à ce que le salon soit rendu au bot, puis ${VOICE_ROW_RETENTION_DAYS} jours, effacée par le balayage suivant, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus)`,
+      `Ligne du salon sur le site (identifiant, numéros, nombre de personnes et heures) : jusqu'à ce que le salon soit rendu au bot, puis ${VOICE_ROW_RETENTION_DAYS} jours, effacée par le balayage suivant, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus)`,
       `Salon sur Discord : supprimé par le bot dès qu'il est vide une fois rendu, au plus tard ${VOICE_BOT_RELEASED_MAX_HOURS} heures et ${VOICE_BOT_SWEEP_MINUTES} minutes après son rendu même occupé (balayage toutes les ${VOICE_BOT_SWEEP_MINUTES} minutes, bot en marche), sauf si Discord l'en empêche (droit retiré, erreur) : il réessaie alors à chaque balayage, et s'il oublie le salon (fiche ci-dessous), celui-ci reste jusqu'à ce que la modération du serveur le supprime ; un salon jamais rendu est supprimé par le bot s'il est vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise, et reste tant qu'il est occupé ; déplacé hors de la catégorie des matchs, le bot cesse de le suivre sans le supprimer (il relève alors de la modération du serveur)`,
-      "État vocal : tenu en mémoire par le bot, à jour de ce que Discord lui transmet, et perdu à son arrêt ; jamais enregistré par le bot ni transmis au site — celui des autres serveurs où il est présent n'est pas gardé",
+      "État vocal : tenu en mémoire par le bot, à jour de ce que Discord lui transmet, et perdu à son arrêt ; jamais enregistré par le bot ni transmis au site — celui des autres serveurs où il est présent n'est pas gardé (la fiche de membre jointe l'est, comme pour tout membre que le bot croise)",
       `Fiche du salon chez le bot : effacée avec le salon ; oubliée ${VOICE_BOT_ABANDONED_MAX_HOURS} heures après sa création ou sa reprise si le bot ne peut plus lire le salon ; gardée sans limite tant qu'il le lit sans pouvoir le supprimer ou que Discord répond par une autre erreur ; hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus)`,
     ],
     recipients: [
