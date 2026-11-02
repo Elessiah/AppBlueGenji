@@ -35,9 +35,10 @@ const LOG_ROW = {
 
 function roundConnection(matches: { id: number; bracket: string }[]) {
   const execute = jest.fn<SqlQuery>(async (sql: string) => {
-    if (sql.startsWith("SELECT id, state FROM bg_tournaments")) return [[{ id: 7, state: "REGISTRATION" }], []];
+    if (sql.startsWith("SELECT state FROM bg_tournaments")) return [[{ state: "REGISTRATION" }], []];
+    if (sql.startsWith("SELECT id FROM bg_matches")) return [matches.map(({ id }) => ({ id })), []];
     if (sql.startsWith("SELECT id, bracket, self_managed")) {
-      return [matches.map((match) => ({ ...match, self_managed: 0, referee_user_id: null })), []];
+      return [matches.map((match) => ({ ...match, self_managed: 0, referee_user_id: null, status: "READY", is_bye: 0 })), []];
     }
     return [{ affectedRows: 1 }, []];
   });

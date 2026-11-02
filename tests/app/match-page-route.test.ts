@@ -192,7 +192,8 @@ describe("encart du lien partagé", () => {
     connection.query.mockRejectedValueOnce(new Error("down"));
     const down = await matchPageMetadata("12", "34", true, async () => ({ canManage: false }));
     expect(down.title).toEqual({ absolute: expect.not.stringMatching(/^Manche/) });
-    expect(down.alternates?.canonical).toBe("/suivre/tournois/12");
+    // Base en panne : la page existe peut-être, sa canonique reste la sienne.
+    expect(down.alternates?.canonical).toBe("/suivre/tournois/12/matchs/34");
     const memberMissing = await matchPageMetadata("12", "35", false, async () => ({ canManage: false }));
     expect(memberMissing.alternates?.canonical).toBe("/tournois/12");
   });

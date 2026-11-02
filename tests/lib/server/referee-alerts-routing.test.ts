@@ -762,6 +762,19 @@ describe("alerte d'une manche : matchs disparus ou au-delà de la liste (EF-31)"
     expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
   });
 
+  it("flushBotLogs_listedMatchPlayedMeanwhile_neitherListedNorCounted", async () => {
+    const execute = mockDb([[MATCH_ROW], [{ ...MATCH_ROW, id: 32, status: "COMPLETED" }]]);
+
+    await flushRound(fakeConnection(), [31, 32], [8, 9]);
+
+    const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
+    expect(message).not.toContain("(match #32)");
+    const released = execute.mock.calls
+      .filter(([sql]) => String(sql).startsWith("DELETE FROM bg_referee_alerts WHERE id = ?"))
+      .map(([, params]) => params);
+    expect(released).toEqual([[9]]);
+  });
+
   it("resolveRoundNoRefereeLog_matchesBeyondList_countsOnlyOpenOnes", async () => {
     const ids = [31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44];
     const execute = mockDb([...ids.slice(0, 12).map((id) => [{ ...MATCH_ROW, id }]), [{ open_count: 1 }]]);

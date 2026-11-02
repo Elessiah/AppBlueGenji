@@ -6,6 +6,7 @@ jest.mock("@/lib/server/tournaments/cast-notices");
 jest.mock("@/lib/server/tournaments/referee-notices");
 
 import type { PoolConnection } from "mysql2/promise";
+import type { NoRefereeCandidate } from "@/lib/shared/match-referee";
 import { withConnection } from "@/lib/server/database";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import {
@@ -22,6 +23,8 @@ import {
   loadViewerCastBlock,
   maintainMatchLaunches,
   releaseIneligibleCast,
+  queueDeferredNoRefereeAlerts,
+  queueNoRefereeAlerts,
   releaseIneligibleReferee,
   releaseMatchCast,
   releaseMatchReferee,
@@ -322,17 +325,20 @@ function readAlertRows(state: World, sql: string, params: unknown[]): [unknown, 
 
 /** Tournoi et matchs d'une manche, verrouillés par les gestes du staff ; `null` pour les autres requêtes. */
 function readRoundRows(state: World, sql: string): [unknown, unknown[]] | null {
-  if (sql.startsWith("SELECT id, state FROM bg_tournaments")) {
-    return [state.match ? [{ id: state.match.tournament_id, state: state.match.tournament_state }] : [], []];
+  if (sql.startsWith("SELECT state FROM bg_tournaments")) {
+    return [state.match ? [{ state: state.match.tournament_state }] : [], []];
   }
-  if (sql.startsWith("SELECT id, bracket, self_managed, referee_user_id FROM bg_matches")) {
+  if (sql.startsWith("SELECT id, bracket, self_managed, referee_user_id, status, is_bye FROM bg_matches WHERE id IN")) {
     const match = state.match;
-    return [
-      match && match.status !== "COMPLETED" && match.is_bye === 0
-        ? [{ id: match.id, bracket: "UPPER", self_managed: match.self_managed, referee_user_id: match.referee_user_id }]
-        : [],
-      [],
-    ];
+    const row = match && {
+      id: match.id,
+      bracket: "UPPER",
+      self_managed: match.self_managed,
+      referee_user_id: match.referee_user_id,
+      status: match.status,
+      is_bye: match.is_bye,
+    };
+    return [row ? [row] : [], []];
   }
   if (sql.startsWith("SELECT id FROM bg_tournaments")) {
     return [state.match ? [{ id: state.match.tournament_id }] : [], []];
@@ -2032,11 +2038,12 @@ describe("règles serveur de l'arbitrage (EF-31)", () => {
 
     await setRoundSelfManaged(7, { phaseId: 0, roundNumber: 1, bracket: null }, true, 3);
 
-    const tournamentLock = state.issued.findIndex((sql) => sql.startsWith("SELECT id, state FROM bg_tournaments"));
-    const matchesRead = state.issued.filter((sql) => sql.startsWith("SELECT id, bracket, self_managed"));
+    const tournamentLock = state.issued.findIndex((sql) => /^SELECT id FROM bg_tournaments WHERE id = \? FOR UPDATE$/.test(sql));
+    const matchLocks = state.issued.filter((sql) => sql.startsWith("SELECT id, bracket, self_managed"));
     expect(tournamentLock).toBe(0);
-    expect(matchesRead).toHaveLength(1);
-    expect(matchesRead[0]).toMatch(/FOR UPDATE$/);
+    // Une seule lecture verrouillée, par clé primaire (pas d'intervalles d'index).
+    expect(matchLocks).toHaveLength(1);
+    expect(matchLocks[0]).toMatch(/WHERE id IN \(\?\) ORDER BY id FOR UPDATE$/);
   });
 
   it("setRoundSelfManaged_refereeReplaced_noticeCarriesActor", async () => {
@@ -2098,5 +2105,81 @@ describe("règles serveur de l'arbitrage (EF-31)", () => {
     await setMatchReady(42, 1, true);
 
     expect(state.issued.filter((sql) => sql.includes("FROM bg_users WHERE id = ?"))).toHaveLength(1);
+  });
+});
+
+describe("retraits en série et alertes regroupées (EF-31, revue)", () => {
+  const REFEREE = 950;
+  const refereeUser = {
+    discord_verified_at: STAMP,
+    discord_pseudo: "arbitre",
+    blizzard_sub: "sub",
+    overwatch_battletag: "Arbitre#1",
+    is_deleted: 0,
+    is_admin: 0,
+    platform_roles_json: JSON.stringify(["ARBITRE"]),
+  };
+
+  it("releaseIneligibleReferee_objectionUpheld_announcesObjectionMotive", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    expect(await releaseIneligibleReferee(42, REFEREE)).toBe(true);
+
+    expect(announceRefereeChange).toHaveBeenCalledWith({ kind: "OBJECTION_RELEASED", matchId: 42, refereeId: REFEREE });
+  });
+
+  it("releaseIneligibleReferee_withSink_collectsAlertInsteadOfQueueing", async () => {
+    state.users[REFEREE] = { ...refereeUser, platform_roles_json: null };
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    const undecided: NoRefereeCandidate[] = [];
+
+    await releaseIneligibleReferee(42, REFEREE, undecided);
+
+    expect(state.match?.launched_at).toBe(STAMP);
+    expect(undecided.map((candidate) => candidate.matchId)).toEqual([42]);
+    expect(state.alerts ?? []).toEqual([]);
+  });
+
+  it("queueDeferredNoRefereeAlerts_collectedCandidates_reservesThemInOneTransaction", async () => {
+    state.match = matchState();
+    const candidate: NoRefereeCandidate = {
+      matchId: 42,
+      pairing: `${TEAM1}:${TEAM2}`,
+      scheduled: true,
+      phaseId: 0,
+      bracket: "UPPER",
+      roundNumber: 1,
+    };
+
+    await queueDeferredNoRefereeAlerts([candidate]);
+
+    expect(state.alerts).toEqual([`42:NO_REFEREE:${TEAM1}:${TEAM2}`]);
+  });
+
+  it("queueDeferredNoRefereeAlerts_emptyList_opensNoTransaction", async () => {
+    await queueDeferredNoRefereeAlerts([]);
+
+    expect(withConnection).not.toHaveBeenCalled();
+  });
+
+  it("queueNoRefereeAlerts_reservationTableUnreadable_keepsCallerTransaction", async () => {
+    const execute = executeFor(state);
+    const failing = fakeConnection({
+      execute: async (sql: string, params?: unknown[]) => {
+        if (sql.startsWith("SELECT match_id, alert_key FROM bg_referee_alerts")) throw new Error("ER_NO_SUCH_TABLE");
+        return execute(sql, params);
+      },
+    });
+    const candidate: NoRefereeCandidate = {
+      matchId: 42,
+      pairing: `${TEAM1}:${TEAM2}`,
+      scheduled: true,
+      phaseId: 0,
+      bracket: "UPPER",
+      roundNumber: 1,
+    };
+
+    await expect(queueNoRefereeAlerts(failing, [candidate])).resolves.toBeUndefined();
   });
 });

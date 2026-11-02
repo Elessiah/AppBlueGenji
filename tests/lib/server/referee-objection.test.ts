@@ -6,7 +6,7 @@ jest.mock("@/lib/server/tournaments/cast-eligibility");
 
 import { getDatabase } from "@/lib/server/database";
 import { loadRefereeEligibility } from "@/lib/server/tournaments/cast-eligibility";
-import { releaseObjectingReferee } from "@/lib/server/tournaments/match-launch";
+import { queueDeferredNoRefereeAlerts, releaseObjectingReferee } from "@/lib/server/tournaments/match-launch";
 import { setRefereeObjection } from "@/lib/server/tournaments/referee-objection";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
@@ -36,8 +36,22 @@ describe("setRefereeObjection", () => {
     expect(result).toEqual({ changed: true, released: 2, failed: 0 });
     expect(execute.mock.calls[0][0]).toContain("SET referee_objection_at = NOW()");
     expect(execute.mock.calls[1][0]).toContain("status <> 'COMPLETED'");
-    expect(releaseObjectingReferee).toHaveBeenNthCalledWith(1, 11, REFEREE);
-    expect(releaseObjectingReferee).toHaveBeenNthCalledWith(2, 12, REFEREE);
+    expect(releaseObjectingReferee).toHaveBeenNthCalledWith(1, 11, REFEREE, expect.any(Array));
+    expect(releaseObjectingReferee).toHaveBeenNthCalledWith(2, 12, REFEREE, expect.any(Array));
+  });
+
+  it("setRefereeObjection_sweep_signalsMatchesLeftWithoutRefereeOnceTogether", async () => {
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockResolvedValueOnce([[{ id: 11 }, { id: 12 }], []]);
+    const candidate = { matchId: 11, pairing: "10:20", scheduled: false, phaseId: 0, bracket: "UPPER", roundNumber: 1 };
+    jest.mocked(releaseObjectingReferee).mockImplementation(async (matchId, _refereeId, undecided) => {
+      undecided?.push({ ...candidate, matchId });
+      return true;
+    });
+
+    await setRefereeObjection(REFEREE, true);
+
+    expect(queueDeferredNoRefereeAlerts).toHaveBeenCalledTimes(1);
+    expect(queueDeferredNoRefereeAlerts).toHaveBeenCalledWith([candidate, { ...candidate, matchId: 12 }]);
   });
 
   it("setRefereeObjection_unfinishedMatchesUnreadable_countsFailure_doesNotThrow", async () => {
@@ -68,7 +82,7 @@ describe("setRefereeObjection", () => {
     const result = await setRefereeObjection(REFEREE, true);
 
     expect(result).toEqual({ changed: false, released: 1, failed: 0 });
-    expect(releaseObjectingReferee).toHaveBeenCalledWith(11, REFEREE);
+    expect(releaseObjectingReferee).toHaveBeenCalledWith(11, REFEREE, expect.any(Array));
   });
 
   it("setRefereeObjection_lift_clearsWithoutSweep", async () => {
@@ -97,7 +111,7 @@ describe("setRefereeObjection", () => {
     const result = await setRefereeObjection(REFEREE, true);
 
     expect(result).toEqual({ changed: true, released: 1, failed: 1 });
-    expect(releaseObjectingReferee).toHaveBeenCalledWith(12, REFEREE);
+    expect(releaseObjectingReferee).toHaveBeenCalledWith(12, REFEREE, expect.any(Array));
     expect(consoleError).toHaveBeenCalledTimes(1);
     consoleError.mockRestore();
   });
