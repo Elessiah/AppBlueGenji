@@ -102,6 +102,24 @@ describe("suspendOn", () => {
     }
   });
 
+  it("suspendOn_severalRendersOnOneFailingLoader_reloadsOnceAndSharesOneRetryTimer", async () => {
+    jest.useFakeTimers();
+    try {
+      jest.mocked(reloadAfterChunkError).mockClear();
+      // `onceLoader` partage une seule promesse : chaque rendu suspendu reçoit le même rejet.
+      const shared = Promise.reject(new Error("ChunkLoadError"));
+      const loader = { load: jest.fn(() => shared) };
+      const waits = [thrownBy(() => suspendOn(loader)), thrownBy(() => suspendOn(loader)), thrownBy(() => suspendOn(loader))];
+      await jest.advanceTimersByTimeAsync(0);
+      expect(reloadAfterChunkError).toHaveBeenCalledTimes(1);
+      expect(jest.getTimerCount()).toBe(1);
+      await jest.advanceTimersByTimeAsync(SUSPEND_RETRY_MS);
+      for (const wait of waits) await expect(wait).resolves.toBeUndefined();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("suspendOn_reloadDidNotHappen_retriesLoadAfterDelay", async () => {
     jest.useFakeTimers();
     try {

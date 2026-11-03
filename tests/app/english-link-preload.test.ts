@@ -7,13 +7,15 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { readSource } from "../helpers/read-source";
 import { englishReports } from "@/components/i18n/english-loaders";
 import { englishPlayers, englishProfile, englishPush, englishStatsPanel, englishTeam, englishTeamErrors, englishTeams } from "@/components/i18n/english-loaders-account";
+import { englishTournamentSheet } from "@/components/i18n/english-loaders-tournament";
 import { preloadEnglishFor } from "@/components/i18n/english-link-targets";
 import { barePath, englishPageOf, ENGLISH_PAGES } from "@/components/i18n/english-pages";
 import { preloadRoute, setRoutePreload } from "@/components/i18n/route-preload";
 
-type Name = "englishReports" | "englishPlayers" | "englishProfile" | "englishPush" | "englishStatsPanel" | "englishTeam" | "englishTeamErrors" | "englishTeams";
+type Name = "englishReports" | "englishPlayers" | "englishProfile" | "englishPush" | "englishStatsPanel" | "englishTeam" | "englishTeamErrors" | "englishTeams" | "englishTournamentSheet";
 const LOADERS: Record<Name, { load: () => Promise<unknown> }> = {
   englishReports,
+  englishTournamentSheet,
   englishPlayers,
   englishProfile,
   englishPush,
@@ -44,6 +46,8 @@ describe("preloadEnglishFor", () => {
     expect(preloaded("/equipes")).toEqual(["englishTeamErrors", "englishTeams"]);
     expect(preloaded("/equipes/creer")).toEqual(["englishTeamErrors", "englishTeams"]);
     expect(preloaded("/signalements/3#detail")).toEqual(["englishReports"]);
+    expect(preloaded("/tournois/4")).toEqual(["englishTournamentSheet"]);
+    expect(preloaded("/tournois/4/modifier")).toEqual(["englishTournamentSheet"]);
     expect(preloaded("/profil#notifications")).toEqual(["englishProfile", "englishPush", "englishTeamErrors"]);
   });
 
@@ -55,7 +59,7 @@ describe("preloadEnglishFor", () => {
   });
 
   it("une page sans dictionnaire de ce lot ne lance rien", () => {
-    expect(preloaded("/tournois/4")).toEqual([]);
+    expect(preloaded("/tournois")).toEqual([]);
     expect(preloaded("/classement")).toEqual([]);
   });
 });
@@ -146,11 +150,15 @@ describe("registre des navigations par le code", () => {
 
 describe("une seule table des pages", () => {
   it("chaque page de la table a son préchargement ; le reste n'en a pas", () => {
-    expect(Object.keys(ENGLISH_PAGES).sort()).toEqual(["playerPage", "players", "profile", "report", "teamPage", "teams"]);
+    expect(Object.keys(ENGLISH_PAGES).sort()).toEqual(["playerPage", "players", "profile", "report", "teamPage", "teams", "tournamentSheet"]);
     expect(englishPageOf("/equipes/12/")).toBe("teamPage");
     expect(englishPageOf("/equipes/creer?x=1")).toBe("teams");
     expect(englishPageOf("/joueurs#top")).toBe("players");
-    expect(englishPageOf("/tournois/4")).toBeNull();
+    expect(englishPageOf("/tournois/4")).toBe("tournamentSheet");
+    expect(englishPageOf("/tournois/4/modifier")).toBe("tournamentSheet");
+    expect(englishPageOf("/tournois/4/matchs/9?x=1")).toBe("tournamentSheet");
+    expect(englishPageOf("/tournois")).toBeNull();
+    expect(englishPageOf("/tournois/creer")).toBeNull();
     const sample: Record<keyof typeof ENGLISH_PAGES, string> = {
       profile: "/profil",
       teamPage: "/equipes/1",
@@ -158,6 +166,7 @@ describe("une seule table des pages", () => {
       playerPage: "/joueurs/1",
       players: "/joueurs",
       report: "/signalements/1",
+      tournamentSheet: "/tournois/1",
     };
     for (const path of Object.values(sample)) expect(preloaded(path).length).toBeGreaterThan(0);
   });

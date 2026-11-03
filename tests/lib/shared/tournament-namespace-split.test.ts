@@ -7,7 +7,7 @@ import enTournaments from "@/messages/en/tournaments.json";
 import frTournaments from "@/messages/fr/tournaments.json";
 import enTournamentsShared from "@/messages/en/tournamentsShared.json";
 import frTournamentsShared from "@/messages/fr/tournamentsShared.json";
-import { englishTournamentSheet } from "@/components/i18n/tournament-sheet-text-gate";
+import { englishTournamentSheet } from "@/components/i18n/english-loaders-tournament";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { tournamentPageMessages } from "@/lib/shared/tournament-page-text";
 import { tournamentsSharedMessages } from "@/lib/shared/tournaments-text";
