@@ -26,14 +26,17 @@ import { listSoloRegistrationTournamentIds, loadSoloRegistrations } from "./acco
  */
 
 /**
- * L'entrée solo `s` n'a jamais joué : aucun match tranché sur le terrain (ni
- * exemption, ni forfait, ni double forfait) ni score en attente de
- * confirmation.
+ * L'entrée solo `s` n'a jamais joué **dans ce tournoi** : aucun match tranché
+ * sur le terrain (ni exemption, ni forfait, ni double forfait) ni score en
+ * attente de confirmation. Filtré par tournoi : un compte n'a qu'une entrée
+ * solo pour tous ses tournois (`uniq_bg_teams_solo_user`), et un match joué
+ * ailleurs ne dit rien de celui-ci.
  */
-export function soloEntryNeverPlayedSql(entry = "s.id"): string {
+export function soloEntryNeverPlayedSql(entry = "s.id", tournament = "r.tournament_id"): string {
   return `NOT EXISTS (
          SELECT 1 FROM bg_matches pm
-          WHERE (pm.team1_id = ${entry} OR pm.team2_id = ${entry})
+          WHERE pm.tournament_id = ${tournament}
+            AND (pm.team1_id = ${entry} OR pm.team2_id = ${entry})
             AND pm.status IN ('COMPLETED', 'AWAITING_CONFIRMATION')
             AND pm.is_bye = 0
             AND pm.team1_id IS NOT NULL
@@ -109,6 +112,19 @@ async function engineFormat(tournamentId: number): Promise<string | null> {
   return row.format === "MULTI" ? row.phase_format : row.format;
 }
 
+/**
+ * L'entrée appartient toujours à un compte en suppression — relu avant chaque
+ * forfait : un compte réactivé entre le relevé et le geste garde ses matchs.
+ */
+async function entryAccountStillDeleted(teamId: number): Promise<boolean> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { is_deleted: number })[]>(
+    `SELECT u.is_deleted FROM bg_teams s JOIN bg_users u ON u.id = s.solo_user_id WHERE s.id = ? LIMIT 1`,
+    [teamId],
+  );
+  return Number(rows[0]?.is_deleted ?? 0) === 1;
+}
+
 /** Garde-fou de la boucle d'un arbre : au-delà, un match qui ne se tranche pas. */
 const MAX_BRACKET_FORFEITS = 64;
 
@@ -119,13 +135,15 @@ const MAX_BRACKET_FORFEITS = 64;
  * chaque forfait propage l'adversaire, et un match d'aval qui reçoit l'entrée
  * (tableau des perdants) est tranché au tour suivant de la boucle. Un match
  * dont l'adversaire n'est pas encore connu attend son appariement : le
- * prochain passage (rattrapage, `settleDeletedSoloEntries`) le tranchera.
+ * passage horaire suivant (`settleDeletedSoloEntries`, lancé avec les
+ * suppressions définitives) le tranchera.
  *
  * Rend le nombre de forfaits posés. Chaque geste ouvre sa propre transaction
  * et prend `lockTournamentRow` le premier.
  */
 export async function forfeitUnplayedSoloEntry(tournamentId: number, teamId: number): Promise<number> {
   const { adminSaveMatchScores, forfeitTournamentTeam } = await import("@/lib/server/tournaments-service");
+  if (!(await entryAccountStillDeleted(teamId))) return 0;
   const format = await engineFormat(tournamentId);
   if (format !== null && ABANDON_FORMATS.has(format)) {
     await forfeitTournamentTeam(tournamentId, teamId, null);
@@ -144,6 +162,7 @@ export async function forfeitUnplayedSoloEntry(tournamentId: number, teamId: num
       [tournamentId, teamId, teamId],
     );
     if (rows.length === 0) break;
+    if (round > 0 && !(await entryAccountStillDeleted(teamId))) break;
     await adminSaveMatchScores(Number(rows[0].id), { forfeitTeamId: teamId });
     forfeits += 1;
   }

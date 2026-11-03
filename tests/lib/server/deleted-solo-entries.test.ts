@@ -17,6 +17,7 @@ import {
   forfeitSoloEntriesAfterCommit,
   forfeitUnplayedSoloEntry,
   settleDeletedSoloEntries,
+  soloEntryNeverPlayedSql,
 } from "@/lib/server/users/deleted-solo-entries";
 import { fakePool } from "../../helpers/sql-double";
 
@@ -33,12 +34,16 @@ type Options = {
   openMatches?: number[];
   candidates?: number[];
   forfeitable?: { tournament_id: number; team_id: number }[];
+  /** Relectures successives de `is_deleted` du compte de l'entrée ; au-delà, 1. */
+  deletedReads?: number[];
 };
 
 function fakeDb(options: Options) {
   const open = [...(options.openMatches ?? [])];
+  const deletedReads = [...(options.deletedReads ?? [])];
   const execute = jest.fn(async (sql: string) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
+    if (q.startsWith("SELECT u.is_deleted FROM bg_teams s")) return [[{ is_deleted: deletedReads.shift() ?? 1 }]];
     if (q.startsWith("SELECT t.format, p.format AS phase_format")) {
       return [[{ format: options.format ?? "SINGLE", phase_format: options.phaseFormat ?? null }]];
     }
@@ -91,6 +96,37 @@ describe("forfeitUnplayedSoloEntry", () => {
     fakeDb({ format: "SINGLE", openMatches: [] });
 
     expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(0);
+  });
+});
+
+describe("soloEntryNeverPlayedSql", () => {
+  it("soloEntryNeverPlayedSql_default_filtersOnRegistrationTournament", () => {
+    // Une seule entrée solo par compte : un match joué dans un autre tournoi ne compte pas.
+    expect(soloEntryNeverPlayedSql()).toContain("pm.tournament_id = r.tournament_id");
+  });
+
+  it("soloEntryNeverPlayedSql_customAliases_usesThem", () => {
+    const sql = soloEntryNeverPlayedSql("x.id", "y.tid");
+
+    expect(sql).toContain("pm.tournament_id = y.tid");
+    expect(sql).toContain("pm.team1_id = x.id");
+  });
+});
+
+describe("forfeitUnplayedSoloEntry — compte réactivé", () => {
+  it("forfeitUnplayedSoloEntry_accountReactivated_noForfeit", async () => {
+    fakeDb({ format: "SWISS", deletedReads: [0] });
+
+    expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(0);
+    expect(forfeitTournamentTeam).not.toHaveBeenCalled();
+    expect(adminSaveMatchScores).not.toHaveBeenCalled();
+  });
+
+  it("forfeitUnplayedSoloEntry_reactivatedMidBracket_stopsLoop", async () => {
+    fakeDb({ format: "DOUBLE", openMatches: [101, 102], deletedReads: [1, 0] });
+
+    expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(1);
+    expect(jest.mocked(adminSaveMatchScores).mock.calls).toEqual([[101, { forfeitTeamId: 40 }]]);
   });
 });
 

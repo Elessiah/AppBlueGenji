@@ -107,7 +107,18 @@ function scheduleDueAccountDeletions(now: number = Date.now()): void {
     return;
   }
   dueDeletionsState.__bgDueDeletionsAt = now;
-  void import("@/lib/server/users/deleted-accounts")
+  // D'abord les forfaits restés en attente d'un adversaire (E1) : un match
+  // d'aval apparié depuis le dernier passage ne reste pas bloqué contre un
+  // compte en suppression jusqu'au prochain redémarrage.
+  void import("@/lib/server/users/deleted-solo-entries")
+    .then(({ settleDeletedSoloEntries }) => settleDeletedSoloEntries())
+    .catch((error: unknown) => {
+      console.error(
+        "[deleted-accounts] Forfaits des comptes supprimés reportés :",
+        error instanceof Error ? error.message : error,
+      );
+    })
+    .then(() => import("@/lib/server/users/deleted-accounts"))
     .then(({ finalizeDueAccountDeletions }) => finalizeDueAccountDeletions())
     .then(({ finalized, failed }) => {
       if (finalized + failed > 0) {

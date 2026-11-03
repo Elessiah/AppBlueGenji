@@ -623,7 +623,12 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   `RUNNING` **jamais jouée** perd ses matchs restants par forfait **après** le
   commit (`forfeitSoloEntriesAfterCommit` : `forfeitTournamentTeam` pour
   SURVIVAL/SWISS/BG_SURVIE, `adminSaveMatchScores({ forfeitTeamId })` match par
-  match sinon). Un échec est repris par le rattrapage.
+  match sinon). « Jamais jouée » se lit **dans ce tournoi** (`pm.tournament_id`) :
+  l'entrée solo est unique pour tous les tournois du compte. Chaque forfait
+  relit d'abord `is_deleted` : un compte réactivé entre-temps garde ses matchs.
+  Un échec, ou un match d'aval dont l'adversaire n'est pas encore connu, est
+  repris par `settleDeletedSoloEntries`, relancé chaque heure avant les
+  suppressions définitives (et au rattrapage de démarrage).
 - Casts et arbitrages à venir retirés, invitations du compte annulées.
 
 **E5 / alerte.** Le journal Discord écrit « 🗑️ Compte supprimé » (catégorie
