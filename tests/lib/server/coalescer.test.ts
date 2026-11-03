@@ -405,3 +405,49 @@ describe("createKeyedChain", () => {
     expect(flushed).toBe(true);
   });
 });
+
+describe("createCoalescer — deliverQueues", () => {
+  beforeEach(() => {
+    jest.useRealTimers();
+  });
+
+  function slowFirstDelivery() {
+    let releaseFirst: () => void = () => undefined;
+    const deliver = jest
+      .fn<(first: number, last: number) => Promise<void>>()
+      .mockImplementationOnce(() => new Promise<void>((resolve) => (releaseFirst = resolve)))
+      .mockResolvedValue();
+    return { deliver, release: () => releaseFirst() };
+  }
+
+  it("flush_deliverQueuesWithBurstInFlight_deliversSameTick", async () => {
+    const { deliver, release } = slowFirstDelivery();
+    const coalescer = createCoalescer<number>({ windowMs: 1_000, maxAgeMs: 5_000, deliver, deliverQueues: true });
+    coalescer.add("a", 1);
+    const first = coalescer.flush("a");
+    coalescer.add("a", 2);
+    let settled = false;
+    const second = coalescer.flush("a").then(() => {
+      settled = true;
+    });
+    expect(deliver).toHaveBeenCalledTimes(2);
+    expect(deliver).toHaveBeenLastCalledWith(2, 2);
+    release();
+    await Promise.all([first, second]);
+    expect(settled).toBe(true);
+  });
+
+  it("flush_defaultWithBurstInFlight_waitsPrevious", async () => {
+    const { deliver, release } = slowFirstDelivery();
+    const coalescer = createCoalescer<number>({ windowMs: 1_000, maxAgeMs: 5_000, deliver });
+    coalescer.add("a", 1);
+    const first = coalescer.flush("a");
+    coalescer.add("a", 2);
+    const second = coalescer.flush("a");
+    await Promise.resolve();
+    expect(deliver).toHaveBeenCalledTimes(1);
+    release();
+    await Promise.all([first, second]);
+    expect(deliver).toHaveBeenCalledTimes(2);
+  });
+});
