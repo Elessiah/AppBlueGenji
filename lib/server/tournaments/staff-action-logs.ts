@@ -99,7 +99,7 @@ export function announceStaffMatchAction(
 ): void {
   // Deux gestes rapprochés sur un match (antenne puis hors antenne) gardent
   // leur ordre ; l'arrêt du serveur attend la ligne.
-  matchLines.chain(matchId, () =>
+  void matchLines.chain(matchId, () =>
     deliverStaffMatchAction(matchId, action, author, options).catch((error) =>
       console.error(`[staff-log] geste ${action} sur le match #${matchId} non journalisé : ${failureReason(error)}`),
     ),
@@ -138,10 +138,7 @@ const tournamentBursts = createCoalescer<TournamentActionBurst>({
 
 /** Range une ligne dans la file de son tournoi ; se règle quand elle est partie. */
 function queueTournamentLine(entry: TournamentActionBurst): Promise<void> {
-  return new Promise((resolve) =>
-    // Réglée même si la ligne lève : une rafale suivante n'attend jamais pour rien.
-    tournamentLines.chain(entry.tournamentId, () => deliverTournamentAction(entry).finally(resolve)),
-  );
+  return tournamentLines.chain(entry.tournamentId, () => deliverTournamentAction(entry));
 }
 
 /** Annonce tout de suite les rafales en attente. Réservé aux tests. */
@@ -180,7 +177,7 @@ export function announceStaffTournamentAction(
     const key = `${tournamentId}:${burst}`;
     if (tournamentBursts.waiting(key)) void tournamentBursts.flush(key);
   }
-  tournamentLines.chain(tournamentId, () => deliverTournamentAction(entry));
+  void tournamentLines.chain(tournamentId, () => deliverTournamentAction(entry));
 }
 
 /** Lignes de tournoi en route, par tournoi, et de match, par match. */

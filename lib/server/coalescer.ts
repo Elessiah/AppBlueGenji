@@ -80,7 +80,12 @@ export function createCoalescer<T>(options: {
     return burst;
   };
 
-  /** Annonce une rafale détachée, après celle de la même clé qui s'annonce encore : jamais deux en parallèle. */
+  /**
+   * Annonce une rafale détachée, après celle de la même clé qui s'annonce
+   * encore : jamais deux en parallèle. Avec `deliverQueues`, `deliver` part dans
+   * ce tour et c'est **sa** file qui garde l'ordre — elle doit y ranger
+   * l'annonce sans rien attendre avant.
+   */
   const start = async (key: string, burst: Burst): Promise<void> => {
     const previous = inFlight.get(key);
     const run = (async () => {
@@ -180,10 +185,11 @@ export function trackAnnouncement(announcement: Promise<void>): Promise<void> {
  * File d'annonces par clé : chaque annonce part après la précédente de la même
  * clé (le journal garde l'ordre des gestes), sans retenir les autres clés. Sans
  * annonce en route, elle part sur-le-champ. Chacune est suivie
- * ({@link trackAnnouncement}) : l'arrêt du serveur l'attend.
+ * ({@link trackAnnouncement}) : l'arrêt du serveur l'attend. `chain` rend sa
+ * fin, qui ne rejette jamais.
  */
 export function createKeyedChain<K>(): {
-  chain: (key: K, run: () => Promise<void>) => void;
+  chain: (key: K, run: () => Promise<void>) => Promise<void>;
   reset: () => void;
 } {
   const tails = new Map<K, Promise<void>>();
@@ -198,6 +204,7 @@ export function createKeyedChain<K>(): {
       void trackAnnouncement(settled).then(() => {
         if (tails.get(key) === settled) tails.delete(key);
       });
+      return settled;
     },
     reset: () => tails.clear(),
   };

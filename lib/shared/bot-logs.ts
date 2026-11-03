@@ -82,7 +82,7 @@ export type BotEventKind =
  * d'une page (`/tournois/<id>`) sans deviner de laquelle il s'agit.
  */
 function tournamentLabel(tournament: BotLogTournament): string {
-  return `« ${discordInline(tournament.name)} » (#${tournament.id})`;
+  return `${discordQuoted(tournament.name, "fr")} (#${tournament.id})`;
 }
 
 /**
