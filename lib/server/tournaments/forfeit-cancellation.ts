@@ -196,6 +196,17 @@ async function cancelTournamentForfeitOnce(
     if (!standing) throw new Error("TEAM_NOT_IN_TOURNAMENT");
     if (standing.status !== "FORFEIT") throw new Error("TEAM_NOT_FORFEITED");
 
+    const [teamRows] = await connection.execute<(RowDataPacket & { name: string })[]>(
+      // Verrouillante, comme toute lecture avant le rejeu : une lecture simple
+      // ouvrirait l'image de la transaction (`ER_CHECKREAD`).
+      `SELECT name FROM bg_teams WHERE id = ? LIMIT 1 LOCK IN SHARE MODE`,
+      [teamId],
+    );
+    // Classement sans engagé (équipe effacée) : rien à remettre en lice — refusé
+    // avant de verrouiller les manches.
+    const team = teamRows[0];
+    if (!team) throw new Error("TEAM_NOT_IN_TOURNAMENT");
+
     // Même borne que le retrait d'une pénalité (`laterRoundsHaveScoreInput`) :
     // une manche **postérieure** à l'abandon déjà entamée, et l'équipe
     // rentrerait sans que les manches manquées comptent contre elle — capital
@@ -217,14 +228,6 @@ async function cancelTournamentForfeitOnce(
     ) {
       throw new Error("FORFEIT_ROUND_PASSED");
     }
-
-    const [teamRows] = await connection.execute<(RowDataPacket & { name: string })[]>(
-      `SELECT name FROM bg_teams WHERE id = ? LIMIT 1`,
-      [teamId],
-    );
-    // Classement sans engagé (équipe effacée) : rien à remettre en lice.
-    const team = teamRows[0];
-    if (!team) throw new Error("TEAM_NOT_IN_TOURNAMENT");
 
     await connection.execute(
       `UPDATE ${table} SET status = 'ACTIVE', ${roundColumn} = NULL WHERE ${scope}`,

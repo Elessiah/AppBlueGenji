@@ -76,7 +76,6 @@ export function isContentionMessage(message: unknown): boolean {
   return typeof message === "string" && CONTENTION_MESSAGES.some((pattern) => pattern.test(message));
 }
 
-/** Codes mysql2 et numéros MariaDB d'une contention passagère. */
 /**
  * MariaDB (11.6.2 et plus, `innodb_snapshot_isolation`) refuse d'écrire une
  * ligne changée depuis l'image lue par la transaction : `ER_CHECKREAD` (1020).

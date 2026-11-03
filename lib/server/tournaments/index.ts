@@ -1084,7 +1084,7 @@ export type TournamentViewerContextOptions = {
  * (25) pour ne rien en faire doublerait la pression à chaque connexion SSE.
  */
 async function resolveViewerEntrant(
-  snapshot: TournamentSnapshot,
+  snapshot: Pick<TournamentSnapshot, "card">,
   userId: number,
   /** Connexion déjà tenue par l'appelant (en individuel) ; sinon, une du pool. */
   connection?: PoolConnection,
@@ -1127,7 +1127,8 @@ function viewerProposalScope(
  * (match inconnu, clos, sans report, ou hors des engagés du lecteur).
  */
 export async function getViewerMatchProposals(
-  snapshot: TournamentSnapshot,
+  /** Seule la carte sert (id, type d'engagés) : la route la lit sans l'instantané. */
+  snapshot: Pick<TournamentSnapshot, "card">,
   userId: number,
   canManage: boolean,
   matchId: number,
