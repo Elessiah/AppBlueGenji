@@ -51,8 +51,9 @@ CSV, objets exportés comparés avant et après) ; les références françaises
   (`PROCESSING_REGISTER.md`).
 - **Ajouter une section à un document du bot** : une clé nommée à sa place dans
   `numberedSections({ … })` — les numéros suivants se décalent seuls, **mais
-  pas les renvois écrits dans le texte** (« section 02 », « section 03 » de la
-  politique, épinglés par `legal-files-dedup.test.ts`) : les reprendre, et
+  pas les renvois écrits dans le texte** (« section 02 », « section 03 » et,
+  dans les puces de contact, « sections 04 et 05 » de la politique, épinglés par
+  `legal-files-dedup.test.ts`) : les reprendre, et
   avancer les dates du document (`BOT_LEGAL_PAGES.md`).
 - Une liste entière peut s'écrire `frEn(listeFr, listeEn)` (puces de contact du
   bot), mais une liste homogène d'une quinzaine d'éléments de même forme peut
@@ -79,7 +80,9 @@ qu'un objet `{ fr, en }` sur quatre.
 - Références et ordre des fiches, nombres d'éléments par rubrique :
   `tests/lib/shared/privacy-legal-en.test.ts` ; numérotation des sections :
   `tests/app/bot-legal-pages.test.ts`.
-- Seul le **français** rendu est épinglé à l'octet (`tests/fixtures/legal-fr/`) ;
+- Seul le **français** rendu des pages du site est épinglé à l'octet
+  (`tests/fixtures/legal-fr/` : conditions, `/rgpd`, registre, mentions,
+  accessibilité — pas les pages du bot) ;
   l'identité de l'anglais a été prouvée une fois, au lot, par comparaison des
   sorties avant et après — un test d'empreinte bloquerait toute retouche.
 - Les contrôles qui lisaient la source anglaise du registre lisent son texte
