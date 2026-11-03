@@ -211,6 +211,32 @@ describe("createCoalescer — annonce forcée", () => {
     expect(coalescer.busy("a")).toBe(false);
   });
 
+  it("waiting_openBurst_trueThenFalseAfterFlush", async () => {
+    const coalescer = createCoalescer<number>({ windowMs: 1_000, maxAgeMs: 5_000, deliver: () => undefined });
+    expect(coalescer.waiting("a")).toBe(false);
+    coalescer.add("a", 1);
+    expect(coalescer.waiting("a")).toBe(true);
+    await coalescer.flush("a");
+    expect(coalescer.waiting("a")).toBe(false);
+  });
+
+  it("drain_inFlightDelivery_waitsWithoutFiringOpenBurst", async () => {
+    let finish: () => void = () => undefined;
+    const deliver = jest
+      .fn<(first: number, last: number) => Promise<void>>()
+      .mockImplementationOnce(() => new Promise<void>((resolve) => (finish = resolve)))
+      .mockResolvedValue();
+    const coalescer = createCoalescer<number>({ windowMs: 1_000, maxAgeMs: 5_000, deliver });
+    coalescer.add("a", 1);
+    jest.advanceTimersByTime(1_000);
+    coalescer.add("a", 2);
+    const drained = coalescer.drain("a");
+    finish();
+    await drained;
+    expect(deliver).toHaveBeenCalledTimes(1);
+    expect(coalescer.waiting("a")).toBe(true);
+  });
+
   it("flush_unknownKey_resolvesWithoutDelivering", async () => {
     const { deliver, coalescer } = setup();
     coalescer.add("a", 1);

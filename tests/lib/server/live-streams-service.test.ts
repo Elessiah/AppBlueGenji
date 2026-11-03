@@ -803,6 +803,7 @@ describe("setMatchOnAir — changement d'état", () => {
     await mockDb(execute);
     await expect(setMatchOnAir(42, true)).resolves.toBe(false);
     expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND status = 'READY'");
+    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND live_trigger = 'MANUAL'");
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
@@ -813,6 +814,18 @@ describe("setMatchOnAir — changement d'état", () => {
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
     await expect(setMatchOnAir(42, true)).resolves.toBe(true);
+  });
+
+  it("setMatchOnAir_triggerSwitchedToAutoBeforeOffAirWrite_returnsFalseWithoutEvent", async () => {
+    // Lu MANUAL à l'antenne, passé en automatique avant l'UPDATE : la ligne n'est plus trouvée.
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: new Date() })]])
+      .mockResolvedValueOnce([{ affectedRows: 0 }]);
+    await mockDb(execute);
+    await expect(setMatchOnAir(42, false)).resolves.toBe(false);
+    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND live_trigger = 'MANUAL'");
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("setMatchOnAir_alreadyOffAir_returnsFalse", async () => {

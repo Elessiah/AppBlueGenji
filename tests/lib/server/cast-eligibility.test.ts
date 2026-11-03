@@ -45,9 +45,13 @@ describe("castEligibilityBlock", () => {
     ["au tag décertifié", { discord_verified_at: null }, "CASTER_IDENTITY_REQUIRED"],
     ["sans tag", { discord_pseudo: null }, "CASTER_IDENTITY_REQUIRED"],
     ["sans Battle.net", { blizzard_sub: null }, "CASTER_IDENTITY_REQUIRED"],
-    ["supprimé", { is_deleted: 1 }, "CASTER_IDENTITY_REQUIRED"],
+    ["supprimé", { is_deleted: 1 }, "NOT_CASTER"],
   ])("refuse un compte %s", (_label, overrides, block) => {
     expect(castEligibilityBlock({ ...ELIGIBLE, ...overrides })).toBe(block);
+  });
+
+  it("castEligibilityBlock_deletedAdmin_returnsNotCaster", () => {
+    expect(castEligibilityBlock({ ...ELIGIBLE, is_admin: 1, is_deleted: 1 })).toBe("NOT_CASTER");
   });
 
   it("refuse un compte introuvable", () => {

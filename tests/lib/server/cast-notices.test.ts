@@ -277,11 +277,9 @@ describe("announceCastChange", () => {
       jest.useRealTimers();
     });
 
-    it("une inscription seule part après le silence de la rafale", async () => {
+    it("announceCastChange_singleClaim_postsBeforeWindowElapses", async () => {
       mockMatch(matchRow());
       announceCastChange(claimed);
-      expect(sendBotLog).not.toHaveBeenCalled();
-      jest.advanceTimersByTime(CAST_TOGGLE_WINDOW_MS);
       jest.useRealTimers();
       await settle();
       expect(loggedLine()).toContain("inscrit");
@@ -299,14 +297,57 @@ describe("announceCastChange", () => {
       expect(jest.mocked(sendBotLog).mock.calls[1][0]).toContain("Cast libéré");
     });
 
-    it("announceCastChange_releasedThenClaimedBurst_postsNothing", async () => {
+    it("announceCastChange_releasedThenClaimedBurst_postsReleaseThenClaim", async () => {
       mockMatch(matchRow());
       announceCastChange(released);
       announceCastChange(claimed);
       jest.advanceTimersByTime(CAST_TOGGLE_WINDOW_MS);
       jest.useRealTimers();
       await settle();
-      expect(sendBotLog).not.toHaveBeenCalled();
+      await settle();
+      expect(sendBotLog).toHaveBeenCalledTimes(2);
+      expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("Cast libéré");
+      expect(jest.mocked(sendBotLog).mock.calls[1][0]).toContain("Cast réservé");
+    });
+
+    it("announceCastChange_matchGoneBeforeWindowEnds_claimStillLogged", async () => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[matchRow()], []])
+        .mockResolvedValue([[], []]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+      announceCastChange(claimed);
+      jest.useRealTimers();
+      await settle();
+      announceCastChange(released);
+      await flushCastToggles();
+      await settle();
+      expect(loggedLine()).toContain("Cast réservé");
+    });
+
+    it("announceCastChange_newBurstWhileClosingInFlight_leadingAfterClosing", async () => {
+      mockMatch(matchRow());
+      let finishClosing: () => void = () => undefined;
+      jest
+        .mocked(sendBotLog)
+        .mockResolvedValueOnce()
+        .mockImplementationOnce(() => new Promise<void>((resolve) => (finishClosing = resolve)));
+      announceCastChange(claimed);
+      announceCastChange(released);
+      jest.useRealTimers();
+      await settle();
+      const closing = flushCastToggles();
+      await settle();
+      announceCastChange(claimed);
+      await settle();
+      expect(lines()).toHaveLength(2);
+      finishClosing();
+      await closing;
+      await settle();
+      await settle();
+      expect(lines()).toHaveLength(3);
+      expect(lines()[1]).toContain("Cast libéré");
+      expect(lines()[2]).toContain("Cast réservé");
     });
 
     it("une rafale qui finit inscrite ne fait qu'une ligne", async () => {
@@ -366,13 +407,13 @@ describe("announceCastChange", () => {
       expect(lines()[1]).toContain("repris");
     });
 
-    it("announceCastChange_staffReleaseOtherCaster_leavesOtherBurstPending", async () => {
+    it("announceCastChange_staffReleaseOtherCaster_otherClaimPostedAtOnce", async () => {
       mockMatch(matchRow());
       announceCastChange({ ...claimed, casterId: 10 });
       announceCastChange({ ...released, byStaff: true });
       await settleChain();
-      expect(lines()).toHaveLength(1);
-      expect(lines()[0]).toContain("par le staff");
+      expect(lines()).toHaveLength(2);
+      expect(lines().some((line) => line.includes("par le staff"))).toBe(true);
       await flushCastToggles();
       await settle();
       expect(lines()).toHaveLength(2);
