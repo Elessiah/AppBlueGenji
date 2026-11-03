@@ -92,7 +92,7 @@ describe("page tournois — barre de recherche et filtres", () => {
     expect(page).not.toContain('fetch("/api/auth/me"');
     expect(page).not.toContain("setIsAdmin");
     // La première lecture des invisibles fait partie de la porte, échec compris.
-    expect(page).toContain("const [hiddenSettled, setHiddenSettled] = useState(!isAdmin);");
+    expect(page).toContain("const [hiddenRead, setHiddenSettled] = useState(false);");
     expect(page).toMatch(/\} finally \{[\s\S]*?if \(!signal\?\.aborted\) setHiddenSettled\(true\);/);
   });
 
@@ -186,5 +186,16 @@ describe("page tournois — annonce des résultats", () => {
   it("a le message en français et en anglais", () => {
     expect(frTournaments.list.resultsCount).toContain("{count}");
     expect(enTournaments.list.resultsCount).toContain("{count}");
+  });
+});
+
+describe("page tournois — porte des invisibles et annonce des gestes", () => {
+  it("dérive la porte des invisibles du droit staff, au lieu de l'initialiser une fois", () => {
+    expect(page).toContain("const hiddenSettled = !isAdmin || hiddenRead;");
+    expect(page).toContain("useState(false);\n  const hiddenSettled".replace(/\n/g, page.includes("\r\n") ? "\r\n" : "\n"));
+  });
+
+  it("annonce le nombre de résultats aussi pour un filtre de jeu ou l'archive dépliée", () => {
+    expect(page).toContain('if (!deferredQuery.trim() && gameFilter === "all" && !finishedExpanded) return "";');
   });
 });
