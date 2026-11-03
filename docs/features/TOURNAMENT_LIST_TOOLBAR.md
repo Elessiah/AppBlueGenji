@@ -169,8 +169,8 @@ déjà la même apparence.
   `Cache-Control: private, no-cache` et **304** à `If-None-Match` (le client lit
   en `cache: "no-cache"`) — le contrôle d'accès passe avant ; le paramètre
   `?search=` est retiré (inutilisé, il contournait le cache partagé). La requête
-  de liste compte les inscriptions dans une table dérivée (plus de `GROUP BY` sur
-  36 colonnes), lit avec elle les colonnes d'avancement (plus de relecture de
+  de liste compte les inscriptions par sous-requête corrélée (plus de `GROUP BY`
+  sur 36 colonnes, ni table dérivée regroupant toute la table), lit avec elle les colonnes d'avancement (plus de relecture de
   `bg_tournaments`) et lance le décompte des terminés en parallèle ;
   `idx_bg_tournaments_start_visibility (start_visibility_at)` (CREATE TABLE et
   `RECENT_SCHEMA_CHANGES`).
