@@ -62,7 +62,10 @@ export function createCoalescer<T>(options: {
     if (!burst) return;
     clearTimeout(burst.timer);
     bursts.delete(key);
+    // Une annonce encore en cours pour cette clé passe avant : jamais deux en parallèle.
+    const previous = inFlight.get(key);
     const run = (async () => {
+      if (previous) await previous;
       try {
         await options.deliver(burst.first, burst.last);
       } catch (error) {

@@ -94,7 +94,15 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
   // Comme tout message de match, seul un tag Discord certifié le reçoit.
   const [row, recipients] = await Promise.all([
     loadMatchLogRow(change.matchId),
-    notice ? loadNotificationRecipients([notice.casterId], "certified", { matchDm: true }) : null,
+    // Une lecture qui échoue ne coûte que l'avis au caster : la ligne du journal part quand même.
+    notice
+      ? loadNotificationRecipients([notice.casterId], "certified", { matchDm: true }).catch((error) => {
+          console.error(
+            `[cast] destinataire de l'avis non lu : ${error instanceof Error ? error.message : "erreur inconnue"}`,
+          );
+          return null;
+        })
+      : null,
   ]);
   if (!row) return;
   const match = matchLogSubject(row);
