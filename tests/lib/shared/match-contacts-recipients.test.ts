@@ -78,7 +78,7 @@ describe("BattleTag masqué — lecteurs d'un même match", () => {
 
 describe("modale « Contacts » — fermée quand l'action disparaît", () => {
   const source = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
-  const reset = 'if (contactsOpen && !actions.some((a) => a.id === "contacts")) setContactsOpen(false);';
+  const reset = 'const [contactsOpen, setContactsOpen] = useConfirmWhile(actions.some((a) => a.id === "contacts"));';
 
   it("un instantané qui retire l'action (match terminé) ferme la modale avant son rendu", () => {
     expect(source).toContain(reset);

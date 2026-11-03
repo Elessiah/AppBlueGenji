@@ -16,8 +16,9 @@ const read = (file: string) =>
 const CASES = [
   {
     file: "MatchCardActions.tsx",
-    reset: "if (confirmForce && !hasForce) setConfirmForce(false);",
-    guard: "{confirmForce && hasForce && (",
+    // `useConfirmWhile` porte la remise à zéro (voir plus bas).
+    reset: "const [confirmForce, setConfirmForce] = useConfirmWhile(hasForce);",
+    guard: "{confirmForce && (",
     opener: "force: () => setConfirmForce(true),",
     openers: /setConfirmForce\(true\)/g,
     close: "onClose={() => setConfirmForce(false)}",
@@ -61,5 +62,27 @@ describe.each(CASES)("confirmation en attente — $file", ({ file, reset, guard,
 
   it("annuler ou confirmer referme toujours la modale", () => {
     expect(source).toContain(close);
+  });
+});
+
+describe("useConfirmWhile — la règle commune de MatchCardActions.tsx", () => {
+  const source = read("MatchCardActions.tsx");
+
+  it("useConfirmWhile_actionGone_forgetsAndHidesTheConfirmation", () => {
+    expect(source).toContain("if (open && !present) setOpen(false);");
+    expect(source).toContain("return [open && present, setOpen] as const;");
+  });
+
+  it("useConfirmWhile_everyPendingModal_goesThroughTheHook", () => {
+    // Plus aucune copie à la main de la règle : chaque modale passe par le hook.
+    expect(source).not.toContain("if (confirmForce && !hasForce)");
+    expect(source).not.toContain("if (contactsOpen && !actions.some");
+    expect(source).toContain('const [contactsOpen, setContactsOpen] = useConfirmWhile(actions.some((a) => a.id === "contacts"));');
+  });
+
+  it("useConfirmWhile_contactsModal_singleOpener", () => {
+    expect(source).toContain("contacts: () => setContactsOpen(true),");
+    expect(source.match(/setContactsOpen\(true\)/g)).toHaveLength(1);
+    expect(source).toContain("onClose={() => setContactsOpen(false)}");
   });
 });
