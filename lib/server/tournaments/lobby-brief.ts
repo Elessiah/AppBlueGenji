@@ -450,8 +450,14 @@ type SweepContext = {
   briefSides: (row: LobbyBriefRow) => Promise<{ teamId: number; side: LobbyBriefSide }[]>;
 };
 
-/** Réservations à rendre en fin de balayage (voir {@link briefMatch}). */
-type Releases = { retry: number[]; closed: number[]; lost: string[] };
+/**
+ * Bilan d'un match (voir {@link briefMatch}) : côtés briefés, réservations à
+ * rendre — `retry` quand rien n'est parti (le balayage suivant les reprend),
+ * `closed` quand le salon s'est refermé (rien à reprendre, aucune relance) —,
+ * `lost` quand une réservation a disparu salon ouvert (relance, rien à
+ * rendre), `error` quand le match s'est interrompu (relance).
+ */
+type MatchBrief = { sent: number; retry: number[]; closed: number[]; lost: boolean; error?: unknown };
 
 /**
  * Gestionnaires d'un côté : `null` pour une vraie équipe sans gestionnaire —
@@ -509,61 +515,71 @@ async function briefClaimedSide(
   );
 }
 
+/** Issue d'un côté au balayage : réservation posée (ou non) et ce qu'il en est advenu. */
+type SlotResult = {
+  claimId: number | null;
+  outcome: SideOutcome | "lost" | "closed" | "ghost" | "taken" | "error";
+  error?: unknown;
+};
+
 /**
- * Brief des deux côtés d'un match, **côté par côté** : réservation, relecture
- * des réglages, envoi. Rend le nombre de côtés briefés ; les réservations à
- * rendre vont au fil de l'eau, pour être rendues même si un côté suivant
- * lève : dans `releases.retry` quand rien n'est parti (le balayage suivant les
- * reprend), dans `releases.closed` quand le salon s'est refermé (rien à
- * reprendre, aucune relance) ; un côté dont la réservation a disparu met le
- * match dans `releases.lost` (relance, rien à rendre).
+ * Un côté : réservation, puis relecture et envoi. Jamais d'exception : une
+ * réservation interrompue (rendue par sa clé), une relecture en panne ou des
+ * réglages illisibles rendent `"error"`, rien n'étant parti de ce côté.
  */
-async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext, releases: Releases): Promise<number> {
-  // Réservations de ce match dont rien n'est parti (fantôme, brief non
-  // rédigé) : seules rendues si le salon se referme — un côté déjà briefé
-  // garde la sienne, sinon il le serait deux fois au retour de l'appariement.
-  const unsent: number[] = [];
-  const retried: number[] = [];
-  let sent = 0;
+async function briefSlot(
+  db: Db,
+  row: LobbyBriefRow,
+  slot: LobbyBriefSlot,
+  managers: { ghost: boolean; userIds: number[] },
+  context: SweepContext,
+): Promise<SlotResult> {
+  let claimId: number | null = null;
+  try {
+    claimId = await claimLobbyBrief(db, row, slot);
+    if (claimId === null) return { claimId, outcome: "taken" };
+    // Fantôme : personne à briefer, la réservation reste.
+    if (managers.ghost) return { claimId, outcome: "ghost" };
+    return { claimId, outcome: await briefClaimedSide(db, row, slot, claimId, managers.userIds, context) };
+  } catch (error) {
+    return { claimId, outcome: "error", error };
+  }
+}
+
+/**
+ * Brief des deux côtés d'un match, **côté par côté**. Jamais d'exception :
+ * une panne interrompt le match et figure au bilan, avec la réservation du
+ * côté en cours à rendre.
+ */
+async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext): Promise<MatchBrief> {
+  const brief: MatchBrief = { sent: 0, retry: [], closed: [], lost: false };
+  // Fantômes réservées : rendues seulement si le salon se referme — un côté
+  // déjà briefé garde la sienne, sinon il le serait deux fois au retour de
+  // l'appariement.
+  const ghosts: number[] = [];
   for (const slot of [1, 2] as const) {
     const managers = sideManagers(row, slot, context);
     if (managers === null) continue;
-    const claimId = await claimLobbyBrief(db, row, slot);
-    if (claimId === null) continue;
-    // Fantôme : personne à briefer, la réservation reste.
-    if (managers.ghost) {
-      unsent.push(claimId);
+    const { claimId, outcome, error } = await briefSlot(db, row, slot, managers, context);
+    if (claimId === null) {
+      if (outcome === "error") return { ...brief, error };
       continue;
     }
-    let outcome: SideOutcome | "lost" | "closed";
-    try {
-      outcome = await briefClaimedSide(db, row, slot, claimId, managers.userIds, context);
-    } catch (error) {
-      // Relecture en panne ou réglages illisibles après la réservation : rien
-      // n'est parti, la réservation est rendue avec les autres.
-      releases.retry.push(claimId);
-      throw error;
-    }
+    if (outcome === "ghost") ghosts.push(claimId);
+    else if (outcome === "error") return { ...brief, retry: [...brief.retry, claimId], error };
     // Salon refermé depuis la réservation : rien de plus ne part de ce match,
     // ses réservations sans envoi sont rendues, sans relance.
-    if (outcome === "closed") {
-      releases.retry.splice(releases.retry.length - retried.length, retried.length);
-      releases.closed.push(...unsent, ...retried, claimId);
-      return sent;
-    }
-    if (outcome === "sent") sent += 1;
-    else if (outcome === "retry") {
-      releases.retry.push(claimId);
-      retried.push(claimId);
-    }
+    else if (outcome === "closed") return { sent: brief.sent, retry: [], closed: [...ghosts, ...brief.retry, claimId], lost: false };
+    else if (outcome === "sent") brief.sent += 1;
+    else if (outcome === "retry") brief.retry.push(claimId);
     else if (outcome === "lost") {
       console.error(
         `[lobby-brief] match ${Number(row.id)} : réservation effacée avant l'envoi, salon toujours ouvert, reprise au balayage suivant`,
       );
-      releases.lost.push(matchRetryKey(row));
+      brief.lost = true;
     }
   }
-  return sent;
+  return brief;
 }
 
 async function runLobbyBriefSweep(): Promise<number> {
@@ -626,33 +642,30 @@ async function runLobbyBriefSweep(): Promise<number> {
   };
 
   let sent = 0;
-  const releases: Releases = { retry: [], closed: [], lost: [] };
-  const toRelease = releases.retry;
+  const toRelease: number[] = [];
+  const closed: number[] = [];
   const toRetry: string[] = [];
   for (const row of rows) {
-    const released = toRelease.length;
-    const lost = releases.lost.length;
-    try {
-      sent += await briefMatch(db, row, { managers, recipients, briefSides }, releases);
-    } catch (error) {
-      // Un match en échec (réservation interrompue, réglages illisibles)
-      // n'empêche pas les suivants ; il est rejoué au balayage suivant.
-      console.error(`[lobby-brief] brief du match ${Number(row.id)} interrompu, repris au balayage suivant`, error);
-      toRetry.push(matchRetryKey(row));
-      continue;
+    const brief = await briefMatch(db, row, { managers, recipients, briefSides });
+    sent += brief.sent;
+    toRelease.push(...brief.retry);
+    closed.push(...brief.closed);
+    if (brief.error !== undefined) {
+      // Un match en échec n'empêche pas les suivants ; il est rejoué au balayage suivant.
+      console.error(`[lobby-brief] brief du match ${Number(row.id)} interrompu, repris au balayage suivant`, brief.error);
     }
-    if (toRelease.length > released) toRetry.push(matchRetryKey(row));
-    else if (releases.lost.length === lost) retries.delete(matchRetryKey(row));
+    if (brief.error !== undefined || brief.retry.length > 0 || brief.lost) toRetry.push(matchRetryKey(row));
+    else retries.delete(matchRetryKey(row));
   }
-  // Rien n'est parti pour ces côtés : leurs réservations sont rendues en un
-  // lot ; pm2 ne dit « remis » qu'une fois le rendu fait.
-  if (toRelease.length + releases.closed.length > 0 && (await releaseQuietly(db, [...toRelease, ...releases.closed]))) {
+  // Leurs réservations sont rendues en un lot ; pm2 ne dit « remis » qu'une
+  // fois le rendu fait.
+  if (toRelease.length + closed.length > 0 && (await releaseQuietly(db, [...toRelease, ...closed]))) {
     if (toRelease.length > 0) console.error(`[lobby-brief] ${toRelease.length} brief(s) remis au balayage suivant`);
-    if (releases.closed.length > 0) {
-      console.error(`[lobby-brief] ${releases.closed.length} réservation(s) rendue(s) : salon refermé avant l'envoi`);
+    if (closed.length > 0) {
+      console.error(`[lobby-brief] ${closed.length} réservation(s) rendue(s) : salon refermé avant l'envoi`);
     }
   }
-  scheduleRetrySweep([...new Set([...toRetry, ...releases.lost])]);
+  scheduleRetrySweep(toRetry);
   return sent;
 }
 

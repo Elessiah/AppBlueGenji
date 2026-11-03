@@ -86,6 +86,13 @@ const LAUNCH_NOTICE_WINDOW_MINUTES = 10;
 export type MatchStartPhase = "LOBBY" | "LAUNCHED";
 
 /**
+ * Un match qui porte déjà un score est joué : le staff qui le replanifie ou
+ * allume l'arbitrage planifié le tient pour lancé (`launched_at` posé) sans
+ * qu'il reparte — ni appel aux « Prêt » ni « match lancé », comme le brief.
+ */
+const NO_SCORE_SQL = "m.team1_score IS NULL AND m.team2_score IS NULL";
+
+/**
  * Réserve l'annonce **si le match est toujours dans l'état annoncé pour cet
  * appariement** : la condition relit le match dans l'instruction même, comme
  * le brief du salon (`./lobby-brief`). Entre la lecture des candidats et la
@@ -102,7 +109,7 @@ async function claimStartNotice(matchId: number, pairing: string, phase: MatchSt
      SELECT m.id, m.launch_pairing, ? FROM bg_matches m
       WHERE m.id = ? AND m.launch_pairing = ? AND m.status = 'READY' AND m.is_bye = 0
         AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
-        AND ${stateSql}`,
+        AND ${NO_SCORE_SQL} AND ${stateSql}`,
     [phase, matchId, pairing],
   );
   return (result as { affectedRows?: number }).affectedRows === 1;
@@ -176,7 +183,7 @@ async function runMatchStartSweep(): Promise<number> {
        JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
-      WHERE m.status = 'READY' AND m.is_bye = 0
+      WHERE m.status = 'READY' AND m.is_bye = 0 AND ${NO_SCORE_SQL}
         AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
         AND ((m.launched_at IS NULL AND m.lobby_opened_at > NOW() - INTERVAL ? MINUTE)
              OR m.launched_at > NOW() - INTERVAL ? MINUTE)
