@@ -212,9 +212,11 @@ export function createKeyedChain<K>(): {
 
 /** Lance `run` dans ce tour ; une levée synchrone devient un rejet. */
 function startNow(run: () => Promise<void>): Promise<void> {
+  let started: Promise<void>;
   try {
-    return run();
+    started = run();
   } catch (error) {
-    return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+    started = Promise.reject(error instanceof Error ? error : new Error(String(error)));
   }
+  return started;
 }

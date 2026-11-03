@@ -231,13 +231,13 @@ export function announceCastChange(change: CastChange): void {
   // Rien en attente (le cas courant) : l'annonce part sur-le-champ, sans détour
   // par la file des microtâches — un arrêt du serveur juste après ne la rate pas.
   if (!keys.some((pendingKey) => voluntaryToggles.busy(pendingKey))) {
-    chainAfter(keys, () => deliverInBackground(change));
+    void chainAfter(keys, () => deliverInBackground(change));
     return;
   }
   // Les rafales sont détachées dès maintenant : un geste du caster noté ensuite
   // ouvre une nouvelle rafale, dont la ligne part après celle-ci.
   const flushed = Promise.all(keys.map((pendingKey) => voluntaryToggles.flush(pendingKey)));
-  chainAfter(keys, () => flushed.then(() => deliverInBackground(change)));
+  void chainAfter(keys, () => flushed.then(() => deliverInBackground(change)));
 }
 
 /** Dernière annonce partie hors clôture de rafale, par (match, caster) : la suivante l'attend. */
