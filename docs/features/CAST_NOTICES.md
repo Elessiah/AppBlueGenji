@@ -33,7 +33,10 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
   (`INELIGIBLE_PERMISSION`) ou identité de caster manquante (`INELIGIBLE_IDENTITY`).
 - Inscriptions et retraits du caster lui-même, en rafale sur un même match,
   sont regroupés (`lib/server/coalescer.ts`, 60 s sans geste, 5 min au plus) :
-  une seule ligne, l'état final, et aucune si le caster revient à l'état de départ.
+  une seule ligne, l'état final ; aucune si un retrait suivi d'une réinscription
+  ramène le caster à l'état de départ ; mais une inscription suivie d'un retrait
+  garde ses deux lignes (« Cast réservé » puis « Cast libéré ») : s'inscrire ouvre
+  les contacts du match, le journal garde trace de qui a tenu la place.
   Un retrait par le staff, d'office, ou une reprise de place sur ce caster fait
   d'abord partir sa rafale : le journal garde l'ordre et finit sur l'état réel.
 - Les **joueurs du match ne sont pas prévenus** (décision 3).
