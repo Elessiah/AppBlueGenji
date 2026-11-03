@@ -589,7 +589,7 @@ describe("setMatchOnAir", () => {
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
-    await expect(setMatchOnAir(42, false)).resolves.toBeUndefined();
+    await expect(setMatchOnAir(42, false)).resolves.toBe(true);
   });
 
   it("refuse d'ouvrir l'antenne sur un match en AUTO", async () => {
@@ -765,5 +765,34 @@ describe("findBroadcastingTournament", () => {
     await mockDb(execute);
 
     expect(await findBroadcastingTournament()).toBeNull();
+  });
+});
+
+describe("setMatchOnAir — changement d'état", () => {
+  it("setMatchOnAir_alreadyOnAir_returnsFalse", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: new Date() })]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+    await mockDb(execute);
+    await expect(setMatchOnAir(42, true)).resolves.toBe(false);
+  });
+
+  it("setMatchOnAir_offAir_switchOn_returnsTrue", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: null })]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+    await mockDb(execute);
+    await expect(setMatchOnAir(42, true)).resolves.toBe(true);
+  });
+
+  it("setMatchOnAir_alreadyOffAir_returnsFalse", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: null })]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+    await mockDb(execute);
+    await expect(setMatchOnAir(42, false)).resolves.toBe(false);
   });
 });

@@ -25,6 +25,7 @@ const TOURNAMENT_ACTIONS: StaffTournamentAction[] = [
   "ADVANCED",
   "GHOST_TEAMS_REGISTERED",
   "IMAGE_SET",
+  "IMAGE_REPLACED",
   "IMAGE_UPDATED",
   "IMAGE_REMOVED",
   "LIVE_URL_SET",
@@ -123,5 +124,41 @@ describe("formatStaffTournamentActionLog", () => {
     const lines = TOURNAMENT_ACTIONS.map((action) => formatStaffTournamentActionLog({ tournament, action }));
     expect(new Set(lines).size).toBe(TOURNAMENT_ACTIONS.length);
     for (const line of lines) expect(line.endsWith(", par le staff.")).toBe(true);
+  });
+});
+
+describe("formatStaffTournamentActionLog — précisions", () => {
+  it.each<["REGISTRATION" | "LOCKED" | "RUNNING", string]>([
+    ["REGISTRATION", "ouverture des inscriptions"],
+    ["LOCKED", "clôture des inscriptions"],
+    ["RUNNING", "coup d'envoi"],
+  ])("format_advancedWithTarget_namesStep (%s)", (target, wording) => {
+    expect(formatStaffTournamentActionLog({ tournament, action: "ADVANCED", target })).toBe(
+      `🛠️ Étape suivante avancée — « Coupe d'hiver » (#7) (${wording}), par le staff.`,
+    );
+  });
+
+  it("format_editedWithPreviousName_citesOldName", () => {
+    expect(formatStaffTournamentActionLog({ tournament, action: "EDITED", previousName: "Coupe *d'automne*" })).toBe(
+      "🛠️ Tournoi modifié — « Coupe d'hiver » (#7) (ancien nom : « Coupe \\*d'automne\\* »), par le staff.",
+    );
+  });
+
+  it("format_editedSameName_noDetail", () => {
+    expect(formatStaffTournamentActionLog({ tournament, action: "EDITED", previousName: "Coupe d'hiver" })).toBe(
+      "🛠️ Tournoi modifié — « Coupe d'hiver » (#7), par le staff.",
+    );
+  });
+
+  it("format_targetOnOtherAction_ignored", () => {
+    expect(formatStaffTournamentActionLog({ tournament, action: "EDITED", target: "RUNNING" })).toBe(
+      "🛠️ Tournoi modifié — « Coupe d'hiver » (#7), par le staff.",
+    );
+  });
+
+  it("format_imageReplaced_saysReplaced", () => {
+    expect(formatStaffTournamentActionLog({ tournament, action: "IMAGE_REPLACED" })).toBe(
+      "🛠️ Image du tournoi remplacée — « Coupe d'hiver » (#7), par le staff.",
+    );
   });
 });

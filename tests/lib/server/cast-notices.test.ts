@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
@@ -16,7 +16,10 @@ import {
   deliverCastChange,
   discardCastChanges,
   flushCastChanges,
+  flushCastToggles,
   queueCastChange,
+  resetCastToggles,
+  CAST_TOGGLE_WINDOW_MS,
   type CastChange,
 } from "@/lib/server/tournaments/cast-notices";
 import type { CastLogChange } from "@/lib/shared/bot-logs";
@@ -72,8 +75,8 @@ function notification() {
 
 describe("castLogChange / castReleaseNotice", () => {
   it.each<[CastChange, CastLogChange, { casterId: number; reason: CastReleaseReason } | null]>([
-    [{ kind: "CLAIMED", matchId: 1, replacedCasterId: null }, "CLAIMED", null],
-    [{ kind: "CLAIMED", matchId: 1, replacedCasterId: 5 }, "REPLACED", { casterId: 5, reason: "REPLACED" }],
+    [{ kind: "CLAIMED", matchId: 1, casterId: 9, replacedCasterId: null }, "CLAIMED", null],
+    [{ kind: "CLAIMED", matchId: 1, casterId: 9, replacedCasterId: 5 }, "REPLACED", { casterId: 5, reason: "REPLACED" }],
     [{ kind: "RELEASED", matchId: 1, casterId: 5, byStaff: false }, "RELEASED", null],
     [{ kind: "RELEASED", matchId: 1, casterId: 5, byStaff: true }, "RELEASED_BY_STAFF", { casterId: 5, reason: "STAFF" }],
     [{ kind: "AUTO_RELEASED", matchId: 1, casterId: 5, reason: "INELIGIBLE" }, "INELIGIBLE", { casterId: 5, reason: "INELIGIBLE" }],
@@ -86,8 +89,8 @@ describe("castLogChange / castReleaseNotice", () => {
 
 describe("castLogCategory — un retrait alerte, une inscription reste une trace", () => {
   it.each<[CastChange, string]>([
-    [{ kind: "CLAIMED", matchId: 1, replacedCasterId: null }, "casts"],
-    [{ kind: "CLAIMED", matchId: 1, replacedCasterId: 5 }, "staff-removal"],
+    [{ kind: "CLAIMED", matchId: 1, casterId: 9, replacedCasterId: null }, "casts"],
+    [{ kind: "CLAIMED", matchId: 1, casterId: 9, replacedCasterId: 5 }, "staff-removal"],
     [{ kind: "RELEASED", matchId: 1, casterId: 5, byStaff: false }, "staff-removal"],
     [{ kind: "RELEASED", matchId: 1, casterId: 5, byStaff: true }, "staff-removal"],
     [{ kind: "AUTO_RELEASED", matchId: 1, casterId: 5, reason: "INELIGIBLE" }, "staff-removal"],
@@ -100,7 +103,7 @@ describe("castLogCategory — un retrait alerte, une inscription reste une trace
     [{ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: false }],
     [{ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true }],
     [{ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "JOINED_TEAM" }],
-    [{ kind: "CLAIMED", matchId: 42, replacedCasterId: CASTER }],
+    [{ kind: "CLAIMED", matchId: 42, casterId: 9, replacedCasterId: CASTER }],
   ])("deliverCastChange %j envoie la ligne dans staff-removal, sans nom", async (change) => {
     mockMatch(matchRow());
     await deliverCastChange(change);
@@ -112,7 +115,7 @@ describe("castLogCategory — un retrait alerte, une inscription reste une trace
 describe("deliverCastChange", () => {
   it("journalise une inscription sans prévenir personne, sans nommer le caster", async () => {
     mockMatch(matchRow());
-    await deliverCastChange({ kind: "CLAIMED", matchId: 42, replacedCasterId: null });
+    await deliverCastChange({ kind: "CLAIMED", matchId: 42, casterId: 9, replacedCasterId: null });
     const line = loggedLine();
     expect(line).toContain("Cast réservé");
     expect(line).toContain("« Coupe d'hiver » (#7)");
@@ -160,7 +163,7 @@ describe("deliverCastChange", () => {
 
   it("prévient le titulaire évincé par un autre caster", async () => {
     mockMatch(matchRow());
-    await deliverCastChange({ kind: "CLAIMED", matchId: 42, replacedCasterId: 901 });
+    await deliverCastChange({ kind: "CLAIMED", matchId: 42, casterId: 9, replacedCasterId: 901 });
     expect(loggedLine("staff-removal")).toContain("Cast repris");
     expect(loadNotificationRecipients).toHaveBeenCalledWith([901], "certified", { matchDm: true });
     expect(notification().discord?.message("fr")).toContain("un autre caster a pris le match");
@@ -204,13 +207,70 @@ describe("deliverCastChange", () => {
 });
 
 describe("announceCastChange", () => {
-  it("ne lève jamais, même base indisponible", async () => {
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
+  const claimed: CastChange = { kind: "CLAIMED", matchId: 42, casterId: 9, replacedCasterId: null };
+  const released: CastChange = { kind: "RELEASED", matchId: 42, casterId: 9, byStaff: false };
+
+  beforeEach(() => resetCastToggles());
+
+  it("ne lève jamais, même base indisponible, et ne vide que le message d'erreur", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(getDatabase).mockRejectedValue(new Error("DB_DOWN"));
-    expect(() => announceCastChange({ kind: "CLAIMED", matchId: 42, replacedCasterId: null })).not.toThrow();
-    await new Promise((resolve) => setImmediate(resolve));
-    expect(error).toHaveBeenCalledWith("[cast] changement d'inscription non annoncé", expect.any(Error));
+    expect(() => announceCastChange({ kind: "RELEASED", matchId: 42, casterId: 9, byStaff: true })).not.toThrow();
+    await settle();
+    expect(error).toHaveBeenCalledWith("[cast] changement d'inscription non annoncé : DB_DOWN");
     error.mockRestore();
+  });
+
+  it("un geste du staff part aussitôt, sans attendre de rafale", async () => {
+    mockMatch(matchRow());
+    announceCastChange({ kind: "RELEASED", matchId: 42, casterId: 9, byStaff: true });
+    await settle();
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+  });
+
+  describe("gestes volontaires du caster", () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    it("une inscription seule part après le silence de la rafale", async () => {
+      mockMatch(matchRow());
+      announceCastChange(claimed);
+      expect(sendBotLog).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(CAST_TOGGLE_WINDOW_MS);
+      jest.useRealTimers();
+      await settle();
+      expect(loggedLine()).toContain("inscrit");
+    });
+
+    it("inscrit puis retiré dans la rafale : effet nul, aucune ligne", async () => {
+      mockMatch(matchRow());
+      for (let i = 0; i < 10; i++) announceCastChange(i % 2 === 0 ? claimed : released);
+      jest.advanceTimersByTime(CAST_TOGGLE_WINDOW_MS);
+      jest.useRealTimers();
+      await settle();
+      expect(sendBotLog).not.toHaveBeenCalled();
+    });
+
+    it("une rafale qui finit inscrite ne fait qu'une ligne", async () => {
+      mockMatch(matchRow());
+      for (let i = 0; i < 9; i++) announceCastChange(i % 2 === 0 ? claimed : released);
+      flushCastToggles();
+      jest.useRealTimers();
+      await settle();
+      expect(sendBotLog).toHaveBeenCalledTimes(1);
+    });
+
+    it("deux casters, ou deux matchs, sont deux rafales", async () => {
+      mockMatch(matchRow());
+      announceCastChange(claimed);
+      announceCastChange({ ...claimed, casterId: 10 });
+      announceCastChange({ ...claimed, matchId: 43 });
+      flushCastToggles();
+      jest.useRealTimers();
+      await settle();
+      expect(sendBotLog).toHaveBeenCalledTimes(3);
+    });
   });
 });
 

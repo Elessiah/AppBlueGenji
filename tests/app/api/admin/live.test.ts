@@ -347,7 +347,7 @@ describe("POST /api/admin/matches/[matchId]/live", () => {
 
   it("ouvre l'antenne pour un CASTER", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
-    jest.mocked(setMatchOnAir).mockResolvedValue(undefined);
+    jest.mocked(setMatchOnAir).mockResolvedValue(true);
 
     const res = await postMatchOnAir(matchReq("POST", { onAir: true }), matchParams("42"));
 
@@ -358,7 +358,7 @@ describe("POST /api/admin/matches/[matchId]/live", () => {
 
   it("referme l'antenne", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
-    jest.mocked(setMatchOnAir).mockResolvedValue(undefined);
+    jest.mocked(setMatchOnAir).mockResolvedValue(true);
 
     await postMatchOnAir(matchReq("POST", { onAir: false }), matchParams("42"));
     expect(setMatchOnAir).toHaveBeenCalledWith(42, false);

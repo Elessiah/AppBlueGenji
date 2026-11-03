@@ -726,7 +726,7 @@ describe("claimMatchCast", () => {
     expect(state.match?.casters).toEqual([{ user_id: CASTER, stream_id: 1, ready_at: null }]);
     // Une inscription neuve : l'accueil relit (un co-caster éligible peut rendre un stream visible).
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, replacedCasterId: null });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, casterId: CASTER, replacedCasterId: null });
   });
 
   it("claimMatchCast_anyClaim_locksTheAccountRowFirst", async () => {
@@ -860,7 +860,7 @@ describe("claimMatchCast", () => {
       { user_id: 901, stream_id: 1, ready_at: STAMP },
       { user_id: CASTER, stream_id: 2, ready_at: null },
     ]);
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, replacedCasterId: null });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, casterId: CASTER, replacedCasterId: null });
   });
 
   it("un match lancé accueille un co-caster sans toucher au caster en place", async () => {
@@ -967,6 +967,13 @@ describe("setMatchHost", () => {
     expect(state.match?.host_team_id).toBe(TEAM2);
     await setMatchHost(42, null);
     expect(state.match?.host_team_id).toBeNull();
+  });
+
+  it("setMatchHost_sameHost_returnsFalse_otherHost_returnsTrue", async () => {
+    await expect(setMatchHost(42, TEAM2)).resolves.toBe(true);
+    await expect(setMatchHost(42, TEAM2)).resolves.toBe(false);
+    await expect(setMatchHost(42, null)).resolves.toBe(true);
+    await expect(setMatchHost(42, null)).resolves.toBe(false);
   });
 
   it("refuse une équipe étrangère au match", async () => {
@@ -1119,7 +1126,7 @@ describe("releaseIneligibleCast", () => {
     expect(casterOf(state)).toBeNull();
     expect(state.match?.launched_at).toBe(STAMP);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "INELIGIBLE" });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "INELIGIBLE", block: "NOT_CASTER" });
   });
 
   it.each<[string, MatchOverrides]>([
@@ -1152,7 +1159,7 @@ describe("releaseIneligibleCast", () => {
     await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
     expect(casterOf(state)).toBeNull();
     expect(state.match?.launched_at).toBe(STAMP);
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "JOINED_TEAM" });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "JOINED_TEAM", block: null });
   });
 
   it("dit d'abord les conditions du cast quand le caster, inéligible, a aussi rejoint une équipe du match", async () => {
@@ -1160,7 +1167,7 @@ describe("releaseIneligibleCast", () => {
     state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
     state.match = matchState({ caster_user_id: CASTER });
     await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "INELIGIBLE" });
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "INELIGIBLE", block: "NOT_CASTER" });
   });
 });
 

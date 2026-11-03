@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 import { mapMatch } from "@/lib/server/tournaments/_internal";
 import {
   castEligibilityBlock,
+  loadCastBlocks,
   loadEligibleRefereeIds,
   loadRefereeEligibility,
   loadRefereeStanding,
@@ -368,5 +369,32 @@ describe("loadRefereeStanding (EF-31)", () => {
     const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("ER_LOCK_WAIT_TIMEOUT"));
 
     await expect(loadRefereeStanding(connectionWith(execute), 950)).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
+  });
+});
+
+describe("loadCastBlocks", () => {
+  it("loadCastBlocks_mixedAccounts_blockPerAccount_missingIsNotCaster", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([
+      [
+        { id: 1, ...ELIGIBLE },
+        { id: 2, ...ELIGIBLE, discord_verified_at: null },
+      ],
+      [],
+    ]);
+    const blocks = await loadCastBlocks(fakeConnection({ execute }), [1, 2, 3, 1]);
+    expect(blocks).toEqual(
+      new Map([
+        [1, null],
+        [2, "CASTER_IDENTITY_REQUIRED"],
+        [3, "NOT_CASTER"],
+      ]),
+    );
+    expect(execute.mock.calls[0][1]).toEqual([1, 2, 3]);
+  });
+
+  it("loadCastBlocks_emptyList_noQuery", async () => {
+    const execute = jest.fn<SqlQuery>();
+    await expect(loadCastBlocks(fakeConnection({ execute }), [])).resolves.toEqual(new Map());
+    expect(execute).not.toHaveBeenCalled();
   });
 });

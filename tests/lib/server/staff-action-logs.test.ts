@@ -1,16 +1,20 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 
 import { getDatabase } from "@/lib/server/database";
-import { sendBotLog } from "@/lib/server/bot-integration";
+import { isBotCircuitOpen, sendBotLog } from "@/lib/server/bot-integration";
 import {
   announceStaffMatchAction,
   announceStaffTournamentAction,
   deliverStaffMatchAction,
   deliverStaffTournamentAction,
+  failureReason,
+  flushStaffActionBursts,
+  resetStaffActionBursts,
   staffActionAuthor,
+  STAFF_LOG_BURST_WINDOW_MS,
 } from "@/lib/server/tournaments/staff-action-logs";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { authUser } from "../../helpers/auth-user";
@@ -89,7 +93,7 @@ describe("staffActionAuthor", () => {
 describe("deliverStaffTournamentAction", () => {
   it("envoie le geste et le compte", async () => {
     const execute = mockRows({ id: 7, name: "Coupe d'hiver" });
-    await deliverStaffTournamentAction(7, "GHOST_TEAMS_REGISTERED", 2);
+    await deliverStaffTournamentAction(7, "GHOST_TEAMS_REGISTERED", { count: 2 });
     expect(execute.mock.calls[0][1]).toEqual([7]);
     expect(sendBotLog).toHaveBeenCalledWith("🛠️ Équipes fantômes inscrites — « Coupe d'hiver » (#7) (2), par le staff.", { tournamentId: 7, category: "admin" });
   });
@@ -140,5 +144,111 @@ describe("announceStaffMatchAction / announceStaffTournamentAction", () => {
     expect(sendBotLog).toHaveBeenCalledTimes(1);
     expect(error).toHaveBeenCalledTimes(1);
     error.mockRestore();
+  });
+});
+
+describe("failureReason", () => {
+  it("failureReason_mysqlErrorWithCode_returnsCodeOnly", () => {
+    const error = Object.assign(new Error("Duplicate entry 'Renards' for key"), {
+      code: "ER_DUP_ENTRY",
+      sqlMessage: "Duplicate entry 'Renards' for key",
+    });
+    expect(failureReason(error)).toBe("ER_DUP_ENTRY");
+  });
+
+  it("failureReason_plainErrorMultiline_returnsFirstLine", () => {
+    expect(failureReason(new Error("BOT_DOWN
+    at stack"))).toBe("BOT_DOWN");
+  });
+
+  it("failureReason_nonError_returnsUnknown", () => {
+    expect(failureReason("boom")).toBe("erreur inconnue");
+  });
+
+  it("announceStaffMatchAction_deliveryFails_logsOneLineWithoutErrorObject", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(getDatabase).mockRejectedValue(Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }));
+    announceStaffMatchAction(42, "HOST_SET");
+    await settle();
+    expect(error).toHaveBeenCalledWith("[staff-log] geste HOST_SET sur le match #42 non journalisé : ECONNREFUSED");
+    error.mockRestore();
+  });
+});
+
+describe("coupe-circuit du bot ouvert", () => {
+  it("deliverStaffMatchAction_circuitOpen_readsNothing", async () => {
+    jest.mocked(isBotCircuitOpen).mockReturnValue(true);
+    const execute = mockRows(matchRow());
+    await deliverStaffMatchAction(42, "HOST_SET");
+    expect(execute).not.toHaveBeenCalled();
+    expect(sendBotLog).not.toHaveBeenCalled();
+    jest.mocked(isBotCircuitOpen).mockReturnValue(false);
+  });
+
+  it("deliverStaffTournamentAction_circuitOpen_readsNothing", async () => {
+    jest.mocked(isBotCircuitOpen).mockReturnValue(true);
+    const execute = mockRows({ id: 7, name: "Coupe d'hiver" });
+    await deliverStaffTournamentAction(7, "EDITED");
+    expect(execute).not.toHaveBeenCalled();
+    expect(sendBotLog).not.toHaveBeenCalled();
+    jest.mocked(isBotCircuitOpen).mockReturnValue(false);
+  });
+});
+
+describe("deliverStaffTournamentAction — précisions", () => {
+  it("deliverStaffTournamentAction_advancedWithTarget_namesStep", async () => {
+    mockRows({ id: 7, name: "Coupe d'hiver" });
+    await deliverStaffTournamentAction(7, "ADVANCED", { target: "REGISTRATION" });
+    expect(sendBotLog).toHaveBeenCalledWith(
+      "🛠️ Étape suivante avancée — « Coupe d'hiver » (#7) (ouverture des inscriptions), par le staff.",
+      { tournamentId: 7, category: "admin" },
+    );
+  });
+
+  it("deliverStaffTournamentAction_renamed_citesOldName", async () => {
+    mockRows({ id: 7, name: "Coupe d'hiver" });
+    await deliverStaffTournamentAction(7, "EDITED", { previousName: "Coupe d'automne" });
+    expect(sendBotLog).toHaveBeenCalledWith(
+      "🛠️ Tournoi modifié — « Coupe d'hiver » (#7) (ancien nom : « Coupe d'automne »), par le staff.",
+      { tournamentId: 7, category: "admin" },
+    );
+  });
+});
+
+describe("announceStaffTournamentAction — rafales", () => {
+  beforeEach(() => {
+    resetStaffActionBursts();
+    jest.useFakeTimers();
+  });
+  afterEach(() => jest.useRealTimers());
+
+  it("announceStaffTournamentAction_seedingBurst_onlyOneLine", async () => {
+    const execute = mockRows({ id: 7, name: "Coupe d'hiver" });
+    for (let i = 0; i < 15; i += 1) announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    expect(execute).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(STAFF_LOG_BURST_WINDOW_MS);
+    jest.useRealTimers();
+    await settle();
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("Têtes de série réordonnées");
+  });
+
+  it("announceStaffTournamentAction_twoTournaments_twoLines", async () => {
+    mockRows({ id: 7, name: "Coupe d'hiver" });
+    announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    announceStaffTournamentAction(8, "SEEDING_REORDERED");
+    flushStaffActionBursts();
+    jest.useRealTimers();
+    await settle();
+    expect(sendBotLog).toHaveBeenCalledTimes(2);
+  });
+
+  it("announceStaffTournamentAction_nonBurstAction_deliversImmediately", async () => {
+    const execute = mockRows({ id: 7, name: "Coupe d'hiver" });
+    announceStaffTournamentAction(7, "EDITED");
+    jest.useRealTimers();
+    await settle();
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
   });
 });

@@ -56,7 +56,7 @@ describe("PUT /api/admin/matches/[matchId]/replay — permissions", () => {
     ["un caster", caster],
   ])("accepte %s", async (_label, user) => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest.mocked(setMatchReplayUrl).mockResolvedValue(VIDEO);
+    jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: VIDEO, changed: true });
 
     const res = await PUT(req({ replayUrl: VIDEO }), params("42"));
 
@@ -84,7 +84,7 @@ describe("PUT /api/admin/matches/[matchId]/replay — entrées", () => {
   });
 
   it("efface sur un corps illisible", async () => {
-    jest.mocked(setMatchReplayUrl).mockResolvedValue(null);
+    jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: null, changed: true });
     expect((await PUT(req("pas du json"), params("42"))).status).toBe(200);
     expect(setMatchReplayUrl).toHaveBeenCalledWith(42, null);
   });

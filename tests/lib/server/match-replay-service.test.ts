@@ -44,9 +44,10 @@ describe("setMatchReplayUrl", () => {
     const execute = found();
     await mockDb(execute);
 
-    expect(await setMatchReplayUrl(42, "youtu.be/dQw4w9WgXcQ")).toBe(
-      "https://youtu.be/dQw4w9WgXcQ",
-    );
+    expect(await setMatchReplayUrl(42, "youtu.be/dQw4w9WgXcQ")).toEqual({
+      replayUrl: "https://youtu.be/dQw4w9WgXcQ",
+      changed: true,
+    });
 
     const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
     expect(sql).toMatch(/SET replay_url = \? WHERE id = \? AND status = 'COMPLETED'/);
@@ -57,10 +58,10 @@ describe("setMatchReplayUrl", () => {
   it.each<[string | null]>([[null], [""], ["   "]])(
     "efface le lien sur %p, sans condition d'état",
     async (raw) => {
-      const execute = found({ ...playedRow, status: "READY" });
+      const execute = found({ ...playedRow, status: "READY", replay_url: "https://youtu.be/old" });
       await mockDb(execute);
 
-      expect(await setMatchReplayUrl(42, raw)).toBeNull();
+      expect(await setMatchReplayUrl(42, raw)).toEqual({ replayUrl: null, changed: true });
       const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
       expect(sql).toMatch(/SET replay_url = NULL WHERE id = \?$/);
       expect(params).toEqual([42]);
@@ -107,5 +108,20 @@ describe("setMatchReplayUrl", () => {
 
     await expect(setMatchReplayUrl(42, VIDEO)).rejects.toThrow("MATCH_NOT_REPLAYABLE");
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("setMatchReplayUrl — changement", () => {
+  it("setMatchReplayUrl_clearNeverSet_changedFalse", async () => {
+    await mockDb(found({ ...playedRow, replay_url: null }));
+    expect(await setMatchReplayUrl(42, null)).toEqual({ replayUrl: null, changed: false });
+  });
+
+  it("setMatchReplayUrl_sameUrl_changedFalse", async () => {
+    await mockDb(found({ ...playedRow, replay_url: "https://youtu.be/dQw4w9WgXcQ" }));
+    expect(await setMatchReplayUrl(42, "youtu.be/dQw4w9WgXcQ")).toEqual({
+      replayUrl: "https://youtu.be/dQw4w9WgXcQ",
+      changed: false,
+    });
   });
 });

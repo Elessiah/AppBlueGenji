@@ -260,7 +260,7 @@ describe("PUT /api/admin/matches/[matchId]/host", () => {
 
   it("valide l'équipe hôte et accepte `null`", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setMatchHost).mockResolvedValue();
+    jest.mocked(setMatchHost).mockResolvedValue(true);
     for (const teamId of ["20", 1.5, -1, 0]) {
       expect((await hostPut(jsonRequest("PUT", { teamId }), params("42"))).status).toBe(400);
     }

@@ -7,6 +7,7 @@ jest.mock("@/lib/server/tournaments/staff-action-logs");
 import { GET, PATCH } from "@/app/api/tournaments/[id]/edit/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/tournaments-service";
+import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 import type { EditableTournamentLoad, EditableTournamentValues } from "@/lib/server/tournaments/edit";
 import type { EditWindow } from "@/lib/shared/tournament-edit";
 import { authUser } from "../../../helpers/auth-user";
@@ -68,7 +69,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(getCurrentUser).mockResolvedValue(referee);
   jest.mocked(service.loadEditableTournament).mockResolvedValue(loaded);
-  jest.mocked(service.updateTournament).mockResolvedValue(undefined);
+  jest.mocked(service.updateTournament).mockResolvedValue({ previousName: "Ancien nom" });
 });
 
 describe("GET /api/tournaments/[id]/edit", () => {
@@ -182,5 +183,17 @@ describe("PATCH /api/tournaments/[id]/edit", () => {
   it("rend 500 sur une panne inattendue", async () => {
     jest.mocked(service.updateTournament).mockRejectedValue(new Error("ECONNRESET"));
     expect((await PATCH(patchReq({ name: "X" }), params("1"))).status).toBe(500);
+  });
+});
+
+describe("PATCH — journal du staff", () => {
+  it("editRoute_renamed_passesPreviousName", async () => {
+    await PATCH(patchReq({ name: "Nouveau nom" }), params("1"));
+    expect(announceStaffTournamentAction).toHaveBeenCalledWith(1, "EDITED", { previousName: "Ancien nom" });
+  });
+
+  it("editRoute_noNameInPatch_noPreviousName", async () => {
+    await PATCH(patchReq({ description: "Texte" }), params("1"));
+    expect(announceStaffTournamentAction).toHaveBeenCalledWith(1, "EDITED", {});
   });
 });
