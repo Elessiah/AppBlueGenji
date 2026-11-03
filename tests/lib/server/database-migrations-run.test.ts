@@ -305,6 +305,47 @@ describe("runMigrations — tolérance d'un ALTER récent", () => {
     expect(errorSpy).not.toHaveBeenCalled();
   });
 
+  it("runMigrations_phaseIndexAlreadyReplaced_staysSilent", async () => {
+    // EF-15 : `idx_bg_matches_phase` cède la place à `idx_bg_matches_phase_round`.
+    fail(/^ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round/, "ER_DUP_KEYNAME");
+
+    await getDatabase();
+
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  // Revue #542 : pose et retrait dans **un** `ALTER`, atomique — une pose
+  // refusée (verrou, disque) ne laisse jamais la phase sans index.
+  it("runMigrations_phaseIndexSwap_addsAndDropsInOneStatement", async () => {
+    await getDatabase();
+
+    expect(
+      count(
+        /^ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round \(tournament_id, phase_id, round_number\), DROP INDEX idx_bg_matches_phase$/,
+      ),
+    ).toBe(1);
+    expect(count(/^ALTER TABLE bg_matches DROP INDEX idx_bg_matches_phase$/)).toBe(0);
+  });
+
+  // Revue #542 : sans l'ancien index, l'échange échoue sur son `DROP` (toléré)
+  // et la pose seule crée quand même le nouvel index.
+  it("runMigrations_oldPhaseIndexMissing_stillAddsNewIndex", async () => {
+    fail(/DROP INDEX idx_bg_matches_phase$/, "ER_CANT_DROP_FIELD_OR_KEY");
+
+    await getDatabase();
+
+    expect(count(/^ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round \(tournament_id, phase_id, round_number\)$/)).toBe(1);
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it("runMigrations_phaseIndexSwapRefused_reportsTheFailure", async () => {
+    fail(/^ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round/, "ER_LOCK_WAIT_TIMEOUT");
+
+    await getDatabase();
+
+    expect(errors()).toContain("idx_bg_matches_phase_round");
+  });
+
   it("dit un index dupliqué sur un ADD COLUMN, qui n'a pas posé la colonne", async () => {
     fail(/ADD COLUMN lookup_hash/, "ER_DUP_KEYNAME");
 

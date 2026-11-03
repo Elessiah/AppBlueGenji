@@ -532,9 +532,6 @@ function TournamentSheetView({
   const { showError, showSuccess } = useToast();
 
   const { tournament: detail, refresh, isLive, tier, fatal, cadenceMs, retrying } = source;
-  // Relecture du contexte du lecteur quand une proposition a changé sous la
-  // modale de score (son détail map par map n'arrive qu'avec lui).
-  const refreshProposals = useCallback(() => refresh(), [refresh]);
   // Même raison que les deux dialogues ci-dessous : on retient l'identifiant, pas
   // l'objet. Un match capturé à l'ouverture ne bougeait plus, si bien que le
   // dialogue continuait d'afficher « 0 – 0 » sur un match que le flux venait de
@@ -879,6 +876,9 @@ function TournamentSheetView({
     try {
       await requestForfeitCancellation(tournamentId, teamId);
       showSuccess(a(`forfeitCancel.success.${entrantType}`, { name: teamName }));
+      // Relecture immédiate, flux ouvert ou non : l'auteur du geste n'attend pas
+      // la diffusion, que la tranche et le budget de la salle peuvent retarder
+      // jusqu'à une minute (bouton périmé, focus perdu).
       void refresh().then(() => focusRowAfterChange(teamId));
       return true;
     } catch (e) {
@@ -1358,7 +1358,6 @@ function TournamentSheetView({
           key={matchForAdminScore.id}
           match={matchForAdminScore}
           proposals={detail.matchProposals}
-          onRefreshProposals={refreshProposals}
           mapNames={matchMapNames(detail.mapRules.rounds, matchForAdminScore)}
           tiebreakMap={roundTiebreakOf(detail.mapRules.tiebreaks, matchForAdminScore)}
           onClose={() => setSelectedMatchForAdminId(null)}
@@ -1382,7 +1381,7 @@ function TournamentSheetView({
           tiebreakMap={roundTiebreakOf(detail.mapRules.tiebreaks, matchForPlayerScore)}
           onClose={() => setPlayerScoreMatchId(null)}
           onSubmitted={() => void refresh()}
-          onRefresh={refreshProposals}
+          onRefresh={refresh}
           onOwnSettle={markOwnSettle}
         />
       )}

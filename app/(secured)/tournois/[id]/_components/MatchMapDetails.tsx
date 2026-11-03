@@ -1,92 +1,23 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Copy } from "lucide-react";
-import { useToast } from "@/components/ui/toast";
-import { useSpectatorView } from "@/components/spectator-view";
-import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
-import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import { mapWinnerSide, type MatchMapResult } from "@/lib/shared/match-maps";
 import type { BracketMatch } from "@/lib/shared/types";
 import { matchAnchorId } from "@/lib/shared/match-anchor";
-import dialogStyles from "./ScoreDialog.module.css";
+import { orReload } from "@/lib/shared/lazy-component";
 import styles from "./MatchMapDetails.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { versusText } from "@/lib/shared/tournament-page-text";
 
 /**
- * Liste des maps d'un match ou d'une proposition (`docs/features/MAP_SCORES.md`) :
- * score de chaque map et son code de replay, copiable — c'est lui que les
- * arbitres vérifient en jeu. Une map posée sans code par l'arbitrage le dit
- * (« Pas de code de replay »).
- *
- * Sans compte (`useSpectatorView`), les codes ne s'affichent pas : la politique
- * de confidentialité les réserve aux membres connectés, et la lecture publique
- * ne les transmet de toute façon pas (`spectatorSnapshot`).
+ * La modale (`createPortal`, `useDialogBehavior({ open: true, onClose })`) vit
+ * dans `./MapDetailsDialog`, chargée au premier clic : seul le bouton résumé
+ * part avec la carte du match. `orReload` : un fichier disparu (déploiement
+ * survenu depuis l'ouverture) recharge la page plutôt que de la casser.
  */
-export function MapResultList({
-  maps,
-  team1Name,
-  team2Name,
-  label,
-}: Readonly<{
-  maps: ReadonlyArray<MatchMapResult>;
-  team1Name: string;
-  team2Name: string;
-  label: string;
-}>) {
-  const { showError, showSuccess } = useToast();
-  const { t } = useTournamentPageText();
-  const spectator = useSpectatorView();
-  const copy = async (code: string) => {
-    try {
-      await navigator.clipboard.writeText(code);
-      showSuccess(t("match.maps.copied", { code }));
-    } catch {
-      showError(t("match.maps.copyFailed"));
-    }
-  };
-
-  return (
-    <ol className={styles.list} aria-label={label}>
-      {maps.map((map) => {
-        const side = mapWinnerSide(map);
-        let outcome = t("match.maps.drawn");
-        if (side === 1) outcome = t("match.maps.wonBy", { team: team1Name });
-        else if (side === 2) outcome = t("match.maps.wonBy", { team: team2Name });
-        return (
-          <li key={map.mapNumber} className={styles.item}>
-            <span className={styles.label}>{t("match.maps.map", { number: String(map.mapNumber) })}</span>
-            <span className={styles.score} title={outcome}>
-              {map.team1Score} – {map.team2Score}
-              <span className="sr-only"> : {outcome}</span>
-            </span>
-            {/* L'arbitrage peut poser une map sans code (replay perdu) : rien à
-                copier. Sans compte, la colonne n'existe pas. */}
-            {!spectator && map.replayCode === "" && (
-              <span className={styles.noCode}>{t("match.maps.noReplayCode")}</span>
-            )}
-            {!spectator && map.replayCode !== "" && (
-              <>
-                <code className={styles.code}>{map.replayCode}</code>
-                <button
-                  type="button"
-                  className={styles.copy}
-                  onClick={() => void copy(map.replayCode)}
-                  aria-label={t("match.maps.copyLabel", { number: String(map.mapNumber) })}
-                  title={t("match.maps.copy")}
-                >
-                  <Copy size={14} aria-hidden="true" />
-                </button>
-              </>
-            )}
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
+const MapDetailsDialog = dynamic(() => orReload(import("./MapDetailsDialog").then((m) => m.MapDetailsDialog)), {
+  ssr: false,
+});
 
 /**
  * Détail map par map d'un match tranché : un bouton sur la carte, le détail
@@ -138,53 +69,5 @@ export function MatchMapDetails({ match }: Readonly<{ match: Pick<BracketMatch, 
         />
       )}
     </>
-  );
-}
-
-function MapDetailsDialog({
-  matchId,
-  maps,
-  team1Name,
-  team2Name,
-  onClose,
-}: Readonly<{
-  matchId: number;
-  maps: ReadonlyArray<MatchMapResult>;
-  team1Name: string;
-  team2Name: string;
-  onClose: () => void;
-}>) {
-  const dialogRef = useDialogBehavior({ open: true, onClose });
-  const backdrop = useBackdropDismiss(onClose);
-  const titleId = `map-details-${matchId}-title`;
-  const { t } = useTournamentPageText();
-
-  return createPortal(
-    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={dialogStyles.backdrop} role="presentation" {...backdrop}>
-      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
-        ref={dialogRef}
-        className={dialogStyles.dialog}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-      >
-        <div className={dialogStyles.head}>
-          <div className={dialogStyles.headText}>
-            <h3 id={titleId} className={dialogStyles.title}>
-              {t("match.maps.title")}
-            </h3>
-            <p className={dialogStyles.opponents}>{t("match.maps.vs", { team1: team1Name, team2: team2Name })}</p>
-          </div>
-        </div>
-        <MapResultList maps={maps} team1Name={team1Name} team2Name={team2Name} label={t("match.maps.listLabel")} />
-        <div className={dialogStyles.actions}>
-          <button type="button" className={`${dialogStyles.link} ${dialogStyles.close}`} onClick={onClose}>
-            {t("match.maps.close")}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
   );
 }

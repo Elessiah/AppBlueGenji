@@ -394,7 +394,7 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
  * Le stockage parle depuis l'engagée (« mon score », « score adverse ») : pour
  * l'équipe 2, son propre score est donc celui de la **seconde** colonne.
  */
-function mapScoreReport(
+export function mapScoreReport(
   score: number | null | undefined,
   opponentScore: number | null | undefined,
   reportedAt: Date | string | null | undefined,

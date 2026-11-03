@@ -35,9 +35,12 @@ import {
   reportMatchScorePublic,
 } from "@/lib/server/tournaments";
 import { getDatabase } from "@/lib/server/database";
+import type { TournamentFormat } from "@/lib/shared/types";
 import {
+  publishMatchUpdatedEvent,
   publishScoreReportedEvent,
   publishScoreResolvedEvent,
+  publishStandingsReplayedEvent,
   publishUpdatedEvent,
 } from "@/lib/server/tournaments/notifications";
 import {
@@ -55,6 +58,7 @@ import { reportMatchScore } from "@/lib/server/tournaments/scoring";
 import { notifyScoreToConfirm } from "@/lib/server/tournaments/player-pushes";
 import { forfeitOwnMatch } from "@/lib/server/tournaments/player-forfeit";
 import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournaments/admin";
+import type { AdminScoreEntry } from "@/lib/server/tournaments/admin";
 import { forfeitSurvivalTeam, reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { forfeitSwissTeam, reconcileSwiss } from "@/lib/server/tournaments/swiss";
 import { forfeitEnduranceTeam } from "@/lib/server/tournaments/bg-survie/forfeit";
@@ -72,7 +76,7 @@ import {
   alertSelfResolvedDispute,
 } from "@/lib/server/tournaments/dispute-self-resolution";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
-import { tournamentRow } from "../../helpers/tournament-rows";
+import { matchRow, tournamentRow } from "../../helpers/tournament-rows";
 import { mapsFor } from "../../helpers/match-maps";
 
 /**
@@ -489,8 +493,23 @@ describe("écritures d'un engagé — report de score, forfait sur sa manche", (
 });
 
 describe("adminSaveMatchScoresPublic", () => {
-  it("réconcilie le tournoi du match et rafraîchit sans condition", async () => {
-    connection.execute.mockResolvedValue([[{ tournament_id: "8" }], undefined]);
+  // ERREUR.txt EF-15 : « Enregistrer » ne clôt jamais un match — aucun rejeu
+  // (ils ne lisent que des matchs COMPLETED), aucune relecture de la ligne, et
+  // l'instantané seul est republié.
+  const saved = matchRow({ id: 70, tournament_id: 8, team1_id: 3, team2_id: 4 });
+  /** Tournoi du match, lu avant la transaction (`saveTargetTournament`). */
+  const target = (head: Record<string, unknown> = {}) =>
+    connection.execute.mockResolvedValue([
+      [{ tournament_id: 8, team1_id: 3, team2_id: 4, status: "READY", format: "SURVIVAL", ...head }],
+      undefined,
+    ]);
+
+  beforeEach(() => {
+    target();
+  });
+
+  it("enregistre sans rien réconcilier ni relire, et ne republie que l'instantané", async () => {
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
 
     await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
 
@@ -498,28 +517,168 @@ describe("adminSaveMatchScoresPublic", () => {
       maps: mapsFor(2, 1),
       userId: 1,
     });
-    for (const fn of [reconcileSurvival, reconcileSwiss, reconcileEndurance, reconcilePhases]) {
-      expect(fn).toHaveBeenCalledWith(8, expect.anything());
+    for (const fn of [reconcileSurvival, reconcileSwiss, reconcileEndurance, reconcilePhases, finalizeTournamentIfDone]) {
+      expect(fn).not.toHaveBeenCalled();
     }
+    // Une seule lecture à part, celle du tournoi du match — rien n'est relu.
+    expect(connection.execute).toHaveBeenCalledTimes(1);
     expectCommitted();
-    expect(publishScoreResolvedEvent).toHaveBeenCalledWith(8, 70);
-    expect(invalidateTournamentLists).toHaveBeenCalledTimes(1);
-  });
-
-  it("ne réconcilie ni ne publie rien quand le match a disparu", async () => {
-    await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
-
-    expect(reconcileSurvival).not.toHaveBeenCalled();
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(8, { landingLive: true });
+    expect(order(jest.mocked(publishMatchUpdatedEvent))).toBeGreaterThan(order(connection.commit));
     expect(publishScoreResolvedEvent).not.toHaveBeenCalled();
+    expect(publishUpdatedEvent).not.toHaveBeenCalled();
     expect(invalidateTournamentLists).not.toHaveBeenCalled();
-    expectCommitted();
   });
 
   it("défait la sauvegarde refusée", async () => {
-    jest.mocked(adminSaveMatchScores).mockRejectedValue(new Error("DOWNSTREAM_SCORES"));
+    // Match supprimé pendant l'attente du verrou (réappariement d'une manche).
+    jest.mocked(adminSaveMatchScores).mockRejectedValue(new Error("MATCH_NOT_FOUND"));
 
-    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow("DOWNSTREAM_SCORES");
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow("MATCH_NOT_FOUND");
     expectRolledBack();
+  });
+
+  // Revue perf #542 : le tournoi **d'abord**, en toute première instruction de
+  // la transaction (ordre des réconciliations et de la programmation) — une
+  // réconciliation qui détruit la manche de ce match pour la réapparier ne peut
+  // plus effacer une saisie commitée entre-temps, et le match n'est jamais
+  // verrouillé pendant l'attente du tournoi.
+  it("adminSave_locksTournamentFirstInTransaction", async () => {
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
+
+    await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
+
+    expect(lockTournamentRow).toHaveBeenCalledWith(fakeConnection(connection), 8);
+    expect(order(jest.mocked(lockTournamentRow))).toBeGreaterThan(order(connection.beginTransaction));
+    expect(order(jest.mocked(lockTournamentRow))).toBeLessThan(order(jest.mocked(adminSaveMatchScores)));
+  });
+
+  // Revue perf #542 : seules les réconciliations de ces formats détruisent une
+  // manche non close — eux seuls imposent le verrou du tournoi.
+  it.each<[TournamentFormat]>([["SURVIVAL"], ["SWISS"], ["BG_SURVIE"], ["MULTI"]])(
+    "adminSave_roundRebuildingFormat_%s_locksTournament",
+    async (format) => {
+      target({ format });
+      jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
+
+      await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
+
+      expect(lockTournamentRow).toHaveBeenCalledWith(fakeConnection(connection), 8);
+    },
+  );
+
+  // En élimination, la saisie map par map ne prend que le verrou du match :
+  // les matchs d'une même manche ne se sérialisent pas sur le tournoi.
+  it.each<[TournamentFormat]>([["SINGLE"], ["DOUBLE"]])(
+    "adminSave_eliminationFormat_%s_savesWithoutTournamentLock",
+    async (format) => {
+      target({ format });
+      jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
+
+      await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
+
+      expect(lockTournamentRow).not.toHaveBeenCalled();
+      expect(adminSaveMatchScores).toHaveBeenCalledTimes(1);
+      expectCommitted();
+    },
+  );
+
+  it("adminSave_preReadOutsideTransaction", async () => {
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
+
+    await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
+
+    const [sql, params] = connection.execute.mock.calls[0];
+    expect(String(sql).replace(/\s+/g, " ")).toBe(
+      "SELECT m.tournament_id, m.team1_id, m.team2_id, m.status, COALESCE(p.format, t.format) AS format FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id LEFT JOIN bg_tournament_phases p ON p.id = m.phase_id AND p.tournament_id = m.tournament_id WHERE m.id = ? LIMIT 1",
+    );
+    expect(params).toEqual([70]);
+    expect(order(connection.execute)).toBeLessThan(order(connection.beginTransaction));
+  });
+
+  it("adminSave_matchMissing_rejectsWithoutTransaction", async () => {
+    connection.execute.mockResolvedValue([[], undefined]);
+
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow("MATCH_NOT_FOUND");
+
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
+    expect(lockTournamentRow).not.toHaveBeenCalled();
+    expect(adminSaveMatchScores).not.toHaveBeenCalled();
+    // Aucune transaction ouverte : pas de `ROLLBACK` pour rien (revue perf #542).
+    expect(connection.rollback).not.toHaveBeenCalled();
+    expect(connection.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("adminSave_matchCompleted_rejectsWithoutWaitingTournament", async () => {
+    target({ status: "COMPLETED" });
+
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow(
+      "MATCH_ALREADY_COMPLETED",
+    );
+
+    expect(lockTournamentRow).not.toHaveBeenCalled();
+    expect(adminSaveMatchScores).not.toHaveBeenCalled();
+  });
+
+  it("adminSave_matchWithoutEntrants_rejectsWithoutWaitingTournament", async () => {
+    target({ team2_id: null });
+
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow("MATCH_NOT_READY");
+
+    expect(lockTournamentRow).not.toHaveBeenCalled();
+    expect(adminSaveMatchScores).not.toHaveBeenCalled();
+  });
+
+  // Revue perf #542 : une saisie qui ne tient pas sur le match se refuse sur
+  // la lecture préalable, sans transaction ni attente du tournoi.
+  it("adminSave_forfeitOfForeignTeam_rejectsWithoutWaitingTournament", async () => {
+    await expect(adminSaveMatchScoresPublic(70, { forfeitTeamId: 9 })).rejects.toThrow("INVALID_FORFEIT_TEAM_ID");
+
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
+    expect(lockTournamentRow).not.toHaveBeenCalled();
+    expect(adminSaveMatchScores).not.toHaveBeenCalled();
+    expect(connection.rollback).not.toHaveBeenCalled();
+  });
+
+  it("adminSave_malformedEntry_rejectsWithoutWaitingTournament", async () => {
+    const entry = JSON.parse('{"maps":"x","userId":1}') as AdminScoreEntry;
+
+    await expect(adminSaveMatchScoresPublic(70, entry)).rejects.toThrow("INVALID_REQUEST");
+
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
+    expect(lockTournamentRow).not.toHaveBeenCalled();
+    expect(adminSaveMatchScores).not.toHaveBeenCalled();
+  });
+
+  // Revue sécurité #542 (cycle 4) : un ROLLBACK raté ne masque pas
+  // l'interblocage (rejoué), et la connexion n'est jamais rendue au pool avec
+  // une transaction peut-être ouverte.
+  it("adminSave_rollbackFailsAfterDeadlock_stillRetriesAndCommits", async () => {
+    const rollbackLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest
+      .mocked(adminSaveMatchScores)
+      .mockRejectedValueOnce(Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" }))
+      .mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
+    connection.rollback.mockRejectedValueOnce(new Error("Connection lost: The server closed the connection."));
+
+    await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
+
+    expect(adminSaveMatchScores).toHaveBeenCalledTimes(2);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(rollbackLog).toHaveBeenCalledTimes(1);
+    rollbackLog.mockRestore();
+  });
+
+  it("adminSave_rollbackFailsAfterRefusal_propagatesCodeAndDestroysConnection", async () => {
+    const rollbackLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(adminSaveMatchScores).mockRejectedValue(new Error("MATCH_NOT_FOUND"));
+    connection.rollback.mockRejectedValue(new Error("Connection lost: The server closed the connection."));
+
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow("MATCH_NOT_FOUND");
+
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+    expect(connection.release).not.toHaveBeenCalled();
+    rollbackLog.mockRestore();
   });
 });
 
@@ -680,13 +839,15 @@ describe("adminResolveMatchPublic", () => {
 describe("adminSaveMatchScoresPublic — suspension de la validation d'office", () => {
   const actor = { id: 9, pseudo: "Sifflet" };
   const savedRow = { tournament_id: 8, team1_id: 3, team2_id: 4 };
+  // Ligne relue par le moteur dans sa transaction : la couche publique ne relit plus.
+  const saved = matchRow({ id: 70, tournament_id: 8, team1_id: 3, team2_id: 4 });
 
   it("rend ce que le moteur dit de la suspension", async () => {
     connection.execute.mockResolvedValue([[savedRow], undefined]);
 
-    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: true, pausedNow: true });
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: true, pausedNow: true });
     await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).resolves.toBe(true);
-    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: false, pausedNow: false });
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
     await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).resolves.toBe(false);
   });
 
@@ -694,7 +855,7 @@ describe("adminSaveMatchScoresPublic — suspension de la validation d'office", 
   // suspension qu'il pose avertit les autres membres du staff, après le commit.
   it("transmet la suspension posée par cette saisie à l'alerte, après le commit", async () => {
     connection.execute.mockResolvedValue([[savedRow], undefined]);
-    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: true, pausedNow: true });
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: true, pausedNow: true });
 
     await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor);
 
@@ -707,15 +868,16 @@ describe("adminSaveMatchScoresPublic — suspension de la validation d'office", 
 
   it("n'alerte pas à chaque saisie d'une validation déjà suspendue, ni sans suspension", async () => {
     connection.execute.mockResolvedValue([[savedRow], undefined]);
-    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: true, pausedNow: false });
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: true, pausedNow: false });
     await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor);
-    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: false, pausedNow: false });
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
     await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor);
 
     expect(alertSelfPausedValidation).not.toHaveBeenCalled();
   });
 
   it("n'alerte personne quand la saisie est défaite", async () => {
+    connection.execute.mockResolvedValue([[savedRow], undefined]);
     jest.mocked(adminSaveMatchScores).mockRejectedValueOnce(new Error("MATCH_ALREADY_COMPLETED"));
 
     await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor)).rejects.toThrow(
@@ -726,7 +888,7 @@ describe("adminSaveMatchScoresPublic — suspension de la validation d'office", 
 
   it("rend la main sans attendre l'envoi de l'alerte", async () => {
     connection.execute.mockResolvedValue([[savedRow], undefined]);
-    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: true, pausedNow: true });
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: true, pausedNow: true });
     jest.mocked(alertSelfPausedValidation).mockReturnValueOnce(new Promise<boolean>(() => undefined));
 
     await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor)).resolves.toBe(true);
@@ -958,5 +1120,101 @@ describe("pénalités d'endurance", () => {
 
     await expect(liftEndurancePenaltyPublic(5, 61)).rejects.toThrow("PENALTY_NOT_FOUND");
     expectRolledBack();
+  });
+
+  it("liftPenalty_refused_publishesNothing", async () => {
+    jest.mocked(liftEndurancePenalty).mockRejectedValue(new Error("PENALTY_NOT_FOUND"));
+
+    await expect(liftEndurancePenaltyPublic(5, 61)).rejects.toThrow("PENALTY_NOT_FOUND");
+
+    expect(publishStandingsReplayedEvent).not.toHaveBeenCalled();
+  });
+
+  // Revue perf #542 : comme l'annulation d'un abandon, aucun résultat de match
+  // ne change — ni classement du site ni statistiques à rebâtir.
+  it("liftPenalty_nominal_invalidatesTargetedCachesOnly", async () => {
+    jest.mocked(liftEndurancePenalty).mockResolvedValue({ teamId: 3, points: 2 });
+
+    await liftEndurancePenaltyPublic(5, 61);
+
+    expect(publishStandingsReplayedEvent).toHaveBeenCalledWith(5);
+    expect(order(jest.mocked(publishStandingsReplayedEvent))).toBeGreaterThan(order(connection.commit));
+    expect(publishUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  // ERREUR.txt EF-15 : les manches postérieures sont lues verrouillées ; un
+  // report concurrent forme un interblocage, rejoué comme partout ailleurs.
+  it("liftPenalty_deadlock_retriesWholeTransaction", async () => {
+    jest
+      .mocked(liftEndurancePenalty)
+      .mockRejectedValueOnce(Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" }))
+      .mockResolvedValueOnce({ teamId: 3, points: 2 });
+
+    await liftEndurancePenaltyPublic(5, 61);
+
+    expect(liftEndurancePenalty).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(publishStandingsReplayedEvent).toHaveBeenCalledTimes(1);
+  });
+
+  // Revue sécurité #542 : un ROLLBACK raté ne masque pas l'erreur d'origine.
+  it("liftPenalty_rollbackFailsAfterDeadlock_stillRetries", async () => {
+    jest
+      .mocked(liftEndurancePenalty)
+      .mockRejectedValueOnce(Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" }))
+      .mockResolvedValueOnce({ teamId: 3, points: 2 });
+    const rollbackLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    connection.rollback.mockRejectedValueOnce(new Error("Connection lost: The server closed the connection."));
+
+    await liftEndurancePenaltyPublic(5, 61);
+
+    expect(liftEndurancePenalty).toHaveBeenCalledTimes(2);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(rollbackLog).toHaveBeenCalledTimes(1);
+    rollbackLog.mockRestore();
+  });
+
+  it("liftPenalty_rollbackFailsAfterRefusal_propagatesRefusalCode", async () => {
+    jest.mocked(liftEndurancePenalty).mockRejectedValue(new Error("PENALTY_NOT_FOUND"));
+    const rollbackLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    connection.rollback.mockRejectedValue(new Error("Connection lost: The server closed the connection."));
+
+    await expect(liftEndurancePenaltyPublic(5, 61)).rejects.toThrow("PENALTY_NOT_FOUND");
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+    expect(connection.release).not.toHaveBeenCalled();
+    expect(rollbackLog).toHaveBeenCalledTimes(1);
+    rollbackLog.mockRestore();
+  });
+
+  // ERREUR.txt EF-15 (revue) : tournoi tenu, manches verrouillées — l'attente
+  // d'un détenteur qui ne demande jamais le tournoi est bornée, puis rendue ;
+  // le verrou du tournoi lui-même (revue #542) s'attend sans borne.
+  // (la borne elle-même entoure la lecture des manches : `laterRoundHasScoreInput`,
+  // round-progress-later-rounds.test.ts).
+  // Revue #542 : la lecture bornée (simulée ici) remet elle-même le délai ;
+  // le retour au pool n'ajoute aucune requête.
+  // Revue perf #542 : le verrou du tournoi est la lecture verrouillée de sa
+  // ligne par le moteur (`loadTournament(…, true)`) — plus de `lockTournamentRow`
+  // qui la doublait.
+  it("liftPenalty_nominal_engineLockIsFirstStatementInTransaction", async () => {
+    jest.mocked(liftEndurancePenalty).mockResolvedValue({ teamId: 3, points: 2 });
+
+    await liftEndurancePenaltyPublic(5, 61);
+
+    expect(connection.query).not.toHaveBeenCalled();
+    expect(connection.release).toHaveBeenCalledTimes(1);
+    expect(lockTournamentRow).not.toHaveBeenCalled();
+    expect(connection.beginTransaction.mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(liftEndurancePenalty).mock.invocationCallOrder[0],
+    );
+    expectCommitted();
+  });
+
+  it("liftPenalty_businessRefusal_notRetried", async () => {
+    jest.mocked(liftEndurancePenalty).mockRejectedValue(new Error("ENDURANCE_ROUND_ALREADY_PLAYED"));
+
+    await expect(liftEndurancePenaltyPublic(5, 61)).rejects.toThrow("ENDURANCE_ROUND_ALREADY_PLAYED");
+    expect(liftEndurancePenalty).toHaveBeenCalledTimes(1);
   });
 });

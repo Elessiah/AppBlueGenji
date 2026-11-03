@@ -387,6 +387,22 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // défaut ; la table `bg_match_voice_channels` est neuve, son `CREATE TABLE` suffit.
     `ALTER TABLE bg_tournaments ADD COLUMN team_voice_channels TINYINT(1) NOT NULL DEFAULT 0
        AFTER match_launch_phase`,
+    // EF-15 — la manche entre dans l'index de phase : les lectures verrouillantes
+    // des manches postérieures (`laterRoundsHaveScoreInput`) et le `DELETE … AND
+    // round_number = ?` du réappariement ne verrouillent plus que leurs manches,
+    // et non toute la phase et ses intervalles. `idx_bg_matches_phase`, préfixe
+    // strict du nouvel index, part **dans la même instruction** : un `ALTER`
+    // est atomique, l'ancien index ne tombe donc jamais sans que le nouveau
+    // soit posé (pose refusée — verrou, disque — : les deux restent ; déjà
+    // jouée, ou base neuve sans l'ancien index : `ER_CANT_DROP_FIELD_OR_KEY`,
+    // les listes de retrait étant vérifiées d'abord — un no-op, la pose seule
+    // ci-dessous garantit le nouvel index).
+    `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round (tournament_id, phase_id, round_number),
+       DROP INDEX idx_bg_matches_phase`,
+    // Base où l'ancien index manquait : l'échange tombe sur son `DROP`
+    // (`ER_CANT_DROP_FIELD_OR_KEY`, toléré) et ne pose rien — la pose seule le
+    // rattrape. Partout ailleurs, `ER_DUP_KEYNAME`, un no-op.
+    `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round (tournament_id, phase_id, round_number)`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

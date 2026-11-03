@@ -1,5 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
+import { isContentionError } from "@/lib/server/mysql-errors";
+import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
 import { liftEndurancePenalty } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
 
@@ -31,6 +33,12 @@ export async function DELETE(
     await liftEndurancePenalty(tournamentId, penalty);
     return ok({ success: true });
   } catch (error) {
+    // Lecture bornée des manches (5 s) ou rejeu épuisé : « réessaie », par le
+    // code de l'erreur — un message localisé (`lc_messages`) ne s'y lit pas.
+    if (isContentionError(error)) {
+      console.warn(`[tournaments] retrait de la pénalité ${penalty} : écriture concurrente, rendue en ${CONCURRENT_UPDATE_RETRY} :`, error);
+      return fail(CONCURRENT_UPDATE_RETRY, 409);
+    }
     const message = (error as Error).message;
     if (
       message === "NOT_BG_SURVIE" ||

@@ -138,10 +138,16 @@ export async function liftEndurancePenalty(
   // appartenant à un autre plateau ne doit pas s'effacer depuis cette page.
   // Sans la table, aucune sanction n'existe : l'identifiant est introuvable
   // (404), pas une panne du serveur.
+  //
+  // Lecture **verrouillante** (la ligne va être effacée) : aucune lecture
+  // d'instantané ne doit précéder celle, verrouillée, des manches suivantes —
+  // sous MariaDB (`innodb_snapshot_isolation`), l'image figée ici ferait
+  // refuser (`ER_CHECKREAD`) la lecture d'une manche qu'un « Prêt » vient de
+  // toucher, et une rafale de « Prêt » épuiserait les rejeux du retrait.
   const rows = await rowsOrEmptyIfMissingTable(
     conn.execute<(RowDataPacket & { team_id: number; points: number; round_number: number })[]>(
       `SELECT team_id, points, round_number FROM bg_endurance_penalties
-       WHERE id = ? AND tournament_id = ? LIMIT 1`,
+       WHERE id = ? AND tournament_id = ? LIMIT 1 FOR UPDATE`,
       [penaltyId, tournamentId],
     ),
   );

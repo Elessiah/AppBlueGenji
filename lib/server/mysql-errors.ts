@@ -52,6 +52,67 @@ export function isDeadlockMessage(message: unknown): boolean {
 }
 
 /**
+ * Messages d'une **contention** passagère que le rejeu (`retryOnDeadlock`) n'a
+ * pas pu vaincre — la liste unique que lisent `fail()` et `isContentionError` :
+ * une nouvelle signature ne s'ajoute qu'ici.
+ *
+ * - l'interblocage (`DEADLOCK_MESSAGE`) ;
+ * - `ER_CHECKREAD` (1020, MariaDB 11.6.2 et plus, `innodb_snapshot_isolation`) :
+ *   la ligne a changé depuis l'image lue par la transaction ;
+ * - `ER_LOCK_WAIT_TIMEOUT` (1205) : le verrou n'est pas venu dans le délai.
+ *
+ * Ni panne ni requête fautive : un conflit (409) que l'interface traduit en
+ * « réessaie », comme l'interblocage.
+ */
+const CONTENTION_MESSAGES = [
+  DEADLOCK_MESSAGE,
+  /^Record has changed since last read in table\b/i,
+  /^Lock wait timeout exceeded\b/i,
+];
+
+/**
+ * `true` si ce message d'exception est celui d'une contention passagère
+ * (interblocage, `ER_CHECKREAD`, `ER_LOCK_WAIT_TIMEOUT`) : `fail()` la rend en
+ * `CONCURRENT_UPDATE_RETRY`.
+ */
+export function isContentionMessage(message: unknown): boolean {
+  return typeof message === "string" && CONTENTION_MESSAGES.some((pattern) => pattern.test(message));
+}
+
+/**
+ * MariaDB (11.6.2 et plus, `innodb_snapshot_isolation`) refuse d'écrire une
+ * ligne changée depuis l'image lue par la transaction : `ER_CHECKREAD` (1020).
+ * Rejouer la transaction entière relit l'état récent — même remède qu'un
+ * interblocage (`retryOnDeadlock`).
+ */
+export function isSnapshotConflict(error: unknown): boolean {
+  return errorCode(error) === "ER_CHECKREAD" || errorNumber(error) === 1020;
+}
+
+/** Numéro d'erreur du serveur, quand l'objet en porte un. */
+function errorNumber(error: unknown): number | null {
+  if (typeof error !== "object" || error === null) return null;
+  const errno = (error as { errno?: unknown }).errno;
+  return typeof errno === "number" ? errno : null;
+}
+
+/**
+ * `true` si l'erreur est une contention passagère — interblocage,
+ * `ER_CHECKREAD`, délai de verrou —, lue sur le **code** de l'erreur d'abord
+ * (indépendant de la langue des messages du serveur, `lc_messages`), sur son
+ * message ensuite. Règle des routes qui remplacent le message par un code fixe
+ * avant `fail()`, et ne profitent donc pas de sa reconnaissance.
+ */
+export function isContentionError(error: unknown): boolean {
+  // Les prédicats du rejeu (`retryOnDeadlock`), plus le délai de verrou dépassé.
+  // Le numéro autant que le code : une erreur relayée peut ne garder que l'un.
+  if (isTransactionAborted(error) || errorNumber(error) === 1213 || isSnapshotConflict(error)) return true;
+  if (errorCode(error) === "ER_LOCK_WAIT_TIMEOUT" || errorNumber(error) === 1205) return true;
+  const message = error instanceof Error ? error.message : undefined;
+  return isContentionMessage(message);
+}
+
+/**
  * `true` si la table n'existe pas.
  *
  * Sept tables de `lib/server/database/schema/` — et elles seules — sont créées dans

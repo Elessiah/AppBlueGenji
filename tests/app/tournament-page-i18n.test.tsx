@@ -39,7 +39,7 @@ import { EnduranceView } from "@/app/(secured)/tournois/[id]/_components/Enduran
 import { RegistrationsPanel } from "@/app/(secured)/tournois/[id]/_components/RegistrationsPanel";
 import { MatchPlanningPanel } from "@/app/(secured)/tournois/[id]/_components/MatchPlanningPanel";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
-import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MatchMapDetails";
+import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MapResultList";
 import { FR_VIEWS_TEXT } from "@/app/(secured)/tournois/[id]/_lib/views-text";
 import { EntrantProvider } from "@/app/(secured)/tournois/[id]/_lib/entrant-link";
 import { registrationConditionsText } from "@/app/(secured)/tournois/[id]/_lib/header-meta";

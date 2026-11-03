@@ -20,6 +20,21 @@ const EMPTY_MATCH: Row = {
 
 // Connexion factice : la première requête décrit le match édité (jointe au
 // format du tournoi), la seconde renvoie les matchs dépendants.
+/** `HAS_SCORE_INPUT_SQL`, rejoué sur une ligne factice. */
+function carriesScoreInput(row: Row): boolean {
+  if (row.team1_id == null || row.team2_id == null) return false;
+  return (
+    row.team1_score != null ||
+    row.team2_score != null ||
+    row.winner_team_id != null ||
+    row.forfeit_team_id != null ||
+    row.double_forfeit === 1 ||
+    row.status === "AWAITING_CONFIRMATION" ||
+    row.team1_reported_at != null ||
+    row.team2_reported_at != null
+  );
+}
+
 function fakeConnection(options: {
   format: string;
   /**
@@ -66,6 +81,11 @@ function fakeConnection(options: {
         ];
       }
       dependentSql = sql;
+      // Modes sans lien de bracket : le prédicat de saisie est en SQL
+      // (`HAS_SCORE_INPUT_SQL`) — le double rend les seules lignes qu'il garde.
+      if (sql.startsWith("SELECT id FROM bg_matches")) {
+        return [options.dependents.filter(carriesScoreInput).map((row) => ({ id: row.id })), []];
+      }
       return [options.dependents, []];
     },
   } as unknown as PoolConnection;
@@ -198,6 +218,16 @@ describe("checkDownstreamMatchesHaveNoScores — formats sans liens de bracket",
       await checkDownstreamMatchesHaveNoScores(conn, editedMatch);
       expect(dependentQuery()).toContain("round_number > ?");
     }
+  });
+
+  // ERREUR.txt EF-15 (revue) : la lecture ordinaire du match a déjà figé
+  // l'image ; un `FOR UPDATE` ici serait refusé sous MariaDB (`ER_CHECKREAD`).
+  it("checkDownstream_laterRounds_snapshotReadWithoutLock", async () => {
+    const { conn, dependentQuery } = fakeConnection({ format: "SURVIVAL", dependents: [] });
+
+    await checkDownstreamMatchesHaveNoScores(conn, editedMatch);
+
+    expect(dependentQuery()).not.toContain("FOR UPDATE");
   });
 
   it("refuse la correction d'un round dont la suite a déjà un score", async () => {

@@ -100,6 +100,25 @@ dès qu'une manche **postérieure** à la sanction porte la moindre saisie
 `lib/shared/match-lock.ts`, transposée : en survie, sans lien de bracket, toute
 manche ultérieure dépend des précédentes.
 
+Les manches postérieures se lisent **verrouillées** (`laterRoundHasScoreInput`,
+ERREUR.txt EF-15) : une lecture d'image manquait le report qu'une équipe écrit
+au même moment. Aucune lecture d'image ne les précède — tournoi et sanction
+sont lus `FOR UPDATE` —, sans quoi MariaDB (`innodb_snapshot_isolation`)
+refuserait la lecture d'une manche qu'un « Prêt » vient de toucher
+(`ER_CHECKREAD`). Le retrait tenant le tournoi, l'attente de cette lecture
+des manches — elle seule — est bornée à 5 s (`withShortLockWait`,
+`lib/server/tournaments/lock-wait.ts`) ; le verrou du tournoi
+(la ligne du tournoi lue `FOR UPDATE` par le moteur, `loadTournament`, en
+toute première instruction — une seule requête, sans `lockTournamentRow` qui
+la doublait) s'attend sans borne et le rejeu garde le délai du serveur ; le
+module du moteur se résout avant la transaction ; contention persistante
+→ `409 CONCURRENT_UPDATE_RETRY`, l'interblocage avec un report étant rejoué
+(`retryOnDeadlock`), même quand le `ROLLBACK` échoue (`rollbackKeepingError` :
+l'erreur d'origine reste, la connexion est détruite). Après le commit, comme l'annulation d'un abandon, seuls
+l'instantané, l'aperçu, les listes, le direct et les mini-arbres de l'accueil
+sont oubliés (`publishStandingsReplayedEvent`, règle partagée) : aucun résultat de match ne change,
+le classement du site et les statistiques restent en cache.
+
 Sans ce verrou : une pénalité de la manche 2 élimine une équipe, les manches 3 à
 6 se jouent sans elle, et lever la sanction à la manche 7 la remet `ACTIVE`
 **avec son capital intact** — elle n'a disputé aucun match depuis. Elle passe
@@ -112,7 +131,8 @@ pénalité tombe de toute façon après ses matchs. Le prédicat « ce match por
 saisie » (`HAS_SCORE_INPUT_SQL`) est écrit **une seule fois** : trois lectures
 s'en servent, dont la borne `EndurancePenaltyRow.removable` que l'interface
 reçoit pour ne pas proposer un bouton voué au 409 (elle affiche « 🔒 Figée » à
-sa place).
+sa place). Comme l'interface (`hasScoreInput`), il exige les deux engagées en
+place : exemption et matchs fantômes clos sans engagé n'entament pas une manche.
 
 ## La forme d'une sanction
 

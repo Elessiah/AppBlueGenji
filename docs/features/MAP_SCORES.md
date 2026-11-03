@@ -39,7 +39,9 @@ détail, l'ajout « Ajouter une map » d'une liste vide (`minRows = 0`).
 4. Instantané commun (flux SSE **et** REST de secours) : `BracketMatch.maps`,
    `MatchScoreReport.maps`.
 5. Interface : `MapScoreList` (modale joueur, dialogue d'arbitrage),
-   `MatchMapDetails` (carte de match).
+   `MatchMapDetails` (carte de match : le bouton résumé seul, la modale
+   `MapDetailsDialog` chargée au clic par `dynamic()` — son CSS et ses crochets
+   ne partent pas avec la page), `MapResultList` (liste partagée).
 6. RGPD (codes de replay), seed, tests.
 
 ## Règles
@@ -238,8 +240,42 @@ propriétaire, ou le joueur en individuel), et pour l'arbitrage (permission
 `tournaments`, qui en a besoin pour trancher un désaccord). Une requête au plus,
 aucune quand rien n'attend. Le contexte du lecteur n'arrivant qu'à la connexion
 au flux, une proposition déposée depuis se repère à son `reportedAt` (porté par
-l'instantané) et déclenche une relecture REST (`useProposalMaps`,
-`proposalsNeedRefresh`).
+l'instantané) et déclenche une relecture du **seul** match
+(`GET /api/tournaments/[id]/matches/[matchId]/proposals`, `useProposalMaps`,
+`proposalsNeedRefresh`) — mêmes conditions que la lecture REST du détail, même
+règle de lecture (`getViewerMatchProposals`, qui partage `viewerProposalScope`
+avec le contexte du lecteur), au plus trois essais : chacun part **après** la
+réponse du précédent (jamais deux lectures en vol sur un serveur lent), 4 s plus
+tard, ou au `Retry-After` d'un 429 s'il est plus long (`proposalRetryDelayMs`) ;
+un 4xx hors 429 arrête les essais, comme toute réponse lue — même une
+proposition plus récente que l'instantané, dont la diffusion relancera la
+lecture. Engagés,
+statut et reports du match y sont **relus avec les maps**, en une instruction
+(`loadFreshMatchProposals`, `bg_matches` joint à `bg_match_maps` — jointure
+limitée aux matchs des engagés du lecteur, aucune map pour un lecteur étranger
+au match, qui ne fait remonter que la ligne du match) : l'instantané
+en cache peut précéder un report, un retrait ou un changement d'engagé
+(correction d'arbitrage). La règle de lecture se juge sur cet état relu — une
+équipe sortie du match n'en lit plus les propositions, un report déposé depuis
+l'instantané est servi avec sa date. La route a son propre plafond (`MATCH_PROPOSALS_READ_RULE`, 60 par minute et
+par compte), distinct de la lecture REST du détail, que ses relectures
+n'entament donc pas. Toute la relecture tient **une** place du
+pool : visibilité du tournoi (sa seule ligne, `participant_type` et
+`start_visibility_at` — ni l'instantané, rebâti à chaque relecture sur un cache
+vidé par les scores, ni l'agrégat des inscrites de la carte), engagé du lecteur
+(équipe active ou entrée solo) puis match et maps ; un lecteur sans engagé ne
+lit pas le match. Le match se lit par son id **et** son tournoi, sans passer par
+l'instantané : une manche posée depuis s'y lit déjà. Elle relisait le tournoi
+entier (instantané et contexte du lecteur) pour les maps d'un match. Une
+réponse `proposals: null` (rien de lisible sur l'état relu) arrête les essais :
+c'est une réponse, pas un échec. Une panne de la lecture rend un code seul :
+`409 CONCURRENT_UPDATE_RETRY` pour une contention, reconnue par le code de
+l'erreur (`isContentionError`, l'erreur gardée au journal), `500 INTERNAL_ERROR`
+sinon — jamais le 500 nu de Next.
+La réponse ne complète un côté que si elle décrit la proposition affichée
+(`mergeMatchProposals`) : une réponse en retard n'écrase rien, et le contexte
+qui décrit déjà ce report l'emporte (relu après un rafraîchissement complet, il
+est plus récent qu'une relecture du même instant).
 
 Un forfait n'affiche jamais de détail, quel que soit le chemin qui l'a posé
 (arbitrage, abandon en Survie / Ronde suisse / BG Survie) : `attachMatchMaps`
@@ -343,12 +379,15 @@ rejouée un match sur trois (`applyMatchMapDetails`).
 | Report / expiration | `lib/server/tournaments/scoring.ts`, `finalization.ts` |
 | Arbitrage | `lib/server/tournaments/admin.ts`, `lib/shared/admin-score-body.ts` |
 | Instantané | `lib/server/tournaments/_internal.ts` (`attachMatchMaps`), `snapshot.ts` |
-| Interface | `_components/MapScoreList.tsx`, `MatchMapDetails.tsx`, `PlayerScoreDialog.tsx`, `AdminScoreDialog.tsx`, `_hooks/useScoreForm.ts` |
+| Interface | `_components/MapScoreList.tsx`, `MatchMapDetails.tsx`, `MapDetailsDialog.tsx`, `MapResultList.tsx`, `PlayerScoreDialog.tsx`, `AdminScoreDialog.tsx`, `_hooks/useScoreForm.ts`, `_hooks/useProposalMaps.ts` |
+| Relecture d'un match | `app/api/tournaments/[id]/matches/[matchId]/proposals/route.ts`, `getViewerMatchProposals` (`tournaments/index.ts`) |
 
 ## Tests
 
 `tests/lib/shared/match-maps.test.ts`, `tests/lib/server/match-maps.test.ts`,
 `tests/app/api/admin/map-scores-routes.test.ts`,
 `tests/app/api/tournaments/report-score.test.ts`,
+`tests/app/api/tournaments/match-proposals.test.ts`, `tests/tournois/viewer-match-proposals.test.ts`,
+`tests/tournois/proposal-maps-hook.test.ts`,
 `tests/lib/server/match-format-report.test.ts`, `score-report-stalled.test.ts`,
 `tournaments-service.matches.test.ts`.

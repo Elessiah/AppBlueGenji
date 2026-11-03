@@ -157,6 +157,55 @@ propositions sur un match ouvert, `isScoreDisputed`) : un arbitrage hors litige
 engagée a reporté **suspend** la validation d'office : le score du déclarant ne
 remplace plus, à l'échéance, ce que l'arbitre a noté.
 
+« Enregistrer » ne clôt jamais un match : la sauvegarde ne lance aucune
+réconciliation de classement et ne publie que le plateau
+(`publishMatchUpdatedEvent`, ERREUR.txt EF-15). Dans les formats qui
+rebâtissent leurs manches (Survie, ronde suisse, endurance, phases :
+`ROUND_REBUILDING_FORMATS`, `tournaments/index.ts`), elle prend pourtant le
+verrou du tournoi **en toute première instruction** de sa transaction, puis celui du
+match (ordre des réconciliations, de l'annulation d'un abandon, du retrait
+d'une pénalité, de la programmation, de l'autogestion de manche et de la
+première carte) : une réconciliation **entrée par le verrou du tournoi** qui
+jugerait la manche vierge sur son instantané puis la détruirait pour la
+réapparier passe avant elle (la saisie lit alors `MATCH_NOT_FOUND`) ou après
+(elle voit la saisie), au lieu d'effacer une saisie commitée entre-temps. Les
+gestes qui prennent le match avant le tournoi — report d'un engagé, forfait
+déclaré par une équipe, « Valider le résultat », correction d'arbitrage —
+restent inversés : sur le même match, l'interblocage est rompu par le moteur
+(« Enregistrer », qui n'a rien écrit, en est la victime) et rejoué
+(`retryOnDeadlock`) ; un report dont l'image précède la saisie peut encore
+juger sa manche vierge (préexistant, ERREUR.txt). En élimination (simple,
+double), aucune réconciliation ne touche un match non clos : la saisie ne prend
+que le verrou du match, et les saisies map par map des matchs d'une même manche
+ne se sérialisent pas sur le tournoi — comme la phase d'élimination d'un
+tournoi multi-phases, jugée sur la phase du match. Le tournoi du match, avec
+le format du match (sa phase, sinon le tournoi), se lit juste avant, hors transaction (la route ne connaît que le match), et les
+refus qui ne lisent rien d'autre (`MATCH_NOT_FOUND`, `MATCH_NOT_READY`,
+`MATCH_ALREADY_COMPLETED`, forfait d'une équipe étrangère
+`INVALID_FORFEIT_TEAM_ID`, saisie mal formée `INVALID_REQUEST`, tous deux en 400) partent là, sans
+attendre le verrou, et sans `ROLLBACK` (aucune transaction ouverte) ; ils se
+rejugent sous verrou, par les mêmes règles (`assertMatchSavable`,
+`assertSaveEntryFits`, `save-guard.ts`). Le contrôle des maps contre le format
+et la fenêtre de saisie lit les règles du tournoi : il reste sous verrou, une
+seule lecture par saisie. Le module du moteur se résout aussi avant la
+transaction : un premier chargement ne se fait pas tournoi verrouillé. Le verrou
+aval (`checkDownstreamMatchesHaveNoScores`) n'y est plus lu : il ne protège
+qu'un match joué, que la sauvegarde refuse. Ses relectures sous verrou
+sont regroupées : la ligne enregistrée revient avec le résultat
+(`AdminSaveResult.saved`), les règles du match (`refereeScheduling` compris) se
+lisent en une requête, et les maps `FINAL` se réécrivent **par leur clé
+primaire** d'après les lignes lues sans verrou (`loadStoredMapSet`,
+`rewriteMapSet`, `match-maps.ts`) : une map inchangée n'est pas touchée, une
+map modifiée se met à jour par son `id`, celles en trop s'effacent par leur
+`id`, les nouvelles s'insèrent à la suite — la saisie map par map n'ajoute que
+sa map. Aucun parcours de la clé unique `(match_id, source, map_number)` : ni
+`DELETE` du jeu, ni mise à jour par doublon (`ON DUPLICATE KEY UPDATE`), dont
+les verrous d'intervalle débordaient sur le match voisin. Les lignes gardées
+se renumérotent 1..n au passage (un jeu troué, {1, 3}, faisait doubler le
+numéro de la map ajoutée) ; par numéro croissant, sans collision de la clé.
+Un `ROLLBACK` raté garde l'erreur d'origine (rejeu de l'interblocage) et
+détruit la connexion (`rollbackKeepingError`).
+
 - **Suspension** : `bg_matches.score_validation_paused_at = NOW()`, posée par
   `pauseAutoValidation` (`admin.ts`) dans la transaction d'« Enregistrer », sur
   la ligne déjà verrouillée, si le match est `AWAITING_CONFIRMATION` avec un

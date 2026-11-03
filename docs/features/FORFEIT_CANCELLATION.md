@@ -49,26 +49,90 @@ message de succès dit seulement que le classement est recalculé.
 | L'engagé est `FORFEIT` | `409 TEAM_NOT_FORFEITED` |
 | Aucune manche **postérieure** à celle de l'abandon ne porte de saisie (même borne que le retrait d'une pénalité) — sinon l'équipe rentrerait sans que les manches manquées comptent contre elle | `409 FORFEIT_ROUND_PASSED` |
 
-La transaction prend `lockTournamentRow` en toute première instruction. Elle
+### Concurrence
+
+La transaction lit la ligne du tournoi `FOR UPDATE` en toute première
+instruction : ce verrou est la lecture de sa tête (colonnes utiles), une seule
+requête au lieu de `lockTournamentRow` suivi d'une relecture. Elle
 verrouille donc le tournoi avant les manches que le rejeu peut poser, quand un
-report ou « Enregistrer » prend la manche avant le tournoi : comme l'abandon,
+report ou une correction d'arbitrage prend son match avant le tournoi
+(« Enregistrer » prend le tournoi d'abord, en toute première instruction de sa
+transaction : face à l'annulation, une simple attente) : comme l'abandon,
 elle passe par `retryOnDeadlock`, qui rejoue la transaction entière après un
-interblocage (publication une seule fois, après le commit réussi). Le contrôle
-des manches postérieures lit d'abord leurs matchs sans verrou (une saisie déjà
-commitée suffit à refuser), puis relit les autres **verrouillés, par clé
-primaire** (`FOR UPDATE`, table seule) : un report en cours écrit son score
-sous le verrou du match avant d'attendre le tournoi, et une lecture
-d'instantané l'aurait manqué — l'équipe rentrait et le rejeu suisse
-réappariait une manche déjà saisie. Ce report et l'annulation s'interbloquent :
-le moteur rompt le cycle, l'annulation (qui n'a encore rien écrit) se rejoue
-(`retryOnDeadlock`) et refuse en `FORFEIT_ROUND_PASSED`. Un « Prêt » commité
-sur ces matchs pendant l'attente fait refuser la relecture sous MariaDB
-(`ER_CHECKREAD`) : même rejeu. Une contention qui dure sur
-les trois tentatives — interblocage, ou ligne changée depuis l'instantané sous
-MariaDB (`ER_CHECKREAD`) — rend `409 CONCURRENT_UPDATE_RETRY`, pas une panne.
-Le verrou ne couvre que les manches postérieures, pas toute la phase ni ses
-intervalles ; il dure jusqu'au commit, si bien qu'un « Prêt » de la manche
-suivante attend la fin du rejeu.
+interblocage (publication une seule fois, après le commit réussi).
+
+**Aucune lecture d'instantané avant celle des manches.** Sous MariaDB 11.8
+(`innodb_snapshot_isolation`), une lecture verrouillante d'une ligne changée
+depuis l'image de la transaction est refusée (`ER_CHECKREAD`) ; une première
+lecture ordinaire figeait cette image avant l'attente du verrou des manches, et
+une rafale de « Prêt » à l'ouverture du salon épuisait les rejeux. Tête du
+tournoi, phase en cours (`FOR UPDATE` : le rejeu des phases peut la réécrire,
+un verrou partagé à promouvoir attendrait tout autre lecteur), ligne du classement (clé
+primaire) et manches postérieures se lisent donc toutes sous verrou ; l'image ne
+naît qu'après (rejeu du classement). Le nom de l'équipe, pour le journal, se lit
+**avant** la transaction, en lecture autonome : ni image ouverte, ni verrou
+partagé tenu pendant le rejeu (un renommage de l'équipe l'attendait). Son
+classement verrouillé la garde : l'effacer le supprime en cascade, et attend
+donc ce verrou.
+
+Les manches postérieures se lisent par `laterRoundsHaveScoreInput`
+(`lib/server/tournaments/bg-survie/round-progress.ts`, la règle commune au
+retrait d'une pénalité, qui la lit verrouillée lui aussi — sa sanction lue
+`FOR UPDATE` d'abord, aucune lecture d'image avant —, et à la correction
+d'arbitrage, qui la lit en image : sa lecture ordinaire du match l'a déjà
+figée, et ses autres dépendants — liens de bracket, phases — se lisent de même ;
+limite consignée dans `ERREUR.txt`), **verrouillées** par
+l'index `idx_bg_matches_phase_round` : les seules manches postérieures, pas
+toute la phase ni ses intervalles. Un report en cours écrit son score sous le
+verrou du match avant d'attendre le tournoi, et une lecture d'instantané
+l'aurait manqué — l'équipe rentrait et le rejeu suisse réappariait une manche
+déjà saisie. Ce report et l'annulation s'interbloquent, et le moteur choisit la
+victime :
+
+- le plus souvent l'annulation, qui n'a encore rien écrit : elle se rejoue
+  (`retryOnDeadlock`), voit le score et refuse en `FORFEIT_ROUND_PASSED` ;
+- si c'est le report, l'annulation passe (aucune saisie commitée ne la
+  bloque) et le report, rejoué par l'équipe (`retryOnDeadlock`), s'écrit sur la
+  manche telle que le rejeu du classement l'a laissée — réappariée si elle
+  était vierge, auquel cas son match a pu disparaître (`MATCH_NOT_FOUND`).
+
+Un détenteur qui ne demande jamais le tournoi (programmation, rappels,
+« Prêt ») ne forme pas d'interblocage : l'annulation l'attend au plus
+`SHORT_LOCK_WAIT_SECONDS` (5 s, `SET SESSION innodb_lock_wait_timeout`, remis
+au défaut du serveur avant de rendre la connexion au pool —
+`lib/server/tournaments/lock-wait.ts`, partagé avec le retrait d'une pénalité,
+qui tient lui aussi le tournoi en verrouillant les manches) au lieu des 50 s du
+serveur, en tenant le verrou du tournoi. La borne n'entoure **que** cette
+lecture des manches (`withShortLockWait`, toute lecture `lock`) : le verrou du
+tournoi (la tête lue `FOR UPDATE`, en toute première instruction) s'attend sans
+borne comme pour tout geste — son détenteur, réconciliation ou lancement, le
+rend sans rien attendre de l'annulation —, et le rejeu qui suit retrouve le
+délai du serveur (journal du bot et alertes, qui tolèrent un délai dépassé,
+perdraient sinon leur ligne en silence). Au retour au pool, le délai n'est
+remis qu'une fois de plus si cette remise a manqué (aucune requête sinon) ; une
+remise ratée après une lecture réussie arrête le geste plutôt que de rejouer sous
+le délai court. Un `ROLLBACK` qui échoue (connexion tombée après l'interblocage)
+ne masque pas l'erreur d'origine — le rejeu et le 409 la reconnaissent — et la
+connexion, transaction peut-être encore ouverte, est détruite au lieu d'être
+rendue (`rollbackKeepingError`, même module). Un classement dont l'équipe n'existe plus rend
+`TEAM_NOT_IN_TOURNAMENT`, avant la lecture bornée des manches. Une contention qui dure —
+interblocage sur les trois tentatives, `ER_CHECKREAD`, délai de verrou
+(`ER_LOCK_WAIT_TIMEOUT`) — rend `409 CONCURRENT_UPDATE_RETRY` (code fixe, le
+journal cite le tournoi et l'engagé), pas une panne. La route la reconnaît par
+`isContentionError` (`lib/server/mysql-errors.ts`), sur le code de l'erreur
+d'abord, indépendant de la langue des messages du serveur. Les verrous durent
+jusqu'au commit, si bien qu'un « Prêt » de la manche suivante attend la fin du
+rejeu.
+
+**Publication** (`publishStandingsReplayedEvent`, `notifications.ts`, règle
+partagée avec le retrait d'une pénalité d'endurance) : instantané, direct de
+l'accueil, aperçu, listes et mini-arbres de l'accueil — le rejeu peut réécrire des
+colonnes de `bg_tournaments` (manche d'endurance courante, phase) et reposer
+les matchs d'une manche périmée. Aucun résultat de match ne change : le
+classement du site, les statistiques et, à l'accueil, leaderboards, bandeau et
+compteurs restent en cache (`publishUpdatedEvent` les vidait). L'administrateur relit le tournoi
+aussitôt (`refresh()`), flux ouvert ou non : la diffusion peut attendre jusqu'à une
+minute (tranche, budget de la salle), son bouton resterait périmé.
 
 ## Permission : administrateur strict
 
@@ -150,9 +214,10 @@ tournoi individuel), auteur nommé dans pm2 seulement.
 
 - `tests/lib/server/forfeit-cancellation-service.test.ts` — verrou en premier,
   fenêtre, statut remis à `ACTIVE`, rejeu du bon moteur, multi-phases,
-  rejeu après interblocage (un refus métier ne se rejoue pas), contrôle des
-  manches postérieures verrouillées par clé primaire (interblocage → rejeu
-  puis refus), contention persistante rendue en `409`.
+  rejeu après interblocage (un refus métier ne se rejoue pas), lectures toutes
+  verrouillantes avant les manches, manches postérieures verrouillées
+  (interblocage → rejeu puis refus), délai de verrou court remis au défaut,
+  publication sans le classement du site, contention persistante rendue en `409`.
 - `tests/app/api/admin/forfeit-cancellation.test.ts` — administrateur seul,
   codes d'erreur, journal anonyme.
 - `tests/tournois/forfeit-eligibility.test.ts` — `canCancelForfeits`.

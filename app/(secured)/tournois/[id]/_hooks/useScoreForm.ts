@@ -45,6 +45,15 @@ export function savedToastKey(forfeit: boolean, paused: boolean) {
 const ADMIN_MAP_RULES: MapEntryRules = { requireReplayCode: false };
 
 /**
+ * Empreinte des règles des lignes d'ouverture (format de la manche, jeu),
+ * champ par champ — rien à sérialiser à chaque frappe.
+ */
+function rulesKey(format: MatchFormat | null, game: string | null): string {
+  if (!format) return `|${game ?? ""}`;
+  return `${format.type}:${format.value}:${format.maxMaps ?? ""}:${format.drawsAllowed ? 1 : 0}|${game ?? ""}`;
+}
+
+/**
  * @param options.scoreEntryClosed match à planifier ou en attente de son heure
  *   (`isScoreEntryOpen`) : les scores sont refusés, le forfait reste ouvert.
  */
@@ -91,9 +100,14 @@ export function useScoreForm(
   // · rien saisi → on adopte silencieusement la nouvelle valeur ;
   // · une saisie en cours → on la garde, et on signale le désaccord plutôt que
   //   de l'effacer ou de la laisser écraser le travail de l'autre.
+  // Règles des lignes d'ouverture (format de la manche, jeu) : changées pendant
+  // que le dialogue est ouvert, elles changent ce qu'ouvrir produirait sans
+  // toucher à l'empreinte du résultat — l'alignement doit les suivre aussi.
+  const rules = rulesKey(matchFormat, game);
   const [synced, setSynced] = useState(() => ({
     signature: storedResultSignature(match),
     proposals: pendingProposalSignature(match),
+    rules,
     // Valeurs adoptées au dernier alignement : c'est à elles que se compare la
     // saisie courante pour savoir si le lecteur a tapé quelque chose. Comparer
     // au match qui *arrive* ne le dirait pas — il a précisément changé.
@@ -106,11 +120,11 @@ export function useScoreForm(
 
   const signature = storedResultSignature(match);
   const proposals = pendingProposalSignature(match);
-  if (signature !== synced.signature || proposals !== synced.proposals) {
+  if (signature !== synced.signature || proposals !== synced.proposals || rules !== synced.rules) {
     const untouched = sameScoreFormState(state, synced.baseline) && sameMaps(maps, synced.mapsBaseline);
     const nextMaps = openingRows();
     const next = adminFormStateFor(match, nextMaps);
-    setSynced({ signature, proposals, baseline: next, mapsBaseline: nextMaps });
+    setSynced({ signature, proposals, rules, baseline: next, mapsBaseline: nextMaps });
 
     if (untouched) {
       setState(next);
@@ -133,7 +147,7 @@ export function useScoreForm(
   const adoptStoredResult = () => {
     const nextMaps = openingRows();
     const next = adminFormStateFor(match, nextMaps);
-    setSynced({ signature, proposals, baseline: next, mapsBaseline: nextMaps });
+    setSynced({ signature, proposals, rules, baseline: next, mapsBaseline: nextMaps });
     setState(next);
     setMaps(nextMaps);
     options.onMapsReset?.();
@@ -275,8 +289,13 @@ export function useScoreForm(
     conflict,
     adoptStoredResult,
     adoptReport,
-    /** Une saisie est en cours, non enregistrée. */
-    dirty: !sameScoreFormState(state, openingState()) || !sameMaps(maps, openingRows()),
+    /**
+     * Une saisie est en cours, non enregistrée. Comparée aux valeurs du dernier
+     * alignement (`synced`), qui sont celles d'ouverture du match reçu : les
+     * reconstruire ici refaisait deux `progressiveMapRows` et deux
+     * `JSON.stringify` à chaque frappe et à chaque trame du flux.
+     */
+    dirty: !sameScoreFormState(state, synced.baseline) || !sameMaps(maps, synced.mapsBaseline),
     // Forfait nominatif et double forfait s'excluent : en choisir un retire
     // l'autre, pour que le formulaire ne porte jamais deux verdicts.
     setForfeitTeamId: (id?: number) =>

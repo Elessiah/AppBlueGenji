@@ -3,9 +3,13 @@ import {
   REPORTED_MAP_SOURCES,
   clearMapSets,
   loadMapsByMatch,
+  loadFreshMatchProposals,
   loadMatchMaps,
+  loadStoredMapSet,
   promoteReportedMaps,
   replaceMatchMaps,
+  rewriteMapSet,
+  type StoredMap,
 } from "@/lib/server/tournaments/match-maps";
 import { attachMatchMaps } from "@/lib/server/tournaments/_internal";
 import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
@@ -134,6 +138,179 @@ describe("stockage map par map (bg_match_maps)", () => {
     const { execute, connection } = conn();
     expect((await loadMapsByMatch(connection, [])).size).toBe(0);
     expect(execute).not.toHaveBeenCalled();
+  });
+});
+
+describe("loadStoredMapSet", () => {
+  it("loadStoredMapSet_rowsFound_returnsMapsWithPrimaryKeyInPlayedOrder", async () => {
+    const { execute, connection } = conn([
+      [[
+        { id: 81, map_number: 1, replay_code: "AAA111", team1_score: 2, team2_score: 1 },
+        { id: 82, map_number: 2, replay_code: "BBB222", team1_score: 0, team2_score: 2 },
+      ], []],
+    ]);
+
+    const stored = await loadStoredMapSet(connection, 70, "FINAL");
+
+    expect(stored).toEqual([
+      { id: 81, mapNumber: 1, replayCode: "AAA111", team1Score: 2, team2Score: 1 },
+      { id: 82, mapNumber: 2, replayCode: "BBB222", team1Score: 0, team2Score: 2 },
+    ]);
+    expect(flat(execute.mock.calls[0][0])).toBe(
+      "SELECT id, map_number, replay_code, team1_score, team2_score FROM bg_match_maps WHERE match_id = ? AND source = ? ORDER BY map_number",
+    );
+    expect(execute.mock.calls[0][1]).toEqual([70, "FINAL"]);
+  });
+
+  it("loadStoredMapSet_noRow_returnsEmptyList", async () => {
+    const { connection } = conn([[[], []]]);
+
+    await expect(loadStoredMapSet(connection, 70, "FINAL")).resolves.toEqual([]);
+  });
+
+  // Un résultat inattendu ne passe pas pour un jeu vide (l'écriture
+  // insérerait par-dessus des maps existantes).
+  it("loadStoredMapSet_malformedResult_throwsInsteadOfReportingEmpty", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue(undefined);
+
+    await expect(loadStoredMapSet(fakeConnection({ execute }), 70, "FINAL")).rejects.toThrow(TypeError);
+  });
+});
+
+/**
+ * Revue perf #542 : le jeu FINAL se réécrit par clé primaire — ni parcours de
+ * la clé unique, ni mise à jour par doublon.
+ */
+describe("rewriteMapSet", () => {
+  const first: StoredMap = { id: 81, mapNumber: 1, replayCode: "AAA111", team1Score: 2, team2Score: 1 };
+  const second: StoredMap = { id: 82, mapNumber: 2, replayCode: "BBB222", team1Score: 0, team2Score: 2 };
+  const third = { replayCode: "CCC333", team1Score: 2, team2Score: 0 };
+  const sameAs = (map: StoredMap) => ({ replayCode: map.replayCode, team1Score: map.team1Score, team2Score: map.team2Score });
+
+  it("rewriteMapSet_unchangedMaps_runsNoStatement", async () => {
+    const { execute, connection } = conn();
+
+    await rewriteMapSet(connection, 10, "FINAL", [first, second], [sameAs(first), sameAs(second)], 7);
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("rewriteMapSet_growing_insertsOnlyNewMapNumberedAfterStored", async () => {
+    const { execute, connection } = conn();
+
+    await rewriteMapSet(connection, 10, "FINAL", [first, second], [sameAs(first), sameAs(second), third], 7);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(flat(execute.mock.calls[0][0])).toMatch(/^INSERT INTO bg_match_maps /);
+    expect(execute.mock.calls[0][1]).toEqual([10, "FINAL", 3, "CCC333", 2, 0, 7]);
+  });
+
+  it("rewriteMapSet_changedMap_updatesByPrimaryKeyOnly", async () => {
+    const { execute, connection } = conn();
+
+    await rewriteMapSet(connection, 10, "FINAL", [first, second], [sameAs(first), { ...sameAs(second), team1Score: 1 }], 7);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(flat(execute.mock.calls[0][0])).toBe(
+      "UPDATE bg_match_maps SET map_number = ?, replay_code = ?, team1_score = ?, team2_score = ?, submitted_by_user_id = ?, submitted_at = CURRENT_TIMESTAMP WHERE id = ?",
+    );
+    expect(execute.mock.calls[0][1]).toEqual([2, "BBB222", 1, 2, 7, 82]);
+  });
+
+  it("rewriteMapSet_shrinking_deletesExtraMapsByPrimaryKey", async () => {
+    const { execute, connection } = conn();
+
+    await rewriteMapSet(connection, 10, "FINAL", [first, second], [sameAs(first)], 7);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(flat(execute.mock.calls[0][0])).toBe("DELETE FROM bg_match_maps WHERE id IN (?)");
+    expect(execute.mock.calls[0][1]).toEqual([82]);
+  });
+
+  it("rewriteMapSet_emptyList_deletesEveryStoredMapWithoutInsert", async () => {
+    const { execute, connection } = conn();
+
+    await rewriteMapSet(connection, 10, "FINAL", [first, second], [], 7);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(flat(execute.mock.calls[0][0])).toBe("DELETE FROM bg_match_maps WHERE id IN (?, ?)");
+    expect(execute.mock.calls[0][1]).toEqual([81, 82]);
+  });
+
+  it("rewriteMapSet_emptyStoredSet_insertsFromMapOne", async () => {
+    const { execute, connection } = conn();
+
+    await rewriteMapSet(connection, 10, "FINAL", [], [third], 7);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0][1]).toEqual([10, "FINAL", 1, "CCC333", 2, 0, 7]);
+  });
+
+  // Revue sécurité #542 (cycle 4) : un jeu stocké troué se renumérote 1..n —
+  // sinon la nouvelle map reprendrait un numéro gardé (doublon de la clé
+  // unique) et « Map 1 » manquerait.
+  it("rewriteMapSet_gappedStoredSet_renumbersKeptRowThenInsertsAfter", async () => {
+    const { execute, connection } = conn();
+    const thirdStored: StoredMap = { ...second, id: 83, mapNumber: 3 };
+
+    await rewriteMapSet(connection, 10, "FINAL", [first, thirdStored], [sameAs(first), sameAs(thirdStored), third], 7);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(flat(execute.mock.calls[0][0])).toMatch(/^UPDATE bg_match_maps SET map_number = \?/);
+    expect(execute.mock.calls[0][1]).toEqual([2, "BBB222", 0, 2, 7, 83]);
+    expect(execute.mock.calls[1][1]).toEqual([10, "FINAL", 3, "CCC333", 2, 0, 7]);
+  });
+
+  it("rewriteMapSet_setStartingAtTwo_renumbersFromOne", async () => {
+    const { execute, connection } = conn();
+    const atTwo: StoredMap = { ...first, id: 82, mapNumber: 2 };
+    const atThree: StoredMap = { ...second, id: 83, mapNumber: 3 };
+
+    await rewriteMapSet(connection, 10, "FINAL", [atTwo, atThree], [sameAs(atTwo), sameAs(atThree)], 7);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[0][1]).toEqual([1, "AAA111", 2, 1, 7, 82]);
+    expect(execute.mock.calls[1][1]).toEqual([2, "BBB222", 0, 2, 7, 83]);
+  });
+});
+
+/**
+ * Revue perf #542 : les maps ne se joignent que pour un lecteur engagé dans
+ * le match — un lecteur étranger ne fait remonter que la ligne du match.
+ */
+describe("loadFreshMatchProposals — jointure des maps", () => {
+  const target = { tournamentId: 5, matchId: 70 };
+  const noReport = () => null;
+  const head = { team1_id: 42, team2_id: 43, status: "AWAITING_CONFIRMATION", source: null };
+
+  it("loadFreshMatchProposals_allScope_joinsMapsWithoutReaderFilter", async () => {
+    const { execute, connection } = conn([[[head], []]]);
+
+    await loadFreshMatchProposals(connection, target, { all: true, teamIds: [42] }, noReport);
+
+    expect(flat(execute.mock.calls[0][0])).toContain("ON mm.match_id = m.id AND mm.source IN (?, ?) WHERE");
+    expect(execute.mock.calls[0][1]).toEqual(["TEAM1", "TEAM2", 70, 5]);
+  });
+
+  it("loadFreshMatchProposals_readerTeams_joinsMapsOnlyForMatchesOfThoseTeams", async () => {
+    const { execute, connection } = conn([[[head], []]]);
+
+    await loadFreshMatchProposals(connection, target, { all: false, teamIds: [42, 99] }, noReport);
+
+    expect(flat(execute.mock.calls[0][0])).toContain(
+      "AND mm.source IN (?, ?) AND (m.team1_id IN (?, ?) OR m.team2_id IN (?, ?)) WHERE",
+    );
+    expect(execute.mock.calls[0][1]).toEqual(["TEAM1", "TEAM2", 42, 99, 42, 99, 70, 5]);
+  });
+
+  it("loadFreshMatchProposals_noReaderTeam_joinsNoMapAndReturnsNull", async () => {
+    const { execute, connection } = conn([[[head], []]]);
+
+    const result = await loadFreshMatchProposals(connection, target, { all: false, teamIds: [] }, noReport);
+
+    expect(flat(execute.mock.calls[0][0])).toContain("AND mm.source IN (?, ?) AND FALSE WHERE");
+    expect(execute.mock.calls[0][1]).toEqual(["TEAM1", "TEAM2", 70, 5]);
+    expect(result).toBeNull();
   });
 });
 

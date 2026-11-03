@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fail } from "@/lib/server/http";
-import { isDeadlockMessage } from "@/lib/server/mysql-errors";
+import { isContentionError, isContentionMessage, isDeadlockMessage, isSnapshotConflict } from "@/lib/server/mysql-errors";
 import { launchFailure } from "@/lib/server/tournaments/match-launch-routes";
 import { CONCURRENT_UPDATE_RETRY, CONCURRENT_UPDATE_RETRY_MESSAGE } from "@/lib/shared/api-error-code";
 import { ERROR_MESSAGES, mapError } from "@/app/(secured)/tournois/[id]/_lib/error-map";
 
 const DEADLOCK = "Deadlock found when trying to get lock; try restarting transaction";
+const LOCK_WAIT = "Lock wait timeout exceeded; try restarting transaction";
 
 describe("isDeadlockMessage", () => {
   it("reconnaît le message d'interblocage d'InnoDB", () => {
@@ -56,9 +57,90 @@ describe("fail — interblocage", () => {
   });
 
   it("laisse les autres erreurs MySQL en panne générique", async () => {
-    const response = fail("Lock wait timeout exceeded; try restarting transaction", 500);
+    const response = fail("Unknown column 'x' in 'field list'", 500);
     expect(response.status).toBe(500);
     expect((await response.json()).error).toBe("INTERNAL_ERROR");
+  });
+
+  // ERREUR.txt EF-15 : les deux autres contentions passagères qu'un rejeu n'a
+  // pas absorbées sont un refus « réessaie », pas une panne.
+  it("fail_snapshotConflictMessage_returns409RetryCode", async () => {
+    const response = fail("Record has changed since last read in table 'bg_matches'", 500);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: CONCURRENT_UPDATE_RETRY });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it("fail_lockWaitTimeoutMessage_returns409RetryCode", async () => {
+    const response = fail(LOCK_WAIT, 400);
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe(CONCURRENT_UPDATE_RETRY);
+  });
+});
+
+describe("isContentionMessage", () => {
+  it("isContentionMessage_snapshotConflict_returnsTrue", () => {
+    expect(isContentionMessage("Record has changed since last read in table 'bg_matches'")).toBe(true);
+  });
+
+  it("isContentionMessage_lockWaitTimeout_returnsTrue", () => {
+    expect(isContentionMessage(LOCK_WAIT)).toBe(true);
+  });
+
+  // Revue perf #542 : liste unique — l'interblocage en fait partie.
+  it("isContentionMessage_deadlock_returnsTrue", () => {
+    expect(isContentionMessage(DEADLOCK)).toBe(true);
+  });
+
+  it("isContentionMessage_otherText_returnsFalse", () => {
+    expect(isContentionMessage(`Erreur : ${LOCK_WAIT}`)).toBe(false);
+    expect(isContentionMessage("Record has changed since last read in tablespace")).toBe(false);
+    expect(isContentionMessage("ER_CHECKREAD")).toBe(false);
+  });
+
+  it("isContentionMessage_nonString_returnsFalse", () => {
+    expect(isContentionMessage(undefined)).toBe(false);
+    expect(isContentionMessage(1020)).toBe(false);
+  });
+});
+
+describe("isContentionError", () => {
+  it("isContentionError_checkreadCodeWithLocalizedMessage_returnsTrue", () => {
+    const localized = Object.assign(new Error("L'enregistrement a changé depuis la dernière lecture"), { code: "ER_CHECKREAD" });
+
+    expect(isContentionError(localized)).toBe(true);
+  });
+
+  it("isContentionError_lockWaitCode_returnsTrue", () => {
+    expect(isContentionError(Object.assign(new Error("délai dépassé"), { code: "ER_LOCK_WAIT_TIMEOUT" }))).toBe(true);
+  });
+
+  it("isContentionError_deadlockCode_returnsTrue", () => {
+    expect(isContentionError(Object.assign(new Error("interblocage"), { code: "ER_LOCK_DEADLOCK" }))).toBe(true);
+  });
+
+  it("isContentionError_errnoOnly_returnsTrue", () => {
+    expect(isContentionError(Object.assign(new Error("x"), { errno: 1020 }))).toBe(true);
+    expect(isContentionError(Object.assign(new Error("x"), { errno: 1205 }))).toBe(true);
+    expect(isContentionError(Object.assign(new Error("x"), { errno: 1213 }))).toBe(true);
+  });
+
+  it("isContentionError_messageWithoutCode_returnsTrue", () => {
+    expect(isContentionError(new Error(LOCK_WAIT))).toBe(true);
+    expect(isContentionError(new Error(DEADLOCK))).toBe(true);
+    expect(isContentionError(new Error("Record has changed since last read in table 'bg_matches'"))).toBe(true);
+  });
+
+  it("isContentionError_otherError_returnsFalse", () => {
+    expect(isContentionError(Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY", errno: 1062 }))).toBe(false);
+    expect(isContentionError(new Error("boom"))).toBe(false);
+  });
+
+  it("isContentionError_nonError_returnsFalse", () => {
+    expect(isContentionError(null)).toBe(false);
+    expect(isContentionError(LOCK_WAIT)).toBe(false);
+    expect(isContentionError(undefined)).toBe(false);
   });
 });
 
@@ -83,6 +165,29 @@ describe("launchFailure — interblocage", () => {
     expect((await response.json()).error).toBe(CONCURRENT_UPDATE_RETRY);
   });
 
+  it("launchFailure_lockWaitTimeout_returns409RetryCode", async () => {
+    const timeout = Object.assign(new Error(LOCK_WAIT), { code: "ER_LOCK_WAIT_TIMEOUT", errno: 1205 });
+
+    const response = launchFailure(timeout, {}, "MATCH_READY_FAILED");
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe(CONCURRENT_UPDATE_RETRY);
+  });
+
+  it("launchFailure_localizedCheckreadWithCode_returns409RetryCode", async () => {
+    const conflict = Object.assign(new Error("Enregistrement modifié"), { code: "ER_CHECKREAD" });
+
+    const response = launchFailure(conflict, {}, "MATCH_READY_FAILED");
+
+    expect(response.status).toBe(409);
+  });
+
+  it("launchFailure_snapshotConflictMessageWithoutCode_returns409RetryCode", async () => {
+    const response = launchFailure(new Error("Record has changed since last read in table 'bg_matches'"), {}, "MATCH_READY_FAILED");
+
+    expect(response.status).toBe(409);
+  });
+
   it("garde le code de repli pour une erreur imprévue", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => {});
     try {
@@ -100,5 +205,19 @@ describe("message d'interface", () => {
     expect(ERROR_MESSAGES[CONCURRENT_UPDATE_RETRY]).toBe(CONCURRENT_UPDATE_RETRY_MESSAGE);
     expect(mapError(CONCURRENT_UPDATE_RETRY)).toBe(CONCURRENT_UPDATE_RETRY_MESSAGE);
     expect(CONCURRENT_UPDATE_RETRY_MESSAGE).toMatch(/Réessaie/);
+  });
+});
+
+// Revue #542 : un seul prédicat du conflit d'image, partagé par le rejeu et le 409.
+describe("isSnapshotConflict", () => {
+  it("isSnapshotConflict_checkreadCodeOrErrno_returnsTrue", () => {
+    expect(isSnapshotConflict(Object.assign(new Error("x"), { code: "ER_CHECKREAD" }))).toBe(true);
+    expect(isSnapshotConflict(Object.assign(new Error("x"), { errno: 1020 }))).toBe(true);
+  });
+
+  it("isSnapshotConflict_otherOrNonError_returnsFalse", () => {
+    expect(isSnapshotConflict(Object.assign(new Error("x"), { code: "ER_LOCK_DEADLOCK", errno: 1213 }))).toBe(false);
+    expect(isSnapshotConflict(null)).toBe(false);
+    expect(isSnapshotConflict("ER_CHECKREAD")).toBe(false);
   });
 });

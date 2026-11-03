@@ -59,7 +59,7 @@ import { matchSideViews } from "../_lib/match-row-sides";
 import { EntrantName, type EntrantLogoSize } from "./EntrantName";
 import { MatchCardActions } from "./MatchCardActions";
 import { LaunchPhaseBadge, hasLaunchPhaseBadge } from "./MatchLaunchStrip";
-import { MapResultList } from "./MatchMapDetails";
+import { MapResultList } from "./MapResultList";
 import { MatchReplayStrip } from "./MatchReplayStrip";
 import { MatchRoundMaps } from "./MatchRoundMaps";
 import { StreamLink } from "./MatchLiveStrip";

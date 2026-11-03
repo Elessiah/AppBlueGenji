@@ -43,7 +43,7 @@ import { useMapError } from "../_lib/error-map";
 import { mapViolationText, useDialogsText } from "../_lib/dialogs-text";
 import type { MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { MapScoreList, mapFieldIds } from "./MapScoreList";
-import { MapResultList } from "./MatchMapDetails";
+import { MapResultList } from "./MapResultList";
 import mapStyles from "./MatchMapDetails.module.css";
 import styles from "./ScoreDialog.module.css";
 
@@ -269,8 +269,8 @@ export function PlayerScoreDialog({
   const mapError = useMapError();
   // Les propositions complétées de leur détail : la modale s'ouvre sur les maps
   // de l'adversaire (codes et scores), à confirmer d'un clic.
-  const match = useProposalMaps(liveMatch, proposals, onRefresh, canReportScore);
-  const detailLoading = proposalDetailLoading(canReportScore, liveMatch, proposals);
+  const { match, proposals: readableProposals } = useProposalMaps(liveMatch, proposals, canReportScore);
+  const detailLoading = proposalDetailLoading(canReportScore, liveMatch, readableProposals);
   const { showError, showSuccess } = useToast();
   const matchFormat = useMatchFormat(match);
   // Phase de lancement, pour dire **pourquoi** le score n'est pas encore

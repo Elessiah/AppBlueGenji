@@ -38,13 +38,26 @@ describe("détail map par map — entretien de l'instantané", () => {
 describe("détail map par map — affichage", () => {
   it("la carte ouvre le détail dans une modale, jamais dans un volet qui grandit le créneau", () => {
     const details = readSource("app/(secured)/tournois/[id]/_components/MatchMapDetails.tsx");
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/MapDetailsDialog.tsx");
     expect(details).not.toContain("<details");
-    expect(details).toContain("createPortal(");
-    expect(details).toContain("useDialogBehavior({ open: true, onClose })");
+    expect(dialog).not.toContain("<details");
+    expect(dialog).toContain("createPortal(");
+    expect(dialog).toContain("useDialogBehavior({ open: true, onClose })");
+  });
+
+  // ERREUR.txt EF-15 : la modale (son CSS, ses hooks) ne part qu'au clic — le
+  // bouton résumé, seul en ligne, la charge par `dynamic()`.
+  it("la modale du détail se charge à la demande, jamais avec la page", () => {
+    const details = readSource("app/(secured)/tournois/[id]/_components/MatchMapDetails.tsx");
+    expect(details).toMatch(/const MapDetailsDialog = dynamic\(\s*\(\) => orReload\(import\("\.\/MapDetailsDialog"\)/);
+    expect(details).toMatch(/\{\s*ssr: false,?\s*\}/);
+    expect(details).not.toMatch(/^import [^;]*from "\.\/MapDetailsDialog";/m);
+    expect(details).not.toMatch(/^import [^;]*ScoreDialog\.module\.css";/m);
+    expect(details).not.toMatch(/^import [^;]*from "react-dom";/m);
   });
 
   it("une map posée sans code dit « Pas de code de replay » au lieu d'un code vide à copier", () => {
-    const details = readSource("app/(secured)/tournois/[id]/_components/MatchMapDetails.tsx");
+    const details = readSource("app/(secured)/tournois/[id]/_components/MapResultList.tsx");
     expect(details).toMatch(/\{!spectator && map\.replayCode === "" && \(\s*<span className=\{styles\.noCode\}>\{t\("match\.maps\.noReplayCode"\)\}<\/span>\s*\)\}/);
     expect(details).toContain('{!spectator && map.replayCode !== "" && (');
     expect(frTournament.match.maps.noReplayCode).toBe("Pas de code de replay");
@@ -125,8 +138,19 @@ describe("détail map par map — arbitrage et relecture", () => {
   it("la relecture du détail adverse se retente tant qu'il manque, au plus trois fois", () => {
     const hook = readSource("app/(secured)/tournois/[id]/_hooks/useProposalMaps.ts");
     expect(hook).toContain("const PROPOSAL_REFRESH_ATTEMPTS = 3;");
-    expect(hook).toMatch(/if \(tries < PROPOSAL_REFRESH_ATTEMPTS\) timer = setTimeout\(attempt, PROPOSAL_REFRESH_DELAY_MS\);/);
+    // Chaque essai part après la réponse du précédent (revue perf #542).
+    expect(hook).toContain("if (waitMs === null || controller.signal.aborted || tries >= PROPOSAL_REFRESH_ATTEMPTS) return;");
+    expect(hook).toContain("timer = setTimeout(() => void attempt(), waitMs);");
     expect(hook).toContain("if (timer !== null) clearTimeout(timer);");
+  });
+
+  // ERREUR.txt EF-15 : la relecture ne vise que le match du dialogue.
+  it("la relecture du détail ne lit que les propositions du match, jamais le tournoi entier", () => {
+    const hook = readSource("app/(secured)/tournois/[id]/_hooks/useProposalMaps.ts");
+    expect(hook).toContain("`/api/tournaments/${tournamentId}/matches/${matchId}/proposals`");
+    expect(hook).not.toContain("onRefresh");
+    const sheet = readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
+    expect(sheet).not.toContain("onRefreshProposals");
   });
 });
 
@@ -218,7 +242,7 @@ describe("détail map par map — retours de la revue UI/UX", () => {
 describe("détail map par map — arbitrage pendant la lecture du détail proposé", () => {
   it("les boutons de score attendent le détail de la proposition, pour ne pas en effacer les codes", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
-    expect(dialog).toMatch(/const awaitingDetail =\s*proposalsNeedRefresh\(liveMatch, proposals\) &&\s*!form\.maps\.some\(isMapTouched\)/);
+    expect(dialog).toMatch(/const awaitingDetail =\s*proposalsNeedRefresh\(liveMatch, readableProposals\) &&\s*!form\.maps\.some\(isMapTouched\)/);
     expect(dialog).toContain("const saveBlocked = (!form.decision.canSave && !form.mapsRefused.save) || awaitingDetail;");
     expect(dialog).toContain("aria-disabled={form.submitting || saveBlocked || undefined}");
     expect(dialog).toContain("if (!form.submitting && !saveBlocked) void run(\"save\");");
@@ -470,5 +494,44 @@ describe("détail map par map — premier report sans verrou d'intervalle", () =
     const scoring = readSource("lib/server/tournaments/scoring.ts");
     expect(scoring).toContain("const hadReport = (isTeam1Reporter ? match.team1_reported_at : match.team2_reported_at) != null;");
     expect(scoring).toContain("await replaceMatchMaps(connection, matchId, reporterSource, maps, userId, { knownEmpty: !hadReport });");
+  });
+});
+
+// ERREUR.txt EF-15 : allers-retours et recalculs évités côté client.
+describe("dialogues de score — calculs évités (EF-15)", () => {
+  it("useScoreForm_dirty_comparesToLastAlignmentBaseline", () => {
+    const hook = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
+    expect(hook).toContain("dirty: !sameScoreFormState(state, synced.baseline) || !sameMaps(maps, synced.mapsBaseline),");
+    expect(hook).not.toContain("dirty: !sameScoreFormState(state, openingState())");
+  });
+
+  it("AdminScoreDialog_mapFieldIds_builtOnceAtModuleLevel", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
+    expect(dialog).toContain('const ADMIN_MAP_FIELD_IDS = mapFieldIds("admin-score", MAP_FIELD_ID_SLOTS);');
+    expect(dialog).toContain("useFieldErrors<string>({}, ADMIN_MAP_FIELD_IDS)");
+    expect(dialog.match(/mapFieldIds\(/g)).toHaveLength(1);
+  });
+
+  it("AdminScoreDialog_storedResultLabel_computedOnce", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
+    expect(dialog.match(/storedResultLabel\(text, match, team1, team2\)/g)).toHaveLength(1);
+  });
+
+  // Revue #542 : l'auteur du geste relit tout de suite, flux ouvert ou non —
+  // la diffusion peut attendre jusqu'à une minute (tranche, budget de la salle).
+  it("TournamentSheet_cancelForfeit_actorRefreshesImmediately", () => {
+    const sheet = readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
+    const start = sheet.indexOf("const performCancelForfeit = async");
+    const body = sheet.slice(start, sheet.indexOf("return true;", start));
+    expect(body).toContain("void refresh().then(() => focusRowAfterChange(teamId));");
+    expect(sheet).not.toContain("isLiveRef");
+  });
+
+  it("useScoreForm_rulesChangeWhileOpen_realignsBaseline", () => {
+    const form = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
+    expect(form).toContain("const rules = rulesKey(matchFormat, game);");
+    expect(form).not.toContain("JSON.stringify(matchFormat)");
+    expect(form).toContain("rules !== synced.rules");
+    expect(form).not.toMatch(/setSynced\(\{ signature, proposals, baseline/);
   });
 });

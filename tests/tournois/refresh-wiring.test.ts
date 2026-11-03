@@ -226,9 +226,14 @@ describe("lectures serveur — ce qui garde le cache utile", () => {
     // réserver une place d'un pool de 25 pour ne rien en faire doublerait la
     // pression à chaque connexion SSE. La lecture d'équipe reste donc **hors**
     // de `withConnection`, qui n'habille que la branche individuelle.
-    expect(index).toContain("const activeTeam = isSolo ? null : await getUserActiveTeam(userId);");
-    expect(index).toContain("const myTeamId = isSolo");
-    expect(index).toMatch(/const myTeamId = isSolo\s*\?\s*await withConnection\(/);
+    // `resolveViewerEntrant`, partagé avec la relecture des propositions d'un
+    // match (ERREUR.txt EF-15) : le contexte du lecteur n'en passe aucune (sa
+    // lecture d'équipe ouvre sa propre requête), la relecture d'un match passe
+    // la sienne (une seule place du pool, revue perf #542).
+    expect(index).toMatch(/if \(!isSoloTournament\(snapshot\.card\.participantType\)\) \{\s*const activeTeam = await getUserActiveTeam\(userId, connection\);/);
+    expect(index).toContain("await resolveViewerEntrant({ card: tournament }, userId, connection)");
+    expect(index).toContain("const myTeamId = connection ? await resolve(connection) : await withConnection(resolve);");
+    expect(index).toContain("const { activeTeam, myTeamId } = await resolveViewerEntrant(snapshot, userId);");
   });
 });
 describe("compteur de visites — déduplication dans l'onglet", () => {

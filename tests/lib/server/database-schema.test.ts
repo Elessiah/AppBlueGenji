@@ -125,7 +125,7 @@ describe("Schéma — les clés primaires portent la phase", () => {
 
 describe("Schéma — les index repliés sont bien là", () => {
   it.each([
-    ["bg_matches", "idx_bg_matches_phase (tournament_id, phase_id)"],
+    ["bg_matches", "idx_bg_matches_phase_round (tournament_id, phase_id, round_number)"],
     ["bg_matches", "idx_bg_matches_live (live_trigger, status)"],
     ["bg_teams", "uniq_bg_teams_tag (tag)"],
     ["bg_teams", "uniq_bg_teams_solo_user (solo_user_id)"],

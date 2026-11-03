@@ -185,7 +185,7 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       INDEX idx_bg_matches_tournament (tournament_id),
       INDEX idx_bg_matches_status_updated (status, updated_at),
       INDEX idx_bg_matches_round (round_number),
-      INDEX idx_bg_matches_phase (tournament_id, phase_id),
+      INDEX idx_bg_matches_phase_round (tournament_id, phase_id, round_number),
       INDEX idx_bg_matches_live (live_trigger, status),
       INDEX idx_bg_matches_caster (caster_user_id),
       INDEX idx_bg_matches_referee (referee_user_id),

@@ -12,6 +12,7 @@ import {
   invalidateLandingTeamViews,
   invalidateLandingLive,
   invalidateLandingCounters,
+  invalidateLandingMiniBrackets,
 } from "@/lib/server/landing-cache";
 
 /**
@@ -136,6 +137,36 @@ describe("cache de la vitrine", () => {
     await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}7`, LANDING_TTL_MS, loader as () => Promise<string>);
 
     expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  // Revue #542 : l'annulation d'un abandon repose des appariements sans
+  // changer de résultat — mini-arbres seuls.
+  it("invalidateLandingMiniBrackets_cachedMiniBracket_reloads", async () => {
+    const loader = jest.fn(async () => "valeur");
+    await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}7`, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    invalidateLandingMiniBrackets();
+    await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}7`, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("invalidateLandingMiniBrackets_cachedLeaderboardTickerStats_keepsThem", async () => {
+    const leaderboard = jest.fn(async () => "rangs");
+    const ticker = jest.fn(async () => "bandeau");
+    const stats = jest.fn(async () => "compteurs");
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, leaderboard as () => Promise<string>);
+    await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, ticker as () => Promise<string>);
+    await cachedLanding(LANDING_STATS_KEY, LANDING_TTL_MS, stats as () => Promise<string>);
+
+    invalidateLandingMiniBrackets();
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, leaderboard as () => Promise<string>);
+    await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, ticker as () => Promise<string>);
+    await cachedLanding(LANDING_STATS_KEY, LANDING_TTL_MS, stats as () => Promise<string>);
+
+    expect(leaderboard).toHaveBeenCalledTimes(1);
+    expect(ticker).toHaveBeenCalledTimes(1);
+    expect(stats).toHaveBeenCalledTimes(1);
   });
 
   it("invalidateLandingLeaderboards_cachedLeaderboardAndStats_reloadsLeaderboardOnly", async () => {
