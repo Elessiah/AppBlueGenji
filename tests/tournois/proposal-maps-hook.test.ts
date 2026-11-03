@@ -98,6 +98,7 @@ function unmount(): void {
 
 const fetchMock = jest.fn<typeof fetch>();
 const okResponse = (body: unknown) => ({ ok: true, json: async () => body }) as Response;
+const failure = (status: number) => ({ ok: false, status, json: async () => ({}) }) as Response;
 
 /** Laisse filer les promesses de la lecture (réponse, puis corps). */
 async function settle(): Promise<void> {
@@ -144,7 +145,7 @@ describe("useProposalMaps", () => {
   });
 
   it("useProposalMaps_detailNeverArrives_triesThreeTimesAtMost", async () => {
-    fetchMock.mockResolvedValue({ ok: false, json: async () => ({}) } as Response);
+    fetchMock.mockResolvedValue(failure(500));
 
     render(match, NO_PROPOSALS);
     jest.advanceTimersByTime(PROPOSAL_REFRESH_DELAY_MS * (PROPOSAL_REFRESH_ATTEMPTS + 2));
@@ -154,15 +155,30 @@ describe("useProposalMaps", () => {
   });
 
   // Revue perf #542 : `proposals: null` est une réponse (rien de lisible pour
-  // ce lecteur sur l'état relu), pas un échec — les essais s'arrêtent là.
-  it("useProposalMaps_serverAnswersNull_stopsRetrying", async () => {
-    fetchMock.mockResolvedValue(okResponse({ proposals: null }));
+  // ce lecteur sur l'état relu), et un 4xx hors 429 un refus définitif (session
+  // expirée, tournoi masqué) — ni l'un ni l'autre n'est retenté.
+  it.each<[string, () => Response]>([
+    ["useProposalMaps_serverAnswersNull_stopsRetrying", () => okResponse({ proposals: null })],
+    ["useProposalMaps_definitiveRefusal404_stopsRetrying", () => failure(404)],
+    ["useProposalMaps_unauthorized401_stopsRetrying", () => failure(401)],
+  ])("%s", async (_name, response) => {
+    fetchMock.mockResolvedValue(response());
 
     render(match, NO_PROPOSALS);
     await settle();
     jest.advanceTimersByTime(PROPOSAL_REFRESH_DELAY_MS * (PROPOSAL_REFRESH_ATTEMPTS + 2));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("useProposalMaps_rateLimited429_keepsRetrying", async () => {
+    fetchMock.mockResolvedValue(failure(429));
+
+    render(match, NO_PROPOSALS);
+    await settle();
+    jest.advanceTimersByTime(PROPOSAL_REFRESH_DELAY_MS * (PROPOSAL_REFRESH_ATTEMPTS + 2));
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("useProposalMaps_unparsableAnswer_keepsRetrying", async () => {

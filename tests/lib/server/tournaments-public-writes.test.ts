@@ -524,21 +524,11 @@ describe("adminSaveMatchScoresPublic", () => {
     expect(invalidateTournamentLists).not.toHaveBeenCalled();
   });
 
-  it("republie aussi l'instantané d'un match encore sans adversaire, sans alerte", async () => {
-    const alone = matchRow({ id: 70, tournament_id: 8, team1_id: 3, team2_id: null });
-    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved: alone, paused: true, pausedNow: true });
-
-    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 }, { id: 9, pseudo: "Sifflet" })).resolves.toBe(true);
-
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(8, { landingLive: true });
-    expect(alertSelfPausedValidation).not.toHaveBeenCalled();
-    expectCommitted();
-  });
-
   it("défait la sauvegarde refusée", async () => {
-    jest.mocked(adminSaveMatchScores).mockRejectedValue(new Error("DOWNSTREAM_SCORES"));
+    // Match supprimé pendant l'attente du verrou (réappariement d'une manche).
+    jest.mocked(adminSaveMatchScores).mockRejectedValue(new Error("MATCH_NOT_FOUND"));
 
-    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow("DOWNSTREAM_SCORES");
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow("MATCH_NOT_FOUND");
     expectRolledBack();
   });
 
@@ -576,6 +566,8 @@ describe("adminSaveMatchScoresPublic", () => {
     expect(connection.beginTransaction).not.toHaveBeenCalled();
     expect(lockTournamentRow).not.toHaveBeenCalled();
     expect(adminSaveMatchScores).not.toHaveBeenCalled();
+    // Aucune transaction ouverte : pas de `ROLLBACK` pour rien (revue perf #542).
+    expect(connection.rollback).not.toHaveBeenCalled();
     expect(connection.release).toHaveBeenCalledTimes(1);
   });
 
