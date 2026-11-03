@@ -228,6 +228,19 @@ describe("usersReachableByPush", () => {
     expect(sql).toContain("u.platform_roles_json");
   });
 
+  it("usersReachableByPush_restrictedTopicSeveralDevices_oneAccountOnce", async () => {
+    const roles = JSON.stringify(["CASTER"]);
+    const query = jest.fn<SqlQuery>().mockResolvedValue([
+      [
+        { user_id: 5, is_admin: 0, platform_roles_json: roles },
+        { user_id: 5, is_admin: 0, platform_roles_json: roles },
+        { user_id: 6, is_admin: 0, platform_roles_json: null },
+      ],
+    ]);
+    pool({ query });
+    await expect(usersReachableByPush([5, 6], "CAST_RELEASED", CONFIG)).resolves.toEqual(new Set([5]));
+  });
+
   it("usersReachableByPush_openTopic_distinctUserIds", async () => {
     const query = jest.fn<SqlQuery>().mockResolvedValue([[]]);
     pool({ query });
