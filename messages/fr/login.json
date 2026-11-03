@@ -139,8 +139,8 @@
   "reactivation": {
     "title": "Réactiver ton compte ?",
     "lead": "Tu as demandé la suppression de ton compte. Elle deviendra définitive le {date} : d'ici là, tu peux encore le réactiver.",
-    "kept": "Réactiver te rend ton compte tel qu'il était : profil, statistiques, réglages.",
-    "notUndone": "Ce qui a été fait à la demande n'est pas annulé : tu as quitté tes équipes (propriété transmise, équipe fantôme ou dissoute), tes tournois organisés ont changé d'organisateur quand quelqu'un pouvait les reprendre, tes inscriptions ont été retirées ou perdues par forfait, et tes casts, désignations d'arbitre et invitations reçues ont été retirés.",
+    "kept": "Réactiver te rend ton compte : profil, statistiques, réglages.",
+    "notUndone": "Ce qui a été fait à la demande n'est pas annulé : tu as quitté tes équipes (propriété transmise, équipe fantôme ou dissoute), tes tournois organisés ont changé d'organisateur quand quelqu'un pouvait les reprendre, tes inscriptions ont été retirées ou perdues par forfait, et tes casts, désignations d'arbitre, invitations et demandes d'adhésion en attente ont été retirés.",
     "confirm": "Réactiver mon compte",
     "cancel": "Ne pas réactiver",
     "done": "Ton compte est réactivé.",

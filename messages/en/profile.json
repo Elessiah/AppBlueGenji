@@ -227,7 +227,7 @@
     "pending": "Deleting…",
     "residual": "As with any deleted account, what remains is: the site's encrypted backups ({backupDays} days), the record of your deletion in the log used to replay it after a restore (at least {journalDays} days), the audience-measurement fingerprint described in the privacy policy, your connection data (IP address, date, login method), which the law requires us to keep for {logDays} days, the announcements of your solo-tournament matches posted in the Discord #live channel (and the moderation alert for an announcement blocked or flagged by AutoMod), which keep your username until they are deleted on request, and, if you're a staff member, the trace of your actions in the server logs.",
     "irreversible": "The deletion becomes final after 30 days: until then, signing in again lets you reactivate your account.",
-    "handover": "Right away, you will leave your teams (ownership goes to a co-owner, else a manager, else a captain, else another member; as the only player, the team becomes a ghost team if it is entered in a tournament that hasn't finished, otherwise it is disbanded), your organised tournaments go to another staff member when someone can take them over, your registrations for solo tournaments that haven't started yet, your casts of matches not yet completed, your referee assignments and the team invitations you received are withdrawn, and your remaining matches in a running solo tournament where you never played are lost by forfeit. Reactivating your account won't undo these steps.",
+    "handover": "Right away, you will leave your teams (ownership will go to a co-owner, else a manager, else a captain, else another member; as the only player, the team will become a ghost team if it is entered in a tournament that hasn't finished, otherwise it will be disbanded), your organised tournaments will go to another staff member when someone can take them over, your registrations for solo tournaments that haven't started yet, your casts of matches not yet completed, your referee assignments and your pending team invitations and join requests will be withdrawn, and your remaining matches in a running solo tournament where you never played will be lost by forfeit. Reactivating your account won't undo these steps.",
     "ownedTeamsFromTerms": "From this window, transferring or disbanding your team first requires accepting the terms of use. Without accepting them, you can ask the association for a complete erasure (“Exercising your rights”, in the privacy policy).",
     "consequences": {
       "TOURNAMENTS": "Your personal information will be erased and your username replaced with a placeholder one, but your tournament statistics will be kept — they also belong to the teams you played against.",
@@ -238,12 +238,12 @@
       "UNKNOWN": "The site couldn't tell what will remain: depending on what you left behind (a match played, a solo tournament registration, a team owned, a tournament organized), it will be anonymized or erased entirely."
     },
     "outcome": {
-      "TOURNAMENTS": "Deletion requested. Your statistics will be kept under a placeholder username. Sign in again within 30 days to cancel.",
-      "SOLO_REGISTRATIONS": "Deletion requested. Your solo tournament registrations will carry a placeholder username. Sign in again within 30 days to cancel.",
-      "ORGANIZED_TOURNAMENTS": "Deletion requested. Your tournaments will keep an anonymous organizer. Sign in again within 30 days to cancel.",
-      "OWNED_TEAMS": "Deletion requested. Your team will keep an anonymous owner. Sign in again within 30 days to cancel.",
-      "NONE": "Deletion requested. Your account and profile will be erased; only the traces described in the privacy policy and its register will remain (backups, deletion log, audience measurement). Sign in again within 30 days to cancel.",
-      "UNKNOWN": "Deletion requested. Sign in again within 30 days to cancel."
+      "TOURNAMENTS": "Deletion requested. Your statistics will be kept under a placeholder username. To cancel it, sign in again within 30 days and confirm the reactivation.",
+      "SOLO_REGISTRATIONS": "Deletion requested. Your solo tournament registrations will carry a placeholder username. To cancel it, sign in again within 30 days and confirm the reactivation.",
+      "ORGANIZED_TOURNAMENTS": "Deletion requested. Your tournaments will keep an anonymous organizer. To cancel it, sign in again within 30 days and confirm the reactivation.",
+      "OWNED_TEAMS": "Deletion requested. Your team will keep an anonymous owner. To cancel it, sign in again within 30 days and confirm the reactivation.",
+      "NONE": "Deletion requested. Your account and profile will be erased; only the traces described in the privacy policy and its register will remain (backups, deletion log, audience measurement). To cancel it, sign in again within 30 days and confirm the reactivation.",
+      "UNKNOWN": "Deletion requested. To cancel it, sign in again within 30 days and confirm the reactivation."
     },
     "errors": {
       "ACCOUNT_STILL_REFERENCED": "Your account was linked to a tournament or a team during the deletion. Try again: it will then be anonymized rather than erased.",

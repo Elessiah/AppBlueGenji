@@ -195,7 +195,7 @@ describe("accountDeletionOutcome", () => {
   it("décrit ce qui vient d'être fait, et pas l'autre cas", () => {
     expect(accountDeletionOutcome(null)).toContain("Suppression demandée");
     expect(accountDeletionOutcome(null)).toContain("seront effacés");
-    expect(accountDeletionOutcome(null)).toMatch(/d'ici 30 jours pour l'annuler\.$/);
+    expect(accountDeletionOutcome(null)).toMatch(/d'ici 30 jours et confirme la réactivation\.$/);
     expect(accountDeletionOutcome(null)).not.toContain("aucune trace");
     expect(accountDeletionOutcome(null)).toMatch(/sauvegardes, journal des suppressions, mesure d'audience/);
     expect(accountDeletionOutcome("TOURNAMENTS")).toContain("pseudo d'emprunt");
@@ -216,7 +216,7 @@ describe("accountDeletionOutcome", () => {
     const unknown = accountDeletionOutcome(RETENTION_UNKNOWN);
     expect(unknown).not.toContain("effacé");
     expect(unknown).not.toContain("anonyme");
-    expect(unknown).toBe("Suppression demandée. Reconnecte-toi d'ici 30 jours pour l'annuler.");
+    expect(unknown).toBe("Suppression demandée. Pour l'annuler, reconnecte-toi d'ici 30 jours et confirme la réactivation.");
   });
 });
 
