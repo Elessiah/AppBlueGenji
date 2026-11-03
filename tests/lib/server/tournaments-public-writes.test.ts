@@ -991,8 +991,9 @@ describe("pénalités d'endurance", () => {
   });
 
   // ERREUR.txt EF-15 (revue) : tournoi tenu, manches verrouillées — l'attente
-  // d'un détenteur qui ne demande jamais le tournoi est bornée, puis rendue.
-  it("liftPenalty_boundsLockWaitThenRestoresBeforeRelease", async () => {
+  // d'un détenteur qui ne demande jamais le tournoi est bornée, puis rendue ;
+  // le verrou du tournoi lui-même (revue #542) s'attend sans borne.
+  it("liftPenalty_boundsLockWaitAfterTournamentLockThenRestoresBeforeRelease", async () => {
     jest.mocked(liftEndurancePenalty).mockResolvedValue({ teamId: 3, points: 2 });
 
     await liftEndurancePenaltyPublic(5, 61);
@@ -1001,8 +1002,12 @@ describe("pénalités d'endurance", () => {
       "SET SESSION innodb_lock_wait_timeout = 5",
       "SET SESSION innodb_lock_wait_timeout = DEFAULT",
     ]);
-    expect(connection.query.mock.invocationCallOrder[0]).toBeLessThan(
-      connection.beginTransaction.mock.invocationCallOrder[0],
+    expect(lockTournamentRow).toHaveBeenCalledWith(expect.anything(), 5);
+    expect(connection.beginTransaction.mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(lockTournamentRow).mock.invocationCallOrder[0],
+    );
+    expect(jest.mocked(lockTournamentRow).mock.invocationCallOrder[0]).toBeLessThan(
+      connection.query.mock.invocationCallOrder[0],
     );
     expect(connection.query.mock.invocationCallOrder[1]).toBeLessThan(connection.release.mock.invocationCallOrder[0]);
   });

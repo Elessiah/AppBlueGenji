@@ -18,7 +18,7 @@ import { flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { invalidateTournamentPreview } from "@/lib/server/tournaments/preview-cache";
 import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
-import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
+import { invalidateLandingAggregates, invalidateLandingMiniBrackets } from "@/lib/server/landing-cache";
 import { reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { reconcileSwiss } from "@/lib/server/tournaments/swiss";
 import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie/reconcile";
@@ -51,6 +51,8 @@ function setup(options: {
   laterInput?: boolean;
   /** Interblocages rendus par la lecture des manches postérieures. */
   laterBusy?: number;
+  /** L'équipe du classement n'existe plus. */
+  teamMissing?: boolean;
 } = {}) {
   const head =
     options.head === null
@@ -66,6 +68,7 @@ function setup(options: {
         };
   const standing =
     options.standing === undefined ? { status: "FORFEIT", forfeit_round: 2 } : options.standing;
+  const teamRows = options.teamMissing ? [] : [{ name: "Team Nova" }];
   const sqls: string[] = [];
   const params: unknown[] = [];
   const queries: string[] = [];
@@ -91,7 +94,7 @@ function setup(options: {
     if (/FROM bg_tournaments WHERE id/.test(flat)) return [head ? [head] : []];
     if (/FROM bg_tournament_phases/.test(flat)) return [options.phase ? [options.phase] : []];
     if (/^SELECT status, \w+ AS forfeit_round FROM/.test(flat)) return [standing ? [standing] : []];
-    if (/^SELECT name FROM bg_teams/.test(flat)) return [[{ name: "Team Nova" }]];
+    if (/^SELECT name FROM bg_teams/.test(flat)) return [teamRows];
     return [{ affectedRows: 1 }];
   });
   jest.mocked(getDatabase).mockResolvedValue(
@@ -105,24 +108,40 @@ describe("cancelTournamentForfeit", () => {
     jest.clearAllMocks();
   });
 
-  it("cancel_nominal_setsShortLockWaitBeforeTransaction", async () => {
+  // Revue #542 : le verrou du tournoi s'attend sans borne ; seules les
+  // attentes suivantes (manches) sont bornées.
+  it("cancel_nominal_boundsLockWaitOnlyAfterTournamentLock", async () => {
     const { connection, queries } = setup();
 
     await cancelTournamentForfeit(7, 102);
 
     expect(queries[0]).toBe(`SET SESSION innodb_lock_wait_timeout = ${SHORT_LOCK_WAIT_SECONDS}`);
+    expect(connection.query.mock.invocationCallOrder[0]).toBeGreaterThan(
+      connection.execute.mock.invocationCallOrder[0],
+    );
     expect(connection.query.mock.invocationCallOrder[0]).toBeLessThan(
-      connection.beginTransaction.mock.invocationCallOrder[0],
+      connection.execute.mock.invocationCallOrder[1],
     );
   });
 
-  it("cancel_nominal_locksTournamentHeadFirst", async () => {
+  it("cancel_nominal_takesLockTournamentRowFirstThenLockedHead", async () => {
     const { sqls } = setup();
 
     await cancelTournamentForfeit(7, 102);
 
-    expect(sqls[0]).toMatch(/FROM bg_tournaments WHERE id = \? LIMIT 1 FOR UPDATE$/);
-    expect(sqls[0]).toContain("current_phase_id");
+    expect(sqls[0]).toBe("SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE");
+    expect(sqls[1]).toMatch(/FROM bg_tournaments WHERE id = \? LIMIT 1 FOR UPDATE$/);
+    expect(sqls[1]).toContain("current_phase_id");
+  });
+
+  // Revue #542 : un classement dont l'équipe a disparu ne remet personne en lice.
+  it("cancel_teamRowMissing_refusesTeamNotInTournamentWithoutWriting", async () => {
+    const { sqls, connection } = setup({ teamMissing: true });
+
+    await expect(cancelTournamentForfeit(7, 102)).rejects.toThrow("TEAM_NOT_IN_TOURNAMENT");
+
+    expect(sqls.some((sql) => sql.startsWith("UPDATE"))).toBe(false);
+    expect(connection.rollback).toHaveBeenCalled();
   });
 
   it("cancel_multiPhase_everyReadBeforeLaterRoundsIsLocking", async () => {
@@ -131,9 +150,9 @@ describe("cancelTournamentForfeit", () => {
     await cancelTournamentForfeit(7, 102);
 
     const later = sqls.findIndex((sql) => LATER_ROUNDS.test(sql));
-    expect(later).toBe(3);
+    expect(later).toBe(4);
     expect(sqls.slice(0, later + 1).every((sql) => LOCKING.test(sql))).toBe(true);
-    expect(sqls[1]).toMatch(/^SELECT format FROM bg_tournament_phases WHERE id = \? LIMIT 1 LOCK IN SHARE MODE$/);
+    expect(sqls[2]).toMatch(/^SELECT format FROM bg_tournament_phases WHERE id = \? LIMIT 1 LOCK IN SHARE MODE$/);
   });
 
   it("cancel_survival_reactivatesReplaysAndPublishesSnapshotAfterCommit", async () => {
@@ -152,9 +171,10 @@ describe("cancelTournamentForfeit", () => {
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
     expect(invalidateTournamentPreview).toHaveBeenCalledWith(7);
     // Le rejeu peut réécrire la manche courante ou la phase : listes et
-    // agrégats de l'accueil suivent, pas le classement du site.
+    // mini-arbres de l'accueil suivent ; leaderboards, ticker et compteurs non.
     expect(invalidateTournamentLists).toHaveBeenCalled();
-    expect(invalidateLandingAggregates).toHaveBeenCalled();
+    expect(invalidateLandingMiniBrackets).toHaveBeenCalled();
+    expect(invalidateLandingAggregates).not.toHaveBeenCalled();
     expect(jest.mocked(publishMatchUpdatedEvent).mock.invocationCallOrder[0]).toBeGreaterThan(
       connection.commit.mock.invocationCallOrder[0],
     );
@@ -311,7 +331,7 @@ describe("cancelTournamentForfeit", () => {
 
     await cancelTournamentForfeit(7, 102);
 
-    expect(params[1]).toEqual([12]);
+    expect(params[2]).toEqual([12]);
     const update = sqls.findIndex((sql) => sql.startsWith("UPDATE bg_swiss_standings"));
     expect(params[update]).toEqual([7, 12, 102]);
     const later = sqls.findIndex((sql) => LATER_ROUNDS.test(sql));

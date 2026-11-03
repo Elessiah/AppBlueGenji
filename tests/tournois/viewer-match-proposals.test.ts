@@ -18,7 +18,7 @@ import { resolveUserEntrantTeamId } from "@/lib/server/tournaments/registration"
 import { loadViewerProposals } from "@/lib/server/tournaments/match-maps";
 import type { MatchProposalMaps, MatchScoreReport, TournamentSnapshot } from "@/lib/shared/types";
 import type { ParticipantType } from "@/lib/shared/participants";
-import { fakeConnection } from "../helpers/sql-double";
+import { connectionMock, fakeConnection } from "../helpers/sql-double";
 import { tournamentSnapshot } from "../helpers/tournament-detail";
 import { tournamentCard } from "../helpers/tournament-card";
 import { bracketMatch } from "../helpers/bracket-match";
@@ -46,9 +46,19 @@ function snapshot(participantType: ParticipantType = "TEAM"): TournamentSnapshot
   });
 }
 
+let connection: ReturnType<typeof connectionMock>;
+
+/** Dates de report relues en base (par défaut : celles de l'instantané). */
+function freshReports(row: { team1_reported_at: string | null; team2_reported_at: string | null } | null) {
+  connection.execute.mockResolvedValue([row ? [row] : [], []]);
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(withConnection).mockImplementation((fn) => fn(fakeConnection({})));
+  connection = connectionMock();
+  connection.query.mockResolvedValue([[], []]);
+  freshReports({ team1_reported_at: report.reportedAt, team2_reported_at: null });
+  jest.mocked(withConnection).mockImplementation((fn) => fn(fakeConnection(connection)));
   jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 42, teamName: "Équipe", roles: ["MANAGER"] });
   jest.mocked(loadViewerProposals).mockResolvedValue([read]);
 });
@@ -111,5 +121,58 @@ describe("getViewerMatchProposals", () => {
     jest.mocked(loadViewerProposals).mockResolvedValue([]);
 
     await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).resolves.toBeNull();
+  });
+
+  // Revue #542 : la date du report part avec ses maps, lues dans la même image.
+  it("getViewerMatchProposals_nominal_readsReportDatesAndMapsInOneReadOnlyTransaction", async () => {
+    await getViewerMatchProposals(snapshot(), 7, false, 70);
+
+    expect(connection.query.mock.calls.map(([sql]) => sql)).toEqual(["START TRANSACTION READ ONLY", "COMMIT"]);
+    expect(connection.execute.mock.calls[0]).toEqual([
+      "SELECT team1_reported_at, team2_reported_at FROM bg_matches WHERE id = ? LIMIT 1",
+      [70],
+    ]);
+    expect(connection.query.mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(loadViewerProposals).mock.invocationCallOrder[0],
+    );
+    expect(connection.query.mock.invocationCallOrder[1]).toBeGreaterThan(
+      jest.mocked(loadViewerProposals).mock.invocationCallOrder[0],
+    );
+  });
+
+  it("getViewerMatchProposals_staleSnapshot_passesFreshReportDate", async () => {
+    freshReports({ team1_reported_at: "2026-11-03T18:05:00.000Z", team2_reported_at: null });
+
+    await getViewerMatchProposals(snapshot(), 7, false, 70);
+
+    const [, [match]] = jest.mocked(loadViewerProposals).mock.calls[0];
+    expect(match.team1Report).toEqual({ ...report, reportedAt: "2026-11-03T18:05:00.000Z" });
+    expect(match.team2Report).toBeNull();
+  });
+
+  it("getViewerMatchProposals_reportWithdrawnSinceSnapshot_dropsIt", async () => {
+    freshReports({ team1_reported_at: null, team2_reported_at: null });
+
+    await getViewerMatchProposals(snapshot(), 7, false, 70);
+
+    const [, [match]] = jest.mocked(loadViewerProposals).mock.calls[0];
+    expect(match.team1Report).toBeNull();
+  });
+
+  it("getViewerMatchProposals_matchRowGone_returnsNullAndCommits", async () => {
+    freshReports(null);
+
+    await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).resolves.toBeNull();
+
+    expect(loadViewerProposals).not.toHaveBeenCalled();
+    expect(connection.query.mock.calls.at(-1)?.[0]).toBe("COMMIT");
+  });
+
+  it("getViewerMatchProposals_readFails_stillEndsTransaction", async () => {
+    jest.mocked(loadViewerProposals).mockRejectedValue(new Error("Connection lost"));
+
+    await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).rejects.toThrow("Connection lost");
+
+    expect(connection.query.mock.calls.at(-1)?.[0]).toBe("COMMIT");
   });
 });
