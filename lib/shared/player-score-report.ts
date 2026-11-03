@@ -366,8 +366,14 @@ export function mergeMatchProposals(
 ): ReadonlyArray<MatchProposalMaps> {
   if (!fetched || fetched.matchId !== match.id) return proposals;
   const current = proposals.find((p) => p.matchId === match.id);
-  const pick = (report: MatchScoreReport | null, own: ProposalMaps | null | undefined, read: ProposalMaps | null) =>
-    report !== null && read?.reportedAt === report.reportedAt ? read : (own ?? null);
+  // Le contexte prime quand il décrit déjà le report affiché : relu après la
+  // relecture ponctuelle (rafraîchissement complet), il est le plus récent —
+  // deux détails déposés dans la même seconde portent le même instant.
+  const pick = (report: MatchScoreReport | null, own: ProposalMaps | null | undefined, read: ProposalMaps | null) => {
+    if (report === null) return own ?? null;
+    if (own?.reportedAt === report.reportedAt) return own;
+    return read?.reportedAt === report.reportedAt ? read : (own ?? null);
+  };
   const team1 = pick(match.team1Report, current?.team1, fetched.team1);
   const team2 = pick(match.team2Report, current?.team2, fetched.team2);
   if (team1 === (current?.team1 ?? null) && team2 === (current?.team2 ?? null)) return proposals;

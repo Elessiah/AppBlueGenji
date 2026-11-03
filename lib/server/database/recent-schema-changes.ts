@@ -397,6 +397,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // jouée : `ER_DUP_KEYNAME`, un no-op).
     `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round (tournament_id, phase_id, round_number),
        DROP INDEX idx_bg_matches_phase`,
+    // Base où l'ancien index manquait : l'échange tombe sur son `DROP`
+    // (`ER_CANT_DROP_FIELD_OR_KEY`, toléré) et ne pose rien — la pose seule le
+    // rattrape. Partout ailleurs, `ER_DUP_KEYNAME`, un no-op.
+    `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round (tournament_id, phase_id, round_number)`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {
