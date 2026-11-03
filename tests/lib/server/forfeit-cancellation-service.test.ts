@@ -2,9 +2,6 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
-jest.mock("@/lib/server/tournaments/preview-cache");
-jest.mock("@/lib/server/tournaments/list-cache");
-jest.mock("@/lib/server/landing-cache");
 jest.mock("@/lib/server/tournaments/bot-logs");
 jest.mock("@/lib/server/tournaments/survival");
 jest.mock("@/lib/server/tournaments/swiss");
@@ -15,10 +12,7 @@ import { SHORT_LOCK_WAIT_SECONDS } from "@/lib/server/tournaments/lock-wait";
 import { cancelTournamentForfeit } from "@/lib/server/tournaments/forfeit-cancellation";
 import { getDatabase } from "@/lib/server/database";
 import { flushBotLogs } from "@/lib/server/tournaments/bot-logs";
-import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
-import { invalidateTournamentPreview } from "@/lib/server/tournaments/preview-cache";
-import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
-import { invalidateLandingAggregates, invalidateLandingMiniBrackets } from "@/lib/server/landing-cache";
+import { publishStandingsReplayedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { reconcileSwiss } from "@/lib/server/tournaments/swiss";
 import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie/reconcile";
@@ -203,14 +197,10 @@ describe("cancelTournamentForfeit", () => {
     expect(reconcileSurvival).toHaveBeenCalledWith(7, fakeConnection(connection), { phaseId: 0 });
     expect(reconcilePhases).not.toHaveBeenCalled();
     expect(flushBotLogs).toHaveBeenCalled();
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
-    expect(invalidateTournamentPreview).toHaveBeenCalledWith(7);
-    // Le rejeu peut réécrire la manche courante ou la phase : listes et
-    // mini-arbres de l'accueil suivent ; leaderboards, ticker et compteurs non.
-    expect(invalidateTournamentLists).toHaveBeenCalled();
-    expect(invalidateLandingMiniBrackets).toHaveBeenCalled();
-    expect(invalidateLandingAggregates).not.toHaveBeenCalled();
-    expect(jest.mocked(publishMatchUpdatedEvent).mock.invocationCallOrder[0]).toBeGreaterThan(
+    // Le rejeu réécrit le classement d'endurance et peut reposer la manche
+    // courante ou la phase : invalidation ciblée (`publishStandingsReplayedEvent`).
+    expect(publishStandingsReplayedEvent).toHaveBeenCalledWith(7);
+    expect(jest.mocked(publishStandingsReplayedEvent).mock.invocationCallOrder[0]).toBeGreaterThan(
       connection.commit.mock.invocationCallOrder[0],
     );
     expect(publishUpdatedEvent).not.toHaveBeenCalled();
@@ -253,7 +243,7 @@ describe("cancelTournamentForfeit", () => {
 
     expect(sqls.some((sql) => sql.startsWith("UPDATE"))).toBe(false);
     expect(connection.rollback).toHaveBeenCalled();
-    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    expect(publishStandingsReplayedEvent).not.toHaveBeenCalled();
   });
 
   it("cancel_deadlockOnReplay_retriesWholeTransactionAndPublishesOnce", async () => {
@@ -268,7 +258,7 @@ describe("cancelTournamentForfeit", () => {
     expect(connection.rollback).toHaveBeenCalledTimes(1);
     expect(connection.commit).toHaveBeenCalledTimes(1);
     expect(connection.release).toHaveBeenCalledTimes(2);
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledTimes(1);
+    expect(publishStandingsReplayedEvent).toHaveBeenCalledTimes(1);
   });
 
   it("cancel_concurrentReportDeadlock_replayThenRefuses", async () => {
@@ -439,9 +429,7 @@ describe("cancelTournamentForfeit", () => {
     expect(sqls.some((sql) => sql.startsWith("UPDATE"))).toBe(false);
     expect(connection.rollback).toHaveBeenCalled();
     expect(connection.commit).not.toHaveBeenCalled();
-    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
-    expect(invalidateTournamentPreview).not.toHaveBeenCalled();
-    expect(invalidateTournamentLists).not.toHaveBeenCalled();
+    expect(publishStandingsReplayedEvent).not.toHaveBeenCalled();
     expect(connection.release).toHaveBeenCalled();
   });
 });

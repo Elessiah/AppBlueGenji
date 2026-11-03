@@ -39,6 +39,7 @@ import {
   publishMatchUpdatedEvent,
   publishScoreReportedEvent,
   publishScoreResolvedEvent,
+  publishStandingsReplayedEvent,
   publishUpdatedEvent,
 } from "@/lib/server/tournaments/notifications";
 import {
@@ -1059,8 +1060,7 @@ describe("pénalités d'endurance", () => {
 
     await expect(liftEndurancePenaltyPublic(5, 61)).rejects.toThrow("PENALTY_NOT_FOUND");
 
-    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
-    expect(invalidateTournamentLists).not.toHaveBeenCalled();
+    expect(publishStandingsReplayedEvent).not.toHaveBeenCalled();
   });
 
   // Revue perf #542 : comme l'annulation d'un abandon, aucun résultat de match
@@ -1070,9 +1070,8 @@ describe("pénalités d'endurance", () => {
 
     await liftEndurancePenaltyPublic(5, 61);
 
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(5, { landingLive: true });
-    expect(order(jest.mocked(publishMatchUpdatedEvent))).toBeGreaterThan(order(connection.commit));
-    expect(invalidateTournamentLists).toHaveBeenCalledTimes(1);
+    expect(publishStandingsReplayedEvent).toHaveBeenCalledWith(5);
+    expect(order(jest.mocked(publishStandingsReplayedEvent))).toBeGreaterThan(order(connection.commit));
     expect(publishUpdatedEvent).not.toHaveBeenCalled();
   });
 
@@ -1089,7 +1088,7 @@ describe("pénalités d'endurance", () => {
     expect(liftEndurancePenalty).toHaveBeenCalledTimes(2);
     expect(connection.rollback).toHaveBeenCalledTimes(1);
     expect(connection.commit).toHaveBeenCalledTimes(1);
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledTimes(1);
+    expect(publishStandingsReplayedEvent).toHaveBeenCalledTimes(1);
   });
 
   // ERREUR.txt EF-15 (revue) : tournoi tenu, manches verrouillées — l'attente

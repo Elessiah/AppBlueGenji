@@ -6,6 +6,7 @@ jest.mock("@/lib/server/tournaments/byes");
 
 import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournaments/admin";
 import { mapsFor } from "../../helpers/match-maps";
+import type { MatchMapInput } from "@/lib/shared/match-maps";
 import { SINGLE_REPORT_SQL } from "@/lib/server/tournaments/score-report-sql";
 
 /**
@@ -40,8 +41,8 @@ function fakeConnection(
     singleReport?: boolean;
     /** La validation d'office était déjà suspendue avant cette saisie. */
     alreadyPaused?: boolean;
-    /** Maps `FINAL` déjà portées par le match (sonde `mapSetSize`) ; aucune par défaut. */
-    finalMapsSize?: number;
+    /** Maps `FINAL` déjà portées par le match (`loadStoredMapSet`, ids 501…) ; aucune par défaut. */
+    finalMaps?: MatchMapInput[];
   } = {},
 ): {
   conn: PoolConnection;
@@ -66,14 +67,22 @@ function fakeConnection(
     return [{ affectedRows: 1 }, []];
   };
 
-  // Écritures, et sondes des maps FINAL (`mapSetSize`, `clearMapSets`) ; `null` pour le reste.
+  // Écritures, et lectures des maps FINAL (`loadStoredMapSet`, `clearMapSets`) ; `null` pour le reste.
+  const finalMaps = options.finalMaps ?? [];
   const writeOrProbe = (q: string, params: unknown[]) => {
     if (q.startsWith("UPDATE")) return update(q, params);
-    if (q.startsWith("SELECT MAX(map_number) AS size FROM bg_match_maps")) {
-      return [[{ size: options.finalMapsSize ?? null }], []];
+    if (q.startsWith("SELECT id, map_number, replay_code, team1_score, team2_score FROM bg_match_maps")) {
+      const rows = finalMaps.map((map, index) => ({
+        id: 501 + index,
+        map_number: index + 1,
+        replay_code: map.replayCode,
+        team1_score: map.team1Score,
+        team2_score: map.team2Score,
+      }));
+      return [rows, []];
     }
     // Sonde de l'effacement sur forfait (`clearMapSets`).
-    if (q.startsWith("SELECT 1 FROM bg_match_maps")) return [(options.finalMapsSize ?? 0) > 0 ? [{ 1: 1 }] : [], []];
+    if (q.startsWith("SELECT 1 FROM bg_match_maps")) return [finalMaps.length > 0 ? [{ 1: 1 }] : [], []];
     return null;
   };
 
@@ -505,39 +514,38 @@ describe("adminSaveMatchScores — allers-retours", () => {
 
     await adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 });
 
-    const probe = statements.findIndex((sql) => sql.startsWith("SELECT MAX(map_number) AS size FROM bg_match_maps"));
+    const probe = statements.findIndex((sql) => sql.startsWith("SELECT id, map_number, replay_code, team1_score, team2_score FROM bg_match_maps"));
     expect(probe).toBeGreaterThan(-1);
     expect(statements[probe]).not.toMatch(/FOR UPDATE|LOCK IN SHARE MODE/);
     expect(statements.some((sql) => sql.startsWith("DELETE FROM bg_match_maps"))).toBe(false);
     expect(statements.some((sql) => sql.startsWith("INSERT INTO bg_match_maps"))).toBe(true);
   });
 
-  // Revue perf #542 : saisie map par map — le jeu qui s'allonge se réécrit en
-  // place, sans lecture verrouillante ni effacement (verrou d'intervalle sur
-  // le match voisin).
-  it("adminSave_finalMapsGrowing_upsertsInPlace", async () => {
-    const { conn, statements } = fakeConnection({ finalMapsSize: 1 });
+  // Revue perf #542 : saisie map par map — le jeu qui s'allonge n'insère que
+  // la nouvelle map, sans lecture verrouillante, effacement ni mise à jour du
+  // jeu (aucun verrou d'intervalle sur le match voisin).
+  it("adminSave_finalMapsGrowing_insertsOnlyNewMap", async () => {
+    const { conn, statements } = fakeConnection({ finalMaps: mapsFor(1, 0) });
 
     await adminSaveMatchScores(conn, 10, { maps: mapsFor(2, 0), userId: 1 });
 
-    expect(statements.some((sql) => sql.startsWith("DELETE FROM bg_match_maps"))).toBe(false);
+    const mapWrites = statements.filter((sql) => /^(INSERT INTO|UPDATE|DELETE FROM) bg_match_maps/.test(sql));
+    expect(mapWrites).toHaveLength(1);
+    expect(mapWrites[0]).toMatch(/^INSERT INTO bg_match_maps /);
     expect(statements.some((sql) => /FROM bg_match_maps .*FOR UPDATE$/.test(sql))).toBe(false);
-    expect(statements.some((sql) => sql.startsWith("INSERT INTO bg_match_maps"))).toBe(true);
   });
 
-  it("adminSave_finalMapsShrinking_deletesBeyondThenInserts", async () => {
-    const { conn, statements } = fakeConnection({ finalMapsSize: 3 });
+  it("adminSave_finalMapsShrinking_deletesExtraMapsByPrimaryKey", async () => {
+    const { conn, statements } = fakeConnection({ finalMaps: mapsFor(3, 0) });
 
     await adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 });
 
-    const remove = statements.indexOf("DELETE FROM bg_match_maps WHERE match_id = ? AND source = ? AND map_number > ?");
-    const insert = statements.findIndex((sql) => sql.startsWith("INSERT INTO bg_match_maps"));
-    expect(remove).toBeGreaterThan(-1);
-    expect(insert).toBeGreaterThan(remove);
+    expect(statements).toContain("DELETE FROM bg_match_maps WHERE id IN (?, ?)");
+    expect(statements.some((sql) => sql.startsWith("INSERT INTO bg_match_maps"))).toBe(false);
   });
 
   it("adminSave_forfeitOverExistingMaps_clearsWithoutInserting", async () => {
-    const { conn, statements } = fakeConnection({ finalMapsSize: 2 });
+    const { conn, statements } = fakeConnection({ finalMaps: mapsFor(2, 0) });
 
     await adminSaveMatchScores(conn, 10, { forfeitTeamId: 200 });
 

@@ -120,7 +120,7 @@ describe("getViewerMatchProposals", () => {
     );
     const [sql, params] = connection.execute.mock.calls[1];
     expect(String(sql).replace(/\s+/g, " ")).toContain("FROM bg_matches m LEFT JOIN bg_match_maps mm");
-    expect(params).toEqual(["TEAM1", "TEAM2", 70, 5]);
+    expect(params).toEqual(["TEAM1", "TEAM2", 42, 42, 70, 5]);
     expect(connection.query).not.toHaveBeenCalled();
   });
 
@@ -129,7 +129,7 @@ describe("getViewerMatchProposals", () => {
   it("getViewerMatchProposals_matchMissingFromSnapshot_readsItByTournament", async () => {
     await expect(getViewerMatchProposals(5, 7, false, 999)).resolves.toEqual(visible({ ...read, matchId: 999 }));
 
-    expect(matchReads()[0][1]).toEqual(["TEAM1", "TEAM2", 999, 5]);
+    expect(matchReads()[0][1]).toEqual(["TEAM1", "TEAM2", 42, 42, 999, 5]);
   });
 
   it("getViewerMatchProposals_matchOfAnotherTournament_returnsNull", async () => {

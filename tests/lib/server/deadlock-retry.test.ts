@@ -88,8 +88,12 @@ describe("isContentionMessage", () => {
     expect(isContentionMessage(LOCK_WAIT)).toBe(true);
   });
 
-  it("isContentionMessage_deadlockOrOtherText_returnsFalse", () => {
-    expect(isContentionMessage(DEADLOCK)).toBe(false);
+  // Revue perf #542 : liste unique — l'interblocage en fait partie.
+  it("isContentionMessage_deadlock_returnsTrue", () => {
+    expect(isContentionMessage(DEADLOCK)).toBe(true);
+  });
+
+  it("isContentionMessage_otherText_returnsFalse", () => {
     expect(isContentionMessage(`Erreur : ${LOCK_WAIT}`)).toBe(false);
     expect(isContentionMessage("Record has changed since last read in tablespace")).toBe(false);
     expect(isContentionMessage("ER_CHECKREAD")).toBe(false);

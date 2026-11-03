@@ -10,6 +10,7 @@ const invalidateLists = jest.fn();
 const invalidatePreview = jest.fn();
 const invalidateLanding = jest.fn();
 const invalidateLandingLive = jest.fn();
+const invalidateMiniBrackets = jest.fn();
 const invalidateRanking = jest.fn();
 const invalidateStats = jest.fn();
 const publishEvent = jest.fn();
@@ -29,6 +30,7 @@ jest.mock("@/lib/server/tournaments/preview-cache", () => ({
 jest.mock("@/lib/server/landing-cache", () => ({
   invalidateLandingAggregates: () => invalidateLanding(),
   invalidateLandingLive: () => invalidateLandingLive(),
+  invalidateLandingMiniBrackets: () => invalidateMiniBrackets(),
 }));
 
 jest.mock("@/lib/server/ranking-cache", () => ({
@@ -58,6 +60,7 @@ import {
   publishMatchUpdatedEvent,
   publishScoreReportedEvent,
   publishScoreResolvedEvent,
+  publishStandingsReplayedEvent,
   publishUpdatedEvent,
 } from "@/lib/server/tournaments/notifications";
 
@@ -67,6 +70,7 @@ beforeEach(() => {
   invalidatePreview.mockReset();
   invalidateLanding.mockReset();
   invalidateLandingLive.mockReset();
+  invalidateMiniBrackets.mockReset();
   invalidateRanking.mockReset();
   invalidateStats.mockReset();
   publishEvent.mockReset();
@@ -152,6 +156,38 @@ describe("notifications — invalidation des caches", () => {
     expect(invalidateLanding).not.toHaveBeenCalled();
     expect(invalidateLists).not.toHaveBeenCalled();
     expect(invalidateRanking).not.toHaveBeenCalled();
+  });
+
+  // Revue perf #542 : annulation d'un abandon, retrait d'une pénalité — le
+  // classement se rejoue sans qu'aucun résultat de match change.
+  it("publishStandingsReplayedEvent_standingsReplayed_forgetsTournamentViewsAndLandingLiveOnly", () => {
+    publishStandingsReplayedEvent(7);
+    expect(invalidateSnapshot).toHaveBeenCalledWith(7);
+    expect(invalidatePreview).toHaveBeenCalledWith(7);
+    expect(invalidateLists).toHaveBeenCalledTimes(1);
+    expect(invalidateLandingLive).toHaveBeenCalledTimes(1);
+    expect(invalidateMiniBrackets).toHaveBeenCalledTimes(1);
+    expect(publishEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "match_updated", tournamentId: 7 }));
+  });
+
+  it("publishStandingsReplayedEvent_noMatchResultChanged_keepsRankingStatsAndLandingAggregates", () => {
+    publishStandingsReplayedEvent(7);
+    expect(invalidateRanking).not.toHaveBeenCalled();
+    expect(invalidateStats).not.toHaveBeenCalled();
+    expect(invalidateLanding).not.toHaveBeenCalled();
+  });
+
+  it("publishStandingsReplayedEvent_subscribersWoken_afterEveryInvalidation", () => {
+    const order: string[] = [];
+    invalidatePreview.mockImplementation(() => order.push("preview"));
+    invalidateLists.mockImplementation(() => order.push("lists"));
+    invalidateMiniBrackets.mockImplementation(() => order.push("brackets"));
+    publishEvent.mockImplementation(() => order.push("publish"));
+
+    publishStandingsReplayedEvent(7);
+
+    expect(order.at(-1)).toBe("publish");
+    expect(order).toHaveLength(4);
   });
 
   it("invalide avant de réveiller les abonnés", () => {

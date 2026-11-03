@@ -18,7 +18,13 @@ import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
  * prêt à deux équipes, le format demandé, et le journal de ce qui touche
  * `bg_match_maps`.
  */
-function fakeConnection(matchFormat: { type: string; value: number }) {
+const STORED_FINAL = [
+  { id: 801, map_number: 1, replay_code: "OLD111", team1_score: 1, team2_score: 2 },
+  { id: 802, map_number: 2, replay_code: "OLD222", team1_score: 0, team2_score: 2 },
+];
+
+/** `storedFinal` : maps retenues déjà là (`loadStoredMapSet`) ; aucune par défaut. */
+function fakeConnection(matchFormat: { type: string; value: number }, storedFinal: Record<string, unknown>[] = []) {
   const updates: unknown[][] = [];
   const maps: { sql: string; params: unknown }[] = [];
   const conn = {
@@ -26,8 +32,10 @@ function fakeConnection(matchFormat: { type: string; value: number }) {
       const q = sql.replace(/\s+/g, " ").trim();
       // Un détail existe déjà : l'effacement a lieu (`clearMatchMaps`).
       if (q.startsWith("SELECT 1 FROM bg_match_maps")) return [[{ found: 1 }], []];
-      // Deux maps retenues déjà là (`mapSetSize`) : une liste plus courte efface le surplus.
-      if (q.startsWith("SELECT MAX(map_number) AS size FROM bg_match_maps")) return [[{ size: 2 }], []];
+      // Maps retenues déjà là (`loadStoredMapSet`) : réécrites par leur clé primaire.
+      if (q.startsWith("SELECT id, map_number, replay_code, team1_score, team2_score FROM bg_match_maps")) {
+        return [storedFinal, []];
+      }
       if (q.includes("bg_match_maps")) {
         maps.push({ sql: q, params });
         return [[], []];
@@ -63,7 +71,8 @@ function fakeConnection(matchFormat: { type: string; value: number }) {
   return { conn, updates, maps };
 }
 
-const CLEAR_FINAL_BEYOND = "DELETE FROM bg_match_maps WHERE match_id = ? AND source = ? AND map_number > ?";
+const UPDATE_FINAL_MAP =
+  "UPDATE bg_match_maps SET replay_code = ?, team1_score = ?, team2_score = ?, submitted_by_user_id = ?, submitted_at = CURRENT_TIMESTAMP WHERE id = ?";
 const CLEAR_FINAL_SET = "DELETE FROM bg_match_maps WHERE match_id IN (?) AND source IN (?)";
 
 beforeEach(() => {
@@ -94,10 +103,12 @@ describe("arbitrage — détail map par map", () => {
   });
 
   it("des maps enregistrées remplacent le détail retenu, sans aucun autre jeu touché", async () => {
-    const { conn, maps } = fakeConnection({ type: "BO", value: 5 });
+    const { conn, maps } = fakeConnection({ type: "BO", value: 5 }, STORED_FINAL);
     await adminSaveMatchScores(conn, 10, { maps: [{ replayCode: "AAA111", team1Score: 2, team2Score: 0 }], userId: 3 });
-    expect(maps.map((m) => m.sql)).toEqual([CLEAR_FINAL_BEYOND, expect.stringMatching(/^INSERT INTO bg_match_maps/)]);
-    expect(maps[0].params).toEqual([10, "FINAL", 1]);
+    expect(maps).toEqual([
+      { sql: UPDATE_FINAL_MAP, params: ["AAA111", 2, 0, 3, 801] },
+      { sql: "DELETE FROM bg_match_maps WHERE id IN (?)", params: [802] },
+    ]);
   });
 
   it("un forfait tranché efface le détail, même déclaré par une engagée", async () => {
