@@ -36,7 +36,7 @@ export async function DELETE(
     // Lecture bornée des manches (5 s) ou rejeu épuisé : « réessaie », par le
     // code de l'erreur — un message localisé (`lc_messages`) ne s'y lit pas.
     if (isContentionError(error)) {
-      console.warn(`[tournaments] retrait de la pénalité ${penalty} : écriture concurrente, rendue en ${CONCURRENT_UPDATE_RETRY}`);
+      console.warn(`[tournaments] retrait de la pénalité ${penalty} : écriture concurrente, rendue en ${CONCURRENT_UPDATE_RETRY} :`, error);
       return fail(CONCURRENT_UPDATE_RETRY, 409);
     }
     const message = (error as Error).message;

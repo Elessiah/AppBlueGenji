@@ -61,7 +61,10 @@ const unsettled = new WeakSet<PoolConnection>();
 export async function rollbackKeepingError(connection: PoolConnection): Promise<void> {
   try {
     await connection.rollback();
-  } catch {
+  } catch (error) {
+    // Au journal : des verrous peuvent rester tenus jusqu'à ce que le serveur
+    // constate la session morte — la trace relie les attentes qui suivent.
+    console.error(`[tournaments] ROLLBACK échoué, connexion ${connection.threadId} détruite :`, error);
     unsettled.add(connection);
   }
 }

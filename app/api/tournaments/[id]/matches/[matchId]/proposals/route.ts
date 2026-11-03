@@ -1,6 +1,8 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { enforceRateLimit, MATCH_PROPOSALS_READ_RULE } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
+import { isContentionError } from "@/lib/server/mysql-errors";
+import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
 import { getViewerMatchProposals } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
 
@@ -32,15 +34,20 @@ export async function GET(_: Request, context: { params: Promise<{ id: string; m
   // Visibilité du tournoi relue sur sa seule ligne, dans la même connexion que
   // le match : ni l'instantané (rebâti à chaque relecture sur un cache vidé par
   // les scores), ni l'agrégat des inscrites de la carte.
-  // Une panne de la lecture (pool épuisé, verrou venu trop tard…) passe par
-  // `fail()` : un code seul — `CONCURRENT_UPDATE_RETRY` en 409 pour une
-  // contention, `INTERNAL_ERROR` sinon —, jamais le 500 nu de Next.
+  // Une panne de la lecture (pool épuisé, verrou venu trop tard…) rend un code
+  // seul, jamais le 500 nu de Next : `CONCURRENT_UPDATE_RETRY` en 409 pour une
+  // contention, reconnue par le code de l'erreur (un message localisé,
+  // `lc_messages`, ne s'y lit pas), `INTERNAL_ERROR` sinon (`fail()`).
   try {
     const read = await getViewerMatchProposals(tournamentId, user.id, can(user, "tournaments"), matchId);
     if (!read.visible) return fail("TOURNAMENT_NOT_FOUND", 404);
 
     return ok({ proposals: read.proposals });
   } catch (error) {
+    if (isContentionError(error)) {
+      console.warn(`[tournaments] propositions du match ${matchId} : lecture en contention, rendue en ${CONCURRENT_UPDATE_RETRY} :`, error);
+      return fail(CONCURRENT_UPDATE_RETRY, 409);
+    }
     return fail(error instanceof Error ? error.message : "INTERNAL_ERROR", 500);
   }
 }

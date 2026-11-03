@@ -58,7 +58,8 @@ export async function DELETE(
     // « réessaie », pas une panne. Code fixe — jamais le texte du moteur.
     if (isContentionError(error)) {
       console.warn(
-        `[tournaments] annulation de l'abandon de ${teamId} au tournoi ${tournamentId} : écriture concurrente, rendue en ${CONCURRENT_UPDATE_RETRY}`,
+        `[tournaments] annulation de l'abandon de ${teamId} au tournoi ${tournamentId} : écriture concurrente, rendue en ${CONCURRENT_UPDATE_RETRY} :`,
+        error,
       );
       return fail(CONCURRENT_UPDATE_RETRY, 409);
     }
