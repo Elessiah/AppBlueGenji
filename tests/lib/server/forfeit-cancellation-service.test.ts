@@ -129,14 +129,31 @@ describe("cancelTournamentForfeit", () => {
     expect(restore).toBeLessThan(jest.mocked(reconcileSurvival).mock.invocationCallOrder[0]);
   });
 
-  it("cancel_nominal_takesLockTournamentRowFirstThenLockedHead", async () => {
-    const { sqls } = setup();
+  // Revue perf #542 : le verrou du tournoi est la lecture verrouillée de sa
+  // tête, première instruction de la transaction — une seule requête.
+  it("cancel_nominal_lockedHeadIsFirstStatementInTransaction", async () => {
+    const { sqls, connection } = setup();
 
     await cancelTournamentForfeit(7, 102);
 
-    expect(sqls[0]).toBe("SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE");
-    expect(sqls[1]).toMatch(/FROM bg_tournaments WHERE id = \? LIMIT 1 FOR UPDATE$/);
-    expect(sqls[1]).toContain("current_phase_id");
+    const begin = connection.beginTransaction.mock.invocationCallOrder[0];
+    const firstInTransaction = connection.execute.mock.invocationCallOrder.findIndex((at) => at > begin);
+    expect(sqls[firstInTransaction]).toMatch(/^SELECT name, format, .* FROM bg_tournaments WHERE id = \? LIMIT 1 FOR UPDATE$/);
+    expect(sqls).not.toContain("SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE");
+  });
+
+  // Revue perf #542 : le nom de l'engagé se lit avant la transaction, sans
+  // verrou partagé tenu pendant tout le rejeu.
+  it("cancel_teamName_readBeforeTransactionWithoutLock", async () => {
+    const { sqls, connection } = setup();
+
+    await cancelTournamentForfeit(7, 102);
+
+    const team = sqls.findIndex((sql) => sql.startsWith("SELECT name FROM bg_teams"));
+    expect(sqls[team]).toBe("SELECT name FROM bg_teams WHERE id = ? LIMIT 1");
+    expect(connection.execute.mock.invocationCallOrder[team]).toBeLessThan(
+      connection.beginTransaction.mock.invocationCallOrder[0],
+    );
   });
 
   // Revue #542 : un classement dont l'équipe a disparu ne remet personne en lice.
@@ -160,14 +177,15 @@ describe("cancelTournamentForfeit", () => {
     expect(queries).toEqual([]);
   });
 
-  it("cancel_multiPhase_everyReadBeforeLaterRoundsIsLocking", async () => {
+  it("cancel_multiPhase_everyReadInTransactionBeforeLaterRoundsIsLocking", async () => {
     const { sqls } = setup({ head: { format: "MULTI", current_phase_id: 12 }, phase: { format: "SWISS" } });
 
     await cancelTournamentForfeit(7, 102);
 
+    // sqls[0] : le nom de l'engagé, lu avant la transaction (aucune image).
     const later = sqls.findIndex((sql) => LATER_ROUNDS.test(sql));
-    expect(later).toBe(5);
-    expect(sqls.slice(0, later + 1).every((sql) => LOCKING.test(sql))).toBe(true);
+    expect(later).toBe(4);
+    expect(sqls.slice(1, later + 1).every((sql) => LOCKING.test(sql))).toBe(true);
     // Revue #542 : verrou exclusif d'emblée (le rejeu des phases peut écrire la ligne).
     expect(sqls[2]).toMatch(/^SELECT format FROM bg_tournament_phases WHERE id = \? LIMIT 1 FOR UPDATE$/);
   });

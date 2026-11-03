@@ -4,7 +4,7 @@ import {
   clearMapSets,
   loadMapsByMatch,
   loadMatchMaps,
-  mapSetExists,
+  mapSetSize,
   promoteReportedMaps,
   replaceMatchMaps,
 } from "@/lib/server/tournaments/match-maps";
@@ -138,28 +138,71 @@ describe("stockage map par map (bg_match_maps)", () => {
   });
 });
 
-describe("mapSetExists", () => {
-  it("mapSetExists_rowFound_returnsTrue", async () => {
-    const { execute, connection } = conn([[[{ 1: 1 }], []]]);
+describe("mapSetSize", () => {
+  it("mapSetSize_rowsFound_returnsHighestMapNumber", async () => {
+    const { execute, connection } = conn([[[{ size: 3 }], []]]);
 
-    await expect(mapSetExists(connection, 70, "FINAL")).resolves.toBe(true);
+    await expect(mapSetSize(connection, 70, "FINAL")).resolves.toBe(3);
 
-    expect(flat(execute.mock.calls[0][0])).toBe("SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1");
+    expect(flat(execute.mock.calls[0][0])).toBe(
+      "SELECT MAX(map_number) AS size FROM bg_match_maps WHERE match_id = ? AND source = ?",
+    );
     expect(execute.mock.calls[0][1]).toEqual([70, "FINAL"]);
   });
 
-  it("mapSetExists_noRow_returnsFalse", async () => {
-    const { connection } = conn([[[], []]]);
+  it("mapSetSize_noRow_returnsZero", async () => {
+    const { connection } = conn([[[{ size: null }], []]]);
 
-    await expect(mapSetExists(connection, 70, "FINAL")).resolves.toBe(false);
+    await expect(mapSetSize(connection, 70, "FINAL")).resolves.toBe(0);
   });
 
   // Revue #542 : un résultat mal formé ne passe plus pour « aucun jeu »
   // (l'écriture sauterait l'effacement et doublerait le jeu FINAL).
-  it("mapSetExists_malformedResult_throwsInsteadOfReportingEmpty", async () => {
+  it("mapSetSize_malformedResult_throwsInsteadOfReportingEmpty", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue(undefined);
 
-    await expect(mapSetExists(fakeConnection({ execute }), 70, "FINAL")).rejects.toThrow(TypeError);
+    await expect(mapSetSize(fakeConnection({ execute }), 70, "FINAL")).rejects.toThrow(TypeError);
+  });
+});
+
+/**
+ * Revue perf #542 : taille connue, le jeu se réécrit en place — seules les
+ * maps au-delà de la nouvelle liste s'effacent.
+ */
+describe("replaceMatchMaps — knownSize", () => {
+  const two = [
+    { replayCode: "AAA111", team1Score: 2, team2Score: 1 },
+    { replayCode: "BBB222", team1Score: 0, team2Score: 2 },
+  ];
+
+  it("replaceMatchMaps_knownSizeGrowing_upsertsWithoutLockOrDelete", async () => {
+    const { execute, connection } = conn();
+
+    await replaceMatchMaps(connection, 10, "FINAL", two, 7, { knownSize: 1 });
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(flat(execute.mock.calls[0][0])).toMatch(/^INSERT INTO bg_match_maps .* ON DUPLICATE KEY UPDATE /);
+  });
+
+  it("replaceMatchMaps_knownSizeShrinking_deletesOnlyMapsBeyondNewList", async () => {
+    const { execute, connection } = conn();
+
+    await replaceMatchMaps(connection, 10, "FINAL", two.slice(0, 1), 7, { knownSize: 3 });
+
+    expect(flat(execute.mock.calls[0][0])).toBe(
+      "DELETE FROM bg_match_maps WHERE match_id = ? AND source = ? AND map_number > ?",
+    );
+    expect(execute.mock.calls[0][1]).toEqual([10, "FINAL", 1]);
+    expect(flat(execute.mock.calls[1][0])).toMatch(/^INSERT INTO bg_match_maps /);
+  });
+
+  it("replaceMatchMaps_knownSizeCleared_deletesAllWithoutInsert", async () => {
+    const { execute, connection } = conn();
+
+    await replaceMatchMaps(connection, 10, "FINAL", [], 7, { knownSize: 2 });
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0][1]).toEqual([10, "FINAL", 0]);
   });
 });
 
