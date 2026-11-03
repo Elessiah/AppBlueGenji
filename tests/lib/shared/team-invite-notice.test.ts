@@ -8,9 +8,12 @@ import {
   teamInviteNoticeRecipient,
   withinTeamInviteNoticeBudget,
   type TeamInviteNoticeAccount,
+  type TeamInviteNoticeKind,
   type TeamInviteNoticeTeam,
 } from "@/lib/shared/team-invite-notice";
 import { teamInvitationPush } from "@/lib/shared/push-messages";
+import type { Locale } from "@/lib/shared/locales";
+import type { PushContent } from "@/lib/shared/push-notifications";
 import { PUSH_TOPICS, canReceivePushTopic, sanitizeDisabledTopics } from "@/lib/shared/push-notifications";
 import frPush from "@/messages/fr/push.json";
 import enPush from "@/messages/en/push.json";
@@ -130,79 +133,116 @@ describe("teamInviteNoticePath", () => {
   });
 });
 
+type NoticeCase = { name: string; kind: TeamInviteNoticeKind; locale: Locale; url: string; expected: string };
+
+const PROFILE_URL = "https://site.test/profil#invitations";
+const TEAM_URL = "https://site.test/equipes/7";
+
+const NOTICE_CASES: NoticeCase[] = [
+  {
+    name: "formatTeamInviteNotice_inviteFr_namesTeamOnly",
+    kind: "INVITE",
+    locale: "fr",
+    url: PROFILE_URL,
+    expected: "📨 BlueGenji — L'équipe « Les Glaciers » t'invite à la rejoindre. Accepte ou refuse depuis ton profil : https://site.test/profil#invitations",
+  },
+  {
+    name: "formatTeamInviteNotice_ghostClaimFr_offersTakeover",
+    kind: "GHOST_CLAIM",
+    locale: "fr",
+    url: PROFILE_URL,
+    expected: "📨 BlueGenji — Le staff te propose de reprendre l'équipe « Les Glaciers » comme propriétaire. Accepte ou refuse depuis ton profil : https://site.test/profil#invitations",
+  },
+  {
+    name: "formatTeamInviteNotice_ownershipFr_linksTeamPage",
+    kind: "OWNERSHIP",
+    locale: "fr",
+    url: TEAM_URL,
+    expected: "👑 BlueGenji — La propriété de ton équipe « Les Glaciers » vient de t'être transférée. Tu gères désormais son nom, son sigle et ses membres : https://site.test/equipes/7",
+  },
+  {
+    name: "formatTeamInviteNotice_inviteEn_localizedUrl",
+    kind: "INVITE",
+    locale: "en",
+    url: PROFILE_URL,
+    expected: "📨 BlueGenji — The team “Les Glaciers” invites you to join it. Accept or decline from your profile: https://site.test/en/profil#invitations",
+  },
+  {
+    name: "formatTeamInviteNotice_ghostClaimEn_offersTakeover",
+    kind: "GHOST_CLAIM",
+    locale: "en",
+    url: PROFILE_URL,
+    expected: "📨 BlueGenji — The staff offers you to take over the team “Les Glaciers” as its owner. Accept or decline from your profile: https://site.test/en/profil#invitations",
+  },
+  {
+    name: "formatTeamInviteNotice_ownershipEn_localizedTeamPage",
+    kind: "OWNERSHIP",
+    locale: "en",
+    url: TEAM_URL,
+    expected: "👑 BlueGenji — Ownership of your team “Les Glaciers” has just been transferred to you. You now manage its name, tag and members: https://site.test/en/equipes/7",
+  },
+];
+
 describe("formatTeamInviteNotice", () => {
-  const url = "https://site.test/profil#invitations";
-
-  it("formatTeamInviteNotice_inviteFr_namesTeamOnly", () => {
-    expect(formatTeamInviteNotice({ kind: "INVITE", teamName: "Les Glaciers", url }, "fr")).toBe(
-      "📨 BlueGenji — L'équipe « Les Glaciers » t'invite à la rejoindre. Accepte ou refuse depuis ton profil : https://site.test/profil#invitations",
-    );
-  });
-
-  it("formatTeamInviteNotice_ghostClaimFr_offersTakeover", () => {
-    expect(formatTeamInviteNotice({ kind: "GHOST_CLAIM", teamName: "Les Glaciers", url }, "fr")).toBe(
-      "📨 BlueGenji — Le staff te propose de reprendre l'équipe « Les Glaciers » comme propriétaire. Accepte ou refuse depuis ton profil : https://site.test/profil#invitations",
-    );
-  });
-
-  it("formatTeamInviteNotice_ownershipFr_linksTeamPage", () => {
-    expect(formatTeamInviteNotice({ kind: "OWNERSHIP", teamName: "Les Glaciers", url: "https://site.test/equipes/7" }, "fr")).toBe(
-      "👑 BlueGenji — La propriété de ton équipe « Les Glaciers » vient de t'être transférée. Tu gères désormais son nom, son sigle et ses membres : https://site.test/equipes/7",
-    );
-  });
-
-  it("formatTeamInviteNotice_inviteEn_localizedUrl", () => {
-    expect(formatTeamInviteNotice({ kind: "INVITE", teamName: "Les Glaciers", url }, "en")).toBe(
-      "📨 BlueGenji — The team “Les Glaciers” invites you to join it. Accept or decline from your profile: https://site.test/en/profil#invitations",
-    );
-  });
-
-  it("formatTeamInviteNotice_ghostClaimEn_offersTakeover", () => {
-    expect(formatTeamInviteNotice({ kind: "GHOST_CLAIM", teamName: "Les Glaciers", url }, "en")).toBe(
-      "📨 BlueGenji — The staff offers you to take over the team “Les Glaciers” as its owner. Accept or decline from your profile: https://site.test/en/profil#invitations",
-    );
-  });
-
-  it("formatTeamInviteNotice_ownershipEn_localizedTeamPage", () => {
-    expect(formatTeamInviteNotice({ kind: "OWNERSHIP", teamName: "Les Glaciers", url: "https://site.test/equipes/7" }, "en")).toBe(
-      "👑 BlueGenji — Ownership of your team “Les Glaciers” has just been transferred to you. You now manage its name, tag and members: https://site.test/en/equipes/7",
-    );
+  it.each(NOTICE_CASES)("$name", ({ kind, locale, url, expected }) => {
+    expect(formatTeamInviteNotice({ kind, teamName: "Les Glaciers", url }, locale)).toBe(expected);
   });
 
   it("formatTeamInviteNotice_mentionInTeamName_neutralized", () => {
-    const text = formatTeamInviteNotice({ kind: "INVITE", teamName: "@everyone <@123>", url }, "fr");
+    const text = formatTeamInviteNotice({ kind: "INVITE", teamName: "@everyone <@123>", url: PROFILE_URL }, "fr");
 
     expect(text).not.toContain("@everyone");
     expect(text).not.toContain("<@123>");
   });
 });
 
-describe("teamInvitationPush", () => {
-  it("teamInvitationPush_inviteFr_profileLinkAndInviteTag", () => {
-    expect(teamInvitationPush({ kind: "INVITE", teamId: 7, teamName: "Les Glaciers" }, "fr")).toEqual({
+type PushCase = { name: string; kind: TeamInviteNoticeKind; locale: Locale; expected: PushContent };
+
+const PUSH_CASES: PushCase[] = [
+  {
+    name: "teamInvitationPush_inviteFr_profileLinkAndInviteTag",
+    kind: "INVITE",
+    locale: "fr",
+    expected: {
       title: "Invitation d'équipe",
       body: "Les Glaciers t'invite à la rejoindre. Accepte ou refuse depuis ton profil.",
       url: "/profil#invitations",
       tag: "team-7-invite",
-    });
-  });
-
-  it("teamInvitationPush_ghostClaimEn_englishProfileLink", () => {
-    expect(teamInvitationPush({ kind: "GHOST_CLAIM", teamId: 7, teamName: "Les Glaciers" }, "en")).toEqual({
+    },
+  },
+  {
+    name: "teamInvitationPush_ghostClaimEn_englishProfileLink",
+    kind: "GHOST_CLAIM",
+    locale: "en",
+    expected: {
       title: "Team takeover offered",
       body: "The staff offers you to take over Les Glaciers as its owner. Accept or decline from your profile.",
       url: "/en/profil#invitations",
       tag: "team-7-invite",
-    });
-  });
-
-  it("teamInvitationPush_ownershipFr_teamPageAndOwnerTag", () => {
-    expect(teamInvitationPush({ kind: "OWNERSHIP", teamId: 7, teamName: "Les Glaciers" }, "fr")).toEqual({
+    },
+  },
+  {
+    name: "teamInvitationPush_ownershipFr_teamPageAndOwnerTag",
+    kind: "OWNERSHIP",
+    locale: "fr",
+    expected: {
       title: "Tu es propriétaire de ton équipe",
       body: "La propriété de Les Glaciers vient de t'être transférée. Tu gères désormais son nom, son sigle et ses membres.",
       url: "/equipes/7",
       tag: "team-7-owner",
-    });
+    },
+  },
+];
+
+describe("teamInvitationPush", () => {
+  it.each(PUSH_CASES)("$name", ({ kind, locale, expected }) => {
+    expect(teamInvitationPush({ kind, teamId: 7, teamName: "Les Glaciers" }, locale)).toEqual(expected);
+  });
+
+  it("teamInvitationPush_bidiControlsInTeamName_stripped", () => {
+    const { body } = teamInvitationPush({ kind: "INVITE", teamId: 7, teamName: "‮nimda​" }, "fr");
+
+    expect(body).toBe("nimda t'invite à la rejoindre. Accepte ou refuse depuis ton profil.");
   });
 
   it("teamInvitationPush_ownershipEn_englishTeamPage", () => {

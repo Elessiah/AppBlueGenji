@@ -101,6 +101,15 @@ describe("notifyTeamInvite", () => {
     expect(pushToUsers).not.toHaveBeenCalled();
   });
 
+  it("notifyTeamInvite_invite_budgetIgnoresGhostTakeoverRows", async () => {
+    const execute = mockDb();
+
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    const budgetSql = execute.mock.calls.map(([sql]) => sql).find((sql) => sql.includes("AS any_player"));
+    expect(budgetSql).toContain(`NOT LIKE '%"OWNER"%'`);
+  });
+
   it("notifyTeamInvite_ghostClaim_skipsBudgetQuery", async () => {
     const execute = mockDb({ thisPlayer: 5, team: teamRow({ is_ghost: 1 }) });
 

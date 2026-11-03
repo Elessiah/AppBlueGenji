@@ -680,7 +680,7 @@ export function teamInvitationPush(
   const t = TEXT[locale];
   return {
     title: t.t(`${text}.title`),
-    body: t.t(`${text}.body`, { team: input.teamName }),
+    body: t.t(`${text}.body`, { team: withoutInvisibles(input.teamName) }),
     url: localeHref(teamInviteNoticePath(input.kind, input.teamId), locale),
     tag: `team-${input.teamId}-${input.kind === "OWNERSHIP" ? "owner" : "invite"}`,
   };

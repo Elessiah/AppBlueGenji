@@ -58,10 +58,11 @@ export async function notifyTeamInvite(
   const db = await getDatabase();
   if (kind === "INVITE") {
     // Invitations ordinaires de l'équipe dans la fenêtre (celle-ci comprise) :
-    // une invitation retirée puis renvoyée n'écrit pas deux fois.
+    // une invitation retirée puis renvoyée n'écrit pas deux fois. Les reprises
+    // proposées par le staff (invitation portant `OWNER`) ne comptent pas.
     const [counts] = await db.execute<(RowDataPacket & { this_player: number | string | null; any_player: number | string })[]>(
       `SELECT SUM(user_id = ?) AS this_player, COUNT(DISTINCT user_id) AS any_player FROM bg_team_invitations
-       WHERE team_id = ? AND kind = 'INVITE'
+       WHERE team_id = ? AND kind = 'INVITE' AND COALESCE(roles_json, '') NOT LIKE '%"OWNER"%'
          AND created_at > NOW() - INTERVAL ${Number(TEAM_INVITE_NOTICE_COOLDOWN_HOURS)} HOUR`,
       [userId, teamId],
     );
