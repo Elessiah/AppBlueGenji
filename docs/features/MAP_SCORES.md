@@ -250,13 +250,16 @@ statut et reports du match y sont **relus avec les maps**, en une instruction
 en cache peut précéder un report, un retrait ou un changement d'engagé
 (correction d'arbitrage). La règle de lecture se juge sur cet état relu — une
 équipe sortie du match n'en lit plus les propositions, un report déposé depuis
-l'instantané est servi avec sa date. En individuel, l'entrée du lecteur se
-résout sur la même connexion (une place du pool par relecture) ; un lecteur
-sans engagé ne déclenche aucune requête. Le match se lit par son id **et** son
-tournoi, sans passer par l'instantané : une manche posée depuis s'y lit déjà ; la
-route ne lit que la carte du tournoi (`getVisibleTournamentCard`, même règle de
-visibilité) pour ne pas rebâtir l'instantané à chaque relecture. Elle relisait
-le tournoi entier (instantané et contexte du lecteur) pour les maps d'un match.
+l'instantané est servi avec sa date. Toute la relecture tient **une** place du
+pool : visibilité du tournoi (sa seule ligne, `participant_type` et
+`start_visibility_at` — ni l'instantané, rebâti à chaque relecture sur un cache
+vidé par les scores, ni l'agrégat des inscrites de la carte), engagé du lecteur
+(équipe active ou entrée solo) puis match et maps ; un lecteur sans engagé ne
+lit pas le match. Le match se lit par son id **et** son tournoi, sans passer par
+l'instantané : une manche posée depuis s'y lit déjà. Elle relisait le tournoi
+entier (instantané et contexte du lecteur) pour les maps d'un match. Une
+réponse `proposals: null` (rien de lisible sur l'état relu) arrête les essais :
+c'est une réponse, pas un échec.
 La réponse ne complète un côté que si elle décrit la proposition affichée
 (`mergeMatchProposals`) : une réponse en retard n'écrase rien, et le contexte
 qui décrit déjà ce report l'emporte (relu après un rafraîchissement complet, il

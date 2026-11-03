@@ -160,11 +160,17 @@ remplace plus, à l'échéance, ce que l'arbitre a noté.
 « Enregistrer » ne clôt jamais un match : la sauvegarde ne lance aucune
 réconciliation de classement et ne publie que le plateau
 (`publishMatchUpdatedEvent`, ERREUR.txt EF-15). Elle prend pourtant le verrou
-du tournoi, juste après celui du match et avant toute lecture ordinaire (ordre
-d'un report) : une réconciliation concurrente qui jugerait la manche vierge sur
-son instantané puis la détruirait pour la réapparier l'attend, ou s'interbloque
-avec elle (rejoué par `retryOnDeadlock`), au lieu d'effacer une saisie commitée
-entre-temps. Ses relectures sous verrou
+du tournoi **en toute première instruction** de sa transaction, puis celui du
+match (ordre des réconciliations, de la programmation, de l'autogestion de
+manche et de la première carte) : une réconciliation concurrente qui jugerait
+la manche vierge sur son instantané puis la détruirait pour la réapparier
+passe avant elle (la saisie lit alors `MATCH_NOT_FOUND`) ou après (elle voit la
+saisie), au lieu d'effacer une saisie commitée entre-temps. Le tournoi du match
+se lit juste avant, hors transaction (la route ne connaît que le match), et les
+refus évidents (`MATCH_NOT_FOUND`, `MATCH_NOT_READY`, `MATCH_ALREADY_COMPLETED`)
+partent là, sans attendre le verrou ; ils se rejugent sous verrou. Le verrou
+aval (`checkDownstreamMatchesHaveNoScores`) n'y est plus lu : il ne protège
+qu'un match joué, que la sauvegarde refuse. Ses relectures sous verrou
 sont regroupées : la ligne enregistrée revient avec le résultat
 (`AdminSaveResult.saved`), les règles du match (`refereeScheduling` compris) se
 lisent en une requête, et les maps `FINAL` ne sont effacées que si une sonde
