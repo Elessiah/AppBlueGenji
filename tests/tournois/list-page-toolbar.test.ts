@@ -80,8 +80,9 @@ describe("page tournois — barre de recherche et filtres", () => {
 
   it("la lecture « Mes tournois » ne retient pas l'affichage au-delà de son délai maximal", () => {
     expect(page).toContain("const MINE_SETTLE_MAX_MS = 2500;");
+    // Le même délai borne la première lecture des invisibles (staff).
     expect(page).toMatch(
-      /window\.setTimeout\(\(\) => setMineSettled\(true\), MINE_SETTLE_MAX_MS\);\s*return \(\) => window\.clearTimeout\(timer\);/,
+      /window\.setTimeout\(\(\) => \{\s*setMineSettled\(true\);\s*setHiddenSettled\(true\);\s*\}, MINE_SETTLE_MAX_MS\);\s*return \(\) => window\.clearTimeout\(timer\);/,
     );
   });
 

@@ -284,18 +284,22 @@ describe("listTournamentBuckets — tournois terminés bornés", () => {
     expect(buckets.finishedTotals).toEqual({ all: 5, byGame: { OW: 5, MR: 0 } });
   });
 
-  it("compte les inscriptions dans une table dérivée, sans regrouper les colonnes du tournoi", async () => {
+  it("compte les inscriptions par sous-requête corrélée, sans regrouper les colonnes du tournoi", async () => {
     const execute = listing([], []);
     await mockDb(execute);
 
     await listTournamentBuckets(null);
 
     const [sql] = listQuery(execute);
-    expect(sql).toMatch(/LEFT JOIN \(\s*SELECT tournament_id, COUNT\(\*\) AS registered\s+FROM bg_tournament_registrations\s+GROUP BY tournament_id\s*\) rc ON rc\.tournament_id = t\.id/);
-    expect(sql).toContain("COALESCE(rc.registered, 0) AS registered_teams");
-    // Plus de `GROUP BY` sur les 36 colonnes (dont `description TEXT`) du tournoi.
-    expect(sql).not.toMatch(/GROUP BY\s+t\.id/);
-    expect(sql.match(/GROUP BY/g)).toHaveLength(1);
+    // Corrélée : seules les inscriptions des tournois listés sont lues, par
+    // l'index `idx_bg_registration_tournament` (une table dérivée aurait
+    // regroupé toute la table à chaque reconstruction).
+    expect(sql).toContain(
+      "(SELECT COUNT(*) FROM bg_tournament_registrations r WHERE r.tournament_id = t.id) AS registered_teams",
+    );
+    expect(sql).not.toContain("LEFT JOIN");
+    // Plus aucun `GROUP BY` : ni les 36 colonnes (dont `description TEXT`) du tournoi, ni table dérivée.
+    expect(sql).not.toContain("GROUP BY");
   });
 
   it("lit l'avancement d'un tournoi en cours avec la liste, sans relire bg_tournaments", async () => {

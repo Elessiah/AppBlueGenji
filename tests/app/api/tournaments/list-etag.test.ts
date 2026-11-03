@@ -84,6 +84,15 @@ describe("GET /api/tournaments — empreinte et 304", () => {
     expect(calls).toHaveLength(1);
   });
 
+  it("une liste rebâtie à chaque appel (portée hidden) garde la même empreinte tant que son contenu est le même", async () => {
+    jest.mocked(service.listTournamentBuckets).mockImplementation(async () => buckets());
+
+    const first = (await get()).headers.get("etag") ?? "";
+    const res = await get({ "If-None-Match": first });
+
+    expect(res.status).toBe(304);
+  });
+
   it("refuse un visiteur sans session en 401, empreinte reçue ou non", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(null);
 
