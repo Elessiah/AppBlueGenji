@@ -48,8 +48,12 @@ export function useProposalMaps(
     // Une relecture, puis au plus deux nouvelles tentatives espacées tant que le
     // détail manque : seul le détail arrivé dit que la lecture a abouti — il
     // fait alors tomber `needsRefresh`, et le nettoyage arrête les tentatives.
+    // Un `proposals: null` du serveur est une réponse, pas un échec : rien n'est
+    // lisible pour ce lecteur sur l'état relu (engagé remplacé, report retiré),
+    // et les tentatives restantes reposeraient la même question pour rien.
     const controller = new AbortController();
     let tries = 0;
+    let answered = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const read = async () => {
       try {
@@ -59,6 +63,11 @@ export function useProposalMaps(
         });
         if (!response.ok) return;
         const payload = (await response.json()) as { proposals?: unknown };
+        if (payload.proposals === null) {
+          answered = true;
+          if (timer !== null) clearTimeout(timer);
+          return;
+        }
         const parsed = parseMatchProposals(payload.proposals, matchId);
         if (parsed && !controller.signal.aborted) setFetched(parsed);
       } catch {
@@ -66,6 +75,7 @@ export function useProposalMaps(
       }
     };
     const attempt = () => {
+      if (answered) return;
       tries += 1;
       void read();
       if (tries < PROPOSAL_REFRESH_ATTEMPTS) timer = setTimeout(attempt, PROPOSAL_REFRESH_DELAY_MS);

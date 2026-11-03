@@ -14,7 +14,6 @@ import { tryAutoResolveByes } from "./byes";
 import { detachDownstreamOutcome } from "./bracket-cascade";
 import { SINGLE_REPORT_SQL } from "./score-report-sql";
 import { laterRoundsHaveScoreInput } from "./bg-survie/round-progress";
-import { lockTournamentRow } from "./registration";
 
 interface DependentMatchRow extends RowDataPacket {
   id: number;
@@ -443,16 +442,6 @@ export async function adminSaveMatchScores(
 
   if (matches.length === 0) throw new Error("MATCH_NOT_FOUND");
   const match = matches[0];
-  // Puis le tournoi, **avant toute lecture ordinaire** — l'ordre d'un report
-  // (match, puis tournoi). « Enregistrer » ne rejoue plus rien, mais une
-  // réconciliation (report, correction, annulation d'abandon, pénalité) peut
-  // juger sur instantané la manche de ce match vierge puis la détruire pour la
-  // réapparier : elle tient le tournoi, si bien que cette saisie l'attend (ou
-  // forme avec son `DELETE` un interblocage que le moteur rompt et que
-  // `retryOnDeadlock` rejoue) au lieu d'être commitée puis effacée. Aucune
-  // lecture d'instantané n'a encore ouvert de vue : sous l'isolation par
-  // instantané de MariaDB, ce verrou ne peut pas lever `ER_CHECKREAD`.
-  await lockTournamentRow(connection, Number(match.tournament_id));
   if (match.team1_id === null || match.team2_id === null) throw new Error("MATCH_NOT_READY");
 
   // Cette route n'écrit que les scores : elle ne recalcule ni le vainqueur ni la
@@ -470,7 +459,10 @@ export async function adminSaveMatchScores(
   // d'endurance en tirait trois maps **de chaque côté**, soit zéro point net.
   if (match.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
 
-  await checkDownstreamMatchesHaveNoScores(connection, match);
+  // Pas de verrou aval (`checkDownstreamMatchesHaveNoScores`) : il ne protège
+  // qu'un match joué, et seul `COMPLETED` l'est (`isMatchPlayed`) — refusé
+  // juste au-dessus. Sa lecture jointe ne servait à rien, sous le verrou du
+  // tournoi, à chaque map enregistrée.
 
   if (isForfeitEntry(entry)) {
     const { forfeitTeamId } = entry;

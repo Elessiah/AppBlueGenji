@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { enforceRateLimit, TOURNAMENT_READ_RULE } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
-import { getViewerMatchProposals, getVisibleTournamentCard } from "@/lib/server/tournaments-service";
+import { getViewerMatchProposals } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
 
 /**
@@ -29,11 +29,11 @@ export async function GET(_: Request, context: { params: Promise<{ id: string; m
     return fail("INVALID_MATCH_ID", 400);
   }
 
-  const canManage = can(user, "tournaments");
-  // La carte seule, même règle de visibilité : l'instantané entier se
-  // rebâtirait à chaque relecture sur un cache vidé par les scores.
-  const card = await getVisibleTournamentCard(tournamentId, { canManage });
-  if (!card) return fail("TOURNAMENT_NOT_FOUND", 404);
+  // Visibilité du tournoi relue sur sa seule ligne, dans la même connexion que
+  // le match : ni l'instantané (rebâti à chaque relecture sur un cache vidé par
+  // les scores), ni l'agrégat des inscrites de la carte.
+  const read = await getViewerMatchProposals(tournamentId, user.id, can(user, "tournaments"), matchId);
+  if (!read.visible) return fail("TOURNAMENT_NOT_FOUND", 404);
 
-  return ok({ proposals: await getViewerMatchProposals({ card }, user.id, canManage, matchId) });
+  return ok({ proposals: read.proposals });
 }

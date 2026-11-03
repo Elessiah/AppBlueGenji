@@ -1084,13 +1084,13 @@ export type TournamentViewerContextOptions = {
  * (25) pour ne rien en faire doublerait la pression à chaque connexion SSE.
  */
 async function resolveViewerEntrant(
-  snapshot: Pick<TournamentSnapshot, "card">,
+  snapshot: { card: Pick<TournamentCard, "participantType"> },
   userId: number,
-  /** Connexion déjà tenue par l'appelant (en individuel) ; sinon, une du pool. */
+  /** Connexion déjà tenue par l'appelant ; sinon, une du pool (individuel seulement). */
   connection?: PoolConnection,
 ): Promise<{ activeTeam: Awaited<ReturnType<typeof getUserActiveTeam>> | null; myTeamId: number | null }> {
   if (!isSoloTournament(snapshot.card.participantType)) {
-    const activeTeam = await getUserActiveTeam(userId);
+    const activeTeam = await getUserActiveTeam(userId, connection);
     return { activeTeam, myTeamId: activeTeam?.teamId ?? null };
   }
   const resolve = (conn: PoolConnection) =>
@@ -1119,41 +1119,70 @@ function viewerProposalScope(
 }
 
 /**
+ * Relecture des propositions d'un match ({@link getViewerMatchProposals}) :
+ * `visible: false` quand le tournoi est inconnu ou pas encore publié pour ce
+ * lecteur (404), sinon les propositions lisibles — `null` : rien pour lui.
+ */
+export type ViewerMatchProposals =
+  | { visible: false }
+  | { visible: true; proposals: MatchProposalMaps | null };
+
+/**
+ * Ce que la relecture lit du tournoi : son type d'engagés, s'il est visible
+ * du lecteur (même règle que `getVisibleTournamentCard`). Une ligne par clé
+ * primaire, sans l'agrégat des inscrites de la carte complète.
+ */
+async function loadVisibleProposalTarget(
+  connection: PoolConnection,
+  tournamentId: number,
+  canManage: boolean,
+): Promise<Pick<TournamentCard, "participantType"> | null> {
+  const [rows] = await connection.execute<
+    (RowDataPacket & { participant_type: string; start_visibility_at: Date })[]
+  >(`SELECT participant_type, start_visibility_at FROM bg_tournaments WHERE id = ? LIMIT 1`, [tournamentId]);
+  const row = rows[0];
+  if (!row || !canViewTournament({ startVisibilityAt: row.start_visibility_at }, { canManage })) return null;
+  return { participantType: toParticipantType(row.participant_type) };
+}
+
+/**
  * Propositions en attente d'**un** match, telles que le lecteur peut les lire
  * (`TournamentViewerContext.matchProposals`, restreint à ce match) : la
  * relecture légère des dialogues de score quand une proposition arrive après la
  * connexion au flux — elle relisait sinon tout le tournoi (instantané et
- * contexte du lecteur) pour les maps d'un seul match. `null` : rien de lisible
- * (match inconnu, clos, sans report, ou hors des engagés du lecteur).
+ * contexte du lecteur) pour les maps d'un seul match. `proposals: null` : rien
+ * de lisible (match inconnu, clos, sans report, ou hors des engagés du lecteur).
+ *
+ * **Une seule place du pool** pour toute la relecture (visibilité du tournoi,
+ * engagé du lecteur, match et maps) : chaque dialogue la rejoue jusqu'à trois
+ * fois par proposition, sur le pool que partagent les contextes du flux.
  */
 export async function getViewerMatchProposals(
-  /** Seule la carte sert (id, type d'engagés) : la route la lit sans l'instantané. */
-  snapshot: Pick<TournamentSnapshot, "card">,
+  tournamentId: number,
   userId: number,
   canManage: boolean,
   matchId: number,
-): Promise<MatchProposalMaps | null> {
-  // Le match se lit par son tournoi, sans passer par l'instantané en cache :
-  // une manche posée ou réappariée depuis n'y figure pas encore.
-  const target = { tournamentId: snapshot.card.id, matchId };
-  const isSolo = isSoloTournament(snapshot.card.participantType);
-  // Lecteur sans engagé : rien à lire. Le reste de la règle (engagés du match,
-  // report en attente) se juge sur l'état **relu** (`loadFreshMatchProposals`).
-  const scopeOf = (entrant: Awaited<ReturnType<typeof resolveViewerEntrant>>) => {
-    const scope = viewerProposalScope(isSolo, entrant.myTeamId, entrant.activeTeam, canManage);
-    return scope.all || scope.teamIds.length > 0 ? scope : null;
-  };
-  // En individuel, l'entrée se résout sur la connexion de la relecture : une
-  // seule place du pool, jamais deux à la fois.
-  if (isSolo && !canManage) {
-    return withConnection(async (connection) => {
-      const scope = scopeOf(await resolveViewerEntrant(snapshot, userId, connection));
-      return scope ? loadFreshMatchProposals(connection, target, scope, mapScoreReport) : null;
-    });
-  }
-  const scope = scopeOf(canManage ? { activeTeam: null, myTeamId: null } : await resolveViewerEntrant(snapshot, userId));
-  if (!scope) return null;
-  return withConnection((connection) => loadFreshMatchProposals(connection, target, scope, mapScoreReport));
+): Promise<ViewerMatchProposals> {
+  return withConnection(async (connection) => {
+    const tournament = await loadVisibleProposalTarget(connection, tournamentId, canManage);
+    if (!tournament) return { visible: false };
+    // Lecteur sans engagé : rien à lire. Le reste de la règle (engagés du match,
+    // report en attente) se juge sur l'état **relu** (`loadFreshMatchProposals`),
+    // le match lu par son tournoi : une manche posée ou réappariée depuis le
+    // dernier instantané n'y figure pas encore.
+    const entrant = canManage
+      ? { activeTeam: null, myTeamId: null }
+      : await resolveViewerEntrant({ card: tournament }, userId, connection);
+    const scope = viewerProposalScope(
+      isSoloTournament(tournament.participantType),
+      entrant.myTeamId,
+      entrant.activeTeam,
+      canManage,
+    );
+    if (!scope.all && scope.teamIds.length === 0) return { visible: true, proposals: null };
+    const proposals = await loadFreshMatchProposals(connection, { tournamentId, matchId }, scope, mapScoreReport);
+    return { visible: true, proposals };
+  });
 }
 
 /**
@@ -1545,6 +1574,22 @@ export async function adminSaveMatchScoresPublic(
   return saved.paused;
 }
 
+/**
+ * Tournoi d'un match à enregistrer, avant la transaction d'« Enregistrer ».
+ *
+ * @throws `MATCH_NOT_FOUND`, `MATCH_NOT_READY`, `MATCH_ALREADY_COMPLETED`
+ */
+async function saveTargetTournament(connection: PoolConnection, matchId: number): Promise<number> {
+  const [rows] = await connection.execute<
+    (RowDataPacket & { tournament_id: number; team1_id: number | null; team2_id: number | null; status: string })[]
+  >(`SELECT tournament_id, team1_id, team2_id, status FROM bg_matches WHERE id = ? LIMIT 1`, [matchId]);
+  const row = rows[0];
+  if (!row) throw new Error("MATCH_NOT_FOUND");
+  if (row.team1_id === null || row.team2_id === null) throw new Error("MATCH_NOT_READY");
+  if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+  return Number(row.tournament_id);
+}
+
 async function adminSaveMatchScoresOnce(
   matchId: number,
   entry: AdminScoreEntry,
@@ -1553,7 +1598,22 @@ async function adminSaveMatchScoresOnce(
   const connection = await db.getConnection();
 
   try {
+    // Le tournoi du match, lu **hors transaction** (instruction autonome : elle
+    // n'ouvre aucune image qui survivrait au `BEGIN`) — la route ne connaît que
+    // le match. Les refus évidents (match inconnu, clos, sans ses deux engagés)
+    // partent ici, sans attendre le verrou du tournoi ; ils se rejugent sous
+    // verrou (`adminSaveMatchScores`).
+    const tournamentId = await saveTargetTournament(connection, matchId);
+
     await connection.beginTransaction();
+    // Tournoi d'abord, **en toute première instruction**, puis le match : l'ordre
+    // des réconciliations, de la programmation, de l'autogestion de manche et de
+    // la première carte. « Enregistrer » ne rejoue rien, mais une réconciliation
+    // qui juge la manche de ce match vierge puis la détruit pour la réapparier
+    // tient le tournoi : la saisie l'attend (puis lit `MATCH_NOT_FOUND`) au lieu
+    // d'être commitée puis effacée. Le match n'est pas verrouillé pendant cette
+    // attente, et aucune image n'est ouverte avant (pas d'`ER_CHECKREAD`).
+    await lockTournamentRow(connection, tournamentId);
 
     const { adminSaveMatchScores: adminSaveInternal } = await import("./admin");
     const { saved, ...pause } = await adminSaveInternal(connection, matchId, entry);

@@ -8,9 +8,6 @@ import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournament
 import { mapsFor } from "../../helpers/match-maps";
 import { SINGLE_REPORT_SQL } from "@/lib/server/tournaments/score-report-sql";
 
-/** Instruction de `lockTournamentRow`, aplatie comme `statements`. */
-const TOURNAMENT_LOCK_SQL = "SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE";
-
 /**
  * Garde-fous d'écriture de l'arbitrage, indépendants du format de match (voir
  * `match-format-admin.test.ts` pour celui-là).
@@ -51,14 +48,11 @@ function fakeConnection(
   writes: string[];
   /** Toutes les instructions, aplaties, dans l'ordre. */
   statements: string[];
-  /** Les mêmes, avec leurs paramètres. */
-  calls: { sql: string; params: unknown[] }[];
   /** Suspensions de la validation d'office tentées (`pauseAutoValidation`), avec leurs paramètres. */
   pauses: { sql: string; params: unknown[] }[];
 } {
   const writes: string[] = [];
   const statements: string[] = [];
-  const calls: { sql: string; params: unknown[] }[] = [];
   const pauses: { sql: string; params: unknown[] }[] = [];
 
   // Suspension de la validation d'office (report seul), comptée à part : elle
@@ -86,7 +80,6 @@ function fakeConnection(
     execute: async (sql: string, params: unknown[] = []) => {
       const q = sql.replace(/\s+/g, " ").trim();
       statements.push(q);
-      calls.push({ sql: q, params });
 
       const direct = writeOrProbe(q, params);
       if (direct) return direct;
@@ -169,7 +162,7 @@ function fakeConnection(
     },
   } as unknown as PoolConnection;
 
-  return { conn, writes, statements, calls, pauses };
+  return { conn, writes, statements, pauses };
 }
 
 describe("adminSaveMatchScores — match déjà tranché", () => {
@@ -499,9 +492,7 @@ describe("adminSaveMatchScores — allers-retours", () => {
 
     await adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 });
 
-    // Le verrou du tournoi (`lockTournamentRow`) ne lit aucune règle : seule la lecture des règles compte.
-    const rulesReads = statements.filter((sql) => sql.includes("FROM bg_tournaments") && !sql.startsWith(TOURNAMENT_LOCK_SQL));
-    expect(rulesReads).toHaveLength(1);
+    expect(statements.filter((sql) => sql.includes("FROM bg_tournaments"))).toHaveLength(1);
     expect(statements.some((sql) => sql.startsWith("SELECT referee_scheduling"))).toBe(false);
   });
 
@@ -534,58 +525,5 @@ describe("adminSaveMatchScores — allers-retours", () => {
 
     expect(statements.some((sql) => sql.startsWith("DELETE FROM bg_match_maps"))).toBe(true);
     expect(statements.some((sql) => sql.startsWith("INSERT INTO bg_match_maps"))).toBe(false);
-  });
-});
-
-// ERREUR.txt EF-15 : « Enregistrer » ne réconcilie plus, mais prend toujours le
-// tournoi, juste après le match (ordre d'un report) et avant toute lecture
-// ordinaire — une réconciliation qui détruit une manche jugée vierge l'attend
-// ou s'interbloque avec lui, au lieu d'effacer une saisie commitée.
-describe("adminSaveMatchScores — verrou du tournoi après celui du match", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it("adminSave_maps_locksTournamentRightAfterMatch", async () => {
-    const { conn, calls } = fakeConnection();
-
-    await adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 });
-
-    expect(calls[0].sql).toMatch(/FROM bg_matches WHERE id = \? LIMIT 1 FOR UPDATE$/);
-    expect(calls[1]).toEqual({ sql: TOURNAMENT_LOCK_SQL, params: [1] });
-  });
-
-  it("adminSave_forfeit_locksTournamentRightAfterMatch", async () => {
-    const { conn, calls } = fakeConnection();
-
-    await adminSaveMatchScores(conn, 10, { forfeitTeamId: 200 });
-
-    expect(calls[0].sql).toMatch(/FROM bg_matches WHERE id = \? LIMIT 1 FOR UPDATE$/);
-    expect(calls[1]).toEqual({ sql: TOURNAMENT_LOCK_SQL, params: [1] });
-  });
-
-  it("adminSave_tournamentLock_precedesEveryNonLockingRead", async () => {
-    const { conn, statements } = fakeConnection({ refereeScheduling: true, launchedAt: new Date() });
-
-    await adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 });
-
-    const lock = statements.indexOf(TOURNAMENT_LOCK_SQL);
-    expect(lock).toBe(1);
-    expect(statements.slice(0, lock).every((sql) => sql.endsWith("FOR UPDATE"))).toBe(true);
-  });
-
-  it("adminSave_matchNotFound_takesNoTournamentLock", async () => {
-    const statements: string[] = [];
-    const conn = {
-      execute: async (sql: string) => {
-        statements.push(sql.replace(/\s+/g, " ").trim());
-        return [[], []];
-      },
-    } as unknown as PoolConnection;
-
-    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 })).rejects.toThrow("MATCH_NOT_FOUND");
-
-    expect(statements).toHaveLength(1);
-    expect(statements[0]).not.toContain("bg_tournaments");
   });
 });
