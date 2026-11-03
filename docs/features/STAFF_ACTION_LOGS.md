@@ -59,7 +59,8 @@ passe par un regroupeur (`lib/server/coalescer.ts`) par tournoi — une ligne
 après 60 s sans nouveau geste, au plus tard 5 min après le premier. Un autre
 geste sur le même tournoi fait d'abord partir la rafale en attente (le journal
 garde l'ordre), et l'arrêt propre du serveur l'annonce avant les lots du journal
-(`flushAllCoalescers`, `bot-log-shutdown.ts`). Le regroupeur vit en mémoire : un
+(`flushAllCoalescers`, `bot-log-shutdown.ts`), comme les lignes de tournoi
+déjà parties qui lisent encore le nom du tournoi (`trackAnnouncement`). Le regroupeur vit en mémoire : un
 seul processus sert le site.
 « Changé » ne se lit jamais dans une lecture hors verrou : l'hôte se compare sous
 le verrou du match, l'antenne et la rediffusion dans l'écriture elle-même
