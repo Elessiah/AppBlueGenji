@@ -17,7 +17,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { reloadAfterChunkError } from "@/lib/shared/lazy-component";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { documentLocale } from "@/lib/shared/document-locale";
-import { SUSPEND_RETRY_MS, suspendOn } from "@/components/i18n/suspend-on-loader";
+import { SUSPEND_MAX_RETRIES, SUSPEND_RETRY_MS, suspendOn } from "@/components/i18n/suspend-on-loader";
 import { TournamentPageTextProvider, useTournamentPageText, useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import { TournamentSheetTextGate, type TournamentSheetEnglish } from "@/components/i18n/tournament-sheet-text-gate";
 import { TournamentsTextProvider, useTournamentsText } from "@/components/i18n/tournaments-text";
@@ -159,6 +159,56 @@ describe("suspendOn", () => {
     // Un bogue remonte à la limite d'erreur : ni attente, ni nouvelle requête.
     expect(thrownBy(() => suspendOn(loader))).toBe(bug);
     expect(loader.load).toHaveBeenCalledTimes(1);
+  });
+
+  it("suspendOn_surfacedErrorAlreadyThrown_followingRenderLoadsAgain", async () => {
+    const loader = { load: jest.fn(async () => Promise.reject(new TypeError("boom"))) };
+    await thrownBy(() => suspendOn(loader));
+    thrownBy(() => suspendOn(loader));
+    // Levée une fois : un nouveau montage retente au lieu de rester bloqué sur l'erreur.
+    expect(thrownBy(() => suspendOn(loader))).toBeInstanceOf(Promise);
+    expect(loader.load).toHaveBeenCalledTimes(2);
+  });
+
+  it("suspendOn_chunkMissingAfterLastRetry_surfacesErrorToBoundary", async () => {
+    jest.useFakeTimers();
+    try {
+      const missing = chunkError();
+      const loader = { load: jest.fn(async () => Promise.reject(missing)) };
+      for (let attempt = 0; attempt < SUSPEND_MAX_RETRIES; attempt++) {
+        thrownBy(() => suspendOn(loader));
+        await jest.advanceTimersByTimeAsync(SUSPEND_RETRY_MS);
+      }
+      await thrownBy(() => suspendOn(loader));
+      expect(jest.getTimerCount()).toBe(0);
+      expect(thrownBy(() => suspendOn(loader))).toBe(missing);
+      expect(loader.load).toHaveBeenCalledTimes(SUSPEND_MAX_RETRIES + 1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("suspendOn_successBetweenChunkFailures_resetsRetryCount", async () => {
+    jest.useFakeTimers();
+    try {
+      const load = jest.fn<() => Promise<string>>();
+      for (let attempt = 0; attempt < SUSPEND_MAX_RETRIES; attempt++) load.mockRejectedValueOnce(chunkError());
+      load.mockResolvedValueOnce("ok").mockRejectedValue(chunkError());
+      const loader = { load };
+      for (let attempt = 0; attempt < SUSPEND_MAX_RETRIES; attempt++) {
+        thrownBy(() => suspendOn(loader));
+        await jest.advanceTimersByTimeAsync(SUSPEND_RETRY_MS);
+      }
+      await thrownBy(() => suspendOn(loader));
+      await jest.advanceTimersByTimeAsync(0);
+      thrownBy(() => suspendOn(loader));
+      await jest.advanceTimersByTimeAsync(0);
+      // Premier échec depuis le succès : un nouvel essai est programmé, l'erreur ne remonte pas.
+      expect(thrownBy(() => suspendOn(loader))).toBeInstanceOf(Promise);
+      expect(jest.getTimerCount()).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
