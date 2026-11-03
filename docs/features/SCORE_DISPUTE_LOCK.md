@@ -182,7 +182,7 @@ tournoi multi-phases, jugée sur la phase du match. Le tournoi du match, avec
 le format du match (sa phase, sinon le tournoi), se lit juste avant, hors transaction (la route ne connaît que le match), et les
 refus qui ne lisent rien d'autre (`MATCH_NOT_FOUND`, `MATCH_NOT_READY`,
 `MATCH_ALREADY_COMPLETED`, forfait d'une équipe étrangère
-`INVALID_FORFEIT_TEAM_ID`, saisie mal formée `INVALID_REQUEST`) partent là, sans
+`INVALID_FORFEIT_TEAM_ID`, saisie mal formée `INVALID_REQUEST`, tous deux en 400) partent là, sans
 attendre le verrou, et sans `ROLLBACK` (aucune transaction ouverte) ; ils se
 rejugent sous verrou, par les mêmes règles (`assertMatchSavable`,
 `assertSaveEntryFits`, `save-guard.ts`). Le contrôle des maps contre le format

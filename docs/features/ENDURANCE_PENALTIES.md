@@ -113,7 +113,8 @@ toute première instruction — une seule requête, sans `lockTournamentRow` qui
 la doublait) s'attend sans borne et le rejeu garde le délai du serveur ; le
 module du moteur se résout avant la transaction ; contention persistante
 → `409 CONCURRENT_UPDATE_RETRY`, l'interblocage avec un report étant rejoué
-(`retryOnDeadlock`). Après le commit, comme l'annulation d'un abandon, seuls
+(`retryOnDeadlock`), même quand le `ROLLBACK` échoue (`rollbackKeepingError` :
+l'erreur d'origine reste, la connexion est détruite). Après le commit, comme l'annulation d'un abandon, seuls
 l'instantané, l'aperçu, les listes, le direct et les mini-arbres de l'accueil
 sont oubliés (`publishStandingsReplayedEvent`, règle partagée) : aucun résultat de match ne change,
 le classement du site et les statistiques restent en cache.

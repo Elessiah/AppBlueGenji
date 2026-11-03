@@ -111,7 +111,10 @@ délai du serveur (journal du bot et alertes, qui tolèrent un délai dépassé,
 perdraient sinon leur ligne en silence). Au retour au pool, le délai n'est
 remis qu'une fois de plus si cette remise a manqué (aucune requête sinon) ; une
 remise ratée après une lecture réussie arrête le geste plutôt que de rejouer sous
-le délai court. Un classement dont l'équipe n'existe plus rend
+le délai court. Un `ROLLBACK` qui échoue (connexion tombée après l'interblocage)
+ne masque pas l'erreur d'origine — le rejeu et le 409 la reconnaissent — et la
+connexion, transaction peut-être encore ouverte, est détruite au lieu d'être
+rendue (`rollbackKeepingError`, même module). Un classement dont l'équipe n'existe plus rend
 `TEAM_NOT_IN_TOURNAMENT`, avant la lecture bornée des manches. Une contention qui dure —
 interblocage sur les trois tentatives, `ER_CHECKREAD`, délai de verrou
 (`ER_LOCK_WAIT_TIMEOUT`) — rend `409 CONCURRENT_UPDATE_RETRY` (code fixe, le
