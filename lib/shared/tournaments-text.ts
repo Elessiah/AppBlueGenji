@@ -4,12 +4,15 @@
  * formateur de `next-intl` pour elle coûterait ~12 Ko compressés.
  *
  * Le français est inclus dans le paquet (il remplace les chaînes écrites en
- * dur) ; l'anglais n'arrive que sous `/en`, sérialisé par la mise en page du
- * segment (`TournamentsTextProvider`). Les propriétés du JSON sont lues une à
- * une, ce qui laisse le bundler écarter celles qu'aucun écran client ne lit
- * (`meta`, réservé aux métadonnées serveur).
+ * dur) ; l'anglais n'arrive que sous `/en` : celui de la liste est sérialisé par
+ * sa page, celui que la fiche partage avec elle (`tournamentsShared.json` :
+ * effectifs, format de match, aide des règles, plus les libellés) voyage avec
+ * l'anglais de la fiche (`TournamentSheetTextGate`). Les propriétés de la liste
+ * sont lues une à une, ce qui laisse le bundler écarter `meta`, réservé aux
+ * métadonnées serveur.
  */
 import frTournaments from "@/messages/fr/tournaments.json";
+import frTournamentsShared from "@/messages/fr/tournamentsShared.json";
 import frLabels from "@/messages/fr/labels.json";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import { messageAt, scopedText, type Leaves, type ScopedText } from "@/lib/shared/scoped-text";
@@ -20,16 +23,26 @@ import { tickerControls, type TickerControls } from "@/lib/shared/ticker-labels"
 
 type FrTournaments = typeof frTournaments;
 
-/** Les espaces de `tournaments` que lisent les écrans client de la liste. */
-export const TOURNAMENTS_LIST_PARTS = ["list", "ticker", "cards", "participants", "matchFormat", "rulesHelp"] as const;
+/** Les espaces de `tournaments` que lisent les écrans client de la liste seule. */
+export const TOURNAMENTS_LIST_PARTS = ["list", "ticker", "cards"] as const;
 type ListPart = (typeof TOURNAMENTS_LIST_PARTS)[number];
 
 /** Libellés du bandeau défilant et de son bouton pause, repris de l'accueil (`landing.ticker`). */
 export type { TickerControls } from "@/lib/shared/ticker-labels";
 
-export type TournamentsClientMessages = Pick<FrTournaments, ListPart> & {
+/**
+ * Les espaces que lisent **aussi** la fiche, la création et l'édition (libellés,
+ * effectifs, format de match, aide des règles) : ce que l'anglais de la fiche
+ * porte (`tournamentsSharedMessages`). La liste, ses cartes et le bandeau
+ * (`list`, `ticker`, `cards`, `tickerControls`) sont posés par la page de la
+ * liste seule.
+ */
+export type TournamentsSharedMessages = typeof frTournamentsShared & {
   /** Libellés de format, de jeu et d'état (espace `labels`, lot 4). */
   labels: Messages["labels"];
+};
+
+export type TournamentsClientMessages = Pick<FrTournaments, ListPart> & TournamentsSharedMessages & {
   /**
    * Contrôles du bandeau, sous `/en` seulement : la liste ne pose pas le
    * fournisseur de l'accueil. En français, le bandeau lit le sien — importer
@@ -48,43 +61,31 @@ export const FR_TOURNAMENTS_CLIENT_MESSAGES: TournamentsClientMessages = {
   list: frTournaments.list,
   ticker: frTournaments.ticker,
   cards: frTournaments.cards,
-  participants: frTournaments.participants,
-  matchFormat: frTournaments.matchFormat,
-  rulesHelp: frTournaments.rulesHelp,
+  participants: frTournamentsShared.participants,
+  matchFormat: frTournamentsShared.matchFormat,
+  rulesHelp: frTournamentsShared.rulesHelp,
   labels: frLabels,
 };
 
 /** Ce qui voyage vers le navigateur sous `/en` : les espaces client, pas `meta`. */
-export function tournamentsClientMessages(messages: Pick<Messages, "tournaments" | "labels" | "landing">): TournamentsClientMessages {
+export function tournamentsClientMessages(messages: Pick<Messages, "tournaments" | "tournamentsShared" | "labels" | "landing">): TournamentsClientMessages {
   const { tournaments } = messages;
   return {
     list: tournaments.list,
     ticker: tournaments.ticker,
     cards: tournaments.cards,
-    participants: tournaments.participants,
-    matchFormat: tournaments.matchFormat,
-    rulesHelp: tournaments.rulesHelp,
-    labels: messages.labels,
+    ...tournamentsSharedMessages(messages),
     tickerControls: tickerControls(messages.landing.ticker),
   };
 }
 
-/**
- * Les espaces que lisent **aussi** la fiche, la création et l'édition (libellés,
- * effectifs, format de match, aide des règles) : ce que la mise en page de
- * `/tournois` sérialise sous `/en`. La liste, ses cartes et le bandeau
- * (`list`, `ticker`, `cards`, `tickerControls`) sont posés par la page de la
- * liste seule : la mise en page enveloppe aussi `[id]`, `creer` et `modifier`,
- * et chaque `router.refresh()` d'une fiche les renverrait pour rien.
- */
-export type TournamentsSharedMessages = Pick<TournamentsClientMessages, "participants" | "matchFormat" | "rulesHelp" | "labels">;
-
-export function tournamentsSharedMessages(messages: Pick<Messages, "tournaments" | "labels">): TournamentsSharedMessages {
-  const { tournaments } = messages;
+/** Ce que l'anglais de la fiche porte des textes communs avec la liste. */
+export function tournamentsSharedMessages(messages: Pick<Messages, "tournamentsShared" | "labels">): TournamentsSharedMessages {
+  const { tournamentsShared } = messages;
   return {
-    participants: tournaments.participants,
-    matchFormat: tournaments.matchFormat,
-    rulesHelp: tournaments.rulesHelp,
+    participants: tournamentsShared.participants,
+    matchFormat: tournamentsShared.matchFormat,
+    rulesHelp: tournamentsShared.rulesHelp,
     labels: messages.labels,
   };
 }

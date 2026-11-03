@@ -25,7 +25,9 @@ import type frVolunteers from "@/messages/fr/volunteers.json";
 import type frRecruitment from "@/messages/fr/recruitment.json";
 import type frLegal from "@/messages/fr/legal.json";
 import type frTournaments from "@/messages/fr/tournaments.json";
+import type frTournamentsShared from "@/messages/fr/tournamentsShared.json";
 import type frTournament from "@/messages/fr/tournament.json";
+import type frTournamentServer from "@/messages/fr/tournamentServer.json";
 import type frTournamentViews from "@/messages/fr/tournamentViews.json";
 import type frTournamentEndurance from "@/messages/fr/tournamentEndurance.json";
 import type frTournamentEnduranceChart from "@/messages/fr/tournamentEnduranceChart.json";
@@ -49,7 +51,7 @@ import type frPushMessages from "@/messages/fr/pushMessages.json";
 import type frRoundMaps from "@/messages/fr/roundMaps.json";
 import type frMatchPage from "@/messages/fr/matchPage.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentEndurance", "tournamentEnduranceChart", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "certifyPrompt", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push", "pushMessages", "roundMaps", "matchPage"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournamentsShared", "tournament", "tournamentServer", "tournamentViews", "tournamentEndurance", "tournamentEnduranceChart", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "certifyPrompt", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push", "pushMessages", "roundMaps", "matchPage"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -81,8 +83,21 @@ export type Messages = {
   legal: typeof frLegal;
   /** Tournois — consultation (lot 8a) : liste, cartes, fiche — `lib/shared/tournaments-text.ts`. */
   tournaments: typeof frTournaments;
+  /**
+   * Textes de la liste que lit aussi la fiche (effectifs, format de match, aide
+   * des règles), dans leur fichier : l'anglais de la fiche ne charge que ceux-là,
+   * sans la liste ni ses cartes — `lib/shared/tournaments-text.ts`.
+   */
+  tournamentsShared: typeof frTournamentsShared;
   /** Fiche d'un tournoi (lot 8a-2) et réglages `?tournoi=` des règles — `lib/shared/tournament-page-text.ts`. */
   tournament: typeof frTournament;
+  /**
+   * Parties de la fiche lues côté serveur seulement (`meta`, `settings`,
+   * `share` : titre de repli, réglages des règles, description d'un lien) :
+   * un fichier à part, pour qu'elles ne partent jamais dans le morceau anglais
+   * de la fiche (`components/i18n/tournament-sheet-text-gate.tsx`).
+   */
+  tournamentServer: typeof frTournamentServer;
   /**
    * Vues de la fiche chargées à la demande (ronde suisse, survie par coupes) :
    * un fichier à part, pour que leurs textes voyagent avec leur morceau et non

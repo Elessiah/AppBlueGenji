@@ -83,32 +83,5 @@
       "standings": "Voir le classement",
       "tournament": "Voir le tournoi"
     }
-  },
-  "participants": {
-    "TEAM": {
-      "manyCapitalized": "Équipes",
-      "manyParticipating": "Équipes participantes"
-    },
-    "SOLO": {
-      "manyCapitalized": "Joueurs",
-      "manyParticipating": "Joueurs participants"
-    }
-  },
-  "matchFormat": {
-    "free": "Score libre",
-    "withMaps": "{base} · {maps} maps"
-  },
-  "rulesHelp": {
-    "index": "Règles des tournois",
-    "mode": "Règles du mode {mode}",
-    "withContext": "{label} — {context}",
-    "modes": {
-      "SINGLE": "Élimination simple",
-      "DOUBLE": "Double élimination",
-      "BG_SURVIE": "BlueGenji Survie",
-      "SURVIVAL": "Survie par coupes",
-      "SWISS": "Ronde suisse",
-      "MULTI": "Tournoi multi-phases"
-    }
   }
 }

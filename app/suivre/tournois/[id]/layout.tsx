@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/server/auth";
-import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { publicTournamentCardForRequest } from "@/lib/server/spectator-request";
 import { tournamentPageMetadata } from "@/lib/server/tournament-metadata";
@@ -14,9 +13,7 @@ import {
   parseTournamentId,
   spectatorTournamentPath,
 } from "@/lib/shared/spectator-view";
-import { tournamentsSharedMessages } from "@/lib/shared/tournaments-text";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
-import { TournamentsTextProvider } from "@/components/i18n/tournaments-text";
 import { SpectatorViewProvider } from "@/components/spectator-view";
 import { MemberRelay } from "./_components/MemberRelay";
 import { TournamentSheetText, tournamentSheetEnglish } from "@/app/(secured)/tournois/[id]/_components/TournamentSheetText";
@@ -91,17 +88,14 @@ export default async function SpectatorTournamentLayout({
     }
   }
 
-  const catalog = locale === "en" ? messagesFor(locale) : null;
   return (
-    <TournamentsTextProvider locale={locale} messages={catalog ? tournamentsSharedMessages(catalog) : undefined}>
-      <TournamentSheetText locale={locale} messages={await tournamentSheetEnglish(locale, true)}>
-        <SpectatorViewProvider>
-          <PublicPageShell>
-            {relay && <MemberRelay tournamentId={tournamentId} />}
-            <div className="page-shell">{children}</div>
-          </PublicPageShell>
-        </SpectatorViewProvider>
-      </TournamentSheetText>
-    </TournamentsTextProvider>
+    <TournamentSheetText locale={locale} messages={await tournamentSheetEnglish(locale, true)}>
+      <SpectatorViewProvider>
+        <PublicPageShell>
+          {relay && <MemberRelay tournamentId={tournamentId} />}
+          <div className="page-shell">{children}</div>
+        </PublicPageShell>
+      </SpectatorViewProvider>
+    </TournamentSheetText>
   );
 }

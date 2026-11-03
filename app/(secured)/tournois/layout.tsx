@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import { memberAreaShareMetadata, segmentTitle } from "@/lib/shared/page-metadata";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { tournamentsSharedMessages } from "@/lib/shared/tournaments-text";
-import { TournamentsTextProvider } from "@/components/i18n/tournaments-text";
 
 /**
  * Le titre du segment (WCAG 2.4.2) et l'encart générique des tournois.
@@ -27,17 +25,12 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Pose les textes client des tournois communs à toutes leurs pages : rien en
- * français (déjà dans le paquet), les espaces communs de l'anglais sous `/en`
- * seulement (`tournamentsSharedMessages`) — ceux de la liste et du bandeau sont
- * posés par sa page (`page.tsx`), pour ne pas voyager avec chaque fiche.
+ * Aucun texte client ici : chaque écran pose les siens — la liste par sa page
+ * (`page.tsx`), la fiche par sa mise en page (`TournamentSheetTextGate`, qui
+ * porte aussi les textes communs avec la liste), la création et l'édition par
+ * leurs mises en page. Un fournisseur à ce niveau renverrait ses textes
+ * anglais à chaque `router.refresh()` de la fiche.
  */
-export default async function TournamentsLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const locale = await requestLocale();
-  const messages = locale === "en" ? tournamentsSharedMessages(messagesFor(locale)) : undefined;
-  return (
-    <TournamentsTextProvider locale={locale} messages={messages}>
-      {children}
-    </TournamentsTextProvider>
-  );
+export default function TournamentsLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return children;
 }

@@ -5,15 +5,17 @@ import type { Messages } from "@/lib/shared/i18n-messages";
 import type { Locale } from "@/lib/shared/locales";
 import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text";
 import { tournamentPageMessages } from "@/lib/shared/tournament-page-text";
+import { tournamentsSharedMessages } from "@/lib/shared/tournaments-text";
 
 function sheetEnglish(messages: Messages): TournamentSheetEnglish {
-  return { page: tournamentPageMessages(messages), actions: tournamentActionsMessages(messages) };
+  return { page: tournamentPageMessages(messages), actions: tournamentActionsMessages(messages), shared: tournamentsSharedMessages(messages) };
 }
 
 /**
  * L'anglais de la fiche d'un tournoi que sa mise en page sérialise : l'espace
- * `tournament` (sans ses parties serveur ni les vues, qui voyagent avec elles)
- * et les gestes (lot 8b : refus, boutons, fenêtres d'action), sous `/en` et
+ * `tournament` (sans ses parties serveur ni les vues, qui voyagent avec elles),
+ * les gestes (lot 8b : refus, boutons, fenêtres d'action) et les textes communs
+ * avec la liste (`tournamentsSharedMessages`), sous `/en` et
  * **au seul chargement complet** d'une page — une réponse du routeur
  * (navigation, préchargement, `router.refresh()` après un geste) n'en porte
  * aucun, le client gardant celui de la session ou le chargeant par son morceau

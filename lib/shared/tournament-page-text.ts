@@ -10,7 +10,9 @@
  * `/en` : celui de la fiche sérialisé par la mise en page au seul chargement
  * complet d'une page, sinon chargé par son morceau (`TournamentSheetTextGate`) ;
  * celui d'une vue avec la vue (`useTournamentViewText`). Les espaces lus côté
- * serveur seulement (`meta`, `settings`, `share`) ne voyagent pas.
+ * serveur seulement (`meta`, `settings`, `share`) vivent dans leur propre
+ * fichier (`messages/<langue>/tournamentServer.json`) : ils n'entrent jamais
+ * dans un paquet client.
  *
  * Les textes portés par le flux temps réel (libellés d'attente d'un créneau,
  * libellés de manche) restent des **données** françaises dans l'instantané,
@@ -31,46 +33,15 @@ import type { BracketType } from "@/lib/shared/types";
 
 type FrTournament = typeof frTournament;
 
-/** Espaces lus côté serveur seulement : jamais sérialisés vers le navigateur. */
-export const TOURNAMENT_SERVER_PARTS = ["meta", "settings", "share"] as const;
-type ServerPart = (typeof TOURNAMENT_SERVER_PARTS)[number];
-
 /** L'espace `endurance` entier : la vue (`tournamentEndurance`) et son graphique (`tournamentEnduranceChart`). */
 type EnduranceMessages = {
   endurance: (typeof frTournamentEndurance)["endurance"] & (typeof frTournamentEnduranceChart)["endurance"];
 };
 
 /** Espaces client de `tournament`, plus ceux des vues (`tournamentViews`, `tournamentEndurance*`). */
-export type TournamentPageMessages = Omit<FrTournament, ServerPart> & typeof frTournamentViews & EnduranceMessages;
+export type TournamentPageMessages = FrTournament & typeof frTournamentViews & EnduranceMessages;
 export type TournamentPageKey = Leaves<TournamentPageMessages>;
 export type TournamentPageText = ScopedText<TournamentPageKey>;
-
-/**
- * Les espaces client, lus **un à un** : c'est ce qui laisse le bundler écarter
- * du paquet les espaces serveur (`meta`, `settings`, `share`) — une
- * déstructuration `...reste` garderait le JSON entier.
- */
-function clientPart(messages: Messages["tournament"]): TournamentSheetMessages {
-  return {
-    participants: messages.participants,
-    page: messages.page,
-    header: messages.header,
-    matchFormat: messages.matchFormat,
-    live: messages.live,
-    loading: messages.loading,
-    progress: messages.progress,
-    phases: messages.phases,
-    bracket: messages.bracket,
-    sections: messages.sections,
-    placeholders: messages.placeholders,
-    match: messages.match,
-    launch: messages.launch,
-    ranking: messages.ranking,
-    registrations: messages.registrations,
-    planning: messages.planning,
-    matchPage: messages.matchPage,
-  };
-}
 
 /**
  * Espaces des vues chargées à la demande (`dynamic()` dans `page.tsx`), rangés
@@ -87,34 +58,15 @@ export type TournamentViewMessages = Partial<Pick<TournamentPageMessages, Tourna
 export type TournamentSheetMessages = Omit<TournamentPageMessages, TournamentViewPart>;
 
 /**
- * Le français du paquet, propriété par propriété **sur l'import lui-même** :
- * passé entier à une fonction, le JSON ne se laisserait plus élaguer et les
- * espaces serveur entreraient dans le paquet de la fiche. Sans les espaces des
- * vues (`TOURNAMENT_VIEW_PARTS`).
+ * Le français du paquet, sans les espaces des vues (`TOURNAMENT_VIEW_PARTS`,
+ * dans leurs propres fichiers). `tournament.json` ne porte que du texte client :
+ * les parties serveur sont à part (`tournamentServer.json`).
  */
-export const FR_TOURNAMENT_PAGE_MESSAGES: TournamentSheetMessages = {
-  participants: frTournament.participants,
-  page: frTournament.page,
-  header: frTournament.header,
-  matchFormat: frTournament.matchFormat,
-  live: frTournament.live,
-  loading: frTournament.loading,
-  progress: frTournament.progress,
-  phases: frTournament.phases,
-  bracket: frTournament.bracket,
-  sections: frTournament.sections,
-  placeholders: frTournament.placeholders,
-  match: frTournament.match,
-  launch: frTournament.launch,
-  ranking: frTournament.ranking,
-  registrations: frTournament.registrations,
-  planning: frTournament.planning,
-  matchPage: frTournament.matchPage,
-};
+export const FR_TOURNAMENT_PAGE_MESSAGES: TournamentSheetMessages = frTournament;
 
 /** Ce qui voyage vers le navigateur sous `/en` : la fiche, sans les vues. */
 export function tournamentPageMessages(messages: Pick<Messages, "tournament">): TournamentSheetMessages {
-  return clientPart(messages.tournament);
+  return messages.tournament;
 }
 
 /**

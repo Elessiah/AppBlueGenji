@@ -5,14 +5,23 @@ import { onceLoader } from "@/lib/shared/lazy-component";
 import type { Locale } from "@/lib/shared/locales";
 import type { TournamentActionsClientMessages } from "@/lib/shared/tournament-actions-text";
 import { tournamentPageMessages, type TournamentSheetMessages } from "@/lib/shared/tournament-page-text";
+import { tournamentsSharedMessages, type TournamentsSharedMessages } from "@/lib/shared/tournaments-text";
 import { EnglishGateFallback } from "./english-gate-fallback";
 import { primeEnglish } from "./english-loaders";
 import { TournamentActionsTextProvider } from "./tournament-actions-text";
 import { TournamentPageTextProvider } from "./tournament-page-text";
+import { TournamentsTextProvider } from "./tournaments-text";
 import { useEnglishMessages } from "./use-english-messages";
 
-/** L'anglais de la fiche d'un tournoi : son espace (sans les vues) et ses gestes. */
-export type TournamentSheetEnglish = { page: TournamentSheetMessages; actions: TournamentActionsClientMessages };
+/**
+ * L'anglais de la fiche d'un tournoi : son espace (sans les vues), ses gestes et
+ * les textes qu'elle partage avec la liste (libellés d'état, aide des règles).
+ */
+export type TournamentSheetEnglish = {
+  page: TournamentSheetMessages;
+  actions: TournamentActionsClientMessages;
+  shared: TournamentsSharedMessages;
+};
 
 /**
  * L'anglais de la fiche, chargé à part (son propre morceau, immuable, gardé par
@@ -26,9 +35,12 @@ export const englishTournamentSheet = /* @__PURE__ */ onceLoader<TournamentSheet
     import("@/messages/en/tournament.json"),
     import("@/messages/en/tournamentErrors.json"),
     import("@/messages/en/tournamentActions.json"),
-  ]).then(([tournament, errors, actions]) => ({
+    import("@/messages/en/tournamentsShared.json"),
+    import("@/messages/en/labels.json"),
+  ]).then(([tournament, errors, actions, shared, labels]) => ({
     page: tournamentPageMessages({ tournament: tournament.default }),
     actions: { errors: errors.default, actions: actions.default },
+    shared: tournamentsSharedMessages({ tournamentsShared: shared.default, labels: labels.default }),
   })),
 );
 
@@ -50,10 +62,12 @@ export function TournamentSheetTextGate({
   // Un échec rend la fiche en français : la langue suit alors le texte.
   const shown: Locale = english ? locale : "fr";
   return (
-    <TournamentPageTextProvider locale={shown} messages={english?.page}>
-      <TournamentActionsTextProvider locale={shown} messages={english?.actions}>
-        {children}
-      </TournamentActionsTextProvider>
-    </TournamentPageTextProvider>
+    <TournamentsTextProvider locale={shown} messages={english?.shared}>
+      <TournamentPageTextProvider locale={shown} messages={english?.page}>
+        <TournamentActionsTextProvider locale={shown} messages={english?.actions}>
+          {children}
+        </TournamentActionsTextProvider>
+      </TournamentPageTextProvider>
+    </TournamentsTextProvider>
   );
 }
