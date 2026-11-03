@@ -52,7 +52,8 @@ message de succès dit seulement que le classement est recalculé.
 ### Concurrence
 
 La transaction lit la ligne du tournoi `FOR UPDATE` en toute première
-instruction (le verrou de `lockTournamentRow`, avec les colonnes utiles). Elle
+instruction : ce verrou est la lecture de sa tête (colonnes utiles), une seule
+requête au lieu de `lockTournamentRow` suivi d'une relecture. Elle
 verrouille donc le tournoi avant les manches que le rejeu peut poser, quand un
 report ou une correction d'arbitrage prend son match avant le tournoi
 (« Enregistrer » prend le tournoi d'abord, en toute première instruction de sa
@@ -68,7 +69,11 @@ une rafale de « Prêt » à l'ouverture du salon épuisait les rejeux. Tête du
 tournoi, phase en cours (`FOR UPDATE` : le rejeu des phases peut la réécrire,
 un verrou partagé à promouvoir attendrait tout autre lecteur), ligne du classement (clé
 primaire) et manches postérieures se lisent donc toutes sous verrou ; l'image ne
-naît qu'après (nom de l'équipe, rejeu du classement).
+naît qu'après (rejeu du classement). Le nom de l'équipe, pour le journal, se lit
+**avant** la transaction, en lecture autonome : ni image ouverte, ni verrou
+partagé tenu pendant le rejeu (un renommage de l'équipe l'attendait). Son
+classement verrouillé la garde : l'effacer le supprime en cascade, et attend
+donc ce verrou.
 
 Les manches postérieures se lisent par `laterRoundsHaveScoreInput`
 (`lib/server/tournaments/bg-survie/round-progress.ts`, la règle commune au
@@ -99,7 +104,7 @@ au défaut du serveur avant de rendre la connexion au pool —
 qui tient lui aussi le tournoi en verrouillant les manches) au lieu des 50 s du
 serveur, en tenant le verrou du tournoi. La borne n'entoure **que** cette
 lecture des manches (`withShortLockWait`, toute lecture `lock`) : le verrou du
-tournoi (`lockTournamentRow`, en toute première instruction) s'attend sans
+tournoi (la tête lue `FOR UPDATE`, en toute première instruction) s'attend sans
 borne comme pour tout geste — son détenteur, réconciliation ou lancement, le
 rend sans rien attendre de l'annulation —, et le rejeu qui suit retrouve le
 délai du serveur (journal du bot et alertes, qui tolèrent un délai dépassé,
