@@ -94,6 +94,15 @@ function deletionCase(subject: ConfirmationSubject): (typeof RETENTION_REASONS)[
  * nomme le recours qui reste (une demande d'effacement à l'association).
  */
 export function deletionConsequencesText(text: ProfileText, subject: ConfirmationSubject, fromTerms = false): string {
+  return deletionConsequencesParagraphs(text, subject, fromTerms).join(" ");
+}
+
+/**
+ * Les mêmes phrases, une par paragraphe : ce qui change tout de suite et ne se
+ * défait pas, puis le délai de trente jours, **avant** la liste de ce qui reste
+ * (le plus long, le moins décisif pour le geste).
+ */
+export function deletionConsequencesParagraphs(text: ProfileText, subject: ConfirmationSubject, fromTerms = false): string[] {
   const { t } = text;
   const residual = t("deletion.residual", {
     backupDays: BACKUP_RETENTION_DAYS,
@@ -103,7 +112,7 @@ export function deletionConsequencesText(text: ProfileText, subject: Confirmatio
   const kind = deletionCase(subject);
   const consequence = t(`deletion.consequences.${kind}`);
   const termsNote = fromTerms && kind === "OWNED_TEAMS" ? [t("deletion.ownedTeamsFromTerms")] : [];
-  return [consequence, ...termsNote, residual, t("deletion.handover"), t("deletion.irreversible")].join(" ");
+  return [consequence, ...termsNote, t("deletion.handover"), t("deletion.irreversible"), residual];
 }
 
 /** `accountDeletionOutcome` dans la langue du texte. */

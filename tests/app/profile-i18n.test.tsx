@@ -470,10 +470,12 @@ describe("anglais — phrases", () => {
     const en = deletionErrorText(EN_PROFILE, "USER_NOT_FOUND");
     expect(fr).toBe(FR_PROFILE.t("deletion.errors.sessionGone"));
     expect(fr).toMatch(/soit ton compte vient d'être supprimé, soit ta session a expiré/);
-    expect(fr).toMatch(/une nouvelle connexion créerait un nouveau compte/);
+    expect(fr).toMatch(/d'ici 30 jours te permet de réactiver ton compte/);
+    expect(fr).not.toMatch(/créerait un nouveau compte/);
     expect(fr).not.toMatch(/pour vérifier/);
     expect(en).toMatch(/either your account has just been deleted, or your session expired/);
-    expect(en).toMatch(/logging in again would create a new account/);
+    expect(en).toMatch(/within 30 days lets you reactivate your account/);
+    expect(en).not.toMatch(/create a new account/);
     expect(en).not.toMatch(/to check/);
   });
 

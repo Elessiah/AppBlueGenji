@@ -223,17 +223,17 @@ export function accountDeletionConfirmation(
   const residual = `Comme pour tout compte supprimé, resteront les sauvegardes chiffrées du site (${BACKUP_RETENTION_DAYS} jours), la mention de ta suppression dans le journal qui permet de la rejouer après une restauration (au moins ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours), l'empreinte de mesure d'audience décrite par la politique de confidentialité, tes données de connexion (adresse IP, date, moyen de connexion), que la loi impose de garder ${CONNECTION_LOG_RETENTION_DAYS} jours, les annonces de tes matchs de tournoi individuel publiées dans le salon #live du Discord (et l'alerte de modération d'une annonce bloquée ou signalée par AutoMod), qui gardent ton pseudo jusqu'à leur suppression sur demande, et, si tu es membre du staff, la trace de tes gestes dans les journaux du serveur.`;
   switch (reason) {
     case "TOURNAMENTS":
-      return `Supprimer ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées. ${residual} ${irreversible}`;
+      return `Supprimer ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées. ${irreversible} ${residual}`;
     case "SOLO_REGISTRATIONS":
-      return `Supprimer ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es engagé dans un tournoi individuel déjà commencé ou terminé, où ton pseudo sert de nom d'engagé et sera remplacé par ce pseudo d'emprunt. ${residual} ${irreversible}`;
+      return `Supprimer ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es engagé dans un tournoi individuel déjà commencé ou terminé, où ton pseudo sert de nom d'engagé et sera remplacé par ce pseudo d'emprunt. ${irreversible} ${residual}`;
     case "ORGANIZED_TOURNAMENTS":
-      return `Supprimer ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es l'organisateur de tournois qui doivent garder un titulaire. ${residual} ${irreversible}`;
+      return `Supprimer ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es l'organisateur de tournois qui doivent garder un titulaire. ${irreversible} ${residual}`;
     case "OWNED_TEAMS":
-      return `Supprimer ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet. ${residual} ${irreversible}`;
+      return `Supprimer ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet. ${irreversible} ${residual}`;
     case null:
-      return `Supprimer ton compte ? Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte et ton profil seront effacés entièrement, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées. ${residual} ${irreversible}`;
+      return `Supprimer ton compte ? Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte et ton profil seront effacés entièrement, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées. ${irreversible} ${residual}`;
     default:
-      return `Supprimer ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, inscription à un tournoi individuel, équipe possédée, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${residual} ${irreversible}`;
+      return `Supprimer ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, inscription à un tournoi individuel, équipe possédée, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${irreversible} ${residual}`;
   }
 }
 

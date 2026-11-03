@@ -6,6 +6,8 @@ import { useLoginText } from "@/components/i18n/login-text";
 import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { CyberCard } from "@/components/cyber/CyberCard";
+import { ACCOUNT_SUSPENDED } from "@/lib/shared/account-suspension";
+import { suspendedLoginText } from "@/lib/shared/login-text";
 import { INTL_LOCALE, SITE_TIME_ZONE } from "@/lib/shared/locales";
 import { LOGIN_HELP_TEXT_STYLE } from "../_lib/login-styles";
 
@@ -16,10 +18,12 @@ export function ReactivationPanel({ finalAt }: Readonly<{ finalAt: string | null
   const router = useLocaleRouter();
   const { showError, showSuccess } = useToast();
   const [loading, setLoading] = useState(false);
-  const [expired, setExpired] = useState(finalAt === null);
+  // Une date illisible vaut un ticket absent : jamais « Invalid Date » devant un bouton.
+  const validFinalAt = finalAt !== null && !Number.isNaN(new Date(finalAt).getTime()) ? finalAt : null;
+  const [expired, setExpired] = useState(validFinalAt === null);
 
-  const date = finalAt
-    ? new Date(finalAt).toLocaleDateString(INTL_LOCALE[text.locale], {
+  const date = validFinalAt
+    ? new Date(validFinalAt).toLocaleDateString(INTL_LOCALE[text.locale], {
         day: "numeric",
         month: "long",
         year: "numeric",
@@ -36,17 +40,23 @@ export function ReactivationPanel({ finalAt }: Readonly<{ finalAt: string | null
         body: "{}",
       });
       if (!response.ok) {
-        setExpired(true);
-        showError(t("reactivation.failed"));
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        // Seul un ticket périmé ou déjà servi (410) change l'écran ; une suspension
+        // ou une panne passagère se disent par une notification, le bouton reste.
+        if (response.status === 410) setExpired(true);
+        let message = t(response.status === 410 ? "reactivation.expired" : "reactivation.failed");
+        if (payload.error === ACCOUNT_SUSPENDED) message = suspendedLoginText(text, null);
+        showError(message);
+        setLoading(false);
         return;
       }
       showSuccess(t("reactivation.done"));
       router.push("/profil");
       // La barre de navigation passe à la session ouverte.
       router.refresh();
+      // `loading` reste vrai : le bouton ne se rouvre pas pendant la navigation.
     } catch {
       showError(t("reactivation.failed"));
-    } finally {
       setLoading(false);
     }
   };

@@ -5,7 +5,7 @@ import { useAppLocale } from "@/components/i18n/locale-context";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
 import {
-  deletionConsequencesText,
+  deletionConsequencesParagraphs,
   deletionErrorText,
   deletionOutcomeText,
   type ProfileText,
@@ -76,7 +76,7 @@ interface UseAccountDeletionOptions {
   onCancel?: () => void;
   /** `overBlocking` : la confirmation s'empile sur une fenêtre bloquante (conditions). */
   layer?: "default" | "overBlocking";
-  /** Ouverte depuis la fenêtre des conditions (non acceptées) : `deletionConsequencesText(…, fromTerms)`. */
+  /** Ouverte depuis la fenêtre des conditions (non acceptées) : `deletionConsequencesParagraphs(…, fromTerms)`. */
   fromTerms?: boolean;
 }
 
@@ -156,7 +156,9 @@ export function useAccountDeletion({
       }}
       onConfirm={() => performAccountDeletion(pendingDeletion.previewed)}
     >
-      <p>{deletionConsequencesText(text, pendingDeletion.subject, fromTerms)}</p>
+      {deletionConsequencesParagraphs(text, pendingDeletion.subject, fromTerms).map((paragraph) => (
+        <p key={paragraph}>{paragraph}</p>
+      ))}
     </ConfirmActionDialog>
   ) : null;
 

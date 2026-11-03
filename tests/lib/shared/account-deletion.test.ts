@@ -177,7 +177,9 @@ describe("accountDeletionConfirmation", () => {
       const text = accountDeletionConfirmation(reason);
       expect(text).toContain(`sauvegardes chiffrées du site (${BACKUP_RETENTION_DAYS} jours)`);
       expect(text).toContain("mesure d'audience");
-      expect(text).toMatch(/réactiver ton compte\.$/);
+      expect(text).toMatch(/journaux du serveur.$/);
+      // Ce qui change tout de suite et ne se défait pas se lit avant la liste des restes.
+      expect(text.indexOf("Réactiver ton compte ne défera pas")).toBeLessThan(text.indexOf("Comme pour tout compte supprimé"));
     }
   });
 
