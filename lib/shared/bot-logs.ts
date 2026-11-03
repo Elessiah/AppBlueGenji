@@ -41,7 +41,7 @@ import { participantWording, type ParticipantType } from "./participants";
 import { ANONYMOUS_STAFF_LABEL, entrantLabel, type LogEntrant } from "./log-privacy";
 import { formatLabel, gameLabel } from "./tournament-labels";
 import type { TournamentFormat, TournamentGame } from "./types";
-import { discordInline } from "./discord-text";
+import { discordInline, discordQuoted } from "./discord-text";
 import { BOT_LOG_MESSAGE_MAX_CHARS } from "./bot-log-batch";
 import { botLogHeader } from "./bot-log-category";
 
@@ -897,7 +897,7 @@ export function formatStaffTournamentActionLog(context: {
   if (context.count !== undefined) details.push(String(context.count));
   if (context.action === "ADVANCED" && context.target) details.push(ADVANCE_TARGET_WORDING[context.target]);
   if (context.action === "EDITED" && context.previousName !== undefined && context.previousName !== context.tournament.name) {
-    details.push(`ancien nom : « ${discordInline(context.previousName)} »`);
+    details.push(`ancien nom : ${discordQuoted(context.previousName, "fr")}`);
   }
   const suffix = details.length === 0 ? "" : ` (${details.join(", ")})`;
   return `${lead("🛠️", STAFF_TOURNAMENT_ACTION_WORDING[context.action], context.tournament)}${suffix}, par ${ANONYMOUS_STAFF_LABEL}.`;

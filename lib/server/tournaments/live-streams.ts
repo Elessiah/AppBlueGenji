@@ -327,9 +327,17 @@ export async function setMatchOnAir(matchId: number, onAir: boolean): Promise<bo
     onAir ? [new Date(), matchId] : [matchId],
   );
   const changed = Number((result as { affectedRows?: number }).affectedRows ?? 0) > 0;
+  if (!changed) {
+    // Rien d'écrit : antenne déjà dans cet état, ou garde tombée entre la lecture
+    // et l'écriture — celle-ci se dit par son refus, jamais par un faux succès.
+    const now = await loadMatchLiveRow(matchId);
+    if (now.live_trigger !== "MANUAL") throw new Error("LIVE_TRIGGER_NOT_MANUAL");
+    if (onAir && now.status !== "READY") throw new Error("MATCH_NOT_LIVE_READY");
+    return false;
+  }
 
-  if (changed) publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
-  return changed;
+  publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
+  return true;
 }
 
 /**

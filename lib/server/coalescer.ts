@@ -64,12 +64,17 @@ export function createCoalescer<T>(options: {
     console.error("[coalescer] annonce regroupée non partie", failureReason(error));
   };
 
-  const fire = async (key: string): Promise<void> => {
+  /** Détache la rafale ouverte de `key`, **sur-le-champ** : un geste noté ensuite ouvre la suivante. */
+  const take = (key: string): Burst | undefined => {
     const burst = bursts.get(key);
-    if (!burst) return;
+    if (!burst) return undefined;
     clearTimeout(burst.timer);
     bursts.delete(key);
-    // Une annonce encore en cours pour cette clé passe avant : jamais deux en parallèle.
+    return burst;
+  };
+
+  /** Annonce une rafale détachée, après celle de la même clé qui s'annonce encore : jamais deux en parallèle. */
+  const start = async (key: string, burst: Burst): Promise<void> => {
     const previous = inFlight.get(key);
     const run = (async () => {
       if (previous) await previous;
@@ -87,11 +92,19 @@ export function createCoalescer<T>(options: {
     }
   };
 
-  /** Attend l'annonce de `key` déjà partie, puis annonce la rafale qui s'est formée depuis. */
+  const fire = async (key: string): Promise<void> => {
+    const burst = take(key);
+    if (burst) await start(key, burst);
+  };
+
+  /**
+   * Annonce la rafale ouverte de `key` (détachée dès l'appel), après l'annonce
+   * déjà partie ; sans rafale, attend seulement celle-ci.
+   */
   const settle = async (key: string): Promise<void> => {
-    const running = inFlight.get(key);
-    if (running) await running;
-    await fire(key);
+    const burst = take(key);
+    if (burst) await start(key, burst);
+    else await inFlight.get(key);
   };
 
   const arm = (key: string, delay: number): Timer => {
@@ -136,4 +149,21 @@ export function createCoalescer<T>(options: {
 /** Annonce les rafales de tous les regroupeurs (arrêt du serveur). Ne lève jamais. */
 export async function flushAllCoalescers(): Promise<void> {
   await Promise.all([...registry].map((coalescer) => coalescer.flushAll()));
+  // Puis les annonces chaînées hors rafale (`trackAnnouncement`), y compris
+  // celles qui ne partaient qu'après une rafale qu'on vient d'annoncer.
+  while (announcements.size > 0) await Promise.all([...announcements]);
+}
+
+const announcementState = globalThis as typeof globalThis & { __bgPendingAnnouncements?: Set<Promise<void>> };
+const announcements = (announcementState.__bgPendingAnnouncements ??= new Set<Promise<void>>());
+
+/**
+ * Fait attendre à l'arrêt du serveur ({@link flushAllCoalescers}) une annonce
+ * partie hors d'un regroupeur — un geste du staff chaîné derrière une rafale.
+ * La promesse ne doit jamais lever.
+ */
+export function trackAnnouncement(announcement: Promise<void>): Promise<void> {
+  announcements.add(announcement);
+  void announcement.then(() => announcements.delete(announcement));
+  return announcement;
 }

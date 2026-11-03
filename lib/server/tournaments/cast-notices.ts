@@ -17,7 +17,7 @@
  */
 import type { PoolConnection } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
-import { createCoalescer } from "@/lib/server/coalescer";
+import { createCoalescer, trackAnnouncement } from "@/lib/server/coalescer";
 import { failureReason } from "@/lib/server/failure-reason";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import { siteCanonicalBase } from "@/lib/server/site-url";
@@ -195,6 +195,7 @@ export function flushCastToggles(): Promise<void> {
 /** Abandonne les rafales en attente. Réservé aux tests. */
 export function resetCastToggles(): void {
   voluntaryToggles.reset();
+  tails.clear();
 }
 
 /**
@@ -208,11 +209,11 @@ export function announceCastChange(change: CastChange): void {
     // Copie : un même objet annoncé deux fois ne doit pas partager sa ligne d'ouverture.
     const gesture = { ...change };
     if (!voluntaryToggles.waiting(key)) {
-      // Rafale qui s'ouvre : sa première ligne part tout de suite, après la clôture
-      // de la rafale précédente si elle s'annonce encore.
+      // Rafale qui s'ouvre : sa première ligne part tout de suite, après les annonces
+      // déjà parties pour ce caster et la clôture de la rafale précédente.
       leadingLines.set(
         gesture,
-        voluntaryToggles.drain(key).then(() => deliverInBackground(gesture)),
+        chainAfter([key], () => voluntaryToggles.drain(key).then(() => deliverInBackground(gesture))),
       );
     }
     voluntaryToggles.add(key, gesture);
@@ -227,12 +228,31 @@ export function announceCastChange(change: CastChange): void {
   // Rien en attente (le cas courant) : l'annonce part sur-le-champ, sans détour
   // par la file des microtâches — un arrêt du serveur juste après ne la rate pas.
   if (!keys.some((pendingKey) => voluntaryToggles.busy(pendingKey))) {
-    void deliverInBackground(change);
+    chainAfter(keys, () => deliverInBackground(change));
     return;
   }
-  void Promise.all(keys.map((pendingKey) => voluntaryToggles.flush(pendingKey))).then(() =>
-    deliverInBackground(change),
-  );
+  // Les rafales sont détachées dès maintenant : un geste du caster noté ensuite
+  // ouvre une nouvelle rafale, dont la ligne part après celle-ci.
+  const flushed = Promise.all(keys.map((pendingKey) => voluntaryToggles.flush(pendingKey)));
+  chainAfter(keys, () => flushed.then(() => deliverInBackground(change)));
+}
+
+/** Dernière annonce partie hors clôture de rafale, par (match, caster) : la suivante l'attend. */
+const tails = new Map<string, Promise<void>>();
+
+/**
+ * Lance `announce` après les annonces encore en cours des clés données —
+ * aussitôt, sans microtâche, s'il n'y en a aucune —, et la fait attendre à
+ * l'arrêt du serveur (`trackAnnouncement`). `announce` ne lève jamais.
+ */
+function chainAfter(keys: readonly string[], announce: () => Promise<void>): Promise<void> {
+  const prior = keys.map((pendingKey) => tails.get(pendingKey)).filter((tail) => tail !== undefined);
+  const run = trackAnnouncement(prior.length > 0 ? Promise.all(prior).then(announce) : announce());
+  for (const pendingKey of keys) tails.set(pendingKey, run);
+  void run.then(() => {
+    for (const pendingKey of keys) if (tails.get(pendingKey) === run) tails.delete(pendingKey);
+  });
+  return run;
 }
 
 /**
