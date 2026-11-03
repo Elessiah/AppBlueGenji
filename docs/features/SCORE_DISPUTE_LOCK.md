@@ -200,7 +200,11 @@ map modifiée se met à jour par son `id`, celles en trop s'effacent par leur
 `id`, les nouvelles s'insèrent à la suite — la saisie map par map n'ajoute que
 sa map. Aucun parcours de la clé unique `(match_id, source, map_number)` : ni
 `DELETE` du jeu, ni mise à jour par doublon (`ON DUPLICATE KEY UPDATE`), dont
-les verrous d'intervalle débordaient sur le match voisin.
+les verrous d'intervalle débordaient sur le match voisin. Les lignes gardées
+se renumérotent 1..n au passage (un jeu troué, {1, 3}, faisait doubler le
+numéro de la map ajoutée) ; par numéro croissant, sans collision de la clé.
+Un `ROLLBACK` raté garde l'erreur d'origine (rejeu de l'interblocage) et
+détruit la connexion (`rollbackKeepingError`).
 
 - **Suspension** : `bg_matches.score_validation_paused_at = NOW()`, posée par
   `pauseAutoValidation` (`admin.ts`) dans la transaction d'« Enregistrer », sur
