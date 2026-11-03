@@ -144,7 +144,7 @@ describe("cartes de /tournois", () => {
   });
 
   it("l'aiguillage StateCard n'est pas mémoïsé : il ne doit pas figer le visage d'une carte « à venir »", () => {
-    expect(StateCard).not.toHaveProperty("$typeof");
+    expect((StateCard as unknown as { $$typeof?: symbol }).$$typeof).not.toBe(Symbol.for("react.memo"));
   });
 
   it("la carte « à venir » juge son visage à chaque rendu mais dessine sous `memo`", () => {
