@@ -44,6 +44,11 @@ se reporte là, et les deux pages le suivent. Aucune adresse électronique n'y e
 le courriel de l'association se lit au clic sur les mentions légales, vers lesquelles
 les textes renvoient.
 
+Chaque document s'écrit **une fois pour les deux langues** : sections nommées
+dans l'ordre de lecture (`numberedSections`, qui les numérote), chaque texte en
+`frEn("français", "anglais")`, résolu par `inBothLanguages` →
+`LEGAL_DATA_FILES.md`.
+
 Chaque document est un `BilingualDoc` (`{ fr, en }`). Un `LegalDoc` contient un
 en-tête (eyebrow, titre, date de mise à jour, intro) et une liste de `LegalSection`,
 elles-mêmes composées de `LegalBlock` (`p`, `subhead`, `bullets`). Les chaînes
