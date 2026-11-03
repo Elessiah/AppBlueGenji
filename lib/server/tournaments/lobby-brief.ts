@@ -259,7 +259,7 @@ async function releaseQuietly(db: Db, claimIds: readonly number[]): Promise<bool
     );
     return true;
   } catch (error) {
-    console.error("[lobby-brief] réservations non rendues", error);
+    console.error(`[lobby-brief] ${claimIds.length} réservation(s) non rendue(s), restée(s) en base`, error);
     return false;
   }
 }
@@ -340,29 +340,30 @@ export function lobbyBriefSides(
 }
 
 /**
- * Relit les réglages du match juste réservé : hôte, cartes, arbitre et
- * autogestion ont pu changer entre la lecture des candidats et la réservation.
- * Une relecture en panne garde la lecture des candidats — la page du match,
- * liée, porte les réglages à jour.
+ * Relit les réglages du match juste réservé, **pour chaque côté** : hôte,
+ * cartes, arbitre et autogestion ont pu changer entre la lecture des candidats
+ * et la réservation, ou entre deux côtés (lancement défait puis rouvert). Une
+ * relecture en panne lève : la réservation est rendue et le match rejoué au
+ * balayage suivant — envoyer sur la lecture des candidats pourrait partir sans
+ * réservation, puis une seconde fois.
  *
  * @returns `null` si le salon s'est refermé depuis la réservation (lancement
- *   défait, réappariement) ou que la réservation `claimId` a été effacée
- *   (lancement défait puis salon rouvert dans l'intervalle) : rien ne part, les
- *   réservations du match sont rendues — sinon le brief partirait pour un
- *   salon fermé, ou sans réservation, puis une seconde fois à la réouverture.
+ *   défait, réappariement) ; sinon la ligne relue, `claim_kept` disant si la
+ *   réservation `claimId` existe encore (un lancement défait puis rouvert, ou
+ *   un autre processus, a pu l'effacer).
  */
-async function rereadBriefRow(db: Db, row: LobbyBriefRow, claimId: number): Promise<LobbyBriefRow | null> {
-  try {
-    const [rows] = await db.query<LobbyBriefRow[]>(
-      `SELECT ${BRIEF_COLUMNS} ${BRIEF_FROM} WHERE m.id = ? AND m.launch_pairing = ? AND ${OPEN_LOBBY_SQL}
-          AND EXISTS (SELECT 1 FROM bg_match_start_notices n WHERE n.id = ?)`,
-      [Number(row.id), String(row.launch_pairing), claimId],
-    );
-    return rows[0] ?? null;
-  } catch (error) {
-    console.error(`[lobby-brief] réglages du match ${Number(row.id)} non relus, brief sur la lecture des candidats`, error);
-    return row;
-  }
+async function rereadBriefRow(
+  db: Db,
+  row: LobbyBriefRow,
+  claimId: number,
+): Promise<(LobbyBriefRow & { claim_kept: number }) | null> {
+  const [rows] = await db.query<(LobbyBriefRow & { claim_kept: number })[]>(
+    `SELECT ${BRIEF_COLUMNS},
+            EXISTS (SELECT 1 FROM bg_match_start_notices n WHERE n.id = ?) AS claim_kept
+       ${BRIEF_FROM} WHERE m.id = ? AND m.launch_pairing = ? AND ${OPEN_LOBBY_SQL}`,
+    [claimId, Number(row.id), String(row.launch_pairing)],
+  );
+  return rows[0] ?? null;
 }
 
 /**
@@ -450,7 +451,7 @@ type SweepContext = {
 };
 
 /** Réservations à rendre en fin de balayage (voir {@link briefMatch}). */
-type Releases = { retry: number[]; closed: number[] };
+type Releases = { retry: number[]; closed: number[]; lost: string[] };
 
 /**
  * Gestionnaires d'un côté : `null` pour une vraie équipe sans gestionnaire —
@@ -472,30 +473,54 @@ function sideManagers(
   return { ghost, userIds };
 }
 
-/** Les deux côtés du match relu ; `null` si son salon s'est refermé depuis la réservation. */
+/**
+ * Relecture d'un côté réservé : `"closed"` — salon refermé, rien ne part du
+ * match ; `"lost"` — salon ouvert mais réservation effacée entre-temps, rien
+ * ne part de ce côté, le balayage suivant le reprend ; sinon les deux côtés relus.
+ */
 async function freshSides(
   db: Db,
   row: LobbyBriefRow,
   claimId: number,
   context: SweepContext,
-): Promise<{ teamId: number; side: LobbyBriefSide }[] | null> {
+): Promise<"closed" | "lost" | { teamId: number; side: LobbyBriefSide }[]> {
   const fresh = await rereadBriefRow(db, row, claimId);
-  return fresh === null ? null : context.briefSides(fresh);
+  if (fresh === null) return "closed";
+  if (Number(fresh.claim_kept) !== 1) return "lost";
+  return context.briefSides(fresh);
+}
+
+/** Relecture puis envoi d'un côté réservé (voir {@link freshSides}). */
+async function briefClaimedSide(
+  db: Db,
+  row: LobbyBriefRow,
+  slot: LobbyBriefSlot,
+  claimId: number,
+  userIds: readonly number[],
+  context: SweepContext,
+): Promise<SideOutcome | "lost" | "closed"> {
+  const sides = await freshSides(db, row, claimId, context);
+  if (typeof sides === "string") return sides;
+  return sendSideBrief(
+    Number(row.id),
+    context.recipients.filter((recipient) => userIds.includes(recipient.userId)),
+    sides[slot - 1].side,
+    siteUrl(matchPageHref(Number(row.tournament_id), Number(row.id))),
+  );
 }
 
 /**
  * Brief des deux côtés d'un match, **côté par côté** : réservation, relecture
- * des réglages (une fois par match), envoi. Rend le nombre de côtés briefés ;
- * les réservations à rendre vont au fil de l'eau, pour être rendues même si
- * un côté suivant lève : dans `releases.retry` quand rien n'est parti (le
- * balayage suivant les reprend), dans `releases.closed` quand le salon s'est
- * refermé (rien à reprendre, aucune relance).
+ * des réglages, envoi. Rend le nombre de côtés briefés ; les réservations à
+ * rendre vont au fil de l'eau, pour être rendues même si un côté suivant
+ * lève : dans `releases.retry` quand rien n'est parti (le balayage suivant les
+ * reprend), dans `releases.closed` quand le salon s'est refermé (rien à
+ * reprendre, aucune relance) ; un côté dont la réservation a disparu met le
+ * match dans `releases.lost` (relance, rien à rendre).
  */
 async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext, releases: Releases): Promise<number> {
-  const toRelease = releases.retry;
   const claimed: number[] = [];
   let sent = 0;
-  let sides: { teamId: number; side: LobbyBriefSide }[] | null | undefined;
   for (const slot of [1, 2] as const) {
     const managers = sideManagers(row, slot, context);
     if (managers === null) continue;
@@ -503,29 +528,29 @@ async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext, rel
     if (claimId !== null) claimed.push(claimId);
     // Fantôme : personne à briefer, la réservation reste.
     if (claimId === null || managers.ghost) continue;
-    let outcome: SideOutcome;
+    let outcome: SideOutcome | "lost" | "closed";
     try {
-      sides ??= await freshSides(db, row, claimId, context);
-      // Salon refermé depuis la réservation : rien ne part de ce match, et ses
-      // réservations (fantôme comprise) sont rendues.
-      if (sides === null) {
-        releases.closed.push(...claimed);
-        return sent;
-      }
-      outcome = await sendSideBrief(
-        Number(row.id),
-        context.recipients.filter((recipient) => managers.userIds.includes(recipient.userId)),
-        sides[slot - 1].side,
-        siteUrl(matchPageHref(Number(row.tournament_id), Number(row.id))),
-      );
+      outcome = await briefClaimedSide(db, row, slot, claimId, managers.userIds, context);
     } catch (error) {
-      // Réglages illisibles (créneaux, cartes) après la réservation : rien
+      // Relecture en panne ou réglages illisibles après la réservation : rien
       // n'est parti, la réservation est rendue avec les autres.
-      toRelease.push(claimId);
+      releases.retry.push(claimId);
       throw error;
     }
+    // Salon refermé depuis la réservation : rien ne part de ce match, et ses
+    // réservations (fantôme comprise) sont rendues.
+    if (outcome === "closed") {
+      releases.closed.push(...claimed);
+      return sent;
+    }
     if (outcome === "sent") sent += 1;
-    else if (outcome === "retry") toRelease.push(claimId);
+    else if (outcome === "retry") releases.retry.push(claimId);
+    else if (outcome === "lost") {
+      console.error(
+        `[lobby-brief] match ${Number(row.id)} : réservation effacée avant l'envoi, salon toujours ouvert, reprise au balayage suivant`,
+      );
+      releases.lost.push(matchRetryKey(row));
+    }
   }
   return sent;
 }
@@ -590,11 +615,12 @@ async function runLobbyBriefSweep(): Promise<number> {
   };
 
   let sent = 0;
-  const releases: Releases = { retry: [], closed: [] };
+  const releases: Releases = { retry: [], closed: [], lost: [] };
   const toRelease = releases.retry;
   const toRetry: string[] = [];
   for (const row of rows) {
     const released = toRelease.length;
+    const lost = releases.lost.length;
     try {
       sent += await briefMatch(db, row, { managers, recipients, briefSides }, releases);
     } catch (error) {
@@ -605,7 +631,7 @@ async function runLobbyBriefSweep(): Promise<number> {
       continue;
     }
     if (toRelease.length > released) toRetry.push(matchRetryKey(row));
-    else retries.delete(matchRetryKey(row));
+    else if (releases.lost.length === lost) retries.delete(matchRetryKey(row));
   }
   // Rien n'est parti pour ces côtés : leurs réservations sont rendues en un
   // lot ; pm2 ne dit « remis » qu'une fois le rendu fait.
@@ -615,7 +641,7 @@ async function runLobbyBriefSweep(): Promise<number> {
       console.error(`[lobby-brief] ${releases.closed.length} réservation(s) rendue(s) : salon refermé avant l'envoi`);
     }
   }
-  scheduleRetrySweep(toRetry);
+  scheduleRetrySweep([...toRetry, ...releases.lost]);
   return sent;
 }
 
