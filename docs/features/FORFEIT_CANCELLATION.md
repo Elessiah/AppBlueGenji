@@ -56,7 +56,8 @@ instruction (le verrou de `lockTournamentRow`, avec les colonnes utiles). Elle
 verrouille donc le tournoi avant les manches que le rejeu peut poser, quand un
 report ou une correction d'arbitrage prend la manche avant le tournoi
 (« Enregistrer », qui ne réconcilie rien, ne demande jamais le tournoi : face à
-l'annulation, c'est une simple attente de verrou, bornée) : comme l'abandon,
+l'annulation, c'est une simple attente de verrou, bornée côté annulation) :
+comme l'abandon,
 elle passe par `retryOnDeadlock`, qui rejoue la transaction entière après un
 interblocage (publication une seule fois, après le commit réussi).
 
@@ -71,9 +72,11 @@ naît qu'après (nom de l'équipe, rejeu du classement).
 
 Les manches postérieures se lisent par `laterRoundsHaveScoreInput`
 (`lib/server/tournaments/bg-survie/round-progress.ts`, la règle commune au
-retrait d'une pénalité et à la correction d'arbitrage, qui la lisent
-verrouillée eux aussi, sans lecture d'image avant — sanction lue `FOR UPDATE`,
-match puis tournoi relus `FOR UPDATE`, table par table), **verrouillées** par
+retrait d'une pénalité, qui la lit verrouillée lui aussi — sa sanction lue
+`FOR UPDATE` d'abord, aucune lecture d'image avant —, et à la correction
+d'arbitrage, qui la lit en image : sa lecture ordinaire du match l'a déjà
+figée, et ses autres dépendants — liens de bracket, phases — se lisent de même ;
+limite consignée dans `ERREUR.txt`), **verrouillées** par
 l'index `idx_bg_matches_phase_round` : les seules manches postérieures, pas
 toute la phase ni ses intervalles. Un report en cours écrit son score sous le
 verrou du match avant d'attendre le tournoi, et une lecture d'instantané
@@ -90,7 +93,7 @@ victime :
 
 Un détenteur qui ne demande jamais le tournoi (programmation, rappels,
 « Prêt ») ne forme pas d'interblocage : l'annulation l'attend au plus
-`CANCEL_LOCK_WAIT_SECONDS` (5 s, `SET SESSION innodb_lock_wait_timeout`, remis
+`SHORT_LOCK_WAIT_SECONDS` (5 s, `SET SESSION innodb_lock_wait_timeout`, remis
 au défaut du serveur avant de rendre la connexion au pool —
 `lib/server/tournaments/lock-wait.ts`, partagé avec le retrait d'une pénalité,
 qui tient lui aussi le tournoi en verrouillant les manches) au lieu des 50 s du
