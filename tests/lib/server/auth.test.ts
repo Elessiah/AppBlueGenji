@@ -34,6 +34,14 @@ jest.mock("@/lib/server/account-suspensions", () => {
   };
 });
 
+// La lecture d'une suppression demandée a ses propres tests
+// (`account-reactivation.test.ts`) : ici, aucun compte n'est en attente.
+jest.mock("@/lib/server/users/account-reactivation", () => {
+  const actual = jest.requireActual<typeof import("@/lib/server/users/account-reactivation")>(
+    "@/lib/server/users/account-reactivation",
+  );
+  return { ...actual, readPendingDeletion: jest.fn(async () => null) };
+});
 // Mock next/headers
 jest.mock("next/headers", () => ({
   cookies: jest.fn(),

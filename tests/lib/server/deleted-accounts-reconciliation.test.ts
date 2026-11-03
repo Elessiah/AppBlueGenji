@@ -148,7 +148,7 @@ describe("reconcileDeletedAccounts", () => {
   it("efface un compte supprimé qui n'a joué aucun match", async () => {
     const { queries } = fakeDb({ 5122: { pseudo: "compte_supprime_5122" } });
 
-    expect(await reconcileDeletedAccounts()).toEqual({ erased: 1, renamed: 0, failed: 0 });
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 1, renamed: 0, failed: 0, withdrawn: 0, forfeited: 0 });
     const writes = writesFor(queries, 5122).map((q) => q.sql);
     expect(writes.some((sql) => sql.startsWith("DELETE FROM bg_users WHERE id = ?"))).toBe(true);
     expect(writes.some((sql) => sql.startsWith("UPDATE bg_users"))).toBe(false);
@@ -157,7 +157,7 @@ describe("reconcileDeletedAccounts", () => {
   it("renomme sous un pseudo d'emprunt un compte qui a joué et porte encore l'ancien pseudo", async () => {
     const { queries } = fakeDb({ 5123: { pseudo: "compte_supprime_5123", played: true } });
 
-    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 1, failed: 0 });
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 1, failed: 0, withdrawn: 0, forfeited: 0 });
     const update = writesFor(queries, 5123).find((q) => q.sql.startsWith("UPDATE bg_users SET pseudo = ?"))!;
     expect(ANONYMOUS_PSEUDOS).toContain(update.params[0]);
     // [pseudo, DEFAULT_LOCALE (langue remise au défaut, lot 9-3), id]
@@ -171,7 +171,7 @@ describe("reconcileDeletedAccounts", () => {
       10: { pseudo: "AlphaFury", played: true, isAdmin: true },
     });
 
-    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 2, failed: 0 });
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 2, failed: 0, withdrawn: 0, forfeited: 0 });
     for (const id of [9, 10]) {
       const update = writesFor(queries, id).find((q) => q.sql.startsWith("UPDATE bg_users SET pseudo = ?"))!;
       expect(update.sql).toContain("platform_roles_json = NULL");
@@ -184,7 +184,7 @@ describe("reconcileDeletedAccounts", () => {
     // aucun verrou, à chaque démarrage de chaque processus.
     const { queries, connections } = fakeDb({ 11: { pseudo: "AlphaGod", played: true } });
 
-    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 0, failed: 0 });
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 0, failed: 0, withdrawn: 0, forfeited: 0 });
     expect(writesFor(queries, 11)).toEqual([]);
     expect(connections).toHaveLength(0);
   });
@@ -208,11 +208,11 @@ describe("reconcileDeletedAccounts", () => {
     // Renommé au premier passage, il n'a plus rien d'un ancien compte.
     const accounts: Record<number, Account> = { 15: { pseudo: "compte_supprime_15", played: true } };
     fakeDb(accounts);
-    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 1, failed: 0 });
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 1, failed: 0, withdrawn: 0, forfeited: 0 });
 
     accounts[15] = { pseudo: "AlphaOne", played: true };
     const { connections } = fakeDb(accounts);
-    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 0, failed: 0 });
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 0, failed: 0, withdrawn: 0, forfeited: 0 });
     expect(connections).toHaveLength(0);
   });
 
@@ -222,7 +222,7 @@ describe("reconcileDeletedAccounts", () => {
   ])("garde la ligne d'un compte qui a %s", async (_label, trace) => {
     const { queries } = fakeDb({ 12: { pseudo: "compte_supprime_12", ...trace } });
 
-    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 1, failed: 0 });
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 1, failed: 0, withdrawn: 0, forfeited: 0 });
     expect(writesFor(queries, 12).some((q) => q.sql.startsWith("DELETE FROM bg_users"))).toBe(false);
   });
 
@@ -247,7 +247,7 @@ describe("reconcileDeletedAccounts", () => {
       getConnection: (await getDatabase()).getConnection,
     }));
 
-    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 0, failed: 0 });
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 0, failed: 0, withdrawn: 0, forfeited: 0 });
     expect(writesFor(queries, 14)).toEqual([]);
     expect(connections[0].rollback).toHaveBeenCalled();
     expect(connections[0].commit).not.toHaveBeenCalled();
@@ -259,7 +259,7 @@ describe("reconcileDeletedAccounts", () => {
       { failFor: 20 },
     );
 
-    expect(await reconcileDeletedAccounts()).toEqual({ erased: 1, renamed: 0, failed: 1 });
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 1, renamed: 0, failed: 1, withdrawn: 0, forfeited: 0 });
     expect(connections[0].rollback).toHaveBeenCalled();
     expect(writesFor(queries, 21).some((q) => q.sql.startsWith("DELETE FROM bg_users"))).toBe(true);
     // Chaque connexion est rendue, échec compris : le pool n'en compte que 25.
@@ -273,7 +273,7 @@ describe("reconcileDeletedAccounts", () => {
       { failFor: 40, rollbackFails: true },
     );
 
-    expect(await reconcileDeletedAccounts()).toEqual({ erased: 1, renamed: 0, failed: 1 });
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 1, renamed: 0, failed: 1, withdrawn: 0, forfeited: 0 });
     expect(writesFor(queries, 41).some((q) => q.sql.startsWith("DELETE FROM bg_users"))).toBe(true);
     expect(connections[0].release).toHaveBeenCalled();
   });
@@ -335,7 +335,7 @@ describe("reconcileDeletedAccounts", () => {
   it("ne fait rien sans compte supprimé", async () => {
     const { connections } = fakeDb({});
 
-    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 0, failed: 0 });
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 0, failed: 0, withdrawn: 0, forfeited: 0 });
     expect(connections).toHaveLength(0);
   });
   it("efface l'acceptation des conditions des comptes déjà anonymisés, sans les renommer", async () => {
@@ -355,7 +355,7 @@ describe("reconcileDeletedAccounts", () => {
   it("poursuit le rattrapage quand cet effacement échoue", async () => {
     const { queries } = fakeDb({ 5122: { pseudo: "compte_supprime_5122" } }, { failTermsCleanup: true });
 
-    expect(await reconcileDeletedAccounts()).toEqual({ erased: 1, renamed: 0, failed: 0 });
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 1, renamed: 0, failed: 0, withdrawn: 0, forfeited: 0 });
     expect(queries.some((q) => q.sql.startsWith("SELECT u.id FROM bg_users u"))).toBe(true);
     expect(console.error).toHaveBeenCalled();
   });
