@@ -38,6 +38,19 @@ describe("bot-integration", () => {
     );
   });
 
+  it("sendDiscordLoginCode_handlePurpose_sentInBody", async () => {
+    const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
+
+    await sendDiscordLoginCode("123456789", "123456", "fr", "handle");
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      discordId: "123456789",
+      code: "123456",
+      locale: "fr",
+      purpose: "handle",
+    });
+  });
+
   it("sends the account locale with the login code, null when unknown", async () => {
     const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
 
@@ -46,8 +59,8 @@ describe("bot-integration", () => {
 
     const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
     expect(bodies).toEqual([
-      { discordId: "123456789", code: "123456", locale: "en" },
-      { discordId: "123456789", code: "654321", locale: null },
+      { discordId: "123456789", code: "123456", locale: "en", purpose: "login" },
+      { discordId: "123456789", code: "654321", locale: null, purpose: "login" },
     ]);
   });
 

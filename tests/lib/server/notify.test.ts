@@ -207,6 +207,55 @@ describe("notifyUsers", () => {
   });
 });
 
+describe("notifyUsers — langue portée et rédaction avant envoi (EF-14)", () => {
+  it("notifyUsers_dmWriterThrows_rejectsBeforeAnyPush", async () => {
+    const throwing = () => {
+      throw new RangeError("Invalid time value");
+    };
+
+    await expect(
+      notifyUsers([{ userId: 1, discord: { discordId: "1", handle: null, label: "A" } }], {
+        topic: "MATCH_REMINDER",
+        push: PUSH,
+        discord: { message: throwing, context: "match-reminder" },
+      }),
+    ).rejects.toThrow("Invalid time value");
+    expect(pushToUsers).not.toHaveBeenCalled();
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("notifyUsers_recipientsCarryLocale_noLocaleQuery", async () => {
+    const query = accountLocales([]);
+
+    await notifyUsers(
+      [
+        { userId: 1, discord: { discordId: "1", handle: null, label: "A" }, locale: "en" },
+        { userId: 2, discord: { discordId: "2", handle: null, label: "B" }, locale: "en" },
+      ],
+      { topic: "MATCH_REMINDER", push: PUSH, discord: { message: DM, context: "ctx" } },
+    );
+
+    expect(query).not.toHaveBeenCalled();
+    expect(jest.mocked(pushDiscordDirectMessages).mock.calls).toEqual([
+      ["m-en", [{ discordId: "1", handle: null, label: "A" }, { discordId: "2", handle: null, label: "B" }], "ctx"],
+    ]);
+  });
+
+  it("notifyUsers_mixedCarriedAndMissingLocale_readsOnlyMissing", async () => {
+    const query = accountLocales([{ id: 2, locale: "fr" }]);
+
+    await notifyUsers(
+      [
+        { userId: 1, discord: { discordId: "1", handle: null, label: "A" }, locale: "en" },
+        { userId: 2, discord: { discordId: "2", handle: null, label: "B" } },
+      ],
+      { topic: "MATCH_REMINDER", push: PUSH, discord: { message: DM, context: "ctx" } },
+    );
+
+    expect(query.mock.calls[0][1]).toEqual([2]);
+  });
+});
+
 describe("notifyUsers — sujet réservé à une permission", () => {
   it("remet tous les destinataires à pushToUsers, qui juge la permission sur ses propres lignes : aucune lecture des droits ici", async () => {
     const query = accountLocales([{ id: 5, locale: "fr" }]);

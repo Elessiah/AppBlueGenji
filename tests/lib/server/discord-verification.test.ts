@@ -270,7 +270,7 @@ describe("startDiscordVerification — le compte Google", () => {
     // Tag pas encore prouvé : jamais la langue du demandeur (compte 7, "en"),
     // celle du compte qui porte déjà ce Discord — ici aucun, donc bilingue.
     expect(jest.mocked(accountLocaleForDiscordId)).toHaveBeenCalledWith("900000000000000002");
-    expect(sendMock).toHaveBeenCalledWith("900000000000000002", "123456", null);
+    expect(sendMock).toHaveBeenCalledWith("900000000000000002", "123456", null, "handle");
     // Rien n'est certifié avant le code.
     expect(db.writes).toHaveLength(0);
   });

@@ -104,6 +104,42 @@ describe("loadNotificationRecipients — option matchDm", () => {
     expect(recipients[2]).toEqual({ userId: 3, discord: null });
   });
 
+  it("loadNotificationRecipients_localeColumnRead_localeCarried", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[{ ...ROWS[0], locale: "en" }], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    const [recipient] = await loadNotificationRecipients([1], "certified");
+
+    expect(String(query.mock.calls[0][0])).toMatch(/, locale\b/);
+    expect(recipient.locale).toBe("en");
+  });
+
+  it("loadNotificationRecipients_localeColumnMissing_retriesWithoutLocale", async () => {
+    const missing = Object.assign(new Error("Unknown column 'locale'"), { code: "ER_BAD_FIELD_ERROR" });
+    const query = jest.fn<SqlQuery>().mockRejectedValueOnce(missing).mockResolvedValueOnce([[ROWS[0]], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    const [recipient] = await loadNotificationRecipients([1], "proven");
+
+    expect(String(query.mock.calls[1][0])).not.toMatch(/locale/);
+    expect(recipient).toEqual({ userId: 1, discord: { discordId: "555", handle: "kiro", label: "Kiro" } });
+  });
+
+  it("loadNotificationRecipients_matchDmBothColumnsMissing_thirdAttemptPlain", async () => {
+    const missing = Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
+    const query = jest
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(missing)
+      .mockRejectedValueOnce(missing)
+      .mockResolvedValueOnce([[ROWS[0]], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    await loadNotificationRecipients([1], "certified", { matchDm: true });
+
+    expect(query).toHaveBeenCalledTimes(3);
+    expect(String(query.mock.calls[2][0])).not.toMatch(/match_dm_enabled|locale/);
+  });
+
   it("laisse passer toute autre erreur de lecture", async () => {
     const query = jest.fn<SqlQuery>().mockRejectedValue(Object.assign(new Error("lock"), { code: "ER_LOCK_WAIT_TIMEOUT" }));
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
