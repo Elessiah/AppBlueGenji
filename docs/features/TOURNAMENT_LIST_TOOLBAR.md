@@ -172,7 +172,9 @@ déjà la même apparence.
   aucune copie sur le disque d'un poste partagé après la déconnexion. Une
   réponse d'erreur non JSON (page du proxy) retombe sur le code
   `TOURNAMENT_LIST_FAILED`, et un refus 401/403 des invisibles vide la section
-  sans toast (droit retiré depuis le rendu). Le paramètre
+  sans toast et retire le droit staff à la page (plus de lecture refusée à
+  chaque rafraîchissement, plus de « Créer », cadence joueur) jusqu'à ce que le
+  serveur rende un nouveau droit (droit retiré depuis le rendu). Le paramètre
   `?search=` est retiré (inutilisé, il contournait le cache partagé). La requête
   de liste compte les inscriptions par sous-requête corrélée (plus de `GROUP BY`
   sur 36 colonnes, ni table dérivée regroupant toute la table), lit avec elle les colonnes d'avancement (plus de relecture de
