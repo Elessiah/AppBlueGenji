@@ -64,7 +64,8 @@ const COUNT_PENDING = "–";
 const NO_TICKER_ITEMS: readonly string[] = [];
 const NO_TOURNAMENTS: TournamentCard[] = [];
 /**
- * Délai au-delà duquel « Mes tournois » ne retient plus l'affichage : une
+ * Délai au-delà duquel « Mes tournois » (et la lecture des invisibles, pour le
+ * staff) ne retient plus l'affichage : une
  * lecture bloquée gardait squelette et comptes « – » jusqu'à la relecture de
  * fond suivante (300 s pour un joueur). Passé ce délai, la liste s'affiche et
  * la section naît à l'arrivée tardive de la réponse.
@@ -308,9 +309,14 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
     { intervalMs: refreshCadenceFor({ isStaff: isAdmin }).listIntervalMs },
   );
 
-  // « Mes tournois » ne retient pas l'affichage indéfiniment (`MINE_SETTLE_MAX_MS`).
+  // Ni « Mes tournois » ni les invisibles (staff) ne retiennent l'affichage
+  // indéfiniment (`MINE_SETTLE_MAX_MS`) : une lecture bloquée gardait la liste
+  // sous le squelette jusqu'à la relecture de fond suivante.
   useEffect(() => {
-    const timer = window.setTimeout(() => setMineSettled(true), MINE_SETTLE_MAX_MS);
+    const timer = window.setTimeout(() => {
+      setMineSettled(true);
+      setHiddenSettled(true);
+    }, MINE_SETTLE_MAX_MS);
     return () => window.clearTimeout(timer);
   }, []);
 

@@ -788,13 +788,8 @@ async function loadTournamentBuckets(
       t.endurance_max_rounds,
       t.endurance_playoff_size,
       t.endurance_playoffs_started,
-      COALESCE(rc.registered, 0) AS registered_teams
+      (SELECT COUNT(*) FROM bg_tournament_registrations r WHERE r.tournament_id = t.id) AS registered_teams
      FROM bg_tournaments t
-     LEFT JOIN (
-       SELECT tournament_id, COUNT(*) AS registered
-       FROM bg_tournament_registrations
-       GROUP BY tournament_id
-     ) rc ON rc.tournament_id = t.id
      WHERE ${where.join(" AND ")}
      ORDER BY t.start_at DESC, t.id DESC`,
     params,
