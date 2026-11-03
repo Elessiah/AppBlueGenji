@@ -20,7 +20,8 @@ const STATUSES: Readonly<Record<string, number>> = {
 /**
  * « Je prends ce match » : le lecteur devient l'arbitre désigné
  * (`docs/features/MATCH_REFEREE.md`). Permission `tournaments`, tag Discord
- * certifié et compte Battle.net rattaché — relus en base sous verrou.
+ * certifié et, pour un match Overwatch, compte Battle.net rattaché — relus en
+ * base sous verrou, le jeu compris.
  */
 export async function POST(_req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();

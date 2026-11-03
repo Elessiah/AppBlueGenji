@@ -1496,7 +1496,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Pour caster ou arbitrer un match Marvel Rivals, un tag Discord certifié suffit désormais : le compte Battle.net rattaché n'est plus demandé. Pour un match Overwatch, rien ne change.",
     details: [
-      "Ce qui change : le site ne vérifie plus, pour un match Marvel Rivals, que ton compte Battle.net est rattaché ni que ton BattleTag en vient ; il n'en tient plus compte pour ces matchs et ne l'y montre pas. Pour un match Overwatch, la condition reste : tag Discord certifié et BattleTag tiré d'un compte Battle.net rattaché.",
+      "Ce qui change : le site ne vérifie plus, pour un match Marvel Rivals, que ton compte Battle.net est rattaché ni que ton BattleTag en vient ; il n'en tient plus compte pour ces matchs. Pour un match Overwatch, la condition reste : tag Discord certifié et BattleTag tiré d'un compte Battle.net rattaché. Les conditions d'utilisation le diront à leur prochaine version.",
       "Ce qui ne change pas : rien de nouveau n'est collecté ni conservé, et ce que les équipes et les casters voient de toi sur un match est inchangé.",
     ],
   },
@@ -1509,9 +1509,9 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     title: "Arbitre désigné : la base de la présentation de ton tag Discord",
     links: [{ href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" }],
     summary:
-      "Si tu arbitres un match, la présentation de ton tag Discord certifié à ses deux équipes et à ses casters repose désormais sur l'exécution du service, et non plus sur l'intérêt légitime : sans lui, les parties du match ne peuvent pas te joindre.",
+      "Si tu arbitres un match, la présentation de ton tag Discord certifié à ses deux équipes et à ses casters repose désormais, une fois la version 7 des conditions ou une suivante acceptée, sur l'exécution du service, et non plus sur l'intérêt légitime : sans lui, les parties du match ne peuvent pas te joindre.",
     details: [
-      "Ce qui change : la base juridique de cette présentation, jugée strictement nécessaire au fonctionnement minimum du service, une fois la version 7 des conditions ou une suivante acceptée (avant, l'intérêt légitime, avec le même droit d'opposition) ; elle n'a donc plus d'opposition propre et ne figure plus parmi les oppositions du « Droit d'opposition ».",
+      "Ce qui change : la base juridique de cette présentation, jugée strictement nécessaire au fonctionnement minimum du service, une fois la version 7 des conditions ou une suivante acceptée (avant cette acceptation, l'intérêt légitime, avec le même droit d'opposition) ; une fois cette version acceptée, elle n'a plus d'opposition propre.",
       "Ce qui ne change pas : rien de nouveau n'est collecté ni montré, aux mêmes personnes et aux mêmes moments ; ton opposition à l'arbitrage (formulaire de signalement, catégorie RGPD), retenue, te retire toujours de tes matchs non terminés, ce tag compris.",
     ],
   },

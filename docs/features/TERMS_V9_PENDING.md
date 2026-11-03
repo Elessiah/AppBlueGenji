@@ -60,10 +60,11 @@ BattleTag ; jamais aux arbitres sans rôle sur le match, ni dans la fenêtre de
 lancement.
 
 - FR (paragraphe 2, remplace « — jamais son tag Discord à ce titre — ») :
-  « — et, depuis la version 9, son **tag Discord certifié**, aux seules parties du
-  match (membres de ses deux équipes, ses casters), aux mêmes moments —, ».
-- EN: "— and, since version 9, their **certified Discord tag**, to the parties to
-  the match alone (members of both its teams, its casters), at the same times —".
+  « — et son **tag Discord certifié**, aux seules parties du match (membres de ses
+  deux équipes, ses casters), aux mêmes moments —, » (sans date : le partage court
+  depuis le 4 novembre 2026, #531, et ne dépend pas de l'acceptation de la v9).
+- EN: "— and their **certified Discord tag**, to the parties to the match alone
+  (members of both its teams, its casters), at the same times —".
 - FR (paragraphe 3, remplace « — jamais les contacts des équipes — ») :
   « et les contacts des deux équipes, aux seules parties du match, aux mêmes
   moments que la fenêtre « Contacts » ; elle reprend aussi les contacts des
@@ -78,11 +79,12 @@ lancement.
 fonctionnement minimum », EN "strictly necessary for its minimum functioning" —,
 soit l'exécution du service, et non plus l'intérêt légitime posé depuis #531 —
 pour un arbitre qui a accepté la v7 ou une suivante, comme le reste de sa
-présentation (avant : intérêt légitime, même droit d'opposition) ; ce tag n'a plus
-d'opposition propre (retiré du « Droit d'opposition »). Elle
+présentation (avant : intérêt légitime, même droit d'opposition) ; une fois la v7
+acceptée, ce tag n'a plus d'opposition propre (avant, le « Droit d'opposition »
+le compte dans la présentation de l'arbitre). Elle
 ne dépend pas de l'acceptation de la v9 : `/rgpd` (FR + EN), le registre (T04,
 `frEn`) et le tableau de `/rgpd` (`REFEREE_DISCORD_SCOPE`, base « Exécution du
-contrat ») le disent depuis ce lot, avec l'entrée `PRIVACY_CHANGES`
+contrat », et `REFEREE_DISCORD_BEFORE_V7_SCOPE`, « Intérêt légitime ») le disent depuis ce lot, avec l'entrée `PRIVACY_CHANGES`
 `2026-11-tag-discord-arbitre-execution-du-service` (5 novembre 2026, `LIVE_STAFF`) ;
 l'opposition à l'arbitrage, retenue, en retire toujours l'arbitre. **Jusqu'à la v9**,
 la v8 (« jamais son tag Discord à ce titre ») contredit ce partage, en place

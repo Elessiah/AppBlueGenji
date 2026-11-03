@@ -14,7 +14,7 @@ import {
 import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
-import { DONNEES_PROFIL, DROITS, REFEREE_DISCORD_SCOPE } from "@/lib/shared/rgpd-policy";
+import { DONNEES_PROFIL, DROITS, REFEREE_DISCORD_BEFORE_V7_SCOPE, REFEREE_DISCORD_SCOPE } from "@/lib/shared/rgpd-policy";
 import { DROITS_EN } from "@/lib/shared/rgpd-policy-en";
 
 const ID = "2026-11-tag-discord-arbitre-execution-du-service";
@@ -38,10 +38,10 @@ describe("PRIVACY_CHANGES — base du tag Discord de l'arbitre", () => {
   });
 
   it("privacyChanges_refereeDiscordBasis_saysNewBasisAndKeptObjectionFrAndEn", () => {
-    expect(entry?.summary).toContain("repose désormais sur l'exécution du service, et non plus sur l'intérêt légitime");
+    expect(entry?.summary).toContain("sur l'exécution du service, et non plus sur l'intérêt légitime");
     expect(entry?.details.join(" ")).toContain("strictement nécessaire au fonctionnement minimum du service");
     expect(entry?.details.join(" ")).toContain("te retire toujours de tes matchs non terminés");
-    expect(english?.summary).toContain("now rests on performance of the service, no longer on legitimate interest");
+    expect(english?.summary).toContain("on performance of the service, no longer on legitimate interest");
     expect(english?.details.join(" ")).toContain("strictly necessary for the minimum functioning of the service");
     expect(english?.details).toHaveLength(entry?.details.length ?? -1);
     expect(english?.linkLabels).toHaveLength(entry?.links?.length ?? -1);
@@ -80,6 +80,24 @@ describe("Registre T04 et /rgpd — exécution du service, FR et EN", () => {
     expect(en).not.toContain("presentation of their certified Discord tag");
     expect(fr).toContain("la présentation de l'arbitre désigné aux parties de ses matchs");
     expect(en).toContain("the presentation of the assigned referee to the parties to their matches");
+  });
+
+  // Revue juridique #545, cycle 3 : avant la version 7, l'opposition vaut aussi pour le tag.
+  it("rgpdPolicy_objectionRight_beforeVersion7IncludesRefereeDiscordTagFrAndEn", () => {
+    const fr = DROITS.find((droit) => droit.title === "Droit d'opposition")?.text ?? "";
+    const en = DROITS_EN.find((droit) => droit.title === "Right to object")?.text ?? "";
+    expect(fr).toContain("aux parties de ses matchs — pseudo, BattleTag et tag Discord certifié — tant qu'il n'a pas accepté la version 7");
+    expect(en).toContain("to the parties to their matches — username, BattleTag and certified Discord tag — as long as they have not accepted version 7");
+  });
+
+  it("rgpdPolicy_refereeDiscordBeforeV7_legitimateInterestRowFrAndEn", () => {
+    const row = DONNEES_PROFIL.find((donnee) => donnee.extraBases?.some((extra) => extra.scope === REFEREE_DISCORD_SCOPE));
+    expect(row?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: REFEREE_DISCORD_BEFORE_V7_SCOPE });
+    expect(REFEREE_DISCORD_SCOPE).toContain("une fois la version 7 des conditions d'utilisation ou une suivante acceptée par toi");
+    expect(REFEREE_DISCORD_BEFORE_V7_SCOPE).toContain("tant que tu n'as pas accepté la version 7");
+    const en = read("lib/shared/rgpd-policy-en.ts");
+    expect(en).toContain("[REFEREE_DISCORD_BEFORE_V7_SCOPE]:");
+    expect(en).toContain("once you have accepted version 7 of the terms of use or a later one");
   });
 
   it("rgpdPages_refereeDiscordTag_performanceOfServiceFrAndEn", () => {
@@ -152,9 +170,11 @@ describe("Base du tag Discord de l'arbitre — cohérence (revue juridique #545,
 
   it("privacyChanges_refereeDiscordBasis_announcesLostSeparateObjectionFrAndEn", () => {
     expect(entry?.summary.startsWith("Si tu arbitres un match")).toBe(true);
-    expect(entry?.details.join(" ")).toContain("ne figure plus parmi les oppositions du « Droit d'opposition »");
+    expect(entry?.summary).toContain("une fois la version 7 des conditions ou une suivante acceptée");
+    expect(entry?.details.join(" ")).toContain("une fois cette version acceptée, elle n'a plus d'opposition propre");
     expect(english?.summary.startsWith("If you referee a match")).toBe(true);
-    expect(english?.details.join(" ")).toContain("is no longer listed under “Right to object”");
+    expect(english?.summary).toContain("once version 7 of the terms or a later one is accepted");
+    expect(english?.details.join(" ")).toContain("once that version is accepted, it has no objection of its own");
   });
 
   it("privacyChanges_battlenetOverwatchOnly_linksCasterConditionFrAndEn", () => {
