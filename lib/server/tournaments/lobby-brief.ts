@@ -519,15 +519,22 @@ async function briefClaimedSide(
  * match dans `releases.lost` (relance, rien à rendre).
  */
 async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext, releases: Releases): Promise<number> {
-  const claimed: number[] = [];
+  // Réservations de ce match dont rien n'est parti (fantôme, brief non
+  // rédigé) : seules rendues si le salon se referme — un côté déjà briefé
+  // garde la sienne, sinon il le serait deux fois au retour de l'appariement.
+  const unsent: number[] = [];
+  const retried: number[] = [];
   let sent = 0;
   for (const slot of [1, 2] as const) {
     const managers = sideManagers(row, slot, context);
     if (managers === null) continue;
     const claimId = await claimLobbyBrief(db, row, slot);
-    if (claimId !== null) claimed.push(claimId);
+    if (claimId === null) continue;
     // Fantôme : personne à briefer, la réservation reste.
-    if (claimId === null || managers.ghost) continue;
+    if (managers.ghost) {
+      unsent.push(claimId);
+      continue;
+    }
     let outcome: SideOutcome | "lost" | "closed";
     try {
       outcome = await briefClaimedSide(db, row, slot, claimId, managers.userIds, context);
@@ -537,14 +544,18 @@ async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext, rel
       releases.retry.push(claimId);
       throw error;
     }
-    // Salon refermé depuis la réservation : rien ne part de ce match, et ses
-    // réservations (fantôme comprise) sont rendues.
+    // Salon refermé depuis la réservation : rien de plus ne part de ce match,
+    // ses réservations sans envoi sont rendues, sans relance.
     if (outcome === "closed") {
-      releases.closed.push(...claimed);
+      releases.retry.splice(releases.retry.length - retried.length, retried.length);
+      releases.closed.push(...unsent, ...retried, claimId);
       return sent;
     }
     if (outcome === "sent") sent += 1;
-    else if (outcome === "retry") releases.retry.push(claimId);
+    else if (outcome === "retry") {
+      releases.retry.push(claimId);
+      retried.push(claimId);
+    }
     else if (outcome === "lost") {
       console.error(
         `[lobby-brief] match ${Number(row.id)} : réservation effacée avant l'envoi, salon toujours ouvert, reprise au balayage suivant`,
@@ -641,7 +652,7 @@ async function runLobbyBriefSweep(): Promise<number> {
       console.error(`[lobby-brief] ${releases.closed.length} réservation(s) rendue(s) : salon refermé avant l'envoi`);
     }
   }
-  scheduleRetrySweep([...toRetry, ...releases.lost]);
+  scheduleRetrySweep([...new Set([...toRetry, ...releases.lost])]);
   return sent;
 }
 
