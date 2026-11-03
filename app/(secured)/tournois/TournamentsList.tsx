@@ -178,7 +178,10 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   // La première lecture des invisibles fait partie de la porte : sans elle, la
   // section s'affichait sous le squelette ou naissait au sommet et poussait les
   // autres sections vers le bas.
-  const [hiddenSettled, setHiddenSettled] = useState(!isAdmin);
+  // Dérivé du droit à chaque rendu : un droit accordé alors que la page reste
+  // montée (`router.refresh()`) rouvre la porte jusqu'à la première lecture.
+  const [hiddenRead, setHiddenSettled] = useState(false);
+  const hiddenSettled = !isAdmin || hiddenRead;
   const listLoaded = isListGateOpen({ listFetched, mineSettled, hiddenSettled });
   const [hiddenTournaments, setHiddenTournaments] = useState<TournamentCard[]>([]);
   const [myTournamentIds, setMyTournamentIds] = useState<ReadonlySet<number>>(new Set());
@@ -429,7 +432,9 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   const liveMessage = (() => {
     if (!listLoaded) return "";
     if (finishedArchiveLoading) return t("list.finishedLoading");
-    if (!deferredQuery.trim()) return "";
+    // Une recherche, un jeu choisi ou l'archive dépliée : un geste dont le
+    // résultat ne se voit qu'à l'écran, donc à dire.
+    if (!deferredQuery.trim() && gameFilter === "all" && !finishedExpanded) return "";
     const shown = totalMine + totalRunning + totalRegistration + totalUpcoming + totalFinished + (showHidden ? totalHidden : 0);
     return t("list.resultsCount", { count: String(shown) });
   })();
