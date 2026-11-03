@@ -132,7 +132,8 @@ export async function cancelTournamentForfeit(
   teamId: number,
 ): Promise<CancelledForfeit> {
   // Verrous tournoi puis manches (le rejeu peut poser la manche suivante),
-  // quand un report ou « Enregistrer » prend la manche puis le tournoi : même
+  // quand un report prend la manche puis le tournoi (« Enregistrer » ne prend
+  // plus le tournoi : il ne fait qu'attendre, borné à 5 s) : même
   // inversion que l'abandon (`forfeitTournamentTeamPublic`), qu'un interblocage
   // rejoue au lieu de renvoyer une erreur à l'administrateur.
   return retryOnDeadlock(() => cancelTournamentForfeitOnce(tournamentId, teamId));
@@ -163,7 +164,7 @@ async function cancelTournamentForfeitOnce(
     // comme tout geste qui le prend : son détenteur (une réconciliation, un
     // lancement) le rend sans rien attendre de nous. Seule la lecture des
     // manches, que des gestes sans verrou du tournoi peuvent tenir longtemps,
-    // a une attente bornée (`boundedWait`, `./lock-wait`). La tête se relit
+    // a une attente bornée (`lock`, `./lock-wait`). La tête se relit
     // verrouillée (déjà tenue, aucune attente ni image).
     await lockTournamentRow(connection, tournamentId);
     const [rows] = await connection.execute<TournamentHead[]>(
@@ -223,7 +224,6 @@ async function cancelTournamentForfeitOnce(
         phaseId,
         afterRound: Number(standing.forfeit_round ?? 1),
         lock: true,
-        boundedWait: true,
       })
     ) {
       throw new Error("FORFEIT_ROUND_PASSED");

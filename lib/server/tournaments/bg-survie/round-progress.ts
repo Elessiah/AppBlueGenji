@@ -92,12 +92,6 @@ export type LaterRoundsScope = {
    * fin du geste.
    */
   lock?: boolean;
-  /**
-   * Avec `lock` : attente de ces verrous bornée ({@link withShortLockWait}) —
-   * le geste tient le verrou du tournoi, et un détenteur qui ne le demande
-   * jamais (programmation, rappels, « Prêt ») le ferait attendre 50 s.
-   */
-  boundedWait?: boolean;
 };
 
 /**
@@ -131,7 +125,10 @@ export async function laterRoundsHaveScoreInput(
     );
     return rows.length > 0;
   };
-  return scope.lock && scope.boundedWait ? withShortLockWait(conn, read) : read();
+  // Verrouillante : attente bornée ({@link withShortLockWait}) — le geste tient
+  // le verrou du tournoi, et un détenteur qui ne le demande jamais
+  // (programmation, rappels, « Prêt ») le ferait attendre 50 s.
+  return scope.lock ? withShortLockWait(conn, read) : read();
 }
 
 /**
@@ -149,7 +146,6 @@ export function laterRoundHasScoreInput(
     afterRound: round,
     beforeRound: PLAYOFF_ROUND_OFFSET,
     lock: true,
-    boundedWait: true,
   });
 }
 

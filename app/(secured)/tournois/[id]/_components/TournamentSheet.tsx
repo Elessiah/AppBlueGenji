@@ -532,12 +532,6 @@ function TournamentSheetView({
   const { showError, showSuccess } = useToast();
 
   const { tournament: detail, refresh, isLive, tier, fatal, cadenceMs, retrying } = source;
-  // État du flux **à la réponse**, pas au clic : tombé pendant la requête, il
-  // ne livrera pas l'instantané.
-  const isLiveRef = useRef(isLive);
-  useEffect(() => {
-    isLiveRef.current = isLive;
-  }, [isLive]);
   // Même raison que les deux dialogues ci-dessous : on retient l'identifiant, pas
   // l'objet. Un match capturé à l'ouverture ne bougeait plus, si bien que le
   // dialogue continuait d'afficher « 0 – 0 » sur un match que le flux venait de
@@ -882,12 +876,10 @@ function TournamentSheetView({
     try {
       await requestForfeitCancellation(tournamentId, teamId);
       showSuccess(a(`forfeitCancel.success.${entrantType}`, { name: teamName }));
-      // Flux ouvert : aucune relecture REST — l'annulation publie l'instantané
-      // par le flux et ne change rien au contexte du lecteur, que `refresh()`
-      // recalculait pour rien ; la veille du focus suit la ligne quand
-      // l'instantané arrive. Flux tombé : la relecture reste le seul retour.
-      if (isLiveRef.current) focusRowAfterChange(teamId);
-      else void refresh().then(() => focusRowAfterChange(teamId));
+      // Relecture immédiate, flux ouvert ou non : l'auteur du geste n'attend pas
+      // la diffusion, que la tranche et le budget de la salle peuvent retarder
+      // jusqu'à une minute (bouton périmé, focus perdu).
+      void refresh().then(() => focusRowAfterChange(teamId));
       return true;
     } catch (e) {
       showError(mapParticipantError((e as Error).message, entrantType));

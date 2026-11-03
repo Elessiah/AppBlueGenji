@@ -1,9 +1,6 @@
 import { randomInt } from "node:crypto";
 import { isSnapshotConflict, isTransactionAborted } from "@/lib/server/mysql-errors";
 
-/** Vit avec les autres prédicats d'erreur (`mysql-errors.ts`) ; réexporté ici. */
-export { isSnapshotConflict };
-
 const DEADLOCK_ATTEMPTS = 3;
 
 /**
