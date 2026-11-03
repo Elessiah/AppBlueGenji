@@ -168,13 +168,15 @@ déjà la même apparence.
   avec la liste mise en cache (`WeakMap` sur l'objet), répond `ETag` +
   `Cache-Control: private, no-cache` et **304** à `If-None-Match` (le client lit
   en `cache: "no-cache"`) — le contrôle d'accès passe avant ; `scope=hidden`
-  (tournois non publiés, staff seul) répond `private, no-store` sans empreinte :
+  (tournois non publiés, staff seul) répond `private, no-store` sans empreinte
+  (et le client la demande en `cache: "no-store"`) :
   aucune copie sur le disque d'un poste partagé après la déconnexion. Une
   réponse d'erreur non JSON (page du proxy) retombe sur le code
   `TOURNAMENT_LIST_FAILED` ; la toast d'échec dit une phrase traduite
   (`list.loadFailed`, `list.hiddenLoadFailed`), jamais le code ni le message
-  brut du navigateur. Un refus 401/403 des invisibles vide la section
-  sans toast et retire le droit staff à la page (plus de lecture refusée à
+  brut du navigateur ; une lecture en échec côté serveur rend le code
+  `TOURNAMENT_LIST_FAILED` en 500. Un refus 401/403 des invisibles vide la section
+  sans toast ; le 403 seul (un 401 peut être passager) retire le droit staff à la page (plus de lecture refusée à
   chaque rafraîchissement, plus de « Créer », cadence joueur) jusqu'à ce que le
   serveur rende un nouveau droit (droit retiré depuis le rendu). Le paramètre
   `?search=` est retiré (inutilisé, il contournait le cache partagé). La requête
