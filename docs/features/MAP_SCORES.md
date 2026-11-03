@@ -39,7 +39,9 @@ détail, l'ajout « Ajouter une map » d'une liste vide (`minRows = 0`).
 4. Instantané commun (flux SSE **et** REST de secours) : `BracketMatch.maps`,
    `MatchScoreReport.maps`.
 5. Interface : `MapScoreList` (modale joueur, dialogue d'arbitrage),
-   `MatchMapDetails` (carte de match).
+   `MatchMapDetails` (carte de match : le bouton résumé seul, la modale
+   `MapDetailsDialog` chargée au clic par `dynamic()` — son CSS et ses crochets
+   ne partent pas avec la page), `MapResultList` (liste partagée).
 6. RGPD (codes de replay), seed, tests.
 
 ## Règles
@@ -238,8 +240,14 @@ propriétaire, ou le joueur en individuel), et pour l'arbitrage (permission
 `tournaments`, qui en a besoin pour trancher un désaccord). Une requête au plus,
 aucune quand rien n'attend. Le contexte du lecteur n'arrivant qu'à la connexion
 au flux, une proposition déposée depuis se repère à son `reportedAt` (porté par
-l'instantané) et déclenche une relecture REST (`useProposalMaps`,
-`proposalsNeedRefresh`).
+l'instantané) et déclenche une relecture du **seul** match
+(`GET /api/tournaments/[id]/matches/[matchId]/proposals`, `useProposalMaps`,
+`proposalsNeedRefresh`) — mêmes conditions que la lecture REST du détail, même
+règle de lecture (`getViewerMatchProposals`, qui partage `viewerProposalScope`
+avec le contexte du lecteur), au plus trois essais espacés de 4 s. Elle relisait
+le tournoi entier (instantané et contexte du lecteur) pour les maps d'un match.
+La réponse ne complète un côté que si elle décrit la proposition affichée
+(`mergeMatchProposals`) : une réponse en retard n'écrase rien.
 
 Un forfait n'affiche jamais de détail, quel que soit le chemin qui l'a posé
 (arbitrage, abandon en Survie / Ronde suisse / BG Survie) : `attachMatchMaps`
@@ -343,12 +351,15 @@ rejouée un match sur trois (`applyMatchMapDetails`).
 | Report / expiration | `lib/server/tournaments/scoring.ts`, `finalization.ts` |
 | Arbitrage | `lib/server/tournaments/admin.ts`, `lib/shared/admin-score-body.ts` |
 | Instantané | `lib/server/tournaments/_internal.ts` (`attachMatchMaps`), `snapshot.ts` |
-| Interface | `_components/MapScoreList.tsx`, `MatchMapDetails.tsx`, `PlayerScoreDialog.tsx`, `AdminScoreDialog.tsx`, `_hooks/useScoreForm.ts` |
+| Interface | `_components/MapScoreList.tsx`, `MatchMapDetails.tsx`, `MapDetailsDialog.tsx`, `MapResultList.tsx`, `PlayerScoreDialog.tsx`, `AdminScoreDialog.tsx`, `_hooks/useScoreForm.ts`, `_hooks/useProposalMaps.ts` |
+| Relecture d'un match | `app/api/tournaments/[id]/matches/[matchId]/proposals/route.ts`, `getViewerMatchProposals` (`tournaments/index.ts`) |
 
 ## Tests
 
 `tests/lib/shared/match-maps.test.ts`, `tests/lib/server/match-maps.test.ts`,
 `tests/app/api/admin/map-scores-routes.test.ts`,
 `tests/app/api/tournaments/report-score.test.ts`,
+`tests/app/api/tournaments/match-proposals.test.ts`, `tests/tournois/viewer-match-proposals.test.ts`,
+`tests/tournois/proposal-maps-hook.test.ts`,
 `tests/lib/server/match-format-report.test.ts`, `score-report-stalled.test.ts`,
 `tournaments-service.matches.test.ts`.

@@ -157,6 +157,14 @@ propositions sur un match ouvert, `isScoreDisputed`) : un arbitrage hors litige
 engagée a reporté **suspend** la validation d'office : le score du déclarant ne
 remplace plus, à l'échéance, ce que l'arbitre a noté.
 
+« Enregistrer » ne clôt jamais un match : la sauvegarde ne lance aucune
+réconciliation de classement et ne publie que le plateau
+(`publishMatchUpdatedEvent`, ERREUR.txt EF-15). Ses relectures sous verrou
+sont regroupées : la ligne enregistrée revient avec le résultat
+(`AdminSaveResult.saved`), les règles du match (`refereeScheduling` compris) se
+lisent en une requête, et les maps `FINAL` ne sont effacées que si une sonde
+(`mapSetExists`) en trouve.
+
 - **Suspension** : `bg_matches.score_validation_paused_at = NOW()`, posée par
   `pauseAutoValidation` (`admin.ts`) dans la transaction d'« Enregistrer », sur
   la ligne déjà verrouillée, si le match est `AWAITING_CONFIRMATION` avec un
