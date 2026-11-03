@@ -29,6 +29,8 @@
     "showMoreLabel": "Voir plus ({count}) · {section}",
     "loading": "Chargement des tournois…",
     "finishedLoading": "Chargement des tournois terminés…",
+    "loadFailed": "Impossible de charger les tournois. Réessaie dans un instant.",
+    "hiddenLoadFailed": "Impossible de charger les tournois invisibles. Réessaie dans un instant.",
     "sections": {
       "hidden": "TOURNOIS INVISIBLES",
       "mine": "MES TOURNOIS",

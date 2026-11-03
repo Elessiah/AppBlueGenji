@@ -29,6 +29,8 @@
     "showMoreLabel": "Show more ({count}) · {section}",
     "loading": "Loading tournaments…",
     "finishedLoading": "Loading finished tournaments…",
+    "loadFailed": "Couldn't load the tournaments. Try again in a moment.",
+    "hiddenLoadFailed": "Couldn't load the hidden tournaments. Try again in a moment.",
     "sections": {
       "hidden": "HIDDEN TOURNAMENTS",
       "mine": "MY TOURNAMENTS",

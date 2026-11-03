@@ -140,7 +140,7 @@ async function fetchBuckets(url: string, signal?: AbortSignal): Promise<Tourname
   // répond 304 sans corps quand la liste n'a pas bougé.
   const response = await fetch(url, { cache: "no-cache", signal });
   // Une page d'erreur HTML (proxy, déploiement) n'est pas du JSON : sans ce
-  // repli, la toast affichait le message brut de `SyntaxError` au lieu d'un code.
+  // repli, elle levait une `SyntaxError` au lieu du code d'échec de la liste.
   const payload = (await response.json().catch(() => ({}))) as {
     error?: string;
     buckets?: TournamentBuckets;
@@ -240,14 +240,17 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
         // minuteur de bascule, pour un contenu identique.
         setBuckets((previous) => (sameBuckets(previous, all) ? previous : all));
         setListFetched(true);
-      } catch (e) {
+      } catch {
         // Une requête abandonnée (démontage, rafraîchissement suivant) n'est pas
         // un incident : la page n'a plus rien à afficher de toute façon.
         if (signal?.aborted || silent) return;
-        showError((e as Error).message);
+        // Une phrase traduite, jamais le code ni le message brut du navigateur
+        // (« Failed to fetch » sur une page en français) : le lecteur n'en
+        // ferait rien.
+        showError(t("list.loadFailed"));
       }
     },
-    [showError, wantFinishedArchive],
+    [showError, t, wantFinishedArchive],
   );
 
   useEffect(() => {
@@ -308,14 +311,14 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
           return;
         }
         if (silent) return;
-        showError(code);
+        showError(t("list.hiddenLoadFailed"));
       } finally {
         // Réglée au premier résultat, échec compris : la liste publique ne doit
         // pas rester sous le squelette pour une lecture réservée au staff.
         if (!signal?.aborted) setHiddenSettled(true);
       }
     },
-    [isAdmin, showError],
+    [isAdmin, showError, t],
   );
 
   useEffect(() => {
