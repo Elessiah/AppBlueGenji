@@ -13,13 +13,17 @@ import { planEnduranceRound, type EnduranceStanding } from "@/lib/shared/bg-surv
  * `lib/shared/match-lock.ts`) en SQL : deux engagées en place **et** un score,
  * un vainqueur, un forfait, un double forfait ou un report en attente.
  *
- * Écrit une seule fois : toutes les lectures « une manche porte une saisie »
- * s'en servent (réappariement d'une manche périmée, verrous du retrait d'une
+ * Écrit une seule fois pour l'endurance et les gestes qui remontent le temps
+ * (réappariement d'une manche d'endurance périmée, verrous du retrait d'une
  * pénalité, de l'annulation d'un abandon et de la correction d'arbitrage, et
  * les bornes que l'interface reçoit pour ne pas proposer un geste que le
- * serveur refusera). Les deux engagées en place écartent l'exemption, que le
- * moteur pose d'office (score 1-0, seconde place vide) : elle ne dit pas qu'une
- * manche est entamée, et l'interface ne la compte pas.
+ * serveur refusera) ; la survie et la ronde suisse gardent encore leur copie
+ * (`ERREUR.txt`). Le report en attente se lit sur ses dates, comme le verrou
+ * d'arbitrage (`admin.ts`). Les deux engagées en place écartent l'exemption,
+ * que le moteur pose d'office (score 1-0, seconde place vide) : elle ne dit
+ * pas qu'une manche est entamée, l'interface ne la compte pas, et une manche
+ * d'endurance dont seule l'exemption est close se réapparie donc comme une
+ * manche vierge (l'exemption rejouée depuis l'historique, rien n'est perdu).
  */
 export const HAS_SCORE_INPUT_SQL = `(team1_id IS NOT NULL AND team2_id IS NOT NULL
             AND (team1_score IS NOT NULL OR team2_score IS NOT NULL

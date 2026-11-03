@@ -20,10 +20,11 @@ import { toParticipantType, type ParticipantType } from "@/lib/shared/participan
 import { laterRoundsHaveScoreInput } from "./bg-survie/round-progress";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { retryOnDeadlock } from "./deadlock-retry";
-import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
+import { invalidateLandingMiniBrackets } from "@/lib/server/landing-cache";
 import { invalidateTournamentLists } from "./list-cache";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { invalidateTournamentPreview } from "./preview-cache";
+import { lockTournamentRow } from "./registration";
 import { boundLockWait, releaseWithServerLockWait } from "./lock-wait";
 
 /** Ce que l'annulation a produit, pour la ligne de journal et le message rendu. */
@@ -143,7 +144,6 @@ async function cancelTournamentForfeitOnce(
   const connection = await db.getConnection();
 
   try {
-    await boundLockWait(connection);
     await connection.beginTransaction();
 
     // **Aucune lecture d'instantané avant celle des manches** : sous MariaDB
@@ -156,8 +156,14 @@ async function cancelTournamentForfeitOnce(
     // phase, classement et manches se lisent donc sous verrou ; l'image ne naît
     // qu'après (nom de l'équipe, rejeu du classement).
     //
-    // En toute première instruction, la ligne du tournoi : c'est le verrou du
-    // tournoi (celui de `lockTournamentRow`), lu avec les colonnes utiles.
+    // En toute première instruction, le verrou du tournoi — attendu sans borne,
+    // comme tout geste qui le prend : son détenteur (une réconciliation, un
+    // lancement) le rend sans rien attendre de nous. L'attente bornée ne vaut
+    // qu'**ensuite**, pour les manches, que des gestes sans verrou du tournoi
+    // peuvent tenir longtemps (`./lock-wait`). La tête se relit verrouillée
+    // (déjà tenue, aucune attente ni image).
+    await lockTournamentRow(connection, tournamentId);
+    await boundLockWait(connection);
     const [rows] = await connection.execute<TournamentHead[]>(
       `SELECT name, format, state, participant_type, endurance_playoffs_started, current_phase_id
        FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
@@ -213,6 +219,9 @@ async function cancelTournamentForfeitOnce(
       `SELECT name FROM bg_teams WHERE id = ? LIMIT 1`,
       [teamId],
     );
+    // Classement sans engagé (équipe effacée) : rien à remettre en lice.
+    const team = teamRows[0];
+    if (!team) throw new Error("TEAM_NOT_IN_TOURNAMENT");
 
     await connection.execute(
       `UPDATE ${table} SET status = 'ACTIVE', ${roundColumn} = NULL WHERE ${scope}`,
@@ -229,18 +238,20 @@ async function cancelTournamentForfeitOnce(
     // statistiques, qui ne rejouent que des matchs `COMPLETED`, restent justes —
     // `publishUpdatedEvent` les vidait aussi. Le rejeu peut en revanche réécrire
     // des colonnes de `bg_tournaments` (manche d'endurance courante, phase) et
-    // reposer les matchs d'une manche périmée : instantané, aperçu, listes et
-    // agrégats de l'accueil (direct et ticker compris) sont oubliés.
+    // reposer les matchs d'une manche périmée : instantané, aperçu, listes, et
+    // à l'accueil le direct et les mini-arbres sont oubliés. Leaderboards,
+    // ticker (derniers résultats) et compteurs ne lisent que des matchs clos ou
+    // des comptes : ils restent en cache.
     publishMatchUpdatedEvent(tournamentId, { landingLive: true });
     invalidateTournamentPreview(tournamentId);
     invalidateTournamentLists();
-    invalidateLandingAggregates();
+    invalidateLandingMiniBrackets();
 
     return {
       tournamentId,
       tournamentName: tournament.name,
       teamId,
-      entrantName: String(teamRows[0]?.name ?? ""),
+      entrantName: team.name,
       participantType: toParticipantType(tournament.participant_type),
     };
   } catch (error) {

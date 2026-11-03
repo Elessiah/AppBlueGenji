@@ -6,7 +6,9 @@ import type {
   TournamentDetail,
   TournamentFormat,
   TournamentGame,
+  BracketMatch,
   MatchProposalMaps,
+  MatchScoreReport,
   TournamentSnapshot,
   TournamentState,
   TournamentViewerContext,
@@ -170,7 +172,8 @@ import { mapCard } from "./_internal";
 import { loadCardSummaries, type CardSummary } from "./list-summary";
 import { getTournamentListRow, loadTournamentRow } from "./repository";
 import { reportMatchScore, type ProposalConfirmation } from "./scoring";
-import { loadViewerProposals, proposalMatches } from "./match-maps";
+import { loadViewerProposals, proposalMatches, type ProposalScope } from "./match-maps";
+import { toIso } from "@/lib/server/serialization";
 import type { MatchMapInput } from "@/lib/shared/match-maps";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { retryOnDeadlock } from "./deadlock-retry";
@@ -1138,8 +1141,49 @@ export async function getViewerMatchProposals(
     : await resolveViewerEntrant(snapshot, userId);
   const scope = viewerProposalScope(isSolo, myTeamId, activeTeam, canManage);
   if (proposalMatches([match], scope).length === 0) return null;
-  const [proposals] = await withConnection((connection) => loadViewerProposals(connection, [match], scope));
+  const [proposals] = await withConnection((connection) => loadFreshProposals(connection, match, scope));
   return proposals ?? null;
+}
+
+/** Instant lu en base (`toIso`). */
+type SqlInstant = Date | string | null;
+
+/**
+ * Propositions d'un match, **dates de report relues avec leurs maps** dans une
+ * même image (transaction en lecture seule) : l'instantané en cache peut dater
+ * d'avant un nouveau report, et apparier sa date au détail du suivant ferait
+ * accepter au client des maps qui ne sont pas celles du score affiché. La date
+ * relue part au client, qui écarte la réponse si elle n'est plus celle qu'il
+ * affiche (`mergeMatchProposals`).
+ */
+async function loadFreshProposals(
+  connection: PoolConnection,
+  match: BracketMatch,
+  scope: ProposalScope,
+): Promise<MatchProposalMaps[]> {
+  await connection.query("START TRANSACTION READ ONLY");
+  try {
+    const [rows] = await connection.execute<
+      (RowDataPacket & { team1_reported_at: SqlInstant; team2_reported_at: SqlInstant })[]
+    >(`SELECT team1_reported_at, team2_reported_at FROM bg_matches WHERE id = ? LIMIT 1`, [match.id]);
+    const fresh = rows[0];
+    if (!fresh) return [];
+    const current: BracketMatch = {
+      ...match,
+      team1Report: withReportedAt(match.team1Report, fresh.team1_reported_at),
+      team2Report: withReportedAt(match.team2Report, fresh.team2_reported_at),
+    };
+    return await loadViewerProposals(connection, [current], scope);
+  } finally {
+    await connection.query("COMMIT");
+  }
+}
+
+/** Le report de l'instantané à sa date relue ; retiré depuis : aucun. */
+function withReportedAt(report: MatchScoreReport | null, reportedAt: SqlInstant): MatchScoreReport | null {
+  const iso = toIso(reportedAt);
+  if (!report || iso === null) return null;
+  return { ...report, reportedAt: iso };
 }
 
 /**
@@ -1861,10 +1905,12 @@ async function liftEndurancePenaltyOnce(tournamentId: number, penaltyId: number)
   const connection = await db.getConnection();
 
   try {
-    // Tournoi verrouillé, puis manches suivantes : attente bornée
-    // (`./lock-wait`), comme l'annulation d'un abandon.
-    await boundLockWait(connection);
     await connection.beginTransaction();
+    // Verrou du tournoi attendu sans borne, en toute première instruction ;
+    // l'attente bornée (`./lock-wait`) ne vaut qu'ensuite, pour la sanction et
+    // les manches suivantes — comme l'annulation d'un abandon.
+    await lockTournamentRow(connection, tournamentId);
+    await boundLockWait(connection);
 
     const { liftEndurancePenalty } = await import("./bg-survie/penalties");
     const lifted = await liftEndurancePenalty(tournamentId, penaltyId, connection);
