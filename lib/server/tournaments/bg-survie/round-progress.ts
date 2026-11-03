@@ -24,7 +24,7 @@ import { planEnduranceRound, type EnduranceStanding } from "@/lib/shared/bg-surv
 export const HAS_SCORE_INPUT_SQL = `(team1_id IS NOT NULL AND team2_id IS NOT NULL
             AND (team1_score IS NOT NULL OR team2_score IS NOT NULL
             OR winner_team_id IS NOT NULL OR forfeit_team_id IS NOT NULL
-            OR double_forfeit = 1 OR status = 'AWAITING_CONFIRMATION'
+            OR (double_forfeit = 1 AND status = 'COMPLETED') OR status = 'AWAITING_CONFIRMATION'
             OR team1_reported_at IS NOT NULL OR team2_reported_at IS NOT NULL))`;
 
 /** Un match de la manche porte-t-il déjà une saisie ? */

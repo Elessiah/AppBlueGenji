@@ -76,9 +76,24 @@ export function isContentionMessage(message: unknown): boolean {
   return typeof message === "string" && CONTENTION_MESSAGES.some((pattern) => pattern.test(message));
 }
 
-/** `true` si l'attente d'un verrou a dépassé `innodb_lock_wait_timeout`. */
-export function isLockWaitTimeout(error: unknown): boolean {
-  return errorCode(error) === "ER_LOCK_WAIT_TIMEOUT";
+/** Codes mysql2 et numéros MariaDB d'une contention passagère. */
+const CONTENTION_CODES = new Set(["ER_LOCK_DEADLOCK", "ER_CHECKREAD", "ER_LOCK_WAIT_TIMEOUT"]);
+const CONTENTION_ERRNOS = new Set([1213, 1020, 1205]);
+
+/**
+ * `true` si l'erreur est une contention passagère — interblocage,
+ * `ER_CHECKREAD`, délai de verrou —, lue sur le **code** de l'erreur d'abord
+ * (indépendant de la langue des messages du serveur, `lc_messages`), sur son
+ * message ensuite. Règle des routes qui remplacent le message par un code fixe
+ * avant `fail()`, et ne profitent donc pas de sa reconnaissance.
+ */
+export function isContentionError(error: unknown): boolean {
+  const code = errorCode(error);
+  if (code !== null && CONTENTION_CODES.has(code)) return true;
+  const errno = typeof error === "object" && error !== null ? (error as { errno?: unknown }).errno : undefined;
+  if (typeof errno === "number" && CONTENTION_ERRNOS.has(errno)) return true;
+  const message = error instanceof Error ? error.message : undefined;
+  return isDeadlockMessage(message) || isContentionMessage(message);
 }
 
 /**

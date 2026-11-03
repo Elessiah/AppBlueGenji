@@ -879,10 +879,12 @@ function TournamentSheetView({
     try {
       await requestForfeitCancellation(tournamentId, teamId);
       showSuccess(a(`forfeitCancel.success.${entrantType}`, { name: teamName }));
-      // Aucune relecture REST : l'annulation publie l'instantané par le flux, et
-      // ne change rien au contexte du lecteur — `refresh()` le recalculait pour
-      // rien. La veille du focus suit la ligne quand l'instantané arrive.
-      focusRowAfterChange(teamId);
+      // Flux ouvert : aucune relecture REST — l'annulation publie l'instantané
+      // par le flux et ne change rien au contexte du lecteur, que `refresh()`
+      // recalculait pour rien ; la veille du focus suit la ligne quand
+      // l'instantané arrive. Flux tombé : la relecture reste le seul retour.
+      if (isLive) focusRowAfterChange(teamId);
+      else void refresh().then(() => focusRowAfterChange(teamId));
       return true;
     } catch (e) {
       showError(mapParticipantError((e as Error).message, entrantType));

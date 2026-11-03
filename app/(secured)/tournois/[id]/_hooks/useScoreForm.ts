@@ -91,9 +91,14 @@ export function useScoreForm(
   // · rien saisi → on adopte silencieusement la nouvelle valeur ;
   // · une saisie en cours → on la garde, et on signale le désaccord plutôt que
   //   de l'effacer ou de la laisser écraser le travail de l'autre.
+  // Règles des lignes d'ouverture (format de la manche, jeu) : changées pendant
+  // que le dialogue est ouvert, elles changent ce qu'ouvrir produirait sans
+  // toucher à l'empreinte du résultat — l'alignement doit les suivre aussi.
+  const rules = `${JSON.stringify(matchFormat)}|${game ?? ""}`;
   const [synced, setSynced] = useState(() => ({
     signature: storedResultSignature(match),
     proposals: pendingProposalSignature(match),
+    rules,
     // Valeurs adoptées au dernier alignement : c'est à elles que se compare la
     // saisie courante pour savoir si le lecteur a tapé quelque chose. Comparer
     // au match qui *arrive* ne le dirait pas — il a précisément changé.
@@ -106,11 +111,11 @@ export function useScoreForm(
 
   const signature = storedResultSignature(match);
   const proposals = pendingProposalSignature(match);
-  if (signature !== synced.signature || proposals !== synced.proposals) {
+  if (signature !== synced.signature || proposals !== synced.proposals || rules !== synced.rules) {
     const untouched = sameScoreFormState(state, synced.baseline) && sameMaps(maps, synced.mapsBaseline);
     const nextMaps = openingRows();
     const next = adminFormStateFor(match, nextMaps);
-    setSynced({ signature, proposals, baseline: next, mapsBaseline: nextMaps });
+    setSynced({ signature, proposals, rules, baseline: next, mapsBaseline: nextMaps });
 
     if (untouched) {
       setState(next);
@@ -133,7 +138,7 @@ export function useScoreForm(
   const adoptStoredResult = () => {
     const nextMaps = openingRows();
     const next = adminFormStateFor(match, nextMaps);
-    setSynced({ signature, proposals, baseline: next, mapsBaseline: nextMaps });
+    setSynced({ signature, proposals, rules, baseline: next, mapsBaseline: nextMaps });
     setState(next);
     setMaps(nextMaps);
     options.onMapsReset?.();

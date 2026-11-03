@@ -20,6 +20,8 @@ import { toParticipantType, type ParticipantType } from "@/lib/shared/participan
 import { laterRoundsHaveScoreInput } from "./bg-survie/round-progress";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { retryOnDeadlock } from "./deadlock-retry";
+import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
+import { invalidateTournamentLists } from "./list-cache";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { invalidateTournamentPreview } from "./preview-cache";
 
@@ -231,12 +233,16 @@ async function cancelTournamentForfeitOnce(
     // Le rejeu a pu réserver des lignes de journal (manche suivante posée).
     flushBotLogs(connection);
 
-    // Instantané et aperçu seulement : aucun résultat de match ni colonne de
-    // `bg_tournaments` ne change, si bien que le classement du site, les
-    // statistiques, les agrégats de l'accueil et les listes restent justes —
-    // `publishUpdatedEvent` les vidait tous.
-    publishMatchUpdatedEvent(tournamentId);
+    // Aucun résultat de match ne change : le classement du site et les
+    // statistiques, qui ne rejouent que des matchs `COMPLETED`, restent justes —
+    // `publishUpdatedEvent` les vidait aussi. Le rejeu peut en revanche réécrire
+    // des colonnes de `bg_tournaments` (manche d'endurance courante, phase) et
+    // reposer les matchs d'une manche périmée : instantané, aperçu, listes et
+    // agrégats de l'accueil (direct et ticker compris) sont oubliés.
+    publishMatchUpdatedEvent(tournamentId, { landingLive: true });
     invalidateTournamentPreview(tournamentId);
+    invalidateTournamentLists();
+    invalidateLandingAggregates();
 
     return {
       tournamentId,

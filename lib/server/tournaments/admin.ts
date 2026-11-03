@@ -182,16 +182,18 @@ async function multiPhaseDependentsHaveInput(
 
 /**
  * Manches ultérieures de la phase du match : la règle partagée
- * (`laterRoundsHaveScoreInput`), **verrouillée** — une lecture d'instantané
- * manquait le score qu'un report de la manche suivante écrit au même moment, et
- * la correction réécrivait alors un résultat dont dépend un match entamé.
+ * (`laterRoundsHaveScoreInput`), en lecture d'**instantané**. Pas de verrou
+ * ici : la lecture ordinaire de `checkDownstreamMatchesHaveNoScores` a déjà
+ * figé l'image de la transaction, et sous MariaDB (`innodb_snapshot_isolation`)
+ * un `FOR UPDATE` sur une manche qu'un « Prêt » vient de toucher serait refusé
+ * (`ER_CHECKREAD`) — une rafale de « Prêt » épuiserait les rejeux de la
+ * correction, et l'attente du verrou se ferait match verrouillé.
  */
 function laterRoundsHaveInput(connection: PoolConnection, current: CurrentMatchRow): Promise<boolean> {
   return laterRoundsHaveScoreInput(connection, {
     tournamentId: Number(current.tournament_id),
     phaseId: Number(current.phase_id ?? 0),
     afterRound: Number(current.round_number),
-    lock: true,
   });
 }
 
