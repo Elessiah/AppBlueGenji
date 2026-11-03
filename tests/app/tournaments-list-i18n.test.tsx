@@ -131,16 +131,14 @@ describe("route et référencement", () => {
 });
 
 describe("mise en page — dictionnaire du navigateur", () => {
-  it("sous /en, la mise en page ne sérialise que les espaces communs à toutes les pages des tournois", async () => {
-    const layout = await TournamentsLayout({ children: null });
-    const shared = (layout.props as { messages?: Record<string, unknown> }).messages;
-    // Ni la liste, ni ses cartes, ni le bandeau : la mise en page enveloppe aussi `[id]`, `creer`, `modifier`.
-    expect(Object.keys(shared ?? {}).sort((a, b) => a.localeCompare(b))).toEqual(["labels", "matchFormat", "participants", "rulesHelp"]);
-    expect(shared).toEqual(tournamentsSharedMessages(messagesFor("en")));
+  it("sous /en, la mise en page ne sérialise aucun texte : la fiche porte les siens, la liste aussi", async () => {
+    const layout = TournamentsLayout({ children: null });
+    expect(layout).toBeNull();
+    expect(Object.keys(tournamentsSharedMessages(messagesFor("en"))).sort((a, b) => a.localeCompare(b))).toEqual(["labels", "matchFormat", "participants", "rulesHelp"]);
     // La page de la liste pose les siens, et rend toute la liste en anglais sous la mise en page.
     const page = await TournamentsPage();
     expect((page.props as { messages?: unknown }).messages).toEqual(tournamentsClientMessages(messagesFor("en")));
-    const html = renderToStaticMarkup(await TournamentsLayout({ children: page }));
+    const html = renderToStaticMarkup(TournamentsLayout({ children: page }));
     expect(html).toContain("Search for a tournament");
     expect(html).toContain('aria-label="News feed"');
     const client = tournamentsClientMessages(messagesFor("en"));
@@ -152,8 +150,7 @@ describe("mise en page — dictionnaire du navigateur", () => {
 
   it("en français, rien n'est passé : le texte est celui du paquet", async () => {
     mockLocale = "fr";
-    const layout = await TournamentsLayout({ children: <TournamentsList canManage={false} /> });
-    expect((layout.props as { messages?: unknown }).messages).toBeUndefined();
+    const layout = TournamentsLayout({ children: <TournamentsList canManage={false} /> });
     expect(((await TournamentsPage()).props as { messages?: unknown }).messages).toBeUndefined();
     expect(renderToStaticMarkup(layout)).toContain("Rechercher un tournoi");
   });
@@ -305,7 +302,7 @@ describe("carte « Connexion requise »", () => {
 
 describe("le français des messages égale les tables d'origine", () => {
   it("sections, effectifs, modes des règles, notation des matchs", () => {
-    const fr = messagesFor("fr").tournaments;
+    const fr = { ...messagesFor("fr").tournaments, ...messagesFor("fr").tournamentsShared };
     expect(fr.list.sections).toEqual(PAGE_SECTION_TITLES);
     expect(fr.list.sectionNav).toEqual(PAGE_SECTION_NAV_LABELS);
     expect(fr.rulesHelp.modes).toEqual(RULE_MODE_LABELS_FR);
@@ -337,7 +334,7 @@ describe("tournaments — équivalence avec next-intl, message par message", () 
   }
 
   it.each(LOCALES.map((locale) => [locale]))("%s", (locale) => {
-    const messages = leaves(messagesFor(locale).tournaments);
+    const messages = [...leaves(messagesFor(locale).tournaments), ...leaves(messagesFor(locale).tournamentsShared)];
     expect(messages.length).toBeGreaterThanOrEqual(80);
     for (const { key, source } of messages) {
       const reference = createTranslator({ locale, messages: { m: source }, timeZone: SITE_TIME_ZONE });

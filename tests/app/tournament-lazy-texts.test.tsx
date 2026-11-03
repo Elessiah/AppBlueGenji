@@ -244,11 +244,14 @@ describe("useTournamentViewText", () => {
   });
 });
 
+const EN_SHARED = EN.tournamentsShared;
+const FR_SHARED = FR.tournamentsShared;
+
 describe("TournamentSheetTextGate", () => {
   function Loading() {
     return <b>{useTournamentPageText().t("loading")}</b>;
   }
-  const english: TournamentSheetEnglish = { page: EN_SHEET, actions: tournamentActionsMessages(EN) };
+  const english: TournamentSheetEnglish = { page: EN_SHEET, actions: tournamentActionsMessages(EN), shared: tournamentsSharedMessages(EN) };
 
   it("TournamentSheetTextGate_french_rendersChildrenFrench", () => {
     const html = renderToStaticMarkup(
@@ -266,6 +269,20 @@ describe("TournamentSheetTextGate", () => {
       </TournamentSheetTextGate>,
     );
     expect(html).toContain("Loading the tournament…");
+  });
+
+  it("TournamentSheetTextGate_englishProvided_sharesTournamentsTextWithTheList", () => {
+    function Shared() {
+      return <b>{useTournamentsText().t("rulesHelp.index")}</b>;
+    }
+    const render = (locale: "fr" | "en") =>
+      renderToStaticMarkup(
+        <TournamentSheetTextGate locale={locale} messages={locale === "en" ? english : undefined}>
+          <Shared />
+        </TournamentSheetTextGate>,
+      );
+    expect(render("en")).toContain(EN_SHARED.rulesHelp.index);
+    expect(render("fr")).toContain(FR_SHARED.rulesHelp.index);
   });
 
   it("TournamentSheetTextGate_englishNotProvided_rendersFallback", () => {
@@ -302,7 +319,7 @@ describe("TournamentsTextProvider — espaces communs de la mise en page", () =>
         <Probe />
       </TournamentsTextProvider>,
     );
-    expect(html).toContain(`${EN.tournaments.rulesHelp.index}|${FR.tournaments.list.searchLabel}`);
+    expect(html).toContain(`${EN.tournamentsShared.rulesHelp.index}|${FR.tournaments.list.searchLabel}`);
   });
 
   it("TournamentsTextProvider_noMessages_returnsFrenchText", () => {
@@ -311,7 +328,7 @@ describe("TournamentsTextProvider — espaces communs de la mise en page", () =>
         <Probe />
       </TournamentsTextProvider>,
     );
-    expect(html).toContain(`${FR.tournaments.rulesHelp.index}|${FR.tournaments.list.searchLabel}`);
+    expect(html).toContain(`${FR.tournamentsShared.rulesHelp.index}|${FR.tournaments.list.searchLabel}`);
   });
 });
 
