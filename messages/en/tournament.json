@@ -1,7 +1,4 @@
 {
-  "meta": {
-    "fallbackTitle": "Tournament"
-  },
   "participants": {
     "soloBadge": "Solo",
     "TEAM": {
@@ -336,90 +333,6 @@
     "titleOff": "Match scheduling",
     "descriptionOn": "Each match waits for a referee or an admin to set its date (“To schedule”), then stays “Waiting to start” until that time, when it moves to launch.",
     "descriptionOff": "Off: a match without a date moves to launch as soon as both its entrants are known."
-  },
-  "settings": {
-    "groups": {
-      "tournament": "Tournament",
-      "conditions": "Registration requirements"
-    },
-    "yes": "Yes",
-    "no": "No",
-    "none": "None",
-    "drawAllowed": "{label} · draws allowed",
-    "seeding": {
-      "MANUAL": "Set by the referees",
-      "RANKING": "Site ranking",
-      "REGISTRATION": "Registration order"
-    },
-    "requirement": {
-      "NONE": "No player",
-      "ANY_PLAYER": "At least one player",
-      "ALL_PLAYERS": "Every player"
-    },
-    "general": {
-      "game": "Game",
-      "mode": "Mode",
-      "participants": "Participants",
-      "participantsSolo": "Players (solo tournament)",
-      "participantsTeam": "Teams",
-      "maxTeam": "{count, plural, one {# team} other {# teams}}",
-      "maxSolo": "{count, plural, one {# player} other {# players}}",
-      "maxLabel": "Maximum entrants",
-      "matchFormat": "Match format",
-      "seeding": "Starting order",
-      "launchPhase": "Match launch phase",
-      "teamVoice": "Team voice channels"
-    },
-    "conditions": {
-      "minRoster": "Minimum roster size",
-      "minRosterValue": "{count, plural, one {# player} other {# players}}",
-      "discord": "Verified Discord tag",
-      "blizzard": "Linked Battle.net account"
-    },
-    "mode": {
-      "thirdPlace": "Third-place match",
-      "roundsBeforeFirstCut": "Rounds before the first cut",
-      "roundsPerCut": "Rounds between two cuts",
-      "swissRounds": "Number of rounds",
-      "swissRoundsAtLaunch": "Set at launch",
-      "scoring": "Scoring",
-      "swissScoring": "Win {win} · draw {draw} · loss {loss} · bye {bye}",
-      "startPoints": "Starting pool",
-      "startPointsValue": "{count, plural, one {# point} other {# points}}",
-      "enduranceScoring": "+{win} per map won · −{loss} per map lost",
-      "playoffSize": "Qualified for the playoffs",
-      "maxRounds": "Cap on qualifying rounds",
-      "earlyExit": "Early “out of contention” exit",
-      "playoffFormat": "Playoff format",
-      "phase": "Stage {position}",
-      "phaseNamed": "Stage {position} — {name}",
-      "phaseChampion": "Decides the champion",
-      "phasePercent": "{value}% qualify",
-      "phaseCount": "{count, plural, one {# qualifies} other {# qualify}}",
-      "phaseSwissRounds": "{count, plural, one {# round} other {# rounds}}",
-      "phaseFirstCut": "first cut after {count, plural, one {# round} other {# rounds}}",
-      "phaseEveryRound": "then every round",
-      "phaseEveryN": "then every {count} rounds",
-      "phaseThirdPlace": "third-place match"
-    }
-  },
-  "share": {
-    "states": {
-      "UPCOMING": "Upcoming",
-      "REGISTRATION": "Registration open",
-      "RUNNING": "Tournament in progress",
-      "FINISHED": "Tournament finished"
-    },
-    "engagedTeam": "{registered}/{max} teams entered",
-    "engagedSolo": "{registered}/{max} players entered",
-    "schedule": {
-      "FINISHED": "Played on {date}",
-      "RUNNING": "In progress since {date}",
-      "REGISTRATION": "Registration until {date}",
-      "OPENS": "Registration opens on {date}",
-      "KICKOFF": "Kickoff on {date}"
-    },
-    "date": "{day} at {hour}"
   },
   "matchPage": {
     "backToTournament": "Back to the tournament",

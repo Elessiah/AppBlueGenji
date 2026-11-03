@@ -26,6 +26,8 @@ import type { LiveFailure } from "../_lib/live-state";
 import { useMapError, useMapParticipantError } from "../_lib/error-map";
 import { focusRowAfterChange } from "./ForfeitRowAction";
 import { advanceSuccessText, rollbackStageText, useActionsText } from "../_lib/actions-text";
+import { withDialogsText } from "../_lib/dialogs-text";
+import { ENGLISH_ENDURANCE, ENGLISH_VIEWS, withViewText } from "../_lib/view-loaders";
 import { registrationConfirmText } from "../_lib/registration-confirm";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import { MatchFormatProvider } from "../_lib/match-format-context";
@@ -75,30 +77,30 @@ import { buildSeedMap } from "@/lib/shared/match-sections";
 // premier instantané du flux, un rendu serveur n'aurait rien à y mettre.
 // `orReload` : un fichier disparu (déploiement survenu depuis l'ouverture)
 // recharge la page au lieu de la faire tomber.
-const SurvivalView = dynamic(() => orReload(import("./SurvivalView").then((m) => m.SurvivalView)), { ssr: false });
-const SurvivalRounds = dynamic(() => orReload(import("./SurvivalView").then((m) => m.SurvivalRounds)), { ssr: false });
-const SwissView = dynamic(() => orReload(import("./SwissView").then((m) => m.SwissView)), { ssr: false });
-const SwissRounds = dynamic(() => orReload(import("./SwissView").then((m) => m.SwissRounds)), { ssr: false });
-const EnduranceView = dynamic(() => orReload(import("./EnduranceView").then((m) => m.EnduranceView)), { ssr: false });
+const SurvivalView = dynamic(() => orReload(withViewText(import("./SurvivalView").then((m) => m.SurvivalView), ENGLISH_VIEWS)), { ssr: false });
+const SurvivalRounds = dynamic(() => orReload(withViewText(import("./SurvivalView").then((m) => m.SurvivalRounds), ENGLISH_VIEWS)), { ssr: false });
+const SwissView = dynamic(() => orReload(withViewText(import("./SwissView").then((m) => m.SwissView), ENGLISH_VIEWS)), { ssr: false });
+const SwissRounds = dynamic(() => orReload(withViewText(import("./SwissView").then((m) => m.SwissRounds), ENGLISH_VIEWS)), { ssr: false });
+const EnduranceView = dynamic(() => orReload(withViewText(import("./EnduranceView").then((m) => m.EnduranceView), ENGLISH_ENDURANCE)), { ssr: false });
 const BracketPreview = dynamic(() => orReload(import("./BracketPreview").then((m) => m.BracketPreview)), { ssr: false });
 const PhaseStandingsBlock = dynamic(() => orReload(import("./PhaseStandingsBlock").then((m) => m.PhaseStandingsBlock)), { ssr: false });
-const EntrantContactsPanel = dynamic(() => orReload(import("./EntrantContactsPanel").then((m) => m.EntrantContactsPanel)), { ssr: false });
-const AdminScoreDialog = dynamic(() => orReload(import("./AdminScoreDialog").then((m) => m.AdminScoreDialog)), { ssr: false });
-const PlayerScoreDialog = dynamic(() => orReload(import("./PlayerScoreDialog").then((m) => m.PlayerScoreDialog)), { ssr: false });
-const GhostRegistrationDialog = dynamic(() => orReload(import("./GhostRegistrationDialog").then((m) => m.GhostRegistrationDialog)), { ssr: false });
-const MatchLiveDialog = dynamic(() => orReload(import("./MatchLiveDialog").then((m) => m.MatchLiveDialog)), { ssr: false });
-const MatchScheduleDialog = dynamic(() => orReload(import("./MatchScheduleDialog").then((m) => m.MatchScheduleDialog)), { ssr: false });
-const MatchReplayDialog = dynamic(() => orReload(import("./MatchReplayDialog").then((m) => m.MatchReplayDialog)), { ssr: false });
-const IssueReportDialog = dynamic(() => orReload(import("./IssueReportDialog").then((m) => m.IssueReportDialog)), { ssr: false });
-const DeleteTournamentDialog = dynamic(() => orReload(import("./DeleteTournamentDialog").then((m) => m.DeleteTournamentDialog)), { ssr: false });
-const RollbackRoundDialog = dynamic(() => orReload(import("./RollbackRoundDialog").then((m) => m.RollbackRoundDialog)), { ssr: false });
-const EndurancePenaltyDialog = dynamic(() => orReload(import("./EndurancePenaltyDialog").then((m) => m.EndurancePenaltyDialog)), { ssr: false });
+const EntrantContactsPanel = dynamic(() => orReload(withDialogsText(import("./EntrantContactsPanel").then((m) => m.EntrantContactsPanel))), { ssr: false });
+const AdminScoreDialog = dynamic(() => orReload(withDialogsText(import("./AdminScoreDialog").then((m) => m.AdminScoreDialog))), { ssr: false });
+const PlayerScoreDialog = dynamic(() => orReload(withDialogsText(import("./PlayerScoreDialog").then((m) => m.PlayerScoreDialog))), { ssr: false });
+const GhostRegistrationDialog = dynamic(() => orReload(withDialogsText(import("./GhostRegistrationDialog").then((m) => m.GhostRegistrationDialog))), { ssr: false });
+const MatchLiveDialog = dynamic(() => orReload(withDialogsText(import("./MatchLiveDialog").then((m) => m.MatchLiveDialog))), { ssr: false });
+const MatchScheduleDialog = dynamic(() => orReload(withDialogsText(import("./MatchScheduleDialog").then((m) => m.MatchScheduleDialog))), { ssr: false });
+const MatchReplayDialog = dynamic(() => orReload(withDialogsText(import("./MatchReplayDialog").then((m) => m.MatchReplayDialog))), { ssr: false });
+const IssueReportDialog = dynamic(() => orReload(withDialogsText(import("./IssueReportDialog").then((m) => m.IssueReportDialog))), { ssr: false });
+const DeleteTournamentDialog = dynamic(() => orReload(withDialogsText(import("./DeleteTournamentDialog").then((m) => m.DeleteTournamentDialog))), { ssr: false });
+const RollbackRoundDialog = dynamic(() => orReload(withDialogsText(import("./RollbackRoundDialog").then((m) => m.RollbackRoundDialog))), { ssr: false });
+const EndurancePenaltyDialog = dynamic(() => orReload(withDialogsText(import("./EndurancePenaltyDialog").then((m) => m.EndurancePenaltyDialog))), { ssr: false });
 // Ouverte d'office : sa place est tenue pendant le chargement (`anotherModalOpen`),
 // et cédée à une modale urgente (`data-modal-yields`).
-const CertificationPromptDialog = dynamic(() => orReload(import("./CertificationPromptDialog").then((m) => m.CertificationPromptDialog)), { ssr: false, loading: () => <span data-modal-pending data-modal-yields hidden /> });
+const CertificationPromptDialog = dynamic(() => orReload(withDialogsText(import("./CertificationPromptDialog").then((m) => m.CertificationPromptDialog))), { ssr: false, loading: () => <span data-modal-pending data-modal-yields hidden /> });
 const RoundMapsPanel = dynamic(() => orReload(import("./MatchRoundMaps").then((m) => m.RoundMapsPanel)), { ssr: false });
-const AdvanceTournamentDialog = dynamic(() => orReload(import("./AdvanceTournamentDialog").then((m) => m.AdvanceTournamentDialog)), { ssr: false });
-const TournamentImageDialog = dynamic(() => orReload(import("./TournamentImageDialog").then((m) => m.TournamentImageDialog)), { ssr: false });
+const AdvanceTournamentDialog = dynamic(() => orReload(withDialogsText(import("./AdvanceTournamentDialog").then((m) => m.AdvanceTournamentDialog))), { ssr: false });
+const TournamentImageDialog = dynamic(() => orReload(withDialogsText(import("./TournamentImageDialog").then((m) => m.TournamentImageDialog))), { ssr: false });
 const ConfirmActionDialog = dynamic(() => orReload(import("@/components/ui/confirm-action-dialog").then((m) => m.ConfirmActionDialog)), { ssr: false });
 // Page d'un match (`MATCH_PAGE.md`) : son propre fichier, jamais chargé par la fiche.
 const MatchPage = dynamic(() => orReload(import("./MatchPage").then((m) => m.MatchPage)), { ssr: false });

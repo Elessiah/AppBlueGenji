@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 
 import { forfeitParties } from "@/app/(secured)/tournois/[id]/_lib/score-form";
-import { FR_DIALOGS_TEXT, adminProposalText } from "@/app/(secured)/tournois/[id]/_lib/dialogs-text";
+import { adminProposalText } from "@/app/(secured)/tournois/[id]/_lib/dialogs-text";
+import { FR_DIALOGS_TEXT } from "@/tests/helpers/lazy-tournament-texts";
 
 const adminProposalNotice = (...args: Parameters<typeof adminProposalText> extends [unknown, ...infer Rest] ? Rest : never) =>
   adminProposalText(FR_DIALOGS_TEXT, ...args);

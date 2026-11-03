@@ -76,7 +76,7 @@ export async function tournamentPageMetadata(
   // carte générique de `/tournois` (mise en page parente), dont le texte ne
   // correspond pas à l'image du site que `opengraph-image.tsx` dessine ici.
   const fallback: Metadata = {
-    title: messages.tournament.meta.fallbackTitle,
+    title: messages.tournamentServer.meta.fallbackTitle,
     description: SITE_DESCRIPTION,
     openGraph: { type: "website", siteName: SITE_NAME, locale: OPEN_GRAPH_LOCALE[locale], title: SITE_NAME, description: SITE_DESCRIPTION },
     twitter: { card: "summary_large_image", title: SITE_NAME, description: SITE_DESCRIPTION },

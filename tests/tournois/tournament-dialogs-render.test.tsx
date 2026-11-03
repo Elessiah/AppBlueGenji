@@ -49,6 +49,7 @@ import { MatchLiveDialog } from "@/app/(secured)/tournois/[id]/_components/Match
 import { RollbackRoundDialog } from "@/app/(secured)/tournois/[id]/_components/RollbackRoundDialog";
 import { bracketMatch } from "../helpers/bracket-match";
 import { tournamentCard } from "../helpers/tournament-card";
+import "@/tests/helpers/lazy-tournament-texts";
 
 const globalWithDocument = globalThis as { document?: unknown };
 const hadDocument = "document" in globalWithDocument;

@@ -10,7 +10,8 @@ import {
   type ScoreFormState,
 } from "@/app/(secured)/tournois/[id]/_lib/score-form";
 import type { BracketMatch } from "@/lib/shared/types";
-import { FR_DIALOGS_TEXT, scoreBlockerText } from "@/app/(secured)/tournois/[id]/_lib/dialogs-text";
+import { scoreBlockerText } from "@/app/(secured)/tournois/[id]/_lib/dialogs-text";
+import { FR_DIALOGS_TEXT } from "@/tests/helpers/lazy-tournament-texts";
 import type { MatchFormat } from "@/lib/shared/match-format";
 import { emptyMap } from "@/lib/shared/match-maps";
 import { mapsFor } from "../helpers/match-maps";

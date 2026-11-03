@@ -1,7 +1,13 @@
 import { describe, expect, it } from "@jest/globals";
 import { readSource } from "../helpers/read-source";
-import frViews from "@/messages/fr/tournamentViews.json";
-import enViews from "@/messages/en/tournamentViews.json";
+import frEndurance from "@/messages/fr/tournamentEndurance.json";
+import enEndurance from "@/messages/en/tournamentEndurance.json";
+import frChart from "@/messages/fr/tournamentEnduranceChart.json";
+import enChart from "@/messages/en/tournamentEnduranceChart.json";
+
+/** L'espace `endurance` entier : la vue et son graphique (EF-17 : deux fichiers, un morceau chacun). */
+const frViews = { endurance: { ...frEndurance.endurance, ...frChart.endurance } };
+const enViews = { endurance: { ...enEndurance.endurance, ...enChart.endurance } };
 
 /**
  * Câblage du graphique « Évolution de l'endurance »
@@ -27,7 +33,9 @@ describe("volet et chargement", () => {
   });
 
   it("le graphique est chargé à la demande, rendu seulement volet ouvert", () => {
-    expect(PANEL).toMatch(/dynamic\(\s*\(\) => orReload\(import\("\.\/EnduranceChart"\)/);
+    expect(PANEL).toMatch(/dynamic\(\s*\(\) => orReload\(withViewText\(import\("\.\/EnduranceChart"\)/);
+    // Son anglais part avec son morceau, volet ouvert seulement (EF-17).
+    expect(PANEL).toContain("ENGLISH_ENDURANCE_CHART))");
     expect(PANEL).not.toMatch(/import \{[^}]*EnduranceChart\b[^}]*\} from "\.\/EnduranceChart"/);
     // BoardPanel ne rend ses enfants qu'ouvert : le graphique se monte au dépliage.
     expect(readSource(`${DIR}/BoardPanel.tsx`)).toContain("{open && (");

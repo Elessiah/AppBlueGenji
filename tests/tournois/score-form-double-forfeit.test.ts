@@ -6,7 +6,8 @@ import {
   scoreFormStateFor,
   storedResultSignature,
 } from "@/app/(secured)/tournois/[id]/_lib/score-form";
-import { FR_DIALOGS_TEXT, scoreBlockerText } from "@/app/(secured)/tournois/[id]/_lib/dialogs-text";
+import { scoreBlockerText } from "@/app/(secured)/tournois/[id]/_lib/dialogs-text";
+import { FR_DIALOGS_TEXT } from "@/tests/helpers/lazy-tournament-texts";
 import { mapError } from "@/app/(secured)/tournois/[id]/_lib/error-map";
 import { formatMatchResultLog } from "@/lib/shared/bot-logs";
 import type { BracketMatch } from "@/lib/shared/types";

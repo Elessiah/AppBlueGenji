@@ -21,7 +21,7 @@ import type { TournamentPhase } from "./types";
 import type { Messages } from "./i18n-messages";
 import { earlyExitApplies } from "./bg-survie/config";
 
-type SettingsMessages = Pick<Messages["tournament"], "settings" | "matchFormat">;
+type SettingsMessages = Pick<Messages["tournamentServer"], "settings"> & Pick<Messages["tournament"], "matchFormat">;
 type SettingsText = ScopedText<Leaves<SettingsMessages>>;
 type LabelMessages = Messages["labels"];
 
@@ -156,7 +156,7 @@ function modeSettings(text: SettingsText, labels: LabelMessages, input: Tourname
 export function localizedTournamentSettingsGroups(
   input: TournamentSettingsInput,
   locale: Locale,
-  messages: Pick<Messages, "tournament" | "labels">,
+  messages: Pick<Messages, "tournament" | "tournamentServer" | "labels">,
 ): TournamentSettingsGroup[] {
   if (locale === "fr") return tournamentSettingsGroups(input);
   return settingsGroupsFrom(input, locale, messages);
@@ -166,9 +166,9 @@ export function localizedTournamentSettingsGroups(
 export function settingsGroupsFrom(
   input: TournamentSettingsInput,
   locale: Locale,
-  messages: Pick<Messages, "tournament" | "labels">,
+  messages: Pick<Messages, "tournament" | "tournamentServer" | "labels">,
 ): TournamentSettingsGroup[] {
-  const text: SettingsText = scopedText(locale, { settings: messages.tournament.settings, matchFormat: messages.tournament.matchFormat });
+  const text: SettingsText = scopedText(locale, { settings: messages.tournamentServer.settings, matchFormat: messages.tournament.matchFormat });
   const { card } = input;
   const { labels } = messages;
   const solo = card.participantType === "SOLO";

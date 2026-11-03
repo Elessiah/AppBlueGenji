@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Ticker } from "@/components/cyber";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { LandingTextProvider } from "@/components/i18n/landing-text";
 import { landingClientMessages } from "@/lib/shared/landing-text";
@@ -7,6 +6,7 @@ import { AboutSection } from "@/components/cyber/landing/AboutSection";
 import { SiteCopyEditorProvider } from "@/components/cyber/landing/EditableCopy";
 import { Hero } from "@/components/cyber/landing/Hero";
 import { JoinCTA } from "@/components/cyber/landing/JoinCTA";
+import { LandingTicker } from "@/components/cyber/landing/LandingTicker";
 import { LeaderCal } from "@/components/cyber/landing/LeaderCal";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { Reveal } from "@/components/cyber/landing/Reveal";
@@ -122,7 +122,7 @@ export default async function HomePage() {
         {/* L'éditeur bilingue ne reçoit ses textes que pour le staff `showcase`. */}
         <SiteCopyEditorProvider entries={isAdmin ? copyBundle.editor : null}>
           <Hero stats={stats} live={live} nextUpcoming={featured} copy={copy} canEditCopy={isAdmin} spectator={!user} />
-          <Ticker items={ticker.items} />
+          <LandingTicker items={ticker.items} />
           {/* Apparition au défilement, une fois : sans JavaScript, tout est visible. */}
           <Reveal>
             <TournamentBoard buckets={buckets} featured={featured} miniBracket={miniBracket} locale={locale} spectator={!user} />

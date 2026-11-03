@@ -3,6 +3,7 @@ import {
   ACCOUNT_SUSPENDED,
   SUSPENSION_DURATION_PRESETS,
   SUSPENSION_GROUNDS,
+  SUSPENSION_GROUND_CLAUSES_EN,
   SUSPENSION_GROUND_DEFINITIONS,
   SUSPENSION_MAX_DAYS,
   SUSPENSION_REASON_MAX_LENGTH,
@@ -276,5 +277,30 @@ describe("cleanModerationReason et messages d'erreur", () => {
     const message = suspensionErrorMessage(code);
     expect(message).not.toContain(code);
     expect(message).not.toBe(suspensionErrorMessage("INCONNU"));
+  });
+});
+
+describe("titres anglais des clauses (EF-17 : table à part, hors paquets client)", () => {
+  const input = (ground: "BEHAVIOR" | "CONTENT" | "ACCOUNT") => ({
+    id: 3,
+    reason: "Propos insultants répétés en partie classée.",
+    ground,
+    endsAt: null,
+    termsUrl: "https://site.test/conditions-utilisation#comportement",
+  });
+
+  it("formatSuspensionNotice_englishLocale_quotesEnglishClauseTitle", () => {
+    expect(formatSuspensionNotice(input("BEHAVIOR"), "en")).toContain("terms of use, “Conduct”");
+    expect(formatSuspensionNotice(input("CONTENT"), "en")).toContain("terms of use, “Content published by users”");
+    expect(formatSuspensionNotice(input("ACCOUNT"), "en")).toContain("terms of use, “Account”");
+  });
+
+  it("formatSuspensionNotice_frenchLocale_keepsFrenchClause", () => {
+    expect(formatSuspensionNotice(input("CONTENT"))).toContain("« Contenus publiés par les utilisateurs »");
+  });
+
+  it("SUSPENSION_GROUND_DEFINITIONS_noEnglishField_clauseEnAbsent", () => {
+    for (const ground of SUSPENSION_GROUNDS) expect(SUSPENSION_GROUND_DEFINITIONS[ground]).not.toHaveProperty("clauseEn");
+    expect(Object.keys(SUSPENSION_GROUND_CLAUSES_EN).sort()).toEqual([...SUSPENSION_GROUNDS].sort());
   });
 });

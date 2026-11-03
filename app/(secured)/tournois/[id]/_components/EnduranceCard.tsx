@@ -4,7 +4,8 @@ import type { BracketMatch, EnduranceMeta } from "@/lib/shared/types";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import { useClock } from "@/lib/shared/hooks/useClock";
 import { formatMatchStartAt, formatMatchStartAtFull } from "@/lib/shared/match-schedule";
-import { FR_VIEWS_TEXT } from "../_lib/views-text";
+import { FR_ENDURANCE_TEXT } from "../_lib/endurance-text";
+import { ENGLISH_ENDURANCE } from "../_lib/view-loaders";
 import { useEntrantParticipantType } from "../_lib/entrant-link";
 import {
   enduranceCurrentRound,
@@ -32,7 +33,7 @@ export function EnduranceCard({
   matches,
   isFinished,
 }: Readonly<{ endurance: EnduranceMeta; matches: BracketMatch[]; isFinished: boolean }>) {
-  const text = useTournamentViewText(FR_VIEWS_TEXT);
+  const text = useTournamentViewText(FR_ENDURANCE_TEXT, ENGLISH_ENDURANCE);
   const { t } = text;
   const participantType = useEntrantParticipantType();
   const solo = participantType === "SOLO";

@@ -19,6 +19,7 @@ import {
 import styles from "./RankingViews.module.css";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import { FR_VIEWS_TEXT } from "../_lib/views-text";
+import { ENGLISH_VIEWS } from "../_lib/view-loaders";
 import type { TournamentPageText } from "@/lib/shared/tournament-page-text";
 import { useActionsText } from "../_lib/actions-text";
 import { useEntrantParticipantType } from "../_lib/entrant-link";
@@ -85,7 +86,7 @@ export function SwissView({
   onCancelForfeit,
   emptyLabel,
 }: Readonly<SwissViewProps>) {
-  const text = useTournamentViewText(FR_VIEWS_TEXT);
+  const text = useTournamentViewText(FR_VIEWS_TEXT, ENGLISH_VIEWS);
   const { t } = text;
   // Textes de l'abandon (espace `tournamentActions`).
   const { t: a } = useActionsText();
@@ -421,7 +422,7 @@ export function SwissRounds({
   onOpenAdminModal,
   emptyLabel,
 }: Readonly<SwissRoundsProps>) {
-  const { t } = useTournamentViewText(FR_VIEWS_TEXT);
+  const { t } = useTournamentViewText(FR_VIEWS_TEXT, ENGLISH_VIEWS);
   return (
     <RoundColumns
       matches={matches}

@@ -7,14 +7,15 @@ import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import { orReload } from "@/lib/shared/lazy-component";
 import { ACCENT } from "../_lib/bracket-sections";
 import { useEnduranceChartAnimate } from "../_lib/use-endurance-chart-animate";
-import { FR_VIEWS_TEXT } from "../_lib/views-text";
+import { FR_ENDURANCE_TEXT } from "../_lib/endurance-text";
+import { ENGLISH_ENDURANCE, ENGLISH_ENDURANCE_CHART, withViewText } from "../_lib/view-loaders";
 import { BoardPanel, PanelPill } from "./BoardPanel";
 
 // Le graphique est chargé au premier dépliage : replié (l'état de chaque
 // chargement de page), le volet ne coûte que son en-tête — ni le module du
 // graphique, ni son calcul, ni son SVG. `orReload` : un fichier disparu depuis
 // un déploiement recharge la page au lieu de la faire tomber.
-const EnduranceChart = dynamic(() => orReload(import("./EnduranceChart").then((m) => m.EnduranceChart)), {
+const EnduranceChart = dynamic(() => orReload(withViewText(import("./EnduranceChart").then((m) => m.EnduranceChart), ENGLISH_ENDURANCE_CHART)), {
   ssr: false,
 });
 
@@ -27,7 +28,7 @@ export function EnduranceChartPanel({
   endurance,
   matches,
 }: Readonly<{ endurance: EnduranceMeta; matches: BracketMatch[] }>) {
-  const { t } = useTournamentViewText(FR_VIEWS_TEXT);
+  const { t } = useTournamentViewText(FR_ENDURANCE_TEXT, ENGLISH_ENDURANCE);
   const [open, setOpen] = useState(false);
   const panelId = useId();
   // « graphique animé » ne se dit que si la courbe s'anime vraiment.

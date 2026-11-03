@@ -40,10 +40,18 @@ import enLegal from "@/messages/en/legal.json";
 import frLegal from "@/messages/fr/legal.json";
 import enTournaments from "@/messages/en/tournaments.json";
 import frTournaments from "@/messages/fr/tournaments.json";
+import enTournamentsShared from "@/messages/en/tournamentsShared.json";
+import frTournamentsShared from "@/messages/fr/tournamentsShared.json";
 import enTournament from "@/messages/en/tournament.json";
 import frTournament from "@/messages/fr/tournament.json";
+import enTournamentServer from "@/messages/en/tournamentServer.json";
+import frTournamentServer from "@/messages/fr/tournamentServer.json";
 import enTournamentViews from "@/messages/en/tournamentViews.json";
 import frTournamentViews from "@/messages/fr/tournamentViews.json";
+import enTournamentEndurance from "@/messages/en/tournamentEndurance.json";
+import frTournamentEndurance from "@/messages/fr/tournamentEndurance.json";
+import enTournamentEnduranceChart from "@/messages/en/tournamentEnduranceChart.json";
+import frTournamentEnduranceChart from "@/messages/fr/tournamentEnduranceChart.json";
 import enTournamentErrors from "@/messages/en/tournamentErrors.json";
 import frTournamentErrors from "@/messages/fr/tournamentErrors.json";
 import enTournamentActions from "@/messages/en/tournamentActions.json";
@@ -86,8 +94,8 @@ import type { Locale } from "@/lib/shared/locales";
 import type { Messages } from "@/lib/shared/i18n-messages";
 
 const CATALOG: Readonly<Record<Locale, Messages>> = {
-  fr: { common: frCommon, landing: frLanding, shell: frShell, rules: frRules, ranking: frRanking, stats: frStats, labels: frLabels, share: frShare, login: frLogin, bot: frBot, association: frAssociation, volunteers: frVolunteers, recruitment: frRecruitment, legal: frLegal, tournaments: frTournaments, tournament: frTournament, tournamentViews: frTournamentViews, tournamentErrors: frTournamentErrors, tournamentActions: frTournamentActions, tournamentDialogs: frTournamentDialogs, tournamentImage: frTournamentImage, tournamentForm: frTournamentForm, launchModal: frLaunchModal, certifyPrompt: frCertifyPrompt, teams: frTeams, team: frTeam, teamErrors: frTeamErrors, teamRoles: frTeamRoles, players: frPlayers, profile: frProfile, reports: frReports, imageCrop: frImageCrop, push: frPush, pushMessages: frPushMessages, roundMaps: frRoundMaps, matchPage: frMatchPage },
-  en: { common: enCommon, landing: enLanding, shell: enShell, rules: enRules, ranking: enRanking, stats: enStats, labels: enLabels, share: enShare, login: enLogin, bot: enBot, association: enAssociation, volunteers: enVolunteers, recruitment: enRecruitment, legal: enLegal, tournaments: enTournaments, tournament: enTournament, tournamentViews: enTournamentViews, tournamentErrors: enTournamentErrors, tournamentActions: enTournamentActions, tournamentDialogs: enTournamentDialogs, tournamentImage: enTournamentImage, tournamentForm: enTournamentForm, launchModal: enLaunchModal, certifyPrompt: enCertifyPrompt, teams: enTeams, team: enTeam, teamErrors: enTeamErrors, teamRoles: enTeamRoles, players: enPlayers, profile: enProfile, reports: enReports, imageCrop: enImageCrop, push: enPush, pushMessages: enPushMessages, roundMaps: enRoundMaps, matchPage: enMatchPage },
+  fr: { common: frCommon, landing: frLanding, shell: frShell, rules: frRules, ranking: frRanking, stats: frStats, labels: frLabels, share: frShare, login: frLogin, bot: frBot, association: frAssociation, volunteers: frVolunteers, recruitment: frRecruitment, legal: frLegal, tournaments: frTournaments, tournamentsShared: frTournamentsShared, tournament: frTournament, tournamentServer: frTournamentServer, tournamentViews: frTournamentViews, tournamentEndurance: frTournamentEndurance, tournamentEnduranceChart: frTournamentEnduranceChart, tournamentErrors: frTournamentErrors, tournamentActions: frTournamentActions, tournamentDialogs: frTournamentDialogs, tournamentImage: frTournamentImage, tournamentForm: frTournamentForm, launchModal: frLaunchModal, certifyPrompt: frCertifyPrompt, teams: frTeams, team: frTeam, teamErrors: frTeamErrors, teamRoles: frTeamRoles, players: frPlayers, profile: frProfile, reports: frReports, imageCrop: frImageCrop, push: frPush, pushMessages: frPushMessages, roundMaps: frRoundMaps, matchPage: frMatchPage },
+  en: { common: enCommon, landing: enLanding, shell: enShell, rules: enRules, ranking: enRanking, stats: enStats, labels: enLabels, share: enShare, login: enLogin, bot: enBot, association: enAssociation, volunteers: enVolunteers, recruitment: enRecruitment, legal: enLegal, tournaments: enTournaments, tournamentsShared: enTournamentsShared, tournament: enTournament, tournamentServer: enTournamentServer, tournamentViews: enTournamentViews, tournamentEndurance: enTournamentEndurance, tournamentEnduranceChart: enTournamentEnduranceChart, tournamentErrors: enTournamentErrors, tournamentActions: enTournamentActions, tournamentDialogs: enTournamentDialogs, tournamentImage: enTournamentImage, tournamentForm: enTournamentForm, launchModal: enLaunchModal, certifyPrompt: enCertifyPrompt, teams: enTeams, team: enTeam, teamErrors: enTeamErrors, teamRoles: enTeamRoles, players: enPlayers, profile: enProfile, reports: enReports, imageCrop: enImageCrop, push: enPush, pushMessages: enPushMessages, roundMaps: enRoundMaps, matchPage: enMatchPage },
 };
 
 export function messagesFor(locale: Locale): Messages {

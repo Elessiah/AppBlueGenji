@@ -39,11 +39,34 @@ const LAZY = [
   "TournamentImageDialog",
 ] as const;
 
+/** Les fenêtres chargent leurs textes avec leur morceau (EF-17), les vues leur anglais. */
+const WITH_DIALOGS_TEXT = new Set<string>([
+  "EntrantContactsPanel",
+  "AdminScoreDialog",
+  "PlayerScoreDialog",
+  "GhostRegistrationDialog",
+  "MatchLiveDialog",
+  "MatchScheduleDialog",
+  "MatchReplayDialog",
+  "IssueReportDialog",
+  "DeleteTournamentDialog",
+  "RollbackRoundDialog",
+  "EndurancePenaltyDialog",
+  "AdvanceTournamentDialog",
+  "TournamentImageDialog",
+]);
+const WITH_VIEW_TEXT: Record<string, string> = { SurvivalView: "ENGLISH_VIEWS", SwissView: "ENGLISH_VIEWS", EnduranceView: "ENGLISH_ENDURANCE" };
+
+function lazyDeclaration(name: string): string {
+  const load = `import("./${name}").then((m) => m.${name})`;
+  if (WITH_DIALOGS_TEXT.has(name)) return `const ${name} = dynamic(() => orReload(withDialogsText(${load})), { ssr: false });`;
+  if (WITH_VIEW_TEXT[name]) return `const ${name} = dynamic(() => orReload(withViewText(${load}, ${WITH_VIEW_TEXT[name]})), { ssr: false });`;
+  return `const ${name} = dynamic(() => orReload(${load}), { ssr: false });`;
+}
+
 describe("paquet de la fiche tournoi", () => {
   it.each(LAZY.map((name) => [name]))("%s est chargé à la demande", (name) => {
-    expect(page).toContain(
-      `const ${name} = dynamic(() => orReload(import("./${name}").then((m) => m.${name})), { ssr: false });`,
-    );
+    expect(page).toContain(lazyDeclaration(name));
     expect(page).not.toMatch(new RegExp(`^import[^;]*\\b${name}\\b[^;]*from`, "m"));
     expect(page).toContain(`<${name}`);
   });
