@@ -49,6 +49,11 @@ function inSuspense(children: ReactNode): string {
 }
 
 /** Ce que lance `fn` (une attente de `Suspense`). */
+/** Un fichier manquant (déploiement, réseau) — le seul échec qu'un rechargement répare. */
+function chunkError(): Error {
+  return Object.assign(new Error("Loading chunk 412 failed."), { name: "ChunkLoadError" });
+}
+
 function thrownBy(fn: () => unknown): unknown {
   try {
     fn();
@@ -88,7 +93,7 @@ describe("suspendOn", () => {
   it("suspendOn_loaderRejects_schedulesReloadAndWaitsWithoutNewRequest", async () => {
     jest.useFakeTimers();
     try {
-      const loader = { load: jest.fn(async () => Promise.reject(new Error("ChunkLoadError"))) };
+      const loader = { load: jest.fn(async () => Promise.reject(chunkError())) };
       const first = thrownBy(() => suspendOn(loader));
       await jest.advanceTimersByTimeAsync(0);
       expect(reloadAfterChunkError).toHaveBeenCalledTimes(1);
@@ -107,7 +112,7 @@ describe("suspendOn", () => {
     try {
       jest.mocked(reloadAfterChunkError).mockClear();
       // `onceLoader` partage une seule promesse : chaque rendu suspendu reçoit le même rejet.
-      const shared = Promise.reject(new Error("ChunkLoadError"));
+      const shared = Promise.reject(chunkError());
       const loader = { load: jest.fn(() => shared) };
       const waits = [thrownBy(() => suspendOn(loader)), thrownBy(() => suspendOn(loader)), thrownBy(() => suspendOn(loader))];
       await jest.advanceTimersByTimeAsync(0);
@@ -123,7 +128,7 @@ describe("suspendOn", () => {
   it("suspendOn_reloadDidNotHappen_retriesLoadAfterDelay", async () => {
     jest.useFakeTimers();
     try {
-      const loader = { load: jest.fn<() => Promise<string>>().mockRejectedValueOnce(new Error("ChunkLoadError")).mockResolvedValue("ok") };
+      const loader = { load: jest.fn<() => Promise<string>>().mockRejectedValueOnce(chunkError()).mockResolvedValue("ok") };
       thrownBy(() => suspendOn(loader));
       await jest.advanceTimersByTimeAsync(SUSPEND_RETRY_MS);
       // Le rechargement n'a pas eu lieu : le rendu suivant relance le chargement, qui réussit.
@@ -132,6 +137,28 @@ describe("suspendOn", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+  it("suspendOn_loaderRejectsWithNonChunkError_noReloadNoTimer", async () => {
+    jest.useFakeTimers();
+    try {
+      jest.mocked(reloadAfterChunkError).mockClear();
+      const loader = { load: jest.fn(async () => Promise.reject(new TypeError("boom"))) };
+      const thrown = thrownBy(() => suspendOn(loader));
+      await expect(thrown).resolves.toBeUndefined();
+      expect(reloadAfterChunkError).not.toHaveBeenCalled();
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("suspendOn_afterNonChunkError_nextRenderThrowsTheErrorWithoutNewRequest", async () => {
+    const bug = new TypeError("boom");
+    const loader = { load: jest.fn(async () => Promise.reject(bug)) };
+    await thrownBy(() => suspendOn(loader));
+    // Un bogue remonte à la limite d'erreur : ni attente, ni nouvelle requête.
+    expect(thrownBy(() => suspendOn(loader))).toBe(bug);
+    expect(loader.load).toHaveBeenCalledTimes(1);
   });
 });
 
