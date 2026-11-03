@@ -77,8 +77,22 @@ export function isContentionMessage(message: unknown): boolean {
 }
 
 /** Codes mysql2 et numéros MariaDB d'une contention passagère. */
-const CONTENTION_CODES = new Set(["ER_LOCK_DEADLOCK", "ER_CHECKREAD", "ER_LOCK_WAIT_TIMEOUT"]);
-const CONTENTION_ERRNOS = new Set([1213, 1020, 1205]);
+/**
+ * MariaDB (11.6.2 et plus, `innodb_snapshot_isolation`) refuse d'écrire une
+ * ligne changée depuis l'image lue par la transaction : `ER_CHECKREAD` (1020).
+ * Rejouer la transaction entière relit l'état récent — même remède qu'un
+ * interblocage (`retryOnDeadlock`).
+ */
+export function isSnapshotConflict(error: unknown): boolean {
+  return errorCode(error) === "ER_CHECKREAD" || errorNumber(error) === 1020;
+}
+
+/** Numéro d'erreur du serveur, quand l'objet en porte un. */
+function errorNumber(error: unknown): number | null {
+  if (typeof error !== "object" || error === null) return null;
+  const errno = (error as { errno?: unknown }).errno;
+  return typeof errno === "number" ? errno : null;
+}
 
 /**
  * `true` si l'erreur est une contention passagère — interblocage,
@@ -88,10 +102,9 @@ const CONTENTION_ERRNOS = new Set([1213, 1020, 1205]);
  * avant `fail()`, et ne profitent donc pas de sa reconnaissance.
  */
 export function isContentionError(error: unknown): boolean {
-  const code = errorCode(error);
-  if (code !== null && CONTENTION_CODES.has(code)) return true;
-  const errno = typeof error === "object" && error !== null ? (error as { errno?: unknown }).errno : undefined;
-  if (typeof errno === "number" && CONTENTION_ERRNOS.has(errno)) return true;
+  // Les prédicats du rejeu (`retryOnDeadlock`), plus le délai de verrou dépassé.
+  if (isTransactionAborted(error) || errorNumber(error) === 1213 || isSnapshotConflict(error)) return true;
+  if (errorCode(error) === "ER_LOCK_WAIT_TIMEOUT" || errorNumber(error) === 1205) return true;
   const message = error instanceof Error ? error.message : undefined;
   return isDeadlockMessage(message) || isContentionMessage(message);
 }

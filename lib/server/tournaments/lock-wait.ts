@@ -21,27 +21,40 @@ export const SHORT_LOCK_WAIT_SECONDS = 5;
  * ({@link releaseWithServerLockWait}).
  */
 export async function withShortLockWait<T>(connection: PoolConnection, read: () => Promise<T>): Promise<T> {
+  // Marquée avant l'envoi : une pose ratée à mi-chemin laisse un délai inconnu.
+  shortened.add(connection);
   await connection.query(`SET SESSION innodb_lock_wait_timeout = ${SHORT_LOCK_WAIT_SECONDS}`);
   try {
     return await read();
   } finally {
     try {
       await connection.query(`SET SESSION innodb_lock_wait_timeout = DEFAULT`);
+      shortened.delete(connection);
     } catch {
       // Rattrapée au retour au pool (`releaseWithServerLockWait`).
     }
   }
 }
 
+/** Connexions dont le délai court n'a pas (encore) été remis. */
+const shortened = new WeakSet<PoolConnection>();
+
 /**
  * Rend la connexion au pool avec le délai de verrou du serveur, filet de
  * {@link withShortLockWait} : rendue avec le délai court, elle l'imposerait à
- * la requête suivante. Si la remise échoue, la connexion est détruite plutôt
- * que rendue.
+ * la requête suivante. La remise n'est rejouée que si celle de
+ * `withShortLockWait` a manqué ; si elle échoue encore, la connexion est
+ * détruite plutôt que rendue.
  */
 export async function releaseWithServerLockWait(connection: PoolConnection): Promise<void> {
+  // Délai jamais raccourci, ou déjà remis : aucune requête de plus.
+  if (!shortened.has(connection)) {
+    connection.release();
+    return;
+  }
   try {
     await connection.query(`SET SESSION innodb_lock_wait_timeout = DEFAULT`);
+    shortened.delete(connection);
   } catch {
     connection.destroy();
     return;

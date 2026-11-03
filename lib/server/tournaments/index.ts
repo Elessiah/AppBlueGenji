@@ -1132,8 +1132,9 @@ export async function getViewerMatchProposals(
   canManage: boolean,
   matchId: number,
 ): Promise<MatchProposalMaps | null> {
-  const match = snapshot.matches.find((candidate) => candidate.id === matchId);
-  if (!match) return null;
+  // Le match se lit par son tournoi, sans passer par l'instantané en cache :
+  // une manche posée ou réappariée depuis n'y figure pas encore.
+  const target = { tournamentId: snapshot.card.id, matchId };
   const isSolo = isSoloTournament(snapshot.card.participantType);
   // Lecteur sans engagé : rien à lire. Le reste de la règle (engagés du match,
   // report en attente) se juge sur l'état **relu** (`loadFreshMatchProposals`).
@@ -1146,12 +1147,12 @@ export async function getViewerMatchProposals(
   if (isSolo && !canManage) {
     return withConnection(async (connection) => {
       const scope = scopeOf(await resolveViewerEntrant(snapshot, userId, connection));
-      return scope ? loadFreshMatchProposals(connection, match, scope, mapScoreReport) : null;
+      return scope ? loadFreshMatchProposals(connection, target, scope, mapScoreReport) : null;
     });
   }
   const scope = scopeOf(canManage ? { activeTeam: null, myTeamId: null } : await resolveViewerEntrant(snapshot, userId));
   if (!scope) return null;
-  return withConnection((connection) => loadFreshMatchProposals(connection, match, scope, mapScoreReport));
+  return withConnection((connection) => loadFreshMatchProposals(connection, target, scope, mapScoreReport));
 }
 
 /**

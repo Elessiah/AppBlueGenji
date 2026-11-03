@@ -2,6 +2,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { MatchMapInput, MatchMapResult } from "@/lib/shared/match-maps";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import type { BracketMatch, MatchProposalMaps, MatchScoreReport, ProposalMaps } from "@/lib/shared/types";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
 /**
  * Stockage du détail map par map (`bg_match_maps`, `docs/features/MAP_SCORES.md`).
@@ -288,7 +289,7 @@ export async function loadMapsByMatch(
   return byMatch;
 }
 
-function toResult(row: MapRow): MatchMapResult {
+function toResult(row: Pick<MapRow, "map_number" | "replay_code" | "team1_score" | "team2_score">): MatchMapResult {
   return {
     mapNumber: Number(row.map_number),
     replayCode: String(row.replay_code),
@@ -297,11 +298,14 @@ function toResult(row: MapRow): MatchMapResult {
   };
 }
 
+/** Ce qui décide des propositions d'un match : engagés, statut, reports. */
+export type ProposalSubject = Pick<BracketMatch, "id" | "team1Id" | "team2Id" | "status" | "team1Report" | "team2Report">;
+
 /** Qui lit des propositions : toutes (arbitrage) ou celles de ses engagés. */
 export type ProposalScope = { all: boolean; teamIds: ReadonlyArray<number> };
 
 /** Matchs ouverts où un report attend, et que ce lecteur a le droit de lire. */
-export function proposalMatches(matches: ReadonlyArray<BracketMatch>, scope: ProposalScope): BracketMatch[] {
+export function proposalMatches<M extends ProposalSubject>(matches: ReadonlyArray<M>, scope: ProposalScope): M[] {
   return matches.filter(
     (match) =>
       !isMatchPlayed(match) &&
@@ -329,7 +333,7 @@ export async function loadViewerProposals(
   return eligible.map((match) => proposalMapsOf(match, byMatch.get(match.id)));
 }
 
-function proposalMapsOf(match: BracketMatch, sets: MatchMapSets | undefined): MatchProposalMaps {
+function proposalMapsOf(match: ProposalSubject, sets: MatchMapSets | undefined): MatchProposalMaps {
   return {
     matchId: match.id,
     team1: proposalOf(match.team1Report, sets?.team1 ?? []),
@@ -337,8 +341,6 @@ function proposalMapsOf(match: BracketMatch, sets: MatchMapSets | undefined): Ma
   };
 }
 
-/** État d'un match qui décide de ses propositions, relu avec leurs maps. */
-export type FreshProposalState = Pick<BracketMatch, "team1Id" | "team2Id" | "status" | "team1Report" | "team2Report">;
 
 type FreshProposalRow = RowDataPacket & {
   team1_id: number | null;
@@ -350,11 +352,12 @@ type FreshProposalRow = RowDataPacket & {
   team2_report_score: number | null;
   team2_report_opponent_score: number | null;
   team2_reported_at: Date | string | null;
+  /** `null` : match sans map proposée (jointure vide), les colonnes de map aussi. */
   source: MatchMapSource | null;
-  map_number: number | null;
-  replay_code: string | null;
-  team1_score: number | null;
-  team2_score: number | null;
+  map_number: number;
+  replay_code: string;
+  team1_score: number;
+  team2_score: number;
 };
 
 /**
@@ -363,14 +366,17 @@ type FreshProposalRow = RowDataPacket & {
  * précéder un report, un retrait ou un changement d'engagé (correction
  * d'arbitrage) : la règle de lecture (`scope`) s'applique donc à l'état relu —
  * une équipe sortie du match n'en lit plus les propositions, et un report
- * déposé depuis l'instantané est servi avec sa date.
+ * déposé depuis l'instantané est servi avec sa date, et un match que
+ * l'instantané ne porte pas encore (manche posée ou réappariée depuis) se lit
+ * par son tournoi.
  *
  * `toReport` rebâtit un report depuis ses colonnes (celui de l'instantané,
- * `_internal.ts`) ; `null` : match introuvable ou hors de la règle.
+ * `_internal.ts`) ; `null` : match introuvable dans ce tournoi, ou hors de la
+ * règle.
  */
 export async function loadFreshMatchProposals(
   connection: PoolConnection,
-  match: BracketMatch,
+  target: { tournamentId: number; matchId: number },
   scope: ProposalScope,
   toReport: (
     score: number | null,
@@ -386,15 +392,15 @@ export async function loadFreshMatchProposals(
             mm.source, mm.map_number, mm.replay_code, mm.team1_score, mm.team2_score
      FROM bg_matches m
      LEFT JOIN bg_match_maps mm
-       ON mm.match_id = m.id AND mm.source IN (${REPORTED_MAP_SOURCES.map(() => "?").join(", ")})
-     WHERE m.id = ?
+       ON mm.match_id = m.id AND mm.source IN (${sqlPlaceholders(REPORTED_MAP_SOURCES.length)})
+     WHERE m.id = ? AND m.tournament_id = ?
      ORDER BY mm.source, mm.map_number`,
-    [...REPORTED_MAP_SOURCES, match.id],
+    [...REPORTED_MAP_SOURCES, target.matchId, target.tournamentId],
   );
   const head = rows[0];
   if (!head) return null;
-  const fresh: BracketMatch = {
-    ...match,
+  const fresh: ProposalSubject = {
+    id: target.matchId,
     team1Id: head.team1_id === null ? null : Number(head.team1_id),
     team2Id: head.team2_id === null ? null : Number(head.team2_id),
     status: head.status,
@@ -404,13 +410,7 @@ export async function loadFreshMatchProposals(
   if (proposalMatches([fresh], scope).length === 0) return null;
   const sets: MatchMapSets = { final: [], team1: [], team2: [] };
   for (const row of rows) {
-    if (row.source === null) continue;
-    sets[SET_KEY[row.source]].push({
-      mapNumber: Number(row.map_number),
-      replayCode: String(row.replay_code),
-      team1Score: Number(row.team1_score),
-      team2Score: Number(row.team2_score),
-    });
+    if (row.source !== null) sets[SET_KEY[row.source]].push(toResult(row));
   }
   return proposalMapsOf(fresh, sets);
 }

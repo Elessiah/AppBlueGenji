@@ -11,8 +11,9 @@ import { withShortLockWait } from "../lock-wait";
 
 /**
  * « Ce match porte une saisie » — le prédicat de `match-lock` (`hasScoreInput`,
- * `lib/shared/match-lock.ts`) en SQL : deux engagées en place **et** un score,
- * un vainqueur, un forfait, un double forfait ou un report en attente.
+ * `lib/shared/match-lock.ts`) en SQL : un match qui n'est pas une exemption **et** un score,
+ * un vainqueur, un forfait, un double forfait ou un report en attente, hors
+ * exemption.
  *
  * Écrit une seule fois pour l'endurance et les gestes qui remontent le temps
  * (réappariement d'une manche d'endurance périmée, verrous du retrait d'une
@@ -20,13 +21,15 @@ import { withShortLockWait } from "../lock-wait";
  * les bornes que l'interface reçoit pour ne pas proposer un geste que le
  * serveur refusera) ; la survie et la ronde suisse gardent encore leur copie
  * (`ERREUR.txt`). Le report en attente se lit sur ses dates, comme le verrou
- * d'arbitrage (`admin.ts`). Les deux engagées en place écartent l'exemption,
- * que le moteur pose d'office (score 1-0, seconde place vide) : elle ne dit
- * pas qu'une manche est entamée, l'interface ne la compte pas, et une manche
+ * d'arbitrage (`admin.ts`). L'exemption (`is_bye`), que le moteur pose
+ * d'office (score 1-0, seconde place vide), est écartée : elle ne dit pas
+ * qu'une manche est entamée, l'interface ne la compte pas, et une manche
  * d'endurance dont seule l'exemption est close se réapparie donc comme une
  * manche vierge (l'exemption rejouée depuis l'historique, rien n'est perdu).
+ * Par la colonne, **pas** par une place vide : un match joué dont une équipe
+ * est ensuite effacée (`ON DELETE SET NULL`) reste une saisie.
  */
-export const HAS_SCORE_INPUT_SQL = `(team1_id IS NOT NULL AND team2_id IS NOT NULL
+export const HAS_SCORE_INPUT_SQL = `(is_bye = 0
             AND (team1_score IS NOT NULL OR team2_score IS NOT NULL
             OR winner_team_id IS NOT NULL OR forfeit_team_id IS NOT NULL
             OR (double_forfeit = 1 AND status = 'COMPLETED') OR status = 'AWAITING_CONFIRMATION'
