@@ -54,6 +54,13 @@ export function createCoalescer<T>(options: {
   windowMs: number;
   maxAgeMs: number;
   deliver: (first: T, last: T) => void | Promise<void>;
+  /**
+   * `true` quand `deliver` range déjà l'annonce dans une file ordonnée
+   * ({@link createKeyedChain}) : elle y entre dans le tour même du `flush` ou
+   * de l'échéance, sans attendre l'annonce précédente de la clé (la file s'en
+   * charge) — un geste qui suit le `flush` ne la double pas.
+   */
+  deliverQueues?: boolean;
 }): Coalescer<T> {
   type Burst = { first: T; last: T; startedAt: number; timer: Timer };
   const bursts = new Map<string, Burst>();
@@ -77,7 +84,7 @@ export function createCoalescer<T>(options: {
   const start = async (key: string, burst: Burst): Promise<void> => {
     const previous = inFlight.get(key);
     const run = (async () => {
-      if (previous) await previous;
+      if (previous && !options.deliverQueues) await previous;
       try {
         await options.deliver(burst.first, burst.last);
       } catch (error) {

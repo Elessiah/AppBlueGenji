@@ -133,12 +133,14 @@ const tournamentBursts = createCoalescer<TournamentActionBurst>({
   // Une rafale prend son tour dans la file du tournoi, qu'elle parte à son
   // échéance ou vidée par un autre geste : elle ne double jamais une ligne d'avant.
   deliver: (_first, last) => queueTournamentLine(last),
+  deliverQueues: true,
 });
 
 /** Range une ligne dans la file de son tournoi ; se règle quand elle est partie. */
 function queueTournamentLine(entry: TournamentActionBurst): Promise<void> {
   return new Promise((resolve) =>
-    tournamentLines.chain(entry.tournamentId, () => deliverTournamentAction(entry).then(resolve)),
+    // Réglée même si la ligne lève : une rafale suivante n'attend jamais pour rien.
+    tournamentLines.chain(entry.tournamentId, () => deliverTournamentAction(entry).finally(resolve)),
   );
 }
 
