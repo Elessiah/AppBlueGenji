@@ -387,6 +387,14 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // défaut ; la table `bg_match_voice_channels` est neuve, son `CREATE TABLE` suffit.
     `ALTER TABLE bg_tournaments ADD COLUMN team_voice_channels TINYINT(1) NOT NULL DEFAULT 0
        AFTER match_launch_phase`,
+    // EF-15 — la manche entre dans l'index de phase : les lectures verrouillantes
+    // des manches postérieures (`laterRoundsHaveScoreInput`) et le `DELETE … AND
+    // round_number = ?` du réappariement ne verrouillent plus que leurs manches,
+    // et non toute la phase et ses intervalles. `idx_bg_matches_phase`, préfixe
+    // strict du nouvel index, est retiré **après** sa pose (`DROP INDEX`
+    // tolérant, comme EF-24).
+    `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round (tournament_id, phase_id, round_number)`,
+    `ALTER TABLE bg_matches DROP INDEX idx_bg_matches_phase`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

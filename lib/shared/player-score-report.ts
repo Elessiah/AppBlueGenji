@@ -14,7 +14,7 @@
  */
 import type { BracketMatch, MatchProposalMaps, MatchScoreReport, ProposalMaps } from "./types";
 import { isMatchPlayed } from "./match-outcome";
-import { sameMapLists, type MatchMapInput } from "./match-maps";
+import { sameMapLists, type MatchMapInput, type MatchMapResult } from "./match-maps";
 import { autoValidateTimeText } from "./score-dispute";
 
 /** Où en est le cycle de report, **vu par un engagé du match**. */
@@ -310,4 +310,66 @@ export function proposalsNeedRefresh(
   const stale = (report: MatchScoreReport | null, side: ProposalMaps | null | undefined) =>
     report !== null && side?.reportedAt !== report.reportedAt;
   return stale(match.team1Report, entry?.team1) || stale(match.team2Report, entry?.team2);
+}
+
+/** Une map d'une proposition relue, ou `null` si la forme ne tient pas. */
+function parseProposalMap(raw: unknown): MatchMapResult | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const { mapNumber, replayCode, team1Score, team2Score } = raw as Record<string, unknown>;
+  if (typeof mapNumber !== "number" || !Number.isInteger(mapNumber) || mapNumber < 1) return null;
+  if (typeof replayCode !== "string") return null;
+  if (typeof team1Score !== "number" || typeof team2Score !== "number") return null;
+  return { mapNumber, replayCode, team1Score, team2Score };
+}
+
+/** Un côté d'une proposition relue : `null` (rien), la proposition, ou `undefined` (forme invalide). */
+function parseProposalSide(raw: unknown): ProposalMaps | null | undefined {
+  if (raw === null) return null;
+  if (typeof raw !== "object") return undefined;
+  const { reportedAt, maps } = raw as Record<string, unknown>;
+  if (typeof reportedAt !== "string" || !Array.isArray(maps)) return undefined;
+  const parsed: MatchMapResult[] = [];
+  for (const entry of maps) {
+    const map = parseProposalMap(entry);
+    if (!map) return undefined;
+    parsed.push(map);
+  }
+  return { reportedAt, maps: parsed };
+}
+
+/**
+ * Lecture de la réponse de `GET /api/tournaments/[id]/matches/[matchId]/proposals`
+ * (`proposals`) : le détail du match demandé, ou `null` — rien de lisible, ou
+ * réponse d'une autre forme (jamais un match voisin).
+ */
+export function parseMatchProposals(raw: unknown, matchId: number): MatchProposalMaps | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const record = raw as Record<string, unknown>;
+  if (record.matchId !== matchId) return null;
+  const team1 = parseProposalSide(record.team1);
+  const team2 = parseProposalSide(record.team2);
+  if (team1 === undefined || team2 === undefined) return null;
+  return { matchId, team1, team2 };
+}
+
+/**
+ * Propositions du contexte du lecteur, complétées d'une relecture du seul
+ * match (`parseMatchProposals`). Côté par côté, la relecture ne remplace le
+ * contexte que si elle décrit la proposition **affichée** (même instant de
+ * dépôt que le report de l'instantané) : une réponse en retard, antérieure à
+ * une nouvelle proposition, ne recouvre pas un détail plus à jour.
+ */
+export function mergeMatchProposals(
+  match: Pick<BracketMatch, "id" | "team1Report" | "team2Report">,
+  proposals: ReadonlyArray<MatchProposalMaps>,
+  fetched: MatchProposalMaps | null,
+): ReadonlyArray<MatchProposalMaps> {
+  if (!fetched || fetched.matchId !== match.id) return proposals;
+  const current = proposals.find((p) => p.matchId === match.id);
+  const pick = (report: MatchScoreReport | null, own: ProposalMaps | null | undefined, read: ProposalMaps | null) =>
+    report !== null && read?.reportedAt === report.reportedAt ? read : (own ?? null);
+  const team1 = pick(match.team1Report, current?.team1, fetched.team1);
+  const team2 = pick(match.team2Report, current?.team2, fetched.team2);
+  if (team1 === (current?.team1 ?? null) && team2 === (current?.team2 ?? null)) return proposals;
+  return [...proposals.filter((p) => p.matchId !== match.id), { matchId: match.id, team1, team2 }];
 }

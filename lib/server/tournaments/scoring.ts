@@ -304,13 +304,19 @@ async function reportsConcord(
   updated: MatchRow,
   maps: ReadonlyArray<MatchMapInput>,
   reporterSource: "TEAM1" | "TEAM2",
+  /**
+   * Détail adverse déjà lu sous verrou par cette transaction (« Confirmer »,
+   * {@link assertProposalUnchanged}) : il ne peut plus changer — tout report
+   * passe par le verrou du match, tenu ici —, inutile de le relire.
+   */
+  knownOtherMaps?: ReadonlyArray<MatchMapInput>,
 ): Promise<boolean> {
   const scoresAgree =
     Number(updated.team1_report_score) === Number(updated.team2_report_opponent_score) &&
     Number(updated.team1_report_opponent_score) === Number(updated.team2_report_score);
   if (!scoresAgree) return false;
   const otherSource = reporterSource === "TEAM1" ? "TEAM2" : "TEAM1";
-  const otherMaps = await loadMatchMaps(connection, Number(updated.id), otherSource);
+  const otherMaps = knownOtherMaps ?? (await loadMatchMaps(connection, Number(updated.id), otherSource));
   return sameMapLists(maps, otherMaps);
 }
 
@@ -320,7 +326,8 @@ export type ProposalConfirmation = { reportedAt: string };
 /**
  * La proposition adverse est-elle toujours celle que l'engagé confirme ? Même
  * instant de dépôt, et les mêmes maps que celles renvoyées. Lève `PROPOSAL_STALE` sinon. La ligne du match est déjà
- * verrouillée ; le détail adverse est relu sous verrou (la dernière version).
+ * verrouillée ; le détail adverse est relu sous verrou (la dernière version),
+ * et rendu pour que la comparaison des deux reports ne le relise pas.
  */
 async function assertProposalUnchanged(
   connection: PoolConnection,
@@ -328,7 +335,7 @@ async function assertProposalUnchanged(
   isTeam1Reporter: boolean,
   maps: ReadonlyArray<MatchMapInput>,
   confirm: ProposalConfirmation,
-): Promise<void> {
+): Promise<ReadonlyArray<MatchMapInput>> {
   const reportedAt = isTeam1Reporter ? match.team2_reported_at : match.team1_reported_at;
   const score = isTeam1Reporter ? match.team2_report_score : match.team1_report_score;
   if (score === null || score === undefined || toIso(reportedAt ?? null) !== confirm.reportedAt) {
@@ -336,6 +343,7 @@ async function assertProposalUnchanged(
   }
   const theirMaps = await loadMatchMaps(connection, Number(match.id), isTeam1Reporter ? "TEAM2" : "TEAM1");
   if (!sameMapLists(maps, theirMaps)) throw new Error("PROPOSAL_STALE");
+  return theirMaps;
 }
 
 /**
@@ -455,7 +463,9 @@ export async function reportMatchScore(
   // vue** — même dépôt, même détail. Elle a pu changer ou partir entre
   // l'ouverture de la modale et le clic : on refuse plutôt que de clore sur
   // autre chose que ce qui a été lu (`docs/features/MAP_SCORES.md`).
-  if (confirm) await assertProposalUnchanged(connection, match, isTeam1Reporter, maps, confirm);
+  const confirmedMaps = confirm
+    ? await assertProposalUnchanged(connection, match, isTeam1Reporter, maps, confirm)
+    : undefined;
 
   // Durée d'une série complète au format de la manche : l'échéance d'un report
   // seul ne court qu'après sa fin plausible (`lib/shared/score-report-deadline.ts`).
@@ -547,7 +557,7 @@ export async function reportMatchScore(
     updated.team2_report_score !== null &&
     updated.team2_report_opponent_score !== null
   ) {
-    const consistent = await reportsConcord(connection, updated, maps, reporterSource);
+    const consistent = await reportsConcord(connection, updated, maps, reporterSource, confirmedMaps);
 
     if (consistent) {
       const team1Score = Number(updated.team1_report_score);

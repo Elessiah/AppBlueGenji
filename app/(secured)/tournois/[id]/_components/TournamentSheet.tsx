@@ -879,7 +879,10 @@ function TournamentSheetView({
     try {
       await requestForfeitCancellation(tournamentId, teamId);
       showSuccess(a(`forfeitCancel.success.${entrantType}`, { name: teamName }));
-      void refresh().then(() => focusRowAfterChange(teamId));
+      // Aucune relecture REST : l'annulation publie l'instantané par le flux, et
+      // ne change rien au contexte du lecteur — `refresh()` le recalculait pour
+      // rien. La veille du focus suit la ligne quand l'instantané arrive.
+      focusRowAfterChange(teamId);
       return true;
     } catch (e) {
       showError(mapParticipantError((e as Error).message, entrantType));
@@ -1358,7 +1361,6 @@ function TournamentSheetView({
           key={matchForAdminScore.id}
           match={matchForAdminScore}
           proposals={detail.matchProposals}
-          onRefreshProposals={refreshProposals}
           mapNames={matchMapNames(detail.mapRules.rounds, matchForAdminScore)}
           tiebreakMap={roundTiebreakOf(detail.mapRules.tiebreaks, matchForAdminScore)}
           onClose={() => setSelectedMatchForAdminId(null)}

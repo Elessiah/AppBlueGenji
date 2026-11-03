@@ -17,12 +17,11 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { toParticipantType, type ParticipantType } from "@/lib/shared/participants";
-import { HAS_SCORE_INPUT_SQL } from "./bg-survie/round-progress";
+import { laterRoundsHaveScoreInput } from "./bg-survie/round-progress";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { retryOnDeadlock } from "./deadlock-retry";
-import { publishUpdatedEvent } from "./notifications";
-import { lockTournamentRow } from "./registration";
-import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
+import { publishMatchUpdatedEvent } from "./notifications";
+import { invalidateTournamentPreview } from "./preview-cache";
 
 /** Ce que l'annulation a produit, pour la ligne de journal et le message rendu. */
 export type CancelledForfeit = {
@@ -39,6 +38,7 @@ type TournamentHead = RowDataPacket & {
   state: string;
   participant_type: string | null;
   endurance_playoffs_started: number | null;
+  current_phase_id: number | null;
 };
 
 /** Table du classement et colonne de la manche de sortie, par moteur. */
@@ -55,23 +55,33 @@ function isEngineFormat(format: string | null): format is EngineFormat {
 }
 
 /**
+ * Délai d'attente d'un verrou pendant l'annulation, en secondes. Un détenteur
+ * qui ne demande jamais le tournoi (programmation, rappels, « Prêt ») ne forme
+ * pas d'interblocage : sans borne, l'annulation l'attendrait jusqu'à
+ * `innodb_lock_wait_timeout` (50 s par défaut) en tenant le verrou du tournoi,
+ * et tout report du plateau avec elle. Passé ce délai, l'administrateur lit
+ * « réessaie » (409, `ER_LOCK_WAIT_TIMEOUT` reconnu par `fail()`).
+ */
+export const CANCEL_LOCK_WAIT_SECONDS = 5;
+
+/**
  * Moteur qui porte l'abandon. En multi-phases, l'abandon vit dans le classement
  * de la phase en cours — le seul que `forfeitTournamentTeamPublic` sache écrire.
+ * La phase est lue **sous verrou partagé**, table seule : aucune lecture
+ * d'instantané avant celle des manches (voir {@link cancelTournamentForfeitOnce}).
  */
 async function resolveEngine(
   connection: PoolConnection,
-  tournamentId: number,
-  format: string,
+  tournament: TournamentHead,
 ): Promise<{ engineFormat: string | null; phaseId: number }> {
-  if (format !== "MULTI") return { engineFormat: format, phaseId: 0 };
-  const [phaseRows] = await connection.execute<(RowDataPacket & { id: number; format: string })[]>(
-    `SELECT p.id, p.format
-     FROM bg_tournament_phases p
-     JOIN bg_tournaments t ON t.current_phase_id = p.id
-     WHERE t.id = ? LIMIT 1`,
-    [tournamentId],
+  if (tournament.format !== "MULTI") return { engineFormat: tournament.format, phaseId: 0 };
+  const phaseId = Number(tournament.current_phase_id ?? 0);
+  if (phaseId === 0) return { engineFormat: null, phaseId: 0 };
+  const [phaseRows] = await connection.execute<(RowDataPacket & { format: string })[]>(
+    `SELECT format FROM bg_tournament_phases WHERE id = ? LIMIT 1 LOCK IN SHARE MODE`,
+    [phaseId],
   );
-  return { engineFormat: phaseRows[0]?.format ?? null, phaseId: Number(phaseRows[0]?.id ?? 0) };
+  return { engineFormat: phaseRows[0]?.format ?? null, phaseId };
 }
 
 /**
@@ -101,48 +111,6 @@ async function replayStandings(
     const { reconcileEndurance } = await import("./bg-survie/reconcile");
     await reconcileEndurance(tournamentId, connection);
   }
-}
-
-/**
- * Une manche postérieure à `round` porte-t-elle une saisie ?
- *
- * Un report écrit son score sous le verrou du match **avant** d'attendre celui
- * du tournoi, que l'annulation tient déjà : une lecture d'instantané manquait ce
- * score en cours, l'équipe rentrait et le rejeu suisse réappariait une manche
- * saisie. Les lignes encore vierges sont donc relues **verrouillées**, par clé
- * primaire seulement (les manches postérieures, pas toute la phase ni ses
- * intervalles). Un report en cours, qui attend le tournoi, forme un
- * interblocage que le moteur rompt aussitôt — l'annulation, qui n'a rien écrit,
- * en est la victime ordinaire et se rejoue (`retryOnDeadlock`) en voyant alors
- * le score. Un « Prêt » commité pendant l'attente fait refuser la relecture
- * sous MariaDB (`ER_CHECKREAD`, ligne plus récente que l'instantané) : même
- * rejeu.
- * Ces lignes restent verrouillées jusqu'au commit : un « Prêt » de la manche
- * suivante attend la fin du rejeu (geste d'administration rare et court).
- */
-async function laterRoundHasInput(
-  connection: PoolConnection,
-  tournamentId: number,
-  phaseId: number,
-  round: number,
-): Promise<boolean> {
-  // Les matchs ne naissent que sous le verrou du tournoi, déjà pris : la
-  // lecture d'instantané les voit tous. Une saisie déjà commitée y suffit à
-  // refuser, sans rien verrouiller.
-  const [later] = await connection.execute<(RowDataPacket & { id: number; has_input: number })[]>(
-    `SELECT id, ${HAS_SCORE_INPUT_SQL} AS has_input FROM bg_matches
-     WHERE tournament_id = ? AND phase_id = ? AND round_number > ?`,
-    [tournamentId, phaseId, round],
-  );
-  if (later.length === 0) return false;
-  if (later.some((row) => Number(row.has_input) === 1)) return true;
-  const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_matches
-     WHERE id IN (${sqlPlaceholders(later.length)}) AND ${HAS_SCORE_INPUT_SQL}
-     FOR UPDATE`,
-    later.map((row) => Number(row.id)),
-  );
-  return rows.length > 0;
 }
 
 /**
@@ -181,56 +149,79 @@ async function cancelTournamentForfeitOnce(
   const connection = await db.getConnection();
 
   try {
+    await connection.query(`SET SESSION innodb_lock_wait_timeout = ${CANCEL_LOCK_WAIT_SECONDS}`);
     await connection.beginTransaction();
 
-    // En toute première instruction : sous `REPEATABLE READ`, une lecture
-    // ordinaire placée avant figerait un état d'avant l'attente du verrou.
-    await lockTournamentRow(connection, tournamentId);
-
+    // **Aucune lecture d'instantané avant celle des manches** : sous MariaDB
+    // (`innodb_snapshot_isolation`), une lecture verrouillante d'une ligne
+    // changée depuis l'image de la transaction est refusée (`ER_CHECKREAD`).
+    // Une première lecture ordinaire figeait cette image avant l'attente du
+    // verrou des manches, si bien qu'un « Prêt » commité pendant cette attente
+    // faisait échouer puis rejouer l'annulation — une rafale de « Prêt » à
+    // l'ouverture du salon épuisait les trois tentatives. Tête du tournoi,
+    // phase, classement et manches se lisent donc sous verrou ; l'image ne naît
+    // qu'après (nom de l'équipe, rejeu du classement).
+    //
+    // En toute première instruction, la ligne du tournoi : c'est le verrou du
+    // tournoi (celui de `lockTournamentRow`), lu avec les colonnes utiles.
     const [rows] = await connection.execute<TournamentHead[]>(
-      `SELECT name, format, state, participant_type, endurance_playoffs_started
-       FROM bg_tournaments WHERE id = ? LIMIT 1`,
+      `SELECT name, format, state, participant_type, endurance_playoffs_started, current_phase_id
+       FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
       [tournamentId],
     );
     const tournament = rows[0];
     if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
     if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
 
-    const { engineFormat, phaseId } = await resolveEngine(connection, tournamentId, tournament.format);
+    const { engineFormat, phaseId } = await resolveEngine(connection, tournament);
     if (!isEngineFormat(engineFormat)) throw new Error("FORMAT_WITHOUT_FORFEIT");
     if (engineFormat === "BG_SURVIE" && Number(tournament.endurance_playoffs_started) === 1) {
       throw new Error("ENDURANCE_PLAYOFFS_STARTED");
     }
 
     const { table, roundColumn, phased } = STANDINGS[engineFormat];
-    const scope = phased ? "s.tournament_id = ? AND s.phase_id = ? AND s.team_id = ?" : "s.tournament_id = ? AND s.team_id = ?";
+    const scope = phased ? "tournament_id = ? AND phase_id = ? AND team_id = ?" : "tournament_id = ? AND team_id = ?";
     const scopeParams = phased ? [tournamentId, phaseId, teamId] : [tournamentId, teamId];
 
+    // Par la clé primaire du classement : le verrou de la seule ligne réécrite.
     const [standingRows] = await connection.execute<
-      (RowDataPacket & { status: string; forfeit_round: number | null; team_name: string })[]
+      (RowDataPacket & { status: string; forfeit_round: number | null })[]
     >(
-      `SELECT s.status, s.${roundColumn} AS forfeit_round, t.name AS team_name
-       FROM ${table} s
-       JOIN bg_teams t ON t.id = s.team_id
-       WHERE ${scope}
-       LIMIT 1`,
+      `SELECT status, ${roundColumn} AS forfeit_round FROM ${table} WHERE ${scope} LIMIT 1 FOR UPDATE`,
       scopeParams,
     );
     const standing = standingRows[0];
     if (!standing) throw new Error("TEAM_NOT_IN_TOURNAMENT");
     if (standing.status !== "FORFEIT") throw new Error("TEAM_NOT_FORFEITED");
 
-    // Même borne que le retrait d'une pénalité (`laterRoundHasScoreInput`) :
+    // Même borne que le retrait d'une pénalité (`laterRoundsHaveScoreInput`) :
     // une manche **postérieure** à l'abandon déjà entamée, et l'équipe
     // rentrerait sans que les manches manquées comptent contre elle — capital
     // intact en BG Survie, défaites en moins en Survie. Une manche posée mais
     // vierge ne bloque pas : l'équipe rejoint l'appariement suivant.
-    if (await laterRoundHasInput(connection, tournamentId, phaseId, Number(standing.forfeit_round ?? 1))) {
+    //
+    // Lecture verrouillante : un report écrit son score sous le verrou du match
+    // **avant** d'attendre celui du tournoi, que l'annulation tient déjà. Les
+    // deux forment un interblocage que le moteur rompt aussitôt
+    // (`docs/features/FORFEIT_CANCELLATION.md` § Concurrence).
+    if (
+      await laterRoundsHaveScoreInput(connection, {
+        tournamentId,
+        phaseId,
+        afterRound: Number(standing.forfeit_round ?? 1),
+        lock: true,
+      })
+    ) {
       throw new Error("FORFEIT_ROUND_PASSED");
     }
 
+    const [teamRows] = await connection.execute<(RowDataPacket & { name: string })[]>(
+      `SELECT name FROM bg_teams WHERE id = ? LIMIT 1`,
+      [teamId],
+    );
+
     await connection.execute(
-      `UPDATE ${table} s SET s.status = 'ACTIVE', s.${roundColumn} = NULL WHERE ${scope}`,
+      `UPDATE ${table} SET status = 'ACTIVE', ${roundColumn} = NULL WHERE ${scope}`,
       scopeParams,
     );
 
@@ -240,13 +231,18 @@ async function cancelTournamentForfeitOnce(
     // Le rejeu a pu réserver des lignes de journal (manche suivante posée).
     flushBotLogs(connection);
 
-    publishUpdatedEvent(tournamentId);
+    // Instantané et aperçu seulement : aucun résultat de match ni colonne de
+    // `bg_tournaments` ne change, si bien que le classement du site, les
+    // statistiques, les agrégats de l'accueil et les listes restent justes —
+    // `publishUpdatedEvent` les vidait tous.
+    publishMatchUpdatedEvent(tournamentId);
+    invalidateTournamentPreview(tournamentId);
 
     return {
       tournamentId,
       tournamentName: tournament.name,
       teamId,
-      entrantName: standing.team_name,
+      entrantName: String(teamRows[0]?.name ?? ""),
       participantType: toParticipantType(tournament.participant_type),
     };
   } catch (error) {
@@ -254,6 +250,21 @@ async function cancelTournamentForfeitOnce(
     throw error;
   } finally {
     discardBotLogs(connection);
-    connection.release();
+    await releaseWithServerLockWait(connection);
   }
+}
+
+/**
+ * Rend la connexion au pool avec le délai de verrou du serveur : rendue avec
+ * les secondes de l'annulation, elle les imposerait à la requête suivante. Si
+ * la remise échoue, la connexion est détruite plutôt que rendue.
+ */
+async function releaseWithServerLockWait(connection: PoolConnection): Promise<void> {
+  try {
+    await connection.query(`SET SESSION innodb_lock_wait_timeout = DEFAULT`);
+  } catch {
+    connection.destroy();
+    return;
+  }
+  connection.release();
 }

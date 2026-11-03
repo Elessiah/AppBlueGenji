@@ -1,5 +1,5 @@
 import { fail } from "@/lib/server/http";
-import { isDeadlockMessage } from "@/lib/server/mysql-errors";
+import { isContentionMessage, isDeadlockMessage } from "@/lib/server/mysql-errors";
 import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
 import { isSnapshotConflict } from "./deadlock-retry";
 import type { CastTarget } from "./match-launch";
@@ -22,11 +22,12 @@ export function launchFailure(
   const message = (error as Error).message;
   const status = statuses[message];
   if (status) return fail(message, status);
-  // Interblocage : le message brut passe, `fail()` le rend en « réessaie ».
-  if (isDeadlockMessage(message)) return fail(message, 500);
-  // Ligne changée depuis l'instantané (MariaDB, `ER_CHECKREAD`) à chaque
-  // rejeu : un conflit « réessaie », pas une panne.
-  if (isSnapshotConflict(error)) return fail(CONCURRENT_UPDATE_RETRY, 409);
+  // Interblocage ou contention passagère (`ER_CHECKREAD`, délai de verrou) à
+  // chaque rejeu : un conflit « réessaie », pas une panne (`fail()` le
+  // reconnaît aussi sur le message).
+  if (isDeadlockMessage(message) || isContentionMessage(message) || isSnapshotConflict(error)) {
+    return fail(CONCURRENT_UPDATE_RETRY, 409);
+  }
   console.error("[match-launch] échec", error);
   return fail(fallback, 500);
 }

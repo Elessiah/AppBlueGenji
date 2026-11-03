@@ -52,6 +52,36 @@ export function isDeadlockMessage(message: unknown): boolean {
 }
 
 /**
+ * Messages d'une **contention** qui n'est pas un interblocage, et que le
+ * rejeu (`retryOnDeadlock`) n'a pas pu vaincre :
+ *
+ * - `ER_CHECKREAD` (1020, MariaDB 11.6.2 et plus, `innodb_snapshot_isolation`) :
+ *   la ligne a changé depuis l'image lue par la transaction ;
+ * - `ER_LOCK_WAIT_TIMEOUT` (1205) : le verrou n'est pas venu dans le délai.
+ *
+ * Ni panne ni requête fautive : un conflit (409) que l'interface traduit en
+ * « réessaie », comme l'interblocage.
+ */
+const CONTENTION_MESSAGES = [
+  /^Record has changed since last read in table\b/i,
+  /^Lock wait timeout exceeded\b/i,
+];
+
+/**
+ * `true` si ce message d'exception est celui d'une contention passagère
+ * (`ER_CHECKREAD`, `ER_LOCK_WAIT_TIMEOUT`). Pendant de `isDeadlockMessage` :
+ * `fail()` rend l'un comme l'autre en `CONCURRENT_UPDATE_RETRY`.
+ */
+export function isContentionMessage(message: unknown): boolean {
+  return typeof message === "string" && CONTENTION_MESSAGES.some((pattern) => pattern.test(message));
+}
+
+/** `true` si l'attente d'un verrou a dépassé `innodb_lock_wait_timeout`. */
+export function isLockWaitTimeout(error: unknown): boolean {
+  return errorCode(error) === "ER_LOCK_WAIT_TIMEOUT";
+}
+
+/**
  * `true` si la table n'existe pas.
  *
  * Sept tables de `lib/server/database/schema/` — et elles seules — sont créées dans

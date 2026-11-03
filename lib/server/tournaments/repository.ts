@@ -39,12 +39,17 @@ export async function loadTournamentMatchFormat(
  * (`lib/shared/match-maps.ts`). `game` vaut `null` sur un tournoi introuvable
  * ou une ligne qui ne le porte pas — le contrôle retombe alors sur le motif
  * permissif.
+ *
+ * `refereeScheduling` (l'option « Horaires par l'arbitrage ») vient de la même
+ * ligne : la saisie d'arbitrage en a besoin pour juger la fenêtre de saisie, et
+ * relire le tournoi pour une colonne coûtait un aller-retour sous le verrou du
+ * match.
  */
 export async function loadTournamentMatchRules(
   connection: PoolConnection,
   tournamentId: number,
   round?: number | null,
-): Promise<{ format: MatchFormat | null; game: TournamentGame | null }> {
+): Promise<{ format: MatchFormat | null; game: TournamentGame | null; refereeScheduling: boolean }> {
   const [rows] = await connection.execute<
     (RowDataPacket & {
       format: string;
@@ -55,12 +60,14 @@ export async function loadTournamentMatchRules(
       match_format_draws: number | null;
       endurance_playoff_format_type: "BO" | "FT" | null;
       endurance_playoff_format_value: number | null;
+      referee_scheduling: number | null;
     })[]
   >(
     `SELECT format, game,
             match_format_type, match_format_value,
             match_format_max_maps, match_format_draws,
-            endurance_playoff_format_type, endurance_playoff_format_value
+            endurance_playoff_format_type, endurance_playoff_format_value,
+            referee_scheduling
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1`,
@@ -68,7 +75,7 @@ export async function loadTournamentMatchRules(
   );
 
   const row = rows[0];
-  if (!row) return { format: null, game: null };
+  if (!row) return { format: null, game: null, refereeScheduling: false };
 
   const qualification = parseMatchFormat(
     row.match_format_type,
@@ -84,7 +91,7 @@ export async function loadTournamentMatchRules(
     round,
   );
   const game = row.game === "OW" || row.game === "MR" ? row.game : null;
-  return { format, game };
+  return { format, game, refereeScheduling: Number(row.referee_scheduling ?? 0) === 1 };
 }
 
 /**

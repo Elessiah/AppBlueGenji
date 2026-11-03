@@ -8,11 +8,12 @@ import { matchWinnerSide, sideTeamIds, type MatchFormat } from "@/lib/shared/mat
 import { MatchRow } from "./_internal";
 import { forfeitMatchScores, loadTournamentMatchRules, reopenTournament } from "./repository";
 import { checkMapList, type MatchMapInput } from "@/lib/shared/match-maps";
-import { clearMapSets, replaceMatchMaps } from "./match-maps";
+import { clearMapSets, mapSetExists, replaceMatchMaps } from "./match-maps";
 import { finalizeMatch } from "./scoring";
 import { tryAutoResolveByes } from "./byes";
 import { detachDownstreamOutcome } from "./bracket-cascade";
 import { SINGLE_REPORT_SQL } from "./score-report-sql";
+import { laterRoundsHaveScoreInput } from "./bg-survie/round-progress";
 
 interface DependentMatchRow extends RowDataPacket {
   id: number;
@@ -179,17 +180,19 @@ async function multiPhaseDependentsHaveInput(
   return dependentMatches(self, states, "MULTI", phaseRows[0]?.format).some(hasScoreInput);
 }
 
-async function laterRoundsHaveInput(
-  connection: PoolConnection,
-  current: CurrentMatchRow,
-): Promise<boolean> {
-  const [rows] = await connection.execute<DependentMatchRow[]>(
-    `SELECT ${DEPENDENT_COLUMNS}
-     FROM bg_matches
-     WHERE tournament_id = ? AND round_number > ?`,
-    [Number(current.tournament_id), Number(current.round_number)],
-  );
-  return rows.map(toMatchScoreState).some(hasScoreInput);
+/**
+ * Manches ultérieures de la phase du match : la règle partagée
+ * (`laterRoundsHaveScoreInput`), **verrouillée** — une lecture d'instantané
+ * manquait le score qu'un report de la manche suivante écrit au même moment, et
+ * la correction réécrivait alors un résultat dont dépend un match entamé.
+ */
+function laterRoundsHaveInput(connection: PoolConnection, current: CurrentMatchRow): Promise<boolean> {
+  return laterRoundsHaveScoreInput(connection, {
+    tournamentId: Number(current.tournament_id),
+    phaseId: Number(current.phase_id ?? 0),
+    afterRound: Number(current.round_number),
+    lock: true,
+  });
 }
 
 async function bracketDependentsHaveInput(
@@ -289,18 +292,15 @@ async function forfeitScores(
  * (l'équipe absente n'a pas à attendre l'heure pour être constatée absente), et
  * un match terminé reste corrigible — sa phase est `NONE`.
  *
- * L'option du tournoi est relue ici, par une lecture à part : la ligne du
- * match est déjà verrouillée seule (MariaDB, pas de `FOR UPDATE` sur jointure),
- * et une option basculée entre-temps n'ouvre au pire que ce qu'elle ouvrait
- * juste avant.
+ * L'option du tournoi (« Horaires par l'arbitrage ») arrive avec les règles de
+ * la manche (`loadTournamentMatchRules`), lues une fois par saisie : la ligne
+ * du match est déjà verrouillée seule (MariaDB, pas de `FOR UPDATE` sur
+ * jointure), et une option basculée entre-temps n'ouvre au pire que ce
+ * qu'elle ouvrait juste avant.
  *
  * @throws `MATCH_NOT_IN_LAUNCH`
  */
-async function assertScoreEntryOpen(connection: PoolConnection, match: MatchRow): Promise<void> {
-  const [rows] = await connection.execute<(RowDataPacket & { referee_scheduling: number | null })[]>(
-    `SELECT referee_scheduling FROM bg_tournaments WHERE id = ? LIMIT 1`,
-    [Number(match.tournament_id)],
-  );
+function assertScoreEntryOpen(match: MatchRow, refereeScheduling: boolean): void {
   const team1Id = match.team1_id === null ? null : Number(match.team1_id);
   const team2Id = match.team2_id === null ? null : Number(match.team2_id);
   // Un lancement posé pour un autre appariement ne lance pas celui-ci
@@ -316,7 +316,7 @@ async function assertScoreEntryOpen(connection: PoolConnection, match: MatchRow)
       team2Id,
       startAt: toIso(match.start_at ?? null),
       launchedAt,
-      refereeScheduling: Number(rows[0]?.referee_scheduling ?? 0) === 1,
+      refereeScheduling,
     },
     Date.now(),
   );
@@ -359,10 +359,12 @@ function mapEntryOf(entry: AdminResolveEntry): AdminMapEntry {
 }
 
 /**
- * Contrôle des maps d'arbitrage contre le format de la manche et le jeu du
- * tournoi (`checkMapList`, la règle du report d'équipe — code de replay
- * facultatif pour l'arbitrage). Rend le score dérivé et le format lu, pour en
- * déduire le vainqueur sans relire le tournoi.
+ * Contrôle d'une saisie map par map de l'arbitrage : fenêtre de saisie
+ * ({@link assertScoreEntryOpen}), puis maps contre le format de la manche et le
+ * jeu du tournoi (`checkMapList`, la règle du report d'équipe — code de replay
+ * facultatif pour l'arbitrage). Une seule lecture du tournoi pour les deux.
+ * Rend le score dérivé et le format lu, pour en déduire le vainqueur sans
+ * relire le tournoi.
  */
 async function checkAdminMaps(
   connection: PoolConnection,
@@ -370,11 +372,12 @@ async function checkAdminMaps(
   maps: ReadonlyArray<MatchMapInput>,
   decisive: boolean,
 ): Promise<{ format: MatchFormat | null; score: { team1: number; team2: number } }> {
-  const { format, game } = await loadTournamentMatchRules(
+  const { format, game, refereeScheduling } = await loadTournamentMatchRules(
     connection,
     Number(match.tournament_id),
     Number(match.round_number),
   );
+  assertScoreEntryOpen(match, refereeScheduling);
   const check = checkMapList(format, game, maps, { decisive, requireReplayCode: false });
   if (check.error) throw new Error(check.error);
   return { format, score: check.score };
@@ -389,6 +392,13 @@ async function checkAdminMaps(
 export type AutoValidationPause = { paused: boolean; pausedNow: boolean };
 
 /**
+ * Ce qu'« Enregistrer » rend à son appelant : l'effet sur la validation
+ * d'office, et la ligne du match **lue sous verrou** (tournoi, engagées,
+ * instants de report) — l'appelant n'a pas à la relire.
+ */
+export type AdminSaveResult = AutoValidationPause & { saved: MatchRow };
+
+/**
  * Note l'avancement d'une rencontre (« Enregistrer ») sans la trancher. Dit si
  * la saisie **suspend** la validation d'office d'un report seul
  * ({@link pauseAutoValidation}).
@@ -397,7 +407,7 @@ export async function adminSaveMatchScores(
   connection: PoolConnection,
   matchId: number,
   entry: AdminScoreEntry,
-): Promise<AutoValidationPause> {
+): Promise<AdminSaveResult> {
   const [matches] = await connection.execute<MatchRow[]>(
     `SELECT
       id,
@@ -412,6 +422,8 @@ export async function adminSaveMatchScores(
       start_at,
       launched_at,
       launch_pairing,
+      team1_reported_at,
+      team2_reported_at,
       score_validation_paused_at IS NOT NULL AS score_validation_paused
      FROM bg_matches
      WHERE id = ?
@@ -469,13 +481,12 @@ export async function adminSaveMatchScores(
     // Un forfait n'a pas de maps jouées : un détail noté plus tôt ne le décrit
     // plus, que le client ait envoyé des maps ou non.
     await clearMapSets(connection, [matchId], ["FINAL"]);
-    return pauseAutoValidation(connection, match);
+    return { ...(await pauseAutoValidation(connection, match)), saved: match };
   }
 
   // Sauvegarde **map par map** : le score se dérive des maps, contrôlées sans
   // exiger un match terminé (l'arbitrage note l'avancement).
   const { maps, userId } = mapEntryOf(entry);
-  await assertScoreEntryOpen(connection, match);
   const { score: derived } = await checkAdminMaps(connection, match, maps, false);
   await connection.execute(
     `UPDATE bg_matches
@@ -485,8 +496,32 @@ export async function adminSaveMatchScores(
      WHERE id = ?`,
     [derived.team1, derived.team2, matchId],
   );
-  await replaceMatchMaps(connection, matchId, "FINAL", maps, userId);
-  return pauseAutoValidation(connection, match);
+  await replaceFinalMaps(connection, matchId, maps, userId);
+  return { ...(await pauseAutoValidation(connection, match)), saved: match };
+}
+
+/**
+ * Réécrit le résultat retenu (`FINAL`) d'un match **dont la ligne est
+ * verrouillée par cette transaction**. Sans jeu existant — le cas ordinaire
+ * d'une première saisie —, l'insertion part seule (`knownEmpty`) : la lecture
+ * verrouillante de l'effacement posait sinon, sur l'intervalle vide qu'il
+ * partage avec les matchs voisins, un verrou tenu jusqu'au commit
+ * (réconciliations comprises), et le premier report d'un match voisin
+ * l'attendait ou s'interbloquait.
+ *
+ * L'absence se lit **sans verrou** (`mapSetExists`), et elle est exacte : tout
+ * écrivain de `FINAL` tient le verrou du match, que cette transaction a pris
+ * **avant** sa première lecture ordinaire (son image est donc postérieure au
+ * dernier écrivain, et aucun ne peut plus passer avant le commit).
+ */
+async function replaceFinalMaps(
+  connection: PoolConnection,
+  matchId: number,
+  maps: ReadonlyArray<MatchMapInput>,
+  userId: number,
+): Promise<void> {
+  const exists = await mapSetExists(connection, matchId, "FINAL");
+  await replaceMatchMaps(connection, matchId, "FINAL", maps, userId, { knownEmpty: !exists });
 }
 
 /**
@@ -599,7 +634,7 @@ export async function adminResolveMatch(
   // pourrait sinon coïncider avec un détail noté plus tôt.
   // Lecture sans verrou (`clearMapSets`) : le forfait déclaré par une engagée
   // passe ici sans rejeu sur interblocage.
-  if ("maps" in entry) await replaceMatchMaps(connection, matchId, "FINAL", entry.maps, entry.userId);
+  if ("maps" in entry) await replaceFinalMaps(connection, matchId, entry.maps, entry.userId);
   else await clearMapSets(connection, [matchId], ["FINAL"]);
 
   await tryAutoResolveByes(connection, tournamentId);
@@ -658,7 +693,6 @@ async function resolveAdminOutcome(
     // implémentation de la règle : ni vainqueur ni perdant sur un nul, donc
     // rien à propager.
     const { maps } = mapEntryOf(entry);
-    await assertScoreEntryOpen(connection, match);
     const { format, score: derived } = await checkAdminMaps(connection, match, maps, true);
     const side = matchWinnerSide(format, derived.team1, derived.team2);
     ({ winnerTeamId, loserTeamId } = sideTeamIds(side, match.team1_id, match.team2_id));

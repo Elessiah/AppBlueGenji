@@ -97,6 +97,24 @@ async function clearMatchMaps(connection: PoolConnection, matchId: number, sourc
 }
 
 /**
+ * Le match porte-t-il un jeu `source` ? Lecture **sans verrou** — aucun verrou
+ * d'intervalle sur un jeu vide. N'est exacte que si l'appelant tient le verrou
+ * du match depuis avant sa première lecture ordinaire, et que tout écrivain du
+ * jeu prend ce même verrou (cas de `FINAL`, voir `replaceFinalMaps`).
+ */
+export async function mapSetExists(
+  connection: PoolConnection,
+  matchId: number,
+  source: MatchMapSource,
+): Promise<boolean> {
+  const result = await connection.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1`,
+    [matchId, source],
+  );
+  return Array.isArray(result) && Array.isArray(result[0]) && result[0].length > 0;
+}
+
+/**
  * Maps d'un jeu précis, dans l'ordre joué. Lecture verrouillante : elle voit
  * la proposition qu'un report concurrent vient de valider (voir
  * `clearMatchMaps`), sans quoi la comparaison des deux propositions ne la

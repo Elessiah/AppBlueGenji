@@ -1,7 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { isDeadlockMessage } from "@/lib/server/mysql-errors";
-import { isSnapshotConflict } from "@/lib/server/tournaments/deadlock-retry";
+import { isContentionMessage, isDeadlockMessage } from "@/lib/server/mysql-errors";
 import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { cancelTournamentForfeit } from "@/lib/server/tournaments/forfeit-cancellation";
@@ -54,12 +53,13 @@ export async function DELETE(
     const message = (error as Error).message;
     const status = CANCEL_ERROR_STATUS.get(message);
     if (status !== undefined) return fail(message, status);
-    // Contention persistante (interblocage, ou ligne changée depuis
-    // l'instantané sous MariaDB) à chaque rejeu : un refus « réessaie », pas une
-    // panne.
-    if (isDeadlockMessage(message)) return fail(message, 409);
-    if (isSnapshotConflict(error)) {
-      console.warn(`[tournaments] annulation de l'abandon de ${teamId} : instantané périmé, rendu en ${CONCURRENT_UPDATE_RETRY}`);
+    // Contention persistante (interblocage, ligne changée depuis l'instantané
+    // sous MariaDB, verrou venu trop tard) à chaque rejeu : un refus
+    // « réessaie », pas une panne. Code fixe — jamais le texte du moteur.
+    if (isDeadlockMessage(message) || isContentionMessage(message)) {
+      console.warn(
+        `[tournaments] annulation de l'abandon de ${teamId} au tournoi ${tournamentId} : écriture concurrente, rendue en ${CONCURRENT_UPDATE_RETRY}`,
+      );
       return fail(CONCURRENT_UPDATE_RETRY, 409);
     }
 

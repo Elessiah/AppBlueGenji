@@ -6,6 +6,7 @@ import type {
   TournamentDetail,
   TournamentFormat,
   TournamentGame,
+  MatchProposalMaps,
   TournamentSnapshot,
   TournamentState,
   TournamentViewerContext,
@@ -178,7 +179,6 @@ import {
   publishMatchUpdatedEvent,
   publishUpdatedEvent,
   publishScoreReportedEvent,
-  publishScoreResolvedEvent,
 } from "./notifications";
 import { discardBotLogs, flushBotLogs, queueBotLog } from "./bot-logs";
 import { getTournamentSnapshot } from "./snapshot";
@@ -1075,6 +1075,73 @@ export type TournamentViewerContextOptions = {
 };
 
 /**
+ * Engagé du lecteur : son équipe active, ou son entrée solo en individuel.
+ *
+ * La connexion n'est prise que dans le second cas — le seul où
+ * `resolveUserEntrantTeamId` s'en serve : en tournoi par équipes,
+ * `getUserActiveTeam` ouvre sa propre requête, et réserver une place du pool
+ * (25) pour ne rien en faire doublerait la pression à chaque connexion SSE.
+ */
+async function resolveViewerEntrant(
+  snapshot: TournamentSnapshot,
+  userId: number,
+): Promise<{ activeTeam: Awaited<ReturnType<typeof getUserActiveTeam>> | null; myTeamId: number | null }> {
+  if (!isSoloTournament(snapshot.card.participantType)) {
+    const activeTeam = await getUserActiveTeam(userId);
+    return { activeTeam, myTeamId: activeTeam?.teamId ?? null };
+  }
+  const myTeamId = await withConnection((connection) =>
+    resolveUserEntrantTeamId(connection, { participant_type: snapshot.card.participantType }, userId),
+  );
+  return { activeTeam: null, myTeamId };
+}
+
+/**
+ * Propositions map par map qu'un lecteur peut lire : aux deux engagés qui mènent
+ * leur match (individuel, ou rôle qui déclare l'équipe prête), et à l'arbitrage
+ * — jamais dans l'instantané diffusé. Une seule règle pour le contexte du
+ * lecteur et la relecture d'un match ({@link getViewerMatchProposals}).
+ */
+function viewerProposalScope(
+  isSolo: boolean,
+  myTeamId: number | null,
+  activeTeam: { roles: Parameters<typeof canDeclareTeamReady>[0] } | null,
+  canManage: boolean,
+): { all: boolean; teamIds: number[] } {
+  const reportTeamIds =
+    myTeamId && (isSolo || canDeclareTeamReady(activeTeam?.roles))
+      ? [myTeamId]
+      : [];
+  return { all: canManage, teamIds: reportTeamIds };
+}
+
+/**
+ * Propositions en attente d'**un** match, telles que le lecteur peut les lire
+ * (`TournamentViewerContext.matchProposals`, restreint à ce match) : la
+ * relecture légère des dialogues de score quand une proposition arrive après la
+ * connexion au flux — elle relisait sinon tout le tournoi (instantané et
+ * contexte du lecteur) pour les maps d'un seul match. `null` : rien de lisible
+ * (match inconnu, clos, sans report, ou hors des engagés du lecteur).
+ */
+export async function getViewerMatchProposals(
+  snapshot: TournamentSnapshot,
+  userId: number,
+  canManage: boolean,
+  matchId: number,
+): Promise<MatchProposalMaps | null> {
+  const match = snapshot.matches.find((candidate) => candidate.id === matchId);
+  if (!match) return null;
+  const isSolo = isSoloTournament(snapshot.card.participantType);
+  const { activeTeam, myTeamId } = canManage
+    ? { activeTeam: null, myTeamId: null }
+    : await resolveViewerEntrant(snapshot, userId);
+  const scope = viewerProposalScope(isSolo, myTeamId, activeTeam, canManage);
+  if (proposalMatches([match], scope).length === 0) return null;
+  const [proposals] = await withConnection((connection) => loadViewerProposals(connection, [match], scope));
+  return proposals ?? null;
+}
+
+/**
  * Contexte propre au lecteur : ce qu'il a le droit de faire ici.
  *
  * Séparé de l'instantané partagé parce qu'il ne bouge presque jamais (il change
@@ -1098,22 +1165,7 @@ export async function getTournamentViewerContext(
   } = rights;
   const isSolo = isSoloTournament(snapshot.card.participantType);
 
-  // Engagé du viewer : son équipe active, ou son entrée solo en individuel.
-  //
-  // La connexion n'est prise que dans le second cas — le seul où
-  // `resolveUserEntrantTeamId` s'en serve : en tournoi par équipes,
-  // `getUserActiveTeam` ouvre sa propre requête, et réserver une place du pool
-  // (25) pour ne rien en faire doublerait la pression à chaque connexion SSE.
-  const activeTeam = isSolo ? null : await getUserActiveTeam(userId);
-  const myTeamId = isSolo
-    ? await withConnection((connection) =>
-        resolveUserEntrantTeamId(
-          connection,
-          { participant_type: snapshot.card.participantType },
-          userId,
-        ),
-      )
-    : activeTeam?.teamId ?? null;
+  const { activeTeam, myTeamId } = await resolveViewerEntrant(snapshot, userId);
 
   // Qualité pour **engager** son équipe : `OWNER` ou `MANAGER`
   // (`lib/shared/team-roles.ts`). En individuel, le joueur n'engage que lui-même.
@@ -1206,10 +1258,9 @@ export async function getTournamentViewerContext(
   // Détail des propositions en attente : aux deux engagés qui mènent leur
   // match, et à l'arbitrage — jamais dans l'instantané diffusé. Calculé ici,
   // porte commune du flux et de la lecture REST de secours.
-  const reportTeamIds = myTeamId && (isSolo || canDeclareTeamReady(activeTeam?.roles)) ? [myTeamId] : [];
   // Une place du pool n'est prise que s'il y a quelque chose à lire — presque
   // jamais : la plupart des lecteurs n'ont aucune proposition en attente.
-  const proposalScope = { all: canManage, teamIds: reportTeamIds };
+  const proposalScope = viewerProposalScope(isSolo, myTeamId, activeTeam, canManage);
   const matchProposals =
     proposalMatches(snapshot.matches, proposalScope).length === 0
       ? []
@@ -1233,7 +1284,7 @@ export async function getTournamentViewerContext(
     // Reporter un score revient à ceux qui mènent le match — capitaine, manager,
     // propriétaire (`reportMatchScore` refuse `NOT_TEAM_MATCH_LEADER`) : un
     // bouton qui mène à un 403 est un bouton qui ment.
-    canCreateReportsForTeamIds: reportTeamIds,
+    canCreateReportsForTeamIds: proposalScope.teamIds,
     isAdmin: canManage,
     canDelete,
     canCancelForfeit,
@@ -1490,55 +1541,35 @@ async function adminSaveMatchScoresOnce(
     await connection.beginTransaction();
 
     const { adminSaveMatchScores: adminSaveInternal } = await import("./admin");
-    const pause = await adminSaveInternal(connection, matchId, entry);
+    const { saved, ...pause } = await adminSaveInternal(connection, matchId, entry);
 
-    // Need to get tournament ID for event + Survival reconciliation
-    const [matchData] = await connection.execute<
-      (RowDataPacket & {
-        tournament_id: number;
-        team1_id: number | null;
-        team2_id: number | null;
-        team1_reported_at: ReportInstant | null;
-        team2_reported_at: ReportInstant | null;
-      })[]
-    >(
-      `SELECT tournament_id, team1_id, team2_id, team1_reported_at, team2_reported_at FROM bg_matches WHERE id = ? LIMIT 1`,
-      [matchId],
-    );
-    const savedTournamentId = matchData.length > 0 ? Number(matchData[0].tournament_id) : null;
+    // La ligne du match, déjà lue sous verrou par la sauvegarde : rien à relire.
+    const savedTournamentId = Number(saved.tournament_id);
     const savedMatch: DisputeBeforeResolution | null =
-      savedTournamentId !== null && matchData[0].team1_id !== null && matchData[0].team2_id !== null
+      saved.team1_id !== null && saved.team2_id !== null
         ? {
             matchId,
             tournamentId: savedTournamentId,
-            team1Id: Number(matchData[0].team1_id),
-            team2Id: Number(matchData[0].team2_id),
-            playedAt: earliestReport(matchData[0].team1_reported_at, matchData[0].team2_reported_at),
+            team1Id: Number(saved.team1_id),
+            team2Id: Number(saved.team2_id),
+            playedAt: earliestReport(saved.team1_reported_at ?? null, saved.team2_reported_at ?? null),
           }
         : null;
 
-    if (savedTournamentId !== null) {
-      const { reconcileSurvival } = await import("./survival");
-      await reconcileSurvival(savedTournamentId, connection);
-      const { reconcileSwiss } = await import("./swiss");
-      await reconcileSwiss(savedTournamentId, connection);
-      const { reconcileEndurance } = await import("./bg-survie/reconcile");
-      await reconcileEndurance(savedTournamentId, connection);
-
-      const { reconcilePhases: reconcileMultiPhases } = await import("./phases");
-      await reconcileMultiPhases(savedTournamentId, connection);
-    }
-
+    // **Aucune réconciliation** : « Enregistrer » note l'avancement d'un match
+    // sans jamais le clore (`MATCH_ALREADY_COMPLETED` le garde), et tous les
+    // moteurs — classements de Survie, de ronde suisse et d'endurance, phases,
+    // clôture — ne rejouent que des matchs `COMPLETED`. Avec la saisie map par
+    // map, ce geste revient à chaque map : les quatre rejeux tournaient pour
+    // rien sous le verrou du tournoi.
     await connection.commit();
     flushBotLogs(connection);
 
-    if (savedTournamentId !== null) {
-      publishScoreResolvedEvent(savedTournamentId, matchId);
-      // L'état d'avant n'a pas pu être lu (l'id du tournoi ne se découvre qu'en
-      // cours de transaction) : on rafraîchit donc la liste sans condition. Un
-      // arbitrage reste rare, contrairement au report de score.
-      invalidateTournamentLists();
-    }
+    // Instantané seulement : un match non clos ne compte ni au classement du
+    // site ni aux statistiques (`playedMatchSql`), et l'état du tournoi ne
+    // bouge pas (aucune clôture possible) — listes et classement restent en
+    // cache.
+    publishMatchUpdatedEvent(savedTournamentId);
     return { ...pause, match: savedMatch };
   } catch (error) {
     await connection.rollback();
@@ -1819,6 +1850,12 @@ export async function liftEndurancePenaltyPublic(
   tournamentId: number,
   penaltyId: number,
 ): Promise<void> {
+  // Tournoi puis manches postérieures verrouillées (`laterRoundHasScoreInput`),
+  // quand un report prend son match puis le tournoi : l'interblocage se rejoue.
+  await retryOnDeadlock(() => liftEndurancePenaltyOnce(tournamentId, penaltyId));
+}
+
+async function liftEndurancePenaltyOnce(tournamentId: number, penaltyId: number): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 

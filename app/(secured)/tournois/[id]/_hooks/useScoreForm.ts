@@ -275,8 +275,13 @@ export function useScoreForm(
     conflict,
     adoptStoredResult,
     adoptReport,
-    /** Une saisie est en cours, non enregistrée. */
-    dirty: !sameScoreFormState(state, openingState()) || !sameMaps(maps, openingRows()),
+    /**
+     * Une saisie est en cours, non enregistrée. Comparée aux valeurs du dernier
+     * alignement (`synced`), qui sont celles d'ouverture du match reçu : les
+     * reconstruire ici refaisait deux `progressiveMapRows` et deux
+     * `JSON.stringify` à chaque frappe et à chaque trame du flux.
+     */
+    dirty: !sameScoreFormState(state, synced.baseline) || !sameMaps(maps, synced.mapsBaseline),
     // Forfait nominatif et double forfait s'excluent : en choisir un retire
     // l'autre, pour que le formulaire ne porte jamais deux verdicts.
     setForfeitTeamId: (id?: number) =>
