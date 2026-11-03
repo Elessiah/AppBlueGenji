@@ -229,7 +229,8 @@ describe("lectures serveur — ce qui garde le cache utile", () => {
     // `resolveViewerEntrant`, partagé avec la relecture des propositions d'un
     // match (ERREUR.txt EF-15).
     expect(index).toMatch(/if \(!isSoloTournament\(snapshot\.card\.participantType\)\) \{\s*const activeTeam = await getUserActiveTeam\(userId\);/);
-    expect(index).toMatch(/const myTeamId = await withConnection\(\(connection\) =>\s*resolveUserEntrantTeamId\(/);
+    // La relecture d'un match passe sa connexion (une seule place du pool).
+    expect(index).toContain("const myTeamId = connection ? await resolve(connection) : await withConnection(resolve);");
     expect(index).toContain("const { activeTeam, myTeamId } = await resolveViewerEntrant(snapshot, userId);");
   });
 });

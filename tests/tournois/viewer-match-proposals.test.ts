@@ -6,16 +6,11 @@ jest.mock("@/lib/server/tournaments/registration", () => ({
   ...jest.requireActual<typeof import("@/lib/server/tournaments/registration")>("@/lib/server/tournaments/registration"),
   resolveUserEntrantTeamId: jest.fn(),
 }));
-jest.mock("@/lib/server/tournaments/match-maps", () => ({
-  ...jest.requireActual<typeof import("@/lib/server/tournaments/match-maps")>("@/lib/server/tournaments/match-maps"),
-  loadViewerProposals: jest.fn(),
-}));
 
 import { getViewerMatchProposals } from "@/lib/server/tournaments";
 import { withConnection } from "@/lib/server/database";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { resolveUserEntrantTeamId } from "@/lib/server/tournaments/registration";
-import { loadViewerProposals } from "@/lib/server/tournaments/match-maps";
 import type { MatchProposalMaps, MatchScoreReport, TournamentSnapshot } from "@/lib/shared/types";
 import type { ParticipantType } from "@/lib/shared/participants";
 import { connectionMock, fakeConnection } from "../helpers/sql-double";
@@ -26,13 +21,16 @@ import { bracketMatch } from "../helpers/bracket-match";
 /**
  * `getViewerMatchProposals` (ERREUR.txt EF-15) : les propositions d'**un**
  * match, sous la règle de lecture du contexte du lecteur — les engagés qui
- * mènent le match et l'arbitrage, personne d'autre.
+ * mènent le match et l'arbitrage, personne d'autre. Revue #542 : la règle se
+ * juge sur l'état **relu** du match (engagés, statut, reports), en une
+ * instruction avec ses maps — l'instantané en cache peut être en retard.
  */
 
-const report: MatchScoreReport = { team1Score: 2, team2Score: 1, reportedAt: "2026-11-03T18:00:00.000Z", maps: [] };
+const REPORTED_AT = "2026-11-03T18:00:00.000Z";
+const report: MatchScoreReport = { team1Score: 2, team2Score: 1, reportedAt: REPORTED_AT, maps: [] };
 const read: MatchProposalMaps = {
   matchId: 70,
-  team1: { reportedAt: report.reportedAt, maps: [{ mapNumber: 1, replayCode: "ABC123", team1Score: 2, team2Score: 0 }] },
+  team1: { reportedAt: REPORTED_AT, maps: [{ mapNumber: 1, replayCode: "ABC123", team1Score: 2, team2Score: 0 }] },
   team2: null,
 };
 
@@ -46,165 +44,173 @@ function snapshot(participantType: ParticipantType = "TEAM"): TournamentSnapshot
   });
 }
 
+type FreshState = {
+  team1_id: number | null;
+  team2_id: number | null;
+  status: string;
+  team1_reported_at: string | null;
+  team2_reported_at: string | null;
+};
+
+type MapLine = { source: string; map_number: number; replay_code: string; team1_score: number; team2_score: number };
+
+const TEAM1_MAP: MapLine = { source: "TEAM1", map_number: 1, replay_code: "ABC123", team1_score: 2, team2_score: 0 };
+
 let connection: ReturnType<typeof connectionMock>;
 
-/** Dates de report relues en base (par défaut : celles de l'instantané). */
-function freshReports(row: { team1_reported_at: string | null; team2_reported_at: string | null } | null) {
-  connection.execute.mockResolvedValue([row ? [row] : [], []]);
+/** État relu du match (par défaut : celui de l'instantané), une ligne par map proposée. */
+function freshMatch(state: Partial<FreshState>, maps: MapLine[] = [TEAM1_MAP]) {
+  const full: FreshState = {
+    team1_id: 42,
+    team2_id: 43,
+    status: "AWAITING_CONFIRMATION",
+    team1_reported_at: REPORTED_AT,
+    team2_reported_at: null,
+    ...state,
+  };
+  const team1Reported = full.team1_reported_at !== null;
+  const team2Reported = full.team2_reported_at !== null;
+  const head = {
+    ...full,
+    team1_report_score: team1Reported ? 2 : null,
+    team1_report_opponent_score: team1Reported ? 1 : null,
+    team2_report_score: team2Reported ? 1 : null,
+    team2_report_opponent_score: team2Reported ? 2 : null,
+  };
+  const noMap = { source: null, map_number: null, replay_code: null, team1_score: null, team2_score: null };
+  const rows = maps.length === 0 ? [{ ...head, ...noMap }] : maps.map((map) => ({ ...head, ...map }));
+  connection.execute.mockResolvedValue([rows, []]);
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
   connection = connectionMock();
-  connection.query.mockResolvedValue([[], []]);
-  freshReports({ team1_reported_at: report.reportedAt, team2_reported_at: null });
+  freshMatch({});
   jest.mocked(withConnection).mockImplementation((fn) => fn(fakeConnection(connection)));
   jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 42, teamName: "Équipe", roles: ["MANAGER"] });
-  jest.mocked(loadViewerProposals).mockResolvedValue([read]);
 });
 
 describe("getViewerMatchProposals", () => {
-  it("getViewerMatchProposals_teamManager_readsOwnMatchOnly", async () => {
+  it("getViewerMatchProposals_teamManager_readsOwnMatch", async () => {
     await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).resolves.toEqual(read);
+  });
 
-    const [, matches, scope] = jest.mocked(loadViewerProposals).mock.calls[0];
-    expect(matches.map((match) => match.id)).toEqual([70]);
-    expect(scope).toEqual({ all: false, teamIds: [42] });
+  it("getViewerMatchProposals_nominal_oneStatementWithMapsNoTransaction", async () => {
+    await getViewerMatchProposals(snapshot(), 7, false, 70);
+
+    expect(connection.execute).toHaveBeenCalledTimes(1);
+    const [sql, params] = connection.execute.mock.calls[0];
+    expect(String(sql).replace(/\s+/g, " ")).toContain("FROM bg_matches m LEFT JOIN bg_match_maps mm");
+    expect(params).toEqual(["TEAM1", "TEAM2", 70]);
+    expect(connection.query).not.toHaveBeenCalled();
   });
 
   it("getViewerMatchProposals_unknownMatch_returnsNullWithoutReading", async () => {
     await expect(getViewerMatchProposals(snapshot(), 7, false, 999)).resolves.toBeNull();
 
     expect(getUserActiveTeam).not.toHaveBeenCalled();
-    expect(loadViewerProposals).not.toHaveBeenCalled();
+    expect(withConnection).not.toHaveBeenCalled();
   });
 
-  it("getViewerMatchProposals_matchWithoutReport_returnsNullWithoutConnection", async () => {
-    await expect(getViewerMatchProposals(snapshot(), 7, true, 71)).resolves.toBeNull();
+  it("getViewerMatchProposals_viewerWithoutTeam_returnsNullWithoutConnection", async () => {
+    jest.mocked(getUserActiveTeam).mockResolvedValue(null);
+
+    await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).resolves.toBeNull();
 
     expect(withConnection).not.toHaveBeenCalled();
+  });
+
+  it("getViewerMatchProposals_matchWithoutReport_returnsNull", async () => {
+    freshMatch({ team1_id: 44, team2_id: 45, status: "READY", team1_reported_at: null }, []);
+
+    await expect(getViewerMatchProposals(snapshot(), 7, true, 71)).resolves.toBeNull();
   });
 
   it("getViewerMatchProposals_otherTeamsMatch_returnsNull", async () => {
     jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 99, teamName: "Autre", roles: ["OWNER"] });
 
     await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).resolves.toBeNull();
-
-    expect(loadViewerProposals).not.toHaveBeenCalled();
   });
 
-  it("getViewerMatchProposals_playerWithoutLeadRole_returnsNull", async () => {
+  it("getViewerMatchProposals_playerWithoutLeadRole_returnsNullWithoutConnection", async () => {
     jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 42, teamName: "Équipe", roles: ["DPS"] });
 
     await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).resolves.toBeNull();
 
-    expect(loadViewerProposals).not.toHaveBeenCalled();
+    expect(withConnection).not.toHaveBeenCalled();
   });
 
   it("getViewerMatchProposals_staff_readsAllWithoutResolvingEntrant", async () => {
     await expect(getViewerMatchProposals(snapshot(), 7, true, 70)).resolves.toEqual(read);
 
     expect(getUserActiveTeam).not.toHaveBeenCalled();
-    expect(jest.mocked(loadViewerProposals).mock.calls[0][2]).toEqual({ all: true, teamIds: [] });
   });
 
-  it("getViewerMatchProposals_soloEntrant_resolvesOwnEntryAndReads", async () => {
+  it("getViewerMatchProposals_soloEntrant_resolvesOwnEntryOnTheReadConnection", async () => {
     jest.mocked(resolveUserEntrantTeamId).mockResolvedValue(43);
 
     await expect(getViewerMatchProposals(snapshot("SOLO"), 7, false, 70)).resolves.toEqual(read);
 
     expect(getUserActiveTeam).not.toHaveBeenCalled();
-    expect(jest.mocked(loadViewerProposals).mock.calls[0][2]).toEqual({ all: false, teamIds: [43] });
-  });
-
-  it("getViewerMatchProposals_nothingLoaded_returnsNull", async () => {
-    jest.mocked(loadViewerProposals).mockResolvedValue([]);
-
-    await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).resolves.toBeNull();
-  });
-
-  // Revue #542 : la date du report part avec ses maps, lues dans la même image.
-  it("getViewerMatchProposals_nominal_readsReportDatesAndMapsInOneReadOnlyTransaction", async () => {
-    await getViewerMatchProposals(snapshot(), 7, false, 70);
-
-    expect(connection.query.mock.calls.map(([sql]) => sql)).toEqual(["START TRANSACTION READ ONLY", "COMMIT"]);
-    expect(connection.execute.mock.calls[0]).toEqual([
-      "SELECT team1_reported_at, team2_reported_at FROM bg_matches WHERE id = ? LIMIT 1",
-      [70],
-    ]);
-    expect(connection.query.mock.invocationCallOrder[0]).toBeLessThan(
-      jest.mocked(loadViewerProposals).mock.invocationCallOrder[0],
-    );
-    expect(connection.query.mock.invocationCallOrder[1]).toBeGreaterThan(
-      jest.mocked(loadViewerProposals).mock.invocationCallOrder[0],
-    );
-  });
-
-  it("getViewerMatchProposals_staleSnapshot_passesFreshReportDate", async () => {
-    freshReports({ team1_reported_at: "2026-11-03T18:05:00.000Z", team2_reported_at: null });
-
-    await getViewerMatchProposals(snapshot(), 7, false, 70);
-
-    const [, [match]] = jest.mocked(loadViewerProposals).mock.calls[0];
-    expect(match.team1Report).toEqual({ ...report, reportedAt: "2026-11-03T18:05:00.000Z" });
-    expect(match.team2Report).toBeNull();
-  });
-
-  it("getViewerMatchProposals_reportWithdrawnSinceSnapshot_dropsIt", async () => {
-    freshReports({ team1_reported_at: null, team2_reported_at: null });
-
-    await getViewerMatchProposals(snapshot(), 7, false, 70);
-
-    const [, [match]] = jest.mocked(loadViewerProposals).mock.calls[0];
-    expect(match.team1Report).toBeNull();
-  });
-
-  it("getViewerMatchProposals_matchRowGone_returnsNullAndCommits", async () => {
-    freshReports(null);
-
-    await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).resolves.toBeNull();
-
-    expect(loadViewerProposals).not.toHaveBeenCalled();
-    expect(connection.query.mock.calls.at(-1)?.[0]).toBe("COMMIT");
-  });
-
-  it("getViewerMatchProposals_readFails_rollsBackAndRethrowsOriginalError", async () => {
-    jest.mocked(loadViewerProposals).mockRejectedValue(new Error("Connection lost"));
-
-    await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).rejects.toThrow("Connection lost");
-
-    expect(connection.query.mock.calls.map(([sql]) => sql)).toEqual(["START TRANSACTION READ ONLY", "ROLLBACK"]);
-  });
-
-  // Revue #542 : la fin de transaction ratée (connexion tombée) ne masque pas
-  // l'erreur d'origine.
-  it("getViewerMatchProposals_readAndRollbackFail_surfacesReadError", async () => {
-    jest.mocked(loadViewerProposals).mockRejectedValue(new Error("Connection lost"));
-    connection.query.mockImplementation(async (sql: string) => {
-      if (sql === "ROLLBACK") throw new Error("Cannot enqueue Query after fatal error");
-      return [[], []];
-    });
-
-    await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).rejects.toThrow("Connection lost");
-  });
-
-  // Revue #542 : en individuel, une seule place du pool par relecture.
-  it("getViewerMatchProposals_soloEntrant_usesOneConnectionForEntryAndRead", async () => {
-    jest.mocked(resolveUserEntrantTeamId).mockResolvedValue(43);
-
-    await getViewerMatchProposals(snapshot("SOLO"), 7, false, 70);
-
     expect(withConnection).toHaveBeenCalledTimes(1);
     expect(jest.mocked(resolveUserEntrantTeamId).mock.calls[0][0]).toBe(fakeConnection(connection));
-    expect(jest.mocked(loadViewerProposals).mock.calls[0][0]).toBe(fakeConnection(connection));
   });
 
-  it("getViewerMatchProposals_soloNotEntrant_returnsNullWithoutStartingTransaction", async () => {
+  it("getViewerMatchProposals_soloNotEntrant_returnsNullWithoutReading", async () => {
     jest.mocked(resolveUserEntrantTeamId).mockResolvedValue(null);
 
     await expect(getViewerMatchProposals(snapshot("SOLO"), 7, false, 70)).resolves.toBeNull();
 
-    expect(connection.query).not.toHaveBeenCalled();
-    expect(loadViewerProposals).not.toHaveBeenCalled();
+    expect(connection.execute).not.toHaveBeenCalled();
+  });
+
+  it("getViewerMatchProposals_matchRowGone_returnsNull", async () => {
+    connection.execute.mockResolvedValue([[], []]);
+
+    await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).resolves.toBeNull();
+  });
+
+  // Revue #542 : une équipe sortie du match (correction d'arbitrage) n'en lit
+  // plus les propositions, même si l'instantané en cache la place encore.
+  it("getViewerMatchProposals_entrantReplacedSinceSnapshot_returnsNull", async () => {
+    freshMatch({ team1_id: 50 });
+
+    await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).resolves.toBeNull();
+  });
+
+  it("getViewerMatchProposals_staleSnapshot_servesFreshReportDate", async () => {
+    freshMatch({ team1_reported_at: "2026-11-03T18:05:00.000Z" });
+
+    await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).resolves.toEqual({
+      ...read,
+      team1: { reportedAt: "2026-11-03T18:05:00.000Z", maps: read.team1?.maps },
+    });
+  });
+
+  // Revue #542 : un report déposé après l'instantané est servi.
+  it("getViewerMatchProposals_reportFiledAfterSnapshot_servesIt", async () => {
+    freshMatch({ team2_reported_at: "2026-11-03T18:06:00.000Z" }, [
+      TEAM1_MAP,
+      { source: "TEAM2", map_number: 1, replay_code: "XYZ789", team1_score: 0, team2_score: 2 },
+    ]);
+
+    const proposals = await getViewerMatchProposals(snapshot(), 7, false, 70);
+
+    expect(proposals?.team2).toEqual({
+      reportedAt: "2026-11-03T18:06:00.000Z",
+      maps: [{ mapNumber: 1, replayCode: "XYZ789", team1Score: 0, team2Score: 2 }],
+    });
+  });
+
+  it("getViewerMatchProposals_reportWithdrawnSinceSnapshot_returnsNull", async () => {
+    freshMatch({ team1_reported_at: null }, []);
+
+    await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).resolves.toBeNull();
+  });
+
+  it("getViewerMatchProposals_matchClosedSinceSnapshot_returnsNull", async () => {
+    freshMatch({ status: "COMPLETED" });
+
+    await expect(getViewerMatchProposals(snapshot(), 7, true, 70)).resolves.toBeNull();
   });
 });

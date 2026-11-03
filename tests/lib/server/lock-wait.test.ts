@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import type { PoolConnection } from "mysql2/promise";
-import { boundLockWait, releaseWithServerLockWait, SHORT_LOCK_WAIT_SECONDS } from "@/lib/server/tournaments/lock-wait";
+import { releaseWithServerLockWait, SHORT_LOCK_WAIT_SECONDS, withShortLockWait } from "@/lib/server/tournaments/lock-wait";
 import { connectionMock } from "../../helpers/sql-double";
 
 /**
@@ -13,14 +13,40 @@ function connection() {
   return { conn, asPool: conn as unknown as PoolConnection };
 }
 
-describe("boundLockWait", () => {
-  it("boundLockWait_setsSessionTimeoutToFiveSeconds", async () => {
+describe("withShortLockWait", () => {
+  it("withShortLockWait_nominal_boundsOnlyTheReadThenRestoresServerDefault", async () => {
     const { conn, asPool } = connection();
+    const read = jest.fn(async () => {
+      expect(conn.query.mock.calls.map(([sql]) => sql)).toEqual(["SET SESSION innodb_lock_wait_timeout = 5"]);
+      return true;
+    });
 
-    await boundLockWait(asPool);
+    await expect(withShortLockWait(asPool, read)).resolves.toBe(true);
 
     expect(SHORT_LOCK_WAIT_SECONDS).toBe(5);
-    expect(conn.query).toHaveBeenCalledWith("SET SESSION innodb_lock_wait_timeout = 5");
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(conn.query.mock.calls.map(([sql]) => sql)).toEqual([
+      "SET SESSION innodb_lock_wait_timeout = 5",
+      "SET SESSION innodb_lock_wait_timeout = DEFAULT",
+    ]);
+  });
+
+  // Revue #542 : le rejeu qui suit garde le délai du serveur, même si la
+  // lecture bornée échoue (délai dépassé → 409).
+  it("withShortLockWait_readTimesOut_restoresDefaultAndRethrows", async () => {
+    const { conn, asPool } = connection();
+    const timeout = Object.assign(new Error("Lock wait timeout exceeded"), { code: "ER_LOCK_WAIT_TIMEOUT" });
+
+    await expect(withShortLockWait(asPool, async () => Promise.reject(timeout))).rejects.toBe(timeout);
+
+    expect(conn.query.mock.calls.at(-1)?.[0]).toBe("SET SESSION innodb_lock_wait_timeout = DEFAULT");
+  });
+
+  it("withShortLockWait_restoreFails_keepsReadResult", async () => {
+    const { conn, asPool } = connection();
+    conn.query.mockResolvedValueOnce([[], []]).mockRejectedValueOnce(new Error("Connection lost"));
+
+    await expect(withShortLockWait(asPool, async () => false)).resolves.toBe(false);
   });
 });
 

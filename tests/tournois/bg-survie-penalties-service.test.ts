@@ -67,7 +67,9 @@ function makeConn(options: {
     return [[], []];
   });
 
-  const conn = { execute } as never as PoolConnection;
+  // Attente bornée de la lecture des manches (`withShortLockWait`).
+  const query = jest.fn(async () => [[], []]);
+  const conn = { execute, query } as never as PoolConnection;
   return { conn, calls, execute };
 }
 

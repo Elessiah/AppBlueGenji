@@ -110,18 +110,24 @@ describe("cancelTournamentForfeit", () => {
 
   // Revue #542 : le verrou du tournoi s'attend sans borne ; seules les
   // attentes suivantes (manches) sont bornées.
-  it("cancel_nominal_boundsLockWaitOnlyAfterTournamentLock", async () => {
-    const { connection, queries } = setup();
+  // Revue #542 : seule la lecture des manches a une attente bornée — ni le
+  // verrou du tournoi avant, ni le rejeu après (journal du bot, alertes).
+  it("cancel_nominal_boundsLockWaitAroundLaterRoundsReadOnly", async () => {
+    const { connection, queries, sqls } = setup();
 
     await cancelTournamentForfeit(7, 102);
 
-    expect(queries[0]).toBe(`SET SESSION innodb_lock_wait_timeout = ${SHORT_LOCK_WAIT_SECONDS}`);
-    expect(connection.query.mock.invocationCallOrder[0]).toBeGreaterThan(
-      connection.execute.mock.invocationCallOrder[0],
-    );
-    expect(connection.query.mock.invocationCallOrder[0]).toBeLessThan(
-      connection.execute.mock.invocationCallOrder[1],
-    );
+    const later = sqls.findIndex((sql) => LATER_ROUNDS.test(sql));
+    expect(queries).toEqual([
+      `SET SESSION innodb_lock_wait_timeout = ${SHORT_LOCK_WAIT_SECONDS}`,
+      "SET SESSION innodb_lock_wait_timeout = DEFAULT",
+      "SET SESSION innodb_lock_wait_timeout = DEFAULT",
+    ]);
+    const [bound, restore] = connection.query.mock.invocationCallOrder;
+    expect(bound).toBeGreaterThan(connection.execute.mock.invocationCallOrder[later - 1]);
+    expect(bound).toBeLessThan(connection.execute.mock.invocationCallOrder[later]);
+    expect(restore).toBeLessThan(connection.execute.mock.invocationCallOrder[later + 1]);
+    expect(restore).toBeLessThan(jest.mocked(reconcileSurvival).mock.invocationCallOrder[0]);
   });
 
   it("cancel_nominal_takesLockTournamentRowFirstThenLockedHead", async () => {
@@ -152,7 +158,8 @@ describe("cancelTournamentForfeit", () => {
     const later = sqls.findIndex((sql) => LATER_ROUNDS.test(sql));
     expect(later).toBe(4);
     expect(sqls.slice(0, later + 1).every((sql) => LOCKING.test(sql))).toBe(true);
-    expect(sqls[2]).toMatch(/^SELECT format FROM bg_tournament_phases WHERE id = \? LIMIT 1 LOCK IN SHARE MODE$/);
+    // Revue #542 : verrou exclusif d'emblée (le rejeu des phases peut écrire la ligne).
+    expect(sqls[2]).toMatch(/^SELECT format FROM bg_tournament_phases WHERE id = \? LIMIT 1 FOR UPDATE$/);
   });
 
   it("cancel_survival_reactivatesReplaysAndPublishesSnapshotAfterCommit", async () => {

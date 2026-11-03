@@ -16,7 +16,8 @@ import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
 
 function connectionReturning(rows: unknown[]) {
   const execute = jest.fn<SqlQuery>(async () => [rows, []]);
-  return { conn: fakeConnection({ execute }), execute };
+  const query = jest.fn<SqlQuery>(async () => [[], []]);
+  return { conn: fakeConnection({ execute, query }), execute, query };
 }
 
 const flat = (sql: unknown) => String(sql).replace(/\s+/g, " ").trim();
@@ -64,6 +65,39 @@ describe("laterRoundsHaveScoreInput", () => {
     expect(flat(execute.mock.calls[0][0])).toMatch(/LIMIT 1 FOR UPDATE$/);
     expect(flat(execute.mock.calls[0][0])).not.toMatch(/JOIN|FOR SHARE/);
   });
+
+  it("laterRoundsHaveScoreInput_lockWithoutBoundedWait_keepsServerTimeout", async () => {
+    const { conn, query } = connectionReturning([]);
+
+    await laterRoundsHaveScoreInput(conn, { tournamentId: 7, phaseId: 0, afterRound: 2, lock: true });
+
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  // Revue #542 : seule la lecture verrouillée des manches a une attente bornée —
+  // le rejeu qui suit retrouve le délai du serveur.
+  it("laterRoundsHaveScoreInput_boundedWait_wrapsOnlyTheLockedRead", async () => {
+    const { conn, execute, query } = connectionReturning([{ id: 9 }]);
+
+    await expect(
+      laterRoundsHaveScoreInput(conn, { tournamentId: 7, phaseId: 0, afterRound: 2, lock: true, boundedWait: true }),
+    ).resolves.toBe(true);
+
+    expect(query.mock.calls.map(([sql]) => sql)).toEqual([
+      "SET SESSION innodb_lock_wait_timeout = 5",
+      "SET SESSION innodb_lock_wait_timeout = DEFAULT",
+    ]);
+    expect(query.mock.invocationCallOrder[0]).toBeLessThan(execute.mock.invocationCallOrder[0]);
+    expect(query.mock.invocationCallOrder[1]).toBeGreaterThan(execute.mock.invocationCallOrder[0]);
+  });
+
+  it("laterRoundsHaveScoreInput_boundedWaitWithoutLock_readsWithoutTouchingTimeout", async () => {
+    const { conn, query } = connectionReturning([]);
+
+    await laterRoundsHaveScoreInput(conn, { tournamentId: 7, phaseId: 0, afterRound: 2, boundedWait: true });
+
+    expect(query).not.toHaveBeenCalled();
+  });
 });
 
 describe("laterRoundHasScoreInput — retrait d'une pénalité", () => {
@@ -75,6 +109,14 @@ describe("laterRoundHasScoreInput — retrait d'une pénalité", () => {
     const [sql, params] = execute.mock.calls[0];
     expect(params).toEqual([7, 0, 2, PLAYOFF_ROUND_OFFSET]);
     expect(flat(sql)).toMatch(/FOR UPDATE$/);
+  });
+
+  it("laterRoundHasScoreInput_qualifiers_boundsLockWait", async () => {
+    const { conn, query } = connectionReturning([]);
+
+    await laterRoundHasScoreInput(conn, 7, 2);
+
+    expect(query.mock.calls[0][0]).toBe("SET SESSION innodb_lock_wait_timeout = 5");
   });
 });
 
