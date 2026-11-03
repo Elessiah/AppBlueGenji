@@ -34,8 +34,14 @@ export interface Coalescer<T> {
   reset(): void;
 }
 
-/** Tous les regroupeurs du processus, pour l'arrêt du serveur. */
-const registry = new Set<Coalescer<unknown>>();
+/**
+ * Tous les regroupeurs du processus, pour l'arrêt du serveur. Sur `globalThis`,
+ * pas dans ce module : Next peut le charger une fois par bundle (routes,
+ * `instrumentation.ts`), et l'arrêt doit voir les rafales des routes
+ * (même raison que le lot de `bot-integration.ts`).
+ */
+const registryState = globalThis as typeof globalThis & { __bgCoalescerRegistry?: Set<Coalescer<unknown>> };
+const registry = (registryState.__bgCoalescerRegistry ??= new Set<Coalescer<unknown>>());
 
 export function createCoalescer<T>(options: {
   windowMs: number;

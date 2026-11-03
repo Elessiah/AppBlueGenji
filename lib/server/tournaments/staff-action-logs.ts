@@ -167,6 +167,12 @@ export function announceStaffTournamentAction(
   }
   // Une rafale en attente sur ce tournoi part d'abord : le journal garde l'ordre
   // des gestes (têtes de série réordonnées, puis coup d'envoi).
-  const pending = [...BURST_ACTIONS].map((burst) => tournamentBursts.flush(`${tournamentId}:${burst}`));
-  void Promise.all(pending).then(() => deliverTournamentAction(entry));
+  const keys = [...BURST_ACTIONS].map((burst) => `${tournamentId}:${burst}`);
+  // Rien en attente (le cas courant) : la ligne part sur-le-champ, sans détour
+  // par la file des microtâches — un arrêt du serveur juste après ne la rate pas.
+  if (!keys.some((key) => tournamentBursts.busy(key))) {
+    void deliverTournamentAction(entry);
+    return;
+  }
+  void Promise.all(keys.map((key) => tournamentBursts.flush(key))).then(() => deliverTournamentAction(entry));
 }
