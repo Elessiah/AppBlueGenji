@@ -57,17 +57,12 @@ function fakeConnection(options: {
   nextWinnerMatchId?: number | null;
   nextLoserMatchId?: number | null;
   dependents: Row[];
-}): { conn: PoolConnection; dependentQuery: () => string | null; statements: string[] } {
+}): { conn: PoolConnection; dependentQuery: () => string | null } {
   let dependentSql: string | null = null;
-  const statements: string[] = [];
 
   const conn = {
     execute: async (sql: string) => {
-      statements.push(sql.replace(/\s+/g, " ").trim());
-      // Format du tournoi, lu à part sous son verrou (table seule).
-      if (sql.startsWith("SELECT format FROM bg_tournaments")) return [[{ format: options.format }], []];
-      // Le match édité, relu sous le verrou que l'appelant tient déjà.
-      if (sql.startsWith("SELECT round_number, status, next_winner_match_id")) {
+      if (sql.includes("JOIN bg_tournaments")) {
         return [
           [
             {
@@ -79,6 +74,7 @@ function fakeConnection(options: {
               next_winner_match_id: options.nextWinnerMatchId ?? null,
               next_loser_match_id: options.nextLoserMatchId ?? null,
               tournament_id: 42,
+              format: options.format,
             },
           ],
           [],
@@ -94,7 +90,7 @@ function fakeConnection(options: {
     },
   } as unknown as PoolConnection;
 
-  return { conn, dependentQuery: () => dependentSql, statements };
+  return { conn, dependentQuery: () => dependentSql };
 }
 
 const editedMatch = { id: 1 } as MatchRow;
@@ -224,37 +220,14 @@ describe("checkDownstreamMatchesHaveNoScores — formats sans liens de bracket",
     }
   });
 
-  // ERREUR.txt EF-15 (revue) : un report de la manche suivante écrit au même
-  // moment ne doit pas échapper au verrou — et sous MariaDB, aucune lecture
-  // d'image ne doit précéder ce `FOR UPDATE` (`ER_CHECKREAD`).
-  it("checkDownstream_laterRounds_lockedRead", async () => {
+  // ERREUR.txt EF-15 (revue) : la lecture ordinaire du match a déjà figé
+  // l'image ; un `FOR UPDATE` ici serait refusé sous MariaDB (`ER_CHECKREAD`).
+  it("checkDownstream_laterRounds_snapshotReadWithoutLock", async () => {
     const { conn, dependentQuery } = fakeConnection({ format: "SURVIVAL", dependents: [] });
 
     await checkDownstreamMatchesHaveNoScores(conn, editedMatch);
 
-    expect(dependentQuery()).toMatch(/FOR UPDATE$/);
-  });
-
-  it("checkDownstream_readsBeforeLaterRounds_allLockingWithoutJoin", async () => {
-    const { conn, statements } = fakeConnection({ format: "SWISS", dependents: [] });
-
-    await checkDownstreamMatchesHaveNoScores(conn, editedMatch);
-
-    expect(statements).toHaveLength(3);
-    for (const statement of statements) {
-      expect(statement).toMatch(/FOR UPDATE$/);
-      expect(statement).not.toContain("JOIN");
-    }
-    expect(statements[1]).toBe("SELECT format FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE");
-  });
-
-  it("checkDownstream_undecidedMatch_neverLocksTournament", async () => {
-    const { conn, statements } = fakeConnection({ format: "SWISS", status: "READY", dependents: [] });
-
-    await checkDownstreamMatchesHaveNoScores(conn, editedMatch);
-
-    expect(statements).toHaveLength(1);
-    expect(statements[0]).not.toContain("bg_tournaments");
+    expect(dependentQuery()).not.toContain("FOR UPDATE");
   });
 
   it("refuse la correction d'un round dont la suite a déjà un score", async () => {

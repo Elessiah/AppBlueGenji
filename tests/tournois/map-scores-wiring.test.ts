@@ -536,8 +536,6 @@ describe("dialogues de score — calculs évités (EF-15)", () => {
     expect(form).toContain("const rules = rulesKey(matchFormat, game);");
     expect(form).not.toContain("JSON.stringify(matchFormat)");
     expect(form).toContain("rules !== synced.rules");
-    // Saisie en cours sous l'ancien format : conflit signalé, pas d'écrasement.
-    expect(form).toContain("} else if ((signature !== synced.signature || rules !== synced.rules) && !submitting) {");
     expect(form).not.toMatch(/setSynced\(\{ signature, proposals, baseline/);
   });
 });

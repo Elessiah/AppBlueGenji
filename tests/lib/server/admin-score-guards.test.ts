@@ -84,11 +84,8 @@ function fakeConnection(
       const direct = writeOrProbe(q, params);
       if (direct) return direct;
 
-      // Verrou aval : le format du tournoi, lu à part sous son verrou.
-      if (q.startsWith("SELECT format FROM bg_tournaments")) return [[{ format: "SINGLE" }], []];
-
-      // Verrou aval, premier temps : le match édité, relu sous son verrou.
-      if (q.startsWith("SELECT round_number, status, next_winner_match_id")) {
+      // Verrou aval, premier temps : le match édité, avec le format du tournoi.
+      if (q.includes("FROM bg_matches m JOIN bg_tournaments t")) {
         // `status` autant que `winner_team_id` : depuis que le verrou lit le statut
         // (`isMatchPlayed`), une ligne factice sans cette colonne le fait sortir
         // aussitôt — le garde-fou était donc neutralisé dans tous les tests qui
@@ -102,6 +99,7 @@ function fakeConnection(
               next_winner_match_id: options.dependents ? 11 : null,
               next_loser_match_id: null,
               tournament_id: 1,
+              format: "SINGLE",
             },
           ],
           [],

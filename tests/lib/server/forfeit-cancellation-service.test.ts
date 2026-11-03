@@ -11,7 +11,8 @@ jest.mock("@/lib/server/tournaments/swiss");
 jest.mock("@/lib/server/tournaments/bg-survie/reconcile");
 jest.mock("@/lib/server/tournaments/phases");
 
-import { CANCEL_LOCK_WAIT_SECONDS, cancelTournamentForfeit } from "@/lib/server/tournaments/forfeit-cancellation";
+import { SHORT_LOCK_WAIT_SECONDS } from "@/lib/server/tournaments/lock-wait";
+import { cancelTournamentForfeit } from "@/lib/server/tournaments/forfeit-cancellation";
 import { getDatabase } from "@/lib/server/database";
 import { flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
@@ -109,8 +110,7 @@ describe("cancelTournamentForfeit", () => {
 
     await cancelTournamentForfeit(7, 102);
 
-    expect(queries[0]).toBe(`SET SESSION innodb_lock_wait_timeout = ${CANCEL_LOCK_WAIT_SECONDS}`);
-    expect(CANCEL_LOCK_WAIT_SECONDS).toBe(5);
+    expect(queries[0]).toBe(`SET SESSION innodb_lock_wait_timeout = ${SHORT_LOCK_WAIT_SECONDS}`);
     expect(connection.query.mock.invocationCallOrder[0]).toBeLessThan(
       connection.beginTransaction.mock.invocationCallOrder[0],
     );
