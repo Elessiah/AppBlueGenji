@@ -199,6 +199,18 @@ describe("motif décliné selon la condition qui manque", () => {
     expect(castReleasedPush(match({ reason: "INELIGIBLE", block: "CASTER_IDENTITY_REQUIRED" }), "en").body).toContain("caster identity is incomplete");
   });
 
+  it("castReleasedPush_identityBlock_pointsToProfile", () => {
+    const subject = match({ reason: "INELIGIBLE", block: "CASTER_IDENTITY_REQUIRED" });
+    expect(castReleasedPush(subject, "fr").body).toContain("« Mon profil »");
+    expect(castReleasedPush(subject, "en").body).toContain("“My profile”");
+  });
+
+  it("castReleasedPush_permissionBlock_doesNotPointToProfile", () => {
+    const subject = match({ reason: "INELIGIBLE", block: "NOT_CASTER" });
+    expect(castReleasedPush(subject, "fr").body).not.toContain("Mon profil");
+    expect(castReleasedPush(subject, "en").body).not.toContain("My profile");
+  });
+
   it("castReleasedPush_replacedEn_joinsWithAnd", () => {
     expect(castReleasedPush(match({ reason: "REPLACED" }), "en").body).toContain(
       "requirements and another caster took your place",
