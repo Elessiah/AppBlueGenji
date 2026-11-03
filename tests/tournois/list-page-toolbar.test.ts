@@ -9,7 +9,9 @@ const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
 // que la section « Tournois invisibles », cf. hidden-tournaments-section.test.ts) :
 // on vérifie le câblage au niveau source.
 const page = read("app/(secured)/tournois/TournamentsList.tsx");
+const css = read("app/(secured)/tournois/tournois.module.css");
 import frTournaments from "@/messages/fr/tournaments.json";
+import enTournaments from "@/messages/en/tournaments.json";
 
 describe("page tournois — barre de recherche et filtres", () => {
   it("le champ de recherche a un nom accessible, indépendant du placeholder", () => {
@@ -39,12 +41,12 @@ describe("page tournois — barre de recherche et filtres", () => {
   });
 
   it("les pastilles comptent selon la recherche en cours, pas seulement le jeu", () => {
-    expect(page).toContain('filterBuckets(scheduledBuckets, query, "all", formatName)');
+    expect(page).toContain('filterBuckets(scheduledBuckets, deferredQuery, "all", formatName)');
     expect(page).toContain("countByGame(queryFilteredBuckets, key)");
   });
 
   it("une page vidée par un filtre le dit, distinctement d'une page réellement vide", () => {
-    expect(page).toContain('sectionEmptyMessage(t("list.emptyUnfiltered"), query, gameFilter, t("list.emptyFiltered"))');
+    expect(page).toContain('sectionEmptyMessage(t("list.emptyUnfiltered"), deferredQuery, gameFilter, t("list.emptyFiltered"))');
     expect(frTournaments.list.emptyUnfiltered).toBe("Aucun tournoi publié pour le moment.");
   });
 
@@ -52,7 +54,7 @@ describe("page tournois — barre de recherche et filtres", () => {
     expect(page).toMatch(/setBuckets\(\(previous\) => \(sameBuckets\(previous, all\) \? previous : all\)\);\s*setListFetched\(true\);/);
     // « Mes tournois » attendu aussi (échec compris), sans quoi sa section
     // naissait au sommet après coup et poussait la liste vers le bas.
-    expect(page).toContain("const listLoaded = listFetched && mineSettled;");
+    expect(page).toContain("isListGateOpen({ listFetched, mineSettled, hiddenSettled })");
     // Une seule porte sur les données : ni section ni invisible sous le
     // squelette, même quand la liste arrive avant « Mes tournois ».
     expect(page).toContain("const viewBuckets = listLoaded ? buckets : emptyBuckets;");
@@ -62,18 +64,56 @@ describe("page tournois — barre de recherche et filtres", () => {
     expect(page).toContain("isAdmin && viewHidden.length > 0");
     expect(page.match(/\bhiddenTournaments\b/g)).toHaveLength(2);
     expect(page).toMatch(/fetchMyTournamentIds[\s\S]*?\} catch \{[\s\S]*?\}\s*if \(!signal\?\.aborted\) setMineSettled\(true\);/);
-    expect(page).toContain('{!listLoaded && <SecuredLoadingView label={t("list.loading")} />}');
+    expect(page).toContain('{!listLoaded && <SecuredLoadingView label={t("list.loading")} cardsOnly />}');
     expect(page).toContain("{listLoaded && shownSections.length === 0 && (");
     // Sommaire, pastilles et bandeau gardent leur place (pas de saut de mise
     // en page à l'arrivée de la liste) : entrées sans compte, bandeau vide.
     expect(page).toMatch(/<nav className=\{s\.sectionNav\}[^>]*>\s*\{sections\.map\(\(entry\) => \{[\s\S]*?if \(!listLoaded\) \{[\s\S]*?\{COUNT_PENDING\}/);
     expect(page).toContain("{listLoaded ? count : COUNT_PENDING}");
-    expect(page).toContain("items={listLoaded ? buildTickerItems(scheduledBuckets, text) : NO_TICKER_ITEMS}");
+    expect(page).toContain("<Ticker items={tickerItems} labels={text.tickerLabels} />");
     expect(page).not.toMatch(/\{listLoaded && \(\s*<(nav|Ticker)/);
     // Le drapeau ne repasse jamais à faux : un échec de relecture garde la liste.
     expect(page.match(/setListFetched\(/g)).toHaveLength(1);
-    expect(page.match(/setMineSettled\(/g)).toHaveLength(1);
+    // Deux portes pour « Mes tournois » : sa réponse, ou son délai maximal.
+    expect(page.match(/setMineSettled\(/g)).toHaveLength(2);
     expect(frTournaments.list.loading).toBe("Chargement des tournois…");
+  });
+
+  it("la lecture « Mes tournois » ne retient pas l'affichage au-delà de son délai maximal", () => {
+    expect(page).toContain("const MINE_SETTLE_MAX_MS = 2500;");
+    // Le même délai borne la première lecture des invisibles (staff).
+    expect(page).toMatch(
+      /window\.setTimeout\(\(\) => \{\s*setMineSettled\(true\);\s*setHiddenSettled\(true\);\s*\}, MINE_SETTLE_MAX_MS\);\s*return \(\) => window\.clearTimeout\(timer\);/,
+    );
+  });
+
+  it("le droit staff vient du serveur : plus de lecture `/api/auth/me` ni d'état `isAdmin`", () => {
+    expect(page).toContain("const isAdmin = canManage;");
+    expect(page).not.toContain('fetch("/api/auth/me"');
+    expect(page).not.toContain("setIsAdmin");
+    // La première lecture des invisibles fait partie de la porte, échec compris.
+    expect(page).toContain("const [hiddenRead, setHiddenSettled] = useState(false);");
+    expect(page).toMatch(/\} finally \{[\s\S]*?if \(!signal\?\.aborted\) setHiddenSettled\(true\);/);
+  });
+
+  it("les entrées d'attente du sommaire gardent leur teinte et réservent « Mes tournois »", () => {
+    expect(page).toMatch(/<span key=\{entry\.key\} className=\{s\.sectionNavLink\} data-tone=\{entry\.key\}>/);
+    expect(page).toContain(": myTournamentIds.size > 0,");
+  });
+
+  it("la zone des sections garde une hauteur minimale pendant le chargement", () => {
+    expect(page).toContain('data-loading={listLoaded ? undefined : "true"}');
+    expect(css).toMatch(/\.sections\[data-loading="true"\]\s*\{\s*min-height:/);
+    expect(css).toMatch(/\.sectionNavLink \.num \{[^}]*min-width: 2ch;/);
+  });
+
+  it("la recherche est différée et le filtrage mémoïsé", () => {
+    expect(page).toContain("const deferredQuery = useDeferredValue(query);");
+    expect(page).toContain("value={query}");
+    for (const memo of ["queryFilteredBuckets", "queryFilteredHidden", "gameFilteredBuckets", "filteredHidden", "hasMyTournaments"]) {
+      expect(page).toMatch(new RegExp(`const ${memo} = useMemo`));
+    }
+    expect(page).toMatch(/const \{ mine: myTournaments, others: filteredBuckets \} = useMemo/);
   });
 
   it("« Créer un tournoi » est un seul contrôle interactif, pas un bouton dans un lien", () => {
@@ -112,7 +152,9 @@ describe("page tournois — volume des sections", () => {
   });
 
   it("l'état déplié se remet à zéro à chaque changement de filtre", () => {
-    expect(page).toMatch(/setExpandedSections\(new Set\(\)\);\s*\}, \[query, gameFilter\]\);/);
+    expect(page).toMatch(
+      /setExpandedSections\(\(previous\) => \(previous\.size === 0 \? previous : new Set\(\)\)\);\s*\}, \[deferredQuery, gameFilter\]\);/,
+    );
   });
 
   it("une section dépliée montre le total réel, jamais un compte figé au moment du clic", () => {
@@ -130,5 +172,47 @@ describe("page tournois — volume des sections", () => {
     for (const key of ["mine", "running", "registration", "upcoming", "finished"]) {
       expect(page).toMatch(new RegExp(`sectionTitle=\\{sectionTitle\\("${key}"\\)\\}[\\s\\S]{0,80}total=\\{total${key[0].toUpperCase()}${key.slice(1)}\\}`));
     }
+  });
+});
+
+describe("page tournois — annonce des résultats", () => {
+  it("garde une région live toujours montée, qui dit le nombre de résultats et l'attente de l'archive", () => {
+    expect(page).toMatch(/<output className="sr-only">[\s\S]{0,20}\{liveMessage\}/);
+    expect(page).toContain('t("list.resultsCount", { count: String(shown) })');
+    expect(page).toContain('if (finishedArchiveLoading) return t("list.finishedLoading");');
+    expect(page).not.toContain("aria-busy");
+  });
+
+  it("a le message en français et en anglais", () => {
+    expect(frTournaments.list.resultsCount).toContain("{count}");
+    expect(enTournaments.list.resultsCount).toContain("{count}");
+  });
+});
+
+describe("page tournois — porte des invisibles et annonce des gestes", () => {
+  it("dérive la porte des invisibles du droit staff, au lieu de l'initialiser une fois", () => {
+    expect(page).toContain("const hiddenSettled = !isAdmin || hiddenRead;");
+    expect(page).toContain("useState(false);\n  const hiddenSettled".replace(/\n/g, page.includes("\r\n") ? "\r\n" : "\n"));
+  });
+
+  it("annonce le nombre de résultats aussi pour un filtre de jeu ou l'archive dépliée", () => {
+    expect(page).toContain(`if (!deferredQuery.trim() && gameFilter === "all" && !finishedExpanded) {`);
+  });
+});
+
+describe("page tournois — porte ouverte une fois, annonce du retour au tout-afficher", () => {
+  it("ne referme jamais la porte d'affichage après son ouverture", () => {
+    expect(page).toContain("if (isListGateOpen({ listFetched, mineSettled, hiddenSettled })) gateOpenedRef.current = true;");
+    expect(page).toContain("const listLoaded = gateOpenedRef.current;");
+  });
+
+  it("annonce encore le total quand les filtres sont retirés après un geste", () => {
+    expect(page).toContain("if (!gestureMadeRef.current) return \"\";");
+    expect(page).toContain("gestureMadeRef.current = true;");
+  });
+
+  it("dit « trouvés » : le total des sections, pas les cartes dessinées", () => {
+    expect(frTournaments.list.resultsCount).toBe("Tournois trouvés : {count}");
+    expect(enTournaments.list.resultsCount).toBe("Tournaments found: {count}");
   });
 });

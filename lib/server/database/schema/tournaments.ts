@@ -94,6 +94,7 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_bg_tournaments_state (state),
       INDEX idx_bg_tournaments_start_at (start_at),
+      INDEX idx_bg_tournaments_start_visibility (start_visibility_at),
       CONSTRAINT fk_bg_tournaments_organizer FOREIGN KEY (organizer_user_id)
         REFERENCES bg_users(id) ON DELETE RESTRICT
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

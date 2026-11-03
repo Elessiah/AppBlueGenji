@@ -208,6 +208,11 @@
 
 .sectionNavLink .num {
   color: var(--blue-300);
+  /* Deux chiffres de large dès le squelette : le compte « – » puis « 12 »
+     n'élargit plus l'entrée, qui ne fait donc plus passer le sommaire à une
+     rangée de plus à l'arrivée de la liste. */
+  min-width: 2ch;
+  text-align: center;
 }
 
 a.sectionNavLink:hover {
@@ -326,6 +331,13 @@ a.sectionNavLink[data-tone="finished"]:hover {
 .sections {
   padding: 28px 0 64px;
   position: relative;
+}
+
+/* Tant que la liste n'est pas là : une hauteur minimale, sans quoi le pied de
+   page restait visible sous le squelette (~260 px) sur un écran haut, puis
+   repoussé hors de l'écran à l'arrivée des sections. */
+.sections[data-loading="true"] {
+  min-height: 70vh;
 }
 
 .section {
@@ -591,22 +603,41 @@ a.sectionNavLink[data-tone="finished"]:hover {
   background: rgba(90, 200, 255, 0.05);
 }
 
-.cardRibbonRunning .dot {
+/* Pastille pulsée : l'anneau est un pseudo-élément animé en `transform` et
+   `opacity` (composés hors du fil principal) — l'ancienne animation de
+   `box-shadow` repeignait chaque pastille de carte à chaque image. */
+.cardRibbonRunning .dot,
+.cardRibbonOpen .dot {
+  position: relative;
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--blue-300);
-  box-shadow: 0 0 0 0 rgba(90, 200, 255, 0.6);
-  animation: pulseBlue 1.6s infinite;
+}
+
+.cardRibbonRunning .dot::after,
+.cardRibbonOpen .dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: inherit;
+  opacity: 0.6;
+  animation: pulseRing 1.6s infinite;
   animation-play-state: var(--deco-anim-state);
 }
 
-@keyframes pulseBlue {
+.cardRibbonRunning .dot {
+  background: var(--blue-300);
+}
+
+@keyframes pulseRing {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(90, 200, 255, 0.6);
+    transform: scale(1);
+    opacity: 0.6;
   }
   50% {
-    box-shadow: 0 0 0 6px rgba(90, 200, 255, 0);
+    transform: scale(3);
+    opacity: 0;
   }
 }
 
@@ -826,22 +857,7 @@ a.sectionNavLink[data-tone="finished"]:hover {
 }
 
 .cardRibbonOpen .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
   background: var(--pink-400);
-  box-shadow: 0 0 0 0 rgba(var(--pink-400-rgb), 0.6);
-  animation: pulsePink 1.6s infinite;
-  animation-play-state: var(--deco-anim-state);
-}
-
-@keyframes pulsePink {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(var(--pink-400-rgb), 0.6);
-  }
-  50% {
-    box-shadow: 0 0 0 6px rgba(var(--pink-400-rgb), 0);
-  }
 }
 
 /* Terminé : terni par les couleurs, jamais par une opacité — elle se

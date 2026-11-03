@@ -43,7 +43,7 @@ describe("annuaires sur grand écran", () => {
 
   it("élargit la colonne des pages `.page-wide` seulement, gouttière d'accessibilité comprise", () => {
     expect(wide).toMatch(
-      /\.page-shell:has\(\.page-wide\)\s*\{\s*width:\s*min\(1680px,\s*calc\(100vw - max\(80px,\s*var\(--a11y-tab-gutter\)\)\)\)/,
+      /\.page-shell:has\(> \.page-wide\)\s*\{\s*width:\s*min\(1680px,\s*calc\(100vw - max\(80px,\s*var\(--a11y-tab-gutter\)\)\)\)/,
     );
     expect(wide).toMatch(/\.page-wide \.container\s*\{\s*width:\s*calc\(100% - 48px\)/);
   });

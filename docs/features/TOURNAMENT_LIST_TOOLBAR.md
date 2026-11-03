@@ -120,8 +120,11 @@ de jeu et « Voir plus (N) » comptent l'archive entière sans l'avoir reçue
 (`finishedBeyondList`). L'archive elle-même est servie par
 `GET /api/tournaments?finished=all`, mutualisée à part : la page la demande dès
 que le lecteur va la chercher — « Voir plus » sur les terminés, une recherche ou
-un filtre de jeu (`needsFinishedArchive`) — puis la garde pour le reste de la
-visite.
+un filtre de jeu (`needsFinishedArchive`) — **tant qu'il en faut** et seulement
+**après la première liste** : une frappe avant son arrivée n'abandonne plus la
+première lecture, et une fois le filtre effacé (ou la section repliée) les
+relectures de fond reprennent la liste courte au lieu de retélécharger sans fin
+une archive qui grossit.
 
 ## « Créer un tournoi »
 
@@ -133,8 +136,67 @@ geste, `components/cyber/CyberButton.tsx`) ; les styles propres au bouton
 (`.create`) ont disparu avec lui, `CyberButton` en variante `primary` rendant
 déjà la même apparence.
 
+## Chargement et coût de rendu (EF-16)
+
+- **Droit staff lu par le serveur** : `page.tsx` passe `canManage`
+  (`can(user, "tournaments")`, `getCurrentUser` étant mémoïsé par requête) à
+  `TournamentsList` ; plus de lecture `/api/auth/me` côté client, « Créer » et la
+  section des invisibles sont là au premier rendu.
+- **Porte d'affichage** (`_lib/list-gate.ts`, `isListGateOpen`) : liste publique,
+  « Mes tournois » **et** première lecture des invisibles (staff) ; chaque lecture
+  est réglée à son premier résultat, échec compris. « Mes tournois » ne retient
+  plus l'affichage au-delà de `MINE_SETTLE_MAX_MS` (2,5 s) : une réponse tardive
+  remplit ensuite la section.
+- **Recherche** : valeur différée (`useDeferredValue`) et filtrage sous `useMemo`
+  (recherche, jeu, découpage « Mes tournois », bandeau) ; l'état déplié n'est
+  remis à zéro que s'il ne l'est pas déjà (pas de second rendu par frappe).
+- **Cartes** sous `memo` (la carte « à venir » juge son visage hors du `memo`) ;
+  `formatCardDate` réutilise un `Intl.DateTimeFormat` par langue et variante ;
+  `sizes` des bandeaux calés sur la grille (`CARD_IMAGE_SIZES`, et
+  `RUNNING_CARD_IMAGE_SIZES` pour la section « En cours », sur deux colonnes) ;
+  `sizes` d'un logo = sa largeur d'affichage (le navigateur multiplie par la
+  densité de l'écran).
+- **Pastilles pulsées** : anneau `::after` animé en `transform` et `opacity`
+  (`pulseRing`), plus de `box-shadow` repeint à chaque image ; l'animation lit
+  toujours `--deco-anim-state`.
+- **Squelette** : `SecuredLoadingView cardsOnly` dans la page (cartes seules, sous
+  le vrai titre), zone des sections à hauteur minimale pendant le chargement
+  (`data-loading`), entrées d'attente du sommaire teintées (`data-tone`), compte
+  sur deux chiffres de large, entrée « Mes tournois » réservée dès que la lecture
+  du joueur a répondu.
+- **Serveur** : `GET /api/tournaments` garde le corps sérialisé et son empreinte
+  avec la liste mise en cache (`WeakMap` sur l'objet), répond `ETag` +
+  `Cache-Control: private, no-cache` et **304** à `If-None-Match` (le client lit
+  en `cache: "no-cache"`) — le contrôle d'accès passe avant ; `scope=hidden`
+  (tournois non publiés, staff seul) répond `private, no-store` sans empreinte
+  (et le client la demande en `cache: "no-store"`) :
+  aucune copie sur le disque d'un poste partagé après la déconnexion. Une
+  réponse d'erreur non JSON (page du proxy) retombe sur le code
+  `TOURNAMENT_LIST_FAILED` ; la toast d'échec dit une phrase traduite
+  (`list.loadFailed`, `list.hiddenLoadFailed`), jamais le code ni le message
+  brut du navigateur ; une lecture en échec côté serveur rend le code
+  `TOURNAMENT_LIST_FAILED` en 500 (une contention passagère garde son message :
+  409 `CONCURRENT_UPDATE_RETRY`). Un refus 401/403 des invisibles vide la section
+  sans toast et fait relire le droit au serveur (`router.refresh()`) : retiré, le
+  prop `canManage` passe à faux (plus de « Créer », plus de lecture refusée,
+  cadence joueur) ; rendu entre-temps, la lecture suivante aboutit. Un 401 sur la
+  liste publique fait de même, sans toast : la page cède la place à la carte
+  « Connexion requise ». Le paramètre
+  `?search=` est retiré (inutilisé, il contournait le cache partagé). La requête
+  de liste compte les inscriptions par sous-requête corrélée (plus de `GROUP BY`
+  sur 36 colonnes, ni table dérivée regroupant toute la table), lit avec elle les colonnes d'avancement (plus de relecture de
+  `bg_tournaments`) et lance le décompte des terminés en parallèle ;
+  `idx_bg_tournaments_start_visibility (start_visibility_at)` (CREATE TABLE et
+  `RECENT_SCHEMA_CHANGES`).
+- **`:has()` borné** : la colonne élargie (≥ 1800 px) vise `.page-shell:has(> .page-wide)`
+  (enfant direct) au lieu d'un descendant réévalué à chaque mutation de la page.
+
 ## Notes reprises de CLAUDE.md
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
 - **Barre d'outils de `/tournois`** (`app/(secured)/tournois/page.tsx` + `Section.tsx` + `_lib/buckets.ts` pur) : la recherche filtre nom, description **et format** (`FORMAT_LABELS` — les équipes engagées n'y figurent pas, `TournamentCard` ne porte que des comptes) et porte un `aria-label` propre, le placeholder seul n'en étant pas un ; son raccourci affiché suit la plateforme (`searchShortcutLabel`, `lib/shared/search-shortcut.ts` : « ⌘K » sur Apple, « Ctrl+K » ailleurs), libellé et touche passant par `useSearchShortcut`, partagé avec `/equipes` et `/joueurs` (`AnnuaireSearchField`, qui affichait « ⌘K » sans écouter aucune touche) ; pastille masquée sous `(hover: none)`, champs en 16 px (iOS zoome en dessous). Les pastilles de jeu portent `aria-pressed` et un `aria-label` qui compose proprement libellé et compte (le chiffre visible passe en `aria-hidden`, sinon le nom accessible les collait — « Tous83 ») ; leur compte suit désormais la recherche en cours, pas seulement le jeu. Une section vidée par un filtre actif dit « Aucun résultat pour cette recherche. » (`sectionEmptyMessage`), distinct d'une section réellement sans tournoi. L'en-tête d'une section pose enfin le bouton **dans** son `<h2>` et non l'inverse (un titre n'est pas du contenu phrasé, il ne pouvait pas vivre dans un `<button>`) — au prix d'un `aria-label` qui retranche le nom accessible du `<h2>` au seul titre et à son accent (« · STAFF »), sans quoi il collerait aussi l'index et le compte ; `aria-controls` ne le relie à son corps que **section dépliée**, jamais vers un id absent du DOM d'une section fermée par défaut. Les quatre sections à cartes sont bornées à 12 par défaut, avec un « Voir plus » **réversible** (`ShowMoreRow`) — la version d'origine, propre à « Terminés », ne savait que déplier, et l'état déplié est un **drapeau** (`expandedSections`), pas un total figé au clic qui resterait périmé après un rafraîchissement de fond. Voir `docs/features/TOURNAMENT_LIST_TOOLBAR.md`.
+
+## Annonce aux lecteurs d'écran
+
+Une balise `<output class="sr-only">` toujours montée (une région live insérée avec son texte n'est pas annoncée) dit « Tournois affichés : N » quand la recherche a mis les cartes à jour (`deferredQuery`), et « chargement de l'archive » après « Voir plus » sur les terminés. Pas d'`aria-busy` sur les sections : il retient les annonces de ses descendants.

@@ -1,5 +1,5 @@
 {
-  "count": 196,
+  "count": 197,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "CERTIFY_PROMPT_OTHER_ACCOUNT": "Un autre compte est connecté dans ce navigateur : « Ne plus voir » n'a pas été enregistré.",
@@ -84,6 +84,7 @@
     "EMPTY_PATCH": "Aucune modification à enregistrer.",
     "TOURNAMENT_UPDATE_FAILED": "Erreur lors de la modification du tournoi.",
     "TOURNAMENT_CREATE_FAILED": "Le tournoi n'a pas pu être créé.",
+    "TOURNAMENT_LIST_FAILED": "Impossible de charger les tournois.",
     "ROLLBACK_NOTHING_TO_UNDO": "Plus rien à défaire : aucun score n'est saisi sur ce plateau.",
     "ROLLBACK_TOURNAMENT_NOT_STARTED": "Le tournoi n'a pas encore commencé : il n'a aucune manche à défaire.",
     "ROLLBACK_ROUND_CHANGED": "La manche courante a changé pendant que le dialogue était ouvert : le plateau vient de se rafraîchir, relis les scores avant de recommencer.",

@@ -42,14 +42,14 @@ async function mockDb(execute: ExecuteMock) {
 }
 
 function listQuery(execute: ExecuteMock): [string, unknown[]] {
-  const call = execute.mock.calls.find(([sql]) => String(sql).includes("FROM bg_tournaments"));
+  const call = execute.mock.calls.find(([sql]) => String(sql).includes("registered_teams"));
   if (!call) throw new Error("aucune requête de liste");
   return call as [string, unknown[]];
 }
 
 /** Clause WHERE seule : la liste des colonnes sélectionnées n'y participe pas. */
 function whereClause(sql: string): string {
-  return sql.slice(sql.indexOf("WHERE "), sql.indexOf("GROUP BY"));
+  return sql.slice(sql.indexOf("WHERE "), sql.indexOf("ORDER BY"));
 }
 
 describe("listTournamentBuckets — portée", () => {
@@ -178,7 +178,7 @@ describe("listTournamentBuckets — tournois terminés bornés", () => {
   /** Liste de `rows`, décompte des terminés `totals` (par jeu). */
   function listing(rows: unknown[], totals: { game: string; total: number | string }[]) {
     return jest.fn<SqlQuery>(async (sql: string) => {
-      if (sql.includes("COUNT(r.id)")) return [rows, undefined];
+      if (sql.includes("registered_teams")) return [rows, undefined];
       if (sql.includes("GROUP BY t.game")) return [totals, undefined];
       return [[], undefined];
     });
@@ -236,7 +236,7 @@ describe("listTournamentBuckets — tournois terminés bornés", () => {
   it("sert la liste entière quand le décompte est en panne", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const execute = jest.fn<SqlQuery>(async (sql: string) => {
-      if (sql.includes("COUNT(r.id)")) {
+      if (sql.includes("registered_teams")) {
         return [sql.includes("t.id IN") ? [finished(1)] : [finished(1), finished(2)], undefined];
       }
       if (sql.includes("GROUP BY t.game")) throw new Error("table verrouillée");
@@ -246,12 +246,80 @@ describe("listTournamentBuckets — tournois terminés bornés", () => {
 
     const buckets = await listTournamentBuckets(null);
 
-    const lists = execute.mock.calls.filter(([sql]) => String(sql).includes("COUNT(r.id)"));
+    const lists = execute.mock.calls.filter(([sql]) => String(sql).includes("registered_teams"));
     expect(lists).toHaveLength(2);
     expect(String(lists[1][0])).not.toContain("t.id IN");
     expect(buckets.finished.map((t) => t.id)).toEqual([1, 2]);
     expect(buckets).not.toHaveProperty("finishedTotals");
     expect(error).toHaveBeenCalled();
+  });
+
+  it("lance le décompte des terminés en même temps que la requête principale, pas derrière elle", async () => {
+    const order: string[] = [];
+    let releaseList: () => void = () => undefined;
+    const execute = jest.fn<SqlQuery>(async (sql: string) => {
+      if (sql.includes("registered_teams")) {
+        order.push("liste:début");
+        await new Promise<void>((resolve) => {
+          releaseList = resolve;
+        });
+        order.push("liste:fin");
+        return [[finished(1)], undefined];
+      }
+      if (sql.includes("GROUP BY t.game")) {
+        order.push("décompte");
+        return [[{ game: "OW", total: 5 }], undefined];
+      }
+      return [[], undefined];
+    });
+    await mockDb(execute);
+
+    const pending = listTournamentBuckets(null);
+    // La requête principale est encore en vol : le décompte est déjà parti.
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(order).toEqual(["décompte", "liste:début"]);
+    releaseList();
+    const buckets = await pending;
+
+    expect(buckets.finishedTotals).toEqual({ all: 5, byGame: { OW: 5, MR: 0 } });
+  });
+
+  it("compte les inscriptions par sous-requête corrélée, sans regrouper les colonnes du tournoi", async () => {
+    const execute = listing([], []);
+    await mockDb(execute);
+
+    await listTournamentBuckets(null);
+
+    const [sql] = listQuery(execute);
+    // Corrélée : seules les inscriptions des tournois listés sont lues, par
+    // l'index `idx_bg_registration_tournament` (une table dérivée aurait
+    // regroupé toute la table à chaque reconstruction).
+    expect(sql).toContain(
+      "(SELECT COUNT(*) FROM bg_tournament_registrations r WHERE r.tournament_id = t.id) AS registered_teams",
+    );
+    expect(sql).not.toContain("LEFT JOIN");
+    // Plus aucun `GROUP BY` : ni les 36 colonnes (dont `description TEXT`) du tournoi, ni table dérivée.
+    expect(sql).not.toContain("GROUP BY");
+  });
+
+  it("lit l'avancement d'un tournoi en cours avec la liste, sans relire bg_tournaments", async () => {
+    const running = tournamentListRow({
+      id: 7,
+      state: "RUNNING",
+      format: "SWISS",
+      start_visibility_at: past,
+      swiss_total_rounds: 4,
+      swiss_current_round: 2,
+    });
+    const execute = listing([running], []);
+    await mockDb(execute);
+
+    await listTournamentBuckets(null);
+
+    const metaReads = execute.mock.calls.filter(([sql]) =>
+      String(sql).includes("FROM bg_tournaments WHERE id IN"),
+    );
+    expect(metaReads).toHaveLength(0);
   });
 
   it("sert l'archive entière à qui la demande, sans borne ni décompte", async () => {
@@ -277,7 +345,7 @@ describe("listTournamentBuckets — tournois terminés bornés", () => {
     await listTournamentBuckets(null);
 
     // Une lecture par liste, pas une par appel ; et les deux ne se confondent pas.
-    expect(execute.mock.calls.filter(([sql]) => String(sql).includes("COUNT(r.id)"))).toHaveLength(2);
+    expect(execute.mock.calls.filter(([sql]) => String(sql).includes("registered_teams"))).toHaveLength(2);
   });
 
   it("ne borne ni une recherche, ni la portée des invisibles", async () => {

@@ -84,7 +84,9 @@ export function TournamentImageEmblem({ image, size, className, priority }: Read
           src={image.url}
           alt=""
           fill
-          sizes={`${size * 2}px`}
+          // `sizes` est la largeur d'affichage : le navigateur la multiplie lui-même
+          // par la densité de l'écran (la doubler chargeait un fichier 2× trop grand).
+          sizes={`${size}px`}
           priority={priority}
           className={s.contain}
           onError={() => setFailedUrl(image.url)}

@@ -128,6 +128,33 @@ describe("useAutoRefresh — sans période (intervalMs: null)", () => {
   });
 });
 
+describe("useAutoRefresh — horodatage du montage", () => {
+  it("le montage compte pour une lecture : un onglet ouvert en arrière-plan ne relit pas à son premier affichage", () => {
+    const refresh = jest.fn<() => void>();
+    render(refresh, { intervalMs: null, focusMinIntervalMs: 30_000 });
+    jest.advanceTimersByTime(5_000);
+    doc.fire("visibilitychange");
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("au-delà du délai minimal, le premier retour relit", () => {
+    const refresh = jest.fn<() => void>();
+    render(refresh, { intervalMs: null, focusMinIntervalMs: 30_000 });
+    jest.advanceTimersByTime(29_999);
+    doc.fire("visibilitychange");
+    expect(refresh).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1);
+    doc.fire("visibilitychange");
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("avec runOnEnable, c'est le hook qui lit : rien n'est supposé lu au montage", () => {
+    const refresh = jest.fn<() => void>();
+    render(refresh, { intervalMs: null, focusMinIntervalMs: 30_000, runOnEnable: true });
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("useAutoRefresh — options de la fenêtre de certification (EF-04)", () => {
   it("pageShow : un retour par le cache avant/arrière relit ; sans l'option, rien n'écoute", () => {
     const refresh = jest.fn<() => void>();
@@ -174,6 +201,8 @@ describe("useAutoRefresh — options de la fenêtre de certification (EF-04)", (
   it("« RETRY » : retenté une fois au retour du focus, même avant le délai", async () => {
     const refresh = jest.fn<() => AutoRefreshOutcome>().mockReturnValue("RETRY");
     render(refresh, { intervalMs: null, focusMinIntervalMs: 30_000 });
+    // Le montage compte pour une lecture : le premier retour utile vient après le délai.
+    jest.advanceTimersByTime(30_000);
     doc.fire("visibilitychange");
     await settle();
     expect(refresh).toHaveBeenCalledTimes(1);
@@ -190,6 +219,8 @@ describe("useAutoRefresh — options de la fenêtre de certification (EF-04)", (
   it("« RETRY » repris au retour du réseau ; un rafraîchissement tranché n'est jamais repris", async () => {
     const refresh = jest.fn<() => AutoRefreshOutcome>().mockReturnValueOnce("RETRY").mockReturnValue(undefined);
     render(refresh, { intervalMs: null, focusMinIntervalMs: 30_000 });
+    // Le montage compte pour une lecture : le premier retour utile vient après le délai.
+    jest.advanceTimersByTime(30_000);
     doc.fire("visibilitychange");
     await settle();
     win.fire("online");
@@ -205,6 +236,7 @@ describe("useAutoRefresh — options de la fenêtre de certification (EF-04)", (
     render(refresh, { intervalMs: null, focusMinIntervalMs: 30_000 });
     win.fire("focus");
     expect(refresh).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(30_000);
     doc.fire("visibilitychange");
     await settle();
     doc.visibilityState = "hidden";
@@ -216,6 +248,8 @@ describe("useAutoRefresh — options de la fenêtre de certification (EF-04)", (
   it("un rafraîchissement en échec (rejet) ne casse rien et n'est pas repris", async () => {
     const refresh = jest.fn<() => Promise<AutoRefreshOutcome>>().mockRejectedValue(new Error("offline"));
     render(refresh, { intervalMs: null, focusMinIntervalMs: 30_000 });
+    // Le montage compte pour une lecture : le premier retour utile vient après le délai.
+    jest.advanceTimersByTime(30_000);
     doc.fire("visibilitychange");
     await settle();
     win.fire("focus");

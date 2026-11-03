@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useTournamentsText } from "@/components/i18n/tournaments-text";
 import { tournamentLabel } from "@/lib/shared/tournaments-text";
 import { richNodes } from "@/components/i18n/shell-text";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
-import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { sameBuckets, sameTournaments } from "@/lib/shared/tournament-schedule";
 import { refreshCadenceFor } from "@/lib/shared/refresh-tiers";
 import { useAutoRefresh } from "@/lib/shared/hooks/useAutoRefresh";
@@ -36,6 +35,7 @@ import {
   sectionEmptyMessage,
   type GameFilter,
 } from "./_lib/buckets";
+import { isListGateOpen } from "./_lib/list-gate";
 import { buildTickerItems } from "./_lib/ticker";
 import {
   DEFAULT_OPEN_SECTIONS,
@@ -63,6 +63,14 @@ const SECTION_DISPLAY_LIMIT = 12;
 const COUNT_PENDING = "–";
 const NO_TICKER_ITEMS: readonly string[] = [];
 const NO_TOURNAMENTS: TournamentCard[] = [];
+/**
+ * Délai au-delà duquel « Mes tournois » (et la lecture des invisibles, pour le
+ * staff) ne retient plus l'affichage : une
+ * lecture bloquée gardait squelette et comptes « – » jusqu'à la relecture de
+ * fond suivante (300 s pour un joueur). Passé ce délai, la liste s'affiche et
+ * la section naît à l'arrivée tardive de la réponse.
+ */
+const MINE_SETTLE_MAX_MS = 2500;
 
 const GAME_FILTERS: readonly GameFilter[] = ["all", "ow", "mr"];
 
@@ -119,16 +127,25 @@ function ShowMoreRow({
  */
 async function fetchMyTournamentIds(signal?: AbortSignal): Promise<number[]> {
   const response = await fetch("/api/me/tournaments", { cache: "no-store", signal });
-  const payload = (await response.json()) as { tournamentIds?: unknown };
+  const payload = (await response.json().catch(() => ({}))) as { tournamentIds?: unknown };
   if (!response.ok || !Array.isArray(payload.tournamentIds)) {
     throw new Error("MY_TOURNAMENTS_READ_FAILED");
   }
   return payload.tournamentIds.filter((id): id is number => Number.isInteger(id));
 }
 
-async function fetchBuckets(url: string, signal?: AbortSignal): Promise<TournamentBuckets> {
-  const response = await fetch(url, { cache: "no-store", signal });
-  const payload = (await response.json()) as {
+async function fetchBuckets(
+  url: string,
+  signal?: AbortSignal,
+  cache: "no-cache" | "no-store" = "no-cache",
+): Promise<TournamentBuckets> {
+  // `no-cache` et non `no-store` : la réponse porte une empreinte (`ETag`,
+  // `app/api/tournaments/route.ts`), le navigateur la revalide et le serveur
+  // répond 304 sans corps quand la liste n'a pas bougé.
+  const response = await fetch(url, { cache, signal });
+  // Une page d'erreur HTML (proxy, déploiement) n'est pas du JSON : sans ce
+  // repli, elle levait une `SyntaxError` au lieu du code d'échec de la liste.
+  const payload = (await response.json().catch(() => ({}))) as {
     error?: string;
     buckets?: TournamentBuckets;
   };
@@ -141,7 +158,7 @@ async function fetchBuckets(url: string, signal?: AbortSignal): Promise<Tourname
 /** Le titre de la page : « BlueGenji » en accent (`<em>` du message). */
 const titleEm = (children: ReadonlyArray<ReactNode>) => <em className={s.titleEm}>{richNodes(children)}</em>;
 
-export default function TournamentsList() {
+export default function TournamentsList({ canManage }: Readonly<{ canManage: boolean }>) {
   const text = useTournamentsText();
   const { t } = text;
   const { showError } = useToast();
@@ -160,18 +177,47 @@ export default function TournamentsList() {
   // section naissait au sommet une fois la liste affichée et poussait tout le
   // reste vers le bas. Réglé au premier résultat, échec compris (silencieux).
   const [mineSettled, setMineSettled] = useState(false);
-  const listLoaded = listFetched && mineSettled;
+  // Droit staff lu par le serveur (`page.tsx`), connu dès le premier rendu :
+  // plus de lecture `/api/auth/me` en chaîne qui décalait « Créer » et la
+  // section des invisibles. Sans ce droit, rien à attendre de ce côté.
+  // Un refus de lecture (droit retiré, session échue) fait relire ce droit au
+  // serveur (`router.refresh()`) plutôt que de le deviner ici : retiré, le prop
+  // passe à faux (plus de « Créer », plus de lecture refusée, cadence joueur) ;
+  // rendu entre-temps, il reste vrai et la lecture suivante aboutit ; session
+  // partie, la page cède la place à la carte « Connexion requise ».
+  const isAdmin = canManage;
+  const router = useLocaleRouter();
+  // La première lecture des invisibles fait partie de la porte : sans elle, la
+  // section s'affichait sous le squelette ou naissait au sommet et poussait les
+  // autres sections vers le bas.
+  // Dérivé du droit à chaque rendu : un droit accordé alors que la page reste
+  // montée (`router.refresh()`) rouvre la porte jusqu'à la première lecture.
+  const [hiddenRead, setHiddenSettled] = useState(false);
+  const hiddenSettled = !isAdmin || hiddenRead;
+  // La porte ne se referme pas : un droit staff accordé page montée
+  // (`router.refresh()`) ne doit pas remettre le squelette sur une liste déjà
+  // affichée — la section des invisibles naît alors à son arrivée.
+  const gateOpenedRef = useRef(false);
+  if (isListGateOpen({ listFetched, mineSettled, hiddenSettled })) gateOpenedRef.current = true;
+  const listLoaded = gateOpenedRef.current;
   const [hiddenTournaments, setHiddenTournaments] = useState<TournamentCard[]>([]);
   const [myTournamentIds, setMyTournamentIds] = useState<ReadonlySet<number>>(new Set());
   const [expandedSections, setExpandedSections] = useState<ReadonlySet<LimitedSectionKey>>(new Set());
   const [openSections, setOpenSections] = useState<ReadonlySet<PageSectionKey>>(
     () => new Set(DEFAULT_OPEN_SECTIONS),
   );
-  const [isAdmin, setIsAdmin] = useState(false);
-  // L'archive entière des terminés n'est demandée qu'une fois le lecteur allé
-  // la chercher (`needsFinishedArchive`), puis gardée : la relâcher au premier
-  // filtre effacé ferait recharger la liste à chaque frappe.
-  const [wantFinishedArchive, setWantFinishedArchive] = useState(false);
+  // La recherche filtre une valeur différée : la frappe reste fluide, et le
+  // filtrage plein texte de toute la liste passe après elle.
+  const deferredQuery = useDeferredValue(query);
+  const finishedExpanded = expandedSections.has("finished");
+  // L'archive entière des terminés n'est demandée **que tant qu'il en faut**
+  // (`needsFinishedArchive` : filtre actif ou section dépliée) et **après** la
+  // première liste — une frappe avant son arrivée abandonnait la première
+  // lecture pour relancer `?finished=all`, sous une clé de cache à part. Hors
+  // de ce besoin, les relectures de fond reprennent la liste courte : elles ne
+  // retéléchargent plus sans fin une archive qui grossit. Le filtre effacé
+  // coûte une relecture de la liste courte, mutualisée côté serveur.
+  const wantFinishedArchive = listFetched && needsFinishedArchive(deferredQuery, gameFilter, finishedExpanded);
   // Lu **après** la réponse : une relecture de fond partie avant la demande
   // d'archive rapporterait la liste tronquée, et l'appliquer effacerait
   // l'archive arrivée entre-temps.
@@ -197,11 +243,21 @@ export default function TournamentsList() {
       } catch (e) {
         // Une requête abandonnée (démontage, rafraîchissement suivant) n'est pas
         // un incident : la page n'a plus rien à afficher de toute façon.
-        if (signal?.aborted || silent) return;
-        showError((e as Error).message);
+        if (signal?.aborted) return;
+        // Session partie : « réessaie » ne mènerait nulle part, le serveur rend
+        // la carte de connexion.
+        if ((e as Error).message === "UNAUTHORIZED") {
+          router.refresh();
+          return;
+        }
+        if (silent) return;
+        // Une phrase traduite, jamais le code ni le message brut du navigateur
+        // (« Failed to fetch » sur une page en français) : le lecteur n'en
+        // ferait rien.
+        showError(t("list.loadFailed"));
       }
     },
-    [showError, wantFinishedArchive],
+    [router, showError, t, wantFinishedArchive],
   );
 
   useEffect(() => {
@@ -246,16 +302,31 @@ export default function TournamentsList() {
         return;
       }
       try {
-        const hidden = flattenBuckets(await fetchBuckets("/api/tournaments?scope=hidden", signal));
+        const hidden = flattenBuckets(await fetchBuckets("/api/tournaments?scope=hidden", signal, "no-store"));
         setHiddenTournaments((previous) =>
           sameTournaments(previous, hidden) ? previous : hidden,
         );
       } catch (e) {
-        if (signal?.aborted || silent) return;
-        showError((e as Error).message);
+        if (signal?.aborted) return;
+        const code = (e as Error).message;
+        // Refus du droit `tournaments` (retiré depuis le rendu de la page, ou
+        // session échue) : la section n'a plus lieu d'être, et une toast
+        // « FORBIDDEN » sur une simple liste ne dirait rien au lecteur. Le droit
+        // se relit au serveur (voir `isAdmin`).
+        if (code === "FORBIDDEN" || code === "UNAUTHORIZED") {
+          setHiddenTournaments((previous) => (previous.length === 0 ? previous : []));
+          router.refresh();
+          return;
+        }
+        if (silent) return;
+        showError(t("list.hiddenLoadFailed"));
+      } finally {
+        // Réglée au premier résultat, échec compris : la liste publique ne doit
+        // pas rester sous le squelette pour une lecture réservée au staff.
+        if (!signal?.aborted) setHiddenSettled(true);
       }
     },
-    [isAdmin, showError],
+    [isAdmin, router, showError, t],
   );
 
   useEffect(() => {
@@ -279,25 +350,24 @@ export default function TournamentsList() {
     { intervalMs: refreshCadenceFor({ isStaff: isAdmin }).listIntervalMs },
   );
 
+  // Ni « Mes tournois » ni les invisibles (staff) ne retiennent l'affichage
+  // indéfiniment (`MINE_SETTLE_MAX_MS`) : une lecture bloquée gardait la liste
+  // sous le squelette jusqu'à la relecture de fond suivante.
   useEffect(() => {
-    fetch("/api/auth/me", { cache: "no-store" })
-      .then(async (r) =>
-        r.ok ? ((await r.json()) as { user?: { isAdmin?: boolean; roles?: PlatformRole[] } }) : null,
-      )
-      .then((p) => setIsAdmin(can(p?.user, "tournaments")))
-      .catch(() => setIsAdmin(false));
+    const timer = window.setTimeout(() => {
+      setMineSettled(true);
+      setHiddenSettled(true);
+    }, MINE_SETTLE_MAX_MS);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const shortcutLabel = useSearchShortcut(searchInputRef);
 
+  // Un Set neuf à chaque frappe, même sans section dépliée, provoquait un second
+  // rendu complet de la liste : on garde l'état s'il est déjà vide.
   useEffect(() => {
-    setExpandedSections(new Set());
-  }, [query, gameFilter]);
-
-  const finishedExpanded = expandedSections.has("finished");
-  useEffect(() => {
-    if (needsFinishedArchive(query, gameFilter, finishedExpanded)) setWantFinishedArchive(true);
-  }, [query, gameFilter, finishedExpanded]);
+    setExpandedSections((previous) => (previous.size === 0 ? previous : new Set()));
+  }, [deferredQuery, gameFilter]);
 
   const toggleSection = (key: LimitedSectionKey) =>
     setExpandedSections((prev) => {
@@ -329,36 +399,58 @@ export default function TournamentsList() {
   const scheduledBuckets = useScheduledBuckets(viewBuckets);
 
   // La recherche (le passage coûteux : nom, description, format sur chaque
-  // tournoi) n'est faite qu'une fois — le filtre de jeu, lui, ne fait que
-  // comparer une chaîne déjà connue, appliqué séparément pour le panier
-  // affiché (`gameFilteredBuckets`) et pour les pastilles, qui veulent le compte
-  // de CHAQUE jeu sans se soucier de celui déjà choisi (`queryFilteredBuckets`).
+  // tournoi) n'est faite qu'une fois par valeur de recherche différée et par
+  // liste — le filtre de jeu, lui, ne fait que comparer une chaîne déjà connue,
+  // appliqué séparément pour le panier affiché (`gameFilteredBuckets`) et pour
+  // les pastilles, qui veulent le compte de CHAQUE jeu sans se soucier de celui
+  // déjà choisi (`queryFilteredBuckets`). Le tout sous `useMemo` : un rendu qui
+  // ne change ni la liste, ni la recherche, ni le jeu ne refiltre rien.
   // Le format se cherche sous le nom que la carte affiche (« Swiss » sous `/en`).
-  const formatName = (format: string) => tournamentLabel(text, "format", format);
-  const queryFilteredBuckets = filterBuckets(scheduledBuckets, query, "all", formatName);
-  const queryFilteredHidden = filterTournamentsByQuery(viewHidden, query, formatName);
+  const formatName = useCallback((format: string) => tournamentLabel(text, "format", format), [text]);
+  const queryFilteredBuckets = useMemo(
+    () => filterBuckets(scheduledBuckets, deferredQuery, "all", formatName),
+    [scheduledBuckets, deferredQuery, formatName],
+  );
+  const queryFilteredHidden = useMemo(
+    () => filterTournamentsByQuery(viewHidden, deferredQuery, formatName),
+    [viewHidden, deferredQuery, formatName],
+  );
 
-  const gameFilteredBuckets: TournamentBuckets =
-    gameFilter === "all"
-      ? queryFilteredBuckets
-      : {
-          upcoming: filterTournamentsByGame(queryFilteredBuckets.upcoming, gameFilter),
-          registration: filterTournamentsByGame(queryFilteredBuckets.registration, gameFilter),
-          running: filterTournamentsByGame(queryFilteredBuckets.running, gameFilter),
-          finished: filterTournamentsByGame(queryFilteredBuckets.finished, gameFilter),
-        };
-  const filteredHidden = filterTournamentsByGame(queryFilteredHidden, gameFilter);
+  const gameFilteredBuckets = useMemo<TournamentBuckets>(
+    () =>
+      gameFilter === "all"
+        ? queryFilteredBuckets
+        : {
+            upcoming: filterTournamentsByGame(queryFilteredBuckets.upcoming, gameFilter),
+            registration: filterTournamentsByGame(queryFilteredBuckets.registration, gameFilter),
+            running: filterTournamentsByGame(queryFilteredBuckets.running, gameFilter),
+            finished: filterTournamentsByGame(queryFilteredBuckets.finished, gameFilter),
+          },
+    [queryFilteredBuckets, gameFilter],
+  );
+  const filteredHidden = useMemo(
+    () => filterTournamentsByGame(queryFilteredHidden, gameFilter),
+    [queryFilteredHidden, gameFilter],
+  );
 
   // Les tournois du lecteur quittent leur section d'origine pour passer en
   // tête : chacun n'apparaît qu'une fois. Le découpage suit les paniers déjà
   // reclassés par l'horloge, pour qu'un tournoi qui démarre reste en tête.
-  const { mine: myTournaments, others: filteredBuckets } = splitMyTournaments(
-    gameFilteredBuckets,
-    myTournamentIds,
+  const { mine: myTournaments, others: filteredBuckets } = useMemo(
+    () => splitMyTournaments(gameFilteredBuckets, myTournamentIds),
+    [gameFilteredBuckets, myTournamentIds],
   );
   // Jugé avant filtre : une recherche qui vide « Mes tournois » laisse son
-  // entrée au sommaire (à zéro) au lieu de la faire disparaître.
-  const hasMyTournaments = splitMyTournaments(scheduledBuckets, myTournamentIds).mine.length > 0;
+  // entrée au sommaire (à zéro) au lieu de la faire disparaître. Tant que la
+  // liste n'est pas là, l'entrée est déjà réservée dès que « Mes tournois »
+  // a répondu (le sommaire d'attente garde ainsi sa hauteur).
+  const hasMyTournaments = useMemo(
+    () =>
+      listLoaded
+        ? splitMyTournaments(scheduledBuckets, myTournamentIds).mine.length > 0
+        : myTournamentIds.size > 0,
+    [listLoaded, scheduledBuckets, myTournamentIds],
+  );
 
   const totalHidden = filteredHidden.length;
   const totalMine = myTournaments.length;
@@ -367,14 +459,36 @@ export default function TournamentsList() {
   const totalUpcoming = filteredBuckets.upcoming.length;
   // Sans recherche, les terminés que la liste tronquée ne porte pas comptent
   // quand même : « Voir plus » et le sommaire annoncent l'archive entière.
-  const finishedBeyond = (key: GameFilter) => (query.trim() ? 0 : finishedBeyondList(viewBuckets, key));
+  const finishedBeyond = (key: GameFilter) => (deferredQuery.trim() ? 0 : finishedBeyondList(viewBuckets, key));
   const totalFinished = filteredBuckets.finished.length + finishedBeyond(gameFilter);
   // Section dépliée, archive demandée mais pas encore reçue : la liste en main
   // est encore la liste tronquée.
   const finishedArchiveLoading =
-    finishedExpanded && wantFinishedArchive && buckets.finishedTotals !== undefined;
+    finishedExpanded && wantFinishedArchive && viewBuckets.finishedTotals !== undefined;
 
   const showHidden = isAdmin && viewHidden.length > 0;
+  const gestureMadeRef = useRef(false);
+  const liveMessage = (() => {
+    if (!listLoaded) return "";
+    if (finishedArchiveLoading) return t("list.finishedLoading");
+    // Une recherche, un jeu choisi ou l'archive dépliée : un geste dont le
+    // résultat ne se voit qu'à l'écran, donc à dire.
+    // Une fois un geste fait, le retour au tout-afficher se dit aussi.
+    if (!deferredQuery.trim() && gameFilter === "all" && !finishedExpanded) {
+      if (!gestureMadeRef.current) return "";
+    } else {
+      gestureMadeRef.current = true;
+    }
+    const shown = totalMine + totalRunning + totalRegistration + totalUpcoming + totalFinished + (showHidden ? totalHidden : 0);
+    return t("list.resultsCount", { count: String(shown) });
+  })();
+
+  // Mêmes paniers que les sections ; un tableau neuf à chaque rendu empêchait
+  // le `memo` du bandeau de jamais servir (chaque frappe le redessinait).
+  const tickerItems = useMemo(
+    () => (listLoaded ? buildTickerItems(scheduledBuckets, text) : NO_TICKER_ITEMS),
+    [listLoaded, scheduledBuckets, text],
+  );
 
   // Toutes les sections que ce lecteur peut avoir, zéros compris : le
   // sommaire les montre toutes (un zéro répond à « y a-t-il un tournoi en
@@ -529,7 +643,7 @@ export default function TournamentsList() {
                 // annoncer de zéros.
                 if (!listLoaded) {
                   return (
-                    <span key={entry.key} className={s.sectionNavLink}>
+                    <span key={entry.key} className={s.sectionNavLink} data-tone={entry.key}>
                       {entry.navLabel}
                       <span className={s.num} aria-hidden="true">
                         {COUNT_PENDING}
@@ -577,19 +691,22 @@ export default function TournamentsList() {
               « INSCRIPTIONS » — le genre de doute qui fait recharger la page.
               Avant la première liste, un bandeau vide (hauteur fixe) : il garde
               sa place, sans annoncer « Aucune actualité ». */}
-          <Ticker
-            items={listLoaded ? buildTickerItems(scheduledBuckets, text) : NO_TICKER_ITEMS}
-            labels={text.tickerLabels}
-          />
+          <Ticker items={tickerItems} labels={text.tickerLabels} />
 
-          <div className={s.sections}>
-            {!listLoaded && <SecuredLoadingView label={t("list.loading")} />}
+          {/* Région live toujours montée (une région insérée avec son texte n'est pas
+              annoncée) : le nombre de résultats de la recherche, une fois les cartes
+              à jour (`deferredQuery`), et l'attente de l'archive des terminés. */}
+          <output className="sr-only">
+            {liveMessage}
+          </output>
+          <div className={s.sections} data-loading={listLoaded ? undefined : "true"}>
+            {!listLoaded && <SecuredLoadingView label={t("list.loading")} cardsOnly />}
 
             {listLoaded && shownSections.length === 0 && (
               <div className={s.emptyAll}>
                 <div className={s.emptyTitle}>{t("list.emptyTitle")}</div>
                 <div className={s.emptyMsg}>
-                  {sectionEmptyMessage(t("list.emptyUnfiltered"), query, gameFilter, t("list.emptyFiltered"))}
+                  {sectionEmptyMessage(t("list.emptyUnfiltered"), deferredQuery, gameFilter, t("list.emptyFiltered"))}
                 </div>
               </div>
             )}
@@ -723,9 +840,7 @@ export default function TournamentsList() {
                     s'afficherait sur les douze mêmes cartes, comme si le clic
                     n'avait rien donné. */}
                 {finishedArchiveLoading && (
-                  <div /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={s.showMoreRow} role="status">
-                    {t("list.finishedLoading")}
-                  </div>
+                  <div className={s.showMoreRow}>{t("list.finishedLoading")}</div>
                 )}
                 <ShowMoreRow
                   sectionTitle={sectionTitle("finished")}

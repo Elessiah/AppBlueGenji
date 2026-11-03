@@ -1,14 +1,18 @@
 "use client";
 
+import { memo } from "react";
 import { useTournamentsText } from "@/components/i18n/tournaments-text";
 import { localizedMatchFormatLabel, participantLabel } from "@/lib/shared/tournaments-text";
 import type { TournamentCard } from "@/lib/shared/types";
 import { formatCardDate, progressPercent, runningCardAction } from "../_lib/card-display";
+import { RUNNING_CARD_IMAGE_SIZES } from "./card-image";
 import { CardMetaItem, CardProgress, LiveRibbon, TournamentCardFrame } from "./CardParts";
 import s from "../tournois.module.css";
 
 interface RunningCardProps {
   t: TournamentCard;
+  /** `sizes` du bandeau : par défaut, la section « En cours » (deux colonnes). */
+  imageSizes?: string;
   /** Bandeau chargé en priorité : premières cartes illustrées de la page (`priorityBannerIds`). */
   priority?: boolean;
 }
@@ -19,7 +23,11 @@ interface RunningCardProps {
  * tournoi en cours n'est pas une diffusion. La place ainsi rendue sert à dire
  * où en est le tournoi (`runningProgress`).
  */
-export function RunningCard({ t, priority }: Readonly<RunningCardProps>) {
+export const RunningCard = memo(function RunningCard({
+  t,
+  priority,
+  imageSizes = RUNNING_CARD_IMAGE_SIZES,
+}: Readonly<RunningCardProps>) {
   const text = useTournamentsText();
   const percent = progressPercent(t.runningProgress);
 
@@ -27,6 +35,7 @@ export function RunningCard({ t, priority }: Readonly<RunningCardProps>) {
     <TournamentCardFrame
       t={t}
       priority={priority}
+      imageSizes={imageSizes}
       state="running"
       ribbonClassName={s.cardRibbonRunning}
       ribbon={<LiveRibbon label={text.t("cards.running")} />}
@@ -55,4 +64,4 @@ export function RunningCard({ t, priority }: Readonly<RunningCardProps>) {
       </div>
     </TournamentCardFrame>
   );
-}
+});

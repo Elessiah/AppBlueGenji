@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import {
   formatCardDate,
   progressPercent,
@@ -129,5 +129,42 @@ describe("formatCardDate", () => {
     const label = formatCardDate("2026-05-12T10:00:00.000Z", true);
     expect(label).toMatch(/\d{2}:\d{2}/);
     expect(label).not.toMatch(/\d{2}:\d{2}:\d{2}/);
+  });
+});
+
+describe("formatCardDate — formateurs mis en cache", () => {
+  const ISO = "2026-05-12T10:00:00.000Z";
+
+  it("ne construit qu'un Intl.DateTimeFormat par langue et par variante, quel que soit le nombre d'appels", () => {
+    const construct = jest.spyOn(Intl, "DateTimeFormat");
+    // Premier appel de chaque couple (langue, avec/sans heure) : un formateur chacun…
+    formatCardDate(ISO, true, "fr");
+    formatCardDate(ISO, false, "fr");
+    formatCardDate(ISO, true, "en");
+    formatCardDate(ISO, false, "en");
+    const afterFirst = construct.mock.calls.length;
+    // …puis aucun de plus, même pour des centaines de cartes.
+    for (let card = 0; card < 200; card += 1) {
+      formatCardDate(ISO, true, "fr");
+      formatCardDate(ISO, false, "en");
+    }
+    const constructed = construct.mock.calls.length;
+    construct.mockRestore();
+
+    expect(afterFirst).toBeLessThanOrEqual(4);
+    expect(constructed).toBe(afterFirst);
+  });
+
+  it("garde les formes propres à chaque langue : jour sur deux chiffres en français seulement", () => {
+    expect(formatCardDate("2026-10-07T10:00:00.000Z", false, "fr")).toMatch(/^07 /);
+    expect(formatCardDate("2026-10-07T10:00:00.000Z", false, "en")).toMatch(/^Oct 7, 2026$/);
+  });
+
+  it("n'écrit pas la même chose avec et sans l'heure, une variante ne contaminant pas l'autre", () => {
+    const withTime = formatCardDate(ISO, true, "en");
+    const withoutTime = formatCardDate(ISO, false, "en");
+    expect(withTime).toMatch(/\d{2}:\d{2}/);
+    expect(withoutTime).not.toMatch(/:/);
+    expect(formatCardDate(ISO, true, "en")).toBe(withTime);
   });
 });

@@ -403,6 +403,11 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // (`ER_CANT_DROP_FIELD_OR_KEY`, toléré) et ne pose rien — la pose seule le
     // rattrape. Partout ailleurs, `ER_DUP_KEYNAME`, un no-op.
     `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round (tournament_id, phase_id, round_number)`,
+    // EF-16 — la visibilité (`start_visibility_at <= ?`, ou `> ?` pour les
+    // invisibles du staff) borne toutes les lectures de la liste des tournois,
+    // du décompte des terminés et du sous-ensemble des plus récents : sans
+    // index, chaque reconstruction de la liste parcourait toute la table.
+    `ALTER TABLE bg_tournaments ADD INDEX idx_bg_tournaments_start_visibility (start_visibility_at)`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

@@ -736,6 +736,12 @@ async function loadTournamentBuckets(
   const now = new Date();
   const { where, params } = tournamentListFilter(searchTerm, scope, finishedLimit, now);
 
+  // Le décompte des terminés ne dépend pas des lignes : il part en même temps
+  // que la requête principale, au lieu d'attendre derrière elle. Son échec ne
+  // lève rien ici — il est jugé plus bas, après la lecture des lignes.
+  const totalsRead =
+    finishedLimit === null ? null : loadFinishedTotals(db, now).then((totals) => ({ totals }), (error: unknown) => ({ error }));
+
   const [rows] = await db.execute<TournamentListRow[]>(
     `SELECT
       t.id,
@@ -775,48 +781,16 @@ async function loadTournamentBuckets(
       t.image_fit,
       t.image_focus_x,
       t.image_focus_y,
-      COALESCE(COUNT(r.id), 0) AS registered_teams
+      t.swiss_total_rounds,
+      t.swiss_current_round,
+      t.current_phase_id,
+      t.endurance_current_round,
+      t.endurance_max_rounds,
+      t.endurance_playoff_size,
+      t.endurance_playoffs_started,
+      (SELECT COUNT(*) FROM bg_tournament_registrations r WHERE r.tournament_id = t.id) AS registered_teams
      FROM bg_tournaments t
-     LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
      WHERE ${where.join(" AND ")}
-     GROUP BY
-      t.id,
-      t.name,
-      t.description,
-      t.format,
-      t.game,
-      t.max_teams,
-      t.state,
-      t.start_visibility_at,
-      t.registration_open_at,
-      t.registration_close_at,
-      t.start_at,
-      t.bracket_size,
-      t.created_at,
-      t.organizer_user_id,
-      t.finished_at,
-      t.has_third_place_match,
-      t.survival_rounds_before_first_cut,
-      t.survival_rounds_per_cut,
-      t.survival_current_round,
-      t.participant_type,
-      t.match_format_type,
-      t.match_format_value,
-      t.match_format_max_maps,
-      t.match_format_draws,
-      t.endurance_playoff_format_type,
-      t.endurance_playoff_format_value,
-      t.registration_discord_requirement,
-      t.registration_blizzard_requirement,
-      t.registration_min_players,
-      t.referee_scheduling,
-      t.match_launch_phase,
-      t.team_voice_channels,
-      t.live_url,
-      t.image_url,
-      t.image_fit,
-      t.image_focus_x,
-      t.image_focus_y
      ORDER BY t.start_at DESC, t.id DESC`,
     params,
   );
@@ -833,19 +807,21 @@ async function loadTournamentBuckets(
   // cache ainsi pour tout le monde. On sert alors la liste entière — plus
   // lourde, jamais fausse — plutôt que de vider `/tournois` pour un compteur.
   let finishedTotals: FinishedTournamentTotals | null = null;
-  if (finishedLimit !== null) {
-    finishedTotals = await loadFinishedTotals(db, now).catch((error: unknown) => {
-      console.error("[tournaments] décompte des tournois terminés indisponible :", error);
-      return null;
-    });
-    if (finishedTotals === null) return loadTournamentBuckets(searchTerm, scope, null);
+  if (totalsRead) {
+    const read = await totalsRead;
+    if ("error" in read) {
+      console.error("[tournaments] décompte des tournois terminés indisponible :", read.error);
+      return loadTournamentBuckets(searchTerm, scope, null);
+    }
+    finishedTotals = read.totals;
   }
 
   const cards = rows.map(mapCard);
   // Décoratifs : une panne de ces lectures ne doit pas vider `/tournois` et
   // l'accueil, qui s'en passent très bien (les cartes retombent sur leurs
   // `null`).
-  const summaries = await loadCardSummaries(db, cards).catch((error: unknown) => {
+  const runningMeta = new Map(rows.map((row) => [Number(row.id), row] as const));
+  const summaries = await loadCardSummaries(db, cards, runningMeta).catch((error: unknown) => {
     console.error("[tournaments] résumé des cartes indisponible :", error);
     return new Map<number, Partial<CardSummary>>();
   });

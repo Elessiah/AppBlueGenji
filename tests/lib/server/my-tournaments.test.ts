@@ -19,27 +19,42 @@ describe("listMyActiveTournamentIds", () => {
     await expect(listMyActiveTournamentIds(12)).resolves.toEqual([4, 9]);
   });
 
-  it("ne lit que les tournois publiés et non terminés", async () => {
+  it("ne lit que les tournois publiés et non terminés, dans chacune des deux branches", async () => {
     execute.mockResolvedValue([[]]);
     await listMyActiveTournamentIds(12);
     const [sql, params] = execute.mock.calls[0];
-    expect(sql).toContain("t.start_visibility_at <= ?");
-    expect(sql).toContain("t.state <> 'FINISHED'");
-    expect((params as unknown[])[0]).toBeInstanceOf(Date);
+    expect(String(sql).match(/t\.start_visibility_at <= \?/g)).toHaveLength(2);
+    expect(String(sql).match(/t\.state <> 'FINISHED'/g)).toHaveLength(2);
+    // Un seul instant, partagé par les deux branches.
+    const [, firstNow, , secondNow] = params as unknown[];
+    expect(firstNow).toBeInstanceOf(Date);
+    expect(secondNow).toBe(firstNow);
   });
 
-  it("couvre l'équipe dont le joueur est membre aujourd'hui et son entrée solo", async () => {
+  it("couvre l'entrée solo du joueur et l'équipe dont il est membre aujourd'hui, chacune partant de ses lignes", async () => {
     execute.mockResolvedValue([[]]);
     await listMyActiveTournamentIds(12);
     const [sql, params] = execute.mock.calls[0];
-    expect(sql).toContain("e.solo_user_id = ?");
-    expect(sql).toMatch(/tm\.user_id = \?\s+AND tm\.left_at IS NULL/);
-    expect((params as unknown[]).slice(1)).toEqual([12, 12]);
+    const [solo, member] = String(sql).split("UNION");
+    expect(solo).toContain("FROM bg_teams e");
+    expect(solo).toContain("e.solo_user_id = ?");
+    expect(member).toContain("FROM bg_team_members tm");
+    expect(member).toMatch(/tm\.user_id = \?\s+AND tm\.left_at IS NULL/);
+    expect((params as unknown[])[0]).toBe(12);
+    expect((params as unknown[])[2]).toBe(12);
   });
 
-  it("dédoublonne en SQL (un tournoi, une ligne)", async () => {
+  it("dédoublonne par UNION et ne parcourt plus toutes les inscriptions (plus d'OR EXISTS)", async () => {
     execute.mockResolvedValue([[]]);
     await listMyActiveTournamentIds(12);
-    expect(execute.mock.calls[0][0]).toContain("SELECT DISTINCT r.tournament_id");
+    const sql = String(execute.mock.calls[0][0]);
+    expect(sql).toMatch(/\bUNION\b(?! ALL)/);
+    expect(sql).not.toContain("EXISTS");
+    expect(sql).not.toContain("DISTINCT");
+  });
+
+  it("ne rend aucun identifiant pour un joueur sans engagement", async () => {
+    execute.mockResolvedValue([[]]);
+    await expect(listMyActiveTournamentIds(12)).resolves.toEqual([]);
   });
 });

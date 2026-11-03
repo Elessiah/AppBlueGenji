@@ -186,6 +186,13 @@ export type MatchRow = RowDataPacket & {
 
 export type TournamentListRow = TournamentRow & {
   registered_teams: number;
+  /** Colonnes d'avancement lues avec la liste (`list-summary.ts`). */
+  swiss_total_rounds: number | null;
+  swiss_current_round: number;
+  endurance_current_round: number;
+  endurance_max_rounds: number | null;
+  endurance_playoff_size: number | null;
+  endurance_playoffs_started: number;
 };
 
 export type PhaseRow = RowDataPacket & {
