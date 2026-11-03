@@ -1479,6 +1479,24 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : rien de nouveau n'est collecté ni conservé ; rien ne part à un compte suspendu ou supprimé, ni à l'auteur du geste. Le message privé relève de l'organisation des compétitions (intérêt légitime, registre T03), auquel tu peux t'opposer (section « Vos droits » de la page RGPD) ; la notification push, de ton accord (registre T12).",
     ],
   },
+  {
+    // MATCH-REFEREE-FINISH (décision de l'utilisateur du 2026-11-03) : en
+    // Marvel Rivals, caster ou arbitrer ne demande plus de compte Battle.net
+    // rattaché (le BattleTag n'y sert à rien, décision 35) ; Overwatch garde
+    // la condition. Public : les comptes pouvant caster (permission `live`).
+    // Datée du lendemain de la nuit de déploiement — à avancer si la fusion glisse.
+    id: "2026-11-battlenet-requis-overwatch-seulement",
+    publishedAt: "2026-11-05",
+    audience: "LIVE_STAFF",
+    title: "Caster ou arbitrer : Battle.net demandé en Overwatch seulement",
+    links: [{ href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" }],
+    summary:
+      "Pour caster ou arbitrer un match Marvel Rivals, un tag Discord certifié suffit désormais : le compte Battle.net rattaché n'est plus demandé. Pour un match Overwatch, rien ne change.",
+    details: [
+      "Ce qui change : le site ne vérifie plus, pour un match Marvel Rivals, que ton compte Battle.net est rattaché ni que ton BattleTag en vient ; il ne lit plus ce BattleTag pour ces matchs. Pour un match Overwatch, la condition reste : tag Discord certifié et BattleTag tiré d'un compte Battle.net rattaché.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté ni conservé, et ce que les équipes et les casters voient de toi sur un match est inchangé.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

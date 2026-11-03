@@ -228,7 +228,7 @@ export function RgpdEn({
             you fill in yourself (game usernames entered, certification of the Discord tag, uploaded avatar,
             adulthood) is optional, and the account works without it, with three limits: a tournament may require,
             to register, a certified Discord tag or a linked Battle.net account, and a member of the streaming
-            staff cannot register as the caster of a match without both (a BattleTag taken from that Battle.net account, not typed in by hand); lastly, without a certified Discord tag,
+            staff cannot register as the caster of a match without a certified Discord tag or, in an Overwatch match, without a linked Battle.net account (a BattleTag taken from that Battle.net account, not typed in by hand); lastly, without a certified Discord tag,
             no match Discord direct message is sent to you.
           </p>
           <p id="age-minimum">
@@ -885,7 +885,7 @@ export function RgpdEn({
           </p>
           <p id="arbitre-designe">
             <strong>Assigned referee of a match.</strong> A staff member who can referee (refereeing permission,
-            certified Discord tag and a BattleTag taken from a linked Battle.net account — a hand-typed BattleTag is not enough) takes a match, or the staff assigns it to them.
+            certified Discord tag and, for an Overwatch match, a BattleTag taken from a linked Battle.net account — a hand-typed BattleTag is not enough) takes a match, or the staff assigns it to them.
             Their username and, in an Overwatch tournament only (in Marvel Rivals, players don&apos;t invite each other by
             BattleTag), their BattleTag (even when hidden) are then presented in the
             match&apos;s “Contacts” and launch windows and on the match page (which also repeats, for the parties to the match alone — never referees with no role in that match —, the teams&apos; contacts), to the same parties and at the same times as the match

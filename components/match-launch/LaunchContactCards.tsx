@@ -8,7 +8,7 @@
  * seule de ce qui est exposé : ces fiches ne font que le montrer.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { PlayerLink, TeamLink } from "@/components/entity-link";
 import { useLaunchText } from "./launch-text";
 import {
@@ -31,6 +31,15 @@ import styles from "./MatchLaunchCenter.module.css";
 const CONTACT_ROLES = ["CAPITAINE", "MANAGER", "OWNER"] as const satisfies readonly TeamRole[];
 export type CopyFn = (value: string, label: string) => Promise<void>;
 
+/**
+ * Libellé que le toast de copie reprend (« Discord (Pseudo) copié ») : le
+ * propriétaire du contact y est nommé quand on le connaît, parmi les boutons
+ * « Copier » identiques d'un écran.
+ */
+export function copyToastLabel(kind: "Discord" | "BattleTag", owner?: string): string {
+  return owner ? `${kind} (${owner})` : kind;
+}
+
 function ReadyChip({ ready, phase }: Readonly<{ ready: boolean; phase: MatchLaunchInfo["phase"] }>) {
   const { t } = useLaunchText();
   if (phase !== "LOBBY") return null;
@@ -47,6 +56,7 @@ function IdentityLine({
   verified,
   onCopy,
   note,
+  owner,
 }: Readonly<{
   kind: "Discord" | "BattleTag";
   value: string | null;
@@ -54,8 +64,14 @@ function IdentityLine({
   onCopy: CopyFn;
   /** Ce que le lecteur doit en faire (page du match : « À inviter — obligatoire »). */
   note?: string;
+  /**
+   * À qui est ce contact : le toast de copie le nomme (« Discord (Pseudo) copié »),
+   * parmi les boutons « Copier » identiques d'une page.
+   */
+  owner?: string;
 }>) {
   const { t } = useLaunchText();
+  const noteId = useId();
   return (
     <div className={styles.identity}>
       <span className={styles.identityKind}>{kind}</span>
@@ -72,14 +88,19 @@ function IdentityLine({
           <button
             type="button"
             className={`${styles.copy} tap-target`}
-            onClick={() => void onCopy(value, kind)}
+            onClick={() => void onCopy(value, copyToastLabel(kind, owner))}
             aria-label={t("copyAria", { kind, value })}
+            aria-describedby={note ? noteId : undefined}
           >
             {t("copy")}
           </button>
           {/* La consigne passe sur sa propre ligne, sous la valeur : avant elle, à
               375 px, elle repoussait le BattleTag et laissait « Copier » seul. */}
-          {note && <span className={styles.identityNote}>{note}</span>}
+          {note && (
+            <span id={noteId} className={styles.identityNote}>
+              {note}
+            </span>
+          )}
         </>
       ) : (
         <span className={styles.missing}>—</span>
@@ -113,10 +134,22 @@ function ContactRow({
           </span>
         ))}
       </div>
-      <IdentityLine kind="Discord" value={contact.discordTag} verified={contact.discordTag !== null} onCopy={onCopy} />
+      <IdentityLine
+        kind="Discord"
+        value={contact.discordTag}
+        verified={contact.discordTag !== null}
+        onCopy={onCopy}
+        owner={contact.pseudo}
+      />
       {/* Hors Overwatch, le serveur n'envoie pas le BattleTag (décision 38) : pas de ligne. */}
       {contact.battletag !== undefined && (
-        <IdentityLine kind="BattleTag" value={contact.battletag} verified={contact.battletagVerified === true} onCopy={onCopy} />
+        <IdentityLine
+          kind="BattleTag"
+          value={contact.battletag}
+          verified={contact.battletagVerified === true}
+          onCopy={onCopy}
+          owner={contact.pseudo}
+        />
       )}
     </li>
   );
@@ -354,7 +387,13 @@ export function CasterCard({
       {caster.contactsShown && !hasContacts && !self && <p className={styles.note}>{t("noContact")}</p>}
       {caster.contactsShown && hasContacts && (
         <div className={styles.casterIds}>
-          <IdentityLine kind="Discord" value={caster.discordTag} verified={caster.discordTag !== null} onCopy={onCopy} />
+          <IdentityLine
+            kind="Discord"
+            value={caster.discordTag}
+            verified={caster.discordTag !== null}
+            onCopy={onCopy}
+            owner={caster.pseudo}
+          />
           {/* Hors Overwatch, le serveur n'envoie pas le BattleTag (`withGameBattletag`) : pas de ligne. */}
           {caster.battletag !== undefined && (
             <IdentityLine
@@ -363,6 +402,7 @@ export function CasterCard({
               verified={caster.battletagVerified === true}
               onCopy={onCopy}
               note={self ? undefined : battletagNote}
+              owner={caster.pseudo}
             />
           )}
         </div>
@@ -410,8 +450,9 @@ export function RefereeCard({
       </div>
     );
   }
+  const hasContacts = referee.discordTag != null || referee.battletag != null;
   return (
-    <section className={styles.caster} aria-label={`${t("referee")} ${referee.pseudo}`}>
+    <section className={styles.caster} aria-label={t("refereeRegion", { pseudo: referee.pseudo })}>
       <div className={styles.sideHead}>
         <span className={styles.emblem} aria-hidden="true">
           🧑‍⚖️
@@ -422,20 +463,28 @@ export function RefereeCard({
         </span>
         <ReadyChip ready={referee.ready} phase={phase} />
       </div>
-      {!referee.isViewer && (referee.discordTag != null || referee.battletag != null) && (
+      {/* Contacts ouverts mais vides (le tag Discord est présent, `null` : le lecteur
+          le reçoit, l'arbitre n'en a pas) : une note, comme sur la fiche d'un caster. */}
+      {!referee.isViewer && referee.contactsShown && referee.discordTag === null && !hasContacts && (
+        <p className={styles.note}>{t("noContact")}</p>
+      )}
+      {!referee.isViewer && hasContacts && (
         <div className={styles.casterIds}>
           {/* Tag Discord certifié : le serveur ne l'envoie qu'aux parties du
               match, par la lecture d'un match (page, fenêtre « Contacts »). */}
           {referee.discordTag != null && (
-            <IdentityLine kind="Discord" value={referee.discordTag} verified onCopy={onCopy} />
+            <IdentityLine kind="Discord" value={referee.discordTag} verified onCopy={onCopy} owner={referee.pseudo} />
           )}
-          {referee.battletag != null && (
+          {/* Même règle que la fiche d'un caster : hors Overwatch le champ est absent (pas de
+              ligne), en Overwatch sans BattleTag lisible la ligne montre « — ». */}
+          {referee.battletag !== undefined && (
             <IdentityLine
               kind="BattleTag"
               value={referee.battletag}
               verified={referee.battletagVerified === true}
               onCopy={onCopy}
               note={battletagNote}
+              owner={referee.pseudo}
             />
           )}
         </div>

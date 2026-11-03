@@ -2094,7 +2094,7 @@ describe("PRIVACY_CHANGES — pseudo de l'arbitre lu par les membres connectés 
   it("privacyChanges_refereeUsernameToMembers_leavesPublishedOppositionEntryIntact", () => {
     const older = PRIVACY_CHANGES.find((c) => c.id === "2026-10-opposition-arbitre-retrait-des-matchs")!;
     expect(older.publishedAt).toBe("2026-10-30");
-    expect(PRIVACY_CHANGES.indexOf(older)).toBe(PRIVACY_CHANGES.length - 11);
+    expect(PRIVACY_CHANGES.indexOf(older)).toBe(PRIVACY_CHANGES.length - 12);
   });
 });
 
@@ -2104,7 +2104,7 @@ describe("PRIVACY_CHANGES — rôles de plateforme au journal du staff (ADMIN-SE
   const english = PRIVACY_CHANGES_EN[id];
 
   it("privacyChanges_platformRolesLog_dated1031ForAllAccountsWithRegisterLink", () => {
-    expect(PRIVACY_CHANGES.at(-9)).toBe(entry);
+    expect(PRIVACY_CHANGES.at(-10)).toBe(entry);
     expect(entry.publishedAt).toBe("2026-10-31");
     expect(entry.audience).toBeUndefined();
     expect(entry.links).toEqual([{ href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" }]);
@@ -2131,7 +2131,7 @@ describe("PRIVACY_CHANGES — rôles de plateforme au journal du staff (ADMIN-SE
   });
 
   it("privacyChanges_platformRolesLog_leavesPublishedEntriesBeforeIt", () => {
-    const previous = PRIVACY_CHANGES[PRIVACY_CHANGES.length - 10];
+    const previous = PRIVACY_CHANGES[PRIVACY_CHANGES.length - 11];
     expect(previous.id).toBe("2026-10-pseudo-arbitre-aux-membres");
     expect(PRIVACY_CHANGES.filter((c) => c.publishedAt > "2026-10-30").map((c) => c.id)).toContain(id);
   });
@@ -2156,8 +2156,8 @@ describe("PRIVACY_CHANGES — BattleTag tapé gardé, jamais vérifié (D3)", ()
   const english = PRIVACY_CHANGES_EN[id];
 
   it("privacyChanges_typedBattletagKept_precedesTermsV8Dated1031ForAllAccounts", () => {
-    expect(PRIVACY_CHANGES.at(-8)).toBe(entry);
-    expect(PRIVACY_CHANGES.at(-9)?.id).toBe("2026-10-roles-de-plateforme-journal-du-staff");
+    expect(PRIVACY_CHANGES.at(-9)).toBe(entry);
+    expect(PRIVACY_CHANGES.at(-10)?.id).toBe("2026-10-roles-de-plateforme-journal-du-staff");
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
     expectStandaloneEntry(entry, english, {
       after: "2026-10-roles-de-plateforme-journal-du-staff",

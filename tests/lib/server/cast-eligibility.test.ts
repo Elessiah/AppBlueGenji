@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 import { mapMatch } from "@/lib/server/tournaments/_internal";
 import {
   castEligibilityBlock,
+  refereeEligibilityBlock,
   loadCastBlocks,
   loadEligibleRefereeIds,
   loadRefereeEligibility,
@@ -31,12 +32,12 @@ const ELIGIBLE: CastEligibilityFields = {
 
 describe("castEligibilityBlock", () => {
   it("laisse caster un compte qui a `live` et l'identité exigée", () => {
-    expect(castEligibilityBlock(ELIGIBLE)).toBeNull();
-    expect(castEligibilityBlock({ ...ELIGIBLE, platform_roles_json: JSON.stringify(["ARBITRE"]) })).toBeNull();
+    expect(castEligibilityBlock(ELIGIBLE, "OW")).toBeNull();
+    expect(castEligibilityBlock({ ...ELIGIBLE, platform_roles_json: JSON.stringify(["ARBITRE"]) }, "OW")).toBeNull();
   });
 
   it("donne `live` à un administrateur sans rôle stocké", () => {
-    expect(castEligibilityBlock({ ...ELIGIBLE, is_admin: 1, platform_roles_json: null })).toBeNull();
+    expect(castEligibilityBlock({ ...ELIGIBLE, is_admin: 1, platform_roles_json: null }, "OW")).toBeNull();
   });
 
   it.each<[string, Partial<CastEligibilityFields>, string]>([
@@ -47,15 +48,37 @@ describe("castEligibilityBlock", () => {
     ["sans Battle.net", { blizzard_sub: null }, "CASTER_IDENTITY_REQUIRED"],
     ["supprimé", { is_deleted: 1 }, "NOT_CASTER"],
   ])("refuse un compte %s", (_label, overrides, block) => {
-    expect(castEligibilityBlock({ ...ELIGIBLE, ...overrides })).toBe(block);
+    expect(castEligibilityBlock({ ...ELIGIBLE, ...overrides }, "OW")).toBe(block);
   });
 
   it("castEligibilityBlock_deletedAdmin_returnsNotCaster", () => {
-    expect(castEligibilityBlock({ ...ELIGIBLE, is_admin: 1, is_deleted: 1 })).toBe("NOT_CASTER");
+    expect(castEligibilityBlock({ ...ELIGIBLE, is_admin: 1, is_deleted: 1 }, "OW")).toBe("NOT_CASTER");
   });
 
   it("refuse un compte introuvable", () => {
-    expect(castEligibilityBlock(undefined)).toBe("NOT_CASTER");
+    expect(castEligibilityBlock(undefined, "OW")).toBe("NOT_CASTER");
+  });
+});
+
+describe("castEligibilityBlock / refereeEligibilityBlock — Battle.net seulement en Overwatch", () => {
+  const noBattlenet = { ...ELIGIBLE, blizzard_sub: null, overwatch_battletag: null };
+
+  it("castEligibilityBlock_marvelRivalsWithoutBattlenet_returnsNull", () => {
+    expect(castEligibilityBlock(noBattlenet, "MR")).toBeNull();
+  });
+
+  it("castEligibilityBlock_overwatchWithoutBattlenet_requiresIdentity", () => {
+    expect(castEligibilityBlock(noBattlenet, "OW")).toBe("CASTER_IDENTITY_REQUIRED");
+  });
+
+  it("castEligibilityBlock_marvelRivalsWithoutDiscord_requiresIdentity", () => {
+    expect(castEligibilityBlock({ ...noBattlenet, discord_verified_at: null }, "MR")).toBe("CASTER_IDENTITY_REQUIRED");
+  });
+
+  it("refereeEligibilityBlock_marvelRivalsWithoutBattlenet_returnsNull", () => {
+    const referee = { ...noBattlenet, platform_roles_json: JSON.stringify(["ARBITRE"]) };
+    expect(refereeEligibilityBlock(referee, "MR")).toBeNull();
+    expect(refereeEligibilityBlock(referee, "OW")).toBe("REFEREE_IDENTITY_REQUIRED");
   });
 });
 
@@ -293,13 +316,13 @@ describe("loadEligibleRefereeIds", () => {
   it("loadEligibleRefereeIds_eligibleReferee_returnsItsId", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[referee], []]);
 
-    await expect(loadEligibleRefereeIds(fakeConnection({ execute }), [950])).resolves.toEqual(new Set([950]));
+    await expect(loadEligibleRefereeIds(fakeConnection({ execute }), [950], "OW")).resolves.toEqual(new Set([950]));
   });
 
   it("loadEligibleRefereeIds_query_excludesUpheldObjections", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
 
-    await loadEligibleRefereeIds(fakeConnection({ execute }), [950]);
+    await loadEligibleRefereeIds(fakeConnection({ execute }), [950], "OW");
 
     expect(execute.mock.calls[0][0]).toContain("AND referee_objection_at IS NULL");
   });
@@ -307,7 +330,7 @@ describe("loadEligibleRefereeIds", () => {
   it("loadEligibleRefereeIds_noId_readsNothing", async () => {
     const execute = jest.fn<SqlQuery>();
 
-    await expect(loadEligibleRefereeIds(fakeConnection({ execute }), [])).resolves.toEqual(new Set());
+    await expect(loadEligibleRefereeIds(fakeConnection({ execute }), [], "OW")).resolves.toEqual(new Set());
     expect(execute).not.toHaveBeenCalled();
   });
 });
@@ -320,7 +343,7 @@ describe("loadRefereeEligibility", () => {
     // Une désignation attend la suppression du compte en cours (verrou exclusif).
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[referee], []]);
 
-    await expect(loadRefereeEligibility(connectionWith(execute), 950, true)).resolves.toBeNull();
+    await expect(loadRefereeEligibility(connectionWith(execute), 950, "OW", true)).resolves.toBeNull();
 
     expect(execute.mock.calls[0][0]).toMatch(/WHERE id = \? LIMIT 1 LOCK IN SHARE MODE$/);
     expect(execute.mock.calls[0][1]).toEqual([950]);
@@ -329,7 +352,7 @@ describe("loadRefereeEligibility", () => {
   it("loadRefereeEligibility_defaultCall_readsWithoutLock", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[referee], []]);
 
-    await loadRefereeEligibility(connectionWith(execute), 950);
+    await loadRefereeEligibility(connectionWith(execute), 950, "OW");
 
     expect(execute.mock.calls[0][0]).not.toContain("LOCK IN SHARE MODE");
   });
@@ -342,7 +365,7 @@ describe("loadRefereeStanding (EF-31)", () => {
   it("loadRefereeStanding_eligibleWithoutObjection_oneRead", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...referee, referee_objection_at: null }], []]);
 
-    await expect(loadRefereeStanding(connectionWith(execute), 950)).resolves.toEqual({ block: null, objection: false });
+    await expect(loadRefereeStanding(connectionWith(execute), 950, "OW")).resolves.toEqual({ block: null, objection: false });
 
     expect(execute).toHaveBeenCalledTimes(1);
     expect(execute.mock.calls[0][0]).toContain("referee_objection_at FROM bg_users WHERE id = ? LIMIT 1");
@@ -351,13 +374,13 @@ describe("loadRefereeStanding (EF-31)", () => {
   it("loadRefereeStanding_objectionSet_returnsObjectionTrue", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...referee, referee_objection_at: "2026-10-28 20:00:00" }], []]);
 
-    await expect(loadRefereeStanding(connectionWith(execute), 950)).resolves.toEqual({ block: null, objection: true });
+    await expect(loadRefereeStanding(connectionWith(execute), 950, "OW")).resolves.toEqual({ block: null, objection: true });
   });
 
   it("loadRefereeStanding_noRole_returnsBlock", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...ELIGIBLE, platform_roles_json: null, referee_objection_at: null }], []]);
 
-    const standing = await loadRefereeStanding(connectionWith(execute), 950);
+    const standing = await loadRefereeStanding(connectionWith(execute), 950, "OW");
 
     expect(standing.block).not.toBeNull();
   });
@@ -366,13 +389,13 @@ describe("loadRefereeStanding (EF-31)", () => {
     const unknownColumn = Object.assign(new Error("Unknown column 'referee_objection_at'"), { code: "ER_BAD_FIELD_ERROR" });
     const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(unknownColumn).mockResolvedValue([[referee], []]);
 
-    await expect(loadRefereeStanding(connectionWith(execute), 950)).resolves.toEqual({ block: null, objection: false });
+    await expect(loadRefereeStanding(connectionWith(execute), 950, "OW")).resolves.toEqual({ block: null, objection: false });
   });
 
   it("loadRefereeStanding_otherError_rethrows", async () => {
     const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("ER_LOCK_WAIT_TIMEOUT"));
 
-    await expect(loadRefereeStanding(connectionWith(execute), 950)).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
+    await expect(loadRefereeStanding(connectionWith(execute), 950, "OW")).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
   });
 });
 
@@ -385,7 +408,7 @@ describe("loadCastBlocks", () => {
       ],
       [],
     ]);
-    const blocks = await loadCastBlocks(fakeConnection({ execute }), [1, 2, 3, 1]);
+    const blocks = await loadCastBlocks(fakeConnection({ execute }), [1, 2, 3, 1], "OW");
     expect(blocks).toEqual(
       new Map([
         [1, null],
@@ -398,7 +421,7 @@ describe("loadCastBlocks", () => {
 
   it("loadCastBlocks_emptyList_noQuery", async () => {
     const execute = jest.fn<SqlQuery>();
-    await expect(loadCastBlocks(fakeConnection({ execute }), [])).resolves.toEqual(new Map());
+    await expect(loadCastBlocks(fakeConnection({ execute }), [], "OW")).resolves.toEqual(new Map());
     expect(execute).not.toHaveBeenCalled();
   });
 });

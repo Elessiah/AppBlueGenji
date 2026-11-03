@@ -51,7 +51,8 @@ export type RefereeObjectionResult = { changed: boolean; released: number; faile
  */
 export async function setRefereeObjection(refereeId: number, upheld: boolean): Promise<RefereeObjectionResult> {
   const db = await getDatabase();
-  if (upheld && (await loadRefereeEligibility(db, refereeId)) === "NOT_REFEREE") throw new Error("NOT_REFEREE");
+  // Seule la permission `tournaments` est jugée ici : le jeu n'y change rien.
+  if (upheld && (await loadRefereeEligibility(db, refereeId, "MR")) === "NOT_REFEREE") throw new Error("NOT_REFEREE");
   const [result] = await db.execute<ResultSetHeader>(
     upheld
       ? `UPDATE bg_users SET referee_objection_at = NOW()

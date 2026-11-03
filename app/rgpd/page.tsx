@@ -288,7 +288,7 @@ function RgpdFr({
             saisis, certification du tag Discord, avatar téléversé, majorité) est facultatif,
             et le compte fonctionne sans, à trois limites près : un tournoi peut exiger, pour s&apos;y inscrire, un tag Discord certifié ou un
             compte Battle.net rattaché, et un membre du staff de diffusion ne peut
-            s&apos;inscrire comme caster d&apos;un match sans les deux (un BattleTag tiré de ce compte Battle.net, pas saisi à la main) ; sans tag Discord certifié, enfin,
+            s&apos;inscrire comme caster d&apos;un match sans tag Discord certifié ni, dans un match Overwatch, sans compte Battle.net rattaché (un BattleTag tiré de ce compte Battle.net, pas saisi à la main) ; sans tag Discord certifié, enfin,
             aucun message privé Discord de match ne vous est envoyé.
           </p>
           <p id="age-minimum">
@@ -1072,7 +1072,7 @@ function RgpdFr({
           </p>
           <p id="arbitre-designe">
             <strong>Arbitre désigné d&apos;un match.</strong> Un membre du staff qui peut arbitrer (permission
-            d&apos;arbitrage, tag Discord certifié et BattleTag tiré d&apos;un compte Battle.net rattaché — un BattleTag tapé à la main n&apos;y suffit pas) prend un match, ou le staff le lui
+            d&apos;arbitrage, tag Discord certifié et, pour un match Overwatch, BattleTag tiré d&apos;un compte Battle.net rattaché — un BattleTag tapé à la main n&apos;y suffit pas) prend un match, ou le staff le lui
             confie. Son pseudo et, dans un tournoi Overwatch seulement (en Marvel Rivals, on ne s&apos;invite pas par
             BattleTag), son BattleTag (même masqué) sont alors présentés dans
             les fenêtres « Contacts » et de lancement du match et sur la page du match (qui reprend aussi, aux seules parties du match — jamais aux arbitres sans rôle sur ce match —, les contacts des équipes), aux mêmes parties et aux mêmes moments que les

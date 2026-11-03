@@ -1,6 +1,6 @@
 /**
  * La condition d'un caster — permission `live`, tag Discord certifié, compte
- * Battle.net rattaché (`castBlockReason`) — rejouée sur la ligne d'un compte
+ * Battle.net rattaché en Overwatch seulement (`castBlockReason`, selon le jeu du match) — rejouée sur la ligne d'un compte
  * **déjà inscrit**. Contrôlée une fois à l'inscription, elle ne suffisait pas :
  * un compte privé de `live` ou d'identité gardait ses inscriptions, recevait les
  * contacts de la modale et pouvait encore déclarer son « Prêt ».
@@ -16,6 +16,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { castBlockReason, type CastBlock, type CasterIdentity } from "@/lib/shared/match-launch";
 import { refereeBlockReason, type RefereeBlock } from "@/lib/shared/match-referee";
 import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
+import type { TournamentGame } from "@/lib/shared/types";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { battletagFromBlizzard, type BattletagOriginFields } from "@/lib/server/battletag-origin";
 
@@ -53,23 +54,27 @@ export function casterIdentityOf(row: CasterIdentityFields | undefined): CasterI
   };
 }
 
-/** `castBlockReason` sur la ligne d'un compte ; `null` s'il peut caster. */
-export function castEligibilityBlock(row: CastEligibilityFields | undefined): CastBlock | null {
+/** `castBlockReason` sur la ligne d'un compte, pour le jeu du match ; `null` s'il peut caster. */
+export function castEligibilityBlock(row: CastEligibilityFields | undefined, game: TournamentGame): CastBlock | null {
   // Un compte supprimé n'a plus aucun droit, même s'il garde ses colonnes de rôles.
   const live =
     row !== undefined &&
     Number(row.is_deleted) !== 1 &&
     can({ isAdmin: Boolean(Number(row.is_admin)), roles: sanitizePlatformRoles(row.platform_roles_json) }, "live");
-  return castBlockReason(live, casterIdentityOf(row));
+  return castBlockReason(live, casterIdentityOf(row), game);
 }
 
 /** La condition d'un seul compte, relue sur l'exécuteur donné (verrou compris). */
-export async function loadCastEligibility(executor: Executor, userId: number): Promise<CastBlock | null> {
+export async function loadCastEligibility(
+  executor: Executor,
+  userId: number,
+  game: TournamentGame,
+): Promise<CastBlock | null> {
   const [rows] = await executor.execute<CastEligibilityRow[]>(
     `SELECT ${CAST_ELIGIBILITY_COLUMNS} FROM bg_users WHERE id = ? LIMIT 1`,
     [userId],
   );
-  return castEligibilityBlock(rows[0]);
+  return castEligibilityBlock(rows[0], game);
 }
 
 /**
@@ -81,9 +86,10 @@ export async function loadCastEligibility(executor: Executor, userId: number): P
 export async function loadEligibleCasterIds(
   executor: Executor,
   userIds: readonly number[],
+  game: TournamentGame,
   lock = false,
 ): Promise<Set<number>> {
-  const blocks = await loadCastBlocks(executor, userIds, lock);
+  const blocks = await loadCastBlocks(executor, userIds, game, lock);
   return new Set([...blocks].filter(([, block]) => block === null).map(([id]) => id));
 }
 
@@ -96,6 +102,7 @@ export async function loadEligibleCasterIds(
 export async function loadCastBlocks(
   executor: Executor,
   userIds: readonly number[],
+  game: TournamentGame,
   lock = false,
 ): Promise<Map<number, CastBlock | null>> {
   const ids = [...new Set(userIds)];
@@ -107,19 +114,23 @@ export async function loadCastBlocks(
     ids,
   );
   const byId = new Map(rows.map((row) => [Number(row.id), row]));
-  return new Map(ids.map((id) => [id, castEligibilityBlock(byId.get(id))]));
+  return new Map(ids.map((id) => [id, castEligibilityBlock(byId.get(id), game)]));
 }
 
 /**
- * `refereeBlockReason` sur la ligne d'un compte ; `null` s'il peut arbitrer
- * (`docs/features/MATCH_REFEREE.md`) : permission `tournaments`, tag Discord
- * certifié, compte Battle.net rattaché — l'identité même d'un caster.
+ * `refereeBlockReason` sur la ligne d'un compte, pour le jeu du match ; `null`
+ * s'il peut arbitrer (`docs/features/MATCH_REFEREE.md`) : permission
+ * `tournaments`, tag Discord certifié, compte Battle.net rattaché en Overwatch
+ * seulement — l'identité même d'un caster.
  */
-export function refereeEligibilityBlock(row: CastEligibilityFields | undefined): RefereeBlock | null {
+export function refereeEligibilityBlock(
+  row: CastEligibilityFields | undefined,
+  game: TournamentGame,
+): RefereeBlock | null {
   const tournaments =
     row !== undefined &&
     can({ isAdmin: Boolean(Number(row.is_admin)), roles: sanitizePlatformRoles(row.platform_roles_json) }, "tournaments");
-  return refereeBlockReason(tournaments, casterIdentityOf(row));
+  return refereeBlockReason(tournaments, casterIdentityOf(row), game);
 }
 
 /**
@@ -132,13 +143,14 @@ export function refereeEligibilityBlock(row: CastEligibilityFields | undefined):
 export async function loadRefereeEligibility(
   executor: Executor,
   userId: number,
+  game: TournamentGame,
   lock = false,
 ): Promise<RefereeBlock | null> {
   const [rows] = await executor.execute<CastEligibilityRow[]>(
     `SELECT ${CAST_ELIGIBILITY_COLUMNS} FROM bg_users WHERE id = ? LIMIT 1${lock ? " LOCK IN SHARE MODE" : ""}`,
     [userId],
   );
-  return refereeEligibilityBlock(rows[0]);
+  return refereeEligibilityBlock(rows[0], game);
 }
 
 /**
@@ -148,6 +160,7 @@ export async function loadRefereeEligibility(
 export async function loadEligibleRefereeIds(
   executor: Executor,
   userIds: readonly number[],
+  game: TournamentGame,
 ): Promise<Set<number>> {
   const ids = [...new Set(userIds)];
   if (ids.length === 0) return new Set();
@@ -156,7 +169,7 @@ export async function loadEligibleRefereeIds(
       WHERE id IN (${ids.map(() => "?").join(", ")}) AND referee_objection_at IS NULL`,
     ids,
   );
-  return new Set(rows.filter((row) => refereeEligibilityBlock(row) === null).map((row) => Number(row.id)));
+  return new Set(rows.filter((row) => refereeEligibilityBlock(row, game) === null).map((row) => Number(row.id)));
 }
 
 /** Ce que le verrou du lancement lit de l'arbitre désigné : sa condition d'arbitrage et son opposition. */
@@ -168,16 +181,20 @@ export type RefereeStanding = { block: RefereeBlock | null; objection: boolean }
  * verrou). Sans la colonne `referee_objection_at` (base pas encore migrée),
  * repli sur la seule condition, sans opposition — comme `refereeObjectionUpheld`.
  */
-export async function loadRefereeStanding(executor: Executor, userId: number): Promise<RefereeStanding> {
+export async function loadRefereeStanding(
+  executor: Executor,
+  userId: number,
+  game: TournamentGame,
+): Promise<RefereeStanding> {
   try {
     const [rows] = await executor.execute<(CastEligibilityRow & { referee_objection_at: Date | string | null })[]>(
       `SELECT ${CAST_ELIGIBILITY_COLUMNS}, referee_objection_at FROM bg_users WHERE id = ? LIMIT 1`,
       [userId],
     );
-    return { block: refereeEligibilityBlock(rows[0]), objection: (rows[0]?.referee_objection_at ?? null) !== null };
+    return { block: refereeEligibilityBlock(rows[0], game), objection: (rows[0]?.referee_objection_at ?? null) !== null };
   } catch (error) {
     if (!isUnknownColumnError(error)) throw error;
-    return { block: await loadRefereeEligibility(executor, userId), objection: false };
+    return { block: await loadRefereeEligibility(executor, userId, game), objection: false };
   }
 }
 

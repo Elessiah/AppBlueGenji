@@ -26,6 +26,7 @@ const LOBBY_MATCH = {
   tournament_id: 4,
   tournament_name: "Coupe",
   participant_type: "TEAM",
+  game: "OW",
   team1_id: 1,
   team2_id: 2,
   team1_name: "Renards",

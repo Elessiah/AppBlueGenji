@@ -389,25 +389,25 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
   // pour caster ; la politique le dit, comme le registre (T04).
   it("rgpdPolicy_casterCondition_requiresBattletagFromBattleNetFrAndEn", () => {
     expect(read("app/rgpd/page.tsx")).toMatch(
-      /sans les deux \(un BattleTag tiré de ce compte Battle\.net,\s+pas saisi à la main\)/,
+      /sans tag Discord certifié ni, dans un match Overwatch, sans compte Battle\.net rattaché \(un BattleTag tiré de ce compte Battle\.net,\s+pas saisi à la main\)/,
     );
     expect(read("app/rgpd/RgpdEn.tsx")).toMatch(
-      /without both \(a BattleTag taken from that Battle\.net account,\s+not typed in by hand\)/,
+      /without a certified Discord tag or, in an Overwatch match, without a linked Battle\.net account \(a BattleTag taken from that Battle\.net account,\s+not typed in by hand\)/,
     );
   });
 
-  // Revue #497 : le BattleTag n'est présenté qu'en Overwatch, mais sa présence
-  // et le compte Battle.net sont vérifiés en tout jeu pour caster ou arbitrer
-  // (`casterIdentityOf`) ; l'arbitre ne s'ajoute en jeu qu'en Overwatch.
+  // Revue #497, puis décision du 2026-11-03 : le BattleTag n'est présenté — et son
+  // origine (compte Battle.net) vérifiée pour caster ou arbitrer — qu'en
+  // Overwatch ; l'arbitre ne s'ajoute en jeu qu'en Overwatch.
   it("processingActivitiesT04_battletagCategoryAndRefereePurpose_limitedToOverwatchFrAndEn", () => {
     const t04 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")!;
     const t04En = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")!;
     expect(t04.dataCategories).toContain(
-      "BattleTag (présenté dans les seuls tournois Overwatch ; en tout jeu, sa présence et sa provenance d'un compte Battle.net rattaché — un BattleTag saisi à la main n'y suffit pas — sont vérifiées pour caster ou arbitrer un match)",
+      "BattleTag (présenté dans les seuls tournois Overwatch, où sa présence et sa provenance d'un compte Battle.net rattaché — un BattleTag saisi à la main n'y suffit pas — sont aussi vérifiées pour caster ou arbitrer un match)",
     );
     expect(t04.dataCategories).not.toContain("BattleTag (dans les seuls tournois Overwatch)");
     expect(t04En.dataCategories).toContain(
-      "BattleTag (shown in Overwatch tournaments only; in every game, its presence and that it comes from a linked Battle.net account — a BattleTag typed in by hand is not enough — are checked to cast or referee a match)",
+      "BattleTag (shown in Overwatch tournaments only, where its presence and that it comes from a linked Battle.net account — a BattleTag typed in by hand is not enough — are also checked to cast or referee a match)",
     );
     expect(t04En.dataCategories).not.toContain("BattleTag (Overwatch tournaments only)");
     expect(t04.dataCategories).not.toContain("BattleTag");

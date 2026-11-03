@@ -27,6 +27,7 @@ import { purgeStaleSubscriptions } from "@/lib/server/push-subscriptions";
 import { throttledSweep } from "@/lib/server/throttled-sweep";
 import { webPushConfig } from "@/lib/server/web-push";
 import { LAUNCH_AUTO_DELAY_MINUTES } from "@/lib/shared/match-launch";
+import type { TournamentGame } from "@/lib/shared/types";
 import { loadEligibleCasterIds } from "./cast-eligibility";
 import { loadCasterLinks } from "./match-casters";
 import {
@@ -66,6 +67,7 @@ type StartingMatchRow = RowDataPacket & {
   tournament_id: number;
   tournament_name: string;
   participant_type: string;
+  game: TournamentGame;
   team1_id: number;
   team2_id: number;
   team1_name: string;
@@ -146,23 +148,33 @@ async function planStartNotice(row: StartingMatchRow): Promise<MatchStartPhase |
 
 /**
  * Casters à appeler, par match : les inscrits qui remplissent encore la
- * condition du cast. Une panne de lecture n'en appelle aucun — les joueurs
+ * condition du cast (selon le jeu du match : `game`). Une panne de lecture n'en appelle aucun — les joueurs
  * gardent leur annonce.
  */
 export async function readMatchCasters(
   db: Awaited<ReturnType<typeof getDatabase>>,
-  matchIds: readonly number[],
+  matches: readonly { id: number; game: TournamentGame }[],
 ): Promise<Map<number, number[]>> {
   try {
-    const links = await loadCasterLinks(db, matchIds);
-    const eligible = await loadEligibleCasterIds(
+    const links = await loadCasterLinks(
       db,
-      [...links.values()].flatMap((casters) => casters.map((caster) => caster.userId)),
+      matches.map((match) => match.id),
     );
+    // Une lecture par jeu : Battle.net n'est demandé qu'en Overwatch.
+    const eligibleByGame = new Map<TournamentGame, Set<number>>();
+    for (const game of new Set(matches.map((match) => match.game))) {
+      const ids = matches
+        .filter((match) => match.game === game)
+        .flatMap((match) => (links.get(match.id) ?? []).map((caster) => caster.userId));
+      eligibleByGame.set(game, await loadEligibleCasterIds(db, ids, game));
+    }
+    const gameOf = new Map(matches.map((match) => [match.id, match.game]));
     return new Map(
       [...links].map(([matchId, casters]) => [
         matchId,
-        casters.map((caster) => caster.userId).filter((userId) => eligible.has(userId)),
+        casters
+          .map((caster) => caster.userId)
+          .filter((userId) => eligibleByGame.get(gameOf.get(matchId) ?? "OW")?.has(userId)),
       ]),
     );
   } catch (error) {
@@ -176,7 +188,7 @@ async function runMatchStartSweep(): Promise<number> {
   // L'appariement courant seulement : un état de lancement posé pour une paire
   // que le moteur a depuis remplacée ne compte pas (`currentLaunchState`).
   const [rows] = await db.query<StartingMatchRow[]>(
-    `SELECT m.id, m.tournament_id, t.name AS tournament_name, t.participant_type,
+    `SELECT m.id, m.tournament_id, t.name AS tournament_name, t.participant_type, t.game,
             m.team1_id, m.team2_id, t1.name AS team1_name, t2.name AS team2_name,
             m.launch_pairing, m.launched_at
        FROM bg_matches m
@@ -213,7 +225,10 @@ async function runMatchStartSweep(): Promise<number> {
   // remplit plus la condition du cast : on ne l'appelle pas à un « Prêt » qu'il ne peut plus
   // déclarer. Les annonces sont déjà réservées : une panne de cette lecture ne
   // doit pas priver les joueurs de la leur, le caster seul s'en passe.
-  const castersByMatch = await readMatchCasters(db, planned.map(({ row }) => Number(row.id)));
+  const castersByMatch = await readMatchCasters(
+    db,
+    planned.map(({ row }) => ({ id: Number(row.id), game: row.game })),
+  );
 
   let pushed = 0;
   for (const { row, phase } of planned) {

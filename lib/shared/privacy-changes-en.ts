@@ -766,6 +766,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What doesn't change: nothing new is collected or kept; nothing is sent to a suspended or deleted account, nor to the author of the action. The direct message falls under organizing competitions (legitimate interest, register T03), which you can object to (section “Your rights” of the privacy page); the push notification, under your consent (register T12).",
     ],
   },
+  "2026-11-battlenet-requis-overwatch-seulement": {
+    linkLabels: ["Read the “Assigned referee of a match” paragraph"],
+    title: "Casting or refereeing: Battle.net required in Overwatch only",
+    summary:
+      "To cast or referee a Marvel Rivals match, a certified Discord tag is now enough: a linked Battle.net account is no longer required. For an Overwatch match, nothing changes.",
+    details: [
+      "What changes: for a Marvel Rivals match, the site no longer checks that your Battle.net account is linked nor that your BattleTag comes from it; it no longer reads that BattleTag for these matches. For an Overwatch match, the requirement stays: a certified Discord tag and a BattleTag taken from a linked Battle.net account.",
+      "What doesn't change: nothing new is collected or kept, and what the teams and casters see of you on a match is unchanged.",
+    ],
+  },
 };
 
 /**

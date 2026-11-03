@@ -5,9 +5,10 @@
  *
  * - Un **arbitre** se désigne lui-même (« Je prends ce match ») ou est désigné
  *   par le staff (permission `tournaments`). Il lui faut la permission
- *   `tournaments`, un tag Discord certifié **et** un compte Battle.net
- *   rattaché : en Overwatch, les équipes l'ajoutent en jeu (hors Overwatch, on
- *   ne s'invite pas par BattleTag, décision 35). Il peut aussi caster le match ;
+ *   `tournaments` et un tag Discord certifié ; en Overwatch, **aussi** un compte
+ *   Battle.net rattaché, car les équipes l'ajoutent en jeu (hors Overwatch, on
+ *   ne s'invite pas par BattleTag, décision 35 : pas de Battle.net demandé).
+ *   Il peut aussi caster le match ;
  *   il ne peut pas le jouer.
  * - L'**autogestion** s'allume à la main, par le staff : désigner un arbitre
  *   l'éteint, l'allumer retire l'arbitre. Sans l'un ni l'autre, le match reste
@@ -17,9 +18,9 @@
  *   finale — la meilleure tête de série, sinon l'équipe 1. Il prend le côté
  *   gauche ; l'autre équipe bannit la première.
  */
-import type { CasterIdentity } from "./match-launch";
+import { identityComplete, type CasterIdentity } from "./match-launch";
 import { visibleText } from "./visible-text";
-import type { MatchStatus } from "./types";
+import type { MatchStatus, TournamentGame } from "./types";
 
 /** Ce qui empêche un compte d'arbitrer un match. */
 export type RefereeBlock = "NOT_REFEREE" | "REFEREE_IDENTITY_REQUIRED";
@@ -47,9 +48,10 @@ export const REFEREE_INELIGIBILITIES: readonly RefereeIneligibility[] = [
 export function refereeBlockReason(
   hasTournamentsPermission: boolean,
   identity: CasterIdentity,
+  game: TournamentGame,
 ): RefereeBlock | null {
   if (!hasTournamentsPermission) return "NOT_REFEREE";
-  if (!identity.discordVerified || !identity.blizzardLinked) return "REFEREE_IDENTITY_REQUIRED";
+  if (!identityComplete(identity, game)) return "REFEREE_IDENTITY_REQUIRED";
   return null;
 }
 

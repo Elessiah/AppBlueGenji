@@ -12,6 +12,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import type { RefereeIneligibility } from "@/lib/shared/match-referee";
+import type { TournamentGame } from "@/lib/shared/types";
 import { parseStoredSlots } from "@/lib/shared/round-maps";
 import { visibleText } from "@/lib/shared/visible-text";
 import { refereeEligibilityBlock, type CastEligibilityRow } from "./cast-eligibility";
@@ -69,6 +70,7 @@ type PanelMatchRow = RowDataPacket & {
   team2_id: number | null;
   status: string;
   launched_at: Date | string | null;
+  tournament_game: TournamentGame;
 };
 
 type RoundStateRow = RowDataPacket & { open: number | string; self_managed: number | string | null; refereed: number | string | null };
@@ -82,9 +84,9 @@ const panelUser = (row: StaffRow): RefereePanelUser => ({ userId: Number(row.id)
 export async function loadRefereePanel(matchId: number, viewerUserId: number): Promise<RefereePanel | null> {
   return withConnection(async (connection) => {
     const [matches] = await connection.execute<PanelMatchRow[]>(
-      `SELECT id, tournament_id, phase_id, round_number, bracket, self_managed, first_map, referee_user_id,
-              team1_id, team2_id, status, launched_at
-         FROM bg_matches WHERE id = ? LIMIT 1`,
+      `SELECT m.id, m.tournament_id, m.phase_id, m.round_number, m.bracket, m.self_managed, m.first_map, m.referee_user_id,
+              m.team1_id, m.team2_id, m.status, m.launched_at, t.game AS tournament_game
+         FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id WHERE m.id = ? LIMIT 1`,
       [matchId],
     );
     const match = matches[0];
@@ -123,16 +125,17 @@ export async function loadRefereePanel(matchId: number, viewerUserId: number): P
     // Avant le départ, l'arbitre qui joue désormais le match ne compte plus —
     // la règle de l'instantané (`refereeKept`), que le bandeau du staff lit déjà.
     const beforeStart = match.status !== "COMPLETED" && match.launched_at === null;
+    const game = match.tournament_game;
     const refereeId = match.referee_user_id === null ? null : Number(match.referee_user_id);
     const refereeRow = refereeId === null ? undefined : byId.get(refereeId);
     const firstMap = match.first_map ? visibleText(match.first_map) : "";
     const objected = (row: StaffRow) => (row.referee_objection_at ?? null) !== null;
     // Un arbitre : la permission `tournaments`, quelle que soit son identité.
-    const referees = staff.filter((row) => refereeEligibilityBlock(row) !== "NOT_REFEREE");
+    const referees = staff.filter((row) => refereeEligibilityBlock(row, game) !== "NOT_REFEREE");
     // L'ordre de `writeReferee` : condition, opposition, joueur du match.
     const ineligibility = (row: StaffRow | undefined, userId: number, countsPlayer: boolean): RefereeIneligibility | null => {
       if (!row) return "ACCOUNT_GONE";
-      const block = refereeEligibilityBlock(row);
+      const block = refereeEligibilityBlock(row, game);
       if (block) return block;
       if (objected(row)) return "REFEREE_OBJECTION";
       if (countsPlayer && players.has(userId)) return "REFEREE_IS_PLAYER";
@@ -167,7 +170,7 @@ export async function loadRefereePanel(matchId: number, viewerUserId: number): P
       candidates: staff
         // Un joueur du match ne l'arbitre pas (`REFEREE_IS_PLAYER`) : pas
         // proposé ; une opposition retenue ferme l'arbitrage (`REFEREE_OBJECTION`).
-        .filter((row) => refereeEligibilityBlock(row) === null && !players.has(Number(row.id)) && !objected(row))
+        .filter((row) => refereeEligibilityBlock(row, game) === null && !players.has(Number(row.id)) && !objected(row))
         .map(panelUser)
         .sort(byPseudo),
       // Toute opposition retenue, même sur un compte qui n'arbitre plus : elle

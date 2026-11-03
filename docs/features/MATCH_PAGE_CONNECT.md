@@ -27,7 +27,15 @@ FR et EN), en tête de la colonne de droite : les fiches des deux engagées
 avec « Copier »), **hôte en tête**. Rendue par `ConnectionSection`
 (`MatchPage.tsx`) quand la lecture du match a répondu et que le lecteur en est
 une **partie** : `connectionReader` (`lib/shared/match-launch.ts`) —
-`viewer.role !== "REFEREE"`, ou `isReferee` / `isCaster`.
+`viewer.role !== "REFEREE"` (le serveur donne `MATCH_REFEREE` ou `CASTER` à qui porte
+l'un de ces rôles : seul `REFEREE` écarte).
+
+Une équipe dont les contacts ne sont pas encore ouverts affiche la note de la
+fenêtre de lancement (`launchSidesLaterText`, qui ne renvoie à l'action
+« Contacts » qu'à qui elle ouvre déjà quelque chose). Le toast de copie nomme la
+personne (« Discord (Pseudo) copié », `copyToastLabel`) ; la note « À ajouter en
+ami » / « À inviter » est liée au bouton « Copier » par `aria-describedby` ; la
+région de l'arbitre est nommée par la clé `refereeRegion` (`{pseudo}`).
 
 ## Tag Discord de l'arbitre
 
@@ -44,7 +52,8 @@ caster, **staff compris** (qui lit pourtant les contacts des équipes dès que
 les adversaires sont connus), ne lit les contacts de l'arbitre que le temps
 du match (`ctx.viewerRole`), comme le dit le texte de certification. Le texte de certification (`DISCORD_VERIFICATION_EXPOSURE`,
 `verify.exposure.match` FR et EN) nomme ces lecteurs.
-`RefereeCard` dessine la ligne « Discord » avec « Copier » quand le champ est
+`refereeDiscordTag` garde `isViewer`/`refereeContactsOpen` malgré la garde de la lecture
+d'une carte : défense en profondeur, voulue. `RefereeCard` dessine la ligne « Discord » avec « Copier » quand le champ est
 présent : sur la page du match comme dans la fenêtre « Contacts », qui lit la
 même route.
 

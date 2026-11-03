@@ -65,8 +65,11 @@ describe("formatLobbyBriefDm", () => {
     expect(referee).toContain("• Match casté : trie les joueurs par rôle dans le salon.");
     expect(referee).toContain("• Arbitre désigné : ajoute-le en jeu, il invitera les joueurs dans le salon.");
     const self = formatLobbyBriefDm(side({ decision: "SELF_MANAGED" }), URL);
-    expect(self).toContain("les managers des deux équipes s'invitent mutuellement, puis invitent les casters.");
+    expect(self).toContain("les managers des deux équipes s'invitent mutuellement.");
+    expect(self).not.toContain("casters");
     expect(self).not.toContain("Match casté");
+    const selfCast = formatLobbyBriefDm(side({ decision: "SELF_MANAGED", cast: true }), URL);
+    expect(selfCast).toContain("les managers des deux équipes s'invitent mutuellement, puis invitent les casters.");
     // Sans décision : aucune ligne (le staff en est averti à part).
     expect(formatLobbyBriefDm(side(), URL)).not.toMatch(/Arbitre|Autogestion/);
   });
@@ -104,8 +107,14 @@ describe("formatLobbyBriefDm", () => {
   it("formatLobbyBriefDm_marvelRivalsSelfManaged_keepsDecisionLineWithoutBattletag", () => {
     const fr = formatLobbyBriefDm(side({ game: "MR", decision: "SELF_MANAGED" }), URL);
 
-    expect(fr).toContain("les managers des deux équipes s'invitent mutuellement, puis invitent les casters.");
+    expect(fr).toContain("les managers des deux équipes s'invitent mutuellement.");
     expect(fr).not.toContain("BattleTag");
+    // Casté : l'étape des casters, sans « inviter » (en jeu) hors Overwatch.
+    const cast = formatLobbyBriefDm(side({ game: "MR", decision: "SELF_MANAGED", cast: true }), URL);
+    expect(cast).toContain("s'invitent mutuellement, puis préviennent les casters.");
+    expect(cast).not.toContain("invitent les casters");
+    const castEn = formatLobbyBriefDm(side({ game: "MR", decision: "SELF_MANAGED", cast: true }), URL, "en");
+    expect(castEn).toContain("invite each other, then notify the casters.");
   });
 
   it("en tournoi individuel, ne nomme personne : « toi » et « ton adversaire »", () => {
@@ -119,7 +128,10 @@ describe("formatLobbyBriefDm", () => {
     expect(fr).toContain("Le salon de ton match est ouvert");
     expect(fr).toContain("• Gauche (hôte) : ton adversaire");
     expect(fr).toContain("• Bans de la carte 1 : toi d'abord, puis ton adversaire");
-    expect(fr).toContain("l'hôte crée la partie et invite son adversaire, puis les casters.");
+    expect(fr).toContain("l'hôte crée la partie et invite son adversaire.");
+    expect(fr).not.toContain("casters");
+    const castSolo = formatLobbyBriefDm({ ...solo, cast: true }, URL);
+    expect(castSolo).toContain("l'hôte crée la partie et invite son adversaire, puis invitent les casters.");
     expect(en).toContain("• Left (host): your opponent");
     expect(en).toContain("• Map 1 bans: you first, then your opponent");
   });

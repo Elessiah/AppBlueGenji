@@ -54,6 +54,7 @@ beforeEach(() => {
     team2_id: 11,
     status: "READY",
     launched_at: null,
+    tournament_game: "OW",
   };
   users = [];
   players = [];

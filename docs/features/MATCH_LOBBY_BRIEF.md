@@ -19,14 +19,16 @@ Vu de l'engagée du destinataire (« ton match « A » contre « B » ») :
   éligible est inscrit (`readMatchCasters`) ;
 - la décision d'arbitrage : arbitre désigné (encore éligible,
   `loadEligibleRefereeIds`) — « ajoute-le en jeu, il invitera les joueurs » —,
-  ou autogestion — l'hôte crée la partie, les managers s'invitent puis invitent
-  les casters ; rien sans décision (le staff en est averti à part). Un arbitre
+  ou autogestion — l'hôte crée la partie, les managers s'invitent ; l'étape
+  « puis invitent les casters » ne figure **que si le match est casté**
+  (`side.cast`), et en Overwatch seulement elle dit « inviter » (hors Overwatch :
+  « puis préviennent les casters » / “then notify the casters”, un caster n'y a
+  que son tag Discord) ; rien sans décision (le staff en est averti à part). Un arbitre
   devenu membre actif (ou joueur solo) d'une des deux engagées n'est pas annoncé
   (`referee_plays`, bâti par `playsMatchSql` comme l'éligibilité). Contre une **fantôme**, la ligne d'autogestion n'est pas
   écrite (personne en face pour s'inviter) ;
 - le lien de la **page du match** (`/tournois/[id]/matchs/[matchId]`,
-  `matchPageHref`, sous `/en` pour un compte anglais une fois la route traduite
-  par MR-3), seule à montrer les BattleTags à inviter — bâti par `siteUrl` :
+  `matchPageHref`, sous `/en` pour un compte anglais), seule à montrer les BattleTags à inviter — bâti par `siteUrl` :
   sans racine du site connue (`APP_URL`), la ligne du lien est tue plutôt que
   de pointer vers une adresse inventée.
 - **Match déjà lancé** (lancement forcé, ou tous « Prêt » avant le balayage) :

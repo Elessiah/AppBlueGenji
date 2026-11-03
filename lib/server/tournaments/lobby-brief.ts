@@ -265,10 +265,14 @@ async function releaseQuietly(db: Db, claimIds: readonly number[]): Promise<bool
 }
 
 /** Les arbitres de la liste qui remplissent encore la condition ; une panne n'en compte aucun. */
-async function readEligibleReferees(db: Db, ids: readonly number[]): Promise<Set<number>> {
+async function readEligibleReferees(
+  db: Db,
+  ids: readonly number[],
+  game: TournamentGame,
+): Promise<Set<number>> {
   if (ids.length === 0) return new Set();
   try {
-    return await loadEligibleRefereeIds(db, ids);
+    return await loadEligibleRefereeIds(db, ids, game);
   } catch (error) {
     console.error("[lobby-brief] lecture des arbitres impossible, brief sans arbitre", error);
     return new Set();
@@ -623,21 +627,34 @@ async function runLobbyBriefSweep(): Promise<number> {
     (row) => hasRecipients(Number(row.team1_id), row.team1_ghost) || hasRecipients(Number(row.team2_id), row.team2_ghost),
   );
   // Ces lectures ne lèvent pas : une panne envoie le brief sans la ligne.
-  const castersByMatch = await readMatchCasters(db, briefable.map((row) => Number(row.id)));
-  const refereeIdsOf = (list: readonly LobbyBriefRow[]) =>
-    list.flatMap((row) => (row.referee_user_id === null ? [] : [Number(row.referee_user_id)]));
-  const checkedReferees = new Set(refereeIdsOf(briefable));
-  const eligibleReferees = await readEligibleReferees(db, [...checkedReferees]);
+  const castersByMatch = await readMatchCasters(
+    db,
+    briefable.map((row) => ({ id: Number(row.id), game: row.game })),
+  );
+  // La condition d'arbitrage dépend du jeu (Battle.net en Overwatch seulement) :
+  // les arbitres lus se retiennent par jeu.
+  const refereeIdsOf = (list: readonly LobbyBriefRow[], game: TournamentGame) =>
+    list.flatMap((row) => (row.referee_user_id === null || row.game !== game ? [] : [Number(row.referee_user_id)]));
+  const games: readonly TournamentGame[] = ["OW", "MR"];
+  const checkedReferees = new Map<TournamentGame, Set<number>>();
+  const eligibleReferees = new Map<TournamentGame, Set<number>>();
+  for (const game of games) {
+    const ids = new Set(refereeIdsOf(briefable, game));
+    checkedReferees.set(game, ids);
+    eligibleReferees.set(game, await readEligibleReferees(db, [...ids], game));
+  }
 
   /** Les deux côtés d'un match relu ; un arbitre désigné depuis la première lecture est lu à part. */
   const briefSides = async (row: LobbyBriefRow) => {
-    const unread = refereeIdsOf([row]).filter((id) => !checkedReferees.has(id));
-    for (const id of unread) checkedReferees.add(id);
-    for (const id of await readEligibleReferees(db, unread)) eligibleReferees.add(id);
+    const checked = checkedReferees.get(row.game) ?? new Set<number>();
+    const eligible = eligibleReferees.get(row.game) ?? new Set<number>();
+    const unread = refereeIdsOf([row], row.game).filter((id) => !checked.has(id));
+    for (const id of unread) checked.add(id);
+    for (const id of await readEligibleReferees(db, unread, row.game)) eligible.add(id);
     const refereeId = row.referee_user_id === null ? null : Number(row.referee_user_id);
     return lobbyBriefSides(row, {
       cast: (castersByMatch.get(Number(row.id)) ?? []).length > 0,
-      refereeAssigned: refereeId !== null && eligibleReferees.has(refereeId) && Number(row.referee_plays ?? 0) !== 1,
+      refereeAssigned: refereeId !== null && eligible.has(refereeId) && Number(row.referee_plays ?? 0) !== 1,
     });
   };
 

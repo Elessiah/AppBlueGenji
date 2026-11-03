@@ -324,7 +324,7 @@ describe("dispatchLobbyBriefs", () => {
     expect(m41.dm()).not.toContain("Match casté");
     // Arbitre devenu inéligible : rien n'est promis.
     expect(m42.dm()).not.toMatch(/Arbitre|Autogestion/);
-    expect(loadEligibleRefereeIds).toHaveBeenCalledWith(expect.anything(), [9, 8]);
+    expect(loadEligibleRefereeIds).toHaveBeenCalledWith(expect.anything(), [9, 8], expect.any(String));
   });
 
   it("dispatchLobbyBriefs_refereePlaysTheMatch_noRefereeLine", async () => {
@@ -355,7 +355,7 @@ describe("dispatchLobbyBriefs", () => {
     expect(sends()[0].dm()).toContain("• Gauche (hôte) : « Nova »");
     expect(sends()[0].dm()).toContain("« Busan »");
     // Arbitre désigné entre les deux lectures : sa condition est lue à part.
-    expect(loadEligibleRefereeIds).toHaveBeenLastCalledWith(expect.anything(), [5]);
+    expect(loadEligibleRefereeIds).toHaveBeenLastCalledWith(expect.anything(), [5], expect.any(String));
     expect(sends()[0].dm()).toContain("Arbitre désigné");
   });
 

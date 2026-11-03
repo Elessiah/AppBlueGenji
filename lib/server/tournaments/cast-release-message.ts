@@ -13,23 +13,23 @@ const DM_REASONS: Readonly<Record<Locale, Readonly<Record<CastReleaseReasonKey, 
   fr: {
     STAFF: "décision du staff",
     REPLACED:
-      "tu ne remplissais plus les conditions du cast (permission de diffusion, tag Discord certifié, compte Battle.net rattaché), et un autre caster a pris le match",
+      "tu ne remplissais plus les conditions du cast (permission de diffusion, tag Discord certifié, compte Battle.net rattaché en Overwatch), et un autre caster a pris le match",
     INELIGIBLE:
-      "tu ne remplis plus les conditions du cast (permission de diffusion, tag Discord certifié, compte Battle.net rattaché)",
+      "tu ne remplis plus les conditions du cast (permission de diffusion, tag Discord certifié, compte Battle.net rattaché en Overwatch)",
     INELIGIBLE_PERMISSION: "tu n'as plus la permission de diffusion",
     INELIGIBLE_IDENTITY:
-      "ton identité de caster est incomplète (tag Discord certifié et compte Battle.net rattaché, à vérifier dans « Mon profil »)",
+      "ton identité de caster est incomplète (tag Discord certifié et, en Overwatch, compte Battle.net rattaché, à vérifier dans « Mon profil »)",
     JOINED_TEAM: "tu joues désormais ce match",
   },
   en: {
     STAFF: "staff decision",
     REPLACED:
-      "you no longer met the casting requirements (streaming permission, certified Discord tag, linked Battle.net account), and another caster took the match",
+      "you no longer met the casting requirements (streaming permission, certified Discord tag, linked Battle.net account in Overwatch), and another caster took the match",
     INELIGIBLE:
-      "you no longer meet the casting requirements (streaming permission, certified Discord tag, linked Battle.net account)",
+      "you no longer meet the casting requirements (streaming permission, certified Discord tag, linked Battle.net account in Overwatch)",
     INELIGIBLE_PERMISSION: "you no longer have the streaming permission",
     INELIGIBLE_IDENTITY:
-      "your caster identity is incomplete (certified Discord tag and linked Battle.net account, check “My profile”)",
+      "your caster identity is incomplete (certified Discord tag and, in Overwatch, linked Battle.net account, check “My profile”)",
     JOINED_TEAM: "you now play in this match",
   },
 };

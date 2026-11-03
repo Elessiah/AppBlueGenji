@@ -52,6 +52,9 @@ type MatchState = {
   id: number;
   tournament_id: number;
   tournament_state: string;
+  /** Jeu du tournoi (la condition de cast et d'arbitrage en dépend). */
+  tournament_game: string;
+  game: string;
   /** Option du tournoi : 1 = phase de lancement allumée. */
   match_launch_phase: number;
   status: string;
@@ -123,6 +126,8 @@ function matchState(overrides: MatchOverrides = {}): MatchState {
     id: 42,
     tournament_id: 7,
     tournament_state: "RUNNING",
+    tournament_game: "OW",
+    game: "OW",
     match_launch_phase: 1,
     status: "READY",
     is_bye: 0,
@@ -1113,12 +1118,12 @@ describe("maintainMatchLaunches", () => {
 
 describe("loadViewerCastBlock", () => {
   it("refuse sans la permission, sans même lire l'identité", async () => {
-    await expect(loadViewerCastBlock(CASTER, false)).resolves.toBe("NOT_CASTER");
+    await expect(loadViewerCastBlock(CASTER, false, "OW")).resolves.toBe("NOT_CASTER");
     expect(withConnection).not.toHaveBeenCalled();
   });
 
   it("lit l'identité avec la permission", async () => {
-    await expect(loadViewerCastBlock(CASTER, true)).resolves.toBe("CASTER_IDENTITY_REQUIRED");
+    await expect(loadViewerCastBlock(CASTER, true, "OW")).resolves.toBe("CASTER_IDENTITY_REQUIRED");
     state.users[CASTER] = {
       discord_verified_at: STAMP,
       discord_pseudo: "caster",
@@ -1126,7 +1131,7 @@ describe("loadViewerCastBlock", () => {
       overwatch_battletag: "Caster#1",
       is_deleted: 0,
     };
-    await expect(loadViewerCastBlock(CASTER, true)).resolves.toBeNull();
+    await expect(loadViewerCastBlock(CASTER, true, "OW")).resolves.toBeNull();
   });
 });
 
