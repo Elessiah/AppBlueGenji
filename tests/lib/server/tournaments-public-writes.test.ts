@@ -590,7 +590,7 @@ describe("adminSaveMatchScoresPublic", () => {
 
     const [sql, params] = connection.execute.mock.calls[0];
     expect(String(sql).replace(/\s+/g, " ")).toBe(
-      "SELECT m.tournament_id, m.team1_id, m.team2_id, m.status, t.format FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id WHERE m.id = ? LIMIT 1",
+      "SELECT m.tournament_id, m.team1_id, m.team2_id, m.status, COALESCE(p.format, t.format) AS format FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id LEFT JOIN bg_tournament_phases p ON p.id = m.phase_id AND p.tournament_id = m.tournament_id WHERE m.id = ? LIMIT 1",
     );
     expect(params).toEqual([70]);
     expect(order(connection.execute)).toBeLessThan(order(connection.beginTransaction));
