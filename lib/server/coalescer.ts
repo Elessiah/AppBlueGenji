@@ -183,7 +183,10 @@ export function createKeyedChain<K>(): {
   return {
     chain(key, run) {
       const previous = tails.get(key);
-      const settled = (previous ? previous.then(run, run) : run()).catch(() => undefined);
+      // Sans annonce en route, `run` part dans ce tour ; une levée synchrone y
+      // devient un rejet, jamais une exception chez l'appelant.
+      const started = previous ? previous.then(run, run) : startNow(run);
+      const settled = started.catch(() => undefined);
       tails.set(key, settled);
       void trackAnnouncement(settled).then(() => {
         if (tails.get(key) === settled) tails.delete(key);
@@ -191,4 +194,13 @@ export function createKeyedChain<K>(): {
     },
     reset: () => tails.clear(),
   };
+}
+
+/** Lance `run` dans ce tour ; une levée synchrone devient un rejet. */
+function startNow(run: () => Promise<void>): Promise<void> {
+  try {
+    return run();
+  } catch (error) {
+    return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+  }
 }

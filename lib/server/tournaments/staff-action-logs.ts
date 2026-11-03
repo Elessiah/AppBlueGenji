@@ -130,8 +130,17 @@ function deliverTournamentAction({ tournamentId, action, details }: TournamentAc
 const tournamentBursts = createCoalescer<TournamentActionBurst>({
   windowMs: STAFF_LOG_BURST_WINDOW_MS,
   maxAgeMs: STAFF_LOG_BURST_MAX_AGE_MS,
-  deliver: (_first, last) => deliverTournamentAction(last),
+  // Une rafale prend son tour dans la file du tournoi, qu'elle parte à son
+  // échéance ou vidée par un autre geste : elle ne double jamais une ligne d'avant.
+  deliver: (_first, last) => queueTournamentLine(last),
 });
+
+/** Range une ligne dans la file de son tournoi ; se règle quand elle est partie. */
+function queueTournamentLine(entry: TournamentActionBurst): Promise<void> {
+  return new Promise((resolve) =>
+    tournamentLines.chain(entry.tournamentId, () => deliverTournamentAction(entry).then(resolve)),
+  );
+}
 
 /** Annonce tout de suite les rafales en attente. Réservé aux tests. */
 export function flushStaffActionBursts(): Promise<void> {
@@ -161,17 +170,15 @@ export function announceStaffTournamentAction(
     return;
   }
   // Une rafale en attente sur ce tournoi part d'abord : le journal garde l'ordre
-  // des gestes (têtes de série réordonnées, puis coup d'envoi).
-  const keys = [...BURST_ACTIONS].map((burst) => `${tournamentId}:${burst}`);
-  // Rien en attente (le cas courant) : la ligne part sur-le-champ, sans détour
-  // par la file des microtâches — un arrêt du serveur juste après ne la rate pas.
-  // La rafale ne se vide qu'à son tour dans la file du tournoi : elle ne double
-  // pas une ligne d'avant encore en route.
-  tournamentLines.chain(tournamentId, () =>
-    keys.some((key) => tournamentBursts.busy(key))
-      ? Promise.all(keys.map((key) => tournamentBursts.flush(key))).then(() => deliverTournamentAction(entry))
-      : deliverTournamentAction(entry),
-  );
+  // des gestes (têtes de série réordonnées, puis coup d'envoi). Elle se détache
+  // dans ce tour et prend sa place dans la file avant cette ligne ; une rafale
+  // ouverte après ce geste reste à venir. Rien en attente (le cas courant) : la
+  // ligne part sur-le-champ — un arrêt du serveur juste après ne la rate pas.
+  for (const burst of BURST_ACTIONS) {
+    const key = `${tournamentId}:${burst}`;
+    if (tournamentBursts.waiting(key)) void tournamentBursts.flush(key);
+  }
+  tournamentLines.chain(tournamentId, () => deliverTournamentAction(entry));
 }
 
 /** Lignes de tournoi en route, par tournoi, et de match, par match. */
