@@ -240,7 +240,7 @@ describe("teamInvitationPush", () => {
   });
 
   it("teamInvitationPush_bidiControlsInTeamName_stripped", () => {
-    const { body } = teamInvitationPush({ kind: "INVITE", teamId: 7, teamName: "‮nimda​" }, "fr");
+    const { body } = teamInvitationPush({ kind: "INVITE", teamId: 7, teamName: "\u202Enimda\u200B" }, "fr");
 
     expect(body).toBe("nimda t'invite à la rejoindre. Accepte ou refuse depuis ton profil.");
   });
