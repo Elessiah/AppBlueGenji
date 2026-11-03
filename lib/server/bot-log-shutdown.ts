@@ -13,6 +13,7 @@
  * un signal retire le comportement par défaut de Node.
  */
 import { flushAllBotLogBatches } from "@/lib/server/bot-integration";
+import { flushAllCoalescers } from "@/lib/server/coalescer";
 
 export const SHUTDOWN_FLUSH_TIMEOUT_MS = 1200;
 
@@ -27,7 +28,12 @@ export async function flushBotLogsBeforeExit(timeoutMs: number = SHUTDOWN_FLUSH_
     timer.unref?.();
   });
   try {
-    await Promise.race([flushAllBotLogBatches().catch(() => undefined), deadline]);
+    // Les rafales regroupées (journal du staff, casts) rejoignent d'abord les lots.
+    const flush = flushAllCoalescers()
+      .catch(() => undefined)
+      .then(() => flushAllBotLogBatches())
+      .catch(() => undefined);
+    await Promise.race([flush, deadline]);
   } finally {
     if (timer) clearTimeout(timer);
   }

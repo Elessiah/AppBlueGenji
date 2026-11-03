@@ -131,8 +131,8 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
   ]);
 }
 
-function deliverInBackground(change: CastChange): void {
-  void deliverCastChange(change).catch((error) =>
+function deliverInBackground(change: CastChange): Promise<void> {
+  return deliverCastChange(change).catch((error) =>
     console.error(
       `[cast] changement d'inscription non annoncé : ${error instanceof Error ? error.message : "erreur inconnue"}`,
     ),
@@ -150,7 +150,7 @@ export const CAST_TOGGLE_MAX_AGE_MS = 5 * 60_000;
  * bascule le bouton en boucle ne remplit plus le salon : la rafale ne dit que
  * son **effet net**, et rien quand elle revient à l'état de départ.
  */
-function isVoluntaryToggle(change: CastChange): change is Extract<CastChange, { kind: "CLAIMED" | "RELEASED" }> {
+function isVoluntaryToggle(change: CastChange): boolean {
   if (change.kind === "CLAIMED") return change.replacedCasterId === null;
   return change.kind === "RELEASED" && !change.byStaff;
 }
@@ -159,14 +159,12 @@ const voluntaryToggles = createCoalescer<CastChange>({
   windowMs: CAST_TOGGLE_WINDOW_MS,
   maxAgeMs: CAST_TOGGLE_MAX_AGE_MS,
   // Inscrit puis retiré (ou l'inverse) : rien n'a changé, rien ne part.
-  deliver: (first, last) => {
-    if (first.kind === last.kind) deliverInBackground(last);
-  },
+  deliver: (first, last) => (first.kind === last.kind ? deliverInBackground(last) : undefined),
 });
 
 /** Annonce tout de suite les rafales en attente. Réservé aux tests. */
-export function flushCastToggles(): void {
-  voluntaryToggles.flushAll();
+export function flushCastToggles(): Promise<void> {
+  return voluntaryToggles.flushAll();
 }
 
 /** Abandonne les rafales en attente. Réservé aux tests. */
@@ -179,8 +177,18 @@ export function resetCastToggles(): void {
  * Un geste volontaire du caster attend {@link CAST_TOGGLE_WINDOW_MS} de silence.
  */
 export function announceCastChange(change: CastChange): void {
-  if (isVoluntaryToggle(change)) voluntaryToggles.add(`${change.matchId}:${change.casterId}`, change);
-  else deliverInBackground(change);
+  const key = `${change.matchId}:${change.casterId}`;
+  if (isVoluntaryToggle(change)) {
+    voluntaryToggles.add(key, change);
+    return;
+  }
+  // La rafale en attente du même caster (ou du titulaire remplacé) part d'abord :
+  // le journal garde l'ordre des gestes et finit sur l'état réel.
+  const pending = [voluntaryToggles.flush(key)];
+  if (change.kind === "CLAIMED" && change.replacedCasterId !== null) {
+    pending.push(voluntaryToggles.flush(`${change.matchId}:${change.replacedCasterId}`));
+  }
+  void Promise.all(pending).then(() => deliverInBackground(change));
 }
 
 /**

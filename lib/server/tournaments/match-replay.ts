@@ -21,7 +21,6 @@ type MatchReplayRow = RowDataPacket & {
   status: MatchStatus;
   team1_id: number | null;
   team2_id: number | null;
-  replay_url: string | null;
   forfeit_team_id: number | null;
   double_forfeit: number | null;
 };
@@ -63,7 +62,7 @@ export async function setMatchReplayUrl(
 
   const db = await getDatabase();
   const [rows] = await db.execute<MatchReplayRow[]>(
-    `SELECT id, tournament_id, status, team1_id, team2_id, forfeit_team_id, double_forfeit, replay_url
+    `SELECT id, tournament_id, status, team1_id, team2_id, forfeit_team_id, double_forfeit
        FROM bg_matches WHERE id = ? LIMIT 1`,
     [matchId],
   );
@@ -85,6 +84,10 @@ export async function setMatchReplayUrl(
     throw new Error("MATCH_NOT_REPLAYABLE");
   }
 
-  publishMatchUpdatedEvent(Number(row.tournament_id));
-  return { replayUrl, changed: (row.replay_url ?? null) !== replayUrl };
+  // « Changé » se lit dans la réponse de l'écriture (`changedRows`), pas dans la
+  // lecture d'avant : deux effacements simultanés n'en comptent qu'un, et un lien
+  // identique à celui en base ne change rien.
+  const changed = Number((result as { changedRows?: number }).changedRows ?? 0) > 0;
+  if (changed) publishMatchUpdatedEvent(Number(row.tournament_id));
+  return { replayUrl, changed };
 }

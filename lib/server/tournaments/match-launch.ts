@@ -867,6 +867,10 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
   let block: CastBlock | null = null;
   await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
+      // Un nouvel essai (interblocage) relit tout : rien ne reste de l'essai précédent.
+      reason = "INELIGIBLE";
+      block = null;
+      tournamentId = null;
       const row = await lockLaunchMatch(connection, matchId);
       if (!row?.casters.some((caster) => caster.userId === casterId)) return;
       // Seul un match qui attend encore son lancement est concerné. Un match

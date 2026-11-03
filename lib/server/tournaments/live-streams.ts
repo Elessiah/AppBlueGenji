@@ -314,13 +314,18 @@ export async function setMatchOnAir(matchId: number, onAir: boolean): Promise<bo
   if (onAir && row.status !== "READY") throw new Error("MATCH_NOT_LIVE_READY");
 
   const db = await getDatabase();
-  await db.execute(`UPDATE bg_matches SET live_started_at = ? WHERE id = ?`, [
-    onAir ? new Date() : null,
-    matchId,
-  ]);
+  // L'état de départ est relu dans la condition : un second clic ne réécrit pas
+  // l'heure de mise à l'antenne, et deux clics simultanés ne changent l'état qu'une fois.
+  const [result] = await db.execute(
+    onAir
+      ? `UPDATE bg_matches SET live_started_at = ? WHERE id = ? AND live_started_at IS NULL`
+      : `UPDATE bg_matches SET live_started_at = NULL WHERE id = ? AND live_started_at IS NOT NULL`,
+    onAir ? [new Date(), matchId] : [matchId],
+  );
+  const changed = Number((result as { affectedRows?: number }).affectedRows ?? 0) > 0;
 
-  publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
-  return onAir === (row.live_started_at === null);
+  if (changed) publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
+  return changed;
 }
 
 /**

@@ -128,8 +128,8 @@ const BURST_ACTIONS: ReadonlySet<StaffTournamentAction> = new Set(["SEEDING_REOR
 
 type TournamentActionBurst = { tournamentId: number; action: StaffTournamentAction; details: StaffTournamentActionDetails };
 
-function deliverTournamentAction({ tournamentId, action, details }: TournamentActionBurst): void {
-  void deliverStaffTournamentAction(tournamentId, action, details).catch((error) =>
+function deliverTournamentAction({ tournamentId, action, details }: TournamentActionBurst): Promise<void> {
+  return deliverStaffTournamentAction(tournamentId, action, details).catch((error) =>
     console.error(`[staff-log] geste ${action} sur le tournoi #${tournamentId} non journalisé : ${failureReason(error)}`),
   );
 }
@@ -141,8 +141,8 @@ const tournamentBursts = createCoalescer<TournamentActionBurst>({
 });
 
 /** Annonce tout de suite les rafales en attente. Réservé aux tests. */
-export function flushStaffActionBursts(): void {
-  tournamentBursts.flushAll();
+export function flushStaffActionBursts(): Promise<void> {
+  return tournamentBursts.flushAll();
 }
 
 /** Abandonne les rafales en attente. Réservé aux tests. */
@@ -161,6 +161,12 @@ export function announceStaffTournamentAction(
   details: StaffTournamentActionDetails = {},
 ): void {
   const entry = { tournamentId, action, details };
-  if (BURST_ACTIONS.has(action)) tournamentBursts.add(`${tournamentId}:${action}`, entry);
-  else deliverTournamentAction(entry);
+  if (BURST_ACTIONS.has(action)) {
+    tournamentBursts.add(`${tournamentId}:${action}`, entry);
+    return;
+  }
+  // Une rafale en attente sur ce tournoi part d'abord : le journal garde l'ordre
+  // des gestes (têtes de série réordonnées, puis coup d'envoi).
+  const pending = [...BURST_ACTIONS].map((burst) => tournamentBursts.flush(`${tournamentId}:${burst}`));
+  void Promise.all(pending).then(() => deliverTournamentAction(entry));
 }
