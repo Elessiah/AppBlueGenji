@@ -72,7 +72,7 @@ describe("createCoalescer", () => {
     expect(coalescer.pending()).toBe(0);
   });
 
-  it("une annonce qui lève ne casse ni le minuteur ni les rafales suivantes", () => {
+  it("une annonce qui lève ne casse ni le minuteur ni les rafales suivantes", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const deliver = jest.fn<(first: number, last: number) => void>().mockImplementationOnce(() => {
       throw new Error("boom");
@@ -81,8 +81,11 @@ describe("createCoalescer", () => {
     coalescer.add("a", 1);
     jest.advanceTimersByTime(1_000);
     expect(error).toHaveBeenCalledWith("[coalescer] annonce regroupée non partie", "boom");
+    await Promise.resolve();
+    await Promise.resolve();
     coalescer.add("a", 2);
     jest.advanceTimersByTime(1_000);
+    await Promise.resolve();
     expect(deliver).toHaveBeenLastCalledWith(2, 2);
     error.mockRestore();
   });
@@ -146,6 +149,35 @@ describe("createCoalescer — annonce forcée", () => {
     finish();
     await flushed;
     expect(done).toEqual(["delivered", "flushed"]);
+  });
+
+  it("fire_previousDeliveryStillRunning_nextWaitsForIt", async () => {
+    const events: string[] = [];
+    const finishes: (() => void)[] = [];
+    const coalescer = createCoalescer<number>({
+      windowMs: 1_000,
+      maxAgeMs: 5_000,
+      deliver: (_first, last) =>
+        new Promise<void>((resolve) => {
+          events.push(`start ${last}`);
+          finishes.push(() => {
+            events.push(`end ${last}`);
+            resolve();
+          });
+        }),
+    });
+    coalescer.add("a", 1);
+    jest.advanceTimersByTime(1_000);
+    coalescer.add("a", 2);
+    jest.advanceTimersByTime(1_000);
+    await Promise.resolve();
+    expect(events).toEqual(["start 1"]);
+    finishes[0]();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(events).toEqual(["start 1", "end 1", "start 2"]);
+    coalescer.reset();
   });
 
   it("busy_pendingInFlightAndUnknown_trueTrueFalse", async () => {

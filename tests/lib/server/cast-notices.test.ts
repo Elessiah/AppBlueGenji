@@ -161,6 +161,17 @@ describe("deliverCastChange", () => {
     expect(resolvePush(sent.push, "en").body).toContain("staff decision");
   });
 
+  it("deliverCastChange_recipientsReadFails_journalLineStillSent", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    mockMatch(matchRow());
+    jest.mocked(loadNotificationRecipients).mockRejectedValue(new Error("POOL_TIMEOUT"));
+    await deliverCastChange({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true });
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+    expect(notifyUsers).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith("[cast] destinataire de l'avis non lu : POOL_TIMEOUT");
+    error.mockRestore();
+  });
+
   it("prévient le titulaire évincé par un autre caster", async () => {
     mockMatch(matchRow());
     await deliverCastChange({ kind: "CLAIMED", matchId: 42, casterId: 9, replacedCasterId: 901 });
