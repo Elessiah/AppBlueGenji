@@ -230,8 +230,12 @@ describe("announceCastChange", () => {
   });
 
   describe("gestes volontaires du caster", () => {
-    beforeEach(() => jest.useFakeTimers());
-    afterEach(() => jest.useRealTimers());
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
 
     it("une inscription seule part après le silence de la rafale", async () => {
       mockMatch(matchRow());

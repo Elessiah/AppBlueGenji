@@ -219,7 +219,9 @@ describe("announceStaffTournamentAction — rafales", () => {
     resetStaffActionBursts();
     jest.useFakeTimers();
   });
-  afterEach(() => jest.useRealTimers());
+  afterEach(() => {
+    jest.useRealTimers();
+  });
 
   it("announceStaffTournamentAction_seedingBurst_onlyOneLine", async () => {
     const execute = mockRows({ id: 7, name: "Coupe d'hiver" });
