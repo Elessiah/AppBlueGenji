@@ -79,8 +79,10 @@ ouvre un lancement, lecture de la liste des tournois).
   réouverture), **côté par côté** : réservation, relecture des réglages du
   match (hôte, cartes, arbitre, autogestion — un changement entre la lecture
   des candidats et la réservation est repris ; relecture en panne : la
-  lecture des candidats ; relecture vide, le salon s'est refermé depuis la
-  réservation : rien ne part, la réservation est rendue), envoi, puis le côté suivant — un arrêt du processus
+  lecture des candidats ; relecture vide — salon refermé depuis la
+  réservation, ou réservation effacée entre-temps (lancement défait puis
+  rouvert) : rien ne part, les réservations du match, fantôme comprise, sont
+  rendues sans relance, pm2 disant « salon refermé avant l'envoi »), envoi, puis le côté suivant — un arrêt du processus
   ne laisse au plus qu'une réservation sans envoi. Un match reste candidat tant
   qu'un côté est libre. Un réappariement est un autre appariement (nouveau
   brief) ; un lancement défait (horaire changé, retour à planifier) **ou un
