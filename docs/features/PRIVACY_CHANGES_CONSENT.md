@@ -84,6 +84,12 @@ française (D6). La politique elle-même (`/rgpd`) se modifie dans les deux
 langues, dans la même PR (`app/rgpd/RgpdEn.tsx`, référence du français
 `tests/fixtures/legal-fr/rgpd.txt`).
 
+Ces deux fichiers restent **exclus de la détection de duplication** de
+SonarCloud (`.sonarcloud.properties`) : entrées publiées immuables, toutes de
+même forme, et module français importé côté client, qui ne peut pas recevoir
+l'anglais. Le registre et les documents du bot, eux, s'écrivent en une fois
+(`frEn`) → `LEGAL_DATA_FILES.md`.
+
 ## Qui voit quoi
 
 `pendingPrivacyChanges` : un changement est dû à un compte s'il n'en a pas pris

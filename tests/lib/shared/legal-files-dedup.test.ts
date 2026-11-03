@@ -1,0 +1,133 @@
+/**
+ * LEGAL-FILES-DEDUP : textes juridiques écrits une fois pour les deux langues
+ * (`frEn`, `docs/features/LEGAL_DATA_FILES.md`). Le français et l'anglais
+ * sortent de la même structure ; ces tests vérifient qu'aucune paire n'échappe
+ * à la résolution et que la forme est la même dans les deux langues.
+ */
+import { describe, expect, it } from "@jest/globals";
+
+import { isBilingual } from "@/lib/shared/bilingual";
+import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "@/lib/shared/bot-legal-content";
+import type { BilingualDoc, LegalDoc } from "@/lib/shared/bot-legal-types";
+import * as register from "@/lib/shared/processing-register";
+import type { ProcessingActivity } from "@/lib/shared/processing-register";
+import * as registerEn from "@/lib/shared/processing-register-en";
+import { englishRegisterText } from "../../helpers/register-english-text";
+
+const LIST_FIELDS = ["subPurposes", "dataSubjects", "dataCategories", "retention", "recipients", "transfers", "security"] satisfies (keyof ProcessingActivity)[];
+
+const DOCS: [string, BilingualDoc][] = [
+  ["TERMS_OF_SERVICE", TERMS_OF_SERVICE],
+  ["PRIVACY_POLICY", PRIVACY_POLICY],
+];
+
+/** Chemins des paires `{ fr, en }` restées dans une valeur résolue. */
+function leftoverPairs(value: unknown, path = "$"): string[] {
+  if (isBilingual(value)) return [path];
+  if (Array.isArray(value)) return value.flatMap((item, index) => leftoverPairs(item, `${path}[${index}]`));
+  if (value !== null && typeof value === "object") {
+    return Object.entries(value).flatMap(([key, item]) => leftoverPairs(item, `${path}.${key}`));
+  }
+  return [];
+}
+
+/** La forme d'un document : par section, la suite des blocs et leur nombre de puces. */
+function shape(doc: LegalDoc): string[][] {
+  return doc.sections.map((section) =>
+    section.blocks.map((block) => (block.kind === "bullets" ? `bullets:${block.items?.length}` : block.kind)),
+  );
+}
+
+describe("documents du bot : même forme en français et en anglais", () => {
+  it.each(DOCS)("%s — botDocs_sameBlockShapeAcrossLanguages_kindsAndBulletCountsMatch", (_name, doc) => {
+    expect(shape(doc.en)).toEqual(shape(doc.fr));
+  });
+
+  it.each(DOCS)("%s — botDocs_resolved_containNoLeftoverPair", (_name, doc) => {
+    expect(leftoverPairs(doc.fr)).toEqual([]);
+    expect(leftoverPairs(doc.en)).toEqual([]);
+  });
+});
+
+/** Le texte des blocs d'une section, mis bout à bout. */
+function sectionText(doc: LegalDoc, num: string): string {
+  const section = doc.sections.find((candidate) => candidate.num === num);
+  return JSON.stringify(section?.blocks ?? []);
+}
+
+/** Le titre de la section portant ce numéro. */
+function sectionTitle(doc: LegalDoc, num: string): string | undefined {
+  return doc.sections.find((candidate) => candidate.num === num)?.title;
+}
+
+// Les numéros viennent de l'ordre des sections (`numberedSections`), mais le texte cite des
+// sections par leur numéro : insérer une section décalerait ces renvois sans rien dire.
+describe("politique du bot : les renvois « section 0n » visent la bonne section", () => {
+  it("privacyPolicy_dataSectionCitesSection03_section03IsRetention", () => {
+    expect(sectionText(PRIVACY_POLICY.fr, "02")).toContain("(section 03,");
+    expect(sectionText(PRIVACY_POLICY.en, "02")).toContain("(section 03,");
+    expect(sectionTitle(PRIVACY_POLICY.fr, "03")).toBe("Durées de conservation");
+    expect(sectionTitle(PRIVACY_POLICY.en, "03")).toBe("Retention periods");
+  });
+
+  it("privacyPolicy_retentionSectionCitesSection02_section02IsDataProcessed", () => {
+    expect(sectionText(PRIVACY_POLICY.fr, "03")).toContain("(section 02)");
+    expect(sectionText(PRIVACY_POLICY.en, "03")).toContain("(section 02)");
+    expect(sectionTitle(PRIVACY_POLICY.fr, "02")).toBe("Données traitées et finalités");
+    expect(sectionTitle(PRIVACY_POLICY.en, "02")).toBe("Data processed and purposes");
+  });
+
+  it("privacyPolicy_contactSectionCitesSections04And05_theyAreRecipientsAndTransfers", () => {
+    expect(sectionTitle(PRIVACY_POLICY.fr, "09")).toBe("Contact");
+    expect(sectionTitle(PRIVACY_POLICY.en, "09")).toBe("Contact");
+    expect(sectionText(PRIVACY_POLICY.fr, "09")).toContain("sections 04 et 05");
+    expect(sectionText(PRIVACY_POLICY.en, "09")).toContain("sections 04 and 05");
+    expect(sectionTitle(PRIVACY_POLICY.fr, "04")).toBe("Destinataires");
+    expect(sectionTitle(PRIVACY_POLICY.en, "04")).toBe("Recipients");
+    expect(sectionTitle(PRIVACY_POLICY.fr, "05")).toBe("Transferts hors de l'Union européenne");
+    expect(sectionTitle(PRIVACY_POLICY.en, "05")).toBe("Transfers outside the European Union");
+  });
+});
+
+describe("registre : fiches résolues dans les deux langues", () => {
+  it("processingActivities_resolved_containNoLeftoverPair", () => {
+    expect(leftoverPairs(register.PROCESSING_ACTIVITIES)).toEqual([]);
+    expect(leftoverPairs(register.PROCESSING_ACTIVITIES_EN)).toEqual([]);
+  });
+
+  it("processingActivities_listFields_areArraysOfStrings", () => {
+    for (const activity of [...register.PROCESSING_ACTIVITIES, ...register.PROCESSING_ACTIVITIES_EN]) {
+      for (const field of LIST_FIELDS) {
+        expect([activity.ref, field, activity[field].every((item) => typeof item === "string")]).toEqual([activity.ref, field, true]);
+      }
+    }
+  });
+
+  it("processingActivities_refFirst_keyOrderMatchesAcrossLanguages", () => {
+    const frKeys = register.PROCESSING_ACTIVITIES.map((activity) => Object.keys(activity));
+    const enKeys = register.PROCESSING_ACTIVITIES_EN.map((activity) => Object.keys(activity));
+
+    expect(enKeys).toEqual(frKeys);
+    expect(frKeys.every((keys) => keys[0] === "ref")).toBe(true);
+  });
+});
+
+describe("processing-register-en : réexporte l'anglais du module français", () => {
+  it("englishRegisterText_resolvedRegister_containsEnglishHalvesOnly", () => {
+    const text = englishRegisterText();
+
+    expect(text).toContain("Player accounts and profiles");
+    expect(text).toContain("EU-U.S. Data Privacy Framework");
+    expect(text).not.toContain("Comptes joueurs et profils");
+  });
+
+  it("processingRegisterEn_reExports_areTheFrenchModuleValues", () => {
+    const names = Object.keys(registerEn);
+
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names) {
+      const key = name as keyof typeof registerEn;
+      expect([name, registerEn[key] === register[key]]).toEqual([name, true]);
+    }
+  });
+});

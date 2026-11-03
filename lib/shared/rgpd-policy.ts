@@ -128,6 +128,15 @@ export const VERIFIED_BADGE_SCOPE =
  */
 export type LegalBase = "Exécution du contrat" | "Consentement" | "Intérêt légitime" | "Obligation légale";
 
+// Les bases et la durée les plus citées, nommées une fois : une ligne du
+// tableau les désigne par leur nom, ce qui la distingue de sa voisine pour la
+// détection de duplication de SonarCloud (`docs/features/LEGAL_DATA_FILES.md`).
+const CONTRAT = "Exécution du contrat" satisfies LegalBase;
+const CONSENTEMENT = "Consentement" satisfies LegalBase;
+const INTERET_LEGITIME = "Intérêt légitime" satisfies LegalBase;
+const OBLIGATION_LEGALE = "Obligation légale" satisfies LegalBase;
+const DUREE_DU_COMPTE = "Durée du compte";
+
 export interface DonneEntry {
   donnee: string;
   finalite: string;
@@ -179,15 +188,15 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // et Blizzard donnent un pseudonyme de jeu (tag, BattleTag sans son numéro).
     finalite:
       "Identification sur la plateforme, URLs de profil. Jamais tiré de ton nom : un compte créé par Discord ou Blizzard reprend ton pseudo Discord ou ton BattleTag (sans son numéro), un compte créé par Google reçoit un pseudo neutre — tu le changes dans Mon profil. Un compte créé par Google avant le 30 septembre 2026 a pu recevoir le nom de ton compte Google : si c'est le cas, remplace-le dans Mon profil",
-    base: "Exécution du contrat",
+    base: CONTRAT,
     extraBases: [
-      { base: "Exécution du contrat", scope: LIVE_PSEUDO_SCOPE },
-      { base: "Intérêt légitime", scope: AUTOMOD_ALERT_SCOPE },
-      { base: "Exécution du contrat", scope: REFEREE_USERNAME_SCOPE },
-      { base: "Intérêt légitime", scope: REFEREE_USERNAME_BEFORE_V7_SCOPE },
-      { base: "Intérêt légitime", scope: REFEREE_USERNAME_MEMBERS_SCOPE },
+      { base: CONTRAT, scope: LIVE_PSEUDO_SCOPE },
+      { base: INTERET_LEGITIME, scope: AUTOMOD_ALERT_SCOPE },
+      { base: CONTRAT, scope: REFEREE_USERNAME_SCOPE },
+      { base: INTERET_LEGITIME, scope: REFEREE_USERNAME_BEFORE_V7_SCOPE },
+      { base: INTERET_LEGITIME, scope: REFEREE_USERNAME_MEMBERS_SCOPE },
     ],
-    duree: "Durée du compte",
+    duree: DUREE_DU_COMPTE,
   },
   {
     donnee: "Pseudo Overwatch",
@@ -202,14 +211,14 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // match », version 6 ; celui de l'arbitre désigné depuis la version 7).
     // Le consentement ne vaut que pour le renseigner et
     // l'afficher au public.
-    base: "Consentement",
+    base: CONSENTEMENT,
     extraBases: [
-      { base: "Exécution du contrat", scope: BATTLETAG_MATCH_SCOPE },
-      { base: "Exécution du contrat", scope: REFEREE_BATTLETAG_SCOPE },
-      { base: "Intérêt légitime", scope: REFEREE_BATTLETAG_BEFORE_V7_SCOPE },
-      { base: "Intérêt légitime", scope: VERIFIED_BADGE_SCOPE },
+      { base: CONTRAT, scope: BATTLETAG_MATCH_SCOPE },
+      { base: CONTRAT, scope: REFEREE_BATTLETAG_SCOPE },
+      { base: INTERET_LEGITIME, scope: REFEREE_BATTLETAG_BEFORE_V7_SCOPE },
+      { base: INTERET_LEGITIME, scope: VERIFIED_BADGE_SCOPE },
     ],
-    duree: "Durée du compte",
+    duree: DUREE_DU_COMPTE,
   },
   {
     donnee: "Pseudo Discord",
@@ -226,9 +235,9 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // (consentement, ligne suivante).
     finalite:
       "Authentification Discord, codes du bot en message privé (connexion, rattachement, certification), notifications bot (tag certifié seulement). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
-    base: "Exécution du contrat",
-    extraBases: [{ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE }],
-    duree: "Durée du compte",
+    base: CONTRAT,
+    extraBases: [{ base: INTERET_LEGITIME, scope: MATCH_TIME_DM_SCOPE }],
+    duree: DUREE_DU_COMPTE,
   },
   {
     donnee: "Certification du pseudo Discord",
@@ -238,14 +247,14 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // tient — le geste est libre, spécifique, et se retire.
     finalite:
       "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, ses casters le temps du match seulement (et, si tu castes un match, ses deux équipes, ses autres casters et son arbitre désigné le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et les autres arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page ; et, si tu es l'arbitre désigné d'un match, ses deux équipes dès que ses deux adversaires sont connus et jusqu'à sa fin et ses casters le temps du match, dans sa fenêtre « Contacts » et sur sa page — le temps du match seulement pour ses parties si tu le castes aussi) ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Que ton tag soit certifié (pastille ✅, sans le tag) se lit sur ta fiche par tout joueur connecté. Sans la certification, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) ou, d'un clic, depuis la fenêtre qui te la propose après une connexion par Discord ou Blizzard (sinon, elle te mène à Mon profil) — se connecter par Discord ne la donne pas. Les conditions d'inscription d'un tournoi peuvent l'exiger, et caster ou arbitrer un match l'exige. Retirée en retirant ton tag ; perdue si ton pseudo change",
-    base: "Consentement",
+    base: CONSENTEMENT,
     // La certification décide aussi qui reçoit les messages privés de match,
     // qui reposent sur l'intérêt légitime (opposition par la case du profil).
     extraBases: [
-      { base: "Exécution du contrat", scope: MATCH_CONTACTS_SCOPE },
-      { base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE },
-      { base: "Intérêt légitime", scope: VERIFIED_BADGE_SCOPE },
-      { base: "Intérêt légitime", scope: REFEREE_DISCORD_SCOPE },
+      { base: CONTRAT, scope: MATCH_CONTACTS_SCOPE },
+      { base: INTERET_LEGITIME, scope: MATCH_TIME_DM_SCOPE },
+      { base: INTERET_LEGITIME, scope: VERIFIED_BADGE_SCOPE },
+      { base: INTERET_LEGITIME, scope: REFEREE_DISCORD_SCOPE },
     ],
     duree: "Jusqu'au retrait ou au changement du tag, ou durée du compte",
   },
@@ -256,13 +265,13 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // que c'est ce qui explique qu'on ne puisse pas retirer le dernier.
     finalite:
       "Moyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires, rappels, retrait de match, réglages du salon si tu gères une engagée ou joues un tournoi individuel, et retrait de ton cast — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, avis de suspension ou de modération, information sur tes données). Retirable depuis Mon profil tant qu'il t'en reste un autre",
-    base: "Exécution du contrat",
+    base: CONTRAT,
     extraBases: [
-      { base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE },
-      { base: "Intérêt légitime", scope: MODERATION_DM_SCOPE },
-      { base: "Obligation légale", scope: DATA_NOTICE_DM_SCOPE },
+      { base: INTERET_LEGITIME, scope: MATCH_TIME_DM_SCOPE },
+      { base: INTERET_LEGITIME, scope: MODERATION_DM_SCOPE },
+      { base: OBLIGATION_LEGALE, scope: DATA_NOTICE_DM_SCOPE },
     ],
-    duree: "Durée du compte",
+    duree: DUREE_DU_COMPTE,
   },
   {
     donnee: "Identifiant Google",
@@ -273,28 +282,28 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // personne.
     finalite:
       "Moyen de connexion (bouton Google) — identifiant technique opaque. Aucune adresse e-mail n'est demandée ni conservée, et le nom de ton compte Google n'est pas repris. Retirable depuis Mon profil tant qu'il t'en reste un autre",
-    base: "Exécution du contrat",
-    duree: "Durée du compte",
+    base: CONTRAT,
+    duree: DUREE_DU_COMPTE,
   },
   {
     donnee: "Identifiant Blizzard",
     finalite:
       "Moyen de connexion (bouton Blizzard) — identifiant technique opaque. Renseigne et tient à jour ton BattleTag. Retirable depuis Mon profil tant qu'il t'en reste un autre",
-    base: "Exécution du contrat",
-    duree: "Durée du compte",
+    base: CONTRAT,
+    duree: DUREE_DU_COMPTE,
   },
   {
     donnee: "Pseudo Marvel Rivals",
     finalite: "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique",
-    base: "Consentement",
-    duree: "Durée du compte",
+    base: CONSENTEMENT,
+    duree: DUREE_DU_COMPTE,
   },
   {
     donnee: "Majorité déclarée",
     finalite:
       "Oui, non ou non renseignée, à ton choix. Affichée sur ta fiche seulement si tu coches « Majorité » dans Mon profil",
-    base: "Consentement",
-    duree: "Durée du compte",
+    base: CONSENTEMENT,
+    duree: DUREE_DU_COMPTE,
   },
   {
     donnee: "Avatar",
@@ -302,8 +311,8 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // elle naît masquée (`adoptRemoteAvatar`), et seul le joueur la publie.
     finalite:
       "Affichage sur le profil et les brackets. Téléversé par toi, ou copié sur nos serveurs depuis Google ou Discord à la connexion — depuis le 30 septembre 2026, la photo copiée reste masquée tant que tu ne coches pas « Avatar » dans Mon profil (une photo copiée avant cette date reste affichée : décoche « Avatar » pour la masquer)",
-    base: "Consentement",
-    duree: "Durée du compte",
+    base: CONSENTEMENT,
+    duree: DUREE_DU_COMPTE,
   },
   {
     donnee: "Langue du compte",
@@ -312,8 +321,8 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // facultatif de visibilité.
     finalite:
       "Français ou anglais : la langue des notifications push et des messages privés Discord du site (transmise au bot avec le seul code envoyé en message privé). Celle de la page du site d'où part ta dernière connexion (sauf les exceptions détaillées à la section Notifications push), ou celle que tu choisis dans Mon profil ; français par défaut, remis au français si le compte est anonymisé",
-    base: "Exécution du contrat",
-    duree: "Durée du compte",
+    base: CONTRAT,
+    duree: DUREE_DU_COMPTE,
   },
   {
     donnee: "Choix des messages privés de match",
@@ -322,8 +331,8 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // relève d'une obligation légale (art. 6.1.c : honorer l'opposition, art. 21).
     finalite:
       "Coché par défaut : le bot t'écrit en privé pour l'horaire, les rappels et le retrait de tes matchs, si ton tag Discord est certifié ; décoché dans Mon profil (ton opposition), il ne le fait plus. Gardé au titre d'une obligation légale : c'est ce qui permet de continuer d'honorer ton opposition. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
-    base: "Obligation légale",
-    duree: "Durée du compte",
+    base: OBLIGATION_LEGALE,
+    duree: DUREE_DU_COMPTE,
   },
   {
     donnee: "Choix « Ne plus afficher » du recrutement",
@@ -332,8 +341,8 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // (`bg_recr_off`) est décrit à la section des cookies.
     finalite:
       "Non par défaut : la fenêtre des annonces de recrutement urgentes s'ouvre d'elle-même. « Ne plus afficher » dans cette fenêtre : elle ne s'ouvre plus d'elle-même sur tes autres appareils (un choix fait sur ce navigateur avant la connexion, ou pas enregistré sur-le-champ, y est reporté à la connexion ou à ta prochaine visite connectée). Réversible dans Mon profil : le compte note alors que la fenêtre a été réaffichée et le cookie bg_recr_off de ce navigateur est effacé ; dès lors, plus aucun cookie n'est reporté sur le compte (un nouveau « Ne plus afficher » fait connecté, ou la case de Mon profil, l'y remet). Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
-    base: "Exécution du contrat",
-    duree: "Durée du compte",
+    base: CONTRAT,
+    duree: DUREE_DU_COMPTE,
   },
   {
     donnee: "Choix « Ne plus voir » de la certification Discord",
@@ -342,15 +351,15 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // de session (`bg_user_sessions.certify_prompt_due`) part avec la session.
     finalite:
       "Non par défaut : après une connexion par Discord ou Blizzard, tant que ton tag Discord n'est pas certifié, une fenêtre te propose de le certifier (ou, si tu n'en as pas, de l'ajouter puis de le certifier), une fois par connexion : « Plus tard » la ferme pour cette connexion-là ; elle revient à ta prochaine connexion par Discord ou Blizzard. La session de connexion note seulement qu'elle reste à proposer : marque levée à ta première réponse (« Ne plus voir » la lève sur toutes tes sessions) ou dès qu'il n'y a plus rien à proposer, effacée avec la session, hors de l'export de tes données. Une réponse qui ne parvient pas au site, ou qu'il refuse (autre compte connecté depuis dans ce navigateur, compte introuvable), ne lève pas la marque : la fenêtre peut revenir au chargement suivant. « Ne plus voir » : elle ne s'ouvre plus, sur aucun appareil (date du choix gardée) — et, sur la fiche d'un tournoi, l'invitation à certifier faite à qui mène une équipe ne s'ouvre plus quand seul son tag Discord manque (jamais quand ton équipe n'a aucun contact) ; la certification reste possible dans Mon profil. Ce choix figure dans l'export de tes données, effacé si le compte est anonymisé",
-    base: "Exécution du contrat",
-    duree: "Durée du compte",
+    base: CONTRAT,
+    duree: DUREE_DU_COMPTE,
   },
 ];
 
 export const DONNEE_TOURNOIS: DonneEntry = {
   donnee: "Résultats de tournois",
   finalite: "Historique compétitif, classements, palmarès",
-  base: "Intérêt légitime",
+  base: INTERET_LEGITIME,
   // Décision de l'association : aucune durée de conservation n'est définie.
   // Les résultats restent tant que le site existe ; à la suppression d'un
   // compte, ils sont anonymisés (pseudo d'emprunt, `anonymizeAccount`).
@@ -372,7 +381,7 @@ export const DONNEE_SAUVEGARDES: DonneEntry = {
   donnee: "Copies de sauvegarde",
   finalite:
     "Reprise après incident (panne, corruption). Chiffrées avant envoi, avec des clés que détient le seul responsable technique de l'association (qui est aussi l'hébergeur du site), puis hébergées chez Hetzner, en Allemagne",
-  base: "Intérêt légitime",
+  base: INTERET_LEGITIME,
   duree: `${BACKUP_RETENTION_DAYS} jours au plus`,
 };
 
@@ -385,7 +394,7 @@ export const DONNEE_CONNEXIONS: DonneEntry = {
   donnee: "Données de connexion (adresse IP, date et heure, moyen de connexion)",
   finalite:
     "Obligation de l'hébergeur des contenus publiés par les membres (LCEN, art. 6 ; décret n° 2021-1362) : permettre d'identifier l'auteur d'un contenu, sur réquisition d'une autorité judiciaire. Aucune autre utilisation",
-  base: "Obligation légale",
+  base: OBLIGATION_LEGALE,
   duree: `${CONNECTION_LOG_RETENTION_DAYS} jours (un an) après chaque connexion, y compris après la suppression du compte`,
 };
 

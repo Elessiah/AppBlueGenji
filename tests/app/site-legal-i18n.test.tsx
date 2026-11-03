@@ -64,6 +64,7 @@ import enShell from "@/messages/en/shell.json";
 import frLegal from "@/messages/fr/legal.json";
 import { legalPageText, withoutFrenchPassages, withoutPrivacyHistory } from "../helpers/legal-text";
 import { readSource } from "../helpers/read-source";
+import { englishRegisterText } from "../helpers/register-english-text";
 
 type Page = () => Promise<React.JSX.Element>;
 type MetadataFn = typeof termsMetadata;
@@ -222,7 +223,6 @@ describe("coordonnées : toujours encodées, révélées au clic", () => {
     "app/rgpd/RgpdEn.tsx",
     "app/rgpd/registre/RegistreEn.tsx",
     "lib/shared/rgpd-policy-en.ts",
-    "lib/shared/processing-register-en.ts",
     "lib/shared/privacy-changes-en.ts",
   ])("%s ne contient aucune coordonnée en clair", (file) => {
     const source = readSource(file);
@@ -230,6 +230,14 @@ describe("coordonnées : toujours encodées, révélées au clic", () => {
     expect(source).not.toContain("mailto:");
     // Ni contrat de sous-traitance de l'hébergeur de sauvegardes, ni identifiants du stockage.
     expect(source).not.toMatch(/your-storageshare|storageshare\.de|customer number|numéro client/i);
+  });
+
+  // Le registre anglais s'écrit dans `processing-register.ts`, à côté du français : on lit son texte résolu.
+  it("englishRegister_contacts_noPlaintextContactNorStorageIdentifiers", () => {
+    const text = englishRegisterText();
+    expect(text).not.toMatch(/[\w.+-]+@[\w-]+\.[a-z]{2,}/i);
+    expect(text).not.toContain("mailto:");
+    expect(text).not.toMatch(/your-storageshare|storageshare\.de|customer number|numéro client/i);
   });
 
   it("les mentions anglaises passent chaque coordonnée par ProtectedContact", () => {
