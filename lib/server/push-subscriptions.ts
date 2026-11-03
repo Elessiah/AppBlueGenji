@@ -13,6 +13,7 @@
 import crypto from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { failureReason } from "@/lib/server/failure-reason";
 import { isMissingTableError, rowsOrEmptyIfMissingTable } from "@/lib/server/mysql-errors";
 import { toIso } from "@/lib/server/serialization";
 import { siteBaseUrl } from "@/lib/server/site-url";
@@ -299,14 +300,14 @@ export async function pushToUsers(
     } catch (error) {
       // Un envoi en échec n'efface pas ceux qui ont abouti : le compte rendu
       // (marques « reçu » des appelants) se fonde sur eux.
-      console.error("[push] envoi interrompu", error);
+      console.error("[push] envoi interrompu", failureReason(error));
     }
     await recordDeliveries(sent, gone);
     // Ce qui a **atteint** un appareil, même si la tenue des abonnements a
     // échoué ensuite : un appelant qui lirait 0 croirait n'avoir prévenu personne.
     return sent.length;
   } catch (error) {
-    if (!isMissingTableError(error)) console.error("[push] distribution impossible", error);
+    if (!isMissingTableError(error)) console.error("[push] distribution impossible", failureReason(error));
     return 0;
   }
 }
@@ -330,7 +331,7 @@ async function recordDeliveries(sent: readonly number[], gone: readonly number[]
       );
     }
   } catch (error) {
-    if (!isMissingTableError(error)) console.error("[push] tenue des abonnements impossible", error);
+    if (!isMissingTableError(error)) console.error("[push] tenue des abonnements impossible", failureReason(error));
   }
 }
 
@@ -361,7 +362,7 @@ export async function subscribedStaffCandidates(): Promise<
       rolesJson: row.platform_roles_json,
     }));
   } catch (error) {
-    if (!isMissingTableError(error)) console.error("[push] lecture du staff impossible", error);
+    if (!isMissingTableError(error)) console.error("[push] lecture du staff impossible", failureReason(error));
     return [];
   }
 }
@@ -381,7 +382,7 @@ export async function purgeStaleSubscriptions(): Promise<number> {
     );
     return Number((result as { affectedRows?: number }).affectedRows ?? 0);
   } catch (error) {
-    if (!isMissingTableError(error)) console.error("[push] purge impossible", error);
+    if (!isMissingTableError(error)) console.error("[push] purge impossible", failureReason(error));
     return 0;
   }
 }

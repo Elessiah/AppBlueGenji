@@ -26,6 +26,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { failureReason } from "@/lib/server/failure-reason";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { parseRoles } from "@/lib/server/serialization";
 import { canDeclareTeamReady } from "@/lib/shared/match-launch";
@@ -129,7 +130,7 @@ async function loadAccountLocales(userIds: readonly number[]): Promise<Map<numbe
     );
     for (const row of rows) locales.set(Number(row.id), accountLocaleFromRow(row.locale));
   } catch (error) {
-    console.error("[notify] langue des comptes illisible, messages privés bilingues", error);
+    console.error("[notify] langue des comptes illisible, messages privés bilingues", failureReason(error));
   }
   return locales;
 }

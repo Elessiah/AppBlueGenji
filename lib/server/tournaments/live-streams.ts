@@ -315,10 +315,11 @@ export async function setMatchOnAir(matchId: number, onAir: boolean): Promise<bo
 
   const db = await getDatabase();
   // L'état de départ est relu dans la condition : un second clic ne réécrit pas
-  // l'heure de mise à l'antenne, et deux clics simultanés ne changent l'état qu'une fois.
+  // l'heure de mise à l'antenne, et deux clics simultanés ne changent l'état qu'une fois ;
+  // le statut aussi : un match validé entre la lecture et l'écriture ne passe pas à l'antenne.
   const [result] = await db.execute(
     onAir
-      ? `UPDATE bg_matches SET live_started_at = ? WHERE id = ? AND live_started_at IS NULL`
+      ? `UPDATE bg_matches SET live_started_at = ? WHERE id = ? AND live_started_at IS NULL AND status = 'READY'`
       : `UPDATE bg_matches SET live_started_at = NULL WHERE id = ? AND live_started_at IS NOT NULL`,
     onAir ? [new Date(), matchId] : [matchId],
   );

@@ -157,7 +157,7 @@ export const CAST_TOGGLE_MAX_AGE_MS = 5 * 60_000;
  * Geste volontaire du caster sur sa propre inscription — inscription simple,
  * retrait par lui-même : une ligne de journal, aucun avis. Un caster qui
  * bascule le bouton en boucle ne remplit plus le salon : la rafale ne dit que
- * son **effet net**, et rien quand elle revient à l'état de départ.
+ * son **effet net** ({@link deliverToggleBurst}).
  */
 function isVoluntaryToggle(change: CastChange): boolean {
   if (change.kind === "CLAIMED") return change.replacedCasterId === null;
@@ -167,9 +167,22 @@ function isVoluntaryToggle(change: CastChange): boolean {
 const voluntaryToggles = createCoalescer<CastChange>({
   windowMs: CAST_TOGGLE_WINDOW_MS,
   maxAgeMs: CAST_TOGGLE_MAX_AGE_MS,
-  // Inscrit puis retiré (ou l'inverse) : rien n'a changé, rien ne part.
-  deliver: (first, last) => (first.kind === last.kind ? deliverInBackground(last) : undefined),
+  deliver: deliverToggleBurst,
 });
+
+/**
+ * Ce qu'une rafale du caster poste : l'état final, et rien quand un retrait
+ * suivi d'une réinscription le ramène à son point de départ. Une inscription
+ * suivie d'un retrait garde **ses deux lignes**, dans l'ordre : s'inscrire
+ * ouvre au caster les contacts du match en cours (`/api/matches/[matchId]/contacts`),
+ * et le journal du staff est la trace de qui a tenu la place, même une minute.
+ */
+async function deliverToggleBurst(first: CastChange, last: CastChange): Promise<void> {
+  if (first.kind === last.kind) return deliverInBackground(last);
+  if (first.kind !== "CLAIMED") return;
+  await deliverInBackground(first);
+  await deliverInBackground(last);
+}
 
 /** Annonce tout de suite les rafales en attente. Réservé aux tests. */
 export function flushCastToggles(): Promise<void> {
