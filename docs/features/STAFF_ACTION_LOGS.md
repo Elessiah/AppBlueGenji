@@ -63,7 +63,9 @@ garde l'ordre), et l'arrêt propre du serveur l'annonce avant les lots du journa
 de match déjà parties qui lisent encore la base (`trackAnnouncement`). Les
 lignes d'un même tournoi, et celles d'un même match, s'enchaînent
 (`createKeyedChain`) : la suivante attend la précédente, sans retenir les autres
-— une rafale en attente ne se vide qu'à son tour dans cette file. Un geste fait
+— une rafale prend aussi son tour dans cette file, qu'elle parte à son échéance
+ou vidée par un geste suivant (détachée au moment de ce geste : une rafale
+ouverte après lui reste à venir). Un geste fait
 coupe-circuit ouvert garde sa ligne : elle rejoint le lot, qui ne part que
 minutes plus tard (`LOG_BATCHING.md`). Une modification nomme le
 tournoi sous le nom qu'elle a écrit, un renommage cite aussi l'ancien, tous deux lus sous le verrou
