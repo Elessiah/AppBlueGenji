@@ -242,6 +242,53 @@ describe("announceStaffMatchAction / announceStaffTournamentAction", () => {
     expect(lines[1]).not.toContain("Mis à l'antenne");
   });
 
+  it("announceStaffTournamentAction_burstTimerDuringSlowLine_waitsItsTurn", async () => {
+    resetStaffActionBursts();
+    jest.useFakeTimers();
+    let finishFirst: () => void = () => undefined;
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (finishFirst = () => resolve([[{ id: 7, name: "Coupe d'hiver" }], []]))),
+      )
+      .mockResolvedValue([[{ id: 7, name: "Coupe d'hiver" }], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    announceStaffTournamentAction(7, "EDITED");
+    announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    jest.advanceTimersByTime(STAFF_LOG_BURST_WINDOW_MS);
+    jest.useRealTimers();
+    await settle();
+    expect(execute).toHaveBeenCalledTimes(1);
+    finishFirst();
+    await flushAllCoalescers();
+    const lines = jest.mocked(sendBotLog).mock.calls.map((call) => String(call[0]));
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("Tournoi modifié");
+    expect(lines[1]).toContain("Têtes de série réordonnées");
+  });
+
+  it("announceStaffTournamentAction_burstOpenedAfterQueuedLine_staysPending", async () => {
+    resetStaffActionBursts();
+    let finishFirst: () => void = () => undefined;
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (finishFirst = () => resolve([[{ id: 7, name: "Coupe d'hiver" }], []]))),
+      )
+      .mockResolvedValue([[{ id: 7, name: "Coupe d'hiver" }], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    announceStaffTournamentAction(7, "IMAGE_UPDATED");
+    announceStaffTournamentAction(7, "EDITED");
+    announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    await settle();
+    finishFirst();
+    await settle();
+    expect(sendBotLog).toHaveBeenCalledTimes(2);
+    await flushStaffActionBursts();
+    expect(sendBotLog).toHaveBeenCalledTimes(3);
+    expect(String(jest.mocked(sendBotLog).mock.calls[2][0])).toContain("Têtes de série réordonnées");
+  });
+
   it("ne lèvent jamais quand la base est indisponible", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(getDatabase).mockRejectedValue(new Error("down"));

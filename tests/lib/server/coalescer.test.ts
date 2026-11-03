@@ -377,6 +377,19 @@ describe("createKeyedChain", () => {
     expect(second).toHaveBeenCalledTimes(1);
   });
 
+  it("createKeyedChain_runThrowsSynchronously_doesNotThrow", async () => {
+    const { chain } = createKeyedChain<number>();
+    const next = jest.fn(async () => undefined);
+    expect(() =>
+      chain(1, () => {
+        throw new Error("SYNC_FAILURE");
+      }),
+    ).not.toThrow();
+    chain(1, next);
+    await flushAllCoalescers();
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
   it("createKeyedChain_pendingRun_awaitedByFlushAllCoalescers", async () => {
     const { chain } = createKeyedChain<number>();
     const run = deferred();
