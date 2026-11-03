@@ -649,6 +649,37 @@ describe("adminSaveMatchScoresPublic", () => {
     expect(lockTournamentRow).not.toHaveBeenCalled();
     expect(adminSaveMatchScores).not.toHaveBeenCalled();
   });
+
+  // Revue sécurité #542 (cycle 4) : un ROLLBACK raté ne masque pas
+  // l'interblocage (rejoué), et la connexion n'est jamais rendue au pool avec
+  // une transaction peut-être ouverte.
+  it("adminSave_rollbackFailsAfterDeadlock_stillRetriesAndCommits", async () => {
+    const rollbackLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest
+      .mocked(adminSaveMatchScores)
+      .mockRejectedValueOnce(Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" }))
+      .mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
+    connection.rollback.mockRejectedValueOnce(new Error("Connection lost: The server closed the connection."));
+
+    await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
+
+    expect(adminSaveMatchScores).toHaveBeenCalledTimes(2);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(rollbackLog).toHaveBeenCalledTimes(1);
+    rollbackLog.mockRestore();
+  });
+
+  it("adminSave_rollbackFailsAfterRefusal_propagatesCodeAndDestroysConnection", async () => {
+    const rollbackLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(adminSaveMatchScores).mockRejectedValue(new Error("MATCH_NOT_FOUND"));
+    connection.rollback.mockRejectedValue(new Error("Connection lost: The server closed the connection."));
+
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow("MATCH_NOT_FOUND");
+
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+    expect(connection.release).not.toHaveBeenCalled();
+    rollbackLog.mockRestore();
+  });
 });
 
 describe("adminResolveMatchPublic", () => {

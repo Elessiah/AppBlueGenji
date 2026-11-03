@@ -212,9 +212,9 @@ describe("rewriteMapSet", () => {
 
     expect(execute).toHaveBeenCalledTimes(1);
     expect(flat(execute.mock.calls[0][0])).toBe(
-      "UPDATE bg_match_maps SET replay_code = ?, team1_score = ?, team2_score = ?, submitted_by_user_id = ?, submitted_at = CURRENT_TIMESTAMP WHERE id = ?",
+      "UPDATE bg_match_maps SET map_number = ?, replay_code = ?, team1_score = ?, team2_score = ?, submitted_by_user_id = ?, submitted_at = CURRENT_TIMESTAMP WHERE id = ?",
     );
-    expect(execute.mock.calls[0][1]).toEqual(["BBB222", 1, 2, 7, 82]);
+    expect(execute.mock.calls[0][1]).toEqual([2, "BBB222", 1, 2, 7, 82]);
   });
 
   it("rewriteMapSet_shrinking_deletesExtraMapsByPrimaryKey", async () => {
@@ -244,6 +244,33 @@ describe("rewriteMapSet", () => {
 
     expect(execute).toHaveBeenCalledTimes(1);
     expect(execute.mock.calls[0][1]).toEqual([10, "FINAL", 1, "CCC333", 2, 0, 7]);
+  });
+
+  // Revue sécurité #542 (cycle 4) : un jeu stocké troué se renumérote 1..n —
+  // sinon la nouvelle map reprendrait un numéro gardé (doublon de la clé
+  // unique) et « Map 1 » manquerait.
+  it("rewriteMapSet_gappedStoredSet_renumbersKeptRowThenInsertsAfter", async () => {
+    const { execute, connection } = conn();
+    const thirdStored: StoredMap = { ...second, id: 83, mapNumber: 3 };
+
+    await rewriteMapSet(connection, 10, "FINAL", [first, thirdStored], [sameAs(first), sameAs(thirdStored), third], 7);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(flat(execute.mock.calls[0][0])).toMatch(/^UPDATE bg_match_maps SET map_number = \?/);
+    expect(execute.mock.calls[0][1]).toEqual([2, "BBB222", 0, 2, 7, 83]);
+    expect(execute.mock.calls[1][1]).toEqual([10, "FINAL", 3, "CCC333", 2, 0, 7]);
+  });
+
+  it("rewriteMapSet_setStartingAtTwo_renumbersFromOne", async () => {
+    const { execute, connection } = conn();
+    const atTwo: StoredMap = { ...first, id: 82, mapNumber: 2 };
+    const atThree: StoredMap = { ...second, id: 83, mapNumber: 3 };
+
+    await rewriteMapSet(connection, 10, "FINAL", [atTwo, atThree], [sameAs(atTwo), sameAs(atThree)], 7);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[0][1]).toEqual([1, "AAA111", 2, 1, 7, 82]);
+    expect(execute.mock.calls[1][1]).toEqual([2, "BBB222", 0, 2, 7, 83]);
   });
 });
 
