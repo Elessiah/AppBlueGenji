@@ -61,8 +61,9 @@ geste sur le même tournoi fait d'abord partir la rafale en attente (le journal
 garde l'ordre), et l'arrêt propre du serveur l'annonce avant les lots du journal
 (`flushAllCoalescers`, `bot-log-shutdown.ts`). Le regroupeur vit en mémoire : un
 seul processus sert le site.
-Hôte, antenne et rediffusion : « changé » se lit dans l'écriture elle-même
-(condition sur l'état de départ, `changedRows`), jamais dans une lecture d'avant.
+« Changé » ne se lit jamais dans une lecture hors verrou : l'hôte se compare sous
+le verrou du match, l'antenne et la rediffusion dans l'écriture elle-même
+(condition sur l'état de départ, `changedRows`).
 
 ## Ce qui ne change pas
 
