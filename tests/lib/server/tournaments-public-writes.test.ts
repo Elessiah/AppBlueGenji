@@ -990,6 +990,23 @@ describe("pénalités d'endurance", () => {
     expect(publishUpdatedEvent).toHaveBeenCalledTimes(1);
   });
 
+  // ERREUR.txt EF-15 (revue) : tournoi tenu, manches verrouillées — l'attente
+  // d'un détenteur qui ne demande jamais le tournoi est bornée, puis rendue.
+  it("liftPenalty_boundsLockWaitThenRestoresBeforeRelease", async () => {
+    jest.mocked(liftEndurancePenalty).mockResolvedValue({ teamId: 3, points: 2 });
+
+    await liftEndurancePenaltyPublic(5, 61);
+
+    expect(connection.query.mock.calls.map(([sql]) => sql)).toEqual([
+      "SET SESSION innodb_lock_wait_timeout = 5",
+      "SET SESSION innodb_lock_wait_timeout = DEFAULT",
+    ]);
+    expect(connection.query.mock.invocationCallOrder[0]).toBeLessThan(
+      connection.beginTransaction.mock.invocationCallOrder[0],
+    );
+    expect(connection.query.mock.invocationCallOrder[1]).toBeLessThan(connection.release.mock.invocationCallOrder[0]);
+  });
+
   it("liftPenalty_businessRefusal_notRetried", async () => {
     jest.mocked(liftEndurancePenalty).mockRejectedValue(new Error("ENDURANCE_ROUND_ALREADY_PLAYED"));
 

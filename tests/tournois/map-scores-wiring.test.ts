@@ -519,7 +519,9 @@ describe("dialogues de score — calculs évités (EF-15)", () => {
     const sheet = readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
     const start = sheet.indexOf("const performCancelForfeit = async");
     const body = sheet.slice(start, sheet.indexOf("return true;", start));
-    expect(body).toContain("if (isLive) focusRowAfterChange(teamId);");
+    expect(body).toContain("if (isLiveRef.current) focusRowAfterChange(teamId);");
+    // État du flux à la réponse, pas celui capturé au clic.
+    expect(sheet).toMatch(/useEffect\(\(\) => \{\s*isLiveRef\.current = isLive;\s*\}, \[isLive\]\);/);
   });
 
   it("TournamentSheet_cancelForfeit_streamDown_fallsBackToRestRefresh", () => {
@@ -531,8 +533,11 @@ describe("dialogues de score — calculs évités (EF-15)", () => {
 
   it("useScoreForm_rulesChangeWhileOpen_realignsBaseline", () => {
     const form = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
-    expect(form).toContain("const rules = `${JSON.stringify(matchFormat)}|${game ?? \"\"}`;");
+    expect(form).toContain("const rules = rulesKey(matchFormat, game);");
+    expect(form).not.toContain("JSON.stringify(matchFormat)");
     expect(form).toContain("rules !== synced.rules");
+    // Saisie en cours sous l'ancien format : conflit signalé, pas d'écrasement.
+    expect(form).toContain("} else if ((signature !== synced.signature || rules !== synced.rules) && !submitting) {");
     expect(form).not.toMatch(/setSynced\(\{ signature, proposals, baseline/);
   });
 });
