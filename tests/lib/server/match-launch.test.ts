@@ -52,6 +52,9 @@ type MatchState = {
   id: number;
   tournament_id: number;
   tournament_state: string;
+  /** Jeu du tournoi (la condition de cast et d'arbitrage en dépend). */
+  tournament_game: string | null;
+  game: string;
   /** Option du tournoi : 1 = phase de lancement allumée. */
   match_launch_phase: number;
   status: string;
@@ -123,6 +126,8 @@ function matchState(overrides: MatchOverrides = {}): MatchState {
     id: 42,
     tournament_id: 7,
     tournament_state: "RUNNING",
+    tournament_game: "OW",
+    game: "OW",
     match_launch_phase: 1,
     status: "READY",
     is_bye: 0,
@@ -214,6 +219,7 @@ function matchContextRows(state: World) {
   if (!match) return [];
   return [{
     tournament_state: match.tournament_state,
+    tournament_game: match.tournament_game,
     match_launch_phase: match.match_launch_phase,
     team1_is_ghost: match.team1_is_ghost,
     team2_is_ghost: match.team2_is_ghost,
@@ -374,6 +380,20 @@ function readVoiceRows(state: World, sql: string) {
   return null;
 }
 
+/** Lectures de `bg_matches` : candidats, ligne verrouillée (sans le jeu), relecture simple. */
+function readMatchRows(state: World, sql: string) {
+  if (!sql.includes("FROM bg_matches m")) return null;
+  if (sql.includes("WHERE m.tournament_id = ?")) return [launchCandidateRows(state), []];
+  if (sql.includes("FOR UPDATE")) {
+    // La ligne verrouillée ne porte que les colonnes du match : le jeu vient
+    // du tournoi, par la lecture du contexte (`matchContextRows`).
+    if (!state.match) return [[], []];
+    const { tournament_game: _game, game: _ownGame, ...own } = state.match;
+    return [[own], []];
+  }
+  return [state.match ? [{ ...state.match }] : [], []];
+}
+
 /** Le double de `execute`, non typé en `PoolConnection` : les tests le composent. */
 function executeFor(state: World) {
   return async (rawSql: string, params: unknown[] = []) => {
@@ -415,12 +435,8 @@ function executeFor(state: World) {
     if (sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches")) {
       return [matchContextRows(state), []];
     }
-    if (sql.includes("FROM bg_matches m") && sql.includes("WHERE m.tournament_id = ?")) {
-      return [launchCandidateRows(state), []];
-    }
-    if (sql.includes("FROM bg_matches m")) {
-      return [state.match ? [{ ...state.match }] : [], []];
-    }
+    const matchResult = readMatchRows(state, sql);
+    if (matchResult) return matchResult;
     throw new Error(`requête inattendue : ${sql}`);
   };
 }
@@ -821,6 +837,18 @@ describe("claimMatchCast", () => {
     await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("CASTER_IDENTITY_REQUIRED");
   });
 
+  it("claimMatchCast_marvelRivalsWithoutBattlenet_isAccepted", async () => {
+    state.match = { ...state.match!, tournament_game: "MR", game: "MR" };
+    state.users[CASTER] = { ...verified, blizzard_sub: null, overwatch_battletag: null };
+    await expect(claimMatchCast(42, CASTER, true)).resolves.toBeUndefined();
+  });
+
+  it("claimMatchCast_marvelRivalsWithoutDiscord_stillRefused", async () => {
+    state.match = { ...state.match!, tournament_game: "MR", game: "MR" };
+    state.users[CASTER] = { ...verified, blizzard_sub: null, discord_verified_at: null };
+    await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("CASTER_DISCORD_REQUIRED");
+  });
+
   it("refuse un compte supprimé ou introuvable", async () => {
     state.users[CASTER] = { ...verified, is_deleted: 1 };
     await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("CASTER_IDENTITY_REQUIRED");
@@ -1113,12 +1141,12 @@ describe("maintainMatchLaunches", () => {
 
 describe("loadViewerCastBlock", () => {
   it("refuse sans la permission, sans même lire l'identité", async () => {
-    await expect(loadViewerCastBlock(CASTER, false)).resolves.toBe("NOT_CASTER");
+    await expect(loadViewerCastBlock(CASTER, false, "OW")).resolves.toBe("NOT_CASTER");
     expect(withConnection).not.toHaveBeenCalled();
   });
 
   it("lit l'identité avec la permission", async () => {
-    await expect(loadViewerCastBlock(CASTER, true)).resolves.toBe("CASTER_IDENTITY_REQUIRED");
+    await expect(loadViewerCastBlock(CASTER, true, "OW")).resolves.toBe("CASTER_IDENTITY_REQUIRED");
     state.users[CASTER] = {
       discord_verified_at: STAMP,
       discord_pseudo: "caster",
@@ -1126,7 +1154,7 @@ describe("loadViewerCastBlock", () => {
       overwatch_battletag: "Caster#1",
       is_deleted: 0,
     };
-    await expect(loadViewerCastBlock(CASTER, true)).resolves.toBeNull();
+    await expect(loadViewerCastBlock(CASTER, true, "OW")).resolves.toBeNull();
   });
 });
 
@@ -2342,5 +2370,87 @@ describe("retraits en série et alertes regroupées (EF-31, revue)", () => {
     };
 
     await expect(queueNoRefereeAlerts(failing, [candidate])).resolves.toBeUndefined();
+  });
+});
+
+describe("jeu du tournoi lu sous le verrou du match (revue sécurité #545)", () => {
+  const REFEREE = 960;
+  const refereeUser = {
+    discord_verified_at: STAMP as string | null,
+    discord_pseudo: "arbitre" as string | null,
+    blizzard_sub: "sub" as string | null,
+    overwatch_battletag: "Arbitre#1" as string | null,
+    is_deleted: 0,
+    is_admin: 0,
+    platform_roles_json: JSON.stringify(["ARBITRE"]) as string | null,
+  };
+  const withoutBattlenet = { blizzard_sub: null, overwatch_battletag: null };
+
+  it("lockLaunchMatch_contextQuery_readsGameFromTournamentWithoutLock", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.issued = [];
+    await claimMatchCast(42, CASTER, true);
+    const context = state.issued.find((sql) => sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches"));
+    expect(context).toContain("(SELECT game FROM bg_tournaments WHERE id = ?) AS tournament_game");
+    expect(context).not.toMatch(/FOR UPDATE|LOCK IN SHARE MODE/);
+    const lock = state.issued.find((sql) => sql.includes("FROM bg_matches m WHERE m.id = ?") && sql.includes("FOR UPDATE"));
+    expect(lock).not.toMatch(/\bgame\b/);
+  });
+
+  it("claimMatchCast_overwatchLockedRowWithoutGame_refusesCasterWithoutBattlenet", async () => {
+    state.users[CASTER] = { ...ELIGIBLE_CASTER, ...withoutBattlenet };
+    await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("CASTER_IDENTITY_REQUIRED");
+    expect(state.match?.casters).toEqual([]);
+  });
+
+  it("claimMatchCast_unreadableGame_fallsBackToOverwatchRule", async () => {
+    state.match = matchState({ tournament_game: null });
+    state.users[CASTER] = { ...ELIGIBLE_CASTER, ...withoutBattlenet };
+    await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("CASTER_IDENTITY_REQUIRED");
+  });
+
+  it("takeMatchReferee_overwatchWithoutBattlenet_refusesReferee", async () => {
+    state.users[REFEREE] = { ...refereeUser, ...withoutBattlenet };
+    await expect(takeMatchReferee(42, REFEREE)).rejects.toThrow("REFEREE_IDENTITY_REQUIRED");
+    expect(state.match?.referee_user_id).toBeNull();
+  });
+
+  it("takeMatchReferee_marvelRivalsWithoutBattlenet_setsReferee", async () => {
+    state.match = matchState({ tournament_game: "MR", game: "MR" });
+    state.users[REFEREE] = { ...refereeUser, ...withoutBattlenet };
+    await takeMatchReferee(42, REFEREE);
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+  });
+
+  it("takeMatchReferee_marvelRivalsWithoutDiscord_refusesWithDiscordCode", async () => {
+    state.match = matchState({ tournament_game: "MR", game: "MR" });
+    state.users[REFEREE] = { ...refereeUser, ...withoutBattlenet, discord_verified_at: null };
+    await expect(takeMatchReferee(42, REFEREE)).rejects.toThrow("REFEREE_DISCORD_REQUIRED");
+    expect(state.match?.referee_user_id).toBeNull();
+  });
+
+  it("assignMatchReferee_overwatchWithoutBattlenet_refuses", async () => {
+    state.users[REFEREE] = { ...refereeUser, ...withoutBattlenet };
+    await expect(assignMatchReferee(42, 1, REFEREE)).rejects.toThrow("REFEREE_IDENTITY_REQUIRED");
+    expect(state.match?.referee_user_id).toBeNull();
+  });
+
+  it("setMatchReady_overwatchRefereeLostBattlenet_launchDoesNotWaitForReferee", async () => {
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP });
+    state.users[REFEREE] = { ...refereeUser, ...withoutBattlenet };
+    await expect(setMatchReady(42, 3, true)).resolves.toEqual({ launched: true });
+  });
+
+  it("setMatchReady_marvelRivalsRefereeDiscordOnly_launchWaitsForReferee", async () => {
+    state.match = matchState({ tournament_game: "MR", game: "MR", referee_user_id: REFEREE, team1_ready_at: STAMP });
+    state.users[REFEREE] = { ...refereeUser, ...withoutBattlenet };
+    await expect(setMatchReady(42, 3, true)).resolves.toEqual({ launched: false });
+  });
+
+  it("setMatchReady_marvelRivalsCasterDiscordOnly_readyAccepted", async () => {
+    state.match = matchState({ tournament_game: "MR", game: "MR", caster_user_id: CASTER });
+    state.users[CASTER] = { ...ELIGIBLE_CASTER, ...withoutBattlenet };
+    await setMatchReady(42, CASTER, true);
+    expect(state.match?.casters.map((caster) => caster.ready_at)).toEqual([STAMP]);
   });
 });

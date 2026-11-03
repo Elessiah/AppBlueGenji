@@ -71,7 +71,7 @@
   },
   "ghostTeamClaim": {
     "title": "Reprise d'équipe proposée",
-    "body": "Le staff te propose de reprendre {team} comme propriétaire. Accepte ou refuse depuis ton profil."
+    "body": "Un admin vous propose de reprendre l'équipe {team}."
   },
   "teamOwnershipTransfer": {
     "title": "Tu es propriétaire de ton équipe",
@@ -171,7 +171,8 @@
       "REPLACED": "tu ne remplissais plus les conditions du cast, un autre caster a pris ta place",
       "INELIGIBLE": "tu ne remplis plus les conditions du cast",
       "INELIGIBLE_PERMISSION": "tu n'as plus la permission de diffusion",
-      "INELIGIBLE_IDENTITY": "ton identité de caster est incomplète (tag Discord certifié, compte Battle.net), voir « Mon profil »",
+      "INELIGIBLE_IDENTITY": "ton identité de caster est incomplète (tag Discord certifié et compte Battle.net), voir « Mon profil »",
+      "INELIGIBLE_DISCORD": "ton tag Discord n'est plus certifié, voir « Mon profil »",
       "JOINED_TEAM": "tu joues désormais ce match"
     }
   },

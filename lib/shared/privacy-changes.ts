@@ -1479,6 +1479,42 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : rien de nouveau n'est collecté ni conservé ; rien ne part à un compte suspendu ou supprimé, ni à l'auteur du geste. Le message privé relève de l'organisation des compétitions (intérêt légitime, registre T03), auquel tu peux t'opposer (section « Vos droits » de la page RGPD) ; la notification push, de ton accord (registre T12).",
     ],
   },
+  {
+    // MATCH-REFEREE-FINISH (décision de l'utilisateur du 2026-11-03) : en
+    // Marvel Rivals, caster ou arbitrer ne demande plus de compte Battle.net
+    // rattaché (le BattleTag n'y sert à rien, décision 35) ; Overwatch garde
+    // la condition. Public : les comptes pouvant caster (permission `live`).
+    // Datée du lendemain de la nuit de déploiement — à avancer si la fusion glisse.
+    id: "2026-11-battlenet-requis-overwatch-seulement",
+    publishedAt: "2026-11-05",
+    audience: "LIVE_STAFF",
+    title: "Caster ou arbitrer : Battle.net demandé en Overwatch seulement",
+    links: [
+      { href: "/rgpd#donnees-collectees", label: "Lire les conditions pour caster un match" },
+      { href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" },
+    ],
+    summary:
+      "Pour caster ou arbitrer un match Marvel Rivals, le compte Battle.net rattaché n'est plus demandé : le tag Discord certifié suffit, avec la permission de diffusion ou d'arbitrage. Pour un match Overwatch, rien ne change.",
+    details: [
+      "Ce qui change : le site ne vérifie plus, pour un match Marvel Rivals, que ton compte Battle.net est rattaché ni que ton BattleTag en vient ; il n'en tient plus compte pour ces matchs. Pour un match Overwatch, la condition reste : tag Discord certifié et BattleTag tiré d'un compte Battle.net rattaché. Les conditions d'utilisation, qui ne demandent Battle.net qu'aux arbitres, le diront à leur prochaine version.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté ni conservé, et un caster ou un arbitre est présenté aux parties de son match comme avant ; seul un membre du staff sans Battle.net, qui ne pouvait pas caster ou arbitrer un match Marvel Rivals, peut désormais le faire et y être présenté (pseudo et tag Discord certifié).",
+    ],
+  },
+  {
+    id: "2026-11-tag-discord-arbitre-execution-du-service",
+    // Même date que l'entrée précédente et que « 5 novembre 2026 » dans /rgpd
+    // (FR + EN) et le registre T04 — tout avancer ensemble si la fusion glisse.
+    publishedAt: "2026-11-05",
+    audience: "LIVE_STAFF",
+    title: "Arbitre désigné : la base de la présentation de ton tag Discord",
+    links: [{ href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" }],
+    summary:
+      "Si tu arbitres un match, la présentation de ton tag Discord certifié à ses deux équipes et à ses casters repose désormais, une fois la version 7 des conditions ou une suivante acceptée, sur l'exécution du service, et non plus sur l'intérêt légitime : sans lui, les parties du match ne peuvent pas te joindre.",
+    details: [
+      "Ce qui change : la base juridique de cette présentation, jugée strictement nécessaire au fonctionnement minimum du service, une fois la version 7 des conditions ou une suivante acceptée (avant cette acceptation, l'intérêt légitime, avec le même droit d'opposition) ; une fois cette version acceptée, elle n'a plus d'opposition propre.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté ni montré, aux mêmes personnes et aux mêmes moments ; ton opposition d'arbitre (formulaire de signalement, catégorie RGPD) — à ta présentation avant la version 7, ou à l'affichage de ton pseudo aux membres —, retenue, te retire toujours de tes matchs non terminés, ce tag compris.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

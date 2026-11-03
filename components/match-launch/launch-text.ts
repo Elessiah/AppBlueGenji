@@ -1,3 +1,4 @@
+import type { MatchLaunchInfo } from "@/lib/shared/match-launch";
 import frLaunchModal from "@/messages/fr/launchModal.json";
 import enLaunchModal from "@/messages/en/launchModal.json";
 import { useShellText } from "@/components/i18n/shell-text";
@@ -22,4 +23,35 @@ const EN_LAUNCH_TEXT: LaunchText = scopedText("en", enLaunchModal);
 /** Textes de la fenêtre, dans la langue de la page (celle de la coquille). */
 export function useLaunchText(): LaunchText {
   return useShellText().locale === "en" ? EN_LAUNCH_TEXT : FR_LAUNCH_TEXT;
+}
+
+/**
+ * Note des contacts tus des engagées : elle ne renvoie à l'action « Contacts »
+ * que si celle-ci lui ouvre déjà quelque chose (`viewer.earlyContacts` : joueur
+ * du match, ou arbitre même inscrit comme caster) — jamais au seul caster
+ * avant le départ.
+ */
+export function launchSidesLaterText(text: LaunchText, viewer: Pick<MatchLaunchInfo["viewer"], "earlyContacts">): string {
+  return text.t(viewer.earlyContacts ? "contactsAtLaunch" : "contactsAtLaunchForCaster");
+}
+
+/**
+ * Note des contacts tus de l'arbitre désigné, sur la page du match. Un arbitre
+ * qui caste aussi le match suit la règle des casters : ses contacts attendent
+ * le départ, pour tout lecteur (« au départ du match »). Sinon, au lecteur dont
+ * l'action « Contacts » ouvre déjà les contacts (`viewer.earlyContacts`), la note
+ * y renvoie, comme celle des engagées (`launchSidesLaterText`) ; au caster seul,
+ * « au départ du match ».
+ */
+export function refereeLaterText(
+  text: LaunchText,
+  launch: {
+    viewer: Pick<MatchLaunchInfo["viewer"], "earlyContacts">;
+    casters: readonly Pick<MatchLaunchInfo["casters"][number], "userId">[];
+    referee: Pick<NonNullable<MatchLaunchInfo["referee"]>, "userId"> | null;
+  },
+): string {
+  const refereeId = launch.referee?.userId;
+  const refereeCasts = refereeId !== undefined && launch.casters.some((caster) => caster.userId === refereeId);
+  return !refereeCasts && launch.viewer.earlyContacts ? text.t("contactsAtLaunch") : text.t("contacts.casterLater");
 }

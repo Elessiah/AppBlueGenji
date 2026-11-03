@@ -499,6 +499,7 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     const mappedMatches = attachMatchMaps(
       applyMapRules(matches.map((row) =>
         mapMatch(row, {
+          game: tournament.game,
           casters: castersByMatch.get(Number(row.id)),
           streams: streamsByMatch.get(Number(row.id)),
         }),

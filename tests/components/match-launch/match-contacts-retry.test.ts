@@ -222,14 +222,14 @@ describe("contacts du caster en attente, modale ouverte", () => {
   });
 
   it("casterRereadDelay_soleCasterWithReferee_rereadsAtServerKickoff", () => {
-    const referee = { userId: 950, pseudo: "Arbitre", discordTag: null, ready: false, isViewer: false };
+    const referee = { userId: 950, pseudo: "Arbitre", discordTag: null, ready: false, contactsShown: true, isViewer: false };
     const own = { ...info("SCHEDULED", CASTER, START, "CASTER"), referee };
     expect(casterContactsPending(own)).toBe(false);
     expect(casterRereadDelay(own, SERVER_BEFORE)).toBe(11_000);
   });
 
   it("casterRereadDelay_playerReaderWithReferee_noReread", () => {
-    const referee = { userId: 950, pseudo: "Arbitre", discordTag: "juge", ready: false, isViewer: false };
+    const referee = { userId: 950, pseudo: "Arbitre", discordTag: "juge", ready: false, contactsShown: true, isViewer: false };
     expect(casterRereadDelay({ ...info("SCHEDULED", null), referee }, SERVER_BEFORE)).toBeNull();
   });
 

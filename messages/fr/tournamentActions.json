@@ -297,6 +297,7 @@
       "ineligibleReason": {
         "NOT_REFEREE": "rôle arbitre retiré",
         "REFEREE_IDENTITY_REQUIRED": "identité à certifier",
+        "REFEREE_DISCORD_REQUIRED": "tag Discord à certifier",
         "REFEREE_IS_PLAYER": "joueur du match",
         "REFEREE_OBJECTION": "opposition retenue",
         "ACCOUNT_GONE": "compte supprimé"

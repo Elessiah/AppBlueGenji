@@ -516,7 +516,7 @@ function keepEligibleCasters(
       // retirée, comme un caster inéligible — sous verrou, `releaseIneligibleCast`
       // rejoue la même règle. Lancé, il garde sa place.
       const playsMatch = recorded !== "LAUNCHED" && casterPlays(row, caster.userId);
-      if (castEligibilityBlock(users.get(caster.userId)) !== null || playsMatch) {
+      if (castEligibilityBlock(users.get(caster.userId), row.tournament_game) !== null || playsMatch) {
         if (recorded !== "LAUNCHED") revokedCasts.push({ matchId: Number(row.id), casterId: caster.userId });
       } else {
         keptHere.push(caster);
@@ -551,7 +551,7 @@ function keepEligibleReferees(
     const playsMatch = recorded !== "LAUNCHED" && plays(row, refereeId);
     const user = users.get(refereeId);
     const objection = (user?.referee_objection_at ?? null) !== null;
-    row.refereeEligible = refereeEligibilityBlock(user) === null && !objection && !playsMatch;
+    row.refereeEligible = refereeEligibilityBlock(user, row.tournament_game) === null && !objection && !playsMatch;
     if (objection || (!row.refereeEligible && recorded !== "LAUNCHED")) {
       revokedReferees.push({ matchId: Number(row.id), refereeId, objection });
     }
@@ -578,7 +578,7 @@ function sideContacts(
     return withGameBattletag(
       game,
       { userId: contact.userId, pseudo: contact.pseudo, roles: contact.roles, discordTag: contact.discordTag },
-      { battletag: contact.battletag, battletagVerified: contact.battletagVerified },
+      () => ({ battletag: contact.battletag, battletagVerified: contact.battletagVerified }),
     );
   });
 }
@@ -629,15 +629,17 @@ function buildLaunchSide(row: CandidateRow, index: 1 | 2, ctx: LaunchContext): L
 function withGameBattletag<T extends object>(
   game: TournamentGame,
   entry: T,
-  battletag: { battletag: string | null; battletagVerified: boolean },
-): T & Partial<typeof battletag> {
-  return battletagRelevantFor(game) ? { ...entry, ...battletag } : entry;
+  battletag: () => { battletag: string | null; battletagVerified: boolean },
+): T & Partial<ReturnType<typeof battletag>> {
+  // Le BattleTag ne se calcule qu'en Overwatch : hors de lui, la fonction n'est pas appelée.
+  return battletagRelevantFor(game) ? { ...entry, ...battletag() } : entry;
 }
 
 function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: LaunchContext): LaunchCaster | null {
   const user = ctx.users.get(caster.userId);
   if (!user || Number(user.is_deleted) !== 0) return null;
   const discordTag = user.discord_verified_at !== null ? user.discord_pseudo : null;
+  const relevant = battletagRelevantFor(game);
   const contact = ctx.exposesCaster
     ? filterContact(
         {
@@ -645,8 +647,9 @@ function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: L
           pseudo: user.pseudo,
           roles: [],
           discordTag,
-          battletag: user.overwatch_battletag,
-          battletagVerified: battletagFromBlizzard(user),
+          // Hors Overwatch le BattleTag n'est pas même lu (`withGameBattletag` le jetterait).
+          battletag: relevant ? user.overwatch_battletag : null,
+          battletagVerified: relevant && battletagFromBlizzard(user),
         },
         ctx.viewer,
         Number(user.visible_overwatch) === 1,
@@ -662,7 +665,11 @@ function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: L
       contactsShown: ctx.exposesCaster,
       isViewer: Number(user.id) === ctx.viewer.id,
     },
-    { battletag: contact?.battletag ?? null, battletagVerified: contact?.battletagVerified ?? false },
+    () => {
+      const battletag = contact?.battletag ?? null;
+      // Comme pour l'arbitre : la pastille « vérifié » ne part qu'avec le BattleTag.
+      return { battletag, battletagVerified: battletag !== null && (contact?.battletagVerified ?? false) };
+    },
   );
 }
 
@@ -687,6 +694,9 @@ function refereeContactsOpen(user: UserRow, ctx: LaunchContext): boolean {
  * ouverts (`refereeContactsOpen`) et sur sa propre fiche, qui n'a rien à lui dire.
  */
 function refereeDiscordTag(user: UserRow, isViewer: boolean, ctx: LaunchContext): string | null {
+  // Garde volontairement redondante avec la lecture d'une carte (`ctx.refereeDiscord`,
+  // `exposesMatchContacts`) : défense en profondeur, ce module ne livre jamais un
+  // tag Discord d'arbitre hors de la fenêtre des contacts, quel que soit l'appelant.
   if (isViewer || !refereeContactsOpen(user, ctx)) return null;
   const verified = user.discord_verified_at !== null;
   return visibleDiscordTag(verified ? user.discord_pseudo : null, ctx.viewer, {
@@ -717,22 +727,24 @@ function buildLaunchReferee(row: CandidateRow, ctx: LaunchContext): LaunchRefere
       pseudo: user.pseudo,
       ...discord,
       ready: ctx.readiness.referee?.ready ?? false,
+      contactsShown: open,
       isViewer,
     },
-    {
+    () => {
       // Le BattleTag suit la fenêtre des contacts du match (`ctx.exposes`) : les
       // parties le lisent dès que les deux adversaires sont connus (le temps du
       // match pour un caster), comme les contacts des engagées ; un arbitre qui
       // caste aussi le match attend le départ (`refereeContactsOpen`).
-      battletag: open
+      const battletag = open
         ? visibleBattletag(user.overwatch_battletag, ctx.viewer, {
             userId: Number(user.id),
             visible: Number(user.visible_overwatch) === 1,
             sharesLiveMatch: true,
           })
-        : null,
-      // Le lien Battle.net se tait avec le BattleTag, comme sur une carte de caster.
-      battletagVerified: open && battletagFromBlizzard(user),
+        : null;
+      // La pastille « vérifié » ne part qu'avec le BattleTag : le lien Battle.net
+      // se tait avec lui, comme sur une carte de caster.
+      return { battletag, battletagVerified: battletag !== null && battletagFromBlizzard(user) };
     },
   );
 }

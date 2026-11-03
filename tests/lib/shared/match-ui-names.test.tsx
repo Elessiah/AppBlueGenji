@@ -150,7 +150,7 @@ describe("refereeReadyRereadDue", () => {
   });
 
   it("refereeReadyRereadDue_refereeReady_returnsFalse", () => {
-    expect(refereeReadyRereadDue(launch({ referee: { userId: 7, pseudo: "Juge", ready: true, isViewer: false } }))).toBe(false);
+    expect(refereeReadyRereadDue(launch({ referee: { userId: 7, pseudo: "Juge", ready: true, contactsShown: true, isViewer: false } }))).toBe(false);
   });
 
   it("refereeReadyRereadDue_notLobbyPhase_returnsFalse", () => {

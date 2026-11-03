@@ -12,7 +12,7 @@ import { KeyFacts, type KeyFact } from "@/components/cyber/KeyFacts";
 import { CasterCards, RefereeCard, SideCard } from "@/components/match-launch/LaunchContactCards";
 import { useMatchContacts } from "@/components/match-launch/MatchContactsDialog";
 import { SharedMatchContactsContext } from "@/components/match-launch/shared-match-contacts";
-import { useLaunchText } from "@/components/match-launch/launch-text";
+import { launchSidesLaterText, refereeLaterText, useLaunchText } from "@/components/match-launch/launch-text";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { useClock } from "@/lib/shared/hooks/useClock";
 import { VOICE_CHANNEL_CAPACITY, parseMatchVoiceInfo, type MatchVoiceInfo } from "@/lib/shared/match-voice";
@@ -645,10 +645,13 @@ function ConnectionSection({
   onCopy,
 }: Readonly<{ launch: MatchLaunchInfo | null; onCopy: (value: string, label: string) => Promise<void> }>) {
   const page = useMatchPageText();
+  const launchText = useLaunchText();
   const titleId = useId();
   if (!launch || !connectionReader(launch)) return null;
   const hostSecond = launch.hostTeamId !== null && launch.hostTeamId === launch.team2.teamId;
   const ordered = hostSecond ? [launch.team2, launch.team1] : [launch.team1, launch.team2];
+  // Contacts pas encore ouverts : la note dit quand (comme la fenêtre de lancement).
+  const laterText = launchSidesLaterText(launchText, launch.viewer);
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
       <SectionTitle id={titleId}>{page.t("sections.connection")}</SectionTitle>
@@ -661,6 +664,7 @@ function ConnectionSection({
             phase={launch.phase}
             onCopy={onCopy}
             linkNames
+            laterText={laterText}
           />
         ))}
       </div>
@@ -775,6 +779,7 @@ function OfficiatingSection({
   invitesByBattletag: boolean;
 }>) {
   const { t } = useTournamentPageText();
+  const launchText = useLaunchText();
   const page = useMatchPageText();
   const titleId = useId();
   const decision = matchPageDecision(match, staff);
@@ -791,6 +796,7 @@ function OfficiatingSection({
           phase={launch.phase}
           onCopy={onCopy}
           linkNames
+          laterText={refereeLaterText(launchText, launch)}
           battletagNote={invitesByBattletag ? t("matchPage.refereeBattletagNote") : undefined}
         />
       )}

@@ -297,6 +297,7 @@
       "ineligibleReason": {
         "NOT_REFEREE": "referee role removed",
         "REFEREE_IDENTITY_REQUIRED": "identity to certify",
+        "REFEREE_DISCORD_REQUIRED": "Discord tag to certify",
         "REFEREE_IS_PLAYER": "plays the match",
         "REFEREE_OBJECTION": "objection upheld",
         "ACCOUNT_GONE": "account deleted"

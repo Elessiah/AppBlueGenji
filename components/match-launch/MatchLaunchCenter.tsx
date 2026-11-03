@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
-import { useLaunchText, type LaunchKey, type LaunchText } from "./launch-text";
+import { launchSidesLaterText, useLaunchText, type LaunchKey, type LaunchText } from "./launch-text";
 import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { ScrollArea } from "@/components/cyber";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
@@ -68,16 +68,6 @@ function formatTime(iso: string | null, locale: Locale): string | null {
   if (Number.isNaN(date.getTime())) return null;
   // 24 h dans les deux langues (le français l'applique de lui-même).
   return date.toLocaleTimeString(INTL_LOCALE[locale], { hour: "2-digit", minute: "2-digit", ...(locale === "fr" ? {} : { hourCycle: "h23" as const }) });
-}
-
-/**
- * Note des contacts tus des engagées : elle ne renvoie à l'action « Contacts »
- * que si celle-ci lui ouvre déjà quelque chose (`viewer.earlyContacts` : joueur
- * du match, ou arbitre même inscrit comme caster) — jamais au seul caster
- * avant le départ.
- */
-export function launchSidesLaterText(text: LaunchText, viewer: Pick<MatchLaunchInfo["viewer"], "earlyContacts">): string {
-  return text.t(viewer.earlyContacts ? "contactsAtLaunch" : "contactsAtLaunchForCaster");
 }
 
 const LAUNCH_COPY_PARTY: Partial<Record<MatchLaunchInfo["viewer"]["role"], "caster" | "referee">> = {

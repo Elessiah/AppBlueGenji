@@ -41,7 +41,7 @@ export const DISCORD_TAG_AUDIENCE: IdentityAudience = {
     "les arbitres, tant que tu es inscrit à un tournoi non terminé ;",
     "les membres des deux équipes de ton match, dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match ;",
     "si tu castes un match : ses deux équipes, ses autres casters et son arbitre désigné le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et les autres arbitres dès que ses adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page ;",
-    "si tu es l'arbitre désigné d'un match : ses deux équipes dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match, dans sa fenêtre « Contacts » et sur sa page — la règle des casters si tu le castes aussi (intérêt légitime : tu peux t'y opposer par le formulaire de signalement) ;",
+    "si tu es l'arbitre désigné d'un match : ses deux équipes dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match, dans sa fenêtre « Contacts » et sur sa page — la règle des casters si tu le castes aussi (pour l'arbitrage : nécessaire au service une fois la version 7 des conditions acceptée, sans opposition propre — ton opposition d'arbitre, retenue, t'en retire toujours ; avant, intérêt légitime : tu peux t'y opposer par le formulaire de signalement) ;",
     "les autres joueurs, seulement si tu coches « Tag Discord » dans tes réglages de confidentialité.",
   ],
   footer: "Personne d'autre.",
@@ -60,7 +60,7 @@ export const HIDDEN_BATTLETAG_AUDIENCE: IdentityAudience = {
   items: [
     "si tu es présenté comme contact (fenêtres « Contacts » et de lancement) : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match ;",
     "si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;",
-    "si tu es l'arbitre désigné d'un match : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match — ses deux équipes le temps du match seulement si tu le castes aussi (tu peux te retirer d'un match à tout moment ; effacer ton BattleTag te retirerait l'arbitrage, qui demande celui de Battle.net) ;",
+    "si tu es l'arbitre désigné d'un match : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match — ses deux équipes le temps du match seulement si tu le castes aussi (tu peux te retirer d'un match à tout moment ; effacer ton BattleTag te retirerait l'arbitrage des matchs Overwatch, qui demande celui de Battle.net) ;",
     "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné ; la page du match reprend le BattleTag de ses contacts d'équipe (aux seules parties du match), de ses casters et de son arbitre désigné, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts ».",
   ],
   footer:

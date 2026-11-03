@@ -38,7 +38,7 @@ import {
 import { formatRoundSelfManagementLog } from "@/lib/shared/bot-logs";
 import { matchRoundLabel } from "@/lib/shared/discord-notifications";
 import { sendBotLog } from "@/lib/server/bot-integration";
-import type { MatchStatus, TeamRole } from "@/lib/shared/types";
+import type { MatchStatus, TeamRole, TournamentGame } from "@/lib/shared/types";
 import {
   casterIdentityOf,
   loadCastEligibility,
@@ -76,6 +76,8 @@ export type LaunchMatchBaseRow = RowDataPacket & {
   id: number;
   tournament_id: number;
   tournament_state: string;
+  /** Jeu du tournoi : la condition de cast et d'arbitrage en dépend (Battle.net en Overwatch seulement). */
+  tournament_game: TournamentGame;
   /** Option du tournoi : matchs planifiés par l'arbitrage (1). */
   referee_scheduling: number | null;
   /** Option du tournoi : phase de lancement (« Prêt », modale) allumée (1). */
@@ -125,7 +127,7 @@ export type LaunchMatchRow = LaunchMatchBaseRow & {
 };
 
 const LAUNCH_MATCH_COLUMNS = `
-  m.id, m.tournament_id, t.state AS tournament_state, t.referee_scheduling, t.match_launch_phase,
+  m.id, m.tournament_id, t.state AS tournament_state, t.game AS tournament_game, t.referee_scheduling, t.match_launch_phase,
   m.status, m.is_bye,
   m.team1_id, m.team2_id, t1.is_ghost AS team1_is_ghost, t2.is_ghost AS team2_is_ghost,
   m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at,
@@ -330,6 +332,7 @@ async function lockLaunchMatch(
   const [context] = await connection.execute<
     (RowDataPacket & {
       tournament_state: string | null;
+      tournament_game: TournamentGame | null;
       referee_scheduling: number | null;
       match_launch_phase: number | null;
       team1_is_ghost: number | null;
@@ -338,11 +341,13 @@ async function lockLaunchMatch(
   >(
     `SELECT
        (SELECT state FROM bg_tournaments WHERE id = ?) AS tournament_state,
+       (SELECT game FROM bg_tournaments WHERE id = ?) AS tournament_game,
        (SELECT referee_scheduling FROM bg_tournaments WHERE id = ?) AS referee_scheduling,
        (SELECT match_launch_phase FROM bg_tournaments WHERE id = ?) AS match_launch_phase,
        (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team1_is_ghost,
        (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team2_is_ghost`,
     [
+      base.tournament_id,
       base.tournament_id,
       base.tournament_id,
       base.tournament_id,
@@ -354,6 +359,10 @@ async function lockLaunchMatch(
   // disparu n'est pas un match à lancer.
   const tournamentState = context[0]?.tournament_state ?? null;
   if (tournamentState === null) return null;
+  // Le jeu, lu ici et jamais ailleurs : la condition de cast et d'arbitrage en
+  // dépend (Battle.net en Overwatch seulement). Posé **avant** de juger
+  // l'arbitre ; un jeu illisible retombe sur Overwatch, la règle la plus stricte.
+  base.tournament_game = context[0]?.tournament_game ?? "OW";
   // Avant le départ, un arbitre qui joue désormais le match (roster rejoint
   // sans changer d'appariement) ne compte plus : sinon le lancement attendrait
   // un « Prêt » d'arbitre qu'il ne peut plus donner (il clique en joueur).
@@ -366,7 +375,7 @@ async function lockLaunchMatch(
   const refereeId = nullableId(base.referee_user_id);
   let refereeStanding: LaunchMatchRow["refereeStanding"] = null;
   if (refereeId !== null) {
-    const standing = await loadRefereeStanding(connection, refereeId);
+    const standing = await loadRefereeStanding(connection, refereeId, base.tournament_game);
     const plays =
       standing.block === null && !standing.objection && base.launched_at === null
         ? (await resolveTeamParty(connection, base, refereeId)) !== null
@@ -407,6 +416,11 @@ export async function resolveMatchParty(
     casters: readonly Pick<MatchCasterLink, "userId">[];
     referee_user_id?: number | null;
     refereeEligible?: boolean;
+    /**
+     * Jeu du tournoi, requis : un appelant qui l'oublie ne compile pas. `null`
+     * (sans casters à juger) retombe sur Overwatch, la règle la plus stricte.
+     */
+    tournament_game: TournamentGame | null;
   },
   userId: number,
 ): Promise<MatchParty | null> {
@@ -417,7 +431,7 @@ export async function resolveMatchParty(
   if (match.casters.some((caster) => caster.userId === userId)) {
     // Une inscription ne vaut que tant que son titulaire remplit la condition
     // du cast : un compte privé de `live` ou d'identité ne déclare plus rien.
-    if ((await loadCastEligibility(connection, userId)) === null) return { role: "CASTER", canDeclareReady: true };
+    if ((await loadCastEligibility(connection, userId, match.tournament_game ?? "OW")) === null) return { role: "CASTER", canDeclareReady: true };
   }
   // L'arbitre désigné, tant qu'il remplit la condition d'arbitrage. Un arbitre
   // qui caste aussi lit en caster : un seul « Prêt » vaut pour les deux.
@@ -658,10 +672,11 @@ export async function loadCasterIdentity(
 export async function loadViewerCastBlock(
   userId: number,
   hasLivePermission: boolean,
+  game: TournamentGame,
 ): Promise<CastBlock | null> {
-  if (!hasLivePermission) return castBlockReason(false, { discordVerified: false, blizzardLinked: false });
+  if (!hasLivePermission) return castBlockReason(false, { discordVerified: false, blizzardLinked: false }, game);
   const identity = await withConnection((connection) => loadCasterIdentity(connection, userId));
-  return castBlockReason(true, identity);
+  return castBlockReason(true, identity, game);
 }
 
 /**
@@ -685,7 +700,7 @@ async function streamShown(connection: PoolConnection, row: LaunchMatchRow, stre
   const holders = row.casters.filter((caster) => caster.streamId === stream.id).map((caster) => caster.userId);
   let held = false;
   if (!stream.staff && !settled && holders.length > 0) {
-    held = (await loadEligibleCasterIds(connection, holders, true)).size > 0;
+    held = (await loadEligibleCasterIds(connection, holders, row.tournament_game, true)).size > 0;
   }
   return shownStreams([stream], held ? new Set([stream.id]) : new Set<number>(), settled).length > 0;
 }
@@ -716,6 +731,7 @@ async function releaseIneligibleCasters(
   const blocks = await loadCastBlocks(
     connection,
     row.casters.map((caster) => caster.userId),
+    row.tournament_game,
     currentRead,
   );
   const leaving = row.casters.filter((caster) => blocks.get(caster.userId) !== null);
@@ -764,11 +780,13 @@ export async function claimMatchCast(
     inTransaction(async (connection) => {
       // Ligne du compte verrouillée en première instruction, avant le match —
       // l'ordre de la suppression de compte (compte, puis ses matchs).
-      const block = castBlockReason(hasLivePermission, await loadCasterIdentity(connection, userId, true));
-      if (block) throw new Error(block);
+      const identity = await loadCasterIdentity(connection, userId, true);
 
+      // Le jeu vient du match verrouillé : aucune lecture avant son verrou (elle figerait l'instantané).
       const row = await lockLaunchMatch(connection, matchId);
       if (!row) throw new Error("MATCH_NOT_FOUND");
+      const block = castBlockReason(hasLivePermission, identity, row.tournament_game);
+      if (block) throw new Error(block);
       if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
       if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
       if (row.casters.some((caster) => caster.userId === userId)) {
@@ -886,7 +904,7 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
       // son « Prêt » de caster : son inscription bloquerait le départ jusqu'au
       // lancement d'office.
       // Le motif dit au caster : les conditions du cast d'abord, l'équipe ensuite.
-      block = await loadCastEligibility(connection, casterId);
+      block = await loadCastEligibility(connection, casterId, row.tournament_game);
       if (block === null) {
         if ((await resolveTeamParty(connection, row, casterId)) === null) return;
         reason = "JOINED_TEAM";
@@ -1159,7 +1177,7 @@ async function writeReferee(connection: PoolConnection, row: LaunchMatchRow, ref
   // Lecture verrouillée : une suppression du compte en cours (verrou exclusif
   // sur sa ligne) est attendue puis lue, sans quoi l'arbitre désigné serait le
   // compte anonymisé, sur un match que son retrait n'avait pas vu.
-  const block = await loadRefereeEligibility(connection, refereeId, true);
+  const block = await loadRefereeEligibility(connection, refereeId, row.tournament_game, true);
   if (block) throw new Error(block);
   // Opposition retenue : plus aucun arbitrage. Lecture verrouillée (partagée)
   // sur la ligne du compte : retenir l'opposition l'écrit en exclusif, donc ou
@@ -1216,6 +1234,25 @@ export async function takeMatchReferee(matchId: number, userId: number): Promise
 }
 
 /**
+ * Le retrait lui-même, commun aux trois chemins (volontaire ou staff, retrait
+ * d'office, opposition retenue) : l'arbitre et son « Prêt » remis à `NULL` sur
+ * le match verrouillé, puis, tournoi en cours, le départ d'un match qui
+ * n'attendait plus que lui. `undecided` reçoit les matchs partis sans
+ * arbitre (comme `launchIfAllReady`).
+ */
+async function clearMatchReferee(
+  connection: PoolConnection,
+  row: Pick<LaunchMatchBaseRow, "tournament_state">,
+  matchId: number,
+  undecided?: NoRefereeCandidate[],
+): Promise<void> {
+  await connection.execute(`UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL WHERE id = ?`, [matchId]);
+  if (row.tournament_state === "RUNNING") {
+    await launchIfAllReady(connection, matchId, false, undefined, undecided);
+  }
+}
+
+/**
  * Retire l'arbitre désigné : le sien pour l'arbitre lui-même, n'importe lequel
  * pour le staff (`canManage`, permission `tournaments`). Sans arbitre, rien ne
  * change. Si toutes les autres parties étaient prêtes, le match part.
@@ -1242,10 +1279,7 @@ export async function releaseMatchReferee(
       if (current !== userId && !canManage) throw new Error("NOT_MATCH_REFEREE");
       assertExpectedReferee(current, expected);
       if (current === null) return null;
-      await connection.execute(`UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL WHERE id = ?`, [
-        matchId,
-      ]);
-      if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
+      await clearMatchReferee(connection, row, matchId);
       queueRefereeChange(connection, { kind: "RELEASED", matchId, refereeId: current, byStaff: current !== userId });
       return Number(row.tournament_id);
     }),
@@ -1593,12 +1627,7 @@ export async function releaseIneligibleReferee(
       if (row.refereeEligible) return;
       // Le motif réel : opposition retenue, équipe rejointe, ou condition perdue.
       change = takenOverChange(row, matchId, refereeId);
-      await connection.execute(`UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL WHERE id = ?`, [
-        matchId,
-      ]);
-      if (row.tournament_state === "RUNNING") {
-        await launchIfAllReady(connection, matchId, false, undefined, undecided ? launched : undefined);
-      }
+      await clearMatchReferee(connection, row, matchId, undecided ? launched : undefined);
       tournamentId = Number(row.tournament_id);
     }),
   );
@@ -1634,12 +1663,7 @@ export async function releaseObjectingReferee(
       // Relue sous le verrou du match (même ordre que `writeReferee` : match
       // puis compte) : levée entre-temps, l'opposition ne retire plus rien.
       if (!(await refereeObjectionUpheld(connection, refereeId, true))) return null;
-      await connection.execute(`UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL WHERE id = ?`, [
-        matchId,
-      ]);
-      if (row.tournament_state === "RUNNING") {
-        await launchIfAllReady(connection, matchId, false, undefined, undecided ? launched : undefined);
-      }
+      await clearMatchReferee(connection, row, matchId, undecided ? launched : undefined);
       queueRefereeChange(connection, { kind: "OBJECTION_RELEASED", matchId, refereeId });
       return Number(row.tournament_id);
     }),

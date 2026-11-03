@@ -13,6 +13,7 @@ import { can } from "@/lib/shared/permissions";
 const STATUSES: Readonly<Record<string, number>> = {
   NOT_CASTER: 403,
   CASTER_IDENTITY_REQUIRED: 409,
+  CASTER_DISCORD_REQUIRED: 409,
   MATCH_NOT_FOUND: 404,
   MATCH_ALREADY_COMPLETED: 409,
   MATCH_NOT_LAUNCHABLE: 409,
@@ -24,7 +25,8 @@ const STATUSES: Readonly<Record<string, number>> = {
 
 /**
  * S'inscrire pour caster un match. Permission `live`, **et** tag Discord
- * certifié **et** compte Battle.net rattaché : le caster se présente aux deux
+ * certifié **et**, pour un match Overwatch, compte Battle.net rattaché (jeu lu
+ * sous le verrou du match) : le caster se présente aux deux
  * équipes dans la modale de lancement (`lib/shared/match-launch.ts`).
  * Corps : `{ streamId: number }` (co-caster un stream du match) ou
  * `{ liveUrl?: string | null }` (ouvrir son propre stream) — vide : un stream
