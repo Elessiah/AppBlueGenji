@@ -46,6 +46,20 @@ CSV, objets exportés comparés avant et après) ; les références françaises
   du même `frEn(` — le français sur la ligne de l'appel, l'anglais sur la
   suivante. Une valeur identique dans les deux langues (un nom, un nombre, une
   constante) s'écrit une fois, sans `frEn`.
+- **Textes encore écrits en deux constantes** (pas de `frEn` à côté) : le
+  jumeau anglais est à reprendre dans le même commit. Registre : les textes de
+  cadre (`HETZNER_BACKUP_FRAMEWORK`, `SPICEWORKS_*`, `OUTLOOK_MAIL_FRAMEWORK`,
+  `ASSOCIATION_GMAIL_FRAMEWORK`, `HOST_PROCESSING_AGREEMENT`,
+  `STANDARD_CONTRACTUAL_CLAUSES`, `DPF_ADEQUACY_DECISION`, `REGISTER_SCOPE(_DETAIL)`,
+  `registerController`, `transferBasis`) ont leur version `…_EN` / `…En` dans
+  le même fichier (sous le bloc « English versions », sauf
+  `DPF_ADEQUACY_DECISION_EN`, juste à côté) ; `RGPD_CONTACT_LINE`
+  (`legal-contact.ts`) a la sienne, `RGPD_CONTACT_LINE_EN`, dans ce bloc. Bot : les dates
+  (`LAST_UPDATED_FR/EN`, `PRIVACY_LAST_UPDATED_FR/EN`) et les puces de contact
+  (`CONTACT_ITEMS_FR/EN`, `PRIVACY_CONTACT_ITEMS_FR/EN`).
+- **Anglais des documents du bot** : il reste repris du dépôt du bot
+  (`BOT_LEGAL_PAGES.md`, « Texte légal anglais figé ») — la retouche s'y décide
+  comme une nouvelle version, puis se reporte ici sur la ligne anglaise.
 - **Ajouter une fiche au registre** : une clé `T19: { … }` à la fin
   d'`ACTIVITIES`, chaque texte en `frEn`, et `REGISTER_UPDATED_AT` avance
   (`PROCESSING_REGISTER.md`).
