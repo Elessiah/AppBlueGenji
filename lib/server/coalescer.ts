@@ -151,7 +151,7 @@ export async function flushAllCoalescers(): Promise<void> {
   await Promise.all([...registry].map((coalescer) => coalescer.flushAll()));
   // Puis les annonces chaînées hors rafale (`trackAnnouncement`), y compris
   // celles qui ne partaient qu'après une rafale qu'on vient d'annoncer.
-  while (announcements.size > 0) await Promise.all([...announcements]);
+  while (announcements.size > 0) await Promise.allSettled([...announcements]);
 }
 
 const announcementState = globalThis as typeof globalThis & { __bgPendingAnnouncements?: Set<Promise<void>> };
@@ -160,10 +160,11 @@ const announcements = (announcementState.__bgPendingAnnouncements ??= new Set<Pr
 /**
  * Fait attendre à l'arrêt du serveur ({@link flushAllCoalescers}) une annonce
  * partie hors d'un regroupeur — un geste du staff chaîné derrière une rafale.
- * La promesse ne doit jamais lever.
+ * Elle est oubliée une fois réglée, qu'elle aboutisse ou lève.
  */
 export function trackAnnouncement(announcement: Promise<void>): Promise<void> {
   announcements.add(announcement);
-  void announcement.then(() => announcements.delete(announcement));
+  const forget = () => void announcements.delete(announcement);
+  void announcement.then(forget, forget);
   return announcement;
 }

@@ -211,9 +211,12 @@ export function announceCastChange(change: CastChange): void {
     if (!voluntaryToggles.waiting(key)) {
       // Rafale qui s'ouvre : sa première ligne part tout de suite, après les annonces
       // déjà parties pour ce caster et la clôture de la rafale précédente.
+      // La clôture attendue est relevée **maintenant** : relevée plus tard, elle
+      // pourrait être celle de cette rafale-ci, qui attend cette ligne (blocage).
+      const closing = voluntaryToggles.drain(key);
       leadingLines.set(
         gesture,
-        chainAfter([key], () => voluntaryToggles.drain(key).then(() => deliverInBackground(gesture))),
+        chainAfter([key], () => closing.then(() => deliverInBackground(gesture))),
       );
     }
     voluntaryToggles.add(key, gesture);

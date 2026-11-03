@@ -11,7 +11,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { isBotCircuitOpen, sendBotLog } from "@/lib/server/bot-integration";
-import { createCoalescer } from "@/lib/server/coalescer";
+import { createCoalescer, trackAnnouncement } from "@/lib/server/coalescer";
 import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
 import {
@@ -156,8 +156,11 @@ export function announceStaffTournamentAction(
   // Rien en attente (le cas courant) : la ligne part sur-le-champ, sans détour
   // par la file des microtâches — un arrêt du serveur juste après ne la rate pas.
   if (!keys.some((key) => tournamentBursts.busy(key))) {
-    void deliverTournamentAction(entry);
+    // Suivie : l'arrêt du serveur attend sa lecture du nom du tournoi.
+    void trackAnnouncement(deliverTournamentAction(entry));
     return;
   }
-  void Promise.all(keys.map((key) => tournamentBursts.flush(key))).then(() => deliverTournamentAction(entry));
+  void trackAnnouncement(
+    Promise.all(keys.map((key) => tournamentBursts.flush(key))).then(() => deliverTournamentAction(entry)),
+  );
 }
