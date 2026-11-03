@@ -178,6 +178,7 @@ import { retryOnDeadlock } from "./deadlock-retry";
 import type { AdminResolveEntry, AdminScoreEntry, AutoValidationPause } from "./admin";
 import {
   publishMatchUpdatedEvent,
+  publishStandingsReplayedEvent,
   publishUpdatedEvent,
   publishScoreReportedEvent,
 } from "./notifications";
@@ -185,8 +186,7 @@ import { discardBotLogs, flushBotLogs, queueBotLog } from "./bot-logs";
 import { releaseWithServerLockWait } from "./lock-wait";
 import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
-import { getTournamentPreview, invalidateTournamentPreview } from "./preview-cache";
-import { invalidateLandingMiniBrackets } from "@/lib/server/landing-cache";
+import { getTournamentPreview } from "./preview-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
 import { dispatchMatchVoiceChannels } from "./match-voice";
 import { dispatchDueRoundMapsNotices } from "./round-maps-notice";
@@ -1981,15 +1981,9 @@ async function liftEndurancePenaltyOnce(tournamentId: number, penaltyId: number)
     await connection.commit();
     flushBotLogs(connection);
 
-    // Comme l'annulation d'un abandon : aucun résultat de match ne change — le
-    // classement du site, les statistiques et les agrégats de l'accueil qui ne
-    // lisent que des matchs clos restent en cache. Le rejeu réécrit le
-    // classement d'endurance (lu par les listes) et peut reposer la manche
-    // courante : instantané, aperçu, listes, direct et mini-arbres de l'accueil.
-    publishMatchUpdatedEvent(tournamentId, { landingLive: true });
-    invalidateTournamentPreview(tournamentId);
-    invalidateTournamentLists();
-    invalidateLandingMiniBrackets();
+    // Aucun résultat de match ne change : même invalidation que l'annulation
+    // d'un abandon.
+    publishStandingsReplayedEvent(tournamentId);
   } catch (error) {
     await connection.rollback();
     throw error;

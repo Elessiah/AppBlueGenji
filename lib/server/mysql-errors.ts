@@ -52,9 +52,11 @@ export function isDeadlockMessage(message: unknown): boolean {
 }
 
 /**
- * Messages d'une **contention** qui n'est pas un interblocage, et que le
- * rejeu (`retryOnDeadlock`) n'a pas pu vaincre :
+ * Messages d'une **contention** passagère que le rejeu (`retryOnDeadlock`) n'a
+ * pas pu vaincre — la liste unique que lisent `fail()` et `isContentionError` :
+ * une nouvelle signature ne s'ajoute qu'ici.
  *
+ * - l'interblocage (`DEADLOCK_MESSAGE`) ;
  * - `ER_CHECKREAD` (1020, MariaDB 11.6.2 et plus, `innodb_snapshot_isolation`) :
  *   la ligne a changé depuis l'image lue par la transaction ;
  * - `ER_LOCK_WAIT_TIMEOUT` (1205) : le verrou n'est pas venu dans le délai.
@@ -63,14 +65,15 @@ export function isDeadlockMessage(message: unknown): boolean {
  * « réessaie », comme l'interblocage.
  */
 const CONTENTION_MESSAGES = [
+  DEADLOCK_MESSAGE,
   /^Record has changed since last read in table\b/i,
   /^Lock wait timeout exceeded\b/i,
 ];
 
 /**
  * `true` si ce message d'exception est celui d'une contention passagère
- * (`ER_CHECKREAD`, `ER_LOCK_WAIT_TIMEOUT`). Pendant de `isDeadlockMessage` :
- * `fail()` rend l'un comme l'autre en `CONCURRENT_UPDATE_RETRY`.
+ * (interblocage, `ER_CHECKREAD`, `ER_LOCK_WAIT_TIMEOUT`) : `fail()` la rend en
+ * `CONCURRENT_UPDATE_RETRY`.
  */
 export function isContentionMessage(message: unknown): boolean {
   return typeof message === "string" && CONTENTION_MESSAGES.some((pattern) => pattern.test(message));
@@ -102,10 +105,11 @@ function errorNumber(error: unknown): number | null {
  */
 export function isContentionError(error: unknown): boolean {
   // Les prédicats du rejeu (`retryOnDeadlock`), plus le délai de verrou dépassé.
+  // Le numéro autant que le code : une erreur relayée peut ne garder que l'un.
   if (isTransactionAborted(error) || errorNumber(error) === 1213 || isSnapshotConflict(error)) return true;
   if (errorCode(error) === "ER_LOCK_WAIT_TIMEOUT" || errorNumber(error) === 1205) return true;
   const message = error instanceof Error ? error.message : undefined;
-  return isDeadlockMessage(message) || isContentionMessage(message);
+  return isContentionMessage(message);
 }
 
 /**

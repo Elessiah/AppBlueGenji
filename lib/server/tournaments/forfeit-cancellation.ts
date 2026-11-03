@@ -20,10 +20,7 @@ import { toParticipantType, type ParticipantType } from "@/lib/shared/participan
 import { laterRoundsHaveScoreInput } from "./bg-survie/round-progress";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { retryOnDeadlock } from "./deadlock-retry";
-import { invalidateLandingMiniBrackets } from "@/lib/server/landing-cache";
-import { invalidateTournamentLists } from "./list-cache";
-import { publishMatchUpdatedEvent } from "./notifications";
-import { invalidateTournamentPreview } from "./preview-cache";
+import { publishStandingsReplayedEvent } from "./notifications";
 import { releaseWithServerLockWait } from "./lock-wait";
 
 /** Ce que l'annulation a produit, pour la ligne de journal et le message rendu. */
@@ -249,10 +246,7 @@ async function cancelTournamentForfeitOnce(
     // à l'accueil le direct et les mini-arbres sont oubliés. Leaderboards,
     // ticker (derniers résultats) et compteurs ne lisent que des matchs clos ou
     // des comptes : ils restent en cache.
-    publishMatchUpdatedEvent(tournamentId, { landingLive: true });
-    invalidateTournamentPreview(tournamentId);
-    invalidateTournamentLists();
-    invalidateLandingMiniBrackets();
+    publishStandingsReplayedEvent(tournamentId);
 
     return {
       tournamentId,

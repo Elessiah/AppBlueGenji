@@ -37,13 +37,6 @@ type MapRow = RowDataPacket & {
  * tous les matchs sans proposition : deux premiers reports simultanés sur des
  * matchs voisins s'interbloquaient presque à coup sûr. L'insertion seule ne
  * prend que des verrous d'intention d'insertion, compatibles entre eux.
- *
- * `knownSize` : l'appelant connaît, sous les mêmes conditions, le nombre de
- * maps du jeu (`mapSetSize`). Les maps se réécrivent alors en place (clé
- * unique, `ON DUPLICATE KEY UPDATE`), et seules celles au-delà de la nouvelle
- * liste s'effacent — ni lecture verrouillante ni `DELETE` du jeu entier, dont
- * le verrou d'intervalle débordait sur le match voisin, quand la liste
- * s'allonge d'une map (saisie map par map).
  */
 export async function replaceMatchMaps(
   connection: PoolConnection,
@@ -51,25 +44,27 @@ export async function replaceMatchMaps(
   source: MatchMapSource,
   maps: ReadonlyArray<MatchMapInput>,
   userId: number | null,
-  options: { knownEmpty?: boolean; knownSize?: number } = {},
+  options: { knownEmpty?: boolean } = {},
 ): Promise<void> {
-  if (options.knownSize !== undefined) {
-    if (options.knownSize > maps.length) {
-      await connection.execute(`DELETE FROM bg_match_maps WHERE match_id = ? AND source = ? AND map_number > ?`, [
-        matchId,
-        source,
-        maps.length,
-      ]);
-    }
-  } else if (!options.knownEmpty) {
-    await clearMatchMaps(connection, matchId, source);
-  }
+  if (!options.knownEmpty) await clearMatchMaps(connection, matchId, source);
+  await insertMaps(connection, matchId, source, maps, userId, 0);
+}
+
+/** Insère `maps` à partir de la map `offset + 1`. */
+async function insertMaps(
+  connection: PoolConnection,
+  matchId: number,
+  source: MatchMapSource,
+  maps: ReadonlyArray<MatchMapInput>,
+  userId: number | null,
+  offset: number,
+): Promise<void> {
   if (maps.length === 0) return;
   const placeholders = maps.map(() => "(?, ?, ?, ?, ?, ?, ?)").join(", ");
   const values = maps.flatMap((map, index) => [
     matchId,
     source,
-    index + 1,
+    offset + index + 1,
     map.replayCode,
     map.team1Score,
     map.team2Score,
@@ -114,23 +109,75 @@ async function clearMatchMaps(connection: PoolConnection, matchId: number, sourc
   await connection.execute(`DELETE FROM bg_match_maps WHERE match_id = ? AND source = ?`, [matchId, source]);
 }
 
+/** Une map stockée, avec sa clé primaire. */
+export type StoredMap = MatchMapInput & { id: number; mapNumber: number };
+
 /**
- * Nombre de maps du jeu `source` d'un match (la plus haute, numérotées depuis
- * 1 sans trou), `0` sans jeu. Lecture **sans verrou** — aucun verrou
- * d'intervalle sur un jeu vide. N'est exacte que si l'appelant tient le verrou
- * du match depuis avant sa première lecture ordinaire, et que tout écrivain du
- * jeu prend ce même verrou (cas de `FINAL`, voir `replaceFinalMaps`).
+ * Maps du jeu `source` d'un match, dans l'ordre joué, avec leur clé primaire.
+ * Lecture **sans verrou** — aucun verrou d'intervalle sur un jeu vide. N'est
+ * exacte que si l'appelant tient le verrou du match depuis avant sa première
+ * lecture ordinaire, et que tout écrivain du jeu prend ce même verrou (cas de
+ * `FINAL`, voir `replaceFinalMaps`).
  */
-export async function mapSetSize(
+export async function loadStoredMapSet(
   connection: PoolConnection,
   matchId: number,
   source: MatchMapSource,
-): Promise<number> {
-  const [rows] = await connection.execute<(RowDataPacket & { size: number | null })[]>(
-    `SELECT MAX(map_number) AS size FROM bg_match_maps WHERE match_id = ? AND source = ?`,
+): Promise<StoredMap[]> {
+  const [rows] = await connection.execute<(RowDataPacket & MapRow & { id: number })[]>(
+    `SELECT id, map_number, replay_code, team1_score, team2_score
+     FROM bg_match_maps WHERE match_id = ? AND source = ? ORDER BY map_number`,
     [matchId, source],
   );
-  return Number(rows[0]?.size ?? 0);
+  return rows.map((row) => ({
+    id: Number(row.id),
+    mapNumber: Number(row.map_number),
+    replayCode: row.replay_code,
+    team1Score: Number(row.team1_score),
+    team2Score: Number(row.team2_score),
+  }));
+}
+
+/**
+ * Réécrit un jeu dont l'appelant connaît les lignes (`loadStoredMapSet`, mêmes
+ * conditions d'exactitude) **par leur clé primaire** : une map inchangée n'est
+ * pas touchée, une map modifiée se met à jour par son `id`, celles en trop
+ * s'effacent par leur `id`, les nouvelles s'insèrent. Aucun parcours de la clé
+ * unique `(match_id, source, map_number)` : ni `DELETE` du jeu, ni mise à jour
+ * par doublon (`ON DUPLICATE KEY UPDATE` verrouille l'intervalle qui précède la
+ * ligne trouvée) — seulement des verrous de ligne et d'intention d'insertion,
+ * qui ne débordent jamais sur le match voisin. La saisie map par map ajoute
+ * ainsi sa map sans rien verrouiller d'autre.
+ */
+export async function rewriteMapSet(
+  connection: PoolConnection,
+  matchId: number,
+  source: MatchMapSource,
+  stored: ReadonlyArray<StoredMap>,
+  maps: ReadonlyArray<MatchMapInput>,
+  userId: number | null,
+): Promise<void> {
+  for (const [index, map] of maps.slice(0, stored.length).entries()) {
+    const current = stored[index];
+    if (
+      current.replayCode === map.replayCode &&
+      current.team1Score === map.team1Score &&
+      current.team2Score === map.team2Score
+    ) {
+      continue;
+    }
+    await connection.execute(
+      `UPDATE bg_match_maps
+       SET replay_code = ?, team1_score = ?, team2_score = ?, submitted_by_user_id = ?, submitted_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [map.replayCode, map.team1Score, map.team2Score, userId, current.id],
+    );
+  }
+  const extra = stored.slice(maps.length).map((map) => map.id);
+  if (extra.length > 0) {
+    await connection.execute(`DELETE FROM bg_match_maps WHERE id IN (${sqlPlaceholders(extra.length)})`, extra);
+  }
+  await insertMaps(connection, matchId, source, maps.slice(stored.length), userId, stored.length);
 }
 
 /**
@@ -403,6 +450,17 @@ export async function loadFreshMatchProposals(
     side: 1 | 2,
   ) => MatchScoreReport | null,
 ): Promise<MatchProposalMaps | null> {
+  // Les maps ne se joignent que pour un lecteur qui pourra les lire : un
+  // lecteur étranger au match ne fait pas remonter toutes les propositions
+  // pour les voir écartées (`proposalMatches` rejuge sur la ligne du match).
+  const teamIds = scope.all ? [] : scope.teamIds;
+  let readerJoin = "";
+  if (!scope.all) {
+    readerJoin =
+      teamIds.length === 0
+        ? " AND FALSE"
+        : ` AND (m.team1_id IN (${sqlPlaceholders(teamIds.length)}) OR m.team2_id IN (${sqlPlaceholders(teamIds.length)}))`;
+  }
   const [rows] = await connection.execute<FreshProposalRow[]>(
     `SELECT m.team1_id, m.team2_id, m.status,
             m.team1_report_score, m.team1_report_opponent_score, m.team1_reported_at,
@@ -410,10 +468,10 @@ export async function loadFreshMatchProposals(
             mm.source, mm.map_number, mm.replay_code, mm.team1_score, mm.team2_score
      FROM bg_matches m
      LEFT JOIN bg_match_maps mm
-       ON mm.match_id = m.id AND mm.source IN (${sqlPlaceholders(REPORTED_MAP_SOURCES.length)})
+       ON mm.match_id = m.id AND mm.source IN (${sqlPlaceholders(REPORTED_MAP_SOURCES.length)})${readerJoin}
      WHERE m.id = ? AND m.tournament_id = ?
      ORDER BY mm.source, mm.map_number`,
-    [...REPORTED_MAP_SOURCES, target.matchId, target.tournamentId],
+    [...REPORTED_MAP_SOURCES, ...teamIds, ...teamIds, target.matchId, target.tournamentId],
   );
   const head = rows[0];
   if (!head) return null;

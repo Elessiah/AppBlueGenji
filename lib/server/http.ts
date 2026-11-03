@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { isContentionMessage, isDeadlockMessage } from "@/lib/server/mysql-errors";
+import { isContentionMessage } from "@/lib/server/mysql-errors";
 import { CONCURRENT_UPDATE_RETRY, publicErrorCode } from "@/lib/shared/api-error-code";
 
 export type ApiError = { error: string };
@@ -46,13 +46,13 @@ export function fail<T extends object = Record<string, never>>(
   // (`fail(error.message, …)`, le motif courant) — pas pour celles qui le
   // remplacent par un code fixe avant d'appeler `fail()`.
   //
-  // Même traitement pour les deux autres contentions passagères qu'un rejeu n'a
-  // pas vaincues (`isContentionMessage`) : ligne changée depuis l'instantané
+  // Même traitement pour les autres contentions passagères qu'un rejeu n'a pas
+  // vaincues (`isContentionMessage`, liste unique) : ligne changée depuis l'instantané
   // sous MariaDB (`ER_CHECKREAD`) et verrou venu trop tard
   // (`ER_LOCK_WAIT_TIMEOUT`). Sans elles ici, la saisie d'arbitrage, le report
   // d'un engagé, la programmation ou les rappels rendaient un 500 générique
   // pour la même contention que l'interblocage rend en « réessaie ».
-  if (isDeadlockMessage(message) || isContentionMessage(message)) {
+  if (isContentionMessage(message)) {
     console.warn(`[api] écriture annulée par une écriture concurrente, rendue en ${CONCURRENT_UPDATE_RETRY} :`, message);
     return NextResponse.json({ ...details, error: CONCURRENT_UPDATE_RETRY } as ApiError & Partial<T>, {
       status: 409,
