@@ -101,8 +101,18 @@ import { STREAM_NOTICE_LIVE, STREAM_NOTICE_OBJECTION, STREAM_NOTICE_PRIVACY_PATH
  * sa mise en ligne. La présentation de l'arbitre désigné, fondée sur le
  * contrat depuis la version 7, l'est pour tout arbitre qui a accepté la
  * version 7 ou une suivante.
+ *
+ * Version 9 (ERASURE-D2, avec MATCH-REFEREE-FINISH, décisions de
+ * l'utilisateur du 2026-11-03, T1 à T3) : « Contacts de match » — Battle.net
+ * exigé de l'arbitre d'un match Overwatch seulement, BattleTag borné à
+ * Overwatch, tag Discord certifié de l'arbitre désigné et contacts des
+ * équipes sur la page du match aux seules parties (fonctionnement minimum),
+ * fenêtre de lancement réécrite, lien vers l'arbitre désigné de `/rgpd`, et
+ * salons vocaux d'équipe comme règle du tournoi (décision V6, sans droit
+ * d'opposition) ; « Compte » — la suppression et ses suites (ERASURE-D2).
+ * Annoncée par l'entrée `2026-11-conditions-v9-contacts-et-suppression`.
  */
-export const TERMS_VERSION = 8;
+export const TERMS_VERSION = 9;
 
 /** Âge minimum pour créer un compte (défini dans `lib/shared/legal-durations.ts`). */
 export { SITE_MINIMUM_AGE };
@@ -115,7 +125,7 @@ export { SITE_MINIMUM_AGE };
 export const TERMS_AGE_DECLARATION = `je déclare avoir au moins ${SITE_MINIMUM_AGE} ans`;
 
 /** Date d'entrée en vigueur de la version courante (AAAA-MM-JJ). */
-export const TERMS_UPDATED_AT = "2026-10-31";
+export const TERMS_UPDATED_AT = "2026-11-05";
 
 /** Adresse de la page publique des conditions. */
 export const TERMS_PATH = "/conditions-utilisation";
@@ -263,6 +273,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
       `Il faut avoir **au moins ${SITE_MINIMUM_AGE} ans** pour créer un compte. En acceptant ces conditions, l'utilisateur déclare avoir atteint cet âge.`,
       "Un compte ne fait pas de son titulaire un **membre de l'association** : l'adhésion est une démarche distincte, soumise aux conditions de ses statuts, dont un âge minimum qui leur est propre.",
       "Le pseudo choisi ne doit ni usurper l'identité d'une autre personne, ni porter atteinte à ses droits, ni être injurieux, discriminatoire ou à caractère sexuel.",
+      // ERASURE-D2: deletion wording added by parent
       "Chaque utilisateur peut exporter ses données et supprimer son compte à tout moment depuis son profil.",
     ],
   },
@@ -312,11 +323,16 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     id: "contacts-de-match",
     title: "Contacts de match",
     paragraphs: [
-      "Pour qu'un match de tournoi se joue, ses parties doivent pouvoir se joindre et s'ajouter en jeu. Au titre de l'organisation du tournoi, les **coordonnées de contact** d'un ou deux membres de chaque équipe — **tag Discord** certifié, **BattleTag**, **même masqué**, et **rôle d'équipe** — sont communiquées aux **membres des deux équipes** du match et aux **arbitres** (administrateurs compris), dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses **casters** inscrits — un match peut en avoir plusieurs — **le temps du match** seulement, de son départ à sa fin ; celles de chaque caster le sont aux deux équipes et aux **autres casters** du match sur ce même temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (en vigueur depuis le 21 octobre 2026 : auparavant, aux arbitres aussi le temps du match seulement).",
-      "Un match peut aussi avoir un **arbitre désigné** : une personne du staff habilitée à arbitrer (permission d'arbitrage, tag Discord certifié et BattleTag tiré d'un compte Battle.net rattaché — un BattleTag tapé à la main n'y suffit pas), qui prend le match ou à qui le staff le confie. Au titre de cette même organisation, son **pseudo** et son **BattleTag**, **même masqué** — jamais son tag Discord à ce titre — sont communiqués aux membres des deux équipes et aux arbitres (administrateurs compris) dès que ses deux adversaires sont connus et jusqu'à sa fin, et aux casters du match le temps du match ; son pseudo seul, sans le BattleTag, se lit dès que la fenêtre de lancement montre le match. Son pseudo seul se lit aussi par tout utilisateur connecté, sur la carte et la page du match, jusqu'à la déclaration de son score ou la fin du tournoi, au titre de l'intérêt légitime de l'association à faire savoir qui arbitre un match, auquel il peut s'opposer comme le dit la politique de confidentialité ; les visiteurs sans compte ne lisent que « Arbitre désigné ». L'arbitre peut se retirer d'un match à tout moment, le staff pouvant le lui confier de nouveau ; il n'est plus présenté s'il ne remplit plus ces conditions ou si, avant le lancement du match, il devient l'un de ses joueurs. S'il caste aussi le match, ses contacts de caster, tag Discord certifié compris, suivent la règle des casters ci-dessus.",
-      "Ce partage passe par la fenêtre « Contacts » du match, par sa fenêtre de lancement, qui la reprend au départ du match et ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné, et par la **page du match**, qui reprend les contacts des casters et le pseudo et le BattleTag de l'arbitre désigné — jamais les contacts des équipes — aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts » : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris. Le jeu, lui, affiche les identifiants de jeu des joueurs : le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi, permet de revoir la partie et de les y lire. Masquer son BattleTag ne le retire donc ni de ces fenêtres ni de cette page : pour ne pas le communiquer, il faut le retirer de son profil (un BattleTag reçu de Battle.net ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion ; un BattleTag tapé à la main, que le site garde quand Battle.net n'en donne aucun, reste modifiable et effaçable depuis le profil, sans être tenu pour vérifié). Un tag Discord non certifié n'est jamais communiqué.",
+      "Pour qu'un match de tournoi se joue, ses parties doivent pouvoir se joindre et s'ajouter en jeu. Au titre de l'organisation du tournoi, les **coordonnées de contact** d'un ou deux membres de chaque équipe — **tag Discord** certifié, **BattleTag** — dans un tournoi Overwatch seulement —, **même masqué**, et **rôle d'équipe** — sont communiquées aux **membres des deux équipes** du match et aux **arbitres** (administrateurs compris), dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses **casters** inscrits — un match peut en avoir plusieurs — **le temps du match** seulement, de son départ à sa fin ; celles de chaque caster le sont aux deux équipes et aux **autres casters** du match sur ce même temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (en vigueur depuis le 21 octobre 2026 : auparavant, aux arbitres aussi le temps du match seulement).",
+      "Un match peut aussi avoir un **arbitre désigné** : une personne du staff habilitée à arbitrer (permission d'arbitrage et tag Discord certifié ; pour un match Overwatch, aussi un BattleTag tiré d'un compte Battle.net rattaché — un BattleTag tapé à la main n'y suffit pas), qui prend le match ou à qui le staff le confie. Au titre de cette même organisation, son **pseudo** et, dans un tournoi Overwatch seulement, son **BattleTag**, **même masqué** — et son **tag Discord certifié**, aux seules parties du match (membres de ses deux équipes, ses casters), aux mêmes moments, ce partage étant strictement nécessaire au fonctionnement minimum du service —, sont communiqués aux membres des deux équipes et aux arbitres (administrateurs compris) dès que ses deux adversaires sont connus et jusqu'à sa fin, et aux casters du match le temps du match ; son pseudo seul, sans le BattleTag, se lit dès que la fenêtre de lancement montre le match. Son pseudo seul se lit aussi par tout utilisateur connecté, sur la carte et la page du match, jusqu'à la déclaration de son score ou la fin du tournoi, au titre de l'intérêt légitime de l'association à faire savoir qui arbitre un match, auquel il peut s'opposer comme le dit la politique de confidentialité ; les visiteurs sans compte ne lisent que « Arbitre désigné ». L'arbitre peut se retirer d'un match à tout moment, le staff pouvant le lui confier de nouveau ; il n'est plus présenté s'il ne remplit plus ces conditions ou si, avant le lancement du match, il devient l'un de ses joueurs. S'il caste aussi le match, ses contacts de caster, tag Discord certifié compris, suivent la règle des casters ci-dessus.",
+      "Ce partage passe par trois écrans. La fenêtre « Contacts » du match. Sa **fenêtre de lancement**, qui la reprend au départ du match et ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné — les autres arbitres ne lisent ces contacts que dans la fenêtre « Contacts » — et qui ne montre jamais le tag Discord de l'arbitre désigné, sauf s'il caste aussi le match (règle des casters). Et la **page du match**, qui reprend, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts », les contacts des casters et le pseudo de l'arbitre désigné (son BattleTag dans un tournoi Overwatch) et, aux seules parties du match (membres de ses deux équipes, ses casters, son arbitre désigné), les contacts des deux équipes et le tag Discord certifié de l'arbitre désigné. Un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris. Le jeu, lui, affiche les identifiants de jeu des joueurs : le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi, permet de revoir la partie et de les y lire. Masquer son BattleTag ne le retire donc ni de ces fenêtres ni de cette page : pour ne pas le communiquer, il faut le retirer de son profil (un BattleTag reçu de Battle.net ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion ; un BattleTag tapé à la main, que le site garde quand Battle.net n'en donne aucun, reste modifiable et effaçable depuis le profil, sans être tenu pour vérifié). Un tag Discord non certifié n'est jamais communiqué.",
+      "Dans un tournoi qui a l'option « **Salons vocaux d'équipe** », réunir chaque équipe dans son salon vocal Discord avant chacun de ses matchs fait partie du **règlement du tournoi** : le bot de l'association ouvre ces salons et y compte les personnes présentes — un nombre, jamais qui —, et le match ne se lance qu'une fois les deux salons pleins, sauf si l'arbitrage le force. Ce comptage repose sur l'exécution du service et du règlement du tournoi, sans droit d'opposition propre : une équipe qui ne veut pas s'y plier ne s'inscrit pas à ce tournoi, ou s'en retire.",
     ],
-    links: [{ href: "/rgpd#donnees-collectees", label: "Politique de confidentialité — données collectées" }],
+    links: [
+      { href: "/rgpd#donnees-collectees", label: "Politique de confidentialité — données collectées" },
+      { href: "/rgpd#arbitre-designe", label: "Politique de confidentialité — arbitre désigné d'un match" },
+      { href: "/rgpd#salons-vocaux", label: "Politique de confidentialité — salons vocaux d'équipe" },
+    ],
   },
   {
     id: "signalement",

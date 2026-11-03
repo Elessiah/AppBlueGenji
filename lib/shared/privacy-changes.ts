@@ -1515,6 +1515,47 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : rien de nouveau n'est collecté ni montré, aux mêmes personnes et aux mêmes moments ; ton opposition d'arbitre (formulaire de signalement, catégorie RGPD) — à ta présentation avant la version 7, ou à l'affichage de ton pseudo aux membres —, retenue, te retire toujours de tes matchs non terminés, ce tag compris.",
     ],
   },
+  {
+    // ERASURE-D2, décision V6 de l'utilisateur (2026-11-03) : dans un tournoi
+    // qui a l'option, les salons vocaux d'équipe sont une règle du tournoi —
+    // les refuser revient à quitter le tournoi. Le comptage (registre T18)
+    // passe de l'intérêt légitime à l'exécution du contrat (règlement du
+    // tournoi), sans droit d'opposition. Pour tous les comptes. Datée du
+    // lendemain de la nuit de déploiement suivant la fusion — à avancer si
+    // elle glisse (avec `/rgpd`, le registre et les conditions v9).
+    id: "2026-11-salons-vocaux-regle-du-tournoi",
+    publishedAt: "2026-11-05",
+    title: "Salons vocaux d'équipe : une règle du tournoi",
+    links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }],
+    summary:
+      "Dans un tournoi qui a l'option « Salons vocaux d'équipe », réunir ton équipe dans son salon vocal avant chaque match fait désormais partie du règlement du tournoi : le comptage des personnes présentes repose sur l'exécution du service, et non plus sur l'intérêt légitime, et il n'a plus de droit d'opposition propre.",
+    details: [
+      "Ce qui change : la base juridique du comptage des salons vocaux d'équipe (registre T18) devient l'exécution du contrat — le règlement du tournoi, que les conditions d'utilisation reprennent dans leur version 9. Une équipe qui ne veut pas s'y plier ne s'inscrit pas à ce tournoi, ou s'en retire ; l'opposition à ce traitement que la page RGPD offrait jusqu'ici n'existe plus.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté ni conservé. Le bot compte toujours un nombre, jamais qui ; le site ne garde que l'identifiant du salon, les numéros du match et de l'équipe, ce nombre et ses heures, aux mêmes durées ; l'option reste éteinte par défaut, et un tournoi sans elle n'ouvre aucun salon.",
+    ],
+  },
+  {
+    // ERASURE-D2 + MATCH-REFEREE-FINISH (décisions de l'utilisateur du
+    // 2026-11-03, T1 à T3, R4b : une seule version 9 pour les deux lots) :
+    // conditions d'utilisation, version 9. Pour tous les comptes. Même date
+    // que `TERMS_UPDATED_AT` — tout avancer ensemble si la fusion glisse.
+    id: "2026-11-conditions-v9-contacts-et-suppression",
+    publishedAt: "2026-11-05",
+    title: "Conditions d'utilisation : version 9 (contacts de match, salons vocaux, suppression du compte)",
+    links: [
+      { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
+      { href: "/conditions-utilisation#compte", label: "Lire la section « Compte »" },
+    ],
+    summary:
+      "Les conditions d'utilisation passent en version 9 : elles disent désormais ce que la page d'un match montre à ses parties, que Battle.net n'est demandé qu'à l'arbitre d'un match Overwatch, que les salons vocaux d'équipe sont une règle du tournoi, et ce que la suppression d'un compte emporte. Elle est à accepter : une fenêtre te la présente tant que tu ne l'as pas acceptée.",
+    asksTermsAcceptance: true,
+    details: [
+      "Contacts de match : la page du match montre, aux seules parties du match (membres de ses deux équipes, ses casters, son arbitre désigné), les contacts des deux équipes et le tag Discord certifié de l'arbitre désigné, aux mêmes moments que la fenêtre « Contacts » — ce partage étant strictement nécessaire au fonctionnement minimum du service ; la fenêtre de lancement ne montre jamais le tag Discord de l'arbitre désigné, sauf s'il caste aussi le match, et les autres arbitres ne lisent ces contacts que dans la fenêtre « Contacts ». Le BattleTag n'est présenté que dans un tournoi Overwatch, et arbitrer un match ne demande un BattleTag tiré d'un compte Battle.net rattaché que pour un match Overwatch.",
+      "Salons vocaux d'équipe : dans un tournoi qui a l'option, réunir chaque équipe dans son salon vocal avant ses matchs fait partie du règlement du tournoi, sans droit d'opposition propre ; une équipe qui ne veut pas s'y plier ne s'inscrit pas à ce tournoi, ou s'en retire.",
+      // ERASURE-D2: parent adds the deletion detail here
+      `Conditions d'utilisation : la version 9, en vigueur depuis le 5 novembre 2026, le dit dans ses sections « Compte » et « Contacts de match ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.`,
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

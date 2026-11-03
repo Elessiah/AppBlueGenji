@@ -786,6 +786,28 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What doesn't change: nothing new is collected or shown, to the same people at the same times; your referee objection (report form, GDPR category) — to your presentation before version 7, or to the display of your username to members —, once upheld, still removes you from your unfinished matches, this tag included.",
     ],
   },
+  "2026-11-salons-vocaux-regle-du-tournoi": {
+    linkLabels: ["Read the “Team voice channels” paragraph"],
+    title: "Team voice channels: a tournament rule",
+    summary:
+      "In a tournament with the “Team voice channels” option, gathering your team in its voice channel before each match is now part of the tournament rules: counting the people present rests on the performance of the service, no longer on legitimate interest, and it no longer has a right to object of its own.",
+    details: [
+      "What changes: the legal basis of counting team voice channels (register T18) becomes the performance of the contract — the tournament rules, which version 9 of the terms of use repeats. A team that does not want to abide by it does not register for that tournament, or withdraws from it; the objection to this processing that the privacy page offered until now no longer exists.",
+      "What doesn't change: nothing new is collected or kept. The bot still counts a number, never who; the site only keeps the channel's identifier, the numbers of the match and team, that number and its times, for the same periods; the option stays off by default, and a tournament without it opens no channel.",
+    ],
+  },
+  "2026-11-conditions-v9-contacts-et-suppression": {
+    linkLabels: ["Read the “Match contacts” section", "Read the “Account” section"],
+    title: "Terms of use: version 9 (match contacts, voice channels, account deletion)",
+    summary:
+      "The terms of use move to version 9: they now say what a match page shows to its parties, that Battle.net is only required from the referee of an Overwatch match, that team voice channels are a tournament rule, and what deleting an account carries off. It must be accepted: a window presents it to you until you have accepted it.",
+    details: [
+      "Match contacts: the match page shows, to the parties to the match alone (members of both its teams, its casters, its assigned referee), both teams' contacts and the assigned referee's certified Discord tag, at the same times as the “Contacts” window — this sharing being strictly necessary for the minimum functioning of the service; the launch window never shows the assigned referee's Discord tag, unless they also cast the match, and the other referees read these contacts in the “Contacts” window only. The BattleTag is only presented in an Overwatch tournament, and refereeing a match only requires a BattleTag taken from a linked Battle.net account for an Overwatch match.",
+      "Team voice channels: in a tournament with the option, gathering each team in its voice channel before its matches is part of the tournament rules, with no right to object of its own; a team that does not want to abide by it does not register for that tournament, or withdraws from it.",
+      // ERASURE-D2: parent adds the deletion detail here
+      "Terms of use: version 9, in force since 5 November 2026, says so in its “Account” and “Match contacts” sections. A window presents it to you until you have accepted it: accepting it lets you keep using the site.",
+    ],
+  },
 };
 
 /**

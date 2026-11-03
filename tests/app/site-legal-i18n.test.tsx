@@ -111,8 +111,8 @@ describe("français : le texte qui fait foi ne bouge pas", () => {
   });
 
   it("la version des conditions n'avance pas pour une traduction", () => {
-    // Version 8 : condition d'arbitrage, pseudo de l'arbitre aux connectés, BattleTag tapé (EF-20, D2), pas une traduction.
-    expect(TERMS_VERSION).toBe(8);
+    // Version 9 : contacts de match, salons vocaux, suppression du compte (ERASURE-D2), pas une traduction.
+    expect(TERMS_VERSION).toBe(9);
   });
 });
 
