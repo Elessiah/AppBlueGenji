@@ -221,20 +221,34 @@ export async function logDeletionWithdrawal(tournamentId: number, forfeited: boo
   }
 }
 
-/** Les forfaits posés après le commit d'une demande, au meilleur effort ; jamais levé. */
-export async function forfeitSoloEntriesAfterCommit(entries: readonly DeletionWithdrawal[]): Promise<void> {
+/**
+ * Forfait de chaque entrée, une à une et au meilleur effort : un échec est dit
+ * et reporté au prochain passage, sans empêcher les suivantes. Jamais levé.
+ * Rend le nombre de tournois où un forfait a été posé.
+ */
+async function forfeitEntries(entries: readonly DeletionWithdrawal[]): Promise<number> {
+  let forfeited = 0;
   for (const entry of entries) {
     try {
       const forfeits = await forfeitUnplayedSoloEntry(entry.tournamentId, entry.teamId);
-      if (forfeits > 0) await logDeletionWithdrawal(entry.tournamentId, true);
+      if (forfeits > 0) {
+        forfeited += 1;
+        await logDeletionWithdrawal(entry.tournamentId, true);
+      }
     } catch (error) {
-      // Reporté au prochain rattrapage (`settleDeletedSoloEntries`).
       console.error(
         `[account-deletion] forfait de l'entrée ${entry.teamId} (tournoi ${entry.tournamentId}) reporté :`,
         error instanceof Error ? error.message : error,
       );
     }
   }
+  return forfeited;
+}
+
+/** Les forfaits posés après le commit d'une demande, au meilleur effort ; jamais levé. */
+export async function forfeitSoloEntriesAfterCommit(entries: readonly DeletionWithdrawal[]): Promise<void> {
+  // Reportés au prochain passage horaire (`settleDeletedSoloEntries`) en cas d'échec.
+  await forfeitEntries(entries);
 }
 
 /**
@@ -268,22 +282,8 @@ export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; f
         publishUpdatedEvent(entry.tournamentId);
         await logDeletionWithdrawal(entry.tournamentId, false);
       }
-      const forfeitable = await listForfeitableSoloEntries(db, userId);
-      for (const entry of forfeitable) {
-        // Un tournoi qui échoue n'empêche pas les suivants du même compte.
-        try {
-          const forfeits = await forfeitUnplayedSoloEntry(entry.tournamentId, entry.teamId);
-          if (forfeits > 0) {
-            outcome.forfeited += 1;
-            await logDeletionWithdrawal(entry.tournamentId, true);
-          }
-        } catch (error) {
-          console.error(
-            `[deleted-accounts] Forfait de l'entrée ${entry.teamId} (tournoi ${entry.tournamentId}) reporté :`,
-            error instanceof Error ? error.message : error,
-          );
-        }
-      }
+      // Un tournoi qui échoue n'empêche pas les suivants du même compte.
+      outcome.forfeited += await forfeitEntries(await listForfeitableSoloEntries(db, userId));
     } catch (error) {
       console.error(
         `[deleted-accounts] Inscriptions solo du compte #${userId} reportées au prochain passage :`,
