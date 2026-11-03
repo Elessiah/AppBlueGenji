@@ -69,7 +69,14 @@ export async function GET(req: Request) {
   const finishedScope = allFinished ? { allFinished: true } : {};
   // Pas de paramètre `search` : le client filtre en mémoire la liste reçue, et
   // un terme libre contournait le cache partagé en chargeant toute l'archive.
-  const buckets = await listTournamentBuckets(null, hiddenOnly ? { hiddenOnly: true } : finishedScope);
+  let buckets: TournamentBuckets;
+  try {
+    buckets = await listTournamentBuckets(null, hiddenOnly ? { hiddenOnly: true } : finishedScope);
+  } catch (error) {
+    // Un code, jamais la page d'erreur de Next ni le message de la base.
+    console.error("[tournaments] lecture de la liste en échec", error);
+    return fail("TOURNAMENT_LIST_FAILED", 500);
+  }
   // `private` : la réponse dépend de la session (la lecture est refusée sans
   // elle, et `scope=hidden` au seul staff) — jamais rangée dans un cache partagé.
   // `no-cache` : le navigateur la garde mais la revalide à chaque lecture, d'où

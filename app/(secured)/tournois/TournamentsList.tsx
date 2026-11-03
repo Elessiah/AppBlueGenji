@@ -127,18 +127,22 @@ function ShowMoreRow({
  */
 async function fetchMyTournamentIds(signal?: AbortSignal): Promise<number[]> {
   const response = await fetch("/api/me/tournaments", { cache: "no-store", signal });
-  const payload = (await response.json()) as { tournamentIds?: unknown };
+  const payload = (await response.json().catch(() => ({}))) as { tournamentIds?: unknown };
   if (!response.ok || !Array.isArray(payload.tournamentIds)) {
     throw new Error("MY_TOURNAMENTS_READ_FAILED");
   }
   return payload.tournamentIds.filter((id): id is number => Number.isInteger(id));
 }
 
-async function fetchBuckets(url: string, signal?: AbortSignal): Promise<TournamentBuckets> {
+async function fetchBuckets(
+  url: string,
+  signal?: AbortSignal,
+  cache: "no-cache" | "no-store" = "no-cache",
+): Promise<TournamentBuckets> {
   // `no-cache` et non `no-store` : la réponse porte une empreinte (`ETag`,
   // `app/api/tournaments/route.ts`), le navigateur la revalide et le serveur
   // répond 304 sans corps quand la liste n'a pas bougé.
-  const response = await fetch(url, { cache: "no-cache", signal });
+  const response = await fetch(url, { cache, signal });
   // Une page d'erreur HTML (proxy, déploiement) n'est pas du JSON : sans ce
   // repli, elle levait une `SyntaxError` au lieu du code d'échec de la liste.
   const payload = (await response.json().catch(() => ({}))) as {
@@ -295,7 +299,7 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
         return;
       }
       try {
-        const hidden = flattenBuckets(await fetchBuckets("/api/tournaments?scope=hidden", signal));
+        const hidden = flattenBuckets(await fetchBuckets("/api/tournaments?scope=hidden", signal, "no-store"));
         setHiddenTournaments((previous) =>
           sameTournaments(previous, hidden) ? previous : hidden,
         );
@@ -304,10 +308,13 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
         const code = (e as Error).message;
         // Refus du droit `tournaments` (retiré depuis le rendu de la page, ou
         // session échue) : la section n'a plus lieu d'être, et une toast
-        // « FORBIDDEN » sur une simple liste ne dirait rien au lecteur.
+        // « FORBIDDEN » sur une simple liste ne dirait rien au lecteur. Seul le
+        // 403 dit que le droit n'est plus : il le retire à la page. Un 401 peut
+        // être passager (session relue pendant un incident) — la lecture
+        // suivante retente, sans éteindre l'interface staff jusqu'au F5.
         if (code === "FORBIDDEN" || code === "UNAUTHORIZED") {
           setHiddenTournaments((previous) => (previous.length === 0 ? previous : []));
-          setStaffRevoked(true);
+          if (code === "FORBIDDEN") setStaffRevoked(true);
           return;
         }
         if (silent) return;
