@@ -49,6 +49,35 @@ describe("documents du bot : même forme en français et en anglais", () => {
   });
 });
 
+/** Le texte des blocs d'une section, mis bout à bout. */
+function sectionText(doc: LegalDoc, num: string): string {
+  const section = doc.sections.find((candidate) => candidate.num === num);
+  return JSON.stringify(section?.blocks ?? []);
+}
+
+/** Le titre de la section portant ce numéro. */
+function sectionTitle(doc: LegalDoc, num: string): string | undefined {
+  return doc.sections.find((candidate) => candidate.num === num)?.title;
+}
+
+// Les numéros viennent de l'ordre des sections (`numberedSections`), mais le texte cite des
+// sections par leur numéro : insérer une section décalerait ces renvois sans rien dire.
+describe("politique du bot : les renvois « section 0n » visent la bonne section", () => {
+  it("privacyPolicy_dataSectionCitesSection03_section03IsRetention", () => {
+    expect(sectionText(PRIVACY_POLICY.fr, "02")).toContain("(section 03,");
+    expect(sectionText(PRIVACY_POLICY.en, "02")).toContain("(section 03,");
+    expect(sectionTitle(PRIVACY_POLICY.fr, "03")).toBe("Durées de conservation");
+    expect(sectionTitle(PRIVACY_POLICY.en, "03")).toBe("Retention periods");
+  });
+
+  it("privacyPolicy_retentionSectionCitesSection02_section02IsDataProcessed", () => {
+    expect(sectionText(PRIVACY_POLICY.fr, "03")).toContain("(section 02)");
+    expect(sectionText(PRIVACY_POLICY.en, "03")).toContain("(section 02)");
+    expect(sectionTitle(PRIVACY_POLICY.fr, "02")).toBe("Données traitées et finalités");
+    expect(sectionTitle(PRIVACY_POLICY.en, "02")).toBe("Data processed and purposes");
+  });
+});
+
 describe("registre : fiches résolues dans les deux langues", () => {
   it("processingActivities_resolved_containNoLeftoverPair", () => {
     expect(leftoverPairs(register.PROCESSING_ACTIVITIES)).toEqual([]);
