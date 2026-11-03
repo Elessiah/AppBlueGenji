@@ -50,6 +50,7 @@ export { reportMatchScore, finalizeMatch } from "./scoring";
 
 // Admin (adminResolveMatch is wrapped as public API function)
 export { adminSaveMatchScores, checkDownstreamMatchesHaveNoScores } from "./admin";
+import { assertMatchSavable } from "./save-guard";
 
 // Suppression définitive (administrateurs)
 export { deleteTournament } from "./deletion";
@@ -1078,15 +1079,18 @@ export type TournamentViewerContextOptions = {
 /**
  * Engagé du lecteur : son équipe active, ou son entrée solo en individuel.
  *
- * La connexion n'est prise que dans le second cas — le seul où
+ * Sans connexion de l'appelant (contexte du lecteur, à chaque connexion SSE),
+ * une place du pool n'est prise qu'en individuel — le seul cas où
  * `resolveUserEntrantTeamId` s'en serve : en tournoi par équipes,
  * `getUserActiveTeam` ouvre sa propre requête, et réserver une place du pool
- * (25) pour ne rien en faire doublerait la pression à chaque connexion SSE.
+ * (25) pour ne rien en faire doublerait la pression. Avec celle de l'appelant
+ * (relecture des propositions d'un match), les deux cas lisent sur elle : une
+ * seule place pour toute la relecture.
  */
 async function resolveViewerEntrant(
   snapshot: { card: Pick<TournamentCard, "participantType"> },
   userId: number,
-  /** Connexion déjà tenue par l'appelant ; sinon, une du pool (individuel seulement). */
+  /** Connexion déjà tenue par l'appelant, servant aux deux cas ; sinon, une du pool en individuel. */
   connection?: PoolConnection,
 ): Promise<{ activeTeam: Awaited<ReturnType<typeof getUserActiveTeam>> | null; myTeamId: number | null }> {
   if (!isSoloTournament(snapshot.card.participantType)) {
@@ -1570,7 +1574,7 @@ export async function adminSaveMatchScoresPublic(
   // Même risque d'interblocage que le report d'un engagé (`retryOnDeadlock`).
   const saved = await retryOnDeadlock(() => adminSaveMatchScoresOnce(matchId, entry));
   // Sans attendre, comme l'alerte d'un litige tranché (meilleur effort, ne lève jamais).
-  if (saved.pausedNow && saved.match && actor) void alertSelfPausedValidation(saved.match, actor);
+  if (saved.pausedNow && actor) void alertSelfPausedValidation(saved.match, actor);
   return saved.paused;
 }
 
@@ -1585,51 +1589,62 @@ async function saveTargetTournament(connection: PoolConnection, matchId: number)
   >(`SELECT tournament_id, team1_id, team2_id, status FROM bg_matches WHERE id = ? LIMIT 1`, [matchId]);
   const row = rows[0];
   if (!row) throw new Error("MATCH_NOT_FOUND");
-  if (row.team1_id === null || row.team2_id === null) throw new Error("MATCH_NOT_READY");
-  if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+  assertMatchSavable(row);
   return Number(row.tournament_id);
 }
 
 async function adminSaveMatchScoresOnce(
   matchId: number,
   entry: AdminScoreEntry,
-): Promise<AutoValidationPause & { match: DisputeBeforeResolution | null }> {
+): Promise<AutoValidationPause & { match: DisputeBeforeResolution }> {
   const db = await getDatabase();
   const connection = await db.getConnection();
+  // Un refus de la lecture préalable part sans transaction ouverte : pas de
+  // `ROLLBACK` pour rien, dont l'échec masquerait le code du refus.
+  let inTransaction = false;
 
   try {
     // Le tournoi du match, lu **hors transaction** (instruction autonome : elle
     // n'ouvre aucune image qui survivrait au `BEGIN`) — la route ne connaît que
     // le match. Les refus évidents (match inconnu, clos, sans ses deux engagés)
     // partent ici, sans attendre le verrou du tournoi ; ils se rejugent sous
-    // verrou (`adminSaveMatchScores`).
+    // verrou (`adminSaveMatchScores`), par la même règle (`assertMatchSavable`).
     const tournamentId = await saveTargetTournament(connection, matchId);
 
     await connection.beginTransaction();
+    inTransaction = true;
     // Tournoi d'abord, **en toute première instruction**, puis le match : l'ordre
-    // des réconciliations, de la programmation, de l'autogestion de manche et de
-    // la première carte. « Enregistrer » ne rejoue rien, mais une réconciliation
-    // qui juge la manche de ce match vierge puis la détruit pour la réapparier
-    // tient le tournoi : la saisie l'attend (puis lit `MATCH_NOT_FOUND`) au lieu
-    // d'être commitée puis effacée. Le match n'est pas verrouillé pendant cette
-    // attente, et aucune image n'est ouverte avant (pas d'`ER_CHECKREAD`).
+    // des réconciliations, des gestes qui remontent le temps (annulation d'un
+    // abandon, retrait d'une pénalité), de la programmation, de l'autogestion de
+    // manche et de la première carte. Une réconciliation **entrée par le verrou
+    // du tournoi** qui juge la manche de ce match vierge puis la détruit pour la
+    // réapparier passe donc avant (la saisie lit `MATCH_NOT_FOUND`) ou après
+    // (elle voit la saisie) — jamais par-dessus une saisie commitée. Le match
+    // n'est pas verrouillé pendant cette attente, et aucune image n'est ouverte
+    // avant (pas d'`ER_CHECKREAD`).
+    //
+    // Restent inversés les gestes qui prennent le match puis le tournoi : report
+    // d'un engagé, forfait déclaré par une équipe (`runPlayerMatchWrite`),
+    // « Valider le résultat » et correction d'arbitrage. Sur le **même** match,
+    // ils forment avec « Enregistrer » un interblocage que le moteur rompt
+    // (« Enregistrer », qui n'a rien écrit, est la victime désignée) et que
+    // `retryOnDeadlock` rejoue. Un report dont l'image précède cette saisie peut
+    // encore juger sa manche vierge (ERREUR.txt, préexistant).
     await lockTournamentRow(connection, tournamentId);
 
     const { adminSaveMatchScores: adminSaveInternal } = await import("./admin");
     const { saved, ...pause } = await adminSaveInternal(connection, matchId, entry);
 
     // La ligne du match, déjà lue sous verrou par la sauvegarde : rien à relire.
+    // Ses deux engagés sont en place (`MATCH_NOT_READY` sinon, `assertMatchSavable`).
     const savedTournamentId = Number(saved.tournament_id);
-    const savedMatch: DisputeBeforeResolution | null =
-      saved.team1_id !== null && saved.team2_id !== null
-        ? {
-            matchId,
-            tournamentId: savedTournamentId,
-            team1Id: Number(saved.team1_id),
-            team2Id: Number(saved.team2_id),
-            playedAt: earliestReport(saved.team1_reported_at ?? null, saved.team2_reported_at ?? null),
-          }
-        : null;
+    const savedMatch: DisputeBeforeResolution = {
+      matchId,
+      tournamentId: savedTournamentId,
+      team1Id: Number(saved.team1_id),
+      team2Id: Number(saved.team2_id),
+      playedAt: earliestReport(saved.team1_reported_at ?? null, saved.team2_reported_at ?? null),
+    };
 
     // **Aucune réconciliation** : « Enregistrer » note l'avancement d'un match
     // sans jamais le clore (`MATCH_ALREADY_COMPLETED` le garde), et tous les
@@ -1647,7 +1662,7 @@ async function adminSaveMatchScoresOnce(
     publishMatchUpdatedEvent(savedTournamentId, { landingLive: true });
     return { ...pause, match: savedMatch };
   } catch (error) {
-    await connection.rollback();
+    if (inTransaction) await connection.rollback();
     throw error;
   } finally {
     discardBotLogs(connection);

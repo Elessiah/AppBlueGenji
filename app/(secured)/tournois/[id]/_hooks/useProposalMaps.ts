@@ -50,22 +50,30 @@ export function useProposalMaps(
     // fait alors tomber `needsRefresh`, et le nettoyage arrête les tentatives.
     // Un `proposals: null` du serveur est une réponse, pas un échec : rien n'est
     // lisible pour ce lecteur sur l'état relu (engagé remplacé, report retiré),
-    // et les tentatives restantes reposeraient la même question pour rien.
+    // et les tentatives restantes reposeraient la même question pour rien. De
+    // même d'un refus définitif (4xx hors 429 : session expirée, tournoi masqué) ;
+    // seuls un 429, un 5xx ou le réseau se retentent.
     const controller = new AbortController();
     let tries = 0;
     let answered = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    const stop = () => {
+      answered = true;
+      if (timer !== null) clearTimeout(timer);
+    };
     const read = async () => {
       try {
         const response = await fetch(`/api/tournaments/${tournamentId}/matches/${matchId}/proposals`, {
           cache: "no-store",
           signal: controller.signal,
         });
-        if (!response.ok) return;
+        if (!response.ok) {
+          if (response.status >= 400 && response.status < 500 && response.status !== 429) stop();
+          return;
+        }
         const payload = (await response.json()) as { proposals?: unknown };
         if (payload.proposals === null) {
-          answered = true;
-          if (timer !== null) clearTimeout(timer);
+          stop();
           return;
         }
         const parsed = parseMatchProposals(payload.proposals, matchId);

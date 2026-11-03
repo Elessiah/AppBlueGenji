@@ -14,6 +14,7 @@ import { tryAutoResolveByes } from "./byes";
 import { detachDownstreamOutcome } from "./bracket-cascade";
 import { SINGLE_REPORT_SQL } from "./score-report-sql";
 import { laterRoundsHaveScoreInput } from "./bg-survie/round-progress";
+import { assertMatchSavable } from "./save-guard";
 
 interface DependentMatchRow extends RowDataPacket {
   id: number;
@@ -442,8 +443,9 @@ export async function adminSaveMatchScores(
 
   if (matches.length === 0) throw new Error("MATCH_NOT_FOUND");
   const match = matches[0];
-  if (match.team1_id === null || match.team2_id === null) throw new Error("MATCH_NOT_READY");
 
+  // Deux engagés en place, et pas encore tranché (`assertMatchSavable`).
+  //
   // Cette route n'écrit que les scores : elle ne recalcule ni le vainqueur ni la
   // suite du plateau. Appliquée à un match déjà tranché, elle le laissait donc
   // affiché « 2-1 » pour l'équipe portée perdante, la qualifiée du tour suivant
@@ -457,7 +459,7 @@ export async function adminSaveMatchScores(
   // `status = COMPLETED` et `winner_team_id = NULL`, si bien que la carte
   // annonçait « 3 – 0 » sous la mention « Match nul » et que le rejeu
   // d'endurance en tirait trois maps **de chaque côté**, soit zéro point net.
-  if (match.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+  assertMatchSavable(match);
 
   // Pas de verrou aval (`checkDownstreamMatchesHaveNoScores`) : il ne protège
   // qu'un match joué, et seul `COMPLETED` l'est (`isMatchPlayed`) — refusé
