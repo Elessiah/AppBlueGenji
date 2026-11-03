@@ -206,9 +206,17 @@ function audienceColumns(topic: PushTopic): string {
 function withinTopicAudience<T extends AudienceColumns>(rows: readonly T[], topic: PushTopic): T[] {
   const audience = PUSH_TOPICS[topic].audience;
   if (audience === null) return [...rows];
-  return rows.filter((row) =>
-    can({ isAdmin: Number(row.is_admin) === 1, roles: sanitizePlatformRoles(row.platform_roles_json) }, audience),
-  );
+  // Un compte à plusieurs appareils revient en plusieurs lignes aux droits identiques : jugés une fois.
+  const verdicts = new Map<string, boolean>();
+  return rows.filter((row) => {
+    const key = `${Number(row.is_admin)}|${JSON.stringify(row.platform_roles_json ?? null)}`;
+    let allowed = verdicts.get(key);
+    if (allowed === undefined) {
+      allowed = can({ isAdmin: Number(row.is_admin) === 1, roles: sanitizePlatformRoles(row.platform_roles_json) }, audience);
+      verdicts.set(key, allowed);
+    }
+    return allowed;
+  });
 }
 
 /**
