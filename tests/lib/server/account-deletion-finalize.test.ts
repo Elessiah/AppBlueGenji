@@ -31,11 +31,12 @@ const RECENT = new Date(Date.now() - 3 * DAY);
 
 type Locked = { is_deleted: 0 | 1; deletion_requested_at: Date | null } | null;
 
-function fakeDb(options: { locked: Locked; played?: number; quarantined?: string[]; due?: number[] }) {
+function fakeDb(options: { locked: Locked; played?: number; quarantined?: string[]; due?: number[]; failLock?: boolean }) {
   const queries: string[] = [];
-  const execute = jest.fn(async (sql: string) => {
+  const execute = jest.fn(async (sql: string, _params?: unknown[]) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
     queries.push(q);
+    if (options.failLock && q.includes("FROM bg_users WHERE id = ? FOR UPDATE")) throw new Error("DB_DOWN");
     if (q.startsWith("SELECT id FROM bg_users WHERE is_deleted = 1 AND deletion_requested_at IS NOT NULL")) {
       return [(options.due ?? []).map((id) => ({ id }))];
     }
@@ -56,7 +57,7 @@ function fakeDb(options: { locked: Locked; played?: number; quarantined?: string
     release: jest.fn(() => {}),
   };
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, getConnection: jest.fn(async () => connection) }));
-  return { queries, connection };
+  return { queries, connection, execute };
 }
 
 const wrote = (queries: string[], prefix: string) => queries.some((q) => q.startsWith(prefix));
@@ -141,5 +142,18 @@ describe("finalizeDueAccountDeletions", () => {
     fakeDb({ locked: { is_deleted: 0, deletion_requested_at: null }, due: [7] });
 
     expect(await finalizeDueAccountDeletions()).toEqual({ finalized: 0, failed: 0 });
+  });
+
+  it("finalizeDueAccountDeletions_failedAccount_sidelinedFromNextPassQuery", async () => {
+    const { execute } = fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, due: [4242], failLock: true });
+    jest.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await finalizeDueAccountDeletions()).toEqual({ finalized: 0, failed: 1 });
+    await finalizeDueAccountDeletions();
+
+    const dueCalls = execute.mock.calls.filter(([sql]) => String(sql).includes("deletion_requested_at IS NOT NULL"));
+    expect(String(dueCalls[0][0])).not.toContain("NOT IN");
+    expect(String(dueCalls[1][0])).toContain("id NOT IN (?)");
+    expect(dueCalls[1][1]).toEqual([4242]);
   });
 });

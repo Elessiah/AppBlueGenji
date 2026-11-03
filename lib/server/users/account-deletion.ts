@@ -343,6 +343,11 @@ async function loadQuarantinedAvatarFiles(connection: SqlRunner, userId: number)
 
 async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<AccountDeletionPlan | null> {
   const db = await getDatabase();
+  // Les tournois où l'entrée solo est inscrite, relevés **avant** de prendre une
+  // connexion : la relève en emprunte une autre au pool, et en tenir une pendant
+  // ce temps ferait attendre chaque suppression simultanée sur une connexion que
+  // les autres tiennent (pool saturé, plus aucune requête ne passe).
+  const soloTournaments = await listSoloRegistrationTournamentIds(db, userId);
   const connection = await db.getConnection();
   let plan: AccountDeletionPlan;
   // Le fichier de l'avatar, relevé **avant** l'effacement : la ligne partie, son
@@ -365,12 +370,9 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
   let quarantinedFiles: string[] = [];
 
   try {
-    // Les tournois où l'entrée solo est inscrite, relevés **avant** la
-    // transaction : leurs lignes s'y verrouillent en premier (ci-dessous). Une
-    // inscription faite entre ce relevé et le verrou tombe dans un tournoi non
-    // verrouillé, et retient alors la ligne (`withdrawableSoloRegistrations`).
-    const soloTournaments = await listSoloRegistrationTournamentIds(db, userId);
-
+    // Une inscription faite entre le relevé ci-dessus et le verrou tombe dans un
+    // tournoi non verrouillé, et retient alors la ligne
+    // (`withdrawableSoloRegistrations`).
     await connection.beginTransaction();
 
     // Les tournois d'abord, par id croissant, **avant toute lecture** : la

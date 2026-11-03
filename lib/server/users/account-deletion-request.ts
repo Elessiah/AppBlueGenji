@@ -94,6 +94,11 @@ async function loadSuccessorCandidates(
   teamId: number,
   userId: number,
 ): Promise<TeamSuccessorCandidate[]> {
+  // Les lignes d'appartenance seules sont verrouillées : joindre `bg_users` en
+  // `FOR UPDATE` verrouillerait aussi le compte de chaque autre membre, alors
+  // qu'une demande simultanée de l'un d'eux tient son compte puis attend
+  // l'équipe que celle-ci tient déjà (interblocage). Les comptes vivants se
+  // lisent à part, sans verrou.
   const [rows] = await connection.execute<(RowDataPacket & {
     id: number;
     user_id: number;
@@ -102,7 +107,6 @@ async function loadSuccessorCandidates(
   })[]>(
     `SELECT tm.id, tm.user_id, tm.roles_json, tm.joined_at
        FROM bg_team_members tm
-       JOIN bg_users u ON u.id = tm.user_id AND u.is_deleted = 0
       WHERE tm.team_id = ?
         AND tm.user_id <> ?
         AND tm.left_at IS NULL
@@ -110,12 +114,21 @@ async function loadSuccessorCandidates(
       FOR UPDATE`,
     [teamId, userId],
   );
-  return rows.map((row) => ({
-    userId: Number(row.user_id),
-    roles: parseRoles(row.roles_json),
-    joinedAt: row.joined_at,
-    membershipId: Number(row.id),
-  }));
+  if (rows.length === 0) return [];
+  const ids = rows.map((row) => Number(row.user_id));
+  const [alive] = await connection.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_users WHERE is_deleted = 0 AND id IN (${ids.map(() => "?").join(", ")})`,
+    ids,
+  );
+  const living = new Set(alive.map((row) => Number(row.id)));
+  return rows
+    .filter((row) => living.has(Number(row.user_id)))
+    .map((row) => ({
+      userId: Number(row.user_id),
+      roles: parseRoles(row.roles_json),
+      joinedAt: row.joined_at,
+      membershipId: Number(row.id),
+    }));
 }
 
 /** L'équipe est inscrite à un tournoi qui n'est pas terminé. */

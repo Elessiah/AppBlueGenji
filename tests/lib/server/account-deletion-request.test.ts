@@ -58,6 +58,7 @@ type Options = {
   alreadyDeleted?: boolean;
   teams?: number[];
   successors?: Member[];
+  deadMembers?: number[];
   activeTournament?: boolean;
   organized?: number[];
   organizerSuccessor?: number | null;
@@ -65,6 +66,15 @@ type Options = {
 };
 
 const NO_TRACE = { playedMatches: false, soloRegistrations: false, organizedTournaments: false, ownedTeams: false };
+
+function livingMembers(options: Options) {
+  const dead = options.deadMembers ?? [];
+  return (options.successors ?? []).filter((m) => !dead.includes(m.user_id)).map((m) => ({ id: m.user_id }));
+}
+
+function organizerRows(options: Options) {
+  return options.organizerSuccessor ? [{ id: options.organizerSuccessor }] : [];
+}
 
 function fakeDb(options: Options) {
   const queries: { sql: string; params: unknown[] }[] = [];
@@ -76,12 +86,11 @@ function fakeDb(options: Options) {
     if (q.startsWith("SELECT tm.team_id")) return [(options.teams ?? []).map((team_id) => ({ team_id }))];
     if (q.startsWith("SELECT logo_url, deleted_at FROM bg_teams")) return [[{ logo_url: "/api/uploads/teams/3.webp", deleted_at: null }]];
     if (q.startsWith("SELECT tm.id, tm.user_id, tm.roles_json, tm.joined_at")) return [options.successors ?? []];
+    if (q.startsWith("SELECT id FROM bg_users WHERE is_deleted = 0 AND id IN")) return [livingMembers(options)];
+    if (q.startsWith("SELECT u.id FROM bg_users u")) return [organizerRows(options)];
     if (q.startsWith("SELECT 1 FROM bg_tournament_registrations r")) return [options.activeTournament ? [{ 1: 1 }] : []];
     if (q.startsWith("SELECT id FROM bg_tournaments WHERE organizer_user_id")) {
       return [(options.organized ?? []).map((id) => ({ id }))];
-    }
-    if (q.startsWith("SELECT u.id FROM bg_users u")) {
-      return [options.organizerSuccessor ? [{ id: options.organizerSuccessor }] : []];
     }
     return [{ affectedRows: 1 }];
   });
@@ -217,6 +226,28 @@ describe("requestAccountDeletion — équipes (E3)", () => {
     expect(rolesWritten()).toEqual([{ teamId: 3, userId: 9, roles: ["OWNER", "MANAGER"] }]);
     expect(notifyTeamInviteInBackground).toHaveBeenCalledWith("OWNERSHIP", 3, 9, 7);
     expect(leftTeams()).toEqual([{ teamId: 3, userId: 7 }]);
+  });
+
+  it("requestAccountDeletion_ownerWithSuccessors_locksMembershipRowsWithoutJoiningUsers", async () => {
+    const { queries } = fakeDb({ teams: [3], successors: [member(8, ["MANAGER"], "2025-01-01 00:00:00")] });
+
+    await requestAccountDeletion(7);
+
+    const lock = queries.find((q) => q.sql.startsWith("SELECT tm.id, tm.user_id, tm.roles_json"));
+    expect(lock?.sql).toContain("FOR UPDATE");
+    expect(lock?.sql).not.toContain("bg_users");
+  });
+
+  it("requestAccountDeletion_managerAccountDeleted_skippedForNextLivingMember", async () => {
+    fakeDb({
+      teams: [3],
+      deadMembers: [9],
+      successors: [member(8, ["CAPITAINE"], "2025-01-01 00:00:00"), member(9, ["MANAGER"], "2026-06-01 00:00:00")],
+    });
+
+    await requestAccountDeletion(7);
+
+    expect(rolesWritten()).toEqual([{ teamId: 3, userId: 8, roles: ["OWNER", "CAPITAINE"] }]);
   });
 
   it("requestAccountDeletion_ownerWithCaptainOnly_transfersToCaptain", async () => {

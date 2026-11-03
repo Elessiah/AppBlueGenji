@@ -169,6 +169,10 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
   return outcome;
 }
 
+/** Les comptes dont la finalisation a échoué, et quand : écartés de la file un temps. */
+const failedFinalizations = new Map<number, number>();
+const FAILED_FINALIZATION_BACKOFF_MS = 6 * 60 * 60 * 1000;
+
 /**
  * Les suppressions demandées il y a trente jours ou plus, rendues définitives
  * (E4) — effacement ou anonymisation, par le chemin ordinaire
@@ -178,13 +182,24 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
  */
 export async function finalizeDueAccountDeletions(): Promise<{ finalized: number; failed: number }> {
   const db = await getDatabase();
+  // Un compte qui échoue ne quitte pas la file : sans mise à l'écart, cent
+  // échecs durables occuperaient chaque heure les cent premières places et
+  // les comptes suivants ne seraient jamais finalisés. Écarté pour
+  // `FAILED_FINALIZATION_BACKOFF_MS`, il repasse ensuite (par processus).
+  const now = Date.now();
+  for (const [id, failedAt] of failedFinalizations) {
+    if (now - failedAt >= FAILED_FINALIZATION_BACKOFF_MS) failedFinalizations.delete(id);
+  }
+  const skipped = [...failedFinalizations.keys()];
   const [due] = await db.execute<(RowDataPacket & { id: number })[]>(
     `SELECT id FROM bg_users
       WHERE is_deleted = 1
         AND deletion_requested_at IS NOT NULL
         AND deletion_requested_at <= NOW() - INTERVAL ${Number(ACCOUNT_REACTIVATION_DAYS)} DAY
+        ${skipped.length > 0 ? `AND id NOT IN (${skipped.map(() => "?").join(", ")})` : ""}
       ORDER BY id
       LIMIT 100`,
+    skipped,
   );
   const outcome = { finalized: 0, failed: 0 };
   for (const row of due) {
@@ -192,6 +207,7 @@ export async function finalizeDueAccountDeletions(): Promise<{ finalized: number
       if ((await finalizeAccountDeletion(Number(row.id))) !== null) outcome.finalized += 1;
     } catch (error) {
       outcome.failed += 1;
+      failedFinalizations.set(Number(row.id), Date.now());
       console.error(
         `[deleted-accounts] Suppression définitive du compte #${Number(row.id)} reportée :`,
         error instanceof Error ? error.message : error,

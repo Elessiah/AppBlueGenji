@@ -144,11 +144,9 @@ function fakeDb(
     release: jest.fn(() => {}),
   };
 
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({
-    execute,
-    getConnection: jest.fn(async () => connection),
-  }));
-  return { queries, connection };
+  const getConnection = jest.fn(async () => connection);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, getConnection }));
+  return { queries, connection, execute, getConnection };
 }
 
 const has = (queries: Query[], needle: string) => queries.some((q) => q.sql.includes(needle));
@@ -157,6 +155,17 @@ const EMPTY = { played: 0, solo_registered: 0, organized: 0, owned: 0 };
 
 beforeEach(() => {
   jest.clearAllMocks();
+});
+
+describe("deleteOwnAccount — connexion du pool", () => {
+  it("deleteOwnAccount_soloTournamentsListing_runsBeforeTakingAPoolConnection", async () => {
+    const { execute, getConnection } = fakeDb(EMPTY);
+
+    await deleteOwnAccount(7);
+
+    const listing = execute.mock.calls.findIndex(([sql]) => String(sql).includes("SELECT DISTINCT r.tournament_id"));
+    expect(execute.mock.invocationCallOrder[listing]).toBeLessThan(getConnection.mock.invocationCallOrder[0]);
+  });
 });
 
 describe("deleteOwnAccount — effacement complet", () => {
