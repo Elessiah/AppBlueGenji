@@ -61,9 +61,12 @@ geste sur le même tournoi fait d'abord partir la rafale en attente (le journal
 garde l'ordre), et l'arrêt propre du serveur l'annonce avant les lots du journal
 (`flushAllCoalescers`, `bot-log-shutdown.ts`), comme les lignes de tournoi et
 de match déjà parties qui lisent encore la base (`trackAnnouncement`). Les
-lignes d'un même tournoi s'enchaînent (`chainTournament`) : la suivante attend
-la précédente, sans retenir les autres tournois. Un renommage cite l'ancien nom
-et nomme le tournoi sous celui qu'il a écrit, tous deux lus sous le verrou
+lignes d'un même tournoi, et celles d'un même match, s'enchaînent
+(`createKeyedChain`) : la suivante attend la précédente, sans retenir les autres
+— une rafale en attente ne se vide qu'à son tour dans cette file. Un geste fait
+coupe-circuit ouvert garde sa ligne : elle rejoint le lot, qui ne part que
+minutes plus tard (`LOG_BATCHING.md`). Une modification nomme le
+tournoi sous le nom qu'elle a écrit, un renommage cite aussi l'ancien, tous deux lus sous le verrou
 (`updateTournament` rend `{ previousName, name }`) — un second renommage
 rapproché ne fausse pas la première ligne. Le regroupeur vit en mémoire : un
 seul processus sert le site.
