@@ -32,8 +32,15 @@ export async function GET(_: Request, context: { params: Promise<{ id: string; m
   // Visibilité du tournoi relue sur sa seule ligne, dans la même connexion que
   // le match : ni l'instantané (rebâti à chaque relecture sur un cache vidé par
   // les scores), ni l'agrégat des inscrites de la carte.
-  const read = await getViewerMatchProposals(tournamentId, user.id, can(user, "tournaments"), matchId);
-  if (!read.visible) return fail("TOURNAMENT_NOT_FOUND", 404);
+  // Une panne de la lecture (pool épuisé, verrou venu trop tard…) passe par
+  // `fail()` : un code seul — `CONCURRENT_UPDATE_RETRY` en 409 pour une
+  // contention, `INTERNAL_ERROR` sinon —, jamais le 500 nu de Next.
+  try {
+    const read = await getViewerMatchProposals(tournamentId, user.id, can(user, "tournaments"), matchId);
+    if (!read.visible) return fail("TOURNAMENT_NOT_FOUND", 404);
 
-  return ok({ proposals: read.proposals });
+    return ok({ proposals: read.proposals });
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "INTERNAL_ERROR", 500);
+  }
 }
