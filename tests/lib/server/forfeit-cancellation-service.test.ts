@@ -395,8 +395,10 @@ describe("cancelTournamentForfeit", () => {
       return [{ affectedRows: 0 }];
     });
 
-    await cancelTournamentForfeit(7, 102);
+    // Revue #542 : le geste s'arrête plutôt que de rejouer sous le délai court.
+    await expect(cancelTournamentForfeit(7, 102)).rejects.toThrow("Connection lost");
 
+    expect(connection.rollback).toHaveBeenCalled();
     expect(connection.destroy).toHaveBeenCalledTimes(1);
     expect(connection.release).not.toHaveBeenCalled();
   });

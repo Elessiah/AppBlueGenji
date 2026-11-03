@@ -42,11 +42,22 @@ describe("withShortLockWait", () => {
     expect(conn.query.mock.calls.at(-1)?.[0]).toBe("SET SESSION innodb_lock_wait_timeout = DEFAULT");
   });
 
-  it("withShortLockWait_restoreFails_keepsReadResult", async () => {
+  // Revue #542 : remise ratée après une lecture réussie — le geste s'arrête
+  // plutôt que de poursuivre son rejeu sous le délai court.
+  it("withShortLockWait_restoreFailsAfterRead_rejectsWithRestoreError", async () => {
     const { conn, asPool } = connection();
+    const lost = new Error("Connection lost");
+    conn.query.mockResolvedValueOnce([[], []]).mockRejectedValueOnce(lost);
+
+    await expect(withShortLockWait(asPool, async () => false)).rejects.toBe(lost);
+  });
+
+  it("withShortLockWait_readAndRestoreFail_rethrowsReadError", async () => {
+    const { conn, asPool } = connection();
+    const timeout = Object.assign(new Error("Lock wait timeout exceeded"), { code: "ER_LOCK_WAIT_TIMEOUT" });
     conn.query.mockResolvedValueOnce([[], []]).mockRejectedValueOnce(new Error("Connection lost"));
 
-    await expect(withShortLockWait(asPool, async () => false)).resolves.toBe(false);
+    await expect(withShortLockWait(asPool, async () => Promise.reject(timeout))).rejects.toBe(timeout);
   });
 });
 
@@ -75,7 +86,7 @@ describe("releaseWithServerLockWait", () => {
   it("releaseWithServerLockWait_innerRestoreFailed_restoresThenReleases", async () => {
     const { conn, asPool } = connection();
     conn.query.mockResolvedValueOnce([[], []]).mockRejectedValueOnce(new Error("Connection lost"));
-    await withShortLockWait(asPool, async () => true);
+    await expect(withShortLockWait(asPool, async () => true)).rejects.toThrow("Connection lost");
     conn.query.mockClear();
 
     await releaseWithServerLockWait(asPool);
@@ -88,7 +99,7 @@ describe("releaseWithServerLockWait", () => {
   it("releaseWithServerLockWait_restoreFails_destroysInsteadOfReleasing", async () => {
     const { conn, asPool } = connection();
     conn.query.mockResolvedValueOnce([[], []]).mockRejectedValueOnce(new Error("Connection lost"));
-    await withShortLockWait(asPool, async () => true);
+    await expect(withShortLockWait(asPool, async () => true)).rejects.toThrow("Connection lost");
     conn.query.mockRejectedValueOnce(new Error("Connection lost"));
 
     await releaseWithServerLockWait(asPool);
