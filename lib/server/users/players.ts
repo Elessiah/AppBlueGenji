@@ -128,6 +128,8 @@ export async function listPlayers(viewerId: number): Promise<DirectoryPlayer[]> 
       is_deleted,
       created_at
      FROM bg_users
+     -- Suppression demandée : le compte est masqué tout le délai de réactivation.
+     WHERE deletion_requested_at IS NULL
      ORDER BY is_deleted ASC, pseudo ASC`,
   );
 
