@@ -100,6 +100,16 @@ dès qu'une manche **postérieure** à la sanction porte la moindre saisie
 `lib/shared/match-lock.ts`, transposée : en survie, sans lien de bracket, toute
 manche ultérieure dépend des précédentes.
 
+Les manches postérieures se lisent **verrouillées** (`laterRoundHasScoreInput`,
+ERREUR.txt EF-15) : une lecture d'image manquait le report qu'une équipe écrit
+au même moment. Aucune lecture d'image ne les précède — tournoi et sanction
+sont lus `FOR UPDATE` —, sans quoi MariaDB (`innodb_snapshot_isolation`)
+refuserait la lecture d'une manche qu'un « Prêt » vient de toucher
+(`ER_CHECKREAD`). Le retrait tenant le tournoi, son attente de verrou est
+bornée à 5 s (`lib/server/tournaments/lock-wait.ts`) ; contention persistante
+→ `409 CONCURRENT_UPDATE_RETRY`, l'interblocage avec un report étant rejoué
+(`retryOnDeadlock`).
+
 Sans ce verrou : une pénalité de la manche 2 élimine une équipe, les manches 3 à
 6 se jouent sans elle, et lever la sanction à la manche 7 la remet `ACTIVE`
 **avec son capital intact** — elle n'a disputé aucun match depuis. Elle passe

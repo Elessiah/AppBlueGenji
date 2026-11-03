@@ -54,7 +54,9 @@ message de succès dit seulement que le classement est recalculé.
 La transaction lit la ligne du tournoi `FOR UPDATE` en toute première
 instruction (le verrou de `lockTournamentRow`, avec les colonnes utiles). Elle
 verrouille donc le tournoi avant les manches que le rejeu peut poser, quand un
-report ou « Enregistrer » prend la manche avant le tournoi : comme l'abandon,
+report ou une correction d'arbitrage prend la manche avant le tournoi
+(« Enregistrer », qui ne réconcilie rien, ne demande jamais le tournoi : face à
+l'annulation, c'est une simple attente de verrou, bornée) : comme l'abandon,
 elle passe par `retryOnDeadlock`, qui rejoue la transaction entière après un
 interblocage (publication une seule fois, après le commit réussi).
 
@@ -69,9 +71,9 @@ naît qu'après (nom de l'équipe, rejeu du classement).
 
 Les manches postérieures se lisent par `laterRoundsHaveScoreInput`
 (`lib/server/tournaments/bg-survie/round-progress.ts`, la règle commune au
-retrait d'une pénalité — verrouillé lui aussi, sa sanction lue `FOR UPDATE`
-d'abord pour la même raison — et à la correction d'arbitrage, qui la lit en
-instantané : sa lecture ordinaire du match a déjà figé l'image), **verrouillées** par
+retrait d'une pénalité et à la correction d'arbitrage, qui la lisent
+verrouillée eux aussi, sans lecture d'image avant — sanction lue `FOR UPDATE`,
+match puis tournoi relus `FOR UPDATE`, table par table), **verrouillées** par
 l'index `idx_bg_matches_phase_round` : les seules manches postérieures, pas
 toute la phase ni ses intervalles. Un report en cours écrit son score sous le
 verrou du match avant d'attendre le tournoi, et une lecture d'instantané
@@ -89,7 +91,9 @@ victime :
 Un détenteur qui ne demande jamais le tournoi (programmation, rappels,
 « Prêt ») ne forme pas d'interblocage : l'annulation l'attend au plus
 `CANCEL_LOCK_WAIT_SECONDS` (5 s, `SET SESSION innodb_lock_wait_timeout`, remis
-au défaut du serveur avant de rendre la connexion au pool) au lieu des 50 s du
+au défaut du serveur avant de rendre la connexion au pool —
+`lib/server/tournaments/lock-wait.ts`, partagé avec le retrait d'une pénalité,
+qui tient lui aussi le tournoi en verrouillant les manches) au lieu des 50 s du
 serveur, en tenant le verrou du tournoi. Une contention qui dure —
 interblocage sur les trois tentatives, `ER_CHECKREAD`, délai de verrou
 (`ER_LOCK_WAIT_TIMEOUT`) — rend `409 CONCURRENT_UPDATE_RETRY` (code fixe, le
