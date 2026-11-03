@@ -53,6 +53,12 @@ interface SpecialUserDef {
   platformRoles?: string[];
   isAdult?: 0 | 1 | null;
   isDeleted?: boolean;
+  /**
+   * Suppression demandée il y a ce nombre de jours (`deletion_requested_at`) :
+   * compte en attente, réactivable tant que le délai reste sous trente jours
+   * (`ACCOUNT_DELETION.md` § Suppression différée). Exige `isDeleted`.
+   */
+  deletionRequestedDaysAgo?: number;
   visibility?: Partial<{
     avatar: 0 | 1;
     overwatch: 0 | 1;
@@ -224,6 +230,13 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     withGameTags: false,
     openToRecruitment: 0,
   },
+  {
+    pseudo: "SuppressionDemandee",
+    purpose: "suppression demandée il y a 3 jours, réactivable (écran /connexion/reactivation)",
+    isAdult: 1,
+    isDeleted: true,
+    deletionRequestedDaysAgo: 3,
+  },
 ];
 
 export async function createUsers(db: Pool): Promise<number[]> {
@@ -330,6 +343,12 @@ export async function createSpecialUsers(db: Pool): Promise<Map<string, number>>
         specialUserInsertParams(def, pseudo),
       );
       const id = result.insertId as number;
+      if (def.deletionRequestedDaysAgo !== undefined) {
+        await db.execute(
+          `UPDATE bg_users SET deletion_requested_at = NOW() - INTERVAL ? DAY WHERE id = ?`,
+          [def.deletionRequestedDaysAgo, id],
+        );
+      }
       ids.set(def.pseudo, id);
       console.log(`  ✓ #${id} ${pseudo} — ${def.purpose}`);
     } catch (error) {
