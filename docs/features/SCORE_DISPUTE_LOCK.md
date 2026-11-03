@@ -177,8 +177,9 @@ restent inversés : sur le même match, l'interblocage est rompu par le moteur
 juger sa manche vierge (préexistant, ERREUR.txt). En élimination (simple,
 double), aucune réconciliation ne touche un match non clos : la saisie ne prend
 que le verrou du match, et les saisies map par map des matchs d'une même manche
-ne se sérialisent pas sur le tournoi. Le tournoi du match, avec son format,
-se lit juste avant, hors transaction (la route ne connaît que le match), et les
+ne se sérialisent pas sur le tournoi — comme la phase d'élimination d'un
+tournoi multi-phases, jugée sur la phase du match. Le tournoi du match, avec
+le format du match (sa phase, sinon le tournoi), se lit juste avant, hors transaction (la route ne connaît que le match), et les
 refus qui ne lisent rien d'autre (`MATCH_NOT_FOUND`, `MATCH_NOT_READY`,
 `MATCH_ALREADY_COMPLETED`, forfait d'une équipe étrangère
 `INVALID_FORFEIT_TEAM_ID`, saisie mal formée `INVALID_REQUEST`) partent là, sans
