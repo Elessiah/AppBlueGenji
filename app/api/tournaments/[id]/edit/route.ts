@@ -69,9 +69,10 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   if (Object.keys(patch).length === 0) return fail("EMPTY_PATCH", 400);
 
   try {
-    const { previousName } = await updateTournament(checked.id, patch);
-    // Un renommage cite l'ancien nom : la ligne nomme le tournoi sous le nouveau.
-    announceStaffTournamentAction(checked.id, "EDITED", patch.name === undefined ? {} : { previousName });
+    const { previousName, name } = await updateTournament(checked.id, patch);
+    // Un renommage cite l'ancien nom : la ligne nomme le tournoi sous le nouveau,
+    // celui que ce geste a écrit (pas celui d'un renommage qui le suivrait).
+    announceStaffTournamentAction(checked.id, "EDITED", patch.name === undefined ? {} : { previousName, name });
     return ok({ success: true });
   } catch (error) {
     const message = (error as Error).message;

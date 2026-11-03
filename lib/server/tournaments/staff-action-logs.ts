@@ -59,12 +59,14 @@ type TournamentNameRow = RowDataPacket & { id: number; name: string };
 /**
  * Précisions d'une ligne de tournoi (`formatStaffTournamentActionLog`) :
  * `count` (équipes fantômes), `target` (étape franchie), `previousName` (nom
- * d'avant un renommage).
+ * d'avant un renommage) et `name` (nom que ce renommage a écrit, à la place
+ * du nom relu à l'envoi).
  */
 export type StaffTournamentActionDetails = {
   count?: number;
   target?: AdvanceTarget;
   previousName?: string;
+  name?: string;
 };
 
 /** La ligne d'un geste sur un tournoi ; rien si le tournoi n'existe plus. Peut lever. */
@@ -80,8 +82,13 @@ export async function deliverStaffTournamentAction(
   ]);
   const tournament = rows[0];
   if (!tournament) return;
+  const { name, ...wording } = details;
   await sendBotLog(
-    formatStaffTournamentActionLog({ tournament: { id: Number(tournament.id), name: tournament.name }, action, ...details }),
+    formatStaffTournamentActionLog({
+      tournament: { id: Number(tournament.id), name: name ?? tournament.name },
+      action,
+      ...wording,
+    }),
     { tournamentId: Number(tournament.id), category: "admin" },
   );
 }
@@ -93,8 +100,11 @@ export function announceStaffMatchAction(
   author: StaffActionAuthor = "STAFF",
   options: StaffMatchActionOptions = {},
 ): void {
-  void deliverStaffMatchAction(matchId, action, author, options).catch((error) =>
-    console.error(`[staff-log] geste ${action} sur le match #${matchId} non journalisé : ${failureReason(error)}`),
+  // Suivie : l'arrêt du serveur attend la ligne avant de couper.
+  void trackAnnouncement(
+    deliverStaffMatchAction(matchId, action, author, options).catch((error) =>
+      console.error(`[staff-log] geste ${action} sur le match #${matchId} non journalisé : ${failureReason(error)}`),
+    ),
   );
 }
 
@@ -133,6 +143,7 @@ export function flushStaffActionBursts(): Promise<void> {
 /** Abandonne les rafales en attente. Réservé aux tests. */
 export function resetStaffActionBursts(): void {
   tournamentBursts.reset();
+  tournamentTails.clear();
 }
 
 /**
@@ -156,11 +167,27 @@ export function announceStaffTournamentAction(
   // Rien en attente (le cas courant) : la ligne part sur-le-champ, sans détour
   // par la file des microtâches — un arrêt du serveur juste après ne la rate pas.
   if (!keys.some((key) => tournamentBursts.busy(key))) {
-    // Suivie : l'arrêt du serveur attend sa lecture du nom du tournoi.
-    void trackAnnouncement(deliverTournamentAction(entry));
+    chainTournament(tournamentId, () => deliverTournamentAction(entry));
     return;
   }
-  void trackAnnouncement(
-    Promise.all(keys.map((key) => tournamentBursts.flush(key))).then(() => deliverTournamentAction(entry)),
-  );
+  const flushed = Promise.all(keys.map((key) => tournamentBursts.flush(key)));
+  chainTournament(tournamentId, () => flushed.then(() => deliverTournamentAction(entry)));
+}
+
+/** Dernière ligne de tournoi en route, par tournoi : la suivante part après elle. */
+const tournamentTails = new Map<number, Promise<void>>();
+
+/**
+ * Enchaîne une ligne de tournoi derrière la précédente du même tournoi : un
+ * geste qui suit une rafale en cours de vidage ne la double pas sur Discord.
+ * Sans ligne en route, elle part sur-le-champ. Suivie : l'arrêt du serveur
+ * attend sa lecture du nom du tournoi.
+ */
+function chainTournament(tournamentId: number, run: () => Promise<void>): void {
+  const previous = tournamentTails.get(tournamentId);
+  const settled = (previous ? previous.then(run, run) : run()).catch(() => undefined);
+  tournamentTails.set(tournamentId, settled);
+  void trackAnnouncement(settled).then(() => {
+    if (tournamentTails.get(tournamentId) === settled) tournamentTails.delete(tournamentId);
+  });
 }
