@@ -1,4 +1,4 @@
-import type { RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { invalidateLandingCounters } from "@/lib/server/landing-cache";
@@ -14,6 +14,60 @@ async function teamIsDeleted(teamId: number): Promise<boolean> {
     [teamId],
   );
   return rows.length > 0 && rows[0].deleted_at !== null;
+}
+
+/**
+ * Les écritures de la dissolution, sur la connexion d'une transaction qui tient
+ * déjà la ligne de l'équipe : nom et sigle libérés (« Équipe dissoute #id »),
+ * description et logo vidés, membres détachés, invitations annulées. La ligne
+ * et l'historique restent. Partagée avec la suppression d'un compte, dont le
+ * propriétaire seul d'une équipe sans tournoi actif la dissout (E3).
+ */
+export async function dissolveTeamOn(
+  connection: Pick<PoolConnection, "execute">,
+  teamId: number,
+): Promise<{ detachedUserIds: number[]; everRegistered: boolean }> {
+  // Anonymise les données saisies par l'utilisateur et libère les deux
+  // identités uniques : le nom **et le sigle**. Le sigle vaut sur tout le
+  // site ; laissé sur une équipe dissoute, il resterait pris à jamais par une
+  // équipe qui n'existe plus — la ligne, elle, survit pour ses statistiques.
+  await connection.execute(
+    `UPDATE bg_teams
+     SET deleted_at = NOW(),
+         name = CONCAT('Équipe dissoute #', id),
+         tag = NULL,
+         description = NULL,
+         logo_url = NULL
+     WHERE id = ?`,
+    [teamId],
+  );
+
+  // Détache tous les membres encore actifs.
+  const [members] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
+    `SELECT user_id FROM bg_team_members WHERE team_id = ? AND left_at IS NULL`,
+    [teamId],
+  );
+  const detachedUserIds = members.map((member) => Number(member.user_id));
+  await connection.execute(
+    `UPDATE bg_team_members SET left_at = NOW() WHERE team_id = ? AND left_at IS NULL`,
+    [teamId],
+  );
+
+  // Annule les invitations/demandes en attente.
+  await connection.execute(
+    `UPDATE bg_team_invitations
+     SET status = 'CANCELLED', responded_at = NOW()
+     WHERE team_id = ? AND status = 'PENDING'`,
+    [teamId],
+  );
+
+  // Sans inscription, l'équipe n'a ni match, ni rang, ni ligne de bandeau ou
+  // de mini-arbre : rien d'autre que le compteur de l'accueil ne la montre.
+  const [registrations] = await connection.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_tournament_registrations WHERE team_id = ? LIMIT 1`,
+    [teamId],
+  );
+  return { detachedUserIds, everRegistered: registrations.length > 0 };
 }
 
 /**
@@ -68,47 +122,9 @@ export async function softDeleteTeam(
     }
     previousLogoUrl = locked[0].logo_url ?? null;
 
-    // Anonymise les données saisies par l'utilisateur et libère les deux
-    // identités uniques : le nom **et le sigle**. Le sigle vaut sur tout le
-    // site ; laissé sur une équipe dissoute, il resterait pris à jamais par une
-    // équipe qui n'existe plus — la ligne, elle, survit pour ses statistiques.
-    await connection.execute(
-      `UPDATE bg_teams
-       SET deleted_at = NOW(),
-           name = CONCAT('Équipe dissoute #', id),
-           tag = NULL,
-           description = NULL,
-           logo_url = NULL
-       WHERE id = ?`,
-      [teamId],
-    );
-
-    // Détache tous les membres encore actifs.
-    const [members] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
-      `SELECT user_id FROM bg_team_members WHERE team_id = ? AND left_at IS NULL`,
-      [teamId],
-    );
-    detachedUserIds = members.map((member) => Number(member.user_id));
-    await connection.execute(
-      `UPDATE bg_team_members SET left_at = NOW() WHERE team_id = ? AND left_at IS NULL`,
-      [teamId],
-    );
-
-    // Annule les invitations/demandes en attente.
-    await connection.execute(
-      `UPDATE bg_team_invitations
-       SET status = 'CANCELLED', responded_at = NOW()
-       WHERE team_id = ? AND status = 'PENDING'`,
-      [teamId],
-    );
-
-    // Sans inscription, l'équipe n'a ni match, ni rang, ni ligne de bandeau ou
-    // de mini-arbre : rien d'autre que le compteur de l'accueil ne la montre.
-    const [registrations] = await connection.execute<RowDataPacket[]>(
-      `SELECT 1 FROM bg_tournament_registrations WHERE team_id = ? LIMIT 1`,
-      [teamId],
-    );
-    everRegistered = registrations.length > 0;
+    const dissolved = await dissolveTeamOn(connection, teamId);
+    detachedUserIds = dissolved.detachedUserIds;
+    everRegistered = dissolved.everRegistered;
     streamTournamentIds = await teamStreamTournamentIds(connection, teamId);
 
     await connection.commit();

@@ -103,7 +103,7 @@ export function deletionConsequencesText(text: ProfileText, subject: Confirmatio
   const kind = deletionCase(subject);
   const consequence = t(`deletion.consequences.${kind}`);
   const termsNote = fromTerms && kind === "OWNED_TEAMS" ? [t("deletion.ownedTeamsFromTerms")] : [];
-  return [consequence, ...termsNote, residual, t("deletion.irreversible")].join(" ");
+  return [consequence, ...termsNote, residual, t("deletion.handover"), t("deletion.irreversible")].join(" ");
 }
 
 /** `accountDeletionOutcome` dans la langue du texte. */

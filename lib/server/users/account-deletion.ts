@@ -4,10 +4,14 @@ import {
   type AccountDeletionPlan,
   accountDeletionPlan,
   type AccountTrace,
+  isReactivationWindowOpen,
   type SoloRegistrationFact,
   withdrawableSoloRegistrations,
 } from "@/lib/shared/account-deletion";
 import { isReferencedRowError } from "@/lib/server/mysql-errors";
+import { avatarFileLocations } from "@/lib/server/logo-quarantine";
+import { blockImageFiles } from "@/lib/server/blocked-images";
+import { unlink } from "node:fs/promises";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { deleteStoredImage } from "@/lib/server/image-upload";
@@ -276,6 +280,33 @@ export async function getAccountDeletionPlan(userId: number): Promise<AccountDel
  * a aucune et dont la ligne n'est retenue que par une équipe à transférer.
  */
 export async function deleteOwnAccount(userId: number): Promise<AccountDeletionPlan> {
+  const plan = await deleteAccountNow(userId, false);
+  if (plan === null) throw new Error("USER_NOT_FOUND");
+  return plan;
+}
+
+/**
+ * La suppression **définitive** d'un compte en attente (E4) : rien si la
+ * demande a été annulée (réactivation) ou si ses trente jours ne sont pas
+ * écoulés — relu sous le verrou du compte. Idempotent : un compte déjà effacé
+ * ou anonymisé n'est plus en attente. Rend `null` quand rien n'est fait.
+ */
+export async function finalizeAccountDeletion(userId: number): Promise<AccountDeletionPlan | null> {
+  return deleteAccountNow(userId, true);
+}
+
+/** Les fichiers d'avatar en quarantaine du compte (signalés, masqués) : ce que l'effacement emporte. */
+async function loadQuarantinedAvatarFiles(connection: SqlRunner, userId: number): Promise<string[]> {
+  const [rows] = await connection.execute<(RowDataPacket & { logo_url: string })[]>(
+    `SELECT logo_url FROM bg_logo_quarantines WHERE user_id = ? AND status = 'HIDDEN' ORDER BY id`,
+    [userId],
+  );
+  return rows
+    .map((row) => avatarFileLocations(row.logo_url, userId)?.quarantined ?? null)
+    .filter((file): file is string => file !== null);
+}
+
+async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<AccountDeletionPlan | null> {
   const db = await getDatabase();
   const connection = await db.getConnection();
   let plan: AccountDeletionPlan;
@@ -294,6 +325,9 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
   // Les tournois dont une inscription solo part avec le compte (D12) :
   // instantanés et aperçus à relire après le commit.
   let withdrawnFrom: number[] = [];
+  // Les avatars en quarantaine qu'emporte l'effacement : leur empreinte est
+  // bloquée dans la transaction (E6), le fichier part après le commit.
+  let quarantinedFiles: string[] = [];
 
   try {
     // Les tournois où l'entrée solo est inscrite, relevés **avant** la
@@ -333,11 +367,31 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
       avatar_url: string | null;
       discord_id: string | null;
       created_at: string;
+      is_deleted: 0 | 1;
+      deletion_requested_at: Date | string | null;
     })[]>(
-      `SELECT avatar_url, discord_id, created_at FROM bg_users WHERE id = ? FOR UPDATE`,
+      `SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at FROM bg_users WHERE id = ? FOR UPDATE`,
       [userId],
     );
-    if (locked.length === 0) throw new Error("USER_NOT_FOUND");
+    if (locked.length === 0) {
+      if (onlyIfDue) {
+        await connection.rollback();
+        return null;
+      }
+      throw new Error("USER_NOT_FOUND");
+    }
+    // La fenêtre de réactivation, relue sous le verrou : une reconnexion qui
+    // vient de réactiver le compte, ou une demande encore dans ses trente
+    // jours, ne tombe pas.
+    if (
+      onlyIfDue &&
+      (Number(locked[0].is_deleted) !== 1 ||
+        locked[0].deletion_requested_at === null ||
+        isReactivationWindowOpen(locked[0].deletion_requested_at))
+    ) {
+      await connection.rollback();
+      return null;
+    }
     orphanedAvatar = toDiskUploadPath(locked[0].avatar_url);
     accountCreatedAt = String(locked[0].created_at);
 
@@ -348,9 +402,20 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
     // vers un compte, seulement une empreinte salée qu'on ne sait pas renverser
     // (`lib/server/site-visits-service.ts`).
 
+    if (plan.mode === "ERASE") {
+      quarantinedFiles = await loadQuarantinedAvatarFiles(connection, userId);
+      await blockImageFiles(connection, quarantinedFiles);
+    }
     const withdrawal = plan.mode === "ERASE"
       ? await eraseAccount(connection, userId, facts.soloWithdrawals)
       : await anonymizeAccount(connection, userId);
+    // Anonymisé, le compte n'est plus en attente : la suppression est faite.
+    if (plan.mode === "ANONYMIZE") {
+      await connection.execute(
+        `UPDATE bg_users SET deletion_requested_at = NULL WHERE id = ? AND is_deleted = 1`,
+        [userId],
+      );
+    }
     if (plan.mode === "ERASE") withdrawnFrom = facts.soloWithdrawals.map((registration) => registration.tournamentId);
     touchedTournaments = withdrawal.tournamentIds;
 
@@ -432,6 +497,7 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
   } catch {
     // Fichier verrouillé ou disque en lecture seule : un résidu, pas un échec.
   }
+  for (const file of quarantinedFiles) await unlink(file).catch(() => {});
 
   // Consignée **après** le commit, pour qu'une restauration de sauvegarde la
   // rejoue (`npm run replay:deletions`). Ne lève jamais : la suppression a eu

@@ -85,7 +85,41 @@ export async function getDatabase(): Promise<Pool> {
 
   await ensureMigrations(pool);
   scheduleDeletedAccountsReconciliation();
+  scheduleDueAccountDeletions();
   return pool;
+}
+
+/** Une passe par heure au plus, par processus (`scheduleDueAccountDeletions`). */
+const DUE_DELETIONS_INTERVAL_MS = 60 * 60 * 1000;
+
+const dueDeletionsState = globalThis as typeof globalThis & { __bgDueDeletionsAt?: number };
+
+/**
+ * Rend définitives les suppressions de compte dont les trente jours de
+ * réactivation sont écoulés (`finalizeDueAccountDeletions`, E4) — portée par le
+ * trafic, au plus une fois par heure et par processus, en tâche de fond, comme
+ * la purge des signalements. Même réserve que le rattrapage : serveur du site
+ * seulement (`NEXT_RUNTIME`), jamais un script.
+ */
+function scheduleDueAccountDeletions(now: number = Date.now()): void {
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  if (dueDeletionsState.__bgDueDeletionsAt !== undefined && now - dueDeletionsState.__bgDueDeletionsAt < DUE_DELETIONS_INTERVAL_MS) {
+    return;
+  }
+  dueDeletionsState.__bgDueDeletionsAt = now;
+  void import("@/lib/server/users/deleted-accounts")
+    .then(({ finalizeDueAccountDeletions }) => finalizeDueAccountDeletions())
+    .then(({ finalized, failed }) => {
+      if (finalized + failed > 0) {
+        console.info(`[deleted-accounts] Suppressions définitives : ${finalized} faite(s), ${failed} reportée(s).`);
+      }
+    })
+    .catch((error: unknown) => {
+      console.error(
+        "[deleted-accounts] Suppressions définitives impossibles :",
+        error instanceof Error ? error.message : error,
+      );
+    });
 }
 
 /**

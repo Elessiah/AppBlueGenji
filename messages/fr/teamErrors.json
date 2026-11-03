@@ -72,7 +72,8 @@
     "IMAGE_FORMAT_INVALID": "Format non reconnu : PNG, JPEG ou WebP seulement.",
     "IMAGE_DIMENSIONS_INVALID": "Dimensions d'image non prises en charge.",
     "IMAGE_ANIMATED_NOT_SUPPORTED": "Les images animées ne sont pas acceptées.",
-    "IMAGE_CROP_INVALID": "Recadrage illisible. Choisis de nouveau l'image et recadre-la."
+    "IMAGE_CROP_INVALID": "Recadrage illisible. Choisis de nouveau l'image et recadre-la.",
+    "IMAGE_BLOCKED": "Cette image a été retirée par la modération : elle ne peut pas être reposée."
   },
   "fallback": "L'opération a échoué.",
   "selfAlreadyInTeam": "Tu appartiens déjà à une équipe : quitte-la d'abord."

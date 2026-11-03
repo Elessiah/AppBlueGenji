@@ -135,5 +135,17 @@
       "launch": "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné ; la page du match reprend le BattleTag de ses contacts d'équipe (aux seules parties du match), de ses casters et de son arbitre désigné, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts ».",
       "footer": "Pour ne plus le partager du tout, efface-le de ton profil (s'il vient de Battle.net, détache d'abord Battle.net, après avoir ajouté un autre moyen de connexion si c'est le seul)."
     }
+  },
+  "reactivation": {
+    "title": "Réactiver ton compte ?",
+    "lead": "Tu as demandé la suppression de ton compte. Elle deviendra définitive le {date} : d'ici là, tu peux encore le réactiver.",
+    "kept": "Réactiver te rend ton compte tel qu'il était : profil, statistiques, réglages.",
+    "notUndone": "Ce qui a été fait à la demande n'est pas annulé : tu as quitté tes équipes (propriété transmise, équipe fantôme ou dissoute), tes tournois organisés ont changé d'organisateur et tes inscriptions ont été retirées ou perdues par forfait.",
+    "confirm": "Réactiver mon compte",
+    "cancel": "Ne pas réactiver",
+    "done": "Ton compte est réactivé.",
+    "expired": "Ce lien de réactivation a expiré ou a déjà servi. Reconnecte-toi pour en obtenir un nouveau.",
+    "backToLogin": "Revenir à la connexion",
+    "failed": "La réactivation a échoué. Reconnecte-toi pour réessayer."
   }
 }

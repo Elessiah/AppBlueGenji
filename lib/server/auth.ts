@@ -14,6 +14,13 @@ import { closeSessionStreams, closeUserStreams } from "@/lib/server/session-stre
 import { activeSuspensionSql, assertNotSuspended, purgeEndedSuspensions } from "@/lib/server/account-suspensions";
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
 import { certifyPromptDoor } from "@/lib/shared/discord-certify-prompt";
+import {
+  AccountPendingDeletionError,
+  createReactivationTicket,
+  REACTIVATION_COOKIE,
+  REACTIVATION_TICKET_MINUTES,
+  readPendingDeletion,
+} from "@/lib/server/users/account-reactivation";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { RECRUITMENT_MODAL_OFF_COOKIE, recruitmentModalOffInBrowser } from "@/lib/shared/recruitment";
 import {
@@ -124,6 +131,22 @@ export async function createSession(userId: number, event: ConnectionLogEvent): 
   // écriture ; la course avec un prononcé concurrent est tranchée par
   // `getCurrentUser`, qui écarte la session d'un compte suspendu.
   await assertNotSuspended(userId);
+  // Un compte dont la suppression est demandée n'ouvre pas de session : dans
+  // ses trente jours, la porte renvoie vers l'écran de réactivation, qui
+  // demande un geste explicite (E4, `account-reactivation.ts`) ; au-delà, la
+  // suppression définitive est due et rien ne s'ouvre.
+  const pending = await readPendingDeletion(userId);
+  if (pending) {
+    if (!pending.windowOpen) throw new Error("ACCOUNT_DELETED");
+    const ticket = await createReactivationTicket(userId, event);
+    // Posé ici comme le cookie de session : la porte (rappel OAuth, code
+    // Discord) n'a plus qu'à renvoyer vers l'écran de réactivation.
+    (await cookies()).set(REACTIVATION_COOKIE, ticket, {
+      ...baseCookieOptions(),
+      maxAge: REACTIVATION_TICKET_MINUTES * 60,
+    });
+    throw new AccountPendingDeletionError(ticket);
+  }
   const db = await getDatabase();
   const token = randomToken(48);
   const tokenHash = hashToken(token);

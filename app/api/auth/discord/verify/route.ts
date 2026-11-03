@@ -1,4 +1,5 @@
 import { createSession } from "@/lib/server/auth";
+import { ACCOUNT_PENDING_DELETION, AccountPendingDeletionError } from "@/lib/server/users/account-reactivation";
 import { AccountSuspendedError, assertIdentityNotSuspended } from "@/lib/server/account-suspensions";
 import { ACCOUNT_SUSPENDED } from "@/lib/shared/account-suspension";
 import { DISCORD_CODE_VERIFY_RULE, enforceRateLimit, requestClientIp } from "@/lib/server/api-guard";
@@ -111,6 +112,9 @@ export async function POST(req: Request) {
     if (error instanceof AccountSuspendedError) {
       return fail(ACCOUNT_SUSPENDED, 403, { suspension: error.notice });
     }
+    // Suppression demandée : la page de connexion ouvre l'écran de
+    // réactivation (ticket en cookie, `createSession`).
+    if (error instanceof AccountPendingDeletionError) return fail(ACCOUNT_PENDING_DELETION, 409);
     return fail((error as Error).message || "DISCORD_AUTH_FAILED", 500);
   }
 }

@@ -72,7 +72,8 @@
     "IMAGE_FORMAT_INVALID": "Format not recognized: PNG, JPEG or WebP only.",
     "IMAGE_DIMENSIONS_INVALID": "Image dimensions not supported.",
     "IMAGE_ANIMATED_NOT_SUPPORTED": "Animated images aren't accepted.",
-    "IMAGE_CROP_INVALID": "Unreadable crop. Choose the image again and crop it."
+    "IMAGE_CROP_INVALID": "Unreadable crop. Choose the image again and crop it.",
+    "IMAGE_BLOCKED": "This image was removed by moderation: it can't be uploaded again."
   },
   "fallback": "The operation failed.",
   "selfAlreadyInTeam": "You already belong to a team: leave it first."

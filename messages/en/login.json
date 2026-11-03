@@ -135,5 +135,17 @@
       "launch": "the launch window only opens for both teams, the casters and the assigned referee; the match page repeats the BattleTag of its team contacts (to the parties to the match alone), its casters and its assigned referee, to the same people at the same times as the “Contacts” window.",
       "footer": "To stop sharing it entirely, clear it from your profile (if it comes from Battle.net, unlink Battle.net first, after adding another way to log in if it is your only one)."
     }
+  },
+  "reactivation": {
+    "title": "Reactivate your account?",
+    "lead": "You asked for your account to be deleted. The deletion becomes final on {date}: until then, you can still reactivate it.",
+    "kept": "Reactivating gives you back your account as it was: profile, statistics, settings.",
+    "notUndone": "What was done when you asked is not undone: you left your teams (ownership handed over, team turned into a ghost team or disbanded), your organised tournaments changed organiser, and your registrations were withdrawn or lost by forfeit.",
+    "confirm": "Reactivate my account",
+    "cancel": "Don't reactivate",
+    "done": "Your account is reactivated.",
+    "expired": "This reactivation link has expired or was already used. Sign in again to get a new one.",
+    "backToLogin": "Back to sign-in",
+    "failed": "Reactivation failed. Sign in again to retry."
   }
 }

@@ -2,7 +2,9 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { accountDeletionPlan } from "@/lib/shared/account-deletion";
 import { isLegacyDeletedPseudo } from "@/lib/shared/anonymous-pseudos";
-import { accountTraceSql, loadAccountTrace } from "./account-deletion";
+import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
+import { accountTraceSql, finalizeAccountDeletion, loadAccountTrace } from "./account-deletion";
+import { settleDeletedSoloEntries } from "./deleted-solo-entries";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
@@ -15,6 +17,9 @@ export type DeletedAccountsReconciliation = {
   renamed: number;
   /** Comptes laissés en l'état faute d'avoir pu être traités (reportés au prochain démarrage). */
   failed: number;
+  /** Inscriptions solo retirées et tournois forfaités (E2, `settleDeletedSoloEntries`). */
+  withdrawn: number;
+  forfeited: number;
 };
 
 /**
@@ -71,11 +76,22 @@ async function settleDeletedAccount(
  */
 export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconciliation> {
   const db = await getDatabase();
+  // E2 d'abord : une inscription solo retirée peut rendre le compte effaçable
+  // au passage suivant de la boucle. Comptes en attente compris — la demande
+  // fait le même geste, ceci n'en rattrape qu'un échec.
+  const solo = await settleDeletedSoloEntries().catch((error: unknown) => {
+    console.error(
+      "[deleted-accounts] Inscriptions solo des comptes supprimés reportées :",
+      error instanceof Error ? error.message : error,
+    );
+    return { withdrawn: 0, forfeited: 0 };
+  });
   const trace = accountTraceSql();
   const [candidates] = await db.execute<(RowDataPacket & { id: number })[]>(
     String.raw`SELECT u.id
        FROM bg_users u
       WHERE u.is_deleted = 1
+        AND u.deletion_requested_at IS NULL
         AND (
           u.pseudo LIKE 'compte\_supprime\_%'
           OR u.is_admin = 1
@@ -84,7 +100,7 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
         )
       ORDER BY u.id`,
   );
-  const outcome: DeletedAccountsReconciliation = { erased: 0, renamed: 0, failed: 0 };
+  const outcome: DeletedAccountsReconciliation = { erased: 0, renamed: 0, failed: 0, ...solo };
   const touchedTournaments = new Set<number>();
 
   // L'anonymisation efface désormais la dernière acceptation des conditions
@@ -97,6 +113,7 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
       `UPDATE bg_users
           SET terms_version = NULL, terms_accepted_at = NULL
         WHERE is_deleted = 1
+          AND deletion_requested_at IS NULL
           AND (terms_version IS NOT NULL OR terms_accepted_at IS NOT NULL)`,
     );
   } catch (error) {
@@ -149,5 +166,37 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
   if (outcome.erased + outcome.renamed > 0) invalidateTeamIdentityViews();
   // Et les matchs qui le nommaient (caster, lien, arbitre), comme `deleteOwnAccount`.
   for (const tournamentId of touchedTournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  return outcome;
+}
+
+/**
+ * Les suppressions demandées il y a trente jours ou plus, rendues définitives
+ * (E4) — effacement ou anonymisation, par le chemin ordinaire
+ * (`finalizeAccountDeletion`, qui relit la fenêtre sous le verrou du compte).
+ * Idempotent : un compte réactivé ou déjà traité n'est plus en attente.
+ * Rend le nombre de comptes traités ; un échec est reporté au passage suivant.
+ */
+export async function finalizeDueAccountDeletions(): Promise<{ finalized: number; failed: number }> {
+  const db = await getDatabase();
+  const [due] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_users
+      WHERE is_deleted = 1
+        AND deletion_requested_at IS NOT NULL
+        AND deletion_requested_at <= NOW() - INTERVAL ${Number(ACCOUNT_REACTIVATION_DAYS)} DAY
+      ORDER BY id
+      LIMIT 100`,
+  );
+  const outcome = { finalized: 0, failed: 0 };
+  for (const row of due) {
+    try {
+      if ((await finalizeAccountDeletion(Number(row.id))) !== null) outcome.finalized += 1;
+    } catch (error) {
+      outcome.failed += 1;
+      console.error(
+        `[deleted-accounts] Suppression définitive du compte #${Number(row.id)} reportée :`,
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
   return outcome;
 }

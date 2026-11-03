@@ -239,6 +239,17 @@ const COMPLIANCE_TABLES: readonly string[] = [
         REFERENCES bg_users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `,
+
+  // Empreintes d'images refusées au téléversement (`ACCOUNT_DELETION.md`, E6) :
+  // l'avatar en quarantaine d'un compte effacé part avec lui, son empreinte
+  // SHA-256 (de l'image traitée, telle que stockée) reste ici. Aucune colonne
+  // ne désigne un compte : l'empreinte d'une image n'identifie personne.
+  `
+      CREATE TABLE IF NOT EXISTS bg_blocked_image_hashes (
+      sha256 CHAR(64) PRIMARY KEY,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `,
 ];
 
 /** Conformité et modération. */

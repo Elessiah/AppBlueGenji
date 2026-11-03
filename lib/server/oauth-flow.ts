@@ -24,6 +24,8 @@
 import crypto from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSession, getCurrentUser } from "@/lib/server/auth";
+import { AccountPendingDeletionError } from "@/lib/server/users/account-reactivation";
+import { REACTIVATION_PATH } from "@/lib/shared/account-deletion";
 import { AccountSuspendedError } from "@/lib/server/account-suspensions";
 import {
   SUSPENSION_NOTICE_COOKIE,
@@ -359,6 +361,12 @@ async function completeLogin(
     // `/en/connexion`, qu'un cookie borné à `/connexion` n'atteindrait pas.
     // Seul le middleware le lit, et seulement sur la page de connexion, qu'il
     // compare sans préfixe de langue (`middleware.ts`).
+    // Suppression demandée il y a moins de trente jours : l'écran de
+    // réactivation, jamais une session ouverte en silence (le ticket est déjà
+    // en cookie, `createSession`).
+    if (error instanceof AccountPendingDeletionError) {
+      return NextResponse.redirect(new URL(localeHref(REACTIVATION_PATH, locale), base));
+    }
     if (error instanceof AccountSuspendedError) {
       const response = loginFailure(base, provider, "suspended", locale);
       response.cookies.set(SUSPENSION_NOTICE_COOKIE, encodeSuspensionNotice(error.notice), {

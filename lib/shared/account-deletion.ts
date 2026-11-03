@@ -217,23 +217,23 @@ export type ConfirmationSubject = AccountRetentionReason | null | typeof RETENTI
 export function accountDeletionConfirmation(
   reason: ConfirmationSubject,
 ): string {
-  const irreversible = "Cette action est irréversible.";
+  const irreversible = `${ACCOUNT_DELETION_HANDOVER} ${ACCOUNT_DELETION_WINDOW}`;
   // Ce qui reste de **toute** suppression, effacement complet compris : la
   // phrase disait « sans laisser de trace », et c'était faux.
   const residual = `Comme pour tout compte supprimé, resteront les sauvegardes chiffrées du site (${BACKUP_RETENTION_DAYS} jours), la mention de ta suppression dans le journal qui permet de la rejouer après une restauration (au moins ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours), l'empreinte de mesure d'audience décrite par la politique de confidentialité, tes données de connexion (adresse IP, date, moyen de connexion), que la loi impose de garder ${CONNECTION_LOG_RETENTION_DAYS} jours, les annonces de tes matchs de tournoi individuel publiées dans le salon #live du Discord (et l'alerte de modération d'une annonce bloquée ou signalée par AutoMod), qui gardent ton pseudo jusqu'à leur suppression sur demande, et, si tu es membre du staff, la trace de tes gestes dans les journaux du serveur.`;
   switch (reason) {
     case "TOURNAMENTS":
-      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées. ${residual} ${irreversible}`;
+      return `Supprimer ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées. ${residual} ${irreversible}`;
     case "SOLO_REGISTRATIONS":
-      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es engagé dans un tournoi individuel déjà commencé ou terminé, où ton pseudo sert de nom d'engagé et sera remplacé par ce pseudo d'emprunt. ${residual} ${irreversible}`;
+      return `Supprimer ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es engagé dans un tournoi individuel déjà commencé ou terminé, où ton pseudo sert de nom d'engagé et sera remplacé par ce pseudo d'emprunt. ${residual} ${irreversible}`;
     case "ORGANIZED_TOURNAMENTS":
-      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es l'organisateur de tournois qui doivent garder un titulaire. ${residual} ${irreversible}`;
+      return `Supprimer ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es l'organisateur de tournois qui doivent garder un titulaire. ${residual} ${irreversible}`;
     case "OWNED_TEAMS":
-      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet. ${residual} ${irreversible}`;
+      return `Supprimer ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet. ${residual} ${irreversible}`;
     case null:
-      return `Supprimer définitivement ton compte ? Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte et ton profil seront effacés entièrement, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées. ${residual} ${irreversible}`;
+      return `Supprimer ton compte ? Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte et ton profil seront effacés entièrement, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées. ${residual} ${irreversible}`;
     default:
-      return `Supprimer définitivement ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, inscription à un tournoi individuel, équipe possédée, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${residual} ${irreversible}`;
+      return `Supprimer ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, inscription à un tournoi individuel, équipe possédée, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${residual} ${irreversible}`;
   }
 }
 
@@ -252,17 +252,17 @@ export function accountDeletionOutcome(
 ): string {
   switch (reason) {
     case "TOURNAMENTS":
-      return "Compte supprimé. Tes statistiques restent conservées sous un pseudo d'emprunt.";
+      return "Suppression demandée. Tes statistiques resteront conservées sous un pseudo d'emprunt. Reconnecte-toi d'ici 30 jours pour l'annuler.";
     case "SOLO_REGISTRATIONS":
-      return "Compte supprimé. Tes inscriptions en tournoi individuel portent désormais un pseudo d'emprunt.";
+      return "Suppression demandée. Tes inscriptions en tournoi individuel porteront un pseudo d'emprunt. Reconnecte-toi d'ici 30 jours pour l'annuler.";
     case "ORGANIZED_TOURNAMENTS":
-      return "Compte supprimé. Tes tournois gardent un organisateur anonyme.";
+      return "Suppression demandée. Tes tournois garderont un organisateur anonyme. Reconnecte-toi d'ici 30 jours pour l'annuler.";
     case "OWNED_TEAMS":
-      return "Compte supprimé. Ton équipe garde un propriétaire anonyme.";
+      return "Suppression demandée. Ton équipe gardera un propriétaire anonyme. Reconnecte-toi d'ici 30 jours pour l'annuler.";
     case null:
-      return "Compte effacé. Ton compte, ton profil et tes éventuelles inscriptions à venir en tournoi individuel ont disparu du site ; seules restent les traces décrites par la politique de confidentialité et son registre (sauvegardes, journal des suppressions, mesure d'audience).";
+      return "Suppression demandée. Ton compte et ton profil seront effacés ; seules resteront les traces décrites par la politique de confidentialité et son registre (sauvegardes, journal des suppressions, mesure d'audience). Reconnecte-toi d'ici 30 jours pour l'annuler.";
     default:
-      return "Compte supprimé.";
+      return "Suppression demandée. Reconnecte-toi d'ici 30 jours pour l'annuler.";
   }
 }
 
@@ -324,7 +324,15 @@ export const ACCOUNT_DELETED_WRITE_MESSAGE =
   "Ce compte vient d'être supprimé : la modification n'a pas été enregistrée.";
 
 /** La question posée par la modale de suppression du compte (son titre). */
-export const ACCOUNT_DELETION_QUESTION = "Supprimer définitivement ton compte ?";
+export const ACCOUNT_DELETION_QUESTION = "Supprimer ton compte ?";
+
+/** Ce qui se fait dès la demande et que la réactivation ne défait pas (E3, E4). */
+export const ACCOUNT_DELETION_HANDOVER =
+  "Dès maintenant, tu quitteras tes équipes (la propriété passera à un gérant, sinon à un capitaine, sinon à un autre membre ; seul joueur, l'équipe deviendra fantôme si elle est engagée dans un tournoi pas terminé, sinon elle sera dissoute), tes tournois organisés passeront à un autre membre du staff, tes inscriptions à des tournois individuels pas encore commencés seront retirées et tes matchs restants d'un tournoi individuel en cours où tu n'as jamais joué seront perdus par forfait. Réactiver ton compte ne défera pas ces gestes.";
+
+/** La fenêtre de réactivation (E4). */
+export const ACCOUNT_DELETION_WINDOW =
+  "La suppression deviendra définitive au bout de 30 jours : d'ici là, te reconnecter te permettra de réactiver ton compte.";
 
 /**
  * Le corps de la modale : `accountDeletionConfirmation` sans la question, déjà
@@ -335,3 +343,112 @@ export function accountDeletionConsequences(reason: ConfirmationSubject): string
   const prefix = `${ACCOUNT_DELETION_QUESTION} `;
   return text.startsWith(prefix) ? text.slice(prefix.length) : text;
 }
+
+// ─── Suppression réversible 30 jours (ERASURE-D2, décisions E1–E6) ──────────
+
+/**
+ * Délai pendant lequel une suppression demandée se défait par une nouvelle
+ * connexion (réactivation explicite). Passé ce délai, le compte est effacé ou
+ * anonymisé pour de bon (`finalizeDueAccountDeletions`).
+ */
+export const ACCOUNT_REACTIVATION_DAYS = 30;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Fin de la fenêtre de réactivation d'une suppression demandée à `requestedAt`. */
+export function reactivationDeadline(requestedAt: Date | string): Date {
+  return new Date(new Date(requestedAt).getTime() + ACCOUNT_REACTIVATION_DAYS * DAY_MS);
+}
+
+/** La suppression demandée à `requestedAt` est-elle encore réversible à `now` ? */
+export function isReactivationWindowOpen(requestedAt: Date | string | null, now: number = Date.now()): boolean {
+  if (requestedAt === null) return false;
+  const deadline = reactivationDeadline(requestedAt).getTime();
+  return Number.isFinite(deadline) && now < deadline;
+}
+
+/**
+ * Les inscriptions solo retirées **dès la demande** (D12 étendu) : chacune, sans
+ * match, à un tournoi pas encore commencé et verrouillé par la transaction —
+ * une à une, et non plus « toutes ou aucune » : les autres (tournoi commencé ou
+ * terminé) restent, et c'est leur sort à elles qui décide de la ligne au jour 30.
+ */
+export function soloRegistrationsWithdrawnOnRequest(
+  registrations: readonly SoloRegistrationFact[],
+  locked: ReadonlySet<number>,
+  now: number = Date.now(),
+): SoloRegistrationFact[] {
+  return registrations.filter(
+    (registration) =>
+      !registration.hasMatch &&
+      locked.has(registration.tournamentId) &&
+      entrantRemovalBlockReason(registration, now) === null,
+  );
+}
+
+/** Un membre d'équipe qui pourrait recevoir la propriété. */
+export type TeamSuccessorCandidate = {
+  userId: number;
+  roles: readonly string[];
+  /** Date d'arrivée dans l'équipe : le plus ancien passe devant. */
+  joinedAt: Date | string;
+  /** Identifiant de la ligne d'appartenance : départage stable à date égale. */
+  membershipId: number;
+};
+
+/** Rang d'un candidat : `MANAGER` d'abord, puis `CAPITAINE`, puis tout autre membre. */
+function successorRank(roles: readonly string[]): number {
+  if (roles.includes("MANAGER")) return 0;
+  if (roles.includes("CAPITAINE")) return 1;
+  return 2;
+}
+
+/**
+ * Le membre qui reçoit l'équipe quand son propriétaire supprime son compte
+ * (E3) : un `MANAGER`, sinon un `CAPITAINE`, sinon un autre membre ; à rang
+ * égal, le plus ancien dans l'équipe, puis la ligne d'appartenance la plus
+ * ancienne. `null` : il était seul.
+ */
+export function pickTeamSuccessor(candidates: readonly TeamSuccessorCandidate[]): TeamSuccessorCandidate | null {
+  let best: TeamSuccessorCandidate | null = null;
+  for (const candidate of candidates) {
+    if (best === null || compareSuccessors(candidate, best) < 0) best = candidate;
+  }
+  return best;
+}
+
+function compareSuccessors(a: TeamSuccessorCandidate, b: TeamSuccessorCandidate): number {
+  const rank = successorRank(a.roles) - successorRank(b.roles);
+  if (rank !== 0) return rank;
+  const joined = new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
+  if (Number.isFinite(joined) && joined !== 0) return joined;
+  return a.membershipId - b.membershipId;
+}
+
+/** États où un tournoi est « actif » pour la règle de l'équipe fantôme (E3). */
+export const ACTIVE_TOURNAMENT_STATES = ["UPCOMING", "REGISTRATION", "RUNNING"] as const;
+
+/** Ce que devient l'équipe d'un propriétaire qui supprime son compte (E3). */
+export type OwnedTeamFate = "TRANSFER" | "GHOST" | "DISSOLVE";
+
+/**
+ * Un successeur → la propriété lui passe. Seul joueur : équipe inscrite à un
+ * tournoi actif → équipe fantôme (le staff la tient, l'inscription reste) ;
+ * sinon dissoute par le chemin de la dissolution (`dissolveTeamOn` : la ligne
+ * et l'historique restent sous « Équipe dissoute #id »).
+ */
+export function ownedTeamFate(input: { hasSuccessor: boolean; registeredInActiveTournament: boolean }): OwnedTeamFate {
+  if (input.hasSuccessor) return "TRANSFER";
+  return input.registeredInActiveTournament ? "GHOST" : "DISSOLVE";
+}
+
+/** Rôles du nouveau propriétaire : `OWNER` en tête, ses rôles gardés. */
+export function successorRoles(roles: readonly string[]): string[] {
+  return ["OWNER", ...roles.filter((role) => role !== "OWNER")];
+}
+
+/** Écran de réactivation d'un compte en attente de suppression (chemin sans préfixe de langue). */
+export const REACTIVATION_PATH = "/connexion/reactivation";
+
+/** Refus d'une connexion à un compte en attente de suppression : la page de connexion ouvre l'écran de réactivation. */
+export const ACCOUNT_PENDING_DELETION_CODE = "ACCOUNT_PENDING_DELETION";
