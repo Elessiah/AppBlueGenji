@@ -168,11 +168,43 @@ describe("getViewerMatchProposals", () => {
     expect(connection.query.mock.calls.at(-1)?.[0]).toBe("COMMIT");
   });
 
-  it("getViewerMatchProposals_readFails_stillEndsTransaction", async () => {
+  it("getViewerMatchProposals_readFails_rollsBackAndRethrowsOriginalError", async () => {
     jest.mocked(loadViewerProposals).mockRejectedValue(new Error("Connection lost"));
 
     await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).rejects.toThrow("Connection lost");
 
-    expect(connection.query.mock.calls.at(-1)?.[0]).toBe("COMMIT");
+    expect(connection.query.mock.calls.map(([sql]) => sql)).toEqual(["START TRANSACTION READ ONLY", "ROLLBACK"]);
+  });
+
+  // Revue #542 : la fin de transaction ratée (connexion tombée) ne masque pas
+  // l'erreur d'origine.
+  it("getViewerMatchProposals_readAndRollbackFail_surfacesReadError", async () => {
+    jest.mocked(loadViewerProposals).mockRejectedValue(new Error("Connection lost"));
+    connection.query.mockImplementation(async (sql: string) => {
+      if (sql === "ROLLBACK") throw new Error("Cannot enqueue Query after fatal error");
+      return [[], []];
+    });
+
+    await expect(getViewerMatchProposals(snapshot(), 7, false, 70)).rejects.toThrow("Connection lost");
+  });
+
+  // Revue #542 : en individuel, une seule place du pool par relecture.
+  it("getViewerMatchProposals_soloEntrant_usesOneConnectionForEntryAndRead", async () => {
+    jest.mocked(resolveUserEntrantTeamId).mockResolvedValue(43);
+
+    await getViewerMatchProposals(snapshot("SOLO"), 7, false, 70);
+
+    expect(withConnection).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(resolveUserEntrantTeamId).mock.calls[0][0]).toBe(fakeConnection(connection));
+    expect(jest.mocked(loadViewerProposals).mock.calls[0][0]).toBe(fakeConnection(connection));
+  });
+
+  it("getViewerMatchProposals_soloNotEntrant_returnsNullWithoutStartingTransaction", async () => {
+    jest.mocked(resolveUserEntrantTeamId).mockResolvedValue(null);
+
+    await expect(getViewerMatchProposals(snapshot("SOLO"), 7, false, 70)).resolves.toBeNull();
+
+    expect(connection.query).not.toHaveBeenCalled();
+    expect(loadViewerProposals).not.toHaveBeenCalled();
   });
 });

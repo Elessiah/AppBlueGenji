@@ -4,6 +4,7 @@ import {
   clearMapSets,
   loadMapsByMatch,
   loadMatchMaps,
+  mapSetExists,
   promoteReportedMaps,
   replaceMatchMaps,
 } from "@/lib/server/tournaments/match-maps";
@@ -134,6 +135,31 @@ describe("stockage map par map (bg_match_maps)", () => {
     const { execute, connection } = conn();
     expect((await loadMapsByMatch(connection, [])).size).toBe(0);
     expect(execute).not.toHaveBeenCalled();
+  });
+});
+
+describe("mapSetExists", () => {
+  it("mapSetExists_rowFound_returnsTrue", async () => {
+    const { execute, connection } = conn([[[{ 1: 1 }], []]]);
+
+    await expect(mapSetExists(connection, 70, "FINAL")).resolves.toBe(true);
+
+    expect(flat(execute.mock.calls[0][0])).toBe("SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1");
+    expect(execute.mock.calls[0][1]).toEqual([70, "FINAL"]);
+  });
+
+  it("mapSetExists_noRow_returnsFalse", async () => {
+    const { connection } = conn([[[], []]]);
+
+    await expect(mapSetExists(connection, 70, "FINAL")).resolves.toBe(false);
+  });
+
+  // Revue #542 : un résultat mal formé ne passe plus pour « aucun jeu »
+  // (l'écriture sauterait l'effacement et doublerait le jeu FINAL).
+  it("mapSetExists_malformedResult_throwsInsteadOfReportingEmpty", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue(undefined);
+
+    await expect(mapSetExists(fakeConnection({ execute }), 70, "FINAL")).rejects.toThrow(TypeError);
   });
 });
 
