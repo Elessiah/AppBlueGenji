@@ -99,7 +99,7 @@ au défaut du serveur avant de rendre la connexion au pool —
 `lib/server/tournaments/lock-wait.ts`, partagé avec le retrait d'une pénalité,
 qui tient lui aussi le tournoi en verrouillant les manches) au lieu des 50 s du
 serveur, en tenant le verrou du tournoi. La borne n'entoure **que** cette
-lecture des manches (`withShortLockWait`, option `boundedWait`) : le verrou du
+lecture des manches (`withShortLockWait`, toute lecture `lock`) : le verrou du
 tournoi (`lockTournamentRow`, en toute première instruction) s'attend sans
 borne comme pour tout geste — son détenteur, réconciliation ou lancement, le
 rend sans rien attendre de l'annulation —, et le rejeu qui suit retrouve le
@@ -121,8 +121,9 @@ compris), aperçu, listes et mini-arbres de l'accueil
 colonnes de `bg_tournaments` (manche d'endurance courante, phase) et reposer
 les matchs d'une manche périmée. Aucun résultat de match ne change : le
 classement du site, les statistiques et, à l'accueil, leaderboards, bandeau et
-compteurs restent en cache (`publishUpdatedEvent` les vidait). Flux ouvert, l'interface s'en remet à lui pour l'instantané ;
-flux tombé, elle relit le tournoi (`refresh()`).
+compteurs restent en cache (`publishUpdatedEvent` les vidait). L'administrateur relit le tournoi
+aussitôt (`refresh()`), flux ouvert ou non : la diffusion peut attendre jusqu'à une
+minute (tranche, budget de la salle), son bouton resterait périmé.
 
 ## Permission : administrateur strict
 
