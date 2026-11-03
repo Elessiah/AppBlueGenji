@@ -359,13 +359,18 @@ export async function confirmDiscordVerification(
  * détient vraiment.
  */
 async function sendHandleChallenge(discordId: string, tag: string): Promise<CodeSent> {
-  const challenge = await createDiscordLoginChallenge(discordId, tag);
+  // Dans la langue du compte **destinataire** — celui qui porte déjà ce
+  // Discord —, jamais dans celle du demandeur : le tag saisi n'est pas encore
+  // prouvé et peut désigner quelqu'un d'autre. Sans compte rattaché, message
+  // bilingue (`BOT_DM_LANGUAGE.md`). Lue pendant l'insertion du défi
+  // (`accountLocaleForDiscordId` ne lève jamais).
+  const [challenge, locale] = await Promise.all([
+    createDiscordLoginChallenge(discordId, tag),
+    accountLocaleForDiscordId(discordId),
+  ]);
   try {
-    // Dans la langue du compte **destinataire** — celui qui porte déjà ce
-    // Discord —, jamais dans celle du demandeur : le tag saisi n'est pas encore
-    // prouvé et peut désigner quelqu'un d'autre. Sans compte rattaché, message
-    // bilingue (`BOT_DM_LANGUAGE.md`).
-    await sendDiscordLoginCode(discordId, challenge.code, await accountLocaleForDiscordId(discordId));
+    // « handle » : le message dit que ce code rattache un tag, qu'il ne connecte pas.
+    await sendDiscordLoginCode(discordId, challenge.code, locale, "handle");
   } catch (error) {
     await discardDiscordChallenge(challenge.challengeId).catch(() => {});
     throw error;

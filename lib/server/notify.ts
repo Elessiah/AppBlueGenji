@@ -52,6 +52,12 @@ import { matchDmEnabled } from "./users/match-dm-preference";
 export type NotificationRecipient = {
   userId: number;
   discord: DiscordRecipient | null;
+  /**
+   * Langue du compte, quand le chargeur l'a lue avec le reste de la ligne
+   * (`loadNotificationRecipients`) : `notifyUsers` ne la relit pas. Absente,
+   * elle est lue au moment de l'envoi.
+   */
+  locale?: Locale;
 };
 
 export type UserNotification = {
@@ -99,11 +105,16 @@ export async function notifyUsers(
   );
   const userIds = recipients.map((recipient) => recipient.userId);
   const message = notification.discord;
+  // Rédigés **avant** tout départ : un rédacteur qui lève (date invalide pour
+  // `Intl`) fait échouer la notification entière, push compris, au lieu de la
+  // rejeter une fois les push partis — l'appelant qui rend sa marque sur
+  // l'échec les renverrait.
+  const texts = message && reachable.length > 0 ? renderAllLocales(message.message) : null;
 
   const [discord, pushed] = await Promise.all([
     // Personne à joindre sur Discord : aucun appel au bot, un bilan vide.
-    message && reachable.length > 0
-      ? sendLocalizedDirectMessages(reachable, message)
+    message && texts
+      ? sendLocalizedDirectMessages(reachable, texts, message.context)
       : Promise.resolve({ report: { sent: 0, unresolved: [], failed: [] }, unreached: [] }),
     // Un sujet réservé à une permission ne part qu'à qui la détient encore, non
     // suspendu : `pushToUsers` en juge sur les lignes d'abonnement qu'il lit
@@ -111,6 +122,15 @@ export async function notifyUsers(
     pushToUsers(userIds, notification.topic, notification.push, notification.pushOptions),
   ]);
   return { discord: discord.report, discordUnreachedUserIds: discord.unreached, pushed };
+}
+
+/** Le message dans chaque langue possible du destinataire (bilingue si elle est inconnue). */
+function renderAllLocales(message: LocalizedDm): Map<Locale | null, string> {
+  return new Map<Locale | null, string>([
+    ["fr", renderDm(message, "fr")],
+    ["en", renderDm(message, "en")],
+    [null, renderDm(message, null)],
+  ]);
 }
 
 /**
@@ -143,12 +163,16 @@ async function loadAccountLocales(userIds: readonly number[]): Promise<Map<numbe
  */
 async function sendLocalizedDirectMessages(
   recipients: readonly (NotificationRecipient & { discord: DiscordRecipient })[],
-  message: { message: LocalizedDm; context: string },
+  texts: ReadonlyMap<Locale | null, string>,
+  context: string,
 ): Promise<{ report: DiscordDeliveryReport | null; unreached: number[] }> {
-  const locales = await loadAccountLocales(recipients.map((recipient) => recipient.userId));
+  // Seules les langues que le chargeur n'a pas lues sont relues.
+  const locales = await loadAccountLocales(
+    recipients.filter((recipient) => recipient.locale === undefined).map((recipient) => recipient.userId),
+  );
   const groups = new Map<Locale | null, (NotificationRecipient & { discord: DiscordRecipient })[]>();
   for (const recipient of recipients) {
-    const locale = locales.get(recipient.userId) ?? null;
+    const locale = recipient.locale ?? locales.get(recipient.userId) ?? null;
     const group = groups.get(locale);
     if (group) group.push(recipient);
     else groups.set(locale, [recipient]);
@@ -165,9 +189,9 @@ async function sendLocalizedDirectMessages(
     const report = botLost
       ? null
       : await pushDiscordDirectMessages(
-          renderDm(message.message, locale),
+          texts.get(locale) ?? "",
           group.map((recipient) => recipient.discord),
-          message.context,
+          context,
         );
     if (report === null) botLost = true;
     sends.push({ group, report });
@@ -276,25 +300,33 @@ export async function loadNotificationRecipients(
   const ids = [...new Set(userIds)];
   if (ids.length === 0) return [];
   const db = await getDatabase();
-  const select = (withMatchDm: boolean) =>
-    db.query<(RecipientRow & { match_dm_enabled?: number | null })[]>(
-      `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at${withMatchDm ? ", match_dm_enabled" : ""}
+  const select = (withMatchDm: boolean, withLocale: boolean) =>
+    db.query<(RecipientRow & { match_dm_enabled?: number | null; locale?: unknown })[]>(
+      `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at${withMatchDm ? ", match_dm_enabled" : ""}${withLocale ? ", locale" : ""}
        FROM bg_users WHERE is_deleted = 0 AND id IN (${ids.map(() => "?").join(", ")})`,
       ids,
     );
-  // La colonne n'est lue que pour un message de match : une migration en échec
+  // La langue (lue ici pour que `notifyUsers` n'y revienne pas) et le réglage
+  // des messages de match sont des colonnes récentes : une migration en échec
   // (`reportSchemaFailure`, rejouée au démarrage suivant) ne coupe pas les
-  // autres envois. Sans elle, personne n'a pu s'opposer (la route d'écriture
-  // échoue aussi) : la relecture sans colonne garde le comportement d'avant.
-  let rows: Awaited<ReturnType<typeof select>>[0];
-  try {
-    [rows] = await select(options.matchDm === true);
-  } catch (error) {
-    if (options.matchDm !== true || !isUnknownColumnError(error)) throw error;
-    [rows] = await select(false);
+  // envois. Sans la langue, `notifyUsers` la relit (bilingue au pire) ; sans
+  // le réglage, personne n'a pu s'opposer (la route d'écriture échoue aussi) :
+  // la relecture sans colonne garde le comportement d'avant. La langue précède
+  // le réglage dans la table (`AFTER locale`) : sans elle, il manque aussi.
+  const matchDm = options.matchDm === true;
+  const attempts: [boolean, boolean][] = matchDm ? [[true, true], [false, true], [false, false]] : [[false, true], [false, false]];
+  let rows: Awaited<ReturnType<typeof select>>[0] | null = null;
+  for (const [index, [withMatchDm, withLocale]] of attempts.entries()) {
+    try {
+      [rows] = await select(withMatchDm, withLocale);
+      break;
+    } catch (error) {
+      if (!isUnknownColumnError(error) || index === attempts.length - 1) throw error;
+    }
   }
-  return rows.map((row) => {
-    const recipient = toNotificationRecipient(row, reach);
+  return (rows ?? []).map((row) => {
+    const base = toNotificationRecipient(row, reach);
+    const recipient = row.locale === undefined ? base : { ...base, locale: accountLocaleFromRow(row.locale) };
     return options.matchDm && !matchDmEnabled(row.match_dm_enabled) ? { ...recipient, discord: null } : recipient;
   });
 }

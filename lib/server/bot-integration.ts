@@ -220,11 +220,25 @@ export async function resolveDiscordUser(handle: string): Promise<string> {
 }
 
 /**
+ * Ce qu'un code envoyé par le bot permet : se connecter (`login`), ou
+ * rattacher un tag Discord à un compte (`handle`) — le bot rédige alors un
+ * message qui dit que le code ne connecte pas.
+ */
+export type DiscordCodePurpose = "login" | "handle";
+
+/**
  * Envoie le code de connexion en message privé. Le bot le rédige lui-même :
  * dans la langue du compte (`locale`) quand le compte existe, sinon (`null`)
  * en un message bilingue, français puis anglais (`BOT_DM_LANGUAGE.md`).
+ * `purpose` dit au bot quel texte rédiger (un bot plus ancien l'ignore et
+ * envoie le texte de connexion).
  */
-export async function sendDiscordLoginCode(discordId: string, code: string, locale: Locale | null): Promise<void> {
+export async function sendDiscordLoginCode(
+  discordId: string,
+  code: string,
+  locale: Locale | null,
+  purpose: DiscordCodePurpose = "login",
+): Promise<void> {
   const baseUrl = resolveBotInternalUrl();
 
   let response: Response;
@@ -235,7 +249,7 @@ export async function sendDiscordLoginCode(discordId: string, code: string, loca
         "content-type": "application/json",
         ...getInternalHeaders(),
       },
-      body: JSON.stringify({ discordId, code, locale }),
+      body: JSON.stringify({ discordId, code, locale, purpose }),
       cache: "no-store",
       signal: AbortSignal.timeout(BOT_LOGIN_FETCH_TIMEOUT_MS),
     });
