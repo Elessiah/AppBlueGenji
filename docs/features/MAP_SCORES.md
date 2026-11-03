@@ -268,7 +268,10 @@ lit pas le match. Le match se lit par son id **et** son tournoi, sans passer par
 l'instantané : une manche posée depuis s'y lit déjà. Elle relisait le tournoi
 entier (instantané et contexte du lecteur) pour les maps d'un match. Une
 réponse `proposals: null` (rien de lisible sur l'état relu) arrête les essais :
-c'est une réponse, pas un échec.
+c'est une réponse, pas un échec. Une panne de la lecture rend un code seul :
+`409 CONCURRENT_UPDATE_RETRY` pour une contention, reconnue par le code de
+l'erreur (`isContentionError`, l'erreur gardée au journal), `500 INTERNAL_ERROR`
+sinon — jamais le 500 nu de Next.
 La réponse ne complète un côté que si elle décrit la proposition affichée
 (`mergeMatchProposals`) : une réponse en retard n'écrase rien, et le contexte
 qui décrit déjà ce report l'emporte (relu après un rafraîchissement complet, il
