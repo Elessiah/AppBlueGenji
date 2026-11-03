@@ -128,11 +128,12 @@ describe("Textes juridiques alignés sur le code (revue juridique #545)", () => 
   it("rgpdPolicy_refereeDiscordScope_noSeparateObjectionFrAndEn", () => {
     expect(REFEREE_DISCORD_SCOPE).not.toContain("avec le même effet");
     // Revue juridique #545, cycle 5 : toutes les fins de la présentation, pas la seule opposition.
-    expect(REFEREE_DISCORD_SCOPE).toContain("la présentation cesse avec ton arbitrage du match — retrait par toi ou par le staff, autre arbitre ou autogestion, conditions de l'arbitrage plus remplies (tag retiré compris), joueur du match avant son lancement, ou ton opposition d'arbitre");
+    expect(REFEREE_DISCORD_SCOPE).toContain("la présentation cesse avec ton arbitrage du match — retrait par toi ou par le staff, autre arbitre ou autogestion, joueur du match avant son lancement, ton opposition d'arbitre");
+    expect(REFEREE_DISCORD_SCOPE).toContain("dès que tu ne remplis plus les conditions de l'arbitrage (tag retiré compris : avant le lancement, tu es aussi retiré du match)");
     expect(REFEREE_DISCORD_SCOPE).toContain("si tu le castes aussi, ton tag suit en plus la règle des casters");
     expect(REFEREE_DISCORD_SCOPE).toContain("depuis le 5 novembre 2026 (auparavant, intérêt légitime)");
     const en = read("lib/shared/rgpd-policy-en.ts");
-    expect(en).toContain("the presentation ends with your refereeing of the match — withdrawal by you or by the staff, another referee or self-management, refereeing requirements no longer met (tag removed included), becoming a player of the match before its launch, or your referee objection");
+    expect(en).toContain("the presentation ends with your refereeing of the match — withdrawal by you or by the staff, another referee or self-management, becoming a player of the match before its launch, your referee objection");
     expect(en).toContain("since 5 November 2026 (before that, legitimate interest)");
   });
 
@@ -250,5 +251,20 @@ describe("Avis du profil — tag Discord et BattleTag de l'arbitre (revue juridi
     }
     expect(read("messages/fr/profile.json")).toContain("te retirerait l'arbitrage des matchs Overwatch");
     expect(read("messages/en/profile.json")).toContain("would remove your refereeing of Overwatch matches");
+  });
+});
+
+// Revue juridique #545, cycle 7 : destinataires du registre et avis du profil complets.
+describe("Tag Discord de l'arbitre — destinataires et avis (revue juridique #545, cycle 7)", () => {
+  it("register_t04Recipients_refereeDiscordTagNamesCastersRuleFrAndEn", () => {
+    const fr = (PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")?.recipients ?? []).join("\n");
+    const en = (PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")?.recipients ?? []).join("\n");
+    expect(fr).toContain("s'il caste aussi le match, la règle des casters : aux autres arbitres dès que ses deux adversaires sont connus");
+    expect(en).toContain("if they also cast the match, the casters' rule: to the other referees from the moment both its opponents are known");
+  });
+
+  it("profileNotices_refereeDiscordTag_keepRefereeObjectionFrAndEn", () => {
+    expect(read("messages/fr/profile.json")).toContain("(pour l'arbitrage : nécessaire au service une fois la version 7 des conditions acceptée, sans opposition propre — ton opposition d'arbitre, retenue, t'en retire toujours ; avant,");
+    expect(read("messages/en/profile.json")).toContain("(for the refereeing: necessary for the service once version 7 of the terms is accepted, with no separate objection — your referee objection, once upheld, still removes you from it; before that,");
   });
 });
