@@ -128,10 +128,11 @@ describe("Textes juridiques alignés sur le code (revue juridique #545)", () => 
   it("rgpdPolicy_refereeDiscordScope_noSeparateObjectionFrAndEn", () => {
     expect(REFEREE_DISCORD_SCOPE).not.toContain("avec le même effet");
     // Revue juridique #545, cycle 5 : toutes les fins de la présentation, pas la seule opposition.
-    expect(REFEREE_DISCORD_SCOPE).toContain("la présentation cesse quand tu te retires du match ou qu'il est confié à un autre arbitre, quand tu retires ton tag, ou quand ton opposition d'arbitre");
+    expect(REFEREE_DISCORD_SCOPE).toContain("la présentation cesse avec ton arbitrage du match — retrait par toi ou par le staff, autre arbitre ou autogestion, conditions de l'arbitrage plus remplies (tag retiré compris), joueur du match avant son lancement, ou ton opposition d'arbitre");
+    expect(REFEREE_DISCORD_SCOPE).toContain("si tu le castes aussi, ton tag suit en plus la règle des casters");
     expect(REFEREE_DISCORD_SCOPE).toContain("depuis le 5 novembre 2026 (auparavant, intérêt légitime)");
     const en = read("lib/shared/rgpd-policy-en.ts");
-    expect(en).toContain("the presentation ends when you withdraw from the match or it is assigned to another referee, when you remove your tag, or when your referee objection");
+    expect(en).toContain("the presentation ends with your refereeing of the match — withdrawal by you or by the staff, another referee or self-management, refereeing requirements no longer met (tag removed included), becoming a player of the match before its launch, or your referee objection");
     expect(en).toContain("since 5 November 2026 (before that, legitimate interest)");
   });
 
@@ -216,10 +217,38 @@ describe("Opposition d'arbitre nommée (revue juridique #545, cycle 5)", () => {
     expect(read("app/rgpd/RgpdEn.tsx").replace(/\s+/g, " ")).toContain("their referee objection (to their presentation before version 7, or to the display of their username to members)");
   });
 
-  it("privacyChanges_refereeDiscordBasis_namesObjectionAndCasterRuleFrAndEn", () => {
-    expect(entry?.summary).toContain("(et, si tu le castes aussi, aux autres arbitres, selon la règle des casters)");
+  it("privacyChanges_refereeDiscordBasis_namesObjectionWithoutClaimingCasterRuleChangedFrAndEn", () => {
+    // Cycle 6 : la part « règle des casters » reposait déjà sur le contrat — l'avis ne la dit pas changée.
+    expect(entry?.summary).not.toContain("règle des casters");
     expect(entry?.details.join(" ")).toContain("ton opposition d'arbitre (formulaire de signalement, catégorie RGPD) — à ta présentation avant la version 7, ou à l'affichage de ton pseudo aux membres —");
-    expect(english?.summary).toContain("(and, if you also cast it, to the other referees, under the casters' rule)");
+    expect(english?.summary).not.toContain("casters' rule");
     expect(english?.details.join(" ")).toContain("your referee objection (report form, GDPR category) — to your presentation before version 7, or to the display of your username to members —");
+  });
+});
+
+// Revue juridique #545, cycle 6 : les avis du profil suivent la nouvelle base.
+describe("Avis du profil — tag Discord et BattleTag de l'arbitre (revue juridique #545, cycle 6)", () => {
+  const files = ["profile", "login", "players"] as const;
+
+  it("profileNotices_refereeDiscordTag_noUnconditionalLegitimateInterestFrAndEn", () => {
+    for (const file of files) {
+      const fr = read(`messages/fr/${file}.json`);
+      const en = read(`messages/en/${file}.json`);
+      expect(fr).not.toContain("(intérêt légitime : tu peux t'y opposer par le formulaire de signalement)");
+      expect(fr).not.toContain("(au titre de l'intérêt légitime : tu peux t'y opposer");
+      expect(en).not.toContain("(legitimate interest: you can object through the report form)");
+      expect(en).not.toContain("(under legitimate interest: you can object");
+    }
+    expect(read("messages/fr/profile.json")).toContain("nécessaire au service une fois la version 7 des conditions acceptée, sans opposition propre");
+    expect(read("messages/en/profile.json")).toContain("necessary for the service once version 7 of the terms is accepted, with no separate objection");
+  });
+
+  it("profileNotices_battletagAsReferee_limitedToOverwatchFrAndEn", () => {
+    for (const file of files) {
+      expect(read(`messages/fr/${file}.json`)).not.toContain("te retirerait l'arbitrage, qui demande");
+      expect(read(`messages/en/${file}.json`)).not.toContain("would remove your refereeing, which requires");
+    }
+    expect(read("messages/fr/profile.json")).toContain("te retirerait l'arbitrage des matchs Overwatch");
+    expect(read("messages/en/profile.json")).toContain("would remove your refereeing of Overwatch matches");
   });
 });
