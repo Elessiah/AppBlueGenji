@@ -139,9 +139,12 @@ describe("cartes de /tournois", () => {
     ["en cours", RunningCard],
     ["inscriptions", RegistrationCard],
     ["terminé", FinishedCard],
-    ["fiche générique", StateCard],
   ])("la carte %s est mémoïsée : une frappe dans la recherche ne la redessine pas", (_, Card) => {
     expect((Card as unknown as { $$typeof: symbol }).$$typeof).toBe(Symbol.for("react.memo"));
+  });
+
+  it("l'aiguillage StateCard n'est pas mémoïsé : il ne doit pas figer le visage d'une carte « à venir »", () => {
+    expect(StateCard).not.toHaveProperty("$typeof");
   });
 
   it("la carte « à venir » juge son visage à chaque rendu mais dessine sous `memo`", () => {
