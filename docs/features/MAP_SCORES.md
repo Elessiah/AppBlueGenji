@@ -258,7 +258,9 @@ route ne lit que la carte du tournoi (`getVisibleTournamentCard`, même règle d
 visibilité) pour ne pas rebâtir l'instantané à chaque relecture. Elle relisait
 le tournoi entier (instantané et contexte du lecteur) pour les maps d'un match.
 La réponse ne complète un côté que si elle décrit la proposition affichée
-(`mergeMatchProposals`) : une réponse en retard n'écrase rien.
+(`mergeMatchProposals`) : une réponse en retard n'écrase rien, et le contexte
+qui décrit déjà ce report l'emporte (relu après un rafraîchissement complet, il
+est plus récent qu'une relecture du même instant).
 
 Un forfait n'affiche jamais de détail, quel que soit le chemin qui l'a posé
 (arbitrage, abandon en Survie / Ronde suisse / BG Survie) : `attachMatchMaps`
