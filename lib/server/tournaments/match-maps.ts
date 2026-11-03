@@ -37,6 +37,13 @@ type MapRow = RowDataPacket & {
  * tous les matchs sans proposition : deux premiers reports simultanés sur des
  * matchs voisins s'interbloquaient presque à coup sûr. L'insertion seule ne
  * prend que des verrous d'intention d'insertion, compatibles entre eux.
+ *
+ * `knownSize` : l'appelant connaît, sous les mêmes conditions, le nombre de
+ * maps du jeu (`mapSetSize`). Les maps se réécrivent alors en place (clé
+ * unique, `ON DUPLICATE KEY UPDATE`), et seules celles au-delà de la nouvelle
+ * liste s'effacent — ni lecture verrouillante ni `DELETE` du jeu entier, dont
+ * le verrou d'intervalle débordait sur le match voisin, quand la liste
+ * s'allonge d'une map (saisie map par map).
  */
 export async function replaceMatchMaps(
   connection: PoolConnection,
@@ -44,9 +51,19 @@ export async function replaceMatchMaps(
   source: MatchMapSource,
   maps: ReadonlyArray<MatchMapInput>,
   userId: number | null,
-  options: { knownEmpty?: boolean } = {},
+  options: { knownEmpty?: boolean; knownSize?: number } = {},
 ): Promise<void> {
-  if (!options.knownEmpty) await clearMatchMaps(connection, matchId, source);
+  if (options.knownSize !== undefined) {
+    if (options.knownSize > maps.length) {
+      await connection.execute(`DELETE FROM bg_match_maps WHERE match_id = ? AND source = ? AND map_number > ?`, [
+        matchId,
+        source,
+        maps.length,
+      ]);
+    }
+  } else if (!options.knownEmpty) {
+    await clearMatchMaps(connection, matchId, source);
+  }
   if (maps.length === 0) return;
   const placeholders = maps.map(() => "(?, ?, ?, ?, ?, ?, ?)").join(", ");
   const values = maps.flatMap((map, index) => [
@@ -98,21 +115,22 @@ async function clearMatchMaps(connection: PoolConnection, matchId: number, sourc
 }
 
 /**
- * Le match porte-t-il un jeu `source` ? Lecture **sans verrou** — aucun verrou
+ * Nombre de maps du jeu `source` d'un match (la plus haute, numérotées depuis
+ * 1 sans trou), `0` sans jeu. Lecture **sans verrou** — aucun verrou
  * d'intervalle sur un jeu vide. N'est exacte que si l'appelant tient le verrou
  * du match depuis avant sa première lecture ordinaire, et que tout écrivain du
  * jeu prend ce même verrou (cas de `FINAL`, voir `replaceFinalMaps`).
  */
-export async function mapSetExists(
+export async function mapSetSize(
   connection: PoolConnection,
   matchId: number,
   source: MatchMapSource,
-): Promise<boolean> {
-  const [rows] = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1`,
+): Promise<number> {
+  const [rows] = await connection.execute<(RowDataPacket & { size: number | null })[]>(
+    `SELECT MAX(map_number) AS size FROM bg_match_maps WHERE match_id = ? AND source = ?`,
     [matchId, source],
   );
-  return rows.length > 0;
+  return Number(rows[0]?.size ?? 0);
 }
 
 /**

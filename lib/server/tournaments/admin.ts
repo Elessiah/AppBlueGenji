@@ -8,7 +8,7 @@ import { matchWinnerSide, sideTeamIds, type MatchFormat } from "@/lib/shared/mat
 import { MatchRow } from "./_internal";
 import { forfeitMatchScores, loadTournamentMatchRules, reopenTournament } from "./repository";
 import { checkMapList, type MatchMapInput } from "@/lib/shared/match-maps";
-import { clearMapSets, mapSetExists, replaceMatchMaps } from "./match-maps";
+import { clearMapSets, mapSetSize, replaceMatchMaps } from "./match-maps";
 import { finalizeMatch } from "./scoring";
 import { tryAutoResolveByes } from "./byes";
 import { detachDownstreamOutcome } from "./bracket-cascade";
@@ -501,7 +501,10 @@ export async function adminSaveMatchScores(
  * (réconciliations comprises), et le premier report d'un match voisin
  * l'attendait ou s'interbloquait.
  *
- * L'absence se lit **sans verrou** (`mapSetExists`), et elle est exacte : tout
+ * Un jeu déjà là (saisie map par map, de la deuxième map) se réécrit en place,
+ * sans lecture verrouillante ni effacement du jeu entier (`knownSize`).
+ *
+ * La taille se lit **sans verrou** (`mapSetSize`), et elle est exacte : tout
  * écrivain de `FINAL` tient le verrou du match, que cette transaction a pris
  * **avant** sa première lecture ordinaire (son image est donc postérieure au
  * dernier écrivain, et aucun ne peut plus passer avant le commit).
@@ -512,8 +515,8 @@ async function replaceFinalMaps(
   maps: ReadonlyArray<MatchMapInput>,
   userId: number,
 ): Promise<void> {
-  const exists = await mapSetExists(connection, matchId, "FINAL");
-  await replaceMatchMaps(connection, matchId, "FINAL", maps, userId, { knownEmpty: !exists });
+  const knownSize = await mapSetSize(connection, matchId, "FINAL");
+  await replaceMatchMaps(connection, matchId, "FINAL", maps, userId, { knownSize });
 }
 
 /**

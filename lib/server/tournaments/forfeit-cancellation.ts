@@ -24,7 +24,6 @@ import { invalidateLandingMiniBrackets } from "@/lib/server/landing-cache";
 import { invalidateTournamentLists } from "./list-cache";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { invalidateTournamentPreview } from "./preview-cache";
-import { lockTournamentRow } from "./registration";
 import { releaseWithServerLockWait } from "./lock-wait";
 
 /** Ce que l'annulation a produit, pour la ligne de journal et le message rendu. */
@@ -147,6 +146,16 @@ async function cancelTournamentForfeitOnce(
   const connection = await db.getConnection();
 
   try {
+    // Nom de l'engagé, pour le journal : lu **avant** la transaction, en
+    // lecture autonome — ni image ouverte (`ER_CHECKREAD`, voir plus bas), ni
+    // verrou partagé tenu jusqu'au commit, qui ferait attendre tout le rejeu à
+    // un renommage de l'équipe. Son classement verrouillé plus bas la garde :
+    // effacer l'équipe le supprime en cascade, et attendrait donc ce verrou.
+    const [teamRows] = await connection.execute<(RowDataPacket & { name: string })[]>(
+      `SELECT name FROM bg_teams WHERE id = ? LIMIT 1`,
+      [teamId],
+    );
+
     await connection.beginTransaction();
 
     // **Aucune lecture d'instantané avant celle des manches** : sous MariaDB
@@ -163,9 +172,8 @@ async function cancelTournamentForfeitOnce(
     // comme tout geste qui le prend : son détenteur (une réconciliation, un
     // lancement) le rend sans rien attendre de nous. Seule la lecture des
     // manches, que des gestes sans verrou du tournoi peuvent tenir longtemps,
-    // a une attente bornée (`lock`, `./lock-wait`). La tête se relit
-    // verrouillée (déjà tenue, aucune attente ni image).
-    await lockTournamentRow(connection, tournamentId);
+    // a une attente bornée (`lock`, `./lock-wait`). Ce verrou est la lecture
+    // verrouillée de la tête elle-même : une seule instruction pour les deux.
     const [rows] = await connection.execute<TournamentHead[]>(
       `SELECT name, format, state, participant_type, endurance_playoffs_started, current_phase_id
        FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
@@ -196,12 +204,6 @@ async function cancelTournamentForfeitOnce(
     if (!standing) throw new Error("TEAM_NOT_IN_TOURNAMENT");
     if (standing.status !== "FORFEIT") throw new Error("TEAM_NOT_FORFEITED");
 
-    const [teamRows] = await connection.execute<(RowDataPacket & { name: string })[]>(
-      // Verrouillante, comme toute lecture avant le rejeu : une lecture simple
-      // ouvrirait l'image de la transaction (`ER_CHECKREAD`).
-      `SELECT name FROM bg_teams WHERE id = ? LIMIT 1 LOCK IN SHARE MODE`,
-      [teamId],
-    );
     // Classement sans engagé (équipe effacée) : rien à remettre en lice — refusé
     // avant de verrouiller les manches.
     const team = teamRows[0];
