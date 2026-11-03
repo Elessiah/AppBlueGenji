@@ -61,6 +61,8 @@ export function useProposalMaps(
     // tentative part **après** la réponse de la précédente (jamais deux lectures
     // en vol sur un serveur lent), à l'espacement de base ou au `Retry-After`
     // d'un 429 s'il est plus long.
+    // Une réponse lue clôt les tentatives, même si elle décrit une proposition
+    // plus récente que l'instantané (voir `read`).
     // Un `proposals: null` du serveur est une réponse, pas un échec : rien n'est
     // lisible pour ce lecteur sur l'état relu (engagé remplacé, report retiré),
     // et les tentatives restantes reposeraient la même question pour rien. De
@@ -83,7 +85,14 @@ export function useProposalMaps(
         const payload = (await response.json()) as { proposals?: unknown };
         if (payload.proposals === null) return null;
         const parsed = parseMatchProposals(payload.proposals, matchId);
-        if (parsed && !controller.signal.aborted) setFetched(parsed);
+        if (parsed) {
+          // Réponse lue : elle décrit la proposition affichée (le détail
+          // arrive), ou une plus récente que l'instantané — dont la diffusion
+          // change `reportsKey` et relance la lecture. Relire tout de suite
+          // rendrait la même réponse.
+          if (!controller.signal.aborted) setFetched(parsed);
+          return null;
+        }
       } catch {
         // Réseau coupé ou dialogue fermé : la tentative suivante relira.
       }

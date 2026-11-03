@@ -185,7 +185,8 @@ import { discardBotLogs, flushBotLogs, queueBotLog } from "./bot-logs";
 import { releaseWithServerLockWait } from "./lock-wait";
 import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
-import { getTournamentPreview } from "./preview-cache";
+import { getTournamentPreview, invalidateTournamentPreview } from "./preview-cache";
+import { invalidateLandingMiniBrackets } from "@/lib/server/landing-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
 import { dispatchMatchVoiceChannels } from "./match-voice";
 import { dispatchDueRoundMapsNotices } from "./round-maps-notice";
@@ -1959,13 +1960,15 @@ async function liftEndurancePenaltyOnce(tournamentId: number, penaltyId: number)
   const connection = await db.getConnection();
 
   try {
-    await connection.beginTransaction();
-    // Verrou du tournoi attendu sans borne, en toute première instruction ;
-    // seule la lecture des manches suivantes a une attente bornée
-    // (`laterRoundHasScoreInput`, `./lock-wait`) — comme l'annulation d'un abandon.
-    await lockTournamentRow(connection, tournamentId);
-
+    // Module résolu avant la transaction : un premier chargement (démarrage à
+    // froid, recompilation en dev) ne se fait pas tournoi verrouillé.
     const { liftEndurancePenalty } = await import("./bg-survie/penalties");
+    await connection.beginTransaction();
+    // Verrou du tournoi attendu sans borne, en toute première instruction : la
+    // lecture verrouillée de la ligne du tournoi par le moteur
+    // (`loadTournament(…, true)`), une seule requête pour les deux. Seule la
+    // lecture des manches suivantes a une attente bornée
+    // (`laterRoundHasScoreInput`, `./lock-wait`) — comme l'annulation d'un abandon.
     const lifted = await liftEndurancePenalty(tournamentId, penaltyId, connection);
 
     queueBotLog(connection, {
@@ -1978,7 +1981,15 @@ async function liftEndurancePenaltyOnce(tournamentId: number, penaltyId: number)
     await connection.commit();
     flushBotLogs(connection);
 
-    publishUpdatedEvent(tournamentId);
+    // Comme l'annulation d'un abandon : aucun résultat de match ne change — le
+    // classement du site, les statistiques et les agrégats de l'accueil qui ne
+    // lisent que des matchs clos restent en cache. Le rejeu réécrit le
+    // classement d'endurance (lu par les listes) et peut reposer la manche
+    // courante : instantané, aperçu, listes, direct et mini-arbres de l'accueil.
+    publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+    invalidateTournamentPreview(tournamentId);
+    invalidateTournamentLists();
+    invalidateLandingMiniBrackets();
   } catch (error) {
     await connection.rollback();
     throw error;
