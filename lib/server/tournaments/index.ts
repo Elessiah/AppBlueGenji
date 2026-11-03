@@ -1135,11 +1135,23 @@ export async function getViewerMatchProposals(
 ): Promise<MatchProposalMaps | null> {
   const match = snapshot.matches.find((candidate) => candidate.id === matchId);
   if (!match) return null;
-  const isSolo = isSoloTournament(snapshot.card.participantType);
-  const { activeTeam, myTeamId } = canManage
-    ? { activeTeam: null, myTeamId: null }
-    : await resolveViewerEntrant(snapshot, userId);
-  const scope = viewerProposalScope(isSolo, myTeamId, activeTeam, canManage);
+  // En individuel, l'entrée du lecteur se résout sur la connexion de la
+  // relecture : une seule place du pool par relecture.
+  if (!canManage && isSoloTournament(snapshot.card.participantType)) {
+    return withConnection(async (connection) => {
+      const myTeamId = await resolveUserEntrantTeamId(
+        connection,
+        { participant_type: snapshot.card.participantType },
+        userId,
+      );
+      const scope = viewerProposalScope(true, myTeamId, null, false);
+      if (proposalMatches([match], scope).length === 0) return null;
+      const [proposals] = await loadFreshProposals(connection, match, scope);
+      return proposals ?? null;
+    });
+  }
+  const activeTeam = canManage ? null : await getUserActiveTeam(userId);
+  const scope = viewerProposalScope(false, activeTeam?.teamId ?? null, activeTeam, canManage);
   if (proposalMatches([match], scope).length === 0) return null;
   const [proposals] = await withConnection((connection) => loadFreshProposals(connection, match, scope));
   return proposals ?? null;
@@ -1162,21 +1174,33 @@ async function loadFreshProposals(
   scope: ProposalScope,
 ): Promise<MatchProposalMaps[]> {
   await connection.query("START TRANSACTION READ ONLY");
+  let proposals: MatchProposalMaps[];
   try {
     const [rows] = await connection.execute<
       (RowDataPacket & { team1_reported_at: SqlInstant; team2_reported_at: SqlInstant })[]
     >(`SELECT team1_reported_at, team2_reported_at FROM bg_matches WHERE id = ? LIMIT 1`, [match.id]);
     const fresh = rows[0];
-    if (!fresh) return [];
-    const current: BracketMatch = {
-      ...match,
-      team1Report: withReportedAt(match.team1Report, fresh.team1_reported_at),
-      team2Report: withReportedAt(match.team2Report, fresh.team2_reported_at),
-    };
-    return await loadViewerProposals(connection, [current], scope);
-  } finally {
-    await connection.query("COMMIT");
+    proposals = fresh
+      ? await loadViewerProposals(
+          connection,
+          [
+            {
+              ...match,
+              team1Report: withReportedAt(match.team1Report, fresh.team1_reported_at),
+              team2Report: withReportedAt(match.team2Report, fresh.team2_reported_at),
+            },
+          ],
+          scope,
+        )
+      : [];
+  } catch (error) {
+    // L'erreur d'origine remonte : une connexion tombée ferait aussi échouer
+    // la fin de transaction, qui la masquerait.
+    await connection.query("ROLLBACK").catch(() => undefined);
+    throw error;
   }
+  await connection.query("COMMIT");
+  return proposals;
 }
 
 /** Le report de l'instantané à sa date relue ; retiré depuis : aucun. */

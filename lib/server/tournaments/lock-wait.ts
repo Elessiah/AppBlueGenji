@@ -11,7 +11,12 @@ import type { PoolConnection } from "mysql2/promise";
  */
 export const SHORT_LOCK_WAIT_SECONDS = 5;
 
-/** Borne l'attente des verrous de la session, **avant** `beginTransaction`. */
+/**
+ * Borne l'attente des verrous de la session — **après** le verrou du tournoi
+ * (`lockTournamentRow`), attendu sans borne : son détenteur (réconciliation,
+ * lancement) le rend sans rien attendre du geste. Seules les attentes
+ * suivantes (manches) sont bornées.
+ */
 export async function boundLockWait(connection: PoolConnection): Promise<void> {
   await connection.query(`SET SESSION innodb_lock_wait_timeout = ${SHORT_LOCK_WAIT_SECONDS}`);
 }

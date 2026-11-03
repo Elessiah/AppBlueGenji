@@ -532,8 +532,9 @@ function TournamentSheetView({
   const { showError, showSuccess } = useToast();
 
   const { tournament: detail, refresh, isLive, tier, fatal, cadenceMs, retrying } = source;
-  // Relecture du contexte du lecteur quand une proposition a changé sous la
-  // modale de score (son détail map par map n'arrive qu'avec lui).
+  // Relecture complète du tournoi après un refus de la modale de score
+  // (`REFRESH_ON_REFUSAL`). Le détail map par map d'une proposition nouvelle,
+  // lui, arrive par la relecture du seul match (`useProposalMaps`).
   const refreshProposals = useCallback(() => refresh(), [refresh]);
   // État du flux **à la réponse**, pas au clic : tombé pendant la requête, il
   // ne livrera pas l'instantané.

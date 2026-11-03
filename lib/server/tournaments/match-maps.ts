@@ -107,11 +107,11 @@ export async function mapSetExists(
   matchId: number,
   source: MatchMapSource,
 ): Promise<boolean> {
-  const result = await connection.execute<RowDataPacket[]>(
+  const [rows] = await connection.execute<RowDataPacket[]>(
     `SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1`,
     [matchId, source],
   );
-  return Array.isArray(result) && Array.isArray(result[0]) && result[0].length > 0;
+  return rows.length > 0;
 }
 
 /**
