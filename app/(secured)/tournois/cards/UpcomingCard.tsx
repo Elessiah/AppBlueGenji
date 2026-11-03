@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useTournamentsText } from "@/components/i18n/tournaments-text";
 import { localizedMatchFormatLabel, participantLabel } from "@/lib/shared/tournaments-text";
 import type { TournamentCard } from "@/lib/shared/types";
@@ -23,9 +24,21 @@ interface UpcomingCardProps {
  * de section, bascule que `useScheduledBuckets` fait déjà à la seconde dite.
  */
 export function UpcomingCard({ t, priority }: Readonly<UpcomingCardProps>) {
+  // Le visage se juge ici, à chaque rendu de la liste, et se passe en
+  // propriété : la carte dessinée dessous est sous `memo`, qui ne la redessine
+  // que si la carte ou son visage a changé (une frappe dans la recherche ne
+  // redessine plus tout), sans figer un « Inscriptions closes » arrivé à l'heure.
+  const locked = upcomingCardFace(t, Date.now()) === "LOCKED";
+  return <UpcomingCardView t={t} priority={priority} locked={locked} />;
+}
+
+const UpcomingCardView = memo(function UpcomingCardView({
+  t,
+  priority,
+  locked,
+}: Readonly<UpcomingCardProps & { locked: boolean }>) {
   const text = useTournamentsText();
   const fill = registrationFill(t);
-  const locked = upcomingCardFace(t, Date.now()) === "LOCKED";
 
   return (
     <TournamentCardFrame
@@ -68,4 +81,4 @@ export function UpcomingCard({ t, priority }: Readonly<UpcomingCardProps>) {
       </div>
     </TournamentCardFrame>
   );
-}
+});

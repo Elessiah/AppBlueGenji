@@ -3,10 +3,20 @@ import type { TournamentCard } from "@/lib/shared/types";
 
 /**
  * Largeur rendue du bandeau d'illustration d'une carte, pour le `srcset` de
- * `next/image`. Une carte occupe une colonne de la grille de sa section, et
- * toute la largeur sous 760 px.
+ * `next/image` (le navigateur multiplie lui-même par la densité de l'écran).
+ * Elle suit la grille de `.sectionBody` (`tournois.module.css`) : une colonne
+ * sous 720 px, deux jusqu'à 1080 px, puis trois (quatre au-delà de 1800 px)
+ * d'environ 400 px.
  */
-export const CARD_IMAGE_SIZES = "(max-width: 760px) 100vw, 720px";
+export const CARD_IMAGE_SIZES = "(max-width: 720px) 100vw, (max-width: 1080px) 50vw, 400px";
+
+/**
+ * Cartes « en cours » : leur section reste sur deux colonnes (`data-cols="2"`)
+ * à toute largeur, soit environ 580 px par carte dans la colonne de 1200 px et
+ * 800 px sur les grands écrans.
+ */
+export const RUNNING_CARD_IMAGE_SIZES =
+  "(max-width: 720px) 100vw, (max-width: 1250px) 50vw, (max-width: 1799px) 580px, 800px";
 
 /** Nombre de bandeaux chargés en priorité en haut de `/tournois`. */
 export const PRIORITY_BANNER_COUNT = 2;

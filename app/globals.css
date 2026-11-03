@@ -2158,7 +2158,10 @@ html {
    Au-delà de 1800 px, la colonne s'élargit jusqu'à 1680 px et le `.container`
    intérieur la suit ; les formulaires et fiches gardent leur colonne. */
 @media (min-width: 1800px) {
-  .page-shell:has(.page-wide) {
+  /* Enfant direct (`> .page-wide`) : la page est le premier niveau de
+     `main.page-shell`. Un `:has()` descendant se réévaluait à chaque mutation
+     du sous-arbre de chaque page sécurisée (relèves de liste, notifications). */
+  .page-shell:has(> .page-wide) {
     width: min(1680px, calc(100vw - max(80px, var(--a11y-tab-gutter))));
   }
 

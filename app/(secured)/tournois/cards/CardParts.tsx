@@ -13,6 +13,8 @@ interface TournamentCardFrameProps {
   t: TournamentCard;
   /** Bandeau chargé en priorité : premières cartes illustrées de la page (`priorityBannerIds`). */
   priority?: boolean;
+  /** `sizes` du bandeau : la largeur que la grille de la section lui donne. */
+  imageSizes?: string;
   /** Visage de la carte (`data-state`), qui en règle les couleurs. */
   state: "running" | "open" | "soon" | "done";
   /** Classe de couleur du ruban (`s.cardRibbonRunning`…). */
@@ -32,6 +34,7 @@ interface TournamentCardFrameProps {
 export function TournamentCardFrame({
   t,
   priority,
+  imageSizes = CARD_IMAGE_SIZES,
   state,
   ribbonClassName,
   ribbon,
@@ -47,7 +50,7 @@ export function TournamentCardFrame({
       />
       <TournamentImageBanner
         image={t.image}
-        sizes={CARD_IMAGE_SIZES}
+        sizes={imageSizes}
         className={s.cardBanner}
         priority={priority}
       />
