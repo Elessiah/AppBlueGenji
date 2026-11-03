@@ -175,10 +175,13 @@ déjà la même apparence.
   `TOURNAMENT_LIST_FAILED` ; la toast d'échec dit une phrase traduite
   (`list.loadFailed`, `list.hiddenLoadFailed`), jamais le code ni le message
   brut du navigateur ; une lecture en échec côté serveur rend le code
-  `TOURNAMENT_LIST_FAILED` en 500. Un refus 401/403 des invisibles vide la section
-  sans toast ; le 403 seul (un 401 peut être passager) retire le droit staff à la page (plus de lecture refusée à
-  chaque rafraîchissement, plus de « Créer », cadence joueur) jusqu'à ce que le
-  serveur rende un nouveau droit (droit retiré depuis le rendu). Le paramètre
+  `TOURNAMENT_LIST_FAILED` en 500 (une contention passagère garde son message :
+  409 `CONCURRENT_UPDATE_RETRY`). Un refus 401/403 des invisibles vide la section
+  sans toast et fait relire le droit au serveur (`router.refresh()`) : retiré, le
+  prop `canManage` passe à faux (plus de « Créer », plus de lecture refusée,
+  cadence joueur) ; rendu entre-temps, la lecture suivante aboutit. Un 401 sur la
+  liste publique fait de même, sans toast : la page cède la place à la carte
+  « Connexion requise ». Le paramètre
   `?search=` est retiré (inutilisé, il contournait le cache partagé). La requête
   de liste compte les inscriptions par sous-requête corrélée (plus de `GROUP BY`
   sur 36 colonnes, ni table dérivée regroupant toute la table), lit avec elle les colonnes d'avancement (plus de relecture de
