@@ -10,8 +10,8 @@
  * optionnel, et un envoi lent n'a pas à retarder la réponse. Ne lève jamais.
  */
 import type { RowDataPacket } from "mysql2/promise";
-import { isBotCircuitOpen, sendBotLog } from "@/lib/server/bot-integration";
-import { createCoalescer, trackAnnouncement } from "@/lib/server/coalescer";
+import { sendBotLog } from "@/lib/server/bot-integration";
+import { createCoalescer, createKeyedChain } from "@/lib/server/coalescer";
 import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
 import {
@@ -43,8 +43,6 @@ export async function deliverStaffMatchAction(
   author: StaffActionAuthor = "STAFF",
   options: StaffMatchActionOptions = {},
 ): Promise<void> {
-  // Bot injoignable : la ligne serait jetée à l'envoi, la lecture ne sert à rien.
-  if (isBotCircuitOpen()) return;
   const row = await loadMatchLogRow(matchId);
   if (!row) return;
   const match = matchLogSubject(row);
@@ -75,7 +73,6 @@ export async function deliverStaffTournamentAction(
   action: StaffTournamentAction,
   details: StaffTournamentActionDetails = {},
 ): Promise<void> {
-  if (isBotCircuitOpen()) return;
   const db = await getDatabase();
   const [rows] = await db.execute<TournamentNameRow[]>("SELECT id, name FROM bg_tournaments WHERE id = ? LIMIT 1", [
     tournamentId,
@@ -100,8 +97,9 @@ export function announceStaffMatchAction(
   author: StaffActionAuthor = "STAFF",
   options: StaffMatchActionOptions = {},
 ): void {
-  // Suivie : l'arrêt du serveur attend la ligne avant de couper.
-  void trackAnnouncement(
+  // Deux gestes rapprochés sur un match (antenne puis hors antenne) gardent
+  // leur ordre ; l'arrêt du serveur attend la ligne.
+  matchLines.chain(matchId, () =>
     deliverStaffMatchAction(matchId, action, author, options).catch((error) =>
       console.error(`[staff-log] geste ${action} sur le match #${matchId} non journalisé : ${failureReason(error)}`),
     ),
@@ -143,7 +141,8 @@ export function flushStaffActionBursts(): Promise<void> {
 /** Abandonne les rafales en attente. Réservé aux tests. */
 export function resetStaffActionBursts(): void {
   tournamentBursts.reset();
-  tournamentTails.clear();
+  tournamentLines.reset();
+  matchLines.reset();
 }
 
 /**
@@ -166,28 +165,15 @@ export function announceStaffTournamentAction(
   const keys = [...BURST_ACTIONS].map((burst) => `${tournamentId}:${burst}`);
   // Rien en attente (le cas courant) : la ligne part sur-le-champ, sans détour
   // par la file des microtâches — un arrêt du serveur juste après ne la rate pas.
-  if (!keys.some((key) => tournamentBursts.busy(key))) {
-    chainTournament(tournamentId, () => deliverTournamentAction(entry));
-    return;
-  }
-  const flushed = Promise.all(keys.map((key) => tournamentBursts.flush(key)));
-  chainTournament(tournamentId, () => flushed.then(() => deliverTournamentAction(entry)));
+  // La rafale ne se vide qu'à son tour dans la file du tournoi : elle ne double
+  // pas une ligne d'avant encore en route.
+  tournamentLines.chain(tournamentId, () =>
+    keys.some((key) => tournamentBursts.busy(key))
+      ? Promise.all(keys.map((key) => tournamentBursts.flush(key))).then(() => deliverTournamentAction(entry))
+      : deliverTournamentAction(entry),
+  );
 }
 
-/** Dernière ligne de tournoi en route, par tournoi : la suivante part après elle. */
-const tournamentTails = new Map<number, Promise<void>>();
-
-/**
- * Enchaîne une ligne de tournoi derrière la précédente du même tournoi : un
- * geste qui suit une rafale en cours de vidage ne la double pas sur Discord.
- * Sans ligne en route, elle part sur-le-champ. Suivie : l'arrêt du serveur
- * attend sa lecture du nom du tournoi.
- */
-function chainTournament(tournamentId: number, run: () => Promise<void>): void {
-  const previous = tournamentTails.get(tournamentId);
-  const settled = (previous ? previous.then(run, run) : run()).catch(() => undefined);
-  tournamentTails.set(tournamentId, settled);
-  void trackAnnouncement(settled).then(() => {
-    if (tournamentTails.get(tournamentId) === settled) tournamentTails.delete(tournamentId);
-  });
-}
+/** Lignes de tournoi en route, par tournoi, et de match, par match. */
+const tournamentLines = createKeyedChain<number>();
+const matchLines = createKeyedChain<number>();

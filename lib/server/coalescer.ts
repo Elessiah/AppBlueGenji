@@ -168,3 +168,27 @@ export function trackAnnouncement(announcement: Promise<void>): Promise<void> {
   void announcement.then(forget, forget);
   return announcement;
 }
+
+/**
+ * File d'annonces par clé : chaque annonce part après la précédente de la même
+ * clé (le journal garde l'ordre des gestes), sans retenir les autres clés. Sans
+ * annonce en route, elle part sur-le-champ. Chacune est suivie
+ * ({@link trackAnnouncement}) : l'arrêt du serveur l'attend.
+ */
+export function createKeyedChain<K>(): {
+  chain: (key: K, run: () => Promise<void>) => void;
+  reset: () => void;
+} {
+  const tails = new Map<K, Promise<void>>();
+  return {
+    chain(key, run) {
+      const previous = tails.get(key);
+      const settled = (previous ? previous.then(run, run) : run()).catch(() => undefined);
+      tails.set(key, settled);
+      void trackAnnouncement(settled).then(() => {
+        if (tails.get(key) === settled) tails.delete(key);
+      });
+    },
+    reset: () => tails.clear(),
+  };
+}

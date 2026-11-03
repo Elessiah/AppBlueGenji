@@ -70,9 +70,9 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
 
   try {
     const { previousName, name } = await updateTournament(checked.id, patch);
-    // Un renommage cite l'ancien nom : la ligne nomme le tournoi sous le nouveau,
-    // celui que ce geste a écrit (pas celui d'un renommage qui le suivrait).
-    announceStaffTournamentAction(checked.id, "EDITED", patch.name === undefined ? {} : { previousName, name });
+    // La ligne nomme le tournoi sous le nom que ce geste a écrit (pas celui d'un
+    // renommage qui le suivrait) ; un renommage cite aussi l'ancien.
+    announceStaffTournamentAction(checked.id, "EDITED", patch.name === undefined ? { name } : { previousName, name });
     return ok({ success: true });
   } catch (error) {
     const message = (error as Error).message;
