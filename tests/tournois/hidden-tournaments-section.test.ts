@@ -14,7 +14,7 @@ const route = read("app/api/tournaments/route.ts");
 
 describe("page tournois — section « Tournois invisibles »", () => {
   it("ne demande les invisibles qu'au staff tournois", () => {
-    expect(page).toContain('fetchBuckets("/api/tournaments?scope=hidden", signal)');
+    expect(page).toContain('fetchBuckets("/api/tournaments?scope=hidden", signal, "no-store")');
     // Un joueur ne déclenche même pas la requête : elle lui serait refusée.
     // Sans permission : la section est vidée et la requête n'est pas envoyée.
     // Le tableau vide n'est réécrit que s'il ne l'est pas déjà, pour ne pas
@@ -122,7 +122,7 @@ describe("page tournois — échecs de lecture de la liste", () => {
 
   it("vide les invisibles sans toast quand le droit est refusé", () => {
     expect(page).toMatch(
-      /if \(code === "FORBIDDEN" \|\| code === "UNAUTHORIZED"\) \{\s*setHiddenTournaments\([^\n]*\);\s*setStaffRevoked\(true\);\s*return;\s*\}/,
+      /if \(code === "FORBIDDEN" \|\| code === "UNAUTHORIZED"\) \{\s*setHiddenTournaments\([^\n]*\);\s*if \(code === "FORBIDDEN"\) setStaffRevoked\(true\);\s*return;\s*\}/,
     );
   });
 
@@ -136,6 +136,15 @@ describe("page tournois — échecs de lecture de la liste", () => {
 
   it("signale les autres échecs des invisibles par une phrase traduite, sauf en lecture de fond", () => {
     expect(page).toMatch(/return;\s*\}\s*if \(silent\) return;\s*showError\(t\("list\.hiddenLoadFailed"\)\);/);
+  });
+
+  it("demande les invisibles sans copie gardée par le navigateur, la liste publique en revalidation", () => {
+    expect(page).toContain('const response = await fetch(url, { cache, signal });');
+    expect(page).toContain('cache: "no-cache" | "no-store" = "no-cache",');
+  });
+
+  it("lit « Mes tournois » sans lever d'erreur de syntaxe sur une page d'erreur HTML", () => {
+    expect(page).toMatch(/async function fetchMyTournamentIds\([\s\S]{0,300}?await response\.json\(\)\.catch\(\(\) => \(\{\}\)\)/);
   });
 
   it("signale l'échec de la liste par une phrase traduite, jamais par le message brut", () => {

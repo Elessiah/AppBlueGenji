@@ -115,8 +115,12 @@ describe("relecture de la liste", () => {
   const list = readSource("app/(secured)/tournois/TournamentsList.tsx");
 
   it("revalide la liste avec son empreinte plutôt que de la contourner", () => {
-    expect(list).toMatch(/fetch\(url, \{ cache: "no-cache", signal \}\)/);
-    expect(list).not.toMatch(/fetch\(url, \{ cache: "no-store"/);
+    // Revalidation par défaut ; seuls les invisibles (non publiés) passent en
+    // `no-store`, une seule lecture.
+    expect(list).toContain('cache: "no-cache" | "no-store" = "no-cache",');
+    expect(list).toContain("fetch(url, { cache, signal })");
+    expect(list.match(/fetchBuckets\([^)]*"no-store"\)/g)).toHaveLength(1);
+    expect(list).toContain('fetchBuckets("/api/tournaments?scope=hidden", signal, "no-store")');
   });
 
   it("n'arme l'archive qu'après la première liste et tant qu'il en faut", () => {

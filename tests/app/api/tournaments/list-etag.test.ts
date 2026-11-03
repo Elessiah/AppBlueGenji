@@ -121,6 +121,17 @@ describe("GET /api/tournaments — empreinte et 304", () => {
     expect(await res.json()).toEqual({ buckets: buckets() });
   });
 
+  it("rend un code 500 quand la lecture de la liste échoue", async () => {
+    jest.mocked(service.listTournamentBuckets).mockRejectedValue(new Error("ECONNREFUSED 127.0.0.1:3306"));
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const res = await get();
+    consoleError.mockRestore();
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "TOURNAMENT_LIST_FAILED" });
+  });
+
   it("ne rend jamais 304 aux invisibles, même au joker", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
 
