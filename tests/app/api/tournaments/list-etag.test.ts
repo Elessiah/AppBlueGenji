@@ -85,7 +85,7 @@ describe("GET /api/tournaments — empreinte et 304", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("une liste rebâtie à chaque appel (portée hidden) garde la même empreinte tant que son contenu est le même", async () => {
+  it("une liste publique rebâtie (cache vidé) garde la même empreinte tant que son contenu est le même", async () => {
     jest.mocked(service.listTournamentBuckets).mockImplementation(async () => buckets());
 
     const first = (await get()).headers.get("etag") ?? "";

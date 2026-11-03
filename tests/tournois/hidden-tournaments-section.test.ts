@@ -122,8 +122,16 @@ describe("page tournois — échecs de lecture de la liste", () => {
 
   it("vide les invisibles sans toast quand le droit est refusé", () => {
     expect(page).toMatch(
-      /if \(code === "FORBIDDEN" \|\| code === "UNAUTHORIZED"\) \{\s*setHiddenTournaments\([^\n]*\);\s*return;\s*\}/,
+      /if \(code === "FORBIDDEN" \|\| code === "UNAUTHORIZED"\) \{\s*setHiddenTournaments\([^\n]*\);\s*setStaffRevoked\(true\);\s*return;\s*\}/,
     );
+  });
+
+  it("un refus des invisibles retire le droit staff à la page, rendu au prop quand il change", () => {
+    expect(page).toContain("const isAdmin = canManage && !staffRevoked;");
+    expect(page).toMatch(/if \(revokedFor !== canManage\) \{\s*setRevokedFor\(canManage\);\s*setStaffRevoked\(false\);\s*\}/);
+    // Le droit retiré commande aussi « Créer » et la cadence staff.
+    expect(page).toContain("refreshCadenceFor({ isStaff: isAdmin })");
+    expect(page).toMatch(/\{isAdmin && \(/);
   });
 
   it("signale les autres échecs des invisibles, sauf en lecture de fond", () => {

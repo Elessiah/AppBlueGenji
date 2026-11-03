@@ -88,7 +88,7 @@ describe("page tournois — barre de recherche et filtres", () => {
   });
 
   it("le droit staff vient du serveur : plus de lecture `/api/auth/me` ni d'état `isAdmin`", () => {
-    expect(page).toContain("const isAdmin = canManage;");
+    expect(page).toContain("const isAdmin = canManage && !staffRevoked;");
     expect(page).not.toContain('fetch("/api/auth/me"');
     expect(page).not.toContain("setIsAdmin");
     // La première lecture des invisibles fait partie de la porte, échec compris.
