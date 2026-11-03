@@ -168,6 +168,20 @@ describe("DELETE /api/tournaments/[id]/penalties/[penaltyId]", () => {
     expect(service.liftEndurancePenalty).not.toHaveBeenCalled();
   });
 
+  // Revue #542 : contention reconnue par son code (message localisé) → 409.
+  it("DELETE_lockWaitTimeoutLocalized_returns409ConcurrentUpdateRetry", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest
+      .mocked(service.liftEndurancePenalty)
+      .mockRejectedValue(Object.assign(new Error("Délai d'attente de verrou dépassé"), { code: "ER_LOCK_WAIT_TIMEOUT", errno: 1205 }));
+
+    const res = await DELETE(deleteReq(), deleteParams);
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: "CONCURRENT_UPDATE_RETRY" });
+  });
+
   it("l'arbitrage retire la sanction", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(referee);
     const res = await DELETE(deleteReq(), deleteParams);

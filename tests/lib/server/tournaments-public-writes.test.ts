@@ -509,7 +509,7 @@ describe("adminSaveMatchScoresPublic", () => {
     }
     expect(connection.execute).not.toHaveBeenCalled();
     expectCommitted();
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(8);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(8, { landingLive: true });
     expect(order(jest.mocked(publishMatchUpdatedEvent))).toBeGreaterThan(order(connection.commit));
     expect(publishScoreResolvedEvent).not.toHaveBeenCalled();
     expect(publishUpdatedEvent).not.toHaveBeenCalled();
@@ -522,7 +522,7 @@ describe("adminSaveMatchScoresPublic", () => {
 
     await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 }, { id: 9, pseudo: "Sifflet" })).resolves.toBe(true);
 
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(8);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(8, { landingLive: true });
     expect(alertSelfPausedValidation).not.toHaveBeenCalled();
     expectCommitted();
   });
