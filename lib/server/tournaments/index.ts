@@ -1580,7 +1580,22 @@ export async function adminSaveMatchScoresPublic(
 }
 
 /**
- * Tournoi d'un match à enregistrer, avant la transaction d'« Enregistrer ».
+ * Formats dont une réconciliation peut **détruire** une manche non close pour
+ * la réapparier (Survie, ronde suisse, endurance, phases) : seule cette
+ * destruction impose à « Enregistrer » le verrou du tournoi avant celui du
+ * match. En élimination, aucune réconciliation ne touche un match non clos.
+ */
+const ROUND_REBUILDING_FORMATS: ReadonlySet<TournamentFormat> = new Set<TournamentFormat>([
+  "SURVIVAL",
+  "SWISS",
+  "BG_SURVIE",
+  "MULTI",
+]);
+
+/**
+ * Tournoi d'un match à enregistrer, avant la transaction d'« Enregistrer » ;
+ * `locksTournament` : son format exige le verrou du tournoi
+ * (`ROUND_REBUILDING_FORMATS`).
  *
  * @throws `MATCH_NOT_FOUND`, `MATCH_NOT_READY`, `MATCH_ALREADY_COMPLETED`,
  *         `INVALID_FORFEIT_TEAM_ID`, `INVALID_REQUEST`
@@ -1589,15 +1604,26 @@ async function saveTargetTournament(
   connection: PoolConnection,
   matchId: number,
   entry: AdminScoreEntry,
-): Promise<number> {
+): Promise<{ tournamentId: number; locksTournament: boolean }> {
   const [rows] = await connection.execute<
-    (RowDataPacket & { tournament_id: number; team1_id: number | null; team2_id: number | null; status: string })[]
-  >(`SELECT tournament_id, team1_id, team2_id, status FROM bg_matches WHERE id = ? LIMIT 1`, [matchId]);
+    (RowDataPacket & {
+      tournament_id: number;
+      team1_id: number | null;
+      team2_id: number | null;
+      status: string;
+      format: TournamentFormat;
+    })[]
+  >(
+    `SELECT m.tournament_id, m.team1_id, m.team2_id, m.status, t.format
+     FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id
+     WHERE m.id = ? LIMIT 1`,
+    [matchId],
+  );
   const row = rows[0];
   if (!row) throw new Error("MATCH_NOT_FOUND");
   assertMatchSavable(row);
   assertSaveEntryFits(row, entry);
-  return Number(row.tournament_id);
+  return { tournamentId: Number(row.tournament_id), locksTournament: ROUND_REBUILDING_FORMATS.has(row.format) };
 }
 
 async function adminSaveMatchScoresOnce(
@@ -1617,14 +1643,15 @@ async function adminSaveMatchScoresOnce(
     // ses deux engagés, forfait d'une équipe étrangère, saisie mal formée)
     // partent ici, sans attendre le verrou du tournoi ; ils se rejugent sous
     // verrou (`adminSaveMatchScores`), par les mêmes règles (`./save-guard`).
-    const tournamentId = await saveTargetTournament(connection, matchId, entry);
+    const { tournamentId, locksTournament } = await saveTargetTournament(connection, matchId, entry);
     // Module résolu avant le verrou : un premier chargement (démarrage à froid,
     // recompilation en dev) ne se fait pas tournoi verrouillé.
     const { adminSaveMatchScores: adminSaveInternal } = await import("./admin");
 
     await connection.beginTransaction();
     inTransaction = true;
-    // Tournoi d'abord, **en toute première instruction**, puis le match : l'ordre
+    // Formats qui rebâtissent leurs manches (`ROUND_REBUILDING_FORMATS`) :
+    // tournoi d'abord, **en toute première instruction**, puis le match : l'ordre
     // des réconciliations, des gestes qui remontent le temps (annulation d'un
     // abandon, retrait d'une pénalité), de la programmation, de l'autogestion de
     // manche et de la première carte. Une réconciliation **entrée par le verrou
@@ -1641,7 +1668,11 @@ async function adminSaveMatchScoresOnce(
     // (« Enregistrer », qui n'a rien écrit, est la victime désignée) et que
     // `retryOnDeadlock` rejoue. Un report dont l'image précède cette saisie peut
     // encore juger sa manche vierge (ERREUR.txt, préexistant).
-    await lockTournamentRow(connection, tournamentId);
+    //
+    // En élimination, aucune réconciliation ne détruit un match non clos : la
+    // saisie map par map ne prend que le verrou du match, et les saisies des
+    // matchs d'une même manche ne se sérialisent pas sur le tournoi.
+    if (locksTournament) await lockTournamentRow(connection, tournamentId);
 
     const { saved, ...pause } = await adminSaveInternal(connection, matchId, entry);
 

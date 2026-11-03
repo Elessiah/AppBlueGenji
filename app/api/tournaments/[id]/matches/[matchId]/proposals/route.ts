@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/server/auth";
-import { enforceRateLimit, TOURNAMENT_READ_RULE } from "@/lib/server/api-guard";
+import { enforceRateLimit, MATCH_PROPOSALS_READ_RULE } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { getViewerMatchProposals } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
@@ -16,7 +16,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string; m
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
 
-  const throttled = enforceRateLimit(TOURNAMENT_READ_RULE, user.id);
+  const throttled = enforceRateLimit(MATCH_PROPOSALS_READ_RULE, user.id);
   if (throttled) return throttled;
 
   const { id, matchId: rawMatchId } = await context.params;

@@ -147,6 +147,18 @@ export const TOURNAMENT_READ_RULE: RateLimitRule = {
   windowMs: 60_000,
 };
 
+/**
+ * Relecture des propositions d'**un** match (`GET …/matches/[matchId]/proposals`),
+ * par compte : seau distinct de `TOURNAMENT_READ_RULE`, pour que les relectures
+ * des dialogues de score (trois au plus par proposition, `useProposalMaps`)
+ * n'entament pas la lecture REST de secours du détail.
+ */
+export const MATCH_PROPOSALS_READ_RULE: RateLimitRule = {
+  name: "match-proposals-read",
+  limit: 60,
+  windowMs: 60_000,
+};
+
 /** Lectures publiques de la vitrine, par IP. */
 export const LANDING_READ_RULE: RateLimitRule = {
   name: "landing-read",
