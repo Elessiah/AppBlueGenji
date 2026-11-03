@@ -161,13 +161,16 @@ export async function readMatchCasters(
       matches.map((match) => match.id),
     );
     // Une lecture par jeu : Battle.net n'est demandé qu'en Overwatch.
-    const eligibleByGame = new Map<TournamentGame, Set<number>>();
-    for (const game of new Set(matches.map((match) => match.game))) {
-      const ids = matches
-        .filter((match) => match.game === game)
-        .flatMap((match) => (links.get(match.id) ?? []).map((caster) => caster.userId));
-      eligibleByGame.set(game, await loadEligibleCasterIds(db, ids, game));
-    }
+    const eligibleByGame = new Map<TournamentGame, Set<number>>(
+      await Promise.all(
+        [...new Set(matches.map((match) => match.game))].map(async (game) => {
+          const ids = matches
+            .filter((match) => match.game === game)
+            .flatMap((match) => (links.get(match.id) ?? []).map((caster) => caster.userId));
+          return [game, await loadEligibleCasterIds(db, ids, game)] as const;
+        }),
+      ),
+    );
     const gameOf = new Map(matches.map((match) => [match.id, match.game]));
     return new Map(
       [...links].map(([matchId, casters]) => [

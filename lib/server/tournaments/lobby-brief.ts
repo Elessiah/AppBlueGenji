@@ -638,11 +638,13 @@ async function runLobbyBriefSweep(): Promise<number> {
   const games = new Set<TournamentGame>(rows.map((row) => row.game));
   const checkedReferees = new Map<TournamentGame, Set<number>>();
   const eligibleReferees = new Map<TournamentGame, Set<number>>();
-  for (const game of games) {
-    const ids = new Set(refereeIdsOf(briefable, game));
-    checkedReferees.set(game, ids);
-    eligibleReferees.set(game, await readEligibleReferees(db, [...ids], game));
-  }
+  await Promise.all(
+    [...games].map(async (game) => {
+      const ids = new Set(refereeIdsOf(briefable, game));
+      checkedReferees.set(game, ids);
+      eligibleReferees.set(game, await readEligibleReferees(db, [...ids], game));
+    }),
+  );
 
   /** Les deux côtés d'un match relu ; un arbitre désigné depuis la première lecture est lu à part. */
   const briefSides = async (row: LobbyBriefRow) => {
