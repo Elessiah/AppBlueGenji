@@ -144,6 +144,60 @@ describe("announceStaffMatchAction / announceStaffTournamentAction", () => {
     expect(sendBotLog).toHaveBeenCalledTimes(1);
   });
 
+  it("announceStaffMatchAction_shutdownFlush_waitsDelivery", async () => {
+    let finishRead: () => void = () => undefined;
+    const execute = jest.fn<SqlQuery>(() => new Promise((resolve) => (finishRead = () => resolve([[matchRow()], []]))));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    announceStaffMatchAction(42, "FORCE_LAUNCHED");
+    const flushed = flushAllCoalescers();
+    await settle();
+    expect(sendBotLog).not.toHaveBeenCalled();
+    finishRead();
+    await flushed;
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("announceStaffTournamentAction_secondLineSameTournament_waitsFirst", async () => {
+    resetStaffActionBursts();
+    let finishFirst: () => void = () => undefined;
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (finishFirst = () => resolve([[{ id: 7, name: "Coupe d'hiver" }], []]))),
+      )
+      .mockResolvedValue([[{ id: 7, name: "Coupe d'hiver" }], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    announceStaffTournamentAction(7, "EDITED");
+    announceStaffTournamentAction(7, "ADVANCED", { target: "RUNNING" });
+    await settle();
+    expect(execute).toHaveBeenCalledTimes(1);
+    finishFirst();
+    await flushAllCoalescers();
+    const lines = jest.mocked(sendBotLog).mock.calls.map((call) => String(call[0]));
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("Tournoi modifié");
+    expect(lines[1]).toContain("Étape suivante avancée");
+  });
+
+  it("announceStaffTournamentAction_otherTournamentBusy_notBlocked", async () => {
+    resetStaffActionBursts();
+    let finishFirst: () => void = () => undefined;
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (finishFirst = () => resolve([[{ id: 7, name: "Coupe d'hiver" }], []]))),
+      )
+      .mockResolvedValue([[{ id: 8, name: "Coupe d'été" }], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    announceStaffTournamentAction(7, "EDITED");
+    announceStaffTournamentAction(8, "EDITED");
+    await settle();
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[1][1]).toEqual([8]);
+    finishFirst();
+    await flushAllCoalescers();
+  });
+
   it("ne lèvent jamais quand la base est indisponible", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(getDatabase).mockRejectedValue(new Error("down"));
@@ -214,6 +268,15 @@ describe("deliverStaffTournamentAction — précisions", () => {
   it("deliverStaffTournamentAction_renamed_citesOldName", async () => {
     mockRows({ id: 7, name: "Coupe d'hiver" });
     await deliverStaffTournamentAction(7, "EDITED", { previousName: "Coupe d'automne" });
+    expect(sendBotLog).toHaveBeenCalledWith(
+      "🛠️ Tournoi modifié — « Coupe d'hiver » (#7) (ancien nom : « Coupe d'automne »), par le staff.",
+      { tournamentId: 7, category: "admin" },
+    );
+  });
+
+  it("deliverStaffTournamentAction_renamedWithName_usesWrittenName", async () => {
+    mockRows({ id: 7, name: "Coupe de printemps" });
+    await deliverStaffTournamentAction(7, "EDITED", { previousName: "Coupe d'automne", name: "Coupe d'hiver" });
     expect(sendBotLog).toHaveBeenCalledWith(
       "🛠️ Tournoi modifié — « Coupe d'hiver » (#7) (ancien nom : « Coupe d'automne »), par le staff.",
       { tournamentId: 7, category: "admin" },

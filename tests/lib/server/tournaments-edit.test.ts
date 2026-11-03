@@ -309,7 +309,7 @@ describe("phase de lancement des matchs", () => {
 
   it("reste modifiable sur un tournoi publié, avant son départ", async () => {
     rowToReturn = hiddenRow({ start_visibility_at: past });
-    await expect(updateTournament(1, { launchPhase: true })).resolves.toEqual({ previousName: "Coupe test" });
+    await expect(updateTournament(1, { launchPhase: true })).resolves.toEqual({ previousName: "Coupe test", name: "Coupe test" });
   });
 
   it.each(["RUNNING", "FINISHED"])("est figée sur un tournoi %s, sans rien écrire", async (state) => {

@@ -69,7 +69,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(getCurrentUser).mockResolvedValue(referee);
   jest.mocked(service.loadEditableTournament).mockResolvedValue(loaded);
-  jest.mocked(service.updateTournament).mockResolvedValue({ previousName: "Ancien nom" });
+  jest.mocked(service.updateTournament).mockResolvedValue({ previousName: "Ancien nom", name: "Nouveau nom" });
 });
 
 describe("GET /api/tournaments/[id]/edit", () => {
@@ -187,9 +187,12 @@ describe("PATCH /api/tournaments/[id]/edit", () => {
 });
 
 describe("PATCH — journal du staff", () => {
-  it("editRoute_renamed_passesPreviousName", async () => {
+  it("editRoute_renamed_passesPreviousAndWrittenName", async () => {
     await PATCH(patchReq({ name: "Nouveau nom" }), params("1"));
-    expect(announceStaffTournamentAction).toHaveBeenCalledWith(1, "EDITED", { previousName: "Ancien nom" });
+    expect(announceStaffTournamentAction).toHaveBeenCalledWith(1, "EDITED", {
+      previousName: "Ancien nom",
+      name: "Nouveau nom",
+    });
   });
 
   it("editRoute_noNameInPatch_noPreviousName", async () => {

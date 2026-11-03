@@ -153,7 +153,7 @@ type TournamentCase = [
 
 describe("gestes du staff sur un tournoi", () => {
   it.each<TournamentCase>([
-    ["tournoi modifié", "EDITED", { previousName: "Nouveau" }, () => editRoute(jsonReq("PATCH", { name: "Nouveau" }), tournament), () => jest.mocked(updateTournament).mockResolvedValue({ previousName: "Nouveau" })],
+    ["tournoi modifié", "EDITED", { previousName: "Ancien", name: "Nouveau" }, () => editRoute(jsonReq("PATCH", { name: "Nouveau" }), tournament), () => jest.mocked(updateTournament).mockResolvedValue({ previousName: "Ancien", name: "Nouveau" })],
     ["seeding", "SEEDING_REORDERED", undefined, () => seedingRoute(jsonReq("PATCH", { teamIds: [1, 2] }), tournament), () => {
       jest.mocked(reorderSeeding).mockResolvedValue();
       jest.mocked(loadSeedingBoard).mockResolvedValue(null);
