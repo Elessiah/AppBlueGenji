@@ -11,6 +11,7 @@ jest.mock("@/lib/server/tournaments/byes");
 jest.mock("@/lib/server/tournaments/scoring");
 jest.mock("@/lib/server/tournaments/player-pushes");
 jest.mock("@/lib/server/tournaments/player-forfeit");
+jest.mock("@/lib/server/tournaments/deleted-entry-forfeit");
 jest.mock("@/lib/server/tournaments/admin");
 jest.mock("@/lib/server/tournaments/survival");
 jest.mock("@/lib/server/tournaments/swiss");
@@ -26,6 +27,7 @@ import {
   adminSaveMatchScoresPublic,
   applyEndurancePenaltyPublic,
   createTournament,
+  forfeitDeletedEntryMatchPublic,
   forfeitOwnMatchPublic,
   forfeitTournamentTeamPublic,
   getUserEntrant,
@@ -54,6 +56,7 @@ import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 import { reportMatchScore } from "@/lib/server/tournaments/scoring";
 import { notifyScoreToConfirm } from "@/lib/server/tournaments/player-pushes";
 import { forfeitOwnMatch } from "@/lib/server/tournaments/player-forfeit";
+import { forfeitDeletedEntryNextMatch } from "@/lib/server/tournaments/deleted-entry-forfeit";
 import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournaments/admin";
 import { forfeitSurvivalTeam, reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { forfeitSwissTeam, reconcileSwiss } from "@/lib/server/tournaments/swiss";
@@ -485,6 +488,25 @@ describe("écritures d'un engagé — report de score, forfait sur sa manche", (
     expect(order(jest.mocked(finalizeTournamentIfDone))).toBeGreaterThan(order(jest.mocked(forfeitOwnMatch)));
     expectCommitted();
     expect(publishScoreReportedEvent).toHaveBeenCalledWith(5, 70);
+  });
+
+  it("forfeitDeletedEntryMatchPublic_matchForfeited_returnsIdAndPublishes", async () => {
+    jest.mocked(forfeitDeletedEntryNextMatch).mockResolvedValue(70);
+
+    expect(await forfeitDeletedEntryMatchPublic(5, 40)).toBe(70);
+
+    expect(forfeitDeletedEntryNextMatch).toHaveBeenCalledWith(expect.anything(), 5, 40);
+    expectCommitted();
+    expect(publishScoreReportedEvent).toHaveBeenCalledWith(5, 70);
+  });
+
+  it("forfeitDeletedEntryMatchPublic_nothingToDo_nullAndNoEvent", async () => {
+    jest.mocked(forfeitDeletedEntryNextMatch).mockResolvedValue(null);
+
+    expect(await forfeitDeletedEntryMatchPublic(5, 40)).toBeNull();
+
+    expect(publishScoreReportedEvent).not.toHaveBeenCalled();
+    expect(notifyScoreToConfirm).not.toHaveBeenCalled();
   });
 });
 
