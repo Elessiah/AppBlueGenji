@@ -257,7 +257,9 @@ au match, qui ne fait remonter que la ligne du match) : l'instantané
 en cache peut précéder un report, un retrait ou un changement d'engagé
 (correction d'arbitrage). La règle de lecture se juge sur cet état relu — une
 équipe sortie du match n'en lit plus les propositions, un report déposé depuis
-l'instantané est servi avec sa date. Toute la relecture tient **une** place du
+l'instantané est servi avec sa date. La route a son propre plafond (`MATCH_PROPOSALS_READ_RULE`, 60 par minute et
+par compte), distinct de la lecture REST du détail, que ses relectures
+n'entament donc pas. Toute la relecture tient **une** place du
 pool : visibilité du tournoi (sa seule ligne, `participant_type` et
 `start_visibility_at` — ni l'instantané, rebâti à chaque relecture sur un cache
 vidé par les scores, ni l'agrégat des inscrites de la carte), engagé du lecteur

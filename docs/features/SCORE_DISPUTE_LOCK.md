@@ -159,8 +159,10 @@ remplace plus, à l'échéance, ce que l'arbitre a noté.
 
 « Enregistrer » ne clôt jamais un match : la sauvegarde ne lance aucune
 réconciliation de classement et ne publie que le plateau
-(`publishMatchUpdatedEvent`, ERREUR.txt EF-15). Elle prend pourtant le verrou
-du tournoi **en toute première instruction** de sa transaction, puis celui du
+(`publishMatchUpdatedEvent`, ERREUR.txt EF-15). Dans les formats qui
+rebâtissent leurs manches (Survie, ronde suisse, endurance, phases :
+`ROUND_REBUILDING_FORMATS`, `tournaments/index.ts`), elle prend pourtant le
+verrou du tournoi **en toute première instruction** de sa transaction, puis celui du
 match (ordre des réconciliations, de l'annulation d'un abandon, du retrait
 d'une pénalité, de la programmation, de l'autogestion de manche et de la
 première carte) : une réconciliation **entrée par le verrou du tournoi** qui
@@ -172,7 +174,10 @@ déclaré par une équipe, « Valider le résultat », correction d'arbitrage �
 restent inversés : sur le même match, l'interblocage est rompu par le moteur
 (« Enregistrer », qui n'a rien écrit, en est la victime) et rejoué
 (`retryOnDeadlock`) ; un report dont l'image précède la saisie peut encore
-juger sa manche vierge (préexistant, ERREUR.txt). Le tournoi du match
+juger sa manche vierge (préexistant, ERREUR.txt). En élimination (simple,
+double), aucune réconciliation ne touche un match non clos : la saisie ne prend
+que le verrou du match, et les saisies map par map des matchs d'une même manche
+ne se sérialisent pas sur le tournoi. Le tournoi du match, avec son format,
 se lit juste avant, hors transaction (la route ne connaît que le match), et les
 refus qui ne lisent rien d'autre (`MATCH_NOT_FOUND`, `MATCH_NOT_READY`,
 `MATCH_ALREADY_COMPLETED`, forfait d'une équipe étrangère
