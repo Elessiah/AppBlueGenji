@@ -426,6 +426,13 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
     finishedExpanded && wantFinishedArchive && viewBuckets.finishedTotals !== undefined;
 
   const showHidden = isAdmin && viewHidden.length > 0;
+  const liveMessage = (() => {
+    if (!listLoaded) return "";
+    if (finishedArchiveLoading) return t("list.finishedLoading");
+    if (!deferredQuery.trim()) return "";
+    const shown = totalMine + totalRunning + totalRegistration + totalUpcoming + totalFinished + (showHidden ? totalHidden : 0);
+    return t("list.resultsCount", { count: String(shown) });
+  })();
 
   // Mêmes paniers que les sections ; un tableau neuf à chaque rendu empêchait
   // le `memo` du bandeau de jamais servir (chaque frappe le redessinait).
@@ -637,12 +644,13 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
               sa place, sans annoncer « Aucune actualité ». */}
           <Ticker items={tickerItems} labels={text.tickerLabels} />
 
-          {/* aria-busy : les cartes suivent `deferredQuery`, en retard d'une frappe sur le champ. */}
-          <div
-            className={s.sections}
-            data-loading={listLoaded ? undefined : "true"}
-            aria-busy={query === deferredQuery ? undefined : true}
-          >
+          {/* Région live toujours montée (une région insérée avec son texte n'est pas
+              annoncée) : le nombre de résultats de la recherche, une fois les cartes
+              à jour (`deferredQuery`), et l'attente de l'archive des terminés. */}
+          <output className="sr-only">
+            {liveMessage}
+          </output>
+          <div className={s.sections} data-loading={listLoaded ? undefined : "true"}>
             {!listLoaded && <SecuredLoadingView label={t("list.loading")} cardsOnly />}
 
             {listLoaded && shownSections.length === 0 && (
@@ -783,9 +791,7 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
                     s'afficherait sur les douze mêmes cartes, comme si le clic
                     n'avait rien donné. */}
                 {finishedArchiveLoading && (
-                  <div /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={s.showMoreRow} role="status">
-                    {t("list.finishedLoading")}
-                  </div>
+                  <div className={s.showMoreRow}>{t("list.finishedLoading")}</div>
                 )}
                 <ShowMoreRow
                   sectionTitle={sectionTitle("finished")}
