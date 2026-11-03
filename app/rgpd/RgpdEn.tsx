@@ -263,10 +263,10 @@ export function RgpdEn({
           </tbody>
         </table>
         <p style={{ marginTop: 16, ...NOTE_STYLE }}>
-          * An account that has played no match, organized no tournament, owns no team and is an entrant in no
-          solo tournament that has started is <strong>entirely erased</strong> when it is deleted, apart from
-          connection data (***); its registrations for solo tournaments that have not started yet are withdrawn
-          with it. Otherwise, its profile data is erased immediately and its username replaced by a borrowed
+          * An account that has played no match, is an entrant in no solo tournament that has started and organized no tournament that no one on the staff could take over is{" "}
+          <strong>entirely erased</strong> at the end of the {ACCOUNT_REACTIVATION_DAYS} days following its deletion request, apart from
+          connection data (***); its registrations for solo tournaments that have not started yet are withdrawn as soon as it is
+          requested. Otherwise, at the same point, its profile data is erased and its username replaced by a borrowed
           username. Sessions (<code>__Host-bg_session</code> cookie) expire 30 days after login.
         </p>
         <p style={{ marginTop: 8, ...NOTE_STYLE }}>
@@ -312,7 +312,7 @@ export function RgpdEn({
           if it left nothing behind, anonymized (borrowed username) otherwise. On erasure, the hash (SHA-256) of
           an avatar removed by moderation is kept, with no link to any account, to refuse it being uploaded
           again. The staff log on Discord records the request and each withdrawal or forfeit it causes, without
-          naming the player (“a player”) (<LocaleLink href="/rgpd/registre#t01">register, T01</LocaleLink>).
+          naming the player (“a player”) (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
         </p>
       </section>
 
@@ -370,13 +370,11 @@ export function RgpdEn({
           <strong>borrowed username</strong>: the record remains under this false name, and the player&apos;s
           page, kept only if they played at least one match, states that the account has been deleted; with no
           match played, the page is gone (page not found) and their name no longer leads anywhere. An account that has never played a match has no record
-          to preserve: it is erased entirely, with no remaining row — with three exceptions, where its row
-          remains because it is the holder of something that survives: if it has <strong>organized</strong> a
-          tournament, if it is the <strong>owner of a team</strong> (transferring or disbanding the team before
-          deletion restores complete erasure), or if it is an entrant in a{" "}
-          <strong>solo tournament</strong> that has already started or ended, whose entry bears its name. A registration for a solo tournament
-          that has not started yet, where it played no match, does not keep the row on its own: if nothing else keeps it, the registration is
-          withdrawn from the tournament with the account; otherwise, it stays under the borrowed username.
+          to preserve: it is erased entirely, with no remaining row — with two exceptions, where its row remains because it is the holder of something that survives: if it has <strong>organized</strong> a
+          tournament that no one on the staff could take over, or if it is an entrant in a{" "}
+          <strong>solo tournament</strong> that has already started or ended, whose entry bears its name. Its teams no longer keep the row:
+          it leaves them as soon as deletion is requested. Its registrations for a solo tournament that has not started yet, where it played
+          no match, are withdrawn as soon as deletion is requested.
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>
           <p>
