@@ -9,6 +9,7 @@ import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
+import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import {
@@ -297,6 +298,22 @@ export function RgpdEn({
           for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most, a technical log of each request (
           {WEB_ACCESS_LOG_FIELDS_EN}), for its security (<LocaleLink href="/rgpd/registre#t17">register, T17</LocaleLink>
           ).
+        </p>
+        <p id="suppression-du-compte" style={{ marginTop: 8, ...NOTE_STYLE }}>
+          <strong>Account deletion.</strong> Requested from “My profile”, it only becomes final after{" "}
+          {ACCOUNT_REACTIVATION_DAYS} days. During that time, the account stays in the database but is no
+          longer visible (its page answers “not found”), its sessions are closed and it can no longer be
+          invited, registered or notified; signing in again lets you reactivate it, through an explicit
+          confirmation. As soon as it is requested, and without being undone by reactivation, it leaves its
+          teams (ownership goes to a manager, else a captain, else another member; a team of which it was the
+          only player becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
+          disbanded otherwise), its organised tournaments go to another staff member, its registrations for a
+          solo tournament that hasn&apos;t started yet are withdrawn and its remaining matches in a running solo
+          tournament where it never played are lost by forfeit. At the end of that time, the account is erased
+          if it left nothing behind, anonymized (borrowed username) otherwise. On erasure, the hash (SHA-256) of
+          an avatar removed by moderation is kept, with no link to any account, to refuse it being uploaded
+          again. The staff log on Discord records the request and each withdrawal or forfeit it causes, without
+          naming the player (“a player”) (<LocaleLink href="/rgpd/registre#t01">register, T01</LocaleLink>).
         </p>
       </section>
 

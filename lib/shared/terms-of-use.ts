@@ -25,6 +25,7 @@
  * Module pur, importable partout.
  */
 
+import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
 import { NOTIFIER_FOLLOW_UP, copyrightNoticeElementsText } from "./content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "./logo-quarantine";
 import { SUSPENSION_MAX_DAYS } from "./account-suspension";
@@ -273,7 +274,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
       `Il faut avoir **au moins ${SITE_MINIMUM_AGE} ans** pour créer un compte. En acceptant ces conditions, l'utilisateur déclare avoir atteint cet âge.`,
       "Un compte ne fait pas de son titulaire un **membre de l'association** : l'adhésion est une démarche distincte, soumise aux conditions de ses statuts, dont un âge minimum qui leur est propre.",
       "Le pseudo choisi ne doit ni usurper l'identité d'une autre personne, ni porter atteinte à ses droits, ni être injurieux, discriminatoire ou à caractère sexuel.",
-      // ERASURE-D2: deletion wording added by parent
+      `La suppression d'un compte se demande depuis son profil et ne devient **définitive qu'au bout de ${ACCOUNT_REACTIVATION_DAYS} jours** : d'ici là, se reconnecter permet de réactiver le compte, par une confirmation explicite. Dès la demande, le compte n'est plus visible et ses sessions sont fermées ; il **quitte ses équipes** — la propriété passe à un gérant, sinon à un capitaine, sinon à un autre membre ; une équipe dont il était le seul joueur devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute sinon —, ses tournois organisés passent à un autre membre du staff, ses inscriptions à un tournoi individuel pas encore commencé sont retirées et ses matchs restants d'un tournoi individuel en cours où il n'a jamais joué sont perdus par forfait. **La réactivation ne défait pas ces gestes.** Au terme du délai, le compte est effacé, ou anonymisé s'il a laissé un historique de tournoi ; un avatar retiré par la modération que l'effacement emporte ne peut pas être reposé.`,
       "Chaque utilisateur peut exporter ses données et supprimer son compte à tout moment depuis son profil.",
     ],
   },

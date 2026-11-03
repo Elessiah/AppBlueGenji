@@ -1,7 +1,12 @@
 import crypto from "node:crypto";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { ACCOUNT_PENDING_DELETION_CODE, isReactivationWindowOpen, reactivationDeadline } from "@/lib/shared/account-deletion";
+import {
+  ACCOUNT_PENDING_DELETION_CODE,
+  isReactivationWindowOpen,
+  REACTIVATION_TICKET_MINUTES,
+  reactivationDeadline,
+} from "@/lib/shared/account-deletion";
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
 
 /*
@@ -19,8 +24,8 @@ import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
 /** Cookie du ticket de réactivation. */
 export const REACTIVATION_COOKIE = "bg_reactivation";
 
-/** Durée de vie d'un ticket. */
-export const REACTIVATION_TICKET_MINUTES = 15;
+/** Durée de vie d'un ticket (`lib/shared/account-deletion.ts`). */
+export { REACTIVATION_TICKET_MINUTES };
 
 /** Refus d'une connexion à un compte en attente de suppression (la porte renvoie vers la réactivation). */
 export const ACCOUNT_PENDING_DELETION = ACCOUNT_PENDING_DELETION_CODE;

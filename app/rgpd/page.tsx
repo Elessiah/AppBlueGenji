@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
 import { CyberButton } from "@/components/cyber";
 import { pageMetadata } from "@/lib/shared/page-metadata";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
@@ -408,6 +409,23 @@ function RgpdFr({
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
           chaque requête ({WEB_ACCESS_LOG_FIELDS}), pour sa sécurité (<Link href="/rgpd/registre#t17">registre,
           T17</Link>).
+        </p>
+        <p id="suppression-du-compte" style={{ marginTop: 8, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
+          <strong>Suppression du compte.</strong> Demandée depuis « Mon profil », elle ne devient définitive
+          qu&apos;au bout de {ACCOUNT_REACTIVATION_DAYS} jours. Pendant ce délai, le compte reste en base mais
+          n&apos;est plus visible (sa fiche répond « introuvable »), ses sessions sont fermées et il ne peut
+          plus être invité, inscrit ni notifié ; se reconnecter permet de le réactiver, par une confirmation
+          explicite. Dès la demande, et sans retour à la réactivation, il quitte ses équipes (la propriété
+          passe à un gérant, sinon à un capitaine, sinon à un autre membre ; une équipe dont il était le seul
+          joueur devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute
+          sinon), ses tournois organisés passent à un autre membre du staff, ses inscriptions à un tournoi
+          individuel pas encore commencé sont retirées et ses matchs restants d&apos;un tournoi individuel en
+          cours où il n&apos;a jamais joué sont perdus par forfait. Au terme du délai, le compte est effacé
+          s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. À l&apos;effacement,
+          l&apos;empreinte (SHA-256) d&apos;un avatar retiré par la modération est gardée, sans lien avec
+          aucun compte, pour en refuser la remise en ligne. Le journal du staff sur Discord note la demande
+          et chaque retrait ou forfait qu&apos;elle entraîne, sans nommer le joueur (« un joueur ») (
+          <Link href="/rgpd/registre#t01">registre, T01</Link>).
         </p>
       </section>
 

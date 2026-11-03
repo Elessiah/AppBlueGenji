@@ -452,3 +452,6 @@ export const REACTIVATION_PATH = "/connexion/reactivation";
 
 /** Refus d'une connexion à un compte en attente de suppression : la page de connexion ouvre l'écran de réactivation. */
 export const ACCOUNT_PENDING_DELETION_CODE = "ACCOUNT_PENDING_DELETION";
+
+/** Durée de vie d'un ticket de réactivation (cookie et ligne `bg_account_reactivation_tickets`), en minutes. */
+export const REACTIVATION_TICKET_MINUTES = 15;
