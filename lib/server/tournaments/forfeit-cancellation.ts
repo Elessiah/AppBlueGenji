@@ -132,9 +132,8 @@ export async function cancelTournamentForfeit(
   teamId: number,
 ): Promise<CancelledForfeit> {
   // Verrous tournoi puis manches (le rejeu peut poser la manche suivante),
-  // quand un report prend la manche puis le tournoi (« Enregistrer » ne prend
-  // plus le tournoi : l'annulation attend son verrou de match, bornée à 5 s) : même
-  // inversion que l'abandon (`forfeitTournamentTeamPublic`), qu'un interblocage
+  // quand un report ou un « Enregistrer » d'arbitrage prend son match puis le
+  // tournoi : même inversion que l'abandon (`forfeitTournamentTeamPublic`), qu'un interblocage
   // rejoue au lieu de renvoyer une erreur à l'administrateur.
   return retryOnDeadlock(() => cancelTournamentForfeitOnce(tournamentId, teamId));
 }
