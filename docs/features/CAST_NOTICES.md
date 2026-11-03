@@ -37,6 +37,9 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
   inscription ouvre les contacts du match : le journal garde qui a tenu la place,
   avec l'appariement du moment, même si le match disparaît ensuite) ; la clôture
   ajoute l'état final s'il diffère de ce premier geste, toujours après lui.
+  Les annonces d'un même (match, caster) s'enchaînent (`chainAfter`) : un geste
+  du caster qui suit un retrait par le staff part après sa ligne, et l'arrêt du
+  serveur attend les annonces chaînées (`trackAnnouncement`).
   Un retrait par le staff, d'office, ou une reprise de place sur ce caster fait
   d'abord partir sa rafale : le journal garde l'ordre et finit sur l'état réel.
 - Les **joueurs du match ne sont pas prévenus** (décision 3).
