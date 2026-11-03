@@ -208,7 +208,6 @@ describe("createCoalescer — annonce forcée", () => {
   it("flushAllCoalescers_moduleLoadedTwice_seesTheOtherCopiesBursts", async () => {
     const deliver = jest.fn<(first: number, last: number) => void>();
     jest.isolateModules(() => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const other = require("@/lib/server/coalescer") as typeof import("@/lib/server/coalescer");
       other.createCoalescer<number>({ windowMs: 1_000, maxAgeMs: 5_000, deliver }).add("a", 7);
     });
