@@ -267,6 +267,54 @@ export async function getAccountDeletionRequestPlan(userId: number): Promise<Acc
   });
 }
 
+/** Ce que la demande a changé, à diffuser une fois la transaction validée. */
+type DeletionRequestEffects = {
+  withdrawn: DeletionWithdrawal[];
+  forfeitable: DeletionWithdrawal[];
+  departures: TeamDeparture[];
+  organizedHandedOver: number[];
+  castTournaments: number[];
+};
+
+/** Rafraîchit les lecteurs, notifie le successeur, journalise et joue les forfaits. */
+async function afterDeletionRequest(userId: number, effects: DeletionRequestEffects): Promise<void> {
+  const { withdrawn, forfeitable, departures, organizedHandedOver, castTournaments } = effects;
+  closeUserStreams(userId);
+  for (const tournamentId of new Set([...withdrawn.map((entry) => entry.tournamentId), ...organizedHandedOver])) {
+    publishUpdatedEvent(tournamentId);
+  }
+  for (const tournamentId of castTournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  let identityChanged = withdrawn.length > 0;
+  for (const departure of departures) {
+    if (await settleDeparture(userId, departure)) identityChanged = true;
+  }
+  if (identityChanged) {
+    invalidateTeamIdentityViews();
+    invalidateStats();
+  }
+
+  // Journal Discord : la demande (sans pseudo), puis chaque retrait (E5).
+  try {
+    await sendBotLog(formatAccountDeletionLog({ days: ACCOUNT_REACTIVATION_DAYS }), { category: "signups" });
+  } catch (error) {
+    console.error("[account-deletion] alerte de suppression non écrite", error);
+  }
+  for (const entry of withdrawn) await logDeletionWithdrawal(entry.tournamentId, false);
+  await forfeitSoloEntriesAfterCommit(forfeitable);
+}
+
+/** Les suites d'un départ d'équipe ; rend `true` si l'identité publiée d'une équipe a changé. */
+async function settleDeparture(userId: number, departure: TeamDeparture): Promise<boolean> {
+  refreshTeamViewers(departure.teamId, departure.detachedUserIds, departure.streamTournamentIds);
+  if (departure.successorId !== null) {
+    notifyTeamInviteInBackground("OWNERSHIP", departure.teamId, departure.successorId, userId);
+  }
+  if (departure.fate !== "DISSOLVE") return false;
+  if (!departure.everRegistered) invalidateLandingCounters();
+  await deleteUnreferencedUpload(departure.logoUrl, "teams").catch(() => {});
+  return departure.everRegistered;
+}
+
 /**
  * Demande la suppression du compte : tout ce qui touche les autres se fait
  * tout de suite, le compte passe en attente trente jours.
@@ -329,36 +377,7 @@ export async function requestAccountDeletion(userId: number): Promise<AccountDel
     connection.release();
   }
 
-  closeUserStreams(userId);
-  for (const tournamentId of new Set([...withdrawn.map((entry) => entry.tournamentId), ...organizedHandedOver])) {
-    publishUpdatedEvent(tournamentId);
-  }
-  for (const tournamentId of castTournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
-  let identityChanged = withdrawn.length > 0;
-  for (const departure of departures) {
-    refreshTeamViewers(departure.teamId, departure.detachedUserIds, departure.streamTournamentIds);
-    if (departure.successorId !== null) {
-      notifyTeamInviteInBackground("OWNERSHIP", departure.teamId, departure.successorId, userId);
-    }
-    if (departure.fate === "DISSOLVE") {
-      if (departure.everRegistered) identityChanged = true;
-      else invalidateLandingCounters();
-      await deleteUnreferencedUpload(departure.logoUrl, "teams").catch(() => {});
-    }
-  }
-  if (identityChanged) {
-    invalidateTeamIdentityViews();
-    invalidateStats();
-  }
-
-  // Journal Discord : la demande (sans pseudo), puis chaque retrait (E5).
-  try {
-    await sendBotLog(formatAccountDeletionLog({ days: ACCOUNT_REACTIVATION_DAYS }), { category: "signups" });
-  } catch (error) {
-    console.error("[account-deletion] alerte de suppression non écrite", error);
-  }
-  for (const entry of withdrawn) await logDeletionWithdrawal(entry.tournamentId, false);
-  await forfeitSoloEntriesAfterCommit(forfeitable);
+  await afterDeletionRequest(userId, { withdrawn, forfeitable, departures, organizedHandedOver, castTournaments });
 
   return { ...plan, finalAt: reactivationDeadline(requestedAt).toISOString() };
 }

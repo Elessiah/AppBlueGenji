@@ -38,6 +38,9 @@ export class AccountPendingDeletionError extends Error {
   }
 }
 
+/** Une date relue de la base (`dateStrings`), ou son absence. */
+type StoredDate = string | Date | null;
+
 function hashTicket(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
@@ -45,7 +48,7 @@ function hashTicket(token: string): string {
 /** L'état de suppression d'un compte : `null` s'il est vivant, inconnu ou déjà supprimé définitivement. */
 export async function readPendingDeletion(userId: number): Promise<{ requestedAt: string; windowOpen: boolean } | null> {
   const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { is_deleted: 0 | 1; deletion_requested_at: string | Date | null })[]>(
+  const [rows] = await db.execute<(RowDataPacket & { is_deleted: 0 | 1; deletion_requested_at: StoredDate })[]>(
     `SELECT is_deleted, deletion_requested_at FROM bg_users WHERE id = ? LIMIT 1`,
     [userId],
   );
@@ -76,7 +79,7 @@ export async function peekReactivationTicket(
 ): Promise<{ userId: number; finalAt: string } | null> {
   if (!token || !/^[0-9a-f]{64}$/.test(token)) return null;
   const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { user_id: number; deletion_requested_at: string | Date | null })[]>(
+  const [rows] = await db.execute<(RowDataPacket & { user_id: number; deletion_requested_at: StoredDate })[]>(
     `SELECT k.user_id, u.deletion_requested_at
        FROM bg_account_reactivation_tickets k
        JOIN bg_users u ON u.id = k.user_id AND u.is_deleted = 1
@@ -117,7 +120,7 @@ export async function reactivateAccount(
       return null;
     }
     const userId = Number(ticket.user_id);
-    const [locked] = await connection.execute<(RowDataPacket & { is_deleted: 0 | 1; deletion_requested_at: string | Date | null })[]>(
+    const [locked] = await connection.execute<(RowDataPacket & { is_deleted: 0 | 1; deletion_requested_at: StoredDate })[]>(
       `SELECT is_deleted, deletion_requested_at FROM bg_users WHERE id = ? FOR UPDATE`,
       [userId],
     );

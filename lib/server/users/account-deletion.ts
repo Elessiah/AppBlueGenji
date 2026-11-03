@@ -295,6 +295,41 @@ export async function finalizeAccountDeletion(userId: number): Promise<AccountDe
   return deleteAccountNow(userId, true);
 }
 
+/**
+ * Efface ou anonymise le compte selon le plan. À l'effacement, l'empreinte des
+ * avatars en quarantaine est bloquée d'abord (E6) ; anonymisé, le compte n'est
+ * plus en attente : la suppression est faite.
+ */
+async function applyDeletionMode(
+  connection: PoolConnection,
+  userId: number,
+  plan: AccountDeletionPlan,
+  soloWithdrawals: readonly SoloRegistrationFact[],
+): Promise<{ withdrawal: { tournamentIds: number[] }; withdrawnFrom: number[]; quarantinedFiles: string[] }> {
+  if (plan.mode === "ERASE") {
+    const quarantinedFiles = await loadQuarantinedAvatarFiles(connection, userId);
+    await blockImageFiles(connection, quarantinedFiles);
+    const withdrawal = await eraseAccount(connection, userId, soloWithdrawals);
+    return { withdrawal, withdrawnFrom: soloWithdrawals.map((registration) => registration.tournamentId), quarantinedFiles };
+  }
+  const withdrawal = await anonymizeAccount(connection, userId);
+  await connection.execute(`UPDATE bg_users SET deletion_requested_at = NULL WHERE id = ? AND is_deleted = 1`, [userId]);
+  return { withdrawal, withdrawnFrom: [], quarantinedFiles: [] };
+}
+
+/** Une date relue de la base (`dateStrings`), ou son absence. */
+type StoredDate = Date | string | null;
+
+/** La suppression définitive est due : demande relevée il y a trente jours ou plus, compte toujours en attente. */
+function deletionIsDue(row: { is_deleted: 0 | 1; deletion_requested_at: StoredDate } | undefined): boolean {
+  return (
+    row !== undefined &&
+    Number(row.is_deleted) === 1 &&
+    row.deletion_requested_at !== null &&
+    !isReactivationWindowOpen(row.deletion_requested_at)
+  );
+}
+
 /** Les fichiers d'avatar en quarantaine du compte (signalés, masqués) : ce que l'effacement emporte. */
 async function loadQuarantinedAvatarFiles(connection: SqlRunner, userId: number): Promise<string[]> {
   const [rows] = await connection.execute<(RowDataPacket & { logo_url: string })[]>(
@@ -368,27 +403,16 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
       discord_id: string | null;
       created_at: string;
       is_deleted: 0 | 1;
-      deletion_requested_at: Date | string | null;
+      deletion_requested_at: StoredDate;
     })[]>(
       `SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at FROM bg_users WHERE id = ? FOR UPDATE`,
       [userId],
     );
-    if (locked.length === 0) {
-      if (onlyIfDue) {
-        await connection.rollback();
-        return null;
-      }
-      throw new Error("USER_NOT_FOUND");
-    }
+    if (locked.length === 0 && !onlyIfDue) throw new Error("USER_NOT_FOUND");
     // La fenêtre de réactivation, relue sous le verrou : une reconnexion qui
     // vient de réactiver le compte, ou une demande encore dans ses trente
     // jours, ne tombe pas.
-    if (
-      onlyIfDue &&
-      (Number(locked[0].is_deleted) !== 1 ||
-        locked[0].deletion_requested_at === null ||
-        isReactivationWindowOpen(locked[0].deletion_requested_at))
-    ) {
+    if (onlyIfDue && !deletionIsDue(locked[0])) {
       await connection.rollback();
       return null;
     }
@@ -402,21 +426,10 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
     // vers un compte, seulement une empreinte salée qu'on ne sait pas renverser
     // (`lib/server/site-visits-service.ts`).
 
-    if (plan.mode === "ERASE") {
-      quarantinedFiles = await loadQuarantinedAvatarFiles(connection, userId);
-      await blockImageFiles(connection, quarantinedFiles);
-    }
-    const withdrawal = plan.mode === "ERASE"
-      ? await eraseAccount(connection, userId, facts.soloWithdrawals)
-      : await anonymizeAccount(connection, userId);
-    // Anonymisé, le compte n'est plus en attente : la suppression est faite.
-    if (plan.mode === "ANONYMIZE") {
-      await connection.execute(
-        `UPDATE bg_users SET deletion_requested_at = NULL WHERE id = ? AND is_deleted = 1`,
-        [userId],
-      );
-    }
-    if (plan.mode === "ERASE") withdrawnFrom = facts.soloWithdrawals.map((registration) => registration.tournamentId);
+    const applied = await applyDeletionMode(connection, userId, plan, facts.soloWithdrawals);
+    quarantinedFiles = applied.quarantinedFiles;
+    withdrawnFrom = applied.withdrawnFrom;
+    const withdrawal = applied.withdrawal;
     touchedTournaments = withdrawal.tournamentIds;
 
     // Les signalements qui le visent gardent leur cible — ils restent à

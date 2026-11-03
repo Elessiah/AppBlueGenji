@@ -170,7 +170,8 @@ export function formatPlayerSignupLog(context: { provider: PlayerSignupProvider 
  * départ ne soit pas compté deux fois si le joueur revient.
  */
 export function formatAccountDeletionLog(context: { days: number }): string {
-  return `${leadOn("🗑️", "Compte supprimé", `suppression demandée, définitive sous ${context.days} jours`)}.`;
+  const detail = `suppression demandée, définitive sous ${context.days} jours`;
+  return `${leadOn("🗑️", "Compte supprimé", detail)}.`;
 }
 
 /**
