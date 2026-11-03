@@ -28,6 +28,7 @@ import type { Locale } from "./locales";
 import { formatMessage, type MessageValues } from "./message-format";
 import { MIN_MINUTES_PER_REPORTED_MAP } from "./score-report-deadline";
 import { LAUNCH_AUTO_DELAY_MINUTES } from "./match-launch";
+import { VOICE_CHANNEL_CAPACITY, VOICE_CHANNEL_LEAD_MINUTES } from "./match-voice";
 import { RANKING_BASE_POINTS } from "./ranking";
 import type { TournamentFormat } from "./types";
 import { RULE_MODE_DEFINITIONS, type RuleModeDefinition } from "./rule-mode-definitions";
@@ -87,6 +88,8 @@ export function ruleTextValues(locale: Locale, messages: RulesMessages): Message
     reportTimeout: SCORE_REPORT_TIMEOUT_MINUTES,
     autoValidate: SCORE_AUTO_VALIDATE_MINUTES / 60,
     minutesPerMap: MIN_MINUTES_PER_REPORTED_MAP,
+    voiceLead: VOICE_CHANNEL_LEAD_MINUTES,
+    voiceCapacity: VOICE_CHANNEL_CAPACITY,
     seedingRule: formatMessage(locale, messages.seedingRule, { basePoints: RANKING_BASE_POINTS }),
   };
 }

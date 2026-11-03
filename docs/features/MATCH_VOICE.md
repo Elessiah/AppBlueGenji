@@ -81,6 +81,15 @@ l'arbitrage) ; à l'édition, elle passe par la route dédiée, pas par le `PATC
 Déclaré dans `PRIVACY_CHANGES` (`2026-11-salons-vocaux-equipe`), `/rgpd#salons-vocaux`
 et le registre (T18). Seul un nombre est gardé, jamais qui est présent.
 
+**Base juridique (décision V6 de l'utilisateur, 2026-11-03)** : dans un tournoi qui
+a l'option, réunir chaque équipe dans son salon fait partie du **règlement du
+tournoi** — le comptage relève de l'exécution du contrat, sans droit d'opposition
+propre ; une équipe qui ne veut pas s'y plier ne s'inscrit pas, ou se retire.
+Depuis le 5 novembre 2026 (entrée `2026-11-salons-vocaux-regle-du-tournoi`) :
+T18, `/rgpd#salons-vocaux` (FR + EN), la règle commune « Salons vocaux d'équipe »
+de `/regles` (`messages/*/rules.json`, `{voiceLead}` / `{voiceCapacity}` lus de
+`match-voice.ts`) et la section « Contacts de match » des conditions v9.
+
 ## Côté bot
 
 Le bot doit avoir **Gérer les salons** sur la catégorie des matchs
