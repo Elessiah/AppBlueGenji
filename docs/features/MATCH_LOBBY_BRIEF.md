@@ -92,7 +92,9 @@ ouvre un lancement, lecture de la liste des tournois).
   brief) ; un lancement défait (horaire changé, retour à planifier) **ou un
   appariement réécrit sur place** (`adoptCurrentPairing`, A:B → A:C → A:B)
   efface les réservations du match : le salon rouvert est briefé de nouveau.
-  Le balayage des départs ne compte que ses phases `LOBBY` / `LAUNCHED`.
+  Le balayage des départs ne compte que ses phases `LOBBY` / `LAUNCHED`, et
+  comme le brief ignore un match qui porte déjà un score (candidats et
+  réservation).
 - Destinataires, lus **une fois pour tous les côtés et avant toute
   réservation** (une panne ne réserve rien) : `loadEntrantManagerIds` — `OWNER`
   et `MANAGER` (`hasTeamManagementRole`, pas le capitaine), joueur d'une entrée
