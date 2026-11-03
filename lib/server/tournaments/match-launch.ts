@@ -224,6 +224,16 @@ async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchR
      WHERE id = ?`,
     [key, row.id],
   );
+  // Les réservations des annonces (« Prêt », départ, brief du salon,
+  // `bg_match_start_notices`) suivent le lancement remis à zéro : un
+  // appariement qui revient (A:B → A:C → A:B après deux corrections de score)
+  // retrouverait sinon les siennes, et ni l'appel aux « Prêt » ni le brief ne
+  // repartiraient à la réouverture — comme pour un lancement défait.
+  // Première adoption (empreinte vide) : aucune réservation n'a pu être posée,
+  // et le DELETE prendrait un verrou d'intervalle inutile sous le verrou du match.
+  if (row.launch_pairing !== null) {
+    await connection.execute(`DELETE FROM bg_match_start_notices WHERE match_id = ?`, [row.id]);
+  }
   row.launch_pairing = key;
   row.lobby_opened_at = null;
   row.launched_at = null;

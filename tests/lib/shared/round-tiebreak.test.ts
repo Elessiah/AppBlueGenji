@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
-import { formatLobbyBriefDm, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
+import { formatLobbyBriefDm } from "@/lib/server/tournaments/lobby-brief-dm";
+import type { LobbyBriefSide } from "@/lib/shared/lobby-brief";
 import { isBestOfThree, type MatchFormat } from "@/lib/shared/match-format";
 import { tiebreakRowIndex } from "@/lib/shared/match-maps";
 import { normalizeTiebreakMap, parseStoredTiebreak, roundTiebreakOf } from "@/lib/shared/round-maps";

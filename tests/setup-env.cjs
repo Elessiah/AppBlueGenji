@@ -23,8 +23,10 @@ process.env.VAPID_PRIVATE_KEY = "";
 
 // Brief du salon (`dispatchLobbyBriefs`) : son balayage ne dépend pas du push,
 // il partirait donc depuis tout test qui publie un évènement de tournoi, contre
-// une base simulée (ou réelle). Simulé pour toute la suite ; ses propres tests
-// le rétablissent par `jest.unmock`.
+// une base simulée (ou réelle). Seul le balayage est simulé pour toute la
+// suite — les autres exports du module restent les vrais (`requireActual`) ;
+// ses propres tests le rétablissent par `jest.unmock`.
 jest.mock("@/lib/server/tournaments/lobby-brief", () => ({
+  ...jest.requireActual("@/lib/server/tournaments/lobby-brief"),
   dispatchLobbyBriefs: jest.fn(async () => 0),
 }));

@@ -24,6 +24,7 @@ import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { loadEntrantMatchLeaderIds, loadEntrantPlayerIds, notifyUsers } from "@/lib/server/notify";
 import { purgeStaleSubscriptions } from "@/lib/server/push-subscriptions";
+import { throttledSweep } from "@/lib/server/throttled-sweep";
 import { webPushConfig } from "@/lib/server/web-push";
 import { LAUNCH_AUTO_DELAY_MINUTES } from "@/lib/shared/match-launch";
 import { loadEligibleCasterIds } from "./cast-eligibility";
@@ -84,11 +85,32 @@ const LAUNCH_NOTICE_WINDOW_MINUTES = 10;
 
 export type MatchStartPhase = "LOBBY" | "LAUNCHED";
 
+/**
+ * Un match qui porte déjà un score est joué : le staff qui le replanifie ou
+ * allume l'arbitrage planifié le tient pour lancé (`launched_at` posé) sans
+ * qu'il reparte — ni appel aux « Prêt » ni « match lancé », comme le brief.
+ */
+const NO_SCORE_SQL = "m.team1_score IS NULL AND m.team2_score IS NULL";
+
+/**
+ * Réserve l'annonce **si le match est toujours dans l'état annoncé pour cet
+ * appariement** : la condition relit le match dans l'instruction même, comme
+ * le brief du salon (`./lobby-brief`). Entre la lecture des candidats et la
+ * réservation, un lancement défait (`match-schedule`, `referee-scheduling`)
+ * efface les réservations et referme le salon ; une réservation posée après
+ * coup ferait taire l'appel aux « Prêt » de la réouverture (même appariement).
+ */
 async function claimStartNotice(matchId: number, pairing: string, phase: MatchStartPhase): Promise<boolean> {
   const db = await getDatabase();
+  const stateSql =
+    phase === "LOBBY" ? "m.launched_at IS NULL AND m.lobby_opened_at IS NOT NULL" : "m.launched_at IS NOT NULL";
   const [result] = await db.execute(
-    `INSERT IGNORE INTO bg_match_start_notices (match_id, pairing, phase) VALUES (?, ?, ?)`,
-    [matchId, pairing, phase],
+    `INSERT IGNORE INTO bg_match_start_notices (match_id, pairing, phase)
+     SELECT m.id, m.launch_pairing, ? FROM bg_matches m
+      WHERE m.id = ? AND m.launch_pairing = ? AND m.status = 'READY' AND m.is_bye = 0
+        AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
+        AND ${NO_SCORE_SQL} AND ${stateSql}`,
+    [phase, matchId, pairing],
   );
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
@@ -161,7 +183,7 @@ async function runMatchStartSweep(): Promise<number> {
        JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
-      WHERE m.status = 'READY' AND m.is_bye = 0
+      WHERE m.status = 'READY' AND m.is_bye = 0 AND ${NO_SCORE_SQL}
         AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
         AND ((m.launched_at IS NULL AND m.lobby_opened_at > NOW() - INTERVAL ? MINUTE)
              OR m.launched_at > NOW() - INTERVAL ? MINUTE)
@@ -237,72 +259,41 @@ const MATCH_START_SWEEP_THROTTLE_MS = 10_000;
 /** Ménage des abonnements oubliés — une fois par heure suffit largement. */
 const PURGE_INTERVAL_MS = 60 * 60_000;
 
-let lastSweepAt = 0;
 let lastPurgeAt = 0;
-let pendingSweep: Promise<number> | null = null;
-let trailingTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
- * Rejoue le balayage une fois l'étranglement écoulé. Un appel étranglé — ou
- * arrivé pendant un balayage déjà parti, dont la lecture a pu précéder le
- * lancement qu'on vient d'ouvrir — ne doit pas être **perdu** : sans cette
- * relève, l'annonce attendrait la prochaine écriture ou la prochaine lecture
- * de la liste, qui peuvent ne venir qu'après le lancement d'office. Un seul
- * minuteur à la fois, détaché du processus (`unref`).
+ * Étranglement à relève partagé (`throttledSweep`). Push éteint (clés
+ * absentes) : rien à annoncer, et surtout rien à **réserver** — une annonce
+ * réservée sans canal serait perdue pour de bon. La garde est relue à chaque
+ * passage, relève comprise.
  */
-function scheduleTrailingSweep(delayMs: number): void {
-  if (trailingTimer) return;
-  trailingTimer = setTimeout(() => {
-    trailingTimer = null;
-    void dispatchMatchStartNotices();
-  }, Math.max(0, delayMs));
-  trailingTimer.unref?.();
-}
+const sweeps = throttledSweep({
+  throttleMs: MATCH_START_SWEEP_THROTTLE_MS,
+  enabled: () => webPushConfig() !== null,
+  sweep: async () => {
+    if (Date.now() - lastPurgeAt >= PURGE_INTERVAL_MS) {
+      lastPurgeAt = Date.now();
+      await purgeStaleSubscriptions();
+    }
+    return runMatchStartSweep();
+  },
+  onError: (error) => {
+    if (!isMissingTableError(error)) console.error("[push] départs de match non annoncés", error);
+  },
+});
 
 /**
  * Annonce les départs de match dus. Jamais bloquant, jamais une exception :
  * l'appelant est une écriture déjà faite ou une lecture de page.
  */
 export async function dispatchMatchStartNotices(): Promise<number> {
-  // Push éteint (clés absentes) : rien à annoncer, et surtout rien à
-  // **réserver** — une annonce réservée sans canal serait perdue pour de bon.
-  if (!webPushConfig()) return 0;
-  if (pendingSweep) {
-    scheduleTrailingSweep(MATCH_START_SWEEP_THROTTLE_MS);
-    return pendingSweep;
-  }
-  const sinceLast = Date.now() - lastSweepAt;
-  if (sinceLast < MATCH_START_SWEEP_THROTTLE_MS) {
-    scheduleTrailingSweep(MATCH_START_SWEEP_THROTTLE_MS - sinceLast);
-    return 0;
-  }
-  pendingSweep = (async () => {
-    try {
-      if (Date.now() - lastPurgeAt >= PURGE_INTERVAL_MS) {
-        lastPurgeAt = Date.now();
-        await purgeStaleSubscriptions();
-      }
-      return await runMatchStartSweep();
-    } catch (error) {
-      if (!isMissingTableError(error)) console.error("[push] départs de match non annoncés", error);
-      return 0;
-    }
-  })();
-  try {
-    return await pendingSweep;
-  } finally {
-    lastSweepAt = Date.now();
-    pendingSweep = null;
-  }
+  return sweeps.run();
 }
 
 /** Remet l'étranglement à zéro. Réservé aux tests. */
 export function resetMatchStartNoticeThrottle(): void {
-  lastSweepAt = 0;
   lastPurgeAt = 0;
-  pendingSweep = null;
-  if (trailingTimer) clearTimeout(trailingTimer);
-  trailingTimer = null;
+  sweeps.reset();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

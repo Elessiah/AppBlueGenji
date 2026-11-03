@@ -114,7 +114,7 @@ describe("dispatchMatchStartNotices", () => {
 
     expect(await dispatchMatchStartNotices()).toBe(3);
 
-    expect(execute.mock.calls[0][1]).toEqual([40, "1:2", "LOBBY"]);
+    expect(execute.mock.calls[0][1]).toEqual(["LOBBY", 40, "1:2"]);
     const [side1, side2] = pushes();
     expect(side1.userIds).toEqual([10, 11]);
     expect(side1.discord).toEqual([null, null]);
@@ -140,6 +140,23 @@ describe("dispatchMatchStartNotices", () => {
     expect(params).toEqual([20, 10]);
   });
 
+  it("dispatchMatchStartNotices_candidates_scoredMatchesExcluded", async () => {
+    const { query } = mockDb([]);
+
+    await dispatchMatchStartNotices();
+
+    expect(query.mock.calls[0][0]).toContain("m.team1_score IS NULL AND m.team2_score IS NULL");
+  });
+
+  it("claimStartNotice_scoreNotedBetweenReadAndClaim_claimRequiresNoScore", async () => {
+    const { execute } = mockDb([{ ...LOBBY_MATCH, launched_at: new Date() }]);
+
+    await dispatchMatchStartNotices();
+
+    const claims = execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_start_notices"));
+    expect(claims[0][0]).toContain("m.team1_score IS NULL AND m.team2_score IS NULL");
+  });
+
   it("n'envoie rien quand un autre balayage a pris la réservation", async () => {
     mockDb([LOBBY_MATCH], { claims: [false] });
     expect(await dispatchMatchStartNotices()).toBe(0);
@@ -150,8 +167,22 @@ describe("dispatchMatchStartNotices", () => {
     const { execute } = mockDb([{ ...LOBBY_MATCH, launched_at: new Date() }]);
     await dispatchMatchStartNotices();
     const claimed = execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_start_notices"));
-    expect(claimed.map(([, params]) => params)).toEqual([[40, "1:2", "LAUNCHED"]]);
+    expect(claimed.map(([, params]) => params)).toEqual([["LAUNCHED", 40, "1:2"]]);
     expect(resolvePush(pushes()[0].notification.push).title).toBe("Ton match est lancé");
+  });
+
+  it("claimStartNotice_launchUndoneBetweenReadAndClaim_claimConditionedOnTheMatchState", async () => {
+    const { execute } = mockDb([LOBBY_MATCH, { ...LOBBY_MATCH, id: 41, launched_at: new Date() }]);
+
+    await dispatchMatchStartNotices();
+
+    const claims = execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_start_notices"));
+    // La réservation relit le match dans l'instruction : un salon refermé ne réserve rien.
+    expect(claims[0][0]).toMatch(/SELECT m\.id, m\.launch_pairing, \? FROM bg_matches m/);
+    expect(claims[0][0]).toMatch(/m\.id = \? AND m\.launch_pairing = \? AND m\.status = 'READY' AND m\.is_bye = 0/);
+    expect(claims[0][0]).toMatch(/m\.launched_at IS NULL AND m\.lobby_opened_at IS NOT NULL/);
+    expect(claims[0][0]).not.toMatch(/VALUES/);
+    expect(claims[1][0]).toMatch(/AND m\.launched_at IS NOT NULL`?$/m);
   });
 
   it("ne fait pas sonner deux fois un départ déjà appelé", async () => {
