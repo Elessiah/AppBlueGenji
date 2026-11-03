@@ -794,6 +794,18 @@ describe("setMatchOnAir — changement d'état", () => {
     await expect(setMatchOnAir(42, true)).resolves.toBe(false);
   });
 
+  it("setMatchOnAir_matchCompletedBeforeWrite_returnsFalseWithoutEvent", async () => {
+    // Lu READY, validé avant l'UPDATE : la condition sur le statut ne trouve plus la ligne.
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: null })]])
+      .mockResolvedValueOnce([{ affectedRows: 0 }]);
+    await mockDb(execute);
+    await expect(setMatchOnAir(42, true)).resolves.toBe(false);
+    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND status = 'READY'");
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
   it("setMatchOnAir_offAir_switchOn_returnsTrue", async () => {
     const execute = jest
       .fn<SqlQuery>()

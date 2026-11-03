@@ -100,7 +100,7 @@ describe("pushToUsers", () => {
     const query = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[{ id: 10, ...SUB }, { id: 11, ...SUB, endpoint: "https://fcm.googleapis.com/fcm/send/b" }]])
-      .mockRejectedValue(new Error("deadlock"));
+      .mockRejectedValue(Object.assign(new Error("deadlock"), { code: "ER_LOCK_DEADLOCK" }));
     pool({ query });
     jest.mocked(sendWebPush).mockResolvedValueOnce("SENT").mockResolvedValueOnce("GONE");
 
@@ -108,7 +108,7 @@ describe("pushToUsers", () => {
 
     // Un appelant qui lirait 0 croirait n'avoir prévenu personne (marques « reçu »).
     expect(count).toBe(1);
-    expect(error).toHaveBeenCalledWith("[push] tenue des abonnements impossible", expect.any(Error));
+    expect(error).toHaveBeenCalledWith("[push] tenue des abonnements impossible", "ER_LOCK_DEADLOCK");
     error.mockRestore();
   });
 
@@ -119,10 +119,25 @@ describe("pushToUsers", () => {
       .mockResolvedValueOnce([[{ id: 10, ...SUB }, { id: 11, ...SUB, endpoint: "https://fcm.googleapis.com/fcm/send/b" }]])
       .mockResolvedValue([{ affectedRows: 1 }]);
     pool({ query });
-    jest.mocked(sendWebPush).mockResolvedValueOnce("SENT").mockRejectedValueOnce(new Error("réseau"));
+    jest.mocked(sendWebPush).mockResolvedValueOnce("SENT").mockRejectedValueOnce(new Error("réseau https://fcm.googleapis.com/fcm/send/b"));
 
     expect(await pushToUsers([1], "MATCH_SCHEDULED", () => ({ title: "t", body: "b", url: "/" }), {}, CONFIG)).toBe(1);
-    expect(error).toHaveBeenCalledWith("[push] envoi interrompu", expect.any(Error));
+    expect(error).toHaveBeenCalledWith("[push] envoi interrompu", "Error");
+    expect(JSON.stringify(error.mock.calls)).not.toContain("fcm.googleapis.com");
+    error.mockRestore();
+  });
+
+  it("pushToUsers_readFailsWithCodedError_logsCodeOnly", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const query = jest
+      .fn<SqlQuery>()
+      .mockRejectedValue(
+        Object.assign(new Error("Connection lost"), { code: "PROTOCOL_CONNECTION_LOST", sql: "SELECT … IN (1, 2)" }),
+      );
+    pool({ query });
+
+    expect(await pushToUsers([1], "MATCH_SCHEDULED", () => ({ title: "t", body: "b", url: "/" }), {}, CONFIG)).toBe(0);
+    expect(error).toHaveBeenCalledWith("[push] distribution impossible", "PROTOCOL_CONNECTION_LOST");
     error.mockRestore();
   });
 

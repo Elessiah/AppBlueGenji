@@ -287,9 +287,22 @@ describe("announceCastChange", () => {
       expect(loggedLine()).toContain("inscrit");
     });
 
-    it("inscrit puis retiré dans la rafale : effet nul, aucune ligne", async () => {
+    it("announceCastChange_claimedThenReleasedBurst_postsBothLinesInOrder", async () => {
       mockMatch(matchRow());
       for (let i = 0; i < 10; i++) announceCastChange(i % 2 === 0 ? claimed : released);
+      jest.advanceTimersByTime(CAST_TOGGLE_WINDOW_MS);
+      jest.useRealTimers();
+      await settle();
+      await settle();
+      expect(sendBotLog).toHaveBeenCalledTimes(2);
+      expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("Cast réservé");
+      expect(jest.mocked(sendBotLog).mock.calls[1][0]).toContain("Cast libéré");
+    });
+
+    it("announceCastChange_releasedThenClaimedBurst_postsNothing", async () => {
+      mockMatch(matchRow());
+      announceCastChange(released);
+      announceCastChange(claimed);
       jest.advanceTimersByTime(CAST_TOGGLE_WINDOW_MS);
       jest.useRealTimers();
       await settle();

@@ -10,20 +10,32 @@ describe("failureReason", () => {
     expect(failureReason(error)).toBe("ER_DUP_ENTRY");
   });
 
-  it("failureReason_emptyCode_returnsMessage", () => {
+  it("failureReason_emptyCode_returnsCodeLikeMessage", () => {
     expect(failureReason(Object.assign(new Error("BOT_DOWN"), { code: "" }))).toBe("BOT_DOWN");
   });
 
-  it("failureReason_nonStringCode_returnsMessage", () => {
+  it("failureReason_nonStringCode_returnsCodeLikeMessage", () => {
     expect(failureReason(Object.assign(new Error("BOT_DOWN"), { code: 1062 }))).toBe("BOT_DOWN");
   });
 
-  it("failureReason_plainErrorMultiline_returnsFirstLine", () => {
-    expect(failureReason(new Error("BOT_DOWN\n    at stack"))).toBe("BOT_DOWN");
+  it("failureReason_siteErrorCode_returnsMessage", () => {
+    expect(failureReason(new Error("MATCH_NOT_FOUND"))).toBe("MATCH_NOT_FOUND");
   });
 
-  it("failureReason_messageOver200Chars_truncatedTo200", () => {
-    expect(failureReason(new Error(`${"a".repeat(200)}b`))).toBe("a".repeat(200));
+  it("failureReason_freeTextMessage_returnsErrorNameOnly", () => {
+    expect(failureReason(new SyntaxError(`"Renards" is not valid JSON`))).toBe("SyntaxError");
+  });
+
+  it("failureReason_multilineMessage_returnsErrorNameOnly", () => {
+    expect(failureReason(new Error("BOT_DOWN\n    at stack"))).toBe("Error");
+  });
+
+  it("failureReason_codeOf64Chars_returnsMessage", () => {
+    expect(failureReason(new Error(`A${"B".repeat(63)}`))).toBe(`A${"B".repeat(63)}`);
+  });
+
+  it("failureReason_codeOf65Chars_returnsErrorNameOnly", () => {
+    expect(failureReason(new Error(`A${"B".repeat(64)}`))).toBe("Error");
   });
 
   it("failureReason_nonError_returnsUnknown", () => {

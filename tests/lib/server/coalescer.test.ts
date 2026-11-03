@@ -93,7 +93,7 @@ describe("createCoalescer", () => {
     const coalescer = createCoalescer<number>({ windowMs: 1_000, maxAgeMs: 5_000, deliver });
     coalescer.add("a", 1);
     jest.advanceTimersByTime(1_000);
-    expect(error).toHaveBeenCalledWith("[coalescer] annonce regroupée non partie", "boom");
+    expect(error).toHaveBeenCalledWith("[coalescer] annonce regroupée non partie", "Error");
     await Promise.resolve();
     await Promise.resolve();
     coalescer.add("a", 2);
@@ -246,7 +246,7 @@ describe("createCoalescer — annonce forcée", () => {
     });
     coalescer.add("a", 1);
     await expect(coalescer.flush("a")).resolves.toBeUndefined();
-    expect(error).toHaveBeenCalledWith("[coalescer] annonce regroupée non partie", "boom");
+    expect(error).toHaveBeenCalledWith("[coalescer] annonce regroupée non partie", "Error");
     error.mockRestore();
   });
 
