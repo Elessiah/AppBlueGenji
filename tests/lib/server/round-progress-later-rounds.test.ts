@@ -66,21 +66,13 @@ describe("laterRoundsHaveScoreInput", () => {
     expect(flat(execute.mock.calls[0][0])).not.toMatch(/JOIN|FOR SHARE/);
   });
 
-  it("laterRoundsHaveScoreInput_lockWithoutBoundedWait_keepsServerTimeout", async () => {
-    const { conn, query } = connectionReturning([]);
-
-    await laterRoundsHaveScoreInput(conn, { tournamentId: 7, phaseId: 0, afterRound: 2, lock: true });
-
-    expect(query).not.toHaveBeenCalled();
-  });
-
   // Revue #542 : seule la lecture verrouillée des manches a une attente bornée —
   // le rejeu qui suit retrouve le délai du serveur.
-  it("laterRoundsHaveScoreInput_boundedWait_wrapsOnlyTheLockedRead", async () => {
+  it("laterRoundsHaveScoreInput_lock_boundsOnlyTheLockedRead", async () => {
     const { conn, execute, query } = connectionReturning([{ id: 9 }]);
 
     await expect(
-      laterRoundsHaveScoreInput(conn, { tournamentId: 7, phaseId: 0, afterRound: 2, lock: true, boundedWait: true }),
+      laterRoundsHaveScoreInput(conn, { tournamentId: 7, phaseId: 0, afterRound: 2, lock: true }),
     ).resolves.toBe(true);
 
     expect(query.mock.calls.map(([sql]) => sql)).toEqual([
@@ -91,10 +83,10 @@ describe("laterRoundsHaveScoreInput", () => {
     expect(query.mock.invocationCallOrder[1]).toBeGreaterThan(execute.mock.invocationCallOrder[0]);
   });
 
-  it("laterRoundsHaveScoreInput_boundedWaitWithoutLock_readsWithoutTouchingTimeout", async () => {
+  it("laterRoundsHaveScoreInput_withoutLock_readsWithoutTouchingTimeout", async () => {
     const { conn, query } = connectionReturning([]);
 
-    await laterRoundsHaveScoreInput(conn, { tournamentId: 7, phaseId: 0, afterRound: 2, boundedWait: true });
+    await laterRoundsHaveScoreInput(conn, { tournamentId: 7, phaseId: 0, afterRound: 2 });
 
     expect(query).not.toHaveBeenCalled();
   });

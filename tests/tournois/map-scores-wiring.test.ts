@@ -515,20 +515,14 @@ describe("dialogues de score — calculs évités (EF-15)", () => {
     expect(dialog.match(/storedResultLabel\(text, match, team1, team2\)/g)).toHaveLength(1);
   });
 
-  it("TournamentSheet_cancelForfeit_streamOpen_reliesOnStreamWithoutRestRefresh", () => {
+  // Revue #542 : l'auteur du geste relit tout de suite, flux ouvert ou non —
+  // la diffusion peut attendre jusqu'à une minute (tranche, budget de la salle).
+  it("TournamentSheet_cancelForfeit_actorRefreshesImmediately", () => {
     const sheet = readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
     const start = sheet.indexOf("const performCancelForfeit = async");
     const body = sheet.slice(start, sheet.indexOf("return true;", start));
-    expect(body).toContain("if (isLiveRef.current) focusRowAfterChange(teamId);");
-    // État du flux à la réponse, pas celui capturé au clic.
-    expect(sheet).toMatch(/useEffect\(\(\) => \{\s*isLiveRef\.current = isLive;\s*\}, \[isLive\]\);/);
-  });
-
-  it("TournamentSheet_cancelForfeit_streamDown_fallsBackToRestRefresh", () => {
-    const sheet = readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
-    const start = sheet.indexOf("const performCancelForfeit = async");
-    const body = sheet.slice(start, sheet.indexOf("return true;", start));
-    expect(body).toContain("else void refresh().then(() => focusRowAfterChange(teamId));");
+    expect(body).toContain("void refresh().then(() => focusRowAfterChange(teamId));");
+    expect(sheet).not.toContain("isLiveRef");
   });
 
   it("useScoreForm_rulesChangeWhileOpen_realignsBaseline", () => {

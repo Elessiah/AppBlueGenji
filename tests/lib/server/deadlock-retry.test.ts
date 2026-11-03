@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fail } from "@/lib/server/http";
 import { isContentionError, isContentionMessage, isDeadlockMessage, isSnapshotConflict } from "@/lib/server/mysql-errors";
-import { isSnapshotConflict as retryIsSnapshotConflict } from "@/lib/server/tournaments/deadlock-retry";
 import { launchFailure } from "@/lib/server/tournaments/match-launch-routes";
 import { CONCURRENT_UPDATE_RETRY, CONCURRENT_UPDATE_RETRY_MESSAGE } from "@/lib/shared/api-error-code";
 import { ERROR_MESSAGES, mapError } from "@/app/(secured)/tournois/[id]/_lib/error-map";
@@ -216,9 +215,5 @@ describe("isSnapshotConflict", () => {
     expect(isSnapshotConflict(Object.assign(new Error("x"), { code: "ER_LOCK_DEADLOCK", errno: 1213 }))).toBe(false);
     expect(isSnapshotConflict(null)).toBe(false);
     expect(isSnapshotConflict("ER_CHECKREAD")).toBe(false);
-  });
-
-  it("isSnapshotConflict_reexportedByDeadlockRetry_isSameFunction", () => {
-    expect(retryIsSnapshotConflict).toBe(isSnapshotConflict);
   });
 });
