@@ -679,6 +679,71 @@ describe("dispatchLobbyBriefs", () => {
     }
   });
 
+  it("dispatchLobbyBriefs_side1SentThenSide2Closed_side1ClaimKept", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const { query, execute } = mockDb([MATCH]);
+    query
+      .mockResolvedValueOnce([[MATCH]])
+      .mockResolvedValueOnce([[{ ...MATCH, claim_kept: 1 }]])
+      .mockResolvedValueOnce([[]]);
+
+    expect(await dispatchLobbyBriefs()).toBe(1);
+
+    expect(releases(execute).map(([, params]) => params)).toEqual([[101]]);
+    error.mockRestore();
+  });
+
+  it("dispatchLobbyBriefs_side1NotRenderedThenSide2Closed_bothReleasedNoRetry", async () => {
+    jest.useFakeTimers();
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      jest.mocked(formatLobbyBriefDm).mockImplementationOnce(() => {
+        throw new Error("RENDER");
+      });
+      const { query, execute } = mockDb([MATCH]);
+      query
+        .mockResolvedValueOnce([[MATCH]])
+        .mockResolvedValueOnce([[{ ...MATCH, claim_kept: 1 }]])
+        .mockResolvedValueOnce([[]]);
+
+      await dispatchLobbyBriefs();
+      await jest.advanceTimersByTimeAsync(10_000);
+
+      expect(releases(execute).map(([, params]) => params)).toEqual([[100, 101]]);
+      expect(logged(error, "remis au balayage suivant")).toBe(false);
+      expect(query.mock.calls.filter(([sql]) => !/WHERE m\.id = \?/.test(sql))).toHaveLength(1);
+    } finally {
+      jest.useRealTimers();
+      error.mockRestore();
+    }
+  });
+
+  it("dispatchLobbyBriefs_sameMatchLostAndRetried_budgetCountedOnce", async () => {
+    jest.useFakeTimers();
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      jest.mocked(formatLobbyBriefDm).mockImplementation(() => {
+        throw new Error("RENDER");
+      });
+      const { query } = mockDb([MATCH]);
+      // Chaque balayage réserve deux côtés : le premier (id pair) a perdu sa réservation.
+      query.mockImplementation(async (sql, params) => {
+        if (!/WHERE m\.id = \? AND m\.launch_pairing = \?/.test(sql)) return [[MATCH]];
+        return [[{ ...MATCH, claim_kept: Number((params as unknown[])[0]) % 2 }]];
+      });
+
+      await dispatchLobbyBriefs();
+      for (let i = 0; i < 6; i += 1) await jest.advanceTimersByTimeAsync(10_000);
+
+      // Le balayage initial puis trois relances : la clé du match n'est comptée qu'une fois par balayage.
+      expect(query.mock.calls.filter(([sql]) => !/WHERE m\.id = \?/.test(sql))).toHaveLength(4);
+    } finally {
+      jest.mocked(formatLobbyBriefDm).mockImplementation(actualDm.formatLobbyBriefDm);
+      jest.useRealTimers();
+      error.mockRestore();
+    }
+  });
+
   it("dispatchLobbyBriefs_ghostSideThenLobbyClosed_bothClaimsReleased", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const { execute } = mockDb([{ ...MATCH, team1_ghost: 1 }], [], new Map([[40, null]]));
