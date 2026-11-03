@@ -97,7 +97,11 @@ Un détenteur qui ne demande jamais le tournoi (programmation, rappels,
 au défaut du serveur avant de rendre la connexion au pool —
 `lib/server/tournaments/lock-wait.ts`, partagé avec le retrait d'une pénalité,
 qui tient lui aussi le tournoi en verrouillant les manches) au lieu des 50 s du
-serveur, en tenant le verrou du tournoi. Une contention qui dure —
+serveur, en tenant le verrou du tournoi. La borne se pose **après** ce verrou
+(`lockTournamentRow`, en toute première instruction), attendu sans borne comme
+pour tout geste : son détenteur — réconciliation, lancement — le rend sans rien
+attendre de l'annulation. Un classement dont l'équipe n'existe plus rend
+`TEAM_NOT_IN_TOURNAMENT`. Une contention qui dure —
 interblocage sur les trois tentatives, `ER_CHECKREAD`, délai de verrou
 (`ER_LOCK_WAIT_TIMEOUT`) — rend `409 CONCURRENT_UPDATE_RETRY` (code fixe, le
 journal cite le tournoi et l'engagé), pas une panne. La route la reconnaît par
@@ -107,11 +111,12 @@ jusqu'au commit, si bien qu'un « Prêt » de la manche suivante attend la fin d
 rejeu.
 
 **Publication** : instantané (`publishMatchUpdatedEvent`, direct de l'accueil
-compris), aperçu, listes et agrégats de l'accueil — le rejeu peut réécrire des
+compris), aperçu, listes et mini-arbres de l'accueil
+(`invalidateLandingMiniBrackets`) — le rejeu peut réécrire des
 colonnes de `bg_tournaments` (manche d'endurance courante, phase) et reposer
 les matchs d'une manche périmée. Aucun résultat de match ne change : le
-classement du site et les statistiques restent en cache (`publishUpdatedEvent`
-les vidait). Flux ouvert, l'interface s'en remet à lui pour l'instantané ;
+classement du site, les statistiques et, à l'accueil, leaderboards, bandeau et
+compteurs restent en cache (`publishUpdatedEvent` les vidait). Flux ouvert, l'interface s'en remet à lui pour l'instantané ;
 flux tombé, elle relit le tournoi (`refresh()`).
 
 ## Permission : administrateur strict

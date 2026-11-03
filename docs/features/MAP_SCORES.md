@@ -244,7 +244,10 @@ l'instantané) et déclenche une relecture du **seul** match
 (`GET /api/tournaments/[id]/matches/[matchId]/proposals`, `useProposalMaps`,
 `proposalsNeedRefresh`) — mêmes conditions que la lecture REST du détail, même
 règle de lecture (`getViewerMatchProposals`, qui partage `viewerProposalScope`
-avec le contexte du lecteur), au plus trois essais espacés de 4 s. Elle relisait
+avec le contexte du lecteur), au plus trois essais espacés de 4 s. Les dates de
+report y sont **relues avec les maps**, dans une même image (transaction en
+lecture seule) : l'instantané en cache peut précéder un nouveau report, et sa
+date apparierait le détail du suivant. Elle relisait
 le tournoi entier (instantané et contexte du lecteur) pour les maps d'un match.
 La réponse ne complète un côté que si elle décrit la proposition affichée
 (`mergeMatchProposals`) : une réponse en retard n'écrase rien.

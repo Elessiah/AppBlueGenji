@@ -400,8 +400,8 @@ classement du site ni statistiques ne comptent un match non `COMPLETED`
 (`playedMatchSql`), et aucun moteur à classement ne le rejoue, si bien que la
 sauvegarde ne lance plus aucune réconciliation —, et l'annulation d'un abandon
 (`FORFEIT_CANCELLATION.md`), qui ne change aucun résultat : instantané, aperçu,
-listes et agrégats de l'accueil (son rejeu peut réécrire la manche courante),
-jamais le classement du site ni les statistiques.
+listes et mini-arbres de l'accueil (son rejeu peut réécrire la manche
+courante), jamais le classement du site, les statistiques ni les leaderboards.
 
 ### L'entretien passif réconcilie ce qu'il tranche
 
