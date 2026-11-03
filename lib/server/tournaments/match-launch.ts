@@ -655,19 +655,6 @@ export async function loadCasterIdentity(
 }
 
 /**
- * Jeu du tournoi d'un match, lu sans verrou (il ne change jamais).
- * @throws `MATCH_NOT_FOUND`
- */
-async function loadMatchGame(connection: PoolConnection, matchId: number): Promise<TournamentGame> {
-  const [rows] = await connection.execute<(RowDataPacket & { game: TournamentGame })[]>(
-    `SELECT t.game FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id WHERE m.id = ? LIMIT 1`,
-    [matchId],
-  );
-  if (!rows[0]) throw new Error("MATCH_NOT_FOUND");
-  return rows[0].game;
-}
-
-/**
  * Ce qui empêche un lecteur de s'inscrire comme caster, `null` s'il le peut.
  * L'identité n'est lue que quand elle peut changer la réponse : sans la
  * permission `live`, le refus est acquis.
@@ -784,12 +771,12 @@ export async function claimMatchCast(
       // Ligne du compte verrouillée en première instruction, avant le match —
       // l'ordre de la suppression de compte (compte, puis ses matchs).
       const identity = await loadCasterIdentity(connection, userId, true);
-      // Le jeu du tournoi ne change jamais : lu sans verrou, une fois le compte verrouillé.
-      const block = castBlockReason(hasLivePermission, identity, await loadMatchGame(connection, matchId));
-      if (block) throw new Error(block);
 
+      // Le jeu vient du match verrouillé : aucune lecture avant son verrou (elle figerait l'instantané).
       const row = await lockLaunchMatch(connection, matchId);
       if (!row) throw new Error("MATCH_NOT_FOUND");
+      const block = castBlockReason(hasLivePermission, identity, row.tournament_game);
+      if (block) throw new Error(block);
       if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
       if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
       if (row.casters.some((caster) => caster.userId === userId)) {

@@ -826,6 +826,18 @@ describe("claimMatchCast", () => {
     await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("CASTER_IDENTITY_REQUIRED");
   });
 
+  it("claimMatchCast_marvelRivalsWithoutBattlenet_isAccepted", async () => {
+    state.match = { ...state.match!, tournament_game: "MR", game: "MR" };
+    state.users[CASTER] = { ...verified, blizzard_sub: null, overwatch_battletag: null };
+    await expect(claimMatchCast(42, CASTER, true)).resolves.toBeUndefined();
+  });
+
+  it("claimMatchCast_marvelRivalsWithoutDiscord_stillRefused", async () => {
+    state.match = { ...state.match!, tournament_game: "MR", game: "MR" };
+    state.users[CASTER] = { ...verified, blizzard_sub: null, discord_verified_at: null };
+    await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("CASTER_IDENTITY_REQUIRED");
+  });
+
   it("refuse un compte supprimé ou introuvable", async () => {
     state.users[CASTER] = { ...verified, is_deleted: 1 };
     await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("CASTER_IDENTITY_REQUIRED");
