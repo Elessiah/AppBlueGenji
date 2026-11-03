@@ -32,6 +32,7 @@ import type { PrivacyChange } from "@/lib/shared/privacy-changes";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { SITE_VISITOR_RETENTION_MONTHS, SITE_VISIT_DETAIL_RETENTION_DAYS } from "@/lib/shared/site-visits";
 import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-request-notice";
+import { TEAM_INVITE_NOTICE_COOLDOWN_HOURS, TEAM_INVITE_NOTICES_DAILY_CAP } from "@/lib/shared/team-invite-notice";
 
 /** The translated part of an entry: its wording, and its links' labels (same targets, same order). */
 export type PrivacyChangeTranslation = {
@@ -749,6 +750,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Solo registrations: a registration for a solo tournament that hasn't started yet, where you played no match, no longer keeps your account under a borrowed username — if nothing else keeps it (a match played, a team owned, a tournament organized, an entry in a solo tournament that has already started or ended), it is erased entirely and the registration withdrawn from the tournament; otherwise, the registration stays, under a borrowed username. Once the tournament has started or ended, the entrant stays, under a borrowed username, as before.",
       "Player page: a deleted account's page, under its borrowed username, is now kept only if it played at least one match (its statistics also belong to its opponents); otherwise the page is not found, and its name is shown without a link.",
       "What doesn't change: nothing new is collected; the traces left after any deletion (including encrypted backups, deletion log, connection data, audience measurement) are the same.",
+    ],
+  },
+  "2026-11-invitations-equipe-notifiees": {
+    linkLabels: ["Read the “Push notifications” section"],
+    title: "Team invitations announced by push and on Discord",
+    summary:
+      "When a team invites you, when the staff offers you to take over a ghost team, or when the ownership of your team is transferred to you, the site now lets you know by push notification and by a direct message from the Discord bot.",
+    details: [
+      `What changes: the push notification (topic “Team invitations”, which you can turn off from My profile) and the Discord direct message (if you linked your Discord account or verified your tag) only name the team — never who invites you, offers you the takeover or transfers the team to you — and lead to My profile, where the invitation is accepted or declined, or to the team's page. The same team only makes the bot write to the same player once every ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} hours, and to ${TEAM_INVITE_NOTICES_DAILY_CAP} players at most within that time; the invitation itself is always recorded.`,
+      "What doesn't change: nothing new is collected or kept; nothing is sent to a suspended or deleted account, nor to the author of the action. The direct message falls under organizing teams (legitimate interest, register T03), which you can object to (section “Your rights” of the privacy page); the push notification, under your consent (register T12).",
     ],
   },
 };

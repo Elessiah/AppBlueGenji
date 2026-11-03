@@ -45,6 +45,7 @@ import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-rep
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-request-notice";
+import { TEAM_INVITE_NOTICE_COOLDOWN_HOURS, TEAM_INVITE_NOTICES_DAILY_CAP } from "@/lib/shared/team-invite-notice";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { SITE_VISITOR_RETENTION_MONTHS, SITE_VISIT_DETAIL_RETENTION_DAYS } from "@/lib/shared/site-visits";
@@ -1454,6 +1455,24 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Inscriptions individuelles : une inscription à un tournoi individuel pas encore commencé, où tu n'as disputé aucun match, ne garde plus ton compte sous un pseudo d'emprunt — si rien d'autre ne le retient (match joué, équipe possédée, tournoi organisé, engagement dans un tournoi individuel déjà commencé ou terminé), il est effacé entièrement et l'inscription retirée du tournoi ; sinon, l'inscription reste, sous un pseudo d'emprunt. Une fois le tournoi commencé ou terminé, l'engagé reste, sous un pseudo d'emprunt, comme avant.",
       "Fiche du joueur : la fiche d'un compte supprimé, sous son pseudo d'emprunt, n'est plus gardée que s'il a joué au moins un match (ses statistiques appartiennent aussi à ses adversaires) ; sinon la page est introuvable, et son nom s'affiche sans lien.",
       "Ce qui ne change pas : rien de nouveau n'est collecté ; les traces qui restent après toute suppression (notamment sauvegardes chiffrées, journal des suppressions, données de connexion, mesure d'audience) sont les mêmes.",
+    ],
+  },
+  {
+    // TEAM-INVITE-NOTIFY (demande de l'utilisateur du 2026-10-28, reprise de
+    // fantôme confirmée le 2026-11-03) : le joueur invité, celui à qui le staff
+    // propose une reprise et le nouveau propriétaire sont prévenus (push, sujet
+    // `TEAM_INVITATION`, et message privé Discord). Pour tous les comptes.
+    // Datée du lendemain de la nuit de déploiement suivant la fusion prévue le
+    // 2026-11-03 — à avancer si la fusion glisse.
+    id: "2026-11-invitations-equipe-notifiees",
+    publishedAt: "2026-11-05",
+    title: "Invitations d'équipe annoncées en push et sur Discord",
+    links: [{ href: "/rgpd#notifications", label: "Lire la section « Notifications push »" }],
+    summary:
+      "Quand une équipe t'invite, quand le staff te propose de reprendre une équipe fantôme, ou quand la propriété de ton équipe t'est transférée, le site te prévient désormais en notification push et par un message privé du bot Discord.",
+    details: [
+      `Ce qui change : la notification push (sujet « Invitations d'équipe », que tu peux couper depuis Mon profil) et le message privé Discord (si tu as rattaché ton compte Discord ou certifié ton tag) ne nomment que l'équipe — jamais qui t'invite, te propose la reprise ou te transfère l'équipe — et renvoient à Mon profil, où l'invitation s'accepte ou se refuse, ou à la fiche de l'équipe. Une même équipe ne fait écrire au même joueur qu'une fois toutes les ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} heures, et à ${TEAM_INVITE_NOTICES_DAILY_CAP} joueurs au plus dans ce délai ; l'invitation, elle, est toujours enregistrée.`,
+      "Ce qui ne change pas : rien de nouveau n'est collecté ni conservé ; rien ne part à un compte suspendu ou supprimé, ni à l'auteur du geste. Le message privé relève de l'organisation des équipes (intérêt légitime, registre T03), auquel tu peux t'opposer (section « Vos droits » de la page RGPD) ; la notification push, de ton accord (registre T12).",
     ],
   },
 ];

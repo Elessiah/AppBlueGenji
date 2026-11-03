@@ -24,6 +24,10 @@
       "label": "Join requests",
       "description": "A player asks to join a team you manage."
     },
+    "TEAM_INVITATION": {
+      "label": "Team invitations",
+      "description": "A team invites you to join it, the staff offers you to take over a team, or the ownership of your team is transferred to you."
+    },
     "CONTENT_REPORT": {
       "label": "Reports about you",
       "description": "A report targets your account or your team: you can appeal it."

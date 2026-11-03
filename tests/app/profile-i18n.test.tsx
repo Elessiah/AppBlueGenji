@@ -938,6 +938,15 @@ describe("anglais — écrans", () => {
     mockPush = states[4];
     expect(inEnglish(<PushNotificationsPanel />)).toContain("2 devices subscribed to your account");
   });
+
+  it("PushNotificationsPanel_subscribed_listsTeamInvitationToggle (TEAM-INVITE-NOTIFY)", () => {
+    mockPush = { support: "AVAILABLE", server: { publicKey: "k", topics: [...PUSH_TOPIC_KEYS], disabledTopics: ["TEAM_INVITATION"], devices: 1 }, checked: true, subscribed: true };
+
+    const html = inEnglish(<PushNotificationsPanel />);
+
+    expect(html).toContain("Team invitations");
+    expect(html).toContain("the ownership of your team is transferred to you");
+  });
 });
 
 function reportsMetadata(id: string) {

@@ -17,6 +17,7 @@ langues.
 | Suspension et levée (`account-suspension.ts`) | site | compte |
 | Signalement qui vise le joueur ou son équipe (`formatTargetNotice`) | site | compte |
 | Demande d'adhésion à une équipe (`team-join-request-notice.ts`) | site | compte |
+| Invitation d'équipe, reprise de fantôme proposée, propriété transférée (`team-invite-notice.ts`) | site | compte |
 | Logo / avatar masqué, supprimé, rétabli (`logo-quarantine.ts`) | site | compte |
 | Changements de la politique de données (`buildPrivacyChangesMessage`) | site | compte |
 | Code de connexion / certification du tag | **bot**, sur la `locale` transmise | compte, bilingue sans compte |

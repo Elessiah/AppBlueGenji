@@ -2094,7 +2094,7 @@ describe("PRIVACY_CHANGES — pseudo de l'arbitre lu par les membres connectés 
   it("privacyChanges_refereeUsernameToMembers_leavesPublishedOppositionEntryIntact", () => {
     const older = PRIVACY_CHANGES.find((c) => c.id === "2026-10-opposition-arbitre-retrait-des-matchs")!;
     expect(older.publishedAt).toBe("2026-10-30");
-    expect(PRIVACY_CHANGES.indexOf(older)).toBe(PRIVACY_CHANGES.length - 10);
+    expect(PRIVACY_CHANGES.indexOf(older)).toBe(PRIVACY_CHANGES.length - 11);
   });
 });
 
@@ -2104,7 +2104,7 @@ describe("PRIVACY_CHANGES — rôles de plateforme au journal du staff (ADMIN-SE
   const english = PRIVACY_CHANGES_EN[id];
 
   it("privacyChanges_platformRolesLog_dated1031ForAllAccountsWithRegisterLink", () => {
-    expect(PRIVACY_CHANGES.at(-8)).toBe(entry);
+    expect(PRIVACY_CHANGES.at(-9)).toBe(entry);
     expect(entry.publishedAt).toBe("2026-10-31");
     expect(entry.audience).toBeUndefined();
     expect(entry.links).toEqual([{ href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" }]);
@@ -2131,7 +2131,7 @@ describe("PRIVACY_CHANGES — rôles de plateforme au journal du staff (ADMIN-SE
   });
 
   it("privacyChanges_platformRolesLog_leavesPublishedEntriesBeforeIt", () => {
-    const previous = PRIVACY_CHANGES[PRIVACY_CHANGES.length - 9];
+    const previous = PRIVACY_CHANGES[PRIVACY_CHANGES.length - 10];
     expect(previous.id).toBe("2026-10-pseudo-arbitre-aux-membres");
     expect(PRIVACY_CHANGES.filter((c) => c.publishedAt > "2026-10-30").map((c) => c.id)).toContain(id);
   });
@@ -2156,8 +2156,8 @@ describe("PRIVACY_CHANGES — BattleTag tapé gardé, jamais vérifié (D3)", ()
   const english = PRIVACY_CHANGES_EN[id];
 
   it("privacyChanges_typedBattletagKept_precedesTermsV8Dated1031ForAllAccounts", () => {
-    expect(PRIVACY_CHANGES.at(-7)).toBe(entry);
-    expect(PRIVACY_CHANGES.at(-8)?.id).toBe("2026-10-roles-de-plateforme-journal-du-staff");
+    expect(PRIVACY_CHANGES.at(-8)).toBe(entry);
+    expect(PRIVACY_CHANGES.at(-9)?.id).toBe("2026-10-roles-de-plateforme-journal-du-staff");
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
     expectStandaloneEntry(entry, english, {
       after: "2026-10-roles-de-plateforme-journal-du-staff",
@@ -2365,7 +2365,7 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     expect(t18En.dataCategories.join(" ")).toContain("never who is present");
     expect(t18.retention[0]).toContain("7 jours");
     expect(t18En.retention[0]).toContain("7 days");
-    expect(REGISTER_UPDATED_AT).toBe("2026-11-04");
+    expect(REGISTER_UPDATED_AT >= "2026-11-04").toBe(true);
   });
 
   it("processingRegister_t18_declaresBotMemoryPresenceAndBotRecordFrAndEn", () => {
@@ -2513,7 +2513,7 @@ describe("Registre — suppression du compte (D12, D13)", () => {
     expect(JSON.stringify(t01)).toContain("sa fiche de joueur seulement s'il a joué au moins un match");
     expect(JSON.stringify(t01En)).toContain("its registrations for solo tournaments that have not started yet, with no match, are then withdrawn with it");
     expect(JSON.stringify(t01En)).toContain("its player page only if it played at least one match");
-    expect(REGISTER_UPDATED_AT).toBe("2026-11-04");
+    expect(REGISTER_UPDATED_AT >= "2026-11-04").toBe(true);
   });
 
   it("processingRegister_t03_statesSoloWithdrawalFrAndEn", () => {

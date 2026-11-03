@@ -98,6 +98,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `TEAM_TAG.md` — Sigle d'équipe unique, facultatif.
 - `TEAM_DIRECTORY_LOGOS.md` — Logos dans l'annuaire `/equipes`.
 - `TEAM_JOIN_REQUEST_NOTIFICATION.md` — Demande d'adhésion annoncée à la gestion sur Discord.
+- `TEAM_INVITATION_NOTIFICATION.md` — Invitation d'équipe, reprise de fantôme proposée et propriété transférée annoncées au joueur (push et message privé Discord).
 - `GHOST_TEAMS.md` — Équipes fantômes et inscription en lot.
 - `ENTITY_LINKS.md` — Noms cliquables : `TeamLink`, `PlayerLink`, `EntrantLink`.
 

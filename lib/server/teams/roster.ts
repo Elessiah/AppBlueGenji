@@ -8,6 +8,7 @@ import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { reconnectUserStreams } from "@/lib/server/session-streams";
 import { forgetCertificationPromptsOfTeam } from "@/lib/server/tournaments/certification-prompt-cache";
 import { lockMemberRoles, withTeamRosterLock, writeActiveMembership } from "./access";
+import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
 
 /**
  * Tournois dont le flux lit l'équipe `teamId` dans le contexte du lecteur :
@@ -282,4 +283,7 @@ export async function transferTeamOwnership(
   );
   // Les deux rôles ont changé : les deux contextes se relisent.
   refreshTeamViewers(teamId, [requesterId, newOwnerUserId], tournamentIds);
+  // Transaction validée (`withTeamRosterLock` lève sinon) : le nouveau
+  // propriétaire est prévenu, sans attendre.
+  notifyTeamInviteInBackground("OWNERSHIP", teamId, newOwnerUserId, requesterId);
 }

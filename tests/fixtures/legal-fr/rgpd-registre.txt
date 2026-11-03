@@ -5,7 +5,7 @@ Le registre décrit les traitements de données personnelles du site et du bot D
 Il décrit aussi le portail de support (Spiceworks), la retransmission des matchs et les journaux techniques du serveur web. La gestion des adhésions à l'association ne relève pas du site : l'association la tient hors du site, et ce registre ne la décrit pas — pour toute question à son sujet, utilisez les moyens de contact de la politique de confidentialité.
 Télécharger le registre (tableur CSV)← Politique de confidentialité
 RESPONSABLE
-ActeursMIS À JOUR LE 04/11/2026
+ActeursMIS À JOUR LE 05/11/2026
 Responsable du traitement
 Bluegenji Esport — Association loi 1901, 4 impasse des Cyprès, 51210 Janvilliers, France
 Contact
@@ -101,6 +101,7 @@ Organiser des tournois amateurs et en conserver les résultats
 Sous-finalités
 Constituer des équipes (membres, rôles, invitations)
 Prévenir en message privé Discord le propriétaire et les managers d'une équipe d'une demande d'adhésion (sans nommer le demandeur, au plus un message par joueur et par équipe toutes les 24 h)
+Prévenir un joueur en message privé Discord de l'invitation d'une équipe (au plus un message par équipe et par joueur toutes les 24 h, et 10 joueurs par équipe), de la reprise d'une équipe fantôme que le staff lui propose, et de la propriété de son équipe qui lui est transférée (sans nommer qui invite, propose ou transfère : le nom de l'équipe seul)
 Inscrire des équipes ou des joueurs, générer les plateaux, saisir et arbitrer les scores
 Publier résultats, classements, statistiques et palmarès
 Laisser suivre sans compte la fiche d'un tournoi publié (/suivre/tournois/…) : plateau, scores, classements, noms et logos des équipes et pseudos des engagés (et, en tournoi individuel, leur avatar s'il n'est pas masqué et leur numéro de compte interne, pour la marque du podium), pénalités d'une BlueGenji Survie sans motif ni arbitre, sans les codes de replay ; page exclue des moteurs de recherche
@@ -127,7 +128,7 @@ Adresse IP d'un visiteur sans compte : en mémoire, le temps de la fenêtre du p
 Destinataires
 Public du site
 Staff d'arbitrage et d'administration
-Discord, qui achemine le message privé d'une demande d'adhésion
+Discord, qui achemine le message privé d'une demande d'adhésion, d'une invitation d'équipe, d'une reprise d'équipe proposée ou d'une propriété transférée
 Transferts hors UE
 États-Unis : Discord (acheminement des messages privés) — Discord, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)
 Sécurité
@@ -307,7 +308,7 @@ Relais des annonces entre les salons des serveurs partenaires, répercussion des
 Exclusion d'un utilisateur du relais par la modération — valable pour tout le réseau de serveurs partenaires (modération communautaire), d'où la liste des exclusions ouverte aux administrateurs de chaque serveur
 Statistiques d'activité (commande /stats, qui ne montre à chacun que sa propre activité ; tableau de bord du bot)
 Confirmation des adhésions à l'association et rappels programmés sur ses serveurs
-Remise des messages du site : codes (rédigés par le bot dans la langue du compte que le site lui transmet), horaires et rappels de match, avis de retrait d'un match (« Match retiré »), réglages du salon d'un match envoyés à ceux qui gèrent ses engagées et avis envoyé à un caster dont l'inscription est retirée par un autre que lui (ces messages de match aux seuls tags Discord certifiés), avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé, avatar masqué, retiré ou rétabli, suspension du compte et sa levée), demandes d'adhésion à une équipe et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un ; annonce des matchs diffusés publiée dans le salon #live du serveur de l'association, en un message par soirée modifié à chaque début et fin de match, avec une mention @everyone pour la chaîne officielle ou du seul rôle StreamViewer pour toute autre chaîne (noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs — traitement T16)
+Remise des messages du site : codes (rédigés par le bot dans la langue du compte que le site lui transmet), horaires et rappels de match, avis de retrait d'un match (« Match retiré »), réglages du salon d'un match envoyés à ceux qui gèrent ses engagées et avis envoyé à un caster dont l'inscription est retirée par un autre que lui (ces messages de match aux seuls tags Discord certifiés), avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé, avatar masqué, retiré ou rétabli, suspension du compte et sa levée), demandes d'adhésion à une équipe, invitations d'équipe, reprises d'équipe proposées, propriétés d'équipe transférées et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un ; annonce des matchs diffusés publiée dans le salon #live du serveur de l'association, en un message par soirée modifié à chaque début et fin de match, avec une mention @everyone pour la chaîne officielle ou du seul rôle StreamViewer pour toute autre chaîne (noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs — traitement T16)
 Salons vocaux d'équipe des matchs, dans les tournois qui en ont l'option : création au nom de l'équipe, comptage des personnes présentes (un nombre, jamais qui) et suppression ; pour compter, présence vocale des membres du serveur de l'association tenue en mémoire seulement (traitement T18, qui en donne les données et les durées)
 Base légale
 Intérêt légitime (faire fonctionner, modérer et mesurer le relais entre serveurs partenaires) ; les messages du site relèvent de la base de leur traitement d'origine ; les salons vocaux d'équipe relèvent de T18
@@ -482,6 +483,7 @@ Sous-finalités
 Réglages du salon de ses matchs, pour qui gère une engagée (propriétaire, manager, joueur d'un tournoi individuel)
 Départ de ses matchs (et, pour un caster inscrit, du match qu'il caste), score à confirmer ou validé automatiquement faute de réponse, coup d'envoi d'un tournoi, horaires de match (posés, changés ou retirés) et rappels de match
 Demandes d'adhésion à une équipe qu'il gère, signalements et décisions de modération le concernant, changements de la politique de données
+Invitation d'une équipe, reprise d'une équipe fantôme proposée par le staff, propriété de son équipe qui lui est transférée (nom de l'équipe seul)
 Alertes d'arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l'adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d'arbitrage et alertes de modération pour le staff qui détient ces rôles
 Retrait de son inscription de caster sur un match (par le staff ou d'office), avec le motif, pour le caster qui détient encore la permission de diffusion
 Retrait de son arbitrage d'un match (par le staff, match confié à un autre arbitre ou passé en autogestion, ou d'office), avec le motif, pour l'arbitre désigné qui détient encore la permission d'arbitrage
