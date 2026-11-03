@@ -1497,6 +1497,19 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : rien de nouveau n'est collecté ni conservé, et ce que les équipes et les casters voient de toi sur un match est inchangé.",
     ],
   },
+  {
+    id: "2026-11-tag-discord-arbitre-execution-du-service",
+    publishedAt: "2026-11-05",
+    audience: "LIVE_STAFF",
+    title: "Arbitre désigné : la base de la présentation de ton tag Discord",
+    links: [{ href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" }],
+    summary:
+      "Quand tu arbitres un match, la présentation de ton tag Discord certifié à ses deux équipes et à ses casters repose désormais sur l'exécution du service, et non plus sur l'intérêt légitime : sans lui, les parties du match ne peuvent pas te joindre.",
+    details: [
+      "Ce qui change : la seule base juridique de cette présentation, jugée strictement nécessaire au fonctionnement minimum du service.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté ni montré, aux mêmes personnes et aux mêmes moments ; ton opposition à l'arbitrage (formulaire de signalement, catégorie RGPD), retenue, te retire toujours de tes matchs non terminés, ce tag compris.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

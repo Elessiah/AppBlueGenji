@@ -13,6 +13,7 @@ import { can } from "@/lib/shared/permissions";
 const STATUSES: Readonly<Record<string, number>> = {
   NOT_CASTER: 403,
   CASTER_IDENTITY_REQUIRED: 409,
+  CASTER_DISCORD_REQUIRED: 409,
   MATCH_NOT_FOUND: 404,
   MATCH_ALREADY_COMPLETED: 409,
   MATCH_NOT_LAUNCHABLE: 409,

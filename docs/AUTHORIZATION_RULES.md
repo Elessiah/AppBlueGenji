@@ -806,7 +806,9 @@ ouvre l'antenne d'un match, il ne décide pas de la chaîne du tournoi.
 `live` ouvre aussi l'**inscription comme caster** d'un match
 (`POST /api/matches/[matchId]/caster`), à une condition de plus que la
 permission : un tag Discord **certifié** et un compte Battle.net **rattaché**
-(`castBlockReason`, refus `CASTER_IDENTITY_REQUIRED` → 409). Un joueur du match
+(`castBlockReason`, refus `CASTER_IDENTITY_REQUIRED` → 409 ; Battle.net en
+Overwatch seulement : en Marvel Rivals, le tag Discord seul, refus
+`CASTER_DISCORD_REQUIRED` → 409). Un joueur du match
 ne peut pas le caster (`CASTER_IS_PLAYER`). Un match n'a **pas de nombre
 maximal** de casters : chacun rejoint un stream du match ou ouvre le sien, et
 les casters d'un même match reçoivent les contacts les uns des autres le temps

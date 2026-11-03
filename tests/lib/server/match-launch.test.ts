@@ -835,7 +835,7 @@ describe("claimMatchCast", () => {
   it("claimMatchCast_marvelRivalsWithoutDiscord_stillRefused", async () => {
     state.match = { ...state.match!, tournament_game: "MR", game: "MR" };
     state.users[CASTER] = { ...verified, blizzard_sub: null, discord_verified_at: null };
-    await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("CASTER_IDENTITY_REQUIRED");
+    await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("CASTER_DISCORD_REQUIRED");
   });
 
   it("refuse un compte supprimé ou introuvable", async () => {

@@ -152,7 +152,10 @@ export function teamInviteNoticeRecipient(account: TeamInviteNoticeAccount): {
 
 /**
  * Le message privé. **Aucun pseudo de joueur ni `#id`** — ni de qui invite, ni
- * de qui transfère : seul le nom de l'équipe (`discordInline`), public.
+ * de qui transfère : seul le nom de l'équipe (`discordInline`), public. Une
+ * reprise ne dit que « un admin » (décision de l'utilisateur, 2026-11-03), le nom
+ * de l'équipe en lien masqué vers « Mon profil » : `discordInline` en échappe
+ * crochets et parenthèses, il ne peut ni fermer le lien ni en forger un autre.
  *
  * @param input.url adresse absolue du site, en français ; passée à l'anglais ici (`localizedSiteUrl`).
  */
@@ -167,7 +170,7 @@ export function formatTeamInviteNotice(
       case "INVITE":
         return `📨 BlueGenji — The team “${team}” invites you to join it. Accept or decline from your profile: ${url}`;
       case "GHOST_CLAIM":
-        return `📨 BlueGenji — The staff offers you to take over the team “${team}” as its owner. Accept or decline from your profile: ${url}`;
+        return `📨 BlueGenji — An admin offers you to take over the team [${team}](${url})`;
       case "OWNERSHIP":
         return `👑 BlueGenji — Ownership of your team “${team}” has just been transferred to you. You now manage its name, tag and members: ${url}`;
     }
@@ -176,7 +179,7 @@ export function formatTeamInviteNotice(
     case "INVITE":
       return `📨 BlueGenji — L'équipe « ${team} » t'invite à la rejoindre. Accepte ou refuse depuis ton profil : ${url}`;
     case "GHOST_CLAIM":
-      return `📨 BlueGenji — Le staff te propose de reprendre l'équipe « ${team} » comme propriétaire. Accepte ou refuse depuis ton profil : ${url}`;
+      return `📨 BlueGenji — Un admin vous propose de reprendre l'équipe [${team}](${url})`;
     case "OWNERSHIP":
       return `👑 BlueGenji — La propriété de ton équipe « ${team} » vient de t'être transférée. Tu gères désormais son nom, son sigle et ses membres : ${url}`;
   }

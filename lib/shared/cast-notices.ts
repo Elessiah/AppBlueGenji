@@ -45,7 +45,11 @@ export type CastReleasedMatch = {
 };
 
 /** Clé du motif, déclinée selon la condition qui manque (`castReleased.reason.*`, message privé). */
-export type CastReleaseReasonKey = CastReleaseReason | "INELIGIBLE_PERMISSION" | "INELIGIBLE_IDENTITY";
+export type CastReleaseReasonKey =
+  | CastReleaseReason
+  | "INELIGIBLE_PERMISSION"
+  | "INELIGIBLE_IDENTITY"
+  | "INELIGIBLE_DISCORD";
 
 /**
  * Le motif tel que le caster le lit : un retrait d'office dit **la** condition
@@ -56,5 +60,6 @@ export function castReleaseReasonKey(match: Pick<CastReleasedMatch, "reason" | "
   if (match.reason !== "INELIGIBLE") return match.reason;
   if (match.block === "NOT_CASTER") return "INELIGIBLE_PERMISSION";
   if (match.block === "CASTER_IDENTITY_REQUIRED") return "INELIGIBLE_IDENTITY";
+  if (match.block === "CASTER_DISCORD_REQUIRED") return "INELIGIBLE_DISCORD";
   return "INELIGIBLE";
 }

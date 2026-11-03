@@ -72,7 +72,7 @@ describe("castEligibilityBlock / refereeEligibilityBlock — Battle.net seulemen
   });
 
   it("castEligibilityBlock_marvelRivalsWithoutDiscord_requiresIdentity", () => {
-    expect(castEligibilityBlock({ ...noBattlenet, discord_verified_at: null }, "MR")).toBe("CASTER_IDENTITY_REQUIRED");
+    expect(castEligibilityBlock({ ...noBattlenet, discord_verified_at: null }, "MR")).toBe("CASTER_DISCORD_REQUIRED");
   });
 
   it("refereeEligibilityBlock_marvelRivalsWithoutBattlenet_returnsNull", () => {

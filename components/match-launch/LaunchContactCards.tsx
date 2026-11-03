@@ -10,7 +10,7 @@
 
 import { useEffect, useId, useState } from "react";
 import { PlayerLink, TeamLink } from "@/components/entity-link";
-import { useLaunchText } from "./launch-text";
+import { useLaunchText, type LaunchText } from "./launch-text";
 import {
   CASTER_ARRIVAL_ANNOUNCE_MS,
   casterCardPending,
@@ -31,13 +31,21 @@ import styles from "./MatchLaunchCenter.module.css";
 const CONTACT_ROLES = ["CAPITAINE", "MANAGER", "OWNER"] as const satisfies readonly TeamRole[];
 export type CopyFn = (value: string, label: string) => Promise<void>;
 
+/** Longueur au-delà de laquelle le pseudo cité par le toast de copie est tronqué (375 px). */
+export const COPY_TOAST_OWNER_MAX = 20;
+
 /**
- * Libellé que le toast de copie reprend (« Discord (Pseudo) copié ») : le
+ * Libellé que le toast de copie reprend (« Discord de Pseudo copié ») : le
  * propriétaire du contact y est nommé quand on le connaît, parmi les boutons
- * « Copier » identiques d'un écran.
+ * « Copier » identiques d'un écran — par une clé traduite (`copyLabelOwner`),
+ * son pseudo tronqué (`COPY_TOAST_OWNER_MAX`, par caractère et non par unité
+ * UTF-16) pour que le toast tienne sur un téléphone.
  */
-export function copyToastLabel(kind: "Discord" | "BattleTag", owner?: string): string {
-  return owner ? `${kind} (${owner})` : kind;
+export function copyToastLabel(text: LaunchText, kind: "Discord" | "BattleTag", owner?: string): string {
+  if (!owner) return kind;
+  const chars = Array.from(owner);
+  const short = chars.length > COPY_TOAST_OWNER_MAX ? `${chars.slice(0, COPY_TOAST_OWNER_MAX - 1).join("")}…` : owner;
+  return text.t("copyLabelOwner", { kind, owner: short });
 }
 
 function ReadyChip({ ready, phase }: Readonly<{ ready: boolean; phase: MatchLaunchInfo["phase"] }>) {
@@ -70,7 +78,8 @@ function IdentityLine({
    */
   owner?: string;
 }>) {
-  const { t } = useLaunchText();
+  const text = useLaunchText();
+  const { t } = text;
   const noteId = useId();
   return (
     <div className={styles.identity}>
@@ -88,7 +97,7 @@ function IdentityLine({
           <button
             type="button"
             className={`${styles.copy} tap-target`}
-            onClick={() => void onCopy(value, copyToastLabel(kind, owner))}
+            onClick={() => void onCopy(value, copyToastLabel(text, kind, owner))}
             aria-label={owner ? t("copyAriaOwner", { kind, owner, value }) : t("copyAria", { kind, value })}
             aria-describedby={note ? noteId : undefined}
           >

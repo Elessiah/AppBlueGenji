@@ -299,7 +299,8 @@ Bouton **« 🎙 Caster »** sur la carte d'un match, pour la permission `live`.
 Trois conditions de plus que la permission :
 
 - tag Discord **certifié** **et** compte Battle.net **rattaché**
-  (`castBlockReason` — refus `CASTER_IDENTITY_REQUIRED`) : le caster se présente
+  (`castBlockReason` — refus `CASTER_IDENTITY_REQUIRED` ; en Marvel Rivals, tag
+  Discord seul, refus `CASTER_DISCORD_REQUIRED`) : le caster se présente
   aux deux équipes, un tag saisi à la main ne dirait rien de qui l'on invite
   dans son salon. Le bouton reste visible mais annonce ce qui manque, plutôt que
   de mener à un 409 ;

@@ -27,7 +27,9 @@ commit : `lib/server/tournaments/referee-notices.ts`. Fenêtre du staff :
 
 `refereeBlockReason(permission, identité, jeu)` : la permission `tournaments`
 (`NOT_REFEREE`), un tag Discord certifié **et, en Overwatch seulement**, un
-compte Battle.net rattaché (`REFEREE_IDENTITY_REQUIRED`, `identityComplete`) —
+compte Battle.net rattaché (`REFEREE_IDENTITY_REQUIRED`, `identityComplete` ; en
+Marvel Rivals, le seul tag Discord manquant se refuse par `REFEREE_DISCORD_REQUIRED` —
+`CASTER_DISCORD_REQUIRED` pour caster —, dont le texte ne parle pas de Battle.net) —
 en Overwatch, les équipes l'ajoutent en jeu par son BattleTag ; hors Overwatch,
 ni BattleTag ni « ajoute-le en jeu » (décision 35) et **aucun Battle.net
 demandé** (décision de l'utilisateur, 2026-11-03 : même règle pour caster,

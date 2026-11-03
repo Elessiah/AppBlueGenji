@@ -5,8 +5,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { closedNoticeText } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
 import { startAtHint, startAtNotice } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
 import { anotherModalOpen } from "@/lib/shared/dialog-focus";
-import { launchSidesLaterText } from "@/components/match-launch/launch-text";
-import { CasterCard, CasterCards, RefereeCard, SideCard, copyToastLabel } from "@/components/match-launch/LaunchContactCards";
+import { launchSidesLaterText, refereeLaterText } from "@/components/match-launch/launch-text";
+import { scopedText } from "@/lib/shared/scoped-text";
+import enLaunchModal from "@/messages/en/launchModal.json";
+import { CasterCard, CasterCards, COPY_TOAST_OWNER_MAX, RefereeCard, SideCard, copyToastLabel } from "@/components/match-launch/LaunchContactCards";
 import { contactsErrorText } from "@/components/match-launch/MatchContactsDialog";
 import { FR_LAUNCH_TEXT } from "@/components/match-launch/launch-text";
 import { tournamentDialogsText } from "@/lib/shared/tournament-actions-text";
@@ -666,13 +668,79 @@ describe("RefereeCard — note sans contact, accessibilité, toast de copie (MAT
   });
 
   it.each([
-    ["Discord", "Alice", "Discord (Alice)"],
-    ["BattleTag", "Bob", "BattleTag (Bob)"],
+    ["Discord", "Alice", "Discord de Alice"],
+    ["BattleTag", "Bob", "BattleTag de Bob"],
     ["Discord", undefined, "Discord"],
   ] as [("Discord" | "BattleTag"), string | undefined, string][])(
     "copyToastLabel_%s_owner_%s",
     (kind, owner, expected) => {
-      expect(copyToastLabel(kind, owner)).toBe(expected);
+      expect(copyToastLabel(FR_LAUNCH_TEXT, kind, owner)).toBe(expected);
     },
   );
+
+  it("copyToastLabel_english_translationKey", () => {
+    expect(copyToastLabel(scopedText("en", enLaunchModal), "Discord", "Alice")).toBe("Alice's Discord");
+  });
+
+  it("copyToastLabel_longPseudo_truncatedWithEllipsis", () => {
+    const owner = "A".repeat(COPY_TOAST_OWNER_MAX + 5);
+    const label = copyToastLabel(FR_LAUNCH_TEXT, "Discord", owner);
+    expect(label).toBe(`Discord de ${"A".repeat(COPY_TOAST_OWNER_MAX - 1)}…`);
+  });
+
+  it("copyToastLabel_pseudoAtLimit_keptWhole", () => {
+    const owner = "B".repeat(COPY_TOAST_OWNER_MAX);
+    expect(copyToastLabel(FR_LAUNCH_TEXT, "BattleTag", owner)).toBe(`BattleTag de ${owner}`);
+  });
+
+  it("copyToastLabel_astralCharacters_truncatedByCharacter", () => {
+    const owner = "😀".repeat(COPY_TOAST_OWNER_MAX + 1);
+    const label = copyToastLabel(FR_LAUNCH_TEXT, "Discord", owner);
+    expect(Array.from(label.replace("Discord de ", ""))).toHaveLength(COPY_TOAST_OWNER_MAX);
+    expect(label.endsWith("…")).toBe(true);
+  });
+
+  it("copyLabelOwner_keyExistsInFrAndEn", () => {
+    const fr = JSON.parse(readFileSync(join(process.cwd(), "messages/fr/launchModal.json"), "utf8"));
+    const en = JSON.parse(readFileSync(join(process.cwd(), "messages/en/launchModal.json"), "utf8"));
+    for (const text of [fr.copyLabelOwner, en.copyLabelOwner]) {
+      expect(text).toContain("{kind}");
+      expect(text).toContain("{owner}");
+    }
+  });
+});
+
+describe("refereeLaterText — note des contacts tus de l'arbitre (MATCH-REFEREE-FINISH)", () => {
+  const referee = { userId: 9 };
+  const launch = (earlyContacts: boolean, casterIds: number[], ref: { userId: number } | null = referee) => ({
+    viewer: { earlyContacts },
+    casters: casterIds.map((userId) => ({ userId })),
+    referee: ref,
+  });
+
+  it("refereeLaterText_earlyContactsViewer_pointsToContactsAction", () => {
+    expect(refereeLaterText(FR_LAUNCH_TEXT, launch(true, []))).toBe(FR_LAUNCH_TEXT.t("contactsAtLaunch"));
+  });
+
+  it("refereeLaterText_casterOnlyViewer_atMatchStart", () => {
+    expect(refereeLaterText(FR_LAUNCH_TEXT, launch(false, []))).toBe(FR_LAUNCH_TEXT.t("contacts.casterLater"));
+  });
+
+  it("refereeLaterText_refereeAlsoCasts_atMatchStartEvenForEarlyViewer", () => {
+    expect(refereeLaterText(FR_LAUNCH_TEXT, launch(true, [3, 9]))).toBe(FR_LAUNCH_TEXT.t("contacts.casterLater"));
+  });
+
+  it("refereeLaterText_otherCasterOnly_earlyViewerStillPointedToContacts", () => {
+    expect(refereeLaterText(FR_LAUNCH_TEXT, launch(true, [3]))).toBe(FR_LAUNCH_TEXT.t("contactsAtLaunch"));
+  });
+
+  it("refereeLaterText_noReferee_followsViewer", () => {
+    expect(refereeLaterText(FR_LAUNCH_TEXT, launch(true, [9], null))).toBe(FR_LAUNCH_TEXT.t("contactsAtLaunch"));
+  });
+
+  it("refereeLaterText_english_translated", () => {
+    const en = scopedText("en", enLaunchModal);
+    expect(refereeLaterText(en, launch(true, []))).toBe(en.t("contactsAtLaunch"));
+    expect(refereeLaterText(en, launch(false, []))).toBe(en.t("contacts.casterLater"));
+  });
 });

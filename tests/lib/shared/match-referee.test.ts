@@ -49,7 +49,7 @@ describe("refereeBlockReason — Battle.net seulement en Overwatch (décision du
   });
 
   it("refereeBlockReason_marvelRivalsWithoutDiscord_stillRefused", () => {
-    expect(refereeBlockReason(true, { discordVerified: false, blizzardLinked: true }, "MR")).toBe("REFEREE_IDENTITY_REQUIRED");
+    expect(refereeBlockReason(true, { discordVerified: false, blizzardLinked: true }, "MR")).toBe("REFEREE_DISCORD_REQUIRED");
   });
 
   it("refereeBlockReason_marvelRivalsWithoutPermission_notReferee", () => {

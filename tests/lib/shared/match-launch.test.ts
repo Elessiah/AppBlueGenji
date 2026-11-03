@@ -355,7 +355,7 @@ describe("castBlockReason — Battle.net seulement en Overwatch (décision du 20
   });
 
   it("castBlockReason_marvelRivalsWithoutDiscord_stillRefused", () => {
-    expect(castBlockReason(true, { discordVerified: false, blizzardLinked: true }, "MR")).toBe("CASTER_IDENTITY_REQUIRED");
+    expect(castBlockReason(true, { discordVerified: false, blizzardLinked: true }, "MR")).toBe("CASTER_DISCORD_REQUIRED");
   });
 
   it("castBlockReason_marvelRivalsWithoutPermission_stillRefused", () => {

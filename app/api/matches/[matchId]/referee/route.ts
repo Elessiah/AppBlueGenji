@@ -7,6 +7,7 @@ import { can } from "@/lib/shared/permissions";
 const STATUSES: Readonly<Record<string, number>> = {
   NOT_REFEREE: 403,
   REFEREE_IDENTITY_REQUIRED: 409,
+  REFEREE_DISCORD_REQUIRED: 409,
   MATCH_NOT_FOUND: 404,
   MATCH_ALREADY_COMPLETED: 409,
   MATCH_NOT_LAUNCHABLE: 409,

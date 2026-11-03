@@ -34,3 +34,24 @@ export function useLaunchText(): LaunchText {
 export function launchSidesLaterText(text: LaunchText, viewer: Pick<MatchLaunchInfo["viewer"], "earlyContacts">): string {
   return text.t(viewer.earlyContacts ? "contactsAtLaunch" : "contactsAtLaunchForCaster");
 }
+
+/**
+ * Note des contacts tus de l'arbitre désigné, sur la page du match. Un arbitre
+ * qui caste aussi le match suit la règle des casters : ses contacts attendent
+ * le départ, pour tout lecteur (« au départ du match »). Sinon, au lecteur dont
+ * l'action « Contacts » ouvre déjà les contacts (`viewer.earlyContacts`), la note
+ * y renvoie, comme celle des engagées (`launchSidesLaterText`) ; au caster seul,
+ * « au départ du match ».
+ */
+export function refereeLaterText(
+  text: LaunchText,
+  launch: {
+    viewer: Pick<MatchLaunchInfo["viewer"], "earlyContacts">;
+    casters: readonly Pick<MatchLaunchInfo["casters"][number], "userId">[];
+    referee: Pick<NonNullable<MatchLaunchInfo["referee"]>, "userId"> | null;
+  },
+): string {
+  const refereeId = launch.referee?.userId;
+  const refereeCasts = refereeId !== undefined && launch.casters.some((caster) => caster.userId === refereeId);
+  return !refereeCasts && launch.viewer.earlyContacts ? text.t("contactsAtLaunch") : text.t("contacts.casterLater");
+}

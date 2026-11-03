@@ -183,7 +183,7 @@ const NOTICE_CASES: NoticeCase[] = [
     kind: "GHOST_CLAIM",
     locale: "fr",
     url: PROFILE_URL,
-    expected: "📨 BlueGenji — Le staff te propose de reprendre l'équipe « Les Glaciers » comme propriétaire. Accepte ou refuse depuis ton profil : https://site.test/profil#invitations",
+    expected: "📨 BlueGenji — Un admin vous propose de reprendre l'équipe [Les Glaciers](https://site.test/profil#invitations)",
   },
   {
     name: "formatTeamInviteNotice_ownershipFr_linksTeamPage",
@@ -204,7 +204,7 @@ const NOTICE_CASES: NoticeCase[] = [
     kind: "GHOST_CLAIM",
     locale: "en",
     url: PROFILE_URL,
-    expected: "📨 BlueGenji — The staff offers you to take over the team “Les Glaciers” as its owner. Accept or decline from your profile: https://site.test/en/profil#invitations",
+    expected: "📨 BlueGenji — An admin offers you to take over the team [Les Glaciers](https://site.test/en/profil#invitations)",
   },
   {
     name: "formatTeamInviteNotice_ownershipEn_localizedTeamPage",
@@ -218,6 +218,21 @@ const NOTICE_CASES: NoticeCase[] = [
 describe("formatTeamInviteNotice", () => {
   it.each(NOTICE_CASES)("$name", ({ kind, locale, url, expected }) => {
     expect(formatTeamInviteNotice({ kind, teamName: "Les Glaciers", url }, locale)).toBe(expected);
+  });
+
+  it.each(["fr", "en"] as Locale[])("formatTeamInviteNotice_ghostClaim_%s_bracketsCannotCloseTheLink", (locale) => {
+    const text = formatTeamInviteNotice({ kind: "GHOST_CLAIM", teamName: "x](https://evil.test) [y", url: PROFILE_URL }, locale);
+    // Crochets et parenthèses du nom échappés : un seul lien actif, vers le profil.
+    expect(text).toContain(String.raw`x\]`);
+    expect(text).toContain(String.raw`\[y`);
+    const activeLinks = text.split("](").filter((before, index, all) => index < all.length - 1 && !before.endsWith("\\"));
+    expect(activeLinks).toHaveLength(1);
+    expect(text.endsWith(`](${locale === "en" ? "https://site.test/en/profil#invitations" : PROFILE_URL})`)).toBe(true);
+  });
+
+  it.each(["fr", "en"] as Locale[])("formatTeamInviteNotice_ghostClaim_%s_namesNoPerson", (locale) => {
+    const text = formatTeamInviteNotice({ kind: "GHOST_CLAIM", teamName: "Les Glaciers", url: PROFILE_URL }, locale);
+    expect(text).toMatch(locale === "fr" ? /^📨 BlueGenji — Un admin vous propose/ : /^📨 BlueGenji — An admin offers you/);
   });
 
   it("formatTeamInviteNotice_mentionInTeamName_neutralized", () => {
@@ -248,7 +263,7 @@ const PUSH_CASES: PushCase[] = [
     locale: "en",
     expected: {
       title: "Team takeover offered",
-      body: "The staff offers you to take over Les Glaciers as its owner. Accept or decline from your profile.",
+      body: "An admin offers you to take over the team Les Glaciers.",
       url: "/en/profil#invitations",
       tag: "team-7-invite",
     },

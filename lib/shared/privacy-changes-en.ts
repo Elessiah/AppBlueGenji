@@ -776,6 +776,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What doesn't change: nothing new is collected or kept, and what the teams and casters see of you on a match is unchanged.",
     ],
   },
+  "2026-11-tag-discord-arbitre-execution-du-service": {
+    linkLabels: ["Read the “Assigned referee of a match” paragraph"],
+    title: "Assigned referee: the basis for presenting your Discord tag",
+    summary:
+      "When you referee a match, presenting your certified Discord tag to both its teams and its casters now rests on performance of the service, no longer on legitimate interest: without it, the parties to the match cannot reach you.",
+    details: [
+      "What changes: only the legal basis of this presentation, deemed strictly necessary for the minimum functioning of the service.",
+      "What doesn't change: nothing new is collected or shown, to the same people at the same times; your objection to refereeing (report form, GDPR category), once upheld, still removes you from your unfinished matches, this tag included.",
+    ],
+  },
 };
 
 /**

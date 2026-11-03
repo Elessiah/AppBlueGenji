@@ -18,12 +18,14 @@
  *   finale — la meilleure tête de série, sinon l'équipe 1. Il prend le côté
  *   gauche ; l'autre équipe bannit la première.
  */
+import { battletagRelevantFor } from "./certification-prompt";
 import { identityComplete, type CasterIdentity } from "./match-launch";
 import { visibleText } from "./visible-text";
 import type { MatchStatus, TournamentGame } from "./types";
 
 /** Ce qui empêche un compte d'arbitrer un match. */
-export type RefereeBlock = "NOT_REFEREE" | "REFEREE_IDENTITY_REQUIRED";
+/** `REFEREE_DISCORD_REQUIRED` : match Marvel Rivals, le seul tag Discord certifié manque (`CastBlock`). */
+export type RefereeBlock = "NOT_REFEREE" | "REFEREE_IDENTITY_REQUIRED" | "REFEREE_DISCORD_REQUIRED";
 
 /**
  * Pourquoi un compte ne peut pas arbitrer **ce** match, tel que la fenêtre
@@ -36,6 +38,7 @@ export type RefereeIneligibility = RefereeBlock | "REFEREE_IS_PLAYER" | "REFEREE
 export const REFEREE_INELIGIBILITIES: readonly RefereeIneligibility[] = [
   "NOT_REFEREE",
   "REFEREE_IDENTITY_REQUIRED",
+  "REFEREE_DISCORD_REQUIRED",
   "REFEREE_IS_PLAYER",
   "REFEREE_OBJECTION",
   "ACCOUNT_GONE",
@@ -51,7 +54,7 @@ export function refereeBlockReason(
   game: TournamentGame,
 ): RefereeBlock | null {
   if (!hasTournamentsPermission) return "NOT_REFEREE";
-  if (!identityComplete(identity, game)) return "REFEREE_IDENTITY_REQUIRED";
+  if (!identityComplete(identity, game)) return battletagRelevantFor(game) ? "REFEREE_IDENTITY_REQUIRED" : "REFEREE_DISCORD_REQUIRED";
   return null;
 }
 

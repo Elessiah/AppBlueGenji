@@ -699,7 +699,7 @@ describe("T04 / T05 — arbitre désigné d'un match (MATCH-REFEREE MR-2, FR et 
   it("déclare qui lit l'arbitre, ce qui est montré, l'avis push et ce qui est gardé", () => {
     // MATCH-PAGE-CONNECT : son tag Discord certifié aux seules parties du match.
     expect(t04.subPurposes.join(" ")).toContain("son tag Discord certifié aussi, dans la fenêtre « Contacts » et sur la page du match, aux seules parties du match");
-    expect(t04.legalBasis).toContain("intérêt légitime (que les parties du match puissent joindre son arbitre) pour la présentation de son tag Discord certifié");
+    expect(t04.legalBasis).toContain("exécution du service (strictement nécessaire à son fonctionnement minimum : sans lui, les parties du match ne peuvent pas joindre son arbitre) pour la présentation de son tag Discord certifié");
     // MATCH-UI-NAMES (décisions 47 et 52) : pseudo seul aux membres connectés, « Prêt » aux seules parties.
     expect(t04.subPurposes.join(" ")).toContain("montrer aussi son pseudo seul à tout membre connecté, sur la carte et la page d'un match, jusqu'à la déclaration de son score ou la fin du tournoi (les visiteurs sans compte ne lisent que « Arbitre désigné »)");
     expect(t04.subPurposes.join(" ")).toContain("que seules ses parties et les arbitres lisent");
@@ -720,7 +720,7 @@ describe("T04 / T05 — arbitre désigné d'un match (MATCH-REFEREE MR-2, FR et 
     expect(t04En.recipients).toHaveLength(t04.recipients.length);
     expect(t05En.subPurposes).toHaveLength(t05.subPurposes.length);
     expect(t04En.subPurposes.join(" ")).toContain("their certified Discord tag as well, in the “Contacts” window and on the match page, for the parties to the match alone");
-    expect(t04En.legalBasis).toContain("legitimate interest (the parties to the match being able to reach its referee) for presenting their certified Discord tag");
+    expect(t04En.legalBasis).toContain("performance of the service (strictly necessary for its minimum functioning: without it, the parties to the match cannot reach its referee) for presenting their certified Discord tag");
     expect(t04En.subPurposes.join(" ")).toContain("by push only (never by direct message)");
     expect(t04En.subPurposes.join(" ")).toContain("also showing their username alone to any signed-in member, on the card and page of a match, until its score is reported or the tournament ends (visitors without an account only read “Referee assigned”)");
     expect(t04En.legalBasis).toContain("legitimate interest (members knowing who referees a match) for showing their username to any signed-in member");
