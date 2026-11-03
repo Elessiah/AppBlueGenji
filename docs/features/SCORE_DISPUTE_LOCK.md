@@ -161,14 +161,23 @@ remplace plus, à l'échéance, ce que l'arbitre a noté.
 réconciliation de classement et ne publie que le plateau
 (`publishMatchUpdatedEvent`, ERREUR.txt EF-15). Elle prend pourtant le verrou
 du tournoi **en toute première instruction** de sa transaction, puis celui du
-match (ordre des réconciliations, de la programmation, de l'autogestion de
-manche et de la première carte) : une réconciliation concurrente qui jugerait
-la manche vierge sur son instantané puis la détruirait pour la réapparier
-passe avant elle (la saisie lit alors `MATCH_NOT_FOUND`) ou après (elle voit la
-saisie), au lieu d'effacer une saisie commitée entre-temps. Le tournoi du match
+match (ordre des réconciliations, de l'annulation d'un abandon, du retrait
+d'une pénalité, de la programmation, de l'autogestion de manche et de la
+première carte) : une réconciliation **entrée par le verrou du tournoi** qui
+jugerait la manche vierge sur son instantané puis la détruirait pour la
+réapparier passe avant elle (la saisie lit alors `MATCH_NOT_FOUND`) ou après
+(elle voit la saisie), au lieu d'effacer une saisie commitée entre-temps. Les
+gestes qui prennent le match avant le tournoi — report d'un engagé, forfait
+déclaré par une équipe, « Valider le résultat », correction d'arbitrage —
+restent inversés : sur le même match, l'interblocage est rompu par le moteur
+(« Enregistrer », qui n'a rien écrit, en est la victime) et rejoué
+(`retryOnDeadlock`) ; un report dont l'image précède la saisie peut encore
+juger sa manche vierge (préexistant, ERREUR.txt). Le tournoi du match
 se lit juste avant, hors transaction (la route ne connaît que le match), et les
 refus évidents (`MATCH_NOT_FOUND`, `MATCH_NOT_READY`, `MATCH_ALREADY_COMPLETED`)
-partent là, sans attendre le verrou ; ils se rejugent sous verrou. Le verrou
+partent là, sans attendre le verrou, et sans `ROLLBACK` (aucune transaction
+ouverte) ; ils se rejugent sous verrou, par la même règle (`assertMatchSavable`,
+`save-guard.ts`). Le verrou
 aval (`checkDownstreamMatchesHaveNoScores`) n'y est plus lu : il ne protège
 qu'un match joué, que la sauvegarde refuse. Ses relectures sous verrou
 sont regroupées : la ligne enregistrée revient avec le résultat
