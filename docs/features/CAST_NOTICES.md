@@ -50,6 +50,10 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
   caster », « le caster », « le staff » ; en tournoi individuel, « un joueur »
   au journal (`entrantLabel`) et « un match » au caster. Aucun
   `publishStaffAction` : la ligne part par `sendBotLog` seul.
+- Échec d'un avis (destinataire illisible, annonce non partie, rafale qui
+  lève) : la ligne `[cast]` ou `[coalescer]` de pm2 ne porte que le code de
+  l'erreur (`failureReason`, `lib/server/failure-reason.ts`, même règle que
+  `[staff-log]`), jamais le message de mysql2, qui peut citer une valeur lue.
 - Message privé : `loadNotificationRecipients(…, "certified", { matchDm: true })`
   — un tag Discord certifié seulement, coupé par la case « Messages privés
   Discord de mes matchs » de « Mon profil » (droit d'opposition). Le push a son
