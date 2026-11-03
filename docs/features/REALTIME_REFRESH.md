@@ -399,8 +399,9 @@ de l'arbitrage, qui note l'avancement d'un match sans jamais le clore — ni
 classement du site ni statistiques ne comptent un match non `COMPLETED`
 (`playedMatchSql`), et aucun moteur à classement ne le rejoue, si bien que la
 sauvegarde ne lance plus aucune réconciliation —, et l'annulation d'un abandon
-(`FORFEIT_CANCELLATION.md`), qui ne change aucun match : instantané et aperçu
-seulement.
+(`FORFEIT_CANCELLATION.md`), qui ne change aucun résultat : instantané, aperçu,
+listes et agrégats de l'accueil (son rejeu peut réécrire la manche courante),
+jamais le classement du site ni les statistiques.
 
 ### L'entretien passif réconcilie ce qu'il tranche
 

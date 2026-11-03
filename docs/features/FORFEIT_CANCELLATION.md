@@ -69,7 +69,9 @@ naît qu'après (nom de l'équipe, rejeu du classement).
 
 Les manches postérieures se lisent par `laterRoundsHaveScoreInput`
 (`lib/server/tournaments/bg-survie/round-progress.ts`, la règle commune au
-retrait d'une pénalité et à la correction d'arbitrage), **verrouillées** par
+retrait d'une pénalité — verrouillé lui aussi, sa sanction lue `FOR UPDATE`
+d'abord pour la même raison — et à la correction d'arbitrage, qui la lit en
+instantané : sa lecture ordinaire du match a déjà figé l'image), **verrouillées** par
 l'index `idx_bg_matches_phase_round` : les seules manches postérieures, pas
 toute la phase ni ses intervalles. Un report en cours écrit son score sous le
 verrou du match avant d'attendre le tournoi, et une lecture d'instantané
@@ -91,15 +93,19 @@ au défaut du serveur avant de rendre la connexion au pool) au lieu des 50 s du
 serveur, en tenant le verrou du tournoi. Une contention qui dure —
 interblocage sur les trois tentatives, `ER_CHECKREAD`, délai de verrou
 (`ER_LOCK_WAIT_TIMEOUT`) — rend `409 CONCURRENT_UPDATE_RETRY` (code fixe, le
-journal cite le tournoi et l'engagé), pas une panne. Les verrous durent
+journal cite le tournoi et l'engagé), pas une panne. La route la reconnaît par
+`isContentionError` (`lib/server/mysql-errors.ts`), sur le code de l'erreur
+d'abord, indépendant de la langue des messages du serveur. Les verrous durent
 jusqu'au commit, si bien qu'un « Prêt » de la manche suivante attend la fin du
 rejeu.
 
-**Publication** : instantané et aperçu seulement (`publishMatchUpdatedEvent`,
-`invalidateTournamentPreview`) — aucun résultat de match ni colonne de
-`bg_tournaments` ne change, le classement du site, les statistiques, les
-agrégats de l'accueil et les listes restent donc en cache. L'interface s'en
-remet au flux pour l'instantané (aucune relecture REST forcée).
+**Publication** : instantané (`publishMatchUpdatedEvent`, direct de l'accueil
+compris), aperçu, listes et agrégats de l'accueil — le rejeu peut réécrire des
+colonnes de `bg_tournaments` (manche d'endurance courante, phase) et reposer
+les matchs d'une manche périmée. Aucun résultat de match ne change : le
+classement du site et les statistiques restent en cache (`publishUpdatedEvent`
+les vidait). Flux ouvert, l'interface s'en remet à lui pour l'instantané ;
+flux tombé, elle relit le tournoi (`refresh()`).
 
 ## Permission : administrateur strict
 
