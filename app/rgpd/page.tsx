@@ -416,10 +416,9 @@ function RgpdFr({
           n&apos;est plus visible (sa fiche répond « introuvable »), ses sessions sont fermées et il ne peut
           plus être invité, inscrit ni notifié ; se reconnecter permet de le réactiver, par une confirmation
           explicite. Dès la demande, et sans retour à la réactivation, il quitte ses équipes (la propriété
-          passe à un gérant, sinon à un capitaine, sinon à un autre membre ; une équipe dont il était le seul
+          passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre ; une équipe dont il était le seul
           joueur devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute
-          sinon), ses tournois organisés passent à un autre membre du staff, ses inscriptions à un tournoi
-          individuel pas encore commencé sont retirées et ses matchs restants d&apos;un tournoi individuel en
+          sinon), ses tournois organisés passent à un autre membre du staff quand quelqu&apos;un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore joués, ses désignations d&apos;arbitre et les invitations d&apos;équipe qu&apos;il a reçues sont retirés et ses matchs restants d&apos;un tournoi individuel en
           cours où il n&apos;a jamais joué sont perdus par forfait. Au terme du délai, le compte est effacé
           s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. À l&apos;effacement,
           l&apos;empreinte (SHA-256) d&apos;un avatar retiré par la modération est gardée, sans lien avec
@@ -593,7 +592,7 @@ function RgpdFr({
             <li>
               <strong>__Host-bg_reactivation</strong> — cookie httpOnly, sameSite=lax, déposé{" "}
               <strong>seulement</strong> quand vous vous reconnectez à un compte dont la suppression est
-              demandée, et supprimé dès votre choix sur l&apos;écran de réactivation. Il dure quinze
+              demandée, et supprimé quand vous réactivez le compte ; sinon il expire de lui-même. Il dure quinze
               minutes au plus et ne contient qu&apos;un jeton aléatoire à usage unique, dont nos serveurs
               ne gardent que l&apos;empreinte (SHA-256).
             </li>

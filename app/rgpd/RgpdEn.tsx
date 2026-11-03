@@ -305,10 +305,9 @@ export function RgpdEn({
           longer visible (its page answers “not found”), its sessions are closed and it can no longer be
           invited, registered or notified; signing in again lets you reactivate it, through an explicit
           confirmation. As soon as it is requested, and without being undone by reactivation, it leaves its
-          teams (ownership goes to a manager, else a captain, else another member; a team of which it was the
+          teams (ownership goes to a co-owner, else a manager, else a captain, else another member; a team of which it was the
           only player becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
-          disbanded otherwise), its organised tournaments go to another staff member, its registrations for a
-          solo tournament that hasn&apos;t started yet are withdrawn and its remaining matches in a running solo
+          disbanded otherwise), its organised tournaments go to another staff member when someone can take them over, its registrations for a solo tournament that hasn&apos;t started yet are withdrawn, its casts of matches not yet played, its referee assignments and the team invitations it received are withdrawn and its remaining matches in a running solo
           tournament where it never played are lost by forfeit. At the end of that time, the account is erased
           if it left nothing behind, anonymized (borrowed username) otherwise. On erasure, the hash (SHA-256) of
           an avatar removed by moderation is kept, with no link to any account, to refuse it being uploaded
@@ -459,8 +458,7 @@ export function RgpdEn({
             </li>
             <li>
               <strong>__Host-bg_reactivation</strong> — httpOnly, sameSite=lax cookie, set <strong>only</strong> when you log in
-              again to an account whose deletion was requested, and deleted as soon as you choose on the reactivation
-              screen. It lasts fifteen minutes at most and only contains a single-use random token, of which our
+              again to an account whose deletion was requested, and deleted when you reactivate the account; otherwise it expires on its own. It lasts fifteen minutes at most and only contains a single-use random token, of which our
               servers only keep the hash (SHA-256).
             </li>
             <li>

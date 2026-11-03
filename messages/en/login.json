@@ -140,7 +140,7 @@
     "title": "Reactivate your account?",
     "lead": "You asked for your account to be deleted. The deletion becomes final on {date}: until then, you can still reactivate it.",
     "kept": "Reactivating gives you back your account as it was: profile, statistics, settings.",
-    "notUndone": "What was done when you asked is not undone: you left your teams (ownership handed over, team turned into a ghost team or disbanded), your organised tournaments changed organiser, and your registrations were withdrawn or lost by forfeit.",
+    "notUndone": "What was done when you asked is not undone: you left your teams (ownership handed over, team turned into a ghost team or disbanded), your organised tournaments changed organiser when someone could take them over, your registrations were withdrawn or lost by forfeit, and your casts, referee assignments and received invitations were withdrawn.",
     "confirm": "Reactivate my account",
     "cancel": "Don't reactivate",
     "done": "Your account is reactivated.",
