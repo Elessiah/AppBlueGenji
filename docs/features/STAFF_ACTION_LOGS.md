@@ -65,7 +65,8 @@ lignes d'un même tournoi, et celles d'un même match, s'enchaînent
 (`createKeyedChain`) : la suivante attend la précédente, sans retenir les autres
 — une rafale prend aussi son tour dans cette file, qu'elle parte à son échéance
 ou vidée par un geste suivant (détachée au moment de ce geste : une rafale
-ouverte après lui reste à venir). Un geste fait
+ouverte après lui reste à venir). Le regroupeur y range la rafale dans le tour
+même (`deliverQueues`), sans attendre la précédente : la file garde l'ordre. Un geste fait
 coupe-circuit ouvert garde sa ligne : elle rejoint le lot, qui ne part que
 minutes plus tard (`LOG_BATCHING.md`). Une modification nomme le
 tournoi sous le nom qu'elle a écrit, un renommage cite aussi l'ancien, tous deux lus sous le verrou
