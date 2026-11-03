@@ -157,8 +157,7 @@ describe("failureReason", () => {
   });
 
   it("failureReason_plainErrorMultiline_returnsFirstLine", () => {
-    expect(failureReason(new Error("BOT_DOWN
-    at stack"))).toBe("BOT_DOWN");
+    expect(failureReason(new Error("BOT_DOWN\n    at stack"))).toBe("BOT_DOWN");
   });
 
   it("failureReason_nonError_returnsUnknown", () => {
