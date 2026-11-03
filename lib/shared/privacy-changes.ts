@@ -1493,7 +1493,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Pour caster ou arbitrer un match Marvel Rivals, un tag Discord certifié suffit désormais : le compte Battle.net rattaché n'est plus demandé. Pour un match Overwatch, rien ne change.",
     details: [
-      "Ce qui change : le site ne vérifie plus, pour un match Marvel Rivals, que ton compte Battle.net est rattaché ni que ton BattleTag en vient ; il ne lit plus ce BattleTag pour ces matchs. Pour un match Overwatch, la condition reste : tag Discord certifié et BattleTag tiré d'un compte Battle.net rattaché.",
+      "Ce qui change : le site ne vérifie plus, pour un match Marvel Rivals, que ton compte Battle.net est rattaché ni que ton BattleTag en vient ; il ne se sert plus de ce BattleTag pour ces matchs et ne l'y montre pas. Pour un match Overwatch, la condition reste : tag Discord certifié et BattleTag tiré d'un compte Battle.net rattaché.",
       "Ce qui ne change pas : rien de nouveau n'est collecté ni conservé, et ce que les équipes et les casters voient de toi sur un match est inchangé.",
     ],
   },

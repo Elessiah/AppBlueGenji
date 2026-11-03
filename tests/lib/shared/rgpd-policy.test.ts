@@ -389,7 +389,7 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
   // pour caster ; la politique le dit, comme le registre (T04).
   it("rgpdPolicy_casterCondition_requiresBattletagFromBattleNetFrAndEn", () => {
     expect(read("app/rgpd/page.tsx")).toMatch(
-      /sans tag Discord certifié ni, dans un match Overwatch, sans compte Battle\.net rattaché \(un BattleTag tiré de ce compte Battle\.net,\s+pas saisi à la main\)/,
+      /sans tag Discord certifié ni, dans un match Overwatch, de compte Battle\.net rattaché \(un BattleTag tiré de ce compte Battle\.net,\s+pas saisi à la main\)/,
     );
     expect(read("app/rgpd/RgpdEn.tsx")).toMatch(
       /without a certified Discord tag or, in an Overwatch match, without a linked Battle\.net account \(a BattleTag taken from that Battle\.net account,\s+not typed in by hand\)/,

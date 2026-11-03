@@ -91,3 +91,38 @@ describe("Registre T04 et /rgpd — exécution du service, FR et EN", () => {
     expect(en).not.toContain("the terms of use do not provide for it");
   });
 });
+
+// Revue juridique #545 : les textes disent ce que fait le code (Battle.net en
+// Overwatch seulement, pas d'opposition propre au tag sous une base contractuelle).
+describe("Textes juridiques alignés sur le code (revue juridique #545)", () => {
+  const t04 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04");
+  const t04En = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04");
+
+  it("register_t04Retention_battlenetConditionLimitedToOverwatchFrAndEn", () => {
+    const fr = (t04?.retention ?? []).join("\n");
+    const en = (t04En?.retention ?? []).join("\n");
+    expect(fr).not.toMatch(/certifié, BattleTag tiré d'un compte Battle\.net/);
+    expect(fr.match(/et dans un match Overwatch le BattleTag tiré d'un compte Battle\.net rattaché/g)).toHaveLength(2);
+    expect(en).not.toMatch(/certified Discord tag, BattleTag taken/);
+    expect(en.match(/and in an Overwatch match the BattleTag taken from a linked Battle\.net account/g)).toHaveLength(2);
+  });
+
+  it("rgpdPolicy_refereeDiscordScope_noSeparateObjectionFrAndEn", () => {
+    expect(REFEREE_DISCORD_SCOPE).not.toContain("avec le même effet");
+    expect(REFEREE_DISCORD_SCOPE).toContain("seule l'opposition à l'arbitrage même");
+    expect(read("lib/shared/rgpd-policy-en.ts")).toContain("only an objection to the refereeing itself");
+  });
+
+  it("rgpdPages_refereeObjectionClause_notDuplicatedFrAndEn", () => {
+    expect(read("app/rgpd/page.tsx")).not.toContain("l&apos;en retire aussi");
+    expect(read("app/rgpd/RgpdEn.tsx")).not.toContain("removes it too");
+  });
+
+  it("privacyChanges_battlenetOverwatchOnly_doesNotClaimBattletagUnread", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === "2026-11-battlenet-requis-overwatch-seulement");
+    const en = PRIVACY_CHANGES_EN["2026-11-battlenet-requis-overwatch-seulement"];
+    expect(JSON.stringify(fr)).not.toContain("ne lit plus ce BattleTag");
+    expect(JSON.stringify(fr)).toContain("ne se sert plus de ce BattleTag pour ces matchs");
+    expect(JSON.stringify(en)).toContain("no longer uses that BattleTag for these matches");
+  });
+});

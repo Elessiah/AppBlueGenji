@@ -100,7 +100,7 @@ export const REFEREE_USERNAME_MEMBERS_SCOPE =
  * l'arbitrage, retenue, l'en retire toujours avec ses matchs non terminés.
  */
 export const REFEREE_DISCORD_SCOPE =
-  "si tu es l'arbitre désigné d'un match, ton tag Discord certifié, dans sa fenêtre « Contacts » et sur sa page, lu par ses deux équipes dès que ses deux adversaires sont connus et jusqu'à sa fin et par ses casters le temps du match (jamais par les arbitres sans rôle sur ce match ni dans la fenêtre de lancement ; si tu le castes aussi, la règle des casters : le temps du match pour ses parties, fenêtre de lancement comprise, et dès que ses deux adversaires sont connus pour les autres arbitres), pour qu'ils puissent te joindre — opposition par le formulaire de signalement, catégorie RGPD, avec le même effet qu'une opposition à ta présentation aux parties (retrait de tes matchs non terminés)";
+  "si tu es l'arbitre désigné d'un match, ton tag Discord certifié, dans sa fenêtre « Contacts » et sur sa page, lu par ses deux équipes dès que ses deux adversaires sont connus et jusqu'à sa fin et par ses casters le temps du match (jamais par les arbitres sans rôle sur ce match ni dans la fenêtre de lancement ; si tu le castes aussi, la règle des casters : le temps du match pour ses parties, fenêtre de lancement comprise, et dès que ses deux adversaires sont connus pour les autres arbitres), pour qu'ils puissent te joindre — nécessaire au fonctionnement minimum du service, sans opposition propre : seule l'opposition à l'arbitrage même (formulaire de signalement, catégorie RGPD) y met fin, en te retirant de tes matchs non terminés";
 
 /**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré

@@ -30,9 +30,9 @@ suffit pas) » par :
   also a BattleTag taken from a linked Battle.net account — a hand-typed BattleTag
   is not enough)".
 
-Même condition pour les casters : tout passage des conditions qui demande un compte
-Battle.net rattaché pour s'inscrire comme caster se borne de la même façon aux
-matchs Overwatch (la section sur la diffusion est à relire à ce moment).
+Casters : la v8 ne demande nulle part un compte Battle.net pour s'inscrire comme
+caster (relu le 2026-11-03 : Battle.net n'y figure qu'aux comptes, au retrait d'un
+BattleTag et au paragraphe 2 ci-dessus) — rien à reprendre pour eux.
 
 ### 1.2 BattleTag borné à Overwatch
 
@@ -81,7 +81,10 @@ ne dépend pas de l'acceptation de la v9 : `/rgpd` (FR + EN), le registre (T04,
 `frEn`) et le tableau de `/rgpd` (`REFEREE_DISCORD_SCOPE`, base « Exécution du
 contrat ») le disent depuis ce lot, avec l'entrée `PRIVACY_CHANGES`
 `2026-11-tag-discord-arbitre-execution-du-service` (5 novembre 2026, `LIVE_STAFF`) ;
-l'opposition à l'arbitrage, retenue, en retire toujours l'arbitre. Le texte v9
+l'opposition à l'arbitrage, retenue, en retire toujours l'arbitre. **Jusqu'à la v9**,
+la v8 (« jamais son tag Discord à ce titre ») contredit ce partage, en place
+depuis #531 : le lot v9 doit suivre sans tarder (ERREUR « conditions v8, Contacts
+de match »). Le texte v9
 ci-dessus suffit ; si le lot v9 veut nommer la base dans les conditions :
 - FR (paragraphe 2, après « aux mêmes moments ») : « ce partage étant
   strictement nécessaire au fonctionnement minimum du service ».
@@ -184,7 +187,7 @@ naming no one)".
 ## 3. Marche à suivre pour la v9
 
 1. Reprendre les passages ci-dessus dans `terms-of-use.ts` / `terms-of-use-en.ts`
-   (une fois les décisions prises), régénérer la fixture des conditions.
+   (décisions toutes prises le 2026-11-03), régénérer la fixture des conditions.
 2. Avancer `TERMS_VERSION` et `TERMS_LAST_UPDATED` ; entrée `PRIVACY_CHANGES`
    (`asksTermsAcceptance: true`, FR + `privacy-changes-en.ts`) qui annonce la v9.
 3. Article 01 du bot : PR dans le dépôt du bot d'abord (texte anglais figé).
