@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/users/account-reactivation", () => ({
-  REACTIVATION_COOKIE: "bg_reactivation",
+  reactivationCookieName: () => "bg_reactivation",
   reactivateAccount: jest.fn(),
   peekReactivationTicket: jest.fn(),
 }));
@@ -28,7 +28,7 @@ import { fakeCookieStore } from "../../../helpers/cookie-store";
  */
 
 const get = jest.fn<(name: string) => { value: string } | undefined>();
-const remove = jest.fn<(name: string) => void>();
+const set = jest.fn<(name: string, value: string, options?: Record<string, unknown>) => void>();
 
 const reactivate = (headers: Record<string, string> = { "sec-fetch-site": "same-origin", "content-type": "application/json" }) =>
   POST(new Request("http://localhost:3000/api/auth/reactivate", { method: "POST", headers, body: "{}" }));
@@ -36,7 +36,7 @@ const reactivate = (headers: Record<string, string> = { "sec-fetch-site": "same-
 beforeEach(() => {
   jest.clearAllMocks();
   get.mockReturnValue({ value: "a".repeat(64) });
-  jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get, delete: remove }));
+  jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get, set }));
   jest.mocked(createSession).mockResolvedValue(undefined);
   jest.mocked(peekReactivationTicket).mockResolvedValue({ userId: 7, finalAt: "2026-12-03T10:00:00.000Z" });
   jest.mocked(assertNotSuspended).mockResolvedValue(undefined);
@@ -69,7 +69,18 @@ describe("POST /api/auth/reactivate", () => {
     expect(res.status).toBe(200);
     expect(reactivateAccount).toHaveBeenCalledWith("a".repeat(64));
     expect(createSession).toHaveBeenCalledWith(7, "LOGIN_DISCORD");
-    expect(remove).toHaveBeenCalledWith("bg_reactivation");
+    expect(set).toHaveBeenCalledWith("bg_reactivation", "", expect.objectContaining({ maxAge: 0, path: "/" }));
+  });
+
+  it("POST_production_clearsCookieSecure", async () => {
+    jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "production" });
+    jest.mocked(reactivateAccount).mockResolvedValue({ userId: 7, event: "LOGIN_DISCORD" });
+
+    await reactivate();
+
+    // Un `__Host-` ne s'efface qu'avec `Secure`, comme il a été posé.
+    expect(set).toHaveBeenCalledWith("bg_reactivation", "", expect.objectContaining({ secure: true, maxAge: 0 }));
+    jest.restoreAllMocks();
   });
 
   it("POST_suspendedAccount_403", async () => {

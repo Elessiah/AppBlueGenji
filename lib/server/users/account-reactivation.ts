@@ -21,8 +21,8 @@ import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
  * consomme le ticket, relève la demande et ouvre la session. Jamais en silence.
  */
 
-/** Cookie du ticket de réactivation. */
-export const REACTIVATION_COOKIE = "bg_reactivation";
+/** Cookie du ticket de réactivation (`__Host-` en production, `auth-cookies.ts`). */
+export { reactivationCookieName } from "@/lib/shared/auth-cookies";
 
 /** Durée de vie d'un ticket (`lib/shared/account-deletion.ts`). */
 export { REACTIVATION_TICKET_MINUTES };

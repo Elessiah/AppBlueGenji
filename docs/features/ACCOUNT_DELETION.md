@@ -622,8 +622,8 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   match, sont retirées (`withdrawSoloRegistrationsOn`). L'entrée d'un tournoi
   `RUNNING` **jamais jouée** perd ses matchs restants par forfait **après** le
   commit (`forfeitSoloEntriesAfterCommit` : `forfeitTournamentTeam` pour
-  SURVIVAL/SWISS/BG_SURVIE, `adminSaveMatchScores({ forfeitTeamId })` match par
-  match sinon). « Jamais jouée » se lit **dans ce tournoi** (`pm.tournament_id`) :
+  SURVIVAL/SWISS/BG_SURVIE, `adminResolveMatch({ forfeitTeamId })` match par
+  match sinon, qui tranche et fait monter l'adversaire). « Jamais jouée » se lit **dans ce tournoi** (`pm.tournament_id`) :
   l'entrée solo est unique pour tous les tournois du compte. Chaque forfait
   relit d'abord `is_deleted` : un compte réactivé entre-temps garde ses matchs.
   Un échec, ou un match d'aval dont l'adversaire n'est pas encore connu, est
@@ -637,7 +637,7 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
 
 **E4 — réactivation.** Se reconnecter dans les trente jours n'ouvre pas de
 session : `createSession` (porte unique de toutes les connexions) pose un ticket
-`bg_reactivation` (jeton aléatoire, empreinte SHA-256 dans
+`__Host-bg_reactivation` en production (`reactivationCookieName`, nom nu en développement ; jeton aléatoire, empreinte SHA-256 dans
 `bg_account_reactivation_tickets`, quinze minutes) et lève
 `AccountPendingDeletionError` ; le rappel OAuth et le code Discord renvoient vers
 `/connexion/reactivation`, qui dit ce qui n'est pas rendu. La connexion Discord

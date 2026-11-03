@@ -458,7 +458,7 @@ export function RgpdEn({
               still finds it.
             </li>
             <li>
-              <strong>bg_reactivation</strong> — httpOnly, sameSite=lax cookie, set <strong>only</strong> when you log in
+              <strong>__Host-bg_reactivation</strong> — httpOnly, sameSite=lax cookie, set <strong>only</strong> when you log in
               again to an account whose deletion was requested, and deleted as soon as you choose on the reactivation
               screen. It lasts fifteen minutes at most and only contains a single-use random token, of which our
               servers only keep the hash (SHA-256).

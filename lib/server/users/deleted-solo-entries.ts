@@ -131,7 +131,8 @@ const MAX_BRACKET_FORFEITS = 64;
 /**
  * Les matchs encore à jouer de l'entrée passent en forfait (E1), par les gestes
  * de l'arbitrage — abandon (`forfeitTournamentTeam`) dans un format à
- * classement, forfait match par match (`adminSaveMatchScores`) dans un arbre :
+ * classement, forfait match par match (`adminResolveMatch`, qui tranche et fait
+ * monter l'adversaire ; `adminSaveMatchScores` ne fait que noter) dans un arbre :
  * chaque forfait propage l'adversaire, et un match d'aval qui reçoit l'entrée
  * (tableau des perdants) est tranché au tour suivant de la boucle. Un match
  * dont l'adversaire n'est pas encore connu attend son appariement : le
@@ -142,7 +143,7 @@ const MAX_BRACKET_FORFEITS = 64;
  * et prend `lockTournamentRow` le premier.
  */
 export async function forfeitUnplayedSoloEntry(tournamentId: number, teamId: number): Promise<number> {
-  const { adminSaveMatchScores, forfeitTournamentTeam } = await import("@/lib/server/tournaments-service");
+  const { adminResolveMatch, forfeitTournamentTeam } = await import("@/lib/server/tournaments-service");
   if (!(await entryAccountStillDeleted(teamId))) return 0;
   const format = await engineFormat(tournamentId);
   if (format !== null && ABANDON_FORMATS.has(format)) {
@@ -151,6 +152,7 @@ export async function forfeitUnplayedSoloEntry(tournamentId: number, teamId: num
   }
   const db = await getDatabase();
   let forfeits = 0;
+  let previousMatchId: number | null = null;
   for (let round = 0; round < MAX_BRACKET_FORFEITS; round += 1) {
     const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
       `SELECT id FROM bg_matches
@@ -162,8 +164,12 @@ export async function forfeitUnplayedSoloEntry(tournamentId: number, teamId: num
       [tournamentId, teamId, teamId],
     );
     if (rows.length === 0) break;
+    const matchId = Number(rows[0].id);
+    // Le même match encore ouvert : le forfait ne l'a pas tranché, inutile d'insister.
+    if (matchId === previousMatchId) break;
     if (round > 0 && !(await entryAccountStillDeleted(teamId))) break;
-    await adminSaveMatchScores(Number(rows[0].id), { forfeitTeamId: teamId });
+    await adminResolveMatch(matchId, { forfeitTeamId: teamId });
+    previousMatchId = matchId;
     forfeits += 1;
   }
   return forfeits;
@@ -268,10 +274,18 @@ export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; f
       }
       const forfeitable = await listForfeitableSoloEntries(db, userId);
       for (const entry of forfeitable) {
-        const forfeits = await forfeitUnplayedSoloEntry(entry.tournamentId, entry.teamId);
-        if (forfeits > 0) {
-          outcome.forfeited += 1;
-          await logDeletionWithdrawal(entry.tournamentId, true);
+        // Un tournoi qui échoue n'empêche pas les suivants du même compte.
+        try {
+          const forfeits = await forfeitUnplayedSoloEntry(entry.tournamentId, entry.teamId);
+          if (forfeits > 0) {
+            outcome.forfeited += 1;
+            await logDeletionWithdrawal(entry.tournamentId, true);
+          }
+        } catch (error) {
+          console.error(
+            `[deleted-accounts] Forfait de l'entrée ${entry.teamId} (tournoi ${entry.tournamentId}) reporté :`,
+            error instanceof Error ? error.message : error,
+          );
         }
       }
     } catch (error) {

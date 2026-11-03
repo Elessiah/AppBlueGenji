@@ -67,8 +67,8 @@ describe("/rgpd et historique", () => {
   });
 
   it("rgpdPage_reactivationCookie_listedFrAndEn", () => {
-    expect(readSource("app/rgpd/page.tsx")).toContain("<strong>bg_reactivation</strong>");
-    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("<strong>bg_reactivation</strong>");
+    expect(readSource("app/rgpd/page.tsx")).toContain("<strong>__Host-bg_reactivation</strong>");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("<strong>__Host-bg_reactivation</strong>");
   });
 
   it("privacyChangesV9_detailsDeferredDeletion_frAndEn", () => {

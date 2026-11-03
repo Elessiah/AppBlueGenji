@@ -591,7 +591,7 @@ function RgpdFr({
               s&apos;il le trouve encore.
             </li>
             <li>
-              <strong>bg_reactivation</strong> — cookie httpOnly, sameSite=lax, déposé{" "}
+              <strong>__Host-bg_reactivation</strong> — cookie httpOnly, sameSite=lax, déposé{" "}
               <strong>seulement</strong> quand vous vous reconnectez à un compte dont la suppression est
               demandée, et supprimé dès votre choix sur l&apos;écran de réactivation. Il dure quinze
               minutes au plus et ne contient qu&apos;un jeton aléatoire à usage unique, dont nos serveurs

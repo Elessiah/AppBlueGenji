@@ -17,7 +17,7 @@ import { certifyPromptDoor } from "@/lib/shared/discord-certify-prompt";
 import {
   AccountPendingDeletionError,
   createReactivationTicket,
-  REACTIVATION_COOKIE,
+  reactivationCookieName,
   REACTIVATION_TICKET_MINUTES,
   readPendingDeletion,
 } from "@/lib/server/users/account-reactivation";
@@ -141,7 +141,7 @@ export async function createSession(userId: number, event: ConnectionLogEvent): 
     const ticket = await createReactivationTicket(userId, event);
     // Posé ici comme le cookie de session : la porte (rappel OAuth, code
     // Discord) n'a plus qu'à renvoyer vers l'écran de réactivation.
-    (await cookies()).set(REACTIVATION_COOKIE, ticket, {
+    (await cookies()).set(reactivationCookieName(), ticket, {
       ...baseCookieOptions(),
       maxAge: REACTIVATION_TICKET_MINUTES * 60,
     });

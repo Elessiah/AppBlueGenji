@@ -3,11 +3,12 @@ import { createSession } from "@/lib/server/auth";
 import { AccountSuspendedError, assertNotSuspended } from "@/lib/server/account-suspensions";
 import { ACCOUNT_SUSPENDED } from "@/lib/shared/account-suspension";
 import { fail, ok } from "@/lib/server/http";
+import { isProductionCookieEnv } from "@/lib/shared/auth-cookies";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import {
   peekReactivationTicket,
   reactivateAccount,
-  REACTIVATION_COOKIE,
+  reactivationCookieName,
 } from "@/lib/server/users/account-reactivation";
 
 /**
@@ -20,8 +21,17 @@ export async function POST(req: Request) {
   if (crossSite) return crossSite;
 
   const cookieStore = await cookies();
-  const token = cookieStore.get(REACTIVATION_COOKIE)?.value;
-  cookieStore.delete(REACTIVATION_COOKIE);
+  const cookieName = reactivationCookieName();
+  const token = cookieStore.get(cookieName)?.value;
+  // Effacé avec les attributs de sa pose : un `__Host-` sans `Secure` serait
+  // refusé par le navigateur, et le ticket resterait.
+  cookieStore.set(cookieName, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: isProductionCookieEnv(),
+    path: "/",
+    maxAge: 0,
+  });
   try {
     // Suspension contrôlée **avant** de relever la demande : sinon le compte
     // revivrait sans session, et la demande de suppression serait perdue.

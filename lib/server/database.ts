@@ -110,7 +110,9 @@ function scheduleDueAccountDeletions(now: number = Date.now()): void {
   // D'abord les forfaits restés en attente d'un adversaire (E1) : un match
   // d'aval apparié depuis le dernier passage ne reste pas bloqué contre un
   // compte en suppression jusqu'au prochain redémarrage.
-  void import("@/lib/server/users/deleted-solo-entries")
+  // Après le rattrapage de démarrage, qui fait la même passe : jamais deux à la fois.
+  void Promise.resolve(reconciliationState.__bgDeletedAccountsReconciliation)
+    .then(() => import("@/lib/server/users/deleted-solo-entries"))
     .then(({ settleDeletedSoloEntries }) => settleDeletedSoloEntries())
     .catch((error: unknown) => {
       console.error(

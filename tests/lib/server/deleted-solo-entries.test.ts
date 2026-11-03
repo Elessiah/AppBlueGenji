@@ -6,13 +6,13 @@ jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/registration");
 jest.mock("@/lib/server/tournaments/seeding");
 jest.mock("@/lib/server/tournaments-service", () => ({
-  adminSaveMatchScores: jest.fn(),
+  adminResolveMatch: jest.fn(),
   forfeitTournamentTeam: jest.fn(),
 }));
 
 import { getDatabase } from "@/lib/server/database";
 import { sendBotLog } from "@/lib/server/bot-integration";
-import { adminSaveMatchScores, forfeitTournamentTeam } from "@/lib/server/tournaments-service";
+import { adminResolveMatch, forfeitTournamentTeam } from "@/lib/server/tournaments-service";
 import {
   forfeitSoloEntriesAfterCommit,
   forfeitUnplayedSoloEntry,
@@ -70,7 +70,7 @@ describe("forfeitUnplayedSoloEntry", () => {
 
     expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(1);
     expect(forfeitTournamentTeam).toHaveBeenCalledWith(4, 40, null);
-    expect(adminSaveMatchScores).not.toHaveBeenCalled();
+    expect(adminResolveMatch).not.toHaveBeenCalled();
   });
 
   it("forfeitUnplayedSoloEntry_multiPhaseRanking_usesPhaseFormat", async () => {
@@ -85,7 +85,7 @@ describe("forfeitUnplayedSoloEntry", () => {
     fakeDb({ format: "DOUBLE", openMatches: [101, 102] });
 
     expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(2);
-    expect(jest.mocked(adminSaveMatchScores).mock.calls).toEqual([
+    expect(jest.mocked(adminResolveMatch).mock.calls).toEqual([
       [101, { forfeitTeamId: 40 }],
       [102, { forfeitTeamId: 40 }],
     ]);
@@ -119,14 +119,23 @@ describe("forfeitUnplayedSoloEntry — compte réactivé", () => {
 
     expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(0);
     expect(forfeitTournamentTeam).not.toHaveBeenCalled();
-    expect(adminSaveMatchScores).not.toHaveBeenCalled();
+    expect(adminResolveMatch).not.toHaveBeenCalled();
   });
 
   it("forfeitUnplayedSoloEntry_reactivatedMidBracket_stopsLoop", async () => {
     fakeDb({ format: "DOUBLE", openMatches: [101, 102], deletedReads: [1, 0] });
 
     expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(1);
-    expect(jest.mocked(adminSaveMatchScores).mock.calls).toEqual([[101, { forfeitTeamId: 40 }]]);
+    expect(jest.mocked(adminResolveMatch).mock.calls).toEqual([[101, { forfeitTeamId: 40 }]]);
+  });
+});
+
+describe("forfeitUnplayedSoloEntry — match non tranché", () => {
+  it("forfeitUnplayedSoloEntry_sameMatchStillOpen_stopsAfterOne", async () => {
+    fakeDb({ format: "SINGLE", openMatches: [101, 101, 101] });
+
+    expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(1);
+    expect(adminResolveMatch).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -167,6 +176,23 @@ describe("settleDeletedSoloEntries", () => {
     expect(await settleDeletedSoloEntries()).toEqual({ withdrawn: 0, forfeited: 1 });
     expect(forfeitTournamentTeam).toHaveBeenCalledWith(4, 40, null);
     expect(sendBotLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("settleDeletedSoloEntries_firstTournamentFails_secondStillForfeited", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    fakeDb({
+      candidates: [7],
+      forfeitable: [
+        { tournament_id: 4, team_id: 40 },
+        { tournament_id: 5, team_id: 40 },
+      ],
+      format: "SWISS",
+    });
+    jest.mocked(forfeitTournamentTeam).mockRejectedValueOnce(new Error("TEAM_ALREADY_OUT"));
+
+    expect(await settleDeletedSoloEntries()).toEqual({ withdrawn: 0, forfeited: 1 });
+    expect(forfeitTournamentTeam).toHaveBeenLastCalledWith(5, 40, null);
+    log.mockRestore();
   });
 
   it("settleDeletedSoloEntries_alreadyForfeited_secondPassNoop", async () => {

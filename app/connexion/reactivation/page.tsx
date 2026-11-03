@@ -3,7 +3,7 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { LoginTextProvider } from "@/components/i18n/login-text";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
-import { peekReactivationTicket, REACTIVATION_COOKIE } from "@/lib/server/users/account-reactivation";
+import { peekReactivationTicket, reactivationCookieName } from "@/lib/server/users/account-reactivation";
 import { ReactivationPanel } from "./ReactivationPanel";
 
 /**
@@ -17,7 +17,7 @@ import { ReactivationPanel } from "./ReactivationPanel";
  */
 export default async function ReactivationPage() {
   const [locale, cookieStore] = await Promise.all([requestLocale(), cookies()]);
-  const ticket = await peekReactivationTicket(cookieStore.get(REACTIVATION_COOKIE)?.value);
+  const ticket = await peekReactivationTicket(cookieStore.get(reactivationCookieName())?.value);
   return (
     <LoginTextProvider locale={locale} messages={locale === DEFAULT_LOCALE ? undefined : messagesFor(locale).login}>
       <ReactivationPanel finalAt={ticket?.finalAt ?? null} />
