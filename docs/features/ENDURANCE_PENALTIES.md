@@ -108,10 +108,15 @@ refuserait la lecture d'une manche qu'un « Prêt » vient de toucher
 (`ER_CHECKREAD`). Le retrait tenant le tournoi, l'attente de cette lecture
 des manches — elle seule — est bornée à 5 s (`withShortLockWait`,
 `lib/server/tournaments/lock-wait.ts`) ; le verrou du tournoi
-(`lockTournamentRow`, en premier) s'attend sans borne et le rejeu garde le
-délai du serveur ; contention persistante
+(la ligne du tournoi lue `FOR UPDATE` par le moteur, `loadTournament`, en
+toute première instruction — une seule requête, sans `lockTournamentRow` qui
+la doublait) s'attend sans borne et le rejeu garde le délai du serveur ; le
+module du moteur se résout avant la transaction ; contention persistante
 → `409 CONCURRENT_UPDATE_RETRY`, l'interblocage avec un report étant rejoué
-(`retryOnDeadlock`).
+(`retryOnDeadlock`). Après le commit, comme l'annulation d'un abandon, seuls
+l'instantané, l'aperçu, les listes, le direct et les mini-arbres de l'accueil
+sont oubliés (`publishMatchUpdatedEvent`) : aucun résultat de match ne change,
+le classement du site et les statistiques restent en cache.
 
 Sans ce verrou : une pénalité de la manche 2 élimine une équipe, les manches 3 à
 6 se jouent sans elle, et lever la sanction à la manche 7 la remet `ACTIVE`

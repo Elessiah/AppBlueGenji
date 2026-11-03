@@ -247,7 +247,9 @@ règle de lecture (`getViewerMatchProposals`, qui partage `viewerProposalScope`
 avec le contexte du lecteur), au plus trois essais : chacun part **après** la
 réponse du précédent (jamais deux lectures en vol sur un serveur lent), 4 s plus
 tard, ou au `Retry-After` d'un 429 s'il est plus long (`proposalRetryDelayMs`) ;
-un 4xx hors 429 arrête les essais. Engagés,
+un 4xx hors 429 arrête les essais, comme toute réponse lue — même une
+proposition plus récente que l'instantané, dont la diffusion relancera la
+lecture. Engagés,
 statut et reports du match y sont **relus avec les maps**, en une instruction
 (`loadFreshMatchProposals`, `bg_matches` joint à `bg_match_maps`) : l'instantané
 en cache peut précéder un report, un retrait ou un changement d'engagé
