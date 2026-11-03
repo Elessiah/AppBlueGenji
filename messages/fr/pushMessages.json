@@ -65,6 +65,18 @@
     "title": "Demande d'adhésion",
     "body": "Un joueur demande à rejoindre {team}. Réponds depuis la fiche de l'équipe."
   },
+  "teamInvitation": {
+    "title": "Invitation d'équipe",
+    "body": "{team} t'invite à la rejoindre. Accepte ou refuse depuis ton profil."
+  },
+  "ghostTeamClaim": {
+    "title": "Reprise d'équipe proposée",
+    "body": "Le staff te propose de reprendre {team} comme propriétaire. Accepte ou refuse depuis ton profil."
+  },
+  "teamOwnershipTransfer": {
+    "title": "Tu es propriétaire de ton équipe",
+    "body": "La propriété de {team} vient de t'être transférée. Tu gères désormais son nom, son sigle et ses membres."
+  },
   "contentReport": {
     "title": "Un signalement te concerne",
     "body": "Signalement ({category}) : aucune décision n'est prise. Consulte-le et conteste-le s'il est infondé."

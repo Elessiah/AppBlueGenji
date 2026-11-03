@@ -51,7 +51,10 @@ création (staff)  →  inscription à un tournoi  →  reprise par un joueur (q
    l'équipe au joueur : une invitation (`INVITE`) portant le rôle `OWNER`, qu'il
    accepte depuis `/profil` (section invitations, où elle est annoncée « tu en
    deviendras propriétaire ») ou par « Rejoindre » sur la fiche de la fantôme.
-   **Rien ne change avant sa réponse.** À l'acceptation (`acceptIntoTeam`, une
+   **Rien ne change avant sa réponse.** La proposition validée (après le
+   commit, jamais attendue), le joueur en est prévenu en push (sujet
+   `TEAM_INVITATION`) et en message privé Discord, qui ne nomment que l'équipe
+   (`TEAM_INVITATION_NOTIFICATION.md`). À l'acceptation (`acceptIntoTeam`, une
    transaction), il devient `OWNER`, `is_ghost` repasse à 0, l'équipe redevient
    ordinaire et les autres reprises encore en attente sur elle sont annulées.
    Refus à la proposition si le joueur appartient déjà à une équipe

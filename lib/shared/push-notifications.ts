@@ -70,6 +70,11 @@ export const PUSH_TOPICS = {
     description: "Un joueur demande à rejoindre une équipe que tu gères.",
     audience: null,
   },
+  TEAM_INVITATION: {
+    label: "Invitations d'équipe",
+    description: "Une équipe t'invite à la rejoindre, le staff te propose de reprendre une équipe, ou la propriété de ton équipe t'est transférée.",
+    audience: null,
+  },
   CONTENT_REPORT: {
     label: "Signalements te concernant",
     description: "Un signalement vise ton compte ou ton équipe : tu peux le contester.",

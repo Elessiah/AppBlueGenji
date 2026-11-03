@@ -48,6 +48,7 @@ import { clipPushText, PUSH_BODY_MAX, type PushContent } from "./push-notificati
 import { castReleaseReasonKey, type CastReleasedMatch } from "./cast-notices";
 import { lobbyBriefNames, neutralizeQuotes, type LobbyBriefSide } from "./lobby-brief";
 import { withoutInvisibles } from "./visible-text";
+import { teamInviteNoticePath, type TeamInviteNoticeKind } from "./team-invite-notice";
 
 type PushText = ScopedText<Leaves<typeof frPush>>;
 
@@ -650,6 +651,38 @@ export function teamJoinRequestPush(input: { teamId: number; teamName: string },
     body: text.t("teamJoinRequest.body", { team: input.teamName }),
     url: localeHref(`/equipes/${input.teamId}`, locale),
     tag: `team-${input.teamId}-join`,
+  };
+}
+
+/**
+ * Ce qui attend le destinataire d'une équipe : une invitation ordinaire, une
+ * reprise de fantôme proposée par le staff (l'invitation porte `OWNER`), ou la
+ * propriété de son équipe qui vient de lui être transférée. Le nom de l'équipe
+ * seul — jamais celui de qui invite ou transfère.
+ */
+export type TeamInvitationPushKind = TeamInviteNoticeKind;
+
+const TEAM_INVITATION_KEYS = {
+  INVITE: "teamInvitation",
+  GHOST_CLAIM: "ghostTeamClaim",
+  OWNERSHIP: "teamOwnershipTransfer",
+} as const satisfies Record<TeamInvitationPushKind, string>;
+
+/**
+ * Invitation, reprise proposée ou propriété reçue. Les deux premières ouvrent
+ * « Mon profil », où l'invitation s'accepte ; la troisième la fiche de l'équipe.
+ */
+export function teamInvitationPush(
+  input: { kind: TeamInvitationPushKind; teamId: number; teamName: string },
+  locale: Locale = DEFAULT_LOCALE,
+): PushContent {
+  const text = TEAM_INVITATION_KEYS[input.kind];
+  const t = TEXT[locale];
+  return {
+    title: t.t(`${text}.title`),
+    body: t.t(`${text}.body`, { team: withoutInvisibles(input.teamName) }),
+    url: localeHref(teamInviteNoticePath(input.kind, input.teamId), locale),
+    tag: `team-${input.teamId}-${input.kind === "OWNERSHIP" ? "owner" : "invite"}`,
   };
 }
 

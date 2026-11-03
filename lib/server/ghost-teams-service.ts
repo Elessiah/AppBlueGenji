@@ -17,6 +17,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { assertTeamTagAvailable, mapTeamTagConflict, resolveTeamTag } from "@/lib/server/team-tags";
 import { localUploadUrl } from "@/lib/shared/uploads";
+import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
 
 export const GHOST_TEAM_NAME_MIN = 3;
 export const GHOST_TEAM_NAME_MAX = 60;
@@ -135,6 +136,8 @@ export async function claimGhostTeam(
     );
 
     await connection.commit();
+    // Après le commit seulement : une proposition défaite n'annonce rien.
+    notifyTeamInviteInBackground("GHOST_CLAIM", teamId, newOwnerUserId, createdBy);
     return "INVITED";
   } catch (error) {
     await connection.rollback();

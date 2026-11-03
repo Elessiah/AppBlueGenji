@@ -91,7 +91,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Discord ID",
-    "Means of logging in (Discord button, or code received by direct message) — stored only if you link Discord. Also used by the bot to write to you by direct message (match times, reminders, removal, lobby settings if you manage an entrant or play a solo tournament, and removal of your cast — only if your tag is certified —, request to join a team you manage, suspension or moderation notices, information about your data). Removable from My profile as long as you have another one left",
+    "Means of logging in (Discord button, or code received by direct message) — stored only if you link Discord. Also used by the bot to write to you by direct message (match times, reminders, removal, lobby settings if you manage an entrant or play a solo tournament, and removal of your cast — only if your tag is certified —, request to join a team you manage, a team's invitation, an offered team takeover or ownership of your team received, suspension or moderation notices, information about your data). Removable from My profile as long as you have another one left",
   ],
   [
     "Google identifier",

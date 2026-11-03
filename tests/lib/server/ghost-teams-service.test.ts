@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { claimGhostTeam, createGhostTeam, listGhostTeams } from "@/lib/server/ghost-teams-service";
+import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
 import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/team-invite-notifications");
 
 type ExecuteMock = SqlMock;
 
@@ -114,6 +116,32 @@ describe("claimGhostTeam", () => {
     expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
     const [first] = execute.mock.calls[0] as [string];
     expect(first).toMatch(/FROM bg_teams WHERE id = \? FOR UPDATE/);
+  });
+
+  it("claimGhostTeam_committed_notifiesPlayerAfterCommit (TEAM-INVITE-NOTIFY)", async () => {
+    const connection = await mockDb(claimableReads());
+
+    await claimGhostTeam(3, 9, 1);
+
+    expect(notifyTeamInviteInBackground).toHaveBeenCalledWith("GHOST_CLAIM", 3, 9, 1);
+    const committedAt = jest.mocked(connection.commit).mock.invocationCallOrder[0];
+    const notifiedAt = jest.mocked(notifyTeamInviteInBackground).mock.invocationCallOrder[0];
+    expect(notifiedAt).toBeGreaterThan(committedAt);
+  });
+
+  it("claimGhostTeam_rolledBack_doesNotNotify (TEAM-INVITE-NOTIFY)", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
+      .mockResolvedValueOnce([[{ id: 9 }]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ id: 5 }]]); // reprise déjà proposée
+    const connection = await mockDb(execute);
+
+    await expect(claimGhostTeam(3, 9, 1)).rejects.toThrow("GHOST_CLAIM_ALREADY_PROPOSED");
+
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(notifyTeamInviteInBackground).not.toHaveBeenCalled();
   });
 
   it("défait la transaction sur un refus", async () => {

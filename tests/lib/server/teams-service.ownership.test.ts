@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import { transferTeamOwnership } from "@/lib/server/teams/roster";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { reconnectUserStreams } from "@/lib/server/session-streams";
+import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
 import { type SqlQuery, connectionMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/terms-acceptance", () =>
   jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
 );
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/team-invite-notifications");
 jest.mock("@/lib/server/session-streams", () => ({ reconnectUserStreams: jest.fn() }));
 
 const TEAM_ID = 7;
@@ -70,6 +72,23 @@ describe("transferTeamOwnership", () => {
   });
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it("transferTeamOwnership_committed_notifiesNewOwner (TEAM-INVITE-NOTIFY)", async () => {
+    const { connection } = await mockDb({ roster: { [REQUESTER_ID]: ["OWNER"], [TARGET_ID]: ["DPS"] } });
+
+    await transferTeamOwnership(REQUESTER_ID, TEAM_ID, TARGET_ID);
+
+    expect(connection.commit).toHaveBeenCalled();
+    expect(notifyTeamInviteInBackground).toHaveBeenCalledWith("OWNERSHIP", TEAM_ID, TARGET_ID, REQUESTER_ID);
+  });
+
+  it("transferTeamOwnership_failsInTransaction_doesNotNotify (TEAM-INVITE-NOTIFY)", async () => {
+    await mockDb({ roster: { [REQUESTER_ID]: ["OWNER"] } });
+
+    await expect(transferTeamOwnership(REQUESTER_ID, TEAM_ID, TARGET_ID)).rejects.toThrow("MEMBER_NOT_FOUND");
+
+    expect(notifyTeamInviteInBackground).not.toHaveBeenCalled();
   });
 
   it("déplace OWNER vers la cible et conserve les autres rôles de chacun", async () => {

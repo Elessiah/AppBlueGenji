@@ -4,6 +4,7 @@ jest.mock("@/lib/server/terms-acceptance", () =>
   jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
 );
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/team-invite-notifications");
 jest.mock("@/lib/server/users/roles", () => {
   const actual = jest.requireActual("@/lib/server/users/roles") as Record<string, unknown>;
   return { ...actual, getUserIdByPseudo: jest.fn() };
@@ -18,6 +19,7 @@ import {
 } from "@/lib/server/teams/invitations";
 import { getDatabase } from "@/lib/server/database";
 import { getUserIdByPseudo } from "@/lib/server/users/roles";
+import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
 import { type SqlMock, fakePool } from "../../helpers/sql-double";
 import {
   cachedCertificationPrompt,
@@ -272,6 +274,27 @@ describe("inviteToTeam — les rôles choisis voyagent avec l'invitation", () =>
     expect(rolesOf(42)).toEqual(["COACH"]);
     expect(state.invitations[0].status).toBe("ACCEPTED");
     expect(connection.commit).toHaveBeenCalled();
+  });
+
+  it("inviteToTeam_invited_notifiesInviteeAfterWrite (TEAM-INVITE-NOTIFY)", async () => {
+    await inviteToTeam(1, 7, "Nova", ["DPS"]);
+
+    expect(state.invitations).toHaveLength(1);
+    expect(notifyTeamInviteInBackground).toHaveBeenCalledWith("INVITE", 7, 42, 1);
+  });
+
+  it("inviteToTeam_pendingRequestJoined_doesNotNotify (TEAM-INVITE-NOTIFY)", async () => {
+    invite({ kind: "REQUEST" });
+
+    await inviteToTeam(1, 7, "Nova", ["DPS"]);
+
+    expect(notifyTeamInviteInBackground).not.toHaveBeenCalled();
+  });
+
+  it("inviteToTeam_refused_doesNotNotify (TEAM-INVITE-NOTIFY)", async () => {
+    await expect(inviteToTeam(9, 7, "Nova", ["DPS"])).rejects.toThrow("FORBIDDEN");
+
+    expect(notifyTeamInviteInBackground).not.toHaveBeenCalled();
   });
 });
 

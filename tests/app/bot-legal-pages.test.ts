@@ -505,8 +505,26 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
     // Retention of the #live post, as on the site (T16).
     expect(fr).toContain("**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (evening message of the streamed matches: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
-    // TERMS v7 : datée du lendemain de la mise en ligne du 28 octobre 2026 (§ Dates corrigées).
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["29 octobre 2026", "29 October 2026"]);
+    // TEAM-INVITE-NOTIFY : datée du lendemain de la nuit de déploiement suivant la fusion du 3 novembre 2026.
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["5 novembre 2026", "5 November 2026"]);
+  });
+});
+
+describe("politique du bot — messages d'équipe (TEAM-INVITE-NOTIFY)", () => {
+  const fr = JSON.stringify(PRIVACY_POLICY.fr);
+  const en = JSON.stringify(PRIVACY_POLICY.en);
+
+  it("policy_teamNotices_listedAmongDeliveredMessagesFrAndEn", () => {
+    expect(fr).toContain("invitation d'une équipe, reprise d'une équipe fantôme que le staff vous propose ou propriété de votre équipe qui vous est transférée, qui ne nomment que l'équipe");
+    expect(fr).toContain("demande d'adhésion, invitation, reprise ou propriété d'équipe, information) en message privé");
+    expect(en).toContain("a team's invitation, the takeover of a ghost team the staff offers you or the ownership of your team transferred to you, which only name the team");
+    expect(en).toContain("join request, team invitation, takeover or ownership, data-protection notice) by direct message");
+  });
+
+  it("terms_article01_unchangedUnderTermsV8", () => {
+    expect(JSON.stringify(TERMS_OF_SERVICE.fr)).not.toContain("invitations d'équipe");
+    expect(JSON.stringify(TERMS_OF_SERVICE.en)).not.toContain("team invitations");
+    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["29 octobre 2026", "29 October 2026"]);
   });
 });
 

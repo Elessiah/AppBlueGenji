@@ -53,6 +53,11 @@ import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import {
+  TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
+  TEAM_INVITE_NOTICES_DAILY_CAP,
+  TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
+} from "@/lib/shared/team-invite-notice";
+import {
   BOT_FEED_EVENT_RETENTION_DAYS,
   BOT_STAFF_LOG_RETENTION_DAYS,
   SUPPORT_TICKET_RETENTION_MONTHS,
@@ -76,7 +81,7 @@ import {
 import { frEn, localize, type Localizable } from "@/lib/shared/bilingual";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-11-04";
+export const REGISTER_UPDATED_AT = "2026-11-05";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -554,6 +559,8 @@ const ACTIVITIES = registerActivities({
         "Forming teams (members, roles, invitations)"),
       frEn("Prévenir en message privé Discord le propriétaire et les managers d'une équipe d'une demande d'adhésion (sans nommer le demandeur, au plus un message par joueur et par équipe toutes les 24 h)",
         "Notifying the owner and managers of a team of a request to join by Discord direct message (without naming the requester, at most one message per player and per team every 24 h)"),
+      frEn(`Prévenir un joueur en message privé Discord de l'invitation d'une équipe (au plus un message par équipe et par joueur toutes les ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} h, ${TEAM_INVITE_NOTICES_DAILY_CAP} joueurs par équipe ou par auteur et ${TEAM_INVITE_NOTICES_PER_PLAYER_CAP} équipes par joueur dans ce délai), de la reprise d'une équipe fantôme que le staff lui propose (une fois par équipe et par joueur dans ce délai), et de la propriété de son équipe qui lui est transférée (sans nommer qui invite, propose ou transfère : le nom de l'équipe seul)`,
+        `Notifying a player by Discord direct message of a team's invitation (at most one message per team and per player every ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} h, ${TEAM_INVITE_NOTICES_DAILY_CAP} players per team or per author and ${TEAM_INVITE_NOTICES_PER_PLAYER_CAP} teams per player within that time), of the takeover of a ghost team the staff offers them (once per team and per player within that time), and of the ownership of their team being transferred to them (without naming who invites, offers or transfers: the team's name only)`),
       frEn("Inscrire des équipes ou des joueurs, générer les plateaux, saisir et arbitrer les scores",
         "Registering teams or players, generating brackets, entering and refereeing scores"),
       frEn("Publier résultats, classements, statistiques et palmarès",
@@ -594,8 +601,8 @@ const ACTIVITIES = registerActivities({
     recipients: [
       frEn("Public du site", "The site's public"),
       frEn("Staff d'arbitrage et d'administration", "Refereeing and administration staff"),
-      frEn("Discord, qui achemine le message privé d'une demande d'adhésion",
-        "Discord, which delivers the direct message of a request to join"),
+      frEn("Discord, qui achemine le message privé d'une demande d'adhésion, d'une invitation d'équipe, d'une reprise d'équipe proposée ou d'une propriété transférée",
+        "Discord, which delivers the direct message of a request to join, a team invitation, an offered team takeover or a transferred ownership"),
     ],
     transfers: [
       frEn(`États-Unis : Discord (acheminement des messages privés) — ${transferBasis(["DISCORD"])}`,
@@ -884,8 +891,8 @@ const ACTIVITIES = registerActivities({
         "Activity statistics (/stats command, which shows each person only their own activity; the bot's dashboard)"),
       frEn("Confirmation des adhésions à l'association et rappels programmés sur ses serveurs",
         "Confirming memberships of the association and scheduled reminders on its servers"),
-      frEn("Remise des messages du site : codes (rédigés par le bot dans la langue du compte que le site lui transmet), horaires et rappels de match, avis de retrait d'un match (« Match retiré »), réglages du salon d'un match envoyés à ceux qui gèrent ses engagées et avis envoyé à un caster dont l'inscription est retirée par un autre que lui (ces messages de match aux seuls tags Discord certifiés), avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé, avatar masqué, retiré ou rétabli, suspension du compte et sa levée), demandes d'adhésion à une équipe et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un ; annonce des matchs diffusés publiée dans le salon #live du serveur de l'association, en un message par soirée modifié à chaque début et fin de match, avec une mention @everyone pour la chaîne officielle ou du seul rôle StreamViewer pour toute autre chaîne (noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs — traitement T16)",
-        "Delivering the site's messages: codes (written by the bot in the account language the site sends it), match times and reminders, notices of removal from a match (“Match retiré”), the lobby settings of a match sent to those who manage its entrants and the notice sent to a caster whose registration for a match is removed by someone else (these match messages to certified Discord tags only), moderation notices (report naming the person, logo hidden, removed or deleted, avatar hidden, removed or restored, suspension of the account and its lifting), requests to join a team and information about data by direct message, without being kept by the bot; refereeing alerts, reports and the site's activity log (without player usernames) posted in the staff's private log channel, refereeing alerts also sent to the members of the refereeing role of each server that has set one; announcement of the streamed matches posted in the #live channel of the association's server, in one message per evening edited at each match start and end, with an @everyone mention for the official channel or a mention of the StreamViewer role only for any other channel (team names or, in a solo tournament, the players' public BlueGenji username — processing activity T16)"),
+      frEn("Remise des messages du site : codes (rédigés par le bot dans la langue du compte que le site lui transmet), horaires et rappels de match, avis de retrait d'un match (« Match retiré »), réglages du salon d'un match envoyés à ceux qui gèrent ses engagées et avis envoyé à un caster dont l'inscription est retirée par un autre que lui (ces messages de match aux seuls tags Discord certifiés), avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé, avatar masqué, retiré ou rétabli, suspension du compte et sa levée), demandes d'adhésion à une équipe, invitations d'équipe, reprises d'équipe proposées, propriétés d'équipe transférées et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un ; annonce des matchs diffusés publiée dans le salon #live du serveur de l'association, en un message par soirée modifié à chaque début et fin de match, avec une mention @everyone pour la chaîne officielle ou du seul rôle StreamViewer pour toute autre chaîne (noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs — traitement T16)",
+        "Delivering the site's messages: codes (written by the bot in the account language the site sends it), match times and reminders, notices of removal from a match (“Match retiré”), the lobby settings of a match sent to those who manage its entrants and the notice sent to a caster whose registration for a match is removed by someone else (these match messages to certified Discord tags only), moderation notices (report naming the person, logo hidden, removed or deleted, avatar hidden, removed or restored, suspension of the account and its lifting), requests to join a team, team invitations, offered team takeovers, transferred team ownerships and information about data by direct message, without being kept by the bot; refereeing alerts, reports and the site's activity log (without player usernames) posted in the staff's private log channel, refereeing alerts also sent to the members of the refereeing role of each server that has set one; announcement of the streamed matches posted in the #live channel of the association's server, in one message per evening edited at each match start and end, with an @everyone mention for the official channel or a mention of the StreamViewer role only for any other channel (team names or, in a solo tournament, the players' public BlueGenji username — processing activity T16)"),
       frEn("Salons vocaux d'équipe des matchs, dans les tournois qui en ont l'option : création au nom de l'équipe, comptage des personnes présentes (un nombre, jamais qui) et suppression ; pour compter, présence vocale des membres du serveur de l'association tenue en mémoire seulement (traitement T18, qui en donne les données et les durées)",
         "Team voice channels for matches, in tournaments with that option: creation named after the team, count of the people present (a number, never who) and deletion; to count, voice presence of the members of the association's server held in memory only (processing activity T18, which gives its data and periods)"),
     ],
@@ -1186,6 +1193,8 @@ const ACTIVITIES = registerActivities({
         "Start of their matches (and, for a registered caster, of the match they cast), score to confirm or confirmed automatically without an answer, tournament kickoff, match times (set, changed or removed) and match reminders"),
       frEn("Demandes d'adhésion à une équipe qu'il gère, signalements et décisions de modération le concernant, changements de la politique de données",
         "Requests to join a team they manage, reports and moderation decisions concerning them, changes to the data policy"),
+      frEn("Invitation d'une équipe, reprise d'une équipe fantôme proposée par le staff, propriété de son équipe qui lui est transférée (nom de l'équipe seul)",
+        "A team's invitation, takeover of a ghost team offered by the staff, ownership of their team transferred to them (team name only)"),
       frEn("Alertes d'arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l'adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d'arbitrage et alertes de modération pour le staff qui détient ces rôles",
         "Referee alerts, disputes settled, results corrected, opponents' withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule and moderation alerts for the staff holding these roles"),
       frEn("Retrait de son inscription de caster sur un match (par le staff ou d'office), avec le motif, pour le caster qui détient encore la permission de diffusion",
