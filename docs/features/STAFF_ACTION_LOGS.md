@@ -56,7 +56,13 @@ match dit le détail.
 
 Les têtes de série se réordonnent par glissements successifs : `SEEDING_REORDERED`
 passe par un regroupeur (`lib/server/coalescer.ts`) par tournoi — une ligne
-après 60 s sans nouveau geste, au plus tard 5 min après le premier.
+après 60 s sans nouveau geste, au plus tard 5 min après le premier. Un autre
+geste sur le même tournoi fait d'abord partir la rafale en attente (le journal
+garde l'ordre), et l'arrêt propre du serveur l'annonce avant les lots du journal
+(`flushAllCoalescers`, `bot-log-shutdown.ts`). Le regroupeur vit en mémoire : un
+seul processus sert le site.
+Hôte, antenne et rediffusion : « changé » se lit dans l'écriture elle-même
+(condition sur l'état de départ, `changedRows`), jamais dans une lecture d'avant.
 
 ## Ce qui ne change pas
 

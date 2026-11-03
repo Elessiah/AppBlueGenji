@@ -34,6 +34,8 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
 - Inscriptions et retraits du caster lui-même, en rafale sur un même match,
   sont regroupés (`lib/server/coalescer.ts`, 60 s sans geste, 5 min au plus) :
   une seule ligne, l'état final, et aucune si le caster revient à l'état de départ.
+  Un retrait par le staff, d'office, ou une reprise de place sur ce caster fait
+  d'abord partir sa rafale : le journal garde l'ordre et finit sur l'état réel.
 - Les **joueurs du match ne sont pas prévenus** (décision 3).
 - Sur la carte de match, « Retirer le caster » (staff) passe par une
   `ConfirmActionDialog` qui dit que le caster sera prévenu, avec le motif
