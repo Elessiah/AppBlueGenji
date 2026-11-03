@@ -147,7 +147,11 @@ export async function loadStoredMapSet(
  * par doublon (`ON DUPLICATE KEY UPDATE` verrouille l'intervalle qui précède la
  * ligne trouvée) — seulement des verrous de ligne et d'intention d'insertion,
  * qui ne débordent jamais sur le match voisin. La saisie map par map ajoute
- * ainsi sa map sans rien verrouiller d'autre.
+ * ainsi sa map sans rien verrouiller d'autre. Le jeu se renumérote 1..n au
+ * passage : un jeu stocké troué ({1, 3}) ne ferait sinon ni « Map 1 », ni place
+ * aux nouvelles maps (numérotées après les lignes gardées). Les lignes vont par
+ * numéro croissant, si bien que la cible (`index + 1`) n'excède jamais le
+ * numéro courant : aucune collision de la clé unique en cours de route.
  */
 export async function rewriteMapSet(
   connection: PoolConnection,
@@ -159,7 +163,9 @@ export async function rewriteMapSet(
 ): Promise<void> {
   for (const [index, map] of maps.slice(0, stored.length).entries()) {
     const current = stored[index];
+    const mapNumber = index + 1;
     if (
+      current.mapNumber === mapNumber &&
       current.replayCode === map.replayCode &&
       current.team1Score === map.team1Score &&
       current.team2Score === map.team2Score
@@ -168,9 +174,9 @@ export async function rewriteMapSet(
     }
     await connection.execute(
       `UPDATE bg_match_maps
-       SET replay_code = ?, team1_score = ?, team2_score = ?, submitted_by_user_id = ?, submitted_at = CURRENT_TIMESTAMP
+       SET map_number = ?, replay_code = ?, team1_score = ?, team2_score = ?, submitted_by_user_id = ?, submitted_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [map.replayCode, map.team1Score, map.team2Score, userId, current.id],
+      [mapNumber, map.replayCode, map.team1Score, map.team2Score, userId, current.id],
     );
   }
   const extra = stored.slice(maps.length).map((map) => map.id);

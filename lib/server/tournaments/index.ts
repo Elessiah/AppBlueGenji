@@ -1708,11 +1708,13 @@ async function adminSaveMatchScoresOnce(
     publishMatchUpdatedEvent(savedTournamentId, { landingLive: true });
     return { ...pause, match: savedMatch };
   } catch (error) {
-    if (inTransaction) await connection.rollback();
+    // ROLLBACK raté : l'erreur d'origine reste (rejeu, 409), la connexion est
+    // détruite au lieu d'être rendue avec une transaction peut-être ouverte.
+    if (inTransaction) await rollbackKeepingError(connection);
     throw error;
   } finally {
     discardBotLogs(connection);
-    connection.release();
+    await releaseWithServerLockWait(connection);
   }
 }
 
