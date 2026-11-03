@@ -346,15 +346,17 @@ export function lobbyBriefSides(
  * liée, porte les réglages à jour.
  *
  * @returns `null` si le salon s'est refermé depuis la réservation (lancement
- *   défait, réappariement) : rien ne part, la réservation est rendue — sinon
- *   le brief partirait pour un salon fermé, puis une seconde fois à la
- *   réouverture du même appariement.
+ *   défait, réappariement) ou que la réservation `claimId` a été effacée
+ *   (lancement défait puis salon rouvert dans l'intervalle) : rien ne part, les
+ *   réservations du match sont rendues — sinon le brief partirait pour un
+ *   salon fermé, ou sans réservation, puis une seconde fois à la réouverture.
  */
-async function rereadBriefRow(db: Db, row: LobbyBriefRow): Promise<LobbyBriefRow | null> {
+async function rereadBriefRow(db: Db, row: LobbyBriefRow, claimId: number): Promise<LobbyBriefRow | null> {
   try {
     const [rows] = await db.query<LobbyBriefRow[]>(
-      `SELECT ${BRIEF_COLUMNS} ${BRIEF_FROM} WHERE m.id = ? AND m.launch_pairing = ? AND ${OPEN_LOBBY_SQL}`,
-      [Number(row.id), String(row.launch_pairing)],
+      `SELECT ${BRIEF_COLUMNS} ${BRIEF_FROM} WHERE m.id = ? AND m.launch_pairing = ? AND ${OPEN_LOBBY_SQL}
+          AND EXISTS (SELECT 1 FROM bg_match_start_notices n WHERE n.id = ?)`,
+      [Number(row.id), String(row.launch_pairing), claimId],
     );
     return rows[0] ?? null;
   } catch (error) {
@@ -447,6 +449,9 @@ type SweepContext = {
   briefSides: (row: LobbyBriefRow) => Promise<{ teamId: number; side: LobbyBriefSide }[]>;
 };
 
+/** Réservations à rendre en fin de balayage (voir {@link briefMatch}). */
+type Releases = { retry: number[]; closed: number[] };
+
 /**
  * Gestionnaires d'un côté : `null` pour une vraie équipe sans gestionnaire —
  * pas de réservation, un manager ajouté dans la fenêtre sera briefé au
@@ -471,33 +476,40 @@ function sideManagers(
 async function freshSides(
   db: Db,
   row: LobbyBriefRow,
+  claimId: number,
   context: SweepContext,
 ): Promise<{ teamId: number; side: LobbyBriefSide }[] | null> {
-  const fresh = await rereadBriefRow(db, row);
+  const fresh = await rereadBriefRow(db, row, claimId);
   return fresh === null ? null : context.briefSides(fresh);
 }
 
 /**
  * Brief des deux côtés d'un match, **côté par côté** : réservation, relecture
  * des réglages (une fois par match), envoi. Rend le nombre de côtés briefés ;
- * les réservations à rendre (rien n'est parti) vont dans `toRelease` au fil
- * de l'eau, pour être rendues même si un côté suivant lève.
+ * les réservations à rendre vont au fil de l'eau, pour être rendues même si
+ * un côté suivant lève : dans `releases.retry` quand rien n'est parti (le
+ * balayage suivant les reprend), dans `releases.closed` quand le salon s'est
+ * refermé (rien à reprendre, aucune relance).
  */
-async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext, toRelease: number[]): Promise<number> {
+async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext, releases: Releases): Promise<number> {
+  const toRelease = releases.retry;
+  const claimed: number[] = [];
   let sent = 0;
   let sides: { teamId: number; side: LobbyBriefSide }[] | null | undefined;
   for (const slot of [1, 2] as const) {
     const managers = sideManagers(row, slot, context);
     if (managers === null) continue;
     const claimId = await claimLobbyBrief(db, row, slot);
+    if (claimId !== null) claimed.push(claimId);
     // Fantôme : personne à briefer, la réservation reste.
     if (claimId === null || managers.ghost) continue;
     let outcome: SideOutcome;
     try {
-      sides ??= await freshSides(db, row, context);
-      // Salon refermé depuis la réservation : rien ne part de ce match.
+      sides ??= await freshSides(db, row, claimId, context);
+      // Salon refermé depuis la réservation : rien ne part de ce match, et ses
+      // réservations (fantôme comprise) sont rendues.
       if (sides === null) {
-        toRelease.push(claimId);
+        releases.closed.push(...claimed);
         return sent;
       }
       outcome = await sendSideBrief(
@@ -578,12 +590,13 @@ async function runLobbyBriefSweep(): Promise<number> {
   };
 
   let sent = 0;
-  const toRelease: number[] = [];
+  const releases: Releases = { retry: [], closed: [] };
+  const toRelease = releases.retry;
   const toRetry: string[] = [];
   for (const row of rows) {
     const released = toRelease.length;
     try {
-      sent += await briefMatch(db, row, { managers, recipients, briefSides }, toRelease);
+      sent += await briefMatch(db, row, { managers, recipients, briefSides }, releases);
     } catch (error) {
       // Un match en échec (réservation interrompue, réglages illisibles)
       // n'empêche pas les suivants ; il est rejoué au balayage suivant.
@@ -596,8 +609,11 @@ async function runLobbyBriefSweep(): Promise<number> {
   }
   // Rien n'est parti pour ces côtés : leurs réservations sont rendues en un
   // lot ; pm2 ne dit « remis » qu'une fois le rendu fait.
-  if (toRelease.length > 0 && (await releaseQuietly(db, toRelease))) {
-    console.error(`[lobby-brief] ${toRelease.length} brief(s) remis au balayage suivant`);
+  if (toRelease.length + releases.closed.length > 0 && (await releaseQuietly(db, [...toRelease, ...releases.closed]))) {
+    if (toRelease.length > 0) console.error(`[lobby-brief] ${toRelease.length} brief(s) remis au balayage suivant`);
+    if (releases.closed.length > 0) {
+      console.error(`[lobby-brief] ${releases.closed.length} réservation(s) rendue(s) : salon refermé avant l'envoi`);
+    }
   }
   scheduleRetrySweep(toRetry);
   return sent;
