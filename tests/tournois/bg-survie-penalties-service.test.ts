@@ -219,6 +219,22 @@ describe("liftEndurancePenalty", () => {
     expect(select?.[1]).toEqual([15, 7]);
   });
 
+  // ERREUR.txt EF-15 (revue) : aucune lecture d'instantané avant celle,
+  // verrouillée, des manches suivantes (`ER_CHECKREAD` sous MariaDB).
+  it("liftEndurancePenalty_penaltyRead_isLockingBeforeLaterRounds", async () => {
+    const { conn, calls } = makeConn({
+      penalties: [{ team_id: 42, points: 3, round_number: 2 }],
+    });
+    await liftEndurancePenalty(7, 15, conn);
+
+    const selectIndex = calls.findIndex(([query]) =>
+      query.startsWith("SELECT team_id, points, round_number FROM bg_endurance_penalties"),
+    );
+    const roundsIndex = calls.findIndex(([query]) => query.startsWith("SELECT id FROM bg_matches"));
+    expect(calls[selectIndex][0]).toMatch(/LIMIT 1 FOR UPDATE$/);
+    expect(selectIndex).toBeLessThan(roundsIndex);
+  });
+
   it("refuse une sanction introuvable", async () => {
     const { conn, calls } = makeConn({ penalties: [] });
     await expect(liftEndurancePenalty(7, 15, conn)).rejects.toThrow("PENALTY_NOT_FOUND");

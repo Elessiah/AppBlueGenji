@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fail } from "@/lib/server/http";
-import { isContentionMessage, isDeadlockMessage, isLockWaitTimeout } from "@/lib/server/mysql-errors";
+import { isContentionError, isContentionMessage, isDeadlockMessage } from "@/lib/server/mysql-errors";
 import { launchFailure } from "@/lib/server/tournaments/match-launch-routes";
 import { CONCURRENT_UPDATE_RETRY, CONCURRENT_UPDATE_RETRY_MESSAGE } from "@/lib/shared/api-error-code";
 import { ERROR_MESSAGES, mapError } from "@/app/(secured)/tournois/[id]/_lib/error-map";
@@ -101,14 +101,42 @@ describe("isContentionMessage", () => {
   });
 });
 
-describe("isLockWaitTimeout", () => {
-  it("isLockWaitTimeout_lockWaitCode_returnsTrue", () => {
-    expect(isLockWaitTimeout(Object.assign(new Error(LOCK_WAIT), { code: "ER_LOCK_WAIT_TIMEOUT" }))).toBe(true);
+describe("isContentionError", () => {
+  it("isContentionError_checkreadCodeWithLocalizedMessage_returnsTrue", () => {
+    const localized = Object.assign(new Error("L'enregistrement a changé depuis la dernière lecture"), { code: "ER_CHECKREAD" });
+
+    expect(isContentionError(localized)).toBe(true);
   });
 
-  it("isLockWaitTimeout_otherCode_returnsFalse", () => {
-    expect(isLockWaitTimeout(Object.assign(new Error(DEADLOCK), { code: "ER_LOCK_DEADLOCK" }))).toBe(false);
-    expect(isLockWaitTimeout(new Error(LOCK_WAIT))).toBe(false);
+  it("isContentionError_lockWaitCode_returnsTrue", () => {
+    expect(isContentionError(Object.assign(new Error("délai dépassé"), { code: "ER_LOCK_WAIT_TIMEOUT" }))).toBe(true);
+  });
+
+  it("isContentionError_deadlockCode_returnsTrue", () => {
+    expect(isContentionError(Object.assign(new Error("interblocage"), { code: "ER_LOCK_DEADLOCK" }))).toBe(true);
+  });
+
+  it("isContentionError_errnoOnly_returnsTrue", () => {
+    expect(isContentionError(Object.assign(new Error("x"), { errno: 1020 }))).toBe(true);
+    expect(isContentionError(Object.assign(new Error("x"), { errno: 1205 }))).toBe(true);
+    expect(isContentionError(Object.assign(new Error("x"), { errno: 1213 }))).toBe(true);
+  });
+
+  it("isContentionError_messageWithoutCode_returnsTrue", () => {
+    expect(isContentionError(new Error(LOCK_WAIT))).toBe(true);
+    expect(isContentionError(new Error(DEADLOCK))).toBe(true);
+    expect(isContentionError(new Error("Record has changed since last read in table 'bg_matches'"))).toBe(true);
+  });
+
+  it("isContentionError_otherError_returnsFalse", () => {
+    expect(isContentionError(Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY", errno: 1062 }))).toBe(false);
+    expect(isContentionError(new Error("boom"))).toBe(false);
+  });
+
+  it("isContentionError_nonError_returnsFalse", () => {
+    expect(isContentionError(null)).toBe(false);
+    expect(isContentionError(LOCK_WAIT)).toBe(false);
+    expect(isContentionError(undefined)).toBe(false);
   });
 });
 
@@ -140,6 +168,14 @@ describe("launchFailure — interblocage", () => {
 
     expect(response.status).toBe(409);
     expect((await response.json()).error).toBe(CONCURRENT_UPDATE_RETRY);
+  });
+
+  it("launchFailure_localizedCheckreadWithCode_returns409RetryCode", async () => {
+    const conflict = Object.assign(new Error("Enregistrement modifié"), { code: "ER_CHECKREAD" });
+
+    const response = launchFailure(conflict, {}, "MATCH_READY_FAILED");
+
+    expect(response.status).toBe(409);
   });
 
   it("launchFailure_snapshotConflictMessageWithoutCode_returns409RetryCode", async () => {

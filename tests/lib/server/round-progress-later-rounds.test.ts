@@ -79,6 +79,12 @@ describe("laterRoundHasScoreInput — retrait d'une pénalité", () => {
 });
 
 describe("HAS_SCORE_INPUT_SQL", () => {
+  it("HAS_SCORE_INPUT_SQL_doubleForfeit_countsOnlyOnceCompleted", () => {
+    // Comme `toMatchScoreState` (admin.ts) : un double forfait ne compte que
+    // sur un match clos.
+    expect(flat(HAS_SCORE_INPUT_SQL)).not.toMatch(/OR double_forfeit = 1 OR/);
+  });
+
   it("HAS_SCORE_INPUT_SQL_requiresBothEntrants_excludesAutomaticBye", () => {
     expect(flat(HAS_SCORE_INPUT_SQL)).toMatch(/^\(team1_id IS NOT NULL AND team2_id IS NOT NULL AND \(/);
   });
@@ -94,7 +100,7 @@ describe("HAS_SCORE_INPUT_SQL", () => {
       "team2_score IS NOT NULL",
       "winner_team_id IS NOT NULL",
       "forfeit_team_id IS NOT NULL",
-      "double_forfeit = 1",
+      "(double_forfeit = 1 AND status = 'COMPLETED')",
       "status = 'AWAITING_CONFIRMATION'",
     ]) {
       expect(HAS_SCORE_INPUT_SQL).toContain(clause);

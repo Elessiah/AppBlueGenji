@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/preview-cache");
+jest.mock("@/lib/server/tournaments/list-cache");
+jest.mock("@/lib/server/landing-cache");
 jest.mock("@/lib/server/tournaments/bot-logs");
 jest.mock("@/lib/server/tournaments/survival");
 jest.mock("@/lib/server/tournaments/swiss");
@@ -14,6 +16,8 @@ import { getDatabase } from "@/lib/server/database";
 import { flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { invalidateTournamentPreview } from "@/lib/server/tournaments/preview-cache";
+import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
+import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
 import { reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { reconcileSwiss } from "@/lib/server/tournaments/swiss";
 import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie/reconcile";
@@ -145,8 +149,12 @@ describe("cancelTournamentForfeit", () => {
     expect(reconcileSurvival).toHaveBeenCalledWith(7, fakeConnection(connection), { phaseId: 0 });
     expect(reconcilePhases).not.toHaveBeenCalled();
     expect(flushBotLogs).toHaveBeenCalled();
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
     expect(invalidateTournamentPreview).toHaveBeenCalledWith(7);
+    // Le rejeu peut réécrire la manche courante ou la phase : listes et
+    // agrégats de l'accueil suivent, pas le classement du site.
+    expect(invalidateTournamentLists).toHaveBeenCalled();
+    expect(invalidateLandingAggregates).toHaveBeenCalled();
     expect(jest.mocked(publishMatchUpdatedEvent).mock.invocationCallOrder[0]).toBeGreaterThan(
       connection.commit.mock.invocationCallOrder[0],
     );
@@ -374,6 +382,7 @@ describe("cancelTournamentForfeit", () => {
     expect(connection.commit).not.toHaveBeenCalled();
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
     expect(invalidateTournamentPreview).not.toHaveBeenCalled();
+    expect(invalidateTournamentLists).not.toHaveBeenCalled();
     expect(connection.release).toHaveBeenCalled();
   });
 });

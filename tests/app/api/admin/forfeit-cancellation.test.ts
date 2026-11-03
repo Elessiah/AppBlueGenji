@@ -173,6 +173,20 @@ describe("DELETE /api/admin/tournaments/[id]/forfeits/[teamId]", () => {
     expect(sendBotLog).not.toHaveBeenCalled();
   });
 
+  it("DELETE_checkreadWithLocalizedMessage_returns409ByCode", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(cancelTournamentForfeit).mockRejectedValue(
+      Object.assign(new Error("L'enregistrement a changé depuis la dernière lecture"), { code: "ER_CHECKREAD", errno: 1020 }),
+    );
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    const res = await cancel("7", "102");
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: CONCURRENT_UPDATE_RETRY });
+    warn.mockRestore();
+  });
+
   it("rend un instantané périmé de MariaDB (1020) en refus « réessaie »", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(cancelTournamentForfeit).mockRejectedValue(

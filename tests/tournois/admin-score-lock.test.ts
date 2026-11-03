@@ -220,6 +220,16 @@ describe("checkDownstreamMatchesHaveNoScores — formats sans liens de bracket",
     }
   });
 
+  // ERREUR.txt EF-15 (revue) : la lecture ordinaire du match a déjà figé
+  // l'image ; un `FOR UPDATE` ici serait refusé sous MariaDB (`ER_CHECKREAD`).
+  it("checkDownstream_laterRounds_snapshotReadWithoutLock", async () => {
+    const { conn, dependentQuery } = fakeConnection({ format: "SURVIVAL", dependents: [] });
+
+    await checkDownstreamMatchesHaveNoScores(conn, editedMatch);
+
+    expect(dependentQuery()).not.toContain("FOR UPDATE");
+  });
+
   it("refuse la correction d'un round dont la suite a déjà un score", async () => {
     const { conn } = fakeConnection({
       format: "SURVIVAL",

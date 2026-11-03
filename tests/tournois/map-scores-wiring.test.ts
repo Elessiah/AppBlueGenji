@@ -515,11 +515,24 @@ describe("dialogues de score — calculs évités (EF-15)", () => {
     expect(dialog.match(/storedResultLabel\(text, match, team1, team2\)/g)).toHaveLength(1);
   });
 
-  it("TournamentSheet_cancelForfeit_reliesOnStreamWithoutRestRefresh", () => {
+  it("TournamentSheet_cancelForfeit_streamOpen_reliesOnStreamWithoutRestRefresh", () => {
     const sheet = readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
     const start = sheet.indexOf("const performCancelForfeit = async");
     const body = sheet.slice(start, sheet.indexOf("return true;", start));
-    expect(body).toContain("focusRowAfterChange(teamId);");
-    expect(body).not.toMatch(/(void|await) refresh\(\)/);
+    expect(body).toContain("if (isLive) focusRowAfterChange(teamId);");
+  });
+
+  it("TournamentSheet_cancelForfeit_streamDown_fallsBackToRestRefresh", () => {
+    const sheet = readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
+    const start = sheet.indexOf("const performCancelForfeit = async");
+    const body = sheet.slice(start, sheet.indexOf("return true;", start));
+    expect(body).toContain("else void refresh().then(() => focusRowAfterChange(teamId));");
+  });
+
+  it("useScoreForm_rulesChangeWhileOpen_realignsBaseline", () => {
+    const form = readSource("app/(secured)/tournois/[id]/_hooks/useScoreForm.ts");
+    expect(form).toContain("const rules = `${JSON.stringify(matchFormat)}|${game ?? \"\"}`;");
+    expect(form).toContain("rules !== synced.rules");
+    expect(form).not.toMatch(/setSynced\(\{ signature, proposals, baseline/);
   });
 });
