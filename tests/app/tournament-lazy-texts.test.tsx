@@ -17,7 +17,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { reloadAfterChunkError } from "@/lib/shared/lazy-component";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { documentLocale } from "@/lib/shared/document-locale";
-import { suspendOn } from "@/components/i18n/suspend-on-loader";
+import { SUSPEND_RETRY_MS, suspendOn } from "@/components/i18n/suspend-on-loader";
 import { TournamentPageTextProvider, useTournamentPageText, useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import { TournamentSheetTextGate, type TournamentSheetEnglish } from "@/components/i18n/tournament-sheet-text-gate";
 import { TournamentsTextProvider, useTournamentsText } from "@/components/i18n/tournaments-text";
@@ -28,6 +28,11 @@ import { FR_VIEWS_TEXT } from "@/app/(secured)/tournois/[id]/_lib/views-text";
 import { tournamentPageMessages, type TournamentViewMessages } from "@/lib/shared/tournament-page-text";
 import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text";
 import { tournamentsSharedMessages } from "@/lib/shared/tournaments-text";
+import { messageAt } from "@/lib/shared/scoped-text";
+import { readSource } from "../helpers/read-source";
+import frViews from "@/messages/fr/tournamentViews.json";
+import frEndurance from "@/messages/fr/tournamentEndurance.json";
+import frEnduranceChart from "@/messages/fr/tournamentEnduranceChart.json";
 
 const EN = messagesFor("en");
 const FR = messagesFor("fr");
@@ -80,13 +85,35 @@ describe("suspendOn", () => {
     await expect(thrown).resolves.toBeUndefined();
   });
 
-  it("suspendOn_loaderRejects_schedulesReloadAndThenThrowsNeverResolvingPromise", async () => {
-    const loader = { load: jest.fn(async () => Promise.reject(new Error("ChunkLoadError"))) };
-    await thrownBy(() => suspendOn(loader));
-    expect(reloadAfterChunkError).toHaveBeenCalledTimes(1);
-    expect(thrownBy(() => suspendOn(loader))).toBeInstanceOf(Promise);
-    // Aucune requête de plus : la page se recharge.
-    expect(loader.load).toHaveBeenCalledTimes(1);
+  it("suspendOn_loaderRejects_schedulesReloadAndWaitsWithoutNewRequest", async () => {
+    jest.useFakeTimers();
+    try {
+      const loader = { load: jest.fn(async () => Promise.reject(new Error("ChunkLoadError"))) };
+      const first = thrownBy(() => suspendOn(loader));
+      await jest.advanceTimersByTimeAsync(0);
+      expect(reloadAfterChunkError).toHaveBeenCalledTimes(1);
+      // D'ici le nouvel essai : la même attente, aucune requête de plus.
+      expect(thrownBy(() => suspendOn(loader))).toBeInstanceOf(Promise);
+      expect(loader.load).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(SUSPEND_RETRY_MS);
+      await expect(first).resolves.toBeUndefined();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("suspendOn_reloadDidNotHappen_retriesLoadAfterDelay", async () => {
+    jest.useFakeTimers();
+    try {
+      const loader = { load: jest.fn<() => Promise<string>>().mockRejectedValueOnce(new Error("ChunkLoadError")).mockResolvedValue("ok") };
+      thrownBy(() => suspendOn(loader));
+      await jest.advanceTimersByTimeAsync(SUSPEND_RETRY_MS);
+      // Le rechargement n'a pas eu lieu : le rendu suivant relance le chargement, qui réussit.
+      await expect(thrownBy(() => suspendOn(loader))).resolves.toBeUndefined();
+      expect(loader.load).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
@@ -285,5 +312,35 @@ describe("TournamentsTextProvider — espaces communs de la mise en page", () =>
       </TournamentsTextProvider>,
     );
     expect(html).toContain(`${FR.tournaments.rulesHelp.index}|${FR.tournaments.list.searchLabel}`);
+  });
+});
+
+describe("chaque vue ne lit que les clés de son espace (EF-17)", () => {
+  const DIR = "app/(secured)/tournois/[id]/";
+  /** Les clés de vue écrites en toutes lettres dans un fichier. */
+  function viewKeys(file: string): string[] {
+    return [...readSource(DIR + file).matchAll(/"((?:swiss|survival|endurance)\.[A-Za-z0-9.]+)"/g)].map((match) => match[1]);
+  }
+  function missingFrom(namespace: Record<string, unknown>, keys: string[]): string[] {
+    return keys.filter((key) => messageAt(namespace, key) === undefined);
+  }
+
+  it.each([
+    ["_components/EnduranceView.tsx"],
+    ["_components/EnduranceCard.tsx"],
+    ["_components/EnduranceRankingViews.tsx"],
+    ["_components/EnduranceRoundPanels.tsx"],
+    ["_components/EnduranceChartPanel.tsx"],
+    ["_lib/endurance-sections.ts"],
+  ])("%s : ses clés sont dans `tournamentEndurance` (pas celles du graphique)", (file) => {
+    expect(missingFrom(frEndurance, viewKeys(file))).toEqual([]);
+  });
+
+  it("EnduranceChart : ses clés sont dans l'endurance ou son graphique", () => {
+    expect(missingFrom({ endurance: { ...frEndurance.endurance, ...frEnduranceChart.endurance } }, viewKeys("_components/EnduranceChart.tsx"))).toEqual([]);
+  });
+
+  it.each([["_components/SwissView.tsx"], ["_components/SurvivalView.tsx"]])("%s : ses clés sont dans `tournamentViews`", (file) => {
+    expect(missingFrom(frViews, viewKeys(file))).toEqual([]);
   });
 });

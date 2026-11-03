@@ -10,7 +10,7 @@ jest.mock("next/headers", () => ({ headers: async () => new Headers(mockHeaders)
 let mockSignedIn = true;
 jest.mock("@/lib/server/auth", () => ({ getCurrentUser: async () => (mockSignedIn ? { id: 1 } : null) }));
 
-import { englishOnDocumentLoad, englishOnDocumentRequest, isDocumentLoad, isDocumentRequest } from "@/lib/server/layout-messages";
+import { englishOnDocumentLoad, isDocumentLoad } from "@/lib/server/layout-messages";
 
 beforeEach(() => {
   mockHeaders = {};
@@ -60,35 +60,5 @@ describe("englishOnDocumentLoad", () => {
     mockHeaders = { "x-bg-document": "1" };
     mockSignedIn = false;
     expect(await englishOnDocumentLoad("en", (all) => all.profile)).toBeUndefined();
-  });
-});
-
-describe("isDocumentRequest (EF-17, page sans compte)", () => {
-  it("isDocumentRequest_header1_true — sans session aussi", async () => {
-    mockSignedIn = false;
-    mockHeaders = { "x-bg-document": "1" };
-    expect(await isDocumentRequest()).toBe(true);
-  });
-
-  it("isDocumentRequest_header0OrMissing_false", async () => {
-    mockHeaders = { "x-bg-document": "0" };
-    expect(await isDocumentRequest()).toBe(false);
-    mockHeaders = {};
-    expect(await isDocumentRequest()).toBe(false);
-  });
-});
-
-describe("englishOnDocumentRequest (EF-17)", () => {
-  it("englishOnDocumentRequest_enDocument_returnsPickedWithoutUser", async () => {
-    mockSignedIn = false;
-    mockHeaders = { "x-bg-document": "1" };
-    expect(await englishOnDocumentRequest("en", (all) => all.profile.meta.title)).toBe("My profile");
-  });
-
-  it("englishOnDocumentRequest_frOrRouterRequest_undefined", async () => {
-    mockHeaders = { "x-bg-document": "1" };
-    expect(await englishOnDocumentRequest("fr", (all) => all.profile)).toBeUndefined();
-    mockHeaders = { "x-bg-document": "0" };
-    expect(await englishOnDocumentRequest("en", (all) => all.profile)).toBeUndefined();
   });
 });

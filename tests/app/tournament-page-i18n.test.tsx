@@ -356,10 +356,12 @@ describe("route et référencement", () => {
     mockDocument = "1";
     jest.mocked(getCurrentUser).mockResolvedValue(null);
     expect(await tournamentSheetEnglish("en")).toBeUndefined();
-    // Page sans compte : tout chargement complet porte l'anglais, une réponse du routeur non.
+    // Page sans compte : toujours l'anglais (robots, aperçus de lien, navigation sans écran d'attente).
     expect(await tournamentSheetEnglish("en", true)).toEqual(messages);
     mockDocument = "0";
-    expect(await tournamentSheetEnglish("en", true)).toBeUndefined();
+    expect(await tournamentSheetEnglish("en", true)).toEqual(messages);
+    mockDocument = "";
+    expect(await tournamentSheetEnglish("en", true)).toEqual(messages);
     // En français, jamais rien.
     mockDocument = "1";
     expect(await tournamentSheetEnglish("fr", true)).toBeUndefined();
