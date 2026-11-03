@@ -591,6 +591,13 @@ function RgpdFr({
               s&apos;il le trouve encore.
             </li>
             <li>
+              <strong>bg_reactivation</strong> — cookie httpOnly, sameSite=lax, déposé{" "}
+              <strong>seulement</strong> quand vous vous reconnectez à un compte dont la suppression est
+              demandée, et supprimé dès votre choix sur l&apos;écran de réactivation. Il dure quinze
+              minutes au plus et ne contient qu&apos;un jeton aléatoire à usage unique, dont nos serveurs
+              ne gardent que l&apos;empreinte (SHA-256).
+            </li>
+            <li>
               <strong>__Host-bg_oauth</strong> — déposé <strong>le temps d&apos;une connexion</strong>{" "}
               par Google, Discord ou Blizzard, et supprimé dès le retour. Il dure dix minutes
               au plus et ne contient qu&apos;un jeton aléatoire à usage unique (protection

@@ -67,8 +67,8 @@ export async function createAccountTables(db: Pool): Promise<void> {
       referee_objection_at DATETIME NULL,
       is_admin TINYINT(1) NOT NULL DEFAULT 0,
       is_deleted TINYINT(1) NOT NULL DEFAULT 0,
-      -- Suppression demandée, réversible 30 jours (\`ACCOUNT_DELETION.md\`) :
-      -- posée avec \`is_deleted = 1\`, remise à \`NULL\` à la réactivation comme à
+      -- Suppression demandée, réversible 30 jours (ACCOUNT_DELETION.md) :
+      -- posée avec is_deleted = 1, remise à NULL à la réactivation comme à
       -- l'effacement ou l'anonymisation définitifs.
       deletion_requested_at DATETIME NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

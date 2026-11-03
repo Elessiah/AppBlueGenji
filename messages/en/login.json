@@ -144,8 +144,8 @@
     "confirm": "Reactivate my account",
     "cancel": "Don't reactivate",
     "done": "Your account is reactivated.",
-    "expired": "This reactivation link has expired or was already used. Sign in again to get a new one.",
-    "backToLogin": "Back to sign-in",
-    "failed": "Reactivation failed. Sign in again to retry."
+    "expired": "This reactivation link has expired or was already used. Log in again to get a new one.",
+    "backToLogin": "Back to login",
+    "failed": "Reactivation failed. Log in again to retry."
   }
 }

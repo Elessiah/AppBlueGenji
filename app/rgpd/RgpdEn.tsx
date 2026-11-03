@@ -458,6 +458,12 @@ export function RgpdEn({
               still finds it.
             </li>
             <li>
+              <strong>bg_reactivation</strong> — httpOnly, sameSite=lax cookie, set <strong>only</strong> when you log in
+              again to an account whose deletion was requested, and deleted as soon as you choose on the reactivation
+              screen. It lasts fifteen minutes at most and only contains a single-use random token, of which our
+              servers only keep the hash (SHA-256).
+            </li>
+            <li>
               <strong>__Host-bg_oauth</strong> — set <strong>for the duration of a login</strong> through Google, Discord
               or Blizzard, and deleted on return. It lasts ten minutes at most and only contains a single-use random
               token (anti-CSRF protection), the provider&apos;s name, the page to bring you back to, the purpose of
