@@ -20,9 +20,9 @@ import type { TournamentBuckets } from "@/lib/shared/types";
  * chaque relecture resérialisait toute la liste (descriptions comprises) et la
  * renvoyait entière pour un corps que le client jette quand rien n'a changé.
  * La clé est l'objet lui-même : vidée, la liste en recrée un, l'ancien corps
- * part avec lui. Seules les listes publiques mutualisées rendent le même objet ;
- * la portée `hidden` en rebâtit un à chaque appel (miss, sans gain mais sans
- * erreur : l'empreinte se déduit du corps, deux objets égaux ont la même).
+ * part avec lui. Seules les listes publiques mutualisées passent par ici : la
+ * portée `hidden` (non publiée) sort plus tôt, en `no-store` et **sans**
+ * empreinte — n'y en remettre aucune (copie sur le disque d'un poste partagé).
  */
 const serializedLists = new WeakMap<TournamentBuckets, { body: string; etag: string }>();
 

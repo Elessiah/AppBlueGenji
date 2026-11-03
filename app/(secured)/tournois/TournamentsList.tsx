@@ -176,7 +176,17 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   // Droit staff lu par le serveur (`page.tsx`), connu dès le premier rendu :
   // plus de lecture `/api/auth/me` en chaîne qui décalait « Créer » et la
   // section des invisibles. Sans ce droit, rien à attendre de ce côté.
-  const isAdmin = canManage;
+  // Un refus des invisibles (droit retiré depuis le rendu, session échue) le
+  // retire aussi à la page : plus de lecture refusée à chaque rafraîchissement
+  // (quota compris), plus de « Créer », cadence joueur. Un nouveau droit lu
+  // par le serveur (`router.refresh()`) rend la main au prop.
+  const [staffRevoked, setStaffRevoked] = useState(false);
+  const [revokedFor, setRevokedFor] = useState(canManage);
+  if (revokedFor !== canManage) {
+    setRevokedFor(canManage);
+    setStaffRevoked(false);
+  }
+  const isAdmin = canManage && !staffRevoked;
   // La première lecture des invisibles fait partie de la porte : sans elle, la
   // section s'affichait sous le squelette ou naissait au sommet et poussait les
   // autres sections vers le bas.
@@ -294,6 +304,7 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
         // « FORBIDDEN » sur une simple liste ne dirait rien au lecteur.
         if (code === "FORBIDDEN" || code === "UNAUTHORIZED") {
           setHiddenTournaments((previous) => (previous.length === 0 ? previous : []));
+          setStaffRevoked(true);
           return;
         }
         if (silent) return;
