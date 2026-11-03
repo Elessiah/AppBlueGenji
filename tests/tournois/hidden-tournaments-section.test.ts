@@ -112,3 +112,21 @@ describe("StateCard — rendu non filtré", () => {
     expect(stateCard).toMatch(/export function StateCard\(/);
   });
 });
+
+describe("page tournois — échecs de lecture de la liste", () => {
+  it("retombe sur un code quand la réponse n'est pas du JSON (page d'erreur du proxy)", () => {
+    expect(page).toMatch(
+      /async function fetchBuckets\([\s\S]{0,900}?await response\.json\(\)\.catch\(\(\) => \(\{\}\)\)[\s\S]{0,300}?"TOURNAMENT_LIST_FAILED"/,
+    );
+  });
+
+  it("vide les invisibles sans toast quand le droit est refusé", () => {
+    expect(page).toMatch(
+      /if \(code === "FORBIDDEN" \|\| code === "UNAUTHORIZED"\) \{\s*setHiddenTournaments\([^\n]*\);\s*return;\s*\}/,
+    );
+  });
+
+  it("signale les autres échecs des invisibles, sauf en lecture de fond", () => {
+    expect(page).toMatch(/return;\s*\}\s*if \(silent\) return;\s*showError\(code\);/);
+  });
+});

@@ -10,6 +10,7 @@ import type { TournamentBuckets } from "@/lib/shared/types";
 
 type User = Awaited<ReturnType<typeof getCurrentUser>>;
 const player = { id: 4, isAdmin: false, roles: [] } as unknown as User;
+const arbitre = { id: 2, isAdmin: false, roles: ["ARBITRE"] } as unknown as User;
 
 function buckets(): TournamentBuckets {
   return { upcoming: [], registration: [], running: [], finished: [] };
@@ -107,5 +108,25 @@ describe("GET /api/tournaments — empreinte et 304", () => {
 
     expect(res.status).toBe(403);
     expect(service.listTournamentBuckets).not.toHaveBeenCalled();
+  });
+
+  it("rend les invisibles au staff sans empreinte et sans copie gardée par le navigateur", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+
+    const res = await get({}, "/api/tournaments?scope=hidden");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+    expect(res.headers.get("etag")).toBeNull();
+    expect(await res.json()).toEqual({ buckets: buckets() });
+  });
+
+  it("ne rend jamais 304 aux invisibles, même au joker", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+
+    const res = await get({ "If-None-Match": "*" }, "/api/tournaments?scope=hidden");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ buckets: buckets() });
   });
 });
