@@ -521,10 +521,19 @@ describe("politique du bot — messages d'équipe (TEAM-INVITE-NOTIFY)", () => {
     expect(en).toContain("join request, team invitation, takeover or ownership, data-protection notice) by direct message");
   });
 
-  it("terms_article01_unchangedUnderTermsV8", () => {
-    expect(JSON.stringify(TERMS_OF_SERVICE.fr)).not.toContain("invitations d'équipe");
-    expect(JSON.stringify(TERMS_OF_SERVICE.en)).not.toContain("team invitations");
-    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["29 octobre 2026", "29 October 2026"]);
+  // Conditions v9 (ERASURE-D2, décision T2 du 2026-11-03) : l'article 01 cite
+  // les messages d'équipe remis en privé, et la reprise ne nomme qu'« un admin ».
+  it("terms_article01_listsTeamNoticesUnderTermsV9FrAndEn", () => {
+    const article01 = (lang: "fr" | "en") => JSON.stringify(TERMS_OF_SERVICE[lang].sections[0]);
+    expect(article01("fr")).toContain("demandes d'adhésion à une équipe, invitations d'une équipe, reprises d'une équipe fantôme que le staff propose et propriétés d'équipe transférées (qui ne nomment que l'équipe — une reprise cite « un admin », sans nommer personne) et informations sur les données.");
+    expect(article01("en")).toContain("team join requests, team invitations, takeovers of a ghost team offered by the staff and team ownership transfers (which only name the team — a takeover mentions “an admin”, naming no one) and data-protection notices.");
+    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["5 novembre 2026", "5 November 2026"]);
+  });
+
+  it("terms_article01_neverNamesWhoInvitesOrOffersFrAndEn", () => {
+    const fr = JSON.stringify(TERMS_OF_SERVICE.fr);
+    expect(fr).not.toMatch(/vous propose de reprendre/);
+    expect(fr).not.toMatch(/pseudo de (l'admin|qui invite)/);
   });
 });
 
@@ -571,11 +580,10 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
   // TERMS v7 : l'article 01 des conditions du bot cite les réglages du salon
   // (MATCH-REFEREE MR-4) parmi les messages de match remis, réservés aux tags
   // certifiés comme les autres ; datée du lendemain de la mise en ligne du 28 octobre.
-  it("les conditions du bot citent les réglages du salon parmi les messages de match remis, datées du 29 octobre 2026 (FR et EN)", () => {
+  it("les conditions du bot citent les réglages du salon parmi les messages de match remis (FR et EN)", () => {
     const terms = { fr: JSON.stringify(TERMS_OF_SERVICE.fr), en: JSON.stringify(TERMS_OF_SERVICE.en) };
     expect(terms.fr).toMatch(/rappels de match, réglages du salon d'un match, avis de retrait d'un match \(« Match retiré »\) et avis envoyé à un caster dont l'inscription est retirée par un autre que lui — ces messages de match aux seuls comptes dont le tag Discord est certifié/);
     expect(terms.en).toMatch(/match reminders, the lobby settings of a match, notices of removal from a match \(“Match retiré”\) and the notice sent to a caster whose registration for a match is removed by someone else — these match messages only to accounts with a Discord tag certified/);
-    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["29 octobre 2026", "29 October 2026"]);
   });
 
   it("déclare qu'un blocage ou un signalement AutoMod peut porter l'annonce #live aux modérateurs (FR et EN)", () => {

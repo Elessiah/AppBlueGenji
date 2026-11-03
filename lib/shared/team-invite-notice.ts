@@ -179,7 +179,7 @@ export function formatTeamInviteNotice(
     case "INVITE":
       return `📨 BlueGenji — L'équipe « ${team} » t'invite à la rejoindre. Accepte ou refuse depuis ton profil : ${url}`;
     case "GHOST_CLAIM":
-      return `📨 BlueGenji — Un admin vous propose de reprendre l'équipe [${team}](${url})`;
+      return `📨 BlueGenji — Un admin te propose de reprendre l'équipe [${team}](${url})`;
     case "OWNERSHIP":
       return `👑 BlueGenji — La propriété de ton équipe « ${team} » vient de t'être transférée. Tu gères désormais son nom, son sigle et ses membres : ${url}`;
   }

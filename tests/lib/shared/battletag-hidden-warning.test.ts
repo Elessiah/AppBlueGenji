@@ -74,13 +74,14 @@ describe("avertissement du BattleTag masqué", () => {
   });
 });
 
-describe("conditions d'utilisation — contacts de match (version 7)", () => {
+describe("conditions d'utilisation — contacts de match (version 9)", () => {
   const fr = TERMS_SECTIONS.find((s) => s.id === "contacts-de-match");
   const en = TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match");
 
   it("prévoit le partage des contacts aux deux équipes, et aux casters le temps du match seulement", () => {
     const text = fr?.paragraphs.join(" ") ?? "";
-    expect(text).toContain("**tag Discord** certifié, **BattleTag**, **même masqué**, et **rôle d'équipe**");
+    // Version 9 : aucun BattleTag n'est présenté en Marvel Rivals (`withGameBattletag`).
+    expect(text).toContain("**tag Discord** certifié, **BattleTag** — dans un tournoi Overwatch seulement —, **même masqué**, et **rôle d'équipe**");
     expect(text).toContain("aux **membres des deux équipes** du match et aux **arbitres** (administrateurs compris), dès que ses deux adversaires sont connus et jusqu'à sa fin");
     // Version 7 : casters au pluriel, chacun voyant aussi les contacts des autres casters du match.
     expect(text).toContain("à ses **casters** inscrits — un match peut en avoir plusieurs — **le temps du match** seulement, de son départ à sa fin");
@@ -93,8 +94,10 @@ describe("conditions d'utilisation — contacts de match (version 7)", () => {
     expect(enProfile.battletagNotice.outro).toContain("after adding another way to log in if it is your only one");
     expect(frProfile.battletagLock.change).toContain("après avoir ajouté un autre moyen de connexion si c'est le seul");
     expect(enProfile.battletagLock.change).toContain("after adding another way to log in if it is your only one");
-    // Version 7 : la page du match est le troisième lieu de ce partage, sans les contacts des équipes.
-    expect(text).toContain("Ce partage passe par la fenêtre « Contacts » du match, par sa fenêtre de lancement, qui la reprend au départ du match et ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné, et par la **page du match**, qui reprend les contacts des casters et le pseudo et le BattleTag de l'arbitre désigné — jamais les contacts des équipes — aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts » : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris.");
+    // Version 9 (T3) : trois écrans ; la page du match montre aux seules parties les contacts des équipes (#531).
+    expect(text).toContain("Ce partage passe par trois écrans. La fenêtre « Contacts » du match. Sa **fenêtre de lancement**, qui la reprend au départ du match et ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné — les autres arbitres ne lisent ces contacts que dans la fenêtre « Contacts » — et qui ne montre jamais le tag Discord de l'arbitre désigné, sauf s'il caste aussi le match (règle des casters).");
+    expect(text).toContain("aux seules parties du match (membres de ses deux équipes, ses casters, son arbitre désigné), les contacts des deux équipes et le tag Discord certifié de l'arbitre désigné. Un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris.");
+    expect(text).not.toContain("jamais les contacts des équipes");
     expect(text).toContain("celles de chaque caster le sont aux deux équipes et aux **autres casters** du match sur ce même temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin");
     expect(text).toContain("Masquer son BattleTag ne le retire donc ni de ces fenêtres ni de cette page");
     expect(text).toContain("le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi");
@@ -116,12 +119,14 @@ describe("conditions d'utilisation — contacts de match (version 7)", () => {
     expect(JSON.stringify(PRIVACY_CHANGES.find((c) => c.id === "2026-10-contacts-de-match-caster-et-conditions-v5"))).toContain("après avoir ajouté un autre moyen de connexion si c'est le seul");
     expect(text).toContain("once the Battle.net account is unlinked, which requires another means of logging in; a hand-typed BattleTag, which the site keeps when Battle.net gives none, can still be changed or erased from the profile, without being treated as verified)");
     expect(text).toContain("**only while the match is being played**, from its start to its end");
-    expect(text).toContain("a hidden BattleTag is readable nowhere else on the site, by anyone — referees and administrators included");
+    expect(text).toContain("A hidden BattleTag cannot be read anywhere else on the site, by anyone — referees and administrators included");
     // Le jeu affiche les identifiants : le code de replay le dit (FR et EN), comme /rgpd.
     expect(text).toContain("a map's replay code, visible to any logged-in user on the tournament page");
     expect(text).toContain("each caster's is shared with both teams and with the **other casters** of the match over that same match time, and with the referees from the moment both its opponents are known until its end");
     expect(text).toContain("and with its registered **casters** — a match may have several — **only while the match is being played**");
-    expect(text).toContain("and through the **match page**, which repeats the casters' contacts and the assigned referee's username and BattleTag — never the teams' contacts — to the same people at the same times as the “Contacts” window");
+    expect(text).toContain("And the **match page**, which repeats, to the same people and at the same times as the “Contacts” window, the casters' contacts and the assigned referee's username (their BattleTag in an Overwatch tournament) and, to the parties to the match alone (members of both its teams, its casters, its assigned referee), both teams' contacts and the assigned referee's certified Discord tag.");
+    expect(text).toContain("— the other referees read these contacts in the “Contacts” window only —");
+    expect(text).not.toContain("never the teams' contacts");
     expect(text).toContain("Hiding a BattleTag therefore removes it neither from these windows nor from this page");
     expect(en?.paragraphs).toHaveLength(fr?.paragraphs.length ?? -1);
   });
@@ -200,15 +205,28 @@ describe("page du match (#489) : chaque avertissement du BattleTag masqué la no
 });
 
 // TERMS v7 : l'arbitre désigné entre dans la section « Contacts de match ».
-describe("conditions d'utilisation — arbitre désigné (version 7)", () => {
+describe("conditions d'utilisation — arbitre désigné (version 9)", () => {
   const fr = TERMS_SECTIONS.find((s) => s.id === "contacts-de-match")?.paragraphs.join(" ") ?? "";
   const en = TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match")?.paragraphs.join(" ") ?? "";
 
-  it("présente son pseudo et son BattleTag, jamais son tag Discord, aux équipes et aux arbitres dès que les adversaires sont connus, aux casters le temps du match (FR et EN)", () => {
-    expect(fr).toContain("Un match peut aussi avoir un **arbitre désigné** : une personne du staff habilitée à arbitrer (permission d'arbitrage, tag Discord certifié et BattleTag tiré d'un compte Battle.net rattaché — un BattleTag tapé à la main n'y suffit pas)");
-    expect(fr).toContain("son **pseudo** et son **BattleTag**, **même masqué** — jamais son tag Discord à ce titre — sont communiqués aux membres des deux équipes et aux arbitres (administrateurs compris) dès que ses deux adversaires sont connus et jusqu'à sa fin, et aux casters du match le temps du match");
-    expect(en).toContain("A match may also have an **assigned referee**: a staff member entitled to referee (refereeing permission, certified Discord tag and a BattleTag taken from a linked Battle.net account — a hand-typed BattleTag is not enough)");
-    expect(en).toContain("their **username** and **BattleTag**, **even when hidden** — never their Discord tag in that capacity — are shared with the members of both teams and with the referees (administrators included) from the moment both its opponents are known until its end, and with the casters of the match while the match is being played");
+  it("présente son pseudo, son BattleTag en Overwatch et son tag Discord certifié aux seules parties, Battle.net exigé en Overwatch seulement (FR et EN)", () => {
+    expect(fr).toContain("Un match peut aussi avoir un **arbitre désigné** : une personne du staff habilitée à arbitrer (permission d'arbitrage et tag Discord certifié ; pour un match Overwatch, aussi un BattleTag tiré d'un compte Battle.net rattaché — un BattleTag tapé à la main n'y suffit pas)");
+    expect(fr).toContain("son **pseudo** et, dans un tournoi Overwatch seulement, son **BattleTag**, **même masqué** — et son **tag Discord certifié**, aux seules parties du match (membres de ses deux équipes, ses casters), aux mêmes moments, ce partage étant strictement nécessaire au fonctionnement minimum du service —, sont communiqués aux membres des deux équipes et aux arbitres (administrateurs compris) dès que ses deux adversaires sont connus et jusqu'à sa fin, et aux casters du match le temps du match");
+    expect(fr).not.toContain("jamais son tag Discord à ce titre");
+    expect(en).toContain("A match may also have an **assigned referee**: a staff member entitled to referee (refereeing permission and certified Discord tag; for an Overwatch match, also a BattleTag taken from a linked Battle.net account — a hand-typed BattleTag is not enough)");
+    expect(en).toContain("their **username** and, in an Overwatch tournament only, their **BattleTag**, **even when hidden** — and their **certified Discord tag**, to the parties to the match alone (members of both its teams, its casters), at the same times, this sharing being strictly necessary for the minimum functioning of the service — are shared with the members of both teams and with the referees (administrators included) from the moment both its opponents are known until its end, and with the casters of the match while the match is being played");
+    expect(en).not.toContain("never their Discord tag in that capacity");
+  });
+
+  it("lie le passage d'opposition de l'arbitre désigné et celui des salons vocaux (FR et EN)", () => {
+    const frLinks = TERMS_SECTIONS.find((s) => s.id === "contacts-de-match")?.links?.map((l) => l.href);
+    const enLinks = TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match")?.links?.map((l) => l.href);
+    expect(frLinks).toEqual(["/rgpd#donnees-collectees", "/rgpd#arbitre-designe", "/rgpd#salons-vocaux"]);
+    expect(enLinks).toEqual(frLinks);
+    expect(readSource("app/rgpd/page.tsx")).toContain('id="arbitre-designe"');
+    expect(readSource("app/rgpd/page.tsx")).toContain('id="salons-vocaux"');
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain('id="arbitre-designe"');
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain('id="salons-vocaux"');
   });
 
   it("ne montre au public que « Arbitre désigné », et dit le retrait et la fin de la présentation (FR et EN)", () => {
@@ -222,8 +240,8 @@ describe("conditions d'utilisation — arbitre désigné (version 7)", () => {
     expect(en).toContain("visitors without an account only read “Referee assigned”.");
     // Revue juridique de #491 : un arbitre qui caste aussi le match est présenté comme caster, tag Discord certifié compris.
     expect(fr).toContain("S'il caste aussi le match, ses contacts de caster, tag Discord certifié compris, suivent la règle des casters ci-dessus.");
-    expect(fr).toContain("qui reprend les contacts des casters et le pseudo et le BattleTag de l'arbitre désigné");
-    expect(en).toContain("which repeats the casters' contacts and the assigned referee's username and BattleTag");
+    expect(fr).toContain("les contacts des casters et le pseudo de l'arbitre désigné (son BattleTag dans un tournoi Overwatch)");
+    expect(en).toContain("the casters' contacts and the assigned referee's username (their BattleTag in an Overwatch tournament)");
     expect(en).toContain("If they also cast the match, their caster contacts, certified Discord tag included, follow the casters' rule above.");
     expect(en).toContain("The referee can withdraw from a match at any time, the staff being able to assign it to them again; they are no longer presented if they no longer meet these requirements or if, before the match is launched, they become one of its players.");
   });

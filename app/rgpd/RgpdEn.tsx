@@ -932,9 +932,12 @@ export function RgpdEn({
             and hand-back times), erased with the channel or when it forgets it — kept with no limit while the channel, never handed back, stays occupied, or while it reads it without being able to delete
             it or while Discord answers it with another error — (apart from the encrypted backup copies). Its other periods
             hold to within one sweep (at most {VOICE_BOT_SWEEP_MINUTES} minutes more). Discord&apos;s audit log keeps the creation and
-            deletion of each channel, with its name, readable by the server&apos;s administration, for the period Discord sets. This count rests on
-            <strong> legitimate interest</strong> (smooth running of tournaments: gathering each team before its match); joining a
-            channel remains a choice — but until both are full, the match waits for referees to force its launch —, and only the presence of those who join it is counted; you can object to this processing (section “Your rights”) (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
+            deletion of each channel, with its name, readable by the server&apos;s administration, for the period Discord sets. Since 5 November 2026, this count rests on
+            the <strong>performance of the contract</strong>: in a tournament with the option, gathering each team in its channel before its match is part of the{" "}
+            <strong>tournament rules</strong> (“Match contacts” section of the{" "}
+            <LocaleLink href="/conditions-utilisation#contacts-de-match">terms of use</LocaleLink>) — until both channels are full, the match waits for referees to force its
+            launch —, and only the presence of those who join it is counted; it therefore has no right to object of its own: a team that does not want to abide by it
+            does not register for that tournament, or withdraws from it (before that date: legitimate interest, with a right to object) (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
           </p>
         </div>
       </section>

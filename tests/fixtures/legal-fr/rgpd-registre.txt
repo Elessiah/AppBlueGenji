@@ -674,7 +674,7 @@ Demander au bot Discord de l'association, à partir de 15 minutes avant l'heure 
 Faire compter par le bot le nombre de personnes présentes dans chaque salon, pour retenir le lancement du match jusqu'à ce que les deux soient pleins (l'arbitrage peut le forcer ; si le bot ne répond pas, le match n'attend pas), et montrer « Salon vocal : n/5 » aux parties du match (membres des deux équipes, casters) et au staff
 Rendre les salons au bot quand le match est terminé (score validé), annulé, retombé en attente ou sorti du programme, quand l'équipe sort de l'appariement, ou quand le tournoi se termine ou éteint l'option ; le bot supprime un salon dès qu'il est vide
 Base légale
-Intérêt légitime (bon déroulement des tournois : réunir chaque équipe avant son match) ; rejoindre un salon reste un choix — mais tant que les deux ne sont pas pleins, le match attend que l'arbitrage force son lancement —, et seule la présence de qui le rejoint est comptée
+Exécution du contrat, depuis le 5 novembre 2026 : dans un tournoi qui a l'option, réunir chaque équipe dans son salon avant son match fait partie du règlement du tournoi (conditions d'utilisation, section « Contacts de match ») — tant que les deux salons ne sont pas pleins, le match attend que l'arbitrage force son lancement —, et seule la présence de qui le rejoint est comptée ; sans droit d'opposition propre : une équipe qui ne veut pas s'y plier ne s'inscrit pas à ce tournoi, ou s'en retire (avant cette date : intérêt légitime, bon déroulement des tournois, avec droit d'opposition)
 Personnes concernées
 Membres des équipes engagées dans un match
 Toute personne qui rejoint un salon vocal d'équipe sur le serveur Discord de l'association

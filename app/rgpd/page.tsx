@@ -1122,9 +1122,11 @@ function RgpdFr({
             l&apos;équipe, heures de création et de rendu), effacée avec le salon ou quand il l&apos;oublie — gardée sans limite tant que le salon, jamais rendu, reste occupé, qu&apos;il le lit sans pouvoir le supprimer ou que
             Discord lui répond par une autre erreur — (hors les copies de sauvegarde chiffrées). Ses autres délais s&apos;entendent à un
             balayage près (au plus {VOICE_BOT_SWEEP_MINUTES} minutes de plus). Le journal d&apos;audit de Discord garde la création et la
-            suppression de chaque salon, avec son nom, lisible par l&apos;administration du serveur, pour la durée que Discord fixe. Ce comptage relève de l&apos;<strong>intérêt légitime</strong> (bon déroulement des tournois : réunir
-            chaque équipe avant son match) ; rejoindre un salon reste un choix — mais tant que les deux ne sont pas pleins, le match attend
-            que l&apos;arbitrage force son lancement —, et seule la présence de qui le rejoint est comptée ; vous pouvez vous opposer à ce traitement (section « Vos droits ») (<Link href="/rgpd/registre#t18">registre, T18</Link>).
+            suppression de chaque salon, avec son nom, lisible par l&apos;administration du serveur, pour la durée que Discord fixe. Depuis le 5 novembre 2026, ce comptage relève de l&apos;<strong>exécution du contrat</strong> : dans un tournoi qui a
+            l&apos;option, réunir chaque équipe dans son salon avant son match fait partie du <strong>règlement du tournoi</strong> (section « Contacts de match » des{" "}
+            <Link href="/conditions-utilisation#contacts-de-match">conditions d&apos;utilisation</Link>) — tant que les deux salons ne sont pas pleins, le match attend
+            que l&apos;arbitrage force son lancement —, et seule la présence de qui le rejoint est comptée ; il n&apos;a donc pas de droit d&apos;opposition propre : une équipe
+            qui ne veut pas s&apos;y plier ne s&apos;inscrit pas à ce tournoi, ou s&apos;en retire (avant cette date : intérêt légitime, avec droit d&apos;opposition) (<Link href="/rgpd/registre#t18">registre, T18</Link>).
           </p>
         </div>
       </section>

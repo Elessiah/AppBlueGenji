@@ -20,7 +20,7 @@ import {
   REGISTER_UPDATED_AT,
 } from "@/lib/shared/processing-register";
 import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
-import { SITE_MINIMUM_AGE, TERMS_PATH, TERMS_UPDATED_AT, TERMS_VERSION, formatTermsDate } from "@/lib/shared/terms-of-use";
+import { SITE_MINIMUM_AGE, TERMS_PATH, TERMS_VERSION, formatTermsDate } from "@/lib/shared/terms-of-use";
 import { PUSH_TOPICS } from "@/lib/shared/push-notifications";
 import { MATCH_REMINDER_LOOKAHEAD_MS } from "@/lib/shared/discord-notifications";
 import { PRIVACY_CHANGES_EN, localizedPrivacyChanges, type PrivacyChangeTranslation } from "@/lib/shared/privacy-changes-en";
@@ -2094,7 +2094,8 @@ describe("PRIVACY_CHANGES — pseudo de l'arbitre lu par les membres connectés 
   it("privacyChanges_refereeUsernameToMembers_leavesPublishedOppositionEntryIntact", () => {
     const older = PRIVACY_CHANGES.find((c) => c.id === "2026-10-opposition-arbitre-retrait-des-matchs")!;
     expect(older.publishedAt).toBe("2026-10-30");
-    expect(PRIVACY_CHANGES.indexOf(older)).toBe(PRIVACY_CHANGES.length - 13);
+    // Positions relatives (et non depuis la fin) : la liste grandit à chaque lot.
+    expect(PRIVACY_CHANGES.indexOf(older)).toBe(PRIVACY_CHANGES.findIndex((c) => c.id === "2026-10-roles-de-plateforme-journal-du-staff") - 2);
   });
 });
 
@@ -2104,7 +2105,7 @@ describe("PRIVACY_CHANGES — rôles de plateforme au journal du staff (ADMIN-SE
   const english = PRIVACY_CHANGES_EN[id];
 
   it("privacyChanges_platformRolesLog_dated1031ForAllAccountsWithRegisterLink", () => {
-    expect(PRIVACY_CHANGES.at(-11)).toBe(entry);
+    expect(PRIVACY_CHANGES[PRIVACY_CHANGES.indexOf(entry) + 1]?.id).toBe("2026-10-battletag-tape-garde-non-verifie");
     expect(entry.publishedAt).toBe("2026-10-31");
     expect(entry.audience).toBeUndefined();
     expect(entry.links).toEqual([{ href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" }]);
@@ -2131,7 +2132,7 @@ describe("PRIVACY_CHANGES — rôles de plateforme au journal du staff (ADMIN-SE
   });
 
   it("privacyChanges_platformRolesLog_leavesPublishedEntriesBeforeIt", () => {
-    const previous = PRIVACY_CHANGES[PRIVACY_CHANGES.length - 12];
+    const previous = PRIVACY_CHANGES[PRIVACY_CHANGES.indexOf(entry) - 1];
     expect(previous.id).toBe("2026-10-pseudo-arbitre-aux-membres");
     expect(PRIVACY_CHANGES.filter((c) => c.publishedAt > "2026-10-30").map((c) => c.id)).toContain(id);
   });
@@ -2156,8 +2157,8 @@ describe("PRIVACY_CHANGES — BattleTag tapé gardé, jamais vérifié (D3)", ()
   const english = PRIVACY_CHANGES_EN[id];
 
   it("privacyChanges_typedBattletagKept_precedesTermsV8Dated1031ForAllAccounts", () => {
-    expect(PRIVACY_CHANGES.at(-10)).toBe(entry);
-    expect(PRIVACY_CHANGES.at(-11)?.id).toBe("2026-10-roles-de-plateforme-journal-du-staff");
+    expect(PRIVACY_CHANGES[PRIVACY_CHANGES.indexOf(entry) + 1]?.id).toBe("2026-10-conditions-v8-arbitre-et-battletag");
+    expect(PRIVACY_CHANGES[PRIVACY_CHANGES.indexOf(entry) - 1]?.id).toBe("2026-10-roles-de-plateforme-journal-du-staff");
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
     expectStandaloneEntry(entry, english, {
       after: "2026-10-roles-de-plateforme-journal-du-staff",
@@ -2230,8 +2231,9 @@ describe("PRIVACY_CHANGES — conditions v8 : arbitre désigné et BattleTag tap
 
   it("privacyChanges_termsV8_asksAcceptanceAndStatesVersionAndDateFrAndEn", () => {
     expect(entry.asksTermsAcceptance).toBe(true);
-    expect([TERMS_VERSION, TERMS_UPDATED_AT]).toEqual([8, entry.publishedAt]);
-    expect(entry.details.at(-1)).toContain(`version ${TERMS_VERSION}, en vigueur depuis le ${formatTermsDate(TERMS_UPDATED_AT)}`);
+    // Entrée publiée, figée : elle annonce la version 8, que la version 9 a remplacée depuis.
+    expect(TERMS_VERSION).toBeGreaterThan(8);
+    expect(entry.details.at(-1)).toContain(`version 8, en vigueur depuis le ${formatTermsDate(entry.publishedAt)}`);
     expect(english.details.at(-1)).toContain("version 8, in force since 31 October 2026");
     expect(entry.summary).toContain("Elle est à accepter : une fenêtre te la présente tant que tu ne l'as pas acceptée.");
     expect(english.summary).toContain("It must be accepted: a window presents it to you until you have accepted it.");
@@ -2397,11 +2399,17 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     expect(en.details.join(" ")).toContain("You can object to this processing");
   });
 
-  it("processingRegister_t18_legalBasisClaimsNoRulebookRequirementFrAndEn", () => {
+  // Décision V6 (2026-11-03) : le salon vocal est une règle du tournoi —
+  // la base passe au contrat, sans droit d'opposition (avant : intérêt légitime).
+  it("processingRegister_t18_legalBasisIsContractTournamentRulesNoObjectionFrAndEn", () => {
     const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
     const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
-    expect(t18.legalBasis).not.toContain("règlement");
-    expect(t18En.legalBasis).not.toContain("rulebook");
+    expect(t18.legalBasis).toMatch(/^Exécution du contrat, depuis le 5 novembre 2026 : .*règlement du tournoi/);
+    expect(t18.legalBasis).toContain("sans droit d'opposition propre : une équipe qui ne veut pas s'y plier ne s'inscrit pas à ce tournoi, ou s'en retire");
+    expect(t18.legalBasis).toContain("(avant cette date : intérêt légitime");
+    expect(t18En.legalBasis).toMatch(/^Performance of the contract, since 5 November 2026: .*tournament rules/);
+    expect(t18En.legalBasis).toContain("with no right to object of its own: a team that does not want to abide by it does not register for that tournament, or withdraws from it");
+    expect(t18En.legalBasis).toContain("(before that date: legitimate interest");
   });
 
   it("processingRegister_t18_botDurationsComeFromTheirConstantsFrAndEn", () => {

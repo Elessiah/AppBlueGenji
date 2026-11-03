@@ -164,6 +164,17 @@
       ]
     },
     {
+      "title": "Team voice channels",
+      "body": [
+        "A tournament can turn on the “Team voice channels” option (off by default, see its settings). It is then part of its <b>rules</b>: from {voiceLead} minutes before each match's time, the association's Discord bot opens a {voiceCapacity}-seat voice channel named after each of the two teams, and each team gathers there before playing."
+      ],
+      "bullets": [
+        "The match only launches once both channels are full: until then, it waits for a referee to force its launch. If the bot doesn't answer, the match doesn't wait.",
+        "The bot counts the people present in each channel — a number, never who. This count is part of the rules, with no right to object of its own: a team that does not want to abide by it does not register for that tournament, or withdraws from it.",
+        "No channel is opened for a solo entry nor for a match against a ghost team."
+      ]
+    },
+    {
       "title": "Match format",
       "body": [
         "The match format (Bo — maximum number of maps — or FT — number of maps to win) is set when the tournament is created and applies to the whole tournament. Without a setting, any score can be entered (free score entry)."
