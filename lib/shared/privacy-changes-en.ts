@@ -767,12 +767,12 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
   },
   "2026-11-battlenet-requis-overwatch-seulement": {
-    linkLabels: ["Read the “Assigned referee of a match” paragraph"],
+    linkLabels: ["Read the requirements for casting a match", "Read the “Assigned referee of a match” paragraph"],
     title: "Casting or refereeing: Battle.net required in Overwatch only",
     summary:
       "To cast or referee a Marvel Rivals match, a certified Discord tag is now enough: a linked Battle.net account is no longer required. For an Overwatch match, nothing changes.",
     details: [
-      "What changes: for a Marvel Rivals match, the site no longer checks that your Battle.net account is linked nor that your BattleTag comes from it; it no longer uses that BattleTag for these matches and does not show it in them. For an Overwatch match, the requirement stays: a certified Discord tag and a BattleTag taken from a linked Battle.net account.",
+      "What changes: for a Marvel Rivals match, the site no longer checks that your Battle.net account is linked nor that your BattleTag comes from it; it no longer takes it into account for these matches and does not show it in them. For an Overwatch match, the requirement stays: a certified Discord tag and a BattleTag taken from a linked Battle.net account.",
       "What doesn't change: nothing new is collected or kept, and what the teams and casters see of you on a match is unchanged.",
     ],
   },
@@ -780,9 +780,9 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     linkLabels: ["Read the “Assigned referee of a match” paragraph"],
     title: "Assigned referee: the basis for presenting your Discord tag",
     summary:
-      "When you referee a match, presenting your certified Discord tag to both its teams and its casters now rests on performance of the service, no longer on legitimate interest: without it, the parties to the match cannot reach you.",
+      "If you referee a match, presenting your certified Discord tag to both its teams and its casters now rests on performance of the service, no longer on legitimate interest: without it, the parties to the match cannot reach you.",
     details: [
-      "What changes: only the legal basis of this presentation, deemed strictly necessary for the minimum functioning of the service.",
+      "What changes: the legal basis of this presentation, deemed strictly necessary for the minimum functioning of the service, once version 7 of the terms or a later one is accepted (before that, legitimate interest, with the same right to object); it therefore has no objection of its own any more and is no longer listed under “Right to object”.",
       "What doesn't change: nothing new is collected or shown, to the same people at the same times; your objection to refereeing (report form, GDPR category), once upheld, still removes you from your unfinished matches, this tag included.",
     ],
   },

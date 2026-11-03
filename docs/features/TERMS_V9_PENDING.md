@@ -76,7 +76,10 @@ lancement.
 **Décision prise (T1, 2026-11-03)** : la base du tag Discord de l'arbitre est le
 **fonctionnement minimum nécessaire** du service — FR « strictement nécessaire à son
 fonctionnement minimum », EN "strictly necessary for its minimum functioning" —,
-soit l'exécution du service, et non plus l'intérêt légitime posé depuis #531. Elle
+soit l'exécution du service, et non plus l'intérêt légitime posé depuis #531 —
+pour un arbitre qui a accepté la v7 ou une suivante, comme le reste de sa
+présentation (avant : intérêt légitime, même droit d'opposition) ; ce tag n'a plus
+d'opposition propre (retiré du « Droit d'opposition »). Elle
 ne dépend pas de l'acceptation de la v9 : `/rgpd` (FR + EN), le registre (T04,
 `frEn`) et le tableau de `/rgpd` (`REFEREE_DISCORD_SCOPE`, base « Exécution du
 contrat ») le disent depuis ce lot, avec l'entrée `PRIVACY_CHANGES`

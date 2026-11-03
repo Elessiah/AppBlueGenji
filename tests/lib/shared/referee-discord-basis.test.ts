@@ -122,7 +122,44 @@ describe("Textes juridiques alignés sur le code (revue juridique #545)", () => 
     const fr = PRIVACY_CHANGES.find((change) => change.id === "2026-11-battlenet-requis-overwatch-seulement");
     const en = PRIVACY_CHANGES_EN["2026-11-battlenet-requis-overwatch-seulement"];
     expect(JSON.stringify(fr)).not.toContain("ne lit plus ce BattleTag");
-    expect(JSON.stringify(fr)).toContain("ne se sert plus de ce BattleTag pour ces matchs");
-    expect(JSON.stringify(en)).toContain("no longer uses that BattleTag for these matches");
+    expect(JSON.stringify(fr)).toContain("n'en tient plus compte pour ces matchs");
+    expect(JSON.stringify(en)).toContain("no longer takes it into account for these matches");
+  });
+});
+
+// Revue juridique #545, cycle 2 : condition de la version 7, avis complet, liens.
+describe("Base du tag Discord de l'arbitre — cohérence (revue juridique #545, cycle 2)", () => {
+  it("register_t04_refereeDiscordTag_followsVersion7ConditionFrAndEn", () => {
+    const fr = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")?.legalBasis ?? "";
+    const en = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")?.legalBasis ?? "";
+    expect(fr).toContain("une fois que cet arbitre a accepté la version 7 des conditions ou une suivante, comme le reste de sa présentation");
+    expect(fr).toContain("ce tag n'a pas d'opposition propre");
+    expect(en).toContain("once this referee has accepted version 7 of the terms or a later one, like the rest of their presentation");
+    expect(en).toContain("this tag has no objection of its own");
+  });
+
+  it("rgpdPages_refereeDiscordTag_followsVersion7ConditionFrAndEn", () => {
+    const fr = read("app/rgpd/page.tsx").replace(/\s+/g, " ");
+    const en = read("app/rgpd/RgpdEn.tsx").replace(/\s+/g, " ");
+    expect(fr).toContain("une fois la version 7 des conditions ou une suivante acceptée (avant, l&apos;intérêt légitime, avec le même droit d&apos;opposition)");
+    expect(en).toContain("once version 7 of the terms or a later one is accepted (before that, legitimate interest, with the same right to object)");
+  });
+
+  it("rgpdPolicy_refereeDiscordScope_decidedNecessityWordingFrAndEn", () => {
+    expect(REFEREE_DISCORD_SCOPE).toContain("strictement nécessaire au fonctionnement minimum du service");
+    expect(read("lib/shared/rgpd-policy-en.ts")).toContain("strictly necessary for the minimum functioning of the service");
+  });
+
+  it("privacyChanges_refereeDiscordBasis_announcesLostSeparateObjectionFrAndEn", () => {
+    expect(entry?.summary.startsWith("Si tu arbitres un match")).toBe(true);
+    expect(entry?.details.join(" ")).toContain("ne figure plus parmi les oppositions du « Droit d'opposition »");
+    expect(english?.summary.startsWith("If you referee a match")).toBe(true);
+    expect(english?.details.join(" ")).toContain("is no longer listed under “Right to object”");
+  });
+
+  it("privacyChanges_battlenetOverwatchOnly_linksCasterConditionFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === "2026-11-battlenet-requis-overwatch-seulement");
+    expect(fr?.links?.map((link) => link.href)).toEqual(["/rgpd#donnees-collectees", "/rgpd#arbitre-designe"]);
+    expect(PRIVACY_CHANGES_EN["2026-11-battlenet-requis-overwatch-seulement"]?.linkLabels).toHaveLength(2);
   });
 });
