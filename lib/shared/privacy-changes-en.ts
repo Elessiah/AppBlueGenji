@@ -770,10 +770,10 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     linkLabels: ["Read the requirements for casting a match", "Read the “Assigned referee of a match” paragraph"],
     title: "Casting or refereeing: Battle.net required in Overwatch only",
     summary:
-      "To cast or referee a Marvel Rivals match, a certified Discord tag is now enough: a linked Battle.net account is no longer required. For an Overwatch match, nothing changes.",
+      "To cast or referee a Marvel Rivals match, a linked Battle.net account is no longer required: the certified Discord tag is enough, together with the streaming or refereeing permission. For an Overwatch match, nothing changes.",
     details: [
-      "What changes: for a Marvel Rivals match, the site no longer checks that your Battle.net account is linked nor that your BattleTag comes from it; it no longer takes it into account for these matches. For an Overwatch match, the requirement stays: a certified Discord tag and a BattleTag taken from a linked Battle.net account. The terms of use will say so in their next version.",
-      "What doesn't change: nothing new is collected or kept, and what the teams and casters see of you on a match is unchanged.",
+      "What changes: for a Marvel Rivals match, the site no longer checks that your Battle.net account is linked nor that your BattleTag comes from it; it no longer takes it into account for these matches. For an Overwatch match, the requirement stays: a certified Discord tag and a BattleTag taken from a linked Battle.net account. The terms of use, which ask only referees for Battle.net, will say so in their next version.",
+      "What doesn't change: nothing new is collected or kept, and a caster or referee is presented to the parties to their match as before; only a staff member without Battle.net, who could not cast or referee a Marvel Rivals match, can now do so and be presented in it (username and certified Discord tag).",
     ],
   },
   "2026-11-tag-discord-arbitre-execution-du-service": {

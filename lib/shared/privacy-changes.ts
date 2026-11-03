@@ -1494,10 +1494,10 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" },
     ],
     summary:
-      "Pour caster ou arbitrer un match Marvel Rivals, un tag Discord certifié suffit désormais : le compte Battle.net rattaché n'est plus demandé. Pour un match Overwatch, rien ne change.",
+      "Pour caster ou arbitrer un match Marvel Rivals, le compte Battle.net rattaché n'est plus demandé : le tag Discord certifié suffit, avec la permission de diffusion ou d'arbitrage. Pour un match Overwatch, rien ne change.",
     details: [
-      "Ce qui change : le site ne vérifie plus, pour un match Marvel Rivals, que ton compte Battle.net est rattaché ni que ton BattleTag en vient ; il n'en tient plus compte pour ces matchs. Pour un match Overwatch, la condition reste : tag Discord certifié et BattleTag tiré d'un compte Battle.net rattaché. Les conditions d'utilisation le diront à leur prochaine version.",
-      "Ce qui ne change pas : rien de nouveau n'est collecté ni conservé, et ce que les équipes et les casters voient de toi sur un match est inchangé.",
+      "Ce qui change : le site ne vérifie plus, pour un match Marvel Rivals, que ton compte Battle.net est rattaché ni que ton BattleTag en vient ; il n'en tient plus compte pour ces matchs. Pour un match Overwatch, la condition reste : tag Discord certifié et BattleTag tiré d'un compte Battle.net rattaché. Les conditions d'utilisation, qui ne demandent Battle.net qu'aux arbitres, le diront à leur prochaine version.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté ni conservé, et un caster ou un arbitre est présenté aux parties de son match comme avant ; seul un membre du staff sans Battle.net, qui ne pouvait pas caster ou arbitrer un match Marvel Rivals, peut désormais le faire et y être présenté (pseudo et tag Discord certifié).",
     ],
   },
   {

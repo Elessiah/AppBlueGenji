@@ -74,13 +74,14 @@ contacts des équipes » sur la page — base retenue : **intérêt légitime**
 (que les parties puissent joindre leur arbitre), opposition par le formulaire
 de signalement, même effet que l'opposition à sa présentation. Depuis le
 5 novembre 2026 (MATCH-REFEREE-FINISH, décision de l'utilisateur) : **exécution
-du service**, strictement nécessaire à son fonctionnement minimum (entrée
+du service**, strictement nécessaire à son fonctionnement minimum, une fois la v7
+acceptée par l'arbitre — avant, intérêt légitime avec opposition (entrée
 `2026-11-tag-discord-arbitre-execution-du-service`) ; l'opposition à l'arbitrage,
 retenue, l'en retire toujours. Les contacts
 des équipes restent sur le contrat (mêmes destinataires, mêmes moments que la
 fenêtre « Contacts »). Déclaré : `PRIVACY_CHANGES`
 `2026-11-page-du-match-infos-de-connexion` (FR + EN), `/rgpd`
-(#arbitre-designe, tableau par `rgpd-policy.ts` : `REFEREE_DISCORD_SCOPE`,
+(#arbitre-designe, tableau par `rgpd-policy.ts` : `REFEREE_DISCORD_SCOPE`, `REFEREE_DISCORD_BEFORE_V7_SCOPE`,
 `MATCH_CONTACTS_SCOPE`, `BATTLETAG_MATCH_SCOPE`), registre T01 et T04. La
 retouche des conditions attend leur prochaine version (`ERREUR.txt`).
 

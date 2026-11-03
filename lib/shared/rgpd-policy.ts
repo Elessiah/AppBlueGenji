@@ -96,7 +96,8 @@ export const REFEREE_USERNAME_MEMBERS_SCOPE =
  * « Contacts » et sur la page du match (lot MATCH-PAGE-CONNECT,
  * `MATCH_PAGE_CONNECT.md`) : depuis le 5 novembre 2026, l'exécution du service,
  * strictement nécessaire à son fonctionnement minimum (décision de
- * l'utilisateur du 2026-11-03, auparavant l'intérêt légitime) ; son opposition à
+ * l'utilisateur du 2026-11-03, auparavant l'intérêt légitime), une fois la
+ * version 7 acceptée par l'arbitre — avant, `REFEREE_DISCORD_BEFORE_V7_SCOPE` ; son opposition à
  * l'arbitrage, retenue, l'en retire toujours avec ses matchs non terminés.
  */
 export const REFEREE_DISCORD_SCOPE =
@@ -427,7 +428,7 @@ export const DROITS: DroitEntry[] = [
   },
   {
     title: "Droit d'opposition",
-    text: "Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire, rappels, avis de retrait de match, réglages du salon et avis du retrait d'un cast en message privé — ces messages se coupent directement par la case « Messages privés Discord de mes matchs » de Mon profil — et pastilles de certification de votre fiche, tag Discord certifié et « BattleTag vérifié », la vérification, quand un membre du staff arbitre un match, qu'il ne le joue pas (impartialité de l'arbitrage), l'affichage du pseudo de l'arbitre désigné à tout membre connecté, la présentation de l'arbitre désigné aux parties de ses matchs — pseudo, BattleTag et tag Discord certifié — tant qu'il n'a pas accepté la version 7 des conditions d'utilisation ou une version suivante, par le formulaire de signalement, catégorie RGPD). Le pseudo publié dans l'annonce #live d'un tournoi individuel n'en fait pas partie : il relève de l'exécution du service auquel vous vous inscrivez — ne pas y être nommé revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande. L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord (intérêt légitime), est supprimée sur demande : c'est ainsi qu'on s'y oppose.",
+    text: "Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire, rappels, avis de retrait de match, réglages du salon et avis du retrait d'un cast en message privé — ces messages se coupent directement par la case « Messages privés Discord de mes matchs » de Mon profil — et pastilles de certification de votre fiche, tag Discord certifié et « BattleTag vérifié », la vérification, quand un membre du staff arbitre un match, qu'il ne le joue pas (impartialité de l'arbitrage), l'affichage du pseudo de l'arbitre désigné à tout membre connecté, la présentation de l'arbitre désigné aux parties de ses matchs — pseudo, BattleTag en Overwatch et tag Discord certifié — tant qu'il n'a pas accepté la version 7 des conditions d'utilisation ou une version suivante, par le formulaire de signalement, catégorie RGPD). Le pseudo publié dans l'annonce #live d'un tournoi individuel n'en fait pas partie : il relève de l'exécution du service auquel vous vous inscrivez — ne pas y être nommé revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande. L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord (intérêt légitime), est supprimée sur demande : c'est ainsi qu'on s'y oppose.",
   },
   {
     title: "Droit à la portabilité",

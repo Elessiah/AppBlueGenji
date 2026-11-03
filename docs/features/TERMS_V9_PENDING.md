@@ -80,8 +80,8 @@ fonctionnement minimum », EN "strictly necessary for its minimum functioning" �
 soit l'exécution du service, et non plus l'intérêt légitime posé depuis #531 —
 pour un arbitre qui a accepté la v7 ou une suivante, comme le reste de sa
 présentation (avant : intérêt légitime, même droit d'opposition) ; une fois la v7
-acceptée, ce tag n'a plus d'opposition propre (avant, le « Droit d'opposition »
-le compte dans la présentation de l'arbitre). Elle
+acceptée, ce tag n'a plus d'opposition propre (avant cette acceptation, le « Droit
+d'opposition » le compte dans la présentation de l'arbitre). Elle
 ne dépend pas de l'acceptation de la v9 : `/rgpd` (FR + EN), le registre (T04,
 `frEn`) et le tableau de `/rgpd` (`REFEREE_DISCORD_SCOPE`, base « Exécution du
 contrat », et `REFEREE_DISCORD_BEFORE_V7_SCOPE`, « Intérêt légitime ») le disent depuis ce lot, avec l'entrée `PRIVACY_CHANGES`

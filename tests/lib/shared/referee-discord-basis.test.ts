@@ -86,8 +86,8 @@ describe("Registre T04 et /rgpd — exécution du service, FR et EN", () => {
   it("rgpdPolicy_objectionRight_beforeVersion7IncludesRefereeDiscordTagFrAndEn", () => {
     const fr = DROITS.find((droit) => droit.title === "Droit d'opposition")?.text ?? "";
     const en = DROITS_EN.find((droit) => droit.title === "Right to object")?.text ?? "";
-    expect(fr).toContain("aux parties de ses matchs — pseudo, BattleTag et tag Discord certifié — tant qu'il n'a pas accepté la version 7");
-    expect(en).toContain("to the parties to their matches — username, BattleTag and certified Discord tag — as long as they have not accepted version 7");
+    expect(fr).toContain("aux parties de ses matchs — pseudo, BattleTag en Overwatch et tag Discord certifié — tant qu'il n'a pas accepté la version 7");
+    expect(en).toContain("to the parties to their matches — username, BattleTag in Overwatch and certified Discord tag — as long as they have not accepted version 7");
   });
 
   it("rgpdPolicy_refereeDiscordBeforeV7_legitimateInterestRowFrAndEn", () => {
@@ -151,16 +151,16 @@ describe("Base du tag Discord de l'arbitre — cohérence (revue juridique #545,
     const fr = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")?.legalBasis ?? "";
     const en = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")?.legalBasis ?? "";
     expect(fr).toContain("une fois que cet arbitre a accepté la version 7 des conditions ou une suivante, comme le reste de sa présentation");
-    expect(fr).toContain("ce tag n'a pas d'opposition propre");
+    expect(fr).toContain("une fois cette version acceptée, ce tag n'a pas d'opposition propre");
     expect(en).toContain("once this referee has accepted version 7 of the terms or a later one, like the rest of their presentation");
-    expect(en).toContain("this tag has no objection of its own");
+    expect(en).toContain("once that version is accepted, this tag has no objection of its own");
   });
 
   it("rgpdPages_refereeDiscordTag_followsVersion7ConditionFrAndEn", () => {
     const fr = read("app/rgpd/page.tsx").replace(/\s+/g, " ");
     const en = read("app/rgpd/RgpdEn.tsx").replace(/\s+/g, " ");
-    expect(fr).toContain("une fois la version 7 des conditions ou une suivante acceptée (avant, l&apos;intérêt légitime, avec le même droit d&apos;opposition)");
-    expect(en).toContain("once version 7 of the terms or a later one is accepted (before that, legitimate interest, with the same right to object)");
+    expect(fr).toContain("une fois la version 7 des conditions ou une suivante acceptée par l&apos;arbitre (avant cette acceptation, l&apos;intérêt légitime, avec le même droit d&apos;opposition) — une fois cette version acceptée, ce tag n&apos;a pas d&apos;opposition propre");
+    expect(en).toContain("once the referee has accepted version 7 of the terms or a later one (before that acceptance, legitimate interest, with the same right to object) — once that version is accepted, this tag has no objection of its own");
   });
 
   it("rgpdPolicy_refereeDiscordScope_decidedNecessityWordingFrAndEn", () => {
@@ -181,5 +181,26 @@ describe("Base du tag Discord de l'arbitre — cohérence (revue juridique #545,
     const fr = PRIVACY_CHANGES.find((change) => change.id === "2026-11-battlenet-requis-overwatch-seulement");
     expect(fr?.links?.map((link) => link.href)).toEqual(["/rgpd#donnees-collectees", "/rgpd#arbitre-designe"]);
     expect(PRIVACY_CHANGES_EN["2026-11-battlenet-requis-overwatch-seulement"]?.linkLabels).toHaveLength(2);
+  });
+});
+
+// Revue juridique #545, cycle 4 : l'avis Battle.net dit qui gagne une présentation, et la permission.
+describe("Avis Battle.net en Overwatch seulement — exactitude (revue juridique #545, cycle 4)", () => {
+  const fr = PRIVACY_CHANGES.find((change) => change.id === "2026-11-battlenet-requis-overwatch-seulement");
+  const en = PRIVACY_CHANGES_EN["2026-11-battlenet-requis-overwatch-seulement"];
+
+  it("privacyChanges_battlenetOverwatchOnly_namesPermissionFrAndEn", () => {
+    expect(fr?.summary).toContain("avec la permission de diffusion ou d'arbitrage");
+    expect(en?.summary).toContain("together with the streaming or refereeing permission");
+  });
+
+  it("privacyChanges_battlenetOverwatchOnly_saysNewlyPresentedStaffFrAndEn", () => {
+    expect(fr?.details.join(" ")).toContain("peut désormais le faire et y être présenté (pseudo et tag Discord certifié)");
+    expect(en?.details.join(" ")).toContain("can now do so and be presented in it (username and certified Discord tag)");
+  });
+
+  it("privacyChanges_battlenetOverwatchOnly_termsChangeLimitedToRefereesFrAndEn", () => {
+    expect(fr?.details.join(" ")).toContain("qui ne demandent Battle.net qu'aux arbitres");
+    expect(en?.details.join(" ")).toContain("which ask only referees for Battle.net");
   });
 });
