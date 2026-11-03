@@ -417,7 +417,7 @@ function RgpdFr({
           explicite. Dès la demande, et sans retour à la réactivation, il quitte ses équipes (la propriété
           passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre ; une équipe dont il était le seul
           joueur devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute
-          sinon), ses tournois organisés passent à un autre membre du staff quand quelqu&apos;un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore joués, ses désignations d&apos;arbitre et les invitations d&apos;équipe qu&apos;il a reçues sont retirés et ses matchs restants d&apos;un tournoi individuel en
+          sinon), ses tournois organisés passent à un autre membre du staff quand quelqu&apos;un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore terminés, ses désignations d&apos;arbitre et les invitations d&apos;équipe qu&apos;il a reçues sont retirés et ses matchs restants d&apos;un tournoi individuel en
           cours où il n&apos;a jamais joué sont perdus par forfait. Au terme du délai, le compte est effacé
           s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. À l&apos;effacement,
           l&apos;empreinte (SHA-256) d&apos;un avatar retiré par la modération est gardée, sans lien avec
@@ -1142,8 +1142,7 @@ function RgpdFr({
             balayage près (au plus {VOICE_BOT_SWEEP_MINUTES} minutes de plus). Le journal d&apos;audit de Discord garde la création et la
             suppression de chaque salon, avec son nom, lisible par l&apos;administration du serveur, pour la durée que Discord fixe. Depuis le 5 novembre 2026, ce comptage relève de l&apos;<strong>exécution du contrat</strong> : dans un tournoi qui a
             l&apos;option, réunir chaque équipe dans son salon avant son match fait partie du <strong>règlement du tournoi</strong> (section « Contacts de match » des{" "}
-            <Link href="/conditions-utilisation#contacts-de-match">conditions d&apos;utilisation</Link>) — tant que les deux salons ne sont pas pleins, le match attend
-            que l&apos;arbitrage force son lancement —, et seule la présence de qui le rejoint est comptée ; il n&apos;a donc pas de droit d&apos;opposition propre : une équipe
+            <Link href="/conditions-utilisation#contacts-de-match">conditions d&apos;utilisation</Link>) — tant que les deux salons ne sont pas pleins, le match attend que l&apos;arbitrage force son lancement, sauf si le bot ne répond pas —, et seule la présence de qui le rejoint est comptée ; il n&apos;a donc pas de droit d&apos;opposition propre : une équipe
             qui ne veut pas s&apos;y plier ne s&apos;inscrit pas à ce tournoi, ou s&apos;en retire (avant cette date : intérêt légitime, avec droit d&apos;opposition) (<Link href="/rgpd/registre#t18">registre, T18</Link>).
           </p>
         </div>

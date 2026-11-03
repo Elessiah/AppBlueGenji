@@ -307,7 +307,7 @@ export function RgpdEn({
           confirmation. As soon as it is requested, and without being undone by reactivation, it leaves its
           teams (ownership goes to a co-owner, else a manager, else a captain, else another member; a team of which it was the
           only player becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
-          disbanded otherwise), its organised tournaments go to another staff member when someone can take them over, its registrations for a solo tournament that hasn&apos;t started yet are withdrawn, its casts of matches not yet played, its referee assignments and the team invitations it received are withdrawn and its remaining matches in a running solo
+          disbanded otherwise), its organised tournaments go to another staff member when someone can take them over, its registrations for a solo tournament that hasn&apos;t started yet are withdrawn, its casts of matches not yet completed, its referee assignments and the team invitations it received are withdrawn and its remaining matches in a running solo
           tournament where it never played are lost by forfeit. At the end of that time, the account is erased
           if it left nothing behind, anonymized (borrowed username) otherwise. On erasure, the hash (SHA-256) of
           an avatar removed by moderation is kept, with no link to any account, to refuse it being uploaded
@@ -954,8 +954,7 @@ export function RgpdEn({
             deletion of each channel, with its name, readable by the server&apos;s administration, for the period Discord sets. Since 5 November 2026, this count rests on
             the <strong>performance of the contract</strong>: in a tournament with the option, gathering each team in its channel before its match is part of the{" "}
             <strong>tournament rules</strong> (“Match contacts” section of the{" "}
-            <LocaleLink href="/conditions-utilisation#contacts-de-match">terms of use</LocaleLink>) — until both channels are full, the match waits for referees to force its
-            launch —, and only the presence of those who join it is counted; it therefore has no right to object of its own: a team that does not want to abide by it
+            <LocaleLink href="/conditions-utilisation#contacts-de-match">terms of use</LocaleLink>) — until both channels are full, the match waits for referees to force its launch, unless the bot does not answer —, and only the presence of those who join it is counted; it therefore has no right to object of its own: a team that does not want to abide by it
             does not register for that tournament, or withdraws from it (before that date: legitimate interest, with a right to object) (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
           </p>
         </div>

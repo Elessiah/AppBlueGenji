@@ -328,7 +328,7 @@ export const ACCOUNT_DELETION_QUESTION = "Supprimer ton compte ?";
 
 /** Ce qui se fait dès la demande et que la réactivation ne défait pas (E3, E4). */
 export const ACCOUNT_DELETION_HANDOVER =
-  "Dès maintenant, tu quitteras tes équipes (la propriété passera à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre ; seul joueur, l'équipe deviendra fantôme si elle est engagée dans un tournoi pas terminé, sinon elle sera dissoute), tes tournois organisés passeront à un autre membre du staff quand quelqu'un pourra les reprendre, tes inscriptions à des tournois individuels pas encore commencés, tes casts de matchs pas encore joués, tes désignations d'arbitre et les invitations d'équipe que tu as reçues seront retirés et tes matchs restants d'un tournoi individuel en cours où tu n'as jamais joué seront perdus par forfait. Réactiver ton compte ne défera pas ces gestes.";
+  "Dès maintenant, tu quitteras tes équipes (la propriété passera à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre ; seul joueur, l'équipe deviendra fantôme si elle est engagée dans un tournoi pas terminé, sinon elle sera dissoute), tes tournois organisés passeront à un autre membre du staff quand quelqu'un pourra les reprendre, tes inscriptions à des tournois individuels pas encore commencés, tes casts de matchs pas encore terminés, tes désignations d'arbitre et les invitations d'équipe que tu as reçues seront retirés et tes matchs restants d'un tournoi individuel en cours où tu n'as jamais joué seront perdus par forfait. Réactiver ton compte ne défera pas ces gestes.";
 
 /** La fenêtre de réactivation (E4). */
 export const ACCOUNT_DELETION_WINDOW =
