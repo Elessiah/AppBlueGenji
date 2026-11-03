@@ -121,7 +121,6 @@ describe("cancelTournamentForfeit", () => {
     expect(queries).toEqual([
       `SET SESSION innodb_lock_wait_timeout = ${SHORT_LOCK_WAIT_SECONDS}`,
       "SET SESSION innodb_lock_wait_timeout = DEFAULT",
-      "SET SESSION innodb_lock_wait_timeout = DEFAULT",
     ]);
     const [bound, restore] = connection.query.mock.invocationCallOrder;
     expect(bound).toBeGreaterThan(connection.execute.mock.invocationCallOrder[later - 1]);
@@ -367,12 +366,14 @@ describe("cancelTournamentForfeit", () => {
     expect(connection.destroy).not.toHaveBeenCalled();
   });
 
-  it("cancel_refusal_stillRestoresServerLockWait", async () => {
+  // Revue #542 : refus avant la lecture bornée, délai jamais raccourci —
+  // la connexion revient au pool sans requête de plus.
+  it("cancel_refusalBeforeBoundedRead_releasesWithoutLockWaitQuery", async () => {
     const { queries, connection } = setup({ standing: null });
 
     await expect(cancelTournamentForfeit(7, 102)).rejects.toThrow("TEAM_NOT_IN_TOURNAMENT");
 
-    expect(queries.at(-1)).toBe("SET SESSION innodb_lock_wait_timeout = DEFAULT");
+    expect(queries).toEqual([]);
     expect(connection.release).toHaveBeenCalledTimes(1);
   });
 

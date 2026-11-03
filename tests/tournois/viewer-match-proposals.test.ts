@@ -101,15 +101,22 @@ describe("getViewerMatchProposals", () => {
     expect(connection.execute).toHaveBeenCalledTimes(1);
     const [sql, params] = connection.execute.mock.calls[0];
     expect(String(sql).replace(/\s+/g, " ")).toContain("FROM bg_matches m LEFT JOIN bg_match_maps mm");
-    expect(params).toEqual(["TEAM1", "TEAM2", 70]);
+    expect(params).toEqual(["TEAM1", "TEAM2", 70, 5]);
     expect(connection.query).not.toHaveBeenCalled();
   });
 
-  it("getViewerMatchProposals_unknownMatch_returnsNullWithoutReading", async () => {
-    await expect(getViewerMatchProposals(snapshot(), 7, false, 999)).resolves.toBeNull();
+  // Revue #542 : un match que l'instantané en cache ne porte pas encore
+  // (manche posée depuis) se lit par son tournoi.
+  it("getViewerMatchProposals_matchMissingFromSnapshot_readsItByTournament", async () => {
+    await expect(getViewerMatchProposals(snapshot(), 7, false, 999)).resolves.toEqual({ ...read, matchId: 999 });
 
-    expect(getUserActiveTeam).not.toHaveBeenCalled();
-    expect(withConnection).not.toHaveBeenCalled();
+    expect(connection.execute.mock.calls[0][1]).toEqual(["TEAM1", "TEAM2", 999, 5]);
+  });
+
+  it("getViewerMatchProposals_matchOfAnotherTournament_returnsNull", async () => {
+    connection.execute.mockResolvedValue([[], []]);
+
+    await expect(getViewerMatchProposals(snapshot(), 7, false, 999)).resolves.toBeNull();
   });
 
   it("getViewerMatchProposals_viewerWithoutTeam_returnsNullWithoutConnection", async () => {

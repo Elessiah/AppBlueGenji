@@ -995,12 +995,15 @@ describe("pénalités d'endurance", () => {
   // le verrou du tournoi lui-même (revue #542) s'attend sans borne.
   // (la borne elle-même entoure la lecture des manches : `laterRoundHasScoreInput`,
   // round-progress-later-rounds.test.ts).
-  it("liftPenalty_tournamentLockFirstThenRestoresServerLockWaitBeforeRelease", async () => {
+  // Revue #542 : la lecture bornée (simulée ici) remet elle-même le délai ;
+  // le retour au pool n'ajoute aucune requête.
+  it("liftPenalty_tournamentLockFirstThenReleasesWithoutExtraLockWaitQuery", async () => {
     jest.mocked(liftEndurancePenalty).mockResolvedValue({ teamId: 3, points: 2 });
 
     await liftEndurancePenaltyPublic(5, 61);
 
-    expect(connection.query.mock.calls.map(([sql]) => sql)).toEqual(["SET SESSION innodb_lock_wait_timeout = DEFAULT"]);
+    expect(connection.query).not.toHaveBeenCalled();
+    expect(connection.release).toHaveBeenCalledTimes(1);
     expect(lockTournamentRow).toHaveBeenCalledWith(expect.anything(), 5);
     expect(connection.beginTransaction.mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(lockTournamentRow).mock.invocationCallOrder[0],
@@ -1008,7 +1011,6 @@ describe("pénalités d'endurance", () => {
     expect(jest.mocked(lockTournamentRow).mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(liftEndurancePenalty).mock.invocationCallOrder[0],
     );
-    expect(connection.query.mock.invocationCallOrder[0]).toBeLessThan(connection.release.mock.invocationCallOrder[0]);
   });
 
   it("liftPenalty_businessRefusal_notRetried", async () => {

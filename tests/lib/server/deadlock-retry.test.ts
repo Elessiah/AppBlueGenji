@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fail } from "@/lib/server/http";
-import { isContentionError, isContentionMessage, isDeadlockMessage } from "@/lib/server/mysql-errors";
+import { isContentionError, isContentionMessage, isDeadlockMessage, isSnapshotConflict } from "@/lib/server/mysql-errors";
+import { isSnapshotConflict as retryIsSnapshotConflict } from "@/lib/server/tournaments/deadlock-retry";
 import { launchFailure } from "@/lib/server/tournaments/match-launch-routes";
 import { CONCURRENT_UPDATE_RETRY, CONCURRENT_UPDATE_RETRY_MESSAGE } from "@/lib/shared/api-error-code";
 import { ERROR_MESSAGES, mapError } from "@/app/(secured)/tournois/[id]/_lib/error-map";
@@ -201,5 +202,23 @@ describe("message d'interface", () => {
     expect(ERROR_MESSAGES[CONCURRENT_UPDATE_RETRY]).toBe(CONCURRENT_UPDATE_RETRY_MESSAGE);
     expect(mapError(CONCURRENT_UPDATE_RETRY)).toBe(CONCURRENT_UPDATE_RETRY_MESSAGE);
     expect(CONCURRENT_UPDATE_RETRY_MESSAGE).toMatch(/Réessaie/);
+  });
+});
+
+// Revue #542 : un seul prédicat du conflit d'image, partagé par le rejeu et le 409.
+describe("isSnapshotConflict", () => {
+  it("isSnapshotConflict_checkreadCodeOrErrno_returnsTrue", () => {
+    expect(isSnapshotConflict(Object.assign(new Error("x"), { code: "ER_CHECKREAD" }))).toBe(true);
+    expect(isSnapshotConflict(Object.assign(new Error("x"), { errno: 1020 }))).toBe(true);
+  });
+
+  it("isSnapshotConflict_otherOrNonError_returnsFalse", () => {
+    expect(isSnapshotConflict(Object.assign(new Error("x"), { code: "ER_LOCK_DEADLOCK", errno: 1213 }))).toBe(false);
+    expect(isSnapshotConflict(null)).toBe(false);
+    expect(isSnapshotConflict("ER_CHECKREAD")).toBe(false);
+  });
+
+  it("isSnapshotConflict_reexportedByDeadlockRetry_isSameFunction", () => {
+    expect(retryIsSnapshotConflict).toBe(isSnapshotConflict);
   });
 });

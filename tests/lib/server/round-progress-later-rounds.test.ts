@@ -127,8 +127,15 @@ describe("HAS_SCORE_INPUT_SQL", () => {
     expect(flat(HAS_SCORE_INPUT_SQL)).not.toMatch(/OR double_forfeit = 1 OR/);
   });
 
-  it("HAS_SCORE_INPUT_SQL_requiresBothEntrants_excludesAutomaticBye", () => {
-    expect(flat(HAS_SCORE_INPUT_SQL)).toMatch(/^\(team1_id IS NOT NULL AND team2_id IS NOT NULL AND \(/);
+  it("HAS_SCORE_INPUT_SQL_bye_excludedByColumn", () => {
+    expect(flat(HAS_SCORE_INPUT_SQL)).toMatch(/^\(is_bye = 0 AND \(/);
+  });
+
+  // Revue #542 : un match joué dont une équipe est effacée depuis
+  // (`ON DELETE SET NULL`) reste une saisie — l'exemption se lit par sa colonne.
+  it("HAS_SCORE_INPUT_SQL_deletedTeam_stillCountsPlayedMatch", () => {
+    expect(HAS_SCORE_INPUT_SQL).not.toContain("team1_id IS NOT NULL");
+    expect(HAS_SCORE_INPUT_SQL).not.toContain("team2_id IS NOT NULL");
   });
 
   it("HAS_SCORE_INPUT_SQL_pendingReport_countsAsInput", () => {

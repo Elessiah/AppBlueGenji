@@ -51,18 +51,44 @@ describe("withShortLockWait", () => {
 });
 
 describe("releaseWithServerLockWait", () => {
-  it("releaseWithServerLockWait_restoreSucceeds_releasesToPool", async () => {
+  // Revue #542 : délai jamais raccourci, aucune requête de plus au retour.
+  it("releaseWithServerLockWait_neverShortened_releasesWithoutQuery", async () => {
     const { conn, asPool } = connection();
 
     await releaseWithServerLockWait(asPool);
 
-    expect(conn.query).toHaveBeenCalledWith("SET SESSION innodb_lock_wait_timeout = DEFAULT");
+    expect(conn.query).not.toHaveBeenCalled();
+    expect(conn.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("releaseWithServerLockWait_alreadyRestored_releasesWithoutQuery", async () => {
+    const { conn, asPool } = connection();
+    await withShortLockWait(asPool, async () => true);
+    conn.query.mockClear();
+
+    await releaseWithServerLockWait(asPool);
+
+    expect(conn.query).not.toHaveBeenCalled();
+    expect(conn.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("releaseWithServerLockWait_innerRestoreFailed_restoresThenReleases", async () => {
+    const { conn, asPool } = connection();
+    conn.query.mockResolvedValueOnce([[], []]).mockRejectedValueOnce(new Error("Connection lost"));
+    await withShortLockWait(asPool, async () => true);
+    conn.query.mockClear();
+
+    await releaseWithServerLockWait(asPool);
+
+    expect(conn.query.mock.calls.map(([sql]) => sql)).toEqual(["SET SESSION innodb_lock_wait_timeout = DEFAULT"]);
     expect(conn.release).toHaveBeenCalledTimes(1);
     expect(conn.destroy).not.toHaveBeenCalled();
   });
 
   it("releaseWithServerLockWait_restoreFails_destroysInsteadOfReleasing", async () => {
     const { conn, asPool } = connection();
+    conn.query.mockResolvedValueOnce([[], []]).mockRejectedValueOnce(new Error("Connection lost"));
+    await withShortLockWait(asPool, async () => true);
     conn.query.mockRejectedValueOnce(new Error("Connection lost"));
 
     await releaseWithServerLockWait(asPool);
