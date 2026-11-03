@@ -251,6 +251,20 @@ describe("useProposalMaps", () => {
     expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true);
   });
 
+  // Revue perf #542 : une réponse lue clôt les tentatives, même plus récente
+  // que l'instantané (la fusion l'écarte) — sa diffusion relancera la lecture.
+  it("useProposalMaps_newerProposalThanSnapshot_stopsRetrying", async () => {
+    const later = "2026-11-03T18:05:00.000Z";
+    fetchMock.mockResolvedValue(okResponse({ proposals: { matchId: 70, team1: { reportedAt: later, maps: [map] }, team2: null } }));
+
+    render(match, NO_PROPOSALS);
+    await jest.advanceTimersByTimeAsync(PROPOSAL_REFRESH_DELAY_MS * (PROPOSAL_REFRESH_ATTEMPTS + 2));
+    const result = render(match, NO_PROPOSALS);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.match.team1Report?.maps).toEqual([]);
+  });
+
   it("useProposalMaps_answerForAnotherMatch_isIgnored", async () => {
     fetchMock.mockResolvedValue(okResponse({ proposals: { matchId: 71, team1: { reportedAt: at, maps: [map] }, team2: null } }));
 

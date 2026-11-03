@@ -1054,6 +1054,28 @@ describe("pénalités d'endurance", () => {
     expectRolledBack();
   });
 
+  it("liftPenalty_refused_publishesNothing", async () => {
+    jest.mocked(liftEndurancePenalty).mockRejectedValue(new Error("PENALTY_NOT_FOUND"));
+
+    await expect(liftEndurancePenaltyPublic(5, 61)).rejects.toThrow("PENALTY_NOT_FOUND");
+
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    expect(invalidateTournamentLists).not.toHaveBeenCalled();
+  });
+
+  // Revue perf #542 : comme l'annulation d'un abandon, aucun résultat de match
+  // ne change — ni classement du site ni statistiques à rebâtir.
+  it("liftPenalty_nominal_invalidatesTargetedCachesOnly", async () => {
+    jest.mocked(liftEndurancePenalty).mockResolvedValue({ teamId: 3, points: 2 });
+
+    await liftEndurancePenaltyPublic(5, 61);
+
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(5, { landingLive: true });
+    expect(order(jest.mocked(publishMatchUpdatedEvent))).toBeGreaterThan(order(connection.commit));
+    expect(invalidateTournamentLists).toHaveBeenCalledTimes(1);
+    expect(publishUpdatedEvent).not.toHaveBeenCalled();
+  });
+
   // ERREUR.txt EF-15 : les manches postérieures sont lues verrouillées ; un
   // report concurrent forme un interblocage, rejoué comme partout ailleurs.
   it("liftPenalty_deadlock_retriesWholeTransaction", async () => {
@@ -1067,7 +1089,7 @@ describe("pénalités d'endurance", () => {
     expect(liftEndurancePenalty).toHaveBeenCalledTimes(2);
     expect(connection.rollback).toHaveBeenCalledTimes(1);
     expect(connection.commit).toHaveBeenCalledTimes(1);
-    expect(publishUpdatedEvent).toHaveBeenCalledTimes(1);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledTimes(1);
   });
 
   // ERREUR.txt EF-15 (revue) : tournoi tenu, manches verrouillées — l'attente
@@ -1077,20 +1099,21 @@ describe("pénalités d'endurance", () => {
   // round-progress-later-rounds.test.ts).
   // Revue #542 : la lecture bornée (simulée ici) remet elle-même le délai ;
   // le retour au pool n'ajoute aucune requête.
-  it("liftPenalty_tournamentLockFirstThenReleasesWithoutExtraLockWaitQuery", async () => {
+  // Revue perf #542 : le verrou du tournoi est la lecture verrouillée de sa
+  // ligne par le moteur (`loadTournament(…, true)`) — plus de `lockTournamentRow`
+  // qui la doublait.
+  it("liftPenalty_nominal_engineLockIsFirstStatementInTransaction", async () => {
     jest.mocked(liftEndurancePenalty).mockResolvedValue({ teamId: 3, points: 2 });
 
     await liftEndurancePenaltyPublic(5, 61);
 
     expect(connection.query).not.toHaveBeenCalled();
     expect(connection.release).toHaveBeenCalledTimes(1);
-    expect(lockTournamentRow).toHaveBeenCalledWith(expect.anything(), 5);
+    expect(lockTournamentRow).not.toHaveBeenCalled();
     expect(connection.beginTransaction.mock.invocationCallOrder[0]).toBeLessThan(
-      jest.mocked(lockTournamentRow).mock.invocationCallOrder[0],
-    );
-    expect(jest.mocked(lockTournamentRow).mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(liftEndurancePenalty).mock.invocationCallOrder[0],
     );
+    expectCommitted();
   });
 
   it("liftPenalty_businessRefusal_notRetried", async () => {
