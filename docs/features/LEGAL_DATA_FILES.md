@@ -50,8 +50,10 @@ CSV, objets exportés comparés avant et après) ; les références françaises
   d'`ACTIVITIES`, chaque texte en `frEn`, et `REGISTER_UPDATED_AT` avance
   (`PROCESSING_REGISTER.md`).
 - **Ajouter une section à un document du bot** : une clé nommée à sa place dans
-  `numberedSections({ … })` — les numéros suivants se décalent seuls ; avancer
-  les dates du document (`BOT_LEGAL_PAGES.md`).
+  `numberedSections({ … })` — les numéros suivants se décalent seuls, **mais
+  pas les renvois écrits dans le texte** (« section 02 », « section 03 » de la
+  politique, épinglés par `legal-files-dedup.test.ts`) : les reprendre, et
+  avancer les dates du document (`BOT_LEGAL_PAGES.md`).
 - Une liste entière peut s'écrire `frEn(listeFr, listeEn)` (puces de contact du
   bot), mais une liste homogène d'une quinzaine d'éléments de même forme peut
   redevenir une duplication : préférer une paire par élément.
@@ -69,9 +71,16 @@ qu'un objet `{ fr, en }` sur quatre.
 
 - `tests/lib/shared/bilingual.test.ts` : `frEn`, `isBilingual`, `localize`,
   `inBothLanguages`.
-- `tests/lib/shared/legal-files-dedup.test.ts` : français et anglais partagent
-  la même structure (références et ordre des fiches, nombre de puces, numéros
-  et forme des sections du bot) et `processing-register-en.ts` réexporte bien
+- `tests/lib/shared/legal-files-dedup.test.ts` : aucune paire `{ fr, en }`
+  laissée dans le texte résolu, même suite de blocs et même nombre de puces par
+  section du bot, mêmes clés de fiche dans le même ordre, renvois « section 0n »
+  de la politique du bot, et `processing-register-en.ts` réexporte bien
   l'anglais du module français.
-- Le texte rendu reste couvert par les références françaises
-  (`tests/fixtures/legal-fr/`) et `tests/lib/shared/privacy-legal-en.test.ts`.
+- Références et ordre des fiches, nombres d'éléments par rubrique :
+  `tests/lib/shared/privacy-legal-en.test.ts` ; numérotation des sections :
+  `tests/app/bot-legal-pages.test.ts`.
+- Seul le **français** rendu est épinglé à l'octet (`tests/fixtures/legal-fr/`) ;
+  l'identité de l'anglais a été prouvée une fois, au lot, par comparaison des
+  sorties avant et après — un test d'empreinte bloquerait toute retouche.
+- Les contrôles qui lisaient la source anglaise du registre lisent son texte
+  résolu (`tests/helpers/register-english-text.ts`).
