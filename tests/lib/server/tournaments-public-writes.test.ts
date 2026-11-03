@@ -36,6 +36,7 @@ import {
 } from "@/lib/server/tournaments";
 import { getDatabase } from "@/lib/server/database";
 import {
+  publishMatchUpdatedEvent,
   publishScoreReportedEvent,
   publishScoreResolvedEvent,
   publishUpdatedEvent,
@@ -72,7 +73,7 @@ import {
   alertSelfResolvedDispute,
 } from "@/lib/server/tournaments/dispute-self-resolution";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
-import { tournamentRow } from "../../helpers/tournament-rows";
+import { matchRow, tournamentRow } from "../../helpers/tournament-rows";
 import { mapsFor } from "../../helpers/match-maps";
 
 /**
@@ -489,8 +490,13 @@ describe("écritures d'un engagé — report de score, forfait sur sa manche", (
 });
 
 describe("adminSaveMatchScoresPublic", () => {
-  it("réconcilie le tournoi du match et rafraîchit sans condition", async () => {
-    connection.execute.mockResolvedValue([[{ tournament_id: "8" }], undefined]);
+  // ERREUR.txt EF-15 : « Enregistrer » ne clôt jamais un match — aucun rejeu
+  // (ils ne lisent que des matchs COMPLETED), aucune relecture de la ligne, et
+  // l'instantané seul est republié.
+  const saved = matchRow({ id: 70, tournament_id: 8, team1_id: 3, team2_id: 4 });
+
+  it("enregistre sans rien réconcilier ni relire, et ne republie que l'instantané", async () => {
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
 
     await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
 
@@ -498,20 +504,26 @@ describe("adminSaveMatchScoresPublic", () => {
       maps: mapsFor(2, 1),
       userId: 1,
     });
-    for (const fn of [reconcileSurvival, reconcileSwiss, reconcileEndurance, reconcilePhases]) {
-      expect(fn).toHaveBeenCalledWith(8, expect.anything());
+    for (const fn of [reconcileSurvival, reconcileSwiss, reconcileEndurance, reconcilePhases, finalizeTournamentIfDone]) {
+      expect(fn).not.toHaveBeenCalled();
     }
+    expect(connection.execute).not.toHaveBeenCalled();
     expectCommitted();
-    expect(publishScoreResolvedEvent).toHaveBeenCalledWith(8, 70);
-    expect(invalidateTournamentLists).toHaveBeenCalledTimes(1);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(8);
+    expect(order(jest.mocked(publishMatchUpdatedEvent))).toBeGreaterThan(order(connection.commit));
+    expect(publishScoreResolvedEvent).not.toHaveBeenCalled();
+    expect(publishUpdatedEvent).not.toHaveBeenCalled();
+    expect(invalidateTournamentLists).not.toHaveBeenCalled();
   });
 
-  it("ne réconcilie ni ne publie rien quand le match a disparu", async () => {
-    await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
+  it("republie aussi l'instantané d'un match encore sans adversaire, sans alerte", async () => {
+    const alone = matchRow({ id: 70, tournament_id: 8, team1_id: 3, team2_id: null });
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved: alone, paused: true, pausedNow: true });
 
-    expect(reconcileSurvival).not.toHaveBeenCalled();
-    expect(publishScoreResolvedEvent).not.toHaveBeenCalled();
-    expect(invalidateTournamentLists).not.toHaveBeenCalled();
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 }, { id: 9, pseudo: "Sifflet" })).resolves.toBe(true);
+
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(8);
+    expect(alertSelfPausedValidation).not.toHaveBeenCalled();
     expectCommitted();
   });
 
@@ -680,13 +692,15 @@ describe("adminResolveMatchPublic", () => {
 describe("adminSaveMatchScoresPublic — suspension de la validation d'office", () => {
   const actor = { id: 9, pseudo: "Sifflet" };
   const savedRow = { tournament_id: 8, team1_id: 3, team2_id: 4 };
+  // Ligne relue par le moteur dans sa transaction : la couche publique ne relit plus.
+  const saved = matchRow({ id: 70, tournament_id: 8, team1_id: 3, team2_id: 4 });
 
   it("rend ce que le moteur dit de la suspension", async () => {
     connection.execute.mockResolvedValue([[savedRow], undefined]);
 
-    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: true, pausedNow: true });
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: true, pausedNow: true });
     await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).resolves.toBe(true);
-    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: false, pausedNow: false });
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
     await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).resolves.toBe(false);
   });
 
@@ -694,7 +708,7 @@ describe("adminSaveMatchScoresPublic — suspension de la validation d'office", 
   // suspension qu'il pose avertit les autres membres du staff, après le commit.
   it("transmet la suspension posée par cette saisie à l'alerte, après le commit", async () => {
     connection.execute.mockResolvedValue([[savedRow], undefined]);
-    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: true, pausedNow: true });
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: true, pausedNow: true });
 
     await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor);
 
@@ -707,9 +721,9 @@ describe("adminSaveMatchScoresPublic — suspension de la validation d'office", 
 
   it("n'alerte pas à chaque saisie d'une validation déjà suspendue, ni sans suspension", async () => {
     connection.execute.mockResolvedValue([[savedRow], undefined]);
-    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: true, pausedNow: false });
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: true, pausedNow: false });
     await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor);
-    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: false, pausedNow: false });
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
     await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor);
 
     expect(alertSelfPausedValidation).not.toHaveBeenCalled();
@@ -726,7 +740,7 @@ describe("adminSaveMatchScoresPublic — suspension de la validation d'office", 
 
   it("rend la main sans attendre l'envoi de l'alerte", async () => {
     connection.execute.mockResolvedValue([[savedRow], undefined]);
-    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: true, pausedNow: true });
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: true, pausedNow: true });
     jest.mocked(alertSelfPausedValidation).mockReturnValueOnce(new Promise<boolean>(() => undefined));
 
     await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor)).resolves.toBe(true);
@@ -958,5 +972,28 @@ describe("pénalités d'endurance", () => {
 
     await expect(liftEndurancePenaltyPublic(5, 61)).rejects.toThrow("PENALTY_NOT_FOUND");
     expectRolledBack();
+  });
+
+  // ERREUR.txt EF-15 : les manches postérieures sont lues verrouillées ; un
+  // report concurrent forme un interblocage, rejoué comme partout ailleurs.
+  it("liftPenalty_deadlock_retriesWholeTransaction", async () => {
+    jest
+      .mocked(liftEndurancePenalty)
+      .mockRejectedValueOnce(Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" }))
+      .mockResolvedValueOnce({ teamId: 3, points: 2 });
+
+    await liftEndurancePenaltyPublic(5, 61);
+
+    expect(liftEndurancePenalty).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(publishUpdatedEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("liftPenalty_businessRefusal_notRetried", async () => {
+    jest.mocked(liftEndurancePenalty).mockRejectedValue(new Error("ENDURANCE_ROUND_ALREADY_PLAYED"));
+
+    await expect(liftEndurancePenaltyPublic(5, 61)).rejects.toThrow("ENDURANCE_ROUND_ALREADY_PLAYED");
+    expect(liftEndurancePenalty).toHaveBeenCalledTimes(1);
   });
 });

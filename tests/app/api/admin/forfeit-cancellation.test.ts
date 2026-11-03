@@ -150,6 +150,29 @@ describe("DELETE /api/admin/tournaments/[id]/forfeits/[teamId]", () => {
     expect(sendBotLog).not.toHaveBeenCalled();
   });
 
+  // ERREUR.txt EF-15 : le délai d'attente court de l'annulation (5 s) dépassé
+  // est une contention, pas une panne — et le journal dit quel tournoi.
+  it("DELETE_lockWaitTimeout_returns409AndLogsTournamentAndTeam", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(cancelTournamentForfeit).mockRejectedValue(
+      Object.assign(new Error("Lock wait timeout exceeded; try restarting transaction"), {
+        code: "ER_LOCK_WAIT_TIMEOUT",
+        errno: 1205,
+      }),
+    );
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    const res = await cancel("7", "102");
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: CONCURRENT_UPDATE_RETRY });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain("102 au tournoi 7");
+    expect(error).not.toHaveBeenCalled();
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
   it("rend un instantané périmé de MariaDB (1020) en refus « réessaie »", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(cancelTournamentForfeit).mockRejectedValue(

@@ -57,8 +57,8 @@ function makeConn(options: {
     }
     if (query.includes("FROM bg_endurance_penalties")) return [[], []];
     // Verrou du retrait : une manche postérieure porte-t-elle une saisie ?
-    if (query.startsWith("SELECT COUNT(*) AS c FROM bg_matches") && query.includes("round_number > ?")) {
-      return [[{ c: options.lastRoundWithInput ? 1 : 0 }], []];
+    if (query.startsWith("SELECT id FROM bg_matches") && query.includes("round_number > ?")) {
+      return [options.lastRoundWithInput ? [{ id: 900 }] : [], []];
     }
     if (query.includes("SELECT status FROM bg_endurance_standings")) {
       return [status === null ? [] : [{ status }], []];

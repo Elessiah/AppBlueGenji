@@ -20,6 +20,21 @@ const EMPTY_MATCH: Row = {
 
 // Connexion factice : la première requête décrit le match édité (jointe au
 // format du tournoi), la seconde renvoie les matchs dépendants.
+/** `HAS_SCORE_INPUT_SQL`, rejoué sur une ligne factice. */
+function carriesScoreInput(row: Row): boolean {
+  if (row.team1_id == null || row.team2_id == null) return false;
+  return (
+    row.team1_score != null ||
+    row.team2_score != null ||
+    row.winner_team_id != null ||
+    row.forfeit_team_id != null ||
+    row.double_forfeit === 1 ||
+    row.status === "AWAITING_CONFIRMATION" ||
+    row.team1_reported_at != null ||
+    row.team2_reported_at != null
+  );
+}
+
 function fakeConnection(options: {
   format: string;
   /**
@@ -66,6 +81,11 @@ function fakeConnection(options: {
         ];
       }
       dependentSql = sql;
+      // Modes sans lien de bracket : le prédicat de saisie est en SQL
+      // (`HAS_SCORE_INPUT_SQL`) — le double rend les seules lignes qu'il garde.
+      if (sql.startsWith("SELECT id FROM bg_matches")) {
+        return [options.dependents.filter(carriesScoreInput).map((row) => ({ id: row.id })), []];
+      }
       return [options.dependents, []];
     },
   } as unknown as PoolConnection;

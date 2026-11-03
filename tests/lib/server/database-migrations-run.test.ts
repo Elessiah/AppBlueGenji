@@ -305,6 +305,20 @@ describe("runMigrations — tolérance d'un ALTER récent", () => {
     expect(errorSpy).not.toHaveBeenCalled();
   });
 
+  it("runMigrations_phaseIndexAlreadyReplaced_staysSilent", async () => {
+    // EF-15 : `idx_bg_matches_phase` cède la place à `idx_bg_matches_phase_round`,
+    // posé avant le retrait pour que les lectures par phase gardent un index.
+    fail(/^ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round/, "ER_DUP_KEYNAME");
+    fail(/^ALTER TABLE bg_matches DROP INDEX idx_bg_matches_phase$/, "ER_CANT_DROP_FIELD_OR_KEY");
+
+    await getDatabase();
+
+    expect(rank(/^ALTER TABLE bg_matches DROP INDEX idx_bg_matches_phase$/)).toBeGreaterThan(
+      rank(/^ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round \(tournament_id, phase_id, round_number\)$/),
+    );
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
   it("dit un index dupliqué sur un ADD COLUMN, qui n'a pas posé la colonne", async () => {
     fail(/ADD COLUMN lookup_hash/, "ER_DUP_KEYNAME");
 

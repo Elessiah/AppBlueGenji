@@ -29,6 +29,14 @@ function fakeConnection(
   format: FakeFormat = null,
   tournamentFormat = "SINGLE",
   game: "OW" | "MR" | null = null,
+  extra: {
+    /** Colonnes du match à remplacer (un report adverse déjà déposé). */
+    match?: Record<string, unknown>;
+    /** Colonnes du match relu après l'écriture du report. */
+    afterReport?: Record<string, unknown>;
+    /** Maps de la proposition adverse (`TEAM2`), telles que la base les rend. */
+    team2Maps?: Record<string, unknown>[];
+  } = {},
 ): { conn: PoolConnection; writes: string[]; mapWrites: { sql: string; params: unknown }[] } {
   const writes: string[] = [];
   const mapWrites: { sql: string; params: unknown }[] = [];
@@ -53,6 +61,7 @@ function fakeConnection(
     // Un match se joue une fois lancé (`lib/shared/match-launch.ts`).
     launched_at: "2026-01-01 20:00:00",
     launch_pairing: "100:200",
+    ...extra.match,
   };
 
   const conn = {
@@ -60,6 +69,9 @@ function fakeConnection(
       const q = sql.replace(/\s+/g, " ").trim();
       if (q.includes("bg_match_maps")) {
         mapWrites.push({ sql: q, params });
+        if (q.startsWith("SELECT match_id, source") && Array.isArray(params) && params[1] === "TEAM2") {
+          return [extra.team2Maps ?? [], []];
+        }
         return [[], []];
       }
       if (q.startsWith("UPDATE")) {
@@ -86,7 +98,9 @@ function fakeConnection(
           [],
         ];
       }
-      if (q.includes("FROM bg_matches")) return [[{ ...match }], []];
+      if (q.includes("FROM bg_matches")) {
+        return [[writes.length > 0 ? { ...match, ...extra.afterReport } : { ...match }], []];
+      }
       return [[], []];
     },
   } as unknown as PoolConnection;
@@ -257,6 +271,67 @@ describe("reportMatchScore — détail map par map (MAP_SCORES.md)", () => {
     mockTournament(null);
     const { conn, writes } = fakeConnection();
     await expect(reportMatchScore(conn, 1, 10, 42, [])).rejects.toThrow("MAP_LIST_EMPTY");
+    expect(writes).toHaveLength(0);
+  });
+});
+
+// ERREUR.txt EF-15 : « Confirmer » lit déjà la proposition adverse sous verrou
+// pour la comparer à ce qui est renvoyé ; la comparaison des deux reports la
+// réutilise au lieu de la relire.
+describe("reportMatchScore — confirmation d'une proposition adverse", () => {
+  const reportedAt = new Date("2026-01-01T20:30:00.000Z");
+  const maps = mapsFor(2, 1);
+  const team2Maps = maps.map((map, index) => ({
+    match_id: 10,
+    source: "TEAM2",
+    map_number: index + 1,
+    replay_code: map.replayCode,
+    team1_score: map.team1Score,
+    team2_score: map.team2Score,
+  }));
+  // Seule l'adversaire a reporté ; relu après l'écriture, le match porte les
+  // deux reports, concordants.
+  const opponentReport = { team2_report_score: 1, team2_report_opponent_score: 2, team2_reported_at: reportedAt };
+  const bothReports = { ...opponentReport, team1_report_score: 2, team1_report_opponent_score: 1, team1_reported_at: reportedAt };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 100, teamName: "Équipe", roles: ["OWNER"] });
+    jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
+  });
+
+  const team2MapReads = (mapWrites: { sql: string; params: unknown }[]) =>
+    mapWrites.filter((w) => w.sql.startsWith("SELECT match_id, source") && Array.isArray(w.params) && w.params[1] === "TEAM2");
+
+  it("reportMatchScore_confirm_readsOpponentMapsOnce", async () => {
+    mockTournament({ type: "BO", value: 3 });
+    const { conn, mapWrites } = fakeConnection({ type: "BO", value: 3 }, "SINGLE", null, { match: opponentReport, afterReport: bothReports, team2Maps });
+
+    await reportMatchScore(conn, 1, 10, 42, maps, { reportedAt: reportedAt.toISOString() }).catch(() => undefined);
+
+    expect(team2MapReads(mapWrites)).toHaveLength(1);
+  });
+
+  it("reportMatchScore_withoutConfirm_readsOpponentMapsForComparison", async () => {
+    mockTournament({ type: "BO", value: 3 });
+    const { conn, mapWrites } = fakeConnection({ type: "BO", value: 3 }, "SINGLE", null, { match: opponentReport, afterReport: bothReports, team2Maps });
+
+    await reportMatchScore(conn, 1, 10, 42, maps).catch(() => undefined);
+
+    expect(team2MapReads(mapWrites)).toHaveLength(1);
+  });
+
+  it("reportMatchScore_confirmChangedOpponentMaps_refusesProposalStale", async () => {
+    mockTournament({ type: "BO", value: 3 });
+    const { conn, writes } = fakeConnection({ type: "BO", value: 3 }, "SINGLE", null, {
+      match: opponentReport,
+      afterReport: bothReports,
+      team2Maps: team2Maps.slice(1),
+    });
+
+    await expect(reportMatchScore(conn, 1, 10, 42, maps, { reportedAt: reportedAt.toISOString() })).rejects.toThrow(
+      "PROPOSAL_STALE",
+    );
     expect(writes).toHaveLength(0);
   });
 });

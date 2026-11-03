@@ -49,7 +49,7 @@ import { SpectatorViewProvider } from "@/components/spectator-view";
 import { PodiumTiersProvider } from "@/components/podium-tiers";
 import { buildPodiumTiers } from "@/lib/shared/podium-tiers";
 import { EntrantLink, EntrantProvider } from "@/app/(secured)/tournois/[id]/_lib/entrant-link";
-import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MatchMapDetails";
+import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MapResultList";
 import { LiveIndicator } from "@/app/(secured)/tournois/[id]/_components/LiveIndicator";
 import { TournamentHeader } from "@/app/(secured)/tournois/[id]/_components/TournamentHeader";
 import { TournamentLoading } from "@/app/(secured)/tournois/[id]/_components/TournamentLoading";
