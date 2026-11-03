@@ -127,8 +127,12 @@ describe("Textes juridiques alignés sur le code (revue juridique #545)", () => 
 
   it("rgpdPolicy_refereeDiscordScope_noSeparateObjectionFrAndEn", () => {
     expect(REFEREE_DISCORD_SCOPE).not.toContain("avec le même effet");
-    expect(REFEREE_DISCORD_SCOPE).toContain("seule l'opposition à l'arbitrage même");
-    expect(read("lib/shared/rgpd-policy-en.ts")).toContain("only an objection to the refereeing itself");
+    // Revue juridique #545, cycle 5 : toutes les fins de la présentation, pas la seule opposition.
+    expect(REFEREE_DISCORD_SCOPE).toContain("la présentation cesse quand tu te retires du match ou qu'il est confié à un autre arbitre, quand tu retires ton tag, ou quand ton opposition d'arbitre");
+    expect(REFEREE_DISCORD_SCOPE).toContain("depuis le 5 novembre 2026 (auparavant, intérêt légitime)");
+    const en = read("lib/shared/rgpd-policy-en.ts");
+    expect(en).toContain("the presentation ends when you withdraw from the match or it is assigned to another referee, when you remove your tag, or when your referee objection");
+    expect(en).toContain("since 5 November 2026 (before that, legitimate interest)");
   });
 
   it("rgpdPages_refereeObjectionClause_notDuplicatedFrAndEn", () => {
@@ -202,5 +206,20 @@ describe("Avis Battle.net en Overwatch seulement — exactitude (revue juridique
   it("privacyChanges_battlenetOverwatchOnly_termsChangeLimitedToRefereesFrAndEn", () => {
     expect(fr?.details.join(" ")).toContain("qui ne demandent Battle.net qu'aux arbitres");
     expect(en?.details.join(" ")).toContain("which ask only referees for Battle.net");
+  });
+});
+
+// Revue juridique #545, cycle 5 : l'opposition nommée, et les lecteurs du tag d'un arbitre qui caste.
+describe("Opposition d'arbitre nommée (revue juridique #545, cycle 5)", () => {
+  it("rgpdPages_refereeObjection_namesWhatItCoversFrAndEn", () => {
+    expect(read("app/rgpd/page.tsx").replace(/\s+/g, " ")).toContain("son opposition d&apos;arbitre (à sa présentation avant la version 7, ou à l&apos;affichage de son pseudo aux membres)");
+    expect(read("app/rgpd/RgpdEn.tsx").replace(/\s+/g, " ")).toContain("their referee objection (to their presentation before version 7, or to the display of their username to members)");
+  });
+
+  it("privacyChanges_refereeDiscordBasis_namesObjectionAndCasterRuleFrAndEn", () => {
+    expect(entry?.summary).toContain("(et, si tu le castes aussi, aux autres arbitres, selon la règle des casters)");
+    expect(entry?.details.join(" ")).toContain("ton opposition d'arbitre (formulaire de signalement, catégorie RGPD) — à ta présentation avant la version 7, ou à l'affichage de ton pseudo aux membres —");
+    expect(english?.summary).toContain("(and, if you also cast it, to the other referees, under the casters' rule)");
+    expect(english?.details.join(" ")).toContain("your referee objection (report form, GDPR category) — to your presentation before version 7, or to the display of your username to members —");
   });
 });

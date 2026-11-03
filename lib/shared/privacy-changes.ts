@@ -1509,10 +1509,10 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     title: "Arbitre désigné : la base de la présentation de ton tag Discord",
     links: [{ href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" }],
     summary:
-      "Si tu arbitres un match, la présentation de ton tag Discord certifié à ses deux équipes et à ses casters repose désormais, une fois la version 7 des conditions ou une suivante acceptée, sur l'exécution du service, et non plus sur l'intérêt légitime : sans lui, les parties du match ne peuvent pas te joindre.",
+      "Si tu arbitres un match, la présentation de ton tag Discord certifié à ses deux équipes et à ses casters (et, si tu le castes aussi, aux autres arbitres, selon la règle des casters) repose désormais, une fois la version 7 des conditions ou une suivante acceptée, sur l'exécution du service, et non plus sur l'intérêt légitime : sans lui, les parties du match ne peuvent pas te joindre.",
     details: [
       "Ce qui change : la base juridique de cette présentation, jugée strictement nécessaire au fonctionnement minimum du service, une fois la version 7 des conditions ou une suivante acceptée (avant cette acceptation, l'intérêt légitime, avec le même droit d'opposition) ; une fois cette version acceptée, elle n'a plus d'opposition propre.",
-      "Ce qui ne change pas : rien de nouveau n'est collecté ni montré, aux mêmes personnes et aux mêmes moments ; ton opposition à l'arbitrage (formulaire de signalement, catégorie RGPD), retenue, te retire toujours de tes matchs non terminés, ce tag compris.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté ni montré, aux mêmes personnes et aux mêmes moments ; ton opposition d'arbitre (formulaire de signalement, catégorie RGPD) — à ta présentation avant la version 7, ou à l'affichage de ton pseudo aux membres —, retenue, te retire toujours de tes matchs non terminés, ce tag compris.",
     ],
   },
 ];

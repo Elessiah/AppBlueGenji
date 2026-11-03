@@ -780,10 +780,10 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     linkLabels: ["Read the “Assigned referee of a match” paragraph"],
     title: "Assigned referee: the basis for presenting your Discord tag",
     summary:
-      "If you referee a match, presenting your certified Discord tag to both its teams and its casters now rests, once version 7 of the terms or a later one is accepted, on performance of the service, no longer on legitimate interest: without it, the parties to the match cannot reach you.",
+      "If you referee a match, presenting your certified Discord tag to both its teams and its casters (and, if you also cast it, to the other referees, under the casters' rule) now rests, once version 7 of the terms or a later one is accepted, on performance of the service, no longer on legitimate interest: without it, the parties to the match cannot reach you.",
     details: [
       "What changes: the legal basis of this presentation, deemed strictly necessary for the minimum functioning of the service, once version 7 of the terms or a later one is accepted (before that acceptance, legitimate interest, with the same right to object); once that version is accepted, it has no objection of its own.",
-      "What doesn't change: nothing new is collected or shown, to the same people at the same times; your objection to refereeing (report form, GDPR category), once upheld, still removes you from your unfinished matches, this tag included.",
+      "What doesn't change: nothing new is collected or shown, to the same people at the same times; your referee objection (report form, GDPR category) — to your presentation before version 7, or to the display of your username to members —, once upheld, still removes you from your unfinished matches, this tag included.",
     ],
   },
 };
