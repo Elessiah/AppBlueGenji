@@ -1584,6 +1584,9 @@ export async function adminSaveMatchScoresPublic(
  * la réapparier (Survie, ronde suisse, endurance, phases) : seule cette
  * destruction impose à « Enregistrer » le verrou du tournoi avant celui du
  * match. En élimination, aucune réconciliation ne touche un match non clos.
+ * Un tournoi multi-phases se juge sur la phase **du match** : sa phase
+ * d'élimination n'a rien à rebâtir (`MULTI` reste verrouillant si la phase est
+ * introuvable).
  */
 const ROUND_REBUILDING_FORMATS: ReadonlySet<TournamentFormat> = new Set<TournamentFormat>([
   "SURVIVAL",
@@ -1594,8 +1597,8 @@ const ROUND_REBUILDING_FORMATS: ReadonlySet<TournamentFormat> = new Set<Tourname
 
 /**
  * Tournoi d'un match à enregistrer, avant la transaction d'« Enregistrer » ;
- * `locksTournament` : son format exige le verrou du tournoi
- * (`ROUND_REBUILDING_FORMATS`).
+ * `locksTournament` : le format du match — celui de sa phase, sinon du
+ * tournoi — exige le verrou du tournoi (`ROUND_REBUILDING_FORMATS`).
  *
  * @throws `MATCH_NOT_FOUND`, `MATCH_NOT_READY`, `MATCH_ALREADY_COMPLETED`,
  *         `INVALID_FORFEIT_TEAM_ID`, `INVALID_REQUEST`
@@ -1614,8 +1617,10 @@ async function saveTargetTournament(
       format: TournamentFormat;
     })[]
   >(
-    `SELECT m.tournament_id, m.team1_id, m.team2_id, m.status, t.format
-     FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id
+    `SELECT m.tournament_id, m.team1_id, m.team2_id, m.status, COALESCE(p.format, t.format) AS format
+     FROM bg_matches m
+     JOIN bg_tournaments t ON t.id = m.tournament_id
+     LEFT JOIN bg_tournament_phases p ON p.id = m.phase_id AND p.tournament_id = m.tournament_id
      WHERE m.id = ? LIMIT 1`,
     [matchId],
   );
