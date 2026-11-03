@@ -229,6 +229,12 @@ describe("announceCastChange", () => {
     expect(sendBotLog).toHaveBeenCalledTimes(1);
   });
 
+  it("announceCastChange_noPendingBurst_startsDeliveryInTheSameTick", () => {
+    mockMatch(matchRow());
+    announceCastChange({ kind: "RELEASED", matchId: 42, casterId: 9, byStaff: true });
+    expect(getDatabase).toHaveBeenCalled();
+  });
+
   describe("gestes volontaires du caster", () => {
     beforeEach(() => {
       jest.useFakeTimers();

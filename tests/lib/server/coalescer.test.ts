@@ -100,6 +100,72 @@ describe("createCoalescer — annonce forcée", () => {
     expect(deliver).toHaveBeenCalledTimes(1);
   });
 
+  it("flush_deliveryInFlight_waitsForItBeforeResolving", async () => {
+    let finish: () => void = () => undefined;
+    const done: string[] = [];
+    const coalescer = createCoalescer<number>({
+      windowMs: 1_000,
+      maxAgeMs: 5_000,
+      deliver: (_first, last) =>
+        new Promise<void>((resolve) => {
+          finish = () => {
+            done.push(`delivered ${last}`);
+            resolve();
+          };
+        }),
+    });
+    coalescer.add("a", 1);
+    jest.advanceTimersByTime(1_000);
+    expect(coalescer.pending()).toBe(0);
+    const flushed = coalescer.flush("a").then(() => done.push("flushed"));
+    await Promise.resolve();
+    expect(done).toEqual([]);
+    finish();
+    await flushed;
+    expect(done).toEqual(["delivered 1", "flushed"]);
+  });
+
+  it("flushAll_deliveryInFlight_waitsForIt", async () => {
+    let finish: () => void = () => undefined;
+    const done: string[] = [];
+    const coalescer = createCoalescer<number>({
+      windowMs: 1_000,
+      maxAgeMs: 5_000,
+      deliver: () =>
+        new Promise<void>((resolve) => {
+          finish = () => {
+            done.push("delivered");
+            resolve();
+          };
+        }),
+    });
+    coalescer.add("a", 1);
+    jest.advanceTimersByTime(1_000);
+    const flushed = coalescer.flushAll().then(() => done.push("flushed"));
+    await Promise.resolve();
+    finish();
+    await flushed;
+    expect(done).toEqual(["delivered", "flushed"]);
+  });
+
+  it("busy_pendingInFlightAndUnknown_trueTrueFalse", async () => {
+    let finish: () => void = () => undefined;
+    const coalescer = createCoalescer<number>({
+      windowMs: 1_000,
+      maxAgeMs: 5_000,
+      deliver: () => new Promise<void>((resolve) => (finish = resolve)),
+    });
+    expect(coalescer.busy("a")).toBe(false);
+    coalescer.add("a", 1);
+    expect(coalescer.busy("a")).toBe(true);
+    jest.advanceTimersByTime(1_000);
+    expect(coalescer.busy("a")).toBe(true);
+    finish();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(coalescer.busy("a")).toBe(false);
+  });
+
   it("flush_unknownKey_resolvesWithoutDelivering", async () => {
     const { deliver, coalescer } = setup();
     coalescer.add("a", 1);

@@ -69,6 +69,16 @@ describe("flushBotLogsBeforeExit — rafales regroupées", () => {
     expect(order).toEqual(["coalescers", "batches"]);
   });
 
+  it("flushBotLogsBeforeExit_coalescerHangs_batchesStillFlushedAtHalfTheTimeout", async () => {
+    jest.useFakeTimers();
+    jest.mocked(flushAllCoalescers).mockReturnValue(new Promise<void>(() => undefined));
+    void flushBotLogsBeforeExit(1_000);
+    await jest.advanceTimersByTimeAsync(499);
+    expect(flushAllBotLogBatches).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(1);
+    expect(flushAllBotLogBatches).toHaveBeenCalledTimes(1);
+  });
+
   it("flushBotLogsBeforeExit_coalescerFlushRejects_batchesStillFlushed", async () => {
     jest.mocked(flushAllCoalescers).mockRejectedValue(new Error("boom"));
     await expect(flushBotLogsBeforeExit()).resolves.toBeUndefined();

@@ -976,6 +976,20 @@ describe("setMatchHost", () => {
     await expect(setMatchHost(42, null)).resolves.toBe(false);
   });
 
+  it("setMatchHost_sameHost_noWriteNoEvent", async () => {
+    await setMatchHost(42, TEAM2);
+    jest.mocked(publishMatchUpdatedEvent).mockClear();
+    state.writes.length = 0;
+    await setMatchHost(42, TEAM2);
+    expect(state.writes).toEqual([]);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchHost_otherHost_publishesOnce", async () => {
+    await setMatchHost(42, TEAM2);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledTimes(1);
+  });
+
   it("refuse une équipe étrangère au match", async () => {
     await expect(setMatchHost(42, 999)).rejects.toThrow("INVALID_HOST_TEAM");
     expect(state.writes).toEqual([]);

@@ -219,6 +219,23 @@ describe("usersReachableByPush", () => {
     expect(params).toEqual([1, 2, 3, "MATCH_REMINDER"]);
   });
 
+  it("usersReachableByPush_restrictedTopic_noDistinctOnTheRolesColumn", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+    pool({ query });
+    await usersReachableByPush([5], "CAST_RELEASED", CONFIG);
+    const [sql] = query.mock.calls[0] as unknown as [string];
+    expect(sql).not.toContain("DISTINCT");
+    expect(sql).toContain("u.platform_roles_json");
+  });
+
+  it("usersReachableByPush_openTopic_distinctUserIds", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+    pool({ query });
+    await usersReachableByPush([5], "MATCH_REMINDER", CONFIG);
+    const [sql] = query.mock.calls[0] as unknown as [string];
+    expect(sql).toContain("SELECT DISTINCT s.user_id");
+  });
+
   it("ne lit rien sans configuration push ni compte, et tient une table absente pour vide", async () => {
     const query = jest.fn<SqlQuery>();
     pool({ query });
