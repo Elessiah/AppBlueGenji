@@ -11,10 +11,10 @@ import { NextResponse } from "next/server";
 import { GET } from "@/app/api/tournaments/[id]/matches/[matchId]/proposals/route";
 import { enforceRateLimit } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
-import { getViewerMatchProposals, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
+import { getViewerMatchProposals, getVisibleTournamentCard } from "@/lib/server/tournaments-service";
 import type { MatchProposalMaps } from "@/lib/shared/types";
 import { authUser } from "../../../helpers/auth-user";
-import { tournamentSnapshot } from "../../../helpers/tournament-detail";
+import { tournamentCard } from "../../../helpers/tournament-card";
 
 /**
  * Relecture légère des propositions d'un match (ERREUR.txt EF-15) : les
@@ -37,7 +37,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 3 }));
   jest.mocked(enforceRateLimit).mockReturnValue(null);
-  jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(tournamentSnapshot());
+  jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard());
   jest.mocked(getViewerMatchProposals).mockResolvedValue(proposals);
 });
 
@@ -57,7 +57,7 @@ describe("GET /api/tournaments/[id]/matches/[matchId]/proposals", () => {
     const res = await get("7", "70");
 
     expect(res.status).toBe(429);
-    expect(getVisibleTournamentSnapshot).not.toHaveBeenCalled();
+    expect(getVisibleTournamentCard).not.toHaveBeenCalled();
   });
 
   it("GET_zeroTournamentId_returns400", async () => {
@@ -78,11 +78,11 @@ describe("GET /api/tournaments/[id]/matches/[matchId]/proposals", () => {
     const res = await get("7", "0");
 
     expect(res.status).toBe(400);
-    expect(getVisibleTournamentSnapshot).not.toHaveBeenCalled();
+    expect(getVisibleTournamentCard).not.toHaveBeenCalled();
   });
 
   it("GET_invisibleTournament_returns404", async () => {
-    jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(null);
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(null);
 
     const res = await get("7", "70");
 
@@ -91,15 +91,15 @@ describe("GET /api/tournaments/[id]/matches/[matchId]/proposals", () => {
   });
 
   it("GET_player_returnsReadableProposalsOfThatMatch", async () => {
-    const snapshot = tournamentSnapshot();
-    jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(snapshot);
+    const card = tournamentCard();
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(card);
 
     const res = await get("7", "70");
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ proposals });
-    expect(getVisibleTournamentSnapshot).toHaveBeenCalledWith(7, { canManage: false });
-    expect(getViewerMatchProposals).toHaveBeenCalledWith(snapshot, 3, false, 70);
+    expect(getVisibleTournamentCard).toHaveBeenCalledWith(7, { canManage: false });
+    expect(getViewerMatchProposals).toHaveBeenCalledWith({ card }, 3, false, 70);
   });
 
   it("GET_nothingReadable_returnsNullProposals", async () => {
@@ -116,7 +116,7 @@ describe("GET /api/tournaments/[id]/matches/[matchId]/proposals", () => {
 
     await get("7", "70");
 
-    expect(getVisibleTournamentSnapshot).toHaveBeenCalledWith(7, { canManage: true });
+    expect(getVisibleTournamentCard).toHaveBeenCalledWith(7, { canManage: true });
     expect(getViewerMatchProposals).toHaveBeenCalledWith(expect.anything(), 1, true, 70);
   });
 });

@@ -149,13 +149,24 @@ describe("cancelTournamentForfeit", () => {
     expect(connection.rollback).toHaveBeenCalled();
   });
 
+  // Revue #542 : l'engagé disparu est refusé avant la lecture bornée des
+  // manches — ni verrou de plage, ni délai court pour une équipe absente.
+  it("cancel_teamRowMissing_refusedBeforeLaterRoundsRead", async () => {
+    const { sqls, queries } = setup({ teamMissing: true });
+
+    await expect(cancelTournamentForfeit(7, 102)).rejects.toThrow("TEAM_NOT_IN_TOURNAMENT");
+
+    expect(sqls.some((sql) => LATER_ROUNDS.test(sql))).toBe(false);
+    expect(queries).toEqual([]);
+  });
+
   it("cancel_multiPhase_everyReadBeforeLaterRoundsIsLocking", async () => {
     const { sqls } = setup({ head: { format: "MULTI", current_phase_id: 12 }, phase: { format: "SWISS" } });
 
     await cancelTournamentForfeit(7, 102);
 
     const later = sqls.findIndex((sql) => LATER_ROUNDS.test(sql));
-    expect(later).toBe(4);
+    expect(later).toBe(5);
     expect(sqls.slice(0, later + 1).every((sql) => LOCKING.test(sql))).toBe(true);
     // Revue #542 : verrou exclusif d'emblée (le rejeu des phases peut écrire la ligne).
     expect(sqls[2]).toMatch(/^SELECT format FROM bg_tournament_phases WHERE id = \? LIMIT 1 FOR UPDATE$/);
