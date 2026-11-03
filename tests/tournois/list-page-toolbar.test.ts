@@ -54,7 +54,7 @@ describe("page tournois — barre de recherche et filtres", () => {
     expect(page).toMatch(/setBuckets\(\(previous\) => \(sameBuckets\(previous, all\) \? previous : all\)\);\s*setListFetched\(true\);/);
     // « Mes tournois » attendu aussi (échec compris), sans quoi sa section
     // naissait au sommet après coup et poussait la liste vers le bas.
-    expect(page).toContain("const listLoaded = isListGateOpen({ listFetched, mineSettled, hiddenSettled });");
+    expect(page).toContain("isListGateOpen({ listFetched, mineSettled, hiddenSettled })");
     // Une seule porte sur les données : ni section ni invisible sous le
     // squelette, même quand la liste arrive avant « Mes tournois ».
     expect(page).toContain("const viewBuckets = listLoaded ? buckets : emptyBuckets;");
@@ -196,6 +196,23 @@ describe("page tournois — porte des invisibles et annonce des gestes", () => {
   });
 
   it("annonce le nombre de résultats aussi pour un filtre de jeu ou l'archive dépliée", () => {
-    expect(page).toContain('if (!deferredQuery.trim() && gameFilter === "all" && !finishedExpanded) return "";');
+    expect(page).toContain(`if (!deferredQuery.trim() && gameFilter === "all" && !finishedExpanded) {`);
+  });
+});
+
+describe("page tournois — porte ouverte une fois, annonce du retour au tout-afficher", () => {
+  it("ne referme jamais la porte d'affichage après son ouverture", () => {
+    expect(page).toContain("if (isListGateOpen({ listFetched, mineSettled, hiddenSettled })) gateOpenedRef.current = true;");
+    expect(page).toContain("const listLoaded = gateOpenedRef.current;");
+  });
+
+  it("annonce encore le total quand les filtres sont retirés après un geste", () => {
+    expect(page).toContain("if (!gestureMadeRef.current) return \"\";");
+    expect(page).toContain("gestureMadeRef.current = true;");
+  });
+
+  it("dit « trouvés » : le total des sections, pas les cartes dessinées", () => {
+    expect(frTournaments.list.resultsCount).toBe("Tournois trouvés : {count}");
+    expect(enTournaments.list.resultsCount).toBe("Tournaments found: {count}");
   });
 });
