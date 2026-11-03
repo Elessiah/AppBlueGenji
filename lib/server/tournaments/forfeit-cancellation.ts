@@ -21,7 +21,7 @@ import { laterRoundsHaveScoreInput } from "./bg-survie/round-progress";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { publishStandingsReplayedEvent } from "./notifications";
-import { releaseWithServerLockWait } from "./lock-wait";
+import { releaseWithServerLockWait, rollbackKeepingError } from "./lock-wait";
 
 /** Ce que l'annulation a produit, pour la ligne de journal et le message rendu. */
 export type CancelledForfeit = {
@@ -256,7 +256,8 @@ async function cancelTournamentForfeitOnce(
       participantType: toParticipantType(tournament.participant_type),
     };
   } catch (error) {
-    await connection.rollback();
+    // ROLLBACK raté : l'erreur d'origine reste, la connexion est détruite.
+    await rollbackKeepingError(connection);
     throw error;
   } finally {
     discardBotLogs(connection);

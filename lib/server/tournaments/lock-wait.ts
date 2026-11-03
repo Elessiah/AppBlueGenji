@@ -48,14 +48,38 @@ export async function withShortLockWait<T>(connection: PoolConnection, read: () 
 /** Connexions dont le délai court n'a pas (encore) été remis. */
 const shortened = new WeakSet<PoolConnection>();
 
+/** Connexions dont le `ROLLBACK` a échoué : transaction peut-être encore ouverte. */
+const unsettled = new WeakSet<PoolConnection>();
+
+/**
+ * Défait la transaction sans masquer l'erreur qui l'a interrompue : un
+ * `ROLLBACK` qui échoue (connexion tombée après un interblocage) ne remplace
+ * pas l'erreur d'origine, que le rejeu et le 409 reconnaissent. La connexion
+ * est alors détruite par {@link releaseWithServerLockWait}, jamais rendue au
+ * pool avec une transaction peut-être ouverte.
+ */
+export async function rollbackKeepingError(connection: PoolConnection): Promise<void> {
+  try {
+    await connection.rollback();
+  } catch {
+    unsettled.add(connection);
+  }
+}
+
 /**
  * Rend la connexion au pool avec le délai de verrou du serveur, filet de
  * {@link withShortLockWait} : rendue avec le délai court, elle l'imposerait à
  * la requête suivante. La remise n'est rejouée que si celle de
  * `withShortLockWait` a manqué ; si elle échoue encore, la connexion est
- * détruite plutôt que rendue.
+ * détruite plutôt que rendue — comme après un `ROLLBACK` raté
+ * ({@link rollbackKeepingError}).
  */
 export async function releaseWithServerLockWait(connection: PoolConnection): Promise<void> {
+  if (unsettled.has(connection)) {
+    unsettled.delete(connection);
+    connection.destroy();
+    return;
+  }
   // Délai jamais raccourci, ou déjà remis : aucune requête de plus.
   if (!shortened.has(connection)) {
     connection.release();

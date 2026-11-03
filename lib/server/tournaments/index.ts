@@ -183,7 +183,7 @@ import {
   publishScoreReportedEvent,
 } from "./notifications";
 import { discardBotLogs, flushBotLogs, queueBotLog } from "./bot-logs";
-import { releaseWithServerLockWait } from "./lock-wait";
+import { releaseWithServerLockWait, rollbackKeepingError } from "./lock-wait";
 import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
@@ -2021,7 +2021,8 @@ async function liftEndurancePenaltyOnce(tournamentId: number, penaltyId: number)
     // d'un abandon.
     publishStandingsReplayedEvent(tournamentId);
   } catch (error) {
-    await connection.rollback();
+    // ROLLBACK raté : l'erreur d'origine reste, la connexion est détruite.
+    await rollbackKeepingError(connection);
     throw error;
   } finally {
     discardBotLogs(connection);
