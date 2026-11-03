@@ -224,6 +224,18 @@ export async function adoptRemoteAvatar(userId: number, picture: string | undefi
   }
 }
 
+/** Compte en attente de suppression qui porte encore ce Discord (réactivable). */
+async function isPendingDeletionWithDiscord(userId: number, discordId: string): Promise<boolean> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_users
+     WHERE id = ? AND is_deleted = 1 AND deletion_requested_at IS NOT NULL AND discord_id = ?
+     LIMIT 1`,
+    [userId, discordId],
+  );
+  return rows.length > 0;
+}
+
 /**
  * Retrouve (ou crée) le compte rattaché à cet identifiant Discord.
  *
@@ -327,7 +339,13 @@ export async function createOrGetDiscordUser(
     // compte supprimé). Pas de session par une porte qu'il n'a plus, et pas de
     // seconde lecture : son nouveau titulaire n'a pas passé le contrôle de
     // suspension fait sur celui-ci. Le joueur recommence la connexion.
-    if (Number(refreshed.affectedRows) === 0) throw new Error("DISCORD_AUTH_FAILED");
+    if (Number(refreshed.affectedRows) === 0) {
+      // Suppression demandée, fenêtre de trente jours (ERASURE-D2) : le compte
+      // garde son Discord. On rend son identifiant sans rien écrire, et
+      // `createSession` le renvoie vers l'écran de réactivation.
+      if (await isPendingDeletionWithDiscord(userId, discordId)) return userId;
+      throw new Error("DISCORD_AUTH_FAILED");
+    }
     await adoptRemoteAvatar(userId, avatarUrl ?? undefined);
     await settleTermsAfterLogin(userId, false, door);
     return userId;

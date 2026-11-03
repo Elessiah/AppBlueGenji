@@ -70,14 +70,15 @@ async function isInActiveTournament(userId: number): Promise<boolean> {
  */
 export async function getPlayerPageIdentity(userId: number): Promise<PlayerPageIdentity | null> {
   const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { pseudo: string; is_deleted: 0 | 1 })[]>(
-    `SELECT pseudo, is_deleted FROM bg_users WHERE id = ? LIMIT 1`,
-    [userId],
-  );
+  const [rows] = await db.execute<
+    (RowDataPacket & { pseudo: string; is_deleted: 0 | 1; deletion_requested_at: unknown })[]
+  >(`SELECT pseudo, is_deleted, deletion_requested_at FROM bg_users WHERE id = ? LIMIT 1`, [userId]);
   if (rows.length === 0) return null;
-  // Un compte supprimé sans statistiques n'a plus de fiche (D13) : l'onglet ne
-  // le nomme pas davantage que la page.
-  if (Boolean(rows[0].is_deleted) && !(await deletedAccountHasStats(userId))) return null;
+  // Un compte supprimé sans statistiques n'a plus de fiche (D13), un compte en
+  // attente de suppression non plus (ERASURE-D2, son pseudo est encore le
+  // vrai) : l'onglet ne le nomme pas davantage que la page.
+  const isDeleted = Boolean(rows[0].is_deleted);
+  if (await hasNoPlayerPage(isDeleted, rows[0].deletion_requested_at != null, userId)) return null;
   return { pseudo: withoutInvisibles(rows[0].pseudo), isDeleted: Boolean(rows[0].is_deleted) };
 }
 
@@ -96,9 +97,14 @@ function ownerOnlyColumns(isSelf: boolean): string {
   return isSelf ? "match_dm_enabled," : "";
 }
 
-/** Vrai pour un compte supprimé qui n'a joué aucun match : il n'a plus de fiche (D13). */
-async function hasNoPlayerPage(isDeleted: boolean, userId: number): Promise<boolean> {
-  return isDeleted && !(await deletedAccountHasStats(userId));
+/**
+ * Vrai pour un compte supprimé qui n'a joué aucun match (D13), ou dont la
+ * suppression est seulement demandée (ERASURE-D2 : invisible pendant les
+ * trente jours, ses données réelles sont encore là) : il n'a plus de fiche.
+ */
+async function hasNoPlayerPage(isDeleted: boolean, pending: boolean, userId: number): Promise<boolean> {
+  if (!isDeleted) return false;
+  return pending || !(await deletedAccountHasStats(userId));
 }
 
 export async function getFullProfile(
@@ -112,7 +118,12 @@ export async function getFullProfile(
   const matchDmColumn = ownerOnlyColumns(viewerId === targetUserId);
 
   const [userRows] = await db.execute<
-    (UserRow & { locale: string; match_dm_enabled?: number | null; blizzard_linked?: number | null })[]
+    (UserRow & {
+      locale: string;
+      deletion_requested_at?: unknown;
+      match_dm_enabled?: number | null;
+      blizzard_linked?: number | null;
+    })[]
   >(
     `SELECT
       id,
@@ -133,6 +144,7 @@ export async function getFullProfile(
       is_admin,
       platform_roles_json,
       is_deleted,
+      deletion_requested_at,
       locale,
       ${matchDmColumn}
       created_at
@@ -150,7 +162,7 @@ export async function getFullProfile(
   // statistiques appartiennent aussi à ses adversaires. Sinon elle répond comme
   // un compte inconnu (404), et les liens qui y menaient sont du texte
   // (`profileless-players`).
-  if (await hasNoPlayerPage(isDeleted, targetUserId)) return null;
+  if (await hasNoPlayerPage(isDeleted, userRows[0].deletion_requested_at != null, targetUserId)) return null;
   // Un compte supprimé n'a plus de titre de staff à afficher : l'anonymisation
   // les efface en base, et `reconcileDeletedAccounts` rattrape les comptes
   // supprimés avant la règle — la lecture n'a pas de cas particulier à tenir.

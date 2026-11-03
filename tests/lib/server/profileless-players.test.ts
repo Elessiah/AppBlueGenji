@@ -87,7 +87,8 @@ describe("loadProfilelessPlayerIds", () => {
     expect(await loadProfilelessPlayerIds()).toEqual([3, 12]);
     const sql = String(execute.mock.calls[0][0]);
     expect(sql).toContain("u.is_deleted = 1");
-    expect(sql).toContain("AND NOT");
+    // Un compte en attente de suppression n'a pas de fiche, même s'il a joué.
+    expect(sql).toContain("u.deletion_requested_at IS NOT NULL OR NOT");
   });
 
   it("loadProfilelessPlayerIds_dbFails_returnsEmpty", async () => {
@@ -142,6 +143,13 @@ describe("getFullProfile — compte supprimé (D13)", () => {
     expect(profile?.profile.isDeleted).toBe(true);
   });
 
+  it("getFullProfile_pendingDeletionWithStats_returnsNull", async () => {
+    // ERASURE-D2 : invisible pendant les trente jours, son vrai pseudo est encore là.
+    profileDb(userRow({ deletion_requested_at: "2026-11-01 10:00:00" }), 1);
+
+    expect(await getFullProfile({ id: 1 }, 7)).toBeNull();
+  });
+
   it("getFullProfile_liveAccount_neverAsksForStats", async () => {
     const execute = profileDb(userRow({ is_deleted: 0, pseudo: "Vivant" }), 0);
 
@@ -153,15 +161,21 @@ describe("getFullProfile — compte supprimé (D13)", () => {
 });
 
 describe("getPlayerPageIdentity — compte supprimé (D13)", () => {
-  function identityDb(isDeleted: number, played: number) {
+  function identityDb(isDeleted: number, played: number, pending = false) {
     return mockDb((sql) => {
       if (sql.includes("AS played")) return [[{ played }]];
-      return [[{ pseudo: "Renard Pâle", is_deleted: isDeleted }]];
+      return [[{ pseudo: "Renard Pâle", is_deleted: isDeleted, deletion_requested_at: pending ? "2026-11-01 10:00:00" : null }]];
     });
   }
 
   it("getPlayerPageIdentity_deletedWithoutStats_returnsNull", async () => {
     identityDb(1, 0);
+
+    expect(await getPlayerPageIdentity(7)).toBeNull();
+  });
+
+  it("getPlayerPageIdentity_pendingDeletionWithStats_returnsNull", async () => {
+    identityDb(1, 1, true);
 
     expect(await getPlayerPageIdentity(7)).toBeNull();
   });

@@ -599,14 +599,17 @@ restaurée. Voir `docs/features/BACKUP_DATA_PROTECTION.md`.
 `DELETE /api/profile` **ne détruit plus rien** : le compte passe en attente
 (`is_deleted = 1` + `deletion_requested_at`), ce qui réutilise toutes les gardes
 `is_deleted = 0` existantes (session, notifications, annuaire, invitations par
-pseudo, fiche joueur en 404). Les sessions sont supprimées dans la transaction.
+pseudo). La fiche joueur répond 404 même s'il a joué, et il compte parmi les
+joueurs sans fiche (`profileless-players`) : son vrai pseudo est encore en base.
+Les sessions sont supprimées dans la transaction.
 
 **Ce qui touche les autres se fait tout de suite, et la réactivation ne le
 défait pas** — une seule transaction, verrous dans l'ordre tournois
 (`lockTournamentRow`, id croissant) → compte (`FOR UPDATE`) → équipes :
 
 - **E3 — équipes.** Le compte quitte chaque équipe. Propriétaire : la propriété
-  passe au `MANAGER`, sinon au `CAPITAINE`, sinon au membre le plus ancien
+  reste à un autre `OWNER` s'il y en a, sinon passe au `MANAGER`, sinon au
+  `CAPITAINE`, sinon au membre le plus ancien
   (`pickTeamSuccessor`, départage par l'id d'appartenance), avec l'avis
   `OWNERSHIP`. Seul joueur : équipe **fantôme** si elle est inscrite à un tournoi
   `UPCOMING`/`REGISTRATION`/`RUNNING`, sinon **dissoute** (`dissolveTeamOn`,
@@ -632,9 +635,12 @@ session : `createSession` (porte unique de toutes les connexions) pose un ticket
 `bg_reactivation` (jeton aléatoire, empreinte SHA-256 dans
 `bg_account_reactivation_tickets`, quinze minutes) et lève
 `AccountPendingDeletionError` ; le rappel OAuth et le code Discord renvoient vers
-`/connexion/reactivation`, qui dit ce qui n'est pas rendu. Seul le clic
+`/connexion/reactivation`, qui dit ce qui n'est pas rendu. La connexion Discord
+(`createOrGetDiscordUser`) rend l'id d'une ligne en attente qui porte encore ce
+Discord, sans rien y écrire, pour atteindre ce point. Seul le clic
 « Réactiver mon compte » (`POST /api/auth/reactivate`) consomme le ticket, relit
-la fenêtre sous verrou et remet `is_deleted = 0`. Au-delà de trente jours, la
+la fenêtre sous verrou et remet `is_deleted = 0` — après le contrôle de
+suspension, pour qu'un compte suspendu ne revive pas sans session. Au-delà de trente jours, la
 connexion est refusée (`ACCOUNT_DELETED`).
 
 **Jour 30.** `finalizeDueAccountDeletions` (horaire, paresseux, lancé par

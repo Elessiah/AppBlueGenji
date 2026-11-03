@@ -38,7 +38,7 @@ async function computeProfilelessPlayerIds(): Promise<number[]> {
     `SELECT u.id
        FROM bg_users u
       WHERE u.is_deleted = 1
-        AND NOT ${accountTraceSql().played}
+        AND (u.deletion_requested_at IS NOT NULL OR NOT ${accountTraceSql().played})
       ORDER BY u.id`,
   );
   return rows.map((row) => Number(row.id));

@@ -49,6 +49,13 @@ describe("isReactivationWindowOpen", () => {
 });
 
 describe("pickTeamSuccessor", () => {
+  it("pickTeamSuccessor_coOwnerPresent_picksCoOwnerOverManager", () => {
+    const manager = candidate({ userId: 2, roles: ["MANAGER"], joinedAt: "2025-01-01T00:00:00.000Z" });
+    const coOwner = candidate({ userId: 3, roles: ["OWNER", "DPS"], joinedAt: "2026-06-01T00:00:00.000Z" });
+
+    expect(pickTeamSuccessor([manager, coOwner])?.userId).toBe(3);
+  });
+
   it("pickTeamSuccessor_managerPresent_picksManagerOverOlderCaptain", () => {
     const captain = candidate({ userId: 2, roles: ["CAPITAINE"], joinedAt: "2025-01-01T00:00:00.000Z" });
     const manager = candidate({ userId: 3, roles: ["MANAGER"], joinedAt: "2026-06-01T00:00:00.000Z" });

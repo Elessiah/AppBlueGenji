@@ -398,14 +398,18 @@ export type TeamSuccessorCandidate = {
 
 /** Rang d'un candidat : `MANAGER` d'abord, puis `CAPITAINE`, puis tout autre membre. */
 function successorRank(roles: readonly string[]): number {
-  if (roles.includes("MANAGER")) return 0;
-  if (roles.includes("CAPITAINE")) return 1;
-  return 2;
+  // Un co-propriétaire déjà en place passe devant tout le monde : la propriété
+  // ne s'ajoute à personne d'autre (rôles cumulatifs, deux `OWNER` possibles).
+  if (roles.includes("OWNER")) return 0;
+  if (roles.includes("MANAGER")) return 1;
+  if (roles.includes("CAPITAINE")) return 2;
+  return 3;
 }
 
 /**
  * Le membre qui reçoit l'équipe quand son propriétaire supprime son compte
- * (E3) : un `MANAGER`, sinon un `CAPITAINE`, sinon un autre membre ; à rang
+ * (E3) : un autre `OWNER` s'il y en a (rien ne change pour lui), sinon un
+ * `MANAGER`, sinon un `CAPITAINE`, sinon un autre membre ; à rang
  * égal, le plus ancien dans l'équipe, puis la ligne d'appartenance la plus
  * ancienne. `null` : il était seul.
  */

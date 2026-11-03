@@ -213,6 +213,40 @@ describe("connexions OAuth — une ligne supprimée ne reprend pas son identité
     expect(update[0]).toMatch(/is_deleted = 0/);
   });
 
+  it("createOrGetDiscordUser_pendingDeletionKeepsDiscord_returnsIdForReactivation", async () => {
+    // ERASURE-D2 : la ligne en attente (`is_deleted = 1`, demande datée) garde
+    // son Discord ; la connexion doit atteindre `createSession`, qui renvoie
+    // vers l'écran de réactivation, sans rien réécrire.
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 412 }], []])
+      .mockResolvedValueOnce([{ affectedRows: 0 }, []])
+      .mockResolvedValueOnce([[{ 1: 1 }], []]);
+    await mockDb(execute);
+
+    await expect(
+      createOrGetDiscordUser("100000000000000001", undefined, "nova", { method: "OAUTH", termsAccepted: true }),
+    ).resolves.toBe(412);
+
+    const [sql, params] = execute.mock.calls[2];
+    expect(sql).toMatch(/is_deleted = 1 AND deletion_requested_at IS NOT NULL AND discord_id = \?/);
+    expect(params).toEqual([412, "100000000000000001"]);
+    expect(execute).toHaveBeenCalledTimes(3);
+  });
+
+  it("createOrGetDiscordUser_anonymizedRow_stillRefused", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 412 }], []])
+      .mockResolvedValueOnce([{ affectedRows: 0 }, []])
+      .mockResolvedValueOnce([[], []]);
+    await mockDb(execute);
+
+    await expect(
+      createOrGetDiscordUser("100000000000000001", undefined, "nova", { method: "DM_CODE", termsAccepted: true }),
+    ).rejects.toThrow("DISCORD_AUTH_FAILED");
+  });
+
   it("Blizzard : ne repose pas le BattleTag sur un compte mort", async () => {
     const execute = jest
       .fn<SqlQuery>()

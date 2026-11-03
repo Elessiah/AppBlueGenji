@@ -1,10 +1,14 @@
 import { cookies } from "next/headers";
 import { createSession } from "@/lib/server/auth";
-import { AccountSuspendedError } from "@/lib/server/account-suspensions";
+import { AccountSuspendedError, assertNotSuspended } from "@/lib/server/account-suspensions";
 import { ACCOUNT_SUSPENDED } from "@/lib/shared/account-suspension";
 import { fail, ok } from "@/lib/server/http";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
-import { reactivateAccount, REACTIVATION_COOKIE } from "@/lib/server/users/account-reactivation";
+import {
+  peekReactivationTicket,
+  reactivateAccount,
+  REACTIVATION_COOKIE,
+} from "@/lib/server/users/account-reactivation";
 
 /**
  * Réactive le compte désigné par le ticket de réactivation (cookie posé par la
@@ -19,6 +23,10 @@ export async function POST(req: Request) {
   const token = cookieStore.get(REACTIVATION_COOKIE)?.value;
   cookieStore.delete(REACTIVATION_COOKIE);
   try {
+    // Suspension contrôlée **avant** de relever la demande : sinon le compte
+    // revivrait sans session, et la demande de suppression serait perdue.
+    const pending = await peekReactivationTicket(token);
+    if (pending) await assertNotSuspended(pending.userId);
     const reactivated = await reactivateAccount(token);
     if (!reactivated) return fail("REACTIVATION_EXPIRED", 410);
     await createSession(reactivated.userId, reactivated.event);
