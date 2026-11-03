@@ -61,7 +61,7 @@ describe("page tournois — section « Tournois invisibles »", () => {
   it("applique la recherche et le filtre de jeu aux invisibles", () => {
     // La recherche (coûteuse) n'est faite qu'une fois, dans `queryFilteredHidden` ;
     // le filtre de jeu (une comparaison de chaîne) s'applique ensuite par-dessus.
-    expect(page).toContain("filterTournamentsByQuery(viewHidden, query, formatName)");
+    expect(page).toContain("filterTournamentsByQuery(viewHidden, deferredQuery, formatName)");
     expect(page).toContain("filterTournamentsByGame(queryFilteredHidden, gameFilter)");
   });
 

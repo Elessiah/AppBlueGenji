@@ -338,6 +338,31 @@ describe("runMigrations — tolérance d'un ALTER récent", () => {
     expect(errorSpy).not.toHaveBeenCalled();
   });
 
+  // EF-16 : la visibilité borne toutes les lectures de la liste des tournois.
+  it("runMigrations_startVisibilityIndex_isAddedOnce", async () => {
+    await getDatabase();
+
+    expect(
+      count(/^ALTER TABLE bg_tournaments ADD INDEX idx_bg_tournaments_start_visibility \(start_visibility_at\)$/),
+    ).toBe(1);
+  });
+
+  it("runMigrations_startVisibilityIndexAlreadyThere_staysSilent", async () => {
+    fail(/ADD INDEX idx_bg_tournaments_start_visibility/, "ER_DUP_KEYNAME");
+
+    await getDatabase();
+
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it("runMigrations_startVisibilityIndexRefused_reportsTheFailure", async () => {
+    fail(/ADD INDEX idx_bg_tournaments_start_visibility/, "ER_LOCK_WAIT_TIMEOUT");
+
+    await getDatabase();
+
+    expect(errors()).toContain("idx_bg_tournaments_start_visibility");
+  });
+
   it("runMigrations_phaseIndexSwapRefused_reportsTheFailure", async () => {
     fail(/^ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round/, "ER_LOCK_WAIT_TIMEOUT");
 

@@ -75,7 +75,17 @@ export function tournamentRow(overrides: RowOverrides<TournamentRow> = {}): Tour
 export function tournamentListRow(
   overrides: RowOverrides<TournamentListRow> = {},
 ): TournamentListRow {
-  return { ...tournamentRow(overrides), registered_teams: overrides.registered_teams ?? 0 };
+  return {
+    ...tournamentRow(overrides),
+    registered_teams: overrides.registered_teams ?? 0,
+    // Colonnes d'avancement lues avec la liste : les défauts d'un tournoi neuf.
+    swiss_total_rounds: overrides.swiss_total_rounds ?? null,
+    swiss_current_round: overrides.swiss_current_round ?? 0,
+    endurance_current_round: overrides.endurance_current_round ?? 0,
+    endurance_max_rounds: overrides.endurance_max_rounds ?? null,
+    endurance_playoff_size: overrides.endurance_playoff_size ?? 8,
+    endurance_playoffs_started: overrides.endurance_playoffs_started ?? 0,
+  };
 }
 
 /** Une ligne `bg_matches` **complète** : match prêt entre les engagés 1 et 2. */

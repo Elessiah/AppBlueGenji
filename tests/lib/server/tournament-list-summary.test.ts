@@ -3,6 +3,7 @@ import { loadCardSummaries } from "@/lib/server/tournaments/list-summary";
 import type { TournamentCard } from "@/lib/shared/types";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { tournamentCard } from "../../helpers/tournament-card";
+import { tournamentListRow } from "../../helpers/tournament-rows";
 
 /**
  * Résumé des cartes de la liste, lu **par lots** : quelques requêtes pour toute
@@ -92,6 +93,70 @@ describe("loadCardSummaries", () => {
 
     expect(summaries.get(1)?.runningProgress).toBeCloseTo(3 / 4);
     expect(summaries.get(2)?.runningProgress).toBeCloseTo(1 / 4);
+  });
+
+  describe("colonnes d'avancement déjà lues avec la liste", () => {
+    const meta = (id: number, swissTotalRounds: number | null, swissCurrentRound: number) =>
+      [
+        id,
+        tournamentListRow({
+          id,
+          swiss_total_rounds: swissTotalRounds,
+          swiss_current_round: swissCurrentRound,
+        }),
+      ] as const;
+
+    it("ne relit pas bg_tournaments quand la liste a déjà ses colonnes", async () => {
+      const { execute, pool } = database({
+        "FROM bg_matches": [
+          { tournament_id: 2, phase_id: 0, round_number: 1, total: 2, completed: 2 },
+          { tournament_id: 2, phase_id: 0, round_number: 2, total: 2, completed: 0 },
+        ],
+      });
+
+      const summaries = await loadCardSummaries(
+        pool,
+        [card({ id: 2, state: "RUNNING", format: "SWISS" })],
+        new Map([meta(2, 4, 2)]),
+      );
+
+      expect(sqlOf(execute).some((sql) => sql.includes("FROM bg_tournaments"))).toBe(false);
+      expect(summaries.get(2)?.runningProgress).toBeCloseTo(1 / 4);
+    });
+
+    it("ne relit que les tournois dont les colonnes manquent", async () => {
+      const { execute, pool } = database({
+        "FROM bg_tournaments": [
+          { id: 3, swiss_total_rounds: null, swiss_current_round: 0, current_phase_id: null },
+        ],
+      });
+
+      await loadCardSummaries(
+        pool,
+        [
+          card({ id: 2, state: "RUNNING", format: "SWISS" }),
+          card({ id: 3, state: "RUNNING", format: "SWISS" }),
+        ],
+        new Map([meta(2, 4, 2)]),
+      );
+
+      const [sql, params] = execute.mock.calls.find(([text]) => String(text).includes("FROM bg_tournaments"))!;
+      expect(String(sql)).toContain("IN (?)");
+      expect(params).toEqual([3]);
+    });
+
+    it("relit toutes les colonnes quand l'appelant n'en fournit aucune", async () => {
+      const { execute, pool } = database({
+        "FROM bg_tournaments": [
+          { id: 2, swiss_total_rounds: 4, swiss_current_round: 2, current_phase_id: null },
+        ],
+      });
+
+      await loadCardSummaries(pool, [card({ id: 2, state: "RUNNING", format: "SWISS" })]);
+
+      const [, params] = execute.mock.calls.find(([text]) => String(text).includes("FROM bg_tournaments"))!;
+      expect(params).toEqual([2]);
+    });
   });
 
   it("lit les manches de BG Survie et les tables utiles aux autres formats", async () => {

@@ -17,6 +17,8 @@ jest.mock("@/components/ui/toast", () => ({
   useToast: () => ({ showError: () => undefined, showSuccess: () => undefined }),
 }));
 jest.mock("@/app/(secured)/_shared/BgCanvas", () => ({ BgCanvas: () => null }));
+// La page lit le droit staff sur le serveur (`getCurrentUser`) : un lecteur sans droit.
+jest.mock("@/lib/server/auth", () => ({ getCurrentUser: async () => null }));
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { createTranslator } from "next-intl";
@@ -129,7 +131,7 @@ describe("route et référencement", () => {
 
 describe("mise en page — dictionnaire du navigateur", () => {
   it("sous /en, ne sérialise que les espaces client (ni `meta`)", async () => {
-    const html = renderToStaticMarkup(await TournamentsLayout({ children: <TournamentsList /> }));
+    const html = renderToStaticMarkup(await TournamentsLayout({ children: <TournamentsList canManage={false} /> }));
     expect(html).toContain("Search for a tournament");
     const client = tournamentsClientMessages(messagesFor("en"));
     expect(Object.keys(client).sort((a, b) => a.localeCompare(b))).toEqual(
@@ -140,15 +142,15 @@ describe("mise en page — dictionnaire du navigateur", () => {
 
   it("en français, rien n'est passé : le texte est celui du paquet", async () => {
     mockLocale = "fr";
-    const layout = await TournamentsLayout({ children: <TournamentsList /> });
+    const layout = await TournamentsLayout({ children: <TournamentsList canManage={false} /> });
     expect((layout.props as { messages?: unknown }).messages).toBeUndefined();
     expect(renderToStaticMarkup(layout)).toContain("Rechercher un tournoi");
   });
 });
 
 describe("page — rendu anglais", () => {
-  it("n'a plus un mot de français, liens dans la langue de la page", () => {
-    const html = inEnglish(<TournamentsPage />);
+  it("n'a plus un mot de français, liens dans la langue de la page", async () => {
+    const html = inEnglish(await TournamentsPage());
     const text = readable(html);
     expect(text).not.toMatch(FRENCH_WORDS);
     expect(text).not.toMatch(ACCENTED);
@@ -164,8 +166,8 @@ describe("page — rendu anglais", () => {
     expect(html).toContain('aria-label="Tournament rules"');
   });
 
-  it("français inchangé hors fournisseur", () => {
-    const html = renderToStaticMarkup(<TournamentsPage />);
+  it("français inchangé hors fournisseur", async () => {
+    const html = renderToStaticMarkup(await TournamentsPage());
     expect(html).toContain("PLATEFORME · TOURNOIS");
     expect(html).toContain('placeholder="Rechercher un tournoi, un format…"');
     expect(html).toContain("Chargement des tournois…");

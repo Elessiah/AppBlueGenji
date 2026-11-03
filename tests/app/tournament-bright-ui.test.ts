@@ -129,11 +129,13 @@ describe("liste /tournois — couleurs d'état", () => {
   });
 
   it("les points qui pulsent suivent le régime de charge", () => {
-    for (const name of ["cardRibbonRunning", "cardRibbonOpen"]) {
-      const block = LIST_CSS.match(new RegExp(`\\.${name} \\.dot\\s*\\{([^}]*)\\}`))?.[1] ?? "";
-      expect(block).toMatch(/animation:[^;]*infinite/);
-      expect(block).toMatch(/animation-play-state:\s*var\(--deco-anim-state\)/);
-    }
+    // L'anneau pulsé est un pseudo-élément (`transform`/`opacity`, EF-16), posé
+    // sur les deux pastilles par une même règle.
+    expect(LIST_CSS).toMatch(/\.cardRibbonRunning \.dot::after,/);
+    expect(LIST_CSS).toMatch(/\.cardRibbonOpen \.dot::after \{/);
+    const block = LIST_CSS.match(/\.cardRibbonOpen \.dot::after\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(block).toMatch(/animation:[^;]*infinite/);
+    expect(block).toMatch(/animation-play-state:\s*var\(--deco-anim-state\)/);
   });
 
   it("aucune teinte d'état n'emprunte le rouge d'antenne", () => {
