@@ -139,7 +139,9 @@ async function fetchBuckets(url: string, signal?: AbortSignal): Promise<Tourname
   // `app/api/tournaments/route.ts`), le navigateur la revalide et le serveur
   // répond 304 sans corps quand la liste n'a pas bougé.
   const response = await fetch(url, { cache: "no-cache", signal });
-  const payload = (await response.json()) as {
+  // Une page d'erreur HTML (proxy, déploiement) n'est pas du JSON : sans ce
+  // repli, la toast affichait le message brut de `SyntaxError` au lieu d'un code.
+  const payload = (await response.json().catch(() => ({}))) as {
     error?: string;
     buckets?: TournamentBuckets;
   };
@@ -285,8 +287,17 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
           sameTournaments(previous, hidden) ? previous : hidden,
         );
       } catch (e) {
-        if (signal?.aborted || silent) return;
-        showError((e as Error).message);
+        if (signal?.aborted) return;
+        const code = (e as Error).message;
+        // Refus du droit `tournaments` (retiré depuis le rendu de la page, ou
+        // session échue) : la section n'a plus lieu d'être, et une toast
+        // « FORBIDDEN » sur une simple liste ne dirait rien au lecteur.
+        if (code === "FORBIDDEN" || code === "UNAUTHORIZED") {
+          setHiddenTournaments((previous) => (previous.length === 0 ? previous : []));
+          return;
+        }
+        if (silent) return;
+        showError(code);
       } finally {
         // Réglée au premier résultat, échec compris : la liste publique ne doit
         // pas rester sous le squelette pour une lecture réservée au staff.

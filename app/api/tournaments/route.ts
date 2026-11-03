@@ -75,6 +75,13 @@ export async function GET(req: Request) {
   // `no-cache` : le navigateur la garde mais la revalide à chaque lecture, d'où
   // le 304 sans corps quand la liste n'a pas bougé. Le refus d'accès passe
   // **avant** : une empreinte ne sert jamais un lecteur sans droit.
+  // `scope=hidden` fait exception : `no-store`, sans empreinte. Ces tournois ne
+  // sont pas encore publiés, et une copie gardée sur le disque d'un poste
+  // partagé resterait lisible après la déconnexion du staff ; la liste,
+  // rebâtie à chaque appel, ne profitait de toute façon d'aucun 304 côté serveur.
+  if (hiddenOnly) {
+    return NextResponse.json({ buckets }, { headers: { "Cache-Control": "private, no-store" } });
+  }
   const { body, etag } = serializedList(buckets);
   const headers = { ETag: etag, "Cache-Control": "private, no-cache" };
   if (matchesEtag(req.headers.get("if-none-match"), etag)) {
