@@ -260,6 +260,13 @@ describe("createCoalescer — annonce forcée", () => {
     expect(done).toEqual(["announced", "flushed"]);
   });
 
+  it("trackAnnouncement_rejectedPromise_forgottenAndFlushResolves", async () => {
+    const rejected = Promise.reject(new Error("boom"));
+    trackAnnouncement(rejected).catch(() => undefined);
+    await expect(flushAllCoalescers()).resolves.toBeUndefined();
+    await expect(flushAllCoalescers()).resolves.toBeUndefined();
+  });
+
   it("flush_unknownKey_resolvesWithoutDelivering", async () => {
     const { deliver, coalescer } = setup();
     coalescer.add("a", 1);

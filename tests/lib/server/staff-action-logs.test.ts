@@ -4,6 +4,7 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 
 import { getDatabase } from "@/lib/server/database";
+import { flushAllCoalescers } from "@/lib/server/coalescer";
 import { isBotCircuitOpen, sendBotLog } from "@/lib/server/bot-integration";
 import {
   announceStaffMatchAction,
@@ -126,6 +127,21 @@ describe("announceStaffMatchAction / announceStaffTournamentAction", () => {
     announceStaffTournamentAction(7, "EDITED");
     expect(getDatabase).toHaveBeenCalled();
     error.mockRestore();
+  });
+
+  it("announceStaffTournamentAction_shutdownFlush_waitsImmediateDelivery", async () => {
+    let finishRead: () => void = () => undefined;
+    const execute = jest.fn<SqlQuery>(
+      () => new Promise((resolve) => (finishRead = () => resolve([[{ id: 7, name: "Coupe d'hiver" }], []]))),
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    announceStaffTournamentAction(7, "EDITED");
+    const flushed = flushAllCoalescers();
+    await settle();
+    expect(sendBotLog).not.toHaveBeenCalled();
+    finishRead();
+    await flushed;
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
   });
 
   it("ne lèvent jamais quand la base est indisponible", async () => {

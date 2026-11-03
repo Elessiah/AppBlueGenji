@@ -424,6 +424,25 @@ describe("announceCastChange", () => {
       expect(lines()[1]).toContain("Cast réservé");
     });
 
+    it("announceCastChange_staffReleaseClaimStaffReleaseWhileFirstSlow_allLinesPosted", async () => {
+      mockMatch(matchRow());
+      let finishRead: () => void = () => undefined;
+      jest.mocked(loadNotificationRecipients).mockImplementationOnce(
+        () => new Promise((resolve) => (finishRead = () => resolve([RECIPIENT]))),
+      );
+      announceCastChange({ ...released, byStaff: true });
+      announceCastChange(claimed);
+      announceCastChange({ ...released, byStaff: true });
+      await settleChain();
+      finishRead();
+      await settleChain();
+      await settleChain();
+      expect(lines()).toHaveLength(3);
+      expect(lines()[0]).toContain("par le staff");
+      expect(lines()[1]).toContain("Cast réservé");
+      expect(lines()[2]).toContain("par le staff");
+    });
+
     it("announceCastChange_gestureAfterStaffFlush_opensNewBurst", async () => {
       mockMatch(matchRow());
       announceCastChange(released);
