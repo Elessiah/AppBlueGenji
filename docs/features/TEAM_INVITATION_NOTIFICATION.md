@@ -55,7 +55,7 @@ avertissement. Une invitation qui valide une demande déjà en attente
 
 Le **nom de l'équipe seul** (`discordInline` sur Discord : ni mention, ni lien,
 ni balisage), jamais le pseudo ni le `#id` de qui invite, propose ou transfère.
-Une reprise dit « Un admin vous propose de reprendre l'équipe [nom](lien) » / "An
+Une reprise dit « Un admin te propose de reprendre l'équipe [nom](lien) » / "An
 admin offers you to take over the team [name](link)" (décision de l'utilisateur,
 2026-11-03) : le nom en lien masqué vers `/profil#invitations`, ses crochets et
 parenthèses échappés par `discordInline` ; le push dit la même phrase sans lien.
