@@ -622,8 +622,12 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   match, sont retirées (`withdrawSoloRegistrationsOn`). L'entrée d'un tournoi
   `RUNNING` **jamais jouée** perd ses matchs restants par forfait **après** le
   commit (`forfeitSoloEntriesAfterCommit` : `forfeitTournamentTeam` pour
-  SURVIVAL/SWISS/BG_SURVIE, `adminResolveMatch({ forfeitTeamId })` match par
-  match sinon, qui tranche et fait monter l'adversaire). « Jamais jouée » se lit **dans ce tournoi** (`pm.tournament_id`) :
+  SURVIVAL/SWISS/BG_SURVIE — une entrée déjà hors course n'est pas une erreur —,
+  sinon `forfeitDeletedEntryMatch` match par match : sous `lockTournamentRow`
+  puis le verrou du match, il relit tournoi `RUNNING`, compte en suppression,
+  entrée jamais jouée et match encore ouvert, puis tranche par
+  `adminResolveMatch` — un relevé hors verrou aurait pu « corriger » en forfait
+  un résultat que l'arbitre venait de saisir). « Jamais jouée » se lit **dans ce tournoi** (`pm.tournament_id`) :
   l'entrée solo est unique pour tous les tournois du compte. Chaque forfait
   relit d'abord `is_deleted` : un compte réactivé entre-temps garde ses matchs.
   Un échec, ou un match d'aval dont l'adversaire n'est pas encore connu, est

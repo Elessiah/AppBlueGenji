@@ -6,13 +6,13 @@ jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/registration");
 jest.mock("@/lib/server/tournaments/seeding");
 jest.mock("@/lib/server/tournaments-service", () => ({
-  adminResolveMatch: jest.fn(),
+  forfeitDeletedEntryMatch: jest.fn(),
   forfeitTournamentTeam: jest.fn(),
 }));
 
 import { getDatabase } from "@/lib/server/database";
 import { sendBotLog } from "@/lib/server/bot-integration";
-import { adminResolveMatch, forfeitTournamentTeam } from "@/lib/server/tournaments-service";
+import { forfeitDeletedEntryMatch, forfeitTournamentTeam } from "@/lib/server/tournaments-service";
 import {
   forfeitSoloEntriesAfterCommit,
   forfeitUnplayedSoloEntry,
@@ -47,7 +47,6 @@ function fakeDb(options: Options) {
     if (q.startsWith("SELECT t.format, p.format AS phase_format")) {
       return [[{ format: options.format ?? "SINGLE", phase_format: options.phaseFormat ?? null }]];
     }
-    if (q.startsWith("SELECT id FROM bg_matches")) return [open.length > 0 ? [{ id: open.shift() }] : []];
     if (q.startsWith("SELECT t.name, t.max_teams, t.participant_type")) {
       return [[{ name: "Coupe solo", max_teams: 16, participant_type: "SOLO", registered: 9 }]];
     }
@@ -56,6 +55,8 @@ function fakeDb(options: Options) {
     return [[]];
   });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, getConnection: jest.fn() }));
+  // Le prochain match ouvert, forfaité sous verrou (`deleted-entry-forfeit.ts`), puis plus rien.
+  jest.mocked(forfeitDeletedEntryMatch).mockImplementation(async () => open.shift() ?? null);
   return execute;
 }
 
@@ -70,7 +71,7 @@ describe("forfeitUnplayedSoloEntry", () => {
 
     expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(1);
     expect(forfeitTournamentTeam).toHaveBeenCalledWith(4, 40, null);
-    expect(adminResolveMatch).not.toHaveBeenCalled();
+    expect(forfeitDeletedEntryMatch).not.toHaveBeenCalled();
   });
 
   it("forfeitUnplayedSoloEntry_multiPhaseRanking_usesPhaseFormat", async () => {
@@ -85,10 +86,8 @@ describe("forfeitUnplayedSoloEntry", () => {
     fakeDb({ format: "DOUBLE", openMatches: [101, 102] });
 
     expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(2);
-    expect(jest.mocked(adminResolveMatch).mock.calls).toEqual([
-      [101, { forfeitTeamId: 40 }],
-      [102, { forfeitTeamId: 40 }],
-    ]);
+    expect(forfeitDeletedEntryMatch).toHaveBeenCalledTimes(3);
+    expect(forfeitDeletedEntryMatch).toHaveBeenCalledWith(4, 40);
     expect(forfeitTournamentTeam).not.toHaveBeenCalled();
   });
 
@@ -119,14 +118,20 @@ describe("forfeitUnplayedSoloEntry — compte réactivé", () => {
 
     expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(0);
     expect(forfeitTournamentTeam).not.toHaveBeenCalled();
-    expect(adminResolveMatch).not.toHaveBeenCalled();
   });
 
-  it("forfeitUnplayedSoloEntry_reactivatedMidBracket_stopsLoop", async () => {
-    fakeDb({ format: "DOUBLE", openMatches: [101, 102], deletedReads: [1, 0] });
+  it("forfeitUnplayedSoloEntry_alreadyOut_zeroWithoutError", async () => {
+    fakeDb({ format: "SURVIVAL" });
+    jest.mocked(forfeitTournamentTeam).mockRejectedValueOnce(new Error("TEAM_ALREADY_OUT"));
 
-    expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(1);
-    expect(jest.mocked(adminResolveMatch).mock.calls).toEqual([[101, { forfeitTeamId: 40 }]]);
+    expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(0);
+  });
+
+  it("forfeitUnplayedSoloEntry_otherEngineError_rethrown", async () => {
+    fakeDb({ format: "SWISS" });
+    jest.mocked(forfeitTournamentTeam).mockRejectedValueOnce(new Error("FORMAT_WITHOUT_FORFEIT"));
+
+    await expect(forfeitUnplayedSoloEntry(4, 40)).rejects.toThrow("FORMAT_WITHOUT_FORFEIT");
   });
 });
 
@@ -135,7 +140,7 @@ describe("forfeitUnplayedSoloEntry — match non tranché", () => {
     fakeDb({ format: "SINGLE", openMatches: [101, 101, 101] });
 
     expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(1);
-    expect(adminResolveMatch).toHaveBeenCalledTimes(1);
+    expect(forfeitDeletedEntryMatch).toHaveBeenCalledTimes(2);
   });
 });
 

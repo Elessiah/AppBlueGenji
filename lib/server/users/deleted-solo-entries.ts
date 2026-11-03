@@ -113,14 +113,16 @@ async function engineFormat(tournamentId: number): Promise<string | null> {
 }
 
 /**
- * L'entrée appartient toujours à un compte en suppression — relu avant chaque
- * forfait : un compte réactivé entre le relevé et le geste garde ses matchs.
+ * L'entrée appartient toujours à un compte en suppression et n'a toujours pas
+ * joué dans ce tournoi — relu juste avant l'abandon : un compte réactivé, ou
+ * une manche saisie, entre le relevé et le geste garde l'entrée.
  */
-async function entryAccountStillDeleted(teamId: number): Promise<boolean> {
+async function entryStillForfeitable(tournamentId: number, teamId: number): Promise<boolean> {
   const db = await getDatabase();
   const [rows] = await db.execute<(RowDataPacket & { is_deleted: number })[]>(
-    `SELECT u.is_deleted FROM bg_teams s JOIN bg_users u ON u.id = s.solo_user_id WHERE s.id = ? LIMIT 1`,
-    [teamId],
+    `SELECT u.is_deleted FROM bg_teams s JOIN bg_users u ON u.id = s.solo_user_id
+      WHERE s.id = ? AND ${soloEntryNeverPlayedSql("?", "?")} LIMIT 1`,
+    [teamId, tournamentId, teamId, teamId],
   );
   return Number(rows[0]?.is_deleted ?? 0) === 1;
 }
@@ -131,44 +133,38 @@ const MAX_BRACKET_FORFEITS = 64;
 /**
  * Les matchs encore à jouer de l'entrée passent en forfait (E1), par les gestes
  * de l'arbitrage — abandon (`forfeitTournamentTeam`) dans un format à
- * classement, forfait match par match (`adminResolveMatch`, qui tranche et fait
- * monter l'adversaire ; `adminSaveMatchScores` ne fait que noter) dans un arbre :
- * chaque forfait propage l'adversaire, et un match d'aval qui reçoit l'entrée
- * (tableau des perdants) est tranché au tour suivant de la boucle. Un match
- * dont l'adversaire n'est pas encore connu attend son appariement : le
- * passage horaire suivant (`settleDeletedSoloEntries`, lancé avec les
- * suppressions définitives) le tranchera.
+ * classement, forfait match par match dans un arbre
+ * (`forfeitDeletedEntryMatch`, qui relit tout sous le verrou du tournoi puis
+ * du match et tranche par `adminResolveMatch`) : chaque forfait propage
+ * l'adversaire, et un match d'aval qui reçoit l'entrée (tableau des perdants)
+ * est tranché au tour suivant de la boucle. Un match dont l'adversaire n'est
+ * pas encore connu attend son appariement : le passage horaire suivant
+ * (`settleDeletedSoloEntries`, lancé avec les suppressions définitives) le
+ * tranchera.
  *
  * Rend le nombre de forfaits posés. Chaque geste ouvre sa propre transaction
  * et prend `lockTournamentRow` le premier.
  */
 export async function forfeitUnplayedSoloEntry(tournamentId: number, teamId: number): Promise<number> {
-  const { adminResolveMatch, forfeitTournamentTeam } = await import("@/lib/server/tournaments-service");
-  if (!(await entryAccountStillDeleted(teamId))) return 0;
+  const { forfeitDeletedEntryMatch, forfeitTournamentTeam } = await import("@/lib/server/tournaments-service");
   const format = await engineFormat(tournamentId);
   if (format !== null && ABANDON_FORMATS.has(format)) {
-    await forfeitTournamentTeam(tournamentId, teamId, null);
+    if (!(await entryStillForfeitable(tournamentId, teamId))) return 0;
+    try {
+      await forfeitTournamentTeam(tournamentId, teamId, null);
+    } catch (error) {
+      // Déjà hors course (abandon antérieur, passage précédent) : rien à faire.
+      if (error instanceof Error && error.message === "TEAM_ALREADY_OUT") return 0;
+      throw error;
+    }
     return 1;
   }
-  const db = await getDatabase();
   let forfeits = 0;
   let previousMatchId: number | null = null;
   for (let round = 0; round < MAX_BRACKET_FORFEITS; round += 1) {
-    const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
-      `SELECT id FROM bg_matches
-        WHERE tournament_id = ?
-          AND status IN ('PENDING', 'READY')
-          AND team1_id IS NOT NULL AND team2_id IS NOT NULL
-          AND (team1_id = ? OR team2_id = ?)
-        ORDER BY id LIMIT 1`,
-      [tournamentId, teamId, teamId],
-    );
-    if (rows.length === 0) break;
-    const matchId = Number(rows[0].id);
-    // Le même match encore ouvert : le forfait ne l'a pas tranché, inutile d'insister.
-    if (matchId === previousMatchId) break;
-    if (round > 0 && !(await entryAccountStillDeleted(teamId))) break;
-    await adminResolveMatch(matchId, { forfeitTeamId: teamId });
+    const matchId = await forfeitDeletedEntryMatch(tournamentId, teamId);
+    // Rien d'ouvert, ou le même match encore rendu : la boucle s'arrête.
+    if (matchId === null || matchId === previousMatchId) break;
     previousMatchId = matchId;
     forfeits += 1;
   }

@@ -1402,6 +1402,29 @@ export async function forfeitOwnMatchPublic(
 }
 
 /**
+ * Forfait du prochain match de l'entrée solo d'un compte en suppression (E1,
+ * `./deleted-entry-forfeit`), par la même chaîne qu'un forfait déclaré : le
+ * plateau avance. Rend l'id du match forfaité, `null` s'il n'y a rien à faire.
+ */
+export async function forfeitDeletedEntryMatchPublic(
+  tournamentId: number,
+  teamId: number,
+): Promise<number | null> {
+  const { forfeitDeletedEntryNextMatch } = await import("./deleted-entry-forfeit");
+  let forfeited: number | null = null;
+  await retryOnDeadlock(() =>
+    runPlayerMatchWrite(
+      tournamentId,
+      () => forfeited,
+      async (connection) => {
+        forfeited = await forfeitDeletedEntryNextMatch(connection, tournamentId, teamId);
+      },
+    ),
+  );
+  return forfeited;
+}
+
+/**
  * Transaction d'une écriture de résultat **par un engagé** (report de score,
  * forfait sur sa manche), suivie de la chaîne qui en tire les conséquences :
  * reports expirés, exemptions, réconciliation des modes à classement et des
@@ -1410,7 +1433,8 @@ export async function forfeitOwnMatchPublic(
  */
 async function runPlayerMatchWrite(
   tournamentId: number,
-  matchId: number,
+  // Un id, ou sa lecture après l'écriture quand c'est elle qui le choisit (`null` : aucun match touché).
+  matchId: number | (() => number | null),
   write: (connection: PoolConnection) => Promise<unknown>,
 ): Promise<void> {
   const stateBefore = await readTournamentState(tournamentId);
@@ -1447,9 +1471,12 @@ async function runPlayerMatchWrite(
     // réponse rendue à l'équipe qui vient de saisir son score.
     flushBotLogs(connection);
 
-    publishScoreReportedEvent(tournamentId, matchId);
-    // L'adversaire a un score à confirmer : il le sait sans avoir la page ouverte.
-    void notifyScoreToConfirm(matchId);
+    const touchedMatchId = typeof matchId === "function" ? matchId() : matchId;
+    if (touchedMatchId !== null) {
+      publishScoreReportedEvent(tournamentId, touchedMatchId);
+      // L'adversaire a un score à confirmer : il le sait sans avoir la page ouverte.
+      void notifyScoreToConfirm(touchedMatchId);
+    }
     await invalidateListsIfStateChanged(tournamentId, stateBefore);
   } catch (error) {
     await connection.rollback();
