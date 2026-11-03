@@ -16,7 +16,7 @@
       "mr": "Marvel Rivals"
     },
     "countLabel": "{label} ({count})",
-    "resultsCount": "Tournaments shown: {count}",
+    "resultsCount": "Tournaments found: {count}",
     "sectionsNav": "Page sections",
     "navNone": "(none)",
     "emptyTitle": "No tournaments",

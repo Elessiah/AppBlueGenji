@@ -182,7 +182,12 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   // montée (`router.refresh()`) rouvre la porte jusqu'à la première lecture.
   const [hiddenRead, setHiddenSettled] = useState(false);
   const hiddenSettled = !isAdmin || hiddenRead;
-  const listLoaded = isListGateOpen({ listFetched, mineSettled, hiddenSettled });
+  // La porte ne se referme pas : un droit staff accordé page montée
+  // (`router.refresh()`) ne doit pas remettre le squelette sur une liste déjà
+  // affichée — la section des invisibles naît alors à son arrivée.
+  const gateOpenedRef = useRef(false);
+  if (isListGateOpen({ listFetched, mineSettled, hiddenSettled })) gateOpenedRef.current = true;
+  const listLoaded = gateOpenedRef.current;
   const [hiddenTournaments, setHiddenTournaments] = useState<TournamentCard[]>([]);
   const [myTournamentIds, setMyTournamentIds] = useState<ReadonlySet<number>>(new Set());
   const [expandedSections, setExpandedSections] = useState<ReadonlySet<LimitedSectionKey>>(new Set());
@@ -429,12 +434,18 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
     finishedExpanded && wantFinishedArchive && viewBuckets.finishedTotals !== undefined;
 
   const showHidden = isAdmin && viewHidden.length > 0;
+  const gestureMadeRef = useRef(false);
   const liveMessage = (() => {
     if (!listLoaded) return "";
     if (finishedArchiveLoading) return t("list.finishedLoading");
     // Une recherche, un jeu choisi ou l'archive dépliée : un geste dont le
     // résultat ne se voit qu'à l'écran, donc à dire.
-    if (!deferredQuery.trim() && gameFilter === "all" && !finishedExpanded) return "";
+    // Une fois un geste fait, le retour au tout-afficher se dit aussi.
+    if (!deferredQuery.trim() && gameFilter === "all" && !finishedExpanded) {
+      if (!gestureMadeRef.current) return "";
+    } else {
+      gestureMadeRef.current = true;
+    }
     const shown = totalMine + totalRunning + totalRegistration + totalUpcoming + totalFinished + (showHidden ? totalHidden : 0);
     return t("list.resultsCount", { count: String(shown) });
   })();
