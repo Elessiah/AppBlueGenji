@@ -106,14 +106,25 @@ export function formatCardDate(iso: string | null, withTime: boolean, locale: Lo
  * Un formateur par langue et par variante (avec ou sans l'heure) : une carte
  * en formate deux ou trois à chaque rendu, et `toLocaleString` avec des
  * options reconstruit un `Intl.DateTimeFormat` à chaque appel. Le fuseau reste
- * celui du lecteur, lu à la création.
+ * celui du lecteur, lu à la création : les formateurs sont donc reconstruits
+ * après `CARD_DATE_FORMAT_TTL_MS`, pour qu'un onglet resté ouvert pendant un
+ * voyage (ou un changement de fuseau de l'appareil) n'affiche pas des heures
+ * décalées.
  */
+export const CARD_DATE_FORMAT_TTL_MS = 60_000;
+let cardDateFormatsBuiltAt = 0;
 const CARD_DATE_FORMATS: Record<"date" | "dateTime", Map<Locale, Intl.DateTimeFormat>> = {
   date: new Map(),
   dateTime: new Map(),
 };
 
 function cardDateFormat(locale: Locale, withTime: boolean): Intl.DateTimeFormat {
+  const now = Date.now();
+  if (now - cardDateFormatsBuiltAt >= CARD_DATE_FORMAT_TTL_MS || now < cardDateFormatsBuiltAt) {
+    CARD_DATE_FORMATS.date.clear();
+    CARD_DATE_FORMATS.dateTime.clear();
+    cardDateFormatsBuiltAt = now;
+  }
   return cached(CARD_DATE_FORMATS[withTime ? "dateTime" : "date"], locale, (key) =>
     new Intl.DateTimeFormat(INTL_LOCALE[key], {
       day: key === "fr" ? "2-digit" : "numeric",

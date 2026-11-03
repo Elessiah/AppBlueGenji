@@ -637,7 +637,12 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
               sa place, sans annoncer « Aucune actualité ». */}
           <Ticker items={tickerItems} labels={text.tickerLabels} />
 
-          <div className={s.sections} data-loading={listLoaded ? undefined : "true"}>
+          {/* aria-busy : les cartes suivent `deferredQuery`, en retard d'une frappe sur le champ. */}
+          <div
+            className={s.sections}
+            data-loading={listLoaded ? undefined : "true"}
+            aria-busy={query === deferredQuery ? undefined : true}
+          >
             {!listLoaded && <SecuredLoadingView label={t("list.loading")} cardsOnly />}
 
             {listLoaded && shownSections.length === 0 && (
