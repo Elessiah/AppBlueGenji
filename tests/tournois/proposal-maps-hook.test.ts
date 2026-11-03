@@ -53,6 +53,7 @@ jest.mock("react", () => ({
 import {
   PROPOSAL_REFRESH_ATTEMPTS,
   PROPOSAL_REFRESH_DELAY_MS,
+  proposalRetryDelayMs,
   useProposalMaps,
 } from "@/app/(secured)/tournois/[id]/_hooks/useProposalMaps";
 import type { BracketMatch, MatchProposalMaps } from "@/lib/shared/types";
@@ -98,7 +99,8 @@ function unmount(): void {
 
 const fetchMock = jest.fn<typeof fetch>();
 const okResponse = (body: unknown) => ({ ok: true, json: async () => body }) as Response;
-const failure = (status: number) => ({ ok: false, status, json: async () => ({}) }) as Response;
+const failure = (status: number, headers: Record<string, string> = {}) =>
+  ({ ok: false, status, headers: new Headers(headers), json: async () => ({}) }) as Response;
 
 /** Laisse filer les promesses de la lecture (réponse, puis corps). */
 async function settle(): Promise<void> {
@@ -148,7 +150,7 @@ describe("useProposalMaps", () => {
     fetchMock.mockResolvedValue(failure(500));
 
     render(match, NO_PROPOSALS);
-    jest.advanceTimersByTime(PROPOSAL_REFRESH_DELAY_MS * (PROPOSAL_REFRESH_ATTEMPTS + 2));
+    await jest.advanceTimersByTimeAsync(PROPOSAL_REFRESH_DELAY_MS * (PROPOSAL_REFRESH_ATTEMPTS + 2));
 
     expect(PROPOSAL_REFRESH_ATTEMPTS).toBe(3);
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -165,8 +167,7 @@ describe("useProposalMaps", () => {
     fetchMock.mockResolvedValue(response());
 
     render(match, NO_PROPOSALS);
-    await settle();
-    jest.advanceTimersByTime(PROPOSAL_REFRESH_DELAY_MS * (PROPOSAL_REFRESH_ATTEMPTS + 2));
+    await jest.advanceTimersByTimeAsync(PROPOSAL_REFRESH_DELAY_MS * (PROPOSAL_REFRESH_ATTEMPTS + 2));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -175,20 +176,39 @@ describe("useProposalMaps", () => {
     fetchMock.mockResolvedValue(failure(429));
 
     render(match, NO_PROPOSALS);
-    await settle();
-    jest.advanceTimersByTime(PROPOSAL_REFRESH_DELAY_MS * (PROPOSAL_REFRESH_ATTEMPTS + 2));
+    await jest.advanceTimersByTimeAsync(PROPOSAL_REFRESH_DELAY_MS * (PROPOSAL_REFRESH_ATTEMPTS + 2));
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  // Revue perf #542 : la tentative suivante attend la réponse de la précédente,
+  // et le `Retry-After` d'un 429 quand il dépasse l'espacement de base.
+  it("useProposalMaps_slowRead_neverOverlapsAttempts", async () => {
+    fetchMock.mockReturnValue(new Promise<Response>(() => undefined));
+
+    render(match, NO_PROPOSALS);
+    await jest.advanceTimersByTimeAsync(PROPOSAL_REFRESH_DELAY_MS * (PROPOSAL_REFRESH_ATTEMPTS + 2));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("useProposalMaps_rateLimited429WithRetryAfter_waitsServerDelay", async () => {
+    fetchMock.mockResolvedValue(failure(429, { "Retry-After": "30" }));
+
+    render(match, NO_PROPOSALS);
+    await jest.advanceTimersByTimeAsync(29_999);
+    const callsBeforeRetryAfter = fetchMock.mock.calls.length;
+    await jest.advanceTimersByTimeAsync(1);
+
+    expect(callsBeforeRetryAfter).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("useProposalMaps_unparsableAnswer_keepsRetrying", async () => {
     fetchMock.mockResolvedValue(okResponse({ proposals: { matchId: "x" } }));
 
     render(match, NO_PROPOSALS);
-    for (let i = 0; i < PROPOSAL_REFRESH_ATTEMPTS + 2; i += 1) {
-      await settle();
-      jest.advanceTimersByTime(PROPOSAL_REFRESH_DELAY_MS);
-    }
+    await jest.advanceTimersByTimeAsync(PROPOSAL_REFRESH_DELAY_MS * (PROPOSAL_REFRESH_ATTEMPTS + 2));
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
@@ -239,5 +259,23 @@ describe("useProposalMaps", () => {
     const result = render(match, NO_PROPOSALS);
 
     expect(result.match.team1Report?.maps).toEqual([]);
+  });
+});
+
+describe("proposalRetryDelayMs", () => {
+  it("proposalRetryDelayMs_noHeader_returnsBaseDelay", () => {
+    expect(proposalRetryDelayMs(null)).toBe(4000);
+  });
+
+  it("proposalRetryDelayMs_shortRetryAfter_returnsBaseDelay", () => {
+    expect(proposalRetryDelayMs("2")).toBe(4000);
+  });
+
+  it("proposalRetryDelayMs_longRetryAfter_returnsRetryAfterMs", () => {
+    expect(proposalRetryDelayMs("30")).toBe(30_000);
+  });
+
+  it("proposalRetryDelayMs_unparsableHeader_returnsBaseDelay", () => {
+    expect(proposalRetryDelayMs("soon")).toBe(4000);
   });
 });

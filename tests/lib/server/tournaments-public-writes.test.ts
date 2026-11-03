@@ -56,6 +56,7 @@ import { reportMatchScore } from "@/lib/server/tournaments/scoring";
 import { notifyScoreToConfirm } from "@/lib/server/tournaments/player-pushes";
 import { forfeitOwnMatch } from "@/lib/server/tournaments/player-forfeit";
 import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournaments/admin";
+import type { AdminScoreEntry } from "@/lib/server/tournaments/admin";
 import { forfeitSurvivalTeam, reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { forfeitSwissTeam, reconcileSwiss } from "@/lib/server/tournaments/swiss";
 import { forfeitEnduranceTeam } from "@/lib/server/tournaments/bg-survie/forfeit";
@@ -587,6 +588,27 @@ describe("adminSaveMatchScoresPublic", () => {
 
     await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow("MATCH_NOT_READY");
 
+    expect(lockTournamentRow).not.toHaveBeenCalled();
+    expect(adminSaveMatchScores).not.toHaveBeenCalled();
+  });
+
+  // Revue perf #542 : une saisie qui ne tient pas sur le match se refuse sur
+  // la lecture préalable, sans transaction ni attente du tournoi.
+  it("adminSave_forfeitOfForeignTeam_rejectsWithoutWaitingTournament", async () => {
+    await expect(adminSaveMatchScoresPublic(70, { forfeitTeamId: 9 })).rejects.toThrow("INVALID_FORFEIT_TEAM_ID");
+
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
+    expect(lockTournamentRow).not.toHaveBeenCalled();
+    expect(adminSaveMatchScores).not.toHaveBeenCalled();
+    expect(connection.rollback).not.toHaveBeenCalled();
+  });
+
+  it("adminSave_malformedEntry_rejectsWithoutWaitingTournament", async () => {
+    const entry = JSON.parse('{"maps":"x","userId":1}') as AdminScoreEntry;
+
+    await expect(adminSaveMatchScoresPublic(70, entry)).rejects.toThrow("INVALID_REQUEST");
+
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
     expect(lockTournamentRow).not.toHaveBeenCalled();
     expect(adminSaveMatchScores).not.toHaveBeenCalled();
   });
