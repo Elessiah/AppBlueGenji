@@ -761,7 +761,7 @@ describe("page d'un match — infos de connexion", () => {
     const html = render(match({ refereeAssigned: true }), "player");
 
     expect(html).toContain(">juge<");
-    expect(html).toContain('aria-label="Copier le Discord juge"');
+    expect(html).toContain('aria-label="Copier le Discord de Juge : juge"');
   });
 
   it("render_refereeDiscordTagNotSent_noDiscordLineOnRefereeCard", () => {

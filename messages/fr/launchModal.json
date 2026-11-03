@@ -90,6 +90,7 @@
   "verified": "vérifié",
   "unverified": "non vérifié",
   "copyAria": "Copier le {kind} {value}",
+  "copyAriaOwner": "Copier le {kind} de {owner} : {value}",
   "copy": "Copier",
   "host": "Héberge la partie — crée le salon",
   "ghost": "Équipe invitée : pas de contact.",

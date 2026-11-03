@@ -90,6 +90,7 @@
   "verified": "verified",
   "unverified": "not verified",
   "copyAria": "Copy the {kind} {value}",
+  "copyAriaOwner": "Copy {owner}'s {kind}: {value}",
   "copy": "Copy",
   "host": "Hosts the game — creates the lobby",
   "ghost": "Guest team: no contact.",

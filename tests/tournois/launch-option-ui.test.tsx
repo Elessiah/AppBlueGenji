@@ -506,7 +506,7 @@ describe("fiches hors Overwatch : BattleTag absent", () => {
 
     expect(html).toContain(">Discord<");
     expect(html).toContain(">juge<");
-    expect(html).toContain('aria-label="Copier le Discord juge"');
+    expect(html).toContain('aria-label="Copier le Discord de Juge : juge"');
     expect(html.indexOf(">juge<")).toBeLessThan(html.indexOf("Juge#3333"));
   });
 
@@ -578,6 +578,13 @@ describe("RefereeCard — note sans contact, accessibilité, toast de copie (MAT
       <RefereeCard referee={{ ...base, contactsShown: false, discordTag: null }} selfManaged={false} phase="LAUNCHED" onCopy={noop} />,
     );
     expect(html).not.toContain("Aucun contact disponible.");
+  });
+
+  it("RefereeCard_copyButton_namesOwnerInAccessibleName", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard referee={{ ...base, discordTag: "juge" }} selfManaged={false} phase="LAUNCHED" onCopy={noop} />,
+    );
+    expect(html).toContain('aria-label="Copier le Discord de Juge : juge"');
   });
 
   it("RefereeCard_contactsNotYetOpen_showsLaterNote", () => {

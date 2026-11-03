@@ -89,7 +89,7 @@ function IdentityLine({
             type="button"
             className={`${styles.copy} tap-target`}
             onClick={() => void onCopy(value, copyToastLabel(kind, owner))}
-            aria-label={t("copyAria", { kind, value })}
+            aria-label={owner ? t("copyAriaOwner", { kind, owner, value }) : t("copyAria", { kind, value })}
             aria-describedby={note ? noteId : undefined}
           >
             {t("copy")}
