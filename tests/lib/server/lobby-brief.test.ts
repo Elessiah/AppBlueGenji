@@ -63,8 +63,9 @@ const actualDm = jest.requireActual<typeof import("@/lib/server/tournaments/lobb
 
 /**
  * Base simulée : la première lecture rend les candidats, les suivantes (la
- * relecture d'un match réservé, par son id) la ligne de `reread` ou le candidat
- * (`null` dans `reread` : relecture vide, le salon s'est refermé).
+ * relecture d'un côté réservé : id de la réservation, puis du match) la ligne
+ * de `reread` ou le candidat, réservation toujours là (`claim_kept`) ; `null`
+ * dans `reread` : relecture vide, le salon s'est refermé.
  * Chaque réservation posée reçoit un id (100, 101, …).
  */
 function mockDb(candidates: Record<string, unknown>[], claims: boolean[] = [], reread = new Map<number, unknown>()) {
@@ -72,9 +73,10 @@ function mockDb(candidates: Record<string, unknown>[], claims: boolean[] = [], r
   let nextId = 100;
   const query = jest.fn<SqlQuery>(async (sql, params) => {
     if (/WHERE m\.id = \? AND m\.launch_pairing = \?/.test(sql)) {
-      const id = Number((params as unknown[])[0]);
-      if (!reread.has(id)) return [candidates.filter((row) => row.id === id)];
-      return [reread.get(id) === null ? [] : [reread.get(id)]];
+      const id = Number((params as unknown[])[1]);
+      if (!reread.has(id)) return [candidates.filter((row) => row.id === id).map((row) => ({ ...row, claim_kept: 1 }))];
+      const row = reread.get(id);
+      return [row === null ? [] : [{ claim_kept: 1, ...(row as object) }]];
     }
     return [candidates];
   });
@@ -348,9 +350,8 @@ describe("dispatchLobbyBriefs", () => {
 
     await dispatchLobbyBriefs();
 
-    // Une relecture par match, après sa première réservation.
-    expect(query).toHaveBeenCalledTimes(2);
-    expect(query.mock.calls[1][1]).toEqual([40, "1:2", 100]);
+    // Une relecture par côté réservé.
+    expect(query).toHaveBeenCalledTimes(3);
     expect(sends()[0].dm()).toContain("• Gauche (hôte) : « Nova »");
     expect(sends()[0].dm()).toContain("« Busan »");
     // Arbitre désigné entre les deux lectures : sa condition est lue à part.
@@ -358,15 +359,78 @@ describe("dispatchLobbyBriefs", () => {
     expect(sends()[0].dm()).toContain("Arbitre désigné");
   });
 
-  it("dispatchLobbyBriefs_rereadFails_candidateSettingsBriefed", async () => {
+  it("dispatchLobbyBriefs_rereadFails_claimReleasedByIdNothingSentRetryArmed", async () => {
+    jest.useFakeTimers();
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const { query, execute } = mockDb([MATCH]);
+      query.mockResolvedValueOnce([[MATCH]]).mockRejectedValueOnce(new Error("DB_DOWN"));
+
+      expect(await dispatchLobbyBriefs()).toBe(0);
+
+      expect(notifyUsers).not.toHaveBeenCalled();
+      expect(releases(execute).map(([sql, params]) => [sql, params])).toEqual([
+        ["DELETE FROM bg_match_start_notices WHERE id IN (?)", [100]],
+      ]);
+      // La relance armée briefe sans autre déclencheur.
+      await jest.advanceTimersByTimeAsync(10_000);
+      expect(notifyUsers).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+      error.mockRestore();
+    }
+  });
+
+  it("dispatchLobbyBriefs_twoClaimedSides_eachSideRereadWithItsOwnClaimId", async () => {
     const { query } = mockDb([MATCH]);
-    query.mockResolvedValueOnce([[MATCH]]).mockRejectedValueOnce(new Error("DB_DOWN"));
 
-    expect(await dispatchLobbyBriefs()).toBe(2);
+    await dispatchLobbyBriefs();
 
-    expect(sends()[0].dm()).toContain("« Ilios »");
-    expect(logged(error, "non relus")).toBe(true);
+    expect(query.mock.calls.slice(1).map(([, params]) => params)).toEqual([
+      [100, 40, "1:2"],
+      [101, 40, "1:2"],
+    ]);
+  });
+
+  it("dispatchLobbyBriefs_claimErasedWhileLobbyOpen_sideNotSentNothingReleasedRetryArmed", async () => {
+    jest.useFakeTimers();
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const { query, execute } = mockDb([MATCH]);
+      query
+        .mockResolvedValueOnce([[MATCH]])
+        .mockResolvedValueOnce([[{ ...MATCH, claim_kept: 0 }]])
+        .mockResolvedValueOnce([[{ ...MATCH, claim_kept: 1 }]]);
+
+      expect(await dispatchLobbyBriefs()).toBe(1);
+
+      expect(sends().map((send) => send.userIds)).toEqual([[20]]);
+      expect(releases(execute)).toHaveLength(0);
+      expect(logged(error, "réservation effacée avant l'envoi")).toBe(true);
+      await jest.advanceTimersByTimeAsync(10_000);
+      expect(query.mock.calls.filter(([sql]) => !/WHERE m\.id = \?/.test(sql))).toHaveLength(2);
+    } finally {
+      jest.useRealTimers();
+      error.mockRestore();
+    }
+  });
+
+  it("dispatchLobbyBriefs_releaseFails_countLogged", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(formatLobbyBriefDm).mockImplementationOnce(() => {
+      throw new Error("RENDER");
+    });
+    const { execute } = mockDb([MATCH]);
+    const insertOrDelete = execute.getMockImplementation()!;
+    execute.mockImplementation(async (sql, params) => {
+      if (sql.startsWith("DELETE FROM bg_match_start_notices WHERE id IN")) throw new Error("DB_DOWN");
+      return insertOrDelete(sql, params);
+    });
+
+    await dispatchLobbyBriefs();
+
+    expect(logged(error, "1 réservation(s) non rendue(s)")).toBe(true);
+    expect(logged(error, "remis au balayage suivant")).toBe(false);
     error.mockRestore();
   });
 
@@ -589,13 +653,12 @@ describe("dispatchLobbyBriefs", () => {
     error.mockRestore();
   });
 
-  it("dispatchLobbyBriefs_claimedSide_rereadRequiresTheClaimToStillExist", async () => {
+  it("dispatchLobbyBriefs_claimedSide_rereadChecksTheClaimStillExists", async () => {
     const { query } = mockDb([MATCH]);
 
     await dispatchLobbyBriefs();
 
-    expect(query.mock.calls[1][0]).toContain("bg_match_start_notices n WHERE n.id = ?");
-    expect(query.mock.calls[1][1]).toEqual([40, "1:2", 100]);
+    expect(query.mock.calls[1][0]).toContain("bg_match_start_notices n WHERE n.id = ?) AS claim_kept");
   });
 
   it("dispatchLobbyBriefs_lobbyClosedBeforeSend_noRetryArmedAndLoggedAsClosed", async () => {
