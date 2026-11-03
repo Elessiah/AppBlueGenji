@@ -350,7 +350,7 @@ describe("dispatchLobbyBriefs", () => {
 
     // Une relecture par match, après sa première réservation.
     expect(query).toHaveBeenCalledTimes(2);
-    expect(query.mock.calls[1][1]).toEqual([40, "1:2"]);
+    expect(query.mock.calls[1][1]).toEqual([40, "1:2", 100]);
     expect(sends()[0].dm()).toContain("• Gauche (hôte) : « Nova »");
     expect(sends()[0].dm()).toContain("« Busan »");
     // Arbitre désigné entre les deux lectures : sa condition est lue à part.
@@ -585,6 +585,46 @@ describe("dispatchLobbyBriefs", () => {
     expect(execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE"))).toHaveLength(1);
     expect(releases(execute).map(([sql, params]) => [sql, params])).toEqual([
       ["DELETE FROM bg_match_start_notices WHERE id IN (?)", [100]],
+    ]);
+    error.mockRestore();
+  });
+
+  it("dispatchLobbyBriefs_claimedSide_rereadRequiresTheClaimToStillExist", async () => {
+    const { query } = mockDb([MATCH]);
+
+    await dispatchLobbyBriefs();
+
+    expect(query.mock.calls[1][0]).toContain("bg_match_start_notices n WHERE n.id = ?");
+    expect(query.mock.calls[1][1]).toEqual([40, "1:2", 100]);
+  });
+
+  it("dispatchLobbyBriefs_lobbyClosedBeforeSend_noRetryArmedAndLoggedAsClosed", async () => {
+    jest.useFakeTimers();
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const { query } = mockDb([MATCH], [], new Map([[40, null]]));
+
+      await dispatchLobbyBriefs();
+      await jest.advanceTimersByTimeAsync(10_000);
+
+      expect(logged(error, "salon refermé avant l'envoi")).toBe(true);
+      expect(logged(error, "remis au balayage suivant")).toBe(false);
+      expect(query.mock.calls.filter(([sql]) => !/WHERE m\.id = \?/.test(sql))).toHaveLength(1);
+    } finally {
+      jest.useRealTimers();
+      error.mockRestore();
+    }
+  });
+
+  it("dispatchLobbyBriefs_ghostSideThenLobbyClosed_bothClaimsReleased", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const { execute } = mockDb([{ ...MATCH, team1_ghost: 1 }], [], new Map([[40, null]]));
+
+    expect(await dispatchLobbyBriefs()).toBe(0);
+
+    expect(notifyUsers).not.toHaveBeenCalled();
+    expect(releases(execute).map(([sql, params]) => [sql, params])).toEqual([
+      ["DELETE FROM bg_match_start_notices WHERE id IN (?, ?)", [100, 101]],
     ]);
     error.mockRestore();
   });
