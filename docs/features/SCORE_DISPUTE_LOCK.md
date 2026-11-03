@@ -174,10 +174,15 @@ restent inversés : sur le même match, l'interblocage est rompu par le moteur
 (`retryOnDeadlock`) ; un report dont l'image précède la saisie peut encore
 juger sa manche vierge (préexistant, ERREUR.txt). Le tournoi du match
 se lit juste avant, hors transaction (la route ne connaît que le match), et les
-refus évidents (`MATCH_NOT_FOUND`, `MATCH_NOT_READY`, `MATCH_ALREADY_COMPLETED`)
-partent là, sans attendre le verrou, et sans `ROLLBACK` (aucune transaction
-ouverte) ; ils se rejugent sous verrou, par la même règle (`assertMatchSavable`,
-`save-guard.ts`). Le verrou
+refus qui ne lisent rien d'autre (`MATCH_NOT_FOUND`, `MATCH_NOT_READY`,
+`MATCH_ALREADY_COMPLETED`, forfait d'une équipe étrangère
+`INVALID_FORFEIT_TEAM_ID`, saisie mal formée `INVALID_REQUEST`) partent là, sans
+attendre le verrou, et sans `ROLLBACK` (aucune transaction ouverte) ; ils se
+rejugent sous verrou, par les mêmes règles (`assertMatchSavable`,
+`assertSaveEntryFits`, `save-guard.ts`). Le contrôle des maps contre le format
+et la fenêtre de saisie lit les règles du tournoi : il reste sous verrou, une
+seule lecture par saisie. Le module du moteur se résout aussi avant la
+transaction : un premier chargement ne se fait pas tournoi verrouillé. Le verrou
 aval (`checkDownstreamMatchesHaveNoScores`) n'y est plus lu : il ne protège
 qu'un match joué, que la sauvegarde refuse. Ses relectures sous verrou
 sont regroupées : la ligne enregistrée revient avec le résultat

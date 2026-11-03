@@ -244,7 +244,10 @@ l'instantané) et déclenche une relecture du **seul** match
 (`GET /api/tournaments/[id]/matches/[matchId]/proposals`, `useProposalMaps`,
 `proposalsNeedRefresh`) — mêmes conditions que la lecture REST du détail, même
 règle de lecture (`getViewerMatchProposals`, qui partage `viewerProposalScope`
-avec le contexte du lecteur), au plus trois essais espacés de 4 s. Engagés,
+avec le contexte du lecteur), au plus trois essais : chacun part **après** la
+réponse du précédent (jamais deux lectures en vol sur un serveur lent), 4 s plus
+tard, ou au `Retry-After` d'un 429 s'il est plus long (`proposalRetryDelayMs`) ;
+un 4xx hors 429 arrête les essais. Engagés,
 statut et reports du match y sont **relus avec les maps**, en une instruction
 (`loadFreshMatchProposals`, `bg_matches` joint à `bg_match_maps`) : l'instantané
 en cache peut précéder un report, un retrait ou un changement d'engagé
