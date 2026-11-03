@@ -635,7 +635,7 @@ async function runLobbyBriefSweep(): Promise<number> {
   // les arbitres lus se retiennent par jeu.
   const refereeIdsOf = (list: readonly LobbyBriefRow[], game: TournamentGame) =>
     list.flatMap((row) => (row.referee_user_id === null || row.game !== game ? [] : [Number(row.referee_user_id)]));
-  const games = new Set<TournamentGame>(rows.map((row) => row.game));
+  const games = new Set<TournamentGame>(briefable.map((row) => row.game));
   const checkedReferees = new Map<TournamentGame, Set<number>>();
   const eligibleReferees = new Map<TournamentGame, Set<number>>();
   await Promise.all(

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import type { TournamentGame } from "@/lib/shared/types";
 import {
   allPartiesReady,
   autoLaunchAt,
@@ -6,6 +7,8 @@ import {
   canPlayersReportScore,
   connectionReader,
   castBlockReason,
+  identityBlockIsDiscordOnly,
+  identityComplete,
   currentLaunchState,
   exposesCasterContacts,
   isAutoLaunchDue,
@@ -601,5 +604,31 @@ describe("exposesCasterContacts (EF-31)", () => {
 
   it("exposesCasterContacts_anyRoleInLobby_true", () => {
     expect(exposesCasterContacts("LOBBY", "TEAM1")).toBe(true);
+  });
+});
+
+describe("identityComplete / identityBlockIsDiscordOnly — dispense nommée, jamais par défaut (revue sécurité #545)", () => {
+  const discordOnly = { discordVerified: true, blizzardLinked: false };
+  // Valeur hors du type : une ligne lue sans sa colonne `game` (le défaut corrigé dans `lockLaunchMatch`).
+  const unknownGame = JSON.parse('"XX"') as TournamentGame;
+
+  it("identityComplete_unknownGame_requiresBattlenet", () => {
+    expect(identityComplete(discordOnly, unknownGame)).toBe(false);
+  });
+
+  it("castBlockReason_unknownGame_identityCode", () => {
+    expect(castBlockReason(true, discordOnly, unknownGame)).toBe("CASTER_IDENTITY_REQUIRED");
+  });
+
+  it("identityComplete_marvelRivalsDiscordOnly_complete", () => {
+    expect(identityComplete(discordOnly, "MR")).toBe(true);
+  });
+
+  it("identityBlockIsDiscordOnly_marvelRivals_true", () => {
+    expect(identityBlockIsDiscordOnly("MR")).toBe(true);
+  });
+
+  it("identityBlockIsDiscordOnly_overwatch_false", () => {
+    expect(identityBlockIsDiscordOnly("OW")).toBe(false);
   });
 });

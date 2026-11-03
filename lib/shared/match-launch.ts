@@ -21,7 +21,6 @@
  * même règle.
  */
 
-import { battletagRelevantFor } from "./certification-prompt";
 import type { MatchStatus, TeamRole, TournamentGame } from "./types";
 
 /**
@@ -303,7 +302,7 @@ export function canDeclareTeamReady(roles: readonly TeamRole[] | null | undefine
 /**
  * Pour caster un match, il faut pouvoir être joint **et**, en Overwatch,
  * retrouvé en jeu : tag Discord certifié et, en Overwatch seulement, compte
- * Battle.net rattaché (`battletagRelevantFor`). Un caster se présente aux deux
+ * Battle.net rattaché (`identityComplete`). Un caster se présente aux deux
  * équipes dans la modale de lancement ; un tag saisi à la main ne dirait rien
  * de qui l'on invite dans son salon. Marvel Rivals ne s'invite pas par
  * BattleTag (décision 35) : le tag Discord certifié y suffit (décision de
@@ -332,13 +331,28 @@ export function castBlockReason(
   game: TournamentGame,
 ): CastBlock | null {
   if (!hasLivePermission) return "NOT_CASTER";
-  if (!identityComplete(identity, game)) return battletagRelevantFor(game) ? "CASTER_IDENTITY_REQUIRED" : "CASTER_DISCORD_REQUIRED";
+  if (!identityComplete(identity, game)) return identityBlockIsDiscordOnly(game) ? "CASTER_DISCORD_REQUIRED" : "CASTER_IDENTITY_REQUIRED";
   return null;
 }
 
-/** L'identité demandée à un caster ou un arbitre : Discord certifié, plus Battle.net en Overwatch. */
+/**
+ * Le jeu qui dispense de Battle.net : Marvel Rivals **seul**, nommé. Tout autre
+ * jeu — Overwatch, mais aussi une valeur absente ou inconnue, par exemple une
+ * ligne lue sans sa colonne `game` — retombe sur la règle la plus stricte : une
+ * dispense ne s'accorde jamais par défaut.
+ */
+function battlenetExempt(game: TournamentGame): boolean {
+  return game === "MR";
+}
+
+/** Le refus d'identité ne parle que du tag Discord (Marvel Rivals) : `*_DISCORD_REQUIRED`. */
+export function identityBlockIsDiscordOnly(game: TournamentGame): boolean {
+  return battlenetExempt(game);
+}
+
+/** L'identité demandée à un caster ou un arbitre : Discord certifié, plus Battle.net hors Marvel Rivals. */
 export function identityComplete(identity: CasterIdentity, game: TournamentGame): boolean {
-  return identity.discordVerified && (!battletagRelevantFor(game) || identity.blizzardLinked);
+  return identity.discordVerified && (battlenetExempt(game) || identity.blizzardLinked);
 }
 
 export const CAST_IDENTITY_NOTICE =

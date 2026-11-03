@@ -332,6 +332,7 @@ async function lockLaunchMatch(
   const [context] = await connection.execute<
     (RowDataPacket & {
       tournament_state: string | null;
+      tournament_game: TournamentGame | null;
       referee_scheduling: number | null;
       match_launch_phase: number | null;
       team1_is_ghost: number | null;
@@ -340,11 +341,13 @@ async function lockLaunchMatch(
   >(
     `SELECT
        (SELECT state FROM bg_tournaments WHERE id = ?) AS tournament_state,
+       (SELECT game FROM bg_tournaments WHERE id = ?) AS tournament_game,
        (SELECT referee_scheduling FROM bg_tournaments WHERE id = ?) AS referee_scheduling,
        (SELECT match_launch_phase FROM bg_tournaments WHERE id = ?) AS match_launch_phase,
        (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team1_is_ghost,
        (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team2_is_ghost`,
     [
+      base.tournament_id,
       base.tournament_id,
       base.tournament_id,
       base.tournament_id,
@@ -356,6 +359,10 @@ async function lockLaunchMatch(
   // disparu n'est pas un match à lancer.
   const tournamentState = context[0]?.tournament_state ?? null;
   if (tournamentState === null) return null;
+  // Le jeu, lu ici et jamais ailleurs : la condition de cast et d'arbitrage en
+  // dépend (Battle.net en Overwatch seulement). Posé **avant** de juger
+  // l'arbitre ; un jeu illisible retombe sur Overwatch, la règle la plus stricte.
+  base.tournament_game = context[0]?.tournament_game ?? "OW";
   // Avant le départ, un arbitre qui joue désormais le match (roster rejoint
   // sans changer d'appariement) ne compte plus : sinon le lancement attendrait
   // un « Prêt » d'arbitre qu'il ne peut plus donner (il clique en joueur).

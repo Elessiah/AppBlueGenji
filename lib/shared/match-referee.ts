@@ -18,8 +18,7 @@
  *   finale — la meilleure tête de série, sinon l'équipe 1. Il prend le côté
  *   gauche ; l'autre équipe bannit la première.
  */
-import { battletagRelevantFor } from "./certification-prompt";
-import { identityComplete, type CasterIdentity } from "./match-launch";
+import { identityBlockIsDiscordOnly, identityComplete, type CasterIdentity } from "./match-launch";
 import { visibleText } from "./visible-text";
 import type { MatchStatus, TournamentGame } from "./types";
 
@@ -54,7 +53,7 @@ export function refereeBlockReason(
   game: TournamentGame,
 ): RefereeBlock | null {
   if (!hasTournamentsPermission) return "NOT_REFEREE";
-  if (!identityComplete(identity, game)) return battletagRelevantFor(game) ? "REFEREE_IDENTITY_REQUIRED" : "REFEREE_DISCORD_REQUIRED";
+  if (!identityComplete(identity, game)) return identityBlockIsDiscordOnly(game) ? "REFEREE_DISCORD_REQUIRED" : "REFEREE_IDENTITY_REQUIRED";
   return null;
 }
 
