@@ -195,8 +195,8 @@ describe("PATCH — journal du staff", () => {
     });
   });
 
-  it("editRoute_noNameInPatch_noPreviousName", async () => {
+  it("editRoute_noNameInPatch_passesWrittenName", async () => {
     await PATCH(patchReq({ description: "Texte" }), params("1"));
-    expect(announceStaffTournamentAction).toHaveBeenCalledWith(1, "EDITED", {});
+    expect(announceStaffTournamentAction).toHaveBeenCalledWith(1, "EDITED", { name: "Nouveau nom" });
   });
 });

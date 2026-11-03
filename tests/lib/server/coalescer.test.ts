@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { createCoalescer, flushAllCoalescers, trackAnnouncement } from "@/lib/server/coalescer";
+import { createCoalescer, createKeyedChain, flushAllCoalescers, trackAnnouncement } from "@/lib/server/coalescer";
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -324,5 +324,71 @@ describe("createCoalescer — annonce forcée", () => {
     await flushAllCoalescers();
     expect(first.deliver).toHaveBeenCalledWith(1, 1);
     expect(second.deliver).toHaveBeenCalledWith(2, 2);
+  });
+});
+
+describe("createKeyedChain", () => {
+  beforeEach(() => {
+    jest.useRealTimers();
+  });
+
+  function deferred() {
+    let release: () => void = () => undefined;
+    let fail: () => void = () => undefined;
+    const promise = new Promise<void>((resolve, reject) => {
+      release = resolve;
+      fail = () => reject(new Error("BOT_DOWN"));
+    });
+    return { promise, release, fail };
+  }
+
+  it("createKeyedChain_sameKey_runsAfterPrevious", async () => {
+    const { chain } = createKeyedChain<number>();
+    const first = deferred();
+    const second = jest.fn(async () => undefined);
+    chain(1, () => first.promise);
+    chain(1, second);
+    await Promise.resolve();
+    expect(second).not.toHaveBeenCalled();
+    first.release();
+    await flushAllCoalescers();
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it("createKeyedChain_otherKey_startsImmediately", async () => {
+    const { chain } = createKeyedChain<number>();
+    const first = deferred();
+    const other = jest.fn(async () => undefined);
+    chain(1, () => first.promise);
+    chain(2, other);
+    expect(other).toHaveBeenCalledTimes(1);
+    first.release();
+    await flushAllCoalescers();
+  });
+
+  it("createKeyedChain_previousRejects_nextStillRuns", async () => {
+    const { chain } = createKeyedChain<number>();
+    const first = deferred();
+    const second = jest.fn(async () => undefined);
+    chain(1, () => first.promise);
+    chain(1, second);
+    first.fail();
+    await flushAllCoalescers();
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it("createKeyedChain_pendingRun_awaitedByFlushAllCoalescers", async () => {
+    const { chain } = createKeyedChain<number>();
+    const run = deferred();
+    let flushed = false;
+    chain(1, () => run.promise);
+    const flushing = flushAllCoalescers().then(() => {
+      flushed = true;
+    });
+    await Promise.resolve();
+    expect(flushed).toBe(false);
+    run.release();
+    await flushing;
+    expect(flushed).toBe(true);
   });
 });

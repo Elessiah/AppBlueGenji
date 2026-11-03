@@ -198,6 +198,50 @@ describe("announceStaffMatchAction / announceStaffTournamentAction", () => {
     await flushAllCoalescers();
   });
 
+  it("announceStaffTournamentAction_burstAfterSlowLine_flushedInTurn", async () => {
+    resetStaffActionBursts();
+    let finishFirst: () => void = () => undefined;
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (finishFirst = () => resolve([[{ id: 7, name: "Coupe d'hiver" }], []]))),
+      )
+      .mockResolvedValue([[{ id: 7, name: "Coupe d'hiver" }], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    announceStaffTournamentAction(7, "EDITED");
+    announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    announceStaffTournamentAction(7, "ADVANCED", { target: "RUNNING" });
+    await settle();
+    expect(execute).toHaveBeenCalledTimes(1);
+    finishFirst();
+    await flushAllCoalescers();
+    const lines = jest.mocked(sendBotLog).mock.calls.map((call) => String(call[0]));
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toContain("Tournoi modifié");
+    expect(lines[1]).toContain("Têtes de série réordonnées");
+    expect(lines[2]).toContain("Étape suivante avancée");
+  });
+
+  it("announceStaffMatchAction_twoGesturesSameMatch_keepOrder", async () => {
+    resetStaffActionBursts();
+    let finishFirst: () => void = () => undefined;
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = () => resolve([[matchRow()], []]))))
+      .mockResolvedValue([[matchRow()], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    announceStaffMatchAction(42, "ON_AIR");
+    announceStaffMatchAction(42, "OFF_AIR");
+    await settle();
+    expect(execute).toHaveBeenCalledTimes(1);
+    finishFirst();
+    await flushAllCoalescers();
+    const lines = jest.mocked(sendBotLog).mock.calls.map((call) => String(call[0]));
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("Mis à l'antenne");
+    expect(lines[1]).not.toContain("Mis à l'antenne");
+  });
+
   it("ne lèvent jamais quand la base est indisponible", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(getDatabase).mockRejectedValue(new Error("down"));
@@ -236,21 +280,20 @@ describe("échecs du journal du staff", () => {
 });
 
 describe("coupe-circuit du bot ouvert", () => {
-  it("deliverStaffMatchAction_circuitOpen_readsNothing", async () => {
+  // Le lot part 5 à 10 min plus tard, coupe-circuit refermé : la ligne s'y range quand même.
+  it("deliverStaffMatchAction_circuitOpen_stillQueuesLine", async () => {
     jest.mocked(isBotCircuitOpen).mockReturnValue(true);
-    const execute = mockRows(matchRow());
+    mockRows(matchRow());
     await deliverStaffMatchAction(42, "HOST_SET");
-    expect(execute).not.toHaveBeenCalled();
-    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
     jest.mocked(isBotCircuitOpen).mockReturnValue(false);
   });
 
-  it("deliverStaffTournamentAction_circuitOpen_readsNothing", async () => {
+  it("deliverStaffTournamentAction_circuitOpen_stillQueuesLine", async () => {
     jest.mocked(isBotCircuitOpen).mockReturnValue(true);
-    const execute = mockRows({ id: 7, name: "Coupe d'hiver" });
+    mockRows({ id: 7, name: "Coupe d'hiver" });
     await deliverStaffTournamentAction(7, "EDITED");
-    expect(execute).not.toHaveBeenCalled();
-    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
     jest.mocked(isBotCircuitOpen).mockReturnValue(false);
   });
 });
