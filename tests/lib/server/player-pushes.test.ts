@@ -140,6 +140,23 @@ describe("dispatchMatchStartNotices", () => {
     expect(params).toEqual([20, 10]);
   });
 
+  it("dispatchMatchStartNotices_candidates_scoredMatchesExcluded", async () => {
+    const { query } = mockDb([]);
+
+    await dispatchMatchStartNotices();
+
+    expect(query.mock.calls[0][0]).toContain("m.team1_score IS NULL AND m.team2_score IS NULL");
+  });
+
+  it("claimStartNotice_scoreNotedBetweenReadAndClaim_claimRequiresNoScore", async () => {
+    const { execute } = mockDb([{ ...LOBBY_MATCH, launched_at: new Date() }]);
+
+    await dispatchMatchStartNotices();
+
+    const claims = execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_start_notices"));
+    expect(claims[0][0]).toContain("m.team1_score IS NULL AND m.team2_score IS NULL");
+  });
+
   it("n'envoie rien quand un autre balayage a pris la réservation", async () => {
     mockDb([LOBBY_MATCH], { claims: [false] });
     expect(await dispatchMatchStartNotices()).toBe(0);

@@ -744,6 +744,27 @@ describe("dispatchLobbyBriefs", () => {
     }
   });
 
+  it("dispatchLobbyBriefs_side1LostThenSide2Closed_noRetryArmed", async () => {
+    jest.useFakeTimers();
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const { query, execute } = mockDb([MATCH]);
+      query
+        .mockResolvedValueOnce([[MATCH]])
+        .mockResolvedValueOnce([[{ ...MATCH, claim_kept: 0 }]])
+        .mockResolvedValueOnce([[]]);
+
+      await dispatchLobbyBriefs();
+      await jest.advanceTimersByTimeAsync(10_000);
+
+      expect(releases(execute).map(([, params]) => params)).toEqual([[101]]);
+      expect(query.mock.calls.filter(([sql]) => !/WHERE m\.id = \?/.test(sql))).toHaveLength(1);
+    } finally {
+      jest.useRealTimers();
+      error.mockRestore();
+    }
+  });
+
   it("dispatchLobbyBriefs_ghostSideThenLobbyClosed_bothClaimsReleased", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const { execute } = mockDb([{ ...MATCH, team1_ghost: 1 }], [], new Map([[40, null]]));
