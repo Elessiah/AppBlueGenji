@@ -17,23 +17,32 @@ export const SHORT_LOCK_WAIT_SECONDS = 5;
  * pris avant, s'attend sans borne (son détenteur le rend sans rien attendre du
  * geste), et le rejeu qui suit garde le délai du serveur — des écritures qui
  * tolèrent un dépassement de délai (journal du bot, alertes) perdraient sinon
- * leur ligne en silence. Une remise ratée est rattrapée au retour au pool
+ * leur ligne en silence. Une remise ratée après une lecture réussie arrête le
+ * geste ; dans tous les cas, elle est rattrapée au retour au pool
  * ({@link releaseWithServerLockWait}).
  */
 export async function withShortLockWait<T>(connection: PoolConnection, read: () => Promise<T>): Promise<T> {
   // Marquée avant l'envoi : une pose ratée à mi-chemin laisse un délai inconnu.
   shortened.add(connection);
   await connection.query(`SET SESSION innodb_lock_wait_timeout = ${SHORT_LOCK_WAIT_SECONDS}`);
+  const restore = async () => {
+    await connection.query(`SET SESSION innodb_lock_wait_timeout = DEFAULT`);
+    shortened.delete(connection);
+  };
+  let result: T;
   try {
-    return await read();
-  } finally {
-    try {
-      await connection.query(`SET SESSION innodb_lock_wait_timeout = DEFAULT`);
-      shortened.delete(connection);
-    } catch {
-      // Rattrapée au retour au pool (`releaseWithServerLockWait`).
-    }
+    result = await read();
+  } catch (error) {
+    // L'erreur de la lecture prime ; une remise ratée est rattrapée au retour
+    // au pool (`releaseWithServerLockWait`).
+    await restore().catch(() => undefined);
+    throw error;
   }
+  // Remise ratée après une lecture réussie : le geste s'arrête (annulé, puis
+  // connexion détruite au retour au pool) plutôt que de poursuivre son rejeu
+  // sous le délai court.
+  await restore();
+  return result;
 }
 
 /** Connexions dont le délai court n'a pas (encore) été remis. */

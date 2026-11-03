@@ -394,7 +394,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // strict du nouvel index, part **dans la même instruction** : un `ALTER`
     // est atomique, l'ancien index ne tombe donc jamais sans que le nouveau
     // soit posé (pose refusée — verrou, disque — : les deux restent ; déjà
-    // jouée : `ER_DUP_KEYNAME`, un no-op).
+    // jouée, ou base neuve sans l'ancien index : `ER_CANT_DROP_FIELD_OR_KEY`,
+    // les listes de retrait étant vérifiées d'abord — un no-op, la pose seule
+    // ci-dessous garantit le nouvel index).
     `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round (tournament_id, phase_id, round_number),
        DROP INDEX idx_bg_matches_phase`,
     // Base où l'ancien index manquait : l'échange tombe sur son `DROP`
