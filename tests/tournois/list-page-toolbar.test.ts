@@ -11,6 +11,7 @@ const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
 const page = read("app/(secured)/tournois/TournamentsList.tsx");
 const css = read("app/(secured)/tournois/tournois.module.css");
 import frTournaments from "@/messages/fr/tournaments.json";
+import enTournaments from "@/messages/en/tournaments.json";
 
 describe("page tournois — barre de recherche et filtres", () => {
   it("le champ de recherche a un nom accessible, indépendant du placeholder", () => {
@@ -174,8 +175,16 @@ describe("page tournois — volume des sections", () => {
   });
 });
 
-describe("page tournois — état occupé pendant la frappe", () => {
-  it("marque les sections aria-busy tant que la recherche différée retarde le champ", () => {
-    expect(page).toMatch(/className=\{s\.sections\}[\s\S]{0,120}aria-busy=\{query === deferredQuery \? undefined : true\}/);
+describe("page tournois — annonce des résultats", () => {
+  it("garde une région live toujours montée, qui dit le nombre de résultats et l'attente de l'archive", () => {
+    expect(page).toMatch(/<output className="sr-only">[\s\S]{0,20}\{liveMessage\}/);
+    expect(page).toContain('t("list.resultsCount", { count: String(shown) })');
+    expect(page).toContain('if (finishedArchiveLoading) return t("list.finishedLoading");');
+    expect(page).not.toContain("aria-busy");
+  });
+
+  it("a le message en français et en anglais", () => {
+    expect(frTournaments.list.resultsCount).toContain("{count}");
+    expect(enTournaments.list.resultsCount).toContain("{count}");
   });
 });
