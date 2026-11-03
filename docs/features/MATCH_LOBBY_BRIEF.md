@@ -80,8 +80,9 @@ ouvre un lancement, lecture de la liste des tournois).
   match **pour ce côté** (hôte, cartes, arbitre, autogestion — un changement
   entre la lecture des candidats et la réservation, ou entre deux côtés, est
   repris ; relecture en panne : la réservation est rendue, le match rejoué au
-  balayage suivant ; salon refermé depuis la réservation : rien ne part, les
-  réservations du match, fantôme comprise, sont rendues sans relance, pm2
+  balayage suivant ; salon refermé depuis la réservation : rien de plus ne
+  part, les réservations du match **sans envoi** (fantôme, brief non rédigé)
+  sont rendues sans relance — un côté déjà briefé garde la sienne —, pm2
   disant « salon refermé avant l'envoi » ; salon ouvert mais réservation
   effacée entre-temps — lancement défait puis rouvert, autre processus : rien
   ne part de ce côté, rien à rendre, le balayage suivant le reprend), envoi,
