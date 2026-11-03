@@ -55,8 +55,10 @@ export function casterIdentityOf(row: CasterIdentityFields | undefined): CasterI
 
 /** `castBlockReason` sur la ligne d'un compte ; `null` s'il peut caster. */
 export function castEligibilityBlock(row: CastEligibilityFields | undefined): CastBlock | null {
+  // Un compte supprimé n'a plus aucun droit, même s'il garde ses colonnes de rôles.
   const live =
     row !== undefined &&
+    Number(row.is_deleted) !== 1 &&
     can({ isAdmin: Boolean(Number(row.is_admin)), roles: sanitizePlatformRoles(row.platform_roles_json) }, "live");
   return castBlockReason(live, casterIdentityOf(row));
 }

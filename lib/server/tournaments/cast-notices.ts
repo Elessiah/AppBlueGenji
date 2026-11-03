@@ -156,13 +156,16 @@ export const CAST_TOGGLE_MAX_AGE_MS = 5 * 60_000;
 /**
  * Geste volontaire du caster sur sa propre inscription — inscription simple,
  * retrait par lui-même : une ligne de journal, aucun avis. Un caster qui
- * bascule le bouton en boucle ne remplit plus le salon : la rafale ne dit que
- * son **effet net** ({@link deliverToggleBurst}).
+ * bascule le bouton en boucle ne remplit plus le salon : deux lignes au plus
+ * par rafale ({@link deliverToggleBurst}).
  */
 function isVoluntaryToggle(change: CastChange): boolean {
   if (change.kind === "CLAIMED") return change.replacedCasterId === null;
   return change.kind === "RELEASED" && !change.byStaff;
 }
+
+/** Ligne d'ouverture de chaque rafale, partie d'emblée (clé : le premier geste de la rafale). */
+const leadingLines = new WeakMap<CastChange, Promise<void>>();
 
 const voluntaryToggles = createCoalescer<CastChange>({
   windowMs: CAST_TOGGLE_WINDOW_MS,
@@ -171,17 +174,17 @@ const voluntaryToggles = createCoalescer<CastChange>({
 });
 
 /**
- * Ce qu'une rafale du caster poste : l'état final, et rien quand un retrait
- * suivi d'une réinscription le ramène à son point de départ. Une inscription
- * suivie d'un retrait garde **ses deux lignes**, dans l'ordre : s'inscrire
- * ouvre au caster les contacts du match en cours (`/api/matches/[matchId]/contacts`),
- * et le journal du staff est la trace de qui a tenu la place, même une minute.
+ * Clôt une rafale du caster. Son premier geste est **parti d'emblée**
+ * ({@link announceCastChange}) : une inscription est journalisée sur-le-champ,
+ * avec l'appariement du moment, puisqu'elle ouvre au caster les contacts du
+ * match en cours (`/api/matches/[matchId]/contacts`) — le journal du staff
+ * garde qui a tenu la place, même une minute, même si le match disparaît
+ * ensuite. La clôture n'ajoute que l'état final, quand il diffère de cette
+ * première ligne ; elle part après elle, jamais avant.
  */
 async function deliverToggleBurst(first: CastChange, last: CastChange): Promise<void> {
-  if (first.kind === last.kind) return deliverInBackground(last);
-  if (first.kind !== "CLAIMED") return;
-  await deliverInBackground(first);
-  await deliverInBackground(last);
+  await leadingLines.get(first);
+  if (first.kind !== last.kind) await deliverInBackground(last);
 }
 
 /** Annonce tout de suite les rafales en attente. Réservé aux tests. */
@@ -196,12 +199,23 @@ export function resetCastToggles(): void {
 
 /**
  * Annonce un changement d'inscription de caster, sans attendre ; ne lève jamais.
- * Un geste volontaire du caster attend {@link CAST_TOGGLE_WINDOW_MS} de silence.
+ * Un geste volontaire du caster part d'emblée s'il ouvre une rafale ; les
+ * suivants attendent {@link CAST_TOGGLE_WINDOW_MS} de silence.
  */
 export function announceCastChange(change: CastChange): void {
   const key = `${change.matchId}:${change.casterId}`;
   if (isVoluntaryToggle(change)) {
-    voluntaryToggles.add(key, change);
+    // Copie : un même objet annoncé deux fois ne doit pas partager sa ligne d'ouverture.
+    const gesture = { ...change };
+    if (!voluntaryToggles.waiting(key)) {
+      // Rafale qui s'ouvre : sa première ligne part tout de suite, après la clôture
+      // de la rafale précédente si elle s'annonce encore.
+      leadingLines.set(
+        gesture,
+        voluntaryToggles.drain(key).then(() => deliverInBackground(gesture)),
+      );
+    }
+    voluntaryToggles.add(key, gesture);
     return;
   }
   // La rafale en attente du même caster (ou du titulaire remplacé) part d'abord :

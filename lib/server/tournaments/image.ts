@@ -77,8 +77,9 @@ async function discardFile(url: string | null): Promise<void> {
 }
 
 /**
- * Pose (ou remplace) l'image d'un tournoi. `replaced` : une image était en
- * place, et vient d'être supprimée (le journal du staff dit « remplacée »).
+ * Pose (ou remplace) l'image d'un tournoi. `replaced` : une image était déjà
+ * en place et cède la place à la nouvelle — son fichier est effacé, sauf s'il
+ * porte le même chemin (le journal du staff dit « remplacée »).
  *
  * @throws `TOURNAMENT_NOT_FOUND`, ou l'erreur de traitement d'image
  *   (`IMAGE_TOO_LARGE`, `IMAGE_FORMAT_INVALID`…) — voir `image-upload.ts`.

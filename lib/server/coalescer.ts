@@ -26,6 +26,10 @@ export interface Coalescer<T> {
   pending(): number;
   /** Une rafale de `key` attend ou s'annonce encore ? Sert à n'attendre que si besoin. */
   busy(key: string): boolean;
+  /** Une rafale de `key` est ouverte (pas encore annoncée) ? */
+  waiting(key: string): boolean;
+  /** Attend l'annonce de `key` déjà partie, s'il y en a une, **sans** annoncer la rafale ouverte. Ne lève jamais. */
+  drain(key: string): Promise<void>;
   /** Annonce tout de suite la rafale `key`, s'il y en a une, et attend celle qui
    * s'annonce déjà : un geste qui ne se regroupe pas part ainsi **après** la
    * rafale qu'il suit, jamais avant. */
@@ -111,6 +115,10 @@ export function createCoalescer<T>(options: {
     },
     pending: () => bursts.size,
     busy: (key) => bursts.has(key) || inFlight.has(key),
+    waiting: (key) => bursts.has(key),
+    drain: async (key) => {
+      await inFlight.get(key);
+    },
     flush: (key) => settle(key),
     async flushAll() {
       await Promise.all([...new Set([...bursts.keys(), ...inFlight.keys()])].map((key) => settle(key)));
