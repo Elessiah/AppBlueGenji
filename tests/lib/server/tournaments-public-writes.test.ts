@@ -494,6 +494,13 @@ describe("adminSaveMatchScoresPublic", () => {
   // (ils ne lisent que des matchs COMPLETED), aucune relecture de la ligne, et
   // l'instantané seul est republié.
   const saved = matchRow({ id: 70, tournament_id: 8, team1_id: 3, team2_id: 4 });
+  /** Tournoi du match, lu avant la transaction (`saveTargetTournament`). */
+  const target = (head: Record<string, unknown> = {}) =>
+    connection.execute.mockResolvedValue([[{ tournament_id: 8, team1_id: 3, team2_id: 4, status: "READY", ...head }], undefined]);
+
+  beforeEach(() => {
+    target();
+  });
 
   it("enregistre sans rien réconcilier ni relire, et ne republie que l'instantané", async () => {
     jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
@@ -507,7 +514,8 @@ describe("adminSaveMatchScoresPublic", () => {
     for (const fn of [reconcileSurvival, reconcileSwiss, reconcileEndurance, reconcilePhases, finalizeTournamentIfDone]) {
       expect(fn).not.toHaveBeenCalled();
     }
-    expect(connection.execute).not.toHaveBeenCalled();
+    // Une seule lecture à part, celle du tournoi du match — rien n'est relu.
+    expect(connection.execute).toHaveBeenCalledTimes(1);
     expectCommitted();
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(8, { landingLive: true });
     expect(order(jest.mocked(publishMatchUpdatedEvent))).toBeGreaterThan(order(connection.commit));
@@ -532,6 +540,63 @@ describe("adminSaveMatchScoresPublic", () => {
 
     await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow("DOWNSTREAM_SCORES");
     expectRolledBack();
+  });
+
+  // Revue perf #542 : le tournoi **d'abord**, en toute première instruction de
+  // la transaction (ordre des réconciliations et de la programmation) — une
+  // réconciliation qui détruit la manche de ce match pour la réapparier ne peut
+  // plus effacer une saisie commitée entre-temps, et le match n'est jamais
+  // verrouillé pendant l'attente du tournoi.
+  it("adminSave_locksTournamentFirstInTransaction", async () => {
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
+
+    await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
+
+    expect(lockTournamentRow).toHaveBeenCalledWith(fakeConnection(connection), 8);
+    expect(order(jest.mocked(lockTournamentRow))).toBeGreaterThan(order(connection.beginTransaction));
+    expect(order(jest.mocked(lockTournamentRow))).toBeLessThan(order(jest.mocked(adminSaveMatchScores)));
+  });
+
+  it("adminSave_preReadOutsideTransaction", async () => {
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
+
+    await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
+
+    const [sql, params] = connection.execute.mock.calls[0];
+    expect(String(sql)).toBe("SELECT tournament_id, team1_id, team2_id, status FROM bg_matches WHERE id = ? LIMIT 1");
+    expect(params).toEqual([70]);
+    expect(order(connection.execute)).toBeLessThan(order(connection.beginTransaction));
+  });
+
+  it("adminSave_matchMissing_rejectsWithoutTransaction", async () => {
+    connection.execute.mockResolvedValue([[], undefined]);
+
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow("MATCH_NOT_FOUND");
+
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
+    expect(lockTournamentRow).not.toHaveBeenCalled();
+    expect(adminSaveMatchScores).not.toHaveBeenCalled();
+    expect(connection.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("adminSave_matchCompleted_rejectsWithoutWaitingTournament", async () => {
+    target({ status: "COMPLETED" });
+
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow(
+      "MATCH_ALREADY_COMPLETED",
+    );
+
+    expect(lockTournamentRow).not.toHaveBeenCalled();
+    expect(adminSaveMatchScores).not.toHaveBeenCalled();
+  });
+
+  it("adminSave_matchWithoutEntrants_rejectsWithoutWaitingTournament", async () => {
+    target({ team2_id: null });
+
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow("MATCH_NOT_READY");
+
+    expect(lockTournamentRow).not.toHaveBeenCalled();
+    expect(adminSaveMatchScores).not.toHaveBeenCalled();
   });
 });
 
@@ -730,6 +795,7 @@ describe("adminSaveMatchScoresPublic — suspension de la validation d'office", 
   });
 
   it("n'alerte personne quand la saisie est défaite", async () => {
+    connection.execute.mockResolvedValue([[savedRow], undefined]);
     jest.mocked(adminSaveMatchScores).mockRejectedValueOnce(new Error("MATCH_ALREADY_COMPLETED"));
 
     await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor)).rejects.toThrow(

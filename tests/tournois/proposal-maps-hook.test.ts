@@ -153,6 +153,30 @@ describe("useProposalMaps", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  // Revue perf #542 : `proposals: null` est une réponse (rien de lisible pour
+  // ce lecteur sur l'état relu), pas un échec — les essais s'arrêtent là.
+  it("useProposalMaps_serverAnswersNull_stopsRetrying", async () => {
+    fetchMock.mockResolvedValue(okResponse({ proposals: null }));
+
+    render(match, NO_PROPOSALS);
+    await settle();
+    jest.advanceTimersByTime(PROPOSAL_REFRESH_DELAY_MS * (PROPOSAL_REFRESH_ATTEMPTS + 2));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("useProposalMaps_unparsableAnswer_keepsRetrying", async () => {
+    fetchMock.mockResolvedValue(okResponse({ proposals: { matchId: "x" } }));
+
+    render(match, NO_PROPOSALS);
+    for (let i = 0; i < PROPOSAL_REFRESH_ATTEMPTS + 2; i += 1) {
+      await settle();
+      jest.advanceTimersByTime(PROPOSAL_REFRESH_DELAY_MS);
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("useProposalMaps_networkError_keepsDisplayedMatch", async () => {
     fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
 

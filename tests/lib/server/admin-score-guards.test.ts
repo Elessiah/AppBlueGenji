@@ -246,8 +246,9 @@ describe("forfait — l'équipe doit jouer le match", () => {
  * Les connexions factices de ce fichier et de ses voisins rendaient la ligne du
  * verrou sans colonne `status` : depuis le passage à `isMatchPlayed`, le
  * garde-fou sortait donc aussitôt, et on aurait pu retirer entièrement son
- * appel d'`adminSaveMatchScores` et d'`adminResolveMatch` sans qu'un seul test
- * bronche. Ces deux cas ferment le trou du côté du chemin réel.
+ * appel d'`adminResolveMatch` sans qu'un seul test bronche. Ces cas ferment le
+ * trou du côté du chemin réel ; « Enregistrer », qui refuse tout match clos,
+ * n'a plus de raison de le lire.
  */
 describe("verrou de manche — depuis l'arbitrage, pas depuis l'helper", () => {
   /** Manche suivante déjà saisie : rien en amont ne doit plus bouger. */
@@ -267,16 +268,15 @@ describe("verrou de manche — depuis l'arbitrage, pas depuis l'helper", () => {
     },
   ];
 
-  it("refuse l'enregistrement quand la manche suivante porte une saisie", async () => {
-    const { conn, writes } = fakeConnection({
-      lockStatus: "COMPLETED",
-      dependents: PLAYED_NEXT_ROUND,
-    });
+  // Revue perf #542 : « Enregistrer » refuse un match clos avant ce verrou, qui
+  // ne protège qu'un match joué (`COMPLETED`) — sa lecture jointe ne servait à
+  // rien, sous le verrou du tournoi, à chaque map. Seule la validation le lit.
+  it("adminSave_openMatch_neverReadsDownstreamLock", async () => {
+    const { conn, statements } = fakeConnection({ lockStatus: "COMPLETED", dependents: PLAYED_NEXT_ROUND });
 
-    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(2, 1), userId: 1 })).rejects.toThrow(
-      "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES",
-    );
-    expect(writes).toHaveLength(0);
+    await adminSaveMatchScores(conn, 10, { maps: mapsFor(2, 1), userId: 1 });
+
+    expect(statements.some((sql) => sql.includes("FROM bg_matches m JOIN bg_tournaments t"))).toBe(false);
   });
 
   it("refuse la validation du résultat dans le même cas", async () => {
