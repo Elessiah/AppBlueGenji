@@ -160,6 +160,7 @@ describe("startDiscordHandleUpdate", () => {
       "900000000000000001",
       "123456",
       "en",
+      "handle",
     );
   });
 
