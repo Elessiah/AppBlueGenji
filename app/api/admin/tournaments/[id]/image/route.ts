@@ -82,8 +82,8 @@ export async function POST(req: Request, context: RouteContext) {
   if (!settings.ok) return fail(settings.error, 400);
 
   try {
-    const image = await setTournamentImage(auth.tournamentId, file, settings.value, crop.crop);
-    announceStaffTournamentAction(auth.tournamentId, "IMAGE_SET");
+    const { replaced, ...image } = await setTournamentImage(auth.tournamentId, file, settings.value, crop.crop);
+    announceStaffTournamentAction(auth.tournamentId, replaced ? "IMAGE_REPLACED" : "IMAGE_SET");
     return ok({ image });
   } catch (error) {
     return mapFailure(error, "TOURNAMENT_IMAGE_UPLOAD_FAILED");

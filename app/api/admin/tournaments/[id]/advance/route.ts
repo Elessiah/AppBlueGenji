@@ -32,7 +32,7 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
 
   try {
     const advanced = await advanceTournamentNow(tournamentId);
-    announceStaffTournamentAction(tournamentId, "ADVANCED");
+    announceStaffTournamentAction(tournamentId, "ADVANCED", { target: advanced.target });
     return ok({ advanced });
   } catch (error) {
     const message = (error as Error).message;

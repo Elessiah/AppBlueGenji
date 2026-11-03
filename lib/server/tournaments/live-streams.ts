@@ -303,9 +303,11 @@ function linkProvider(setter: MatchLiveSetter): number | null {
  * ni sur un match qui n'est pas jouable ou dont le score est déjà saisi — dans
  * ces cas la fermeture est déjà acquise par dérivation.
  *
+ * @returns `true` quand l'antenne a changé d'état — un second clic sur « à
+ *   l'antenne » ne change rien, et le journal du staff ne le note pas.
  * @throws `MATCH_NOT_FOUND` | `LIVE_TRIGGER_NOT_MANUAL` | `MATCH_NOT_LIVE_READY`
  */
-export async function setMatchOnAir(matchId: number, onAir: boolean): Promise<void> {
+export async function setMatchOnAir(matchId: number, onAir: boolean): Promise<boolean> {
   const row = await loadMatchLiveRow(matchId);
 
   if (row.live_trigger !== "MANUAL") throw new Error("LIVE_TRIGGER_NOT_MANUAL");
@@ -318,6 +320,7 @@ export async function setMatchOnAir(matchId: number, onAir: boolean): Promise<vo
   ]);
 
   publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
+  return onAir === (row.live_started_at === null);
 }
 
 /**

@@ -81,15 +81,30 @@ export async function loadEligibleCasterIds(
   userIds: readonly number[],
   lock = false,
 ): Promise<Set<number>> {
+  const blocks = await loadCastBlocks(executor, userIds, lock);
+  return new Set([...blocks].filter(([, block]) => block === null).map(([id]) => id));
+}
+
+/**
+ * La condition du cast de chaque compte de la liste, en une lecture : `null`
+ * s'il peut caster, sinon ce qui manque (`castEligibilityBlock`) — un compte
+ * introuvable compte comme supprimé. `lock` : comme {@link loadEligibleCasterIds}.
+ */
+export async function loadCastBlocks(
+  executor: Executor,
+  userIds: readonly number[],
+  lock = false,
+): Promise<Map<number, CastBlock | null>> {
   const ids = [...new Set(userIds)];
-  if (ids.length === 0) return new Set();
+  if (ids.length === 0) return new Map();
   const [rows] = await executor.execute<(CastEligibilityRow & { id: number })[]>(
     `SELECT id, ${CAST_ELIGIBILITY_COLUMNS} FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})${
       lock ? " LOCK IN SHARE MODE" : ""
     }`,
     ids,
   );
-  return new Set(rows.filter((row) => castEligibilityBlock(row) === null).map((row) => Number(row.id)));
+  const byId = new Map(rows.map((row) => [Number(row.id), row]));
+  return new Map(ids.map((id) => [id, castEligibilityBlock(byId.get(id))]));
 }
 
 /**

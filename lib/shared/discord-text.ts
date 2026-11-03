@@ -81,6 +81,15 @@ export function discordInline(value: string): string {
 }
 
 /**
+ * Un nom cité dans une phrase d'un message Discord, guillemets de la langue
+ * compris — « … » en français, “…” en anglais — et rendu sûr par
+ * {@link discordInline}.
+ */
+export function discordQuoted(value: string, locale: "fr" | "en"): string {
+  return locale === "en" ? `“${discordInline(value)}”` : `« ${discordInline(value)} »`;
+}
+
+/**
  * Texte libre sûr, cité ligne à ligne : ses sauts de ligne sont gardés (un
  * signalement se lit mieux en paragraphes), mais chaque ligne commence par
  * `> `, marque qu'aucune ligne rédigée par le site ne porte.

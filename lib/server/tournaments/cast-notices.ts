@@ -17,23 +17,35 @@
  */
 import type { PoolConnection } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
+import { createCoalescer } from "@/lib/server/coalescer";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import type { BotLogCategory } from "@/lib/shared/bot-log-category";
 import { formatCastChangeLog, type CastLogChange } from "@/lib/shared/bot-logs";
-import { formatCastReleasedNotice, type CastReleaseReason, type CastReleasedMatch } from "@/lib/shared/cast-notices";
+import type { CastReleaseReason, CastReleasedMatch } from "@/lib/shared/cast-notices";
+import type { CastBlock } from "@/lib/shared/match-launch";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import { castReleasedPush } from "@/lib/shared/push-messages";
+import { formatCastReleasedNotice } from "./cast-release-message";
 import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
 
 /** Un changement d'inscription de caster, tel que `match-launch.ts` le constate sous verrou. */
 export type CastChange =
-  /** Inscription posée ; `replacedCasterId` : le titulaire inéligible dont la place est reprise. */
-  | { kind: "CLAIMED"; matchId: number; replacedCasterId: number | null }
+  /** Inscription posée par `casterId` ; `replacedCasterId` : le titulaire inéligible dont la place est reprise. */
+  | { kind: "CLAIMED"; matchId: number; casterId: number; replacedCasterId: number | null }
   /** Inscription retirée par son caster (`byStaff: false`) ou par le staff. */
   | { kind: "RELEASED"; matchId: number; casterId: number; byStaff: boolean }
-  /** Inscription retirée d'office (`releaseIneligibleCast`). */
-  | { kind: "AUTO_RELEASED"; matchId: number; casterId: number; reason: "INELIGIBLE" | "JOINED_TEAM" };
+  /**
+   * Inscription retirée d'office (`releaseIneligibleCast`) ; `block`
+   * (`INELIGIBLE`) : la condition qui manque, que le motif nomme au caster.
+   */
+  | {
+      kind: "AUTO_RELEASED";
+      matchId: number;
+      casterId: number;
+      reason: "INELIGIBLE" | "JOINED_TEAM";
+      block?: CastBlock | null;
+    };
 
 /** Ligne du journal de ce changement. */
 export function castLogChange(change: CastChange): CastLogChange {
@@ -58,38 +70,40 @@ export function castLogCategory(change: CastChange): BotLogCategory {
 }
 
 /** Le caster à prévenir et son motif ; `null` quand personne n'a à l'être (il s'est retiré lui-même, ou rien n'est retiré). */
-export function castReleaseNotice(change: CastChange): { casterId: number; reason: CastReleaseReason } | null {
+export function castReleaseNotice(
+  change: CastChange,
+): { casterId: number; reason: CastReleaseReason; block?: CastBlock | null } | null {
   switch (change.kind) {
     case "CLAIMED":
       return change.replacedCasterId === null ? null : { casterId: change.replacedCasterId, reason: "REPLACED" };
     case "RELEASED":
       return change.byStaff ? { casterId: change.casterId, reason: "STAFF" } : null;
     case "AUTO_RELEASED":
-      return { casterId: change.casterId, reason: change.reason };
+      return change.block === undefined
+        ? { casterId: change.casterId, reason: change.reason }
+        : { casterId: change.casterId, reason: change.reason, block: change.block };
   }
 }
 
 /** Le journal, puis l'avis au caster s'il en faut un. Peut lever (base indisponible) : {@link announceCastChange} l'enveloppe. */
 export async function deliverCastChange(change: CastChange): Promise<void> {
-  const row = await loadMatchLogRow(change.matchId);
+  const notice = castReleaseNotice(change);
+  // Le destinataire ne dépend que du caster : sa lecture part avec celle du match.
+  // Message de match : l'interrupteur « messages privés de mes matchs » de
+  // « Mon profil » le coupe (droit d'opposition), le push garde son sujet.
+  // Comme tout message de match, seul un tag Discord certifié le reçoit.
+  const [row, recipients] = await Promise.all([
+    loadMatchLogRow(change.matchId),
+    notice ? loadNotificationRecipients([notice.casterId], "certified", { matchDm: true }) : null,
+  ]);
   if (!row) return;
   const match = matchLogSubject(row);
-  const log = sendBotLog(
-    formatCastChangeLog({
-      tournament: match.tournament,
-      matchId: match.matchId,
-      bracket: match.bracket,
-      roundNumber: match.roundNumber,
-      swiss: match.swiss,
-      team1: match.team1,
-      team2: match.team2,
-      change: castLogChange(change),
-    }),
-    { tournamentId: match.tournament.id, category: castLogCategory(change) },
-  );
+  const log = sendBotLog(formatCastChangeLog({ ...match, change: castLogChange(change) }), {
+    tournamentId: match.tournament.id,
+    category: castLogCategory(change),
+  });
 
-  const notice = castReleaseNotice(change);
-  if (!notice) {
+  if (!notice || !recipients) {
     await log;
     return;
   }
@@ -104,12 +118,9 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
     team2Name: row.team2_name,
     solo: match.participantType === "SOLO",
     reason: notice.reason,
+    block: notice.block,
   };
   const url = `${siteCanonicalBase()}${tournamentMatchHref(subject.tournamentId, subject.matchId)}`;
-  // Message de match : l'interrupteur « messages privés de mes matchs » de
-  // « Mon profil » le coupe (droit d'opposition), le push garde son sujet.
-  // Comme tout message de match, seul un tag Discord certifié le reçoit.
-  const recipients = await loadNotificationRecipients([notice.casterId], "certified", { matchDm: true });
   await Promise.all([
     log,
     notifyUsers(recipients, {
@@ -120,9 +131,56 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
   ]);
 }
 
-/** Annonce un changement d'inscription de caster, sans attendre ; ne lève jamais. */
+function deliverInBackground(change: CastChange): void {
+  void deliverCastChange(change).catch((error) =>
+    console.error(
+      `[cast] changement d'inscription non annoncé : ${error instanceof Error ? error.message : "erreur inconnue"}`,
+    ),
+  );
+}
+
+/** Silence qui clôt une rafale d'inscriptions et de retraits d'un même caster sur un même match. */
+export const CAST_TOGGLE_WINDOW_MS = 60_000;
+/** Au plus tard, la rafale s'annonce ce délai après son premier geste. */
+export const CAST_TOGGLE_MAX_AGE_MS = 5 * 60_000;
+
+/**
+ * Geste volontaire du caster sur sa propre inscription — inscription simple,
+ * retrait par lui-même : une ligne de journal, aucun avis. Un caster qui
+ * bascule le bouton en boucle ne remplit plus le salon : la rafale ne dit que
+ * son **effet net**, et rien quand elle revient à l'état de départ.
+ */
+function isVoluntaryToggle(change: CastChange): change is Extract<CastChange, { kind: "CLAIMED" | "RELEASED" }> {
+  if (change.kind === "CLAIMED") return change.replacedCasterId === null;
+  return change.kind === "RELEASED" && !change.byStaff;
+}
+
+const voluntaryToggles = createCoalescer<CastChange>({
+  windowMs: CAST_TOGGLE_WINDOW_MS,
+  maxAgeMs: CAST_TOGGLE_MAX_AGE_MS,
+  // Inscrit puis retiré (ou l'inverse) : rien n'a changé, rien ne part.
+  deliver: (first, last) => {
+    if (first.kind === last.kind) deliverInBackground(last);
+  },
+});
+
+/** Annonce tout de suite les rafales en attente. Réservé aux tests. */
+export function flushCastToggles(): void {
+  voluntaryToggles.flushAll();
+}
+
+/** Abandonne les rafales en attente. Réservé aux tests. */
+export function resetCastToggles(): void {
+  voluntaryToggles.reset();
+}
+
+/**
+ * Annonce un changement d'inscription de caster, sans attendre ; ne lève jamais.
+ * Un geste volontaire du caster attend {@link CAST_TOGGLE_WINDOW_MS} de silence.
+ */
 export function announceCastChange(change: CastChange): void {
-  void deliverCastChange(change).catch((error) => console.error("[cast] changement d'inscription non annoncé", error));
+  if (isVoluntaryToggle(change)) voluntaryToggles.add(`${change.matchId}:${change.casterId}`, change);
+  else deliverInBackground(change);
 }
 
 /**

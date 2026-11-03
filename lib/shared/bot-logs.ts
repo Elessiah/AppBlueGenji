@@ -836,7 +836,9 @@ export function formatStaffMatchActionLog(context: {
  * - `SEEDING_REORDERED` — ordre des têtes de série changé ;
  * - `ADVANCED` — étape suivante avancée (ouverture des inscriptions, début) ;
  * - `GHOST_TEAMS_REGISTERED` — équipes fantômes inscrites (`count`) ;
- * - `IMAGE_SET` / `IMAGE_UPDATED` / `IMAGE_REMOVED` — image du tournoi ;
+ * - `IMAGE_SET` / `IMAGE_REPLACED` / `IMAGE_UPDATED` / `IMAGE_REMOVED` — image
+ *   du tournoi (posée sur un tournoi qui n'en avait pas, ou par-dessus une
+ *   image en place, qu'elle supprime) ;
  * - `LIVE_URL_SET` / `LIVE_URL_REMOVED` — lien de diffusion du tournoi ;
  * - `TEAM_VOICE_ON` / `TEAM_VOICE_OFF` — option « Salons vocaux d'équipe »
  *   (`docs/features/MATCH_VOICE.md`).
@@ -847,6 +849,7 @@ export type StaffTournamentAction =
   | "ADVANCED"
   | "GHOST_TEAMS_REGISTERED"
   | "IMAGE_SET"
+  | "IMAGE_REPLACED"
   | "IMAGE_UPDATED"
   | "IMAGE_REMOVED"
   | "LIVE_URL_SET"
@@ -860,6 +863,7 @@ const STAFF_TOURNAMENT_ACTION_WORDING: Record<StaffTournamentAction, string> = {
   ADVANCED: "Étape suivante avancée",
   GHOST_TEAMS_REGISTERED: "Équipes fantômes inscrites",
   IMAGE_SET: "Image du tournoi ajoutée",
+  IMAGE_REPLACED: "Image du tournoi remplacée",
   IMAGE_UPDATED: "Cadrage de l'image modifié",
   IMAGE_REMOVED: "Image du tournoi retirée",
   LIVE_URL_SET: "Lien de diffusion du tournoi posé",
@@ -868,16 +872,33 @@ const STAFF_TOURNAMENT_ACTION_WORDING: Record<StaffTournamentAction, string> = {
   TEAM_VOICE_OFF: "Salons vocaux d'équipe désactivés",
 };
 
+/** Étape franchie par « Avancer l'étape suivante » (`ADVANCED`), telle que la ligne la nomme. */
+const ADVANCE_TARGET_WORDING: Record<"REGISTRATION" | "LOCKED" | "RUNNING", string> = {
+  REGISTRATION: "ouverture des inscriptions",
+  LOCKED: "clôture des inscriptions",
+  RUNNING: "coup d'envoi",
+};
+
 /**
  * Geste du staff sur un tournoi, auteur anonyme (« le staff ») et rien dans
  * pm2, comme {@link formatStaffMatchActionLog}. `count` (équipes fantômes) suit
  * le geste : c'est ce que l'arbitre vérifie, et il ne nomme personne.
+ * `target` (`ADVANCED`) dit l'étape franchie ; `previousName` (`EDITED`), le
+ * nom d'avant un renommage — la ligne nomme le tournoi sous son nouveau nom.
  */
 export function formatStaffTournamentActionLog(context: {
   tournament: BotLogTournament;
   action: StaffTournamentAction;
   count?: number;
+  target?: keyof typeof ADVANCE_TARGET_WORDING;
+  previousName?: string;
 }): string {
-  const count = context.count === undefined ? "" : ` (${context.count})`;
-  return `${lead("🛠️", STAFF_TOURNAMENT_ACTION_WORDING[context.action], context.tournament)}${count}, par ${ANONYMOUS_STAFF_LABEL}.`;
+  const details: string[] = [];
+  if (context.count !== undefined) details.push(String(context.count));
+  if (context.action === "ADVANCED" && context.target) details.push(ADVANCE_TARGET_WORDING[context.target]);
+  if (context.action === "EDITED" && context.previousName !== undefined && context.previousName !== context.tournament.name) {
+    details.push(`ancien nom : « ${discordInline(context.previousName)} »`);
+  }
+  const suffix = details.length === 0 ? "" : ` (${details.join(", ")})`;
+  return `${lead("🛠️", STAFF_TOURNAMENT_ACTION_WORDING[context.action], context.tournament)}${suffix}, par ${ANONYMOUS_STAFF_LABEL}.`;
 }

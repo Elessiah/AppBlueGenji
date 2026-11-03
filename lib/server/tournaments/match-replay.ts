@@ -21,6 +21,7 @@ type MatchReplayRow = RowDataPacket & {
   status: MatchStatus;
   team1_id: number | null;
   team2_id: number | null;
+  replay_url: string | null;
   forfeit_team_id: number | null;
   double_forfeit: number | null;
 };
@@ -47,20 +48,22 @@ function isReplayableRow(row: MatchReplayRow): boolean {
  * revanche une rencontre réellement disputée (`canHaveReplay`), sans quoi le
  * bandeau annoncerait la rediff d'un match qui n'a pas eu lieu.
  *
- * @returns le lien normalisé, ou `null` s'il a été effacé.
+ * @returns le lien normalisé (`null` s'il a été effacé), et `changed` : le
+ *   lien a changé — effacer un lien jamais posé, ou reposer le même, ne change
+ *   rien, et le journal du staff ne le note pas.
  * @throws `INVALID_REPLAY_URL` | `MATCH_NOT_FOUND` | `MATCH_NOT_REPLAYABLE`
  */
 export async function setMatchReplayUrl(
   matchId: number,
   rawUrl: string | null,
-): Promise<string | null> {
+): Promise<{ replayUrl: string | null; changed: boolean }> {
   const blank = rawUrl === null || rawUrl.trim() === "";
   const replayUrl = blank ? null : normalizeReplayUrl(rawUrl);
   if (!blank && replayUrl === null) throw new Error("INVALID_REPLAY_URL");
 
   const db = await getDatabase();
   const [rows] = await db.execute<MatchReplayRow[]>(
-    `SELECT id, tournament_id, status, team1_id, team2_id, forfeit_team_id, double_forfeit
+    `SELECT id, tournament_id, status, team1_id, team2_id, forfeit_team_id, double_forfeit, replay_url
        FROM bg_matches WHERE id = ? LIMIT 1`,
     [matchId],
   );
@@ -83,5 +86,5 @@ export async function setMatchReplayUrl(
   }
 
   publishMatchUpdatedEvent(Number(row.tournament_id));
-  return replayUrl;
+  return { replayUrl, changed: (row.replay_url ?? null) !== replayUrl };
 }

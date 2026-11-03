@@ -42,6 +42,7 @@ import type { MatchStatus, TeamRole } from "@/lib/shared/types";
 import {
   casterIdentityOf,
   loadCastEligibility,
+  loadCastBlocks,
   loadEligibleCasterIds,
   loadRefereeEligibility,
   loadRefereeStanding,
@@ -712,11 +713,12 @@ async function releaseIneligibleCasters(
   currentRead = false,
 ): Promise<boolean> {
   if (row.casters.length === 0 || row.launched_at !== null || row.status === "COMPLETED") return false;
-  const eligible = await loadEligibleCasterIds(
+  const blocks = await loadCastBlocks(
     connection,
     row.casters.map((caster) => caster.userId),
     currentRead,
   );
+  const eligible = new Set(row.casters.map((caster) => caster.userId).filter((id) => blocks.get(id) === null));
   const leaving = row.casters.filter((caster) => !eligible.has(caster.userId));
   if (leaving.length === 0) return false;
   await connection.execute(
@@ -731,6 +733,7 @@ async function releaseIneligibleCasters(
       matchId: Number(row.id),
       casterId: caster.userId,
       reason: "INELIGIBLE",
+      block: blocks.get(caster.userId) ?? null,
     });
   }
   return true;
@@ -802,7 +805,7 @@ export async function claimMatchCast(
   // visible) ; une inscription déjà acquise ne change rien.
   publishMatchUpdatedEvent(tournamentId, { landingLive: claimed });
   // Après le commit : journal du staff. Aucune place n'est reprise à personne.
-  if (claimed) announceCastChange({ kind: "CLAIMED", matchId, replacedCasterId: null });
+  if (claimed) announceCastChange({ kind: "CLAIMED", matchId, casterId: userId, replacedCasterId: null });
 }
 
 /**
@@ -861,6 +864,7 @@ export async function releaseMatchCast(
 export async function releaseIneligibleCast(matchId: number, casterId: number): Promise<boolean> {
   let tournamentId: number | null = null;
   let reason: "INELIGIBLE" | "JOINED_TEAM" = "INELIGIBLE";
+  let block: CastBlock | null = null;
   await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       const row = await lockLaunchMatch(connection, matchId);
@@ -879,7 +883,8 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
       // son « Prêt » de caster : son inscription bloquerait le départ jusqu'au
       // lancement d'office.
       // Le motif dit au caster : les conditions du cast d'abord, l'équipe ensuite.
-      if ((await loadCastEligibility(connection, casterId)) === null) {
+      block = await loadCastEligibility(connection, casterId);
+      if (block === null) {
         if ((await resolveTeamParty(connection, row, casterId)) === null) return;
         reason = "JOINED_TEAM";
       }
@@ -894,7 +899,7 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
   );
   if (tournamentId === null) return false;
   publishMatchUpdatedEvent(tournamentId, { landingLive: true });
-  announceCastChange({ kind: "AUTO_RELEASED", matchId, casterId, reason });
+  announceCastChange({ kind: "AUTO_RELEASED", matchId, casterId, reason, block });
   return true;
 }
 
@@ -902,10 +907,12 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
  * Désigne l'équipe qui héberge la partie ; `null` rend la main au défaut
  * (équipe 1). Aucune garde d'état : c'est une information d'organisation.
  *
+ * @returns `true` quand l'hôte a changé — renvoyer le même hôte ne change rien,
+ *   et le journal du staff ne le note pas.
  * @throws `MATCH_NOT_FOUND` | `INVALID_HOST_TEAM`
  */
-export async function setMatchHost(matchId: number, teamId: number | null): Promise<void> {
-  const tournamentId = await inTransaction(async (connection) => {
+export async function setMatchHost(matchId: number, teamId: number | null): Promise<boolean> {
+  const { tournamentId, changed } = await inTransaction(async (connection) => {
     const row = await lockLaunchMatch(connection, matchId);
     if (!row) throw new Error("MATCH_NOT_FOUND");
     if (
@@ -919,9 +926,10 @@ export async function setMatchHost(matchId: number, teamId: number | null): Prom
       teamId,
       matchId,
     ]);
-    return Number(row.tournament_id);
+    return { tournamentId: Number(row.tournament_id), changed: nullableId(row.host_team_id) !== teamId };
   });
   publishMatchUpdatedEvent(tournamentId);
+  return changed;
 }
 
 /**

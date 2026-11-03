@@ -16,8 +16,10 @@ import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError, rowsOrEmptyIfMissingTable } from "@/lib/server/mysql-errors";
 import { toIso } from "@/lib/server/serialization";
 import { siteBaseUrl } from "@/lib/server/site-url";
+import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
 import {
   PUSH_SUBSCRIPTION_RETENTION_DAYS,
+  PUSH_TOPICS,
   PUSH_TOPIC_KEYS,
   buildPushPayload,
   isPushTopic,
@@ -148,7 +150,10 @@ type SubscriptionRow = RowDataPacket & {
   auth: string;
   /** Langue du compte abonné (lot 9-3) ; toute valeur inattendue vaut le français. */
   locale: string | null;
-};
+} & AudienceColumns;
+
+/** Droits du titulaire, relus avec l'abonnement pour un sujet réservé. */
+type AudienceColumns = { is_admin?: number; platform_roles_json?: unknown };
 
 /** Envois simultanés au plus : un tournoi prévient des dizaines d'appareils. */
 const PUSH_CONCURRENCY = 8;
@@ -165,13 +170,45 @@ export type PushOptions = {
  * sujet non coupé. **Une seule écriture de la règle**, pour la distribution
  * (`pushToUsers`) comme pour la question « ce joueur serait-il atteint ? »
  * (`usersReachableByPush`). Paramètres : les comptes, puis le sujet.
+ *
+ * Un sujet réservé à une permission (`PUSH_TOPICS[topic].audience`) écarte en
+ * plus les comptes suspendus, comme les destinataires du staff
+ * (`subscribedStaffCandidates`) ; la permission elle-même se juge sur les
+ * colonnes de droits lues avec l'abonnement ({@link audienceColumns},
+ * {@link withinTopicAudience}).
  */
-function reachableSubscriptionsSql(accounts: number): string {
+function reachableSubscriptionsSql(accounts: number, topic: PushTopic): string {
+  const restricted = PUSH_TOPICS[topic].audience !== null;
   return `FROM bg_push_subscriptions s
        JOIN bg_users u ON u.id = s.user_id AND u.is_deleted = 0
        WHERE s.user_id IN (${sqlPlaceholders(accounts)})
          AND NOT EXISTS (SELECT 1 FROM bg_push_topic_optouts o
-                         WHERE o.user_id = s.user_id AND o.topic = ?)`;
+                         WHERE o.user_id = s.user_id AND o.topic = ?)${
+                           restricted
+                             ? `
+         AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions sus
+                         WHERE sus.user_id = s.user_id AND ${activeSuspensionSql("sus")})`
+                             : ""
+                         }`;
+}
+
+/** Colonnes de droits à lire avec l'abonnement pour un sujet réservé ; rien pour un sujet ouvert. */
+function audienceColumns(topic: PushTopic): string {
+  return PUSH_TOPICS[topic].audience === null ? "" : ", u.is_admin, u.platform_roles_json";
+}
+
+/**
+ * Garde les lignes dont le titulaire détient **encore** la permission du sujet
+ * (toutes pour un sujet ouvert). « Mon profil » ne montre le réglage d'un sujet
+ * réservé qu'à eux : qui ne le voit pas ne pourrait pas le couper, il ne le
+ * reçoit donc pas (un caster dont la permission de diffusion est retirée).
+ */
+function withinTopicAudience<T extends AudienceColumns>(rows: readonly T[], topic: PushTopic): T[] {
+  const audience = PUSH_TOPICS[topic].audience;
+  if (audience === null) return [...rows];
+  return rows.filter((row) =>
+    can({ isAdmin: Number(row.is_admin) === 1, roles: sanitizePlatformRoles(row.platform_roles_json) }, audience),
+  );
 }
 
 /**
@@ -189,12 +226,12 @@ export async function usersReachableByPush(
   if (!config || ids.length === 0) return new Set();
   const db = await getDatabase();
   const rows = await rowsOrEmptyIfMissingTable(
-    db.query<(RowDataPacket & { user_id: number })[]>(
-      `SELECT DISTINCT s.user_id ${reachableSubscriptionsSql(ids.length)}`,
+    db.query<(RowDataPacket & { user_id: number } & AudienceColumns)[]>(
+      `SELECT DISTINCT s.user_id${audienceColumns(topic)} ${reachableSubscriptionsSql(ids.length, topic)}`,
       [...ids, topic],
     ),
   );
-  return new Set(rows.map((row) => Number(row.user_id)));
+  return new Set(withinTopicAudience(rows, topic).map((row) => Number(row.user_id)));
 }
 
 /**
@@ -215,10 +252,11 @@ export async function pushToUsers(
   if (!config || ids.length === 0) return 0;
   try {
     const db = await getDatabase();
-    const [rows] = await db.query<SubscriptionRow[]>(
-      `SELECT s.id, s.endpoint, s.p256dh, s.auth, u.locale ${reachableSubscriptionsSql(ids.length)}`,
+    const [read] = await db.query<SubscriptionRow[]>(
+      `SELECT s.id, s.endpoint, s.p256dh, s.auth, u.locale${audienceColumns(topic)} ${reachableSubscriptionsSql(ids.length, topic)}`,
       [...ids, topic],
     );
+    const rows = withinTopicAudience(read, topic);
     if (rows.length === 0) return 0;
 
     // Une charge par langue de compte (lot 9-3), rédigée une seule fois
