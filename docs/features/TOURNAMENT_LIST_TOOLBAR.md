@@ -167,7 +167,12 @@ déjà la même apparence.
 - **Serveur** : `GET /api/tournaments` garde le corps sérialisé et son empreinte
   avec la liste mise en cache (`WeakMap` sur l'objet), répond `ETag` +
   `Cache-Control: private, no-cache` et **304** à `If-None-Match` (le client lit
-  en `cache: "no-cache"`) — le contrôle d'accès passe avant ; le paramètre
+  en `cache: "no-cache"`) — le contrôle d'accès passe avant ; `scope=hidden`
+  (tournois non publiés, staff seul) répond `private, no-store` sans empreinte :
+  aucune copie sur le disque d'un poste partagé après la déconnexion. Une
+  réponse d'erreur non JSON (page du proxy) retombe sur le code
+  `TOURNAMENT_LIST_FAILED`, et un refus 401/403 des invisibles vide la section
+  sans toast (droit retiré depuis le rendu). Le paramètre
   `?search=` est retiré (inutilisé, il contournait le cache partagé). La requête
   de liste compte les inscriptions par sous-requête corrélée (plus de `GROUP BY`
   sur 36 colonnes, ni table dérivée regroupant toute la table), lit avec elle les colonnes d'avancement (plus de relecture de
