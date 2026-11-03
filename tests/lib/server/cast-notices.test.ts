@@ -407,6 +407,37 @@ describe("announceCastChange", () => {
       expect(lines()[1]).toContain("repris");
     });
 
+    it("announceCastChange_staffReleaseThenImmediateReclaim_staffLineFirst", async () => {
+      mockMatch(matchRow());
+      let finishRead: () => void = () => undefined;
+      jest.mocked(loadNotificationRecipients).mockImplementationOnce(
+        () => new Promise((resolve) => (finishRead = () => resolve([RECIPIENT]))),
+      );
+      announceCastChange({ ...released, byStaff: true });
+      announceCastChange(claimed);
+      await settleChain();
+      expect(lines()).toHaveLength(0);
+      finishRead();
+      await settleChain();
+      expect(lines()).toHaveLength(2);
+      expect(lines()[0]).toContain("par le staff");
+      expect(lines()[1]).toContain("Cast réservé");
+    });
+
+    it("announceCastChange_gestureAfterStaffFlush_opensNewBurst", async () => {
+      mockMatch(matchRow());
+      announceCastChange(released);
+      announceCastChange({ ...released, byStaff: true });
+      announceCastChange(claimed);
+      await settleChain();
+      await flushCastToggles();
+      await settle();
+      expect(lines()).toHaveLength(3);
+      expect(lines()[0]).toContain("Cast libéré");
+      expect(lines()[1]).toContain("par le staff");
+      expect(lines()[2]).toContain("Cast réservé");
+    });
+
     it("announceCastChange_staffReleaseOtherCaster_otherClaimPostedAtOnce", async () => {
       mockMatch(matchRow());
       announceCastChange({ ...claimed, casterId: 10 });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { createCoalescer, flushAllCoalescers } from "@/lib/server/coalescer";
+import { createCoalescer, flushAllCoalescers, trackAnnouncement } from "@/lib/server/coalescer";
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -235,6 +235,29 @@ describe("createCoalescer — annonce forcée", () => {
     await drained;
     expect(deliver).toHaveBeenCalledTimes(1);
     expect(coalescer.waiting("a")).toBe(true);
+  });
+
+  it("flush_gestureAddedAfterCall_opensNextBurst", async () => {
+    const deliver = jest.fn<(first: number, last: number) => void>();
+    const coalescer = createCoalescer<number>({ windowMs: 1_000, maxAgeMs: 5_000, deliver });
+    coalescer.add("a", 1);
+    const flushed = coalescer.flush("a");
+    coalescer.add("a", 2);
+    await flushed;
+    expect(deliver).toHaveBeenCalledWith(1, 1);
+    expect(coalescer.waiting("a")).toBe(true);
+  });
+
+  it("flushAllCoalescers_trackedAnnouncementPending_waitsForIt", async () => {
+    let finish: () => void = () => undefined;
+    const done: string[] = [];
+    trackAnnouncement(new Promise<void>((resolve) => (finish = resolve)).then(() => void done.push("announced")));
+    const flushed = flushAllCoalescers().then(() => done.push("flushed"));
+    await Promise.resolve();
+    expect(done).toEqual([]);
+    finish();
+    await flushed;
+    expect(done).toEqual(["announced", "flushed"]);
   });
 
   it("flush_unknownKey_resolvesWithoutDelivering", async () => {

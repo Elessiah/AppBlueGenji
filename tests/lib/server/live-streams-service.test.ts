@@ -772,11 +772,17 @@ describe("findBroadcastingTournament", () => {
 });
 
 describe("setMatchOnAir — changement d'état", () => {
-  it("setMatchOnAir_alreadyOnAir_returnsFalse", async () => {
-    const execute = jest
+  /** Lecture, UPDATE conditionnel (lignes touchées), puis relecture si rien n'a changé. */
+  function liveRows(before: Record<string, unknown>, affectedRows: number, after: Record<string, unknown> = before) {
+    return jest
       .fn<SqlQuery>()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: new Date() })]])
-      .mockResolvedValueOnce([{ affectedRows: 0 }]);
+      .mockResolvedValueOnce([[matchRow(before)]])
+      .mockResolvedValueOnce([{ affectedRows }])
+      .mockResolvedValueOnce([[matchRow(after)]]);
+  }
+
+  it("setMatchOnAir_alreadyOnAir_returnsFalse", async () => {
+    const execute = liveRows({ live_trigger: "MANUAL", live_started_at: new Date() }, 0);
     await mockDb(execute);
     await expect(setMatchOnAir(42, true)).resolves.toBe(false);
     // L'heure de mise à l'antenne n'est pas réécrite : la condition la garde.
@@ -786,54 +792,43 @@ describe("setMatchOnAir — changement d'état", () => {
 
   it("setMatchOnAir_concurrentSecondClick_returnsFalse", async () => {
     // Les deux clics ont lu l'antenne fermée ; seul le premier UPDATE trouve la ligne.
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: null })]])
-      .mockResolvedValueOnce([{ affectedRows: 0 }]);
-    await mockDb(execute);
+    await mockDb(liveRows({ live_trigger: "MANUAL", live_started_at: null }, 0, { live_trigger: "MANUAL", live_started_at: new Date() }));
     await expect(setMatchOnAir(42, true)).resolves.toBe(false);
   });
 
-  it("setMatchOnAir_matchCompletedBeforeWrite_returnsFalseWithoutEvent", async () => {
+  it("setMatchOnAir_matchCompletedBeforeWrite_throwsNotLiveReady", async () => {
     // Lu READY, validé avant l'UPDATE : la condition sur le statut ne trouve plus la ligne.
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: null })]])
-      .mockResolvedValueOnce([{ affectedRows: 0 }]);
+    const execute = liveRows({ live_trigger: "MANUAL", live_started_at: null }, 0, {
+      live_trigger: "MANUAL",
+      live_started_at: null,
+      status: "COMPLETED",
+    });
     await mockDb(execute);
-    await expect(setMatchOnAir(42, true)).resolves.toBe(false);
+    await expect(setMatchOnAir(42, true)).rejects.toThrow("MATCH_NOT_LIVE_READY");
     expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND status = 'READY'");
     expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND live_trigger = 'MANUAL'");
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
-  it("setMatchOnAir_offAir_switchOn_returnsTrue", async () => {
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: null })]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
-    await mockDb(execute);
-    await expect(setMatchOnAir(42, true)).resolves.toBe(true);
-  });
-
-  it("setMatchOnAir_triggerSwitchedToAutoBeforeOffAirWrite_returnsFalseWithoutEvent", async () => {
+  it("setMatchOnAir_triggerSwitchedToAutoBeforeOffAirWrite_throwsNotManual", async () => {
     // Lu MANUAL à l'antenne, passé en automatique avant l'UPDATE : la ligne n'est plus trouvée.
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: new Date() })]])
-      .mockResolvedValueOnce([{ affectedRows: 0 }]);
+    const execute = liveRows({ live_trigger: "MANUAL", live_started_at: new Date() }, 0, {
+      live_trigger: "AUTO",
+      live_started_at: new Date(),
+    });
     await mockDb(execute);
-    await expect(setMatchOnAir(42, false)).resolves.toBe(false);
+    await expect(setMatchOnAir(42, false)).rejects.toThrow("LIVE_TRIGGER_NOT_MANUAL");
     expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND live_trigger = 'MANUAL'");
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
+  it("setMatchOnAir_offAir_switchOn_returnsTrue", async () => {
+    await mockDb(liveRows({ live_trigger: "MANUAL", live_started_at: null }, 1));
+    await expect(setMatchOnAir(42, true)).resolves.toBe(true);
+  });
+
   it("setMatchOnAir_alreadyOffAir_returnsFalse", async () => {
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: null })]])
-      .mockResolvedValueOnce([{ affectedRows: 0 }]);
-    await mockDb(execute);
+    await mockDb(liveRows({ live_trigger: "MANUAL", live_started_at: null }, 0));
     await expect(setMatchOnAir(42, false)).resolves.toBe(false);
   });
 });

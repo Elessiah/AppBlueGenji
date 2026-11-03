@@ -18,6 +18,10 @@ describe("failureReason", () => {
     expect(failureReason(Object.assign(new Error("BOT_DOWN"), { code: 1062 }))).toBe("BOT_DOWN");
   });
 
+  it("failureReason_freeTextCode_fallsBackToName", () => {
+    expect(failureReason(Object.assign(new Error("boom"), { code: "connect to https://x failed" }))).toBe("Error");
+  });
+
   it("failureReason_siteErrorCode_returnsMessage", () => {
     expect(failureReason(new Error("MATCH_NOT_FOUND"))).toBe("MATCH_NOT_FOUND");
   });
