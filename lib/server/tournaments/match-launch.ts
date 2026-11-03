@@ -718,14 +718,13 @@ async function releaseIneligibleCasters(
     row.casters.map((caster) => caster.userId),
     currentRead,
   );
-  const eligible = new Set(row.casters.map((caster) => caster.userId).filter((id) => blocks.get(id) === null));
-  const leaving = row.casters.filter((caster) => !eligible.has(caster.userId));
+  const leaving = row.casters.filter((caster) => blocks.get(caster.userId) !== null);
   if (leaving.length === 0) return false;
   await connection.execute(
     `DELETE FROM bg_match_casters WHERE match_id = ? AND user_id IN (${leaving.map(() => "?").join(", ")})`,
     [row.id, ...leaving.map((caster) => caster.userId)],
   );
-  row.casters = row.casters.filter((caster) => eligible.has(caster.userId));
+  row.casters = row.casters.filter((caster) => blocks.get(caster.userId) === null);
   await pruneMatchStreams(connection, Number(row.id), { casters: row.casters });
   for (const caster of leaving) {
     queueCastChange(connection, {
@@ -926,13 +925,15 @@ export async function setMatchHost(matchId: number, teamId: number | null): Prom
     ) {
       throw new Error("INVALID_HOST_TEAM");
     }
-    await connection.execute(`UPDATE bg_matches SET host_team_id = ? WHERE id = ?`, [
-      teamId,
-      matchId,
-    ]);
-    return { tournamentId: Number(row.tournament_id), changed: nullableId(row.host_team_id) !== teamId };
+    // Verrou du match tenu : `changed` est exact. Même hôte = ni écriture ni
+    // événement (chaque événement reconstruit l'instantané de tous les lecteurs).
+    const changed = nullableId(row.host_team_id) !== teamId;
+    if (changed) {
+      await connection.execute(`UPDATE bg_matches SET host_team_id = ? WHERE id = ?`, [teamId, matchId]);
+    }
+    return { tournamentId: Number(row.tournament_id), changed };
   });
-  publishMatchUpdatedEvent(tournamentId);
+  if (changed) publishMatchUpdatedEvent(tournamentId);
   return changed;
 }
 

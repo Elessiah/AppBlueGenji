@@ -227,7 +227,9 @@ export async function usersReachableByPush(
   const db = await getDatabase();
   const rows = await rowsOrEmptyIfMissingTable(
     db.query<(RowDataPacket & { user_id: number } & AudienceColumns)[]>(
-      `SELECT DISTINCT s.user_id${audienceColumns(topic)} ${reachableSubscriptionsSql(ids.length, topic)}`,
+      // DISTINCT seulement sans colonne de droits : dédoublonner un texte JSON
+      // coûterait une table temporaire, et le `Set` ci-dessous dédoublonne déjà.
+      `SELECT ${audienceColumns(topic) ? "" : "DISTINCT "}s.user_id${audienceColumns(topic)} ${reachableSubscriptionsSql(ids.length, topic)}`,
       [...ids, topic],
     ),
   );

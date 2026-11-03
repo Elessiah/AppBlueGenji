@@ -184,11 +184,19 @@ export function announceCastChange(change: CastChange): void {
   }
   // La rafale en attente du même caster (ou du titulaire remplacé) part d'abord :
   // le journal garde l'ordre des gestes et finit sur l'état réel.
-  const pending = [voluntaryToggles.flush(key)];
+  const keys = [key];
   if (change.kind === "CLAIMED" && change.replacedCasterId !== null) {
-    pending.push(voluntaryToggles.flush(`${change.matchId}:${change.replacedCasterId}`));
+    keys.push(`${change.matchId}:${change.replacedCasterId}`);
   }
-  void Promise.all(pending).then(() => deliverInBackground(change));
+  // Rien en attente (le cas courant) : l'annonce part sur-le-champ, sans détour
+  // par la file des microtâches — un arrêt du serveur juste après ne la rate pas.
+  if (!keys.some((pendingKey) => voluntaryToggles.busy(pendingKey))) {
+    void deliverInBackground(change);
+    return;
+  }
+  void Promise.all(keys.map((pendingKey) => voluntaryToggles.flush(pendingKey))).then(() =>
+    deliverInBackground(change),
+  );
 }
 
 /**

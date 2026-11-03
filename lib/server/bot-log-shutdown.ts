@@ -28,12 +28,18 @@ export async function flushBotLogsBeforeExit(timeoutMs: number = SHUTDOWN_FLUSH_
     timer.unref?.();
   });
   try {
-    // Les rafales regroupées (journal du staff, casts) rejoignent d'abord les lots.
-    const flush = flushAllCoalescers()
-      .catch(() => undefined)
-      .then(() => flushAllBotLogBatches())
-      .catch(() => undefined);
-    await Promise.race([flush, deadline]);
+    // Les rafales regroupées (journal du staff, casts) rejoignent d'abord les
+    // lots, mais ne tiennent que la moitié du délai : des lectures lentes ne
+    // doivent pas priver les lots déjà en attente de leur envoi.
+    const coalesced = flushAllCoalescers().catch(() => undefined);
+    let half: ReturnType<typeof setTimeout> | null = null;
+    const halfDeadline = new Promise<void>((resolve) => {
+      half = setTimeout(resolve, timeoutMs / 2);
+      half.unref?.();
+    });
+    await Promise.race([coalesced, halfDeadline]);
+    if (half) clearTimeout(half);
+    await Promise.race([flushAllBotLogBatches().catch(() => undefined), deadline]);
   } finally {
     if (timer) clearTimeout(timer);
   }
