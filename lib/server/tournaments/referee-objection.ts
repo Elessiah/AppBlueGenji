@@ -26,7 +26,7 @@
  */
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { loadRefereeEligibility } from "./cast-eligibility";
+import { loadRefereePermission } from "./cast-eligibility";
 import { queueDeferredNoRefereeAlerts, releaseObjectingReferee } from "./match-launch";
 import type { NoRefereeCandidate } from "@/lib/shared/match-referee";
 
@@ -51,8 +51,8 @@ export type RefereeObjectionResult = { changed: boolean; released: number; faile
  */
 export async function setRefereeObjection(refereeId: number, upheld: boolean): Promise<RefereeObjectionResult> {
   const db = await getDatabase();
-  // Seule la permission `tournaments` est jugée ici : le jeu n'y change rien.
-  if (upheld && (await loadRefereeEligibility(db, refereeId, "MR")) === "NOT_REFEREE") throw new Error("NOT_REFEREE");
+  // Seule la permission `tournaments` est jugée ici : ni le jeu ni l'identité n'y changent rien.
+  if (upheld && !(await loadRefereePermission(db, refereeId))) throw new Error("NOT_REFEREE");
   const [result] = await db.execute<ResultSetHeader>(
     upheld
       ? `UPDATE bg_users SET referee_objection_at = NOW()

@@ -648,8 +648,11 @@ async function runLobbyBriefSweep(): Promise<number> {
 
   /** Les deux côtés d'un match relu ; un arbitre désigné depuis la première lecture est lu à part. */
   const briefSides = async (row: LobbyBriefRow) => {
+    // Un jeu absent de la première lecture garde ses ensembles : la relecture d'un arbitre ne se fait qu'une fois.
     const checked = checkedReferees.get(row.game) ?? new Set<number>();
     const eligible = eligibleReferees.get(row.game) ?? new Set<number>();
+    checkedReferees.set(row.game, checked);
+    eligibleReferees.set(row.game, eligible);
     const unread = refereeIdsOf([row], row.game).filter((id) => !checked.has(id));
     for (const id of unread) checked.add(id);
     for (const id of await readEligibleReferees(db, unread, row.game)) eligible.add(id);

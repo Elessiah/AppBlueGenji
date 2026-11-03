@@ -6,6 +6,7 @@ import {
   loadCastBlocks,
   loadEligibleRefereeIds,
   loadRefereeEligibility,
+  loadRefereePermission,
   loadRefereeStanding,
   refereeObjectionUpheld,
   type CastEligibilityFields,
@@ -355,6 +356,36 @@ describe("loadRefereeEligibility", () => {
     await loadRefereeEligibility(connectionWith(execute), 950, "OW");
 
     expect(execute.mock.calls[0][0]).not.toContain("LOCK IN SHARE MODE");
+  });
+});
+
+describe("loadRefereePermission — permission seule, sans jeu ni identité (revue sécurité #545)", () => {
+  const connectionWith = (execute: jest.Mock<SqlQuery>) => fakeConnection({ execute });
+  const referee: CastEligibilityFields = { ...ELIGIBLE, platform_roles_json: JSON.stringify(["ARBITRE"]) };
+
+  it("loadRefereePermission_refereeWithoutIdentity_returnsTrue", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...referee, discord_verified_at: null, blizzard_sub: null }], []]);
+
+    await expect(loadRefereePermission(connectionWith(execute), 950)).resolves.toBe(true);
+    expect(execute.mock.calls[0][1]).toEqual([950]);
+  });
+
+  it("loadRefereePermission_withoutTournamentsPermission_returnsFalse", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...referee, platform_roles_json: JSON.stringify(["CASTER"]) }], []]);
+
+    await expect(loadRefereePermission(connectionWith(execute), 950)).resolves.toBe(false);
+  });
+
+  it("loadRefereePermission_missingAccount_returnsFalse", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+
+    await expect(loadRefereePermission(connectionWith(execute), 950)).resolves.toBe(false);
+  });
+
+  it("loadRefereePermission_adminWithoutStoredRoles_returnsTrue", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...referee, is_admin: 1, platform_roles_json: null }], []]);
+
+    await expect(loadRefereePermission(connectionWith(execute), 950)).resolves.toBe(true);
   });
 });
 

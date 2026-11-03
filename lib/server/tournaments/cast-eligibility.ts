@@ -127,10 +127,27 @@ export function refereeEligibilityBlock(
   row: CastEligibilityFields | undefined,
   game: TournamentGame,
 ): RefereeBlock | null {
-  const tournaments =
+  return refereeBlockReason(hasRefereePermission(row), casterIdentityOf(row), game);
+}
+
+/** Le compte relu porte-t-il la permission `tournaments` (celle d'un arbitre) ? Indépendant du jeu. */
+function hasRefereePermission(row: CastEligibilityFields | undefined): boolean {
+  return (
     row !== undefined &&
-    can({ isAdmin: Boolean(Number(row.is_admin)), roles: sanitizePlatformRoles(row.platform_roles_json) }, "tournaments");
-  return refereeBlockReason(tournaments, casterIdentityOf(row), game);
+    can({ isAdmin: Boolean(Number(row.is_admin)), roles: sanitizePlatformRoles(row.platform_roles_json) }, "tournaments")
+  );
+}
+
+/**
+ * Le compte arbitre-t-il (permission `tournaments`, relue en base), sans
+ * condition d'identité ni de jeu : ce que juge une opposition d'arbitre.
+ */
+export async function loadRefereePermission(executor: Executor, userId: number): Promise<boolean> {
+  const [rows] = await executor.execute<CastEligibilityRow[]>(
+    `SELECT ${CAST_ELIGIBILITY_COLUMNS} FROM bg_users WHERE id = ? LIMIT 1`,
+    [userId],
+  );
+  return hasRefereePermission(rows[0]);
 }
 
 /**

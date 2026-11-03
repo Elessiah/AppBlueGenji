@@ -416,8 +416,11 @@ export async function resolveMatchParty(
     casters: readonly Pick<MatchCasterLink, "userId">[];
     referee_user_id?: number | null;
     refereeEligible?: boolean;
-    /** Jeu du tournoi, lu seulement avec des casters ; absent : Overwatch, la règle la plus stricte. */
-    tournament_game?: TournamentGame;
+    /**
+     * Jeu du tournoi, requis : un appelant qui l'oublie ne compile pas. `null`
+     * (sans casters à juger) retombe sur Overwatch, la règle la plus stricte.
+     */
+    tournament_game: TournamentGame | null;
   },
   userId: number,
 ): Promise<MatchParty | null> {

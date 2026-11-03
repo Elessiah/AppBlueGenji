@@ -478,7 +478,8 @@ export function RefereeCard({
       {/* Contacts pas encore ouverts : la note dit quand, comme sur la fiche d'un caster. */}
       {casterCardPending(referee) && <p className={styles.note}>{laterText ?? t("casterContactsAtLaunch")}</p>}
       {/* Contacts ouverts mais vides (`discordTag` vaut `null`, non `undefined` : le serveur
-          l'a envoyé, l'arbitre n'en a pas) : une note, comme sur la fiche d'un caster. */}
+          l'a envoyé, l'arbitre n'en a pas) : une note, comme sur la fiche d'un caster. La
+          fenêtre de lancement n'envoie pas le tag (champ absent) : rien n'y est « vide ». */}
       {!referee.isViewer && referee.contactsShown && referee.discordTag === null && !hasContacts && (
         <p className={styles.note}>{t("noContact")}</p>
       )}
@@ -490,7 +491,7 @@ export function RefereeCard({
             <IdentityLine kind="Discord" value={referee.discordTag} verified onCopy={onCopy} owner={referee.pseudo} />
           )}
           {/* Même règle que la fiche d'un caster : hors Overwatch le champ est absent (pas de
-              ligne), en Overwatch sans BattleTag lisible la ligne montre « — ». */}
+              ligne) ; en Overwatch, un BattleTag illisible montre « — » à côté du tag Discord. */}
           {referee.battletag !== undefined && (
             <IdentityLine
               kind="BattleTag"

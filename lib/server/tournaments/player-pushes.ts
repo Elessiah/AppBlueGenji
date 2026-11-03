@@ -160,24 +160,26 @@ export async function readMatchCasters(
       db,
       matches.map((match) => match.id),
     );
-    // Une lecture par jeu : Battle.net n'est demandé qu'en Overwatch.
+    // Une lecture par jeu : Battle.net n'est demandé qu'en Overwatch. Un jeu
+    // illisible (`null` en base) se juge en Overwatch, la règle la plus stricte,
+    // sous la même clé à la construction et à la lecture.
+    const gameOf = new Map(matches.map((match) => [match.id, match.game ?? "OW"] as const));
     const eligibleByGame = new Map<TournamentGame, Set<number>>(
       await Promise.all(
-        [...new Set(matches.map((match) => match.game))].map(async (game) => {
+        [...new Set(gameOf.values())].map(async (game) => {
           const ids = matches
-            .filter((match) => match.game === game)
+            .filter((match) => gameOf.get(match.id) === game)
             .flatMap((match) => (links.get(match.id) ?? []).map((caster) => caster.userId));
           return [game, await loadEligibleCasterIds(db, ids, game)] as const;
         }),
       ),
     );
-    const gameOf = new Map(matches.map((match) => [match.id, match.game]));
     return new Map(
       [...links].map(([matchId, casters]) => [
         matchId,
         casters
           .map((caster) => caster.userId)
-          .filter((userId) => eligibleByGame.get(gameOf.get(matchId) ?? "OW")?.has(userId)),
+          .filter((userId) => eligibleByGame.get(gameOf.get(matchId) ?? "OW")?.has(userId) === true),
       ]),
     );
   } catch (error) {
