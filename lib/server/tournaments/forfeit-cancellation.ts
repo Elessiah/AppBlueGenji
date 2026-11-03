@@ -24,6 +24,7 @@ import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
 import { invalidateTournamentLists } from "./list-cache";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { invalidateTournamentPreview } from "./preview-cache";
+import { boundLockWait, releaseWithServerLockWait, SHORT_LOCK_WAIT_SECONDS } from "./lock-wait";
 
 /** Ce que l'annulation a produit, pour la ligne de journal et le message rendu. */
 export type CancelledForfeit = {
@@ -56,15 +57,8 @@ function isEngineFormat(format: string | null): format is EngineFormat {
   return format !== null && Object.hasOwn(STANDINGS, format);
 }
 
-/**
- * Délai d'attente d'un verrou pendant l'annulation, en secondes. Un détenteur
- * qui ne demande jamais le tournoi (programmation, rappels, « Prêt ») ne forme
- * pas d'interblocage : sans borne, l'annulation l'attendrait jusqu'à
- * `innodb_lock_wait_timeout` (50 s par défaut) en tenant le verrou du tournoi,
- * et tout report du plateau avec elle. Passé ce délai, l'administrateur lit
- * « réessaie » (409, `ER_LOCK_WAIT_TIMEOUT` reconnu par `fail()`).
- */
-export const CANCEL_LOCK_WAIT_SECONDS = 5;
+/** Délai d'attente d'un verrou pendant l'annulation (`./lock-wait`). */
+export const CANCEL_LOCK_WAIT_SECONDS = SHORT_LOCK_WAIT_SECONDS;
 
 /**
  * Moteur qui porte l'abandon. En multi-phases, l'abandon vit dans le classement
@@ -151,7 +145,7 @@ async function cancelTournamentForfeitOnce(
   const connection = await db.getConnection();
 
   try {
-    await connection.query(`SET SESSION innodb_lock_wait_timeout = ${CANCEL_LOCK_WAIT_SECONDS}`);
+    await boundLockWait(connection);
     await connection.beginTransaction();
 
     // **Aucune lecture d'instantané avant celle des manches** : sous MariaDB
@@ -258,19 +252,4 @@ async function cancelTournamentForfeitOnce(
     discardBotLogs(connection);
     await releaseWithServerLockWait(connection);
   }
-}
-
-/**
- * Rend la connexion au pool avec le délai de verrou du serveur : rendue avec
- * les secondes de l'annulation, elle les imposerait à la requête suivante. Si
- * la remise échoue, la connexion est détruite plutôt que rendue.
- */
-async function releaseWithServerLockWait(connection: PoolConnection): Promise<void> {
-  try {
-    await connection.query(`SET SESSION innodb_lock_wait_timeout = DEFAULT`);
-  } catch {
-    connection.destroy();
-    return;
-  }
-  connection.release();
 }

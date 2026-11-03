@@ -181,6 +181,7 @@ import {
   publishScoreReportedEvent,
 } from "./notifications";
 import { discardBotLogs, flushBotLogs, queueBotLog } from "./bot-logs";
+import { boundLockWait, releaseWithServerLockWait } from "./lock-wait";
 import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
@@ -1860,6 +1861,9 @@ async function liftEndurancePenaltyOnce(tournamentId: number, penaltyId: number)
   const connection = await db.getConnection();
 
   try {
+    // Tournoi verrouillé, puis manches suivantes : attente bornée
+    // (`./lock-wait`), comme l'annulation d'un abandon.
+    await boundLockWait(connection);
     await connection.beginTransaction();
 
     const { liftEndurancePenalty } = await import("./bg-survie/penalties");
@@ -1881,7 +1885,7 @@ async function liftEndurancePenaltyOnce(tournamentId: number, penaltyId: number)
     throw error;
   } finally {
     discardBotLogs(connection);
-    connection.release();
+    await releaseWithServerLockWait(connection);
   }
 }
 

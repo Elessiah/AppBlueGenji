@@ -45,6 +45,15 @@ export function savedToastKey(forfeit: boolean, paused: boolean) {
 const ADMIN_MAP_RULES: MapEntryRules = { requireReplayCode: false };
 
 /**
+ * Empreinte des règles des lignes d'ouverture (format de la manche, jeu),
+ * champ par champ — rien à sérialiser à chaque frappe.
+ */
+function rulesKey(format: MatchFormat | null, game: string | null): string {
+  if (!format) return `|${game ?? ""}`;
+  return `${format.type}:${format.value}:${format.maxMaps ?? ""}:${format.drawsAllowed ? 1 : 0}|${game ?? ""}`;
+}
+
+/**
  * @param options.scoreEntryClosed match à planifier ou en attente de son heure
  *   (`isScoreEntryOpen`) : les scores sont refusés, le forfait reste ouvert.
  */
@@ -94,7 +103,7 @@ export function useScoreForm(
   // Règles des lignes d'ouverture (format de la manche, jeu) : changées pendant
   // que le dialogue est ouvert, elles changent ce qu'ouvrir produirait sans
   // toucher à l'empreinte du résultat — l'alignement doit les suivre aussi.
-  const rules = `${JSON.stringify(matchFormat)}|${game ?? ""}`;
+  const rules = rulesKey(matchFormat, game);
   const [synced, setSynced] = useState(() => ({
     signature: storedResultSignature(match),
     proposals: pendingProposalSignature(match),
@@ -122,8 +131,9 @@ export function useScoreForm(
       setMaps(nextMaps);
       options.onMapsReset?.();
       setConflict(false);
-    } else if (signature !== synced.signature && !submitting) {
-      // Seul un résultat **enregistré** fait conflit : une proposition
+    } else if ((signature !== synced.signature || rules !== synced.rules) && !submitting) {
+      // Seul un résultat **enregistré** — ou un format de manche changé, qui
+      // redessine les lignes d'ouverture — fait conflit : une proposition
       // d'équipe arrivée pendant la saisie n'écrase rien, la saisie reste.
       //
       // Pas pendant un envoi : le flux rapporte alors **notre propre** écriture,

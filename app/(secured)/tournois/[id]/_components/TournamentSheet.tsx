@@ -535,6 +535,12 @@ function TournamentSheetView({
   // Relecture du contexte du lecteur quand une proposition a changé sous la
   // modale de score (son détail map par map n'arrive qu'avec lui).
   const refreshProposals = useCallback(() => refresh(), [refresh]);
+  // État du flux **à la réponse**, pas au clic : tombé pendant la requête, il
+  // ne livrera pas l'instantané.
+  const isLiveRef = useRef(isLive);
+  useEffect(() => {
+    isLiveRef.current = isLive;
+  }, [isLive]);
   // Même raison que les deux dialogues ci-dessous : on retient l'identifiant, pas
   // l'objet. Un match capturé à l'ouverture ne bougeait plus, si bien que le
   // dialogue continuait d'afficher « 0 – 0 » sur un match que le flux venait de
@@ -883,7 +889,7 @@ function TournamentSheetView({
       // par le flux et ne change rien au contexte du lecteur, que `refresh()`
       // recalculait pour rien ; la veille du focus suit la ligne quand
       // l'instantané arrive. Flux tombé : la relecture reste le seul retour.
-      if (isLive) focusRowAfterChange(teamId);
+      if (isLiveRef.current) focusRowAfterChange(teamId);
       else void refresh().then(() => focusRowAfterChange(teamId));
       return true;
     } catch (e) {
