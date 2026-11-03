@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { memberAreaShareMetadata, segmentTitle } from "@/lib/shared/page-metadata";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { tournamentsClientMessages } from "@/lib/shared/tournaments-text";
+import { tournamentsSharedMessages } from "@/lib/shared/tournaments-text";
 import { TournamentsTextProvider } from "@/components/i18n/tournaments-text";
 
 /**
@@ -27,12 +27,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Pose les textes client des tournois : rien en français (déjà dans le
- * paquet), les espaces client de l'anglais sous `/en` seulement.
+ * Pose les textes client des tournois communs à toutes leurs pages : rien en
+ * français (déjà dans le paquet), les espaces communs de l'anglais sous `/en`
+ * seulement (`tournamentsSharedMessages`) — ceux de la liste et du bandeau sont
+ * posés par sa page (`page.tsx`), pour ne pas voyager avec chaque fiche.
  */
 export default async function TournamentsLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await requestLocale();
-  const messages = locale === "en" ? tournamentsClientMessages(messagesFor(locale)) : undefined;
+  const messages = locale === "en" ? tournamentsSharedMessages(messagesFor(locale)) : undefined;
   return (
     <TournamentsTextProvider locale={locale} messages={messages}>
       {children}

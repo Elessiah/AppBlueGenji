@@ -24,7 +24,9 @@ export const TOURNAMENTS_LIST_PARTS = ["list", "ticker", "cards", "participants"
 type ListPart = (typeof TOURNAMENTS_LIST_PARTS)[number];
 
 /** Libellés du bandeau défilant et de son bouton pause, repris de l'accueil (`landing.ticker`). */
-export type TickerControls = Pick<Messages["landing"]["ticker"], "label" | "resume" | "pause" | "resumeShort" | "pauseShort">;
+import { tickerControls, type TickerControls } from "@/lib/shared/ticker-labels";
+
+export type { TickerControls } from "@/lib/shared/ticker-labels";
 
 export type TournamentsClientMessages = Pick<FrTournaments, ListPart> & {
   /** Libellés de format, de jeu et d'état (espace `labels`, lot 4). */
@@ -36,10 +38,6 @@ export type TournamentsClientMessages = Pick<FrTournaments, ListPart> & {
    */
   tickerControls?: TickerControls;
 };
-
-function tickerControls(ticker: Messages["landing"]["ticker"]): TickerControls {
-  return { label: ticker.label, resume: ticker.resume, pause: ticker.pause, resumeShort: ticker.resumeShort, pauseShort: ticker.pauseShort };
-}
 
 type TextKey = Leaves<Omit<TournamentsClientMessages, "tickerControls">>;
 export type TournamentsText = ScopedText<TextKey> & {
@@ -69,6 +67,26 @@ export function tournamentsClientMessages(messages: Pick<Messages, "tournaments"
     rulesHelp: tournaments.rulesHelp,
     labels: messages.labels,
     tickerControls: tickerControls(messages.landing.ticker),
+  };
+}
+
+/**
+ * Les espaces que lisent **aussi** la fiche, la création et l'édition (libellés,
+ * effectifs, format de match, aide des règles) : ce que la mise en page de
+ * `/tournois` sérialise sous `/en`. La liste, ses cartes et le bandeau
+ * (`list`, `ticker`, `cards`, `tickerControls`) sont posés par la page de la
+ * liste seule : la mise en page enveloppe aussi `[id]`, `creer` et `modifier`,
+ * et chaque `router.refresh()` d'une fiche les renverrait pour rien.
+ */
+export type TournamentsSharedMessages = Pick<TournamentsClientMessages, "participants" | "matchFormat" | "rulesHelp" | "labels">;
+
+export function tournamentsSharedMessages(messages: Pick<Messages, "tournaments" | "labels">): TournamentsSharedMessages {
+  const { tournaments } = messages;
+  return {
+    participants: tournaments.participants,
+    matchFormat: tournaments.matchFormat,
+    rulesHelp: tournaments.rulesHelp,
+    labels: messages.labels,
   };
 }
 

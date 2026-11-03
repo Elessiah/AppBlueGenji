@@ -5,9 +5,12 @@
  *
  * Le français est inclus dans le paquet de la fiche (il remplace les chaînes
  * écrites en dur) — sauf celui des vues chargées à la demande (suisse, survie,
- * endurance), qui voyage avec la vue (`frTournamentViewText`, `_lib/views-text.ts`) ; l'anglais n'arrive que sous `/en`, sérialisé par la mise en
- * page du segment (`TournamentPageTextProvider`). Les espaces lus côté serveur
- * seulement (`meta`, `settings`, `share`) ne voyagent pas.
+ * endurance, graphique), qui voyage avec la vue (`frTournamentViewText`,
+ * `_lib/views-text.ts`, `_lib/endurance-text.ts`). L'anglais n'arrive que sous
+ * `/en` : celui de la fiche sérialisé par la mise en page au seul chargement
+ * complet d'une page, sinon chargé par son morceau (`TournamentSheetTextGate`) ;
+ * celui d'une vue avec la vue (`useTournamentViewText`). Les espaces lus côté
+ * serveur seulement (`meta`, `settings`, `share`) ne voyagent pas.
  *
  * Les textes portés par le flux temps réel (libellés d'attente d'un créneau,
  * libellés de manche) restent des **données** françaises dans l'instantané,
@@ -16,6 +19,8 @@
  */
 import frTournament from "@/messages/fr/tournament.json";
 import type frTournamentViews from "@/messages/fr/tournamentViews.json";
+import type frTournamentEndurance from "@/messages/fr/tournamentEndurance.json";
+import type frTournamentEnduranceChart from "@/messages/fr/tournamentEnduranceChart.json";
 import { DEFAULT_LOCALE, INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 import { scopedText, type Leaves, type ScopedText } from "@/lib/shared/scoped-text";
 import { matchAllowsDraw, matchFormatNotation, matchMaxMaps, matchWinsRequired, naturalMaxMaps, type MatchFormat } from "@/lib/shared/match-format";
@@ -30,8 +35,13 @@ type FrTournament = typeof frTournament;
 export const TOURNAMENT_SERVER_PARTS = ["meta", "settings", "share"] as const;
 type ServerPart = (typeof TOURNAMENT_SERVER_PARTS)[number];
 
-/** Espaces client de `tournament`, plus ceux des vues (`tournamentViews`). */
-export type TournamentPageMessages = Omit<FrTournament, ServerPart> & typeof frTournamentViews;
+/** L'espace `endurance` entier : la vue (`tournamentEndurance`) et son graphique (`tournamentEnduranceChart`). */
+type EnduranceMessages = {
+  endurance: (typeof frTournamentEndurance)["endurance"] & (typeof frTournamentEnduranceChart)["endurance"];
+};
+
+/** Espaces client de `tournament`, plus ceux des vues (`tournamentViews`, `tournamentEndurance*`). */
+export type TournamentPageMessages = Omit<FrTournament, ServerPart> & typeof frTournamentViews & EnduranceMessages;
 export type TournamentPageKey = Leaves<TournamentPageMessages>;
 export type TournamentPageText = ScopedText<TournamentPageKey>;
 
@@ -40,7 +50,7 @@ export type TournamentPageText = ScopedText<TournamentPageKey>;
  * du paquet les espaces serveur (`meta`, `settings`, `share`) — une
  * déstructuration `...reste` garderait le JSON entier.
  */
-function clientPart(messages: Messages["tournament"], views: Messages["tournamentViews"]): TournamentPageMessages {
+function clientPart(messages: Messages["tournament"]): TournamentSheetMessages {
   return {
     participants: messages.participants,
     page: messages.page,
@@ -56,9 +66,6 @@ function clientPart(messages: Messages["tournament"], views: Messages["tournamen
     match: messages.match,
     launch: messages.launch,
     ranking: messages.ranking,
-    swiss: views.swiss,
-    survival: views.survival,
-    endurance: views.endurance,
     registrations: messages.registrations,
     planning: messages.planning,
     matchPage: messages.matchPage,
@@ -69,13 +76,15 @@ function clientPart(messages: Messages["tournament"], views: Messages["tournamen
  * Espaces des vues chargées à la demande (`dynamic()` dans `page.tsx`), rangés
  * dans leur propre fichier (`messages/<langue>/tournamentViews.json`) : un JSON
  * est un seul module pour le bundler, si bien qu'un espace lu à part dans le
- * même fichier restait dans le premier chargement. Leur français est importé
- * par la vue elle-même (`useTournamentViewText`) ; l'anglais, sérialisé par la
- * mise en page, les porte tous.
+ * même fichier restait dans le premier chargement. Leurs deux langues voyagent
+ * avec la vue (`useTournamentViewText`) : ni la mise en page ni le morceau de la
+ * fiche ne les portent.
  */
 export const TOURNAMENT_VIEW_PARTS = ["swiss", "survival", "endurance"] as const;
 export type TournamentViewPart = (typeof TOURNAMENT_VIEW_PARTS)[number];
 export type TournamentViewMessages = Partial<Pick<TournamentPageMessages, TournamentViewPart>>;
+/** Les espaces de la fiche, sans ceux des vues : ce que sérialise la mise en page. */
+export type TournamentSheetMessages = Omit<TournamentPageMessages, TournamentViewPart>;
 
 /**
  * Le français du paquet, propriété par propriété **sur l'import lui-même** :
@@ -83,7 +92,7 @@ export type TournamentViewMessages = Partial<Pick<TournamentPageMessages, Tourna
  * espaces serveur entreraient dans le paquet de la fiche. Sans les espaces des
  * vues (`TOURNAMENT_VIEW_PARTS`).
  */
-export const FR_TOURNAMENT_PAGE_MESSAGES: Omit<TournamentPageMessages, TournamentViewPart> = {
+export const FR_TOURNAMENT_PAGE_MESSAGES: TournamentSheetMessages = {
   participants: frTournament.participants,
   page: frTournament.page,
   header: frTournament.header,
@@ -103,13 +112,18 @@ export const FR_TOURNAMENT_PAGE_MESSAGES: Omit<TournamentPageMessages, Tournamen
   matchPage: frTournament.matchPage,
 };
 
-/** Ce qui voyage vers le navigateur sous `/en`. */
-export function tournamentPageMessages(messages: Pick<Messages, "tournament" | "tournamentViews">): TournamentPageMessages {
-  return clientPart(messages.tournament, messages.tournamentViews);
+/** Ce qui voyage vers le navigateur sous `/en` : la fiche, sans les vues. */
+export function tournamentPageMessages(messages: Pick<Messages, "tournament">): TournamentSheetMessages {
+  return clientPart(messages.tournament);
 }
 
-export function tournamentPageText(locale: Locale, messages: TournamentPageMessages): TournamentPageText {
-  return scopedText(locale, messages);
+/**
+ * Le texte de la fiche, typé sur **toutes** les clés : celles des vues
+ * (`view`, absentes par défaut) se rendent telles quelles — une vue lit le sien
+ * par `useTournamentViewText`.
+ */
+export function tournamentPageText(locale: Locale, messages: TournamentSheetMessages, view: TournamentViewMessages = {}): TournamentPageText {
+  return scopedText(locale, { ...messages, ...view } as TournamentPageMessages);
 }
 
 /**

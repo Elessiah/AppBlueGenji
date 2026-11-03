@@ -14,12 +14,12 @@ import {
   parseTournamentId,
   spectatorTournamentPath,
 } from "@/lib/shared/spectator-view";
-import { tournamentsClientMessages } from "@/lib/shared/tournaments-text";
+import { tournamentsSharedMessages } from "@/lib/shared/tournaments-text";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { TournamentsTextProvider } from "@/components/i18n/tournaments-text";
 import { SpectatorViewProvider } from "@/components/spectator-view";
 import { MemberRelay } from "./_components/MemberRelay";
-import { TournamentSheetText } from "@/app/(secured)/tournois/[id]/_components/TournamentSheetText";
+import { TournamentSheetText, tournamentSheetEnglish } from "@/app/(secured)/tournois/[id]/_components/TournamentSheetText";
 
 type LayoutProps = {
   params: Promise<{ id: string }>;
@@ -93,8 +93,8 @@ export default async function SpectatorTournamentLayout({
 
   const catalog = locale === "en" ? messagesFor(locale) : null;
   return (
-    <TournamentsTextProvider locale={locale} messages={catalog ? tournamentsClientMessages(catalog) : undefined}>
-      <TournamentSheetText locale={locale}>
+    <TournamentsTextProvider locale={locale} messages={catalog ? tournamentsSharedMessages(catalog) : undefined}>
+      <TournamentSheetText locale={locale} messages={await tournamentSheetEnglish(locale, true)}>
         <SpectatorViewProvider>
           <PublicPageShell>
             {relay && <MemberRelay tournamentId={tournamentId} />}

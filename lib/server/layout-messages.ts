@@ -25,8 +25,17 @@ import type { Messages } from "@/lib/shared/i18n-messages";
  * mémoïsé par requête : aucune lecture de plus.
  */
 export async function isDocumentLoad(): Promise<boolean> {
-  if ((await headers()).get(DOCUMENT_REQUEST_HEADER) !== "1") return false;
+  if (!(await isDocumentRequest())) return false;
   return (await getCurrentUser()) !== null;
+}
+
+/**
+ * Chargement complet d'une page, quel que soit le lecteur : pour une page sans
+ * compte (`/suivre/tournois/[id]`), dont le rendu serveur doit déjà être dans
+ * sa langue. Même en-tête, même règle que {@link isDocumentLoad}.
+ */
+export async function isDocumentRequest(): Promise<boolean> {
+  return (await headers()).get(DOCUMENT_REQUEST_HEADER) === "1";
 }
 
 /**
@@ -38,5 +47,11 @@ export async function isDocumentLoad(): Promise<boolean> {
  */
 export async function englishOnDocumentLoad<T>(locale: Locale, pick: (messages: Messages) => T): Promise<T | undefined> {
   if (locale !== "en" || !(await isDocumentLoad())) return undefined;
+  return pick(messagesFor("en"));
+}
+
+/** Comme {@link englishOnDocumentLoad}, pour une page sans compte ({@link isDocumentRequest}). */
+export async function englishOnDocumentRequest<T>(locale: Locale, pick: (messages: Messages) => T): Promise<T | undefined> {
+  if (locale !== "en" || !(await isDocumentRequest())) return undefined;
   return pick(messagesFor("en"));
 }

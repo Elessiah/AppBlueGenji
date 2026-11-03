@@ -18,7 +18,8 @@ import {
 } from "../_lib/endurance-sections";
 import { useEntrantParticipantType } from "../_lib/entrant-link";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
-import { FR_VIEWS_TEXT } from "../_lib/views-text";
+import { FR_ENDURANCE_TEXT } from "../_lib/endurance-text";
+import { ENGLISH_ENDURANCE } from "../_lib/view-loaders";
 import { INTL_LOCALE } from "@/lib/shared/locales";
 import { toParticipantType } from "@/lib/shared/participants";
 import { useActionsText } from "../_lib/actions-text";
@@ -116,7 +117,7 @@ function PenaltyLog({
   /** Retrait proposé, `undefined` pour un lecteur sans droit d'arbitrage. */
   onLift?: (penalty: EndurancePenaltyRow) => void;
 }>) {
-  const text = useTournamentViewText(FR_VIEWS_TEXT);
+  const text = useTournamentViewText(FR_ENDURANCE_TEXT, ENGLISH_ENDURANCE);
   const { t } = text;
   // Le retrait d'une sanction est un geste du staff (lot 8b).
   const { t: a } = useActionsText();
@@ -227,7 +228,7 @@ export function EnduranceView({
   showNextRound = false,
   qualificationFormat = null,
 }: Readonly<EnduranceViewProps>) {
-  const text = useTournamentViewText(FR_VIEWS_TEXT);
+  const text = useTournamentViewText(FR_ENDURANCE_TEXT, ENGLISH_ENDURANCE);
   const { t } = text;
   // Abandon et sanctions : gestes du lot 8b et du staff.
   const { t: a } = useActionsText();

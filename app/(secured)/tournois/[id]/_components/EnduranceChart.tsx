@@ -39,7 +39,8 @@ import {
   type EnduranceChartSeries,
 } from "../_lib/endurance-chart";
 import { useEnduranceChartAnimate } from "../_lib/use-endurance-chart-animate";
-import { FR_VIEWS_TEXT } from "../_lib/views-text";
+import { FR_ENDURANCE_CHART_TEXT } from "../_lib/endurance-chart-text";
+import { ENGLISH_ENDURANCE_CHART } from "../_lib/view-loaders";
 import { EnduranceChartLines, type ChartHoverEntry, type ChartLineEntry } from "./EnduranceChartLines";
 import styles from "./EnduranceChart.module.css";
 
@@ -232,7 +233,7 @@ export function EnduranceChart({
   endurance: pushedEndurance,
   matches: pushedMatches,
 }: Readonly<{ endurance: EnduranceMeta; matches: BracketMatch[] }>) {
-  const { t } = useTournamentViewText(FR_VIEWS_TEXT);
+  const { t } = useTournamentViewText(FR_ENDURANCE_CHART_TEXT, ENGLISH_ENDURANCE_CHART);
   const { showError } = useToast();
   const hintId = useId();
   const solo = useEntrantParticipantType() === "SOLO";

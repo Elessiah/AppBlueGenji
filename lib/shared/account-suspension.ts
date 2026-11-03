@@ -41,26 +41,35 @@ export const SUSPENSION_GROUNDS: readonly SuspensionGround[] = ["BEHAVIOR", "CON
 
 export const SUSPENSION_GROUND_DEFINITIONS: Record<
   SuspensionGround,
-  { anchor: string; clause: string; clauseEn: string; label: string }
+  { anchor: string; clause: string; label: string }
 > = {
   BEHAVIOR: {
     anchor: "comportement",
     clause: "Comportement",
-    clauseEn: "Conduct",
     label: "Comportement — harcèlement, propos haineux, triche, contournement des protections",
   },
   CONTENT: {
     anchor: "contenus",
     clause: "Contenus publiés par les utilisateurs",
-    clauseEn: "Content published by users",
     label: "Contenus publiés — atteinte aux droits d'un tiers, contenu illicite",
   },
   ACCOUNT: {
     anchor: "compte",
     clause: "Compte",
-    clauseEn: "Account",
     label: "Compte — usurpation, compte prêté ou partagé, pseudo contraire aux règles",
   },
+};
+
+/**
+ * Titres anglais des clauses, lus par le seul message privé anglais
+ * ({@link formatSuspensionNotice}) : une table à part, que le bundler écarte
+ * des paquets client qui n'importent que {@link SUSPENSION_GROUND_DEFINITIONS}
+ * (fenêtre de suspension de `/connexion`, barre de modération d'une fiche).
+ */
+export const SUSPENSION_GROUND_CLAUSES_EN: Record<SuspensionGround, string> = {
+  BEHAVIOR: "Conduct",
+  CONTENT: "Content published by users",
+  ACCOUNT: "Account",
 };
 
 export function isSuspensionGround(value: unknown): value is SuspensionGround {
@@ -251,7 +260,7 @@ export function formatSuspensionNotice(
       `Your sessions have been closed and you can no longer log in while the suspension lasts. ` +
       `Facts found: ${discordInline(input.reason)}. ` +
       `Decision made by a member of the moderation team, without automated processing. ` +
-      `Grounds: terms of use, “${SUSPENSION_GROUND_DEFINITIONS[input.ground].clauseEn}” — ${localizedSiteUrl(input.termsUrl, locale)}. ` +
+      `Grounds: terms of use, “${SUSPENSION_GROUND_CLAUSES_EN[input.ground]}” — ${localizedSiteUrl(input.termsUrl, locale)}. ` +
       `Appeal: use “Report a problem” at the bottom of any page of the site, category “Other” (no login needed), ` +
       `quoting decision ${reference} and leaving a way to reply to you: the association will review its decision. ` +
       `You can then take the decision to the competent court.`

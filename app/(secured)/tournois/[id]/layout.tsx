@@ -4,7 +4,7 @@ import { can } from "@/lib/shared/permissions";
 import { requestLocale } from "@/lib/server/request-locale";
 import { tournamentPageMetadata } from "@/lib/server/tournament-metadata";
 import { memberTournamentPath } from "@/lib/shared/spectator-view";
-import { TournamentSheetText } from "./_components/TournamentSheetText";
+import { TournamentSheetText, tournamentSheetEnglish } from "./_components/TournamentSheetText";
 
 type MetadataProps = {
   params: Promise<{ id: string }>;
@@ -29,5 +29,10 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
 
 /** Pose les textes de la fiche (`TournamentSheetText`, communs à la page sans compte). */
 export default async function TournamentDetailLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <TournamentSheetText locale={await requestLocale()}>{children}</TournamentSheetText>;
+  const locale = await requestLocale();
+  return (
+    <TournamentSheetText locale={locale} messages={await tournamentSheetEnglish(locale)}>
+      {children}
+    </TournamentSheetText>
+  );
 }
