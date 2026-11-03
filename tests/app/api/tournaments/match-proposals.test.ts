@@ -9,7 +9,7 @@ jest.mock("@/lib/server/api-guard", () => ({
 
 import { NextResponse } from "next/server";
 import { GET } from "@/app/api/tournaments/[id]/matches/[matchId]/proposals/route";
-import { enforceRateLimit } from "@/lib/server/api-guard";
+import { MATCH_PROPOSALS_READ_RULE, enforceRateLimit } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getViewerMatchProposals } from "@/lib/server/tournaments-service";
 import type { MatchProposalMaps } from "@/lib/shared/types";
@@ -47,6 +47,13 @@ describe("GET /api/tournaments/[id]/matches/[matchId]/proposals", () => {
 
     expect(res.status).toBe(401);
     expect(getViewerMatchProposals).not.toHaveBeenCalled();
+  });
+
+  // Revue perf #542 : seau propre, distinct de la lecture REST du détail.
+  it("GET_nominal_usesItsOwnRateBucket", async () => {
+    await get("7", "70");
+
+    expect(enforceRateLimit).toHaveBeenCalledWith(MATCH_PROPOSALS_READ_RULE, 3);
   });
 
   it("GET_rateLimited_returnsThrottleResponse", async () => {

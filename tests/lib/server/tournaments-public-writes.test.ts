@@ -35,6 +35,7 @@ import {
   reportMatchScorePublic,
 } from "@/lib/server/tournaments";
 import { getDatabase } from "@/lib/server/database";
+import type { TournamentFormat } from "@/lib/shared/types";
 import {
   publishMatchUpdatedEvent,
   publishScoreReportedEvent,
@@ -498,7 +499,10 @@ describe("adminSaveMatchScoresPublic", () => {
   const saved = matchRow({ id: 70, tournament_id: 8, team1_id: 3, team2_id: 4 });
   /** Tournoi du match, lu avant la transaction (`saveTargetTournament`). */
   const target = (head: Record<string, unknown> = {}) =>
-    connection.execute.mockResolvedValue([[{ tournament_id: 8, team1_id: 3, team2_id: 4, status: "READY", ...head }], undefined]);
+    connection.execute.mockResolvedValue([
+      [{ tournament_id: 8, team1_id: 3, team2_id: 4, status: "READY", format: "SURVIVAL", ...head }],
+      undefined,
+    ]);
 
   beforeEach(() => {
     target();
@@ -549,13 +553,45 @@ describe("adminSaveMatchScoresPublic", () => {
     expect(order(jest.mocked(lockTournamentRow))).toBeLessThan(order(jest.mocked(adminSaveMatchScores)));
   });
 
+  // Revue perf #542 : seules les réconciliations de ces formats détruisent une
+  // manche non close — eux seuls imposent le verrou du tournoi.
+  it.each<[TournamentFormat]>([["SURVIVAL"], ["SWISS"], ["BG_SURVIE"], ["MULTI"]])(
+    "adminSave_roundRebuildingFormat_%s_locksTournament",
+    async (format) => {
+      target({ format });
+      jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
+
+      await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
+
+      expect(lockTournamentRow).toHaveBeenCalledWith(fakeConnection(connection), 8);
+    },
+  );
+
+  // En élimination, la saisie map par map ne prend que le verrou du match :
+  // les matchs d'une même manche ne se sérialisent pas sur le tournoi.
+  it.each<[TournamentFormat]>([["SINGLE"], ["DOUBLE"]])(
+    "adminSave_eliminationFormat_%s_savesWithoutTournamentLock",
+    async (format) => {
+      target({ format });
+      jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
+
+      await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
+
+      expect(lockTournamentRow).not.toHaveBeenCalled();
+      expect(adminSaveMatchScores).toHaveBeenCalledTimes(1);
+      expectCommitted();
+    },
+  );
+
   it("adminSave_preReadOutsideTransaction", async () => {
     jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ saved, paused: false, pausedNow: false });
 
     await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 });
 
     const [sql, params] = connection.execute.mock.calls[0];
-    expect(String(sql)).toBe("SELECT tournament_id, team1_id, team2_id, status FROM bg_matches WHERE id = ? LIMIT 1");
+    expect(String(sql).replace(/\s+/g, " ")).toBe(
+      "SELECT m.tournament_id, m.team1_id, m.team2_id, m.status, t.format FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id WHERE m.id = ? LIMIT 1",
+    );
     expect(params).toEqual([70]);
     expect(order(connection.execute)).toBeLessThan(order(connection.beginTransaction));
   });
