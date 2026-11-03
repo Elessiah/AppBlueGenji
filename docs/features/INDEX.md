@@ -124,6 +124,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `TERMS_OF_USE.md` — Conditions d'utilisation et leur acceptation.
 - `LEGAL_PAGE.md` — Mentions légales, coordonnées protégées (`ProtectedContact`).
 - `BOT_LEGAL_PAGES.md` — Pages légales bilingues du bot.
+- `LEGAL_DATA_FILES.md` — Textes juridiques FR/EN écrits une fois (`frEn`), sans duplication Sonar.
 - `LICENSE_SOURCE_CODE.md` — Licence AGPL et lien « Code source ».
 - `UNTRUSTED_NAMES.md` — Noms saisis (`visibleText`) et textes vers Discord (`discordInline`, `discordQuote`).
 

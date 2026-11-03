@@ -13,6 +13,7 @@ import enReports from "@/messages/en/reports.json";
 import enLogin from "@/messages/en/login.json";
 import frLogin from "@/messages/fr/login.json";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
+import { englishRegisterText } from "../helpers/register-english-text";
 
 const ROOT = join(__dirname, "..", "..");
 const source = (path: string) => readFileSync(join(ROOT, path), "utf8");
@@ -23,7 +24,6 @@ const ENGLISH_REFERRERS = [
   "app/mentions-legales/MentionsLegalesEn.tsx",
   "app/accessibilite/AccessibilityStatementEn.tsx",
   "lib/shared/legal-text-en.ts",
-  "lib/shared/processing-register-en.ts",
   "lib/shared/terms-of-use-en.ts",
   "messages/en/login.json",
 ];
@@ -42,6 +42,17 @@ describe("catégories du formulaire citées en anglais", () => {
       for (const [, quoted] of source(path).matchAll(/“(\w+)” category/g)) expect(labels).toContain(quoted);
     }
     expect(enReports.privacy.followUp).toContain("“Appeal” category");
+  });
+
+  // Le registre anglais s'écrit dans `processing-register.ts`, à côté du français : on lit son texte résolu.
+  it("englishRegister_formCategories_noFrenchCategoryName", () => {
+    const text = englishRegisterText();
+    for (const name of FRENCH_CATEGORY_NAMES) expect(text).not.toContain(name);
+  });
+
+  it("englishRegister_quotedCategories_existInEnglishForm", () => {
+    const labels = Object.values(enReports.categories).map((category) => category.label);
+    for (const [, quoted] of englishRegisterText().matchAll(/“(\w+)” category/g)) expect(labels).toContain(quoted);
   });
 
   it("l'exposé de suspension : même phrase française, catégorie anglaise sous /en", () => {
