@@ -21,7 +21,7 @@ describe("page tournois — section « Tournois invisibles »", () => {
     // redessiner la page à chaque rafraîchissement de fond.
     expect(page).toMatch(/if \(!isAdmin\) \{[\s\S]{0,400}?setHiddenTournaments\([\s\S]{0,120}?return;\s*\}/);
     // La permission commande le chargement : elle est dans ses dépendances.
-    expect(page).toMatch(/\[isAdmin, showError\],\s*\);/);
+    expect(page).toMatch(/\[isAdmin, showError, t\],\s*\);/);
   });
 
   it("charge les invisibles à part de la liste publique", () => {
@@ -30,7 +30,7 @@ describe("page tournois — section « Tournois invisibles »", () => {
     // rafraîchissement de fond), mais elle reste étrangère aux invisibles.
     const start = page.indexOf("const load = useCallback(");
     expect(start).toBeGreaterThan(-1);
-    const end = page.indexOf("[showError, wantFinishedArchive],", start);
+    const end = page.indexOf("[showError, t, wantFinishedArchive],", start);
     expect(end).toBeGreaterThan(start);
     const publicLoad = page.slice(start, end);
 
@@ -134,7 +134,12 @@ describe("page tournois — échecs de lecture de la liste", () => {
     expect(page).toMatch(/\{isAdmin && \(/);
   });
 
-  it("signale les autres échecs des invisibles, sauf en lecture de fond", () => {
-    expect(page).toMatch(/return;\s*\}\s*if \(silent\) return;\s*showError\(code\);/);
+  it("signale les autres échecs des invisibles par une phrase traduite, sauf en lecture de fond", () => {
+    expect(page).toMatch(/return;\s*\}\s*if \(silent\) return;\s*showError\(t\("list\.hiddenLoadFailed"\)\);/);
+  });
+
+  it("signale l'échec de la liste par une phrase traduite, jamais par le message brut", () => {
+    expect(page).toMatch(/if \(signal\?\.aborted \|\| silent\) return;[\s\S]{0,300}?showError\(t\("list\.loadFailed"\)\);/);
+    expect(page).not.toContain("showError((e as Error).message)");
   });
 });
