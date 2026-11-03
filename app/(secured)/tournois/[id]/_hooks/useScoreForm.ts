@@ -131,9 +131,8 @@ export function useScoreForm(
       setMaps(nextMaps);
       options.onMapsReset?.();
       setConflict(false);
-    } else if ((signature !== synced.signature || rules !== synced.rules) && !submitting) {
-      // Seul un résultat **enregistré** — ou un format de manche changé, qui
-      // redessine les lignes d'ouverture — fait conflit : une proposition
+    } else if (signature !== synced.signature && !submitting) {
+      // Seul un résultat **enregistré** fait conflit : une proposition
       // d'équipe arrivée pendant la saisie n'écrase rien, la saisie reste.
       //
       // Pas pendant un envoi : le flux rapporte alors **notre propre** écriture,

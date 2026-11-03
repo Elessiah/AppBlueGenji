@@ -70,19 +70,13 @@ export async function checkDownstreamMatchesHaveNoScores(
   connection: PoolConnection,
   match: MatchRow,
 ): Promise<void> {
-  // Lectures **verrouillantes** seules, table par table (MariaDB : pas de
-  // `FOR UPDATE` sur jointure) — la ligne du match, que l'appelant tient déjà,
-  // puis le tournoi : aucune image de transaction ne naît avant la lecture,
-  // verrouillée, des manches suivantes. Sous `innodb_snapshot_isolation`, une
-  // image figée plus tôt ferait refuser cette lecture (`ER_CHECKREAD`) dès
-  // qu'un « Prêt » touche une manche ; une lecture d'image, elle, manquerait le
-  // report qu'une manche suivante écrit au même moment.
   const [currentRows] = await connection.execute<CurrentMatchRow[]>(
-    `SELECT round_number, status, next_winner_match_id, next_loser_match_id, tournament_id, phase_id
-     FROM bg_matches
-     WHERE id = ?
-     LIMIT 1
-     FOR UPDATE`,
+    `SELECT m.round_number, m.status, m.next_winner_match_id, m.next_loser_match_id,
+            m.tournament_id, m.phase_id, t.format
+     FROM bg_matches m
+     JOIN bg_tournaments t ON t.id = m.tournament_id
+     WHERE m.id = ?
+     LIMIT 1`,
     [match.id],
   );
 
@@ -98,16 +92,6 @@ export async function checkDownstreamMatchesHaveNoScores(
   // (`isScoreEditLocked` juge, lui, sur `decided`).
   if (!current || !isMatchPlayed({ status: current.status })) return;
 
-  // Verrou du tournoi après celui du match, dans l'ordre d'un report : seule une
-  // correction (match clos) le prend ici, et sa réconciliation le prendrait
-  // de toute façon.
-  const [formatRows] = await connection.execute<(RowDataPacket & { format: TournamentFormat })[]>(
-    `SELECT format FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
-    [Number(current.tournament_id)],
-  );
-  if (!formatRows[0]) return;
-  current.format = formatRows[0].format;
-
   if (await dependentsHaveScoreInput(connection, current, Number(match.id))) {
     throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
   }
@@ -121,7 +105,6 @@ type CurrentMatchRow = RowDataPacket & {
   next_loser_match_id: number | null;
   tournament_id: number;
   phase_id: number | null;
-  /** Lu à part, sous le verrou du tournoi. */
   format: TournamentFormat;
 };
 
@@ -199,17 +182,18 @@ async function multiPhaseDependentsHaveInput(
 
 /**
  * Manches ultérieures de la phase du match : la règle partagée
- * (`laterRoundsHaveScoreInput`), **verrouillée** — une lecture d'image
- * manquait le score qu'un report de la manche suivante écrit au même moment, et
- * la correction réécrivait alors un résultat dont dépend un match entamé.
- * Aucune lecture d'image ne la précède (`checkDownstreamMatchesHaveNoScores`).
+ * (`laterRoundsHaveScoreInput`), en lecture d'**instantané**. Pas de verrou
+ * ici : la lecture ordinaire de `checkDownstreamMatchesHaveNoScores` a déjà
+ * figé l'image de la transaction, et sous MariaDB (`innodb_snapshot_isolation`)
+ * un `FOR UPDATE` sur une manche qu'un « Prêt » vient de toucher serait refusé
+ * (`ER_CHECKREAD`) — une rafale de « Prêt » épuiserait les rejeux de la
+ * correction, et l'attente du verrou se ferait match verrouillé.
  */
 function laterRoundsHaveInput(connection: PoolConnection, current: CurrentMatchRow): Promise<boolean> {
   return laterRoundsHaveScoreInput(connection, {
     tournamentId: Number(current.tournament_id),
     phaseId: Number(current.phase_id ?? 0),
     afterRound: Number(current.round_number),
-    lock: true,
   });
 }
 

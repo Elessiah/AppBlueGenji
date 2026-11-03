@@ -24,7 +24,7 @@ import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
 import { invalidateTournamentLists } from "./list-cache";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { invalidateTournamentPreview } from "./preview-cache";
-import { boundLockWait, releaseWithServerLockWait, SHORT_LOCK_WAIT_SECONDS } from "./lock-wait";
+import { boundLockWait, releaseWithServerLockWait } from "./lock-wait";
 
 /** Ce que l'annulation a produit, pour la ligne de journal et le message rendu. */
 export type CancelledForfeit = {
@@ -57,8 +57,6 @@ function isEngineFormat(format: string | null): format is EngineFormat {
   return format !== null && Object.hasOwn(STANDINGS, format);
 }
 
-/** Délai d'attente d'un verrou pendant l'annulation (`./lock-wait`). */
-export const CANCEL_LOCK_WAIT_SECONDS = SHORT_LOCK_WAIT_SECONDS;
 
 /**
  * Moteur qui porte l'abandon. En multi-phases, l'abandon vit dans le classement
