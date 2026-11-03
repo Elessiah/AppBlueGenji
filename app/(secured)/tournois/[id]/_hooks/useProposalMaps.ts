@@ -14,6 +14,16 @@ export const PROPOSAL_REFRESH_ATTEMPTS = 3;
 export const PROPOSAL_REFRESH_DELAY_MS = 4000;
 
 /**
+ * Attente avant la tentative suivante : l'espacement de base, jamais moins que
+ * le `Retry-After` (secondes) d'un 429 — relancer avant reprendrait un refus.
+ */
+export function proposalRetryDelayMs(retryAfterHeader: string | null): number {
+  const seconds = retryAfterHeader === null ? Number.NaN : Number(retryAfterHeader);
+  const floorMs = Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 0;
+  return Math.max(PROPOSAL_REFRESH_DELAY_MS, floorMs);
+}
+
+/**
  * Le match, propositions complétées de leur détail map par map
  * (`docs/features/MAP_SCORES.md`) — détail lu dans le contexte du lecteur, que
  * l'instantané diffusé ne porte pas —, et les propositions ainsi complétées
@@ -45,9 +55,12 @@ export function useProposalMaps(
   const { tournamentId, id: matchId } = liveMatch;
   useEffect(() => {
     if (!needsRefresh) return;
-    // Une relecture, puis au plus deux nouvelles tentatives espacées tant que le
-    // détail manque : seul le détail arrivé dit que la lecture a abouti — il
-    // fait alors tomber `needsRefresh`, et le nettoyage arrête les tentatives.
+    // Une relecture, puis au plus deux nouvelles tentatives tant que le détail
+    // manque : seul le détail arrivé dit que la lecture a abouti — il fait alors
+    // tomber `needsRefresh`, et le nettoyage arrête les tentatives. Chaque
+    // tentative part **après** la réponse de la précédente (jamais deux lectures
+    // en vol sur un serveur lent), à l'espacement de base ou au `Retry-After`
+    // d'un 429 s'il est plus long.
     // Un `proposals: null` du serveur est une réponse, pas un échec : rien n'est
     // lisible pour ce lecteur sur l'état relu (engagé remplacé, report retiré),
     // et les tentatives restantes reposeraient la même question pour rien. De
@@ -55,40 +68,34 @@ export function useProposalMaps(
     // seuls un 429, un 5xx ou le réseau se retentent.
     const controller = new AbortController();
     let tries = 0;
-    let answered = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const stop = () => {
-      answered = true;
-      if (timer !== null) clearTimeout(timer);
-    };
-    const read = async () => {
+    /** L'attente avant de retenter, ou `null` : la réponse clôt les tentatives. */
+    const read = async (): Promise<number | null> => {
       try {
         const response = await fetch(`/api/tournaments/${tournamentId}/matches/${matchId}/proposals`, {
           cache: "no-store",
           signal: controller.signal,
         });
         if (!response.ok) {
-          if (response.status >= 400 && response.status < 500 && response.status !== 429) stop();
-          return;
+          if (response.status === 429) return proposalRetryDelayMs(response.headers.get("Retry-After"));
+          return response.status >= 400 && response.status < 500 ? null : PROPOSAL_REFRESH_DELAY_MS;
         }
         const payload = (await response.json()) as { proposals?: unknown };
-        if (payload.proposals === null) {
-          stop();
-          return;
-        }
+        if (payload.proposals === null) return null;
         const parsed = parseMatchProposals(payload.proposals, matchId);
         if (parsed && !controller.signal.aborted) setFetched(parsed);
       } catch {
         // Réseau coupé ou dialogue fermé : la tentative suivante relira.
       }
+      return PROPOSAL_REFRESH_DELAY_MS;
     };
-    const attempt = () => {
-      if (answered) return;
+    const attempt = async () => {
       tries += 1;
-      void read();
-      if (tries < PROPOSAL_REFRESH_ATTEMPTS) timer = setTimeout(attempt, PROPOSAL_REFRESH_DELAY_MS);
+      const waitMs = await read();
+      if (waitMs === null || controller.signal.aborted || tries >= PROPOSAL_REFRESH_ATTEMPTS) return;
+      timer = setTimeout(() => void attempt(), waitMs);
     };
-    attempt();
+    void attempt();
     return () => {
       controller.abort();
       if (timer !== null) clearTimeout(timer);

@@ -14,7 +14,7 @@ import { tryAutoResolveByes } from "./byes";
 import { detachDownstreamOutcome } from "./bracket-cascade";
 import { SINGLE_REPORT_SQL } from "./score-report-sql";
 import { laterRoundsHaveScoreInput } from "./bg-survie/round-progress";
-import { assertMatchSavable } from "./save-guard";
+import { assertForfeitBelongsToMatch, assertMatchSavable, mapEntryOf } from "./save-guard";
 
 interface DependentMatchRow extends RowDataPacket {
   id: number;
@@ -326,12 +326,6 @@ function assertScoreEntryOpen(match: MatchRow, refereeScheduling: boolean): void
   if (!open) throw new Error("MATCH_NOT_IN_LAUNCH");
 }
 
-function assertForfeitBelongsToMatch(match: MatchRow, forfeitTeamId: number): void {
-  if (forfeitTeamId !== Number(match.team1_id) && forfeitTeamId !== Number(match.team2_id)) {
-    throw new Error("INVALID_FORFEIT_TEAM_ID");
-  }
-}
-
 /** Maps saisies par l'arbitrage, et qui les a saisies. */
 export type AdminMapEntry = { maps: ReadonlyArray<MatchMapInput>; userId: number };
 
@@ -350,15 +344,6 @@ function isForfeitEntry(entry: AdminResolveEntry): entry is { forfeitTeamId: num
 
 function isDoubleForfeitEntry(entry: AdminResolveEntry): entry is { doubleForfeit: true } {
   return "doubleForfeit" in entry && entry.doubleForfeit === true;
-}
-
-/**
- * Les maps d'une saisie, ou `INVALID_REQUEST` : le type ferme la porte aux
- * appelants TypeScript, la garde la ferme à tous (corps non typé, conversion).
- */
-function mapEntryOf(entry: AdminResolveEntry): AdminMapEntry {
-  if ("maps" in entry && Array.isArray(entry.maps) && Number.isInteger(entry.userId)) return entry;
-  throw new Error("INVALID_REQUEST");
 }
 
 /**

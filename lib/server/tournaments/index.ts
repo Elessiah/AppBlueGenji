@@ -50,7 +50,7 @@ export { reportMatchScore, finalizeMatch } from "./scoring";
 
 // Admin (adminResolveMatch is wrapped as public API function)
 export { adminSaveMatchScores, checkDownstreamMatchesHaveNoScores } from "./admin";
-import { assertMatchSavable } from "./save-guard";
+import { assertMatchSavable, assertSaveEntryFits } from "./save-guard";
 
 // Suppression définitive (administrateurs)
 export { deleteTournament } from "./deletion";
@@ -1581,15 +1581,21 @@ export async function adminSaveMatchScoresPublic(
 /**
  * Tournoi d'un match à enregistrer, avant la transaction d'« Enregistrer ».
  *
- * @throws `MATCH_NOT_FOUND`, `MATCH_NOT_READY`, `MATCH_ALREADY_COMPLETED`
+ * @throws `MATCH_NOT_FOUND`, `MATCH_NOT_READY`, `MATCH_ALREADY_COMPLETED`,
+ *         `INVALID_FORFEIT_TEAM_ID`, `INVALID_REQUEST`
  */
-async function saveTargetTournament(connection: PoolConnection, matchId: number): Promise<number> {
+async function saveTargetTournament(
+  connection: PoolConnection,
+  matchId: number,
+  entry: AdminScoreEntry,
+): Promise<number> {
   const [rows] = await connection.execute<
     (RowDataPacket & { tournament_id: number; team1_id: number | null; team2_id: number | null; status: string })[]
   >(`SELECT tournament_id, team1_id, team2_id, status FROM bg_matches WHERE id = ? LIMIT 1`, [matchId]);
   const row = rows[0];
   if (!row) throw new Error("MATCH_NOT_FOUND");
   assertMatchSavable(row);
+  assertSaveEntryFits(row, entry);
   return Number(row.tournament_id);
 }
 
@@ -1606,10 +1612,14 @@ async function adminSaveMatchScoresOnce(
   try {
     // Le tournoi du match, lu **hors transaction** (instruction autonome : elle
     // n'ouvre aucune image qui survivrait au `BEGIN`) — la route ne connaît que
-    // le match. Les refus évidents (match inconnu, clos, sans ses deux engagés)
+    // le match. Les refus qui ne lisent rien d'autre (match inconnu, clos, sans
+    // ses deux engagés, forfait d'une équipe étrangère, saisie mal formée)
     // partent ici, sans attendre le verrou du tournoi ; ils se rejugent sous
-    // verrou (`adminSaveMatchScores`), par la même règle (`assertMatchSavable`).
-    const tournamentId = await saveTargetTournament(connection, matchId);
+    // verrou (`adminSaveMatchScores`), par les mêmes règles (`./save-guard`).
+    const tournamentId = await saveTargetTournament(connection, matchId, entry);
+    // Module résolu avant le verrou : un premier chargement (démarrage à froid,
+    // recompilation en dev) ne se fait pas tournoi verrouillé.
+    const { adminSaveMatchScores: adminSaveInternal } = await import("./admin");
 
     await connection.beginTransaction();
     inTransaction = true;
@@ -1632,7 +1642,6 @@ async function adminSaveMatchScoresOnce(
     // encore juger sa manche vierge (ERREUR.txt, préexistant).
     await lockTournamentRow(connection, tournamentId);
 
-    const { adminSaveMatchScores: adminSaveInternal } = await import("./admin");
     const { saved, ...pause } = await adminSaveInternal(connection, matchId, entry);
 
     // La ligne du match, déjà lue sous verrou par la sauvegarde : rien à relire.
