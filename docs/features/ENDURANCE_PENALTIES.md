@@ -125,7 +125,8 @@ pénalité tombe de toute façon après ses matchs. Le prédicat « ce match por
 saisie » (`HAS_SCORE_INPUT_SQL`) est écrit **une seule fois** : trois lectures
 s'en servent, dont la borne `EndurancePenaltyRow.removable` que l'interface
 reçoit pour ne pas proposer un bouton voué au 409 (elle affiche « 🔒 Figée » à
-sa place).
+sa place). L'exemption s'y écarte par sa colonne (`is_bye`), pas par une place
+vide : un match joué dont une équipe est effacée depuis reste une saisie.
 
 ## La forme d'une sanction
 

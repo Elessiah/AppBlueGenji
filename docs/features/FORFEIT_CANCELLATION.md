@@ -104,7 +104,8 @@ tournoi (`lockTournamentRow`, en toute première instruction) s'attend sans
 borne comme pour tout geste — son détenteur, réconciliation ou lancement, le
 rend sans rien attendre de l'annulation —, et le rejeu qui suit retrouve le
 délai du serveur (journal du bot et alertes, qui tolèrent un délai dépassé,
-perdraient sinon leur ligne en silence). Un classement dont l'équipe n'existe plus rend
+perdraient sinon leur ligne en silence). Au retour au pool, le délai n'est
+remis qu'une fois de plus si cette remise a manqué (aucune requête sinon). Un classement dont l'équipe n'existe plus rend
 `TEAM_NOT_IN_TOURNAMENT`. Une contention qui dure —
 interblocage sur les trois tentatives, `ER_CHECKREAD`, délai de verrou
 (`ER_LOCK_WAIT_TIMEOUT`) — rend `409 CONCURRENT_UPDATE_RETRY` (code fixe, le
