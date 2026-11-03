@@ -13,6 +13,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { isBotCircuitOpen, sendBotLog } from "@/lib/server/bot-integration";
 import { createCoalescer } from "@/lib/server/coalescer";
 import { getDatabase } from "@/lib/server/database";
+import { failureReason } from "@/lib/server/failure-reason";
 import {
   formatStaffMatchActionLog,
   formatStaffTournamentActionLog,
@@ -83,22 +84,6 @@ export async function deliverStaffTournamentAction(
     formatStaffTournamentActionLog({ tournament: { id: Number(tournament.id), name: tournament.name }, action, ...details }),
     { tournamentId: Number(tournament.id), category: "admin" },
   );
-}
-
-/**
- * Ce que la ligne d'échec [staff-log] dit de l'erreur : son code (`ER_…`,
- * `ECONNREFUSED`) ou son message, **jamais l'objet entier** — pile, requête et
- * `sqlMessage` de mysql2 pourraient porter des valeurs lues, alors que le
- * registre (T05) et /rgpd décrivent cette ligne comme le geste et le numéro,
- * sans plus.
- */
-export function failureReason(error: unknown): string {
-  if (error && typeof error === "object") {
-    const code = (error as { code?: unknown }).code;
-    if (typeof code === "string" && code !== "") return code;
-  }
-  if (error instanceof Error) return error.message.split("\n")[0].slice(0, 200);
-  return "erreur inconnue";
 }
 
 /** Journalise un geste du staff sur un match, sans attendre ; ne lève jamais. */

@@ -173,7 +173,9 @@ export type PushOptions = {
  *
  * Un sujet réservé à une permission (`PUSH_TOPICS[topic].audience`) écarte en
  * plus les comptes suspendus, comme les destinataires du staff
- * (`subscribedStaffCandidates`) ; la permission elle-même se juge sur les
+ * (`subscribedStaffCandidates`) — un sujet ouvert, lui, n'en tient pas compte :
+ * l'exposé des motifs d'une suspension (`MODERATION`) doit atteindre le compte
+ * suspendu ; la permission elle-même se juge sur les
  * colonnes de droits lues avec l'abonnement ({@link audienceColumns},
  * {@link withinTopicAudience}).
  */

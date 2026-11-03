@@ -14,6 +14,9 @@
  * les lots du journal) ; un arrêt brutal perd au plus la rafale en cours. Les
  * minuteurs sont `unref()` : ils ne retiennent jamais le processus.
  */
+
+import { failureReason } from "@/lib/server/failure-reason";
+
 type Timer = ReturnType<typeof setTimeout>;
 
 export interface Coalescer<T> {
@@ -54,7 +57,7 @@ export function createCoalescer<T>(options: {
   const inFlight = new Map<string, Promise<void>>();
 
   const fail = (error: unknown) => {
-    console.error("[coalescer] annonce regroupée non partie", error instanceof Error ? error.message : "erreur inconnue");
+    console.error("[coalescer] annonce regroupée non partie", failureReason(error));
   };
 
   const fire = async (key: string): Promise<void> => {
