@@ -62,6 +62,15 @@ beforeEach(() => {
     .mockResolvedValue({ discord: { sent: 1, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 1 });
 });
 
+/** La première lecture des destinataires reste en suspens jusqu'à l'appel rendu. */
+function slowFirstRecipientsRead(): () => void {
+  let release: () => void = () => undefined;
+  jest
+    .mocked(loadNotificationRecipients)
+    .mockImplementationOnce(() => new Promise((resolve) => (release = () => resolve([RECIPIENT]))));
+  return () => release();
+}
+
 function loggedLine(category = "casts"): string {
   expect(sendBotLog).toHaveBeenCalledTimes(1);
   expect(jest.mocked(sendBotLog).mock.calls[0][1]).toMatchObject({ category });
@@ -409,10 +418,7 @@ describe("announceCastChange", () => {
 
     it("announceCastChange_staffReleaseThenImmediateReclaim_staffLineFirst", async () => {
       mockMatch(matchRow());
-      let finishRead: () => void = () => undefined;
-      jest.mocked(loadNotificationRecipients).mockImplementationOnce(
-        () => new Promise((resolve) => (finishRead = () => resolve([RECIPIENT]))),
-      );
+      const finishRead = slowFirstRecipientsRead();
       announceCastChange({ ...released, byStaff: true });
       announceCastChange(claimed);
       await settleChain();
@@ -426,10 +432,7 @@ describe("announceCastChange", () => {
 
     it("announceCastChange_staffReleaseClaimStaffReleaseWhileFirstSlow_allLinesPosted", async () => {
       mockMatch(matchRow());
-      let finishRead: () => void = () => undefined;
-      jest.mocked(loadNotificationRecipients).mockImplementationOnce(
-        () => new Promise((resolve) => (finishRead = () => resolve([RECIPIENT]))),
-      );
+      const finishRead = slowFirstRecipientsRead();
       announceCastChange({ ...released, byStaff: true });
       announceCastChange(claimed);
       announceCastChange({ ...released, byStaff: true });
