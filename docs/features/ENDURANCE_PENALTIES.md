@@ -105,9 +105,11 @@ ERREUR.txt EF-15) : une lecture d'image manquait le report qu'une équipe écrit
 au même moment. Aucune lecture d'image ne les précède — tournoi et sanction
 sont lus `FOR UPDATE` —, sans quoi MariaDB (`innodb_snapshot_isolation`)
 refuserait la lecture d'une manche qu'un « Prêt » vient de toucher
-(`ER_CHECKREAD`). Le retrait tenant le tournoi, son attente de verrou est
-bornée à 5 s (`lib/server/tournaments/lock-wait.ts`) **après** le verrou du
-tournoi (`lockTournamentRow`, attendu sans borne) ; contention persistante
+(`ER_CHECKREAD`). Le retrait tenant le tournoi, l'attente de cette lecture
+des manches — elle seule — est bornée à 5 s (`withShortLockWait`,
+`lib/server/tournaments/lock-wait.ts`) ; le verrou du tournoi
+(`lockTournamentRow`, en premier) s'attend sans borne et le rejeu garde le
+délai du serveur ; contention persistante
 → `409 CONCURRENT_UPDATE_RETRY`, l'interblocage avec un report étant rejoué
 (`retryOnDeadlock`).
 

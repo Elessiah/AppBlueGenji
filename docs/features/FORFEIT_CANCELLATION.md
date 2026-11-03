@@ -66,7 +66,8 @@ interblocage (publication une seule fois, après le commit réussi).
 depuis l'image de la transaction est refusée (`ER_CHECKREAD`) ; une première
 lecture ordinaire figeait cette image avant l'attente du verrou des manches, et
 une rafale de « Prêt » à l'ouverture du salon épuisait les rejeux. Tête du
-tournoi, phase en cours (`LOCK IN SHARE MODE`), ligne du classement (clé
+tournoi, phase en cours (`FOR UPDATE` : le rejeu des phases peut la réécrire,
+un verrou partagé à promouvoir attendrait tout autre lecteur), ligne du classement (clé
 primaire) et manches postérieures se lisent donc toutes sous verrou ; l'image ne
 naît qu'après (nom de l'équipe, rejeu du classement).
 
@@ -97,10 +98,13 @@ Un détenteur qui ne demande jamais le tournoi (programmation, rappels,
 au défaut du serveur avant de rendre la connexion au pool —
 `lib/server/tournaments/lock-wait.ts`, partagé avec le retrait d'une pénalité,
 qui tient lui aussi le tournoi en verrouillant les manches) au lieu des 50 s du
-serveur, en tenant le verrou du tournoi. La borne se pose **après** ce verrou
-(`lockTournamentRow`, en toute première instruction), attendu sans borne comme
-pour tout geste : son détenteur — réconciliation, lancement — le rend sans rien
-attendre de l'annulation. Un classement dont l'équipe n'existe plus rend
+serveur, en tenant le verrou du tournoi. La borne n'entoure **que** cette
+lecture des manches (`withShortLockWait`, option `boundedWait`) : le verrou du
+tournoi (`lockTournamentRow`, en toute première instruction) s'attend sans
+borne comme pour tout geste — son détenteur, réconciliation ou lancement, le
+rend sans rien attendre de l'annulation —, et le rejeu qui suit retrouve le
+délai du serveur (journal du bot et alertes, qui tolèrent un délai dépassé,
+perdraient sinon leur ligne en silence). Un classement dont l'équipe n'existe plus rend
 `TEAM_NOT_IN_TOURNAMENT`. Une contention qui dure —
 interblocage sur les trois tentatives, `ER_CHECKREAD`, délai de verrou
 (`ER_LOCK_WAIT_TIMEOUT`) — rend `409 CONCURRENT_UPDATE_RETRY` (code fixe, le

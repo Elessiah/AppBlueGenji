@@ -244,12 +244,15 @@ l'instantané) et déclenche une relecture du **seul** match
 (`GET /api/tournaments/[id]/matches/[matchId]/proposals`, `useProposalMaps`,
 `proposalsNeedRefresh`) — mêmes conditions que la lecture REST du détail, même
 règle de lecture (`getViewerMatchProposals`, qui partage `viewerProposalScope`
-avec le contexte du lecteur), au plus trois essais espacés de 4 s. Les dates de
-report y sont **relues avec les maps**, dans une même image (transaction en
-lecture seule) : l'instantané en cache peut précéder un nouveau report, et sa
-date apparierait le détail du suivant. Une lecture ratée annule la transaction
-et rend son erreur d'origine ; en individuel, l'entrée du lecteur se résout sur
-la même connexion (une place du pool par relecture). Elle relisait
+avec le contexte du lecteur), au plus trois essais espacés de 4 s. Engagés,
+statut et reports du match y sont **relus avec les maps**, en une instruction
+(`loadFreshMatchProposals`, `bg_matches` joint à `bg_match_maps`) : l'instantané
+en cache peut précéder un report, un retrait ou un changement d'engagé
+(correction d'arbitrage). La règle de lecture se juge sur cet état relu — une
+équipe sortie du match n'en lit plus les propositions, un report déposé depuis
+l'instantané est servi avec sa date. En individuel, l'entrée du lecteur se
+résout sur la même connexion (une place du pool par relecture) ; un lecteur
+sans engagé ne déclenche aucune requête. Elle relisait
 le tournoi entier (instantané et contexte du lecteur) pour les maps d'un match.
 La réponse ne complète un côté que si elle décrit la proposition affichée
 (`mergeMatchProposals`) : une réponse en retard n'écrase rien.
