@@ -40,8 +40,16 @@ avertissement. Une invitation qui valide une demande déjà en attente
 - Invitation ordinaire : une même équipe ne fait écrire au même joueur qu'une
   fois en `TEAM_INVITE_NOTICE_COOLDOWN_HOURS` (24 h — une invitation se retire
   et se renvoie), et à `TEAM_INVITE_NOTICES_DAILY_CAP` (10) joueurs distincts
-  au plus dans la fenêtre, pour que le bot ne soit pas classé comme spammeur.
-  L'invitation, elle, est toujours enregistrée.
+  au plus dans la fenêtre — par équipe **et** par auteur, toutes ses équipes
+  confondues (une équipe recréée ne repart pas de zéro) —, et un joueur ne
+  reçoit l'invitation que de `TEAM_INVITE_NOTICES_PER_PLAYER_CAP` (3) équipes
+  distinctes dans la fenêtre, pour que le bot ne soit pas classé comme
+  spammeur. L'invitation, elle, est toujours enregistrée.
+- Reprise proposée par le staff : une fois par équipe et par joueur dans la
+  même fenêtre (proposition retirée puis refaite comprise).
+- Les comptes portent sur les **lignes écrites** (l'invitation qui vient
+  d'être enregistrée comprise) : la ligne est la réservation. Deux invitations
+  simultanées se voient au pire l'une l'autre et se taisent, jamais l'inverse.
 
 ## Ce que dit le message
 

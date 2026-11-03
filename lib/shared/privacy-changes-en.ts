@@ -32,7 +32,11 @@ import type { PrivacyChange } from "@/lib/shared/privacy-changes";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { SITE_VISITOR_RETENTION_MONTHS, SITE_VISIT_DETAIL_RETENTION_DAYS } from "@/lib/shared/site-visits";
 import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-request-notice";
-import { TEAM_INVITE_NOTICE_COOLDOWN_HOURS, TEAM_INVITE_NOTICES_DAILY_CAP } from "@/lib/shared/team-invite-notice";
+import {
+  TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
+  TEAM_INVITE_NOTICES_DAILY_CAP,
+  TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
+} from "@/lib/shared/team-invite-notice";
 
 /** The translated part of an entry: its wording, and its links' labels (same targets, same order). */
 export type PrivacyChangeTranslation = {
@@ -758,7 +762,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "When a team invites you, when the staff offers you to take over a ghost team, or when the ownership of your team is transferred to you, the site now lets you know by push notification and by a direct message from the Discord bot.",
     details: [
-      `What changes: the push notification (topic “Team invitations”, which you can turn off from My profile) and the Discord direct message (if you linked your Discord account or verified your tag) only name the team — never who invites you, offers you the takeover or transfers the team to you — and lead to My profile, where the invitation is accepted or declined, or to the team's page. The same team only makes the bot write to the same player once every ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} hours, and to ${TEAM_INVITE_NOTICES_DAILY_CAP} players at most within that time; the invitation itself is always recorded.`,
+      `What changes: the push notification (topic “Team invitations”, which you can turn off from My profile) and the Discord direct message (if you linked your Discord account or verified your tag) only name the team — never who invites you, offers you the takeover or transfers the team to you — and lead to My profile, where the invitation is accepted or declined, or to the team's page. The same team only makes the bot write to the same player once every ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} hours (a takeover offered by the staff too), a team or the same person to ${TEAM_INVITE_NOTICES_DAILY_CAP} players at most within that time, and a player only gets the invitation of ${TEAM_INVITE_NOTICES_PER_PLAYER_CAP} teams at most within that time; the invitation itself is always recorded.`,
       "What doesn't change: nothing new is collected or kept; nothing is sent to a suspended or deleted account, nor to the author of the action. The direct message falls under organizing teams (legitimate interest, register T03), which you can object to (section “Your rights” of the privacy page); the push notification, under your consent (register T12).",
     ],
   },

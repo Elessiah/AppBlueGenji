@@ -2,11 +2,14 @@ import { describe, expect, it } from "@jest/globals";
 import {
   TEAM_INVITATIONS_PATH,
   TEAM_INVITE_NOTICES_DAILY_CAP,
+  TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
   formatTeamInviteNotice,
   shouldNotifyTeamInvite,
   teamInviteNoticePath,
   teamInviteNoticeRecipient,
+  withinGhostClaimNoticeBudget,
   withinTeamInviteNoticeBudget,
+  type TeamInviteNoticeBudget,
   type TeamInviteNoticeAccount,
   type TeamInviteNoticeKind,
   type TeamInviteNoticeTeam,
@@ -86,16 +89,45 @@ describe("shouldNotifyTeamInvite", () => {
 });
 
 describe("withinTeamInviteNoticeBudget", () => {
-  it("withinTeamInviteNoticeBudget_firstInviteAtCap_returnsTrue", () => {
-    expect(withinTeamInviteNoticeBudget({ toThisPlayer: 1, toAnyPlayer: TEAM_INVITE_NOTICES_DAILY_CAP })).toBe(true);
+  /** Toutes les bornes juste satisfaites : seul le champ surchargé les franchit. */
+  function budget(overrides: Partial<TeamInviteNoticeBudget> = {}): TeamInviteNoticeBudget {
+    return {
+      toThisPlayer: 1,
+      toAnyPlayer: TEAM_INVITE_NOTICES_DAILY_CAP,
+      byActor: TEAM_INVITE_NOTICES_DAILY_CAP,
+      teamsToThisPlayer: TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
+      ...overrides,
+    };
+  }
+
+  it("withinTeamInviteNoticeBudget_allCountersAtCap_returnsTrue", () => {
+    expect(withinTeamInviteNoticeBudget(budget())).toBe(true);
   });
 
   it("withinTeamInviteNoticeBudget_reinviteWithinWindow_returnsFalse", () => {
-    expect(withinTeamInviteNoticeBudget({ toThisPlayer: 2, toAnyPlayer: 1 })).toBe(false);
+    expect(withinTeamInviteNoticeBudget(budget({ toThisPlayer: 2 }))).toBe(false);
   });
 
-  it("withinTeamInviteNoticeBudget_overCap_returnsFalse", () => {
-    expect(withinTeamInviteNoticeBudget({ toThisPlayer: 1, toAnyPlayer: TEAM_INVITE_NOTICES_DAILY_CAP + 1 })).toBe(false);
+  it("withinTeamInviteNoticeBudget_teamOverCap_returnsFalse", () => {
+    expect(withinTeamInviteNoticeBudget(budget({ toAnyPlayer: TEAM_INVITE_NOTICES_DAILY_CAP + 1 }))).toBe(false);
+  });
+
+  it("withinTeamInviteNoticeBudget_actorOverCap_returnsFalse", () => {
+    expect(withinTeamInviteNoticeBudget(budget({ byActor: TEAM_INVITE_NOTICES_DAILY_CAP + 1 }))).toBe(false);
+  });
+
+  it("withinTeamInviteNoticeBudget_playerOverTeamCap_returnsFalse", () => {
+    expect(withinTeamInviteNoticeBudget(budget({ teamsToThisPlayer: TEAM_INVITE_NOTICES_PER_PLAYER_CAP + 1 }))).toBe(false);
+  });
+});
+
+describe("withinGhostClaimNoticeBudget", () => {
+  it("withinGhostClaimNoticeBudget_firstOffer_returnsTrue", () => {
+    expect(withinGhostClaimNoticeBudget(1)).toBe(true);
+  });
+
+  it("withinGhostClaimNoticeBudget_reOfferWithinWindow_returnsFalse", () => {
+    expect(withinGhostClaimNoticeBudget(2)).toBe(false);
   });
 });
 

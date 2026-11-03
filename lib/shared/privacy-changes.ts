@@ -45,7 +45,11 @@ import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-rep
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-request-notice";
-import { TEAM_INVITE_NOTICE_COOLDOWN_HOURS, TEAM_INVITE_NOTICES_DAILY_CAP } from "@/lib/shared/team-invite-notice";
+import {
+  TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
+  TEAM_INVITE_NOTICES_DAILY_CAP,
+  TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
+} from "@/lib/shared/team-invite-notice";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { SITE_VISITOR_RETENTION_MONTHS, SITE_VISIT_DETAIL_RETENTION_DAYS } from "@/lib/shared/site-visits";
@@ -1471,7 +1475,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Quand une équipe t'invite, quand le staff te propose de reprendre une équipe fantôme, ou quand la propriété de ton équipe t'est transférée, le site te prévient désormais en notification push et par un message privé du bot Discord.",
     details: [
-      `Ce qui change : la notification push (sujet « Invitations d'équipe », que tu peux couper depuis Mon profil) et le message privé Discord (si tu as rattaché ton compte Discord ou certifié ton tag) ne nomment que l'équipe — jamais qui t'invite, te propose la reprise ou te transfère l'équipe — et renvoient à Mon profil, où l'invitation s'accepte ou se refuse, ou à la fiche de l'équipe. Une même équipe ne fait écrire au même joueur qu'une fois toutes les ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} heures, et à ${TEAM_INVITE_NOTICES_DAILY_CAP} joueurs au plus dans ce délai ; l'invitation, elle, est toujours enregistrée.`,
+      `Ce qui change : la notification push (sujet « Invitations d'équipe », que tu peux couper depuis Mon profil) et le message privé Discord (si tu as rattaché ton compte Discord ou certifié ton tag) ne nomment que l'équipe — jamais qui t'invite, te propose la reprise ou te transfère l'équipe — et renvoient à Mon profil, où l'invitation s'accepte ou se refuse, ou à la fiche de l'équipe. Une même équipe ne fait écrire au même joueur qu'une fois toutes les ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} heures (une reprise proposée par le staff aussi), une équipe ou une même personne à ${TEAM_INVITE_NOTICES_DAILY_CAP} joueurs au plus dans ce délai, et un joueur ne reçoit l'invitation que de ${TEAM_INVITE_NOTICES_PER_PLAYER_CAP} équipes au plus dans ce délai ; l'invitation, elle, est toujours enregistrée.`,
       "Ce qui ne change pas : rien de nouveau n'est collecté ni conservé ; rien ne part à un compte suspendu ou supprimé, ni à l'auteur du geste. Le message privé relève de l'organisation des équipes (intérêt légitime, registre T03), auquel tu peux t'opposer (section « Vos droits » de la page RGPD) ; la notification push, de ton accord (registre T12).",
     ],
   },

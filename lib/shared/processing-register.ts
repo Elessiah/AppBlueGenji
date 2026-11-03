@@ -52,7 +52,11 @@ import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
-import { TEAM_INVITE_NOTICE_COOLDOWN_HOURS, TEAM_INVITE_NOTICES_DAILY_CAP } from "@/lib/shared/team-invite-notice";
+import {
+  TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
+  TEAM_INVITE_NOTICES_DAILY_CAP,
+  TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
+} from "@/lib/shared/team-invite-notice";
 import {
   BOT_FEED_EVENT_RETENTION_DAYS,
   BOT_STAFF_LOG_RETENTION_DAYS,
@@ -555,8 +559,8 @@ const ACTIVITIES = registerActivities({
         "Forming teams (members, roles, invitations)"),
       frEn("Prévenir en message privé Discord le propriétaire et les managers d'une équipe d'une demande d'adhésion (sans nommer le demandeur, au plus un message par joueur et par équipe toutes les 24 h)",
         "Notifying the owner and managers of a team of a request to join by Discord direct message (without naming the requester, at most one message per player and per team every 24 h)"),
-      frEn(`Prévenir un joueur en message privé Discord de l'invitation d'une équipe (au plus un message par équipe et par joueur toutes les ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} h, et ${TEAM_INVITE_NOTICES_DAILY_CAP} joueurs par équipe), de la reprise d'une équipe fantôme que le staff lui propose, et de la propriété de son équipe qui lui est transférée (sans nommer qui invite, propose ou transfère : le nom de l'équipe seul)`,
-        `Notifying a player by Discord direct message of a team's invitation (at most one message per team and per player every ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} h, and ${TEAM_INVITE_NOTICES_DAILY_CAP} players per team), of the takeover of a ghost team the staff offers them, and of the ownership of their team being transferred to them (without naming who invites, offers or transfers: the team's name only)`),
+      frEn(`Prévenir un joueur en message privé Discord de l'invitation d'une équipe (au plus un message par équipe et par joueur toutes les ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} h, ${TEAM_INVITE_NOTICES_DAILY_CAP} joueurs par équipe ou par auteur et ${TEAM_INVITE_NOTICES_PER_PLAYER_CAP} équipes par joueur dans ce délai), de la reprise d'une équipe fantôme que le staff lui propose (une fois par équipe et par joueur dans ce délai), et de la propriété de son équipe qui lui est transférée (sans nommer qui invite, propose ou transfère : le nom de l'équipe seul)`,
+        `Notifying a player by Discord direct message of a team's invitation (at most one message per team and per player every ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} h, ${TEAM_INVITE_NOTICES_DAILY_CAP} players per team or per author and ${TEAM_INVITE_NOTICES_PER_PLAYER_CAP} teams per player within that time), of the takeover of a ghost team the staff offers them (once per team and per player within that time), and of the ownership of their team being transferred to them (without naming who invites, offers or transfers: the team's name only)`),
       frEn("Inscrire des équipes ou des joueurs, générer les plateaux, saisir et arbitrer les scores",
         "Registering teams or players, generating brackets, entering and refereeing scores"),
       frEn("Publier résultats, classements, statistiques et palmarès",

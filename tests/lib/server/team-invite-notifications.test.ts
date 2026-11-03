@@ -20,6 +20,9 @@ const ACTOR_ID = 1;
 
 type Scenario = {
   thisPlayer?: number;
+  byActor?: number;
+  teamsToPlayer?: number;
+  offers?: number;
   team?: Record<string, unknown> | null;
   account?: Record<string, unknown> | null;
   locale?: string;
@@ -42,9 +45,20 @@ function accountRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function mockDb({ thisPlayer = 1, team = teamRow(), account = accountRow(), locale = "fr" }: Scenario = {}) {
+function mockDb({
+  thisPlayer = 1,
+  byActor = 1,
+  teamsToPlayer = 1,
+  offers = 1,
+  team = teamRow(),
+  account = accountRow(),
+  locale = "fr",
+}: Scenario = {}) {
   const execute = jest.fn<SqlQuery>(async (sql) => {
-    if (sql.includes("AS any_player")) return [[{ this_player: String(thisPlayer), any_player: 1 }], []];
+    if (sql.includes("AS any_player")) {
+      return [[{ this_player: String(thisPlayer), any_player: 1, by_actor: byActor, teams_to_player: teamsToPlayer }], []];
+    }
+    if (sql.includes("AS offers")) return [[{ offers }], []];
     if (sql.includes("FROM bg_teams")) return [team === null ? [] : [team], []];
     if (sql.includes("FROM bg_users u")) return [account === null ? [] : [account], []];
     throw new Error(`requête inattendue : ${sql}`);
@@ -110,13 +124,61 @@ describe("notifyTeamInvite", () => {
     expect(budgetSql).toContain(`NOT LIKE '%"OWNER"%'`);
   });
 
-  it("notifyTeamInvite_ghostClaim_skipsBudgetQuery", async () => {
+  it("notifyTeamInvite_invite_budgetParamsInOrder", async () => {
+    const execute = mockDb();
+
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    const budgetCall = execute.mock.calls.find(([sql]) => sql.includes("AS any_player"));
+    expect(budgetCall?.[1]).toEqual([TEAM_ID, PLAYER_ID, TEAM_ID, ACTOR_ID, PLAYER_ID, TEAM_ID, ACTOR_ID, PLAYER_ID]);
+  });
+
+  it("notifyTeamInvite_actorOverCapAcrossTeams_sendsNothing", async () => {
+    mockDb({ byActor: 11 });
+
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(pushToUsers).not.toHaveBeenCalled();
+  });
+
+  it("notifyTeamInvite_playerInvitedByTooManyTeams_sendsNothing", async () => {
+    mockDb({ teamsToPlayer: 4 });
+
+    await notifyTeamInvite("INVITE", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(pushToUsers).not.toHaveBeenCalled();
+  });
+
+  it("notifyTeamInvite_ghostClaimFirstOffer_sends", async () => {
     const execute = mockDb({ thisPlayer: 5, team: teamRow({ is_ghost: 1 }) });
 
     await notifyTeamInvite("GHOST_CLAIM", TEAM_ID, PLAYER_ID, ACTOR_ID);
 
+    const offersCall = execute.mock.calls.find(([sql]) => sql.includes("AS offers"));
+    expect(offersCall?.[0]).toContain(`LIKE '%"OWNER"%'`);
+    expect(offersCall?.[1]).toEqual([TEAM_ID, PLAYER_ID]);
     expect(execute.mock.calls.some(([sql]) => sql.includes("AS any_player"))).toBe(false);
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    expect(pushToUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifyTeamInvite_ghostClaimReofferedWithinWindow_sendsNothing", async () => {
+    mockDb({ offers: 2, team: teamRow({ is_ghost: 1 }) });
+
+    await notifyTeamInvite("GHOST_CLAIM", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(pushToUsers).not.toHaveBeenCalled();
+  });
+
+  it("notifyTeamInvite_ownership_runsNoBudgetQuery", async () => {
+    const execute = mockDb();
+
+    await notifyTeamInvite("OWNERSHIP", TEAM_ID, PLAYER_ID, ACTOR_ID);
+
+    expect(execute.mock.calls.some(([sql]) => sql.includes("AS any_player") || sql.includes("AS offers"))).toBe(false);
     expect(pushToUsers).toHaveBeenCalledTimes(1);
   });
 

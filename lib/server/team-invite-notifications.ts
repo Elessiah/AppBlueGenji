@@ -17,6 +17,7 @@ import { activeSuspensionSql } from "@/lib/server/suspension-sql";
 import { teamInvitationPush } from "@/lib/shared/push-messages";
 import {
   TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
+  withinGhostClaimNoticeBudget,
   withinTeamInviteNoticeBudget,
   formatTeamInviteNotice,
   shouldNotifyTeamInvite,
@@ -56,18 +57,44 @@ export async function notifyTeamInvite(
   actorId: number,
 ): Promise<void> {
   const db = await getDatabase();
+  const windowSql = `created_at > NOW() - INTERVAL ${Number(TEAM_INVITE_NOTICE_COOLDOWN_HOURS)} HOUR`;
   if (kind === "INVITE") {
-    // Invitations ordinaires de l'équipe dans la fenêtre (celle-ci comprise) :
-    // une invitation retirée puis renvoyée n'écrit pas deux fois. Les reprises
-    // proposées par le staff (invitation portant `OWNER`) ne comptent pas.
-    const [counts] = await db.execute<(RowDataPacket & { this_player: number | string | null; any_player: number | string })[]>(
-      `SELECT SUM(user_id = ?) AS this_player, COUNT(DISTINCT user_id) AS any_player FROM bg_team_invitations
-       WHERE team_id = ? AND kind = 'INVITE' AND COALESCE(roles_json, '') NOT LIKE '%"OWNER"%'
-         AND created_at > NOW() - INTERVAL ${Number(TEAM_INVITE_NOTICE_COOLDOWN_HOURS)} HOUR`,
-      [userId, teamId],
+    // Invitations ordinaires dans la fenêtre, celle-ci comprise : une
+    // invitation retirée puis renvoyée n'écrit pas deux fois, une équipe
+    // recréée ne repart pas de zéro (compte par auteur), et un joueur n'est
+    // pas relancé par équipe après équipe (compte par destinataire). Les
+    // reprises proposées par le staff (invitation portant `OWNER`) ne comptent pas.
+    const [counts] = await db.execute<(RowDataPacket & {
+      this_player: number | string | null;
+      any_player: number | string;
+      by_actor: number | string;
+      teams_to_player: number | string;
+    })[]>(
+      `SELECT SUM(team_id = ? AND user_id = ?) AS this_player,
+              COUNT(DISTINCT CASE WHEN team_id = ? THEN user_id END) AS any_player,
+              COUNT(DISTINCT CASE WHEN created_by = ? THEN user_id END) AS by_actor,
+              COUNT(DISTINCT CASE WHEN user_id = ? THEN team_id END) AS teams_to_player
+       FROM bg_team_invitations
+       WHERE (team_id = ? OR created_by = ? OR user_id = ?)
+         AND kind = 'INVITE' AND COALESCE(roles_json, '') NOT LIKE '%"OWNER"%' AND ${windowSql}`,
+      [teamId, userId, teamId, actorId, userId, teamId, actorId, userId],
     );
-    const budget = { toThisPlayer: Number(counts[0]?.this_player ?? 0), toAnyPlayer: Number(counts[0]?.any_player ?? 0) };
+    const budget = {
+      toThisPlayer: Number(counts[0]?.this_player ?? 0),
+      toAnyPlayer: Number(counts[0]?.any_player ?? 0),
+      byActor: Number(counts[0]?.by_actor ?? 0),
+      teamsToThisPlayer: Number(counts[0]?.teams_to_player ?? 0),
+    };
     if (!withinTeamInviteNoticeBudget(budget)) return;
+  } else if (kind === "GHOST_CLAIM") {
+    // Une proposition retirée puis refaite n'écrit pas deux fois au joueur.
+    const [offers] = await db.execute<(RowDataPacket & { offers: number | string })[]>(
+      `SELECT COUNT(*) AS offers FROM bg_team_invitations
+       WHERE team_id = ? AND user_id = ? AND kind = 'INVITE'
+         AND COALESCE(roles_json, '') LIKE '%"OWNER"%' AND ${windowSql}`,
+      [teamId, userId],
+    );
+    if (!withinGhostClaimNoticeBudget(Number(offers[0]?.offers ?? 0))) return;
   }
   const [teams] = await db.execute<TeamRow[]>(
     `SELECT name, is_ghost, solo_user_id, deleted_at FROM bg_teams WHERE id = ? LIMIT 1`,

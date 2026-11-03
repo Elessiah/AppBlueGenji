@@ -39,22 +39,61 @@ export function teamInviteNoticePath(kind: TeamInviteNoticeKind, teamId: number)
 export const TEAM_INVITE_NOTICE_COOLDOWN_HOURS = 24;
 
 /**
- * Joueurs **distincts** qu'une même équipe peut faire prévenir par fenêtre :
- * une gestion qui inviterait chaque pseudo du site ferait classer le bot comme
- * spammeur par Discord (ce qui couperait aussi la connexion par code). Au-delà,
- * les invitations sont enregistrées et visibles sur « Mon profil » ; seul le
- * message est retenu.
+ * Joueurs **distincts** qu'une même équipe — ou une même personne, toutes ses
+ * équipes confondues — peut faire prévenir par fenêtre : une gestion qui
+ * inviterait chaque pseudo du site (ou recréerait une équipe pour repartir de
+ * zéro) ferait classer le bot comme spammeur par Discord (ce qui couperait
+ * aussi la connexion par code). Au-delà, les invitations sont enregistrées et
+ * visibles sur « Mon profil » ; seul le message est retenu.
  */
 export const TEAM_INVITE_NOTICES_DAILY_CAP = 10;
 
 /**
+ * Équipes **distinctes** dont un même joueur peut recevoir l'invitation par
+ * fenêtre : plusieurs comptes, ou plusieurs équipes, ne lui écrivent pas en
+ * boucle.
+ */
+export const TEAM_INVITE_NOTICES_PER_PLAYER_CAP = 3;
+
+/**
+ * Ce que la base compte dans la fenêtre, invitation qui vient d'être écrite
+ * **comprise** — la ligne écrite est la réservation : deux invitations
+ * simultanées se voient l'une l'autre au pire, et se taisent plutôt que
+ * d'écrire deux fois.
+ */
+export type TeamInviteNoticeBudget = {
+  /** Invitations de cette équipe à ce joueur. */
+  toThisPlayer: number;
+  /** Joueurs distincts invités par cette équipe. */
+  toAnyPlayer: number;
+  /** Joueurs distincts invités par l'auteur, toutes équipes confondues. */
+  byActor: number;
+  /** Équipes distinctes qui ont invité ce joueur. */
+  teamsToThisPlayer: number;
+};
+
+/**
  * Borne d'une invitation ordinaire : la **seule** invitation de cette équipe à
  * ce joueur dans la fenêtre (celle qui vient d'être écrite, d'où `<= 1`), tant
- * que les joueurs invités par l'équipe dans la fenêtre n'excèdent pas
- * {@link TEAM_INVITE_NOTICES_DAILY_CAP}.
+ * que les joueurs invités par l'équipe, ou par l'auteur, n'excèdent pas
+ * {@link TEAM_INVITE_NOTICES_DAILY_CAP} et que les équipes qui invitent ce
+ * joueur n'excèdent pas {@link TEAM_INVITE_NOTICES_PER_PLAYER_CAP}.
  */
-export function withinTeamInviteNoticeBudget(input: { toThisPlayer: number; toAnyPlayer: number }): boolean {
-  return input.toThisPlayer <= 1 && input.toAnyPlayer <= TEAM_INVITE_NOTICES_DAILY_CAP;
+export function withinTeamInviteNoticeBudget(input: TeamInviteNoticeBudget): boolean {
+  return (
+    input.toThisPlayer <= 1 &&
+    input.toAnyPlayer <= TEAM_INVITE_NOTICES_DAILY_CAP &&
+    input.byActor <= TEAM_INVITE_NOTICES_DAILY_CAP &&
+    input.teamsToThisPlayer <= TEAM_INVITE_NOTICES_PER_PLAYER_CAP
+  );
+}
+
+/**
+ * Borne d'une reprise proposée par le staff : une fois par équipe et par
+ * joueur dans la fenêtre (proposition retirée puis refaite comprise).
+ */
+export function withinGhostClaimNoticeBudget(offersToThisPlayer: number): boolean {
+  return offersToThisPlayer <= 1;
 }
 
 /** Le compte visé, tel que le service le lit. */
