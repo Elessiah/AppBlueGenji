@@ -253,7 +253,9 @@ en cache peut précéder un report, un retrait ou un changement d'engagé
 l'instantané est servi avec sa date. En individuel, l'entrée du lecteur se
 résout sur la même connexion (une place du pool par relecture) ; un lecteur
 sans engagé ne déclenche aucune requête. Le match se lit par son id **et** son
-tournoi, sans passer par l'instantané : une manche posée depuis s'y lit déjà. Elle relisait
+tournoi, sans passer par l'instantané : une manche posée depuis s'y lit déjà ; la
+route ne lit que la carte du tournoi (`getVisibleTournamentCard`, même règle de
+visibilité) pour ne pas rebâtir l'instantané à chaque relecture. Elle relisait
 le tournoi entier (instantané et contexte du lecteur) pour les maps d'un match.
 La réponse ne complète un côté que si elle décrit la proposition affichée
 (`mergeMatchProposals`) : une réponse en retard n'écrase rien.
