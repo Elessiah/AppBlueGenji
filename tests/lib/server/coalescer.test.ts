@@ -377,6 +377,28 @@ describe("createKeyedChain", () => {
     expect(second).toHaveBeenCalledTimes(1);
   });
 
+  it("chain_runResolves_returnedPromiseResolvesAfterRun", async () => {
+    const { chain } = createKeyedChain<number>();
+    const run = deferred();
+    let done = false;
+    const settled = chain(1, () => run.promise).then(() => {
+      done = true;
+    });
+    await Promise.resolve();
+    expect(done).toBe(false);
+    run.release();
+    await settled;
+    expect(done).toBe(true);
+  });
+
+  it("chain_runRejects_returnedPromiseResolves", async () => {
+    const { chain } = createKeyedChain<number>();
+    const run = deferred();
+    const settled = chain(1, () => run.promise);
+    run.fail();
+    await expect(settled).resolves.toBeUndefined();
+  });
+
   it("createKeyedChain_runThrowsSynchronously_doesNotThrow", async () => {
     const { chain } = createKeyedChain<number>();
     const next = jest.fn(async () => undefined);
