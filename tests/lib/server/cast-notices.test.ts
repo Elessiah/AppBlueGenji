@@ -275,6 +275,55 @@ describe("announceCastChange", () => {
       await settle();
       expect(sendBotLog).toHaveBeenCalledTimes(3);
     });
+
+    /** Laisse partir la rafale forcée puis le geste qui la suit (chaînés). */
+    async function settleChain(): Promise<void> {
+      jest.useRealTimers();
+      for (let i = 0; i < 5; i++) await settle();
+    }
+    const lines = () => jest.mocked(sendBotLog).mock.calls.map((call) => String(call[0]));
+
+    it("announceCastChange_staffReleaseAfterPendingClaim_claimLoggedFirst", async () => {
+      mockMatch(matchRow());
+      announceCastChange(claimed);
+      announceCastChange({ ...released, byStaff: true });
+      await settleChain();
+      expect(lines()).toHaveLength(2);
+      expect(lines()[0]).toContain("inscrit");
+      expect(lines()[1]).toContain("par le staff");
+    });
+
+    it("announceCastChange_autoReleaseAfterPendingClaim_claimLoggedFirst", async () => {
+      mockMatch(matchRow());
+      announceCastChange(claimed);
+      announceCastChange({ kind: "AUTO_RELEASED", matchId: 42, casterId: 9, reason: "JOINED_TEAM" });
+      await settleChain();
+      expect(lines()).toHaveLength(2);
+      expect(lines()[0]).toContain("inscrit");
+      expect(lines()[1]).toContain("le caster joue désormais ce match");
+    });
+
+    it("announceCastChange_takeoverAfterReplacedCasterToggle_toggleFlushedFirst", async () => {
+      mockMatch(matchRow());
+      announceCastChange(claimed);
+      announceCastChange({ kind: "CLAIMED", matchId: 42, casterId: 10, replacedCasterId: 9 });
+      await settleChain();
+      expect(lines()).toHaveLength(2);
+      expect(lines()[0]).toContain("inscrit");
+      expect(lines()[1]).toContain("repris");
+    });
+
+    it("announceCastChange_staffReleaseOtherCaster_leavesOtherBurstPending", async () => {
+      mockMatch(matchRow());
+      announceCastChange({ ...claimed, casterId: 10 });
+      announceCastChange({ ...released, byStaff: true });
+      await settleChain();
+      expect(lines()).toHaveLength(1);
+      expect(lines()[0]).toContain("par le staff");
+      await flushCastToggles();
+      await settle();
+      expect(lines()).toHaveLength(2);
+    });
   });
 });
 

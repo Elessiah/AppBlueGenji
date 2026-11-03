@@ -24,12 +24,15 @@ const playedRow = {
   double_forfeit: 0,
 };
 
-/** Lecture du match, puis `UPDATE` touchant `affectedRows` lignes. */
-function found(row: Record<string, unknown> = playedRow, affectedRows = 1) {
+/**
+ * Lecture du match, puis `UPDATE` qui trouve `affectedRows` lignes et en
+ * modifie `changedRows` (MySQL / MariaDB : une valeur identique ne compte pas).
+ */
+function found(row: Record<string, unknown> = playedRow, affectedRows = 1, changedRows = affectedRows) {
   return jest
     .fn<SqlQuery>()
     .mockResolvedValueOnce([[row]])
-    .mockResolvedValue([{ affectedRows }]);
+    .mockResolvedValue([{ affectedRows, changedRows }]);
 }
 
 beforeEach(() => {
@@ -58,7 +61,7 @@ describe("setMatchReplayUrl", () => {
   it.each<[string | null]>([[null], [""], ["   "]])(
     "efface le lien sur %p, sans condition d'état",
     async (raw) => {
-      const execute = found({ ...playedRow, status: "READY", replay_url: "https://youtu.be/old" });
+      const execute = found({ ...playedRow, status: "READY" });
       await mockDb(execute);
 
       expect(await setMatchReplayUrl(42, raw)).toEqual({ replayUrl: null, changed: true });
@@ -113,12 +116,19 @@ describe("setMatchReplayUrl", () => {
 
 describe("setMatchReplayUrl — changement", () => {
   it("setMatchReplayUrl_clearNeverSet_changedFalse", async () => {
-    await mockDb(found({ ...playedRow, replay_url: null }));
+    await mockDb(found(playedRow, 1, 0));
     expect(await setMatchReplayUrl(42, null)).toEqual({ replayUrl: null, changed: false });
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchReplayUrl_concurrentClear_secondChangedFalse", async () => {
+    // Deux effacements simultanés : la ligne est trouvée, mais déjà vide au second.
+    await mockDb(found(playedRow, 1, 0));
+    expect((await setMatchReplayUrl(42, "")).changed).toBe(false);
   });
 
   it("setMatchReplayUrl_sameUrl_changedFalse", async () => {
-    await mockDb(found({ ...playedRow, replay_url: "https://youtu.be/dQw4w9WgXcQ" }));
+    await mockDb(found(playedRow, 1, 0));
     expect(await setMatchReplayUrl(42, "youtu.be/dQw4w9WgXcQ")).toEqual({
       replayUrl: "https://youtu.be/dQw4w9WgXcQ",
       changed: false,

@@ -577,7 +577,10 @@ describe("setMatchOnAir", () => {
 
     await setMatchOnAir(42, false);
 
-    expect((execute.mock.calls[1] as [string, unknown[]])[1]).toEqual([null, 42]);
+    const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
+    expect(sql).toContain("live_started_at = NULL");
+    expect(sql).toContain("live_started_at IS NOT NULL");
+    expect(params).toEqual([42]);
   });
 
   it("referme l'antenne même sur un match déjà noté — nettoyage toujours permis", async () => {
@@ -773,7 +776,20 @@ describe("setMatchOnAir — changement d'état", () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: new Date() })]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce([{ affectedRows: 0 }]);
+    await mockDb(execute);
+    await expect(setMatchOnAir(42, true)).resolves.toBe(false);
+    // L'heure de mise à l'antenne n'est pas réécrite : la condition la garde.
+    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND live_started_at IS NULL");
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchOnAir_concurrentSecondClick_returnsFalse", async () => {
+    // Les deux clics ont lu l'antenne fermée ; seul le premier UPDATE trouve la ligne.
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: null })]])
+      .mockResolvedValueOnce([{ affectedRows: 0 }]);
     await mockDb(execute);
     await expect(setMatchOnAir(42, true)).resolves.toBe(false);
   });
@@ -791,7 +807,7 @@ describe("setMatchOnAir — changement d'état", () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: null })]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce([{ affectedRows: 0 }]);
     await mockDb(execute);
     await expect(setMatchOnAir(42, false)).resolves.toBe(false);
   });

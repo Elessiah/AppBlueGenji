@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { createCoalescer } from "@/lib/server/coalescer";
+import { createCoalescer, flushAllCoalescers } from "@/lib/server/coalescer";
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -85,5 +85,67 @@ describe("createCoalescer", () => {
     jest.advanceTimersByTime(1_000);
     expect(deliver).toHaveBeenLastCalledWith(2, 2);
     error.mockRestore();
+  });
+});
+
+describe("createCoalescer — annonce forcée", () => {
+  it("flush_pendingKey_deliversAtOnceAndClearsBurst", async () => {
+    const { deliver, coalescer } = setup();
+    coalescer.add("a", 1);
+    coalescer.add("a", 2);
+    await coalescer.flush("a");
+    expect(deliver).toHaveBeenCalledWith(1, 2);
+    expect(coalescer.pending()).toBe(0);
+    jest.advanceTimersByTime(10_000);
+    expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  it("flush_unknownKey_resolvesWithoutDelivering", async () => {
+    const { deliver, coalescer } = setup();
+    coalescer.add("a", 1);
+    await expect(coalescer.flush("x")).resolves.toBeUndefined();
+    expect(deliver).not.toHaveBeenCalled();
+    expect(coalescer.pending()).toBe(1);
+  });
+
+  it("flushAll_asyncDeliver_resolvesAfterDeliveries", async () => {
+    const delivered: number[] = [];
+    const coalescer = createCoalescer<number>({
+      windowMs: 1_000,
+      maxAgeMs: 5_000,
+      deliver: async (_first, last) => {
+        await Promise.resolve();
+        delivered.push(last);
+      },
+    });
+    coalescer.add("a", 1);
+    coalescer.add("b", 2);
+    await coalescer.flushAll();
+    expect(delivered).toEqual([1, 2]);
+  });
+
+  it("flush_deliverRejects_logsAndResolves", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const coalescer = createCoalescer<number>({
+      windowMs: 1_000,
+      maxAgeMs: 5_000,
+      deliver: async () => {
+        throw new Error("boom");
+      },
+    });
+    coalescer.add("a", 1);
+    await expect(coalescer.flush("a")).resolves.toBeUndefined();
+    expect(error).toHaveBeenCalledWith("[coalescer] annonce regroupée non partie", "boom");
+    error.mockRestore();
+  });
+
+  it("flushAllCoalescers_twoCoalescers_flushesBoth", async () => {
+    const first = setup();
+    const second = setup();
+    first.coalescer.add("a", 1);
+    second.coalescer.add("b", 2);
+    await flushAllCoalescers();
+    expect(first.deliver).toHaveBeenCalledWith(1, 1);
+    expect(second.deliver).toHaveBeenCalledWith(2, 2);
   });
 });

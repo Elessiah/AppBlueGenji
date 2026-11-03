@@ -252,4 +252,28 @@ describe("announceStaffTournamentAction — rafales", () => {
     expect(execute).toHaveBeenCalledTimes(1);
     expect(sendBotLog).toHaveBeenCalledTimes(1);
   });
+
+  it("announceStaffTournamentAction_advanceAfterPendingSeeding_seedingLoggedFirst", async () => {
+    mockRows({ id: 7, name: "Coupe d'hiver" });
+    announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    announceStaffTournamentAction(7, "ADVANCED", { target: "RUNNING" });
+    jest.useRealTimers();
+    await settle();
+    await settle();
+    const lines = jest.mocked(sendBotLog).mock.calls.map((call) => String(call[0]));
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("Têtes de série réordonnées");
+    expect(lines[1]).toContain("coup d'envoi");
+  });
+
+  it("announceStaffTournamentAction_advanceOtherTournament_seedingStaysPending", async () => {
+    mockRows({ id: 8, name: "Coupe d'été" });
+    announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    announceStaffTournamentAction(8, "ADVANCED", { target: "RUNNING" });
+    jest.useRealTimers();
+    await settle();
+    await settle();
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+    expect(String(jest.mocked(sendBotLog).mock.calls[0][0])).toContain("coup d'envoi");
+  });
 });

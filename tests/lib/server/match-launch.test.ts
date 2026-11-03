@@ -1119,6 +1119,34 @@ describe("loadViewerCastBlock", () => {
 describe("releaseIneligibleCast", () => {
   const ineligible = { ...ELIGIBLE_CASTER, platform_roles_json: null };
 
+  it("releaseIneligibleCast_deadlockThenCasterGone_announcesNothing", async () => {
+    // Première tentative : retrait JOINED_TEAM, puis interblocage au commit. Le
+    // double garde l'écriture : la seconde ne trouve plus le caster — rien de la
+    // tentative défaite (match, motif, blocage) ne doit s'annoncer.
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
+    state.match = matchState({ caster_user_id: CASTER });
+    let commits = 0;
+    jest.mocked(withConnection).mockImplementation((run) =>
+      run(
+        fakeConnection({
+          execute: executeFor(state),
+          beginTransaction: async () => undefined,
+          commit: async () => {
+            commits += 1;
+            if (commits === 1) throw Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK" });
+          },
+          rollback: async () => undefined,
+        }),
+      ),
+    );
+
+    await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(false);
+
+    expect(commits).toBe(2);
+    expect(announceCastChange).not.toHaveBeenCalled();
+  });
+
   it("retire un caster qui ne remplit plus la condition, et lance ce qui n'attendait que lui", async () => {
     state.users[CASTER] = ineligible;
     state.match = matchState({ caster_user_id: CASTER, team1_ready_at: STAMP, team2_ready_at: STAMP });
