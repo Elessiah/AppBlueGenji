@@ -171,7 +171,9 @@ déjà la même apparence.
   (tournois non publiés, staff seul) répond `private, no-store` sans empreinte :
   aucune copie sur le disque d'un poste partagé après la déconnexion. Une
   réponse d'erreur non JSON (page du proxy) retombe sur le code
-  `TOURNAMENT_LIST_FAILED`, et un refus 401/403 des invisibles vide la section
+  `TOURNAMENT_LIST_FAILED` ; la toast d'échec dit une phrase traduite
+  (`list.loadFailed`, `list.hiddenLoadFailed`), jamais le code ni le message
+  brut du navigateur. Un refus 401/403 des invisibles vide la section
   sans toast et retire le droit staff à la page (plus de lecture refusée à
   chaque rafraîchissement, plus de « Créer », cadence joueur) jusqu'à ce que le
   serveur rende un nouveau droit (droit retiré depuis le rendu). Le paramètre
