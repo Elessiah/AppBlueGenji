@@ -21,7 +21,7 @@ describe("page tournois — section « Tournois invisibles »", () => {
     // redessiner la page à chaque rafraîchissement de fond.
     expect(page).toMatch(/if \(!isAdmin\) \{[\s\S]{0,400}?setHiddenTournaments\([\s\S]{0,120}?return;\s*\}/);
     // La permission commande le chargement : elle est dans ses dépendances.
-    expect(page).toMatch(/\[isAdmin, showError, t\],\s*\);/);
+    expect(page).toMatch(/\[isAdmin, router, showError, t\],\s*\);/);
   });
 
   it("charge les invisibles à part de la liste publique", () => {
@@ -30,7 +30,7 @@ describe("page tournois — section « Tournois invisibles »", () => {
     // rafraîchissement de fond), mais elle reste étrangère aux invisibles.
     const start = page.indexOf("const load = useCallback(");
     expect(start).toBeGreaterThan(-1);
-    const end = page.indexOf("[showError, t, wantFinishedArchive],", start);
+    const end = page.indexOf("[router, showError, t, wantFinishedArchive],", start);
     expect(end).toBeGreaterThan(start);
     const publicLoad = page.slice(start, end);
 
@@ -120,18 +120,25 @@ describe("page tournois — échecs de lecture de la liste", () => {
     );
   });
 
-  it("vide les invisibles sans toast quand le droit est refusé", () => {
+  it("vide les invisibles sans toast et fait relire le droit au serveur quand il est refusé", () => {
     expect(page).toMatch(
-      /if \(code === "FORBIDDEN" \|\| code === "UNAUTHORIZED"\) \{\s*setHiddenTournaments\([^\n]*\);\s*if \(code === "FORBIDDEN"\) setStaffRevoked\(true\);\s*return;\s*\}/,
+      /if \(code === "FORBIDDEN" \|\| code === "UNAUTHORIZED"\) \{\s*setHiddenTournaments\([^\n]*\);\s*router\.refresh\(\);\s*return;\s*\}/,
     );
   });
 
-  it("un refus des invisibles retire le droit staff à la page, rendu au prop quand il change", () => {
-    expect(page).toContain("const isAdmin = canManage && !staffRevoked;");
-    expect(page).toMatch(/if \(revokedFor !== canManage\) \{\s*setRevokedFor\(canManage\);\s*setStaffRevoked\(false\);\s*\}/);
-    // Le droit retiré commande aussi « Créer » et la cadence staff.
+  it("le droit staff reste celui du serveur : aucun drapeau local qui survivrait à un droit rendu", () => {
+    expect(page).toContain("const isAdmin = canManage;");
+    expect(page).not.toContain("staffRevoked");
+    expect(page).toContain("const router = useLocaleRouter();");
+    // Le droit relu commande aussi « Créer » et la cadence staff.
     expect(page).toContain("refreshCadenceFor({ isStaff: isAdmin })");
     expect(page).toMatch(/\{isAdmin && \(/);
+  });
+
+  it("une session partie sur la liste publique fait relire la page, sans toast « réessaie »", () => {
+    expect(page).toMatch(
+      /if \(signal\?\.aborted\) return;[\s\S]{0,200}?if \(\(e as Error\)\.message === "UNAUTHORIZED"\) \{\s*router\.refresh\(\);\s*return;\s*\}\s*if \(silent\) return;/,
+    );
   });
 
   it("signale les autres échecs des invisibles par une phrase traduite, sauf en lecture de fond", () => {
@@ -148,7 +155,7 @@ describe("page tournois — échecs de lecture de la liste", () => {
   });
 
   it("signale l'échec de la liste par une phrase traduite, jamais par le message brut", () => {
-    expect(page).toMatch(/if \(signal\?\.aborted \|\| silent\) return;[\s\S]{0,300}?showError\(t\("list\.loadFailed"\)\);/);
+    expect(page).toMatch(/if \(silent\) return;[\s\S]{0,300}?showError\(t\("list\.loadFailed"\)\);/);
     expect(page).not.toContain("showError((e as Error).message)");
   });
 });

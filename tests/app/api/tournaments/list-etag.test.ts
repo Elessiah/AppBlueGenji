@@ -132,12 +132,25 @@ describe("GET /api/tournaments — empreinte et 304", () => {
     expect(await res.json()).toEqual({ error: "TOURNAMENT_LIST_FAILED" });
   });
 
+  it("rend une contention passagère en 409 « réessaie », pas en panne", async () => {
+    jest.mocked(service.listTournamentBuckets).mockRejectedValue(new Error("Lock wait timeout exceeded; try restarting transaction"));
+    const consoleWarn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const res = await get();
+    consoleWarn.mockRestore();
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "CONCURRENT_UPDATE_RETRY" });
+  });
+
   it("ne rend jamais 304 aux invisibles, même au joker", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
 
     const res = await get({ "If-None-Match": "*" }, "/api/tournaments?scope=hidden");
 
     expect(res.status).toBe(200);
+    expect(res.headers.get("etag")).toBeNull();
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
     expect(await res.json()).toEqual({ buckets: buckets() });
   });
 });
