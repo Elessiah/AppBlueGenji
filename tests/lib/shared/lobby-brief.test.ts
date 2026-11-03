@@ -131,7 +131,9 @@ describe("formatLobbyBriefDm", () => {
     expect(fr).toContain("l'hôte crée la partie et invite son adversaire.");
     expect(fr).not.toContain("casters");
     const castSolo = formatLobbyBriefDm({ ...solo, cast: true }, URL);
-    expect(castSolo).toContain("l'hôte crée la partie et invite son adversaire, puis invitent les casters.");
+    expect(castSolo).toContain("l'hôte crée la partie et invite son adversaire, puis invite les casters.");
+    const castSoloEn = formatLobbyBriefDm({ ...solo, cast: true }, URL, "en");
+    expect(castSoloEn).toMatch(/invites their opponent, then (invites|notifies) the casters\./);
     expect(en).toContain("• Left (host): your opponent");
     expect(en).toContain("• Map 1 bans: you first, then your opponent");
   });

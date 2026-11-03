@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { closedNoticeText } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
 import { startAtHint, startAtNotice } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
 import { anotherModalOpen } from "@/lib/shared/dialog-focus";
-import { launchSidesLaterText } from "@/components/match-launch/MatchLaunchCenter";
+import { launchSidesLaterText } from "@/components/match-launch/launch-text";
 import { CasterCard, CasterCards, RefereeCard, SideCard, copyToastLabel } from "@/components/match-launch/LaunchContactCards";
 import { contactsErrorText } from "@/components/match-launch/MatchContactsDialog";
 import { FR_LAUNCH_TEXT } from "@/components/match-launch/launch-text";
@@ -578,6 +578,27 @@ describe("RefereeCard — note sans contact, accessibilité, toast de copie (MAT
       <RefereeCard referee={{ ...base, contactsShown: false, discordTag: null }} selfManaged={false} phase="LAUNCHED" onCopy={noop} />,
     );
     expect(html).not.toContain("Aucun contact disponible.");
+  });
+
+  it("RefereeCard_contactsNotYetOpen_showsLaterNote", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard referee={{ ...base, contactsShown: false }} selfManaged={false} phase="LAUNCHED" onCopy={noop} />,
+    );
+    expect(html).toContain("Ses contacts s&#x27;affichent au lancement.");
+  });
+
+  it("RefereeCard_contactsNotYetOpen_laterTextOverridesDefault", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard referee={{ ...base, contactsShown: false }} selfManaged={false} phase="LAUNCHED" onCopy={noop} laterText="Plus tard." />,
+    );
+    expect(html).toContain("Plus tard.");
+  });
+
+  it("RefereeCard_ownCardNotYetOpen_noLaterNote", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard referee={{ ...base, contactsShown: false, isViewer: true }} selfManaged={false} phase="LAUNCHED" onCopy={noop} />,
+    );
+    expect(html).not.toContain("au lancement");
   });
 
   it("RefereeCard_launchWindowWithoutDiscordField_noNoContactNote", () => {

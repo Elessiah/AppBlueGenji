@@ -32,6 +32,16 @@ const DECISION_LINES: Readonly<Record<Locale, Readonly<Record<DecisionLine, stri
   },
 };
 
+type CasterVerbs = Readonly<Record<"solo" | "team", Readonly<Record<"invite" | "notify", string>>>>;
+const EN_CASTER_VERBS: CasterVerbs = {
+  solo: { invite: "invites", notify: "notifies" },
+  team: { invite: "invite", notify: "notify" },
+};
+const FR_CASTER_VERBS: CasterVerbs = {
+  solo: { invite: "invite", notify: "prévient" },
+  team: { invite: "invitent", notify: "préviennent" },
+};
+
 /**
  * La ligne d'autogestion : l'étape des casters n'y figure que si le match est
  * casté (`side.cast`), et elle dit « inviter » (en jeu) seulement en Overwatch,
@@ -40,15 +50,17 @@ const DECISION_LINES: Readonly<Record<Locale, Readonly<Record<DecisionLine, stri
  */
 function selfManagedLine(side: LobbyBriefSide, locale: Locale): string {
   const invite = battletagRelevantFor(side.game);
+  // Le verbe suit le sujet : l'hôte (un seul) au singulier, les managers au pluriel.
+  const verbs = locale === "en" ? EN_CASTER_VERBS : FR_CASTER_VERBS;
+  const casterVerb = verbs[side.solo ? "solo" : "team"][invite ? "invite" : "notify"];
+  const joiner = locale === "en" ? "then" : "puis";
+  const article = locale === "en" ? "the" : "les";
+  const casters = side.cast ? `, ${joiner} ${casterVerb} ${article} casters` : "";
   if (locale === "en") {
-    const casterStep = invite ? ", then invite the casters" : ", then notify the casters";
-    const casters = side.cast ? casterStep : "";
     return side.solo
       ? `Self-managed: the host creates the game and invites their opponent${casters}.`
       : `Self-managed: the host team creates the game, the managers of both teams invite each other${casters}.`;
   }
-  const casterStep = invite ? ", puis invitent les casters" : ", puis préviennent les casters";
-  const casters = side.cast ? casterStep : "";
   return side.solo
     ? `Autogestion : l'hôte crée la partie et invite son adversaire${casters}.`
     : `Autogestion : l'équipe hôte crée la partie, les managers des deux équipes s'invitent mutuellement${casters}.`;

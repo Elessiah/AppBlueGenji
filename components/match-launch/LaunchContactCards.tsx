@@ -429,6 +429,7 @@ export function RefereeCard({
   onCopy,
   linkNames = false,
   battletagNote,
+  laterText,
 }: Readonly<{
   referee: LaunchReferee | null;
   selfManaged: boolean;
@@ -437,6 +438,8 @@ export function RefereeCard({
   linkNames?: boolean;
   /** Note posée sur le BattleTag (page du match : « À ajouter en ami »). */
   battletagNote?: string;
+  /** Note des contacts pas encore ouverts au lecteur (défaut : « au lancement »). */
+  laterText?: string;
 }>) {
   const { t } = useLaunchText();
   if (!referee) {
@@ -463,8 +466,10 @@ export function RefereeCard({
         </span>
         <ReadyChip ready={referee.ready} phase={phase} />
       </div>
-      {/* Contacts ouverts mais vides (le tag Discord est présent, `null` : le lecteur
-          le reçoit, l'arbitre n'en a pas) : une note, comme sur la fiche d'un caster. */}
+      {/* Contacts pas encore ouverts : la note dit quand, comme sur la fiche d'un caster. */}
+      {casterCardPending(referee) && <p className={styles.note}>{laterText ?? t("casterContactsAtLaunch")}</p>}
+      {/* Contacts ouverts mais vides (`discordTag` vaut `null`, non `undefined` : le serveur
+          l'a envoyé, l'arbitre n'en a pas) : une note, comme sur la fiche d'un caster. */}
       {!referee.isViewer && referee.contactsShown && referee.discordTag === null && !hasContacts && (
         <p className={styles.note}>{t("noContact")}</p>
       )}

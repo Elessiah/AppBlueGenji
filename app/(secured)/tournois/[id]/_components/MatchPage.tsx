@@ -12,8 +12,7 @@ import { KeyFacts, type KeyFact } from "@/components/cyber/KeyFacts";
 import { CasterCards, RefereeCard, SideCard } from "@/components/match-launch/LaunchContactCards";
 import { useMatchContacts } from "@/components/match-launch/MatchContactsDialog";
 import { SharedMatchContactsContext } from "@/components/match-launch/shared-match-contacts";
-import { useLaunchText } from "@/components/match-launch/launch-text";
-import { launchSidesLaterText } from "@/components/match-launch/MatchLaunchCenter";
+import { launchSidesLaterText, useLaunchText } from "@/components/match-launch/launch-text";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { useClock } from "@/lib/shared/hooks/useClock";
 import { VOICE_CHANNEL_CAPACITY, parseMatchVoiceInfo, type MatchVoiceInfo } from "@/lib/shared/match-voice";
@@ -780,6 +779,7 @@ function OfficiatingSection({
   invitesByBattletag: boolean;
 }>) {
   const { t } = useTournamentPageText();
+  const launchText = useLaunchText();
   const page = useMatchPageText();
   const titleId = useId();
   const decision = matchPageDecision(match, staff);
@@ -796,6 +796,7 @@ function OfficiatingSection({
           phase={launch.phase}
           onCopy={onCopy}
           linkNames
+          laterText={launchText.t("contacts.casterLater")}
           battletagNote={invitesByBattletag ? t("matchPage.refereeBattletagNote") : undefined}
         />
       )}
