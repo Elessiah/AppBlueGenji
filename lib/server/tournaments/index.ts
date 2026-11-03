@@ -6,9 +6,7 @@ import type {
   TournamentDetail,
   TournamentFormat,
   TournamentGame,
-  BracketMatch,
   MatchProposalMaps,
-  MatchScoreReport,
   TournamentSnapshot,
   TournamentState,
   TournamentViewerContext,
@@ -168,12 +166,11 @@ import {
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { resolveExpiredScoreReports, finalizeTournamentIfDone } from "./finalization";
 import { tryAutoResolveByes } from "./byes";
-import { mapCard } from "./_internal";
+import { mapCard, mapScoreReport } from "./_internal";
 import { loadCardSummaries, type CardSummary } from "./list-summary";
 import { getTournamentListRow, loadTournamentRow } from "./repository";
 import { reportMatchScore, type ProposalConfirmation } from "./scoring";
-import { loadViewerProposals, proposalMatches, type ProposalScope } from "./match-maps";
-import { toIso } from "@/lib/server/serialization";
+import { loadFreshMatchProposals, loadViewerProposals, proposalMatches } from "./match-maps";
 import type { MatchMapInput } from "@/lib/shared/match-maps";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { retryOnDeadlock } from "./deadlock-retry";
@@ -184,7 +181,7 @@ import {
   publishScoreReportedEvent,
 } from "./notifications";
 import { discardBotLogs, flushBotLogs, queueBotLog } from "./bot-logs";
-import { boundLockWait, releaseWithServerLockWait } from "./lock-wait";
+import { releaseWithServerLockWait } from "./lock-wait";
 import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
@@ -1089,14 +1086,16 @@ export type TournamentViewerContextOptions = {
 async function resolveViewerEntrant(
   snapshot: TournamentSnapshot,
   userId: number,
+  /** Connexion déjà tenue par l'appelant (en individuel) ; sinon, une du pool. */
+  connection?: PoolConnection,
 ): Promise<{ activeTeam: Awaited<ReturnType<typeof getUserActiveTeam>> | null; myTeamId: number | null }> {
   if (!isSoloTournament(snapshot.card.participantType)) {
     const activeTeam = await getUserActiveTeam(userId);
     return { activeTeam, myTeamId: activeTeam?.teamId ?? null };
   }
-  const myTeamId = await withConnection((connection) =>
-    resolveUserEntrantTeamId(connection, { participant_type: snapshot.card.participantType }, userId),
-  );
+  const resolve = (conn: PoolConnection) =>
+    resolveUserEntrantTeamId(conn, { participant_type: snapshot.card.participantType }, userId);
+  const myTeamId = connection ? await resolve(connection) : await withConnection(resolve);
   return { activeTeam: null, myTeamId };
 }
 
@@ -1135,79 +1134,24 @@ export async function getViewerMatchProposals(
 ): Promise<MatchProposalMaps | null> {
   const match = snapshot.matches.find((candidate) => candidate.id === matchId);
   if (!match) return null;
-  // En individuel, l'entrée du lecteur se résout sur la connexion de la
-  // relecture : une seule place du pool par relecture.
-  if (!canManage && isSoloTournament(snapshot.card.participantType)) {
+  const isSolo = isSoloTournament(snapshot.card.participantType);
+  // Lecteur sans engagé : rien à lire. Le reste de la règle (engagés du match,
+  // report en attente) se juge sur l'état **relu** (`loadFreshMatchProposals`).
+  const scopeOf = (entrant: Awaited<ReturnType<typeof resolveViewerEntrant>>) => {
+    const scope = viewerProposalScope(isSolo, entrant.myTeamId, entrant.activeTeam, canManage);
+    return scope.all || scope.teamIds.length > 0 ? scope : null;
+  };
+  // En individuel, l'entrée se résout sur la connexion de la relecture : une
+  // seule place du pool, jamais deux à la fois.
+  if (isSolo && !canManage) {
     return withConnection(async (connection) => {
-      const myTeamId = await resolveUserEntrantTeamId(
-        connection,
-        { participant_type: snapshot.card.participantType },
-        userId,
-      );
-      const scope = viewerProposalScope(true, myTeamId, null, false);
-      if (proposalMatches([match], scope).length === 0) return null;
-      const [proposals] = await loadFreshProposals(connection, match, scope);
-      return proposals ?? null;
+      const scope = scopeOf(await resolveViewerEntrant(snapshot, userId, connection));
+      return scope ? loadFreshMatchProposals(connection, match, scope, mapScoreReport) : null;
     });
   }
-  const activeTeam = canManage ? null : await getUserActiveTeam(userId);
-  const scope = viewerProposalScope(false, activeTeam?.teamId ?? null, activeTeam, canManage);
-  if (proposalMatches([match], scope).length === 0) return null;
-  const [proposals] = await withConnection((connection) => loadFreshProposals(connection, match, scope));
-  return proposals ?? null;
-}
-
-/** Instant lu en base (`toIso`). */
-type SqlInstant = Date | string | null;
-
-/**
- * Propositions d'un match, **dates de report relues avec leurs maps** dans une
- * même image (transaction en lecture seule) : l'instantané en cache peut dater
- * d'avant un nouveau report, et apparier sa date au détail du suivant ferait
- * accepter au client des maps qui ne sont pas celles du score affiché. La date
- * relue part au client, qui écarte la réponse si elle n'est plus celle qu'il
- * affiche (`mergeMatchProposals`).
- */
-async function loadFreshProposals(
-  connection: PoolConnection,
-  match: BracketMatch,
-  scope: ProposalScope,
-): Promise<MatchProposalMaps[]> {
-  await connection.query("START TRANSACTION READ ONLY");
-  let proposals: MatchProposalMaps[];
-  try {
-    const [rows] = await connection.execute<
-      (RowDataPacket & { team1_reported_at: SqlInstant; team2_reported_at: SqlInstant })[]
-    >(`SELECT team1_reported_at, team2_reported_at FROM bg_matches WHERE id = ? LIMIT 1`, [match.id]);
-    const fresh = rows[0];
-    proposals = fresh
-      ? await loadViewerProposals(
-          connection,
-          [
-            {
-              ...match,
-              team1Report: withReportedAt(match.team1Report, fresh.team1_reported_at),
-              team2Report: withReportedAt(match.team2Report, fresh.team2_reported_at),
-            },
-          ],
-          scope,
-        )
-      : [];
-  } catch (error) {
-    // L'erreur d'origine remonte : une connexion tombée ferait aussi échouer
-    // la fin de transaction, qui la masquerait.
-    await connection.query("ROLLBACK").catch(() => undefined);
-    throw error;
-  }
-  await connection.query("COMMIT");
-  return proposals;
-}
-
-/** Le report de l'instantané à sa date relue ; retiré depuis : aucun. */
-function withReportedAt(report: MatchScoreReport | null, reportedAt: SqlInstant): MatchScoreReport | null {
-  const iso = toIso(reportedAt);
-  if (!report || iso === null) return null;
-  return { ...report, reportedAt: iso };
+  const scope = scopeOf(canManage ? { activeTeam: null, myTeamId: null } : await resolveViewerEntrant(snapshot, userId));
+  if (!scope) return null;
+  return withConnection((connection) => loadFreshMatchProposals(connection, match, scope, mapScoreReport));
 }
 
 /**
@@ -1931,10 +1875,9 @@ async function liftEndurancePenaltyOnce(tournamentId: number, penaltyId: number)
   try {
     await connection.beginTransaction();
     // Verrou du tournoi attendu sans borne, en toute première instruction ;
-    // l'attente bornée (`./lock-wait`) ne vaut qu'ensuite, pour la sanction et
-    // les manches suivantes — comme l'annulation d'un abandon.
+    // seule la lecture des manches suivantes a une attente bornée
+    // (`laterRoundHasScoreInput`, `./lock-wait`) — comme l'annulation d'un abandon.
     await lockTournamentRow(connection, tournamentId);
-    await boundLockWait(connection);
 
     const { liftEndurancePenalty } = await import("./bg-survie/penalties");
     const lifted = await liftEndurancePenalty(tournamentId, penaltyId, connection);

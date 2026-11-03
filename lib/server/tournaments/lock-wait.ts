@@ -12,19 +12,32 @@ import type { PoolConnection } from "mysql2/promise";
 export const SHORT_LOCK_WAIT_SECONDS = 5;
 
 /**
- * Borne l'attente des verrous de la session — **après** le verrou du tournoi
- * (`lockTournamentRow`), attendu sans borne : son détenteur (réconciliation,
- * lancement) le rend sans rien attendre du geste. Seules les attentes
- * suivantes (manches) sont bornées.
+ * Exécute `read` sous un délai de verrou court, puis remet celui du serveur.
+ * Pour la **seule** lecture verrouillée des manches : le verrou du tournoi,
+ * pris avant, s'attend sans borne (son détenteur le rend sans rien attendre du
+ * geste), et le rejeu qui suit garde le délai du serveur — des écritures qui
+ * tolèrent un dépassement de délai (journal du bot, alertes) perdraient sinon
+ * leur ligne en silence. Une remise ratée est rattrapée au retour au pool
+ * ({@link releaseWithServerLockWait}).
  */
-export async function boundLockWait(connection: PoolConnection): Promise<void> {
+export async function withShortLockWait<T>(connection: PoolConnection, read: () => Promise<T>): Promise<T> {
   await connection.query(`SET SESSION innodb_lock_wait_timeout = ${SHORT_LOCK_WAIT_SECONDS}`);
+  try {
+    return await read();
+  } finally {
+    try {
+      await connection.query(`SET SESSION innodb_lock_wait_timeout = DEFAULT`);
+    } catch {
+      // Rattrapée au retour au pool (`releaseWithServerLockWait`).
+    }
+  }
 }
 
 /**
- * Rend la connexion au pool avec le délai de verrou du serveur : rendue avec
- * le délai court, elle l'imposerait à la requête suivante. Si la remise
- * échoue, la connexion est détruite plutôt que rendue.
+ * Rend la connexion au pool avec le délai de verrou du serveur, filet de
+ * {@link withShortLockWait} : rendue avec le délai court, elle l'imposerait à
+ * la requête suivante. Si la remise échoue, la connexion est détruite plutôt
+ * que rendue.
  */
 export async function releaseWithServerLockWait(connection: PoolConnection): Promise<void> {
   try {

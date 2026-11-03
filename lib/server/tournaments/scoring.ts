@@ -305,9 +305,10 @@ async function reportsConcord(
   maps: ReadonlyArray<MatchMapInput>,
   reporterSource: "TEAM1" | "TEAM2",
   /**
-   * Détail adverse déjà lu sous verrou par cette transaction (« Confirmer »,
-   * {@link assertProposalUnchanged}) : il ne peut plus changer — tout report
-   * passe par le verrou du match, tenu ici —, inutile de le relire.
+   * Détail adverse déjà lu sous verrou par cette transaction **et comparé** aux
+   * maps confirmées (« Confirmer », {@link assertProposalUnchanged}) : il ne
+   * peut plus changer — tout report passe par le verrou du match, tenu ici —,
+   * inutile de le relire ni de le recomparer.
    */
   knownOtherMaps?: ReadonlyArray<MatchMapInput>,
 ): Promise<boolean> {
@@ -315,9 +316,11 @@ async function reportsConcord(
     Number(updated.team1_report_score) === Number(updated.team2_report_opponent_score) &&
     Number(updated.team1_report_opponent_score) === Number(updated.team2_report_score);
   if (!scoresAgree) return false;
+  // « Confirmer » : `assertProposalUnchanged` vient de comparer ces mêmes
+  // listes (refus sinon) — une seule comparaison, une seule règle.
+  if (knownOtherMaps) return true;
   const otherSource = reporterSource === "TEAM1" ? "TEAM2" : "TEAM1";
-  const otherMaps = knownOtherMaps ?? (await loadMatchMaps(connection, Number(updated.id), otherSource));
-  return sameMapLists(maps, otherMaps);
+  return sameMapLists(maps, await loadMatchMaps(connection, Number(updated.id), otherSource));
 }
 
 /** Ce que l'engagé confirme : le dépôt de la proposition adverse qu'il a lue. */

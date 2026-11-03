@@ -326,14 +326,93 @@ export async function loadViewerProposals(
   const eligible = proposalMatches(matches, scope);
   if (eligible.length === 0) return [];
   const byMatch = await loadMapsByMatch(connection, eligible.map((match) => match.id), REPORTED_MAP_SOURCES);
-  return eligible.map((match) => {
-    const sets = byMatch.get(match.id);
-    return {
-      matchId: match.id,
-      team1: proposalOf(match.team1Report, sets?.team1 ?? []),
-      team2: proposalOf(match.team2Report, sets?.team2 ?? []),
-    };
-  });
+  return eligible.map((match) => proposalMapsOf(match, byMatch.get(match.id)));
+}
+
+function proposalMapsOf(match: BracketMatch, sets: MatchMapSets | undefined): MatchProposalMaps {
+  return {
+    matchId: match.id,
+    team1: proposalOf(match.team1Report, sets?.team1 ?? []),
+    team2: proposalOf(match.team2Report, sets?.team2 ?? []),
+  };
+}
+
+/** État d'un match qui décide de ses propositions, relu avec leurs maps. */
+export type FreshProposalState = Pick<BracketMatch, "team1Id" | "team2Id" | "status" | "team1Report" | "team2Report">;
+
+type FreshProposalRow = RowDataPacket & {
+  team1_id: number | null;
+  team2_id: number | null;
+  status: BracketMatch["status"];
+  team1_report_score: number | null;
+  team1_report_opponent_score: number | null;
+  team1_reported_at: Date | string | null;
+  team2_report_score: number | null;
+  team2_report_opponent_score: number | null;
+  team2_reported_at: Date | string | null;
+  source: MatchMapSource | null;
+  map_number: number | null;
+  replay_code: string | null;
+  team1_score: number | null;
+  team2_score: number | null;
+};
+
+/**
+ * Propositions d'**un** match relues en **une** instruction : engagés, statut,
+ * reports et maps proposées, dans la même image. L'instantané en cache peut
+ * précéder un report, un retrait ou un changement d'engagé (correction
+ * d'arbitrage) : la règle de lecture (`scope`) s'applique donc à l'état relu —
+ * une équipe sortie du match n'en lit plus les propositions, et un report
+ * déposé depuis l'instantané est servi avec sa date.
+ *
+ * `toReport` rebâtit un report depuis ses colonnes (celui de l'instantané,
+ * `_internal.ts`) ; `null` : match introuvable ou hors de la règle.
+ */
+export async function loadFreshMatchProposals(
+  connection: PoolConnection,
+  match: BracketMatch,
+  scope: ProposalScope,
+  toReport: (
+    score: number | null,
+    opponentScore: number | null,
+    reportedAt: Date | string | null,
+    side: 1 | 2,
+  ) => MatchScoreReport | null,
+): Promise<MatchProposalMaps | null> {
+  const [rows] = await connection.execute<FreshProposalRow[]>(
+    `SELECT m.team1_id, m.team2_id, m.status,
+            m.team1_report_score, m.team1_report_opponent_score, m.team1_reported_at,
+            m.team2_report_score, m.team2_report_opponent_score, m.team2_reported_at,
+            mm.source, mm.map_number, mm.replay_code, mm.team1_score, mm.team2_score
+     FROM bg_matches m
+     LEFT JOIN bg_match_maps mm
+       ON mm.match_id = m.id AND mm.source IN (${REPORTED_MAP_SOURCES.map(() => "?").join(", ")})
+     WHERE m.id = ?
+     ORDER BY mm.source, mm.map_number`,
+    [...REPORTED_MAP_SOURCES, match.id],
+  );
+  const head = rows[0];
+  if (!head) return null;
+  const fresh: BracketMatch = {
+    ...match,
+    team1Id: head.team1_id === null ? null : Number(head.team1_id),
+    team2Id: head.team2_id === null ? null : Number(head.team2_id),
+    status: head.status,
+    team1Report: toReport(head.team1_report_score, head.team1_report_opponent_score, head.team1_reported_at, 1),
+    team2Report: toReport(head.team2_report_score, head.team2_report_opponent_score, head.team2_reported_at, 2),
+  };
+  if (proposalMatches([fresh], scope).length === 0) return null;
+  const sets: MatchMapSets = { final: [], team1: [], team2: [] };
+  for (const row of rows) {
+    if (row.source === null) continue;
+    sets[SET_KEY[row.source]].push({
+      mapNumber: Number(row.map_number),
+      replayCode: String(row.replay_code),
+      team1Score: Number(row.team1_score),
+      team2Score: Number(row.team2_score),
+    });
+  }
+  return proposalMapsOf(fresh, sets);
 }
 
 /** Le détail d'une proposition — toute proposition en porte un (`MAP_LIST_EMPTY`). */

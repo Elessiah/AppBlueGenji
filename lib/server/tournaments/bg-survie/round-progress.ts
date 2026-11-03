@@ -7,6 +7,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { pairingsAreStale } from "@/lib/shared/bg-survie/pairing-staleness";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { planEnduranceRound, type EnduranceStanding } from "@/lib/shared/bg-survie/standings";
+import { withShortLockWait } from "../lock-wait";
 
 /**
  * « Ce match porte une saisie » — le prédicat de `match-lock` (`hasScoreInput`,
@@ -88,6 +89,12 @@ export type LaterRoundsScope = {
    * fin du geste.
    */
   lock?: boolean;
+  /**
+   * Avec `lock` : attente de ces verrous bornée ({@link withShortLockWait}) —
+   * le geste tient le verrou du tournoi, et un détenteur qui ne le demande
+   * jamais (programmation, rappels, « Prêt ») le ferait attendre 50 s.
+   */
+  boundedWait?: boolean;
 };
 
 /**
@@ -109,16 +116,19 @@ export async function laterRoundsHaveScoreInput(
 ): Promise<boolean> {
   const params: number[] = [scope.tournamentId, scope.phaseId, scope.afterRound];
   if (scope.beforeRound !== undefined) params.push(scope.beforeRound);
-  const [rows] = await conn.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_matches
-     WHERE tournament_id = ? AND phase_id = ? AND round_number > ?${
-       scope.beforeRound === undefined ? "" : " AND round_number < ?"
-     }
-       AND ${HAS_SCORE_INPUT_SQL}
-     LIMIT 1${scope.lock ? " FOR UPDATE" : ""}`,
-    params,
-  );
-  return rows.length > 0;
+  const read = async () => {
+    const [rows] = await conn.execute<(RowDataPacket & { id: number })[]>(
+      `SELECT id FROM bg_matches
+       WHERE tournament_id = ? AND phase_id = ? AND round_number > ?${
+         scope.beforeRound === undefined ? "" : " AND round_number < ?"
+       }
+         AND ${HAS_SCORE_INPUT_SQL}
+       LIMIT 1${scope.lock ? " FOR UPDATE" : ""}`,
+      params,
+    );
+    return rows.length > 0;
+  };
+  return scope.lock && scope.boundedWait ? withShortLockWait(conn, read) : read();
 }
 
 /**
@@ -136,6 +146,7 @@ export function laterRoundHasScoreInput(
     afterRound: round,
     beforeRound: PLAYOFF_ROUND_OFFSET,
     lock: true,
+    boundedWait: true,
   });
 }
 

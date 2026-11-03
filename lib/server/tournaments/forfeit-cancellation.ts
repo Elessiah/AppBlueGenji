@@ -25,7 +25,7 @@ import { invalidateTournamentLists } from "./list-cache";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { invalidateTournamentPreview } from "./preview-cache";
 import { lockTournamentRow } from "./registration";
-import { boundLockWait, releaseWithServerLockWait } from "./lock-wait";
+import { releaseWithServerLockWait } from "./lock-wait";
 
 /** Ce que l'annulation a produit, pour la ligne de journal et le message rendu. */
 export type CancelledForfeit = {
@@ -62,8 +62,11 @@ function isEngineFormat(format: string | null): format is EngineFormat {
 /**
  * Moteur qui porte l'abandon. En multi-phases, l'abandon vit dans le classement
  * de la phase en cours — le seul que `forfeitTournamentTeamPublic` sache écrire.
- * La phase est lue **sous verrou partagé**, table seule : aucune lecture
- * d'instantané avant celle des manches (voir {@link cancelTournamentForfeitOnce}).
+ * La phase est lue **verrouillée**, table seule : aucune lecture d'instantané
+ * avant celle des manches (voir {@link cancelTournamentForfeitOnce}). Verrou
+ * exclusif d'emblée : le rejeu des phases (`reconcilePhases`) peut réécrire
+ * cette ligne, et un verrou partagé à promouvoir attendrait tout autre lecteur
+ * partagé. Le verrou du tournoi, déjà tenu, sérialise les gestes qui l'écrivent.
  */
 async function resolveEngine(
   connection: PoolConnection,
@@ -73,7 +76,7 @@ async function resolveEngine(
   const phaseId = Number(tournament.current_phase_id ?? 0);
   if (phaseId === 0) return { engineFormat: null, phaseId: 0 };
   const [phaseRows] = await connection.execute<(RowDataPacket & { format: string })[]>(
-    `SELECT format FROM bg_tournament_phases WHERE id = ? LIMIT 1 LOCK IN SHARE MODE`,
+    `SELECT format FROM bg_tournament_phases WHERE id = ? LIMIT 1 FOR UPDATE`,
     [phaseId],
   );
   return { engineFormat: phaseRows[0]?.format ?? null, phaseId };
@@ -158,12 +161,11 @@ async function cancelTournamentForfeitOnce(
     //
     // En toute première instruction, le verrou du tournoi — attendu sans borne,
     // comme tout geste qui le prend : son détenteur (une réconciliation, un
-    // lancement) le rend sans rien attendre de nous. L'attente bornée ne vaut
-    // qu'**ensuite**, pour les manches, que des gestes sans verrou du tournoi
-    // peuvent tenir longtemps (`./lock-wait`). La tête se relit verrouillée
-    // (déjà tenue, aucune attente ni image).
+    // lancement) le rend sans rien attendre de nous. Seule la lecture des
+    // manches, que des gestes sans verrou du tournoi peuvent tenir longtemps,
+    // a une attente bornée (`boundedWait`, `./lock-wait`). La tête se relit
+    // verrouillée (déjà tenue, aucune attente ni image).
     await lockTournamentRow(connection, tournamentId);
-    await boundLockWait(connection);
     const [rows] = await connection.execute<TournamentHead[]>(
       `SELECT name, format, state, participant_type, endurance_playoffs_started, current_phase_id
        FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
@@ -210,6 +212,7 @@ async function cancelTournamentForfeitOnce(
         phaseId,
         afterRound: Number(standing.forfeit_round ?? 1),
         lock: true,
+        boundedWait: true,
       })
     ) {
       throw new Error("FORFEIT_ROUND_PASSED");
