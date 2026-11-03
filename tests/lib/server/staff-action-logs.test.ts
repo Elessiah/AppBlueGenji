@@ -121,6 +121,14 @@ describe("deliverStaffMatchAction — sans désigner le match", () => {
 });
 
 describe("announceStaffMatchAction / announceStaffTournamentAction", () => {
+  it("announceStaffTournamentAction_noPendingBurst_startsDeliveryInTheSameTick", () => {
+    jest.mocked(getDatabase).mockRejectedValue(new Error("down"));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    announceStaffTournamentAction(7, "EDITED");
+    expect(getDatabase).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
   it("ne lèvent jamais quand la base est indisponible", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(getDatabase).mockRejectedValue(new Error("down"));
