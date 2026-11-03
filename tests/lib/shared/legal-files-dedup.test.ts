@@ -76,6 +76,17 @@ describe("politique du bot : les renvois « section 0n » visent la bonne sectio
     expect(sectionTitle(PRIVACY_POLICY.fr, "02")).toBe("Données traitées et finalités");
     expect(sectionTitle(PRIVACY_POLICY.en, "02")).toBe("Data processed and purposes");
   });
+
+  it("privacyPolicy_contactSectionCitesSections04And05_theyAreRecipientsAndTransfers", () => {
+    expect(sectionTitle(PRIVACY_POLICY.fr, "09")).toBe("Contact");
+    expect(sectionTitle(PRIVACY_POLICY.en, "09")).toBe("Contact");
+    expect(sectionText(PRIVACY_POLICY.fr, "09")).toContain("sections 04 et 05");
+    expect(sectionText(PRIVACY_POLICY.en, "09")).toContain("sections 04 and 05");
+    expect(sectionTitle(PRIVACY_POLICY.fr, "04")).toBe("Destinataires");
+    expect(sectionTitle(PRIVACY_POLICY.en, "04")).toBe("Recipients");
+    expect(sectionTitle(PRIVACY_POLICY.fr, "05")).toBe("Transferts hors de l'Union européenne");
+    expect(sectionTitle(PRIVACY_POLICY.en, "05")).toBe("Transfers outside the European Union");
+  });
 });
 
 describe("registre : fiches résolues dans les deux langues", () => {
