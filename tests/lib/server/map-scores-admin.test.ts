@@ -72,7 +72,7 @@ function fakeConnection(matchFormat: { type: string; value: number }, storedFina
 }
 
 const UPDATE_FINAL_MAP =
-  "UPDATE bg_match_maps SET replay_code = ?, team1_score = ?, team2_score = ?, submitted_by_user_id = ?, submitted_at = CURRENT_TIMESTAMP WHERE id = ?";
+  "UPDATE bg_match_maps SET map_number = ?, replay_code = ?, team1_score = ?, team2_score = ?, submitted_by_user_id = ?, submitted_at = CURRENT_TIMESTAMP WHERE id = ?";
 const CLEAR_FINAL_SET = "DELETE FROM bg_match_maps WHERE match_id IN (?) AND source IN (?)";
 
 beforeEach(() => {
@@ -106,7 +106,7 @@ describe("arbitrage — détail map par map", () => {
     const { conn, maps } = fakeConnection({ type: "BO", value: 5 }, STORED_FINAL);
     await adminSaveMatchScores(conn, 10, { maps: [{ replayCode: "AAA111", team1Score: 2, team2Score: 0 }], userId: 3 });
     expect(maps).toEqual([
-      { sql: UPDATE_FINAL_MAP, params: ["AAA111", 2, 0, 3, 801] },
+      { sql: UPDATE_FINAL_MAP, params: [1, "AAA111", 2, 0, 3, 801] },
       { sql: "DELETE FROM bg_match_maps WHERE id IN (?)", params: [802] },
     ]);
   });
