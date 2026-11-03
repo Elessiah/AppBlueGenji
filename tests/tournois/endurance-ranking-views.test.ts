@@ -25,7 +25,7 @@ import {
   type EnduranceRankingView,
 } from "@/app/(secured)/tournois/[id]/_lib/endurance-ranking-views";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
-import { FR_VIEWS_TEXT } from "@/app/(secured)/tournois/[id]/_lib/views-text";
+import { FR_ENDURANCE_TEXT } from "@/app/(secured)/tournois/[id]/_lib/endurance-text";
 import { bracketMatch } from "../helpers/bracket-match";
 
 /**
@@ -469,7 +469,7 @@ describe("enduranceRoundColumnCell — la colonne « MANCHE n » (variante A)", 
 
 describe("textes — équipe ou joueur", () => {
   it("accorde le bandeau et les cases au type d'engagé", () => {
-    const { t } = FR_VIEWS_TEXT;
+    const { t } = FR_ENDURANCE_TEXT;
     expect(t("endurance.stripPendingTeam", { count: 2 })).toBe("2 équipes doivent encore jouer cette manche");
     expect(t("endurance.stripPendingSolo", { count: 1 })).toBe("1 joueur doit encore jouer cette manche");
     expect(t("endurance.inContentionTeam", { count: 19, size: "8" })).toBe("19 équipes en lice → 8 en play-offs");

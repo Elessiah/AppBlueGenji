@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import "@/tests/helpers/lazy-tournament-texts";
 
 /**
  * Câblage de la refonte du plateau « BlueGenji Survie », lot 1
@@ -282,7 +283,7 @@ describe("EnduranceRankingViews — pénalité de la manche", () => {
 
 describe("EnduranceRankingViews — repères et noms accessibles", () => {
   const messages = (lang: string) =>
-    JSON.parse(readFileSync(join(ROOT, "messages", lang, "tournamentViews.json"), "utf8")).endurance as Record<string, string>;
+    JSON.parse(readFileSync(join(ROOT, "messages", lang, "tournamentEndurance.json"), "utf8")).endurance as Record<string, string>;
 
   it("la zone défilante, la liste d'onglets et la navigation du bas portent trois noms différents", () => {
     expect(RANKING).toContain('ariaLabel={t("endurance.viewsScrollLabel")}');

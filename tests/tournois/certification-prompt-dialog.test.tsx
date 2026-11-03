@@ -27,6 +27,7 @@ import { CertificationPromptDialog } from "@/app/(secured)/tournois/[id]/_compon
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { TournamentActionsTextProvider } from "@/components/i18n/tournament-actions-text";
 import type { CertificationPrompt } from "@/lib/shared/certification-prompt";
+import "@/tests/helpers/lazy-tournament-texts";
 
 /**
  * Modale d'invitation à certifier (`docs/features/CERTIFICATION_PROMPT.md`) :

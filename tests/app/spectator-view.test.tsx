@@ -527,9 +527,10 @@ describe("liens publics vers un tournoi", () => {
 
 describe("textes de la fiche", () => {
   it("les deux espaces posent les mêmes textes, par un seul composant", () => {
-    expect(readSource("app/(secured)/tournois/[id]/layout.tsx")).toContain("<TournamentSheetText locale={await requestLocale()}>");
+    // Espace connecté : l'anglais au chargement complet d'un lecteur connecté ; sans compte : tout chargement complet.
+    expect(readSource("app/(secured)/tournois/[id]/layout.tsx")).toContain("<TournamentSheetText locale={locale} messages={await tournamentSheetEnglish(locale)}>");
     const spectator = readSource("app/suivre/tournois/[id]/layout.tsx");
-    expect(spectator).toContain("<TournamentSheetText locale={locale}>");
+    expect(spectator).toContain("<TournamentSheetText locale={locale} messages={await tournamentSheetEnglish(locale, true)}>");
     expect(spectator).not.toContain("TournamentPageTextProvider");
     expect(spectator).not.toContain("TournamentActionsTextProvider");
   });

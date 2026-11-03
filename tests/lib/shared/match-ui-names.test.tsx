@@ -11,6 +11,7 @@ import { tournamentDetail, tournamentSnapshot } from "../../helpers/tournament-d
 import { readSource } from "../../helpers/read-source";
 import type { FieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import type { MatchStatus } from "@/lib/shared/types";
+import "@/tests/helpers/lazy-tournament-texts";
 
 /** Noms de cartes, d'arbitre et de chaînes sur les matchs (MATCH-UI-NAMES). */
 

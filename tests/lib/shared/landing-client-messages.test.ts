@@ -14,7 +14,7 @@ const en = JSON.parse(readFileSync(join(ROOT, "messages", "en", "landing.json"),
 
 const CLIENT_FILES = [
   "components/cyber/CountdownStrip.tsx",
-  "components/cyber/Ticker.tsx",
+  "components/cyber/landing/LandingTicker.tsx",
   "components/cyber/landing/DiscordCommunity.tsx",
   "components/cyber/landing/Hero.tsx",
   "components/cyber/landing/Leaderboard.tsx",

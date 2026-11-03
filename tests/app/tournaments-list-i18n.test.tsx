@@ -49,6 +49,7 @@ import {
   localizedMatchFormatLabel,
   tournamentLabel,
   tournamentsClientMessages,
+  tournamentsSharedMessages,
   tournamentsText,
 } from "@/lib/shared/tournaments-text";
 import type { TournamentBuckets, TournamentFormat } from "@/lib/shared/types";
@@ -130,9 +131,18 @@ describe("route et référencement", () => {
 });
 
 describe("mise en page — dictionnaire du navigateur", () => {
-  it("sous /en, ne sérialise que les espaces client (ni `meta`)", async () => {
-    const html = renderToStaticMarkup(await TournamentsLayout({ children: <TournamentsList canManage={false} /> }));
+  it("sous /en, la mise en page ne sérialise que les espaces communs à toutes les pages des tournois", async () => {
+    const layout = await TournamentsLayout({ children: null });
+    const shared = (layout.props as { messages?: Record<string, unknown> }).messages;
+    // Ni la liste, ni ses cartes, ni le bandeau : la mise en page enveloppe aussi `[id]`, `creer`, `modifier`.
+    expect(Object.keys(shared ?? {}).sort((a, b) => a.localeCompare(b))).toEqual(["labels", "matchFormat", "participants", "rulesHelp"]);
+    expect(shared).toEqual(tournamentsSharedMessages(messagesFor("en")));
+    // La page de la liste pose les siens, et rend toute la liste en anglais sous la mise en page.
+    const page = await TournamentsPage();
+    expect((page.props as { messages?: unknown }).messages).toEqual(tournamentsClientMessages(messagesFor("en")));
+    const html = renderToStaticMarkup(await TournamentsLayout({ children: page }));
     expect(html).toContain("Search for a tournament");
+    expect(html).toContain('aria-label="News feed"');
     const client = tournamentsClientMessages(messagesFor("en"));
     expect(Object.keys(client).sort((a, b) => a.localeCompare(b))).toEqual(
       ["cards", "labels", "list", "matchFormat", "participants", "rulesHelp", "ticker", "tickerControls"],
@@ -144,6 +154,7 @@ describe("mise en page — dictionnaire du navigateur", () => {
     mockLocale = "fr";
     const layout = await TournamentsLayout({ children: <TournamentsList canManage={false} /> });
     expect((layout.props as { messages?: unknown }).messages).toBeUndefined();
+    expect(((await TournamentsPage()).props as { messages?: unknown }).messages).toBeUndefined();
     expect(renderToStaticMarkup(layout)).toContain("Rechercher un tournoi");
   });
 });
@@ -166,7 +177,8 @@ describe("page — rendu anglais", () => {
     expect(html).toContain('aria-label="Tournament rules"');
   });
 
-  it("français inchangé hors fournisseur", async () => {
+  it("français inchangé sans préfixe", async () => {
+    mockLocale = "fr";
     const html = renderToStaticMarkup(await TournamentsPage());
     expect(html).toContain("PLATEFORME · TOURNOIS");
     expect(html).toContain('placeholder="Rechercher un tournoi, un format…"');

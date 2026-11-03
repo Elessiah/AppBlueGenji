@@ -64,12 +64,12 @@ import {
   rollbackStageText,
 } from "@/app/(secured)/tournois/[id]/_lib/actions-text";
 import {
-  FR_DIALOGS_TEXT,
   adminProposalText,
   mapViolationText,
   scoreBlockerText,
   scoreViolationText,
 } from "@/app/(secured)/tournois/[id]/_lib/dialogs-text";
+import { FR_DIALOGS_TEXT } from "@/tests/helpers/lazy-tournament-texts";
 import { matchCardActionList, matchCardActionName } from "@/app/(secured)/tournois/[id]/_lib/match-card-actions";
 import { registerBlockedNotice } from "@/app/(secured)/tournois/[id]/_lib/register-entry";
 import { registrationConfirmText } from "@/app/(secured)/tournois/[id]/_lib/registration-confirm";
