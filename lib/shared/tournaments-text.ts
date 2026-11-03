@@ -16,6 +16,7 @@ import { messageAt, scopedText, type Leaves, type ScopedText } from "@/lib/share
 import type { Messages } from "@/lib/shared/i18n-messages";
 import { matchFormatNotation, matchMaxMaps, naturalMaxMaps, type MatchFormat } from "@/lib/shared/match-format";
 import { toParticipantType, type ParticipantType } from "@/lib/shared/participants";
+import { tickerControls, type TickerControls } from "@/lib/shared/ticker-labels";
 
 type FrTournaments = typeof frTournaments;
 
@@ -24,8 +25,6 @@ export const TOURNAMENTS_LIST_PARTS = ["list", "ticker", "cards", "participants"
 type ListPart = (typeof TOURNAMENTS_LIST_PARTS)[number];
 
 /** Libellés du bandeau défilant et de son bouton pause, repris de l'accueil (`landing.ticker`). */
-import { tickerControls, type TickerControls } from "@/lib/shared/ticker-labels";
-
 export type { TickerControls } from "@/lib/shared/ticker-labels";
 
 export type TournamentsClientMessages = Pick<FrTournaments, ListPart> & {

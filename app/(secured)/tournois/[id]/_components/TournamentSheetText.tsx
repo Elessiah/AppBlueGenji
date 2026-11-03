@@ -1,5 +1,6 @@
 import { TournamentSheetTextGate, type TournamentSheetEnglish } from "@/components/i18n/tournament-sheet-text-gate";
-import { englishOnDocumentLoad, englishOnDocumentRequest } from "@/lib/server/layout-messages";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { englishOnDocumentLoad } from "@/lib/server/layout-messages";
 import type { Messages } from "@/lib/shared/i18n-messages";
 import type { Locale } from "@/lib/shared/locales";
 import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text";
@@ -18,11 +19,14 @@ function sheetEnglish(messages: Messages): TournamentSheetEnglish {
  * aucun, le client gardant celui de la session ou le chargeant par son morceau
  * (`TournamentSheetTextGate`). Espace connecté : lecteur connecté seulement
  * (`englishOnDocumentLoad`, la carte « Connexion requise » remplace sinon la
- * page) ; page sans compte (`spectator`) : tout chargement complet, pour que
- * son rendu serveur soit déjà en anglais.
+ * page) ; page sans compte (`spectator`) : **toujours** sous `/en` — son rendu
+ * serveur doit être en anglais pour tout client (robot d'indexation, aperçu de
+ * lien, qui ne disent pas « document »), et sa coquille publique ne doit pas
+ * céder la place à l'écran d'attente lors d'une navigation.
  */
-export function tournamentSheetEnglish(locale: Locale, spectator = false): Promise<TournamentSheetEnglish | undefined> {
-  return (spectator ? englishOnDocumentRequest : englishOnDocumentLoad)(locale, sheetEnglish);
+export async function tournamentSheetEnglish(locale: Locale, spectator = false): Promise<TournamentSheetEnglish | undefined> {
+  if (!spectator) return englishOnDocumentLoad(locale, sheetEnglish);
+  return locale === "en" ? sheetEnglish(messagesFor("en")) : undefined;
 }
 
 /**
