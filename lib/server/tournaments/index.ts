@@ -1583,8 +1583,8 @@ async function adminSaveMatchScoresOnce(
     // Instantané seulement : un match non clos ne compte ni au classement du
     // site ni aux statistiques (`playedMatchSql`), et l'état du tournoi ne
     // bouge pas (aucune clôture possible) — listes et classement restent en
-    // cache.
-    publishMatchUpdatedEvent(savedTournamentId);
+    // cache. Le direct de l'accueil, lui, peut montrer ce match à l'antenne.
+    publishMatchUpdatedEvent(savedTournamentId, { landingLive: true });
     return { ...pause, match: savedMatch };
   } catch (error) {
     await connection.rollback();
