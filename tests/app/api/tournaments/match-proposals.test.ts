@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments-service");
@@ -37,6 +37,10 @@ beforeEach(() => {
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 3 }));
   jest.mocked(enforceRateLimit).mockReturnValue(null);
   jest.mocked(getViewerMatchProposals).mockResolvedValue({ visible: true, proposals });
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 describe("GET /api/tournaments/[id]/matches/[matchId]/proposals", () => {
@@ -118,5 +122,38 @@ describe("GET /api/tournaments/[id]/matches/[matchId]/proposals", () => {
     await get("7", "70");
 
     expect(getViewerMatchProposals).toHaveBeenCalledWith(7, 1, true, 70);
+  });
+
+  // Revue sécurité #542 : une panne de la lecture rend un code seul par
+  // `fail()`, jamais le 500 nu de Next ni le texte du moteur.
+  it("GET_readThrowsLockWaitTimeout_returns409ConcurrentUpdateRetry", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest.mocked(getViewerMatchProposals).mockRejectedValue(
+      new Error("Lock wait timeout exceeded; try restarting transaction"),
+    );
+
+    const res = await get("7", "70");
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "CONCURRENT_UPDATE_RETRY" });
+  });
+
+  it("GET_readThrowsDriverError_returns500InternalErrorWithoutEngineText", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(getViewerMatchProposals).mockRejectedValue(new Error("connect ECONNREFUSED 127.0.0.1:3306"));
+
+    const res = await get("7", "70");
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "INTERNAL_ERROR" });
+  });
+
+  it("GET_readThrowsNonError_returns500InternalError", async () => {
+    jest.mocked(getViewerMatchProposals).mockRejectedValue("boom");
+
+    const res = await get("7", "70");
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "INTERNAL_ERROR" });
   });
 });
