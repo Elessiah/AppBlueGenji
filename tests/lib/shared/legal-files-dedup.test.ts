@@ -12,6 +12,7 @@ import type { BilingualDoc, LegalDoc } from "@/lib/shared/bot-legal-types";
 import * as register from "@/lib/shared/processing-register";
 import type { ProcessingActivity } from "@/lib/shared/processing-register";
 import * as registerEn from "@/lib/shared/processing-register-en";
+import { englishRegisterText } from "../../helpers/register-english-text";
 
 const LIST_FIELDS = ["subPurposes", "dataSubjects", "dataCategories", "retention", "recipients", "transfers", "security"] satisfies (keyof ProcessingActivity)[];
 
@@ -72,6 +73,14 @@ describe("registre : fiches résolues dans les deux langues", () => {
 });
 
 describe("processing-register-en : réexporte l'anglais du module français", () => {
+  it("englishRegisterText_resolvedRegister_containsEnglishHalvesOnly", () => {
+    const text = englishRegisterText();
+
+    expect(text).toContain("Player accounts and profiles");
+    expect(text).toContain("EU-U.S. Data Privacy Framework");
+    expect(text).not.toContain("Comptes joueurs et profils");
+  });
+
   it("processingRegisterEn_reExports_areTheFrenchModuleValues", () => {
     const names = Object.keys(registerEn);
 
