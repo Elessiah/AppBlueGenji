@@ -20,6 +20,10 @@ export function suspendOn(loader: Pick<OnceLoader<unknown>, "load">): never {
   throw loader.load().then(
     () => undefined,
     () => {
+      // Plusieurs rendus suspendus sur le même chargeur reçoivent chacun le
+      // rejet : un seul rechargement et un seul minuteur pour tous.
+      const already = retrying.get(loader);
+      if (already) return already;
       reloadAfterChunkError();
       const retry = new Promise<void>((resolve) => {
         setTimeout(() => {

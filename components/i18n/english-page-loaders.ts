@@ -2,6 +2,7 @@
 
 import type { PreloadableLoader } from "@/lib/shared/lazy-component";
 import { englishReports } from "./english-loaders";
+import { englishTournamentSheet } from "./english-loaders-tournament";
 import { englishPlayers, englishStatsPanel, englishTeam, englishTeamErrors, englishTeams } from "./english-loaders-account";
 import type { EnglishPage } from "./english-pages";
 
@@ -14,6 +15,7 @@ import type { EnglishPage } from "./english-pages";
 export type PageLoader = PreloadableLoader;
 
 export const PAGE_LOADERS = {
+  tournamentSheet: [englishTournamentSheet],
   teamPage: [englishTeamErrors, englishTeam, englishStatsPanel],
   teams: [englishTeamErrors, englishTeams],
   playerPage: [englishPlayers, englishStatsPanel],

@@ -1,48 +1,16 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { onceLoader } from "@/lib/shared/lazy-component";
 import type { Locale } from "@/lib/shared/locales";
-import type { TournamentActionsClientMessages } from "@/lib/shared/tournament-actions-text";
-import { tournamentPageMessages, type TournamentSheetMessages } from "@/lib/shared/tournament-page-text";
-import { tournamentsSharedMessages, type TournamentsSharedMessages } from "@/lib/shared/tournaments-text";
 import { EnglishGateFallback } from "./english-gate-fallback";
 import { primeEnglish } from "./english-loaders";
+import { englishTournamentSheet, type TournamentSheetEnglish } from "./english-loaders-tournament";
 import { TournamentActionsTextProvider } from "./tournament-actions-text";
 import { TournamentPageTextProvider } from "./tournament-page-text";
 import { TournamentsTextProvider } from "./tournaments-text";
 import { useEnglishMessages } from "./use-english-messages";
 
-/**
- * L'anglais de la fiche d'un tournoi : son espace (sans les vues), ses gestes et
- * les textes qu'elle partage avec la liste (libellés d'état, aide des règles).
- */
-export type TournamentSheetEnglish = {
-  page: TournamentSheetMessages;
-  actions: TournamentActionsClientMessages;
-  shared: TournamentsSharedMessages;
-};
-
-/**
- * L'anglais de la fiche, chargé à part (son propre morceau, immuable, gardé par
- * le cache HTTP) quand la mise en page ne l'a pas sérialisé — une navigation,
- * un préchargement ou un `router.refresh()` : une réponse du routeur n'est pas
- * gardée par le navigateur, et chaque geste qui rafraîchit la fiche renvoyait
- * sinon les ~40 Ko du dictionnaire. Une fois pour la session.
- */
-export const englishTournamentSheet = /* @__PURE__ */ onceLoader<TournamentSheetEnglish>(() =>
-  Promise.all([
-    import("@/messages/en/tournament.json"),
-    import("@/messages/en/tournamentErrors.json"),
-    import("@/messages/en/tournamentActions.json"),
-    import("@/messages/en/tournamentsShared.json"),
-    import("@/messages/en/labels.json"),
-  ]).then(([tournament, errors, actions, shared, labels]) => ({
-    page: tournamentPageMessages({ tournament: tournament.default }),
-    actions: { errors: errors.default, actions: actions.default },
-    shared: tournamentsSharedMessages({ tournamentsShared: shared.default, labels: labels.default }),
-  })),
-);
+export type { TournamentSheetEnglish };
 
 /**
  * Les fournisseurs de la fiche (espace connecté et page sans compte) : en
