@@ -241,6 +241,28 @@ describe("notifyUsers — langue portée et rédaction avant envoi (EF-14)", () 
     ]);
   });
 
+  it("notifyUsers_writerThrowsForUnusedLocale_sentInNeededLocale", async () => {
+    const frOnly = (locale: string) => {
+      if (locale !== "fr") throw new RangeError("no en text");
+      return "m-fr";
+    };
+
+    await notifyUsers([{ userId: 1, discord: { discordId: "1", handle: null, label: "A" }, locale: "fr" }], {
+      topic: "MATCH_REMINDER",
+      push: PUSH,
+      discord: { message: frOnly, context: "ctx" },
+    });
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledWith("m-fr", [{ discordId: "1", handle: null, label: "A" }], "ctx");
+    expect(pushToUsers).toHaveBeenCalled();
+  });
+
+  it("toNotificationRecipient_rowWithLocale_localeCarried", () => {
+    const row = { id: 7, pseudo: "Iris", discord_id: "7", discord_pseudo: null, discord_verified_at: null, locale: "en" } as unknown as Parameters<typeof toNotificationRecipient>[0];
+
+    expect(toNotificationRecipient(row, "proven").locale).toBe("en");
+  });
+
   it("notifyUsers_mixedCarriedAndMissingLocale_readsOnlyMissing", async () => {
     const query = accountLocales([{ id: 2, locale: "fr" }]);
 
