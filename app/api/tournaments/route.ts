@@ -11,6 +11,7 @@ import {
   type TournamentInputBody,
 } from "@/lib/server/tournaments/validation";
 import { readJsonBody } from "@/lib/server/request-body";
+import { isContentionMessage } from "@/lib/server/mysql-errors";
 import type { TournamentBuckets } from "@/lib/shared/types";
 
 /**
@@ -73,7 +74,11 @@ export async function GET(req: Request) {
   try {
     buckets = await listTournamentBuckets(null, hiddenOnly ? { hiddenOnly: true } : finishedScope);
   } catch (error) {
-    // Un code, jamais la page d'erreur de Next ni le message de la base.
+    // Un code, jamais la page d'erreur de Next ni le message de la base. Une
+    // contention passagère (la lecture fait aussi avancer les états des
+    // tournois) garde son message : `fail()` la rend en 409 « réessaie ».
+    const message = (error as Error).message;
+    if (isContentionMessage(message)) return fail(message, 500);
     console.error("[tournaments] lecture de la liste en échec", error);
     return fail("TOURNAMENT_LIST_FAILED", 500);
   }

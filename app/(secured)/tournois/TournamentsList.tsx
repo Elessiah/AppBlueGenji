@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useTournamentsText } from "@/components/i18n/tournaments-text";
 import { tournamentLabel } from "@/lib/shared/tournaments-text";
 import { richNodes } from "@/components/i18n/shell-text";
@@ -180,17 +180,13 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
   // Droit staff lu par le serveur (`page.tsx`), connu dès le premier rendu :
   // plus de lecture `/api/auth/me` en chaîne qui décalait « Créer » et la
   // section des invisibles. Sans ce droit, rien à attendre de ce côté.
-  // Un refus des invisibles (droit retiré depuis le rendu, session échue) le
-  // retire aussi à la page : plus de lecture refusée à chaque rafraîchissement
-  // (quota compris), plus de « Créer », cadence joueur. Un nouveau droit lu
-  // par le serveur (`router.refresh()`) rend la main au prop.
-  const [staffRevoked, setStaffRevoked] = useState(false);
-  const [revokedFor, setRevokedFor] = useState(canManage);
-  if (revokedFor !== canManage) {
-    setRevokedFor(canManage);
-    setStaffRevoked(false);
-  }
-  const isAdmin = canManage && !staffRevoked;
+  // Un refus de lecture (droit retiré, session échue) fait relire ce droit au
+  // serveur (`router.refresh()`) plutôt que de le deviner ici : retiré, le prop
+  // passe à faux (plus de « Créer », plus de lecture refusée, cadence joueur) ;
+  // rendu entre-temps, il reste vrai et la lecture suivante aboutit ; session
+  // partie, la page cède la place à la carte « Connexion requise ».
+  const isAdmin = canManage;
+  const router = useLocaleRouter();
   // La première lecture des invisibles fait partie de la porte : sans elle, la
   // section s'affichait sous le squelette ou naissait au sommet et poussait les
   // autres sections vers le bas.
@@ -244,17 +240,24 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
         // minuteur de bascule, pour un contenu identique.
         setBuckets((previous) => (sameBuckets(previous, all) ? previous : all));
         setListFetched(true);
-      } catch {
+      } catch (e) {
         // Une requête abandonnée (démontage, rafraîchissement suivant) n'est pas
         // un incident : la page n'a plus rien à afficher de toute façon.
-        if (signal?.aborted || silent) return;
+        if (signal?.aborted) return;
+        // Session partie : « réessaie » ne mènerait nulle part, le serveur rend
+        // la carte de connexion.
+        if ((e as Error).message === "UNAUTHORIZED") {
+          router.refresh();
+          return;
+        }
+        if (silent) return;
         // Une phrase traduite, jamais le code ni le message brut du navigateur
         // (« Failed to fetch » sur une page en français) : le lecteur n'en
         // ferait rien.
         showError(t("list.loadFailed"));
       }
     },
-    [showError, t, wantFinishedArchive],
+    [router, showError, t, wantFinishedArchive],
   );
 
   useEffect(() => {
@@ -308,13 +311,11 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
         const code = (e as Error).message;
         // Refus du droit `tournaments` (retiré depuis le rendu de la page, ou
         // session échue) : la section n'a plus lieu d'être, et une toast
-        // « FORBIDDEN » sur une simple liste ne dirait rien au lecteur. Seul le
-        // 403 dit que le droit n'est plus : il le retire à la page. Un 401 peut
-        // être passager (session relue pendant un incident) — la lecture
-        // suivante retente, sans éteindre l'interface staff jusqu'au F5.
+        // « FORBIDDEN » sur une simple liste ne dirait rien au lecteur. Le droit
+        // se relit au serveur (voir `isAdmin`).
         if (code === "FORBIDDEN" || code === "UNAUTHORIZED") {
           setHiddenTournaments((previous) => (previous.length === 0 ? previous : []));
-          if (code === "FORBIDDEN") setStaffRevoked(true);
+          router.refresh();
           return;
         }
         if (silent) return;
@@ -325,7 +326,7 @@ export default function TournamentsList({ canManage }: Readonly<{ canManage: boo
         if (!signal?.aborted) setHiddenSettled(true);
       }
     },
-    [isAdmin, showError, t],
+    [isAdmin, router, showError, t],
   );
 
   useEffect(() => {
