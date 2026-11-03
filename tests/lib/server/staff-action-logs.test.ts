@@ -10,7 +10,6 @@ import {
   announceStaffTournamentAction,
   deliverStaffMatchAction,
   deliverStaffTournamentAction,
-  failureReason,
   flushStaffActionBursts,
   resetStaffActionBursts,
   staffActionAuthor,
@@ -155,23 +154,7 @@ describe("announceStaffMatchAction / announceStaffTournamentAction", () => {
   });
 });
 
-describe("failureReason", () => {
-  it("failureReason_mysqlErrorWithCode_returnsCodeOnly", () => {
-    const error = Object.assign(new Error("Duplicate entry 'Renards' for key"), {
-      code: "ER_DUP_ENTRY",
-      sqlMessage: "Duplicate entry 'Renards' for key",
-    });
-    expect(failureReason(error)).toBe("ER_DUP_ENTRY");
-  });
-
-  it("failureReason_plainErrorMultiline_returnsFirstLine", () => {
-    expect(failureReason(new Error("BOT_DOWN\n    at stack"))).toBe("BOT_DOWN");
-  });
-
-  it("failureReason_nonError_returnsUnknown", () => {
-    expect(failureReason("boom")).toBe("erreur inconnue");
-  });
-
+describe("échecs du journal du staff", () => {
   it("announceStaffMatchAction_deliveryFails_logsOneLineWithoutErrorObject", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(getDatabase).mockRejectedValue(Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }));

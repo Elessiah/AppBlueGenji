@@ -72,6 +72,19 @@ describe("createCoalescer", () => {
     expect(coalescer.pending()).toBe(0);
   });
 
+  it("createCoalescer_deliveryRejectsWithCodedError_logsCodeNotMessage", () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const deliver = jest.fn<(first: number, last: number) => void>().mockImplementationOnce(() => {
+      throw Object.assign(new Error("Duplicate entry 'Renards' for key 'name'"), { code: "ER_DUP_ENTRY" });
+    });
+    const coalescer = createCoalescer<number>({ windowMs: 1_000, maxAgeMs: 5_000, deliver });
+    coalescer.add("a", 1);
+    jest.advanceTimersByTime(1_000);
+    expect(error).toHaveBeenCalledWith("[coalescer] annonce regroupée non partie", "ER_DUP_ENTRY");
+    expect(JSON.stringify(error.mock.calls)).not.toContain("Renards");
+    error.mockRestore();
+  });
+
   it("une annonce qui lève ne casse ni le minuteur ni les rafales suivantes", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const deliver = jest.fn<(first: number, last: number) => void>().mockImplementationOnce(() => {

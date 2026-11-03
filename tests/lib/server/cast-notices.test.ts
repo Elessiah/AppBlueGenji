@@ -172,6 +172,18 @@ describe("deliverCastChange", () => {
     error.mockRestore();
   });
 
+  it("deliverCastChange_recipientsReadFailsWithCodedError_logsCodeOnly", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    mockMatch(matchRow());
+    jest
+      .mocked(loadNotificationRecipients)
+      .mockRejectedValue(Object.assign(new Error("Duplicate entry 'Renards' for key 'name'"), { code: "ER_DUP_ENTRY" }));
+    await deliverCastChange({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true });
+    expect(error).toHaveBeenCalledWith("[cast] destinataire de l'avis non lu : ER_DUP_ENTRY");
+    expect(JSON.stringify(error.mock.calls)).not.toContain("Renards");
+    error.mockRestore();
+  });
+
   it("prévient le titulaire évincé par un autre caster", async () => {
     mockMatch(matchRow());
     await deliverCastChange({ kind: "CLAIMED", matchId: 42, casterId: 9, replacedCasterId: 901 });
@@ -230,6 +242,17 @@ describe("announceCastChange", () => {
     expect(() => announceCastChange({ kind: "RELEASED", matchId: 42, casterId: 9, byStaff: true })).not.toThrow();
     await settle();
     expect(error).toHaveBeenCalledWith("[cast] changement d'inscription non annoncé : DB_DOWN");
+    error.mockRestore();
+  });
+
+  it("announceCastChange_deliveryFailsWithCodedError_logsCodeOnly", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest
+      .mocked(getDatabase)
+      .mockRejectedValue(Object.assign(new Error("connect ECONNREFUSED 10.0.0.1:3306"), { code: "ECONNREFUSED" }));
+    announceCastChange({ kind: "RELEASED", matchId: 42, casterId: 9, byStaff: true });
+    await settle();
+    expect(error).toHaveBeenCalledWith("[cast] changement d'inscription non annoncé : ECONNREFUSED");
     error.mockRestore();
   });
 
