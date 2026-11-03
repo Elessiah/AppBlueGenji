@@ -173,3 +173,9 @@ describe("page tournois — volume des sections", () => {
     }
   });
 });
+
+describe("page tournois — état occupé pendant la frappe", () => {
+  it("marque les sections aria-busy tant que la recherche différée retarde le champ", () => {
+    expect(page).toMatch(/className=\{s\.sections\}[\s\S]{0,120}aria-busy=\{query === deferredQuery \? undefined : true\}/);
+  });
+});

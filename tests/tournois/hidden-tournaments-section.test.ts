@@ -104,3 +104,11 @@ describe("StateCard", () => {
     expect(stateCard).toMatch(/return <UpcomingCard t=\{t\}( priority=\{priority\})? \/>;\s*\}/);
   });
 });
+
+describe("StateCard — rendu non filtré", () => {
+  it("n'est pas sous memo : UpcomingCard juge son visage à l'heure du rendu du parent", () => {
+    expect(stateCard).not.toMatch(/\bmemo\b\(/);
+    expect(stateCard).not.toMatch(/from "react"/);
+    expect(stateCard).toMatch(/export function StateCard\(/);
+  });
+});

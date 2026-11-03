@@ -1,5 +1,6 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import {
+  CARD_DATE_FORMAT_TTL_MS,
   formatCardDate,
   progressPercent,
   registrationFill,
@@ -166,5 +167,41 @@ describe("formatCardDate — formateurs mis en cache", () => {
     expect(withTime).toMatch(/\d{2}:\d{2}/);
     expect(withoutTime).not.toMatch(/:/);
     expect(formatCardDate(ISO, true, "en")).toBe(withTime);
+  });
+});
+
+describe("formatCardDate — fuseau relu après le délai", () => {
+  const ISO = "2026-05-12T10:00:00.000Z";
+
+  it("reconstruit les formateurs passé CARD_DATE_FORMAT_TTL_MS, pas avant", () => {
+    const base = Date.now() + 10 * CARD_DATE_FORMAT_TTL_MS;
+    const clock = jest.spyOn(Date, "now").mockReturnValue(base);
+    formatCardDate(ISO, true, "fr");
+    const construct = jest.spyOn(Intl, "DateTimeFormat");
+
+    clock.mockReturnValue(base + CARD_DATE_FORMAT_TTL_MS - 1);
+    formatCardDate(ISO, true, "fr");
+    expect(construct).not.toHaveBeenCalled();
+
+    clock.mockReturnValue(base + CARD_DATE_FORMAT_TTL_MS);
+    const before = formatCardDate(ISO, true, "fr");
+    expect(construct).toHaveBeenCalledTimes(1);
+    expect(formatCardDate(ISO, true, "fr")).toBe(before);
+    expect(construct).toHaveBeenCalledTimes(1);
+
+    construct.mockRestore();
+    clock.mockRestore();
+  });
+
+  it("reconstruit aussi quand l'horloge recule (réglage de l'appareil)", () => {
+    const base = Date.now() + 100 * CARD_DATE_FORMAT_TTL_MS;
+    const clock = jest.spyOn(Date, "now").mockReturnValue(base);
+    formatCardDate(ISO, false, "en");
+    const construct = jest.spyOn(Intl, "DateTimeFormat");
+    clock.mockReturnValue(base - 5_000);
+    formatCardDate(ISO, false, "en");
+    expect(construct).toHaveBeenCalledTimes(1);
+    construct.mockRestore();
+    clock.mockRestore();
   });
 });
