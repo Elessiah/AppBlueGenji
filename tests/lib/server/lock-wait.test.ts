@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import type { PoolConnection } from "mysql2/promise";
 import {
   releaseWithServerLockWait,
@@ -117,6 +117,10 @@ describe("releaseWithServerLockWait", () => {
 // Revue sécurité #542 : un ROLLBACK raté ne masque pas l'erreur d'origine, et
 // la connexion — transaction peut-être encore ouverte — n'est jamais rendue.
 describe("rollbackKeepingError", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it("rollbackKeepingError_rollbackSucceeds_releasesNormally", async () => {
     const { conn, asPool } = connection();
     conn.rollback.mockResolvedValue(undefined);
@@ -130,6 +134,7 @@ describe("rollbackKeepingError", () => {
   });
 
   it("rollbackKeepingError_rollbackFails_resolvesAndDestroysOnRelease", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
     const { conn, asPool } = connection();
     conn.rollback.mockRejectedValue(new Error("Connection lost"));
 
@@ -141,6 +146,7 @@ describe("rollbackKeepingError", () => {
   });
 
   it("releaseWithServerLockWait_shortenedAndRollbackFailed_destroysWithoutRestoreQuery", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
     const { conn, asPool } = connection();
     conn.query.mockResolvedValueOnce([[], []]).mockRejectedValueOnce(new Error("Connection lost"));
     await expect(withShortLockWait(asPool, async () => true)).rejects.toThrow("Connection lost");
@@ -153,5 +159,17 @@ describe("rollbackKeepingError", () => {
     expect(conn.destroy).toHaveBeenCalledTimes(1);
     expect(conn.query).not.toHaveBeenCalled();
     expect(conn.release).not.toHaveBeenCalled();
+  });
+
+  it("rollbackKeepingError_rollbackFails_logsTheRollbackError", async () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const { conn, asPool } = connection();
+    const lost = new Error("Connection lost");
+    conn.rollback.mockRejectedValue(lost);
+
+    await rollbackKeepingError(asPool);
+
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining("ROLLBACK"), lost);
   });
 });

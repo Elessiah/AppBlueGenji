@@ -1133,21 +1133,27 @@ describe("pénalités d'endurance", () => {
       .mocked(liftEndurancePenalty)
       .mockRejectedValueOnce(Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" }))
       .mockResolvedValueOnce({ teamId: 3, points: 2 });
+    const rollbackLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
     connection.rollback.mockRejectedValueOnce(new Error("Connection lost: The server closed the connection."));
 
     await liftEndurancePenaltyPublic(5, 61);
 
     expect(liftEndurancePenalty).toHaveBeenCalledTimes(2);
     expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(rollbackLog).toHaveBeenCalledTimes(1);
+    rollbackLog.mockRestore();
   });
 
   it("liftPenalty_rollbackFailsAfterRefusal_propagatesRefusalCode", async () => {
     jest.mocked(liftEndurancePenalty).mockRejectedValue(new Error("PENALTY_NOT_FOUND"));
+    const rollbackLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
     connection.rollback.mockRejectedValue(new Error("Connection lost: The server closed the connection."));
 
     await expect(liftEndurancePenaltyPublic(5, 61)).rejects.toThrow("PENALTY_NOT_FOUND");
     expect(connection.destroy).toHaveBeenCalledTimes(1);
     expect(connection.release).not.toHaveBeenCalled();
+    expect(rollbackLog).toHaveBeenCalledTimes(1);
+    rollbackLog.mockRestore();
   });
 
   // ERREUR.txt EF-15 (revue) : tournoi tenu, manches verrouillées — l'attente

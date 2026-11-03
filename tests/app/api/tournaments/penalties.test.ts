@@ -182,6 +182,18 @@ describe("DELETE /api/tournaments/[id]/penalties/[penaltyId]", () => {
     expect(await res.json()).toMatchObject({ error: "CONCURRENT_UPDATE_RETRY" });
   });
 
+  // Revue sécurité #542 (cycle 3) : le journal garde l'erreur du moteur.
+  it("DELETE_contention_logsEngineError", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const timeout = Object.assign(new Error("Délai d'attente de verrou dépassé"), { code: "ER_LOCK_WAIT_TIMEOUT", errno: 1205 });
+    jest.mocked(service.liftEndurancePenalty).mockRejectedValue(timeout);
+
+    await DELETE(deleteReq(), deleteParams);
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("écriture concurrente"), timeout);
+  });
+
   it("l'arbitrage retire la sanction", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(referee);
     const res = await DELETE(deleteReq(), deleteParams);

@@ -138,6 +138,20 @@ describe("GET /api/tournaments/[id]/matches/[matchId]/proposals", () => {
     expect(await res.json()).toEqual({ error: "CONCURRENT_UPDATE_RETRY" });
   });
 
+  // Revue sécurité #542 (cycle 3) : la contention se lit sur le code de
+  // l'erreur, pas sur son texte (`lc_messages` localisé).
+  it("GET_readThrowsLocalizedLockTimeout_returns409ByCode", async () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    jest
+      .mocked(getViewerMatchProposals)
+      .mockRejectedValue(Object.assign(new Error("Délai d'attente de verrou dépassé"), { code: "ER_LOCK_WAIT_TIMEOUT", errno: 1205 }));
+
+    const res = await get("7", "70");
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "CONCURRENT_UPDATE_RETRY" });
+  });
+
   it("GET_readThrowsDriverError_returns500InternalErrorWithoutEngineText", async () => {
     jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(getViewerMatchProposals).mockRejectedValue(new Error("connect ECONNREFUSED 127.0.0.1:3306"));

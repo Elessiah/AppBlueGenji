@@ -325,6 +325,7 @@ describe("cancelTournamentForfeit", () => {
       }
       return execute!(sql, values);
     });
+    const rollbackLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
     connection.rollback.mockRejectedValue(new Error("Connection lost: The server closed the connection."));
 
     await expect(cancelTournamentForfeit(7, 102)).rejects.toThrow("Lock wait timeout exceeded");
@@ -332,18 +333,23 @@ describe("cancelTournamentForfeit", () => {
     // Transaction peut-être encore ouverte : la connexion n'est pas rendue.
     expect(connection.destroy).toHaveBeenCalledTimes(1);
     expect(connection.release).not.toHaveBeenCalled();
+    expect(rollbackLog).toHaveBeenCalledTimes(1);
+    rollbackLog.mockRestore();
   });
 
   it("cancel_rollbackFailsAfterDeadlock_stillRetries", async () => {
     const { connection } = setup();
     const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
     jest.mocked(reconcileSurvival).mockRejectedValueOnce(deadlock);
+    const rollbackLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
     connection.rollback.mockRejectedValueOnce(new Error("Connection lost: The server closed the connection."));
 
     const result = await cancelTournamentForfeit(7, 102);
 
     expect(result.entrantName).toBe("Team Nova");
     expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(rollbackLog).toHaveBeenCalledTimes(1);
+    rollbackLog.mockRestore();
   });
 
   it("cancel_businessRefusal_notRetried", async () => {

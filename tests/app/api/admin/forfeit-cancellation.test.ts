@@ -187,6 +187,22 @@ describe("DELETE /api/admin/tournaments/[id]/forfeits/[teamId]", () => {
     warn.mockRestore();
   });
 
+  // Revue sécurité #542 (cycle 3) : le journal garde l'erreur du moteur
+  // (interblocage ou délai borné), la réponse n'en garde que le code.
+  it("DELETE_contention_logsEngineError", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    const checkread = Object.assign(new Error("L'enregistrement a changé depuis la dernière lecture"), {
+      code: "ER_CHECKREAD",
+      errno: 1020,
+    });
+    jest.mocked(cancelTournamentForfeit).mockRejectedValue(checkread);
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    await cancel("7", "102");
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("écriture concurrente"), checkread);
+  });
+
   it("rend un instantané périmé de MariaDB (1020) en refus « réessaie »", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(cancelTournamentForfeit).mockRejectedValue(
