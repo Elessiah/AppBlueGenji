@@ -54,10 +54,8 @@ message de succès dit seulement que le classement est recalculé.
 La transaction lit la ligne du tournoi `FOR UPDATE` en toute première
 instruction (le verrou de `lockTournamentRow`, avec les colonnes utiles). Elle
 verrouille donc le tournoi avant les manches que le rejeu peut poser, quand un
-report ou une correction d'arbitrage prend la manche avant le tournoi
-(« Enregistrer », qui ne réconcilie rien, ne demande jamais le tournoi : face à
-l'annulation, c'est une simple attente de verrou, bornée côté annulation) :
-comme l'abandon,
+report, une correction ou un « Enregistrer » d'arbitrage prend son match avant
+le tournoi : comme l'abandon,
 elle passe par `retryOnDeadlock`, qui rejoue la transaction entière après un
 interblocage (publication une seule fois, après le commit réussi).
 

@@ -159,7 +159,12 @@ remplace plus, à l'échéance, ce que l'arbitre a noté.
 
 « Enregistrer » ne clôt jamais un match : la sauvegarde ne lance aucune
 réconciliation de classement et ne publie que le plateau
-(`publishMatchUpdatedEvent`, ERREUR.txt EF-15). Ses relectures sous verrou
+(`publishMatchUpdatedEvent`, ERREUR.txt EF-15). Elle prend pourtant le verrou
+du tournoi, juste après celui du match et avant toute lecture ordinaire (ordre
+d'un report) : une réconciliation concurrente qui jugerait la manche vierge sur
+son instantané puis la détruirait pour la réapparier l'attend, ou s'interbloque
+avec elle (rejoué par `retryOnDeadlock`), au lieu d'effacer une saisie commitée
+entre-temps. Ses relectures sous verrou
 sont regroupées : la ligne enregistrée revient avec le résultat
 (`AdminSaveResult.saved`), les règles du match (`refereeScheduling` compris) se
 lisent en une requête, et les maps `FINAL` ne sont effacées que si une sonde
