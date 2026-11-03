@@ -303,21 +303,41 @@ function linkProvider(setter: MatchLiveSetter): number | null {
  * ni sur un match qui n'est pas jouable ou dont le score est déjà saisi — dans
  * ces cas la fermeture est déjà acquise par dérivation.
  *
+ * @returns `true` quand l'antenne a changé d'état — un second clic sur « à
+ *   l'antenne » ne change rien, et le journal du staff ne le note pas.
  * @throws `MATCH_NOT_FOUND` | `LIVE_TRIGGER_NOT_MANUAL` | `MATCH_NOT_LIVE_READY`
  */
-export async function setMatchOnAir(matchId: number, onAir: boolean): Promise<void> {
+export async function setMatchOnAir(matchId: number, onAir: boolean): Promise<boolean> {
   const row = await loadMatchLiveRow(matchId);
 
   if (row.live_trigger !== "MANUAL") throw new Error("LIVE_TRIGGER_NOT_MANUAL");
   if (onAir && row.status !== "READY") throw new Error("MATCH_NOT_LIVE_READY");
 
   const db = await getDatabase();
-  await db.execute(`UPDATE bg_matches SET live_started_at = ? WHERE id = ?`, [
-    onAir ? new Date() : null,
-    matchId,
-  ]);
+  // L'état de départ est relu dans la condition : un second clic ne réécrit pas
+  // l'heure de mise à l'antenne, et deux clics simultanés ne changent l'état qu'une fois ;
+  // le statut et le déclencheur aussi : un match validé, ou passé en automatique, entre la
+  // lecture et l'écriture ne change pas d'antenne.
+  const [result] = await db.execute(
+    onAir
+      ? `UPDATE bg_matches SET live_started_at = ?
+         WHERE id = ? AND live_started_at IS NULL AND status = 'READY' AND live_trigger = 'MANUAL'`
+      : `UPDATE bg_matches SET live_started_at = NULL
+         WHERE id = ? AND live_started_at IS NOT NULL AND live_trigger = 'MANUAL'`,
+    onAir ? [new Date(), matchId] : [matchId],
+  );
+  const changed = Number((result as { affectedRows?: number }).affectedRows ?? 0) > 0;
+  if (!changed) {
+    // Rien d'écrit : antenne déjà dans cet état, ou garde tombée entre la lecture
+    // et l'écriture — celle-ci se dit par son refus, jamais par un faux succès.
+    const now = await loadMatchLiveRow(matchId);
+    if (now.live_trigger !== "MANUAL") throw new Error("LIVE_TRIGGER_NOT_MANUAL");
+    if (onAir && now.status !== "READY") throw new Error("MATCH_NOT_LIVE_READY");
+    return false;
+  }
 
   publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
+  return true;
 }
 
 /**

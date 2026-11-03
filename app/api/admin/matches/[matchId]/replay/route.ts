@@ -31,8 +31,11 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   if (raw !== null && typeof raw !== "string") return fail("INVALID_REPLAY_URL", 400);
 
   try {
-    const replayUrl = await setMatchReplayUrl(matchId, raw);
-    announceStaffMatchAction(matchId, replayUrl === null ? "REPLAY_REMOVED" : "REPLAY_SET", staffActionAuthor(user));
+    const { replayUrl, changed } = await setMatchReplayUrl(matchId, raw);
+    // Un geste sans effet (retirer un lien jamais posé, reposer le même) ne se journalise pas.
+    if (changed) {
+      announceStaffMatchAction(matchId, replayUrl === null ? "REPLAY_REMOVED" : "REPLAY_SET", staffActionAuthor(user));
+    }
     return ok({ replayUrl });
   } catch (error) {
     const message = (error as Error).message;

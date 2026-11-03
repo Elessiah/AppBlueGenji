@@ -108,7 +108,11 @@ Choisis **par match**, au moment où on le marque comme casté :
 - **`MANUAL`** — le direct s'ouvre au clic (« Lancer le direct », menu « Plus d'actions » de la carte), et se referme au clic
   (« Couper le direct ») ou tout seul à la saisie du score. C'est le mode qui convient
   aux tournois étalés sur plusieurs jours, où un match peut être jouable des
-  heures avant que le cast commence.
+  heures avant que le cast commence. Le clic écrit sous condition
+  (`setMatchOnAir` : déclencheur `MANUAL`, match `READY` pour ouvrir, état de
+  départ) : un match validé ou passé en `AUTO` entre la lecture et l'écriture
+  est refusé (`MATCH_NOT_LIVE_READY`, `LIVE_TRIGGER_NOT_MANUAL`, 409), jamais
+  rendu comme un succès ; un second clic ne change rien et n'est pas journalisé.
 
 Passer un match en `AUTO` referme son antenne : `live_started_at` n'a plus de
 sens dans ce mode. Démarquer un match efface aussi son lien et son antenne,

@@ -2,7 +2,8 @@
 
 Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
 `lib/server/tournaments/cast-notices.ts` (déclenchement, après le commit),
-`lib/shared/cast-notices.ts` (motifs, message privé FR/EN),
+`lib/shared/cast-notices.ts` (motifs, pur), `lib/server/tournaments/cast-release-message.ts`
+(message privé FR/EN),
 `formatCastChangeLog` (`lib/shared/bot-logs.ts`), `castReleasedPush`
 (`lib/shared/push-messages.ts`). Appelé par `claimMatchCast`,
 `releaseMatchCast` et `releaseIneligibleCast` (`match-launch.ts`).
@@ -27,7 +28,20 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
   appelé par `inTransaction`, `flushBotLogs` et l'entretien de la modale) ;
   une transaction annulée le jette (`discardCastChanges`).
 - Retrait d'office : si le caster est à la fois inéligible et devenu joueur du
-  match, le motif dit les conditions du cast (`INELIGIBLE`).
+  match, le motif dit les conditions du cast (`INELIGIBLE`). Le blocage lu
+  (`loadCastBlocks`) précise le motif : permission `live` perdue
+  (`INELIGIBLE_PERMISSION`) ou identité de caster manquante (`INELIGIBLE_IDENTITY`).
+- Inscriptions et retraits du caster lui-même, en rafale sur un même match,
+  sont regroupés (`lib/server/coalescer.ts`, 60 s sans geste, 5 min au plus) :
+  deux lignes au plus par rafale. Le premier geste part **sur-le-champ** (une
+  inscription ouvre les contacts du match : le journal garde qui a tenu la place,
+  avec l'appariement du moment, même si le match disparaît ensuite) ; la clôture
+  ajoute l'état final s'il diffère de ce premier geste, toujours après lui.
+  Les annonces d'un même (match, caster) s'enchaînent (`chainAfter`) : un geste
+  du caster qui suit un retrait par le staff part après sa ligne, et l'arrêt du
+  serveur attend les annonces chaînées (`trackAnnouncement`).
+  Un retrait par le staff, d'office, ou une reprise de place sur ce caster fait
+  d'abord partir sa rafale : le journal garde l'ordre et finit sur l'état réel.
 - Les **joueurs du match ne sont pas prévenus** (décision 3).
 - Sur la carte de match, « Retirer le caster » (staff) passe par une
   `ConfirmActionDialog` qui dit que le caster sera prévenu, avec le motif
@@ -42,6 +56,10 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
   caster », « le caster », « le staff » ; en tournoi individuel, « un joueur »
   au journal (`entrantLabel`) et « un match » au caster. Aucun
   `publishStaffAction` : la ligne part par `sendBotLog` seul.
+- Échec d'un avis (destinataire illisible, annonce non partie, rafale qui
+  lève) : la ligne `[cast]` ou `[coalescer]` de pm2 ne porte que le code de
+  l'erreur (`failureReason`, `lib/server/failure-reason.ts`, même règle que
+  `[staff-log]`), jamais le message de mysql2, qui peut citer une valeur lue.
 - Message privé : `loadNotificationRecipients(…, "certified", { matchDm: true })`
   — un tag Discord certifié seulement, coupé par la case « Messages privés
   Discord de mes matchs » de « Mon profil » (droit d'opposition). Le push a son
@@ -71,6 +89,8 @@ s'ajoute aux deux tables de textes (`DM_REASONS`, `castReleased.reason.*` des
 ## Tests
 
 `tests/lib/server/cast-notices.test.ts` (routage, solo, TBD, match disparu,
-erreur avalée), `tests/lib/shared/cast-notices.test.ts` (textes FR/EN, motifs,
-longueurs, noms piégés), `tests/lib/server/match-launch.test.ts` (déclenchement
-après chaque geste, et silence sinon).
+erreur avalée, rafales regroupées), `tests/lib/server/cast-release-message.test.ts`
+(clés de motif, textes FR/EN, longueurs, noms piégés),
+`tests/lib/server/coalescer.test.ts` (fenêtre, plafond),
+`tests/lib/server/match-launch.test.ts` (déclenchement après chaque geste, et
+silence sinon).

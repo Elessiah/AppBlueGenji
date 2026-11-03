@@ -1,16 +1,20 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 
 import { getDatabase } from "@/lib/server/database";
-import { sendBotLog } from "@/lib/server/bot-integration";
+import { flushAllCoalescers } from "@/lib/server/coalescer";
+import { isBotCircuitOpen, sendBotLog } from "@/lib/server/bot-integration";
 import {
   announceStaffMatchAction,
   announceStaffTournamentAction,
   deliverStaffMatchAction,
   deliverStaffTournamentAction,
+  flushStaffActionBursts,
+  resetStaffActionBursts,
   staffActionAuthor,
+  STAFF_LOG_BURST_WINDOW_MS,
 } from "@/lib/server/tournaments/staff-action-logs";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { authUser } from "../../helpers/auth-user";
@@ -34,6 +38,25 @@ function mockRows(row: Record<string, unknown> | null) {
   const execute = jest.fn<SqlQuery>(async () => [row === null ? [] : [row], []]);
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
+}
+
+/**
+ * La première lecture en base reste en suspens jusqu'à `finishFirst()` ; les
+ * suivantes rendent `next` (par défaut, la même ligne).
+ */
+function slowFirstRead(first: Record<string, unknown>, next: Record<string, unknown> = first) {
+  let release: () => void = () => undefined;
+  const execute = jest
+    .fn<SqlQuery>()
+    .mockImplementationOnce(() => new Promise((resolve) => (release = () => resolve([[first], []]))))
+    .mockResolvedValue([[next], []]);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  return { execute, finishFirst: () => release() };
+}
+
+/** Lignes envoyées au journal, dans l'ordre. */
+function sentLines(): string[] {
+  return jest.mocked(sendBotLog).mock.calls.map((call) => String(call[0]));
 }
 
 /** Laisse filer les promesses lancées sans attendre. */
@@ -89,7 +112,7 @@ describe("staffActionAuthor", () => {
 describe("deliverStaffTournamentAction", () => {
   it("envoie le geste et le compte", async () => {
     const execute = mockRows({ id: 7, name: "Coupe d'hiver" });
-    await deliverStaffTournamentAction(7, "GHOST_TEAMS_REGISTERED", 2);
+    await deliverStaffTournamentAction(7, "GHOST_TEAMS_REGISTERED", { count: 2 });
     expect(execute.mock.calls[0][1]).toEqual([7]);
     expect(sendBotLog).toHaveBeenCalledWith("🛠️ Équipes fantômes inscrites — « Coupe d'hiver » (#7) (2), par le staff.", { tournamentId: 7, category: "admin" });
   });
@@ -117,6 +140,149 @@ describe("deliverStaffMatchAction — sans désigner le match", () => {
 });
 
 describe("announceStaffMatchAction / announceStaffTournamentAction", () => {
+  it("announceStaffTournamentAction_noPendingBurst_startsDeliveryInTheSameTick", () => {
+    jest.mocked(getDatabase).mockRejectedValue(new Error("down"));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    announceStaffTournamentAction(7, "EDITED");
+    expect(getDatabase).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it("announceStaffTournamentAction_shutdownFlush_waitsImmediateDelivery", async () => {
+    const { finishFirst: finishRead } = slowFirstRead({ id: 7, name: "Coupe d'hiver" });
+    announceStaffTournamentAction(7, "EDITED");
+    const flushed = flushAllCoalescers();
+    await settle();
+    expect(sendBotLog).not.toHaveBeenCalled();
+    finishRead();
+    await flushed;
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("announceStaffMatchAction_shutdownFlush_waitsDelivery", async () => {
+    const { finishFirst: finishRead } = slowFirstRead(matchRow());
+    announceStaffMatchAction(42, "FORCE_LAUNCHED");
+    const flushed = flushAllCoalescers();
+    await settle();
+    expect(sendBotLog).not.toHaveBeenCalled();
+    finishRead();
+    await flushed;
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("announceStaffTournamentAction_secondLineSameTournament_waitsFirst", async () => {
+    resetStaffActionBursts();
+    const { execute, finishFirst } = slowFirstRead({ id: 7, name: "Coupe d'hiver" });
+    announceStaffTournamentAction(7, "EDITED");
+    announceStaffTournamentAction(7, "ADVANCED", { target: "RUNNING" });
+    await settle();
+    expect(execute).toHaveBeenCalledTimes(1);
+    finishFirst();
+    await flushAllCoalescers();
+    const lines = sentLines();
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("Tournoi modifié");
+    expect(lines[1]).toContain("Étape suivante avancée");
+  });
+
+  it("announceStaffTournamentAction_otherTournamentBusy_notBlocked", async () => {
+    resetStaffActionBursts();
+    const { execute, finishFirst } = slowFirstRead({ id: 7, name: "Coupe d'hiver" }, { id: 8, name: "Coupe d'été" });
+    announceStaffTournamentAction(7, "EDITED");
+    announceStaffTournamentAction(8, "EDITED");
+    await settle();
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[1][1]).toEqual([8]);
+    finishFirst();
+    await flushAllCoalescers();
+  });
+
+  it("announceStaffTournamentAction_burstAfterSlowLine_flushedInTurn", async () => {
+    resetStaffActionBursts();
+    const { execute, finishFirst } = slowFirstRead({ id: 7, name: "Coupe d'hiver" });
+    announceStaffTournamentAction(7, "EDITED");
+    announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    announceStaffTournamentAction(7, "ADVANCED", { target: "RUNNING" });
+    await settle();
+    expect(execute).toHaveBeenCalledTimes(1);
+    finishFirst();
+    await flushAllCoalescers();
+    const lines = sentLines();
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toContain("Tournoi modifié");
+    expect(lines[1]).toContain("Têtes de série réordonnées");
+    expect(lines[2]).toContain("Étape suivante avancée");
+  });
+
+  it("announceStaffMatchAction_twoGesturesSameMatch_keepOrder", async () => {
+    resetStaffActionBursts();
+    const { execute, finishFirst } = slowFirstRead(matchRow());
+    announceStaffMatchAction(42, "ON_AIR");
+    announceStaffMatchAction(42, "OFF_AIR");
+    await settle();
+    expect(execute).toHaveBeenCalledTimes(1);
+    finishFirst();
+    await flushAllCoalescers();
+    const lines = sentLines();
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("Mis à l'antenne");
+    expect(lines[1]).not.toContain("Mis à l'antenne");
+  });
+
+  it("announceStaffTournamentAction_burstTimerDuringSlowLine_waitsItsTurn", async () => {
+    resetStaffActionBursts();
+    jest.useFakeTimers();
+    const { execute, finishFirst } = slowFirstRead({ id: 7, name: "Coupe d'hiver" });
+    announceStaffTournamentAction(7, "EDITED");
+    announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    jest.advanceTimersByTime(STAFF_LOG_BURST_WINDOW_MS);
+    jest.useRealTimers();
+    await settle();
+    expect(execute).toHaveBeenCalledTimes(1);
+    finishFirst();
+    await flushAllCoalescers();
+    const lines = sentLines();
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("Tournoi modifié");
+    expect(lines[1]).toContain("Têtes de série réordonnées");
+  });
+
+  it("announceStaffTournamentAction_burstOpenedAfterQueuedLine_staysPending", async () => {
+    resetStaffActionBursts();
+    const { finishFirst } = slowFirstRead({ id: 7, name: "Coupe d'hiver" });
+    announceStaffTournamentAction(7, "IMAGE_UPDATED");
+    announceStaffTournamentAction(7, "EDITED");
+    announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    await settle();
+    finishFirst();
+    await settle();
+    expect(sendBotLog).toHaveBeenCalledTimes(2);
+    await flushStaffActionBursts();
+    expect(sendBotLog).toHaveBeenCalledTimes(3);
+    expect(String(jest.mocked(sendBotLog).mock.calls[2][0])).toContain("Têtes de série réordonnées");
+  });
+
+  it("announceStaffTournamentAction_secondBurstThenAdvance_keepsGestureOrder", async () => {
+    resetStaffActionBursts();
+    jest.useFakeTimers();
+    const { finishFirst } = slowFirstRead({ id: 7, name: "Coupe d'hiver" });
+    announceStaffTournamentAction(7, "EDITED");
+    announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    jest.advanceTimersByTime(STAFF_LOG_BURST_WINDOW_MS);
+    announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    announceStaffTournamentAction(7, "ADVANCED", { target: "RUNNING" });
+    jest.useRealTimers();
+    await settle();
+    finishFirst();
+    await flushAllCoalescers();
+    const lines = sentLines();
+    expect(lines).toHaveLength(4);
+    expect(lines[0]).toContain("Tournoi modifié");
+    expect(lines[1]).toContain("Têtes de série réordonnées");
+    expect(lines[2]).toContain("Têtes de série réordonnées");
+    expect(lines[3]).toContain("Étape suivante avancée");
+  });
+
   it("ne lèvent jamais quand la base est indisponible", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(getDatabase).mockRejectedValue(new Error("down"));
@@ -140,5 +306,128 @@ describe("announceStaffMatchAction / announceStaffTournamentAction", () => {
     expect(sendBotLog).toHaveBeenCalledTimes(1);
     expect(error).toHaveBeenCalledTimes(1);
     error.mockRestore();
+  });
+});
+
+describe("échecs du journal du staff", () => {
+  it("announceStaffMatchAction_deliveryFails_logsOneLineWithoutErrorObject", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(getDatabase).mockRejectedValue(Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }));
+    announceStaffMatchAction(42, "HOST_SET");
+    await settle();
+    expect(error).toHaveBeenCalledWith("[staff-log] geste HOST_SET sur le match #42 non journalisé : ECONNREFUSED");
+    error.mockRestore();
+  });
+});
+
+describe("coupe-circuit du bot ouvert", () => {
+  // Le lot part 5 à 10 min plus tard, coupe-circuit refermé : la ligne s'y range quand même.
+  it("deliverStaffMatchAction_circuitOpen_stillQueuesLine", async () => {
+    jest.mocked(isBotCircuitOpen).mockReturnValue(true);
+    mockRows(matchRow());
+    await deliverStaffMatchAction(42, "HOST_SET");
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+    jest.mocked(isBotCircuitOpen).mockReturnValue(false);
+  });
+
+  it("deliverStaffTournamentAction_circuitOpen_stillQueuesLine", async () => {
+    jest.mocked(isBotCircuitOpen).mockReturnValue(true);
+    mockRows({ id: 7, name: "Coupe d'hiver" });
+    await deliverStaffTournamentAction(7, "EDITED");
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+    jest.mocked(isBotCircuitOpen).mockReturnValue(false);
+  });
+});
+
+describe("deliverStaffTournamentAction — précisions", () => {
+  it("deliverStaffTournamentAction_advancedWithTarget_namesStep", async () => {
+    mockRows({ id: 7, name: "Coupe d'hiver" });
+    await deliverStaffTournamentAction(7, "ADVANCED", { target: "REGISTRATION" });
+    expect(sendBotLog).toHaveBeenCalledWith(
+      "🛠️ Étape suivante avancée — « Coupe d'hiver » (#7) (ouverture des inscriptions), par le staff.",
+      { tournamentId: 7, category: "admin" },
+    );
+  });
+
+  it("deliverStaffTournamentAction_renamed_citesOldName", async () => {
+    mockRows({ id: 7, name: "Coupe d'hiver" });
+    await deliverStaffTournamentAction(7, "EDITED", { previousName: "Coupe d'automne" });
+    expect(sendBotLog).toHaveBeenCalledWith(
+      "🛠️ Tournoi modifié — « Coupe d'hiver » (#7) (ancien nom : « Coupe d'automne »), par le staff.",
+      { tournamentId: 7, category: "admin" },
+    );
+  });
+
+  it("deliverStaffTournamentAction_renamedWithName_usesWrittenName", async () => {
+    mockRows({ id: 7, name: "Coupe de printemps" });
+    await deliverStaffTournamentAction(7, "EDITED", { previousName: "Coupe d'automne", name: "Coupe d'hiver" });
+    expect(sendBotLog).toHaveBeenCalledWith(
+      "🛠️ Tournoi modifié — « Coupe d'hiver » (#7) (ancien nom : « Coupe d'automne »), par le staff.",
+      { tournamentId: 7, category: "admin" },
+    );
+  });
+});
+
+describe("announceStaffTournamentAction — rafales", () => {
+  beforeEach(() => {
+    resetStaffActionBursts();
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("announceStaffTournamentAction_seedingBurst_onlyOneLine", async () => {
+    const execute = mockRows({ id: 7, name: "Coupe d'hiver" });
+    for (let i = 0; i < 15; i += 1) announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    expect(execute).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(STAFF_LOG_BURST_WINDOW_MS);
+    jest.useRealTimers();
+    await settle();
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("Têtes de série réordonnées");
+  });
+
+  it("announceStaffTournamentAction_twoTournaments_twoLines", async () => {
+    mockRows({ id: 7, name: "Coupe d'hiver" });
+    announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    announceStaffTournamentAction(8, "SEEDING_REORDERED");
+    flushStaffActionBursts();
+    jest.useRealTimers();
+    await settle();
+    expect(sendBotLog).toHaveBeenCalledTimes(2);
+  });
+
+  it("announceStaffTournamentAction_nonBurstAction_deliversImmediately", async () => {
+    const execute = mockRows({ id: 7, name: "Coupe d'hiver" });
+    announceStaffTournamentAction(7, "EDITED");
+    jest.useRealTimers();
+    await settle();
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("announceStaffTournamentAction_advanceAfterPendingSeeding_seedingLoggedFirst", async () => {
+    mockRows({ id: 7, name: "Coupe d'hiver" });
+    announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    announceStaffTournamentAction(7, "ADVANCED", { target: "RUNNING" });
+    jest.useRealTimers();
+    await settle();
+    await settle();
+    const lines = sentLines();
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("Têtes de série réordonnées");
+    expect(lines[1]).toContain("coup d'envoi");
+  });
+
+  it("announceStaffTournamentAction_advanceOtherTournament_seedingStaysPending", async () => {
+    mockRows({ id: 8, name: "Coupe d'été" });
+    announceStaffTournamentAction(7, "SEEDING_REORDERED");
+    announceStaffTournamentAction(8, "ADVANCED", { target: "RUNNING" });
+    jest.useRealTimers();
+    await settle();
+    await settle();
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+    expect(String(jest.mocked(sendBotLog).mock.calls[0][0])).toContain("coup d'envoi");
   });
 });

@@ -45,7 +45,7 @@ import { cached } from "./intl-cache";
 import { DEFAULT_LOCALE, INTL_LOCALE, localeHref, type Locale } from "./locales";
 import { scopedText, type Leaves, type ScopedText } from "./scoped-text";
 import { clipPushText, PUSH_BODY_MAX, type PushContent } from "./push-notifications";
-import type { CastReleasedMatch } from "./cast-notices";
+import { castReleaseReasonKey, type CastReleasedMatch } from "./cast-notices";
 import { lobbyBriefNames, neutralizeQuotes, type LobbyBriefSide } from "./lobby-brief";
 import { withoutInvisibles } from "./visible-text";
 
@@ -945,7 +945,7 @@ export function castReleasedPush(input: CastReleasedMatch, locale: Locale = DEFA
   return {
     title: text.t("castReleased.title"),
     body: text.t("castReleased.body", {
-      reason: text.t(`castReleased.reason.${input.reason}`),
+      reason: text.t(`castReleased.reason.${castReleaseReasonKey(input)}`),
       pairing: pairingText,
       tournament: input.tournamentName,
       round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),

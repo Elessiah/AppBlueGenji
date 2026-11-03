@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/bot-integration");
+jest.mock("@/lib/server/coalescer");
 
 import { flushAllBotLogBatches } from "@/lib/server/bot-integration";
+import { flushAllCoalescers } from "@/lib/server/coalescer";
 import {
   flushBotLogsBeforeExit,
   holdExitUntil,
@@ -18,6 +20,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   resetBotLogShutdownState();
   jest.mocked(flushAllBotLogBatches).mockResolvedValue();
+  jest.mocked(flushAllCoalescers).mockResolvedValue();
   handlers = new Map();
   onceSpy = jest.spyOn(process, "once").mockImplementation(((event: string, listener: () => void) => {
     handlers.set(event, listener);
@@ -50,6 +53,36 @@ describe("flushBotLogsBeforeExit", () => {
   it("flushBotLogsBeforeExit_flushRejects_neverThrows", async () => {
     jest.mocked(flushAllBotLogBatches).mockRejectedValue(new Error("bot"));
     await expect(flushBotLogsBeforeExit()).resolves.toBeUndefined();
+  });
+});
+
+describe("flushBotLogsBeforeExit — rafales regroupées", () => {
+  it("flushBotLogsBeforeExit_pendingBurst_coalescersBeforeBatches", async () => {
+    const order: string[] = [];
+    jest.mocked(flushAllCoalescers).mockImplementation(async () => {
+      order.push("coalescers");
+    });
+    jest.mocked(flushAllBotLogBatches).mockImplementation(async () => {
+      order.push("batches");
+    });
+    await flushBotLogsBeforeExit();
+    expect(order).toEqual(["coalescers", "batches"]);
+  });
+
+  it("flushBotLogsBeforeExit_coalescerHangs_batchesStillFlushedAtHalfTheTimeout", async () => {
+    jest.useFakeTimers();
+    jest.mocked(flushAllCoalescers).mockReturnValue(new Promise<void>(() => undefined));
+    void flushBotLogsBeforeExit(1_000);
+    await jest.advanceTimersByTimeAsync(499);
+    expect(flushAllBotLogBatches).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(1);
+    expect(flushAllBotLogBatches).toHaveBeenCalledTimes(1);
+  });
+
+  it("flushBotLogsBeforeExit_coalescerFlushRejects_batchesStillFlushed", async () => {
+    jest.mocked(flushAllCoalescers).mockRejectedValue(new Error("boom"));
+    await expect(flushBotLogsBeforeExit()).resolves.toBeUndefined();
+    expect(flushAllBotLogBatches).toHaveBeenCalledTimes(1);
   });
 });
 

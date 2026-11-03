@@ -71,7 +71,7 @@ describe("setTournamentImage", () => {
   it("convertit le fichier sous le gabarit du tournoi, puis l'enregistre avec son cadrage", async () => {
     const { execute, connection } = mockTournament(null);
 
-    await expect(setTournamentImage(7, pngFile(), cover)).resolves.toEqual({ url: NEW_URL, ...cover });
+    await expect(setTournamentImage(7, pngFile(), cover)).resolves.toEqual({ url: NEW_URL, ...cover, replaced: false });
 
     expect(processAndStoreImage).toHaveBeenCalledWith(expect.any(File), "tournament-image", 7, null);
     const statements = sql(execute);
@@ -153,7 +153,7 @@ describe("setTournamentImage", () => {
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(deleteStoredImage).mockRejectedValue(new Error("EPERM"));
 
-    await expect(setTournamentImage(7, pngFile(), cover)).resolves.toEqual({ url: NEW_URL, ...cover });
+    await expect(setTournamentImage(7, pngFile(), cover)).resolves.toEqual({ url: NEW_URL, ...cover, replaced: true });
     expect(log).toHaveBeenCalled();
     expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
   });

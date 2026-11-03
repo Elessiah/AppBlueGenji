@@ -23,21 +23,27 @@ export type MatchLogRow = RowDataPacket & {
   participant_type: string | null;
 };
 
-/** Le match `matchId`, ou `null` s'il n'existe plus. */
-export async function loadMatchLogRow(matchId: number): Promise<MatchLogRow | null> {
-  const db = await getDatabase();
-  const [rows] = await db.execute<MatchLogRow[]>(
-    `SELECT m.id, m.bracket, m.round_number, ${swissRoundSql("m", "tr")},
+/**
+ * Colonnes et jointures de {@link MatchLogRow} : **le** chargeur des lignes du
+ * journal qui désignent un match, partagé avec `loadMatch` de `./bot-logs`
+ * (qui y ajoute score et statut) — une seule requête à tenir à jour.
+ */
+export const MATCH_LOG_COLUMNS_SQL = `m.id, m.bracket, m.round_number, ${swissRoundSql("m", "tr")},
             t1.name AS team1_name, t2.name AS team2_name,
-            tr.id AS tournament_id, tr.name AS tournament_name, tr.participant_type
-       FROM bg_matches m
+            tr.id AS tournament_id, tr.name AS tournament_name, tr.participant_type`;
+
+export const MATCH_LOG_FROM_SQL = `FROM bg_matches m
        JOIN bg_tournaments tr ON tr.id = m.tournament_id
        LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
        LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
       WHERE m.id = ?
-      LIMIT 1`,
-    [matchId],
-  );
+      LIMIT 1`;
+
+/** Le match `matchId`, ou `null` s'il n'existe plus. */
+export async function loadMatchLogRow(matchId: number): Promise<MatchLogRow | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<MatchLogRow[]>(`SELECT ${MATCH_LOG_COLUMNS_SQL}
+       ${MATCH_LOG_FROM_SQL}`, [matchId]);
   return rows[0] ?? null;
 }
 

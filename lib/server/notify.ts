@@ -26,6 +26,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { failureReason } from "@/lib/server/failure-reason";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { parseRoles } from "@/lib/server/serialization";
 import { canDeclareTeamReady } from "@/lib/shared/match-launch";
@@ -104,40 +105,12 @@ export async function notifyUsers(
     message && reachable.length > 0
       ? sendLocalizedDirectMessages(reachable, message)
       : Promise.resolve({ report: { sent: 0, unresolved: [], failed: [] }, unreached: [] }),
-    pushAudience(userIds, notification.topic).then((ids) =>
-      pushToUsers(ids, notification.topic, notification.push, notification.pushOptions),
-    ),
+    // Un sujet réservé à une permission ne part qu'à qui la détient encore, non
+    // suspendu : `pushToUsers` en juge sur les lignes d'abonnement qu'il lit
+    // déjà — aucune lecture de plus, et aucune sans configuration push.
+    pushToUsers(userIds, notification.topic, notification.push, notification.pushOptions),
   ]);
   return { discord: discord.report, discordUnreachedUserIds: discord.unreached, pushed };
-}
-
-/**
- * Destinataires du push d'un sujet : tous pour un sujet ouvert ; pour un sujet
- * réservé à une permission (`PUSH_TOPICS[topic].audience`), ceux qui la
- * détiennent **encore**. « Mon profil » ne montre le réglage d'un tel sujet qu'à
- * eux : qui ne le voit pas ne pourrait pas le couper, il ne le reçoit donc pas
- * (un caster dont la permission de diffusion est retirée, par exemple). Une
- * lecture des droits qui échoue n'envoie à personne.
- */
-async function pushAudience(userIds: readonly number[], topic: PushTopic): Promise<number[]> {
-  const audience = PUSH_TOPICS[topic].audience;
-  const ids = [...new Set(userIds)];
-  if (audience === null || ids.length === 0) return [...userIds];
-  try {
-    const db = await getDatabase();
-    const [rows] = await db.query<(RowDataPacket & { id: number; is_admin: number; platform_roles_json: unknown })[]>(
-      `SELECT id, is_admin, platform_roles_json FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})`,
-      ids,
-    );
-    return rows
-      .filter((row) =>
-        can({ isAdmin: Number(row.is_admin) === 1, roles: sanitizePlatformRoles(row.platform_roles_json) }, audience),
-      )
-      .map((row) => Number(row.id));
-  } catch (error) {
-    console.error("[notify] droits des destinataires illisibles, push d'un sujet réservé non envoyé", error);
-    return [];
-  }
 }
 
 /**
@@ -157,7 +130,7 @@ async function loadAccountLocales(userIds: readonly number[]): Promise<Map<numbe
     );
     for (const row of rows) locales.set(Number(row.id), accountLocaleFromRow(row.locale));
   } catch (error) {
-    console.error("[notify] langue des comptes illisible, messages privés bilingues", error);
+    console.error("[notify] langue des comptes illisible, messages privés bilingues", failureReason(error));
   }
   return locales;
 }

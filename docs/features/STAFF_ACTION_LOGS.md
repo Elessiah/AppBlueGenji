@@ -12,12 +12,13 @@ n'appellent l'intervention de personne.
   dans `lib/shared/bot-logs.ts`, vocabulaire `StaffMatchAction` /
   `StaffTournamentAction`.
 - Envoi : `announceStaffMatchAction(matchId, action)` /
-  `announceStaffTournamentAction(tournamentId, action, count?)` dans
+  `announceStaffTournamentAction(tournamentId, action, details?)` dans
   `lib/server/tournaments/staff-action-logs.ts` — relit le match
   (`match-log-subject.ts`, partagé avec `CAST_NOTICES.md`) ou le nom du tournoi,
   n'attend pas, ne lève jamais (base indisponible : une ligne `[staff-log]`
-  en erreur dans pm2, avec le geste et le numéro du match ou du tournoi mais
-  jamais l'auteur — le registre et `/rgpd` le disent ; bot injoignable :
+  en erreur dans pm2, avec le geste, le numéro du match ou du tournoi et le
+  code de l'erreur (`failureReason`, `lib/server/failure-reason.ts` : code de l'erreur, sinon message qui est lui-même un code du site, sinon nom de l'erreur — jamais un texte libre) mais
+  jamais l'auteur ; disjoncteur du bot ouvert (`isBotCircuitOpen`) : rien n'est relu — le registre et `/rgpd` le disent ; bot injoignable :
   `sendBotLog` abandonne en silence ; la réponse de la route ne change pas).
 - Appel : dans chaque route, **après** le geste réussi ; un refus (401, 403,
   400) ou un échec du service n'écrit rien.
@@ -29,15 +30,15 @@ n'appellent l'intervention de personne.
 | `POST /api/admin/matches/[id]/resolve` | `RESULT_VALIDATED` | Résultat validé |
 | `PATCH /api/admin/matches/[id]/scores` | `SCORES_SAVED` | Score enregistré |
 | `POST /api/admin/matches/[id]/launch` | `FORCE_LAUNCHED` | Lancement forcé |
-| `PUT /api/admin/matches/[id]/host` | `HOST_SET` / `HOST_CLEARED` | Hôte désigné / retiré |
+| `PUT /api/admin/matches/[id]/host` | `HOST_SET` / `HOST_CLEARED` | Hôte désigné / retiré (seulement quand l'hôte change) |
 | `PUT /api/admin/matches/[id]/live` | `LIVE_CONFIGURED` / `LIVE_REMOVED` (déclencheur `null`) | Diffusion réglée / retirée |
-| `POST /api/admin/matches/[id]/live` | `ON_AIR` / `OFF_AIR` | Mis à l'antenne / Retiré de l'antenne |
-| `PUT /api/admin/matches/[id]/replay` | `REPLAY_SET` / `REPLAY_REMOVED` | Rediffusion ajoutée / retirée |
-| `PATCH /api/tournaments/[id]/edit` | `EDITED` | Tournoi modifié |
-| `PATCH /api/admin/tournaments/[id]/seeding` | `SEEDING_REORDERED` | Têtes de série réordonnées |
-| `POST /api/admin/tournaments/[id]/advance` | `ADVANCED` | Étape suivante avancée |
+| `POST /api/admin/matches/[id]/live` | `ON_AIR` / `OFF_AIR` | Mis à l'antenne / Retiré de l'antenne (seulement quand l'état change) |
+| `PUT /api/admin/matches/[id]/replay` | `REPLAY_SET` / `REPLAY_REMOVED` | Rediffusion ajoutée / retirée (seulement quand le lien change) |
+| `PATCH /api/tournaments/[id]/edit` | `EDITED` | Tournoi modifié (ancien nom entre parenthèses quand le nom change) |
+| `PATCH /api/admin/tournaments/[id]/seeding` | `SEEDING_REORDERED` | Têtes de série réordonnées (une rafale = une ligne, voir plus bas) |
+| `POST /api/admin/tournaments/[id]/advance` | `ADVANCED` | Étape suivante avancée (ouverture des inscriptions, clôture des inscriptions ou coup d'envoi) |
 | `POST /api/admin/tournaments/[id]/ghost-registrations` | `GHOST_TEAMS_REGISTERED` (nombre) | Équipes fantômes inscrites (N) |
-| `POST` / `PATCH` / `DELETE /api/admin/tournaments/[id]/image` | `IMAGE_SET` / `IMAGE_UPDATED` / `IMAGE_REMOVED` | Image ajoutée / cadrage modifié / image retirée |
+| `POST` / `PATCH` / `DELETE /api/admin/tournaments/[id]/image` | `IMAGE_SET` / `IMAGE_REPLACED` / `IMAGE_UPDATED` / `IMAGE_REMOVED` | Image ajoutée / remplacée / cadrage modifié / image retirée |
 | `PUT /api/admin/tournaments/[id]/live` | `LIVE_URL_SET` / `LIVE_URL_REMOVED` | Lien de diffusion du tournoi posé / retiré |
 | `PUT /api/admin/tournaments/[id]/voice-channels` | `TEAM_VOICE_ON` / `TEAM_VOICE_OFF` | Option « Salons vocaux d'équipe » allumée / éteinte (seulement quand elle change) |
 
@@ -52,6 +53,29 @@ L'auteur est « le staff », ou « un caster » pour un geste de diffusion
 Les engagés passent par `entrantLabel` (« un joueur » en tournoi individuel,
 « TBD » pour une place vide) ; ni score, ni lien, ni équipe hôte : la page du
 match dit le détail.
+
+Les têtes de série se réordonnent par glissements successifs : `SEEDING_REORDERED`
+passe par un regroupeur (`lib/server/coalescer.ts`) par tournoi — une ligne
+après 60 s sans nouveau geste, au plus tard 5 min après le premier. Un autre
+geste sur le même tournoi fait d'abord partir la rafale en attente (le journal
+garde l'ordre), et l'arrêt propre du serveur l'annonce avant les lots du journal
+(`flushAllCoalescers`, `bot-log-shutdown.ts`), comme les lignes de tournoi et
+de match déjà parties qui lisent encore la base (`trackAnnouncement`). Les
+lignes d'un même tournoi, et celles d'un même match, s'enchaînent
+(`createKeyedChain`) : la suivante attend la précédente, sans retenir les autres
+— une rafale prend aussi son tour dans cette file, qu'elle parte à son échéance
+ou vidée par un geste suivant (détachée au moment de ce geste : une rafale
+ouverte après lui reste à venir). Le regroupeur y range la rafale dans le tour
+même (`deliverQueues`), sans attendre la précédente : la file garde l'ordre. Un geste fait
+coupe-circuit ouvert garde sa ligne : elle rejoint le lot, qui ne part que
+minutes plus tard (`LOG_BATCHING.md`). Une modification nomme le
+tournoi sous le nom qu'elle a écrit, un renommage cite aussi l'ancien, tous deux lus sous le verrou
+(`updateTournament` rend `{ previousName, name }`) — un second renommage
+rapproché ne fausse pas la première ligne. Le regroupeur vit en mémoire : un
+seul processus sert le site.
+« Changé » ne se lit jamais dans une lecture hors verrou : l'hôte se compare sous
+le verrou du match, l'antenne et la rediffusion dans l'écriture elle-même
+(condition sur l'état de départ, `changedRows`).
 
 ## Ce qui ne change pas
 
@@ -79,5 +103,5 @@ donnée nouvelle (noms d'équipe, tournoi, manche — déjà au journal), ni
 destinataire nouveau, ni durée nouvelle, et l'auteur n'est pas identifié.
 
 Tests : `tests/lib/shared/staff-action-logs.test.ts`,
-`tests/lib/server/staff-action-logs.test.ts`,
+`tests/lib/server/staff-action-logs.test.ts`, `tests/lib/server/coalescer.test.ts`,
 `tests/app/api/admin/staff-action-log-routes.test.ts`.

@@ -242,12 +242,20 @@ export async function loadEditableTournament(
   }
 }
 
+/**
+ * Applique un patch d'édition. Rend le nom du tournoi **d'avant** et celui
+ * qu'il vient d'écrire, lus sous le verrou de la ligne : le journal du staff
+ * cite l'un et nomme le tournoi sous l'autre, même si un second renommage
+ * suit avant que sa ligne parte.
+ */
 export async function updateTournament(
   tournamentId: number,
   patch: Partial<EditableTournamentValues>,
-): Promise<void> {
+): Promise<{ previousName: string; name: string }> {
   const db = await getDatabase();
   const connection = await db.getConnection();
+  let previousName: string;
+  let name: string;
 
   try {
     await connection.beginTransaction();
@@ -267,6 +275,7 @@ export async function updateTournament(
       startVisibilityAt: current.startVisibilityAt,
       maxTeams: current.maxTeams,
     };
+    previousName = current.name;
 
     if (editWindowFor(editable) === "LOCKED") throw new Error("TOURNAMENT_LOCKED");
 
@@ -282,6 +291,7 @@ export async function updateTournament(
     const next: EditableTournamentValues = { ...current, ...patch };
 
     const { valid, normalizedPhases } = validateEditedValues(next);
+    name = valid.name;
 
     await connection.execute(
       `UPDATE bg_tournaments SET
@@ -370,6 +380,7 @@ export async function updateTournament(
   }
 
   publishUpdatedEvent(tournamentId);
+  return { previousName, name };
 }
 
 /**

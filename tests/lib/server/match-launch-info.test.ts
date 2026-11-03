@@ -8,6 +8,7 @@ import { withConnection } from "@/lib/server/database";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { listViewerMatchLaunches, loadViewerMatchContacts } from "@/lib/server/tournaments/match-launch-info";
 import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
+import * as castNotices from "@/lib/server/tournaments/cast-notices";
 import { fakeConnection } from "../../helpers/sql-double";
 
 /**
@@ -721,6 +722,53 @@ describe("listViewerMatchLaunches — lancement d'office", () => {
     state.candidates = [candidate({ lobby_opened_at: new Date(Date.now() - 20 * 60_000).toISOString() })];
     await listViewerMatchLaunches(viewer);
     expect(state.writes.some((w) => w.includes("SET launched_at = NOW()"))).toBe(true);
+  });
+
+  it("maintainIfDue_maintenanceCommits_flushesCastChangesAfterCommit", async () => {
+    // Les casters désinscrits par l'entretien ne s'annoncent qu'après le commit.
+    const order: string[] = [];
+    const connection = Object.assign(connectionFor(state), {
+      commit: jest.fn<() => Promise<void>>(async () => {
+        order.push("commit");
+      }),
+    });
+    const flush = jest.spyOn(castNotices, "flushCastChanges").mockImplementation(() => {
+      order.push("flush");
+    });
+    const discard = jest.spyOn(castNotices, "discardCastChanges");
+    jest.mocked(withConnection).mockImplementation((run) => run(connection));
+    state.candidates = [candidate({ lobby_opened_at: null })];
+
+    await listViewerMatchLaunches(viewer);
+
+    expect(flush).toHaveBeenCalledWith(connection);
+    // Chaque transaction de l'entretien : le commit, puis l'annonce.
+    expect(order).toEqual(["commit", "flush", "commit", "flush"]);
+    expect(discard).not.toHaveBeenCalled();
+    flush.mockRestore();
+    discard.mockRestore();
+  });
+
+  it("maintainIfDue_maintenanceFails_discardsCastChanges", async () => {
+    // Un entretien qui échoue n'annonce rien : la file est jetée, pas reportée
+    // à la transaction suivante de la connexion.
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const connection = Object.assign(connectionFor(state), {
+      commit: jest.fn<() => Promise<void>>().mockRejectedValue(new Error("commit perdu")),
+    });
+    const flush = jest.spyOn(castNotices, "flushCastChanges");
+    const discard = jest.spyOn(castNotices, "discardCastChanges");
+    jest.mocked(withConnection).mockImplementation((run) => run(connection));
+    state.candidates = [candidate({ lobby_opened_at: null })];
+
+    await listViewerMatchLaunches(viewer);
+
+    expect(discard).toHaveBeenCalledWith(connection);
+    expect(flush).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith("[match-launch] entretien impossible", expect.any(Error));
+    flush.mockRestore();
+    discard.mockRestore();
+    error.mockRestore();
   });
 
   it("n'écrit rien quand rien n'est dû", async () => {

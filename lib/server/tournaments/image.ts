@@ -77,7 +77,9 @@ async function discardFile(url: string | null): Promise<void> {
 }
 
 /**
- * Pose (ou remplace) l'image d'un tournoi.
+ * Pose (ou remplace) l'image d'un tournoi. `replaced` : une image était déjà
+ * en place et cède la place à la nouvelle — son fichier est effacé, sauf s'il
+ * porte le même chemin (le journal du staff dit « remplacée »).
  *
  * @throws `TOURNAMENT_NOT_FOUND`, ou l'erreur de traitement d'image
  *   (`IMAGE_TOO_LARGE`, `IMAGE_FORMAT_INVALID`…) — voir `image-upload.ts`.
@@ -87,7 +89,7 @@ export async function setTournamentImage(
   file: File,
   settings: TournamentImageSettings,
   crop: CropRect | null = null,
-): Promise<TournamentImage> {
+): Promise<TournamentImage & { replaced: boolean }> {
   const url = toServedUploadUrl(await processAndStoreImage(file, "tournament-image", tournamentId, crop));
 
   let previousUrl: string | null;
@@ -108,7 +110,7 @@ export async function setTournamentImage(
 
   if (previousUrl !== url) await discardFile(previousUrl);
   publishUpdatedEvent(tournamentId);
-  return { url, ...settings };
+  return { url, ...settings, replaced: previousUrl !== null };
 }
 
 /**

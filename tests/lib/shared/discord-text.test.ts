@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { discordInline, discordQuote } from "@/lib/shared/discord-text";
+import { discordInline, discordQuote, discordQuoted } from "@/lib/shared/discord-text";
 import { entrantLabel } from "@/lib/shared/log-privacy";
 import { buildIssueReportMessage } from "@/lib/shared/discord-notifications";
 import { formatTeamJoinRequestNotice } from "@/lib/shared/team-join-request-notice";
@@ -137,5 +137,16 @@ describe("discordInline — barre oblique inverse", () => {
   it("échappe la barre oblique elle-même : un nom ne peut pas défaire la balise qui le suit", () => {
     const backslash = String.fromCharCode(92);
     expect(discordInline(`x${backslash}`)).toBe(`x${backslash}${backslash}`);
+  });
+});
+
+describe("discordQuoted", () => {
+  it("discordQuoted_fr_frenchQuotes", () => {
+    expect(discordQuoted("Renards", "fr")).toBe("« Renards »");
+  });
+
+  it("discordQuoted_en_curlyQuotesAndNeutralised", () => {
+    expect(discordQuoted("@everyone", "en")).toBe(`“${discordInline("@everyone")}”`);
+    expect(discordQuoted("@everyone", "en")).not.toContain("“@everyone”");
   });
 });

@@ -433,8 +433,6 @@ export function MatchCardActions({
   const actionName = (label: string) => matchCardActionName(label, matchLabel, actionText);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
-  const [confirmForce, setConfirmForce] = useState(false);
-  const [contactsOpen, setContactsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
@@ -444,7 +442,7 @@ export function MatchCardActions({
   // Une confirmation en attente ne survit pas à la disparition de son action :
   // sans cette remise à zéro, la modale se rouvrirait seule au retour de
   // « Forcer » (instantané du flux), sans clic.
-  if (confirmForce && !hasForce) setConfirmForce(false);
+  const [confirmForce, setConfirmForce] = useConfirmWhile(hasForce);
   // Même règle pour le retrait du caster (match terminé, caster parti…).
   const { confirmRelease, openRelease, setConfirmRelease, releasedCaster, setReleaseTarget, markOwnRelease } =
     useReleaseConfirm(
@@ -459,7 +457,7 @@ export function MatchCardActions({
   // Les contacts ne restent pas affichés quand le match ne les offre plus
   // (terminé, caster retiré, tournoi clos) : l'instantané du flux retire
   // l'action, et la modale se ferme avec elle.
-  if (contactsOpen && !actions.some((a) => a.id === "contacts")) setContactsOpen(false);
+  const [contactsOpen, setContactsOpen] = useConfirmWhile(actions.some((a) => a.id === "contacts"));
   // La fenêtre « Arbitrage » se ferme avec son action (match joué, tournoi clos).
   const [refereeOpen, setRefereeOpen] = useConfirmWhile(actions.some((a) => a.id === "referee"));
   // Ouvert **et** encore quelque chose à montrer : un instantané du flux qui
@@ -770,8 +768,9 @@ export function MatchCardActions({
           document.body,
         )}
       {/* Refermée — et oubliée — si l'action disparaît (match lancé entre-temps
-          par un autre arbitre). */}
-      {confirmForce && hasForce && (
+          par un autre arbitre) : c'est `useConfirmWhile` (plus haut) qui le
+          garantit, pas cette garde seule. */}
+      {confirmForce && (
         <ConfirmActionDialog
           title={t("cardActions.forceConfirm.title", { match: matchLabel })}
           confirmLabel={t("cardActions.forceConfirm.confirm")}

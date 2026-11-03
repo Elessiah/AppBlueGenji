@@ -47,13 +47,15 @@ function isReplayableRow(row: MatchReplayRow): boolean {
  * revanche une rencontre réellement disputée (`canHaveReplay`), sans quoi le
  * bandeau annoncerait la rediff d'un match qui n'a pas eu lieu.
  *
- * @returns le lien normalisé, ou `null` s'il a été effacé.
+ * @returns le lien normalisé (`null` s'il a été effacé), et `changed` : le
+ *   lien a changé — effacer un lien jamais posé, ou reposer le même, ne change
+ *   rien, et le journal du staff ne le note pas.
  * @throws `INVALID_REPLAY_URL` | `MATCH_NOT_FOUND` | `MATCH_NOT_REPLAYABLE`
  */
 export async function setMatchReplayUrl(
   matchId: number,
   rawUrl: string | null,
-): Promise<string | null> {
+): Promise<{ replayUrl: string | null; changed: boolean }> {
   const blank = rawUrl === null || rawUrl.trim() === "";
   const replayUrl = blank ? null : normalizeReplayUrl(rawUrl);
   if (!blank && replayUrl === null) throw new Error("INVALID_REPLAY_URL");
@@ -82,6 +84,10 @@ export async function setMatchReplayUrl(
     throw new Error("MATCH_NOT_REPLAYABLE");
   }
 
-  publishMatchUpdatedEvent(Number(row.tournament_id));
-  return replayUrl;
+  // « Changé » se lit dans la réponse de l'écriture (`changedRows`), pas dans la
+  // lecture d'avant : deux effacements simultanés n'en comptent qu'un, et un lien
+  // identique à celui en base ne change rien.
+  const changed = Number((result as { changedRows?: number }).changedRows ?? 0) > 0;
+  if (changed) publishMatchUpdatedEvent(Number(row.tournament_id));
+  return { replayUrl, changed };
 }

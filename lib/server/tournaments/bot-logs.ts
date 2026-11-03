@@ -77,7 +77,8 @@ import {
 } from "@/lib/shared/referee-alerts";
 import { tournamentPageUrl } from "./app-url";
 import { STALLED_ALERT_KEY } from "./score-report-sql";
-import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
+import { isSwissRound } from "./swiss-round-sql";
+import { MATCH_LOG_COLUMNS_SQL, MATCH_LOG_FROM_SQL, type MatchLogRow as SubjectRow } from "./match-log-subject";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
 /**
@@ -961,11 +962,7 @@ async function loadEntrantName(teamId: number): Promise<string | null> {
   return rows[0]?.name ?? null;
 }
 
-type MatchLogRow = RowDataPacket & {
-  id: number;
-  bracket: string;
-  round_number: number;
-  swiss_round: number;
+type MatchLogRow = SubjectRow & {
   team1_score: number | null;
   team2_score: number | null;
   forfeit_team_id: number | null;
@@ -974,21 +971,13 @@ type MatchLogRow = RowDataPacket & {
   status?: string | null;
   referee_user_id?: number | null;
   self_managed?: number | null;
-  team1_name: string | null;
-  team2_name: string | null;
-  tournament_id: number;
-  tournament_name: string;
-  participant_type: string | null;
 };
 
 async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<MatchLogRow[]>(
     `SELECT
-        m.id,
-        m.bracket,
-        m.round_number,
-        ${swissRoundSql("m", "tr")},
+        ${MATCH_LOG_COLUMNS_SQL},
         m.team1_score,
         m.team2_score,
         m.forfeit_team_id,
@@ -996,18 +985,8 @@ async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
         m.is_bye,
         m.status,
         m.referee_user_id,
-        m.self_managed,
-        t1.name AS team1_name,
-        t2.name AS team2_name,
-        tr.id AS tournament_id,
-        tr.name AS tournament_name,
-        tr.participant_type
-       FROM bg_matches m
-       JOIN bg_tournaments tr ON tr.id = m.tournament_id
-       LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
-       LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
-      WHERE m.id = ?
-      LIMIT 1`,
+        m.self_managed
+       ${MATCH_LOG_FROM_SQL}`,
     [matchId],
   );
   return rows[0] ?? null;

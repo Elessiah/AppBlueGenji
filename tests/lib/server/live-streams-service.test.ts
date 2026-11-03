@@ -577,7 +577,10 @@ describe("setMatchOnAir", () => {
 
     await setMatchOnAir(42, false);
 
-    expect((execute.mock.calls[1] as [string, unknown[]])[1]).toEqual([null, 42]);
+    const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
+    expect(sql).toContain("live_started_at = NULL");
+    expect(sql).toContain("live_started_at IS NOT NULL");
+    expect(params).toEqual([42]);
   });
 
   it("referme l'antenne même sur un match déjà noté — nettoyage toujours permis", async () => {
@@ -589,7 +592,7 @@ describe("setMatchOnAir", () => {
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
-    await expect(setMatchOnAir(42, false)).resolves.toBeUndefined();
+    await expect(setMatchOnAir(42, false)).resolves.toBe(true);
   });
 
   it("refuse d'ouvrir l'antenne sur un match en AUTO", async () => {
@@ -765,5 +768,67 @@ describe("findBroadcastingTournament", () => {
     await mockDb(execute);
 
     expect(await findBroadcastingTournament()).toBeNull();
+  });
+});
+
+describe("setMatchOnAir — changement d'état", () => {
+  /** Lecture, UPDATE conditionnel (lignes touchées), puis relecture si rien n'a changé. */
+  function liveRows(before: Record<string, unknown>, affectedRows: number, after: Record<string, unknown> = before) {
+    return jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow(before)]])
+      .mockResolvedValueOnce([{ affectedRows }])
+      .mockResolvedValueOnce([[matchRow(after)]]);
+  }
+
+  it("setMatchOnAir_alreadyOnAir_returnsFalse", async () => {
+    const execute = liveRows({ live_trigger: "MANUAL", live_started_at: new Date() }, 0);
+    await mockDb(execute);
+    await expect(setMatchOnAir(42, true)).resolves.toBe(false);
+    // L'heure de mise à l'antenne n'est pas réécrite : la condition la garde.
+    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND live_started_at IS NULL");
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchOnAir_concurrentSecondClick_returnsFalse", async () => {
+    // Les deux clics ont lu l'antenne fermée ; seul le premier UPDATE trouve la ligne.
+    await mockDb(liveRows({ live_trigger: "MANUAL", live_started_at: null }, 0, { live_trigger: "MANUAL", live_started_at: new Date() }));
+    await expect(setMatchOnAir(42, true)).resolves.toBe(false);
+  });
+
+  it("setMatchOnAir_matchCompletedBeforeWrite_throwsNotLiveReady", async () => {
+    // Lu READY, validé avant l'UPDATE : la condition sur le statut ne trouve plus la ligne.
+    const execute = liveRows({ live_trigger: "MANUAL", live_started_at: null }, 0, {
+      live_trigger: "MANUAL",
+      live_started_at: null,
+      status: "COMPLETED",
+    });
+    await mockDb(execute);
+    await expect(setMatchOnAir(42, true)).rejects.toThrow("MATCH_NOT_LIVE_READY");
+    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND status = 'READY'");
+    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND live_trigger = 'MANUAL'");
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchOnAir_triggerSwitchedToAutoBeforeOffAirWrite_throwsNotManual", async () => {
+    // Lu MANUAL à l'antenne, passé en automatique avant l'UPDATE : la ligne n'est plus trouvée.
+    const execute = liveRows({ live_trigger: "MANUAL", live_started_at: new Date() }, 0, {
+      live_trigger: "AUTO",
+      live_started_at: new Date(),
+    });
+    await mockDb(execute);
+    await expect(setMatchOnAir(42, false)).rejects.toThrow("LIVE_TRIGGER_NOT_MANUAL");
+    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND live_trigger = 'MANUAL'");
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchOnAir_offAir_switchOn_returnsTrue", async () => {
+    await mockDb(liveRows({ live_trigger: "MANUAL", live_started_at: null }, 1));
+    await expect(setMatchOnAir(42, true)).resolves.toBe(true);
+  });
+
+  it("setMatchOnAir_alreadyOffAir_returnsFalse", async () => {
+    await mockDb(liveRows({ live_trigger: "MANUAL", live_started_at: null }, 0));
+    await expect(setMatchOnAir(42, false)).resolves.toBe(false);
   });
 });

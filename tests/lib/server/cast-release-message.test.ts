@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { formatCastChangeLog, type CastLogChange } from "@/lib/shared/bot-logs";
-import { formatCastReleasedNotice, type CastReleasedMatch, type CastReleaseReason } from "@/lib/shared/cast-notices";
+import { castReleaseReasonKey, type CastReleasedMatch, type CastReleaseReason } from "@/lib/shared/cast-notices";
+import { formatCastReleasedNotice } from "@/lib/server/tournaments/cast-release-message";
 import { castReleasedPush } from "@/lib/shared/push-messages";
 import { DM_MAX_LENGTH } from "@/lib/shared/dm-language";
 import { PUSH_BODY_MAX, PUSH_TOPICS } from "@/lib/shared/push-notifications";
@@ -155,6 +156,64 @@ describe("sujet CAST_RELEASED", () => {
     }
     expect(enPush.topics.CAST_RELEASED.description).toBe(
       "Your caster registration for a match is removed by the staff or automatically: the reason is given.",
+    );
+  });
+});
+
+describe("castReleaseReasonKey", () => {
+  it("castReleaseReasonKey_ineligibleNotCaster_returnsPermission", () => {
+    expect(castReleaseReasonKey({ reason: "INELIGIBLE", block: "NOT_CASTER" })).toBe("INELIGIBLE_PERMISSION");
+  });
+
+  it("castReleaseReasonKey_ineligibleIdentity_returnsIdentity", () => {
+    expect(castReleaseReasonKey({ reason: "INELIGIBLE", block: "CASTER_IDENTITY_REQUIRED" })).toBe("INELIGIBLE_IDENTITY");
+  });
+
+  it("castReleaseReasonKey_ineligibleNoBlock_returnsIneligible", () => {
+    expect(castReleaseReasonKey({ reason: "INELIGIBLE", block: null })).toBe("INELIGIBLE");
+    expect(castReleaseReasonKey({ reason: "INELIGIBLE" })).toBe("INELIGIBLE");
+  });
+
+  it("castReleaseReasonKey_otherReason_ignoresBlock", () => {
+    expect(castReleaseReasonKey({ reason: "STAFF", block: "NOT_CASTER" })).toBe("STAFF");
+  });
+});
+
+describe("motif décliné selon la condition qui manque", () => {
+  it("formatCastReleasedNotice_ineligiblePermission_namesPermissionOnly", () => {
+    const subject = match({ reason: "INELIGIBLE", block: "NOT_CASTER" });
+    expect(formatCastReleasedNotice(subject, URL, "fr")).toContain("a été retirée : tu n'as plus la permission de diffusion.");
+    expect(formatCastReleasedNotice(subject, URL, "en")).toContain("has been removed: you no longer have the streaming permission.");
+  });
+
+  it("formatCastReleasedNotice_ineligibleIdentity_pointsToProfile", () => {
+    const subject = match({ reason: "INELIGIBLE", block: "CASTER_IDENTITY_REQUIRED" });
+    expect(formatCastReleasedNotice(subject, URL, "fr")).toContain("ton identité de caster est incomplète");
+    expect(formatCastReleasedNotice(subject, URL, "en")).toContain("your caster identity is incomplete");
+  });
+
+  it("castReleasedPush_ineligibleBlocks_frAndEn", () => {
+    expect(castReleasedPush(match({ reason: "INELIGIBLE", block: "NOT_CASTER" }), "fr").body).toContain("tu n'as plus la permission de diffusion");
+    expect(castReleasedPush(match({ reason: "INELIGIBLE", block: "NOT_CASTER" }), "en").body).toContain("you no longer have the streaming permission");
+    expect(castReleasedPush(match({ reason: "INELIGIBLE", block: "CASTER_IDENTITY_REQUIRED" }), "fr").body).toContain("identité de caster est incomplète");
+    expect(castReleasedPush(match({ reason: "INELIGIBLE", block: "CASTER_IDENTITY_REQUIRED" }), "en").body).toContain("caster identity is incomplete");
+  });
+
+  it("castReleasedPush_identityBlock_pointsToProfile", () => {
+    const subject = match({ reason: "INELIGIBLE", block: "CASTER_IDENTITY_REQUIRED" });
+    expect(castReleasedPush(subject, "fr").body).toContain("« Mon profil »");
+    expect(castReleasedPush(subject, "en").body).toContain("“My profile”");
+  });
+
+  it("castReleasedPush_permissionBlock_doesNotPointToProfile", () => {
+    const subject = match({ reason: "INELIGIBLE", block: "NOT_CASTER" });
+    expect(castReleasedPush(subject, "fr").body).not.toContain("Mon profil");
+    expect(castReleasedPush(subject, "en").body).not.toContain("My profile");
+  });
+
+  it("castReleasedPush_replacedEn_joinsWithAnd", () => {
+    expect(castReleasedPush(match({ reason: "REPLACED" }), "en").body).toContain(
+      "requirements and another caster took your place",
     );
   });
 });

@@ -58,7 +58,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   try {
     await registerGhostTeams(tournamentId, selection.teamIds);
-    announceStaffTournamentAction(tournamentId, "GHOST_TEAMS_REGISTERED", selection.teamIds.length);
+    announceStaffTournamentAction(tournamentId, "GHOST_TEAMS_REGISTERED", { count: selection.teamIds.length });
     return ok({ success: true, registered: selection.teamIds.length }, 201);
   } catch (error) {
     const message = (error as Error).message;

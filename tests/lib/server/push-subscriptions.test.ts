@@ -26,7 +26,8 @@ import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notification
 import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 const CONFIG = { publicKey: "pk", privateKey: {} as WebPushConfig["privateKey"], subject: "mailto:a@b.test" };
-const SUB = { endpoint: "https://fcm.googleapis.com/fcm/send/a", p256dh: "k", auth: "s" };
+/** Titulaire administrateur : un sujet réservé à une permission (`MATCH_SCHEDULED`, `CAST_RELEASED`) l'atteint. */
+const SUB = { endpoint: "https://fcm.googleapis.com/fcm/send/a", p256dh: "k", auth: "s", is_admin: 1, platform_roles_json: null };
 
 function pool(members: { query?: jest.Mock<SqlQuery>; execute?: jest.Mock<SqlQuery>; getConnection?: unknown }) {
   jest.mocked(getDatabase).mockResolvedValue(fakePool(members));
@@ -99,7 +100,7 @@ describe("pushToUsers", () => {
     const query = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[{ id: 10, ...SUB }, { id: 11, ...SUB, endpoint: "https://fcm.googleapis.com/fcm/send/b" }]])
-      .mockRejectedValue(new Error("deadlock"));
+      .mockRejectedValue(Object.assign(new Error("deadlock"), { code: "ER_LOCK_DEADLOCK" }));
     pool({ query });
     jest.mocked(sendWebPush).mockResolvedValueOnce("SENT").mockResolvedValueOnce("GONE");
 
@@ -107,7 +108,7 @@ describe("pushToUsers", () => {
 
     // Un appelant qui lirait 0 croirait n'avoir prévenu personne (marques « reçu »).
     expect(count).toBe(1);
-    expect(error).toHaveBeenCalledWith("[push] tenue des abonnements impossible", expect.any(Error));
+    expect(error).toHaveBeenCalledWith("[push] tenue des abonnements impossible", "ER_LOCK_DEADLOCK");
     error.mockRestore();
   });
 
@@ -118,10 +119,25 @@ describe("pushToUsers", () => {
       .mockResolvedValueOnce([[{ id: 10, ...SUB }, { id: 11, ...SUB, endpoint: "https://fcm.googleapis.com/fcm/send/b" }]])
       .mockResolvedValue([{ affectedRows: 1 }]);
     pool({ query });
-    jest.mocked(sendWebPush).mockResolvedValueOnce("SENT").mockRejectedValueOnce(new Error("réseau"));
+    jest.mocked(sendWebPush).mockResolvedValueOnce("SENT").mockRejectedValueOnce(new Error("réseau https://fcm.googleapis.com/fcm/send/b"));
 
     expect(await pushToUsers([1], "MATCH_SCHEDULED", () => ({ title: "t", body: "b", url: "/" }), {}, CONFIG)).toBe(1);
-    expect(error).toHaveBeenCalledWith("[push] envoi interrompu", expect.any(Error));
+    expect(error).toHaveBeenCalledWith("[push] envoi interrompu", "Error");
+    expect(JSON.stringify(error.mock.calls)).not.toContain("fcm.googleapis.com");
+    error.mockRestore();
+  });
+
+  it("pushToUsers_readFailsWithCodedError_logsCodeOnly", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const query = jest
+      .fn<SqlQuery>()
+      .mockRejectedValue(
+        Object.assign(new Error("Connection lost"), { code: "PROTOCOL_CONNECTION_LOST", sql: "SELECT … IN (1, 2)" }),
+      );
+    pool({ query });
+
+    expect(await pushToUsers([1], "MATCH_SCHEDULED", () => ({ title: "t", body: "b", url: "/" }), {}, CONFIG)).toBe(0);
+    expect(error).toHaveBeenCalledWith("[push] distribution impossible", "PROTOCOL_CONNECTION_LOST");
     error.mockRestore();
   });
 
@@ -216,6 +232,36 @@ describe("usersReachableByPush", () => {
     expect(sql).toContain("u.is_deleted = 0");
     expect(sql).toContain("o.topic = ?");
     expect(params).toEqual([1, 2, 3, "MATCH_REMINDER"]);
+  });
+
+  it("usersReachableByPush_restrictedTopic_noDistinctOnTheRolesColumn", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+    pool({ query });
+    await usersReachableByPush([5], "CAST_RELEASED", CONFIG);
+    const [sql] = query.mock.calls[0] as unknown as [string];
+    expect(sql).not.toContain("DISTINCT");
+    expect(sql).toContain("u.platform_roles_json");
+  });
+
+  it("usersReachableByPush_restrictedTopicSeveralDevices_oneAccountOnce", async () => {
+    const roles = JSON.stringify(["CASTER"]);
+    const query = jest.fn<SqlQuery>().mockResolvedValue([
+      [
+        { user_id: 5, is_admin: 0, platform_roles_json: roles },
+        { user_id: 5, is_admin: 0, platform_roles_json: roles },
+        { user_id: 6, is_admin: 0, platform_roles_json: null },
+      ],
+    ]);
+    pool({ query });
+    await expect(usersReachableByPush([5, 6], "CAST_RELEASED", CONFIG)).resolves.toEqual(new Set([5]));
+  });
+
+  it("usersReachableByPush_openTopic_distinctUserIds", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+    pool({ query });
+    await usersReachableByPush([5], "MATCH_REMINDER", CONFIG);
+    const [sql] = query.mock.calls[0] as unknown as [string];
+    expect(sql).toContain("SELECT DISTINCT s.user_id");
   });
 
   it("ne lit rien sans configuration push ni compte, et tient une table absente pour vide", async () => {
@@ -376,8 +422,73 @@ describe("staff, purge et export", () => {
       .mockRejectedValueOnce(Object.assign(new Error("x"), { code: "ER_NO_SUCH_TABLE" }));
     pool({ execute });
     expect(await exportPushData(7)).toEqual({
-      devices: [{ ...SUB, createdAt: "2026-09-01T10:00:00.000Z", lastSuccessAt: null }],
+      devices: [{ endpoint: SUB.endpoint, p256dh: SUB.p256dh, auth: SUB.auth, createdAt: "2026-09-01T10:00:00.000Z", lastSuccessAt: null }],
       disabledTopics: [],
     });
+  });
+});
+
+describe("pushToUsers — sujet réservé à une permission", () => {
+  const content = () => ({ title: "t", body: "b", url: "/" });
+
+  it("ne remet qu'aux titulaires qui détiennent encore la permission, et lit leurs droits avec l'abonnement", async () => {
+    const query = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([
+        [
+          { id: 10, ...SUB, is_admin: 0, platform_roles_json: JSON.stringify(["CASTER"]) },
+          { id: 11, ...SUB, is_admin: 0, platform_roles_json: null, endpoint: "https://fcm.googleapis.com/fcm/send/b" },
+          { id: 12, ...SUB, is_admin: 1, endpoint: "https://fcm.googleapis.com/fcm/send/c" },
+        ],
+      ])
+      .mockResolvedValue([{ affectedRows: 1 }]);
+    pool({ query });
+    jest.mocked(sendWebPush).mockResolvedValue("SENT");
+
+    await expect(pushToUsers([5, 6, 7], "CAST_RELEASED", content, {}, CONFIG)).resolves.toBe(2);
+
+    const [sql] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("u.is_admin, u.platform_roles_json");
+    // Un compte suspendu qui garde la permission ne reçoit rien, comme côté staff.
+    expect(sql).toContain("bg_account_suspensions");
+    expect(jest.mocked(sendWebPush).mock.calls.map((call) => call[1].endpoint)).toEqual([
+      SUB.endpoint,
+      "https://fcm.googleapis.com/fcm/send/c",
+    ]);
+  });
+
+  it("aucun titulaire ne détient la permission : rien ne part", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValueOnce([[{ id: 10, ...SUB, is_admin: 0, platform_roles_json: null }]]);
+    pool({ query });
+    await expect(pushToUsers([5], "CAST_RELEASED", content, {}, CONFIG)).resolves.toBe(0);
+    expect(sendWebPush).not.toHaveBeenCalled();
+  });
+
+  it("sujet ouvert : ni droits lus ni filtre de suspension", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValueOnce([[{ id: 10, ...SUB, is_admin: 0 }]]).mockResolvedValue([{ affectedRows: 1 }]);
+    pool({ query });
+    jest.mocked(sendWebPush).mockResolvedValue("SENT");
+    await expect(pushToUsers([5], "MATCH_REMINDER", content, {}, CONFIG)).resolves.toBe(1);
+    const [sql] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).not.toContain("platform_roles_json");
+    expect(sql).not.toContain("bg_account_suspensions");
+  });
+
+  it("sans configuration push : aucune lecture", async () => {
+    const query = jest.fn<SqlQuery>();
+    pool({ query });
+    await expect(pushToUsers([5], "CAST_RELEASED", content, {}, null)).resolves.toBe(0);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("usersReachableByPush applique la même règle", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValueOnce([
+      [
+        { user_id: 5, is_admin: 0, platform_roles_json: JSON.stringify(["CASTER"]) },
+        { user_id: 6, is_admin: 0, platform_roles_json: null },
+      ],
+    ]);
+    pool({ query });
+    await expect(usersReachableByPush([5, 6], "CAST_RELEASED", CONFIG)).resolves.toEqual(new Set([5]));
   });
 });

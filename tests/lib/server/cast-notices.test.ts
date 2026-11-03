@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
@@ -16,7 +16,10 @@ import {
   deliverCastChange,
   discardCastChanges,
   flushCastChanges,
+  flushCastToggles,
   queueCastChange,
+  resetCastToggles,
+  CAST_TOGGLE_WINDOW_MS,
   type CastChange,
 } from "@/lib/server/tournaments/cast-notices";
 import type { CastLogChange } from "@/lib/shared/bot-logs";
@@ -59,6 +62,15 @@ beforeEach(() => {
     .mockResolvedValue({ discord: { sent: 1, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 1 });
 });
 
+/** La première lecture des destinataires reste en suspens jusqu'à l'appel rendu. */
+function slowFirstRecipientsRead(): () => void {
+  let release: () => void = () => undefined;
+  jest
+    .mocked(loadNotificationRecipients)
+    .mockImplementationOnce(() => new Promise((resolve) => (release = () => resolve([RECIPIENT]))));
+  return () => release();
+}
+
 function loggedLine(category = "casts"): string {
   expect(sendBotLog).toHaveBeenCalledTimes(1);
   expect(jest.mocked(sendBotLog).mock.calls[0][1]).toMatchObject({ category });
@@ -72,8 +84,8 @@ function notification() {
 
 describe("castLogChange / castReleaseNotice", () => {
   it.each<[CastChange, CastLogChange, { casterId: number; reason: CastReleaseReason } | null]>([
-    [{ kind: "CLAIMED", matchId: 1, replacedCasterId: null }, "CLAIMED", null],
-    [{ kind: "CLAIMED", matchId: 1, replacedCasterId: 5 }, "REPLACED", { casterId: 5, reason: "REPLACED" }],
+    [{ kind: "CLAIMED", matchId: 1, casterId: 9, replacedCasterId: null }, "CLAIMED", null],
+    [{ kind: "CLAIMED", matchId: 1, casterId: 9, replacedCasterId: 5 }, "REPLACED", { casterId: 5, reason: "REPLACED" }],
     [{ kind: "RELEASED", matchId: 1, casterId: 5, byStaff: false }, "RELEASED", null],
     [{ kind: "RELEASED", matchId: 1, casterId: 5, byStaff: true }, "RELEASED_BY_STAFF", { casterId: 5, reason: "STAFF" }],
     [{ kind: "AUTO_RELEASED", matchId: 1, casterId: 5, reason: "INELIGIBLE" }, "INELIGIBLE", { casterId: 5, reason: "INELIGIBLE" }],
@@ -86,8 +98,8 @@ describe("castLogChange / castReleaseNotice", () => {
 
 describe("castLogCategory — un retrait alerte, une inscription reste une trace", () => {
   it.each<[CastChange, string]>([
-    [{ kind: "CLAIMED", matchId: 1, replacedCasterId: null }, "casts"],
-    [{ kind: "CLAIMED", matchId: 1, replacedCasterId: 5 }, "staff-removal"],
+    [{ kind: "CLAIMED", matchId: 1, casterId: 9, replacedCasterId: null }, "casts"],
+    [{ kind: "CLAIMED", matchId: 1, casterId: 9, replacedCasterId: 5 }, "staff-removal"],
     [{ kind: "RELEASED", matchId: 1, casterId: 5, byStaff: false }, "staff-removal"],
     [{ kind: "RELEASED", matchId: 1, casterId: 5, byStaff: true }, "staff-removal"],
     [{ kind: "AUTO_RELEASED", matchId: 1, casterId: 5, reason: "INELIGIBLE" }, "staff-removal"],
@@ -100,7 +112,7 @@ describe("castLogCategory — un retrait alerte, une inscription reste une trace
     [{ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: false }],
     [{ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true }],
     [{ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "JOINED_TEAM" }],
-    [{ kind: "CLAIMED", matchId: 42, replacedCasterId: CASTER }],
+    [{ kind: "CLAIMED", matchId: 42, casterId: 9, replacedCasterId: CASTER }],
   ])("deliverCastChange %j envoie la ligne dans staff-removal, sans nom", async (change) => {
     mockMatch(matchRow());
     await deliverCastChange(change);
@@ -112,7 +124,7 @@ describe("castLogCategory — un retrait alerte, une inscription reste une trace
 describe("deliverCastChange", () => {
   it("journalise une inscription sans prévenir personne, sans nommer le caster", async () => {
     mockMatch(matchRow());
-    await deliverCastChange({ kind: "CLAIMED", matchId: 42, replacedCasterId: null });
+    await deliverCastChange({ kind: "CLAIMED", matchId: 42, casterId: 9, replacedCasterId: null });
     const line = loggedLine();
     expect(line).toContain("Cast réservé");
     expect(line).toContain("« Coupe d'hiver » (#7)");
@@ -158,9 +170,32 @@ describe("deliverCastChange", () => {
     expect(resolvePush(sent.push, "en").body).toContain("staff decision");
   });
 
+  it("deliverCastChange_recipientsReadFails_journalLineStillSent", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    mockMatch(matchRow());
+    jest.mocked(loadNotificationRecipients).mockRejectedValue(new Error("POOL_TIMEOUT"));
+    await deliverCastChange({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true });
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+    expect(notifyUsers).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith("[cast] destinataire de l'avis non lu : POOL_TIMEOUT");
+    error.mockRestore();
+  });
+
+  it("deliverCastChange_recipientsReadFailsWithCodedError_logsCodeOnly", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    mockMatch(matchRow());
+    jest
+      .mocked(loadNotificationRecipients)
+      .mockRejectedValue(Object.assign(new Error("Duplicate entry 'Renards' for key 'name'"), { code: "ER_DUP_ENTRY" }));
+    await deliverCastChange({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true });
+    expect(error).toHaveBeenCalledWith("[cast] destinataire de l'avis non lu : ER_DUP_ENTRY");
+    expect(JSON.stringify(error.mock.calls)).not.toContain("Renards");
+    error.mockRestore();
+  });
+
   it("prévient le titulaire évincé par un autre caster", async () => {
     mockMatch(matchRow());
-    await deliverCastChange({ kind: "CLAIMED", matchId: 42, replacedCasterId: 901 });
+    await deliverCastChange({ kind: "CLAIMED", matchId: 42, casterId: 9, replacedCasterId: 901 });
     expect(loggedLine("staff-removal")).toContain("Cast repris");
     expect(loadNotificationRecipients).toHaveBeenCalledWith([901], "certified", { matchDm: true });
     expect(notification().discord?.message("fr")).toContain("un autre caster a pris le match");
@@ -204,13 +239,238 @@ describe("deliverCastChange", () => {
 });
 
 describe("announceCastChange", () => {
-  it("ne lève jamais, même base indisponible", async () => {
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
+  const claimed: CastChange = { kind: "CLAIMED", matchId: 42, casterId: 9, replacedCasterId: null };
+  const released: CastChange = { kind: "RELEASED", matchId: 42, casterId: 9, byStaff: false };
+
+  beforeEach(() => resetCastToggles());
+
+  it("ne lève jamais, même base indisponible, et ne vide que le message d'erreur", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(getDatabase).mockRejectedValue(new Error("DB_DOWN"));
-    expect(() => announceCastChange({ kind: "CLAIMED", matchId: 42, replacedCasterId: null })).not.toThrow();
-    await new Promise((resolve) => setImmediate(resolve));
-    expect(error).toHaveBeenCalledWith("[cast] changement d'inscription non annoncé", expect.any(Error));
+    expect(() => announceCastChange({ kind: "RELEASED", matchId: 42, casterId: 9, byStaff: true })).not.toThrow();
+    await settle();
+    expect(error).toHaveBeenCalledWith("[cast] changement d'inscription non annoncé : DB_DOWN");
     error.mockRestore();
+  });
+
+  it("announceCastChange_deliveryFailsWithCodedError_logsCodeOnly", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest
+      .mocked(getDatabase)
+      .mockRejectedValue(Object.assign(new Error("connect ECONNREFUSED 10.0.0.1:3306"), { code: "ECONNREFUSED" }));
+    announceCastChange({ kind: "RELEASED", matchId: 42, casterId: 9, byStaff: true });
+    await settle();
+    expect(error).toHaveBeenCalledWith("[cast] changement d'inscription non annoncé : ECONNREFUSED");
+    error.mockRestore();
+  });
+
+  it("un geste du staff part aussitôt, sans attendre de rafale", async () => {
+    mockMatch(matchRow());
+    announceCastChange({ kind: "RELEASED", matchId: 42, casterId: 9, byStaff: true });
+    await settle();
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("announceCastChange_noPendingBurst_startsDeliveryInTheSameTick", () => {
+    mockMatch(matchRow());
+    announceCastChange({ kind: "RELEASED", matchId: 42, casterId: 9, byStaff: true });
+    expect(getDatabase).toHaveBeenCalled();
+  });
+
+  describe("gestes volontaires du caster", () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("announceCastChange_singleClaim_postsBeforeWindowElapses", async () => {
+      mockMatch(matchRow());
+      announceCastChange(claimed);
+      jest.useRealTimers();
+      await settle();
+      expect(loggedLine()).toContain("inscrit");
+    });
+
+    it("announceCastChange_claimedThenReleasedBurst_postsBothLinesInOrder", async () => {
+      mockMatch(matchRow());
+      for (let i = 0; i < 10; i++) announceCastChange(i % 2 === 0 ? claimed : released);
+      jest.advanceTimersByTime(CAST_TOGGLE_WINDOW_MS);
+      jest.useRealTimers();
+      await settle();
+      await settle();
+      expect(sendBotLog).toHaveBeenCalledTimes(2);
+      expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("Cast réservé");
+      expect(jest.mocked(sendBotLog).mock.calls[1][0]).toContain("Cast libéré");
+    });
+
+    it("announceCastChange_releasedThenClaimedBurst_postsReleaseThenClaim", async () => {
+      mockMatch(matchRow());
+      announceCastChange(released);
+      announceCastChange(claimed);
+      jest.advanceTimersByTime(CAST_TOGGLE_WINDOW_MS);
+      jest.useRealTimers();
+      await settle();
+      await settle();
+      expect(sendBotLog).toHaveBeenCalledTimes(2);
+      expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("Cast libéré");
+      expect(jest.mocked(sendBotLog).mock.calls[1][0]).toContain("Cast réservé");
+    });
+
+    it("announceCastChange_matchGoneBeforeWindowEnds_claimStillLogged", async () => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[matchRow()], []])
+        .mockResolvedValue([[], []]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+      announceCastChange(claimed);
+      jest.useRealTimers();
+      await settle();
+      announceCastChange(released);
+      await flushCastToggles();
+      await settle();
+      expect(loggedLine()).toContain("Cast réservé");
+    });
+
+    it("announceCastChange_newBurstWhileClosingInFlight_leadingAfterClosing", async () => {
+      mockMatch(matchRow());
+      let finishClosing: () => void = () => undefined;
+      jest
+        .mocked(sendBotLog)
+        .mockResolvedValueOnce()
+        .mockImplementationOnce(() => new Promise<void>((resolve) => (finishClosing = resolve)));
+      announceCastChange(claimed);
+      announceCastChange(released);
+      jest.useRealTimers();
+      await settle();
+      const closing = flushCastToggles();
+      await settle();
+      announceCastChange(claimed);
+      await settle();
+      expect(lines()).toHaveLength(2);
+      finishClosing();
+      await closing;
+      await settle();
+      await settle();
+      expect(lines()).toHaveLength(3);
+      expect(lines()[1]).toContain("Cast libéré");
+      expect(lines()[2]).toContain("Cast réservé");
+    });
+
+    it("une rafale qui finit inscrite ne fait qu'une ligne", async () => {
+      mockMatch(matchRow());
+      for (let i = 0; i < 9; i++) announceCastChange(i % 2 === 0 ? claimed : released);
+      flushCastToggles();
+      jest.useRealTimers();
+      await settle();
+      expect(sendBotLog).toHaveBeenCalledTimes(1);
+    });
+
+    it("deux casters, ou deux matchs, sont deux rafales", async () => {
+      mockMatch(matchRow());
+      announceCastChange(claimed);
+      announceCastChange({ ...claimed, casterId: 10 });
+      announceCastChange({ ...claimed, matchId: 43 });
+      flushCastToggles();
+      jest.useRealTimers();
+      await settle();
+      expect(sendBotLog).toHaveBeenCalledTimes(3);
+    });
+
+    /** Laisse partir la rafale forcée puis le geste qui la suit (chaînés). */
+    async function settleChain(): Promise<void> {
+      jest.useRealTimers();
+      for (let i = 0; i < 5; i++) await settle();
+    }
+    const lines = () => jest.mocked(sendBotLog).mock.calls.map((call) => String(call[0]));
+
+    it("announceCastChange_staffReleaseAfterPendingClaim_claimLoggedFirst", async () => {
+      mockMatch(matchRow());
+      announceCastChange(claimed);
+      announceCastChange({ ...released, byStaff: true });
+      await settleChain();
+      expect(lines()).toHaveLength(2);
+      expect(lines()[0]).toContain("inscrit");
+      expect(lines()[1]).toContain("par le staff");
+    });
+
+    it("announceCastChange_autoReleaseAfterPendingClaim_claimLoggedFirst", async () => {
+      mockMatch(matchRow());
+      announceCastChange(claimed);
+      announceCastChange({ kind: "AUTO_RELEASED", matchId: 42, casterId: 9, reason: "JOINED_TEAM" });
+      await settleChain();
+      expect(lines()).toHaveLength(2);
+      expect(lines()[0]).toContain("inscrit");
+      expect(lines()[1]).toContain("le caster joue désormais ce match");
+    });
+
+    it("announceCastChange_takeoverAfterReplacedCasterToggle_toggleFlushedFirst", async () => {
+      mockMatch(matchRow());
+      announceCastChange(claimed);
+      announceCastChange({ kind: "CLAIMED", matchId: 42, casterId: 10, replacedCasterId: 9 });
+      await settleChain();
+      expect(lines()).toHaveLength(2);
+      expect(lines()[0]).toContain("inscrit");
+      expect(lines()[1]).toContain("repris");
+    });
+
+    it("announceCastChange_staffReleaseThenImmediateReclaim_staffLineFirst", async () => {
+      mockMatch(matchRow());
+      const finishRead = slowFirstRecipientsRead();
+      announceCastChange({ ...released, byStaff: true });
+      announceCastChange(claimed);
+      await settleChain();
+      expect(lines()).toHaveLength(0);
+      finishRead();
+      await settleChain();
+      expect(lines()).toHaveLength(2);
+      expect(lines()[0]).toContain("par le staff");
+      expect(lines()[1]).toContain("Cast réservé");
+    });
+
+    it("announceCastChange_staffReleaseClaimStaffReleaseWhileFirstSlow_allLinesPosted", async () => {
+      mockMatch(matchRow());
+      const finishRead = slowFirstRecipientsRead();
+      announceCastChange({ ...released, byStaff: true });
+      announceCastChange(claimed);
+      announceCastChange({ ...released, byStaff: true });
+      await settleChain();
+      finishRead();
+      await settleChain();
+      await settleChain();
+      expect(lines()).toHaveLength(3);
+      expect(lines()[0]).toContain("par le staff");
+      expect(lines()[1]).toContain("Cast réservé");
+      expect(lines()[2]).toContain("par le staff");
+    });
+
+    it("announceCastChange_gestureAfterStaffFlush_opensNewBurst", async () => {
+      mockMatch(matchRow());
+      announceCastChange(released);
+      announceCastChange({ ...released, byStaff: true });
+      announceCastChange(claimed);
+      await settleChain();
+      await flushCastToggles();
+      await settle();
+      expect(lines()).toHaveLength(3);
+      expect(lines()[0]).toContain("Cast libéré");
+      expect(lines()[1]).toContain("par le staff");
+      expect(lines()[2]).toContain("Cast réservé");
+    });
+
+    it("announceCastChange_staffReleaseOtherCaster_otherClaimPostedAtOnce", async () => {
+      mockMatch(matchRow());
+      announceCastChange({ ...claimed, casterId: 10 });
+      announceCastChange({ ...released, byStaff: true });
+      await settleChain();
+      expect(lines()).toHaveLength(2);
+      expect(lines().some((line) => line.includes("par le staff"))).toBe(true);
+      await flushCastToggles();
+      await settle();
+      expect(lines()).toHaveLength(2);
+    });
   });
 });
 

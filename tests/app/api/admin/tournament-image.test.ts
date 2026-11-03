@@ -6,6 +6,7 @@ jest.mock("@/lib/server/tournaments/staff-action-logs");
 
 import { DELETE, PATCH, POST } from "@/app/api/admin/tournaments/[id]/image/route";
 import { getCurrentUser } from "@/lib/server/auth";
+import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 import {
   removeTournamentImage,
   setTournamentImage,
@@ -58,7 +59,7 @@ const saved: TournamentImage = {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(setTournamentImage).mockResolvedValue(saved);
+  jest.mocked(setTournamentImage).mockResolvedValue({ ...saved, replaced: false });
   jest.mocked(updateTournamentImageSettings).mockResolvedValue(saved);
   jest.mocked(removeTournamentImage).mockResolvedValue(undefined);
 });
@@ -262,5 +263,23 @@ describe("DELETE — retire l'image", () => {
   it("rend un tournoi inconnu en 404", async () => {
     jest.mocked(removeTournamentImage).mockRejectedValue(new Error("TOURNAMENT_NOT_FOUND"));
     expect((await DELETE(deleteReq(), params())).status).toBe(404);
+  });
+});
+
+describe("POST — journal du staff", () => {
+  beforeEach(() => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+  });
+
+  it("imagePost_noPreviousImage_logsImageSet", async () => {
+    await POST(uploadReq({ file: pngFile() }), params());
+    expect(announceStaffTournamentAction).toHaveBeenCalledWith(5, "IMAGE_SET");
+  });
+
+  it("imagePost_previousImageReplaced_logsImageReplaced_andHidesFlag", async () => {
+    jest.mocked(setTournamentImage).mockResolvedValue({ ...saved, replaced: true });
+    const res = await POST(uploadReq({ file: pngFile() }), params());
+    expect(await res.json()).toEqual({ image: saved });
+    expect(announceStaffTournamentAction).toHaveBeenCalledWith(5, "IMAGE_REPLACED");
   });
 });

@@ -124,7 +124,7 @@ describe("confirmations des gestes sans retour", () => {
 
   it("se referment quand l'action n'est plus offerte", () => {
     expect(page).toContain("{pendingConfirm !== null && !frozen && (");
-    expect(launchStrip).toContain("{confirmForce && hasForce && (");
+    expect(launchStrip).toContain("const [confirmForce, setConfirmForce] = useConfirmWhile(hasForce);");
   });
 
   it("ne se ferment que sur un geste abouti, et s'ouvrent sur « Annuler »", () => {

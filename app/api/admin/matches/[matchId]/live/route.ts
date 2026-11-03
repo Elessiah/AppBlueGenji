@@ -101,8 +101,10 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   if (typeof body.onAir !== "boolean") return fail("INVALID_ON_AIR", 400);
 
   try {
-    await setMatchOnAir(matchId, body.onAir);
-    announceStaffMatchAction(matchId, body.onAir ? "ON_AIR" : "OFF_AIR", staffActionAuthor(user));
+    // Un double clic (déjà à l'antenne, ou déjà hors antenne) ne se journalise pas.
+    if (await setMatchOnAir(matchId, body.onAir)) {
+      announceStaffMatchAction(matchId, body.onAir ? "ON_AIR" : "OFF_AIR", staffActionAuthor(user));
+    }
     return ok({ onAir: body.onAir });
   } catch (error) {
     return mapLiveError(error);
