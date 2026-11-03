@@ -1127,6 +1127,29 @@ describe("pénalités d'endurance", () => {
     expect(publishStandingsReplayedEvent).toHaveBeenCalledTimes(1);
   });
 
+  // Revue sécurité #542 : un ROLLBACK raté ne masque pas l'erreur d'origine.
+  it("liftPenalty_rollbackFailsAfterDeadlock_stillRetries", async () => {
+    jest
+      .mocked(liftEndurancePenalty)
+      .mockRejectedValueOnce(Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" }))
+      .mockResolvedValueOnce({ teamId: 3, points: 2 });
+    connection.rollback.mockRejectedValueOnce(new Error("Connection lost: The server closed the connection."));
+
+    await liftEndurancePenaltyPublic(5, 61);
+
+    expect(liftEndurancePenalty).toHaveBeenCalledTimes(2);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("liftPenalty_rollbackFailsAfterRefusal_propagatesRefusalCode", async () => {
+    jest.mocked(liftEndurancePenalty).mockRejectedValue(new Error("PENALTY_NOT_FOUND"));
+    connection.rollback.mockRejectedValue(new Error("Connection lost: The server closed the connection."));
+
+    await expect(liftEndurancePenaltyPublic(5, 61)).rejects.toThrow("PENALTY_NOT_FOUND");
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+    expect(connection.release).not.toHaveBeenCalled();
+  });
+
   // ERREUR.txt EF-15 (revue) : tournoi tenu, manches verrouillées — l'attente
   // d'un détenteur qui ne demande jamais le tournoi est bornée, puis rendue ;
   // le verrou du tournoi lui-même (revue #542) s'attend sans borne.

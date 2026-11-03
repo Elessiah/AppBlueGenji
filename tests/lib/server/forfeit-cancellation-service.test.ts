@@ -313,6 +313,39 @@ describe("cancelTournamentForfeit", () => {
     expect(connection.rollback).toHaveBeenCalledTimes(1);
   });
 
+  // Revue sécurité #542 : un ROLLBACK raté ne masque pas l'erreur d'origine.
+  it("cancel_rollbackFailsAfterLockTimeout_propagatesOriginalError", async () => {
+    const { connection } = setup();
+    const execute = connection.execute.getMockImplementation();
+    connection.execute.mockImplementation(async (sql: string, values?: unknown) => {
+      if (/round_number > \?/.test(sql)) {
+        throw Object.assign(new Error("Lock wait timeout exceeded; try restarting transaction"), {
+          code: "ER_LOCK_WAIT_TIMEOUT",
+        });
+      }
+      return execute!(sql, values);
+    });
+    connection.rollback.mockRejectedValue(new Error("Connection lost: The server closed the connection."));
+
+    await expect(cancelTournamentForfeit(7, 102)).rejects.toThrow("Lock wait timeout exceeded");
+
+    // Transaction peut-être encore ouverte : la connexion n'est pas rendue.
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+    expect(connection.release).not.toHaveBeenCalled();
+  });
+
+  it("cancel_rollbackFailsAfterDeadlock_stillRetries", async () => {
+    const { connection } = setup();
+    const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+    jest.mocked(reconcileSurvival).mockRejectedValueOnce(deadlock);
+    connection.rollback.mockRejectedValueOnce(new Error("Connection lost: The server closed the connection."));
+
+    const result = await cancelTournamentForfeit(7, 102);
+
+    expect(result.entrantName).toBe("Team Nova");
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
   it("cancel_businessRefusal_notRetried", async () => {
     const { connection } = setup({ standing: { status: "ACTIVE" } });
 

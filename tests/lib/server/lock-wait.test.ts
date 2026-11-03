@@ -1,6 +1,11 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import type { PoolConnection } from "mysql2/promise";
-import { releaseWithServerLockWait, SHORT_LOCK_WAIT_SECONDS, withShortLockWait } from "@/lib/server/tournaments/lock-wait";
+import {
+  releaseWithServerLockWait,
+  rollbackKeepingError,
+  SHORT_LOCK_WAIT_SECONDS,
+  withShortLockWait,
+} from "@/lib/server/tournaments/lock-wait";
 import { connectionMock } from "../../helpers/sql-double";
 
 /**
@@ -105,6 +110,48 @@ describe("releaseWithServerLockWait", () => {
     await releaseWithServerLockWait(asPool);
 
     expect(conn.destroy).toHaveBeenCalledTimes(1);
+    expect(conn.release).not.toHaveBeenCalled();
+  });
+});
+
+// Revue sécurité #542 : un ROLLBACK raté ne masque pas l'erreur d'origine, et
+// la connexion — transaction peut-être encore ouverte — n'est jamais rendue.
+describe("rollbackKeepingError", () => {
+  it("rollbackKeepingError_rollbackSucceeds_releasesNormally", async () => {
+    const { conn, asPool } = connection();
+    conn.rollback.mockResolvedValue(undefined);
+
+    await rollbackKeepingError(asPool);
+    await releaseWithServerLockWait(asPool);
+
+    expect(conn.release).toHaveBeenCalledTimes(1);
+    expect(conn.destroy).not.toHaveBeenCalled();
+    expect(conn.query).not.toHaveBeenCalled();
+  });
+
+  it("rollbackKeepingError_rollbackFails_resolvesAndDestroysOnRelease", async () => {
+    const { conn, asPool } = connection();
+    conn.rollback.mockRejectedValue(new Error("Connection lost"));
+
+    await expect(rollbackKeepingError(asPool)).resolves.toBeUndefined();
+    await releaseWithServerLockWait(asPool);
+
+    expect(conn.destroy).toHaveBeenCalledTimes(1);
+    expect(conn.release).not.toHaveBeenCalled();
+  });
+
+  it("releaseWithServerLockWait_shortenedAndRollbackFailed_destroysWithoutRestoreQuery", async () => {
+    const { conn, asPool } = connection();
+    conn.query.mockResolvedValueOnce([[], []]).mockRejectedValueOnce(new Error("Connection lost"));
+    await expect(withShortLockWait(asPool, async () => true)).rejects.toThrow("Connection lost");
+    conn.rollback.mockRejectedValue(new Error("Connection lost"));
+    await rollbackKeepingError(asPool);
+    conn.query.mockClear();
+
+    await releaseWithServerLockWait(asPool);
+
+    expect(conn.destroy).toHaveBeenCalledTimes(1);
+    expect(conn.query).not.toHaveBeenCalled();
     expect(conn.release).not.toHaveBeenCalled();
   });
 });

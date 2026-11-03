@@ -117,4 +117,15 @@ describe("codes propres à chaque route", () => {
     const res = await scoresRoute(req("PATCH", { maps: mapsFor(1, 1) }), params);
     expect(res.status).toBe(500);
   });
+
+  // Revue sécurité #542 : la saisie mal formée, jugée dès la lecture
+  // préalable, est un corps invalide — pas une panne.
+  it("scores_serviceThrowsInvalidRequest_returns400", async () => {
+    jest.mocked(adminSaveMatchScores).mockRejectedValueOnce(new Error("INVALID_REQUEST"));
+
+    const res = await scoresRoute(req("PATCH", { maps: mapsFor(1, 0) }), params);
+
+    expect(res.status).toBe(400);
+    expect(await errorOf(res)).toBe("INVALID_REQUEST");
+  });
 });
