@@ -121,9 +121,9 @@ d'abord, indépendant de la langue des messages du serveur. Les verrous durent
 jusqu'au commit, si bien qu'un « Prêt » de la manche suivante attend la fin du
 rejeu.
 
-**Publication** : instantané (`publishMatchUpdatedEvent`, direct de l'accueil
-compris), aperçu, listes et mini-arbres de l'accueil
-(`invalidateLandingMiniBrackets`) — le rejeu peut réécrire des
+**Publication** (`publishStandingsReplayedEvent`, `notifications.ts`, règle
+partagée avec le retrait d'une pénalité d'endurance) : instantané, direct de
+l'accueil, aperçu, listes et mini-arbres de l'accueil — le rejeu peut réécrire des
 colonnes de `bg_tournaments` (manche d'endurance courante, phase) et reposer
 les matchs d'une manche périmée. Aucun résultat de match ne change : le
 classement du site, les statistiques et, à l'accueil, leaderboards, bandeau et

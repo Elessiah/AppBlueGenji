@@ -115,7 +115,7 @@ module du moteur se résout avant la transaction ; contention persistante
 → `409 CONCURRENT_UPDATE_RETRY`, l'interblocage avec un report étant rejoué
 (`retryOnDeadlock`). Après le commit, comme l'annulation d'un abandon, seuls
 l'instantané, l'aperçu, les listes, le direct et les mini-arbres de l'accueil
-sont oubliés (`publishMatchUpdatedEvent`) : aucun résultat de match ne change,
+sont oubliés (`publishStandingsReplayedEvent`, règle partagée) : aucun résultat de match ne change,
 le classement du site et les statistiques restent en cache.
 
 Sans ce verrou : une pénalité de la manche 2 élimine une équipe, les manches 3 à

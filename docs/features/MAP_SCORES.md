@@ -251,7 +251,9 @@ un 4xx hors 429 arrête les essais, comme toute réponse lue — même une
 proposition plus récente que l'instantané, dont la diffusion relancera la
 lecture. Engagés,
 statut et reports du match y sont **relus avec les maps**, en une instruction
-(`loadFreshMatchProposals`, `bg_matches` joint à `bg_match_maps`) : l'instantané
+(`loadFreshMatchProposals`, `bg_matches` joint à `bg_match_maps` — jointure
+limitée aux matchs des engagés du lecteur, aucune map pour un lecteur étranger
+au match, qui ne fait remonter que la ligne du match) : l'instantané
 en cache peut précéder un report, un retrait ou un changement d'engagé
 (correction d'arbitrage). La règle de lecture se juge sur cet état relu — une
 équipe sortie du match n'en lit plus les propositions, un report déposé depuis

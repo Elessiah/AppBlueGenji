@@ -187,12 +187,14 @@ aval (`checkDownstreamMatchesHaveNoScores`) n'y est plus lu : il ne protège
 qu'un match joué, que la sauvegarde refuse. Ses relectures sous verrou
 sont regroupées : la ligne enregistrée revient avec le résultat
 (`AdminSaveResult.saved`), les règles du match (`refereeScheduling` compris) se
-lisent en une requête, et les maps `FINAL` se réécrivent d'après leur nombre,
-lu sans verrou (`mapSetSize`) : aucune, l'insertion part seule ; un jeu qui
-s'allonge (saisie map par map) se réécrit en place, sans lecture verrouillante
-ni `DELETE` du jeu entier, dont le verrou d'intervalle débordait sur le match
-voisin ; seule une liste raccourcie efface ses maps en trop
-(`map_number > ?`).
+lisent en une requête, et les maps `FINAL` se réécrivent **par leur clé
+primaire** d'après les lignes lues sans verrou (`loadStoredMapSet`,
+`rewriteMapSet`, `match-maps.ts`) : une map inchangée n'est pas touchée, une
+map modifiée se met à jour par son `id`, celles en trop s'effacent par leur
+`id`, les nouvelles s'insèrent à la suite — la saisie map par map n'ajoute que
+sa map. Aucun parcours de la clé unique `(match_id, source, map_number)` : ni
+`DELETE` du jeu, ni mise à jour par doublon (`ON DUPLICATE KEY UPDATE`), dont
+les verrous d'intervalle débordaient sur le match voisin.
 
 - **Suspension** : `bg_matches.score_validation_paused_at = NOW()`, posée par
   `pauseAutoValidation` (`admin.ts`) dans la transaction d'« Enregistrer », sur
