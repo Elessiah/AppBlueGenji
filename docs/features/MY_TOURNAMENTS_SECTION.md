@@ -59,6 +59,15 @@ Ce n'est pas l'ancien onglet « Mes tournois » (`scope=mine`, retiré avec la
 section des invisibles), qui listait les tournois **organisés** par le
 lecteur.
 
+## Lecture (EF-16)
+
+`listMyActiveTournamentIds` réunit par `UNION` deux branches qui **partent des
+lignes du joueur** — son entrée solo (`bg_teams.solo_user_id`) et ses
+appartenances d'équipe actuelles (`bg_team_members.user_id`, `left_at IS NULL`) —
+pour remonter à leurs inscriptions ; la forme `OR EXISTS` parcourait toutes les
+inscriptions des tournois non terminés. La page n'attend la réponse que
+`MINE_SETTLE_MAX_MS` avant d'afficher la liste (voir `TOURNAMENT_LIST_TOOLBAR.md`).
+
 ## Notes reprises de CLAUDE.md
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
