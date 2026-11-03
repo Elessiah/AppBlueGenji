@@ -45,6 +45,11 @@ import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-rep
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-request-notice";
+import {
+  TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
+  TEAM_INVITE_NOTICES_DAILY_CAP,
+  TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
+} from "@/lib/shared/team-invite-notice";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { SITE_VISITOR_RETENTION_MONTHS, SITE_VISIT_DETAIL_RETENTION_DAYS } from "@/lib/shared/site-visits";
@@ -1454,6 +1459,60 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Inscriptions individuelles : une inscription à un tournoi individuel pas encore commencé, où tu n'as disputé aucun match, ne garde plus ton compte sous un pseudo d'emprunt — si rien d'autre ne le retient (match joué, équipe possédée, tournoi organisé, engagement dans un tournoi individuel déjà commencé ou terminé), il est effacé entièrement et l'inscription retirée du tournoi ; sinon, l'inscription reste, sous un pseudo d'emprunt. Une fois le tournoi commencé ou terminé, l'engagé reste, sous un pseudo d'emprunt, comme avant.",
       "Fiche du joueur : la fiche d'un compte supprimé, sous son pseudo d'emprunt, n'est plus gardée que s'il a joué au moins un match (ses statistiques appartiennent aussi à ses adversaires) ; sinon la page est introuvable, et son nom s'affiche sans lien.",
       "Ce qui ne change pas : rien de nouveau n'est collecté ; les traces qui restent après toute suppression (notamment sauvegardes chiffrées, journal des suppressions, données de connexion, mesure d'audience) sont les mêmes.",
+    ],
+  },
+  {
+    // TEAM-INVITE-NOTIFY (demande de l'utilisateur du 2026-10-28, reprise de
+    // fantôme confirmée le 2026-11-03) : le joueur invité, celui à qui le staff
+    // propose une reprise et le nouveau propriétaire sont prévenus (push, sujet
+    // `TEAM_INVITATION`, et message privé Discord). Pour tous les comptes.
+    // Datée du lendemain de la nuit de déploiement suivant la fusion prévue le
+    // 2026-11-03 — à avancer si la fusion glisse.
+    id: "2026-11-invitations-equipe-notifiees",
+    publishedAt: "2026-11-05",
+    title: "Invitations d'équipe annoncées en push et sur Discord",
+    links: [{ href: "/rgpd#notifications", label: "Lire la section « Notifications push »" }],
+    summary:
+      "Quand une équipe t'invite, quand le staff te propose de reprendre une équipe fantôme, ou quand la propriété de ton équipe t'est transférée, le site te prévient désormais en notification push et par un message privé du bot Discord.",
+    details: [
+      `Ce qui change : la notification push (sujet « Invitations d'équipe », que tu peux couper depuis Mon profil) et le message privé Discord (si tu as rattaché ton compte Discord ou certifié ton tag) ne nomment que l'équipe — jamais qui t'invite, te propose la reprise ou te transfère l'équipe — et renvoient à Mon profil, où l'invitation s'accepte ou se refuse, ou à la fiche de l'équipe. Pour une invitation ordinaire, une même équipe ne fait prévenir le même joueur qu'une fois toutes les ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} heures, une équipe ou une même personne ${TEAM_INVITE_NOTICES_DAILY_CAP} joueurs au plus dans ce délai, et un joueur ne reçoit l'invitation que de ${TEAM_INVITE_NOTICES_PER_PLAYER_CAP} équipes au plus dans ce délai ; une reprise proposée par le staff n'est annoncée qu'une fois par équipe et par joueur dans ce délai ; une propriété transférée prévient à chaque transfert ; l'invitation, elle, est toujours enregistrée.`,
+      "Ce qui ne change pas : rien de nouveau n'est collecté ni conservé ; rien ne part à un compte suspendu ou supprimé, ni à l'auteur du geste. Le message privé relève de l'organisation des compétitions (intérêt légitime, registre T03), auquel tu peux t'opposer (section « Vos droits » de la page RGPD) ; la notification push, de ton accord (registre T12).",
+    ],
+  },
+  {
+    // MATCH-REFEREE-FINISH (décision de l'utilisateur du 2026-11-03) : en
+    // Marvel Rivals, caster ou arbitrer ne demande plus de compte Battle.net
+    // rattaché (le BattleTag n'y sert à rien, décision 35) ; Overwatch garde
+    // la condition. Public : les comptes pouvant caster (permission `live`).
+    // Datée du lendemain de la nuit de déploiement — à avancer si la fusion glisse.
+    id: "2026-11-battlenet-requis-overwatch-seulement",
+    publishedAt: "2026-11-05",
+    audience: "LIVE_STAFF",
+    title: "Caster ou arbitrer : Battle.net demandé en Overwatch seulement",
+    links: [
+      { href: "/rgpd#donnees-collectees", label: "Lire les conditions pour caster un match" },
+      { href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" },
+    ],
+    summary:
+      "Pour caster ou arbitrer un match Marvel Rivals, le compte Battle.net rattaché n'est plus demandé : le tag Discord certifié suffit, avec la permission de diffusion ou d'arbitrage. Pour un match Overwatch, rien ne change.",
+    details: [
+      "Ce qui change : le site ne vérifie plus, pour un match Marvel Rivals, que ton compte Battle.net est rattaché ni que ton BattleTag en vient ; il n'en tient plus compte pour ces matchs. Pour un match Overwatch, la condition reste : tag Discord certifié et BattleTag tiré d'un compte Battle.net rattaché. Les conditions d'utilisation, qui ne demandent Battle.net qu'aux arbitres, le diront à leur prochaine version.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté ni conservé, et un caster ou un arbitre est présenté aux parties de son match comme avant ; seul un membre du staff sans Battle.net, qui ne pouvait pas caster ou arbitrer un match Marvel Rivals, peut désormais le faire et y être présenté (pseudo et tag Discord certifié).",
+    ],
+  },
+  {
+    id: "2026-11-tag-discord-arbitre-execution-du-service",
+    // Même date que l'entrée précédente et que « 5 novembre 2026 » dans /rgpd
+    // (FR + EN) et le registre T04 — tout avancer ensemble si la fusion glisse.
+    publishedAt: "2026-11-05",
+    audience: "LIVE_STAFF",
+    title: "Arbitre désigné : la base de la présentation de ton tag Discord",
+    links: [{ href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" }],
+    summary:
+      "Si tu arbitres un match, la présentation de ton tag Discord certifié à ses deux équipes et à ses casters repose désormais, une fois la version 7 des conditions ou une suivante acceptée, sur l'exécution du service, et non plus sur l'intérêt légitime : sans lui, les parties du match ne peuvent pas te joindre.",
+    details: [
+      "Ce qui change : la base juridique de cette présentation, jugée strictement nécessaire au fonctionnement minimum du service, une fois la version 7 des conditions ou une suivante acceptée (avant cette acceptation, l'intérêt légitime, avec le même droit d'opposition) ; une fois cette version acceptée, elle n'a plus d'opposition propre.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté ni montré, aux mêmes personnes et aux mêmes moments ; ton opposition d'arbitre (formulaire de signalement, catégorie RGPD) — à ta présentation avant la version 7, ou à l'affichage de ton pseudo aux membres —, retenue, te retire toujours de tes matchs non terminés, ce tag compris.",
     ],
   },
 ];

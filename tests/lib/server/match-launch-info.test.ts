@@ -114,12 +114,13 @@ let state: World;
  * statut fantôme) : le tournoi est passé deux fois.
  */
 function candidateContextRows(world: World, params: unknown[]) {
-  const [tournamentId, , , team1Id] = params.map(Number);
+  const [tournamentId, , , , team1Id] = params.map(Number);
   const c = world.candidates.find((x) => x.tournament_id === tournamentId && x.team1_id === team1Id);
   if (!c) return [];
   return [
     {
       tournament_state: c.tournament_state,
+      tournament_game: c.tournament_game,
       referee_scheduling: c.referee_scheduling ?? 0,
       match_launch_phase: c.match_launch_phase ?? 1,
       team1_is_ghost: c.team1_is_ghost,
@@ -180,8 +181,14 @@ function connectionFor(world: World): PoolConnection {
     }
     if (sql.startsWith("SELECT id FROM bg_teams WHERE solo_user_id")) return [world.viewerSolo, []];
     if (sql.includes("FOR UPDATE")) {
-      // Relecture sous verrou d'un candidat par l'entretien.
-      return [world.candidates.filter((c) => c.id === Number(params[0])), []];
+      // Relecture sous verrou d'un candidat par l'entretien : le jeu n'y est
+      // pas (il se lit à part, dans le contexte).
+      return [
+        world.candidates
+          .filter((c) => c.id === Number(params[0]))
+          .map(({ tournament_game: _game, ...row }) => row),
+        [],
+      ];
     }
     if (sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches")) {
       return [candidateContextRows(world, params), []];
@@ -1133,6 +1140,7 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
       battletag: "Arbitre#1",
       battletagVerified: true,
       ready: false,
+      contactsShown: true,
       isViewer: false,
     });
     expect(info.selfManaged).toBe(false);
@@ -1145,8 +1153,41 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
 
     const [info] = await listViewerMatchLaunches(viewer);
 
-    expect(info.referee).toEqual({ userId: REFEREE, pseudo: "Arbitre", ready: false, isViewer: false });
+    expect(info.referee).toEqual({ userId: REFEREE, pseudo: "Arbitre", ready: false, contactsShown: true, isViewer: false });
     expect(JSON.stringify(info)).not.toContain("Arbitre#1");
+  });
+
+  // R2 (2026-11-03) : hors Overwatch, ni Battle.net rattaché ni BattleTag n'est demandé.
+  it("listViewerMatchLaunches_marvelRivalsRefereeWithoutBattlenet_isPresented", async () => {
+    state.candidates = [candidate({ tournament_game: "MR", referee_user_id: REFEREE, self_managed: 0 })];
+    state.users = [refereeUser({ blizzard_sub: null, overwatch_battletag: null })];
+
+    const [info] = await listViewerMatchLaunches(viewer);
+
+    expect(info.referee).toMatchObject({ userId: REFEREE, pseudo: "Arbitre" });
+    expect(info.referee).not.toHaveProperty("battletag");
+    expect(info.referee).not.toHaveProperty("battletagVerified");
+  });
+
+  it("listViewerMatchLaunches_overwatchRefereeWithoutBattlenet_isNotPresented", async () => {
+    state.candidates = [candidate({ tournament_game: "OW", referee_user_id: REFEREE, self_managed: 0 })];
+    state.users = [refereeUser({ blizzard_sub: null, overwatch_battletag: null })];
+
+    const [info] = await listViewerMatchLaunches(viewer);
+
+    expect(info.referee).toBeNull();
+  });
+
+  it("listViewerMatchLaunches_overwatchRefereeBeforeContactsOpen_sendsNoVerifiedBadge", async () => {
+    // La pastille « vérifié » ne part qu'avec le BattleTag : contacts pas ouverts, ni l'un ni l'autre.
+    state.candidates = [
+      candidate({ referee_user_id: REFEREE, self_managed: 0, start_at: new Date(Date.now() + 30 * 60_000).toISOString() }),
+    ];
+    state.users = [refereeUser()];
+    const [info] = await listViewerMatchLaunches(viewer);
+    expect(info.referee?.battletag).toBeNull();
+    expect(info.referee?.battletagVerified).toBe(false);
+    expect(info.referee?.contactsShown).toBe(false);
   });
 
   it("son BattleTag attend la fenêtre des contacts : rien avant l'heure de début", async () => {
@@ -1406,7 +1447,14 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
 
       const info = await loadViewerMatchContacts(viewer, 42);
 
-      expect(info?.referee).toEqual({ userId: REFEREE, pseudo: "Arbitre", discordTag: "juge", ready: false, isViewer: false });
+      expect(info?.referee).toEqual({
+        userId: REFEREE,
+        pseudo: "Arbitre",
+        discordTag: "juge",
+        ready: false,
+        contactsShown: true,
+        isViewer: false,
+      });
     });
   });
 

@@ -21,7 +21,7 @@
  * même règle.
  */
 
-import type { MatchStatus, TeamRole } from "./types";
+import type { MatchStatus, TeamRole, TournamentGame } from "./types";
 
 /**
  * Délai au-delà duquel un match en lancement part **d'office**, compté depuis
@@ -300,17 +300,26 @@ export function canDeclareTeamReady(roles: readonly TeamRole[] | null | undefine
 }
 
 /**
- * Pour caster un match, il faut pouvoir être joint **et** retrouvé en jeu : tag
- * Discord certifié et compte Battle.net rattaché. Un caster se présente aux
- * deux équipes dans la modale de lancement ; un tag saisi à la main ne dirait
- * rien de qui l'on invite dans son salon.
+ * Pour caster un match, il faut pouvoir être joint **et**, en Overwatch,
+ * retrouvé en jeu : tag Discord certifié et, en Overwatch seulement, compte
+ * Battle.net rattaché (`identityComplete`). Un caster se présente aux deux
+ * équipes dans la modale de lancement ; un tag saisi à la main ne dirait rien
+ * de qui l'on invite dans son salon. Marvel Rivals ne s'invite pas par
+ * BattleTag (décision 35) : le tag Discord certifié y suffit (décision de
+ * l'utilisateur, 2026-11-03).
  */
 export type CasterIdentity = {
   discordVerified: boolean;
   blizzardLinked: boolean;
 };
 
-export type CastBlock = "NOT_CASTER" | "CASTER_IDENTITY_REQUIRED";
+/**
+ * `CASTER_IDENTITY_REQUIRED` : match Overwatch, tag Discord certifié **et**
+ * compte Battle.net demandés ; `CASTER_DISCORD_REQUIRED` : match Marvel Rivals,
+ * le seul tag Discord certifié manque — un code par jeu, pour que le refus ne
+ * parle de Battle.net qu'à qui en a besoin.
+ */
+export type CastBlock = "NOT_CASTER" | "CASTER_IDENTITY_REQUIRED" | "CASTER_DISCORD_REQUIRED";
 
 /**
  * Motif qui empêche de caster, `null` si rien ne l'empêche. `hasLivePermission`
@@ -319,14 +328,38 @@ export type CastBlock = "NOT_CASTER" | "CASTER_IDENTITY_REQUIRED";
 export function castBlockReason(
   hasLivePermission: boolean,
   identity: CasterIdentity,
+  game: TournamentGame,
 ): CastBlock | null {
   if (!hasLivePermission) return "NOT_CASTER";
-  if (!identity.discordVerified || !identity.blizzardLinked) return "CASTER_IDENTITY_REQUIRED";
+  if (!identityComplete(identity, game)) return identityBlockIsDiscordOnly(game) ? "CASTER_DISCORD_REQUIRED" : "CASTER_IDENTITY_REQUIRED";
   return null;
 }
 
+/**
+ * Le jeu qui dispense de Battle.net : Marvel Rivals **seul**, nommé. Tout autre
+ * jeu — Overwatch, mais aussi une valeur absente ou inconnue, par exemple une
+ * ligne lue sans sa colonne `game` — retombe sur la règle la plus stricte : une
+ * dispense ne s'accorde jamais par défaut.
+ */
+function battlenetExempt(game: TournamentGame): boolean {
+  return game === "MR";
+}
+
+/** Le refus d'identité ne parle que du tag Discord (Marvel Rivals) : `*_DISCORD_REQUIRED`. */
+export function identityBlockIsDiscordOnly(game: TournamentGame): boolean {
+  return battlenetExempt(game);
+}
+
+/** L'identité demandée à un caster ou un arbitre : Discord certifié, plus Battle.net hors Marvel Rivals. */
+export function identityComplete(identity: CasterIdentity, game: TournamentGame): boolean {
+  return identity.discordVerified && (battlenetExempt(game) || identity.blizzardLinked);
+}
+
 export const CAST_IDENTITY_NOTICE =
-  "Pour caster un match, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.";
+  "Pour caster un match Overwatch, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.";
+
+/** Le refus d'un cast Marvel Rivals : le tag Discord certifié seul. */
+export const CAST_DISCORD_NOTICE = "Pour caster un match Marvel Rivals, certifie ton tag Discord depuis ton profil.";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Contacts présentés dans la modale
@@ -511,6 +544,11 @@ export type LaunchReferee = {
   battletag?: string | null;
   battletagVerified?: boolean;
   ready: boolean;
+  /**
+   * Les contacts de l'arbitre sont-ils ouverts à ce lecteur (`refereeContactsOpen`) ?
+   * Distingue « pas encore » de « aucun contact » pour la note de la fiche.
+   */
+  contactsShown: boolean;
   /** Cette fiche est-elle celle du lecteur ? */
   isViewer: boolean;
 };
@@ -605,10 +643,12 @@ export function exposesMatchContacts(phase: MatchLaunchPhase, earlyReader: boole
  * (rôle `REFEREE`, permission `tournaments`) ? Les infos de connexion de la
  * page du match ne s'adressent qu'aux parties (`MATCH_PAGE_CONNECT.md`) ; le
  * tag Discord de l'arbitre suit la même règle, au serveur (`refereeDiscord`).
+ * Le serveur donne `MATCH_REFEREE` ou `CASTER` à qui porte l'un de ces rôles,
+ * jamais `REFEREE` : seul le rôle `REFEREE` décide donc.
  */
 export function connectionReader(launch: Pick<MatchLaunchInfo, "viewer">): boolean {
   const { viewer } = launch;
-  return viewer.role !== "REFEREE" || viewer.isReferee || viewer.isCaster;
+  return viewer.role !== "REFEREE";
 }
 
 /**
@@ -738,6 +778,7 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   NOT_TEAM_READY_ROLE: "Seul le capitaine, un manager ou le propriétaire peut déclarer l'équipe prête.",
   NOT_CASTER: "Caster un match demande le rôle caster.",
   CASTER_IDENTITY_REQUIRED: CAST_IDENTITY_NOTICE,
+  CASTER_DISCORD_REQUIRED: CAST_DISCORD_NOTICE,
   CASTER_IS_PLAYER: "Tu joues ce match : tu ne peux pas le caster.",
   STREAM_NOT_FOUND: "Ce stream n'existe plus sur ce match : choisis-en un autre.",
   INVALID_STREAM_URL: "Lien de diffusion non reconnu (Twitch, YouTube ou Kick attendu).",
@@ -746,7 +787,8 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_HOST_TEAM: "L'équipe hôte doit être l'une des deux engagées du match.",
   TOURNAMENT_NOT_RUNNING: "Le tournoi n'est pas en cours.",
   NOT_REFEREE: "Arbitrer un match demande le rôle arbitre.",
-  REFEREE_IDENTITY_REQUIRED: "Pour arbitrer un match, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.",
+  REFEREE_IDENTITY_REQUIRED: "Pour arbitrer un match Overwatch, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.",
+  REFEREE_DISCORD_REQUIRED: "Pour arbitrer un match Marvel Rivals, certifie ton tag Discord depuis ton profil.",
   REFEREE_IS_PLAYER: "Ce compte joue ce match : il ne peut pas l'arbitrer.",
   REFEREE_OBJECTION: "Ce compte a une opposition retenue à l'arbitrage : il ne peut plus arbitrer de match.",
   REFEREE_OBJECTION_FAILED: "L'opposition est retenue, mais l'arbitre n'a pas pu être retiré de tous ses matchs : retiens-la de nouveau pour réessayer.",

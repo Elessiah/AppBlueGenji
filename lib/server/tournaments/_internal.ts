@@ -1,7 +1,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { toIso } from "@/lib/server/serialization";
 import { toParticipantType } from "@/lib/shared/participants";
-import type { BracketMatch, MatchScoreReport, TournamentCard, TournamentPhase } from "@/lib/shared/types";
+import type { BracketMatch, MatchScoreReport, TournamentCard, TournamentGame, TournamentPhase } from "@/lib/shared/types";
 import type { MatchMapResult } from "@/lib/shared/match-maps";
 import { parseMatchFormat } from "@/lib/shared/match-format";
 import {
@@ -307,18 +307,24 @@ export function mapCard(row: TournamentListRow): TournamentCard {
  * l'instantané les passe, une lecture partielle s'en passe (listes vides).
  */
 export type MatchCastExtras = {
+  /**
+   * Jeu du tournoi : la condition de cast et d'arbitrage en dépend (Battle.net
+   * rattaché en Overwatch seulement). Absent : Overwatch, la règle la plus stricte.
+   */
+  game?: TournamentGame;
   casters?: readonly MatchCasterRow[];
   streams?: readonly MatchStreamRow[];
 };
 
 export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMatch {
+  const game = extras.game ?? "OW";
   // Un stream que seul tient un caster que la lecture tait n'est pas montré
   // (sa chaîne n'est plus celle d'un caster du match) ; le stream du staff
   // reste. Le premier lien se tire des streams montrés (`firstStreamUrl`) : ni
   // sous-requête par match dans la lecture du plateau, ni troisième écriture
   // de la règle (`shownStreams`).
   const heldStreams = new Set(
-    (extras.casters ?? []).filter((caster) => !casterWithdrawn(row, caster)).map((caster) => caster.streamId),
+    (extras.casters ?? []).filter((caster) => !casterWithdrawn(row, caster, game)).map((caster) => caster.streamId),
   );
   const shown = shownStreams(
     extras.streams ?? [],
@@ -378,7 +384,7 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
         staff: stream.staff,
       })),
     liveStartedAt: toIso(row.live_started_at),
-    ...mapMatchLaunch(row, extras.casters ?? []),
+    ...mapMatchLaunch(row, extras.casters ?? [], game),
     replayUrl: normalizeReplayUrl(row.replay_url ?? null),
   };
 }
@@ -445,9 +451,9 @@ function nullableId(value: number | null | undefined): number | null {
  * ou joué garde ses casters : on ne réécrit ni une diffusion en cours ni
  * l'histoire.
  */
-function casterWithdrawn(row: MatchRow, caster: MatchCasterRow): boolean {
+function casterWithdrawn(row: MatchRow, caster: MatchCasterRow, game: TournamentGame): boolean {
   if (row.status === "COMPLETED" || (row.launched_at ?? null) !== null) return false;
-  return castEligibilityBlock(caster.eligibility) !== null;
+  return castEligibilityBlock(caster.eligibility, game) !== null;
 }
 
 /**
@@ -456,7 +462,7 @@ function casterWithdrawn(row: MatchRow, caster: MatchCasterRow): boolean {
  * d'opposition retenue ; sinon l'instantané le tait, comme
  * un caster inéligible, et la lecture de la modale le retire avant le lancement.
  */
-function refereeKept(row: MatchRow): boolean {
+function refereeKept(row: MatchRow, game: TournamentGame): boolean {
   if (row.referee_user_id === null || row.referee_user_id === undefined) return false;
   // Avant le départ, l'arbitre qui joue désormais le match ne compte plus — la
   // même règle que le verrou du lancement (`lockLaunchMatch`).
@@ -475,16 +481,16 @@ function refereeKept(row: MatchRow): boolean {
       is_deleted: Number(row.referee_is_deleted ?? 1),
       is_admin: Number(row.referee_is_admin ?? 0),
       platform_roles_json: row.referee_platform_roles_json ?? null,
-    }) === null
+    }, game) === null
   );
 }
 
 /** Champs du lancement d'un match (`lib/shared/match-launch.ts`). */
-function mapMatchLaunch(row: MatchRow, allCasters: readonly MatchCasterRow[]) {
+function mapMatchLaunch(row: MatchRow, allCasters: readonly MatchCasterRow[], game: TournamentGame) {
   const team1Id = nullableId(row.team1_id);
   const team2Id = nullableId(row.team2_id);
-  const casters = allCasters.filter((caster) => !casterWithdrawn(row, caster));
-  const referee = refereeKept(row);
+  const casters = allCasters.filter((caster) => !casterWithdrawn(row, caster, game));
+  const referee = refereeKept(row, game);
   // Un état posé pour un autre appariement ne vaut rien pour celui-ci.
   const launch = currentLaunchState(
     {

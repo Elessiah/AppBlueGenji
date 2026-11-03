@@ -34,10 +34,30 @@ const VERIFIED = { discordVerified: true, blizzardLinked: true };
 
 describe("refereeBlockReason", () => {
   it("demande la permission `tournaments`, puis l'identité d'un caster", () => {
-    expect(refereeBlockReason(false, VERIFIED)).toBe("NOT_REFEREE");
-    expect(refereeBlockReason(true, { discordVerified: false, blizzardLinked: true })).toBe("REFEREE_IDENTITY_REQUIRED");
-    expect(refereeBlockReason(true, { discordVerified: true, blizzardLinked: false })).toBe("REFEREE_IDENTITY_REQUIRED");
-    expect(refereeBlockReason(true, VERIFIED)).toBeNull();
+    expect(refereeBlockReason(false, VERIFIED, "OW")).toBe("NOT_REFEREE");
+    expect(refereeBlockReason(true, { discordVerified: false, blizzardLinked: true }, "OW")).toBe("REFEREE_IDENTITY_REQUIRED");
+    expect(refereeBlockReason(true, { discordVerified: true, blizzardLinked: false }, "OW")).toBe("REFEREE_IDENTITY_REQUIRED");
+    expect(refereeBlockReason(true, VERIFIED, "OW")).toBeNull();
+  });
+});
+
+describe("refereeBlockReason — Battle.net seulement en Overwatch (décision du 2026-11-03)", () => {
+  const withoutBattlenet = { discordVerified: true, blizzardLinked: false };
+
+  it("refereeBlockReason_marvelRivalsWithoutBattlenet_allowsRefereeing", () => {
+    expect(refereeBlockReason(true, withoutBattlenet, "MR")).toBeNull();
+  });
+
+  it("refereeBlockReason_marvelRivalsWithoutDiscord_stillRefused", () => {
+    expect(refereeBlockReason(true, { discordVerified: false, blizzardLinked: true }, "MR")).toBe("REFEREE_DISCORD_REQUIRED");
+  });
+
+  it("refereeBlockReason_marvelRivalsWithoutPermission_notReferee", () => {
+    expect(refereeBlockReason(false, withoutBattlenet, "MR")).toBe("NOT_REFEREE");
+  });
+
+  it("refereeBlockReason_overwatchWithoutBattlenet_stillRefused", () => {
+    expect(refereeBlockReason(true, withoutBattlenet, "OW")).toBe("REFEREE_IDENTITY_REQUIRED");
   });
 });
 

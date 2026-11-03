@@ -98,6 +98,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `TEAM_TAG.md` — Sigle d'équipe unique, facultatif.
 - `TEAM_DIRECTORY_LOGOS.md` — Logos dans l'annuaire `/equipes`.
 - `TEAM_JOIN_REQUEST_NOTIFICATION.md` — Demande d'adhésion annoncée à la gestion sur Discord.
+- `TEAM_INVITATION_NOTIFICATION.md` — Invitation d'équipe, reprise de fantôme proposée et propriété transférée annoncées au joueur (push et message privé Discord).
 - `GHOST_TEAMS.md` — Équipes fantômes et inscription en lot.
 - `ENTITY_LINKS.md` — Noms cliquables : `TeamLink`, `PlayerLink`, `EntrantLink`.
 
@@ -122,6 +123,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `CONTENT_REPORTS.md` — Signalements, contestations, panneau de modération.
 - `LOGO_QUARANTINE.md` — Quarantaine des images signalées.
 - `TERMS_OF_USE.md` — Conditions d'utilisation et leur acceptation.
+- `TERMS_V9_PENDING.md` — Texte exact (FR + EN) à reprendre dans les conditions v9 (contacts de match, BattleTag borné à Overwatch, invitations d'équipe) ; v8 reste figée, rien ici n'avance `TERMS_VERSION`.
 - `LEGAL_PAGE.md` — Mentions légales, coordonnées protégées (`ProtectedContact`).
 - `BOT_LEGAL_PAGES.md` — Pages légales bilingues du bot.
 - `LEGAL_DATA_FILES.md` — Textes juridiques FR/EN écrits une fois (`frEn`), sans duplication Sonar.

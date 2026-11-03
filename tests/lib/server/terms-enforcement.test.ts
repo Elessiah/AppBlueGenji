@@ -11,6 +11,7 @@ jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/user-avatar-import");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
+jest.mock("@/lib/server/team-invite-notifications");
 
 import { getDatabase } from "@/lib/server/database";
 import { ensureUniquePseudo } from "@/lib/server/auth";

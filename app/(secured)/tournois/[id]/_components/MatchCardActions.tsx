@@ -429,7 +429,8 @@ export function MatchCardActions({
   const actionText = useActionsText();
   const { t } = actionText;
   const launchError = (code: string | null | undefined) => launchErrorText(actionText, errorsText, code);
-  const castIdentityNotice = launchError("CASTER_IDENTITY_REQUIRED");
+  // Le refus d'identité dit ce qui manque pour le jeu du tournoi (Battle.net en Overwatch seulement).
+  const castIdentityNotice = castBlock && castBlock !== "NOT_CASTER" ? launchError(castBlock) : undefined;
   const actionName = (label: string) => matchCardActionName(label, matchLabel, actionText);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
@@ -688,7 +689,7 @@ export function MatchCardActions({
         className={className}
         disabled={busy && writes(id)}
         aria-disabled={id === "claimCast" ? blocked : undefined}
-        title={blocked && castBlock === "CASTER_IDENTITY_REQUIRED" ? castIdentityNotice : undefined}
+        title={blocked ? castIdentityNotice : undefined}
         aria-label={actionName(action.label)}
         data-action={id}
         onKeyDown={inMenu ? onPanelKeyDown : undefined}

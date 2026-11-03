@@ -25,13 +25,32 @@ commit : `lib/server/tournaments/referee-notices.ts`. Fenêtre du staff :
 
 ## Qui peut arbitrer
 
-`refereeBlockReason` : la permission `tournaments` (`NOT_REFEREE`), un tag
-Discord certifié **et** un compte Battle.net rattaché
-(`REFEREE_IDENTITY_REQUIRED`) — en Overwatch, les équipes l'ajoutent en jeu
-par son BattleTag (hors Overwatch, ni BattleTag ni « ajoute-le en jeu », décision 35). Conditions
+`refereeBlockReason(permission, identité, jeu)` : la permission `tournaments`
+(`NOT_REFEREE`), un tag Discord certifié **et, en Overwatch seulement**, un
+compte Battle.net rattaché (`REFEREE_IDENTITY_REQUIRED`, `identityComplete` ; en
+Marvel Rivals, le seul tag Discord manquant se refuse par `REFEREE_DISCORD_REQUIRED` —
+`CASTER_DISCORD_REQUIRED` pour caster —, dont le texte ne parle pas de Battle.net) —
+en Overwatch, les équipes l'ajoutent en jeu par son BattleTag ; hors Overwatch,
+ni BattleTag ni « ajoute-le en jeu » (décision 35) et **aucun Battle.net
+demandé** (décision de l'utilisateur, 2026-11-03 : même règle pour caster,
+`castBlockReason`). Le jeu est celui du tournoi du match
+(`LaunchMatchBaseRow.tournament_game`, `MatchCastExtras.game`) ; les lectures
+par lot (`readMatchCasters`, brief du salon) se font par jeu. Conditions
 relues en base à chaque geste (`loadRefereeEligibility`, jamais les rôles d'une
 session). Il **peut caster** le match, il **ne peut pas le jouer**
 (`REFEREE_IS_PLAYER`).
+
+Le retrait de l'arbitre (volontaire/staff, d'office, opposition retenue) passe
+par un seul assistant, `clearMatchReferee` (`match-launch.ts`) : arbitre et
+« Prêt » remis à `NULL`, puis, tournoi en cours, départ d'un match qui ne
+l'attendait plus.
+
+La fiche porte `contactsShown` (contacts de l'arbitre ouverts à ce lecteur,
+`refereeContactsOpen`) : ouverts mais vides (champ Discord présent et `null`,
+pas de BattleTag lisible), `RefereeCard` écrit « Aucun contact disponible. »,
+comme la fiche d'un caster. `battletagVerified` ne part qu'avec le BattleTag
+lisible, jamais seul ; hors Overwatch, ni l'un ni l'autre n'est même calculé
+(`withGameBattletag` reçoit une fonction).
 
 Un arbitre qui ne remplit plus ces conditions ou qui, avant le départ, joue
 désormais le match (roster rejoint, même sans changer d'appariement — le verrou

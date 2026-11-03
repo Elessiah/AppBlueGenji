@@ -1302,7 +1302,7 @@ export async function getTournamentViewerContext(
 
   // Inscription comme caster : la permission ne suffit pas, il faut aussi une
   // identité vérifiée (`castBlockReason`).
-  const castBlock = await loadViewerCastBlock(userId, canManageLive);
+  const castBlock = await loadViewerCastBlock(userId, canManageLive, snapshot.card.game);
 
   // Détail des propositions en attente : aux deux engagés qui mènent leur
   // match, et à l'arbitrage — jamais dans l'instantané diffusé. Calculé ici,

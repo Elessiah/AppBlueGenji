@@ -94,12 +94,22 @@ export const REFEREE_USERNAME_MEMBERS_SCOPE =
  * Tag Discord certifié de l'arbitre désigné, présenté aux seules parties du
  * match — membres de ses deux équipes, ses casters — dans la fenêtre
  * « Contacts » et sur la page du match (lot MATCH-PAGE-CONNECT,
- * `MATCH_PAGE_CONNECT.md`) : les conditions d'utilisation (version 8) ne le
- * prévoyant pas, l'intérêt légitime, avec le même droit d'opposition que sa
- * présentation aux parties.
+ * `MATCH_PAGE_CONNECT.md`) : depuis le 5 novembre 2026, l'exécution du service,
+ * strictement nécessaire à son fonctionnement minimum (décision de
+ * l'utilisateur du 2026-11-03, auparavant l'intérêt légitime), une fois la
+ * version 7 acceptée par l'arbitre — avant, `REFEREE_DISCORD_BEFORE_V7_SCOPE` ; son opposition à
+ * l'arbitrage, retenue, l'en retire toujours avec ses matchs non terminés.
  */
 export const REFEREE_DISCORD_SCOPE =
-  "si tu es l'arbitre désigné d'un match, ton tag Discord certifié, dans sa fenêtre « Contacts » et sur sa page, lu par ses deux équipes dès que ses deux adversaires sont connus et jusqu'à sa fin et par ses casters le temps du match (jamais par les arbitres sans rôle sur ce match ni dans la fenêtre de lancement ; si tu le castes aussi, la règle des casters : le temps du match pour ses parties, fenêtre de lancement comprise, et dès que ses deux adversaires sont connus pour les autres arbitres), pour qu'ils puissent te joindre — opposition par le formulaire de signalement, catégorie RGPD, avec le même effet qu'une opposition à ta présentation aux parties (retrait de tes matchs non terminés)";
+  "si tu es l'arbitre désigné d'un match, ton tag Discord certifié, dans sa fenêtre « Contacts » et sur sa page, lu par ses deux équipes dès que ses deux adversaires sont connus et jusqu'à sa fin et par ses casters le temps du match (jamais par les arbitres sans rôle sur ce match ni dans la fenêtre de lancement ; si tu le castes aussi, la règle des casters : le temps du match pour ses parties, fenêtre de lancement comprise, et dès que ses deux adversaires sont connus pour les autres arbitres), pour qu'ils puissent te joindre, depuis le 5 novembre 2026 (auparavant, intérêt légitime) et une fois la version 7 des conditions d'utilisation ou une suivante acceptée par toi — strictement nécessaire au fonctionnement minimum du service, sans opposition propre : la présentation cesse avec ton arbitrage du match — retrait par toi ou par le staff, autre arbitre ou autogestion, joueur du match avant son lancement, ton opposition d'arbitre (formulaire de signalement, catégorie RGPD) retenue, qui te retire de tes matchs non terminés, ou la suppression de ton compte —, dès que tu ne remplis plus les conditions de l'arbitrage (tag retiré compris : avant le lancement, tu es aussi retiré du match), et à la fin du match ; si tu le castes aussi, ton tag suit en plus la règle des casters";
+
+/**
+ * Même présentation du tag Discord, pour un arbitre qui n'a pas encore accepté
+ * la version 7 des conditions : intérêt légitime, avec un droit d'opposition,
+ * comme son pseudo et son BattleTag (`REFEREE_BATTLETAG_BEFORE_V7_SCOPE`).
+ */
+export const REFEREE_DISCORD_BEFORE_V7_SCOPE =
+  "la même présentation de ton tag Discord certifié d'arbitre désigné, tant que tu n'as pas accepté la version 7 des conditions d'utilisation ou une version suivante — opposition par le formulaire de signalement, catégorie RGPD (retenue, tu es retiré de tous tes matchs non terminés et ne peux plus en prendre un ni t'en voir confier un tant qu'elle n'est pas levée — à ta seule demande —, même une fois la version 7 ou une suivante acceptée)";
 
 /**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré
@@ -254,7 +264,8 @@ export const DONNEES_PROFIL: DonneEntry[] = [
       { base: CONTRAT, scope: MATCH_CONTACTS_SCOPE },
       { base: INTERET_LEGITIME, scope: MATCH_TIME_DM_SCOPE },
       { base: INTERET_LEGITIME, scope: VERIFIED_BADGE_SCOPE },
-      { base: INTERET_LEGITIME, scope: REFEREE_DISCORD_SCOPE },
+      { base: CONTRAT, scope: REFEREE_DISCORD_SCOPE },
+      { base: INTERET_LEGITIME, scope: REFEREE_DISCORD_BEFORE_V7_SCOPE },
     ],
     duree: "Jusqu'au retrait ou au changement du tag, ou durée du compte",
   },
@@ -264,7 +275,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // connexion, au même titre que les deux suivants. La finalité le dit, parce
     // que c'est ce qui explique qu'on ne puisse pas retirer le dernier.
     finalite:
-      "Moyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires, rappels, retrait de match, réglages du salon si tu gères une engagée ou joues un tournoi individuel, et retrait de ton cast — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, avis de suspension ou de modération, information sur tes données). Retirable depuis Mon profil tant qu'il t'en reste un autre",
+      "Moyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires, rappels, retrait de match, réglages du salon si tu gères une engagée ou joues un tournoi individuel, et retrait de ton cast — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, invitation d'une équipe, reprise d'équipe proposée ou propriété de ton équipe reçue, avis de suspension ou de modération, information sur tes données). Retirable depuis Mon profil tant qu'il t'en reste un autre",
     base: CONTRAT,
     extraBases: [
       { base: INTERET_LEGITIME, scope: MATCH_TIME_DM_SCOPE },
@@ -417,7 +428,7 @@ export const DROITS: DroitEntry[] = [
   },
   {
     title: "Droit d'opposition",
-    text: "Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire, rappels, avis de retrait de match, réglages du salon et avis du retrait d'un cast en message privé — ces messages se coupent directement par la case « Messages privés Discord de mes matchs » de Mon profil — et pastilles de certification de votre fiche, tag Discord certifié et « BattleTag vérifié », la vérification, quand un membre du staff arbitre un match, qu'il ne le joue pas (impartialité de l'arbitrage), l'affichage du pseudo de l'arbitre désigné à tout membre connecté, la présentation de l'arbitre désigné aux parties de ses matchs tant qu'il n'a pas accepté la version 7 des conditions d'utilisation ou une version suivante, ainsi que la présentation de son tag Discord certifié aux deux équipes et aux casters de ses matchs, par le formulaire de signalement, catégorie RGPD). Le pseudo publié dans l'annonce #live d'un tournoi individuel n'en fait pas partie : il relève de l'exécution du service auquel vous vous inscrivez — ne pas y être nommé revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande. L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord (intérêt légitime), est supprimée sur demande : c'est ainsi qu'on s'y oppose.",
+    text: "Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire, rappels, avis de retrait de match, réglages du salon et avis du retrait d'un cast en message privé — ces messages se coupent directement par la case « Messages privés Discord de mes matchs » de Mon profil — et pastilles de certification de votre fiche, tag Discord certifié et « BattleTag vérifié », la vérification, quand un membre du staff arbitre un match, qu'il ne le joue pas (impartialité de l'arbitrage), l'affichage du pseudo de l'arbitre désigné à tout membre connecté, la présentation de l'arbitre désigné aux parties de ses matchs — pseudo, BattleTag en Overwatch et tag Discord certifié — tant qu'il n'a pas accepté la version 7 des conditions d'utilisation ou une version suivante, par le formulaire de signalement, catégorie RGPD). Le pseudo publié dans l'annonce #live d'un tournoi individuel n'en fait pas partie : il relève de l'exécution du service auquel vous vous inscrivez — ne pas y être nommé revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande. L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord (intérêt légitime), est supprimée sur demande : c'est ainsi qu'on s'y oppose.",
   },
   {
     title: "Droit à la portabilité",

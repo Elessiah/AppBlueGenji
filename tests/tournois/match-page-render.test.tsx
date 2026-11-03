@@ -415,7 +415,7 @@ describe("page d'un match — arbitrage × lecteur", () => {
   });
 
   it("arbitre : « Arbitre désigné » pour tous, sa fiche aux seules parties du match et au staff", () => {
-    const referee = { userId: 77, pseudo: "Juge", battletag: "Juge#3333", battletagVerified: true, ready: false, isViewer: false };
+    const referee = { userId: 77, pseudo: "Juge", battletag: "Juge#3333", battletagVerified: true, ready: false, contactsShown: true, isViewer: false };
     mockLaunch = launch({ referee });
     const page = match({ refereeAssigned: true });
     for (const viewer of ["public", "other"] as const) {
@@ -611,7 +611,7 @@ describe("page d'un match — streams et casters", () => {
   // Décision 35 (2026-10-28) : en Marvel Rivals, on n'invite pas par BattleTag.
   it("MatchPage_marvelRivals_noInviteNotesAndNeutralHeading", () => {
     const mrCaster: LaunchCaster = { userId: 900, pseudo: "Voix", discordTag: "voix", ready: false, contactsShown: true, isViewer: false };
-    mockLaunch = launch({ casters: [mrCaster], referee: { userId: 77, pseudo: "Juge", ready: false, isViewer: false } });
+    mockLaunch = launch({ casters: [mrCaster], referee: { userId: 77, pseudo: "Juge", ready: false, contactsShown: true, isViewer: false } });
     const page = cast({ refereeAssigned: true });
 
     const fr = visible(render(page, "player", false, "fr", EMPTY_MAP_RULES, "MR"));
@@ -659,7 +659,7 @@ describe("page d'un match — contacts : qui les demande", () => {
 // MATCH-PAGE-CONNECT : infos de connexion et tag Discord de l'arbitre aux
 // seules parties du match (`docs/features/MATCH_PAGE_CONNECT.md`).
 describe("page d'un match — infos de connexion", () => {
-  const juge = { userId: 77, pseudo: "Juge", discordTag: "juge", battletag: "Juge#3333", battletagVerified: true, ready: false, isViewer: false };
+  const juge = { userId: 77, pseudo: "Juge", discordTag: "juge", battletag: "Juge#3333", battletagVerified: true, ready: false, contactsShown: true, isViewer: false };
   const staffOnly = { role: "REFEREE", canDeclareReady: false, isReferee: false, isCaster: false, earlyContacts: true, ready: false } as const;
 
   it("render_playerOfMatch_connectionSectionWithBothTeamsContacts", () => {
@@ -686,6 +686,27 @@ describe("page d'un match — infos de connexion", () => {
     const html = render(match(), "player");
 
     expect(html.indexOf("Bravo#1111")).toBeLessThan(html.indexOf("Alpha#1111"));
+  });
+
+  it("render_teamContactsNotYetShown_saysWhenInsteadOfBareNote", () => {
+    mockLaunch = launch({ team2: { ...side(BRAVO, "Bravo"), contacts: [], contactsShown: false } });
+
+    const html = visible(render(match(), "player"));
+
+    expect(html).toContain("Les contacts s'affichent au lancement");
+    expect(html).not.toContain("Contacts non affichés.");
+  });
+
+  it("render_casterViewerTeamContactsNotYetShown_noReferenceToContactsAction", () => {
+    mockLaunch = launch({
+      team2: { ...side(BRAVO, "Bravo"), contacts: [], contactsShown: false },
+      viewer: { role: "CASTER", canDeclareReady: true, isReferee: false, isCaster: true, earlyContacts: false, ready: false },
+    });
+
+    const html = visible(render(match(), "player"));
+
+    expect(html).toContain("Les contacts s'affichent au lancement.");
+    expect(html).not.toContain("ou dès maintenant");
   });
 
   it("render_registeredCaster_connectionSectionShown", () => {
@@ -740,7 +761,7 @@ describe("page d'un match — infos de connexion", () => {
     const html = render(match({ refereeAssigned: true }), "player");
 
     expect(html).toContain(">juge<");
-    expect(html).toContain('aria-label="Copier le Discord juge"');
+    expect(html).toContain('aria-label="Copier le Discord de Juge : juge"');
   });
 
   it("render_refereeDiscordTagNotSent_noDiscordLineOnRefereeCard", () => {

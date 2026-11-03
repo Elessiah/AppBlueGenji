@@ -26,6 +26,7 @@ const LOBBY_MATCH = {
   tournament_id: 4,
   tournament_name: "Coupe",
   participant_type: "TEAM",
+  game: "OW",
   team1_id: 1,
   team2_id: 2,
   team1_name: "Renards",
@@ -230,6 +231,25 @@ describe("dispatchMatchStartNotices", () => {
     mockDb([LOBBY_MATCH], { castLinks: [[40, 99]], casters: [caster({ platform_roles_json: null })] });
     await dispatchMatchStartNotices();
     expect(pushes().map((p) => p.userIds)).toEqual([[10, 11], [20]]);
+  });
+
+  it("dispatchMatchStartNotices_unreadableGame_judgesCasterUnderOverwatchRule", async () => {
+    // Jeu illisible (`null`) : la règle d'Overwatch, sous la même clé à la construction et à la lecture.
+    mockDb([{ ...LOBBY_MATCH, game: null }], { castLinks: [[40, 99]], casters: [caster()] });
+    await dispatchMatchStartNotices();
+    expect(pushes().map((p) => p.userIds)).toEqual([[10, 11], [20], [99]]);
+  });
+
+  it("dispatchMatchStartNotices_unreadableGameCasterWithoutBattlenet_notCalled", async () => {
+    mockDb([{ ...LOBBY_MATCH, game: null }], { castLinks: [[40, 99]], casters: [caster({ blizzard_sub: null })] });
+    await dispatchMatchStartNotices();
+    expect(pushes().map((p) => p.userIds)).toEqual([[10, 11], [20]]);
+  });
+
+  it("dispatchMatchStartNotices_marvelRivalsCasterWithoutBattlenet_called", async () => {
+    mockDb([{ ...LOBBY_MATCH, game: "MR" }], { castLinks: [[40, 99]], casters: [caster({ blizzard_sub: null })] });
+    await dispatchMatchStartNotices();
+    expect(pushes().map((p) => p.userIds)).toEqual([[10, 11], [20], [99]]);
   });
 
   it("ne nomme aucun joueur en tournoi individuel", async () => {

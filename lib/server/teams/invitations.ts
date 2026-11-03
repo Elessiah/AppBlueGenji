@@ -6,6 +6,7 @@ import { getUserIdByPseudo, sanitizeRoles } from "@/lib/server/users/roles";
 import { arrivalRoles, teamJoinRefusal } from "@/lib/shared/team-join";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { notifyTeamJoinRequest } from "@/lib/server/team-join-notifications";
+import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { forgetCertificationPromptsOfTeam } from "@/lib/server/tournaments/certification-prompt-cache";
 import { ghostAdminOverride, userCanManageTeam } from "./access";
@@ -244,6 +245,10 @@ export async function inviteToTeam(
      VALUES (?, ?, ?, 'INVITE', ?, 'PENDING')`,
     [teamId, userId, requesterId, JSON.stringify(inviteRoles)],
   );
+  // L'invitation est écrite (instruction seule, validée) : le joueur est
+  // prévenu, sans attendre — sans cela, elle n'existait que pour qui ouvrait
+  // « Mon profil ».
+  notifyTeamInviteInBackground("INVITE", teamId, userId, requesterId);
   return "INVITED";
 }
 

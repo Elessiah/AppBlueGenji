@@ -65,6 +65,18 @@
     "title": "Demande d'adhésion",
     "body": "Un joueur demande à rejoindre {team}. Réponds depuis la fiche de l'équipe."
   },
+  "teamInvitation": {
+    "title": "Invitation d'équipe",
+    "body": "{team} t'invite à la rejoindre. Accepte ou refuse depuis ton profil."
+  },
+  "ghostTeamClaim": {
+    "title": "Reprise d'équipe proposée",
+    "body": "Un admin vous propose de reprendre l'équipe {team}."
+  },
+  "teamOwnershipTransfer": {
+    "title": "Tu es propriétaire de ton équipe",
+    "body": "La propriété de {team} vient de t'être transférée. Tu gères désormais son nom, son sigle et ses membres."
+  },
   "contentReport": {
     "title": "Un signalement te concerne",
     "body": "Signalement ({category}) : aucune décision n'est prise. Consulte-le et conteste-le s'il est infondé."
@@ -159,7 +171,8 @@
       "REPLACED": "tu ne remplissais plus les conditions du cast, un autre caster a pris ta place",
       "INELIGIBLE": "tu ne remplis plus les conditions du cast",
       "INELIGIBLE_PERMISSION": "tu n'as plus la permission de diffusion",
-      "INELIGIBLE_IDENTITY": "ton identité de caster est incomplète (tag Discord certifié, compte Battle.net), voir « Mon profil »",
+      "INELIGIBLE_IDENTITY": "ton identité de caster est incomplète (tag Discord certifié et compte Battle.net), voir « Mon profil »",
+      "INELIGIBLE_DISCORD": "ton tag Discord n'est plus certifié, voir « Mon profil »",
       "JOINED_TEAM": "tu joues désormais ce match"
     }
   },

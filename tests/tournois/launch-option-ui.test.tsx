@@ -5,8 +5,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { closedNoticeText } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
 import { startAtHint, startAtNotice } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
 import { anotherModalOpen } from "@/lib/shared/dialog-focus";
-import { launchSidesLaterText } from "@/components/match-launch/MatchLaunchCenter";
-import { CasterCard, CasterCards, RefereeCard, SideCard } from "@/components/match-launch/LaunchContactCards";
+import { launchSidesLaterText, refereeLaterText } from "@/components/match-launch/launch-text";
+import { scopedText } from "@/lib/shared/scoped-text";
+import enLaunchModal from "@/messages/en/launchModal.json";
+import { CasterCard, CasterCards, COPY_TOAST_OWNER_MAX, RefereeCard, SideCard, copyToastLabel } from "@/components/match-launch/LaunchContactCards";
 import { contactsErrorText } from "@/components/match-launch/MatchContactsDialog";
 import { FR_LAUNCH_TEXT } from "@/components/match-launch/launch-text";
 import { tournamentDialogsText } from "@/lib/shared/tournament-actions-text";
@@ -481,7 +483,7 @@ describe("fiches hors Overwatch : BattleTag absent", () => {
   it("RefereeCard_battletagAbsent_rendersPseudoWithoutBattletagLine", () => {
     const html = renderToStaticMarkup(
       <RefereeCard
-        referee={{ userId: 77, pseudo: "Juge", ready: false, isViewer: false }}
+        referee={{ userId: 77, pseudo: "Juge", ready: false, contactsShown: true, isViewer: false }}
         selfManaged={false}
         phase="LAUNCHED"
         onCopy={noop}
@@ -497,7 +499,7 @@ describe("fiches hors Overwatch : BattleTag absent", () => {
   it("RefereeCard_discordTagSent_rendersDiscordLineWithCopyButton", () => {
     const html = renderToStaticMarkup(
       <RefereeCard
-        referee={{ userId: 77, pseudo: "Juge", discordTag: "juge", battletag: "Juge#3333", battletagVerified: true, ready: false, isViewer: false }}
+        referee={{ userId: 77, pseudo: "Juge", discordTag: "juge", battletag: "Juge#3333", battletagVerified: true, ready: false, contactsShown: true, isViewer: false }}
         selfManaged={false}
         phase="LAUNCHED"
         onCopy={noop}
@@ -506,14 +508,14 @@ describe("fiches hors Overwatch : BattleTag absent", () => {
 
     expect(html).toContain(">Discord<");
     expect(html).toContain(">juge<");
-    expect(html).toContain('aria-label="Copier le Discord juge"');
+    expect(html).toContain('aria-label="Copier le Discord de Juge : juge"');
     expect(html.indexOf(">juge<")).toBeLessThan(html.indexOf("Juge#3333"));
   });
 
   it("RefereeCard_discordTagNotSent_noDiscordLine", () => {
     const html = renderToStaticMarkup(
       <RefereeCard
-        referee={{ userId: 77, pseudo: "Juge", battletag: "Juge#3333", battletagVerified: true, ready: false, isViewer: false }}
+        referee={{ userId: 77, pseudo: "Juge", battletag: "Juge#3333", battletagVerified: true, ready: false, contactsShown: true, isViewer: false }}
         selfManaged={false}
         phase="LAUNCHED"
         onCopy={noop}
@@ -526,7 +528,7 @@ describe("fiches hors Overwatch : BattleTag absent", () => {
   it("RefereeCard_ownCard_noDiscordLine", () => {
     const html = renderToStaticMarkup(
       <RefereeCard
-        referee={{ userId: 77, pseudo: "Juge", discordTag: "juge", ready: false, isViewer: true }}
+        referee={{ userId: 77, pseudo: "Juge", discordTag: "juge", ready: false, contactsShown: true, isViewer: true }}
         selfManaged={false}
         phase="LAUNCHED"
         onCopy={noop}
@@ -549,7 +551,7 @@ describe("fiches hors Overwatch : BattleTag absent", () => {
   it("RefereeCard_battletagNote_followsValueAndCopyButton", () => {
     const html = renderToStaticMarkup(
       <RefereeCard
-        referee={{ userId: 77, pseudo: "Juge", battletag: "Juge#3333", battletagVerified: true, ready: false, isViewer: false }}
+        referee={{ userId: 77, pseudo: "Juge", battletag: "Juge#3333", battletagVerified: true, ready: false, contactsShown: true, isViewer: false }}
         selfManaged={false}
         phase="LAUNCHED"
         onCopy={noop}
@@ -559,5 +561,186 @@ describe("fiches hors Overwatch : BattleTag absent", () => {
 
     expect(html.indexOf("Juge#3333")).toBeLessThan(html.indexOf("À ajouter en ami"));
     expect(html.indexOf(">Copier<")).toBeLessThan(html.indexOf("À ajouter en ami"));
+  });
+});
+
+describe("RefereeCard — note sans contact, accessibilité, toast de copie (MATCH-REFEREE-FINISH)", () => {
+  const noop = async () => undefined;
+  const base = { userId: 77, pseudo: "Juge", ready: false, contactsShown: true, isViewer: false } as const;
+
+  it("RefereeCard_contactsOpenButEmpty_showsNoContactNote", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard referee={{ ...base, discordTag: null }} selfManaged={false} phase="LAUNCHED" onCopy={noop} />,
+    );
+    expect(html).toContain("Aucun contact disponible.");
+  });
+
+  it("RefereeCard_contactsNotYetOpen_noNoContactNote", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard referee={{ ...base, contactsShown: false, discordTag: null }} selfManaged={false} phase="LAUNCHED" onCopy={noop} />,
+    );
+    expect(html).not.toContain("Aucun contact disponible.");
+  });
+
+  it("RefereeCard_copyButton_namesOwnerInAccessibleName", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard referee={{ ...base, discordTag: "juge" }} selfManaged={false} phase="LAUNCHED" onCopy={noop} />,
+    );
+    expect(html).toContain('aria-label="Copier le Discord de Juge : juge"');
+  });
+
+  it("RefereeCard_contactsNotYetOpen_showsLaterNote", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard referee={{ ...base, contactsShown: false }} selfManaged={false} phase="LAUNCHED" onCopy={noop} />,
+    );
+    expect(html).toContain("Ses contacts s&#x27;affichent au lancement.");
+  });
+
+  it("RefereeCard_contactsNotYetOpen_laterTextOverridesDefault", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard referee={{ ...base, contactsShown: false }} selfManaged={false} phase="LAUNCHED" onCopy={noop} laterText="Plus tard." />,
+    );
+    expect(html).toContain("Plus tard.");
+  });
+
+  it("RefereeCard_ownCardNotYetOpen_noLaterNote", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard referee={{ ...base, contactsShown: false, isViewer: true }} selfManaged={false} phase="LAUNCHED" onCopy={noop} />,
+    );
+    expect(html).not.toContain("au lancement");
+  });
+
+  it("RefereeCard_launchWindowWithoutDiscordField_noNoContactNote", () => {
+    // Fenêtre de lancement : le champ Discord est absent, pas « vide ».
+    const html = renderToStaticMarkup(<RefereeCard referee={base} selfManaged={false} phase="LAUNCHED" onCopy={noop} />);
+    expect(html).not.toContain("Aucun contact disponible.");
+  });
+
+  it("RefereeCard_ownCard_noNoContactNote", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard referee={{ ...base, isViewer: true, discordTag: null }} selfManaged={false} phase="LAUNCHED" onCopy={noop} />,
+    );
+    expect(html).not.toContain("Aucun contact disponible.");
+  });
+
+  it("RefereeCard_overwatchWithoutReadableBattletag_showsDashLikeCasterCard", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard referee={{ ...base, discordTag: "juge", battletag: null }} selfManaged={false} phase="LAUNCHED" onCopy={noop} />,
+    );
+    expect(html).toContain("BattleTag");
+    expect(html).toContain("—");
+  });
+
+  it("RefereeCard_battletagNote_isLinkedToCopyButtonByAriaDescribedby", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard
+        referee={{ ...base, battletag: "Juge#3333", battletagVerified: true }}
+        selfManaged={false}
+        phase="LAUNCHED"
+        onCopy={noop}
+        battletagNote="À ajouter en ami"
+      />,
+    );
+    const describedby = /aria-describedby="([^"]+)"/.exec(html)?.[1];
+    expect(describedby).toBeTruthy();
+    expect(html).toContain(`id="${describedby}"`);
+    expect(html).toContain("À ajouter en ami");
+  });
+
+  it("RefereeCard_withoutNote_copyButtonHasNoAriaDescribedby", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard referee={{ ...base, discordTag: "juge" }} selfManaged={false} phase="LAUNCHED" onCopy={noop} />,
+    );
+    expect(html).not.toContain("aria-describedby");
+  });
+
+  it("RefereeCard_region_isNamedByRefereeRegionKey", () => {
+    const html = renderToStaticMarkup(<RefereeCard referee={base} selfManaged={false} phase="LAUNCHED" onCopy={noop} />);
+    expect(html).toContain('aria-label="Arbitre Juge"');
+    expect(FR_LAUNCH_TEXT.t("refereeRegion", { pseudo: "Juge" })).toBe("Arbitre Juge");
+  });
+
+  it("refereeRegion_keyExistsInFrAndEn", () => {
+    const fr = JSON.parse(readFileSync(join(process.cwd(), "messages/fr/launchModal.json"), "utf8"));
+    const en = JSON.parse(readFileSync(join(process.cwd(), "messages/en/launchModal.json"), "utf8"));
+    expect(fr.refereeRegion).toContain("{pseudo}");
+    expect(en.refereeRegion).toContain("{pseudo}");
+  });
+
+  it.each([
+    ["Discord", "Alice", "Discord de Alice"],
+    ["BattleTag", "Bob", "BattleTag de Bob"],
+    ["Discord", undefined, "Discord"],
+  ] as [("Discord" | "BattleTag"), string | undefined, string][])(
+    "copyToastLabel_%s_owner_%s",
+    (kind, owner, expected) => {
+      expect(copyToastLabel(FR_LAUNCH_TEXT, kind, owner)).toBe(expected);
+    },
+  );
+
+  it("copyToastLabel_english_translationKey", () => {
+    expect(copyToastLabel(scopedText("en", enLaunchModal), "Discord", "Alice")).toBe("Alice's Discord");
+  });
+
+  it("copyToastLabel_longPseudo_truncatedWithEllipsis", () => {
+    const owner = "A".repeat(COPY_TOAST_OWNER_MAX + 5);
+    const label = copyToastLabel(FR_LAUNCH_TEXT, "Discord", owner);
+    expect(label).toBe(`Discord de ${"A".repeat(COPY_TOAST_OWNER_MAX - 1)}…`);
+  });
+
+  it("copyToastLabel_pseudoAtLimit_keptWhole", () => {
+    const owner = "B".repeat(COPY_TOAST_OWNER_MAX);
+    expect(copyToastLabel(FR_LAUNCH_TEXT, "BattleTag", owner)).toBe(`BattleTag de ${owner}`);
+  });
+
+  it("copyToastLabel_astralCharacters_truncatedByCharacter", () => {
+    const owner = "😀".repeat(COPY_TOAST_OWNER_MAX + 1);
+    const label = copyToastLabel(FR_LAUNCH_TEXT, "Discord", owner);
+    expect(Array.from(label.replace("Discord de ", ""))).toHaveLength(COPY_TOAST_OWNER_MAX);
+    expect(label.endsWith("…")).toBe(true);
+  });
+
+  it("copyLabelOwner_keyExistsInFrAndEn", () => {
+    const fr = JSON.parse(readFileSync(join(process.cwd(), "messages/fr/launchModal.json"), "utf8"));
+    const en = JSON.parse(readFileSync(join(process.cwd(), "messages/en/launchModal.json"), "utf8"));
+    for (const text of [fr.copyLabelOwner, en.copyLabelOwner]) {
+      expect(text).toContain("{kind}");
+      expect(text).toContain("{owner}");
+    }
+  });
+});
+
+describe("refereeLaterText — note des contacts tus de l'arbitre (MATCH-REFEREE-FINISH)", () => {
+  const referee = { userId: 9 };
+  const launch = (earlyContacts: boolean, casterIds: number[], ref: { userId: number } | null = referee) => ({
+    viewer: { earlyContacts },
+    casters: casterIds.map((userId) => ({ userId })),
+    referee: ref,
+  });
+
+  it("refereeLaterText_earlyContactsViewer_pointsToContactsAction", () => {
+    expect(refereeLaterText(FR_LAUNCH_TEXT, launch(true, []))).toBe(FR_LAUNCH_TEXT.t("contactsAtLaunch"));
+  });
+
+  it("refereeLaterText_casterOnlyViewer_atMatchStart", () => {
+    expect(refereeLaterText(FR_LAUNCH_TEXT, launch(false, []))).toBe(FR_LAUNCH_TEXT.t("contacts.casterLater"));
+  });
+
+  it("refereeLaterText_refereeAlsoCasts_atMatchStartEvenForEarlyViewer", () => {
+    expect(refereeLaterText(FR_LAUNCH_TEXT, launch(true, [3, 9]))).toBe(FR_LAUNCH_TEXT.t("contacts.casterLater"));
+  });
+
+  it("refereeLaterText_otherCasterOnly_earlyViewerStillPointedToContacts", () => {
+    expect(refereeLaterText(FR_LAUNCH_TEXT, launch(true, [3]))).toBe(FR_LAUNCH_TEXT.t("contactsAtLaunch"));
+  });
+
+  it("refereeLaterText_noReferee_followsViewer", () => {
+    expect(refereeLaterText(FR_LAUNCH_TEXT, launch(true, [9], null))).toBe(FR_LAUNCH_TEXT.t("contactsAtLaunch"));
+  });
+
+  it("refereeLaterText_english_translated", () => {
+    const en = scopedText("en", enLaunchModal);
+    expect(refereeLaterText(en, launch(true, []))).toBe(en.t("contactsAtLaunch"));
+    expect(refereeLaterText(en, launch(false, []))).toBe(en.t("contacts.casterLater"));
   });
 });

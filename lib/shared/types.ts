@@ -679,7 +679,8 @@ export type BracketMatch = {
    * Le match a-t-il un arbitre désigné (`docs/features/MATCH_REFEREE.md`) ?
    * L'instantané ne nomme personne et ne dit pas si l'arbitre est « Prêt »
    * (décision 47) : le pseudo vient du contexte du lecteur connecté
-   * (`TournamentViewerContext.refereeNames`), le BattleTag et le « Prêt » ne
+   * (`TournamentViewerContext.refereeNames`), le BattleTag (tournois Overwatch
+   * seulement) et le « Prêt » ne
    * vont qu'aux parties du match et au staff (modale « Contacts », fenêtre
    * « Arbitrage » du staff). Un arbitre devenu inéligible en est tu.
    */
@@ -866,7 +867,7 @@ export type TournamentViewerContext = {
   /**
    * Ce qui empêche le lecteur de s'inscrire pour caster un match, `null` s'il
    * le peut : permission `live` **et** tag Discord certifié **et** compte
-   * Battle.net rattaché (`castBlockReason`, `lib/shared/match-launch.ts`).
+   * Battle.net rattaché en Overwatch seulement (`castBlockReason`, `lib/shared/match-launch.ts`).
    */
   castBlock: CastBlock | null;
   /**

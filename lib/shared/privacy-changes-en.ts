@@ -32,6 +32,11 @@ import type { PrivacyChange } from "@/lib/shared/privacy-changes";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { SITE_VISITOR_RETENTION_MONTHS, SITE_VISIT_DETAIL_RETENTION_DAYS } from "@/lib/shared/site-visits";
 import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-request-notice";
+import {
+  TEAM_INVITE_NOTICE_COOLDOWN_HOURS,
+  TEAM_INVITE_NOTICES_DAILY_CAP,
+  TEAM_INVITE_NOTICES_PER_PLAYER_CAP,
+} from "@/lib/shared/team-invite-notice";
 
 /** The translated part of an entry: its wording, and its links' labels (same targets, same order). */
 export type PrivacyChangeTranslation = {
@@ -749,6 +754,36 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Solo registrations: a registration for a solo tournament that hasn't started yet, where you played no match, no longer keeps your account under a borrowed username — if nothing else keeps it (a match played, a team owned, a tournament organized, an entry in a solo tournament that has already started or ended), it is erased entirely and the registration withdrawn from the tournament; otherwise, the registration stays, under a borrowed username. Once the tournament has started or ended, the entrant stays, under a borrowed username, as before.",
       "Player page: a deleted account's page, under its borrowed username, is now kept only if it played at least one match (its statistics also belong to its opponents); otherwise the page is not found, and its name is shown without a link.",
       "What doesn't change: nothing new is collected; the traces left after any deletion (including encrypted backups, deletion log, connection data, audience measurement) are the same.",
+    ],
+  },
+  "2026-11-invitations-equipe-notifiees": {
+    linkLabels: ["Read the “Push notifications” section"],
+    title: "Team invitations announced by push and on Discord",
+    summary:
+      "When a team invites you, when the staff offers you to take over a ghost team, or when the ownership of your team is transferred to you, the site now lets you know by push notification and by a direct message from the Discord bot.",
+    details: [
+      `What changes: the push notification (topic “Team invitations”, which you can turn off from My profile) and the Discord direct message (if you linked your Discord account or verified your tag) only name the team — never who invites you, offers you the takeover or transfers the team to you — and lead to My profile, where the invitation is accepted or declined, or to the team's page. For an ordinary invitation, the same team only gets the same player notified once every ${TEAM_INVITE_NOTICE_COOLDOWN_HOURS} hours, a team or the same person gets ${TEAM_INVITE_NOTICES_DAILY_CAP} players notified at most within that time, and a player only gets the invitation of ${TEAM_INVITE_NOTICES_PER_PLAYER_CAP} teams at most within that time; a takeover offered by the staff is only announced once per team and per player within that time; a transferred ownership is announced at each transfer; the invitation itself is always recorded.`,
+      "What doesn't change: nothing new is collected or kept; nothing is sent to a suspended or deleted account, nor to the author of the action. The direct message falls under organizing competitions (legitimate interest, register T03), which you can object to (section “Your rights” of the privacy page); the push notification, under your consent (register T12).",
+    ],
+  },
+  "2026-11-battlenet-requis-overwatch-seulement": {
+    linkLabels: ["Read the requirements for casting a match", "Read the “Assigned referee of a match” paragraph"],
+    title: "Casting or refereeing: Battle.net required in Overwatch only",
+    summary:
+      "To cast or referee a Marvel Rivals match, a linked Battle.net account is no longer required: the certified Discord tag is enough, together with the streaming or refereeing permission. For an Overwatch match, nothing changes.",
+    details: [
+      "What changes: for a Marvel Rivals match, the site no longer checks that your Battle.net account is linked nor that your BattleTag comes from it; it no longer takes it into account for these matches. For an Overwatch match, the requirement stays: a certified Discord tag and a BattleTag taken from a linked Battle.net account. The terms of use, which ask only referees for Battle.net, will say so in their next version.",
+      "What doesn't change: nothing new is collected or kept, and a caster or referee is presented to the parties to their match as before; only a staff member without Battle.net, who could not cast or referee a Marvel Rivals match, can now do so and be presented in it (username and certified Discord tag).",
+    ],
+  },
+  "2026-11-tag-discord-arbitre-execution-du-service": {
+    linkLabels: ["Read the “Assigned referee of a match” paragraph"],
+    title: "Assigned referee: the basis for presenting your Discord tag",
+    summary:
+      "If you referee a match, presenting your certified Discord tag to both its teams and its casters now rests, once version 7 of the terms or a later one is accepted, on performance of the service, no longer on legitimate interest: without it, the parties to the match cannot reach you.",
+    details: [
+      "What changes: the legal basis of this presentation, deemed strictly necessary for the minimum functioning of the service, once version 7 of the terms or a later one is accepted (before that acceptance, legitimate interest, with the same right to object); once that version is accepted, it has no objection of its own.",
+      "What doesn't change: nothing new is collected or shown, to the same people at the same times; your referee objection (report form, GDPR category) — to your presentation before version 7, or to the display of your username to members —, once upheld, still removes you from your unfinished matches, this tag included.",
     ],
   },
 };

@@ -608,7 +608,7 @@ const CAST_LOG_WORDING: Record<CastLogChange, { kind: string; detail: string }> 
   RELEASED_BY_STAFF: { kind: "Cast retiré", detail: `inscription du caster retirée par ${ANONYMOUS_STAFF_LABEL}` },
   INELIGIBLE: {
     kind: "Cast retiré d'office",
-    detail: "le caster ne remplit plus les conditions du cast (permission de diffusion, tag Discord certifié, compte Battle.net)",
+    detail: "le caster ne remplit plus les conditions du cast (permission de diffusion, tag Discord certifié, compte Battle.net en Overwatch)",
   },
   JOINED_TEAM: { kind: "Cast retiré d'office", detail: "le caster joue désormais ce match" },
 };
@@ -642,7 +642,7 @@ const REFEREE_LOG_WORDING: Record<RefereeLogChange, { kind: string; detail: stri
   RELEASED_BY_STAFF: { kind: "Arbitre retiré", detail: `arbitre retiré par ${ANONYMOUS_STAFF_LABEL}` },
   INELIGIBLE: {
     kind: "Arbitre retiré d'office",
-    detail: "l'arbitre ne remplit plus les conditions (rôle d'arbitre, tag Discord certifié, compte Battle.net)",
+    detail: "l'arbitre ne remplit plus les conditions (rôle d'arbitre, tag Discord certifié, compte Battle.net en Overwatch)",
   },
   JOINED_TEAM: { kind: "Arbitre retiré d'office", detail: "l'arbitre joue désormais ce match" },
   SELF_MANAGED_ON: { kind: "Autogestion activée", detail: `par ${ANONYMOUS_STAFF_LABEL}` },

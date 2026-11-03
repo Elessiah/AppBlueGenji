@@ -19,24 +19,52 @@ function quoted(value: string, locale: Locale): string {
   return locale === "en" ? `“${name}”` : `« ${name} »`;
 }
 
-type DecisionLine = "REFEREE" | "REFEREE_NO_BATTLETAG" | "SELF_MANAGED_TEAM" | "SELF_MANAGED_SOLO";
+type DecisionLine = "REFEREE" | "REFEREE_NO_BATTLETAG";
 
 const DECISION_LINES: Readonly<Record<Locale, Readonly<Record<DecisionLine, string>>>> = {
   fr: {
     REFEREE: "Arbitre désigné : ajoute-le en jeu, il invitera les joueurs dans le salon.",
     REFEREE_NO_BATTLETAG: "Arbitre désigné : il invitera les joueurs dans le salon.",
-    SELF_MANAGED_TEAM:
-      "Autogestion : l'équipe hôte crée la partie, les managers des deux équipes s'invitent mutuellement, puis invitent les casters.",
-    SELF_MANAGED_SOLO: "Autogestion : l'hôte crée la partie et invite son adversaire, puis les casters.",
   },
   en: {
     REFEREE: "Assigned referee: add them in game, they will invite the players to the lobby.",
     REFEREE_NO_BATTLETAG: "Assigned referee: they will invite the players to the lobby.",
-    SELF_MANAGED_TEAM:
-      "Self-managed: the host team creates the game, the managers of both teams invite each other, then invite the casters.",
-    SELF_MANAGED_SOLO: "Self-managed: the host creates the game and invites their opponent, then the casters.",
   },
 };
+
+type CasterVerbs = Readonly<Record<"solo" | "team", Readonly<Record<"invite" | "notify", string>>>>;
+const EN_CASTER_VERBS: CasterVerbs = {
+  solo: { invite: "invites", notify: "notifies" },
+  team: { invite: "invite", notify: "notify" },
+};
+const FR_CASTER_VERBS: CasterVerbs = {
+  solo: { invite: "invite", notify: "prévient" },
+  team: { invite: "invitent", notify: "préviennent" },
+};
+
+/**
+ * La ligne d'autogestion : l'étape des casters n'y figure que si le match est
+ * casté (`side.cast`), et elle dit « inviter » (en jeu) seulement en Overwatch,
+ * où la fiche d'un caster porte un BattleTag ; ailleurs, seul son tag Discord
+ * est donné, on le « prévient ».
+ */
+function selfManagedLine(side: LobbyBriefSide, locale: Locale): string {
+  const invite = battletagRelevantFor(side.game);
+  // Le verbe suit le sujet : l'hôte (un seul) au singulier, les managers au pluriel.
+  const verbs = locale === "en" ? EN_CASTER_VERBS : FR_CASTER_VERBS;
+  const casterVerb = verbs[side.solo ? "solo" : "team"][invite ? "invite" : "notify"];
+  const joiner = locale === "en" ? "then" : "puis";
+  const article = locale === "en" ? "the" : "les";
+  const casters = side.cast ? `, ${joiner} ${casterVerb} ${article} casters` : "";
+  if (locale === "en") {
+    return side.solo
+      ? `Self-managed: the host creates the game and invites their opponent${casters}.`
+      : `Self-managed: the host team creates the game, the managers of both teams invite each other${casters}.`;
+  }
+  return side.solo
+    ? `Autogestion : l'hôte crée la partie et invite son adversaire${casters}.`
+    : `Autogestion : l'équipe hôte crée la partie, les managers des deux équipes s'invitent mutuellement${casters}.`;
+}
 
 /** La ligne de la décision d'arbitrage ; `null` sans décision (le staff en est averti à part). */
 function decisionLine(side: LobbyBriefSide, locale: Locale): string | null {
@@ -47,7 +75,7 @@ function decisionLine(side: LobbyBriefSide, locale: Locale): string | null {
     // Contre une fantôme, aucun manager en face : « s'invitent mutuellement »
     // serait faux, la ligne n'est pas écrite.
     if (side.opponentGhost) return null;
-    return DECISION_LINES[locale][side.solo ? "SELF_MANAGED_SOLO" : "SELF_MANAGED_TEAM"];
+    return selfManagedLine(side, locale);
   }
   return null;
 }
