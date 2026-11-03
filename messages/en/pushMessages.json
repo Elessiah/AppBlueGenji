@@ -159,7 +159,7 @@
       "REPLACED": "you no longer met the casting requirements and another caster took your place",
       "INELIGIBLE": "you no longer meet the casting requirements",
       "INELIGIBLE_PERMISSION": "you no longer have the streaming permission",
-      "INELIGIBLE_IDENTITY": "your caster identity is incomplete (certified Discord tag, Battle.net account)",
+      "INELIGIBLE_IDENTITY": "your caster identity is incomplete (certified Discord tag, Battle.net account), see “My profile”",
       "JOINED_TEAM": "you now play in this match"
     }
   },

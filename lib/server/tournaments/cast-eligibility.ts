@@ -88,7 +88,8 @@ export async function loadEligibleCasterIds(
 /**
  * La condition du cast de chaque compte de la liste, en une lecture : `null`
  * s'il peut caster, sinon ce qui manque (`castEligibilityBlock`) — un compte
- * introuvable compte comme supprimé. `lock` : comme {@link loadEligibleCasterIds}.
+ * introuvable ou supprimé n'a aucun droit : `NOT_CASTER`, sans avis possible
+ * (il n'y a plus personne à prévenir). `lock` : comme {@link loadEligibleCasterIds}.
  */
 export async function loadCastBlocks(
   executor: Executor,

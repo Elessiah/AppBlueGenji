@@ -768,7 +768,8 @@ export function MatchCardActions({
           document.body,
         )}
       {/* Refermée — et oubliée — si l'action disparaît (match lancé entre-temps
-          par un autre arbitre). */}
+          par un autre arbitre) : c'est `useConfirmWhile` (plus haut) qui le
+          garantit, pas cette garde seule. */}
       {confirmForce && (
         <ConfirmActionDialog
           title={t("cardActions.forceConfirm.title", { match: matchLabel })}
