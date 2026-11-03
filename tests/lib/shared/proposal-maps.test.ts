@@ -142,6 +142,15 @@ describe("mergeMatchProposals", () => {
     expect(mergeMatchProposals(match, proposals, late)).toBe(proposals);
   });
 
+  // Revue #542 : détail corrigé dans la même seconde (même `reportedAt`) —
+  // le contexte relu par le rafraîchissement complet l'emporte sur la relecture
+  // ponctuelle restée en mémoire.
+  it("mergeMatchProposals_contextSameInstantAsFetched_keepsContext", () => {
+    const corrected: MatchProposalMaps = { matchId: 10, team1: { reportedAt: at, maps: [] }, team2: null };
+    const proposals = [corrected];
+    expect(mergeMatchProposals(match, proposals, fresh)).toBe(proposals);
+  });
+
   it("mergeMatchProposals_fetchedEqualsContext_returnsContextAsIs", () => {
     const proposals = [fresh];
     expect(mergeMatchProposals(match, proposals, fresh)).toBe(proposals);
