@@ -86,7 +86,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `PERMISSION_ROLES.md` — Rôles de plateforme cumulables et permissions `can(user, …)` ; un administrateur règle les siens depuis « Mon profil », sans se retirer `ADMIN`.
 - `PROFILE_SCREEN.md` — Écran « Mon profil ».
 - `ACCOUNT_MENU.md` — Menu du compte, hauteur des barres de navigation.
-- `ACCOUNT_DELETION.md` — Suppression d'un compte : effacement ou anonymisation.
+- `ACCOUNT_DELETION.md` — Suppression d'un compte : demande réversible 30 jours (réactivation, départ des équipes, forfaits), puis effacement ou anonymisation.
 - `ACCOUNT_SUSPENSION.md` — Suspension d'un compte.
 - `USER_AVATAR_IMPORT.md` — Photos OAuth copiées chez nous, jamais relayées.
 - `USER_AVATAR_DISPLAY.md` — `<UserAvatar>`, repli à initiale, `visibleAvatarUrl`.

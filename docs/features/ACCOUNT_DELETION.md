@@ -590,6 +590,70 @@ suppression **après le commit** dans un journal hors de la base
 (`recordAccountDeletion`), que `npm run replay:deletions` rejoue sur la base
 restaurée. Voir `docs/features/BACKUP_DATA_PROTECTION.md`.
 
+## Suppression différée de trente jours (ERASURE-D2)
+
+> `requestAccountDeletion` (`lib/server/users/account-deletion-request.ts`),
+> `account-reactivation.ts`, `deleted-solo-entries.ts`,
+> `finalizeAccountDeletion` / `finalizeDueAccountDeletions`, `blocked-images.ts`.
+
+`DELETE /api/profile` **ne détruit plus rien** : le compte passe en attente
+(`is_deleted = 1` + `deletion_requested_at`), ce qui réutilise toutes les gardes
+`is_deleted = 0` existantes (session, notifications, annuaire, invitations par
+pseudo, fiche joueur en 404). Les sessions sont supprimées dans la transaction.
+
+**Ce qui touche les autres se fait tout de suite, et la réactivation ne le
+défait pas** — une seule transaction, verrous dans l'ordre tournois
+(`lockTournamentRow`, id croissant) → compte (`FOR UPDATE`) → équipes :
+
+- **E3 — équipes.** Le compte quitte chaque équipe. Propriétaire : la propriété
+  passe au `MANAGER`, sinon au `CAPITAINE`, sinon au membre le plus ancien
+  (`pickTeamSuccessor`, départage par l'id d'appartenance), avec l'avis
+  `OWNERSHIP`. Seul joueur : équipe **fantôme** si elle est inscrite à un tournoi
+  `UPCOMING`/`REGISTRATION`/`RUNNING`, sinon **dissoute** (`dissolveTeamOn`,
+  « Équipe dissoute #id »). Les candidats ne sont pas verrouillés côté compte
+  (inversion d'ordre évitée) ; seuls les comptes vivants héritent.
+- **Tournois organisés** : au compte vivant le plus ancien qui tient la
+  permission `tournaments` par un rôle, sinon à un administrateur. Personne :
+  rien ne change et le compte sera anonymisé au jour 30 (décision requise).
+- **E1 — inscriptions solo.** Celles d'un tournoi pas encore commencé, sans
+  match, sont retirées (`withdrawSoloRegistrationsOn`). L'entrée d'un tournoi
+  `RUNNING` **jamais jouée** perd ses matchs restants par forfait **après** le
+  commit (`forfeitSoloEntriesAfterCommit` : `forfeitTournamentTeam` pour
+  SURVIVAL/SWISS/BG_SURVIE, `adminSaveMatchScores({ forfeitTeamId })` match par
+  match sinon). Un échec est repris par le rattrapage.
+- Casts et arbitrages à venir retirés, invitations du compte annulées.
+
+**E5 / alerte.** Le journal Discord écrit « 🗑️ Compte supprimé » (catégorie
+`signups`, sans pseudo ni id) puis une ligne par retrait ou forfait
+(`registrations`, « un joueur »).
+
+**E4 — réactivation.** Se reconnecter dans les trente jours n'ouvre pas de
+session : `createSession` (porte unique de toutes les connexions) pose un ticket
+`bg_reactivation` (jeton aléatoire, empreinte SHA-256 dans
+`bg_account_reactivation_tickets`, quinze minutes) et lève
+`AccountPendingDeletionError` ; le rappel OAuth et le code Discord renvoient vers
+`/connexion/reactivation`, qui dit ce qui n'est pas rendu. Seul le clic
+« Réactiver mon compte » (`POST /api/auth/reactivate`) consomme le ticket, relit
+la fenêtre sous verrou et remet `is_deleted = 0`. Au-delà de trente jours, la
+connexion est refusée (`ACCOUNT_DELETED`).
+
+**Jour 30.** `finalizeDueAccountDeletions` (horaire, paresseux, lancé par
+`getDatabase` sous `NEXT_RUNTIME`) appelle `finalizeAccountDeletion`, qui relit
+la fenêtre sous le verrou et retombe dans la règle habituelle (effacer ou
+anonymiser). Idempotent : un compte réactivé ou déjà traité rend `null`.
+L'anonymisation remet `deletion_requested_at` à `NULL`.
+
+**E2 — rattrapage.** `reconcileDeletedAccounts` commence par
+`settleDeletedSoloEntries` : les comptes déjà supprimés gardant une inscription
+à un tournoi actif voient la règle E1 rejouée (retrait ou forfait), sans effet
+au second passage. Le reste du rattrapage ignore les comptes en attente.
+
+**E6 — avatar en quarantaine.** À l'effacement, l'empreinte SHA-256 du fichier
+en quarantaine (`bg_logo_quarantines` `HIDDEN`) entre dans
+`bg_blocked_image_hashes` (aucune colonne de compte) avant que la cascade
+n'emporte la ligne ; un avatar ou un logo dont l'image traitée y figure est
+refusé (`IMAGE_BLOCKED`).
+
 ## Voir aussi
 
 - `docs/AUTHORIZATION_RULES.md` — qui peut supprimer quoi.

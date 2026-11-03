@@ -324,6 +324,14 @@ Tests : `tests/lib/server/teams-service.ownership.test.ts` (service, refus et
 rollback) et `tests/app/api/teams/transfer-ownership.test.ts` (route, codes
 HTTP).
 
+## Suppression du compte du propriétaire
+
+Un propriétaire qui demande la suppression de son compte, seul joueur de son
+équipe, la laisse **fantôme** si elle est inscrite à un tournoi non terminé
+(`is_ghost = 1`, invitations en attente annulées), dissoute sinon. Avec d'autres
+membres, la propriété passe d'abord à un gérant, puis à un capitaine, puis au
+plus ancien → `ACCOUNT_DELETION.md` § Suppression différée.
+
 ## Notes reprises de CLAUDE.md
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
