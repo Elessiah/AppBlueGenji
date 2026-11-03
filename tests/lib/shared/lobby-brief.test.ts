@@ -296,7 +296,7 @@ describe("lobbyBriefPush", () => {
 
   it("lobbyBriefPush_emptyOrInvisibleOnlyMap_fallsBackToNotSetYet", () => {
     expect(lobbyBriefPush(side({ firstMap: "" })).body).toContain("1re carte : pas encore fixée.");
-    expect(lobbyBriefPush(side({ firstMap: "​‮" }), "en").body).toContain("1st map: not set yet.");
+    expect(lobbyBriefPush(side({ firstMap: "\u200B\u202E" }), "en").body).toContain("1st map: not set yet.");
   });
 
   it("lobbyBriefPush_nameWithQuoteMarks_cannotCloseTheQuotation", () => {
@@ -328,7 +328,7 @@ describe("lobbyBriefPush", () => {
 
   it("formatLobbyBriefDm_blankOrInvisibleFirstMap_fallsBackToNotSetYet", () => {
     expect(formatLobbyBriefDm(side({ firstMap: "" }), URL)).toContain("Première carte : pas encore fixée");
-    expect(formatLobbyBriefDm(side({ firstMap: "​‮ " }), URL, "en")).toContain("First map: not set yet");
+    expect(formatLobbyBriefDm(side({ firstMap: "\u200B\u202E " }), URL, "en")).toContain("First map: not set yet");
   });
 
   it("formatLobbyBriefDm_nameWithOtherQuoteMarks_cannotCloseTheQuotation", () => {
