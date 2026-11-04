@@ -27,7 +27,7 @@ n'appellent l'intervention de personne.
 
 | Route | Geste | Ligne |
 |---|---|---|
-| `POST /api/admin/matches/[id]/resolve` | `RESULT_VALIDATED` | Résultat validé |
+| `POST /api/admin/matches/[id]/resolve` | — (aucune ligne 🛠️) | La ligne « Match terminé » du moteur porte « — résultat validé par le staff » (`markResultValidatedByStaff`, lot `results` du tournoi, `LOG_BATCHING.md`) |
 | `PATCH /api/admin/matches/[id]/scores` | `SCORES_SAVED` | Score enregistré |
 | `POST /api/admin/matches/[id]/launch` | `FORCE_LAUNCHED` | Lancement forcé |
 | `PUT /api/admin/matches/[id]/host` | `HOST_SET` / `HOST_CLEARED` | Hôte désigné / retiré (seulement quand l'hôte change) |
