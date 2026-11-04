@@ -120,6 +120,10 @@ est vide. Base : **intérêt légitime** (bon déroulement des tournois). La rè
 Les conditions d'utilisation v9, pas encore en ligne, ont été reformulées sur place par
 EF-43 (ni attente ni comptage, aucune mention d'opposition) : `TERMS_VERSION` reste 9.
 
+La politique de confidentialité du bot (`lib/shared/bot-legal-content.ts`, copiée dans
+`LegalTerms/` du bot) décrit aussi ces salons (données, base, durées, destinataires) et
+renvoie à `/rgpd#salons-vocaux` (T18).
+
 ## Côté bot
 
 Le bot doit avoir **Gérer les salons** sur la catégorie des matchs
