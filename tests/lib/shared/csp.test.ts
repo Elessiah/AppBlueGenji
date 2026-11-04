@@ -165,29 +165,32 @@ describe("contentSecurityPolicy — dev Turbopack", () => {
     expect(scriptSrc).toContain("'strict-dynamic'");
   });
 
-  // Avec l'origine, la source se borne aux morceaux de Next : un script sans
+  // Avec les hôtes, la source se borne aux morceaux de Next : un script sans
   // nonce écrit à la main reste refusé en dev, comme en production.
-  it("contentSecurityPolicy_turbopackDevWithOrigin_restrictsSourceToNextChunks", () => {
+  it("contentSecurityPolicy_turbopackDevWithHosts_restrictsSourceToNextChunks", () => {
     const scriptSrc = directive(
-      contentSecurityPolicy("n", { dev: true, turbopack: true, origin: "https://bluegenji.test" }),
+      contentSecurityPolicy("n", { dev: true, turbopack: true, scriptHosts: ["127.0.0.1:3457", "bluegenji.test"] }),
       "script-src"
     );
 
-    expect(scriptSrc).toBe("https://bluegenji.test/_next/ 'nonce-n' 'unsafe-inline' 'unsafe-eval'");
+    expect(scriptSrc).toBe("127.0.0.1:3457/_next/ bluegenji.test/_next/ 'nonce-n' 'unsafe-inline' 'unsafe-eval'");
   });
 
-  it("contentSecurityPolicy_webpackDevWithOrigin_keepsSelf", () => {
-    const scriptSrc = directive(
-      contentSecurityPolicy("n", { dev: true, origin: "https://bluegenji.test" }),
-      "script-src"
-    );
+  it("contentSecurityPolicy_turbopackDevEmptyHosts_keepsSelf", () => {
+    const scriptSrc = directive(contentSecurityPolicy("n", { dev: true, turbopack: true, scriptHosts: [] }), "script-src");
+
+    expect(scriptSrc).toBe("'self' 'nonce-n' 'unsafe-inline' 'unsafe-eval'");
+  });
+
+  it("contentSecurityPolicy_webpackDevWithHosts_keepsSelf", () => {
+    const scriptSrc = directive(contentSecurityPolicy("n", { dev: true, scriptHosts: ["bluegenji.test"] }), "script-src");
 
     expect(scriptSrc).toBe("'self' 'nonce-n' 'strict-dynamic' 'unsafe-inline' 'unsafe-eval'");
   });
 
-  it("contentSecurityPolicy_productionWithOriginAndTurbopack_keepsFullPolicy", () => {
+  it("contentSecurityPolicy_productionWithHostsAndTurbopack_keepsFullPolicy", () => {
     const scriptSrc = directive(
-      contentSecurityPolicy("n", { dev: false, turbopack: true, origin: "https://bluegenji.test" }),
+      contentSecurityPolicy("n", { dev: false, turbopack: true, scriptHosts: ["bluegenji.test"] }),
       "script-src"
     );
 
