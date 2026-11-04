@@ -93,7 +93,7 @@ describe("Leaderboard — nuls et entrées", () => {
 
   it("Leaderboard_rowWithDraws_showsShortAndSpokenDraws", () => {
     const markup = render({ wins: 0, losses: 0, draws: 1 });
-    expect(markup).toContain('<span aria-hidden="true">1 N</span>');
+    expect(markup).toContain('<span aria-hidden="true" title="1 match nul">1 N</span>');
     expect(markup).toContain('<span class="sr-only">1 match nul</span>');
   });
 
@@ -113,6 +113,12 @@ describe("Leaderboard — nuls et entrées", () => {
 
   it("Leaderboard_rowWithDraws_givesDrawsAVisibleTitleWithTheLongText", () => {
     expect(render({ draws: 2 })).toContain('title="2 matchs nuls"');
+  });
+
+  it("Leaderboard_rowWithDraws_keepsTitleOnHiddenVisibleTextOnly", () => {
+    const markup = render({ draws: 2 });
+    expect(markup).toContain('<span aria-hidden="true" title="2 matchs nuls">2 N</span>');
+    expect(markup.match(/title="2 matchs nuls"/g)).toHaveLength(1);
   });
 
   it("Leaderboard_rowWithoutDraws_showsNoDrawsSpan", () => {

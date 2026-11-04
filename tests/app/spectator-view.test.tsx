@@ -285,7 +285,7 @@ describe("page sans compte — mise en page", () => {
     expect(html).not.toContain("plateau");
     expect(html).toContain("<main");
     // Repli visible si le renvoi tarde : jamais une page vide.
-    expect(html).toContain("<output>Ouverture du tournoi…</output>");
+    expect(html).toContain('<output class="fallback">Ouverture du tournoi…</output>');
     expect(redirect).not.toHaveBeenCalled();
   });
 
