@@ -174,6 +174,22 @@ describe("dispatchMatchVoiceChannels — création", () => {
     expect(writes.filter((w) => w.sql.includes("failed_at = NOW(), released_at = NULL"))).toHaveLength(4);
   });
 
+  it("dispatchMatchVoiceChannels_teamCreateFailedWithinBackoff_asksOnlyOtherTeam", async () => {
+    // L'autre équipe ramène le match dans la passe : le délai de l'équipe en échec tient.
+    database({ due: [dueMatch], voiceRows: [{ ...openRow(1, "x"), channel_id: null, failed_at: "2026-11-04 19:00:00", backing_off: 1 }] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "902" });
+    await dispatchMatchVoiceChannels();
+    expect(jest.mocked(ensureVoiceChannel).mock.calls).toEqual([["match:42:team:2", "Beta"]]);
+  });
+
+  it("dispatchMatchVoiceChannels_voiceRowsQuery_computesBackoffInDatabase", async () => {
+    const { execute } = database({ due: [dueMatch] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    await dispatchMatchVoiceChannels();
+    const voiceRowsSql = execute.mock.calls.map(([sql]) => sql).find((sql) => sql.includes("AS backing_off"));
+    expect(voiceRowsSql).toContain(`failed_at > NOW() - INTERVAL ${VOICE_RETRY_SECONDS} SECOND`);
+  });
+
   it("dispatchMatchVoiceChannels_createDiscordError_continuesWithNextTeam", async () => {
     // Erreur de Discord sur un salon : propre à ce salon, l'autre équipe est servie.
     database({ due: [dueMatch] });
@@ -300,7 +316,7 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
   });
 
   it("dispatchMatchVoiceChannels_releaseFirstRefusal_logsOnceWithCodeOnly", async () => {
-    database({ releasable: [{ ...releasable, failed_at: null }] });
+    database({ releasable: [releasable] });
     jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "failed", code: "VOICE_DISCORD_ERROR" });
     await dispatchMatchVoiceChannels();
     expect(jest.mocked(console.warn).mock.calls).toEqual([
@@ -308,12 +324,48 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     ]);
   });
 
-  it("dispatchMatchVoiceChannels_releaseRefusedAgain_doesNotLogAgain", async () => {
-    const { writes } = database({ releasable: [{ ...releasable, failed_at: "2026-11-04 18:00:00" }] });
+  it("dispatchMatchVoiceChannels_releaseRefusedTwiceSameCode_logsOnce", async () => {
+    database({ releasable: [releasable] });
     jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "failed", code: "VOICE_DISCORD_ERROR" });
+    await dispatchMatchVoiceChannels();
+    await dispatchMatchVoiceChannels(true);
+    expect(console.warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("dispatchMatchVoiceChannels_releaseRefusedWithNewCode_logsAgain", async () => {
+    database({ releasable: [releasable] });
+    jest
+      .mocked(releaseVoiceChannel)
+      .mockResolvedValueOnce({ kind: "failed", code: "VOICE_DISCORD_ERROR" })
+      .mockResolvedValueOnce({ kind: "failed", code: "VOICE_DISCORD_REFUSED" });
+    await dispatchMatchVoiceChannels();
+    await dispatchMatchVoiceChannels(true);
+    expect(jest.mocked(console.warn).mock.calls).toEqual([
+      ["[match-voice] match 42 : rendu du salon vocal refusé (VOICE_DISCORD_ERROR)"],
+      ["[match-voice] match 42 : rendu du salon vocal refusé (VOICE_DISCORD_REFUSED)"],
+    ]);
+  });
+
+  it("dispatchMatchVoiceChannels_releaseTransportOutage_logsNoRefusal", async () => {
+    // Coupe-circuit ouvert : le bot n'a rien refusé, la ligne attend seulement son délai.
+    const { writes } = database({ releasable: [releasable] });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "failed", code: "BOT_CIRCUIT_OPEN" });
     await dispatchMatchVoiceChannels();
     expect(console.warn).not.toHaveBeenCalled();
     expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toHaveLength(1);
+  });
+
+  it("dispatchMatchVoiceChannels_releaseClosedThenRefusedAgain_logsAgain", async () => {
+    database({ releasable: [releasable] });
+    jest
+      .mocked(releaseVoiceChannel)
+      .mockResolvedValueOnce({ kind: "failed", code: "VOICE_DISCORD_ERROR" })
+      .mockResolvedValueOnce({ kind: "ok", value: true })
+      .mockResolvedValueOnce({ kind: "failed", code: "VOICE_DISCORD_ERROR" });
+    await dispatchMatchVoiceChannels();
+    await dispatchMatchVoiceChannels(true);
+    await dispatchMatchVoiceChannels(true);
+    expect(console.warn).toHaveBeenCalledTimes(2);
   });
 
   it("dispatchMatchVoiceChannels_releaseNotTracked_marksReleased", async () => {
