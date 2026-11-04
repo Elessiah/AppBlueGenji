@@ -322,6 +322,23 @@ describe("« Page du match » dans le pied d'action", () => {
 describe("« Page du match » dans le panneau — câblage", () => {
   const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/MatchCardActions.tsx"), "utf8");
 
+  it("groupMatchCardActions_onlyMatchPageAndReport_matchPageIsPrimary", () => {
+    // « Page du match » vient en dernier de l'ordre des principales, avant aucun repli à part.
+    const actual = groupMatchCardActions(matchCardActionList({ ...NOTHING, canReport: true, showMatchPage: true }));
+
+    expect(actual.primary?.id).toBe("matchPage");
+  });
+
+  it("messages_viewMatchAndMatchPage_sameLabelFrAndEn", () => {
+    // Deux clés (bundles distincts), un seul libellé : la carte et la modale disent la même chose.
+    const read = (locale: string, file: string) =>
+      JSON.parse(readFileSync(join(process.cwd(), "messages", locale, `${file}.json`), "utf8")) as Record<string, unknown>;
+    const cardLabel = (locale: string) => (read(locale, "tournamentActions").cardActions as Record<string, string>).matchPage;
+
+    expect(read("fr", "launchModal").viewMatch).toBe(cardLabel("fr"));
+    expect(read("en", "launchModal").viewMatch).toBe(cardLabel("en"));
+  });
+
   it("ne referme le panneau que sur un clic ordinaire (un clic avec modificateur ouvre un onglet)", () => {
     expect(source).toMatch(/if \(isPlainLeftClick\(event\)\) onNavigate\?\.\(\);/);
   });

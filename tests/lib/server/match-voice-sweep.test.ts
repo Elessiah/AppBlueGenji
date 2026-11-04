@@ -369,10 +369,18 @@ describe("setTeamVoiceChannels", () => {
     expect(jest.mocked(maintainMatchLaunches).mock.calls[0][1]).toBe(7);
   });
 
-  it("setTeamVoiceChannels_turnOffFinished_doesNotMaintainLaunches", async () => {
-    connectionWith({ name: "Coupe", state: "FINISHED", team_voice_channels: 1 });
+  it("setTeamVoiceChannels_turnOffUpcoming_doesNotMaintainLaunches", async () => {
+    connectionWith({ name: "Coupe", state: "UPCOMING", team_voice_channels: 1 });
     await expect(setTeamVoiceChannels(7, false)).resolves.toMatchObject({ enabled: false, changed: true });
     expect(maintainMatchLaunches).not.toHaveBeenCalled();
+  });
+
+  it("setTeamVoiceChannels_finishedTournament_throwsFinishedWithoutWrite", async () => {
+    // Même règle que le formulaire (verrouillé) et la planification par l'arbitrage.
+    const connection = connectionWith({ name: "Coupe", state: "FINISHED", team_voice_channels: 1 });
+    await expect(setTeamVoiceChannels(7, false)).rejects.toThrow("TOURNAMENT_FINISHED");
+    expect(connection.execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE"))).toBe(false);
+    expect(publishUpdatedEvent).not.toHaveBeenCalled();
   });
 });
 
@@ -464,7 +472,7 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
       ])
       .mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
-    expect(infos.get(42)).toEqual({ team1Members: 3, team2Members: 5, pending: true });
+    expect(infos.get(42)).toEqual({ team1Members: 3, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true });
   });
 
   it("loadMatchVoiceInfos_staleCount_showsLastCountButPending", async () => {
@@ -480,14 +488,44 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
       ])
       .mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
-    expect(infos.get(42)).toEqual({ team1Members: 5, team2Members: 5, pending: true });
+    expect(infos.get(42)).toEqual({ team1Members: 5, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true });
+  });
+
+  it("loadMatchVoiceInfos_freshFailure_showsFailedAndReleasesGate", async () => {
+    const connection = connectionMock();
+    const now = new Date().toISOString();
+    connection.execute
+      .mockResolvedValueOnce([
+        [
+          { match_id: 42, team_id: 1, channel_id: null, members: null, counted_at: null, failed_at: now, released_at: null },
+          { match_id: 42, team_id: 2, channel_id: "902", members: 2, counted_at: now, failed_at: null, released_at: null },
+        ],
+        [],
+      ])
+      .mockResolvedValueOnce([teams, []]);
+    const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
+    expect(infos.get(42)).toEqual({ team1Members: null, team2Members: 2, team1State: "FAILED", team2State: "COUNTED", pending: false });
+  });
+
+  it("loadMatchVoiceInfos_staleFailure_notShownAsFailed", async () => {
+    // Un échec ancien a pu être réessayé : la page ne le dit plus, comme la porte de lancement.
+    const connection = connectionMock();
+    const stale = new Date(Date.now() - 6 * 60_000).toISOString();
+    connection.execute
+      .mockResolvedValueOnce([
+        [{ match_id: 42, team_id: 1, channel_id: "901", members: null, counted_at: null, failed_at: stale, released_at: null }],
+        [],
+      ])
+      .mockResolvedValueOnce([teams, []]);
+    const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
+    expect(infos.get(42)?.team1State).toBe("UNCOUNTED");
   });
 
   it("loadMatchVoiceInfos_dueMatchWithoutRows_showsPendingLikeTheGate", async () => {
     const connection = connectionMock();
     connection.execute.mockResolvedValueOnce([[], []]).mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
-    expect(infos.get(42)).toEqual({ team1Members: null, team2Members: null, pending: true });
+    expect(infos.get(42)).toEqual({ team1Members: null, team2Members: null, team1State: "WAITING", team2State: "WAITING", pending: true });
   });
 
   it("loadMatchVoiceInfos_soloSide_isNotShown", async () => {

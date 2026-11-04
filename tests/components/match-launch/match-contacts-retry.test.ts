@@ -179,6 +179,7 @@ const info = (
   matchId: 7,
   tournamentId: 3,
   tournamentName: "Coupe",
+  battletagRelevant: true,
   phase,
   startAt,
   lobbyOpenedAt: null,

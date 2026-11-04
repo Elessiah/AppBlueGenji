@@ -271,6 +271,16 @@ export function resolveMatchMaps(
 }
 
 /**
+ * Nom de map **affiché** : saisie libre (première map, choix dans un pool)
+ * réduite à son texte visible (`visibleText`, `UNTRUSTED_NAMES.md`) ; `null`
+ * quand il n'en reste rien. Seul nettoyage des noms de maps à l'affichage.
+ */
+export function shownMapName(name: string | null): string | null {
+  const text = name === null ? "" : visibleText(name).trim();
+  return text === "" ? null : text;
+}
+
+/**
  * Nom de chaque carte d'un match, dans l'ordre (index 0 = carte 1), pour la
  * saisie du score (« Map 1 : Ilios ») : celles de sa manche (`resolveMatchMaps`,
  * imposée ou choisie dans le pool, `null` tant qu'un pool attend son choix),
@@ -291,10 +301,7 @@ export function matchMapNames(
     round && round.slots.length > 0
       ? resolveMatchMaps(round.slots, match.firstMap, match.mapPicks).map((slot) => slot.map)
       : [match.firstMap];
-  const shown = names.map((name) => {
-    const text = name === null ? "" : visibleText(name).trim();
-    return text === "" ? null : text;
-  });
+  const shown = names.map(shownMapName);
   return shown.some((name) => name !== null) ? shown : [];
 }
 
