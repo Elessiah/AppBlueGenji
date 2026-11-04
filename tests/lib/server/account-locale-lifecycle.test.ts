@@ -9,6 +9,7 @@ import { getDatabase } from "@/lib/server/database";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { anonymizeAccount } from "@/lib/server/users/account-erasure";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
+import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
 import { getFullProfile } from "@/lib/server/users/full-profile";
 import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
@@ -73,7 +74,7 @@ describe("langue du compte — anonymisation", () => {
       .find((sql) => /^ ?UPDATE bg_users SET/.test(sql) && sql.includes("is_deleted = 1"));
     expect(users).toBeDefined();
     expect(users).toMatch(/locale = \?/);
-    const call = execute.mock.calls.find(([sql]) => String(sql).includes("is_deleted = 1"));
+    const call = execute.mock.calls.find(([sql]) => /^\s*UPDATE bg_users/.test(String(sql)) && String(sql).includes("is_deleted = 1"));
     expect(call?.[1]).toEqual([expect.any(String), DEFAULT_LOCALE, 42]);
   });
 });
@@ -204,5 +205,57 @@ describe("« Ne plus voir » de l'invitation à certifier de la fiche tournoi �
       return [[], []];
     });
     await expect(anonymizeAccount(fakeConnection({ execute }), 42)).rejects.toThrow("lock");
+  });
+});
+
+describe("anonymizeAccount — pseudo d'emprunt", () => {
+  const BORROWED_READ = "SELECT pseudo FROM bg_users WHERE id = ? AND is_deleted = 1 AND deletion_requested_at IS NOT NULL";
+  const isAnonymizeWrite = (sql: string) => /^\s*UPDATE bg_users\s+SET pseudo = \?/.test(sql);
+
+  function connectionWith(borrowed: string | null, failFirstWrite = false) {
+    let writes = 0;
+    const execute = jest.fn<SqlQuery>(async (sql) => {
+      const q = String(sql);
+      if (q.replace(/\s+/g, " ").trim().startsWith(BORROWED_READ)) return [borrowed ? [{ pseudo: borrowed }] : [], []];
+      if (isAnonymizeWrite(q)) {
+        writes += 1;
+        if (failFirstWrite && writes === 1) throw Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY" });
+      }
+      return [[], []];
+    });
+    return execute;
+  }
+
+  const writtenPseudos = (execute: ReturnType<typeof connectionWith>) =>
+    execute.mock.calls.filter(([sql]) => isAnonymizeWrite(String(sql))).map(([, params]) => (params as unknown[])[0]);
+
+  it("anonymizeAccount_pendingAccount_keepsBorrowedPseudo", async () => {
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
+    const execute = connectionWith("AlphaFX");
+
+    await anonymizeAccount(fakeConnection({ execute }), 42);
+
+    expect(writtenPseudos(execute)).toEqual(["AlphaFX"]);
+  });
+
+  it("anonymizeAccount_notPending_drawsPseudoFromPool", async () => {
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
+    const execute = connectionWith(null);
+
+    await anonymizeAccount(fakeConnection({ execute }), 42);
+
+    const [pseudo] = writtenPseudos(execute);
+    expect(ANONYMOUS_PSEUDOS).toContain(pseudo);
+  });
+
+  it("anonymizeAccount_borrowedPseudoClash_drawsAnother", async () => {
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
+    const execute = connectionWith("AlphaFX", true);
+
+    await anonymizeAccount(fakeConnection({ execute }), 42);
+
+    const pseudos = writtenPseudos(execute);
+    expect(pseudos[0]).toBe("AlphaFX");
+    expect(pseudos[1]).not.toBe("AlphaFX");
   });
 });

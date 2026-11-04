@@ -30,6 +30,26 @@ describe("isBlockedImage", () => {
     expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE)]);
   });
 
+  it("isBlockedImage_twoContents_queriesBothHashesInOneStatement", async () => {
+    const raw = Buffer.from("fichier tel que téléversé");
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await isBlockedImage(IMAGE, raw);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0][0]).toContain("sha256 IN (?, ?)");
+    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), imageSha256(raw)]);
+  });
+
+  it("isBlockedImage_noContent_falseWithoutQuery", async () => {
+    const execute = jest.fn<SqlQuery>();
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    expect(await isBlockedImage()).toBe(false);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it("isBlockedImage_hashAbsent_false", async () => {
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[], []]) }));
 

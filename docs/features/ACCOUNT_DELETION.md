@@ -736,8 +736,14 @@ au second passage. Le reste du rattrapage ignore les comptes en attente.
 **E6 — avatar en quarantaine.** À l'effacement, l'empreinte SHA-256 du fichier
 en quarantaine (`bg_logo_quarantines` `HIDDEN`) entre dans
 `bg_blocked_image_hashes` (aucune colonne de compte) avant que la cascade
-n'emporte la ligne ; un avatar ou un logo dont l'image traitée y figure est
-refusé (`IMAGE_BLOCKED`).
+n'emporte la ligne ; un avatar ou un logo dont l'image traitée **ou le fichier
+téléversé tel quel** y figure est refusé (`IMAGE_BLOCKED`) — le fichier brut
+compte, la copie exacte d'un avatar servi étant réencodée en d'autres octets.
+
+**Pseudo d'emprunt gardé au jour 30.** `anonymizeAccount` reprend le pseudo
+d'emprunt d'un compte en attente (`is_deleted = 1`, `deletion_requested_at`
+posé) au lieu d'en tirer un second : ses adversaires le voient sous ce nom
+depuis la demande. Un doublon (course) retombe sur un tirage.
 
 ## Voir aussi
 

@@ -218,7 +218,7 @@ export async function storeImageBuffer(
 
   // Avatar ou logo d'équipe : une image bloquée (avatar en quarantaine d'un
   // compte effacé, `blocked-images.ts`) n'est pas reposée.
-  if ((kind === "avatar" || kind === "team-logo") && (await isBlockedImage(output))) {
+  if ((kind === "avatar" || kind === "team-logo") && (await isBlockedImage(output, buffer))) {
     throw new Error(IMAGE_BLOCKED);
   }
 

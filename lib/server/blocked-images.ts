@@ -27,13 +27,19 @@ export function imageSha256(content: Buffer): string {
   return createHash("sha256").update(content).digest("hex");
 }
 
-/** L'image traitée est-elle bloquée ? Table absente (migration en échec) = non. */
-export async function isBlockedImage(content: Buffer): Promise<boolean> {
+/**
+ * L'une de ces images (l'image traitée, et le fichier tel que téléversé) est-elle
+ * bloquée ? Le fichier brut compte : la copie exacte d'un avatar servi, reposée
+ * telle quelle, est réencodée en d'autres octets. Table absente (migration en
+ * échec) = non.
+ */
+export async function isBlockedImage(...contents: Buffer[]): Promise<boolean> {
+  if (contents.length === 0) return false;
   const db = await getDatabase();
   try {
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT 1 FROM bg_blocked_image_hashes WHERE sha256 = ? LIMIT 1`,
-      [imageSha256(content)],
+      `SELECT 1 FROM bg_blocked_image_hashes WHERE sha256 IN (${contents.map(() => "?").join(", ")}) LIMIT 1`,
+      contents.map((content) => imageSha256(content)),
     );
     return rows.length > 0;
   } catch (error) {

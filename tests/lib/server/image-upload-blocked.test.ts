@@ -38,6 +38,15 @@ describe("storeImageBuffer — image bloquée", () => {
     await expect(storeImageBuffer(await png(), "image/png", "team-logo", 3)).rejects.toThrow("IMAGE_BLOCKED");
   });
 
+  it("storeImageBuffer_rawUploadMatchesBlockedHash_refusedImageBlocked", async () => {
+    // La copie exacte d'un avatar servi : c'est le fichier brut qui est bloqué.
+    const upload = await png();
+    jest.mocked(isBlockedImage).mockImplementation(async (...contents) => contents.some((content) => content.equals(upload)));
+
+    await expect(storeImageBuffer(upload, "image/png", "avatar", 7)).rejects.toThrow("IMAGE_BLOCKED");
+    expect(writeFile).not.toHaveBeenCalled();
+  });
+
   it("storeImageBuffer_notBlockedAvatar_writesFile", async () => {
     jest.mocked(isBlockedImage).mockResolvedValue(false);
 
