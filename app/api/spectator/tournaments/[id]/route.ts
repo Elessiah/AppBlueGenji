@@ -51,6 +51,19 @@ function matchesEtag(header: string | null, etag: string): boolean {
     .some((tag) => tag === "*" || tag === etag);
 }
 
+/**
+ * Comme {@link matchesEtag}, sans le joker `*` : sous refus, seul qui détient
+ * **la** version de la copie a son `304` — un `If-None-Match: *` dirait sinon,
+ * par 304 contre 429, si quelqu'un a lu ce tournoi depuis moins de 150 s.
+ */
+function holdsExactEtag(header: string | null, etag: string): boolean {
+  if (!header) return false;
+  return header
+    .split(",")
+    .map((tag) => tag.trim().replace(/^W\//, ""))
+    .some((tag) => tag === etag);
+}
+
 function pollHeaders(pollAfterMs: number): Record<string, string> {
   return { "Cache-Control": "no-store", [SPECTATOR_POLL_HEADER]: String(pollAfterMs) };
 }
@@ -93,7 +106,7 @@ function refusedRead(
     // qu'il a reçu en repli d'une compression ratée : les deux ont un `304`
     // derrière (`GET`). Une version gzip présentée par un client sans gzip n'en a
     // pas, et tirerait le corps entier d'un réseau refusé.
-    if (stale && (matchesEtag(ifNoneMatch, etagOf(stale, gzipped)) || (gzipped && matchesEtag(ifNoneMatch, etagOf(stale, false))))) {
+    if (stale && (holdsExactEtag(ifNoneMatch, etagOf(stale, gzipped)) || (gzipped && holdsExactEtag(ifNoneMatch, etagOf(stale, false))))) {
       return stale;
     }
     return refusal.response ?? unavailable(level);
@@ -118,20 +131,20 @@ async function readPayload(
   level: SpectatorLoadLevel,
   client: string | null,
   gzipped: boolean,
-): Promise<{ payload: SpectatorPayload | null; stale: boolean } | Response> {
+): Promise<{ payload: SpectatorPayload | null; stale: boolean; rateRefused: boolean } | Response> {
   try {
-    return { payload: await getSpectatorPayload(tournamentId, level, client), stale: false };
+    return { payload: await getSpectatorPayload(tournamentId, level, client), stale: false, rateRefused: false };
   } catch (error) {
     if (error instanceof SpectatorRebuildRefused) {
       const served = refusedRead(tournamentId, error, level, req.headers.get("if-none-match"), gzipped);
-      return served instanceof Response ? served : { payload: served, stale: true };
+      return served instanceof Response ? served : { payload: served, stale: true, rateRefused: error.kind === "rate" };
     }
     // Base injoignable ou saturée : la copie de moins de 150 s tient la page
     // (sinon les spectateurs passaient en « réessaie » alors que le plateau
     // de la minute précédente était encore là).
     console.error("[spectator] lecture publique impossible :", error);
     const copy = staleSpectatorPayload(tournamentId);
-    return copy === null ? unavailable(level) : { payload: copy, stale: true };
+    return copy === null ? unavailable(level) : { payload: copy, stale: true, rateRefused: false };
   }
 }
 
@@ -150,12 +163,14 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const gzipped = acceptsGzip(req.headers.get("accept-encoding"));
   const read = await readPayload(req, tournamentId, level, client, gzipped);
   if (read instanceof Response) return read;
-  const { payload, stale } = read;
+  const { payload, stale, rateRefused } = read;
   if (!payload) return fail("TOURNAMENT_NOT_FOUND", 404);
   // Seules les lectures d'un tournoi servi pèsent dans la charge : des
   // identifiants au hasard ne ralentissent pas les vrais spectateurs, et la
-  // part d'un même réseau est plafonnée (`SPECTATOR_READS_PER_CLIENT`).
-  recordSpectatorRead(Date.now(), client);
+  // part d'un même réseau est plafonnée (`SPECTATOR_READS_PER_CLIENT`). Un
+  // réseau déjà refusé par son plafond (`304` sous refus) n'y pèse pas : ses
+  // sondages n'allongeraient pas l'attente des vrais spectateurs.
+  if (!rateRefused) recordSpectatorRead(Date.now(), client);
 
   const pollMs = spectatorPollIntervalMs(payload.state, level);
   // Une copie servie périmée peut avoir jusqu'à l'âge déclaré : c'est lui que
