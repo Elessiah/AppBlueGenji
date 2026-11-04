@@ -9,6 +9,7 @@ import {
 } from "@/lib/shared/account-deletion";
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
 import { recordAccountReactivation } from "@/lib/server/account-deletion-journal";
+import { reactivationUndoes, type AccountDeletionEntry } from "@/lib/shared/account-deletion-journal";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { restoreAccountIdentity } from "./account-deletion-hold";
@@ -176,7 +177,11 @@ export async function reactivateAccount(
     // restauration — la réactivation l'y remplace, et une sauvegarde prise
     // pendant les trente jours, restaurée, réactive le compte au rejeu
     // (décision R1) —, et les vues en cache montraient le pseudo d'emprunt.
-    await recordAccountReactivation({ userId, accountCreatedAt: String(row.created_at) });
+    await recordAccountReactivation({
+      userId,
+      accountCreatedAt: String(row.created_at),
+      undoneRequestAt: String(row.deletion_requested_at),
+    });
     invalidateTeamIdentityViews();
     invalidateStats();
     await republishSoloEntryTournaments(userId);
@@ -197,7 +202,8 @@ export async function reactivateAccount(
  * N'écrit pas le journal (sa ligne de réactivation y est déjà). Rend `true` si
  * le compte est réactivé.
  */
-export async function replayAccountReactivation(userId: number): Promise<boolean> {
+export async function replayAccountReactivation(entry: AccountDeletionEntry): Promise<boolean> {
+  const userId = entry.userId;
   const db = await getDatabase();
   const connection = await db.getConnection();
   let restored = false;
@@ -206,9 +212,20 @@ export async function replayAccountReactivation(userId: number): Promise<boolean
     const [locked] = await connection.execute<(RowDataPacket & {
       is_deleted: 0 | 1;
       deletion_requested_at: StoredDate;
-    })[]>(`SELECT is_deleted, deletion_requested_at FROM bg_users WHERE id = ? FOR UPDATE`, [userId]);
+      created_at: string;
+    })[]>(`SELECT is_deleted, deletion_requested_at, created_at FROM bg_users WHERE id = ? FOR UPDATE`, [userId]);
     const row = locked[0];
-    if (row && Number(row.is_deleted) === 1 && row.deletion_requested_at !== null) {
+    // Revérifié sous verrou : même compte, et demande que la réactivation défait.
+    const undoes =
+      !!row &&
+      String(row.created_at) === entry.accountCreatedAt &&
+      reactivationUndoes(entry, {
+        createdAt: String(row.created_at),
+        isDeleted: Number(row.is_deleted) === 1,
+        pendingDeletion: Number(row.is_deleted) === 1 && row.deletion_requested_at !== null,
+        deletionRequestedAt: row.deletion_requested_at === null ? null : String(row.deletion_requested_at),
+      });
+    if (undoes) {
       restored = await restoreAccountIdentity(connection, userId);
       if (restored) await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
     }

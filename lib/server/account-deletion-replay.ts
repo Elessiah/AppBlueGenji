@@ -1,6 +1,5 @@
-import type { RowDataPacket } from "mysql2/promise";
+import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { toIso } from "@/lib/server/serialization";
 import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
 import { requestAccountDeletion } from "@/lib/server/users/account-deletion-request";
 import { replayAccountReactivation } from "@/lib/server/users/account-reactivation";
@@ -59,6 +58,7 @@ export async function replayAccountDeletions(
     OTHER_ACCOUNT: "otherAccount",
     REACTIVATE: "reactivated",
     ALREADY_ACTIVE: "alreadyActive",
+    REDATE: "replayed",
   };
 
   // Séquentiel : chaque suppression prend le verrou de sa ligne et ouvre sa
@@ -66,10 +66,7 @@ export async function replayAccountDeletions(
   for (const entry of entries) {
     const decision = replayDecision(entry, await readRestoredRow(db, entry.userId));
 
-    if (decision === "REACTIVATE") {
-      await handleReactivation(entry, report, log, options.dryRun === true);
-      continue;
-    }
+    if (await handleStateDecision(db, decision, entry, report, log, options.dryRun === true)) continue;
 
     if (decision !== "REPLAY") {
       report[counters[decision]] += 1;
@@ -112,7 +109,7 @@ async function readRestoredRow(
     createdAt: String(row.created_at),
     isDeleted,
     pendingDeletion: isDeleted && row.deletion_requested_at !== null,
-    deletionRequestedAt: toIso(row.deletion_requested_at),
+    deletionRequestedAt: row.deletion_requested_at === null ? null : String(row.deletion_requested_at),
   };
 }
 
@@ -131,6 +128,62 @@ async function handleReactivation(
   log(`  · #${entry.userId} — réactivé le ${entry.deletedAt}, à réactiver`);
 }
 
+/** Réactivation ou demande à redater : traitée ici (`true`), sinon laissée au rejeu ordinaire. */
+async function handleStateDecision(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  decision: ReplayDecision,
+  entry: AccountDeletionEntry,
+  report: ReplayReport,
+  log: (line: string) => void,
+  dryRun: boolean,
+): Promise<boolean> {
+  if (decision === "REACTIVATE") {
+    await handleReactivation(entry, report, log, dryRun);
+    return true;
+  }
+  if (decision === "REDATE") {
+    await handleRedate(db, entry, report, log, dryRun);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Demande en attente revenue en attente : sa date reprend celle du journal,
+ * qui garde la plus récente (`pruneJournal`). Rien à faire si elle y est déjà.
+ */
+async function handleRedate(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  entry: AccountDeletionEntry,
+  report: ReplayReport,
+  log: (line: string) => void,
+  dryRun: boolean,
+): Promise<void> {
+  const requestedAt = new Date(entry.deletedAt);
+  if (dryRun) {
+    report.replayed += 1;
+    log(`  · #${entry.userId} — demande de suppression à redater au ${entry.deletedAt}`);
+    return;
+  }
+  try {
+    const [result] = await db.execute<ResultSetHeader>(
+      `UPDATE bg_users SET deletion_requested_at = ?
+        WHERE id = ? AND created_at = ? AND is_deleted = 1
+          AND deletion_requested_at IS NOT NULL AND deletion_requested_at <> ?`,
+      [requestedAt, entry.userId, entry.accountCreatedAt, requestedAt],
+    );
+    if (Number(result.affectedRows) === 1) {
+      report.replayed += 1;
+      log(`  ✓ #${entry.userId} — demande de suppression redatée`);
+    } else {
+      report.alreadyDeleted += 1;
+    }
+  } catch (error) {
+    report.failed += 1;
+    log(`  ✗ #${entry.userId} — échec : ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 /** Rejoue une réactivation (décision R1), et la compte. */
 async function replayReactivation(
   entry: AccountDeletionEntry,
@@ -138,7 +191,7 @@ async function replayReactivation(
   log: (line: string) => void,
 ): Promise<void> {
   try {
-    if (await replayAccountReactivation(entry.userId)) {
+    if (await replayAccountReactivation(entry)) {
       report.reactivated += 1;
       log(`  ✓ #${entry.userId} — réactivé`);
     } else {

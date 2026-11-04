@@ -23,8 +23,13 @@ const entry = (userId: number, accountCreatedAt = CREATED): AccountDeletionEntry
 /** La base restaurée : un compte par identifiant, ou rien. */
 function restoredDb(
   rows: Record<number, { created_at: string; is_deleted: number; deletion_requested_at?: string | null }>,
+  update: { affectedRows?: number; error?: Error } = {},
 ) {
-  const execute = jest.fn(async (_sql: string, params: unknown[] = []) => {
+  const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
+    if (sql.startsWith("UPDATE")) {
+      if (update.error) throw update.error;
+      return [{ affectedRows: update.affectedRows ?? 1 }];
+    }
     const row = rows[Number(params[0])];
     return [row ? [row] : []];
   });
@@ -176,7 +181,12 @@ describe("replayAccountDeletions — demande en attente (décision du 2026-11-04
 
 // Décision R1 du 2026-11-04 : une réactivation journalisée se rejoue.
 describe("replayAccountDeletions — réactivation (décision R1)", () => {
-  const reactivated: AccountDeletionEntry = { ...entry(7), reactivated: true, deletedAt: "2026-11-03T09:00:00.000Z" };
+  const reactivated: AccountDeletionEntry = {
+    ...entry(7),
+    reactivated: true,
+    deletedAt: "2026-11-03T09:00:00.000Z",
+    undoneRequestAt: "2026-11-01 10:00:00",
+  };
   const pendingRow = { created_at: CREATED, is_deleted: 1, deletion_requested_at: "2026-11-01 10:00:00" };
 
   it("replayAccountDeletions_reactivatedEntryPendingRow_callsReplayReactivation", async () => {
@@ -185,7 +195,7 @@ describe("replayAccountDeletions — réactivation (décision R1)", () => {
 
     const report = await replayAccountDeletions([reactivated], { log });
 
-    expect(replayAccountReactivation).toHaveBeenCalledWith(7);
+    expect(replayAccountReactivation).toHaveBeenCalledWith(reactivated);
     expect(deleteOwnAccount).not.toHaveBeenCalled();
     expect(report).toMatchObject({ reactivated: 1, replayed: 0, failed: 0 });
     expect(lines.join("\n")).toContain("réactivé");
@@ -227,6 +237,53 @@ describe("replayAccountDeletions — réactivation (décision R1)", () => {
     const report = await replayAccountDeletions([reactivated], { log });
 
     expect(report).toMatchObject({ failed: 1, reactivated: 0 });
+    expect(lines.join("\n")).toContain("DB_DOWN");
+  });
+});
+
+// Revue sécurité #546, cycle 9 : demande défaite puis refaite, revenue avec la
+// sauvegarde sous sa date d'origine — la date du journal (la plus récente) la remplace.
+describe("replayAccountDeletions — demande à redater", () => {
+  const pending: AccountDeletionEntry = { ...entry(7), pending: true, deletedAt: "2026-11-03T09:00:00.000Z" };
+  const pendingRow = { created_at: CREATED, is_deleted: 1, deletion_requested_at: "2026-10-01 10:00:00" };
+
+  it("replayAccountDeletions_pendingEntryPendingRowDifferentDate_redatedCountedReplayed", async () => {
+    const execute = restoredDb({ 7: pendingRow }, { affectedRows: 1 });
+
+    const report = await replayAccountDeletions([pending], { log });
+
+    const update = execute.mock.calls.find(([sql]) => sql.startsWith("UPDATE"));
+    expect(update?.[1]).toEqual([new Date(pending.deletedAt), 7, CREATED, new Date(pending.deletedAt)]);
+    expect(requestAccountDeletion).not.toHaveBeenCalled();
+    expect(deleteOwnAccount).not.toHaveBeenCalled();
+    expect(report).toMatchObject({ replayed: 1, alreadyDeleted: 0 });
+    expect(lines.join("\n")).toContain("redatée");
+  });
+
+  it("replayAccountDeletions_pendingEntryPendingRowSameDate_alreadyDeleted", async () => {
+    restoredDb({ 7: pendingRow }, { affectedRows: 0 });
+
+    const report = await replayAccountDeletions([pending], { log });
+
+    expect(report).toMatchObject({ replayed: 0, alreadyDeleted: 1 });
+  });
+
+  it("replayAccountDeletions_redateDryRun_countsWithoutWriting", async () => {
+    const execute = restoredDb({ 7: pendingRow });
+
+    const report = await replayAccountDeletions([pending], { dryRun: true, log });
+
+    expect(execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE"))).toBe(false);
+    expect(report.replayed).toBe(1);
+    expect(lines.join("\n")).toContain("à redater");
+  });
+
+  it("replayAccountDeletions_redateThrows_failedCounted", async () => {
+    restoredDb({ 7: pendingRow }, { error: new Error("DB_DOWN") });
+
+    const report = await replayAccountDeletions([pending], { log });
+
+    expect(report).toMatchObject({ failed: 1, replayed: 0 });
     expect(lines.join("\n")).toContain("DB_DOWN");
   });
 });

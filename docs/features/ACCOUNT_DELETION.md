@@ -629,16 +629,22 @@ puis renomme l'entrée solo (`syncSoloEntryIdentityOn`). Toute lecture qui joint
   dix essais épuisés, le compte revit sous son pseudo d'emprunt.
 - **Journal à la réactivation** (décision R1) : `recordAccountReactivation`
   remplace la ligne en attente par une ligne de réactivation, écrite
-  `{userId, accountCreatedAt, reactivatedAt}` **sans** `deletedAt` : une version
+  `{userId, accountCreatedAt, reactivatedAt, undoneRequestAt}` **sans**
+  `deletedAt` (`undoneRequestAt` : `deletion_requested_at` défait, tel que la
+  base le rend, comparé texte à texte — ni fuseau ni arrondi) : une version
   antérieure du site (retour arrière) l'écarte comme illisible au lieu d'y lire
   une suppression définitive (même rétention que les autres). Au rejeu,
   `replayDecision` rend `REACTIVATE` si le compte est revenu en attente avec la
-  sauvegarde **sur une demande antérieure à la réactivation** (une demande
-  refaite après tient : `ALREADY_DELETED`) —
+  sauvegarde **sur une demande égale ou antérieure à celle défaite** (une
+  demande refaite après tient : `ALREADY_DELETED` ; revérifié sous verrou,
+  avec la date de création) —
   `replayAccountReactivation` le réactive (même écriture, sans ticket ni
   fenêtre, sans réécrire le journal) — et `ALREADY_ACTIVE` s'il est vivant.
   Entre demande et réactivation d'un même compte, la ligne la plus récente
-  l'emporte ; une suppression définitive les rend caduques.
+  l'emporte ; une suppression définitive les rend caduques. Une ligne en
+  attente dont le compte revient **en attente** avec la sauvegarde (demande
+  défaite puis refaite) rend `REDATE` : `deletion_requested_at` reprend la date
+  du journal, pour que l'ancienne demande n'abrège pas la nouvelle fenêtre.
 - **Jour 30** : l'effacement supprime aussi le fichier d'avatar mis de côté ;
   l'anonymisation efface le masque (cascade sur l'effacement).
 - **Organisateur sans repreneur** : même règle, anonyme dès la demande.

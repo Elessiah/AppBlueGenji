@@ -219,8 +219,8 @@ describe("scheduleAccountDeletionJournalPrune", () => {
 
 // Décision R1 du 2026-11-04 : la réactivation remplace la demande en attente.
 describe("recordAccountReactivation", () => {
-  const key = { userId: 1, accountCreatedAt: "2026-01-02 03:04:05" };
-  const reactivated = { ...entry(1, now.toISOString()), reactivated: true };
+  const key = { userId: 1, accountCreatedAt: "2026-01-02 03:04:05", undoneRequestAt: "2026-09-20 10:00:00" };
+  const reactivated = { ...entry(1, now.toISOString()), reactivated: true, undoneRequestAt: "2026-09-20 10:00:00" };
 
   it("recordAccountReactivation_pendingEntry_replacedOthersKept", async () => {
     await recordAccountDeletion({ ...entry(1, "2026-09-20T10:00:00.000Z"), pending: true }, { filePath: file, now });

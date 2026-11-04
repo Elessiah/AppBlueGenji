@@ -182,9 +182,19 @@ describe("demande en attente (décision du 2026-11-04)", () => {
 // Décision R1 du 2026-11-04 : la réactivation est journalisée.
 describe("réactivation journalisée (décision R1)", () => {
   const now = new Date("2026-11-06T12:00:00.000Z");
-  const key = { userId: 7, accountCreatedAt: "2026-01-02 03:04:05" };
+  const key = { userId: 7, accountCreatedAt: "2026-01-02 03:04:05", undoneRequestAt: "2026-11-01 10:00:00" };
   const reactivatedAt = new Date("2026-11-03T09:00:00.000Z");
-  const reactivated = entry({ reactivated: true, deletedAt: "2026-11-03T09:00:00.000Z" });
+  const reactivated = entry({
+    reactivated: true,
+    deletedAt: "2026-11-03T09:00:00.000Z",
+    undoneRequestAt: "2026-11-01 10:00:00",
+  });
+  const pendingRow = (deletionRequestedAt: string | null) => ({
+    createdAt: "2026-01-02 03:04:05",
+    isDeleted: true,
+    pendingDeletion: true,
+    deletionRequestedAt,
+  });
 
   it("withReactivationEntry_pendingLine_replacedByReactivatedLine", () => {
     const pending = entry({ pending: true });
@@ -230,10 +240,23 @@ describe("réactivation journalisée (décision R1)", () => {
 
   // Revue sécurité #546, cycle 8 : une version antérieure exige `deletedAt` et
   // écarte la ligne, au lieu d'y lire une suppression définitive.
-  it("formatJournalEntry_reactivatedEntry_writesReactivatedAtWithoutDeletedAt", () => {
+  it("formatJournalEntry_reactivatedEntry_writesReactivatedAtAndUndoneRequestAt", () => {
     expect(formatJournalEntry(reactivated)).toBe(
-      '{"userId":7,"accountCreatedAt":"2026-01-02 03:04:05","reactivatedAt":"2026-11-03T09:00:00.000Z"}\n',
+      '{"userId":7,"accountCreatedAt":"2026-01-02 03:04:05","reactivatedAt":"2026-11-03T09:00:00.000Z",' +
+        '"undoneRequestAt":"2026-11-01 10:00:00"}\n',
     );
+  });
+
+  it("parseJournal_reactivationWithoutUndoneRequestAt_rejected", () => {
+    const line = JSON.stringify({ userId: 7, accountCreatedAt: "2026-01-02 03:04:05", reactivatedAt: "2026-11-03T09:00:00.000Z" });
+
+    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+  });
+
+  it("parseJournal_deletionLineWithUndoneRequestAt_rejected", () => {
+    const line = JSON.stringify({ ...entry(), undoneRequestAt: "2026-11-01 10:00:00" });
+
+    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
   });
 
   it("parseJournal_deletedAtAndReactivatedAt_rejected", () => {
@@ -260,27 +283,27 @@ describe("réactivation journalisée (décision R1)", () => {
     expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
   });
 
-  it("replayDecision_reactivatedEntryRequestBeforeReactivation_reactivate", () => {
-    expect(
-      replayDecision(reactivated, {
-        createdAt: "2026-01-02 03:04:05",
-        isDeleted: true,
-        pendingDeletion: true,
-        deletionRequestedAt: "2026-11-01T10:00:00.000Z",
-      }),
-    ).toBe("REACTIVATE");
+  it("replayDecision_restoredRequestEqualToUndone_reactivate", () => {
+    expect(replayDecision(reactivated, pendingRow("2026-11-01 10:00:00"))).toBe("REACTIVATE");
+  });
+
+  it("replayDecision_restoredRequestOlderThanUndone_reactivate", () => {
+    expect(replayDecision(reactivated, pendingRow("2026-10-20 08:00:00"))).toBe("REACTIVATE");
   });
 
   // Revue sécurité #546, cycle 8 : une nouvelle demande, postérieure, reste en attente.
-  it("replayDecision_reactivatedEntryRequestAfterReactivation_alreadyDeleted", () => {
-    expect(
-      replayDecision(reactivated, {
-        createdAt: "2026-01-02 03:04:05",
-        isDeleted: true,
-        pendingDeletion: true,
-        deletionRequestedAt: "2026-11-05T10:00:00.000Z",
-      }),
-    ).toBe("ALREADY_DELETED");
+  it("replayDecision_restoredRequestLaterThanUndone_alreadyDeleted", () => {
+    expect(replayDecision(reactivated, pendingRow("2026-11-05 10:00:00"))).toBe("ALREADY_DELETED");
+  });
+
+  // Revue sécurité #546, cycle 9 : comparaison à la seconde, sans fuseau.
+  it("replayDecision_restoredRequestSameSecondLater_alreadyDeleted", () => {
+    expect(replayDecision(reactivated, pendingRow("2026-11-01 10:00:01"))).toBe("ALREADY_DELETED");
+  });
+
+  // Revue sécurité #546, cycle 9 : une demande défaite puis refaite reprend la date du journal.
+  it("replayDecision_pendingEntryPendingRow_redate", () => {
+    expect(replayDecision(entry({ pending: true }), pendingRow("2026-09-01 10:00:00"))).toBe("REDATE");
   });
 
   it("replayDecision_reactivatedEntryPendingWithoutRequestDate_alreadyDeleted", () => {

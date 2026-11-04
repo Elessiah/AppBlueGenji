@@ -163,7 +163,11 @@ describe("reactivateAccount", () => {
     // Le compte revit avec son vrai pseudo et son avatar, sur la transaction.
     expect(restoreAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7);
     expect(connection.commit).toHaveBeenCalled();
-    expect(recordAccountReactivation).toHaveBeenCalledWith({ userId: 7, accountCreatedAt: "2025-01-01 10:00:00" });
+    expect(recordAccountReactivation).toHaveBeenCalledWith({
+      userId: 7,
+      accountCreatedAt: "2025-01-01 10:00:00",
+      undoneRequestAt: String(RECENT),
+    });
     expect(invalidateTeamIdentityViews).toHaveBeenCalled();
     expect(invalidateStats).toHaveBeenCalled();
   });
@@ -276,10 +280,20 @@ describe("reactivateAccount", () => {
 
 // Décision R1 du 2026-11-04 : rejeu d'une réactivation après restauration.
 describe("replayAccountReactivation", () => {
-  it("replayAccountReactivation_pendingRow_restoresAndRevokesSessions", async () => {
-    const connection = transaction({ locked: { is_deleted: 1, deletion_requested_at: RECENT } });
+  const CREATED = "2025-01-01 10:00:00";
+  const reactivation = {
+    userId: 7,
+    accountCreatedAt: CREATED,
+    deletedAt: "2026-11-03T09:00:00.000Z",
+    reactivated: true,
+    undoneRequestAt: "2026-11-01 10:00:00",
+  };
+  const lockedPending = { is_deleted: 1, deletion_requested_at: "2026-11-01 10:00:00", created_at: CREATED };
 
-    expect(await replayAccountReactivation(7)).toBe(true);
+  it("replayAccountReactivation_pendingRow_restoresAndRevokesSessions", async () => {
+    const connection = transaction({ locked: lockedPending });
+
+    expect(await replayAccountReactivation(reactivation)).toBe(true);
 
     expect(restoreAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7);
     const sqls = connection.execute.mock.calls.map(([sql]) => String(sql));
@@ -291,9 +305,9 @@ describe("replayAccountReactivation", () => {
   });
 
   it("replayAccountReactivation_aliveRow_falseWithoutRestore", async () => {
-    const connection = transaction({ locked: { is_deleted: 0, deletion_requested_at: null } });
+    const connection = transaction({ locked: { is_deleted: 0, deletion_requested_at: null, created_at: CREATED } });
 
-    expect(await replayAccountReactivation(7)).toBe(false);
+    expect(await replayAccountReactivation(reactivation)).toBe(false);
 
     expect(restoreAccountIdentity).not.toHaveBeenCalled();
     expect(connection.commit).toHaveBeenCalled();
@@ -301,12 +315,30 @@ describe("replayAccountReactivation", () => {
   });
 
   it("replayAccountReactivation_error_rollsBackAndReleases", async () => {
-    const connection = transaction({ locked: { is_deleted: 1, deletion_requested_at: RECENT } });
+    const connection = transaction({ locked: lockedPending });
     jest.mocked(restoreAccountIdentity).mockRejectedValue(new Error("DB_DOWN"));
 
-    await expect(replayAccountReactivation(7)).rejects.toThrow("DB_DOWN");
+    await expect(replayAccountReactivation(reactivation)).rejects.toThrow("DB_DOWN");
 
     expect(connection.rollback).toHaveBeenCalled();
     expect(connection.release).toHaveBeenCalled();
+  });
+
+  // Revue sécurité #546, cycle 9 : revérifié sous verrou.
+  it("replayAccountReactivation_laterRequestUnderLock_falseWithoutRestore", async () => {
+    const connection = transaction({ locked: { ...lockedPending, deletion_requested_at: "2026-11-05 10:00:00" } });
+
+    expect(await replayAccountReactivation(reactivation)).toBe(false);
+
+    expect(restoreAccountIdentity).not.toHaveBeenCalled();
+    expect(connection.commit).toHaveBeenCalled();
+  });
+
+  it("replayAccountReactivation_otherCreatedAt_falseWithoutRestore", async () => {
+    transaction({ locked: { ...lockedPending, created_at: "2026-09-22 08:00:00" } });
+
+    expect(await replayAccountReactivation(reactivation)).toBe(false);
+
+    expect(restoreAccountIdentity).not.toHaveBeenCalled();
   });
 });

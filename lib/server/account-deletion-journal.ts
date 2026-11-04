@@ -6,6 +6,7 @@ import {
   parseJournal,
   pruneJournal,
   withReactivationEntry,
+  type AccountReactivationKey,
   type AccountDeletionEntry,
 } from "@/lib/shared/account-deletion-journal";
 
@@ -150,7 +151,7 @@ export function recordAccountDeletion(
  * (`replayAccountDeletions`). Un échec est dit dans les journaux du serveur.
  */
 export function recordAccountReactivation(
-  key: { userId: number; accountCreatedAt: string },
+  key: AccountReactivationKey,
   options: { filePath?: string; now?: Date } = {},
 ): Promise<void> {
   const filePath = options.filePath ?? accountDeletionJournalPath();
