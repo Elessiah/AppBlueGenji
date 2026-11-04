@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { BotLogCategory } from "@/lib/shared/bot-log-category";
-import { createBotLogBatcher, type BotLogBatcher } from "@/lib/server/bot-log-batcher";
+import { createBotLogBatcher, MAX_TIMER_MS, type BotLogBatcher } from "@/lib/server/bot-log-batcher";
 import { botLogHeader } from "@/lib/shared/bot-log-category";
 import { REFEREE_DIGEST_LOG_MAX_LENGTH } from "@/lib/shared/bot-logs";
 
@@ -9,6 +9,7 @@ import { REFEREE_DIGEST_LOG_MAX_LENGTH } from "@/lib/shared/bot-logs";
  * relancé par chaque ligne (âge maximal 10 min), envoi immédiat à 5 lignes, un message par lot.
  */
 const WINDOW = 5 * 60 * 1000;
+const FOUR_MINUTES = 4 * 60 * 1000;
 
 type Send = (message: string, category: BotLogCategory) => Promise<void>;
 
@@ -117,8 +118,38 @@ describe("add", () => {
     const timer = { unref } as unknown as ReturnType<typeof setTimeout>;
     jest.spyOn(globalThis, "setTimeout").mockReturnValue(timer);
     jest.spyOn(globalThis, "clearTimeout").mockImplementation(() => undefined);
-    batcher.add("k", "ligne");
-    expect(unref).toHaveBeenCalled();
+    // Lot construit après la bascule : celui du `beforeEach` reste vide.
+    const real = createBotLogBatcher({ send });
+    real.add("k", "ligne");
+    expect(unref).toHaveBeenCalledTimes(1);
+    real.reset();
+  });
+
+  it("add_silenceRestartedByEachLine_singleTimerPerBatch", () => {
+    batcher.add("k", "un");
+    jest.advanceTimersByTime(1000);
+    batcher.add("k", "deux");
+    jest.advanceTimersByTime(1000);
+    batcher.add("k", "trois");
+    expect(jest.getTimerCount()).toBe(1);
+  });
+
+  it("add_lineWhileTimerArmed_timerRearmedToTheRemainingSilence", async () => {
+    batcher.add("k", "un");
+    jest.advanceTimersByTime(FOUR_MINUTES);
+    batcher.add("k", "deux");
+    jest.advanceTimersByTime(WINDOW - FOUR_MINUTES);
+    await settle();
+    expect(send).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(FOUR_MINUTES);
+    await settle();
+    expect(send).toHaveBeenCalledWith("un\ndeux", "general");
+  });
+
+  it("add_indentedLine_keptVerbatim", async () => {
+    batcher.add("k", "  • détail");
+    await batcher.flush("k");
+    expect(send).toHaveBeenCalledWith("  • détail", "general");
   });
 
   it("add_batchOverCharLimit_splitIntoOrderedMessages", async () => {
@@ -180,6 +211,80 @@ describe("flushAll", () => {
     await batcher.flushAll();
     expect(send).not.toHaveBeenCalled();
   });
+
+  it("flushAll_lineAddedAfterwards_sentImmediately", async () => {
+    await batcher.flushAll();
+    batcher.add("k", "pendant l'arrêt");
+    await settle();
+    expect(send).toHaveBeenCalledWith("pendant l'arrêt", "general");
+    expect(batcher.pending().size).toBe(0);
+  });
+
+  it("flushAll_twoScopes_sentInParallel", async () => {
+    const started: string[] = [];
+    const finish: Array<() => void> = [];
+    send.mockImplementation(
+      (message) =>
+        new Promise<void>((resolve) => {
+          started.push(message);
+          finish.push(resolve);
+        }),
+    );
+    batcher.add("a", "une");
+    batcher.add("b", "deux");
+    const done = batcher.flushAll();
+    await settle();
+    expect(started).toEqual(["une", "deux"]);
+    for (const resolve of finish) resolve();
+    await done;
+  });
+});
+
+describe("portées", () => {
+  const scoped = (key: string) => key.split(":")[0];
+
+  it("dispatch_slowSendInOneScope_otherScopeNotDelayed", async () => {
+    const scopedBatcher = createBotLogBatcher({ send, scopeOf: scoped });
+    send.mockImplementationOnce(() => new Promise<void>(() => undefined));
+    scopedBatcher.add("t1:a", "lent");
+    scopedBatcher.add("t2:a", "rapide");
+    void scopedBatcher.flush("t1:a");
+    await scopedBatcher.flush("t2:a");
+    expect(send.mock.calls.map(([message]) => message)).toEqual(["lent", "rapide"]);
+    scopedBatcher.reset();
+  });
+
+  it("dispatch_sameScope_secondBatchWaitsForTheFirst", async () => {
+    const scopedBatcher = createBotLogBatcher({ send, scopeOf: scoped });
+    let finishFirst: () => void = () => undefined;
+    send.mockImplementationOnce(() => new Promise<void>((resolve) => (finishFirst = resolve)));
+    scopedBatcher.add("t1:a", "premier");
+    scopedBatcher.add("t1:b", "second");
+    void scopedBatcher.flush("t1:a");
+    const second = scopedBatcher.flush("t1:b");
+    await settle();
+    expect(send.mock.calls.map(([message]) => message)).toEqual(["premier"]);
+    finishFirst();
+    await second;
+    expect(send.mock.calls.map(([message]) => message)).toEqual(["premier", "second"]);
+    scopedBatcher.reset();
+  });
+
+  it("flushKeys_twoKeys_sentInOrderOfTheirFirstLine", async () => {
+    batcher.add("b", "arrivée d'abord");
+    batcher.add("a", "arrivée ensuite");
+    await batcher.flushKeys(["a", "b"]);
+    expect(send.mock.calls.map(([message]) => message)).toEqual(["arrivée d'abord", "arrivée ensuite"]);
+  });
+
+  it("flushKeys_noBatch_resolvesWithoutWaitingForAnotherScope", async () => {
+    const scopedBatcher = createBotLogBatcher({ send, scopeOf: scoped });
+    send.mockImplementationOnce(() => new Promise<void>(() => undefined));
+    scopedBatcher.add("t1:a", "lent");
+    void scopedBatcher.flush("t1:a");
+    await expect(scopedBatcher.flushKeys(["t2:a"])).resolves.toBeUndefined();
+    scopedBatcher.reset();
+  });
 });
 
 describe("reset", () => {
@@ -189,6 +294,59 @@ describe("reset", () => {
     jest.advanceTimersByTime(WINDOW);
     await settle();
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it("reset_afterFlushAll_linesWaitAgain", async () => {
+    await batcher.flushAll();
+    batcher.reset();
+    batcher.add("k", "une");
+    await settle();
+    expect(send).not.toHaveBeenCalled();
+    expect(batcher.pending().get("k")).toBe(1);
+  });
+});
+
+describe("bornes", () => {
+  it("create_windowNotFinite_defaultWindowUsed", async () => {
+    const bounded = createBotLogBatcher({ send, windowMs: Number.NaN });
+    bounded.add("k", "ligne");
+    jest.advanceTimersByTime(WINDOW - 1);
+    await settle();
+    expect(send).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1);
+    await settle();
+    expect(send).toHaveBeenCalledTimes(1);
+    bounded.reset();
+  });
+
+  it("create_windowZero_sentAfterOneMillisecond", async () => {
+    const bounded = createBotLogBatcher({ send, windowMs: 0 });
+    bounded.add("k", "ligne");
+    await settle();
+    expect(send).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1);
+    await settle();
+    expect(send).toHaveBeenCalledTimes(1);
+    bounded.reset();
+  });
+
+  it("create_windowBeyondTimerLimit_clampedToTheLimit", () => {
+    const spy = jest.spyOn(globalThis, "setTimeout");
+    const bounded = createBotLogBatcher({ send, windowMs: MAX_TIMER_MS * 4, maxAgeMs: MAX_TIMER_MS * 4 });
+    bounded.add("k", "ligne");
+    expect(spy).toHaveBeenLastCalledWith(expect.any(Function), MAX_TIMER_MS);
+    bounded.reset();
+  });
+
+  it("create_maxLinesNotFinite_defaultCapUsed", async () => {
+    const bounded = createBotLogBatcher({ send, maxLines: Number.NaN });
+    for (const line of ["1", "2", "3", "4"]) bounded.add("k", line);
+    await settle();
+    expect(send).not.toHaveBeenCalled();
+    bounded.add("k", "5");
+    await settle();
+    expect(send).toHaveBeenCalledWith("1\n2\n3\n4\n5", "general");
+    bounded.reset();
   });
 });
 
@@ -256,7 +414,7 @@ describe("maxAge", () => {
     jest.advanceTimersByTime(FOUR_MIN);
     batcher.add("k", "7");
     // t = 10,5 min : l'âge du premier lot (10 min) est échu, pas celui du suivant.
-    jest.advanceTimersByTime(MAX_AGE - 2 * FOUR_MIN + FOUR_MIN / 2 + 1000);
+    jest.advanceTimersByTime(MAX_AGE + 30_000 - 2 * FOUR_MIN);
     await settle();
     expect(send).toHaveBeenCalledTimes(1);
     expect(batcher.pending().get("k")).toBe(2);
@@ -279,7 +437,7 @@ describe("maxAge", () => {
     expect(batcher.pending().get("b")).toBe(2);
   });
 
-  it("maxAge_flushAll_clearsBothTimers", async () => {
+  it("maxAge_flushAll_clearsTheTimer", async () => {
     batcher.add("k", "un");
     await batcher.flushAll();
     expect(jest.getTimerCount()).toBe(0);
@@ -288,9 +446,9 @@ describe("maxAge", () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
-  it("maxAge_reset_clearsBothTimers", () => {
+  it("maxAge_reset_clearsTheTimer", () => {
     batcher.add("k", "un");
-    expect(jest.getTimerCount()).toBe(2);
+    expect(jest.getTimerCount()).toBe(1);
     batcher.reset();
     expect(jest.getTimerCount()).toBe(0);
   });
@@ -310,8 +468,11 @@ describe("maxAge", () => {
     const timer = { unref } as unknown as ReturnType<typeof setTimeout>;
     jest.spyOn(globalThis, "setTimeout").mockReturnValue(timer);
     jest.spyOn(globalThis, "clearTimeout").mockImplementation(() => undefined);
-    batcher.add("k", "ligne");
-    expect(unref).toHaveBeenCalledTimes(2);
+    const real = createBotLogBatcher({ send });
+    real.add("k", "ligne");
+    // Un seul minuteur par lot, à l'échéance la plus proche (silence ou âge).
+    expect(unref).toHaveBeenCalledTimes(1);
+    real.reset();
   });
 });
 
@@ -375,6 +536,24 @@ describe("catégories", () => {
     expect(messages).toEqual([`# maps\n${"a".repeat(20)}`, `# maps\n${"b".repeat(20)}`]);
     for (const message of messages) expect(message.length).toBeLessThanOrEqual(40);
     headed.reset();
+  });
+
+  it("header_tooLongForTheLimit_omittedAndLimitKept", async () => {
+    const headed = createBotLogBatcher({ send, header: () => "h".repeat(30), maxChars: 40 });
+    headed.add("k", "ligne");
+    await headed.flush("k");
+    expect(send).toHaveBeenCalledWith("ligne", "general");
+    headed.reset();
+  });
+
+  it("category_otherCategoryOnSameKey_previousBatchSentFirst", async () => {
+    batcher.add("k", "carte", "maps");
+    batcher.add("k", "cast", "casts");
+    await settle();
+    expect(send.mock.calls).toEqual([["carte", "maps"]]);
+    expect(batcher.pending().get("k")).toBe(1);
+    await batcher.flush("k");
+    expect(send).toHaveBeenLastCalledWith("cast", "casts");
   });
 
   it("dispatch_fullLengthDigest_sentAsSingleAlertMessage", async () => {

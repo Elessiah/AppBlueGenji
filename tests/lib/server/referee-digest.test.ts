@@ -81,7 +81,7 @@ async function publishedLine(): Promise<string> {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 1, discordUnreachedUserIds: [] });
-  jest.mocked(sendBotLog).mockResolvedValue(undefined);
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
 });
 
 describe("dispatchRefereeDigest", () => {

@@ -340,6 +340,21 @@ describe("formatMatchResultLog", () => {
     expect(line).not.toContain("forfait");
   });
 
+  it("formatMatchResultLog_staffValidated_saysSoWithoutNamingAnyone", () => {
+    const line = formatMatchResultLog({
+      tournament: TOURNAMENT,
+      bracket: "UPPER",
+      roundNumber: 2,
+      team1: { name: "Les Renards", participantType: "TEAM" },
+      team2: { name: "Team Nova", participantType: "TEAM" },
+      team1Score: 2,
+      team2Score: 1,
+      staffValidated: true,
+    });
+
+    expect(line).toMatch(/Les Renards 2–1 Team Nova — résultat validé par le staff\.$/);
+  });
+
   it("signale un forfait, que le score seul ne dirait pas", () => {
     const line = formatMatchResultLog({
       tournament: TOURNAMENT,

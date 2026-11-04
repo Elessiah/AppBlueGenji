@@ -31,7 +31,7 @@ function pool(select: unknown[]) {
 beforeEach(() => {
   jest.clearAllMocks();
   resetRoundMapsNoticeState();
-  jest.mocked(sendBotLog).mockResolvedValue();
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
 });
 
 afterEach(() => resetRoundMapsNoticeState());

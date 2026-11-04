@@ -7,7 +7,6 @@ import {
 } from "@/lib/shared/bot-logs";
 
 const MATCH_ACTIONS: StaffMatchAction[] = [
-  "RESULT_VALIDATED",
   "SCORES_SAVED",
   "FORCE_LAUNCHED",
   "HOST_SET",
@@ -46,8 +45,8 @@ const base = {
 
 describe("formatStaffMatchActionLog", () => {
   it("écrit une ligne d'entame commune, auteur anonyme", () => {
-    expect(formatStaffMatchActionLog({ ...base, action: "RESULT_VALIDATED" })).toBe(
-      "🛠️ Résultat validé — « Coupe d'hiver » (#7) : Manche 2 — Renards vs Nova (#42), par le staff.",
+    expect(formatStaffMatchActionLog({ ...base, action: "SCORES_SAVED" })).toBe(
+      "🛠️ Score enregistré — « Coupe d'hiver » (#7) : Manche 2 — Renards vs Nova (#42), par le staff.",
     );
     expect(formatStaffMatchActionLog({ ...base, action: "FORCE_LAUNCHED" })).toBe(
       "🛠️ Lancement forcé — « Coupe d'hiver » (#7) : Manche 2 — Renards vs Nova (#42), par le staff.",

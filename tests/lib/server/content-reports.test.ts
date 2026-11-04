@@ -741,7 +741,7 @@ describe("applyReportAction", () => {
     expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("Signalement #9 résolu et archivé par le staff"), {
       id: 1,
       pseudo: "Admin",
-    }, undefined, "moderation");
+    }, { category: "moderation" });
   });
 
   it("archive sans note en `NULL`, et rouvre", async () => {

@@ -42,7 +42,7 @@ function pool(select: unknown[], claimed = 1, phases: unknown[] = []) {
 beforeEach(() => {
   jest.clearAllMocks();
   resetRoundMapsNoticeState();
-  jest.mocked(sendBotLog).mockResolvedValue();
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
   jest.spyOn(console, "error").mockImplementation(() => undefined);
 });
 
@@ -138,12 +138,6 @@ describe("dispatchDueRoundMapsNotices", () => {
   it("dispatchDueRoundMapsNotices_databaseDown_resolvesZeroWithoutThrowing", async () => {
     jest.mocked(getDatabase).mockRejectedValue(new Error("down"));
     await expect(dispatchDueRoundMapsNotices()).resolves.toBe(0);
-  });
-
-  it("dispatchDueRoundMapsNotices_botFails_stillResolves", async () => {
-    pool([dueRow([R2])]);
-    jest.mocked(sendBotLog).mockRejectedValue(new Error("bot"));
-    await expect(dispatchDueRoundMapsNotices()).resolves.toBe(1);
   });
 
   it("dispatchDueRoundMapsNotices_unreadablePendingRounds_sendsNothing", async () => {

@@ -33,12 +33,12 @@ const LOG_ROW = {
   participant_type: "TEAM",
 } as MatchLogRow;
 
-function roundConnection(matches: { id: number; bracket: string }[]) {
+function roundConnection(matches: { id: number; bracket: string }[], refereeUserId: number | null = null) {
   const execute = jest.fn<SqlQuery>(async (sql: string) => {
     if (sql.startsWith("SELECT state FROM bg_tournaments")) return [[{ state: "REGISTRATION" }], []];
     if (sql.startsWith("SELECT id FROM bg_matches")) return [matches.map(({ id }) => ({ id })), []];
     if (sql.startsWith("SELECT id, bracket, self_managed")) {
-      return [matches.map((match) => ({ ...match, self_managed: 0, referee_user_id: null, status: "READY", is_bye: 0 })), []];
+      return [matches.map((match) => ({ ...match, self_managed: 0, referee_user_id: refereeUserId, status: "READY", is_bye: 0 })), []];
     }
     return [{ affectedRows: 1 }, []];
   });
@@ -50,7 +50,7 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(loadMatchLogRow).mockResolvedValue(LOG_ROW);
-  jest.mocked(sendBotLog).mockResolvedValue();
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
 });
 
 describe("setRoundSelfManaged — ligne de journal", () => {
@@ -78,5 +78,25 @@ describe("setRoundSelfManaged — ligne de journal", () => {
 
     const [message] = jest.mocked(sendBotLog).mock.calls[0];
     expect(message).toContain("Tableau perdants · manche 2");
+  });
+
+  it("setRoundSelfManaged_noRefereeRemoved_refereesBatchOfTheTournament", async () => {
+    const connection = roundConnection([{ id: 41, bracket: "LOWER" }]);
+    jest.mocked(inTransaction).mockImplementation((run) => run(connection));
+
+    await setRoundSelfManaged(7, { phaseId: 0, roundNumber: 2, bracket: "LOWER" }, true, 3);
+    await settle();
+
+    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 7, category: "referees" });
+  });
+
+  it("setRoundSelfManaged_refereeRemoved_staffRemovalAlert", async () => {
+    const connection = roundConnection([{ id: 41, bracket: "LOWER" }], 9);
+    jest.mocked(inTransaction).mockImplementation((run) => run(connection));
+
+    await setRoundSelfManaged(7, { phaseId: 0, roundNumber: 2, bracket: "LOWER" }, true, 3);
+    await settle();
+
+    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 7, category: "staff-removal" });
   });
 });

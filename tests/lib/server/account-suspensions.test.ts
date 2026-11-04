@@ -201,8 +201,8 @@ describe("suspendAccount", () => {
     await suspendAccount(5, input, actor);
     await flush();
 
-    expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("un joueur"), actor, undefined, "moderation");
-    expect(publishStaffAction).not.toHaveBeenCalledWith(expect.stringContaining(input.reason), actor);
+    expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("un joueur"), actor, { category: "moderation" });
+    expect(publishStaffAction).not.toHaveBeenCalledWith(expect.stringContaining(input.reason), actor, expect.anything());
     expect(loadNotificationRecipients).toHaveBeenCalledWith([5], "proven");
     const notification = jest.mocked(notifyUsers).mock.calls[0][1];
     expect(notification.topic).toBe("MODERATION");
@@ -259,7 +259,7 @@ describe("liftSuspension", () => {
     expect(sql).toContain("SET s.lifted_at = NOW(), s.lifted_by = ?");
     expect(sql).toContain(activeSuspensionSql("s"));
     expect(params).toEqual([1, 11]);
-    expect(publishStaffAction).toHaveBeenCalledWith("✅ Suspension S-11 levée par le staff.", actor, undefined, "moderation");
+    expect(publishStaffAction).toHaveBeenCalledWith("✅ Suspension S-11 levée par le staff.", actor, { category: "moderation" });
     const lifted = jest.mocked(notifyUsers).mock.calls[0][1].discord?.message;
     expect(lifted?.("fr")).toContain("S-11");
     expect(lifted?.("en")).toContain("S-11");

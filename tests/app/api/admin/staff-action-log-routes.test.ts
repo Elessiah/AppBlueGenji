@@ -77,7 +77,6 @@ const LIVE_ACTIONS = new Set<StaffMatchAction>(["LIVE_CONFIGURED", "LIVE_REMOVED
 
 describe("gestes du staff sur un match", () => {
   it.each<MatchCase>([
-    ["résultat validé", "RESULT_VALIDATED", () => resolveRoute(jsonReq("POST", { doubleForfeit: true }), match), () => jest.mocked(adminResolveMatch).mockResolvedValue()],
     ["score enregistré", "SCORES_SAVED", () => scoresRoute(jsonReq("PATCH", { forfeitTeamId: 7 }), match), () => jest.mocked(adminSaveMatchScores).mockResolvedValue(false)],
     ["lancement forcé", "FORCE_LAUNCHED", () => launchRoute(jsonReq("POST", {}), match), () => jest.mocked(forceLaunchMatch).mockResolvedValue()],
     ["hôte désigné", "HOST_SET", () => hostRoute(jsonReq("PUT", { teamId: 3 }), match), () => jest.mocked(setMatchHost).mockResolvedValue(true)],
@@ -122,6 +121,14 @@ describe("gestes du staff sur un match", () => {
       [42, "LIVE_REMOVED", "CASTER"],
       [42, "REPLAY_SET", "CASTER"],
     ]);
+  });
+
+  it("resolveRoute_success_noSeparateStaffLine", async () => {
+    // « Valider le résultat » est dit par la ligne « Match terminé » du moteur
+    // (`markResultValidatedByStaff`), dans le lot des résultats du tournoi.
+    jest.mocked(adminResolveMatch).mockResolvedValue();
+    expect((await resolveRoute(jsonReq("POST", { doubleForfeit: true }), match)).status).toBe(200);
+    expect(announceStaffMatchAction).not.toHaveBeenCalled();
   });
 
   it("n'écrit rien quand le geste échoue", async () => {

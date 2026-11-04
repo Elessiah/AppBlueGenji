@@ -85,7 +85,7 @@ const lines = () => {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(ensureUniquePseudo).mockImplementation(async (source: unknown) => String(source));
-  jest.mocked(sendBotLog).mockResolvedValue(undefined);
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
   // La photo de profil ne concerne pas ce fichier : rien à copier, donc aucun
   // appel sortant en marge de celui qu'on mesure.
   jest.mocked(shouldImportRemoteAvatar).mockReturnValue(false);
@@ -181,16 +181,3 @@ describe("inscription par Discord", () => {
   });
 });
 
-describe("le journal ne tient pas la connexion en otage", () => {
-  it("laisse le compte se créer quand le bot est injoignable", async () => {
-    // `sendBotLog` avale déjà ses erreurs ; ce test garde la propriété au cas où
-    // une version future les laisserait passer. Un bot endormi ne doit ni faire
-    // échouer une connexion, ni la rendre plus lente : l'envoi n'est pas attendu.
-    jest.mocked(sendBotLog).mockRejectedValue(new Error("ECONNREFUSED"));
-    fakeDb([]);
-
-    await expect(
-      createOrGetDiscordUser("123456789", "Nova", undefined, { method: "DM_CODE", termsAccepted: true }),
-    ).resolves.toBe(4242);
-  });
-});

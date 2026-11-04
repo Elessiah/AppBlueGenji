@@ -84,7 +84,7 @@ beforeEach(() => {
   connection.commit.mockResolvedValue();
   connection.rollback.mockResolvedValue();
   jest.mocked(withConnection).mockImplementation((run) => run(fakeConnection(connection)));
-  jest.mocked(sendBotLog).mockResolvedValue();
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
 });
 
 describe("parseRoundKey", () => {
@@ -386,6 +386,7 @@ describe("setTournamentMapRules", () => {
     expect(update[1]).toEqual(["HOST", "LOSER", "LOSER", 7]);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
     expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("Règles de ban modifiées");
+    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 7, category: "maps" });
   });
 
   it("des règles inchangées n'écrivent rien", async () => {

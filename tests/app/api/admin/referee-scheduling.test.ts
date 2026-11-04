@@ -128,7 +128,8 @@ describe("PUT /api/admin/tournaments/[id]/referee-scheduling — journal", () =>
   it("journalise la bascule, nom de tournoi désamorcé, auteur à part", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     await PUT(req({ enabled: true }), params("7"));
-    const [line, actor] = jest.mocked(publishStaffAction).mock.calls[0];
+    const [line, actor, options] = jest.mocked(publishStaffAction).mock.calls[0];
+    expect(options).toEqual({ category: "referees", tournamentId: 7 });
     expect(line).toMatch(/activée/);
     expect(line).toMatch(/par le staff/);
     expect(line).not.toContain("<@&1>");

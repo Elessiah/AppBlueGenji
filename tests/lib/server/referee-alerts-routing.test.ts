@@ -15,6 +15,7 @@ import {
   resolveBotLogs,
 } from "@/lib/server/tournaments/bot-logs";
 import {
+  flushBotLogBatch,
   isBotCircuitOpen,
   pushRefereeAlert,
   sendBotLog,
@@ -93,8 +94,9 @@ const DELIVERED = { sent: 1, unresolved: [], failed: [] };
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(isBotCircuitOpen).mockReturnValue(false);
-  jest.mocked(sendBotLog).mockResolvedValue(undefined);
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
   jest.mocked(pushRefereeAlert).mockResolvedValue(DELIVERED);
+  jest.mocked(flushBotLogBatch).mockResolvedValue();
 });
 
 describe("routage vers deux transports", () => {
@@ -118,6 +120,27 @@ describe("routage vers deux transports", () => {
     const [french, english] = String(options?.dmMessage).split(BILINGUAL_DM_SEPARATOR);
     expect(french).toBe(message);
     expect(english).toMatch(/^\*\*.+\*\* — .+ https?:\/\/\S+$/);
+  });
+
+  it("flushBotLogs_scoreConflict_tournamentBatchFlushedBeforeTheAlert", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+    const order: string[] = [];
+    jest.mocked(flushBotLogBatch).mockImplementation(async () => {
+      order.push("flush");
+    });
+    jest.mocked(pushRefereeAlert).mockImplementation(async () => {
+      order.push("alert");
+      return DELIVERED;
+    });
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // Les lignes du tournoi en attente précèdent, au salon, le désaccord qu'elles expliquent.
+    expect(flushBotLogBatch).toHaveBeenCalledWith({ tournamentId: 12 });
+    expect(order).toEqual(["flush", "alert"]);
   });
 
   // Report expiré sans réponse → alerte arbitre seulement.
@@ -361,7 +384,9 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
   it("ne libère rien pour un évènement de journal", async () => {
     const connection = fakeConnection();
     const execute = mockDb([[TOURNAMENT_ROW]]);
-    jest.mocked(sendBotLog).mockRejectedValue(new Error("ECONNREFUSED"));
+    jest.mocked(sendBotLog).mockImplementation(() => {
+      throw new Error("ECONNREFUSED");
+    });
 
     queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
     flushBotLogs(connection);
