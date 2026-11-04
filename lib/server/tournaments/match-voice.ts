@@ -144,6 +144,8 @@ const VOICE_PURGE_INTERVAL_MS = 3_600_000;
 /** Lignes effacées par requête, et nombre de requêtes au plus par purge. */
 const VOICE_PURGE_BATCH = VOICE_SWEEP_BATCH * 5;
 const VOICE_PURGE_MAX_BATCHES = 10;
+/** Pause avant de reprendre un arriéré de purge plus long qu'une passe. */
+const VOICE_PURGE_BACKLOG_PAUSE_MS = 60_000;
 /**
  * Nom envoyé au bot quand il refuse celui de l'équipe (`INVALID_VOICE_CHANNEL_NAME`) :
  * le même repli que le sien (`FALLBACK_VOICE_NAME`), jamais un pseudo.
@@ -373,8 +375,8 @@ async function purgeReleasedRows(): Promise<void> {
       break;
     }
   }
-  // Arriéré restant : la passe suivante continue, sans attendre l'heure.
-  if (caughtUp) sweep.purgedAt = Date.now();
+  // Arriéré restant : reprise dans la minute (pas à chaque passe de dix secondes).
+  sweep.purgedAt = caughtUp ? Date.now() : Date.now() - VOICE_PURGE_INTERVAL_MS + VOICE_PURGE_BACKLOG_PAUSE_MS;
 }
 
 /** Salons ouverts lus par passe : plus large que le lot revérifié, pour que la rotation les atteigne tous. */
@@ -404,6 +406,13 @@ export const OPEN_DUE_CHANNELS_SQL = `SELECT v.match_id, v.team_id, v.channel_id
 
 /** Un salon ouvert n'est redemandé qu'une fois par minute. */
 const VOICE_RECHECK_MS = 60_000;
+/**
+ * Horodatage donné à un salon dont la vérification a échoué : « vu il y a
+ * `VOICE_RECHECK_MS - VOICE_RECHECK_RETRY_MS` », donc dû dans `VOICE_RECHECK_RETRY_MS`
+ * et classé derrière les salons vus plus tôt.
+ */
+const retryStamp = (): number => Date.now() - Math.max(VOICE_RECHECK_MS - VOICE_RECHECK_RETRY_MS, 0);
+
 /** Délai avant de redemander un salon dont la vérification a échoué sur le canal du bot. */
 const VOICE_RECHECK_RETRY_MS = 10_000;
 /** Appels au bot en parallèle pendant la revérification : une passe ne s'éternise pas sur un bot lent. */
@@ -454,7 +463,7 @@ async function recheckOpenChannels(touched: Set<number>): Promise<boolean> {
         botDown = true;
         // Un salon qui n'a pas pu être vérifié n'est pas « vu » : redemandé dans `VOICE_RECHECK_RETRY_MS`
         // et derrière les salons plus anciennement vus (un salon lent n'ouvre pas chaque passe).
-        sweep.checkedAt.set(next.key, Date.now() - VOICE_RECHECK_MS + VOICE_RECHECK_RETRY_MS);
+        sweep.checkedAt.set(next.key, retryStamp());
       }
     }
   };
@@ -487,27 +496,29 @@ async function createDueChannels(touched: Set<number>): Promise<boolean> {
   return false;
 }
 
-async function runSweep(): Promise<Set<number>> {
-  const touched = new Set<number>();
+/** Une passe : les tournois dont la page change s'ajoutent à `touched` (publiés par l'appelant, même si la passe échoue). */
+async function runSweep(touched: Set<number>): Promise<void> {
   let needed: (RowDataPacket & { due: number | null; open_rows: number | null })[];
   try {
     needed = await run(SWEEP_NEEDED_SQL);
   } catch (error) {
     // Table absente (création avalée au démarrage) : rien à balayer.
-    if (isMissingTableError(error)) return touched;
+    if (isMissingTableError(error)) return;
     throw error;
   }
   const due = Number(needed[0]?.due ?? 0) === 1;
   const open = Number(needed[0]?.open_rows ?? 0) === 1;
   try {
-    // Bot en panne : une seule attente par passe, la suivante reprend le reste.
-    const botDown = due && ((await createDueChannels(touched)) || (await recheckOpenChannels(touched)));
-    if ((due || open) && !botDown) await releaseChannels(touched);
+    // Bot en panne : la revérification est sautée (une seule attente de plus), la suivante reprend le reste.
+    // Le rendu a son propre arrêt sur panne et ne dépend ni de la création ni de la revérification.
+    if (due && !(await createDueChannels(touched))) await recheckOpenChannels(touched);
+    if (due || open) await releaseChannels(touched);
   } finally {
-    // La minimisation ne dépend ni du bot ni d'une étape en échec.
+    // La minimisation ne dépend ni du bot ni d'une étape en échec ; après la publication, qu'elle ne retarde pas.
+    for (const tournamentId of touched) publishMatchUpdatedEvent(tournamentId);
+    touched.clear();
     await purgeReleasedRows().catch((error: unknown) => console.error("[match-voice] purge en échec", error));
   }
-  return touched;
 }
 
 /**
@@ -528,8 +539,7 @@ export function dispatchMatchVoiceChannels(rerun = false): Promise<void> {
     try {
       do {
         sweep.again = false;
-        const touched = await runSweep();
-        for (const tournamentId of touched) publishMatchUpdatedEvent(tournamentId);
+        await runSweep(new Set<number>());
       } while (sweep.again);
       sweep.again = false;
     } catch (error) {
