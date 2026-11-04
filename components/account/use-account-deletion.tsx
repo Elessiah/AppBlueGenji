@@ -120,7 +120,14 @@ export function useAccountDeletion({
     // l'annulation de la modale.
     if (deleting) return;
     setDeleting(true);
-    setPendingDeletion(await (preview ?? previewAccountDeletion()));
+    try {
+      setPendingDeletion(await (preview ?? previewAccountDeletion()));
+    } catch {
+      // Un aperçu qui échoue (réseau, morceau de code introuvable) ne doit pas
+      // laisser le bouton fermé sans un mot : il se rouvre, avec une erreur.
+      setDeleting(false);
+      showError(deletionErrorText(text, undefined), { lang: contentLang });
+    }
   };
 
   /** Joué par la modale : rend `false` sur un refus, qui la laisse ouverte. */

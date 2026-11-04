@@ -276,7 +276,7 @@ describe("plus de window.confirm", () => {
     const deletion = readSource("components/account/use-account-deletion.tsx");
     expect(page).toContain("const accountDeletion = useAccountDeletion({");
     expect(page).toContain("{accountDeletion.dialog}");
-    expect(deletion).toContain("setPendingDeletion(await (preview ?? previewAccountDeletion()));");
+    expect(deletion).toContain("setPendingDeletion(await (preview ?? previewAccountDeletion()));");  // dans un try : un aperçu qui échoue rouvre le bouton
     // Lot 9-2 : textes de la langue de la page (`profile.deletion`).
     expect(deletion).toContain('title={text.t("deletion.question")}');
     expect(deletion).toContain("deletionConsequencesParagraphs(text, pendingDeletion.subject, fromTerms)");

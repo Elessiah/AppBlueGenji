@@ -233,6 +233,17 @@ describe("useAccountDeletion", () => {
     expect(dialogProps(opened).children).toBeDefined();
   });
 
+  it("un aperçu qui échoue rouvre le bouton et le dit par une notification, sans ouvrir la modale", async () => {
+    const flow = useAccountDeletion({ text: FR_PROFILE });
+    await flow.start(Promise.reject(new Error("chunk load failed")));
+    expect(showError).toHaveBeenCalledWith(FR_PROFILE.t("deletion.errors.fallback"), { lang: undefined });
+    rerender();
+    const after = useAccountDeletion({ text: FR_PROFILE });
+    expect(after.deleting).toBe(false);
+    expect(after.confirming).toBe(false);
+    expect(after.dialog).toBeNull();
+  });
+
   it("un second lancement pendant l'aperçu n'envoie rien de plus", async () => {
     globalThis.fetch = fakeFetch({ "GET /api/profile/deletion": () => jsonResponse(200, { mode: "ERASE", reason: null }) }, calls);
     const flow = useAccountDeletion({ text: FR_PROFILE });

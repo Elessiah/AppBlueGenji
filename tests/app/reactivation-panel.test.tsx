@@ -10,10 +10,21 @@ import type { ReactElement, ReactNode } from "react";
  */
 const cells: unknown[] = [];
 let cursor = 0;
+const refs: { current: unknown }[] = [];
+let refCursor = 0;
+let effects: Array<() => void> = [];
 jest.mock("react", () => {
   const actual = jest.requireActual<typeof import("react")>("react");
   return {
     ...actual,
+    useRef: <T,>(initial: T) => {
+      const index = refCursor++;
+      if (!(index in refs)) refs[index] = { current: initial };
+      return refs[index] as { current: T };
+    },
+    useEffect: (effect: () => void) => {
+      effects.push(effect);
+    },
     useState: <T,>(initial: T) => {
       const index = cursor++;
       if (!(index in cells)) cells[index] = initial;
@@ -48,6 +59,8 @@ type Props = { disabled?: boolean; onClick?: () => Promise<void>; children?: Rea
 
 function render(finalAt: string | null): ReactElement {
   cursor = 0;
+  refCursor = 0;
+  effects = [];
   return ReactivationPanel({ finalAt });
 }
 
@@ -74,6 +87,7 @@ const FUTURE = "2026-12-03T10:00:00.000Z";
 
 beforeEach(() => {
   cells.length = 0;
+  refs.length = 0;
   jest.clearAllMocks();
 });
 
@@ -92,6 +106,27 @@ describe("ReactivationPanel", () => {
     await findButton(render(FUTURE))!.props.onClick!();
     expect(showError).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.expired"));
     expect(findButton(render(FUTURE))).toBeNull();
+  });
+
+  it("410 : le focus passe au bloc « expiré » (le bouton qui l'avait a disparu)", async () => {
+    global.fetch = jest.fn(async () => jsonResponse(410, { error: "REACTIVATION_EXPIRED" })) as typeof fetch;
+    await findButton(render(FUTURE))!.props.onClick!();
+    const focus = jest.fn();
+    render(FUTURE);
+    refs[0] = { current: { focus } };
+    refCursor = 0;
+    render(FUTURE);
+    for (const effect of effects) effect();
+    expect(focus).toHaveBeenCalledTimes(1);
+  });
+
+  it("ouvert déjà expiré, l'écran ne vole pas le focus", () => {
+    const focus = jest.fn();
+    render(null);
+    refs[0] = { current: { focus } };
+    render(null);
+    for (const effect of effects) effect();
+    expect(focus).not.toHaveBeenCalled();
   });
 
   it("500 : notification, la vue ne change pas et le bouton se rouvre", async () => {

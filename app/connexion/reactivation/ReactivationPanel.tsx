@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useLoginText } from "@/components/i18n/login-text";
 import { useToast } from "@/components/ui/toast";
@@ -21,6 +21,14 @@ export function ReactivationPanel({ finalAt }: Readonly<{ finalAt: string | null
   // Une date illisible vaut un ticket absent : jamais « Invalid Date » devant un bouton.
   const validFinalAt = finalAt !== null && !Number.isNaN(new Date(finalAt).getTime()) ? finalAt : null;
   const [expired, setExpired] = useState(validFinalAt === null);
+  const expiredRef = useRef<HTMLDivElement>(null);
+  const expiredOnMount = useRef(validFinalAt === null);
+  // Un ticket qui expire sous le clic retire le bouton qui avait le focus : il
+  // passe au bloc « expiré » (annoncé), sinon il tomberait sur <body>. Un écran
+  // ouvert déjà expiré garde le focus d'une arrivée de page normale.
+  useEffect(() => {
+    if (expired && !expiredOnMount.current) expiredRef.current?.focus();
+  }, [expired]);
 
   const date = validFinalAt
     ? new Date(validFinalAt).toLocaleDateString(INTL_LOCALE[text.locale], {
@@ -74,7 +82,7 @@ export function ReactivationPanel({ finalAt }: Readonly<{ finalAt: string | null
   };
 
   return (
-    <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", position: "relative" }}>
+    <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", position: "relative" }}>
       <div className="fabric" />
       <CyberCard
         ticks
@@ -88,12 +96,12 @@ export function ReactivationPanel({ finalAt }: Readonly<{ finalAt: string | null
           <span className="text-gradient">{t("reactivation.title")}</span>
         </h1>
         {expired ? (
-          <>
+          <div ref={expiredRef} tabIndex={-1} role="alert" style={{ outline: "none" }}>
             <p style={{ ...LOGIN_HELP_TEXT_STYLE, fontSize: 14 }}>{t("reactivation.expired")}</p>
             <LocaleLink href="/connexion" style={{ display: "inline-flex", alignItems: "center", minHeight: 44 }}>
               {t("reactivation.backToLogin")}
             </LocaleLink>
-          </>
+          </div>
         ) : (
           <>
             <p style={{ fontSize: 14, lineHeight: 1.5, color: "var(--ink)" }}>{t("reactivation.lead", { date })}</p>
