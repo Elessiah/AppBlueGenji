@@ -517,6 +517,16 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
     expect(writes.filter((w) => w.sql.includes("bg_match_voice_channels") && !w.sql.startsWith("DELETE"))).toEqual([]);
   });
 
+  it("dispatchMatchVoiceChannels_recheckFailsThenBotBack_retriesNextPass", async () => {
+    database({ openDue: [open] });
+    jest.mocked(ensureVoiceChannel)
+      .mockResolvedValueOnce({ kind: "failed", code: "BOT_INTERNAL_UNREACHABLE" })
+      .mockResolvedValue({ kind: "ok", value: "901" });
+    await dispatchMatchVoiceChannels();
+    await dispatchMatchVoiceChannels(true);
+    expect(ensureVoiceChannel).toHaveBeenCalledTimes(2);
+  });
+
   it("dispatchMatchVoiceChannels_recheckQuery_dueOpenChannelsOfCurrentTeamsOnly", () => {
     expect(OPEN_DUE_CHANNELS_SQL).toContain("v.released_at IS NULL AND v.channel_id IS NOT NULL");
     expect(OPEN_DUE_CHANNELS_SQL).toContain(`m.start_at >= NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR`);
