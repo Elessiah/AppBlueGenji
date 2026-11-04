@@ -53,7 +53,9 @@ type VoiceRow = RowDataPacket & {
 /** État d'un salon tel que l'instantané le lit : ouvert, en panne, ou rien. */
 function channelState(row: VoiceRow | undefined): VoiceChannelState | null {
   if (!row || row.released_at !== null) return null;
-  return { channelId: row.channel_id ?? null, failed: row.failed_at !== null };
+  // Un rendu refusé note `failed_at` sur un salon encore ouvert : il reste « ouvert ».
+  const channelId = row.channel_id ?? null;
+  return { channelId, failed: channelId === null && row.failed_at !== null };
 }
 
 function rowFor<R extends VoiceRow>(rows: readonly R[], matchId: number, teamId: number | null): R | undefined {
@@ -77,8 +79,9 @@ type VoiceTeamRow = RowDataPacket & { id: number; solo: number | null; ghost: nu
 /**
  * Salons des matchs d'un instantané, deux lectures pour les seuls matchs
  * concernés — et aucune quand l'option est éteinte ou le tournoi pas en cours
- * (`enabled`). Seul un match jouable, programmé, pas encore lancé, et dont les
- * salons sont dus, en montre : ce sont ceux que le balayage ouvre.
+ * (`enabled`). Seul un match jouable (prêt ou score en attente de
+ * confirmation), programmé, et dont les salons sont dus, en montre — lancé ou
+ * non : le lancement n'en dépend pas, et les salons restent jusqu'au score.
  */
 export async function loadMatchVoiceInfos(
   connection: PoolConnection,
@@ -90,8 +93,7 @@ export async function loadMatchVoiceInfos(
   const now = Date.now();
   const candidates = matches.filter(
     (match) =>
-      match.status === "READY" &&
-      match.launchedAt === null &&
+      (match.status === "READY" || match.status === "AWAITING_CONFIRMATION") &&
       match.team1Id !== null &&
       match.team2Id !== null &&
       voiceChannelsDue(match.startAt, now),
@@ -170,7 +172,7 @@ function needsChannel(teamColumn: "team1_id" | "team2_id"): string {
 /**
  * Matchs dont un salon reste à créer : tournoi en cours à l'option allumée,
  * match jouable programmé dans le quart d'heure (ou passé l'heure de moins de
- * `VOICE_CHANNEL_LATE_HOURS`) et pas encore lancé pour son appariement, deux
+ * `VOICE_CHANNEL_LATE_HOURS`), lancé ou non (le lancement n'en dépend pas), deux
  * équipes réelles — **jamais** une entrée solo (le nom du salon serait un
  * pseudo) ni une fantôme. Un match dont les deux salons sont ouverts n'est
  * plus relu.
@@ -182,10 +184,9 @@ export const DUE_CHANNELS_SQL = `SELECT m.id, m.tournament_id, m.team1_id, m.tea
   JOIN bg_teams t1 ON t1.id = m.team1_id
   JOIN bg_teams t2 ON t2.id = m.team2_id
  WHERE t.state = 'RUNNING' AND t.team_voice_channels = 1
-   AND m.status = 'READY' AND m.start_at IS NOT NULL
+   AND m.status IN ('READY', 'AWAITING_CONFIRMATION') AND m.start_at IS NOT NULL
    AND m.start_at <= NOW() + INTERVAL ${VOICE_CHANNEL_LEAD_MINUTES} MINUTE
    AND m.start_at >= NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
-   AND (m.launched_at IS NULL OR NOT (m.launch_pairing <=> CONCAT(m.team1_id, ':', m.team2_id)))
    AND t1.solo_user_id IS NULL AND t2.solo_user_id IS NULL
    AND COALESCE(t1.is_ghost, 0) = 0 AND COALESCE(t2.is_ghost, 0) = 0
    AND (${needsChannel("team1_id")} OR ${needsChannel("team2_id")})
@@ -222,10 +223,17 @@ const SWEEP_NEEDED_SQL = `SELECT
    EXISTS (SELECT 1 FROM bg_tournaments WHERE state = 'RUNNING' AND team_voice_channels = 1) AS due,
    EXISTS (SELECT 1 FROM bg_match_voice_channels WHERE released_at IS NULL) AS open_rows`;
 
-type SweepState = { pending: Promise<void> | null; lastAt: number; again: boolean; purgedAt: number };
+type SweepState = {
+  pending: Promise<void> | null;
+  lastAt: number;
+  again: boolean;
+  purgedAt: number;
+  /** Dernière vérification de chaque salon ouvert (clé du salon → ms). */
+  checkedAt: Map<string, number>;
+};
 const sweepState = globalThis as typeof globalThis & { __bgVoiceSweep?: Partial<SweepState> };
 const sweep = Object.assign(
-  { pending: null, lastAt: 0, again: false, purgedAt: 0 },
+  { pending: null, lastAt: 0, again: false, purgedAt: 0, checkedAt: new Map<string, number>() },
   sweepState.__bgVoiceSweep,
 ) as SweepState;
 sweepState.__bgVoiceSweep = sweep;
@@ -335,12 +343,63 @@ async function loadVoiceRows(matchIds: readonly number[]): Promise<VoiceRow[]> {
  */
 async function purgeReleasedRows(): Promise<void> {
   if (Date.now() - sweep.purgedAt < VOICE_PURGE_INTERVAL_MS) return;
-  sweep.purgedAt = Date.now();
+  // Horodatée après le `DELETE` seulement : une purge en échec se rejoue à la passe suivante.
   await run(
     `DELETE FROM bg_match_voice_channels
      WHERE released_at IS NOT NULL AND released_at < NOW() - INTERVAL ${VOICE_ROW_RETENTION_DAYS} DAY
      LIMIT ${VOICE_SWEEP_BATCH * 5}`,
   );
+  sweep.purgedAt = Date.now();
+}
+
+/**
+ * Salons ouverts des matchs dus : redemandés au bot par leur clé au plus une
+ * fois par `VOICE_RECHECK_MS` et par salon. Le bot rend le même salon, ou un
+ * neuf s'il a été supprimé à la main — seul moyen pour le site de le savoir,
+ * sans jamais demander qui s'y trouve.
+ */
+export const OPEN_DUE_CHANNELS_SQL = `SELECT v.match_id, v.team_id, v.channel_id, m.tournament_id,
+       IF(v.team_id <=> m.team1_id, t1.name, t2.name) AS team_name
+  FROM bg_match_voice_channels v
+  JOIN bg_matches m ON m.id = v.match_id
+  JOIN bg_tournaments t ON t.id = m.tournament_id
+  JOIN bg_teams t1 ON t1.id = m.team1_id
+  JOIN bg_teams t2 ON t2.id = m.team2_id
+ WHERE v.released_at IS NULL AND v.channel_id IS NOT NULL
+   AND t.state = 'RUNNING' AND t.team_voice_channels = 1
+   AND m.status IN ('READY', 'AWAITING_CONFIRMATION') AND m.start_at IS NOT NULL
+   AND m.start_at <= NOW() + INTERVAL ${VOICE_CHANNEL_LEAD_MINUTES} MINUTE
+   AND m.start_at >= NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
+   AND (v.team_id <=> m.team1_id OR v.team_id <=> m.team2_id)
+ ORDER BY m.start_at, v.match_id, v.team_id
+ LIMIT ${VOICE_SWEEP_BATCH * 2}`;
+
+/** Un salon ouvert n'est redemandé qu'une fois par minute. */
+const VOICE_RECHECK_MS = 60_000;
+
+type OpenRow = RowDataPacket & { match_id: number; team_id: number; channel_id: string; tournament_id: number; team_name: string };
+
+async function recheckOpenChannels(touched: Set<number>): Promise<void> {
+  const rows = await run<OpenRow[]>(OPEN_DUE_CHANNELS_SQL);
+  const now = Date.now();
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const key = voiceChannelKey(Number(row.match_id), Number(row.team_id));
+    seen.add(key);
+    if (now - (sweep.checkedAt.get(key) ?? 0) < VOICE_RECHECK_MS) continue;
+    sweep.checkedAt.set(key, now);
+    let ensured = await ensureVoiceChannel(key, visibleText(String(row.team_name)));
+    if (ensured.kind !== "ok" && ensured.code === "INVALID_VOICE_CHANNEL_NAME") {
+      ensured = await ensureVoiceChannel(key, VOICE_FALLBACK_CHANNEL_NAME);
+    }
+    // Une panne ici ne dit rien du salon : il reste tel qu'il est, redemandé plus tard.
+    if (ensured.kind === "ok" && ensured.value !== String(row.channel_id)) {
+      await writeChannel(Number(row.match_id), Number(row.team_id), ensured.value);
+      touched.add(Number(row.tournament_id));
+    }
+  }
+  // Mémoire bornée : seuls les salons encore dus gardent leur horodatage.
+  for (const key of sweep.checkedAt.keys()) if (!seen.has(key)) sweep.checkedAt.delete(key);
 }
 
 async function createDueChannels(touched: Set<number>): Promise<void> {
@@ -373,7 +432,10 @@ async function runSweep(): Promise<Set<number>> {
   }
   const due = Number(needed[0]?.due ?? 0) === 1;
   const open = Number(needed[0]?.open_rows ?? 0) === 1;
-  if (due) await createDueChannels(touched);
+  if (due) {
+    await createDueChannels(touched);
+    await recheckOpenChannels(touched);
+  }
   if (due || open) await releaseChannels(touched);
   await purgeReleasedRows();
   return touched;
@@ -400,12 +462,17 @@ export function dispatchMatchVoiceChannels(rerun = false): Promise<void> {
         const touched = await runSweep();
         for (const tournamentId of touched) publishMatchUpdatedEvent(tournamentId);
       } while (sweep.again);
+      sweep.again = false;
     } catch (error) {
       console.error("[match-voice] balayage en échec", error);
     } finally {
       sweep.lastAt = Date.now();
-      sweep.again = false;
       sweep.pending = null;
+    }
+    // Une bascule pendant une passe en échec garde sa passe de plus (une seule).
+    if (sweep.again) {
+      sweep.again = false;
+      await dispatchMatchVoiceChannels(true);
     }
   })();
   return sweep.pending;
@@ -417,6 +484,7 @@ export function resetVoiceSweepForTests(): void {
   sweep.lastAt = 0;
   sweep.again = false;
   sweep.purgedAt = 0;
+  sweep.checkedAt.clear();
 }
 
 /* ── Bascule de l'option ──────────────────────────────────────────────────── */
