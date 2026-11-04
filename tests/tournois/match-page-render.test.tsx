@@ -369,8 +369,11 @@ describe("page d'un match — cartes du round et bans", () => {
     expect(html).toContain("Busan");
   });
 
-  it("render_staffOnUnsetRound_hidesRoundReset", () => {
-    expect(visible(render(match(), "staff", false, "fr", rules([])))).not.toContain("Réinitialiser le tour");
+  it("render_staffOnUnsetRound_keepsRoundResetMountedButDisabled", () => {
+    // Démonté, il laisserait tomber le focus sur le <body> après une réinitialisation réussie.
+    const html = render(match(), "staff", false, "fr", rules([]));
+
+    expect(html).toMatch(/<button[^>]*aria-disabled="true"[^>]*>Réinitialiser le tour/);
   });
 
   it("sans autogestion, une équipe du match lit le pool sans le choisir ; en autogestion, elle choisit", () => {

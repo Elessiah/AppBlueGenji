@@ -158,10 +158,12 @@ describe("détail map par map — noms accessibles", () => {
   it("chaque champ nomme sa map, et la phrase d'erreur reste hors du label", () => {
     const list = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
     // Lot 8b : « Map N, » / « Map N, score de » passent par les messages.
-    expect(list.match(/<span className="sr-only">\{t\("score\.maps\.scoreOf", \{ index: index \+ 1 \}\)\}<\/span>/g)).toHaveLength(2);
+    // Chaque champ de score dit le nom de la carte comme la ligne : un seul libellé (`mapRowLabels`).
+    expect(list.match(/<span className="sr-only">\{labels\.scorePrefix\}<\/span>/g)).toHaveLength(2);
+    expect(list).toMatch(/scorePrefix: t\("score\.maps\.scoreOf", \{ index: number \}\)/);
     // Le code de replay nomme sa map, avec le nom de la carte quand il est fixé (« Map 1 : Ilios, »).
-    expect(list).toMatch(/prefix: t\("score\.maps\.mapNamedPrefix", \{ index: index \+ 1, name: mapName \}\)/);
-    expect(list).toMatch(/prefix: t\("score\.maps\.mapPrefix", \{ index: index \+ 1 \}\)/);
+    expect(list).toMatch(/prefix: t\("score\.maps\.mapNamedPrefix", \{ index: number, name: mapName \}\)/);
+    expect(list).toMatch(/prefix: t\("score\.maps\.mapPrefix", \{ index: number \}\)/);
     // La map de départage d'un vrai best of 3 se nomme comme telle (« Map de départage : Ilios, »).
     expect(list).toMatch(/prefix: t\("score\.maps\.tiebreakNamedPrefix", \{ name: tiebreak \}\)/);
     expect(list).toContain('<span className="sr-only">{labels.prefix}</span>');
