@@ -240,6 +240,16 @@ describe("Schéma — la règle des deux endroits", () => {
     expect(migrations).toMatch(/ALTER TABLE bg_about_stats ADD COLUMN value_en VARCHAR\(40\) NULL AFTER value/);
   });
 
+  it("recentSchemaChanges_challengePurpose_tightenedToNotNullAfterLegacyRowsDropped", () => {
+    // Comme une base neuve : une insertion sans usage échoue aussi en production.
+    const added = migrations.indexOf("ADD COLUMN purpose ENUM('LOGIN', 'HANDLE') NULL");
+    const dropped = migrations.indexOf("DELETE FROM bg_discord_login_challenges WHERE purpose IS NULL");
+    const tightened = migrations.indexOf("MODIFY purpose ENUM('LOGIN', 'HANDLE') NOT NULL");
+    expect(added).toBeGreaterThan(-1);
+    expect(dropped).toBeGreaterThan(added);
+    expect(tightened).toBeGreaterThan(dropped);
+  });
+
   it("porte des instructions entières, et non des triplets table/colonne/type", () => {
     // Un triplet ne sait dire qu'`ADD COLUMN` : la règle des deux endroits ne
     // s'appliquait alors ni à un `ENUM` élargi, ni à un index posé, ni à une clé

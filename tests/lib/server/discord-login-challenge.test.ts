@@ -81,13 +81,17 @@ function fakeDb(
     return 1;
   };
 
+  // Lecture par compte : `AND purpose = ?` n'y prend que le dernier de l'usage demandé.
+  const accountRead = (purpose: unknown): Challenge[] =>
+    state !== null && state.purpose === purpose ? [{ ...state }] : [];
+
   const runner = (origin: "pool" | "tx") =>
     jest.fn(async (sql: string, params: unknown[] = []) => {
       const q = String(sql).replace(/\s+/g, " ").trim();
       trace.push({ origin, sql: q });
 
       if (q.startsWith("SELECT id, discord_id, code_hash")) {
-        return [state === null ? [] : [{ ...state }], []];
+        return [accountRead(params[1]), []];
       }
 
       // Lecture par jeton de défi : la clause `NOT EXISTS` écarte un défi
@@ -598,5 +602,23 @@ describe("consumeDiscordLoginChallenge — usage du code (EF-14)", () => {
       (db.connection.execute.mock.calls.find(([q]) => String(q).trim().startsWith("INSERT")) as unknown as [string, unknown[]])[1];
     expect(insertParams(handle)[4]).toBe("HANDLE");
     expect(insertParams(login)[4]).toBe("LOGIN");
+  });
+
+  it("verifyDiscordChallenge_accountRead_scopedToLoginPurpose", async () => {
+    // Un code de certification plus récent ne masque pas le code de connexion du même compte.
+    const { execute } = fakeDb(pendingChallenge());
+
+    await expect(verifyDiscordChallenge("123", "424242")).resolves.toBe(true);
+
+    const call = execute.mock.calls.find(([q]) => String(q).replace(/\s+/g, " ").trim().startsWith("SELECT id, discord_id, code_hash"));
+    expect(String(call?.[0]).replace(/\s+/g, " ")).toContain("WHERE discord_id = ? AND purpose = ?");
+    expect(call?.[1]).toEqual(["123", "LOGIN"]);
+  });
+
+  it("verifyDiscordChallenge_onlyHandleCodePending_rejectedWithoutAttempt", async () => {
+    const { state } = fakeDb(pendingChallenge({ purpose: "HANDLE" }));
+
+    await expect(verifyDiscordChallenge("123", "424242")).resolves.toBe(false);
+    expect(state!.attempts).toBe(0);
   });
 });
