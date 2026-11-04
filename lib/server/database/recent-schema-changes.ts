@@ -143,6 +143,12 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // `NULL` pour les défis d'avant (dix minutes de vie) : refusés partout, le
     // joueur redemande un code. Les bases neuves la créent `NOT NULL`.
     `ALTER TABLE bg_discord_login_challenges ADD COLUMN purpose ENUM('LOGIN', 'HANDLE') NULL AFTER handle`,
+    // Puis `NOT NULL`, comme sur une base neuve : une insertion qui oublierait
+    // l'usage échoue partout, au lieu d'émettre en production un code refusé
+    // de tous. Les défis d'avant, refusés de toute façon, partent d'abord.
+    // Rejouées, les deux ne changent rien.
+    `DELETE FROM bg_discord_login_challenges WHERE purpose IS NULL`,
+    `ALTER TABLE bg_discord_login_challenges MODIFY purpose ENUM('LOGIN', 'HANDLE') NOT NULL`,
     // Cible d'un signalement réellement prévenue : le délai de reprévenance et
     // le plafond de l'auteur ne comptent plus que les messages partis. `NULL`
     // pour les lignes d'avant, **sans remplissage** — on ne sait pas lesquelles

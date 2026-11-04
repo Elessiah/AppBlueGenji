@@ -87,7 +87,7 @@ export async function POST(req: Request) {
     } catch (error) {
       // **Un envoi raté n'a produit aucun code**, et la base doit le dire.
       //
-      // `consumeDiscordLoginChallenge` ne lit que le **dernier émis** : laissée là, la
+      // `consumeDiscordLoginChallenge` ne lit que le **dernier émis** du même usage : laissée là, la
       // ligne mort-née ferait refuser le code que le joueur tient de la demande
       // précédente — refusé comme invalide, et chaque essai brûlant le quota de
       // la mauvaise ligne. Le supprimer rend au code déjà reçu sa place de

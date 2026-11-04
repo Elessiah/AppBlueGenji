@@ -182,8 +182,9 @@ const DISCORD_CODE_LOCK_TIMEOUT_SECONDS = 1;
  * Émet un code de connexion.
  *
  * **Ne périme pas les codes précédents**, et n'a pas à le faire :
- * {@link verifyDiscordChallenge} ne lit que le **dernier émis**, si bien qu'un
- * code neuf rend le précédent inatteignable par sa seule existence. Rien à
+ * {@link verifyDiscordChallenge} ne lit que le **dernier émis du même usage**
+ * (`purpose`), si bien qu'un code neuf rend le précédent de cet usage
+ * inatteignable par sa seule existence — un code de l'autre usage reste valable. Rien à
  * écrire, donc rien qui puisse échouer à mi-chemin. Le corollaire est tenu à
  * l'autre bout : un envoi raté **supprime** sa ligne
  * ({@link discardDiscordChallenge}), faute de quoi la mort-née resterait la
@@ -305,8 +306,8 @@ export async function createDiscordLoginChallenge(
  * Efface un code dont l'envoi a échoué.
  *
  * **Un code qui n'est pas parti ne doit pas survivre à son échec.**
- * `verifyDiscordChallenge` ne lit que le plus récent : la ligne mort-née
- * masquerait celui que le joueur a réellement reçu, qui serait alors refusé
+ * `verifyDiscordChallenge` ne lit que le plus récent du même usage : la ligne
+ * mort-née masquerait celui que le joueur a réellement reçu, qui serait alors refusé
  * comme invalide — et chaque essai brûlerait le quota de la mauvaise ligne
  * jusqu'à ce qu'elle se consume.
  *
@@ -339,10 +340,10 @@ export async function consumeDiscordChallenge(
   const [rows] = await db.execute<ChallengeRow[]>(
     `SELECT id, discord_id, code_hash, handle, purpose, expires_at, consumed_at, attempts
      FROM bg_discord_login_challenges
-     WHERE discord_id = ?
+     WHERE discord_id = ? AND purpose = ?
      ORDER BY id DESC
      LIMIT 1`,
-    [discordId],
+    [discordId, PURPOSE_COLUMN[purpose]],
   );
 
   if (rows.length === 0) return null;
