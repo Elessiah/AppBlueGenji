@@ -346,11 +346,11 @@ export function sendBotLog(message: string, scope: BotLogScope = {}): void {
   const category = scope.category ?? DEFAULT_BOT_LOG_CATEGORY;
   const key = botLogBatchKey(BOT_LOG_CHANNEL, scope.tournamentId, category);
   botLogBatcher.add(key, message, category);
-  // Sans tournoi, aucune ligne en attente n'explique l'alerte : le lot commun du
-  // salon (inscriptions, modération) ne part pas pour elle.
-  if (botLogKind(category) === "alert" && botLogTournamentId(scope.tournamentId) !== null) {
-    void flushBotLogBatch({ tournamentId: scope.tournamentId });
-  }
+  if (botLogKind(category) !== "alert") return;
+  // Avec un tournoi, ses lignes en attente partent avec l'alerte, qui les
+  // explique. Sans tournoi rien ne l'explique : seul son propre lot part, pas le
+  // lot commun du salon (inscriptions, modération).
+  void flushBotLogBatch(botLogTournamentId(scope.tournamentId) === null ? { category } : { tournamentId: scope.tournamentId });
 }
 
 /**
