@@ -197,7 +197,10 @@ export async function applyCastSettings(
   }
   // Un lien retiré peut laisser un stream que plus personne ne tient : le même
   // ménage que la configuration du staff et que le retrait d'un caster.
-  if (streams !== undefined) await pruneMatchStreams(connection, matchId, { streams });
+  // Les casters sont ceux de la ligne verrouillée (aucun n'est ajouté ni retiré ici
+  // : l'inscription ne passe jamais de lien) : les relire sous `FOR UPDATE`
+  // verrouillerait l'intervalle de `bg_match_casters` des matchs voisins.
+  if (streams !== undefined) await pruneMatchStreams(connection, matchId, { streams, casters: row.casters });
 }
 
 /** Ce qu'un caster lit de **son** cast pour le régler (`CastSettingsDialog`). */
