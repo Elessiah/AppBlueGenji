@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { InfoHint } from "@/components/ui/info-hint";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -45,8 +45,11 @@ function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id
   // `sent` : l'envoi est fini (`false` tant qu'il est en vol).
   const [optimistic, setOptimistic] = useState<{ map: string; sent: boolean } | null>(null);
   const stored = slot.map ?? "";
-  // L'instantané fait foi dès que la carte enregistrée change : la valeur locale s'efface.
-  useEffect(() => setOptimistic(null), [stored]);
+  const storedRef = useRef(stored);
+  storedRef.current = stored;
+  // L'instantané fait foi dès que la carte enregistrée change : la valeur locale s'efface — une fois
+  // l'envoi fini seulement (en vol, elle reste, sinon la liste sauterait d'une carte à l'autre).
+  useEffect(() => setOptimistic((current) => (current?.sent ? null : current)), [stored]);
   // Envoi fini mais carte enregistrée inchangée : relecture à mi-parcours, puis relâche.
   const settled = optimistic !== null && optimistic.sent;
   useEffect(() => {
@@ -64,6 +67,7 @@ function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id
     if (busy || map === shown) return;
     setBusy(true);
     setOptimistic({ map, sent: false });
+    const storedBefore = storedRef.current;
     try {
       const response = await fetch(`/api/matches/${match.id}/map-pick`, {
         method: "PUT",
@@ -73,7 +77,8 @@ function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "UNKNOWN");
       showSuccess(t(map === "" ? "page.pickCleared" : "page.picked"));
-      setOptimistic({ map, sent: true });
+      // La carte enregistrée a déjà changé pendant l'envoi : l'instantané fait foi, rien à garder.
+      setOptimistic(storedRef.current === storedBefore ? { map, sent: true } : null);
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
     } catch (error) {
       setOptimistic(null);

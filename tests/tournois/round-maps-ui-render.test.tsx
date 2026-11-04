@@ -178,7 +178,9 @@ describe("câblage de la fenêtre des cartes", () => {
     const source = readSource("app/(secured)/tournois/[id]/_components/MatchRoundMaps.tsx");
 
     expect(source).not.toContain("snapshotVersion");
-    expect(source).toContain("useEffect(() => setOptimistic(null), [stored])");
+    // En vol, un instantané ne retire pas la valeur locale ; un changement arrivé pendant l'envoi non plus ne la rétablit pas.
+    expect(source).toContain("current?.sent ? null : current");
+    expect(source).toContain("storedRef.current === storedBefore");
     expect(source).toContain("setTimeout(() => window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT)), OPTIMISTIC_REFETCH_MS)");
   });
 
@@ -193,8 +195,12 @@ describe("câblage de la fenêtre des cartes", () => {
   it("dialog_copyAndApplyAll_refuseARoundThatPlaysFewerMaps", () => {
     const source = dialog();
 
-    expect(source).toContain("gapRefused() || targetOverMaxRefused(rounds)");
-    expect(source).toContain("gapRefused() || targetOverMaxRefused([target])");
+    expect(source).toContain('gapRefused() || targetOverMaxRefused(rounds, "applyAll")');
+    expect(source).toContain('gapRefused() || targetOverMaxRefused([target], "copy")');
+    // Le refus est rattaché au champ désigné (cible de la copie, bouton « Appliquer à tous »).
+    expect(source).toContain("fieldErrors.flag(field, text)");
+    expect(source).toContain('{...fieldErrors.aria("copy")}');
+    expect(source).toContain('fieldId={`${ids}-apply-all`}');
     expect(frRoundMaps.dialog.overMaxTarget).toContain("{round}");
     expect(enRoundMaps.dialog.overMaxTarget).toContain("{max}");
   });
@@ -222,7 +228,8 @@ describe("câblage de la fenêtre des cartes", () => {
     expect(source).not.toContain('<p className={styles.muted}>{t("dialog.staleTiebreakHint")}</p>');
     expect(source).toContain("{t(\"dialog.staleTiebreakHint\")}\n        </InfoHint>");
     expect(source).toContain("fallbackFocusId={`${ids}-close`}");
-    expect(source).toContain("focusAfter.current = index;");
+    expect(source).toContain("focusAfter.current = { key: roundKeyId(item), index };");
+    expect(source).toContain("items.some((item) => roundKeyId(item) === pending.key)");
   });
 
   it("dialog_tiebreakEnterOnAnUntouchedField_staysSilent", () => {
@@ -233,4 +240,10 @@ describe("câblage de la fenêtre des cartes", () => {
     expect(frDialogs.score.maps.tiebreakRow).toContain("{name}");
     expect(enDialogs.score.maps.tiebreakRow).toContain("{name}");
   });
+
+  it("switchConfirmBody_mentionsTheTiebreakMapInBothLanguages", () => {
+    expect(frRoundMaps.dialog.switchConfirm.body).toContain("map de départage");
+    expect(enRoundMaps.dialog.switchConfirm.body).toContain("tiebreak map");
+  });
 });
+

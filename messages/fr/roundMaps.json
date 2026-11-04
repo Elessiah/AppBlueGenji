@@ -107,7 +107,7 @@
     },
     "switchConfirm": {
       "title": "Abandonner les cartes non enregistrées ?",
-      "body": "Les cartes saisies pour {round} et pas encore enregistrées seront perdues.",
+      "body": "Les cartes ou la map de départage saisies pour {round} et pas encore enregistrées seront perdues.",
       "confirm": "Abandonner"
     },
     "pending": "Envoi…",

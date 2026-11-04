@@ -94,8 +94,14 @@ function useRoundLabel(detail: TournamentDetail, t: RoundMapsText["t"]) {
   };
 }
 
+/**
+ * Champs du tour qui portent un refus : la liste des cartes (refus du serveur ou
+ * contrôle avant l'envoi), la cible d'une copie et le bouton « Appliquer à tous ».
+ */
+type RoundField = "slots" | "copy" | "applyAll";
+
 /** Refus du serveur rattachés à la liste des cartes du tour (`useFieldErrors`). */
-const SLOT_FIELD_ERRORS = { INVALID_ROUND_MAPS: "slots" } as const satisfies Record<string, "slots">;
+const SLOT_FIELD_ERRORS = { INVALID_ROUND_MAPS: "slots" } as const satisfies Record<string, RoundField>;
 
 /** Témoin d'un formulaire modifié et pas encore enregistré, annoncé au lecteur d'écran. */
 function UnsavedNote({ dirty, text }: Readonly<{ dirty: boolean; text: string }>) {
@@ -498,12 +504,14 @@ function StaleTiebreaks({
   const ids = useId();
   // Un retrait réussi démonte la ligne et son bouton : le focus passe à la ligne
   // voisine, ou à `fallbackFocusId` quand la rubrique disparaît (jamais au <body>).
-  const focusAfter = useRef<number | null>(null);
+  // Le retrait n'apparaît dans la liste qu'à la relecture suivante : le focus attend que la ligne ait
+  // vraiment disparu (un instantané intermédiaire, même liste, ne le consomme pas).
+  const focusAfter = useRef<{ key: string; index: number } | null>(null);
   useEffect(() => {
-    const removed = focusAfter.current;
-    if (removed === null) return;
+    const pending = focusAfter.current;
+    if (pending === null || items.some((item) => roundKeyId(item) === pending.key)) return;
     focusAfter.current = null;
-    const next = focusIndexAfterRemoval(removed, items.length);
+    const next = focusIndexAfterRemoval(pending.index, items.length);
     document.getElementById(next === null ? fallbackFocusId : `${ids}-${next}`)?.focus();
   }, [items, ids, fallbackFocusId]);
   if (items.length === 0) return null;
@@ -539,7 +547,7 @@ function StaleTiebreaks({
                       map: null,
                     });
                     onWritten(item);
-                    focusAfter.current = index;
+                    focusAfter.current = { key: roundKeyId(item), index };
                     showSuccess(t("dialog.tiebreakRemoved"));
                   });
                 }}
@@ -620,11 +628,13 @@ export function RoundMapsDialog({
   const [errorSlot, setErrorSlot] = useState<number | null>(null);
   const slotToggleId = (number: number) => `${ids}-slot-${number}`;
   const slotsListId = `${ids}-slots`;
-  const fieldErrors = useFieldErrors(SLOT_FIELD_ERRORS, {
+  const fieldErrors = useFieldErrors<RoundField>(SLOT_FIELD_ERRORS, {
     slots: errorSlot === null ? slotsListId : slotToggleId(errorSlot),
+    copy: `${ids}-copy`,
+    applyAll: `${ids}-apply-all`,
   });
   const clearSlotError = fieldErrors.clear;
-  useEffect(() => clearSlotError(), [slots, clearSlotError]);
+  useEffect(() => clearSlotError(), [slots, copyTarget, clearSlotError]);
 
   // L'instantané change sous la fenêtre (autre membre du staff, ou son propre
   // envoi) : règles et cartes suivent le serveur tant qu'elles n'ont pas été
@@ -787,19 +797,25 @@ export function RoundMapsDialog({
     void sendRounds([round], toSave, toSave.length === 0 ? clearedText : t("dialog.roundSaved"));
   };
 
-  /** Un tour cible joue moins de cartes que la sélection : refusé avant l'envoi, en nommant ce tour. */
-  const targetOverMaxRefused = (targets: readonly RoundKey[]) => {
-    const target = firstTargetOverMax(targets, toSave.length, (key) => {
+  /**
+   * Un tour cible joue moins de cartes que la sélection : refusé avant l'envoi, en nommant ce tour
+   * et son plafond effectif, et rattaché au champ qui l'a désigné (`field`).
+   */
+  const targetOverMaxRefused = (targets: readonly RoundKey[], field: "copy" | "applyAll") => {
+    const limitOf = (key: RoundKey) => {
       const max = roundMaxMaps(detail.card, key.roundNumber);
       return max === null ? null : Math.max(max, roundMapsOf(rules.rounds, key)?.slots.length ?? 0);
-    });
+    };
+    const target = firstTargetOverMax(targets, toSave.length, limitOf);
     if (target === null) return false;
-    showError(t("dialog.overMaxTarget", { round: roundLabel(target), max: roundMaxMaps(detail.card, target.roundNumber) ?? 0 }));
+    const text = t("dialog.overMaxTarget", { round: roundLabel(target), max: limitOf(target) ?? 0 });
+    showError(text);
+    fieldErrors.flag(field, text);
     return true;
   };
 
   const applyAll = () => {
-    if (busy || toSave.length === 0 || gapRefused() || targetOverMaxRefused(rounds)) return;
+    if (busy || toSave.length === 0 || gapRefused() || targetOverMaxRefused(rounds, "applyAll")) return;
     const others = rounds.filter((key) => roundKeyId(key) !== roundId);
     const overwritten = overwrittenRounds(rules.rounds, others, toSave).length;
     if (overwritten > 0) setPending({ kind: "applyAll", overwritten });
@@ -808,7 +824,7 @@ export function RoundMapsDialog({
 
   const copy = () => {
     const target = findRound(rounds, copyTarget);
-    if (busy || !target || toSave.length === 0 || gapRefused() || targetOverMaxRefused([target])) return;
+    if (busy || !target || toSave.length === 0 || gapRefused() || targetOverMaxRefused([target], "copy")) return;
     if (overwrittenRounds(rules.rounds, [target], toSave).length > 0) setPending({ kind: "copy", target });
     else void sendRounds([target], toSave, t("dialog.copied", { round: roundLabel(target) }));
   };
@@ -1034,7 +1050,12 @@ export function RoundMapsDialog({
                 <div className={styles.copyRow}>
                   <div className={`field ${styles.grow}`}>
                     <label htmlFor={`${ids}-copy`}>{t("dialog.copyLabel")}</label>
-                    <select id={`${ids}-copy`} value={copyTarget} onChange={(event) => setCopyTarget(event.target.value)}>
+                    <select
+                      id={`${ids}-copy`}
+                      value={copyTarget}
+                      {...fieldErrors.aria("copy")}
+                      onChange={(event) => setCopyTarget(event.target.value)}
+                    >
                       <option value="">—</option>
                       {rounds
                         .filter((item) => roundKeyId(item) !== roundId)
@@ -1044,6 +1065,7 @@ export function RoundMapsDialog({
                           </option>
                         ))}
                     </select>
+                    <FieldErrorText fieldId={`${ids}-copy`} message={fieldErrors.message("copy")} />
                   </div>
                   <button
                     type="button"
@@ -1056,6 +1078,8 @@ export function RoundMapsDialog({
                   <button
                     type="button"
                     className="btn ghost"
+                    id={`${ids}-apply-all`}
+                    {...fieldErrors.aria("applyAll")}
                     aria-disabled={busy || toSave.length === 0 || undefined}
                     onClick={applyAll}
                   >
@@ -1063,6 +1087,7 @@ export function RoundMapsDialog({
                   </button>
                 </div>
               )}
+              <FieldErrorText fieldId={`${ids}-apply-all`} message={fieldErrors.message("applyAll")} />
             </fieldset>
           </form>
         )}

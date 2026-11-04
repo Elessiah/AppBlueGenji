@@ -107,7 +107,7 @@
     },
     "switchConfirm": {
       "title": "Discard unsaved maps?",
-      "body": "The maps entered for {round} and not yet saved will be lost.",
+      "body": "The maps or tiebreak map entered for {round} and not yet saved will be lost.",
       "confirm": "Discard"
     },
     "pending": "Sending…",

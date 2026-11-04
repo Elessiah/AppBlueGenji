@@ -294,12 +294,13 @@ score, câblage), `tests/lib/shared/round-maps-tiebreak-plan.test.ts`,
   (`roundClearedTiebreakKept`) quand elle reste.
 - Choix de carte optimiste (`MapPickSelect`) : relâché quand la carte enregistrée
   change (un instantané sur un autre match ne la touche pas) ; sans changement,
-  relecture REST 6 s après la fin de l'envoi, relâche à 30 s.
+  relecture REST 6 s après la fin de l'envoi, relâche à 30 s. En vol, un instantané ne
+  retire pas la valeur locale.
 - Fermer ou changer de tour avec une map de départage saisie et non enregistrée
   demande aussi confirmation (le formulaire remonte son état, `onDirtyChange`).
 - « Copier » et « Appliquer à tous » refusent un tour cible qui joue moins de cartes
   que la sélection (`firstTargetOverMax`, plafond effectif du tour cible, message
-  `overMaxTarget`) ; l'avertissement rouge et le refus partagent le même seuil.
+  `overMaxTarget`, rattaché à la cible de la copie ou au bouton) ; l'avertissement rouge et le refus partagent le même seuil.
 - « Enregistrer les règles » est inactif et sans effet quand rien n'a changé.
 - Les boutons qui se vident eux-mêmes (« Réinitialiser le tour », « Retirer la map de
   départage », la rangée de copie) restent montés en `aria-disabled` ; le retrait d'une
