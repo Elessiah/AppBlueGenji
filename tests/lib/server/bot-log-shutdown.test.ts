@@ -194,6 +194,17 @@ describe("installBotLogShutdownFlush", () => {
     expect(exit).not.toHaveBeenCalled();
   });
 
+  it("installBotLogShutdownFlush_signalAfterCompletedFlush_flushesAgain", async () => {
+    jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    jest.spyOn(process, "listenerCount").mockReturnValue(1);
+    installBotLogShutdownFlush();
+    handlers.get("SIGINT")?.();
+    await new Promise((resolve) => setImmediate(resolve));
+    handlers.get("SIGTERM")?.();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(flushAllBotLogBatches).toHaveBeenCalledTimes(2);
+  });
+
   it("installBotLogShutdownFlush_twoSignals_oneFlushShared", async () => {
     jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
     jest.spyOn(process, "listenerCount").mockReturnValue(1);

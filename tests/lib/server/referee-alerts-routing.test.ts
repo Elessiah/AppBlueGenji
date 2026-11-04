@@ -1112,4 +1112,21 @@ describe("tour du journal et vidage avant alerte", () => {
       timers.mockRestore();
     }
   });
+  it("flushBotLogs_previousTurnHangs_linesDeliveredAtTheBoundFromTheCommit", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick", "queueMicrotask"] });
+    try {
+      order.__bgBotLogOrder = new Promise<void>(() => undefined);
+      mockDb([[TOURNAMENT_ROW]]);
+      const connection = fakeConnection();
+      queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
+      flushBotLogs(connection);
+      await flushed();
+      expect(sendBotLog).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(BOT_LOG_ORDER_WAIT_MS);
+      await flushed();
+      expect(sendBotLog).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

@@ -131,6 +131,24 @@ describe("kind et catégories", () => {
     expect(() => sendBotLog("ligne", hostile)).not.toThrow();
   });
 
+  it("sendBotLog_burstOfAlertsSameTournament_oneMessage", async () => {
+    jest.useFakeTimers();
+    sendBotLog("un", { tournamentId: 3, category: "staff-removal" });
+    sendBotLog("deux", { tournamentId: 3, category: "staff-removal" });
+    sendBotLog("trois", { tournamentId: 3, category: "staff-removal" });
+    await settle();
+    expect(postedMessages()).toHaveLength(1);
+    expect(postedMessages()[0]).toContain("un"+String.fromCharCode(10)+"deux"+String.fromCharCode(10)+"trois");
+  });
+
+  it("sendBotLog_alertsOfTwoTournaments_oneMessageEach", async () => {
+    jest.useFakeTimers();
+    sendBotLog("A", { tournamentId: 3, category: "staff-removal" });
+    sendBotLog("B", { tournamentId: 4, category: "staff-removal" });
+    await settle();
+    expect(postedMessages()).toHaveLength(2);
+  });
+
   it("sendBotLog_logCategory_waitsForTheWindow", async () => {
     jest.useFakeTimers();
     sendBotLog("cartes", { tournamentId: 3, category: "maps" });
