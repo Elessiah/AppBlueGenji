@@ -62,7 +62,9 @@ changement de tag) fait rédiger au bot un texte qui dit que le code rattache un
 tag et ne connecte pas ; `"login"` par défaut (un bot plus ancien l'ignore).
 L'usage est aussi gardé sur le défi (`bg_discord_login_challenges.purpose`,
 `LOGIN` / `HANDLE`) : un code de certification est refusé à la connexion, et
-l'inverse, sans consommer d'essai (`NULL` : défi d'avant la colonne, accepté).
+l'inverse, sans consommer d'essai (`NULL` : défi d'avant la colonne, refusé —
+le joueur redemande un code). « Seul le dernier code vaut » se lit par usage :
+une demande de connexion n'annule pas le code de certification en attente.
 
 ## Ce que vaut une `locale` absente
 
