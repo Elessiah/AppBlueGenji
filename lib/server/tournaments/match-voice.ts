@@ -193,7 +193,8 @@ export const DUE_CHANNELS_SQL = `SELECT m.id, m.tournament_id, m.team1_id, m.tea
    AND t1.solo_user_id IS NULL AND t2.solo_user_id IS NULL
    AND COALESCE(t1.is_ghost, 0) = 0 AND COALESCE(t2.is_ghost, 0) = 0
    AND (${needsChannel("team1_id")} OR ${needsChannel("team2_id")})
- ORDER BY m.start_at, m.id
+ ORDER BY EXISTS (SELECT 1 FROM bg_match_voice_channels f
+                  WHERE f.match_id = m.id AND f.released_at IS NULL AND f.failed_at IS NOT NULL), m.start_at, m.id
  LIMIT ${VOICE_SWEEP_BATCH}`;
 
 /**
@@ -284,14 +285,15 @@ async function writeFailure(matchId: number, teamId: number): Promise<void> {
 /**
  * Crée le salon d'une équipe (le bot rend le même pour la même clé). Un nom
  * que le bot refuse est remplacé par `VOICE_FALLBACK_CHANNEL_NAME`, une fois.
- * Rend `true` quand ce que la page montre a changé.
+ * Rend si ce que la page montre a changé (`changed`) et si le canal vers le bot
+ * est en panne (`down` : le reste de la passe s'arrête, la suivante reprend).
  */
 async function createTeamChannel(
   matchId: number,
   teamId: number,
   teamName: string,
   existing: VoiceRow | undefined,
-): Promise<boolean> {
+): Promise<{ changed: boolean; down: boolean }> {
   const key = voiceChannelKey(matchId, teamId);
   let created = await ensureVoiceChannel(key, teamName);
   if (created.kind !== "ok" && created.code === "INVALID_VOICE_CHANNEL_NAME") {
@@ -301,13 +303,13 @@ async function createTeamChannel(
     await writeChannel(matchId, teamId, created.value);
     // Le bot vient de répondre : pas de seconde demande identique dans la même passe.
     sweep.checkedAt.set(key, Date.now());
-    return true;
+    return { changed: true, down: false };
   }
   const shownFailed = existing?.released_at === null && existing.failed_at !== null;
   // Une seule ligne pm2 par panne : pas de répétition à chaque nouvel essai.
   if (!shownFailed) logFailure(matchId, created.code);
   await writeFailure(matchId, teamId);
-  return !shownFailed;
+  return { changed: !shownFailed, down: BOT_TRANSPORT_FAILURES.has(created.code) };
 }
 
 /** Codes d'une panne du canal vers le bot : tout le reste est un refus propre à un salon. */
@@ -359,15 +361,20 @@ async function purgeReleasedRows(): Promise<void> {
   // Horodatée après le `DELETE` seulement : une purge en échec se rejoue à la passe suivante.
   const db = await getDatabase();
   // Un arriéré (plus de lignes échues que d'un lot) se résorbe dans la passe : la durée de garde annoncée tient.
+  let caughtUp = false;
   for (let batch = 0; batch < VOICE_PURGE_MAX_BATCHES; batch++) {
     const [result] = await db.execute<ResultSetHeader>(
       `DELETE FROM bg_match_voice_channels
        WHERE released_at IS NOT NULL AND released_at < NOW() - INTERVAL ${VOICE_ROW_RETENTION_DAYS} DAY
        LIMIT ${VOICE_PURGE_BATCH}`,
     );
-    if (Number(result.affectedRows) < VOICE_PURGE_BATCH) break;
+    if (Number(result.affectedRows) < VOICE_PURGE_BATCH) {
+      caughtUp = true;
+      break;
+    }
   }
-  sweep.purgedAt = Date.now();
+  // Arriéré restant : la passe suivante continue, sans attendre l'heure.
+  if (caughtUp) sweep.purgedAt = Date.now();
 }
 
 /** Salons ouverts lus par passe : plus large que le lot revérifié, pour que la rotation les atteigne tous. */
@@ -468,7 +475,10 @@ async function createDueChannels(touched: Set<number>): Promise<void> {
       const before = rowFor(rows, matchId, teamId);
       // Salon déjà ouvert : rien à demander au bot.
       if (before?.released_at === null && before.channel_id !== null) continue;
-      if (await createTeamChannel(matchId, teamId, teamName, before)) touched.add(Number(match.tournament_id));
+      const { changed, down } = await createTeamChannel(matchId, teamId, teamName, before);
+      if (changed) touched.add(Number(match.tournament_id));
+      // Bot injoignable : inutile d'attendre le délai de chaque salon suivant, la prochaine passe reprend.
+      if (down) return;
     }
   }
 }
@@ -485,12 +495,16 @@ async function runSweep(): Promise<Set<number>> {
   }
   const due = Number(needed[0]?.due ?? 0) === 1;
   const open = Number(needed[0]?.open_rows ?? 0) === 1;
-  if (due) {
-    await createDueChannels(touched);
-    await recheckOpenChannels(touched);
+  try {
+    if (due) {
+      await createDueChannels(touched);
+      await recheckOpenChannels(touched);
+    }
+    if (due || open) await releaseChannels(touched);
+  } finally {
+    // La minimisation ne dépend ni du bot ni d'une étape en échec.
+    await purgeReleasedRows().catch((error: unknown) => console.error("[match-voice] purge en échec", error));
   }
-  if (due || open) await releaseChannels(touched);
-  await purgeReleasedRows();
   return touched;
 }
 
