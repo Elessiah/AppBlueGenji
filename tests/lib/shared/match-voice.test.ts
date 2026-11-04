@@ -207,8 +207,8 @@ describe("textes des salons vocaux (FR + EN)", () => {
   it("messages_voiceStateTexts_frenchAndEnglish", () => {
     expect(frMatchPage.voice.open).toBe("Salon vocal : ouvert");
     expect(enMatchPage.voice.open).toBe("Voice channel: open");
-    expect(frMatchPage.voice.failed).toBe("Salon vocal : indisponible");
-    expect(enMatchPage.voice.failed).toBe("Voice channel: unavailable");
+    expect(frMatchPage.voice.failed).toBe("Salon vocal : indisponible, nouvelle tentative en cours");
+    expect(enMatchPage.voice.failed).toBe("Voice channel: unavailable, trying again");
   });
 
   it("messages_finishedVoiceError_frenchAndEnglish", () => {

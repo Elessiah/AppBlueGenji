@@ -962,8 +962,8 @@ describe("page d'un match — salons vocaux d'équipe", () => {
     // Décision de l'utilisateur du 2026-11-04 : jamais le nombre de présents.
     expect(visible(html)).not.toMatch(/\d\/5/);
     // L'état change sans que la personne touche à rien : annoncé.
-    expect(html.match(/<div aria-live="polite">/g)).toHaveLength(1);
-    expect(html).toMatch(/<div aria-live="polite"><ul[\s\S]*<\/ul><\/div>/);
+    expect(html.match(/<div aria-live="polite" aria-atomic="false">/g)).toHaveLength(1);
+    expect(html).toMatch(/<div aria-live="polite" aria-atomic="false"><ul[\s\S]*<\/ul><\/div>/);
   });
 
   it("render_voiceOpen_neverSaysTheMatchWaits", () => {
@@ -980,13 +980,13 @@ describe("page d'un match — salons vocaux d'équipe", () => {
 
   it("render_voiceFailed_saysUnavailableWithoutGateNote", () => {
     const html = visible(render(match({ voice: { ...opened, team1State: "FAILED" } }), "staff"));
-    expect(html).toContain("Salon vocal : indisponible");
+    expect(html).toContain("Salon vocal : indisponible, nouvelle tentative en cours");
     expect(html).not.toContain("Un salon est indisponible");
   });
 
   it("render_voiceFailedEnglish_saysUnavailable", () => {
     const html = visible(render(match({ voice: { ...opened, team2State: "FAILED" } }), "staff", false, "en"));
-    expect(html).toContain("Voice channel: unavailable");
+    expect(html).toContain("Voice channel: unavailable, trying again");
     expect(html).toContain("Voice channel: open");
   });
 
