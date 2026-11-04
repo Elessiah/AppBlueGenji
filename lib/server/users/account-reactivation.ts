@@ -166,6 +166,10 @@ export async function reactivateAccount(
     // Le vrai pseudo et l'avatar reviennent avec le compte (anonyme depuis la
     // demande, `account-deletion-hold.ts`).
     const restored = await restoreAccountIdentity(connection, userId);
+    // Une session ouverte pendant la demande (connexion en cours au moment du
+    // `DELETE` de la demande) redeviendrait valide avec le compte : toutes
+    // partent, seule celle de la réactivation sera créée ensuite.
+    if (restored) await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
     await connection.commit();
     if (!restored) return null;
     // Après le commit : la demande en attente ne doit plus être rejouée par une

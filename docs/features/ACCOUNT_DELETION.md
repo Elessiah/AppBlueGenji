@@ -679,6 +679,14 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   repris par `settleDeletedSoloEntries`, relancé chaque heure avant les
   suppressions définitives (et au rattrapage de démarrage).
 - Casts et arbitrages à venir retirés, invitations du compte annulées.
+- Après le commit, chaque tournoi de l'entrée solo est rediffusé (son nom
+  d'engagé vient de passer au pseudo d'emprunt) ; la réactivation rediffuse les
+  mêmes au retour du vrai pseudo, et efface dans sa transaction toutes les
+  sessions du compte (une connexion en cours au moment de la demande aurait
+  laissé une session qui revivrait avec lui). Une équipe propriétaire seule
+  devient fantôme ou dissoute selon ses inscriptions lues **verrouillantes**
+  (`LOCK IN SHARE MODE`, table seule) : une inscription validée pendant
+  l'attente du verrou de l'équipe est vue.
 
 **E5 / alerte.** Le journal Discord écrit « 🗑️ Compte supprimé » (catégorie
 `signups`, sans pseudo ni id) puis **une seule** ligne par tournoi retiré ou

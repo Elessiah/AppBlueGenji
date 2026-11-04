@@ -190,6 +190,30 @@ describe("reactivateAccount", () => {
     expect(await reactivateAccount(TOKEN)).toEqual({ userId: 7, event: "LOGIN_DISCORD" });
   });
 
+  it("reactivateAccount_valid_revokesSessionsBeforeCommit", async () => {
+    const connection = transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+    });
+
+    await reactivateAccount(TOKEN);
+
+    const revoke = connection.execute.mock.calls.find(([sql]) => sql === "DELETE FROM bg_user_sessions WHERE user_id = ?");
+    expect(revoke?.[1]).toEqual([7]);
+    expect(connection.execute.mock.invocationCallOrder.at(-1)).toBeLessThan(connection.commit.mock.invocationCallOrder[0]);
+  });
+
+  it("reactivateAccount_restoreRefused_keepsSessionsUntouched", async () => {
+    const connection = transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+    });
+    jest.mocked(restoreAccountIdentity).mockResolvedValue(false);
+
+    expect(await reactivateAccount(TOKEN)).toBeNull();
+    expect(connection.execute.mock.calls.some(([sql]) => sql.startsWith("DELETE FROM bg_user_sessions"))).toBe(false);
+  });
+
   it("reactivateAccount_ticketConsumedConcurrently_nullWithoutRestore", async () => {
     const connection = transaction({
       ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
