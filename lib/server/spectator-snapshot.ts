@@ -265,12 +265,14 @@ export async function getSpectatorPayload(
  *
  * @param admit Appelé **seulement** quand la réponse n'est ni fraîche en cache
  *   ni en vol (comme {@link publicTournamentCard}) ; `false` : refusée.
+ *   **Obligatoire** : un appelant ne contourne pas le plafond des lectures
+ *   publiques par oubli (`spectator-request.ts` le pose).
  */
 export async function publicTournamentSnapshot(
   tournamentId: number,
   level: SpectatorLoadLevel,
   client: string | null,
-  admit: () => boolean = () => true,
+  admit: () => boolean,
 ): Promise<PublicTournamentView | null> {
   // Une réponse déjà servie à d'autres ne coûte pas de jeton du plafond des
   // lectures publiques : seuls les rendus qui la (re)construisent le paient.
@@ -306,10 +308,11 @@ export const SPECTATOR_CARD_TTL_MS = 10_000;
  * l'encart général.
  *
  * @param admit Appelé **seulement** avant une lecture en base ; `false` : refusée.
+ *   **Obligatoire**, comme pour {@link publicTournamentSnapshot}.
  */
 export async function publicTournamentCard(
   tournamentId: number,
-  admit: () => boolean = () => true,
+  admit: () => boolean,
 ): Promise<TournamentCard | null> {
   const copy = staleSpectatorPayload(tournamentId);
   if (copy) return { ...copy.snapshot.card, state: computeTournamentState(copy.snapshot.card) };

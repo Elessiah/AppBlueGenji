@@ -119,8 +119,10 @@ export async function setTournamentImage(
     throw error;
   }
 
-  if (previousUrl !== url) await discardFile(previousUrl);
+  // Éviction d'abord : l'effacement du fichier (carte SD) peut traîner, la copie
+  // publique ne désigne plus l'ancienne bannière pendant ce temps.
   publishImageChange(tournamentId);
+  if (previousUrl !== url) await discardFile(previousUrl);
   return { url, ...settings, replaced: previousUrl !== null };
 }
 
@@ -170,6 +172,6 @@ export async function removeTournamentImage(tournamentId: number): Promise<void>
   });
 
   if (previousUrl === null) return;
-  await discardFile(previousUrl);
   publishImageChange(tournamentId);
+  await discardFile(previousUrl);
 }

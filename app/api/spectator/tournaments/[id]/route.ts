@@ -185,7 +185,9 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   // ci-dessous) revalide avec l'`ETag` brut : même contenu, 304 sous cet `ETag`
   // plutôt qu'un corps complet à chaque sondage, au moment même où la mémoire manque.
   const rawEtag = etagOf(payload, false);
-  if (gzipped && matchesEtag(req.headers.get("if-none-match"), rawEtag)) {
+  // Sous refus du plafond, jamais le joker `*` — ici non plus, quel que soit
+  // l'ordre des contrôles en amont (`refusedRead`).
+  if (gzipped && matchesEtag(req.headers.get("if-none-match"), rawEtag, !rateRefused)) {
     return new Response(null, { status: 304, headers: { ...headers, ETag: rawEtag } });
   }
   const jsonHeaders = { ...headers, "Content-Type": "application/json; charset=utf-8" };
