@@ -33,15 +33,27 @@ type Row = Record<string, unknown>;
  * Base simulée **sur le pool** (le balayage ne prend jamais de connexion) :
  * lignes rendues selon la requête, écritures notées.
  */
-function database(script: { needed?: Row; due?: Row[]; voiceRows?: Row[]; releasable?: Row[]; openDue?: Row[] }) {
+function database(script: {
+  needed?: Row;
+  due?: Row[];
+  voiceRows?: Row[];
+  releasable?: Row[];
+  openDue?: Row[];
+  /** Lignes changées par le remplacement d'un salon revérifié (1 par défaut). */
+  replaced?: number;
+  /** Réponse au contrôle « ligne encore ouverte ? » qui suit un remplacement sans effet. */
+  stillOpen?: Row[];
+}) {
   const writes: { sql: string; params: unknown }[] = [];
   const execute = jest.fn<SqlQuery>(async (sql, params) => {
     if (sql.includes("AS open_rows")) return [[script.needed ?? { due: 1, open_rows: 1 }], []];
     if (sql === DUE_CHANNELS_SQL) return [script.due ?? [], []];
     if (sql === RELEASABLE_SQL) return [script.releasable ?? [], []];
     if (sql === OPEN_DUE_CHANNELS_SQL) return [script.openDue ?? [], []];
+    if (sql.startsWith("SELECT 1 FROM bg_match_voice_channels")) return [script.stillOpen ?? [], []];
     if (sql.startsWith("SELECT") && sql.includes("FROM bg_match_voice_channels")) return [script.voiceRows ?? [], []];
     writes.push({ sql, params });
+    if (sql.includes("SET channel_id = ?, failed_at = NULL")) return [{ affectedRows: script.replaced ?? 1 }, []];
     return [{ affectedRows: 1 }, []];
   });
   const getConnection = jest.fn<() => Promise<never>>();
@@ -596,8 +608,33 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
     jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "905" });
     await dispatchMatchVoiceChannels();
     expect(jest.mocked(ensureVoiceChannel).mock.calls).toEqual([["match:42:team:1", "Alpha"]]);
-    expect(writes.filter((w) => w.sql.startsWith("INSERT")).map((w) => w.params)).toEqual([[42, 1, "905"]]);
+    expect(writes.filter((w) => w.sql.startsWith("INSERT"))).toEqual([]);
+    const replace = writes.filter((w) => w.sql.includes("SET channel_id = ?, failed_at = NULL"));
+    expect(replace.map((w) => w.params)).toEqual([["905", 42, 1]]);
+    expect(replace[0]!.sql).toContain("released_at IS NULL");
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("dispatchMatchVoiceChannels_rowReleasedDuringRecheck_releasesNewChannelWithoutReopening", async () => {
+    const { writes } = database({ openDue: [open], replaced: 0, stillOpen: [] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "905" });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "ok", value: true });
+    await dispatchMatchVoiceChannels();
+    expect(releaseVoiceChannel).toHaveBeenCalledWith("905");
+    expect(writes.filter((w) => w.sql.startsWith("INSERT"))).toEqual([]);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("dispatchMatchVoiceChannels_rowAlreadyOnNewChannel_keepsChannelOpen", async () => {
+    database({ openDue: [open], replaced: 0, stillOpen: [{ 1: 1 }] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "905" });
+    await dispatchMatchVoiceChannels();
+    expect(releaseVoiceChannel).not.toHaveBeenCalled();
+  });
+
+  it("dispatchMatchVoiceChannels_recheckQuery_skipsSoloAndGhostMatches", () => {
+    expect(OPEN_DUE_CHANNELS_SQL).toContain("t1.solo_user_id IS NULL AND t2.solo_user_id IS NULL");
+    expect(OPEN_DUE_CHANNELS_SQL).toContain("COALESCE(t1.is_ghost, 0) = 0 AND COALESCE(t2.is_ghost, 0) = 0");
   });
 
   it("dispatchMatchVoiceChannels_openChannelStillThere_writesNothing", async () => {
