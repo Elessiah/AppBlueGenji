@@ -348,7 +348,7 @@ export async function consumeDiscordChallenge(
   );
 
   if (rows.length === 0) return null;
-  return settleChallengeAttempt(db, rows[0], code, purpose);
+  return settleChallengeAttempt(db, rows[0], code);
 }
 
 /**
@@ -395,7 +395,7 @@ export async function consumeDiscordLoginChallenge(
   );
 
   if (rows.length === 0) return null;
-  const proof = await settleChallengeAttempt(db, rows[0], code, purpose);
+  const proof = await settleChallengeAttempt(db, rows[0], code);
   return proof ? { ...proof, discordId: String(rows[0].discord_id) } : null;
 }
 
@@ -404,8 +404,8 @@ type ChallengeRow = RowDataPacket & {
   discord_id: string;
   code_hash: string;
   handle: string | null;
-  /** `NOT NULL` en base ; `null` n'est gardé que pour le refus explicite (`purpose !== …`) d'une ligne impossible. */
-  purpose: "LOGIN" | "HANDLE" | null;
+  /** Usage du défi ; les deux lectures ne prennent que celui demandé (`purpose = ?`). */
+  purpose: "LOGIN" | "HANDLE";
   expires_at: Date;
   consumed_at: Date | null;
   attempts: number;
@@ -419,15 +419,12 @@ async function settleChallengeAttempt(
   db: Awaited<ReturnType<typeof getDatabase>>,
   challenge: ChallengeRow,
   code: string,
-  purpose: DiscordCodePurpose,
 ): Promise<DiscordChallengeProof | null> {
-  // **Un code ne sert qu'à l'usage annoncé par son message.** Celui d'une
-  // certification dit qu'il ne connecte pas : accepté par la connexion, il
-  // ouvrirait le compte de qui le transmet en confiance (et l'inverse
-  // rattacherait son Discord à un autre compte). Refusé sans réserver d'essai :
-  // le code n'est pas comparé, rien n'est appris. Un défi sans usage (antérieur
-  // à la colonne) est refusé aussi : le joueur redemande un code.
-  if (challenge.purpose !== PURPOSE_COLUMN[purpose]) return null;
+  // **Un code ne sert qu'à l'usage annoncé par son message** : les deux
+  // lecteurs ne lisent que les défis de cet usage (`purpose = ?` en SQL). Celui
+  // d'une certification dit qu'il ne connecte pas : accepté par la connexion,
+  // il ouvrirait le compte de qui le transmet en confiance. Un défi d'un autre
+  // usage n'est donc jamais lu ni comparé, et ne coûte aucun essai.
   if (challenge.consumed_at !== null) return null;
   if (new Date(challenge.expires_at).getTime() < Date.now()) return null;
 

@@ -325,7 +325,7 @@ export async function loadNotificationRecipients(
   // **avant** le réglage : une langue absente ne fait jamais perdre une
   // opposition aux messages de match (RGPD, article 21).
   const matchDm = options.matchDm === true;
-  const attempts: [boolean, boolean][] = matchDm
+  const attempts: readonly [[boolean, boolean], ...[boolean, boolean][]] = matchDm
     ? [[true, true], [true, false], [false, true], [false, false]]
     : [[false, true], [false, false]];
   const rows = await firstReadable(attempts, ([withMatchDm, withLocale]) => select(withMatchDm, withLocale));
@@ -336,18 +336,26 @@ export async function loadNotificationRecipients(
 }
 
 /**
- * Joue les lectures dans l'ordre jusqu'à la première dont les colonnes
- * existent ; toute autre erreur, ou l'échec de la dernière, est levée.
+ * Joue les lectures dans l'ordre (au moins une) jusqu'à la première dont les
+ * colonnes existent ; toute autre erreur, ou l'échec de la dernière, est levée.
+ * **L'ordre est la règle** : chez `loadNotificationRecipients`, la langue
+ * tombe avant le réglage des messages de match.
  */
-async function firstReadable<A, T>(attempts: readonly A[], read: (attempt: A) => Promise<[T, unknown]>): Promise<T> {
-  for (let index = 0; ; index += 1) {
+async function firstReadable<A, T>(
+  attempts: readonly [A, ...A[]],
+  read: (attempt: A) => Promise<[T, unknown]>,
+): Promise<T> {
+  let lastError: unknown;
+  for (const attempt of attempts) {
     try {
-      const [rows] = await read(attempts[index]);
+      const [rows] = await read(attempt);
       return rows;
     } catch (error) {
-      if (!isUnknownColumnError(error) || index >= attempts.length - 1) throw error;
+      if (!isUnknownColumnError(error)) throw error;
+      lastError = error;
     }
   }
+  throw lastError;
 }
 
 /**
