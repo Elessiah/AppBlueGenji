@@ -234,7 +234,7 @@ describe("Schéma — la règle des deux endroits", () => {
     // EF-43 : le site ne compte plus personne — ni nombre ni date de comptage,
     // retirés aussi des bases existantes.
     expect(table("bg_match_voice_channels")).not.toMatch(/members|counted_at/);
-    expect(migrations).toContain("ALTER TABLE bg_match_voice_channels DROP COLUMN members, DROP COLUMN counted_at");
+    expect(migrations).toContain("ALTER TABLE bg_match_voice_channels DROP COLUMN members, DROP COLUMN counted_at, ALGORITHM=COPY");
   });
 
   // Facultative : `NULL` reprend la valeur française sous `/en`, rien à remplir.
@@ -439,7 +439,7 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
       .map((line) => line.trim());
     expect(drops).toEqual([
       // EF-43 : le nombre de présents des salons vocaux n'est plus gardé.
-      "`ALTER TABLE bg_match_voice_channels DROP COLUMN members, DROP COLUMN counted_at`,",
+      "`ALTER TABLE bg_match_voice_channels DROP COLUMN members, DROP COLUMN counted_at, ALGORITHM=COPY`,",
       "await db.execute(`ALTER TABLE bg_recruitment_ads DROP COLUMN contact_email`);",
       'const DROP_EMAIL = "ALTER TABLE bg_users DROP COLUMN email";',
       // Les visites ne désignent plus de compte : seul `authenticated` reste.
