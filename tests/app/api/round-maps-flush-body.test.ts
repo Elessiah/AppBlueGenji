@@ -30,6 +30,13 @@ describe("POST /round-maps/flush — body", () => {
     expect(flushRoundMapsNotice).toHaveBeenCalledWith(7, ["0:UPPER:2", "1:LOWER:3"]);
   });
 
+  it("flush_oversizedBody_returns400WithoutFlushing", async () => {
+    const response = await flushPost(post(`{"rounds":[],"pad":"${"x".repeat(40_000)}"}`), context);
+
+    expect(response.status).toBe(400);
+    expect(flushRoundMapsNotice).not.toHaveBeenCalled();
+  });
+
   it("flush_noBody_passesUndefined", async () => {
     await flushPost(post(), context);
 
