@@ -39,7 +39,8 @@ et rien n'est compté.
   le bot rend le même, ou un neuf s'il a disparu — jamais qui s'y trouve.
   Coût borné : au plus 5 appels au bot en parallèle, 80 salons par passe (les
   plus anciennement vus d'abord, aucun n'est affamé), arrêt de la passe au premier
-  échec du bot ; un salon tout juste créé n'est pas redemandé dans la même passe.
+  échec du bot (le salon en échec n'est pas marqué vu : redemandé à la passe
+  suivante, pas une minute plus tard) ; un salon tout juste créé n'est pas redemandé dans la même passe.
   Le rendu s'arrête aussi au premier échec (la passe suivante reprend).
 - **Panne du bot** : `failed_at` noté, une ligne pm2 sans donnée de joueur, une
   seule par panne ; création comme rendu réessayés au plus une fois par
