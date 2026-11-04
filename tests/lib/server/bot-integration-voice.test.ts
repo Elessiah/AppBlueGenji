@@ -32,6 +32,17 @@ describe("bot-integration — salons vocaux", () => {
     await expect(releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "gone", code: "VOICE_CHANNEL_NOT_TRACKED" });
   });
 
+  it("releaseVoiceChannel_routeMissing404_returnsFailed", async () => {
+    // Bot d'une autre version sans la route : jamais « déjà rendu », la ligne reste ouverte.
+    jest.spyOn(global, "fetch").mockResolvedValue(json(404, { error: "INTERNAL_ROUTE_NOT_FOUND" }));
+    await expect(releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "failed", code: "INTERNAL_ROUTE_NOT_FOUND" });
+  });
+
+  it("releaseVoiceChannel_unreadable404_returnsFailed", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(new Response("<html>Cannot POST</html>", { status: 404 }));
+    await expect(releaseVoiceChannel("123456789")).resolves.toMatchObject({ kind: "failed" });
+  });
+
   it("releaseVoiceChannel_unreachable_returnsFailed", async () => {
     jest.spyOn(global, "fetch").mockRejectedValue(new TypeError("fetch failed"));
     await expect(releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "failed", code: "BOT_INTERNAL_UNREACHABLE" });
