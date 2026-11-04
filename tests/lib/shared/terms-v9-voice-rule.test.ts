@@ -26,15 +26,17 @@ describe("PRIVACY_CHANGES — salons vocaux (décision du 2026-11-04 : intérêt
     expect(PRIVACY_CHANGES_EN[VOICE_ID]).toBeUndefined();
   });
 
-  it("privacyChanges_termsV9_voiceDetailStatesLegitimateInterestAndAnonymousCountFrAndEn", () => {
+  it("privacyChanges_termsV9_voiceDetailNoGateNoCountLegitimateInterestFrAndEn", () => {
     const fr = change(TERMS_V9_ID).details.join(" ");
     const en = PRIVACY_CHANGES_EN[TERMS_V9_ID].details.join(" ");
 
-    expect(fr).toContain("repose toujours sur l'intérêt légitime de l'association");
-    expect(fr).toContain("ce nombre ne sert qu'à retenir le lancement du match et n'est plus montré à personne");
+    expect(fr).toContain("le lancement du match n'en dépend pas et personne n'y est compté");
+    expect(fr).toContain("ces salons reposent sur l'intérêt légitime de l'association");
+    expect(fr).not.toContain("retenir le lancement");
     expect(fr).not.toContain("t'y opposer");
-    expect(en).toContain("still rests on the association's legitimate interest");
-    expect(en).toContain("that number only serves to hold the match's launch and is no longer shown to anyone");
+    expect(en).toContain("the match's launch does not depend on it and no one is counted in it");
+    expect(en).toContain("these channels rest on the association's legitimate interest");
+    expect(en).not.toContain("hold the match's launch");
     expect(en).not.toContain("object to it");
   });
 });
@@ -142,15 +144,21 @@ describe("notification de reprise d'équipe fantôme", () => {
 });
 
 describe("conditions d'utilisation v9 — salons vocaux", () => {
-  it("termsV9_voiceParagraph_legitimateInterestAnonymousCountFrAndEn", () => {
+  it("termsV9_voiceParagraph_noGateNoCountLegitimateInterestFrAndEn", () => {
     const fr = TERMS_SECTIONS.find((s) => s.id === "contacts-de-match")?.paragraphs.join("\n") ?? "";
     const en = TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match")?.paragraphs.join("\n") ?? "";
 
     expect(fr).toContain("fait partie du **déroulement du tournoi**");
-    expect(fr).toContain("Ce comptage, anonyme (un nombre, jamais qui ; il ne sert qu'à retenir le lancement et n'est montré à personne : la page du match dit seulement si chaque salon est ouvert et si le match attend ses salons), repose sur l'intérêt légitime de l'association au bon déroulement des tournois.");
+    expect(fr).toContain("Le lancement du match n'en dépend pas, et personne n'y est compté");
+    expect(fr).toContain("Ces salons reposent sur l'intérêt légitime de l'association au bon déroulement des tournois.");
+    expect(fr).not.toContain("comptage");
+    expect(fr).not.toContain("salons pleins");
     expect(fr).not.toContain("s'y opposer");
     expect(en).toContain("is part of the **running of the tournament**");
-    expect(en).toContain("This count, which is anonymous (a number, never who; it only serves to hold the launch and is shown to no one: the match page only says whether each channel is open and whether the match is waiting for its channels), rests on the association's legitimate interest in the smooth running of tournaments.");
+    expect(en).toContain("The match's launch does not depend on them, and no one is counted");
+    expect(en).toContain("These channels rest on the association's legitimate interest in the smooth running of tournaments.");
+    expect(en).not.toContain("This count");
+    expect(en).not.toContain("channels are full");
     expect(en).not.toContain("object to it");
   });
 });
@@ -171,15 +179,17 @@ describe("pseudo rendu à la réactivation — suffixe « OG » (FR + EN)", () =
   });
 });
 
-// Revue juridique #546, cycle 5 : conditions et /regles disent aussi l'attente des salons.
-describe("salons vocaux — la page dit aussi si le match attend ses salons (FR + EN)", () => {
-  it("termsV9AndRules_voiceWording_mentionWaitingForChannelsFrAndEn", () => {
+// EF-43 : la version 9, pas encore en ligne, est reformulée sur place — plus d'attente des salons.
+describe("salons vocaux — la page dit seulement si chaque salon est ouvert (FR + EN)", () => {
+  it("termsV9AndRules_voiceWording_noWaitingForChannelsFrAndEn", () => {
     const fr = TERMS_SECTIONS.flatMap((s) => s.paragraphs).join(" ");
     const en = TERMS_SECTIONS_EN.flatMap((s) => s.paragraphs).join(" ");
 
-    expect(fr).toContain("la page du match dit seulement si chaque salon est ouvert et si le match attend ses salons");
-    expect(en).toContain("the match page only says whether each channel is open and whether the match is waiting for its channels");
-    // Les conditions v9 publiées restent telles quelles ; /regles ne parle plus d'attente (EF-43).
+    expect(fr).toContain("la page du match dit seulement si chaque salon est ouvert.");
+    expect(fr).not.toContain("attend ses salons");
+    expect(en).toContain("the match page only says whether each channel is open.");
+    expect(en).not.toContain("waiting for its channels");
+    // /regles ne parle plus d'attente non plus (EF-43).
     expect(JSON.stringify(frRules)).not.toContain("si le match attend ses salons");
     expect(JSON.stringify(enRules)).not.toContain("whether the match is waiting for its channels");
   });
