@@ -50,7 +50,10 @@ function catalogueStrings(locale: "fr" | "en"): string[] {
     if (typeof value === "string") strings.push(value);
     else if (value && typeof value === "object") Object.values(value).forEach(walk);
   };
-  for (const file of readdirSync(dir).filter((name) => name.endsWith(".json"))) {
+  // `tournamentErrors.json` attend sa décision : son français est verrouillé à
+  // l'octet (`tournament-errors-fr-before-lot8b.json`), entrée d'ERREUR.txt.
+  const files = readdirSync(dir).filter((name) => name.endsWith(".json") && name !== "tournamentErrors.json");
+  for (const file of files) {
     walk(JSON.parse(readFileSync(path.join(dir, file), "utf8")));
   }
   return strings;
