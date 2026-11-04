@@ -70,6 +70,9 @@ et rien n'est compté.
   (`backing_off`, calculé par la base). Un rendu refusé par le bot donne une ligne
   pm2 `rendu du salon vocal refusé (CODE)` par salon et par code (mémoire du
   processus, oubliée à la clôture de la ligne) ; une panne du canal n'en donne pas.
+- **Refus de rendu sans fin** : passé `VOICE_BOT_UNRELEASED_MAX_HOURS` depuis la création de la
+  ligne (filet du bot), un refus propre au salon clôt la ligne au lieu de la redemander chaque
+  minute ; une panne du bot, elle, la laisse ouverte.
 - **Étapes indépendantes** : une création ou une revérification en erreur n'empêche pas le
   rendu de la même passe (l'erreur remonte ensuite) ; la revérification attend tous ses
   ouvriers avant de rendre la main, même si l'un échoue.
