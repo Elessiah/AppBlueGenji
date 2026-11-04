@@ -1006,6 +1006,26 @@ describe("releaseMatchCast", () => {
     expect(state.match?.launched_at).toBe(STAMP);
   });
 
+  it("releaseMatchCast_lastCasterNoStreamLeft_unmarksMatch", async () => {
+    // Le stream à part du caster part avec lui : plus personne ne diffuse.
+    state.match = matchState({ caster_user_id: CASTER, live_trigger: "AUTO", streams: [{ id: 1, live_url: "https://twitch.tv/voix" }] });
+    state.issued = [];
+    await releaseMatchCast(42, CASTER, false);
+    expect(state.match?.streams).toEqual([]);
+    expect(state.issued).toContain("UPDATE bg_matches SET live_trigger = NULL, live_started_at = NULL WHERE id = ?");
+  });
+
+  it("releaseMatchCast_staffStreamWithLinkRemains_keepsTrigger", async () => {
+    state.match = matchState({
+      caster_user_id: CASTER,
+      live_trigger: "AUTO",
+      streams: [{ id: 1, live_url: "https://twitch.tv/bluegenji", staff_owned: 1 }],
+    });
+    state.issued = [];
+    await releaseMatchCast(42, CASTER, false);
+    expect(state.issued.some((sql) => sql.includes("SET live_trigger = NULL"))).toBe(false);
+  });
+
   it("ne fait rien sur un match sans caster", async () => {
     await releaseMatchCast(42, CASTER, false);
     expect(state.writes).toEqual([]);

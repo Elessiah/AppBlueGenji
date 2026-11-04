@@ -965,9 +965,18 @@ export async function releaseMatchCast(
       if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
 
       await connection.execute(`DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?`, [matchId, casterId]);
-      await pruneMatchStreams(connection, matchId, {
-        casters: row.casters.filter((caster) => caster.userId !== casterId),
-      });
+      const remaining = row.casters.filter((caster) => caster.userId !== casterId);
+      await pruneMatchStreams(connection, matchId, { casters: remaining });
+      // L'inscription marque le match casté (`CAST_SETTINGS.md`) : le dernier
+      // caster parti sans qu'aucun stream reste (ni celui du staff avec son
+      // lien), le match n'est plus casté — sans quoi il passerait « En direct »
+      // à son lancement sans que personne ne diffuse.
+      if (remaining.length === 0 && (row.live_trigger ?? null) !== null) {
+        const left = await lockMatchStreams(connection, matchId, true);
+        if (left.length === 0) {
+          await connection.execute(`UPDATE bg_matches SET live_trigger = NULL, live_started_at = NULL WHERE id = ?`, [matchId]);
+        }
+      }
       if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
       return { tournamentId: Number(row.tournament_id), releasedCasterId: casterId };
     }),

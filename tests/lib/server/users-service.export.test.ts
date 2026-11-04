@@ -19,7 +19,7 @@ jest.mock("@/lib/server/users/live-announcement-export", () => ({
 }));
 jest.mock("@/lib/server/users/match-roles-export", () => ({
   listOwnMatchRoles: jest.fn(async () => ({
-    casts: [{ matchId: 5, tournamentId: 2, streamId: 3, readyAt: null, createdAt: "2026-10-20T17:00:00.000Z" }],
+    casts: [{ matchId: 5, tournamentId: 2, streamId: 3, readyAt: null, createdAt: "2026-10-20T17:00:00.000Z", castBattletag: null }],
     providedStreamLinks: [{ matchId: 5, tournamentId: 2, liveUrl: "https://twitch.tv/x", createdAt: "2026-10-20T17:00:00.000Z" }],
     refereeAssignments: [{ matchId: 6, tournamentId: 2, readyAt: "2026-10-20T17:30:00.000Z" }],
   })),
@@ -359,7 +359,7 @@ describe("exportOwnData", () => {
       .mockResolvedValue([[]]);
     await mockDb(execute);
     const data = await exportOwnData(42);
-    expect(data.casts).toEqual([{ matchId: 5, tournamentId: 2, streamId: 3, readyAt: null, createdAt: "2026-10-20T17:00:00.000Z" }]);
+    expect(data.casts).toEqual([{ matchId: 5, tournamentId: 2, streamId: 3, readyAt: null, createdAt: "2026-10-20T17:00:00.000Z", castBattletag: null }]);
     expect(data.providedStreamLinks).toEqual([{ matchId: 5, tournamentId: 2, liveUrl: "https://twitch.tv/x", createdAt: "2026-10-20T17:00:00.000Z" }]);
     expect(data.refereeAssignments).toEqual([{ matchId: 6, tournamentId: 2, readyAt: "2026-10-20T17:30:00.000Z" }]);
   });

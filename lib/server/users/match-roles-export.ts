@@ -26,7 +26,8 @@ async function tolerantRows<T extends RowDataPacket>(db: Db, sql: string, userId
 
 /**
  * Les matchs où le titulaire a tenu un rôle, pour l'export (art. 15 et 20) :
- * ses inscriptions de caster (`bg_match_casters`, avec son « Prêt »), les
+ * ses inscriptions de caster (`bg_match_casters`, avec son « Prêt » et le
+ * BattleTag qu'il a donné pour ce cast), les
  * liens de chaîne qu'il a fournis (`bg_match_streams.link_user_id`, registre
  * T16) et ses arbitrages désignés (`bg_matches.referee_user_id`, avec son
  * « Prêt », registre T04) — ce que le site garde avec le match. Trois
@@ -35,10 +36,17 @@ async function tolerantRows<T extends RowDataPacket>(db: Db, sql: string, userId
 export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> {
   const db = await getDatabase();
   const casts = await tolerantRows<
-    RowDataPacket & { match_id: number; tournament_id: number; stream_id: number; ready_at: Date | null; created_at: Date | null }
+    RowDataPacket & {
+      match_id: number;
+      tournament_id: number;
+      stream_id: number;
+      ready_at: Date | null;
+      created_at: Date | null;
+      cast_battletag: string | null;
+    }
   >(
     db,
-    `SELECT c.match_id, m.tournament_id, c.stream_id, c.ready_at, c.created_at
+    `SELECT c.match_id, m.tournament_id, c.stream_id, c.ready_at, c.created_at, c.cast_battletag
        FROM bg_match_casters c
        JOIN bg_matches m ON m.id = c.match_id
       WHERE c.user_id = ?
@@ -68,6 +76,7 @@ export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> 
       streamId: Number(row.stream_id),
       readyAt: toIso(row.ready_at),
       createdAt: toIso(row.created_at),
+      castBattletag: row.cast_battletag ?? null,
     })),
     providedStreamLinks: links.map((row) => ({
       matchId: Number(row.match_id),
