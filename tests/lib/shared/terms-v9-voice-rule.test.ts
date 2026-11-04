@@ -118,9 +118,9 @@ describe("/regles — règle commune « Salons vocaux d'équipe »", () => {
     expect(enBody).toContain(`from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before each match's time`);
     expect(enBody).toContain(`a ${VOICE_CHANNEL_CAPACITY}-seat voice channel`);
     // Décision R2 du 2026-11-04 : comptage anonyme, sans droit d'opposition.
-    expect(frSection?.bullets?.join(" ")).toContain("Ce comptage est anonyme : il ne sert qu'à retenir le lancement et n'est montré à personne (la page du match dit seulement si chaque salon est ouvert). Il repose sur l'intérêt légitime de l'association");
+    expect(frSection?.bullets?.join(" ")).toContain("Ce comptage est anonyme : il ne sert qu'à retenir le lancement et n'est montré à personne (la page du match dit seulement si chaque salon est ouvert et si le match attend ses salons). Il repose sur l'intérêt légitime de l'association");
     expect(frSection?.bullets?.join(" ")).not.toContain("t'y opposer");
-    expect(enSection?.bullets?.join(" ")).toContain("This count is anonymous: it only serves to hold the launch and is shown to no one (the match page only says whether each channel is open). It rests on the association's legitimate interest");
+    expect(enSection?.bullets?.join(" ")).toContain("This count is anonymous: it only serves to hold the launch and is shown to no one (the match page only says whether each channel is open and whether the match is waiting for its channels). It rests on the association's legitimate interest");
     expect(enSection?.bullets?.join(" ")).not.toContain("object to it");
   });
 });
@@ -137,10 +137,10 @@ describe("conditions d'utilisation v9 — salons vocaux", () => {
     const en = TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match")?.paragraphs.join("\n") ?? "";
 
     expect(fr).toContain("fait partie du **déroulement du tournoi**");
-    expect(fr).toContain("Ce comptage, anonyme (un nombre, jamais qui ; il ne sert qu'à retenir le lancement et n'est montré à personne : la page du match dit seulement si chaque salon est ouvert), repose sur l'intérêt légitime de l'association au bon déroulement des tournois.");
+    expect(fr).toContain("Ce comptage, anonyme (un nombre, jamais qui ; il ne sert qu'à retenir le lancement et n'est montré à personne : la page du match dit seulement si chaque salon est ouvert et si le match attend ses salons), repose sur l'intérêt légitime de l'association au bon déroulement des tournois.");
     expect(fr).not.toContain("s'y opposer");
     expect(en).toContain("is part of the **running of the tournament**");
-    expect(en).toContain("This count, which is anonymous (a number, never who; it only serves to hold the launch and is shown to no one: the match page only says whether each channel is open), rests on the association's legitimate interest in the smooth running of tournaments.");
+    expect(en).toContain("This count, which is anonymous (a number, never who; it only serves to hold the launch and is shown to no one: the match page only says whether each channel is open and whether the match is waiting for its channels), rests on the association's legitimate interest in the smooth running of tournaments.");
     expect(en).not.toContain("object to it");
   });
 });
@@ -158,5 +158,18 @@ describe("pseudo rendu à la réactivation — suffixe « OG » (FR + EN)", () =
     expect(PRIVACY_CHANGES_EN[TERMS_V9_ID].details.join(" ")).toContain("up to “OG10”");
     expect(readSource("app/rgpd/page.tsx")).toContain("jusqu&apos;à « OG10 »");
     expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("up to “OG10”");
+  });
+});
+
+// Revue juridique #546, cycle 5 : conditions et /regles disent aussi l'attente des salons.
+describe("salons vocaux — la page dit aussi si le match attend ses salons (FR + EN)", () => {
+  it("termsV9AndRules_voiceWording_mentionWaitingForChannelsFrAndEn", () => {
+    const fr = TERMS_SECTIONS.flatMap((s) => s.paragraphs).join(" ");
+    const en = TERMS_SECTIONS_EN.flatMap((s) => s.paragraphs).join(" ");
+
+    expect(fr).toContain("la page du match dit seulement si chaque salon est ouvert et si le match attend ses salons");
+    expect(en).toContain("the match page only says whether each channel is open and whether the match is waiting for its channels");
+    expect(JSON.stringify(frRules)).toContain("la page du match dit seulement si chaque salon est ouvert et si le match attend ses salons");
+    expect(JSON.stringify(enRules)).toContain("the match page only says whether each channel is open and whether the match is waiting for its channels");
   });
 });

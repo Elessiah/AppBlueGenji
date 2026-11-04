@@ -164,8 +164,16 @@ describe("revue juridique cycle 4", () => {
     const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.subPurposes.join("\n") ?? "";
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.subPurposes.join("\n") ?? "";
 
-    expect(fr).toContain("Refuser la remise en ligne d'un avatar déjà retiré par la modération");
-    expect(en).toContain("Refusing the re-upload of an avatar already removed by moderation");
+    expect(fr).toContain("Refuser la remise en ligne, comme avatar ou comme logo d'équipe, d'un avatar déjà retiré par la modération");
+    expect(en).toContain("Refusing the re-upload, as an avatar or as a team logo, of an avatar already removed by moderation");
+  });
+
+  it("processingRegisterT01_avatarHash_dataCategoryNamesAvatarsFrAndEn", () => {
+    const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.dataCategories.join(" ") ?? "";
+    const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.dataCategories.join(" ") ?? "";
+
+    expect(fr).toContain("empreintes (SHA-256) des avatars retirés par la modération");
+    expect(en).toContain("hashes (SHA-256) of avatars removed by moderation");
   });
 
   it("processingRegisterT01_avatarHash_legitimateInterestBasisFrAndEn", () => {

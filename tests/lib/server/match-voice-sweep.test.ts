@@ -214,6 +214,48 @@ describe("dispatchMatchVoiceChannels — création et comptage", () => {
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
+  // Revue juridique #546, cycle 5 : le nombre n'est montré à personne — seul
+  // « plein ou non » publie.
+  it("dispatchMatchVoiceChannels_freshRecountStaysBelowFull_publishesNothing", async () => {
+    const fresh = new Date().toISOString();
+    database({
+      due: [dueMatch],
+      voiceRows: [
+        { match_id: 42, team_id: 1, channel_id: "900", members: 3, counted_at: fresh, failed_at: null, released_at: null },
+        { match_id: 42, team_id: 2, channel_id: "900", members: 3, counted_at: fresh, failed_at: null, released_at: null },
+      ],
+      voiceRowsAfterWrite: [
+        { match_id: 42, team_id: 1, channel_id: "900", members: 4, counted_at: fresh, failed_at: null, released_at: null },
+        { match_id: 42, team_id: 2, channel_id: "900", members: 3, counted_at: fresh, failed_at: null, released_at: null },
+      ],
+    });
+    jest.mocked(countVoiceChannel).mockResolvedValue({ kind: "ok", value: 4 });
+
+    await dispatchMatchVoiceChannels();
+
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("dispatchMatchVoiceChannels_freshRecountReachesFull_publishesTournament", async () => {
+    const fresh = new Date().toISOString();
+    database({
+      due: [dueMatch],
+      voiceRows: [
+        { match_id: 42, team_id: 1, channel_id: "900", members: 4, counted_at: fresh, failed_at: null, released_at: null },
+        { match_id: 42, team_id: 2, channel_id: "900", members: 4, counted_at: fresh, failed_at: null, released_at: null },
+      ],
+      voiceRowsAfterWrite: [
+        { match_id: 42, team_id: 1, channel_id: "900", members: 5, counted_at: fresh, failed_at: null, released_at: null },
+        { match_id: 42, team_id: 2, channel_id: "900", members: 4, counted_at: fresh, failed_at: null, released_at: null },
+      ],
+    });
+    jest.mocked(countVoiceChannel).mockResolvedValue({ kind: "ok", value: 5 });
+
+    await dispatchMatchVoiceChannels();
+
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
   it("dispatchMatchVoiceChannels_teamNameWithInvisibles_sendsVisibleText", async () => {
     database({ due: [{ ...dueMatch, team1_name: "Al\u200Bpha\u202E" }] });
     jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "900" });

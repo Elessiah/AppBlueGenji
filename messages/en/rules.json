@@ -170,7 +170,7 @@
       ],
       "bullets": [
         "The match only launches once both channels are full: until then, it waits for a referee to force its launch. If the bot doesn't answer, the match doesn't wait.",
-        "The bot counts the people present in each channel — a number, never who. This count is anonymous: it only serves to hold the launch and is shown to no one (the match page only says whether each channel is open). It rests on the association's legitimate interest (smooth running of tournaments).",
+        "The bot counts the people present in each channel — a number, never who. This count is anonymous: it only serves to hold the launch and is shown to no one (the match page only says whether each channel is open and whether the match is waiting for its channels). It rests on the association's legitimate interest (smooth running of tournaments).",
         "No channel is opened for a solo entry nor for a match against a ghost team."
       ]
     },

@@ -41,7 +41,7 @@ salons pleins.
   qu'une observation du bot de moins de 5 minutes (`VOICE_OBSERVATION_FRESH_MINUTES`,
   `counted_at` / `failed_at`) : un « 5/5 » ancien (match reporté hors du quart d'heure
   puis revenu) ne lance rien et une panne ancienne ne lève plus le verrou — le
-  balayage suivant tranche. L'affichage garde le dernier nombre compté. Un comptage
+  balayage suivant tranche. Le nombre compté n'est montré à personne : la page ne dit que l'état de chaque salon. Un comptage
   redevenu frais compte comme un changement (publication + entretien rejoué).
 - **Relecture de la page du match** : **flux coupé seulement** (`isLive` de la fiche),
   toutes les 10 s, tant que la source qui fait foi porte `voice` (match dû, pas encore

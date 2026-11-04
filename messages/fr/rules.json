@@ -170,7 +170,7 @@
       ],
       "bullets": [
         "Le match ne se lance qu'une fois les deux salons pleins : jusque-là, il attend qu'un arbitre force son lancement. Si le bot ne répond pas, le match n'attend pas.",
-        "Le bot compte les personnes présentes dans chaque salon — un nombre, jamais qui. Ce comptage est anonyme : il ne sert qu'à retenir le lancement et n'est montré à personne (la page du match dit seulement si chaque salon est ouvert). Il repose sur l'intérêt légitime de l'association (bon déroulement des tournois).",
+        "Le bot compte les personnes présentes dans chaque salon — un nombre, jamais qui. Ce comptage est anonyme : il ne sert qu'à retenir le lancement et n'est montré à personne (la page du match dit seulement si chaque salon est ouvert et si le match attend ses salons). Il repose sur l'intérêt légitime de l'association (bon déroulement des tournois).",
         "Aucun salon n'est ouvert pour une entrée en tournoi individuel ni pour un match contre une équipe fantôme."
       ]
     },
