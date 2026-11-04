@@ -177,6 +177,19 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
+  it("dispatchMatchVoiceChannels_firstReleaseFailed_stopsLoopAndMarksOnlyThatRow", async () => {
+    const { writes } = database({
+      releasable: [
+        { match_id: 42, team_id: 1, channel_id: "901", tournament_id: 7 },
+        { match_id: 43, team_id: 1, channel_id: "902", tournament_id: 7 },
+      ],
+    });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "failed", code: "BOT_VOICE_TIMEOUT" });
+    await dispatchMatchVoiceChannels();
+    expect(releaseVoiceChannel).toHaveBeenCalledTimes(1);
+    expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toHaveLength(1);
+  });
+
   it("dispatchMatchVoiceChannels_releaseNotTracked_marksReleased", async () => {
     const { writes } = database({ releasable: [releasable] });
     jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "gone", code: "VOICE_CHANNEL_NOT_TRACKED" });
@@ -508,6 +521,57 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
     expect(OPEN_DUE_CHANNELS_SQL).toContain("v.released_at IS NULL AND v.channel_id IS NOT NULL");
     expect(OPEN_DUE_CHANNELS_SQL).toContain(`m.start_at >= NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR`);
     expect(OPEN_DUE_CHANNELS_SQL).toContain("v.team_id <=> m.team1_id OR v.team_id <=> m.team2_id");
+  });
+
+  const openRows = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({ ...open, match_id: 100 + index, channel_id: `9${index}` }));
+
+  it("dispatchMatchVoiceChannels_sixDueOpenChannels_neverMoreThanFiveBotCallsInFlight", async () => {
+    database({ openDue: openRows(6) });
+    let inFlight = 0;
+    let peak = 0;
+    jest.mocked(ensureVoiceChannel).mockImplementation(async (key) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return { kind: "ok", value: `9${Number(key.split(":")[1]) - 100}` };
+    });
+    await dispatchMatchVoiceChannels();
+    expect(ensureVoiceChannel).toHaveBeenCalledTimes(6);
+    expect(peak).toBe(5);
+  });
+
+  it("dispatchMatchVoiceChannels_botUnreachableOnRecheck_stopsRemainingChecks", async () => {
+    database({ openDue: openRows(12) });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "BOT_INTERNAL_UNREACHABLE" });
+    await dispatchMatchVoiceChannels();
+    expect(jest.mocked(ensureVoiceChannel).mock.calls.length).toBeLessThanOrEqual(5);
+  });
+
+  it("dispatchMatchVoiceChannels_moreThanBatchDue_checksAtMostEightyPerPass", async () => {
+    database({ openDue: openRows(100) });
+    jest.mocked(ensureVoiceChannel).mockImplementation(async (key) => ({
+      kind: "ok",
+      value: `9${Number(key.split(":")[1]) - 100}`,
+    }));
+    await dispatchMatchVoiceChannels();
+    expect(ensureVoiceChannel).toHaveBeenCalledTimes(80);
+    await dispatchMatchVoiceChannels(true);
+    // Passe suivante : les vingt non vus passent avant les quatre-vingts déjà revus.
+    const keys = jest.mocked(ensureVoiceChannel).mock.calls.slice(80).map(([key]) => key);
+    expect(keys).toHaveLength(20);
+    expect(new Set(keys).size).toBe(20);
+  });
+
+  it("dispatchMatchVoiceChannels_channelCreatedThisPass_notAskedAgainByRecheck", async () => {
+    database({ due: [dueMatch], openDue: [{ ...open, match_id: 42, team_id: 1 }] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    await dispatchMatchVoiceChannels();
+    expect(jest.mocked(ensureVoiceChannel).mock.calls.map(([key]) => key)).toEqual([
+      "match:42:team:1",
+      "match:42:team:2",
+    ]);
   });
 
   it("dispatchMatchVoiceChannels_nothingDue_skipsRecheck", async () => {
