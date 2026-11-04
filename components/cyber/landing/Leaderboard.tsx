@@ -138,11 +138,11 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
                 <span className={styles.wl} role="cell">
                   <span className={styles.wins}>{row.wins}</span>
                   <span className={styles.losses}>–</span>
-                  {/* Les nuls, s'il y en a, **entre** les victoires et les défaites : « 3–1 N–2 » se lit V–N–D (une équipe classée sur un seul nul lisait « 0–0 »). La lettre seule n'est pas explicite : titre au survol, texte long lu à voix. */}
+                  {/* Les nuls, s'il y en a, **entre** les victoires et les défaites : « 3–1 N–2 » se lit V–N–D (une équipe classée sur un seul nul lisait « 0–0 »). La lettre seule n'est pas explicite : titre au survol sur le texte visible (masqué aux lecteurs d'écran), texte long lu à voix. */}
                   {row.draws > 0 ? (
                     <>
-                      <span className={styles.draws} title={t("leaderboard.drawsLabel", { count: row.draws })}>
-                        <span aria-hidden="true">{t("leaderboard.draws", { count: String(row.draws) })}</span>
+                      <span className={styles.draws}>
+                        <span aria-hidden="true" title={t("leaderboard.drawsLabel", { count: row.draws })}>{t("leaderboard.draws", { count: String(row.draws) })}</span>
                         <span className="sr-only">{t("leaderboard.drawsLabel", { count: row.draws })}</span>
                       </span>
                       <span className={styles.losses}>–</span>

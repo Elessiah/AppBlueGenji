@@ -183,7 +183,11 @@
   }
 
   .withDraws {
-    --wl-col: 82px;
+    --wl-col: 90px;
+  }
+
+  .withDraws .wl {
+    font-size: 12px;
   }
 
   .tableHead,

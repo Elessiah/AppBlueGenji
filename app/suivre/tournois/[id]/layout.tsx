@@ -9,6 +9,7 @@ import { tournamentPageMetadata } from "@/lib/server/tournament-metadata";
 import { PATHNAME_HEADER, SEARCH_HEADER } from "@/lib/shared/csp";
 import { memberPathForSpectatorPath } from "@/lib/shared/spectator-member-path";
 import { localeHref } from "@/lib/shared/locales";
+import styles from "./relay.module.css";
 import {
   forwardedSearch,
   parseTournamentId,
@@ -99,7 +100,7 @@ export default async function SpectatorTournamentLayout({
             <div className="page-shell">
               <MemberRelay tournamentId={tournamentId} />
               {/* Repli visible si le renvoi tarde ou échoue : jamais une page vide. */}
-              <output>{messagesFor(locale).login.authGate.redirecting}</output>
+              <output className={styles.fallback}>{messagesFor(locale).login.authGate.redirecting}</output>
             </div>
           ) : (
             <div className="page-shell">{children}</div>
