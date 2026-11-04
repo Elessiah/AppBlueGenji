@@ -70,6 +70,9 @@ et rien n'est compté.
   (`backing_off`, calculé par la base). Un rendu refusé par le bot donne une ligne
   pm2 `rendu du salon vocal refusé (CODE)` par salon et par code (mémoire du
   processus, oubliée à la clôture de la ligne) ; une panne du canal n'en donne pas.
+- **Étapes indépendantes** : une création ou une revérification en erreur n'empêche pas le
+  rendu de la même passe (l'erreur remonte ensuite) ; la revérification attend tous ses
+  ouvriers avant de rendre la main, même si l'un échoue.
 - **Tournoi pas encore publié** (`start_visibility_at` à venir) : aucun salon n'est
   créé ni redemandé (`DUE_CHANNELS_SQL`, `OPEN_DUE_CHANNELS_SQL`), et un salon déjà ouvert est
   rendu si le tournoi est de nouveau masqué (`RELEASABLE_SQL`) — les noms
