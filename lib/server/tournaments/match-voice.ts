@@ -401,6 +401,8 @@ export const OPEN_DUE_CHANNELS_SQL = `SELECT v.match_id, v.team_id, v.channel_id
    AND m.start_at <= NOW() + INTERVAL ${VOICE_CHANNEL_LEAD_MINUTES} MINUTE
    AND m.start_at >= NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
    AND (v.team_id <=> m.team1_id OR v.team_id <=> m.team2_id)
+   AND t1.solo_user_id IS NULL AND t2.solo_user_id IS NULL
+   AND COALESCE(t1.is_ghost, 0) = 0 AND COALESCE(t2.is_ghost, 0) = 0
  ORDER BY m.start_at, v.match_id, v.team_id
  LIMIT ${VOICE_RECHECK_WINDOW}`;
 
@@ -435,10 +437,34 @@ async function recheckOneChannel(row: OpenRow, touched: Set<number>): Promise<bo
   // Une panne ici ne dit rien du salon : il reste tel qu'il est, redemandé plus tard.
   if (ensured.kind !== "ok") return !BOT_TRANSPORT_FAILURES.has(ensured.code);
   if (ensured.value !== String(row.channel_id)) {
-    await writeChannel(Number(row.match_id), Number(row.team_id), ensured.value);
-    touched.add(Number(row.tournament_id));
+    if (await replaceOpenChannel(row, ensured.value)) touched.add(Number(row.tournament_id));
+    // Ligne rendue entre-temps (autre processus, rechargement pm2) : le salon neuf n'a plus
+    // de match à servir, il est rendu aussitôt — la ligne rendue n'est jamais rouverte.
+    else await releaseVoiceChannel(ensured.value);
   }
   return true;
+}
+
+/**
+ * Remplace le salon d'une ligne **encore ouverte** : `false` si elle a été rendue
+ * (ou purgée) depuis sa lecture. Contrairement à `writeChannel`, jamais
+ * d'insertion ni de réouverture. Une ligne restée ouverte que rien ne change
+ * (déjà sur ce salon, écrit par un autre processus) compte comme ouverte.
+ */
+async function replaceOpenChannel(row: OpenRow, channelId: string): Promise<boolean> {
+  const db = await getDatabase();
+  const params = [Number(row.match_id), Number(row.team_id)];
+  const [result] = await db.execute<ResultSetHeader>(
+    `UPDATE bg_match_voice_channels SET channel_id = ?, failed_at = NULL
+      WHERE match_id = ? AND team_id = ? AND released_at IS NULL`,
+    [channelId, ...params],
+  );
+  if (Number(result.affectedRows) > 0) return true;
+  const [open] = await db.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_match_voice_channels WHERE match_id = ? AND team_id = ? AND released_at IS NULL`,
+    params,
+  );
+  return open.length > 0;
 }
 
 /** Rend `true` quand le canal vers le bot est en panne. */
