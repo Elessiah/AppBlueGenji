@@ -126,20 +126,17 @@ describe("dispatchMatchVoiceChannels — création", () => {
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
-  it("dispatchMatchVoiceChannels_botTransportDownOnCreate_stopsRemainingCalls", async () => {
-    database({ due: [dueMatch, { ...dueMatch, id: 43 }] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "BOT_VOICE_TIMEOUT" });
-    await dispatchMatchVoiceChannels();
-    expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
-  });
-
-  it("dispatchMatchVoiceChannels_botInternalErrorOnCreate_stopsRemainingCalls", async () => {
-    // Erreur du bot hors route (`INTERNAL_ERROR`) : le bot entier est en panne, pas un salon.
-    database({ due: [dueMatch, { ...dueMatch, id: 43 }] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "INTERNAL_ERROR" });
-    await dispatchMatchVoiceChannels();
-    expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
-  });
+  // Panne du canal ou du bot entier (`INTERNAL_ERROR` hors route, page d'erreur d'un proxy) :
+  // jamais un refus propre à un salon.
+  it.each(["BOT_VOICE_TIMEOUT", "INTERNAL_ERROR", "BOT_INTERNAL_REQUEST_FAILED"])(
+    "dispatchMatchVoiceChannels_botDownOnCreate_%s_stopsRemainingCalls",
+    async (code) => {
+      database({ due: [dueMatch, { ...dueMatch, id: 43 }] });
+      jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code });
+      await dispatchMatchVoiceChannels();
+      expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("dispatchMatchVoiceChannels_botDownOnCreate_skipsRecheckButStillReleases", async () => {
     const { execute } = database({ due: [dueMatch], openDue: [{ match_id: 9, team_id: 1, channel_id: "5", tournament_id: 7, team_name: "Gamma" }] });
