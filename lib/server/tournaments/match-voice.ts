@@ -422,7 +422,11 @@ async function recheckOpenChannels(touched: Set<number>): Promise<void> {
   const worker = async (): Promise<void> => {
     for (let next = queue.shift(); next && !botDown; next = queue.shift()) {
       sweep.checkedAt.set(next.key, Date.now());
-      if (!(await recheckOneChannel(next.row, touched))) botDown = true;
+      if (!(await recheckOneChannel(next.row, touched))) {
+        botDown = true;
+        // Un salon qui n'a pas pu être vérifié n'est pas « vu » : redemandé à la passe suivante, pas dans une minute.
+        sweep.checkedAt.delete(next.key);
+      }
     }
   };
   await Promise.all(Array.from({ length: VOICE_RECHECK_CONCURRENCY }, worker));
