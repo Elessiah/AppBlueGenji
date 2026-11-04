@@ -127,19 +127,20 @@ describe("dispatchMatchVoiceChannels — création", () => {
     expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
   });
 
-  it("dispatchMatchVoiceChannels_botDownOnCreate_skipsRecheckAndRelease", async () => {
+  it("dispatchMatchVoiceChannels_botDownOnCreate_skipsRecheckButStillReleases", async () => {
     const { execute } = database({ due: [dueMatch], openDue: [{ match_id: 9, team_id: 1, channel_id: "5", tournament_id: 7, team_name: "Gamma" }] });
     jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "BOT_VOICE_TIMEOUT" });
     await dispatchMatchVoiceChannels();
     expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
-    expect(execute.mock.calls.some(([sql]) => sql === OPEN_DUE_CHANNELS_SQL || sql === RELEASABLE_SQL)).toBe(false);
+    expect(execute.mock.calls.some(([sql]) => sql === OPEN_DUE_CHANNELS_SQL)).toBe(false);
+    expect(execute.mock.calls.some(([sql]) => sql === RELEASABLE_SQL)).toBe(true);
   });
 
-  it("dispatchMatchVoiceChannels_botDownOnRecheck_skipsRelease", async () => {
+  it("dispatchMatchVoiceChannels_botDownOnRecheck_stillReleases", async () => {
     const { execute } = database({ openDue: [{ match_id: 9, team_id: 1, channel_id: "5", tournament_id: 7, team_name: "Gamma" }] });
     jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "BOT_INTERNAL_UNREACHABLE" });
     await dispatchMatchVoiceChannels();
-    expect(execute.mock.calls.some(([sql]) => sql === RELEASABLE_SQL)).toBe(false);
+    expect(execute.mock.calls.some(([sql]) => sql === RELEASABLE_SQL)).toBe(true);
   });
 
   it("dispatchMatchVoiceChannels_botRefusesOneChannel_triesTheOtherSideAndMatches", async () => {
@@ -294,16 +295,31 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     expect(deletes()).toBe(3);
   });
 
-  it("dispatchMatchVoiceChannels_purgeBacklogBeyondTheCap_continuesNextPass", async () => {
+  it("dispatchMatchVoiceChannels_purgeBacklogBeyondTheCap_continuesAfterShortPause", async () => {
     const { execute } = database({ needed: { due: 0, open_rows: 0 } });
     const deletes = () => execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE")).length;
     execute.mockImplementation(async (sql) =>
       sql.includes("AS open_rows") ? [[{ due: 0, open_rows: 0 }], []] : [{ affectedRows: 200 }, []],
     );
+    const start = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(start);
     await dispatchMatchVoiceChannels();
     expect(deletes()).toBe(10);
+    clock.mockReturnValue(start + 10_000);
+    await dispatchMatchVoiceChannels(true);
+    expect(deletes()).toBe(10);
+    clock.mockReturnValue(start + 61_000);
     await dispatchMatchVoiceChannels(true);
     expect(deletes()).toBe(20);
+  });
+
+  it("dispatchMatchVoiceChannels_touchedAndPurge_publishesBeforePurging", async () => {
+    const { execute } = database({ due: [dueMatch] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    await dispatchMatchVoiceChannels();
+    const publishedAt = jest.mocked(publishMatchUpdatedEvent).mock.invocationCallOrder[0]!;
+    const purgeAt = execute.mock.invocationCallOrder[execute.mock.calls.findIndex(([sql]) => sql.startsWith("DELETE"))]!;
+    expect(publishedAt).toBeLessThan(purgeAt);
   });
 
   it("dispatchMatchVoiceChannels_releaseStepThrows_stillPurges", async () => {
