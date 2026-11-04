@@ -5,23 +5,7 @@ import type {
   TournamentListRow,
   TournamentRow,
 } from "@/lib/server/tournaments/_internal";
-import type { RowOverrides } from "./row-overrides";
-
-/**
- * Les colonnes d'une ligne mysql2, **toutes requises** : `RowDataPacket` porte
- * des signatures d'index (`[column: string]: any`) qui font accepter n'importe
- * quel objet partiel. Elles sont retirées, avec le `constructor` littéral, pour
- * que l'oubli d'une colonne se voie à la compilation.
- */
-type RowColumns<T> = {
-  [K in keyof T as K extends "constructor"
-    ? never
-    : string extends K
-      ? never
-      : number extends K
-        ? never
-        : K]: T[K];
-};
+import type { RowColumns, RowOverrides } from "./row-overrides";
 
 /**
  * Une ligne `bg_tournaments` **complète**, surchargée colonne par colonne.

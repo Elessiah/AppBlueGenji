@@ -95,13 +95,28 @@ describe("loadNotificationRecipients — option matchDm", () => {
   it("relit sans la colonne quand la migration n'est pas passée : personne n'a pu s'opposer", async () => {
     const missing = Object.assign(new Error("Unknown column 'match_dm_enabled'"), { code: "ER_BAD_FIELD_ERROR" });
     const rows = ROWS.map(({ match_dm_enabled: _ignored, ...row }) => row);
-    const query = jest.fn<SqlQuery>().mockRejectedValueOnce(missing).mockResolvedValueOnce([rows, []]);
+    // Lecture sans la langue d'abord (opposition gardée), puis sans les deux.
+    const query = jest.fn<SqlQuery>().mockRejectedValueOnce(missing).mockRejectedValueOnce(missing).mockResolvedValueOnce([rows, []]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
     const recipients = await loadNotificationRecipients([1, 2, 3], "certified", { matchDm: true });
-    expect(query).toHaveBeenCalledTimes(2);
-    expect(String(query.mock.calls[1][0])).not.toMatch(/match_dm_enabled/);
+    expect(query).toHaveBeenCalledTimes(3);
+    expect(String(query.mock.calls[2][0])).not.toMatch(/match_dm_enabled/);
     expect(recipients[1]).toEqual({ userId: 2, discord: { discordId: "777", handle: "ayla", label: "Ayla" } });
     expect(recipients[2]).toEqual({ userId: 3, discord: null });
+  });
+
+  it("loadNotificationRecipients_localeColumnMissing_matchDmOptOutKept", async () => {
+    // Seule la colonne de langue manque : l'opposition du joueur reste lue, et respectée.
+    const missing = Object.assign(new Error("Unknown column 'locale'"), { code: "ER_BAD_FIELD_ERROR" });
+    const query = jest.fn<SqlQuery>().mockRejectedValueOnce(missing).mockResolvedValueOnce([ROWS, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    const recipients = await loadNotificationRecipients([1, 2, 3], "certified", { matchDm: true });
+
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(String(query.mock.calls[1][0])).toMatch(/match_dm_enabled/);
+    expect(String(query.mock.calls[1][0])).not.toMatch(/locale/);
+    expect(recipients[1]).toEqual({ userId: 2, discord: null });
   });
 
   it("loadNotificationRecipients_localeColumnRead_localeCarried", async () => {

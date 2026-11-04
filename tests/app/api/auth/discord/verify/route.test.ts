@@ -136,7 +136,7 @@ describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
     const res = await attempt(VICTIM_CHALLENGE, "424242");
 
     expect(res.status).toBe(200);
-    expect(verifyMock).toHaveBeenCalledWith(VICTIM_CHALLENGE, "424242");
+    expect(verifyMock).toHaveBeenCalledWith(VICTIM_CHALLENGE, "424242", "login");
     expect(createSessionMock).toHaveBeenCalledWith(42, "LOGIN_DISCORD_CODE");
     // Sans langue envoyée (page d'avant le lot) : rien d'écrit, le compte garde la sienne (lot 9-3).
     expect(recordLoginLocale).not.toHaveBeenCalled();

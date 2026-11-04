@@ -35,6 +35,7 @@ type Challenge = {
   discord_id: string;
   lookup_hash: string | null;
   code_hash: string;
+  purpose: "LOGIN" | "HANDLE" | null;
   expires_at: Date;
   consumed_at: Date | null;
   attempts: number;
@@ -158,6 +159,7 @@ function pendingChallenge(overrides: Partial<Challenge> = {}): Challenge {
     discord_id: "123",
     lookup_hash: hash(TOKEN),
     code_hash: hash("424242"),
+    purpose: "LOGIN",
     expires_at: new Date(Date.now() + 600_000),
     consumed_at: null,
     attempts: 0,
@@ -449,7 +451,7 @@ describe("consumeDiscordLoginChallenge — le défi désigné par son jeton", ()
     // ici, qu'il réapparaît — une fois la preuve faite.
     fakeDb(pendingChallenge({ id: 9, discord_id: "555" }));
 
-    await expect(consumeDiscordLoginChallenge(TOKEN, "424242")).resolves.toEqual({
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toEqual({
       discordId: "555",
       handle: null,
     });
@@ -458,7 +460,7 @@ describe("consumeDiscordLoginChallenge — le défi désigné par son jeton", ()
   it("refuse un code faux sans rien rendre, et décompte l'essai", async () => {
     const { state } = fakeDb(pendingChallenge({ id: 9 }));
 
-    await expect(consumeDiscordLoginChallenge(TOKEN, "000000")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge(TOKEN, "000000", "login")).resolves.toBeNull();
     expect(state!.attempts).toBe(1);
   });
 
@@ -466,26 +468,26 @@ describe("consumeDiscordLoginChallenge — le défi désigné par son jeton", ()
     const { state } = fakeDb(pendingChallenge({ id: 9 }));
 
     for (let i = 0; i < MAX_DISCORD_CODE_ATTEMPTS; i += 1) {
-      await consumeDiscordLoginChallenge(TOKEN, "000000");
+      await consumeDiscordLoginChallenge(TOKEN, "000000", "login");
     }
 
     expect(state!.consumed_at).not.toBeNull();
-    await expect(consumeDiscordLoginChallenge(TOKEN, "424242")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toBeNull();
   });
 
   it("refuse un défi inconnu", async () => {
     fakeDb(pendingChallenge({ id: 9 }));
-    await expect(consumeDiscordLoginChallenge(OTHER_TOKEN, "424242")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge(OTHER_TOKEN, "424242", "login")).resolves.toBeNull();
   });
 
   it("refuse un défi remplacé par un plus récent : seul le dernier code émis vaut", async () => {
     fakeDb(pendingChallenge({ id: 9 }), 0, true, 0, true);
-    await expect(consumeDiscordLoginChallenge(TOKEN, "424242")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toBeNull();
   });
 
   it("écarte le défi remplacé **dans la requête**", async () => {
     const { execute } = fakeDb(pendingChallenge({ id: 9 }));
-    await consumeDiscordLoginChallenge(TOKEN, "424242");
+    await consumeDiscordLoginChallenge(TOKEN, "424242", "login");
 
     const [sql, params] = execute.mock.calls.find(([q]) =>
       String(q).replace(/\s+/g, " ").trim().startsWith("SELECT c.id"),
@@ -499,13 +501,13 @@ describe("consumeDiscordLoginChallenge — le défi désigné par son jeton", ()
 
   it("refuse un défi expiré", async () => {
     fakeDb(pendingChallenge({ id: 9, expires_at: new Date(Date.now() - 1000) }));
-    await expect(consumeDiscordLoginChallenge(TOKEN, "424242")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toBeNull();
   });
 
   it("refuse sans rien lire un jeton mal formé (l'ancien numéro de ligne compris)", async () => {
     const { execute } = fakeDb(pendingChallenge({ id: 9 }));
 
-    await expect(consumeDiscordLoginChallenge("9", "424242")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge("9", "424242", "login")).resolves.toBeNull();
     expect(execute).not.toHaveBeenCalled();
   });
 });
@@ -540,5 +542,51 @@ describe("jeton de défi", () => {
     ["rien", undefined],
   ])("refuse %s", (_label, value) => {
     expect(isDiscordChallengeToken(value)).toBe(false);
+  });
+});
+
+describe("consumeDiscordLoginChallenge — usage du code (EF-14)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("consumeDiscordLoginChallenge_handleCodeAtLogin_rejectedWithoutAttempt", async () => {
+    // Le message d'un code de certification dit qu'il ne connecte pas : la
+    // connexion le refuse, sans même le comparer.
+    const { state } = fakeDb(pendingChallenge({ id: 9, purpose: "HANDLE" }));
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toBeNull();
+    expect(state!.attempts).toBe(0);
+  });
+
+  it("consumeDiscordLoginChallenge_loginCodeAtCertification_rejected", async () => {
+    fakeDb(pendingChallenge({ id: 9, purpose: "LOGIN" }));
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "handle")).resolves.toBeNull();
+  });
+
+  it("consumeDiscordLoginChallenge_matchingHandlePurpose_accepted", async () => {
+    fakeDb(pendingChallenge({ id: 9, discord_id: "555", purpose: "HANDLE" }));
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "handle")).resolves.toEqual({ discordId: "555", handle: null });
+  });
+
+  it("consumeDiscordLoginChallenge_legacyNullPurpose_accepted", async () => {
+    // Défi émis avant la colonne (quinze minutes de vie) : accepté pour les deux usages.
+    fakeDb(pendingChallenge({ id: 9, discord_id: "555", purpose: null }));
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "handle")).resolves.toEqual({ discordId: "555", handle: null });
+  });
+
+  it("createDiscordLoginChallenge_handlePurpose_storedInInsert", async () => {
+    const handle = fakeDb(null, 0);
+    await createDiscordLoginChallenge("123", "nova", "handle");
+    const login = fakeDb(null, 0);
+    await createDiscordLoginChallenge("123");
+
+    const insertParams = (db: typeof handle) =>
+      (db.connection.execute.mock.calls.find(([q]) => String(q).trim().startsWith("INSERT")) as unknown as [string, unknown[]])[1];
+    expect(insertParams(handle)[4]).toBe("HANDLE");
+    expect(insertParams(login)[4]).toBe("LOGIN");
   });
 });
