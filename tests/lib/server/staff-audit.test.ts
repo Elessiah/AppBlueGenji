@@ -9,23 +9,43 @@ const ACTOR = { id: 9, pseudo: "ArbitreZelé" };
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(sendBotLog).mockResolvedValue(undefined);
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
 });
 
 describe("staff-audit", () => {
   it("publishStaffAction : pm2 nominatif, Discord anonyme", () => {
     const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
-    publishStaffAction("ligne par le staff.", ACTOR);
+    publishStaffAction("ligne par le staff.", ACTOR, { category: "admin" });
     expect(info).toHaveBeenCalledWith("[staff-audit] ligne par le staff. — auteur : ArbitreZelé (#9)");
-    expect(sendBotLog).toHaveBeenCalledWith("ligne par le staff.", { category: "admin" });
+    expect(sendBotLog).toHaveBeenCalledWith("ligne par le staff.", { category: "admin", tournamentId: null });
     info.mockRestore();
   });
 
   it("publishStaffAction : un détail réservé à pm2 n'atteint pas Discord", () => {
     const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
-    publishStaffAction("geste par le staff.", ACTOR, "geste par le staff, manche 2 : 2 – 1.");
+    publishStaffAction("geste par le staff.", ACTOR, { auditLine: "geste par le staff, manche 2 : 2 – 1.", category: "admin" });
     expect(info).toHaveBeenCalledWith("[staff-audit] geste par le staff, manche 2 : 2 – 1. — auteur : ArbitreZelé (#9)");
-    expect(sendBotLog).toHaveBeenCalledWith("geste par le staff.", { category: "admin" });
+    expect(sendBotLog).toHaveBeenCalledWith("geste par le staff.", { category: "admin", tournamentId: null });
+    info.mockRestore();
+  });
+
+  it("publishStaffAction_tournamentGesture_joinsThatTournamentsBatch", () => {
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+    publishStaffAction("inscription retirée par le staff.", ACTOR, { category: "registrations", tournamentId: 12 });
+    expect(sendBotLog).toHaveBeenCalledWith("inscription retirée par le staff.", { category: "registrations", tournamentId: 12 });
+    info.mockRestore();
+  });
+
+  it("publishStaffAction_auditWrittenBeforeTheDiscordLine", () => {
+    const order: string[] = [];
+    const info = jest.spyOn(console, "info").mockImplementation(() => {
+      order.push("pm2");
+    });
+    jest.mocked(sendBotLog).mockImplementation(() => {
+      order.push("discord");
+    });
+    publishStaffAction("geste par le staff.", ACTOR, { category: "moderation" });
+    expect(order).toEqual(["pm2", "discord"]);
     info.mockRestore();
   });
 

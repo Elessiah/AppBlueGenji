@@ -8,6 +8,8 @@ import {
   discardBotLogs,
   dropQueuedRefereeAlerts,
   flushBotLogs,
+  ALERT_FLUSH_WAIT_MS,
+  BOT_LOG_ORDER_WAIT_MS,
   markMatchResolved,
   queueBotLog,
   queueRefereeAlert,
@@ -15,6 +17,7 @@ import {
   resolveBotLogs,
 } from "@/lib/server/tournaments/bot-logs";
 import {
+  flushBotLogBatch,
   isBotCircuitOpen,
   pushRefereeAlert,
   sendBotLog,
@@ -93,8 +96,9 @@ const DELIVERED = { sent: 1, unresolved: [], failed: [] };
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(isBotCircuitOpen).mockReturnValue(false);
-  jest.mocked(sendBotLog).mockResolvedValue(undefined);
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
   jest.mocked(pushRefereeAlert).mockResolvedValue(DELIVERED);
+  jest.mocked(flushBotLogBatch).mockResolvedValue();
 });
 
 describe("routage vers deux transports", () => {
@@ -118,6 +122,71 @@ describe("routage vers deux transports", () => {
     const [french, english] = String(options?.dmMessage).split(BILINGUAL_DM_SEPARATOR);
     expect(french).toBe(message);
     expect(english).toMatch(/^\*\*.+\*\* — .+ https?:\/\/\S+$/);
+  });
+
+  it("flushBotLogs_scoreConflict_tournamentBatchFlushedBeforeTheAlert", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+    const order: string[] = [];
+    jest.mocked(flushBotLogBatch).mockImplementation(async () => {
+      order.push("flush");
+    });
+    jest.mocked(pushRefereeAlert).mockImplementation(async () => {
+      order.push("alert");
+      return DELIVERED;
+    });
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // Les lignes du tournoi en attente précèdent, au salon, le désaccord qu'elles expliquent.
+    expect(flushBotLogBatch).toHaveBeenCalledWith({ tournamentId: 12 });
+    expect(order).toEqual(["flush", "alert"]);
+  });
+
+  it("flushBotLogs_slowBotForTheTournamentBatch_alertNotHeldBeyondTheBound", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick", "queueMicrotask"] });
+    try {
+      const connection = fakeConnection();
+      mockDb([[MATCH_ROW]]);
+      jest.mocked(flushBotLogBatch).mockReturnValue(new Promise<void>(() => undefined));
+
+      queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+      flushBotLogs(connection);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(pushRefereeAlert).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(ALERT_FLUSH_WAIT_MS);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("flushBotLogs_previousPassStillResolving_alertSentWithoutWaitingForItsTurn", async () => {
+    let releaseSlow: () => void = () => undefined;
+    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
+      params?.[0] === 12
+        ? new Promise((resolve) => {
+            releaseSlow = () => resolve([[]]);
+          })
+        : Promise.resolve([[MATCH_ROW]]),
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const slow = fakeConnection();
+    const alerting = fakeConnection();
+
+    queueBotLog(slow, { kind: "tournament_started", tournamentId: 12 });
+    queueBotLog(alerting, { kind: "score_conflict", matchId: 31 });
+    flushBotLogs(slow);
+    flushBotLogs(alerting);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+    // Rend le tour, pour que les tests suivants ne l'attendent pas.
+    releaseSlow();
+    await new Promise((resolve) => setImmediate(resolve));
   });
 
   // Report expiré sans réponse → alerte arbitre seulement.
@@ -222,7 +291,7 @@ describe("routage vers deux transports", () => {
   // partir quand même.
   it("poursuit la file quand pushRefereeAlert rend null (bot injoignable)", async () => {
     const connection = fakeConnection();
-    mockDb([[MATCH_ROW], [TOURNAMENT_ROW]]);
+    mockDb([[TOURNAMENT_ROW], [MATCH_ROW]]);
     jest.mocked(pushRefereeAlert).mockResolvedValue(null);
 
     queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
@@ -361,7 +430,9 @@ describe("réservation rendue quand l'alerte n'est pas remise", () => {
   it("ne libère rien pour un évènement de journal", async () => {
     const connection = fakeConnection();
     const execute = mockDb([[TOURNAMENT_ROW]]);
-    jest.mocked(sendBotLog).mockRejectedValue(new Error("ECONNREFUSED"));
+    jest.mocked(sendBotLog).mockImplementation(() => {
+      throw new Error("ECONNREFUSED");
+    });
 
     queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
     flushBotLogs(connection);
@@ -913,5 +984,149 @@ describe("queueRoundNoRefereeAlert", () => {
     jest.mocked(isBotCircuitOpen).mockReturnValue(true);
     expect(await queueRoundNoRefereeAlert(roundConnection(state), roundOf(31))).toBe(false);
     expect(state.rows).toEqual([]);
+  });
+});
+
+describe("tour du journal et vidage avant alerte", () => {
+  const order = globalThis as typeof globalThis & { __bgBotLogOrder?: Promise<void> };
+  const flushed = () => new Promise((resolve) => setImmediate(resolve));
+
+  it("flushBotLogs_onlyAlerts_noTurnTaken", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+    const before = order.__bgBotLogOrder;
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    flushBotLogs(connection);
+    await flushed();
+
+    expect(order.__bgBotLogOrder).toBe(before);
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it("flushBotLogs_logLine_turnTakenAndReleased", async () => {
+    const connection = fakeConnection();
+    mockDb([[TOURNAMENT_ROW]]);
+    const before = order.__bgBotLogOrder;
+
+    queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
+    flushBotLogs(connection);
+
+    const turn = order.__bgBotLogOrder;
+    expect(turn).not.toBe(before);
+    await expect(turn).resolves.toBeUndefined();
+  });
+
+  it("flushBotLogs_severalAlertsSameTournamentSlowBot_oneBoundedPreFlush", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick", "queueMicrotask"] });
+    try {
+      const connection = fakeConnection();
+      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(async () => [[MATCH_ROW]]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+      jest.mocked(flushBotLogBatch).mockReturnValue(new Promise<void>(() => undefined));
+
+      queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+      queueBotLog(connection, { kind: "score_conflict", matchId: 32 });
+      queueBotLog(connection, { kind: "score_conflict", matchId: 33 });
+      flushBotLogs(connection);
+      await flushed();
+      await jest.advanceTimersByTimeAsync(ALERT_FLUSH_WAIT_MS);
+      await flushed();
+
+      expect(flushBotLogBatch).toHaveBeenCalledTimes(1);
+      expect(pushRefereeAlert).toHaveBeenCalledTimes(3);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("flushBotLogs_alertsOfTwoTournaments_oneFlushEach", async () => {
+    const connection = fakeConnection();
+    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(async (_sql, params) => [
+      [params?.[0] === 32 ? { ...MATCH_ROW, id: 32, tournament_id: 13 } : MATCH_ROW],
+    ]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    queueBotLog(connection, { kind: "score_conflict", matchId: 32 });
+    flushBotLogs(connection);
+    await flushed();
+
+    expect(jest.mocked(flushBotLogBatch).mock.calls).toEqual([[{ tournamentId: 12 }], [{ tournamentId: 13 }]]);
+  });
+  it("flushBotLogs_alertAndSlowLogLineSamePass_alertSentWithoutWaitingForTheLine", async () => {
+    const connection = fakeConnection();
+    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
+      params?.[0] === 12 ? new Promise(() => undefined) : Promise.resolve([[MATCH_ROW]]),
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    flushBotLogs(connection);
+    await flushed();
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+    jest.mocked(sendBotLog).mockClear();
+  });
+
+  it("flushBotLogs_lineResolutionHangs_turnReleasedAfterTheBound", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick", "queueMicrotask"] });
+    try {
+      const connection = fakeConnection();
+      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(() => new Promise(() => undefined));
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+      queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
+      flushBotLogs(connection);
+      const turn = order.__bgBotLogOrder;
+      let released = false;
+      void turn?.then(() => {
+        released = true;
+      });
+      await jest.advanceTimersByTimeAsync(BOT_LOG_ORDER_WAIT_MS - 1);
+      expect(released).toBe(false);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(released).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+  it("flushBotLogs_previousTurnSettled_onlyItsOwnTurnTimer", async () => {
+    mockDb([[TOURNAMENT_ROW], [TOURNAMENT_ROW]]);
+    const first = fakeConnection();
+    queueBotLog(first, { kind: "tournament_started", tournamentId: 12 });
+    flushBotLogs(first);
+    await flushed();
+    await flushed();
+    const timers = jest.spyOn(globalThis, "setTimeout");
+    try {
+      const second = fakeConnection();
+      queueBotLog(second, { kind: "tournament_started", tournamentId: 12 });
+      flushBotLogs(second);
+      await flushed();
+      await flushed();
+      // Le tour précédent est rendu : seul le minuteur du tour de ce passage est posé.
+      expect(timers).toHaveBeenCalledTimes(1);
+    } finally {
+      timers.mockRestore();
+    }
+  });
+  it("flushBotLogs_previousTurnHangs_linesDeliveredAtTheBoundFromTheCommit", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick", "queueMicrotask"] });
+    try {
+      order.__bgBotLogOrder = new Promise<void>(() => undefined);
+      mockDb([[TOURNAMENT_ROW]]);
+      const connection = fakeConnection();
+      queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
+      flushBotLogs(connection);
+      await flushed();
+      expect(sendBotLog).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(BOT_LOG_ORDER_WAIT_MS);
+      await flushed();
+      expect(sendBotLog).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

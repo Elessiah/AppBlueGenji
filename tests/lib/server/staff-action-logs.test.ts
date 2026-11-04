@@ -66,7 +66,7 @@ async function settle(): Promise<void> {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(sendBotLog).mockResolvedValue();
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
 });
 
 describe("deliverStaffMatchAction", () => {
@@ -82,7 +82,7 @@ describe("deliverStaffMatchAction", () => {
 
   it("écrit « un joueur » en tournoi individuel", async () => {
     mockRows(matchRow({ participant_type: "SOLO", team1_name: "Alice", team2_name: "Bob" }));
-    await deliverStaffMatchAction(42, "RESULT_VALIDATED");
+    await deliverStaffMatchAction(42, "SCORES_SAVED");
     const line = jest.mocked(sendBotLog).mock.calls[0][0];
     expect(line).toContain("un joueur vs un joueur");
     expect(line).not.toMatch(/Alice|Bob/);
@@ -300,7 +300,9 @@ describe("announceStaffMatchAction / announceStaffTournamentAction", () => {
   it("ne lèvent jamais quand le bot est injoignable", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     mockRows(matchRow());
-    jest.mocked(sendBotLog).mockRejectedValue(new Error("bot down"));
+    jest.mocked(sendBotLog).mockImplementation(() => {
+      throw new Error("bot down");
+    });
     announceStaffMatchAction(42, "REPLAY_SET");
     await settle();
     expect(sendBotLog).toHaveBeenCalledTimes(1);

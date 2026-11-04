@@ -4,7 +4,7 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 
 import { getDatabase } from "@/lib/server/database";
-import { sendBotLog } from "@/lib/server/bot-integration";
+import { flushBotLogBatch, sendBotLog } from "@/lib/server/bot-integration";
 import { flushRoundMapsNotice, resetRoundMapsNoticeState } from "@/lib/server/tournaments/round-maps-notice";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
@@ -31,7 +31,8 @@ function pool(select: unknown[]) {
 beforeEach(() => {
   jest.clearAllMocks();
   resetRoundMapsNoticeState();
-  jest.mocked(sendBotLog).mockResolvedValue();
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
+  jest.mocked(flushBotLogBatch).mockResolvedValue();
 });
 
 afterEach(() => resetRoundMapsNoticeState());

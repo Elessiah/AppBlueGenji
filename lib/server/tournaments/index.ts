@@ -182,7 +182,7 @@ import {
   publishUpdatedEvent,
   publishScoreReportedEvent,
 } from "./notifications";
-import { discardBotLogs, flushBotLogs, queueBotLog } from "./bot-logs";
+import { discardBotLogs, flushBotLogs, markResultValidatedByStaff, queueBotLog } from "./bot-logs";
 import { releaseWithServerLockWait, rollbackKeepingError } from "./lock-wait";
 import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
@@ -2111,6 +2111,8 @@ async function adminResolveMatchOnce(
 
     const { adminResolveMatch } = await import("./admin");
     await adminResolveMatch(connection, matchId, entry);
+    // « Match terminé » dira « résultat validé par le staff » (`./bot-logs`).
+    markResultValidatedByStaff(connection, matchId);
 
     // Correction : seule une issue **changée** en est une (revalider le même
     // résultat, pour relancer la propagation par exemple, n'avertit personne).

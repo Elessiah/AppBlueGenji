@@ -34,7 +34,7 @@ describe("DELETE /api/admin/tournaments/[id]/forfeits/[teamId]", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(cancelTournamentForfeit).mockResolvedValue(cancelled);
-    jest.mocked(sendBotLog).mockResolvedValue(undefined);
+    jest.mocked(sendBotLog).mockReturnValue(undefined);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -57,7 +57,9 @@ describe("DELETE /api/admin/tournaments/[id]/forfeits/[teamId]", () => {
 
     await cancel("7", "102");
 
-    const line = jest.mocked(sendBotLog).mock.calls[0][0] as string;
+    const [line, scope] = jest.mocked(sendBotLog).mock.calls[0];
+    // Le lot du tournoi, à la suite de ses autres lignes d'inscription.
+    expect(scope).toEqual({ category: "registrations", tournamentId: 7 });
     expect(line).toContain("Team Nova");
     expect(line).toContain("par le staff");
     expect(line).not.toContain("Root");

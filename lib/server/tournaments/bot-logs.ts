@@ -49,6 +49,7 @@ import { discardCastChanges, flushCastChanges } from "./cast-notices";
 import { discardRefereeChanges, flushRefereeChanges } from "./referee-notices";
 import { getDatabase } from "@/lib/server/database";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
+import { botLogTournamentId } from "@/lib/shared/bot-log-batch";
 import {
   formatEndurancePenaltyLiftedLog,
   formatEndurancePenaltyLog,
@@ -91,7 +92,8 @@ export type PendingBotLog =
   | { kind: "tournament_created"; tournamentId: number }
   | { kind: "registration"; tournamentId: number; teamId: number; byStaff: boolean }
   | { kind: "forfeit"; tournamentId: number; teamId: number }
-  | { kind: "match_finished"; matchId: number }
+  // `staffValidated` : tranché par « Valider le résultat » (`markResultValidatedByStaff`).
+  | { kind: "match_finished"; matchId: number; staffValidated?: boolean }
   | { kind: "score_conflict"; matchId: number; claimId?: number }
   | { kind: "score_report_stalled"; matchId: number; claimId?: number }
   // `pairing` : l'appariement lancé — une alerte par appariement, pas par match.
@@ -275,6 +277,51 @@ const pending = new WeakMap<PoolConnection, PendingBotLog[]>();
  */
 const resolvedMatches = new WeakMap<PoolConnection, Set<number>>();
 
+/**
+ * Manches tranchées par « Valider le résultat » dans la transaction en cours :
+ * leur ligne « Match terminé » le dit (`markResultValidatedByStaff`).
+ */
+const staffValidatedMatches = new WeakMap<PoolConnection, Set<number>>();
+
+/**
+ * Ordre des passages : chaque `flushBotLogs` range ses lignes de journal
+ * **après** celles du passage précédent, c'est-à-dire dans l'ordre des commits.
+ * Sans lui, deux transactions rapprochées (score de la finale, puis clôture par
+ * le balayage) résoudraient leurs lignes en parallèle, et le résultat de la
+ * finale pourrait rejoindre un lot parti après « Tournoi terminé ». Seule la
+ * mise au lot (instantanée) attend : les alertes aux arbitres et les envois au
+ * bot se font hors de ce tour.
+ *
+ * Le tour vit sur `globalThis`, comme les lots : Next charge le module une fois
+ * par bundle (routes, instrumentation), et deux copies auraient deux tours.
+ */
+const logOrderState = globalThis as typeof globalThis & {
+  __bgBotLogOrder?: Promise<void>;
+  /** Tours déjà rendus : le passage suivant ne pose pas de minuteur pour les attendre. */
+  __bgBotLogSettled?: WeakSet<Promise<void>>;
+};
+const settledTurns = (logOrderState.__bgBotLogSettled ??= new WeakSet<Promise<void>>());
+
+/**
+ * Attente maximale du passage précédent : une lecture bloquée ne retient pas le
+ * journal, et un arrêt propre (1,2 s) trouve la ligne déjà au lot.
+ */
+export const BOT_LOG_ORDER_WAIT_MS = 1_000;
+
+/** Attente maximale de l'envoi des lots d'un tournoi avant une alerte : le bot lent ne la retient pas. */
+export const ALERT_FLUSH_WAIT_MS = 2_000;
+
+function waitAtMost(promise: Promise<void>, ms: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const deadline = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, ms);
+    timer.unref?.();
+  });
+  return Promise.race([promise, deadline]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 /** Deux entrées identiques dans une même transaction ne font qu'une ligne. */
 function entryKey(entry: PendingBotLog): string {
   return JSON.stringify(entry);
@@ -320,6 +367,22 @@ export function markMatchResolved(connection: PoolConnection, matchId: number): 
   else resolvedMatches.set(connection, new Set([matchId]));
 }
 
+/**
+ * Note que la transaction en cours vient de trancher une manche par « Valider
+ * le résultat » : sa ligne « Match terminé » le mentionne, au lieu d'une ligne
+ * 🛠️ à part qui relisait le match et partait dans un autre lot, dans un ordre
+ * quelconque. En mémoire et synchrone, comme `markMatchResolved`.
+ */
+export function markResultValidatedByStaff(connection: PoolConnection, matchId: number): void {
+  const marked = staffValidatedMatches.get(connection);
+  if (marked) marked.add(matchId);
+  else staffValidatedMatches.set(connection, new Set([matchId]));
+  // La manche tranchée a déjà sa ligne (`finalizeMatch`) ; sinon, elle l'obtient,
+  // même file pleine : c'est la seule trace du geste au journal.
+  const entry: PendingBotLog = { kind: "match_finished", matchId };
+  if (!queueBotLog(connection, entry)) pending.get(connection)?.push(entry);
+}
+
 /** Jette les lignes réservées : la transaction n'a pas abouti. */
 export function discardBotLogs(connection: PoolConnection): void {
   pending.delete(connection);
@@ -332,6 +395,96 @@ export function discardBotLogs(connection: PoolConnection): void {
   // Les manches notées tranchées ne l'ont pas été : leurs réservations gardent
   // tout leur objet, et le prochain entretien les retrouvera telles quelles.
   resolvedMatches.delete(connection);
+  staffValidatedMatches.delete(connection);
+}
+
+/**
+ * Tournoi d'une ligne : celui relu pour un résultat de match ou pour la
+ * manche d'une alerte, sinon celui de l'entrée.
+ */
+function batchTournamentOf({ entry, tournamentId, refereeMatch }: ResolvedBotLog): number | null {
+  return botLogTournamentId(
+    tournamentId ?? refereeMatch?.tournamentId ?? ("tournamentId" in entry ? entry.tournamentId : null),
+  );
+}
+
+/**
+ * Range une ligne du journal dans le lot de son tournoi — jamais le lot
+ * commun, pour qu'un « tournoi terminé » ne passe pas devant le résultat de
+ * sa finale. Les catégories ont des lots (et des minuteurs) séparés, d'où
+ * deux vidages : avant « Tournoi terminé », **tous** les lots du tournoi
+ * partent (dans l'ordre de leur première ligne) — résultats, lancement,
+ * forfait qui le clôt ; avant un résultat, le lot `tournament` part, pour
+ * qu'un lancement qui attend son silence ne paraisse pas après les
+ * résultats. Synchrone : les lots quittent l'attente sur-le-champ.
+ */
+function deliverLog(resolved: ResolvedBotLog): void {
+  const { entry, message } = resolved;
+  const batchTournamentId = batchTournamentOf(resolved);
+  const category = BOT_EVENT_LOG_CATEGORIES[entry.kind];
+  if (batchTournamentId !== null) {
+    if (entry.kind === "tournament_finished") void flushBotLogBatch({ tournamentId: batchTournamentId });
+    else if (category === "results") void flushBotLogBatch({ tournamentId: batchTournamentId, category: "tournament" });
+  }
+  sendBotLog(message, { tournamentId: batchTournamentId, category });
+  // Le coup d'envoi est une ligne de journal pour le staff, et une
+  // notification pour les joueurs engagés — la seule qui n'ait pas de
+  // message privé Discord : elle naît au même point de passage unique.
+  if (entry.kind === "tournament_started") {
+    void notifyTournamentStart(entry.tournamentId).catch(() => undefined);
+  }
+}
+
+/**
+ * Avant une alerte du canal arbitre, qui s'écrit aussi au salon du journal :
+ * les lignes du tournoi en attente partent d'abord, pour qu'un désaccord ne s'y
+ * lise pas plusieurs minutes avant les lignes qui l'expliquent. Ne lève jamais.
+ */
+async function flushTournamentBeforeAlert(
+  resolved: ResolvedBotLog,
+  preFlushed: Map<number, Promise<void>>,
+): Promise<void> {
+  const tournamentId = batchTournamentOf(resolved);
+  if (tournamentId === null) return;
+  // Une seule attente par tournoi et par passage : les alertes suivantes du
+  // même tournoi trouvent le vidage déjà fait (ou déjà borné) et ne paient pas
+  // chacune la fenêtre de ALERT_FLUSH_WAIT_MS.
+  let waited = preFlushed.get(tournamentId);
+  if (!waited) {
+    // Meilleur effort : l'alerte part même si le journal n'a pas suivi.
+    const flushed = (async () => flushBotLogBatch({ tournamentId }))().catch(() => undefined);
+    waited = waitAtMost(flushed, ALERT_FLUSH_WAIT_MS);
+    preFlushed.set(tournamentId, waited);
+  }
+  await waited;
+}
+
+/**
+ * Range les lignes de journal d'un passage **à son tour** (`previousTurn` : le
+ * passage commité juste avant, attendu au plus BOT_LOG_ORDER_WAIT_MS depuis le
+ * commit), puis rend le tour. Les alertes n'attendent pas
+ * ce tour : l'appelant les envoie sans lui.
+ */
+async function deliverLogLinesInTurn(
+  resolved: readonly ResolvedBotLog[],
+  previousWait: Promise<void> | null,
+  releaseTurn: () => void,
+): Promise<void> {
+  try {
+    // `previousWait` court depuis le commit, en parallèle de la lecture des lignes.
+    if (previousWait) await previousWait;
+    for (const line of resolved) {
+      if (line.channel !== "REFEREE") {
+        try {
+          deliverLog(line);
+        } catch {
+          // Meilleur effort : une ligne perdue n'emporte pas les suivantes.
+        }
+      }
+    }
+  } finally {
+    releaseTurn();
+  }
 }
 
 /**
@@ -351,11 +504,39 @@ export function flushBotLogs(connection: PoolConnection): void {
   // Et les casters désinscrits d'office par l'entretien (`./cast-notices`).
   flushCastChanges(connection);
   flushRefereeChanges(connection);
-  const queue = pending.get(connection) ?? [];
+  const validated = staffValidatedMatches.get(connection);
+  staffValidatedMatches.delete(connection);
+  const queue = (pending.get(connection) ?? []).map((entry) =>
+    entry.kind === "match_finished" && validated?.has(entry.matchId) ? { ...entry, staffValidated: true } : entry,
+  );
   pending.delete(connection);
   const settled = resolvedMatches.get(connection) ?? new Set<number>();
   resolvedMatches.delete(connection);
   if (queue.length === 0 && settled.size === 0) return;
+  // Le tour de ce passage, pris **au commit** (synchrone) : l'ordre des commits.
+  // Un passage qui ne porte que des alertes n'a aucune ligne à ranger : il ne
+  // prend pas de tour, et ne fait donc ni attendre ni attendre les autres.
+  const hasLogLines = queue.some((entry) => entry.kind !== "score_report_stalled" && botEventChannel(entry.kind) !== "REFEREE");
+  const previousTurn = logOrderState.__bgBotLogOrder ?? Promise.resolve();
+  let releaseTurn: () => void = () => undefined;
+  // Le plus souvent le tour précédent est déjà rendu : pas de minuteur pour rien.
+  const previousWait =
+    hasLogLines && !settledTurns.has(previousTurn) ? waitAtMost(previousTurn, BOT_LOG_ORDER_WAIT_MS) : null;
+  if (hasLogLines) {
+    const turn: Promise<void> = new Promise<void>((resolve) => {
+      // Une lecture qui traîne ne retient pas les passages suivants : le tour est
+      // rendu au bout de BOT_LOG_ORDER_WAIT_MS, ses lignes rejoignent leur lot
+      // dès qu'elles sont résolues.
+      const timer = setTimeout(() => releaseTurn(), BOT_LOG_ORDER_WAIT_MS);
+      timer.unref?.();
+      releaseTurn = () => {
+        clearTimeout(timer);
+        settledTurns.add(turn);
+        resolve();
+      };
+    });
+    logOrderState.__bgBotLogOrder = turn;
+  }
 
   // Une manche dont le désaccord vient d'être annoncé n'a pas besoin de son
   // escalade dans la même seconde : le téléphone de l'arbitre sonne déjà, et
@@ -373,6 +554,10 @@ export function flushBotLogs(connection: PoolConnection): void {
   // l'empêcherait de repartir un jour.
   const escalations = queue.filter((entry) => entry.kind === "score_report_stalled");
   const rest = queue.filter((entry) => entry.kind !== "score_report_stalled");
+  // Les alertes se résolvent à part : elles n'attendent pas les lectures des
+  // lignes du journal (jusqu'à une file entière de résultats).
+  const restAlerts = rest.filter((entry) => botEventChannel(entry.kind) === "REFEREE");
+  const restLines = rest.filter((entry) => botEventChannel(entry.kind) !== "REFEREE");
 
   void (async () => {
     // Ce qui a été **effectivement remis** aux arbitres, repéré par la clé de
@@ -383,29 +568,20 @@ export function flushBotLogs(connection: PoolConnection): void {
     const delivered = new Set<string>();
     /** Manches dont le désaccord vient d'être annoncé, et remis. */
     const announcedConflicts = new Set<number>();
+    /** Vidages avant alerte déjà lancés par ce passage, par tournoi. */
+    const preFlushed = new Map<number, Promise<void>>();
 
-    /** Envoie une ligne déjà rédigée, et dit si les arbitres l'ont reçue. */
-    async function deliver({ entry, channel, message, refereeMatch, tournamentId }: ResolvedBotLog): Promise<void> {
-      if (channel !== "REFEREE") {
-        // Lot du tournoi : celui de l'entrée, ou celui relu pour un résultat de
-        // match — jamais le lot commun, pour qu'un « tournoi terminé » ne passe
-        // pas devant le résultat de sa finale. Les catégories ont des lots (et des
-        // minuteurs) séparés : le lot des résultats part donc d'abord, pour que
-        // le résultat de la finale précède toujours la fin du tournoi.
-        const batchTournamentId = tournamentId ?? ("tournamentId" in entry ? entry.tournamentId : null);
-        if (entry.kind === "tournament_finished") await flushBotLogBatch({ tournamentId: batchTournamentId, category: "results" });
-        await sendBotLog(message, {
-          tournamentId: batchTournamentId,
-          category: BOT_EVENT_LOG_CATEGORIES[entry.kind],
-        });
-        // Le coup d'envoi est une ligne de journal pour le staff, et une
-        // notification pour les joueurs engagés — la seule qui n'ait pas de
-        // message privé Discord : elle naît au même point de passage unique.
-        if (entry.kind === "tournament_started") {
-          void notifyTournamentStart(entry.tournamentId).catch(() => undefined);
-        }
-        return;
-      }
+    /** Envoie une alerte déjà rédigée aux arbitres, et dit s'ils l'ont reçue. */
+    async function deliver(resolved: ResolvedBotLog): Promise<void> {
+      const { entry, channel, message, refereeMatch } = resolved;
+      // Seules les alertes passent ici (les lignes de journal suivent le tour,
+      // les escalades sont toutes du canal arbitre).
+      if (channel !== "REFEREE") return;
+
+      // Les alertes de ce chemin écrivent au bot sans passer par `sendBotLog`
+      // (qui vide lui-même le lot de ses propres lignes d'alerte) : un seul
+      // vidage, ici.
+      await flushTournamentBeforeAlert(resolved, preFlushed);
 
       // Le coupe-circuit est respecté ici, contrairement au signalement d'un
       // problème : personne n'attend cette réponse, et un bot éteint ferait
@@ -456,9 +632,19 @@ export function flushBotLogs(connection: PoolConnection): void {
       if (entry.kind === "score_conflict") announcedConflicts.add(entry.matchId);
     }
 
+    // Les lignes du journal rejoignent leur lot à leur tour (ordre des
+    // commits), en arrière-plan ; les alertes partent sans attendre ce tour ni
+    // la lecture des lignes.
+    if (hasLogLines) {
+      void resolveBotLogs(restLines)
+        .catch((): ResolvedBotLog[] => [])
+        .then((lines) => deliverLogLinesInTurn(lines, previousWait, releaseTurn));
+    }
+    const resolvedAlerts = await resolveBotLogs(restAlerts);
+
     /** Réservations des matchs sortis d'une alerte de manche pourtant remise. */
     const droppedClaims: number[] = [];
-    for (const resolved of await resolveBotLogs(rest)) {
+    for (const resolved of resolvedAlerts) {
       await deliver(resolved);
       if (delivered.has(entryKey(resolved.entry))) droppedClaims.push(...droppedClaimIds(resolved));
     }
@@ -1102,6 +1288,7 @@ async function resolveMatchFinishedLog(
     team2Score: match.team2_score === null ? null : Number(match.team2_score),
     forfeit,
     doubleForfeit,
+    staffValidated: entry.staffValidated === true,
   });
   return { message, tournamentId: Number(match.tournament_id) };
 }

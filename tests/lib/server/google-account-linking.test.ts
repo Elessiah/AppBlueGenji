@@ -31,7 +31,7 @@ import { fakePool } from "../../helpers/sql-double";
 // (`tests/lib/server/player-signup-log.test.ts`). Rien à mesurer ici, mais
 // l'envoi est bien tenté : sans promesse en retour, l'auto-mock ferait échouer
 // la création. `clearAllMocks` ne défait pas les implémentations.
-jest.mocked(sendBotLog).mockResolvedValue(undefined);
+jest.mocked(sendBotLog).mockReturnValue(undefined);
 
 /**
  * **Une identité Google ne revendique plus aucun compte du site.**

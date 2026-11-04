@@ -48,7 +48,7 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(removeTournamentEntrant).mockResolvedValue(removed);
-    jest.mocked(sendBotLog).mockResolvedValue(undefined);
+    jest.mocked(sendBotLog).mockReturnValue(undefined);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -77,7 +77,8 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
     await remove("7", "102");
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
-    const line = jest.mocked(sendBotLog).mock.calls[0][0] as string;
+    const [line, scope] = jest.mocked(sendBotLog).mock.calls[0];
+    expect(scope).toEqual({ category: "registrations", tournamentId: 7 });
     // Le canal est la **seule** trace qui subsiste d'une inscription effacée :
     // elle porte le tournoi, l'engagé et l'effectif restant — l'auteur y est
     // « le staff », jamais son pseudo.
@@ -93,16 +94,6 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
     expect(audit).toContain("Sifflet (#2)");
     expect(audit).toContain(line);
     info.mockRestore();
-  });
-
-  it("répond malgré un bot injoignable", async () => {
-    // Le bot est optionnel, et la ligne est déjà effacée : rien à annuler.
-    jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(sendBotLog).mockRejectedValue(new Error("ECONNREFUSED"));
-
-    const res = await remove("7", "102");
-
-    expect(res.status).toBe(200);
   });
 
   it("rejette un visiteur anonyme avec 401", async () => {

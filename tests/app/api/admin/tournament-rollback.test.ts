@@ -54,7 +54,7 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(rollbackCurrentRound).mockResolvedValue(rolledBack);
-    jest.mocked(sendBotLog).mockResolvedValue(undefined);
+    jest.mocked(sendBotLog).mockReturnValue(undefined);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -179,6 +179,7 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
     await rollback("7");
 
     const line = String(jest.mocked(sendBotLog).mock.calls[0]?.[0]);
+    expect(jest.mocked(sendBotLog).mock.calls[0]?.[1]).toEqual({ category: "admin", tournamentId: 7 });
     expect(line).toContain("Retour en arrière");
     expect(line).toContain("« BlueGenji Open » (#7)");
     expect(line).toContain("la manche 4");
@@ -219,14 +220,5 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
     await rollback("7");
 
     expect(String(jest.mocked(sendBotLog).mock.calls[0]?.[0])).toContain("tournoi rouvert");
-  });
-
-  it("n'échoue pas parce que le bot dort", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(sendBotLog).mockRejectedValue(new Error("ECONNREFUSED"));
-
-    const res = await rollback("7");
-
-    expect(res.status).toBe(200);
   });
 });

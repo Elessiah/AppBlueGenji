@@ -147,14 +147,14 @@ async function sendClaimed(rows: readonly NoticeRow[]): Promise<number> {
     const rounds = parsePending(row.rounds_json);
     if (rounds.length === 0) continue;
     const roundLabels = await labelRounds(db, row, rounds);
-    await sendBotLog(
+    sendBotLog(
       formatRoundMapsSummaryLog({
         tournament: { id: Number(row.tournament_id), name: row.name },
         roundLabels,
         listed: ROUND_MAPS_NOTICE_LISTED,
       }),
       { tournamentId: Number(row.tournament_id), category: "maps" },
-    ).catch((error: unknown) => console.error("[round-maps] journal non envoyé", error));
+    );
     sent += 1;
   }
   return sent;
@@ -235,7 +235,9 @@ async function flushNow(tournamentId: number, ownRounds?: readonly string[]): Pr
     sent = (await sendClaimed(claimable)) > 0;
     // L'écran fermé demande un envoi immédiat : le résumé ne reste pas dans le
     // lot du journal du tournoi (`LOG_BATCHING.md`), qui part avec lui.
-    if (sent) await flushBotLogBatch({ tournamentId, category: "maps" });
+    // Sans l'attendre : personne n'a besoin de son aboutissement, et un bot lent
+    // ne retient ni l'appelant ni la réservation de `lastFlushAt`.
+    if (sent) void flushBotLogBatch({ tournamentId, category: "maps" }).catch(() => undefined);
     return sent;
   } finally {
     if (!sent && lastFlushAt.get(tournamentId) === now) lastFlushAt.delete(tournamentId);

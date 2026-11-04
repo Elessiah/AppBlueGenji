@@ -364,7 +364,7 @@ export async function deleteTeamLogoForReport(
   publishStaffAction(`🗑️ Logo de l'équipe « ${discordInline(teamName)} » supprimé sans délai par le staff (signalement #${reportId}).`, {
     id: actor.userId,
     pseudo: actor.pseudo,
-  }, undefined, "moderation");
+  }, { category: "moderation" });
   notifyTeamLogoRemoved(teamId, teamName, reportId);
 
   const at = removedAt.toISOString();
@@ -444,7 +444,7 @@ export async function deleteUserAvatarForReport(
   publishStaffAction(`🗑️ Avatar d'${ANONYMOUS_PLAYER_LABEL} supprimé sans délai par le staff (signalement #${reportId}).`, {
     id: actor.userId,
     pseudo: actor.pseudo,
-  }, undefined, "moderation");
+  }, { category: "moderation" });
   notifyUserAvatarRemoved(userId, reportId);
 
   const at = removedAt.toISOString();
@@ -553,7 +553,7 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
     connection.release();
   }
 
-  publishStaffAction(formatLogoHiddenLog({ teamName, reportId, purgeAfter }), { id: actor.userId, pseudo: actor.pseudo }, undefined, "moderation");
+  publishStaffAction(formatLogoHiddenLog({ teamName, reportId, purgeAfter }), { id: actor.userId, pseudo: actor.pseudo }, { category: "moderation" });
   const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
   void teamMemberRecipients(teamId)
     .then((recipients) =>
@@ -652,7 +652,7 @@ export async function hideUserAvatarForReport(
 
   // L'avatar est le logo de l'entrée solo, nommée par les vues de la vitrine.
   invalidateLandingTeamViews();
-  publishStaffAction(formatAvatarHiddenLog({ reportId, purgeAfter }), { id: actor.userId, pseudo: actor.pseudo }, undefined, "moderation");
+  publishStaffAction(formatAvatarHiddenLog({ reportId, purgeAfter }), { id: actor.userId, pseudo: actor.pseudo }, { category: "moderation" });
   const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
   void userRecipient(userId)
     .then((recipients) =>
@@ -854,7 +854,7 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
     publishStaffAction(`✅ Logo de l'équipe « ${discordInline(teamName)} » rétabli par le staff (contestation acceptée).`, {
       id: actor.userId,
       pseudo: actor.pseudo,
-    }, undefined, "moderation");
+    }, { category: "moderation" });
     void teamMemberRecipients(Number(row.target_id))
       .then((recipients) =>
         notifyUsers(recipients, {
@@ -878,7 +878,7 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
     publishStaffAction(`✅ Avatar d'${ANONYMOUS_PLAYER_LABEL} rétabli par le staff (contestation acceptée).`, {
       id: actor.userId,
       pseudo: actor.pseudo,
-    }, undefined, "moderation");
+    }, { category: "moderation" });
     void userRecipient(Number(row.target_id))
       .then((recipients) =>
         notifyUsers(recipients, {
@@ -937,7 +937,7 @@ export async function purgeQuarantinedLogo(quarantineId: number, actor: ReportPe
     ? `🗑️ Logo de l'équipe « ${discordInline(row.target_name)} » supprimé définitivement`
     : `🗑️ Avatar d'${ANONYMOUS_PLAYER_LABEL} supprimé définitivement`;
   if (actor) {
-    publishStaffAction(`${line} par le staff.`, { id: actor.userId, pseudo: actor.pseudo }, undefined, "moderation");
+    publishStaffAction(`${line} par le staff.`, { id: actor.userId, pseudo: actor.pseudo }, { category: "moderation" });
     // Avant l'échéance annoncée : la personne concernée attend une date qui ne
     // vaut plus, elle apprend la décision (DSA art. 17) comme elle apprendrait
     // un rétablissement. À l'échéance, le message du masquage l'a déjà dite.

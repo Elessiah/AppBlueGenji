@@ -218,7 +218,11 @@ async function alertSelfAction(
     const input = await loadAlertMatch(match);
     if (!input) return false;
 
-    publishStaffAction(selfActionDiscordLine(kind, input.tournamentName), actor, SELF_ACTION_LOG[kind](input), "referee-self-action");
+    publishStaffAction(selfActionDiscordLine(kind, input.tournamentName), actor, {
+      auditLine: SELF_ACTION_LOG[kind](input),
+      category: "referee-self-action",
+      tournamentId: match.tournamentId,
+    });
     logged = true;
     await notifyStaff({
       topic: "REFEREE_SELF_RESOLUTION",

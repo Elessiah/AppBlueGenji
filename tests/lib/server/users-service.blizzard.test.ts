@@ -58,7 +58,7 @@ const find = (statements: Statement[], fragment: string) =>
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(ensureUniquePseudo).mockImplementation(async (source: unknown) => String(source));
-  jest.mocked(sendBotLog).mockResolvedValue(undefined);
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
 });
 
 describe("normalizeBattletag", () => {
@@ -151,7 +151,7 @@ describe("createOrGetBlizzardUser", () => {
     expect(sendBotLog).toHaveBeenCalledTimes(1);
 
     jest.clearAllMocks();
-    jest.mocked(sendBotLog).mockResolvedValue(undefined);
+    jest.mocked(sendBotLog).mockReturnValue(undefined);
     fakeDb([{ id: 7, blizzard_sub: "bz-1" }]);
     await createOrGetBlizzardUser("bz-1", "Nova#2143", { termsAccepted: true });
     expect(sendBotLog).not.toHaveBeenCalled();

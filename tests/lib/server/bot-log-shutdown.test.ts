@@ -5,12 +5,8 @@ jest.mock("@/lib/server/coalescer");
 
 import { flushAllBotLogBatches } from "@/lib/server/bot-integration";
 import { flushAllCoalescers } from "@/lib/server/coalescer";
-import {
-  flushBotLogsBeforeExit,
-  holdExitUntil,
-  installBotLogShutdownFlush,
-  resetBotLogShutdownState,
-} from "@/lib/server/bot-log-shutdown";
+import { flushBotLogsBeforeExit, holdExitUntil, installBotLogShutdownFlush } from "@/lib/server/bot-log-shutdown";
+import { resetBotLogShutdownState } from "@/tests/helpers/bot-log-batches";
 
 /** Arrêt propre : les lots du journal en attente partent (`docs/features/LOG_BATCHING.md`). */
 let onceSpy: jest.SpiedFunction<typeof process.once>;
@@ -103,6 +99,22 @@ describe("holdExitUntil", () => {
     expect(exit).toHaveBeenCalledWith(0);
   });
 
+  it("holdExitUntil_failureCodeDuringTheFlush_exitsAtOnce", () => {
+    const exit = jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    holdExitUntil(new Promise<void>(() => undefined));
+    process.exit(1);
+    expect(exit).toHaveBeenCalledWith(1);
+  });
+
+  it("holdExitUntil_successRequestedTwice_replayedOnce", async () => {
+    const exit = jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    holdExitUntil(Promise.resolve());
+    process.exit(0);
+    process.exit(0);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(exit).toHaveBeenCalledTimes(1);
+  });
+
   it("holdExitUntil_noExitDuringTheFlush_exitRestoredUntouched", async () => {
     const exit = jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
     holdExitUntil(Promise.resolve());
@@ -170,12 +182,82 @@ describe("installBotLogShutdownFlush", () => {
     expect(exit).not.toHaveBeenCalled();
   });
 
-  it("installBotLogShutdownFlush_signalWithNoOtherListener_exitsAfterTheFlush", async () => {
+  it("installBotLogShutdownFlush_signalWithNoOtherListener_signalRaisedAgainAfterTheFlush", async () => {
     const exit = jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    const kill = jest.spyOn(process, "kill").mockImplementation(() => true);
     jest.spyOn(process, "listenerCount").mockReturnValue(0);
     installBotLogShutdownFlush();
     handlers.get("SIGINT")?.();
     await new Promise((resolve) => setImmediate(resolve));
-    expect(exit).toHaveBeenCalledWith(0);
+    // Relancé sans écouteur, le signal termine en 128 + n, jamais en succès.
+    expect(kill).toHaveBeenCalledWith(process.pid, "SIGINT");
+    expect(exit).not.toHaveBeenCalled();
+  });
+
+  it("installBotLogShutdownFlush_signalAfterCompletedFlush_flushesAgain", async () => {
+    jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    jest.spyOn(process, "listenerCount").mockReturnValue(1);
+    installBotLogShutdownFlush();
+    handlers.get("SIGINT")?.();
+    await new Promise((resolve) => setImmediate(resolve));
+    handlers.get("SIGTERM")?.();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(flushAllBotLogBatches).toHaveBeenCalledTimes(2);
+  });
+
+  it("installBotLogShutdownFlush_twoSignals_oneFlushShared", async () => {
+    jest.spyOn(process, "exit").mockImplementation((() => undefined) as typeof process.exit);
+    jest.spyOn(process, "listenerCount").mockReturnValue(1);
+    installBotLogShutdownFlush();
+    handlers.get("SIGINT")?.();
+    handlers.get("SIGTERM")?.();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(flushAllBotLogBatches).toHaveBeenCalledTimes(1);
+  });
+
+  it("installBotLogShutdownFlush_alreadyInstalledByAnotherModuleCopy_listensNoMore", () => {
+    (globalThis as typeof globalThis & { __bgBotLogShutdown?: unknown }).__bgBotLogShutdown = {
+      installed: true,
+      flush: null,
+    };
+    installBotLogShutdownFlush();
+    expect(onceSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("flushBotLogsBeforeExit — tour des passages", () => {
+  const order = globalThis as typeof globalThis & { __bgBotLogOrder?: Promise<void> };
+
+  afterEach(() => {
+    delete order.__bgBotLogOrder;
+  });
+
+  it("flushBotLogsBeforeExit_orderTurnPending_awaitedBeforeTheBatchesLeave", async () => {
+    let release: () => void = () => undefined;
+    order.__bgBotLogOrder = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const done = flushBotLogsBeforeExit();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(flushAllBotLogBatches).not.toHaveBeenCalled();
+    release();
+    await done;
+    expect(flushAllBotLogBatches).toHaveBeenCalledTimes(1);
+  });
+
+  it("flushBotLogsBeforeExit_orderTurnHangs_boundedByHalfTheTimeout", async () => {
+    jest.useFakeTimers();
+    order.__bgBotLogOrder = new Promise<void>(() => undefined);
+    void flushBotLogsBeforeExit(1_000);
+    await jest.advanceTimersByTimeAsync(499);
+    expect(flushAllBotLogBatches).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(1);
+    expect(flushAllBotLogBatches).toHaveBeenCalledTimes(1);
+  });
+
+  it("flushBotLogsBeforeExit_orderTurnRejects_neverThrowsAndStillFlushes", async () => {
+    order.__bgBotLogOrder = Promise.reject(new Error("tour"));
+    await expect(flushBotLogsBeforeExit()).resolves.toBeUndefined();
+    expect(flushAllBotLogBatches).toHaveBeenCalledTimes(1);
   });
 });

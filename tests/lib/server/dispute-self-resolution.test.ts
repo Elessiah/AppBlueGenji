@@ -132,7 +132,10 @@ describe("alertSelfResolvedDispute", () => {
     await alertSelfResolvedDispute(dispute, actor);
 
     expect(publishStaffAction).toHaveBeenCalledTimes(1);
-    const [line, author, audit, category] = jest.mocked(publishStaffAction).mock.calls[0];
+    const [line, author, options] = jest.mocked(publishStaffAction).mock.calls[0];
+    const { auditLine: audit, category, tournamentId } = options;
+    // Le lot du tournoi, jamais le lot commun du salon.
+    expect(tournamentId).toBe(dispute.tournamentId);
     // Appel au staff à vérifier : une alerte qui notifie, jamais une trace silencieuse.
     expect(category).toBe("referee-self-action");
     // Discord : le tournoi et la nature du geste, ni manche, ni issue, ni nom d'équipe.
@@ -152,7 +155,7 @@ describe("alertSelfResolvedDispute", () => {
 
     // La ronde se lit par `swissRoundSql` (tournoi SWISS ou phase suisse), pas par le seul format.
     expect(String(execute.mock.calls[1][0])).toContain("AS swiss_round");
-    const [line, , audit] = jest.mocked(publishStaffAction).mock.calls[0];
+    const [line, , { auditLine: audit }] = jest.mocked(publishStaffAction).mock.calls[0];
     expect(line).not.toContain("Ronde");
     expect(audit).toContain("Ronde 3");
     const [notification] = jest.mocked(notifyStaff).mock.calls[0];
@@ -165,7 +168,7 @@ describe("alertSelfResolvedDispute", () => {
     await expect(alertSelfImposedForfeit(dispute, actor, [4])).resolves.toBe(true);
 
     expect(execute.mock.calls[0][1]).toEqual([70, 4, 4, 9, null, null, 4, 4, 9]);
-    const [line, , audit] = jest.mocked(publishStaffAction).mock.calls[0];
+    const [line, , { auditLine: audit }] = jest.mocked(publishStaffAction).mock.calls[0];
     expect(line).toBe("⚠️ Abandon imposé à son adversaire par un membre du staff qui joue ce match · « Coupe d'hiver ».");
     expect(audit).toBe(
       "⚠️ Abandon imposé à son adversaire par un membre du staff qui joue ce match · « Coupe d'hiver », Manche 2 : Alpha 2 – 1 Bravo.",
@@ -234,7 +237,7 @@ describe("alertSelfResolvedDispute", () => {
 
     await alertSelfResolvedDispute(dispute, actor);
 
-    const [line, , audit] = jest.mocked(publishStaffAction).mock.calls[0];
+    const [line, , { auditLine: audit }] = jest.mocked(publishStaffAction).mock.calls[0];
     expect(line).not.toMatch(/Joueur1|Joueur2/);
     expect(audit).not.toMatch(/Joueur1|Joueur2/);
     expect(audit).toContain(": 2 – 1.");
@@ -270,7 +273,7 @@ describe("alertSelfCorrectedResult — correction d'un résultat acquis par un a
   it("avertit les autres membres du staff et journalise l'issue, sans pseudo (FR + EN)", async () => {
     await expect(alertSelfCorrectedResult(dispute, actor)).resolves.toBe(true);
 
-    const [line, author, audit] = jest.mocked(publishStaffAction).mock.calls[0];
+    const [line, author, { auditLine: audit }] = jest.mocked(publishStaffAction).mock.calls[0];
     expect(line).toBe("⚠️ Résultat corrigé par un membre du staff qui joue ce match · « Coupe d'hiver ».");
     expect(audit).toBe(
       "⚠️ Résultat corrigé par un membre du staff qui joue ce match · « Coupe d'hiver », Manche 2 : Alpha 2 – 1 Bravo.",
@@ -301,7 +304,7 @@ describe("alertSelfPausedValidation — « Enregistrer » d'un arbitre qui joue"
   it("avertit les autres membres du staff et journalise, sans pseudo ni nom d'engagé", async () => {
     await expect(alertSelfPausedValidation(dispute, actor)).resolves.toBe(true);
 
-    const [line, author, audit] = jest.mocked(publishStaffAction).mock.calls[0];
+    const [line, author, { auditLine: audit }] = jest.mocked(publishStaffAction).mock.calls[0];
     expect(line).toBe("⚠️ Validation automatique suspendue par un membre du staff qui joue ce match · « Coupe d'hiver ».");
     expect(audit).toBe(
       "⚠️ Validation automatique suspendue par un membre du staff qui joue ce match · « Coupe d'hiver », Manche 2.",

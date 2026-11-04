@@ -143,11 +143,10 @@ export function publishRolesChange(
   targetUserId: number,
   roles: readonly PlatformRole[],
 ): void {
-  publishStaffAction(
-    ROLES_CHANGE_DISCORD_LINE,
-    actor,
-    rolesChangeAuditLine(targetUserId, roles, targetUserId === actor.id),
-  );
+  publishStaffAction(ROLES_CHANGE_DISCORD_LINE, actor, {
+    auditLine: rolesChangeAuditLine(targetUserId, roles, targetUserId === actor.id),
+    category: "admin",
+  });
 }
 
 /**

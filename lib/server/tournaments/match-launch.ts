@@ -1511,7 +1511,7 @@ async function announceRoundSelfManagement(
     const row = await loadMatchLogRow(sampleMatchId);
     if (!row) return;
     const match = matchLogSubject(row);
-    await sendBotLog(
+    sendBotLog(
       formatRoundSelfManagementLog({
         tournament: match.tournament,
         roundLabel: matchRoundLabel(mixedBrackets ? "" : match.bracket, match.roundNumber, match.swiss),

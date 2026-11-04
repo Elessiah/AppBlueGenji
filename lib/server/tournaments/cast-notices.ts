@@ -107,15 +107,12 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
   ]);
   if (!row) return;
   const match = matchLogSubject(row);
-  const log = sendBotLog(formatCastChangeLog({ ...match, change: castLogChange(change) }), {
+  sendBotLog(formatCastChangeLog({ ...match, change: castLogChange(change) }), {
     tournamentId: match.tournament.id,
     category: castLogCategory(change),
   });
 
-  if (!notice || !recipients) {
-    await log;
-    return;
-  }
+  if (!notice || !recipients) return;
   const subject: CastReleasedMatch = {
     tournamentId: match.tournament.id,
     tournamentName: match.tournament.name,
@@ -130,14 +127,11 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
     block: notice.block,
   };
   const url = `${siteCanonicalBase()}${tournamentMatchHref(subject.tournamentId, subject.matchId)}`;
-  await Promise.all([
-    log,
-    notifyUsers(recipients, {
-      topic: "CAST_RELEASED",
-      discord: { message: (locale) => formatCastReleasedNotice(subject, url, locale), context: "cast-released" },
-      push: (locale) => castReleasedPush(subject, locale),
-    }),
-  ]);
+  await notifyUsers(recipients, {
+    topic: "CAST_RELEASED",
+    discord: { message: (locale) => formatCastReleasedNotice(subject, url, locale), context: "cast-released" },
+    push: (locale) => castReleasedPush(subject, locale),
+  });
 }
 
 function deliverInBackground(change: CastChange): Promise<void> {

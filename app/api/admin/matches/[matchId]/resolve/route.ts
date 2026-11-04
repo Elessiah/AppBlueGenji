@@ -6,7 +6,6 @@ import { readJsonBody } from "@/lib/server/request-body";
 import { parseAdminScoreBody } from "@/lib/shared/admin-score-body";
 import { MAP_LIST_ERROR_CODES } from "@/lib/shared/match-maps";
 import type { StaffActor } from "@/lib/shared/log-privacy";
-import { announceStaffMatchAction } from "@/lib/server/tournaments/staff-action-logs";
 
 export async function POST(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -49,11 +48,12 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
 }
 
 // L'arbitre qui tranche : s'il joue la manche en litige, les autres membres du
-// staff en sont avertis (`SCORE_DISPUTE_LOCK.md` § Arbitre qui joue).
+// staff en sont avertis (`SCORE_DISPUTE_LOCK.md` § Arbitre qui joue). La trace
+// du geste est la ligne « Match terminé » elle-même, qui dit « résultat validé
+// par le staff » (`markResultValidatedByStaff`, `STAFF_ACTION_LOGS.md`).
 async function resolve(matchId: number, entry: AdminResolveEntry, actor: StaffActor) {
   try {
     await adminResolveMatch(matchId, entry, { id: actor.id, pseudo: actor.pseudo });
-    announceStaffMatchAction(matchId, "RESULT_VALIDATED");
     return ok({});
   } catch (e) {
     const msg = (e as Error).message;

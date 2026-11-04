@@ -50,7 +50,7 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
     publishStaffAction(`🧹 Logo de l'équipe « ${discordInline(teamName)} » retiré par le staff (modération).`, {
       id: user.id,
       pseudo: user.pseudo,
-    }, undefined, "moderation");
+    }, { category: "moderation" });
     // L'équipe apprend la décision et le moyen d'y répondre (DSA art. 17) ;
     // hors de tout signalement, le message renvoie vers l'association.
     notifyTeamLogoRemoved(teamId, teamName, null, reason.reason);

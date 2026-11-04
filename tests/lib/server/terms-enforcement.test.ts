@@ -72,7 +72,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(assertTermsAccepted).mockResolvedValue(undefined);
   jest.mocked(recordTermsAcceptance).mockResolvedValue(true);
-  jest.mocked(sendBotLog).mockResolvedValue(undefined);
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
   jest.mocked(ensureUniquePseudo).mockImplementation(async (source: unknown) => String(source));
 });
 

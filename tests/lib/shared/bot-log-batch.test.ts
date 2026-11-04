@@ -1,5 +1,11 @@
 import { describe, expect, it } from "@jest/globals";
-import { botLogBatchKey, packBotLogLines } from "@/lib/shared/bot-log-batch";
+import {
+  botLogBatchKey,
+  botLogBatchScopeOfKey,
+  botLogTournamentId,
+  isBlank,
+  packBotLogLines,
+} from "@/lib/shared/bot-log-batch";
 import { discordInline } from "@/lib/shared/discord-text";
 
 /** Mise en messages d'un lot du journal Discord (`docs/features/LOG_BATCHING.md`). */
@@ -82,6 +88,54 @@ describe("packBotLogLines", () => {
   it("packBotLogLines_quotedRowWithTinyLimit_plainCutWithoutPrefix", () => {
     expect(packBotLogLines(["> abcdef"], 4)).toEqual(["> ab", "cdef"]);
   });
+
+  it("packBotLogLines_indentedLine_indentationKept", () => {
+    expect(packBotLogLines(["  • détail"], 100)).toEqual(["  • détail"]);
+  });
+
+  it("packBotLogLines_trailingBlanksAndLeadingEmptyRows_dropped", () => {
+    expect(packBotLogLines(["\n  • détail  \n"], 100)).toEqual(["  • détail"]);
+  });
+
+  it("packBotLogLines_cutInsideAWord_backsOffToTheLastBlank", () => {
+    expect(packBotLogLines(["aaa bbbbb"], 7)).toEqual(["aaa", "bbbbb"]);
+  });
+
+  it("packBotLogLines_quotedRowWithAddress_addressNeverTruncated", () => {
+    expect(packBotLogLines(["> voir https://x.io/a"], 16)).toEqual(["> voir", "> https://x.io/a"]);
+  });
+});
+
+describe("botLogTournamentId", () => {
+  it("botLogTournamentId_numericString_parsed", () => {
+    expect(botLogTournamentId("12")).toBe(12);
+  });
+
+  it("botLogTournamentId_nonNumericString_null", () => {
+    expect(botLogTournamentId("12abc")).toBeNull();
+  });
+
+  it("botLogTournamentId_negativeString_null", () => {
+    expect(botLogTournamentId("-3")).toBeNull();
+  });
+
+  it("botLogTournamentId_zeroString_null", () => {
+    expect(botLogTournamentId("0")).toBeNull();
+  });
+
+  it("botLogTournamentId_undefined_null", () => {
+    expect(botLogTournamentId(undefined)).toBeNull();
+  });
+});
+
+describe("botLogBatchScopeOfKey", () => {
+  it("botLogBatchScopeOfKey_tournamentKey_categoryDropped", () => {
+    expect(botLogBatchScopeOfKey(botLogBatchKey("log", 12, "maps"))).toBe("log:tournament:12");
+  });
+
+  it("botLogBatchScopeOfKey_globalKey_categoryDropped", () => {
+    expect(botLogBatchScopeOfKey(botLogBatchKey("log", null, "moderation"))).toBe("log:global");
+  });
 });
 
 describe("botLogBatchKey", () => {
@@ -101,7 +155,31 @@ describe("botLogBatchKey", () => {
     expect(botLogBatchKey("log", 0)).toBe("log:global:general");
   });
 
+  it("botLogBatchKey_stringTournamentId_sameKeyAsTheNumber", () => {
+    expect(botLogBatchKey("log", "12")).toBe("log:tournament:12:general");
+  });
+
   it("botLogBatchKey_fractionalTournamentId_globalKey", () => {
     expect(botLogBatchKey("log", 1.5)).toBe("log:global:general");
+  });
+});
+
+describe("isBlank", () => {
+  it("isBlank_everyCodeUnit_sameAsTheWhitespaceRegex", () => {
+    const differing: number[] = [];
+    for (let code = 0; code <= 0xffff; code += 1) {
+      const char = String.fromCharCode(code);
+      if (isBlank(char) !== /^\s$/u.test(char)) differing.push(code);
+    }
+    expect(differing).toEqual([]);
+  });
+
+  it.each(["", "😀", "ab"])("isBlank_notASingleCodeUnit_false (%j)", (value) => {
+    expect(isBlank(value)).toBe(false);
+  });
+
+  it("packBotLogLines_longRowWithNoBreakSpace_cutAtTheNoBreakSpace", () => {
+    const row = `${"a".repeat(10)}\u00a0${"b".repeat(10)}`;
+    expect(packBotLogLines([row], 14)).toEqual(["a".repeat(10), "b".repeat(10)]);
   });
 });
