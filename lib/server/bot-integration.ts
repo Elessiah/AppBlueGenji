@@ -116,8 +116,9 @@ function resolveFailureCode(error: unknown): string {
 
 async function safeReadError(response: Response): Promise<string> {
   try {
-    const payload = (await response.json()) as { error?: string };
-    if (payload.error) {
+    const payload = (await response.json()) as { error?: unknown } | null;
+    // Un code est une chaîne : tout autre « error » (objet, nombre) ne sort pas tel quel.
+    if (typeof payload?.error === "string" && payload.error) {
       return payload.error;
     }
   } catch {

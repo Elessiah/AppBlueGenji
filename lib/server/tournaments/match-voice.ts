@@ -70,8 +70,6 @@ export type VoiceSnapshotMatch = {
   team1Id: number | null;
   team2Id: number | null;
   startAt: string | null;
-  /** Lancement valable pour l'appariement courant ; `null` : pas lancé. */
-  launchedAt: string | null;
 };
 
 type VoiceTeamRow = RowDataPacket & { id: number; solo: number | null; ghost: number | null };
@@ -202,7 +200,8 @@ export const DUE_CHANNELS_SQL = `SELECT m.id, m.tournament_id, m.team1_id, m.tea
 /**
  * Salons à rendre au bot : match joué (score confirmé) ou disparu, match
  * retombé en attente ou sorti du programme (heure retirée), équipe sortie de
- * l'appariement, entrée solo ou fantôme dans le match, tournoi terminé ou
+ * l'appariement, entrée solo ou fantôme dans le match, tournoi qui n'est plus en
+ * cours (terminé, ou retombé avant son départ : la page ne montre plus ses salons) ou
  * option éteinte, match resté sans score passé `VOICE_CHANNEL_LATE_HOURS` (sans
  * quoi sa ligne resterait ouverte et la passe ne s'arrêterait plus au garde-fou). Un rendu refusé attend `VOICE_RETRY_SECONDS` avant d'être
  * redemandé. Le bot supprime le salon s'il est vide, sinon dès qu'il se vide
@@ -218,7 +217,7 @@ export const RELEASABLE_SQL = `SELECT v.match_id, v.team_id, v.channel_id, m.tou
    AND (m.id IS NULL OR t.id IS NULL
         OR m.status IN ('COMPLETED', 'PENDING') OR m.start_at IS NULL
         OR m.start_at < NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
-        OR t.state = 'FINISHED' OR t.team_voice_channels = 0
+        OR t.state <> 'RUNNING' OR t.team_voice_channels = 0
         OR NOT (v.team_id <=> m.team1_id OR v.team_id <=> m.team2_id)
         OR EXISTS (SELECT 1 FROM bg_teams x
                     WHERE x.id IN (m.team1_id, m.team2_id)
@@ -314,8 +313,17 @@ async function createTeamChannel(
   return { changed: !shownFailed, down: BOT_TRANSPORT_FAILURES.has(created.code) };
 }
 
-/** Codes d'une panne du canal vers le bot : tout le reste est un refus propre à un salon. */
-const BOT_TRANSPORT_FAILURES: ReadonlySet<string> = new Set(["BOT_CIRCUIT_OPEN", "BOT_INTERNAL_UNREACHABLE", "BOT_VOICE_TIMEOUT"]);
+/**
+ * Codes d'une panne du canal vers le bot, ou du bot entier (erreur hors route, route
+ * absente d'un bot d'une autre version) : tout le reste est un refus propre à un salon.
+ */
+const BOT_TRANSPORT_FAILURES: ReadonlySet<string> = new Set([
+  "BOT_CIRCUIT_OPEN",
+  "BOT_INTERNAL_UNREACHABLE",
+  "BOT_VOICE_TIMEOUT",
+  "INTERNAL_ERROR",
+  "INTERNAL_ROUTE_NOT_FOUND",
+]);
 
 async function releaseChannels(touched: Set<number>): Promise<void> {
   const rows = await run<ReleaseRow[]>(RELEASABLE_SQL);
@@ -589,9 +597,9 @@ export type TeamVoiceChannelsResult = {
  * terminé n'a plus de match à qui ouvrir un salon.
  *
  * - Allumée en cours de tournoi : les matchs à plus d'un quart d'heure ont
- *   leurs salons à T−15 ; ceux déjà dans le quart d'heure, et pas encore
- *   lancés, les reçoivent aussitôt (balayage lancé ici). Un match déjà lancé
- *   n'est pas concerné.
+ *   leurs salons à T−15 ; ceux déjà dans le quart d'heure ou commencés (sans
+ *   score validé, depuis moins de `VOICE_CHANNEL_LATE_HOURS`), lancés ou non,
+ *   les reçoivent aussitôt (balayage lancé ici).
  * - Éteinte : les salons existants sont rendus au bot (balayage lancé ici).
  *
  * Une passe déjà en cours a pu lire l'option d'avant : une passe de plus la
@@ -636,8 +644,6 @@ type SingleMatchRow = RowDataPacket & {
   team1_id: number | null;
   team2_id: number | null;
   start_at: Date | string | null;
-  launched_at: Date | string | null;
-  launch_pairing: string | null;
   team_voice_channels: number | null;
   tournament_state: TournamentState;
   start_visibility_at: Date | string;
@@ -657,8 +663,8 @@ export async function readMatchVoice(matchId: number, staff: boolean): Promise<M
   void dispatchMatchVoiceChannels();
   return withConnection(async (connection) => {
     const [rows] = await connection.execute<SingleMatchRow[]>(
-      `SELECT m.id, m.tournament_id, m.status, m.team1_id, m.team2_id, m.start_at, m.launched_at,
-              m.launch_pairing, t.team_voice_channels, t.state AS tournament_state, t.start_visibility_at
+      `SELECT m.id, m.tournament_id, m.status, m.team1_id, m.team2_id, m.start_at,
+              t.team_voice_channels, t.state AS tournament_state, t.start_visibility_at
        FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id
        WHERE m.id = ? LIMIT 1`,
       [matchId],
@@ -669,7 +675,6 @@ export async function readMatchVoice(matchId: number, staff: boolean): Promise<M
     }
     const team1Id = match.team1_id === null ? null : Number(match.team1_id);
     const team2Id = match.team2_id === null ? null : Number(match.team2_id);
-    const currentPairing = team1Id !== null && team2Id !== null && match.launch_pairing === `${team1Id}:${team2Id}`;
     const enabled = Number(match.team_voice_channels ?? 0) === 1 && match.tournament_state === "RUNNING";
     const infos = await loadMatchVoiceInfos(connection, enabled, [
       {
@@ -678,7 +683,6 @@ export async function readMatchVoice(matchId: number, staff: boolean): Promise<M
         team1Id,
         team2Id,
         startAt: toIso(match.start_at),
-        launchedAt: currentPairing ? toIso(match.launched_at) : null,
       },
     ]);
     return infos.get(Number(match.id)) ?? null;

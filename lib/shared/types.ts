@@ -715,7 +715,7 @@ export type BracketMatch = {
   /**
    * Salons vocaux d'équipe du match (`docs/features/MATCH_VOICE.md`) : état
    * du salon de chaque côté (bientôt ouvert, ouvert, indisponible). Absent ou
-   * `null` : aucun salon suivi (option éteinte, match lancé, entrée solo,
+   * `null` : aucun salon suivi (option éteinte, match joué ou hors délai, entrée solo,
    * fantôme, lecteur sans compte). Ni nombre ni personne.
    */
   voice?: MatchVoiceInfo | null;
