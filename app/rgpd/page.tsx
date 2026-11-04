@@ -1255,8 +1255,8 @@ function RgpdFr({
             connu et reste au match.{" "}
             Un caster peut aussi donner, pour un cast précis, un <strong>BattleTag propre à ce
             match</strong>, qui remplace alors celui de son profil là où ce dernier était montré (fenêtres
-            « Contacts » et de lancement, page du match, aux seules parties du match et dans un tournoi
-            Overwatch) : il est gardé avec son inscription de caster, part avec elle, n&apos;est jamais
+            « Contacts » et de lancement, page du match : aux mêmes personnes et aux mêmes moments — parties
+            du match et arbitres —, dans un tournoi Overwatch seulement) : il est gardé avec son inscription de caster, part avec elle, n&apos;est jamais
             recopié sur son profil ni présenté comme prouvé, et le réglage « BattleTag OW » du profil ne le
             masque pas — c&apos;est le caster qui le donne, pour ce match, au titre de l&apos;exécution du
             service (<Link href="/rgpd/registre#t04">registre, T04</Link>).{" "}

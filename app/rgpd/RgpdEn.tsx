@@ -1049,7 +1049,7 @@ export function RgpdEn({
             known author and stays with the match.{" "}
             A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which
             then replaces their profile one wherever the latter was shown (“Contacts” and launch windows, match
-            page, to the parties of the match only and in an Overwatch tournament): it is kept with their caster
+            page: to the same people at the same times — parties to the match and referees —, in an Overwatch tournament only): it is kept with their caster
             registration, goes with it, is never copied onto their profile nor presented as proven, and the “OW
             BattleTag” setting of the profile does not hide it — the caster is the one giving it, for this match,
             as part of the performance of the service (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).{" "}
