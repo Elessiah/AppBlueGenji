@@ -200,7 +200,7 @@ export async function penalizeEnduranceTeams(
   count: number
 ): Promise<number> {
   const limit = Math.floor(count);
-  if (!(limit > 0)) return 0;
+  if (Number.isNaN(limit) || limit <= 0) return 0;
   const [rows] = await connection.execute<(RowDataPacket & { team_id: number })[]>(
     `SELECT team_id FROM bg_endurance_standings
        WHERE tournament_id = ? AND status = 'ACTIVE'
