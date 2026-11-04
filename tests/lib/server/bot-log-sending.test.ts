@@ -103,6 +103,16 @@ describe("kind et catégories", () => {
     expect(pendingBotLogBatches().size).toBe(0);
   });
 
+  it("sendBotLog_alertCategory_pendingLinesOfItsTournamentSentFirst", async () => {
+    jest.useFakeTimers();
+    sendBotLog("désignation", { tournamentId: 3, category: "referees" });
+    sendBotLog("autre tournoi", { tournamentId: 4, category: "referees" });
+    sendBotLog("arbitre qui joue", { tournamentId: 3, category: "referee-self-action" });
+    await settle();
+    expect(postedMessages()).toEqual(["🧑‍⚖️ Arbitrage\ndésignation", "⚠️ Arbitrage à vérifier\narbitre qui joue"]);
+    expect(pendingBotLogBatches()).toEqual(new Map([["log:tournament:4:referees", 1]]));
+  });
+
   it("sendBotLog_logCategory_waitsForTheWindow", async () => {
     jest.useFakeTimers();
     sendBotLog("cartes", { tournamentId: 3, category: "maps" });

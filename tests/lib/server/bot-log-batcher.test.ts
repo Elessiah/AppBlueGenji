@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { BotLogCategory } from "@/lib/shared/bot-log-category";
-import { createBotLogBatcher, MAX_TIMER_MS, type BotLogBatcher } from "@/lib/server/bot-log-batcher";
+import { CLOSING_GRACE_MS, createBotLogBatcher, MAX_TIMER_MS, type BotLogBatcher } from "@/lib/server/bot-log-batcher";
 import { botLogHeader } from "@/lib/shared/bot-log-category";
 import { REFEREE_DIGEST_LOG_MAX_LENGTH } from "@/lib/shared/bot-logs";
 
@@ -218,6 +218,15 @@ describe("flushAll", () => {
     await settle();
     expect(send).toHaveBeenCalledWith("pendant l'arrêt", "general");
     expect(batcher.pending().size).toBe(0);
+  });
+
+  it("flushAll_processOutlivesTheGrace_linesBatchedAgain", async () => {
+    await batcher.flushAll();
+    jest.advanceTimersByTime(CLOSING_GRACE_MS);
+    batcher.add("k", "après l'arrêt");
+    await settle();
+    expect(send).not.toHaveBeenCalled();
+    expect(batcher.pending().get("k")).toBe(1);
   });
 
   it("flushAll_twoScopes_sentInParallel", async () => {
@@ -440,6 +449,7 @@ describe("maxAge", () => {
   it("maxAge_flushAll_clearsTheTimer", async () => {
     batcher.add("k", "un");
     await batcher.flushAll();
+    jest.advanceTimersByTime(CLOSING_GRACE_MS);
     expect(jest.getTimerCount()).toBe(0);
     jest.advanceTimersByTime(MAX_AGE);
     await settle();

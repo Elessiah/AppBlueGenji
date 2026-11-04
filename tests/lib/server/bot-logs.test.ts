@@ -9,6 +9,7 @@ import {
   discardBotLogs,
   flushBotLogs,
   markResultValidatedByStaff,
+  MAX_PENDING_PER_TRANSACTION,
   queueBotLog,
   resolveBotLogs,
 } from "@/lib/server/tournaments/bot-logs";
@@ -189,6 +190,24 @@ describe("file par transaction", () => {
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
     expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("résultat validé par le staff");
+  });
+
+  it("markResultValidatedByStaff_queueFull_validationStillLogged", async () => {
+    const connection = fakeConnection();
+    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(async (_sql, params) =>
+      params?.includes(31) ? [[MATCH_ROW]] : [[]],
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    for (let teamId = 1; teamId <= MAX_PENDING_PER_TRANSACTION; teamId += 1) {
+      queueBotLog(connection, { kind: "forfeit", tournamentId: 12, teamId });
+    }
+
+    markResultValidatedByStaff(connection, 31);
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const messages = jest.mocked(sendBotLog).mock.calls.map(([message]) => message);
+    expect(messages.some((message) => message.includes("résultat validé par le staff"))).toBe(true);
   });
 
   it("markResultValidatedByStaff_resultAlreadyQueued_oneLineOnly", async () => {

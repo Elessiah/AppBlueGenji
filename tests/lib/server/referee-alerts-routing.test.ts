@@ -8,6 +8,7 @@ import {
   discardBotLogs,
   dropQueuedRefereeAlerts,
   flushBotLogs,
+  ALERT_FLUSH_WAIT_MS,
   markMatchResolved,
   queueBotLog,
   queueRefereeAlert,
@@ -141,6 +142,50 @@ describe("routage vers deux transports", () => {
     // Les lignes du tournoi en attente précèdent, au salon, le désaccord qu'elles expliquent.
     expect(flushBotLogBatch).toHaveBeenCalledWith({ tournamentId: 12 });
     expect(order).toEqual(["flush", "alert"]);
+  });
+
+  it("flushBotLogs_slowBotForTheTournamentBatch_alertNotHeldBeyondTheBound", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick", "queueMicrotask"] });
+    try {
+      const connection = fakeConnection();
+      mockDb([[MATCH_ROW]]);
+      jest.mocked(flushBotLogBatch).mockReturnValue(new Promise<void>(() => undefined));
+
+      queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+      flushBotLogs(connection);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(pushRefereeAlert).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(ALERT_FLUSH_WAIT_MS);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("flushBotLogs_previousPassStillResolving_alertSentWithoutWaitingForItsTurn", async () => {
+    let releaseSlow: () => void = () => undefined;
+    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
+      params?.[0] === 12
+        ? new Promise((resolve) => {
+            releaseSlow = () => resolve([[]]);
+          })
+        : Promise.resolve([[MATCH_ROW]]),
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const slow = fakeConnection();
+    const alerting = fakeConnection();
+
+    queueBotLog(slow, { kind: "tournament_started", tournamentId: 12 });
+    queueBotLog(alerting, { kind: "score_conflict", matchId: 31 });
+    flushBotLogs(slow);
+    flushBotLogs(alerting);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+    // Rend le tour, pour que les tests suivants ne l'attendent pas.
+    releaseSlow();
+    await new Promise((resolve) => setImmediate(resolve));
   });
 
   // Report expiré sans réponse → alerte arbitre seulement.

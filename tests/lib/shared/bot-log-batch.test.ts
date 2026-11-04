@@ -88,8 +88,12 @@ describe("packBotLogLines", () => {
     expect(packBotLogLines(["> abcdef"], 4)).toEqual(["> ab", "cdef"]);
   });
 
-  it("packBotLogLines_indentedLine_keptVerbatim", () => {
-    expect(packBotLogLines(["  • détail  "], 100)).toEqual(["  • détail  "]);
+  it("packBotLogLines_indentedLine_indentationKept", () => {
+    expect(packBotLogLines(["  • détail"], 100)).toEqual(["  • détail"]);
+  });
+
+  it("packBotLogLines_trailingBlanksAndLeadingEmptyRows_dropped", () => {
+    expect(packBotLogLines(["\n  • détail  \n"], 100)).toEqual(["  • détail"]);
   });
 
   it("packBotLogLines_cutInsideAWord_backsOffToTheLastBlank", () => {
