@@ -724,22 +724,24 @@ function VoiceSection({ voice, sides }: Readonly<{ voice: MatchVoiceInfo; sides:
           <p>{page.t("voice.hint", { capacity: VOICE_CHANNEL_CAPACITY })}</p>
         </InfoHint>
       </InfoHintRow>
-      <ul className={styles.voiceList} aria-live="polite">
-        {sides.map((pageSide) => {
-          const { state, count } = side(pageSide.slot);
-          return (
-            <li key={pageSide.slot} className={styles.voiceRow}>
-              <SideName side={pageSide} logoSize={20} truncate />
-              <span className={`${styles.voiceCount} ${voiceSideFull(state, count) ? styles.ok : styles.factNote}`}>
-                {voiceRowText(page, state, count)}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-      {/* Zone vivante toujours montée : un texte inséré dans une zone déjà
-          présente est annoncé, une zone montée avec son texte ne l'est pas. */}
+      {/* Une seule zone vivante, toujours montée : un texte inséré dans une
+          zone déjà présente est annoncé (monté avec son texte, il ne l'est pas),
+          et une mise à jour qui change une ligne et retire la note ne se lit
+          qu'une fois. */}
       <div aria-live="polite">
+        <ul className={styles.voiceList}>
+          {sides.map((pageSide) => {
+            const { state, count } = side(pageSide.slot);
+            return (
+              <li key={pageSide.slot} className={styles.voiceRow}>
+                <SideName side={pageSide} logoSize={20} truncate />
+                <span className={`${styles.voiceCount} ${voiceSideFull(state, count) ? styles.ok : styles.factNote}`}>
+                  {voiceRowText(page, state, count)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
         {voice.pending && <p className={styles.factNote}>{page.t("voice.waiting")}</p>}
         {failed && <p className={styles.factNote}>{page.t("voice.failedNote")}</p>}
       </div>

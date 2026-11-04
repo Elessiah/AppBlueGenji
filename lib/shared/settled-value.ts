@@ -24,5 +24,8 @@ export function settledRefusals(...results: (PromiseSettledResult<unknown> | nul
 export function mergeRefusals(refusals: unknown[]): unknown {
   if (refusals.length <= 1) return refusals[0];
   const messages = refusals.map((reason) => (reason instanceof Error ? reason.message : ""));
-  return new CodedError(errorCode(refusals[0]) ?? "UNKNOWN", messages.filter(Boolean).join(" "));
+  const message = messages.filter(Boolean).join(" ");
+  // Aucun motif lisible : le premier refus, tel quel, plutôt qu'une notification vide.
+  if (message === "") return refusals[0];
+  return new CodedError(errorCode(refusals[0]) ?? "UNKNOWN", message);
 }

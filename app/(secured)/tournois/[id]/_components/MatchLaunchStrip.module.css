@@ -48,13 +48,12 @@
   overflow-wrap: anywhere;
 }
 
-/* Le départ attend les salons vocaux d'équipe : dit dans la pastille, qui
-   passe alors à la ligne (375 px) — c'est la pastille, pas seulement sa
-   raison, qui lâche `nowrap`. */
-.toPlan.wrap,
+/* Le départ attend les salons vocaux d'équipe : dit dans la pastille
+   « planifié » ou « lancement » (les seules qui précèdent le départ une fois
+   l'heure posée), qui passe alors à la ligne (375 px) — c'est la pastille, pas
+   seulement sa raison, qui lâche `nowrap`. */
 .lobby.wrap,
-.scheduled.wrap,
-.launched.wrap {
+.scheduled.wrap {
   white-space: normal;
 }
 
