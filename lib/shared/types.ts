@@ -713,10 +713,10 @@ export type BracketMatch = {
   /** Lancement du match (ISO) ; `null` = pas encore lancé. */
   launchedAt: string | null;
   /**
-   * Salons vocaux d'équipe du match (`docs/features/MATCH_VOICE.md`) : nombre
-   * de personnes de chaque côté et verrou du lancement. Absent ou `null` :
-   * aucun salon suivi (option éteinte, match lancé, entrée solo, fantôme).
-   * Un nombre, jamais qui.
+   * Salons vocaux d'équipe du match (`docs/features/MATCH_VOICE.md`) : état
+   * du salon de chaque côté (bientôt ouvert, ouvert, indisponible). Absent ou
+   * `null` : aucun salon suivi (option éteinte, match lancé, entrée solo,
+   * fantôme, lecteur sans compte). Ni nombre ni personne.
    */
   voice?: MatchVoiceInfo | null;
   /** « Prêt » de chaque partie ; une fantôme est prête d'office. */

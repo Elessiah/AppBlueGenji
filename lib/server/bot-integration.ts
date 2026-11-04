@@ -1021,11 +1021,11 @@ const BOT_VOICE_FETCH_TIMEOUT_MS = 5000;
 /**
  * Issue d'un appel « salon vocal ».
  *
- * - `ok` : réponse attendue (`channelId`, `members`, ou libération faite) ;
+ * - `ok` : réponse attendue (`channelId`, ou libération faite) ;
  * - `gone` : le bot ne suit plus ce salon (`404`) — supprimé à la main, sorti
  *   de la catégorie, ou déjà libéré puis effacé ;
  * - `failed` : bot injoignable, coupe-circuit ouvert, permission refusée,
- *   Discord indisponible, réponse illisible — le verrou du lancement est levé.
+ *   Discord indisponible, réponse illisible — redemandé au passage suivant.
  */
 export type VoiceCallOutcome<T> =
   | { kind: "ok"; value: T }
@@ -1080,14 +1080,6 @@ function readChannelId(payload: unknown): string | null {
  */
 export function ensureVoiceChannel(key: string, name: string): Promise<VoiceCallOutcome<string>> {
   return voiceCall("POST", "/internal/voice/channels", { key, name }, readChannelId);
-}
-
-/** Nombre de personnes dans un salon suivi par le bot. */
-export function countVoiceChannel(channelId: string): Promise<VoiceCallOutcome<number>> {
-  return voiceCall("GET", `/internal/voice/channels/${encodeURIComponent(channelId)}/count`, undefined, (payload) => {
-    const members = (payload as { members?: unknown } | null)?.members;
-    return typeof members === "number" && Number.isInteger(members) && members >= 0 ? members : null;
-  });
 }
 
 /**

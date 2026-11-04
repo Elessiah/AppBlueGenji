@@ -1560,6 +1560,23 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       `Conditions d'utilisation : la version 9, en vigueur depuis le 6 novembre 2026, le dit dans ses sections « Compte » et « Contacts de match ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.`,
     ],
   },
+  {
+    // EF-43 (décisions de l'utilisateur du 2026-11-04 : décision 22 et suites
+    // 1+2 de D2) : les salons vocaux ne retiennent plus le lancement du match,
+    // le nombre de présents n'est plus demandé au bot ni gardé (colonnes
+    // `members` et `counted_at` retirées). Pour tous les comptes. Les entrées
+    // publiées (`2026-11-salons-vocaux-equipe`, version 9) ne sont pas retouchées.
+    id: "2026-11-salons-vocaux-sans-comptage",
+    publishedAt: "2026-11-06",
+    title: "Salons vocaux d'équipe : plus de comptage, plus d'attente",
+    links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }],
+    summary:
+      "Les salons vocaux d'équipe ne retiennent plus le lancement d'un match, et le bot ne compte plus les personnes présentes : le site ne garde, pour chaque salon, que son identifiant et ses horaires — ni qui s'y trouve, ni combien.",
+    details: [
+      "Ce qui change : un match qui a ses salons se lance comme dans tout autre tournoi, qu'ils soient pleins ou non ; sa page dit seulement si chaque salon est ouvert. Le nombre de personnes présentes n'est plus demandé au bot, et celui déjà gardé est effacé avec sa colonne.",
+      "Ce qui reste : pour savoir si un salon est vide et le supprimer, le bot tient toujours en mémoire, sans l'enregistrer, l'état vocal des membres du serveur Discord de l'association ; rien de nouveau n'est collecté. Le salon est aussi rendu quand une entrée en tournoi individuel ou une équipe fantôme entre dans le match. C'est toujours au titre de l'intérêt légitime (bon déroulement des tournois).",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

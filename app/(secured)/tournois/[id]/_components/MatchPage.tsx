@@ -704,8 +704,6 @@ function VoiceSection({ voice, sides }: Readonly<{ voice: MatchVoiceInfo; sides:
   const page = useMatchPageText();
   const titleId = useId();
   const side = (slot: 1 | 2) => (slot === 1 ? voice.team1State : voice.team2State);
-  // Une panne du bot lève le verrou : le match n'attend pas les salons.
-  const failed = !voice.pending && (voice.team1State === "FAILED" || voice.team2State === "FAILED");
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
       <InfoHintRow>
@@ -714,10 +712,8 @@ function VoiceSection({ voice, sides }: Readonly<{ voice: MatchVoiceInfo; sides:
           <p>{page.t("voice.hint", { capacity: VOICE_CHANNEL_CAPACITY })}</p>
         </InfoHint>
       </InfoHintRow>
-      {/* Une seule zone vivante, toujours montée : un texte inséré dans une
-          zone déjà présente est annoncé (monté avec son texte, il ne l'est pas),
-          et une mise à jour qui change une ligne et retire la note ne se lit
-          qu'une fois. */}
+      {/* Une seule zone vivante, toujours montée : un texte changé dans une
+          zone déjà présente est annoncé (monté avec son texte, il ne l'est pas). */}
       <div aria-live="polite">
         <ul className={styles.voiceList}>
           {sides.map((pageSide) => {
@@ -730,8 +726,6 @@ function VoiceSection({ voice, sides }: Readonly<{ voice: MatchVoiceInfo; sides:
             );
           })}
         </ul>
-        {voice.pending && <p className={styles.factNote}>{page.t("voice.waiting")}</p>}
-        {failed && <p className={styles.factNote}>{page.t("voice.failedNote")}</p>}
       </div>
     </section>
   );

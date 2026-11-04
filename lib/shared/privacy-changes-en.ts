@@ -810,6 +810,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Terms of use: version 9, in force since 6 November 2026, says so in its “Account” and “Match contacts” sections. A window presents it to you until you have accepted it: accepting it lets you keep using the site.",
     ],
   },
+  "2026-11-salons-vocaux-sans-comptage": {
+    linkLabels: ["Read the “Team voice channels” paragraph"],
+    title: "Team voice channels: no more counting, no more waiting",
+    summary:
+      "Team voice channels no longer hold a match's launch, and the bot no longer counts the people present: for each channel, the site only keeps its identifier and its times — neither who is in it nor how many.",
+    details: [
+      "What changes: a match with channels launches as in any other tournament, whether they are full or not; its page only says whether each channel is open. The number of people present is no longer requested from the bot, and the one already kept is erased with its column.",
+      "What stays: to know whether a channel is empty and delete it, the bot still holds in memory, without recording it, the voice state of the members of the association's Discord server; nothing new is collected. The channel is also handed back when a solo entry or a ghost team enters the match. It still rests on legitimate interest (smooth running of tournaments).",
+    ],
+  },
 };
 
 /**

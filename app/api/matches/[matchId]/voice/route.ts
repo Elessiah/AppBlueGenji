@@ -7,12 +7,11 @@ import { can } from "@/lib/shared/permissions";
 
 /**
  * Salons vocaux d'équipe d'un match (`docs/features/MATCH_VOICE.md`) : l'état
- * de chaque salon et celui du verrou du lancement, jamais le nombre de personnes
- * — la porte REST de `TournamentMatch.voice`, que la page du match relit flux
+ * de chaque salon, jamais qui s'y trouve ni combien — la porte REST de `TournamentMatch.voice`, que la page du match relit flux
  * coupé seulement. Connecté seulement.
  *
  * La lecture ne sollicite jamais le bot : elle relance le balayage (étranglé),
- * qui compte et publie un changement par le flux.
+ * qui crée ou rend les salons et publie un changement par le flux.
  */
 export async function GET(_req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
