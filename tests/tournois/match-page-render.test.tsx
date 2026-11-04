@@ -271,7 +271,9 @@ describe("page d'un match — ce que tout le monde lit", () => {
 
   it("launchStripStyles_heldBadge_dropsNowrapOnTheBadgeItself", () => {
     const css = readSource("app/(secured)/tournois/[id]/_components/MatchLaunchStrip.module.css");
-    expect(css).toMatch(/\.lobby\.wrap,[\s\S]*?\.launched\.wrap \{\s*white-space: normal;/);
+    expect(css).toMatch(/\.lobby\.wrap,\s*\.scheduled\.wrap \{\s*white-space: normal;/);
+    // Seules ces deux pastilles portent la raison : pas de règle morte pour les autres.
+    expect(css).not.toMatch(/\.(toPlan|launched)\.wrap/);
   });
 
   it("render_noHost_noSidesFact", () => {
@@ -969,7 +971,10 @@ describe("page d'un match — salons vocaux d'équipe", () => {
     expect(visible(html)).toContain("Le match se lance quand les deux salons sont pleins.");
     // Le remplissage change sans que la personne touche à rien : annoncé.
     expect(html).toContain('aria-live="polite"');
-    expect(html).toMatch(/aria-live="polite"><p[^>]*>Le match se lance quand/);
+    // Une seule zone vivante pour la section : lignes et notes.
+    expect(html).not.toContain('<ul class="voiceList" aria-live');
+    expect(html.match(/<div aria-live="polite">/g)).toHaveLength(1);
+    expect(html).toMatch(/<div aria-live="polite"><ul[\s\S]*<p[^>]*>Le match se lance quand/);
   });
 
   it("render_voiceNotCreated_saysOpeningSoon", () => {
@@ -982,7 +987,7 @@ describe("page d'un match — salons vocaux d'équipe", () => {
     expect(visible(html)).toContain("Salon vocal : 5/5");
     expect(visible(html)).not.toContain("se lance quand");
     // La zone vivante reste montée, vide : le texte qui y entrera sera annoncé.
-    expect(html).toContain('<div aria-live="polite"></div>');
+    expect(html).toMatch(/<div aria-live="polite"><ul[\s\S]*<\/ul><\/div>/);
   });
 
   it("render_voiceFull_saysFull", () => {
@@ -1003,7 +1008,7 @@ describe("page d'un match — salons vocaux d'équipe", () => {
     expect(visible(html)).toContain("Salon vocal : indisponible");
     expect(visible(html)).toContain("Un salon est indisponible : le match n'attend pas les salons.");
     expect(visible(html)).not.toContain("se lance quand");
-    expect(html).toMatch(/aria-live="polite"><p[^>]*>Un salon est indisponible/);
+    expect(html).toMatch(/<\/ul><p[^>]*>Un salon est indisponible/);
   });
 
   it("render_voiceFailedEnglish_saysUnavailable", () => {

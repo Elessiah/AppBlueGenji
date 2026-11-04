@@ -127,6 +127,16 @@ describe("mergeRefusals", () => {
     expect((merged as Error).message).toBe("Réseau.");
     expect(errorCode(merged)).toBe("UNKNOWN");
   });
+
+  it("mergeRefusals_noReadableMessage_firstRefusalNotBlankToast", () => {
+    const first = { status: 409 };
+
+    expect(mergeRefusals([first, "boom"])).toBe(first);
+  });
+
+  it("mergeRefusals_noRefusal_undefined", () => {
+    expect(mergeRefusals([])).toBeUndefined();
+  });
 });
 
 describe("launchPhaseBadgeKind", () => {
