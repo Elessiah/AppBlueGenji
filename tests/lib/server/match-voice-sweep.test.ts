@@ -248,6 +248,18 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     expect(deletes()).toBe(2);
   });
 
+  it("dispatchMatchVoiceChannels_purgeBacklogLargerThanABatch_deletesUntilCaughtUp", async () => {
+    const { execute } = database({ needed: { due: 0, open_rows: 0 } });
+    const deletes = () => execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE")).length;
+    execute
+      .mockImplementationOnce(async () => [[{ due: 0, open_rows: 0 }], []])
+      .mockImplementationOnce(async () => [{ affectedRows: 200 }, []])
+      .mockImplementationOnce(async () => [{ affectedRows: 200 }, []])
+      .mockImplementationOnce(async () => [{ affectedRows: 3 }, []]);
+    await dispatchMatchVoiceChannels();
+    expect(deletes()).toBe(3);
+  });
+
   it("dispatchMatchVoiceChannels_twoPassesWithinAnHour_purgesOnce", async () => {
     const { writes } = database({ needed: { due: 0, open_rows: 0 } });
     await dispatchMatchVoiceChannels();
@@ -538,14 +550,48 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
     expect(writes.filter((w) => w.sql.includes("bg_match_voice_channels") && !w.sql.startsWith("DELETE"))).toEqual([]);
   });
 
-  it("dispatchMatchVoiceChannels_recheckFailsThenBotBack_retriesNextPass", async () => {
+  it("dispatchMatchVoiceChannels_recheckFailsThenBotBack_retriesAfterShortBackoff", async () => {
     database({ openDue: [open] });
+    const start = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(start);
     jest.mocked(ensureVoiceChannel)
       .mockResolvedValueOnce({ kind: "failed", code: "BOT_INTERNAL_UNREACHABLE" })
       .mockResolvedValue({ kind: "ok", value: "901" });
     await dispatchMatchVoiceChannels();
+    clock.mockReturnValue(start + 11_000);
     await dispatchMatchVoiceChannels(true);
     expect(ensureVoiceChannel).toHaveBeenCalledTimes(2);
+  });
+
+  it("dispatchMatchVoiceChannels_recheckFailsOnTransport_notAskedAgainBeforeBackoff", async () => {
+    database({ openDue: [open] });
+    const start = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(start);
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "BOT_VOICE_TIMEOUT" });
+    await dispatchMatchVoiceChannels();
+    clock.mockReturnValue(start + 5_000);
+    await dispatchMatchVoiceChannels(true);
+    expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
+  });
+
+  it("dispatchMatchVoiceChannels_failedChannelRetried_comesAfterOverdueChannels", async () => {
+    const [first, second] = openRows(2);
+    const start = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(start);
+    database({ openDue: [first!] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: first!.channel_id });
+    await dispatchMatchVoiceChannels();
+    clock.mockReturnValue(start + 55_000);
+    database({ openDue: [first!, second!] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValueOnce({ kind: "failed", code: "BOT_VOICE_TIMEOUT" });
+    await dispatchMatchVoiceChannels(true);
+    const failedKey = jest.mocked(ensureVoiceChannel).mock.calls.at(-1)![0];
+    jest.mocked(ensureVoiceChannel).mockReset().mockResolvedValue({ kind: "ok", value: "90" });
+    clock.mockReturnValue(start + 66_000);
+    await dispatchMatchVoiceChannels(true);
+    const keys = jest.mocked(ensureVoiceChannel).mock.calls.map(([key]) => key);
+    expect(keys).toHaveLength(2);
+    expect(keys[1]).toBe(failedKey);
   });
 
   it("dispatchMatchVoiceChannels_recheckRefusedForOneChannel_checksTheOthersAndKeepsStamp", async () => {
