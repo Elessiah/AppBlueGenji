@@ -52,7 +52,7 @@ import {
 } from "./repository";
 import { invalidateTournamentLists } from "./list-cache";
 import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
-import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
+import { invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
@@ -287,7 +287,8 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
     if (syncResult.stateChanged || syncResult.contentChanged) {
       invalidateTournamentLists();
       invalidateLandingAggregates();
-      invalidateTeamRanking();
+      // PNG d'aperçu au plus une fois par fenêtre, comme les scores (`invalidateTeamRankingForScore`).
+      invalidateTeamRankingForScore();
       invalidateStats();
     }
 
