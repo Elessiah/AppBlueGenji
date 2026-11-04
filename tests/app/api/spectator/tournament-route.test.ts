@@ -414,6 +414,38 @@ describe("GET /api/spectator/tournaments/[id]", () => {
       }
     });
 
+    it("GET_rateRefusedWildcardIfNoneMatch_returns429", async () => {
+      jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
+      try {
+        await exhaustedNetworkWithCopy();
+
+        const res = await GET(req("5", { "accept-encoding": "identity", "if-none-match": "*" }), params("5"));
+
+        expect(res.status).toBe(429);
+        expect(res.headers.get("retry-after")).not.toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("GET_rateRefused304_doesNotCountInLoad", async () => {
+      jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
+      try {
+        const first = await exhaustedNetworkWithCopy();
+        resetSpectatorLoad();
+
+        const res = await GET(
+          req("5", { "accept-encoding": "identity", "if-none-match": first.headers.get("etag") ?? "" }),
+          params("5"),
+        );
+
+        expect(res.status).toBe(304);
+        expect(spectatorReadsPerMinute()).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it("répond 429 à une version d'un autre codage que celui demandé, sans corps", async () => {
       jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
       try {
