@@ -488,8 +488,8 @@ function FunnelBox({ in: inCount, out: outCount, x, y }: Readonly<FunnelLevel>) 
 function MultiDiagram({ t, locale }: DiagramProps) {
   return (
     <svg
-      className={styles.svg}
-      viewBox="0 0 680 300"
+      className={`${styles.svg} ${styles.svgMulti}`}
+      viewBox="0 0 760 300"
       role="img"
       aria-label={t.multi.ariaLabel}
       style={{ color: LINE }}
@@ -532,11 +532,12 @@ function MultiDiagram({ t, locale }: DiagramProps) {
         {t.multi.line3}
       </text>
 
-      {/* Trophy for winner */}
+      {/* Trophée de la gagnante, à droite du dernier entonnoir (x 420–580) :
+          rien ne se chevauche, la flèche part du bord de l'entonnoir. */}
       <g>
         <rect
-          x={535}
-          y={60}
+          x={620}
+          y={55}
           width={120}
           height={50}
           rx={7}
@@ -544,14 +545,14 @@ function MultiDiagram({ t, locale }: DiagramProps) {
           stroke={BLUE}
           strokeWidth={1.2}
         />
-        <text x={595} y={82} fill={INK} fontSize={14} textAnchor="middle">
+        <text x={680} y={77} fill={INK} fontSize={14} textAnchor="middle">
           🏆
         </text>
         <text
-          x={595}
-          y={103}
+          x={680}
+          y={98}
           fill={BLUE}
-          fontSize={9}
+          fontSize={11}
           fontFamily={MONO}
           textAnchor="middle"
           letterSpacing="0.1em"
@@ -560,7 +561,7 @@ function MultiDiagram({ t, locale }: DiagramProps) {
         </text>
       </g>
 
-      <Elbow from={[545, 80]} to={[535, 85]} color={BLUE} />
+      <Elbow from={[580, 80]} to={[620, 80]} color={BLUE} />
     </svg>
   );
 }

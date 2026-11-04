@@ -157,15 +157,30 @@ export const CSP_NONCE_HEADER = "x-nonce";
  *   couvre pas un attribut `style`. La restreindre demanderait de réécrire ces
  *   endroits en CSS Modules ; c'est un chantier, pas une ligne d'en-tête.
  *
+ * Sous `next dev --turbopack` seulement, `'strict-dynamic'` tombe : Turbopack
+ * (Next 15) écrit dans le HTML le morceau d'un `loading.tsx` en
+ * `<script src async>` **sans nonce**, que `'strict-dynamic'` refuse (il écarte
+ * `'self'`) — la fiche d'un tournoi restait sur « Chargement ». Le morceau vient
+ * du site, `'self'` le couvre. Le prix, assumé : sous Turbopack, un
+ * `<script src>` du site sans nonce passe aussi, donc l'oubli d'un nonce ne se
+ * voit qu'en dev webpack (`next dev` sans `--turbopack`) ou en production. Borner
+ * la source à `<hôte>/_next/` a été essayé puis retiré : le serveur ne connaît
+ * pas l'origine qu'a tapée le navigateur (`next dev` réécrit `nextUrl` en
+ * `localhost`, un tunnel réécrit `Host`), et une seule erreur d'hôte refusait
+ * tous les morceaux. Le dev webpack et la production gardent la politique
+ * entière : `next build` pose le nonce sur chaque script.
+ *
  * @param nonce Nonce de la requête, déjà encodé en base64.
- * @param options `dev` autorise `'unsafe-eval'`, dont le rafraîchissement à chaud de Next a besoin.
+ * @param options `dev` autorise `'unsafe-eval'`, dont le rafraîchissement à chaud de Next a besoin ;
+ *   `turbopack` (dev Turbopack seulement, ignoré hors `dev`) retire `'strict-dynamic'`.
  * @returns La politique, prête à être posée en en-tête.
  */
-export function contentSecurityPolicy(nonce: string, options: { dev: boolean }): string {
+export function contentSecurityPolicy(nonce: string, options: { dev: boolean; turbopack?: boolean }): string {
+  const turbopackDev = options.dev && options.turbopack === true;
   const scriptSrc = [
     "'self'",
     `'nonce-${nonce}'`,
-    "'strict-dynamic'",
+    ...(turbopackDev ? [] : ["'strict-dynamic'"]),
     "'unsafe-inline'",
     ...(options.dev ? ["'unsafe-eval'"] : []),
   ];

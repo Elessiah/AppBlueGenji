@@ -177,30 +177,52 @@ async function playPartialEnduranceRound(
 }
 
 /**
+ * Refus attendus d'une pénalité de fin de simulation, refus du domaine et non
+ * pannes : l'équipe est sortie entre-temps (on passe à la suivante), les
+ * play-offs ont commencé ou le tournoi n'est plus en cours (on s'arrête).
+ * Toute autre erreur (requête cassée, syntaxe refusée par MariaDB, table
+ * absente, pénalité invalide) remonte, car le seed est le seul contrôle réel
+ * du SQL.
+ */
+const SKIPPED_PENALTY_REFUSALS: ReadonlySet<string> = new Set(["TEAM_ALREADY_OUT"]);
+const FINAL_PENALTY_REFUSALS: ReadonlySet<string> = new Set(["ENDURANCE_PLAYOFFS_STARTED", "TOURNAMENT_NOT_RUNNING"]);
+
+/**
  * Pose `count` pénalités d'un point, par le service de production, sur les
  * équipes en lice du haut du classement (une par équipe). Le rejeu les
  * applique à la manche courante, comme une sanction prononcée à l'écran.
+ * Le nombre de pénalités se compte en code, jamais par un `LIMIT` interpolé :
+ * une valeur non numérique, infinie ou inférieure à 1 ne pose rien, une
+ * décimale est arrondie à l'entier inférieur.
+ *
+ * Exportée pour les tests.
  */
-async function penalizeEnduranceTeams(
+export async function penalizeEnduranceTeams(
   connection: PoolConnection,
   tournamentId: number,
   count: number
 ): Promise<number> {
-  if (count <= 0) return 0;
+  const limit = Math.floor(count);
+  if (!Number.isFinite(limit) || limit <= 0) return 0;
   const [rows] = await connection.execute<(RowDataPacket & { team_id: number })[]>(
     `SELECT team_id FROM bg_endurance_standings
        WHERE tournament_id = ? AND status = 'ACTIVE'
-       ORDER BY \`rank\` ASC
-       LIMIT ${Math.floor(count)}`,
+       ORDER BY \`rank\` ASC`,
     [tournamentId]
   );
   let penalized = 0;
+  // La liste est lue une fois : une pénalité peut faire sortir une équipe plus
+  // bas (rejeu), qui est alors sautée au profit de la suivante encore en lice.
   for (const row of rows) {
+    if (penalized >= limit) break;
     try {
       await applyEndurancePenalty(tournamentId, Number(row.team_id), 1, "Test_ retard au check-in", null, connection);
       penalized++;
-    } catch {
-      break;
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      if (SKIPPED_PENALTY_REFUSALS.has(code)) continue;
+      if (FINAL_PENALTY_REFUSALS.has(code)) break;
+      throw error;
     }
   }
   return penalized;
