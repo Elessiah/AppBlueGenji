@@ -20,6 +20,10 @@ Marvel Rivals. Corrections apportées à un audit UI/UX antérieur
 
 ## Règles
 
+- Le bilan d'une équipe qui a des nuls se lit **V–N–D** : les nuls s'insèrent
+  entre les victoires et les défaites (« 3–1 N–2 », « 3–1 D–2 » en anglais), avec
+  le texte long en `title` et lu à voix (`leaderboard.drawsLabel`).
+
 - Le dernier filtre **chargé avec succès** est gardé dans une ref
   (`lastLoadedGame`) : un échec y revient plutôt que de laisser l'état visuel
   (la pastille) mentir sur les données affichées. Le retour à ce filtre ne

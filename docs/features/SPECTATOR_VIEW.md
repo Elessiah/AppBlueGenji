@@ -180,7 +180,8 @@ lui-même).
   `WeakMap`, la boucle d'événements des salons SSE n'est plus bloquée par un
   corps d'environ 1 Mo) pour tous les lecteurs qui l'acceptent
   (`Content-Encoding: gzip`, `Vary: Accept-Encoding` ; Next ne recompresse pas
-  une réponse déjà encodée) ;
+  une réponse déjà encodée) ; une compression qui échoue (mémoire) ne donne pas
+  un 500 : la route sert le corps brut, avec l'`ETag` du codage réellement servi ;
 - le cache commun purge ses entrées échues toutes les 10 s au plus
   (`CACHE_SWEEP_INTERVAL_MS`, à l'écriture), et non plus seulement au plafond
   de 500 : un parcours de tournois ne laisse plus d'instantanés en mémoire
@@ -279,8 +280,16 @@ page sans compte, l'encart lit la **carte seule**
 150 s, sinon la carte (une requête indexée) gardée 10 s — jamais une
 reconstruction de l'instantané entier payée par le réseau d'un robot d'aperçu.
 L'état en est **recalculé depuis les dates** (la copie garde celui de sa
-construction). Chaque rendu de page sans session compte dans
-`SPECTATOR_READ_RULE` ; au plafond, encart ou page générale.
+construction). Seule une lecture **en base** de la carte prend un jeton de
+`SPECTATOR_READ_RULE` (`admit`, consulté dans le chargeur du cache de carte) :
+une carte servie par la copie ou par le cache de carte ne coûte rien, et la page
+d'un match (mise en page du tournoi + du match) n'épuise plus le plafond deux
+fois plus vite ; au plafond, encart ou page générale. Un tournoi **dépublié**
+(`updateTournament` qui repousse `startVisibilityAt` dans le futur) est évincé
+aussitôt (`invalidateSpectatorSnapshot` vide la réponse publique et la carte
+d'encart). Un membre connecté arrivant par une mise en page préchargée ne voit
+pas la fiche publique : `MemberRelay` seul est rendu, à la place de `children`,
+jusqu'au `router.replace`.
 
 **Règles du mode** — le « ? » de la fiche (`RulesHelpFab`) mène à
 `/regles/<mode>?tournoi=<id>`. Sans session aussi, les réglages du tournoi

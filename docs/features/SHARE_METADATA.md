@@ -117,10 +117,14 @@ navigateur. D'où quatre contraintes qui ne sont pas des maladresses :
 - la taille du titre est choisie d'après sa longueur, Satori ne sachant pas
   rétrécir un texte pour qu'il tienne — un nom de tournoi va de « OW Cup » à
   soixante caractères ;
-- la police est celle que `next/og` embarque : celles du dépôt sont en WOFF2,
-  que Satori ne lit pas, et en télécharger une serait une requête réseau par
-  rendu. Elle n'a qu'une graisse : `fontWeight: 700` n'y change rien, la
-  hiérarchie tient par la taille.
+- la police est **Inter**, Regular et Bold, en TTF statiques embarqués dans le
+  dépôt (`app/og-fonts/`, instances 400 et 700 des fichiers variables latin et
+  latin étendu, licence OFL à côté dans `app/fonts/`) : Satori ne lit pas le
+  WOFF2 du site, et en télécharger une serait une requête réseau par rendu.
+  `lib/server/share-card-fonts.ts` les lit une fois par processus et les passe en
+  `fonts` à chaque `ImageResponse` (`shareImageOptions`) ; illisibles, `[]` et
+  la police par défaut de Satori (avertissement journalisé, relecture au rendu
+  suivant). `fontWeight: 700` y a donc son effet.
 
 ### Palette « néons froids » (décision du 2026-10-06)
 
@@ -421,8 +425,11 @@ réserve, un tel robot obtient des réponses plus lentes, pas un processeur satu
 - Un échec de rendu n'est jamais gardé.
 - **Cartes tirées du classement** (`followsRanking` : podium, équipe
   nominative) : `invalidateRankingShareImages` les oublie — rendues ou en vol —
-  à chaque vidage du classement (`invalidateTeamRanking`, score) et à chaque
-  écriture d'identité (`invalidateTeamIdentityViews` : nom, logo, dissolution).
+  à chaque écriture d'identité (`invalidateTeamIdentityViews` : nom, logo,
+  dissolution) — mais, pour un **score** (`invalidateTeamRanking`), au plus une
+  fois par fenêtre de `RANKING_TTL_MS` (60 s) : un soir de tournoi chargé, les
+  rendus Satori/`sharp` du Raspberry Pi ne suivent plus le nombre de matchs, et
+  un PNG gardé n'a que l'âge de sa propre échéance de retard.
   Un compteur de génération empêche de garder un rendu lancé avant le vidage et
   fini après : il est servi à qui l'attendait, jamais gardé. Les cartes fixes
   restent (elles ne changent qu'au déploiement).

@@ -39,7 +39,7 @@ rendu.
   sinon les derniers ; quatre matchs au plus, ceux à jouer d'abord) — et non
   plus toujours la manche 1 de l'`UPPER`, qui faisait passer les premiers
   résultats d'un tournoi Suisse ou multi-phases, ou la finale du haut d'une
-  double élimination à sa grande finale, pour son plateau. La place vide d'une
+  double élimination à sa grande finale, pour son plateau. La requête ne lit que la manche en cours de chaque couple (phase, tableau) — sous-requête agrégée sur `bg_matches`, même choix final à la lecture —, pour que le coût (relu à chaque écriture de tournoi) ne suive plus le nombre de matchs. La place vide d'une
   exemption se lit « Exempt » / « Bye » (`board.bye`), jamais « À venir » :
   `is_bye` (Survie) ou place vide d'un match **clos** (les arbres à élimination
   ferment l'exemption sans poser `is_bye`, `byes.ts`). Noms par
