@@ -57,8 +57,8 @@ anciennes clés `tournament.matchPage.*` restant pour les sections.
    chaque engagé par `EntrantName` (case vide « BYE » ou « TBD » comme la carte, logo 40 px, nom qui passe à la ligne, logo
    au-dessus du nom sous 560 px) ; score au centre (`matchPageHeaderScore`,
    « FF » sur forfait, « VS » avant tout score ; texte pour lecteur d'écran
-   « Score : x à y » — les noms se lisent déjà de part et d'autre —, « Forfait de A »
-   sur forfait, rien sur double forfait, que la pastille d'état dit). Dessous : vainqueur, nul ou double forfait, horaire, état de
+   « Score : A x, B y » (les deux équipes nommées : le libellé se lit seul),
+   « A contre B : forfait de A » sur forfait, rien sur double forfait, que la pastille d'état dit). Dessous : vainqueur, nul ou double forfait, horaire, état de
    diffusion (`pill-live` seulement à l'antenne, « Cast annoncé » sinon), date
    manquante (staff), rediffusion et proposition de score en attente.
 2. **Faits clés** (`KeyFacts`, `components/cyber/` — la grille des pages de
