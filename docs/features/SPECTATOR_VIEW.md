@@ -284,13 +284,19 @@ L'état en est **recalculé depuis les dates** (la copie garde celui de sa
 construction). Seule une lecture **en base** de la carte prend un jeton de
 `SPECTATOR_READ_RULE` (`admit`, consulté dans le chargeur du cache de carte) :
 une carte servie par la copie ou par le cache de carte ne coûte rien, et la page
-d'un match (mise en page du tournoi + du match) n'épuise plus le plafond deux
-fois plus vite ; les réglages de `/regles/<mode>?tournoi=` suivent la même règle
+d'un match d'un tournoi publié (mise en page du tournoi + du match) n'épuise plus
+le plafond deux fois plus vite (un « introuvable », jamais gardé, reprend un jeton
+à chaque lecture) ; les réglages de `/regles/<mode>?tournoi=` suivent la même règle
 (`publicTournamentSnapshot` ne consulte `admit` que si la réponse publique
-n'est ni fraîche en cache ni en vol) ; au plafond, encart ou page générale. Toute **édition** d'un
+n'est ni fraîche en cache ni en vol : une copie échue servie en repli en prend
+un) ; au plafond, encart ou page générale. Toute **édition** d'un
 tournoi (`updateTournament` : nom, description, dates ; image posée, recadrée ou retirée, `image.ts` ; lien de chaîne, `setTournamentLiveUrl`) l’évince aussitôt
 (`invalidateSpectatorSnapshot` vide la réponse publique et la carte d'encart) :
-un nom ou une description retirés par le staff ne restent pas en aperçu. Un membre connecté arrivant par une mise en page préchargée ne voit
+un nom ou une description retirés par le staff ne restent pas en aperçu. Le
+périmètre est **la carte du tournoi** : ce qui vit sur les matchs (antenne,
+liens de chaîne d'un match, horaire) suit la durée de vie de la copie, comme un
+renommage d'équipe ou un compte supprimé (choix de l'auteur, délai déclaré dans
+`/rgpd`). Un membre connecté arrivant par une mise en page préchargée ne voit
 pas la fiche publique : `MemberRelay` seul est rendu, à la place de `children`,
 jusqu'au `router.replace` ; un repli « Ouverture du tournoi… » (`login.authGate.redirecting`) évite la page vide si le renvoi tarde. `admit` est consulté avant `cached`, jamais dans le chargeur partagé : le refus d'un réseau plafonné n'est pas servi aux appelants qui rejoignent la lecture en vol.
 
