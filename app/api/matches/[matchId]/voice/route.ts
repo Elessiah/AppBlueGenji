@@ -8,8 +8,8 @@ import { can } from "@/lib/shared/permissions";
 /**
  * Salons vocaux d'équipe d'un match (`docs/features/MATCH_VOICE.md`) : le
  * nombre de personnes de chaque côté et l'état du verrou du lancement — la
- * porte REST de `TournamentMatch.voice`, que la page du match relit tant que
- * le verrou tient. Connecté seulement ; un nombre, jamais qui.
+ * porte REST de `TournamentMatch.voice`, que la page du match relit flux coupé
+ * seulement. Connecté seulement ; un nombre, jamais qui.
  *
  * La lecture ne sollicite jamais le bot : elle relance le balayage (étranglé),
  * qui compte et publie un changement par le flux.

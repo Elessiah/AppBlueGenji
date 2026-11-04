@@ -81,7 +81,7 @@ import {
 import { frEn, localize, type Localizable } from "@/lib/shared/bilingual";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-11-05";
+export const REGISTER_UPDATED_AT = "2026-11-06";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -1492,8 +1492,8 @@ const ACTIVITIES = registerActivities({
     subPurposes: [
       frEn(`Demander au bot Discord de l'association, à partir de ${VOICE_CHANNEL_LEAD_MINUTES} minutes avant l'heure d'un match (ou dès l'option allumée, pour un match déjà dans ce délai), un salon vocal de ${VOICE_CHANNEL_CAPACITY} places par équipe dans la catégorie des matchs de son serveur, au nom de l'équipe — jamais pour une entrée en tournoi individuel (son nom serait un pseudo) ni pour un match contre une équipe fantôme`,
         `Asking the association's Discord bot, from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before a match's time (or as soon as the option is turned on, for a match already within that window), for a ${VOICE_CHANNEL_CAPACITY}-seat voice channel per team in its server's match category, named after the team — never for a solo entry (its name would be a username) nor for a match against a ghost team`),
-      frEn(`Faire compter par le bot le nombre de personnes présentes dans chaque salon, pour retenir le lancement du match jusqu'à ce que les deux soient pleins (l'arbitrage peut le forcer ; si le bot ne répond pas, le match n'attend pas), et montrer « Salon vocal : n/${VOICE_CHANNEL_CAPACITY} » aux parties du match (membres des deux équipes, casters) et au staff`,
-        `Having the bot count the people present in each channel, to hold the match's launch until both are full (referees can force it; if the bot doesn't answer, the match doesn't wait), and showing “Voice channel: n/${VOICE_CHANNEL_CAPACITY}” to the match's parties (members of both teams, casters) and to staff`),
+      frEn(`Faire compter par le bot le nombre de personnes présentes dans chaque salon, pour retenir le lancement du match jusqu'à ce que les deux soient pleins (l'arbitrage peut le forcer ; si le bot échoue, le match n'attend pas), et montrer « Salon vocal : n/${VOICE_CHANNEL_CAPACITY} » aux parties du match (membres des deux équipes, casters) et au staff`,
+        `Having the bot count the people present in each channel, to hold the match's launch until both are full (referees can force it; if the bot fails, the match doesn't wait), and showing “Voice channel: n/${VOICE_CHANNEL_CAPACITY}” to the match's parties (members of both teams, casters) and to staff`),
       frEn("Rendre les salons au bot quand le match est terminé (score validé), annulé, retombé en attente ou sorti du programme, quand l'équipe sort de l'appariement, ou quand le tournoi se termine ou éteint l'option ; le bot supprime un salon dès qu'il est vide",
         "Handing the channels back to the bot when the match is finished (score confirmed), cancelled, back to waiting or taken off the schedule, when the team leaves the pairing, or when the tournament ends or turns the option off; the bot deletes a channel as soon as it is empty"),
     ],

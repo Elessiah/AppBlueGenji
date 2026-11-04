@@ -61,7 +61,7 @@ import { ACTIONABLE_EXPIRED_REPORT_SQL } from "./score-report-sql";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { pickChampion } from "@/lib/shared/tournament-card-summary";
 import { computeRunningRatio } from "@/lib/shared/tournament-progress";
-import { applyMapRules } from "@/lib/shared/round-maps";
+import { applyMapRules, roundKeyId, type RoundTiebreak } from "@/lib/shared/round-maps";
 import { loadMapRules } from "./round-maps";
 import { applicableTiebreaks } from "@/lib/shared/round-plan";
 import { withoutRefereeKeys } from "./referee-names";
@@ -498,14 +498,18 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     const storedMapRules = await loadMapRules(connection, tournamentId, tournament);
     // Map de départage : celles des seuls tours éligibles (play-offs en vrai
     // best of 3) — un réglage resté d'un format changé depuis n'est pas montré.
+    const activeTiebreaks = applicableTiebreaks(storedMapRules.tiebreaks, {
+      format: card.format,
+      matchFormat: card.matchFormat,
+      endurancePlayoffFormat: card.endurancePlayoffFormat,
+      phases: phasesDetail?.phases ?? null,
+    });
+    // Les inactives restent portées : le staff peut les retirer (`RoundMapsDialog`).
+    // Champ omis quand rien n'est périmé (le cas courant) : les spectateurs ne le portent pas.
     const mapRules = {
       ...storedMapRules,
-      tiebreaks: applicableTiebreaks(storedMapRules.tiebreaks, {
-        format: card.format,
-        matchFormat: card.matchFormat,
-        endurancePlayoffFormat: card.endurancePlayoffFormat,
-        phases: phasesDetail?.phases ?? null,
-      }),
+      tiebreaks: activeTiebreaks,
+      ...staleTiebreaksField(storedMapRules.tiebreaks, activeTiebreaks),
     };
     const mappedMatches = attachMatchMaps(
       applyMapRules(matches.map((row) =>
@@ -594,6 +598,13 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
   } finally {
     connection.release();
   }
+}
+
+/** `{ staleTiebreaks }` quand des réglages stockés ne sont plus actifs, `{}` sinon. */
+function staleTiebreaksField(stored: readonly RoundTiebreak[], active: readonly RoundTiebreak[]): { staleTiebreaks?: RoundTiebreak[] } {
+  const activeKeys = new Set(active.map(roundKeyId));
+  const stale = stored.filter((entry) => !activeKeys.has(roundKeyId(entry)));
+  return stale.length > 0 ? { staleTiebreaks: stale } : {};
 }
 
 /**

@@ -32,6 +32,8 @@
       "replayCode": "Code de replay",
       "replayCodeOptional": "Code de replay (facultatif)",
       "scoreOf": "Map {index}, score de ",
+      "scoreOfNamed": "Map {index} : {name}, score de ",
+      "scoreOfTiebreak": "Map de départage : {name}, score de ",
       "remove": "Retirer la map {index}",
       "summary": "Score du match",
       "violation": {
@@ -49,7 +51,8 @@
         "belowFree": "Score incomplet."
       },
       "tiebreakNamed": "Map de départage : {name}",
-      "tiebreakNamedPrefix": "Map de départage : {name}, "
+      "tiebreakNamedPrefix": "Map de départage : {name}, ",
+      "tiebreakRow": "Map {index} : c'est la map de départage, {name}."
     },
     "admin": {
       "title": "Score du match",

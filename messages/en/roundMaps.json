@@ -18,7 +18,7 @@
     "scaleHint": "These maps apply to every match of the round: the map is no longer entered match by match. “Reset the round” brings back the per-match entry.",
     "resetConfirmBody": "This round's maps are removed for all its matches: the map is entered match by match again. Picks already made on matches stay.",
     "tiebreak": "Tiebreak map",
-    "tiebreakHint": "Played only if the series is level after the 3 maps (a drawn map). Bans: the next-maps rule."
+    "tiebreakHint": "Playoff round played as a real Bo3: a map played only if the series is level after the 3 maps. Bans follow the next-maps rule."
   },
   "sheet": {
     "title": "Maps and bans",
@@ -81,6 +81,7 @@
     },
     "maxMaps": "{max} maps at most per match (tournament format).",
     "overMaxMaps": "This round has more maps than the format plays ({max} at most).",
+    "overMaxTarget": "Not possible: {round} plays {max} maps at most and the selection has more.",
     "mapEmpty": "Type a map name.",
     "mapTooLong": "Map name too long (64 characters at most).",
     "poolFull": "20 maps at most per pool.",
@@ -106,19 +107,29 @@
     },
     "switchConfirm": {
       "title": "Discard unsaved maps?",
-      "body": "The maps entered for {round} and not yet saved will be lost.",
+      "body": "The maps or tiebreak map entered for {round} and not yet saved will be lost.",
       "confirm": "Discard"
     },
     "pending": "Sending…",
     "slotGap": "Map {number} is empty: fill it or remove it, otherwise the following maps would shift.",
     "tiebreakTitle": "Tiebreak map",
-    "tiebreakHint": "Playoff round played as a real Bo3: a map played only if the series is level after the 3 maps. Bans follow the next-maps rule.",
     "tiebreakLabel": "Tiebreak map name",
     "tiebreakSave": "Save the tiebreak map",
     "tiebreakRemove": "Remove the tiebreak map",
     "tiebreakSaved": "Tiebreak map saved.",
     "tiebreakRemoved": "Tiebreak map removed.",
     "tiebreakEmpty": "Enter a map name or remove the tiebreak map.",
-    "summaryTiebreak": "tiebreak map"
+    "summaryTiebreak": "tiebreak map",
+    "closeConfirm": {
+      "title": "Close without saving?",
+      "body": "Unsaved changes in this window will be lost.",
+      "confirm": "Close without saving"
+    },
+    "roundClearedTiebreakKept": "Round reset: maps match by match. The tiebreak map stays.",
+    "staleTiebreakTitle": "Inactive tiebreak maps",
+    "staleTiebreakHint": "These rounds are no longer playoffs played as a real Bo3 (format changed): their tiebreak map is neither shown nor played. Remove it to delete it.",
+    "staleTiebreakItem": "{round}: {map}",
+    "staleTiebreakRemove": "Remove",
+    "staleTiebreakRemoveLabel": "Remove the tiebreak map of {round}"
   }
 }

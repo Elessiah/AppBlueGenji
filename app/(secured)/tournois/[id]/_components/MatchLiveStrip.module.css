@@ -50,13 +50,15 @@
    l'extension de `tap-target`. */
 .link {
   display: inline-block;
-  min-height: 24px;
+  /* Cible de 24 px (WCAG 2.5.8) par la hauteur de ligne seule, la boîte
+     centrée sur les faits voisins (flex) plutôt qu'alignée en bas. */
   line-height: 24px;
+  align-self: center;
   max-width: 18ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  vertical-align: bottom;
+  vertical-align: middle;
   color: var(--blue-300);
   text-decoration: underline;
 }

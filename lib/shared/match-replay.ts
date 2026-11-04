@@ -114,3 +114,12 @@ export function visibleReplayUrl(
   if (!canHaveReplay(match)) return null;
   return normalizeReplayUrl(match.replayUrl);
 }
+
+/**
+ * Le lecteur (permission `live`) peut-il poser, modifier ou retirer la rediff ?
+ * Lu par le modèle de la carte (`match-card-model.ts`) : logique pure, hors du
+ * composant du bandeau.
+ */
+export function canEditReplay(match: MatchReplayInput & { replayUrl: string | null }, canManage: boolean): boolean {
+  return canManage && (canHaveReplay(match) || match.replayUrl !== null);
+}

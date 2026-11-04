@@ -22,6 +22,7 @@
  */
 
 import type { MatchStatus, TeamRole, TournamentGame } from "./types";
+import { isoTime } from "./iso-time";
 
 /**
  * Délai au-delà duquel un match en lancement part **d'office**, compté depuis
@@ -78,12 +79,6 @@ export type MatchLaunchInput = {
    */
   voice?: { pending: boolean } | null;
 };
-
-function isoTime(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const time = Date.parse(iso);
-  return Number.isNaN(time) ? null : time;
-}
 
 /**
  * Phase de lancement d'un match à l'instant `now` (ms).
@@ -585,6 +580,12 @@ export type MatchLaunchInfo = {
   referee: LaunchReferee | null;
   /** Match en autogestion (aucun arbitre : les équipes créent et règlent la partie). */
   selfManaged: boolean;
+  /**
+   * On invite par BattleTag (Overwatch, `battletagRelevantFor`) : le serveur,
+   * qui décide déjà de servir ou de taire les BattleTags, le dit à la page —
+   * une seule source pour les consignes d'invitation.
+   */
+  battletagRelevant: boolean;
   viewer: {
     role: MatchLaunchViewerRole;
     /** Le lecteur peut-il cliquer « Prêt » pour sa partie ? */

@@ -100,6 +100,7 @@ function launch(overrides: Partial<MatchLaunchInfo> = {}): MatchLaunchInfo {
     matchId: 34,
     tournamentId: 12,
     tournamentName: "Coupe",
+    battletagRelevant: true,
     phase: "LOBBY",
     startAt: null,
     lobbyOpenedAt: null,
@@ -155,6 +156,7 @@ function render(
             scoreLocked={false}
             onOpenAdminModal={() => undefined}
             frozen={frozen}
+            streamLive={!frozen}
             status={<span data-probe="live-status">{frozen ? "Hors ligne" : "À jour"}</span>}
           />
         )}
@@ -215,9 +217,65 @@ describe("page d'un match — ce que tout le monde lit", () => {
     const html = render(match({ status: "COMPLETED", team1Score: 3, team2Score: 1, winnerTeamId: ALPHA }), "public");
     const header = visible(html.slice(html.indexOf("<h1"), html.indexOf('data-fact="host"')));
     expect(header).toContain("Bravo 1 – 3");
+    // Le libellé nomme les deux équipes, dans l'ordre affiché : il se lit seul.
     expect(header).toContain("Score : Bravo 1, Alpha 3");
     expect(header).toContain("Victoire de Alpha");
     expect(html).toContain('class="pill pill-success');
+  });
+
+  it("render_forfeit_screenReaderNamesForfeitingTeam", () => {
+    const html = render(match({ status: "COMPLETED", forfeitTeamId: ALPHA, winnerTeamId: BRAVO }), "public");
+    const header = visible(html.slice(html.indexOf("<h1"), html.indexOf('data-fact="host"')));
+    expect(header).toContain("Bravo contre Alpha : forfait de Alpha");
+    expect(header).not.toContain("Score :");
+  });
+
+  it("render_forfeitEnglish_screenReaderNamesForfeitingTeam", () => {
+    const html = render(match({ status: "COMPLETED", forfeitTeamId: BRAVO, winnerTeamId: ALPHA }), "public", false, "en");
+    expect(visible(html)).toContain("Bravo versus Alpha: forfeit by Bravo");
+  });
+
+  it("render_scoreEnglish_scoreNamesBothTeams", () => {
+    const html = render(match({ status: "COMPLETED", team1Score: 3, team2Score: 1, winnerTeamId: ALPHA }), "public", false, "en");
+    expect(visible(html)).toContain("Score: Bravo 1, Alpha 3");
+  });
+
+  it("render_nothingForRightColumn_singleColumnGrid", () => {
+    const html = render(match(), "public");
+    expect(html).toContain('data-columns="1"');
+  });
+
+  it("render_voiceForStaff_twoColumnGrid", () => {
+    const html = render(match({ voice: { team1Members: 1, team2Members: 1, team1State: "COUNTED", team2State: "COUNTED", pending: true } }), "staff");
+    expect(html).toContain('data-columns="2"');
+  });
+
+  it("render_scheduledHeldByVoice_launchFactSaysChannelsFilling", () => {
+    const voice = { team1Members: 1, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true } as const;
+    const fr = visible(render(match({ startAt: "2026-01-01T00:00:00.000Z", voice }), "staff"));
+    const en = visible(render(match({ startAt: "2026-01-01T00:00:00.000Z", voice }), "staff", false, "en"));
+    expect(fr).toContain("salons vocaux à remplir");
+    expect(en).toContain("voice channels filling up");
+  });
+
+  it("render_lobbyHeldByVoice_badgeWrapsAndSeparatorHiddenFromReaders", () => {
+    const voice = { team1Members: 1, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true } as const;
+    const held = render(match({ startAt: "2026-01-01T00:00:00.000Z", voice }), "staff");
+    // La pastille (pas seulement la raison) passe à la ligne ; le point médian est décoratif.
+    expect(held).toContain('class="lobby wrap"');
+    expect(held).toContain('<span aria-hidden="true"> · </span><span class="sr-only">. </span>salons vocaux à remplir');
+    const free = render(match({ startAt: "2026-01-01T00:00:00.000Z" }), "staff");
+    expect(free).toContain('class="lobby"');
+    expect(free).not.toContain("wrap");
+  });
+
+  it("launchStripStyles_heldBadge_dropsNowrapOnTheBadgeItself", () => {
+    const css = readSource("app/(secured)/tournois/[id]/_components/MatchLaunchStrip.module.css");
+    expect(css).toMatch(/\.lobby\.wrap,\s*\.scheduled\.wrap \{\s*white-space: normal;/);
+    // Seules ces deux pastilles portent la raison : pas de règle morte pour les autres.
+    expect(css).not.toMatch(/\.(toPlan|launched)\.wrap/);
+    // La raison est une phrase lisible : ni capitales ni espacement de pastille.
+    expect(css).toMatch(/\.voiceHeld \{[^}]*text-transform: none;[^}]*letter-spacing: normal;/);
   });
 
   it("render_noHost_noSidesFact", () => {
@@ -369,8 +427,11 @@ describe("page d'un match — cartes du round et bans", () => {
     expect(html).toContain("Busan");
   });
 
-  it("render_staffOnUnsetRound_hidesRoundReset", () => {
-    expect(visible(render(match(), "staff", false, "fr", rules([])))).not.toContain("Réinitialiser le tour");
+  it("render_staffOnUnsetRound_keepsRoundResetMountedButDisabled", () => {
+    // Démonté, il laisserait tomber le focus sur le <body> après une réinitialisation réussie.
+    const html = render(match(), "staff", false, "fr", rules([]));
+
+    expect(html).toMatch(/<button[^>]*aria-disabled="true"[^>]*>Réinitialiser le tour/);
   });
 
   it("sans autogestion, une équipe du match lit le pool sans le choisir ; en autogestion, elle choisit", () => {
@@ -611,7 +672,7 @@ describe("page d'un match — streams et casters", () => {
   // Décision 35 (2026-10-28) : en Marvel Rivals, on n'invite pas par BattleTag.
   it("MatchPage_marvelRivals_noInviteNotesAndNeutralHeading", () => {
     const mrCaster: LaunchCaster = { userId: 900, pseudo: "Voix", discordTag: "voix", ready: false, contactsShown: true, isViewer: false };
-    mockLaunch = launch({ casters: [mrCaster], referee: { userId: 77, pseudo: "Juge", ready: false, contactsShown: true, isViewer: false } });
+    mockLaunch = launch({ battletagRelevant: false, casters: [mrCaster], referee: { userId: 77, pseudo: "Juge", ready: false, contactsShown: true, isViewer: false } });
     const page = cast({ refereeAssigned: true });
 
     const fr = visible(render(page, "player", false, "fr", EMPTY_MAP_RULES, "MR"));
@@ -624,6 +685,14 @@ describe("page d'un match — streams et casters", () => {
     expect(fr).not.toContain("Casters à inviter");
     expect(en).toContain("Caster contacts");
     expect(en).not.toContain("To invite");
+  });
+
+  it("render_launchSaysBattletagIrrelevant_noInviteNoteEvenOnOverwatchCard", () => {
+    // Le serveur fait foi (jeu du tournoi), pas le jeu lu dans la fiche.
+    mockLaunch = launch({ battletagRelevant: false, casters: [caster()] });
+    const party = visible(render(cast(), "player"));
+    expect(party).not.toContain("À inviter — obligatoire");
+    expect(party).not.toContain("Casters à inviter");
   });
 
   it("sa propre fiche de caster ne porte pas la note d'invitation", () => {
@@ -844,6 +913,13 @@ describe("page d'un match — mêmes gestes que la carte du plateau", () => {
   // sauf le lien vers elle-même.
   const actionIds = (html: string) => [...html.matchAll(/data-action="([^"]+)"/g)].map((found) => found[1]);
 
+  it("render_page_actionNamesFollowPageSidesHostFirst", () => {
+    // Le titre dit « Bravo contre Alpha » (hôte à gauche) : les noms accessibles des gestes aussi.
+    const html = render(match(), "staff");
+    expect(html).toMatch(/: Bravo contre Alpha/);
+    expect(html).not.toMatch(/: Alpha contre Bravo/);
+  });
+
   it("render_staff_sameActionsAsBoardCardWithoutMatchPage", () => {
     const page = match({ startAt: "2099-01-01T00:00:00.000Z" });
     const onPage = actionIds(render(page, "staff"));
@@ -891,7 +967,7 @@ describe("page d'un match — sous /en", () => {
 });
 
 describe("page d'un match — salons vocaux d'équipe", () => {
-  const held = { team1Members: 3, team2Members: 5, pending: true };
+  const held = { team1Members: 3, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true } as const;
 
   it("render_voiceHeld_staffReadsCountsAndWaitingNoteAnnounced", () => {
     const html = render(match({ voice: held }), "staff");
@@ -900,26 +976,68 @@ describe("page d'un match — salons vocaux d'équipe", () => {
     expect(visible(html)).toContain("Le match se lance quand les deux salons sont pleins.");
     // Le remplissage change sans que la personne touche à rien : annoncé.
     expect(html).toContain('aria-live="polite"');
-    expect(html).toMatch(/aria-live="polite">Le match se lance quand/);
+    // Une seule zone vivante pour la section : lignes et notes.
+    expect(html).not.toContain('<ul class="voiceList" aria-live');
+    expect(html.match(/<div aria-live="polite">/g)).toHaveLength(1);
+    expect(html).toMatch(/<div aria-live="polite"><ul[\s\S]*<p[^>]*>Le match se lance quand/);
   });
 
   it("render_voiceNotCreated_saysOpeningSoon", () => {
-    const html = render(match({ voice: { team1Members: null, team2Members: null, pending: true } }), "staff");
+    const html = render(match({ voice: { team1Members: null, team2Members: null, team1State: "WAITING", team2State: "WAITING", pending: true } }), "staff");
     expect(visible(html)).toContain("Salon vocal : bientôt ouvert");
   });
 
   it("render_voiceReleased_noWaitingNote", () => {
-    const html = render(match({ voice: { team1Members: 5, team2Members: 5, pending: false } }), "player");
+    const html = render(match({ voice: { team1Members: 5, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: false } }), "player");
     expect(visible(html)).toContain("Salon vocal : 5/5");
     expect(visible(html)).not.toContain("se lance quand");
+    // La zone vivante reste montée, vide : le texte qui y entrera sera annoncé.
+    expect(html).toMatch(/<div aria-live="polite"><ul[\s\S]*<\/ul><\/div>/);
   });
 
-  it("voiceSection_trackedButNotPending_stillPollsRestDoor", () => {
-    // Un comptage frais (verrou levé) vieillit sans écriture : la page relit la
-    // porte REST tant que le match suit ses salons, pas seulement tant qu'il attend.
+  it("render_voiceFull_saysFull", () => {
+    const html = render(match({ voice: held }), "staff");
+    expect(visible(html)).toContain("Salon vocal : 5/5 · complet");
+    expect(visible(html)).not.toContain("Salon vocal : 3/5 · complet");
+  });
+
+  it("render_voiceCreatedNotCounted_saysNotCountedYet", () => {
+    const html = render(match({ voice: { ...held, team1Members: null, team1State: "UNCOUNTED" } }), "staff");
+    expect(visible(html)).toContain("Salon vocal : pas encore compté");
+    expect(visible(html)).not.toContain("bientôt ouvert");
+  });
+
+  it("render_voiceFailed_saysUnavailableAndGateReleased", () => {
+    const voice = { ...held, team1Members: null, team1State: "FAILED", pending: false } as const;
+    const html = render(match({ voice }), "staff");
+    expect(visible(html)).toContain("Salon vocal : indisponible");
+    expect(visible(html)).toContain("Un salon est indisponible : le match n'attend pas les salons.");
+    expect(visible(html)).not.toContain("se lance quand");
+    expect(html).toMatch(/<\/ul><p[^>]*>Un salon est indisponible/);
+  });
+
+  it("render_voiceFailedEnglish_saysUnavailable", () => {
+    const voice = { ...held, team2Members: null, team2State: "FAILED", pending: false } as const;
+    const html = visible(render(match({ voice }), "staff", false, "en"));
+    expect(html).toContain("Voice channel: unavailable");
+    expect(html).toContain("Voice channel: 3/5");
+  });
+
+  it("editPage_source_refusalKeepsSavedConfirmationAndSaysEveryRefusal", () => {
+    const source = readSource("app/(secured)/tournois/[id]/modifier/page.tsx");
+    const refusal = source.indexOf("if (refusals.length > 0) {");
+
+    // Ce qui est enregistré à côté d'un refus est confirmé, puis tous les refus sont dits.
+    expect(refusal).toBeGreaterThan(-1);
+    expect(source).toContain("settledRefusals(planningResult, voiceResult)");
+    expect(source.indexOf("showSuccess(", refusal)).toBeLessThan(source.indexOf("throw mergeRefusals(refusals)"));
+    expect(source.indexOf("throw mergeRefusals(refusals)")).toBeLessThan(source.indexOf("router.push("));
+  });
+
+  it("matchPage_source_voiceFollowsStreamLive", () => {
+    // Flux sain : l'instantané suffit ; la relecture REST ne sert que flux coupé.
     const source = readSource("app/(secured)/tournois/[id]/_components/MatchPage.tsx");
-    expect(source).toContain("const tracked = streamed !== null;");
-    expect(source).toContain("useClock(VOICE_POLL_MS, tracked)");
+    expect(source).toContain("useMatchVoice(match, organizes && !frozen && match.status !== \"COMPLETED\", streamLive)");
   });
 
   it("render_voiceForSpectatorOrFrozenOrNoOption_sectionAbsent", () => {
@@ -928,9 +1046,36 @@ describe("page d'un match — salons vocaux d'équipe", () => {
     expect(visible(render(match(), "staff"))).not.toContain("Salon vocal");
   });
 
+  it("render_voiceEnglishFull_saysFull", () => {
+    expect(visible(render(match({ voice: held }), "staff", false, "en"))).toContain("Voice channel: 5/5 · full");
+  });
+
   it("render_voiceEnglish_readsVoiceChannel", () => {
     const html = render(match({ voice: held }), "staff", false, "en");
     expect(visible(html)).toContain("Voice channel: 3/5");
     expect(visible(html)).toContain("The match launches once both channels are full.");
+  });
+});
+
+describe("page d'un match — mise en page (CSS)", () => {
+  const css = (file: string) => readSource(`app/(secured)/tournois/[id]/_components/${file}`);
+  const rule = (source: string, selector: string) => source.slice(source.indexOf(`${selector} {`), source.indexOf("}", source.indexOf(`${selector} {`)));
+
+  it("grid_singleColumnByAttributeNotHas", () => {
+    const source = css("MatchPage.module.css");
+    expect(source).toContain('.grid[data-columns="1"]');
+    expect(source).not.toContain(":has(> .column:empty)");
+  });
+
+  it("streamLinks_centredWithoutMinHeight", () => {
+    for (const [file, selector] of [["MatchPage.module.css", ".streamLink"], ["MatchLiveStrip.module.css", ".link"]]) {
+      const block = rule(css(file), selector);
+      expect(block).toContain("align-self: center");
+      expect(block).not.toContain("min-height");
+    }
+  });
+
+  it("launchFact_longPseudoWraps", () => {
+    expect(rule(css("MatchLaunchStrip.module.css"), ".fact")).toContain("overflow-wrap: anywhere");
   });
 });

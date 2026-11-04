@@ -220,7 +220,7 @@ describe("POST /round-maps/flush", () => {
     jest.mocked(flushRoundMapsNotice).mockResolvedValue(true);
     const response = await flushPost(post(), tournament("7"));
     expect(response.status).toBe(200);
-    expect(flushRoundMapsNotice).toHaveBeenCalledWith(7);
+    expect(flushRoundMapsNotice).toHaveBeenCalledWith(7, undefined);
   });
 
   it("flush_serviceThrows_returns500WithCode", async () => {

@@ -318,6 +318,7 @@ describe("GET /api/matches/[matchId]/contacts", () => {
     matchId: 42,
     tournamentId: 7,
     tournamentName: "Coupe",
+    battletagRelevant: true,
     phase: "SCHEDULED",
     startAt: "2026-10-20T18:00:00.000Z",
     lobbyOpenedAt: null,

@@ -173,12 +173,9 @@
   min-width: 0;
 }
 
-.column:empty {
-  display: none;
-}
-
-/* Rien à droite (public sans cast ni arbitrage détaillé) : une seule colonne pleine. */
-.grid:has(> .column:empty) {
+/* Rien à droite (public sans cast ni arbitrage détaillé) : une seule colonne
+   pleine — la page le décide (`data-columns`), la colonne vide n'est pas rendue. */
+.grid[data-columns="1"] {
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -296,13 +293,15 @@
    (l'ellipse) rognerait l'extension de `tap-target`. */
 .streamLink {
   display: inline-block;
-  min-height: 24px;
+  /* Cible de 24 px (WCAG 2.5.8) par la hauteur de ligne seule, la boîte
+     centrée sur les faits voisins (flex) plutôt qu'alignée en bas. */
   line-height: 24px;
+  align-self: center;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  vertical-align: bottom;
+  vertical-align: middle;
   color: var(--blue-300);
   text-decoration: underline;
   font-weight: 600;

@@ -14,7 +14,7 @@ import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
 import type { TournamentActionsText } from "@/lib/shared/tournament-actions-text";
 import { useSpectatorView } from "@/components/spectator-view";
-import { canEditReplay } from "../_components/MatchReplayStrip";
+import { canEditReplay } from "@/lib/shared/match-replay";
 import { usePlayerScore } from "./player-score-context";
 import { useIssueReport } from "./issue-report-context";
 import { useLiveControls } from "./live-context";
