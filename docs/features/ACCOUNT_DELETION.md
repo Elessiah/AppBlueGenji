@@ -697,6 +697,19 @@ la fenêtre sous le verrou et retombe dans la règle habituelle (effacer ou
 anonymiser). Idempotent : un compte réactivé ou déjà traité rend `null`.
 L'anonymisation remet `deletion_requested_at` à `NULL`.
 
+**Coût et ordre des verrous (revue perf).** Le passage horaire (forfaits, puis
+suppressions définitives) tourne derrière le verrou nommé
+`bg_due_account_deletions` (`GET_LOCK`, sans attente) : un seul processus pm2 à
+la fois, les autres passent leur tour. Ses candidats sont filtrés en SQL (une
+inscription à retirer, ou une entrée en cours jamais jouée à forfaiter) et
+bornés à `SETTLE_BATCH_SIZE` ; `bg_users.is_deleted` est indexé. La demande et
+la suppression prennent `lockTournamentRow` **en premier**, par id croissant,
+sur tous les tournois qu'elles touchent — inscriptions solo, tournois organisés
+(demande), matchs castés, liés ou arbitrés (`listCastTournamentIds`) — avant le
+compte, puis les équipes ; les avatars en quarantaine sont lus et hachés
+**avant** la transaction (`hashImageFiles`), seule l'insertion des empreintes
+s'y fait.
+
 **E2 — rattrapage.** `reconcileDeletedAccounts` commence par
 `settleDeletedSoloEntries` : les comptes déjà supprimés gardant une inscription
 à un tournoi actif voient la règle E1 rejouée (retrait ou forfait), sans effet

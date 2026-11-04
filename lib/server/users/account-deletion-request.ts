@@ -31,7 +31,13 @@ import { refreshTeamViewers, teamStreamTournamentIds } from "@/lib/server/teams/
 import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { holdAccountIdentity } from "./account-deletion-hold";
-import { listSoloRegistrationTournamentIds, loadAccountTrace, loadSoloRegistrations } from "./account-deletion";
+import {
+  listCastTournamentIds,
+  listSoloRegistrationTournamentIds,
+  loadAccountTrace,
+  loadSoloRegistrations,
+  mergeTournamentIds,
+} from "./account-deletion";
 import {
   type DeletionWithdrawal,
   forfeitSoloEntriesAfterCommit,
@@ -237,8 +243,8 @@ async function findOrganizerSuccessor(
   return rows.length > 0 ? Number(rows[0].id) : null;
 }
 
-/** Les tournois organisés par le compte passent à un autre membre du staff ; rend les tournois touchés. */
-async function handOverOrganizedTournaments(
+/** Les tournois organisés par le compte, par id croissant : la demande les verrouille avant de les céder. */
+async function listOrganizedTournamentIds(
   connection: Pick<PoolConnection, "execute">,
   userId: number,
 ): Promise<number[]> {
@@ -246,7 +252,16 @@ async function handOverOrganizedTournaments(
     `SELECT id FROM bg_tournaments WHERE organizer_user_id = ? ORDER BY id`,
     [userId],
   );
-  if (rows.length === 0) return [];
+  return rows.map((row) => Number(row.id));
+}
+
+/** Les tournois organisés par le compte passent à un autre membre du staff ; rend les tournois touchés. */
+async function handOverOrganizedTournaments(
+  connection: Pick<PoolConnection, "execute">,
+  userId: number,
+): Promise<number[]> {
+  const organized = await listOrganizedTournamentIds(connection, userId);
+  if (organized.length === 0) return [];
   const successor = await findOrganizerSuccessor(connection, userId);
   // Personne à qui les confier : rien ne change (décision requise), et le
   // compte sera anonymisé et non effacé, l'organisateur le retenant.
@@ -255,7 +270,7 @@ async function handOverOrganizedTournaments(
     successor,
     userId,
   ]);
-  return rows.map((row) => Number(row.id));
+  return organized;
 }
 
 /**
@@ -331,16 +346,22 @@ async function settleDeparture(userId: number, departure: TeamDeparture): Promis
  * Demande la suppression du compte : tout ce qui touche les autres se fait
  * tout de suite, le compte passe en attente trente jours.
  *
- * Une transaction : tournois de l'entrée solo verrouillés d'abord (id
- * croissant, `lockTournamentRow`), puis le compte, puis chaque équipe — l'ordre
- * de l'inscription en tournoi individuel et du transfert de propriété.
+ * Une transaction : tournois verrouillés d'abord (id croissant,
+ * `lockTournamentRow`) — ceux de l'entrée solo, ceux qu'il organise (cédés) et
+ * ceux dont un match le nomme (casts, arbitrage : leurs matchs se verrouillent
+ * dans la transaction) —, puis le compte, puis chaque équipe : l'ordre de
+ * l'inscription en tournoi individuel et du transfert de propriété.
  */
 export async function requestAccountDeletion(
   userId: number,
   options: { requestedAt?: Date } = {},
 ): Promise<AccountDeletionRequestOutcome> {
   const db = await getDatabase();
-  const soloTournaments = await listSoloRegistrationTournamentIds(db, userId);
+  const soloTournaments = mergeTournamentIds(
+    await listSoloRegistrationTournamentIds(db, userId),
+    await listOrganizedTournamentIds(db, userId),
+    await listCastTournamentIds(db, userId),
+  );
   const connection = await db.getConnection();
   let plan: AccountDeletionPlan;
   let withdrawn: DeletionWithdrawal[] = [];

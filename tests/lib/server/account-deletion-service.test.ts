@@ -6,12 +6,17 @@ jest.mock("@/lib/server/stats-service");
 jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/tournaments/notifications");
 
-import { deleteOwnAccount, getAccountDeletionPlan } from "@/lib/server/users/account-deletion";
+import {
+  deleteOwnAccount,
+  getAccountDeletionPlan,
+  listCastTournamentIds,
+  mergeTournamentIds,
+} from "@/lib/server/users/account-deletion";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
-import { fakePool } from "../../helpers/sql-double";
+import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { clearCache } from "@/lib/server/cache";
 import { LANDING_STATS_KEY, LANDING_TICKER_KEY, LANDING_TTL_MS, cachedLanding } from "@/lib/server/landing-cache";
 import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
@@ -65,10 +70,16 @@ const STARTED_REGISTRATION: SoloRegistrationRow = {
 };
 
 /**
- * Les instructions de la **transaction** : sans le relevé des tournois de
- * l'entrée solo, lu sur le pool avant elle (le double partage `execute`).
+ * Les instructions de la **transaction** : sans les relevés lus sur le pool
+ * avant elle (tournois de l'entrée solo et des matchs nommant le compte,
+ * avatars en quarantaine ; le double partage `execute`).
  */
-const inTransaction = (queries: Query[]) => queries.filter((q) => !q.sql.startsWith("SELECT DISTINCT r.tournament_id"));
+const BEFORE_TRANSACTION = [
+  "SELECT DISTINCT r.tournament_id",
+  "SELECT m.tournament_id FROM bg_matches m JOIN bg_match_casters",
+  "SELECT logo_url FROM bg_logo_quarantines",
+];
+const inTransaction = (queries: Query[]) => queries.filter((q) => !BEFORE_TRANSACTION.some((prefix) => q.sql.startsWith(prefix)));
 
 /**
  * La base, et la transaction qui la porte.
@@ -120,6 +131,10 @@ function fakeDb(
     if (q.startsWith("SELECT DISTINCT r.tournament_id")) {
       const listed = options.listedTournaments ?? [...new Set(soloRegistrations.map((row) => row.tournament_id))];
       return [listed.map((id) => ({ tournament_id: id }))];
+    }
+    if (q.startsWith("SELECT m.tournament_id FROM bg_matches m JOIN bg_match_casters")) {
+      const tournaments = [...new Set((options.refereed ?? []).map((match) => match.tournamentId))];
+      return [tournaments.map((id) => ({ tournament_id: id }))];
     }
     if (q.startsWith("SELECT r.tournament_id, r.team_id, t.state")) return [soloRegistrations];
     if (q.startsWith("SELECT id AS match_id FROM bg_matches WHERE referee_user_id = ?")) {
@@ -860,5 +875,49 @@ describe("deleteOwnAccount — inscription solo à un tournoi pas encore commenc
 
     expect(await getAccountDeletionPlan(7)).toEqual({ mode: "ERASE", reason: null });
     expect(queries.every((q) => q.sql.startsWith("SELECT"))).toBe(true);
+  });
+});
+
+describe("mergeTournamentIds", () => {
+  it("mergeTournamentIds_overlappingLists_returnsSortedUnique", () => {
+    expect(mergeTournamentIds([42, 40], [40, 41], [])).toEqual([40, 41, 42]);
+  });
+});
+
+describe("listCastTournamentIds", () => {
+  it("listCastTournamentIds_rows_returnsIdsAndBindsUserThreeTimes", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ tournament_id: 3 }, { tournament_id: "9" }], []]);
+
+    const ids = await listCastTournamentIds(fakeConnection({ execute }), 7);
+
+    expect(ids).toEqual([3, 9]);
+    expect(execute.mock.calls[0][1]).toEqual([7, 7, 7]);
+  });
+});
+
+describe("deleteOwnAccount — verrous et lectures avant la transaction", () => {
+  beforeEach(() => {
+    // Les doubles posés par les tests précédents (assertion sur le commit) ne sont pas les nôtres.
+    jest.mocked(publishMatchUpdatedEvent).mockReset();
+  });
+
+  it("deleteOwnAccount_refereedTournament_locksItBeforeAccountRow", async () => {
+    const { queries } = fakeDb(EMPTY, { refereed: [{ matchId: 5, tournamentId: 55 }] });
+
+    await deleteOwnAccount(7);
+
+    const tx = inTransaction(queries);
+    expect(tx[0]).toEqual({ sql: "SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE", params: [55] });
+    expect(tx[1].sql).toContain("FROM bg_users WHERE id = ? FOR UPDATE");
+  });
+
+  it("deleteOwnAccount_quarantinedAvatars_readBeforeTakingAPoolConnectionAndNotInTransaction", async () => {
+    const { execute, getConnection, queries } = fakeDb(EMPTY);
+
+    await deleteOwnAccount(7);
+
+    const read = execute.mock.calls.findIndex(([sql]) => String(sql).includes("FROM bg_logo_quarantines"));
+    expect(execute.mock.invocationCallOrder[read]).toBeLessThan(getConnection.mock.invocationCallOrder[0]);
+    expect(has(inTransaction(queries), "FROM bg_logo_quarantines")).toBe(false);
   });
 });

@@ -10,7 +10,7 @@ import {
 } from "@/lib/shared/account-deletion";
 import { isReferencedRowError } from "@/lib/server/mysql-errors";
 import { avatarFileLocations } from "@/lib/server/logo-quarantine";
-import { blockImageFiles } from "@/lib/server/blocked-images";
+import { blockImageHashes, hashImageFiles } from "@/lib/server/blocked-images";
 import { unlink } from "node:fs/promises";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
@@ -172,6 +172,29 @@ export async function listSoloRegistrationTournamentIds(runner: SqlRunner, userI
 }
 
 /**
+ * Les tournois dont un match nomme le compte (caster, lien de chaîne, arbitre),
+ * par id croissant : `withdrawUserCasts` y verrouille des matchs, donc la ligne
+ * du tournoi se prend **avant**, comme partout (tournoi, puis match).
+ */
+export async function listCastTournamentIds(runner: SqlRunner, userId: number): Promise<number[]> {
+  const [rows] = await runner.execute<(RowDataPacket & { tournament_id: number })[]>(
+    `SELECT m.tournament_id FROM bg_matches m JOIN bg_match_casters c ON c.match_id = m.id WHERE c.user_id = ?
+     UNION
+     SELECT m.tournament_id FROM bg_matches m JOIN bg_match_streams s ON s.match_id = m.id WHERE s.link_user_id = ?
+     UNION
+     SELECT tournament_id FROM bg_matches WHERE referee_user_id = ?
+     ORDER BY tournament_id`,
+    [userId, userId, userId],
+  );
+  return rows.map((row) => Number(row.tournament_id));
+}
+
+/** Plusieurs listes de tournois en une, sans doublon, par id croissant : l'ordre de prise des verrous. */
+export function mergeTournamentIds(...lists: readonly (readonly number[])[]): number[] {
+  return [...new Set(lists.flat())].sort((a, b) => a - b);
+}
+
+/**
  * Les inscriptions de l'entrée solo du compte, avec ce qui décide de leur sort
  * (`withdrawableSoloRegistrations`) : les dates du tournoi et la présence d'un
  * match qui nomme l'entrée.
@@ -306,12 +329,16 @@ async function applyDeletionMode(
   userId: number,
   plan: AccountDeletionPlan,
   soloWithdrawals: readonly SoloRegistrationFact[],
+  quarantine: QuarantinedAvatars,
 ): Promise<{ withdrawal: { tournamentIds: number[] }; withdrawnFrom: number[]; quarantinedFiles: string[] }> {
   if (plan.mode === "ERASE") {
-    const quarantinedFiles = await loadQuarantinedAvatarFiles(connection, userId);
-    await blockImageFiles(connection, quarantinedFiles);
+    await blockImageHashes(connection, quarantine.hashes);
     const withdrawal = await eraseAccount(connection, userId, soloWithdrawals);
-    return { withdrawal, withdrawnFrom: soloWithdrawals.map((registration) => registration.tournamentId), quarantinedFiles };
+    return {
+      withdrawal,
+      withdrawnFrom: soloWithdrawals.map((registration) => registration.tournamentId),
+      quarantinedFiles: quarantine.files,
+    };
   }
   const withdrawal = await anonymizeAccount(connection, userId);
   await connection.execute(`UPDATE bg_users SET deletion_requested_at = NULL WHERE id = ? AND is_deleted = 1`, [userId]);
@@ -334,15 +361,23 @@ function deletionIsDue(row: { is_deleted: 0 | 1; deletion_requested_at: StoredDa
   );
 }
 
-/** Les fichiers d'avatar en quarantaine du compte (signalés, masqués) : ce que l'effacement emporte. */
-async function loadQuarantinedAvatarFiles(connection: SqlRunner, userId: number): Promise<string[]> {
-  const [rows] = await connection.execute<(RowDataPacket & { logo_url: string })[]>(
+/** Les avatars en quarantaine du compte : leurs fichiers, et l'empreinte de ceux qui se lisent encore. */
+type QuarantinedAvatars = { files: string[]; hashes: string[] };
+
+/**
+ * Les fichiers d'avatar en quarantaine du compte (signalés, masqués) — ce que
+ * l'effacement emporte — et leurs empreintes (E6). Hors transaction : la lecture
+ * des fichiers ne tient aucun verrou.
+ */
+async function loadQuarantinedAvatars(runner: SqlRunner, userId: number): Promise<QuarantinedAvatars> {
+  const [rows] = await runner.execute<(RowDataPacket & { logo_url: string })[]>(
     `SELECT logo_url FROM bg_logo_quarantines WHERE user_id = ? AND status = 'HIDDEN' ORDER BY id`,
     [userId],
   );
-  return rows
+  const files = rows
     .map((row) => avatarFileLocations(row.logo_url, userId)?.quarantined ?? null)
     .filter((file): file is string => file !== null);
+  return { files, hashes: await hashImageFiles(files) };
 }
 
 async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<AccountDeletionPlan | null> {
@@ -351,7 +386,15 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
   // connexion : la relève en emprunte une autre au pool, et en tenir une pendant
   // ce temps ferait attendre chaque suppression simultanée sur une connexion que
   // les autres tiennent (pool saturé, plus aucune requête ne passe).
-  const soloTournaments = await listSoloRegistrationTournamentIds(db, userId);
+  // Y compris ceux de ses casts et arbitrages : la transaction verrouille leurs
+  // matchs, et le tournoi se verrouille avant (`listCastTournamentIds`).
+  const soloTournaments = mergeTournamentIds(
+    await listSoloRegistrationTournamentIds(db, userId),
+    await listCastTournamentIds(db, userId),
+  );
+  // Les avatars en quarantaine, lus et hachés **avant** la connexion : un
+  // `readFile` par fichier ne se fait pas sous les verrous de la transaction.
+  const quarantine = await loadQuarantinedAvatars(db, userId);
   const connection = await db.getConnection();
   let plan: AccountDeletionPlan;
   // Le fichier de l'avatar, relevé **avant** l'effacement : la ligne partie, son
@@ -435,7 +478,7 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
     // vers un compte, seulement une empreinte salée qu'on ne sait pas renverser
     // (`lib/server/site-visits-service.ts`).
 
-    const applied = await applyDeletionMode(connection, userId, plan, facts.soloWithdrawals);
+    const applied = await applyDeletionMode(connection, userId, plan, facts.soloWithdrawals, quarantine);
     quarantinedFiles = applied.quarantinedFiles;
     withdrawnFrom = applied.withdrawnFrom;
     const withdrawal = applied.withdrawal;

@@ -43,27 +43,45 @@ export async function isBlockedImage(content: Buffer): Promise<boolean> {
 }
 
 /**
+ * L'empreinte de chacun de ces fichiers, lus **en parallèle**, à lire hors de
+ * toute transaction. Un fichier illisible (déjà parti) est passé : il n'y a
+ * plus rien à reposer.
+ */
+export async function hashImageFiles(absolutePaths: readonly string[]): Promise<string[]> {
+  const hashes = await Promise.all(
+    absolutePaths.map((file) =>
+      readFile(file).then(
+        (content) => imageSha256(content),
+        () => null,
+      ),
+    ),
+  );
+  return hashes.filter((sha): sha is string => sha !== null);
+}
+
+/** Pose ces empreintes, sur la connexion de la transaction qui emporte les images. */
+export async function blockImageHashes(
+  connection: Pick<PoolConnection, "execute">,
+  hashes: readonly string[],
+): Promise<void> {
+  for (const sha of hashes) {
+    await ignoreMissingTable(
+      connection.execute(`INSERT IGNORE INTO bg_blocked_image_hashes (sha256) VALUES (?)`, [sha]),
+    );
+  }
+}
+
+/**
  * Bloque les images de ces fichiers, sur la connexion de la transaction qui les
- * emporte. Un fichier illisible (déjà parti) est passé : il n'y a plus rien à
- * reposer. Rend les empreintes posées.
+ * emporte ; rend les empreintes posées. Une transaction lit les fichiers
+ * **avant** (`hashImageFiles`) et pose ensuite (`blockImageHashes`) : la lecture
+ * ne tient alors aucun verrou.
  */
 export async function blockImageFiles(
   connection: Pick<PoolConnection, "execute">,
   absolutePaths: readonly string[],
 ): Promise<string[]> {
-  const hashes: string[] = [];
-  for (const file of absolutePaths) {
-    let content: Buffer;
-    try {
-      content = await readFile(file);
-    } catch {
-      continue;
-    }
-    const sha = imageSha256(content);
-    await ignoreMissingTable(
-      connection.execute(`INSERT IGNORE INTO bg_blocked_image_hashes (sha256) VALUES (?)`, [sha]),
-    );
-    hashes.push(sha);
-  }
+  const hashes = await hashImageFiles(absolutePaths);
+  await blockImageHashes(connection, hashes);
   return hashes;
 }

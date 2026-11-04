@@ -12,7 +12,7 @@ jest.mock("@/lib/server/logo-quarantine", () => ({
 }));
 
 import { getDatabase } from "@/lib/server/database";
-import { blockImageFiles } from "@/lib/server/blocked-images";
+import { blockImageHashes, hashImageFiles } from "@/lib/server/blocked-images";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { finalizeAccountDeletion } from "@/lib/server/users/account-deletion";
 import { finalizeDueAccountDeletions } from "@/lib/server/users/deleted-accounts";
@@ -64,7 +64,7 @@ const wrote = (queries: string[], prefix: string) => queries.some((q) => q.start
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(blockImageFiles).mockResolvedValue([]);
+  jest.mocked(hashImageFiles).mockImplementation(async (files) => files.map((file) => `sha:${file}`));
 });
 
 describe("finalizeAccountDeletion", () => {
@@ -112,7 +112,8 @@ describe("finalizeAccountDeletion", () => {
 
     await finalizeAccountDeletion(7);
 
-    expect(jest.mocked(blockImageFiles).mock.calls[0][1]).toEqual(["/quarantine/7-abc.webp"]);
+    expect(jest.mocked(hashImageFiles).mock.calls[0][0]).toEqual(["/quarantine/7-abc.webp"]);
+    expect(jest.mocked(blockImageHashes).mock.calls[0][1]).toEqual(["sha:/quarantine/7-abc.webp"]);
   });
 
   it("finalizeAccountDeletion_anonymize_doesNotBlockAvatar", async () => {
@@ -120,7 +121,7 @@ describe("finalizeAccountDeletion", () => {
 
     await finalizeAccountDeletion(7);
 
-    expect(blockImageFiles).not.toHaveBeenCalled();
+    expect(blockImageHashes).not.toHaveBeenCalled();
   });
 });
 

@@ -73,7 +73,8 @@ export async function createAccountTables(db: Pool): Promise<void> {
       deletion_requested_at DATETIME NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_bg_users_deletion_requested (deletion_requested_at)
+      INDEX idx_bg_users_deletion_requested (deletion_requested_at),
+      INDEX idx_bg_users_is_deleted (is_deleted)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 

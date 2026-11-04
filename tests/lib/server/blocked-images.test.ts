@@ -6,7 +6,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getDatabase } from "@/lib/server/database";
-import { blockImageFiles, imageSha256, isBlockedImage } from "@/lib/server/blocked-images";
+import { blockImageFiles, blockImageHashes, hashImageFiles, imageSha256, isBlockedImage } from "@/lib/server/blocked-images";
 import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /*
@@ -65,5 +65,39 @@ describe("blockImageFiles", () => {
 
     expect(await blockImageFiles(fakeConnection({ execute }), [join(tmpdir(), "bg-absent-avatar.webp")])).toEqual([]);
     expect(execute).not.toHaveBeenCalled();
+  });
+});
+
+describe("hashImageFiles", () => {
+  it("hashImageFiles_readableAndMissingFiles_skipsMissingAndKeepsReadableHashes", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "bg-blocked-")), "avatar.webp");
+    writeFileSync(file, IMAGE);
+
+    const hashes = await hashImageFiles([join(tmpdir(), "bg-absent-avatar.webp"), file]);
+
+    expect(hashes).toEqual([imageSha256(IMAGE)]);
+  });
+
+  it("hashImageFiles_noFile_returnsEmpty", async () => {
+    expect(await hashImageFiles([])).toEqual([]);
+  });
+});
+
+describe("blockImageHashes", () => {
+  it("blockImageHashes_hashes_insertsEachIgnoringDuplicates", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+
+    await blockImageHashes(fakeConnection({ execute }), ["aa", "bb"]);
+
+    expect(execute.mock.calls.map(([sql, params]) => [String(sql), params])).toEqual([
+      ["INSERT IGNORE INTO bg_blocked_image_hashes (sha256) VALUES (?)", ["aa"]],
+      ["INSERT IGNORE INTO bg_blocked_image_hashes (sha256) VALUES (?)", ["bb"]],
+    ]);
+  });
+
+  it("blockImageHashes_missingTable_doesNotThrow", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(missingTable);
+
+    await expect(blockImageHashes(fakeConnection({ execute }), ["aa"])).resolves.toBeUndefined();
   });
 });

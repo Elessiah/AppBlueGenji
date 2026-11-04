@@ -16,6 +16,7 @@ import { forfeitDeletedEntryMatch, forfeitTournamentTeam } from "@/lib/server/to
 import {
   forfeitSoloEntriesAfterCommit,
   forfeitUnplayedSoloEntry,
+  SETTLE_BATCH_SIZE,
   settleDeletedSoloEntries,
   soloEntryNeverPlayedSql,
 } from "@/lib/server/users/deleted-solo-entries";
@@ -206,5 +207,21 @@ describe("settleDeletedSoloEntries", () => {
 
     expect(await settleDeletedSoloEntries()).toEqual({ withdrawn: 0, forfeited: 0 });
     expect(forfeitTournamentTeam).not.toHaveBeenCalled();
+  });
+});
+
+describe("settleDeletedSoloEntries — relevé des candidats", () => {
+  it("settleDeletedSoloEntries_candidateQuery_keepsOnlyAccountsWithSomethingToDoAndBoundsBatch", async () => {
+    const execute = fakeDb({ candidates: [] });
+
+    await settleDeletedSoloEntries();
+
+    const sql = String(execute.mock.calls.map(([q]) => String(q)).find((q) => q.includes("SELECT DISTINCT u.id"))).replace(/\s+/g, " ");
+    // Pas commencé : une inscription à retirer ; en cours : seulement une entrée jamais jouée à forfaiter.
+    expect(sql).toContain("t.state IN ('UPCOMING', 'REGISTRATION')");
+    expect(sql).toContain("t.state = 'RUNNING' AND NOT EXISTS");
+    expect(sql).toContain("om.status IN ('PENDING', 'READY')");
+    expect(sql).toContain(`LIMIT ${SETTLE_BATCH_SIZE}`);
+    expect(SETTLE_BATCH_SIZE).toBe(200);
   });
 });

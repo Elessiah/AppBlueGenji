@@ -15,9 +15,11 @@ jest.mock("@/lib/server/teams/dissolution");
 jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/team-invite-notifications");
 jest.mock("@/lib/server/users/account-deletion", () => ({
+  listCastTournamentIds: jest.fn(),
   listSoloRegistrationTournamentIds: jest.fn(),
   loadAccountTrace: jest.fn(),
   loadSoloRegistrations: jest.fn(),
+  mergeTournamentIds: (...lists: (readonly number[])[]) => [...new Set(lists.flat())].sort((a, b) => a - b),
 }));
 jest.mock("@/lib/server/account-deletion-journal");
 jest.mock("@/lib/server/users/account-deletion-hold");
@@ -40,7 +42,12 @@ import { lockMemberRoles, writeActiveMembership } from "@/lib/server/teams/acces
 import { dissolveTeamOn } from "@/lib/server/teams/dissolution";
 import { teamStreamTournamentIds } from "@/lib/server/teams/roster";
 import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
-import { listSoloRegistrationTournamentIds, loadAccountTrace, loadSoloRegistrations } from "@/lib/server/users/account-deletion";
+import {
+  listCastTournamentIds,
+  listSoloRegistrationTournamentIds,
+  loadAccountTrace,
+  loadSoloRegistrations,
+} from "@/lib/server/users/account-deletion";
 import {
   forfeitSoloEntriesAfterCommit,
   listForfeitableSoloEntries,
@@ -135,6 +142,7 @@ const leftTeams = () =>
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([]);
+  jest.mocked(listCastTournamentIds).mockResolvedValue([]);
   jest.mocked(loadSoloRegistrations).mockResolvedValue([]);
   jest.mocked(loadAccountTrace).mockResolvedValue(NO_TRACE);
   jest.mocked(withdrawSoloRegistrationsOn).mockResolvedValue([]);
@@ -209,6 +217,25 @@ describe("requestAccountDeletion — le compte", () => {
     await requestAccountDeletion(7);
 
     expect(order.slice(0, 3)).toEqual(["tournament 3", "tournament 5", "account"]);
+  });
+
+  it("requestAccountDeletion_organizedAndCastTournaments_locksUnionInIdOrderBeforeAccount", async () => {
+    const order: string[] = [];
+    jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([3]);
+    jest.mocked(listCastTournamentIds).mockResolvedValue([1, 3, 5]);
+    jest.mocked(lockTournamentRow).mockImplementation(async (_c, id) => {
+      order.push(`tournament ${id}`);
+    });
+    const { connection } = fakeDb({ organized: [4, 5] });
+    const execute = connection.execute.getMockImplementation()!;
+    connection.execute.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (sql.startsWith("SELECT is_deleted, created_at FROM bg_users")) order.push("account");
+      return execute(sql, params);
+    });
+
+    await requestAccountDeletion(7);
+
+    expect(order.slice(0, 5)).toEqual(["tournament 1", "tournament 3", "tournament 4", "tournament 5", "account"]);
   });
 
   it("requestAccountDeletion_failureMidway_rollsBackAndSendsNothing", async () => {

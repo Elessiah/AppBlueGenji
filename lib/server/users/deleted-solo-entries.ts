@@ -46,6 +46,9 @@ export function soloEntryNeverPlayedSql(entry = "s.id", tournament = "r.tourname
        )`;
 }
 
+/** Comptes relevés par passage de `settleDeletedSoloEntries`. */
+export const SETTLE_BATCH_SIZE = 200;
+
 /** Une inscription retirée par la suppression du compte. */
 export type DeletionWithdrawal = { tournamentId: number; teamId: number };
 
@@ -70,6 +73,21 @@ export async function withdrawSoloRegistrationsOn(
   return withdrawn;
 }
 
+/**
+ * L'entrée solo `s` n'a jamais joué dans le tournoi `r.tournament_id` **et** y
+ * a encore un match à jouer (« à planifier » ou « planifié ») : ce que le forfait
+ * peut encore trancher.
+ */
+function forfeitableEntrySql(): string {
+  return `${soloEntryNeverPlayedSql()}
+        AND EXISTS (
+          SELECT 1 FROM bg_matches om
+           WHERE om.tournament_id = r.tournament_id
+             AND (om.team1_id = s.id OR om.team2_id = s.id)
+             AND om.status IN ('PENDING', 'READY')
+        )`;
+}
+
 /** Les tournois en cours où l'entrée solo du compte n'a jamais joué et a encore un match à jouer. */
 export async function listForfeitableSoloEntries(
   runner: Pick<PoolConnection, "execute">,
@@ -81,13 +99,7 @@ export async function listForfeitableSoloEntries(
        JOIN bg_tournament_registrations r ON r.team_id = s.id
        JOIN bg_tournaments t ON t.id = r.tournament_id AND t.state = 'RUNNING'
       WHERE s.solo_user_id = ?
-        AND ${soloEntryNeverPlayedSql()}
-        AND EXISTS (
-          SELECT 1 FROM bg_matches om
-           WHERE om.tournament_id = r.tournament_id
-             AND (om.team1_id = s.id OR om.team2_id = s.id)
-             AND om.status IN ('PENDING', 'READY')
-        )
+        AND ${forfeitableEntrySql()}
       ORDER BY r.tournament_id`,
     [userId],
   );
@@ -263,6 +275,11 @@ export async function forfeitSoloEntriesAfterCommit(entries: readonly DeletionWi
  */
 export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; forfeited: number }> {
   const db = await getDatabase();
+  // Seuls les comptes qui ont **quelque chose** à faire : une inscription à
+  // retirer (tournoi pas commencé) ou une entrée en cours à forfaiter. Un
+  // compte dont l'entrée a joué reste inscrit à un tournoi en cours des
+  // semaines durant — le relever ici le ferait relire à chaque passage
+  // horaire de chaque processus. Borné : un lot par passage.
   const [candidates] = await db.execute<(RowDataPacket & { id: number })[]>(
     `SELECT DISTINCT u.id
        FROM bg_users u
@@ -270,8 +287,12 @@ export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; f
        JOIN bg_tournament_registrations r ON r.team_id = s.id
        JOIN bg_tournaments t ON t.id = r.tournament_id
       WHERE u.is_deleted = 1
-        AND t.state IN ('UPCOMING', 'REGISTRATION', 'RUNNING')
-      ORDER BY u.id`,
+        AND (
+          t.state IN ('UPCOMING', 'REGISTRATION')
+          OR (t.state = 'RUNNING' AND ${forfeitableEntrySql()})
+        )
+      ORDER BY u.id
+      LIMIT ${SETTLE_BATCH_SIZE}`,
   );
   const outcome = { withdrawn: 0, forfeited: 0 };
   for (const candidate of candidates) {

@@ -431,6 +431,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // du décompte des terminés et du sous-ensemble des plus récents : sans
     // index, chaque reconstruction de la liste parcourait toute la table.
     `ALTER TABLE bg_tournaments ADD INDEX idx_bg_tournaments_start_visibility (start_visibility_at)`,
+    // ERASURE-D2 — le rattrapage de démarrage et le passage horaire ne relèvent que
+    // les comptes supprimés (une poignée) : sans index, chaque démarrage de chaque
+    // processus parcourait toute la table des comptes.
+    `ALTER TABLE bg_users ADD INDEX idx_bg_users_is_deleted (is_deleted)`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

@@ -1,6 +1,7 @@
 ﻿import "dotenv/config";
 import mysql, { type ExecuteValues, type Pool, type PoolConnection } from "mysql2/promise";
 import { createOnceGate, withMigrationLock } from "@/lib/server/migration-lock";
+import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { runMigrations } from "@/lib/server/database/run-migrations";
 
 /*
@@ -112,27 +113,57 @@ function scheduleDueAccountDeletions(now: number = Date.now()): void {
   // compte en suppression jusqu'au prochain redémarrage.
   // Après le rattrapage de démarrage, qui fait la même passe : jamais deux à la fois.
   void Promise.resolve(reconciliationState.__bgDeletedAccountsReconciliation)
-    .then(() => import("@/lib/server/users/deleted-solo-entries"))
-    .then(({ settleDeletedSoloEntries }) => settleDeletedSoloEntries())
+    .then(() => runDueAccountDeletionsExclusively())
     .catch((error: unknown) => {
       console.error(
-        "[deleted-accounts] Forfaits des comptes supprimés reportés :",
-        error instanceof Error ? error.message : error,
-      );
-    })
-    .then(() => import("@/lib/server/users/deleted-accounts"))
-    .then(({ finalizeDueAccountDeletions }) => finalizeDueAccountDeletions())
-    .then(({ finalized, failed }) => {
-      if (finalized + failed > 0) {
-        console.info(`[deleted-accounts] Suppressions définitives : ${finalized} faite(s), ${failed} reportée(s).`);
-      }
-    })
-    .catch((error: unknown) => {
-      console.error(
-        "[deleted-accounts] Suppressions définitives impossibles :",
+        "[deleted-accounts] Passage horaire impossible :",
         error instanceof Error ? error.message : error,
       );
     });
+}
+
+/** Verrou nommé du passage horaire : un seul processus à la fois fait le travail. */
+export const DUE_DELETIONS_LOCK_NAME = "bg_due_account_deletions";
+
+/**
+ * Le passage horaire, derrière un verrou nommé (`GET_LOCK`, sans attente) : les
+ * processus du site (pm2) le lancent tous à la même heure, et chacun relirait les
+ * mêmes candidats et se disputerait les mêmes verrous de comptes et de tournois.
+ * Celui qui n'obtient pas le verrou passe son tour — l'heure suivante, un autre
+ * aura la main. Chaque étape échoue seule : un forfait reporté n'empêche pas
+ * les suppressions définitives.
+ */
+export async function runDueAccountDeletionsExclusively(): Promise<void> {
+  if (!pool) return;
+  try {
+    await withNamedLock(pool, DUE_DELETIONS_LOCK_NAME, 0, async () => {
+      try {
+        const { settleDeletedSoloEntries } = await import("@/lib/server/users/deleted-solo-entries");
+        await settleDeletedSoloEntries();
+      } catch (error) {
+        console.error(
+          "[deleted-accounts] Forfaits des comptes supprimés reportés :",
+          error instanceof Error ? error.message : error,
+        );
+      }
+      try {
+        const { finalizeDueAccountDeletions } = await import("@/lib/server/users/deleted-accounts");
+        const { finalized, failed } = await finalizeDueAccountDeletions();
+        if (finalized + failed > 0) {
+          console.info(`[deleted-accounts] Suppressions définitives : ${finalized} faite(s), ${failed} reportée(s).`);
+        }
+      } catch (error) {
+        console.error(
+          "[deleted-accounts] Suppressions définitives impossibles :",
+          error instanceof Error ? error.message : error,
+        );
+      }
+    });
+  } catch (error) {
+    // Un autre processus tient le passage : rien à faire de ce côté-ci.
+    if (error instanceof NamedLockUnavailableError) return;
+    throw error;
+  }
 }
 
 /**
