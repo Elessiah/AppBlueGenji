@@ -647,14 +647,20 @@ function MapsSection({
  * de la lecture d'un match (`useMatchContacts`), propre au lecteur : rien
  * dans l'instantané diffusé à tous.
  */
+/** Lecture des contacts que la section « Infos de connexion » montre ; `null` : la section se tait. */
+function connectionLaunchOf(launch: MatchLaunchInfo | null): MatchLaunchInfo | null {
+  return launch && connectionReader(launch) ? launch : null;
+}
+
 function ConnectionSection({
-  launch,
+  launch: read,
   onCopy,
 }: Readonly<{ launch: MatchLaunchInfo | null; onCopy: (value: string, label: string) => Promise<void> }>) {
   const page = useMatchPageText();
   const launchText = useLaunchText();
   const titleId = useId();
-  if (!launch || !connectionReader(launch)) return null;
+  const launch = connectionLaunchOf(read);
+  if (launch === null) return null;
   const hostSecond = launch.hostTeamId !== null && launch.hostTeamId === launch.team2.teamId;
   const ordered = hostSecond ? [launch.team2, launch.team1] : [launch.team1, launch.team2];
   // Contacts pas encore ouverts : la note dit quand (comme la fenêtre de lancement).
@@ -756,6 +762,11 @@ function officiatingContent(match: BracketMatch, staff: boolean, forParties: boo
   };
 }
 
+/** La section « Arbitrage » a-t-elle quelque chose à montrer ? */
+function officiatingShown(content: ReturnType<typeof officiatingContent>): boolean {
+  return content.refereeCard !== null || content.showSteps;
+}
+
 /**
  * Arbitrage, en détail : la fiche de l'arbitre (aux lecteurs que sert la
  * lecture des contacts) ou l'aide-mémoire de l'autogestion. La décision
@@ -786,8 +797,9 @@ function OfficiatingSection({
   const launchText = useLaunchText();
   const page = useMatchPageText();
   const titleId = useId();
-  const { refereeCard, showSteps } = officiatingContent(match, staff, forParties, launch);
-  if (refereeCard === null && !showSteps) return null;
+  const content = officiatingContent(match, staff, forParties, launch);
+  if (!officiatingShown(content)) return null;
+  const { refereeCard, showSteps } = content;
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
       <SectionTitle id={titleId}>{page.t("sections.officiating")}</SectionTitle>
@@ -829,6 +841,11 @@ function castContactsOf(launch: MatchLaunchInfo | null): MatchLaunchInfo | null 
   return launch && launch.casters.length > 0 ? launch : null;
 }
 
+/** La section des casts a-t-elle quelque chose à montrer (un stream ou des contacts de casters) ? */
+function castShown(streams: readonly unknown[], launch: MatchLaunchInfo | null): boolean {
+  return streams.length > 0 || castContactsOf(launch) !== null;
+}
+
 /**
  * Cast et streams : chaque stream avec son lien et ses casters, puis les
  * contacts des casters — en Overwatch, leurs BattleTags à inviter ; ailleurs,
@@ -856,8 +873,8 @@ function CastSection({
   const linkTexts = streams.map((stream) => (stream.url ? streamLinkText(stream.url, t("match.channel")) : null));
   const sharedText = (index: number) =>
     linkTexts[index] !== null && linkTexts.filter((item) => item === linkTexts[index]).length > 1;
+  if (!castShown(streams, launch)) return null;
   const contacts = castContactsOf(launch);
-  if (streams.length === 0 && contacts === null) return null;
   // Overwatch : on invite par BattleTag — le serveur le dit (`battletagRelevant`).
   const invitesByBattletag = contacts?.battletagRelevant ?? false;
   return (
@@ -1011,13 +1028,12 @@ function MatchPageContent({
   const officiating = officiatingContent(match, canSchedule, organizes, shownLaunch);
   // Colonne de droite : rendue seulement si une section y a quelque chose à
   // dire ; sinon la grille passe à une colonne (attribut posé ici, pas `:has()`).
+  // Chaque section se tait par le même prédicat que celui lu ici : une seule source.
   const rightColumn =
     voice !== null ||
-    (shownLaunch !== null && connectionReader(shownLaunch)) ||
-    officiating.refereeCard !== null ||
-    officiating.showSteps ||
-    streams.length > 0 ||
-    castContactsOf(shownLaunch) !== null;
+    connectionLaunchOf(shownLaunch) !== null ||
+    officiatingShown(officiating) ||
+    castShown(streams, shownLaunch);
 
   return (
     <>
