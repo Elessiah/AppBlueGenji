@@ -37,6 +37,10 @@ et rien n'est compté.
 - **Salon supprimé à la main** : les salons ouverts des matchs dus sont redemandés au
   bot par leur clé au plus une fois par minute et par salon (`OPEN_DUE_CHANNELS_SQL`) ;
   le bot rend le même, ou un neuf s'il a disparu — jamais qui s'y trouve.
+  Coût borné : au plus 5 appels au bot en parallèle, 80 salons par passe (les
+  plus anciennement vus d'abord, aucun n'est affamé), arrêt de la passe au premier
+  échec du bot ; un salon tout juste créé n'est pas redemandé dans la même passe.
+  Le rendu s'arrête aussi au premier échec (la passe suivante reprend).
 - **Panne du bot** : `failed_at` noté, une ligne pm2 sans donnée de joueur, une
   seule par panne ; création comme rendu réessayés au plus une fois par
   `VOICE_RETRY_SECONDS` (60 s), en fin de file.
