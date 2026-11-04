@@ -167,7 +167,7 @@ lui-même).
   charge, est ce qui protège la machine d'un tournoi animé (choix de l'auteur ;
   ce délai, 150 s au pire, est déclaré dans `/rgpd`). Seules la
   **suppression** du tournoi et son **édition** par le staff la retirent
-  (`invalidateSpectatorSnapshot`, `deletion.ts`, `edit.ts`). Une lecture froide lit d'abord la **carte** du tournoi (une
+  (`invalidateSpectatorSnapshot`, `deletion.ts`, `edit.ts`, `image.ts`). Une lecture froide lit d'abord la **carte** du tournoi (une
   requête indexée, `isSpectatorTournamentPublic`, mutualisée en vol entre les
   lectures simultanées et jamais gardée) : un identifiant inconnu ou pas encore
   publié s'arrête là, sans faire construire d'instantané. Si l'instantané des
@@ -286,7 +286,7 @@ construction). Seule une lecture **en base** de la carte prend un jeton de
 une carte servie par la copie ou par le cache de carte ne coûte rien, et la page
 d'un match (mise en page du tournoi + du match) n'épuise plus le plafond deux
 fois plus vite ; au plafond, encart ou page générale. Toute **édition** d'un
-tournoi (`updateTournament` : nom, description, dates) l'évince aussitôt
+tournoi (`updateTournament` : nom, description, dates ; image posée, recadrée ou retirée, `image.ts`) l’évince aussitôt
 (`invalidateSpectatorSnapshot` vide la réponse publique et la carte d'encart) :
 un nom ou une description retirés par le staff ne restent pas en aperçu. Un membre connecté arrivant par une mise en page préchargée ne voit
 pas la fiche publique : `MemberRelay` seul est rendu, à la place de `children`,
