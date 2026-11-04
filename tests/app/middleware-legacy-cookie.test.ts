@@ -184,6 +184,14 @@ describe("middleware — politique CSP selon le serveur de développement", () =
     expect(scriptSrcWithHeaders({ host: "[::1]:3000" }).startsWith("script-src 'self' ")).toBe(true);
   });
 
+  // `APP_URL` nomme le site public, pas la page servie en dev.
+  it("middleware_turbopackDevWithAppUrl_omitsPublicHost", () => {
+    withEnv({ NODE_ENV: "development", TURBOPACK: "1" });
+    Reflect.set(process.env, "APP_URL", "https://public.example");
+
+    expect(scriptSrcWithHeaders({ host: "localhost:3000" })).not.toContain("public.example");
+  });
+
   it("middleware_turbopackDevMissingHost_listsRequestHost", () => {
     withEnv({ NODE_ENV: "development", TURBOPACK: "1" });
 
