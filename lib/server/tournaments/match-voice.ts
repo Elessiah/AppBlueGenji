@@ -305,6 +305,9 @@ async function createTeamChannel(
   return !shownFailed;
 }
 
+/** Codes d'une panne du canal vers le bot : tout le reste est un refus propre à un salon. */
+const BOT_TRANSPORT_FAILURES: ReadonlySet<string> = new Set(["BOT_CIRCUIT_OPEN", "BOT_INTERNAL_UNREACHABLE", "BOT_VOICE_TIMEOUT"]);
+
 async function releaseChannels(touched: Set<number>): Promise<void> {
   const rows = await run<ReleaseRow[]>(RELEASABLE_SQL);
   for (const row of rows) {
@@ -320,7 +323,9 @@ async function releaseChannels(touched: Set<number>): Promise<void> {
           [Number(row.match_id), Number(row.team_id)],
         );
         // Bot injoignable : inutile d'attendre le délai de chaque salon suivant, la prochaine passe reprend.
-        break;
+        // Un refus propre à ce salon, lui, n'arrête pas les autres rendus.
+        if (BOT_TRANSPORT_FAILURES.has(released.code)) break;
+        continue;
       }
     }
     await run(
@@ -389,7 +394,10 @@ const VOICE_RECHECK_BATCH = VOICE_SWEEP_BATCH * 2;
 
 type OpenRow = RowDataPacket & { match_id: number; team_id: number; channel_id: string; tournament_id: number; team_name: string };
 
-/** Revérifie un salon ouvert ; `false` si le bot n'a pas répondu (le reste de la passe s'arrête alors). */
+/**
+ * Revérifie un salon ouvert ; `false` si le canal vers le bot est en panne (le reste de la
+ * passe s'arrête alors). Un refus propre au salon le laisse tel quel, redemandé après `VOICE_RECHECK_MS`.
+ */
 async function recheckOneChannel(row: OpenRow, touched: Set<number>): Promise<boolean> {
   const key = voiceChannelKey(Number(row.match_id), Number(row.team_id));
   let ensured = await ensureVoiceChannel(key, visibleText(String(row.team_name)));
@@ -397,7 +405,7 @@ async function recheckOneChannel(row: OpenRow, touched: Set<number>): Promise<bo
     ensured = await ensureVoiceChannel(key, VOICE_FALLBACK_CHANNEL_NAME);
   }
   // Une panne ici ne dit rien du salon : il reste tel qu'il est, redemandé plus tard.
-  if (ensured.kind !== "ok") return false;
+  if (ensured.kind !== "ok") return !BOT_TRANSPORT_FAILURES.has(ensured.code);
   if (ensured.value !== String(row.channel_id)) {
     await writeChannel(Number(row.match_id), Number(row.team_id), ensured.value);
     touched.add(Number(row.tournament_id));
