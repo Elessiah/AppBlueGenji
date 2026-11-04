@@ -37,7 +37,14 @@ function poolExecute(rows: unknown[]) {
 }
 
 /** Connexion de transaction : ticket, ligne verrouillée, résultat de l'UPDATE. */
-function transaction(options: { ticket?: object; locked?: object; affectedRows?: number; failOn?: string }) {
+function transaction(options: {
+  ticket?: object;
+  locked?: object;
+  affectedRows?: number;
+  /** Lignes retirées par le `DELETE` du ticket : 0 = une autre requête l'a servi. */
+  ticketDeleted?: number;
+  failOn?: string;
+}) {
   const connection = connectionMock();
   connection.rollback.mockResolvedValue(undefined);
   connection.execute.mockImplementation(async (sql: string) => {
@@ -45,6 +52,7 @@ function transaction(options: { ticket?: object; locked?: object; affectedRows?:
     if (sql.includes("SELECT user_id, login_event")) return [options.ticket ? [options.ticket] : [], []];
     if (sql.includes("FOR UPDATE")) return [options.locked ? [options.locked] : [], []];
     if (sql.startsWith("UPDATE bg_users")) return [{ affectedRows: options.affectedRows ?? 1 }, []];
+    if (sql.startsWith("DELETE FROM bg_account_reactivation_tickets")) return [{ affectedRows: options.ticketDeleted ?? 1 }, []];
     return [{ affectedRows: 1 }, []];
   });
   jest.mocked(getDatabase).mockResolvedValue(
@@ -152,6 +160,20 @@ describe("reactivateAccount", () => {
     expect(forgetPendingAccountDeletion).toHaveBeenCalledWith({ userId: 7, accountCreatedAt: "2025-01-01 10:00:00" });
     expect(invalidateTeamIdentityViews).toHaveBeenCalled();
     expect(invalidateStats).toHaveBeenCalled();
+  });
+
+  it("reactivateAccount_ticketConsumedConcurrently_nullWithoutRestore", async () => {
+    const connection = transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+      ticketDeleted: 0,
+    });
+
+    expect(await reactivateAccount(TOKEN)).toBeNull();
+    expect(connection.commit).toHaveBeenCalled();
+    expect(connection.execute.mock.calls.some(([sql]) => sql.includes("FOR UPDATE"))).toBe(false);
+    expect(restoreAccountIdentity).not.toHaveBeenCalled();
+    expect(forgetPendingAccountDeletion).not.toHaveBeenCalled();
   });
 
   it("reactivateAccount_restoreRefused_nullAndJournalKept", async () => {

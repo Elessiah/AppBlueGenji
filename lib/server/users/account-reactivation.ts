@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { RowDataPacket } from "mysql2/promise";
+import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import {
   ACCOUNT_PENDING_DELETION_CODE,
@@ -116,9 +116,14 @@ export async function reactivateAccount(
         WHERE token_hash = ? AND expires_at > NOW() LIMIT 1`,
       [tokenHash],
     );
-    // Servi une fois, quoi qu'il advienne de la suite.
-    await connection.execute(`DELETE FROM bg_account_reactivation_tickets WHERE token_hash = ?`, [tokenHash]);
-    const ticket = tickets[0];
+    // Servi une fois, quoi qu'il advienne de la suite — et réservé par cette
+    // instruction même (`affectedRows`) : une seconde requête au même cookie,
+    // qui a lu le ticket avant ce retrait, n'en tire rien.
+    const [consumed] = await connection.execute<ResultSetHeader>(
+      `DELETE FROM bg_account_reactivation_tickets WHERE token_hash = ?`,
+      [tokenHash],
+    );
+    const ticket = Number(consumed.affectedRows) === 1 ? tickets[0] : undefined;
     if (!ticket) {
       await connection.commit();
       return null;
