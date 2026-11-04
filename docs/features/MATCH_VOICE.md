@@ -44,8 +44,10 @@ et rien n'est compté.
   Discord, la ligne le suit, et le rendu de la même passe (après la revérification)
   le rend au bot avec ses reprises — jamais un salon sans ligne.
 - **404 du bot** : seul `VOICE_CHANNEL_NOT_TRACKED` vaut « déjà rendu » ; un autre
-  `404` (route absente, `INTERNAL_ROUTE_NOT_FOUND`) est un échec redemandé, la ligne
-  reste ouverte.
+  `404` (route absente, `INTERNAL_ROUTE_NOT_FOUND` ; tout autre code, ou un service
+  mal routé, devient `BOT_INTERNAL_REQUEST_FAILED`) est une panne du canal : comptée
+  au coupe-circuit, elle arrête la passe, la ligne reste ouverte. Un code du bot
+  n'est repris que s'il a la forme `[A-Z0-9_]{1,64}` — jamais une phrase.
   Coût borné : au plus 5 appels au bot en parallèle, 80 salons par passe (les
   plus anciennement vus d'abord, aucun n'est affamé), arrêt de la passe au premier
   échec du canal du bot (le salon en échec est redemandé après 10 s, derrière les
