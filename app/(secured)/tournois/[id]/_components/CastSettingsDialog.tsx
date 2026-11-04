@@ -88,7 +88,10 @@ export function CastSettingsDialog({
   const [cast, setCast] = useState<OwnCast | null>(null);
   const [url, setUrl] = useState("");
   const [battletag, setBattletag] = useState("");
-  const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "AUTO");
+  // `null` tant que le caster n'a pas choisi : un match démarqué montre
+  // « automatique » sans que l'enregistrement d'un BattleTag le marque casté.
+  const [pickedTrigger, setTrigger] = useState<MatchLiveTrigger | null>(null);
+  const trigger: MatchLiveTrigger = pickedTrigger ?? match.liveTrigger ?? "AUTO";
   const [organisationLink, setOrganisationLink] = useState(false);
   const [busy, setBusy] = useState(false);
   const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId, battletag: battletagId });
@@ -142,7 +145,7 @@ export function CastSettingsDialog({
       // Un seul envoi pour le cast ; la rediff a sa route (celle du staff de
       // diffusion), et n'est envoyée que si elle a changé.
       const settings: Record<string, unknown> = {};
-      if (configurable && trigger !== match.liveTrigger) settings.trigger = trigger;
+      if (configurable && pickedTrigger !== null && pickedTrigger !== match.liveTrigger) settings.trigger = pickedTrigger;
       if (streamEditable && url.trim() !== (cast.liveUrl ?? "")) {
         settings.liveUrl = url.trim() === "" ? null : url.trim();
         if (canSchedule && organisationLink) settings.organisationLink = true;

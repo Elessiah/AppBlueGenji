@@ -45,7 +45,12 @@ Trois conséquences voulues :
 - Le **BattleTag du cast** suit les deux choix : il parle du caster, non de son
   stream (un co-caster paraît lui aussi dans les contacts).
 
-Une inscription déjà acquise (rejouée) ne réécrit **aucun** réglage.
+Une inscription déjà acquise (rejouée) ne réécrit **aucun** réglage. Le mode
+d'antenne envoyé à l'inscription ne s'écrit que s'il **change** et que le match
+est encore castable (`isMatchCastable`) : un match dont le score attend sa
+confirmation s'inscrit toujours, son mode ne bouge plus. Un lien dit de
+l'organisation n'est rattaché à **aucun** compte (`link_user_id` nul) : il reste
+au match quand le staff qui l'a posé part.
 
 ## « Configurer ma diffusion »
 
@@ -54,7 +59,7 @@ Fenêtre du caster, sur **son** cast :
 - **lien de sa chaîne** — celui du stream qu'il tient ; le stream du staff se
   lit seulement (`CAST_STREAM_NOT_OWNED` au serveur, champ en lecture seule avec
   sa note dans la fenêtre). Le lien reste obligatoire : pour s'en défaire, on ne
-  caste plus ;
+  caste plus (un `liveUrl` vide ou nul : `STREAM_URL_REQUIRED`) ;
 - **passage à l'antenne** du match (`AUTO` / `START_TIME` / `MANUAL`), avec la
   même garde que la fenêtre du staff : `START_TIME` demande une date de début
   (`MATCH_START_AT_REQUIRED`) ;
@@ -110,6 +115,14 @@ en silence. Les refus des réglages portent leur code
 `STREAM_URL_REQUIRED`, `INVALID_CAST_BATTLETAG`, `CAST_STREAM_NOT_OWNED`,
 `INVALID_CAST_SETTINGS`, `MATCH_NOT_CASTABLE`, `MATCH_START_AT_REQUIRED`.
 
+La fenêtre n'envoie le mode d'antenne que si le caster en a **choisi** un autre :
+un match démarqué montre « automatique » sans qu'enregistrer un BattleTag le
+marque casté.
+
+Le BattleTag de cast part avec l'inscription ; sur un match joué gardé à
+l'anonymisation d'un compte (`withdrawUserCasts`, `includeCompleted` faux),
+l'inscription reste mais son `cast_battletag` est effacé.
+
 ## Verrous
 
 Tout passe par le verrou de la ligne du match, pris en **première instruction**
@@ -125,4 +138,6 @@ mode du match dans la transaction qui l'inscrit.
 `tests/tournois/match-card-actions.test.tsx` (inventaire et rangement),
 `tests/app/api/match-launch-routes.test.ts` (lien obligatoire, réglages
 transmis, lien de l'organisation refusé), `tests/lib/server/match-launch.test.ts`
-(inscription).
+(inscription : lien de l'organisation, mode inchangé ou non castable),
+`tests/lib/server/cast-settings.test.ts` (lien obligatoire au réglage),
+`tests/lib/server/match-casters.test.ts` (BattleTag de cast à l'anonymisation).

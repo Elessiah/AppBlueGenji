@@ -112,6 +112,11 @@ function applyWithdrawWrites(state: WorldState, sql: string, params: unknown[]):
     state.casters = state.casters.filter((c) => !(c.user_id === userId && ids.includes(matchOf(c))));
     return [{ affectedRows: 1 }];
   }
+  // Le BattleTag de cast d'un cast gardé (anonymisation) : la base n'en modélise
+  // pas la valeur, l'instruction se lit dans `sqls()`.
+  if (sql === "UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL") {
+    return [{ affectedRows: 1 }];
+  }
   if (sql.startsWith("UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE link_user_id = ? AND match_id IN")) {
     const provided = state.streams.filter((s) => s.link_user_id === userId && ids.includes(matchOf(s)));
     for (const s of provided) Object.assign(s, { live_url: null, link_user_id: null });
@@ -274,6 +279,20 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
     expect(await withdrawUserCasts(w.connection, 12, false)).toEqual(untouched);
     expect(w.state.casters).toEqual([{ user_id: 12, stream_id: 4 }]);
     expect(w.sqls().some((sql) => sql.startsWith("DELETE"))).toBe(false);
+  });
+
+  it("withdrawUserCasts_keptCompletedCast_clearsCastBattletag", async () => {
+    const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }], true);
+    await withdrawUserCasts(w.connection, 12, false);
+    // Le cast reste sur le match joué, son BattleTag de cast part avec le compte.
+    expect(w.state.casters).toEqual([{ user_id: 12, stream_id: 4 }]);
+    expect(w.sqls()).toContain("UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL");
+  });
+
+  it("withdrawUserCasts_allCastsDropped_noBattletagUpdate", async () => {
+    const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }]);
+    await withdrawUserCasts(w.connection, 12, false);
+    expect(w.sqls().some((sql) => sql.includes("cast_battletag"))).toBe(false);
   });
 
   it("effacement : le cast d'un match joué part aussi", async () => {

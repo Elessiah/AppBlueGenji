@@ -119,7 +119,12 @@ export async function applyCastTrigger(
  * Rend les streams du match **tels qu'ils sont après l'écriture**, pour le
  * ménage de l'appelant.
  *
+ * Un lien ne s'efface pas : le stream d'un caster sans lien n'apparaîtrait
+ * sur aucune vue, et le staff le prendrait pour le sien (`staffStream`, le
+ * premier stream sans lien) — exigé ici comme à l'inscription.
+ *
  * @throws `STREAM_NOT_FOUND` | `CAST_STREAM_NOT_OWNED` | `INVALID_STREAM_URL`
+ *   | `STREAM_URL_REQUIRED`
  */
 export async function setCasterStreamUrl(
   connection: PoolConnection,
@@ -132,6 +137,7 @@ export async function setCasterStreamUrl(
   const target = streams.find((stream) => stream.id === streamId);
   if (!target) throw new Error("STREAM_NOT_FOUND");
   if (!casterStreamEditable(target)) throw new Error("CAST_STREAM_NOT_OWNED");
+  if (url === null) throw new Error("STREAM_URL_REQUIRED");
   // Un lien inchangé n'est pas réécrit : il reste à qui l'a fourni, comme dans
   // la configuration du staff (`setStaffStreamUrl`).
   if (target.liveUrl === url) return streams;

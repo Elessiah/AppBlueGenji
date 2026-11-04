@@ -28,7 +28,7 @@ import {
   type LaunchViewerRole,
   type MatchLaunchInput,
 } from "@/lib/shared/match-launch";
-import { parseStreamUrlInput, shownStreams, type MatchLiveTrigger } from "@/lib/shared/live-streams";
+import { isMatchCastable, parseStreamUrlInput, shownStreams, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import { parseCastBattletagInput } from "@/lib/shared/cast-settings";
 import {
   groupNoRefereeAlerts,
@@ -843,10 +843,12 @@ export async function claimMatchCast(
         streamId = castTarget.streamId;
       } else {
         // Le lien est rattaché à celui qui le fournit : son effacement de
-        // compte le retire (`withdrawUserCasts`).
+        // compte le retire (`withdrawUserCasts`) — sauf le lien dit de
+        // l'organisation (`asOrganisation`, permission `tournaments` vérifiée
+        // par la route), qui reste au match comme celui du staff.
         const [created] = await connection.execute<ResultSetHeader>(
           `INSERT INTO bg_match_streams (match_id, live_url, link_user_id) VALUES (?, ?, ?)`,
-          [matchId, liveUrl, liveUrl === null ? null : userId],
+          [matchId, liveUrl, liveUrl === null || settings.asOrganisation === true ? null : userId],
         );
         streamId = Number(created.insertId);
       }
@@ -860,7 +862,21 @@ export async function claimMatchCast(
       // Réglages du même geste (mode d'antenne, BattleTag du cast) : le lien,
       // lui, vient d'être posé avec le stream (`target`) — le repasser ici le
       // réécrirait, et la route ne l'envoie pas.
-      await applyCastSettings(connection, row, userId, streamId, { ...settings, liveUrl: undefined });
+      // Le mode d'antenne ne s'écrit que s'il change, et sur un match encore
+      // castable : la fenêtre envoie toujours celui qu'elle montre (celui du
+      // match par défaut), et un match dont le score attend sa confirmation
+      // s'inscrit toujours — seul son mode ne bouge plus (`isMatchCastable`).
+      const castable = isMatchCastable({
+        status: row.status,
+        liveTrigger: row.live_trigger ?? null,
+        liveStartedAt: row.live_started_at ?? null,
+        launchedAt: null,
+      });
+      const trigger =
+        settings.trigger === undefined || settings.trigger === (row.live_trigger ?? null) || !castable
+          ? undefined
+          : settings.trigger;
+      await applyCastSettings(connection, row, userId, streamId, { ...settings, trigger, liveUrl: undefined });
       return { tournamentId: Number(row.tournament_id), claimed: true };
     }),
   );

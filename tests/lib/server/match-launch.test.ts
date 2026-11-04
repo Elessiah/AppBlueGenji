@@ -75,6 +75,8 @@ type MatchState = {
   referee_ready_at: string | null;
   self_managed: number;
   first_map: string | null;
+  /** Mode d'antenne du match (`bg_matches.live_trigger`), absent = non casté. */
+  live_trigger?: string | null;
   /** `bg_match_casters` du match, dans l'ordre d'inscription. */
   casters: CasterState[];
   /** `bg_match_streams` du match (`staff_owned` : 1 = stream du staff). */
@@ -738,6 +740,37 @@ describe("claimMatchCast", () => {
     state.issued = [];
     await claimMatchCast(42, CASTER, true, OWN_STREAM);
     expect(state.issued[0]).toMatch(/FROM bg_users WHERE id = \? LIMIT 1 LOCK IN SHARE MODE$/);
+  });
+
+  it("claimMatchCast_ownStreamAsOrganisation_streamHasNoLinkUser", async () => {
+    state.users[CASTER] = verified;
+    await claimMatchCast(42, CASTER, true, OWN_STREAM, { asOrganisation: true });
+    // Le lien de l'organisation reste au match : aucun compte ne l'emporte.
+    expect(state.match?.streams).toEqual([{ id: 1, live_url: "https://twitch.tv/voix" }]);
+  });
+
+  it("claimMatchCast_awaitingConfirmationWithTrigger_registersWithoutWritingTrigger", async () => {
+    state.users[CASTER] = verified;
+    state.match = matchState({ status: "AWAITING_CONFIRMATION" });
+    state.issued = [];
+    await claimMatchCast(42, CASTER, true, OWN_STREAM, { trigger: "AUTO" });
+    expect(casterOf(state)).toBe(CASTER);
+    expect(state.issued.some((sql) => sql.includes("SET live_trigger"))).toBe(false);
+  });
+
+  it("claimMatchCast_sameTriggerAsMatch_doesNotRewriteIt", async () => {
+    state.users[CASTER] = verified;
+    state.match = matchState({ live_trigger: "MANUAL" });
+    state.issued = [];
+    await claimMatchCast(42, CASTER, true, OWN_STREAM, { trigger: "MANUAL" });
+    expect(state.issued.some((sql) => sql.includes("SET live_trigger"))).toBe(false);
+  });
+
+  it("claimMatchCast_castableNewTrigger_writesTrigger", async () => {
+    state.users[CASTER] = verified;
+    state.issued = [];
+    await claimMatchCast(42, CASTER, true, OWN_STREAM, { trigger: "AUTO" });
+    expect(state.issued).toContain("UPDATE bg_matches SET live_trigger = ?, live_started_at = NULL WHERE id = ?");
   });
 
   it("ouvre un stream à part avec son lien, normalisé : l'accueil relit", async () => {

@@ -390,6 +390,14 @@ export async function withdrawUserCasts(
       [userId, ...castsToDrop],
     );
   }
+  // Un cast gardé sur un match joué (anonymisation) ne garde pas son
+  // BattleTag de cast : il part avec le compte (`CAST_SETTINGS.md`).
+  if (casts.size > castsToDrop.length) {
+    await connection.execute(
+      `UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL`,
+      [userId],
+    );
+  }
   if (linksToDrop.length > 0) {
     await connection.execute(
       `UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL
