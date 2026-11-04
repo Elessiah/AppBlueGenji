@@ -40,8 +40,8 @@ et rien n'est compté.
   le bot rend le même, ou un neuf s'il a disparu — jamais qui s'y trouve.
   Coût borné : au plus 5 appels au bot en parallèle, 80 salons par passe (les
   plus anciennement vus d'abord, aucun n'est affamé), arrêt de la passe au premier
-  échec du bot (le salon en échec n'est pas marqué vu : redemandé à la passe
-  suivante, pas une minute plus tard) ; un salon tout juste créé n'est pas redemandé dans la même passe.
+  échec du canal du bot (le salon en échec est redemandé après 10 s, derrière les
+  salons plus anciennement vus : un salon lent n'ouvre pas chaque passe) ; un salon tout juste créé n'est pas redemandé dans la même passe.
   Le rendu s'arrête aussi au premier échec (la passe suivante reprend). Seule
   une panne du canal (`BOT_CIRCUIT_OPEN`, `BOT_INTERNAL_UNREACHABLE`,
   `BOT_VOICE_TIMEOUT`) arrête une passe ; le refus du bot pour un salon (code
@@ -54,7 +54,7 @@ et rien n'est compté.
   sorti du programme (heure retirée), d'un match où entre une entrée solo ou une
   équipe fantôme, d'un tournoi terminé ou qui a éteint l'option ; un match
   simplement reporté garde les siens. `VOICE_CHANNEL_NOT_TRACKED` = déjà fait. Une
-  ligne rendue est effacée 7 jours après (purge au plus une fois par heure).
+  ligne rendue est effacée 7 jours après (purge au plus une fois par heure, par lots de 200 jusqu'à épuisement de l'arriéré, 10 lots au plus).
 - **Lecture** : `loadMatchVoiceInfos` ne lit que les lignes non rendues des matchs
   demandés, et seulement quand l'option est allumée **et** le tournoi en cours ; un
   match prêt ou au score en attente de confirmation les montre, lancé ou non. Un rendu
