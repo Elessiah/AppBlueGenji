@@ -1,9 +1,10 @@
 /*
- * Bandeau de lancement d'une carte de match (`MatchLaunchStrip`) : phase,
- * équipe hôte, caster. Rangé dans la zone d'état de la carte (`MatchRow`), qui
- * porte le filet et les marges ; ses boutons vivent dans `MatchCardActions`.
- * Ambre : un geste humain attendu (planifier, se dire prêt) — jamais le rouge,
- * réservé à l'antenne.
+ * Bandeau de lancement d'une carte de match (`MatchLaunchStrip`) : la pastille
+ * de phase, seule — les faits du match vivent sur sa page
+ * (`docs/features/MATCH_CARD_LAYOUT.md`). Rangé dans la zone d'état de la carte
+ * (`MatchRow`), qui porte le filet et les marges ; ses boutons vivent dans
+ * `MatchCardActions`. Ambre : un geste humain attendu (planifier, se dire
+ * prêt) — jamais le rouge, réservé à l'antenne.
  */
 .strip {
   display: flex;
@@ -37,17 +38,6 @@
   color: var(--teal-400);
 }
 
-.fact {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  max-width: 100%;
-  color: var(--ink);
-  /* Un pseudo d'arbitre sans espace se coupe au lieu de déborder à 375 px. */
-  overflow-wrap: anywhere;
-}
-
 /* Le départ attend les salons vocaux d'équipe : dit dans la pastille
    « planifié » ou « lancement » (les seules qui précèdent le départ une fois
    l'heure posée), qui passe alors à la ligne (375 px) — c'est la pastille, pas
@@ -64,25 +54,4 @@
   text-transform: none;
   letter-spacing: normal;
   overflow-wrap: anywhere;
-}
-
-.name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 150px;
-}
-
-.ok {
-  color: var(--teal-400);
-}
-
-.wait {
-  color: var(--ink-mute);
-}
-
-/* « Sans arbitre » : une décision attendue du staff — ambre, l'avertissement. */
-.alert {
-  color: var(--amber);
-  white-space: nowrap;
 }

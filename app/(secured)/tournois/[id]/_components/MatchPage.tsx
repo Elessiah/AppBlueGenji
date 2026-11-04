@@ -1058,9 +1058,6 @@ function MatchPageContent({
                     phase={model.launchPhase}
                     actions={model.actions}
                     matchLabel={matchLabel}
-                    isCaster={model.launch.isCaster}
-                    releasesOthers={model.launch.releasesOthers}
-                    onAir={liveState === "LIVE"}
                     onPlayerScore={model.openPlayerScore}
                     onAdminScore={() => onOpenAdminModal(match)}
                     onReport={model.openReport}

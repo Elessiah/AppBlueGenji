@@ -110,7 +110,10 @@ anciennes clés `tournament.matchPage.*` restant pour les sections.
    leur numéro (« YouTube 2 »). Les liens suivent la règle de la carte : tus
    tant que le match n'est pas annoncé casté. Puis les fiches des casters, BattleTag marqué
    « À inviter — obligatoire » (pas sur sa propre fiche) sous « Casters à
-   inviter ».
+   inviter ». Un caster qui a donné un **BattleTag propre à ce cast**
+   (`CAST_SETTINGS.md`) voit celui-là présenté à sa place, jamais marqué
+   vérifié : la fiche n'y change rien, le serveur le substitue
+   (`buildLaunchCaster`).
 
 ## Hors Overwatch (décision 35, 2026-10-28)
 
@@ -126,7 +129,12 @@ serveur), jamais dans le jeu de la fiche : une seule source. Les contacts des
 équipes perdent aussi le leur hors Overwatch (décision 38, `sideContacts`,
 `MATCH_LAUNCH.md` § Les contacts présentés).
 
-## Données : aucune nouvelle
+## Données : le BattleTag d'un cast mis à part
+
+Le BattleTag qu'un caster donne pour un cast précis (`CAST_SETTINGS.md`,
+`bg_match_casters.cast_battletag`) est la seule donnée nouvelle que cette page
+peut montrer : il remplace celui du compte, aux mêmes lecteurs et aux mêmes
+moments, et n'est jamais marqué vérifié. Tout le reste est inchangé.
 
 Les BattleTags de l'arbitre et des casters viennent de la **même lecture** que
 la fenêtre « Contacts » (`GET /api/matches/[id]/contacts`, hook partagé

@@ -28,7 +28,8 @@ import {
   type LaunchViewerRole,
   type MatchLaunchInput,
 } from "@/lib/shared/match-launch";
-import { parseStreamUrlInput, shownStreams } from "@/lib/shared/live-streams";
+import { parseStreamUrlInput, shownStreams, type MatchLiveTrigger } from "@/lib/shared/live-streams";
+import { parseCastBattletagInput } from "@/lib/shared/cast-settings";
 import {
   groupNoRefereeAlerts,
   normalizeFirstMap,
@@ -51,6 +52,7 @@ import {
   type RefereeStanding,
 } from "./cast-eligibility";
 import { announceCastChange, queueCastChange } from "./cast-notices";
+import { applyCastSettings, type CastSettings } from "./cast-settings";
 import {
   lockMatchCasters,
   lockMatchStreams,
@@ -99,6 +101,13 @@ export type LaunchMatchBaseRow = RowDataPacket & {
   referee_user_id: number | null;
   referee_ready_at: Date | string | null;
   self_managed: number | null;
+  /**
+   * Diffusion du match (`lib/shared/live-streams.ts`) : lues sous le verrou
+   * parce qu'un caster règle le mode d'antenne en s'inscrivant, et dans la même
+   * transaction (`docs/features/CAST_SETTINGS.md`).
+   */
+  live_trigger: MatchLiveTrigger | null;
+  live_started_at: Date | string | null;
   /** La manche du match : l'alerte « sans arbitre » d'un match sans horaire est groupée par manche. */
   phase_id?: number | null;
   bracket?: string | null;
@@ -132,6 +141,7 @@ const LAUNCH_MATCH_COLUMNS = `
   m.team1_id, m.team2_id, t1.is_ghost AS team1_is_ghost, t2.is_ghost AS team2_is_ghost,
   m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at,
   m.team2_ready_at, m.host_team_id, m.referee_user_id, m.referee_ready_at, m.self_managed,
+  m.live_trigger, m.live_started_at,
   m.phase_id, m.bracket, m.round_number`;
 
 const LAUNCH_MATCH_FROM = `
@@ -291,6 +301,7 @@ const LAUNCH_MATCH_OWN_COLUMNS = `
   m.id, m.tournament_id, m.status, m.is_bye, m.team1_id, m.team2_id,
   m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at,
   m.team2_ready_at, m.host_team_id, m.referee_user_id, m.referee_ready_at, m.self_managed,
+  m.live_trigger, m.live_started_at,
   m.phase_id, m.bracket, m.round_number`;
 
 /**
@@ -689,10 +700,11 @@ export async function loadViewerCastBlock(
 
 /**
  * Où un caster s'inscrit : **co-cast** d'un stream existant du match
- * (`streamId`, aucun lien de plus), ou stream **à part** (`liveUrl`, son propre
- * lien, facultatif — `null` : pas encore de lien public).
+ * (`streamId`, aucun lien de plus), ou stream **à part** (`liveUrl`, le lien de
+ * sa chaîne, **obligatoire** depuis `docs/features/CAST_SETTINGS.md` : un stream
+ * sans lien ne paraissait nulle part et n'annonçait donc rien).
  */
-export type CastTarget = { streamId: number } | { liveUrl: string | null };
+export type CastTarget = { streamId: number } | { liveUrl: string };
 
 /**
  * Le stream est-il montré ? La règle de `shownStreams` (celle de `mapMatch`) :
@@ -764,24 +776,40 @@ async function releaseIneligibleCasters(
 
 /**
  * Inscrit le lecteur comme caster du match, sans plafond : sur un stream
- * existant (co-cast) ou sur un stream qu'il ouvre (`target`).
- * `hasLivePermission` est la permission `live`, établie par la route. Un
- * caster déjà inscrit sur le match n'est pas réinscrit (rien ne change, pas
- * même son stream : il se retire d'abord pour en changer).
+ * existant (co-cast) ou sur un stream qu'il ouvre (`target`, avec le lien de sa
+ * chaîne — obligatoire). `hasLivePermission` est la permission `live`, établie
+ * par la route. Un caster déjà inscrit sur le match n'est pas réinscrit (rien
+ * ne change, pas même son stream : il se retire d'abord pour en changer).
+ *
+ * `settings` : ce que la fenêtre d'inscription règle du même geste et dans la
+ * même transaction (`docs/features/CAST_SETTINGS.md`) — mode de passage à
+ * l'antenne du match, BattleTag donné pour ce cast. Une inscription déjà
+ * acquise n'en réécrit rien.
  *
  * @throws `NOT_CASTER` | `CASTER_IDENTITY_REQUIRED` | `MATCH_NOT_FOUND`
  *   | `MATCH_ALREADY_COMPLETED` | `MATCH_NOT_LAUNCHABLE` | `CASTER_IS_PLAYER`
- *   | `STREAM_NOT_FOUND` | `INVALID_STREAM_URL`
+ *   | `STREAM_NOT_FOUND` | `INVALID_STREAM_URL` | `STREAM_URL_REQUIRED`
+ *   | `INVALID_LIVE_TRIGGER` | `MATCH_NOT_CASTABLE` | `MATCH_START_AT_REQUIRED`
+ *   | `INVALID_CAST_BATTLETAG`
  */
 export async function claimMatchCast(
   matchId: number,
   userId: number,
   hasLivePermission: boolean,
-  target?: CastTarget,
+  target: CastTarget,
+  settings: CastSettings = {},
 ): Promise<void> {
-  const castTarget: CastTarget = target ?? { liveUrl: null };
-  // Le lien est jugé avant toute lecture : un refus ne coûte rien.
-  const liveUrl = "liveUrl" in castTarget ? parseStreamUrlInput(castTarget.liveUrl) : null;
+  const castTarget: CastTarget = target;
+  // Le lien est jugé avant toute lecture : un refus ne coûte rien. Un stream
+  // ouvert sans lien n'apparaissait sur aucune vue et n'annonçait rien : le
+  // lien est exigé ici comme la fenêtre l'exige (`STREAM_URL_REQUIRED`).
+  let liveUrl: string | null = null;
+  if ("liveUrl" in castTarget) {
+    liveUrl = parseStreamUrlInput(castTarget.liveUrl);
+    if (liveUrl === null) throw new Error("STREAM_URL_REQUIRED");
+  }
+  // Le BattleTag de cast aussi : une saisie illisible se refuse sans rien lire.
+  if (settings.battletag !== undefined) parseCastBattletagInput(settings.battletag);
   // Deux inscriptions simultanées se croisent sur les verrous d'intervalle
   // d'InnoDB : l'interblocage se rejoue.
   const { tournamentId, claimed } = await retryOnDeadlock(() =>
@@ -826,6 +854,10 @@ export async function claimMatchCast(
         `INSERT INTO bg_match_casters (match_id, user_id, stream_id, ready_at) VALUES (?, ?, ?, NULL)`,
         [matchId, userId, streamId],
       );
+      // Réglages du même geste (mode d'antenne, BattleTag du cast) : le lien,
+      // lui, vient d'être posé avec le stream (`target`) — le repasser ici le
+      // réécrirait, et la route ne l'envoie pas.
+      await applyCastSettings(connection, row, userId, streamId, { ...settings, liveUrl: undefined });
       return { tournamentId: Number(row.tournament_id), claimed: true };
     }),
   );
@@ -835,6 +867,55 @@ export async function claimMatchCast(
   publishMatchUpdatedEvent(tournamentId, { landingLive: claimed });
   // Après le commit : journal du staff. Aucune place n'est reprise à personne.
   if (claimed) announceCastChange({ kind: "CLAIMED", matchId, casterId: userId, replacedCasterId: null });
+}
+
+/**
+ * Enregistre les réglages de **son** cast, pour un caster inscrit sur le match
+ * (fenêtre « Configurer ma diffusion », `docs/features/CAST_SETTINGS.md`) : mode
+ * de passage à l'antenne du match, lien de son stream, BattleTag donné pour ce
+ * cast. Chaque champ absent n'est pas touché.
+ *
+ * `hasLivePermission` est la permission `live`, établie par la route : un compte
+ * qui l'a perdue n'a plus rien à régler — son inscription part d'office
+ * (`releaseIneligibleCast`) et son stream est déjà tu.
+ *
+ * Tout passe par le verrou de la ligne du match, pris en **première
+ * instruction** comme pour l'inscription : les streams et les casters ne
+ * s'écrivent que sous lui.
+ *
+ * @throws `NOT_CASTER` | `MATCH_NOT_FOUND` | `NOT_MATCH_CASTER`
+ *   | `MATCH_ALREADY_COMPLETED` | `INVALID_LIVE_TRIGGER` | `MATCH_NOT_CASTABLE`
+ *   | `MATCH_START_AT_REQUIRED` | `INVALID_STREAM_URL` | `CAST_STREAM_NOT_OWNED`
+ *   | `INVALID_CAST_BATTLETAG` | `STREAM_NOT_FOUND`
+ */
+export async function setCastSettings(
+  matchId: number,
+  userId: number,
+  hasLivePermission: boolean,
+  settings: CastSettings,
+): Promise<void> {
+  if (!hasLivePermission) throw new Error("NOT_CASTER");
+  // Le lien et le BattleTag sont jugés avant toute lecture : un refus ne coûte rien.
+  if (settings.liveUrl !== undefined) parseStreamUrlInput(settings.liveUrl);
+  if (settings.battletag !== undefined) parseCastBattletagInput(settings.battletag);
+
+  const tournamentId = await retryOnDeadlock(() =>
+    inTransaction(async (connection) => {
+      const row = await lockLaunchMatch(connection, matchId);
+      if (!row) throw new Error("MATCH_NOT_FOUND");
+      const caster = row.casters.find((entry) => entry.userId === userId);
+      if (!caster) throw new Error("NOT_MATCH_CASTER");
+      // Un match joué est de l'histoire : son mode, son lien et le BattleTag
+      // qui a servi restent tels quels (l'inscription et le retrait refusent de
+      // même de le réécrire). Sa rediff, elle, a sa propre route.
+      if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+      await applyCastSettings(connection, row, userId, caster.streamId, settings);
+      return Number(row.tournament_id);
+    }),
+  );
+  // Un mode, un lien ou un stream retiré change ce que montrent l'accueil, ses
+  // bandeaux et l'annonce #live : même éviction qu'une configuration du staff.
+  publishMatchUpdatedEvent(tournamentId, { landingLive: true });
 }
 
 /**

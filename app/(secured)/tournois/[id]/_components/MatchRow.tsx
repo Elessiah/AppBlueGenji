@@ -5,7 +5,6 @@ import type { BracketMatch } from "@/lib/shared/types";
 import { matchAnchorId } from "@/lib/shared/match-anchor";
 import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
 import { teamLabel } from "@/lib/shared/match-card-viewer";
-import { useLiveControls } from "../_lib/live-context";
 import { useHighlightedMatch } from "../_lib/match-anchor-context";
 import { matchSideViews } from "../_lib/match-row-sides";
 import { useMatchCardModel } from "../_lib/match-card-model";
@@ -55,10 +54,9 @@ export const MatchRow = memo(function MatchRow({
 }: MatchRowProps) {
   const text = useTournamentPageText();
   const actionText = useActionsText();
-  const { canSchedule } = useLiveControls();
   // Phase, diffusion, gestes du lecteur : le modèle partagé avec la page du
   // match (`useMatchCardModel`), qui offre exactement les mêmes actions.
-  const { launchPhase, liveState, launch, actions, reportNotice, openPlayerScore, openReport } = useMatchCardModel(
+  const { launchPhase, liveState, actions, reportNotice, openPlayerScore, openReport } = useMatchCardModel(
     match,
     adminResolvable,
     scoreLocked,
@@ -159,7 +157,7 @@ export const MatchRow = memo(function MatchRow({
           Vide (`:empty`), elle disparaît avec son filet. */}
       <div className={styles.meta}>
         <MatchLiveStrip match={match} state={liveState} />
-        <MatchLaunchStrip match={match} phase={launchPhase} staff={canSchedule} />
+        <MatchLaunchStrip match={match} phase={launchPhase} />
       </div>
 
       <MatchReplayStrip match={match} />
@@ -176,9 +174,6 @@ export const MatchRow = memo(function MatchRow({
         phase={launchPhase}
         actions={actions}
         matchLabel={actionMatchLabel}
-        isCaster={launch.isCaster}
-        releasesOthers={launch.releasesOthers}
-        onAir={liveState === "LIVE"}
         onPlayerScore={openPlayerScore}
         onAdminScore={() => onOpenAdminModal(match)}
         onReport={openReport}

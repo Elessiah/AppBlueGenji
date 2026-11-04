@@ -1560,6 +1560,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       `Conditions d'utilisation : la version 9, en vigueur depuis le 6 novembre 2026, le dit dans ses sections « Compte » et « Contacts de match ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.`,
     ],
   },
+  {
+    // CAST-SETTINGS (demande de l'utilisateur du 2026-11-04) : un caster peut
+    // donner, pour un cast précis, un BattleTag autre que celui de son compte
+    // (`bg_match_casters.cast_battletag`). Donnée nouvelle, montrée aux mêmes
+    // personnes et aux mêmes moments que celui du compte — seuls les casters
+    // sont concernés, d'où le public. Publiée le lendemain de la mise en ligne
+    // prévue, l'heure du déploiement n'étant pas connue (§ Dates corrigées).
+    audience: "LIVE_STAFF",
+    id: "2026-11-battletag-de-cast",
+    publishedAt: "2026-11-06",
+    title: "Un BattleTag propre à un cast",
+    links: [{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }],
+    summary:
+      "Si tu castes un match, tu peux donner dans « Configurer ma diffusion » un BattleTag propre à ce cast : c'est lui, et non celui de ton profil, qui est montré aux parties du match. Laissé vide, rien ne change.",
+    details: [
+      "Ce que le site garde : le BattleTag que tu tapes pour ce cast, avec ton inscription de caster sur ce match ; il part avec elle (retrait du cast, suppression de ton compte) et n'est jamais recopié sur ton profil.",
+      "À qui il est montré, et quand : exactement comme le BattleTag de ton profil l'était — aux parties du match (membres de ses deux équipes, ses casters, son arbitre désigné) dans les fenêtres « Contacts » et de lancement et sur la page du match, le temps du match seulement (aux arbitres, dès que ses deux adversaires sont connus), dans un tournoi Overwatch seulement, au titre de l'exécution du service. Personne ne le vérifie : il n'est jamais présenté comme un BattleTag prouvé, et le réglage « BattleTag OW » de ton profil ne le masque pas — c'est toi qui le donnes, pour ce match.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

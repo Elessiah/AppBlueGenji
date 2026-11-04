@@ -810,6 +810,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Terms of use: version 9, in force since 6 November 2026, says so in its “Account” and “Match contacts” sections. A window presents it to you until you have accepted it: accepting it lets you keep using the site.",
     ],
   },
+  "2026-11-battletag-de-cast": {
+    linkLabels: ["Read the “Match streaming” paragraph"],
+    title: "A BattleTag of its own for a cast",
+    summary:
+      "If you cast a match, you can give a BattleTag of its own for that cast in “Configure my broadcast”: that one, and not your profile's, is shown to the parties of the match. Left empty, nothing changes.",
+    details: [
+      "What the site keeps: the BattleTag you type for that cast, with your caster registration on that match; it goes with it (leaving the cast, deleting your account) and is never copied onto your profile.",
+      "Who it is shown to, and when: exactly as your profile BattleTag was — to the parties of the match (members of both its teams, its casters, its designated referee) in the “Contacts” and launch windows and on the match page, only while the match is being played (to the referees, as soon as both its opponents are known), in an Overwatch tournament only, as part of the performance of the service. Nobody verifies it: it is never presented as a proven BattleTag, and the “OW BattleTag” setting of your profile does not hide it — you are the one giving it, for this match.",
+    ],
+  },
 };
 
 /**

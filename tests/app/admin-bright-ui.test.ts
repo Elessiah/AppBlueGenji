@@ -51,7 +51,7 @@ const AMBER_WARNINGS: Record<string, string> = {
   "app/(secured)/tournois/[id]/_components/EntrantContactsPanel.module.css": "engagé injoignable",
   "app/(secured)/tournois/[id]/_components/GhostRegistrationDialog.module.css": "dépassement de places",
   "app/(secured)/tournois/[id]/_components/MatchCardActions.module.css": "geste à risque",
-  "app/(secured)/tournois/[id]/_components/MatchLaunchStrip.module.css": "match à planifier, « Sans arbitre »",
+  "app/(secured)/tournois/[id]/_components/MatchLaunchStrip.module.css": "match à planifier, en lancement",
   "app/(secured)/tournois/[id]/_components/MatchLiveStrip.module.css": "diffusion manquante",
   "app/(secured)/tournois/[id]/_components/MatchReplayDialog.tsx": "rejeu impossible",
   "app/(secured)/tournois/[id]/_components/MatchRow.module.css": "forfait",

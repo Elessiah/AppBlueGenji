@@ -1,26 +1,14 @@
 /**
- * Ce que le bandeau de lancement d'une carte de match (`MatchLaunchStrip`)
- * montre et offre, décidé hors du composant : une règle pure se teste sans
- * rendu, et le composant ne garde que la mise en page.
+ * Ce qu'une carte de match offre de son lancement et de son cast, décidé hors
+ * des composants : une règle pure se teste sans rendu, et le pied d'action
+ * (`MatchCardActions`) comme le bandeau (`MatchLaunchStrip`) ne gardent que la
+ * mise en page.
  */
 import { exposesMatchContacts, matchUnderway, readsContactsEarly, type MatchLaunchPhase } from "@/lib/shared/match-launch";
-import { refereeDecision, type RefereeDecision } from "@/lib/shared/match-referee";
 import { isByeMatch } from "@/lib/shared/match-page";
 import type { BracketMatch } from "@/lib/shared/types";
 
-type StripMatch = Pick<
-  BracketMatch,
-  | "status"
-  | "team1Id"
-  | "team2Id"
-  | "team1Name"
-  | "team2Name"
-  | "hostTeamId"
-  | "casters"
-  | "firstBanTeamId"
-  | "refereeAssigned"
-  | "selfManaged"
->;
+type StripMatch = Pick<BracketMatch, "status" | "team1Id" | "team2Id" | "casters">;
 
 export type LaunchStripViewer = {
   /** Permission `live` : s'inscrire comme caster. */
@@ -48,19 +36,18 @@ export type LaunchStripControls = {
   showContacts: boolean;
   /** S'inscrire comme caster — sans plafond : co-caster ou ouvrir son stream. */
   showClaim: boolean;
-  /** Se retirer du cast, ou retirer un des casters (arbitrage). */
-  showRelease: boolean;
   /**
-   * L'arbitrage peut retirer un **autre** caster que le lecteur : le retrait
-   * passe par le choix du caster, même quand le lecteur caste aussi le match.
+   * Retirer **un autre** caster que le lecteur : l'arbitrage seul
+   * (`canSchedule`, permission `tournaments`). Le caster qui se retire lui-même
+   * ne passe plus par la carte : « Ne plus caster » vit dans sa fenêtre
+   * « Configurer ma diffusion » (`docs/features/CAST_SETTINGS.md`), pour que la
+   * carte n'ait qu'**un** bouton de cast.
    */
-  releasesOthers: boolean;
+  showRelease: boolean;
   /** Ouvrir la date d'un match à planifier. */
   showPlan: boolean;
   /** Lancer sans attendre les « Prêt » — et, à planifier, sans date. */
   showForce: boolean;
-  /** Annoncer l'équipe hôte. */
-  showHost: boolean;
   /** Changer d'équipe hôte. */
   showHostSwap: boolean;
   /**
@@ -88,7 +75,6 @@ export function launchStripControls(
   // Exemption : la règle partagée de la page du match (`isByeMatch`).
   const isByeLike = isByeMatch(match);
   const castable = open && !isByeLike && !isPlayer;
-  const showHost = phase !== "NONE";
   // `canSchedule` : la permission `tournaments`, celle de l'arbitre au serveur.
   const early = readsContactsEarly({ playsMatch: isPlayer, referee: viewer.canSchedule });
   return {
@@ -99,44 +85,14 @@ export function launchStripControls(
     // adversaires sont connus ; le caster inscrit, le temps du match seulement.
     showContacts: (early || isCaster) && exposesMatchContacts(phase, early),
     showClaim: viewer.canManage && castable && !isCaster,
-    showRelease: open && match.casters.length > 0 && (isCaster || viewer.canSchedule),
-    releasesOthers:
+    showRelease:
       open && viewer.canSchedule && match.casters.some((caster) => caster.userId !== viewer.viewerUserId),
     showPlan: viewer.canSchedule && phase === "TO_PLAN",
     showForce: viewer.canSchedule && FORCEABLE_PHASES.has(phase),
-    showHost,
-    showHostSwap: viewer.canSchedule && showHost,
+    // L'hôte ne se change que là où il existe (phase de lancement ouverte).
+    showHostSwap: viewer.canSchedule && phase !== "NONE",
     showReferee: viewer.canSchedule && open && !isByeLike,
   };
-}
-
-/** Nom de l'équipe hôte, `null` sans hôte connu. */
-export function hostTeamName(match: StripMatch): string | null {
-  if (match.hostTeamId === null) return null;
-  return match.hostTeamId === match.team1Id ? match.team1Name : match.team2Name;
-}
-
-/** Nom de l'équipe qui bannit la première (celle qui n'héberge pas), `null` sans adversaires connus. */
-export function firstBanTeamName(match: StripMatch): string | null {
-  if (match.firstBanTeamId === null) return null;
-  return match.firstBanTeamId === match.team1Id ? match.team1Name : match.team2Name;
-}
-
-/**
- * Ce que le bandeau dit de l'arbitrage (`docs/features/MATCH_REFEREE.md`) :
- * « Arbitre désigné » ou « Autogestion » pour tous — jamais un nom —, et
- * « Sans arbitre » pour le **staff** seul (`staff`, permission `tournaments`),
- * là où une décision est attendue. Rien sur un match terminé ou sans phase.
- */
-export function refereeStripState(
-  match: Pick<StripMatch, "status" | "refereeAssigned" | "selfManaged">,
-  phase: MatchLaunchPhase,
-  staff: boolean,
-): RefereeDecision | null {
-  if (phase === "NONE" || match.status === "COMPLETED") return null;
-  const decision = refereeDecision({ refereeAssigned: match.refereeAssigned, selfManaged: match.selfManaged });
-  if (decision === "UNDECIDED" && !staff) return null;
-  return decision;
 }
 
 /** Pastille de la phase de lancement (`LaunchPhaseBadge`) ; `null` : aucune. */

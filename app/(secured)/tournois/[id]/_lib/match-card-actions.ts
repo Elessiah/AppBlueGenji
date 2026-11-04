@@ -27,10 +27,9 @@ export type MatchCardActionId =
   | "hostSwap"
   | "referee"
   | "claimCast"
+  | "castConfig"
   | "releaseCast"
-  | "onAir"
   | "liveConfig"
-  | "replay"
   | "report";
 
 export type MatchCardActionTone = "primary" | "staff" | "warn" | "neutral";
@@ -58,13 +57,20 @@ export type MatchCardActionInput = {
   /** Permission `tournaments`, hors phase `TO_PLAN` (où « Planifier » prend le relais). */
   showSchedule: boolean;
   hasStartAt: boolean;
-  /** Bouton d'antenne (mode `MANUAL`, permission `live`) ; `onAir` : le direct est ouvert. */
-  showOnAir: boolean;
-  onAir: boolean;
+  /**
+   * « Configurer ma diffusion » : le lecteur caste ce match et il y reste
+   * quelque chose à régler (`offersCastSettings`). Antenne et rediff vivent
+   * dans cette fenêtre, et non plus sur la carte
+   * (`docs/features/CAST_SETTINGS.md`).
+   */
+  showCastConfig: boolean;
+  /**
+   * « Configurer la diffusion » de l'organisation : permission `tournaments`
+   * seule — un porteur de `live` qui ne caste pas n'a plus de diffusion à
+   * régler.
+   */
   showLiveConfig: boolean;
   liveConfigured: boolean;
-  showReplay: boolean;
-  hasReplay: boolean;
   canReport: boolean;
   /**
    * « Page du match » offerte : pas sur la page elle-même, pas sur une
@@ -105,20 +111,14 @@ export function matchCardActionList(
     [launch.showHostSwap, "hostSwap", t("cardActions.hostSwap"), "staff"],
     [launch.showReferee, "referee", t("cardActions.referee"), "staff"],
     [launch.showClaim, "claimCast", t("cardActions.claimCast"), "neutral"],
-    [
-      launch.showRelease,
-      "releaseCast",
-      either(launch.isCaster && !launch.releasesOthers, t("cardActions.stopCasting"), t("cardActions.removeCaster")),
-      "neutral",
-    ],
-    [input.showOnAir, "onAir", either(input.onAir, t("cardActions.stopLive"), t("cardActions.startLive")), "neutral"],
+    [input.showCastConfig, "castConfig", t("cardActions.castConfig"), "neutral"],
+    [launch.showRelease, "releaseCast", t("cardActions.removeCaster"), "neutral"],
     [
       input.showLiveConfig,
       "liveConfig",
       either(input.liveConfigured, t("cardActions.configureStream"), t("cardActions.streamMatch")),
       "neutral",
     ],
-    [input.showReplay, "replay", either(input.hasReplay, t("cardActions.editReplay"), t("cardActions.addReplay")), "neutral"],
     [input.canReport, "report", t("header.reportIssue"), "neutral"],
   ];
   return rows

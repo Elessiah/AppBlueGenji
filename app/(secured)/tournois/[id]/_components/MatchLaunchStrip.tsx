@@ -3,23 +3,20 @@
 import { readyCount, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
 import type { BracketMatch } from "@/lib/shared/types";
-import { firstBanTeamName, hostTeamName, launchPhaseBadgeKind, refereeStripState } from "../_lib/launch-strip";
+import { launchPhaseBadgeKind } from "../_lib/launch-strip";
 import styles from "./MatchLaunchStrip.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useSpectatorView } from "@/components/spectator-view";
-import { refereeNameOf } from "@/lib/shared/match-referee";
-import { useLiveControls } from "../_lib/live-context";
 
 /**
- * Bandeau de **lancement** d'un match (`lib/shared/match-launch.ts`) : ce
- * qu'il dit à tous — la phase (à planifier, en attente de départ, lancement
- * avec le décompte des « Prêt », lancé), l'équipe qui héberge la partie et
- * chacun des casters inscrits.
+ * Bandeau de **lancement** d'un match (`lib/shared/match-launch.ts`) : la
+ * phase, et elle seule — à planifier, en attente de départ, lancement avec le
+ * décompte des « Prêt », lancé.
  *
  * Ses boutons (ouvrir le lancement, planifier, caster, hôte, forcer) vivent
- * dans le pied d'action de la carte (`MatchCardActions`, voir
- * `docs/features/MATCH_CARD_LAYOUT.md`) : rangés avec les autres, une seule
- * action principale reste visible.
+ * dans le pied d'action de la carte (`MatchCardActions`) ; les faits du match
+ * (hôte, premier ban, carte de départ, arbitrage, casters) vivent sur la page
+ * du match — voir `docs/features/MATCH_CARD_LAYOUT.md`.
  */
 /**
  * Pastille de la phase de lancement : à planifier, en attente de départ, en
@@ -112,98 +109,30 @@ export function hasLaunchPhaseBadge(match: Pick<BracketMatch, "status">, phase: 
   return launchPhaseBadgeKind(match, phase) !== null;
 }
 
+/**
+ * Bandeau de **lancement** d'une carte de match : la seule pastille de phase
+ * (à planifier, en attente de départ, en lancement avec le décompte des
+ * « Prêt », lancé).
+ *
+ * Les faits du match — équipe hôte, premier ban, carte de départ, arbitre ou
+ * autogestion, casters — ont quitté la carte : à 260 px, ils y tenaient sur
+ * autant de lignes qu'ils étaient et noyaient les engagés, le score et
+ * l'action. Ils sont tous dits en toutes lettres sur la page du match
+ * (`MatchKeyFacts`, `docs/features/MATCH_CARD_LAYOUT.md`), à laquelle chaque
+ * carte mène.
+ */
 export function MatchLaunchStrip({
   match,
   phase,
-  staff = false,
 }: Readonly<{
   match: BracketMatch;
   /** Phase de lancement, calculée par la carte (`MatchRow`). */
   phase: MatchLaunchPhase;
-  /** Permission `tournaments` : le staff seul lit « Sans arbitre ». */
-  staff?: boolean;
 }>) {
-  const { t } = useTournamentPageText();
-  // Sans compte, aucun « Prêt » n'est servi : pas d'« En attente » trompeur.
-  const spectator = useSpectatorView();
-  const showReady = phase === "LOBBY" && !spectator;
-  const showHost = phase !== "NONE";
-  const hostName = hostTeamName(match);
-  const firstBanName = showHost ? firstBanTeamName(match) : null;
-  const referee = refereeStripState(match, phase, staff);
-  // Pseudo de l'arbitre pour un membre connecté (décision 52) ; « Arbitre
-  // désigné » sans compte, ou tant que le pseudo de la désignation manque.
-  const { refereeNames } = useLiveControls();
-  const refereeName = refereeNameOf(match, refereeNames);
-  const badge = <LaunchPhaseBadge match={match} phase={phase} />;
-  const hasBadge = hasLaunchPhaseBadge(match, phase);
-
-  if (!hasBadge && !(showHost && hostName) && match.casters.length === 0 && referee === null) return null;
-
+  if (!hasLaunchPhaseBadge(match, phase)) return null;
   return (
     <div className={styles.strip} data-phase={phase}>
-      {badge}
-
-      {showHost && hostName && (
-        // Le côté de l'hôte, dit aux voyants par l'infobulle comme au lecteur d'écran.
-        <span className={styles.fact} title={t("launch.hostTitle")}>
-          <span aria-hidden="true">🏠</span>
-          <span className="sr-only">{t("launch.hostSr")}</span>
-          <span className={styles.name}>{hostName}</span>
-          <span className="sr-only">{t("launch.hostLeftSr")}</span>
-        </span>
-      )}
-
-      {firstBanName && (
-        <span className={styles.fact} title={t("launch.firstBanTitle")}>
-          <span aria-hidden="true">🚫</span>
-          <span className="sr-only">{t("launch.firstBanSr")}</span>
-          <span className={styles.name}>{firstBanName}</span>
-        </span>
-      )}
-
-      {showHost && match.firstMap && (
-        // Le nom est coupé à 150 px (64 caractères permis) : l'infobulle le porte en entier.
-        <span className={styles.fact} title={t("launch.firstMapTitle", { map: match.firstMap })}>
-          <span aria-hidden="true">🗺</span>
-          <span className="sr-only">{t("launch.firstMapSr")}</span>
-          <span className={styles.name}>{match.firstMap}</span>
-        </span>
-      )}
-
-      {referee === "REFEREE" && (
-        <span className={styles.fact} title={t("launch.refereeTitle")}>
-          <span aria-hidden="true">🧑‍⚖️</span>{" "}
-          {refereeName ? t("launch.refereeNamed", { name: refereeName }) : t("launch.referee")}
-        </span>
-      )}
-      {referee === "SELF_MANAGED" && (
-        <span className={styles.fact} title={t("launch.selfManagedTitle")}>
-          <span aria-hidden="true">🤝</span> {t("launch.selfManaged")}
-        </span>
-      )}
-      {referee === "UNDECIDED" && (
-        // Alerte du staff : teinte d'avertissement et préfixe lu, comme « sans date »
-        // (`MatchLiveStrip`) ; la décision attendue est dite aussi au lecteur d'écran.
-        <span className={styles.alert} title={t("launch.undecidedTitle")}>
-          <span aria-hidden="true">⚠</span>
-          <span className="sr-only">{t("launch.undecidedSr")}</span> {t("launch.undecided")}
-          <span className="sr-only">{t("launch.undecidedDetailSr")}</span>
-        </span>
-      )}
-
-      {match.casters.map((caster, index) => (
-        <span key={`${index}:${caster.userId}`} className={styles.fact} title={t("launch.casterTitle")}>
-          <span aria-hidden="true">🎙</span>
-          <span className="sr-only">{t("launch.casterSr")}</span>
-          <span className={styles.name}>{caster.pseudo}</span>
-          {showReady && (
-            <span className={caster.ready ? styles.ok : styles.wait}>
-              {caster.ready ? t("launch.casterReady") : t("launch.casterWaiting")}
-            </span>
-          )}
-        </span>
-      ))}
+      <LaunchPhaseBadge match={match} phase={phase} />
     </div>
   );
 }

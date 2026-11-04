@@ -159,12 +159,9 @@ describe("bouton « Contacts » de la carte", () => {
       adminScoreLabel: null,
       showSchedule: false,
       hasStartAt: true,
-      showOnAir: false,
-      onAir: false,
+      showCastConfig: false,
       showLiveConfig: false,
       liveConfigured: false,
-      showReplay: false,
-      hasReplay: false,
       canReport: true,
       showMatchPage: false,
     });

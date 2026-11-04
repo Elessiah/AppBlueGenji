@@ -1245,7 +1245,7 @@ function RgpdFr({
             <strong>Retransmission des matchs.</strong> Un match de tournoi peut être diffusé en
             direct et enregistré sur <strong>YouTube, Twitch ou Kick</strong>, par la chaîne de l&apos;association
             ou d&apos;un ou plusieurs casters : chaque caster rejoint un stream du match ou ouvre le sien,
-            avec son propre lien (facultatif), publié avec le match ; le nom de la chaîne, lu dans ce lien (souvent le pseudo du caster), en est le texte visible. Ce stream part, avec son lien, quand
+            avec le lien de sa chaîne (obligatoire), publié avec le match ; le nom de la chaîne, lu dans ce lien (souvent le pseudo du caster), en est le texte visible. Ce stream part, avec son lien, quand
             plus aucun caster ne le tient ; seul le lien posé dans la configuration du direct du match (par
             l&apos;organisation ou un caster) reste au match. Le lien qu&apos;un caster a fourni, là ou en ouvrant
             son stream, part aussi à la suppression de son compte, matchs joués compris, même si un autre caster
@@ -1254,6 +1254,13 @@ function RgpdFr({
             qui part avec son compte. Un lien
             posé dans cette configuration avant que le site n&apos;enregistre qui le fournit n&apos;a pas d&apos;auteur
             connu et reste au match.{" "}
+            Un caster peut aussi donner, pour un cast précis, un <strong>BattleTag propre à ce
+            match</strong>, qui remplace alors celui de son profil là où ce dernier était montré (fenêtres
+            « Contacts » et de lancement, page du match, aux seules parties du match et dans un tournoi
+            Overwatch) : il est gardé avec son inscription de caster, part avec elle, n&apos;est jamais
+            recopié sur son profil ni présenté comme prouvé, et le réglage « BattleTag OW » du profil ne le
+            masque pas — c&apos;est le caster qui le donne, pour ce match, au titre de l&apos;exécution du
+            service (<Link href="/rgpd/registre#t04">registre, T04</Link>).{" "}
             {STREAM_NOTICE_SHOWN} Ce traitement repose sur l&apos;intérêt
             légitime de l&apos;association à faire connaître ses compétitions.{" "}
             {STREAM_NOTICE_OBJECTION} Un lien de rediffusion qui montre le joueur est alors

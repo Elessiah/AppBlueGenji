@@ -1,6 +1,7 @@
 import type { BracketMatch } from "@/lib/shared/types";
 import { SCORE_ENTRY_CLOSED_PHASES, type MatchLaunchPhase } from "@/lib/shared/match-launch";
-import { canConfigureLive, canToggleOnAir, type MatchLiveState } from "@/lib/shared/live-streams";
+import { canConfigureLive, type MatchLiveState } from "@/lib/shared/live-streams";
+import { offersCastSettings } from "@/lib/shared/cast-settings";
 import { canReportOwnMatch } from "@/lib/shared/match-card-viewer";
 import {
   pendingReportState,
@@ -14,7 +15,6 @@ import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
 import type { TournamentActionsText } from "@/lib/shared/tournament-actions-text";
 import { useSpectatorView } from "@/components/spectator-view";
-import { canEditReplay } from "@/lib/shared/match-replay";
 import { usePlayerScore } from "./player-score-context";
 import { useIssueReport } from "./issue-report-context";
 import { useLiveControls } from "./live-context";
@@ -144,12 +144,14 @@ export function useMatchCardModel(
       adminScoreLabel: adminResolvable && !scoreLocked ? adminScoreLabel : null,
       showSchedule: canSchedule && launchPhase !== "TO_PLAN",
       hasStartAt: formatMatchStartAt(match.startAt) !== null,
-      showOnAir: canManage && canToggleOnAir(match),
-      onAir: liveState === "LIVE",
-      showLiveConfig: canManage && canConfigureLive(match),
+      // Un seul bouton de cast sur la carte : « Caster ce match » devient
+      // « Configurer ma diffusion » une fois inscrit, et l'antenne comme la
+      // rediff vivent dans cette fenêtre (`docs/features/CAST_SETTINGS.md`).
+      showCastConfig: offersCastSettings(match, launch.isCaster, canManage),
+      // La diffusion de l'organisation reste au staff `tournaments` : un
+      // porteur de `live` qui ne caste pas n'en règle plus aucune.
+      showLiveConfig: canSchedule && canConfigureLive(match),
       liveConfigured: match.liveTrigger !== null,
-      showReplay: canEditReplay(match, canManage),
-      hasReplay: match.replayUrl !== null,
       canReport: canReportMatch,
       showMatchPage,
     },

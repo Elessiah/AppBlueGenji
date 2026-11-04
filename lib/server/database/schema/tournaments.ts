@@ -271,12 +271,16 @@ export async function createTournamentTables(db: Pool): Promise<void> {
 
   // Un caster par ligne, au plus une fois par match (clé primaire) ; son
   // « Prêt » (`ready_at`) lui est propre. Aucun plafond par match.
+  // `cast_battletag` : le BattleTag que **ce** caster donne pour **ce** cast
+  // (`docs/features/CAST_SETTINGS.md`), jamais vérifié ; nul = celui de son
+  // compte, comme avant.
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_match_casters (
       match_id BIGINT NOT NULL,
       user_id BIGINT NOT NULL,
       stream_id BIGINT NOT NULL,
       ready_at DATETIME NULL,
+      cast_battletag VARCHAR(64) NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (match_id, user_id),
       INDEX idx_bg_match_casters_user (user_id),

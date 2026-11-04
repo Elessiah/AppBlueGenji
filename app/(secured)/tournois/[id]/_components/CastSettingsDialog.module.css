@@ -1,0 +1,60 @@
+/* Fenêtre « Configurer ma diffusion » (`CastSettingsDialog`). */
+.title {
+  margin: 0;
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.subtitle {
+  margin: 6px 0 16px;
+  font-size: 13px;
+  color: var(--ink-quiet);
+}
+
+.section {
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+
+.sectionTitle {
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--ink-quiet);
+}
+
+.hintInvalid {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+/* Pied : « Ne plus caster » à gauche (geste de retrait), envoi à droite. */
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.button {
+  padding: 8px 18px;
+  font-size: 13px;
+}

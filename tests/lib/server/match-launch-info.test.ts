@@ -160,7 +160,9 @@ function readCastRows(world: World, sql: string, params: unknown[]): unknown[] |
   if (sql.includes("FROM bg_match_streams") || sql.startsWith("SELECT match_id, alert_key FROM bg_referee_alerts")) {
     return [[], []];
   }
-  if (!sql.startsWith("SELECT match_id, user_id, stream_id, ready_at FROM bg_match_casters")) return null;
+  // La lecture de la modale demande en plus `cast_battletag` (`CAST_SETTINGS.md`) ;
+  // celle sous verrou garde ses quatre colonnes.
+  if (!/^SELECT match_id, user_id, stream_id, ready_at(, cast_battletag)? FROM bg_match_casters/.test(sql)) return null;
   const ids = new Set(params.map(Number));
   return [world.candidates.filter((c) => ids.has(Number(c.id))).flatMap(castersOf), []];
 }

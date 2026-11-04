@@ -98,26 +98,56 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
   });
 
   it("transmet la permission `live` au service, qui décide", async () => {
+    const link = { liveUrl: "https://twitch.tv/voix" };
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     jest.mocked(claimMatchCast).mockResolvedValue();
-    expect((await casterPost(jsonRequest("POST"), params("42"))).status).toBe(200);
-    expect(claimMatchCast).toHaveBeenCalledWith(42, 4, true, { liveUrl: null });
+    expect((await casterPost(jsonRequest("POST", link), params("42"))).status).toBe(200);
+    expect(claimMatchCast).toHaveBeenCalledWith(42, 4, true, link, {});
+
 
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(claimMatchCast).mockRejectedValue(new Error("NOT_CASTER"));
-    expect((await casterPost(jsonRequest("POST"), params("42"))).status).toBe(403);
-    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 2, false, { liveUrl: null });
+    expect((await casterPost(jsonRequest("POST", link), params("42"))).status).toBe(403);
+    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 2, false, link, {});
   });
 
-  it("transmet le stream choisi : co-cast d'un stream, ou stream séparé avec ou sans lien", async () => {
+  it("transmet le stream choisi et les réglages du même geste", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     jest.mocked(claimMatchCast).mockResolvedValue();
     expect((await casterPost(jsonRequest("POST", { streamId: 7 }), params("42"))).status).toBe(200);
-    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 4, true, { streamId: 7 });
-    expect((await casterPost(jsonRequest("POST", { liveUrl: "https://twitch.tv/voix" }), params("42"))).status).toBe(200);
-    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 4, true, { liveUrl: "https://twitch.tv/voix" });
-    expect((await casterPost(jsonRequest("POST", { liveUrl: null }), params("42"))).status).toBe(200);
-    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 4, true, { liveUrl: null });
+    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 4, true, { streamId: 7 }, {});
+    expect(
+      (await casterPost(
+        jsonRequest("POST", { liveUrl: "https://twitch.tv/voix", trigger: "AUTO", battletag: "Voix#2100" }),
+        params("42"),
+      )).status,
+    ).toBe(200);
+    expect(claimMatchCast).toHaveBeenLastCalledWith(
+      42,
+      4,
+      true,
+      { liveUrl: "https://twitch.tv/voix" },
+      { trigger: "AUTO", battletag: "Voix#2100" },
+    );
+  });
+
+  it("refuse un stream propre sans lien : il n'apparaîtrait nulle part", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    const res = await casterPost(jsonRequest("POST", { liveUrl: null }), params("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: "INVALID_CAST_TARGET" });
+    expect(claimMatchCast).not.toHaveBeenCalled();
+  });
+
+  it("refuse le lien de l'organisation sans la permission `tournaments`", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    const res = await casterPost(
+      jsonRequest("POST", { liveUrl: "https://twitch.tv/voix", organisationLink: true }),
+      params("42"),
+    );
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "FORBIDDEN" });
+    expect(claimMatchCast).not.toHaveBeenCalled();
   });
 
   it("refuse un corps illisible au lieu de le prendre pour un corps vide", async () => {
@@ -135,7 +165,7 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
     expect(claimMatchCast).not.toHaveBeenCalled();
   });
 
-  it("refuse un corps non déclaré en JSON (415) et accepte l'absence de corps", async () => {
+  it("refuse un corps non déclaré en JSON (415) et un corps absent (aucun stream choisi)", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     const text = new Request("http://localhost/api/matches/42", {
       method: "POST",
@@ -146,11 +176,13 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
     expect(claimMatchCast).not.toHaveBeenCalled();
 
     const none = new Request("http://localhost/api/matches/42", { method: "POST" });
-    expect((await casterPost(none, params("42"))).status).toBe(200);
-    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 4, true, { liveUrl: null });
+    const res = await casterPost(none, params("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: "INVALID_CAST_TARGET" });
+    expect(claimMatchCast).not.toHaveBeenCalled();
   });
 
-  it("un corps JSON vide (Content-Length: 0) vaut l'absence de corps : un stream sans lien", async () => {
+  it("un corps JSON vide (Content-Length: 0) ne choisit aucun stream", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     const empty = new Request("http://localhost/api/matches/42", {
       method: "POST",
@@ -158,8 +190,8 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
       body: "",
     });
 
-    expect((await casterPost(empty, params("42"))).status).toBe(200);
-    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 4, true, { liveUrl: null });
+    expect((await casterPost(empty, params("42"))).status).toBe(400);
+    expect(claimMatchCast).not.toHaveBeenCalled();
   });
 
   it("refuse un choix de stream mal formé, sans appeler le service", async () => {
@@ -189,7 +221,8 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
   ])("traduit le refus %s en %i", async (code, status) => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     jest.mocked(claimMatchCast).mockRejectedValue(new Error(code));
-    expect((await casterPost(jsonRequest("POST"), params("42"))).status).toBe(status);
+    const res = await casterPost(jsonRequest("POST", { liveUrl: "https://twitch.tv/voix" }), params("42"));
+    expect(res.status).toBe(status);
   });
 
   it("laisse l'arbitrage retirer un caster, pas un joueur", async () => {

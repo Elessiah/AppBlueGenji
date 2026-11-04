@@ -429,16 +429,18 @@ describe("withdrawUserCasts — plusieurs matchs, arbitrages", () => {
 });
 
 describe("parseCastTarget — corps de POST /api/matches/[id]/caster", () => {
-  it("rejoindre un stream, ouvrir le sien avec ou sans lien", () => {
+  it("rejoindre un stream, ou ouvrir le sien avec le lien de sa chaîne", () => {
     expect(parseCastTarget({ streamId: 3 })).toEqual({ streamId: 3 });
     expect(parseCastTarget({ liveUrl: "twitch.tv/x" })).toEqual({ liveUrl: "twitch.tv/x" });
-    expect(parseCastTarget({ liveUrl: null })).toEqual({ liveUrl: null });
-    expect(parseCastTarget({})).toEqual({ liveUrl: null });
-    expect(parseCastTarget(null)).toEqual({ liveUrl: null });
+    // Aucune cible : le lien d'un stream propre est obligatoire
+    // (`docs/features/CAST_SETTINGS.md`), un corps vide ne choisit rien.
+    expect(parseCastTarget({ liveUrl: null })).toBeNull();
+    expect(parseCastTarget({})).toBeNull();
+    expect(parseCastTarget(null)).toBeNull();
   });
 
   it("refuse les deux à la fois, un identifiant mal formé et un lien qui n'est pas du texte", () => {
-    expect(parseCastTarget({ streamId: 3, liveUrl: null })).toBeNull();
+    expect(parseCastTarget({ streamId: 3, liveUrl: "twitch.tv/x" })).toBeNull();
     for (const streamId of ["3", 0, -1, 1.5, null]) expect(parseCastTarget({ streamId })).toBeNull();
     expect(parseCastTarget({ liveUrl: 12 })).toBeNull();
   });

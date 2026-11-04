@@ -111,7 +111,9 @@ describe("canEditReplay — logique pure", () => {
     // Le modèle de la carte ne dépend d'aucun composant : la règle vit dans `lib/shared`.
     const source = readSource("app/(secured)/tournois/[id]/_lib/match-card-model.ts");
 
-    expect(source).toContain('import { canEditReplay } from "@/lib/shared/match-replay";');
+    // La rediff d'un caster passe par `offersCastSettings`, qui lit
+    // `canEditReplay` (`docs/features/CAST_SETTINGS.md`).
+    expect(source).toContain('import { offersCastSettings } from "@/lib/shared/cast-settings";');
     expect(source).not.toContain("_components/");
   });
 });

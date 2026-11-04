@@ -554,7 +554,9 @@ describe("page sans compte — ce que la fiche tait des données retirées", () 
     const strip = <MatchLaunchStrip match={lobby} phase="LOBBY" />;
     const shown = spectator(strip);
     expect(shown).toContain(frTournament.launch.lobby);
-    expect(shown).toContain("Caster");
+    // La carte ne nomme plus les casters, avec compte comme sans
+    // (`docs/features/MATCH_CARD_LAYOUT.md`) : la page du match les nomme.
+    expect(shown).not.toContain("Caster");
     expect(shown).not.toContain(frTournament.launch.ready);
     expect(shown).not.toContain(frTournament.launch.casterReady);
     expect(shown).not.toContain(frTournament.launch.casterWaiting);
@@ -562,7 +564,7 @@ describe("page sans compte — ce que la fiche tait des données retirées", () 
 
     const members = member(strip);
     expect(members).toContain(frTournament.launch.ready);
-    expect(members).toContain(frTournament.launch.casterReady);
+    expect(members).not.toContain("Caster");
     expect(members).toMatch(/\d+\/\d+/);
   });
 

@@ -2,16 +2,10 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
-import { FieldErrorText } from "@/components/ui/field-error-text";
 import { useOptionalToast } from "@/components/ui/toast";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
-import {
-  LIVE_PLATFORMS,
-  MAX_STREAM_URL_LENGTH,
-  PLATFORM_LABELS,
-  normalizeStreamUrl,
-  streamPlatform,
-} from "@/lib/shared/live-streams";
+import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
+import { PLATFORM_LABELS, streamPlatform, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import type { BracketMatch } from "@/lib/shared/types";
 import {
   castClaimBody,
@@ -21,19 +15,35 @@ import {
   type CastClaimChoice,
 } from "../_lib/cast-claim";
 import { useActionsText } from "../_lib/actions-text";
+import { useLiveControls } from "../_lib/live-context";
+import { useTournamentGame } from "../_lib/match-format-context";
+import {
+  CastBattletagField,
+  CastOrganisationLinkField,
+  CastTriggerField,
+  CastUrlField,
+  castBattletagInvalid,
+  castTriggerNeedsDate,
+  castUrlInvalid,
+} from "./CastSettingsFields";
 import styles from "./CastClaimDialog.module.css";
 
-const CAST_FIELD_ERRORS = { INVALID_STREAM_URL: "url" } as const;
+const CAST_FIELD_ERRORS = { INVALID_STREAM_URL: "url", STREAM_URL_REQUIRED: "url" } as const;
 
 /** Issue d'une inscription : le refus porte son code et la phrase déjà notifiée. */
 export type CastClaimOutcome = { ok: true } | { ok: false; code: string; message: string };
 
 /**
- * S'inscrire pour caster un match qui a déjà un stream (`docs/features/MATCH_LAUNCH.md`
- * § Casters et streams) : rejoindre un stream existant — co-caster, sans lien
- * à donner — ou ouvrir le sien, avec son propre lien (facultatif). Un match
- * sans stream l'ouvre aussi, avec le seul choix « ouvrir mon propre stream » :
- * le premier caster peut donner sa chaîne.
+ * S'inscrire pour caster un match (`docs/features/CAST_SETTINGS.md`) :
+ * rejoindre un stream existant — co-caster, sans lien à donner — ou ouvrir le
+ * sien, **avec le lien de sa chaîne** (obligatoire : un stream sans lien
+ * n'apparaissait sur aucune vue et n'annonçait rien). Un match sans stream
+ * l'ouvre aussi, avec le seul choix « ouvrir mon propre stream ».
+ *
+ * Ouvrir son propre stream règle du même geste ce que l'ancien bouton
+ * « Configurer la diffusion » offrait : le mode de passage à l'antenne du match
+ * et, pour la permission `tournaments`, l'origine du lien. Le BattleTag de ce
+ * cast suit les deux choix — il parle du caster, non de son stream.
  *
  * Le focus d'ouverture va à « Annuler » (comme la fenêtre de retrait) : un
  * Entrée réflexe sur un bouton radio ne doit pas inscrire un caster.
@@ -51,15 +61,17 @@ export function CastClaimDialog({
   onClose,
   onClaim,
 }: Readonly<{
-  match: Pick<BracketMatch, "streams" | "casters">;
+  match: Pick<BracketMatch, "streams" | "casters" | "startAt" | "liveTrigger">;
   matchLabel: string;
   onClose: () => void;
   onClaim: (body: CastClaimBody) => Promise<CastClaimOutcome>;
 }>) {
   const { t, locale } = useActionsText();
+  const { canSchedule } = useLiveControls();
+  const game = useTournamentGame();
   const name = useId();
   const urlId = useId();
-  const hintId = useId();
+  const battletagId = useId();
   const choices = castClaimChoices(match);
   const [choiceKey, setChoiceKey] = useState(castClaimChoiceKey(choices[0]));
   // Un stream choisi qui disparaît (son dernier caster parti) ne se remplace
@@ -69,6 +81,11 @@ export function CastClaimDialog({
   // Le choix disparu est oublié : un stream qui reviendrait ne se recocherait pas seul.
   if (choice === null && choiceKey !== "") setChoiceKey("");
   const [url, setUrl] = useState("");
+  const [battletag, setBattletag] = useState("");
+  // Un match déjà casté garde son mode ; sinon « automatique au démarrage »,
+  // qui ne demande plus un clic à l'heure dite.
+  const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "AUTO");
+  const [organisationLink, setOrganisationLink] = useState(false);
   const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId });
   const fieldsetRef = useRef<HTMLFieldSetElement>(null);
   const gone = choice === null;
@@ -88,14 +105,17 @@ export function CastClaimDialog({
     fieldsetRef.current?.querySelector<HTMLInputElement>("input[type=radio]")?.focus();
   }, [gone]);
   const separate = choice?.kind === "SEPARATE";
-  const urlInvalid = separate && url.trim() !== "" && normalizeStreamUrl(url) === null;
-  const platforms = LIVE_PLATFORMS.join(", ");
+  // Lien **obligatoire** : vide, il désarme le bouton comme un lien fautif.
+  const urlMissing = separate && url.trim() === "";
+  const urlRefused = separate && castUrlInvalid(url);
+  const battletagRefused = castBattletagInvalid(battletag);
+  const triggerRefused = separate && castTriggerNeedsDate(trigger, match.startAt);
   // « A, B et C » / "A, B, and C" : la conjonction de la langue de la page.
   const casterList = useMemo(() => new Intl.ListFormat(locale, { style: "long", type: "conjunction" }), [locale]);
 
   const confirm = async (): Promise<boolean> => {
     if (choice === null) return false;
-    const outcome = await onClaim(castClaimBody(choice, url));
+    const outcome = await onClaim(castClaimBody(choice, { url, battletag, trigger, organisationLink }));
     if (!outcome.ok) fieldErrors.report(outcome.code, outcome.message);
     return outcome.ok;
   };
@@ -106,7 +126,7 @@ export function CastClaimDialog({
       confirmLabel={t("cardActions.claimDialog.confirm")}
       pendingLabel={t("cardActions.claimDialog.pending")}
       tone="primary"
-      disabled={choice === null || urlInvalid}
+      disabled={choice === null || urlMissing || urlRefused || battletagRefused || triggerRefused}
       onClose={onClose}
       onConfirm={confirm}
     >
@@ -148,29 +168,31 @@ export function CastClaimDialog({
         {gone ? t("cardActions.claimDialog.gone") : ""}
       </output>
       {separate && (
-        <div className="field">
-          <label htmlFor={urlId}>{t("cardActions.claimDialog.url")}</label>
-          <input
+        <>
+          <CastUrlField
             id={urlId}
             value={url}
-            onChange={(e) => {
-              setUrl(e.target.value);
+            onChange={(next) => {
+              setUrl(next);
               fieldErrors.clear("url");
             }}
-            maxLength={MAX_STREAM_URL_LENGTH}
-            inputMode="url"
-            placeholder="https://twitch.tv/…"
-            {...fieldErrors.aria("url", hintId)}
-            // Le lien mal formé se voit avant l'envoi (bouton désarmé, aide en rouge).
-            aria-invalid={urlInvalid || fieldErrors.invalidField === "url" ? true : undefined}
+            invalid={urlRefused || fieldErrors.invalidField === "url"}
+            fieldError={fieldErrors.message("url")}
           />
-          <p id={hintId} className={urlInvalid ? styles.hintInvalid : styles.hint}>
-            {urlInvalid
-              ? t("cardActions.claimDialog.urlInvalid", { platforms })
-              : t("cardActions.claimDialog.urlHint", { platforms })}
-          </p>
-          <FieldErrorText fieldId={urlId} message={fieldErrors.message("url")} />
-        </div>
+          <CastTriggerField trigger={trigger} startAt={match.startAt} onChange={setTrigger} />
+          {canSchedule && url.trim() !== "" && (
+            <CastOrganisationLinkField checked={organisationLink} onChange={setOrganisationLink} />
+          )}
+        </>
+      )}
+      {/* Le BattleTag n'a de sens qu'en Overwatch, comme celui des contacts. */}
+      {game !== null && battletagRelevantFor(game) && (
+        <CastBattletagField
+          id={battletagId}
+          value={battletag}
+          onChange={setBattletag}
+          invalid={battletagRefused}
+        />
       )}
     </ConfirmActionDialog>
   );
