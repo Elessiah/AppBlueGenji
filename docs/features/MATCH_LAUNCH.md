@@ -589,12 +589,10 @@ ne coûte plus qu'une lecture de session.
 
 ## Salons vocaux d'équipe
 
-Avec l'option « Salons vocaux d'équipe » (`MATCH_VOICE.md`), le lancement attend
-que les salons vocaux des deux équipes soient pleins : avec la phase de lancement,
-« Prêt » et le lancement d'office après 15 min sont retenus (`voiceGateBlocksLaunch`) ;
-sans elle, `matchLaunchPhase` reste `SCHEDULED` après l'heure tant que le verrou
-attend (`voice.pending`). Le lancement forcé par l'arbitrage passe toujours, et une
-panne du bot lève le verrou.
+Avec l'option « Salons vocaux d'équipe » (`MATCH_VOICE.md`), le lancement n'en
+dépend pas (EF-43, décision du 2026-11-04) : « Prêt », le lancement d'office après
+15 min et le lancement forcé se jouent comme dans tout autre tournoi, que les salons
+soient pleins ou non ; le site ne compte personne.
 
 ## Notes reprises de CLAUDE.md
 

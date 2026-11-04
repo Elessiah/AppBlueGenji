@@ -39,10 +39,13 @@ et rien n'est compté.
   bot par leur clé au plus une fois par minute et par salon (`OPEN_DUE_CHANNELS_SQL`) ;
   le bot rend le même, ou un neuf s'il a disparu — jamais qui s'y trouve.
   Un match où entre une entrée solo ou une fantôme n'est plus revérifié (il est rendu).
-  Le salon neuf ne remplace que sur une ligne **encore ouverte** (`UPDATE … WHERE
-  released_at IS NULL`, jamais l'upsert de création qui rouvre) : rendue entre-temps
-  (autre processus, rechargement pm2), la ligne reste close et le salon neuf est rendu
-  aussitôt au bot.
+  Le salon neuf s'écrit par l'upsert de création, qui rouvre une ligne rendue
+  entre-temps (autre processus, rechargement pm2) : le salon existe déjà sur
+  Discord, la ligne le suit, et le rendu de la même passe (après la revérification)
+  le rend au bot avec ses reprises — jamais un salon sans ligne.
+- **404 du bot** : seul `VOICE_CHANNEL_NOT_TRACKED` vaut « déjà rendu » ; un autre
+  `404` (route absente, `INTERNAL_ROUTE_NOT_FOUND`) est un échec redemandé, la ligne
+  reste ouverte.
   Coût borné : au plus 5 appels au bot en parallèle, 80 salons par passe (les
   plus anciennement vus d'abord, aucun n'est affamé), arrêt de la passe au premier
   échec du canal du bot (le salon en échec est redemandé après 10 s, derrière les
