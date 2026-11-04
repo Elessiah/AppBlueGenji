@@ -321,6 +321,12 @@ describe("MatchCardActions — branchements du cast", () => {
     expect(settings).toContain('fetch(`/api/matches/${match.id}/caster`, { method: "DELETE" })');
   });
 
+  it("la case « lien de l'organisation » n'est offerte que pour un lien modifié (sinon l'envoi l'ignorerait)", () => {
+    const settings = readSource("app/(secured)/tournois/[id]/_components/CastSettingsDialog.tsx");
+    expect(settings).toContain("canSchedule && streamEditable && urlChanged && url.trim() !== \"\" && (");
+    expect(settings).toContain("if (canSchedule && organisationLink) settings.organisationLink = true;");
+  });
+
   it("le caster à retirer est fixé à l'ouverture ; parti entre-temps, la fenêtre se ferme au lieu d'en viser un autre", () => {
     expectContains(card, [
       "setReleaseTarget(casters[0]?.userId ?? null);",

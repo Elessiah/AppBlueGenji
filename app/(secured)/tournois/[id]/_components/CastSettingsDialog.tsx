@@ -130,6 +130,8 @@ export function CastSettingsDialog({
   const configurable = isMatchCastable(match);
   const streamEditable = cast !== null && !cast.staffStream;
   const urlRefused = streamEditable && castUrlInvalid(url);
+  // L’origine du lien ne s’envoie qu’avec un lien modifié (`submit`) : la case n’est offerte que lui.
+  const urlChanged = cast !== null && url.trim() !== (cast.liveUrl ?? "");
   const urlMissing = streamEditable && url.trim() === "";
   const battletagRefused = castBattletagInvalid(battletag);
   // Seul un mode choisi ici s'envoie : celui du match, même sans sa date, ne
@@ -231,7 +233,7 @@ export function CastSettingsDialog({
             {configurable && (
               <>
                 <CastTriggerField trigger={trigger} startAt={match.startAt} onChange={setTrigger} />
-                {canSchedule && streamEditable && url.trim() !== "" && (
+                {canSchedule && streamEditable && urlChanged && url.trim() !== "" && (
                   <CastOrganisationLinkField checked={organisationLink} onChange={setOrganisationLink} />
                 )}
               </>
