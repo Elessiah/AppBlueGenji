@@ -334,7 +334,7 @@ export async function discardDiscordChallenge(challengeId: number): Promise<void
 export async function consumeDiscordChallenge(
   discordId: string,
   code: string,
-  purpose: DiscordCodePurpose = "login",
+  purpose: DiscordCodePurpose,
 ): Promise<DiscordChallengeProof | null> {
   const db = await getDatabase();
 
@@ -384,14 +384,14 @@ export async function consumeDiscordLoginChallenge(
   const [rows] = await db.execute<ChallengeRow[]>(
     `SELECT c.id, c.discord_id, c.code_hash, c.handle, c.purpose, c.expires_at, c.consumed_at, c.attempts
      FROM bg_discord_login_challenges c
-     WHERE c.lookup_hash = ?
+     WHERE c.lookup_hash = ? AND c.purpose = ?
        AND NOT EXISTS (
          SELECT 1 FROM bg_discord_login_challenges newer
          WHERE newer.discord_id = c.discord_id AND newer.id > c.id
            AND newer.purpose = c.purpose
        )
      LIMIT 1`,
-    [hashCode(challengeToken)],
+    [hashCode(challengeToken), PURPOSE_COLUMN[purpose]],
   );
 
   if (rows.length === 0) return null;

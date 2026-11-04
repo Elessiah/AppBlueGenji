@@ -221,16 +221,13 @@ export async function resolveDiscordUser(handle: string): Promise<string> {
 }
 
 /**
- * Ce qu'un code envoyé par le bot permet : se connecter (`login`), ou
- * rattacher un tag Discord à un compte (`handle`) — le bot rédige alors un
- * message qui dit que le code ne connecte pas.
- */
-/**
- * Envoie le code de connexion en message privé. Le bot le rédige lui-même :
+ * Envoie un code Discord en message privé. Le bot le rédige lui-même :
  * dans la langue du compte (`locale`) quand le compte existe, sinon (`null`)
  * en un message bilingue, français puis anglais (`BOT_DM_LANGUAGE.md`).
- * `purpose` dit au bot quel texte rédiger (un bot plus ancien l'ignore et
- * envoie le texte de connexion).
+ * `purpose` dit ce que le code permet : se connecter (`login`), ou rattacher
+ * un tag Discord à un compte (`handle`) — le bot rédige alors un message qui
+ * dit que le code ne connecte pas (un bot plus ancien l'ignore et envoie le
+ * texte de connexion).
  */
 export async function sendDiscordLoginCode(
   discordId: string,
