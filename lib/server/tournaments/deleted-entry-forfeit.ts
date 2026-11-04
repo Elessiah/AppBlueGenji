@@ -4,8 +4,8 @@ import { adminResolveMatch } from "./admin";
 import { lockTournamentRow } from "./registration";
 
 /**
- * L'entrée solo appartient toujours à un compte en suppression et n'a toujours
- * pas joué dans ce tournoi — relu sur la transaction du forfait, après le
+ * Le tournoi est toujours en cours, l'entrée solo appartient toujours à un
+ * compte en suppression et n'a toujours pas joué dans ce tournoi — relu sur la transaction du forfait, après le
  * verrou du tournoi, la ligne du compte **verrouillée** (`FOR UPDATE`, table
  * seule) : une réactivation commitée avant est vue, une réactivation qui
  * arrive pendant attend le commit du forfait, au lieu qu'un compte réactivé
@@ -16,6 +16,12 @@ export async function lockDeletedSoloEntryStillForfeitable(
   tournamentId: number,
   teamId: number,
 ): Promise<boolean> {
+  // Tournoi toujours en cours : un abandon après la clôture n'a plus de sens.
+  const [tournaments] = await connection.execute<(RowDataPacket & { state: string })[]>(
+    `SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  if (tournaments[0]?.state !== "RUNNING") return false;
   const [entries] = await connection.execute<(RowDataPacket & { solo_user_id: number | null })[]>(
     `SELECT s.solo_user_id
        FROM bg_teams s
@@ -55,12 +61,6 @@ export async function forfeitDeletedEntryNextMatch(
   teamId: number,
 ): Promise<number | null> {
   await lockTournamentRow(connection, tournamentId);
-  const [tournaments] = await connection.execute<(RowDataPacket & { state: string })[]>(
-    `SELECT state FROM bg_tournaments WHERE id = ? LIMIT 1`,
-    [tournamentId],
-  );
-  if (tournaments[0]?.state !== "RUNNING") return null;
-
   if (!(await lockDeletedSoloEntryStillForfeitable(connection, tournamentId, teamId))) return null;
 
   // Table seule, sans jointure (MariaDB) : le verrou ne porte que sur le match.

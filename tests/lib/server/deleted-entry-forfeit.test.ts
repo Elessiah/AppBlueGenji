@@ -89,11 +89,18 @@ describe("lockDeletedSoloEntryStillForfeitable", () => {
     const { connection, queries } = fakeTx({});
 
     expect(await lockDeletedSoloEntryStillForfeitable(connection, 4, 40)).toBe(true);
-    expect(queries[1]).toBe("SELECT is_deleted FROM bg_users WHERE id = ? FOR UPDATE");
+    expect(queries[2]).toBe("SELECT is_deleted FROM bg_users WHERE id = ? FOR UPDATE");
   });
 
   it("lockDeletedSoloEntryStillForfeitable_entryPlayed_falseWithoutUserLock", async () => {
     const { connection, queries } = fakeTx({ neverPlayed: false });
+
+    expect(await lockDeletedSoloEntryStillForfeitable(connection, 4, 40)).toBe(false);
+    expect(queries).toHaveLength(2);
+  });
+
+  it("lockDeletedSoloEntryStillForfeitable_tournamentFinished_falseWithoutEntryRead", async () => {
+    const { connection, queries } = fakeTx({ state: "FINISHED" });
 
     expect(await lockDeletedSoloEntryStillForfeitable(connection, 4, 40)).toBe(false);
     expect(queries).toHaveLength(1);

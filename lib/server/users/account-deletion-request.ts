@@ -145,14 +145,22 @@ async function registeredInActiveTournament(
   connection: Pick<PoolConnection, "execute">,
   teamId: number,
 ): Promise<boolean> {
+  // Lecture verrouillante, table seule (MariaDB) : sous `REPEATABLE READ`, une
+  // lecture simple rendrait l'instantané d'avant l'attente du verrou de
+  // l'équipe, sans l'inscription qu'un gérant vient de valider — et l'équipe
+  // inscrite serait dissoute au lieu de devenir fantôme.
+  const [registrations] = await connection.execute<(RowDataPacket & { tournament_id: number })[]>(
+    `SELECT tournament_id FROM bg_tournament_registrations WHERE team_id = ? LOCK IN SHARE MODE`,
+    [teamId],
+  );
+  if (registrations.length === 0) return false;
+  const ids = registrations.map((row) => Number(row.tournament_id));
   const [rows] = await connection.execute<RowDataPacket[]>(
-    `SELECT 1
-       FROM bg_tournament_registrations r
-       JOIN bg_tournaments t ON t.id = r.tournament_id
-      WHERE r.team_id = ?
-        AND t.state IN (${ACTIVE_TOURNAMENT_STATES.map(() => "?").join(", ")})
+    `SELECT 1 FROM bg_tournaments
+      WHERE id IN (${ids.map(() => "?").join(", ")})
+        AND state IN (${ACTIVE_TOURNAMENT_STATES.map(() => "?").join(", ")})
       LIMIT 1`,
-    [teamId, ...ACTIVE_TOURNAMENT_STATES],
+    [...ids, ...ACTIVE_TOURNAMENT_STATES],
   );
   return rows.length > 0;
 }
@@ -320,13 +328,21 @@ type DeletionRequestEffects = {
   departures: TeamDeparture[];
   organizedHandedOver: number[];
   castTournaments: number[];
+  /** Tous les tournois de l'entrée solo : son nom d'engagé vient de passer au pseudo d'emprunt. */
+  soloTournaments: number[];
 };
 
 /** Rafraîchit les lecteurs, notifie le successeur, journalise et joue les forfaits. */
 async function afterDeletionRequest(userId: number, effects: DeletionRequestEffects): Promise<void> {
-  const { withdrawn, forfeitable, departures, organizedHandedOver, castTournaments } = effects;
+  const { withdrawn, forfeitable, departures, organizedHandedOver, castTournaments, soloTournaments } = effects;
   closeUserStreams(userId);
-  for (const tournamentId of new Set([...withdrawn.map((entry) => entry.tournamentId), ...organizedHandedOver])) {
+  // L'entrée solo restée inscrite (jouée, tournoi en cours ou terminé) porte
+  // désormais le pseudo d'emprunt : ses lecteurs gardaient le vrai.
+  for (const tournamentId of new Set([
+    ...withdrawn.map((entry) => entry.tournamentId),
+    ...organizedHandedOver,
+    ...soloTournaments,
+  ])) {
     publishUpdatedEvent(tournamentId);
   }
   for (const tournamentId of castTournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
@@ -373,8 +389,9 @@ export async function requestAccountDeletion(
   options: { requestedAt?: Date } = {},
 ): Promise<AccountDeletionRequestOutcome> {
   const db = await getDatabase();
+  const soloEntryTournaments = await listSoloRegistrationTournamentIds(db, userId);
   const soloTournaments = mergeTournamentIds(
-    await listSoloRegistrationTournamentIds(db, userId),
+    soloEntryTournaments,
     await listOrganizedTournamentIds(db, userId),
     await listCastTournamentIds(db, userId),
   );
@@ -443,7 +460,14 @@ export async function requestAccountDeletion(
   // 2026-11-04) : une restauration d'une sauvegarde antérieure la rejoue. La
   // réactivation la retire ; la suppression définitive écrit la sienne.
   await recordAccountDeletion({ userId, accountCreatedAt, deletedAt: requestedAt.toISOString(), pending: true });
-  await afterDeletionRequest(userId, { withdrawn, forfeitable, departures, organizedHandedOver, castTournaments });
+  await afterDeletionRequest(userId, {
+    withdrawn,
+    forfeitable,
+    departures,
+    organizedHandedOver,
+    castTournaments,
+    soloTournaments: soloEntryTournaments,
+  });
 
   return { ...plan, finalAt: reactivationDeadline(requestedAt).toISOString() };
 }

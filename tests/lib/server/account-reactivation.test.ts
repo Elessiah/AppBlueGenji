@@ -5,6 +5,8 @@ jest.mock("@/lib/server/account-deletion-journal");
 jest.mock("@/lib/server/users/account-deletion-hold");
 jest.mock("@/lib/server/ranking-cache");
 jest.mock("@/lib/server/stats-cache");
+jest.mock("@/lib/server/tournaments/notifications");
+jest.mock("@/lib/server/users/account-deletion", () => ({ listSoloRegistrationTournamentIds: jest.fn() }));
 
 import crypto from "node:crypto";
 import { getDatabase } from "@/lib/server/database";
@@ -12,6 +14,8 @@ import { forgetPendingAccountDeletion } from "@/lib/server/account-deletion-jour
 import { restoreAccountIdentity } from "@/lib/server/users/account-deletion-hold";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
+import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { listSoloRegistrationTournamentIds } from "@/lib/server/users/account-deletion";
 import {
   createReactivationTicket,
   peekReactivationTicket,
@@ -65,6 +69,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(restoreAccountIdentity).mockResolvedValue(true);
   jest.mocked(forgetPendingAccountDeletion).mockResolvedValue(undefined);
+  jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([]);
 });
 
 describe("readPendingDeletion", () => {
@@ -160,6 +165,29 @@ describe("reactivateAccount", () => {
     expect(forgetPendingAccountDeletion).toHaveBeenCalledWith({ userId: 7, accountCreatedAt: "2025-01-01 10:00:00" });
     expect(invalidateTeamIdentityViews).toHaveBeenCalled();
     expect(invalidateStats).toHaveBeenCalled();
+  });
+
+  it("reactivateAccount_valid_republishesSoloEntryTournaments", async () => {
+    transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+    });
+    jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([8, 9]);
+
+    await reactivateAccount(TOKEN);
+
+    expect(jest.mocked(publishUpdatedEvent).mock.calls).toEqual([[8], [9]]);
+  });
+
+  it("reactivateAccount_republishFails_stillReturnsAccount", async () => {
+    transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+    });
+    jest.mocked(listSoloRegistrationTournamentIds).mockRejectedValue(new Error("DB_DOWN"));
+    jest.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await reactivateAccount(TOKEN)).toEqual({ userId: 7, event: "LOGIN_DISCORD" });
   });
 
   it("reactivateAccount_ticketConsumedConcurrently_nullWithoutRestore", async () => {

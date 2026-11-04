@@ -289,3 +289,31 @@ describe("POST /api/auth/discord/verify — compte suspendu", () => {
     expect(createSessionMock).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /api/auth/discord/verify — erreur interne", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetRateLimit(DISCORD_CODE_VERIFY_RULE.name);
+    verifyMock.mockResolvedValue({ discordId: VICTIM_DISCORD, handle: "keryan" });
+    createUserMock.mockResolvedValue(42);
+    jest.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("POST_sqlErrorSentence_returnsDiscordAuthFailed500", async () => {
+    createSessionMock.mockRejectedValueOnce(new Error("Lock wait timeout exceeded; try restarting transaction"));
+
+    const res = await attempt(VICTIM_CHALLENGE, "424242");
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "DISCORD_AUTH_FAILED" });
+  });
+
+  it("POST_codeLikeError_passesCodeThrough500", async () => {
+    createSessionMock.mockRejectedValueOnce(new Error("ACCOUNT_DELETED"));
+
+    const res = await attempt(VICTIM_CHALLENGE, "424242");
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "ACCOUNT_DELETED" });
+  });
+});

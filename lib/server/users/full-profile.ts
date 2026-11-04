@@ -75,8 +75,9 @@ export async function getPlayerPageIdentity(userId: number): Promise<PlayerPageI
   >(`SELECT pseudo, is_deleted, deletion_requested_at FROM bg_users WHERE id = ? LIMIT 1`, [userId]);
   if (rows.length === 0) return null;
   // Un compte supprimé sans statistiques n'a plus de fiche (D13), un compte en
-  // attente de suppression non plus (ERASURE-D2, son pseudo est encore le
-  // vrai) : l'onglet ne le nomme pas davantage que la page.
+  // attente de suppression non plus (ERASURE-D2 : anonyme dès la demande, sa
+  // fiche montrerait encore BattleTag, tag Discord et le reste) : l'onglet ne
+  // le nomme pas davantage que la page.
   const isDeleted = Boolean(rows[0].is_deleted);
   if (await hasNoPlayerPage(isDeleted, rows[0].deletion_requested_at != null, userId)) return null;
   return { pseudo: withoutInvisibles(rows[0].pseudo), isDeleted: Boolean(rows[0].is_deleted) };

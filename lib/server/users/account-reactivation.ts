@@ -97,6 +97,22 @@ export async function peekReactivationTicket(
 }
 
 /**
+ * L'entrée solo reprend le vrai pseudo : les lecteurs de ses tournois voyaient
+ * le pseudo d'emprunt. Meilleur effort, ne lève jamais (le compte est déjà
+ * réactivé). Imports différés : ce module est lu par `auth.ts`.
+ */
+async function republishSoloEntryTournaments(userId: number): Promise<void> {
+  try {
+    const db = await getDatabase();
+    const { listSoloRegistrationTournamentIds } = await import("./account-deletion");
+    const { publishUpdatedEvent } = await import("@/lib/server/tournaments/notifications");
+    for (const tournamentId of await listSoloRegistrationTournamentIds(db, userId)) publishUpdatedEvent(tournamentId);
+  } catch (error) {
+    console.error("[account-reactivation] tournois de l'entrée solo non rediffusés", error);
+  }
+}
+
+/**
  * Consomme le ticket et relève la demande de suppression, sous le verrou du
  * compte (fenêtre relue dessous : la suppression définitive ne passe pas entre
  * la lecture et l'écriture). Rend le compte et sa porte d'entrée, ou `null` —
@@ -157,6 +173,7 @@ export async function reactivateAccount(
     await forgetPendingAccountDeletion({ userId, accountCreatedAt: String(row.created_at) });
     invalidateTeamIdentityViews();
     invalidateStats();
+    await republishSoloEntryTournaments(userId);
     return { userId, event: ticket.login_event as ConnectionLogEvent };
   } catch (error) {
     await connection.rollback().catch(() => {});

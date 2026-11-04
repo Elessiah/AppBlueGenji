@@ -37,6 +37,7 @@ import { sendBotLog } from "@/lib/server/bot-integration";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
+import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { lockMemberRoles, writeActiveMembership } from "@/lib/server/teams/access";
 import { dissolveTeamOn } from "@/lib/server/teams/dissolution";
@@ -89,6 +90,14 @@ function organizerRows(options: Options) {
   return options.organizerSuccessor ? [{ id: options.organizerSuccessor }] : [];
 }
 
+/** Inscriptions de l'équipe (lecture verrouillante) puis état de leurs tournois : la même réponse aux deux. */
+function isActiveRegistrationRead(sql: string) {
+  return (
+    sql.startsWith("SELECT tournament_id FROM bg_tournament_registrations WHERE team_id") ||
+    sql.startsWith("SELECT 1 FROM bg_tournaments WHERE id IN")
+  );
+}
+
 /** Le premier relevé (avant la transaction) lit `organized`, les suivants `organizedLater` s'il est donné. */
 function organizedRows(options: Options, queries: { sql: string }[]) {
   const reads = queries.filter((entry) => entry.sql.startsWith("SELECT id FROM bg_tournaments WHERE organizer_user_id"));
@@ -110,7 +119,7 @@ function fakeDb(options: Options) {
     if (q.startsWith("SELECT tm.id, tm.user_id, tm.roles_json, tm.joined_at")) return [options.successors ?? []];
     if (q.startsWith("SELECT id FROM bg_users WHERE is_deleted = 0 AND id IN")) return [livingMembers(options)];
     if (q.startsWith("SELECT u.id FROM bg_users u")) return [organizerRows(options)];
-    if (q.startsWith("SELECT 1 FROM bg_tournament_registrations r")) return [options.activeTournament ? [{ 1: 1 }] : []];
+    if (isActiveRegistrationRead(q)) return [options.activeTournament ? [{ tournament_id: 8 }] : []];
     if (q.startsWith("SELECT id FROM bg_tournaments WHERE organizer_user_id")) return [organizedRows(options, queries)];
     return [{ affectedRows: 1 }];
   });
@@ -332,6 +341,33 @@ describe("requestAccountDeletion — équipes (E3)", () => {
     expect(dissolveTeamOn).toHaveBeenCalledWith(expect.anything(), 3);
     expect(deleteUnreferencedUpload).toHaveBeenCalledWith("/api/uploads/teams/3.webp", "teams");
     expect(queries.some((q) => q.sql.startsWith("UPDATE bg_teams SET is_ghost = 1"))).toBe(false);
+  });
+
+  it("requestAccountDeletion_soleOwner_registrationReadIsLockingWithoutJoin", async () => {
+    const { queries } = fakeDb({ teams: [3], successors: [], activeTournament: true });
+
+    await requestAccountDeletion(7);
+
+    const read = queries.find((q) => q.sql.startsWith("SELECT tournament_id FROM bg_tournament_registrations"));
+    expect(read?.sql).toContain("LOCK IN SHARE MODE");
+    expect(read?.sql).not.toContain("JOIN");
+  });
+
+  it("requestAccountDeletion_soleOwnerNoRegistration_skipsStateRead", async () => {
+    const { queries } = fakeDb({ teams: [3], successors: [], activeTournament: false });
+
+    await requestAccountDeletion(7);
+
+    expect(queries.some((q) => q.sql.startsWith("SELECT 1 FROM bg_tournaments WHERE id IN"))).toBe(false);
+  });
+
+  it("requestAccountDeletion_soloEntryStaysInTournament_republishesIt", async () => {
+    jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([8]);
+    fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    expect(publishUpdatedEvent).toHaveBeenCalledWith(8);
   });
 
   it("requestAccountDeletion_plainMember_leavesOnly", async () => {

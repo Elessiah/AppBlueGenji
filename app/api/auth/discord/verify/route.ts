@@ -121,5 +121,10 @@ function signInFailure(error: unknown) {
   // Suppression demandée : la page de connexion ouvre l'écran de
   // réactivation (ticket en cookie, `createSession`).
   if (error instanceof AccountPendingDeletionError) return fail(ACCOUNT_PENDING_DELETION, 409);
-  return fail((error as Error).message || "DISCORD_AUTH_FAILED", 500);
+  // Un code (`MAJUSCULES_SOULIGNÉES`) passe tel quel ; toute autre phrase
+  // (texte du pilote SQL…) reste au journal, la réponse ne porte qu'un code.
+  const message = error instanceof Error ? error.message : "";
+  if (/^[A-Z][A-Z0-9_]*$/.test(message)) return fail(message, 500);
+  console.error("[discord-verify] connexion par code refusée", error);
+  return fail("DISCORD_AUTH_FAILED", 500);
 }
