@@ -39,26 +39,31 @@ describe("voiceStreamKey", () => {
 
 describe("currentMatchVoice", () => {
   it("currentMatchVoice_noPoll_streamed", () => {
-    expect(currentMatchVoice(34, streamed, null)).toBe(streamed);
+    expect(currentMatchVoice(34, streamed, null, false)).toBe(streamed);
   });
 
   it("currentMatchVoice_pollOnCurrentSnapshot_polledWins", () => {
-    expect(currentMatchVoice(34, streamed, polled())).toBe(polledVoice);
+    expect(currentMatchVoice(34, streamed, polled(), false)).toBe(polledVoice);
   });
 
   it("currentMatchVoice_pollAnsweredNull_nullWins", () => {
     // Match lancé ou option éteinte : la porte REST répond `null`, la section se tait.
-    expect(currentMatchVoice(34, streamed, polled({ voice: null }))).toBeNull();
+    expect(currentMatchVoice(34, streamed, polled({ voice: null }), false)).toBeNull();
   });
 
   it("currentMatchVoice_newerSnapshotAfterPoll_streamedWins", () => {
     const newer: MatchVoiceInfo = { ...streamed, team1Members: 4 };
 
-    expect(currentMatchVoice(34, newer, polled())).toBe(newer);
+    expect(currentMatchVoice(34, newer, polled(), false)).toBe(newer);
+  });
+
+  it("currentMatchVoice_streamBackWithSameSnapshot_streamedWins", () => {
+    // Reconnexion sur l'instantané d'avant la coupure : la relecture faite flux coupé ne survit pas.
+    expect(currentMatchVoice(34, streamed, polled(), true)).toBe(streamed);
   });
 
   it("currentMatchVoice_pollOfOtherMatch_ignored", () => {
-    expect(currentMatchVoice(35, streamed, polled())).toBe(streamed);
+    expect(currentMatchVoice(35, streamed, polled(), false)).toBe(streamed);
   });
 });
 
@@ -88,6 +93,8 @@ describe("useMatchVoice — câblage", () => {
     expect(source).toContain("voicePollActive(");
     expect(source).toContain("VOICE_POLL_MS");
     expect(source).toContain('"voice" in');
+    // Pas d'empreinte en dépendance : un nouvel instantané ne relit pas hors cadence.
+    expect(source).toContain("}, [tick, active, match.id]);");
   });
 
   it("matchPageSection_source_passesStreamLiveFromSheet", () => {
