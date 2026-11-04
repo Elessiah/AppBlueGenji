@@ -28,7 +28,8 @@ et rien n'est compté.
   (`INVALID_VOICE_CHANNEL_NAME`), le salon est redemandé sous « Salon d'équipe »
   (`VOICE_FALLBACK_CHANNEL_NAME`).
 - **Échéance** : de T−15 min à T+24 h (`VOICE_CHANNEL_LATE_HOURS`) — un match
-  oublié bien après son heure n'ouvre plus de salon.
+  oublié bien après son heure n'ouvre plus de salon. et ses salons déjà ouverts sont rendus au bot
+  passé ce délai (`RELEASABLE_SQL`), pour que la passe revienne au garde-fou.
 - **Balayage** : au plus toutes les 10 s, déclenché par le trafic (listes de
   tournois et `/api/me/match-launches`), sur le pool, **sans connexion tenue pendant
   un appel au bot**. Une passe vérifie d'abord qu'il y a quelque chose à faire
