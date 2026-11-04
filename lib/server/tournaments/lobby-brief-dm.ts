@@ -252,11 +252,19 @@ function castBlock(side: LobbyBriefSide, locale: Locale): string[] {
  * tue plutôt que de pointer vers une adresse inventée (`siteUrl`).
  */
 export function formatLobbyBriefDm(side: LobbyBriefSide, url: string | null, locale: Locale = "fr"): string {
-  const full = buildLobbyBriefDm(side, url, locale, MAPS_LINE_MAX);
-  if (full.length <= DISCORD_MESSAGE_MAX) return full;
-  // Trop long : le bloc des cartes cède l'excédent (la page du match les donne toutes).
-  return buildLobbyBriefDm(side, url, locale, Math.max(0, MAPS_LINE_MAX - (full.length - DISCORD_MESSAGE_MAX)));
+  // Trop long : le bloc des cartes cède, par paliers, jusqu'au seul renvoi à la
+  // page du match (qui les donne toutes).
+  for (let budget = MAPS_LINE_MAX; budget > 0; budget -= MAPS_BUDGET_STEP) {
+    const text = buildLobbyBriefDm(side, url, locale, budget);
+    if (text.length <= DISCORD_MESSAGE_MAX) return text;
+  }
+  const bare = buildLobbyBriefDm(side, url, locale, 0);
+  // Dernier recours (noms et lien aux longueurs maximales) : coupé, jamais refusé par Discord.
+  return bare.length <= DISCORD_MESSAGE_MAX ? bare : `${bare.slice(0, DISCORD_MESSAGE_MAX - 1)}…`;
 }
+
+/** Pas de réduction du bloc des cartes quand le message dépasse `DISCORD_MESSAGE_MAX`. */
+const MAPS_BUDGET_STEP = 30;
 
 function buildLobbyBriefDm(side: LobbyBriefSide, url: string | null, locale: Locale, mapsBudget: number): string {
   const text = DM_TEXT[locale];

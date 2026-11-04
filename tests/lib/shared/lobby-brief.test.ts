@@ -297,6 +297,28 @@ describe("formatLobbyBriefDm — cartes du round", () => {
     expect(text.endsWith("GL HF :)")).toBe(true);
   });
 
+  it("formatLobbyBriefDm_fewMapsButMaximalNamesAndStream_cappedAtDiscordLimit", () => {
+    // Noms aux longueurs des colonnes (tournoi 120, équipes 60), lien de 247 caractères.
+    const maps = Array.from({ length: 3 }, (_, index) => ({ number: index + 1, kind: "POOL" as const, map: null, candidates: ["A".repeat(40), "B".repeat(40)] }));
+    const long = side({
+      tournamentName: "T".repeat(120),
+      teamName: "R".repeat(60),
+      opponentName: "N".repeat(60),
+      maps,
+      tiebreakMap: "M".repeat(64),
+      cast: true,
+      streamUrl: `https://twitch.tv/${"s".repeat(229)}`,
+      voice: true,
+      decision: "SELF_MANAGED",
+    });
+
+    const fr = formatLobbyBriefDm(long, URL);
+    const en = formatLobbyBriefDm(long, URL, "en");
+
+    expect([fr.length <= 2000, en.length <= 2000]).toEqual([true, true]);
+    expect(fr).toContain("* Suite des cartes sur la page du match.");
+  });
+
   it("formatLobbyBriefDm_mapsOverMaxInEnglish_pointsToMatchPage", () => {
     const pool = Array.from({ length: 20 }, (_, index) => `Map-${String(index).padStart(2, "0")}-${"x".repeat(50)}`);
     const maps = Array.from({ length: 9 }, (_, index) => ({ number: index + 1, kind: "POOL" as const, map: null, candidates: pool }));

@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { enforceRateLimit, MATCH_LAUNCH_READ_RULE } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { listViewerMatchLaunches } from "@/lib/server/tournaments/match-launch-info";
+import { dispatchLobbyBriefs } from "@/lib/server/tournaments/lobby-brief";
 import { dispatchMatchVoiceChannels } from "@/lib/server/tournaments/match-voice";
 
 /**
@@ -18,6 +19,9 @@ export async function GET() {
 
   // Les salons vocaux d'équipe se créent et se rendent au rythme de la modale (`./match-voice`).
   void dispatchMatchVoiceChannels();
+  // Et le check-in du match (`./lobby-brief`), dû 15 minutes avant l'horaire :
+  // les joueurs proches de leur match interrogent cette route, pas forcément la liste.
+  void dispatchLobbyBriefs().catch(() => undefined);
   try {
     const launches = await listViewerMatchLaunches(user);
     return ok({ launches });

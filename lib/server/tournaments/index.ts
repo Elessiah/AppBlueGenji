@@ -660,7 +660,8 @@ export async function listTournamentBuckets(
   void dispatchMatchStartNotices().catch(() => undefined);
   // Et l'annonce unique des cartes de manche, une fois la fenêtre de silence échue.
   void dispatchDueRoundMapsNotices().catch(() => undefined);
-  // Et le brief du salon des managers (`./lobby-brief`), ouvert au même moment.
+  // Et le check-in du match (`./lobby-brief`), 15 minutes avant l'horaire (ou à
+  // l'ouverture du salon d'un match sans horaire), à tous les joueurs.
   void dispatchLobbyBriefs().catch(() => undefined);
   // Et les salons vocaux d'équipe (`./match-voice`) : création à T−15,
   // libération après le score.

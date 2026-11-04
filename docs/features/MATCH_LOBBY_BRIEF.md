@@ -110,7 +110,8 @@ Vu de l'engagée du destinataire :
   renvoie à la page du match — un message de plus de 2 000 caractères ne
   serait pas remis par Discord. Si des noms longs (équipes, tournoi, lien de
   diffusion) font malgré tout passer le message au-delà de
-  `DISCORD_MESSAGE_MAX` (2 000), le bloc des cartes cède l'excédent.
+  `DISCORD_MESSAGE_MAX` (2 000), le bloc des cartes cède par paliers de 30
+  jusqu'au seul renvoi ; aux longueurs maximales, le message est coupé (« … »).
 - **Match casté**, dès qu'un caster encore éligible est inscrit
   (`readMatchCasters`) : le **lien du live** quand il est public
   (`firstStreamUrlSql`, `bg_match_streams`, repassé par `normalizeStreamUrl` —
@@ -152,7 +153,8 @@ portent) — la carte n'est jamais coupée sans le dire.
 étranglé à dix secondes avec relève (`throttledSweep`, `lib/server/throttled-sweep.ts`,
 partagé avec les départs de match), appelé aux mêmes endroits que les départs
 de match (publication d'un évènement de tournoi, entretien de l'instantané qui
-ouvre un lancement, lecture de la liste des tournois).
+ouvre un lancement, lecture de la liste des tournois, et `GET /api/me/match-launches`,
+interrogée par les joueurs proches de leur match, comme les salons vocaux).
 
 - Candidats (`BRIEF_DUE_SQL`) : tournoi `RUNNING` **et publié**
   (`start_visibility_at` passé, comme les salons vocaux : un tournoi masqué de
