@@ -32,7 +32,7 @@ describe("matchPageHeaderScore", () => {
   it("matchPageHeaderScore_hostIsTeam2_ordersScoresHostFirst", () => {
     const actual = matchPageHeaderScore(roundTwo({ team1Score: 1, team2Score: 3 }), HOST_LEFT_SLOTS, false);
 
-    expect(actual).toEqual({ left: "3", right: "1" });
+    expect(actual).toEqual({ left: "3", right: "1", leftForfeits: false, rightForfeits: false });
   });
 
   it("matchPageHeaderScore_forfeit_showsFFOnForfeitingSide", () => {
@@ -43,6 +43,16 @@ describe("matchPageHeaderScore", () => {
     );
 
     expect(actual?.left).toBe("FF");
+  });
+
+  it("matchPageHeaderScore_forfeit_flagsOnlyForfeitingSide", () => {
+    const actual = matchPageHeaderScore(
+      roundTwo({ status: "COMPLETED", forfeitTeamId: 10, winnerTeamId: 20 }),
+      HOST_LEFT_SLOTS,
+      false,
+    );
+
+    expect(actual).toMatchObject({ leftForfeits: false, rightForfeits: true });
   });
 });
 

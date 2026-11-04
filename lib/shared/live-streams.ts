@@ -366,6 +366,16 @@ export function isMatchCastable(match: MatchLiveInput): boolean {
 }
 
 /**
+ * Match casté à son heure de début (`START_TIME`) mais sans date, encore
+ * castable : il ne passera jamais à l'antenne. Alerte du staff, lue par le
+ * bandeau d'horaire de la carte (`MatchLiveStrip`) et l'en-tête de la page du
+ * match — le lecteur sans permission `live`/`tournaments` ne la voit pas.
+ */
+export function castWithoutStartAt(match: MatchLiveInput): boolean {
+  return requiresMatchStartAt(match.liveTrigger) && matchStartAtTime({ startAt: match.startAt }) === null && isMatchCastable(match);
+}
+
+/**
  * Faut-il exposer la configuration de diffusion à un porteur de `live` ?
  *
  * On l'ouvre aussi sur un match déjà marqué mais devenu non castable, sans quoi

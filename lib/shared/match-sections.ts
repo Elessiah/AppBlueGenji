@@ -29,6 +29,7 @@
  * Voir `docs/features/ROUND_MATCH_SECTIONS.md`.
  */
 import { matchLaunchPhase, nextLaunchPhaseChangeAt } from "./match-launch";
+import { isoTime } from "./iso-time";
 import type { BracketMatch } from "./types";
 
 export type MatchSectionKey = "TO_PLAN" | "WAITING" | "LOBBY" | "PLAYING" | "DONE";
@@ -76,12 +77,6 @@ export function buildSeedMap(
     if (registration.seed !== null) seeds[registration.teamId] = registration.seed;
   }
   return seeds;
-}
-
-function isoTime(iso: string | null): number | null {
-  if (iso === null) return null;
-  const time = Date.parse(iso);
-  return Number.isNaN(time) ? null : time;
 }
 
 /**

@@ -79,8 +79,10 @@ export type MatchCardActionInput = {
  * suivre ; l'arbitrage, un match à planifier avant d'en trancher le score.
  */
 // « Contacts » (lecture seule) vient après les gestes d'arbitrage : un arbitre
-// qui caste ou joue le match garde « Score » en principal.
-const PRIMARY_ORDER: readonly MatchCardActionId[] = ["playerScore", "openLaunch", "plan", "adminScore", "contacts"];
+// qui caste ou joue le match garde « Score » en principal. « Page du match »
+// ferme la marche : aucun geste attendu de ce lecteur, elle tient le pied (un
+// lien, jamais derrière un menu quand rien d'autre ne le précède).
+const PRIMARY_ORDER: readonly MatchCardActionId[] = ["playerScore", "openLaunch", "plan", "adminScore", "contacts", "matchPage"];
 
 /** Toutes les actions offertes, dans l'ordre du menu. */
 export function matchCardActionList(
@@ -156,14 +158,8 @@ export function groupMatchCardActions(actions: readonly MatchCardAction[]): Matc
   // le verrou ; pour l'engagé, le litige reste le bouton visible.
   const disputeView = actions.find((a) => a.id === "playerScore" && a.readOnly === true);
   const adminScore = actions.find((a) => a.id === "adminScore");
-  // Aucun geste attendu de ce lecteur : « Page du match » tient le pied (un
-  // lien, jamais derrière un menu quand rien d'autre ne le précède).
   const primary =
-    disputeView && adminScore
-      ? adminScore
-      : PRIMARY_ORDER.map((id) => actions.find((a) => a.id === id)).find(Boolean) ??
-        actions.find((a) => a.id === "matchPage") ??
-        null;
+    disputeView && adminScore ? adminScore : (PRIMARY_ORDER.map((id) => actions.find((a) => a.id === id)).find(Boolean) ?? null);
   return { primary, more: actions.filter((a) => a !== primary) };
 }
 

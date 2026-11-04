@@ -56,14 +56,16 @@ describe("liens de stream rognés par l'ellipse : 24 px par la hauteur de ligne 
 
   it("MatchLiveStrip_link_atLeast24pxHigh", () => {
     const block = blockFor(/^\.link \{/m, css("app/(secured)/tournois/[id]/_components/MatchLiveStrip.module.css"));
-    expect(block).toContain("min-height: 24px");
+    // Inline-block d'une ligne : la hauteur de ligne seule donne les 24 px (un `min-height` en plus n'ajoutait rien).
     expect(block).toContain("line-height: 24px");
+    expect(block).toContain("display: inline-block");
   });
 
   it("MatchPage_streamLink_atLeast24pxHigh", () => {
     const block = blockFor(/^\.streamLink \{/m, css("app/(secured)/tournois/[id]/_components/MatchPage.module.css"));
-    expect(block).toContain("min-height: 24px");
+    // Inline-block d'une ligne : la hauteur de ligne seule donne les 24 px (un `min-height` en plus n'ajoutait rien).
     expect(block).toContain("line-height: 24px");
+    expect(block).toContain("display: inline-block");
   });
 
   it("LiveCard_streamButton_playIconStaysOnFirstLine", () => {

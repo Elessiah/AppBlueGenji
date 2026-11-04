@@ -105,11 +105,24 @@ export const MATCH_CONTACTS_READ_RULE: RateLimitRule = {
   windowMs: 60_000,
 };
 
-/** Compteur des salons vocaux d'un match, relu toutes les 10 s par sa page tant que le verrou tient. */
+/** Compteur des salons vocaux d'un match, relu toutes les 10 s par sa page, flux coupé seulement (30 par minute et par compte : trois onglets sans flux en prennent dix-huit). */
 export const MATCH_VOICE_READ_RULE: RateLimitRule = {
   name: "match-voice-read",
   limit: 30,
   windowMs: 60_000,
+};
+
+/**
+ * Bascule de l'option « Salons vocaux d'équipe » d'un tournoi, par compte :
+ * chaque vrai changement poste au journal Discord du staff, remet
+ * l'étranglement du balayage à zéro et rejoue l'entretien des lancements.
+ * Trente en cinq minutes couvrent un staff qui corrige plusieurs tournois ;
+ * au-delà, c'est une bascule en boucle.
+ */
+export const TEAM_VOICE_TOGGLE_RULE: RateLimitRule = {
+  name: "team-voice-toggle",
+  limit: 30,
+  windowMs: 5 * 60_000,
 };
 
 /**

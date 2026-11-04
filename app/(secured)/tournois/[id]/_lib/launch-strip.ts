@@ -138,3 +138,21 @@ export function refereeStripState(
   if (decision === "UNDECIDED" && !staff) return null;
   return decision;
 }
+
+/** Pastille de la phase de lancement (`LaunchPhaseBadge`) ; `null` : aucune. */
+export type LaunchPhaseBadgeKind = "TO_PLAN" | "SCHEDULED" | "LOBBY" | "LAUNCHED";
+
+/**
+ * Pastille à montrer pour une phase — seule règle de `LaunchPhaseBadge` et de
+ * `hasLaunchPhaseBadge` (fait « Lancement » de la page du match) : une phase
+ * ajoutée ici paraît aux deux, jamais un fait vide. « Lancé » ne se dit que
+ * tant que le match se joue (`READY`).
+ */
+export function launchPhaseBadgeKind(
+  match: Pick<BracketMatch, "status">,
+  phase: MatchLaunchPhase,
+): LaunchPhaseBadgeKind | null {
+  if (phase === "TO_PLAN" || phase === "SCHEDULED" || phase === "LOBBY") return phase;
+  if (phase === "LAUNCHED" && match.status === "READY") return "LAUNCHED";
+  return null;
+}

@@ -143,12 +143,15 @@ function MatchPageSection({
   canAdminResolve,
   onOpenAdminModal,
   status,
+  streamLive,
   children,
 }: Readonly<{
   detail: TournamentDetail;
   matchId: number | null;
   frozen: boolean;
   status: ReactNode;
+  /** Flux de la fiche ouvert (`isLive`). */
+  streamLive: boolean;
   canAdminResolve: (match: BracketMatch) => boolean;
   onOpenAdminModal: (match: BracketMatch) => void;
   children: ReactNode;
@@ -167,6 +170,7 @@ function MatchPageSection({
           onOpenAdminModal={onOpenAdminModal}
           frozen={frozen}
           status={status}
+          streamLive={streamLive}
         />
       ) : (
         <MatchMissing tournamentId={detail.card.id} />
@@ -1270,6 +1274,7 @@ function TournamentSheetView({
         canAdminResolve={canAdminResolve}
         onOpenAdminModal={openAdminScore}
         status={<LiveIndicator isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />}
+        streamLive={isLive}
       >
       <section className={`fade-in ${styles.sheet}`}>
         <TournamentHeader
