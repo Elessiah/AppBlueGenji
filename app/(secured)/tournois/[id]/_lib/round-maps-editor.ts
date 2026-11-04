@@ -140,3 +140,41 @@ export function overwrittenRounds(
 export function findRound(rounds: readonly RoundKey[], id: string): RoundKey | null {
   return rounds.find((round) => roundKeyId(round) === id) ?? null;
 }
+
+/**
+ * Numéro (1, 2…) du premier créneau **de trop** : celui qui porte la carte
+ * au-delà de `max` (les créneaux vides ne comptent pas, ils sont écartés à
+ * l'envoi). `null` si le tour tient dans `max`, ou sans plafond.
+ */
+export function slotOverMax(slots: readonly (readonly string[])[], max: number | null): number | null {
+  if (max === null) return null;
+  let filled = 0;
+  for (const [index, slot] of slots.entries()) {
+    if (slot.length === 0) continue;
+    filled += 1;
+    if (filled > max) return index + 1;
+  }
+  return null;
+}
+
+/**
+ * Indice du voisin qui reprend le focus quand l'élément `removed` disparaît d'une
+ * liste de `remaining` éléments restants : le suivant, ou le dernier. `null`
+ * quand il n'en reste aucun (le focus va alors à l'élément qui porte la liste).
+ */
+export function focusIndexAfterRemoval(removed: number, remaining: number): number | null {
+  return remaining <= 0 ? null : Math.min(Math.max(removed, 0), remaining - 1);
+}
+
+/**
+ * Tour vers lequel se rabattre quand celui qui est affiché (`roundId`) a quitté
+ * la liste — un autre membre du staff a changé le format, le plateau a été
+ * régénéré — ou n'a jamais existé. `null` : rien à faire. L'identifiant rendu
+ * est celui du premier tour, `""` quand il n'y en a plus.
+ */
+export function vanishedRoundFallback(rounds: readonly RoundKey[], roundId: string): string | null {
+  if (findRound(rounds, roundId) !== null) return null;
+  const first = rounds[0];
+  if (!first) return roundId === "" ? null : "";
+  return roundKeyId(first);
+}

@@ -22,8 +22,13 @@
   font-weight: 600;
 }
 
-.hint {
+/* Rangée de la consigne : la marge est ici, le paragraphe voisin du « i » est en ligne, sans marge. */
+.hintRow {
   margin: 6px 0 10px;
+}
+
+.hint {
+  margin: 0;
   font-size: 12px;
   line-height: 1.5;
   color: var(--ink-quiet, #9aa4b2);

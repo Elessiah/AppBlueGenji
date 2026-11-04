@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { InfoHint } from "@/components/ui/info-hint";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -16,28 +16,57 @@ import styles from "./MatchPage.module.css";
 const RoundMapsDialog = dynamic(() => import("./RoundMapsDialog").then((m) => m.RoundMapsDialog), { ssr: false });
 
 /**
+ * Délai après lequel un choix optimiste est relâché même si aucun instantané
+ * ne l'a remplacé : l'instantané ne part que quand le contenu change (même
+ * version = rien d'envoyé), donc une carte revenue entre-temps à l'ancienne
+ * valeur ne ferait jamais relâcher la valeur locale.
+ */
+const OPTIMISTIC_PICK_MS = 6000;
+
+/**
  * Choix d'une carte dans un pool, par le staff ou une équipe en autogestion.
  * Valeur **optimiste** : la liste garde le choix envoyé (au lieu de revenir à
  * l'ancienne carte jusqu'à l'instantané suivant, d'où un second envoi possible
- * sur un flux lent) ; elle la relâche à l'arrivée de l'instantané ou sur refus.
+ * sur un flux lent) ; elle la relâche à l'arrivée d'un instantané (la carte
+ * change, ou la version du détail change une fois l'envoi fini), après
+ * {@link OPTIMISTIC_PICK_MS}, ou sur refus.
  */
-function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id">; slot: ResolvedMapSlot }>) {
+function MapPickSelect({
+  match,
+  slot,
+  snapshotVersion,
+}: Readonly<{ match: Pick<BracketMatch, "id">; slot: ResolvedMapSlot; snapshotVersion: string }>) {
   const { t } = useRoundMapsText();
   const actionText = useActionsText();
   const errorsText = useErrorsText();
   const { showError, showSuccess } = useToast();
   const selectId = useId();
   const [busy, setBusy] = useState(false);
-  const [optimistic, setOptimistic] = useState<string | null>(null);
+  // `since` : version du détail à la fin de l'envoi (`null` tant qu'il est en vol).
+  const [optimistic, setOptimistic] = useState<{ map: string; since: string | null } | null>(null);
   const stored = slot.map ?? "";
+  const versionRef = useRef(snapshotVersion);
+  versionRef.current = snapshotVersion;
   // L'instantané fait foi dès qu'il change : la valeur locale s'efface.
   useEffect(() => setOptimistic(null), [stored]);
-  const shown = optimistic ?? stored;
+  // Un instantané arrivé depuis la fin de l'envoi (même si la carte est revenue
+  // à l'ancienne valeur) : la valeur locale n'a plus de raison d'être.
+  useEffect(() => {
+    if (optimistic !== null && optimistic.since !== null && optimistic.since !== snapshotVersion) setOptimistic(null);
+  }, [optimistic, snapshotVersion]);
+  // Et sans instantané du tout (même version), elle expire.
+  const settled = optimistic !== null && optimistic.since !== null;
+  useEffect(() => {
+    if (!settled) return;
+    const timer = setTimeout(() => setOptimistic(null), OPTIMISTIC_PICK_MS);
+    return () => clearTimeout(timer);
+  }, [settled]);
+  const shown = optimistic?.map ?? stored;
 
   const pick = async (map: string) => {
     if (busy || map === shown) return;
     setBusy(true);
-    setOptimistic(map);
+    setOptimistic({ map, since: null });
     try {
       const response = await fetch(`/api/matches/${match.id}/map-pick`, {
         method: "PUT",
@@ -47,6 +76,7 @@ function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "UNKNOWN");
       showSuccess(t(map === "" ? "page.pickCleared" : "page.picked"));
+      setOptimistic({ map, since: versionRef.current });
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
     } catch (error) {
       setOptimistic(null);
@@ -89,7 +119,8 @@ function MapSlotLine({
   match,
   slot,
   canPick,
-}: Readonly<{ match: Pick<BracketMatch, "id">; slot: ResolvedMapSlot; canPick: boolean }>) {
+  snapshotVersion,
+}: Readonly<{ match: Pick<BracketMatch, "id">; slot: ResolvedMapSlot; canPick: boolean; snapshotVersion: string }>) {
   const { t } = useRoundMapsText();
   return (
     <li className={styles.mapSlot}>
@@ -100,11 +131,27 @@ function MapSlotLine({
             <strong>{slot.map}</strong> <span className="pill pill-neutral">{t("page.imposed")}</span>
           </>
         )}
-        {slot.kind === "POOL" && canPick && <MapPickSelect match={match} slot={slot} />}
+        {slot.kind === "POOL" && canPick && <MapPickSelect match={match} slot={slot} snapshotVersion={snapshotVersion} />}
         {slot.kind === "POOL" && !canPick && slot.map !== null && <strong>{slot.map}</strong>}
         {slot.kind === "POOL" && !canPick && slot.map === null && (
           <span className={styles.muted}>{t("page.toChoose", { maps: slot.candidates.join(", ") })}</span>
         )}
+      </span>
+    </li>
+  );
+}
+
+/** Map de départage du tour : la dernière ligne de la liste des cartes, lue avec elle. */
+function TiebreakLine({ id, map }: Readonly<{ id: string; map: string }>) {
+  const { t } = useRoundMapsText();
+  return (
+    <li className={`${styles.mapSlot} ${styles.tiebreakLine}`}>
+      <span className={styles.mapNumber}>{t("page.tiebreak")}</span>
+      <span className={styles.mapValue}>
+        <strong>{map}</strong>{" "}
+        <InfoHint id={id} subject={t("page.tiebreak")}>
+          {t("page.tiebreakHint")}
+        </InfoHint>
       </span>
     </li>
   );
@@ -131,7 +178,11 @@ export function MatchRoundMaps({
   const [resetting, setResetting] = useState(false);
   const rules = detail.mapRules;
   const round = roundMapsOf(rules.rounds, match);
-  const slots = round ? resolveMatchMaps(round.slots, match.firstMap, match.mapPicks) : [];
+  // Recalculé quand le réglage ou les choix du match changent, pas à chaque rendu de la page.
+  const slots = useMemo(
+    () => (round ? resolveMatchMaps(round.slots, match.firstMap, match.mapPicks) : []),
+    [round, match.firstMap, match.mapPicks],
+  );
   // Map de départage du tour (play-offs en vrai best of 3) : l'instantané ne
   // porte que celles des tours éligibles.
   const tiebreak = roundTiebreakOf(rules.tiebreaks, match);
@@ -146,7 +197,8 @@ export function MatchRoundMaps({
       });
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "UNKNOWN");
-      showSuccess(t("dialog.roundCleared"));
+      // La map de départage reste : le toast le dit, il ne promet pas un tour entièrement vidé.
+      showSuccess(t(tiebreak === null ? "dialog.roundCleared" : "dialog.roundClearedTiebreakKept"));
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
       return true;
     } catch (error) {
@@ -164,36 +216,36 @@ export function MatchRoundMaps({
       {slots.length > 0 && (
         <ol className={styles.mapSlots} aria-labelledby={titleId}>
           {slots.map((slot) => (
-            <MapSlotLine key={slot.number} match={match} slot={slot} canPick={canPick} />
+            <MapSlotLine key={slot.number} match={match} slot={slot} canPick={canPick} snapshotVersion={detail.version} />
           ))}
+          {tiebreak !== null && <TiebreakLine id={`${titleId}-tiebreak`} map={tiebreak} />}
         </ol>
       )}
-      {tiebreak !== null && (
-        <div className={`${styles.mapSlot} ${styles.tiebreakLine}`}>
-          <span className={styles.mapNumber}>{t("page.tiebreak")}</span>
-          <span className={styles.mapValue}>
-            <strong>{tiebreak}</strong>{" "}
-            <InfoHint id={`${titleId}-tiebreak`} subject={t("page.tiebreak")}>
-              {t("page.tiebreakHint")}
-            </InfoHint>
-          </span>
-        </div>
+      {slots.length === 0 && tiebreak !== null && (
+        <ol className={styles.mapSlots} aria-labelledby={titleId}>
+          <TiebreakLine id={`${titleId}-tiebreak`} map={tiebreak} />
+        </ol>
       )}
       {staff && (
         <div className={styles.roundMapsActions}>
           <button type="button" className="btn ghost" onClick={() => setOpen(true)}>
             {t("page.configureMaps")}
           </button>
-          {slots.length > 0 && (
-            <>
-              <button type="button" className="btn ghost" onClick={() => setResetting(true)}>
-                {t("page.resetRound")}
-              </button>
-              <InfoHint id={`${titleId}-scale`} subject={t("page.resetRound")}>
-                {t("page.scaleHint")}
-              </InfoHint>
-            </>
-          )}
+          {/* Toujours monté : après une réinitialisation réussie il n'y a plus rien à
+              réinitialiser, mais un bouton démonté laisserait tomber le focus sur le <body>. */}
+          <button
+            type="button"
+            className="btn ghost"
+            aria-disabled={slots.length === 0 || undefined}
+            onClick={() => {
+              if (slots.length > 0) setResetting(true);
+            }}
+          >
+            {t("page.resetRound")}
+          </button>
+          <InfoHint id={`${titleId}-scale`} subject={t("page.resetRound")}>
+            {t("page.scaleHint")}
+          </InfoHint>
         </div>
       )}
       {resetting && (

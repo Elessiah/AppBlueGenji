@@ -18,7 +18,7 @@
     "scaleHint": "Ces cartes valent pour tous les matchs du tour : la carte ne se saisit plus match par match. « Réinitialiser le tour » rend la saisie par match.",
     "resetConfirmBody": "Les cartes de ce tour sont retirées pour tous ses matchs : la carte se saisit de nouveau match par match. Les choix déjà faits sur les matchs restent.",
     "tiebreak": "Map de départage",
-    "tiebreakHint": "Jouée seulement si la série est à égalité après les 3 maps (une map nulle). Bans : la règle des cartes suivantes."
+    "tiebreakHint": "Tour de play-offs en vrai Bo3 : une map jouée seulement si la série est à égalité après les 3 maps. Les bans suivent la règle des cartes suivantes."
   },
   "sheet": {
     "title": "Cartes et bans",
@@ -112,13 +112,23 @@
     "pending": "Envoi…",
     "slotGap": "La carte {number} est vide : remplis-la ou retire-la, sinon les cartes suivantes seraient décalées.",
     "tiebreakTitle": "Map de départage",
-    "tiebreakHint": "Tour de play-offs en vrai Bo3 : une map jouée seulement si la série est à égalité après les 3 maps. Les bans suivent la règle des cartes suivantes.",
     "tiebreakLabel": "Nom de la map de départage",
     "tiebreakSave": "Enregistrer la map de départage",
     "tiebreakRemove": "Retirer la map de départage",
     "tiebreakSaved": "Map de départage enregistrée.",
     "tiebreakRemoved": "Map de départage retirée.",
     "tiebreakEmpty": "Saisis un nom de map ou retire la map de départage.",
-    "summaryTiebreak": "map de départage"
+    "summaryTiebreak": "map de départage",
+    "closeConfirm": {
+      "title": "Fermer sans enregistrer ?",
+      "body": "Les modifications non enregistrées de cette fenêtre seront perdues.",
+      "confirm": "Fermer sans enregistrer"
+    },
+    "roundClearedTiebreakKept": "Tour réinitialisé : cartes match par match. La map de départage reste.",
+    "staleTiebreakTitle": "Maps de départage inactives",
+    "staleTiebreakHint": "Ces tours ne sont plus des play-offs en vrai Bo3 (format changé) : leur map de départage n'est ni montrée ni jouée. Retire-la pour la supprimer.",
+    "staleTiebreakItem": "{round} : {map}",
+    "staleTiebreakRemove": "Retirer",
+    "staleTiebreakRemoveLabel": "Retirer la map de départage de {round}"
   }
 }

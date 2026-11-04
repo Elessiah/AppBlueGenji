@@ -27,6 +27,14 @@ export const ROUND_MAP_CANDIDATES_MAX = 20;
 
 /** Tours qu'une seule écriture « copier / appliquer à tous » peut viser ; l'écran découpe au-delà. */
 export const ROUND_MAPS_BULK_MAX = 128;
+
+/**
+ * Tours qu'un écran des cartes peut déclarer écrits au signal de fermeture
+ * (`POST …/round-maps/flush`) : au-delà, il n'envoie rien et le balayage de la
+ * fenêtre de silence annonce. Borne le corps (`keepalive` : 64 Ko) et la route.
+ */
+export const ROUND_MAPS_FLUSH_ROUNDS_MAX = 1024;
+
 /** Silence (secondes) après la dernière modification avant l'annonce Discord unique des cartes de manche. */
 export const ROUND_MAPS_NOTICE_WINDOW_SECONDS = 60;
 /** Manches nommées au plus dans cette annonce ; les suivantes sont comptées. */
@@ -88,6 +96,13 @@ export type TournamentMapRules = {
    * (`applicableTiebreaks`, `round-plan.ts`).
    */
   tiebreaks: RoundTiebreak[];
+  /**
+   * Maps de départage **gardées en base mais inactives** : celles de tours que
+   * le format n'autorise plus (FT 3, phase devenue suisse). Ni montrées ni
+   * jouées ; portées pour que le staff puisse les retirer
+   * (`RoundMapsDialog`). Absent : aucune.
+   */
+  staleTiebreaks?: RoundTiebreak[];
 };
 
 /** Map de départage d'un tour du tournoi (`bg_tournament_round_maps.tiebreak_map`). */
@@ -176,12 +191,12 @@ export function roundTiebreakOf(
   tiebreaks: readonly RoundTiebreak[] | undefined,
   match: { phaseId: number; bracket: string; roundNumber: number },
 ): string | null {
-  return (
-    tiebreaks?.find(
-      (round) =>
-        round.phaseId === match.phaseId && round.bracket === match.bracket && round.roundNumber === match.roundNumber,
-    )?.map ?? null
-  );
+  const map = tiebreaks?.find(
+    (round) =>
+      round.phaseId === match.phaseId && round.bracket === match.bracket && round.roundNumber === match.roundNumber,
+  )?.map;
+  // Rendu sous forme affichable, comme les cartes du tour : un nom stocké ne passe jamais brut à l'écran.
+  return map === undefined ? null : visibleText(map) || null;
 }
 
 /** Créneaux relus en base ; tolérant : une valeur illisible vaut « aucun réglage ». */
@@ -424,4 +439,22 @@ export function canPickMatchMap(
   // Un membre du staff qui joue le match suit la règle des joueurs.
   if (viewer.staff && !plays) return true;
   return plays && match.selfManaged && viewer.canDeclareReady;
+}
+
+/** Cartes du tour d'un match, telles que la saisie du score les lit. */
+export type MatchMapPlan = { mapNames: (string | null)[]; tiebreakMap: string | null };
+
+const NO_MAP_PLAN: MatchMapPlan = { mapNames: [], tiebreakMap: null };
+
+/**
+ * Nom des cartes et map de départage d'un match pour la saisie du score
+ * (`matchMapNames`, `roundTiebreakOf`) ; rien sans match. Séparée pour qu'un
+ * écran la mémorise sur le réglage et le match, pas sur chaque rendu.
+ */
+export function matchMapPlan(
+  rules: Pick<TournamentMapRules, "rounds" | "tiebreaks"> | null | undefined,
+  match: Parameters<typeof matchMapNames>[1] | null,
+): MatchMapPlan {
+  if (!rules || !match) return NO_MAP_PLAN;
+  return { mapNames: matchMapNames(rules.rounds, match), tiebreakMap: roundTiebreakOf(rules.tiebreaks, match) };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint } from "@/components/ui/info-hint";
@@ -9,7 +9,7 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { MATCH_LAUNCH_REFRESH_EVENT } from "@/lib/shared/match-launch";
 import { FIRST_MAP_MAX_LENGTH } from "@/lib/shared/match-referee";
-import type { FieldAria } from "@/lib/shared/field-errors";
+import { fieldErrorId, type FieldAria } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { filterOverwatchMaps } from "@/lib/shared/overwatch-maps";
 import { visibleText } from "@/lib/shared/visible-text";
@@ -18,6 +18,7 @@ import {
   NEXT_BAN_RULES,
   ROUND_MAP_SLOTS_MAX,
   ROUND_MAPS_BULK_MAX,
+  ROUND_MAPS_FLUSH_ROUNDS_MAX,
   roundKeyId,
   roundKeysOf,
   roundMapsOf,
@@ -26,6 +27,7 @@ import {
   type FirstBanRule,
   type NextBanRule,
   type RoundKey,
+  type RoundTiebreak,
 } from "@/lib/shared/round-maps";
 import { plannedRoundKeys, roundAllowsTiebreak, roundMaxMaps } from "@/lib/shared/round-plan";
 import type { BracketType, TournamentDetail } from "@/lib/shared/types";
@@ -36,15 +38,18 @@ import {
   blocksImplicitSubmit,
   chunkRounds,
   findRound,
+  focusIndexAfterRemoval,
   overwrittenRounds,
   removeMapFromSlot,
   resyncSlots,
   slotGap,
   slotHasMap,
+  slotOverMax,
   slotsDirty,
   slotsToEdit,
   slotsToSave,
   toggleMapInSlot,
+  vanishedRoundFallback,
   type SlotEdit,
 } from "../_lib/round-maps-editor";
 import { useRoundMapsText, type RoundMapsText } from "../_lib/round-maps-text";
@@ -99,6 +104,8 @@ function UnsavedNote({ dirty, text }: Readonly<{ dirty: boolean; text: string }>
   );
 }
 
+type RunTask = (task: () => Promise<void>, onRefused?: (code: string, text: string) => void) => Promise<boolean>;
+
 async function putJson(url: string, body: unknown): Promise<void> {
   const response = await fetch(url, {
     method: "PUT",
@@ -109,7 +116,12 @@ async function putJson(url: string, body: unknown): Promise<void> {
   if (!response.ok) throw new Error(payload.error || "UNKNOWN");
 }
 
-type Pending = { kind: "reset" } | { kind: "switch"; id: string } | { kind: "applyAll"; overwritten: number } | { kind: "copy"; target: RoundKey };
+type Pending =
+  | { kind: "reset" }
+  | { kind: "switch"; id: string }
+  | { kind: "close" }
+  | { kind: "applyAll"; overwritten: number }
+  | { kind: "copy"; target: RoundKey };
 
 /**
  * Liste des cartes d'Overwatch pour un créneau : recherche, cases groupées par
@@ -124,16 +136,21 @@ function MapPicker({
   number: number;
   slot: readonly string[];
   overwatch: boolean;
-  onEdit: (edit: (slot: readonly string[]) => SlotEdit) => void;
+  /** Rend `true` quand la carte est prise en compte : un refus laisse la saisie en place. */
+  onEdit: (edit: (slot: readonly string[]) => SlotEdit) => boolean;
 }>) {
   const { t } = useRoundMapsText();
   const ids = useId();
   const [query, setQuery] = useState("");
   const [custom, setCustom] = useState("");
   const groups = overwatch ? filterOverwatchMaps(query) : [];
+  // La liste vient de s'ouvrir : le focus va à son premier champ, il ne reste
+  // pas sur le bouton qui la déclenche (ni sur une « Ajouter une carte » démontée).
+  useEffect(() => {
+    document.getElementById(`${ids}-${overwatch ? "search" : "custom"}`)?.focus();
+  }, [ids, overwatch]);
   const addCustom = () => {
-    onEdit((current) => addMapToSlot(current, custom));
-    setCustom("");
+    if (onEdit((current) => addMapToSlot(current, custom))) setCustom("");
   };
   // Posé sur chaque champ, pas sur le conteneur : un `div` muni d'un gestionnaire
   // clavier passe pour un faux contrôle (Sonar S6848).
@@ -230,10 +247,22 @@ function SlotEditor({
   onToggle: () => void;
   onRemoveSlot: () => void;
   onRemoveMap: (map: string) => void;
-  onEdit: (edit: (slot: readonly string[]) => SlotEdit) => void;
+  onEdit: (edit: (slot: readonly string[]) => SlotEdit) => boolean;
 }>) {
   const { t } = useRoundMapsText();
   const pickerId = useId();
+  const chipsId = useId();
+  // Retirer une pastille la démonte avec son bouton : le focus passe à la
+  // pastille voisine, ou au bouton de la liste quand il n'en reste aucune
+  // (jamais au <body>, WCAG 2.4.3).
+  const focusAfterChip = useRef<number | null>(null);
+  useEffect(() => {
+    const removed = focusAfterChip.current;
+    if (removed === null) return;
+    focusAfterChip.current = null;
+    const next = focusIndexAfterRemoval(removed, slot.length);
+    document.getElementById(next === null ? toggleId : `${chipsId}-${next}`)?.focus();
+  }, [slot, chipsId, toggleId]);
   let kind = t("dialog.slotEmpty");
   if (slot.length === 1) kind = t("dialog.slotImposed");
   else if (slot.length > 1) kind = t("dialog.slotPool", { count: slot.length });
@@ -258,14 +287,18 @@ function SlotEditor({
       </div>
       {slot.length > 0 && (
         <ul className={styles.chips}>
-          {slot.map((map) => (
+          {slot.map((map, index) => (
             <li key={map} className={styles.chip}>
               <span>{map}</span>
               <button
                 type="button"
+                id={`${chipsId}-${index}`}
                 className={styles.chipRemove}
                 aria-label={t("dialog.removeMap", { map, number })}
-                onClick={() => onRemoveMap(map)}
+                onClick={() => {
+                  focusAfterChip.current = index;
+                  onRemoveMap(map);
+                }}
               >
                 <span aria-hidden="true">✕</span>
               </button>
@@ -305,6 +338,17 @@ const TIEBREAK_FIELD_ERRORS = { INVALID_TIEBREAK_MAP: "tiebreak", TIEBREAK_NOT_A
 /** Toutes les cartes de la liste d'Overwatch, pour la suggestion du champ. */
 const OVERWATCH_MAP_NAMES: readonly string[] = filterOverwatchMaps("").flatMap((group) => group.maps);
 
+/** Suggestions du champ de départage : une quarantaine d'options, rendues une seule fois. */
+const MapNamesDatalist = memo(function MapNamesDatalist({ id }: Readonly<{ id: string }>) {
+  return (
+    <datalist id={id}>
+      {OVERWATCH_MAP_NAMES.map((map) => (
+        <option key={map} value={map} />
+      ))}
+    </datalist>
+  );
+});
+
 /**
  * Map de départage d'un tour de play-offs en vrai best of 3 : une carte,
  * imposée, jouée seulement si la série est à égalité après les trois maps.
@@ -318,13 +362,16 @@ function TiebreakForm({
   overwatch,
   busy,
   run,
+  onWritten,
 }: Readonly<{
   tournamentId: number;
   round: RoundKey;
   saved: string | null;
   overwatch: boolean;
   busy: boolean;
-  run: (task: () => Promise<void>, onRefused?: (code: string, text: string) => void) => Promise<boolean>;
+  run: RunTask;
+  /** Une écriture a réussi : le tour entre dans l'annonce que la fermeture peut devancer. */
+  onWritten: () => void;
 }>) {
   const { t } = useRoundMapsText();
   const { showError, showSuccess } = useToast();
@@ -345,6 +392,7 @@ function TiebreakForm({
     run(
       async () => {
         await putJson(`/api/admin/tournaments/${tournamentId}/round-tiebreak`, { ...round, map });
+        onWritten();
         showSuccess(success);
       },
       (code, text) => fieldErrors.report(code, text),
@@ -359,6 +407,8 @@ function TiebreakForm({
       fieldErrors.flag("tiebreak", text);
       return;
     }
+    // Rien de changé : rien à envoyer (renvoyer la valeur en place n'écrirait que du bruit au journal).
+    if (!dirty) return;
     void send(value, t("dialog.tiebreakSaved"));
   };
 
@@ -370,7 +420,7 @@ function TiebreakForm({
           <div className={styles.labelRow}>
             <label htmlFor={inputId}>{t("dialog.tiebreakLabel")}</label>
             <InfoHint id={`${ids}-tiebreak-hint`} subject={t("dialog.tiebreakTitle")}>
-              {t("dialog.tiebreakHint")}
+              {t("page.tiebreakHint")}
             </InfoHint>
           </div>
           <input
@@ -386,13 +436,7 @@ function TiebreakForm({
             }}
           />
           <FieldErrorText fieldId={inputId} message={fieldErrors.message("tiebreak")} />
-          {overwatch && (
-            <datalist id={listId}>
-              {OVERWATCH_MAP_NAMES.map((map) => (
-                <option key={map} value={map} />
-              ))}
-            </datalist>
-          )}
+          {overwatch && <MapNamesDatalist id={listId} />}
         </div>
         <div className={styles.actions}>
           <UnsavedNote dirty={dirty} text={t("dialog.unsaved")} />
@@ -403,20 +447,80 @@ function TiebreakForm({
               aria-disabled={busy || undefined}
               onClick={() => {
                 if (busy) return;
-                void send(null, t("dialog.tiebreakRemoved")).then((ok) => {
-                  if (ok) setValue("");
-                });
+                // Le champ suit le serveur tout seul s'il n'a pas été modifié ; un texte en cours de saisie reste.
+                void send(null, t("dialog.tiebreakRemoved"));
               }}
             >
               {t("dialog.tiebreakRemove")}
             </button>
           )}
-          <button type="submit" className="btn ghost" aria-disabled={busy || undefined}>
+          <button type="submit" className="btn ghost" aria-disabled={busy || !dirty || undefined}>
             {t("dialog.tiebreakSave")}
           </button>
         </div>
       </fieldset>
     </form>
+  );
+}
+
+/**
+ * Maps de départage gardées en base sur des tours que le format n'autorise
+ * plus : ni montrées ni jouées, mais le staff doit pouvoir les retirer.
+ */
+function StaleTiebreaks({
+  items,
+  roundLabel,
+  tournamentId,
+  busy,
+  run,
+  onWritten,
+}: Readonly<{
+  items: readonly RoundTiebreak[];
+  roundLabel: (round: RoundKey) => string;
+  tournamentId: number;
+  busy: boolean;
+  run: RunTask;
+  onWritten: (round: RoundKey) => void;
+}>) {
+  const { t } = useRoundMapsText();
+  const { showSuccess } = useToast();
+  if (items.length === 0) return null;
+  return (
+    <fieldset className={styles.section}>
+      <legend className={styles.legend}>{t("dialog.staleTiebreakTitle")}</legend>
+      <p className={styles.muted}>{t("dialog.staleTiebreakHint")}</p>
+      <ul className={styles.stale}>
+        {items.map((item) => {
+          const label = roundLabel(item);
+          return (
+            <li key={roundKeyId(item)} className={styles.staleItem}>
+              <span>{t("dialog.staleTiebreakItem", { round: label, map: visibleText(item.map) })}</span>
+              <button
+                type="button"
+                className="btn ghost"
+                aria-label={t("dialog.staleTiebreakRemoveLabel", { round: label })}
+                aria-disabled={busy || undefined}
+                onClick={() => {
+                  if (busy) return;
+                  void run(async () => {
+                    await putJson(`/api/admin/tournaments/${tournamentId}/round-tiebreak`, {
+                      phaseId: item.phaseId,
+                      bracket: item.bracket,
+                      roundNumber: item.roundNumber,
+                      map: null,
+                    });
+                    onWritten(item);
+                    showSuccess(t("dialog.tiebreakRemoved"));
+                  });
+                }}
+              >
+                {t("dialog.staleTiebreakRemove")}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </fieldset>
   );
 }
 
@@ -446,15 +550,23 @@ export function RoundMapsDialog({
   const rounds = useMemo(() => dialogRounds(detail), [detail]);
 
   // Une seule annonce Discord par série d'enregistrements : à la fermeture de
-  // l'écran on demande son envoi tout de suite. Un accélérateur — sans lui
-  // (onglet fermé), le serveur envoie quand sa fenêtre de silence est échue.
-  const savedRounds = useRef(false);
+  // l'écran on demande son envoi tout de suite, en listant les tours écrits ici
+  // — une série qu'un autre membre du staff règle encore n'est pas devancée.
+  // Un accélérateur : sans lui (onglet fermé), le serveur envoie quand sa
+  // fenêtre de silence est échue. Un tour n'entre dans la liste qu'une fois
+  // **tous** les lots d'une écriture passés : un écran démonté en plein envoi
+  // n'annonce pas une série à moitié écrite.
+  const writtenRounds = useRef(new Set<string>());
   useEffect(
     () => () => {
-      if (!savedRounds.current) return;
-      void fetch(`/api/admin/tournaments/${tournamentId}/round-maps/flush`, { method: "POST", keepalive: true }).catch(
-        () => undefined,
-      );
+      const rounds = [...writtenRounds.current];
+      if (rounds.length === 0 || rounds.length > ROUND_MAPS_FLUSH_ROUNDS_MAX) return;
+      void fetch(`/api/admin/tournaments/${tournamentId}/round-maps/flush`, {
+        method: "POST",
+        keepalive: true,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ rounds }),
+      }).catch(() => undefined);
     },
     [tournamentId],
   );
@@ -471,10 +583,14 @@ export function RoundMapsDialog({
   const [copyTarget, setCopyTarget] = useState("");
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
-  // Créneau que désigne un refus (créneau vide entre deux cartes, ou refus du serveur : le premier).
-  const [errorSlot, setErrorSlot] = useState(1);
+  // Créneau que désigne un refus (créneau vide entre deux cartes, carte de trop) ;
+  // `null` : le refus du serveur ne dit pas lequel, il vise la liste entière.
+  const [errorSlot, setErrorSlot] = useState<number | null>(null);
   const slotToggleId = (number: number) => `${ids}-slot-${number}`;
-  const fieldErrors = useFieldErrors(SLOT_FIELD_ERRORS, { slots: slotToggleId(errorSlot) });
+  const slotsListId = `${ids}-slots`;
+  const fieldErrors = useFieldErrors(SLOT_FIELD_ERRORS, {
+    slots: errorSlot === null ? slotsListId : slotToggleId(errorSlot),
+  });
   const clearSlotError = fieldErrors.clear;
   useEffect(() => clearSlotError(), [slots, clearSlotError]);
 
@@ -495,6 +611,29 @@ export function RoundMapsDialog({
     });
   }, [rules.firstBan, rules.nextBan, rules.rounds, round]);
 
+  // Le tour affiché a quitté la liste (format changé par un autre membre du staff,
+  // plateau régénéré) : retour au premier tour, et plus de confirmation orpheline
+  // qui reparaîtrait si le tour revenait.
+  const fallbackRoundId = vanishedRoundFallback(rounds, roundId);
+  useEffect(() => {
+    if (fallbackRoundId === null) return;
+    setPending(null);
+    setRoundId(fallbackRoundId);
+    setActiveSlot(null);
+    setCopyTarget("");
+    setSlots(slotsToEdit(rules.rounds, findRound(rounds, fallbackRoundId)));
+  }, [fallbackRoundId, rounds, rules.rounds]);
+
+  // Retirer un créneau le démonte avec son bouton : le focus passe au créneau voisin.
+  const focusAfterSlotRemoval = useRef<number | null>(null);
+  useEffect(() => {
+    const removed = focusAfterSlotRemoval.current;
+    if (removed === null) return;
+    focusAfterSlotRemoval.current = null;
+    const next = focusIndexAfterRemoval(removed, slots.length);
+    if (next !== null) document.getElementById(`${ids}-slot-${next + 1}`)?.focus();
+  }, [slots, ids]);
+
   const rulesDirty = firstBan !== rules.firstBan || nextBan !== rules.nextBan;
   const roundDirty = slotsDirty(slots, rules.rounds, round);
 
@@ -503,8 +642,12 @@ export function RoundMapsDialog({
   const slotCap = maxMaps ?? ROUND_MAP_SLOTS_MAX;
   const toSave = slotsToSave(slots);
   const overMax = maxMaps !== null && toSave.length > maxMaps;
+  // « Réinitialiser » ne touche pas la map de départage : le toast le dit quand elle reste.
+  const tiebreakKept =
+    round !== null && (roundTiebreakOf(rules.tiebreaks, round) !== null || roundTiebreakOf(rules.staleTiebreaks, round) !== null);
+  const clearedText = t(tiebreakKept ? "dialog.roundClearedTiebreakKept" : "dialog.roundCleared");
 
-  const run = async (task: () => Promise<void>, onRefused?: (code: string, text: string) => void): Promise<boolean> => {
+  const run: RunTask = async (task, onRefused) => {
     if (busy) return false;
     setBusy(true);
     try {
@@ -538,12 +681,17 @@ export function RoundMapsDialog({
     return `${roundLabel(key)} · ${t("dialog.summarySet", { maps, pools })}${tiebreak}`;
   };
 
-  const editSlot = (index: number, edit: (slot: readonly string[]) => SlotEdit) => {
+  /** Applique l'édition au créneau ; `false` si elle est refusée (notification, saisie conservée). */
+  const editSlot = (index: number, edit: (slot: readonly string[]) => SlotEdit): boolean => {
     const result = edit(slots[index] ?? []);
     if (result.refused === "EMPTY") showError(t("dialog.mapEmpty"));
     else if (result.refused === "TOO_LONG") showError(t("dialog.mapTooLong"));
     else if (result.refused === "POOL_FULL") showError(t("dialog.poolFull"));
-    else setSlots((current) => current.map((slot, at) => (at === index ? [...result.slot] : slot)));
+    else {
+      setSlots((current) => current.map((slot, at) => (at === index ? [...result.slot] : slot)));
+      return true;
+    }
+    return false;
   };
 
   const saveRules = (event: FormEvent) => {
@@ -561,12 +709,13 @@ export function RoundMapsDialog({
       async () => {
         for (const chunk of chunkRounds(targets, ROUND_MAPS_BULK_MAX)) {
           await putJson(`/api/admin/tournaments/${tournamentId}/round-maps`, { rounds: chunk, slots: payload });
-          savedRounds.current = true;
         }
+        for (const key of targets) writtenRounds.current.add(roundKeyId(key));
         showSuccess(success);
       },
       (code, text) => {
-        setErrorSlot(1);
+        // Le serveur refuse sans dire quelle carte : le refus vise la liste, pas le premier créneau.
+        setErrorSlot(null);
         fieldErrors.report(code, text);
       },
     );
@@ -583,10 +732,22 @@ export function RoundMapsDialog({
     return gap !== null;
   };
 
+  /** Plus de cartes que le format n'en joue : refusé avant l'envoi, et rattaché à la première carte de trop. */
+  const overMaxRefused = () => {
+    const over = slotOverMax(slots, maxMaps);
+    if (over === null) return false;
+    const text = t("dialog.overMaxMaps", { max: maxMaps ?? 0 });
+    showError(text);
+    setErrorSlot(over);
+    fieldErrors.flag("slots", text);
+    return true;
+  };
+
   const saveRound = (event: FormEvent) => {
     event.preventDefault();
-    if (!round || gapRefused()) return;
-    void sendRounds([round], toSave, t(toSave.length === 0 ? "dialog.roundCleared" : "dialog.roundSaved"));
+    // Rien de modifié : ni envoi, ni « Tour réinitialisé » annoncé sur un tour qui n'a pas bougé.
+    if (!round || busy || !roundDirty || gapRefused() || overMaxRefused()) return;
+    void sendRounds([round], toSave, toSave.length === 0 ? clearedText : t("dialog.roundSaved"));
   };
 
   const applyAll = () => {
@@ -618,15 +779,33 @@ export function RoundMapsDialog({
     setSlots(slotsToEdit(rules.rounds, findRound(rounds, id)));
   };
 
+  // Fermer (Échap, voile, « Fermer ») jetterait les saisies non enregistrées : on le demande, comme au changement de tour.
+  const requestClose = () => {
+    if (roundDirty || rulesDirty) setPending({ kind: "close" });
+    else onClose();
+  };
+
   const confirmation = (() => {
-    if (!pending || !round) return null;
+    if (!pending) return null;
+    if (pending.kind === "close") {
+      return {
+        title: t("dialog.closeConfirm.title"),
+        body: t("dialog.closeConfirm.body"),
+        confirm: t("dialog.closeConfirm.confirm"),
+        action: async () => {
+          onClose();
+          return true;
+        },
+      };
+    }
+    if (!round) return null;
     if (pending.kind === "reset") {
       return {
         title: t("dialog.resetConfirm.title"),
         body: t("dialog.resetConfirm.body", { round: roundLabel(round) }),
         confirm: t("dialog.resetConfirm.confirm"),
         action: async () => {
-          const ok = await sendRounds([round], [], t("dialog.roundCleared"));
+          const ok = await sendRounds([round], [], clearedText);
           if (ok) setSlots([[]]);
           return ok;
         },
@@ -664,7 +843,7 @@ export function RoundMapsDialog({
   const titleId = `${ids}-title`;
   return (
     <>
-      <TournamentDialogFrame titleId={titleId} maxWidth={640} zIndex={90} deferMount busy={busy} onClose={onClose}>
+      <TournamentDialogFrame titleId={titleId} maxWidth={640} zIndex={90} deferMount busy={busy} onClose={requestClose}>
         <div className={styles.titleRow}>
           <h3 id={titleId} className={styles.title}>
             {t("dialog.title")}
@@ -709,7 +888,9 @@ export function RoundMapsDialog({
         {round && (
           <form onSubmit={saveRound} aria-busy={busy}>
             <fieldset className={styles.section}>
-              <legend className={styles.legend}>{t("dialog.roundTitle")}</legend>
+              <legend id={`${ids}-round-legend`} className={styles.legend}>
+                {t("dialog.roundTitle")}
+              </legend>
               <div className="field">
                 <div className={styles.labelRow}>
                   <label htmlFor={`${ids}-round`}>{t("dialog.round")}</label>
@@ -726,11 +907,18 @@ export function RoundMapsDialog({
                 </select>
               </div>
               {maxMaps !== null && (
-                <p className={overMax ? styles.warn : styles.muted}>
+                // `<output>` : région d'état, le passage au dépassement est annoncé (et dit en mots, pas seulement en couleur).
+                <output className={overMax ? styles.warn : styles.muted}>
                   {t(overMax ? "dialog.overMaxMaps" : "dialog.maxMaps", { max: maxMaps })}
-                </p>
+                </output>
               )}
-              <ol className={styles.slots}>
+              <ol
+                id={slotsListId}
+                className={styles.slots}
+                tabIndex={-1}
+                aria-labelledby={`${ids}-round-legend`}
+                aria-describedby={errorSlot === null && fieldErrors.message("slots") ? fieldErrorId(slotsListId) : undefined}
+              >
                 {slots.map((slot, index) => (
                   <SlotEditor
                     // L'ordre des créneaux est leur identité (carte 1, carte 2…).
@@ -746,6 +934,7 @@ export function RoundMapsDialog({
                     errorMessage={errorSlot === index + 1 ? fieldErrors.message("slots") : null}
                     onToggle={() => setActiveSlot(activeSlot === index ? null : index)}
                     onRemoveSlot={() => {
+                      focusAfterSlotRemoval.current = index;
                       setSlots((current) => current.filter((_, at) => at !== index));
                       setActiveSlot(null);
                     }}
@@ -756,6 +945,7 @@ export function RoundMapsDialog({
                   />
                 ))}
               </ol>
+              <FieldErrorText fieldId={slotsListId} message={errorSlot === null ? fieldErrors.message("slots") : null} />
               {slots.length < slotCap ? (
                 <div>
                   <button
@@ -788,7 +978,7 @@ export function RoundMapsDialog({
                     {t("dialog.clearRound")}
                   </button>
                 )}
-                <button type="submit" className="btn" aria-disabled={busy || undefined}>
+                <button type="submit" className="btn" aria-disabled={busy || !roundDirty || undefined}>
                   {t("dialog.saveRound")}
                 </button>
               </div>
@@ -833,11 +1023,21 @@ export function RoundMapsDialog({
             overwatch={overwatch}
             busy={busy}
             run={run}
+            onWritten={() => writtenRounds.current.add(roundKeyId(round))}
           />
         )}
 
+        <StaleTiebreaks
+          items={rules.staleTiebreaks ?? []}
+          roundLabel={roundLabel}
+          tournamentId={tournamentId}
+          busy={busy}
+          run={run}
+          onWritten={(key) => writtenRounds.current.add(roundKeyId(key))}
+        />
+
         <div className={styles.footer}>
-          <button type="button" className="btn ghost" onClick={onClose} aria-disabled={busy || undefined}>
+          <button type="button" className="btn ghost" onClick={requestClose} aria-disabled={busy || undefined}>
             {t("dialog.close")}
           </button>
         </div>
@@ -847,7 +1047,7 @@ export function RoundMapsDialog({
           title={confirmation.title}
           confirmLabel={confirmation.confirm}
           pendingLabel={t("dialog.pending")}
-          tone={pending?.kind === "reset" || pending?.kind === "switch" ? "danger" : "primary"}
+          tone={pending?.kind === "reset" || pending?.kind === "switch" || pending?.kind === "close" ? "danger" : "primary"}
           onClose={() => setPending(null)}
           onConfirm={confirmation.action}
         >

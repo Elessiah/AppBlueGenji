@@ -487,14 +487,17 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     const storedMapRules = await loadMapRules(connection, tournamentId, tournament);
     // Map de départage : celles des seuls tours éligibles (play-offs en vrai
     // best of 3) — un réglage resté d'un format changé depuis n'est pas montré.
+    const activeTiebreaks = applicableTiebreaks(storedMapRules.tiebreaks, {
+      format: card.format,
+      matchFormat: card.matchFormat,
+      endurancePlayoffFormat: card.endurancePlayoffFormat,
+      phases: phasesDetail?.phases ?? null,
+    });
+    // Les inactives restent portées : le staff peut les retirer (`RoundMapsDialog`).
     const mapRules = {
       ...storedMapRules,
-      tiebreaks: applicableTiebreaks(storedMapRules.tiebreaks, {
-        format: card.format,
-        matchFormat: card.matchFormat,
-        endurancePlayoffFormat: card.endurancePlayoffFormat,
-        phases: phasesDetail?.phases ?? null,
-      }),
+      tiebreaks: activeTiebreaks,
+      staleTiebreaks: storedMapRules.tiebreaks.filter((entry) => !activeTiebreaks.includes(entry)),
     };
     const mappedMatches = attachMatchMaps(
       applyMapRules(matches.map((row) =>
