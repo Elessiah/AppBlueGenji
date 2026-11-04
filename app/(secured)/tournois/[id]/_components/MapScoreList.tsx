@@ -62,26 +62,37 @@ interface MapScoreListProps {
   tiebreakMap?: string | null;
 }
 
-/** Libellés d'une ligne : visible, et préfixe masqué des noms de champ. */
-function mapRowLabels(
+/**
+ * Libellés d'une ligne, d'un seul endroit : le texte visible, et les préfixes
+ * masqués des noms de champ (code de replay, score) — tous disent le nom de la
+ * carte quand on le connaît, comme la ligne.
+ */
+export function mapRowLabels(
   t: ReturnType<typeof useDialogsText>["t"],
   index: number,
   mapName: string | null,
   tiebreak: string | null,
-): { label: string; prefix: string } {
+): { label: string; prefix: string; scorePrefix: string } {
+  const number = index + 1;
   if (tiebreak) {
     return {
       label: t("score.maps.tiebreakNamed", { name: tiebreak }),
       prefix: t("score.maps.tiebreakNamedPrefix", { name: tiebreak }),
+      scorePrefix: t("score.maps.scoreOfTiebreak", { name: tiebreak }),
     };
   }
   if (mapName) {
     return {
-      label: t("score.maps.mapNamed", { index: index + 1, name: mapName }),
-      prefix: t("score.maps.mapNamedPrefix", { index: index + 1, name: mapName }),
+      label: t("score.maps.mapNamed", { index: number, name: mapName }),
+      prefix: t("score.maps.mapNamedPrefix", { index: number, name: mapName }),
+      scorePrefix: t("score.maps.scoreOfNamed", { index: number, name: mapName }),
     };
   }
-  return { label: t("score.maps.map", { index: index + 1 }), prefix: t("score.maps.mapPrefix", { index: index + 1 }) };
+  return {
+    label: t("score.maps.map", { index: number }),
+    prefix: t("score.maps.mapPrefix", { index: number }),
+    scorePrefix: t("score.maps.scoreOf", { index: number }),
+  };
 }
 
 /** `id` du contrôle d'un champ de la liste. */
@@ -174,6 +185,24 @@ export function MapScoreList({
     autoGrown.current = false;
   }, [maps.length, t]);
 
+  // La ligne qui passe de « Map 4 » à « Map de départage : X » (les trois
+  // premières viennent d'atteindre 1-1) est annoncée : sinon seule la couleur
+  // du libellé change. Posée après l'annonce « ligne ajoutée » : quand les deux
+  // tombent ensemble, c'est celle-ci, plus précise, qui reste.
+  // Une ligne déjà de départage à l'ouverture (saisie reprise) ne s'annonce pas.
+  // La clé porte aussi le nom : une map de départage changée sur la même ligne s'annonce de nouveau.
+  const tiebreakKey = tiebreakIndex === null || !tiebreakMap ? null : `${tiebreakIndex}:${tiebreakMap}`;
+  const announcedTiebreak = useRef<string | null>(tiebreakKey);
+  useEffect(() => {
+    if (tiebreakIndex === null || tiebreakKey === null || !tiebreakMap) {
+      announcedTiebreak.current = null;
+      return;
+    }
+    if (announcedTiebreak.current === tiebreakKey) return;
+    announcedTiebreak.current = tiebreakKey;
+    setAnnouncement(t("score.maps.tiebreakRow", { index: tiebreakIndex + 1, name: tiebreakMap }));
+  }, [tiebreakIndex, tiebreakKey, tiebreakMap, t]);
+
   const update = (index: number, patch: Partial<MatchMapInput>, field: MapField) => {
     // Rien de changé (un champ de score vide quitté sans saisie rend `NaN`, et
     // `NaN !== NaN`) : ni mise à jour, ni levée des refus.
@@ -218,18 +247,20 @@ export function MapScoreList({
       {/* En ligne, la seule consigne de format — celle que chaque champ de code
           cite (`aria-describedby`) ; le reste derrière le « i » (INFO_HINTS.md) :
           un paragraphe de quatre phrases repoussait maps et boutons à 375 px. */}
-      <InfoHintRow>
-        <p id={hintId} className={styles.hint}>
-          {replayCodeHintText(text, game)}
-        </p>
-        <InfoHint id={`${idPrefix}-map-rules`} subject={t("score.maps.legend")}>
-          <p>
-            {t("score.maps.drawHint")}
-            {replayHint ? ` ${replayHint}` : ""}
-            {replayCodeOptional ? ` ${t("score.maps.replayOptionalHint")}` : ""}
+      <div className={styles.hintRow}>
+        <InfoHintRow inline>
+          <p id={hintId} className={styles.hint}>
+            {replayCodeHintText(text, game)}
           </p>
-        </InfoHint>
-      </InfoHintRow>
+          <InfoHint id={`${idPrefix}-map-rules`} subject={t("score.maps.legend")}>
+            <p>
+              {t("score.maps.drawHint")}
+              {replayHint ? ` ${replayHint}` : ""}
+              {replayCodeOptional ? ` ${t("score.maps.replayOptionalHint")}` : ""}
+            </p>
+          </InfoHint>
+        </InfoHintRow>
+      </div>
 
       {maps.length > 0 && (
         <ol className={styles.rows}>
@@ -279,7 +310,7 @@ export function MapScoreList({
                   <label className={styles.fieldLabel} htmlFor={t1Id} title={team1Name}>
                     {team1Id !== null && <EntrantLogo teamId={team1Id} name={team1Name} size={16} />}
                     <span className={styles.fieldLabelText}>
-                      <span className="sr-only">{t("score.maps.scoreOf", { index: index + 1 })}</span>
+                      <span className="sr-only">{labels.scorePrefix}</span>
                       {team1Name}
                     </span>
                   </label>
@@ -303,7 +334,7 @@ export function MapScoreList({
                   <label className={styles.fieldLabel} htmlFor={t2Id} title={team2Name}>
                     {team2Id !== null && <EntrantLogo teamId={team2Id} name={team2Name} size={16} />}
                     <span className={styles.fieldLabelText}>
-                      <span className="sr-only">{t("score.maps.scoreOf", { index: index + 1 })}</span>
+                      <span className="sr-only">{labels.scorePrefix}</span>
                       {team2Name}
                     </span>
                   </label>

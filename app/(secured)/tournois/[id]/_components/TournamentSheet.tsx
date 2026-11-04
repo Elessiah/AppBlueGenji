@@ -17,7 +17,7 @@ import { toParticipantType } from "@/lib/shared/participants";
 import { remainingSlots } from "@/lib/shared/ghost-registration";
 import { useToast } from "@/components/ui/toast";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
-import { matchMapNames, roundTiebreakOf } from "@/lib/shared/round-maps";
+import { matchMapPlan } from "@/lib/shared/round-maps";
 import { CyberButton } from "@/components/cyber";
 import { useSpectatorView } from "@/components/spectator-view";
 import { SPECTATOR_NOT_FOUND_RECHECK_MINUTES } from "@/lib/shared/spectator-view";
@@ -764,6 +764,18 @@ function TournamentSheetView({
   );
   useCloseSettledPlayerScore(detail?.matches, playerScoreMatchId, canOpenPlayerScore, playerScoreOwnSettle, settledActions);
 
+  // Cartes du tour des matchs dont la saisie du score est ouverte : recalculées
+  // quand le réglage ou le plateau changent, pas à chaque rendu de la fiche
+  // (les dialogues reçoivent des références stables).
+  const adminScorePlan = useMemo(
+    () => matchMapPlan(detail?.mapRules, matchById(detail?.matches ?? [], selectedMatchForAdminId)),
+    [detail?.mapRules, detail?.matches, selectedMatchForAdminId],
+  );
+  const playerScorePlan = useMemo(
+    () => matchMapPlan(detail?.mapRules, matchById(detail?.matches ?? [], playerScoreMatchId)),
+    [detail?.mapRules, detail?.matches, playerScoreMatchId],
+  );
+
   // Échec définitif avant même d'avoir reçu quoi que ce soit : sans ce cas, la
   // page resterait sur « Chargement… » pour toujours — le seul état où il ne
   // reste que le F5, et où il ne sert à rien.
@@ -1365,8 +1377,8 @@ function TournamentSheetView({
           key={matchForAdminScore.id}
           match={matchForAdminScore}
           proposals={detail.matchProposals}
-          mapNames={matchMapNames(detail.mapRules.rounds, matchForAdminScore)}
-          tiebreakMap={roundTiebreakOf(detail.mapRules.tiebreaks, matchForAdminScore)}
+          mapNames={adminScorePlan.mapNames}
+          tiebreakMap={adminScorePlan.tiebreakMap}
           onClose={() => setSelectedMatchForAdminId(null)}
           onSubmitted={() => {
             setSelectedMatchForAdminId(null);
@@ -1384,8 +1396,8 @@ function TournamentSheetView({
           canReportScore={canReportScore(matchForPlayerScore)}
           canForfeit={detail.canRegisterEntrant}
           proposals={detail.matchProposals}
-          mapNames={matchMapNames(detail.mapRules.rounds, matchForPlayerScore)}
-          tiebreakMap={roundTiebreakOf(detail.mapRules.tiebreaks, matchForPlayerScore)}
+          mapNames={playerScorePlan.mapNames}
+          tiebreakMap={playerScorePlan.tiebreakMap}
           onClose={() => setPlayerScoreMatchId(null)}
           onSubmitted={() => void refresh()}
           onRefresh={refresh}

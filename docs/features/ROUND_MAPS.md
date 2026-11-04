@@ -124,7 +124,9 @@ série est à égalité après les trois maps régulières, sinon inutilisée.
 - **Instantané** : `mapRules.tiebreaks` (liste séparée de `mapRules.rounds`, dont
   le sens ne change pas), filtrée par l'éligibilité courante
   (`applicableTiebreaks`) : un format changé depuis masque le réglage sans
-  l'effacer.
+  l'effacer. Ces réglages inactifs restent portés par l'instantané
+  (`mapRules.staleTiebreaks`, champ omis quand il n'y en a pas) : `RoundMapsDialog` les liste (« Maps de départage
+  inactives ») avec un bouton « Retirer » (retirer est permis sur toute clé).
 - **Écran** : section « Map de départage » de `RoundMapsDialog` (formulaire à
   part, liste d'Overwatch suggérée, saisie libre, « Enregistrer » / « Retirer »),
   visible seulement sur un tour éligible ; le sélecteur de tours la signale. La
@@ -217,10 +219,15 @@ au pool.
   (`dispatchDueRoundMapsNotices`, appelé par la liste des tournois, étranglé à
   15 s), un minuteur de processus n'est qu'un accélérateur. La fermeture de
   l'écran appelle `POST /api/admin/tournaments/[id]/round-maps/flush` (permission
-  `tournaments`) pour envoyer tout de suite, lot du journal du tournoi compris
+  `tournaments`, corps `{ rounds: ["phase:tableau:numéro", …] }` = les tours écrits
+  par cet écran, au plus `ROUND_MAPS_FLUSH_ROUNDS_MAX`) pour envoyer tout de suite, lot du journal du tournoi compris
   (`flushBotLogBatch`) — au plus un envoi anticipé par
   tournoi et par fenêtre de 60 s (au-delà, la fenêtre de silence enverra), et
-  jamais le seul déclencheur : un onglet fermé n'y perd rien. Un multi-phases
+  jamais le seul déclencheur : un onglet fermé n'y perd rien. L'annonce en
+  attente ne part que si **tous** ses tours sont de la liste : une série qu'un
+  autre membre du staff règle encore reste à la fenêtre de silence (sans liste,
+  tout part). Un tour n'entre dans la liste qu'une fois tous les lots d'une écriture
+  passés. Un multi-phases
   préfixe la phase (« Phase 2 · Manche 1 ») et prend le format suisse de la
   phase. La ligne est revendiquée par
   `DELETE … WHERE changes = ?` : pas de doublon, pas de changement perdu.
@@ -265,4 +272,38 @@ round et bans, réinitialisation), `tests/lib/server/match-launch.test.ts`
 `tests/tournois/round-maps-dialog.test.ts` (`resyncSlots`). Map de départage :
 `tests/lib/shared/round-tiebreak.test.ts` (éligibilité, ligne de saisie, brief),
 `tests/lib/server/round-maps.test.ts` (`setRoundTiebreak`, `loadMapRules`,
-`briefTiebreakMap`), `tests/app/api/round-tiebreak-route.test.ts`.
+`briefTiebreakMap`), `tests/app/api/round-tiebreak-route.test.ts`. Garde-fous de la fenêtre :
+`tests/tournois/round-maps-editor-guards.test.ts` (carte de trop, focus rendu, tour
+disparu), `tests/tournois/round-maps-ui-render.test.tsx` (page du match, libellés de
+score, câblage), `tests/lib/shared/round-maps-tiebreak-plan.test.ts`,
+`tests/lib/server/round-maps-notice-own-rounds.test.ts`,
+`tests/app/api/round-maps-flush-body.test.ts`.
+
+## Comportements de la fenêtre (accessibilité, pertes de saisie)
+
+- Fermer (Échap, voile, « Fermer ») avec des cartes ou des règles non enregistrées
+  demande confirmation, comme le changement de tour ; « Enregistrer » est inactif
+  (`aria-disabled`) et sans effet quand rien n'a changé ; plus de cartes que le
+  format n'en joue est refusé avant l'envoi (rattaché à la première carte de trop).
+- Un refus `INVALID_ROUND_MAPS` du serveur vise la liste entière (le serveur ne dit
+  pas quelle carte), pas le premier créneau. Un tour qui quitte la liste pendant
+  la fenêtre ramène au premier tour et annule la confirmation en cours.
+- Retirer une pastille ou un créneau rend le focus au voisin ; ouvrir la liste de
+  cartes place le focus sur son premier champ ; un ajout libre refusé garde la saisie.
+- « Réinitialiser le tour » ne touche pas la map de départage : le toast le dit
+  (`roundClearedTiebreakKept`) quand elle reste.
+- Choix de carte optimiste (`MapPickSelect`) : relâché quand la carte enregistrée
+  change (un instantané sur un autre match ne la touche pas) ; sans changement,
+  relecture REST 6 s après la fin de l'envoi, relâche à 30 s. En vol, un instantané ne
+  retire pas la valeur locale.
+- Fermer ou changer de tour avec une map de départage saisie et non enregistrée
+  demande aussi confirmation (le formulaire remonte son état, `onDirtyChange`).
+- « Copier » et « Appliquer à tous » refusent un tour cible qui joue moins de cartes
+  que la sélection (`firstTargetOverMax`, plafond effectif du tour cible, message
+  `overMaxTarget`, rattaché à la cible de la copie ou au bouton) ; l'avertissement rouge et le refus partagent le même seuil.
+- « Enregistrer les règles » est inactif et sans effet quand rien n'a changé.
+- Les boutons qui se vident eux-mêmes (« Réinitialiser le tour », « Retirer la map de
+  départage », la rangée de copie) restent montés en `aria-disabled` ; le retrait d'une
+  map de départage inactive rend le focus à la ligne voisine, ou à « Fermer ».
+- Deux fermetures d'écran simultanées sont chaînées côté serveur (`flushRoundMapsNotice`)
+  : la seconde attend le verdict de la première au lieu d'être écartée par le plafond.

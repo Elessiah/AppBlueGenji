@@ -50,6 +50,8 @@ const SWEEP_THROTTLE_MS = 15_000;
  */
 const FLUSH_MIN_INTERVAL_MS = ROUND_MAPS_NOTICE_WINDOW_SECONDS * 1000;
 const lastFlushAt = new Map<number, number>();
+/** Envois immédiats en cours, par tournoi : chaînés, jamais concurrents. */
+const flushing = new Map<number, Promise<boolean>>();
 let lastSweepAt = 0;
 let sweeping: Promise<number> | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -190,9 +192,29 @@ export async function dispatchDueRoundMapsNotices(): Promise<number> {
  * Envoie tout de suite l'annonce de ce tournoi, fenêtre ou non (écran fermé).
  * Au plus une fois par fenêtre et par tournoi ({@link FLUSH_MIN_INTERVAL_MS}) :
  * au-delà, rien ne part et la fenêtre de silence enverra l'annonce.
+ *
+ * `ownRounds` (clés `phaseId:bracket:roundNumber`) : les manches que l'écran
+ * fermé a écrites. L'annonce en attente ne part que si **toutes** ses manches en
+ * sont : une manche qu'un autre membre du staff règle encore reste à la fenêtre
+ * de silence, sinon sa série partirait en deux lignes. Sans liste, tout part.
  * @returns `true` si un message est parti.
  */
-export async function flushRoundMapsNotice(tournamentId: number): Promise<boolean> {
+export async function flushRoundMapsNotice(tournamentId: number, ownRounds?: readonly string[]): Promise<boolean> {
+  // Un envoi à la fois par tournoi : une seconde fermeture qui tombe pendant la lecture de la
+  // première attend son verdict au lieu d'être écartée par le plafond qu'elle a réservé (et qu'elle
+  // rend si rien n'est parti) — ses propres manches ne retombent pas à la fenêtre de silence.
+  const queued = (flushing.get(tournamentId) ?? Promise.resolve(false))
+    .catch(() => false)
+    .then(() => flushNow(tournamentId, ownRounds));
+  flushing.set(tournamentId, queued);
+  try {
+    return await queued;
+  } finally {
+    if (flushing.get(tournamentId) === queued) flushing.delete(tournamentId);
+  }
+}
+
+async function flushNow(tournamentId: number, ownRounds?: readonly string[]): Promise<boolean> {
   const now = Date.now();
   if (now - (lastFlushAt.get(tournamentId) ?? 0) < FLUSH_MIN_INTERVAL_MS) return false;
   // Réservé avant le premier `await` : deux fermetures simultanées ne passent
@@ -203,7 +225,14 @@ export async function flushRoundMapsNotice(tournamentId: number): Promise<boolea
   try {
     const db = await getDatabase();
     const [rows] = await db.execute<NoticeRow[]>(`${NOTICE_SELECT} WHERE n.tournament_id = ?`, [tournamentId]);
-    sent = (await sendClaimed(rows)) > 0;
+    const own = ownRounds ? new Set(ownRounds) : null;
+    const claimable = own
+      ? rows.filter((row) => {
+          const pending = parsePending(row.rounds_json);
+          return pending.length > 0 && pending.every((round) => own.has(roundKey(round)));
+        })
+      : rows;
+    sent = (await sendClaimed(claimable)) > 0;
     // L'écran fermé demande un envoi immédiat : le résumé ne reste pas dans le
     // lot du journal du tournoi (`LOG_BATCHING.md`), qui part avec lui.
     if (sent) await flushBotLogBatch({ tournamentId, category: "maps" });
@@ -231,6 +260,7 @@ export function scheduleRoundMapsNotice(): void {
 export function resetRoundMapsNoticeState(): void {
   lastSweepAt = 0;
   lastFlushAt.clear();
+  flushing.clear();
   sweeping = null;
   if (timer) clearTimeout(timer);
   timer = null;
