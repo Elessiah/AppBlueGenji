@@ -294,6 +294,8 @@ async function createTeamChannel(
   }
   if (created.kind === "ok") {
     await writeChannel(matchId, teamId, created.value);
+    // Le bot vient de répondre : pas de seconde demande identique dans la même passe.
+    sweep.checkedAt.set(key, Date.now());
     return true;
   }
   const shownFailed = existing?.released_at === null && existing.failed_at !== null;
@@ -317,7 +319,8 @@ async function releaseChannels(touched: Set<number>): Promise<void> {
           `UPDATE bg_match_voice_channels SET failed_at = NOW() WHERE match_id = ? AND team_id = ? AND released_at IS NULL`,
           [Number(row.match_id), Number(row.team_id)],
         );
-        continue;
+        // Bot injoignable : inutile d'attendre le délai de chaque salon suivant, la prochaine passe reprend.
+        break;
       }
     }
     await run(
@@ -352,6 +355,9 @@ async function purgeReleasedRows(): Promise<void> {
   sweep.purgedAt = Date.now();
 }
 
+/** Salons ouverts lus par passe : plus large que le lot revérifié, pour que la rotation les atteigne tous. */
+const VOICE_RECHECK_WINDOW = 400;
+
 /**
  * Salons ouverts des matchs dus : redemandés au bot par leur clé au plus une
  * fois par `VOICE_RECHECK_MS` et par salon. Le bot rend le même salon, ou un
@@ -372,32 +378,54 @@ export const OPEN_DUE_CHANNELS_SQL = `SELECT v.match_id, v.team_id, v.channel_id
    AND m.start_at >= NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
    AND (v.team_id <=> m.team1_id OR v.team_id <=> m.team2_id)
  ORDER BY m.start_at, v.match_id, v.team_id
- LIMIT ${VOICE_SWEEP_BATCH * 2}`;
+ LIMIT ${VOICE_RECHECK_WINDOW}`;
 
 /** Un salon ouvert n'est redemandé qu'une fois par minute. */
 const VOICE_RECHECK_MS = 60_000;
+/** Appels au bot en parallèle pendant la revérification : une passe ne s'éternise pas sur un bot lent. */
+const VOICE_RECHECK_CONCURRENCY = 5;
+/** Au plus tant de salons revérifiés par passe, les plus anciennement vus d'abord. */
+const VOICE_RECHECK_BATCH = VOICE_SWEEP_BATCH * 2;
 
 type OpenRow = RowDataPacket & { match_id: number; team_id: number; channel_id: string; tournament_id: number; team_name: string };
+
+/** Revérifie un salon ouvert ; `false` si le bot n'a pas répondu (le reste de la passe s'arrête alors). */
+async function recheckOneChannel(row: OpenRow, touched: Set<number>): Promise<boolean> {
+  const key = voiceChannelKey(Number(row.match_id), Number(row.team_id));
+  let ensured = await ensureVoiceChannel(key, visibleText(String(row.team_name)));
+  if (ensured.kind !== "ok" && ensured.code === "INVALID_VOICE_CHANNEL_NAME") {
+    ensured = await ensureVoiceChannel(key, VOICE_FALLBACK_CHANNEL_NAME);
+  }
+  // Une panne ici ne dit rien du salon : il reste tel qu'il est, redemandé plus tard.
+  if (ensured.kind !== "ok") return false;
+  if (ensured.value !== String(row.channel_id)) {
+    await writeChannel(Number(row.match_id), Number(row.team_id), ensured.value);
+    touched.add(Number(row.tournament_id));
+  }
+  return true;
+}
 
 async function recheckOpenChannels(touched: Set<number>): Promise<void> {
   const rows = await run<OpenRow[]>(OPEN_DUE_CHANNELS_SQL);
   const now = Date.now();
   const seen = new Set<string>();
+  const due: { key: string; row: OpenRow }[] = [];
   for (const row of rows) {
     const key = voiceChannelKey(Number(row.match_id), Number(row.team_id));
     seen.add(key);
-    if (now - (sweep.checkedAt.get(key) ?? 0) < VOICE_RECHECK_MS) continue;
-    sweep.checkedAt.set(key, now);
-    let ensured = await ensureVoiceChannel(key, visibleText(String(row.team_name)));
-    if (ensured.kind !== "ok" && ensured.code === "INVALID_VOICE_CHANNEL_NAME") {
-      ensured = await ensureVoiceChannel(key, VOICE_FALLBACK_CHANNEL_NAME);
-    }
-    // Une panne ici ne dit rien du salon : il reste tel qu'il est, redemandé plus tard.
-    if (ensured.kind === "ok" && ensured.value !== String(row.channel_id)) {
-      await writeChannel(Number(row.match_id), Number(row.team_id), ensured.value);
-      touched.add(Number(row.tournament_id));
-    }
+    if (now - (sweep.checkedAt.get(key) ?? 0) >= VOICE_RECHECK_MS) due.push({ key, row });
   }
+  // Les plus anciennement vus d'abord : aucun salon n'est affamé par ceux qui le précèdent.
+  due.sort((a, b) => (sweep.checkedAt.get(a.key) ?? 0) - (sweep.checkedAt.get(b.key) ?? 0));
+  let botDown = false;
+  const queue = due.slice(0, VOICE_RECHECK_BATCH);
+  const worker = async (): Promise<void> => {
+    for (let next = queue.shift(); next && !botDown; next = queue.shift()) {
+      sweep.checkedAt.set(next.key, Date.now());
+      if (!(await recheckOneChannel(next.row, touched))) botDown = true;
+    }
+  };
+  await Promise.all(Array.from({ length: VOICE_RECHECK_CONCURRENCY }, worker));
   // Mémoire bornée : seuls les salons encore dus gardent leur horodatage.
   for (const key of sweep.checkedAt.keys()) if (!seen.has(key)) sweep.checkedAt.delete(key);
 }
