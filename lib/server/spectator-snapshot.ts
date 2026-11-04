@@ -274,7 +274,11 @@ export async function publicTournamentSnapshot(
 ): Promise<PublicTournamentView | null> {
   // Une réponse déjà servie à d'autres ne coûte pas de jeton du plafond des
   // lectures publiques : seuls les rendus qui la (re)construisent le paient.
-  if (!isCachedOrLoading(spectatorSnapshotCacheKey(tournamentId)) && !admit()) return null;
+  // Au plafond, la copie échue de moins de 150 s se sert encore, sans base —
+  // comme l'encart (`publicTournamentCard`) du même réseau.
+  if (!isCachedOrLoading(spectatorSnapshotCacheKey(tournamentId)) && !admit()) {
+    return staleSpectatorPayload(tournamentId)?.snapshot ?? null;
+  }
   try {
     return (await getSpectatorPayload(tournamentId, level, client))?.snapshot ?? null;
   } catch (error) {

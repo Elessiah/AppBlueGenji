@@ -1,3 +1,6 @@
+import { isContentionError } from "@/lib/server/mysql-errors";
+import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
+
 /**
  * Ce qu'une ligne d'échec de pm2 dit d'une erreur : **un code, jamais un
  * texte libre**. Le code de l'erreur (`ER_…`, `ECONNREFUSED`) s'il a la forme
@@ -30,11 +33,17 @@ export function isErrorCode(message: string): boolean {
 
 /**
  * Code renvoyé au client pour l'erreur d'un service : son message s'il est un
- * code du site (`LABEL_TOO_LONG`), sinon `fallback` — le texte d'un pilote
+ * code du site (`LABEL_TOO_LONG`), une contention passagère (interblocage,
+ * délai de verrou : `isContentionError`) en `CONCURRENT_UPDATE_RETRY`, que
+ * `fail()` rend en 409 (« réessaie »), sinon `fallback` — le texte d'un pilote
  * (hôte, port, valeur en double) n'atteint jamais une réponse ; il est alors
  * journalisé, réduit à {@link failureReason}.
  */
 export function serviceErrorCode(error: unknown, fallback: string): string {
+  if (isContentionError(error)) {
+    console.warn(`[api] ${fallback} : écriture concurrente, rendue en ${CONCURRENT_UPDATE_RETRY} (${failureReason(error)})`);
+    return CONCURRENT_UPDATE_RETRY;
+  }
   const message = error instanceof Error ? error.message : "";
   if (isErrorCode(message)) return message;
   console.error(`[api] ${fallback} : ${failureReason(error)}`);

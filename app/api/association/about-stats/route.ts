@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     const stat = await createAboutStat({
       value: typeof body.value === "string" ? body.value : "",
       // Un type qui n'est pas un texte est refusé par la validation (`VALUE_EN_INVALID`).
-      valueEn: (body.valueEn ?? null) as string | null,
+      valueEn: body.valueEn ?? null,
       label: typeof body.label === "string" ? body.label : "",
       labelEn: typeof body.labelEn === "string" ? body.labelEn : null,
     });

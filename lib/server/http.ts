@@ -38,6 +38,9 @@ export function fail<T extends object = Record<string, never>>(
   // Même chemin pour un corps non déclaré JSON (`readJsonBody`) : c'est un
   // refus de la requête, jamais une panne du serveur.
   if (message === "UNSUPPORTED_CONTENT_TYPE") status = 415;
+  // Contention déjà ramenée à son code par la route (`serviceErrorCode`) :
+  // le même 409 que le message brut reconnu plus bas.
+  if (message === CONCURRENT_UPDATE_RETRY) status = 409;
   // Interblocage : InnoDB a défait la transaction de cette requête au profit
   // d'une écriture concurrente (saisie de score contre réordonnancement du
   // seeding, par exemple). Rien n'est écrit, et ce n'est ni une panne ni une

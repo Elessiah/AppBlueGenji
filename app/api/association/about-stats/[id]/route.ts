@@ -6,9 +6,9 @@ import { deleteAboutStat, updateAboutStat } from "@/lib/server/about-stats-servi
  * validation (`validateAboutStatInput`) qui refuse un type qui n'est pas un
  * texte (`VALUE_EN_INVALID`) — plutôt que de le lire « vide » et d'effacer.
  */
-function valueEnOf(body: Record<string, unknown>): string | null | undefined {
+function valueEnOf(body: Record<string, unknown>): unknown {
   if (!("valueEn" in body)) return undefined;
-  return body.valueEn as string | null;
+  return body.valueEn;
 }
 
 export const { PUT, DELETE } = itemRoutes({

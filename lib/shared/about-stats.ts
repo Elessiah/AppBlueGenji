@@ -31,6 +31,13 @@ export type AboutStatInput = {
 };
 
 /**
+ * Carte telle que la reçoit une route : `valueEn` n'y est pas encore tenu
+ * d'être un texte — c'est {@link validateAboutStatInput} qui refuse le reste
+ * (`VALUE_EN_INVALID`), et le type oblige chaque appelant à passer par elle.
+ */
+export type AboutStatRequestInput = Omit<AboutStatInput, "valueEn"> & { valueEn?: unknown };
+
+/**
  * Cartes affichées sous le titre « L'association » tant qu'aucune ligne n'existe
  * en base (ou si la base est injoignable). Les `id` négatifs marquent ces cartes
  * « de secours » comme non modifiables côté interface. Partagé client/serveur.
@@ -65,7 +72,7 @@ function cleanField(raw: unknown): unknown {
  * Valide et normalise une carte (valeur + titre). Les deux champs sont requis ;
  * la valeur anglaise est facultative (rognée, vide → `null`).
  */
-export function validateAboutStatInput(input: AboutStatInput): AboutStatValidationResult {
+export function validateAboutStatInput(input: AboutStatRequestInput): AboutStatValidationResult {
   const cleanValue = cleanField(input.value);
   const cleanLabel = cleanField(input.label);
   const value = typeof cleanValue === "string" ? cleanValue : "";

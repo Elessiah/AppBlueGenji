@@ -3,7 +3,7 @@ import { getDatabase } from "./database";
 import { applyDisplayOrder } from "./reorder";
 import {
   type AboutStat,
-  type AboutStatInput,
+  type AboutStatRequestInput,
   FALLBACK_ABOUT_STATS,
   validateAboutStatInput,
 } from "@/lib/shared/about-stats";
@@ -65,7 +65,7 @@ async function loadListAboutStats(): Promise<AboutStat[]> {
 }
 
 /** Crée une carte et la renvoie. Place la nouvelle carte en fin de liste. */
-export async function createAboutStat(input: AboutStatInput): Promise<AboutStat> {
+export async function createAboutStat(input: AboutStatRequestInput): Promise<AboutStat> {
   const validation = validateAboutStatInput(input);
   if (!validation.ok) throw new Error(validation.error);
   const { value, valueEn, label, labelEn } = validation.value;
@@ -86,7 +86,7 @@ export async function createAboutStat(input: AboutStatInput): Promise<AboutStat>
  * Met à jour une carte existante et renvoie sa version mise à jour. `valueEn`
  * absent (`undefined`) conserve la valeur anglaise enregistrée ; `null` ou vide l'efface.
  */
-export async function updateAboutStat(id: number, input: AboutStatInput): Promise<AboutStat> {
+export async function updateAboutStat(id: number, input: AboutStatRequestInput): Promise<AboutStat> {
   const validation = validateAboutStatInput(input);
   if (!validation.ok) throw new Error(validation.error);
   const { value, valueEn, label, labelEn } = validation.value;

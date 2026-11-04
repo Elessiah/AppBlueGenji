@@ -12,8 +12,10 @@
  * Chaque lecture **en base** compte dans le plafond des lectures publiques
  * (`SPECTATOR_READ_RULE`) : une boucle sur des identifiants ne coûte plus une
  * lecture de carte par requête sans limite ; une carte ou une réponse publique
- * **fraîche** en cache (ou en vol) ne prend aucun jeton — une copie échue servie
- * en repli, ou un « introuvable » (jamais gardé), en prend un. Au plafond : `null`, l'encart ou la page générale.
+ * **fraîche** en cache (ou en vol) ne prend aucun jeton, une lecture qui touche
+ * la base (réponse échue à reconstruire, carte absente du cache, « introuvable »
+ * jamais gardé) en prend un. Au plafond : la copie échue de moins de 150 s si
+ * elle existe (sans jeton, sans base), sinon `null` — l'encart ou la page générale.
  */
 import { headers } from "next/headers";
 import { clientIpFromHeaders, clientNetworkKey, enforceRateLimit, SPECTATOR_READ_RULE } from "@/lib/server/api-guard";

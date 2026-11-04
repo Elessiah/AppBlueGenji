@@ -4,6 +4,7 @@ import {
   requestClientIp,
   SPECTATOR_READ_RULE,
 } from "@/lib/server/api-guard";
+import { failureReason } from "@/lib/server/failure-reason";
 import { fail } from "@/lib/server/http";
 import { acceptsGzip } from "@/lib/server/sse-gzip";
 import { currentSpectatorLoadLevel, recordSpectatorRead } from "@/lib/server/spectator-load";
@@ -42,26 +43,18 @@ import {
  */
 export const dynamic = "force-dynamic";
 
-/** `If-None-Match` désigne-t-il cette version ? (liste, faibles compris, `*`) */
-function matchesEtag(header: string | null, etag: string): boolean {
-  if (!header) return false;
-  return header
-    .split(",")
-    .map((tag) => tag.trim().replace(/^W\//, ""))
-    .some((tag) => tag === "*" || tag === etag);
-}
-
 /**
- * Comme {@link matchesEtag}, sans le joker `*` : sous refus, seul qui détient
- * **la** version de la copie a son `304` — un `If-None-Match: *` dirait sinon,
- * par 304 contre 429, si quelqu'un a lu ce tournoi depuis moins de 150 s.
+ * `If-None-Match` désigne-t-il cette version ? (liste, faibles compris). Le
+ * joker `*` ne vaut que hors refus (`allowWildcard`) : sous refus, seul qui
+ * détient **la** version de la copie a son `304` — un `If-None-Match: *` dirait
+ * sinon, par 304 contre 429, si quelqu'un a lu ce tournoi depuis moins de 150 s.
  */
-function holdsExactEtag(header: string | null, etag: string): boolean {
+function matchesEtag(header: string | null, etag: string, allowWildcard = true): boolean {
   if (!header) return false;
   return header
     .split(",")
     .map((tag) => tag.trim().replace(/^W\//, ""))
-    .some((tag) => tag === etag);
+    .some((tag) => (allowWildcard && tag === "*") || tag === etag);
 }
 
 function pollHeaders(pollAfterMs: number): Record<string, string> {
@@ -106,7 +99,7 @@ function refusedRead(
     // qu'il a reçu en repli d'une compression ratée : les deux ont un `304`
     // derrière (`GET`). Une version gzip présentée par un client sans gzip n'en a
     // pas, et tirerait le corps entier d'un réseau refusé.
-    if (stale && (holdsExactEtag(ifNoneMatch, etagOf(stale, gzipped)) || (gzipped && holdsExactEtag(ifNoneMatch, etagOf(stale, false))))) {
+    if (stale && (matchesEtag(ifNoneMatch, etagOf(stale, gzipped), false) || (gzipped && matchesEtag(ifNoneMatch, etagOf(stale, false), false)))) {
       return stale;
     }
     return refusal.response ?? unavailable(level);
@@ -142,7 +135,7 @@ async function readPayload(
     // Base injoignable ou saturée : la copie de moins de 150 s tient la page
     // (sinon les spectateurs passaient en « réessaie » alors que le plateau
     // de la minute précédente était encore là).
-    console.error("[spectator] lecture publique impossible :", error);
+    console.error(`[spectator] lecture publique impossible : ${failureReason(error)}`);
     const copy = staleSpectatorPayload(tournamentId);
     return copy === null ? unavailable(level) : { payload: copy, stale: true, rateRefused: false };
   }
@@ -206,7 +199,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       return new Response(bytes, { status: 200, headers: { ...jsonHeaders, "Content-Encoding": "gzip" } });
     } catch (error) {
       // Visible à l'opérateur : sous pression mémoire, chaque client gzip repasse au corps brut.
-      console.error("[spectator] compression gzip impossible, corps brut servi", error);
+      console.error(`[spectator] compression gzip impossible, corps brut servi : ${failureReason(error)}`);
       return new Response(payload.body, { status: 200, headers: { ...jsonHeaders, ETag: rawEtag } });
     }
   }
