@@ -317,6 +317,36 @@ describe("image du tournoi — éviction de la page sans compte", () => {
     expect(invalidateSpectatorSnapshot).toHaveBeenCalledWith(7);
   });
 
+  it("setTournamentImage_replacingImage_evictsBeforeDeletingOldFile", async () => {
+    mockTournament(OLD_URL);
+    const order: string[] = [];
+    jest.mocked(invalidateSpectatorSnapshot).mockImplementation(() => {
+      order.push("evict");
+    });
+    jest.mocked(deleteStoredImage).mockImplementation(async () => {
+      order.push("delete");
+    });
+
+    await setTournamentImage(7, pngFile(), cover);
+
+    expect(order).toEqual(["evict", "delete"]);
+  });
+
+  it("removeTournamentImage_withImage_evictsBeforeDeletingFile", async () => {
+    mockTournament(OLD_URL);
+    const order: string[] = [];
+    jest.mocked(invalidateSpectatorSnapshot).mockImplementation(() => {
+      order.push("evict");
+    });
+    jest.mocked(deleteStoredImage).mockImplementation(async () => {
+      order.push("delete");
+    });
+
+    await removeTournamentImage(7);
+
+    expect(order).toEqual(["evict", "delete"]);
+  });
+
   it("removeTournamentImage_noImage_evictsNothing", async () => {
     mockTournament(null);
 

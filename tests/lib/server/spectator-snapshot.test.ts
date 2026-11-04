@@ -284,7 +284,7 @@ describe("copie périmée et corps compressé", () => {
 describe("publicTournamentSnapshot", () => {
   it("rend l'instantané public, sans la version des membres", async () => {
     mockedSnapshot.mockResolvedValue(tournamentSnapshot({ version: "membres-v7" }));
-    expect(await publicTournamentSnapshot(5, 0, CLIENT)).not.toHaveProperty("version");
+    expect(await publicTournamentSnapshot(5, 0, CLIENT, () => true)).not.toHaveProperty("version");
   });
 
   it("refus : la copie récente s'il y en a une, sinon null", async () => {
@@ -296,13 +296,13 @@ describe("publicTournamentSnapshot", () => {
     jest.setSystemTime(3_000_000 + 20_000);
     await spendAllTokens();
 
-    expect(await publicTournamentSnapshot(100, 0, CLIENT)).not.toBeNull();
-    expect(await publicTournamentSnapshot(77, 0, CLIENT)).toBeNull();
+    expect(await publicTournamentSnapshot(100, 0, CLIENT, () => true)).not.toBeNull();
+    expect(await publicTournamentSnapshot(77, 0, CLIENT, () => true)).toBeNull();
   });
 
   it("base injoignable : null, sans lever", async () => {
     mockedSnapshot.mockRejectedValue(new Error("ECONNREFUSED"));
-    await expect(publicTournamentSnapshot(5, 0, CLIENT)).resolves.toBeNull();
+    await expect(publicTournamentSnapshot(5, 0, CLIENT, () => true)).resolves.toBeNull();
   });
 
   it("publicTournamentSnapshot_freshCopy_doesNotConsultAdmit", async () => {
@@ -432,8 +432,8 @@ describe("publicTournamentCard", () => {
   it("lit la carte seule, gardée quelques secondes : jamais l'instantané entier", async () => {
     jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 5, name: "Cup" }));
 
-    expect((await publicTournamentCard(5))?.name).toBe("Cup");
-    await publicTournamentCard(5);
+    expect((await publicTournamentCard(5, () => true))?.name).toBe("Cup");
+    await publicTournamentCard(5, () => true);
 
     expect(getVisibleTournamentCard).toHaveBeenCalledTimes(1);
     expect(mockedSnapshot).not.toHaveBeenCalled();
@@ -442,8 +442,8 @@ describe("publicTournamentCard", () => {
   it("ne garde pas un introuvable : un tournoi publié une seconde plus tard s'ouvre aussitôt", async () => {
     jest.mocked(getVisibleTournamentCard).mockResolvedValueOnce(null).mockResolvedValue(tournamentCard({ id: 5 }));
 
-    expect(await publicTournamentCard(5)).toBeNull();
-    expect(await publicTournamentCard(5)).not.toBeNull();
+    expect(await publicTournamentCard(5, () => true)).toBeNull();
+    expect(await publicTournamentCard(5, () => true)).not.toBeNull();
   });
 
   it("consulte `admit` seulement avant une lecture en base, une fois pour des lectures en vol ou en cache", async () => {
@@ -493,21 +493,21 @@ describe("publicTournamentCard", () => {
 
     invalidateSpectatorSnapshot(5);
 
-    expect(await publicTournamentCard(5)).toBeNull();
+    expect(await publicTournamentCard(5, () => true)).toBeNull();
   });
 
   it("l'éviction oublie aussi une carte gardée par le cache de carte seul", async () => {
     jest.mocked(getVisibleTournamentCard).mockResolvedValueOnce(tournamentCard({ id: 5, name: "Gardée" })).mockResolvedValue(null);
-    expect((await publicTournamentCard(5))?.name).toBe("Gardée");
+    expect((await publicTournamentCard(5, () => true))?.name).toBe("Gardée");
 
     invalidateSpectatorSnapshot(5);
 
-    expect(await publicTournamentCard(5)).toBeNull();
+    expect(await publicTournamentCard(5, () => true)).toBeNull();
   });
 
   it("rend null quand la base ne répond pas", async () => {
     jest.mocked(getVisibleTournamentCard).mockRejectedValue(new Error("ECONNREFUSED"));
-    expect(await publicTournamentCard(5)).toBeNull();
+    expect(await publicTournamentCard(5, () => true)).toBeNull();
   });
 
   it("préfère la copie récente de la réponse publique, état recalculé depuis les dates", async () => {
@@ -523,7 +523,7 @@ describe("publicTournamentCard", () => {
     await getSpectatorPayload(5, 0, CLIENT);
     jest.mocked(getVisibleTournamentCard).mockClear();
 
-    const card = await publicTournamentCard(5);
+    const card = await publicTournamentCard(5, () => true);
 
     expect(card?.name).toBe("Copie");
     expect(card?.state).toBe("REGISTRATION");

@@ -257,7 +257,7 @@ describe("page sans compte — mise en page", () => {
     // Une lecture de la réponse publique (route) laisse sa copie, état stocké « à venir ».
     await getSpectatorPayload(12, 0, null);
 
-    const card = await publicTournamentCard(12);
+    const card = await publicTournamentCard(12, () => true);
     expect(card?.state).toBe("REGISTRATION");
   });
 
