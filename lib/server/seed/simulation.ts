@@ -177,30 +177,44 @@ async function playPartialEnduranceRound(
 }
 
 /**
+ * Refus attendus d'une pénalité de fin de simulation : l'équipe est sortie
+ * entre-temps, ou les play-offs ont commencé. Seuls ceux-là arrêtent la boucle
+ * en silence ; toute autre erreur (requête cassée, syntaxe refusée par
+ * MariaDB) remonte, car le seed est le seul contrôle réel du SQL.
+ */
+const EXPECTED_PENALTY_REFUSALS: ReadonlySet<string> = new Set(["TEAM_ALREADY_OUT", "ENDURANCE_PLAYOFFS_STARTED"]);
+
+/**
  * Pose `count` pénalités d'un point, par le service de production, sur les
  * équipes en lice du haut du classement (une par équipe). Le rejeu les
  * applique à la manche courante, comme une sanction prononcée à l'écran.
+ * Le nombre de lignes se coupe en code, jamais par un `LIMIT` interpolé :
+ * une valeur non numérique ou inférieure à 1 ne pose rien, une décimale est
+ * arrondie à l'entier inférieur.
+ *
+ * Exportée pour les tests.
  */
-async function penalizeEnduranceTeams(
+export async function penalizeEnduranceTeams(
   connection: PoolConnection,
   tournamentId: number,
   count: number
 ): Promise<number> {
-  if (count <= 0) return 0;
+  const limit = Math.floor(count);
+  if (!(limit > 0)) return 0;
   const [rows] = await connection.execute<(RowDataPacket & { team_id: number })[]>(
     `SELECT team_id FROM bg_endurance_standings
        WHERE tournament_id = ? AND status = 'ACTIVE'
-       ORDER BY \`rank\` ASC
-       LIMIT ${Math.floor(count)}`,
+       ORDER BY \`rank\` ASC`,
     [tournamentId]
   );
   let penalized = 0;
-  for (const row of rows) {
+  for (const row of rows.slice(0, limit)) {
     try {
       await applyEndurancePenalty(tournamentId, Number(row.team_id), 1, "Test_ retard au check-in", null, connection);
       penalized++;
-    } catch {
-      break;
+    } catch (error) {
+      if (error instanceof Error && EXPECTED_PENALTY_REFUSALS.has(error.message)) break;
+      throw error;
     }
   }
   return penalized;
