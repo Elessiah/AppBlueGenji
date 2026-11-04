@@ -20,10 +20,11 @@ ligne du journal (`sendBotLog` → `POST /internal/log`) rejoint désormais un
   silence.
 - Une ligne d'**alerte** (`botLogKind(category) === "alert"` : relevé des
   arbitres, arbitre qui joue, retrait d'un arbitre ou d'un caster) part
-  **aussitôt** : l'appel à agir n'attend pas le silence d'une trace.
+  **aussitôt**, précédée des lignes de son tournoi en attente (qui
+  l'expliquent) : l'appel à agir n'attend pas le silence d'une trace.
 - Un lot = un message, une ligne par rangée, dans l'ordre d'arrivée, chaque
-  ligne telle quelle (indentation comprise ; seules les lignes vides sont
-  ignorées). Il n'est
+  ligne telle quelle, indentation comprise (les lignes vides sont ignorées ;
+  rangées vides de tête et blancs de fin tombent). Il n'est
   découpé que si Discord l'impose : 1 900 caractères par message
   (`BOT_LOG_MESSAGE_MAX_CHARS` — 2 000 chez Discord, moins le préfixe
   `[AppBlueGenji] ` du bot) ; une ligne seule plus longue est coupée
@@ -57,9 +58,11 @@ Un identifiant de tournoi reçu en chaîne (colonne relue de MySQL) est accepté
   (résultats, lancement, forfait qui le clôt) ;
 - un résultat fait partir d'abord le lot `tournament` (un lancement qui attend
   son silence ne paraît pas après les résultats) ;
-- une alerte du canal arbitre fait partir d'abord les lots de son tournoi ;
+- une alerte du canal arbitre fait partir d'abord les lots de son tournoi
+  (attente bornée à `ALERT_FLUSH_WAIT_MS`, 2 s : un bot lent ne la retient pas) ;
 - les lignes de deux transactions sortent dans l'**ordre des commits** (un tour
-  pris au commit, attendu au plus `BOT_LOG_ORDER_WAIT_MS`, 10 s).
+  pris au commit, sur `globalThis`, attendu au plus `BOT_LOG_ORDER_WAIT_MS`,
+  1 s — sous le délai de l'arrêt propre). Les alertes n'attendent pas ce tour.
 
 Plusieurs lots vidés ensemble (`flushBotLogBatch` sans catégorie, `flushKeys`)
 partent dans l'ordre de leur **première ligne**. Les envois s'enchaînent **par
@@ -155,7 +158,8 @@ concerné : le bot y gère lui-même la trace.
   d'autre n'écoute le signal, le module **relance le signal** une fois l'envoi
   fini (`process.kill`) : sortie 128 + n, jamais un succès. Un seul vidage par
   processus, partagé par `SIGINT` et `SIGTERM` ; son état vit sur `globalThis`.
-  Après `flushAll`, une ligne demandée part aussitôt.
+  Après `flushAll`, une ligne demandée part aussitôt, pendant
+  `CLOSING_GRACE_MS` (10 s) : un processus qui survit à l'arrêt retrouve ses lots.
 - **Arrêt brutal** : perd les lots en attente (au plus 4 lignes par clé, jusqu'à
   10 minutes de journal dans le pire cas). Rien n'est persisté : le journal n'est pas une
   donnée de référence (pm2 garde la trace d'audit).
