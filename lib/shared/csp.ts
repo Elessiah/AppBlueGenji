@@ -142,21 +142,6 @@ export const SEARCH_HEADER = "x-search";
 /** Nom de l'en-tête de requête par lequel le nonce atteint les composants serveur. */
 export const CSP_NONCE_HEADER = "x-nonce";
 
-/** Étiquette DNS ou octet IPv4 : lettres, chiffres, tiret, rien d'autre. */
-const HOST_LABEL = /^[A-Za-z0-9-]+$/;
-
-/**
- * Vrai si `host` peut entrer tel quel dans une source CSP : nom ou IPv4 fait
- * d'étiquettes non vides, port facultatif de 1 à 65535. Rien qui puisse clore
- * une directive (`;`, espace) ; une IPv6 entre crochets n'est pas exprimable.
- */
-export function isCspHost(host: string): boolean {
-  const [name, port, extra] = host.split(":");
-  if (extra !== undefined || !name) return false;
-  if (port !== undefined && !(/^\d{1,5}$/.test(port) && Number(port) >= 1 && Number(port) <= 65535)) return false;
-  return name.split(".").every((label) => HOST_LABEL.test(label));
-}
-
 /**
  * Rédige la politique.
  *
@@ -176,34 +161,24 @@ export function isCspHost(host: string): boolean {
  * (Next 15) écrit dans le HTML le morceau d'un `loading.tsx` en
  * `<script src async>` **sans nonce**, que `'strict-dynamic'` refuse (il écarte
  * `'self'`) — la fiche d'un tournoi restait sur « Chargement ». Le morceau vient
- * du site : à la place de `'self'`, la source se restreint alors aux morceaux de
- * Next (`<hôte>/_next/`, sans schéma : il suit celui de la page), si bien qu'un
- * `<script src>` sans nonce écrit à la main reste refusé en dev comme il le
- * serait en production. **Tout ou rien** : si un seul hôte n'est pas un nom
- * valable ({@link isCspHost} — un `;`, une espace, une IPv6, un port hors
- * plage), ou s'il n'y en a aucun, la liste entière est écartée et `'self'`
- * reste ; une liste filtrée pourrait perdre l'hôte réel et refuser tous les
- * morceaux. Ce repli est **plus large** : sans `'strict-dynamic'`, `'self'`
- * admet tout script du site, nonce ou non — un oubli de nonce n'y est plus
- * signalé (page ouverte sur `[::1]`, hôte à tiret bas…). On préfère un dev qui
- * charge à un dev bloqué ; le dev webpack, lui, reste strict. Le dev webpack et la production gardent la politique entière :
- * `next build` pose le nonce sur chaque script.
+ * du site, `'self'` le couvre. Le prix, assumé : sous Turbopack, un
+ * `<script src>` du site sans nonce passe aussi, donc l'oubli d'un nonce ne se
+ * voit qu'en dev webpack (`next dev` sans `--turbopack`) ou en production. Borner
+ * la source à `<hôte>/_next/` a été essayé puis retiré : le serveur ne connaît
+ * pas l'origine qu'a tapée le navigateur (`next dev` réécrit `nextUrl` en
+ * `localhost`, un tunnel réécrit `Host`), et une seule erreur d'hôte refusait
+ * tous les morceaux. Le dev webpack et la production gardent la politique
+ * entière : `next build` pose le nonce sur chaque script.
  *
  * @param nonce Nonce de la requête, déjà encodé en base64.
  * @param options `dev` autorise `'unsafe-eval'`, dont le rafraîchissement à chaud de Next a besoin ;
- *   `turbopack` (dev Turbopack seulement, ignoré hors `dev`) retire `'strict-dynamic'` et,
- *   avec `scriptHosts` (hôtes visés par la requête, validés ici), borne la source à `<hôte>/_next/`.
+ *   `turbopack` (dev Turbopack seulement, ignoré hors `dev`) retire `'strict-dynamic'`.
  * @returns La politique, prête à être posée en en-tête.
  */
-export function contentSecurityPolicy(
-  nonce: string,
-  options: { dev: boolean; turbopack?: boolean; scriptHosts?: readonly string[] }
-): string {
+export function contentSecurityPolicy(nonce: string, options: { dev: boolean; turbopack?: boolean }): string {
   const turbopackDev = options.dev && options.turbopack === true;
-  const candidates = turbopackDev ? (options.scriptHosts ?? []) : [];
-  const hosts = candidates.every(isCspHost) ? [...new Set(candidates.map((host) => host.toLowerCase()))] : [];
   const scriptSrc = [
-    ...(hosts.length > 0 ? hosts.map((host) => `${host}/_next/`) : ["'self'"]),
+    "'self'",
     `'nonce-${nonce}'`,
     ...(turbopackDev ? [] : ["'strict-dynamic'"]),
     "'unsafe-inline'",

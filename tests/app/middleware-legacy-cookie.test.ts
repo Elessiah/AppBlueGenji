@@ -104,7 +104,7 @@ describe("middleware — politique CSP selon le serveur de développement", () =
   // Sous Jest, le middleware n'est pas compilé par Next : `process.env.TURBOPACK`
   // se lit tel quel, et `Boolean("1")` vaut ce que Next y aurait inscrit.
   const withEnv = (env: { NODE_ENV: NodeJS.ProcessEnv["NODE_ENV"]; TURBOPACK?: string }) => {
-    const { TURBOPACK: _ignored, APP_URL: _appUrl, ...rest } = process.env;
+    const { TURBOPACK: _ignored, ...rest } = process.env;
     jest.replaceProperty(process, "env", { ...rest, ...env });
   };
   const scriptSrc = () =>
@@ -137,74 +137,6 @@ describe("middleware — politique CSP selon le serveur de développement", () =
     Reflect.set(process.env, "TURBOPACK", false);
 
     expect(scriptSrc()).toContain("'strict-dynamic'");
-  });
-
-  // Les hôtes viennent de `requestHosts` (`Host`, `X-Forwarded-Host`, URL — sans
-  // `APP_URL`) et non du seul `nextUrl.origin`, que `next dev` réécrit en `localhost`.
-  const scriptSrcWithHeaders = (headers: Record<string, string>) =>
-    (middleware(new NextRequest("https://bluegenji.test/tournois", { headers })).headers.get(CSP_HEADER) ?? "")
-      .split("; ")
-      .find((part) => part.startsWith("script-src ")) ?? "";
-
-  it("middleware_turbopackDevPlainHost_listsHostAndRequestHost", () => {
-    withEnv({ NODE_ENV: "development", TURBOPACK: "1" });
-
-    const actual = scriptSrcWithHeaders({ host: "127.0.0.1:3457" });
-
-    expect(actual.startsWith("script-src 127.0.0.1:3457/_next/ bluegenji.test/_next/ 'nonce-")).toBe(true);
-    expect(actual).not.toContain("'self'");
-  });
-
-  it("middleware_turbopackDevForwardedHost_addsTunnelHost", () => {
-    withEnv({ NODE_ENV: "development", TURBOPACK: "1" });
-
-    const actual = scriptSrcWithHeaders({ host: "localhost:3000", "x-forwarded-host": "abc.ngrok.app" });
-
-    expect(actual).toContain(" abc.ngrok.app/_next/ ");
-  });
-
-  it("middleware_turbopackDevDuplicateHosts_listsEachOnce", () => {
-    withEnv({ NODE_ENV: "development", TURBOPACK: "1" });
-
-    expect(scriptSrcWithHeaders({ host: "bluegenji.test" }).startsWith("script-src bluegenji.test/_next/ 'nonce-")).toBe(true);
-  });
-
-  it("middleware_turbopackDevHostWithDirectiveInjection_keepsSelf", () => {
-    withEnv({ NODE_ENV: "development", TURBOPACK: "1" });
-
-    const actual = scriptSrcWithHeaders({ host: "evil.test; script-src *" });
-
-    expect(actual.startsWith("script-src 'self' ")).toBe(true);
-    expect(actual).not.toContain("evil.test");
-  });
-
-  it("middleware_turbopackDevIpv6Host_keepsSelf", () => {
-    withEnv({ NODE_ENV: "development", TURBOPACK: "1" });
-
-    expect(scriptSrcWithHeaders({ host: "[::1]:3000" }).startsWith("script-src 'self' ")).toBe(true);
-  });
-
-  // `APP_URL` nomme le site public, pas la page servie en dev.
-  it("middleware_turbopackDevWithAppUrl_omitsPublicHost", () => {
-    withEnv({ NODE_ENV: "development", TURBOPACK: "1" });
-    Reflect.set(process.env, "APP_URL", "https://public.example");
-
-    expect(scriptSrcWithHeaders({ host: "localhost:3000" })).not.toContain("public.example");
-  });
-
-  it("middleware_turbopackDevMissingHost_listsRequestHost", () => {
-    withEnv({ NODE_ENV: "development", TURBOPACK: "1" });
-
-    expect(scriptSrcWithHeaders({}).startsWith("script-src bluegenji.test/_next/ 'nonce-")).toBe(true);
-  });
-
-  it("middleware_turbopackProduction_keepsSelfSource", () => {
-    withEnv({ NODE_ENV: "production", TURBOPACK: "1" });
-
-    const actual = scriptSrc();
-
-    expect(actual.startsWith("script-src 'self' ")).toBe(true);
-    expect(actual).not.toContain("/_next/");
   });
 
   it("middleware_turbopackProduction_keepsStrictDynamic", () => {

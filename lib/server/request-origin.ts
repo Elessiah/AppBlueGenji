@@ -27,23 +27,6 @@ function siteHosts(req: Request): string[] {
       // `APP_URL` illisible : les en-têtes suffisent.
     }
   }
-  hosts.push(...requestHosts(req));
-  return hosts;
-}
-
-/**
- * Hôtes que la requête a visés : `Host`, `X-Forwarded-Host` (liste) quand un
- * relais le pose, puis celui de l'URL. Sans `APP_URL` : le middleware en tire
- * les sources `script-src` du dev Turbopack, qui ne doivent nommer que la page
- * servie, pas le site public.
- *
- * **Valeurs non fiables** : le client écrit `Host` et, sans relais qui le
- * nettoie, `X-Forwarded-Host`. Elles ne servent qu'à **comparer** (provenance)
- * ou, validées par `isCspHost`, au seul dev Turbopack ; jamais à bâtir une URL,
- * une redirection ou une politique de production.
- */
-export function requestHosts(req: Request): string[] {
-  const hosts: string[] = [];
   for (const header of ["host", "x-forwarded-host"]) {
     const value = req.headers.get(header);
     if (value) hosts.push(...value.split(",").map((h) => h.trim()).filter(Boolean));

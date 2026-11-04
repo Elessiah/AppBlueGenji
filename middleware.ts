@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { rejectCrossSiteRequest, requestHosts } from "@/lib/server/request-origin";
+import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { siteBaseUrl } from "@/lib/server/site-url";
 import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, SEARCH_HEADER, contentSecurityPolicy } from "@/lib/shared/csp";
 import { apiWriteNeedsProvenance } from "@/lib/shared/request-origin";
@@ -57,20 +57,12 @@ export function middleware(request: NextRequest) {
   crypto.getRandomValues(bytes);
   const nonce = btoa(String.fromCodePoint(...bytes));
 
-  const dev = process.env.NODE_ENV === "development";
-  // Next le remplace à la compilation par un booléen (`define-env`, `true`
-  // sous Turbopack) ; lu à l'exécution, c'est la chaîne "1". `Boolean()`
-  // couvre les deux formes — ni `=== "1"` ni `=== true` ne les couvrirait.
-  const turbopack = Boolean(process.env.TURBOPACK);
   const policy = contentSecurityPolicy(nonce, {
-    dev,
-    turbopack,
-    // Hôtes visés par la requête ({@link requestHosts} : `Host`,
-    // `X-Forwarded-Host` d'un tunnel, URL), et non le seul `nextUrl.origin`,
-    // que `next dev` réécrit en `localhost` — ouverte sur `127.0.0.1`, la page
-    // aurait vu tous ses morceaux refusés. `contentSecurityPolicy` les valide.
-    // Lus seulement là où ils servent : en production, `Host` n'est pas touché.
-    scriptHosts: dev && turbopack ? requestHosts(request) : undefined,
+    dev: process.env.NODE_ENV === "development",
+    // Next le remplace à la compilation par un booléen (`define-env`, `true`
+    // sous Turbopack) ; lu à l'exécution, c'est la chaîne "1". `Boolean()`
+    // couvre les deux formes — ni `=== "1"` ni `=== true` ne les couvrirait.
+    turbopack: Boolean(process.env.TURBOPACK),
   });
 
   const requestHeaders = localizedRequestHeaders(request, locale, path);

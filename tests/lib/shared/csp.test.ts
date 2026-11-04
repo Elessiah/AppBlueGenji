@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { CSP_HEADER, CSP_MODE, CSP_REPORT_PATH, contentSecurityPolicy, isCspHost } from "@/lib/shared/csp";
+import { CSP_HEADER, CSP_MODE, CSP_REPORT_PATH, contentSecurityPolicy } from "@/lib/shared/csp";
 
 /** Lit une directive de la politique, sans son nom. */
 function directive(policy: string, name: string): string | undefined {
@@ -165,105 +165,4 @@ describe("contentSecurityPolicy — dev Turbopack", () => {
     expect(scriptSrc).toContain("'strict-dynamic'");
   });
 
-  // Avec les hôtes, la source se borne aux morceaux de Next : un script sans
-  // nonce écrit à la main reste refusé en dev, comme en production.
-  it("contentSecurityPolicy_turbopackDevWithHosts_restrictsSourceToNextChunks", () => {
-    const scriptSrc = directive(
-      contentSecurityPolicy("n", { dev: true, turbopack: true, scriptHosts: ["127.0.0.1:3457", "bluegenji.test"] }),
-      "script-src"
-    );
-
-    expect(scriptSrc).toBe("127.0.0.1:3457/_next/ bluegenji.test/_next/ 'nonce-n' 'unsafe-inline' 'unsafe-eval'");
-  });
-
-  it("contentSecurityPolicy_turbopackDevEmptyHosts_keepsSelf", () => {
-    const scriptSrc = directive(contentSecurityPolicy("n", { dev: true, turbopack: true, scriptHosts: [] }), "script-src");
-
-    expect(scriptSrc).toBe("'self' 'nonce-n' 'unsafe-inline' 'unsafe-eval'");
-  });
-
-  // Tout ou rien : une liste filtrée pourrait perdre l'hôte réel.
-  it("contentSecurityPolicy_turbopackDevOneInvalidHost_keepsSelf", () => {
-    const scriptSrc = directive(
-      contentSecurityPolicy("n", { dev: true, turbopack: true, scriptHosts: ["127.0.0.1:3457", "x;y"] }),
-      "script-src"
-    );
-
-    expect(scriptSrc).toBe("'self' 'nonce-n' 'unsafe-inline' 'unsafe-eval'");
-  });
-
-  it("contentSecurityPolicy_turbopackDevMixedCaseDuplicates_listsLowercaseOnce", () => {
-    const scriptSrc = directive(
-      contentSecurityPolicy("n", { dev: true, turbopack: true, scriptHosts: ["LOCALHOST:3000", "localhost:3000"] }),
-      "script-src"
-    );
-
-    expect(scriptSrc).toBe("localhost:3000/_next/ 'nonce-n' 'unsafe-inline' 'unsafe-eval'");
-  });
-
-  it("contentSecurityPolicy_webpackDevWithHosts_keepsSelf", () => {
-    const scriptSrc = directive(contentSecurityPolicy("n", { dev: true, scriptHosts: ["bluegenji.test"] }), "script-src");
-
-    expect(scriptSrc).toBe("'self' 'nonce-n' 'strict-dynamic' 'unsafe-inline' 'unsafe-eval'");
-  });
-
-  it("contentSecurityPolicy_productionWithHostsAndTurbopack_keepsFullPolicy", () => {
-    const scriptSrc = directive(
-      contentSecurityPolicy("n", { dev: false, turbopack: true, scriptHosts: ["bluegenji.test"] }),
-      "script-src"
-    );
-
-    expect(scriptSrc).toBe("'self' 'nonce-n' 'strict-dynamic' 'unsafe-inline'");
-  });
-});
-
-// Une source CSP ne tolère ni `;` ni espace, ni IPv6 entre crochets.
-describe("isCspHost", () => {
-  it("isCspHost_nameWithoutPort_returnsTrue", () => {
-    expect(isCspHost("bluegenji.test")).toBe(true);
-  });
-
-  it("isCspHost_lowestPort_returnsTrue", () => {
-    expect(isCspHost("127.0.0.1:1")).toBe(true);
-  });
-
-  it("isCspHost_highestPort_returnsTrue", () => {
-    expect(isCspHost("localhost:65535")).toBe(true);
-  });
-
-  it("isCspHost_portZero_returnsFalse", () => {
-    expect(isCspHost("localhost:0")).toBe(false);
-  });
-
-  it("isCspHost_portAboveRange_returnsFalse", () => {
-    expect(isCspHost("localhost:65536")).toBe(false);
-  });
-
-  it("isCspHost_sixDigitPort_returnsFalse", () => {
-    expect(isCspHost("localhost:100000")).toBe(false);
-  });
-
-  it("isCspHost_nonNumericPort_returnsFalse", () => {
-    expect(isCspHost("localhost:abc")).toBe(false);
-  });
-
-  it("isCspHost_bracketedIpv6_returnsFalse", () => {
-    expect(isCspHost("[::1]:3000")).toBe(false);
-  });
-
-  it("isCspHost_emptyName_returnsFalse", () => {
-    expect(isCspHost(":3000")).toBe(false);
-  });
-
-  it("isCspHost_emptyLabel_returnsFalse", () => {
-    expect(isCspHost("a..b")).toBe(false);
-  });
-
-  it("isCspHost_directiveSeparator_returnsFalse", () => {
-    expect(isCspHost("evil.test;x")).toBe(false);
-  });
-
-  it("isCspHost_space_returnsFalse", () => {
-    expect(isCspHost("evil.test x")).toBe(false);
-  });
 });
