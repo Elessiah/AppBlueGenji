@@ -217,8 +217,8 @@ describe("page d'un match — ce que tout le monde lit", () => {
     const html = render(match({ status: "COMPLETED", team1Score: 3, team2Score: 1, winnerTeamId: ALPHA }), "public");
     const header = visible(html.slice(html.indexOf("<h1"), html.indexOf('data-fact="host"')));
     expect(header).toContain("Bravo 1 – 3");
-    // Les noms se lisent déjà autour (liens) : le score seul, dans l'ordre affiché.
-    expect(header).toContain("Score : 1 à 3");
+    // Le libellé nomme les deux équipes, dans l'ordre affiché : il se lit seul.
+    expect(header).toContain("Score : Bravo 1, Alpha 3");
     expect(header).toContain("Victoire de Alpha");
     expect(html).toContain('class="pill pill-success');
   });
@@ -226,18 +226,18 @@ describe("page d'un match — ce que tout le monde lit", () => {
   it("render_forfeit_screenReaderNamesForfeitingTeam", () => {
     const html = render(match({ status: "COMPLETED", forfeitTeamId: ALPHA, winnerTeamId: BRAVO }), "public");
     const header = visible(html.slice(html.indexOf("<h1"), html.indexOf('data-fact="host"')));
-    expect(header).toContain("Forfait de Alpha");
+    expect(header).toContain("Bravo contre Alpha : forfait de Alpha");
     expect(header).not.toContain("Score :");
   });
 
   it("render_forfeitEnglish_screenReaderNamesForfeitingTeam", () => {
     const html = render(match({ status: "COMPLETED", forfeitTeamId: BRAVO, winnerTeamId: ALPHA }), "public", false, "en");
-    expect(visible(html)).toContain("Forfeit by Bravo");
+    expect(visible(html)).toContain("Bravo versus Alpha: forfeit by Bravo");
   });
 
-  it("render_scoreEnglish_scoreOnlyInDisplayedOrder", () => {
+  it("render_scoreEnglish_scoreNamesBothTeams", () => {
     const html = render(match({ status: "COMPLETED", team1Score: 3, team2Score: 1, winnerTeamId: ALPHA }), "public", false, "en");
-    expect(visible(html)).toContain("Score: 1 to 3");
+    expect(visible(html)).toContain("Score: Bravo 1, Alpha 3");
   });
 
   it("render_nothingForRightColumn_singleColumnGrid", () => {
@@ -256,6 +256,22 @@ describe("page d'un match — ce que tout le monde lit", () => {
     const en = visible(render(match({ startAt: "2026-01-01T00:00:00.000Z", voice }), "staff", false, "en"));
     expect(fr).toContain("salons vocaux à remplir");
     expect(en).toContain("voice channels filling up");
+  });
+
+  it("render_lobbyHeldByVoice_badgeWrapsAndSeparatorHiddenFromReaders", () => {
+    const voice = { team1Members: 1, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true } as const;
+    const held = render(match({ startAt: "2026-01-01T00:00:00.000Z", voice }), "staff");
+    // La pastille (pas seulement la raison) passe à la ligne ; le point médian est décoratif.
+    expect(held).toContain('class="lobby wrap"');
+    expect(held).toContain('<span aria-hidden="true"> · </span><span class="sr-only">. </span>salons vocaux à remplir');
+    const free = render(match({ startAt: "2026-01-01T00:00:00.000Z" }), "staff");
+    expect(free).toContain('class="lobby"');
+    expect(free).not.toContain("wrap");
+  });
+
+  it("launchStripStyles_heldBadge_dropsNowrapOnTheBadgeItself", () => {
+    const css = readSource("app/(secured)/tournois/[id]/_components/MatchLaunchStrip.module.css");
+    expect(css).toMatch(/\.lobby\.wrap,[\s\S]*?\.launched\.wrap \{\s*white-space: normal;/);
   });
 
   it("render_noHost_noSidesFact", () => {
@@ -953,7 +969,7 @@ describe("page d'un match — salons vocaux d'équipe", () => {
     expect(visible(html)).toContain("Le match se lance quand les deux salons sont pleins.");
     // Le remplissage change sans que la personne touche à rien : annoncé.
     expect(html).toContain('aria-live="polite"');
-    expect(html).toMatch(/aria-live="polite">Le match se lance quand/);
+    expect(html).toMatch(/aria-live="polite"><p[^>]*>Le match se lance quand/);
   });
 
   it("render_voiceNotCreated_saysOpeningSoon", () => {
@@ -965,6 +981,8 @@ describe("page d'un match — salons vocaux d'équipe", () => {
     const html = render(match({ voice: { team1Members: 5, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: false } }), "player");
     expect(visible(html)).toContain("Salon vocal : 5/5");
     expect(visible(html)).not.toContain("se lance quand");
+    // La zone vivante reste montée, vide : le texte qui y entrera sera annoncé.
+    expect(html).toContain('<div aria-live="polite"></div>');
   });
 
   it("render_voiceFull_saysFull", () => {
@@ -985,6 +1003,7 @@ describe("page d'un match — salons vocaux d'équipe", () => {
     expect(visible(html)).toContain("Salon vocal : indisponible");
     expect(visible(html)).toContain("Un salon est indisponible : le match n'attend pas les salons.");
     expect(visible(html)).not.toContain("se lance quand");
+    expect(html).toMatch(/aria-live="polite"><p[^>]*>Un salon est indisponible/);
   });
 
   it("render_voiceFailedEnglish_saysUnavailable", () => {
@@ -992,6 +1011,17 @@ describe("page d'un match — salons vocaux d'équipe", () => {
     const html = visible(render(match({ voice }), "staff", false, "en"));
     expect(html).toContain("Voice channel: unavailable");
     expect(html).toContain("Voice channel: 3/5");
+  });
+
+  it("editPage_source_refusalKeepsSavedConfirmationAndSaysEveryRefusal", () => {
+    const source = readSource("app/(secured)/tournois/[id]/modifier/page.tsx");
+    const refusal = source.indexOf("if (refusals.length > 0) {");
+
+    // Ce qui est enregistré à côté d'un refus est confirmé, puis tous les refus sont dits.
+    expect(refusal).toBeGreaterThan(-1);
+    expect(source).toContain("settledRefusals(planningResult, voiceResult)");
+    expect(source.indexOf("showSuccess(", refusal)).toBeLessThan(source.indexOf("throw mergeRefusals(refusals)"));
+    expect(source.indexOf("throw mergeRefusals(refusals)")).toBeLessThan(source.indexOf("router.push("));
   });
 
   it("matchPage_source_voiceFollowsStreamLive", () => {

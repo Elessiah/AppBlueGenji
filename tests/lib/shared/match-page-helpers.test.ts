@@ -2,7 +2,8 @@ import { describe, expect, it } from "@jest/globals";
 import { isoTime } from "@/lib/shared/dates";
 import { castWithoutStartAt, type MatchLiveInput } from "@/lib/shared/live-streams";
 import { shownMapName } from "@/lib/shared/round-maps";
-import { settledValue } from "@/lib/shared/settled-value";
+import { CodedError, errorCode } from "@/lib/shared/field-errors";
+import { mergeRefusals, settledRefusals, settledValue } from "@/lib/shared/settled-value";
 import { launchPhaseBadgeKind } from "@/app/(secured)/tournois/[id]/_lib/launch-strip";
 
 // Petites aides partagées par la page du match et sa carte (lot EF-36).
@@ -79,10 +80,52 @@ describe("settledValue", () => {
     expect(settledValue({ status: "fulfilled", value: true }, false)).toBe(true);
   });
 
-  it("settledValue_rejected_rethrowsReason", () => {
+  it("settledValue_rejected_fallbackNotThrow", () => {
     const reason = new Error("TOURNAMENT_FINISHED");
 
-    expect(() => settledValue({ status: "rejected", reason }, false)).toThrow(reason);
+    expect(settledValue({ status: "rejected", reason }, false)).toBe(false);
+  });
+});
+
+describe("settledRefusals", () => {
+  const refused = (message: string): PromiseSettledResult<boolean> => ({ status: "rejected", reason: new CodedError(message, message) });
+
+  it("settledRefusals_allFulfilledOrNotSent_empty", () => {
+    expect(settledRefusals(null, { status: "fulfilled", value: true })).toEqual([]);
+    expect(settledRefusals()).toEqual([]);
+  });
+
+  it("settledRefusals_oneRefused_itsReasonOnly", () => {
+    const refusals = settledRefusals({ status: "fulfilled", value: true }, refused("VOICE"));
+
+    expect(refusals).toHaveLength(1);
+    expect(errorCode(refusals[0])).toBe("VOICE");
+  });
+
+  it("settledRefusals_bothRefused_keepsSendOrder", () => {
+    expect(settledRefusals(refused("PLANNING"), refused("VOICE")).map(errorCode)).toEqual(["PLANNING", "VOICE"]);
+  });
+});
+
+describe("mergeRefusals", () => {
+  it("mergeRefusals_single_returnedAsIs", () => {
+    const reason = new CodedError("VOICE", "Salons refusés.");
+
+    expect(mergeRefusals([reason])).toBe(reason);
+  });
+
+  it("mergeRefusals_several_sayEveryRefusalWithFirstCode", () => {
+    const merged = mergeRefusals([new CodedError("PLANNING", "Planification refusée."), new CodedError("VOICE", "Salons refusés.")]);
+
+    expect((merged as Error).message).toBe("Planification refusée. Salons refusés.");
+    expect(errorCode(merged)).toBe("PLANNING");
+  });
+
+  it("mergeRefusals_plainErrorsWithoutMessage_skipsEmptyAndUsesUnknownCode", () => {
+    const merged = mergeRefusals(["boom", new Error("Réseau.")]);
+
+    expect((merged as Error).message).toBe("Réseau.");
+    expect(errorCode(merged)).toBe("UNKNOWN");
   });
 });
 

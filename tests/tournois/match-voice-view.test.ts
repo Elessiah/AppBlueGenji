@@ -97,6 +97,16 @@ describe("useMatchVoice — câblage", () => {
     expect(source).toContain("}, [tick, active, match.id]);");
   });
 
+  it("useMatchVoice_source_streamKeyRefWrittenInEffectNotDuringRender", () => {
+    const source = readSource("app/(secured)/tournois/[id]/_lib/match-voice-view.ts");
+
+    // Un rendu écarté ne doit pas estampiller une relecture : la ref suit l'empreinte validée.
+    expect(source).not.toContain("streamKey.current = voiceStreamKey(");
+    expect(source).toMatch(/useEffect\(\(\) => \{\s*streamKey\.current = key;\s*\}, \[key\]\);/);
+    // Posée avant l'effet de relecture, qui la lit.
+    expect(source.indexOf("streamKey.current = key;")).toBeLessThan(source.indexOf("const seen = streamKey.current;"));
+  });
+
   it("matchPageSection_source_passesStreamLiveFromSheet", () => {
     const source = readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
 
