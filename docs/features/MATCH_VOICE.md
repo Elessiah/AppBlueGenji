@@ -45,8 +45,10 @@ et rien n'est compté.
   le rend au bot avec ses reprises — jamais un salon sans ligne.
 - **404 du bot** : seul `VOICE_CHANNEL_NOT_TRACKED` vaut « déjà rendu » ; un autre
   `404` (route absente, `INTERNAL_ROUTE_NOT_FOUND` ; tout autre code, ou un service
-  mal routé, devient `BOT_INTERNAL_REQUEST_FAILED`) est une panne du canal : comptée
-  au coupe-circuit, elle arrête la passe, la ligne reste ouverte. Un code du bot
+  mal routé, devient `BOT_INTERNAL_REQUEST_FAILED`) est une panne du canal : elle
+  arrête la passe sans compter au coupe-circuit (partagé par le journal et les
+  annonces), la ligne reste ouverte. Un rendu refusé pour `INVALID_CHANNEL_ID` clôt la
+  ligne (le bot ne suivra jamais cet identifiant) au lieu d'être redemandé sans fin. Un code du bot
   n'est repris que s'il a la forme `[A-Z0-9_]{1,64}` — jamais une phrase.
   Coût borné : au plus 5 appels au bot en parallèle, 80 salons par passe (les
   plus anciennement vus d'abord, aucun n'est affamé), arrêt de la passe au premier
@@ -55,7 +57,8 @@ et rien n'est compté.
   La création, la revérification et le rendu s'arrêtent chacun à la première panne du canal (la création en panne saute la revérification ; le rendu, indépendant, passe toujours), la suivante reprend ; les matchs dont un salon vient d'échouer passent après les autres dans le lot de création. Seule
   une panne du canal ou du bot entier (`BOT_CIRCUIT_OPEN`, `BOT_INTERNAL_UNREACHABLE`,
   `BOT_VOICE_TIMEOUT`, `INTERNAL_ERROR`, `INTERNAL_ROUTE_NOT_FOUND`, `BOT_INTERNAL_REQUEST_FAILED` —
-  réponse sans code lisible) arrête une passe ; le refus du bot pour un salon (code
+  réponse sans code lisible —, `UNAUTHORIZED`, `INTERNAL_API_TOKEN_NOT_CONFIGURED`,
+  `DISCORD_NOT_READY` : jeton refusé ou absent, bot pas connecté à Discord) arrête une passe ; le refus du bot pour un salon (code
   `VOICE_*`) ne retient que ce salon : les autres sont traités, et il garde son
   horodatage (redemandé après la minute, jamais en tête de file).
 - **Panne du bot** : `failed_at` noté, une ligne pm2 sans donnée de joueur, une
