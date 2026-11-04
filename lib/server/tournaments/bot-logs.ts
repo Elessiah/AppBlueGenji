@@ -438,12 +438,8 @@ function deliverLog(resolved: ResolvedBotLog): void {
 async function flushTournamentBeforeAlert(resolved: ResolvedBotLog): Promise<void> {
   const tournamentId = batchTournamentOf(resolved);
   if (tournamentId === null) return;
-  let flushed: Promise<void>;
-  try {
-    flushed = Promise.resolve(flushBotLogBatch({ tournamentId })).catch(() => undefined);
-  } catch {
-    return; // Meilleur effort : l'alerte part même si le journal n'a pas suivi.
-  }
+  // Meilleur effort : l'alerte part même si le journal n'a pas suivi.
+  const flushed = (async () => flushBotLogBatch({ tournamentId }))().catch(() => undefined);
   await waitAtMost(flushed, ALERT_FLUSH_WAIT_MS);
 }
 
