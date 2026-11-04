@@ -331,7 +331,10 @@ export type BotLogScope = {
 };
 
 /** Vidages d'alerte déjà demandés dans le tour courant, par tournoi (ou catégorie hors tournoi). */
-const scheduledAlertFlushes = new Set<string>();
+// Sur `globalThis`, comme le lot : deux copies du module (routes, instrumentation)
+// partagent la même rafale.
+const alertFlushState = globalThis as typeof globalThis & { __bgBotLogAlertFlushes?: Set<string> };
+const scheduledAlertFlushes = (alertFlushState.__bgBotLogAlertFlushes ??= new Set<string>());
 
 /**
  * Fait partir une alerte **à la fin du tour synchrone** : une rafale d'alertes
