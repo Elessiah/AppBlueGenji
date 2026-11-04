@@ -39,15 +39,27 @@
 }
 
 .table {
+  --wl-col: 70px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
+/* Un nul au tableau : « 12–3 N–4 » ne tient pas dans la colonne V–D ordinaire
+   (il débordait sur les points). La colonne s'élargit pour toutes les lignes
+   (alignement conservé) et le score se resserre. */
+.withDraws {
+  --wl-col: 100px;
+}
+
+.withDraws .wl {
+  font-size: 13px;
+}
+
 .tableHead,
 .row {
   display: grid;
-  grid-template-columns: 32px 1fr 70px 60px 36px;
+  grid-template-columns: 32px 1fr var(--wl-col) 60px 36px;
   gap: 10px;
   align-items: center;
 }
@@ -166,9 +178,17 @@
     padding: 16px;
   }
 
+  .table {
+    --wl-col: 56px;
+  }
+
+  .withDraws {
+    --wl-col: 82px;
+  }
+
   .tableHead,
   .row {
-    grid-template-columns: 24px minmax(0, 1fr) 56px 40px 30px;
+    grid-template-columns: 24px minmax(0, 1fr) var(--wl-col) 40px 30px;
     gap: 8px;
   }
 }
@@ -177,7 +197,7 @@
 @media (max-width: 400px) {
   .tableHead,
   .row {
-    grid-template-columns: 24px minmax(0, 1fr) 56px 40px;
+    grid-template-columns: 24px minmax(0, 1fr) var(--wl-col) 40px;
   }
 
   .trend,

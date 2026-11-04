@@ -106,7 +106,7 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
         </div>
       </div>
 
-      <div className={styles.table} role="table" aria-label={t("leaderboard.tableLabel")} aria-busy={loading}>
+      <div className={`${styles.table} ${rows.some((row) => row.draws > 0) ? styles.withDraws : ""}`} role="table" aria-label={t("leaderboard.tableLabel")} aria-busy={loading}>
         <div className={styles.tableHead} role="row">
           <span role="columnheader">#</span>
           <span role="columnheader">{t("leaderboard.team")}</span>
