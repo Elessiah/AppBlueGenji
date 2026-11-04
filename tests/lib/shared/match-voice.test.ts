@@ -271,6 +271,26 @@ describe("textes des salons vocaux (FR + EN)", () => {
     expect(sentences(enForm.form.teamVoice.description)).toBeLessThanOrEqual(2);
   });
 
+  it("messages_teamVoiceDescription_scopeEitherSideSoloOrGhost", () => {
+    // voiceTracked : aucun salon dès qu'un des deux camps n'est pas éligible.
+    expect(frForm.form.teamVoice.description).toContain("aucun si l'un des deux camps est une entrée solo ou une équipe fantôme");
+    expect(enForm.form.teamVoice.description).toContain("none if either side is a solo entry or a ghost team");
+  });
+
+  it("messages_teamVoiceDescription_gateReleaseAnyBotFailure", () => {
+    // voiceGatePending : levé sur tout échec du bot, pas seulement s'il est injoignable.
+    expect(frForm.form.teamVoice.description).toContain("échec du bot");
+    expect(frForm.form.teamVoice.description).not.toContain("injoignable");
+    expect(enForm.form.teamVoice.description).toContain("the bot fails");
+    expect(enForm.form.teamVoice.description).not.toContain("can't be reached");
+  });
+
+  it("messages_teamVoiceDescription_keptDataPerTeamOfMatch", () => {
+    // Registre T18 : chaque relevé est rattaché au match et à l'équipe.
+    expect(frForm.form.teamVoice.description).toContain("pour chaque équipe du match");
+    expect(enForm.form.teamVoice.description).toContain("For each team in the match");
+  });
+
   it("messages_voiceStateTexts_frenchAndEnglish", () => {
     expect(frMatchPage.voice.uncounted).toBe("Salon vocal : pas encore compté");
     expect(enMatchPage.voice.uncounted).toBe("Voice channel: not counted yet");
