@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
-import { countVoiceChannel, ensureVoiceChannel, releaseVoiceChannel } from "@/lib/server/bot-integration";
+import { ensureVoiceChannel, releaseVoiceChannel } from "@/lib/server/bot-integration";
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -25,21 +25,6 @@ describe("bot-integration — salons vocaux", () => {
       kind: "failed",
       code: "VOICE_MISSING_PERMISSIONS",
     });
-  });
-
-  it("countVoiceChannel_ok_returnsMembers", async () => {
-    jest.spyOn(global, "fetch").mockResolvedValue(json(200, { members: 4 }));
-    await expect(countVoiceChannel("123456789")).resolves.toEqual({ kind: "ok", value: 4 });
-  });
-
-  it("countVoiceChannel_notFound_returnsGone", async () => {
-    jest.spyOn(global, "fetch").mockResolvedValue(json(404, { error: "VOICE_CHANNEL_NOT_FOUND" }));
-    await expect(countVoiceChannel("123456789")).resolves.toEqual({ kind: "gone", code: "VOICE_CHANNEL_NOT_FOUND" });
-  });
-
-  it("countVoiceChannel_badPayload_returnsFailed", async () => {
-    jest.spyOn(global, "fetch").mockResolvedValue(json(200, { members: -1 }));
-    await expect(countVoiceChannel("123456789")).resolves.toEqual({ kind: "failed", code: "BOT_VOICE_BAD_RESPONSE" });
   });
 
   it("releaseVoiceChannel_notTracked_returnsGone", async () => {

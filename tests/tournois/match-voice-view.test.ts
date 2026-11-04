@@ -15,8 +15,8 @@ import { readSource } from "../helpers/read-source";
 // Salons vocaux sur la page du match (`docs/features/MATCH_VOICE.md`) : la
 // source qui fait foi entre l'instantané du flux et la relecture REST.
 
-const streamed: MatchVoiceInfo = { team1State: "OPEN", team2State: "OPEN", pending: true };
-const polledVoice: MatchVoiceInfo = { team1State: "OPEN", team2State: "OPEN", pending: false };
+const streamed: MatchVoiceInfo = { team1State: "OPEN", team2State: "OPEN" };
+const polledVoice: MatchVoiceInfo = { team1State: "OPEN", team2State: "FAILED" };
 
 const polled = (overrides: Partial<PolledMatchVoice> = {}): PolledMatchVoice => ({
   matchId: 34,
@@ -28,10 +28,6 @@ const polled = (overrides: Partial<PolledMatchVoice> = {}): PolledMatchVoice => 
 describe("voiceStreamKey", () => {
   it("voiceStreamKey_null_none", () => {
     expect(voiceStreamKey(null)).toBe("none");
-  });
-
-  it("voiceStreamKey_gateLifted_changesKey", () => {
-    expect(voiceStreamKey({ ...streamed, pending: false })).not.toBe(voiceStreamKey(streamed));
   });
 
   it("voiceStreamKey_stateChange_changesKey", () => {

@@ -160,7 +160,7 @@ describe("GET /api/matches/[matchId]/voice", () => {
 
   it("get_tracked_returnsVoiceStates", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    const voice = { team1State: "OPEN", team2State: "OPEN", pending: true } as const;
+    const voice = { team1State: "OPEN", team2State: "OPEN" } as const;
     jest.mocked(readMatchVoice).mockResolvedValue(voice);
     const res = await GET(getReq(), matchParams("9"));
     expect(res.status).toBe(200);
