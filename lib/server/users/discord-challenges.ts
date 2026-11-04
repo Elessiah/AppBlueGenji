@@ -182,9 +182,10 @@ const DISCORD_CODE_LOCK_TIMEOUT_SECONDS = 1;
  * Émet un code de connexion.
  *
  * **Ne périme pas les codes précédents**, et n'a pas à le faire :
- * {@link verifyDiscordChallenge} ne lit que le **dernier émis du même usage**
- * (`purpose`), si bien qu'un code neuf rend le précédent de cet usage
- * inatteignable par sa seule existence — un code de l'autre usage reste valable. Rien à
+ * {@link consumeDiscordLoginChallenge} (clause `NOT EXISTS`) refuse un défi
+ * qu'un plus récent **du même usage** (`purpose`) a remplacé, si bien qu'un code
+ * neuf rend le précédent de cet usage inatteignable par sa seule existence — un
+ * code de l'autre usage reste valable. Rien à
  * écrire, donc rien qui puisse échouer à mi-chemin. Le corollaire est tenu à
  * l'autre bout : un envoi raté **supprime** sa ligne
  * ({@link discardDiscordChallenge}), faute de quoi la mort-née resterait la
@@ -306,8 +307,8 @@ export async function createDiscordLoginChallenge(
  * Efface un code dont l'envoi a échoué.
  *
  * **Un code qui n'est pas parti ne doit pas survivre à son échec.**
- * `verifyDiscordChallenge` ne lit que le plus récent du même usage : la ligne
- * mort-née masquerait celui que le joueur a réellement reçu, qui serait alors refusé
+ * `consumeDiscordLoginChallenge` refuse un défi qu'un plus récent du même usage
+ * a remplacé : la ligne mort-née masquerait celui que le joueur a réellement reçu, qui serait alors refusé
  * comme invalide — et chaque essai brûlerait le quota de la mauvaise ligne
  * jusqu'à ce qu'elle se consume.
  *
@@ -403,7 +404,7 @@ type ChallengeRow = RowDataPacket & {
   discord_id: string;
   code_hash: string;
   handle: string | null;
-  /** `NULL` : défi antérieur à la colonne (dix minutes de vie), refusé pour les deux usages. */
+  /** `NULL` : défi antérieur à la colonne, que la migration marque consommé ; gardé par prudence, refusé pour les deux usages. */
   purpose: "LOGIN" | "HANDLE" | null;
   expires_at: Date;
   consumed_at: Date | null;
