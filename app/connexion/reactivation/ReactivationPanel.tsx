@@ -40,12 +40,16 @@ export function ReactivationPanel({ finalAt }: Readonly<{ finalAt: string | null
         body: "{}",
       });
       if (!response.ok) {
-        const payload = (await response.json().catch(() => ({}))) as { error?: string; reactivated?: boolean };
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          reactivated?: boolean;
+          suspension?: { endsAt?: string | null };
+        };
         // Compte suspendu : la réactivation est faite, il revient suspendu
         // (décision du 2026-11-04) — l'écran le dit et rend la connexion.
         if (payload.error === ACCOUNT_SUSPENDED && payload.reactivated === true) {
           showSuccess(t("reactivation.doneSuspended"));
-          showError(suspendedLoginText(text, null));
+          showError(suspendedLoginText(text, payload.suspension?.endsAt ?? null));
           router.push("/connexion");
           return;
         }

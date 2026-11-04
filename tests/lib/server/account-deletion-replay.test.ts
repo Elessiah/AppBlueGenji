@@ -132,12 +132,22 @@ describe("replayAccountDeletions — demande en attente (décision du 2026-11-04
     expect(requestAccountDeletion).not.toHaveBeenCalled();
   });
 
-  it("replayAccountDeletions_pendingDryRun_saysRequestWouldReplay", async () => {
+  it("replayAccountDeletions_pendingWindowOpenDryRun_saysRequestWouldReplay", async () => {
+    restoredDb({ 7: { created_at: CREATED, is_deleted: 0 } });
+    const requestedAt = new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString();
+
+    await replayAccountDeletions([pending(requestedAt)], { log, dryRun: true });
+
+    expect(lines.join("\n")).toContain(`demande de suppression du ${requestedAt} à rejouer`);
+    expect(requestAccountDeletion).not.toHaveBeenCalled();
+  });
+
+  it("replayAccountDeletions_pendingWindowClosedDryRun_saysWouldBeDeleted", async () => {
     restoredDb({ 7: { created_at: CREATED, is_deleted: 0 } });
 
     await replayAccountDeletions([pending("2026-09-20T10:00:00.000Z")], { log, dryRun: true });
 
-    expect(lines.join("\n")).toContain("demande de suppression du 2026-09-20T10:00:00.000Z à rejouer");
-    expect(requestAccountDeletion).not.toHaveBeenCalled();
+    expect(lines.join("\n")).toContain("serait supprimé");
+    expect(deleteOwnAccount).not.toHaveBeenCalled();
   });
 });

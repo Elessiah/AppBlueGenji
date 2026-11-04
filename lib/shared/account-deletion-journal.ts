@@ -138,11 +138,15 @@ export function pruneJournal(
     const key = `${entry.userId}|${entry.accountCreatedAt}`;
     const known = byKey.get(key);
     // Une suppression définitive rend caduque la demande en attente du même
-    // compte ; entre deux lignes de même nature, la plus ancienne l'emporte.
+    // compte ; entre deux suppressions définitives, la plus ancienne l'emporte
+    // (elle situe le compte face aux sauvegardes) ; entre deux demandes, la plus
+    // récente (l'ancienne n'a survécu qu'à un retrait manqué à la réactivation).
+    const knownAt = known ? Date.parse(known.deletedAt) : 0;
     const replaces =
       !known ||
       (known.pending === true && entry.pending !== true) ||
-      (Boolean(known.pending) === Boolean(entry.pending) && at < Date.parse(known.deletedAt));
+      (known.pending !== true && entry.pending !== true && at < knownAt) ||
+      (known.pending === true && entry.pending === true && at > knownAt);
     if (replaces) byKey.set(key, entry);
   }
   return [...byKey.values()].sort(

@@ -67,7 +67,7 @@ export async function replayAccountDeletions(
     if (options.dryRun) {
       report.replayed += 1;
       log(
-        entry.pending
+        entry.pending && isReactivationWindowOpen(entry.deletedAt)
           ? `  · #${entry.userId} — demande de suppression du ${entry.deletedAt} à rejouer`
           : `  · #${entry.userId} — serait supprimé (supprimé le ${entry.deletedAt})`,
       );

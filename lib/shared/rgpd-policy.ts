@@ -94,14 +94,14 @@ export const REFEREE_USERNAME_MEMBERS_SCOPE =
  * Tag Discord certifié de l'arbitre désigné, présenté aux seules parties du
  * match — membres de ses deux équipes, ses casters — dans la fenêtre
  * « Contacts » et sur la page du match (lot MATCH-PAGE-CONNECT,
- * `MATCH_PAGE_CONNECT.md`) : depuis le 5 novembre 2026, l'exécution du service,
+ * `MATCH_PAGE_CONNECT.md`) : depuis le 6 novembre 2026, l'exécution du service,
  * strictement nécessaire à son fonctionnement minimum (décision de
  * l'utilisateur du 2026-11-03, auparavant l'intérêt légitime), une fois la
  * version 7 acceptée par l'arbitre — avant, `REFEREE_DISCORD_BEFORE_V7_SCOPE` ; son opposition à
  * l'arbitrage, retenue, l'en retire toujours avec ses matchs non terminés.
  */
 export const REFEREE_DISCORD_SCOPE =
-  "si tu es l'arbitre désigné d'un match, ton tag Discord certifié, dans sa fenêtre « Contacts » et sur sa page, lu par ses deux équipes dès que ses deux adversaires sont connus et jusqu'à sa fin et par ses casters le temps du match (jamais par les arbitres sans rôle sur ce match ni dans la fenêtre de lancement ; si tu le castes aussi, la règle des casters : le temps du match pour ses parties, fenêtre de lancement comprise, et dès que ses deux adversaires sont connus pour les autres arbitres), pour qu'ils puissent te joindre, depuis le 5 novembre 2026 (auparavant, intérêt légitime) et une fois la version 9 des conditions d'utilisation ou une suivante acceptée par toi — strictement nécessaire au fonctionnement minimum du service, sans opposition propre : la présentation cesse avec ton arbitrage du match — retrait par toi ou par le staff, autre arbitre ou autogestion, joueur du match avant son lancement, ton opposition d'arbitre (formulaire de signalement, catégorie RGPD) retenue, qui te retire de tes matchs non terminés, ou la suppression de ton compte —, dès que tu ne remplis plus les conditions de l'arbitrage (tag retiré compris : avant le lancement, tu es aussi retiré du match), et à la fin du match ; si tu le castes aussi, ton tag suit en plus la règle des casters";
+  "si tu es l'arbitre désigné d'un match, ton tag Discord certifié, dans sa fenêtre « Contacts » et sur sa page, lu par ses deux équipes dès que ses deux adversaires sont connus et jusqu'à sa fin et par ses casters le temps du match (jamais par les arbitres sans rôle sur ce match ni dans la fenêtre de lancement ; si tu le castes aussi, la règle des casters : le temps du match pour ses parties, fenêtre de lancement comprise, et dès que ses deux adversaires sont connus pour les autres arbitres), pour qu'ils puissent te joindre, depuis le 6 novembre 2026 (auparavant, intérêt légitime) et une fois la version 9 des conditions d'utilisation ou une suivante acceptée par toi — strictement nécessaire au fonctionnement minimum du service, sans opposition propre : la présentation cesse avec ton arbitrage du match — retrait par toi ou par le staff, autre arbitre ou autogestion, joueur du match avant son lancement, ton opposition d'arbitre (formulaire de signalement, catégorie RGPD) retenue, qui te retire de tes matchs non terminés, ou la suppression de ton compte —, dès que tu ne remplis plus les conditions de l'arbitrage (tag retiré compris : avant le lancement, tu es aussi retiré du match), et à la fin du match ; si tu le castes aussi, ton tag suit en plus la règle des casters";
 
 /**
  * Même présentation du tag Discord, pour un arbitre qui n'a pas encore accepté
@@ -109,7 +109,7 @@ export const REFEREE_DISCORD_SCOPE =
  * comme son pseudo et son BattleTag (`REFEREE_BATTLETAG_BEFORE_V7_SCOPE`).
  */
 export const REFEREE_DISCORD_BEFORE_V7_SCOPE =
-  "la même présentation de ton tag Discord certifié d'arbitre désigné, tant que tu n'as pas accepté la version 9 des conditions d'utilisation ou une version suivante — opposition par le formulaire de signalement, catégorie RGPD (retenue, tu es retiré de tous tes matchs non terminés et ne peux plus en prendre un ni t'en voir confier un tant qu'elle n'est pas levée — à ta seule demande —, même une fois la version 7 ou une suivante acceptée)";
+  "la même présentation de ton tag Discord certifié d'arbitre désigné, tant que tu n'as pas accepté la version 9 des conditions d'utilisation ou une version suivante — opposition par le formulaire de signalement, catégorie RGPD (retenue, tu es retiré de tous tes matchs non terminés et ne peux plus en prendre un ni t'en voir confier un tant qu'elle n'est pas levée — à ta seule demande —, même une fois la version 9 ou une suivante acceptée)";
 
 /**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré

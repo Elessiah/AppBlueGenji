@@ -1,6 +1,6 @@
 /**
  * Tag Discord certifié de l'arbitre désigné : base juridique « exécution du
- * service » (fonctionnement minimum nécessaire) depuis le 5 novembre 2026 —
+ * service » (fonctionnement minimum nécessaire) depuis le 6 novembre 2026 —
  * décision T1 de l'utilisateur du 2026-11-03 (MATCH-REFEREE-FINISH).
  */
 import { describe, expect, it } from "@jest/globals";
@@ -103,8 +103,8 @@ describe("Registre T04 et /rgpd — exécution du service, FR et EN", () => {
   it("rgpdPages_refereeDiscordTag_performanceOfServiceFrAndEn", () => {
     const fr = read("app/rgpd/page.tsx");
     const en = read("app/rgpd/RgpdEn.tsx");
-    expect(fr).toContain("relève, depuis le 5 novembre 2026, de l&apos;<strong>exécution du service</strong>, strictement nécessaire à son fonctionnement minimum");
-    expect(en).toContain("falls, since 5 November 2026, under <strong>performance of the service</strong>, strictly necessary for its minimum functioning");
+    expect(fr).toContain("relève, depuis le 6 novembre 2026, de l&apos;<strong>exécution du service</strong>, strictement nécessaire à son fonctionnement minimum");
+    expect(en).toContain("falls, since 6 November 2026, under <strong>performance of the service</strong>, strictly necessary for its minimum functioning");
     expect(fr).not.toContain("les conditions d&apos;utilisation ne la prévoient pas");
     expect(en).not.toContain("the terms of use do not provide for it");
   });
@@ -131,10 +131,10 @@ describe("Textes juridiques alignés sur le code (revue juridique #545)", () => 
     expect(REFEREE_DISCORD_SCOPE).toContain("la présentation cesse avec ton arbitrage du match — retrait par toi ou par le staff, autre arbitre ou autogestion, joueur du match avant son lancement, ton opposition d'arbitre");
     expect(REFEREE_DISCORD_SCOPE).toContain("dès que tu ne remplis plus les conditions de l'arbitrage (tag retiré compris : avant le lancement, tu es aussi retiré du match)");
     expect(REFEREE_DISCORD_SCOPE).toContain("si tu le castes aussi, ton tag suit en plus la règle des casters");
-    expect(REFEREE_DISCORD_SCOPE).toContain("depuis le 5 novembre 2026 (auparavant, intérêt légitime)");
+    expect(REFEREE_DISCORD_SCOPE).toContain("depuis le 6 novembre 2026 (auparavant, intérêt légitime)");
     const en = read("lib/shared/rgpd-policy-en.ts");
     expect(en).toContain("the presentation ends with your refereeing of the match — withdrawal by you or by the staff, another referee or self-management, becoming a player of the match before its launch, your referee objection");
-    expect(en).toContain("since 5 November 2026 (before that, legitimate interest)");
+    expect(en).toContain("since 6 November 2026 (before that, legitimate interest)");
   });
 
   it("rgpdPages_refereeObjectionClause_notDuplicatedFrAndEn", () => {

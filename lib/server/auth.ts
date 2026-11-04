@@ -127,8 +127,10 @@ function fromRow(row: UserRow): AuthUser {
 export async function createSession(userId: number, event: ConnectionLogEvent): Promise<void> {
   // Un compte suspendu n'ouvre pas de session, quelle que soit la porte :
   // `AccountSuspendedError` porte l'exposé de la décision, que la porte rend
-  // lisible (`lib/shared/account-suspension.ts`). Contrôle *avant* toute
-  // écriture ; la course avec un prononcé concurrent est tranchée par
+  // lisible (`lib/shared/account-suspension.ts`). Contrôle avant toute
+  // écriture de session — mais après la demande de suppression en attente, qui
+  // pose d'abord son ticket de réactivation (un compte suspendu se réactive
+  // aussi, décision du 2026-11-04) ; la course avec un prononcé concurrent est tranchée par
   // `getCurrentUser`, qui écarte la session d'un compte suspendu.
   // Un compte dont la suppression est demandée n'ouvre pas de session : dans
   // ses trente jours, la porte renvoie vers l'écran de réactivation, qui

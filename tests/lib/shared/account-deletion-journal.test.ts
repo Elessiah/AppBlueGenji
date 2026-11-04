@@ -170,11 +170,11 @@ describe("demande en attente (décision du 2026-11-04)", () => {
     expect(pruneJournal([final, pending], now)).toEqual([final]);
   });
 
-  it("pruneJournal_twoPending_oldestWins", () => {
-    const first = entry({ pending: true, deletedAt: "2026-10-01T10:00:00.000Z" });
-    const second = entry({ pending: true, deletedAt: "2026-10-05T10:00:00.000Z" });
+  it("pruneJournal_twoPending_newestWins", () => {
+    const stale = entry({ pending: true, deletedAt: "2026-10-01T10:00:00.000Z" });
+    const current = entry({ pending: true, deletedAt: "2026-10-05T10:00:00.000Z" });
 
-    expect(pruneJournal([second, first], now)).toEqual([first]);
+    expect(pruneJournal([current, stale], now)).toEqual([current]);
   });
 
   it("withoutPendingEntry_reactivatedAccount_removesOnlyItsPendingLine", () => {
