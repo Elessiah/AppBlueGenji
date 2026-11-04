@@ -37,21 +37,3 @@
 .launched {
   color: var(--teal-400);
 }
-
-/* Le départ attend les salons vocaux d'équipe : dit dans la pastille
-   « planifié » ou « lancement » (les seules qui précèdent le départ une fois
-   l'heure posée), qui passe alors à la ligne (375 px) — c'est la pastille, pas
-   seulement sa raison, qui lâche `nowrap`. */
-.lobby.wrap,
-.scheduled.wrap {
-  white-space: normal;
-}
-
-/* La raison est une phrase : en minuscules, sans espacement de pastille — une
-   longue ligne en capitales espacées se lirait mal sur 375 px, surtout en anglais. */
-.voiceHeld {
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: normal;
-  overflow-wrap: anywhere;
-}

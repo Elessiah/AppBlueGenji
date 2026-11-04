@@ -223,6 +223,27 @@ describe("setMatchStartAt", () => {
     expect(writes.find((w) => w.sql.startsWith("UPDATE bg_matches"))?.params[0]).toBeNull();
   });
 
+  it("setMatchStartAt_timeChangedLobbyClosed_releasesCheckInOnly", async () => {
+    // Heure passée : le match reste en lancement, rien n'est défait.
+    const { writes } = world({ row: matchRow({ start_at: new Date("2020-06-01T10:00:00Z") }), refereeScheduling: true });
+
+    await setMatchStartAt(42, "2020-06-01T12:00:00Z");
+
+    const release = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_start_notices"));
+    expect(release?.sql).toBe(
+      "DELETE FROM bg_match_start_notices WHERE match_id = ? AND phase IN ('LOBBY_BRIEF_1', 'LOBBY_BRIEF_2') AND EXISTS (SELECT 1 FROM bg_matches m WHERE m.id = ? AND m.lobby_opened_at IS NULL)",
+    );
+    expect(release?.params).toEqual([42, 42]);
+  });
+
+  it("setMatchStartAt_sameTime_checkInKept", async () => {
+    const { writes } = world({ row: matchRow({ start_at: new Date("2020-06-01T12:00:00Z") }), refereeScheduling: true });
+
+    await setMatchStartAt(42, "2020-06-01T12:00:00Z");
+
+    expect(writes.some((w) => w.sql.startsWith("DELETE FROM bg_match_start_notices"))).toBe(false);
+  });
+
   it("efface les paliers quand la date change vraiment, et pose la marque d'observation dans le même geste", async () => {
     const { writes } = world({ row: matchRow({ start_at: new Date("2099-08-29T18:30:00Z") }) });
 
@@ -541,7 +562,9 @@ describe("setMatchStartAt", () => {
       const { writes } = world({ refereeScheduling: true });
       await setMatchStartAt(42, "2020-06-01T12:00:00Z");
       expect(resets(writes)).toBe(false);
-      expect(writes.some((w) => w.sql.startsWith("DELETE FROM bg_match_start_notices"))).toBe(false);
+      // Seul le check-in de l'ancienne heure peut être rendu, jamais les « Prêt ».
+      expect(writes.some((w) => w.sql.startsWith("DELETE FROM bg_match_start_notices WHERE match_id = ? AND phase IN"))).toBe(true);
+      expect(writes.some((w) => w.sql === "DELETE FROM bg_match_start_notices WHERE match_id = ?")).toBe(false);
     });
 
     it("match déjà lancé : jamais défait, même reporté", async () => {

@@ -71,7 +71,6 @@ import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { loadRoundSlots } from "./round-map-slots";
 import { inTransaction } from "./transaction";
-import { voiceGateBlocksLaunch } from "./match-voice";
 
 /** La ligne d'un match telle que le lancement la lit, sans ses casters. */
 export type LaunchMatchBaseRow = RowDataPacket & {
@@ -244,8 +243,15 @@ async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchR
   // repartiraient à la réouverture — comme pour un lancement défait.
   // Première adoption (empreinte vide) : aucune réservation n'a pu être posée,
   // et le DELETE prendrait un verrou d'intervalle inutile sous le verrou du match.
+  // Le check-in de l'appariement qui arrive, déjà parti 15 minutes avant
+  // l'horaire (avant toute ouverture, `./lobby-brief`), reste réservé : sinon il
+  // repartirait à l'ouverture du salon.
   if (row.launch_pairing !== null) {
-    await connection.execute(`DELETE FROM bg_match_start_notices WHERE match_id = ?`, [row.id]);
+    await connection.execute(
+      `DELETE FROM bg_match_start_notices
+       WHERE match_id = ? AND NOT (pairing = ? AND phase IN ('LOBBY_BRIEF_1', 'LOBBY_BRIEF_2'))`,
+      [row.id, key],
+    );
   }
   row.launch_pairing = key;
   row.lobby_opened_at = null;
@@ -530,9 +536,6 @@ async function launchIfAllReady(
   // avant le décompte, sinon le match l'attendrait jusqu'au lancement d'office.
   await releaseIneligibleCasters(connection, row, snapshotBeforeLock);
   if (!allPartiesReady(rowReadiness(row))) return false;
-  // Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) : tous prêts ne
-  // suffit pas tant que les deux salons ne sont pas pleins.
-  if (await voiceGateBlocksLaunch(connection, row)) return false;
   await connection.execute(`UPDATE bg_matches SET launched_at = NOW() WHERE id = ?`, [matchId]);
   const candidate = undecidedCandidate(row);
   if (candidate && undecided) undecided.push(candidate);
@@ -1204,14 +1207,10 @@ export async function maintainMatchLaunches(
     const released = await releaseIneligibleCasters(connection, row, true);
     const undecidedMatch = undecidedCandidate(row);
     if (undecidedMatch) undecided.push(undecidedMatch);
-    // Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) : départ à
-    // l'heure, « Prêt » ou lancement d'office attendent aussi que les deux
-    // salons soient pleins — lu en base seulement, jamais au bot sous verrou.
     const launch =
-      (Number(row.match_launch_phase ?? 0) !== 1 ||
-        allPartiesReady(rowReadiness(row)) ||
-        isAutoLaunchDue(toIso(row.lobby_opened_at), now)) &&
-      !(await voiceGateBlocksLaunch(connection, row));
+      Number(row.match_launch_phase ?? 0) !== 1 ||
+      allPartiesReady(rowReadiness(row)) ||
+      isAutoLaunchDue(toIso(row.lobby_opened_at), now);
     if (launch) {
       await connection.execute(
         `UPDATE bg_matches
@@ -1220,10 +1219,7 @@ export async function maintainMatchLaunches(
         [row.id],
       );
       changed += 1;
-    } else if (row.lobby_opened_at === null && Number(row.match_launch_phase ?? 0) === 1) {
-      // Sans phase de lancement, un match que ses salons vocaux retiennent
-      // n'ouvre aucun lancement : ni appel aux « Prêt » (`player-pushes`), ni
-      // brief du salon, pour un tournoi qui n'a pas de bouton « Prêt ».
+    } else if (row.lobby_opened_at === null) {
       await connection.execute(
         `UPDATE bg_matches SET lobby_opened_at = NOW() WHERE id = ? AND lobby_opened_at IS NULL`,
         [row.id],

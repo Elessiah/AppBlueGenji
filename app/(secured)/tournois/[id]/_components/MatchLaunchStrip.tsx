@@ -22,25 +22,12 @@ import { useSpectatorView } from "@/components/spectator-view";
  * Pastille de la phase de lancement : à planifier, en attente de départ, en
  * lancement (avec le décompte des « Prêt »), ou lancé — la phase vient de
  * `launchPhaseBadgeKind`, seule règle partagée avec `hasLaunchPhaseBadge`.
- * Tant que les salons vocaux d'équipe retiennent le départ (`voice.pending`),
- * la pastille le dit : « Prêt » seul ne lancera pas le match.
  */
 export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatch; phase: MatchLaunchPhase }>) {
   // Libellés de `LAUNCH_PHASE_LABELS` (`match-planning.ts`, français égal testé).
   const { t, locale } = useTournamentPageText();
   const spectator = useSpectatorView();
   const kind = launchPhaseBadgeKind(match, phase);
-  const held = match.voice?.pending === true;
-  // Le séparateur est décoratif ; le lecteur d'écran entend une phrase à part.
-  const voiceHeld = held ? (
-    <span className={styles.voiceHeld}>
-      <span aria-hidden="true"> · </span>
-      <span className="sr-only">. </span>
-      {t("launch.voicePending")}
-    </span>
-  ) : null;
-  // Le texte s'allonge d'une raison : la pastille passe alors à la ligne (375 px, /en).
-  const wrap = held ? ` ${styles.wrap}` : "";
   if (kind === "TO_PLAN") {
     return (
       <span className={styles.toPlan} title={t("launch.toPlanTitle")}>
@@ -52,13 +39,12 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
   if (kind === "SCHEDULED") {
     const startAtTitle = formatMatchStartAtFull(match.startAt, locale);
     return (
-      <span className={`${styles.scheduled}${wrap}`} title={startAtTitle ?? undefined}>
+      <span className={styles.scheduled} title={startAtTitle ?? undefined}>
         <span aria-hidden="true">⏱</span> {t("launch.scheduled")}
         {/* L'heure est déjà dans le bandeau d'horaire juste au-dessus : on ne
             la répète que pour les lecteurs d'écran, qui lisent ce libellé
             seul. */}
         {startAtTitle && <span className="sr-only">{t("launch.scheduledSr", { date: startAtTitle })}</span>}
-        {voiceHeld}
       </span>
     );
   }
@@ -66,9 +52,8 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
     // Sans compte, les « Prêt » ne sont pas servis (`spectatorSnapshot`) : la
     // phase seule, sans un décompte qui dirait toujours « 0 ».
     return (
-      <span className={`${styles.lobby}${wrap}`}>
+      <span className={styles.lobby}>
         <span aria-hidden="true">⏳</span> {t("launch.lobby")}
-        {voiceHeld}
       </span>
     );
   }
@@ -84,13 +69,12 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
       referee: null,
     });
     return (
-      <span className={`${styles.lobby}${wrap}`}>
+      <span className={styles.lobby}>
         <span aria-hidden="true">⏳</span> {t("launch.lobby")} ·{" "}
         <span className="num">
           {count.ready}/{count.expected}
         </span>{" "}
         {t("launch.ready")}
-        {voiceHeld}
       </span>
     );
   }

@@ -284,7 +284,6 @@
     "scheduledSr": " — starts {date}",
     "lobby": "Launching",
     "ready": "ready",
-    "voicePending": "voice channels filling up",
     "launched": "Launched",
     "hostTitle": "Team that creates the in-game lobby (left side)",
     "hostSr": "Host team: ",
@@ -350,11 +349,6 @@
       "settings": "Set the game settings.",
       "inviteCasters": "Invite the match's casters."
     },
-    "owSettings": {
-      "competitive": "Competitive settings",
-      "killcamOff": "Killcam disabled",
-      "pauseOnDisconnect": "Pause when a player disconnects"
-    },
     "undecided": "No decision",
     "undecidedLead": "Neither a referee nor self-management: to be decided.",
     "stream": "Stream {number}",
@@ -364,6 +358,11 @@
     "battletagRequired": "To invite — required",
     "missingTitle": "Match not found",
     "missingText": "This match doesn't exist in this tournament.",
-    "missingBack": "Back to the tournament"
+    "missingBack": "Back to the tournament",
+    "gameSettings": {
+      "competitive": "Competitive settings",
+      "killcamOff": "Killcam disabled",
+      "pauseOnDisconnect": "Pause when a player disconnects"
+    }
   }
 }

@@ -259,13 +259,13 @@ describe("formatLobbyBriefDm — map de départage", () => {
 
   it("formatLobbyBriefDm_tiebreakFr_addsLine", () => {
     expect(formatLobbyBriefDm(side({ tiebreakMap: "Busan" }), URL)).toContain(
-      "• Map de départage (jouée seulement si la série est à égalité après les 3 maps) : « Busan »",
+      "* Map de départage (jouée seulement si la série est à égalité après les 3 maps) : « Busan »",
     );
   });
 
   it("formatLobbyBriefDm_tiebreakEn_addsLine", () => {
     expect(formatLobbyBriefDm(side({ tiebreakMap: "Busan" }), URL, "en")).toContain(
-      "• Tiebreak map (played only if the series is level after the 3 maps): “Busan”",
+      "* Tiebreak map (played only if the series is level after the 3 maps): “Busan”",
     );
   });
 

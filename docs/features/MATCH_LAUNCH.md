@@ -291,7 +291,8 @@ d'elle-même à l'heure de départ d'un match en attente et à son lancement
 d'office (`nextRoomWakeAt`), au lieu d'attendre son filet de cinq minutes.
 
 L'ouverture du salon (`lobby_opened_at`) déclenche aussi, après coup, le
-**brief du salon** aux propriétaires et managers (`MATCH_LOBBY_BRIEF.md`).
+**check-in du match** quand il n'a pas d'horaire — avec un horaire, il est
+déjà parti 15 minutes avant le coup d'envoi (`MATCH_LOBBY_BRIEF.md`).
 
 ## S'inscrire pour caster
 
@@ -596,12 +597,10 @@ ne coûte plus qu'une lecture de session.
 
 ## Salons vocaux d'équipe
 
-Avec l'option « Salons vocaux d'équipe » (`MATCH_VOICE.md`), le lancement attend
-que les salons vocaux des deux équipes soient pleins : avec la phase de lancement,
-« Prêt » et le lancement d'office après 15 min sont retenus (`voiceGateBlocksLaunch`) ;
-sans elle, `matchLaunchPhase` reste `SCHEDULED` après l'heure tant que le verrou
-attend (`voice.pending`). Le lancement forcé par l'arbitrage passe toujours, et une
-panne du bot lève le verrou.
+Avec l'option « Salons vocaux d'équipe » (`MATCH_VOICE.md`), le lancement n'en
+dépend pas (EF-43, décision du 2026-11-04) : « Prêt », le lancement d'office après
+15 min et le lancement forcé se jouent comme dans tout autre tournoi, que les salons
+soient pleins ou non ; le site ne compte personne.
 
 ## Notes reprises de CLAUDE.md
 

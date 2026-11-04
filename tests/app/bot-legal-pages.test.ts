@@ -18,6 +18,12 @@ import {
   PROCESSING_ACTIVITIES,
 } from "@/lib/shared/processing-register";
 import { SITE_HOST } from "@/lib/shared/site-host";
+import {
+  VOICE_BOT_ABANDONED_MAX_HOURS,
+  VOICE_BOT_RELEASED_MAX_HOURS,
+  VOICE_BOT_SWEEP_MINUTES,
+  VOICE_BOT_UNRELEASED_MAX_HOURS,
+} from "@/lib/shared/match-voice";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -494,19 +500,19 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
   });
 
   it("renvoie à « Mon profil » pour couper les messages de match, et avance sa date (FR et EN)", () => {
-    expect(fr).toContain("un joueur, propriétaire ou manager d'équipe, ou un caster, peut couper ceux de ses matchs (horaire, rappel, retrait d'un match, réglages du salon, retrait d'un cast) dans « Mon profil »");
-    expect(fr).toContain("(horaire, rappel, retrait d'un match, réglages du salon, retrait d'un cast)");
-    expect(en).toContain("(time, reminder, removal from a match, lobby settings, removal of a cast)");
+    expect(fr).toContain("chaque destinataire (joueur, membre d'une engagée ou caster) peut couper ceux de ses matchs (horaire, rappel, retrait d'un match, check-in du match, retrait d'un cast) dans « Mon profil »");
+    expect(fr).toContain("(horaire, rappel, retrait d'un match, check-in du match, retrait d'un cast)");
+    expect(en).toContain("(time, reminder, removal from a match, match check-in, removal of a cast)");
     expect(fr).toContain("« un joueur » pour une entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026");
-    expect(en).toContain("a player, team owner or manager, or a caster, can turn off those about their matches (time, reminder, removal from a match, lobby settings, removal of a cast) in “My profile”");
+    expect(en).toContain("each recipient (player, member of an entrant or caster) can turn off those about their matches (time, reminder, removal from a match, match check-in, removal of a cast) in “My profile”");
     // The solo #live username rests on performance of the service, not legitimate interest (user decision 2026-10-14).
     expect(fr).toContain("Le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel n'en relève pas : il repose sur l'exécution du service auquel il s'inscrit — ne pas y être nommé revient à ne pas s'inscrire");
     expect(en).toContain("A player's username in the #live announcement of a solo tournament is not covered: it rests on performance of the service they register for — not being named in it means not registering");
     // Retention of the #live post, as on the site (T16).
     expect(fr).toContain("**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (evening message of the streamed matches: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
-    // TEAM-INVITE-NOTIFY : datée du lendemain de la nuit de déploiement suivant la fusion du 3 novembre 2026.
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["5 novembre 2026", "5 November 2026"]);
+    // EF-43 (salons vocaux) : datée du lendemain de la mise en ligne du 5 novembre 2026.
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["6 novembre 2026", "6 November 2026"]);
   });
 });
 
@@ -537,19 +543,19 @@ describe("politique du bot — messages d'équipe (TEAM-INVITE-NOTIFY)", () => {
   });
 });
 
-describe("politique du bot — réglages du salon (MATCH-REFEREE MR-4)", () => {
+describe("politique du bot — check-in du match (MATCH-CHECKIN)", () => {
   const fr = JSON.stringify(PRIVACY_POLICY.fr);
   const en = JSON.stringify(PRIVACY_POLICY.en);
 
   it("liste le brief parmi les messages remis, certifiés et opposables, avec sa base (FR et EN)", () => {
-    expect(fr).toContain("réglages du salon d'un match envoyés à ceux qui gèrent ses engagées, avis envoyé à un caster dont l'inscription est retirée par un autre que lui, alerte d'arbitrage");
-    expect(fr).toContain("(code, horaire, rappel, retrait d'un match, réglages du salon, retrait d'un cast, avis de modération");
-    expect(fr).toContain("ceux des matchs (horaire, rappel, retrait d'un match, réglages du salon, retrait d'un cast) ne partent qu'aux comptes dont le tag Discord est certifié");
-    expect(fr).toContain("intérêt légitime pour les messages privés de match d'un joueur (horaire, rappels, « Match retiré »), les réglages du salon envoyés à ceux qui gèrent les engagées d'un match et l'avis envoyé à un caster dont l'inscription est retirée par un autre que lui, auxquels chacun s'oppose");
-    expect(en).toContain("lobby settings of a match sent to those who manage its entrants, notice to a caster that someone else removed their registration for a match, referee alert");
-    expect(en).toContain("(code, match time, reminder, removal from a match, lobby settings, removal of a cast, moderation notice");
-    expect(en).toContain("those about matches (time, reminder, removal from a match, lobby settings, removal of a cast) only go to accounts with a Discord tag certified");
-    expect(en).toContain("the lobby settings sent to those who manage the entrants of a match and the notice sent to a caster whose registration someone else removes, which each of them objects to");
+    expect(fr).toContain("check-in d'un match envoyé aux membres de ses engagées, avis envoyé à un caster dont l'inscription est retirée par un autre que lui, alerte d'arbitrage");
+    expect(fr).toContain("(code, horaire, rappel, retrait d'un match, check-in du match, retrait d'un cast, avis de modération");
+    expect(fr).toContain("ceux des matchs (horaire, rappel, retrait d'un match, check-in du match, retrait d'un cast) ne partent qu'aux comptes dont le tag Discord est certifié");
+    expect(fr).toContain("intérêt légitime pour les messages privés de match d'un joueur (horaire, rappels, « Match retiré »), le check-in du match envoyé aux membres de ses engagées et l'avis envoyé à un caster dont l'inscription est retirée par un autre que lui, auxquels chacun s'oppose");
+    expect(en).toContain("check-in of a match sent to the members of its entrants, notice to a caster that someone else removed their registration for a match, referee alert");
+    expect(en).toContain("(code, match time, reminder, removal from a match, match check-in, removal of a cast, moderation notice");
+    expect(en).toContain("those about matches (time, reminder, removal from a match, match check-in, removal of a cast) only go to accounts with a Discord tag certified");
+    expect(en).toContain("the match check-in sent to the members of its entrants and the notice sent to a caster whose registration someone else removes, which each of them objects to");
   });
 });
 
@@ -558,10 +564,10 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
   const en = JSON.stringify(PRIVACY_POLICY.en);
 
   it("déclare l'avis de retrait d'un match parmi les messages remis (FR et EN)", () => {
-    expect(fr).toContain("horaire ou rappel de match, avis de retrait d'un match (« Match retiré »), réglages du salon");
-    expect(fr).toContain("(code, horaire, rappel, retrait d'un match, réglages du salon, retrait d'un cast, avis de modération");
-    expect(en).toContain("match time or reminder, notice of removal from a match (“Match retiré”), lobby settings");
-    expect(en).toContain("(code, match time, reminder, removal from a match, lobby settings, removal of a cast, moderation notice");
+    expect(fr).toContain("horaire ou rappel de match, avis de retrait d'un match (« Match retiré »), check-in d'un match envoyé aux membres de ses engagées");
+    expect(fr).toContain("(code, horaire, rappel, retrait d'un match, check-in du match, retrait d'un cast, avis de modération");
+    expect(en).toContain("match time or reminder, notice of removal from a match (“Match retiré”), check-in of a match");
+    expect(en).toContain("(code, match time, reminder, removal from a match, match check-in, removal of a cast, moderation notice");
   });
 
   it("donne une base à l'alerte AutoMod d'une annonce #live bloquée ou signalée (FR et EN)", () => {
@@ -570,20 +576,20 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
   });
 
   it("les conditions du bot citent aussi l'avis « Match retiré » parmi les messages remis (FR et EN)", () => {
-    expect(JSON.stringify(TERMS_OF_SERVICE.fr)).toContain("rappels de match, réglages du salon d'un match, avis de retrait d'un match (« Match retiré ») et avis envoyé à un caster dont l'inscription est retirée par un autre que lui");
-    expect(JSON.stringify(TERMS_OF_SERVICE.en)).toContain("match reminders, the lobby settings of a match, notices of removal from a match (“Match retiré”) and the notice sent to a caster whose registration for a match is removed by someone else");
+    expect(JSON.stringify(TERMS_OF_SERVICE.fr)).toContain("rappels de match, check-in d'un match, avis de retrait d'un match (« Match retiré ») et avis envoyé à un caster dont l'inscription est retirée par un autre que lui");
+    expect(JSON.stringify(TERMS_OF_SERVICE.en)).toContain("match reminders, the check-in of a match, notices of removal from a match (“Match retiré”) and the notice sent to a caster whose registration for a match is removed by someone else");
     // DM-CERTIFIED-ONLY (revue légale) : les conditions disent, comme la politique, que ces messages de match ne partent qu'aux tags certifiés.
     expect(JSON.stringify(TERMS_OF_SERVICE.fr)).toContain("— ces messages de match aux seuls comptes dont le tag Discord est certifié sur le site —");
     expect(JSON.stringify(TERMS_OF_SERVICE.en)).toContain("— these match messages only to accounts with a Discord tag certified on the website —");
   });
 
-  // TERMS v7 : l'article 01 des conditions du bot cite les réglages du salon
+  // TERMS v7 citait les réglages du salon ; la v9 (MATCH-CHECKIN) cite le check-in du match
   // (MATCH-REFEREE MR-4) parmi les messages de match remis, réservés aux tags
   // certifiés comme les autres ; datée du lendemain de la mise en ligne du 28 octobre.
-  it("les conditions du bot citent les réglages du salon parmi les messages de match remis (FR et EN)", () => {
+  it("les conditions du bot citent le check-in du match parmi les messages de match remis (FR et EN)", () => {
     const terms = { fr: JSON.stringify(TERMS_OF_SERVICE.fr), en: JSON.stringify(TERMS_OF_SERVICE.en) };
-    expect(terms.fr).toMatch(/rappels de match, réglages du salon d'un match, avis de retrait d'un match \(« Match retiré »\) et avis envoyé à un caster dont l'inscription est retirée par un autre que lui — ces messages de match aux seuls comptes dont le tag Discord est certifié/);
-    expect(terms.en).toMatch(/match reminders, the lobby settings of a match, notices of removal from a match \(“Match retiré”\) and the notice sent to a caster whose registration for a match is removed by someone else — these match messages only to accounts with a Discord tag certified/);
+    expect(terms.fr).toMatch(/rappels de match, check-in d'un match, avis de retrait d'un match \(« Match retiré »\) et avis envoyé à un caster dont l'inscription est retirée par un autre que lui — ces messages de match aux seuls comptes dont le tag Discord est certifié/);
+    expect(terms.en).toMatch(/match reminders, the check-in of a match, notices of removal from a match \(“Match retiré”\) and the notice sent to a caster whose registration for a match is removed by someone else — these match messages only to accounts with a Discord tag certified/);
   });
 
   it("déclare qu'un blocage ou un signalement AutoMod peut porter l'annonce #live aux modérateurs (FR et EN)", () => {
@@ -621,5 +627,47 @@ describe("politique du bot — sauvegardes deux fois par semaine (BACKUP-SCHEDUL
   it("ne dit plus « chaque semaine » ni « weekly » pour les sauvegardes", () => {
     expect(flatOf(PRIVACY_POLICY, "fr")).not.toContain("sauvegardée chaque semaine");
     expect(flatOf(PRIVACY_POLICY, "en")).not.toContain("backed up weekly");
+  });
+});
+
+describe("politique du bot — salons vocaux d'équipe (EF-43, registre T18)", () => {
+  const fr = JSON.stringify(PRIVACY_POLICY.fr);
+  const en = JSON.stringify(PRIVACY_POLICY.en);
+
+  it("privacyPolicy_voiceChannels_dataParagraphLinksT18NoCountMemoryOnlyFrAndEn", () => {
+    expect(fr).toContain("Salons vocaux d'équipe des matchs");
+    expect(fr).toContain("(/rgpd#salons-vocaux) (traitement T18)");
+    expect(fr).toContain("sans jamais l'enregistrer ni le transmettre au site, l'état vocal des membres du serveur de l'association");
+    expect(fr).toContain("Il ne compte personne et ne dit jamais au site qui se trouve dans un salon.");
+    expect(en).toContain("Team voice channels for matches");
+    expect(en).toContain("(/rgpd#salons-vocaux) (processing activity T18)");
+    expect(en).toContain("without ever recording it or sending it to the website, the voice state of the members of the association's server");
+    expect(en).toContain("It counts no one and never tells the website who is in a channel.");
+  });
+
+  it("privacyPolicy_voiceChannels_heldAtAllTimesWhateverTheOptionFrAndEn", () => {
+    expect(fr).toContain("il tient en mémoire en permanence, que l'option soit allumée ou non dans un tournoi");
+    expect(en).toContain("it holds in memory at all times, whether or not a tournament has the option on");
+  });
+
+  it("privacyPolicy_voiceChannels_legitimateInterestFrAndEn", () => {
+    expect(fr).toContain("Les salons vocaux d'équipe reposent aussi sur son intérêt légitime (bon déroulement des tournois).");
+    expect(en).toContain("Team voice channels also rest on its legitimate interest (smooth running of tournaments).");
+  });
+
+  it("privacyPolicy_voiceChannels_retentionUsesBotConstantsFrAndEn", () => {
+    expect(fr).toContain(`au plus tard ${VOICE_BOT_RELEASED_MAX_HOURS} heures et ${VOICE_BOT_SWEEP_MINUTES} minutes après son rendu même occupé`);
+    expect(fr).toContain(`il est supprimé s'il est vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise`);
+    expect(fr).toContain(`oubliée ${VOICE_BOT_ABANDONED_MAX_HOURS} heures après sa création ou sa reprise si le Bot ne peut plus lire le salon`);
+    expect(fr).toContain("Le journal d'audit de Discord garde la création et la suppression de chaque salon, avec son nom");
+    expect(en).toContain(`within ${VOICE_BOT_RELEASED_MAX_HOURS} hours and ${VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest even if occupied`);
+    expect(en).toContain(`it is deleted if it is empty ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation or its reuse`);
+    expect(en).toContain(`forgotten ${VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation or its reuse if the Bot can no longer read the channel`);
+    expect(en).toContain("Discord's audit log keeps the creation and deletion of each channel, with its name");
+  });
+
+  it("privacyPolicy_voiceChannels_recipientsIncludeMatchCategoryAndAuditLogFrAndEn", () => {
+    expect(fr).toContain("Les membres du serveur Discord de l'association autorisés dans la catégorie des matchs, qui voient les salons vocaux d'équipe et leurs occupants");
+    expect(en).toContain("Members of the association's Discord server allowed in the match category, who see the team voice channels and their occupants");
   });
 });

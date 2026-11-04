@@ -439,6 +439,13 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // (`docs/features/CAST_SETTINGS.md`) : nul partout au départ, donc aucun
     // remplissage — un cast sans tag propre montre celui du compte, comme avant.
     `ALTER TABLE bg_match_casters ADD COLUMN cast_battletag VARCHAR(64) NULL AFTER ready_at`,
+    // EF-43 — le lancement ne dépend plus des salons vocaux d'équipe
+    // (`docs/features/MATCH_VOICE.md`) : le site ne compte plus personne, le
+    // nombre et sa date partent. Déjà jouée ou base neuve :
+    // `ER_CANT_DROP_FIELD_OR_KEY`, ignoré comme toute instruction déjà passée.
+    // `ALGORITHM=COPY` : la table est reconstruite, les nombres quittent ses pages
+    // (un retrait « instantané » de MariaDB les y laisserait jusqu'à la réécriture).
+    `ALTER TABLE bg_match_voice_channels DROP COLUMN members, DROP COLUMN counted_at, ALGORITHM=COPY`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

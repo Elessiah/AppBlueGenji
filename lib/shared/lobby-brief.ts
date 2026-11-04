@@ -1,15 +1,20 @@
 /**
- * Brief du salon (`MATCH_LOBBY_BRIEF`) — la règle et le texte du message privé
- * Discord, sans réseau ni base (`docs/features/MATCH_LOBBY_BRIEF.md`).
+ * Check-in du match (`MATCH_LOBBY_BRIEF`) — la règle et le texte du message
+ * privé Discord, sans réseau ni base (`docs/features/MATCH_LOBBY_BRIEF.md`).
  *
- * Quand le salon d'un match s'ouvre, ceux qui gèrent chaque engagée (`OWNER`,
- * `MANAGER` ; le joueur d'une entrée solo) reçoivent les réglages de la partie :
- * qui joue à gauche (l'hôte) et à droite, la première carte, le premier ban, le
- * rappel de trier les joueurs par rôle quand le match est casté, et ce que dit
- * la décision d'arbitrage (arbitre désigné ou autogestion). Puis le lien de la
- * page du match, qui seule montre les BattleTags à inviter — en Overwatch : en
- * Marvel Rivals, où l'on ne s'invite pas par BattleTag, ni le lien ni la ligne
- * de l'arbitre n'en parlent (décision 35, 2026-10-28).
+ * **Un seul message, 15 minutes avant le coup d'envoi** (décision de
+ * l'utilisateur, 2026-11-04) : le brief du salon et le rappel des règles de
+ * l'autogestion sont fusionnés. Les joueurs des deux engagées reçoivent le
+ * check-in du match — vocal d'équipe, qui héberge, paramètres de partie,
+ * déroulé des maps, cast, saisie des scores, et à qui s'adresser en cas de
+ * problème. Un match **sans horaire** n'a pas de repère H-15 : son check-in
+ * part à l'ouverture du salon (repli, `LOBBY_BRIEF_LEAD_MINUTES`).
+ *
+ * Ce que dit la décision d'arbitrage (arbitre désigné ou autogestion) y reste,
+ * ainsi que le lien de la page du match, qui seule montre les BattleTags à
+ * inviter — en Overwatch : en Marvel Rivals, où l'on ne s'invite pas par
+ * BattleTag, ni le lien ni la ligne de l'arbitre n'en parlent (décision 35,
+ * 2026-10-28).
  *
  * **Ni BattleTag, ni tag Discord, ni pseudo de joueur** (décision de
  * l'utilisateur, 2026-10-27) : seuls les noms d'équipe sont écrits ; en tournoi
@@ -17,11 +22,13 @@
  * « ton adversaire ».
  *
  * Ce module ne garde que ce qui est commun aux deux canaux (le type d'un côté,
- * les noms par place) : il n'importe rien de lourd et reste importable partout.
- * Le message privé se rédige côté serveur (`lib/server/tournaments/lobby-brief-dm.ts`),
- * qui atteint `push-messages.ts` et ses deux langues.
+ * les noms par place, les paramètres de partie) : il n'importe rien de lourd et
+ * reste importable partout. Le message privé se rédige côté serveur
+ * (`lib/server/tournaments/lobby-brief-dm.ts`), qui atteint `push-messages.ts`
+ * et ses deux langues.
  */
 import type { Locale } from "./locales";
+import type { GameSetting } from "./match-page";
 import type { RefereeDecision } from "./match-referee";
 import type { NextBanRule, ResolvedMapSlot } from "./round-maps";
 import type { TournamentGame } from "./types";
@@ -64,7 +71,51 @@ export type LobbyBriefSide = {
   nextBan: NextBanRule;
   /** Au moins un caster inscrit (et éligible) : rappel du tri par rôle. */
   cast: boolean;
+  /**
+   * Les salons vocaux d'équipe sont suivis pour ce match : l'option du tournoi
+   * est allumée **et** le match est suivi (`MATCH_VOICE.md` : jamais pour une
+   * entrée solo ni contre une fantôme). Faux, la ligne du vocal n'est pas
+   * écrite — le bot n'ouvrira aucun salon, l'annoncer serait faux.
+   */
+  voice?: boolean;
+  /**
+   * Lien de diffusion du match (`bg_match_streams`, `firstStreamUrlSql`),
+   * écrit sous la section du cast ; `null` quand aucun n'est public — la ligne
+   * est alors tue plutôt que d'annoncer un live introuvable.
+   */
+  streamUrl?: string | null;
   decision: RefereeDecision;
+};
+
+/**
+ * Combien de temps avant le coup d'envoi part le check-in du match.
+ *
+ * Aligné sur l'ouverture des salons vocaux (`VOICE_CHANNEL_LEAD_MINUTES`) et
+ * du salon de check-in (`CHECK_IN_OPENS_MINUTES_BEFORE`) : les trois décrivent
+ * le même quart d'heure, celui où les joueurs se rassemblent. Les constantes
+ * restent distinctes — déplacer le message ne doit pas déplacer les salons.
+ */
+export const LOBBY_BRIEF_LEAD_MINUTES = 15;
+
+/**
+ * Les paramètres de partie **du check-in**, dans la langue du destinataire.
+ *
+ * La liste et son ordre viennent de `GAME_SETTINGS` (`lib/shared/match-page.ts`),
+ * que la page du match rend par ses propres clés : une seule liste, deux
+ * rendus, tenus ensemble par un test. Ils ne dépendent ni du jeu, ni du
+ * tournoi, ni de la manche : aucune colonne, aucun écran.
+ */
+export const GAME_SETTINGS_TEXT: Readonly<Record<Locale, Readonly<Record<GameSetting, string>>>> = {
+  fr: {
+    competitive: "Mode compétitif",
+    killcamOff: "Pas de killcam",
+    pauseOnDisconnect: "Pause à la déconnexion",
+  },
+  en: {
+    competitive: "Competitive mode",
+    killcamOff: "No killcam",
+    pauseOnDisconnect: "Pause on disconnect",
+  },
 };
 
 /**

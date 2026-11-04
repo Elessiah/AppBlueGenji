@@ -10,7 +10,7 @@ import {
   matchPageSides,
   matchPageStreams,
   selfManagementSteps,
-  OW_SELF_MANAGEMENT_SETTINGS,
+  GAME_SETTINGS,
   SELF_MANAGEMENT_STEPS,
 } from "@/lib/shared/match-page";
 import { bracketMatch, matchCaster } from "../../helpers/bracket-match";
@@ -198,8 +198,8 @@ describe("selfManagementSteps", () => {
     expect(selfManagementSteps(3)).toEqual([...SELF_MANAGEMENT_STEPS]);
   });
 
-  it("réglages Overwatch : compétitif, killcam, pause, dans cet ordre", () => {
-    expect(OW_SELF_MANAGEMENT_SETTINGS).toEqual(["competitive", "killcamOff", "pauseOnDisconnect"]);
+  it("paramètres de partie : compétitif, killcam, pause, dans cet ordre, tous jeux", () => {
+    expect(GAME_SETTINGS).toEqual(["competitive", "killcamOff", "pauseOnDisconnect"]);
   });
 
   it("sans caster, rien à inviter", () => {

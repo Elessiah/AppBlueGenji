@@ -1,12 +1,13 @@
 /**
  * Salons vocaux d'équipe des matchs (`docs/features/MATCH_VOICE.md`) — règles
- * pures, partagées par le serveur (création, verrou du lancement) et par
+ * pures, partagées par le serveur (création, libération) et par
  * l'interface (« Salon vocal : ouvert »).
  *
  * Option du tournoi « Salons vocaux d'équipe » (`bg_tournaments.team_voice_channels`,
  * éteinte par défaut, modifiable à tout moment) : un quart d'heure avant
  * l'heure d'un match, le bot crée un salon vocal par équipe, limité à cinq
- * places ; le lancement attend que les deux soient pleins. Équipes seulement :
+ * places. Le lancement du match n'en dépend pas (décision du 2026-11-04), et
+ * le site ne compte personne : il ne garde que l'identifiant du salon. Équipes seulement :
  * jamais pour une entrée solo (le nom du salon serait un pseudo) ni pour une
  * fantôme (personne ne la rejoindrait).
  */
@@ -16,23 +17,21 @@ import { isoTime } from "./iso-time";
 /** Avance de la création des salons sur l'heure du match (minutes). */
 export const VOICE_CHANNEL_LEAD_MINUTES = 15;
 
-/** Places d'un salon (`userLimit` côté bot) : « plein » = ce nombre de personnes. */
+/** Places d'un salon (`userLimit` côté bot). */
 export const VOICE_CHANNEL_CAPACITY = 5;
 
 /**
- * Âge maximal d'une observation du bot (comptage ou panne) que le verrou croit
- * encore (minutes). Au-delà — match reporté hors du quart d'heure puis revenu,
- * file du balayage en retard — le dernier nombre ne dit plus rien de la salle :
- * le verrou attend un nouveau comptage plutôt que de lancer sur un « 5/5 » ou
- * de lever sur une panne d'hier.
+ * Délai avant de redemander au bot ce qu'il a refusé (création ou rendu d'un
+ * salon), en secondes : une panne du bot coûte un appel par salon et par
+ * minute, pas un par passe du balayage.
  */
-export const VOICE_OBSERVATION_FRESH_MINUTES = 5;
+export const VOICE_RETRY_SECONDS = 60;
 
-/** L'observation datée `at` (ISO) est-elle assez récente à l'instant `now` (ms) ? */
-export function voiceObservationFresh(at: string | null, now: number): boolean {
-  const time = isoTime(at);
-  return time !== null && now - time <= VOICE_OBSERVATION_FRESH_MINUTES * 60_000;
-}
+/**
+ * Retard au-delà duquel un match jamais lancé ne reçoit plus de salon (heures) :
+ * un match oublié au programme n'ouvre pas de salon des jours après son heure.
+ */
+export const VOICE_CHANNEL_LATE_HOURS = 24;
 
 /**
  * Durée de garde d'une ligne de `bg_match_voice_channels` une fois le salon
@@ -80,86 +79,60 @@ export function voiceEligibleTeam(team: { isSolo: boolean; isGhost: boolean }): 
  * Les salons d'un match sont-ils dus à l'instant `now` (ms) ? Un match sans
  * heure n'en a pas ; un match à plus d'un quart d'heure attend ; un match plus
  * proche — ou dont l'heure est passée sans qu'il soit lancé (option allumée en
- * cours de route) — les reçoit aussitôt.
+ * cours de route) — les reçoit aussitôt, sauf passé `VOICE_CHANNEL_LATE_HOURS`.
  */
 export function voiceChannelsDue(startAt: string | null, now: number): boolean {
   const start = isoTime(startAt);
-  return start !== null && start - VOICE_CHANNEL_LEAD_MINUTES * 60_000 <= now;
+  return (
+    start !== null &&
+    start - VOICE_CHANNEL_LEAD_MINUTES * 60_000 <= now &&
+    now - start <= VOICE_CHANNEL_LATE_HOURS * 3_600_000
+  );
 }
 
 /** Ce que l'on sait du salon d'une équipe (`bg_match_voice_channels`). */
 export type VoiceChannelState = {
   /** Identifiant Discord du salon ; `null` : pas encore créé. */
   channelId: string | null;
-  /** Dernier nombre de personnes compté ; `null` : jamais compté. */
-  members: number | null;
   /** Le dernier appel au bot pour ce salon a échoué (injoignable, permission). */
   failed: boolean;
 };
 
-/** Ce que le verrou du lancement doit savoir d'un match. */
-export type VoiceGateInput = {
+/** Ce qu'il faut savoir d'un match pour lui ouvrir des salons. */
+export type VoiceMatchInput = {
   /** Option du tournoi allumée. */
   enabled: boolean;
   /** Heure du match ; `null` : aucun salon (match non programmé). */
   startAt: string | null;
   team1: { isSolo: boolean; isGhost: boolean };
   team2: { isSolo: boolean; isGhost: boolean };
-  /** Salon de chaque équipe de l'appariement courant ; `null` : aucune ligne. */
-  team1Channel: VoiceChannelState | null;
-  team2Channel: VoiceChannelState | null;
 };
 
-/** Le salon est-il plein au dernier comptage ? */
-export function voiceChannelFull(channel: VoiceChannelState | null): boolean {
-  return channel !== null && channel.channelId !== null && (channel.members ?? 0) >= VOICE_CHANNEL_CAPACITY;
-}
-
 /**
- * Le match a-t-il des salons à suivre ? Option allumée, match programmé, deux
- * équipes réelles. Une entrée solo ou une fantôme d'un côté : aucun salon, ni
- * pour l'une ni pour l'autre — un salon d'un seul côté ne verrouillerait rien
- * de juste.
+ * Le match a-t-il des salons ? Option allumée, match programmé, deux équipes
+ * réelles. Une entrée solo ou une fantôme d'un côté : aucun salon, ni pour
+ * l'une ni pour l'autre.
  */
-export function voiceTracked(input: Pick<VoiceGateInput, "enabled" | "startAt" | "team1" | "team2">): boolean {
+export function voiceTracked(input: VoiceMatchInput): boolean {
   return input.enabled && input.startAt !== null && voiceEligibleTeam(input.team1) && voiceEligibleTeam(input.team2);
 }
 
 /**
- * Le verrou retient-il le lancement ? Vrai tant que les deux salons ne sont
- * pas pleins — y compris avant leur création, que le balayage fait au plus
- * tard à l'heure du match.
- *
- * **Levé** si le bot a échoué sur l'un des deux salons (injoignable,
- * permission refusée) : une panne du bot ne bloque jamais un tournoi. Le
- * lancement forcé par l'arbitrage ne passe pas par ici.
- */
-export function voiceGatePending(input: VoiceGateInput): boolean {
-  if (!voiceTracked(input)) return false;
-  if (input.team1Channel?.failed || input.team2Channel?.failed) return false;
-  return !(voiceChannelFull(input.team1Channel) && voiceChannelFull(input.team2Channel));
-}
-
-/**
- * État du salon d'une équipe tel que la page le dit — jamais son nombre de
- * présents, qui ne sert qu'au verrou du lancement (côté serveur) :
+ * État du salon d'une équipe tel que la page le dit :
  * - `WAITING` : pas encore créé (le balayage l'ouvre à T−15) ;
  * - `OPEN` : créé, joignable sur Discord ;
- * - `FAILED` : le bot a échoué sur ce salon (création ou comptage) — le
- *   verrou est levé, le match n'attend pas.
+ * - `FAILED` : le bot a refusé ou n'a pas répondu (redemandé une minute plus tard).
  */
 export type MatchVoiceSideState = "WAITING" | "OPEN" | "FAILED";
 
 /**
  * Ce que l'instantané dit des salons d'un match (`TournamentMatch.voice`) :
- * l'état du salon de chaque côté et celui du verrou. Aucun nombre de présents
- * ni personne : rien de personnel n'y figure.
+ * l'état du salon de chaque côté. Aucun nombre de présents ni personne : rien
+ * de personnel n'y figure.
  */
 export type MatchVoiceInfo = {
   team1State: MatchVoiceSideState;
   team2State: MatchVoiceSideState;
-  /** Le lancement attend le remplissage des deux salons. */
-  pending: boolean;
 };
 
 /** Ce que la page montre d'un salon : son état seul. */
@@ -170,21 +143,21 @@ export function shownVoiceSide(channel: VoiceChannelState | null): MatchVoiceSid
 }
 
 /** Rendu de l'instantané pour un match suivi, `null` sinon. */
-export function matchVoiceInfo(input: VoiceGateInput): MatchVoiceInfo | null {
+export function matchVoiceInfo(
+  input: VoiceMatchInput,
+  team1Channel: VoiceChannelState | null,
+  team2Channel: VoiceChannelState | null,
+): MatchVoiceInfo | null {
   if (!voiceTracked(input)) return null;
-  return {
-    team1State: shownVoiceSide(input.team1Channel),
-    team2State: shownVoiceSide(input.team2Channel),
-    pending: voiceGatePending(input),
-  };
+  return { team1State: shownVoiceSide(team1Channel), team2State: shownVoiceSide(team2Channel) };
 }
 
 const SIDE_STATES: readonly MatchVoiceSideState[] = ["WAITING", "OPEN", "FAILED"];
 
 /**
  * Lecture tolérante de `TournamentMatch.voice` (données d'un flux ou d'un
- * cache). Une ancienne charge (« COUNTED », « UNCOUNTED », nombres) se lit
- * comme un salon ouvert ; ses nombres ne sont jamais repris.
+ * cache). Une ancienne charge (« COUNTED », « UNCOUNTED », nombres, `pending`)
+ * se lit comme un salon ouvert ; ses nombres et son verrou ne sont jamais repris.
  */
 export function parseMatchVoiceInfo(value: unknown): MatchVoiceInfo | null {
   if (typeof value !== "object" || value === null) return null;
@@ -193,9 +166,5 @@ export function parseMatchVoiceInfo(value: unknown): MatchVoiceInfo | null {
     if (entry === "COUNTED" || entry === "UNCOUNTED") return "OPEN";
     return SIDE_STATES.find((candidate) => candidate === entry) ?? "WAITING";
   };
-  return {
-    team1State: state(raw.team1State),
-    team2State: state(raw.team2State),
-    pending: raw.pending === true,
-  };
+  return { team1State: state(raw.team1State), team2State: state(raw.team2State) };
 }

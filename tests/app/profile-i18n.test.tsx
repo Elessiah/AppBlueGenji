@@ -558,8 +558,8 @@ describe("langue du compte (lot 9-3)", () => {
     expect(fr.hint).toMatch(/quand ton inscription de caster sur un match est retirée par un autre que toi/);
     expect(en.hint).toMatch(/when someone else removes your caster registration for a match/);
     // Et le brief du salon (MATCH_LOBBY_BRIEF.md) : l'aide le dit aussi.
-    expect(fr.hint).toMatch(/quand le salon d'un match que tu gères, ou que tu joues en tournoi individuel, s'ouvre \(réglages de la partie\)/);
-    expect(en.hint).toMatch(/when the lobby of a match you manage, or play in a solo tournament, opens \(game settings\)/);
+    expect(fr.hint).toMatch(/15 minutes avant un match de ton équipe ou de ton tournoi individuel \(check-in du match\), et pour ses rappels \(24 h et 10 h avant\)/);
+    expect(en.hint).toMatch(/15 minutes before a match of your team or of your solo tournament \(match check-in\), and for its reminders \(24 h and 10 h before\)/);
     expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8")).toMatch(
       /<MatchDmField\s+initial=\{data\?\.matchDmEnabled\}\s+discordReachable=/,
     );

@@ -42,6 +42,7 @@ import {
   VOICE_BOT_UNRELEASED_MAX_HOURS,
   VOICE_CHANNEL_CAPACITY,
   VOICE_CHANNEL_LEAD_MINUTES,
+  VOICE_CHANNEL_LATE_HOURS,
   VOICE_ROW_RETENTION_DAYS,
 } from "@/lib/shared/match-voice";
 import {
@@ -1012,7 +1013,7 @@ function RgpdFr({
           <p>
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
             score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, de l&apos;horaire de vos matchs (posé,
-            changé ou retiré) et de ses rappels, des réglages du salon d&apos;un match que vous gérez (propriétaire ou manager d&apos;une équipe, joueur d&apos;un tournoi individuel), d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
+            changé ou retiré) et de ses rappels, du check-in d&apos;un match de votre équipe ou de votre tournoi individuel, d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
             alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du départ du match qu&apos;il caste et du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage. <strong>Rien ne part sans votre geste</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
             <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets.
@@ -1057,10 +1058,12 @@ function RgpdFr({
             <strong>Messages privés Discord de match.</strong> Le bot vous écrit aussi en privé, dans la
             langue de votre compte, quand l&apos;horaire d&apos;un de vos matchs est posé, changé ou retiré, pour ses
             rappels (24 h et 10 h avant), quand vous êtes retiré d&apos;un match et, si vous castez, quand votre
-            inscription de caster sur un match est retirée par le staff ou d&apos;office (avec le motif) et, si vous gérez une
-            équipe engagée (propriétaire ou manager) ou jouez un tournoi individuel, à l&apos;ouverture du salon d&apos;un
-            match (de nouveau s&apos;il rouvre, par exemple après un changement d&apos;horaire), les réglages de la partie (équipe à gauche — l&apos;hôte — et à droite, première
-            carte, premier ban, tri des joueurs par rôle si le match est casté, arbitre désigné ou autogestion), avec les noms
+            inscription de caster sur un match est retirée par le staff ou d&apos;office (avec le motif) et, si vous êtes membre
+            d&apos;une équipe engagée (joueur, coach ou manager) ou jouez un tournoi individuel, 15 minutes avant le coup d&apos;envoi d&apos;un
+            match — ou à l&apos;ouverture de son salon si elle vient plus tôt ou si le match n&apos;a pas d&apos;horaire, de nouveau s&apos;il rouvre —, le check-in du match
+            (rejoindre le salon vocal de votre équipe et le salon de check-in, équipe à gauche — l&apos;hôte — et à droite, paramètres de partie, déroulé
+            des maps et ordre des bans, tri des joueurs par rôle si le match est casté, arbitre désigné ou autogestion, lien de diffusion du match s&apos;il est
+            public, rappel de saisir les scores et à qui signaler un problème), avec les noms
             d&apos;équipe, le tournoi, la manche et le lien de la page du match, sans BattleTag, tag Discord ni pseudo de joueur (en tournoi
             individuel, le message ne nomme ni vous ni votre adversaire) — seulement si votre tag
             Discord est <strong>certifié</strong> : un tag non certifié, même rattaché par la connexion Discord,
@@ -1129,28 +1132,24 @@ function RgpdFr({
             (éteinte par défaut), le bot Discord de l&apos;association ouvre, à partir de {VOICE_CHANNEL_LEAD_MINUTES} minutes avant l&apos;heure d&apos;un
             match (au premier passage du site dans ce délai), un salon vocal de {VOICE_CHANNEL_CAPACITY} places pour chacune de ses deux
             équipes, au nom de l&apos;équipe — jamais pour une entrée en tournoi individuel, dont le nom serait un pseudo, ni pour un
-            match contre une équipe fantôme. Le match ne se lance qu&apos;une fois les deux salons pleins (l&apos;arbitrage peut le forcer ; si le
-            bot échoue, le match n&apos;attend pas). Pour le savoir, le bot compte les personnes présentes dans chaque salon : il tient pour
-            cela en mémoire, en permanence (option allumée ou non), sans jamais l&apos;enregistrer, l&apos;état vocal (identifiant Discord du membre et de sa session vocale, salon où il se trouve, micro ou son coupés par lui ou par la modération, partage d&apos;écran ou caméra actifs, demande de parole et mise en sourdine de scène), avec la fiche de membre que Discord y joint (sa fiche sur le serveur, dont pseudo, surnom, avatar, rôles, dates d&apos;arrivée et de boost, exclusion temporaire), des membres du serveur Discord de
+            match contre une équipe fantôme. Le lancement du match n&apos;en dépend pas : il se lance comme dans tout autre tournoi. Pour savoir si un salon est vide, le bot tient
+            en mémoire, en permanence (option allumée ou non), sans jamais l&apos;enregistrer, l&apos;état vocal (identifiant Discord du membre et de sa session vocale, salon où il se trouve, micro ou son coupés par lui ou par la modération, partage d&apos;écran ou caméra actifs, demande de parole et mise en sourdine de scène), avec la fiche de membre que Discord y joint (sa fiche sur le serveur, dont pseudo, surnom, avatar, rôles, dates d&apos;arrivée et de boost, exclusion temporaire), des membres du serveur Discord de
             l&apos;association, tel que Discord le lui transmet — celui des autres serveurs où il est présent lui parvient aussi, mais il
-            ne le garde pas (la fiche de membre jointe, si : en mémoire, à jour de Discord, perdue à l&apos;arrêt du bot) ; le site ne reçoit et ne garde que l&apos;identifiant du salon, les numéros du match et de l&apos;équipe, ce <strong>nombre</strong> (qui ne sert qu&apos;à retenir le lancement et n&apos;est montré à personne : la page du match dit seulement à ses parties et au staff si chaque salon est ouvert et si le match attend ses salons, ce que tout membre connecté peut lire ; un visiteur sans compte voit seulement si le match attend ses salons)
-            et les heures du comptage (ou d&apos;une panne du bot), de création et de rendu, jamais qui. Le salon est rendu au bot quand le match est terminé (score validé), annulé,
-            retombé en attente ou sorti du programme, quand l&apos;équipe sort de l&apos;appariement, ou quand le tournoi se termine ou éteint
+            ne le garde pas (la fiche de membre jointe, si : en mémoire, à jour de Discord, perdue à l&apos;arrêt du bot) ; le site ne reçoit et ne garde que l&apos;identifiant du salon, les numéros du match et de l&apos;équipe, les heures de création et de rendu (ou d&apos;une panne du bot, ou d&apos;un rendu refusé), jamais qui se trouve dans un salon, ni combien : la page du match dit seulement à ses parties et au staff si chaque salon est ouvert, ce que tout membre connecté peut lire ; un visiteur sans compte n&apos;en voit rien. Le salon est rendu au bot quand le match est terminé (score validé), annulé,
+            retombé en attente, sorti du programme ou resté sans score validé {VOICE_CHANNEL_LATE_HOURS} heures après son horaire, quand l&apos;équipe sort de l&apos;appariement, quand une entrée en tournoi individuel ou une équipe fantôme entre dans le match, ou quand le tournoi n&apos;est plus en cours (terminé, ou ramené avant son départ), est de nouveau masqué ou éteint
             l&apos;option ; le bot le supprime dès qu&apos;il est vide (au plus tard {VOICE_BOT_RELEASED_MAX_HOURS} heures et {VOICE_BOT_SWEEP_MINUTES} minutes après son rendu, même occupé, bot en marche ; si Discord l&apos;en empêche, il réessaie à chaque balayage, et s&apos;il ne peut plus lire le salon{" "}
             {VOICE_BOT_ABANDONED_MAX_HOURS} heures après sa création ou sa reprise, il l&apos;oublie : le salon reste alors jusqu&apos;à ce que la
             modération du serveur le supprime ; un salon jamais rendu est supprimé s&apos;il est vide {VOICE_BOT_UNRELEASED_MAX_HOURS} heures
             après sa création ou sa reprise — occupé, il reste jusqu&apos;à son rendu ; déplacé hors de la catégorie des matchs, le bot cesse de le
             suivre sans le supprimer et il relève de la modération du serveur — comme après une suppression par la modération ou un oubli par le bot, un nouveau salon est alors ouvert à
-            l&apos;équipe si son match n&apos;est pas encore lancé ; un match reporté
-            garde ses salons jusqu&apos;à son rendu), et le site efface sa ligne {VOICE_ROW_RETENTION_DAYS} jours après le rendu (hors les
+            l&apos;équipe si son match n&apos;a pas encore de score validé, est à moins de {VOICE_CHANNEL_LEAD_MINUTES} minutes de son horaire ou l&apos;a passé, et n&apos;a pas dépassé son horaire de plus de {VOICE_CHANNEL_LATE_HOURS} heures ; un match reporté
+            garde ses salons jusqu&apos;à son rendu), et le site efface sa ligne {VOICE_ROW_RETENTION_DAYS} jours après le rendu ou, si le bot ne le reprend pas, après sa clôture {VOICE_BOT_UNRELEASED_MAX_HOURS} heures après la création du salon actuel (hors les
             copies de sauvegarde chiffrées). Le bot garde de chaque salon une fiche sans nom (identifiant du salon, numéros du match et de
             l&apos;équipe, heures de création et de rendu), effacée avec le salon ou quand il l&apos;oublie — gardée sans limite tant que le salon, jamais rendu, reste occupé, qu&apos;il le lit sans pouvoir le supprimer ou que
             Discord lui répond par une autre erreur — (hors les copies de sauvegarde chiffrées). Ses autres délais s&apos;entendent à un
             balayage près (au plus {VOICE_BOT_SWEEP_MINUTES} minutes de plus). Le journal d&apos;audit de Discord garde la création et la
-            suppression de chaque salon, avec son nom, lisible par l&apos;administration du serveur, pour la durée que Discord fixe. Ce comptage relève de l&apos;<strong>intérêt légitime</strong> de l&apos;association (bon déroulement des tournois : réunir chaque
-            équipe avant son match) ; rejoindre un salon reste un choix — mais tant que les deux ne sont pas pleins, le match attend que l&apos;arbitrage force son lancement, sauf si le bot ne répond pas —, et seule la présence de qui le rejoint est comptée. Ce comptage est
-            anonyme (un nombre, jamais qui ; il ne sert qu&apos;à retenir le lancement et n&apos;est montré à personne) : il n&apos;a pas de droit
-            d&apos;opposition propre (<Link href="/rgpd/registre#t18">registre, T18</Link>).
+            suppression de chaque salon, avec son nom, lisible par l&apos;administration du serveur, pour la durée que Discord fixe. Ces salons relèvent de l&apos;<strong>intérêt légitime</strong> de l&apos;association (bon déroulement des tournois : réunir chaque
+            équipe avant son match) ; rejoindre un salon reste un choix, sans effet sur le lancement du match (<Link href="/rgpd/registre#t18">registre, T18</Link>).
           </p>
         </div>
       </section>

@@ -2373,8 +2373,8 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
   it("processingRegister_t18_declaresBotMemoryPresenceAndBotRecordFrAndEn", () => {
     const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
     const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
-    expect(t18.dataCategories.join(" ")).toContain("tenu en mémoire par le bot pour compter, jamais enregistré");
-    expect(t18En.dataCategories.join(" ")).toContain("held in memory by the bot to count, never recorded");
+    expect(t18.dataCategories.join(" ")).toContain("tenu en mémoire par le bot pour savoir si un salon est vide, jamais enregistré");
+    expect(t18En.dataCategories.join(" ")).toContain("held in memory by the bot to know whether a channel is empty, never recorded");
     expect(t18.retention.join(" ")).toContain("oubliée 96 heures après sa création");
     expect(t18En.retention.join(" ")).toContain("forgotten 96 hours after its creation");
     expect(t18.dataSubjects).toHaveLength(t18En.dataSubjects.length);
@@ -2399,32 +2399,30 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     expect(en.details.join(" ")).toContain("You can object to this processing");
   });
 
-  // Décision V6 (2026-11-03) : le salon vocal est une règle du tournoi —
-  // la base passe au contrat, sans droit d'opposition (avant : intérêt légitime).
-  it("processingRegister_t18_legalBasisIsLegitimateInterestAnonymousCountFrAndEn", () => {
+  // EF-43 (décisions de l'utilisateur du 2026-11-04) : plus d'attente ni de comptage.
+  it("processingRegister_t18_legalBasisIsLegitimateInterestWithoutCountFrAndEn", () => {
     const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
     const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
     expect(t18.legalBasis).toMatch(/^Intérêt légitime \(bon déroulement des tournois/);
-    expect(t18.legalBasis).toContain("le comptage est anonyme (un nombre, jamais qui ; il ne sert qu'à retenir le lancement et n'est montré à personne), sans droit d'opposition propre");
-    expect(t18.legalBasis).not.toContain("exercé en le demandant à l'association");
+    expect(t18.legalBasis).toContain("rejoindre un salon reste un choix, sans effet sur le lancement du match ; le site ne garde ni qui se trouve dans un salon, ni combien");
+    expect(t18.legalBasis).not.toContain("comptage");
     expect(t18.legalBasis).not.toContain("Exécution du contrat");
     expect(t18En.legalBasis).toMatch(/^Legitimate interest \(smooth running of tournaments/);
-    expect(t18En.legalBasis).toContain("the count is anonymous (a number, never who; it only serves to hold the launch and is shown to no one), with no right to object of its own");
-    expect(t18En.legalBasis).not.toContain("exercised by asking the association");
+    expect(t18En.legalBasis).toContain("joining a channel remains a choice, with no effect on the match's launch; the site keeps neither who is in a channel nor how many");
+    expect(t18En.legalBasis).not.toContain("count");
     expect(t18En.legalBasis).not.toContain("Performance of the contract");
   });
 
-  // Décision de l'utilisateur du 2026-11-04 : le nombre de présents n'est montré à personne.
-  it("processingRegister_t18_countShownToNoOneFrAndEn", () => {
+  it("processingRegister_t18_noCountNorGateAnywhereFrAndEn", () => {
     const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
     const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
-    expect(t18.subPurposes.join(" ")).toContain("ce nombre n'est montré à personne");
-    expect(t18.subPurposes.join(" ")).not.toContain("Salon vocal : n/");
-    expect(t18.recipients.join(" ")).toContain("jamais le nombre de personnes");
-    expect(t18.recipients.join(" ")).not.toContain("affiche le nombre");
-    expect(t18En.subPurposes.join(" ")).toContain("that number is shown to no one");
-    expect(t18En.recipients.join(" ")).toContain("never the number of people");
-    expect(t18En.recipients.join(" ")).not.toContain("displays the number");
+    const fr = [t18.purpose, ...t18.subPurposes, ...t18.dataCategories, ...t18.recipients, ...t18.retention, t18.legalBasis].join(" ");
+    const en = [t18En.purpose, ...t18En.subPurposes, ...t18En.dataCategories, ...t18En.recipients, ...t18En.retention, t18En.legalBasis].join(" ");
+    expect(fr).not.toMatch(/compt(e|er|age) (les|le nombre|des) personnes|nombre de personnes présentes|attend ses salons|salons pleins/);
+    expect(en).not.toMatch(/count(s|ing)? (the|of) people|number of people present|waiting for its channels|channels are full/);
+    expect(t18.subPurposes.join(" ")).toContain("le site ne demande jamais au bot qui se trouve dans un salon, ni combien");
+    expect(t18En.subPurposes.join(" ")).toContain("the site never asks the bot who is in a channel, nor how many");
+    expect(REGISTER_UPDATED_AT >= "2026-11-06").toBe(true);
   });
 
   it("processingRegister_t18_botDurationsComeFromTheirConstantsFrAndEn", () => {
@@ -2492,8 +2490,8 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
     expect(t18.subPurposes.join(" ")).toContain("quand l'équipe sort de l'appariement");
     expect(t18En.subPurposes.join(" ")).toContain("when the team leaves the pairing");
-    expect(t18.legalBasis).toContain("le match attend que l'arbitrage force son lancement");
-    expect(t18En.legalBasis).toContain("the match waits for referees to force its launch");
+    expect(t18.subPurposes.join(" ")).toContain("quand une entrée en tournoi individuel ou une équipe fantôme entre dans le match");
+    expect(t18En.subPurposes.join(" ")).toContain("when a solo entry or a ghost team enters the match");
   });
 });
 
@@ -2545,5 +2543,27 @@ describe("Registre — suppression du compte (D12, D13)", () => {
     expect(t03.retention).toHaveLength(t03En.retention.length);
     expect(t03.retention.join(" ")).toContain("retirées du tournoi dès la demande de suppression du compte");
     expect(t03En.retention.join(" ")).toContain("withdrawn from the tournament as soon as deletion of the account is requested");
+  });
+});
+
+// EF-43 : entrée qui suit la v9, pour tous les comptes ; l'entrée publiée du 4 novembre reste telle quelle.
+describe("PRIVACY_CHANGES — salons vocaux sans comptage ni attente (EF-43)", () => {
+  const voiceEntry = () => PRIVACY_CHANGES.find((c) => c.id === "2026-11-salons-vocaux-sans-comptage")!;
+
+  it("privacyChanges_voiceWithoutCount_followsTermsV9Dated1106ForAllAccounts", () => {
+    const entry = voiceEntry();
+    expect(entry.id).toBe("2026-11-salons-vocaux-sans-comptage");
+    expect([entry.id.length <= PRIVACY_CHANGE_ID_MAX_LENGTH, entry.asksTermsAcceptance, privacyChangeReachesAccount(entry, {}), isPrivacyPolicyVersion(entry)]).toEqual([true, undefined, true, true]);
+    expectStandaloneEntry(entry, PRIVACY_CHANGES_EN[entry.id], { after: "2026-11-conditions-v9-contacts-et-suppression", publishedAt: "2026-11-06", audience: undefined, links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }] });
+    expect(PRIVACY_CHANGES_EN[entry.id].linkLabels).toEqual(["Read the “Team voice channels” paragraph"]);
+  });
+
+  it("privacyChanges_voiceWithoutCount_saysNoGateNoCountMemoryOnlyFrAndEn", () => {
+    expectEntryTexts(voiceEntry(), PRIVACY_CHANGES_EN[voiceEntry().id], {
+      fr: ["ne retiennent plus le lancement d'un match", "ni qui s'y trouve, ni combien", "effacé avec sa colonne (hors les copies de sauvegarde chiffrées, 30 jours au plus)", "pour savoir si un salon est vide", "rien de nouveau n'est collecté", "une équipe fantôme entre dans le match", "sans score validé 24 heures après son horaire", "quand le tournoi est de nouveau masqué ou ramené avant son départ", "pour un match déjà lancé ou dont le score attend sa confirmation", "dès 15 minutes avant l'horaire du match, le site le redemande", "environ une fois par minute, pour en rouvrir", "intérêt légitime"],
+      en: ["no longer hold a match's launch", "neither who is in it nor how many", "erased with its column (apart from the encrypted backup copies, 30 days at most)", "to know whether a channel is empty", "nothing new is collected", "a ghost team enters the match", "without a confirmed score 24 hours after its time", "when the tournament is hidden again or moved back before its start", "for a match already launched or whose score awaits confirmation", "from 15 minutes before the match time, the site asks", "about once a minute, to reopen", "legitimate interest"],
+    });
+    const published = PRIVACY_CHANGES.find((c) => c.id === "2026-11-salons-vocaux-equipe")!;
+    expect([published.publishedAt, published.summary.includes("le bot compte les personnes présentes")]).toEqual(["2026-11-04", true]);
   });
 });
