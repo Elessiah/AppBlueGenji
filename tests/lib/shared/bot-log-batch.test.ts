@@ -3,6 +3,7 @@ import {
   botLogBatchKey,
   botLogBatchScopeOfKey,
   botLogTournamentId,
+  isBlank,
   packBotLogLines,
 } from "@/lib/shared/bot-log-batch";
 import { discordInline } from "@/lib/shared/discord-text";
@@ -160,5 +161,25 @@ describe("botLogBatchKey", () => {
 
   it("botLogBatchKey_fractionalTournamentId_globalKey", () => {
     expect(botLogBatchKey("log", 1.5)).toBe("log:global:general");
+  });
+});
+
+describe("isBlank", () => {
+  it("isBlank_everyCodeUnit_sameAsTheWhitespaceRegex", () => {
+    const differing: number[] = [];
+    for (let code = 0; code <= 0xffff; code += 1) {
+      const char = String.fromCharCode(code);
+      if (isBlank(char) !== /^\s$/u.test(char)) differing.push(code);
+    }
+    expect(differing).toEqual([]);
+  });
+
+  it.each(["", "😀", "ab"])("isBlank_notASingleCodeUnit_false (%j)", (value) => {
+    expect(isBlank(value)).toBe(false);
+  });
+
+  it("packBotLogLines_longRowWithNoBreakSpace_cutAtTheNoBreakSpace", () => {
+    const row = `${"a".repeat(10)}\u00a0${"b".repeat(10)}`;
+    expect(packBotLogLines([row], 14)).toEqual(["a".repeat(10), "b".repeat(10)]);
   });
 });

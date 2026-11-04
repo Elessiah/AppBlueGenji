@@ -213,3 +213,40 @@ describe("installBotLogShutdownFlush", () => {
     expect(onceSpy).not.toHaveBeenCalled();
   });
 });
+
+describe("flushBotLogsBeforeExit — tour des passages", () => {
+  const order = globalThis as typeof globalThis & { __bgBotLogOrder?: Promise<void> };
+
+  afterEach(() => {
+    delete order.__bgBotLogOrder;
+  });
+
+  it("flushBotLogsBeforeExit_orderTurnPending_awaitedBeforeTheBatchesLeave", async () => {
+    let release: () => void = () => undefined;
+    order.__bgBotLogOrder = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const done = flushBotLogsBeforeExit();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(flushAllBotLogBatches).not.toHaveBeenCalled();
+    release();
+    await done;
+    expect(flushAllBotLogBatches).toHaveBeenCalledTimes(1);
+  });
+
+  it("flushBotLogsBeforeExit_orderTurnHangs_boundedByHalfTheTimeout", async () => {
+    jest.useFakeTimers();
+    order.__bgBotLogOrder = new Promise<void>(() => undefined);
+    void flushBotLogsBeforeExit(1_000);
+    await jest.advanceTimersByTimeAsync(499);
+    expect(flushAllBotLogBatches).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(1);
+    expect(flushAllBotLogBatches).toHaveBeenCalledTimes(1);
+  });
+
+  it("flushBotLogsBeforeExit_orderTurnRejects_neverThrowsAndStillFlushes", async () => {
+    order.__bgBotLogOrder = Promise.reject(new Error("tour"));
+    await expect(flushBotLogsBeforeExit()).resolves.toBeUndefined();
+    expect(flushAllBotLogBatches).toHaveBeenCalledTimes(1);
+  });
+});

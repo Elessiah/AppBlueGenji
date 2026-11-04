@@ -576,3 +576,60 @@ describe("catégories", () => {
     headed.reset();
   });
 });
+
+describe("robustesse de l'envoi", () => {
+  it("flush_headerThrows_batchSentWithoutHeader", async () => {
+    const failing = createBotLogBatcher({
+      send,
+      header: () => {
+        throw new Error("header");
+      },
+    });
+    failing.add("k", "ligne", "results");
+    await expect(failing.flush("k")).resolves.toBeUndefined();
+    expect(send.mock.calls).toEqual([["ligne", "results"]]);
+  });
+
+  it("flushAll_headerThrowsForOneKey_otherKeysStillSent", async () => {
+    const failing = createBotLogBatcher({
+      send,
+      header: (category) => {
+        if (category === "admin") throw new Error("header");
+        return "";
+      },
+    });
+    failing.add("a", "x", "results");
+    failing.add("b", "y", "admin");
+    failing.add("c", "z", "maps");
+    await failing.flushAll();
+    expect(send.mock.calls).toEqual([["x", "results"], ["y", "admin"], ["z", "maps"]]);
+  });
+});
+
+describe("flushAll — lignes tardives", () => {
+  it("flushAll_lineAddedDuringTheSend_resolvesOnlyOnceItIsSent", async () => {
+    const finished: string[] = [];
+    send.mockImplementation(async (message) => {
+      if (message === "x") batcher.add("b", "tardive");
+      if (message === "tardive") batcher.add("c", "encore plus tard");
+      await Promise.resolve();
+      finished.push(message);
+    });
+    batcher.add("a", "x");
+    await batcher.flushAll();
+    expect(finished).toEqual(["x", "tardive", "encore plus tard"]);
+  });
+
+  it("flushAll_linesKeepComing_stillResolves", async () => {
+    let counter = 0;
+    send.mockImplementation(async () => {
+      counter += 1;
+      // Une ligne tardive à chaque envoi (bornée, pour que le test ne s'emballe pas).
+      if (counter < 50) batcher.add(`k${counter}`, `ligne ${counter}`);
+    });
+    batcher.add("a", "x");
+    // La boucle est plafonnée : `flushAll` rend la main même sans repos.
+    await expect(batcher.flushAll()).resolves.toBeUndefined();
+    expect(send.mock.calls.length).toBeGreaterThan(1);
+  });
+});
