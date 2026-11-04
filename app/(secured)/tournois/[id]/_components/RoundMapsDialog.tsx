@@ -634,7 +634,8 @@ export function RoundMapsDialog({
     applyAll: `${ids}-apply-all`,
   });
   const clearSlotError = fieldErrors.clear;
-  useEffect(() => clearSlotError(), [slots, copyTarget, clearSlotError]);
+  // Un refus ne survit pas à ce qui l'a causé : cartes, cible, tour affiché ou réglages du serveur changés.
+  useEffect(() => clearSlotError(), [slots, copyTarget, roundId, rules.rounds, clearSlotError]);
 
   // L'instantané change sous la fenêtre (autre membre du staff, ou son propre
   // envoi) : règles et cartes suivent le serveur tant qu'elles n'ont pas été
@@ -659,7 +660,8 @@ export function RoundMapsDialog({
   const fallbackRoundId = vanishedRoundFallback(rounds, roundId);
   useEffect(() => {
     if (fallbackRoundId === null) return;
-    setPending(null);
+    // La confirmation de fermeture ne tient pas au tour : elle reste.
+    setPending((current) => (current?.kind === "close" ? current : null));
     setRoundId(fallbackRoundId);
     setActiveSlot(null);
     setCopyTarget("");
@@ -751,7 +753,8 @@ export function RoundMapsDialog({
   };
 
   // Au-delà de ROUND_MAPS_BULK_MAX tours, une écriture par lot (le serveur borne chaque requête).
-  const sendRounds = (targets: readonly RoundKey[], payload: string[][], success: string) =>
+  // `field` : où se rattache un refus du serveur (la liste du tour, ou le geste de copie qui a visé d'autres tours).
+  const sendRounds = (targets: readonly RoundKey[], payload: string[][], success: string, field: RoundField = "slots") =>
     run(
       async () => {
         for (const chunk of chunkRounds(targets, ROUND_MAPS_BULK_MAX)) {
@@ -763,7 +766,7 @@ export function RoundMapsDialog({
       (code, text) => {
         // Le serveur refuse sans dire quelle carte : le refus vise la liste, pas le premier créneau.
         setErrorSlot(null);
-        fieldErrors.report(code, text);
+        if (fieldErrors.report(code, text) && field !== "slots") fieldErrors.flag(field, text);
       },
     );
 
@@ -819,14 +822,14 @@ export function RoundMapsDialog({
     const others = rounds.filter((key) => roundKeyId(key) !== roundId);
     const overwritten = overwrittenRounds(rules.rounds, others, toSave).length;
     if (overwritten > 0) setPending({ kind: "applyAll", overwritten });
-    else void sendRounds(rounds, toSave, t("dialog.appliedAll"));
+    else void sendRounds(rounds, toSave, t("dialog.appliedAll"), "applyAll");
   };
 
   const copy = () => {
     const target = findRound(rounds, copyTarget);
     if (busy || !target || toSave.length === 0 || gapRefused() || targetOverMaxRefused([target], "copy")) return;
     if (overwrittenRounds(rules.rounds, [target], toSave).length > 0) setPending({ kind: "copy", target });
-    else void sendRounds([target], toSave, t("dialog.copied", { round: roundLabel(target) }));
+    else void sendRounds([target], toSave, t("dialog.copied", { round: roundLabel(target) }), "copy");
   };
 
   const changeRound = (id: string) => {
@@ -892,7 +895,7 @@ export function RoundMapsDialog({
         title: t("dialog.applyAllConfirm.title"),
         body: t("dialog.applyAllConfirm.body", { count: pending.overwritten }),
         confirm: t("dialog.applyAllConfirm.confirm"),
-        action: () => sendRounds(rounds, toSave, t("dialog.appliedAll")),
+        action: () => sendRounds(rounds, toSave, t("dialog.appliedAll"), "applyAll"),
       };
     }
     const target = pending.target;
@@ -900,7 +903,7 @@ export function RoundMapsDialog({
       title: t("dialog.copyConfirm.title"),
       body: t("dialog.copyConfirm.body", { round: roundLabel(target) }),
       confirm: t("dialog.copyConfirm.confirm"),
-      action: () => sendRounds([target], toSave, t("dialog.copied", { round: roundLabel(target) })),
+      action: () => sendRounds([target], toSave, t("dialog.copied", { round: roundLabel(target) }), "copy"),
     };
   })();
 
@@ -1117,7 +1120,15 @@ export function RoundMapsDialog({
         />
 
         <div className={styles.footer}>
-          <button id={`${ids}-close`} type="button" className="btn ghost" onClick={requestClose} aria-disabled={busy || undefined}>
+          <button
+            id={`${ids}-close`}
+            type="button"
+            className="btn ghost"
+            onClick={() => {
+              if (!busy) requestClose();
+            }}
+            aria-disabled={busy || undefined}
+          >
             {t("dialog.close")}
           </button>
         </div>

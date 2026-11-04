@@ -118,7 +118,7 @@ describe("câblage de la fenêtre des cartes", () => {
     const source = dialog();
 
     expect(source).toContain("onClose={requestClose}");
-    expect(source).toMatch(/onClick=\{requestClose\}/);
+    expect(source).toContain("if (!busy) requestClose();");
     expect(source).toMatch(/if \(roundDirty \|\| rulesDirty \|\| tiebreakDirty\) setPending\(\{ kind: "close" \}\)/);
   });
 
@@ -184,58 +184,6 @@ describe("câblage de la fenêtre des cartes", () => {
     expect(source).toContain("setTimeout(() => window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT)), OPTIMISTIC_REFETCH_MS)");
   });
 
-  it("dialog_tiebreakDraft_isCoveredByCloseAndRoundSwitchConfirmations", () => {
-    const source = dialog();
-
-    expect(source).toContain("onDirtyChange={setTiebreakDirty}");
-    expect(source).toContain("if (roundDirty || tiebreakDirty) setPending({ kind: \"switch\", id })");
-    expect(source).toContain("return () => onDirtyChange(false)");
-  });
-
-  it("dialog_copyAndApplyAll_refuseARoundThatPlaysFewerMaps", () => {
-    const source = dialog();
-
-    expect(source).toContain('gapRefused() || targetOverMaxRefused(rounds, "applyAll")');
-    expect(source).toContain('gapRefused() || targetOverMaxRefused([target], "copy")');
-    // Le refus est rattaché au champ désigné (cible de la copie, bouton « Appliquer à tous »).
-    expect(source).toContain("fieldErrors.flag(field, text)");
-    expect(source).toContain('{...fieldErrors.aria("copy")}');
-    expect(source).toContain('fieldId={`${ids}-apply-all`}');
-    expect(frRoundMaps.dialog.overMaxTarget).toContain("{round}");
-    expect(enRoundMaps.dialog.overMaxTarget).toContain("{max}");
-  });
-
-  it("dialog_unchangedRules_areNotSent", () => {
-    const source = dialog();
-
-    expect(source).toContain("if (busy || !rulesDirty) return;");
-    expect(source).toContain("aria-disabled={busy || !rulesDirty || undefined}");
-  });
-
-  it("dialog_buttonsThatEmptyThemselves_stayMountedWithAriaDisabled", () => {
-    const source = dialog();
-
-    expect(source).not.toContain("{saved && (");
-    expect(source).not.toContain("{saved !== null && (");
-    expect(source).toContain("aria-disabled={busy || !saved || undefined}");
-    expect(source).toContain("aria-disabled={busy || saved === null || undefined}");
-    expect(source).toContain("{rounds.length > 1 && (");
-  });
-
-  it("dialog_staleTiebreaks_explanationIsBehindAnInfoHintAndFocusIsKept", () => {
-    const source = dialog();
-
-    expect(source).not.toContain('<p className={styles.muted}>{t("dialog.staleTiebreakHint")}</p>');
-    expect(source).toContain("{t(\"dialog.staleTiebreakHint\")}\n        </InfoHint>");
-    expect(source).toContain("fallbackFocusId={`${ids}-close`}");
-    expect(source).toContain("focusAfter.current = { key: roundKeyId(item), index };");
-    expect(source).toContain("items.some((item) => roundKeyId(item) === pending.key)");
-  });
-
-  it("dialog_tiebreakEnterOnAnUntouchedField_staysSilent", () => {
-    expect(dialog()).toContain("if (busy || !dirty) return;");
-  });
-
   it("mapScoreList_tiebreakRowAnnouncement_isInBothLanguages", () => {
     expect(frDialogs.score.maps.tiebreakRow).toContain("{name}");
     expect(enDialogs.score.maps.tiebreakRow).toContain("{name}");
@@ -245,5 +193,83 @@ describe("câblage de la fenêtre des cartes", () => {
     expect(frRoundMaps.dialog.switchConfirm.body).toContain("map de départage");
     expect(enRoundMaps.dialog.switchConfirm.body).toContain("tiebreak map");
   });
+
+  it("dialog_copyAndApplyAll_overMaxTexts_areInBothLanguages", () => {
+    expect(frRoundMaps.dialog.overMaxTarget).toContain("{round}");
+    expect(enRoundMaps.dialog.overMaxTarget).toContain("{max}");
+  });
+
+
+  const WIRING = [
+    {
+      name: "tiebreakDraft_isCoveredByCloseAndRoundSwitchConfirmations",
+      file: "RoundMapsDialog.tsx",
+      present: ["onDirtyChange={setTiebreakDirty}", 'if (roundDirty || tiebreakDirty) setPending({ kind: "switch", id })', "return () => onDirtyChange(false)"],
+      absent: [],
+    },
+    {
+      name: "copyAndApplyAll_refuseARoundThatPlaysFewerMaps_attachedToTheirField",
+      file: "RoundMapsDialog.tsx",
+      present: [
+        'gapRefused() || targetOverMaxRefused(rounds, "applyAll")',
+        'gapRefused() || targetOverMaxRefused([target], "copy")',
+        "fieldErrors.flag(field, text)",
+        '{...fieldErrors.aria("copy")}',
+        "fieldId={`${ids}-apply-all`}",
+      ],
+      absent: [],
+    },
+    {
+      name: "serverRefusalOfCopyAndApplyAll_isAttachedToTheGestureNotToTheCurrentList",
+      file: "RoundMapsDialog.tsx",
+      present: ['success: string, field: RoundField = "slots"', 'fieldErrors.report(code, text) && field !== "slots"', 't("dialog.appliedAll"), "applyAll")'],
+      absent: [],
+    },
+    {
+      name: "unchangedRules_areNotSent",
+      file: "RoundMapsDialog.tsx",
+      present: ["if (busy || !rulesDirty) return;", "aria-disabled={busy || !rulesDirty || undefined}"],
+      absent: [],
+    },
+    {
+      name: "buttonsThatEmptyThemselves_stayMountedWithAriaDisabled",
+      file: "RoundMapsDialog.tsx",
+      present: ["aria-disabled={busy || !saved || undefined}", "aria-disabled={busy || saved === null || undefined}", "{rounds.length > 1 && ("],
+      absent: ["{saved && (", "{saved !== null && ("],
+    },
+    {
+      name: "staleTiebreaks_explanationIsBehindAnInfoHintAndFocusIsKept",
+      file: "RoundMapsDialog.tsx",
+      present: [
+        '{t("dialog.staleTiebreakHint")}\n        </InfoHint>',
+        "fallbackFocusId={`${ids}-close`}",
+        "focusAfter.current = { key: roundKeyId(item), index };",
+        "items.some((item) => roundKeyId(item) === pending.key)",
+      ],
+      absent: ['<p className={styles.muted}>{t("dialog.staleTiebreakHint")}</p>'],
+    },
+    {
+      name: "untouchedFormsAndStaleRefusals_areHandledWithoutNoise",
+      file: "RoundMapsDialog.tsx",
+      present: ["if (busy || !dirty) return;", 'current?.kind === "close" ? current : null', "[slots, copyTarget, roundId, rules.rounds, clearSlotError]"],
+      absent: [],
+    },
+    {
+      name: "mapScoreList_tiebreakAnnouncement_tracksTheMapNameToo",
+      file: "MapScoreList.tsx",
+      present: ["`${tiebreakIndex}:${tiebreakMap}`", "announcedTiebreak.current === tiebreakKey"],
+      absent: [],
+    },
+  ];
+
+  it.each(WIRING)("wiring_$name", ({ file, present, absent }) => {
+    const source = readSource(`app/(secured)/tournois/[id]/_components/${file}`);
+
+    expect({
+      missing: present.filter((fragment) => !source.includes(fragment)),
+      forbidden: absent.filter((fragment) => source.includes(fragment)),
+    }).toEqual({ missing: [], forbidden: [] });
+  });
+
 });
 

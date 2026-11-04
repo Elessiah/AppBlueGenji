@@ -190,16 +190,18 @@ export function MapScoreList({
   // du libellé change. Posée après l'annonce « ligne ajoutée » : quand les deux
   // tombent ensemble, c'est celle-ci, plus précise, qui reste.
   // Une ligne déjà de départage à l'ouverture (saisie reprise) ne s'annonce pas.
-  const announcedTiebreak = useRef<number | null>(tiebreakIndex);
+  // La clé porte aussi le nom : une map de départage changée sur la même ligne s'annonce de nouveau.
+  const tiebreakKey = tiebreakIndex === null || !tiebreakMap ? null : `${tiebreakIndex}:${tiebreakMap}`;
+  const announcedTiebreak = useRef<string | null>(tiebreakKey);
   useEffect(() => {
-    if (tiebreakIndex === null || !tiebreakMap) {
+    if (tiebreakIndex === null || tiebreakKey === null || !tiebreakMap) {
       announcedTiebreak.current = null;
       return;
     }
-    if (announcedTiebreak.current === tiebreakIndex) return;
-    announcedTiebreak.current = tiebreakIndex;
+    if (announcedTiebreak.current === tiebreakKey) return;
+    announcedTiebreak.current = tiebreakKey;
     setAnnouncement(t("score.maps.tiebreakRow", { index: tiebreakIndex + 1, name: tiebreakMap }));
-  }, [tiebreakIndex, tiebreakMap, t]);
+  }, [tiebreakIndex, tiebreakKey, tiebreakMap, t]);
 
   const update = (index: number, patch: Partial<MatchMapInput>, field: MapField) => {
     // Rien de changé (un champ de score vide quitté sans saisie rend `NaN`, et
