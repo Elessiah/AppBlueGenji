@@ -5,6 +5,8 @@ import { flushRoundMapsNotice } from "@/lib/server/tournaments/round-maps-notice
 import { can } from "@/lib/shared/permissions";
 import { ROUND_MAPS_FLUSH_ROUNDS_MAX } from "@/lib/shared/round-maps";
 
+/** 1024 clés de 31 caractères au plus, guillemets et virgules compris : au-delà, le corps n'est pas lu. */
+const BODY_MAX_CHARS = 40_000;
 const ROUND_KEY_PATTERN = /^\d{1,9}:[A-Z_]{1,16}:\d{1,4}$/;
 
 /**
@@ -17,6 +19,7 @@ async function ownRoundsOf(req: Request): Promise<string[] | null | undefined> {
   const raw = await req.text().catch(() => null);
   if (raw === null) return null;
   if (raw.trim() === "") return undefined;
+  if (raw.length > BODY_MAX_CHARS) return null;
   let body: unknown;
   try {
     body = JSON.parse(raw);
