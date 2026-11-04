@@ -202,6 +202,11 @@ describe("dispatchMatchVoiceChannels — création", () => {
     expect(jest.mocked(ensureVoiceChannel).mock.calls.map(([key]) => key)).toEqual(["match:42:team:1", "match:42:team:2"]);
   });
 
+  it("dispatchMatchVoiceChannels_releaseQuery_handsBackChannelsOfReHiddenTournament", () => {
+    // Tournoi de nouveau masqué : ses salons ne gardent pas les noms d'équipes sur Discord.
+    expect(RELEASABLE_SQL).toContain("OR t.start_visibility_at > NOW()");
+  });
+
   it("dispatchMatchVoiceChannels_dueQuery_skipsUnpublishedTournaments", () => {
     // Tournoi encore caché : aucun salon au nom de ses équipes dans la catégorie publique.
     expect(DUE_CHANNELS_SQL).toContain("t.start_visibility_at <= NOW()");
