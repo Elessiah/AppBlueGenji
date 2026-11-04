@@ -294,8 +294,8 @@ le plafond deux fois plus vite (un « introuvable », jamais gardé, reprend un 
 (`publicTournamentSnapshot` ne consulte `admit` que si la réponse publique
 n'est ni fraîche en cache ni en vol : une reconstruction en prend un) ; au
 plafond, la copie échue de moins de 150 s si elle existe (sans base, comme
-l'encart), sinon encart ou page générale. Toute **édition** d'un
-tournoi (`updateTournament` : nom, description, dates ; image posée, recadrée ou retirée, `image.ts` ; lien de chaîne, `setTournamentLiveUrl`) l’évince aussitôt
+l'encart), sinon encart ou page générale. `admit` est un paramètre **obligatoire** des deux lectures : un appelant ne contourne pas le plafond par oubli. Toute **édition** d'un
+tournoi (`updateTournament` : nom, description, dates ; image posée, recadrée ou retirée, `image.ts`, évincée **avant** l'effacement de l'ancien fichier ; lien de chaîne, `setTournamentLiveUrl`) l’évince aussitôt
 (`invalidateSpectatorSnapshot` vide la réponse publique et la carte d'encart) :
 un nom ou une description retirés par le staff ne restent pas en aperçu. Le
 périmètre est **la carte du tournoi** : ce qui vit sur les matchs (antenne,
