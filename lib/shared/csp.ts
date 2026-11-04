@@ -162,24 +162,25 @@ export const CSP_NONCE_HEADER = "x-nonce";
  * `<script src async>` **sans nonce**, que `'strict-dynamic'` refuse (il écarte
  * `'self'`) — la fiche d'un tournoi restait sur « Chargement ». Le morceau vient
  * du site : à la place de `'self'`, la source se restreint alors aux morceaux de
- * Next (`<origine>/_next/`), si bien qu'un `<script src>` sans nonce écrit à la
- * main reste refusé en dev comme il le serait en production. Sans origine
- * connue, `'self'` reste. Le dev webpack et la production gardent la politique
+ * Next (`<hôte>/_next/`, sans schéma : il suit celui de la page), si bien qu'un
+ * `<script src>` sans nonce écrit à la main reste refusé en dev comme il le
+ * serait en production. Sans hôte connu, `'self'` reste. Le dev webpack et la production gardent la politique
  * entière : `next build` pose le nonce sur chaque script.
  *
  * @param nonce Nonce de la requête, déjà encodé en base64.
  * @param options `dev` autorise `'unsafe-eval'`, dont le rafraîchissement à chaud de Next a besoin ;
  *   `turbopack` (dev Turbopack seulement, ignoré hors `dev`) retire `'strict-dynamic'` et,
- *   avec `origin` (origine vue par le navigateur, hôte déjà validé), borne la source à `<origin>/_next/`.
+ *   avec `scriptHosts` (hôtes visés par le navigateur, déjà validés), borne la source à `<hôte>/_next/`.
  * @returns La politique, prête à être posée en en-tête.
  */
 export function contentSecurityPolicy(
   nonce: string,
-  options: { dev: boolean; turbopack?: boolean; origin?: string }
+  options: { dev: boolean; turbopack?: boolean; scriptHosts?: readonly string[] }
 ): string {
   const turbopackDev = options.dev && options.turbopack === true;
+  const hosts = turbopackDev ? (options.scriptHosts ?? []) : [];
   const scriptSrc = [
-    turbopackDev && options.origin ? `${options.origin}/_next/` : "'self'",
+    ...(hosts.length > 0 ? hosts.map((host) => `${host}/_next/`) : ["'self'"]),
     `'nonce-${nonce}'`,
     ...(turbopackDev ? [] : ["'strict-dynamic'"]),
     "'unsafe-inline'",

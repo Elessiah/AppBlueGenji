@@ -16,8 +16,9 @@ import {
  * sur une machine servie sous plusieurs noms, `APP_URL` peut ne pas être réglée
  * ou ne pas être celui qu'on a tapé. Ces en-têtes ne donnent rien à un tiers :
  * c'est le navigateur de la **victime** qui les écrit, avec l'hôte du site.
+ * Le middleware en tire aussi les sources `script-src` du dev Turbopack.
  */
-function siteHosts(req: Request): string[] {
+export function siteHosts(req: Request): string[] {
   const hosts: string[] = [];
   const base = siteBaseUrl();
   if (base) {
