@@ -65,7 +65,7 @@ Un identifiant de tournoi reçu en chaîne (colonne relue de MySQL) est accepté
   1 s — sous le délai de l'arrêt propre). Les alertes n'attendent pas ce tour, et un passage
   qui ne porte que des alertes n'en prend pas. Plusieurs alertes d'un même tournoi dans un
   passage ne paient qu'une attente de vidage. L'arrêt propre attend (borné) le dernier tour,
-  et `flushAll` boucle jusqu'au repos (5 tours au plus) pour les lignes tardives.
+  et `flushAll` boucle jusqu'au repos (5 tours au plus) pour les lignes tardives. Les alertes se résolvent à part des lignes ; le tour se rend de lui-même après `BOT_LOG_ORDER_WAIT_MS` si la lecture traîne ; une alerte sans tournoi ne vide aucun lot.
 
 Plusieurs lots vidés ensemble (`flushBotLogBatch` sans catégorie, `flushKeys`)
 partent dans l'ordre de leur **première ligne**. Les envois s'enchaînent **par

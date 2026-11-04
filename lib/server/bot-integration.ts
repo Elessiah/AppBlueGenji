@@ -11,7 +11,7 @@ import { normalizeBotServersPayload, normalizeBotStats } from "@/lib/shared/bot-
 import type { LiveMentionTarget } from "@/lib/shared/live-announcements";
 import type { Locale } from "@/lib/shared/locales";
 import { BOT_LOG_CATEGORIES, botLogHeader, botLogKind, DEFAULT_BOT_LOG_CATEGORY, type BotLogCategory } from "@/lib/shared/bot-log-category";
-import { botLogBatchKey, botLogBatchScopeOfKey } from "@/lib/shared/bot-log-batch";
+import { botLogBatchKey, botLogBatchScopeOfKey, botLogTournamentId } from "@/lib/shared/bot-log-batch";
 import { createBotLogBatcher, type BotLogBatcher } from "@/lib/server/bot-log-batcher";
 
 const DEFAULT_BOT_INTERNAL_HOST = "127.0.0.1";
@@ -346,7 +346,11 @@ export function sendBotLog(message: string, scope: BotLogScope = {}): void {
   const category = scope.category ?? DEFAULT_BOT_LOG_CATEGORY;
   const key = botLogBatchKey(BOT_LOG_CHANNEL, scope.tournamentId, category);
   botLogBatcher.add(key, message, category);
-  if (botLogKind(category) === "alert") void flushBotLogBatch({ tournamentId: scope.tournamentId });
+  // Sans tournoi, aucune ligne en attente n'explique l'alerte : le lot commun du
+  // salon (inscriptions, modération) ne part pas pour elle.
+  if (botLogKind(category) === "alert" && botLogTournamentId(scope.tournamentId) !== null) {
+    void flushBotLogBatch({ tournamentId: scope.tournamentId });
+  }
 }
 
 /**

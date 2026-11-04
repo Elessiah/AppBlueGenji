@@ -514,7 +514,15 @@ export function flushBotLogs(connection: PoolConnection): void {
   let releaseTurn: () => void = () => undefined;
   if (hasLogLines) {
     logOrderState.__bgBotLogOrder = new Promise<void>((resolve) => {
-      releaseTurn = resolve;
+      // Une lecture qui traîne ne retient pas les passages suivants : le tour est
+      // rendu au bout de BOT_LOG_ORDER_WAIT_MS, ses lignes rejoignent leur lot
+      // dès qu'elles sont résolues.
+      const timer = setTimeout(resolve, BOT_LOG_ORDER_WAIT_MS);
+      timer.unref?.();
+      releaseTurn = () => {
+        clearTimeout(timer);
+        resolve();
+      };
     });
   }
 
@@ -534,6 +542,10 @@ export function flushBotLogs(connection: PoolConnection): void {
   // l'empêcherait de repartir un jour.
   const escalations = queue.filter((entry) => entry.kind === "score_report_stalled");
   const rest = queue.filter((entry) => entry.kind !== "score_report_stalled");
+  // Les alertes se résolvent à part : elles n'attendent pas les lectures des
+  // lignes du journal (jusqu'à une file entière de résultats).
+  const restAlerts = rest.filter((entry) => botEventChannel(entry.kind) === "REFEREE");
+  const restLines = rest.filter((entry) => botEventChannel(entry.kind) !== "REFEREE");
 
   void (async () => {
     // Ce qui a été **effectivement remis** aux arbitres, repéré par la clé de
@@ -609,18 +621,18 @@ export function flushBotLogs(connection: PoolConnection): void {
     }
 
     // Les lignes du journal rejoignent leur lot à leur tour (ordre des
-    // commits) ; les alertes partent sans attendre ce tour.
-    let resolvedRest: ResolvedBotLog[] = [];
-    try {
-      resolvedRest = await resolveBotLogs(rest);
-    } finally {
-      if (hasLogLines) void deliverLogLinesInTurn(resolvedRest, previousTurn, releaseTurn);
+    // commits), en arrière-plan ; les alertes partent sans attendre ce tour ni
+    // la lecture des lignes.
+    if (hasLogLines) {
+      void resolveBotLogs(restLines)
+        .catch((): ResolvedBotLog[] => [])
+        .then((lines) => deliverLogLinesInTurn(lines, previousTurn, releaseTurn));
     }
+    const resolvedAlerts = await resolveBotLogs(restAlerts);
 
     /** Réservations des matchs sortis d'une alerte de manche pourtant remise. */
     const droppedClaims: number[] = [];
-    for (const resolved of resolvedRest) {
-      if (resolved.channel !== "REFEREE") continue;
+    for (const resolved of resolvedAlerts) {
       await deliver(resolved);
       if (delivered.has(entryKey(resolved.entry))) droppedClaims.push(...droppedClaimIds(resolved));
     }

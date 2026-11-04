@@ -122,6 +122,7 @@ export function createBotLogBatcher(options: BotLogBatcherOptions): BotLogBatche
   const chains = new Map<string, Promise<void>>();
   let sequence = 0;
   let closing = false;
+  let reopenTimer: Timer | null = null;
 
   function deadlineOf(batch: Batch): number {
     return Math.min(batch.lastAt + windowMs, batch.firstAt + maxAgeMs);
@@ -201,6 +202,7 @@ export function createBotLogBatcher(options: BotLogBatcherOptions): BotLogBatche
   }
 
   function flushKeys(keys: readonly string[]): Promise<void> {
+    if (batches.size === 0) return Promise.resolve();
     const taken: Array<[string, Batch]> = [];
     for (const key of new Set(keys)) {
       const batch = take(key);
@@ -257,10 +259,14 @@ export function createBotLogBatcher(options: BotLogBatcherOptions): BotLogBatche
       }
       // Un processus qui survit à l'arrêt (écouteur qui ne sort pas) retrouve
       // ses lots après un délai bien supérieur à celui de pm2.
-      const reopen = setTimeout(() => {
+      // Un seul minuteur de réouverture : un second `flushAll` (SIGINT puis
+      // SIGTERM) repousse l'échéance au lieu d'en poser une autre.
+      if (reopenTimer) clearTimeout(reopenTimer);
+      reopenTimer = setTimeout(() => {
         closing = false;
+        reopenTimer = null;
       }, CLOSING_GRACE_MS);
-      reopen.unref?.();
+      reopenTimer.unref?.();
     },
     pending() {
       return new Map([...batches].map(([key, batch]) => [key, batch.lines.length]));
@@ -269,6 +275,8 @@ export function createBotLogBatcher(options: BotLogBatcherOptions): BotLogBatche
       for (const batch of batches.values()) if (batch.timer) clearTimeout(batch.timer);
       batches.clear();
       chains.clear();
+      if (reopenTimer) clearTimeout(reopenTimer);
+      reopenTimer = null;
       closing = false;
       sequence = 0;
     },
