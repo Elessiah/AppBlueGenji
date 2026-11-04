@@ -126,6 +126,10 @@ describe("câblage de la fenêtre des cartes", () => {
     expect(dialog()).toMatch(/!roundDirty \|\| gapRefused\(\) \|\| overMaxRefused\(\)/);
   });
 
+  it("dialog_overMax_savedRoundAlreadyOverTheCapCanStillBeEditedWithoutGrowing", () => {
+    expect(dialog()).toContain("Math.max(maxMaps, saved?.slots.length ?? 0)");
+  });
+
   it("dialog_serverRefusal_attachesToTheListNotToTheFirstSlot", () => {
     const source = dialog();
 

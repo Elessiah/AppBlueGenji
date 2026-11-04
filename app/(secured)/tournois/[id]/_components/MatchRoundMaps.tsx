@@ -198,7 +198,8 @@ export function MatchRoundMaps({
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "UNKNOWN");
       // La map de départage reste : le toast le dit, il ne promet pas un tour entièrement vidé.
-      showSuccess(t(tiebreak === null ? "dialog.roundCleared" : "dialog.roundClearedTiebreakKept"));
+      const tiebreakKept = tiebreak !== null || roundTiebreakOf(rules.staleTiebreaks, match) !== null;
+      showSuccess(t(tiebreakKept ? "dialog.roundClearedTiebreakKept" : "dialog.roundCleared"));
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
       return true;
     } catch (error) {

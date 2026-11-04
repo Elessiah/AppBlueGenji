@@ -13,9 +13,19 @@ const ROUND_KEY_PATTERN = /^\d{1,9}:[A-Z_]{1,16}:\d{1,4}$/;
  * liste est mal formée.
  */
 async function ownRoundsOf(req: Request): Promise<string[] | null | undefined> {
-  const body = (await req.json().catch(() => null)) as { rounds?: unknown } | null;
-  if (body === null || body.rounds === undefined) return undefined;
-  const { rounds } = body;
+  // Pas de corps du tout : ancien client, tout part. Un corps illisible n'est pas « pas de corps ».
+  const raw = await req.text().catch(() => null);
+  if (raw === null) return null;
+  if (raw.trim() === "") return undefined;
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof body !== "object" || body === null) return null;
+  const { rounds } = body as { rounds?: unknown };
+  if (rounds === undefined) return undefined;
   if (!Array.isArray(rounds) || rounds.length > ROUND_MAPS_FLUSH_ROUNDS_MAX) return null;
   if (!rounds.every((key) => typeof key === "string" && ROUND_KEY_PATTERN.test(key))) return null;
   return rounds as string[];

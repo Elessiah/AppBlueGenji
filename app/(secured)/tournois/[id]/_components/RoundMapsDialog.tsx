@@ -734,7 +734,8 @@ export function RoundMapsDialog({
 
   /** Plus de cartes que le format n'en joue : refusé avant l'envoi, et rattaché à la première carte de trop. */
   const overMaxRefused = () => {
-    const over = slotOverMax(slots, maxMaps);
+    // Un tour déjà enregistré au-dessus du plafond (le serveur n'en impose pas) peut être retouché sans grossir.
+    const over = slotOverMax(slots, maxMaps === null ? null : Math.max(maxMaps, saved?.slots.length ?? 0));
     if (over === null) return false;
     const text = t("dialog.overMaxMaps", { max: maxMaps ?? 0 });
     showError(text);

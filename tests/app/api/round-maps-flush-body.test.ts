@@ -36,6 +36,19 @@ describe("POST /round-maps/flush — body", () => {
     expect(flushRoundMapsNotice).toHaveBeenCalledWith(7, undefined);
   });
 
+  it("flush_malformedJson_returns400AndFlushesNothing", async () => {
+    const response = await flushPost(post("{oups"), context);
+
+    expect(response.status).toBe(400);
+    expect(flushRoundMapsNotice).not.toHaveBeenCalled();
+  });
+
+  it("flush_bodyWithoutRoundsKey_passesUndefined", async () => {
+    await flushPost(post("{}"), context);
+
+    expect(flushRoundMapsNotice).toHaveBeenCalledWith(7, undefined);
+  });
+
   it("flush_roundsNotAnArray_returns400", async () => {
     const response = await flushPost(withRounds("0:UPPER:2"), context);
 
