@@ -227,7 +227,10 @@ lui-même).
     copie existe ou non** : elle ne dit pas si quelqu'un d'autre vient de lire
     ce tournoi, et un réseau sans jeton ne tire plus de corps de la copie
     (bande passante plafonnée). Seul un client qui détient déjà la version de
-    la copie (`If-None-Match`) reçoit un `304` ; l'instantané des membres
+    la copie (`If-None-Match` exact, jamais le joker `*`, qui dirait sinon si
+    la copie existe : `holdsExactEtag`) reçoit un `304`, qui ne pèse pas dans
+    la charge (`recordSpectatorRead` sauté : les sondages d'un réseau refusé
+    n'allongent pas l'attente des autres) ; l'instantané des membres
     chaud ne coûte rien et se sert donc toujours ;
   - le chargeur **revérifie** la chaleur de l'instantané des membres : si elle
     est tombée entre le contrôle de `beforeLoad` et la lecture, le jeton et la
