@@ -2,11 +2,13 @@ import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
 import { requestAccountDeletion } from "@/lib/server/users/account-deletion-request";
+import { replayAccountReactivation } from "@/lib/server/users/account-reactivation";
 import { isReactivationWindowOpen } from "@/lib/shared/account-deletion";
 import {
   replayDecision,
   type AccountDeletionEntry,
   type ReplayDecision,
+  type RestoredAccountRow,
 } from "@/lib/shared/account-deletion-journal";
 
 export interface ReplayReport {
@@ -14,6 +16,10 @@ export interface ReplayReport {
   absent: number;
   alreadyDeleted: number;
   otherAccount: number;
+  /** Comptes réactivés depuis la sauvegarde, revenus en attente avec elle, réactivés de nouveau. */
+  reactivated: number;
+  /** Comptes réactivés depuis la sauvegarde et déjà vivants dans la base restaurée. */
+  alreadyActive: number;
   failed: number;
 }
 
@@ -36,25 +42,33 @@ export async function replayAccountDeletions(
 ): Promise<ReplayReport> {
   const log = options.log ?? ((line: string) => console.log(line));
   const db = await getDatabase();
-  const report: ReplayReport = { replayed: 0, absent: 0, alreadyDeleted: 0, otherAccount: 0, failed: 0 };
+  const report: ReplayReport = {
+    replayed: 0,
+    absent: 0,
+    alreadyDeleted: 0,
+    otherAccount: 0,
+    reactivated: 0,
+    alreadyActive: 0,
+    failed: 0,
+  };
   const counters: Record<ReplayDecision, keyof ReplayReport> = {
     REPLAY: "replayed",
     ABSENT: "absent",
     ALREADY_DELETED: "alreadyDeleted",
     OTHER_ACCOUNT: "otherAccount",
+    REACTIVATE: "reactivated",
+    ALREADY_ACTIVE: "alreadyActive",
   };
 
   // Séquentiel : chaque suppression prend le verrou de sa ligne et ouvre sa
   // transaction, rien ne presse, et l'ordre du journal est celui des faits.
   for (const entry of entries) {
-    const [rows] = await db.execute<(RowDataPacket & { created_at: string; is_deleted: number })[]>(
-      `SELECT created_at, is_deleted FROM bg_users WHERE id = ?`,
-      [entry.userId],
-    );
-    const row = rows[0]
-      ? { createdAt: String(rows[0].created_at), isDeleted: Boolean(rows[0].is_deleted) }
-      : null;
-    const decision = replayDecision(entry, row);
+    const decision = replayDecision(entry, await readRestoredRow(db, entry.userId));
+
+    if (decision === "REACTIVATE") {
+      await handleReactivation(entry, report, log, options.dryRun === true);
+      continue;
+    }
 
     if (decision !== "REPLAY") {
       report[counters[decision]] += 1;
@@ -78,6 +92,60 @@ export async function replayAccountDeletions(
   }
 
   return report;
+}
+
+/** L'état du compte dans la base restaurée, ou `null` s'il n'y figure pas. */
+async function readRestoredRow(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  userId: number,
+): Promise<RestoredAccountRow | null> {
+  const [rows] = await db.execute<(RowDataPacket & {
+    created_at: string;
+    is_deleted: number;
+    deletion_requested_at: string | Date | null;
+  })[]>(`SELECT created_at, is_deleted, deletion_requested_at FROM bg_users WHERE id = ?`, [userId]);
+  const row = rows[0];
+  if (!row) return null;
+  const isDeleted = Boolean(row.is_deleted);
+  return {
+    createdAt: String(row.created_at),
+    isDeleted,
+    pendingDeletion: isDeleted && row.deletion_requested_at !== null,
+  };
+}
+
+/** Réactivation à rejouer : dite en simulation, rejouée sinon. */
+async function handleReactivation(
+  entry: AccountDeletionEntry,
+  report: ReplayReport,
+  log: (line: string) => void,
+  dryRun: boolean,
+): Promise<void> {
+  if (!dryRun) {
+    await replayReactivation(entry, report, log);
+    return;
+  }
+  report.reactivated += 1;
+  log(`  · #${entry.userId} — réactivé le ${entry.deletedAt}, à réactiver`);
+}
+
+/** Rejoue une réactivation (décision R1), et la compte. */
+async function replayReactivation(
+  entry: AccountDeletionEntry,
+  report: ReplayReport,
+  log: (line: string) => void,
+): Promise<void> {
+  try {
+    if (await replayAccountReactivation(entry.userId)) {
+      report.reactivated += 1;
+      log(`  ✓ #${entry.userId} — réactivé`);
+    } else {
+      report.alreadyActive += 1;
+    }
+  } catch (error) {
+    report.failed += 1;
+    log(`  ✗ #${entry.userId} — échec : ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 /** Rejoue une suppression par le chemin ordinaire, et la compte. */

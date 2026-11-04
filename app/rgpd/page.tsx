@@ -419,8 +419,9 @@ function RgpdFr({
           passés, classements, effectifs, pages de tournoi) ; son vrai pseudo, qui lui reste réservé, et son avatar
           sont gardés à part pour la seule réactivation, qui les lui rend, et effacés au terme du délai. La demande
           est aussi notée au journal hors base qui rejoue les suppressions après la restauration d&apos;une
-          sauvegarde (identifiant et date de création du compte, date de la demande), et en est retirée à la
-          réactivation. Dès la demande, et sans retour à la réactivation, il quitte ses équipes (la propriété
+          sauvegarde (identifiant et date de création du compte, date de la demande), et y est remplacée, à la
+          réactivation, par la date de celle-ci (gardée comme les autres lignes), pour qu&apos;une sauvegarde restaurée ne
+          ramène pas le compte en attente de suppression. Dès la demande, et sans retour à la réactivation, il quitte ses équipes (la propriété
           passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre ; une équipe dont il était le seul
           joueur devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute
           sinon), ses tournois organisés passent à un autre membre du staff quand quelqu&apos;un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore terminés, ses désignations d&apos;arbitre et ses invitations et demandes d&apos;adhésion d&apos;équipe en attente sont retirés et ses matchs restants d&apos;un tournoi individuel en
@@ -1147,9 +1148,9 @@ function RgpdFr({
             Discord lui répond par une autre erreur — (hors les copies de sauvegarde chiffrées). Ses autres délais s&apos;entendent à un
             balayage près (au plus {VOICE_BOT_SWEEP_MINUTES} minutes de plus). Le journal d&apos;audit de Discord garde la création et la
             suppression de chaque salon, avec son nom, lisible par l&apos;administration du serveur, pour la durée que Discord fixe. Ce comptage relève de l&apos;<strong>intérêt légitime</strong> de l&apos;association (bon déroulement des tournois : réunir chaque
-            équipe avant son match) ; rejoindre un salon reste un choix — mais tant que les deux ne sont pas pleins, le match attend que l&apos;arbitrage force son lancement, sauf si le bot ne répond pas —, et seule la présence de qui le rejoint est comptée. Vous pouvez
-            vous opposer à ce traitement en le demandant à l&apos;association, par le formulaire de signalement (catégorie RGPD) (section{" "}
-            <a href="#exercer-vos-droits">« Exercer vos droits »</a>) (<Link href="/rgpd/registre#t18">registre, T18</Link>).
+            équipe avant son match) ; rejoindre un salon reste un choix — mais tant que les deux ne sont pas pleins, le match attend que l&apos;arbitrage force son lancement, sauf si le bot ne répond pas —, et seule la présence de qui le rejoint est comptée. Ce comptage est
+            anonyme (un nombre, jamais qui : aucune donnée personnelle n&apos;en est gardée ni montrée) : il n&apos;a pas de droit
+            d&apos;opposition propre (<Link href="/rgpd/registre#t18">registre, T18</Link>).
           </p>
         </div>
       </section>

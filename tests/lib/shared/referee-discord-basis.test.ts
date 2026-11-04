@@ -99,12 +99,12 @@ describe("Registre T04 et /rgpd — exécution du service, FR et EN", () => {
     expect(en).toContain("the presentation of the assigned referee to the parties to their matches");
   });
 
-  // Revue juridique #546 : le comptage vocal (T18, intérêt légitime) est opposable.
-  it("rgpdRights_objection_listsVoiceChannelCountFrAndEn", () => {
+  // Décision R2 du 2026-11-04 : le comptage vocal, anonyme, n'est pas dans la liste.
+  it("rgpdRights_objection_doesNotListVoiceCount", () => {
     const fr = DROITS.find((droit) => droit.title === "Droit d'opposition")?.text ?? "";
     const en = DROITS_EN.find((droit) => droit.title === "Right to object")?.text ?? "";
-    expect(fr).toContain("le comptage des personnes présentes dans les salons vocaux d'équipe (un nombre, jamais qui)");
-    expect(en).toContain("the count of people present in team voice channels (a number, never who)");
+    expect(fr).not.toContain("salons vocaux");
+    expect(en).not.toContain("voice channels");
   });
 
   // Revue juridique #545, cycle 3 : avant la version 7, l'opposition vaut aussi pour le tag.

@@ -10,7 +10,7 @@ jest.mock("@/lib/server/users/account-deletion", () => ({ listSoloRegistrationTo
 
 import crypto from "node:crypto";
 import { getDatabase } from "@/lib/server/database";
-import { forgetPendingAccountDeletion } from "@/lib/server/account-deletion-journal";
+import { recordAccountReactivation } from "@/lib/server/account-deletion-journal";
 import { restoreAccountIdentity } from "@/lib/server/users/account-deletion-hold";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
@@ -21,6 +21,7 @@ import {
   peekReactivationTicket,
   reactivateAccount,
   readPendingDeletion,
+  replayAccountReactivation,
 } from "@/lib/server/users/account-reactivation";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
@@ -68,7 +69,7 @@ function transaction(options: {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(restoreAccountIdentity).mockResolvedValue(true);
-  jest.mocked(forgetPendingAccountDeletion).mockResolvedValue(undefined);
+  jest.mocked(recordAccountReactivation).mockResolvedValue(undefined);
   jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([]);
 });
 
@@ -162,7 +163,7 @@ describe("reactivateAccount", () => {
     // Le compte revit avec son vrai pseudo et son avatar, sur la transaction.
     expect(restoreAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7);
     expect(connection.commit).toHaveBeenCalled();
-    expect(forgetPendingAccountDeletion).toHaveBeenCalledWith({ userId: 7, accountCreatedAt: "2025-01-01 10:00:00" });
+    expect(recordAccountReactivation).toHaveBeenCalledWith({ userId: 7, accountCreatedAt: "2025-01-01 10:00:00" });
     expect(invalidateTeamIdentityViews).toHaveBeenCalled();
     expect(invalidateStats).toHaveBeenCalled();
   });
@@ -225,7 +226,7 @@ describe("reactivateAccount", () => {
     expect(connection.commit).toHaveBeenCalled();
     expect(connection.execute.mock.calls.some(([sql]) => sql.includes("FOR UPDATE"))).toBe(false);
     expect(restoreAccountIdentity).not.toHaveBeenCalled();
-    expect(forgetPendingAccountDeletion).not.toHaveBeenCalled();
+    expect(recordAccountReactivation).not.toHaveBeenCalled();
   });
 
   it("reactivateAccount_restoreRefused_nullAndJournalKept", async () => {
@@ -236,7 +237,7 @@ describe("reactivateAccount", () => {
     jest.mocked(restoreAccountIdentity).mockResolvedValue(false);
 
     expect(await reactivateAccount(TOKEN)).toBeNull();
-    expect(forgetPendingAccountDeletion).not.toHaveBeenCalled();
+    expect(recordAccountReactivation).not.toHaveBeenCalled();
     expect(connection.release).toHaveBeenCalled();
   });
 
@@ -270,5 +271,42 @@ describe("reactivateAccount", () => {
 
     expect(await reactivateAccount(undefined)).toBeNull();
     expect(getConnection).not.toHaveBeenCalled();
+  });
+});
+
+// Décision R1 du 2026-11-04 : rejeu d'une réactivation après restauration.
+describe("replayAccountReactivation", () => {
+  it("replayAccountReactivation_pendingRow_restoresAndRevokesSessions", async () => {
+    const connection = transaction({ locked: { is_deleted: 1, deletion_requested_at: RECENT } });
+
+    expect(await replayAccountReactivation(7)).toBe(true);
+
+    expect(restoreAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7);
+    const sqls = connection.execute.mock.calls.map(([sql]) => String(sql));
+    expect(sqls).toContain("DELETE FROM bg_user_sessions WHERE user_id = ?");
+    expect(connection.commit).toHaveBeenCalled();
+    expect(invalidateTeamIdentityViews).toHaveBeenCalled();
+    expect(invalidateStats).toHaveBeenCalled();
+    expect(recordAccountReactivation).not.toHaveBeenCalled();
+  });
+
+  it("replayAccountReactivation_aliveRow_falseWithoutRestore", async () => {
+    const connection = transaction({ locked: { is_deleted: 0, deletion_requested_at: null } });
+
+    expect(await replayAccountReactivation(7)).toBe(false);
+
+    expect(restoreAccountIdentity).not.toHaveBeenCalled();
+    expect(connection.commit).toHaveBeenCalled();
+    expect(invalidateStats).not.toHaveBeenCalled();
+  });
+
+  it("replayAccountReactivation_error_rollsBackAndReleases", async () => {
+    const connection = transaction({ locked: { is_deleted: 1, deletion_requested_at: RECENT } });
+    jest.mocked(restoreAccountIdentity).mockRejectedValue(new Error("DB_DOWN"));
+
+    await expect(replayAccountReactivation(7)).rejects.toThrow("DB_DOWN");
+
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(connection.release).toHaveBeenCalled();
   });
 });

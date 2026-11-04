@@ -8,7 +8,7 @@ import {
   reactivationDeadline,
 } from "@/lib/shared/account-deletion";
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
-import { forgetPendingAccountDeletion } from "@/lib/server/account-deletion-journal";
+import { recordAccountReactivation } from "@/lib/server/account-deletion-journal";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { restoreAccountIdentity } from "./account-deletion-hold";
@@ -173,8 +173,10 @@ export async function reactivateAccount(
     await connection.commit();
     if (!restored) return null;
     // Après le commit : la demande en attente ne doit plus être rejouée par une
-    // restauration, et les vues en cache montraient le pseudo d'emprunt.
-    await forgetPendingAccountDeletion({ userId, accountCreatedAt: String(row.created_at) });
+    // restauration — la réactivation l'y remplace, et une sauvegarde prise
+    // pendant les trente jours, restaurée, réactive le compte au rejeu
+    // (décision R1) —, et les vues en cache montraient le pseudo d'emprunt.
+    await recordAccountReactivation({ userId, accountCreatedAt: String(row.created_at) });
     invalidateTeamIdentityViews();
     invalidateStats();
     await republishSoloEntryTournaments(userId);
@@ -185,4 +187,42 @@ export async function reactivateAccount(
   } finally {
     connection.release();
   }
+}
+
+/**
+ * Rejeu après la restauration d'une sauvegarde (décision R1 du 2026-11-04) :
+ * un compte réactivé depuis la sauvegarde, revenu avec elle en attente de
+ * suppression, est réactivé de nouveau — même écriture que la réactivation
+ * (pseudo, avatar, sessions retirées), sans ticket ni fenêtre : elle a eu lieu.
+ * N'écrit pas le journal (sa ligne de réactivation y est déjà). Rend `true` si
+ * le compte est réactivé.
+ */
+export async function replayAccountReactivation(userId: number): Promise<boolean> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+  let restored = false;
+  try {
+    await connection.beginTransaction();
+    const [locked] = await connection.execute<(RowDataPacket & {
+      is_deleted: 0 | 1;
+      deletion_requested_at: StoredDate;
+    })[]>(`SELECT is_deleted, deletion_requested_at FROM bg_users WHERE id = ? FOR UPDATE`, [userId]);
+    const row = locked[0];
+    if (row && Number(row.is_deleted) === 1 && row.deletion_requested_at !== null) {
+      restored = await restoreAccountIdentity(connection, userId);
+      if (restored) await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
+    }
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    throw error;
+  } finally {
+    connection.release();
+  }
+  if (restored) {
+    invalidateTeamIdentityViews();
+    invalidateStats();
+    await republishSoloEntryTournaments(userId);
+  }
+  return restored;
 }

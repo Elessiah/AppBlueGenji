@@ -88,4 +88,10 @@ describe("/rgpd et historique", () => {
     expect(en).toContain("15-minute reactivation ticket (account, sign-in method, expiry and token hash)");
     expect(en).toContain("`__Host-bg_reactivation`");
   });
+
+  // Décision R3 du 2026-11-04 : l'écran de réactivation dit le suffixe « OG ».
+  it("reactivationMessages_kept_mentionsOGSuffixFrAndEn", () => {
+    expect(frLogin.reactivation.kept).toContain("si ton pseudo a été pris entre-temps, il te revient suivi de « OG »");
+    expect(enLogin.reactivation.kept).toContain("if your username was taken in the meantime, it comes back followed by “OG”");
+  });
 });

@@ -5,7 +5,7 @@ import {
   formatJournalEntry,
   parseJournal,
   pruneJournal,
-  withoutPendingEntry,
+  withReactivationEntry,
   type AccountDeletionEntry,
 } from "@/lib/shared/account-deletion-journal";
 
@@ -141,14 +141,15 @@ export function recordAccountDeletion(
 }
 
 /**
- * Retire la demande **en attente** d'un compte qui vient d'être réactivé, et ne
- * lève jamais : gardée, elle ferait supprimer de nouveau, à la prochaine
- * restauration, un compte que son titulaire a choisi de garder. Un échec est
- * dit dans les journaux du serveur ; le rejeu le rattrape à moitié — la ligne
- * en attente d'un compte vivant n'y est rejouée que si la sauvegarde restaurée
- * est antérieure à la demande, ce qui ne se distingue pas d'ici.
+ * Consigne la **réactivation** d'un compte (décision R1 du 2026-11-04) : sa
+ * demande en attente cède la place à une ligne de réactivation, et ne lève
+ * jamais. Gardée, la demande ferait supprimer de nouveau, à la prochaine
+ * restauration, un compte que son titulaire a choisi de garder ; retirée sans
+ * trace, une sauvegarde prise pendant les trente jours ramènerait le compte en
+ * attente de suppression. La ligne de réactivation le fait réactiver au rejeu
+ * (`replayAccountDeletions`). Un échec est dit dans les journaux du serveur.
  */
-export function forgetPendingAccountDeletion(
+export function recordAccountReactivation(
   key: { userId: number; accountCreatedAt: string },
   options: { filePath?: string; now?: Date } = {},
 ): Promise<void> {
@@ -156,12 +157,10 @@ export function forgetPendingAccountDeletion(
   const now = options.now ?? new Date();
   return enqueue(async () => {
     const current = await readAccountDeletionJournal(filePath);
-    const kept = withoutPendingEntry(current.entries, key);
-    if (kept.length === current.entries.length) return;
-    await writeJournal(pruneJournal(kept, now), filePath);
+    await writeJournal(pruneJournal(withReactivationEntry(current.entries, key, now), now), filePath);
   }).catch((error: unknown) => {
     console.error(
-      `[account-deletion-journal] demande en attente du compte #${key.userId} non retirée (${filePath}) :`,
+      `[account-deletion-journal] réactivation du compte #${key.userId} non consignée (${filePath}) :`,
       error,
     );
   });

@@ -2,6 +2,7 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/prom
 import { isDuplicateEntryError } from "@/lib/server/mysql-errors";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { ANONYMOUS_PSEUDOS, pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
+import { reactivationPseudoCandidate } from "@/lib/shared/pseudo";
 
 /*
  * Masque d'un compte en attente de suppression (décision du 2026-11-04,
@@ -24,6 +25,9 @@ type Runner = Pick<PoolConnection, "execute">;
 
 /** Tentatives de pose d'un pseudo d'emprunt avant d'abandonner (même borne que l'anonymisation). */
 const HOLD_PSEUDO_ATTEMPTS = 5;
+
+/** Pseudos suffixés « OG » essayés à la réactivation (« PseudoOG » à « PseudoOG10 »). */
+const REACTIVATION_PSEUDO_ATTEMPTS = 10;
 
 /** Le pseudo est-il réservé par un **autre** compte en attente de suppression ? */
 export async function isPseudoHeldByOther(runner: Runner, pseudo: string, userId: number | null): Promise<boolean> {
@@ -114,9 +118,11 @@ export async function dropDeletionHold(runner: Runner, userId: number): Promise<
  * Réactivation : relève la demande **et** rend le vrai pseudo et l'avatar, en
  * une instruction, puis efface le masque et renomme l'entrée solo. Le pseudo
  * étant réservé pendant la fenêtre, le conflit ne vient que d'une course (un
- * renommage concurrent passé entre sa vérification et son écriture) : le
- * compte revit alors sous son pseudo d'emprunt, que son titulaire peut changer
- * dans Mon profil. Rend `true` si le compte est réactivé.
+ * renommage concurrent passé entre sa vérification et son écriture) ou d'une
+ * sauvegarde restaurée : le compte revit alors sous son pseudo suivi de « OG »
+ * (« PseudoOG », puis « PseudoOG2 »… — décision R3 du 2026-11-04), que son
+ * titulaire peut changer dans Mon profil ; à défaut, sous son pseudo d'emprunt.
+ * Rend `true` si le compte est réactivé.
  */
 export async function restoreAccountIdentity(connection: PoolConnection, userId: number): Promise<boolean> {
   const hold = await readDeletionHold(connection, userId, true);
@@ -136,11 +142,33 @@ export async function restoreAccountIdentity(connection: PoolConnection, userId:
       result = await reactivate(", pseudo = ?, avatar_url = ?", [hold.pseudo, hold.avatarUrl]);
     } catch (error) {
       if (!isDuplicateEntryError(error)) throw error;
-      result = await reactivate(", avatar_url = ?", [hold.avatarUrl]);
+      result = await reactivateUnderSuffixedPseudo(connection, userId, hold, reactivate);
     }
   }
   if (Number(result.affectedRows) !== 1) return false;
   await dropDeletionHold(connection, userId);
   await syncSoloEntryIdentityOn(connection, userId);
   return true;
+}
+
+/**
+ * Vrai pseudo pris : essaie « PseudoOG », « PseudoOG2 »… (en sautant ceux
+ * qu'un autre compte en attente réserve), et à défaut garde le pseudo d'emprunt.
+ */
+async function reactivateUnderSuffixedPseudo(
+  connection: PoolConnection,
+  userId: number,
+  hold: DeletionHold,
+  reactivate: (assignments: string, params: (string | null)[]) => Promise<ResultSetHeader>,
+): Promise<ResultSetHeader> {
+  for (let attempt = 0; attempt < REACTIVATION_PSEUDO_ATTEMPTS; attempt += 1) {
+    const candidate = reactivationPseudoCandidate(hold.pseudo, attempt);
+    if (await isPseudoHeldByOther(connection, candidate, userId)) continue;
+    try {
+      return await reactivate(", pseudo = ?, avatar_url = ?", [candidate, hold.avatarUrl]);
+    } catch (error) {
+      if (!isDuplicateEntryError(error)) throw error;
+    }
+  }
+  return reactivate(", avatar_url = ?", [hold.avatarUrl]);
 }

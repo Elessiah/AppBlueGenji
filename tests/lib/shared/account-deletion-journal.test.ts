@@ -6,7 +6,7 @@ import {
   parseJournal,
   pruneJournal,
   replayDecision,
-  withoutPendingEntry,
+  withReactivationEntry,
   type AccountDeletionEntry,
 } from "@/lib/shared/account-deletion-journal";
 
@@ -177,22 +177,82 @@ describe("demande en attente (décision du 2026-11-04)", () => {
     expect(pruneJournal([current, stale], now)).toEqual([current]);
   });
 
-  it("withoutPendingEntry_reactivatedAccount_removesOnlyItsPendingLine", () => {
+});
+
+// Décision R1 du 2026-11-04 : la réactivation est journalisée.
+describe("réactivation journalisée (décision R1)", () => {
+  const now = new Date("2026-11-06T12:00:00.000Z");
+  const key = { userId: 7, accountCreatedAt: "2026-01-02 03:04:05" };
+  const reactivatedAt = new Date("2026-11-03T09:00:00.000Z");
+  const reactivated = entry({ reactivated: true, deletedAt: "2026-11-03T09:00:00.000Z" });
+
+  it("withReactivationEntry_pendingLine_replacedByReactivatedLine", () => {
     const pending = entry({ pending: true });
-    const otherCreation = entry({ pending: true, accountCreatedAt: "2025-05-05 05:05:05" });
     const other = entry({ userId: 8, pending: true });
     const final = entry({ userId: 9 });
 
-    expect(withoutPendingEntry([pending, otherCreation, other, final], { userId: 7, accountCreatedAt: "2026-01-02 03:04:05" })).toEqual([
-      otherCreation,
-      other,
-      final,
-    ]);
+    expect(withReactivationEntry([pending, other, final], key, reactivatedAt)).toEqual([other, final, reactivated]);
   });
 
-  it("withoutPendingEntry_finalLineOfSameAccount_kept", () => {
+  it("withReactivationEntry_otherCreationDate_untouched", () => {
+    const otherCreation = entry({ pending: true, accountCreatedAt: "2025-05-05 05:05:05" });
+
+    expect(withReactivationEntry([otherCreation], key, reactivatedAt)).toEqual([otherCreation, reactivated]);
+  });
+
+  it("withReactivationEntry_finalLineOfSameAccount_kept", () => {
     const final = entry();
 
-    expect(withoutPendingEntry([final], { userId: 7, accountCreatedAt: "2026-01-02 03:04:05" })).toEqual([final]);
+    expect(withReactivationEntry([final], key, reactivatedAt)).toEqual([final, reactivated]);
+  });
+
+  it("pruneJournal_reactivationAfterRequest_reactivationWins", () => {
+    const pending = entry({ pending: true, deletedAt: "2026-11-01T10:00:00.000Z" });
+
+    expect(pruneJournal([pending, reactivated], now)).toEqual([reactivated]);
+  });
+
+  it("pruneJournal_newRequestAfterReactivation_requestWins", () => {
+    const pending = entry({ pending: true, deletedAt: "2026-11-05T10:00:00.000Z" });
+
+    expect(pruneJournal([reactivated, pending], now)).toEqual([pending]);
+  });
+
+  it("pruneJournal_finalDeletion_overridesReactivation", () => {
+    const final = entry({ deletedAt: "2026-10-01T10:00:00.000Z" });
+
+    expect(pruneJournal([reactivated, final], now)).toEqual([final]);
+  });
+
+  it("formatParse_reactivatedEntry_roundTrips", () => {
+    expect(parseJournal(formatJournalEntry(reactivated)).entries).toEqual([reactivated]);
+  });
+
+  it("parseJournal_pendingAndReactivated_rejected", () => {
+    const line = JSON.stringify({ ...entry(), pending: true, reactivated: true });
+
+    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+  });
+
+  it("replayDecision_reactivatedEntryPendingRow_reactivate", () => {
+    expect(
+      replayDecision(reactivated, { createdAt: "2026-01-02 03:04:05", isDeleted: true, pendingDeletion: true }),
+    ).toBe("REACTIVATE");
+  });
+
+  it("replayDecision_reactivatedEntryAliveRow_alreadyActive", () => {
+    expect(replayDecision(reactivated, { createdAt: "2026-01-02 03:04:05", isDeleted: false })).toBe("ALREADY_ACTIVE");
+  });
+
+  it("replayDecision_reactivatedEntryFinalDeletedRow_alreadyDeleted", () => {
+    expect(
+      replayDecision(reactivated, { createdAt: "2026-01-02 03:04:05", isDeleted: true, pendingDeletion: false }),
+    ).toBe("ALREADY_DELETED");
+  });
+
+  it("replayDecision_reactivatedEntryOtherAccount_otherAccount", () => {
+    expect(
+      replayDecision(reactivated, { createdAt: "2026-09-22 08:00:00", isDeleted: true, pendingDeletion: true }),
+    ).toBe("OTHER_ACCOUNT");
   });
 });

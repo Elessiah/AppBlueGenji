@@ -89,10 +89,13 @@ l'arbitrage) ; à l'édition, elle passe par la route dédiée, pas par le `PATC
 Déclaré dans `PRIVACY_CHANGES` (`2026-11-salons-vocaux-equipe`), `/rgpd#salons-vocaux`
 et le registre (T18). Seul un nombre est gardé, jamais qui est présent.
 
-**Base juridique (décision V6 de l'utilisateur, 2026-11-03)** : dans un tournoi qui
-a l'option, réunir chaque équipe dans son salon fait partie du **règlement du
-tournoi** — le comptage relève de l'exécution du contrat, sans droit d'opposition
-propre ; une équipe qui ne veut pas s'y plier ne s'inscrit pas, ou se retire.
+**Base juridique (décisions de l'utilisateur du 2026-11-04, qui remplacent la V6)** :
+dans un tournoi qui a l'option, réunir chaque équipe dans son salon fait partie du
+**règlement du tournoi** ; le comptage relève de l'**intérêt légitime** (bon
+déroulement des tournois) et, **anonyme** (un nombre, jamais qui : aucune donnée
+personnelle n'en est gardée ni montrée), n'a pas de droit d'opposition propre
+(R2) — dit par les conditions v9, T18, `/rgpd#salons-vocaux` et la règle commune
+(FR + EN).
 Depuis le 5 novembre 2026 (entrée `2026-11-salons-vocaux-regle-du-tournoi`) :
 T18, `/rgpd#salons-vocaux` (FR + EN), la règle commune « Salons vocaux d'équipe »
 de `/regles` (`messages/*/rules.json`, `{voiceLead}` / `{voiceCapacity}` lus de

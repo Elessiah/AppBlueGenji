@@ -139,7 +139,7 @@
   "reactivation": {
     "title": "Reactivate your account?",
     "lead": "You asked for your account to be deleted. The deletion becomes final on {date}: until then, you can still reactivate it.",
-    "kept": "Reactivating gives you back your account: profile, statistics, settings, and your username and avatar, hidden everywhere since the request. A suspended account can be reactivated too: it stays suspended.",
+    "kept": "Reactivating gives you back your account: profile, statistics, settings, and your username and avatar, hidden everywhere since the request (if your username was taken in the meantime, it comes back followed by “OG”, for example “UsernameOG”: you can change it in My profile). A suspended account can be reactivated too: it stays suspended.",
     "notUndone": "What was done when you asked is not undone: you left your teams (ownership handed over, team turned into a ghost team or disbanded), your organised tournaments changed organiser when someone could take them over, your registrations were withdrawn or lost by forfeit, and your casts, referee assignments and pending invitations and join requests were withdrawn.",
     "confirm": "Reactivate my account",
     "cancel": "Don't reactivate",

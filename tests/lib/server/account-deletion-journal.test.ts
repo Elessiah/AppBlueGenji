@@ -4,10 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import {
   accountDeletionJournalPath,
-  forgetPendingAccountDeletion,
   pruneAccountDeletionJournal,
   readAccountDeletionJournal,
   recordAccountDeletion,
+  recordAccountReactivation,
   scheduleAccountDeletionJournalPrune,
 } from "@/lib/server/account-deletion-journal";
 import type { AccountDeletionEntry } from "@/lib/shared/account-deletion-journal";
@@ -217,24 +217,25 @@ describe("scheduleAccountDeletionJournalPrune", () => {
   });
 });
 
-describe("forgetPendingAccountDeletion", () => {
+// Décision R1 du 2026-11-04 : la réactivation remplace la demande en attente.
+describe("recordAccountReactivation", () => {
   const key = { userId: 1, accountCreatedAt: "2026-01-02 03:04:05" };
+  const reactivated = { ...entry(1, now.toISOString()), reactivated: true };
 
-  it("forgetPendingAccountDeletion_pendingEntry_removedOthersKept", async () => {
-    await recordAccountDeletion({ ...entry(1), pending: true }, { filePath: file, now });
+  it("recordAccountReactivation_pendingEntry_replacedOthersKept", async () => {
+    await recordAccountDeletion({ ...entry(1, "2026-09-20T10:00:00.000Z"), pending: true }, { filePath: file, now });
     await recordAccountDeletion(entry(2), { filePath: file, now });
 
-    await forgetPendingAccountDeletion(key, { filePath: file, now });
+    await recordAccountReactivation(key, { filePath: file, now });
 
-    expect((await readAccountDeletionJournal(file)).entries).toEqual([entry(2)]);
+    expect((await readAccountDeletionJournal(file)).entries).toEqual([entry(2), reactivated]);
   });
 
-  it("forgetPendingAccountDeletion_noPendingLine_fileUntouched", async () => {
+  it("recordAccountReactivation_noPendingLine_writesReactivationLine", async () => {
     await recordAccountDeletion(entry(2), { filePath: file, now });
-    const before = await readFile(file, "utf8");
 
-    await forgetPendingAccountDeletion(key, { filePath: file, now });
+    await recordAccountReactivation(key, { filePath: file, now });
 
-    expect(await readFile(file, "utf8")).toBe(before);
+    expect((await readAccountDeletionJournal(file)).entries).toEqual([entry(2), reactivated]);
   });
 });

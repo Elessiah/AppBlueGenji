@@ -621,9 +621,20 @@ puis renomme l'entrée solo (`syncSoloEntryIdentityOn`). Toute lecture qui joint
   (`PSEUDO_ALREADY_USED`) et `pseudoExists` à l'inscription.
 - **Réactivation** : `restoreAccountIdentity` relève la demande et rend pseudo et
   avatar en une instruction, efface le masque et renomme l'entrée solo. Un
-  conflit (course avec un renommage) ne rend que l'avatar : le compte revit sous
-  son pseudo d'emprunt, modifiable dans Mon profil (décision requise si l'on
-  veut mieux).
+  conflit (course avec un renommage, sauvegarde restaurée) rend le pseudo suivi
+  de « OG » (`reactivationPseudoCandidate` : « PseudoOG », puis « PseudoOG2 »…
+  jusqu'à « PseudoOG10 », en sautant les pseudos réservés par un masque ; début
+  raccourci pour tenir dans 40 caractères), modifiable dans Mon profil
+  (décision R3 du 2026-11-04, dite sur l'écran de réactivation FR + EN) ; ces
+  dix essais épuisés, le compte revit sous son pseudo d'emprunt.
+- **Journal à la réactivation** (décision R1) : `recordAccountReactivation`
+  remplace la ligne en attente par une ligne `reactivated: true` datée de la
+  réactivation (même rétention que les autres). Au rejeu, `replayDecision`
+  rend `REACTIVATE` si le compte est revenu en attente avec la sauvegarde —
+  `replayAccountReactivation` le réactive (même écriture, sans ticket ni
+  fenêtre, sans réécrire le journal) — et `ALREADY_ACTIVE` s'il est vivant.
+  Entre demande et réactivation d'un même compte, la ligne la plus récente
+  l'emporte ; une suppression définitive les rend caduques.
 - **Jour 30** : l'effacement supprime aussi le fichier d'avatar mis de côté ;
   l'anonymisation efface le masque (cascade sur l'effacement).
 - **Organisateur sans repreneur** : même règle, anonyme dès la demande.

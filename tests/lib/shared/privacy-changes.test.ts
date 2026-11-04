@@ -2401,14 +2401,16 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
 
   // Décision V6 (2026-11-03) : le salon vocal est une règle du tournoi —
   // la base passe au contrat, sans droit d'opposition (avant : intérêt légitime).
-  it("processingRegister_t18_legalBasisIsLegitimateInterestWithObjectionByRequestFrAndEn", () => {
+  it("processingRegister_t18_legalBasisIsLegitimateInterestAnonymousCountFrAndEn", () => {
     const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
     const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
     expect(t18.legalBasis).toMatch(/^Intérêt légitime \(bon déroulement des tournois/);
-    expect(t18.legalBasis).toContain("droit d'opposition, exercé en le demandant à l'association (formulaire de signalement, catégorie RGPD)");
+    expect(t18.legalBasis).toContain("le comptage est anonyme (un nombre, jamais qui : aucune donnée personnelle n'en est gardée ni montrée), sans droit d'opposition propre");
+    expect(t18.legalBasis).not.toContain("exercé en le demandant à l'association");
     expect(t18.legalBasis).not.toContain("Exécution du contrat");
     expect(t18En.legalBasis).toMatch(/^Legitimate interest \(smooth running of tournaments/);
-    expect(t18En.legalBasis).toContain("right to object, exercised by asking the association (report form, GDPR category)");
+    expect(t18En.legalBasis).toContain("the count is anonymous (a number, never who: no personal data from it is kept or shown), with no right to object of its own");
+    expect(t18En.legalBasis).not.toContain("exercised by asking the association");
     expect(t18En.legalBasis).not.toContain("Performance of the contract");
   });
 

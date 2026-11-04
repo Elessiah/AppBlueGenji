@@ -61,6 +61,30 @@ function failCall(connection: ReturnType<typeof connectionMock>, n: number, erro
   });
 }
 
+/**
+ * Réactivation dont le vrai pseudo est pris : l'UPDATE qui pose un pseudo de
+ * `taken` lève un doublon ; `heldBy` dit quel compte réserve un pseudo (masque).
+ */
+function takenPseudos(taken: string[], heldBy: Record<string, number> = {}) {
+  const connection = connectionMock();
+  connection.execute.mockImplementation(async (sql: string, params?: unknown) => {
+    const q = sql.replace(/\s+/g, " ").trim();
+    const values = Array.isArray(params) ? params : [];
+    if (q.startsWith("SELECT pseudo, avatar_url FROM bg_account_deletion_holds")) {
+      return [[{ pseudo: "Kerya", avatar_url: AVATAR }], []];
+    }
+    if (q.startsWith("SELECT user_id FROM bg_account_deletion_holds")) {
+      const owner = heldBy[String(values[0])];
+      return [owner ? [{ user_id: owner }] : [], []];
+    }
+    if (q.startsWith("UPDATE bg_users") && q.includes("pseudo = ?") && taken.includes(String(values[0]))) {
+      throw duplicate();
+    }
+    return [{ affectedRows: 1 }, []];
+  });
+  return connection;
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
@@ -202,15 +226,34 @@ describe("restoreAccountIdentity", () => {
     expect(syncSoloEntryIdentityOn).toHaveBeenCalledWith(expect.anything(), 7);
   });
 
-  it("restoreAccountIdentity_pseudoTakenByRace_restoresAvatarOnly", async () => {
-    const connection = transaction({ hold: { pseudo: "Kerya", avatar_url: AVATAR } });
-    failCall(connection, 2, duplicate());
+  // Décision R3 du 2026-11-04 : le vrai pseudo pris revient suivi de « OG ».
+  it("restoreAccountIdentity_pseudoTaken_restoresPseudoOG", async () => {
+    const connection = takenPseudos(["Kerya"]);
 
     expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe(true);
 
-    const [, revive] = updatesOf(connection);
-    expect(revive.sql).not.toContain("pseudo = ?");
-    expect(revive.params).toEqual([AVATAR, 7]);
+    const revive = updatesOf(connection).at(-1);
+    expect(revive?.params).toEqual(["KeryaOG", AVATAR, 7]);
+  });
+
+  it("restoreAccountIdentity_pseudoOGHeldByOther_triesOG2", async () => {
+    const connection = takenPseudos(["Kerya"], { KeryaOG: 9 });
+
+    expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe(true);
+
+    expect(updatesOf(connection).map((q) => q.params[0])).toEqual(["Kerya", "KeryaOG2"]);
+  });
+
+  it("restoreAccountIdentity_allCandidatesTaken_keepsBorrowedPseudo", async () => {
+    const taken = ["Kerya", "KeryaOG", ...Array.from({ length: 9 }, (_, i) => `KeryaOG${i + 2}`)];
+    const connection = takenPseudos(taken);
+
+    expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe(true);
+
+    const revive = updatesOf(connection).at(-1);
+    expect(revive?.sql).not.toContain("pseudo = ?");
+    expect(revive?.params).toEqual([AVATAR, 7]);
+    expect(updatesOf(connection)).toHaveLength(12);
   });
 
   it("restoreAccountIdentity_otherError_propagates", async () => {

@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/users/account-deletion");
 jest.mock("@/lib/server/users/account-deletion-request", () => ({ requestAccountDeletion: jest.fn() }));
+jest.mock("@/lib/server/users/account-reactivation", () => ({ replayAccountReactivation: jest.fn() }));
 
 import { replayAccountDeletions } from "@/lib/server/account-deletion-replay";
 import { getDatabase } from "@/lib/server/database";
 import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
 import { requestAccountDeletion } from "@/lib/server/users/account-deletion-request";
+import { replayAccountReactivation } from "@/lib/server/users/account-reactivation";
 import type { AccountDeletionEntry } from "@/lib/shared/account-deletion-journal";
 import { fakePool } from "../../helpers/sql-double";
 
@@ -19,7 +21,9 @@ const entry = (userId: number, accountCreatedAt = CREATED): AccountDeletionEntry
 });
 
 /** La base restaurée : un compte par identifiant, ou rien. */
-function restoredDb(rows: Record<number, { created_at: string; is_deleted: number }>) {
+function restoredDb(
+  rows: Record<number, { created_at: string; is_deleted: number; deletion_requested_at?: string | null }>,
+) {
   const execute = jest.fn(async (_sql: string, params: unknown[] = []) => {
     const row = rows[Number(params[0])];
     return [row ? [row] : []];
@@ -44,7 +48,15 @@ describe("replayAccountDeletions", () => {
     restoredDb({ 7: { created_at: CREATED, is_deleted: 0 } });
     const report = await replayAccountDeletions([entry(7)], { log });
     expect(deleteOwnAccount).toHaveBeenCalledWith(7);
-    expect(report).toEqual({ replayed: 1, absent: 0, alreadyDeleted: 0, otherAccount: 0, failed: 0 });
+    expect(report).toEqual({
+      replayed: 1,
+      absent: 0,
+      alreadyDeleted: 0,
+      otherAccount: 0,
+      reactivated: 0,
+      alreadyActive: 0,
+      failed: 0,
+    });
     expect(lines.join("\n")).toContain("effacé");
   });
 
@@ -62,7 +74,15 @@ describe("replayAccountDeletions", () => {
     });
     const report = await replayAccountDeletions([entry(1), entry(2), entry(3)], { log });
     expect(deleteOwnAccount).not.toHaveBeenCalled();
-    expect(report).toEqual({ replayed: 0, absent: 1, alreadyDeleted: 1, otherAccount: 1, failed: 0 });
+    expect(report).toEqual({
+      replayed: 0,
+      absent: 1,
+      alreadyDeleted: 1,
+      otherAccount: 1,
+      reactivated: 0,
+      alreadyActive: 0,
+      failed: 0,
+    });
     expect(lines.join("\n")).toContain("#3");
   });
 
@@ -101,6 +121,8 @@ describe("replayAccountDeletions", () => {
       absent: 0,
       alreadyDeleted: 0,
       otherAccount: 0,
+      reactivated: 0,
+      alreadyActive: 0,
       failed: 0,
     });
     expect(execute).not.toHaveBeenCalled();
@@ -149,5 +171,52 @@ describe("replayAccountDeletions — demande en attente (décision du 2026-11-04
 
     expect(lines.join("\n")).toContain("serait supprimé");
     expect(deleteOwnAccount).not.toHaveBeenCalled();
+  });
+});
+
+// Décision R1 du 2026-11-04 : une réactivation journalisée se rejoue.
+describe("replayAccountDeletions — réactivation (décision R1)", () => {
+  const reactivated: AccountDeletionEntry = { ...entry(7), reactivated: true, deletedAt: "2026-11-03T09:00:00.000Z" };
+  const pendingRow = { created_at: CREATED, is_deleted: 1, deletion_requested_at: "2026-11-01 10:00:00" };
+
+  it("replayAccountDeletions_reactivatedEntryPendingRow_callsReplayReactivation", async () => {
+    restoredDb({ 7: pendingRow });
+    jest.mocked(replayAccountReactivation).mockResolvedValue(true);
+
+    const report = await replayAccountDeletions([reactivated], { log });
+
+    expect(replayAccountReactivation).toHaveBeenCalledWith(7);
+    expect(deleteOwnAccount).not.toHaveBeenCalled();
+    expect(report).toMatchObject({ reactivated: 1, replayed: 0, failed: 0 });
+    expect(lines.join("\n")).toContain("réactivé");
+  });
+
+  it("replayAccountDeletions_reactivatedEntryDryRun_countsWithoutWriting", async () => {
+    restoredDb({ 7: pendingRow });
+
+    const report = await replayAccountDeletions([reactivated], { dryRun: true, log });
+
+    expect(replayAccountReactivation).not.toHaveBeenCalled();
+    expect(report.reactivated).toBe(1);
+    expect(lines.join("\n")).toContain("à réactiver");
+  });
+
+  it("replayAccountDeletions_reactivatedEntryAliveRow_alreadyActive", async () => {
+    restoredDb({ 7: { created_at: CREATED, is_deleted: 0, deletion_requested_at: null } });
+
+    const report = await replayAccountDeletions([reactivated], { log });
+
+    expect(replayAccountReactivation).not.toHaveBeenCalled();
+    expect(report).toMatchObject({ alreadyActive: 1, reactivated: 0 });
+  });
+
+  it("replayAccountDeletions_replayReactivationThrows_failedCounted", async () => {
+    restoredDb({ 7: pendingRow });
+    jest.mocked(replayAccountReactivation).mockRejectedValue(new Error("DB_DOWN"));
+
+    const report = await replayAccountDeletions([reactivated], { log });
+
+    expect(report).toMatchObject({ failed: 1, reactivated: 0 });
+    expect(lines.join("\n")).toContain("DB_DOWN");
   });
 });

@@ -309,8 +309,9 @@ export function RgpdEn({
           link: past results, rankings, rosters, tournament pages); its real username, which stays reserved for
           it, and its avatar are kept apart for reactivation only, which gives them back, and erased at the end
           of that time. The request is also recorded in the off-database log that replays deletions after a
-          backup is restored (account identifier and creation date, date of the request), and removed from it on
-          reactivation. As soon as it is requested, and without being undone by reactivation, it leaves its
+          backup is restored (account identifier and creation date, date of the request), and replaced, on
+          reactivation, by the date of the reactivation (kept like the other lines), so that a restored backup does not
+          bring the account back as pending deletion. As soon as it is requested, and without being undone by reactivation, it leaves its
           teams (ownership goes to a co-owner, else a manager, else a captain, else another member; a team of which it was the
           only player becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
           disbanded otherwise), its organised tournaments go to another staff member when someone can take them over, its registrations for a solo tournament that hasn&apos;t started yet are withdrawn, its casts of matches not yet completed, its referee assignments and its pending team invitations and join requests are withdrawn and its remaining matches in a running solo
@@ -958,9 +959,9 @@ export function RgpdEn({
             it or while Discord answers it with another error — (apart from the encrypted backup copies). Its other periods
             hold to within one sweep (at most {VOICE_BOT_SWEEP_MINUTES} minutes more). Discord&apos;s audit log keeps the creation and
             deletion of each channel, with its name, readable by the server&apos;s administration, for the period Discord sets. This count rests on the association&apos;s <strong>legitimate interest</strong> (smooth running of tournaments: gathering each
-            team before its match); joining a channel remains a choice — but until both are full, the match waits for referees to force its launch, unless the bot does not answer —, and only the presence of those who join it is counted. You can
-            object to this processing by asking the association, through the report form (GDPR category) (section{" "}
-            <a href="#exercer-vos-droits">“Exercising your rights”</a>) (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
+            team before its match); joining a channel remains a choice — but until both are full, the match waits for referees to force its launch, unless the bot does not answer —, and only the presence of those who join it is counted. This count is
+            anonymous (a number, never who: no personal data from it is kept or shown): it has no right to object of its
+            own (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
           </p>
         </div>
       </section>
