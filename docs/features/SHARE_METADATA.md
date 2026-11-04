@@ -426,7 +426,7 @@ réserve, un tel robot obtient des réponses plus lentes, pas un processeur satu
 - **Cartes tirées du classement** (`followsRanking` : podium, équipe
   nominative) : `invalidateRankingShareImages` les oublie — rendues ou en vol —
   à chaque écriture d'identité (`invalidateTeamIdentityViews` : nom, logo,
-  dissolution), à chaque suppression ou dépublication de tournoi (`invalidateTeamRanking`) — mais, pour un **score** rapporté ou arbitré (`invalidateTeamRankingForScore`), au plus une
+  dissolution), à chaque suppression de tournoi (`invalidateTeamRanking`) — mais, pour un **score** rapporté ou arbitré ou toute autre écriture de tournoi (`invalidateTeamRankingForScore`, `publishUpdatedEvent`), au plus une
   fois par fenêtre de `RANKING_TTL_MS` (60 s) : un soir de tournoi chargé, les
   rendus Satori/`sharp` du Raspberry Pi ne suivent plus le nombre de matchs, et
   un PNG gardé n'a que l'âge de sa propre échéance de retard.

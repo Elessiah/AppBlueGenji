@@ -165,9 +165,9 @@ lui-même).
   quel que soit le nombre de visiteurs. Une écriture ne **réveille** pas les visiteurs sans
   compte et n'**invalide** pas cette réponse : sa durée de vie, allongée sous la
   charge, est ce qui protège la machine d'un tournoi animé (choix de l'auteur ;
-  ce délai, 150 s au pire, est déclaré dans `/rgpd`). Seule la
-  **suppression** du tournoi la retire (`invalidateSpectatorSnapshot`,
-  `deletion.ts`). Une lecture froide lit d'abord la **carte** du tournoi (une
+  ce délai, 150 s au pire, est déclaré dans `/rgpd`). Seules la
+  **suppression** du tournoi et son **édition** par le staff la retirent
+  (`invalidateSpectatorSnapshot`, `deletion.ts`, `edit.ts`). Une lecture froide lit d'abord la **carte** du tournoi (une
   requête indexée, `isSpectatorTournamentPublic`, mutualisée en vol entre les
   lectures simultanées et jamais gardée) : un identifiant inconnu ou pas encore
   publié s'arrête là, sans faire construire d'instantané. Si l'instantané des
@@ -181,7 +181,8 @@ lui-même).
   corps d'environ 1 Mo) pour tous les lecteurs qui l'acceptent
   (`Content-Encoding: gzip`, `Vary: Accept-Encoding` ; Next ne recompresse pas
   une réponse déjà encodée) ; une compression qui échoue (mémoire) ne donne pas
-  un 500 : la route sert le corps brut, avec l'`ETag` du codage réellement servi ;
+  un 500 : la route sert le corps brut, avec l'`ETag` du codage réellement servi,
+  et un client gzip qui revalide avec cet `ETag` brut reçoit un 304 ;
 - le cache commun purge ses entrées échues toutes les 10 s au plus
   (`CACHE_SWEEP_INTERVAL_MS`, à l'écriture), et non plus seulement au plafond
   de 500 : un parcours de tournois ne laisse plus d'instantanés en mémoire
@@ -284,10 +285,10 @@ construction). Seule une lecture **en base** de la carte prend un jeton de
 `SPECTATOR_READ_RULE` (`admit`, consulté dans le chargeur du cache de carte) :
 une carte servie par la copie ou par le cache de carte ne coûte rien, et la page
 d'un match (mise en page du tournoi + du match) n'épuise plus le plafond deux
-fois plus vite ; au plafond, encart ou page générale. Un tournoi **dépublié**
-(`updateTournament` qui repousse `startVisibilityAt` dans le futur) est évincé
-aussitôt (`invalidateSpectatorSnapshot` vide la réponse publique et la carte
-d'encart). Un membre connecté arrivant par une mise en page préchargée ne voit
+fois plus vite ; au plafond, encart ou page générale. Toute **édition** d'un
+tournoi (`updateTournament` : nom, description, dates) l'évince aussitôt
+(`invalidateSpectatorSnapshot` vide la réponse publique et la carte d'encart) :
+un nom ou une description retirés par le staff ne restent pas en aperçu. Un membre connecté arrivant par une mise en page préchargée ne voit
 pas la fiche publique : `MemberRelay` seul est rendu, à la place de `children`,
 jusqu'au `router.replace` ; un repli « Ouverture du tournoi… » (`login.authGate.redirecting`) évite la page vide si le renvoi tarde. `admit` est consulté avant `cached`, jamais dans le chargeur partagé : le refus d'un réseau plafonné n'est pas servi aux appelants qui rejoignent la lecture en vol.
 
