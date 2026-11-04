@@ -23,6 +23,7 @@ import {
 import type { TournamentSnapshot } from "@/lib/shared/types";
 import { gunzipSync } from "node:zlib";
 import { SPECTATOR_MAX_CONCURRENT_REBUILDS } from "@/lib/server/spectator-snapshot";
+import * as spectatorSnapshotModule from "@/lib/server/spectator-snapshot";
 import { tournamentSnapshot } from "../../../helpers/tournament-detail";
 import { tournamentCard } from "../../../helpers/tournament-card";
 import { bracketMatch, matchCaster } from "../../../helpers/bracket-match";
@@ -468,6 +469,22 @@ describe("GET /api/spectator/tournaments/[id]", () => {
       params("5"),
     );
     expect(crossed.status).toBe(200);
+  });
+
+  it("compression qui échoue (mémoire) : 200 avec le corps brut et son ETag, jamais un 500", async () => {
+    mockedSnapshot.mockResolvedValue(snapshot());
+    const plain = await GET(req("5", { "accept-encoding": "identity" }), params("5"));
+    const gzip = jest.spyOn(spectatorSnapshotModule, "gzippedSpectatorBody").mockRejectedValue(new Error("ENOMEM"));
+
+    const served = await GET(req("5", { "accept-encoding": "gzip" }), params("5"));
+
+    expect(gzip).toHaveBeenCalledTimes(1);
+    expect(served.status).toBe(200);
+    expect(served.headers.get("content-encoding")).toBeNull();
+    expect(served.headers.get("etag")).toBe(plain.headers.get("etag"));
+    expect(served.headers.get("content-type")).toBe("application/json; charset=utf-8");
+    expect(await served.text()).toBe(await plain.text());
+    gzip.mockRestore();
   });
 
   it("répond 503 quand toutes les places de construction sont prises, sans faire payer", async () => {

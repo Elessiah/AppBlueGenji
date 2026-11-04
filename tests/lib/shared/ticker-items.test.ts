@@ -37,11 +37,11 @@ describe("tickerOutcomes", () => {
     expect(tickerOutcomes(match({ team1Id: null, team2Id: null, winnerTeamId: null, forfeitTeamId: null }))).toEqual(["none", "none"]);
   });
 
-  it("tickerOutcomes_winnerIsForfeitSide_forfeitSideSaysForfeitOtherWins", () => {
-    // Ligne incohérente (vainqueur = camp forfait) : un camp forfait n'a pas
-    // gagné ; il s'affichait « ✓ » et l'autre « perdant ».
-    expect(tickerOutcomes(match({ winnerTeamId: 1, forfeitTeamId: 1 }))).toEqual(["forfeit", "win"]);
-    expect(tickerOutcomes(match({ winnerTeamId: 2, forfeitTeamId: 2 }))).toEqual(["win", "forfeit"]);
+  it("tickerOutcomes_winnerIsForfeitSide_showsNoWinner", () => {
+    // Ligne incohérente (vainqueur = camp forfait) : l'arbre et le classement
+    // créditent `winner_team_id`, le bandeau ne tranche pas.
+    expect(tickerOutcomes(match({ winnerTeamId: 1, forfeitTeamId: 1 }))).toEqual(["none", "none"]);
+    expect(tickerOutcomes(match({ winnerTeamId: 2, forfeitTeamId: 2 }))).toEqual(["none", "none"]);
   });
 
   it("forfait de l'adversaire d'un vainqueur enregistré : il reste « forfait », pas « perdant »", () => {

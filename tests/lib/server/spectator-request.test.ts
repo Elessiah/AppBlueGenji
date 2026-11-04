@@ -21,22 +21,58 @@ beforeEach(() => {
   jest.mocked(publicTournamentSnapshot).mockResolvedValue(null);
 });
 
+/** Une carte qui touche la base : consulte `admit` avant de lire, comme la vraie. */
+function cardReadsDatabase() {
+  jest.mocked(publicTournamentCard).mockImplementation(async (id, admit) =>
+    (admit ?? (() => true))() ? tournamentCard({ id }) : null,
+  );
+}
+
+/** Une carte servie par la copie ou le cache de carte : `admit` n'est jamais consulté. */
+function cardServedFromCache() {
+  jest.mocked(publicTournamentCard).mockImplementation(async (id) => tournamentCard({ id }));
+}
+
+/** Épuise le plafond du réseau par des lectures en base. */
+async function exhaustReadAllowance() {
+  cardReadsDatabase();
+  for (let i = 0; i < SPECTATOR_READ_RULE.limit; i += 1) await publicTournamentCardForRequest(i + 1);
+}
+
 describe("publicTournamentCardForRequest", () => {
   it("rend la carte lue pour le tournoi demandé", async () => {
+    cardReadsDatabase();
     expect((await publicTournamentCardForRequest(5))?.id).toBe(5);
-    expect(publicTournamentCard).toHaveBeenCalledWith(5);
+    expect(publicTournamentCard).toHaveBeenCalledWith(5, expect.any(Function));
   });
 
-  it("rend null, sans lire, une fois le plafond des lectures du réseau atteint", async () => {
-    for (let i = 0; i < SPECTATOR_READ_RULE.limit; i += 1) await publicTournamentCardForRequest(i + 1);
-    jest.mocked(publicTournamentCard).mockClear();
-
+  it("rend null une fois le plafond des lectures en base du réseau atteint", async () => {
+    await exhaustReadAllowance();
     expect(await publicTournamentCardForRequest(5)).toBeNull();
-    expect(publicTournamentCard).not.toHaveBeenCalled();
+  });
+
+  it("une carte servie par un cache ne prend aucun jeton : le plafond ne s'épuise pas", async () => {
+    cardServedFromCache();
+    for (let i = 0; i < SPECTATOR_READ_RULE.limit * 2; i += 1) await publicTournamentCardForRequest(i + 1);
+    cardReadsDatabase();
+    expect(await publicTournamentCardForRequest(5)).not.toBeNull();
+  });
+
+  it("un jeton seulement par lecture en base : deux mises en page, un cache chaud pour la seconde", async () => {
+    cardReadsDatabase();
+    await publicTournamentCardForRequest(5);
+    cardServedFromCache();
+    await publicTournamentCardForRequest(5);
+    // Il reste limit - 1 jetons : limit - 1 lectures passent encore, la suivante est refusée.
+    cardReadsDatabase();
+    for (let i = 0; i < SPECTATOR_READ_RULE.limit - 1; i += 1) {
+      expect(await publicTournamentCardForRequest(i + 1)).not.toBeNull();
+    }
+    expect(await publicTournamentCardForRequest(5)).toBeNull();
   });
 
   it("ne plafonne pas un réseau inconnu, et un autre réseau n'en pâtit pas", async () => {
-    for (let i = 0; i < SPECTATOR_READ_RULE.limit; i += 1) await publicTournamentCardForRequest(i + 1);
+    await exhaustReadAllowance();
     mockForwardedFor = "198.51.100.9";
     expect(await publicTournamentCardForRequest(5)).not.toBeNull();
     mockForwardedFor = null;
@@ -49,7 +85,7 @@ describe("publicTournamentSnapshotForRequest", () => {
     await publicTournamentSnapshotForRequest(5);
     expect(publicTournamentSnapshot).toHaveBeenCalledWith(5, expect.any(Number), "203.0.113.7");
 
-    for (let i = 0; i < SPECTATOR_READ_RULE.limit; i += 1) await publicTournamentCardForRequest(i + 1);
+    await exhaustReadAllowance();
     jest.mocked(publicTournamentSnapshot).mockClear();
     expect(await publicTournamentSnapshotForRequest(5)).toBeNull();
     expect(publicTournamentSnapshot).not.toHaveBeenCalled();

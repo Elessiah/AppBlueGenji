@@ -281,7 +281,10 @@ describe("page sans compte — mise en page", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
     mockPathname = null;
     const html = renderToStaticMarkup(await SpectatorLayout({ children: <p>plateau</p>, ...params("12") }));
-    expect(html).toContain("plateau");
+    // La fiche publique n'est pas rendue (elle s'hydraterait, SSE et sondage REST compris, avant le renvoi).
+    expect(html).not.toContain("plateau");
+    expect(html).not.toContain('class="page-shell"');
+    expect(html).toContain("<main");
     expect(redirect).not.toHaveBeenCalled();
   });
 

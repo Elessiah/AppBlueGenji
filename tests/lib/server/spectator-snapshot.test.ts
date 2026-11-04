@@ -399,6 +399,53 @@ describe("publicTournamentCard", () => {
     expect(await publicTournamentCard(5)).not.toBeNull();
   });
 
+  it("consulte `admit` seulement avant une lecture en base, une fois pour des lectures en vol ou en cache", async () => {
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 5 }));
+    const admit = jest.fn(() => true);
+
+    await publicTournamentCard(5, admit);
+    await publicTournamentCard(5, admit);
+
+    expect(admit).toHaveBeenCalledTimes(1);
+    expect(getVisibleTournamentCard).toHaveBeenCalledTimes(1);
+  });
+
+  it("refusée par `admit` : null, sans lire la base, et sans garder le refus", async () => {
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 5 }));
+
+    expect(await publicTournamentCard(5, () => false)).toBeNull();
+    expect(getVisibleTournamentCard).not.toHaveBeenCalled();
+    expect(await publicTournamentCard(5, () => true)).not.toBeNull();
+  });
+
+  it("copie récente : `admit` n'est pas consulté", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ card: tournamentCard({ id: 5 }) }));
+    await getSpectatorPayload(5, 0, CLIENT);
+    const admit = jest.fn(() => false);
+
+    expect(await publicTournamentCard(5, admit)).not.toBeNull();
+    expect(admit).not.toHaveBeenCalled();
+  });
+
+  it("dépublié : l'éviction vide la carte d'encart (10 s) et la copie (150 s)", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ card: tournamentCard({ id: 5, name: "Avant" }) }));
+    await getSpectatorPayload(5, 0, CLIENT);
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(null);
+
+    invalidateSpectatorSnapshot(5);
+
+    expect(await publicTournamentCard(5)).toBeNull();
+  });
+
+  it("l'éviction oublie aussi une carte gardée par le cache de carte seul", async () => {
+    jest.mocked(getVisibleTournamentCard).mockResolvedValueOnce(tournamentCard({ id: 5, name: "Gardée" })).mockResolvedValue(null);
+    expect((await publicTournamentCard(5))?.name).toBe("Gardée");
+
+    invalidateSpectatorSnapshot(5);
+
+    expect(await publicTournamentCard(5)).toBeNull();
+  });
+
   it("rend null quand la base ne répond pas", async () => {
     jest.mocked(getVisibleTournamentCard).mockRejectedValue(new Error("ECONNREFUSED"));
     expect(await publicTournamentCard(5)).toBeNull();

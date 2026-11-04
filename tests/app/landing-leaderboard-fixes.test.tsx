@@ -101,6 +101,20 @@ describe("Leaderboard — nuls et entrées", () => {
     expect(render({ draws: 3 })).toContain('<span class="sr-only">3 matchs nuls</span>');
   });
 
+  it("Leaderboard_rowWithDraws_readsWinsDrawsLossesInThatOrder", () => {
+    const markup = render({ wins: 3, draws: 1, losses: 2 });
+    const wins = markup.indexOf(">3<");
+    const draws = markup.indexOf("1 N");
+    const losses = markup.indexOf(">2<");
+    expect(wins).toBeGreaterThan(-1);
+    expect(draws).toBeGreaterThan(wins);
+    expect(losses).toBeGreaterThan(draws);
+  });
+
+  it("Leaderboard_rowWithDraws_givesDrawsAVisibleTitleWithTheLongText", () => {
+    expect(render({ draws: 2 })).toContain('title="2 matchs nuls"');
+  });
+
   it("Leaderboard_rowWithoutDraws_showsNoDrawsSpan", () => {
     expect(render({ draws: 0 })).not.toContain('class="draws"');
   });

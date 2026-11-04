@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
+jest.mock("@/lib/server/tournaments/snapshot");
 
 import { getDatabase } from "@/lib/server/database";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { invalidateSpectatorSnapshot } from "@/lib/server/tournaments/snapshot";
 import { loadEditableTournament, updateTournament } from "@/lib/server/tournaments/edit";
 import { fakePool } from "../../helpers/sql-double";
 
@@ -119,6 +121,22 @@ describe("updateTournament", () => {
     expect(connection.commit).toHaveBeenCalledTimes(1);
     expect(publishUpdatedEvent).toHaveBeenCalledTimes(1);
     expect(publishUpdatedEvent).toHaveBeenCalledWith(1);
+  });
+
+  it("repousse la visibilité dans le futur : évince la réponse publique et la carte d'encart", async () => {
+    await updateTournament(1, { startVisibilityAt: new Date(Date.now() + 24 * HOUR).toISOString() });
+    expect(invalidateSpectatorSnapshot).toHaveBeenCalledTimes(1);
+    expect(invalidateSpectatorSnapshot).toHaveBeenCalledWith(1);
+  });
+
+  it("une édition sans date de visibilité n'évince rien", async () => {
+    await updateTournament(1, { name: "Autre nom" });
+    expect(invalidateSpectatorSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("une visibilité déjà passée dans le patch n'évince rien", async () => {
+    await updateTournament(1, { startVisibilityAt: past.toISOString() }).catch(() => undefined);
+    expect(invalidateSpectatorSnapshot).not.toHaveBeenCalled();
   });
 
   it("verrouille la ligne pendant la modification", async () => {

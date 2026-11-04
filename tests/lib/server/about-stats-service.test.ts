@@ -7,13 +7,19 @@ import {
   updateAboutStat,
 } from "@/lib/server/about-stats-service";
 import { clearCache } from "@/lib/server/cache";
-import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
+import { type SqlQuery, type SqlMock, connectionMock, fakeConnection, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
+/** Pool dont la connexion de transaction partage le même `execute` ; la connexion est rendue pour les vérifier. */
 async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  const connection = connectionMock();
+  connection.execute = execute;
+  jest.mocked(getDatabase).mockResolvedValue(
+    fakePool({ execute, getConnection: jest.fn(async () => fakeConnection(connection)) }),
+  );
+  return connection;
 }
 
 describe("about-stats-service", () => {
@@ -147,9 +153,49 @@ describe("about-stats-service", () => {
       expect(execute).toHaveBeenCalledTimes(1);
     });
 
-    it("throws NOT_FOUND when no row matches", async () => {
-      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]));
+    it("throws NOT_FOUND when no row matches, and rolls the transaction back", async () => {
+      const connection = await mockDb(jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]));
       await expect(updateAboutStat(999, { labelEn: "EN", value: "X", label: "Y" })).rejects.toThrow("ABOUT_STAT_NOT_FOUND");
+      expect(connection.rollback).toHaveBeenCalledTimes(1);
+      expect(connection.commit).not.toHaveBeenCalled();
+      expect(connection.release).toHaveBeenCalledTimes(1);
+    });
+
+    it("writes and re-reads the kept English value in one transaction", async () => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([{ affectedRows: 1 }])
+        .mockResolvedValueOnce([[{ value_en: "€4,200" }]]);
+      const connection = await mockDb(execute);
+
+      await updateAboutStat(7, { labelEn: "EN", value: "€5 000", label: "Prizepool" });
+      expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
+      expect(execute).toHaveBeenCalledTimes(2);
+      expect(connection.commit).toHaveBeenCalledTimes(1);
+      expect(connection.rollback).not.toHaveBeenCalled();
+      expect(connection.release).toHaveBeenCalledTimes(1);
+    });
+
+    it("rolls back and releases when the re-read fails", async () => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([{ affectedRows: 1 }])
+        .mockRejectedValueOnce(new Error("boom"));
+      const connection = await mockDb(execute);
+
+      await expect(updateAboutStat(7, { labelEn: "EN", value: "12", label: "Arbitres" })).rejects.toThrow("boom");
+      expect(connection.rollback).toHaveBeenCalledTimes(1);
+      expect(connection.release).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects a non-text English value without touching the database", async () => {
+      const execute = jest.fn<SqlQuery>();
+      await mockDb(execute);
+      const wrong: unknown = 42;
+      await expect(
+        updateAboutStat(7, { labelEn: "EN", value: "12", valueEn: wrong as string, label: "Arbitres" }),
+      ).rejects.toThrow("VALUE_EN_INVALID");
+      expect(execute).not.toHaveBeenCalled();
     });
 
     it("rejects invalid input", async () => {

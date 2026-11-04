@@ -7,6 +7,7 @@ import { GET, POST } from "@/app/api/association/about-stats/route";
 import { PUT, DELETE } from "@/app/api/association/about-stats/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/about-stats-service";
+import { validateAboutStatInput, type AboutStatInput } from "@/lib/shared/about-stats";
 import { authUser } from "../../../helpers/auth-user";
 
 const admin = authUser({ id: 1, isAdmin: true });
@@ -18,6 +19,12 @@ function jsonReq(method: string, body: unknown) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+/** Le service simulé refuse comme le vrai : par la validation partagée. */
+function refuseLikeService(input: AboutStatInput): never {
+  const check = validateAboutStatInput(input);
+  throw new Error(check.ok ? "UNEXPECTED_OK" : check.error);
 }
 
 function params(id: string) {
@@ -84,14 +91,30 @@ describe("POST /api/association/about-stats", () => {
     expect(await res.json()).toEqual({ stat });
   });
 
-  it("drops a non-text English value and returns the validation code", async () => {
+  it("refuses a non-text English value with 400 VALUE_EN_INVALID instead of reading it empty", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createAboutStat).mockImplementation(async (input) => refuseLikeService(input));
+
+    const res = await POST(jsonReq("POST", { value: "X", valueEn: 42, label: "Y", labelEn: "Y" }));
+    expect(service.createAboutStat).toHaveBeenCalledWith(expect.objectContaining({ valueEn: 42 }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "VALUE_EN_INVALID" });
+  });
+
+  it("returns the validation code of too long English value", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(service.createAboutStat).mockRejectedValue(new Error("VALUE_EN_TOO_LONG"));
 
-    const res = await POST(jsonReq("POST", { value: "X", valueEn: 42, label: "Y", labelEn: "Y" }));
-    expect(service.createAboutStat).toHaveBeenCalledWith(expect.objectContaining({ valueEn: null }));
+    const res = await POST(jsonReq("POST", { value: "X", valueEn: "e", label: "Y", labelEn: "Y" }));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "VALUE_EN_TOO_LONG" });
+  });
+
+  it("sends an absent valueEn as null on creation", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createAboutStat).mockResolvedValue({ id: 1, value: "X", valueEn: null, label: "Y", labelEn: "Y" });
+    await POST(jsonReq("POST", { value: "X", label: "Y", labelEn: "Y" }));
+    expect(service.createAboutStat).toHaveBeenCalledWith(expect.objectContaining({ valueEn: null }));
   });
 
   it("returns 400 with the validation error message", async () => {
@@ -173,13 +196,21 @@ describe("PUT /api/association/about-stats/[id]", () => {
     expect(input.valueEn).toBeUndefined();
   });
 
-  it("clears valueEn when the key is present but not text (null, number)", async () => {
+  it("clears valueEn when the key is present and null", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(service.updateAboutStat).mockResolvedValue({ id: 3, value: "X", valueEn: null, label: "Y", labelEn: "Y en" });
 
     await PUT(jsonReq("PUT", { value: "X", valueEn: null, label: "Y", labelEn: "Y en" }), params("3"));
-    await PUT(jsonReq("PUT", { value: "X", valueEn: 5, label: "Y", labelEn: "Y en" }), params("3"));
-    expect(jest.mocked(service.updateAboutStat).mock.calls.map((c) => c[1].valueEn)).toEqual([null, null]);
+    expect(jest.mocked(service.updateAboutStat).mock.calls.map((c) => c[1].valueEn)).toEqual([null]);
+  });
+
+  it("refuses a numeric valueEn with 400 VALUE_EN_INVALID, the stored English stays untouched", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.updateAboutStat).mockImplementation(async (_id, input) => refuseLikeService(input));
+
+    const res = await PUT(jsonReq("PUT", { value: "X", valueEn: 5, label: "Y", labelEn: "Y en" }), params("3"));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "VALUE_EN_INVALID" });
   });
 
   it("returns 404 when the stat does not exist", async () => {
