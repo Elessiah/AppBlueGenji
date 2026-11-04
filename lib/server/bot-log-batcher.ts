@@ -100,6 +100,9 @@ function boundedCount(value: number | undefined, min: number, fallback: number):
   return Math.max(min, Math.floor(value));
 }
 
+/** Après `flushAll`, durée pendant laquelle une ligne part aussitôt (arrêt en cours). */
+export const CLOSING_GRACE_MS = 10_000;
+
 /** Place minimale laissée aux lignes sous un en-tête ; en deçà, l'en-tête est omis. */
 export const MIN_ROOM_UNDER_HEADER = 16;
 
@@ -225,6 +228,12 @@ export function createBotLogBatcher(options: BotLogBatcherOptions): BotLogBatche
       closing = true;
       await flushKeys([...batches.keys()]);
       await Promise.all([...chains.values()]);
+      // Un processus qui survit à l'arrêt (écouteur qui ne sort pas) retrouve
+      // ses lots après un délai bien supérieur à celui de pm2.
+      const reopen = setTimeout(() => {
+        closing = false;
+      }, CLOSING_GRACE_MS);
+      reopen.unref?.();
     },
     pending() {
       return new Map([...batches].map(([key, batch]) => [key, batch.lines.length]));

@@ -337,7 +337,8 @@ export type BotLogScope = {
  * son tournoi, envoyé en un message après 5 min sans nouvelle ligne ou dès
  * 5 lignes (`docs/features/LOG_BATCHING.md`). Une ligne d'**alerte**
  * (`botLogKind(category) === "alert"` : relevé des arbitres, arbitre qui joue)
- * part, elle, tout de suite — elle appelle quelqu'un à agir. Synchrone, ne lève
+ * part, elle, tout de suite — elle appelle quelqu'un à agir — avec les lignes
+ * de son tournoi en attente, qui l'expliquent. Synchrone, ne lève
  * jamais : le bot reste optionnel, et l'envoi se fait plus tard, hors de
  * l'appelant.
  */
@@ -345,7 +346,7 @@ export function sendBotLog(message: string, scope: BotLogScope = {}): void {
   const category = scope.category ?? DEFAULT_BOT_LOG_CATEGORY;
   const key = botLogBatchKey(BOT_LOG_CHANNEL, scope.tournamentId, category);
   botLogBatcher.add(key, message, category);
-  if (botLogKind(category) === "alert") void botLogBatcher.flush(key);
+  if (botLogKind(category) === "alert") void flushBotLogBatch({ tournamentId: scope.tournamentId });
 }
 
 /**

@@ -147,7 +147,8 @@ export const BOT_LOG_CONTINUATION_LEAD = "(suite)";
  * que si elle dépasse seule la limite — entre ses rangées d'abord, jamais au
  * milieu d'une séquence d'échappement — et chaque message qui en poursuit une
  * s'ouvre sur {@link BOT_LOG_CONTINUATION_LEAD}. Les lignes vides (ou faites de
- * blancs) sont ignorées ; les autres partent telles quelles, indentation comprise.
+ * blancs) sont ignorées ; les autres partent sans leurs rangées vides de tête
+ * ni leurs blancs de fin, indentation comprise.
  */
 export function packBotLogLines(lines: readonly string[], maxChars: number = BOT_LOG_MESSAGE_MAX_CHARS): string[] {
   const limit = Math.max(2, Math.floor(maxChars));
@@ -171,8 +172,11 @@ export function packBotLogLines(lines: readonly string[], maxChars: number = BOT
       open(piece, continued);
     }
   };
-  for (const line of lines) {
-    if (!line.trim()) continue;
+  for (const raw of lines) {
+    // Les rangées vides en tête et les blancs de fin tombent ; l'indentation de
+    // la première rangée reste.
+    const line = raw.replace(/^(?:[ \t]*\r?\n)+/u, "").trimEnd();
+    if (!line) continue;
     if (line.length <= limit) {
       push(line, false);
       continue;
