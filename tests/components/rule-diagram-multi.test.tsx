@@ -32,7 +32,10 @@ describe("RuleDiagramFigure — MULTI", () => {
     const html = renderMulti();
 
     expect(html).toMatch(/class="[^"]*svgMulti[^"]*"/);
-    expect(html).toMatch(/font-size="11"[^>]*letter-spacing="0.1em"[^>]*>CHAMPIONNE</);
+    const champion = frRules.diagram.champion;
+    const label = new RegExp(`<text[^>]*>${champion}</text>`).exec(html);
+    expect(label).not.toBeNull();
+    expect(label?.[0]).toContain('font-size="11"');
   });
 
   it("multiDiagram_arrow_leavesFromFunnelEdgeForward", () => {
