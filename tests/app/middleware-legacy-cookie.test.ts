@@ -139,6 +139,49 @@ describe("middleware — politique CSP selon le serveur de développement", () =
     expect(scriptSrc()).toContain("'strict-dynamic'");
   });
 
+  // L'origine se lit sur `Host` : `next dev` réécrit `nextUrl.origin` en
+  // `localhost`, ce qui aurait refusé tous les morceaux sur `127.0.0.1`.
+  const scriptSrcWithHost = (headers: Record<string, string>) =>
+    (middleware(new NextRequest("https://bluegenji.test/tournois", { headers })).headers.get(CSP_HEADER) ?? "")
+      .split("; ")
+      .find((part) => part.startsWith("script-src ")) ?? "";
+
+  it("middleware_turbopackDevPlainHostWithPort_usesHostHeaderOrigin", () => {
+    withEnv({ NODE_ENV: "development", TURBOPACK: "1" });
+
+    expect(scriptSrcWithHost({ host: "127.0.0.1:3457" }).startsWith("script-src https://127.0.0.1:3457/_next/ ")).toBe(true);
+  });
+
+  it("middleware_turbopackDevBracketedIpv6Host_usesHostHeaderOrigin", () => {
+    withEnv({ NODE_ENV: "development", TURBOPACK: "1" });
+
+    expect(scriptSrcWithHost({ host: "[::1]:3000" }).startsWith("script-src https://[::1]:3000/_next/ ")).toBe(true);
+  });
+
+  it("middleware_turbopackDevHostWithDirectiveInjection_keepsSelf", () => {
+    withEnv({ NODE_ENV: "development", TURBOPACK: "1" });
+
+    const actual = scriptSrcWithHost({ host: "evil.test; script-src *" });
+
+    expect(actual.startsWith("script-src 'self' ")).toBe(true);
+    expect(actual).not.toContain("evil.test");
+  });
+
+  it("middleware_turbopackDevMissingHost_keepsSelf", () => {
+    withEnv({ NODE_ENV: "development", TURBOPACK: "1" });
+
+    expect(scriptSrcWithHost({}).startsWith("script-src 'self' ")).toBe(true);
+  });
+
+  it("middleware_turbopackProduction_keepsSelfSource", () => {
+    withEnv({ NODE_ENV: "production", TURBOPACK: "1" });
+
+    const actual = scriptSrc();
+
+    expect(actual.startsWith("script-src 'self' ")).toBe(true);
+    expect(actual).not.toContain("/_next/");
+  });
+
   it("middleware_turbopackProduction_keepsStrictDynamic", () => {
     withEnv({ NODE_ENV: "production", TURBOPACK: "1" });
 
