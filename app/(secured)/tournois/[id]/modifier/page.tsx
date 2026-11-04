@@ -26,7 +26,7 @@ import type { TournamentState } from "@/lib/shared/types";
 import { mapError, useErrorsText } from "../_lib/error-map";
 import { useFormText } from "../../_lib/form-text";
 import { CodedError } from "@/lib/shared/field-errors";
-import { settledValue } from "@/lib/shared/settled-value";
+import { mergeRefusals, settledRefusals, settledValue } from "@/lib/shared/settled-value";
 
 /**
  * Édition d'un tournoi.
@@ -126,6 +126,20 @@ async function saveTeamVoiceChannels(tournamentId: number, enabled: boolean, tex
   if (response.ok) return result.changed === true;
   const code = result.error ?? "UNKNOWN";
   throw new CodedError(code, voiceErrorText(text, code));
+}
+
+/** Les deux bascules, envoyées l'une sans l'autre ; `null` pour chacune quand la fenêtre est fermée. */
+async function saveToggles(
+  tournamentId: number,
+  editable: boolean,
+  values: Pick<TournamentFormValues, "refereeScheduling" | "teamVoiceChannels">,
+  text: TournamentFormText,
+): Promise<[PromiseSettledResult<PlanningSaveResult> | null, PromiseSettledResult<boolean> | null]> {
+  if (!editable) return [null, null];
+  return Promise.allSettled([
+    saveRefereeScheduling(tournamentId, values.refereeScheduling, text),
+    saveTeamVoiceChannels(tournamentId, values.teamVoiceChannels, text),
+  ]);
 }
 
 /** Envoie les champs de la fenêtre d'édition ; un refus nomme le champ en cause. */
@@ -344,18 +358,20 @@ export default function EditTournamentPage() {
           // Salons vocaux d'équipe : même régime que la planification — route
           // dédiée, envoyée à chaque enregistrement, idempotente. Les deux
           // bascules partent l'une sans l'autre : un refus de la planification
-          // n'empêche pas d'enregistrer les salons (et inversement) ; le
-          // premier refus est dit ensuite.
-          const [planningResult, voiceResult] = planningEditable
-            ? await Promise.allSettled([
-                saveRefereeScheduling(tournamentId, values.refereeScheduling, text),
-                saveTeamVoiceChannels(tournamentId, values.teamVoiceChannels, text),
-              ])
-            : [null, null];
+          // n'empêche pas d'enregistrer les salons (et inversement) ; ce qui a
+          // réussi est confirmé, chaque refus est dit ensuite.
+          const [planningResult, voiceResult] = await saveToggles(tournamentId, planningEditable, values, text);
           const planning = settledValue(planningResult, null);
           const voiceChanged = settledValue(voiceResult, false);
+          const refusals = settledRefusals(planningResult, voiceResult);
+          const savedText = editSavedText(text, fieldsSent || voiceChanged, planning, values.refereeScheduling);
 
-          showSuccess(editSavedText(text, fieldsSent || voiceChanged, planning, values.refereeScheduling));
+          // Un refus ne cache ni ce qui a été enregistré à côté, ni l'autre refus.
+          if (refusals.length > 0) {
+            if (savedText !== text.t("edit.savedNone")) showSuccess(savedText);
+            throw mergeRefusals(refusals);
+          }
+          showSuccess(savedText);
           router.push(`/tournois/${tournamentId}`);
           router.refresh();
         }}

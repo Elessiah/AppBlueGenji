@@ -33,8 +33,17 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
   const { t, locale } = useTournamentPageText();
   const spectator = useSpectatorView();
   const kind = launchPhaseBadgeKind(match, phase);
-  const voiceHeld =
-    match.voice?.pending === true ? <span className={styles.voiceHeld}> · {t("launch.voicePending")}</span> : null;
+  const held = match.voice?.pending === true;
+  // Le séparateur est décoratif ; le lecteur d'écran entend une phrase à part.
+  const voiceHeld = held ? (
+    <span className={styles.voiceHeld}>
+      <span aria-hidden="true"> · </span>
+      <span className="sr-only">. </span>
+      {t("launch.voicePending")}
+    </span>
+  ) : null;
+  // Le texte s'allonge d'une raison : la pastille passe alors à la ligne (375 px, /en).
+  const wrap = held ? ` ${styles.wrap}` : "";
   if (kind === "TO_PLAN") {
     return (
       <span className={styles.toPlan} title={t("launch.toPlanTitle")}>
@@ -46,7 +55,7 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
   if (kind === "SCHEDULED") {
     const startAtTitle = formatMatchStartAtFull(match.startAt, locale);
     return (
-      <span className={styles.scheduled} title={startAtTitle ?? undefined}>
+      <span className={`${styles.scheduled}${wrap}`} title={startAtTitle ?? undefined}>
         <span aria-hidden="true">⏱</span> {t("launch.scheduled")}
         {/* L'heure est déjà dans le bandeau d'horaire juste au-dessus : on ne
             la répète que pour les lecteurs d'écran, qui lisent ce libellé
@@ -60,7 +69,7 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
     // Sans compte, les « Prêt » ne sont pas servis (`spectatorSnapshot`) : la
     // phase seule, sans un décompte qui dirait toujours « 0 ».
     return (
-      <span className={styles.lobby}>
+      <span className={`${styles.lobby}${wrap}`}>
         <span aria-hidden="true">⏳</span> {t("launch.lobby")}
         {voiceHeld}
       </span>
@@ -78,7 +87,7 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
       referee: null,
     });
     return (
-      <span className={styles.lobby}>
+      <span className={`${styles.lobby}${wrap}`}>
         <span aria-hidden="true">⏳</span> {t("launch.lobby")} ·{" "}
         <span className="num">
           {count.ready}/{count.expected}

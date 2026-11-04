@@ -49,10 +49,17 @@
 }
 
 /* Le départ attend les salons vocaux d'équipe : dit dans la pastille, qui
-   peut alors passer à la ligne (375 px). */
+   passe alors à la ligne (375 px) — c'est la pastille, pas seulement sa
+   raison, qui lâche `nowrap`. */
+.toPlan.wrap,
+.lobby.wrap,
+.scheduled.wrap,
+.launched.wrap {
+  white-space: normal;
+}
+
 .voiceHeld {
   font-weight: 400;
-  white-space: normal;
 }
 
 .name {

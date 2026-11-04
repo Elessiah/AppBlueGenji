@@ -76,8 +76,13 @@ export function useMatchVoice(
   const streamed = enabled ? (match.voice ?? null) : null;
   // L'empreinte est lue au départ de la requête, pas en dépendance : un nouvel instantané
   // ne déclenche pas de relecture hors cadence, seule l'horloge le fait.
-  const streamKey = useRef(voiceStreamKey(streamed));
-  streamKey.current = voiceStreamKey(streamed);
+  // Il est posé après la validation du rendu (jamais pendant : un rendu écarté
+  // ne doit pas estampiller une relecture), avant l'effet de relecture qui le lit.
+  const key = voiceStreamKey(streamed);
+  const streamKey = useRef(key);
+  useEffect(() => {
+    streamKey.current = key;
+  }, [key]);
   const voice = enabled ? currentMatchVoice(match.id, streamed, polled, streamLive) : null;
   const active = voicePollActive(voice, streamLive);
   const tick = useClock(VOICE_POLL_MS, active);

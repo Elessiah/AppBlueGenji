@@ -1,7 +1,7 @@
 {
   "header": {
-    "scoreLabel": "Score : {score1} à {score2}",
-    "forfeitLabel": "Forfait de {team}",
+    "scoreLabel": "Score : {team1} {score1}, {team2} {score2}",
+    "forfeitLabel": "{team1} contre {team2} : forfait de {team}",
     "versus": "VS",
     "completed": "Terminé",
     "winner": "Victoire de {team}",

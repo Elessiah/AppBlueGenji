@@ -221,9 +221,11 @@ function headerScoreSr(
   doubleForfeit: boolean,
 ): string | null {
   if (doubleForfeit) return null;
-  if (score.leftForfeits) return page.t("header.forfeitLabel", { team: sides[0].displayName });
-  if (score.rightForfeits) return page.t("header.forfeitLabel", { team: sides[1].displayName });
-  return page.t("header.scoreLabel", { score1: score.left, score2: score.right });
+  const [left, right] = [sides[0].displayName, sides[1].displayName];
+  // Les deux noms dans le libellé : il se lit seul (navigation par repères), sans dépendre de l'ordre de lecture.
+  if (score.leftForfeits) return page.t("header.forfeitLabel", { team1: left, team2: right, team: left });
+  if (score.rightForfeits) return page.t("header.forfeitLabel", { team1: left, team2: right, team: right });
+  return page.t("header.scoreLabel", { team1: left, score1: score.left, team2: right, score2: score.right });
 }
 
 /**
@@ -277,9 +279,9 @@ function MatchHeader({
             <span aria-hidden="true" className="num">
               {score.left} – {score.right}
             </span>
-            {/* Les noms se lisent déjà de part et d'autre (liens) : le score seul,
-                « forfait » en toutes lettres plutôt que « FF » épelé. Double
-                forfait : la pastille d'état le dit. */}
+            {/* Le libellé nomme les deux équipes et dit « forfait » en toutes
+                lettres plutôt que « FF » épelé. Double forfait : la pastille
+                d'état le dit. */}
             {scoreSr && <span className="sr-only">{scoreSr}</span>}
           </p>
         ) : (
@@ -735,16 +737,12 @@ function VoiceSection({ voice, sides }: Readonly<{ voice: MatchVoiceInfo; sides:
           );
         })}
       </ul>
-      {voice.pending && (
-        <p className={styles.factNote} aria-live="polite">
-          {page.t("voice.waiting")}
-        </p>
-      )}
-      {failed && (
-        <p className={styles.factNote} aria-live="polite">
-          {page.t("voice.failedNote")}
-        </p>
-      )}
+      {/* Zone vivante toujours montée : un texte inséré dans une zone déjà
+          présente est annoncé, une zone montée avec son texte ne l'est pas. */}
+      <div aria-live="polite">
+        {voice.pending && <p className={styles.factNote}>{page.t("voice.waiting")}</p>}
+        {failed && <p className={styles.factNote}>{page.t("voice.failedNote")}</p>}
+      </div>
     </section>
   );
 }
