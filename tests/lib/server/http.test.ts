@@ -59,6 +59,13 @@ describe("http", () => {
       }
     });
 
+    it("fail_concurrentUpdateRetryCode_returns409", async () => {
+      const response = fail("CONCURRENT_UPDATE_RETRY", 400);
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({ error: "CONCURRENT_UPDATE_RETRY" });
+    });
+
     it("rend 415 pour un corps non déclaré JSON, quel que soit le statut demandé", async () => {
       // `readJsonBody` le lève ; une route qui le rendrait en 500 ferait passer
       // le refus d'un formulaire forgé pour une panne du serveur.

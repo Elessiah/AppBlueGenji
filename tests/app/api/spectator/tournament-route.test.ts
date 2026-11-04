@@ -242,6 +242,16 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect(await res.json()).toEqual({ error: "TOURNAMENT_LOAD_FAILED" });
   });
 
+  it("GET_databaseFailure_logsCodeOnly", async () => {
+    const logged = jest.mocked(console.error);
+    mockedSnapshot.mockRejectedValue(new Error("connect ECONNREFUSED 10.0.0.2:3306"));
+
+    await GET(req(), params("5"));
+
+    expect(logged).toHaveBeenCalled();
+    expect(JSON.stringify(logged.mock.calls)).not.toContain("10.0.0.2");
+  });
+
   it("plafonne les lectures d'une même adresse", async () => {
     mockedSnapshot.mockResolvedValue(snapshot());
 

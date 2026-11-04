@@ -177,6 +177,16 @@ describe("serviceFailure — une erreur hors code du site", () => {
     logged.mockRestore();
   });
 
+  it("reorder_deadlock_returns409ConcurrentUpdateRetry", async () => {
+    const warned = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    reorder.mockRejectedValueOnce(Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" }));
+
+    const actual = await reply(await plainOrder(request('{"ids":[1]}')));
+
+    expect(actual).toEqual({ status: 409, body: { error: "CONCURRENT_UPDATE_RETRY" } });
+    warned.mockRestore();
+  });
+
   it("reorder_driverErrorMessage_returnsFallbackCodeOnly", async () => {
     const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
     reorder.mockRejectedValueOnce(new Error(driverText));

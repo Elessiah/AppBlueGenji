@@ -326,6 +326,22 @@ describe("publicTournamentSnapshot", () => {
     expect(mockedSnapshot).not.toHaveBeenCalled();
   });
 
+  it("publicTournamentSnapshot_expiredCopyAndRefused_returnsCopyWithoutLoading", async () => {
+    jest.useFakeTimers({ now: 3_000_000, ...FAKE_CLOCK });
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot());
+    await getSpectatorPayload(5, 0, CLIENT);
+    // Échue (15 s au calme), mais dans l'âge déclaré de la copie.
+    jest.setSystemTime(3_000_000 + 20_000);
+    mockedSnapshot.mockClear();
+    const admit = jest.fn(() => false);
+
+    const actual = await publicTournamentSnapshot(5, 0, CLIENT, admit);
+
+    expect(actual).not.toBeNull();
+    expect(admit).toHaveBeenCalledTimes(1);
+    expect(mockedSnapshot).not.toHaveBeenCalled();
+  });
+
   it("publicTournamentSnapshot_coldAndAdmitted_builds", async () => {
     mockedSnapshot.mockResolvedValue(tournamentSnapshot());
     const admit = jest.fn(() => true);

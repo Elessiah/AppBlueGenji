@@ -7,7 +7,7 @@ import { GET, POST } from "@/app/api/association/about-stats/route";
 import { PUT, DELETE } from "@/app/api/association/about-stats/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/about-stats-service";
-import { validateAboutStatInput, type AboutStatInput } from "@/lib/shared/about-stats";
+import { validateAboutStatInput, type AboutStatRequestInput } from "@/lib/shared/about-stats";
 import { authUser } from "../../../helpers/auth-user";
 
 const admin = authUser({ id: 1, isAdmin: true });
@@ -22,7 +22,7 @@ function jsonReq(method: string, body: unknown) {
 }
 
 /** Le service simulé refuse comme le vrai : par la validation partagée. */
-function refuseLikeService(input: AboutStatInput): never {
+function refuseLikeService(input: AboutStatRequestInput): never {
   const check = validateAboutStatInput(input);
   throw new Error(check.ok ? "UNEXPECTED_OK" : check.error);
 }

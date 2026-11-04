@@ -1,5 +1,6 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { failureReason, isErrorCode, serviceErrorCode } from "@/lib/server/failure-reason";
+import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
 
 describe("failureReason", () => {
   it("failureReason_mysqlErrorWithCode_returnsCodeOnly", () => {
@@ -93,5 +94,30 @@ describe("serviceErrorCode", () => {
 
     expect(serviceErrorCode(thrown, "THING_CREATE_FAILED")).toBe("THING_CREATE_FAILED");
     logged.mockRestore();
+  });
+
+  it("serviceErrorCode_deadlockError_returnsConcurrentUpdateRetry", () => {
+    const warned = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const deadlock = Object.assign(new Error("Deadlock found when trying to get lock; try restarting transaction"), {
+      code: "ER_LOCK_DEADLOCK",
+      errno: 1213,
+    });
+
+    const actual = serviceErrorCode(deadlock, "THING_CREATE_FAILED");
+
+    expect(actual).toBe(CONCURRENT_UPDATE_RETRY);
+    expect(warned).toHaveBeenCalledTimes(1);
+    expect(logged).not.toHaveBeenCalled();
+    warned.mockRestore();
+    logged.mockRestore();
+  });
+
+  it("serviceErrorCode_lockWaitTimeoutErrno_returnsConcurrentUpdateRetry", () => {
+    const warned = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const timeout = Object.assign(new Error("Délai d'attente du verrou dépassé"), { errno: 1205 });
+
+    expect(serviceErrorCode(timeout, "THING_CREATE_FAILED")).toBe(CONCURRENT_UPDATE_RETRY);
+    warned.mockRestore();
   });
 });
