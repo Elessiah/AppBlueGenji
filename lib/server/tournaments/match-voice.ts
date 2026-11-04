@@ -554,7 +554,11 @@ async function recheckOpenChannels(touched: Set<number>): Promise<void> {
       }
     }
   };
-  await Promise.all(Array.from({ length: VOICE_RECHECK_CONCURRENCY }, worker));
+  // Tous les ouvriers finissent avant que la passe ne rende la main : aucun n'écrit après
+  // la publication de `touched`, ni ne chevauche la passe suivante.
+  const settled = await Promise.allSettled(Array.from({ length: VOICE_RECHECK_CONCURRENCY }, worker));
+  const failed = settled.find((result): result is PromiseRejectedResult => result.status === "rejected");
+  if (failed) throw failed.reason;
   // Mémoire bornée : tout lu, seuls les salons encore dus gardent leur horodatage ;
   // fenêtre pleine, ceux hors fenêtre le gardent (leur tour viendra) jusqu'à vieillir.
   const forgetBefore = Date.now() - VOICE_RECHECK_FORGET_MS;
@@ -598,6 +602,16 @@ async function createDueChannels(touched: Set<number>): Promise<boolean> {
   return false;
 }
 
+/** Création puis revérification ; rend l'erreur au lieu de la lever, pour que le rendu passe. */
+async function askDueChannels(touched: Set<number>): Promise<{ error: unknown } | null> {
+  try {
+    if (!(await createDueChannels(touched))) await recheckOpenChannels(touched);
+    return null;
+  } catch (error) {
+    return { error };
+  }
+}
+
 /** Une passe : les tournois dont la page change s'ajoutent à `touched` (publiés par l'appelant, même si la passe échoue). */
 async function runSweep(touched: Set<number>): Promise<void> {
   let needed: (RowDataPacket & { due: number | null; open_rows: number | null })[];
@@ -612,9 +626,12 @@ async function runSweep(touched: Set<number>): Promise<void> {
   const open = Number(needed[0]?.open_rows ?? 0) === 1;
   try {
     // Bot en panne : la revérification est sautée (une seule attente de plus), la suivante reprend le reste.
-    // Le rendu a son propre arrêt sur panne et ne dépend ni de la création ni de la revérification.
-    if (due && !(await createDueChannels(touched))) await recheckOpenChannels(touched);
+    // Le rendu a son propre arrêt sur panne et ne dépend ni de la création ni de la revérification :
+    // même si l'une d'elles échoue, il passe (la rétention n'attend pas), puis l'erreur remonte.
+    const asked = due ? askDueChannels(touched) : Promise.resolve(null);
+    const askError = await asked;
     if (due || open) await releaseChannels(touched);
+    if (askError) throw askError.error;
   } finally {
     // La minimisation ne dépend ni du bot ni d'une étape en échec ; après la publication, qu'elle ne retarde pas.
     for (const tournamentId of touched) publishMatchUpdatedEvent(tournamentId);
