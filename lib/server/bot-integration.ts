@@ -114,11 +114,15 @@ function resolveFailureCode(error: unknown): string {
     : "BOT_INTERNAL_UNREACHABLE";
 }
 
+/** Forme d'un code du bot (`VOICE_CHANNEL_NOT_TRACKED`) : jamais une phrase ni un nom. */
+const BOT_ERROR_CODE = /^[A-Z0-9_]{1,64}$/;
+
 async function safeReadError(response: Response): Promise<string> {
   try {
     const payload = (await response.json()) as { error?: unknown } | null;
-    // Un code est une chaîne : tout autre « error » (objet, nombre) ne sort pas tel quel.
-    if (typeof payload?.error === "string" && payload.error) {
+    // Un code est une chaîne en capitales : tout autre « error » (objet, nombre, phrase
+    // d'un relais qui pourrait citer un salon ou un membre) ne sort pas tel quel.
+    if (typeof payload?.error === "string" && BOT_ERROR_CODE.test(payload.error)) {
       return payload.error;
     }
   } catch {
@@ -1019,7 +1023,8 @@ const BOT_VOICE_FETCH_TIMEOUT_MS = 5000;
  * - `ok` : réponse attendue (`channelId`, ou libération faite) ;
  * - `gone` : le bot ne suit plus ce salon (`404 VOICE_CHANNEL_NOT_TRACKED`) —
  *   supprimé à la main, sorti de la catégorie, ou déjà libéré puis effacé ; un
- *   autre `404` (route absente du bot, `INTERNAL_ROUTE_NOT_FOUND`) est un échec ;
+ *   autre `404` (route absente du bot, `INTERNAL_ROUTE_NOT_FOUND`, ou service mal
+ *   routé, `BOT_INTERNAL_REQUEST_FAILED`) est une panne comptée au coupe-circuit ;
  * - `failed` : bot injoignable, coupe-circuit ouvert, permission refusée,
  *   Discord indisponible, réponse illisible — redemandé au passage suivant.
  */
@@ -1027,6 +1032,23 @@ export type VoiceCallOutcome<T> =
   | { kind: "ok"; value: T }
   | { kind: "gone"; code: string }
   | { kind: "failed"; code: string };
+
+/**
+ * Issue d'un `404` du bot vocal. Seul « salon non suivi » vaut « déjà rendu » (et
+ * prouve un bot sain) : une route absente (bot d'une autre version) ou un 404 d'un
+ * autre service fermerait sinon des lignes dont le salon reste sur Discord. Ces
+ * 404-là sont une panne du canal interne : comptés au coupe-circuit, et rendus sous
+ * un code de transport qui arrête le balayage.
+ */
+async function voiceNotFoundOutcome(response: Response): Promise<{ kind: "gone" | "failed"; code: string }> {
+  const code = await safeReadError(response);
+  if (code !== "VOICE_CHANNEL_NOT_TRACKED") {
+    recordFailure();
+    return { kind: "failed", code: code === "INTERNAL_ROUTE_NOT_FOUND" ? code : "BOT_INTERNAL_REQUEST_FAILED" };
+  }
+  recordSuccess();
+  return { kind: "gone", code };
+}
 
 async function voiceCall<T>(
   method: "GET" | "POST",
@@ -1043,15 +1065,7 @@ async function voiceCall<T>(
       cache: "no-store",
       signal: AbortSignal.timeout(BOT_VOICE_FETCH_TIMEOUT_MS),
     });
-    if (response.status === 404) {
-      const code = await safeReadError(response);
-      // Seul « salon non suivi » vaut « déjà rendu » (et prouve un bot sain) : une route absente
-      // (bot d'une autre version) ou un 404 d'un autre service fermerait sinon des lignes dont
-      // le salon reste sur Discord. Ces 404-là ne comptent ni pour ni contre le coupe-circuit.
-      if (code !== "VOICE_CHANNEL_NOT_TRACKED") return { kind: "failed", code };
-      recordSuccess();
-      return { kind: "gone", code };
-    }
+    if (response.status === 404) return await voiceNotFoundOutcome(response);
     if (!response.ok) {
       // Un refus du bot lui-même (permission, catégorie, Discord) n'est pas une
       // panne du canal interne : seul un 5xx de transport compte au coupe-circuit.
