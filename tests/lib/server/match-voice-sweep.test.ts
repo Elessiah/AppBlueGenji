@@ -235,6 +235,10 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     expect(RELEASABLE_SQL).toContain("m.start_at IS NULL");
   });
 
+  it("dispatchMatchVoiceChannels_releasableQuery_releasesMatchesPastTheLateWindow", () => {
+    expect(RELEASABLE_SQL).toContain(`m.start_at < NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR`);
+  });
+
   it("dispatchMatchVoiceChannels_purgeFails_retriedAtNextPass", async () => {
     const { execute } = database({ needed: { due: 0, open_rows: 0 } });
     const deletes = () => execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE")).length;
