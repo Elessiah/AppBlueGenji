@@ -117,8 +117,8 @@ tient en mémoire seulement l'état vocal des membres du serveur, pour savoir si
 est vide. Base : **intérêt légitime** (bon déroulement des tournois). La règle commune
 « Salons vocaux d'équipe » de `/regles` (`messages/*/rules.json`) le dit aussi.
 
-Les conditions d'utilisation v9 (publiées) décrivent encore l'attente et le comptage :
-une version 10 relève d'une décision de l'utilisateur.
+Les conditions d'utilisation v9, pas encore en ligne, ont été reformulées sur place par
+EF-43 (ni attente ni comptage, aucune mention d'opposition) : `TERMS_VERSION` reste 9.
 
 ## Côté bot
 
