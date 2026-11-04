@@ -422,12 +422,10 @@ export async function setTournamentMapRules(tournamentId: number, rules: MapRule
   });
   if (tournament === null) return;
   publishMatchUpdatedEvent(tournamentId);
-  void sendBotLog(formatMapRulesLog({ tournament: { id: Number(tournament.id), name: tournament.name } }), {
+  sendBotLog(formatMapRulesLog({ tournament: { id: Number(tournament.id), name: tournament.name } }), {
     tournamentId: Number(tournament.id),
     category: "maps",
-  }).catch(
-    (error: unknown) => console.error("[round-maps] journal non envoyé", error),
-  );
+  });
 }
 
 const PICK_MATCH_SELECT = `SELECT tournament_id, status, phase_id, bracket, round_number, self_managed, team1_id, team2_id,

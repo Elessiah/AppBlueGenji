@@ -35,6 +35,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     publishStaffAction(
       formatTournamentDeletedLog({ tournament: { id: deleted.id, name: deleted.name } }),
       { id: user.id, pseudo: user.pseudo },
+      { category: "admin", tournamentId: deleted.id },
     );
 
     return ok({ deleted });

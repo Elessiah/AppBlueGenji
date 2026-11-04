@@ -226,7 +226,7 @@ export async function suspendAccount(
   // partout — on ne ferme que ce qui est réellement révoqué.
   closeUserStreams(targetUserId);
 
-  publishStaffAction(formatSuspensionLog({ id: view.id, ground: view.ground, endsAt: view.endsAt }), actor, undefined, "moderation");
+  publishStaffAction(formatSuspensionLog({ id: view.id, ground: view.ground, endsAt: view.endsAt }), actor, { category: "moderation" });
   void loadNotificationRecipients([targetUserId], "proven")
     .then((recipients) =>
       notifyUsers(recipients, {
@@ -269,7 +269,7 @@ export async function liftSuspension(targetUserId: number, actor: StaffActor): P
   );
   if (result.affectedRows === 0) throw new Error("NO_ACTIVE_SUSPENSION");
 
-  publishStaffAction(formatSuspensionLiftedLog(active.id), actor, undefined, "moderation");
+  publishStaffAction(formatSuspensionLiftedLog(active.id), actor, { category: "moderation" });
   void loadNotificationRecipients([targetUserId], "proven")
     .then((recipients) =>
       notifyUsers(recipients, {

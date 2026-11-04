@@ -57,6 +57,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         reopenedTournament: rolledBack.reopenedTournament,
       }),
       { id: user.id, pseudo: user.pseudo },
+      { category: "admin", tournamentId: rolledBack.tournamentId },
     );
 
     return ok({ rolledBack });

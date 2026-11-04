@@ -10,25 +10,32 @@ import { staffAuditLine, type StaffActor } from "@/lib/shared/log-privacy";
  * dans ses journaux — c'est là que la modération retrouve qui a fait quoi
  * (`pm2 logs bluegenji | grep staff-audit`).
  *
- * `auditLine`, quand il est donné, remplace la ligne côté pm2 seulement : un
- * geste dont le détail (manche, issue) n'a pas sa place sur Discord y reste
- * vague, et le détail ne vit que dans pm2.
+ * Options ({@link StaffActionOptions}) :
+ * - `category` (obligatoire) range la ligne dans son lot Discord — un lot ne
+ *   mêle jamais deux catégories ;
+ * - `tournamentId`, pour un geste sur un tournoi : la ligne rejoint le lot de
+ *   **ce** tournoi, comme les lignes `bot-logs.ts` de la même catégorie, et un
+ *   message ne mêle jamais deux tournois ;
+ * - `auditLine`, quand il est donné, remplace la ligne côté pm2 seulement : un
+ *   geste dont le détail (manche, issue) n'a pas sa place sur Discord y reste
+ *   vague, et le détail ne vit que dans pm2.
  *
- * `category` range la ligne dans son lot Discord (`admin` par défaut ; un lot ne
- * mêle jamais deux catégories).
- *
- * L'audit est écrit **avant** l'envoi et sans l'attendre : le bot est optionnel,
- * la trace de modération ne l'est pas. L'envoi Discord reste au meilleur effort.
+ * L'audit est écrit **avant** l'envoi : le bot est optionnel, la trace de
+ * modération ne l'est pas. L'envoi Discord reste au meilleur effort.
  */
-export function publishStaffAction(
-  discordLine: string,
-  actor: StaffActor,
-  auditLine: string = discordLine,
-  category: BotLogCategory = "admin",
-): void {
-  console.info(staffAuditLine(auditLine, actor));
-  void sendBotLog(discordLine, { category }).catch(() => undefined);
+export function publishStaffAction(discordLine: string, actor: StaffActor, options: StaffActionOptions): void {
+  console.info(staffAuditLine(options.auditLine ?? discordLine, actor));
+  sendBotLog(discordLine, { category: options.category, tournamentId: options.tournamentId ?? null });
 }
+
+/** Rangement et détail d'un geste du staff ({@link publishStaffAction}). */
+export type StaffActionOptions = {
+  category: BotLogCategory;
+  /** Tournoi du geste, s'il en relève : son lot, jamais le lot commun. */
+  tournamentId?: number | null;
+  /** Ligne pm2 détaillée, à la place de la ligne Discord. */
+  auditLine?: string;
+};
 
 /**
  * La moitié pm2 de {@link publishStaffAction}, seule : pour un geste dont la

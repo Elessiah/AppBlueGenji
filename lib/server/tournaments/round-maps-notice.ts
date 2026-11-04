@@ -147,14 +147,14 @@ async function sendClaimed(rows: readonly NoticeRow[]): Promise<number> {
     const rounds = parsePending(row.rounds_json);
     if (rounds.length === 0) continue;
     const roundLabels = await labelRounds(db, row, rounds);
-    await sendBotLog(
+    sendBotLog(
       formatRoundMapsSummaryLog({
         tournament: { id: Number(row.tournament_id), name: row.name },
         roundLabels,
         listed: ROUND_MAPS_NOTICE_LISTED,
       }),
       { tournamentId: Number(row.tournament_id), category: "maps" },
-    ).catch((error: unknown) => console.error("[round-maps] journal non envoyé", error));
+    );
     sent += 1;
   }
   return sent;

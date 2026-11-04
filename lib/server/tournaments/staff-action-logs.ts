@@ -46,7 +46,7 @@ export async function deliverStaffMatchAction(
   const row = await loadMatchLogRow(matchId);
   if (!row) return;
   const match = matchLogSubject(row);
-  await sendBotLog(formatStaffMatchActionLog({ ...match, action, author, withoutMatch: options.withoutMatch }), {
+  sendBotLog(formatStaffMatchActionLog({ ...match, action, author, withoutMatch: options.withoutMatch }), {
     tournamentId: match.tournament.id,
     category: "admin",
   });
@@ -80,7 +80,7 @@ export async function deliverStaffTournamentAction(
   const tournament = rows[0];
   if (!tournament) return;
   const { name, ...wording } = details;
-  await sendBotLog(
+  sendBotLog(
     formatStaffTournamentActionLog({
       tournament: { id: Number(tournament.id), name: name ?? tournament.name },
       action,
