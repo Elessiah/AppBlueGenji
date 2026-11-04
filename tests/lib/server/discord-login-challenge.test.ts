@@ -590,7 +590,7 @@ describe("consumeDiscordLoginChallenge — usage du code (EF-14)", () => {
   });
 
   it("consumeDiscordLoginChallenge_legacyNullPurpose_rejected", async () => {
-    // Défi émis avant la colonne (dix minutes de vie) : refusé, le joueur redemande un code.
+    // Défi sans usage : la lecture `purpose = ?` ne le prend pas (le joueur redemande un code).
     const { state } = fakeDb(pendingChallenge({ id: 9, discord_id: "555", purpose: null }));
 
     await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toBeNull();

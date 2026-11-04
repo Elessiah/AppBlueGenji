@@ -156,6 +156,24 @@ describe("loadNotificationRecipients — option matchDm", () => {
     expect(String(query.mock.calls[3][0])).not.toMatch(/match_dm_enabled|locale/);
   });
 
+  it("loadNotificationRecipients_everyAttemptColumnMissing_lastErrorRaised", async () => {
+    const missing = Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
+    const query = jest.fn<SqlQuery>().mockRejectedValue(missing);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    await expect(loadNotificationRecipients([1], "proven")).rejects.toBe(missing);
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  it("loadNotificationRecipients_otherDatabaseError_raisedWithoutRetry", async () => {
+    const busy = Object.assign(new Error("Lock wait timeout exceeded"), { code: "ER_LOCK_WAIT_TIMEOUT" });
+    const query = jest.fn<SqlQuery>().mockRejectedValue(busy);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    await expect(loadNotificationRecipients([1], "proven")).rejects.toBe(busy);
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
   it("loadNotificationRecipients_onlyMatchDmColumnMissing_localeStillRead", async () => {
     // L'opposition ne peut pas être lue : la langue l'est encore, sans seconde lecture.
     const missing = Object.assign(new Error("Unknown column 'match_dm_enabled'"), { code: "ER_BAD_FIELD_ERROR" });
