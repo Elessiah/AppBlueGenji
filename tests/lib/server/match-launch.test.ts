@@ -103,18 +103,6 @@ type World = {
   alerts?: string[];
   /** Cartes réglées de la manche du match (`bg_tournament_round_maps.slots_json`), aucune par défaut. */
   roundSlots?: string;
-  /** Salons vocaux d'équipe (`MATCH_VOICE.md`) : option éteinte sans cette clé. */
-  voice?: {
-    enabled: boolean;
-    team1Solo?: boolean;
-    rows: {
-      team_id: number;
-      channel_id: string | null;
-      members: number | null;
-      counted_at: string | null;
-      failed_at: string | null;
-    }[];
-  };
 };
 
 const STAMP = "2026-09-24 20:00:00";
@@ -369,17 +357,6 @@ function readUserRows(state: World, sql: string, params: unknown[]): unknown[] |
   return null;
 }
 
-/** Les lectures du verrou des salons vocaux : l'option et les salons suivis. */
-function readVoiceRows(state: World, sql: string) {
-  if (sql.includes("AS enabled") && sql.includes("team_voice_channels")) {
-    return [[{ enabled: state.voice?.enabled ? 1 : 0, team1_solo: state.voice?.team1Solo ? 1 : 0, team2_solo: 0 }], []];
-  }
-  if (sql.includes("FROM bg_match_voice_channels")) {
-    return [(state.voice?.rows ?? []).map((row) => ({ match_id: 42, released_at: null, ...row })), []];
-  }
-  return null;
-}
-
 /** Lectures de `bg_matches` : candidats, ligne verrouillée (sans le jeu), relecture simple. */
 function readMatchRows(state: World, sql: string) {
   if (!sql.includes("FROM bg_matches m")) return null;
@@ -412,8 +389,6 @@ function executeFor(state: World) {
     }
     const userResult = readUserRows(state, sql, params);
     if (userResult) return userResult;
-    const voiceResult = readVoiceRows(state, sql);
-    if (voiceResult) return voiceResult;
     if (sql.includes("solo_user_id = ?")) {
       const userId = Number(params[0]);
       const ids = params.slice(1).map(Number);
@@ -1979,118 +1954,36 @@ describe("releaseMatchCast / claimMatchCast : gardes et publications (EF-29)", (
   });
 });
 
-describe("verrou des salons vocaux d'équipe (`MATCH_VOICE.md`)", () => {
+describe("salons vocaux d'équipe : le départ n'en dépend pas (`MATCH_VOICE.md`)", () => {
   const connection = () => connectionFor(state);
   const past = () => new Date(Date.now() - 60_000).toISOString();
-  const fresh = () => new Date().toISOString();
-  const stale = () => new Date(Date.now() - 6 * 60_000).toISOString();
-  const channel = (teamId: number, members: number | null, failed = false, at: () => string = fresh) => ({
-    team_id: teamId,
-    channel_id: members === null && failed ? null : `c${teamId}`,
-    members,
-    counted_at: members === null ? null : at(),
-    failed_at: failed ? at() : null,
+  const voiceRead = () => (state.issued ?? []).some((sql) => sql.includes("bg_match_voice_channels"));
+  beforeEach(() => {
+    state.issued = [];
   });
 
-  it("maintainMatchLaunches_phaseOffStartReachedChannelsNotFull_doesNotLaunch", async () => {
+  it("maintainMatchLaunches_phaseOffStartReached_launchesWithoutReadingVoiceChannels", async () => {
     state.match = matchState({ match_launch_phase: 0, start_at: past() });
-    state.voice = { enabled: true, rows: [channel(TEAM1, 5), channel(TEAM2, 4)] };
-    await maintainMatchLaunches(connection(), 7);
-    expect(state.match?.launched_at).toBeNull();
-  });
-
-  it("maintainMatchLaunches_phaseOffHeldByChannels_opensNoLobby", async () => {
-    state.match = matchState({ match_launch_phase: 0, start_at: past() });
-    state.voice = { enabled: true, rows: [channel(TEAM1, 5), channel(TEAM2, 4)] };
-    await maintainMatchLaunches(connection(), 7);
-    expect(state.match?.lobby_opened_at).toBeNull();
-  });
-
-  it("maintainMatchLaunches_phaseOnHeldByChannels_opensLobby", async () => {
-    state.match = matchState({ start_at: past() });
-    state.voice = { enabled: true, rows: [channel(TEAM1, 5), channel(TEAM2, 4)] };
-    await maintainMatchLaunches(connection(), 7);
-    expect(state.match?.lobby_opened_at).toBe(STAMP);
-  });
-
-  it("maintainMatchLaunches_phaseOffChannelsFull_launches", async () => {
-    state.match = matchState({ match_launch_phase: 0, start_at: past() });
-    state.voice = { enabled: true, rows: [channel(TEAM1, 5), channel(TEAM2, 5)] };
     await maintainMatchLaunches(connection(), 7);
     expect(state.match?.launched_at).toBe(STAMP);
+    expect(voiceRead()).toBe(false);
   });
 
-  it("maintainMatchLaunches_phaseOffNoChannelYet_doesNotLaunch", async () => {
-    state.match = matchState({ match_launch_phase: 0, start_at: past() });
-    state.voice = { enabled: true, rows: [] };
-    await maintainMatchLaunches(connection(), 7);
-    expect(state.match?.launched_at).toBeNull();
-  });
-
-  it("maintainMatchLaunches_botFailed_launchesBypassingGate", async () => {
-    state.match = matchState({ match_launch_phase: 0, start_at: past() });
-    state.voice = { enabled: true, rows: [channel(TEAM1, null, true), channel(TEAM2, 0)] };
-    await maintainMatchLaunches(connection(), 7);
-    expect(state.match?.launched_at).toBe(STAMP);
-  });
-
-  it("maintainMatchLaunches_phaseOffChannelsFullButStale_doesNotLaunch", async () => {
-    state.match = matchState({ match_launch_phase: 0, start_at: past() });
-    state.voice = { enabled: true, rows: [channel(TEAM1, 5, false, stale), channel(TEAM2, 5, false, stale)] };
-    await maintainMatchLaunches(connection(), 7);
-    expect(state.match?.launched_at).toBeNull();
-  });
-
-  it("maintainMatchLaunches_staleBotFailure_doesNotLaunch", async () => {
-    state.match = matchState({ match_launch_phase: 0, start_at: past() });
-    state.voice = { enabled: true, rows: [channel(TEAM1, null, true, stale), channel(TEAM2, 0)] };
-    await maintainMatchLaunches(connection(), 7);
-    expect(state.match?.launched_at).toBeNull();
-  });
-
-  it("maintainMatchLaunches_optionOff_launchesWithoutChannels", async () => {
-    state.match = matchState({ match_launch_phase: 0, start_at: past() });
-    state.voice = { enabled: false, rows: [] };
-    await maintainMatchLaunches(connection(), 7);
-    expect(state.match?.launched_at).toBe(STAMP);
-  });
-
-  it("maintainMatchLaunches_soloEntrant_gateIgnored", async () => {
-    state.match = matchState({ match_launch_phase: 0, start_at: past() });
-    state.voice = { enabled: true, team1Solo: true, rows: [] };
-    await maintainMatchLaunches(connection(), 7);
-    expect(state.match?.launched_at).toBe(STAMP);
-  });
-
-  it("maintainMatchLaunches_autoLaunchDueChannelsNotFull_doesNotLaunch", async () => {
+  it("maintainMatchLaunches_autoLaunchDue_launchesWithoutReadingVoiceChannels", async () => {
     state.match = matchState({
       start_at: new Date(Date.now() - 60 * 60_000).toISOString(),
       lobby_opened_at: new Date(Date.now() - 60 * 60_000).toISOString(),
       team1_ready_at: STAMP,
     });
-    state.voice = { enabled: true, rows: [channel(TEAM1, 2), channel(TEAM2, 5)] };
     await maintainMatchLaunches(connection(), 7);
-    expect(state.match?.launched_at).toBeNull();
-  });
-
-  it("setMatchReady_lastReadyChannelsNotFull_doesNotLaunch", async () => {
-    state.match = matchState({ team2_ready_at: STAMP, start_at: past(), lobby_opened_at: STAMP });
-    state.voice = { enabled: true, rows: [channel(TEAM1, 5), channel(TEAM2, 3)] };
-    await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: false });
-    expect(state.match?.launched_at).toBeNull();
-  });
-
-  it("setMatchReady_lastReadyChannelsFull_launches", async () => {
-    state.match = matchState({ team2_ready_at: STAMP, start_at: past(), lobby_opened_at: STAMP });
-    state.voice = { enabled: true, rows: [channel(TEAM1, 5), channel(TEAM2, 5)] };
-    await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: true });
-  });
-
-  it("forceLaunchMatch_channelsNotFull_stillLaunches", async () => {
-    state.match = matchState({ start_at: past() });
-    state.voice = { enabled: true, rows: [channel(TEAM1, 0), channel(TEAM2, 0)] };
-    await forceLaunchMatch(42);
     expect(state.match?.launched_at).toBe(STAMP);
+    expect(voiceRead()).toBe(false);
+  });
+
+  it("setMatchReady_lastReady_launchesWithoutReadingVoiceChannels", async () => {
+    state.match = matchState({ team2_ready_at: STAMP, start_at: past(), lobby_opened_at: STAMP });
+    await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: true });
+    expect(voiceRead()).toBe(false);
   });
 });
 

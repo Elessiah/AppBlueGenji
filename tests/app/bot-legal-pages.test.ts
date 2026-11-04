@@ -18,6 +18,12 @@ import {
   PROCESSING_ACTIVITIES,
 } from "@/lib/shared/processing-register";
 import { SITE_HOST } from "@/lib/shared/site-host";
+import {
+  VOICE_BOT_ABANDONED_MAX_HOURS,
+  VOICE_BOT_RELEASED_MAX_HOURS,
+  VOICE_BOT_SWEEP_MINUTES,
+  VOICE_BOT_UNRELEASED_MAX_HOURS,
+} from "@/lib/shared/match-voice";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -505,8 +511,8 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
     // Retention of the #live post, as on the site (T16).
     expect(fr).toContain("**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (evening message of the streamed matches: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
-    // TEAM-INVITE-NOTIFY : datée du lendemain de la nuit de déploiement suivant la fusion du 3 novembre 2026.
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["5 novembre 2026", "5 November 2026"]);
+    // EF-43 (salons vocaux) : datée du lendemain de la mise en ligne du 5 novembre 2026.
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["6 novembre 2026", "6 November 2026"]);
   });
 });
 
@@ -621,5 +627,47 @@ describe("politique du bot — sauvegardes deux fois par semaine (BACKUP-SCHEDUL
   it("ne dit plus « chaque semaine » ni « weekly » pour les sauvegardes", () => {
     expect(flatOf(PRIVACY_POLICY, "fr")).not.toContain("sauvegardée chaque semaine");
     expect(flatOf(PRIVACY_POLICY, "en")).not.toContain("backed up weekly");
+  });
+});
+
+describe("politique du bot — salons vocaux d'équipe (EF-43, registre T18)", () => {
+  const fr = JSON.stringify(PRIVACY_POLICY.fr);
+  const en = JSON.stringify(PRIVACY_POLICY.en);
+
+  it("privacyPolicy_voiceChannels_dataParagraphLinksT18NoCountMemoryOnlyFrAndEn", () => {
+    expect(fr).toContain("Salons vocaux d'équipe des matchs");
+    expect(fr).toContain("(/rgpd#salons-vocaux) (traitement T18)");
+    expect(fr).toContain("sans jamais l'enregistrer ni le transmettre au site, l'état vocal des membres du serveur de l'association");
+    expect(fr).toContain("Il ne compte personne et ne dit jamais au site qui se trouve dans un salon.");
+    expect(en).toContain("Team voice channels for matches");
+    expect(en).toContain("(/rgpd#salons-vocaux) (processing activity T18)");
+    expect(en).toContain("without ever recording it or sending it to the website, the voice state of the members of the association's server");
+    expect(en).toContain("It counts no one and never tells the website who is in a channel.");
+  });
+
+  it("privacyPolicy_voiceChannels_heldAtAllTimesWhateverTheOptionFrAndEn", () => {
+    expect(fr).toContain("il tient en mémoire en permanence, que l'option soit allumée ou non dans un tournoi");
+    expect(en).toContain("it holds in memory at all times, whether or not a tournament has the option on");
+  });
+
+  it("privacyPolicy_voiceChannels_legitimateInterestFrAndEn", () => {
+    expect(fr).toContain("Les salons vocaux d'équipe reposent aussi sur son intérêt légitime (bon déroulement des tournois).");
+    expect(en).toContain("Team voice channels also rest on its legitimate interest (smooth running of tournaments).");
+  });
+
+  it("privacyPolicy_voiceChannels_retentionUsesBotConstantsFrAndEn", () => {
+    expect(fr).toContain(`au plus tard ${VOICE_BOT_RELEASED_MAX_HOURS} heures et ${VOICE_BOT_SWEEP_MINUTES} minutes après son rendu même occupé`);
+    expect(fr).toContain(`il est supprimé s'il est vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise`);
+    expect(fr).toContain(`oubliée ${VOICE_BOT_ABANDONED_MAX_HOURS} heures après sa création ou sa reprise si le Bot ne peut plus lire le salon`);
+    expect(fr).toContain("Le journal d'audit de Discord garde la création et la suppression de chaque salon, avec son nom");
+    expect(en).toContain(`within ${VOICE_BOT_RELEASED_MAX_HOURS} hours and ${VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest even if occupied`);
+    expect(en).toContain(`it is deleted if it is empty ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation or its reuse`);
+    expect(en).toContain(`forgotten ${VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation or its reuse if the Bot can no longer read the channel`);
+    expect(en).toContain("Discord's audit log keeps the creation and deletion of each channel, with its name");
+  });
+
+  it("privacyPolicy_voiceChannels_recipientsIncludeMatchCategoryAndAuditLogFrAndEn", () => {
+    expect(fr).toContain("Les membres du serveur Discord de l'association autorisés dans la catégorie des matchs, qui voient les salons vocaux d'équipe et leurs occupants");
+    expect(en).toContain("Members of the association's Discord server allowed in the match category, who see the team voice channels and their occupants");
   });
 });

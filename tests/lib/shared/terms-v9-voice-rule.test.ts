@@ -26,15 +26,17 @@ describe("PRIVACY_CHANGES — salons vocaux (décision du 2026-11-04 : intérêt
     expect(PRIVACY_CHANGES_EN[VOICE_ID]).toBeUndefined();
   });
 
-  it("privacyChanges_termsV9_voiceDetailStatesLegitimateInterestAndAnonymousCountFrAndEn", () => {
+  it("privacyChanges_termsV9_voiceDetailNoGateNoCountLegitimateInterestFrAndEn", () => {
     const fr = change(TERMS_V9_ID).details.join(" ");
     const en = PRIVACY_CHANGES_EN[TERMS_V9_ID].details.join(" ");
 
-    expect(fr).toContain("repose toujours sur l'intérêt légitime de l'association");
-    expect(fr).toContain("ce nombre ne sert qu'à retenir le lancement du match et n'est plus montré à personne");
+    expect(fr).toContain("le lancement du match n'en dépend pas et personne n'y est compté");
+    expect(fr).toContain("ces salons reposent sur l'intérêt légitime de l'association");
+    expect(fr).not.toContain("retenir le lancement");
     expect(fr).not.toContain("t'y opposer");
-    expect(en).toContain("still rests on the association's legitimate interest");
-    expect(en).toContain("that number only serves to hold the match's launch and is no longer shown to anyone");
+    expect(en).toContain("the match's launch does not depend on it and no one is counted in it");
+    expect(en).toContain("these channels rest on the association's legitimate interest");
+    expect(en).not.toContain("hold the match's launch");
     expect(en).not.toContain("object to it");
   });
 });
@@ -88,21 +90,28 @@ describe("PRIVACY_CHANGES — conditions d'utilisation, version 9", () => {
   });
 });
 
-describe("/rgpd — salons vocaux d'équipe (intérêt légitime, décision du 2026-11-04)", () => {
-  it("rgpdPage_voiceChannels_legitimateInterestAnonymousWithoutObjectionFrAndEn", () => {
+describe("/rgpd — salons vocaux d'équipe (intérêt légitime, sans attente ni comptage : EF-43)", () => {
+  it("rgpdPage_voiceChannels_legitimateInterestWithoutGateNorCountFrAndEn", () => {
     const fr = readSource("app/rgpd/page.tsx");
     const en = readSource("app/rgpd/RgpdEn.tsx");
 
-    expect(fr).toContain("Ce comptage relève de l&apos;<strong>intérêt légitime</strong> de l&apos;association");
-    expect(fr).toContain("il ne sert qu&apos;à retenir le lancement et n&apos;est montré à personne) : il n&apos;a pas de droit");
-    expect(fr).not.toContain("Salon vocal : 3/5");
+    expect(fr).toContain("Ces salons relèvent de l&apos;<strong>intérêt légitime</strong> de l&apos;association");
+    expect(fr).toContain("Le lancement du match n&apos;en dépend pas");
+    expect(fr).toContain("jamais qui se trouve dans un salon, ni combien");
+    expect(fr).not.toContain("comptage");
+    expect(fr).not.toContain("deux salons pleins");
     expect(fr).not.toContain("vous opposer à ce traitement en le demandant à l&apos;association");
-    expect(fr).not.toContain("<strong>exécution du contrat</strong> : dans un tournoi qui a");
-    expect(en).toContain("This count rests on the association&apos;s <strong>legitimate interest</strong>");
-    expect(en).toContain("it only serves to hold the launch and is shown to no one): it has no right to object of its");
-    expect(en).not.toContain("Voice channel: 3/5");
+    expect(en).toContain("These channels rest on the association&apos;s <strong>legitimate interest</strong>");
+    expect(en).toContain("The match&apos;s launch doesn&apos;t depend on them");
+    expect(en).toContain("never who is in a channel, nor how many");
+    expect(en).not.toContain("This count");
+    expect(en).not.toContain("channels are full");
     expect(en).not.toContain("object to this processing by asking the association");
-    expect(en).not.toContain("<strong>performance of the contract</strong>: in a tournament with the option");
+  });
+
+  it("rgpdPage_voiceChannels_soloOrGhostEnteringMatchHandsBackFrAndEn", () => {
+    expect(readSource("app/rgpd/page.tsx")).toContain("quand une entrée en tournoi individuel ou une équipe fantôme entre dans le match");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("when a solo entry or a ghost team enters the match");
   });
 });
 
@@ -117,11 +126,14 @@ describe("/regles — règle commune « Salons vocaux d'équipe »", () => {
     expect(frBody).toContain(`un salon vocal de ${VOICE_CHANNEL_CAPACITY} places`);
     expect(enBody).toContain(`from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before each match's time`);
     expect(enBody).toContain(`a ${VOICE_CHANNEL_CAPACITY}-seat voice channel`);
-    // Décision R2 du 2026-11-04 : comptage anonyme, sans droit d'opposition.
-    expect(frSection?.bullets?.join(" ")).toContain("Ce comptage est anonyme : il ne sert qu'à retenir le lancement et n'est montré à personne (la page du match dit seulement si chaque salon est ouvert et si le match attend ses salons). Il repose sur l'intérêt légitime de l'association");
-    expect(frSection?.bullets?.join(" ")).not.toContain("t'y opposer");
-    expect(enSection?.bullets?.join(" ")).toContain("This count is anonymous: it only serves to hold the launch and is shown to no one (the match page only says whether each channel is open and whether the match is waiting for its channels). It rests on the association's legitimate interest");
-    expect(enSection?.bullets?.join(" ")).not.toContain("object to it");
+    // EF-43 (décision 22 du 2026-11-04) : le départ ne dépend plus des salons,
+    // le site ne compte plus personne.
+    expect(frSection?.bullets?.join(" ")).toContain("Les salons ne retiennent jamais le lancement du match");
+    expect(frSection?.bullets?.join(" ")).toContain("ni qui s'y trouve, ni combien de personnes s'y trouvent");
+    expect(frSection?.bullets?.join(" ")).not.toContain("comptage");
+    expect(enSection?.bullets?.join(" ")).toContain("The channels never hold the match's launch");
+    expect(enSection?.bullets?.join(" ")).toContain("neither who is in it nor how many people are");
+    expect(enSection?.bullets?.join(" ")).not.toContain("count");
   });
 });
 
@@ -132,15 +144,21 @@ describe("notification de reprise d'équipe fantôme", () => {
 });
 
 describe("conditions d'utilisation v9 — salons vocaux", () => {
-  it("termsV9_voiceParagraph_legitimateInterestAnonymousCountFrAndEn", () => {
+  it("termsV9_voiceParagraph_noGateNoCountLegitimateInterestFrAndEn", () => {
     const fr = TERMS_SECTIONS.find((s) => s.id === "contacts-de-match")?.paragraphs.join("\n") ?? "";
     const en = TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match")?.paragraphs.join("\n") ?? "";
 
     expect(fr).toContain("fait partie du **déroulement du tournoi**");
-    expect(fr).toContain("Ce comptage, anonyme (un nombre, jamais qui ; il ne sert qu'à retenir le lancement et n'est montré à personne : la page du match dit seulement si chaque salon est ouvert et si le match attend ses salons), repose sur l'intérêt légitime de l'association au bon déroulement des tournois.");
+    expect(fr).toContain("Le lancement du match n'en dépend pas, et personne n'y est compté");
+    expect(fr).toContain("Ces salons reposent sur l'intérêt légitime de l'association au bon déroulement des tournois.");
+    expect(fr).not.toContain("comptage");
+    expect(fr).not.toContain("salons pleins");
     expect(fr).not.toContain("s'y opposer");
     expect(en).toContain("is part of the **running of the tournament**");
-    expect(en).toContain("This count, which is anonymous (a number, never who; it only serves to hold the launch and is shown to no one: the match page only says whether each channel is open and whether the match is waiting for its channels), rests on the association's legitimate interest in the smooth running of tournaments.");
+    expect(en).toContain("The match's launch does not depend on them, and no one is counted");
+    expect(en).toContain("These channels rest on the association's legitimate interest in the smooth running of tournaments.");
+    expect(en).not.toContain("This count");
+    expect(en).not.toContain("channels are full");
     expect(en).not.toContain("object to it");
   });
 });
@@ -161,15 +179,18 @@ describe("pseudo rendu à la réactivation — suffixe « OG » (FR + EN)", () =
   });
 });
 
-// Revue juridique #546, cycle 5 : conditions et /regles disent aussi l'attente des salons.
-describe("salons vocaux — la page dit aussi si le match attend ses salons (FR + EN)", () => {
-  it("termsV9AndRules_voiceWording_mentionWaitingForChannelsFrAndEn", () => {
+// EF-43 : la version 9, pas encore en ligne, est reformulée sur place — plus d'attente des salons.
+describe("salons vocaux — la page dit seulement si chaque salon est ouvert (FR + EN)", () => {
+  it("termsV9AndRules_voiceWording_noWaitingForChannelsFrAndEn", () => {
     const fr = TERMS_SECTIONS.flatMap((s) => s.paragraphs).join(" ");
     const en = TERMS_SECTIONS_EN.flatMap((s) => s.paragraphs).join(" ");
 
-    expect(fr).toContain("la page du match dit seulement si chaque salon est ouvert et si le match attend ses salons");
-    expect(en).toContain("the match page only says whether each channel is open and whether the match is waiting for its channels");
-    expect(JSON.stringify(frRules)).toContain("la page du match dit seulement si chaque salon est ouvert et si le match attend ses salons");
-    expect(JSON.stringify(enRules)).toContain("the match page only says whether each channel is open and whether the match is waiting for its channels");
+    expect(fr).toContain("la page du match dit seulement si chaque salon est ouvert.");
+    expect(fr).not.toContain("attend ses salons");
+    expect(en).toContain("the match page only says whether each channel is open.");
+    expect(en).not.toContain("waiting for its channels");
+    // /regles ne parle plus d'attente non plus (EF-43).
+    expect(JSON.stringify(frRules)).not.toContain("si le match attend ses salons");
+    expect(JSON.stringify(enRules)).not.toContain("whether the match is waiting for its channels");
   });
 });

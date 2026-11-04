@@ -435,6 +435,13 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // les comptes supprimés (une poignée) : sans index, chaque démarrage de chaque
     // processus parcourait toute la table des comptes.
     `ALTER TABLE bg_users ADD INDEX idx_bg_users_is_deleted (is_deleted)`,
+    // EF-43 — le lancement ne dépend plus des salons vocaux d'équipe
+    // (`docs/features/MATCH_VOICE.md`) : le site ne compte plus personne, le
+    // nombre et sa date partent. Déjà jouée ou base neuve :
+    // `ER_CANT_DROP_FIELD_OR_KEY`, ignoré comme toute instruction déjà passée.
+    // `ALGORITHM=COPY` : la table est reconstruite, les nombres quittent ses pages
+    // (un retrait « instantané » de MariaDB les y laisserait jusqu'à la réécriture).
+    `ALTER TABLE bg_match_voice_channels DROP COLUMN members, DROP COLUMN counted_at, ALGORITHM=COPY`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

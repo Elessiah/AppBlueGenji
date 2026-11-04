@@ -16,7 +16,7 @@ export async function GET() {
   const throttled = enforceRateLimit(MATCH_LAUNCH_READ_RULE, user.id);
   if (throttled) return throttled;
 
-  // Les salons vocaux d'équipe se comptent au rythme de la modale (`./match-voice`).
+  // Les salons vocaux d'équipe se créent et se rendent au rythme de la modale (`./match-voice`).
   void dispatchMatchVoiceChannels();
   try {
     const launches = await listViewerMatchLaunches(user);

@@ -284,7 +284,6 @@
     "scheduledSr": " — starts {date}",
     "lobby": "Launching",
     "ready": "ready",
-    "voicePending": "voice channels filling up",
     "launched": "Launched",
     "hostTitle": "Team that creates the in-game lobby (left side)",
     "hostSr": "Host team: ",

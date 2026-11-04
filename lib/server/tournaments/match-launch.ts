@@ -69,7 +69,6 @@ import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { loadRoundSlots } from "./round-map-slots";
 import { inTransaction } from "./transaction";
-import { voiceGateBlocksLaunch } from "./match-voice";
 
 /** La ligne d'un match telle que le lancement la lit, sans ses casters. */
 export type LaunchMatchBaseRow = RowDataPacket & {
@@ -519,9 +518,6 @@ async function launchIfAllReady(
   // avant le décompte, sinon le match l'attendrait jusqu'au lancement d'office.
   await releaseIneligibleCasters(connection, row, snapshotBeforeLock);
   if (!allPartiesReady(rowReadiness(row))) return false;
-  // Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) : tous prêts ne
-  // suffit pas tant que les deux salons ne sont pas pleins.
-  if (await voiceGateBlocksLaunch(connection, row)) return false;
   await connection.execute(`UPDATE bg_matches SET launched_at = NOW() WHERE id = ?`, [matchId]);
   const candidate = undecidedCandidate(row);
   if (candidate && undecided) undecided.push(candidate);
@@ -1123,14 +1119,10 @@ export async function maintainMatchLaunches(
     const released = await releaseIneligibleCasters(connection, row, true);
     const undecidedMatch = undecidedCandidate(row);
     if (undecidedMatch) undecided.push(undecidedMatch);
-    // Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) : départ à
-    // l'heure, « Prêt » ou lancement d'office attendent aussi que les deux
-    // salons soient pleins — lu en base seulement, jamais au bot sous verrou.
     const launch =
-      (Number(row.match_launch_phase ?? 0) !== 1 ||
-        allPartiesReady(rowReadiness(row)) ||
-        isAutoLaunchDue(toIso(row.lobby_opened_at), now)) &&
-      !(await voiceGateBlocksLaunch(connection, row));
+      Number(row.match_launch_phase ?? 0) !== 1 ||
+      allPartiesReady(rowReadiness(row)) ||
+      isAutoLaunchDue(toIso(row.lobby_opened_at), now);
     if (launch) {
       await connection.execute(
         `UPDATE bg_matches
@@ -1139,10 +1131,7 @@ export async function maintainMatchLaunches(
         [row.id],
       );
       changed += 1;
-    } else if (row.lobby_opened_at === null && Number(row.match_launch_phase ?? 0) === 1) {
-      // Sans phase de lancement, un match que ses salons vocaux retiennent
-      // n'ouvre aucun lancement : ni appel aux « Prêt » (`player-pushes`), ni
-      // brief du salon, pour un tournoi qui n'a pas de bouton « Prêt ».
+    } else if (row.lobby_opened_at === null) {
       await connection.execute(
         `UPDATE bg_matches SET lobby_opened_at = NOW() WHERE id = ? AND lobby_opened_at IS NULL`,
         [row.id],

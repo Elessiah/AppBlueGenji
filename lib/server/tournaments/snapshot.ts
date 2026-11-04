@@ -365,6 +365,11 @@ function encodeSnapshotFrame(
   };
 }
 
+/** Option « Salons vocaux d'équipe » allumée sur un tournoi en cours : seul cas où des salons se lisent. */
+function voiceOptionLive(card: { teamVoiceChannels: boolean; state: string }): boolean {
+  return card.teamVoiceChannels && card.state === "RUNNING";
+}
+
 async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFrame | null> {
   const tournament = await loadMaintainedRow(tournamentId);
   if (!tournament) return null;
@@ -523,9 +528,10 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
       await loadMapsByMatch(connection, matchIds),
     );
     // Salons vocaux d'équipe : une lecture pour tout le plateau, aucune
-    // option éteinte (`docs/features/MATCH_VOICE.md`). Dans l'instantané
-    // commun — un nombre de personnes, jamais qui —, servi par les deux portes.
-    const voiceByMatch = await loadMatchVoiceInfos(connection, tournamentId, card.teamVoiceChannels, mappedMatches);
+    // option éteinte ni hors tournoi en cours (`docs/features/MATCH_VOICE.md`).
+    // Dans l'instantané commun — l'état de chaque salon, jamais qui —, servi
+    // par les deux portes.
+    const voiceByMatch = await loadMatchVoiceInfos(connection, voiceOptionLive(card), mappedMatches);
     if (voiceByMatch.size > 0) {
       for (const match of mappedMatches) match.voice = voiceByMatch.get(match.id) ?? null;
     }

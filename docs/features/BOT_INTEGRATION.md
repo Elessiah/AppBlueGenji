@@ -10,10 +10,10 @@ HTTP calls to an internal Discord bot (configurable host/port). Gracefully degra
 ## Salons vocaux d'équipe
 
 `ensureVoiceChannel(key, name)` → `POST /internal/voice/channels` (`{ key, name }`,
-rend `channelId`), `countVoiceChannel(id)` → `GET /internal/voice/channels/:id/count`
-(rend `members`), `releaseVoiceChannel(id)` → `POST /internal/voice/channels/:id/release`.
-Réponse `VoiceCallOutcome` : `ok`, `gone` (404 : `VOICE_CHANNEL_NOT_FOUND` au compte
-= redemander par la clé ; `VOICE_CHANNEL_NOT_TRACKED` au rendu = déjà fait) ou
-`failed` (code seul). Le coupe-circuit s'applique ; seule une panne de transport
-(5xx sans code `VOICE_*` ni `DISCORD_NOT_READY`) compte contre lui. Jamais appelé
+rend `channelId`), `releaseVoiceChannel(id)` → `POST /internal/voice/channels/:id/release`
+(le site ne demande plus jamais au bot combien de personnes sont dans un salon, EF-43).
+Réponse `VoiceCallOutcome` : `ok`, `gone` (404 : `VOICE_CHANNEL_NOT_TRACKED` au rendu
+= déjà fait) ou
+`failed` (code seul, forme `[A-Z0-9_]{1,64}`, sinon `BOT_INTERNAL_REQUEST_FAILED`). Le coupe-circuit s'applique ; seule une panne de transport
+(5xx sans code `VOICE_*` ni `DISCORD_NOT_READY`) compte contre lui ; un 404 autre que `VOICE_CHANNEL_NOT_TRACKED` arrête le balayage sans compter. Jamais appelé
 sous transaction : seul le balayage de `MATCH_VOICE.md` l'utilise.

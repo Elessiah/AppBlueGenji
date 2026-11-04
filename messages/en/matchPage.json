@@ -44,9 +44,7 @@
     "title": "Voice channels",
     "notCreated": "Voice channel: opening soon",
     "open": "Voice channel: open",
-    "failed": "Voice channel: unavailable",
-    "failedNote": "A channel is unavailable: the match doesn't wait for the channels.",
-    "waiting": "The match launches once both channels are full.",
-    "hint": "Fifteen minutes before the match, the Discord bot opens a {capacity}-seat voice channel per team; launch waits until both are full."
+    "failed": "Voice channel: unavailable, trying again",
+    "hint": "Fifteen minutes before the match, the Discord bot opens a {capacity}-seat voice channel per team; the match launch doesn't depend on the channels."
   }
 }
