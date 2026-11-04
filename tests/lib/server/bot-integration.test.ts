@@ -30,7 +30,7 @@ describe("bot-integration", () => {
   it("uses localhost fallback URL when BOT_INTERNAL_URL is missing", async () => {
     const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
 
-    await sendDiscordLoginCode("123456789", "123456", null);
+    await sendDiscordLoginCode("123456789", "123456", null, "login");
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://127.0.0.1:4400/internal/auth/send-code",
@@ -54,8 +54,8 @@ describe("bot-integration", () => {
   it("sends the account locale with the login code, null when unknown", async () => {
     const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
 
-    await sendDiscordLoginCode("123456789", "123456", "en");
-    await sendDiscordLoginCode("123456789", "654321", null);
+    await sendDiscordLoginCode("123456789", "123456", "en", "login");
+    await sendDiscordLoginCode("123456789", "654321", null, "login");
 
     const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
     expect(bodies).toEqual([
@@ -69,7 +69,7 @@ describe("bot-integration", () => {
     process.env.BOT_INTERNAL_PORT = "4510";
     const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
 
-    await sendDiscordLoginCode("123456789", "123456", null);
+    await sendDiscordLoginCode("123456789", "123456", null, "login");
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://10.10.10.7:4510/internal/auth/send-code",
@@ -80,7 +80,7 @@ describe("bot-integration", () => {
   it("throws BOT_INTERNAL_UNREACHABLE when bot API cannot be reached", async () => {
     jest.spyOn(global, "fetch").mockRejectedValue(new Error("ECONNREFUSED"));
 
-    await expect(sendDiscordLoginCode("123456789", "123456", null)).rejects.toThrow("BOT_INTERNAL_UNREACHABLE");
+    await expect(sendDiscordLoginCode("123456789", "123456", null, "login")).rejects.toThrow("BOT_INTERNAL_UNREACHABLE");
   });
 
   it("throws BOT_INTERNAL_UNAUTHORIZED on 401", async () => {
@@ -91,7 +91,7 @@ describe("bot-integration", () => {
       }),
     );
 
-    await expect(sendDiscordLoginCode("123456789", "123456", null)).rejects.toThrow("BOT_INTERNAL_UNAUTHORIZED");
+    await expect(sendDiscordLoginCode("123456789", "123456", null, "login")).rejects.toThrow("BOT_INTERNAL_UNAUTHORIZED");
   });
 
   it("throws DISCORD_DM_FAILED when bot reports DM failure", async () => {
@@ -102,7 +102,7 @@ describe("bot-integration", () => {
       }),
     );
 
-    await expect(sendDiscordLoginCode("123456789", "123456", null)).rejects.toThrow("DISCORD_DM_FAILED");
+    await expect(sendDiscordLoginCode("123456789", "123456", null, "login")).rejects.toThrow("DISCORD_DM_FAILED");
   });
 
   it("resolveDiscordUser returns a numeric id without calling the bot", async () => {
@@ -206,7 +206,7 @@ describe("bot-integration", () => {
       .spyOn(global, "fetch")
       .mockRejectedValue(new DOMException("The operation timed out.", "TimeoutError"));
 
-    await expect(sendDiscordLoginCode("123456789", "123456", null)).rejects.toThrow(
+    await expect(sendDiscordLoginCode("123456789", "123456", null, "login")).rejects.toThrow(
       "BOT_INTERNAL_UNREACHABLE",
     );
   });

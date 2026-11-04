@@ -112,8 +112,9 @@ function fakeDb(
       }
 
       if (q.startsWith("UPDATE bg_discord_login_challenges SET consumed_at = NOW()")) {
-        if (state === null || state.consumed_at !== null) return [{ affectedRows: 0 }, []];
+        if (state === null || state.code_hash !== params[1]) return [{ affectedRows: 0 }, []];
         state.consumed_at = new Date();
+        state.code_hash = "";
         return [{ affectedRows: 1 }, []];
       }
 
@@ -612,20 +613,38 @@ describe("consumeDiscordLoginChallenge — usage du code (EF-14)", () => {
     execute.mockImplementation(async (sql: string, params?: unknown[]) => {
       const result = await base(sql, params);
       // L'autre requête consomme la ligne juste après notre réservation.
-      if (String(sql).includes("attempts = attempts + 1")) state!.consumed_at = new Date();
+      if (String(sql).includes("attempts = attempts + 1")) {
+        state!.consumed_at = new Date();
+        state!.code_hash = "";
+      }
       return result;
     });
 
     await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toBeNull();
   });
 
-  it("consumeDiscordLoginChallenge_rightCode_consumeGuardedByConsumedAtIsNull", async () => {
-    const { execute } = fakeDb(pendingChallenge());
+  it("consumeDiscordLoginChallenge_rightCode_consumeGuardedByReadHash", async () => {
+    const { execute, state } = fakeDb(pendingChallenge());
 
     await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.not.toBeNull();
 
     const consume = statementsOf(execute).find((q) => q.startsWith("UPDATE bg_discord_login_challenges SET consumed_at = NOW()"));
-    expect(consume).toContain("WHERE id = ? AND consumed_at IS NULL");
+    expect(consume).toContain("SET consumed_at = NOW(), code_hash = '' WHERE id = ? AND code_hash = ?");
+    expect(state!.code_hash).toBe("");
+  });
+
+  it("consumeDiscordLoginChallenge_rightCodeOnLastAttempt_accepted", async () => {
+    // La réservation du dernier essai pose déjà `consumed_at` : le code juste passe quand même.
+    const { state } = fakeDb(pendingChallenge({ attempts: MAX_DISCORD_CODE_ATTEMPTS - 1 }));
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.not.toBeNull();
+    expect(state!.attempts).toBe(MAX_DISCORD_CODE_ATTEMPTS);
+  });
+
+  it("verifyDiscordChallenge_rightCodeOnLastAttempt_accepted", async () => {
+    fakeDb(pendingChallenge({ attempts: MAX_DISCORD_CODE_ATTEMPTS - 1 }));
+
+    await expect(verifyDiscordChallenge("123", "424242")).resolves.toBe(true);
   });
 
   it("verifyDiscordChallenge_accountRead_scopedToLoginPurpose", async () => {
