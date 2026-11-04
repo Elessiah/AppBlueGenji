@@ -371,6 +371,13 @@ registre avance (`REGISTER_UPDATED_AT`).
 
 ## Base de données
 
+**Retour arrière sous EF-14 : impossible sans geste sur la base.** Depuis EF-14,
+`bg_discord_login_challenges.purpose` est `NOT NULL` sans valeur par défaut : une
+version antérieure, qui n'écrit pas l'usage, voit chaque demande de code Discord
+refusée par la base (connexion par code et certification du tag en 500). Avant de
+revenir en deçà, rendre la colonne facultative :
+`ALTER TABLE bg_discord_login_challenges MODIFY purpose ENUM('LOGIN', 'HANDLE') NULL`.
+
 Le seed ne se pose jamais sur la production : `npm run seed` refuse de tourner
 quand `NODE_ENV=production`, avant toute connexion. Le refus porte sur
 `NODE_ENV` et non sur `DB_HOST` — la base écoute sur `127.0.0.1` des deux côtés.

@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     // L'identifiant Discord vient **du défi**, jamais du client : la demande de
     // code ne le publie plus (c'était un oracle), et il n'est relu qu'une fois
     // le code juste.
-    const proof = await consumeDiscordLoginChallenge(challenge, code);
+    const proof = await consumeDiscordLoginChallenge(challenge, code, "login");
     if (!proof) {
       return fail("CODE_INVALID_OR_EXPIRED", 401);
     }

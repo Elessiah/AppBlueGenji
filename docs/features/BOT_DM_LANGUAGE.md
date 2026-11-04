@@ -28,7 +28,11 @@ langues.
 | Diagnostics au titulaire du bot (repli du canal de logs, sauvegardes, assistant d'installation, ménage des journaux) | bot | français — journaux d'exploitation, pas des messages à un joueur |
 
 **Site.** Chaque message privé est une fonction de la langue (`LocalizedDm`,
-`lib/shared/dm-language.ts`). `notifyUsers` lit `bg_users.locale` des
+`lib/shared/dm-language.ts`). `notifyUsers` rédige le message dans
+chaque langue de ses destinataires (`fr`, `en`, bilingue sans langue connue) **avant** tout départ — un rédacteur qui lève
+fait échouer la notification sans qu'aucun push ne soit parti —, prend la langue
+que le chargeur a lue avec la ligne (`loadNotificationRecipients`,
+`NotificationRecipient.locale`), relit `bg_users.locale` des seuls autres
 destinataires en **une** requête, les groupe par langue et fait **un appel**
 `/internal/notify/dm` par groupe : le contrat du bot ne change pas. Les groupes
 partent **l'un après l'autre** et un appel perdu arrête les suivants : un bot
@@ -47,11 +51,20 @@ inchangée) et `dmMessage` : cette ligne, le séparateur, puis le push anglais d
 même évènement (`push-messages.ts`, une rédaction par langue) et son lien. Le
 texte libre d'un joueur (signalement) n'est que dans la partie française.
 
-**Code de connexion.** `sendDiscordLoginCode(discordId, code, locale)` transmet
+**Code de connexion.** `sendDiscordLoginCode(discordId, code, locale, purpose)` transmet
 la langue du compte **destinataire**, celui qui porte déjà ce Discord
 (`accountLocaleForDiscordId`), pour la connexion comme pour la certification ou
 le changement de tag — jamais celle du demandeur : un tag saisi n'est pas encore
-prouvé et peut désigner quelqu'un d'autre. Sans compte rattaché, bilingue.
+prouvé et peut désigner quelqu'un d'autre. Sans compte rattaché, bilingue. La
+langue n'est lue qu'**après** l'insertion du défi : un refus de quota ne dépend
+pas de l'existence d'un compte rattaché. `purpose: "handle"` (certification ou
+changement de tag) fait rédiger au bot un texte qui dit que le code rattache un
+tag et ne connecte pas ; `"login"` sinon, toujours explicite (un bot plus ancien l'ignore).
+L'usage est aussi gardé sur le défi (`bg_discord_login_challenges.purpose`,
+`LOGIN` / `HANDLE`) : un code de certification est refusé à la connexion, et
+l'inverse, sans consommer d'essai (les défis d'avant la colonne sont marqués
+consommés par la migration — le joueur redemande un code). « Seul le dernier code vaut » se lit par usage :
+une demande de connexion n'annule pas le code de certification en attente.
 
 ## Ce que vaut une `locale` absente
 

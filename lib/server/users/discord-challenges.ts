@@ -4,6 +4,7 @@ import { getDatabase } from "@/lib/server/database";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { DISCORD_CODE_VALIDITY_MINUTES } from "@/lib/shared/processing-register";
 import { normalizeDiscordHandle } from "./tag-normalization";
+import { DISCORD_CODE_PURPOSE_COLUMN as PURPOSE_COLUMN, type DiscordCodePurpose } from "@/lib/shared/discord-code-purpose";
 
 /*
  * Codes de connexion Discord envoyés en message privé : création sous quotas,
@@ -181,8 +182,10 @@ const DISCORD_CODE_LOCK_TIMEOUT_SECONDS = 1;
  * Émet un code de connexion.
  *
  * **Ne périme pas les codes précédents**, et n'a pas à le faire :
- * {@link verifyDiscordChallenge} ne lit que le **dernier émis**, si bien qu'un
- * code neuf rend le précédent inatteignable par sa seule existence. Rien à
+ * {@link consumeDiscordLoginChallenge} (clause `NOT EXISTS`) refuse un défi
+ * qu'un plus récent **du même usage** (`purpose`) a remplacé, si bien qu'un code
+ * neuf rend le précédent de cet usage inatteignable par sa seule existence — un
+ * code de l'autre usage reste valable. Rien à
  * écrire, donc rien qui puisse échouer à mi-chemin. Le corollaire est tenu à
  * l'autre bout : un envoi raté **supprime** sa ligne
  * ({@link discardDiscordChallenge}), faute de quoi la mort-née resterait la
@@ -214,7 +217,8 @@ const DISCORD_CODE_LOCK_TIMEOUT_SECONDS = 1;
  */
 export async function createDiscordLoginChallenge(
   discordId: string,
-  handle?: string | null,
+  handle: string | null | undefined,
+  purpose: DiscordCodePurpose,
 ): Promise<DiscordChallenge> {
   const db = await getDatabase();
   const code = randomCode();
@@ -266,9 +270,9 @@ export async function createDiscordLoginChallenge(
         }
 
         const [insert] = await connection.execute<ResultSetHeader>(
-          `INSERT INTO bg_discord_login_challenges (discord_id, lookup_hash, code_hash, handle, expires_at)
-           VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ${DISCORD_CODE_VALIDITY_MINUTES} MINUTE))`,
-          [discordId, hashCode(challengeToken), hashCode(code), storedHandle],
+          `INSERT INTO bg_discord_login_challenges (discord_id, lookup_hash, code_hash, handle, purpose, expires_at)
+           VALUES (?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ${DISCORD_CODE_VALIDITY_MINUTES} MINUTE))`,
+          [discordId, hashCode(challengeToken), hashCode(code), storedHandle, PURPOSE_COLUMN[purpose]],
         );
 
         const [rows] = await connection.execute<(RowDataPacket & { expires_at: Date | string })[]>(
@@ -303,8 +307,8 @@ export async function createDiscordLoginChallenge(
  * Efface un code dont l'envoi a échoué.
  *
  * **Un code qui n'est pas parti ne doit pas survivre à son échec.**
- * `verifyDiscordChallenge` ne lit que le plus récent : la ligne mort-née
- * masquerait celui que le joueur a réellement reçu, qui serait alors refusé
+ * `consumeDiscordLoginChallenge` refuse un défi qu'un plus récent du même usage
+ * a remplacé : la ligne mort-née masquerait celui que le joueur a réellement reçu, qui serait alors refusé
  * comme invalide — et chaque essai brûlerait le quota de la mauvaise ligne
  * jusqu'à ce qu'elle se consume.
  *
@@ -330,16 +334,17 @@ export async function discardDiscordChallenge(challengeId: number): Promise<void
 export async function consumeDiscordChallenge(
   discordId: string,
   code: string,
+  purpose: DiscordCodePurpose,
 ): Promise<DiscordChallengeProof | null> {
   const db = await getDatabase();
 
   const [rows] = await db.execute<ChallengeRow[]>(
-    `SELECT id, discord_id, code_hash, handle, expires_at, consumed_at, attempts
+    `SELECT id, discord_id, code_hash, handle, purpose, expires_at, consumed_at, attempts
      FROM bg_discord_login_challenges
-     WHERE discord_id = ?
+     WHERE discord_id = ? AND purpose = ?
      ORDER BY id DESC
      LIMIT 1`,
-    [discordId],
+    [discordId, PURPOSE_COLUMN[purpose]],
   );
 
   if (rows.length === 0) return null;
@@ -363,27 +368,30 @@ export async function consumeDiscordChallenge(
  * connexions et certifications de tag confondues, sans connaître personne.
  * Seule l'empreinte du jeton est en base.
  *
- * La règle « seul le dernier code émis vaut » est gardée : un défi que suit un
- * défi plus récent pour le même compte est refusé, exactement comme
- * {@link consumeDiscordChallenge} ne le lirait jamais.
+ * La règle « seul le dernier code émis vaut » est gardée **par usage** : un
+ * défi que suit un défi plus récent du même usage pour le même compte est
+ * refusé. Une demande de connexion (anonyme) n'annule donc pas le code de
+ * certification qu'attend le joueur, ni l'inverse.
  */
 export async function consumeDiscordLoginChallenge(
   challengeToken: string,
   code: string,
+  purpose: DiscordCodePurpose,
 ): Promise<DiscordLoginProof | null> {
   if (!isDiscordChallengeToken(challengeToken)) return null;
   const db = await getDatabase();
 
   const [rows] = await db.execute<ChallengeRow[]>(
-    `SELECT c.id, c.discord_id, c.code_hash, c.handle, c.expires_at, c.consumed_at, c.attempts
+    `SELECT c.id, c.discord_id, c.code_hash, c.handle, c.purpose, c.expires_at, c.consumed_at, c.attempts
      FROM bg_discord_login_challenges c
-     WHERE c.lookup_hash = ?
+     WHERE c.lookup_hash = ? AND c.purpose = ?
        AND NOT EXISTS (
          SELECT 1 FROM bg_discord_login_challenges newer
          WHERE newer.discord_id = c.discord_id AND newer.id > c.id
+           AND newer.purpose = c.purpose
        )
      LIMIT 1`,
-    [hashCode(challengeToken)],
+    [hashCode(challengeToken), PURPOSE_COLUMN[purpose]],
   );
 
   if (rows.length === 0) return null;
@@ -396,6 +404,8 @@ type ChallengeRow = RowDataPacket & {
   discord_id: string;
   code_hash: string;
   handle: string | null;
+  /** Usage du défi ; les deux lectures ne prennent que celui demandé (`purpose = ?`). */
+  purpose: "LOGIN" | "HANDLE";
   expires_at: Date;
   consumed_at: Date | null;
   attempts: number;
@@ -410,6 +420,11 @@ async function settleChallengeAttempt(
   challenge: ChallengeRow,
   code: string,
 ): Promise<DiscordChallengeProof | null> {
+  // **Un code ne sert qu'à l'usage annoncé par son message** : les deux
+  // lecteurs ne lisent que les défis de cet usage (`purpose = ?` en SQL). Celui
+  // d'une certification dit qu'il ne connecte pas : accepté par la connexion,
+  // il ouvrirait le compte de qui le transmet en confiance. Un défi d'un autre
+  // usage n'est donc jamais lu ni comparé, et ne coûte aucun essai.
   if (challenge.consumed_at !== null) return null;
   if (new Date(challenge.expires_at).getTime() < Date.now()) return null;
 
@@ -444,12 +459,18 @@ async function settleChallengeAttempt(
 
   if (!timingSafeEquals(challenge.code_hash, hashCode(code))) return null;
 
-  await db.execute(
+  // **Un code juste ne sert qu'une fois**, même à deux requêtes de front :
+  // seule celle dont l'écriture efface l'empreinte lue obtient la preuve. La
+  // garde porte sur `code_hash`, pas sur `consumed_at` : la réservation du
+  // dernier essai permis a déjà posé `consumed_at`, et un code juste à ce
+  // dernier essai doit rester accepté.
+  const [consumed] = await db.execute<ResultSetHeader>(
     `UPDATE bg_discord_login_challenges
-     SET consumed_at = NOW()
-     WHERE id = ?`,
-    [challenge.id],
+     SET consumed_at = NOW(), code_hash = ''
+     WHERE id = ? AND code_hash = ?`,
+    [challenge.id, challenge.code_hash],
   );
+  if (Number(consumed.affectedRows) !== 1) return null;
 
   return { handle: normalizeDiscordHandle(challenge.handle) };
 }
@@ -461,5 +482,5 @@ async function settleChallengeAttempt(
  * de la réservation d'essai divergeraient, et c'est elle qui tient le secret.
  */
 export async function verifyDiscordChallenge(discordId: string, code: string): Promise<boolean> {
-  return (await consumeDiscordChallenge(discordId, code)) !== null;
+  return (await consumeDiscordChallenge(discordId, code, "login")) !== null;
 }

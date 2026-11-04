@@ -138,6 +138,24 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // d'abord sur la colonne (`ER_DUP_FIELDNAME`, toléré).
     `ALTER TABLE bg_discord_login_challenges ADD COLUMN lookup_hash CHAR(64) NULL AFTER discord_id,
        ADD UNIQUE INDEX uniq_bg_challenges_lookup (lookup_hash)`,
+    // EF-14 — usage d'un code (connexion ou rattachement d'un tag) : un code
+    // de certification ne connecte pas, un code de connexion ne certifie pas.
+    // `NULL` le temps de la migration : les défis d'avant sont marqués consommés
+    // juste après (le joueur redemande un code). Les bases neuves la créent `NOT NULL`.
+    `ALTER TABLE bg_discord_login_challenges ADD COLUMN purpose ENUM('LOGIN', 'HANDLE') NULL AFTER handle`,
+    // Puis `NOT NULL`, comme sur une base neuve : sous le `sql_mode` strict par
+    // défaut de MySQL 8 et de MariaDB, une insertion qui oublierait l'usage
+    // échoue partout, au lieu d'émettre en production un code refusé de tous.
+    // Les défis d'avant sont **marqués consommés**, jamais supprimés : ils
+    // comptent encore dans les plafonds de codes du compte (une suppression les
+    // remettrait à zéro au déploiement, doublant le budget du jour). Le
+    // redémarrage pm2 arrête l'ancien processus avant de lancer le neuf : aucune
+    // insertion sans usage ne suit le `MODIFY`. **Retour arrière** : une version
+    // d'avant EF-14 n'écrit pas l'usage et n'émet plus aucun code sur cette base
+    // (`docs/DEPLOYMENT.md`). Rejouées, les deux ne changent rien.
+    `UPDATE bg_discord_login_challenges SET purpose = 'LOGIN', consumed_at = COALESCE(consumed_at, NOW())
+       WHERE purpose IS NULL`,
+    `ALTER TABLE bg_discord_login_challenges MODIFY purpose ENUM('LOGIN', 'HANDLE') NOT NULL`,
     // Cible d'un signalement réellement prévenue : le délai de reprévenance et
     // le plafond de l'auteur ne comptent plus que les messages partis. `NULL`
     // pour les lignes d'avant, **sans remplissage** — on ne sait pas lesquelles

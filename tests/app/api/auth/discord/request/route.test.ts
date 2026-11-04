@@ -81,7 +81,7 @@ describe("POST /api/auth/discord/request", () => {
       expiresAt: "2030-01-01T10:00:00.000Z",
     });
     // Aucun compte rattaché à ce Discord : langue inconnue, message bilingue.
-    expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("123456789012345678", "123456", null);
+    expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("123456789012345678", "123456", null, "login");
   });
 
   it("écrit le code dans la langue du compte déjà rattaché à ce Discord", async () => {
@@ -99,7 +99,7 @@ describe("POST /api/auth/discord/request", () => {
 
     expect(response.status).toBe(200);
     expect(accountLocaleForDiscordId).toHaveBeenCalledWith("123456789012345670");
-    expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("123456789012345670", "222333", "en");
+    expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("123456789012345670", "222333", "en", "login");
     // La réponse ne dit rien de la langue du compte visé.
     expect(await response.json()).toEqual({ success: true, challenge: "t-en", expiresAt: "2030-01-01T10:00:00.000Z" });
   });
@@ -149,7 +149,7 @@ describe("POST /api/auth/discord/request", () => {
 
   it("efface le code mort-né quand l'envoi échoue", async () => {
     // **Rendre au code déjà reçu sa place de dernier.**
-    // `verifyDiscordChallenge` ne lit que le dernier émis : laissée en base, la
+    // Seul le dernier défi émis vaut (`consumeDiscordLoginChallenge`) : laissée en base, la
     // ligne dont le message privé n'est jamais parti ferait refuser le code que
     // le joueur tient de sa demande précédente — et lui brûlerait ses cinq
     // essais sur la mauvaise ligne.
@@ -209,6 +209,17 @@ describe("POST /api/auth/discord/request", () => {
     expect(response.status).toBe(429);
     expect(payload.error).toBe("TOO_MANY_CODE_REQUESTS");
     expect(sendDiscordLoginCodeMock).not.toHaveBeenCalled();
+  });
+
+  it("POST_codeQuotaRefused_accountLocaleNotRead", async () => {
+    // Un refus ne doit pas dépendre de l'existence d'un compte rattaché (EF-14) :
+    // la langue n'est lue qu'une fois le code émis.
+    jest.mocked(accountLocaleForDiscordId).mockClear();
+    createDiscordLoginChallengeMock.mockRejectedValue(new Error("TOO_MANY_CODE_REQUESTS"));
+
+    await POST(buildRequest({ discordId: "123456789012345678" }));
+
+    expect(accountLocaleForDiscordId).not.toHaveBeenCalled();
   });
 
   it("plafonne par IP **avant** de résoudre le pseudo auprès du bot", async () => {
@@ -321,10 +332,10 @@ describe("POST /api/auth/discord/request", () => {
     expect(response.status).toBe(200);
     expect(resolveDiscordUserMock).toHaveBeenCalledWith("keryan");
     // Le tag part **avec** le défi : c'est lui que la certification écrira si le
-    // code revient juste (`consumeDiscordChallenge`), et il doit être celui qui a
+    // code revient juste (`consumeDiscordLoginChallenge`), et il doit être celui qui a
     // servi à la résolution, pas celui qu'un second appel renverrait.
-    expect(createDiscordLoginChallengeMock).toHaveBeenCalledWith("999888777666555444", "keryan");
-    expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("999888777666555444", "654321", null);
+    expect(createDiscordLoginChallengeMock).toHaveBeenCalledWith("999888777666555444", "keryan", "login");
+    expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("999888777666555444", "654321", null, "login");
   });
 
   it("maps DISCORD_USER_NOT_FOUND to 404 when the tag cannot be resolved", async () => {
