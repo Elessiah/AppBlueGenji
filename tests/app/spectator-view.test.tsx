@@ -284,8 +284,8 @@ describe("page sans compte — mise en page", () => {
     // La fiche publique n'est pas rendue (elle s'hydraterait, SSE et sondage REST compris, avant le renvoi).
     expect(html).not.toContain("plateau");
     expect(html).toContain("<main");
-    // Repli visible si le renvoi tarde : jamais une page vide.
-    expect(html).toContain('<output class="fallback">Ouverture du tournoi…</output>');
+    // Repli visible si le renvoi tarde : jamais une page vide, ni une impasse.
+    expect(html).toContain('<output class="fallback"><a href="/tournois/12">Ouverture du tournoi…</a></output>');
     expect(redirect).not.toHaveBeenCalled();
   });
 

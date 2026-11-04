@@ -105,6 +105,17 @@ describe("POST /api/landing/sponsors", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_TIER" });
   });
+
+  it("POST_driverErrorMessage_returnsFallbackCodeOnly", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(service.createSponsor).mockRejectedValue(new Error("Duplicate entry 'Foo' for key 'uq_name'"));
+
+    const res = await POST(jsonReq("POST", { name: "Foo" }));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "SPONSOR_CREATE_FAILED" });
+  });
 });
 
 describe("PUT /api/landing/sponsors/[id]", () => {

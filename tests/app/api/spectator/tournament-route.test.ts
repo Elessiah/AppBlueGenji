@@ -398,6 +398,22 @@ describe("GET /api/spectator/tournaments/[id]", () => {
       }
     });
 
+    it("GET_rateRefusedGzipClientWithRawEtag_returns304", async () => {
+      jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
+      try {
+        // Corps brut reçu par un client gzip (repli d'une compression ratée).
+        const first = await exhaustedNetworkWithCopy();
+        const rawEtag = first.headers.get("etag") ?? "";
+
+        const res = await GET(req("5", { "accept-encoding": "gzip", "if-none-match": rawEtag }), params("5"));
+
+        expect(res.status).toBe(304);
+        expect(res.headers.get("etag")).toBe(rawEtag);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it("répond 429 à une version d'un autre codage que celui demandé, sans corps", async () => {
       jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
       try {

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "@jest/globals";
-import { failureReason, isErrorCode } from "@/lib/server/failure-reason";
+import { describe, expect, it, jest } from "@jest/globals";
+import { failureReason, isErrorCode, serviceErrorCode } from "@/lib/server/failure-reason";
 
 describe("failureReason", () => {
   it("failureReason_mysqlErrorWithCode_returnsCodeOnly", () => {
@@ -58,5 +58,40 @@ describe("isErrorCode", () => {
 
   it("isErrorCode_65Chars_returnsFalse", () => {
     expect(isErrorCode(`A${"B".repeat(64)}`)).toBe(false);
+  });
+});
+
+describe("serviceErrorCode", () => {
+  it("serviceErrorCode_siteCode_returnsMessage", () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(serviceErrorCode(new Error("LABEL_TOO_LONG"), "THING_CREATE_FAILED")).toBe("LABEL_TOO_LONG");
+    expect(logged).not.toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
+  it("serviceErrorCode_driverText_returnsFallbackAndLogsCodeOnly", () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const actual = serviceErrorCode(new Error("connect ECONNREFUSED 10.0.0.5:3306"), "THING_CREATE_FAILED");
+
+    expect(actual).toBe("THING_CREATE_FAILED");
+    expect(logged).toHaveBeenCalledWith("[api] THING_CREATE_FAILED : Error");
+    logged.mockRestore();
+  });
+
+  it("serviceErrorCode_emptyMessage_returnsFallback", () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(serviceErrorCode(new Error(""), "THING_CREATE_FAILED")).toBe("THING_CREATE_FAILED");
+    logged.mockRestore();
+  });
+
+  it("serviceErrorCode_nonError_returnsFallback", () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const thrown: unknown = "LABEL_TOO_LONG";
+
+    expect(serviceErrorCode(thrown, "THING_CREATE_FAILED")).toBe("THING_CREATE_FAILED");
+    logged.mockRestore();
   });
 });
