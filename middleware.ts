@@ -59,6 +59,9 @@ export function middleware(request: NextRequest) {
 
   const policy = contentSecurityPolicy(nonce, {
     dev: process.env.NODE_ENV === "development",
+    // Remplacé à la compilation par Next (`true` sous Turbopack, `false` sous
+    // webpack) : une comparaison à "1" ne serait jamais vraie ici.
+    turbopack: Boolean(process.env.TURBOPACK),
   });
 
   const requestHeaders = localizedRequestHeaders(request, locale, path);
