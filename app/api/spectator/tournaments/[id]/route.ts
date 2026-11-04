@@ -169,6 +169,13 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   if (matchesEtag(req.headers.get("if-none-match"), etag)) {
     return new Response(null, { status: 304, headers });
   }
+  // Le client gzip qui a reçu le corps brut (repli d'une compression ratée,
+  // ci-dessous) revalide avec l'`ETag` brut : même contenu, 304 sous cet `ETag`
+  // plutôt qu'un corps complet à chaque sondage, au moment même où la mémoire manque.
+  const rawEtag = etagOf(payload, false);
+  if (gzipped && matchesEtag(req.headers.get("if-none-match"), rawEtag)) {
+    return new Response(null, { status: 304, headers: { ...headers, ETag: rawEtag } });
+  }
   const jsonHeaders = { ...headers, "Content-Type": "application/json; charset=utf-8" };
   if (gzipped) {
     // Compressé une fois pour tous ses lecteurs ; Next laisse passer une
@@ -181,7 +188,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     } catch (error) {
       // Visible à l'opérateur : sous pression mémoire, chaque client gzip repasse au corps brut.
       console.error("[spectator] compression gzip impossible, corps brut servi", error);
-      return new Response(payload.body, { status: 200, headers: { ...jsonHeaders, ETag: etagOf(payload, false) } });
+      return new Response(payload.body, { status: 200, headers: { ...jsonHeaders, ETag: rawEtag } });
     }
   }
   return new Response(payload.body, { status: 200, headers: jsonHeaders });

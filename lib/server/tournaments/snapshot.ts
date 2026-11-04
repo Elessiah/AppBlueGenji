@@ -138,8 +138,8 @@ export function spectatorSnapshotCacheKey(tournamentId: number): string {
  *
  * La réponse publique, elle, **reste** : sa durée de vie, allongée sous la
  * charge, est précisément ce qui protège la machine d'un tournoi animé — chaque
- * score la reconstruirait sinon. Elle ne part qu'avec le tournoi
- * ({@link invalidateSpectatorSnapshot}, à la suppression).
+ * score la reconstruirait sinon. Elle ne part qu'avec le tournoi ou une édition
+ * du staff ({@link invalidateSpectatorSnapshot}).
  */
 export function invalidateTournamentSnapshot(tournamentId: number): void {
   invalidateCached(cacheKey(tournamentId));
@@ -152,9 +152,9 @@ export function spectatorCardCacheKey(tournamentId: number): string {
 
 /**
  * Oublie la réponse publique d'un tournoi **et** sa carte d'encart : il vient
- * d'être supprimé ou dépublié (`startVisibilityAt` repoussé dans le futur) —
- * sans cela, son titre et sa description restaient servis en aperçu jusqu'à
- * 150 s (copie) et 10 s (carte).
+ * d'être supprimé ou édité par le staff (`updateTournament` : nom, description,
+ * dates) — sans cela, l'ancien titre et l'ancienne description restaient servis
+ * en aperçu jusqu'à 150 s (copie) et 10 s (carte).
  */
 export function invalidateSpectatorSnapshot(tournamentId: number): void {
   invalidateCached(spectatorSnapshotCacheKey(tournamentId));

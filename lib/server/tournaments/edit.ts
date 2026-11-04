@@ -244,14 +244,6 @@ export async function loadEditableTournament(
 }
 
 /**
- * Dépublié (visibilité repoussée dans le futur) : la page sans compte ne garde
- * ni sa réponse publique ni sa carte d'encart (titre, description).
- */
-function evictIfUnpublished(tournamentId: number, writtenVisibilityAt: string): void {
-  if (Date.parse(writtenVisibilityAt) > Date.now()) invalidateSpectatorSnapshot(tournamentId);
-}
-
-/**
  * Applique un patch d'édition. Rend le nom du tournoi **d'avant** et celui
  * qu'il vient d'écrire, lus sous le verrou de la ligne : le journal du staff
  * cite l'un et nomme le tournoi sous l'autre, même si un second renommage
@@ -265,7 +257,6 @@ export async function updateTournament(
   const connection = await db.getConnection();
   let previousName: string;
   let name: string;
-  let writtenVisibilityAt: string;
 
   try {
     await connection.beginTransaction();
@@ -302,7 +293,6 @@ export async function updateTournament(
 
     const { valid, normalizedPhases } = validateEditedValues(next);
     name = valid.name;
-    writtenVisibilityAt = next.startVisibilityAt;
 
     await connection.execute(
       `UPDATE bg_tournaments SET
@@ -390,8 +380,11 @@ export async function updateTournament(
     connection.release();
   }
 
-  // La visibilité **écrite** (relue sous le verrou, patch compris), pas la chaîne brute du patch.
-  evictIfUnpublished(tournamentId, writtenVisibilityAt);
+  // La page sans compte ne garde ni sa réponse publique ni sa carte d'encart :
+  // un nom ou une description retirés par le staff (insulte, coordonnées)
+  // restaient sinon servis en aperçu jusqu'à 150 s (copie) et 10 s (carte).
+  // Une édition est un geste rare du staff : une reconstruction de plus.
+  invalidateSpectatorSnapshot(tournamentId);
   publishUpdatedEvent(tournamentId);
   return { previousName, name };
 }

@@ -117,7 +117,12 @@ export async function updateAboutStat(id: number, input: AboutStatInput): Promis
     }
     await connection.commit();
   } catch (error) {
-    await connection.rollback();
+    // Un `rollback` raté (connexion perdue) ne remplace pas l'erreur d'origine.
+    try {
+      await connection.rollback();
+    } catch {
+      // Rien à ajouter : l'erreur d'origine est celle qui compte.
+    }
     throw error;
   } finally {
     connection.release();

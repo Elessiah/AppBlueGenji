@@ -58,10 +58,11 @@ function invalidateRankingReplay(): void {
 }
 
 /**
- * Comme {@link invalidateTeamRanking} pour un **score** (rapporté ou arbitré) :
- * le rejeu et les leaderboards sont vidés aussitôt, les PNG d'aperçu **au plus
- * une fois par fenêtre** (ci-dessous). Une suppression ou une dépublication de
- * tournoi, elle, vide tout aussitôt (`invalidateTeamRanking`).
+ * Comme {@link invalidateTeamRanking} pour un **score** (rapporté ou arbitré)
+ * et toute autre écriture de tournoi (`publishUpdatedEvent` : avancée, salon
+ * vocal, horaire, inscription) : le rejeu et les leaderboards sont vidés
+ * aussitôt, les PNG d'aperçu **au plus une fois par fenêtre** (ci-dessous). Une
+ * suppression de tournoi, elle, vide tout aussitôt (`invalidateTeamRanking`).
  */
 export function invalidateTeamRankingForScore(): void {
   invalidateRankingReplay();

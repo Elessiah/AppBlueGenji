@@ -12,8 +12,8 @@
  * Une écriture ne réveille pas les visiteurs sans compte et n'invalide pas cette
  * réponse : sa durée de vie, allongée sous la charge, est ce qui protège la
  * machine d'un tournoi animé — au plus une reconstruction par tournoi et par
- * durée de vie, quel que soit le nombre de visiteurs. Seule la suppression du
- * tournoi la retire (`invalidateSpectatorSnapshot`).
+ * durée de vie, quel que soit le nombre de visiteurs. Seules la suppression du
+ * tournoi et son édition par le staff la retirent (`invalidateSpectatorSnapshot`).
  *
  * **Ce que coûte une reconstruction, et qui la paie** — tout se décide ici, sur
  * le chemin même où `cached` lance le chargeur (`beforeLoad`), jamais par un

@@ -22,3 +22,8 @@ export function failureReason(error: unknown): string {
 
 /** Forme d'un code d'erreur du site : majuscules, chiffres et soulignés. */
 const ERROR_CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
+
+/** `message` a-t-il la forme d'un code d'erreur du site (`MATCH_NOT_FOUND`) ? */
+export function isErrorCode(message: string): boolean {
+  return ERROR_CODE.test(message);
+}
