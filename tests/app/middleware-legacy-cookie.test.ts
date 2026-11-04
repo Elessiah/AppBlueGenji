@@ -103,7 +103,7 @@ describe("middleware — politique CSP selon le serveur de développement", () =
   });
   // Sous Jest, le middleware n'est pas compilé par Next : `process.env.TURBOPACK`
   // se lit tel quel, et `Boolean("1")` vaut ce que Next y aurait inscrit.
-  const withEnv = (env: { NODE_ENV: string; TURBOPACK?: string }) => {
+  const withEnv = (env: { NODE_ENV: NodeJS.ProcessEnv["NODE_ENV"]; TURBOPACK?: string }) => {
     const { TURBOPACK: _ignored, ...rest } = process.env;
     jest.replaceProperty(process, "env", { ...rest, ...env });
   };
