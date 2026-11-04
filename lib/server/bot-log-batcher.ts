@@ -103,6 +103,9 @@ function boundedCount(value: number | undefined, min: number, fallback: number):
 /** Après `flushAll`, durée pendant laquelle une ligne part aussitôt (arrêt en cours). */
 export const CLOSING_GRACE_MS = 10_000;
 
+/** Tours au plus de `flushAll` : le temps que les lignes tardives soient parties. */
+const MAX_FLUSH_ALL_ROUNDS = 5;
+
 /** Place minimale laissée aux lignes sous un en-tête ; en deçà, l'en-tête est omis. */
 export const MIN_ROOM_UNDER_HEADER = 16;
 
@@ -159,8 +162,24 @@ export function createBotLogBatcher(options: BotLogBatcherOptions): BotLogBatche
     return headed ? packed.map((message) => `${header}\n${message}`) : packed;
   }
 
+  /**
+   * Messages d'un lot, sans jamais lever : un en-tête (`options.header`) qui
+   * échoue ne fait pas perdre le lot, qui part alors sans en-tête.
+   */
+  function safeMessagesOf(batch: Batch): string[] {
+    try {
+      return messagesOf(batch);
+    } catch {
+      try {
+        return packBotLogLines(batch.lines, maxChars);
+      } catch {
+        return [];
+      }
+    }
+  }
+
   function dispatch(key: string, batch: Batch): Promise<void> {
-    const messages = messagesOf(batch);
+    const messages = safeMessagesOf(batch);
     const scope = scopeOf(key);
     const previous = chains.get(scope) ?? Promise.resolve();
     if (messages.length === 0) return previous;
@@ -201,7 +220,10 @@ export function createBotLogBatcher(options: BotLogBatcherOptions): BotLogBatche
       if (!line.trim()) return;
       let batch = batches.get(key);
       // Une clé ne porte qu'une catégorie : une ligne d'une autre catégorie
-      // envoie d'abord le lot en cours, pour ne jamais en mêler deux.
+      // envoie d'abord le lot en cours, pour ne jamais en mêler deux. Un appelant
+      // qui alterne les catégories sur une même clé défait donc le regroupement
+      // (un message par changement) : les clés du journal portent leur catégorie
+      // (`botLogBatchKey`), ce qui n'arrive pas.
       if (batch && batch.category !== category) {
         void flush(key);
         batch = undefined;
@@ -226,8 +248,13 @@ export function createBotLogBatcher(options: BotLogBatcherOptions): BotLogBatche
     flushKeys,
     async flushAll() {
       closing = true;
-      await flushKeys([...batches.keys()]);
-      await Promise.all([...chains.values()]);
+      // Une ligne ajoutée pendant l'envoi part aussitôt (`closing`) et ouvre une
+      // chaîne : on boucle jusqu'au repos, dans la limite de quelques tours.
+      for (let round = 0; round < MAX_FLUSH_ALL_ROUNDS; round += 1) {
+        await flushKeys([...batches.keys()]);
+        await Promise.all([...chains.values()]);
+        if (batches.size === 0 && chains.size === 0) break;
+      }
       // Un processus qui survit à l'arrêt (écouteur qui ne sort pas) retrouve
       // ses lots après un délai bien supérieur à celui de pm2.
       const reopen = setTimeout(() => {

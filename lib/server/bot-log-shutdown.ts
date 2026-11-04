@@ -29,7 +29,11 @@ const SIGNALS = ["SIGTERM", "SIGINT"] as const;
 
 /** État de l'arrêt propre, partagé par toutes les copies du module. */
 type ShutdownState = { installed: boolean; flush: Promise<void> | null };
-const shutdownGlobal = globalThis as typeof globalThis & { __bgBotLogShutdown?: ShutdownState };
+const shutdownGlobal = globalThis as typeof globalThis & {
+  __bgBotLogShutdown?: ShutdownState;
+  /** Tour du dernier passage de `flushBotLogs` (`tournaments/bot-logs.ts`). */
+  __bgBotLogOrder?: Promise<void>;
+};
 
 function shutdownState(): ShutdownState {
   if (!shutdownGlobal.__bgBotLogShutdown) shutdownGlobal.__bgBotLogShutdown = { installed: false, flush: null };
@@ -47,7 +51,12 @@ export async function flushBotLogsBeforeExit(timeoutMs: number = SHUTDOWN_FLUSH_
     // Les rafales regroupées (journal du staff, casts) rejoignent d'abord les
     // lots, mais ne tiennent que la moitié du délai : des lectures lentes ne
     // doivent pas priver les lots déjà en attente de leur envoi.
-    const coalesced = flushAllCoalescers().catch(() => undefined);
+    const coalesced = Promise.all([
+      flushAllCoalescers().catch(() => undefined),
+      // Les passages encore en train de résoudre leurs lignes les posent au lot
+      // avant le vidage ; la limite de la moitié du délai les borne aussi.
+      shutdownGlobal.__bgBotLogOrder?.catch(() => undefined),
+    ]).then(() => undefined);
     let half: ReturnType<typeof setTimeout> | null = null;
     const halfDeadline = new Promise<void>((resolve) => {
       half = setTimeout(resolve, timeoutMs / 2);

@@ -39,9 +39,18 @@ function endsWithOpenEscape(text: string): boolean {
 }
 
 /** Un blanc (espace, tabulation…), où une rangée peut se couper sans briser un mot ni une adresse. */
-function isBlank(char: string): boolean {
-  return /^\s$/u.test(char);
+export function isBlank(char: string): boolean {
+  if (char.length !== 1) return false;
+  const code = char.charCodeAt(0);
+  if (code <= 0x20) return code === 0x20 || (code >= 0x09 && code <= 0x0d);
+  return code >= 0xa0 && UNICODE_BLANKS.has(code);
 }
+
+/** Les blancs au-delà de l'ASCII que `\s` reconnaît (contrôle de parité dans les tests). */
+const UNICODE_BLANKS: ReadonlySet<number> = new Set([
+  0xa0, 0x1680, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff,
+  0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200a,
+]);
 
 /**
  * Point de coupe reculé au dernier blanc de `current`, quand la coupe tomberait

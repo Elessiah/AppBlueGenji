@@ -435,12 +435,23 @@ function deliverLog(resolved: ResolvedBotLog): void {
  * les lignes du tournoi en attente partent d'abord, pour qu'un désaccord ne s'y
  * lise pas plusieurs minutes avant les lignes qui l'expliquent. Ne lève jamais.
  */
-async function flushTournamentBeforeAlert(resolved: ResolvedBotLog): Promise<void> {
+async function flushTournamentBeforeAlert(
+  resolved: ResolvedBotLog,
+  preFlushed: Map<number, Promise<void>>,
+): Promise<void> {
   const tournamentId = batchTournamentOf(resolved);
   if (tournamentId === null) return;
-  // Meilleur effort : l'alerte part même si le journal n'a pas suivi.
-  const flushed = (async () => flushBotLogBatch({ tournamentId }))().catch(() => undefined);
-  await waitAtMost(flushed, ALERT_FLUSH_WAIT_MS);
+  // Une seule attente par tournoi et par passage : les alertes suivantes du
+  // même tournoi trouvent le vidage déjà fait (ou déjà borné) et ne paient pas
+  // chacune la fenêtre de ALERT_FLUSH_WAIT_MS.
+  let waited = preFlushed.get(tournamentId);
+  if (!waited) {
+    // Meilleur effort : l'alerte part même si le journal n'a pas suivi.
+    const flushed = (async () => flushBotLogBatch({ tournamentId }))().catch(() => undefined);
+    waited = waitAtMost(flushed, ALERT_FLUSH_WAIT_MS);
+    preFlushed.set(tournamentId, waited);
+  }
+  await waited;
 }
 
 /**
@@ -496,11 +507,16 @@ export function flushBotLogs(connection: PoolConnection): void {
   resolvedMatches.delete(connection);
   if (queue.length === 0 && settled.size === 0) return;
   // Le tour de ce passage, pris **au commit** (synchrone) : l'ordre des commits.
+  // Un passage qui ne porte que des alertes n'a aucune ligne à ranger : il ne
+  // prend pas de tour, et ne fait donc ni attendre ni attendre les autres.
+  const hasLogLines = queue.some((entry) => entry.kind !== "score_report_stalled" && botEventChannel(entry.kind) !== "REFEREE");
   const previousTurn = logOrderState.__bgBotLogOrder ?? Promise.resolve();
   let releaseTurn: () => void = () => undefined;
-  logOrderState.__bgBotLogOrder = new Promise<void>((resolve) => {
-    releaseTurn = resolve;
-  });
+  if (hasLogLines) {
+    logOrderState.__bgBotLogOrder = new Promise<void>((resolve) => {
+      releaseTurn = resolve;
+    });
+  }
 
   // Une manche dont le désaccord vient d'être annoncé n'a pas besoin de son
   // escalade dans la même seconde : le téléphone de l'arbitre sonne déjà, et
@@ -528,6 +544,8 @@ export function flushBotLogs(connection: PoolConnection): void {
     const delivered = new Set<string>();
     /** Manches dont le désaccord vient d'être annoncé, et remis. */
     const announcedConflicts = new Set<number>();
+    /** Vidages avant alerte déjà lancés par ce passage, par tournoi. */
+    const preFlushed = new Map<number, Promise<void>>();
 
     /** Envoie une alerte déjà rédigée aux arbitres, et dit s'ils l'ont reçue. */
     async function deliver(resolved: ResolvedBotLog): Promise<void> {
@@ -536,7 +554,10 @@ export function flushBotLogs(connection: PoolConnection): void {
       // les escalades sont toutes du canal arbitre).
       if (channel !== "REFEREE") return;
 
-      await flushTournamentBeforeAlert(resolved);
+      // Les alertes de ce chemin écrivent au bot sans passer par `sendBotLog`
+      // (qui vide lui-même le lot de ses propres lignes d'alerte) : un seul
+      // vidage, ici.
+      await flushTournamentBeforeAlert(resolved, preFlushed);
 
       // Le coupe-circuit est respecté ici, contrairement au signalement d'un
       // problème : personne n'attend cette réponse, et un bot éteint ferait
@@ -593,7 +614,7 @@ export function flushBotLogs(connection: PoolConnection): void {
     try {
       resolvedRest = await resolveBotLogs(rest);
     } finally {
-      void deliverLogLinesInTurn(resolvedRest, previousTurn, releaseTurn);
+      if (hasLogLines) void deliverLogLinesInTurn(resolvedRest, previousTurn, releaseTurn);
     }
 
     /** Réservations des matchs sortis d'une alerte de manche pourtant remise. */
