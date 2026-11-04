@@ -142,6 +142,21 @@ export const SEARCH_HEADER = "x-search";
 /** Nom de l'en-tête de requête par lequel le nonce atteint les composants serveur. */
 export const CSP_NONCE_HEADER = "x-nonce";
 
+/** Étiquette DNS ou octet IPv4 : lettres, chiffres, tiret, rien d'autre. */
+const HOST_LABEL = /^[A-Za-z0-9-]+$/;
+
+/**
+ * Vrai si `host` peut entrer tel quel dans une source CSP : nom ou IPv4 fait
+ * d'étiquettes non vides, port facultatif de 1 à 65535. Rien qui puisse clore
+ * une directive (`;`, espace) ; une IPv6 entre crochets n'est pas exprimable.
+ */
+export function isCspHost(host: string): boolean {
+  const [name, port, extra] = host.split(":");
+  if (extra !== undefined || !name) return false;
+  if (port !== undefined && !(/^\d{1,5}$/.test(port) && Number(port) >= 1 && Number(port) <= 65535)) return false;
+  return name.split(".").every((label) => HOST_LABEL.test(label));
+}
+
 /**
  * Rédige la politique.
  *
@@ -168,7 +183,10 @@ export const CSP_NONCE_HEADER = "x-nonce";
  * valable ({@link isCspHost} — un `;`, une espace, une IPv6, un port hors
  * plage), ou s'il n'y en a aucun, la liste entière est écartée et `'self'`
  * reste ; une liste filtrée pourrait perdre l'hôte réel et refuser tous les
- * morceaux. Le dev webpack et la production gardent la politique entière :
+ * morceaux. Ce repli est **plus large** : sans `'strict-dynamic'`, `'self'`
+ * admet tout script du site, nonce ou non — un oubli de nonce n'y est plus
+ * signalé (page ouverte sur `[::1]`, hôte à tiret bas…). On préfère un dev qui
+ * charge à un dev bloqué ; le dev webpack, lui, reste strict. Le dev webpack et la production gardent la politique entière :
  * `next build` pose le nonce sur chaque script.
  *
  * @param nonce Nonce de la requête, déjà encodé en base64.
@@ -177,21 +195,6 @@ export const CSP_NONCE_HEADER = "x-nonce";
  *   avec `scriptHosts` (hôtes visés par la requête, validés ici), borne la source à `<hôte>/_next/`.
  * @returns La politique, prête à être posée en en-tête.
  */
-/** Étiquette DNS ou octet IPv4 : lettres, chiffres, tiret, rien d'autre. */
-const HOST_LABEL = /^[A-Za-z0-9-]+$/;
-
-/**
- * Vrai si `host` peut entrer tel quel dans une source CSP : nom ou IPv4 fait
- * d'étiquettes non vides, port facultatif de 1 à 65535. Rien qui puisse clore
- * une directive (`;`, espace) ; une IPv6 entre crochets n'est pas exprimable.
- */
-export function isCspHost(host: string): boolean {
-  const [name, port, extra] = host.split(":");
-  if (extra !== undefined || !name) return false;
-  if (port !== undefined && !(/^\d{1,5}$/.test(port) && Number(port) >= 1 && Number(port) <= 65535)) return false;
-  return name.split(".").every((label) => HOST_LABEL.test(label));
-}
-
 export function contentSecurityPolicy(
   nonce: string,
   options: { dev: boolean; turbopack?: boolean; scriptHosts?: readonly string[] }
