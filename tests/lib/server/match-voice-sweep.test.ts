@@ -135,6 +135,11 @@ describe("dispatchMatchVoiceChannels — création", () => {
     "UNAUTHORIZED",
     "INTERNAL_API_TOKEN_NOT_CONFIGURED",
     "DISCORD_NOT_READY",
+    // Refus du bot qui valent pour tous les salons.
+    "VOICE_CATEGORY_UNAVAILABLE",
+    "VOICE_MISSING_PERMISSIONS",
+    "VOICE_STORAGE_ERROR",
+    "VOICE_INTERNAL_ERROR",
   ])(
     "dispatchMatchVoiceChannels_botDownOnCreate_%s_stopsRemainingCalls",
     async (code) => {
@@ -167,6 +172,17 @@ describe("dispatchMatchVoiceChannels — création", () => {
     await dispatchMatchVoiceChannels();
     expect(ensureVoiceChannel).toHaveBeenCalledTimes(4);
     expect(writes.filter((w) => w.sql.includes("failed_at = NOW(), released_at = NULL"))).toHaveLength(4);
+  });
+
+  it("dispatchMatchVoiceChannels_createDiscordError_continuesWithNextTeam", async () => {
+    // Erreur de Discord sur un salon : propre à ce salon, l'autre équipe est servie.
+    database({ due: [dueMatch] });
+    jest
+      .mocked(ensureVoiceChannel)
+      .mockResolvedValueOnce({ kind: "failed", code: "VOICE_DISCORD_ERROR" })
+      .mockResolvedValueOnce({ kind: "ok", value: "902" });
+    await dispatchMatchVoiceChannels();
+    expect(jest.mocked(ensureVoiceChannel).mock.calls.map(([key]) => key)).toEqual(["match:42:team:1", "match:42:team:2"]);
   });
 
   it("dispatchMatchVoiceChannels_dueQuery_asksMatchesWithAFailedSideAfterTheOthers", () => {
@@ -281,6 +297,23 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     expect(releaseVoiceChannel).toHaveBeenCalledTimes(2);
     expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toHaveLength(1);
     expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()")).map((w) => w.params)).toEqual([[43, 1]]);
+  });
+
+  it("dispatchMatchVoiceChannels_releaseFirstRefusal_logsOnceWithCodeOnly", async () => {
+    database({ releasable: [{ ...releasable, failed_at: null }] });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "failed", code: "VOICE_DISCORD_ERROR" });
+    await dispatchMatchVoiceChannels();
+    expect(jest.mocked(console.warn).mock.calls).toEqual([
+      ["[match-voice] match 42 : rendu du salon vocal refusé (VOICE_DISCORD_ERROR)"],
+    ]);
+  });
+
+  it("dispatchMatchVoiceChannels_releaseRefusedAgain_doesNotLogAgain", async () => {
+    const { writes } = database({ releasable: [{ ...releasable, failed_at: "2026-11-04 18:00:00" }] });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "failed", code: "VOICE_DISCORD_ERROR" });
+    await dispatchMatchVoiceChannels();
+    expect(console.warn).not.toHaveBeenCalled();
+    expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toHaveLength(1);
   });
 
   it("dispatchMatchVoiceChannels_releaseNotTracked_marksReleased", async () => {
@@ -787,6 +820,51 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
     const keys = jest.mocked(ensureVoiceChannel).mock.calls.slice(80).map(([key]) => key);
     expect(keys).toHaveLength(20);
     expect(new Set(keys).size).toBe(20);
+  });
+
+  const openDueParams = (execute: ReturnType<typeof database>["execute"]) =>
+    execute.mock.calls.filter(([sql]) => sql === OPEN_DUE_CHANNELS_SQL).map(([, params]) => params);
+
+  it("dispatchMatchVoiceChannels_recheckWindowNotFull_readsFromStartEachPass", async () => {
+    const { execute } = database({ openDue: [open] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    await dispatchMatchVoiceChannels();
+    await dispatchMatchVoiceChannels(true);
+    expect(openDueParams(execute)).toEqual([
+      [0, 0, 0],
+      [0, 0, 0],
+    ]);
+  });
+
+  it("dispatchMatchVoiceChannels_recheckWindowFull_nextPassStartsAfterLastRow", async () => {
+    // 400 salons (matchs 100 à 499) : la fenêtre est pleine, la suivante tourne.
+    const { execute } = database({ openDue: openRows(400) });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "90" });
+    await dispatchMatchVoiceChannels();
+    await dispatchMatchVoiceChannels(true);
+    expect(openDueParams(execute)).toEqual([
+      [0, 0, 0],
+      [499, 499, 1],
+    ]);
+  });
+
+  it("dispatchMatchVoiceChannels_recheckWindowFull_keepsStampsOfRowsOutsideWindow", async () => {
+    jest.spyOn(Date, "now").mockReturnValue(Date.now());
+    const windowA = openRows(400);
+    const windowB = openRows(400).map((row) => ({ ...row, match_id: row.match_id + 1000 }));
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "90" });
+    database({ openDue: windowA });
+    await dispatchMatchVoiceChannels();
+    const checkedFirst = jest.mocked(ensureVoiceChannel).mock.calls.map(([key]) => key);
+    database({ openDue: windowB });
+    await dispatchMatchVoiceChannels(true);
+    jest.mocked(ensureVoiceChannel).mockClear();
+    database({ openDue: windowA });
+    await dispatchMatchVoiceChannels(true);
+    // Les salons de A déjà revus gardent leur horodatage : la troisième passe revoit les autres.
+    const checkedAgain = jest.mocked(ensureVoiceChannel).mock.calls.map(([key]) => key);
+    expect(checkedAgain).toHaveLength(80);
+    expect(checkedAgain.filter((key) => checkedFirst.includes(key))).toEqual([]);
   });
 
   it("dispatchMatchVoiceChannels_channelCreatedThisPass_notAskedAgainByRecheck", async () => {
