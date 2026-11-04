@@ -126,8 +126,10 @@ export function installBotLogShutdownFlush(): void {
         flush = started;
         state.flush = started;
         holdExitUntil(started);
-        // Un processus qui survit à l'arrêt rebatche ses lignes : un signal
-        // ultérieur doit vider de nouveau, non réutiliser ce vidage terminé.
+        // Un processus qui survit à l'arrêt rebatche ses lignes : l'autre signal
+        // (SIGINT puis SIGTERM de pm2) doit vider de nouveau, non réutiliser ce
+        // vidage terminé. Chaque écouteur est `once` : un même signal répété ne
+        // revient pas ici.
         void started.then(() => {
           if (state.flush === started) state.flush = null;
         });
