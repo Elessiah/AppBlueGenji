@@ -120,11 +120,19 @@ export function installBotLogShutdownFlush(): void {
     process.once(signal, () => {
       // Un second signal rejoint le vidage en cours : ni second envoi, ni
       // second `process.exit` retenu par-dessus le premier.
-      if (!state.flush) {
-        state.flush = flushBotLogsBeforeExit();
-        holdExitUntil(state.flush);
+      let flush = state.flush;
+      if (!flush) {
+        const started = flushBotLogsBeforeExit();
+        flush = started;
+        state.flush = started;
+        holdExitUntil(started);
+        // Un processus qui survit à l'arrêt rebatche ses lignes : un signal
+        // ultérieur doit vider de nouveau, non réutiliser ce vidage terminé.
+        void started.then(() => {
+          if (state.flush === started) state.flush = null;
+        });
       }
-      void state.flush.then(() => {
+      void flush.then(() => {
         // Personne d'autre n'écoute : le signal relancé sans écouteur termine le
         // processus comme Node l'aurait fait (128 + n), et non en succès.
         if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);

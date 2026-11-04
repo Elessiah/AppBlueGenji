@@ -330,6 +330,27 @@ export type BotLogScope = {
   category?: BotLogCategory;
 };
 
+/** Vidages d'alerte déjà demandés dans le tour courant, par tournoi (ou catégorie hors tournoi). */
+const scheduledAlertFlushes = new Set<string>();
+
+/**
+ * Fait partir une alerte **à la fin du tour synchrone** : une rafale d'alertes
+ * d'un même geste (huit casters désinscrits d'un coup) n'envoie qu'un message, et
+ * non un par ligne. Avec un tournoi, ses lignes en attente partent avec l'alerte,
+ * qui les explique ; sans tournoi rien ne l'explique, et seul son propre lot part,
+ * pas le lot commun du salon (inscriptions, modération).
+ */
+function scheduleAlertFlush(tournamentId: number | string | null | undefined, category: BotLogCategory): void {
+  const id = botLogTournamentId(tournamentId);
+  const key = id === null ? `category:${category}` : `tournament:${id}`;
+  if (scheduledAlertFlushes.has(key)) return;
+  scheduledAlertFlushes.add(key);
+  void Promise.resolve().then(() => {
+    scheduledAlertFlushes.delete(key);
+    return flushBotLogBatch(id === null ? { category } : { tournamentId: id });
+  }).catch(() => undefined);
+}
+
 /**
  * Demande une ligne au journal Discord du bot.
  *
@@ -348,12 +369,7 @@ export function sendBotLog(message: string, scope: BotLogScope = {}): void {
     const key = botLogBatchKey(BOT_LOG_CHANNEL, scope.tournamentId, category);
     botLogBatcher.add(key, message, category);
     if (botLogKind(category) !== "alert") return;
-    // Avec un tournoi, ses lignes en attente partent avec l'alerte, qui les
-    // explique. Sans tournoi rien ne l'explique : seul son propre lot part, pas le
-    // lot commun du salon (inscriptions, modération).
-    void flushBotLogBatch(
-      botLogTournamentId(scope.tournamentId) === null ? { category } : { tournamentId: scope.tournamentId },
-    ).catch(() => undefined);
+    scheduleAlertFlush(scope.tournamentId, category);
   } catch {
     // Meilleur effort : un journal manquant ne fait jamais échouer un geste déjà validé.
   }

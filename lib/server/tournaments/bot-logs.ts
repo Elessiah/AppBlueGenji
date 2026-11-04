@@ -461,17 +461,18 @@ async function flushTournamentBeforeAlert(
 
 /**
  * Range les lignes de journal d'un passage **à son tour** (`previousTurn` : le
- * passage commité juste avant), puis rend le tour. Les alertes n'attendent pas
+ * passage commité juste avant, attendu au plus BOT_LOG_ORDER_WAIT_MS depuis le
+ * commit), puis rend le tour. Les alertes n'attendent pas
  * ce tour : l'appelant les envoie sans lui.
  */
 async function deliverLogLinesInTurn(
   resolved: readonly ResolvedBotLog[],
-  previousTurn: Promise<void>,
+  previousWait: Promise<void> | null,
   releaseTurn: () => void,
 ): Promise<void> {
   try {
-    // Le plus souvent le tour précédent est déjà rendu : pas de minuteur pour rien.
-    if (!settledTurns.has(previousTurn)) await waitAtMost(previousTurn, BOT_LOG_ORDER_WAIT_MS);
+    // `previousWait` court depuis le commit, en parallèle de la lecture des lignes.
+    if (previousWait) await previousWait;
     for (const line of resolved) {
       if (line.channel !== "REFEREE") {
         try {
@@ -518,6 +519,9 @@ export function flushBotLogs(connection: PoolConnection): void {
   const hasLogLines = queue.some((entry) => entry.kind !== "score_report_stalled" && botEventChannel(entry.kind) !== "REFEREE");
   const previousTurn = logOrderState.__bgBotLogOrder ?? Promise.resolve();
   let releaseTurn: () => void = () => undefined;
+  // Le plus souvent le tour précédent est déjà rendu : pas de minuteur pour rien.
+  const previousWait =
+    hasLogLines && !settledTurns.has(previousTurn) ? waitAtMost(previousTurn, BOT_LOG_ORDER_WAIT_MS) : null;
   if (hasLogLines) {
     const turn: Promise<void> = new Promise<void>((resolve) => {
       // Une lecture qui traîne ne retient pas les passages suivants : le tour est
@@ -634,7 +638,7 @@ export function flushBotLogs(connection: PoolConnection): void {
     if (hasLogLines) {
       void resolveBotLogs(restLines)
         .catch((): ResolvedBotLog[] => [])
-        .then((lines) => deliverLogLinesInTurn(lines, previousTurn, releaseTurn));
+        .then((lines) => deliverLogLinesInTurn(lines, previousWait, releaseTurn));
     }
     const resolvedAlerts = await resolveBotLogs(restAlerts);
 

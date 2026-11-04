@@ -219,7 +219,7 @@ export function createBotLogBatcher(options: BotLogBatcherOptions): BotLogBatche
     }
     // Rien en attente : les lots déjà partis de la portée sont peut-être encore
     // en route, et ce qui les suit (une alerte) ne doit pas les doubler.
-    if (taken.length === 0) return inFlight(keys);
+    if (taken.length === 0) return chains.size === 0 ? Promise.resolve() : inFlight(keys);
     taken.sort(([, a], [, b]) => a.order - b.order);
     return Promise.all(taken.map(([key, batch]) => dispatch(key, batch))).then(() => undefined);
   }
