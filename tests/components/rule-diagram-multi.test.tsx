@@ -28,6 +28,13 @@ describe("RuleDiagramFigure — MULTI", () => {
     expect(html).toContain('viewBox="0 0 760 300"');
   });
 
+  it("multiDiagram_minWidth_keepsPhoneScale", () => {
+    const html = renderMulti();
+
+    expect(html).toContain("min-width:582px");
+    expect(html).toMatch(/font-size="11"[^>]*letter-spacing="0.1em"[^>]*>CHAMPIONNE</);
+  });
+
   it("multiDiagram_arrow_leavesFromFunnelEdgeForward", () => {
     const html = renderMulti();
 

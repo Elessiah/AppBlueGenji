@@ -485,6 +485,9 @@ function FunnelBox({ in: inCount, out: outCount, x, y }: Readonly<FunnelLevel>) 
   );
 }
 
+/** 520 × 760 / 680 : garde, sur téléphone, l'échelle du schéma d'avant l'élargissement. */
+const MULTI_MIN_WIDTH = 582;
+
 function MultiDiagram({ t, locale }: DiagramProps) {
   return (
     <svg
@@ -492,7 +495,7 @@ function MultiDiagram({ t, locale }: DiagramProps) {
       viewBox="0 0 760 300"
       role="img"
       aria-label={t.multi.ariaLabel}
-      style={{ color: LINE }}
+      style={{ color: LINE, minWidth: MULTI_MIN_WIDTH }}
     >
       <ArrowDefs />
 
@@ -552,7 +555,7 @@ function MultiDiagram({ t, locale }: DiagramProps) {
           x={680}
           y={98}
           fill={BLUE}
-          fontSize={9}
+          fontSize={11}
           fontFamily={MONO}
           textAnchor="middle"
           letterSpacing="0.1em"
