@@ -6,6 +6,7 @@ import {
   parseJournal,
   pruneJournal,
   replayDecision,
+  withoutPendingEntry,
   type AccountDeletionEntry,
 } from "@/lib/shared/account-deletion-journal";
 
@@ -139,5 +140,59 @@ describe("replayDecision", () => {
   it("ne touche jamais un identifiant réattribué à un autre compte, anonymisé ou non", () => {
     expect(replayDecision(entry(), { createdAt: "2026-09-22 08:00:00", isDeleted: false })).toBe("OTHER_ACCOUNT");
     expect(replayDecision(entry(), { createdAt: "2026-09-22 08:00:00", isDeleted: true })).toBe("OTHER_ACCOUNT");
+  });
+});
+
+describe("demande en attente (décision du 2026-11-04)", () => {
+  const now = new Date("2026-11-06T12:00:00.000Z");
+
+  it("formatJournalEntry_pendingFlag_roundTrips", () => {
+    const pending = entry({ pending: true });
+
+    expect(parseJournal(formatJournalEntry(pending) + "\n").entries).toEqual([pending]);
+  });
+
+  it("formatJournalEntry_finalEntry_hasNoPendingField", () => {
+    expect(formatJournalEntry(entry())).not.toContain("pending");
+  });
+
+  it("pruneJournal_finalAfterPending_finalWins", () => {
+    const pending = entry({ pending: true, deletedAt: "2026-10-01T10:00:00.000Z" });
+    const final = entry({ deletedAt: "2026-10-31T10:00:00.000Z" });
+
+    expect(pruneJournal([pending, final], now)).toEqual([final]);
+  });
+
+  it("pruneJournal_pendingAfterFinal_finalKept", () => {
+    const final = entry({ deletedAt: "2026-10-31T10:00:00.000Z" });
+    const pending = entry({ pending: true, deletedAt: "2026-11-01T10:00:00.000Z" });
+
+    expect(pruneJournal([final, pending], now)).toEqual([final]);
+  });
+
+  it("pruneJournal_twoPending_oldestWins", () => {
+    const first = entry({ pending: true, deletedAt: "2026-10-01T10:00:00.000Z" });
+    const second = entry({ pending: true, deletedAt: "2026-10-05T10:00:00.000Z" });
+
+    expect(pruneJournal([second, first], now)).toEqual([first]);
+  });
+
+  it("withoutPendingEntry_reactivatedAccount_removesOnlyItsPendingLine", () => {
+    const pending = entry({ pending: true });
+    const otherCreation = entry({ pending: true, accountCreatedAt: "2025-05-05 05:05:05" });
+    const other = entry({ userId: 8, pending: true });
+    const final = entry({ userId: 9 });
+
+    expect(withoutPendingEntry([pending, otherCreation, other, final], { userId: 7, accountCreatedAt: "2026-01-02 03:04:05" })).toEqual([
+      otherCreation,
+      other,
+      final,
+    ]);
+  });
+
+  it("withoutPendingEntry_finalLineOfSameAccount_kept", () => {
+    const final = entry();
+
+    expect(withoutPendingEntry([final], { userId: 7, accountCreatedAt: "2026-01-02 03:04:05" })).toEqual([final]);
   });
 });

@@ -29,6 +29,8 @@ import { lockMemberRoles, writeActiveMembership } from "@/lib/server/teams/acces
 import { dissolveTeamOn } from "@/lib/server/teams/dissolution";
 import { refreshTeamViewers, teamStreamTournamentIds } from "@/lib/server/teams/roster";
 import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
+import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
+import { holdAccountIdentity } from "./account-deletion-hold";
 import { listSoloRegistrationTournamentIds, loadAccountTrace, loadSoloRegistrations } from "./account-deletion";
 import {
   type DeletionWithdrawal,
@@ -297,18 +299,15 @@ async function afterDeletionRequest(userId: number, effects: DeletionRequestEffe
     publishUpdatedEvent(tournamentId);
   }
   for (const tournamentId of castTournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
-  let identityChanged = withdrawn.length > 0;
-  for (const departure of departures) {
-    if (await settleDeparture(userId, departure)) identityChanged = true;
-  }
-  if (identityChanged) {
-    invalidateTeamIdentityViews();
-    invalidateStats();
-  }
+  for (const departure of departures) await settleDeparture(userId, departure);
+  // Le compte est anonyme dès la demande : classements, accueil, statistiques
+  // et liste des comptes sans fiche gardaient son vrai pseudo en cache.
+  invalidateTeamIdentityViews();
+  invalidateStats();
 
   // Journal Discord : la demande (sans pseudo), puis chaque retrait (E5).
   try {
-    await sendBotLog(formatAccountDeletionLog({ days: ACCOUNT_REACTIVATION_DAYS }), { category: "signups" });
+    sendBotLog(formatAccountDeletionLog({ days: ACCOUNT_REACTIVATION_DAYS }), { category: "signups" });
   } catch (error) {
     console.error("[account-deletion] alerte de suppression non écrite", error);
   }
@@ -336,7 +335,10 @@ async function settleDeparture(userId: number, departure: TeamDeparture): Promis
  * croissant, `lockTournamentRow`), puis le compte, puis chaque équipe — l'ordre
  * de l'inscription en tournoi individuel et du transfert de propriété.
  */
-export async function requestAccountDeletion(userId: number): Promise<AccountDeletionRequestOutcome> {
+export async function requestAccountDeletion(
+  userId: number,
+  options: { requestedAt?: Date } = {},
+): Promise<AccountDeletionRequestOutcome> {
   const db = await getDatabase();
   const soloTournaments = await listSoloRegistrationTournamentIds(db, userId);
   const connection = await db.getConnection();
@@ -346,15 +348,19 @@ export async function requestAccountDeletion(userId: number): Promise<AccountDel
   const departures: TeamDeparture[] = [];
   let organizedHandedOver: number[] = [];
   let castTournaments: number[] = [];
-  const requestedAt = new Date();
+  // Le rejeu d'une demande après restauration (`account-deletion-replay.ts`)
+  // garde la date d'origine : la fenêtre de trente jours ne repart pas à zéro.
+  const requestedAt = options.requestedAt ?? new Date();
+  let accountCreatedAt = "";
   try {
     await connection.beginTransaction();
     for (const tournamentId of soloTournaments) await lockTournamentRow(connection, tournamentId);
-    const [locked] = await connection.execute<(RowDataPacket & { is_deleted: 0 | 1 })[]>(
-      `SELECT is_deleted FROM bg_users WHERE id = ? FOR UPDATE`,
+    const [locked] = await connection.execute<(RowDataPacket & { is_deleted: 0 | 1; created_at: string })[]>(
+      `SELECT is_deleted, created_at FROM bg_users WHERE id = ? FOR UPDATE`,
       [userId],
     );
     if (locked.length === 0 || Number(locked[0].is_deleted) === 1) throw new Error("USER_NOT_FOUND");
+    accountCreatedAt = String(locked[0].created_at);
 
     withdrawn = await withdrawSoloRegistrationsOn(
       connection,
@@ -376,9 +382,15 @@ export async function requestAccountDeletion(userId: number): Promise<AccountDel
         WHERE user_id = ? AND status = 'PENDING'`,
       [userId],
     );
+    // Anonyme dès la demande (décision du 2026-11-04) : pseudo d'emprunt et
+    // avatar retiré posés avec le drapeau, le vrai pseudo mis de côté pour la
+    // réactivation (`account-deletion-hold.ts`).
+    if (!(await holdAccountIdentity(connection, userId, requestedAt))) throw new Error("USER_NOT_FOUND");
+    // Le pseudo relevé sur ses signalements est montré à la modération quand
+    // le compte n'est plus vivant : il part dès la demande (la cible reste).
     await connection.execute(
-      `UPDATE bg_users SET is_deleted = 1, deletion_requested_at = ? WHERE id = ? AND is_deleted = 0`,
-      [requestedAt, userId],
+      `UPDATE bg_report_targets SET label_snapshot = NULL WHERE target_type = 'USER' AND target_id = ?`,
+      [userId],
     );
     await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
     plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
@@ -390,6 +402,10 @@ export async function requestAccountDeletion(userId: number): Promise<AccountDel
     connection.release();
   }
 
+  // Demande consignée « en attente » au journal hors base (décision 8 du
+  // 2026-11-04) : une restauration d'une sauvegarde antérieure la rejoue. La
+  // réactivation la retire ; la suppression définitive écrit la sienne.
+  await recordAccountDeletion({ userId, accountCreatedAt, deletedAt: requestedAt.toISOString(), pending: true });
   await afterDeletionRequest(userId, { withdrawn, forfeitable, departures, organizedHandedOver, castTournaments });
 
   return { ...plan, finalAt: reactivationDeadline(requestedAt).toISOString() };

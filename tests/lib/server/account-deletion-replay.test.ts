@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/users/account-deletion");
+jest.mock("@/lib/server/users/account-deletion-request", () => ({ requestAccountDeletion: jest.fn() }));
 
 import { replayAccountDeletions } from "@/lib/server/account-deletion-replay";
 import { getDatabase } from "@/lib/server/database";
 import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
+import { requestAccountDeletion } from "@/lib/server/users/account-deletion-request";
 import type { AccountDeletionEntry } from "@/lib/shared/account-deletion-journal";
 import { fakePool } from "../../helpers/sql-double";
 
@@ -102,5 +104,40 @@ describe("replayAccountDeletions", () => {
       failed: 0,
     });
     expect(execute).not.toHaveBeenCalled();
+  });
+});
+
+describe("replayAccountDeletions — demande en attente (décision du 2026-11-04)", () => {
+  const pending = (deletedAt: string): AccountDeletionEntry => ({ ...entry(7), pending: true, deletedAt });
+
+  it("replayAccountDeletions_pendingWindowOpen_reRequestsWithOriginalDate", async () => {
+    restoredDb({ 7: { created_at: CREATED, is_deleted: 0 } });
+    const requestedAt = new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString();
+    jest.mocked(requestAccountDeletion).mockResolvedValue({ mode: "ERASE", reason: null, finalAt: requestedAt });
+
+    const report = await replayAccountDeletions([pending(requestedAt)], { log });
+
+    expect(requestAccountDeletion).toHaveBeenCalledWith(7, { requestedAt: new Date(requestedAt) });
+    expect(deleteOwnAccount).not.toHaveBeenCalled();
+    expect(report.replayed).toBe(1);
+    expect(lines.join("\n")).toContain("demande de suppression rejouée");
+  });
+
+  it("replayAccountDeletions_pendingWindowClosed_deletesForGood", async () => {
+    restoredDb({ 7: { created_at: CREATED, is_deleted: 0 } });
+
+    await replayAccountDeletions([pending("2026-09-20T10:00:00.000Z")], { log });
+
+    expect(deleteOwnAccount).toHaveBeenCalledWith(7);
+    expect(requestAccountDeletion).not.toHaveBeenCalled();
+  });
+
+  it("replayAccountDeletions_pendingDryRun_saysRequestWouldReplay", async () => {
+    restoredDb({ 7: { created_at: CREATED, is_deleted: 0 } });
+
+    await replayAccountDeletions([pending("2026-09-20T10:00:00.000Z")], { log, dryRun: true });
+
+    expect(lines.join("\n")).toContain("demande de suppression du 2026-09-20T10:00:00.000Z à rejouer");
+    expect(requestAccountDeletion).not.toHaveBeenCalled();
   });
 });

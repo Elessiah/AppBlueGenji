@@ -170,7 +170,7 @@
       ],
       "bullets": [
         "Le match ne se lance qu'une fois les deux salons pleins : jusque-là, il attend qu'un arbitre force son lancement. Si le bot ne répond pas, le match n'attend pas.",
-        "Le bot compte les personnes présentes dans chaque salon — un nombre, jamais qui. Ce comptage fait partie du règlement, sans droit d'opposition propre : une équipe qui ne veut pas s'y plier ne s'inscrit pas à ce tournoi, ou s'en retire.",
+        "Le bot compte les personnes présentes dans chaque salon — un nombre, jamais qui. Ce comptage repose sur l'intérêt légitime de l'association (bon déroulement des tournois) : tu peux t'y opposer en le demandant à l'association, par le formulaire de signalement (catégorie RGPD).",
         "Aucun salon n'est ouvert pour une entrée en tournoi individuel ni pour un match contre une équipe fantôme."
       ]
     },

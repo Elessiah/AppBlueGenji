@@ -130,7 +130,6 @@ export async function createSession(userId: number, event: ConnectionLogEvent): 
   // lisible (`lib/shared/account-suspension.ts`). Contrôle *avant* toute
   // écriture ; la course avec un prononcé concurrent est tranchée par
   // `getCurrentUser`, qui écarte la session d'un compte suspendu.
-  await assertNotSuspended(userId);
   // Un compte dont la suppression est demandée n'ouvre pas de session : dans
   // ses trente jours, la porte renvoie vers l'écran de réactivation, qui
   // demande un geste explicite (E4, `account-reactivation.ts`) ; au-delà, la
@@ -147,6 +146,10 @@ export async function createSession(userId: number, event: ConnectionLogEvent): 
     });
     throw new AccountPendingDeletionError(ticket);
   }
+  // Après la demande de suppression : un compte suspendu peut aussi être
+  // réactivé dans ses trente jours (décision du 2026-11-04) — il revient
+  // suspendu, la réactivation ne l'ouvre pas pour autant.
+  await assertNotSuspended(userId);
   const db = await getDatabase();
   const token = randomToken(48);
   const tokenHash = hashToken(token);
@@ -481,9 +484,12 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
 
 async function pseudoExists(candidate: string): Promise<boolean> {
   const db = await getDatabase();
+  // Un pseudo réservé par un compte en attente de suppression compte comme pris
+  // (sa réactivation le lui rend, `account-deletion-hold.ts`).
   const [rows] = await db.execute<(RowDataPacket & { c: number })[]>(
-    `SELECT COUNT(*) AS c FROM bg_users WHERE pseudo = ?`,
-    [candidate],
+    `SELECT (SELECT COUNT(*) FROM bg_users WHERE pseudo = ?)
+          + (SELECT COUNT(*) FROM bg_account_deletion_holds WHERE pseudo = ?) AS c`,
+    [candidate, candidate],
   );
   return Number(rows[0]?.c ?? 0) > 0;
 }

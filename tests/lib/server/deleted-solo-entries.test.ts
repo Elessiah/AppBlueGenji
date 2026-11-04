@@ -62,7 +62,7 @@ function fakeDb(options: Options) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(sendBotLog).mockResolvedValue(undefined);
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
 });
 
 describe("forfeitUnplayedSoloEntry", () => {
@@ -70,7 +70,7 @@ describe("forfeitUnplayedSoloEntry", () => {
     fakeDb({ format: "SWISS" });
 
     expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(1);
-    expect(forfeitTournamentTeam).toHaveBeenCalledWith(4, 40, null);
+    expect(forfeitTournamentTeam).toHaveBeenCalledWith(4, 40, null, undefined, { skipForfeitLog: true });
     expect(forfeitDeletedEntryMatch).not.toHaveBeenCalled();
   });
 
@@ -79,7 +79,7 @@ describe("forfeitUnplayedSoloEntry", () => {
 
     await forfeitUnplayedSoloEntry(4, 40);
 
-    expect(forfeitTournamentTeam).toHaveBeenCalledWith(4, 40, null);
+    expect(forfeitTournamentTeam).toHaveBeenCalledWith(4, 40, null, undefined, { skipForfeitLog: true });
   });
 
   it("forfeitUnplayedSoloEntry_bracket_savesForfeitPerReadyMatch", async () => {
@@ -179,7 +179,7 @@ describe("settleDeletedSoloEntries", () => {
     fakeDb({ candidates: [7], forfeitable: [{ tournament_id: 4, team_id: 40 }], format: "SWISS" });
 
     expect(await settleDeletedSoloEntries()).toEqual({ withdrawn: 0, forfeited: 1 });
-    expect(forfeitTournamentTeam).toHaveBeenCalledWith(4, 40, null);
+    expect(forfeitTournamentTeam).toHaveBeenCalledWith(4, 40, null, undefined, { skipForfeitLog: true });
     expect(sendBotLog).toHaveBeenCalledTimes(1);
   });
 
@@ -196,7 +196,7 @@ describe("settleDeletedSoloEntries", () => {
     jest.mocked(forfeitTournamentTeam).mockRejectedValueOnce(new Error("TEAM_ALREADY_OUT"));
 
     expect(await settleDeletedSoloEntries()).toEqual({ withdrawn: 0, forfeited: 1 });
-    expect(forfeitTournamentTeam).toHaveBeenLastCalledWith(5, 40, null);
+    expect(forfeitTournamentTeam).toHaveBeenLastCalledWith(5, 40, null, undefined, { skipForfeitLog: true });
     log.mockRestore();
   });
 

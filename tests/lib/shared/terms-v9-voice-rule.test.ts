@@ -20,28 +20,22 @@ function change(id: string) {
   return entry;
 }
 
-describe("PRIVACY_CHANGES — salons vocaux, règle du tournoi (décision V6)", () => {
-  it("privacyChanges_voiceChannelsRule_dated1105ForAllAccountsAfterRefereeTagEntry", () => {
-    const entry = change(VOICE_ID);
-    const ids = PRIVACY_CHANGES.map((c) => c.id);
-
-    expect(entry.publishedAt).toBe("2026-11-05");
-    expect(entry.asksTermsAcceptance).toBeUndefined();
-    expect(entry.links?.map((l) => l.href)).toEqual(["/rgpd#salons-vocaux"]);
-    expect(ids.indexOf(VOICE_ID)).toBe(ids.indexOf("2026-11-tag-discord-arbitre-execution-du-service") + 1);
+describe("PRIVACY_CHANGES — salons vocaux (décision du 2026-11-04 : intérêt légitime)", () => {
+  it("privacyChanges_voiceChannelsContractEntry_removedFrAndEn", () => {
+    expect(PRIVACY_CHANGES.some((c) => c.id === VOICE_ID)).toBe(false);
+    expect(PRIVACY_CHANGES_EN[VOICE_ID]).toBeUndefined();
   });
 
-  it("privacyChanges_voiceChannelsRule_statesContractNoObjectionFrAndEn", () => {
-    const fr = change(VOICE_ID);
-    const en = PRIVACY_CHANGES_EN[VOICE_ID];
+  it("privacyChanges_termsV9_voiceDetailStatesLegitimateInterestAndObjectionFrAndEn", () => {
+    const fr = change(TERMS_V9_ID).details.join(" ");
+    const en = PRIVACY_CHANGES_EN[TERMS_V9_ID].details.join(" ");
 
-    expect(fr.summary).toContain("fait désormais partie du règlement du tournoi");
-    expect(fr.summary).toContain("il n'a plus de droit d'opposition propre");
-    expect(fr.details[0]).toContain("devient l'exécution du contrat");
-    expect(en.summary).toContain("is now part of the tournament rules");
-    expect(en.summary).toContain("it no longer has a right to object of its own");
-    expect(en.details[0]).toContain("becomes the performance of the contract");
-    expect(en.details).toHaveLength(fr.details.length);
+    expect(fr).toContain("repose toujours sur l'intérêt légitime de l'association");
+    expect(fr).toContain("tu peux t'y opposer en le demandant à l'association");
+    expect(fr).not.toContain("sans droit d'opposition propre");
+    expect(en).toContain("still rests on the association's legitimate interest");
+    expect(en).toContain("you can object to it by asking the association");
+    expect(en).not.toContain("no right to object of its own");
   });
 });
 
@@ -53,8 +47,34 @@ describe("PRIVACY_CHANGES — conditions d'utilisation, version 9", () => {
     expect(TERMS_VERSION).toBe(9);
     expect(fr.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(fr.asksTermsAcceptance).toBe(true);
-    expect(fr.details.at(-1)).toContain("la version 9, en vigueur depuis le 5 novembre 2026");
-    expect(en.details.at(-1)).toContain("version 9, in force since 5 November 2026");
+    expect(fr.publishedAt).toBe("2026-11-06");
+    expect(fr.details.at(-1)).toContain("la version 9, en vigueur depuis le 6 novembre 2026");
+    expect(en.details.at(-1)).toContain("version 9, in force since 6 November 2026");
+  });
+
+  it("privacyChanges_termsV9_foldsV6AcceptanceCorrectionFrAndEn", () => {
+    const fr = change(TERMS_V9_ID).details.join(" ");
+    const en = PRIVACY_CHANGES_EN[TERMS_V9_ID].details.join(" ");
+    const v6 = change("2026-10-conditions-v6-acceptation-pour-tous");
+
+    expect(fr).toContain("le message privé qui annonçait la version 6 des conditions d'utilisation finissait par « Aucun accord ne t'est demandé »");
+    expect(en).toContain("the private message announcing version 6 of the terms of use ended with “No consent is asked of you”");
+    // L'entrée publiée de la version 6 n'est jamais retouchée.
+    expect(v6.asksTermsAcceptance).toBeUndefined();
+    expect(v6.publishedAt).toBe("2026-10-19");
+  });
+
+  it("privacyChanges_termsV9_saysAnonymousFromRequestAndSuspendedReactivationFrAndEn", () => {
+    const fr = change(TERMS_V9_ID).details.join(" ");
+    const en = PRIVACY_CHANGES_EN[TERMS_V9_ID].details.join(" ");
+
+    expect(fr).toContain("le compte est montré anonyme partout");
+    expect(fr).toContain("un compte suspendu peut aussi être réactivé, et revient suspendu");
+    expect(fr).toContain("retirée de ce journal à la réactivation");
+    expect(en).toContain("the account is shown as anonymous everywhere");
+    expect(en).toContain("a suspended account can be reactivated too, and comes back suspended");
+    expect(en).toContain("removed from that log on reactivation");
+    expect(PRIVACY_CHANGES_EN[TERMS_V9_ID].details).toHaveLength(change(TERMS_V9_ID).details.length);
   });
 
   it("privacyChanges_termsV9_linksContactsAndAccountSectionsFrAndEn", () => {
@@ -68,17 +88,17 @@ describe("PRIVACY_CHANGES — conditions d'utilisation, version 9", () => {
   });
 });
 
-describe("/rgpd — salons vocaux d'équipe (décision V6)", () => {
-  it("rgpdPage_voiceChannels_contractBasisWithoutObjectionFrAndEn", () => {
+describe("/rgpd — salons vocaux d'équipe (intérêt légitime, décision du 2026-11-04)", () => {
+  it("rgpdPage_voiceChannels_legitimateInterestWithObjectionByRequestFrAndEn", () => {
     const fr = readSource("app/rgpd/page.tsx");
     const en = readSource("app/rgpd/RgpdEn.tsx");
 
-    expect(fr).toContain("ce comptage relève de l&apos;<strong>exécution du contrat</strong>");
-    expect(fr).toContain("il n&apos;a donc pas de droit d&apos;opposition propre");
-    expect(fr).not.toContain("vous pouvez vous opposer à ce traitement (section « Vos droits ») (<Link href=\"/rgpd/registre#t18\">");
-    expect(en).toContain("the <strong>performance of the contract</strong>");
-    expect(en).toContain("it therefore has no right to object of its own");
-    expect(en).not.toContain("you can object to this processing (section “Your rights”) (<LocaleLink href=\"/rgpd/registre#t18\">");
+    expect(fr).toContain("Ce comptage relève de l&apos;<strong>intérêt légitime</strong> de l&apos;association");
+    expect(fr).toContain("vous opposer à ce traitement en le demandant à l&apos;association, par le formulaire de signalement (catégorie RGPD)");
+    expect(fr).not.toContain("<strong>exécution du contrat</strong> : dans un tournoi qui a");
+    expect(en).toContain("This count rests on the association&apos;s <strong>legitimate interest</strong>");
+    expect(en).toContain("object to this processing by asking the association, through the report form (GDPR category)");
+    expect(en).not.toContain("<strong>performance of the contract</strong>: in a tournament with the option");
   });
 });
 
@@ -93,8 +113,8 @@ describe("/regles — règle commune « Salons vocaux d'équipe »", () => {
     expect(frBody).toContain(`un salon vocal de ${VOICE_CHANNEL_CAPACITY} places`);
     expect(enBody).toContain(`from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before each match's time`);
     expect(enBody).toContain(`a ${VOICE_CHANNEL_CAPACITY}-seat voice channel`);
-    expect(frSection?.bullets?.join(" ")).toContain("sans droit d'opposition propre");
-    expect(enSection?.bullets?.join(" ")).toContain("with no right to object of its own");
+    expect(frSection?.bullets?.join(" ")).toContain("repose sur l'intérêt légitime de l'association (bon déroulement des tournois) : tu peux t'y opposer en le demandant à l'association");
+    expect(enSection?.bullets?.join(" ")).toContain("rests on the association's legitimate interest (smooth running of tournaments): you can object to it by asking the association");
   });
 });
 
@@ -105,13 +125,15 @@ describe("notification de reprise d'équipe fantôme", () => {
 });
 
 describe("conditions d'utilisation v9 — salons vocaux", () => {
-  it("termsV9_voiceParagraph_contractNoObjectionFrAndEn", () => {
+  it("termsV9_voiceParagraph_legitimateInterestWithObjectionFrAndEn", () => {
     const fr = TERMS_SECTIONS.find((s) => s.id === "contacts-de-match")?.paragraphs.join("\n") ?? "";
     const en = TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match")?.paragraphs.join("\n") ?? "";
 
-    expect(fr).toContain("fait partie du **règlement du tournoi**");
-    expect(fr).toContain("sans droit d'opposition propre : une équipe qui ne veut pas s'y plier ne s'inscrit pas à ce tournoi, ou s'en retire.");
-    expect(en).toContain("is part of the **tournament rules**");
-    expect(en).toContain("with no right to object of its own: a team that does not want to abide by it does not register for that tournament, or withdraws from it.");
+    expect(fr).toContain("fait partie du **déroulement du tournoi**");
+    expect(fr).toContain("Ce comptage repose sur l'intérêt légitime de l'association au bon déroulement des tournois ; chacun peut s'y opposer en le demandant à l'association");
+    expect(fr).not.toContain("sans droit d'opposition propre");
+    expect(en).toContain("is part of the **running of the tournament**");
+    expect(en).toContain("This count rests on the association's legitimate interest in the smooth running of tournaments; anyone can object to it by asking the association");
+    expect(en).not.toContain("no right to object of its own");
   });
 });

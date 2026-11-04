@@ -1,6 +1,8 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
+import { requestAccountDeletion } from "@/lib/server/users/account-deletion-request";
+import { isReactivationWindowOpen } from "@/lib/shared/account-deletion";
 import {
   replayDecision,
   type AccountDeletionEntry,
@@ -64,7 +66,11 @@ export async function replayAccountDeletions(
 
     if (options.dryRun) {
       report.replayed += 1;
-      log(`  · #${entry.userId} — serait supprimé (supprimé le ${entry.deletedAt})`);
+      log(
+        entry.pending
+          ? `  · #${entry.userId} — demande de suppression du ${entry.deletedAt} à rejouer`
+          : `  · #${entry.userId} — serait supprimé (supprimé le ${entry.deletedAt})`,
+      );
       continue;
     }
 
@@ -81,6 +87,15 @@ async function replayDeletion(
   log: (line: string) => void,
 ): Promise<void> {
   try {
+    // Une demande en attente revenue vivante avec la sauvegarde est rejouée
+    // comme une demande (anonyme dès ce moment, trente jours comptés depuis la
+    // date d'origine) ; sa fenêtre déjà close, la suppression devient définitive.
+    if (entry.pending && isReactivationWindowOpen(entry.deletedAt)) {
+      await requestAccountDeletion(entry.userId, { requestedAt: new Date(entry.deletedAt) });
+      report.replayed += 1;
+      log(`  ✓ #${entry.userId} — demande de suppression rejouée`);
+      return;
+    }
     const plan = await deleteOwnAccount(entry.userId);
     report.replayed += 1;
     log(`  ✓ #${entry.userId} — ${plan.mode === "ERASE" ? "effacé" : "anonymisé"}`);

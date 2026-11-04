@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import {
   ACCOUNT_PENDING_DELETION_CODE,
@@ -8,6 +8,10 @@ import {
   reactivationDeadline,
 } from "@/lib/shared/account-deletion";
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
+import { forgetPendingAccountDeletion } from "@/lib/server/account-deletion-journal";
+import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
+import { invalidateStats } from "@/lib/server/stats-cache";
+import { restoreAccountIdentity } from "./account-deletion-hold";
 
 /*
  * Réactivation d'un compte dont la suppression est demandée (E4,
@@ -120,8 +124,12 @@ export async function reactivateAccount(
       return null;
     }
     const userId = Number(ticket.user_id);
-    const [locked] = await connection.execute<(RowDataPacket & { is_deleted: 0 | 1; deletion_requested_at: StoredDate })[]>(
-      `SELECT is_deleted, deletion_requested_at FROM bg_users WHERE id = ? FOR UPDATE`,
+    const [locked] = await connection.execute<(RowDataPacket & {
+      is_deleted: 0 | 1;
+      deletion_requested_at: StoredDate;
+      created_at: string;
+    })[]>(
+      `SELECT is_deleted, deletion_requested_at, created_at FROM bg_users WHERE id = ? FOR UPDATE`,
       [userId],
     );
     const row = locked[0];
@@ -134,13 +142,16 @@ export async function reactivateAccount(
       await connection.commit();
       return null;
     }
-    const [result] = await connection.execute<ResultSetHeader>(
-      `UPDATE bg_users SET is_deleted = 0, deletion_requested_at = NULL
-        WHERE id = ? AND is_deleted = 1 AND deletion_requested_at IS NOT NULL`,
-      [userId],
-    );
+    // Le vrai pseudo et l'avatar reviennent avec le compte (anonyme depuis la
+    // demande, `account-deletion-hold.ts`).
+    const restored = await restoreAccountIdentity(connection, userId);
     await connection.commit();
-    if (Number(result.affectedRows) !== 1) return null;
+    if (!restored) return null;
+    // Après le commit : la demande en attente ne doit plus être rejouée par une
+    // restauration, et les vues en cache montraient le pseudo d'emprunt.
+    await forgetPendingAccountDeletion({ userId, accountCreatedAt: String(row.created_at) });
+    invalidateTeamIdentityViews();
+    invalidateStats();
     return { userId, event: ticket.login_event as ConnectionLogEvent };
   } catch (error) {
     await connection.rollback().catch(() => {});

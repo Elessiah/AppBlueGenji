@@ -21,6 +21,7 @@ import { playedMatchSql } from "@/lib/shared/ranking";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
+import { dropDeletionHold, readDeletionHold } from "./account-deletion-hold";
 
 /*
  * Suppression de son compte par le joueur : ce qu'elle emportera (le plan,
@@ -314,6 +315,9 @@ async function applyDeletionMode(
   }
   const withdrawal = await anonymizeAccount(connection, userId);
   await connection.execute(`UPDATE bg_users SET deletion_requested_at = NULL WHERE id = ? AND is_deleted = 1`, [userId]);
+  // Le vrai pseudo mis de côté pour la réactivation ne survit pas à la
+  // suppression définitive (l'effacement l'emporte par cascade).
+  await dropDeletionHold(connection, userId);
   return { withdrawal, withdrawnFrom: [], quarantinedFiles: [] };
 }
 
@@ -418,7 +422,10 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
       await connection.rollback();
       return null;
     }
-    orphanedAvatar = toDiskUploadPath(locked[0].avatar_url);
+    // Anonyme depuis la demande, le compte en attente n'a plus d'avatar sur sa
+    // ligne : son chemin attend dans le masque (`account-deletion-hold.ts`).
+    const hold = await readDeletionHold(connection, userId, true);
+    orphanedAvatar = toDiskUploadPath(locked[0].avatar_url ?? hold?.avatarUrl ?? null);
     accountCreatedAt = String(locked[0].created_at);
 
     const facts = await loadAccountDeletionFacts(connection, userId, new Set(soloTournaments));

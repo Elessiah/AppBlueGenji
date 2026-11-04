@@ -40,7 +40,15 @@ export function ReactivationPanel({ finalAt }: Readonly<{ finalAt: string | null
         body: "{}",
       });
       if (!response.ok) {
-        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        const payload = (await response.json().catch(() => ({}))) as { error?: string; reactivated?: boolean };
+        // Compte suspendu : la réactivation est faite, il revient suspendu
+        // (décision du 2026-11-04) — l'écran le dit et rend la connexion.
+        if (payload.error === ACCOUNT_SUSPENDED && payload.reactivated === true) {
+          showSuccess(t("reactivation.doneSuspended"));
+          showError(suspendedLoginText(text, null));
+          router.push("/connexion");
+          return;
+        }
         // Seul un ticket périmé ou déjà servi (410) change l'écran ; une suspension
         // ou une panne passagère se disent par une notification, le bouton reste.
         if (response.status === 410) setExpired(true);

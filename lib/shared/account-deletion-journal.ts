@@ -46,8 +46,14 @@ export interface AccountDeletionEntry {
    * répète pas d'un compte à l'autre sur la même ligne.
    */
   accountCreatedAt: string;
-  /** Instant de la suppression, ISO 8601. */
+  /** Instant de la suppression, ISO 8601 (d'une demande en attente : celui de la demande). */
   deletedAt: string;
+  /**
+   * Demande **en attente** (fenêtre de réactivation de trente jours) : écrite à
+   * la demande, retirée à la réactivation, rendue caduque par la ligne de la
+   * suppression définitive. Absent = suppression définitive.
+   */
+  pending?: boolean;
 }
 
 /** Une ligne JSON par suppression, terminée par un saut de ligne. */
@@ -56,6 +62,7 @@ export function formatJournalEntry(entry: AccountDeletionEntry): string {
     userId: entry.userId,
     accountCreatedAt: entry.accountCreatedAt,
     deletedAt: entry.deletedAt,
+    ...(entry.pending ? { pending: true } : {}),
   })}\n`;
 }
 
@@ -69,7 +76,8 @@ function isEntry(value: unknown): value is AccountDeletionEntry {
     typeof v.accountCreatedAt === "string" &&
     v.accountCreatedAt.length > 0 &&
     typeof v.deletedAt === "string" &&
-    Number.isFinite(Date.parse(v.deletedAt))
+    Number.isFinite(Date.parse(v.deletedAt)) &&
+    (v.pending === undefined || typeof v.pending === "boolean")
   );
 }
 
@@ -97,6 +105,7 @@ export function parseJournal(text: string): ParsedJournal {
           userId: parsed.userId,
           accountCreatedAt: parsed.accountCreatedAt,
           deletedAt: parsed.deletedAt,
+          ...(parsed.pending ? { pending: true } : {}),
         });
       } else {
         invalidLines += 1;
@@ -128,10 +137,26 @@ export function pruneJournal(
     if (!Number.isFinite(at) || at < cutoff) continue;
     const key = `${entry.userId}|${entry.accountCreatedAt}`;
     const known = byKey.get(key);
-    if (!known || at < Date.parse(known.deletedAt)) byKey.set(key, entry);
+    // Une suppression définitive rend caduque la demande en attente du même
+    // compte ; entre deux lignes de même nature, la plus ancienne l'emporte.
+    const replaces =
+      !known ||
+      (known.pending === true && entry.pending !== true) ||
+      (Boolean(known.pending) === Boolean(entry.pending) && at < Date.parse(known.deletedAt));
+    if (replaces) byKey.set(key, entry);
   }
   return [...byKey.values()].sort(
     (a, b) => Date.parse(a.deletedAt) - Date.parse(b.deletedAt) || a.userId - b.userId,
+  );
+}
+
+/** Retire la demande en attente d'un compte (réactivation) ; les autres lignes restent. */
+export function withoutPendingEntry(
+  entries: readonly AccountDeletionEntry[],
+  key: { userId: number; accountCreatedAt: string },
+): AccountDeletionEntry[] {
+  return entries.filter(
+    (entry) => !(entry.pending && entry.userId === key.userId && entry.accountCreatedAt === key.accountCreatedAt),
   );
 }
 

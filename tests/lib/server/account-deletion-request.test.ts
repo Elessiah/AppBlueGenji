@@ -19,6 +19,8 @@ jest.mock("@/lib/server/users/account-deletion", () => ({
   loadAccountTrace: jest.fn(),
   loadSoloRegistrations: jest.fn(),
 }));
+jest.mock("@/lib/server/account-deletion-journal");
+jest.mock("@/lib/server/users/account-deletion-hold");
 jest.mock("@/lib/server/users/deleted-solo-entries", () => ({
   forfeitSoloEntriesAfterCommit: jest.fn(),
   listForfeitableSoloEntries: jest.fn(),
@@ -27,6 +29,8 @@ jest.mock("@/lib/server/users/deleted-solo-entries", () => ({
 }));
 
 import { getDatabase } from "@/lib/server/database";
+import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
+import { holdAccountIdentity } from "@/lib/server/users/account-deletion-hold";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
@@ -82,7 +86,9 @@ function fakeDb(options: Options) {
     const q = String(sql).replace(/\s+/g, " ").trim();
     queries.push({ sql: q, params });
     if (options.failOn && q.startsWith(options.failOn)) throw new Error("DB_DOWN");
-    if (q.startsWith("SELECT is_deleted FROM bg_users")) return [[{ is_deleted: options.alreadyDeleted ? 1 : 0 }]];
+    if (q.startsWith("SELECT is_deleted, created_at FROM bg_users")) {
+      return [[{ is_deleted: options.alreadyDeleted ? 1 : 0, created_at: "2025-01-01 10:00:00" }]];
+    }
     if (q.startsWith("SELECT tm.team_id")) return [(options.teams ?? []).map((team_id) => ({ team_id }))];
     if (q.startsWith("SELECT logo_url, deleted_at FROM bg_teams")) return [[{ logo_url: "/api/uploads/teams/3.webp", deleted_at: null }]];
     if (q.startsWith("SELECT tm.id, tm.user_id, tm.roles_json, tm.joined_at")) return [options.successors ?? []];
@@ -140,8 +146,10 @@ beforeEach(() => {
   jest.mocked(writeActiveMembership).mockResolvedValue(undefined);
   jest.mocked(dissolveTeamOn).mockResolvedValue({ detachedUserIds: [7], everRegistered: false });
   jest.mocked(teamStreamTournamentIds).mockResolvedValue(new Set());
-  jest.mocked(sendBotLog).mockResolvedValue(undefined);
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
   jest.mocked(deleteUnreferencedUpload).mockResolvedValue(true);
+  jest.mocked(holdAccountIdentity).mockResolvedValue(true);
+  jest.mocked(recordAccountDeletion).mockResolvedValue(undefined);
 });
 
 describe("requestAccountDeletion — le compte", () => {
@@ -158,9 +166,9 @@ describe("requestAccountDeletion — le compte", () => {
 
     await requestAccountDeletion(7);
 
-    const mark = queries.find((q) => q.sql.startsWith("UPDATE bg_users SET is_deleted = 1, deletion_requested_at = ?"));
-    expect(mark?.sql).toContain("AND is_deleted = 0");
-    expect(mark?.params[0]).toBeInstanceOf(Date);
+    // Le compte passe en attente et devient anonyme dans la même écriture
+    // (`holdAccountIdentity`, sur la transaction).
+    expect(holdAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7, expect.any(Date));
     expect(queries.some((q) => q.sql === "DELETE FROM bg_user_sessions WHERE user_id = ?")).toBe(true);
     expect(connection.commit).toHaveBeenCalled();
     expect(closeUserStreams).toHaveBeenCalledWith(7);
@@ -194,7 +202,7 @@ describe("requestAccountDeletion — le compte", () => {
     const { connection } = fakeDb({});
     const execute = connection.execute.getMockImplementation()!;
     connection.execute.mockImplementation(async (sql: string, params?: unknown[]) => {
-      if (sql.startsWith("SELECT is_deleted FROM bg_users")) order.push("account");
+      if (sql.startsWith("SELECT is_deleted, created_at FROM bg_users")) order.push("account");
       return execute(sql, params);
     });
 
@@ -204,7 +212,7 @@ describe("requestAccountDeletion — le compte", () => {
   });
 
   it("requestAccountDeletion_failureMidway_rollsBackAndSendsNothing", async () => {
-    const { connection } = fakeDb({ failOn: "UPDATE bg_users SET is_deleted = 1" });
+    const { connection } = fakeDb({ failOn: "UPDATE bg_report_targets SET label_snapshot = NULL" });
 
     await expect(requestAccountDeletion(7)).rejects.toThrow("DB_DOWN");
     expect(connection.rollback).toHaveBeenCalled();
@@ -374,7 +382,9 @@ describe("requestAccountDeletion — journal et forfaits (E1, E5)", () => {
 
   it("requestAccountDeletion_botUnreachable_stillSucceeds", async () => {
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
-    jest.mocked(sendBotLog).mockRejectedValue(new Error("BOT_DOWN"));
+    jest.mocked(sendBotLog).mockImplementation(() => {
+      throw new Error("BOT_DOWN");
+    });
     fakeDb({});
 
     await expect(requestAccountDeletion(7)).resolves.toHaveProperty("finalAt");

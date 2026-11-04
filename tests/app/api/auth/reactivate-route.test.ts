@@ -4,21 +4,14 @@ jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/users/account-reactivation", () => ({
   reactivationCookieName: () => "bg_reactivation",
   reactivateAccount: jest.fn(),
-  peekReactivationTicket: jest.fn(),
 }));
-jest.mock("@/lib/server/account-suspensions", () => {
-  const actual = jest.requireActual<typeof import("@/lib/server/account-suspensions")>(
-    "@/lib/server/account-suspensions",
-  );
-  return { ...actual, assertNotSuspended: jest.fn() };
-});
 jest.mock("next/headers", () => ({ cookies: jest.fn() }));
 
 import { cookies } from "next/headers";
 import { POST } from "@/app/api/auth/reactivate/route";
 import { createSession } from "@/lib/server/auth";
-import { AccountSuspendedError, assertNotSuspended } from "@/lib/server/account-suspensions";
-import { peekReactivationTicket, reactivateAccount } from "@/lib/server/users/account-reactivation";
+import { AccountSuspendedError } from "@/lib/server/account-suspensions";
+import { reactivateAccount } from "@/lib/server/users/account-reactivation";
 import { fakeCookieStore } from "../../../helpers/cookie-store";
 
 /*
@@ -38,8 +31,6 @@ beforeEach(() => {
   get.mockReturnValue({ value: "a".repeat(64) });
   jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get, set }));
   jest.mocked(createSession).mockResolvedValue(undefined);
-  jest.mocked(peekReactivationTicket).mockResolvedValue({ userId: 7, finalAt: "2026-12-03T10:00:00.000Z" });
-  jest.mocked(assertNotSuspended).mockResolvedValue(undefined);
 });
 
 describe("POST /api/auth/reactivate", () => {
@@ -83,7 +74,9 @@ describe("POST /api/auth/reactivate", () => {
     jest.restoreAllMocks();
   });
 
-  it("POST_suspendedAccount_403", async () => {
+  // Décision du 2026-11-04 : un compte suspendu se réactive aussi, et revient
+  // suspendu — la réponse dit la suspension et la réactivation faite.
+  it("POST_suspendedAccount_reactivatedThen403WithReactivatedFlag", async () => {
     jest.mocked(reactivateAccount).mockResolvedValue({ userId: 7, event: "LOGIN_GOOGLE" });
     const notice = { reference: "S-1", reason: "Propos haineux en match", ground: "BEHAVIOR" as const, endsAt: null };
     jest.mocked(createSession).mockRejectedValue(new AccountSuspendedError(notice));
@@ -91,19 +84,21 @@ describe("POST /api/auth/reactivate", () => {
     const res = await reactivate();
 
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ error: "ACCOUNT_SUSPENDED", suspension: notice });
+    expect(await res.json()).toEqual({ error: "ACCOUNT_SUSPENDED", suspension: notice, reactivated: true });
+    expect(reactivateAccount).toHaveBeenCalledTimes(1);
+    expect(createSession).toHaveBeenCalledWith(7, "LOGIN_GOOGLE");
   });
 
-  it("POST_suspendedBeforeReactivation_403AndAccountLeftPending", async () => {
-    const notice = { reference: "S-2", reason: "Triche", ground: "BEHAVIOR" as const, endsAt: null };
-    jest.mocked(assertNotSuspended).mockRejectedValue(new AccountSuspendedError(notice));
+  it("POST_sessionOtherError_500AndNoReactivatedFlag", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(reactivateAccount).mockResolvedValue({ userId: 7, event: "LOGIN_GOOGLE" });
+    jest.mocked(createSession).mockRejectedValue(new Error("DB_DOWN"));
 
     const res = await reactivate();
 
-    expect(res.status).toBe(403);
-    expect(assertNotSuspended).toHaveBeenCalledWith(7);
-    expect(reactivateAccount).not.toHaveBeenCalled();
-    expect(createSession).not.toHaveBeenCalled();
+    expect(res.status).toBe(500);
+    expect(await res.json()).not.toHaveProperty("reactivated");
+    log.mockRestore();
   });
 
   it("POST_unexpectedError_500WithCodeOnly", async () => {

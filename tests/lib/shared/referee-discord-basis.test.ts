@@ -86,18 +86,18 @@ describe("Registre T04 et /rgpd — exécution du service, FR et EN", () => {
   it("rgpdPolicy_objectionRight_beforeVersion7IncludesRefereeDiscordTagFrAndEn", () => {
     const fr = DROITS.find((droit) => droit.title === "Droit d'opposition")?.text ?? "";
     const en = DROITS_EN.find((droit) => droit.title === "Right to object")?.text ?? "";
-    expect(fr).toContain("aux parties de ses matchs — pseudo, BattleTag en Overwatch et tag Discord certifié — tant qu'il n'a pas accepté la version 7");
-    expect(en).toContain("to the parties to their matches — username, BattleTag in Overwatch and certified Discord tag — as long as they have not accepted version 7");
+    expect(fr).toContain("aux parties de ses matchs — pseudo et BattleTag en Overwatch tant qu'il n'a pas accepté la version 7 des conditions d'utilisation ou une version suivante, tag Discord certifié tant qu'il n'a pas accepté la version 9");
+    expect(en).toContain("to the parties to their matches — username and BattleTag in Overwatch as long as they have not accepted version 7 of the terms of use or a later version, certified Discord tag as long as they have not accepted version 9");
   });
 
   it("rgpdPolicy_refereeDiscordBeforeV7_legitimateInterestRowFrAndEn", () => {
     const row = DONNEES_PROFIL.find((donnee) => donnee.extraBases?.some((extra) => extra.scope === REFEREE_DISCORD_SCOPE));
     expect(row?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: REFEREE_DISCORD_BEFORE_V7_SCOPE });
-    expect(REFEREE_DISCORD_SCOPE).toContain("une fois la version 7 des conditions d'utilisation ou une suivante acceptée par toi");
-    expect(REFEREE_DISCORD_BEFORE_V7_SCOPE).toContain("tant que tu n'as pas accepté la version 7");
+    expect(REFEREE_DISCORD_SCOPE).toContain("une fois la version 9 des conditions d'utilisation ou une suivante acceptée par toi");
+    expect(REFEREE_DISCORD_BEFORE_V7_SCOPE).toContain("tant que tu n'as pas accepté la version 9");
     const en = read("lib/shared/rgpd-policy-en.ts");
     expect(en).toContain("[REFEREE_DISCORD_BEFORE_V7_SCOPE]:");
-    expect(en).toContain("once you have accepted version 7 of the terms of use or a later one");
+    expect(en).toContain("once you have accepted version 9 of the terms of use or a later one");
   });
 
   it("rgpdPages_refereeDiscordTag_performanceOfServiceFrAndEn", () => {
@@ -153,20 +153,20 @@ describe("Textes juridiques alignés sur le code (revue juridique #545)", () => 
 
 // Revue juridique #545, cycle 2 : condition de la version 7, avis complet, liens.
 describe("Base du tag Discord de l'arbitre — cohérence (revue juridique #545, cycle 2)", () => {
-  it("register_t04_refereeDiscordTag_followsVersion7ConditionFrAndEn", () => {
+  it("register_t04_refereeDiscordTag_followsVersion9ConditionFrAndEn", () => {
     const fr = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")?.legalBasis ?? "";
     const en = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")?.legalBasis ?? "";
-    expect(fr).toContain("une fois que cet arbitre a accepté la version 7 des conditions ou une suivante, comme le reste de sa présentation");
+    expect(fr).toContain("une fois que cet arbitre a accepté la version 9 des conditions ou une suivante, comme le reste de sa présentation");
     expect(fr).toContain("une fois cette version acceptée, ce tag n'a pas d'opposition propre");
-    expect(en).toContain("once this referee has accepted version 7 of the terms or a later one, like the rest of their presentation");
+    expect(en).toContain("once this referee has accepted version 9 of the terms or a later one, like the rest of their presentation");
     expect(en).toContain("once that version is accepted, this tag has no objection of its own");
   });
 
-  it("rgpdPages_refereeDiscordTag_followsVersion7ConditionFrAndEn", () => {
+  it("rgpdPages_refereeDiscordTag_followsVersion9ConditionFrAndEn", () => {
     const fr = read("app/rgpd/page.tsx").replace(/\s+/g, " ");
     const en = read("app/rgpd/RgpdEn.tsx").replace(/\s+/g, " ");
-    expect(fr).toContain("une fois la version 7 des conditions ou une suivante acceptée par l&apos;arbitre (avant cette acceptation, l&apos;intérêt légitime, avec le même droit d&apos;opposition) — une fois cette version acceptée, ce tag n&apos;a pas d&apos;opposition propre");
-    expect(en).toContain("once the referee has accepted version 7 of the terms or a later one (before that acceptance, legitimate interest, with the same right to object) — once that version is accepted, this tag has no objection of its own");
+    expect(fr).toContain("une fois la version 9 des conditions ou une suivante acceptée par l&apos;arbitre (avant cette acceptation, l&apos;intérêt légitime, avec le même droit d&apos;opposition) — une fois cette version acceptée, ce tag n&apos;a pas d&apos;opposition propre");
+    expect(en).toContain("once the referee has accepted version 9 of the terms or a later one (before that acceptance, legitimate interest, with the same right to object) — once that version is accepted, this tag has no objection of its own");
   });
 
   it("rgpdPolicy_refereeDiscordScope_decidedNecessityWordingFrAndEn", () => {
@@ -240,8 +240,8 @@ describe("Avis du profil — tag Discord et BattleTag de l'arbitre (revue juridi
       expect(en).not.toContain("(legitimate interest: you can object through the report form)");
       expect(en).not.toContain("(under legitimate interest: you can object");
     }
-    expect(read("messages/fr/profile.json")).toContain("nécessaire au service une fois la version 7 des conditions acceptée, sans opposition propre");
-    expect(read("messages/en/profile.json")).toContain("necessary for the service once version 7 of the terms is accepted, with no separate objection");
+    expect(read("messages/fr/profile.json")).toContain("nécessaire au service une fois la version 9 des conditions acceptée, sans opposition propre");
+    expect(read("messages/en/profile.json")).toContain("necessary for the service once version 9 of the terms is accepted, with no separate objection");
   });
 
   it("profileNotices_battletagAsReferee_limitedToOverwatchFrAndEn", () => {
@@ -264,7 +264,7 @@ describe("Tag Discord de l'arbitre — destinataires et avis (revue juridique #5
   });
 
   it("profileNotices_refereeDiscordTag_keepRefereeObjectionFrAndEn", () => {
-    expect(read("messages/fr/profile.json")).toContain("(pour l'arbitrage : nécessaire au service une fois la version 7 des conditions acceptée, sans opposition propre — ton opposition d'arbitre, retenue, t'en retire toujours ; avant,");
-    expect(read("messages/en/profile.json")).toContain("(for the refereeing: necessary for the service once version 7 of the terms is accepted, with no separate objection — your referee objection, once upheld, still removes you from it; before that,");
+    expect(read("messages/fr/profile.json")).toContain("(pour l'arbitrage : nécessaire au service une fois la version 9 des conditions acceptée, sans opposition propre — ton opposition d'arbitre, retenue, t'en retire toujours ; avant,");
+    expect(read("messages/en/profile.json")).toContain("(for the refereeing: necessary for the service once version 9 of the terms is accepted, with no separate objection — your referee objection, once upheld, still removes you from it; before that,");
   });
 });

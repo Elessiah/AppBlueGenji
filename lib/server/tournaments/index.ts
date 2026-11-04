@@ -1738,12 +1738,15 @@ export async function forfeitTournamentTeamPublic(
   teamId: number,
   actingUserId: number | null = null,
   actor?: StaffActor,
+  // La suppression d'un compte écrit sa propre ligne, qui dit aussi le forfait
+  // (`logDeletionWithdrawal`) : une seule ligne au journal, pas deux.
+  options: { skipForfeitLog?: boolean } = {},
 ): Promise<void> {
   // Verrous tournoi puis manches, quand « Valider le résultat » prend la manche
   // puis le tournoi (réconciliation) : un interblocage se rejoue
   // (`retryOnDeadlock`) au lieu de renvoyer l'arbitre à son clic.
   const settledDisputes = await retryOnDeadlock(() =>
-    forfeitTournamentTeamOnce(tournamentId, teamId, actingUserId, actor),
+    forfeitTournamentTeamOnce(tournamentId, teamId, actingUserId, actor, options.skipForfeitLog === true),
   );
   // Sans attendre (meilleur effort, ne lève jamais), une fois l'abandon acquis.
   // Seul l'abandon imposé à l'**adversaire** de l'arbitre le sert : retirer sa
@@ -1764,6 +1767,7 @@ async function forfeitTournamentTeamOnce(
   teamId: number,
   actingUserId: number | null,
   actor: StaffActor | undefined,
+  skipForfeitLog = false,
 ): Promise<DisputeBeforeResolution[]> {
   const db = await getDatabase();
   const connection = await db.getConnection();
@@ -1800,7 +1804,7 @@ async function forfeitTournamentTeamOnce(
 
     // La ligne d'abandon est réservée par le moteur du format concerné
     // (survie, suisse, endurance) : elle ne part qu'une fois l'abandon écrit.
-    queueBotLog(connection, { kind: "forfeit", tournamentId, teamId });
+    if (!skipForfeitLog) queueBotLog(connection, { kind: "forfeit", tournamentId, teamId });
     settledDisputes = await keepSettled(connection, openMatches);
 
     await connection.commit();

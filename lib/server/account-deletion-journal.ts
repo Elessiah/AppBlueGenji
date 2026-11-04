@@ -5,6 +5,7 @@ import {
   formatJournalEntry,
   parseJournal,
   pruneJournal,
+  withoutPendingEntry,
   type AccountDeletionEntry,
 } from "@/lib/shared/account-deletion-journal";
 
@@ -134,6 +135,33 @@ export function recordAccountDeletion(
     console.error(
       `[account-deletion-journal] suppression du compte #${entry.userId} non consignée (${filePath}) — ` +
         "elle ne serait pas rejouée après restauration d'une sauvegarde antérieure :",
+      error,
+    );
+  });
+}
+
+/**
+ * Retire la demande **en attente** d'un compte qui vient d'être réactivé, et ne
+ * lève jamais : gardée, elle ferait supprimer de nouveau, à la prochaine
+ * restauration, un compte que son titulaire a choisi de garder. Un échec est
+ * dit dans les journaux du serveur ; le rejeu le rattrape à moitié — la ligne
+ * en attente d'un compte vivant n'y est rejouée que si la sauvegarde restaurée
+ * est antérieure à la demande, ce qui ne se distingue pas d'ici.
+ */
+export function forgetPendingAccountDeletion(
+  key: { userId: number; accountCreatedAt: string },
+  options: { filePath?: string; now?: Date } = {},
+): Promise<void> {
+  const filePath = options.filePath ?? accountDeletionJournalPath();
+  const now = options.now ?? new Date();
+  return enqueue(async () => {
+    const current = await readAccountDeletionJournal(filePath);
+    const kept = withoutPendingEntry(current.entries, key);
+    if (kept.length === current.entries.length) return;
+    await writeJournal(pruneJournal(kept, now), filePath);
+  }).catch((error: unknown) => {
+    console.error(
+      `[account-deletion-journal] demande en attente du compte #${key.userId} non retirée (${filePath}) :`,
       error,
     );
   });

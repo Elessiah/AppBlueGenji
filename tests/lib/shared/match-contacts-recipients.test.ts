@@ -418,8 +418,8 @@ describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", (
   it("garde l'opposition de l'arbitre tant qu'il n'a pas accepté la version 7, le contrat ensuite (FR et EN)", () => {
     const objectFr = DROITS.find((d) => d.title === "Droit d'opposition")?.text ?? "";
     const objectEn = DROITS_EN.find((d) => d.title === "Right to object")?.text ?? "";
-    expect(objectFr).toContain("la présentation de l'arbitre désigné aux parties de ses matchs — pseudo, BattleTag en Overwatch et tag Discord certifié — tant qu'il n'a pas accepté la version 7 des conditions d'utilisation ou une version suivante, par le formulaire de signalement");
-    expect(objectEn).toContain("the presentation of the assigned referee to the parties to their matches — username, BattleTag in Overwatch and certified Discord tag — as long as they have not accepted version 7 of the terms of use or a later version, through the report form");
+    expect(objectFr).toContain("la présentation de l'arbitre désigné aux parties de ses matchs — pseudo et BattleTag en Overwatch tant qu'il n'a pas accepté la version 7 des conditions d'utilisation ou une version suivante, tag Discord certifié tant qu'il n'a pas accepté la version 9 ou une version suivante —, par le formulaire de signalement");
+    expect(objectEn).toContain("the presentation of the assigned referee to the parties to their matches — username and BattleTag in Overwatch as long as they have not accepted version 7 of the terms of use or a later version, certified Discord tag as long as they have not accepted version 9 or a later version —, through the report form");
     const row = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch");
     expect(row?.extraBases).toContainEqual({ base: "Exécution du contrat", scope: REFEREE_BATTLETAG_SCOPE });
     expect(row?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: REFEREE_BATTLETAG_BEFORE_V7_SCOPE });

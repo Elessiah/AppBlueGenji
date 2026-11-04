@@ -1516,45 +1516,30 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
   },
   {
-    // ERASURE-D2, décision V6 de l'utilisateur (2026-11-03) : dans un tournoi
-    // qui a l'option, les salons vocaux d'équipe sont une règle du tournoi —
-    // les refuser revient à quitter le tournoi. Le comptage (registre T18)
-    // passe de l'intérêt légitime à l'exécution du contrat (règlement du
-    // tournoi), sans droit d'opposition. Pour tous les comptes. Datée du
-    // lendemain de la nuit de déploiement suivant la fusion — à avancer si
-    // elle glisse (avec `/rgpd`, le registre et les conditions v9).
-    id: "2026-11-salons-vocaux-regle-du-tournoi",
-    publishedAt: "2026-11-05",
-    title: "Salons vocaux d'équipe : une règle du tournoi",
-    links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }],
-    summary:
-      "Dans un tournoi qui a l'option « Salons vocaux d'équipe », réunir ton équipe dans son salon vocal avant chaque match fait désormais partie du règlement du tournoi : le comptage des personnes présentes repose sur l'exécution du service, et non plus sur l'intérêt légitime, et il n'a plus de droit d'opposition propre.",
-    details: [
-      "Ce qui change : la base juridique du comptage des salons vocaux d'équipe (registre T18) devient l'exécution du contrat — le règlement du tournoi, que les conditions d'utilisation reprennent dans leur version 9. Une équipe qui ne veut pas s'y plier ne s'inscrit pas à ce tournoi, ou s'en retire ; l'opposition à ce traitement que la page RGPD offrait jusqu'ici n'existe plus.",
-      "Ce qui ne change pas : rien de nouveau n'est collecté ni conservé. Le bot compte toujours un nombre, jamais qui ; le site ne garde que l'identifiant du salon, les numéros du match et de l'équipe, ce nombre et ses heures, aux mêmes durées ; l'option reste éteinte par défaut, et un tournoi sans elle n'ouvre aucun salon.",
-    ],
-  },
-  {
     // ERASURE-D2 + MATCH-REFEREE-FINISH (décisions de l'utilisateur du
-    // 2026-11-03, T1 à T3, R4b : une seule version 9 pour les deux lots) :
-    // conditions d'utilisation, version 9. Pour tous les comptes. Même date
-    // que `TERMS_UPDATED_AT` — tout avancer ensemble si la fusion glisse.
+    // 2026-11-03, T1 à T3, R4b : une seule version 9 pour les deux lots ;
+    // décisions du 2026-11-04 : anonyme dès la demande, réactivation d'un
+    // compte suspendu, salons vocaux sur l'intérêt légitime, correction de
+    // l'annonce de la version 6 reprise ici — l'entrée publiée n'est pas
+    // retouchée) : conditions d'utilisation, version 9. Pour tous les comptes.
+    // Même date que `TERMS_UPDATED_AT` — tout avancer ensemble si la fusion glisse.
     id: "2026-11-conditions-v9-contacts-et-suppression",
-    publishedAt: "2026-11-05",
+    publishedAt: "2026-11-06",
     title: "Conditions d'utilisation : version 9 (contacts de match, salons vocaux, suppression du compte)",
     links: [
       { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
       { href: "/conditions-utilisation#compte", label: "Lire la section « Compte »" },
     ],
     summary:
-      "Les conditions d'utilisation passent en version 9 : elles disent désormais ce que la page d'un match montre à ses parties, que Battle.net n'est demandé qu'à l'arbitre d'un match Overwatch, que les salons vocaux d'équipe sont une règle du tournoi, et ce que la suppression d'un compte emporte. Elle est à accepter : une fenêtre te la présente tant que tu ne l'as pas acceptée.",
+      "Les conditions d'utilisation passent en version 9 : elles disent désormais ce que la page d'un match montre à ses parties, que Battle.net n'est demandé qu'à l'arbitre d'un match Overwatch, ce que sont les salons vocaux d'équipe, et ce que la suppression d'un compte emporte. Elle est à accepter : une fenêtre te la présente tant que tu ne l'as pas acceptée.",
     asksTermsAcceptance: true,
     details: [
       "Contacts de match : la page du match montre, aux seules parties du match (membres de ses deux équipes, ses casters, son arbitre désigné), les contacts des deux équipes et le tag Discord certifié de l'arbitre désigné, aux mêmes moments que la fenêtre « Contacts » — ce partage étant strictement nécessaire au fonctionnement minimum du service ; la fenêtre de lancement ne montre jamais le tag Discord de l'arbitre désigné, sauf s'il caste aussi le match, et les autres arbitres ne lisent ces contacts que dans la fenêtre « Contacts ». Le BattleTag n'est présenté que dans un tournoi Overwatch, et arbitrer un match ne demande un BattleTag tiré d'un compte Battle.net rattaché que pour un match Overwatch.",
-      "Salons vocaux d'équipe : dans un tournoi qui a l'option, réunir chaque équipe dans son salon vocal avant ses matchs fait partie du règlement du tournoi, sans droit d'opposition propre ; une équipe qui ne veut pas s'y plier ne s'inscrit pas à ce tournoi, ou s'en retire.",
-      "Suppression du compte : elle ne devient définitive qu'au bout de 30 jours, pendant lesquels se reconnecter permet de réactiver le compte (par une confirmation explicite) ; dès la demande, le compte quitte ses équipes (propriété transmise à un copropriétaire, un gérant, un capitaine ou un autre membre ; équipe fantôme ou dissoute s'il en était le seul joueur), ses tournois organisés passent à un autre membre du staff quand quelqu'un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore terminés, ses désignations d'arbitre et ses invitations et demandes d'adhésion d'équipe en attente sont retirés et ses matchs restants d'un tournoi individuel en cours où il n'a jamais joué sont perdus par forfait — sans retour à la réactivation.",
-      "Côté données : à l'effacement d'un compte, l'empreinte (SHA-256) d'un avatar retiré par la modération est gardée, sans lien avec aucun compte, pour en refuser la remise en ligne ; le journal du staff sur Discord note les suppressions demandées et les retraits ou forfaits qu'elles entraînent, sans nommer le joueur (« un joueur »).",
-      `Conditions d'utilisation : la version 9, en vigueur depuis le 5 novembre 2026, le dit dans ses sections « Compte » et « Contacts de match ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.`,
+      "Salons vocaux d'équipe : dans un tournoi qui a l'option, le bot ouvre un salon vocal à chaque équipe avant ses matchs et y compte les personnes présentes — un nombre, jamais qui ; ce comptage repose toujours sur l'intérêt légitime de l'association (bon déroulement des tournois), et tu peux t'y opposer en le demandant à l'association, par le formulaire de signalement (catégorie RGPD).",
+      "Suppression du compte : elle ne devient définitive qu'au bout de 30 jours, pendant lesquels se reconnecter permet de réactiver le compte (par une confirmation explicite ; un compte suspendu peut aussi être réactivé, et revient suspendu) ; dès la demande, le compte est montré anonyme partout (pseudo d'emprunt, sans avatar ni fiche, dans les résultats, classements, effectifs et pages de tournoi) — la réactivation lui rend son pseudo et son avatar, que personne d'autre ne peut prendre d'ici là —, le compte quitte ses équipes (propriété transmise à un copropriétaire, un gérant, un capitaine ou un autre membre ; équipe fantôme ou dissoute s'il en était le seul joueur), ses tournois organisés passent à un autre membre du staff quand quelqu'un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore terminés, ses désignations d'arbitre et ses invitations et demandes d'adhésion d'équipe en attente sont retirés et ses matchs restants d'un tournoi individuel en cours où il n'a jamais joué sont perdus par forfait — sans retour à la réactivation.",
+      "Côté données : pendant les 30 jours, le vrai pseudo et l'avatar sont gardés à part, pour la seule réactivation, puis effacés ; la demande est notée au journal hors base qui rejoue les suppressions après la restauration d'une sauvegarde (identifiant et date de création du compte, date de la demande), et retirée de ce journal à la réactivation ; à l'effacement d'un compte, l'empreinte (SHA-256) d'un avatar retiré par la modération est gardée, sans lien avec aucun compte, pour en refuser la remise en ligne ; le journal du staff sur Discord note les suppressions demandées et les retraits ou forfaits qu'elles entraînent, en une ligne par tournoi, sans nommer le joueur (« un joueur »).",
+      "Correction : le message privé qui annonçait la version 6 des conditions d'utilisation finissait par « Aucun accord ne t'est demandé », alors que les conditions, elles, demandent ton accord : c'est la fenêtre d'acceptation qui le recueille, et elle te présente la version 9 tant que tu ne l'as pas acceptée.",
+      `Conditions d'utilisation : la version 9, en vigueur depuis le 6 novembre 2026, le dit dans ses sections « Compte » et « Contacts de match ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.`,
     ],
   },
 ];

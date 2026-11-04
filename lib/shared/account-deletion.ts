@@ -332,7 +332,7 @@ export const ACCOUNT_DELETION_HANDOVER =
 
 /** La fenêtre de réactivation (E4). */
 export const ACCOUNT_DELETION_WINDOW =
-  "La suppression deviendra définitive au bout de 30 jours : d'ici là, te reconnecter te permettra de réactiver ton compte.";
+  "La suppression deviendra définitive au bout de 30 jours : d'ici là, te reconnecter te permettra de réactiver ton compte. Dès la demande, ton compte sera montré anonyme partout, sans ton pseudo ni ton avatar ; la réactivation te les rendra.";
 
 /**
  * Le corps de la modale : `accountDeletionConfirmation` sans la question, déjà

@@ -406,8 +406,8 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     `ALTER TABLE bg_tournaments ADD COLUMN team_voice_channels TINYINT(1) NOT NULL DEFAULT 0
        AFTER match_launch_phase`,
     // Suppression de compte réversible 30 jours (`docs/features/ACCOUNT_DELETION.md`) ;
-    // les tables `bg_account_reactivation_tickets` et `bg_blocked_image_hashes`
-    // sont neuves, leur `CREATE TABLE` suffit.
+    // les tables `bg_account_reactivation_tickets`, `bg_account_deletion_holds` et
+    // `bg_blocked_image_hashes` sont neuves, leur `CREATE TABLE` suffit.
     `ALTER TABLE bg_users ADD COLUMN deletion_requested_at DATETIME NULL AFTER is_deleted`,
     `ALTER TABLE bg_users ADD INDEX idx_bg_users_deletion_requested (deletion_requested_at)`,
     // EF-15 — la manche entre dans l'index de phase : les lectures verrouillantes

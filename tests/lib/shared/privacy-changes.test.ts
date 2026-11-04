@@ -2401,15 +2401,15 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
 
   // Décision V6 (2026-11-03) : le salon vocal est une règle du tournoi —
   // la base passe au contrat, sans droit d'opposition (avant : intérêt légitime).
-  it("processingRegister_t18_legalBasisIsContractTournamentRulesNoObjectionFrAndEn", () => {
+  it("processingRegister_t18_legalBasisIsLegitimateInterestWithObjectionByRequestFrAndEn", () => {
     const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
     const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
-    expect(t18.legalBasis).toMatch(/^Exécution du contrat, depuis le 5 novembre 2026 : .*règlement du tournoi/);
-    expect(t18.legalBasis).toContain("sans droit d'opposition propre : une équipe qui ne veut pas s'y plier ne s'inscrit pas à ce tournoi, ou s'en retire");
-    expect(t18.legalBasis).toContain("(avant cette date : intérêt légitime");
-    expect(t18En.legalBasis).toMatch(/^Performance of the contract, since 5 November 2026: .*tournament rules/);
-    expect(t18En.legalBasis).toContain("with no right to object of its own: a team that does not want to abide by it does not register for that tournament, or withdraws from it");
-    expect(t18En.legalBasis).toContain("(before that date: legitimate interest");
+    expect(t18.legalBasis).toMatch(/^Intérêt légitime \(bon déroulement des tournois/);
+    expect(t18.legalBasis).toContain("droit d'opposition, exercé en le demandant à l'association (formulaire de signalement, catégorie RGPD)");
+    expect(t18.legalBasis).not.toContain("Exécution du contrat");
+    expect(t18En.legalBasis).toMatch(/^Legitimate interest \(smooth running of tournaments/);
+    expect(t18En.legalBasis).toContain("right to object, exercised by asking the association (report form, GDPR category)");
+    expect(t18En.legalBasis).not.toContain("Performance of the contract");
   });
 
   it("processingRegister_t18_botDurationsComeFromTheirConstantsFrAndEn", () => {

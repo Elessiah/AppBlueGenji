@@ -304,14 +304,20 @@ export function RgpdEn({
           {ACCOUNT_REACTIVATION_DAYS} days. During that time, the account stays in the database but is no
           longer visible (its page answers “not found”), its sessions are closed and it can no longer be
           invited, registered or notified; signing in again lets you reactivate it, through an explicit
-          confirmation. As soon as it is requested, and without being undone by reactivation, it leaves its
+          confirmation (a suspended account can be reactivated too: it comes back suspended). As soon as it is
+          requested, it is shown as anonymous wherever it appeared (borrowed username, no avatar or player-page
+          link: past results, rankings, rosters, tournament pages); its real username, which stays reserved for
+          it, and its avatar are kept apart for reactivation only, which gives them back, and erased at the end
+          of that time. The request is also recorded in the off-database log that replays deletions after a
+          backup is restored (account identifier and creation date, date of the request), and removed from it on
+          reactivation. As soon as it is requested, and without being undone by reactivation, it leaves its
           teams (ownership goes to a co-owner, else a manager, else a captain, else another member; a team of which it was the
           only player becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
           disbanded otherwise), its organised tournaments go to another staff member when someone can take them over, its registrations for a solo tournament that hasn&apos;t started yet are withdrawn, its casts of matches not yet completed, its referee assignments and its pending team invitations and join requests are withdrawn and its remaining matches in a running solo
           tournament where it never played are lost by forfeit. At the end of that time, the account is erased
           if it left nothing behind, anonymized (borrowed username) otherwise. On erasure, the hash (SHA-256) of
           an avatar removed by moderation is kept, with no link to any account, to refuse it being uploaded
-          again. The staff log on Discord records the request and each withdrawal or forfeit it causes, without
+          again. The staff log on Discord records the request and each withdrawal or forfeit it causes (one line per tournament), without
           naming the player (“a player”) (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
         </p>
       </section>
@@ -926,7 +932,7 @@ export function RgpdEn({
             parties know who referees and, in Overwatch, can add them in game; until they accept it, it falls under{" "}
             <strong>legitimate interest</strong> (same aim), and they may object to it through the report form
             (GDPR category). Showing their username to any signed-in member falls under <strong>legitimate interest</strong>{" "}
-            (members knowing who referees a match), with the same right to object; presenting their certified Discord tag to the parties to the match falls, since 5 November 2026, under <strong>performance of the service</strong>, strictly necessary for its minimum functioning (without it, the parties cannot reach their referee), once the referee has accepted version 7 of the terms or a later one (before that acceptance, legitimate interest, with the same right to object) — once that version is accepted, this tag has no objection of its own; once upheld, their referee objection (to their presentation before version 7, or to the display of their username to members) removes them from all their unfinished matches (the staff assigns another referee; their finished matches keep their referee) and stops them taking or being assigned one until it is lifted (at their request only, through that same form), and still stands once version 7 or a later one is accepted; the date it was upheld is kept on their account, so that it keeps being honoured (<strong>legal obligation</strong>), and included in their data export, until the staff lifts it or the account is deleted; the staff log on Discord only notes the action and its lifting, naming neither anyone nor their matches, and the server logs the author of the action and the referee&apos;s account identifier (when upheld, with the number of matches they are removed from). They can withdraw from a match at any time, the staff being able to assign that match to them again (unless an objection is upheld), without notice; until they have accepted version 7 or a later one, as the acceptance window
+            (members knowing who referees a match), with the same right to object; presenting their certified Discord tag to the parties to the match falls, since 5 November 2026, under <strong>performance of the service</strong>, strictly necessary for its minimum functioning (without it, the parties cannot reach their referee), once the referee has accepted version 9 of the terms or a later one (before that acceptance, legitimate interest, with the same right to object) — once that version is accepted, this tag has no objection of its own; once upheld, their referee objection (to their presentation before version 7, or to the display of their username to members) removes them from all their unfinished matches (the staff assigns another referee; their finished matches keep their referee) and stops them taking or being assigned one until it is lifted (at their request only, through that same form), and still stands once version 7 or a later one is accepted; the date it was upheld is kept on their account, so that it keeps being honoured (<strong>legal obligation</strong>), and included in their data export, until the staff lifts it or the account is deleted; the staff log on Discord only notes the action and its lifting, naming neither anyone nor their matches, and the server logs the author of the action and the referee&apos;s account identifier (when upheld, with the number of matches they are removed from). They can withdraw from a match at any time, the staff being able to assign that match to them again (unless an objection is upheld), without notice; until they have accepted version 7 or a later one, as the acceptance window
             covers the tournament pages, they withdraw by asking for it through that same form. Collecting their “Ready” also falls under performance of the service,
             the referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>); the removal notice, sent as a push notification, falls under the consent given by turning them on (<LocaleLink href="/rgpd/registre#t12">register, T12</LocaleLink>).
           </p>
@@ -951,11 +957,10 @@ export function RgpdEn({
             and hand-back times), erased with the channel or when it forgets it — kept with no limit while the channel, never handed back, stays occupied, or while it reads it without being able to delete
             it or while Discord answers it with another error — (apart from the encrypted backup copies). Its other periods
             hold to within one sweep (at most {VOICE_BOT_SWEEP_MINUTES} minutes more). Discord&apos;s audit log keeps the creation and
-            deletion of each channel, with its name, readable by the server&apos;s administration, for the period Discord sets. Since 5 November 2026, this count rests on
-            the <strong>performance of the contract</strong>: in a tournament with the option, gathering each team in its channel before its match is part of the{" "}
-            <strong>tournament rules</strong> (“Match contacts” section of the{" "}
-            <LocaleLink href="/conditions-utilisation#contacts-de-match">terms of use</LocaleLink>) — until both channels are full, the match waits for referees to force its launch, unless the bot does not answer —, and only the presence of those who join it is counted; it therefore has no right to object of its own: a team that does not want to abide by it
-            does not register for that tournament, or withdraws from it (before that date: legitimate interest, with a right to object) (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
+            deletion of each channel, with its name, readable by the server&apos;s administration, for the period Discord sets. This count rests on the association&apos;s <strong>legitimate interest</strong> (smooth running of tournaments: gathering each
+            team before its match); joining a channel remains a choice — but until both are full, the match waits for referees to force its launch, unless the bot does not answer —, and only the presence of those who join it is counted. You can
+            object to this processing by asking the association, through the report form (GDPR category) (section{" "}
+            <a href="#exercer-vos-droits">“Exercising your rights”</a>) (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
           </p>
         </div>
       </section>

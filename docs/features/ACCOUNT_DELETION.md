@@ -600,8 +600,43 @@ restaurée. Voir `docs/features/BACKUP_DATA_PROTECTION.md`.
 (`is_deleted = 1` + `deletion_requested_at`), ce qui réutilise toutes les gardes
 `is_deleted = 0` existantes (session, notifications, annuaire, invitations par
 pseudo). La fiche joueur répond 404 même s'il a joué, et il compte parmi les
-joueurs sans fiche (`profileless-players`) : son vrai pseudo est encore en base.
-Les sessions sont supprimées dans la transaction.
+joueurs sans fiche (`profileless-players`). Les sessions sont supprimées dans
+la transaction.
+
+### Anonyme dès la demande (décision du 2026-11-04)
+
+> `lib/server/users/account-deletion-hold.ts`, table `bg_account_deletion_holds`.
+
+Dès la demande, le compte est **montré anonyme partout** — résultats passés,
+classements, effectifs, pages de tournoi, entrée solo. Plutôt que de filtrer
+chaque lecture, `holdAccountIdentity` met le vrai pseudo et le chemin de
+l'avatar de côté (`bg_account_deletion_holds`, une ligne par compte) et pose
+sur `bg_users` un pseudo d'emprunt (`pickAnonymousPseudo`, en écartant ceux des
+comptes et des masques) et `avatar_url = NULL` **dans l'instruction même** qui
+pose `is_deleted = 1` (le balayage des gardes d'écriture n'en dispense qu'elle),
+puis renomme l'entrée solo (`syncSoloEntryIdentityOn`). Toute lecture qui joint
+`bg_users` montre donc déjà le faux nom, sans lien de fiche.
+
+- **Pseudo réservé** : `isPseudoHeldByOther` le refuse au renommage
+  (`PSEUDO_ALREADY_USED`) et `pseudoExists` à l'inscription.
+- **Réactivation** : `restoreAccountIdentity` relève la demande et rend pseudo et
+  avatar en une instruction, efface le masque et renomme l'entrée solo. Un
+  conflit (course avec un renommage) ne rend que l'avatar : le compte revit sous
+  son pseudo d'emprunt, modifiable dans Mon profil (décision requise si l'on
+  veut mieux).
+- **Jour 30** : l'effacement supprime aussi le fichier d'avatar mis de côté ;
+  l'anonymisation efface le masque (cascade sur l'effacement).
+- **Organisateur sans repreneur** : même règle, anonyme dès la demande.
+- Un **forfait ou un retrait ordinaire** n'anonymise jamais personne
+  (`forfeit-never-anonymises.test.ts`).
+
+**Journal de rejeu** : la demande y entre en ligne `pending: true` (identifiant,
+date de création, date de la demande). Une restauration la rejoue comme une
+demande (`requestAccountDeletion(id, { requestedAt })`, trente jours comptés
+depuis l'origine) si la fenêtre est encore ouverte, sinon comme une suppression
+définitive. La réactivation la retire (`forgetPendingAccountDeletion`, ne lève
+jamais) ; à l'élagage, une ligne définitive remplace la ligne en attente du
+même compte.
 
 **Ce qui touche les autres se fait tout de suite, et la réactivation ne le
 défait pas** — une seule transaction, verrous dans l'ordre tournois
@@ -617,7 +652,7 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   (inversion d'ordre évitée) ; seuls les comptes vivants héritent.
 - **Tournois organisés** : au compte vivant le plus ancien qui tient la
   permission `tournaments` par un rôle, sinon à un administrateur. Personne :
-  rien ne change et le compte sera anonymisé au jour 30 (décision requise).
+  rien ne change ; le compte est anonyme dès la demande, puis anonymisé au jour 30.
 - **E1 — inscriptions solo.** Celles d'un tournoi pas encore commencé, sans
   match, sont retirées (`withdrawSoloRegistrationsOn`). L'entrée d'un tournoi
   `RUNNING` **jamais jouée** perd ses matchs restants par forfait **après** le
@@ -636,8 +671,9 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
 - Casts et arbitrages à venir retirés, invitations du compte annulées.
 
 **E5 / alerte.** Le journal Discord écrit « 🗑️ Compte supprimé » (catégorie
-`signups`, sans pseudo ni id) puis une ligne par retrait ou forfait
-(`registrations`, « un joueur »).
+`signups`, sans pseudo ni id) puis **une seule** ligne par tournoi retiré ou
+forfaité (`registrations`, « un joueur ») : le forfait d'une suppression passe
+`skipForfeitLog` à `forfeitTournamentTeam`, qui tait sa propre ligne de forfait.
 
 **E4 — réactivation.** Se reconnecter dans les trente jours n'ouvre pas de
 session : `createSession` (porte unique de toutes les connexions) pose un ticket
@@ -648,9 +684,12 @@ session : `createSession` (porte unique de toutes les connexions) pose un ticket
 (`createOrGetDiscordUser`) rend l'id d'une ligne en attente qui porte encore ce
 Discord, sans rien y écrire, pour atteindre ce point. Seul le clic
 « Réactiver mon compte » (`POST /api/auth/reactivate`) consomme le ticket, relit
-la fenêtre sous verrou et remet `is_deleted = 0` — après le contrôle de
-suspension, pour qu'un compte suspendu ne revive pas sans session. Au-delà de trente jours, la
-connexion est refusée (`ACCOUNT_DELETED`).
+la fenêtre sous verrou et remet `is_deleted = 0`. **Un compte suspendu se
+réactive aussi** (décision du 2026-11-04) : `createSession` lit la demande en
+attente avant la suspension, la réactivation se fait, puis la session est
+refusée (`403 ACCOUNT_SUSPENDED` avec `reactivated: true`) ; l'écran dit la
+réactivation, puis la suspension. Au-delà de trente jours, la connexion est
+refusée (`ACCOUNT_DELETED`).
 
 **Jour 30.** `finalizeDueAccountDeletions` (horaire, paresseux, lancé par
 `getDatabase` sous `NEXT_RUNTIME`) appelle `finalizeAccountDeletion`, qui relit

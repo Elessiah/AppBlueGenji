@@ -170,7 +170,7 @@
       ],
       "bullets": [
         "The match only launches once both channels are full: until then, it waits for a referee to force its launch. If the bot doesn't answer, the match doesn't wait.",
-        "The bot counts the people present in each channel — a number, never who. This count is part of the rules, with no right to object of its own: a team that does not want to abide by it does not register for that tournament, or withdraws from it.",
+        "The bot counts the people present in each channel — a number, never who. This count rests on the association's legitimate interest (smooth running of tournaments): you can object to it by asking the association, through the report form (GDPR category).",
         "No channel is opened for a solo entry nor for a match against a ghost team."
       ]
     },

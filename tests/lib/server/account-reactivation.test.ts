@@ -1,9 +1,17 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/account-deletion-journal");
+jest.mock("@/lib/server/users/account-deletion-hold");
+jest.mock("@/lib/server/ranking-cache");
+jest.mock("@/lib/server/stats-cache");
 
 import crypto from "node:crypto";
 import { getDatabase } from "@/lib/server/database";
+import { forgetPendingAccountDeletion } from "@/lib/server/account-deletion-journal";
+import { restoreAccountIdentity } from "@/lib/server/users/account-deletion-hold";
+import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
+import { invalidateStats } from "@/lib/server/stats-cache";
 import {
   createReactivationTicket,
   peekReactivationTicket,
@@ -47,6 +55,8 @@ function transaction(options: { ticket?: object; locked?: object; affectedRows?:
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(restoreAccountIdentity).mockResolvedValue(true);
+  jest.mocked(forgetPendingAccountDeletion).mockResolvedValue(undefined);
 });
 
 describe("readPendingDeletion", () => {
@@ -130,14 +140,29 @@ describe("reactivateAccount", () => {
   it("reactivateAccount_valid_consumesTicketAndClearsPending", async () => {
     const connection = transaction({
       ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
-      locked: { is_deleted: 1, deletion_requested_at: RECENT },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
     });
 
     expect(await reactivateAccount(TOKEN)).toEqual({ userId: 7, event: "LOGIN_DISCORD" });
     const sqls = connection.execute.mock.calls.map(([sql]) => sql);
     expect(sqls.some((sql) => sql.startsWith("DELETE FROM bg_account_reactivation_tickets"))).toBe(true);
-    expect(sqls.find((sql) => sql.startsWith("UPDATE bg_users"))).toContain("is_deleted = 0, deletion_requested_at = NULL");
+    // Le compte revit avec son vrai pseudo et son avatar, sur la transaction.
+    expect(restoreAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7);
     expect(connection.commit).toHaveBeenCalled();
+    expect(forgetPendingAccountDeletion).toHaveBeenCalledWith({ userId: 7, accountCreatedAt: "2025-01-01 10:00:00" });
+    expect(invalidateTeamIdentityViews).toHaveBeenCalled();
+    expect(invalidateStats).toHaveBeenCalled();
+  });
+
+  it("reactivateAccount_restoreRefused_nullAndJournalKept", async () => {
+    const connection = transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+    });
+    jest.mocked(restoreAccountIdentity).mockResolvedValue(false);
+
+    expect(await reactivateAccount(TOKEN)).toBeNull();
+    expect(forgetPendingAccountDeletion).not.toHaveBeenCalled();
     expect(connection.release).toHaveBeenCalled();
   });
 
@@ -153,16 +178,6 @@ describe("reactivateAccount", () => {
 
   it("reactivateAccount_alreadyReactivated_null", async () => {
     transaction({ ticket: { user_id: 7, login_event: "LOGIN_DISCORD" }, locked: { is_deleted: 0, deletion_requested_at: null } });
-
-    expect(await reactivateAccount(TOKEN)).toBeNull();
-  });
-
-  it("reactivateAccount_raceAffectedRows0_null", async () => {
-    transaction({
-      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
-      locked: { is_deleted: 1, deletion_requested_at: RECENT },
-      affectedRows: 0,
-    });
 
     expect(await reactivateAccount(TOKEN)).toBeNull();
   });

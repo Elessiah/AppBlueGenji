@@ -131,4 +131,21 @@ export async function createAccountTables(db: Pool): Promise<void> {
         REFERENCES bg_users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Ce que la demande de suppression masque dès le premier jour (pseudo et
+  // avatar remplacés sur `bg_users`, décision du 2026-11-04) et que la
+  // réactivation rend : une ligne par compte en attente, effacée à la
+  // réactivation, et à la suppression définitive (cascade, ou anonymisation).
+  // `pseudo` unique : le nom reste réservé à son titulaire pendant les trente
+  // jours (`pseudoReservedSql`).
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_account_deletion_holds (
+      user_id BIGINT PRIMARY KEY,
+      pseudo VARCHAR(40) NOT NULL,
+      avatar_url TEXT NULL,
+      UNIQUE KEY uq_bg_deletion_holds_pseudo (pseudo),
+      CONSTRAINT fk_bg_deletion_holds_user FOREIGN KEY (user_id)
+        REFERENCES bg_users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
 }

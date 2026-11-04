@@ -344,9 +344,16 @@ export async function createSpecialUsers(db: Pool): Promise<Map<string, number>>
       );
       const id = result.insertId as number;
       if (def.deletionRequestedDaysAgo !== undefined) {
+        // Anonyme dès la demande (`account-deletion-hold.ts`) : le vrai pseudo
+        // attend dans le masque, la ligne porte un pseudo d'emprunt — gardé
+        // sous le préfixe `Test_` pour que le nettoyage du seed la retrouve.
         await db.execute(
-          `UPDATE bg_users SET deletion_requested_at = NOW() - INTERVAL ? DAY WHERE id = ?`,
-          [def.deletionRequestedDaysAgo, id],
+          `INSERT INTO bg_account_deletion_holds (user_id, pseudo, avatar_url) VALUES (?, ?, NULL)`,
+          [id, pseudo],
+        );
+        await db.execute(
+          `UPDATE bg_users SET deletion_requested_at = NOW() - INTERVAL ? DAY, pseudo = ?, avatar_url = NULL WHERE id = ?`,
+          [def.deletionRequestedDaysAgo, `Test_Anonyme${id}`, id],
         );
       }
       ids.set(def.pseudo, id);

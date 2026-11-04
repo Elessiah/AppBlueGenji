@@ -414,7 +414,13 @@ function RgpdFr({
           qu&apos;au bout de {ACCOUNT_REACTIVATION_DAYS} jours. Pendant ce délai, le compte reste en base mais
           n&apos;est plus visible (sa fiche répond « introuvable »), ses sessions sont fermées et il ne peut
           plus être invité, inscrit ni notifié ; se reconnecter permet de le réactiver, par une confirmation
-          explicite. Dès la demande, et sans retour à la réactivation, il quitte ses équipes (la propriété
+          explicite (un compte suspendu peut aussi être réactivé : il revient suspendu). Dès la demande, il est
+          montré anonyme partout où il paraissait (pseudo d&apos;emprunt, sans avatar ni lien de fiche : résultats
+          passés, classements, effectifs, pages de tournoi) ; son vrai pseudo, qui lui reste réservé, et son avatar
+          sont gardés à part pour la seule réactivation, qui les lui rend, et effacés au terme du délai. La demande
+          est aussi notée au journal hors base qui rejoue les suppressions après la restauration d&apos;une
+          sauvegarde (identifiant et date de création du compte, date de la demande), et en est retirée à la
+          réactivation. Dès la demande, et sans retour à la réactivation, il quitte ses équipes (la propriété
           passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre ; une équipe dont il était le seul
           joueur devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute
           sinon), ses tournois organisés passent à un autre membre du staff quand quelqu&apos;un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore terminés, ses désignations d&apos;arbitre et ses invitations et demandes d&apos;adhésion d&apos;équipe en attente sont retirés et ses matchs restants d&apos;un tournoi individuel en
@@ -422,7 +428,7 @@ function RgpdFr({
           s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. À l&apos;effacement,
           l&apos;empreinte (SHA-256) d&apos;un avatar retiré par la modération est gardée, sans lien avec
           aucun compte, pour en refuser la remise en ligne. Le journal du staff sur Discord note la demande
-          et chaque retrait ou forfait qu&apos;elle entraîne, sans nommer le joueur (« un joueur ») (
+          et chaque retrait ou forfait qu&apos;elle entraîne (une ligne par tournoi), sans nommer le joueur (« un joueur ») (
           <Link href="/rgpd/registre#t05">registre, T05</Link>).
         </p>
       </section>
@@ -1112,7 +1118,7 @@ function RgpdFr({
             parties sachent qui arbitre et, en Overwatch, puissent l&apos;ajouter en jeu ; tant qu&apos;il ne l&apos;a pas
             acceptée, elle relève de l&apos;<strong>intérêt légitime</strong> (même but), et il peut s&apos;y
             opposer par le formulaire de signalement (catégorie RGPD). L&apos;affichage de son pseudo à tout membre connecté relève de
-            l&apos;<strong>intérêt légitime</strong> (que les membres sachent qui arbitre un match), avec le même droit d&apos;opposition ; la présentation de son tag Discord certifié aux parties du match relève, depuis le 5 novembre 2026, de l&apos;<strong>exécution du service</strong>, strictement nécessaire à son fonctionnement minimum (sans lui, les parties ne peuvent pas joindre leur arbitre), une fois la version 7 des conditions ou une suivante acceptée par l&apos;arbitre (avant cette acceptation, l&apos;intérêt légitime, avec le même droit d&apos;opposition) — une fois cette version acceptée, ce tag n&apos;a pas d&apos;opposition propre ; retenue, son opposition d&apos;arbitre (à sa présentation avant la version 7, ou à l&apos;affichage de son pseudo aux membres) le retire de tous ses matchs non terminés (le staff en désigne un autre ; ses matchs terminés gardent leur arbitre) et l&apos;empêche d'en prendre un ou de s&apos;en voir confier un tant qu&apos;elle n'est pas levée (à sa seule demande, par ce même formulaire), et continue de valoir une fois la version 7 ou une suivante acceptée ; la date à laquelle elle est retenue reste sur son compte, pour continuer de l&apos;honorer (<strong>obligation légale</strong>), et figure dans l&apos;export de ses données, jusqu&apos;à sa levée par le staff ou la suppression du compte ; le journal du staff sur Discord n&apos;en note que le geste et sa levée, sans nommer personne ni ses matchs, et les journaux du serveur l&apos;auteur du geste et l&apos;identifiant du compte de l&apos;arbitre (retenue, avec le nombre de matchs dont il est retiré). Il peut se retirer d&apos;un match à tout moment, le staff
+            l&apos;<strong>intérêt légitime</strong> (que les membres sachent qui arbitre un match), avec le même droit d&apos;opposition ; la présentation de son tag Discord certifié aux parties du match relève, depuis le 5 novembre 2026, de l&apos;<strong>exécution du service</strong>, strictement nécessaire à son fonctionnement minimum (sans lui, les parties ne peuvent pas joindre leur arbitre), une fois la version 9 des conditions ou une suivante acceptée par l&apos;arbitre (avant cette acceptation, l&apos;intérêt légitime, avec le même droit d&apos;opposition) — une fois cette version acceptée, ce tag n&apos;a pas d&apos;opposition propre ; retenue, son opposition d&apos;arbitre (à sa présentation avant la version 7, ou à l&apos;affichage de son pseudo aux membres) le retire de tous ses matchs non terminés (le staff en désigne un autre ; ses matchs terminés gardent leur arbitre) et l&apos;empêche d'en prendre un ou de s&apos;en voir confier un tant qu&apos;elle n'est pas levée (à sa seule demande, par ce même formulaire), et continue de valoir une fois la version 7 ou une suivante acceptée ; la date à laquelle elle est retenue reste sur son compte, pour continuer de l&apos;honorer (<strong>obligation légale</strong>), et figure dans l&apos;export de ses données, jusqu&apos;à sa levée par le staff ou la suppression du compte ; le journal du staff sur Discord n&apos;en note que le geste et sa levée, sans nommer personne ni ses matchs, et les journaux du serveur l&apos;auteur du geste et l&apos;identifiant du compte de l&apos;arbitre (retenue, avec le nombre de matchs dont il est retiré). Il peut se retirer d&apos;un match à tout moment, le staff
             pouvant lui confier de nouveau ce match (sauf opposition retenue), sans avis ; tant qu&apos;il n&apos;a pas accepté la version 7 ou une suivante, la fenêtre
             d&apos;acceptation couvrant les pages des tournois, il s&apos;en retire en le demandant par ce même formulaire. Le recueil de son « Prêt » relève aussi de l&apos;exécution
             du service, les arbitres agissant pour l&apos;association (<Link href="/rgpd/registre#t04">registre, T04</Link>) ; l&apos;avis du retrait, envoyé en notification push, relève du consentement donné en les activant (<Link href="/rgpd/registre#t12">registre, T12</Link>).
@@ -1140,10 +1146,10 @@ function RgpdFr({
             l&apos;équipe, heures de création et de rendu), effacée avec le salon ou quand il l&apos;oublie — gardée sans limite tant que le salon, jamais rendu, reste occupé, qu&apos;il le lit sans pouvoir le supprimer ou que
             Discord lui répond par une autre erreur — (hors les copies de sauvegarde chiffrées). Ses autres délais s&apos;entendent à un
             balayage près (au plus {VOICE_BOT_SWEEP_MINUTES} minutes de plus). Le journal d&apos;audit de Discord garde la création et la
-            suppression de chaque salon, avec son nom, lisible par l&apos;administration du serveur, pour la durée que Discord fixe. Depuis le 5 novembre 2026, ce comptage relève de l&apos;<strong>exécution du contrat</strong> : dans un tournoi qui a
-            l&apos;option, réunir chaque équipe dans son salon avant son match fait partie du <strong>règlement du tournoi</strong> (section « Contacts de match » des{" "}
-            <Link href="/conditions-utilisation#contacts-de-match">conditions d&apos;utilisation</Link>) — tant que les deux salons ne sont pas pleins, le match attend que l&apos;arbitrage force son lancement, sauf si le bot ne répond pas —, et seule la présence de qui le rejoint est comptée ; il n&apos;a donc pas de droit d&apos;opposition propre : une équipe
-            qui ne veut pas s&apos;y plier ne s&apos;inscrit pas à ce tournoi, ou s&apos;en retire (avant cette date : intérêt légitime, avec droit d&apos;opposition) (<Link href="/rgpd/registre#t18">registre, T18</Link>).
+            suppression de chaque salon, avec son nom, lisible par l&apos;administration du serveur, pour la durée que Discord fixe. Ce comptage relève de l&apos;<strong>intérêt légitime</strong> de l&apos;association (bon déroulement des tournois : réunir chaque
+            équipe avant son match) ; rejoindre un salon reste un choix — mais tant que les deux ne sont pas pleins, le match attend que l&apos;arbitrage force son lancement, sauf si le bot ne répond pas —, et seule la présence de qui le rejoint est comptée. Vous pouvez
+            vous opposer à ce traitement en le demandant à l&apos;association, par le formulaire de signalement (catégorie RGPD) (section{" "}
+            <a href="#exercer-vos-droits">« Exercer vos droits »</a>) (<Link href="/rgpd/registre#t18">registre, T18</Link>).
           </p>
         </div>
       </section>

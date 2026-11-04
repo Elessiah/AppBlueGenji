@@ -401,7 +401,9 @@ describe("deleteOwnAccount — l'anonymisation sous un pseudo d'emprunt", () => 
 
     const taken = queries.find((q) => q.sql.startsWith("SELECT pseudo FROM bg_users WHERE id <> ?"))!;
     expect(taken.params[0]).toBe(7);
-    expect(taken.params).toHaveLength(ANONYMOUS_PSEUDOS.length + 1);
+    // Les pseudos portés par les autres comptes et ceux mis de côté par une
+    // demande en attente (`bg_account_deletion_holds`).
+    expect(taken.params).toHaveLength(2 * ANONYMOUS_PSEUDOS.length + 2);
     expect(connection.execute).toHaveBeenCalled();
   });
 
@@ -795,7 +797,8 @@ describe("deleteOwnAccount — inscription solo à un tournoi pas encore commenc
     expect(tx[0]).toEqual({ sql: "SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE", params: [40] });
     expect(tx[1]).toEqual({ sql: "SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE", params: [42] });
     expect(tx[2].sql).toContain("FROM bg_users WHERE id = ? FOR UPDATE");
-    expect(tx[3].sql).toContain("AS played");
+    expect(tx[3].sql).toContain("FROM bg_account_deletion_holds WHERE user_id = ?");
+    expect(tx[4].sql).toContain("AS played");
   });
 
   it("deleteOwnAccount_registrationInUnlockedTournament_anonymizes", async () => {

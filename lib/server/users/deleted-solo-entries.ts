@@ -151,7 +151,8 @@ export async function forfeitUnplayedSoloEntry(tournamentId: number, teamId: num
   if (format !== null && ABANDON_FORMATS.has(format)) {
     if (!(await entryStillForfeitable(tournamentId, teamId))) return 0;
     try {
-      await forfeitTournamentTeam(tournamentId, teamId, null);
+      // Une seule ligne au journal : celle de la suppression, qui dit le forfait.
+      await forfeitTournamentTeam(tournamentId, teamId, null, undefined, { skipForfeitLog: true });
     } catch (error) {
       // Déjà hors course (abandon antérieur, passage précédent) : rien à faire.
       if (error instanceof Error && error.message === "TEAM_ALREADY_OUT") return 0;
@@ -205,7 +206,7 @@ export async function logDeletionWithdrawal(tournamentId: number, forfeited: boo
   try {
     const facts = await withdrawalLogFacts(tournamentId);
     if (!facts) return;
-    await sendBotLog(
+    sendBotLog(
       formatDeletionWithdrawalLog({
         tournament: { id: tournamentId, name: facts.name },
         // Nom jamais lu en tournoi individuel (« un joueur ») ; vide par prudence.

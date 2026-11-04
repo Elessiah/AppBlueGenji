@@ -86,8 +86,8 @@ export const BOT_COPYRIGHT_HOLDER = "Keryan Houssin";
 // renvoient donc.
 const CONTACT_DISCORD = LEGAL_CONTACT_DISCORD;
 
-const LAST_UPDATED_FR = "5 novembre 2026";
-const LAST_UPDATED_EN = "5 November 2026";
+const LAST_UPDATED_FR = "6 novembre 2026";
+const LAST_UPDATED_EN = "6 November 2026";
 // La politique a sa propre date : une modification qui ne touche qu'elle (le
 // passage des sauvegardes chez Hetzner) laisse aux conditions la leur. Les
 // horaires de match remis en message privé touchent les deux ; l'annonce des

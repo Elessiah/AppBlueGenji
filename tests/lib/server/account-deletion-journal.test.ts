@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   accountDeletionJournalPath,
+  forgetPendingAccountDeletion,
   pruneAccountDeletionJournal,
   readAccountDeletionJournal,
   recordAccountDeletion,
@@ -213,5 +214,27 @@ describe("scheduleAccountDeletionJournalPrune", () => {
     expect(() => scheduleAccountDeletionJournalPrune(Date.parse("2031-01-01T00:00:00.000Z"))).not.toThrow();
     await drain();
     expect(error).toHaveBeenCalledWith(expect.stringContaining("élagage impossible"), expect.anything());
+  });
+});
+
+describe("forgetPendingAccountDeletion", () => {
+  const key = { userId: 1, accountCreatedAt: "2026-01-02 03:04:05" };
+
+  it("forgetPendingAccountDeletion_pendingEntry_removedOthersKept", async () => {
+    await recordAccountDeletion({ ...entry(1), pending: true }, { filePath: file, now });
+    await recordAccountDeletion(entry(2), { filePath: file, now });
+
+    await forgetPendingAccountDeletion(key, { filePath: file, now });
+
+    expect((await readAccountDeletionJournal(file)).entries).toEqual([entry(2)]);
+  });
+
+  it("forgetPendingAccountDeletion_noPendingLine_fileUntouched", async () => {
+    await recordAccountDeletion(entry(2), { filePath: file, now });
+    const before = await readFile(file, "utf8");
+
+    await forgetPendingAccountDeletion(key, { filePath: file, now });
+
+    expect(await readFile(file, "utf8")).toBe(before);
   });
 });

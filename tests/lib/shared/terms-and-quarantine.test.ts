@@ -52,9 +52,9 @@ describe("conditions d'utilisation", () => {
     expect(termsRequestFor(TERMS_VERSION + 1)).toBeNull();
   });
 
-  it("version 9 en vigueur le 5 novembre 2026 (acceptation par tout compte) : les versions 1 à 8 sont redemandées", () => {
+  it("version 9 en vigueur le 6 novembre 2026 (acceptation par tout compte) : les versions 1 à 8 sont redemandées", () => {
     expect(TERMS_VERSION).toBe(9);
-    expect(TERMS_UPDATED_AT).toBe("2026-11-05");
+    expect(TERMS_UPDATED_AT).toBe("2026-11-06");
     expect(termsRequestFor(1)).toBe("UPDATED");
     expect(termsRequestFor(2)).toBe("UPDATED");
     expect(termsRequestFor(3)).toBe("UPDATED");

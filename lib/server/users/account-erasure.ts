@@ -1,8 +1,9 @@
-import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection } from "mysql2/promise";
 import { ignoreMissingTable, isDuplicateEntryError, isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { type MatchWithdrawal, withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
-import { ANONYMOUS_PSEUDOS, pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
+import { pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
+import { loadTakenAnonymousPseudos } from "./account-deletion-hold";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
 import type { SoloRegistrationFact } from "@/lib/shared/account-deletion";
 import { resequenceSeeds } from "@/lib/server/tournaments/seeding";
@@ -106,13 +107,9 @@ async function resetOptionalColumn(
  * Rend les matchs touchés (casts, liens, arbitrages), comme `eraseAccount`.
  */
 export async function anonymizeAccount(connection: PoolConnection, userId: number): Promise<MatchWithdrawal> {
-  const [takenRows] = await connection.execute<(RowDataPacket & { pseudo: string })[]>(
-    `SELECT pseudo FROM bg_users
-      WHERE id <> ?
-        AND pseudo IN (${ANONYMOUS_PSEUDOS.map(() => "?").join(", ")})`,
-    [userId, ...ANONYMOUS_PSEUDOS],
-  );
-  const taken = new Set(takenRows.map((row) => row.pseudo));
+  // Pseudos portés, et pseudos réservés par un compte en attente de suppression
+  // (`account-deletion-hold.ts`) : sa réactivation doit pouvoir le lui rendre.
+  const taken = await loadTakenAnonymousPseudos(connection, userId);
   for (let attempt = 0; ; attempt += 1) {
     const pseudo = pickAnonymousPseudo(taken);
     try {
