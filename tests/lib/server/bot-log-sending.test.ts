@@ -153,7 +153,6 @@ describe("kind et catégories", () => {
     jest.useFakeTimers();
     let otherCopy: typeof sendBotLog = sendBotLog;
     jest.isolateModules(() => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       otherCopy = (require("@/lib/server/bot-integration") as { sendBotLog: typeof sendBotLog }).sendBotLog;
     });
     const shared = (globalThis as typeof globalThis & { __bgBotLogAlertFlushes?: Set<string> }).__bgBotLogAlertFlushes;
