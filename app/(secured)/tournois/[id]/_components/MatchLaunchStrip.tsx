@@ -3,7 +3,7 @@
 import { readyCount, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
 import type { BracketMatch } from "@/lib/shared/types";
-import { firstBanTeamName, hostTeamName, refereeStripState } from "../_lib/launch-strip";
+import { firstBanTeamName, hostTeamName, launchPhaseBadgeKind, refereeStripState } from "../_lib/launch-strip";
 import styles from "./MatchLaunchStrip.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useSpectatorView } from "@/components/spectator-view";
@@ -23,13 +23,19 @@ import { useLiveControls } from "../_lib/live-context";
  */
 /**
  * Pastille de la phase de lancement : à planifier, en attente de départ, en
- * lancement (avec le décompte des « Prêt »), ou lancé.
+ * lancement (avec le décompte des « Prêt »), ou lancé — la phase vient de
+ * `launchPhaseBadgeKind`, seule règle partagée avec `hasLaunchPhaseBadge`.
+ * Tant que les salons vocaux d'équipe retiennent le départ (`voice.pending`),
+ * la pastille le dit : « Prêt » seul ne lancera pas le match.
  */
 export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatch; phase: MatchLaunchPhase }>) {
   // Libellés de `LAUNCH_PHASE_LABELS` (`match-planning.ts`, français égal testé).
   const { t, locale } = useTournamentPageText();
   const spectator = useSpectatorView();
-  if (phase === "TO_PLAN") {
+  const kind = launchPhaseBadgeKind(match, phase);
+  const voiceHeld =
+    match.voice?.pending === true ? <span className={styles.voiceHeld}> · {t("launch.voicePending")}</span> : null;
+  if (kind === "TO_PLAN") {
     return (
       <span className={styles.toPlan} title={t("launch.toPlanTitle")}>
         <span aria-hidden="true">📅</span> {t("launch.toPlan")}
@@ -37,7 +43,7 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
       </span>
     );
   }
-  if (phase === "SCHEDULED") {
+  if (kind === "SCHEDULED") {
     const startAtTitle = formatMatchStartAtFull(match.startAt, locale);
     return (
       <span className={styles.scheduled} title={startAtTitle ?? undefined}>
@@ -46,19 +52,21 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
             la répète que pour les lecteurs d'écran, qui lisent ce libellé
             seul. */}
         {startAtTitle && <span className="sr-only">{t("launch.scheduledSr", { date: startAtTitle })}</span>}
+        {voiceHeld}
       </span>
     );
   }
-  if (phase === "LOBBY" && spectator) {
+  if (kind === "LOBBY" && spectator) {
     // Sans compte, les « Prêt » ne sont pas servis (`spectatorSnapshot`) : la
     // phase seule, sans un décompte qui dirait toujours « 0 ».
     return (
       <span className={styles.lobby}>
         <span aria-hidden="true">⏳</span> {t("launch.lobby")}
+        {voiceHeld}
       </span>
     );
   }
-  if (phase === "LOBBY") {
+  if (kind === "LOBBY") {
     // Les « Prêt » arrivent déjà résolus dans l'instantané (une fantôme y est
     // prête d'office) : on ne fait que les compter. Celui de l'arbitre n'y est
     // pas (décision 47) : le décompte public est celui des équipes et des
@@ -76,10 +84,11 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
           {count.ready}/{count.expected}
         </span>{" "}
         {t("launch.ready")}
+        {voiceHeld}
       </span>
     );
   }
-  if (phase === "LAUNCHED" && match.status === "READY") {
+  if (kind === "LAUNCHED") {
     return (
       <span className={styles.launched}>
         <span aria-hidden="true">▶</span> {t("launch.launched")}
@@ -91,7 +100,7 @@ export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatc
 
 /** La phase a-t-elle une pastille (`LaunchPhaseBadge`) ? Partagé avec les faits clés de la page du match. */
 export function hasLaunchPhaseBadge(match: Pick<BracketMatch, "status">, phase: MatchLaunchPhase): boolean {
-  return phase === "TO_PLAN" || phase === "SCHEDULED" || phase === "LOBBY" || (phase === "LAUNCHED" && match.status === "READY");
+  return launchPhaseBadgeKind(match, phase) !== null;
 }
 
 export function MatchLaunchStrip({

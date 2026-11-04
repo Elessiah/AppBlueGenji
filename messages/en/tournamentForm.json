@@ -69,6 +69,7 @@
     },
     "voiceErrors": {
       "TOURNAMENT_NOT_FOUND": "Tournament not found.",
+      "TOURNAMENT_FINISHED": "The tournament is finished: this option can no longer be changed.",
       "INVALID_TEAM_VOICE_CHANNELS": "Invalid value for team voice channels.",
       "fallback": "Team voice channels couldn't be changed. Try again in a moment."
     }
@@ -198,7 +199,7 @@
     },
     "teamVoice": {
       "label": "Team voice channels",
-      "description": "On: fifteen minutes before each match, the Discord bot opens a {capacity}-seat voice channel for each team, and the match only launches once both channels are full. Referees can always force it; if the bot doesn't answer, the match doesn't wait. Never for a solo entry. The site only keeps how many people are present, never who they are.",
+      "description": "On: fifteen minutes before each match, the Discord bot opens a {capacity}-seat voice channel per team (never for a solo entry or a ghost team), and the match only launches once both are full — unless referees force it or the bot can't be reached. The site keeps the channel's ID, its times and how many people are present, never who they are (details: GDPR page, “Team voice channels”).",
       "create": "Can be changed later, until the tournament closes — even while it runs.",
       "edit": "Can be changed until the tournament closes — even while it runs.",
       "finished": "The tournament is finished: this option can no longer be changed."

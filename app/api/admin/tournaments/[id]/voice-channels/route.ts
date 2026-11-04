@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/server/auth";
+import { enforceRateLimit, TEAM_VOICE_TOGGLE_RULE } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { readJsonBody } from "@/lib/server/request-body";
 import { setTeamVoiceChannels } from "@/lib/server/tournaments/match-voice";
@@ -10,16 +11,20 @@ import { can } from "@/lib/shared/permissions";
  * (`docs/features/MATCH_VOICE.md`). Corps : `{ enabled: boolean }` — un
  * booléen strict.
  *
- * Permission `tournaments`. Aucune garde sur l'état du tournoi, par décision de
- * l'utilisateur (2026-11-02) : l'option se modifie à tout moment, tournoi en
- * cours compris. Le geste est journalisé seulement s'il change la valeur, comme
- * les autres gestes du staff sur un tournoi (`STAFF_ACTION_LOGS.md`) : auteur
- * anonyme sur Discord, rien dans pm2.
+ * Permission `tournaments`. L'option se modifie à tout moment jusqu'à la
+ * clôture, tournoi en cours compris (décision de l'utilisateur, 2026-11-02) :
+ * un tournoi terminé est refusé (409 `TOURNAMENT_FINISHED`), comme le
+ * formulaire le verrouille. Débit plafonné par compte (`TEAM_VOICE_TOGGLE_RULE`).
+ * Le geste est journalisé seulement s'il change la valeur, comme les autres
+ * gestes du staff sur un tournoi (`STAFF_ACTION_LOGS.md`) : auteur anonyme sur
+ * Discord, rien dans pm2.
  */
 export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
+  const throttled = enforceRateLimit(TEAM_VOICE_TOGGLE_RULE, user.id);
+  if (throttled) return throttled;
 
   const { id } = await context.params;
   const tournamentId = Number(id);
@@ -39,6 +44,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
   } catch (error) {
     const message = (error as Error).message;
     if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
+    if (message === "TOURNAMENT_FINISHED") return fail(message, 409);
     return fail("TEAM_VOICE_CHANNELS_UPDATE_FAILED", 500);
   }
 }

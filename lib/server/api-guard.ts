@@ -113,6 +113,19 @@ export const MATCH_VOICE_READ_RULE: RateLimitRule = {
 };
 
 /**
+ * Bascule de l'option « Salons vocaux d'équipe » d'un tournoi, par compte :
+ * chaque vrai changement poste au journal Discord du staff, remet
+ * l'étranglement du balayage à zéro et rejoue l'entretien des lancements.
+ * Trente en cinq minutes couvrent un staff qui corrige plusieurs tournois ;
+ * au-delà, c'est une bascule en boucle.
+ */
+export const TEAM_VOICE_TOGGLE_RULE: RateLimitRule = {
+  name: "team-voice-toggle",
+  limit: 30,
+  windowMs: 5 * 60_000,
+};
+
+/**
  * Horaires de match posés, changés ou retirés par un arbitre : chaque geste
  * écrit aux joueurs des deux engagées (message privé Discord, push) et pousse
  * aux arbitres. Trois cents gestes en cinq minutes (un par seconde) laissent

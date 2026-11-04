@@ -11,6 +11,8 @@
  * fantôme (personne ne la rejoindrait).
  */
 
+import { isoTime } from "./dates";
+
 /** Avance de la création des salons sur l'heure du match (minutes). */
 export const VOICE_CHANNEL_LEAD_MINUTES = 15;
 
@@ -72,12 +74,6 @@ export function voiceChannelKey(matchId: number, teamId: number): string {
 /** Une engagée qui peut avoir un salon : une équipe réelle, ni solo ni fantôme. */
 export function voiceEligibleTeam(team: { isSolo: boolean; isGhost: boolean }): boolean {
   return !team.isSolo && !team.isGhost;
-}
-
-function isoTime(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const time = Date.parse(iso);
-  return Number.isNaN(time) ? null : time;
 }
 
 /**
@@ -145,31 +141,58 @@ export function voiceGatePending(input: VoiceGateInput): boolean {
 }
 
 /**
+ * État du salon d'une équipe tel que la page le dit :
+ * - `WAITING` : pas encore créé (le balayage l'ouvre à T−15) ;
+ * - `UNCOUNTED` : créé, jamais compté (« pas encore compté », pas « 0/5 ») ;
+ * - `COUNTED` : un nombre est connu ;
+ * - `FAILED` : le bot a échoué sur ce salon (création ou comptage) — le
+ *   verrou est levé, le match n'attend pas.
+ */
+export type MatchVoiceSideState = "WAITING" | "UNCOUNTED" | "COUNTED" | "FAILED";
+
+/**
  * Ce que l'instantané dit des salons d'un match (`TournamentMatch.voice`) :
- * le nombre de personnes de chaque côté (`null` : salon pas encore créé) et
- * l'état du verrou. Un nombre, jamais qui : rien de personnel n'y figure.
+ * l'état du salon de chaque côté, le nombre de personnes (`null` hors de
+ * `COUNTED`) et l'état du verrou. Un nombre, jamais qui : rien de personnel
+ * n'y figure.
  */
 export type MatchVoiceInfo = {
   team1Members: number | null;
   team2Members: number | null;
+  team1State: MatchVoiceSideState;
+  team2State: MatchVoiceSideState;
   /** Le lancement attend le remplissage des deux salons. */
   pending: boolean;
 };
 
-function shownMembers(channel: VoiceChannelState | null): number | null {
-  if (!channel?.channelId) return null;
-  return Math.max(0, Math.min(channel.members ?? 0, VOICE_CHANNEL_CAPACITY));
+/** Ce que la page montre d'un salon : son état et, compté, son nombre (borné à la capacité). */
+export function shownVoiceSide(channel: VoiceChannelState | null): { state: MatchVoiceSideState; members: number | null } {
+  if (channel?.failed) return { state: "FAILED", members: null };
+  if (!channel?.channelId) return { state: "WAITING", members: null };
+  if (channel.members === null) return { state: "UNCOUNTED", members: null };
+  return { state: "COUNTED", members: Math.max(0, Math.min(channel.members, VOICE_CHANNEL_CAPACITY)) };
 }
 
 /** Rendu de l'instantané pour un match suivi, `null` sinon. */
 export function matchVoiceInfo(input: VoiceGateInput): MatchVoiceInfo | null {
   if (!voiceTracked(input)) return null;
+  const team1 = shownVoiceSide(input.team1Channel);
+  const team2 = shownVoiceSide(input.team2Channel);
   return {
-    team1Members: shownMembers(input.team1Channel),
-    team2Members: shownMembers(input.team2Channel),
+    team1Members: team1.members,
+    team2Members: team2.members,
+    team1State: team1.state,
+    team2State: team2.state,
     pending: voiceGatePending(input),
   };
 }
+
+/** Le salon est-il plein (compté à la capacité) ? Pour la page : « complet ». */
+export function voiceSideFull(state: MatchVoiceSideState, members: number | null): boolean {
+  return state === "COUNTED" && members !== null && members >= VOICE_CHANNEL_CAPACITY;
+}
+
+const SIDE_STATES: readonly MatchVoiceSideState[] = ["WAITING", "UNCOUNTED", "COUNTED", "FAILED"];
 
 /** Lecture tolérante de `TournamentMatch.voice` (données d'un flux ou d'un cache). */
 export function parseMatchVoiceInfo(value: unknown): MatchVoiceInfo | null {
@@ -177,9 +200,21 @@ export function parseMatchVoiceInfo(value: unknown): MatchVoiceInfo | null {
   const raw = value as Record<string, unknown>;
   const members = (entry: unknown) =>
     typeof entry === "number" && Number.isInteger(entry) && entry >= 0 ? Math.min(entry, VOICE_CHANNEL_CAPACITY) : null;
+  // Un état inconnu (ancienne charge) se déduit du nombre : compté s'il y en a un.
+  const state = (entry: unknown, count: number | null): MatchVoiceSideState => {
+    const known = SIDE_STATES.find((candidate) => candidate === entry) ?? (count === null ? "WAITING" : "COUNTED");
+    // « Compté » sans nombre lisible : le salon existe, son nombre reste à venir.
+    return known === "COUNTED" && count === null ? "UNCOUNTED" : known;
+  };
+  const team1Members = members(raw.team1Members);
+  const team2Members = members(raw.team2Members);
+  const team1State = state(raw.team1State, team1Members);
+  const team2State = state(raw.team2State, team2Members);
   return {
-    team1Members: members(raw.team1Members),
-    team2Members: members(raw.team2Members),
+    team1Members: team1State === "COUNTED" ? team1Members : null,
+    team2Members: team2State === "COUNTED" ? team2Members : null,
+    team1State,
+    team2State,
     pending: raw.pending === true,
   };
 }

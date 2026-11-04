@@ -1,6 +1,7 @@
 {
   "header": {
-    "scoreLabel": "Score: {team1} {score1}, {team2} {score2}",
+    "scoreLabel": "Score: {score1} to {score2}",
+    "forfeitLabel": "Forfeit by {team}",
     "versus": "VS",
     "completed": "Finished",
     "winner": "{team} wins",
@@ -41,7 +42,11 @@
   "voice": {
     "title": "Voice channels",
     "count": "Voice channel: {count}/{capacity}",
+    "countFull": "Voice channel: {count}/{capacity} · full",
     "notCreated": "Voice channel: opening soon",
+    "uncounted": "Voice channel: not counted yet",
+    "failed": "Voice channel: unavailable",
+    "failedNote": "A channel is unavailable: the match doesn't wait for the channels.",
     "waiting": "The match launches once both channels are full.",
     "hint": "Fifteen minutes before the match, the Discord bot opens a {capacity}-seat voice channel per team; launch waits until both are full."
   }

@@ -26,6 +26,7 @@ import type { TournamentState } from "@/lib/shared/types";
 import { mapError, useErrorsText } from "../_lib/error-map";
 import { useFormText } from "../../_lib/form-text";
 import { CodedError } from "@/lib/shared/field-errors";
+import { settledValue } from "@/lib/shared/settled-value";
 
 /**
  * Édition d'un tournoi.
@@ -107,7 +108,7 @@ function planningErrorText(text: TournamentFormText, code: string): string {
 
 /** Refus de la bascule des salons vocaux d'équipe. */
 function voiceErrorText(text: TournamentFormText, code: string): string {
-  const known = (["TOURNAMENT_NOT_FOUND", "INVALID_TEAM_VOICE_CHANNELS"] as const).find((c) => c === code);
+  const known = (["TOURNAMENT_NOT_FOUND", "TOURNAMENT_FINISHED", "INVALID_TEAM_VOICE_CHANNELS"] as const).find((c) => c === code);
   return text.t(known ? `edit.voiceErrors.${known}` : "edit.voiceErrors.fallback");
 }
 
@@ -340,14 +341,19 @@ export default function EditTournamentPage() {
           // celle-ci a pu être changée depuis la fiche entre-temps, et
           // l'enregistrement doit écrire ce que le formulaire montre. La route
           // est idempotente (rien n'est réécrit ni annoncé sans changement).
-          const planning = planningEditable
-            ? await saveRefereeScheduling(tournamentId, values.refereeScheduling, text)
-            : null;
           // Salons vocaux d'équipe : même régime que la planification — route
-          // dédiée, envoyée à chaque enregistrement, idempotente.
-          const voiceChanged = planningEditable
-            ? await saveTeamVoiceChannels(tournamentId, values.teamVoiceChannels, text)
-            : false;
+          // dédiée, envoyée à chaque enregistrement, idempotente. Les deux
+          // bascules partent l'une sans l'autre : un refus de la planification
+          // n'empêche pas d'enregistrer les salons (et inversement) ; le
+          // premier refus est dit ensuite.
+          const [planningResult, voiceResult] = planningEditable
+            ? await Promise.allSettled([
+                saveRefereeScheduling(tournamentId, values.refereeScheduling, text),
+                saveTeamVoiceChannels(tournamentId, values.teamVoiceChannels, text),
+              ])
+            : [null, null];
+          const planning = settledValue(planningResult, null);
+          const voiceChanged = settledValue(voiceResult, false);
 
           showSuccess(editSavedText(text, fieldsSent || voiceChanged, planning, values.refereeScheduling));
           router.push(`/tournois/${tournamentId}`);

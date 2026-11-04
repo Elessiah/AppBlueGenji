@@ -44,6 +44,15 @@
   min-width: 0;
   max-width: 100%;
   color: var(--ink);
+  /* Un pseudo d'arbitre sans espace se coupe au lieu de déborder à 375 px. */
+  overflow-wrap: anywhere;
+}
+
+/* Le départ attend les salons vocaux d'équipe : dit dans la pastille, qui
+   peut alors passer à la ligne (375 px). */
+.voiceHeld {
+  font-weight: 400;
+  white-space: normal;
 }
 
 .name {

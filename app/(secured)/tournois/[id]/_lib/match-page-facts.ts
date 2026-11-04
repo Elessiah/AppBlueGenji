@@ -1,7 +1,6 @@
 import type { BracketMatch } from "@/lib/shared/types";
 import type { MatchPageSide } from "@/lib/shared/match-page";
-import { resolveMatchMaps, roundMapsOf, type TournamentMapRules } from "@/lib/shared/round-maps";
-import { visibleText } from "@/lib/shared/visible-text";
+import { resolveMatchMaps, roundMapsOf, shownMapName, type TournamentMapRules } from "@/lib/shared/round-maps";
 import { matchSideViews } from "./match-row-sides";
 
 /**
@@ -11,8 +10,12 @@ import { matchSideViews } from "./match-row-sides";
  * l'instantané que la carte montrait déjà.
  */
 
-/** Score de l'en-tête, côté gauche puis côté droit ; `null` tant qu'aucun score ni forfait n'est posé. */
-export type MatchPageHeaderScore = { left: string; right: string };
+/**
+ * Score de l'en-tête, côté gauche puis côté droit ; `null` tant qu'aucun score
+ * ni forfait n'est posé. `leftForfeits` / `rightForfeits` : ce côté a déclaré
+ * forfait (« FF » à l'écran, « Forfait de … » au lecteur d'écran).
+ */
+export type MatchPageHeaderScore = { left: string; right: string; leftForfeits: boolean; rightForfeits: boolean };
 
 /**
  * Score de l'en-tête, rangé comme les côtés (`matchPageSides`, hôte à gauche) :
@@ -27,7 +30,7 @@ export function matchPageHeaderScore(
   const views = matchSideViews(match, match.roundNumber, doubleForfeit);
   const [left, right] = sides.map((side) => views[side.slot - 1]);
   if (left.score === "-" && right.score === "-") return null;
-  return { left: String(left.score), right: String(right.score) };
+  return { left: String(left.score), right: String(right.score), leftForfeits: left.forfeits, rightForfeits: right.forfeits };
 }
 
 /** Une map des faits clés : jouée (imposée ou choisie), ou à choisir dans un pool. */
@@ -55,9 +58,8 @@ export function matchPageMapFacts(
   const round = roundMapsOf(rules.rounds, match);
   if (!round) return [];
   return resolveMatchMaps(round.slots, match.firstMap, match.mapPicks).map((slot) => {
-    // Saisie libre (première map, choix) : texte visible seulement, comme `matchMapNames`.
-    const map = slot.map === null ? "" : visibleText(slot.map).trim();
-    const known = map === "" ? null : map;
+    // Saisie libre (première map, choix) : texte visible seulement (`shownMapName`).
+    const known = shownMapName(slot.map);
     return {
       number: slot.number,
       map: known,

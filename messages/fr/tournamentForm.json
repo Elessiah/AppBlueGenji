@@ -69,6 +69,7 @@
     },
     "voiceErrors": {
       "TOURNAMENT_NOT_FOUND": "Tournoi introuvable.",
+      "TOURNAMENT_FINISHED": "Le tournoi est terminé : l'option ne peut plus être modifiée.",
       "INVALID_TEAM_VOICE_CHANNELS": "Valeur invalide pour les salons vocaux d'équipe.",
       "fallback": "Les salons vocaux d'équipe n'ont pas pu être modifiés. Réessaie dans un instant."
     }
@@ -198,7 +199,7 @@
     },
     "teamVoice": {
       "label": "Salons vocaux d'équipe",
-      "description": "Allumée : un quart d'heure avant chaque match, le bot Discord ouvre un salon vocal de {capacity} places pour chaque équipe, et le match ne se lance qu'une fois les deux salons pleins. L'arbitrage peut toujours le forcer ; si le bot ne répond pas, le match n'attend pas. Jamais pour une entrée solo. Le site ne retient que le nombre de personnes présentes, jamais leur identité.",
+      "description": "Allumée : un quart d'heure avant chaque match, le bot Discord ouvre un salon vocal de {capacity} places par équipe (ni pour une entrée solo ni pour une équipe fantôme), et le match ne se lance qu'une fois les deux pleins — sauf lancement forcé par l'arbitrage ou bot injoignable. Le site garde l'identifiant du salon, ses horaires et le nombre de présents, jamais leur identité (détail : page RGPD, « Salons vocaux d'équipe »).",
       "create": "Modifiable ensuite, jusqu'à la clôture du tournoi — même en cours.",
       "edit": "Modifiable jusqu'à la clôture du tournoi — même en cours.",
       "finished": "Le tournoi est terminé : l'option n'est plus modifiable."
