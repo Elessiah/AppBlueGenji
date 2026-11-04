@@ -2546,39 +2546,24 @@ describe("Registre — suppression du compte (D12, D13)", () => {
   });
 });
 
+// EF-43 : dernière entrée, pour tous les comptes ; l'entrée publiée du 4 novembre reste telle quelle.
 describe("PRIVACY_CHANGES — salons vocaux sans comptage ni attente (EF-43)", () => {
-  const id = "2026-11-salons-vocaux-sans-comptage";
-  const entry = PRIVACY_CHANGES.find((c) => c.id === id)!;
-  const english = PRIVACY_CHANGES_EN[id];
+  const voiceEntry = () => PRIVACY_CHANGES.at(-1)!;
 
-  it("privacyChanges_voiceWithoutCount_closesListDated1106ForAllAccounts", () => {
-    expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
-    expectStandaloneEntry(entry, english, {
-      after: "2026-11-conditions-v9-contacts-et-suppression",
-      publishedAt: "2026-11-06",
-      audience: undefined,
-      links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }],
-    });
-    expect(PRIVACY_CHANGES.at(-1)).toBe(entry);
-    expect(english.linkLabels).toEqual(["Read the “Team voice channels” paragraph"]);
-    expect(entry.asksTermsAcceptance).toBeUndefined();
+  it("privacyChanges_voiceWithoutCount_isLastEntryDated1106ForAllAccounts", () => {
+    const entry = voiceEntry();
+    expect(entry.id).toBe("2026-11-salons-vocaux-sans-comptage");
+    expect([entry.id.length <= PRIVACY_CHANGE_ID_MAX_LENGTH, entry.asksTermsAcceptance, privacyChangeReachesAccount(entry, {}), isPrivacyPolicyVersion(entry)]).toEqual([true, undefined, true, true]);
+    expectStandaloneEntry(entry, PRIVACY_CHANGES_EN[entry.id], { after: "2026-11-conditions-v9-contacts-et-suppression", publishedAt: "2026-11-06", audience: undefined, links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }] });
+    expect(PRIVACY_CHANGES_EN[entry.id].linkLabels).toEqual(["Read the “Team voice channels” paragraph"]);
   });
 
-  it("privacyChanges_voiceWithoutCount_statesNoGateNoCountMemoryOnlyFrAndEn", () => {
-    expectEntryTexts(entry, english, {
+  it("privacyChanges_voiceWithoutCount_saysNoGateNoCountMemoryOnlyFrAndEn", () => {
+    expectEntryTexts(voiceEntry(), PRIVACY_CHANGES_EN[voiceEntry().id], {
       fr: ["ne retiennent plus le lancement d'un match", "ni qui s'y trouve, ni combien", "effacé avec sa colonne", "pour savoir si un salon est vide", "rien de nouveau n'est collecté", "une équipe fantôme entre dans le match", "intérêt légitime"],
       en: ["no longer hold a match's launch", "neither who is in it nor how many", "erased with its column", "to know whether a channel is empty", "nothing new is collected", "a ghost team enters the match", "legitimate interest"],
     });
-  });
-
-  it("privacyChanges_voiceWithoutCount_reachesEveryAccountAndStaysPolicyVersion", () => {
-    expect(privacyChangeReachesAccount(entry, {})).toBe(true);
-    expect(isPrivacyPolicyVersion(entry)).toBe(true);
-  });
-
-  it("privacyChanges_publishedVoiceEntry_keptUnchanged", () => {
     const published = PRIVACY_CHANGES.find((c) => c.id === "2026-11-salons-vocaux-equipe")!;
-    expect(published.publishedAt).toBe("2026-11-04");
-    expect(published.summary).toContain("le bot compte les personnes présentes");
+    expect([published.publishedAt, published.summary.includes("le bot compte les personnes présentes")]).toEqual(["2026-11-04", true]);
   });
 });
