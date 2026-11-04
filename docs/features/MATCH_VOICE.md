@@ -52,7 +52,8 @@ et rien n'est compté.
   salons plus anciennement vus : un salon lent n'ouvre pas chaque passe) ; un salon tout juste créé n'est pas redemandé dans la même passe.
   La création, la revérification et le rendu s'arrêtent chacun à la première panne du canal (la création en panne saute la revérification ; le rendu, indépendant, passe toujours), la suivante reprend ; les matchs dont un salon vient d'échouer passent après les autres dans le lot de création. Seule
   une panne du canal ou du bot entier (`BOT_CIRCUIT_OPEN`, `BOT_INTERNAL_UNREACHABLE`,
-  `BOT_VOICE_TIMEOUT`, `INTERNAL_ERROR`, `INTERNAL_ROUTE_NOT_FOUND`) arrête une passe ; le refus du bot pour un salon (code
+  `BOT_VOICE_TIMEOUT`, `INTERNAL_ERROR`, `INTERNAL_ROUTE_NOT_FOUND`, `BOT_INTERNAL_REQUEST_FAILED` —
+  réponse sans code lisible) arrête une passe ; le refus du bot pour un salon (code
   `VOICE_*`) ne retient que ce salon : les autres sont traités, et il garde son
   horodatage (redemandé après la minute, jamais en tête de file).
 - **Panne du bot** : `failed_at` noté, une ligne pm2 sans donnée de joueur, une
