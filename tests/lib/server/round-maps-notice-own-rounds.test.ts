@@ -68,4 +68,32 @@ describe("flushRoundMapsNotice — own rounds", () => {
 
     await expect(flushRoundMapsNotice(7)).resolves.toBe(true);
   });
+
+  it("flushRoundMapsNotice_secondCloseDuringTheFirstRead_waitsAndSendsItsOwnRounds", async () => {
+    let resolveFirst = (_value: [unknown[], unknown[]]): void => undefined;
+    let selects = 0;
+    const execute = jest.fn<SqlQuery>(async (sql) => {
+      if (!/^\s*SELECT/.test(sql)) return [{ affectedRows: 1 }, []];
+      selects += 1;
+      if (selects === 1) return new Promise<[unknown[], unknown[]]>((resolve) => (resolveFirst = resolve));
+      return [[row([R3])], []];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    const first = flushRoundMapsNotice(7, ["0:UPPER:2"]);
+    const second = flushRoundMapsNotice(7, ["0:UPPER:3"]);
+    await new Promise((resolve) => setImmediate(resolve));
+    resolveFirst([[row([R3])], []]);
+
+    await expect(first).resolves.toBe(false);
+    await expect(second).resolves.toBe(true);
+  });
+
+  it("flushRoundMapsNotice_firstCloseSent_secondOneIsCapped", async () => {
+    pool([row([R2])]);
+    await flushRoundMapsNotice(7, ["0:UPPER:2"]);
+
+    await expect(flushRoundMapsNotice(7, ["0:UPPER:2"])).resolves.toBe(false);
+  });
 });
+

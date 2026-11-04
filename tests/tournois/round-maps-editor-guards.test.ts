@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  firstTargetOverMax,
   focusIndexAfterRemoval,
   slotOverMax,
   vanishedRoundFallback,
@@ -65,5 +66,26 @@ describe("vanishedRoundFallback", () => {
 
   it("vanishedRoundFallback_emptyIdWithRoundsAvailable_returnsFirstRoundId", () => {
     expect(vanishedRoundFallback([R2, R1], "")).toBe("0:UPPER:2");
+  });
+});
+
+describe("firstTargetOverMax", () => {
+  const limits: Record<number, number | null> = { 1: 1, 2: 3, 3: 5, 4: null };
+  const limitOf = (target: { roundNumber: number }) => limits[target.roundNumber] ?? null;
+
+  it("firstTargetOverMax_everyTargetFits_returnsNull", () => {
+    expect(firstTargetOverMax([R2, { ...R2, roundNumber: 3 }], 3, limitOf)).toBeNull();
+  });
+
+  it("firstTargetOverMax_severalTooSmall_returnsTheFirstOffender", () => {
+    expect(firstTargetOverMax([R2, R1, { ...R2, roundNumber: 3 }], 4, limitOf)).toBe(R2);
+  });
+
+  it("firstTargetOverMax_targetWithoutCap_isIgnored", () => {
+    expect(firstTargetOverMax([{ ...R2, roundNumber: 4 }], 20, limitOf)).toBeNull();
+  });
+
+  it("firstTargetOverMax_noTargets_returnsNull", () => {
+    expect(firstTargetOverMax([], 3, limitOf)).toBeNull();
   });
 });

@@ -158,6 +158,18 @@ export function slotOverMax(slots: readonly (readonly string[])[], max: number |
 }
 
 /**
+ * Premier tour cible qui ne peut pas porter `count` cartes : `limitOf` rend son
+ * plafond effectif (`null` : sans plafond). `null` si tous les tours tiennent.
+ */
+export function firstTargetOverMax<T>(targets: readonly T[], count: number, limitOf: (target: T) => number | null): T | null {
+  for (const target of targets) {
+    const limit = limitOf(target);
+    if (limit !== null && count > limit) return target;
+  }
+  return null;
+}
+
+/**
  * Indice du voisin qui reprend le focus quand l'élément `removed` disparaît d'une
  * liste de `remaining` éléments restants : le suivant, ou le dernier. `null`
  * quand il n'en reste aucun (le focus va alors à l'élément qui porte la liste).

@@ -38,6 +38,7 @@ import {
   blocksImplicitSubmit,
   chunkRounds,
   findRound,
+  firstTargetOverMax,
   focusIndexAfterRemoval,
   overwrittenRounds,
   removeMapFromSlot,
@@ -363,6 +364,7 @@ function TiebreakForm({
   busy,
   run,
   onWritten,
+  onDirtyChange,
 }: Readonly<{
   tournamentId: number;
   round: RoundKey;
@@ -372,6 +374,8 @@ function TiebreakForm({
   run: RunTask;
   /** Une écriture a réussi : le tour entre dans l'annonce que la fermeture peut devancer. */
   onWritten: () => void;
+  /** Le champ porte une saisie non enregistrée : fermer ou changer de tour le demande. */
+  onDirtyChange: (dirty: boolean) => void;
 }>) {
   const { t } = useRoundMapsText();
   const { showError, showSuccess } = useToast();
@@ -387,6 +391,10 @@ function TiebreakForm({
     setValue((current) => (current === (before ?? "") ? (saved ?? "") : current));
   }, [saved]);
   const dirty = visibleText(value) !== (saved ?? "");
+  useEffect(() => {
+    onDirtyChange(dirty);
+    return () => onDirtyChange(false);
+  }, [dirty, onDirtyChange]);
 
   const send = (map: string | null, success: string) =>
     run(
@@ -400,15 +408,15 @@ function TiebreakForm({
 
   const save = (event: FormEvent) => {
     event.preventDefault();
-    if (busy) return;
+    // Rien de changé : rien à envoyer (renvoyer la valeur en place n'écrirait que du bruit au journal),
+    // et Entrée dans un champ intact ne réclame pas un nom que le bouton grisé ne demande pas.
+    if (busy || !dirty) return;
     if (visibleText(value) === "") {
       const text = t("dialog.tiebreakEmpty");
       showError(text);
       fieldErrors.flag("tiebreak", text);
       return;
     }
-    // Rien de changé : rien à envoyer (renvoyer la valeur en place n'écrirait que du bruit au journal).
-    if (!dirty) return;
     void send(value, t("dialog.tiebreakSaved"));
   };
 
@@ -440,20 +448,20 @@ function TiebreakForm({
         </div>
         <div className={styles.actions}>
           <UnsavedNote dirty={dirty} text={t("dialog.unsaved")} />
-          {saved !== null && (
-            <button
-              type="button"
-              className="btn ghost"
-              aria-disabled={busy || undefined}
-              onClick={() => {
-                if (busy) return;
-                // Le champ suit le serveur tout seul s'il n'a pas été modifié ; un texte en cours de saisie reste.
-                void send(null, t("dialog.tiebreakRemoved"));
-              }}
-            >
-              {t("dialog.tiebreakRemove")}
-            </button>
-          )}
+          {/* Toujours monté : après un retrait réussi il n'y a plus rien à retirer, mais un
+              bouton démonté laisserait tomber le focus sur le <body> (WCAG 2.4.3). */}
+          <button
+            type="button"
+            className="btn ghost"
+            aria-disabled={busy || saved === null || undefined}
+            onClick={() => {
+              if (busy || saved === null) return;
+              // Le champ suit le serveur tout seul s'il n'a pas été modifié ; un texte en cours de saisie reste.
+              void send(null, t("dialog.tiebreakRemoved"));
+            }}
+          >
+            {t("dialog.tiebreakRemove")}
+          </button>
           <button type="submit" className="btn ghost" aria-disabled={busy || !dirty || undefined}>
             {t("dialog.tiebreakSave")}
           </button>
@@ -474,6 +482,7 @@ function StaleTiebreaks({
   busy,
   run,
   onWritten,
+  fallbackFocusId,
 }: Readonly<{
   items: readonly RoundTiebreak[];
   roundLabel: (round: RoundKey) => string;
@@ -481,22 +490,42 @@ function StaleTiebreaks({
   busy: boolean;
   run: RunTask;
   onWritten: (round: RoundKey) => void;
+  /** Où va le focus quand le dernier retrait fait disparaître toute la rubrique. */
+  fallbackFocusId: string;
 }>) {
   const { t } = useRoundMapsText();
   const { showSuccess } = useToast();
+  const ids = useId();
+  // Un retrait réussi démonte la ligne et son bouton : le focus passe à la ligne
+  // voisine, ou à `fallbackFocusId` quand la rubrique disparaît (jamais au <body>).
+  const focusAfter = useRef<number | null>(null);
+  useEffect(() => {
+    const removed = focusAfter.current;
+    if (removed === null) return;
+    focusAfter.current = null;
+    const next = focusIndexAfterRemoval(removed, items.length);
+    document.getElementById(next === null ? fallbackFocusId : `${ids}-${next}`)?.focus();
+  }, [items, ids, fallbackFocusId]);
   if (items.length === 0) return null;
   return (
-    <fieldset className={styles.section}>
-      <legend className={styles.legend}>{t("dialog.staleTiebreakTitle")}</legend>
-      <p className={styles.muted}>{t("dialog.staleTiebreakHint")}</p>
+    <fieldset className={styles.section} aria-labelledby={`${ids}-title`}>
+      <div className={styles.labelRow}>
+        <span id={`${ids}-title`} className={styles.legend}>
+          {t("dialog.staleTiebreakTitle")}
+        </span>
+        <InfoHint id={`${ids}-hint`} subject={t("dialog.staleTiebreakTitle")}>
+          {t("dialog.staleTiebreakHint")}
+        </InfoHint>
+      </div>
       <ul className={styles.stale}>
-        {items.map((item) => {
+        {items.map((item, index) => {
           const label = roundLabel(item);
           return (
             <li key={roundKeyId(item)} className={styles.staleItem}>
               <span>{t("dialog.staleTiebreakItem", { round: label, map: visibleText(item.map) })}</span>
               <button
                 type="button"
+                id={`${ids}-${index}`}
                 className="btn ghost"
                 aria-label={t("dialog.staleTiebreakRemoveLabel", { round: label })}
                 aria-disabled={busy || undefined}
@@ -510,6 +539,7 @@ function StaleTiebreaks({
                       map: null,
                     });
                     onWritten(item);
+                    focusAfter.current = index;
                     showSuccess(t("dialog.tiebreakRemoved"));
                   });
                 }}
@@ -583,6 +613,8 @@ export function RoundMapsDialog({
   const [copyTarget, setCopyTarget] = useState("");
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
+  // Saisie non enregistrée du champ de la map de départage (remontée par son formulaire).
+  const [tiebreakDirty, setTiebreakDirty] = useState(false);
   // Créneau que désigne un refus (créneau vide entre deux cartes, carte de trop) ;
   // `null` : le refus du serveur ne dit pas lequel, il vise la liste entière.
   const [errorSlot, setErrorSlot] = useState<number | null>(null);
@@ -641,7 +673,10 @@ export function RoundMapsDialog({
   const maxMaps = round ? roundMaxMaps(detail.card, round.roundNumber) : null;
   const slotCap = maxMaps ?? ROUND_MAP_SLOTS_MAX;
   const toSave = slotsToSave(slots);
-  const overMax = maxMaps !== null && toSave.length > maxMaps;
+  // Un tour déjà enregistré au-dessus du plafond (le serveur n'en impose pas) peut être retouché sans
+  // grossir : l'avertissement et le refus partagent ce seuil, l'un ne promet pas ce que l'autre laisse passer.
+  const effectiveMax = maxMaps === null ? null : Math.max(maxMaps, saved?.slots.length ?? 0);
+  const overMax = effectiveMax !== null && toSave.length > effectiveMax;
   // « Réinitialiser » ne touche pas la map de départage : le toast le dit quand elle reste.
   const tiebreakKept =
     round !== null && (roundTiebreakOf(rules.tiebreaks, round) !== null || roundTiebreakOf(rules.staleTiebreaks, round) !== null);
@@ -696,6 +731,8 @@ export function RoundMapsDialog({
 
   const saveRules = (event: FormEvent) => {
     event.preventDefault();
+    // Rien de modifié : rien à envoyer, ni « Règles enregistrées » annoncé sur des règles qui n'ont pas bougé.
+    if (busy || !rulesDirty) return;
     void run(async () => {
       // La règle « carte suivante » n'est plus proposée (`NextPickRule`) : la valeur en place est renvoyée telle quelle.
       await putJson(`/api/admin/tournaments/${tournamentId}/map-rules`, { firstBan, nextBan, nextPick: rules.nextPick });
@@ -734,8 +771,7 @@ export function RoundMapsDialog({
 
   /** Plus de cartes que le format n'en joue : refusé avant l'envoi, et rattaché à la première carte de trop. */
   const overMaxRefused = () => {
-    // Un tour déjà enregistré au-dessus du plafond (le serveur n'en impose pas) peut être retouché sans grossir.
-    const over = slotOverMax(slots, maxMaps === null ? null : Math.max(maxMaps, saved?.slots.length ?? 0));
+    const over = slotOverMax(slots, effectiveMax);
     if (over === null) return false;
     const text = t("dialog.overMaxMaps", { max: maxMaps ?? 0 });
     showError(text);
@@ -751,8 +787,19 @@ export function RoundMapsDialog({
     void sendRounds([round], toSave, toSave.length === 0 ? clearedText : t("dialog.roundSaved"));
   };
 
+  /** Un tour cible joue moins de cartes que la sélection : refusé avant l'envoi, en nommant ce tour. */
+  const targetOverMaxRefused = (targets: readonly RoundKey[]) => {
+    const target = firstTargetOverMax(targets, toSave.length, (key) => {
+      const max = roundMaxMaps(detail.card, key.roundNumber);
+      return max === null ? null : Math.max(max, roundMapsOf(rules.rounds, key)?.slots.length ?? 0);
+    });
+    if (target === null) return false;
+    showError(t("dialog.overMaxTarget", { round: roundLabel(target), max: roundMaxMaps(detail.card, target.roundNumber) ?? 0 }));
+    return true;
+  };
+
   const applyAll = () => {
-    if (busy || toSave.length === 0 || gapRefused()) return;
+    if (busy || toSave.length === 0 || gapRefused() || targetOverMaxRefused(rounds)) return;
     const others = rounds.filter((key) => roundKeyId(key) !== roundId);
     const overwritten = overwrittenRounds(rules.rounds, others, toSave).length;
     if (overwritten > 0) setPending({ kind: "applyAll", overwritten });
@@ -761,7 +808,7 @@ export function RoundMapsDialog({
 
   const copy = () => {
     const target = findRound(rounds, copyTarget);
-    if (busy || !target || toSave.length === 0 || gapRefused()) return;
+    if (busy || !target || toSave.length === 0 || gapRefused() || targetOverMaxRefused([target])) return;
     if (overwrittenRounds(rules.rounds, [target], toSave).length > 0) setPending({ kind: "copy", target });
     else void sendRounds([target], toSave, t("dialog.copied", { round: roundLabel(target) }));
   };
@@ -769,7 +816,7 @@ export function RoundMapsDialog({
   const changeRound = (id: string) => {
     if (id === roundId) return;
     // Des cartes saisies et non enregistrées seraient perdues en silence : on le demande.
-    if (roundDirty) setPending({ kind: "switch", id });
+    if (roundDirty || tiebreakDirty) setPending({ kind: "switch", id });
     else selectRound(id);
   };
 
@@ -782,7 +829,7 @@ export function RoundMapsDialog({
 
   // Fermer (Échap, voile, « Fermer ») jetterait les saisies non enregistrées : on le demande, comme au changement de tour.
   const requestClose = () => {
-    if (roundDirty || rulesDirty) setPending({ kind: "close" });
+    if (roundDirty || rulesDirty || tiebreakDirty) setPending({ kind: "close" });
     else onClose();
   };
 
@@ -879,7 +926,7 @@ export function RoundMapsDialog({
             </div>
             <div className={styles.actions}>
               <UnsavedNote dirty={rulesDirty} text={t("dialog.unsaved")} />
-              <button type="submit" className="btn ghost" aria-disabled={busy || undefined}>
+              <button type="submit" className="btn ghost" aria-disabled={busy || !rulesDirty || undefined}>
                 {t("dialog.saveRules")}
               </button>
             </div>
@@ -967,23 +1014,23 @@ export function RoundMapsDialog({
               )}
               <div className={styles.actions}>
                 <UnsavedNote dirty={roundDirty} text={t("dialog.unsaved")} />
-                {saved && (
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    aria-disabled={busy || undefined}
-                    onClick={() => {
-                      if (!busy) setPending({ kind: "reset" });
-                    }}
-                  >
-                    {t("dialog.clearRound")}
-                  </button>
-                )}
+                {/* Toujours monté : après une réinitialisation il n'y a plus rien à réinitialiser, mais un
+                    bouton démonté laisserait tomber le focus sur le <body> (WCAG 2.4.3). */}
+                <button
+                  type="button"
+                  className="btn ghost"
+                  aria-disabled={busy || !saved || undefined}
+                  onClick={() => {
+                    if (!busy && saved) setPending({ kind: "reset" });
+                  }}
+                >
+                  {t("dialog.clearRound")}
+                </button>
                 <button type="submit" className="btn" aria-disabled={busy || !roundDirty || undefined}>
                   {t("dialog.saveRound")}
                 </button>
               </div>
-              {toSave.length > 0 && rounds.length > 1 && (
+              {rounds.length > 1 && (
                 <div className={styles.copyRow}>
                   <div className={`field ${styles.grow}`}>
                     <label htmlFor={`${ids}-copy`}>{t("dialog.copyLabel")}</label>
@@ -1001,12 +1048,17 @@ export function RoundMapsDialog({
                   <button
                     type="button"
                     className="btn ghost"
-                    aria-disabled={busy || copyTarget === "" || undefined}
+                    aria-disabled={busy || copyTarget === "" || toSave.length === 0 || undefined}
                     onClick={copy}
                   >
                     {t("dialog.copy")}
                   </button>
-                  <button type="button" className="btn ghost" aria-disabled={busy || undefined} onClick={applyAll}>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    aria-disabled={busy || toSave.length === 0 || undefined}
+                    onClick={applyAll}
+                  >
                     {t("dialog.applyAll")}
                   </button>
                 </div>
@@ -1025,6 +1077,7 @@ export function RoundMapsDialog({
             busy={busy}
             run={run}
             onWritten={() => writtenRounds.current.add(roundKeyId(round))}
+            onDirtyChange={setTiebreakDirty}
           />
         )}
 
@@ -1035,10 +1088,11 @@ export function RoundMapsDialog({
           busy={busy}
           run={run}
           onWritten={(key) => writtenRounds.current.add(roundKeyId(key))}
+          fallbackFocusId={`${ids}-close`}
         />
 
         <div className={styles.footer}>
-          <button type="button" className="btn ghost" onClick={requestClose} aria-disabled={busy || undefined}>
+          <button id={`${ids}-close`} type="button" className="btn ghost" onClick={requestClose} aria-disabled={busy || undefined}>
             {t("dialog.close")}
           </button>
         </div>

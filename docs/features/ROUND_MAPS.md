@@ -292,5 +292,17 @@ score, câblage), `tests/lib/shared/round-maps-tiebreak-plan.test.ts`,
   cartes place le focus sur son premier champ ; un ajout libre refusé garde la saisie.
 - « Réinitialiser le tour » ne touche pas la map de départage : le toast le dit
   (`roundClearedTiebreakKept`) quand elle reste.
-- Choix de carte optimiste (`MapPickSelect`) : relâché à l'arrivée d'un instantané,
-  ou 6 s après la fin de l'envoi si aucun n'est arrivé (même version = rien envoyé).
+- Choix de carte optimiste (`MapPickSelect`) : relâché quand la carte enregistrée
+  change (un instantané sur un autre match ne la touche pas) ; sans changement,
+  relecture REST 6 s après la fin de l'envoi, relâche à 30 s.
+- Fermer ou changer de tour avec une map de départage saisie et non enregistrée
+  demande aussi confirmation (le formulaire remonte son état, `onDirtyChange`).
+- « Copier » et « Appliquer à tous » refusent un tour cible qui joue moins de cartes
+  que la sélection (`firstTargetOverMax`, plafond effectif du tour cible, message
+  `overMaxTarget`) ; l'avertissement rouge et le refus partagent le même seuil.
+- « Enregistrer les règles » est inactif et sans effet quand rien n'a changé.
+- Les boutons qui se vident eux-mêmes (« Réinitialiser le tour », « Retirer la map de
+  départage », la rangée de copie) restent montés en `aria-disabled` ; le retrait d'une
+  map de départage inactive rend le focus à la ligne voisine, ou à « Fermer ».
+- Deux fermetures d'écran simultanées sont chaînées côté serveur (`flushRoundMapsNotice`)
+  : la seconde attend le verdict de la première au lieu d'être écartée par le plafond.

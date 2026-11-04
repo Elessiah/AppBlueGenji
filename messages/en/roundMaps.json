@@ -81,6 +81,7 @@
     },
     "maxMaps": "{max} maps at most per match (tournament format).",
     "overMaxMaps": "This round has more maps than the format plays ({max} at most).",
+    "overMaxTarget": "Not possible: {round} plays {max} maps at most and the selection has more.",
     "mapEmpty": "Type a map name.",
     "mapTooLong": "Map name too long (64 characters at most).",
     "poolFull": "20 maps at most per pool.",

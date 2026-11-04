@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { InfoHint } from "@/components/ui/info-hint";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -16,57 +16,54 @@ import styles from "./MatchPage.module.css";
 const RoundMapsDialog = dynamic(() => import("./RoundMapsDialog").then((m) => m.RoundMapsDialog), { ssr: false });
 
 /**
- * Délai après lequel un choix optimiste est relâché même si aucun instantané
- * ne l'a remplacé : l'instantané ne part que quand le contenu change (même
- * version = rien d'envoyé), donc une carte revenue entre-temps à l'ancienne
- * valeur ne ferait jamais relâcher la valeur locale.
+ * Un choix envoyé que l'instantané n'a pas encore rendu : au bout de ce délai
+ * on redemande l'état au serveur (lecture REST, indépendante d'un flux lent).
  */
-const OPTIMISTIC_PICK_MS = 6000;
+const OPTIMISTIC_REFETCH_MS = 6000;
+/**
+ * Garde-fou : une valeur locale que plus rien ne confirme (carte revenue à
+ * l'ancienne valeur entre-temps, donc aucun changement à observer) est relâchée.
+ */
+const OPTIMISTIC_PICK_MS = 30_000;
 
 /**
  * Choix d'une carte dans un pool, par le staff ou une équipe en autogestion.
  * Valeur **optimiste** : la liste garde le choix envoyé (au lieu de revenir à
  * l'ancienne carte jusqu'à l'instantané suivant, d'où un second envoi possible
- * sur un flux lent) ; elle la relâche à l'arrivée d'un instantané (la carte
- * change, ou la version du détail change une fois l'envoi fini), après
- * {@link OPTIMISTIC_PICK_MS}, ou sur refus.
+ * sur un flux lent) ; elle la relâche quand la carte enregistrée change (un
+ * instantané sur un autre match ne la touche pas), après
+ * {@link OPTIMISTIC_PICK_MS}, ou sur refus. Un instantané qui tarde déclenche
+ * une relecture au bout de {@link OPTIMISTIC_REFETCH_MS}.
  */
-function MapPickSelect({
-  match,
-  slot,
-  snapshotVersion,
-}: Readonly<{ match: Pick<BracketMatch, "id">; slot: ResolvedMapSlot; snapshotVersion: string }>) {
+function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id">; slot: ResolvedMapSlot }>) {
   const { t } = useRoundMapsText();
   const actionText = useActionsText();
   const errorsText = useErrorsText();
   const { showError, showSuccess } = useToast();
   const selectId = useId();
   const [busy, setBusy] = useState(false);
-  // `since` : version du détail à la fin de l'envoi (`null` tant qu'il est en vol).
-  const [optimistic, setOptimistic] = useState<{ map: string; since: string | null } | null>(null);
+  // `sent` : l'envoi est fini (`false` tant qu'il est en vol).
+  const [optimistic, setOptimistic] = useState<{ map: string; sent: boolean } | null>(null);
   const stored = slot.map ?? "";
-  const versionRef = useRef(snapshotVersion);
-  versionRef.current = snapshotVersion;
-  // L'instantané fait foi dès qu'il change : la valeur locale s'efface.
+  // L'instantané fait foi dès que la carte enregistrée change : la valeur locale s'efface.
   useEffect(() => setOptimistic(null), [stored]);
-  // Un instantané arrivé depuis la fin de l'envoi (même si la carte est revenue
-  // à l'ancienne valeur) : la valeur locale n'a plus de raison d'être.
-  useEffect(() => {
-    if (optimistic !== null && optimistic.since !== null && optimistic.since !== snapshotVersion) setOptimistic(null);
-  }, [optimistic, snapshotVersion]);
-  // Et sans instantané du tout (même version), elle expire.
-  const settled = optimistic !== null && optimistic.since !== null;
+  // Envoi fini mais carte enregistrée inchangée : relecture à mi-parcours, puis relâche.
+  const settled = optimistic !== null && optimistic.sent;
   useEffect(() => {
     if (!settled) return;
-    const timer = setTimeout(() => setOptimistic(null), OPTIMISTIC_PICK_MS);
-    return () => clearTimeout(timer);
+    const refetch = setTimeout(() => window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT)), OPTIMISTIC_REFETCH_MS);
+    const release = setTimeout(() => setOptimistic(null), OPTIMISTIC_PICK_MS);
+    return () => {
+      clearTimeout(refetch);
+      clearTimeout(release);
+    };
   }, [settled]);
   const shown = optimistic?.map ?? stored;
 
   const pick = async (map: string) => {
     if (busy || map === shown) return;
     setBusy(true);
-    setOptimistic({ map, since: null });
+    setOptimistic({ map, sent: false });
     try {
       const response = await fetch(`/api/matches/${match.id}/map-pick`, {
         method: "PUT",
@@ -76,7 +73,7 @@ function MapPickSelect({
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "UNKNOWN");
       showSuccess(t(map === "" ? "page.pickCleared" : "page.picked"));
-      setOptimistic({ map, since: versionRef.current });
+      setOptimistic({ map, sent: true });
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
     } catch (error) {
       setOptimistic(null);
@@ -119,8 +116,7 @@ function MapSlotLine({
   match,
   slot,
   canPick,
-  snapshotVersion,
-}: Readonly<{ match: Pick<BracketMatch, "id">; slot: ResolvedMapSlot; canPick: boolean; snapshotVersion: string }>) {
+}: Readonly<{ match: Pick<BracketMatch, "id">; slot: ResolvedMapSlot; canPick: boolean }>) {
   const { t } = useRoundMapsText();
   return (
     <li className={styles.mapSlot}>
@@ -131,7 +127,7 @@ function MapSlotLine({
             <strong>{slot.map}</strong> <span className="pill pill-neutral">{t("page.imposed")}</span>
           </>
         )}
-        {slot.kind === "POOL" && canPick && <MapPickSelect match={match} slot={slot} snapshotVersion={snapshotVersion} />}
+        {slot.kind === "POOL" && canPick && <MapPickSelect match={match} slot={slot} />}
         {slot.kind === "POOL" && !canPick && slot.map !== null && <strong>{slot.map}</strong>}
         {slot.kind === "POOL" && !canPick && slot.map === null && (
           <span className={styles.muted}>{t("page.toChoose", { maps: slot.candidates.join(", ") })}</span>
@@ -217,7 +213,7 @@ export function MatchRoundMaps({
       {slots.length > 0 && (
         <ol className={styles.mapSlots} aria-labelledby={titleId}>
           {slots.map((slot) => (
-            <MapSlotLine key={slot.number} match={match} slot={slot} canPick={canPick} snapshotVersion={detail.version} />
+            <MapSlotLine key={slot.number} match={match} slot={slot} canPick={canPick} />
           ))}
           {tiebreak !== null && <TiebreakLine id={`${titleId}-tiebreak`} map={tiebreak} />}
         </ol>

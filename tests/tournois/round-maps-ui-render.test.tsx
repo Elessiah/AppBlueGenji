@@ -119,7 +119,7 @@ describe("câblage de la fenêtre des cartes", () => {
 
     expect(source).toContain("onClose={requestClose}");
     expect(source).toMatch(/onClick=\{requestClose\}/);
-    expect(source).toMatch(/if \(roundDirty \|\| rulesDirty\) setPending\(\{ kind: "close" \}\)/);
+    expect(source).toMatch(/if \(roundDirty \|\| rulesDirty \|\| tiebreakDirty\) setPending\(\{ kind: "close" \}\)/);
   });
 
   it("dialog_saveRound_refusesOverMaxAndUnchangedRoundsBeforeSending", () => {
@@ -127,7 +127,12 @@ describe("câblage de la fenêtre des cartes", () => {
   });
 
   it("dialog_overMax_savedRoundAlreadyOverTheCapCanStillBeEditedWithoutGrowing", () => {
-    expect(dialog()).toContain("Math.max(maxMaps, saved?.slots.length ?? 0)");
+    const source = dialog();
+
+    expect(source).toContain("Math.max(maxMaps, saved?.slots.length ?? 0)");
+    // L'avertissement rouge et le refus partagent le même seuil.
+    expect(source).toContain("toSave.length > effectiveMax");
+    expect(source).toContain("slotOverMax(slots, effectiveMax)");
   });
 
   it("dialog_serverRefusal_attachesToTheListNotToTheFirstSlot", () => {
@@ -167,7 +172,61 @@ describe("câblage de la fenêtre des cartes", () => {
     const source = readSource("app/(secured)/tournois/[id]/_components/MatchRoundMaps.tsx");
 
     expect(source).toContain("setTimeout(() => setOptimistic(null), OPTIMISTIC_PICK_MS)");
-    expect(source).toContain("optimistic.since !== snapshotVersion");
+  });
+
+  it("mapPick_optimisticValue_isNotClearedByAnUnrelatedSnapshot", () => {
+    const source = readSource("app/(secured)/tournois/[id]/_components/MatchRoundMaps.tsx");
+
+    expect(source).not.toContain("snapshotVersion");
+    expect(source).toContain("useEffect(() => setOptimistic(null), [stored])");
+    expect(source).toContain("setTimeout(() => window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT)), OPTIMISTIC_REFETCH_MS)");
+  });
+
+  it("dialog_tiebreakDraft_isCoveredByCloseAndRoundSwitchConfirmations", () => {
+    const source = dialog();
+
+    expect(source).toContain("onDirtyChange={setTiebreakDirty}");
+    expect(source).toContain("if (roundDirty || tiebreakDirty) setPending({ kind: \"switch\", id })");
+    expect(source).toContain("return () => onDirtyChange(false)");
+  });
+
+  it("dialog_copyAndApplyAll_refuseARoundThatPlaysFewerMaps", () => {
+    const source = dialog();
+
+    expect(source).toContain("gapRefused() || targetOverMaxRefused(rounds)");
+    expect(source).toContain("gapRefused() || targetOverMaxRefused([target])");
+    expect(frRoundMaps.dialog.overMaxTarget).toContain("{round}");
+    expect(enRoundMaps.dialog.overMaxTarget).toContain("{max}");
+  });
+
+  it("dialog_unchangedRules_areNotSent", () => {
+    const source = dialog();
+
+    expect(source).toContain("if (busy || !rulesDirty) return;");
+    expect(source).toContain("aria-disabled={busy || !rulesDirty || undefined}");
+  });
+
+  it("dialog_buttonsThatEmptyThemselves_stayMountedWithAriaDisabled", () => {
+    const source = dialog();
+
+    expect(source).not.toContain("{saved && (");
+    expect(source).not.toContain("{saved !== null && (");
+    expect(source).toContain("aria-disabled={busy || !saved || undefined}");
+    expect(source).toContain("aria-disabled={busy || saved === null || undefined}");
+    expect(source).toContain("{rounds.length > 1 && (");
+  });
+
+  it("dialog_staleTiebreaks_explanationIsBehindAnInfoHintAndFocusIsKept", () => {
+    const source = dialog();
+
+    expect(source).not.toContain('<p className={styles.muted}>{t("dialog.staleTiebreakHint")}</p>');
+    expect(source).toContain("{t(\"dialog.staleTiebreakHint\")}\n        </InfoHint>");
+    expect(source).toContain("fallbackFocusId={`${ids}-close`}");
+    expect(source).toContain("focusAfter.current = index;");
+  });
+
+  it("dialog_tiebreakEnterOnAnUntouchedField_staysSilent", () => {
+    expect(dialog()).toContain("if (busy || !dirty) return;");
   });
 
   it("mapScoreList_tiebreakRowAnnouncement_isInBothLanguages", () => {

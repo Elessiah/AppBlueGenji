@@ -81,6 +81,7 @@
     },
     "maxMaps": "{max} cartes au plus par match (format du tournoi).",
     "overMaxMaps": "Ce tour a plus de cartes que le format n'en joue ({max} au plus).",
+    "overMaxTarget": "Impossible : {round} joue {max} cartes au plus, et la sélection en compte davantage.",
     "mapEmpty": "Saisis un nom de carte.",
     "mapTooLong": "Nom de carte trop long (64 caractères au plus).",
     "poolFull": "20 cartes au plus par pool.",
