@@ -203,8 +203,8 @@ describe("DONNEES_PROFIL", () => {
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Certification of the Discord username")?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: "match time notices, reminders, match removal notices, match check-ins and cast removal notices by direct message" });
     // L'ID sert aussi, certifié ou non, aux avis passant par la portée « proven ».
     const id = DONNEES_PROFIL.find((d) => d.donnee === "ID Discord");
-    expect(id?.finalite).toMatch(/horaires, rappels, retrait de match, check-in d'un match de ton équipe, et retrait de ton cast — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, invitation d'une équipe, reprise d'équipe proposée ou propriété de ton équipe reçue, avis de suspension ou de modération, information sur tes données/);
-    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID")?.finalite).toMatch(/match times, reminders, removal, the check-in of a match of your team, and removal of your cast — only if your tag is certified —, request to join a team you manage, a team's invitation, an offered team takeover or ownership of your team received, suspension or moderation notices, information about your data/);
+    expect(id?.finalite).toMatch(/horaires, rappels, retrait de match, check-in d'un match de ton équipe ou de ton tournoi individuel, et retrait de ton cast — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, invitation d'une équipe, reprise d'équipe proposée ou propriété de ton équipe reçue, avis de suspension ou de modération, information sur tes données/);
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID")?.finalite).toMatch(/match times, reminders, removal, the check-in of a match of your team or of your solo tournament, and removal of your cast — only if your tag is certified —, request to join a team you manage, a team's invitation, an offered team takeover or ownership of your team received, suspension or moderation notices, information about your data/);
   });
 
   it("déclare, sur la certification, chaque public qu'elle ouvre — et celui qu'on choisit", () => {

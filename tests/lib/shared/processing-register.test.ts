@@ -175,7 +175,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04.dataCategories.join(" ")).toMatch(/recevoir ou non les messages privés Discord de ses matchs/);
     expect(t04.retention.join(" ")).toMatch(/Choix des messages privés de match : jusqu'à sa modification/);
     expect(t04.retention.join(" ")).toMatch(/Traces d'envoi des rappels, alertes et programmes d'arbitrage/);
-    expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; joueur d'une engagée : check-in du match ; caster : [^;]*; arbitre désigné : [^;]*; arbitre ou administrateur : programme d'arbitrage, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue par un membre du staff qui joue le match ; traitement T12\), qui/);
+    expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; membre d'une engagée ou joueur d'un tournoi individuel : check-in du match ; caster : [^;]*; arbitre désigné : [^;]*; arbitre ou administrateur : programme d'arbitrage, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue par un membre du staff qui joue le match ; traitement T12\), qui/);
     expect(t04.subPurposes.join(" ")).toMatch(/en message privé Discord et en push l'annonce/);
     expect(t04.recipients.join(" ")).toMatch(/Staff de l'association ayant accès au canal de logs Discord/);
     expect(byRef("T05").dataCategories.join(" ")).toMatch(/Sur Discord : [^—]*horaires et manches des matchs/);

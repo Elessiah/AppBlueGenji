@@ -500,11 +500,11 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
   });
 
   it("renvoie à « Mon profil » pour couper les messages de match, et avance sa date (FR et EN)", () => {
-    expect(fr).toContain("un joueur, ou un caster, peut couper ceux de ses matchs (horaire, rappel, retrait d'un match, check-in du match, retrait d'un cast) dans « Mon profil »");
+    expect(fr).toContain("chaque destinataire (joueur, membre d'une engagée ou caster) peut couper ceux de ses matchs (horaire, rappel, retrait d'un match, check-in du match, retrait d'un cast) dans « Mon profil »");
     expect(fr).toContain("(horaire, rappel, retrait d'un match, check-in du match, retrait d'un cast)");
     expect(en).toContain("(time, reminder, removal from a match, match check-in, removal of a cast)");
     expect(fr).toContain("« un joueur » pour une entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026");
-    expect(en).toContain("a player, or a caster, can turn off those about their matches (time, reminder, removal from a match, match check-in, removal of a cast) in “My profile”");
+    expect(en).toContain("each recipient (player, member of an entrant or caster) can turn off those about their matches (time, reminder, removal from a match, match check-in, removal of a cast) in “My profile”");
     // The solo #live username rests on performance of the service, not legitimate interest (user decision 2026-10-14).
     expect(fr).toContain("Le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel n'en relève pas : il repose sur l'exécution du service auquel il s'inscrit — ne pas y être nommé revient à ne pas s'inscrire");
     expect(en).toContain("A player's username in the #live announcement of a solo tournament is not covered: it rests on performance of the service they register for — not being named in it means not registering");
