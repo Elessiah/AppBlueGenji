@@ -16,7 +16,7 @@
  * Le site ne garde que l'identifiant de chaque salon et ses horaires : il ne
  * demande jamais au bot qui s'y trouve, ni combien.
  */
-import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
 import { ensureVoiceChannel, releaseVoiceChannel } from "@/lib/server/bot-integration";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
@@ -141,6 +141,9 @@ const VOICE_SWEEP_THROTTLE_MS = VOICE_SWEEP_THROTTLE_SECONDS * 1000;
 const VOICE_SWEEP_BATCH = 40;
 /** Purge des lignes rendues : au plus une fois par heure, pas à chaque passe. */
 const VOICE_PURGE_INTERVAL_MS = 3_600_000;
+/** Lignes effacées par requête, et nombre de requêtes au plus par purge. */
+const VOICE_PURGE_BATCH = VOICE_SWEEP_BATCH * 5;
+const VOICE_PURGE_MAX_BATCHES = 10;
 /**
  * Nom envoyé au bot quand il refuse celui de l'équipe (`INVALID_VOICE_CHANNEL_NAME`) :
  * le même repli que le sien (`FALLBACK_VOICE_NAME`), jamais un pseudo.
@@ -354,11 +357,16 @@ async function loadVoiceRows(matchIds: readonly number[]): Promise<VoiceRow[]> {
 async function purgeReleasedRows(): Promise<void> {
   if (Date.now() - sweep.purgedAt < VOICE_PURGE_INTERVAL_MS) return;
   // Horodatée après le `DELETE` seulement : une purge en échec se rejoue à la passe suivante.
-  await run(
-    `DELETE FROM bg_match_voice_channels
-     WHERE released_at IS NOT NULL AND released_at < NOW() - INTERVAL ${VOICE_ROW_RETENTION_DAYS} DAY
-     LIMIT ${VOICE_SWEEP_BATCH * 5}`,
-  );
+  const db = await getDatabase();
+  // Un arriéré (plus de lignes échues que d'un lot) se résorbe dans la passe : la durée de garde annoncée tient.
+  for (let batch = 0; batch < VOICE_PURGE_MAX_BATCHES; batch++) {
+    const [result] = await db.execute<ResultSetHeader>(
+      `DELETE FROM bg_match_voice_channels
+       WHERE released_at IS NOT NULL AND released_at < NOW() - INTERVAL ${VOICE_ROW_RETENTION_DAYS} DAY
+       LIMIT ${VOICE_PURGE_BATCH}`,
+    );
+    if (Number(result.affectedRows) < VOICE_PURGE_BATCH) break;
+  }
   sweep.purgedAt = Date.now();
 }
 
@@ -389,6 +397,8 @@ export const OPEN_DUE_CHANNELS_SQL = `SELECT v.match_id, v.team_id, v.channel_id
 
 /** Un salon ouvert n'est redemandé qu'une fois par minute. */
 const VOICE_RECHECK_MS = 60_000;
+/** Délai avant de redemander un salon dont la vérification a échoué sur le canal du bot. */
+const VOICE_RECHECK_RETRY_MS = 10_000;
 /** Appels au bot en parallèle pendant la revérification : une passe ne s'éternise pas sur un bot lent. */
 const VOICE_RECHECK_CONCURRENCY = 5;
 /** Au plus tant de salons revérifiés par passe, les plus anciennement vus d'abord. */
@@ -434,8 +444,9 @@ async function recheckOpenChannels(touched: Set<number>): Promise<void> {
       sweep.checkedAt.set(next.key, Date.now());
       if (!(await recheckOneChannel(next.row, touched))) {
         botDown = true;
-        // Un salon qui n'a pas pu être vérifié n'est pas « vu » : redemandé à la passe suivante, pas dans une minute.
-        sweep.checkedAt.delete(next.key);
+        // Un salon qui n'a pas pu être vérifié n'est pas « vu » : redemandé dans `VOICE_RECHECK_RETRY_MS`
+        // et derrière les salons plus anciennement vus (un salon lent n'ouvre pas chaque passe).
+        sweep.checkedAt.set(next.key, Date.now() - VOICE_RECHECK_MS + VOICE_RECHECK_RETRY_MS);
       }
     }
   };
