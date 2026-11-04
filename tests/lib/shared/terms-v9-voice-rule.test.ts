@@ -31,10 +31,10 @@ describe("PRIVACY_CHANGES — salons vocaux (décision du 2026-11-04 : intérêt
     const en = PRIVACY_CHANGES_EN[TERMS_V9_ID].details.join(" ");
 
     expect(fr).toContain("repose toujours sur l'intérêt légitime de l'association");
-    expect(fr).toContain("ce comptage est anonyme (aucune donnée personnelle n'en est gardée ni montrée)");
+    expect(fr).toContain("ce nombre ne sert qu'à retenir le lancement du match et n'est plus montré à personne");
     expect(fr).not.toContain("t'y opposer");
     expect(en).toContain("still rests on the association's legitimate interest");
-    expect(en).toContain("this count is anonymous (no personal data from it is kept or shown)");
+    expect(en).toContain("that number only serves to hold the match's launch and is no longer shown to anyone");
     expect(en).not.toContain("object to it");
   });
 });
@@ -57,8 +57,8 @@ describe("PRIVACY_CHANGES — conditions d'utilisation, version 9", () => {
     const en = PRIVACY_CHANGES_EN[TERMS_V9_ID].details.join(" ");
     const v6 = change("2026-10-conditions-v6-acceptation-pour-tous");
 
-    expect(fr).toContain("le message privé qui annonçait la version 6 des conditions d'utilisation finissait par « Aucun accord ne t'est demandé »");
-    expect(en).toContain("the private message announcing version 6 of the terms of use ended with “No consent is asked of you”");
+    expect(fr).toContain("le message privé qui annonçait la version 6 des conditions d'utilisation disait « Aucun accord ne t'est demandé »");
+    expect(en).toContain("the private message announcing version 6 of the terms of use said “No consent is asked of you”");
     // L'entrée publiée de la version 6 n'est jamais retouchée.
     expect(v6.asksTermsAcceptance).toBeUndefined();
     expect(v6.publishedAt).toBe("2026-10-19");
@@ -94,11 +94,13 @@ describe("/rgpd — salons vocaux d'équipe (intérêt légitime, décision du 2
     const en = readSource("app/rgpd/RgpdEn.tsx");
 
     expect(fr).toContain("Ce comptage relève de l&apos;<strong>intérêt légitime</strong> de l&apos;association");
-    expect(fr).toContain("aucune donnée personnelle n&apos;en est gardée ni montrée) : il n&apos;a pas de droit");
+    expect(fr).toContain("il ne sert qu&apos;à retenir le lancement et n&apos;est montré à personne) : il n&apos;a pas de droit");
+    expect(fr).not.toContain("Salon vocal : 3/5");
     expect(fr).not.toContain("vous opposer à ce traitement en le demandant à l&apos;association");
     expect(fr).not.toContain("<strong>exécution du contrat</strong> : dans un tournoi qui a");
     expect(en).toContain("This count rests on the association&apos;s <strong>legitimate interest</strong>");
-    expect(en).toContain("no personal data from it is kept or shown): it has no right to object of its");
+    expect(en).toContain("it only serves to hold the launch and is shown to no one): it has no right to object of its");
+    expect(en).not.toContain("Voice channel: 3/5");
     expect(en).not.toContain("object to this processing by asking the association");
     expect(en).not.toContain("<strong>performance of the contract</strong>: in a tournament with the option");
   });
@@ -116,9 +118,9 @@ describe("/regles — règle commune « Salons vocaux d'équipe »", () => {
     expect(enBody).toContain(`from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before each match's time`);
     expect(enBody).toContain(`a ${VOICE_CHANNEL_CAPACITY}-seat voice channel`);
     // Décision R2 du 2026-11-04 : comptage anonyme, sans droit d'opposition.
-    expect(frSection?.bullets?.join(" ")).toContain("Ce comptage est anonyme : aucune donnée personnelle n'en est gardée ni montrée. Il repose sur l'intérêt légitime de l'association");
+    expect(frSection?.bullets?.join(" ")).toContain("Ce comptage est anonyme : il ne sert qu'à retenir le lancement et n'est montré à personne (la page du match dit seulement si chaque salon est ouvert). Il repose sur l'intérêt légitime de l'association");
     expect(frSection?.bullets?.join(" ")).not.toContain("t'y opposer");
-    expect(enSection?.bullets?.join(" ")).toContain("This count is anonymous: no personal data from it is kept or shown. It rests on the association's legitimate interest");
+    expect(enSection?.bullets?.join(" ")).toContain("This count is anonymous: it only serves to hold the launch and is shown to no one (the match page only says whether each channel is open). It rests on the association's legitimate interest");
     expect(enSection?.bullets?.join(" ")).not.toContain("object to it");
   });
 });
@@ -135,10 +137,26 @@ describe("conditions d'utilisation v9 — salons vocaux", () => {
     const en = TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match")?.paragraphs.join("\n") ?? "";
 
     expect(fr).toContain("fait partie du **déroulement du tournoi**");
-    expect(fr).toContain("Ce comptage, anonyme (aucune donnée personnelle n'en est gardée ni montrée), repose sur l'intérêt légitime de l'association au bon déroulement des tournois.");
+    expect(fr).toContain("Ce comptage, anonyme (un nombre, jamais qui ; il ne sert qu'à retenir le lancement et n'est montré à personne : la page du match dit seulement si chaque salon est ouvert), repose sur l'intérêt légitime de l'association au bon déroulement des tournois.");
     expect(fr).not.toContain("s'y opposer");
     expect(en).toContain("is part of the **running of the tournament**");
-    expect(en).toContain("This count, which is anonymous (no personal data from it is kept or shown), rests on the association's legitimate interest in the smooth running of tournaments.");
+    expect(en).toContain("This count, which is anonymous (a number, never who; it only serves to hold the launch and is shown to no one: the match page only says whether each channel is open), rests on the association's legitimate interest in the smooth running of tournaments.");
     expect(en).not.toContain("object to it");
+  });
+});
+
+// Décision R3 du 2026-11-04, revue juridique #546 cycle 3 : les textes disent
+// tout ce que fait `account-deletion-hold.ts` (OG, puis OG2… OG10, sinon le pseudo d'emprunt).
+describe("pseudo rendu à la réactivation — suffixe « OG » (FR + EN)", () => {
+  it("legalTexts_ogSuffix_mentionsCounterAndFallbackFrAndEn", () => {
+    const fr = TERMS_SECTIONS.find((s) => s.id === "compte")?.paragraphs.join(" ") ?? "";
+    const en = TERMS_SECTIONS_EN.find((s) => s.id === "compte")?.paragraphs.join(" ") ?? "";
+
+    expect(fr).toContain("« OG2 », « OG3 »… jusqu'à « OG10 » si ceux-là le sont aussi, à défaut le pseudo d'emprunt");
+    expect(en).toContain("“OG2”, “OG3”… up to “OG10” if those are taken too, failing that the borrowed username");
+    expect(change(TERMS_V9_ID).details.join(" ")).toContain("jusqu'à « OG10 »");
+    expect(PRIVACY_CHANGES_EN[TERMS_V9_ID].details.join(" ")).toContain("up to “OG10”");
+    expect(readSource("app/rgpd/page.tsx")).toContain("jusqu&apos;à « OG10 »");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("up to “OG10”");
   });
 });

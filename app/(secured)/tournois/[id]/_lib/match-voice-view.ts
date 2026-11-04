@@ -57,10 +57,10 @@ export type PolledMatchVoice = {
   voice: MatchVoiceInfo | null;
 };
 
-/** Empreinte d'un état des salons de l'instantané : elle change à chaque comptage publié. */
+/** Empreinte d'un état des salons de l'instantané : elle change à chaque état publié. */
 export function voiceStreamKey(voice: MatchVoiceInfo | null): string {
   if (voice === null) return "none";
-  return [voice.team1State, voice.team1Members, voice.team2State, voice.team2Members, voice.pending].join(":");
+  return [voice.team1State, voice.team2State, voice.pending].join(":");
 }
 
 /**

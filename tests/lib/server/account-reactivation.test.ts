@@ -7,6 +7,7 @@ jest.mock("@/lib/server/ranking-cache");
 jest.mock("@/lib/server/stats-cache");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/users/account-deletion", () => ({ listSoloRegistrationTournamentIds: jest.fn() }));
+jest.mock("@/lib/server/bot-integration", () => ({ sendBotLog: jest.fn() }));
 
 import crypto from "node:crypto";
 import { getDatabase } from "@/lib/server/database";
@@ -16,6 +17,7 @@ import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { listSoloRegistrationTournamentIds } from "@/lib/server/users/account-deletion";
+import { sendBotLog } from "@/lib/server/bot-integration";
 import {
   createReactivationTicket,
   peekReactivationTicket,
@@ -163,13 +165,55 @@ describe("reactivateAccount", () => {
     // Le compte revit avec son vrai pseudo et son avatar, sur la transaction.
     expect(restoreAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7);
     expect(connection.commit).toHaveBeenCalled();
-    expect(recordAccountReactivation).toHaveBeenCalledWith({
-      userId: 7,
-      accountCreatedAt: "2025-01-01 10:00:00",
-      undoneRequestAt: String(RECENT),
-    });
+    expect(recordAccountReactivation).toHaveBeenCalledWith(
+      {
+        userId: 7,
+        accountCreatedAt: "2025-01-01 10:00:00",
+        undoneRequestAt: String(RECENT),
+      },
+      { strict: true },
+    );
     expect(invalidateTeamIdentityViews).toHaveBeenCalled();
     expect(invalidateStats).toHaveBeenCalled();
+  });
+
+  // Revue juridique #546, cycle 3 : la ligne de réactivation précède le commit.
+  it("reactivateAccount_valid_journalsBeforeCommit", async () => {
+    const connection = transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+    });
+
+    await reactivateAccount(TOKEN);
+
+    const journaled = jest.mocked(recordAccountReactivation).mock.invocationCallOrder[0];
+    const committed = connection.commit.mock.invocationCallOrder[0];
+    expect(journaled).toBeLessThan(committed);
+  });
+
+  it("reactivateAccount_journalWriteFails_rollsBackWithoutCommit", async () => {
+    const connection = transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+    });
+    jest.mocked(recordAccountReactivation).mockRejectedValueOnce(new Error("EACCES"));
+
+    await expect(reactivateAccount(TOKEN)).rejects.toThrow("EACCES");
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(invalidateTeamIdentityViews).not.toHaveBeenCalled();
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("reactivateAccount_valid_logsReactivationWithoutPseudo", async () => {
+    transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+    });
+
+    await reactivateAccount(TOKEN);
+
+    expect(sendBotLog).toHaveBeenCalledWith("↩️ Compte réactivé — suppression demandée annulée.", { category: "signups" });
   });
 
   it("reactivateAccount_valid_republishesSoloEntryTournaments", async () => {

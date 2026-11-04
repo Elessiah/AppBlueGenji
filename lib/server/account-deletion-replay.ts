@@ -203,6 +203,20 @@ async function replayReactivation(
   }
 }
 
+/**
+ * Passe par la demande un compte restauré **vivant** (sauvegarde antérieure à
+ * sa demande) dont la fenêtre de trente jours est close, avant son effacement.
+ * Un compte déjà en attente ou supprimé (`USER_NOT_FOUND`) n'a rien à refaire.
+ */
+async function requestRestoredLiveAccount(entry: AccountDeletionEntry): Promise<void> {
+  try {
+    await requestAccountDeletion(entry.userId, { requestedAt: new Date(entry.deletedAt) });
+  } catch (error) {
+    if (error instanceof Error && error.message === "USER_NOT_FOUND") return;
+    throw error;
+  }
+}
+
 /** Rejoue une suppression par le chemin ordinaire, et la compte. */
 async function replayDeletion(
   entry: AccountDeletionEntry,
@@ -219,6 +233,12 @@ async function replayDeletion(
       log(`  ✓ #${entry.userId} — demande de suppression rejouée`);
       return;
     }
+    // Revenu vivant avec la sauvegarde (antérieure à la demande), le compte
+    // passe d'abord par la demande — quitter ses équipes, céder ses tournois,
+    // retirer casts, invitations et inscriptions —, comme l'annoncent /rgpd et
+    // le registre (T01) : effacé directement, il laisserait un propriétaire
+    // anonyme à ses équipes.
+    await requestRestoredLiveAccount(entry);
     const plan = await deleteOwnAccount(entry.userId);
     report.replayed += 1;
     log(`  ✓ #${entry.userId} — ${plan.mode === "ERASE" ? "effacé" : "anonymisé"}`);

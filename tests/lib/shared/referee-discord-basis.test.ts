@@ -18,7 +18,9 @@ import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 import { DONNEES_PROFIL, DROITS, REFEREE_DISCORD_BEFORE_V7_SCOPE, REFEREE_DISCORD_SCOPE } from "@/lib/shared/rgpd-policy";
 import { DROITS_EN } from "@/lib/shared/rgpd-policy-en";
 
-const ID = "2026-11-tag-discord-arbitre-execution-du-service";
+const ID = "2026-11-tag-discord-arbitre-version-9";
+// Entrée déjà publiée sur main (5 novembre, version 7) : jamais retouchée (revue juridique #546, cycle 3).
+const PUBLISHED_ID = "2026-11-tag-discord-arbitre-execution-du-service";
 const entry = PRIVACY_CHANGES.find((change) => change.id === ID);
 const english = PRIVACY_CHANGES_EN[ID];
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
@@ -52,14 +54,27 @@ describe("PRIVACY_CHANGES — base du tag Discord de l'arbitre", () => {
 
   it("privacyChanges_refereeDiscordBasis_namesVersion9NotVersion7FrAndEn", () => {
     expect(entry?.summary).toContain("une fois la version 9 des conditions ou une suivante acceptée");
-    expect(entry?.summary).not.toContain("version 7");
+    expect(entry?.summary).not.toContain("la version 7");
     expect(english?.summary).toContain("once version 9 of the terms or a later one is accepted");
     expect(english?.summary).not.toContain("version 7");
   });
 
-  it("privacyChanges_refereeDiscordBasis_followsBattlenetEntry", () => {
+  it("privacyChanges_refereeDiscordBasis_followsPublishedEntry", () => {
     const index = PRIVACY_CHANGES.findIndex((change) => change.id === ID);
-    expect(PRIVACY_CHANGES[index - 1]?.id).toBe("2026-11-battlenet-requis-overwatch-seulement");
+    expect(PRIVACY_CHANGES[index - 1]?.id).toBe(PUBLISHED_ID);
+    expect(PRIVACY_CHANGES[index - 2]?.id).toBe("2026-11-battlenet-requis-overwatch-seulement");
+  });
+
+  it("privacyChanges_publishedRefereeDiscordEntry_untouchedFrAndEn", () => {
+    const published = PRIVACY_CHANGES.find((change) => change.id === PUBLISHED_ID);
+    expect(published?.publishedAt).toBe("2026-11-05");
+    expect(published?.summary).toContain("une fois la version 7 des conditions ou une suivante acceptée");
+    expect(PRIVACY_CHANGES_EN[PUBLISHED_ID]?.summary).toContain("once version 7 of the terms or a later one is accepted");
+  });
+
+  it("privacyChanges_refereeDiscordBasis_correctsVersion7NoticeFrAndEn", () => {
+    expect(entry?.details[0]).toContain("et non la version 7, comme l'annonçait l'avis du 5 novembre 2026");
+    expect(english?.details[0]).toContain("not version 7, as the notice of 5 November 2026 said");
   });
 });
 

@@ -284,11 +284,11 @@ describe("ce que lit le visiteur sans compte", () => {
     expect(played.replayUrl).toBe(url);
   });
 
-  it("spectatorSnapshot_voice_stripsCountsKeepsPending", () => {
+  it("spectatorSnapshot_voice_hidesChannelStatesKeepsPending", () => {
     const snapshot = tournamentSnapshot({
-      matches: [bracketMatch({ id: 1, voice: { team1Members: 3, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true } })],
+      matches: [bracketMatch({ id: 1, voice: { team1State: "OPEN", team2State: "FAILED", pending: true } })],
     });
-    expect(spectatorSnapshot(snapshot).matches[0].voice).toEqual({ team1Members: null, team2Members: null, team1State: "WAITING", team2State: "WAITING", pending: true });
+    expect(spectatorSnapshot(snapshot).matches[0].voice).toEqual({ team1State: "WAITING", team2State: "WAITING", pending: true });
   });
 
   it("retire les codes de replay, réservés aux membres connectés", () => {

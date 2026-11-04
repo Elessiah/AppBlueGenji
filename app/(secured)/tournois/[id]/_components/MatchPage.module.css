@@ -447,8 +447,3 @@
   gap: 2px 10px;
   min-width: 0;
 }
-
-/* Le compteur ne se coupe jamais : sur une colonne étroite il passe sous le nom. */
-.voiceCount {
-  white-space: nowrap;
-}

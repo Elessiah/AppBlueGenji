@@ -2405,13 +2405,26 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
     const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
     expect(t18.legalBasis).toMatch(/^Intérêt légitime \(bon déroulement des tournois/);
-    expect(t18.legalBasis).toContain("le comptage est anonyme (un nombre, jamais qui : aucune donnée personnelle n'en est gardée ni montrée), sans droit d'opposition propre");
+    expect(t18.legalBasis).toContain("le comptage est anonyme (un nombre, jamais qui ; il ne sert qu'à retenir le lancement et n'est montré à personne), sans droit d'opposition propre");
     expect(t18.legalBasis).not.toContain("exercé en le demandant à l'association");
     expect(t18.legalBasis).not.toContain("Exécution du contrat");
     expect(t18En.legalBasis).toMatch(/^Legitimate interest \(smooth running of tournaments/);
-    expect(t18En.legalBasis).toContain("the count is anonymous (a number, never who: no personal data from it is kept or shown), with no right to object of its own");
+    expect(t18En.legalBasis).toContain("the count is anonymous (a number, never who; it only serves to hold the launch and is shown to no one), with no right to object of its own");
     expect(t18En.legalBasis).not.toContain("exercised by asking the association");
     expect(t18En.legalBasis).not.toContain("Performance of the contract");
+  });
+
+  // Décision de l'utilisateur du 2026-11-04 : le nombre de présents n'est montré à personne.
+  it("processingRegister_t18_countShownToNoOneFrAndEn", () => {
+    const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
+    const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
+    expect(t18.subPurposes.join(" ")).toContain("ce nombre n'est montré à personne");
+    expect(t18.subPurposes.join(" ")).not.toContain("Salon vocal : n/");
+    expect(t18.recipients.join(" ")).toContain("jamais le nombre de personnes");
+    expect(t18.recipients.join(" ")).not.toContain("affiche le nombre");
+    expect(t18En.subPurposes.join(" ")).toContain("that number is shown to no one");
+    expect(t18En.recipients.join(" ")).toContain("never the number of people");
+    expect(t18En.recipients.join(" ")).not.toContain("displays the number");
   });
 
   it("processingRegister_t18_botDurationsComeFromTheirConstantsFrAndEn", () => {

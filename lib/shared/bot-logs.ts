@@ -170,8 +170,17 @@ export function formatPlayerSignupLog(context: { provider: PlayerSignupProvider 
  * départ ne soit pas compté deux fois si le joueur revient.
  */
 export function formatAccountDeletionLog(context: { days: number }): string {
-  const detail = `suppression demandée, définitive sous ${context.days} jours`;
-  return `${leadOn("🗑️", "Compte supprimé", detail)}.`;
+  const detail = `définitive sous ${context.days} jours, sauf réactivation`;
+  return `${leadOn("🗑️", "Suppression de compte demandée", detail)}.`;
+}
+
+/**
+ * Réactivation d'un compte en attente de suppression : le pendant de
+ * {@link formatAccountDeletionLog}, même canal, même discrétion — ni pseudo
+ * ni identifiant. Sans elle, le staff croirait parti un joueur revenu.
+ */
+export function formatAccountReactivationLog(): string {
+  return `${leadOn("↩️", "Compte réactivé", "suppression demandée annulée")}.`;
 }
 
 /**

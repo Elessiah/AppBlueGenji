@@ -238,4 +238,27 @@ describe("recordAccountReactivation", () => {
 
     expect((await readAccountDeletionJournal(file)).entries).toEqual([entry(2), reactivated]);
   });
+
+  it("recordAccountReactivation_writeFailsNotStrict_resolvesAndSignals", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    await writeFile(path.join(dir, "sub"), "x");
+
+    await expect(recordAccountReactivation(key, { filePath: file, now })).resolves.toBeUndefined();
+    expect(error).toHaveBeenCalledTimes(1);
+  });
+
+  // Revue juridique #546, cycle 3 : la réactivation s'annule si sa ligne n'est pas écrite.
+  it("recordAccountReactivation_writeFailsStrict_rejects", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    await writeFile(path.join(dir, "sub"), "x");
+
+    await expect(recordAccountReactivation(key, { filePath: file, now, strict: true })).rejects.toHaveProperty("code");
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it("recordAccountReactivation_strictSuccess_writesLine", async () => {
+    await recordAccountReactivation(key, { filePath: file, now, strict: true });
+
+    expect((await readAccountDeletionJournal(file)).entries).toEqual([reactivated]);
+  });
 });

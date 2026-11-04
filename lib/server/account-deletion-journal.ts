@@ -149,17 +149,24 @@ export function recordAccountDeletion(
  * trace, une sauvegarde prise pendant les trente jours ramènerait le compte en
  * attente de suppression. La ligne de réactivation le fait réactiver au rejeu
  * (`replayAccountDeletions`). Un échec est dit dans les journaux du serveur.
+ *
+ * `strict` : l'échec est levé au lieu d'être avalé — la réactivation écrit sa
+ * ligne **avant** son commit et s'annule si elle échoue (revue juridique #546,
+ * cycle 3) : une réactivation commitée sans ligne laisserait au journal la
+ * demande en attente, qu'une restauration rejouerait.
  */
 export function recordAccountReactivation(
   key: AccountReactivationKey,
-  options: { filePath?: string; now?: Date } = {},
+  options: { filePath?: string; now?: Date; strict?: boolean } = {},
 ): Promise<void> {
   const filePath = options.filePath ?? accountDeletionJournalPath();
   const now = options.now ?? new Date();
-  return enqueue(async () => {
+  const written = enqueue(async () => {
     const current = await readAccountDeletionJournal(filePath);
     await writeJournal(pruneJournal(withReactivationEntry(current.entries, key, now), now), filePath);
-  }).catch((error: unknown) => {
+  });
+  if (options.strict) return written;
+  return written.catch((error: unknown) => {
     console.error(
       `[account-deletion-journal] réactivation du compte #${key.userId} non consignée (${filePath}) :`,
       error,

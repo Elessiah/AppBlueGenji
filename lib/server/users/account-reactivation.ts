@@ -114,6 +114,21 @@ async function republishSoloEntryTournaments(userId: number): Promise<void> {
 }
 
 /**
+ * Ligne du journal Discord du staff (canal `signups`, sans pseudo) : la
+ * demande y était notée, son annulation l'est aussi. Meilleur effort, ne lève
+ * jamais. Imports différés : ce module est lu par `auth.ts`.
+ */
+async function logReactivation(): Promise<void> {
+  try {
+    const { sendBotLog } = await import("@/lib/server/bot-integration");
+    const { formatAccountReactivationLog } = await import("@/lib/shared/bot-logs");
+    sendBotLog(formatAccountReactivationLog(), { category: "signups" });
+  } catch (error) {
+    console.error("[account-reactivation] alerte de réactivation non écrite", error);
+  }
+}
+
+/**
  * Consomme le ticket et relève la demande de suppression, sous le verrou du
  * compte (fenêtre relue dessous : la suppression définitive ne passe pas entre
  * la lecture et l'écriture). Rend le compte et sa porte d'entrée, ou `null` —
@@ -170,21 +185,32 @@ export async function reactivateAccount(
     // Une session ouverte pendant la demande (connexion en cours au moment du
     // `DELETE` de la demande) redeviendrait valide avec le compte : toutes
     // partent, seule celle de la réactivation sera créée ensuite.
-    if (restored) await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
-    await connection.commit();
-    if (!restored) return null;
-    // Après le commit : la demande en attente ne doit plus être rejouée par une
+    if (!restored) {
+      await connection.commit();
+      return null;
+    }
+    await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
+    // Avant le commit, et levé s'il échoue (la transaction s'annule, le ticket
+    // revient) : la demande en attente ne doit plus être rejouée par une
     // restauration — la réactivation l'y remplace, et une sauvegarde prise
     // pendant les trente jours, restaurée, réactive le compte au rejeu
-    // (décision R1) —, et les vues en cache montraient le pseudo d'emprunt.
-    await recordAccountReactivation({
-      userId,
-      accountCreatedAt: String(row.created_at),
-      undoneRequestAt: String(row.deletion_requested_at),
-    });
+    // (décision R1). Un commit qui échouerait ensuite laisse une ligne de
+    // réactivation pour une demande restée en attente : son titulaire, qui
+    // voit l'échec, réactive de nouveau (même ligne) ou laisse courir le délai.
+    await recordAccountReactivation(
+      {
+        userId,
+        accountCreatedAt: String(row.created_at),
+        undoneRequestAt: String(row.deletion_requested_at),
+      },
+      { strict: true },
+    );
+    await connection.commit();
+    // Les vues en cache montraient le pseudo d'emprunt.
     invalidateTeamIdentityViews();
     invalidateStats();
     await republishSoloEntryTournaments(userId);
+    await logReactivation();
     return { userId, event: ticket.login_event as ConnectionLogEvent };
   } catch (error) {
     await connection.rollback().catch(() => {});

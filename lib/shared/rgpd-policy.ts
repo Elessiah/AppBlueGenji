@@ -97,7 +97,7 @@ export const REFEREE_USERNAME_MEMBERS_SCOPE =
  * `MATCH_PAGE_CONNECT.md`) : depuis le 6 novembre 2026, l'exécution du service,
  * strictement nécessaire à son fonctionnement minimum (décision de
  * l'utilisateur du 2026-11-03, auparavant l'intérêt légitime), une fois la
- * version 7 acceptée par l'arbitre — avant, `REFEREE_DISCORD_BEFORE_V7_SCOPE` ; son opposition à
+ * version 9 acceptée par l'arbitre — avant, `REFEREE_DISCORD_BEFORE_V7_SCOPE` (nom hérité : il vaut avant la version 9) ; son opposition à
  * l'arbitrage, retenue, l'en retire toujours avec ses matchs non terminés.
  */
 export const REFEREE_DISCORD_SCOPE =
@@ -105,7 +105,7 @@ export const REFEREE_DISCORD_SCOPE =
 
 /**
  * Même présentation du tag Discord, pour un arbitre qui n'a pas encore accepté
- * la version 7 des conditions : intérêt légitime, avec un droit d'opposition,
+ * la version 9 des conditions (nom hérité de la version 7) : intérêt légitime, avec un droit d'opposition,
  * comme son pseudo et son BattleTag (`REFEREE_BATTLETAG_BEFORE_V7_SCOPE`).
  */
 export const REFEREE_DISCORD_BEFORE_V7_SCOPE =

@@ -335,8 +335,8 @@ describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", (
     // Revue juridique de #491 : la preuve d'acceptation (T13) fixe aussi cette base.
     const T13 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T13");
     const T13_EN = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T13");
-    expect(T13?.subPurposes).toContain("Fixer la base de la présentation d'un arbitre désigné aux parties de ses matchs (registre T04) : l'intérêt légitime tant qu'il n'a pas accepté la version 7 ou une suivante, le contrat ensuite");
-    expect(T13_EN?.subPurposes).toContain("Setting the basis for presenting an assigned referee to the parties to their matches (record T04): legitimate interest until they have accepted version 7 or a later one, the contract afterwards");
+    expect(T13?.subPurposes).toContain("Fixer la base de la présentation d'un arbitre désigné aux parties de ses matchs (registre T04) : l'intérêt légitime tant qu'il n'a pas accepté la version 7 ou une suivante — la version 9 pour son tag Discord certifié —, le contrat ensuite");
+    expect(T13_EN?.subPurposes).toContain("Setting the basis for presenting an assigned referee to the parties to their matches (record T04): legitimate interest until they have accepted version 7 or a later one — version 9 for their certified Discord tag —, the contract afterwards");
     expect(T04?.legalBasis).toContain("exécution du service (les arbitres agissant pour l'association) pour le recueil de son « Prêt »");
     expect(T04_EN?.legalBasis).toContain("performance of the service (the referees acting for the association) for collecting their “Ready”");
     // Revue juridique de #491 : retrait d'office quand l'arbitre devient joueur du match avant son lancement.

@@ -150,13 +150,38 @@ describe("replayAccountDeletions — demande en attente (décision du 2026-11-04
     expect(lines.join("\n")).toContain("demande de suppression rejouée");
   });
 
-  it("replayAccountDeletions_pendingWindowClosed_deletesForGood", async () => {
+  // Revue juridique #546, cycle 3 : revenu vivant, le compte passe d'abord par la demande
+  // (équipes quittées, tournois cédés…) avant d'être effacé.
+  it("replayAccountDeletions_pendingWindowClosedLiveRow_requestsThenDeletes", async () => {
     restoredDb({ 7: { created_at: CREATED, is_deleted: 0 } });
 
     await replayAccountDeletions([pending("2026-09-20T10:00:00.000Z")], { log });
 
+    expect(requestAccountDeletion).toHaveBeenCalledWith(7, { requestedAt: new Date("2026-09-20T10:00:00.000Z") });
     expect(deleteOwnAccount).toHaveBeenCalledWith(7);
-    expect(requestAccountDeletion).not.toHaveBeenCalled();
+    expect(jest.mocked(requestAccountDeletion).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(deleteOwnAccount).mock.invocationCallOrder[0],
+    );
+  });
+
+  it("replayAccountDeletions_requestSaysUserNotFound_stillDeletes", async () => {
+    restoredDb({ 7: { created_at: CREATED, is_deleted: 0 } });
+    jest.mocked(requestAccountDeletion).mockRejectedValueOnce(new Error("USER_NOT_FOUND"));
+
+    const report = await replayAccountDeletions([entry(7)], { log });
+
+    expect(deleteOwnAccount).toHaveBeenCalledWith(7);
+    expect(report.replayed).toBe(1);
+  });
+
+  it("replayAccountDeletions_requestFailsOtherwise_failedWithoutDelete", async () => {
+    restoredDb({ 7: { created_at: CREATED, is_deleted: 0 } });
+    jest.mocked(requestAccountDeletion).mockRejectedValueOnce(new Error("DB_DOWN"));
+
+    const report = await replayAccountDeletions([entry(7)], { log });
+
+    expect(deleteOwnAccount).not.toHaveBeenCalled();
+    expect(report.failed).toBe(1);
   });
 
   it("replayAccountDeletions_pendingWindowOpenDryRun_saysRequestWouldReplay", async () => {

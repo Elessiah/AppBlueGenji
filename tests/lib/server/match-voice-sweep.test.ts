@@ -460,7 +460,7 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
     expect(connection.execute).not.toHaveBeenCalled();
   });
 
-  it("loadMatchVoiceInfos_unlaunchedMatchWithRows_returnsCounts", async () => {
+  it("loadMatchVoiceInfos_unlaunchedMatchWithRows_returnsStatesWithoutCounts", async () => {
     const connection = connectionMock();
     connection.execute
       .mockResolvedValueOnce([
@@ -472,10 +472,10 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
       ])
       .mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
-    expect(infos.get(42)).toEqual({ team1Members: 3, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true });
+    expect(infos.get(42)).toEqual({ team1State: "OPEN", team2State: "OPEN", pending: true });
   });
 
-  it("loadMatchVoiceInfos_staleCount_showsLastCountButPending", async () => {
+  it("loadMatchVoiceInfos_staleCount_showsOpenButPending", async () => {
     const connection = connectionMock();
     const stale = new Date(Date.now() - 6 * 60_000).toISOString();
     connection.execute
@@ -488,7 +488,7 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
       ])
       .mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
-    expect(infos.get(42)).toEqual({ team1Members: 5, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true });
+    expect(infos.get(42)).toEqual({ team1State: "OPEN", team2State: "OPEN", pending: true });
   });
 
   it("loadMatchVoiceInfos_freshFailure_showsFailedAndReleasesGate", async () => {
@@ -504,7 +504,7 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
       ])
       .mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
-    expect(infos.get(42)).toEqual({ team1Members: null, team2Members: 2, team1State: "FAILED", team2State: "COUNTED", pending: false });
+    expect(infos.get(42)).toEqual({ team1State: "FAILED", team2State: "OPEN", pending: false });
   });
 
   it("loadMatchVoiceInfos_staleFailure_notShownAsFailed", async () => {
@@ -518,14 +518,14 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
       ])
       .mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
-    expect(infos.get(42)?.team1State).toBe("UNCOUNTED");
+    expect(infos.get(42)?.team1State).toBe("OPEN");
   });
 
   it("loadMatchVoiceInfos_dueMatchWithoutRows_showsPendingLikeTheGate", async () => {
     const connection = connectionMock();
     connection.execute.mockResolvedValueOnce([[], []]).mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
-    expect(infos.get(42)).toEqual({ team1Members: null, team2Members: null, team1State: "WAITING", team2State: "WAITING", pending: true });
+    expect(infos.get(42)).toEqual({ team1State: "WAITING", team2State: "WAITING", pending: true });
   });
 
   it("loadMatchVoiceInfos_soloSide_isNotShown", async () => {

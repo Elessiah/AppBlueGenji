@@ -158,9 +158,9 @@ describe("GET /api/matches/[matchId]/voice", () => {
     expect((await GET(getReq(), matchParams("9"))).status).toBe(404);
   });
 
-  it("get_tracked_returnsVoiceCounts", async () => {
+  it("get_tracked_returnsVoiceStates", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    const voice = { team1Members: 3, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true } as const;
+    const voice = { team1State: "OPEN", team2State: "OPEN", pending: true } as const;
     jest.mocked(readMatchVoice).mockResolvedValue(voice);
     const res = await GET(getReq(), matchParams("9"));
     expect(res.status).toBe(200);

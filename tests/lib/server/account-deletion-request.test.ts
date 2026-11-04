@@ -439,7 +439,7 @@ describe("requestAccountDeletion — journal et forfaits (E1, E5)", () => {
     await requestAccountDeletion(7);
 
     const [message, options] = jest.mocked(sendBotLog).mock.calls[0];
-    expect(message).toContain("Compte supprimé");
+    expect(message).toContain("Suppression de compte demandée");
     expect(message).not.toMatch(/#7\b|7\)/);
     expect(options).toEqual({ category: "signups" });
   });

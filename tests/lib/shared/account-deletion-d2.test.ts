@@ -8,7 +8,7 @@ import {
   successorRoles,
   type TeamSuccessorCandidate,
 } from "@/lib/shared/account-deletion";
-import { formatAccountDeletionLog, formatDeletionWithdrawalLog } from "@/lib/shared/bot-logs";
+import { formatAccountDeletionLog, formatAccountReactivationLog, formatDeletionWithdrawalLog } from "@/lib/shared/bot-logs";
 
 /*
  * ERASURE-D2 — règles pures de la suppression différée : fenêtre de trente
@@ -117,8 +117,15 @@ describe("formatAccountDeletionLog", () => {
   it("formatAccountDeletionLog_days_mentionsDelayWithoutPseudo", () => {
     const actual = formatAccountDeletionLog({ days: 30 });
 
-    expect(actual).toContain("Compte supprimé");
-    expect(actual).toContain("définitive sous 30 jours");
+    expect(actual).toBe("🗑️ Suppression de compte demandée — définitive sous 30 jours, sauf réactivation.");
+  });
+});
+
+describe("formatAccountReactivationLog", () => {
+  it("formatAccountReactivationLog_always_saysReactivatedWithoutPseudo", () => {
+    const actual = formatAccountReactivationLog();
+
+    expect(actual).toBe("↩️ Compte réactivé — suppression demandée annulée.");
   });
 });
 

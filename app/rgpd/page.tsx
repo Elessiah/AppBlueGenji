@@ -417,7 +417,7 @@ function RgpdFr({
           explicite (un compte suspendu peut aussi être réactivé : il revient suspendu). Dès la demande, il est
           montré anonyme partout où il paraissait (pseudo d&apos;emprunt, sans avatar ni lien de fiche : résultats
           passés, classements, effectifs, pages de tournoi) ; son vrai pseudo, qui lui reste réservé, et son avatar
-          sont gardés à part pour la seule réactivation, qui les lui rend (le pseudo suivi de « OG » s&apos;il a tout de même été pris), et effacés au terme du délai. La demande
+          sont gardés à part pour la seule réactivation, qui les lui rend (le pseudo suivi de « OG » s&apos;il a tout de même été pris — « OG2 », « OG3 »… jusqu&apos;à « OG10 » si ceux-là le sont aussi, à défaut le pseudo d&apos;emprunt), et effacés au terme du délai. La demande
           est aussi notée au journal hors base qui rejoue les suppressions après la restauration d&apos;une
           sauvegarde (identifiant et date de création du compte, date de la demande), et y est remplacée, à la
           réactivation, par une ligne qui porte la date de celle-ci et celle de la demande défaite (gardée comme les autres lignes), pour qu&apos;une sauvegarde restaurée ne
@@ -1133,7 +1133,7 @@ function RgpdFr({
             bot échoue, le match n&apos;attend pas). Pour le savoir, le bot compte les personnes présentes dans chaque salon : il tient pour
             cela en mémoire, en permanence (option allumée ou non), sans jamais l&apos;enregistrer, l&apos;état vocal (identifiant Discord du membre et de sa session vocale, salon où il se trouve, micro ou son coupés par lui ou par la modération, partage d&apos;écran ou caméra actifs, demande de parole et mise en sourdine de scène), avec la fiche de membre que Discord y joint (sa fiche sur le serveur, dont pseudo, surnom, avatar, rôles, dates d&apos;arrivée et de boost, exclusion temporaire), des membres du serveur Discord de
             l&apos;association, tel que Discord le lui transmet — celui des autres serveurs où il est présent lui parvient aussi, mais il
-            ne le garde pas (la fiche de membre jointe, si : en mémoire, à jour de Discord, perdue à l&apos;arrêt du bot) ; le site ne reçoit et ne garde que l&apos;identifiant du salon, les numéros du match et de l&apos;équipe, ce <strong>nombre</strong> (« Salon vocal : 3/5 », affiché aux parties du match et au staff, et lisible par tout membre connecté ; un visiteur sans compte voit seulement si le match attend ses salons)
+            ne le garde pas (la fiche de membre jointe, si : en mémoire, à jour de Discord, perdue à l&apos;arrêt du bot) ; le site ne reçoit et ne garde que l&apos;identifiant du salon, les numéros du match et de l&apos;équipe, ce <strong>nombre</strong> (qui ne sert qu&apos;à retenir le lancement et n&apos;est montré à personne : la page du match dit seulement à ses parties et au staff si chaque salon est ouvert et si le match attend ses salons, ce que tout membre connecté peut lire ; un visiteur sans compte voit seulement si le match attend ses salons)
             et les heures du comptage (ou d&apos;une panne du bot), de création et de rendu, jamais qui. Le salon est rendu au bot quand le match est terminé (score validé), annulé,
             retombé en attente ou sorti du programme, quand l&apos;équipe sort de l&apos;appariement, ou quand le tournoi se termine ou éteint
             l&apos;option ; le bot le supprime dès qu&apos;il est vide (au plus tard {VOICE_BOT_RELEASED_MAX_HOURS} heures et {VOICE_BOT_SWEEP_MINUTES} minutes après son rendu, même occupé, bot en marche ; si Discord l&apos;en empêche, il réessaie à chaque balayage, et s&apos;il ne peut plus lire le salon{" "}
@@ -1149,7 +1149,7 @@ function RgpdFr({
             balayage près (au plus {VOICE_BOT_SWEEP_MINUTES} minutes de plus). Le journal d&apos;audit de Discord garde la création et la
             suppression de chaque salon, avec son nom, lisible par l&apos;administration du serveur, pour la durée que Discord fixe. Ce comptage relève de l&apos;<strong>intérêt légitime</strong> de l&apos;association (bon déroulement des tournois : réunir chaque
             équipe avant son match) ; rejoindre un salon reste un choix — mais tant que les deux ne sont pas pleins, le match attend que l&apos;arbitrage force son lancement, sauf si le bot ne répond pas —, et seule la présence de qui le rejoint est comptée. Ce comptage est
-            anonyme (un nombre, jamais qui : aucune donnée personnelle n&apos;en est gardée ni montrée) : il n&apos;a pas de droit
+            anonyme (un nombre, jamais qui ; il ne sert qu&apos;à retenir le lancement et n&apos;est montré à personne) : il n&apos;a pas de droit
             d&apos;opposition propre (<Link href="/rgpd/registre#t18">registre, T18</Link>).
           </p>
         </div>

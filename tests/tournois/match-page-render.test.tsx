@@ -246,12 +246,12 @@ describe("page d'un match — ce que tout le monde lit", () => {
   });
 
   it("render_voiceForStaff_twoColumnGrid", () => {
-    const html = render(match({ voice: { team1Members: 1, team2Members: 1, team1State: "COUNTED", team2State: "COUNTED", pending: true } }), "staff");
+    const html = render(match({ voice: { team1State: "OPEN", team2State: "OPEN", pending: true } }), "staff");
     expect(html).toContain('data-columns="2"');
   });
 
   it("render_scheduledHeldByVoice_launchFactSaysChannelsFilling", () => {
-    const voice = { team1Members: 1, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true } as const;
+    const voice = { team1State: "OPEN", team2State: "OPEN", pending: true } as const;
     const fr = visible(render(match({ startAt: "2026-01-01T00:00:00.000Z", voice }), "staff"));
     const en = visible(render(match({ startAt: "2026-01-01T00:00:00.000Z", voice }), "staff", false, "en"));
     expect(fr).toContain("salons vocaux à remplir");
@@ -259,7 +259,7 @@ describe("page d'un match — ce que tout le monde lit", () => {
   });
 
   it("render_lobbyHeldByVoice_badgeWrapsAndSeparatorHiddenFromReaders", () => {
-    const voice = { team1Members: 1, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true } as const;
+    const voice = { team1State: "OPEN", team2State: "OPEN", pending: true } as const;
     const held = render(match({ startAt: "2026-01-01T00:00:00.000Z", voice }), "staff");
     // La pastille (pas seulement la raison) passe à la ligne ; le point médian est décoratif.
     expect(held).toContain('class="lobby wrap"');
@@ -967,12 +967,13 @@ describe("page d'un match — sous /en", () => {
 });
 
 describe("page d'un match — salons vocaux d'équipe", () => {
-  const held = { team1Members: 3, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true } as const;
+  const held = { team1State: "OPEN", team2State: "OPEN", pending: true } as const;
 
-  it("render_voiceHeld_staffReadsCountsAndWaitingNoteAnnounced", () => {
+  it("render_voiceHeld_staffReadsOpenStatesAndWaitingNoteAnnounced", () => {
     const html = render(match({ voice: held }), "staff");
-    expect(visible(html)).toContain("Salon vocal : 3/5");
-    expect(visible(html)).toContain("Salon vocal : 5/5");
+    expect(visible(html)).toContain("Salon vocal : ouvert");
+    // Décision de l'utilisateur du 2026-11-04 : jamais le nombre de présents.
+    expect(visible(html)).not.toMatch(/\d\/5/);
     expect(visible(html)).toContain("Le match se lance quand les deux salons sont pleins.");
     // Le remplissage change sans que la personne touche à rien : annoncé.
     expect(html).toContain('aria-live="polite"');
@@ -983,32 +984,27 @@ describe("page d'un match — salons vocaux d'équipe", () => {
   });
 
   it("render_voiceNotCreated_saysOpeningSoon", () => {
-    const html = render(match({ voice: { team1Members: null, team2Members: null, team1State: "WAITING", team2State: "WAITING", pending: true } }), "staff");
+    const html = render(match({ voice: { team1State: "WAITING", team2State: "WAITING", pending: true } }), "staff");
     expect(visible(html)).toContain("Salon vocal : bientôt ouvert");
   });
 
   it("render_voiceReleased_noWaitingNote", () => {
-    const html = render(match({ voice: { team1Members: 5, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: false } }), "player");
-    expect(visible(html)).toContain("Salon vocal : 5/5");
+    const html = render(match({ voice: { team1State: "OPEN", team2State: "OPEN", pending: false } }), "player");
+    expect(visible(html)).toContain("Salon vocal : ouvert");
     expect(visible(html)).not.toContain("se lance quand");
     // La zone vivante reste montée, vide : le texte qui y entrera sera annoncé.
     expect(html).toMatch(/<div aria-live="polite"><ul[\s\S]*<\/ul><\/div>/);
   });
 
-  it("render_voiceFull_saysFull", () => {
-    const html = render(match({ voice: held }), "staff");
-    expect(visible(html)).toContain("Salon vocal : 5/5 · complet");
-    expect(visible(html)).not.toContain("Salon vocal : 3/5 · complet");
-  });
-
-  it("render_voiceCreatedNotCounted_saysNotCountedYet", () => {
-    const html = render(match({ voice: { ...held, team1Members: null, team1State: "UNCOUNTED" } }), "staff");
-    expect(visible(html)).toContain("Salon vocal : pas encore compté");
-    expect(visible(html)).not.toContain("bientôt ouvert");
+  it("render_voiceOpen_neverSaysFullOrCount", () => {
+    const html = visible(render(match({ voice: held }), "staff"));
+    expect(html).not.toContain("complet");
+    expect(html).not.toContain("compté");
+    expect(html).not.toContain("bientôt ouvert");
   });
 
   it("render_voiceFailed_saysUnavailableAndGateReleased", () => {
-    const voice = { ...held, team1Members: null, team1State: "FAILED", pending: false } as const;
+    const voice = { ...held, team1State: "FAILED", pending: false } as const;
     const html = render(match({ voice }), "staff");
     expect(visible(html)).toContain("Salon vocal : indisponible");
     expect(visible(html)).toContain("Un salon est indisponible : le match n'attend pas les salons.");
@@ -1017,10 +1013,10 @@ describe("page d'un match — salons vocaux d'équipe", () => {
   });
 
   it("render_voiceFailedEnglish_saysUnavailable", () => {
-    const voice = { ...held, team2Members: null, team2State: "FAILED", pending: false } as const;
+    const voice = { ...held, team2State: "FAILED", pending: false } as const;
     const html = visible(render(match({ voice }), "staff", false, "en"));
     expect(html).toContain("Voice channel: unavailable");
-    expect(html).toContain("Voice channel: 3/5");
+    expect(html).toContain("Voice channel: open");
   });
 
   it("editPage_source_refusalKeepsSavedConfirmationAndSaysEveryRefusal", () => {
@@ -1046,13 +1042,13 @@ describe("page d'un match — salons vocaux d'équipe", () => {
     expect(visible(render(match(), "staff"))).not.toContain("Salon vocal");
   });
 
-  it("render_voiceEnglishFull_saysFull", () => {
-    expect(visible(render(match({ voice: held }), "staff", false, "en"))).toContain("Voice channel: 5/5 · full");
+  it("render_voiceEnglishOpen_neverSaysFull", () => {
+    expect(visible(render(match({ voice: held }), "staff", false, "en"))).not.toContain("full ·");
   });
 
   it("render_voiceEnglish_readsVoiceChannel", () => {
     const html = render(match({ voice: held }), "staff", false, "en");
-    expect(visible(html)).toContain("Voice channel: 3/5");
+    expect(visible(html)).toContain("Voice channel: open");
     expect(visible(html)).toContain("The match launches once both channels are full.");
   });
 });

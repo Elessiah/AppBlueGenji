@@ -15,8 +15,8 @@ import { readSource } from "../helpers/read-source";
 // Salons vocaux sur la page du match (`docs/features/MATCH_VOICE.md`) : la
 // source qui fait foi entre l'instantané du flux et la relecture REST.
 
-const streamed: MatchVoiceInfo = { team1Members: 3, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true };
-const polledVoice: MatchVoiceInfo = { team1Members: 5, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: false };
+const streamed: MatchVoiceInfo = { team1State: "OPEN", team2State: "OPEN", pending: true };
+const polledVoice: MatchVoiceInfo = { team1State: "OPEN", team2State: "OPEN", pending: false };
 
 const polled = (overrides: Partial<PolledMatchVoice> = {}): PolledMatchVoice => ({
   matchId: 34,
@@ -30,12 +30,12 @@ describe("voiceStreamKey", () => {
     expect(voiceStreamKey(null)).toBe("none");
   });
 
-  it("voiceStreamKey_newCount_changesKey", () => {
-    expect(voiceStreamKey({ ...streamed, team1Members: 4 })).not.toBe(voiceStreamKey(streamed));
+  it("voiceStreamKey_gateLifted_changesKey", () => {
+    expect(voiceStreamKey({ ...streamed, pending: false })).not.toBe(voiceStreamKey(streamed));
   });
 
-  it("voiceStreamKey_stateChangeSameCount_changesKey", () => {
-    const waiting: MatchVoiceInfo = { ...streamed, team1Members: null, team1State: "WAITING" };
+  it("voiceStreamKey_stateChange_changesKey", () => {
+    const waiting: MatchVoiceInfo = { ...streamed, team1State: "WAITING" };
 
     expect(voiceStreamKey({ ...waiting, team1State: "FAILED" })).not.toBe(voiceStreamKey(waiting));
   });
@@ -56,7 +56,7 @@ describe("currentMatchVoice", () => {
   });
 
   it("currentMatchVoice_newerSnapshotAfterPoll_streamedWins", () => {
-    const newer: MatchVoiceInfo = { ...streamed, team1Members: 4 };
+    const newer: MatchVoiceInfo = { ...streamed, team2State: "FAILED" };
 
     expect(currentMatchVoice(34, newer, polled(), false)).toBe(newer);
   });

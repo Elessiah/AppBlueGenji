@@ -9,7 +9,6 @@ import {
   voiceChannelsDue,
   voiceGatePending,
   voiceObservationFresh,
-  voiceSideFull,
   voiceTracked,
   type VoiceGateInput,
 } from "@/lib/shared/match-voice";
@@ -141,55 +140,45 @@ describe("matchVoiceInfo", () => {
     expect(matchVoiceInfo(gate({ team1: { isSolo: true, isGhost: false } }))).toBeNull();
   });
 
-  it("matchVoiceInfo_counts_clampsToCapacityAndNullWhenNotCreated", () => {
+  // Décision de l'utilisateur du 2026-11-04 : le nombre de présents ne quitte plus le serveur.
+  it("matchVoiceInfo_tracked_returnsStatesWithoutCounts", () => {
     expect(matchVoiceInfo(gate({ team1Channel: { channelId: "c1", members: 9, failed: false } }))).toEqual({
-      team1Members: VOICE_CHANNEL_CAPACITY,
-      team2Members: null,
-      team1State: "COUNTED",
+      team1State: "OPEN",
       team2State: "WAITING",
       pending: true,
     });
   });
 
-  it("matchVoiceInfo_createdNotCounted_saysUncountedNotWaiting", () => {
+  it("matchVoiceInfo_createdNotCounted_saysOpenNotWaiting", () => {
     const actual = matchVoiceInfo(gate({ team1Channel: { channelId: "c1", members: null, failed: false } }));
 
-    expect(actual?.team1State).toBe("UNCOUNTED");
-    expect(actual?.team1Members).toBeNull();
+    expect(actual?.team1State).toBe("OPEN");
   });
 
   it("matchVoiceInfo_failedSide_saysFailedAndReleasesGate", () => {
     const actual = matchVoiceInfo(gate({ team1Channel: { channelId: null, members: null, failed: true }, team2Channel: full }));
 
-    expect(actual).toEqual({ team1Members: null, team2Members: 5, team1State: "FAILED", team2State: "COUNTED", pending: false });
+    expect(actual).toEqual({ team1State: "FAILED", team2State: "OPEN", pending: false });
+  });
+
+  it("matchVoiceInfo_bothFull_gateLiftedWithoutCounts", () => {
+    const actual = matchVoiceInfo(gate({ team1Channel: full, team2Channel: full }));
+
+    expect(actual).toEqual({ team1State: "OPEN", team2State: "OPEN", pending: false });
   });
 });
 
 describe("shownVoiceSide", () => {
   it("shownVoiceSide_noChannel_waiting", () => {
-    expect(shownVoiceSide(null)).toEqual({ state: "WAITING", members: null });
+    expect(shownVoiceSide(null)).toBe("WAITING");
   });
 
   it("shownVoiceSide_failedEvenWithChannel_failed", () => {
-    expect(shownVoiceSide({ channelId: "c1", members: 4, failed: true })).toEqual({ state: "FAILED", members: null });
+    expect(shownVoiceSide({ channelId: "c1", members: 4, failed: true })).toBe("FAILED");
   });
 
-  it("shownVoiceSide_negativeCount_clampsToZero", () => {
-    expect(shownVoiceSide({ channelId: "c1", members: -2, failed: false })).toEqual({ state: "COUNTED", members: 0 });
-  });
-});
-
-describe("voiceSideFull", () => {
-  it("voiceSideFull_countedAtCapacity_true", () => {
-    expect(voiceSideFull("COUNTED", VOICE_CHANNEL_CAPACITY)).toBe(true);
-  });
-
-  it("voiceSideFull_countedBelowCapacity_false", () => {
-    expect(voiceSideFull("COUNTED", VOICE_CHANNEL_CAPACITY - 1)).toBe(false);
-  });
-
-  it("voiceSideFull_notCounted_false", () => {
-    expect(voiceSideFull("UNCOUNTED", null)).toBe(false);
+  it("shownVoiceSide_created_open", () => {
+    expect(shownVoiceSide({ channelId: "c1", members: 2, failed: false })).toBe("OPEN");
   });
 });
 
@@ -198,43 +187,27 @@ describe("parseMatchVoiceInfo", () => {
     expect(parseMatchVoiceInfo("3/5")).toBeNull();
   });
 
-  it("parseMatchVoiceInfo_badMembers_mapsToNull", () => {
-    expect(parseMatchVoiceInfo({ team1Members: -1, team2Members: 2.5, pending: "yes" })).toEqual({
-      team1Members: null,
-      team2Members: null,
-      team1State: "WAITING",
-      team2State: "WAITING",
-      pending: false,
-    });
+  it("parseMatchVoiceInfo_noStates_waitingAndNotPending", () => {
+    expect(parseMatchVoiceInfo({ pending: "yes" })).toEqual({ team1State: "WAITING", team2State: "WAITING", pending: false });
   });
 
-  it("parseMatchVoiceInfo_olderPayloadWithCount_derivesCounted", () => {
-    expect(parseMatchVoiceInfo({ team1Members: 3, team2Members: null, pending: true })).toEqual({
-      team1Members: 3,
-      team2Members: null,
-      team1State: "COUNTED",
-      team2State: "WAITING",
-      pending: true,
-    });
+  it("parseMatchVoiceInfo_legacyCountedPayload_mapsToOpenAndDropsNumbers", () => {
+    const actual = parseMatchVoiceInfo({ team1Members: 3, team2Members: 5, team1State: "COUNTED", team2State: "UNCOUNTED", pending: true });
+
+    expect(actual).toEqual({ team1State: "OPEN", team2State: "OPEN", pending: true });
   });
 
-  it("parseMatchVoiceInfo_countedWithoutNumber_becomesUncounted", () => {
-    const actual = parseMatchVoiceInfo({ team1Members: null, team2Members: 2, team1State: "COUNTED", team2State: "COUNTED", pending: true });
+  it("parseMatchVoiceInfo_knownStates_keptAsIs", () => {
+    const actual = parseMatchVoiceInfo({ team1State: "FAILED", team2State: "OPEN", pending: false });
 
-    expect(actual?.team1State).toBe("UNCOUNTED");
+    expect(actual).toEqual({ team1State: "FAILED", team2State: "OPEN", pending: false });
   });
 
-  it("parseMatchVoiceInfo_failedWithStrayCount_dropsCount", () => {
-    const actual = parseMatchVoiceInfo({ team1Members: 4, team2Members: 2, team1State: "FAILED", team2State: "COUNTED", pending: false });
-
-    expect(actual).toEqual({ team1Members: null, team2Members: 2, team1State: "FAILED", team2State: "COUNTED", pending: false });
-  });
-
-  it("parseMatchVoiceInfo_unknownState_fallsBackToCount", () => {
-    const actual = parseMatchVoiceInfo({ team1Members: null, team2Members: 1, team1State: "OPEN", team2State: 7, pending: true });
+  it("parseMatchVoiceInfo_unknownState_waiting", () => {
+    const actual = parseMatchVoiceInfo({ team1State: "FULL", team2State: 7, pending: true });
 
     expect(actual?.team1State).toBe("WAITING");
-    expect(actual?.team2State).toBe("COUNTED");
+    expect(actual?.team2State).toBe("WAITING");
   });
 });
 
@@ -262,8 +235,8 @@ describe("textes des salons vocaux (FR + EN)", () => {
   it("messages_voiceKeys_presentInFrAndEn", () => {
     expect(Object.keys(enMatchPage.voice)).toEqual(Object.keys(frMatchPage.voice));
     expect(Object.keys(enForm.form.teamVoice)).toEqual(Object.keys(frForm.form.teamVoice));
-    expect(frMatchPage.voice.count).toBe("Salon vocal : {count}/{capacity}");
-    expect(enMatchPage.voice.count).toBe("Voice channel: {count}/{capacity}");
+    expect(frMatchPage.voice).not.toHaveProperty("count");
+    expect(enMatchPage.voice).not.toHaveProperty("countFull");
   });
 
   it("messages_teamVoiceDescription_atMostTwoSentences", () => {
@@ -295,8 +268,8 @@ describe("textes des salons vocaux (FR + EN)", () => {
   });
 
   it("messages_voiceStateTexts_frenchAndEnglish", () => {
-    expect(frMatchPage.voice.uncounted).toBe("Salon vocal : pas encore compté");
-    expect(enMatchPage.voice.uncounted).toBe("Voice channel: not counted yet");
+    expect(frMatchPage.voice.open).toBe("Salon vocal : ouvert");
+    expect(enMatchPage.voice.open).toBe("Voice channel: open");
     expect(frMatchPage.voice.failed).toBe("Salon vocal : indisponible");
     expect(enMatchPage.voice.failed).toBe("Voice channel: unavailable");
   });

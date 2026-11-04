@@ -307,7 +307,7 @@ export function RgpdEn({
           confirmation (a suspended account can be reactivated too: it comes back suspended). As soon as it is
           requested, it is shown as anonymous wherever it appeared (borrowed username, no avatar or player-page
           link: past results, rankings, rosters, tournament pages); its real username, which stays reserved for
-          it, and its avatar are kept apart for reactivation only, which gives them back (the username followed by “OG” if it was taken all the same), and erased at the end
+          it, and its avatar are kept apart for reactivation only, which gives them back (the username followed by “OG” if it was taken all the same — “OG2”, “OG3”… up to “OG10” if those are taken too, failing that the borrowed username), and erased at the end
           of that time. The request is also recorded in the off-database log that replays deletions after a
           backup is restored (account identifier and creation date, date of the request), and replaced, on
           reactivation, by a line carrying the date of the reactivation and that of the undone request (kept like the other lines), so that a restored backup does not
@@ -944,8 +944,8 @@ export function RgpdEn({
             entry, whose name would be a username, nor for a match against a ghost team. The match only launches once both
             channels are full (referees can force it; if the bot fails, the match doesn&apos;t wait). To know this, the bot
             counts the people present in each channel: to do so it holds in memory, at all times (option on or not), without ever recording it, the voice state (Discord identifier of the member and of their voice session, channel they are in, microphone or sound muted by them or by moderation, screen sharing or camera on, request to speak and stage suppression), with the member profile Discord attaches to it (their profile on the server, including username, nickname, avatar, roles, join and boost dates, timeout), of the members of the association&apos;s Discord server, as Discord sends it — that of the other servers it is
-            on reaches it too, but it does not keep it (the attached member profile, it does: in memory, kept up to date by Discord, lost when the bot stops); the site only receives and keeps the channel&apos;s identifier, the numbers of the match and team, that <strong>number</strong> (“Voice channel: 3/5”,
-            displayed to the match&apos;s parties and to staff, and readable by any signed-in member; a visitor without an account only sees whether the match is waiting for its channels) and the times of the count (or of a bot outage), of creation and of hand-back, never who. The channel is handed back to the bot when the match is finished (score confirmed),
+            on reaches it too, but it does not keep it (the attached member profile, it does: in memory, kept up to date by Discord, lost when the bot stops); the site only receives and keeps the channel&apos;s identifier, the numbers of the match and team, that <strong>number</strong> (which only serves to hold the launch and is shown to no one:
+            the match page only tells its parties and staff whether each channel is open and whether the match is waiting for its channels, which any signed-in member can read; a visitor without an account only sees whether the match is waiting for its channels) and the times of the count (or of a bot outage), of creation and of hand-back, never who. The channel is handed back to the bot when the match is finished (score confirmed),
             cancelled, back to waiting or taken off the schedule, when the team leaves the pairing, or when the tournament ends or turns the option off; the bot deletes it as soon as it is
             empty (within {VOICE_BOT_RELEASED_MAX_HOURS} hours and {VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest, even if occupied, while the bot is running; if Discord prevents it, it retries at every sweep, and if it can no longer read the channel{" "}
             {VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation or its reuse, it forgets it: the channel then stays until the
@@ -960,7 +960,7 @@ export function RgpdEn({
             hold to within one sweep (at most {VOICE_BOT_SWEEP_MINUTES} minutes more). Discord&apos;s audit log keeps the creation and
             deletion of each channel, with its name, readable by the server&apos;s administration, for the period Discord sets. This count rests on the association&apos;s <strong>legitimate interest</strong> (smooth running of tournaments: gathering each
             team before its match); joining a channel remains a choice — but until both are full, the match waits for referees to force its launch, unless the bot does not answer —, and only the presence of those who join it is counted. This count is
-            anonymous (a number, never who: no personal data from it is kept or shown): it has no right to object of its
+            anonymous (a number, never who; it only serves to hold the launch and is shown to no one): it has no right to object of its
             own (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
           </p>
         </div>

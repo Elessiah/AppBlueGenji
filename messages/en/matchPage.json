@@ -41,10 +41,8 @@
   },
   "voice": {
     "title": "Voice channels",
-    "count": "Voice channel: {count}/{capacity}",
-    "countFull": "Voice channel: {count}/{capacity} · full",
     "notCreated": "Voice channel: opening soon",
-    "uncounted": "Voice channel: not counted yet",
+    "open": "Voice channel: open",
     "failed": "Voice channel: unavailable",
     "failedNote": "A channel is unavailable: the match doesn't wait for the channels.",
     "waiting": "The match launches once both channels are full.",
