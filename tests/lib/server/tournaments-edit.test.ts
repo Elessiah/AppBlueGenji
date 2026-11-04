@@ -129,13 +129,20 @@ describe("updateTournament", () => {
     expect(invalidateSpectatorSnapshot).toHaveBeenCalledWith(1);
   });
 
-  it("évince d'après la visibilité écrite, patch ou non : un tournoi encore masqué reste hors du cache public", async () => {
-    await updateTournament(1, { name: "Autre nom" });
+  it("updateTournament_visibleTournamentDescriptionEdit_evictsSpectatorCopy", async () => {
+    rowToReturn = hiddenRow({ start_visibility_at: past });
+
+    await updateTournament(1, { description: "Description corrigée" });
+
+    expect(invalidateSpectatorSnapshot).toHaveBeenCalledTimes(1);
     expect(invalidateSpectatorSnapshot).toHaveBeenCalledWith(1);
   });
 
-  it("une visibilité déjà passée dans le patch n'évince rien", async () => {
-    await updateTournament(1, { startVisibilityAt: past.toISOString() }).catch(() => undefined);
+  it("updateTournament_refusedEdit_evictsNothing", async () => {
+    rowToReturn = null;
+
+    await expect(updateTournament(1, { name: "Autre nom" })).rejects.toThrow("TOURNAMENT_NOT_FOUND");
+
     expect(invalidateSpectatorSnapshot).not.toHaveBeenCalled();
   });
 

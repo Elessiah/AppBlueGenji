@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { failureReason } from "@/lib/server/failure-reason";
+import { failureReason, isErrorCode } from "@/lib/server/failure-reason";
 
 describe("failureReason", () => {
   it("failureReason_mysqlErrorWithCode_returnsCodeOnly", () => {
@@ -44,5 +44,19 @@ describe("failureReason", () => {
 
   it("failureReason_nonError_returnsUnknown", () => {
     expect(failureReason("boom")).toBe("erreur inconnue");
+  });
+});
+
+describe("isErrorCode", () => {
+  it("isErrorCode_siteCode_returnsTrue", () => {
+    expect(isErrorCode("ABOUT_STAT_NOT_FOUND")).toBe(true);
+  });
+
+  it("isErrorCode_freeText_returnsFalse", () => {
+    expect(isErrorCode("connect ECONNREFUSED 127.0.0.1:3306")).toBe(false);
+  });
+
+  it("isErrorCode_65Chars_returnsFalse", () => {
+    expect(isErrorCode(`A${"B".repeat(64)}`)).toBe(false);
   });
 });

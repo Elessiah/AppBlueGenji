@@ -152,3 +152,38 @@ describe("reorderRoute", () => {
     });
   });
 });
+
+describe("serviceFailure — une erreur hors code du site", () => {
+  const driverText = "connect ECONNREFUSED 127.0.0.1:3306";
+
+  it("PUT_driverErrorMessage_returnsFallbackCodeOnly", async () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    update.mockRejectedValueOnce(new Error(driverText));
+
+    const actual = await reply(await item.PUT(request("{}"), params("1")));
+
+    expect(actual).toEqual({ status: 400, body: { error: "THING_UPDATE_FAILED" } });
+    expect(JSON.stringify(logged.mock.calls)).not.toContain("127.0.0.1");
+    logged.mockRestore();
+  });
+
+  it("DELETE_driverErrorMessage_returnsFallbackCodeOnly", async () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    remove.mockRejectedValueOnce(new Error(driverText));
+
+    const actual = await reply(await item.DELETE(request(""), params("7")));
+
+    expect(actual).toEqual({ status: 400, body: { error: "THING_DELETE_FAILED" } });
+    logged.mockRestore();
+  });
+
+  it("reorder_driverErrorMessage_returnsFallbackCodeOnly", async () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    reorder.mockRejectedValueOnce(new Error(driverText));
+
+    const actual = await reply(await plainOrder(request('{"ids":[1]}')));
+
+    expect(actual).toEqual({ status: 400, body: { error: "THING_REORDER_FAILED" } });
+    logged.mockRestore();
+  });
+});

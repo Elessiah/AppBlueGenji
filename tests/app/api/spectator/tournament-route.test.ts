@@ -463,12 +463,24 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect(gzipped.headers.get("content-encoding")).toBe("gzip");
     expect(plain.headers.get("etag")).toMatch(/^"[\w-]{22}"$/);
     expect(gzipped.headers.get("etag")).toBe(`${plain.headers.get("etag")?.slice(0, -1)}-gzip"`);
-    // La version d'un codage ne valide pas l'autre.
+    // La version gzip ne valide pas le corps brut d'un client qui ne l'accepte pas.
     const crossed = await GET(
-      req("5", { "accept-encoding": "gzip", "if-none-match": plain.headers.get("etag") ?? "" }),
+      req("5", { "accept-encoding": "identity", "if-none-match": gzipped.headers.get("etag") ?? "" }),
       params("5"),
     );
     expect(crossed.status).toBe(200);
+  });
+
+  it("GET_gzipClientWithRawEtag_returns304UnderRawEtag", async () => {
+    mockedSnapshot.mockResolvedValue(snapshot());
+    const plain = await GET(req("5", { "accept-encoding": "identity" }), params("5"));
+    const rawEtag = plain.headers.get("etag") ?? "";
+
+    // Corps brut reçu par repli (compression ratée) : la revalidation aboutit.
+    const revalidated = await GET(req("5", { "accept-encoding": "gzip", "if-none-match": rawEtag }), params("5"));
+
+    expect(revalidated.status).toBe(304);
+    expect(revalidated.headers.get("etag")).toBe(rawEtag);
   });
 
   it("compression qui échoue (mémoire) : 200 avec le corps brut et son ETag, jamais un 500", async () => {

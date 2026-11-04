@@ -188,6 +188,15 @@ describe("about-stats-service", () => {
       expect(connection.release).toHaveBeenCalledTimes(1);
     });
 
+    it("updateAboutStat_rollbackFails_rethrowsOriginalError", async () => {
+      const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(new Error("boom"));
+      const connection = await mockDb(execute);
+      connection.rollback.mockRejectedValueOnce(new Error("Can't add new command when connection is in closed state"));
+
+      await expect(updateAboutStat(7, { labelEn: "EN", value: "12", label: "Arbitres" })).rejects.toThrow("boom");
+      expect(connection.release).toHaveBeenCalledTimes(1);
+    });
+
     it("rejects a non-text English value without touching the database", async () => {
       const execute = jest.fn<SqlQuery>();
       await mockDb(execute);
