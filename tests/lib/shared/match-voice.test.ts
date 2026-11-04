@@ -1,84 +1,58 @@
 import { describe, expect, it } from "@jest/globals";
 import {
-  VOICE_CHANNEL_CAPACITY,
+  VOICE_CHANNEL_LATE_HOURS,
   VOICE_CHANNEL_LEAD_MINUTES,
   matchVoiceInfo,
   parseMatchVoiceInfo,
   shownVoiceSide,
   voiceChannelKey,
   voiceChannelsDue,
-  voiceGatePending,
-  voiceObservationFresh,
   voiceTracked,
-  type VoiceGateInput,
+  type VoiceMatchInput,
 } from "@/lib/shared/match-voice";
-import { matchLaunchPhase } from "@/lib/shared/match-launch";
+import { matchLaunchPhase, nextLaunchPhaseChangeAt } from "@/lib/shared/match-launch";
 import frMatchPage from "@/messages/fr/matchPage.json";
 import enMatchPage from "@/messages/en/matchPage.json";
 import frForm from "@/messages/fr/tournamentForm.json";
 import enForm from "@/messages/en/tournamentForm.json";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
+import frTournament from "@/messages/fr/tournament.json";
+import enTournament from "@/messages/en/tournament.json";
+import frRules from "@/messages/fr/rules.json";
+import enRules from "@/messages/en/rules.json";
 
 const START = "2026-11-05T20:00:00.000Z";
 const startMs = Date.parse(START);
 const team = { isSolo: false, isGhost: false };
-const full = { channelId: "c1", members: VOICE_CHANNEL_CAPACITY, failed: false };
+const open = { channelId: "c1", failed: false };
 
-function gate(overrides: Partial<VoiceGateInput> = {}): VoiceGateInput {
-  return {
-    enabled: true,
-    startAt: START,
-    team1: team,
-    team2: team,
-    team1Channel: null,
-    team2Channel: null,
-    ...overrides,
-  };
+function match(overrides: Partial<VoiceMatchInput> = {}): VoiceMatchInput {
+  return { enabled: true, startAt: START, team1: team, team2: team, ...overrides };
 }
-
-describe("voiceObservationFresh", () => {
-  const now = Date.parse("2026-11-05T20:00:00.000Z");
-
-  it("voiceObservationFresh_justObserved_returnsTrue", () => {
-    expect(voiceObservationFresh("2026-11-05T20:00:00.000Z", now)).toBe(true);
-  });
-
-  it("voiceObservationFresh_exactlyFiveMinutes_returnsTrue", () => {
-    expect(voiceObservationFresh("2026-11-05T19:55:00.000Z", now)).toBe(true);
-  });
-
-  it("voiceObservationFresh_justOverFiveMinutes_returnsFalse", () => {
-    expect(voiceObservationFresh("2026-11-05T19:54:59.999Z", now)).toBe(false);
-  });
-
-  it("voiceObservationFresh_null_returnsFalse", () => {
-    expect(voiceObservationFresh(null, now)).toBe(false);
-  });
-
-  it("voiceObservationFresh_unreadable_returnsFalse", () => {
-    expect(voiceObservationFresh("garbage", now)).toBe(false);
-  });
-});
 
 describe("voiceChannelKey", () => {
   it("voiceChannelKey_ids_returnsMatchTeamKey", () => {
-    expect(voiceChannelKey(12, 34)).toBe("match:12:team:34");
+    expect(voiceChannelKey(42, 7)).toBe("match:42:team:7");
   });
 });
 
 describe("voiceChannelsDue", () => {
+  const lead = VOICE_CHANNEL_LEAD_MINUTES * 60_000;
+  const late = VOICE_CHANNEL_LATE_HOURS * 3_600_000;
+
   it("voiceChannelsDue_justBeforeLead_returnsFalse", () => {
-    expect(voiceChannelsDue(START, startMs - VOICE_CHANNEL_LEAD_MINUTES * 60_000 - 1)).toBe(false);
+    expect(voiceChannelsDue(START, startMs - lead - 1)).toBe(false);
   });
 
   it("voiceChannelsDue_exactlyLead_returnsTrue", () => {
-    expect(voiceChannelsDue(START, startMs - VOICE_CHANNEL_LEAD_MINUTES * 60_000)).toBe(true);
+    expect(voiceChannelsDue(START, startMs - lead)).toBe(true);
   });
 
-  it("voiceChannelsDue_startPassedLateToggle_returnsTrue", () => {
-    expect(voiceChannelsDue(START, startMs + 3_600_000)).toBe(true);
+  it("voiceChannelsDue_exactlyLateBound_returnsTrue", () => {
+    expect(voiceChannelsDue(START, startMs + late)).toBe(true);
+  });
+
+  it("voiceChannelsDue_pastLateBound_returnsFalse", () => {
+    expect(voiceChannelsDue(START, startMs + late + 1)).toBe(false);
   });
 
   it("voiceChannelsDue_nullStart_returnsFalse", () => {
@@ -88,97 +62,53 @@ describe("voiceChannelsDue", () => {
 
 describe("voiceTracked", () => {
   it("voiceTracked_optionOff_returnsFalse", () => {
-    expect(voiceTracked(gate({ enabled: false }))).toBe(false);
+    expect(voiceTracked(match({ enabled: false }))).toBe(false);
   });
 
   it("voiceTracked_soloSide_returnsFalse", () => {
-    expect(voiceTracked(gate({ team2: { isSolo: true, isGhost: false } }))).toBe(false);
+    expect(voiceTracked(match({ team2: { isSolo: true, isGhost: false } }))).toBe(false);
   });
 
   it("voiceTracked_ghostSide_returnsFalse", () => {
-    expect(voiceTracked(gate({ team1: { isSolo: false, isGhost: true } }))).toBe(false);
+    expect(voiceTracked(match({ team1: { isSolo: false, isGhost: true } }))).toBe(false);
   });
 
   it("voiceTracked_noStartAt_returnsFalse", () => {
-    expect(voiceTracked(gate({ startAt: null }))).toBe(false);
+    expect(voiceTracked(match({ startAt: null }))).toBe(false);
   });
 
   it("voiceTracked_twoRealTeams_returnsTrue", () => {
-    expect(voiceTracked(gate())).toBe(true);
-  });
-});
-
-describe("voiceGatePending", () => {
-  it("voiceGatePending_noChannelsYet_returnsTrue", () => {
-    expect(voiceGatePending(gate())).toBe(true);
-  });
-
-  it("voiceGatePending_oneFull_returnsTrue", () => {
-    expect(voiceGatePending(gate({ team1Channel: full, team2Channel: { channelId: "c2", members: 0, failed: false } }))).toBe(true);
-  });
-
-  it("voiceGatePending_oneShortOfCapacity_returnsTrue", () => {
-    const four = { channelId: "c2", members: VOICE_CHANNEL_CAPACITY - 1, failed: false };
-    expect(voiceGatePending(gate({ team1Channel: full, team2Channel: four }))).toBe(true);
-  });
-
-  it("voiceGatePending_bothFull_returnsFalse", () => {
-    expect(voiceGatePending(gate({ team1Channel: full, team2Channel: { ...full, channelId: "c2" } }))).toBe(false);
-  });
-
-  it("voiceGatePending_oneFailed_returnsFalse", () => {
-    expect(voiceGatePending(gate({ team1Channel: { channelId: null, members: null, failed: true } }))).toBe(false);
-  });
-
-  it("voiceGatePending_untracked_returnsFalse", () => {
-    expect(voiceGatePending(gate({ enabled: false }))).toBe(false);
+    expect(voiceTracked(match())).toBe(true);
   });
 });
 
 describe("matchVoiceInfo", () => {
   it("matchVoiceInfo_untracked_returnsNull", () => {
-    expect(matchVoiceInfo(gate({ team1: { isSolo: true, isGhost: false } }))).toBeNull();
+    expect(matchVoiceInfo(match({ enabled: false }), open, open)).toBeNull();
   });
 
-  // Décision de l'utilisateur du 2026-11-04 : le nombre de présents ne quitte plus le serveur.
-  it("matchVoiceInfo_tracked_returnsStatesWithoutCounts", () => {
-    expect(matchVoiceInfo(gate({ team1Channel: { channelId: "c1", members: 9, failed: false } }))).toEqual({
-      team1State: "OPEN",
-      team2State: "WAITING",
-      pending: true,
-    });
+  it("matchVoiceInfo_tracked_returnsSideStatesOnly", () => {
+    const actual = matchVoiceInfo(match(), open, { channelId: null, failed: true });
+
+    expect(actual).toEqual({ team1State: "OPEN", team2State: "FAILED" });
   });
 
-  it("matchVoiceInfo_createdNotCounted_saysOpenNotWaiting", () => {
-    const actual = matchVoiceInfo(gate({ team1Channel: { channelId: "c1", members: null, failed: false } }));
-
-    expect(actual?.team1State).toBe("OPEN");
-  });
-
-  it("matchVoiceInfo_failedSide_saysFailedAndReleasesGate", () => {
-    const actual = matchVoiceInfo(gate({ team1Channel: { channelId: null, members: null, failed: true }, team2Channel: full }));
-
-    expect(actual).toEqual({ team1State: "FAILED", team2State: "OPEN", pending: false });
-  });
-
-  it("matchVoiceInfo_bothFull_gateLiftedWithoutCounts", () => {
-    const actual = matchVoiceInfo(gate({ team1Channel: full, team2Channel: full }));
-
-    expect(actual).toEqual({ team1State: "OPEN", team2State: "OPEN", pending: false });
+  it("matchVoiceInfo_noRows_waitingBothSides", () => {
+    expect(matchVoiceInfo(match(), null, null)).toEqual({ team1State: "WAITING", team2State: "WAITING" });
   });
 });
 
 describe("shownVoiceSide", () => {
   it("shownVoiceSide_noChannel_waiting", () => {
-    expect(shownVoiceSide(null)).toBe("WAITING");
+    expect(shownVoiceSide({ channelId: null, failed: false })).toBe("WAITING");
   });
 
   it("shownVoiceSide_failedEvenWithChannel_failed", () => {
-    expect(shownVoiceSide({ channelId: "c1", members: 4, failed: true })).toBe("FAILED");
+    expect(shownVoiceSide({ channelId: "c1", failed: true })).toBe("FAILED");
   });
 
   it("shownVoiceSide_created_open", () => {
-    expect(shownVoiceSide({ channelId: "c1", members: 2, failed: false })).toBe("OPEN");
+    expect(shownVoiceSide(open)).toBe("OPEN");
   });
 });
 
@@ -187,31 +117,28 @@ describe("parseMatchVoiceInfo", () => {
     expect(parseMatchVoiceInfo("3/5")).toBeNull();
   });
 
-  it("parseMatchVoiceInfo_noStates_waitingAndNotPending", () => {
-    expect(parseMatchVoiceInfo({ pending: "yes" })).toEqual({ team1State: "WAITING", team2State: "WAITING", pending: false });
+  it("parseMatchVoiceInfo_noStates_waiting", () => {
+    expect(parseMatchVoiceInfo({})).toEqual({ team1State: "WAITING", team2State: "WAITING" });
   });
 
-  it("parseMatchVoiceInfo_legacyCountedPayload_mapsToOpenAndDropsNumbers", () => {
-    const actual = parseMatchVoiceInfo({ team1Members: 3, team2Members: 5, team1State: "COUNTED", team2State: "UNCOUNTED", pending: true });
+  it("parseMatchVoiceInfo_legacyGatePayload_dropsPendingAndNumbers", () => {
+    const actual = parseMatchVoiceInfo({ team1Members: 3, team1State: "COUNTED", team2State: "UNCOUNTED", pending: true });
 
-    expect(actual).toEqual({ team1State: "OPEN", team2State: "OPEN", pending: true });
+    expect(actual).toEqual({ team1State: "OPEN", team2State: "OPEN" });
   });
 
   it("parseMatchVoiceInfo_knownStates_keptAsIs", () => {
-    const actual = parseMatchVoiceInfo({ team1State: "FAILED", team2State: "OPEN", pending: false });
-
-    expect(actual).toEqual({ team1State: "FAILED", team2State: "OPEN", pending: false });
+    expect(parseMatchVoiceInfo({ team1State: "FAILED", team2State: "OPEN" })).toEqual({ team1State: "FAILED", team2State: "OPEN" });
   });
 
   it("parseMatchVoiceInfo_unknownState_waiting", () => {
-    const actual = parseMatchVoiceInfo({ team1State: "FULL", team2State: 7, pending: true });
+    const actual = parseMatchVoiceInfo({ team1State: "FULL", team2State: 7 });
 
-    expect(actual?.team1State).toBe("WAITING");
-    expect(actual?.team2State).toBe("WAITING");
+    expect(actual).toEqual({ team1State: "WAITING", team2State: "WAITING" });
   });
 });
 
-describe("matchLaunchPhase — salons vocaux", () => {
+describe("matchLaunchPhase — les salons ne retiennent plus le départ", () => {
   const base = {
     status: "READY" as const,
     team1Id: 1,
@@ -221,22 +148,25 @@ describe("matchLaunchPhase — salons vocaux", () => {
     refereeScheduling: false,
     launchPhase: false,
   };
+  const afterStart = Date.parse("2026-01-01T01:00:00.000Z");
 
-  it("matchLaunchPhase_phaseOffGatePending_returnsScheduled", () => {
-    expect(matchLaunchPhase({ ...base, voice: { pending: true } }, Date.parse("2026-01-01T01:00:00.000Z"))).toBe("SCHEDULED");
+  it("matchLaunchPhase_phaseOffPastStart_returnsLaunched", () => {
+    expect(matchLaunchPhase(base, afterStart)).toBe("LAUNCHED");
   });
 
-  it("matchLaunchPhase_phaseOffGateLifted_returnsLaunched", () => {
-    expect(matchLaunchPhase({ ...base, voice: { pending: false } }, Date.parse("2026-01-01T01:00:00.000Z"))).toBe("LAUNCHED");
+  it("nextLaunchPhaseChangeAt_scheduled_returnsStart", () => {
+    expect(nextLaunchPhaseChangeAt(base, Date.parse("2025-12-31T23:00:00.000Z"))).toBe(Date.parse(base.startAt));
   });
 });
 
 describe("textes des salons vocaux (FR + EN)", () => {
-  it("messages_voiceKeys_presentInFrAndEn", () => {
+  it("messages_voiceKeys_presentInFrAndEnWithoutGateTexts", () => {
     expect(Object.keys(enMatchPage.voice)).toEqual(Object.keys(frMatchPage.voice));
     expect(Object.keys(enForm.form.teamVoice)).toEqual(Object.keys(frForm.form.teamVoice));
-    expect(frMatchPage.voice).not.toHaveProperty("count");
-    expect(enMatchPage.voice).not.toHaveProperty("countFull");
+    expect(frMatchPage.voice).not.toHaveProperty("waiting");
+    expect(frMatchPage.voice).not.toHaveProperty("failedNote");
+    expect(frTournament.launch).not.toHaveProperty("voicePending");
+    expect(enTournament.launch).not.toHaveProperty("voicePending");
   });
 
   it("messages_teamVoiceDescription_atMostTwoSentences", () => {
@@ -248,57 +178,41 @@ describe("textes des salons vocaux (FR + EN)", () => {
   });
 
   it("messages_teamVoiceDescription_scopeEitherSideSoloOrGhost", () => {
-    // voiceTracked : aucun salon dès qu'un des deux camps n'est pas éligible.
     expect(frForm.form.teamVoice.description).toContain("aucun si l'un des deux camps est une entrée solo ou une équipe fantôme");
     expect(enForm.form.teamVoice.description).toContain("none if either side is a solo entry or a ghost team");
   });
 
-  it("messages_teamVoiceDescription_gateReleaseAnyBotFailure", () => {
-    // voiceGatePending : levé sur tout échec du bot, pas seulement s'il est injoignable.
-    expect(frForm.form.teamVoice.description).toContain("échec du bot");
-    expect(frForm.form.teamVoice.description).not.toContain("injoignable");
-    expect(enForm.form.teamVoice.description).toContain("the bot fails");
-    expect(enForm.form.teamVoice.description).not.toContain("can't be reached");
+  it("messages_teamVoiceDescription_launchIndependentAndNoCount", () => {
+    expect(frForm.form.teamVoice.description).toContain("le lancement du match n'en dépend pas");
+    expect(frForm.form.teamVoice.description).not.toContain("nombre de présents");
+    expect(enForm.form.teamVoice.description).toContain("the match launch doesn't depend on the channels");
+    expect(enForm.form.teamVoice.description).not.toContain("how many people");
   });
 
-  it("messages_teamVoiceDescription_keptDataPerTeamOfMatch", () => {
-    // Registre T18 : chaque relevé est rattaché au match et à l'équipe.
-    expect(frForm.form.teamVoice.description).toContain("pour chaque équipe du match");
-    expect(enForm.form.teamVoice.description).toContain("For each team in the match");
+  it("messages_voiceHint_launchIndependentFrAndEn", () => {
+    expect(frMatchPage.voice.hint).toContain("le lancement du match ne dépend pas des salons");
+    expect(enMatchPage.voice.hint).toContain("the match launch doesn't depend on the channels");
+  });
+
+  it("messages_rulesVoice_noGateNoCountFrAndEn", () => {
+    const fr = frRules.common[1].bullets.join(" ");
+    const en = enRules.common[1].bullets.join(" ");
+
+    expect(fr).toContain("Les salons ne retiennent jamais le lancement du match");
+    expect(fr).not.toContain("compte les personnes");
+    expect(en).toContain("The channels never hold the match's launch");
+    expect(en).not.toContain("counts the people");
   });
 
   it("messages_voiceStateTexts_frenchAndEnglish", () => {
     expect(frMatchPage.voice.open).toBe("Salon vocal : ouvert");
     expect(enMatchPage.voice.open).toBe("Voice channel: open");
-    expect(frMatchPage.voice.failed).toBe("Salon vocal : indisponible");
-    expect(enMatchPage.voice.failed).toBe("Voice channel: unavailable");
+    expect(frMatchPage.voice.failed).toBe("Salon vocal : indisponible, nouvelle tentative en cours");
+    expect(enMatchPage.voice.failed).toBe("Voice channel: unavailable, trying again");
   });
 
   it("messages_finishedVoiceError_frenchAndEnglish", () => {
     expect(frForm.edit.voiceErrors.TOURNAMENT_FINISHED).toBe(frForm.edit.planningErrors.TOURNAMENT_FINISHED);
     expect(enForm.edit.voiceErrors.TOURNAMENT_FINISHED).toBe(enForm.edit.planningErrors.TOURNAMENT_FINISHED);
-  });
-});
-
-describe("levée du verrou vocal : textes juridiques anglais", () => {
-  // voiceGatePending lève le verrou sur tout échec du bot (le français est figé par tests/fixtures/legal-fr).
-  const subPurposesEn = (ref: string) => {
-    const found = PROCESSING_ACTIVITIES_EN.find((entry) => entry.ref === ref);
-    if (!found) throw new Error(`activité absente : ${ref}`);
-    return found.subPurposes.join(" ");
-  };
-
-  it("legalTexts_voiceGateRelease_registerEnSaysBotFails", () => {
-    const text = subPurposesEn("T18");
-
-    expect(text).toContain("if the bot fails, the match doesn't wait");
-    expect(text).not.toContain("doesn't answer");
-  });
-
-  it("legalTexts_voiceGateRelease_rgpdEnSaysBotFails", () => {
-    const source = readFileSync(join(__dirname, "..", "..", "..", "app", "rgpd", "RgpdEn.tsx"), "utf8");
-
-    expect(source).toContain("if the bot fails, the match doesn&apos;t wait");
-    expect(source).not.toContain("the bot doesn&apos;t answer, the match");
   });
 });

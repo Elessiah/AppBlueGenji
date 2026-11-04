@@ -114,22 +114,21 @@ function resolveFailureCode(error: unknown): string {
     : "BOT_INTERNAL_UNREACHABLE";
 }
 
+/** Forme d'un code du bot (`VOICE_CHANNEL_NOT_TRACKED`) : jamais une phrase ni un nom. */
+const BOT_ERROR_CODE = /^[A-Z0-9_]{1,64}$/;
+
 async function safeReadError(response: Response): Promise<string> {
   try {
-    const payload = (await response.json()) as { error?: string };
-    if (payload.error) {
+    const payload = (await response.json()) as { error?: unknown } | null;
+    // Un code est une chaîne en capitales : tout autre « error » (objet, nombre, phrase
+    // d'un relais qui pourrait citer un salon ou un membre) ne sort pas tel quel.
+    if (typeof payload?.error === "string" && BOT_ERROR_CODE.test(payload.error)) {
       return payload.error;
     }
   } catch {
-    // ignore json parse failures and fallback to plain text
+    // Corps illisible (page HTML d'un proxy, texte libre) : jamais recopié comme code.
   }
-
-  try {
-    const text = (await response.text()).trim();
-    return text || "BOT_INTERNAL_REQUEST_FAILED";
-  } catch {
-    return "BOT_INTERNAL_REQUEST_FAILED";
-  }
+  return "BOT_INTERNAL_REQUEST_FAILED";
 }
 
 export async function fetchBotStats(): Promise<BotStats> {
@@ -1011,8 +1010,8 @@ async function postLiveAnnouncement(body: Record<string, unknown>): Promise<Live
 /*
  * ── Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) ─────────────────
  * Contrat du bot : `doc/internal-api.md` § « Salons vocaux d'équipe des matchs ».
- * Le site ne demande jamais que des **nombres** : aucun identifiant ni pseudo
- * de membre ne transite, rien n'est journalisé de ce qui est compté.
+ * Le site ne demande que de créer ou de rendre un salon, jamais qui s'y trouve
+ * ni combien : aucun identifiant ni pseudo de membre ne transite.
  */
 
 /** Délai d'un appel « salon vocal » : création et suppression passent par Discord. */
@@ -1021,16 +1020,35 @@ const BOT_VOICE_FETCH_TIMEOUT_MS = 5000;
 /**
  * Issue d'un appel « salon vocal ».
  *
- * - `ok` : réponse attendue (`channelId`, `members`, ou libération faite) ;
- * - `gone` : le bot ne suit plus ce salon (`404`) — supprimé à la main, sorti
- *   de la catégorie, ou déjà libéré puis effacé ;
+ * - `ok` : réponse attendue (`channelId`, ou libération faite) ;
+ * - `gone` : le bot ne suit plus ce salon (`404 VOICE_CHANNEL_NOT_TRACKED`) —
+ *   supprimé à la main, sorti de la catégorie, ou déjà libéré puis effacé ; un
+ *   autre `404` (route absente du bot, `INTERNAL_ROUTE_NOT_FOUND`, ou service mal
+ *   routé, `BOT_INTERNAL_REQUEST_FAILED`) arrête le balayage sans compter au coupe-circuit ;
  * - `failed` : bot injoignable, coupe-circuit ouvert, permission refusée,
- *   Discord indisponible, réponse illisible — le verrou du lancement est levé.
+ *   Discord indisponible, réponse illisible — redemandé au passage suivant.
  */
 export type VoiceCallOutcome<T> =
   | { kind: "ok"; value: T }
   | { kind: "gone"; code: string }
   | { kind: "failed"; code: string };
+
+/**
+ * Issue d'un `404` du bot vocal. Seul « salon non suivi » vaut « déjà rendu » (et
+ * prouve un bot sain) : une route absente (bot d'une autre version) ou un 404 d'un
+ * autre service fermerait sinon des lignes dont le salon reste sur Discord. Ces
+ * 404-là sont rendus sous un code de transport qui arrête le balayage (la passe
+ * s'arrête au premier), sans compter au coupe-circuit, partagé par toutes les fonctions du bot : un
+ * écart de version des seules routes vocales ne coupe ni le journal ni les annonces.
+ */
+async function voiceNotFoundOutcome(response: Response): Promise<{ kind: "gone" | "failed"; code: string }> {
+  const code = await safeReadError(response);
+  if (code !== "VOICE_CHANNEL_NOT_TRACKED") {
+    return { kind: "failed", code: code === "INTERNAL_ROUTE_NOT_FOUND" ? code : "BOT_INTERNAL_REQUEST_FAILED" };
+  }
+  recordSuccess();
+  return { kind: "gone", code };
+}
 
 async function voiceCall<T>(
   method: "GET" | "POST",
@@ -1047,10 +1065,7 @@ async function voiceCall<T>(
       cache: "no-store",
       signal: AbortSignal.timeout(BOT_VOICE_FETCH_TIMEOUT_MS),
     });
-    if (response.status === 404) {
-      recordSuccess();
-      return { kind: "gone", code: await safeReadError(response) };
-    }
+    if (response.status === 404) return await voiceNotFoundOutcome(response);
     if (!response.ok) {
       // Un refus du bot lui-même (permission, catégorie, Discord) n'est pas une
       // panne du canal interne : seul un 5xx de transport compte au coupe-circuit.
@@ -1080,14 +1095,6 @@ function readChannelId(payload: unknown): string | null {
  */
 export function ensureVoiceChannel(key: string, name: string): Promise<VoiceCallOutcome<string>> {
   return voiceCall("POST", "/internal/voice/channels", { key, name }, readChannelId);
-}
-
-/** Nombre de personnes dans un salon suivi par le bot. */
-export function countVoiceChannel(channelId: string): Promise<VoiceCallOutcome<number>> {
-  return voiceCall("GET", `/internal/voice/channels/${encodeURIComponent(channelId)}/count`, undefined, (payload) => {
-    const members = (payload as { members?: unknown } | null)?.members;
-    return typeof members === "number" && Number.isInteger(members) && members >= 0 ? members : null;
-  });
 }
 
 /**

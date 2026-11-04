@@ -18,12 +18,7 @@ const startPassedPhaseOff: MatchLaunchInput = {
   launchPhase: false,
 };
 
-describe("useMatchLaunchPhase — salons vocaux (`MATCH_VOICE.md`)", () => {
-  it("useMatchLaunchPhase_phaseOffStartPassedVoicePending_returnsScheduled", () => {
-    const html = renderToStaticMarkup(<Phase match={{ ...startPassedPhaseOff, voice: { pending: true } }} />);
-    expect(html).toBe("<span>SCHEDULED</span>");
-  });
-
+describe("useMatchLaunchPhase — sans phase de lancement", () => {
   it("useMatchLaunchPhase_phaseOffStartPassedNoVoice_returnsLaunched", () => {
     const html = renderToStaticMarkup(<Phase match={startPassedPhaseOff} />);
     expect(html).toBe("<span>LAUNCHED</span>");

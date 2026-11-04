@@ -12,7 +12,7 @@ import type { BracketMatch } from "@/lib/shared/types";
  * nombre de personnes) arrive dans l'instantané (`BracketMatch.voice`, poussé
  * par le flux quand il change). La page ne
  * relit `GET /api/matches/[id]/voice` que **flux coupé** : flux sain, chaque
- * comptage est déjà publié, et une relecture par lecteur toutes les dix
+ * changement d'état est déjà publié, et une relecture par lecteur toutes les dix
  * secondes ne ferait que charger le serveur. Le balayage, lui, reste porté par
  * le trafic (listes de tournois, `/api/me/match-launches`).
  */
@@ -61,7 +61,7 @@ export type PolledMatchVoice = {
 /** Empreinte d'un état des salons de l'instantané : elle change à chaque état publié. */
 export function voiceStreamKey(voice: MatchVoiceInfo | null): string {
   if (voice === null) return "none";
-  return [voice.team1State, voice.team2State, voice.pending].join(":");
+  return [voice.team1State, voice.team2State].join(":");
 }
 
 /**
@@ -85,8 +85,7 @@ export function currentMatchVoice(
 
 /**
  * Faut-il relire la porte REST ? Seulement flux coupé, et tant que la source
- * qui fait foi dit que le match suit ses salons (verrou tenu ou non : un
- * comptage frais vieillit sans écriture).
+ * qui fait foi dit que le match suit ses salons.
  */
 export function voicePollActive(current: MatchVoiceInfo | null, streamLive: boolean): boolean {
   return !streamLive && current !== null;

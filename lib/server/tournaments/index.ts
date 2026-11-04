@@ -662,8 +662,8 @@ export async function listTournamentBuckets(
   void dispatchDueRoundMapsNotices().catch(() => undefined);
   // Et le brief du salon des managers (`./lobby-brief`), ouvert au même moment.
   void dispatchLobbyBriefs().catch(() => undefined);
-  // Et les salons vocaux d'équipe (`./match-voice`) : création à T−15, comptage
-  // des salons qui retiennent un lancement, libération après le score.
+  // Et les salons vocaux d'équipe (`./match-voice`) : création à T−15,
+  // libération après le score.
   void dispatchMatchVoiceChannels();
   // Et pour l'annonce des lives : le mode `START_TIME` passe à l'antenne à
   // l'heure dite, sans aucune écriture.

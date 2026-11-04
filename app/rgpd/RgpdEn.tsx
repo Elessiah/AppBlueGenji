@@ -45,6 +45,7 @@ import {
   VOICE_BOT_UNRELEASED_MAX_HOURS,
   VOICE_CHANNEL_CAPACITY,
   VOICE_CHANNEL_LEAD_MINUTES,
+  VOICE_CHANNEL_LATE_HOURS,
   VOICE_ROW_RETENTION_DAYS,
 } from "@/lib/shared/match-voice";
 import {
@@ -941,27 +942,22 @@ export function RgpdEn({
             <strong>Team voice channels.</strong> In a tournament with the “Team voice channels” option (off by default), the
             association&apos;s Discord bot opens, from {VOICE_CHANNEL_LEAD_MINUTES} minutes before a match&apos;s time (on the site&apos;s first pass within that
             window), a {VOICE_CHANNEL_CAPACITY}-seat voice channel for each of its two teams, named after the team — never for a solo
-            entry, whose name would be a username, nor for a match against a ghost team. The match only launches once both
-            channels are full (referees can force it; if the bot fails, the match doesn&apos;t wait). To know this, the bot
-            counts the people present in each channel: to do so it holds in memory, at all times (option on or not), without ever recording it, the voice state (Discord identifier of the member and of their voice session, channel they are in, microphone or sound muted by them or by moderation, screen sharing or camera on, request to speak and stage suppression), with the member profile Discord attaches to it (their profile on the server, including username, nickname, avatar, roles, join and boost dates, timeout), of the members of the association&apos;s Discord server, as Discord sends it — that of the other servers it is
-            on reaches it too, but it does not keep it (the attached member profile, it does: in memory, kept up to date by Discord, lost when the bot stops); the site only receives and keeps the channel&apos;s identifier, the numbers of the match and team, that <strong>number</strong> (which only serves to hold the launch and is shown to no one:
-            the match page only tells its parties and staff whether each channel is open and whether the match is waiting for its channels, which any signed-in member can read; a visitor without an account only sees whether the match is waiting for its channels) and the times of the count (or of a bot outage), of creation and of hand-back, never who. The channel is handed back to the bot when the match is finished (score confirmed),
-            cancelled, back to waiting or taken off the schedule, when the team leaves the pairing, or when the tournament ends or turns the option off; the bot deletes it as soon as it is
+            entry, whose name would be a username, nor for a match against a ghost team. The match&apos;s launch doesn&apos;t depend on them: it launches as in any other tournament. To know whether a channel is empty, the bot holds in memory, at all times (option on or not), without ever recording it, the voice state (Discord identifier of the member and of their voice session, channel they are in, microphone or sound muted by them or by moderation, screen sharing or camera on, request to speak and stage suppression), with the member profile Discord attaches to it (their profile on the server, including username, nickname, avatar, roles, join and boost dates, timeout), of the members of the association&apos;s Discord server, as Discord sends it — that of the other servers it is
+            on reaches it too, but it does not keep it (the attached member profile, it does: in memory, kept up to date by Discord, lost when the bot stops); the site only receives and keeps the channel&apos;s identifier, the numbers of the match and team, the times of creation and of hand-back (or of a bot outage or a refused hand-back), never who is in a channel, nor how many: the match page only tells its parties and staff whether each channel is open, which any signed-in member can read; a visitor without an account sees none of it. The channel is handed back to the bot when the match is finished (score confirmed),
+            cancelled, back to waiting, taken off the schedule or left without a confirmed score {VOICE_CHANNEL_LATE_HOURS} hours after its time, when the team leaves the pairing, when a solo entry or a ghost team enters the match, or when the tournament is no longer running (finished, or moved back before its start), is hidden again or turns the option off; the bot deletes it as soon as it is
             empty (within {VOICE_BOT_RELEASED_MAX_HOURS} hours and {VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest, even if occupied, while the bot is running; if Discord prevents it, it retries at every sweep, and if it can no longer read the channel{" "}
             {VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation or its reuse, it forgets it: the channel then stays until the
             server&apos;s moderation deletes it; a channel never handed back is deleted if it is empty {VOICE_BOT_UNRELEASED_MAX_HOURS} hours
             after its creation or its reuse — occupied, it stays until it is handed back; moved out of the match category, the bot stops tracking it without deleting it
             and it falls to the server&apos;s moderation — as after a deletion by moderation or the bot forgetting it, a new channel is then opened for the team if its match
-            has not launched yet; a rescheduled match keeps its
-            channels until they are handed back), and the site erases its record {VOICE_ROW_RETENTION_DAYS} days after the hand-back (apart from the encrypted backup
+            has no confirmed score yet, is less than {VOICE_CHANNEL_LEAD_MINUTES} minutes from its time or past it, and is not more than {VOICE_CHANNEL_LATE_HOURS} hours past its time; a rescheduled match keeps its
+            channels until they are handed back), and the site erases its record {VOICE_ROW_RETENTION_DAYS} days after the hand-back or, if the bot does not take it back, after its closure {VOICE_BOT_UNRELEASED_MAX_HOURS} hours after the current channel was created (apart from the encrypted backup
             copies). The bot keeps for each channel a record with no name (channel identifier, numbers of the match and team, creation
             and hand-back times), erased with the channel or when it forgets it — kept with no limit while the channel, never handed back, stays occupied, or while it reads it without being able to delete
             it or while Discord answers it with another error — (apart from the encrypted backup copies). Its other periods
             hold to within one sweep (at most {VOICE_BOT_SWEEP_MINUTES} minutes more). Discord&apos;s audit log keeps the creation and
-            deletion of each channel, with its name, readable by the server&apos;s administration, for the period Discord sets. This count rests on the association&apos;s <strong>legitimate interest</strong> (smooth running of tournaments: gathering each
-            team before its match); joining a channel remains a choice — but until both are full, the match waits for referees to force its launch, unless the bot does not answer —, and only the presence of those who join it is counted. This count is
-            anonymous (a number, never who; it only serves to hold the launch and is shown to no one): it has no right to object of its
-            own (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
+            deletion of each channel, with its name, readable by the server&apos;s administration, for the period Discord sets. These channels rest on the association&apos;s <strong>legitimate interest</strong> (smooth running of tournaments: gathering each
+            team before its match); joining a channel remains a choice, with no effect on the match&apos;s launch (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
           </p>
         </div>
       </section>

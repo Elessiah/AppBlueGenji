@@ -4,6 +4,8 @@ jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments/match-launch");
 jest.mock("@/lib/server/tournaments/match-launch-info");
 jest.mock("@/lib/server/tournaments/staff-action-logs");
+// Le balayage des salons vocaux ne doit jamais ouvrir de vraie connexion ici (ERREUR.txt, EF-43).
+jest.mock("@/lib/server/tournaments/match-voice");
 
 import { POST as readyPost } from "@/app/api/matches/[matchId]/ready/route";
 import { DELETE as casterDelete, POST as casterPost } from "@/app/api/matches/[matchId]/caster/route";
@@ -19,6 +21,7 @@ import {
   setMatchReady,
 } from "@/lib/server/tournaments/match-launch";
 import { listViewerMatchLaunches, loadViewerMatchContacts } from "@/lib/server/tournaments/match-launch-info";
+import { dispatchMatchVoiceChannels } from "@/lib/server/tournaments/match-voice";
 import { GET as contactsGet } from "@/app/api/matches/[matchId]/contacts/route";
 import type { LaunchSide, MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { authUser } from "../../helpers/auth-user";
@@ -282,6 +285,7 @@ describe("GET /api/me/match-launches", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(null);
     expect((await launchesGet()).status).toBe(401);
     expect(listViewerMatchLaunches).not.toHaveBeenCalled();
+    expect(dispatchMatchVoiceChannels).not.toHaveBeenCalled();
   });
 
   it("rend les matchs du lecteur connecté", async () => {
@@ -291,6 +295,13 @@ describe("GET /api/me/match-launches", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ launches: [] });
     expect(listViewerMatchLaunches).toHaveBeenCalledWith(expect.objectContaining({ id: 77 }));
+  });
+
+  it("launchesGet_signedIn_startsVoiceSweepWithoutWaiting", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 79 }));
+    jest.mocked(listViewerMatchLaunches).mockResolvedValue([]);
+    await launchesGet();
+    expect(dispatchMatchVoiceChannels).toHaveBeenCalledTimes(1);
   });
 
   it("répond 500 sans détail sur une panne de lecture", async () => {

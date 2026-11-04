@@ -302,11 +302,9 @@ export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnaps
       lobbyOpenedAt: null,
       // Ni pseudo ni empreinte de l'arbitre sans compte : « Arbitre désigné ».
       refereeKey: null,
-      // Salons vocaux d'équipe : sans compte, le verrou seul (la carte dit
-      // « en attente de départ »), jamais l'ouverture des salons.
-      voice: match.voice
-        ? { team1State: "WAITING", team2State: "WAITING", pending: match.voice.pending }
-        : match.voice,
+      // Salons vocaux d'équipe : sans compte, rien — ni l'ouverture des
+      // salons ni leur panne (le lancement n'en dépend pas).
+      voice: match.voice === undefined ? undefined : null,
       casters: match.casters.map((caster, index) => ({
         ...caster,
         userId: SPECTATOR_HIDDEN_USER_ID - index,

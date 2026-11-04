@@ -169,8 +169,8 @@
         "A tournament can turn on the “Team voice channels” option (off by default, see its settings). It is then part of its <b>rules</b>: from {voiceLead} minutes before each match's time, the association's Discord bot opens a {voiceCapacity}-seat voice channel named after each of the two teams, and each team gathers there before playing."
       ],
       "bullets": [
-        "The match only launches once both channels are full: until then, it waits for a referee to force its launch. If the bot doesn't answer, the match doesn't wait.",
-        "The bot counts the people present in each channel — a number, never who. This count is anonymous: it only serves to hold the launch and is shown to no one (the match page only says whether each channel is open and whether the match is waiting for its channels). It rests on the association's legitimate interest (smooth running of tournaments).",
+        "The channels never hold the match's launch: it launches as in any other tournament.",
+        "For each channel, the site only keeps its Discord ID and its times: neither who is in it nor how many people are.",
         "No channel is opened for a solo entry nor for a match against a ghost team."
       ]
     },

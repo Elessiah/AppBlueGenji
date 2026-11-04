@@ -43,9 +43,7 @@
     "title": "Salons vocaux",
     "notCreated": "Salon vocal : bientôt ouvert",
     "open": "Salon vocal : ouvert",
-    "failed": "Salon vocal : indisponible",
-    "failedNote": "Un salon est indisponible : le match n'attend pas les salons.",
-    "waiting": "Le match se lance quand les deux salons sont pleins.",
-    "hint": "Un quart d'heure avant le match, le bot Discord ouvre un salon vocal de {capacity} places par équipe ; le lancement attend que les deux soient pleins."
+    "failed": "Salon vocal : indisponible, nouvelle tentative en cours",
+    "hint": "Un quart d'heure avant le match, le bot Discord ouvre un salon vocal de {capacity} places par équipe ; le lancement du match ne dépend pas des salons."
   }
 }
