@@ -77,4 +77,15 @@ describe("/rgpd et historique", () => {
     expect(fr?.details.join("\n")).toContain("ne devient définitive qu'au bout de 30 jours");
     expect(PRIVACY_CHANGES_EN[TERMS_V9_ID].details.join("\n")).toContain("only becomes final after 30 days");
   });
+
+  // Revue juridique #546 : la collecte nouvelle du ticket de réactivation est déclarée.
+  it("privacyChangesV9_dataParagraph_declaresReactivationTicketAndCookieFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((c) => c.id === TERMS_V9_ID)?.details.join("\n") ?? "";
+    const en = PRIVACY_CHANGES_EN[TERMS_V9_ID].details.join("\n");
+
+    expect(fr).toContain("ticket de réactivation de 15 minutes (compte, moyen de connexion, échéance et empreinte du jeton)");
+    expect(fr).toContain("`__Host-bg_reactivation`");
+    expect(en).toContain("15-minute reactivation ticket (account, sign-in method, expiry and token hash)");
+    expect(en).toContain("`__Host-bg_reactivation`");
+  });
 });

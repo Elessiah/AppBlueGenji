@@ -13,6 +13,7 @@ import {
 } from "@/lib/shared/privacy-changes";
 import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
+import { TERMS_UPDATED_AT } from "@/lib/shared/terms-of-use";
 import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 import { DONNEES_PROFIL, DROITS, REFEREE_DISCORD_BEFORE_V7_SCOPE, REFEREE_DISCORD_SCOPE } from "@/lib/shared/rgpd-policy";
 import { DROITS_EN } from "@/lib/shared/rgpd-policy-en";
@@ -23,9 +24,11 @@ const english = PRIVACY_CHANGES_EN[ID];
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
 describe("PRIVACY_CHANGES — base du tag Discord de l'arbitre", () => {
-  it("privacyChanges_refereeDiscordBasis_datedAfterDeployNightForLiveStaff", () => {
+  // Revue juridique #546 : la base du tag suit la version 9, publiée le même jour.
+  it("privacyChanges_refereeDiscordBasis_datedWithTermsV9ForLiveStaff", () => {
     expect(entry).toBeDefined();
-    expect(entry?.publishedAt).toBe("2026-11-05");
+    expect(entry?.publishedAt).toBe(TERMS_UPDATED_AT);
+    expect(entry?.publishedAt).toBe("2026-11-06");
     expect(entry?.audience).toBe("LIVE_STAFF");
     expect(entry?.links?.[0]?.href).toBe("/rgpd#arbitre-designe");
     expect(entry && isPrivacyPolicyVersion(entry)).toBe(true);
@@ -45,6 +48,13 @@ describe("PRIVACY_CHANGES — base du tag Discord de l'arbitre", () => {
     expect(english?.details.join(" ")).toContain("strictly necessary for the minimum functioning of the service");
     expect(english?.details).toHaveLength(entry?.details.length ?? -1);
     expect(english?.linkLabels).toHaveLength(entry?.links?.length ?? -1);
+  });
+
+  it("privacyChanges_refereeDiscordBasis_namesVersion9NotVersion7FrAndEn", () => {
+    expect(entry?.summary).toContain("une fois la version 9 des conditions ou une suivante acceptée");
+    expect(entry?.summary).not.toContain("version 7");
+    expect(english?.summary).toContain("once version 9 of the terms or a later one is accepted");
+    expect(english?.summary).not.toContain("version 7");
   });
 
   it("privacyChanges_refereeDiscordBasis_followsBattlenetEntry", () => {
@@ -68,6 +78,13 @@ describe("Registre T04 et /rgpd — exécution du service, FR et EN", () => {
     expect(t04En?.legalBasis).not.toContain("the terms of use (version 8) not providing for it");
   });
 
+  it("register_t04_refereeDiscordTag_noLongerTiedToRestOfPresentationFrAndEn", () => {
+    expect(t04?.legalBasis).not.toContain("comme le reste de sa présentation");
+    expect(t04?.legalBasis).toContain("(le reste de sa présentation dépendant de la version 7, ci-dessus)");
+    expect(t04En?.legalBasis).not.toContain("like the rest of their presentation");
+    expect(t04En?.legalBasis).toContain("(the rest of their presentation depending on version 7, above)");
+  });
+
   it("rgpdPolicy_refereeDiscordScope_contractBase", () => {
     const row = DONNEES_PROFIL.find((donnee) => donnee.extraBases?.some((extra) => extra.scope === REFEREE_DISCORD_SCOPE));
     expect(row?.extraBases?.find((extra) => extra.scope === REFEREE_DISCORD_SCOPE)?.base).toBe("Exécution du contrat");
@@ -80,6 +97,14 @@ describe("Registre T04 et /rgpd — exécution du service, FR et EN", () => {
     expect(en).not.toContain("presentation of their certified Discord tag");
     expect(fr).toContain("la présentation de l'arbitre désigné aux parties de ses matchs");
     expect(en).toContain("the presentation of the assigned referee to the parties to their matches");
+  });
+
+  // Revue juridique #546 : le comptage vocal (T18, intérêt légitime) est opposable.
+  it("rgpdRights_objection_listsVoiceChannelCountFrAndEn", () => {
+    const fr = DROITS.find((droit) => droit.title === "Droit d'opposition")?.text ?? "";
+    const en = DROITS_EN.find((droit) => droit.title === "Right to object")?.text ?? "";
+    expect(fr).toContain("le comptage des personnes présentes dans les salons vocaux d'équipe (un nombre, jamais qui)");
+    expect(en).toContain("the count of people present in team voice channels (a number, never who)");
   });
 
   // Revue juridique #545, cycle 3 : avant la version 7, l'opposition vaut aussi pour le tag.
@@ -156,9 +181,9 @@ describe("Base du tag Discord de l'arbitre — cohérence (revue juridique #545,
   it("register_t04_refereeDiscordTag_followsVersion9ConditionFrAndEn", () => {
     const fr = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")?.legalBasis ?? "";
     const en = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")?.legalBasis ?? "";
-    expect(fr).toContain("une fois que cet arbitre a accepté la version 9 des conditions ou une suivante, comme le reste de sa présentation");
+    expect(fr).toContain("une fois que cet arbitre a accepté la version 9 des conditions ou une suivante (le reste de sa présentation dépendant de la version 7, ci-dessus)");
     expect(fr).toContain("une fois cette version acceptée, ce tag n'a pas d'opposition propre");
-    expect(en).toContain("once this referee has accepted version 9 of the terms or a later one, like the rest of their presentation");
+    expect(en).toContain("once this referee has accepted version 9 of the terms or a later one (the rest of their presentation depending on version 7, above)");
     expect(en).toContain("once that version is accepted, this tag has no objection of its own");
   });
 
@@ -176,10 +201,10 @@ describe("Base du tag Discord de l'arbitre — cohérence (revue juridique #545,
 
   it("privacyChanges_refereeDiscordBasis_announcesLostSeparateObjectionFrAndEn", () => {
     expect(entry?.summary.startsWith("Si tu arbitres un match")).toBe(true);
-    expect(entry?.summary).toContain("une fois la version 7 des conditions ou une suivante acceptée");
+    expect(entry?.summary).toContain("une fois la version 9 des conditions ou une suivante acceptée");
     expect(entry?.details.join(" ")).toContain("une fois cette version acceptée, elle n'a plus d'opposition propre");
     expect(english?.summary.startsWith("If you referee a match")).toBe(true);
-    expect(english?.summary).toContain("once version 7 of the terms or a later one is accepted");
+    expect(english?.summary).toContain("once version 9 of the terms or a later one is accepted");
     expect(english?.details.join(" ")).toContain("once that version is accepted, it has no objection of its own");
   });
 
@@ -221,9 +246,9 @@ describe("Opposition d'arbitre nommée (revue juridique #545, cycle 5)", () => {
   it("privacyChanges_refereeDiscordBasis_namesObjectionWithoutClaimingCasterRuleChangedFrAndEn", () => {
     // Cycle 6 : la part « règle des casters » reposait déjà sur le contrat — l'avis ne la dit pas changée.
     expect(entry?.summary).not.toContain("règle des casters");
-    expect(entry?.details.join(" ")).toContain("ton opposition d'arbitre (formulaire de signalement, catégorie RGPD) — à ta présentation avant la version 7, ou à l'affichage de ton pseudo aux membres —");
+    expect(entry?.details.join(" ")).toContain("ton opposition d'arbitre (formulaire de signalement, catégorie RGPD) — à ta présentation avant la version 7 (avant la version 9 pour ce tag), ou à l'affichage de ton pseudo aux membres —");
     expect(english?.summary).not.toContain("casters' rule");
-    expect(english?.details.join(" ")).toContain("your referee objection (report form, GDPR category) — to your presentation before version 7, or to the display of your username to members —");
+    expect(english?.details.join(" ")).toContain("your referee objection (report form, GDPR category) — to your presentation before version 7 (before version 9 for this tag), or to the display of your username to members —");
   });
 });
 
