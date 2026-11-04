@@ -10,6 +10,7 @@ import {
   invalidateRankingLists,
   invalidateTeamIdentityViews,
   invalidateTeamRanking,
+  invalidateTeamRankingForScore,
 } from "@/lib/server/ranking-cache";
 import { LANDING_TICKER_KEY } from "@/lib/server/landing-cache";
 
@@ -152,7 +153,7 @@ describe("invalidateTeamIdentityViews", () => {
   });
 });
 
-describe("invalidateTeamRanking — PNG d'aperçu, au plus une fois par fenêtre", () => {
+describe("invalidateTeamRankingForScore — PNG d'aperçu, au plus une fois par fenêtre", () => {
   const T0 = 1_800_000_000_000;
   const png = () => new Response("png", { headers: { "cache-control": "public, max-age=60" } });
 
@@ -166,11 +167,11 @@ describe("invalidateTeamRanking — PNG d'aperçu, au plus une fois par fenêtre
 
   async function scoreThenRender(now: number, build: () => Promise<Response>) {
     jest.spyOn(Date, "now").mockReturnValue(now);
-    invalidateTeamRanking();
+    invalidateTeamRankingForScore();
     await cachedShareImage("fr:podium", 600_000, build, "fixed", true);
   }
 
-  it("invalidateTeamRanking_secondScoreInsideWindow_keepsPng", async () => {
+  it("invalidateTeamRankingForScore_secondScoreInsideWindow_keepsPng", async () => {
     const build = jest.fn(async () => png());
     await scoreThenRender(T0, build); // premier score : vide (rien) puis rend
     await scoreThenRender(T0 + 1_000, build); // dans la fenêtre : garde
@@ -178,14 +179,14 @@ describe("invalidateTeamRanking — PNG d'aperçu, au plus une fois par fenêtre
     expect(build).toHaveBeenCalledTimes(1);
   });
 
-  it("invalidateTeamRanking_scoreAfterWindow_rendersAgain", async () => {
+  it("invalidateTeamRankingForScore_scoreAfterWindow_rendersAgain", async () => {
     const build = jest.fn(async () => png());
     await scoreThenRender(T0, build);
     await scoreThenRender(T0 + RANKING_TTL_MS, build);
     expect(build).toHaveBeenCalledTimes(2);
   });
 
-  it("invalidateTeamRanking_clockGoesBack_flushesInsteadOfStaying", async () => {
+  it("invalidateTeamRankingForScore_clockGoesBack_flushesInsteadOfStaying", async () => {
     const build = jest.fn(async () => png());
     await scoreThenRender(T0, build);
     await scoreThenRender(T0 - 5_000, build);
@@ -199,5 +200,25 @@ describe("invalidateTeamRanking — PNG d'aperçu, au plus une fois par fenêtre
     invalidateTeamIdentityViews();
     await cachedShareImage("fr:podium", 600_000, build, "fixed", true);
     expect(build).toHaveBeenCalledTimes(2);
+  });
+
+  it("invalidateTeamRanking_insideScoreWindow_flushesAtOnce", async () => {
+    // Suppression ou dépublication d'un tournoi : jamais retenue par la fenêtre des scores.
+    const build = jest.fn(async () => png());
+    await scoreThenRender(T0, build);
+    jest.spyOn(Date, "now").mockReturnValue(T0 + 1_000);
+    invalidateTeamRanking();
+    await cachedShareImage("fr:podium", 600_000, build, "fixed", true);
+    expect(build).toHaveBeenCalledTimes(2);
+  });
+
+  it("invalidateTeamRankingForScore_scoreInsideWindow_stillReloadsReplayAndLeaderboards", async () => {
+    const loader = jest.fn(async () => "rejeu");
+    await scoreThenRender(T0, async () => png());
+    await cachedRanking("state:x", loader);
+    jest.spyOn(Date, "now").mockReturnValue(T0 + 1_000);
+    invalidateTeamRankingForScore();
+    await cachedRanking("state:x", loader);
+    expect(loader).toHaveBeenCalledTimes(2);
   });
 });

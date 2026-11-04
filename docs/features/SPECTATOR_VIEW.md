@@ -289,7 +289,7 @@ fois plus vite ; au plafond, encart ou page générale. Un tournoi **dépublié*
 aussitôt (`invalidateSpectatorSnapshot` vide la réponse publique et la carte
 d'encart). Un membre connecté arrivant par une mise en page préchargée ne voit
 pas la fiche publique : `MemberRelay` seul est rendu, à la place de `children`,
-jusqu'au `router.replace`.
+jusqu'au `router.replace` ; un repli « Ouverture du tournoi… » (`login.authGate.redirecting`) évite la page vide si le renvoi tarde. `admit` est consulté avant `cached`, jamais dans le chargeur partagé : le refus d'un réseau plafonné n'est pas servi aux appelants qui rejoignent la lecture en vol.
 
 **Règles du mode** — le « ? » de la fiche (`RulesHelpFab`) mène à
 `/regles/<mode>?tournoi=<id>`. Sans session aussi, les réglages du tournoi

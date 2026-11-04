@@ -475,16 +475,19 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     mockedSnapshot.mockResolvedValue(snapshot());
     const plain = await GET(req("5", { "accept-encoding": "identity" }), params("5"));
     const gzip = jest.spyOn(spectatorSnapshotModule, "gzippedSpectatorBody").mockRejectedValue(new Error("ENOMEM"));
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
     const served = await GET(req("5", { "accept-encoding": "gzip" }), params("5"));
 
     expect(gzip).toHaveBeenCalledTimes(1);
+    expect(logged).toHaveBeenCalledTimes(1);
     expect(served.status).toBe(200);
     expect(served.headers.get("content-encoding")).toBeNull();
     expect(served.headers.get("etag")).toBe(plain.headers.get("etag"));
     expect(served.headers.get("content-type")).toBe("application/json; charset=utf-8");
     expect(await served.text()).toBe(await plain.text());
     gzip.mockRestore();
+    logged.mockRestore();
   });
 
   it("répond 503 quand toutes les places de construction sont prises, sans faire payer", async () => {

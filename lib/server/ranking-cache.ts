@@ -46,10 +46,25 @@ export function cachedRanking<T>(key: string, loader: () => Promise<T>): Promise
  * lit aussi (`getLeaderboardRows`) : un score s'y voit aussitôt.
  */
 export function invalidateTeamRanking(): void {
+  invalidateRankingReplay();
+  // Le podium et les cartes nominatives d'aperçu sont rendus depuis ces entrées.
+  invalidateRankingShareImages();
+}
+
+/** Le rejeu et les leaderboards de la vitrine, sans les PNG d'aperçu. */
+function invalidateRankingReplay(): void {
   invalidateCachedPrefix(PREFIX);
   invalidateLandingLeaderboards();
-  // Le podium et les cartes nominatives d'aperçu sont rendus depuis ces entrées,
-  // mais un score ne les vide qu'**au plus une fois par fenêtre** (ci-dessous).
+}
+
+/**
+ * Comme {@link invalidateTeamRanking} pour un **score** (rapporté ou arbitré) :
+ * le rejeu et les leaderboards sont vidés aussitôt, les PNG d'aperçu **au plus
+ * une fois par fenêtre** (ci-dessous). Une suppression ou une dépublication de
+ * tournoi, elle, vide tout aussitôt (`invalidateTeamRanking`).
+ */
+export function invalidateTeamRankingForScore(): void {
+  invalidateRankingReplay();
   invalidateRankingShareImagesForScore();
 }
 
@@ -58,7 +73,7 @@ let lastScoreShareFlushAt = 0;
 
 /**
  * Vide les PNG d'aperçu tirés du classement, au plus une fois par
- * {@link RANKING_TTL_MS} pour les **scores**. Un soir de tournoi chargé, chaque
+ * {@link RANKING_TTL_MS} pour les **scores** ({@link invalidateTeamRankingForScore}). Un soir de tournoi chargé, chaque
  * score vidait tous les PNG : les rendus Satori/`sharp` du Raspberry Pi suivaient
  * le nombre de matchs au lieu d'un par fenêtre. Un PNG gardé après un score non
  * vidé n'a que l'âge de sa propre échéance (60 s) de retard — la même fenêtre

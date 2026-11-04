@@ -129,9 +129,9 @@ describe("updateTournament", () => {
     expect(invalidateSpectatorSnapshot).toHaveBeenCalledWith(1);
   });
 
-  it("une édition sans date de visibilité n'évince rien", async () => {
+  it("évince d'après la visibilité écrite, patch ou non : un tournoi encore masqué reste hors du cache public", async () => {
     await updateTournament(1, { name: "Autre nom" });
-    expect(invalidateSpectatorSnapshot).not.toHaveBeenCalled();
+    expect(invalidateSpectatorSnapshot).toHaveBeenCalledWith(1);
   });
 
   it("une visibilité déjà passée dans le patch n'évince rien", async () => {

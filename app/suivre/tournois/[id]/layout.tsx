@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/server/auth";
+import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { publicTournamentCardForRequest } from "@/lib/server/spectator-request";
 import { tournamentPageMetadata } from "@/lib/server/tournament-metadata";
@@ -94,7 +95,15 @@ export default async function SpectatorTournamentLayout({
         <PublicPageShell>
           {/* Renvoi dû : la fiche publique n'est pas rendue à la place de `children` — elle
               s'hydratait (SSE, sondage REST) avant que `router.replace` n'ait mené au membre. */}
-          {relay ? <MemberRelay tournamentId={tournamentId} /> : <div className="page-shell">{children}</div>}
+          {relay ? (
+            <div className="page-shell">
+              <MemberRelay tournamentId={tournamentId} />
+              {/* Repli visible si le renvoi tarde ou échoue : jamais une page vide. */}
+              <output>{messagesFor(locale).login.authGate.redirecting}</output>
+            </div>
+          ) : (
+            <div className="page-shell">{children}</div>
+          )}
         </PublicPageShell>
       </SpectatorViewProvider>
     </TournamentSheetText>

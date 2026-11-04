@@ -35,6 +35,7 @@ jest.mock("@/lib/server/landing-cache", () => ({
 
 jest.mock("@/lib/server/ranking-cache", () => ({
   invalidateTeamRanking: () => invalidateRanking(),
+  invalidateTeamRankingForScore: () => invalidateRanking(),
 }));
 
 jest.mock("@/lib/server/stats-cache", () => ({

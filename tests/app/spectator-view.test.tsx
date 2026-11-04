@@ -283,8 +283,9 @@ describe("page sans compte — mise en page", () => {
     const html = renderToStaticMarkup(await SpectatorLayout({ children: <p>plateau</p>, ...params("12") }));
     // La fiche publique n'est pas rendue (elle s'hydraterait, SSE et sondage REST compris, avant le renvoi).
     expect(html).not.toContain("plateau");
-    expect(html).not.toContain('class="page-shell"');
     expect(html).toContain("<main");
+    // Repli visible si le renvoi tarde : jamais une page vide.
+    expect(html).toContain("<output>Ouverture du tournoi…</output>");
     expect(redirect).not.toHaveBeenCalled();
   });
 

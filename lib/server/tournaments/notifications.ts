@@ -10,7 +10,7 @@
  */
 import { publishTournamentEvent } from "@/lib/server/live";
 import { invalidateLandingAggregates, invalidateLandingLive, invalidateLandingMiniBrackets } from "@/lib/server/landing-cache";
-import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
+import { invalidateTeamRanking, invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { invalidateTournamentLists } from "./list-cache";
 import { invalidateTournamentPreview } from "./preview-cache";
@@ -165,7 +165,7 @@ export function publishScoreReportedEvent(tournamentId: number, matchId: number)
   scheduleMatchStartNotices();
   scheduleLiveEveningRefresh();
   invalidateTournamentSnapshot(tournamentId);
-  invalidateTeamRanking();
+  invalidateTeamRankingForScore();
   // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.
   invalidateStats();
   publishTournamentEvent({
@@ -181,7 +181,7 @@ export function publishScoreResolvedEvent(tournamentId: number, matchId: number)
   scheduleMatchStartNotices();
   scheduleLiveEveningRefresh();
   invalidateTournamentSnapshot(tournamentId);
-  invalidateTeamRanking();
+  invalidateTeamRankingForScore();
   // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.
   invalidateStats();
   publishTournamentEvent({

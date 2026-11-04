@@ -256,6 +256,12 @@ describe("sameSlideProps", () => {
     expect(sameSlideProps(withArray, withObject)).toBe(false);
   });
 
+  it("sameSlideProps_differentDatesOrMaps_neverEqualByMistake", () => {
+    const at = (value: unknown) => props({ match: { ...match(1), extra: value } as ReturnType<typeof match> });
+    expect(sameSlideProps(at(new Date(1)), at(new Date(2)))).toBe(false);
+    expect(sameSlideProps(at(new Map([[1, 1]])), at(new Map([[2, 2]])))).toBe(false);
+  });
+
   it("sameSlideProps_equalContent_doesNotSerialize", () => {
     const stringify = jest.spyOn(JSON, "stringify");
     sameSlideProps(props(), props());

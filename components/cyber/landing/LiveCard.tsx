@@ -213,7 +213,10 @@ export function slideLoadsLogos(index: number, active: number, count: number, fe
 function sameValue(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true;
   if (typeof left !== "object" || typeof right !== "object" || left === null || right === null) return false;
-  if (Array.isArray(left) !== Array.isArray(right)) return false;
+  // Seuls objets simples et tableaux se comparent par contenu : une `Date`, une
+  // `Map` ou une instance (aucune clé énumérable) ne se disent jamais égales à tort.
+  const proto: unknown = Object.getPrototypeOf(left);
+  if (proto !== Object.getPrototypeOf(right) || (proto !== Object.prototype && proto !== Array.prototype)) return false;
   const leftKeys = Object.keys(left);
   return (
     leftKeys.length === Object.keys(right).length

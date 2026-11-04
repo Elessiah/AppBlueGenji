@@ -178,7 +178,9 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     try {
       const bytes = await gzippedSpectatorBody(payload);
       return new Response(bytes, { status: 200, headers: { ...jsonHeaders, "Content-Encoding": "gzip" } });
-    } catch {
+    } catch (error) {
+      // Visible à l'opérateur : sous pression mémoire, chaque client gzip repasse au corps brut.
+      console.error("[spectator] compression gzip impossible, corps brut servi", error);
       return new Response(payload.body, { status: 200, headers: { ...jsonHeaders, ETag: etagOf(payload, false) } });
     }
   }

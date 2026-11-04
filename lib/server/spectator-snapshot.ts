@@ -30,7 +30,7 @@ import { gzip } from "node:zlib";
 import { promisify } from "node:util";
 import { createHash } from "node:crypto";
 import { refundRateToken, SPECTATOR_REBUILD_RULE, takeRateToken } from "@/lib/server/api-guard";
-import { cached, cachedStale } from "@/lib/server/cache";
+import { cached, cachedStale, isCachedOrLoading } from "@/lib/server/cache";
 import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { isTournamentSnapshotWarm, spectatorCardCacheKey, spectatorSnapshotCacheKey } from "@/lib/server/tournaments/snapshot";
 import {
@@ -298,14 +298,18 @@ export async function publicTournamentCard(
 ): Promise<TournamentCard | null> {
   const copy = staleSpectatorPayload(tournamentId);
   if (copy) return { ...copy.snapshot.card, state: computeTournamentState(copy.snapshot.card) };
+  const key = spectatorCardCacheKey(tournamentId);
+  // `admit` (le plafond des lectures publiques) n'est consulté que quand la
+  // lecture **touche la base** : ni une carte déjà en cache, ni une lecture déjà
+  // en vol (qu'on rejoint) ne prennent de jeton. Consulté **avant** `cached`,
+  // sans attente entre les deux : un refus ne devient jamais le résultat commun
+  // d'une lecture en vol que d'autres, non plafonnés, auraient rejointe.
+  if (!isCachedOrLoading(key) && !admit()) return null;
   try {
     return await cached(
-      spectatorCardCacheKey(tournamentId),
+      key,
       (card: TournamentCard | null) => (card ? SPECTATOR_CARD_TTL_MS : 0),
-      // `admit` (le plafond des lectures publiques) n'est consulté qu'ici, quand
-      // la lecture **touche la base** : une carte servie par la copie ou par ce
-      // cache ne prend aucun jeton. Refusé : `null`, jamais gardé (TTL 0).
-      () => (admit() ? getVisibleTournamentCard(tournamentId) : Promise.resolve(null)),
+      () => getVisibleTournamentCard(tournamentId),
     );
   } catch {
     return null;

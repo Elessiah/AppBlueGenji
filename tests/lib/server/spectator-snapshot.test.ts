@@ -418,6 +418,18 @@ describe("publicTournamentCard", () => {
     expect(await publicTournamentCard(5, () => true)).not.toBeNull();
   });
 
+  it("lecture déjà en vol : rejointe sans consulter `admit`, et le refus d'un appelant n'est pas partagé", async () => {
+    let finish: (card: ReturnType<typeof tournamentCard>) => void = (_card) => undefined;
+    jest.mocked(getVisibleTournamentCard).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const first = publicTournamentCard(5, () => true);
+    const admitJoiner = jest.fn(() => false);
+    const joiner = publicTournamentCard(5, admitJoiner);
+    finish(tournamentCard({ id: 5 }));
+    expect((await first)?.id).toBe(5);
+    expect((await joiner)?.id).toBe(5);
+    expect(admitJoiner).not.toHaveBeenCalled();
+  });
+
   it("copie récente : `admit` n'est pas consulté", async () => {
     mockedSnapshot.mockResolvedValue(tournamentSnapshot({ card: tournamentCard({ id: 5 }) }));
     await getSpectatorPayload(5, 0, CLIENT);

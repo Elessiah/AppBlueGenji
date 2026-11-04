@@ -247,8 +247,8 @@ export async function loadEditableTournament(
  * Dépublié (visibilité repoussée dans le futur) : la page sans compte ne garde
  * ni sa réponse publique ni sa carte d'encart (titre, description).
  */
-function evictIfUnpublished(tournamentId: number, startVisibilityAt: string | undefined): void {
-  if (Date.parse(startVisibilityAt ?? "") > Date.now()) invalidateSpectatorSnapshot(tournamentId);
+function evictIfUnpublished(tournamentId: number, writtenVisibilityAt: string): void {
+  if (Date.parse(writtenVisibilityAt) > Date.now()) invalidateSpectatorSnapshot(tournamentId);
 }
 
 /**
@@ -265,6 +265,7 @@ export async function updateTournament(
   const connection = await db.getConnection();
   let previousName: string;
   let name: string;
+  let writtenVisibilityAt: string;
 
   try {
     await connection.beginTransaction();
@@ -301,6 +302,7 @@ export async function updateTournament(
 
     const { valid, normalizedPhases } = validateEditedValues(next);
     name = valid.name;
+    writtenVisibilityAt = next.startVisibilityAt;
 
     await connection.execute(
       `UPDATE bg_tournaments SET
@@ -388,7 +390,8 @@ export async function updateTournament(
     connection.release();
   }
 
-  evictIfUnpublished(tournamentId, patch.startVisibilityAt);
+  // La visibilité **écrite** (relue sous le verrou, patch compris), pas la chaîne brute du patch.
+  evictIfUnpublished(tournamentId, writtenVisibilityAt);
   publishUpdatedEvent(tournamentId);
   return { previousName, name };
 }
