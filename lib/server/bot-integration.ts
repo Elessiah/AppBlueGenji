@@ -1024,7 +1024,7 @@ const BOT_VOICE_FETCH_TIMEOUT_MS = 5000;
  * - `gone` : le bot ne suit plus ce salon (`404 VOICE_CHANNEL_NOT_TRACKED`) —
  *   supprimé à la main, sorti de la catégorie, ou déjà libéré puis effacé ; un
  *   autre `404` (route absente du bot, `INTERNAL_ROUTE_NOT_FOUND`, ou service mal
- *   routé, `BOT_INTERNAL_REQUEST_FAILED`) est une panne comptée au coupe-circuit ;
+ *   routé, `BOT_INTERNAL_REQUEST_FAILED`) arrête le balayage sans compter au coupe-circuit ;
  * - `failed` : bot injoignable, coupe-circuit ouvert, permission refusée,
  *   Discord indisponible, réponse illisible — redemandé au passage suivant.
  */
@@ -1037,13 +1037,13 @@ export type VoiceCallOutcome<T> =
  * Issue d'un `404` du bot vocal. Seul « salon non suivi » vaut « déjà rendu » (et
  * prouve un bot sain) : une route absente (bot d'une autre version) ou un 404 d'un
  * autre service fermerait sinon des lignes dont le salon reste sur Discord. Ces
- * 404-là sont une panne du canal interne : comptés au coupe-circuit, et rendus sous
- * un code de transport qui arrête le balayage.
+ * 404-là sont rendus sous un code de transport qui arrête le balayage (la passe
+ * s'arrête au premier), sans compter au coupe-circuit, partagé par toutes les fonctions du bot : un
+ * écart de version des seules routes vocales ne coupe ni le journal ni les annonces.
  */
 async function voiceNotFoundOutcome(response: Response): Promise<{ kind: "gone" | "failed"; code: string }> {
   const code = await safeReadError(response);
   if (code !== "VOICE_CHANNEL_NOT_TRACKED") {
-    recordFailure();
     return { kind: "failed", code: code === "INTERNAL_ROUTE_NOT_FOUND" ? code : "BOT_INTERNAL_REQUEST_FAILED" };
   }
   recordSuccess();

@@ -325,6 +325,11 @@ const BOT_TRANSPORT_FAILURES: ReadonlySet<string> = new Set([
   "INTERNAL_ROUTE_NOT_FOUND",
   // Réponse sans code lisible (page d'erreur d'un proxy, bot arrêté derrière lui).
   "BOT_INTERNAL_REQUEST_FAILED",
+  // Jeton interne refusé ou absent, bot pas encore connecté à Discord : le bot entier
+  // refuse, chaque appel suivant aussi.
+  "UNAUTHORIZED",
+  "INTERNAL_API_TOKEN_NOT_CONFIGURED",
+  "DISCORD_NOT_READY",
 ]);
 
 async function releaseChannels(touched: Set<number>): Promise<void> {
@@ -333,8 +338,10 @@ async function releaseChannels(touched: Set<number>): Promise<void> {
     // Une ligne sans salon (création échouée) se clôt sans appel au bot.
     if (row.channel_id !== null) {
       const released = await releaseVoiceChannel(String(row.channel_id));
-      // `gone` (`VOICE_CHANNEL_NOT_TRACKED`) : déjà supprimé, rien de plus à faire.
-      if (released.kind === "failed") {
+      // `gone` (`VOICE_CHANNEL_NOT_TRACKED`) : déjà supprimé, rien de plus à faire ; un
+      // identifiant que le bot refuse (`INVALID_CHANNEL_ID`) ne sera jamais suivi : la
+      // ligne se clôt aussi, au lieu d'être redemandée sans fin et jamais purgée.
+      if (released.kind === "failed" && released.code !== "INVALID_CHANNEL_ID") {
         // Redemandé après `VOICE_RETRY_SECONDS`, en fin de file : un rendu qui
         // échoue n'affame pas les autres.
         await run(
