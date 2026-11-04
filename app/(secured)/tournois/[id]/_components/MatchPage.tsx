@@ -1024,8 +1024,11 @@ function MatchPageContent({
   const editable = match.status !== "COMPLETED" && match.team1Id !== null && match.team2Id !== null;
   const locked = adminResolvable && scoreLocked;
   const voice = useMatchVoice(match, organizes && !frozen && match.status !== "COMPLETED", streamLive);
-  const streams = matchPageStreams(match, liveState);
-  const officiating = officiatingContent(match, canSchedule, organizes, shownLaunch);
+  const streams = useMemo(() => matchPageStreams(match, liveState), [match, liveState]);
+  const officiating = useMemo(
+    () => officiatingContent(match, canSchedule, organizes, shownLaunch),
+    [match, canSchedule, organizes, shownLaunch],
+  );
   // Colonne de droite : rendue seulement si une section y a quelque chose à
   // dire ; sinon la grille passe à une colonne (attribut posé ici, pas `:has()`).
   // Chaque section se tait par le même prédicat que celui lu ici : une seule source.

@@ -22,7 +22,7 @@
  */
 
 import type { MatchStatus, TeamRole, TournamentGame } from "./types";
-import { isoTime } from "./dates";
+import { isoTime } from "./iso-time";
 
 /**
  * Délai au-delà duquel un match en lancement part **d'office**, compté depuis

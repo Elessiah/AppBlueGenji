@@ -12,13 +12,6 @@ import { cached } from "./intl-cache";
 /** Ce qu'affiche une date ou une heure illisible : visible, sans langue (jamais « Invalid Date »). */
 export const UNREADABLE_DATE = "—";
 
-/** Instant (ms) d'une date ISO ; `null` si absente ou illisible. */
-export function isoTime(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const time = Date.parse(iso);
-  return Number.isNaN(time) ? null : time;
-}
-
 /**
  * L'heure d'une échéance proche (expiration d'un code), dans la langue de la
  * page ; une valeur absente ou illisible rend {@link UNREADABLE_DATE}.

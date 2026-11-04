@@ -45,7 +45,7 @@ salons pleins.
   redevenu frais compte comme un changement (publication + entretien rejoué).
 - **Relecture de la page du match** : **flux coupé seulement** (`isLive` de la fiche),
   toutes les 10 s, tant que la source qui fait foi porte `voice` (match dû, pas encore
-  lancé), verrou tenu ou non. Flux sain, chaque comptage est déjà publié dans
+  lancé), verrou tenu ou non ; la relecture lue à l'instant où le flux se coupe (ouverture de la page, reconnexion) est sautée (`voicePollDue`, grâce d'une demi-période). Flux sain, chaque comptage est déjà publié dans
   l'instantané ; le balayage reste porté par le trafic (listes de tournois,
   `/api/me/match-launches`). Une réponse REST `null` (match lancé, option éteinte) fait
   taire la section jusqu'au prochain instantané ; une réponse sans clé `voice` est

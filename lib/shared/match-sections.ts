@@ -29,7 +29,7 @@
  * Voir `docs/features/ROUND_MATCH_SECTIONS.md`.
  */
 import { matchLaunchPhase, nextLaunchPhaseChangeAt } from "./match-launch";
-import { isoTime } from "./dates";
+import { isoTime } from "./iso-time";
 import type { BracketMatch } from "./types";
 
 export type MatchSectionKey = "TO_PLAN" | "WAITING" | "LOBBY" | "PLAYING" | "DONE";

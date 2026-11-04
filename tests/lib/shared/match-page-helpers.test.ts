@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { isoTime } from "@/lib/shared/dates";
+import { isoTime } from "@/lib/shared/iso-time";
 import { castWithoutStartAt, type MatchLiveInput } from "@/lib/shared/live-streams";
 import { shownMapName } from "@/lib/shared/round-maps";
 import { CodedError, errorCode } from "@/lib/shared/field-errors";

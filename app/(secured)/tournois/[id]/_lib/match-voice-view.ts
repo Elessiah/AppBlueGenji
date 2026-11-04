@@ -19,6 +19,18 @@ import type { BracketMatch } from "@/lib/shared/types";
 /** Relecture REST des salons vocaux, flux coupé, tant que le match suit ses salons. */
 export const VOICE_POLL_MS = 10_000;
 
+/**
+ * Un flux qui n'est pas encore là (page qui s'ouvre, reconnexion) n'est pas un
+ * flux coupé : la relecture lue à l'instant où il se coupe est sautée, et la
+ * suivante (une période plus tard, à quelques millisecondes près) a lieu — un
+ * flux qui revient aussitôt n'a rien à payer par lecteur.
+ */
+export const VOICE_POLL_GRACE_MS = VOICE_POLL_MS / 2;
+
+export function voicePollDue(downSince: number | null, now: number): boolean {
+  return downSince !== null && now - downSince >= VOICE_POLL_GRACE_MS;
+}
+
 /** Relecture REST rangée avec l'instantané qu'elle a vu : elle ne vaut que pour lui. */
 export type PolledMatchVoice = {
   matchId: number;
@@ -87,8 +99,15 @@ export function useMatchVoice(
   const active = voicePollActive(voice, streamLive);
   const tick = useClock(VOICE_POLL_MS, active);
 
+  // Depuis quand le flux est coupé (relecture due) ; remis à zéro dès qu'elle n'a plus lieu d'être.
+  const downSince = useRef<number | null>(null);
   useEffect(() => {
-    if (tick === null || !active) return;
+    if (!active) downSince.current = null;
+    else downSince.current ??= Date.now();
+  }, [active]);
+
+  useEffect(() => {
+    if (tick === null || !active || !voicePollDue(downSince.current, tick)) return;
     // Rangée avec l'instantané vu au départ : un instantané publié pendant la
     // requête la rend caduque.
     const seen = streamKey.current;

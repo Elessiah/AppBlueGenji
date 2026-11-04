@@ -11,7 +11,7 @@
  * fantôme (personne ne la rejoindrait).
  */
 
-import { isoTime } from "./dates";
+import { isoTime } from "./iso-time";
 
 /** Avance de la création des salons sur l'heure du match (minutes). */
 export const VOICE_CHANNEL_LEAD_MINUTES = 15;

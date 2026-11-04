@@ -1,7 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   currentMatchVoice,
+  VOICE_POLL_GRACE_MS,
+  VOICE_POLL_MS,
   voicePollActive,
+  voicePollDue,
   voiceStreamKey,
   type PolledMatchVoice,
 } from "@/app/(secured)/tournois/[id]/_lib/match-voice-view";
@@ -111,5 +114,64 @@ describe("useMatchVoice — câblage", () => {
     const source = readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
 
     expect(source).toMatch(/streamLive=\{isLive\}/);
+  });
+});
+
+describe("voicePollDue", () => {
+  const since = 1_000_000;
+
+  it("voicePollDue_streamNeverDown_false", () => {
+    expect(voicePollDue(null, since + VOICE_POLL_MS)).toBe(false);
+  });
+
+  it("voicePollDue_justWentDown_false", () => {
+    expect(voicePollDue(since, since)).toBe(false);
+  });
+
+  it("voicePollDue_justBelowGrace_false", () => {
+    expect(voicePollDue(since, since + VOICE_POLL_GRACE_MS - 1)).toBe(false);
+  });
+
+  it("voicePollDue_atGraceBoundary_true", () => {
+    expect(voicePollDue(since, since + VOICE_POLL_GRACE_MS)).toBe(true);
+  });
+
+  it("voicePollDue_firstIntervalTickWithJitter_true", () => {
+    // Le premier battement tombe une période après l'instant lu, à quelques ms près.
+    expect(voicePollDue(since, since + VOICE_POLL_MS - 5)).toBe(true);
+  });
+
+  it("VOICE_POLL_GRACE_MS_isHalfPeriod", () => {
+    expect(VOICE_POLL_GRACE_MS).toBe(VOICE_POLL_MS / 2);
+  });
+
+  it("useMatchVoice_source_pollGatedByGraceAndDownSinceReset", () => {
+    const source = readSource("app/(secured)/tournois/[id]/_lib/match-voice-view.ts");
+
+    expect(source).toContain("voicePollDue(downSince.current, tick)");
+    expect(source).toContain("if (!active) downSince.current = null;");
+  });
+});
+
+describe("isoTime et mémoïsation de la page (poids client)", () => {
+  it("isoTime_module_hasNoImport", () => {
+    expect(readSource("lib/shared/iso-time.ts")).not.toMatch(/^import /m);
+    expect(readSource("lib/shared/dates.ts")).not.toContain("export function isoTime");
+  });
+
+  it("isoTime_clientModules_importTinyModuleNotDates", () => {
+    for (const file of ["match-voice", "match-launch", "match-sections"]) {
+      const source = readSource(`lib/shared/${file}.ts`);
+
+      expect(source).toContain('from "./iso-time"');
+      expect(source).not.toContain('from "./dates"');
+    }
+  });
+
+  it("matchPage_source_streamsAndOfficiatingMemoized", () => {
+    const source = readSource("app/(secured)/tournois/[id]/_components/MatchPage.tsx");
+
+    expect(source).toContain("useMemo(() => matchPageStreams(match, liveState)");
+    expect(source).toMatch(/useMemo\(\s*\(\) => officiatingContent\(/);
   });
 });
