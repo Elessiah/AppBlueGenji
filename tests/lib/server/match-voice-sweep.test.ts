@@ -127,6 +127,21 @@ describe("dispatchMatchVoiceChannels — création", () => {
     expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
   });
 
+  it("dispatchMatchVoiceChannels_botDownOnCreate_skipsRecheckAndRelease", async () => {
+    const { execute } = database({ due: [dueMatch], openDue: [{ match_id: 9, team_id: 1, channel_id: "5", tournament_id: 7, team_name: "Gamma" }] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "BOT_VOICE_TIMEOUT" });
+    await dispatchMatchVoiceChannels();
+    expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls.some(([sql]) => sql === OPEN_DUE_CHANNELS_SQL || sql === RELEASABLE_SQL)).toBe(false);
+  });
+
+  it("dispatchMatchVoiceChannels_botDownOnRecheck_skipsRelease", async () => {
+    const { execute } = database({ openDue: [{ match_id: 9, team_id: 1, channel_id: "5", tournament_id: 7, team_name: "Gamma" }] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "BOT_INTERNAL_UNREACHABLE" });
+    await dispatchMatchVoiceChannels();
+    expect(execute.mock.calls.some(([sql]) => sql === RELEASABLE_SQL)).toBe(false);
+  });
+
   it("dispatchMatchVoiceChannels_botRefusesOneChannel_triesTheOtherSideAndMatches", async () => {
     const { writes } = database({ due: [dueMatch, { ...dueMatch, id: 43 }] });
     jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "VOICE_PERMISSION_DENIED" });
