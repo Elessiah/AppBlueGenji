@@ -463,12 +463,15 @@ async function settleChallengeAttempt(
   if (!timingSafeEquals(challenge.code_hash, hashCode(code))) return null;
 
   // **Un code juste ne sert qu'une fois**, même à deux requêtes de front :
-  // seule celle dont l'écriture consomme réellement la ligne obtient la preuve.
+  // seule celle dont l'écriture efface l'empreinte lue obtient la preuve. La
+  // garde porte sur `code_hash`, pas sur `consumed_at` : la réservation du
+  // dernier essai permis a déjà posé `consumed_at`, et un code juste à ce
+  // dernier essai doit rester accepté.
   const [consumed] = await db.execute<ResultSetHeader>(
     `UPDATE bg_discord_login_challenges
-     SET consumed_at = NOW()
-     WHERE id = ? AND consumed_at IS NULL`,
-    [challenge.id],
+     SET consumed_at = NOW(), code_hash = ''
+     WHERE id = ? AND code_hash = ?`,
+    [challenge.id, challenge.code_hash],
   );
   if (Number(consumed.affectedRows) !== 1) return null;
 

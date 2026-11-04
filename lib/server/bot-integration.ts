@@ -225,8 +225,6 @@ export async function resolveDiscordUser(handle: string): Promise<string> {
  * rattacher un tag Discord à un compte (`handle`) — le bot rédige alors un
  * message qui dit que le code ne connecte pas.
  */
-export type { DiscordCodePurpose } from "@/lib/shared/discord-code-purpose";
-
 /**
  * Envoie le code de connexion en message privé. Le bot le rédige lui-même :
  * dans la langue du compte (`locale`) quand le compte existe, sinon (`null`)
@@ -238,7 +236,7 @@ export async function sendDiscordLoginCode(
   discordId: string,
   code: string,
   locale: Locale | null,
-  purpose: DiscordCodePurpose = "login",
+  purpose: DiscordCodePurpose,
 ): Promise<void> {
   const baseUrl = resolveBotInternalUrl();
 
