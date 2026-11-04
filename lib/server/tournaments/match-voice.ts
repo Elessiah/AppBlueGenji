@@ -279,11 +279,15 @@ async function run<T extends RowDataPacket[]>(sql: string, params: (string | num
   return rows;
 }
 
+// Ligne rouverte ou salon remplacé : `created_at` repart (âge du salon courant, lu par
+// `bot_expired` et dit « heure de création » par T18) ; lu avant les autres affectations.
 async function writeChannel(matchId: number, teamId: number, channelId: string): Promise<void> {
   await run(
     `INSERT INTO bg_match_voice_channels (match_id, team_id, channel_id, failed_at, released_at)
      VALUES (?, ?, ?, NULL, NULL)
-     ON DUPLICATE KEY UPDATE channel_id = VALUES(channel_id), failed_at = NULL, released_at = NULL`,
+     ON DUPLICATE KEY UPDATE
+       created_at = IF(released_at IS NOT NULL OR NOT (channel_id <=> VALUES(channel_id)), NOW(), created_at),
+       channel_id = VALUES(channel_id), failed_at = NULL, released_at = NULL`,
     [matchId, teamId, channelId],
   );
 }
@@ -299,6 +303,7 @@ async function writeFailure(matchId: number, teamId: number): Promise<void> {
   await run(
     `INSERT INTO bg_match_voice_channels (match_id, team_id, failed_at) VALUES (?, ?, NOW())
      ON DUPLICATE KEY UPDATE
+       created_at = IF(released_at IS NULL, created_at, NOW()),
        channel_id = IF(released_at IS NULL, channel_id, NULL),
        failed_at = NOW(), released_at = NULL`,
     [matchId, teamId],
@@ -382,18 +387,18 @@ async function releaseOne(row: ReleaseRow): Promise<"closed" | "kept" | "down"> 
     return "closed";
   }
   const down = BOT_TRANSPORT_FAILURES.has(released.code);
+  // Rendu impossible passé le filet du bot (salon non rendu supprimé de son côté) : la ligne
+  // se clôt, refus ou panne, au lieu d'être redemandée et gardée pour toujours.
+  if (Number(row.bot_expired ?? 0) === 1) {
+    sweep.releaseLogged.delete(key);
+    return "closed";
+  }
   // Refus du bot : une ligne pm2 par salon et par code (le staff voit un salon qui reste
   // sur Discord, et pourquoi) ; une panne du canal n'est pas un refus de ce salon.
   if (!down && sweep.releaseLogged.get(key) !== released.code) {
     if (sweep.releaseLogged.size >= VOICE_RELEASE_LOG_MEMORY) sweep.releaseLogged.clear();
     sweep.releaseLogged.set(key, released.code);
     logReleaseFailure(Number(row.match_id), released.code);
-  }
-  // Refus sans fin d'un salon : passé le filet du bot (salon non rendu supprimé de son côté),
-  // la ligne se clôt au lieu d'être redemandée chaque minute et gardée pour toujours.
-  if (!down && Number(row.bot_expired ?? 0) === 1) {
-    sweep.releaseLogged.delete(key);
-    return "closed";
   }
   // Redemandé après `VOICE_RETRY_SECONDS`, en fin de file : un rendu qui échoue n'affame pas les autres.
   await run(
