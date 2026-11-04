@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
-import { failureReason, isErrorCode } from "@/lib/server/failure-reason";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createAboutStat, listAboutStats } from "@/lib/server/about-stats-service";
 import { bodyReadRefusal, readJsonBody } from "@/lib/server/request-body";
@@ -36,11 +36,6 @@ export async function POST(req: Request) {
     });
     return ok({ stat }, 201);
   } catch (e) {
-    // Un refus de validation (`LABEL_TOO_LONG`) passe tel quel ; le texte d'un
-    // pilote (hôte, port, valeur en double) jamais : code de repli, journalisé.
-    const msg = e instanceof Error ? e.message : "";
-    if (isErrorCode(msg)) return fail(msg, 400);
-    console.error(`[admin] ABOUT_STAT_CREATE_FAILED : ${failureReason(e)}`);
-    return fail("ABOUT_STAT_CREATE_FAILED", 400);
+    return fail(serviceErrorCode(e, "ABOUT_STAT_CREATE_FAILED"), 400);
   }
 }

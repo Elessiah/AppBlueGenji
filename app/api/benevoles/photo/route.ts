@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { processAndStoreImage } from "@/lib/server/image-upload";
 import { toServedUploadUrl } from "@/lib/shared/uploads";
@@ -31,6 +32,6 @@ export async function POST(req: Request) {
     const diskPath = await processAndStoreImage(file, "benevole-photo", user.id, crop.crop);
     return ok({ photoUrl: toServedUploadUrl(diskPath) });
   } catch (error) {
-    return fail((error as Error).message || "PHOTO_UPLOAD_FAILED", 400);
+    return fail(serviceErrorCode(error, "PHOTO_UPLOAD_FAILED"), 400);
   }
 }

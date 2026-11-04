@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/server/auth";
-import { failureReason, isErrorCode } from "@/lib/server/failure-reason";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { readJsonBody } from "@/lib/server/request-body";
 import { validateReorderIds } from "@/lib/shared/reorder";
@@ -59,10 +59,8 @@ async function readBody(req: Request): Promise<JsonBody | null> {
  * texte d'une bibliothèque (hôte, port, valeur lue).
  */
 function serviceFailure(error: unknown, fallback: string, statusOf: (message: string) => number): Response {
-  const msg = error instanceof Error ? error.message : "";
-  if (isErrorCode(msg)) return fail(msg, statusOf(msg));
-  console.error(`[admin] ${fallback} : ${failureReason(error)}`);
-  return fail(fallback, statusOf(fallback));
+  const code = serviceErrorCode(error, fallback);
+  return fail(code, statusOf(code));
 }
 
 export interface ItemRouteOptions {

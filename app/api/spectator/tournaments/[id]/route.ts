@@ -89,9 +89,13 @@ function refusedRead(
 ): SpectatorPayload | Response {
   const stale = staleSpectatorPayload(tournamentId);
   if (refusal.kind === "rate") {
-    // Seul l'`ETag` du codage demandé : une version d'un autre codage n'aurait
-    // pas de `304` derrière et tirerait le corps entier d'un réseau refusé.
-    if (stale && matchesEtag(ifNoneMatch, etagOf(stale, gzipped))) return stale;
+    // L'`ETag` du codage demandé, ou — pour un client gzip — celui du corps brut
+    // qu'il a reçu en repli d'une compression ratée : les deux ont un `304`
+    // derrière (`GET`). Une version gzip présentée par un client sans gzip n'en a
+    // pas, et tirerait le corps entier d'un réseau refusé.
+    if (stale && (matchesEtag(ifNoneMatch, etagOf(stale, gzipped)) || (gzipped && matchesEtag(ifNoneMatch, etagOf(stale, false))))) {
+      return stale;
+    }
     return refusal.response ?? unavailable(level);
   }
   return stale ?? refusal.response ?? unavailable(level);

@@ -27,3 +27,16 @@ const ERROR_CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
 export function isErrorCode(message: string): boolean {
   return ERROR_CODE.test(message);
 }
+
+/**
+ * Code renvoyé au client pour l'erreur d'un service : son message s'il est un
+ * code du site (`LABEL_TOO_LONG`), sinon `fallback` — le texte d'un pilote
+ * (hôte, port, valeur en double) n'atteint jamais une réponse ; il est alors
+ * journalisé, réduit à {@link failureReason}.
+ */
+export function serviceErrorCode(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : "";
+  if (isErrorCode(message)) return message;
+  console.error(`[api] ${fallback} : ${failureReason(error)}`);
+  return fallback;
+}

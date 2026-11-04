@@ -18,6 +18,7 @@ import {
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { SpectatorViewProvider } from "@/components/spectator-view";
 import { MemberRelay } from "./_components/MemberRelay";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { TournamentSheetText, tournamentSheetEnglish } from "@/app/(secured)/tournois/[id]/_components/TournamentSheetText";
 
 type LayoutProps = {
@@ -99,8 +100,12 @@ export default async function SpectatorTournamentLayout({
           {relay ? (
             <div className="page-shell">
               <MemberRelay tournamentId={tournamentId} />
-              {/* Repli visible si le renvoi tarde ou échoue : jamais une page vide. */}
-              <output className={styles.fallback}>{messagesFor(locale).login.authGate.redirecting}</output>
+              {/* Repli visible si le renvoi tarde ou échoue : jamais une page vide, ni une
+                  impasse — le texte mène à la fiche membre du tournoi (le chemin exact
+                  du match n'est pas connu ici, faute d'en-tête). */}
+              <output className={styles.fallback}>
+                <LocaleLink href={`/tournois/${tournamentId}`}>{messagesFor(locale).login.authGate.redirecting}</LocaleLink>
+              </output>
             </div>
           ) : (
             <div className="page-shell">{children}</div>
