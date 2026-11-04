@@ -202,6 +202,11 @@ describe("dispatchMatchVoiceChannels — création", () => {
     expect(jest.mocked(ensureVoiceChannel).mock.calls.map(([key]) => key)).toEqual(["match:42:team:1", "match:42:team:2"]);
   });
 
+  it("dispatchMatchVoiceChannels_dueQuery_skipsUnpublishedTournaments", () => {
+    // Tournoi encore caché : aucun salon au nom de ses équipes dans la catégorie publique.
+    expect(DUE_CHANNELS_SQL).toContain("t.start_visibility_at <= NOW()");
+  });
+
   it("dispatchMatchVoiceChannels_dueQuery_asksMatchesWithAFailedSideAfterTheOthers", () => {
     expect(DUE_CHANNELS_SQL).toMatch(/ORDER BY EXISTS \(SELECT 1 FROM bg_match_voice_channels f[\s\S]*f\.failed_at IS NOT NULL\), m\.start_at, m\.id/);
   });
@@ -826,6 +831,10 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
     expect(ensureVoiceChannel).toHaveBeenCalledTimes(2);
     await dispatchMatchVoiceChannels(true);
     expect(ensureVoiceChannel).toHaveBeenCalledTimes(2);
+  });
+
+  it("dispatchMatchVoiceChannels_recheckQuery_skipsUnpublishedTournaments", () => {
+    expect(OPEN_DUE_CHANNELS_SQL).toContain("t.start_visibility_at <= NOW()");
   });
 
   it("dispatchMatchVoiceChannels_recheckQuery_dueOpenChannelsOfCurrentTeamsOnly", () => {

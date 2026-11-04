@@ -2560,8 +2560,8 @@ describe("PRIVACY_CHANGES — salons vocaux sans comptage ni attente (EF-43)", (
 
   it("privacyChanges_voiceWithoutCount_saysNoGateNoCountMemoryOnlyFrAndEn", () => {
     expectEntryTexts(voiceEntry(), PRIVACY_CHANGES_EN[voiceEntry().id], {
-      fr: ["ne retiennent plus le lancement d'un match", "ni qui s'y trouve, ni combien", "effacé avec sa colonne (hors les copies de sauvegarde chiffrées, 30 jours au plus)", "pour savoir si un salon est vide", "rien de nouveau n'est collecté", "une équipe fantôme entre dans le match", "sans score 24 heures après son horaire", "environ une fois par minute (dix secondes après un échec)", "intérêt légitime"],
-      en: ["no longer hold a match's launch", "neither who is in it nor how many", "erased with its column (apart from the encrypted backup copies, 30 days at most)", "to know whether a channel is empty", "nothing new is collected", "a ghost team enters the match", "without a score 24 hours after its time", "about once a minute (ten seconds after a failure)", "legitimate interest"],
+      fr: ["ne retiennent plus le lancement d'un match", "ni qui s'y trouve, ni combien", "effacé avec sa colonne (hors les copies de sauvegarde chiffrées, 30 jours au plus)", "pour savoir si un salon est vide", "rien de nouveau n'est collecté", "une équipe fantôme entre dans le match", "sans score 24 heures après son horaire", "environ une fois par minute, pour en rouvrir", "intérêt légitime"],
+      en: ["no longer hold a match's launch", "neither who is in it nor how many", "erased with its column (apart from the encrypted backup copies, 30 days at most)", "to know whether a channel is empty", "nothing new is collected", "a ghost team enters the match", "without a score 24 hours after its time", "about once a minute, to reopen", "legitimate interest"],
     });
     const published = PRIVACY_CHANGES.find((c) => c.id === "2026-11-salons-vocaux-equipe")!;
     expect([published.publishedAt, published.summary.includes("le bot compte les personnes présentes")]).toEqual(["2026-11-04", true]);
