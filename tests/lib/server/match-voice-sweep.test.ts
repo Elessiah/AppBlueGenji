@@ -132,6 +132,7 @@ describe("dispatchMatchVoiceChannels — création", () => {
     "BOT_VOICE_TIMEOUT",
     "INTERNAL_ERROR",
     "BOT_INTERNAL_REQUEST_FAILED",
+    "BOT_VOICE_BAD_RESPONSE",
     "UNAUTHORIZED",
     "INTERNAL_API_TOKEN_NOT_CONFIGURED",
     "DISCORD_NOT_READY",
