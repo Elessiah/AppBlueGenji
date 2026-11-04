@@ -274,6 +274,8 @@ describe("page d'un match — ce que tout le monde lit", () => {
     expect(css).toMatch(/\.lobby\.wrap,\s*\.scheduled\.wrap \{\s*white-space: normal;/);
     // Seules ces deux pastilles portent la raison : pas de règle morte pour les autres.
     expect(css).not.toMatch(/\.(toPlan|launched)\.wrap/);
+    // La raison est une phrase lisible : ni capitales ni espacement de pastille.
+    expect(css).toMatch(/\.voiceHeld \{[^}]*text-transform: none;[^}]*letter-spacing: normal;/);
   });
 
   it("render_noHost_noSidesFact", () => {
