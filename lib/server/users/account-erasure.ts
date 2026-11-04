@@ -106,10 +106,15 @@ async function resetOptionalColumn(
  *
  * Rend les matchs touchés (casts, liens, arbitrages), comme `eraseAccount`.
  */
-/** Le pseudo d'emprunt d'un compte en attente de suppression, sinon `null` (son pseudo est encore le vrai, ou date d'une règle antérieure). */
+/** Le pseudo d'emprunt d'un compte en attente de suppression (masque posé), sinon `null`. */
 async function readBorrowedPseudo(connection: PoolConnection, userId: number): Promise<string | null> {
   const [rows] = await connection.execute<(RowDataPacket & { pseudo: string })[]>(
-    `SELECT pseudo FROM bg_users WHERE id = ? AND is_deleted = 1 AND deletion_requested_at IS NOT NULL LIMIT 1`,
+    // Le masque doit exister : sans lui, rien ne prouve que le pseudo de la
+    // ligne est l'emprunt et non le vrai.
+    `SELECT u.pseudo FROM bg_users u
+       JOIN bg_account_deletion_holds h ON h.user_id = u.id
+      WHERE u.id = ? AND u.is_deleted = 1 AND u.deletion_requested_at IS NOT NULL
+      LIMIT 1`,
     [userId],
   );
   return rows[0]?.pseudo ?? null;

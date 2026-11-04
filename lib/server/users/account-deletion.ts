@@ -197,7 +197,9 @@ export function mergeTournamentIds(...lists: readonly (readonly number[])[]): nu
 /**
  * Les inscriptions de l'entrée solo du compte, avec ce qui décide de leur sort
  * (`withdrawableSoloRegistrations`) : les dates du tournoi et la présence d'un
- * match qui nomme l'entrée.
+ * match qui nomme l'entrée **dans ce tournoi** (l'entrée solo est unique pour
+ * tous les tournois du compte : un tournoi passé ne bloque pas le retrait d'un
+ * tournoi à venir).
  */
 export async function loadSoloRegistrations(runner: SqlRunner, userId: number): Promise<SoloRegistrationFact[]> {
   const [rows] = await runner.execute<(RowDataPacket & {
@@ -212,8 +214,9 @@ export async function loadSoloRegistrations(runner: SqlRunner, userId: number): 
   })[]>(
     `SELECT r.tournament_id, r.team_id, t.state, t.finished_at,
             t.registration_open_at, t.registration_close_at, t.start_at,
-            (EXISTS (SELECT 1 FROM bg_matches m WHERE m.team1_id = s.id)
-              OR EXISTS (SELECT 1 FROM bg_matches m WHERE m.team2_id = s.id)) AS has_match
+            (EXISTS (SELECT 1 FROM bg_matches m WHERE m.team1_id = s.id AND m.tournament_id = r.tournament_id)
+              OR EXISTS (SELECT 1 FROM bg_matches m WHERE m.team2_id = s.id AND m.tournament_id = r.tournament_id))
+              AS has_match
        FROM bg_teams s
        JOIN bg_tournament_registrations r ON r.team_id = s.id
        JOIN bg_tournaments t ON t.id = r.tournament_id

@@ -209,7 +209,7 @@ describe("« Ne plus voir » de l'invitation à certifier de la fiche tournoi �
 });
 
 describe("anonymizeAccount — pseudo d'emprunt", () => {
-  const BORROWED_READ = "SELECT pseudo FROM bg_users WHERE id = ? AND is_deleted = 1 AND deletion_requested_at IS NOT NULL";
+  const BORROWED_READ = "SELECT u.pseudo FROM bg_users u JOIN bg_account_deletion_holds h ON h.user_id = u.id";
   const isAnonymizeWrite = (sql: string) => /^\s*UPDATE bg_users\s+SET pseudo = \?/.test(sql);
 
   function connectionWith(borrowed: string | null, failFirstWrite = false) {
@@ -246,6 +246,17 @@ describe("anonymizeAccount — pseudo d'emprunt", () => {
 
     const [pseudo] = writtenPseudos(execute);
     expect(ANONYMOUS_PSEUDOS).toContain(pseudo);
+  });
+
+  it("anonymizeAccount_pendingWithoutHold_readRequiresHold", async () => {
+    // Sans masque, rien ne prouve que le pseudo de la ligne est l'emprunt.
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
+    const execute = connectionWith(null);
+
+    await anonymizeAccount(fakeConnection({ execute }), 42);
+
+    const read = execute.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.includes("SELECT u.pseudo"));
+    expect(read).toContain("JOIN bg_account_deletion_holds h ON h.user_id = u.id");
   });
 
   it("anonymizeAccount_borrowedPseudoClash_drawsAnother", async () => {

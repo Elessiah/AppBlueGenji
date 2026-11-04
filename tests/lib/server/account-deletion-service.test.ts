@@ -7,6 +7,7 @@ jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/tournaments/notifications");
 
 import {
+  loadSoloRegistrations,
   deleteOwnAccount,
   getAccountDeletionPlan,
   listCastTournamentIds,
@@ -919,5 +920,19 @@ describe("deleteOwnAccount — verrous et lectures avant la transaction", () => 
     const read = execute.mock.calls.findIndex(([sql]) => String(sql).includes("FROM bg_logo_quarantines"));
     expect(execute.mock.invocationCallOrder[read]).toBeLessThan(getConnection.mock.invocationCallOrder[0]);
     expect(has(inTransaction(queries), "FROM bg_logo_quarantines")).toBe(false);
+  });
+});
+
+describe("loadSoloRegistrations", () => {
+  it("loadSoloRegistrations_query_scopesMatchesToTheRegistrationTournament", async () => {
+    // L'entrée solo est unique pour tous les tournois du compte : un match d'un
+    // tournoi passé ne doit pas bloquer le retrait d'un tournoi à venir.
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+
+    await loadSoloRegistrations(fakePool({ execute }), 7);
+
+    const sql = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
+    expect(sql).toContain("WHERE m.team1_id = s.id AND m.tournament_id = r.tournament_id");
+    expect(sql).toContain("WHERE m.team2_id = s.id AND m.tournament_id = r.tournament_id");
   });
 });
