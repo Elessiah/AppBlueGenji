@@ -23,6 +23,7 @@ import {
 import type { TournamentSnapshot } from "@/lib/shared/types";
 import { gunzipSync } from "node:zlib";
 import { SPECTATOR_MAX_CONCURRENT_REBUILDS } from "@/lib/server/spectator-snapshot";
+import * as spectatorSnapshotModule from "@/lib/server/spectator-snapshot";
 import { tournamentSnapshot } from "../../../helpers/tournament-detail";
 import { tournamentCard } from "../../../helpers/tournament-card";
 import { bracketMatch, matchCaster } from "../../../helpers/bracket-match";
@@ -241,6 +242,16 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect(await res.json()).toEqual({ error: "TOURNAMENT_LOAD_FAILED" });
   });
 
+  it("GET_databaseFailure_logsCodeOnly", async () => {
+    const logged = jest.mocked(console.error);
+    mockedSnapshot.mockRejectedValue(new Error("connect ECONNREFUSED 10.0.0.2:3306"));
+
+    await GET(req(), params("5"));
+
+    expect(logged).toHaveBeenCalled();
+    expect(JSON.stringify(logged.mock.calls)).not.toContain("10.0.0.2");
+  });
+
   it("plafonne les lectures d'une même adresse", async () => {
     mockedSnapshot.mockResolvedValue(snapshot());
 
@@ -397,6 +408,54 @@ describe("GET /api/spectator/tournaments/[id]", () => {
       }
     });
 
+    it("GET_rateRefusedGzipClientWithRawEtag_returns304", async () => {
+      jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
+      try {
+        // Corps brut reçu par un client gzip (repli d'une compression ratée).
+        const first = await exhaustedNetworkWithCopy();
+        const rawEtag = first.headers.get("etag") ?? "";
+
+        const res = await GET(req("5", { "accept-encoding": "gzip", "if-none-match": rawEtag }), params("5"));
+
+        expect(res.status).toBe(304);
+        expect(res.headers.get("etag")).toBe(rawEtag);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("GET_rateRefusedWildcardIfNoneMatch_returns429", async () => {
+      jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
+      try {
+        await exhaustedNetworkWithCopy();
+
+        const res = await GET(req("5", { "accept-encoding": "identity", "if-none-match": "*" }), params("5"));
+
+        expect(res.status).toBe(429);
+        expect(res.headers.get("retry-after")).not.toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("GET_rateRefused304_doesNotCountInLoad", async () => {
+      jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
+      try {
+        const first = await exhaustedNetworkWithCopy();
+        resetSpectatorLoad();
+
+        const res = await GET(
+          req("5", { "accept-encoding": "identity", "if-none-match": first.headers.get("etag") ?? "" }),
+          params("5"),
+        );
+
+        expect(res.status).toBe(304);
+        expect(spectatorReadsPerMinute()).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it("répond 429 à une version d'un autre codage que celui demandé, sans corps", async () => {
       jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
       try {
@@ -462,12 +521,43 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect(gzipped.headers.get("content-encoding")).toBe("gzip");
     expect(plain.headers.get("etag")).toMatch(/^"[\w-]{22}"$/);
     expect(gzipped.headers.get("etag")).toBe(`${plain.headers.get("etag")?.slice(0, -1)}-gzip"`);
-    // La version d'un codage ne valide pas l'autre.
+    // La version gzip ne valide pas le corps brut d'un client qui ne l'accepte pas.
     const crossed = await GET(
-      req("5", { "accept-encoding": "gzip", "if-none-match": plain.headers.get("etag") ?? "" }),
+      req("5", { "accept-encoding": "identity", "if-none-match": gzipped.headers.get("etag") ?? "" }),
       params("5"),
     );
     expect(crossed.status).toBe(200);
+  });
+
+  it("GET_gzipClientWithRawEtag_returns304UnderRawEtag", async () => {
+    mockedSnapshot.mockResolvedValue(snapshot());
+    const plain = await GET(req("5", { "accept-encoding": "identity" }), params("5"));
+    const rawEtag = plain.headers.get("etag") ?? "";
+
+    // Corps brut reçu par repli (compression ratée) : la revalidation aboutit.
+    const revalidated = await GET(req("5", { "accept-encoding": "gzip", "if-none-match": rawEtag }), params("5"));
+
+    expect(revalidated.status).toBe(304);
+    expect(revalidated.headers.get("etag")).toBe(rawEtag);
+  });
+
+  it("compression qui échoue (mémoire) : 200 avec le corps brut et son ETag, jamais un 500", async () => {
+    mockedSnapshot.mockResolvedValue(snapshot());
+    const plain = await GET(req("5", { "accept-encoding": "identity" }), params("5"));
+    const gzip = jest.spyOn(spectatorSnapshotModule, "gzippedSpectatorBody").mockRejectedValue(new Error("ENOMEM"));
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const served = await GET(req("5", { "accept-encoding": "gzip" }), params("5"));
+
+    expect(gzip).toHaveBeenCalledTimes(1);
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(served.status).toBe(200);
+    expect(served.headers.get("content-encoding")).toBeNull();
+    expect(served.headers.get("etag")).toBe(plain.headers.get("etag"));
+    expect(served.headers.get("content-type")).toBe("application/json; charset=utf-8");
+    expect(await served.text()).toBe(await plain.text());
+    gzip.mockRestore();
+    logged.mockRestore();
   });
 
   it("répond 503 quand toutes les places de construction sont prises, sans faire payer", async () => {

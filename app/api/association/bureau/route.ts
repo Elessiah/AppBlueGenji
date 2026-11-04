@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createBureauMember, listBureauMembers } from "@/lib/server/bureau-service";
 import { readJsonBody } from "@/lib/server/request-body";
@@ -31,6 +32,6 @@ export async function POST(req: Request) {
     });
     return ok({ member }, 201);
   } catch (e) {
-    return fail((e as Error).message || "BUREAU_CREATE_FAILED", 400);
+    return fail(serviceErrorCode(e, "BUREAU_CREATE_FAILED"), 400);
   }
 }

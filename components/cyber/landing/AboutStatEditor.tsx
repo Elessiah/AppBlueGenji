@@ -180,8 +180,9 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
           <InfoHint id={VALUE_EN_HINT_ID} subject="Valeur en anglais">
             <p>
               La valeur affichée sur la page anglaise, écrite à l'anglaise (« <span lang="en">€4,200</span> »,
-              « <span lang="en">Free</span> »). Laissée vide, la valeur française y est reprise : faite de mots ou
-              écrite à la française, la carte reste alors marquée « EN ».
+              « <span lang="en">Free</span> »). Saisis-la même si elle est identique à la valeur française ;
+              laissée vide, la valeur française y est reprise : faite de mots ou écrite à la française, la carte
+              reste alors marquée « EN ».
             </p>
           </InfoHint>
         </InfoHintRow>
@@ -190,7 +191,6 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
           className={styles.modalInput}
           value={form.valueEn}
           maxLength={ABOUT_STAT_VALUE_MAX}
-          placeholder={form.value.trim() || "€4,200"}
           lang="en"
           enterKeyHint="next"
           readOnly={busy}
@@ -201,7 +201,10 @@ export function AboutStatEditor({ editing, staffLang, onClose, onSaved }: Readon
           }}
           onKeyDown={focusNextOnEnter(STAT_FIELD_IDS.label)}
         />
-        {valueEnNote !== null && <EnglishMissingHint id={VALUE_EN_MISSING_ID}>{valueEnNote}</EnglishMissingHint>}
+        {/* Région vivante (`<output>`) toujours montée : la note qui apparaît (valeur anglaise manquante ou à vérifier) est annoncée. */}
+        <output>
+          {valueEnNote !== null && <EnglishMissingHint id={VALUE_EN_MISSING_ID}>{valueEnNote}</EnglishMissingHint>}
+        </output>
         <FieldErrorText fieldId={STAT_FIELD_IDS.valueEn} message={fieldErrors.message("valueEn")} />
       </div>
 

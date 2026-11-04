@@ -24,7 +24,7 @@ describe("AboutStats — valeur anglaise", () => {
     expect(source).toContain("htmlFor={STAT_FIELD_IDS.valueEn}");
     expect(source).toContain("Valeur en anglais (facultatif)");
     expect(source).toMatch(/<InfoHint id=\{VALUE_EN_HINT_ID\} subject="Valeur en anglais">/);
-    expect(source).toContain("Laissée vide, la valeur française y est reprise : faite de mots ou");
+    expect(source).toContain("laissée vide, la valeur française y est reprise : faite de mots ou écrite à la française, la carte");
     expect(source).toContain('{...fieldErrors.aria("valueEn", VALUE_EN_HINT_ID, valueEnNote !== null && VALUE_EN_MISSING_ID)}');
     expect(source).toContain('<FieldErrorText fieldId={STAT_FIELD_IDS.valueEn} message={fieldErrors.message("valueEn")} />');
     expect(source).toContain("maxLength={ABOUT_STAT_VALUE_MAX}");
@@ -37,6 +37,8 @@ describe("AboutStats — valeur anglaise", () => {
       '"Pas encore de valeur anglaise : la page anglaise affiche la valeur française telle quelle."',
     );
     expect(source).toContain("{valueEnNote !== null && <EnglishMissingHint id={VALUE_EN_MISSING_ID}>{valueEnNote}</EnglishMissingHint>}");
+    // La note est annoncée : région vivante toujours montée autour d'elle.
+    expect(source).toMatch(/<output>\s*\{valueEnNote !== null/);
   });
 
   it("n'annonce qu'une fois ce que l'« i » explique déjà : l'avertissement ne reprend pas l'exemple", () => {
@@ -49,10 +51,6 @@ describe("AboutStats — valeur anglaise", () => {
     expect(source).toContain("form.valueEn.trim() === (editing.valueEn ?? \"\").trim() &&");
     expect(source).toContain("form.value.trim() !== editing.value.trim();");
     expect(source).toContain("else if (valueEnStale) valueEnNote = VALUE_EN_STALE_TEXT;");
-  });
-
-  it("l'exemple du champ anglais reprend la valeur française saisie", () => {
-    expect(source).toContain('placeholder={form.value.trim() || "€4,200"}');
   });
 
   it("les exemples anglais de l'explication portent lang=\"en\"", () => {
@@ -118,5 +116,25 @@ describe("AboutStats — valeur anglaise", () => {
     const css = readSource("components/cyber/landing/AboutStats.module.css");
     expect(css).toContain('.action[aria-disabled="true"]');
     expect(css).toContain('.actionPrimary[aria-disabled="true"]');
+  });
+});
+
+describe("AboutStats — retours de l'éditeur", () => {
+  it("l'indice dit de saisir l'anglais même identique au français", () => {
+    expect(source).toContain("Saisis-la même si elle est identique à la valeur française");
+  });
+
+  it("le champ anglais n'a aucun placeholder repris du français (il se lisait « rempli »)", () => {
+    const field = /id=\{STAT_FIELD_IDS\.valueEn\}[\s\S]*?onKeyDown=\{focusNextOnEnter\(STAT_FIELD_IDS\.label\)\}/.exec(source)?.[0] ?? "";
+    expect(field).not.toBe("");
+    expect(field).not.toContain("placeholder");
+  });
+
+  it("le morceau chargé à la demande montre un retour : statut visible, en français (gestion D4)", () => {
+    const loading = /loading: \(\) => \(([\s\S]*?)\),\s*\},/.exec(grid)?.[1] ?? "";
+    expect(loading).toContain("<output");
+    expect(loading).toContain('lang="fr"');
+    expect(loading).toContain("Ouverture de l&apos;éditeur…");
+    expect(grid).toContain("ssr: false,");
   });
 });

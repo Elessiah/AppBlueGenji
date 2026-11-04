@@ -10,7 +10,7 @@
  */
 import { publishTournamentEvent } from "@/lib/server/live";
 import { invalidateLandingAggregates, invalidateLandingLive, invalidateLandingMiniBrackets } from "@/lib/server/landing-cache";
-import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
+import { invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { invalidateTournamentLists } from "./list-cache";
 import { invalidateTournamentPreview } from "./preview-cache";
@@ -73,8 +73,11 @@ export function publishUpdatedEvent(tournamentId: number): void {
   invalidateLandingAggregates();
   // Le classement du site est un **rejeu** de tous les matchs : un tournoi
   // supprimé emporte ses rencontres, et toutes les cotes qu'elles avaient
-  // déplacées. Rien ne se répare tout seul dans un cache.
-  invalidateTeamRanking();
+  // déplacées. Rien ne se répare tout seul dans un cache. Les PNG d'aperçu, eux,
+  // suivent la fenêtre des scores : avancée, salon vocal, horaire d'arbitrage
+  // publient ici à chaque match. La suppression, elle, vide tout aussitôt
+  // (`./deletion`, `invalidateTeamRanking`).
+  invalidateTeamRankingForScore();
   // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.
   invalidateStats();
   publishTournamentEvent({
@@ -165,7 +168,7 @@ export function publishScoreReportedEvent(tournamentId: number, matchId: number)
   scheduleMatchStartNotices();
   scheduleLiveEveningRefresh();
   invalidateTournamentSnapshot(tournamentId);
-  invalidateTeamRanking();
+  invalidateTeamRankingForScore();
   // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.
   invalidateStats();
   publishTournamentEvent({
@@ -181,7 +184,7 @@ export function publishScoreResolvedEvent(tournamentId: number, matchId: number)
   scheduleMatchStartNotices();
   scheduleLiveEveningRefresh();
   invalidateTournamentSnapshot(tournamentId);
-  invalidateTeamRanking();
+  invalidateTeamRankingForScore();
   // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.
   invalidateStats();
   publishTournamentEvent({

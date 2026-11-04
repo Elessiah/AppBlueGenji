@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { getContactInfo, setContactInfo } from "@/lib/server/contact-service";
 import { readJsonBody } from "@/lib/server/request-body";
@@ -35,6 +36,6 @@ export async function PUT(req: Request) {
     });
     return ok({ contact });
   } catch (e) {
-    return fail((e as Error).message || "CONTACT_UPDATE_FAILED", 400);
+    return fail(serviceErrorCode(e, "CONTACT_UPDATE_FAILED"), 400);
   }
 }

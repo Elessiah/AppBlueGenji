@@ -126,6 +126,17 @@ describe("loadMiniBracket", () => {
     expect(sql).not.toMatch(/LIMIT/i);
   });
 
+  it("loadMiniBracket_query_joinsOnlyTheCurrentRoundOfEachBracketAndPhase", async () => {
+    const execute = await mockRows(ROWS);
+    await loadMiniBracket(5);
+    const sql = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
+    expect(sql).toContain("COALESCE(MIN(CASE WHEN status <> 'COMPLETED' THEN round_number END), MAX(round_number)) AS target_round");
+    expect(sql).toContain("GROUP BY phase_id, bracket");
+    expect(sql).toContain("target.phase_id <=> m.phase_id");
+    expect(sql).toContain("target.target_round = m.round_number");
+    expect(execute.mock.calls[0][1]).toEqual([5, 5]);
+  });
+
   it("incident de lecture : liste vide, sans mise en cache du rejet", async () => {
     const { getDatabase } = await import("@/lib/server/database");
     const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(new Error("down")).mockResolvedValue([ROWS]);
@@ -298,4 +309,49 @@ describe("loadMiniBracket — requête confrontée au schéma réel", () => {
     const selectList = query.slice(query.indexOf("SELECT") + 6, query.indexOf("FROM"));
     for (const item of selectList.split(",")) expect(item.trim()).toMatch(/^(\(?(m|p|t1|t2)\.)/);
   });
+});
+
+/** Ce que la requête garde : la manche en cours (sinon la dernière) de chaque couple (phase, tableau). */
+function currentRoundOfEachBracket(rows: MiniBracketRow[]): MiniBracketRow[] {
+  const groups = new Map<string, MiniBracketRow[]>();
+  for (const candidate of rows) {
+    const key = `${candidate.phaseOrder}:${candidate.bracket}`;
+    groups.set(key, [...(groups.get(key) ?? []), candidate]);
+  }
+  return [...groups.values()].flatMap((group) => {
+    const open = group.filter((candidate) => candidate.status !== "COMPLETED").map((candidate) => candidate.roundNumber);
+    const target = open.length > 0 ? Math.min(...open) : Math.max(...group.map((candidate) => candidate.roundNumber));
+    return group.filter((candidate) => candidate.roundNumber === target);
+  });
+}
+
+describe("pickMiniBracketMatches — lignes réduites à la manche en cours de chaque tableau", () => {
+  const done = (overrides: Partial<MiniBracketRow>) => row({ status: "COMPLETED", ...overrides });
+  const scenarios: Record<string, MiniBracketRow[]> = {
+    "élimination en cours": [
+      done({ roundNumber: 1, matchNumber: 1 }), done({ roundNumber: 1, matchNumber: 2 }),
+      row({ roundNumber: 2, matchNumber: 1 }), row({ roundNumber: 3, matchNumber: 1 }),
+    ],
+    "tout est joué": [
+      done({ roundNumber: 1, matchNumber: 1 }), done({ roundNumber: 2, matchNumber: 1 }), done({ roundNumber: 3, matchNumber: 1 }),
+    ],
+    "tableau du haut fini, celui du bas en cours": [
+      done({ bracket: "UPPER", roundNumber: 2, matchNumber: 1 }), done({ bracket: "UPPER", roundNumber: 1, matchNumber: 1 }),
+      row({ bracket: "LOWER", roundNumber: 1, matchNumber: 1 }), row({ bracket: "LOWER", roundNumber: 2, matchNumber: 1 }),
+    ],
+    "phases : la première garde un match à jouer": [
+      done({ phaseOrder: 1, roundNumber: 1, matchNumber: 1 }), row({ phaseOrder: 1, roundNumber: 2, matchNumber: 1 }),
+      row({ phaseOrder: 2, roundNumber: 1, matchNumber: 1 }),
+    ],
+    "phases toutes jouées : la dernière": [
+      done({ phaseOrder: 1, roundNumber: 1, matchNumber: 1 }), done({ phaseOrder: 2, roundNumber: 4, matchNumber: 1 }),
+      done({ phaseOrder: 2, roundNumber: 1, matchNumber: 1 }),
+    ],
+  };
+
+  for (const [name, rows] of Object.entries(scenarios)) {
+    it(`pickMiniBracketMatches_${name}_sameOnReducedRows`, () => {
+      expect(pickMiniBracketMatches(currentRoundOfEachBracket(rows))).toEqual(pickMiniBracketMatches(rows));
+    });
+  }
 });

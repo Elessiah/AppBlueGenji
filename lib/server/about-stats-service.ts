@@ -3,7 +3,7 @@ import { getDatabase } from "./database";
 import { applyDisplayOrder } from "./reorder";
 import {
   type AboutStat,
-  type AboutStatInput,
+  type AboutStatRequestInput,
   FALLBACK_ABOUT_STATS,
   validateAboutStatInput,
 } from "@/lib/shared/about-stats";
@@ -65,7 +65,7 @@ async function loadListAboutStats(): Promise<AboutStat[]> {
 }
 
 /** Crée une carte et la renvoie. Place la nouvelle carte en fin de liste. */
-export async function createAboutStat(input: AboutStatInput): Promise<AboutStat> {
+export async function createAboutStat(input: AboutStatRequestInput): Promise<AboutStat> {
   const validation = validateAboutStatInput(input);
   if (!validation.ok) throw new Error(validation.error);
   const { value, valueEn, label, labelEn } = validation.value;
@@ -86,32 +86,46 @@ export async function createAboutStat(input: AboutStatInput): Promise<AboutStat>
  * Met à jour une carte existante et renvoie sa version mise à jour. `valueEn`
  * absent (`undefined`) conserve la valeur anglaise enregistrée ; `null` ou vide l'efface.
  */
-export async function updateAboutStat(id: number, input: AboutStatInput): Promise<AboutStat> {
+export async function updateAboutStat(id: number, input: AboutStatRequestInput): Promise<AboutStat> {
   const validation = validateAboutStatInput(input);
   if (!validation.ok) throw new Error(validation.error);
   const { value, valueEn, label, labelEn } = validation.value;
 
   // Clé `valueEn` absente (onglet resté sur un ancien bundle) : l'anglais
-  // enregistré n'est pas touché, plutôt qu'effacé sans avertissement.
+  // enregistré n'est pas touché, plutôt qu'effacé sans avertissement. L'écriture
+  // et la relecture de cet anglais gardé se font **dans une transaction** : la
+  // ligne reste verrouillée entre les deux, une autre écriture ne s'intercale pas.
   const keepValueEn = input.valueEn === undefined;
   const db = await getDatabase();
-  const [res] = keepValueEn
-    ? await db.execute<ResultSetHeader>(`UPDATE bg_about_stats SET value = ?, label = ?, label_en = ? WHERE id = ?`, [
-        value,
-        label,
-        labelEn,
-        id,
-      ])
-    : await db.execute<ResultSetHeader>(
-        `UPDATE bg_about_stats SET value = ?, value_en = ?, label = ?, label_en = ? WHERE id = ?`,
-        [value, valueEn, label, labelEn, id],
-      );
-  if (res.affectedRows === 0) throw new Error("ABOUT_STAT_NOT_FOUND");
-
+  const connection = await db.getConnection();
   let keptValueEn = valueEn;
-  if (keepValueEn) {
-    const [rows] = await db.execute<AboutStatRow[]>(`SELECT value_en FROM bg_about_stats WHERE id = ?`, [id]);
-    keptValueEn = rows?.[0]?.value_en ?? null;
+  try {
+    await connection.beginTransaction();
+    const [res] = keepValueEn
+      ? await connection.execute<ResultSetHeader>(
+          `UPDATE bg_about_stats SET value = ?, label = ?, label_en = ? WHERE id = ?`,
+          [value, label, labelEn, id],
+        )
+      : await connection.execute<ResultSetHeader>(
+          `UPDATE bg_about_stats SET value = ?, value_en = ?, label = ?, label_en = ? WHERE id = ?`,
+          [value, valueEn, label, labelEn, id],
+        );
+    if (res.affectedRows === 0) throw new Error("ABOUT_STAT_NOT_FOUND");
+    if (keepValueEn) {
+      const [rows] = await connection.execute<AboutStatRow[]>(`SELECT value_en FROM bg_about_stats WHERE id = ?`, [id]);
+      keptValueEn = rows?.[0]?.value_en ?? null;
+    }
+    await connection.commit();
+  } catch (error) {
+    // Un `rollback` raté (connexion perdue) ne remplace pas l'erreur d'origine.
+    try {
+      await connection.rollback();
+    } catch {
+      // Rien à ajouter : l'erreur d'origine est celle qui compte.
+    }
+    throw error;
+  } finally {
+    connection.release();
   }
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.

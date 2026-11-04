@@ -324,18 +324,22 @@ async function loadLandingLive(): Promise<LandingLive | null> {
     // comme la fiche du tournoi — rien plutôt qu'un seed inventé s'il manque.
     // `manual_seeding` est une colonne du tournoi : toutes les lignes la portent.
     const firstRow = rows[currentIndex] ?? rows[carouselIndexes[0]] ?? null;
-    const frozenSeeds =
+    // Deux lectures indépendantes, lancées ensemble : les têtes de série figées
+    // (tournois à classement) et les joueurs sans fiche.
+    const [frozenSeeds, profilelessIds] = await Promise.all([
       firstRow !== null &&
       seedingSource(tournament.format, Number(firstRow.manual_seeding ?? 0) === 1) === "RANKING"
-        ? await loadFrozenRankingSeeds(db, tournament.id, tournament.format)
-        : null;
+        ? loadFrozenRankingSeeds(db, tournament.id, tournament.format)
+        : Promise.resolve(null),
+      loadProfilelessPlayerIds(),
+    ]);
     const scoreOf = (value: number | null): number | null => (value === null ? null : Number(value));
     const drawSeedOf = (teamId: number | null, value: number | null): number | null => {
       if (frozenSeeds === null) return toSeed(value);
       return teamId === null ? null : (frozenSeeds.get(Number(teamId)) ?? null);
     };
 
-    const profileless = new Set(await loadProfilelessPlayerIds());
+    const profileless = new Set(profilelessIds);
     const toLandingMatch = (index: number): LandingLiveMatch => {
       const row = rows[index];
       // Un match à l'antenne se joue, quelle que soit sa phase de lancement : la
@@ -692,6 +696,17 @@ type WinnerRow = RowDataPacket & {
  */
 const TICKER_MAX_ITEMS = 10;
 
+/** Résultats montrés au bandeau. */
+const TICKER_RESULT_COUNT = 3;
+/**
+ * Résultats lus : plus que montrés, car une ligne incohérente est écartée en
+ * code (la règle d'issue vit à un seul endroit, `tickerOutcomes`) **après** la
+ * limite — avec exactement `TICKER_RESULT_COUNT`, chaque ligne écartée coûtait
+ * une place jamais remplie. Le plan reste le même (parcours de l'index par
+ * `updated_at`), seule la borne grandit.
+ */
+const TICKER_RESULT_FETCH = 12;
+
 /** Ce que les lectures du bandeau ont besoin d'une connexion : `execute` seul. */
 type TickerReader = Pick<Awaited<ReturnType<typeof getDatabase>>, "execute">;
 
@@ -800,7 +815,7 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
              )
              AND t.start_visibility_at <= NOW()
            ORDER BY m.updated_at DESC
-           LIMIT 3`,
+           LIMIT ${TICKER_RESULT_FETCH}`,
         ),
         connection.execute<RegistrationRow[]>(
           `SELECT
@@ -908,7 +923,7 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
           outcomes,
           sortAt: new Date(row.updated_at).getTime(),
         }];
-      }),
+      }).slice(0, TICKER_RESULT_COUNT),
     );
 
     entries.push(

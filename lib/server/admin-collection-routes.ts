@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/server/auth";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { readJsonBody } from "@/lib/server/request-body";
 import { validateReorderIds } from "@/lib/shared/reorder";
@@ -14,8 +15,9 @@ import { can, type Permission } from "@/lib/shared/permissions";
  * Déroulé, dans cet ordre : session (401 `UNAUTHORIZED`), permission
  * (403 `FORBIDDEN`), identifiant (400 `INVALID_ID`), corps JSON
  * (400 `INVALID_BODY`), puis le service — dont le message d'erreur devient le
- * code renvoyé (404 pour l'élément introuvable, 400 sinon, le code de repli
- * quand le message est vide).
+ * code renvoyé s'il a la forme d'un code du site (404 pour l'élément
+ * introuvable, 400 sinon) ; tout autre message (vide, texte d'un pilote) donne
+ * le code de repli, journalisé.
  */
 
 type JsonBody = Record<string, unknown>;
@@ -50,10 +52,15 @@ async function readBody(req: Request): Promise<JsonBody | null> {
   return json as JsonBody;
 }
 
-/** Message du service → code et statut renvoyés. */
+/**
+ * Message du service → code et statut renvoyés. Un refus du service (code du site : `ABOUT_STAT_NOT_FOUND`, `LABEL_TOO_LONG`)
+ * passe tel quel ; toute autre erreur (pilote SQL, connexion perdue) devient le
+ * code de repli — une réponse d'erreur ne porte qu'un code, jamais le
+ * texte d'une bibliothèque (hôte, port, valeur lue).
+ */
 function serviceFailure(error: unknown, fallback: string, statusOf: (message: string) => number): Response {
-  const msg = (error as Error).message;
-  return fail(msg || fallback, statusOf(msg));
+  const code = serviceErrorCode(error, fallback);
+  return fail(code, statusOf(code));
 }
 
 export interface ItemRouteOptions {

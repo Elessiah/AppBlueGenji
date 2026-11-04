@@ -139,6 +139,16 @@
   cursor: not-allowed;
 }
 
+/* Retour pendant le chargement du morceau de l'éditeur. */
+.editorLoading {
+  display: block;
+  margin: 10px 0 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+  color: var(--blue-300);
+}
+
 /* Modale d'ajout / édition */
 .modal {
   width: min(440px, 100%);

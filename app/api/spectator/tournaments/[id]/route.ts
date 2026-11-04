@@ -4,6 +4,7 @@ import {
   requestClientIp,
   SPECTATOR_READ_RULE,
 } from "@/lib/server/api-guard";
+import { failureReason } from "@/lib/server/failure-reason";
 import { fail } from "@/lib/server/http";
 import { acceptsGzip } from "@/lib/server/sse-gzip";
 import { currentSpectatorLoadLevel, recordSpectatorRead } from "@/lib/server/spectator-load";
@@ -42,13 +43,18 @@ import {
  */
 export const dynamic = "force-dynamic";
 
-/** `If-None-Match` désigne-t-il cette version ? (liste, faibles compris, `*`) */
-function matchesEtag(header: string | null, etag: string): boolean {
+/**
+ * `If-None-Match` désigne-t-il cette version ? (liste, faibles compris). Le
+ * joker `*` ne vaut que hors refus (`allowWildcard`) : sous refus, seul qui
+ * détient **la** version de la copie a son `304` — un `If-None-Match: *` dirait
+ * sinon, par 304 contre 429, si quelqu'un a lu ce tournoi depuis moins de 150 s.
+ */
+function matchesEtag(header: string | null, etag: string, allowWildcard = true): boolean {
   if (!header) return false;
   return header
     .split(",")
     .map((tag) => tag.trim().replace(/^W\//, ""))
-    .some((tag) => tag === "*" || tag === etag);
+    .some((tag) => (allowWildcard && tag === "*") || tag === etag);
 }
 
 function pollHeaders(pollAfterMs: number): Record<string, string> {
@@ -89,9 +95,13 @@ function refusedRead(
 ): SpectatorPayload | Response {
   const stale = staleSpectatorPayload(tournamentId);
   if (refusal.kind === "rate") {
-    // Seul l'`ETag` du codage demandé : une version d'un autre codage n'aurait
-    // pas de `304` derrière et tirerait le corps entier d'un réseau refusé.
-    if (stale && matchesEtag(ifNoneMatch, etagOf(stale, gzipped))) return stale;
+    // L'`ETag` du codage demandé, ou — pour un client gzip — celui du corps brut
+    // qu'il a reçu en repli d'une compression ratée : les deux ont un `304`
+    // derrière (`GET`). Une version gzip présentée par un client sans gzip n'en a
+    // pas, et tirerait le corps entier d'un réseau refusé.
+    if (stale && (matchesEtag(ifNoneMatch, etagOf(stale, gzipped), false) || (gzipped && matchesEtag(ifNoneMatch, etagOf(stale, false), false)))) {
+      return stale;
+    }
     return refusal.response ?? unavailable(level);
   }
   return stale ?? refusal.response ?? unavailable(level);
@@ -114,20 +124,20 @@ async function readPayload(
   level: SpectatorLoadLevel,
   client: string | null,
   gzipped: boolean,
-): Promise<{ payload: SpectatorPayload | null; stale: boolean } | Response> {
+): Promise<{ payload: SpectatorPayload | null; stale: boolean; rateRefused: boolean } | Response> {
   try {
-    return { payload: await getSpectatorPayload(tournamentId, level, client), stale: false };
+    return { payload: await getSpectatorPayload(tournamentId, level, client), stale: false, rateRefused: false };
   } catch (error) {
     if (error instanceof SpectatorRebuildRefused) {
       const served = refusedRead(tournamentId, error, level, req.headers.get("if-none-match"), gzipped);
-      return served instanceof Response ? served : { payload: served, stale: true };
+      return served instanceof Response ? served : { payload: served, stale: true, rateRefused: error.kind === "rate" };
     }
     // Base injoignable ou saturée : la copie de moins de 150 s tient la page
     // (sinon les spectateurs passaient en « réessaie » alors que le plateau
     // de la minute précédente était encore là).
-    console.error("[spectator] lecture publique impossible :", error);
+    console.error(`[spectator] lecture publique impossible : ${failureReason(error)}`);
     const copy = staleSpectatorPayload(tournamentId);
-    return copy === null ? unavailable(level) : { payload: copy, stale: true };
+    return copy === null ? unavailable(level) : { payload: copy, stale: true, rateRefused: false };
   }
 }
 
@@ -146,12 +156,14 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const gzipped = acceptsGzip(req.headers.get("accept-encoding"));
   const read = await readPayload(req, tournamentId, level, client, gzipped);
   if (read instanceof Response) return read;
-  const { payload, stale } = read;
+  const { payload, stale, rateRefused } = read;
   if (!payload) return fail("TOURNAMENT_NOT_FOUND", 404);
   // Seules les lectures d'un tournoi servi pèsent dans la charge : des
   // identifiants au hasard ne ralentissent pas les vrais spectateurs, et la
-  // part d'un même réseau est plafonnée (`SPECTATOR_READS_PER_CLIENT`).
-  recordSpectatorRead(Date.now(), client);
+  // part d'un même réseau est plafonnée (`SPECTATOR_READS_PER_CLIENT`). Un
+  // réseau déjà refusé par son plafond (`304` sous refus) n'y pèse pas : ses
+  // sondages n'allongeraient pas l'attente des vrais spectateurs.
+  if (!rateRefused) recordSpectatorRead(Date.now(), client);
 
   const pollMs = spectatorPollIntervalMs(payload.state, level);
   // Une copie servie périmée peut avoir jusqu'à l'âge déclaré : c'est lui que
@@ -169,12 +181,29 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   if (matchesEtag(req.headers.get("if-none-match"), etag)) {
     return new Response(null, { status: 304, headers });
   }
+  // Le client gzip qui a reçu le corps brut (repli d'une compression ratée,
+  // ci-dessous) revalide avec l'`ETag` brut : même contenu, 304 sous cet `ETag`
+  // plutôt qu'un corps complet à chaque sondage, au moment même où la mémoire manque.
+  const rawEtag = etagOf(payload, false);
+  // Sous refus du plafond, jamais le joker `*` — ici non plus, quel que soit
+  // l'ordre des contrôles en amont (`refusedRead`).
+  if (gzipped && matchesEtag(req.headers.get("if-none-match"), rawEtag, !rateRefused)) {
+    return new Response(null, { status: 304, headers: { ...headers, ETag: rawEtag } });
+  }
   const jsonHeaders = { ...headers, "Content-Type": "application/json; charset=utf-8" };
   if (gzipped) {
     // Compressé une fois pour tous ses lecteurs ; Next laisse passer une
     // réponse déjà encodée sans la recompresser.
-    const bytes = await gzippedSpectatorBody(payload);
-    return new Response(bytes, { status: 200, headers: { ...jsonHeaders, "Content-Encoding": "gzip" } });
+    // Une compression qui échoue (mémoire) ne fait pas un 500 non structuré : repli
+    // sur le corps brut, avec l'`ETag` du codage réellement servi.
+    try {
+      const bytes = await gzippedSpectatorBody(payload);
+      return new Response(bytes, { status: 200, headers: { ...jsonHeaders, "Content-Encoding": "gzip" } });
+    } catch (error) {
+      // Visible à l'opérateur : sous pression mémoire, chaque client gzip repasse au corps brut.
+      console.error(`[spectator] compression gzip impossible, corps brut servi : ${failureReason(error)}`);
+      return new Response(payload.body, { status: 200, headers: { ...jsonHeaders, ETag: rawEtag } });
+    }
   }
   return new Response(payload.body, { status: 200, headers: jsonHeaders });
 }

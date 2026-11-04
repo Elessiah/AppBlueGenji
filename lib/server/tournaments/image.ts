@@ -30,6 +30,17 @@ import {
 } from "@/lib/shared/tournament-image";
 import { localUploadUrl, toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 import { publishUpdatedEvent } from "./notifications";
+import { invalidateSpectatorSnapshot } from "./snapshot";
+
+/**
+ * Une image posée, recadrée ou retirée par le staff (bannière choquante) ne
+ * reste pas servie aux visiteurs sans compte, copie (150 s) ni carte (10 s) :
+ * même éviction qu'une édition du tournoi (`updateTournament`).
+ */
+function publishImageChange(tournamentId: number): void {
+  invalidateSpectatorSnapshot(tournamentId);
+  publishUpdatedEvent(tournamentId);
+}
 
 type ImageRow = RowDataPacket & { image_url: string | null };
 
@@ -108,8 +119,10 @@ export async function setTournamentImage(
     throw error;
   }
 
+  // Éviction d'abord : l'effacement du fichier (carte SD) peut traîner, la copie
+  // publique ne désigne plus l'ancienne bannière pendant ce temps.
+  publishImageChange(tournamentId);
   if (previousUrl !== url) await discardFile(previousUrl);
-  publishUpdatedEvent(tournamentId);
   return { url, ...settings, replaced: previousUrl !== null };
 }
 
@@ -134,7 +147,7 @@ export async function updateTournamentImageSettings(
     );
   });
 
-  publishUpdatedEvent(tournamentId);
+  publishImageChange(tournamentId);
   return { url: url as string, ...settings };
 }
 
@@ -159,6 +172,6 @@ export async function removeTournamentImage(tournamentId: number): Promise<void>
   });
 
   if (previousUrl === null) return;
+  publishImageChange(tournamentId);
   await discardFile(previousUrl);
-  publishUpdatedEvent(tournamentId);
 }

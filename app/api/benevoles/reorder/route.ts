@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { reorderBenevoleCategories } from "@/lib/server/benevoles-service";
 import { validateCategoryReorder } from "@/lib/shared/benevoles";
@@ -25,6 +26,6 @@ export async function PUT(req: Request) {
     await reorderBenevoleCategories(validation.categories);
     return ok({});
   } catch (e) {
-    return fail((e as Error).message || "BENEVOLE_REORDER_FAILED", 400);
+    return fail(serviceErrorCode(e, "BENEVOLE_REORDER_FAILED"), 400);
   }
 }

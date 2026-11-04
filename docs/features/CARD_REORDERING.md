@@ -63,7 +63,11 @@ service (404 pour l'élément introuvable) — par
 `lib/server/admin-collection-routes.ts` (`itemRoutes`, `reorderRoute`) : chaque
 fichier de route ne dit que sa permission, son service et ses codes. Un corps
 JSON qui n'est pas un objet (`null`, tableau, nombre…) est refusé en
-`INVALID_BODY` (400) avant le service.
+`INVALID_BODY` (400) avant le service. L'erreur du service passe par
+`serviceErrorCode` (`lib/server/failure-reason.ts`), comme les `POST` de création
+et d'envoi d'image de la vitrine : seul un message en forme de code du site
+(`LABEL_TOO_LONG`) est renvoyé, une contention passagère (interblocage, délai de verrou : `isContentionError`) devient `CONCURRENT_UPDATE_RETRY` en 409 (« réessaie »), tout autre texte (pilote SQL, connexion perdue)
+devient le code de repli de la route et n'est journalisé que réduit à son nom.
 
 ## Interface
 

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
+jest.mock("@/lib/server/tournaments/snapshot");
 
 import {
   findBroadcastingTournament,
@@ -10,6 +11,7 @@ import {
   setTournamentLiveUrl,
 } from "@/lib/server/tournaments/live-streams";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { invalidateSpectatorSnapshot } from "@/lib/server/tournaments/snapshot";
 import { type SqlQuery, type SqlMock, fakeConnection, fakePool } from "../../helpers/sql-double";
 
 async function mockDb(execute: SqlMock) {
@@ -93,6 +95,37 @@ describe("setTournamentLiveUrl", () => {
     await expect(setTournamentLiveUrl(999, "https://twitch.tv/x")).rejects.toThrow(
       "TOURNAMENT_NOT_FOUND",
     );
+  });
+
+  it("setTournamentLiveUrl_success_evictsSpectatorCopy", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 7, state: "RUNNING" }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+    await mockDb(execute);
+
+    await setTournamentLiveUrl(7, null);
+
+    expect(invalidateSpectatorSnapshot).toHaveBeenCalledTimes(1);
+    expect(invalidateSpectatorSnapshot).toHaveBeenCalledWith(7);
+  });
+
+  it("setTournamentLiveUrl_invalidUrl_evictsNothing", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[{ id: 7, state: "RUNNING" }]]);
+    await mockDb(execute);
+
+    await expect(setTournamentLiveUrl(7, "https://exemple.com/live")).rejects.toThrow("INVALID_STREAM_URL");
+
+    expect(invalidateSpectatorSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("setTournamentLiveUrl_unknownTournament_evictsNothing", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    await expect(setTournamentLiveUrl(999, "https://twitch.tv/x")).rejects.toThrow("TOURNAMENT_NOT_FOUND");
+
+    expect(invalidateSpectatorSnapshot).not.toHaveBeenCalled();
   });
 });
 

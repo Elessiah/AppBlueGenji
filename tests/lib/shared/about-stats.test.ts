@@ -85,11 +85,24 @@ describe("validateAboutStatInput — valeur anglaise (facultative)", () => {
     });
   });
 
-  it("vide, absente ou non textuelle → null", () => {
-    for (const valueEn of ["", "   ", null, undefined, 42 as unknown as string]) {
+  it("vide ou absente → null", () => {
+    for (const valueEn of ["", "   ", null, undefined]) {
       const result = validateAboutStatInput({ ...base, valueEn });
       expect(result.ok && result.value.valueEn).toBeNull();
     }
+  });
+
+  it("non textuelle (nombre, objet, booléen, tableau) → VALUE_EN_INVALID, jamais lue « vide »", () => {
+    const wrongTypes: unknown[] = [42, {}, true, ["Free"]];
+    for (const valueEn of wrongTypes) {
+      const result = validateAboutStatInput({ ...base, valueEn: valueEn as string });
+      expect(result).toEqual({ ok: false, error: "VALUE_EN_INVALID" });
+    }
+  });
+
+  it("VALUE_EN_INVALID désigne le champ anglais et a sa phrase", () => {
+    expect(ABOUT_STAT_FIELD_ERRORS.VALUE_EN_INVALID).toBe("valueEn");
+    expect(aboutStatErrorMessage("VALUE_EN_INVALID", "x")).toBe("La valeur anglaise doit être un texte.");
   });
 
   it("accepte la longueur maximale, refuse au-delà", () => {

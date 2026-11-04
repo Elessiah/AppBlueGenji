@@ -27,6 +27,7 @@ import type { MatchStatus } from "@/lib/shared/types";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { lockMatchStreams, pruneMatchStreams, staffStream, type MatchStreamRow } from "./match-casters";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
+import { invalidateSpectatorSnapshot } from "./snapshot";
 
 /** Cible du bouton d'accueil : un tournoi en cours réellement à l'antenne. */
 export type BroadcastingTournament = {
@@ -111,6 +112,9 @@ export async function setTournamentLiveUrl(
   const url = parseStreamUrlInput(rawUrl);
 
   await db.execute(`UPDATE bg_tournaments SET live_url = ? WHERE id = ?`, [url, tournamentId]);
+  // La page sans compte ne garde pas un lien de chaîne retiré ou corrigé par le
+  // staff, copie (150 s) ni carte (10 s) : même éviction qu'une édition du tournoi.
+  invalidateSpectatorSnapshot(tournamentId);
   publishUpdatedEvent(tournamentId);
   return url;
 }

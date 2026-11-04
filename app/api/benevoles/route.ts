@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createBenevole, listBenevoles } from "@/lib/server/benevoles-service";
 import { readJsonBody } from "@/lib/server/request-body";
@@ -41,6 +42,6 @@ export async function POST(req: Request) {
     });
     return ok({ benevole }, 201);
   } catch (e) {
-    return fail((e as Error).message || "BENEVOLE_CREATE_FAILED", 400);
+    return fail(serviceErrorCode(e, "BENEVOLE_CREATE_FAILED"), 400);
   }
 }
