@@ -340,8 +340,10 @@ const BOT_TRANSPORT_FAILURES: ReadonlySet<string> = new Set([
   "BOT_VOICE_TIMEOUT",
   "INTERNAL_ERROR",
   "INTERNAL_ROUTE_NOT_FOUND",
-  // Réponse sans code lisible (page d'erreur d'un proxy, bot arrêté derrière lui).
+  // Réponse sans code lisible (page d'erreur d'un proxy, bot arrêté derrière lui), ou
+  // 2xx au corps illisible (service mal routé, page d'un proxy servie en 200).
   "BOT_INTERNAL_REQUEST_FAILED",
+  "BOT_VOICE_BAD_RESPONSE",
   // Jeton interne refusé ou absent, bot pas encore connecté à Discord : le bot entier
   // refuse, chaque appel suivant aussi.
   "UNAUTHORIZED",
