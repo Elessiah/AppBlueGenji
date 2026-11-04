@@ -18,6 +18,9 @@ import frMatchPage from "@/messages/fr/matchPage.json";
 import enMatchPage from "@/messages/en/matchPage.json";
 import frForm from "@/messages/fr/tournamentForm.json";
 import enForm from "@/messages/en/tournamentForm.json";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 
 const START = "2026-11-05T20:00:00.000Z";
 const startMs = Date.parse(START);
@@ -301,5 +304,28 @@ describe("textes des salons vocaux (FR + EN)", () => {
   it("messages_finishedVoiceError_frenchAndEnglish", () => {
     expect(frForm.edit.voiceErrors.TOURNAMENT_FINISHED).toBe(frForm.edit.planningErrors.TOURNAMENT_FINISHED);
     expect(enForm.edit.voiceErrors.TOURNAMENT_FINISHED).toBe(enForm.edit.planningErrors.TOURNAMENT_FINISHED);
+  });
+});
+
+describe("levée du verrou vocal : textes juridiques anglais", () => {
+  // voiceGatePending lève le verrou sur tout échec du bot (le français est figé par tests/fixtures/legal-fr).
+  const subPurposesEn = (ref: string) => {
+    const found = PROCESSING_ACTIVITIES_EN.find((entry) => entry.ref === ref);
+    if (!found) throw new Error(`activité absente : ${ref}`);
+    return found.subPurposes.join(" ");
+  };
+
+  it("legalTexts_voiceGateRelease_registerEnSaysBotFails", () => {
+    const text = subPurposesEn("T18");
+
+    expect(text).toContain("if the bot fails, the match doesn't wait");
+    expect(text).not.toContain("doesn't answer");
+  });
+
+  it("legalTexts_voiceGateRelease_rgpdEnSaysBotFails", () => {
+    const source = readFileSync(join(__dirname, "..", "..", "..", "app", "rgpd", "RgpdEn.tsx"), "utf8");
+
+    expect(source).toContain("if the bot fails, the match doesn&apos;t wait");
+    expect(source).not.toContain("the bot doesn&apos;t answer, the match");
   });
 });
