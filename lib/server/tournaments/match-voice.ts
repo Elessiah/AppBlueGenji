@@ -432,7 +432,8 @@ async function recheckOneChannel(row: OpenRow, touched: Set<number>): Promise<bo
   return true;
 }
 
-async function recheckOpenChannels(touched: Set<number>): Promise<void> {
+/** Rend `true` quand le canal vers le bot est en panne. */
+async function recheckOpenChannels(touched: Set<number>): Promise<boolean> {
   const rows = await run<OpenRow[]>(OPEN_DUE_CHANNELS_SQL);
   const now = Date.now();
   const seen = new Set<string>();
@@ -460,9 +461,11 @@ async function recheckOpenChannels(touched: Set<number>): Promise<void> {
   await Promise.all(Array.from({ length: VOICE_RECHECK_CONCURRENCY }, worker));
   // Mémoire bornée : seuls les salons encore dus gardent leur horodatage.
   for (const key of sweep.checkedAt.keys()) if (!seen.has(key)) sweep.checkedAt.delete(key);
+  return botDown;
 }
 
-async function createDueChannels(touched: Set<number>): Promise<void> {
+/** Rend `true` quand le canal vers le bot est en panne : le reste de la passe s'arrête. */
+async function createDueChannels(touched: Set<number>): Promise<boolean> {
   const candidates = await run<CandidateRow[]>(DUE_CHANNELS_SQL);
   const rows = await loadVoiceRows(candidates.map((row) => Number(row.id)));
   for (const match of candidates) {
@@ -478,9 +481,10 @@ async function createDueChannels(touched: Set<number>): Promise<void> {
       const { changed, down } = await createTeamChannel(matchId, teamId, teamName, before);
       if (changed) touched.add(Number(match.tournament_id));
       // Bot injoignable : inutile d'attendre le délai de chaque salon suivant, la prochaine passe reprend.
-      if (down) return;
+      if (down) return true;
     }
   }
+  return false;
 }
 
 async function runSweep(): Promise<Set<number>> {
@@ -496,11 +500,9 @@ async function runSweep(): Promise<Set<number>> {
   const due = Number(needed[0]?.due ?? 0) === 1;
   const open = Number(needed[0]?.open_rows ?? 0) === 1;
   try {
-    if (due) {
-      await createDueChannels(touched);
-      await recheckOpenChannels(touched);
-    }
-    if (due || open) await releaseChannels(touched);
+    // Bot en panne : une seule attente par passe, la suivante reprend le reste.
+    const botDown = due && ((await createDueChannels(touched)) || (await recheckOpenChannels(touched)));
+    if ((due || open) && !botDown) await releaseChannels(touched);
   } finally {
     // La minimisation ne dépend ni du bot ni d'une étape en échec.
     await purgeReleasedRows().catch((error: unknown) => console.error("[match-voice] purge en échec", error));
