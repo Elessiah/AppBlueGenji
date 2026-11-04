@@ -77,16 +77,13 @@ export async function POST(req: Request) {
     // Le tag part avec le défi : c'est lui qui sera enregistré (non certifié)
     // si le code revient juste (`consumeDiscordChallenge`). Un identifiant numérique n'en
     // est pas un, `normalizeDiscordHandle` le laisse tomber.
-    // Langue du compte déjà rattaché à ce Discord, sinon message bilingue
-    // (`BOT_DM_LANGUAGE.md`) : lue pendant l'insertion du défi
-    // (`accountLocaleForDiscordId` ne lève jamais).
-    const [challenge, locale] = await Promise.all([
-      createDiscordLoginChallenge(discordId, handle),
-      accountLocaleForDiscordId(discordId),
-    ]);
+    const challenge = await createDiscordLoginChallenge(discordId, handle, "login");
 
     try {
-      await sendDiscordLoginCode(discordId, challenge.code, locale);
+      // Langue du compte déjà rattaché à ce Discord, sinon message bilingue
+      // (`BOT_DM_LANGUAGE.md`) — lue après le défi : une demande refusée (quota)
+      // ne coûte aucune lecture de plus sur cette route anonyme.
+      await sendDiscordLoginCode(discordId, challenge.code, await accountLocaleForDiscordId(discordId), "login");
     } catch (error) {
       // **Un envoi raté n'a produit aucun code**, et la base doit le dire.
       //

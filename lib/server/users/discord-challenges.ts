@@ -4,6 +4,10 @@ import { getDatabase } from "@/lib/server/database";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { DISCORD_CODE_VALIDITY_MINUTES } from "@/lib/shared/processing-register";
 import { normalizeDiscordHandle } from "./tag-normalization";
+import type { DiscordCodePurpose } from "@/lib/server/bot-integration";
+
+/** Valeur de `purpose` en base pour chaque usage d'un code. */
+const PURPOSE_COLUMN: Record<DiscordCodePurpose, "LOGIN" | "HANDLE"> = { login: "LOGIN", handle: "HANDLE" };
 
 /*
  * Codes de connexion Discord envoyés en message privé : création sous quotas,
@@ -215,6 +219,7 @@ const DISCORD_CODE_LOCK_TIMEOUT_SECONDS = 1;
 export async function createDiscordLoginChallenge(
   discordId: string,
   handle?: string | null,
+  purpose: DiscordCodePurpose = "login",
 ): Promise<DiscordChallenge> {
   const db = await getDatabase();
   const code = randomCode();
@@ -266,9 +271,9 @@ export async function createDiscordLoginChallenge(
         }
 
         const [insert] = await connection.execute<ResultSetHeader>(
-          `INSERT INTO bg_discord_login_challenges (discord_id, lookup_hash, code_hash, handle, expires_at)
-           VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ${DISCORD_CODE_VALIDITY_MINUTES} MINUTE))`,
-          [discordId, hashCode(challengeToken), hashCode(code), storedHandle],
+          `INSERT INTO bg_discord_login_challenges (discord_id, lookup_hash, code_hash, handle, purpose, expires_at)
+           VALUES (?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ${DISCORD_CODE_VALIDITY_MINUTES} MINUTE))`,
+          [discordId, hashCode(challengeToken), hashCode(code), storedHandle, PURPOSE_COLUMN[purpose]],
         );
 
         const [rows] = await connection.execute<(RowDataPacket & { expires_at: Date | string })[]>(
@@ -330,11 +335,12 @@ export async function discardDiscordChallenge(challengeId: number): Promise<void
 export async function consumeDiscordChallenge(
   discordId: string,
   code: string,
+  purpose: DiscordCodePurpose = "login",
 ): Promise<DiscordChallengeProof | null> {
   const db = await getDatabase();
 
   const [rows] = await db.execute<ChallengeRow[]>(
-    `SELECT id, discord_id, code_hash, handle, expires_at, consumed_at, attempts
+    `SELECT id, discord_id, code_hash, handle, purpose, expires_at, consumed_at, attempts
      FROM bg_discord_login_challenges
      WHERE discord_id = ?
      ORDER BY id DESC
@@ -343,7 +349,7 @@ export async function consumeDiscordChallenge(
   );
 
   if (rows.length === 0) return null;
-  return settleChallengeAttempt(db, rows[0], code);
+  return settleChallengeAttempt(db, rows[0], code, purpose);
 }
 
 /**
@@ -370,12 +376,13 @@ export async function consumeDiscordChallenge(
 export async function consumeDiscordLoginChallenge(
   challengeToken: string,
   code: string,
+  purpose: DiscordCodePurpose,
 ): Promise<DiscordLoginProof | null> {
   if (!isDiscordChallengeToken(challengeToken)) return null;
   const db = await getDatabase();
 
   const [rows] = await db.execute<ChallengeRow[]>(
-    `SELECT c.id, c.discord_id, c.code_hash, c.handle, c.expires_at, c.consumed_at, c.attempts
+    `SELECT c.id, c.discord_id, c.code_hash, c.handle, c.purpose, c.expires_at, c.consumed_at, c.attempts
      FROM bg_discord_login_challenges c
      WHERE c.lookup_hash = ?
        AND NOT EXISTS (
@@ -387,7 +394,7 @@ export async function consumeDiscordLoginChallenge(
   );
 
   if (rows.length === 0) return null;
-  const proof = await settleChallengeAttempt(db, rows[0], code);
+  const proof = await settleChallengeAttempt(db, rows[0], code, purpose);
   return proof ? { ...proof, discordId: String(rows[0].discord_id) } : null;
 }
 
@@ -396,6 +403,8 @@ type ChallengeRow = RowDataPacket & {
   discord_id: string;
   code_hash: string;
   handle: string | null;
+  /** `NULL` : défi antérieur à la colonne, accepté pour les deux usages. */
+  purpose: "LOGIN" | "HANDLE" | null;
   expires_at: Date;
   consumed_at: Date | null;
   attempts: number;
@@ -409,7 +418,14 @@ async function settleChallengeAttempt(
   db: Awaited<ReturnType<typeof getDatabase>>,
   challenge: ChallengeRow,
   code: string,
+  purpose: DiscordCodePurpose,
 ): Promise<DiscordChallengeProof | null> {
+  // **Un code ne sert qu'à l'usage annoncé par son message.** Celui d'une
+  // certification dit qu'il ne connecte pas : accepté par la connexion, il
+  // ouvrirait le compte de qui le transmet en confiance (et l'inverse
+  // rattacherait son Discord à un autre compte). Refusé sans réserver d'essai :
+  // le code n'est pas comparé, rien n'est appris.
+  if (challenge.purpose && challenge.purpose !== PURPOSE_COLUMN[purpose]) return null;
   if (challenge.consumed_at !== null) return null;
   if (new Date(challenge.expires_at).getTime() < Date.now()) return null;
 
@@ -461,5 +477,5 @@ async function settleChallengeAttempt(
  * de la réservation d'essai divergeraient, et c'est elle qui tient le secret.
  */
 export async function verifyDiscordChallenge(discordId: string, code: string): Promise<boolean> {
-  return (await consumeDiscordChallenge(discordId, code)) !== null;
+  return (await consumeDiscordChallenge(discordId, code, "login")) !== null;
 }

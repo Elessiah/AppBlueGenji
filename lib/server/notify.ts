@@ -321,23 +321,31 @@ export async function loadNotificationRecipients(
   // (`reportSchemaFailure`, rejouée au démarrage suivant) ne coupe pas les
   // envois. Sans la langue, `notifyUsers` la relit (bilingue au pire) ; sans
   // le réglage, personne n'a pu s'opposer (la route d'écriture échoue aussi) :
-  // la relecture sans colonne garde le comportement d'avant. La langue précède
-  // le réglage dans la table (`AFTER locale`) : sans elle, il manque aussi.
+  // la relecture sans colonne garde le comportement d'avant. La langue tombe
+  // **avant** le réglage : une langue absente ne fait jamais perdre une
+  // opposition aux messages de match (RGPD, article 21).
   const matchDm = options.matchDm === true;
-  const attempts: [boolean, boolean][] = matchDm ? [[true, true], [false, true], [false, false]] : [[false, true], [false, false]];
-  let rows: Awaited<ReturnType<typeof select>>[0] | null = null;
-  for (const [index, [withMatchDm, withLocale]] of attempts.entries()) {
-    try {
-      [rows] = await select(withMatchDm, withLocale);
-      break;
-    } catch (error) {
-      if (!isUnknownColumnError(error) || index === attempts.length - 1) throw error;
-    }
-  }
-  return (rows ?? []).map((row) => {
+  const attempts: [boolean, boolean][] = matchDm ? [[true, true], [true, false], [false, false]] : [[false, true], [false, false]];
+  const rows = await firstReadable(attempts, ([withMatchDm, withLocale]) => select(withMatchDm, withLocale));
+  return rows.map((row) => {
     const recipient = toNotificationRecipient(row, reach);
     return options.matchDm && !matchDmEnabled(row.match_dm_enabled) ? { ...recipient, discord: null } : recipient;
   });
+}
+
+/**
+ * Joue les lectures dans l'ordre jusqu'à la première dont les colonnes
+ * existent ; toute autre erreur, ou l'échec de la dernière, est levée.
+ */
+async function firstReadable<A, T>(attempts: readonly A[], read: (attempt: A) => Promise<[T, unknown]>): Promise<T> {
+  for (let index = 0; ; index += 1) {
+    try {
+      const [rows] = await read(attempts[index]);
+      return rows;
+    } catch (error) {
+      if (!isUnknownColumnError(error) || index >= attempts.length - 1) throw error;
+    }
+  }
 }
 
 /**

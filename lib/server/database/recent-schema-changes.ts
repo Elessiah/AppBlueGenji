@@ -138,6 +138,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // d'abord sur la colonne (`ER_DUP_FIELDNAME`, toléré).
     `ALTER TABLE bg_discord_login_challenges ADD COLUMN lookup_hash CHAR(64) NULL AFTER discord_id,
        ADD UNIQUE INDEX uniq_bg_challenges_lookup (lookup_hash)`,
+    // EF-14 — usage d'un code (connexion ou rattachement d'un tag) : un code
+    // de certification ne connecte pas, un code de connexion ne certifie pas.
+    // `NULL` pour les défis d'avant (quinze minutes de vie) : acceptés partout.
+    `ALTER TABLE bg_discord_login_challenges ADD COLUMN purpose ENUM('LOGIN', 'HANDLE') NULL AFTER handle`,
     // Cible d'un signalement réellement prévenue : le délai de reprévenance et
     // le plafond de l'auteur ne comptent plus que les messages partis. `NULL`
     // pour les lignes d'avant, **sans remplissage** — on ne sait pas lesquelles

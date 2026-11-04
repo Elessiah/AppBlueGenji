@@ -334,7 +334,7 @@ export async function confirmDiscordVerification(
   const row = await loadDiscordRow(userId);
   if (!row) throw new Error("PROFILE_NOT_FOUND");
 
-  const proof = await consumeDiscordLoginChallenge(challenge, code);
+  const proof = await consumeDiscordLoginChallenge(challenge, code, "handle");
   if (!proof) throw new Error("CODE_INVALID_OR_EXPIRED");
   const { discordId } = proof;
   // Relu après l'aller-retour du joueur : son compte a pu se rattacher entre la
@@ -362,15 +362,13 @@ async function sendHandleChallenge(discordId: string, tag: string): Promise<Code
   // Dans la langue du compte **destinataire** — celui qui porte déjà ce
   // Discord —, jamais dans celle du demandeur : le tag saisi n'est pas encore
   // prouvé et peut désigner quelqu'un d'autre. Sans compte rattaché, message
-  // bilingue (`BOT_DM_LANGUAGE.md`). Lue pendant l'insertion du défi
-  // (`accountLocaleForDiscordId` ne lève jamais).
-  const [challenge, locale] = await Promise.all([
-    createDiscordLoginChallenge(discordId, tag),
-    accountLocaleForDiscordId(discordId),
-  ]);
+  // bilingue (`BOT_DM_LANGUAGE.md`). Lue **après** le défi : une demande refusée
+  // (quota, avalanche) ne coûte aucune lecture de plus.
+  // « handle » : le message dit que ce code rattache un tag, qu'il ne connecte
+  // pas — et le défi le retient, la connexion le refuse.
+  const challenge = await createDiscordLoginChallenge(discordId, tag, "handle");
   try {
-    // « handle » : le message dit que ce code rattache un tag, qu'il ne connecte pas.
-    await sendDiscordLoginCode(discordId, challenge.code, locale, "handle");
+    await sendDiscordLoginCode(discordId, challenge.code, await accountLocaleForDiscordId(discordId), "handle");
   } catch (error) {
     await discardDiscordChallenge(challenge.challengeId).catch(() => {});
     throw error;
@@ -456,7 +454,7 @@ export async function confirmDiscordHandleUpdate(
   const row = await loadDiscordRow(userId);
   if (!row) throw new Error("PROFILE_NOT_FOUND");
 
-  const proof = await consumeDiscordLoginChallenge(challenge, code);
+  const proof = await consumeDiscordLoginChallenge(challenge, code, "handle");
   if (!proof) throw new Error("CODE_INVALID_OR_EXPIRED");
   const { discordId } = proof;
   if (row.discord_id && row.discord_id !== discordId) throw new Error("DISCORD_ID_MISMATCH");
