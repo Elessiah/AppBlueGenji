@@ -258,14 +258,21 @@ export async function getSpectatorPayload(
  * Le tournoi tel que le voit le public, pour une page rendue sans session
  * (encart d'un lien, réglages de la page des règles) : la même réponse
  * mutualisée, au même prix pour le réseau qui la demande. `null` : introuvable,
- * reconstruction refusée sans copie récente, ou base injoignable — l'appelant
- * se rabat sur sa version générale.
+ * reconstruction refusée sans copie récente, lecture refusée par `admit`, ou
+ * base injoignable — l'appelant se rabat sur sa version générale.
+ *
+ * @param admit Appelé **seulement** quand la réponse n'est ni fraîche en cache
+ *   ni en vol (comme {@link publicTournamentCard}) ; `false` : refusée.
  */
 export async function publicTournamentSnapshot(
   tournamentId: number,
   level: SpectatorLoadLevel,
   client: string | null,
+  admit: () => boolean = () => true,
 ): Promise<PublicTournamentView | null> {
+  // Une réponse déjà servie à d'autres ne coûte pas de jeton du plafond des
+  // lectures publiques : seuls les rendus qui la (re)construisent le paient.
+  if (!isCachedOrLoading(spectatorSnapshotCacheKey(tournamentId)) && !admit()) return null;
   try {
     return (await getSpectatorPayload(tournamentId, level, client))?.snapshot ?? null;
   } catch (error) {
