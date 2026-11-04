@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { rejectCrossSiteRequest, siteHosts } from "@/lib/server/request-origin";
+import { rejectCrossSiteRequest, requestHosts } from "@/lib/server/request-origin";
 import { siteBaseUrl } from "@/lib/server/site-url";
 import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, SEARCH_HEADER, contentSecurityPolicy } from "@/lib/shared/csp";
 import { apiWriteNeedsProvenance } from "@/lib/shared/request-origin";
@@ -14,27 +14,6 @@ export const LEGACY_GOOGLE_ONE_TAP_COOKIE = "g_state";
 
 /** Ancien chemin du cookie d'avis de suspension, avant `path: "/"` (i18n, lot 0). */
 export const LEGACY_SUSPENSION_NOTICE_PATH = "/connexion";
-
-/**
- * Hôte nu (nom ou IPv4), port facultatif — rien qui puisse clore une directive
- * CSP. Une IPv6 entre crochets n'est pas exprimable en source CSP.
- */
-const PLAIN_HOST = /^[A-Za-z0-9.-]+(?::\d{1,5})?$/;
-
-/**
- * Hôtes que le navigateur a pu viser, pour borner `script-src` sous le dev
- * Turbopack : ceux de la vérification de provenance ({@link siteHosts} —
- * `APP_URL`, `Host`, `X-Forwarded-Host` d'un relais), et non le seul
- * `nextUrl.origin`, que `next dev` réécrit en `localhost` : ouverte sur
- * `127.0.0.1` ou derrière un tunnel, la page aurait vu tous ses morceaux
- * refusés. Dès qu'un hôte n'est pas nu (`;`, espace, IPv6…), la liste entière
- * est écartée et `'self'` reste : mieux vaut une politique large qu'une page
- * dont l'hôte réel manquerait.
- */
-function scriptHosts(request: NextRequest): string[] {
-  const hosts = siteHosts(request);
-  return hosts.every((host) => PLAIN_HOST.test(host)) ? [...new Set(hosts)] : [];
-}
 
 /**
  * Pose la politique de sécurité du contenu, avec un nonce par requête, et la
@@ -86,8 +65,12 @@ export function middleware(request: NextRequest) {
   const policy = contentSecurityPolicy(nonce, {
     dev,
     turbopack,
-    // Lu seulement là où il sert : en production, `Host` n'est pas touché.
-    scriptHosts: dev && turbopack ? scriptHosts(request) : undefined,
+    // Hôtes visés par la requête ({@link requestHosts} : `Host`,
+    // `X-Forwarded-Host` d'un tunnel, URL), et non le seul `nextUrl.origin`,
+    // que `next dev` réécrit en `localhost` — ouverte sur `127.0.0.1`, la page
+    // aurait vu tous ses morceaux refusés. `contentSecurityPolicy` les valide.
+    // Lus seulement là où ils servent : en production, `Host` n'est pas touché.
+    scriptHosts: dev && turbopack ? requestHosts(request) : undefined,
   });
 
   const requestHeaders = localizedRequestHeaders(request, locale, path);

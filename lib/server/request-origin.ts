@@ -16,9 +16,8 @@ import {
  * sur une machine servie sous plusieurs noms, `APP_URL` peut ne pas être réglée
  * ou ne pas être celui qu'on a tapé. Ces en-têtes ne donnent rien à un tiers :
  * c'est le navigateur de la **victime** qui les écrit, avec l'hôte du site.
- * Le middleware en tire aussi les sources `script-src` du dev Turbopack.
  */
-export function siteHosts(req: Request): string[] {
+function siteHosts(req: Request): string[] {
   const hosts: string[] = [];
   const base = siteBaseUrl();
   if (base) {
@@ -28,6 +27,18 @@ export function siteHosts(req: Request): string[] {
       // `APP_URL` illisible : les en-têtes suffisent.
     }
   }
+  hosts.push(...requestHosts(req));
+  return hosts;
+}
+
+/**
+ * Hôtes que la requête a visés : `Host`, `X-Forwarded-Host` (liste) quand un
+ * relais le pose, puis celui de l'URL. Sans `APP_URL` : le middleware en tire
+ * les sources `script-src` du dev Turbopack, qui ne doivent nommer que la page
+ * servie, pas le site public.
+ */
+export function requestHosts(req: Request): string[] {
+  const hosts: string[] = [];
   for (const header of ["host", "x-forwarded-host"]) {
     const value = req.headers.get(header);
     if (value) hosts.push(...value.split(",").map((h) => h.trim()).filter(Boolean));

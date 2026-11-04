@@ -164,21 +164,41 @@ export const CSP_NONCE_HEADER = "x-nonce";
  * du site : à la place de `'self'`, la source se restreint alors aux morceaux de
  * Next (`<hôte>/_next/`, sans schéma : il suit celui de la page), si bien qu'un
  * `<script src>` sans nonce écrit à la main reste refusé en dev comme il le
- * serait en production. Sans hôte connu, `'self'` reste. Le dev webpack et la production gardent la politique
- * entière : `next build` pose le nonce sur chaque script.
+ * serait en production. **Tout ou rien** : si un seul hôte n'est pas un nom
+ * valable ({@link isCspHost} — un `;`, une espace, une IPv6, un port hors
+ * plage), ou s'il n'y en a aucun, la liste entière est écartée et `'self'`
+ * reste ; une liste filtrée pourrait perdre l'hôte réel et refuser tous les
+ * morceaux. Le dev webpack et la production gardent la politique entière :
+ * `next build` pose le nonce sur chaque script.
  *
  * @param nonce Nonce de la requête, déjà encodé en base64.
  * @param options `dev` autorise `'unsafe-eval'`, dont le rafraîchissement à chaud de Next a besoin ;
  *   `turbopack` (dev Turbopack seulement, ignoré hors `dev`) retire `'strict-dynamic'` et,
- *   avec `scriptHosts` (hôtes visés par le navigateur, déjà validés), borne la source à `<hôte>/_next/`.
+ *   avec `scriptHosts` (hôtes visés par la requête, validés ici), borne la source à `<hôte>/_next/`.
  * @returns La politique, prête à être posée en en-tête.
  */
+/** Étiquette DNS ou octet IPv4 : lettres, chiffres, tiret, rien d'autre. */
+const HOST_LABEL = /^[A-Za-z0-9-]+$/;
+
+/**
+ * Vrai si `host` peut entrer tel quel dans une source CSP : nom ou IPv4 fait
+ * d'étiquettes non vides, port facultatif de 1 à 65535. Rien qui puisse clore
+ * une directive (`;`, espace) ; une IPv6 entre crochets n'est pas exprimable.
+ */
+export function isCspHost(host: string): boolean {
+  const [name, port, extra] = host.split(":");
+  if (extra !== undefined || !name) return false;
+  if (port !== undefined && !(/^\d{1,5}$/.test(port) && Number(port) >= 1 && Number(port) <= 65535)) return false;
+  return name.split(".").every((label) => HOST_LABEL.test(label));
+}
+
 export function contentSecurityPolicy(
   nonce: string,
   options: { dev: boolean; turbopack?: boolean; scriptHosts?: readonly string[] }
 ): string {
   const turbopackDev = options.dev && options.turbopack === true;
-  const hosts = turbopackDev ? (options.scriptHosts ?? []) : [];
+  const candidates = turbopackDev ? (options.scriptHosts ?? []) : [];
+  const hosts = candidates.every(isCspHost) ? [...new Set(candidates.map((host) => host.toLowerCase()))] : [];
   const scriptSrc = [
     ...(hosts.length > 0 ? hosts.map((host) => `${host}/_next/`) : ["'self'"]),
     `'nonce-${nonce}'`,
