@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/tournaments/notifications");
+jest.mock("@/lib/server/tournaments/snapshot");
 
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
@@ -13,6 +14,7 @@ import {
   updateTournamentImageSettings,
 } from "@/lib/server/tournaments/image";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { invalidateSpectatorSnapshot } from "@/lib/server/tournaments/snapshot";
 import { fakePool } from "../../helpers/sql-double";
 
 /**
@@ -270,5 +272,56 @@ describe("mapCard — l'image voyage avec la carte du tournoi", () => {
 
   it("écarte une URL étrangère à la sortie", () => {
     expect(mapCard(row({ image_url: "https://exemple.invalid/x.png", image_fit: "COVER" })).image).toBeNull();
+  });
+});
+
+describe("image du tournoi — éviction de la page sans compte", () => {
+  it("setTournamentImage_success_evictsSpectatorCopy", async () => {
+    mockTournament(OLD_URL);
+
+    await setTournamentImage(7, pngFile(), cover);
+
+    expect(invalidateSpectatorSnapshot).toHaveBeenCalledTimes(1);
+    expect(invalidateSpectatorSnapshot).toHaveBeenCalledWith(7);
+  });
+
+  it("setTournamentImage_unknownTournament_evictsNothing", async () => {
+    mockTournament(undefined);
+
+    await expect(setTournamentImage(7, pngFile(), cover)).rejects.toThrow("TOURNAMENT_NOT_FOUND");
+
+    expect(invalidateSpectatorSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("updateTournamentImageSettings_success_evictsSpectatorCopy", async () => {
+    mockTournament(OLD_URL);
+
+    await updateTournamentImageSettings(7, cover);
+
+    expect(invalidateSpectatorSnapshot).toHaveBeenCalledWith(7);
+  });
+
+  it("updateTournamentImageSettings_missingImage_evictsNothing", async () => {
+    mockTournament(null);
+
+    await expect(updateTournamentImageSettings(7, cover)).rejects.toThrow("TOURNAMENT_IMAGE_MISSING");
+
+    expect(invalidateSpectatorSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("removeTournamentImage_success_evictsSpectatorCopy", async () => {
+    mockTournament(OLD_URL);
+
+    await removeTournamentImage(7);
+
+    expect(invalidateSpectatorSnapshot).toHaveBeenCalledWith(7);
+  });
+
+  it("removeTournamentImage_noImage_evictsNothing", async () => {
+    mockTournament(null);
+
+    await removeTournamentImage(7);
+
+    expect(invalidateSpectatorSnapshot).not.toHaveBeenCalled();
   });
 });

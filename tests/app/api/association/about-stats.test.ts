@@ -117,6 +117,28 @@ describe("POST /api/association/about-stats", () => {
     expect(service.createAboutStat).toHaveBeenCalledWith(expect.objectContaining({ valueEn: null }));
   });
 
+  it("POST_driverErrorMessage_returnsFallbackCodeOnly", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(service.createAboutStat).mockRejectedValue(new Error("connect ECONNREFUSED 10.0.0.5:3306"));
+
+    const res = await POST(jsonReq("POST", { value: "X", label: "Y" }));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "ABOUT_STAT_CREATE_FAILED" });
+  });
+
+  it("POST_emptyErrorMessage_returnsFallbackCode", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(service.createAboutStat).mockRejectedValue(new Error(""));
+
+    const res = await POST(jsonReq("POST", { value: "X", label: "Y" }));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "ABOUT_STAT_CREATE_FAILED" });
+  });
+
   it("returns 400 with the validation error message", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(service.createAboutStat).mockRejectedValue(new Error("VALUE_REQUIRED"));
