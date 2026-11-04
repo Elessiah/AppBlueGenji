@@ -2,6 +2,8 @@ import { describe, expect, it } from "@jest/globals";
 import {
   firstTargetOverMax,
   focusIndexAfterRemoval,
+  sameRoundKeys,
+  storedRoundSignature,
   slotOverMax,
   vanishedRoundFallback,
 } from "@/app/(secured)/tournois/[id]/_lib/round-maps-editor";
@@ -87,5 +89,45 @@ describe("firstTargetOverMax", () => {
 
   it("firstTargetOverMax_noTargets_returnsNull", () => {
     expect(firstTargetOverMax([], 3, limitOf)).toBeNull();
+  });
+});
+
+describe("sameRoundKeys", () => {
+  it("sameRoundKeys_sameKeysSameOrder_returnsTrue", () => {
+    expect(sameRoundKeys([R1, R2], [{ ...R1 }, { ...R2 }])).toBe(true);
+  });
+
+  it("sameRoundKeys_differentLength_returnsFalse", () => {
+    expect(sameRoundKeys([R1, R2], [R1])).toBe(false);
+  });
+
+  it("sameRoundKeys_sameKeysOtherOrder_returnsFalse", () => {
+    expect(sameRoundKeys([R1, R2], [R2, R1])).toBe(false);
+  });
+
+  it("sameRoundKeys_bothEmpty_returnsTrue", () => {
+    expect(sameRoundKeys([], [])).toBe(true);
+  });
+});
+
+describe("storedRoundSignature", () => {
+  const stored = (maps: string[][]) => [{ ...R1, slots: maps }];
+
+  it("storedRoundSignature_equalContentNewArray_sameSignature", () => {
+    expect(storedRoundSignature(stored([["a"]]), R1)).toBe(storedRoundSignature(stored([["a"]]), R1));
+  });
+
+  it("storedRoundSignature_mapsChanged_signatureChanges", () => {
+    expect(storedRoundSignature(stored([["a"]]), R1)).not.toBe(storedRoundSignature(stored([["b"]]), R1));
+  });
+
+  it("storedRoundSignature_otherRoundChanged_signatureUnchanged", () => {
+    const other = { ...R2, slots: [["x"]] };
+
+    expect(storedRoundSignature([...stored([["a"]]), other], R1)).toBe(storedRoundSignature(stored([["a"]]), R1));
+  });
+
+  it("storedRoundSignature_noRound_isStable", () => {
+    expect(storedRoundSignature(stored([["a"]]), null)).toBe("null");
   });
 });

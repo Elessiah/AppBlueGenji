@@ -165,7 +165,21 @@ describe("câblage de la fenêtre des cartes", () => {
   it("snapshot_staleTiebreaks_areTheStoredOnesThatAreNotActive", () => {
     const snapshot = readSource("lib/server/tournaments/snapshot.ts");
 
-    expect(snapshot).toContain("staleTiebreaks: storedMapRules.tiebreaks.filter((entry) => !activeTiebreaks.includes(entry))");
+    expect(snapshot).toContain("stored.filter((entry) => !activeSet.has(entry))");
+  });
+
+  it("snapshot_staleTiebreaks_omittedWhenNoneIsStale", () => {
+    const snapshot = readSource("lib/server/tournaments/snapshot.ts");
+
+    expect(snapshot).toContain("stale.length > 0 ? { staleTiebreaks: stale } : {}");
+  });
+
+  it("dialog_rendersWithStableReferences", () => {
+    const source = dialog();
+
+    expect(source).toContain("if (!sameRoundKeys(stable.current, planned)) stable.current = planned;");
+    expect(source).toContain("[slots, copyTarget, roundId, storedKey, clearSlotError]");
+    expect(source).toContain("items={rules.staleTiebreaks ?? NO_STALE_TIEBREAKS}");
   });
 
   it("mapPick_optimisticValue_expiresWithoutASnapshot", () => {
@@ -251,7 +265,7 @@ describe("câblage de la fenêtre des cartes", () => {
     {
       name: "untouchedFormsAndStaleRefusals_areHandledWithoutNoise",
       file: "RoundMapsDialog.tsx",
-      present: ["if (busy || !dirty) return;", 'current?.kind === "close" ? current : null', "[slots, copyTarget, roundId, rules.rounds, clearSlotError]"],
+      present: ["if (busy || !dirty) return;", 'current?.kind === "close" ? current : null', "[slots, copyTarget, roundId, storedKey, clearSlotError]"],
       absent: [],
     },
     {
