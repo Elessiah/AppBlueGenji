@@ -475,6 +475,18 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     expect(execute.mock.calls.some(([sql]) => sql.startsWith("DELETE"))).toBe(true);
   });
 
+  it("dispatchMatchVoiceChannels_createStepThrows_stillReleases", async () => {
+    const { execute } = database({ releasable: [{ match_id: 42, team_id: 1, channel_id: "901", tournament_id: 7 }] });
+    const base = execute.getMockImplementation()!;
+    execute.mockImplementation(async (sql, params) => {
+      if (sql === DUE_CHANNELS_SQL) throw new Error("ER_LOCK_WAIT_TIMEOUT");
+      return base(sql, params);
+    });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "ok", value: true });
+    await dispatchMatchVoiceChannels();
+    expect(releaseVoiceChannel).toHaveBeenCalledWith("901");
+  });
+
   it("dispatchMatchVoiceChannels_twoPassesWithinAnHour_purgesOnce", async () => {
     const { writes } = database({ needed: { due: 0, open_rows: 0 } });
     await dispatchMatchVoiceChannels();
@@ -740,6 +752,20 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
     expect(jest.mocked(ensureVoiceChannel).mock.calls).toEqual([["match:42:team:1", "Alpha"]]);
     expect(writes.filter((w) => w.sql.startsWith("INSERT")).map((w) => w.params)).toEqual([[42, 1, "905"]]);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("dispatchMatchVoiceChannels_oneRecheckWorkerThrows_othersFinishBeforePublication", async () => {
+    // Un ouvrier en erreur : la passe attend les autres, dont le salon rouvert est publié.
+    database({ openDue: [open, { match_id: 43, team_id: 3, channel_id: "906", tournament_id: 8, team_name: "Gamma" }] });
+    jest
+      .mocked(ensureVoiceChannel)
+      .mockRejectedValueOnce(new Error("ER_BAD"))
+      .mockImplementationOnce(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return { kind: "ok", value: "907" };
+      });
+    await dispatchMatchVoiceChannels();
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(8);
   });
 
   it("dispatchMatchVoiceChannels_matchFinishedDuringRecheck_newChannelHandedBackInSamePass", async () => {
