@@ -70,6 +70,9 @@ et rien n'est compté.
   (`backing_off`, calculé par la base). Un rendu refusé par le bot donne une ligne
   pm2 `rendu du salon vocal refusé (CODE)` par salon et par code (mémoire du
   processus, oubliée à la clôture de la ligne) ; une panne du canal n'en donne pas.
+- **Tournoi pas encore publié** (`start_visibility_at` à venir) : aucun salon n'est
+  créé ni redemandé (`DUE_CHANNELS_SQL`, `OPEN_DUE_CHANNELS_SQL`) — les noms
+  d'équipes d'un tournoi caché n'apparaissent pas sur Discord.
 - **Rendu** : le balayage rend les salons d'un match terminé, forfait, annulé,
   sorti du programme (heure retirée), d'un match où entre une entrée solo ou une
   équipe fantôme, d'un tournoi qui n'est plus en cours (terminé, ou retombé avant
