@@ -355,7 +355,7 @@ export async function confirmDiscordVerification(
  * La mécanique est celle de la connexion par code, sans rien de plus : même
  * table, mêmes deux bornes en base (`createDiscordLoginChallenge`), et un envoi
  * raté **supprime** sa ligne — un code qui n'est pas parti ne doit pas survivre
- * à son échec, sinon il masque comme « dernier émis » celui que le joueur
+ * à son échec, sinon il masque comme « dernier émis » de son usage celui que le joueur
  * détient vraiment.
  */
 async function sendHandleChallenge(discordId: string, tag: string): Promise<CodeSent> {

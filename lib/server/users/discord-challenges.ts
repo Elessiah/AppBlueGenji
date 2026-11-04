@@ -388,7 +388,7 @@ export async function consumeDiscordLoginChallenge(
        AND NOT EXISTS (
          SELECT 1 FROM bg_discord_login_challenges newer
          WHERE newer.discord_id = c.discord_id AND newer.id > c.id
-           AND newer.purpose <=> c.purpose
+           AND newer.purpose = c.purpose
        )
      LIMIT 1`,
     [hashCode(challengeToken)],
@@ -404,7 +404,7 @@ type ChallengeRow = RowDataPacket & {
   discord_id: string;
   code_hash: string;
   handle: string | null;
-  /** `NULL` : défi antérieur à la colonne, que la migration marque consommé ; gardé par prudence, refusé pour les deux usages. */
+  /** `NOT NULL` en base ; `null` n'est gardé que pour le refus explicite (`purpose !== …`) d'une ligne impossible. */
   purpose: "LOGIN" | "HANDLE" | null;
   expires_at: Date;
   consumed_at: Date | null;
@@ -462,12 +462,15 @@ async function settleChallengeAttempt(
 
   if (!timingSafeEquals(challenge.code_hash, hashCode(code))) return null;
 
-  await db.execute(
+  // **Un code juste ne sert qu'une fois**, même à deux requêtes de front :
+  // seule celle dont l'écriture consomme réellement la ligne obtient la preuve.
+  const [consumed] = await db.execute<ResultSetHeader>(
     `UPDATE bg_discord_login_challenges
      SET consumed_at = NOW()
-     WHERE id = ?`,
+     WHERE id = ? AND consumed_at IS NULL`,
     [challenge.id],
   );
+  if (Number(consumed.affectedRows) !== 1) return null;
 
   return { handle: normalizeDiscordHandle(challenge.handle) };
 }

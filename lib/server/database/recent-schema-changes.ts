@@ -150,7 +150,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // comptent encore dans les plafonds de codes du compte (une suppression les
     // remettrait à zéro au déploiement, doublant le budget du jour). Le
     // redémarrage pm2 arrête l'ancien processus avant de lancer le neuf : aucune
-    // insertion sans usage ne suit le `MODIFY`. Rejouées, les deux ne changent rien.
+    // insertion sans usage ne suit le `MODIFY`. **Retour arrière** : une version
+    // d'avant EF-14 n'écrit pas l'usage et n'émet plus aucun code sur cette base
+    // (`docs/DEPLOYMENT.md`). Rejouées, les deux ne changent rien.
     `UPDATE bg_discord_login_challenges SET purpose = 'LOGIN', consumed_at = COALESCE(consumed_at, NOW())
        WHERE purpose IS NULL`,
     `ALTER TABLE bg_discord_login_challenges MODIFY purpose ENUM('LOGIN', 'HANDLE') NOT NULL`,
