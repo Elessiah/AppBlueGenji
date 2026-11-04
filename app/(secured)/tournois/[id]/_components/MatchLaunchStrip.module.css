@@ -57,8 +57,13 @@
   white-space: normal;
 }
 
+/* La raison est une phrase : en minuscules, sans espacement de pastille — une
+   longue ligne en capitales espacées se lirait mal sur 375 px, surtout en anglais. */
 .voiceHeld {
   font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  overflow-wrap: anywhere;
 }
 
 .name {
