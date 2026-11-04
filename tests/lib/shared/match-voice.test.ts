@@ -4,10 +4,12 @@ import {
   VOICE_CHANNEL_LEAD_MINUTES,
   matchVoiceInfo,
   parseMatchVoiceInfo,
+  shownVoiceSide,
   voiceChannelKey,
   voiceChannelsDue,
   voiceGatePending,
   voiceObservationFresh,
+  voiceSideFull,
   voiceTracked,
   type VoiceGateInput,
 } from "@/lib/shared/match-voice";
@@ -140,8 +142,51 @@ describe("matchVoiceInfo", () => {
     expect(matchVoiceInfo(gate({ team1Channel: { channelId: "c1", members: 9, failed: false } }))).toEqual({
       team1Members: VOICE_CHANNEL_CAPACITY,
       team2Members: null,
+      team1State: "COUNTED",
+      team2State: "WAITING",
       pending: true,
     });
+  });
+
+  it("matchVoiceInfo_createdNotCounted_saysUncountedNotWaiting", () => {
+    const actual = matchVoiceInfo(gate({ team1Channel: { channelId: "c1", members: null, failed: false } }));
+
+    expect(actual?.team1State).toBe("UNCOUNTED");
+    expect(actual?.team1Members).toBeNull();
+  });
+
+  it("matchVoiceInfo_failedSide_saysFailedAndReleasesGate", () => {
+    const actual = matchVoiceInfo(gate({ team1Channel: { channelId: null, members: null, failed: true }, team2Channel: full }));
+
+    expect(actual).toEqual({ team1Members: null, team2Members: 5, team1State: "FAILED", team2State: "COUNTED", pending: false });
+  });
+});
+
+describe("shownVoiceSide", () => {
+  it("shownVoiceSide_noChannel_waiting", () => {
+    expect(shownVoiceSide(null)).toEqual({ state: "WAITING", members: null });
+  });
+
+  it("shownVoiceSide_failedEvenWithChannel_failed", () => {
+    expect(shownVoiceSide({ channelId: "c1", members: 4, failed: true })).toEqual({ state: "FAILED", members: null });
+  });
+
+  it("shownVoiceSide_negativeCount_clampsToZero", () => {
+    expect(shownVoiceSide({ channelId: "c1", members: -2, failed: false })).toEqual({ state: "COUNTED", members: 0 });
+  });
+});
+
+describe("voiceSideFull", () => {
+  it("voiceSideFull_countedAtCapacity_true", () => {
+    expect(voiceSideFull("COUNTED", VOICE_CHANNEL_CAPACITY)).toBe(true);
+  });
+
+  it("voiceSideFull_countedBelowCapacity_false", () => {
+    expect(voiceSideFull("COUNTED", VOICE_CHANNEL_CAPACITY - 1)).toBe(false);
+  });
+
+  it("voiceSideFull_notCounted_false", () => {
+    expect(voiceSideFull("UNCOUNTED", null)).toBe(false);
   });
 });
 
@@ -154,8 +199,39 @@ describe("parseMatchVoiceInfo", () => {
     expect(parseMatchVoiceInfo({ team1Members: -1, team2Members: 2.5, pending: "yes" })).toEqual({
       team1Members: null,
       team2Members: null,
+      team1State: "WAITING",
+      team2State: "WAITING",
       pending: false,
     });
+  });
+
+  it("parseMatchVoiceInfo_olderPayloadWithCount_derivesCounted", () => {
+    expect(parseMatchVoiceInfo({ team1Members: 3, team2Members: null, pending: true })).toEqual({
+      team1Members: 3,
+      team2Members: null,
+      team1State: "COUNTED",
+      team2State: "WAITING",
+      pending: true,
+    });
+  });
+
+  it("parseMatchVoiceInfo_countedWithoutNumber_becomesUncounted", () => {
+    const actual = parseMatchVoiceInfo({ team1Members: null, team2Members: 2, team1State: "COUNTED", team2State: "COUNTED", pending: true });
+
+    expect(actual?.team1State).toBe("UNCOUNTED");
+  });
+
+  it("parseMatchVoiceInfo_failedWithStrayCount_dropsCount", () => {
+    const actual = parseMatchVoiceInfo({ team1Members: 4, team2Members: 2, team1State: "FAILED", team2State: "COUNTED", pending: false });
+
+    expect(actual).toEqual({ team1Members: null, team2Members: 2, team1State: "FAILED", team2State: "COUNTED", pending: false });
+  });
+
+  it("parseMatchVoiceInfo_unknownState_fallsBackToCount", () => {
+    const actual = parseMatchVoiceInfo({ team1Members: null, team2Members: 1, team1State: "OPEN", team2State: 7, pending: true });
+
+    expect(actual?.team1State).toBe("WAITING");
+    expect(actual?.team2State).toBe("COUNTED");
   });
 });
 
@@ -185,5 +261,25 @@ describe("textes des salons vocaux (FR + EN)", () => {
     expect(Object.keys(enForm.form.teamVoice)).toEqual(Object.keys(frForm.form.teamVoice));
     expect(frMatchPage.voice.count).toBe("Salon vocal : {count}/{capacity}");
     expect(enMatchPage.voice.count).toBe("Voice channel: {count}/{capacity}");
+  });
+
+  it("messages_teamVoiceDescription_atMostTwoSentences", () => {
+    // Texte explicatif d'un « i » (INFO_HINTS.md) : une à deux phrases.
+    const sentences = (text: string) => text.split(/[.!?](?:\s|$)/).filter((part) => part.trim() !== "").length;
+
+    expect(sentences(frForm.form.teamVoice.description)).toBeLessThanOrEqual(2);
+    expect(sentences(enForm.form.teamVoice.description)).toBeLessThanOrEqual(2);
+  });
+
+  it("messages_voiceStateTexts_frenchAndEnglish", () => {
+    expect(frMatchPage.voice.uncounted).toBe("Salon vocal : pas encore compté");
+    expect(enMatchPage.voice.uncounted).toBe("Voice channel: not counted yet");
+    expect(frMatchPage.voice.failed).toBe("Salon vocal : indisponible");
+    expect(enMatchPage.voice.failed).toBe("Voice channel: unavailable");
+  });
+
+  it("messages_finishedVoiceError_frenchAndEnglish", () => {
+    expect(frForm.edit.voiceErrors.TOURNAMENT_FINISHED).toBe(frForm.edit.planningErrors.TOURNAMENT_FINISHED);
+    expect(enForm.edit.voiceErrors.TOURNAMENT_FINISHED).toBe(enForm.edit.planningErrors.TOURNAMENT_FINISHED);
   });
 });

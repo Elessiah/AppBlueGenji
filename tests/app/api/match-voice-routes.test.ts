@@ -11,7 +11,7 @@ jest.mock("@/lib/server/api-guard", () => ({
 
 import { PUT } from "@/app/api/admin/tournaments/[id]/voice-channels/route";
 import { GET } from "@/app/api/matches/[matchId]/voice/route";
-import { enforceRateLimit, MATCH_VOICE_READ_RULE } from "@/lib/server/api-guard";
+import { enforceRateLimit, MATCH_VOICE_READ_RULE, TEAM_VOICE_TOGGLE_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 import { readMatchVoice, setTeamVoiceChannels } from "@/lib/server/tournaments/match-voice";
@@ -80,6 +80,24 @@ describe("PUT /api/admin/tournaments/[id]/voice-channels", () => {
     expect((await res.json()).error).toBe("TOURNAMENT_NOT_FOUND");
   });
 
+  it("put_finishedTournament_returns409", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setTeamVoiceChannels).mockRejectedValue(new Error("TOURNAMENT_FINISHED"));
+    const res = await PUT(putReq({ enabled: true }), tournamentParams("7"));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("TOURNAMENT_FINISHED");
+    expect(announceStaffTournamentAction).not.toHaveBeenCalled();
+  });
+
+  it("put_rateLimited_returns429WithoutService", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(enforceRateLimit).mockReturnValueOnce(NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 }));
+    const res = await PUT(putReq({ enabled: true }), tournamentParams("7"));
+    expect(res.status).toBe(429);
+    expect(enforceRateLimit).toHaveBeenCalledWith(TEAM_VOICE_TOGGLE_RULE, 3);
+    expect(setTeamVoiceChannels).not.toHaveBeenCalled();
+  });
+
   it("put_serviceThrows_returns500", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     jest.mocked(setTeamVoiceChannels).mockRejectedValue(new Error("boom"));
@@ -142,10 +160,11 @@ describe("GET /api/matches/[matchId]/voice", () => {
 
   it("get_tracked_returnsVoiceCounts", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(readMatchVoice).mockResolvedValue({ team1Members: 3, team2Members: 5, pending: true });
+    const voice = { team1Members: 3, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true } as const;
+    jest.mocked(readMatchVoice).mockResolvedValue(voice);
     const res = await GET(getReq(), matchParams("9"));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ voice: { team1Members: 3, team2Members: 5, pending: true } });
+    expect(await res.json()).toEqual({ voice });
     expect(readMatchVoice).toHaveBeenCalledWith(9, true);
   });
 

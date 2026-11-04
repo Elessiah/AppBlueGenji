@@ -199,7 +199,7 @@ describe("modale « Contacts »", () => {
 
   it("« Contacts » ne prend pas la place principale d'un geste d'arbitrage", () => {
     expect(read("app/(secured)/tournois/[id]/_lib/match-card-actions.ts")).toContain(
-      '["playerScore", "openLaunch", "plan", "adminScore", "contacts"]',
+      '["playerScore", "openLaunch", "plan", "adminScore", "contacts", "matchPage"]',
     );
   });
 
