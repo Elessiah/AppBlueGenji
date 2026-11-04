@@ -199,7 +199,7 @@
     },
     "teamVoice": {
       "label": "Salons vocaux d'équipe",
-      "description": "Allumée : un quart d'heure avant chaque match, le bot Discord ouvre un salon vocal de {capacity} places par équipe (ni pour une entrée solo ni pour une équipe fantôme), et le match ne se lance qu'une fois les deux pleins — sauf lancement forcé par l'arbitrage ou bot injoignable. Le site garde l'identifiant du salon, ses horaires et le nombre de présents, jamais leur identité (détail : page RGPD, « Salons vocaux d'équipe »).",
+      "description": "Allumée : un quart d'heure avant chaque match, le bot Discord ouvre un salon vocal de {capacity} places par équipe (aucun si l'un des deux camps est une entrée solo ou une équipe fantôme), et le match ne se lance qu'une fois les deux pleins — sauf lancement forcé par l'arbitrage ou échec du bot. Le site garde, pour chaque équipe du match, l'identifiant du salon, ses horaires et le nombre de présents, jamais leur identité (détail : page RGPD, « Salons vocaux d'équipe »).",
       "create": "Modifiable ensuite, jusqu'à la clôture du tournoi — même en cours.",
       "edit": "Modifiable jusqu'à la clôture du tournoi — même en cours.",
       "finished": "Le tournoi est terminé : l'option n'est plus modifiable."

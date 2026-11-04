@@ -199,7 +199,7 @@
     },
     "teamVoice": {
       "label": "Team voice channels",
-      "description": "On: fifteen minutes before each match, the Discord bot opens a {capacity}-seat voice channel per team (never for a solo entry or a ghost team), and the match only launches once both are full — unless referees force it or the bot can't be reached. The site keeps the channel's ID, its times and how many people are present, never who they are (details: GDPR page, “Team voice channels”).",
+      "description": "On: fifteen minutes before each match, the Discord bot opens a {capacity}-seat voice channel per team (none if either side is a solo entry or a ghost team), and the match only launches once both are full — unless referees force it or the bot fails. For each team in the match, the site keeps the channel's ID, its times and how many people are present, never who they are (details: GDPR page, “Team voice channels”).",
       "create": "Can be changed later, until the tournament closes — even while it runs.",
       "edit": "Can be changed until the tournament closes — even while it runs.",
       "finished": "The tournament is finished: this option can no longer be changed."
