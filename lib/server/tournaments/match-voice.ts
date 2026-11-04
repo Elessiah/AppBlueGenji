@@ -226,6 +226,7 @@ export const RELEASABLE_SQL = `SELECT v.match_id, v.team_id, v.channel_id, m.tou
         OR m.status IN ('COMPLETED', 'PENDING') OR m.start_at IS NULL
         OR m.start_at < NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
         OR t.state <> 'RUNNING' OR t.team_voice_channels = 0
+        OR t.start_visibility_at > NOW()
         OR NOT (v.team_id <=> m.team1_id OR v.team_id <=> m.team2_id)
         OR EXISTS (SELECT 1 FROM bg_teams x
                     WHERE x.id IN (m.team1_id, m.team2_id)
