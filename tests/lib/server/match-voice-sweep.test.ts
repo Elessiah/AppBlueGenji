@@ -113,11 +113,30 @@ describe("dispatchMatchVoiceChannels — création", () => {
     const { writes } = database({ due: [dueMatch] });
     jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "BOT_INTERNAL_UNREACHABLE" });
     await dispatchMatchVoiceChannels();
-    expect(writes.filter((w) => w.sql.includes("failed_at = NOW(), released_at = NULL"))).toHaveLength(2);
+    expect(writes.filter((w) => w.sql.includes("failed_at = NOW(), released_at = NULL"))).toHaveLength(1);
     const logged = jest.mocked(console.warn).mock.calls.map(([line]) => String(line)).join("\n");
     expect(logged).toContain("BOT_INTERNAL_UNREACHABLE");
     expect(logged).not.toMatch(/Alpha|Beta/);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("dispatchMatchVoiceChannels_botTransportDownOnCreate_stopsRemainingCalls", async () => {
+    database({ due: [dueMatch, { ...dueMatch, id: 43 }] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "BOT_VOICE_TIMEOUT" });
+    await dispatchMatchVoiceChannels();
+    expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
+  });
+
+  it("dispatchMatchVoiceChannels_botRefusesOneChannel_triesTheOtherSideAndMatches", async () => {
+    const { writes } = database({ due: [dueMatch, { ...dueMatch, id: 43 }] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "VOICE_PERMISSION_DENIED" });
+    await dispatchMatchVoiceChannels();
+    expect(ensureVoiceChannel).toHaveBeenCalledTimes(4);
+    expect(writes.filter((w) => w.sql.includes("failed_at = NOW(), released_at = NULL"))).toHaveLength(4);
+  });
+
+  it("dispatchMatchVoiceChannels_dueQuery_asksMatchesWithAFailedSideAfterTheOthers", () => {
+    expect(DUE_CHANNELS_SQL).toMatch(/ORDER BY EXISTS \(SELECT 1 FROM bg_match_voice_channels f[\s\S]*f\.failed_at IS NOT NULL\), m\.start_at, m\.id/);
   });
 
   it("dispatchMatchVoiceChannels_ensureFailsAgain_neitherLogsNorPublishes", async () => {
@@ -258,6 +277,29 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
       .mockImplementationOnce(async () => [{ affectedRows: 3 }, []]);
     await dispatchMatchVoiceChannels();
     expect(deletes()).toBe(3);
+  });
+
+  it("dispatchMatchVoiceChannels_purgeBacklogBeyondTheCap_continuesNextPass", async () => {
+    const { execute } = database({ needed: { due: 0, open_rows: 0 } });
+    const deletes = () => execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE")).length;
+    execute.mockImplementation(async (sql) =>
+      sql.includes("AS open_rows") ? [[{ due: 0, open_rows: 0 }], []] : [{ affectedRows: 200 }, []],
+    );
+    await dispatchMatchVoiceChannels();
+    expect(deletes()).toBe(10);
+    await dispatchMatchVoiceChannels(true);
+    expect(deletes()).toBe(20);
+  });
+
+  it("dispatchMatchVoiceChannels_releaseStepThrows_stillPurges", async () => {
+    const { execute } = database({ needed: { due: 0, open_rows: 1 } });
+    execute.mockImplementation(async (sql) => {
+      if (sql.includes("AS open_rows")) return [[{ due: 0, open_rows: 1 }], []];
+      if (sql === RELEASABLE_SQL) throw new Error("ER_BAD");
+      return [{ affectedRows: 0 }, []];
+    });
+    await dispatchMatchVoiceChannels();
+    expect(execute.mock.calls.some(([sql]) => sql.startsWith("DELETE"))).toBe(true);
   });
 
   it("dispatchMatchVoiceChannels_twoPassesWithinAnHour_purgesOnce", async () => {
