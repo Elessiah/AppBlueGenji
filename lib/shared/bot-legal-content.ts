@@ -47,6 +47,12 @@ import {
   DPF_ADEQUACY_DECISION_EN,
 } from "@/lib/shared/processing-register";
 import { SITE_HOST } from "@/lib/shared/site-host";
+import {
+  VOICE_BOT_ABANDONED_MAX_HOURS,
+  VOICE_BOT_RELEASED_MAX_HOURS,
+  VOICE_BOT_SWEEP_MINUTES,
+  VOICE_BOT_UNRELEASED_MAX_HOURS,
+} from "@/lib/shared/match-voice";
 
 import { frEn, inBothLanguages, type Localizable } from "@/lib/shared/bilingual";
 import type { BilingualDoc, LegalDoc, LegalSection } from "@/lib/shared/bot-legal-types";
@@ -106,9 +112,11 @@ const LAST_UPDATED_EN = "6 November 2026";
 // invitations d'équipe, reprises proposées et propriétés transférées remises en
 // message privé (TEAM-INVITE-NOTIFY), la politique seule — l'article 01 des
 // conditions, figé avec TERMS v8, les ajoutera à la prochaine version ; datée du
-// lendemain de la nuit de déploiement suivant la fusion du 3 novembre 2026.
-const PRIVACY_LAST_UPDATED_FR = "5 novembre 2026";
-const PRIVACY_LAST_UPDATED_EN = "5 November 2026";
+// lendemain de la nuit de déploiement suivant la fusion du 3 novembre 2026 ;
+// salons vocaux d'équipe des matchs (EF-43, registre T18), la politique seule —
+// datée du lendemain de la mise en ligne du 5 novembre 2026.
+const PRIVACY_LAST_UPDATED_FR = "6 novembre 2026";
+const PRIVACY_LAST_UPDATED_EN = "6 November 2026";
 
 const CONTACT_ITEMS_FR = [
   `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site (catégorie « RGPD » pour vos données)`,
@@ -418,12 +426,21 @@ export const PRIVACY_POLICY: BilingualDoc = inBothLanguages<LegalDoc>({
         },
         {
           kind: "subhead",
+          text: frEn("Salons vocaux d'équipe des matchs", "Team voice channels for matches"),
+        },
+        {
+          kind: "p",
+          text: frEn("Dans les tournois BlueGenji qui en ont l'option, le Bot crée sur le serveur Discord de l'association un salon vocal par équipe d'un match, au nom que le site lui transmet (le nom de l'équipe), et le supprime une fois rendu et vide. Il en garde une fiche : identifiant du salon, clé du match et de l'équipe (des numéros, aucun nom), heures de création et de rendu. Pour savoir si un salon est vide, il tient en mémoire, sans jamais l'enregistrer ni le transmettre au site, l'état vocal des membres du serveur de l'association (identifiant du membre et de sa session vocale, salon, micro, son, caméra ou partage d'écran), avec la fiche de membre que Discord y joint (dont pseudo, surnom, avatar et rôles) — pour les autres serveurs, seule cette fiche jointe est gardée en mémoire. Il ne compte personne et ne dit jamais au site qui se trouve dans un salon. Le détail figure au [paragraphe « Salons vocaux d'équipe » de la politique de confidentialité du site](/rgpd#salons-vocaux) (traitement T18).",
+            "In BlueGenji tournaments with that option, the Bot creates on the association's Discord server one voice channel per team of a match, under the name the website sends it (the team's name), and deletes it once handed back and empty. It keeps a record of it: channel ID, key of the match and team (numbers, no name), creation and hand-back times. To know whether a channel is empty, it holds in memory, without ever recording it or sending it to the website, the voice state of the members of the association's server (ID of the member and of their voice session, channel, microphone, sound, camera or screen sharing), with the member profile Discord attaches to it (including username, nickname, avatar and roles) — for other servers, only that attached profile is kept in memory. It counts no one and never tells the website who is in a channel. The details are in the [“Team voice channels” paragraph of the website's privacy policy](/rgpd#salons-vocaux) (processing activity T18)."),
+        },
+        {
+          kind: "subhead",
           text: frEn("Base légale", "Legal basis"),
         },
         {
           kind: "p",
-          text: frEn("Ces traitements reposent sur l'**intérêt légitime** de l'association (article 6.1.f du RGPD) : faire fonctionner le relais entre serveurs partenaires, le modérer et en mesurer l'activité. Les messages du site reposent sur la base légale de leur traitement d'origine, indiquée dans le registre du site : intérêt légitime pour les messages privés de match d'un joueur (horaire, rappels, « Match retiré »), les réglages du salon envoyés à ceux qui gèrent les engagées d'un match et l'avis envoyé à un caster dont l'inscription est retirée par un autre que lui, auxquels chacun s'oppose par l'interrupteur de « Mon profil » — le site garde ce choix au titre d'une obligation légale (article 6.1.c du RGPD), pour continuer d'honorer cette opposition ; exécution du service auquel le joueur s'inscrit pour son pseudo public dans l'annonce #live d'un tournoi individuel ; intérêt légitime de l'association à modérer son serveur pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, supprimée sur demande.",
-            "This processing is based on the association's **legitimate interest** (Article 6(1)(f) GDPR): running the relay between partner servers, moderating it and measuring its activity. Messages from the website rely on the legal basis of their original processing, set out in the website's register: legitimate interest for a player's match direct messages (time, reminders, “Match retiré”), the lobby settings sent to those who manage the entrants of a match and the notice sent to a caster whose registration someone else removes, which each of them objects to with the switch in “My profile” — the website keeps that choice under a legal obligation (Article 6(1)(c) GDPR), to keep honouring that objection; performance of the service the player registers for, for their public username in the #live announcement of a solo tournament; the association's legitimate interest in moderating its server for the AutoMod alert of such an announcement when blocked or flagged, deleted on request."),
+          text: frEn("Ces traitements reposent sur l'**intérêt légitime** de l'association (article 6.1.f du RGPD) : faire fonctionner le relais entre serveurs partenaires, le modérer et en mesurer l'activité. Les salons vocaux d'équipe reposent aussi sur son intérêt légitime (bon déroulement des tournois). Les messages du site reposent sur la base légale de leur traitement d'origine, indiquée dans le registre du site : intérêt légitime pour les messages privés de match d'un joueur (horaire, rappels, « Match retiré »), les réglages du salon envoyés à ceux qui gèrent les engagées d'un match et l'avis envoyé à un caster dont l'inscription est retirée par un autre que lui, auxquels chacun s'oppose par l'interrupteur de « Mon profil » — le site garde ce choix au titre d'une obligation légale (article 6.1.c du RGPD), pour continuer d'honorer cette opposition ; exécution du service auquel le joueur s'inscrit pour son pseudo public dans l'annonce #live d'un tournoi individuel ; intérêt légitime de l'association à modérer son serveur pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, supprimée sur demande.",
+            "This processing is based on the association's **legitimate interest** (Article 6(1)(f) GDPR): running the relay between partner servers, moderating it and measuring its activity. Team voice channels also rest on its legitimate interest (smooth running of tournaments). Messages from the website rely on the legal basis of their original processing, set out in the website's register: legitimate interest for a player's match direct messages (time, reminders, “Match retiré”), the lobby settings sent to those who manage the entrants of a match and the notice sent to a caster whose registration someone else removes, which each of them objects to with the switch in “My profile” — the website keeps that choice under a legal obligation (Article 6(1)(c) GDPR), to keep honouring that objection; performance of the service the player registers for, for their public username in the #live announcement of a solo tournament; the association's legitimate interest in moderating its server for the AutoMod alert of such an announcement when blocked or flagged, deleted on request."),
         },
       ],
     },
@@ -448,6 +465,8 @@ export const PRIVACY_POLICY: BilingualDoc = inBothLanguages<LegalDoc>({
               "**Memberships and scheduled reminders**: until the reminder's last sending (for a membership, its expiry date) or its deletion, and at the latest until the Bot leaves the server where they were recorded, which erases them — including a departure while the Bot is down, caught up when it restarts."),
             frEn(`**Salon de journal privé du staff** (et messages privés du Bot à son titulaire) : un an (${BOT_STAFF_LOG_RETENTION_DAYS} jours) ; les messages du Bot plus anciens sont supprimés par le ménage de nuit, par lots (plusieurs nuits pour un arriéré important), sauf le motif publié au salon d'une exclusion en cours — et, pour une exclusion prononcée à partir de cette règle, son avis et la copie de son motif en message privé —, supprimés à sa levée.`,
               `**Staff private log channel** (and the Bot's direct messages to its owner): one year (${BOT_STAFF_LOG_RETENTION_DAYS} days); older messages from the Bot are deleted by the nightly clean-up, in batches (several nights for a large backlog), except the reason posted in the channel for an exclusion still in force — and, for an exclusion issued from this rule on, its notice and the copy of its reason by direct message —, deleted when it is lifted.`),
+            frEn(`**Salons vocaux d'équipe** : le salon est supprimé dès qu'il est vide une fois rendu, au plus tard ${VOICE_BOT_RELEASED_MAX_HOURS} heures et ${VOICE_BOT_SWEEP_MINUTES} minutes après son rendu même occupé ; jamais rendu, il est supprimé s'il est vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise ; sa fiche part avec lui, ou est oubliée ${VOICE_BOT_ABANDONED_MAX_HOURS} heures après sa création ou sa reprise si le Bot ne peut plus lire le salon, et reste sans limite tant qu'un salon jamais rendu reste occupé ou que Discord empêche sa suppression. L'état vocal et les fiches de membre ne sont tenus qu'en mémoire, à jour de Discord, et perdus à l'arrêt du Bot. Le journal d'audit de Discord garde la création et la suppression de chaque salon, avec son nom, pour la durée que Discord fixe.`,
+              `**Team voice channels**: the channel is deleted as soon as it is empty once handed back, within ${VOICE_BOT_RELEASED_MAX_HOURS} hours and ${VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest even if occupied; never handed back, it is deleted if it is empty ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation or its reuse; its record goes with it, or is forgotten ${VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation or its reuse if the Bot can no longer read the channel, and stays with no limit while a channel never handed back stays occupied or while Discord prevents its deletion. Voice state and member profiles are only held in memory, kept up to date by Discord, and lost when the Bot stops. Discord's audit log keeps the creation and deletion of each channel, with its name, for the period Discord sets.`),
             frEn("**Journaux du serveur** : selon leur rotation automatique.",
               "**Server logs**: according to their automatic rotation."),
             frEn("**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur ; supprimées sur demande de l'équipe ou du joueur concerné (formulaire « Signaler un problème » du site, catégorie RGPD). Une annonce bloquée ou signalée par une règle AutoMod : son alerte reste dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs, et est supprimée sur demande de la même façon.",
@@ -484,6 +503,8 @@ export const PRIVACY_POLICY: BilingualDoc = inBothLanguages<LegalDoc>({
               "Members of the referee role of every server that has set one, for the website's referee alerts."),
             frEn("Les membres du serveur Discord de l'association, qui lisent dans le salon #live l'annonce des matchs diffusés.",
               "Members of the association's Discord server, who read the announcement of streamed matches in the #live channel."),
+            frEn("Les membres du serveur Discord de l'association autorisés dans la catégorie des matchs, qui voient les salons vocaux d'équipe et leurs occupants, et son administration, qui lit dans le journal d'audit de Discord la création et la suppression de chaque salon, avec son nom.",
+              "Members of the association's Discord server allowed in the match category, who see the team voice channels and their occupants, and its administration, which reads in Discord's audit log the creation and deletion of each channel, with its name."),
             frEn("Les modérateurs du serveur Discord de l'association : si une règle AutoMod de Discord bloque ou signale une annonce #live, son texte (pseudo public compris en tournoi individuel) peut parvenir au salon d'alertes de modération du serveur.",
               "Moderators of the association's Discord server: if a Discord AutoMod rule blocks or flags a #live announcement, its text (including the public username in a solo tournament) may reach the server's moderation alert channel."),
             frEn("Les administrateurs de tout serveur où le Bot est installé, et les titulaires du rôle d'administration du Bot que chaque serveur désigne (**/set-bot-admin**), qui peuvent lire la liste des exclusions (commande **/ban-list**, réponse visible du seul demandeur).",
