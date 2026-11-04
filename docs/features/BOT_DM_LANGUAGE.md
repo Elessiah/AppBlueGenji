@@ -56,9 +56,13 @@ la langue du compte **destinataire**, celui qui porte déjà ce Discord
 (`accountLocaleForDiscordId`), pour la connexion comme pour la certification ou
 le changement de tag — jamais celle du demandeur : un tag saisi n'est pas encore
 prouvé et peut désigner quelqu'un d'autre. Sans compte rattaché, bilingue. La
-langue est lue pendant l'insertion du défi. `purpose: "handle"` (certification ou
+langue n'est lue qu'**après** l'insertion du défi : un refus de quota ne dépend
+pas de l'existence d'un compte rattaché. `purpose: "handle"` (certification ou
 changement de tag) fait rédiger au bot un texte qui dit que le code rattache un
 tag et ne connecte pas ; `"login"` par défaut (un bot plus ancien l'ignore).
+L'usage est aussi gardé sur le défi (`bg_discord_login_challenges.purpose`,
+`LOGIN` / `HANDLE`) : un code de certification est refusé à la connexion, et
+l'inverse, sans consommer d'essai (`NULL` : défi d'avant la colonne, accepté).
 
 ## Ce que vaut une `locale` absente
 
