@@ -149,6 +149,21 @@ describe("kind et catégories", () => {
     expect(postedMessages()).toHaveLength(2);
   });
 
+  it("sendBotLog_alertFromAnotherModuleCopy_burstStateSharedOnGlobalThis", async () => {
+    jest.useFakeTimers();
+    let otherCopy: typeof sendBotLog = sendBotLog;
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      otherCopy = (require("@/lib/server/bot-integration") as { sendBotLog: typeof sendBotLog }).sendBotLog;
+    });
+    const shared = (globalThis as typeof globalThis & { __bgBotLogAlertFlushes?: Set<string> }).__bgBotLogAlertFlushes;
+    otherCopy("deux", { tournamentId: 3, category: "staff-removal" });
+    // La rafale est visible depuis la copie principale : un seul vidage sera posé.
+    expect(shared?.has("tournament:3")).toBe(true);
+    await settle();
+    expect(postedMessages()).toHaveLength(1);
+  });
+
   it("sendBotLog_logCategory_waitsForTheWindow", async () => {
     jest.useFakeTimers();
     sendBotLog("cartes", { tournamentId: 3, category: "maps" });
