@@ -357,6 +357,27 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     ]);
   });
 
+  it("dispatchMatchVoiceChannels_releaseRefusedPastBotNet_closesRow", async () => {
+    // Refus sans fin : passé le filet de 48 h du bot, la ligne se clôt et pourra être purgée.
+    const { writes } = database({ releasable: [{ ...releasable, bot_expired: 1 }] });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "failed", code: "VOICE_DISCORD_ERROR" });
+    await dispatchMatchVoiceChannels();
+    expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()"))).toHaveLength(1);
+    expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toHaveLength(0);
+  });
+
+  it("dispatchMatchVoiceChannels_releaseOutagePastBotNet_keepsRowOpen", async () => {
+    // Bot injoignable : rien ne dit que son filet a tourné, la ligne attend.
+    const { writes } = database({ releasable: [{ ...releasable, bot_expired: 1 }] });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "failed", code: "BOT_CIRCUIT_OPEN" });
+    await dispatchMatchVoiceChannels();
+    expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()"))).toHaveLength(0);
+  });
+
+  it("dispatchMatchVoiceChannels_releaseQuery_flagsRowsPastBotNet", () => {
+    expect(RELEASABLE_SQL).toContain("v.created_at < NOW() - INTERVAL 48 HOUR");
+  });
+
   it("dispatchMatchVoiceChannels_releaseTransportOutage_logsNoRefusal", async () => {
     // Coupe-circuit ouvert : le bot n'a rien refusé, la ligne attend seulement son délai.
     const { writes } = database({ releasable: [releasable] });
