@@ -628,9 +628,13 @@ puis renomme l'entrée solo (`syncSoloEntryIdentityOn`). Toute lecture qui joint
   (décision R3 du 2026-11-04, dite sur l'écran de réactivation FR + EN) ; ces
   dix essais épuisés, le compte revit sous son pseudo d'emprunt.
 - **Journal à la réactivation** (décision R1) : `recordAccountReactivation`
-  remplace la ligne en attente par une ligne `reactivated: true` datée de la
-  réactivation (même rétention que les autres). Au rejeu, `replayDecision`
-  rend `REACTIVATE` si le compte est revenu en attente avec la sauvegarde —
+  remplace la ligne en attente par une ligne de réactivation, écrite
+  `{userId, accountCreatedAt, reactivatedAt}` **sans** `deletedAt` : une version
+  antérieure du site (retour arrière) l'écarte comme illisible au lieu d'y lire
+  une suppression définitive (même rétention que les autres). Au rejeu,
+  `replayDecision` rend `REACTIVATE` si le compte est revenu en attente avec la
+  sauvegarde **sur une demande antérieure à la réactivation** (une demande
+  refaite après tient : `ALREADY_DELETED`) —
   `replayAccountReactivation` le réactive (même écriture, sans ticket ni
   fenêtre, sans réécrire le journal) — et `ALREADY_ACTIVE` s'il est vivant.
   Entre demande et réactivation d'un même compte, la ligne la plus récente

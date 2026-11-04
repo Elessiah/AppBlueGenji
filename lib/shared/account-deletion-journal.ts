@@ -71,32 +71,50 @@ function isFinalEntry(entry: AccountDeletionEntry): boolean {
   return entry.pending !== true && entry.reactivated !== true;
 }
 
-/** Une ligne JSON par suppression, terminée par un saut de ligne. */
+/**
+ * Une ligne JSON par suppression, terminée par un saut de ligne.
+ *
+ * Une réactivation s'écrit **sans** `deletedAt`, sous `reactivatedAt` : une
+ * version antérieure du site (retour arrière, vieux rejeu) exige `deletedAt` et
+ * écarte donc la ligne comme illisible, au lieu de la lire comme une
+ * suppression définitive et d'effacer un compte réactivé.
+ */
 export function formatJournalEntry(entry: AccountDeletionEntry): string {
-  return `${JSON.stringify({
-    userId: entry.userId,
-    accountCreatedAt: entry.accountCreatedAt,
-    deletedAt: entry.deletedAt,
-    ...(entry.pending ? { pending: true } : {}),
-    ...(entry.reactivated && !entry.pending ? { reactivated: true } : {}),
-  })}\n`;
+  const line =
+    entry.reactivated && !entry.pending
+      ? { userId: entry.userId, accountCreatedAt: entry.accountCreatedAt, reactivatedAt: entry.deletedAt }
+      : {
+          userId: entry.userId,
+          accountCreatedAt: entry.accountCreatedAt,
+          deletedAt: entry.deletedAt,
+          ...(entry.pending ? { pending: true } : {}),
+        };
+  return `${JSON.stringify(line)}\n`;
 }
 
-function isEntry(value: unknown): value is AccountDeletionEntry {
-  if (!value || typeof value !== "object") return false;
+function isIsoDate(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
+/** Ligne lue : suppression ou demande (`deletedAt`), ou réactivation (`reactivatedAt` seul). */
+function readEntry(value: unknown): AccountDeletionEntry | null {
+  if (!value || typeof value !== "object") return null;
   const v = value as Record<string, unknown>;
-  return (
+  const keyValid =
     typeof v.userId === "number" &&
     Number.isInteger(v.userId) &&
     v.userId > 0 &&
     typeof v.accountCreatedAt === "string" &&
-    v.accountCreatedAt.length > 0 &&
-    typeof v.deletedAt === "string" &&
-    Number.isFinite(Date.parse(v.deletedAt)) &&
-    (v.pending === undefined || typeof v.pending === "boolean") &&
-    (v.reactivated === undefined || typeof v.reactivated === "boolean") &&
-    !(v.pending === true && v.reactivated === true)
-  );
+    v.accountCreatedAt.length > 0;
+  if (!keyValid || v.reactivated !== undefined) return null;
+  const key = { userId: v.userId as number, accountCreatedAt: v.accountCreatedAt as string };
+  if (v.deletedAt === undefined) {
+    if (!isIsoDate(v.reactivatedAt) || v.pending !== undefined) return null;
+    return { ...key, deletedAt: v.reactivatedAt, reactivated: true };
+  }
+  if (!isIsoDate(v.deletedAt) || v.reactivatedAt !== undefined) return null;
+  if (v.pending !== undefined && typeof v.pending !== "boolean") return null;
+  return { ...key, deletedAt: v.deletedAt, ...(v.pending ? { pending: true } : {}) };
 }
 
 export interface ParsedJournal {
@@ -117,15 +135,9 @@ export function parseJournal(text: string): ParsedJournal {
     const line = raw.trim();
     if (!line) continue;
     try {
-      const parsed: unknown = JSON.parse(line);
-      if (isEntry(parsed)) {
-        entries.push({
-          userId: parsed.userId,
-          accountCreatedAt: parsed.accountCreatedAt,
-          deletedAt: parsed.deletedAt,
-          ...(parsed.pending ? { pending: true } : {}),
-          ...(parsed.reactivated ? { reactivated: true } : {}),
-        });
+      const parsed = readEntry(JSON.parse(line));
+      if (parsed) {
+        entries.push(parsed);
       } else {
         invalidLines += 1;
       }
@@ -205,6 +217,8 @@ export interface RestoredAccountRow {
   isDeleted: boolean;
   /** En attente de suppression (`is_deleted = 1` et `deletion_requested_at` posé) : réactivable. */
   pendingDeletion?: boolean;
+  /** `deletion_requested_at` en ISO 8601, quand il est posé. */
+  deletionRequestedAt?: string | null;
 }
 
 export type ReplayDecision =
@@ -237,7 +251,11 @@ export function replayDecision(
   if (row.createdAt !== entry.accountCreatedAt) return "OTHER_ACCOUNT";
   if (entry.reactivated) {
     if (!row.isDeleted) return "ALREADY_ACTIVE";
-    return row.pendingDeletion ? "REACTIVATE" : "ALREADY_DELETED";
+    // Seule une demande **antérieure** à la réactivation est défaite : une
+    // nouvelle demande, faite après, reste en attente.
+    const requestedAt = Date.parse(row.deletionRequestedAt ?? "");
+    const undone = row.pendingDeletion && requestedAt <= Date.parse(entry.deletedAt);
+    return undone ? "REACTIVATE" : "ALREADY_DELETED";
   }
   if (row.isDeleted) return "ALREADY_DELETED";
   return "REPLAY";

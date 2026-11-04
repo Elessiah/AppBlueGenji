@@ -228,16 +228,70 @@ describe("réactivation journalisée (décision R1)", () => {
     expect(parseJournal(formatJournalEntry(reactivated)).entries).toEqual([reactivated]);
   });
 
-  it("parseJournal_pendingAndReactivated_rejected", () => {
-    const line = JSON.stringify({ ...entry(), pending: true, reactivated: true });
+  // Revue sécurité #546, cycle 8 : une version antérieure exige `deletedAt` et
+  // écarte la ligne, au lieu d'y lire une suppression définitive.
+  it("formatJournalEntry_reactivatedEntry_writesReactivatedAtWithoutDeletedAt", () => {
+    expect(formatJournalEntry(reactivated)).toBe(
+      '{"userId":7,"accountCreatedAt":"2026-01-02 03:04:05","reactivatedAt":"2026-11-03T09:00:00.000Z"}\n',
+    );
+  });
+
+  it("parseJournal_deletedAtAndReactivatedAt_rejected", () => {
+    const line = JSON.stringify({ ...entry(), reactivatedAt: "2026-11-03T09:00:00.000Z" });
 
     expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
   });
 
-  it("replayDecision_reactivatedEntryPendingRow_reactivate", () => {
+  it("parseJournal_reactivatedAtWithPending_rejected", () => {
+    const line = JSON.stringify({ ...key, reactivatedAt: "2026-11-03T09:00:00.000Z", pending: true });
+
+    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+  });
+
+  it("parseJournal_legacyReactivatedFlag_rejected", () => {
+    const line = JSON.stringify({ ...entry(), reactivated: true });
+
+    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+  });
+
+  it("parseJournal_invalidReactivatedAt_rejected", () => {
+    const line = JSON.stringify({ ...key, reactivatedAt: "pas une date" });
+
+    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+  });
+
+  it("replayDecision_reactivatedEntryRequestBeforeReactivation_reactivate", () => {
     expect(
-      replayDecision(reactivated, { createdAt: "2026-01-02 03:04:05", isDeleted: true, pendingDeletion: true }),
+      replayDecision(reactivated, {
+        createdAt: "2026-01-02 03:04:05",
+        isDeleted: true,
+        pendingDeletion: true,
+        deletionRequestedAt: "2026-11-01T10:00:00.000Z",
+      }),
     ).toBe("REACTIVATE");
+  });
+
+  // Revue sécurité #546, cycle 8 : une nouvelle demande, postérieure, reste en attente.
+  it("replayDecision_reactivatedEntryRequestAfterReactivation_alreadyDeleted", () => {
+    expect(
+      replayDecision(reactivated, {
+        createdAt: "2026-01-02 03:04:05",
+        isDeleted: true,
+        pendingDeletion: true,
+        deletionRequestedAt: "2026-11-05T10:00:00.000Z",
+      }),
+    ).toBe("ALREADY_DELETED");
+  });
+
+  it("replayDecision_reactivatedEntryPendingWithoutRequestDate_alreadyDeleted", () => {
+    expect(
+      replayDecision(reactivated, {
+        createdAt: "2026-01-02 03:04:05",
+        isDeleted: true,
+        pendingDeletion: true,
+        deletionRequestedAt: null,
+      }),
+    ).toBe("ALREADY_DELETED");
   });
 
   it("replayDecision_reactivatedEntryAliveRow_alreadyActive", () => {

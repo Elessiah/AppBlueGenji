@@ -201,6 +201,16 @@ describe("replayAccountDeletions — réactivation (décision R1)", () => {
     expect(lines.join("\n")).toContain("à réactiver");
   });
 
+  // Revue sécurité #546, cycle 8 : une demande refaite après la réactivation tient.
+  it("replayAccountDeletions_reactivatedEntryLaterRequest_notReactivated", async () => {
+    restoredDb({ 7: { ...pendingRow, deletion_requested_at: "2026-11-05 10:00:00" } });
+
+    const report = await replayAccountDeletions([reactivated], { log });
+
+    expect(replayAccountReactivation).not.toHaveBeenCalled();
+    expect(report).toMatchObject({ alreadyDeleted: 1, reactivated: 0 });
+  });
+
   it("replayAccountDeletions_reactivatedEntryAliveRow_alreadyActive", async () => {
     restoredDb({ 7: { created_at: CREATED, is_deleted: 0, deletion_requested_at: null } });
 

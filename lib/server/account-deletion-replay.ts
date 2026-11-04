@@ -1,5 +1,6 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { toIso } from "@/lib/server/serialization";
 import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
 import { requestAccountDeletion } from "@/lib/server/users/account-deletion-request";
 import { replayAccountReactivation } from "@/lib/server/users/account-reactivation";
@@ -111,6 +112,7 @@ async function readRestoredRow(
     createdAt: String(row.created_at),
     isDeleted,
     pendingDeletion: isDeleted && row.deletion_requested_at !== null,
+    deletionRequestedAt: toIso(row.deletion_requested_at),
   };
 }
 
