@@ -439,7 +439,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // (`docs/features/MATCH_VOICE.md`) : le site ne compte plus personne, le
     // nombre et sa date partent. Déjà jouée ou base neuve :
     // `ER_CANT_DROP_FIELD_OR_KEY`, ignoré comme toute instruction déjà passée.
-    `ALTER TABLE bg_match_voice_channels DROP COLUMN members, DROP COLUMN counted_at`,
+    // `ALGORITHM=COPY` : la table est reconstruite, les nombres quittent ses pages
+    // (un retrait « instantané » de MariaDB les y laisserait jusqu'à la réécriture).
+    `ALTER TABLE bg_match_voice_channels DROP COLUMN members, DROP COLUMN counted_at, ALGORITHM=COPY`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

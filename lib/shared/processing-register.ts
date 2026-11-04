@@ -1566,8 +1566,8 @@ const ACTIVITIES = registerActivities({
       ...COMMON_SECURITY,
       frEn("Aucune présence : ni identifiant, ni pseudo, ni nombre des personnes présentes n'est demandé au bot, reçu ou journalisé par le site",
         "No presence data: neither the identifier, the username nor the number of the people present is requested from the bot, received or logged by the site"),
-      frEn(`Le bot n'est appelé que par le balayage du serveur, au plus une fois toutes les ${VOICE_SWEEP_THROTTLE_SECONDS} secondes (aussitôt quand l'arbitrage change l'option), jamais pour chaque lecteur, et seulement pour créer un salon, le redemander (une fois par minute au plus, ce qui en ouvre un neuf s'il a été supprimé) ou le rendre — jamais pour savoir qui s'y trouve, ni combien`,
-        `The bot is only called by the server's sweep, at most once every ${VOICE_SWEEP_THROTTLE_SECONDS} seconds (immediately when referees change the option), never for each viewer, and only to create a channel, ask for it again (at most once a minute, which opens a new one if it was deleted) or hand it back — never to know who is in it, nor how many`),
+      frEn(`Le bot n'est appelé que par le balayage du serveur, au plus une fois toutes les ${VOICE_SWEEP_THROTTLE_SECONDS} secondes (aussitôt quand l'arbitrage change l'option), jamais pour chaque lecteur, et seulement pour créer un salon, le redemander (environ une fois par minute, dix secondes après un échec, ce qui en ouvre un neuf s'il a été supprimé) ou le rendre — jamais pour savoir qui s'y trouve, ni combien`,
+        `The bot is only called by the server's sweep, at most once every ${VOICE_SWEEP_THROTTLE_SECONDS} seconds (immediately when referees change the option), never for each viewer, and only to create a channel, ask for it again (about once a minute, ten seconds after a failure, which opens a new one if it was deleted) or hand it back — never to know who is in it, nor how many`),
     ],
   },
 });
