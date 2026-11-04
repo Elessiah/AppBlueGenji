@@ -304,6 +304,37 @@ describe("publicTournamentSnapshot", () => {
     mockedSnapshot.mockRejectedValue(new Error("ECONNREFUSED"));
     await expect(publicTournamentSnapshot(5, 0, CLIENT)).resolves.toBeNull();
   });
+
+  it("publicTournamentSnapshot_freshCopy_doesNotConsultAdmit", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot());
+    await getSpectatorPayload(5, 0, CLIENT);
+    const admit = jest.fn(() => false);
+
+    const actual = await publicTournamentSnapshot(5, 0, CLIENT, admit);
+
+    expect(actual).not.toBeNull();
+    expect(admit).not.toHaveBeenCalled();
+  });
+
+  it("publicTournamentSnapshot_coldAndRefused_returnsNullWithoutLoading", async () => {
+    const admit = jest.fn(() => false);
+
+    const actual = await publicTournamentSnapshot(5, 0, CLIENT, admit);
+
+    expect(actual).toBeNull();
+    expect(admit).toHaveBeenCalledTimes(1);
+    expect(mockedSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("publicTournamentSnapshot_coldAndAdmitted_builds", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot());
+    const admit = jest.fn(() => true);
+
+    const actual = await publicTournamentSnapshot(5, 0, CLIENT, admit);
+
+    expect(actual).not.toBeNull();
+    expect(admit).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("isSpectatorTournamentPublic", () => {
