@@ -645,6 +645,11 @@ describe("politique du bot — salons vocaux d'équipe (EF-43, registre T18)", (
     expect(en).toContain("It counts no one and never tells the website who is in a channel.");
   });
 
+  it("privacyPolicy_voiceChannels_heldAtAllTimesWhateverTheOptionFrAndEn", () => {
+    expect(fr).toContain("il tient en mémoire en permanence, que l'option soit allumée ou non dans un tournoi");
+    expect(en).toContain("it holds in memory at all times, whether or not a tournament has the option on");
+  });
+
   it("privacyPolicy_voiceChannels_legitimateInterestFrAndEn", () => {
     expect(fr).toContain("Les salons vocaux d'équipe reposent aussi sur son intérêt légitime (bon déroulement des tournois).");
     expect(en).toContain("Team voice channels also rest on its legitimate interest (smooth running of tournaments).");
