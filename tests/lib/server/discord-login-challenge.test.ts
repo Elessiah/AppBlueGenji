@@ -97,7 +97,7 @@ function fakeDb(
       // Lecture par jeton de défi : la clause `NOT EXISTS` écarte un défi
       // qu'un plus récent a remplacé.
       if (q.startsWith("SELECT c.id, c.discord_id, c.code_hash")) {
-        const matches = state !== null && state.lookup_hash === params[0] && !newerChallengeExists;
+        const matches = state !== null && state.lookup_hash === params[0] && state.purpose === params[1] && !newerChallengeExists;
         return [matches ? [{ ...state }] : [], []];
       }
 
@@ -500,7 +500,7 @@ describe("consumeDiscordLoginChallenge — le défi désigné par son jeton", ()
     ) as [string, unknown[]];
     const read = sql.replace(/\s+/g, " ");
     // Le jeton n'est jamais écrit ni cherché en clair : seule son empreinte l'est.
-    expect(params).toEqual([hash(TOKEN)]);
+    expect(params).toEqual([hash(TOKEN), "LOGIN"]);
     expect(read).toContain("NOT EXISTS");
     expect(read).toContain("newer.id > c.id");
   });
@@ -563,6 +563,18 @@ describe("consumeDiscordLoginChallenge — usage du code (EF-14)", () => {
 
     await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toBeNull();
     expect(state!.attempts).toBe(0);
+  });
+
+  it("consumeDiscordLoginChallenge_tokenRead_scopedToRequestedPurpose", async () => {
+    const { execute } = fakeDb(pendingChallenge({ id: 9, purpose: "HANDLE" }));
+
+    await consumeDiscordLoginChallenge(TOKEN, "424242", "handle");
+
+    const [sql, params] = execute.mock.calls.find(([q]) =>
+      String(q).replace(/\s+/g, " ").trim().startsWith("SELECT c.id"),
+    ) as [string, unknown[]];
+    expect(sql.replace(/\s+/g, " ")).toContain("WHERE c.lookup_hash = ? AND c.purpose = ?");
+    expect(params).toEqual([hash(TOKEN), "HANDLE"]);
   });
 
   it("consumeDiscordLoginChallenge_loginCodeAtCertification_rejected", async () => {
