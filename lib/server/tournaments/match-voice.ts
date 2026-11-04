@@ -323,6 +323,8 @@ const BOT_TRANSPORT_FAILURES: ReadonlySet<string> = new Set([
   "BOT_VOICE_TIMEOUT",
   "INTERNAL_ERROR",
   "INTERNAL_ROUTE_NOT_FOUND",
+  // Réponse sans code lisible (page d'erreur d'un proxy, bot arrêté derrière lui).
+  "BOT_INTERNAL_REQUEST_FAILED",
 ]);
 
 async function releaseChannels(touched: Set<number>): Promise<void> {

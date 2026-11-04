@@ -122,15 +122,9 @@ async function safeReadError(response: Response): Promise<string> {
       return payload.error;
     }
   } catch {
-    // ignore json parse failures and fallback to plain text
+    // Corps illisible (page HTML d'un proxy, texte libre) : jamais recopié comme code.
   }
-
-  try {
-    const text = (await response.text()).trim();
-    return text || "BOT_INTERNAL_REQUEST_FAILED";
-  } catch {
-    return "BOT_INTERNAL_REQUEST_FAILED";
-  }
+  return "BOT_INTERNAL_REQUEST_FAILED";
 }
 
 export async function fetchBotStats(): Promise<BotStats> {
@@ -1012,8 +1006,8 @@ async function postLiveAnnouncement(body: Record<string, unknown>): Promise<Live
 /*
  * ── Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) ─────────────────
  * Contrat du bot : `doc/internal-api.md` § « Salons vocaux d'équipe des matchs ».
- * Le site ne demande jamais que des **nombres** : aucun identifiant ni pseudo
- * de membre ne transite, rien n'est journalisé de ce qui est compté.
+ * Le site ne demande que de créer ou de rendre un salon, jamais qui s'y trouve
+ * ni combien : aucun identifiant ni pseudo de membre ne transite.
  */
 
 /** Délai d'un appel « salon vocal » : création et suppression passent par Discord. */
@@ -1050,11 +1044,13 @@ async function voiceCall<T>(
       signal: AbortSignal.timeout(BOT_VOICE_FETCH_TIMEOUT_MS),
     });
     if (response.status === 404) {
-      recordSuccess();
       const code = await safeReadError(response);
-      // Seul « salon non suivi » vaut « déjà rendu » : une route absente (bot d'une autre
-      // version) fermerait sinon des lignes dont le salon reste sur Discord.
-      return code === "VOICE_CHANNEL_NOT_TRACKED" ? { kind: "gone", code } : { kind: "failed", code };
+      // Seul « salon non suivi » vaut « déjà rendu » (et prouve un bot sain) : une route absente
+      // (bot d'une autre version) ou un 404 d'un autre service fermerait sinon des lignes dont
+      // le salon reste sur Discord. Ces 404-là ne comptent ni pour ni contre le coupe-circuit.
+      if (code !== "VOICE_CHANNEL_NOT_TRACKED") return { kind: "failed", code };
+      recordSuccess();
+      return { kind: "gone", code };
     }
     if (!response.ok) {
       // Un refus du bot lui-même (permission, catégorie, Discord) n'est pas une
