@@ -1573,7 +1573,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Les salons vocaux d'équipe ne retiennent plus le lancement d'un match, et le bot ne compte plus les personnes présentes : le site ne garde, pour chaque salon, que son identifiant et ses horaires — ni qui s'y trouve, ni combien.",
     details: [
-      "Ce qui change : un match qui a ses salons se lance comme dans tout autre tournoi, qu'ils soient pleins ou non ; sa page dit seulement si chaque salon est ouvert. Le nombre de personnes présentes n'est plus demandé au bot, et celui déjà gardé est effacé avec sa colonne.",
+      `Ce qui change : un match qui a ses salons se lance comme dans tout autre tournoi, qu'ils soient pleins ou non ; sa page dit seulement si chaque salon est ouvert. Le nombre de personnes présentes n'est plus demandé au bot, et celui déjà gardé est effacé avec sa colonne (hors les copies de sauvegarde chiffrées, ${BACKUP_RETENTION_DAYS} jours au plus).`,
       "Ce qui reste : pour savoir si un salon est vide et le supprimer, le bot tient toujours en mémoire, sans l'enregistrer, l'état vocal des membres du serveur Discord de l'association ; rien de nouveau n'est collecté. Le salon est aussi rendu quand une entrée en tournoi individuel ou une équipe fantôme entre dans le match. C'est toujours au titre de l'intérêt légitime (bon déroulement des tournois).",
     ],
   },
