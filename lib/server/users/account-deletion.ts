@@ -4,10 +4,14 @@ import {
   type AccountDeletionPlan,
   accountDeletionPlan,
   type AccountTrace,
+  isReactivationWindowOpen,
   type SoloRegistrationFact,
   withdrawableSoloRegistrations,
 } from "@/lib/shared/account-deletion";
 import { isReferencedRowError } from "@/lib/server/mysql-errors";
+import { avatarFileLocations } from "@/lib/server/logo-quarantine";
+import { blockImageHashes, hashImageFiles } from "@/lib/server/blocked-images";
+import { unlink } from "node:fs/promises";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { deleteStoredImage } from "@/lib/server/image-upload";
@@ -17,6 +21,7 @@ import { playedMatchSql } from "@/lib/shared/ranking";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
+import { dropDeletionHold, readDeletionHold } from "./account-deletion-hold";
 
 /*
  * Suppression de son compte par le joueur : ce qu'elle emportera (le plan,
@@ -167,9 +172,34 @@ export async function listSoloRegistrationTournamentIds(runner: SqlRunner, userI
 }
 
 /**
+ * Les tournois dont un match nomme le compte (caster, lien de chaîne, arbitre),
+ * par id croissant : `withdrawUserCasts` y verrouille des matchs, donc la ligne
+ * du tournoi se prend **avant**, comme partout (tournoi, puis match).
+ */
+export async function listCastTournamentIds(runner: SqlRunner, userId: number): Promise<number[]> {
+  const [rows] = await runner.execute<(RowDataPacket & { tournament_id: number })[]>(
+    `SELECT m.tournament_id FROM bg_matches m JOIN bg_match_casters c ON c.match_id = m.id WHERE c.user_id = ?
+     UNION
+     SELECT m.tournament_id FROM bg_matches m JOIN bg_match_streams s ON s.match_id = m.id WHERE s.link_user_id = ?
+     UNION
+     SELECT tournament_id FROM bg_matches WHERE referee_user_id = ?
+     ORDER BY tournament_id`,
+    [userId, userId, userId],
+  );
+  return rows.map((row) => Number(row.tournament_id));
+}
+
+/** Plusieurs listes de tournois en une, sans doublon, par id croissant : l'ordre de prise des verrous. */
+export function mergeTournamentIds(...lists: readonly (readonly number[])[]): number[] {
+  return [...new Set(lists.flat())].sort((a, b) => a - b);
+}
+
+/**
  * Les inscriptions de l'entrée solo du compte, avec ce qui décide de leur sort
  * (`withdrawableSoloRegistrations`) : les dates du tournoi et la présence d'un
- * match qui nomme l'entrée.
+ * match qui nomme l'entrée **dans ce tournoi** (l'entrée solo est unique pour
+ * tous les tournois du compte : un tournoi passé ne bloque pas le retrait d'un
+ * tournoi à venir).
  */
 export async function loadSoloRegistrations(runner: SqlRunner, userId: number): Promise<SoloRegistrationFact[]> {
   const [rows] = await runner.execute<(RowDataPacket & {
@@ -184,8 +214,9 @@ export async function loadSoloRegistrations(runner: SqlRunner, userId: number): 
   })[]>(
     `SELECT r.tournament_id, r.team_id, t.state, t.finished_at,
             t.registration_open_at, t.registration_close_at, t.start_at,
-            (EXISTS (SELECT 1 FROM bg_matches m WHERE m.team1_id = s.id)
-              OR EXISTS (SELECT 1 FROM bg_matches m WHERE m.team2_id = s.id)) AS has_match
+            (EXISTS (SELECT 1 FROM bg_matches m WHERE m.team1_id = s.id AND m.tournament_id = r.tournament_id)
+              OR EXISTS (SELECT 1 FROM bg_matches m WHERE m.team2_id = s.id AND m.tournament_id = r.tournament_id))
+              AS has_match
        FROM bg_teams s
        JOIN bg_tournament_registrations r ON r.team_id = s.id
        JOIN bg_tournaments t ON t.id = r.tournament_id
@@ -276,7 +307,97 @@ export async function getAccountDeletionPlan(userId: number): Promise<AccountDel
  * a aucune et dont la ligne n'est retenue que par une équipe à transférer.
  */
 export async function deleteOwnAccount(userId: number): Promise<AccountDeletionPlan> {
+  const plan = await deleteAccountNow(userId, false);
+  if (plan === null) throw new Error("USER_NOT_FOUND");
+  return plan;
+}
+
+/**
+ * La suppression **définitive** d'un compte en attente (E4) : rien si la
+ * demande a été annulée (réactivation) ou si ses trente jours ne sont pas
+ * écoulés — relu sous le verrou du compte. Idempotent : un compte déjà effacé
+ * ou anonymisé n'est plus en attente. Rend `null` quand rien n'est fait.
+ */
+export async function finalizeAccountDeletion(userId: number): Promise<AccountDeletionPlan | null> {
+  return deleteAccountNow(userId, true);
+}
+
+/**
+ * Efface ou anonymise le compte selon le plan. À l'effacement, l'empreinte des
+ * avatars en quarantaine est bloquée d'abord (E6) ; anonymisé, le compte n'est
+ * plus en attente : la suppression est faite.
+ */
+async function applyDeletionMode(
+  connection: PoolConnection,
+  userId: number,
+  plan: AccountDeletionPlan,
+  soloWithdrawals: readonly SoloRegistrationFact[],
+  quarantine: QuarantinedAvatars,
+): Promise<{ withdrawal: { tournamentIds: number[] }; withdrawnFrom: number[]; quarantinedFiles: string[] }> {
+  if (plan.mode === "ERASE") {
+    await blockImageHashes(connection, quarantine.hashes);
+    const withdrawal = await eraseAccount(connection, userId, soloWithdrawals);
+    return {
+      withdrawal,
+      withdrawnFrom: soloWithdrawals.map((registration) => registration.tournamentId),
+      quarantinedFiles: quarantine.files,
+    };
+  }
+  const withdrawal = await anonymizeAccount(connection, userId);
+  await connection.execute(`UPDATE bg_users SET deletion_requested_at = NULL WHERE id = ? AND is_deleted = 1`, [userId]);
+  // Le vrai pseudo mis de côté pour la réactivation ne survit pas à la
+  // suppression définitive (l'effacement l'emporte par cascade).
+  await dropDeletionHold(connection, userId);
+  return { withdrawal, withdrawnFrom: [], quarantinedFiles: [] };
+}
+
+/** Une date relue de la base (`dateStrings`), ou son absence. */
+type StoredDate = Date | string | null;
+
+/** La suppression définitive est due : demande relevée il y a trente jours ou plus, compte toujours en attente. */
+function deletionIsDue(row: { is_deleted: 0 | 1; deletion_requested_at: StoredDate } | undefined): boolean {
+  return (
+    row !== undefined &&
+    Number(row.is_deleted) === 1 &&
+    row.deletion_requested_at !== null &&
+    !isReactivationWindowOpen(row.deletion_requested_at)
+  );
+}
+
+/** Les avatars en quarantaine du compte : leurs fichiers, et l'empreinte de ceux qui se lisent encore. */
+type QuarantinedAvatars = { files: string[]; hashes: string[] };
+
+/**
+ * Les fichiers d'avatar en quarantaine du compte (signalés, masqués) — ce que
+ * l'effacement emporte — et leurs empreintes (E6). Hors transaction : la lecture
+ * des fichiers ne tient aucun verrou.
+ */
+async function loadQuarantinedAvatars(runner: SqlRunner, userId: number): Promise<QuarantinedAvatars> {
+  const [rows] = await runner.execute<(RowDataPacket & { logo_url: string })[]>(
+    `SELECT logo_url FROM bg_logo_quarantines WHERE user_id = ? AND status = 'HIDDEN' ORDER BY id`,
+    [userId],
+  );
+  const files = rows
+    .map((row) => avatarFileLocations(row.logo_url, userId)?.quarantined ?? null)
+    .filter((file): file is string => file !== null);
+  return { files, hashes: await hashImageFiles(files) };
+}
+
+async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<AccountDeletionPlan | null> {
   const db = await getDatabase();
+  // Les tournois où l'entrée solo est inscrite, relevés **avant** de prendre une
+  // connexion : la relève en emprunte une autre au pool, et en tenir une pendant
+  // ce temps ferait attendre chaque suppression simultanée sur une connexion que
+  // les autres tiennent (pool saturé, plus aucune requête ne passe).
+  // Y compris ceux de ses casts et arbitrages : la transaction verrouille leurs
+  // matchs, et le tournoi se verrouille avant (`listCastTournamentIds`).
+  const soloTournaments = mergeTournamentIds(
+    await listSoloRegistrationTournamentIds(db, userId),
+    await listCastTournamentIds(db, userId),
+  );
+  // Les avatars en quarantaine, lus et hachés **avant** la connexion : un
+  // `readFile` par fichier ne se fait pas sous les verrous de la transaction.
+  const quarantine = await loadQuarantinedAvatars(db, userId);
   const connection = await db.getConnection();
   let plan: AccountDeletionPlan;
   // Le fichier de l'avatar, relevé **avant** l'effacement : la ligne partie, son
@@ -294,14 +415,14 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
   // Les tournois dont une inscription solo part avec le compte (D12) :
   // instantanés et aperçus à relire après le commit.
   let withdrawnFrom: number[] = [];
+  // Les avatars en quarantaine qu'emporte l'effacement : leur empreinte est
+  // bloquée dans la transaction (E6), le fichier part après le commit.
+  let quarantinedFiles: string[] = [];
 
   try {
-    // Les tournois où l'entrée solo est inscrite, relevés **avant** la
-    // transaction : leurs lignes s'y verrouillent en premier (ci-dessous). Une
-    // inscription faite entre ce relevé et le verrou tombe dans un tournoi non
-    // verrouillé, et retient alors la ligne (`withdrawableSoloRegistrations`).
-    const soloTournaments = await listSoloRegistrationTournamentIds(db, userId);
-
+    // Une inscription faite entre le relevé ci-dessus et le verrou tombe dans un
+    // tournoi non verrouillé, et retient alors la ligne
+    // (`withdrawableSoloRegistrations`).
     await connection.beginTransaction();
 
     // Les tournois d'abord, par id croissant, **avant toute lecture** : la
@@ -333,12 +454,24 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
       avatar_url: string | null;
       discord_id: string | null;
       created_at: string;
+      is_deleted: 0 | 1;
+      deletion_requested_at: StoredDate;
     })[]>(
-      `SELECT avatar_url, discord_id, created_at FROM bg_users WHERE id = ? FOR UPDATE`,
+      `SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at FROM bg_users WHERE id = ? FOR UPDATE`,
       [userId],
     );
-    if (locked.length === 0) throw new Error("USER_NOT_FOUND");
-    orphanedAvatar = toDiskUploadPath(locked[0].avatar_url);
+    if (locked.length === 0 && !onlyIfDue) throw new Error("USER_NOT_FOUND");
+    // La fenêtre de réactivation, relue sous le verrou : une reconnexion qui
+    // vient de réactiver le compte, ou une demande encore dans ses trente
+    // jours, ne tombe pas.
+    if (onlyIfDue && !deletionIsDue(locked[0])) {
+      await connection.rollback();
+      return null;
+    }
+    // Anonyme depuis la demande, le compte en attente n'a plus d'avatar sur sa
+    // ligne : son chemin attend dans le masque (`account-deletion-hold.ts`).
+    const hold = await readDeletionHold(connection, userId, true);
+    orphanedAvatar = toDiskUploadPath(locked[0].avatar_url ?? hold?.avatarUrl ?? null);
     accountCreatedAt = String(locked[0].created_at);
 
     const facts = await loadAccountDeletionFacts(connection, userId, new Set(soloTournaments));
@@ -348,10 +481,10 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
     // vers un compte, seulement une empreinte salée qu'on ne sait pas renverser
     // (`lib/server/site-visits-service.ts`).
 
-    const withdrawal = plan.mode === "ERASE"
-      ? await eraseAccount(connection, userId, facts.soloWithdrawals)
-      : await anonymizeAccount(connection, userId);
-    if (plan.mode === "ERASE") withdrawnFrom = facts.soloWithdrawals.map((registration) => registration.tournamentId);
+    const applied = await applyDeletionMode(connection, userId, plan, facts.soloWithdrawals, quarantine);
+    quarantinedFiles = applied.quarantinedFiles;
+    withdrawnFrom = applied.withdrawnFrom;
+    const withdrawal = applied.withdrawal;
     touchedTournaments = withdrawal.tournamentIds;
 
     // Les signalements qui le visent gardent leur cible — ils restent à
@@ -432,6 +565,7 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
   } catch {
     // Fichier verrouillé ou disque en lecture seule : un résidu, pas un échec.
   }
+  for (const file of quarantinedFiles) await unlink(file).catch(() => {});
 
   // Consignée **après** le commit, pour qu'une restauration de sauvegarde la
   // rejoue (`npm run replay:deletions`). Ne lève jamais : la suppression a eu

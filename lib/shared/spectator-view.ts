@@ -303,9 +303,9 @@ export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnaps
       // Ni pseudo ni empreinte de l'arbitre sans compte : « Arbitre désigné ».
       refereeKey: null,
       // Salons vocaux d'équipe : sans compte, le verrou seul (la carte dit
-      // « en attente de départ »), jamais le remplissage à la minute près.
+      // « en attente de départ »), jamais l'ouverture des salons.
       voice: match.voice
-        ? { team1Members: null, team2Members: null, team1State: "WAITING", team2State: "WAITING", pending: match.voice.pending }
+        ? { team1State: "WAITING", team2State: "WAITING", pending: match.voice.pending }
         : match.voice,
       casters: match.casters.map((caster, index) => ({
         ...caster,

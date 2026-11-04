@@ -1,5 +1,6 @@
 import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { isPseudoHeldByOther } from "./account-deletion-hold";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { isDuplicateEntryError } from "@/lib/server/mysql-errors";
 import { BATTLETAG_LOCKED, isBattletagLocked } from "@/lib/shared/battletag-lock";
@@ -35,7 +36,9 @@ async function assertPseudoAvailable(db: Pool, nextPseudo: string, userId: numbe
     `SELECT id FROM bg_users WHERE pseudo = ? AND id <> ? LIMIT 1`,
     [nextPseudo, userId],
   );
-  if (conflicts.length > 0) {
+  // Le pseudo d'un compte en attente de suppression lui reste réservé trente
+  // jours : sa réactivation le lui rend (`account-deletion-hold.ts`).
+  if (conflicts.length > 0 || (await isPseudoHeldByOther(db, nextPseudo, userId))) {
     throw new Error("PSEUDO_ALREADY_USED");
   }
 }

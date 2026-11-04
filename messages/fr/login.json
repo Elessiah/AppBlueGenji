@@ -123,7 +123,7 @@
       "referees": "les arbitres, tant que tu es inscrit à un tournoi non terminé ;",
       "match": "les membres des deux équipes de ton match, dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match ;",
       "asCaster": "si tu castes un match : ses deux équipes, ses autres casters et son arbitre désigné le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et les autres arbitres dès que ses adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page ;",
-      "asReferee": "si tu es l'arbitre désigné d'un match : ses deux équipes dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match, dans sa fenêtre « Contacts » et sur sa page — la règle des casters si tu le castes aussi (pour l'arbitrage : nécessaire au service une fois la version 7 des conditions acceptée, sans opposition propre — ton opposition d'arbitre, retenue, t'en retire toujours ; avant, intérêt légitime : tu peux t'y opposer par le formulaire de signalement) ;",
+      "asReferee": "si tu es l'arbitre désigné d'un match : ses deux équipes dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match, dans sa fenêtre « Contacts » et sur sa page — la règle des casters si tu le castes aussi (pour l'arbitrage : nécessaire au service une fois la version 9 des conditions acceptée, sans opposition propre — ton opposition d'arbitre, retenue, t'en retire toujours ; avant, intérêt légitime : tu peux t'y opposer par le formulaire de signalement) ;",
       "players": "les autres joueurs, seulement si tu coches « Tag Discord » dans tes réglages de confidentialité.",
       "footer": "Personne d'autre."
     },
@@ -135,5 +135,18 @@
       "launch": "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné ; la page du match reprend le BattleTag de ses contacts d'équipe (aux seules parties du match), de ses casters et de son arbitre désigné, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts ».",
       "footer": "Pour ne plus le partager du tout, efface-le de ton profil (s'il vient de Battle.net, détache d'abord Battle.net, après avoir ajouté un autre moyen de connexion si c'est le seul)."
     }
+  },
+  "reactivation": {
+    "title": "Réactiver ton compte ?",
+    "lead": "Tu as demandé la suppression de ton compte. Elle deviendra définitive le {date} : d'ici là, tu peux encore le réactiver.",
+    "kept": "Réactiver te rend ton compte : profil, statistiques, réglages, et ton pseudo et ton avatar, masqués partout depuis la demande (si ton pseudo a été pris entre-temps, il te revient, raccourci au besoin, suivi de « OG », par exemple « PseudoOG » — ou « PseudoOG2 »… si celui-ci l'est aussi, à défaut ton pseudo d'emprunt : tu peux le changer dans Mon profil). Un compte suspendu peut aussi être réactivé : il reste suspendu.",
+    "notUndone": "Ce qui a été fait à la demande n'est pas annulé : tu as quitté tes équipes (propriété transmise, équipe fantôme ou dissoute), tes tournois organisés ont changé d'organisateur quand quelqu'un pouvait les reprendre, tes inscriptions ont été retirées ou perdues par forfait, et tes casts, désignations d'arbitre, invitations et demandes d'adhésion en attente ont été retirés.",
+    "confirm": "Réactiver mon compte",
+    "cancel": "Ne pas réactiver",
+    "done": "Ton compte est réactivé.",
+    "doneSuspended": "Ton compte est réactivé, mais il reste suspendu : tu ne peux pas encore te connecter.",
+    "expired": "Ce lien de réactivation a expiré ou a déjà servi. Reconnecte-toi pour en obtenir un nouveau.",
+    "backToLogin": "Revenir à la connexion",
+    "failed": "La réactivation a échoué. Reconnecte-toi pour réessayer."
   }
 }

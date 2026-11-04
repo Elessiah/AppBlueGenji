@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/users/account-deletion");
+jest.mock("@/lib/server/users/account-deletion-request");
 jest.mock("@/lib/server/users/full-profile");
 jest.mock("@/lib/server/users/profile-update");
 
@@ -9,8 +9,11 @@ import { GET } from "@/app/api/profile/deletion/route";
 import { DELETE } from "@/app/api/profile/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { clearSession, expireSessionCookies } from "@/lib/server/auth";
-import { deleteOwnAccount, getAccountDeletionPlan } from "@/lib/server/users/account-deletion";
+import { requestAccountDeletion, getAccountDeletionRequestPlan } from "@/lib/server/users/account-deletion-request";
 import { authUser } from "../../../helpers/auth-user";
+
+/** La date de suppression définitive que rend la demande. */
+const FINAL_AT = "2026-12-05T10:00:00.000Z";
 
 /**
  * Les deux bouts du geste : la route qui **annonce** ce que la suppression
@@ -23,8 +26,8 @@ import { authUser } from "../../../helpers/auth-user";
  * Les deux rendent le **motif** avec le mode : « anonymisé » ne dit pas au
  * joueur ce qui retient sa ligne, et la phrase qu'il lira en dépend.
  */
-const modeMock = getAccountDeletionPlan as jest.MockedFunction<typeof getAccountDeletionPlan>;
-const deleteMock = deleteOwnAccount as jest.MockedFunction<typeof deleteOwnAccount>;
+const modeMock = getAccountDeletionRequestPlan as jest.MockedFunction<typeof getAccountDeletionRequestPlan>;
+const deleteMock = requestAccountDeletion as jest.MockedFunction<typeof requestAccountDeletion>;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -61,7 +64,7 @@ describe("GET /api/profile/deletion", () => {
 
 describe("DELETE /api/profile", () => {
   it("rend le plan que l'écriture a réellement appliqué", async () => {
-    deleteMock.mockResolvedValue({ mode: "ERASE", reason: null });
+    deleteMock.mockResolvedValue({ mode: "ERASE", reason: null, finalAt: FINAL_AT });
 
     const payload = await DELETE().then((r) => r.json());
 
@@ -69,7 +72,7 @@ describe("DELETE /api/profile", () => {
   });
 
   it("rend le motif quand la ligne est retenue", async () => {
-    deleteMock.mockResolvedValue({ mode: "ANONYMIZE", reason: "ORGANIZED_TOURNAMENTS" });
+    deleteMock.mockResolvedValue({ mode: "ANONYMIZE", reason: "ORGANIZED_TOURNAMENTS", finalAt: FINAL_AT });
 
     const payload = await DELETE().then((r) => r.json());
 
@@ -77,7 +80,7 @@ describe("DELETE /api/profile", () => {
   });
 
   it("ferme la session dans les deux cas", async () => {
-    deleteMock.mockResolvedValue({ mode: "ANONYMIZE", reason: "TOURNAMENTS" });
+    deleteMock.mockResolvedValue({ mode: "ANONYMIZE", reason: "TOURNAMENTS", finalAt: FINAL_AT });
 
     await DELETE();
 
@@ -88,14 +91,14 @@ describe("DELETE /api/profile", () => {
 
   it("une panne en fermant la session après coup ne change pas la suppression faite en échec", async () => {
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
-    deleteMock.mockResolvedValue({ mode: "ERASE", reason: null });
+    deleteMock.mockResolvedValue({ mode: "ERASE", reason: null, finalAt: FINAL_AT });
     jest.mocked(clearSession).mockRejectedValue(new Error("Connection lost: The server closed the connection."));
 
     const res = await DELETE();
 
     expect(res.status).toBe(200);
     const payload = await res.json();
-    expect(payload).toEqual({ deleted: true, mode: "ERASE", reason: null });
+    expect(payload).toEqual({ deleted: true, mode: "ERASE", reason: null, finalAt: FINAL_AT });
     // Le message interne reste au journal, jamais dans la réponse.
     expect(JSON.stringify(payload)).not.toContain("Connection lost");
     expect(log).toHaveBeenCalled();
@@ -115,7 +118,7 @@ describe("DELETE /api/profile", () => {
 describe("DELETE /api/profile — aucun message interne ne sort", () => {
   it.each(["ACCOUNT_STILL_REFERENCED", "USER_NOT_FOUND"])("rend le refus nommé %s tel quel", async (code) => {
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 42 }));
-    jest.mocked(deleteOwnAccount).mockRejectedValue(new Error(code));
+    jest.mocked(requestAccountDeletion).mockRejectedValue(new Error(code));
     const res = await DELETE();
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: code });
@@ -124,7 +127,7 @@ describe("DELETE /api/profile — aucun message interne ne sort", () => {
   it("remplace le message d'une panne par le code générique", async () => {
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 42 }));
-    jest.mocked(deleteOwnAccount).mockRejectedValue(
+    jest.mocked(requestAccountDeletion).mockRejectedValue(
       new Error("Deadlock found when trying to get lock; try restarting transaction"),
     );
     const res = await DELETE();

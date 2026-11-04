@@ -6,10 +6,10 @@ import { readMatchVoice } from "@/lib/server/tournaments/match-voice";
 import { can } from "@/lib/shared/permissions";
 
 /**
- * Salons vocaux d'équipe d'un match (`docs/features/MATCH_VOICE.md`) : le
- * nombre de personnes de chaque côté et l'état du verrou du lancement — la
- * porte REST de `TournamentMatch.voice`, que la page du match relit flux coupé
- * seulement. Connecté seulement ; un nombre, jamais qui.
+ * Salons vocaux d'équipe d'un match (`docs/features/MATCH_VOICE.md`) : l'état
+ * de chaque salon et celui du verrou du lancement, jamais le nombre de personnes
+ * — la porte REST de `TournamentMatch.voice`, que la page du match relit flux
+ * coupé seulement. Connecté seulement.
  *
  * La lecture ne sollicite jamais le bot : elle relance le balayage (étranglé),
  * qui compte et publie un changement par le flux.

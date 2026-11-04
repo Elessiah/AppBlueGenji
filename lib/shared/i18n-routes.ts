@@ -36,6 +36,8 @@ export const MIGRATED_ROUTES: readonly string[] = [
   // Lot 6 — connexion (page, refus, exposé de suspension, modale d'entrée).
   // `noindex` et hors sitemap dans les deux langues, comme avant.
   "/connexion",
+  // ERASURE-D2 — écran de réactivation d'un compte en attente de suppression.
+  "/connexion/reactivation",
   // Lot 5a — page du bot et sa documentation. Le guide sert `help.md` sous
   // `/en` ; les pages réservées au staff, françaises seulement, y sont
   // annoncées `lang="fr"` (`lib/shared/bot-doc-sections.ts`).

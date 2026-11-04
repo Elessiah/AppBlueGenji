@@ -41,7 +41,7 @@ salons pleins.
   qu'une observation du bot de moins de 5 minutes (`VOICE_OBSERVATION_FRESH_MINUTES`,
   `counted_at` / `failed_at`) : un « 5/5 » ancien (match reporté hors du quart d'heure
   puis revenu) ne lance rien et une panne ancienne ne lève plus le verrou — le
-  balayage suivant tranche. L'affichage garde le dernier nombre compté. Un comptage
+  balayage suivant tranche. Le nombre compté n'est montré à personne : la page ne dit que l'état de chaque salon. Un comptage
   redevenu frais compte comme un changement (publication + entretien rejoué).
 - **Relecture de la page du match** : **flux coupé seulement** (`isLive` de la fiche),
   toutes les 10 s, tant que la source qui fait foi porte `voice` (match dû, pas encore
@@ -66,14 +66,15 @@ salons pleins.
   (`UNTRUSTED_NAMES.md`), qui le nettoie encore.
 - **Affichage** : par équipe sur la page du match, pour ses parties et le staff, un
   état (`team1State` / `team2State`) : « bientôt ouvert » (`WAITING`, pas de salon),
-  « pas encore compté » (`UNCOUNTED`), « n/5 » puis « 5/5 · complet » (`COUNTED`),
-  « indisponible » (`FAILED`, panne fraîche : une note dit que le match n'attend pas
-  les salons). Tant que le verrou retient le match, le badge de lancement (carte et
-  faits clés) ajoute « salons vocaux à remplir ». Le nombre voyage dans
-  l'instantané commun : tout membre connecté qui suit le tournoi peut le lire (le
-  RGPD le dit) ; la vue spectateur retire les compteurs et ne garde que `pending`.
-  Un match dû dont aucun salon n'est encore créé se montre en attente, comme le
-  verrou le lit.
+  « ouvert » (`OPEN`, salon créé), « indisponible » (`FAILED`, panne fraîche : une
+  note dit que le match n'attend pas les salons). **Jamais le nombre de présents**
+  (décision de l'utilisateur du 2026-11-04, #546) : il reste en base
+  (`bg_match_voice_channels.members`) pour le seul verrou du lancement, et ne
+  voyage ni dans l'instantané, ni dans la porte REST ; une ancienne charge
+  (`COUNTED`/`UNCOUNTED`, nombres) se lit `OPEN`, sans ses nombres. Tant que le
+  verrou retient le match, le badge de lancement (carte et faits clés) ajoute
+  « salons vocaux à remplir ». La vue spectateur ne garde que `pending`. Un match
+  dû dont aucun salon n'est encore créé se montre en attente, comme le verrou le lit.
 - **File du balayage** : les matchs dus passent du moins récemment compté au plus
   récent (40 par passe) ; un rendu qui échoue repasse en fin de file (`failed_at`).
   Deux salons perdus d'affilée au comptage valent une panne.
@@ -88,6 +89,18 @@ l'arbitrage) ; à l'édition, elle passe par la route dédiée, pas par le `PATC
 
 Déclaré dans `PRIVACY_CHANGES` (`2026-11-salons-vocaux-equipe`), `/rgpd#salons-vocaux`
 et le registre (T18). Seul un nombre est gardé, jamais qui est présent.
+
+**Base juridique (décisions de l'utilisateur du 2026-11-04, qui remplacent la V6)** :
+dans un tournoi qui a l'option, réunir chaque équipe dans son salon fait partie du
+**règlement du tournoi** ; le comptage relève de l'**intérêt légitime** (bon
+déroulement des tournois) et, **anonyme** (un nombre, jamais qui ; il ne sert qu'à
+retenir le lancement et n'est montré à personne), n'a pas de droit d'opposition propre
+(R2) — dit par les conditions v9, T18, `/rgpd#salons-vocaux` et la règle commune
+(FR + EN).
+Depuis le 5 novembre 2026 (entrée `2026-11-salons-vocaux-regle-du-tournoi`) :
+T18, `/rgpd#salons-vocaux` (FR + EN), la règle commune « Salons vocaux d'équipe »
+de `/regles` (`messages/*/rules.json`, `{voiceLead}` / `{voiceCapacity}` lus de
+`match-voice.ts`) et la section « Contacts de match » des conditions v9.
 
 ## Côté bot
 

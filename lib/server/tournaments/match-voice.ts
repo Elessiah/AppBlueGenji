@@ -33,6 +33,7 @@ import {
   VOICE_ROW_RETENTION_DAYS,
   VOICE_SWEEP_THROTTLE_SECONDS,
   matchVoiceInfo,
+  voiceChannelFull,
   voiceChannelKey,
   voiceChannelsDue,
   voiceGatePending,
@@ -71,8 +72,8 @@ function channelState(row: VoiceRow | undefined, now: number): VoiceChannelState
 }
 
 /**
- * État **affiché** d'un salon : le dernier nombre compté, même ancien — un
- * « 0/5 » sur un salon plein dont le comptage date tromperait la page. La
+ * État **affiché** d'un salon (ouvert ou en panne — le nombre compté n'en sort
+ * pas : `matchVoiceInfo` n'en garde que l'état). La
  * panne, elle, se lit comme au verrou (récente seulement) : « indisponible,
  * le match n'attend pas » ne se dit que tant que le verrou est réellement levé.
  */
@@ -341,14 +342,16 @@ async function writeCount(
 
 /**
  * Empreinte de ce qu'un lecteur voit d'un salon **et de ce que le verrou en
- * croit** : un changement se publie et rejoue l'entretien des lancements. Un
+ * croit** : un changement se publie et rejoue l'entretien des lancements. Le
+ * nombre n'y entre que par « plein ou non » : il n'est montré à personne, et un
+ * départ ou une arrivée qui ne change rien au verrou ne publie rien. Un
  * comptage identique mais redevenu frais (5/5 ancien recompté 5/5) lève le
  * verrou : il compte comme un changement.
  */
 function stateKey(row: VoiceRow | undefined, now: number): string {
   const gate = channelState(row, now);
   if (!row || gate === null) return "none";
-  return `${row.channel_id ?? "-"}:${row.members ?? "-"}:${gate.members === null ? 0 : 1}:${gate.failed ? 1 : 0}`;
+  return `${row.channel_id ?? "-"}:${voiceChannelFull(gate) ? 1 : 0}:${gate.members === null ? 0 : 1}:${gate.failed ? 1 : 0}`;
 }
 
 /**

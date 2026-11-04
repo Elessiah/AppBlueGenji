@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/users/account-deletion");
+jest.mock("@/lib/server/users/account-deletion-request");
 jest.mock("@/lib/server/users/data-export");
 jest.mock("@/lib/server/users/full-profile");
 jest.mock("@/lib/server/users/profile-update");
@@ -12,11 +12,14 @@ import { GET as exportData } from "@/app/api/profile/export/route";
 import { DELETE } from "@/app/api/profile/route";
 import { clearSession, getCurrentUser } from "@/lib/server/auth";
 import { assertTermsAccepted, hasAcceptedCurrentTerms, needsTermsAcceptance } from "@/lib/server/terms-acceptance";
-import { deleteOwnAccount, getAccountDeletionPlan } from "@/lib/server/users/account-deletion";
+import { requestAccountDeletion, getAccountDeletionRequestPlan } from "@/lib/server/users/account-deletion-request";
 import { exportOwnData } from "@/lib/server/users/data-export";
 import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
 import { authUser } from "../../../helpers/auth-user";
 import { readSource } from "../../../helpers/read-source";
+
+/** La date de suppression définitive que rend la demande. */
+const FINAL_AT = "2026-12-05T10:00:00.000Z";
 
 /**
  * La fenêtre bloquante des conditions offre « Supprimer mon compte » (et lie
@@ -35,18 +38,18 @@ beforeEach(() => {
 
 describe("suppression et export sans conditions acceptées", () => {
   it("l'aperçu de la suppression répond", async () => {
-    jest.mocked(getAccountDeletionPlan).mockResolvedValue({ mode: "ERASE", reason: null });
+    jest.mocked(getAccountDeletionRequestPlan).mockResolvedValue({ mode: "ERASE", reason: null });
     const response = await previewDeletion();
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ mode: "ERASE", reason: null });
   });
 
   it("la suppression s'exécute et ferme la session", async () => {
-    jest.mocked(deleteOwnAccount).mockResolvedValue({ mode: "ANONYMIZE", reason: "TOURNAMENTS" });
+    jest.mocked(requestAccountDeletion).mockResolvedValue({ mode: "ANONYMIZE", reason: "TOURNAMENTS", finalAt: FINAL_AT });
     const response = await DELETE();
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ deleted: true, mode: "ANONYMIZE", reason: "TOURNAMENTS" });
-    expect(deleteOwnAccount).toHaveBeenCalledWith(7);
+    expect(requestAccountDeletion).toHaveBeenCalledWith(7);
     expect(clearSession).toHaveBeenCalledTimes(1);
   });
 

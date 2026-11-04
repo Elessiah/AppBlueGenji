@@ -183,7 +183,7 @@ const NOTICE_CASES: NoticeCase[] = [
     kind: "GHOST_CLAIM",
     locale: "fr",
     url: PROFILE_URL,
-    expected: "📨 BlueGenji — Un admin vous propose de reprendre l'équipe [Les Glaciers](https://site.test/profil#invitations)",
+    expected: "📨 BlueGenji — Un admin te propose de reprendre l'équipe [Les Glaciers](https://site.test/profil#invitations)",
   },
   {
     name: "formatTeamInviteNotice_ownershipFr_linksTeamPage",
@@ -232,7 +232,7 @@ describe("formatTeamInviteNotice", () => {
 
   it.each(["fr", "en"] as Locale[])("formatTeamInviteNotice_ghostClaim_%s_namesNoPerson", (locale) => {
     const text = formatTeamInviteNotice({ kind: "GHOST_CLAIM", teamName: "Les Glaciers", url: PROFILE_URL }, locale);
-    expect(text).toMatch(locale === "fr" ? /^📨 BlueGenji — Un admin vous propose/ : /^📨 BlueGenji — An admin offers you/);
+    expect(text).toMatch(locale === "fr" ? /^📨 BlueGenji — Un admin te propose/ : /^📨 BlueGenji — An admin offers you/);
   });
 
   it("formatTeamInviteNotice_mentionInTeamName_neutralized", () => {

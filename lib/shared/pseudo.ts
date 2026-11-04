@@ -23,3 +23,18 @@ export const PSEUDO_MAX_LENGTH = 40;
 export function pseudoLength(pseudo: string): number {
   return Array.from(pseudo).length;
 }
+
+/** Suffixe du pseudo rendu à la réactivation quand le vrai a été pris entre-temps (décision R3). */
+export const REACTIVATION_PSEUDO_SUFFIX = "OG";
+
+/**
+ * Le `attempt`-ième pseudo à essayer à la réactivation quand le vrai pseudo a
+ * été pris entre-temps (décision R3 du 2026-11-04) : « Pseudo » → « PseudoOG »,
+ * puis « PseudoOG2 », « PseudoOG3 »… Le début du pseudo est raccourci (en
+ * caractères, comme la colonne) pour que le tout tienne dans `PSEUDO_MAX_LENGTH`.
+ */
+export function reactivationPseudoCandidate(pseudo: string, attempt: number): string {
+  const suffix = attempt === 0 ? REACTIVATION_PSEUDO_SUFFIX : `${REACTIVATION_PSEUDO_SUFFIX}${attempt + 1}`;
+  const base = Array.from(pseudo).slice(0, PSEUDO_MAX_LENGTH - suffix.length).join("");
+  return `${base}${suffix}`;
+}

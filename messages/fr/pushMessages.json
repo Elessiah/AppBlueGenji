@@ -71,7 +71,7 @@
   },
   "ghostTeamClaim": {
     "title": "Reprise d'équipe proposée",
-    "body": "Un admin vous propose de reprendre l'équipe {team}."
+    "body": "Un admin te propose de reprendre l'équipe {team}."
   },
   "teamOwnershipTransfer": {
     "title": "Tu es propriétaire de ton équipe",

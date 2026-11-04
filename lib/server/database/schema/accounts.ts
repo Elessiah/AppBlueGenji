@@ -67,8 +67,14 @@ export async function createAccountTables(db: Pool): Promise<void> {
       referee_objection_at DATETIME NULL,
       is_admin TINYINT(1) NOT NULL DEFAULT 0,
       is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+      -- Suppression demandée, réversible 30 jours (ACCOUNT_DELETION.md) :
+      -- posée avec is_deleted = 1, remise à NULL à la réactivation comme à
+      -- l'effacement ou l'anonymisation définitifs.
+      deletion_requested_at DATETIME NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_bg_users_deletion_requested (deletion_requested_at),
+      INDEX idx_bg_users_is_deleted (is_deleted)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
@@ -106,6 +112,41 @@ export async function createAccountTables(db: Pool): Promise<void> {
       INDEX idx_bg_challenges_discord_id (discord_id),
       INDEX idx_bg_challenges_expires_at (expires_at),
       UNIQUE INDEX uniq_bg_challenges_lookup (lookup_hash)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // Billets de réactivation (`ACCOUNT_DELETION.md`, « Les 30 jours ») : une
+  // connexion sur un compte dont la suppression est demandée n'ouvre pas de
+  // session, elle pose ce billet (cookie `httpOnly`, jeton haché ici) que seul
+  // le bouton « Réactiver mon compte » consomme. Courte durée, purgé à chaque
+  // émission.
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_account_reactivation_tickets (
+      token_hash CHAR(64) PRIMARY KEY,
+      user_id BIGINT NOT NULL,
+      login_event VARCHAR(40) NOT NULL,
+      expires_at DATETIME NOT NULL,
+      INDEX idx_bg_reactivation_user (user_id),
+      INDEX idx_bg_reactivation_expires (expires_at),
+      CONSTRAINT fk_bg_reactivation_user FOREIGN KEY (user_id)
+        REFERENCES bg_users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // Ce que la demande de suppression masque dès le premier jour (pseudo et
+  // avatar remplacés sur `bg_users`, décision du 2026-11-04) et que la
+  // réactivation rend : une ligne par compte en attente, effacée à la
+  // réactivation, et à la suppression définitive (cascade, ou anonymisation).
+  // `pseudo` unique : le nom reste réservé à son titulaire pendant les trente
+  // jours (`pseudoReservedSql`).
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_account_deletion_holds (
+      user_id BIGINT PRIMARY KEY,
+      pseudo VARCHAR(40) NOT NULL,
+      avatar_url TEXT NULL,
+      UNIQUE KEY uq_bg_deletion_holds_pseudo (pseudo),
+      CONSTRAINT fk_bg_deletion_holds_user FOREIGN KEY (user_id)
+        REFERENCES bg_users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 }

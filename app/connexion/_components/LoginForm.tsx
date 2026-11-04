@@ -22,6 +22,7 @@ import { SuspensionNoticeDialog } from "./SuspensionNoticeDialog";
 import { ACCOUNT_SUSPENDED, parseSuspensionNotice, type SuspensionNotice } from "@/lib/shared/account-suspension";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
+import { ACCOUNT_PENDING_DELETION_CODE, REACTIVATION_PATH } from "@/lib/shared/account-deletion";
 import { isCertifiableDiscordHandle } from "@/lib/shared/discord-identity";
 import { CodedError, LOGIN_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
@@ -263,6 +264,12 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       const payload = (await response.json()) as { error?: string; suspension?: unknown };
       if (!response.ok) {
         const code = payload.error || "FAILED";
+        // Suppression demandée il y a moins de trente jours : l'écran de
+        // réactivation (ticket posé en cookie par le serveur), jamais en silence.
+        if (code === ACCOUNT_PENDING_DELETION_CODE) {
+          router.push(REACTIVATION_PATH);
+          return;
+        }
         const notice = code === ACCOUNT_SUSPENDED ? parseSuspensionNotice(payload.suspension) : null;
         if (notice) {
           setSuspension(notice);

@@ -162,6 +162,46 @@ export function formatPlayerSignupLog(context: { provider: PlayerSignupProvider 
   return `${leadOn("👋", "Nouveau joueur", detail)}.`;
 }
 
+/**
+ * Suppression d'un compte demandée par son titulaire : le pendant de
+ * {@link formatPlayerSignupLog}, même canal (`signups`), même discrétion — ni
+ * pseudo ni identifiant. La suppression ne devient définitive qu'au bout de
+ * `days` jours (réactivation possible d'ici là) : la ligne le dit, pour qu'un
+ * départ ne soit pas compté deux fois si le joueur revient.
+ */
+export function formatAccountDeletionLog(context: { days: number }): string {
+  const detail = `définitive sous ${context.days} jours, sauf réactivation`;
+  return `${leadOn("🗑️", "Suppression de compte demandée", detail)}.`;
+}
+
+/**
+ * Réactivation d'un compte en attente de suppression : le pendant de
+ * {@link formatAccountDeletionLog}, même canal, même discrétion — ni pseudo
+ * ni identifiant. Sans elle, le staff croirait parti un joueur revenu.
+ */
+export function formatAccountReactivationLog(): string {
+  return `${leadOn("↩️", "Compte réactivé", "suppression demandée annulée")}.`;
+}
+
+/**
+ * Inscription retirée par la suppression du compte de l'engagé (E5) — tournoi
+ * individuel pas encore commencé, ou entrée solo jamais jouée d'un tournoi en
+ * cours, dont les matchs restants passent en forfait. « un joueur », jamais son
+ * pseudo (`entrantLabel`).
+ */
+export function formatDeletionWithdrawalLog(context: {
+  tournament: BotLogTournament;
+  entrant: LogEntrant;
+  registeredTeams: number;
+  maxTeams: number;
+  forfeited: boolean;
+}): string {
+  const field = `${context.registeredTeams}/${context.maxTeams} ${participantWording(context.entrant.participantType).many}`;
+  const kind = context.forfeited ? "Forfait (compte supprimé)" : "Inscription retirée";
+  const detail = context.forfeited ? "ses matchs restants sont perdus par forfait" : `${field}`;
+  return `${lead("➖", kind, context.tournament)} : ${entrantLabel(context.entrant)} supprime son compte, ${detail}.`;
+}
+
 /** Création d'un tournoi par le staff. */
 export function formatTournamentCreatedLog(context: {
   tournament: BotLogTournament;

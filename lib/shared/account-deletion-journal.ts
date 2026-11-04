@@ -46,31 +46,89 @@ export interface AccountDeletionEntry {
    * répète pas d'un compte à l'autre sur la même ligne.
    */
   accountCreatedAt: string;
-  /** Instant de la suppression, ISO 8601. */
+  /**
+   * Instant de la suppression, ISO 8601 (d'une demande en attente : celui de la
+   * demande ; d'une réactivation : celui de la réactivation).
+   */
   deletedAt: string;
+  /**
+   * Demande **en attente** (fenêtre de réactivation de trente jours) : écrite à
+   * la demande, remplacée par la ligne de réactivation, rendue caduque par la
+   * ligne de la suppression définitive. Absent = suppression définitive.
+   */
+  pending?: boolean;
+  /**
+   * **Réactivation** d'une demande (décision R1 du 2026-11-04) : remplace la
+   * ligne en attente, pour qu'une sauvegarde prise pendant les trente jours,
+   * restaurée, ne ramène pas le compte en attente de suppression — le rejeu le
+   * réactive. Exclusif de `pending`.
+   */
+  reactivated?: boolean;
+  /**
+   * D'une réactivation : `deletion_requested_at` de la demande défaite, **tel
+   * que la base le rend** (`AAAA-MM-JJ HH:MM:SS`). Le rejeu le compare, texte à
+   * texte, à celui de la base restaurée — sans conversion de fuseau ni perte à
+   * la seconde : seule une demande égale ou antérieure est défaite.
+   */
+  undoneRequestAt?: string;
 }
 
-/** Une ligne JSON par suppression, terminée par un saut de ligne. */
+/** Ligne qui n'est ni une demande en attente ni une réactivation : une suppression définitive. */
+function isFinalEntry(entry: AccountDeletionEntry): boolean {
+  return entry.pending !== true && entry.reactivated !== true;
+}
+
+/**
+ * Une ligne JSON par suppression, terminée par un saut de ligne.
+ *
+ * Une réactivation s'écrit **sans** `deletedAt`, sous `reactivatedAt` : une
+ * version antérieure du site (retour arrière, vieux rejeu) exige `deletedAt` et
+ * écarte donc la ligne comme illisible, au lieu de la lire comme une
+ * suppression définitive et d'effacer un compte réactivé.
+ */
 export function formatJournalEntry(entry: AccountDeletionEntry): string {
-  return `${JSON.stringify({
-    userId: entry.userId,
-    accountCreatedAt: entry.accountCreatedAt,
-    deletedAt: entry.deletedAt,
-  })}\n`;
+  const line =
+    entry.reactivated && !entry.pending
+      ? {
+          userId: entry.userId,
+          accountCreatedAt: entry.accountCreatedAt,
+          reactivatedAt: entry.deletedAt,
+          undoneRequestAt: entry.undoneRequestAt,
+        }
+      : {
+          userId: entry.userId,
+          accountCreatedAt: entry.accountCreatedAt,
+          deletedAt: entry.deletedAt,
+          ...(entry.pending ? { pending: true } : {}),
+        };
+  return `${JSON.stringify(line)}\n`;
 }
 
-function isEntry(value: unknown): value is AccountDeletionEntry {
-  if (!value || typeof value !== "object") return false;
+function isIsoDate(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
+/** Ligne lue : suppression ou demande (`deletedAt`), ou réactivation (`reactivatedAt` seul). */
+function readEntry(value: unknown): AccountDeletionEntry | null {
+  if (!value || typeof value !== "object") return null;
   const v = value as Record<string, unknown>;
-  return (
+  const keyValid =
     typeof v.userId === "number" &&
     Number.isInteger(v.userId) &&
     v.userId > 0 &&
     typeof v.accountCreatedAt === "string" &&
-    v.accountCreatedAt.length > 0 &&
-    typeof v.deletedAt === "string" &&
-    Number.isFinite(Date.parse(v.deletedAt))
-  );
+    v.accountCreatedAt.length > 0;
+  if (!keyValid || v.reactivated !== undefined) return null;
+  const key = { userId: v.userId as number, accountCreatedAt: v.accountCreatedAt as string };
+  if (v.deletedAt === undefined) {
+    const undone = v.undoneRequestAt;
+    if (!isIsoDate(v.reactivatedAt) || v.pending !== undefined) return null;
+    if (typeof undone !== "string" || undone.length === 0) return null;
+    return { ...key, deletedAt: v.reactivatedAt, reactivated: true, undoneRequestAt: undone };
+  }
+  if (!isIsoDate(v.deletedAt) || v.reactivatedAt !== undefined || v.undoneRequestAt !== undefined) return null;
+  if (v.pending !== undefined && typeof v.pending !== "boolean") return null;
+  return { ...key, deletedAt: v.deletedAt, ...(v.pending ? { pending: true } : {}) };
 }
 
 export interface ParsedJournal {
@@ -91,13 +149,9 @@ export function parseJournal(text: string): ParsedJournal {
     const line = raw.trim();
     if (!line) continue;
     try {
-      const parsed: unknown = JSON.parse(line);
-      if (isEntry(parsed)) {
-        entries.push({
-          userId: parsed.userId,
-          accountCreatedAt: parsed.accountCreatedAt,
-          deletedAt: parsed.deletedAt,
-        });
+      const parsed = readEntry(JSON.parse(line));
+      if (parsed) {
+        entries.push(parsed);
       } else {
         invalidLines += 1;
       }
@@ -128,17 +182,66 @@ export function pruneJournal(
     if (!Number.isFinite(at) || at < cutoff) continue;
     const key = `${entry.userId}|${entry.accountCreatedAt}`;
     const known = byKey.get(key);
-    if (!known || at < Date.parse(known.deletedAt)) byKey.set(key, entry);
+    // Une suppression définitive rend caduques la demande en attente et la
+    // réactivation du même compte ; entre deux suppressions définitives, la plus
+    // ancienne l'emporte (elle situe le compte face aux sauvegardes) ; entre
+    // demandes et réactivations, la plus récente (une réactivation succède à sa
+    // demande, une nouvelle demande à la réactivation).
+    const knownAt = known ? Date.parse(known.deletedAt) : 0;
+    const replaces =
+      !known ||
+      (!isFinalEntry(known) && isFinalEntry(entry)) ||
+      (isFinalEntry(known) && isFinalEntry(entry) && at < knownAt) ||
+      (!isFinalEntry(known) && !isFinalEntry(entry) && at >= knownAt);
+    if (replaces) byKey.set(key, entry);
   }
   return [...byKey.values()].sort(
     (a, b) => Date.parse(a.deletedAt) - Date.parse(b.deletedAt) || a.userId - b.userId,
   );
 }
 
+/**
+ * Réactivation : la demande en attente du compte (ou une réactivation plus
+ * ancienne) cède la place à une ligne de réactivation datée de `reactivatedAt` ;
+ * les autres lignes restent.
+ */
+export function withReactivationEntry(
+  entries: readonly AccountDeletionEntry[],
+  key: AccountReactivationKey,
+  reactivatedAt: Date,
+): AccountDeletionEntry[] {
+  const others = entries.filter(
+    (entry) =>
+      isFinalEntry(entry) || entry.userId !== key.userId || entry.accountCreatedAt !== key.accountCreatedAt,
+  );
+  return [
+    ...others,
+    {
+      userId: key.userId,
+      accountCreatedAt: key.accountCreatedAt,
+      deletedAt: reactivatedAt.toISOString(),
+      reactivated: true,
+      undoneRequestAt: key.undoneRequestAt,
+    },
+  ];
+}
+
+/** Ce qu'une réactivation consigne : le compte, et la demande qu'elle défait. */
+export interface AccountReactivationKey {
+  userId: number;
+  accountCreatedAt: string;
+  /** `deletion_requested_at` de la demande défaite, tel que la base le rend. */
+  undoneRequestAt: string;
+}
+
 /** L'état d'un compte dans la base restaurée, ou `null` s'il n'y figure pas. */
 export interface RestoredAccountRow {
   createdAt: string;
   isDeleted: boolean;
+  /** En attente de suppression (`is_deleted = 1` et `deletion_requested_at` posé) : réactivable. */
+  pendingDeletion?: boolean;
+  /** `deletion_requested_at` tel que la base le rend (`AAAA-MM-JJ HH:MM:SS`), quand il est posé. */
+  deletionRequestedAt?: string | null;
 }
 
 export type ReplayDecision =
@@ -149,7 +252,17 @@ export type ReplayDecision =
   /** L'identifiant désigne un **autre** compte que celui qui a été supprimé. */
   | "OTHER_ACCOUNT"
   /** Le compte est revenu avec la sauvegarde : la suppression doit être rejouée. */
-  | "REPLAY";
+  | "REPLAY"
+  /** Réactivé depuis, mais revenu en attente de suppression avec la sauvegarde : à réactiver. */
+  | "REACTIVATE"
+  /** Réactivé depuis, et vivant dans la base restaurée : rien à refaire. */
+  | "ALREADY_ACTIVE"
+  /**
+   * Demande en attente, revenue en attente avec la sauvegarde : sa date est
+   * reprise de celle du journal (une demande plus ancienne, défaite puis
+   * refaite, raccourcirait sinon la nouvelle fenêtre).
+   */
+  | "REDATE";
 
 /**
  * Faut-il rejouer cette suppression sur la base restaurée ?
@@ -165,6 +278,23 @@ export function replayDecision(
 ): ReplayDecision {
   if (!row) return "ABSENT";
   if (row.createdAt !== entry.accountCreatedAt) return "OTHER_ACCOUNT";
+  if (entry.reactivated) {
+    if (!row.isDeleted) return "ALREADY_ACTIVE";
+    return reactivationUndoes(entry, row) ? "REACTIVATE" : "ALREADY_DELETED";
+  }
+  if (entry.pending && row.pendingDeletion) return "REDATE";
   if (row.isDeleted) return "ALREADY_DELETED";
   return "REPLAY";
+}
+
+/**
+ * La réactivation défait-elle la demande que porte la base restaurée ? Oui si
+ * celle-ci est égale ou antérieure à la demande défaite : une demande refaite
+ * après la réactivation tient. Comparaison de textes `AAAA-MM-JJ HH:MM:SS`
+ * (ordre chronologique), sans conversion de fuseau.
+ */
+export function reactivationUndoes(entry: AccountDeletionEntry, row: RestoredAccountRow): boolean {
+  const restored = row.deletionRequestedAt;
+  const undone = entry.undoneRequestAt;
+  return row.pendingDeletion === true && !!restored && !!undone && restored <= undone;
 }

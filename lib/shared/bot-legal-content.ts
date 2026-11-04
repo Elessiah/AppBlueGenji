@@ -86,8 +86,8 @@ export const BOT_COPYRIGHT_HOLDER = "Keryan Houssin";
 // renvoient donc.
 const CONTACT_DISCORD = LEGAL_CONTACT_DISCORD;
 
-const LAST_UPDATED_FR = "29 octobre 2026";
-const LAST_UPDATED_EN = "29 October 2026";
+const LAST_UPDATED_FR = "6 novembre 2026";
+const LAST_UPDATED_EN = "6 November 2026";
 // La politique a sa propre date : une modification qui ne touche qu'elle (le
 // passage des sauvegardes chez Hetzner) laisse aux conditions la leur. Les
 // horaires de match remis en message privé touchent les deux ; l'annonce des
@@ -180,8 +180,8 @@ export const TERMS_OF_SERVICE: BilingualDoc = inBothLanguages<LegalDoc>({
         },
         {
           kind: "p",
-          text: frEn("Le Bot relaie les annonces de la communauté esport BlueGenji — Overwatch et Marvel Rivals — entre les salons des serveurs partenaires (recherches de scrims, recrutements et autres services). Il remet aussi en message privé les messages du site BlueGenji : codes de connexion, horaires de match (posés, changés ou retirés), rappels de match, réglages du salon d'un match, avis de retrait d'un match (« Match retiré ») et avis envoyé à un caster dont l'inscription est retirée par un autre que lui — ces messages de match aux seuls comptes dont le tag Discord est certifié sur le site —, alertes d'arbitrage, avis de modération, demandes d'adhésion à une équipe et informations sur les données. Il est gratuit.",
-            "The Bot relays the advertisements of the BlueGenji esport community — Overwatch and Marvel Rivals — between the channels of partner servers (scrim searches, recruitment and other services). It also delivers by direct message the messages of the BlueGenji website: login codes, match times (set, changed or removed), match reminders, the lobby settings of a match, notices of removal from a match (“Match retiré”) and the notice sent to a caster whose registration for a match is removed by someone else — these match messages only to accounts with a Discord tag certified on the website —, referee alerts, moderation notices, team join requests and data-protection notices. It is free of charge."),
+          text: frEn("Le Bot relaie les annonces de la communauté esport BlueGenji — Overwatch et Marvel Rivals — entre les salons des serveurs partenaires (recherches de scrims, recrutements et autres services). Il remet aussi en message privé les messages du site BlueGenji : codes de connexion, horaires de match (posés, changés ou retirés), rappels de match, réglages du salon d'un match, avis de retrait d'un match (« Match retiré ») et avis envoyé à un caster dont l'inscription est retirée par un autre que lui — ces messages de match aux seuls comptes dont le tag Discord est certifié sur le site —, alertes d'arbitrage, avis de modération, demandes d'adhésion à une équipe, invitations d'une équipe, reprises d'une équipe fantôme que le staff propose et propriétés d'équipe transférées (qui ne nomment que l'équipe — une reprise cite « un admin », sans nommer personne) et informations sur les données. Il est gratuit.",
+            "The Bot relays the advertisements of the BlueGenji esport community — Overwatch and Marvel Rivals — between the channels of partner servers (scrim searches, recruitment and other services). It also delivers by direct message the messages of the BlueGenji website: login codes, match times (set, changed or removed), match reminders, the lobby settings of a match, notices of removal from a match (“Match retiré”) and the notice sent to a caster whose registration for a match is removed by someone else — these match messages only to accounts with a Discord tag certified on the website —, referee alerts, moderation notices, team join requests, team invitations, takeovers of a ghost team offered by the staff and team ownership transfers (which only name the team — a takeover mentions “an admin”, naming no one) and data-protection notices. It is free of charge."),
         },
       ],
     },

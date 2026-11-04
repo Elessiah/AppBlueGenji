@@ -201,7 +201,7 @@ describe("useAccountDeletion", () => {
     expect(opened.deleting).toBe(true);
     expect(opened.confirming).toBe(true);
     const props = dialogProps(opened);
-    expect(props.title).toBe("Supprimer définitivement ton compte ?");
+    expect(props.title).toBe("Supprimer ton compte ?");
     expect(props.confirmLabel).toBe("Supprimer mon compte");
     expect(props.layer).toBe("overBlocking");
     expect(props.closeOnSuccess).toBe(false);
@@ -231,6 +231,17 @@ describe("useAccountDeletion", () => {
     const opened = useAccountDeletion({ text: FR_PROFILE });
     expect(opened.confirming).toBe(true);
     expect(dialogProps(opened).children).toBeDefined();
+  });
+
+  it("un aperçu qui échoue rouvre le bouton et le dit par une notification, sans ouvrir la modale", async () => {
+    const flow = useAccountDeletion({ text: FR_PROFILE });
+    await flow.start(Promise.reject(new Error("chunk load failed")));
+    expect(showError).toHaveBeenCalledWith(FR_PROFILE.t("deletion.errors.fallback"), { lang: undefined });
+    rerender();
+    const after = useAccountDeletion({ text: FR_PROFILE });
+    expect(after.deleting).toBe(false);
+    expect(after.confirming).toBe(false);
+    expect(after.dialog).toBeNull();
   });
 
   it("un second lancement pendant l'aperçu n'envoie rien de plus", async () => {
@@ -271,7 +282,7 @@ describe("useAccountDeletion", () => {
     expect(ok).toBe(true);
     expect(calls.at(-1)).toEqual({ url: "/api/profile", init: { method: "DELETE" } });
     // Textes retombés sur le français sous /en : le toast le déclare aussi.
-    expect(showSuccess).toHaveBeenCalledWith(expect.stringMatching(/^Compte effacé\./), { lang: "fr" });
+    expect(showSuccess).toHaveBeenCalledWith(expect.stringMatching(/^Suppression demandée\./), { lang: "fr" });
     expect(fakeWindow.location.href).toBe("/tournois");
     jest.advanceTimersByTime(ACCOUNT_DELETED_REDIRECT_MS);
     expect(fakeWindow.location.href).toBe("/en");

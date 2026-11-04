@@ -14,7 +14,7 @@ import { useMatchContacts } from "@/components/match-launch/MatchContactsDialog"
 import { SharedMatchContactsContext } from "@/components/match-launch/shared-match-contacts";
 import { launchSidesLaterText, refereeLaterText, useLaunchText } from "@/components/match-launch/launch-text";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
-import { VOICE_CHANNEL_CAPACITY, voiceSideFull, type MatchVoiceInfo, type MatchVoiceSideState } from "@/lib/shared/match-voice";
+import { VOICE_CHANNEL_CAPACITY, type MatchVoiceInfo, type MatchVoiceSideState } from "@/lib/shared/match-voice";
 import {
   MATCH_LAUNCH_REFRESH_EVENT,
   connectionReader,
@@ -687,33 +687,23 @@ function ConnectionSection({
   );
 }
 
-/** Libellé d'un salon (« Salon vocal : 3/5 · complet », « pas encore compté », « indisponible »). */
-export function voiceRowText(
-  page: ReturnType<typeof useMatchPageText>,
-  state: MatchVoiceSideState,
-  count: number | null,
-): string {
+/** Libellé d'un salon (« Salon vocal : ouvert », « bientôt ouvert », « indisponible ») — jamais son nombre de présents. */
+export function voiceRowText(page: ReturnType<typeof useMatchPageText>, state: MatchVoiceSideState): string {
   if (state === "FAILED") return page.t("voice.failed");
   if (state === "WAITING") return page.t("voice.notCreated");
-  if (state === "UNCOUNTED" || count === null) return page.t("voice.uncounted");
-  const values = { count, capacity: VOICE_CHANNEL_CAPACITY };
-  // Plein : dit en toutes lettres, pas seulement par la couleur (WCAG 1.4.1).
-  return voiceSideFull(state, count) ? page.t("voice.countFull", values) : page.t("voice.count", values);
+  return page.t("voice.open");
 }
 
 /**
  * Salons vocaux d'équipe du match (`docs/features/MATCH_VOICE.md`) :
- * « Salon vocal : 3/5 » par équipe, aux parties du match et au staff. L'état
+ * « Salon vocal : ouvert » par équipe, aux parties du match et au staff. L'état
  * vient de `useMatchVoice` (instantané, relecture REST flux coupé) : la page
  * le lit une fois, pour la section comme pour la grille.
  */
 function VoiceSection({ voice, sides }: Readonly<{ voice: MatchVoiceInfo; sides: [PageSide, PageSide] }>) {
   const page = useMatchPageText();
   const titleId = useId();
-  const side = (slot: 1 | 2) =>
-    slot === 1
-      ? { state: voice.team1State, count: voice.team1Members }
-      : { state: voice.team2State, count: voice.team2Members };
+  const side = (slot: 1 | 2) => (slot === 1 ? voice.team1State : voice.team2State);
   // Une panne du bot lève le verrou : le match n'attend pas les salons.
   const failed = !voice.pending && (voice.team1State === "FAILED" || voice.team2State === "FAILED");
   return (
@@ -731,13 +721,11 @@ function VoiceSection({ voice, sides }: Readonly<{ voice: MatchVoiceInfo; sides:
       <div aria-live="polite">
         <ul className={styles.voiceList}>
           {sides.map((pageSide) => {
-            const { state, count } = side(pageSide.slot);
+            const state = side(pageSide.slot);
             return (
               <li key={pageSide.slot} className={styles.voiceRow}>
                 <SideName side={pageSide} logoSize={20} truncate />
-                <span className={`${styles.voiceCount} ${voiceSideFull(state, count) ? styles.ok : styles.factNote}`}>
-                  {voiceRowText(page, state, count)}
-                </span>
+                <span className={styles.factNote}>{voiceRowText(page, state)}</span>
               </li>
             );
           })}

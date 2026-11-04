@@ -1478,6 +1478,29 @@ export async function forfeitOwnMatchPublic(
 }
 
 /**
+ * Forfait du prochain match de l'entrée solo d'un compte en suppression (E1,
+ * `./deleted-entry-forfeit`), par la même chaîne qu'un forfait déclaré : le
+ * plateau avance. Rend l'id du match forfaité, `null` s'il n'y a rien à faire.
+ */
+export async function forfeitDeletedEntryMatchPublic(
+  tournamentId: number,
+  teamId: number,
+): Promise<number | null> {
+  const { forfeitDeletedEntryNextMatch } = await import("./deleted-entry-forfeit");
+  let forfeited: number | null = null;
+  await retryOnDeadlock(() =>
+    runPlayerMatchWrite(
+      tournamentId,
+      () => forfeited,
+      async (connection) => {
+        forfeited = await forfeitDeletedEntryNextMatch(connection, tournamentId, teamId);
+      },
+    ),
+  );
+  return forfeited;
+}
+
+/**
  * Transaction d'une écriture de résultat **par un engagé** (report de score,
  * forfait sur sa manche), suivie de la chaîne qui en tire les conséquences :
  * reports expirés, exemptions, réconciliation des modes à classement et des
@@ -1486,7 +1509,8 @@ export async function forfeitOwnMatchPublic(
  */
 async function runPlayerMatchWrite(
   tournamentId: number,
-  matchId: number,
+  // Un id, ou sa lecture après l'écriture quand c'est elle qui le choisit (`null` : aucun match touché).
+  matchId: number | (() => number | null),
   write: (connection: PoolConnection) => Promise<unknown>,
 ): Promise<void> {
   const stateBefore = await readTournamentState(tournamentId);
@@ -1523,9 +1547,12 @@ async function runPlayerMatchWrite(
     // réponse rendue à l'équipe qui vient de saisir son score.
     flushBotLogs(connection);
 
-    publishScoreReportedEvent(tournamentId, matchId);
-    // L'adversaire a un score à confirmer : il le sait sans avoir la page ouverte.
-    void notifyScoreToConfirm(matchId);
+    const touchedMatchId = typeof matchId === "function" ? matchId() : matchId;
+    if (touchedMatchId !== null) {
+      publishScoreReportedEvent(tournamentId, touchedMatchId);
+      // L'adversaire a un score à confirmer : il le sait sans avoir la page ouverte.
+      void notifyScoreToConfirm(touchedMatchId);
+    }
     await invalidateListsIfStateChanged(tournamentId, stateBefore);
   } catch (error) {
     await connection.rollback();
@@ -1711,12 +1738,18 @@ export async function forfeitTournamentTeamPublic(
   teamId: number,
   actingUserId: number | null = null,
   actor?: StaffActor,
+  // La suppression d'un compte écrit sa propre ligne, qui dit aussi le forfait
+  // (`logDeletionWithdrawal`) : une seule ligne au journal, pas deux.
+  // `stillDue`, relu sur la transaction juste après le verrou du tournoi :
+  // faux, rien n'est abandonné (`FORFEIT_NO_LONGER_DUE`) — la suppression d'un
+  // compte s'assure ainsi qu'il n'a pas été réactivé entre-temps.
+  options: { skipForfeitLog?: boolean; stillDue?: (connection: PoolConnection) => Promise<boolean> } = {},
 ): Promise<void> {
   // Verrous tournoi puis manches, quand « Valider le résultat » prend la manche
   // puis le tournoi (réconciliation) : un interblocage se rejoue
   // (`retryOnDeadlock`) au lieu de renvoyer l'arbitre à son clic.
   const settledDisputes = await retryOnDeadlock(() =>
-    forfeitTournamentTeamOnce(tournamentId, teamId, actingUserId, actor),
+    forfeitTournamentTeamOnce(tournamentId, teamId, actingUserId, actor, options.skipForfeitLog === true, options.stillDue),
   );
   // Sans attendre (meilleur effort, ne lève jamais), une fois l'abandon acquis.
   // Seul l'abandon imposé à l'**adversaire** de l'arbitre le sert : retirer sa
@@ -1737,6 +1770,8 @@ async function forfeitTournamentTeamOnce(
   teamId: number,
   actingUserId: number | null,
   actor: StaffActor | undefined,
+  skipForfeitLog = false,
+  stillDue?: (connection: PoolConnection) => Promise<boolean>,
 ): Promise<DisputeBeforeResolution[]> {
   const db = await getDatabase();
   const connection = await db.getConnection();
@@ -1748,6 +1783,7 @@ async function forfeitTournamentTeamOnce(
     // ci-dessous et le droit relu ensuite le sont sur l'état que l'abandon
     // écrit, pas sur un instantané figé avant l'attente du verrou.
     await lockTournamentRow(connection, tournamentId);
+    if (stillDue && !(await stillDue(connection))) throw new Error("FORFEIT_NO_LONGER_DUE");
     const openMatches = actingUserId === null && actor ? await lockOpenMatches(connection, tournamentId, teamId) : [];
 
     // Droit relu **dans la transaction**, comme à l'inscription
@@ -1773,7 +1809,7 @@ async function forfeitTournamentTeamOnce(
 
     // La ligne d'abandon est réservée par le moteur du format concerné
     // (survie, suisse, endurance) : elle ne part qu'une fois l'abandon écrit.
-    queueBotLog(connection, { kind: "forfeit", tournamentId, teamId });
+    if (!skipForfeitLog) queueBotLog(connection, { kind: "forfeit", tournamentId, teamId });
     settledDisputes = await keepSettled(connection, openMatches);
 
     await connection.commit();

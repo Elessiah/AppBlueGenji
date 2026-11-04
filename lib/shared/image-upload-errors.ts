@@ -28,6 +28,7 @@ const IMAGE_UPLOAD_ERRORS: Record<string, string> = {
   IMAGE_DIMENSIONS_INVALID: "Dimensions d'image non prises en charge.",
   IMAGE_ANIMATED_NOT_SUPPORTED: "Les images animées ne sont pas acceptées.",
   [IMAGE_CROP_INVALID]: "Recadrage illisible. Choisis de nouveau l'image et recadre-la.",
+  IMAGE_BLOCKED: "Cette image a été retirée par la modération : elle ne peut pas être reposée.",
 };
 
 /**

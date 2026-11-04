@@ -214,6 +214,48 @@ describe("dispatchMatchVoiceChannels — création et comptage", () => {
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
+  // Revue juridique #546, cycle 5 : le nombre n'est montré à personne — seul
+  // « plein ou non » publie.
+  it("dispatchMatchVoiceChannels_freshRecountStaysBelowFull_publishesNothing", async () => {
+    const fresh = new Date().toISOString();
+    database({
+      due: [dueMatch],
+      voiceRows: [
+        { match_id: 42, team_id: 1, channel_id: "900", members: 3, counted_at: fresh, failed_at: null, released_at: null },
+        { match_id: 42, team_id: 2, channel_id: "900", members: 3, counted_at: fresh, failed_at: null, released_at: null },
+      ],
+      voiceRowsAfterWrite: [
+        { match_id: 42, team_id: 1, channel_id: "900", members: 4, counted_at: fresh, failed_at: null, released_at: null },
+        { match_id: 42, team_id: 2, channel_id: "900", members: 3, counted_at: fresh, failed_at: null, released_at: null },
+      ],
+    });
+    jest.mocked(countVoiceChannel).mockResolvedValue({ kind: "ok", value: 4 });
+
+    await dispatchMatchVoiceChannels();
+
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("dispatchMatchVoiceChannels_freshRecountReachesFull_publishesTournament", async () => {
+    const fresh = new Date().toISOString();
+    database({
+      due: [dueMatch],
+      voiceRows: [
+        { match_id: 42, team_id: 1, channel_id: "900", members: 4, counted_at: fresh, failed_at: null, released_at: null },
+        { match_id: 42, team_id: 2, channel_id: "900", members: 4, counted_at: fresh, failed_at: null, released_at: null },
+      ],
+      voiceRowsAfterWrite: [
+        { match_id: 42, team_id: 1, channel_id: "900", members: 5, counted_at: fresh, failed_at: null, released_at: null },
+        { match_id: 42, team_id: 2, channel_id: "900", members: 4, counted_at: fresh, failed_at: null, released_at: null },
+      ],
+    });
+    jest.mocked(countVoiceChannel).mockResolvedValue({ kind: "ok", value: 5 });
+
+    await dispatchMatchVoiceChannels();
+
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
   it("dispatchMatchVoiceChannels_teamNameWithInvisibles_sendsVisibleText", async () => {
     database({ due: [{ ...dueMatch, team1_name: "Al\u200Bpha\u202E" }] });
     jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "900" });
@@ -460,7 +502,7 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
     expect(connection.execute).not.toHaveBeenCalled();
   });
 
-  it("loadMatchVoiceInfos_unlaunchedMatchWithRows_returnsCounts", async () => {
+  it("loadMatchVoiceInfos_unlaunchedMatchWithRows_returnsStatesWithoutCounts", async () => {
     const connection = connectionMock();
     connection.execute
       .mockResolvedValueOnce([
@@ -472,10 +514,10 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
       ])
       .mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
-    expect(infos.get(42)).toEqual({ team1Members: 3, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true });
+    expect(infos.get(42)).toEqual({ team1State: "OPEN", team2State: "OPEN", pending: true });
   });
 
-  it("loadMatchVoiceInfos_staleCount_showsLastCountButPending", async () => {
+  it("loadMatchVoiceInfos_staleCount_showsOpenButPending", async () => {
     const connection = connectionMock();
     const stale = new Date(Date.now() - 6 * 60_000).toISOString();
     connection.execute
@@ -488,7 +530,7 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
       ])
       .mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
-    expect(infos.get(42)).toEqual({ team1Members: 5, team2Members: 5, team1State: "COUNTED", team2State: "COUNTED", pending: true });
+    expect(infos.get(42)).toEqual({ team1State: "OPEN", team2State: "OPEN", pending: true });
   });
 
   it("loadMatchVoiceInfos_freshFailure_showsFailedAndReleasesGate", async () => {
@@ -504,7 +546,7 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
       ])
       .mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
-    expect(infos.get(42)).toEqual({ team1Members: null, team2Members: 2, team1State: "FAILED", team2State: "COUNTED", pending: false });
+    expect(infos.get(42)).toEqual({ team1State: "FAILED", team2State: "OPEN", pending: false });
   });
 
   it("loadMatchVoiceInfos_staleFailure_notShownAsFailed", async () => {
@@ -518,14 +560,14 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
       ])
       .mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
-    expect(infos.get(42)?.team1State).toBe("UNCOUNTED");
+    expect(infos.get(42)?.team1State).toBe("OPEN");
   });
 
   it("loadMatchVoiceInfos_dueMatchWithoutRows_showsPendingLikeTheGate", async () => {
     const connection = connectionMock();
     connection.execute.mockResolvedValueOnce([[], []]).mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), 7, true, [ready]);
-    expect(infos.get(42)).toEqual({ team1Members: null, team2Members: null, team1State: "WAITING", team2State: "WAITING", pending: true });
+    expect(infos.get(42)).toEqual({ team1State: "WAITING", team2State: "WAITING", pending: true });
   });
 
   it("loadMatchVoiceInfos_soloSide_isNotShown", async () => {

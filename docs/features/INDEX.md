@@ -19,7 +19,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `REGISTRATION_FILTERS.md` — Conditions d'inscription : effectif minimal, Discord certifié, compte Blizzard.
 - `UNDERFILLED_TOURNAMENTS.md` — Tournoi sans adversaires : 0 ou 1 engagée au coup d'envoi → clos.
 - `MATCH_LAUNCH.md` — Lancement d'un match : lobby, trois « Prêt », contacts, inscription du caster ; option du tournoi (éteinte par défaut) et bouton « Contacts » de la carte.
-- `MATCH_VOICE.md` — Salons vocaux d'équipe : option du tournoi (éteinte par défaut), salons Discord de 5 places ouverts 15 min avant le match, lancement retenu jusqu'à ce qu'ils soient pleins, compteur « Salon vocal : n/5 ».
+- `MATCH_VOICE.md` — Salons vocaux d'équipe : option du tournoi (éteinte par défaut), salons Discord de 5 places ouverts 15 min avant le match, lancement retenu jusqu'à ce qu'ils soient pleins, état « Salon vocal : ouvert » (jamais le nombre de présents).
 - `MATCH_REFEREE.md` — Arbitre désigné d'un match (4e « Prêt », nommé aux seules parties du match), autogestion par match ou par manche, première carte, hôte à gauche et premier ban ; avertissement « sans arbitre » au staff, jamais d'autogestion d'office ; opposition d'un arbitre retenue par le staff (retrait de ses matchs non terminés, arbitrage fermé).
 - `MATCH_LOBBY_BRIEF.md` — Brief du salon : à son ouverture, réglages de la partie (gauche/hôte, droite, première carte, premier ban, tri par rôle si casté, arbitre ou autogestion) aux propriétaires/managers en DM + push `MATCH_LOBBY_BRIEF`, sans BattleTag, tag Discord ni pseudo.
 - `ROUND_MAPS.md` — Cartes par tour du tournoi (une carte = imposée, plusieurs = pool choisi par l'arbitrage ou l'équipe en autogestion ; liste Overwatch, tours à venir, copie vers tous les tours, verrou d'échelle sur la carte du match et réinitialisation) et règles de ban du tournoi, réglables à tout moment par le staff.
@@ -86,7 +86,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `PERMISSION_ROLES.md` — Rôles de plateforme cumulables et permissions `can(user, …)` ; un administrateur règle les siens depuis « Mon profil », sans se retirer `ADMIN`.
 - `PROFILE_SCREEN.md` — Écran « Mon profil ».
 - `ACCOUNT_MENU.md` — Menu du compte, hauteur des barres de navigation.
-- `ACCOUNT_DELETION.md` — Suppression d'un compte : effacement ou anonymisation.
+- `ACCOUNT_DELETION.md` — Suppression d'un compte : demande réversible 30 jours (réactivation, départ des équipes, forfaits), puis effacement ou anonymisation.
 - `ACCOUNT_SUSPENSION.md` — Suspension d'un compte.
 - `USER_AVATAR_IMPORT.md` — Photos OAuth copiées chez nous, jamais relayées.
 - `USER_AVATAR_DISPLAY.md` — `<UserAvatar>`, repli à initiale, `visibleAvatarUrl`.
@@ -123,7 +123,6 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `CONTENT_REPORTS.md` — Signalements, contestations, panneau de modération.
 - `LOGO_QUARANTINE.md` — Quarantaine des images signalées.
 - `TERMS_OF_USE.md` — Conditions d'utilisation et leur acceptation.
-- `TERMS_V9_PENDING.md` — Texte exact (FR + EN) à reprendre dans les conditions v9 (contacts de match, BattleTag borné à Overwatch, invitations d'équipe) ; v8 reste figée, rien ici n'avance `TERMS_VERSION`.
 - `LEGAL_PAGE.md` — Mentions légales, coordonnées protégées (`ProtectedContact`).
 - `BOT_LEGAL_PAGES.md` — Pages légales bilingues du bot.
 - `LEGAL_DATA_FILES.md` — Textes juridiques FR/EN écrits une fois (`frEn`), sans duplication Sonar.

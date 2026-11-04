@@ -131,4 +131,23 @@ describe("updateOwnProfile — la course sur l'index unique du pseudo", () => {
     });
     await expect(updateOwnProfile(42, { pseudo: "Nova" })).rejects.toThrow("deadlock");
   });
+
+  it("updateOwnProfile_pseudoHeldByPendingDeletion_rejectedAsTaken", async () => {
+    const execute = await mockDb();
+    execute.mockImplementation(async (sql: string) =>
+      /bg_account_deletion_holds/.test(sql) ? [[{ user_id: 9 }]] : /^\s*UPDATE/.test(sql) ? [{ affectedRows: 1 }] : [[]],
+    );
+
+    await expect(updateOwnProfile(42, { pseudo: "Nova" })).rejects.toThrow("PSEUDO_ALREADY_USED");
+    expect(writtenPseudo(execute)).toBeUndefined();
+  });
+
+  it("updateOwnProfile_ownHeldPseudo_accepted", async () => {
+    const execute = await mockDb();
+    execute.mockImplementation(async (sql: string) =>
+      /bg_account_deletion_holds/.test(sql) ? [[{ user_id: 42 }]] : /^\s*UPDATE/.test(sql) ? [{ affectedRows: 1 }] : [[]],
+    );
+
+    await expect(updateOwnProfile(42, { pseudo: "Nova" })).resolves.toBeUndefined();
+  });
 });

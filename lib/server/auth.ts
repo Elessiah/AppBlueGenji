@@ -14,6 +14,13 @@ import { closeSessionStreams, closeUserStreams } from "@/lib/server/session-stre
 import { activeSuspensionSql, assertNotSuspended, purgeEndedSuspensions } from "@/lib/server/account-suspensions";
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
 import { certifyPromptDoor } from "@/lib/shared/discord-certify-prompt";
+import {
+  AccountPendingDeletionError,
+  createReactivationTicket,
+  reactivationCookieName,
+  REACTIVATION_TICKET_MINUTES,
+  readPendingDeletion,
+} from "@/lib/server/users/account-reactivation";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { RECRUITMENT_MODAL_OFF_COOKIE, recruitmentModalOffInBrowser } from "@/lib/shared/recruitment";
 import {
@@ -120,9 +127,30 @@ function fromRow(row: UserRow): AuthUser {
 export async function createSession(userId: number, event: ConnectionLogEvent): Promise<void> {
   // Un compte suspendu n'ouvre pas de session, quelle que soit la porte :
   // `AccountSuspendedError` porte l'exposé de la décision, que la porte rend
-  // lisible (`lib/shared/account-suspension.ts`). Contrôle *avant* toute
-  // écriture ; la course avec un prononcé concurrent est tranchée par
+  // lisible (`lib/shared/account-suspension.ts`). Contrôle avant toute
+  // écriture de session — mais après la demande de suppression en attente, qui
+  // pose d'abord son ticket de réactivation (un compte suspendu se réactive
+  // aussi, décision du 2026-11-04) ; la course avec un prononcé concurrent est tranchée par
   // `getCurrentUser`, qui écarte la session d'un compte suspendu.
+  // Un compte dont la suppression est demandée n'ouvre pas de session : dans
+  // ses trente jours, la porte renvoie vers l'écran de réactivation, qui
+  // demande un geste explicite (E4, `account-reactivation.ts`) ; au-delà, la
+  // suppression définitive est due et rien ne s'ouvre.
+  const pending = await readPendingDeletion(userId);
+  if (pending) {
+    if (!pending.windowOpen) throw new Error("ACCOUNT_DELETED");
+    const ticket = await createReactivationTicket(userId, event);
+    // Posé ici comme le cookie de session : la porte (rappel OAuth, code
+    // Discord) n'a plus qu'à renvoyer vers l'écran de réactivation.
+    (await cookies()).set(reactivationCookieName(), ticket, {
+      ...baseCookieOptions(),
+      maxAge: REACTIVATION_TICKET_MINUTES * 60,
+    });
+    throw new AccountPendingDeletionError(ticket);
+  }
+  // Après la demande de suppression : un compte suspendu peut aussi être
+  // réactivé dans ses trente jours (décision du 2026-11-04) — il revient
+  // suspendu, la réactivation ne l'ouvre pas pour autant.
   await assertNotSuspended(userId);
   const db = await getDatabase();
   const token = randomToken(48);
@@ -458,9 +486,12 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
 
 async function pseudoExists(candidate: string): Promise<boolean> {
   const db = await getDatabase();
+  // Un pseudo réservé par un compte en attente de suppression compte comme pris
+  // (sa réactivation le lui rend, `account-deletion-hold.ts`).
   const [rows] = await db.execute<(RowDataPacket & { c: number })[]>(
-    `SELECT COUNT(*) AS c FROM bg_users WHERE pseudo = ?`,
-    [candidate],
+    `SELECT (SELECT COUNT(*) FROM bg_users WHERE pseudo = ?)
+          + (SELECT COUNT(*) FROM bg_account_deletion_holds WHERE pseudo = ?) AS c`,
+    [candidate, candidate],
   );
   return Number(rows[0]?.c ?? 0) > 0;
 }

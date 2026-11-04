@@ -127,9 +127,10 @@ describe("accountDeletionConfirmation", () => {
     expect(owned).toContain("dissous");
   });
 
-  it("dit dans tous les cas que le geste est irréversible", () => {
+  it("dit dans tous les cas que la suppression devient définitive au bout du délai", () => {
     for (const reason of [null, "TOURNAMENTS", "ORGANIZED_TOURNAMENTS", "OWNED_TEAMS"] as const) {
-      expect(accountDeletionConfirmation(reason)).toContain("irréversible");
+      expect(accountDeletionConfirmation(reason)).toContain("définitive au bout de 30 jours");
+      expect(accountDeletionConfirmation(reason)).toContain("Réactiver ton compte ne défera pas ces gestes");
     }
   });
 
@@ -142,7 +143,7 @@ describe("accountDeletionConfirmation", () => {
    */
   it("ne promet ni conservation ni effacement quand le sort du compte est inconnu", () => {
     const unknown = accountDeletionConfirmation(RETENTION_UNKNOWN);
-    expect(unknown).toContain("irréversible");
+    expect(unknown).toContain("définitive au bout de 30 jours");
     expect(unknown).not.toContain("statistiques");
     // Ni « ton compte sera effacé entièrement », ni « le compte devient
     // anonyme » : les deux issues sont nommées comme possibles, aucune promise.
@@ -176,7 +177,9 @@ describe("accountDeletionConfirmation", () => {
       const text = accountDeletionConfirmation(reason);
       expect(text).toContain(`sauvegardes chiffrées du site (${BACKUP_RETENTION_DAYS} jours)`);
       expect(text).toContain("mesure d'audience");
-      expect(text).toMatch(/irréversible\.$/);
+      expect(text).toMatch(/journaux du serveur.$/);
+      // Ce qui change tout de suite et ne se défait pas se lit avant la liste des restes.
+      expect(text.indexOf("Réactiver ton compte ne défera pas")).toBeLessThan(text.indexOf("Comme pour tout compte supprimé"));
     }
   });
 
@@ -190,7 +193,9 @@ describe("accountDeletionConfirmation", () => {
 
 describe("accountDeletionOutcome", () => {
   it("décrit ce qui vient d'être fait, et pas l'autre cas", () => {
-    expect(accountDeletionOutcome(null)).toContain("Compte effacé");
+    expect(accountDeletionOutcome(null)).toContain("Suppression demandée");
+    expect(accountDeletionOutcome(null)).toContain("seront effacés");
+    expect(accountDeletionOutcome(null)).toMatch(/d'ici 30 jours et confirme la réactivation\.$/);
     expect(accountDeletionOutcome(null)).not.toContain("aucune trace");
     expect(accountDeletionOutcome(null)).toMatch(/sauvegardes, journal des suppressions, mesure d'audience/);
     expect(accountDeletionOutcome("TOURNAMENTS")).toContain("pseudo d'emprunt");
@@ -211,7 +216,7 @@ describe("accountDeletionOutcome", () => {
     const unknown = accountDeletionOutcome(RETENTION_UNKNOWN);
     expect(unknown).not.toContain("effacé");
     expect(unknown).not.toContain("anonyme");
-    expect(unknown).toContain("supprimé");
+    expect(unknown).toBe("Suppression demandée. Pour l'annuler, reconnecte-toi d'ici 30 jours et confirme la réactivation.");
   });
 });
 

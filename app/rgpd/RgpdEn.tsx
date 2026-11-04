@@ -9,6 +9,7 @@ import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
+import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import {
@@ -262,10 +263,10 @@ export function RgpdEn({
           </tbody>
         </table>
         <p style={{ marginTop: 16, ...NOTE_STYLE }}>
-          * An account that has played no match, organized no tournament, owns no team and is an entrant in no
-          solo tournament that has started is <strong>entirely erased</strong> when it is deleted, apart from
-          connection data (***); its registrations for solo tournaments that have not started yet are withdrawn
-          with it. Otherwise, its profile data is erased immediately and its username replaced by a borrowed
+          * An account that has played no match, is an entrant in no solo tournament that has started and organized no tournament that no one on the staff could take over is{" "}
+          <strong>entirely erased</strong> at the end of the {ACCOUNT_REACTIVATION_DAYS} days following its deletion request, apart from
+          connection data (***); its registrations for solo tournaments that have not started yet are withdrawn as soon as it is
+          requested. Otherwise, at the same point, its profile data is erased and its username replaced by a borrowed
           username. Sessions (<code>__Host-bg_session</code> cookie) expire 30 days after login.
         </p>
         <p style={{ marginTop: 8, ...NOTE_STYLE }}>
@@ -297,6 +298,28 @@ export function RgpdEn({
           for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most, a technical log of each request (
           {WEB_ACCESS_LOG_FIELDS_EN}), for its security (<LocaleLink href="/rgpd/registre#t17">register, T17</LocaleLink>
           ).
+        </p>
+        <p id="suppression-du-compte" style={{ marginTop: 8, ...NOTE_STYLE }}>
+          <strong>Account deletion.</strong> Requested from “My profile”, it only becomes final after{" "}
+          {ACCOUNT_REACTIVATION_DAYS} days. During that time, the account stays in the database but is no
+          longer visible (its page answers “not found”), its sessions are closed and it can no longer be
+          invited, registered or notified; signing in again lets you reactivate it, through an explicit
+          confirmation (a suspended account can be reactivated too: it comes back suspended). As soon as it is
+          requested, it is shown as anonymous wherever it appeared (borrowed username, no avatar or player-page
+          link: past results, rankings, rosters, tournament pages); its real username, which stays reserved for
+          it, and its avatar are kept apart for reactivation only, which gives them back (the username, shortened if needed, followed by “OG” if it was taken all the same — “OG2”, “OG3”… up to “OG10” if those are taken too, failing that the borrowed username), and erased at the end
+          of that time. The request is also recorded in the off-database log that replays deletions after a
+          backup is restored (account identifier and creation date, date of the request), and replaced, on
+          reactivation, by a line carrying the date of the reactivation and that of the undone request (kept like the other lines), so that a restored backup does not
+          bring the account back as pending deletion. As soon as it is requested, and without being undone by reactivation, it leaves its
+          teams (ownership goes to a co-owner, else a manager, else a captain, else another member; a team of which it was the
+          only player becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
+          disbanded otherwise), its organised tournaments go to another staff member when someone can take them over, its registrations for a solo tournament that hasn&apos;t started yet are withdrawn, its casts of matches not yet completed, its referee assignments and its pending team invitations and join requests are withdrawn and its remaining matches in a running solo
+          tournament where it never played are lost by forfeit. At the end of that time, the account is erased
+          if it left nothing behind, anonymized (borrowed username) otherwise. On erasure, the hash (SHA-256) of
+          an avatar removed by moderation is kept, with no link to any account, to refuse it being uploaded
+          again. The staff log on Discord records the request, its reactivation and each withdrawal or forfeit it causes (one line per tournament for those), without
+          naming the player (“a player”) (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
         </p>
       </section>
 
@@ -354,13 +377,11 @@ export function RgpdEn({
           <strong>borrowed username</strong>: the record remains under this false name, and the player&apos;s
           page, kept only if they played at least one match, states that the account has been deleted; with no
           match played, the page is gone (page not found) and their name no longer leads anywhere. An account that has never played a match has no record
-          to preserve: it is erased entirely, with no remaining row — with three exceptions, where its row
-          remains because it is the holder of something that survives: if it has <strong>organized</strong> a
-          tournament, if it is the <strong>owner of a team</strong> (transferring or disbanding the team before
-          deletion restores complete erasure), or if it is an entrant in a{" "}
-          <strong>solo tournament</strong> that has already started or ended, whose entry bears its name. A registration for a solo tournament
-          that has not started yet, where it played no match, does not keep the row on its own: if nothing else keeps it, the registration is
-          withdrawn from the tournament with the account; otherwise, it stays under the borrowed username.
+          to preserve: it is erased entirely, with no remaining row — with two exceptions, where its row remains because it is the holder of something that survives: if it has <strong>organized</strong> a
+          tournament that no one on the staff could take over, or if it is an entrant in a{" "}
+          <strong>solo tournament</strong> that has already started or ended, whose entry bears its name. Its teams no longer keep the row:
+          it leaves them as soon as deletion is requested. Its registrations for a solo tournament that has not started yet, where it played
+          no match, are withdrawn as soon as deletion is requested.
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>
           <p>
@@ -439,6 +460,11 @@ export function RgpdEn({
               you to be recognized on the platform; our servers only keep its hash (SHA-256), never the token
               itself. It is deleted at logout. It replaces <strong>bg_session</strong>, which the site deletes if it
               still finds it.
+            </li>
+            <li>
+              <strong>__Host-bg_reactivation</strong> — httpOnly, sameSite=lax cookie, set <strong>only</strong> when you log in
+              again to an account whose deletion was requested, and deleted when you reactivate the account; otherwise it expires on its own. It lasts fifteen minutes at most and only contains a single-use random token, of which our
+              servers only keep the hash (SHA-256).
             </li>
             <li>
               <strong>__Host-bg_oauth</strong> — set <strong>for the duration of a login</strong> through Google, Discord
@@ -907,7 +933,7 @@ export function RgpdEn({
             parties know who referees and, in Overwatch, can add them in game; until they accept it, it falls under{" "}
             <strong>legitimate interest</strong> (same aim), and they may object to it through the report form
             (GDPR category). Showing their username to any signed-in member falls under <strong>legitimate interest</strong>{" "}
-            (members knowing who referees a match), with the same right to object; presenting their certified Discord tag to the parties to the match falls, since 5 November 2026, under <strong>performance of the service</strong>, strictly necessary for its minimum functioning (without it, the parties cannot reach their referee), once the referee has accepted version 7 of the terms or a later one (before that acceptance, legitimate interest, with the same right to object) — once that version is accepted, this tag has no objection of its own; once upheld, their referee objection (to their presentation before version 7, or to the display of their username to members) removes them from all their unfinished matches (the staff assigns another referee; their finished matches keep their referee) and stops them taking or being assigned one until it is lifted (at their request only, through that same form), and still stands once version 7 or a later one is accepted; the date it was upheld is kept on their account, so that it keeps being honoured (<strong>legal obligation</strong>), and included in their data export, until the staff lifts it or the account is deleted; the staff log on Discord only notes the action and its lifting, naming neither anyone nor their matches, and the server logs the author of the action and the referee&apos;s account identifier (when upheld, with the number of matches they are removed from). They can withdraw from a match at any time, the staff being able to assign that match to them again (unless an objection is upheld), without notice; until they have accepted version 7 or a later one, as the acceptance window
+            (members knowing who referees a match), with the same right to object; presenting their certified Discord tag to the parties to the match falls, since 6 November 2026, under <strong>performance of the service</strong>, strictly necessary for its minimum functioning (without it, the parties cannot reach their referee), once the referee has accepted version 9 of the terms or a later one (before that acceptance, legitimate interest, with the same right to object) — once that version is accepted, this tag has no objection of its own; once upheld, their referee objection (to their presentation before version 7, or to the display of their username to members) removes them from all their unfinished matches (the staff assigns another referee; their finished matches keep their referee) and stops them taking or being assigned one until it is lifted (at their request only, through that same form), and still stands once version 7 or a later one is accepted; the date it was upheld is kept on their account, so that it keeps being honoured (<strong>legal obligation</strong>), and included in their data export, until the staff lifts it or the account is deleted; the staff log on Discord only notes the action and its lifting, naming neither anyone nor their matches, and the server logs the author of the action and the referee&apos;s account identifier (when upheld, with the number of matches they are removed from). They can withdraw from a match at any time, the staff being able to assign that match to them again (unless an objection is upheld), without notice; until they have accepted version 7 or a later one, as the acceptance window
             covers the tournament pages, they withdraw by asking for it through that same form. Collecting their “Ready” also falls under performance of the service,
             the referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>); the removal notice, sent as a push notification, falls under the consent given by turning them on (<LocaleLink href="/rgpd/registre#t12">register, T12</LocaleLink>).
           </p>
@@ -918,8 +944,8 @@ export function RgpdEn({
             entry, whose name would be a username, nor for a match against a ghost team. The match only launches once both
             channels are full (referees can force it; if the bot fails, the match doesn&apos;t wait). To know this, the bot
             counts the people present in each channel: to do so it holds in memory, at all times (option on or not), without ever recording it, the voice state (Discord identifier of the member and of their voice session, channel they are in, microphone or sound muted by them or by moderation, screen sharing or camera on, request to speak and stage suppression), with the member profile Discord attaches to it (their profile on the server, including username, nickname, avatar, roles, join and boost dates, timeout), of the members of the association&apos;s Discord server, as Discord sends it — that of the other servers it is
-            on reaches it too, but it does not keep it (the attached member profile, it does: in memory, kept up to date by Discord, lost when the bot stops); the site only receives and keeps the channel&apos;s identifier, the numbers of the match and team, that <strong>number</strong> (“Voice channel: 3/5”,
-            displayed to the match&apos;s parties and to staff, and readable by any signed-in member; a visitor without an account only sees whether the match is waiting for its channels) and the times of the count (or of a bot outage), of creation and of hand-back, never who. The channel is handed back to the bot when the match is finished (score confirmed),
+            on reaches it too, but it does not keep it (the attached member profile, it does: in memory, kept up to date by Discord, lost when the bot stops); the site only receives and keeps the channel&apos;s identifier, the numbers of the match and team, that <strong>number</strong> (which only serves to hold the launch and is shown to no one:
+            the match page only tells its parties and staff whether each channel is open and whether the match is waiting for its channels, which any signed-in member can read; a visitor without an account only sees whether the match is waiting for its channels) and the times of the count (or of a bot outage), of creation and of hand-back, never who. The channel is handed back to the bot when the match is finished (score confirmed),
             cancelled, back to waiting or taken off the schedule, when the team leaves the pairing, or when the tournament ends or turns the option off; the bot deletes it as soon as it is
             empty (within {VOICE_BOT_RELEASED_MAX_HOURS} hours and {VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest, even if occupied, while the bot is running; if Discord prevents it, it retries at every sweep, and if it can no longer read the channel{" "}
             {VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation or its reuse, it forgets it: the channel then stays until the
@@ -932,9 +958,10 @@ export function RgpdEn({
             and hand-back times), erased with the channel or when it forgets it — kept with no limit while the channel, never handed back, stays occupied, or while it reads it without being able to delete
             it or while Discord answers it with another error — (apart from the encrypted backup copies). Its other periods
             hold to within one sweep (at most {VOICE_BOT_SWEEP_MINUTES} minutes more). Discord&apos;s audit log keeps the creation and
-            deletion of each channel, with its name, readable by the server&apos;s administration, for the period Discord sets. This count rests on
-            <strong> legitimate interest</strong> (smooth running of tournaments: gathering each team before its match); joining a
-            channel remains a choice — but until both are full, the match waits for referees to force its launch —, and only the presence of those who join it is counted; you can object to this processing (section “Your rights”) (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
+            deletion of each channel, with its name, readable by the server&apos;s administration, for the period Discord sets. This count rests on the association&apos;s <strong>legitimate interest</strong> (smooth running of tournaments: gathering each
+            team before its match); joining a channel remains a choice — but until both are full, the match waits for referees to force its launch, unless the bot does not answer —, and only the presence of those who join it is counted. This count is
+            anonymous (a number, never who; it only serves to hold the launch and is shown to no one): it has no right to object of its
+            own (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
           </p>
         </div>
       </section>

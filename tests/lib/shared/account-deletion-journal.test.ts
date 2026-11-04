@@ -6,6 +6,7 @@ import {
   parseJournal,
   pruneJournal,
   replayDecision,
+  withReactivationEntry,
   type AccountDeletionEntry,
 } from "@/lib/shared/account-deletion-journal";
 
@@ -139,5 +140,196 @@ describe("replayDecision", () => {
   it("ne touche jamais un identifiant réattribué à un autre compte, anonymisé ou non", () => {
     expect(replayDecision(entry(), { createdAt: "2026-09-22 08:00:00", isDeleted: false })).toBe("OTHER_ACCOUNT");
     expect(replayDecision(entry(), { createdAt: "2026-09-22 08:00:00", isDeleted: true })).toBe("OTHER_ACCOUNT");
+  });
+});
+
+describe("demande en attente (décision du 2026-11-04)", () => {
+  const now = new Date("2026-11-06T12:00:00.000Z");
+
+  it("formatJournalEntry_pendingFlag_roundTrips", () => {
+    const pending = entry({ pending: true });
+
+    expect(parseJournal(formatJournalEntry(pending) + "\n").entries).toEqual([pending]);
+  });
+
+  it("formatJournalEntry_finalEntry_hasNoPendingField", () => {
+    expect(formatJournalEntry(entry())).not.toContain("pending");
+  });
+
+  it("pruneJournal_finalAfterPending_finalWins", () => {
+    const pending = entry({ pending: true, deletedAt: "2026-10-01T10:00:00.000Z" });
+    const final = entry({ deletedAt: "2026-10-31T10:00:00.000Z" });
+
+    expect(pruneJournal([pending, final], now)).toEqual([final]);
+  });
+
+  it("pruneJournal_pendingAfterFinal_finalKept", () => {
+    const final = entry({ deletedAt: "2026-10-31T10:00:00.000Z" });
+    const pending = entry({ pending: true, deletedAt: "2026-11-01T10:00:00.000Z" });
+
+    expect(pruneJournal([final, pending], now)).toEqual([final]);
+  });
+
+  it("pruneJournal_twoPending_newestWins", () => {
+    const stale = entry({ pending: true, deletedAt: "2026-10-01T10:00:00.000Z" });
+    const current = entry({ pending: true, deletedAt: "2026-10-05T10:00:00.000Z" });
+
+    expect(pruneJournal([current, stale], now)).toEqual([current]);
+  });
+
+});
+
+// Décision R1 du 2026-11-04 : la réactivation est journalisée.
+describe("réactivation journalisée (décision R1)", () => {
+  const now = new Date("2026-11-06T12:00:00.000Z");
+  const key = { userId: 7, accountCreatedAt: "2026-01-02 03:04:05", undoneRequestAt: "2026-11-01 10:00:00" };
+  const reactivatedAt = new Date("2026-11-03T09:00:00.000Z");
+  const reactivated = entry({
+    reactivated: true,
+    deletedAt: "2026-11-03T09:00:00.000Z",
+    undoneRequestAt: "2026-11-01 10:00:00",
+  });
+  const pendingRow = (deletionRequestedAt: string | null) => ({
+    createdAt: "2026-01-02 03:04:05",
+    isDeleted: true,
+    pendingDeletion: true,
+    deletionRequestedAt,
+  });
+
+  it("withReactivationEntry_pendingLine_replacedByReactivatedLine", () => {
+    const pending = entry({ pending: true });
+    const other = entry({ userId: 8, pending: true });
+    const final = entry({ userId: 9 });
+
+    expect(withReactivationEntry([pending, other, final], key, reactivatedAt)).toEqual([other, final, reactivated]);
+  });
+
+  it("withReactivationEntry_otherCreationDate_untouched", () => {
+    const otherCreation = entry({ pending: true, accountCreatedAt: "2025-05-05 05:05:05" });
+
+    expect(withReactivationEntry([otherCreation], key, reactivatedAt)).toEqual([otherCreation, reactivated]);
+  });
+
+  it("withReactivationEntry_finalLineOfSameAccount_kept", () => {
+    const final = entry();
+
+    expect(withReactivationEntry([final], key, reactivatedAt)).toEqual([final, reactivated]);
+  });
+
+  it("pruneJournal_reactivationAfterRequest_reactivationWins", () => {
+    const pending = entry({ pending: true, deletedAt: "2026-11-01T10:00:00.000Z" });
+
+    expect(pruneJournal([pending, reactivated], now)).toEqual([reactivated]);
+  });
+
+  it("pruneJournal_newRequestAfterReactivation_requestWins", () => {
+    const pending = entry({ pending: true, deletedAt: "2026-11-05T10:00:00.000Z" });
+
+    expect(pruneJournal([reactivated, pending], now)).toEqual([pending]);
+  });
+
+  it("pruneJournal_finalDeletion_overridesReactivation", () => {
+    const final = entry({ deletedAt: "2026-10-01T10:00:00.000Z" });
+
+    expect(pruneJournal([reactivated, final], now)).toEqual([final]);
+  });
+
+  it("formatParse_reactivatedEntry_roundTrips", () => {
+    expect(parseJournal(formatJournalEntry(reactivated)).entries).toEqual([reactivated]);
+  });
+
+  // Revue sécurité #546, cycle 8 : une version antérieure exige `deletedAt` et
+  // écarte la ligne, au lieu d'y lire une suppression définitive.
+  it("formatJournalEntry_reactivatedEntry_writesReactivatedAtAndUndoneRequestAt", () => {
+    expect(formatJournalEntry(reactivated)).toBe(
+      '{"userId":7,"accountCreatedAt":"2026-01-02 03:04:05","reactivatedAt":"2026-11-03T09:00:00.000Z",' +
+        '"undoneRequestAt":"2026-11-01 10:00:00"}\n',
+    );
+  });
+
+  it("parseJournal_reactivationWithoutUndoneRequestAt_rejected", () => {
+    const line = JSON.stringify({ userId: 7, accountCreatedAt: "2026-01-02 03:04:05", reactivatedAt: "2026-11-03T09:00:00.000Z" });
+
+    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+  });
+
+  it("parseJournal_deletionLineWithUndoneRequestAt_rejected", () => {
+    const line = JSON.stringify({ ...entry(), undoneRequestAt: "2026-11-01 10:00:00" });
+
+    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+  });
+
+  it("parseJournal_deletedAtAndReactivatedAt_rejected", () => {
+    const line = JSON.stringify({ ...entry(), reactivatedAt: "2026-11-03T09:00:00.000Z" });
+
+    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+  });
+
+  it("parseJournal_reactivatedAtWithPending_rejected", () => {
+    const line = JSON.stringify({ ...key, reactivatedAt: "2026-11-03T09:00:00.000Z", pending: true });
+
+    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+  });
+
+  it("parseJournal_legacyReactivatedFlag_rejected", () => {
+    const line = JSON.stringify({ ...entry(), reactivated: true });
+
+    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+  });
+
+  it("parseJournal_invalidReactivatedAt_rejected", () => {
+    const line = JSON.stringify({ ...key, reactivatedAt: "pas une date" });
+
+    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+  });
+
+  it("replayDecision_restoredRequestEqualToUndone_reactivate", () => {
+    expect(replayDecision(reactivated, pendingRow("2026-11-01 10:00:00"))).toBe("REACTIVATE");
+  });
+
+  it("replayDecision_restoredRequestOlderThanUndone_reactivate", () => {
+    expect(replayDecision(reactivated, pendingRow("2026-10-20 08:00:00"))).toBe("REACTIVATE");
+  });
+
+  // Revue sécurité #546, cycle 8 : une nouvelle demande, postérieure, reste en attente.
+  it("replayDecision_restoredRequestLaterThanUndone_alreadyDeleted", () => {
+    expect(replayDecision(reactivated, pendingRow("2026-11-05 10:00:00"))).toBe("ALREADY_DELETED");
+  });
+
+  // Revue sécurité #546, cycle 9 : comparaison à la seconde, sans fuseau.
+  it("replayDecision_restoredRequestSameSecondLater_alreadyDeleted", () => {
+    expect(replayDecision(reactivated, pendingRow("2026-11-01 10:00:01"))).toBe("ALREADY_DELETED");
+  });
+
+  // Revue sécurité #546, cycle 9 : une demande défaite puis refaite reprend la date du journal.
+  it("replayDecision_pendingEntryPendingRow_redate", () => {
+    expect(replayDecision(entry({ pending: true }), pendingRow("2026-09-01 10:00:00"))).toBe("REDATE");
+  });
+
+  it("replayDecision_reactivatedEntryPendingWithoutRequestDate_alreadyDeleted", () => {
+    expect(
+      replayDecision(reactivated, {
+        createdAt: "2026-01-02 03:04:05",
+        isDeleted: true,
+        pendingDeletion: true,
+        deletionRequestedAt: null,
+      }),
+    ).toBe("ALREADY_DELETED");
+  });
+
+  it("replayDecision_reactivatedEntryAliveRow_alreadyActive", () => {
+    expect(replayDecision(reactivated, { createdAt: "2026-01-02 03:04:05", isDeleted: false })).toBe("ALREADY_ACTIVE");
+  });
+
+  it("replayDecision_reactivatedEntryFinalDeletedRow_alreadyDeleted", () => {
+    expect(
+      replayDecision(reactivated, { createdAt: "2026-01-02 03:04:05", isDeleted: true, pendingDeletion: false }),
+    ).toBe("ALREADY_DELETED");
+  });
+
+  it("replayDecision_reactivatedEntryOtherAccount_otherAccount", () => {
+    expect(
+      replayDecision(reactivated, { createdAt: "2026-09-22 08:00:00", isDeleted: true, pendingDeletion: true }),
+    ).toBe("OTHER_ACCOUNT");
   });
 });

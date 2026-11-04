@@ -41,10 +41,8 @@
   },
   "voice": {
     "title": "Salons vocaux",
-    "count": "Salon vocal : {count}/{capacity}",
-    "countFull": "Salon vocal : {count}/{capacity} · complet",
     "notCreated": "Salon vocal : bientôt ouvert",
-    "uncounted": "Salon vocal : pas encore compté",
+    "open": "Salon vocal : ouvert",
     "failed": "Salon vocal : indisponible",
     "failedNote": "Un salon est indisponible : le match n'attend pas les salons.",
     "waiting": "Le match se lance quand les deux salons sont pleins.",

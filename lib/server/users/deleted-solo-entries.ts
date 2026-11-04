@@ -1,0 +1,362 @@
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import { getDatabase } from "@/lib/server/database";
+import { sendBotLog } from "@/lib/server/bot-integration";
+import { formatDeletionWithdrawalLog } from "@/lib/shared/bot-logs";
+import { toParticipantType } from "@/lib/shared/participants";
+import { soloRegistrationsWithdrawnOnRequest, type SoloRegistrationFact } from "@/lib/shared/account-deletion";
+import { lockTournamentRow } from "@/lib/server/tournaments/registration";
+import { resequenceSeeds } from "@/lib/server/tournaments/seeding";
+import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { listSoloRegistrationTournamentIds, loadSoloRegistrations } from "./account-deletion";
+
+/*
+ * Les inscriptions solo d'un compte dont la suppression est demandée (ou faite)
+ * — décisions D12 étendue, E1, E2 et E5 (`docs/features/ACCOUNT_DELETION.md`) :
+ *
+ * - tournoi **pas encore commencé**, sans match : l'inscription est retirée,
+ *   une à une, dès la demande ;
+ * - tournoi **en cours** où l'entrée n'a **jamais joué** : ses matchs « à
+ *   planifier » ou « planifiés » (deux engagées connues, rien de saisi) sont
+ *   perdus par forfait, par le chemin d'arbitrage du format (abandon des
+ *   formats à classement, forfait match par match dans un arbre) ;
+ * - tout autre cas : rien ici, l'entrée garde son historique.
+ *
+ * Chaque retrait et chaque forfait écrit une ligne au journal Discord (« un
+ * joueur », jamais son pseudo).
+ */
+
+/**
+ * L'entrée solo `s` n'a jamais joué **dans ce tournoi** : aucun match tranché
+ * sur le terrain (ni exemption, ni forfait, ni double forfait) ni score en
+ * attente de confirmation. Filtré par tournoi : un compte n'a qu'une entrée
+ * solo pour tous ses tournois (`uniq_bg_teams_solo_user`), et un match joué
+ * ailleurs ne dit rien de celui-ci.
+ */
+export function soloEntryNeverPlayedSql(entry = "s.id", tournament = "r.tournament_id"): string {
+  return `NOT EXISTS (
+         SELECT 1 FROM bg_matches pm
+          WHERE pm.tournament_id = ${tournament}
+            AND (pm.team1_id = ${entry} OR pm.team2_id = ${entry})
+            AND pm.status IN ('COMPLETED', 'AWAITING_CONFIRMATION')
+            AND pm.is_bye = 0
+            AND pm.team1_id IS NOT NULL
+            AND pm.team2_id IS NOT NULL
+            AND pm.forfeit_team_id IS NULL
+            AND pm.double_forfeit = 0
+       )`;
+}
+
+/** Comptes relevés par passage de `settleDeletedSoloEntries`. */
+export const SETTLE_BATCH_SIZE = 200;
+
+/** Une inscription retirée par la suppression du compte. */
+export type DeletionWithdrawal = { tournamentId: number; teamId: number };
+
+/**
+ * Retire, sur la transaction de l'appelant (qui tient déjà la ligne de chacun
+ * des tournois `locked`), chaque inscription solo retirable dès la demande.
+ */
+export async function withdrawSoloRegistrationsOn(
+  connection: PoolConnection,
+  registrations: readonly SoloRegistrationFact[],
+  locked: ReadonlySet<number>,
+): Promise<DeletionWithdrawal[]> {
+  const withdrawn: DeletionWithdrawal[] = [];
+  for (const registration of soloRegistrationsWithdrawnOnRequest(registrations, locked)) {
+    await connection.execute(
+      `DELETE FROM bg_tournament_registrations WHERE tournament_id = ? AND team_id = ?`,
+      [registration.tournamentId, registration.teamId],
+    );
+    await resequenceSeeds(connection, registration.tournamentId);
+    withdrawn.push({ tournamentId: registration.tournamentId, teamId: registration.teamId });
+  }
+  return withdrawn;
+}
+
+/**
+ * L'entrée solo `s` n'a jamais joué dans le tournoi `r.tournament_id` **et** y
+ * a encore un match à jouer (« à planifier » ou « planifié ») : ce que le forfait
+ * peut encore trancher.
+ */
+function forfeitableEntrySql(): string {
+  return `${soloEntryNeverPlayedSql()}
+        AND EXISTS (
+          SELECT 1 FROM bg_matches om
+           WHERE om.tournament_id = r.tournament_id
+             AND (om.team1_id = s.id OR om.team2_id = s.id)
+             AND om.status IN ('PENDING', 'READY')
+        )`;
+}
+
+/** Les tournois en cours où l'entrée solo du compte n'a jamais joué et a encore un match à jouer. */
+export async function listForfeitableSoloEntries(
+  runner: Pick<PoolConnection, "execute">,
+  userId: number,
+): Promise<DeletionWithdrawal[]> {
+  const [rows] = await runner.execute<(RowDataPacket & { tournament_id: number; team_id: number })[]>(
+    `SELECT DISTINCT r.tournament_id, s.id AS team_id
+       FROM bg_teams s
+       JOIN bg_tournament_registrations r ON r.team_id = s.id
+       JOIN bg_tournaments t ON t.id = r.tournament_id AND t.state = 'RUNNING'
+      WHERE s.solo_user_id = ?
+        AND ${forfeitableEntrySql()}
+      ORDER BY r.tournament_id`,
+    [userId],
+  );
+  return rows.map((row) => ({ tournamentId: Number(row.tournament_id), teamId: Number(row.team_id) }));
+}
+
+/** Formats où un engagé abandonne d'un geste (tout le reste du tournoi). */
+const ABANDON_FORMATS: ReadonlySet<string> = new Set(["SURVIVAL", "SWISS", "BG_SURVIE"]);
+
+/** Le format qui décide d'un abandon : celui de la phase en cours d'un multi-phases. */
+async function engineFormat(tournamentId: number): Promise<string | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { format: string; phase_format: string | null })[]>(
+    `SELECT t.format, p.format AS phase_format
+       FROM bg_tournaments t
+       LEFT JOIN bg_tournament_phases p ON p.id = t.current_phase_id
+      WHERE t.id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return row.format === "MULTI" ? row.phase_format : row.format;
+}
+
+/**
+ * L'entrée appartient toujours à un compte en suppression et n'a toujours pas
+ * joué dans ce tournoi — relu juste avant l'abandon : un compte réactivé, ou
+ * une manche saisie, entre le relevé et le geste garde l'entrée.
+ */
+async function entryStillForfeitable(tournamentId: number, teamId: number): Promise<boolean> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { is_deleted: number })[]>(
+    `SELECT u.is_deleted FROM bg_teams s JOIN bg_users u ON u.id = s.solo_user_id
+      WHERE s.id = ? AND ${soloEntryNeverPlayedSql("?", "?")} LIMIT 1`,
+    [teamId, tournamentId, teamId, teamId],
+  );
+  return Number(rows[0]?.is_deleted ?? 0) === 1;
+}
+
+/** Garde-fou de la boucle d'un arbre : au-delà, un match qui ne se tranche pas. */
+const MAX_BRACKET_FORFEITS = 64;
+
+/**
+ * Les matchs encore à jouer de l'entrée passent en forfait (E1), par les gestes
+ * de l'arbitrage — abandon (`forfeitTournamentTeam`) dans un format à
+ * classement, forfait match par match dans un arbre
+ * (`forfeitDeletedEntryMatch`, qui relit tout sous le verrou du tournoi puis
+ * du match et tranche par `adminResolveMatch`) : chaque forfait propage
+ * l'adversaire, et un match d'aval qui reçoit l'entrée (tableau des perdants)
+ * est tranché au tour suivant de la boucle. Un match dont l'adversaire n'est
+ * pas encore connu attend son appariement : le passage horaire suivant
+ * (`settleDeletedSoloEntries`, lancé avec les suppressions définitives) le
+ * tranchera.
+ *
+ * Rend le nombre de forfaits posés. Chaque geste ouvre sa propre transaction
+ * et prend `lockTournamentRow` le premier.
+ */
+export async function forfeitUnplayedSoloEntry(tournamentId: number, teamId: number): Promise<number> {
+  const { forfeitDeletedEntryMatch, forfeitTournamentTeam } = await import("@/lib/server/tournaments-service");
+  const { lockDeletedSoloEntryStillForfeitable } = await import("@/lib/server/tournaments/deleted-entry-forfeit");
+  const format = await engineFormat(tournamentId);
+  if (format !== null && ABANDON_FORMATS.has(format)) {
+    if (!(await entryStillForfeitable(tournamentId, teamId))) return 0;
+    try {
+      // Une seule ligne au journal : celle de la suppression, qui dit le forfait.
+      // Relu une seconde fois sous le verrou du tournoi et du compte : le
+      // premier relevé, hors transaction, ne ferme pas la course d'une
+      // réactivation.
+      await forfeitTournamentTeam(tournamentId, teamId, null, undefined, {
+        skipForfeitLog: true,
+        stillDue: (connection) => lockDeletedSoloEntryStillForfeitable(connection, tournamentId, teamId),
+      });
+    } catch (error) {
+      // Déjà hors course (abandon antérieur, passage précédent), ou plus dû
+      // (compte réactivé, manche jouée) : rien à faire.
+      if (error instanceof Error && (error.message === "TEAM_ALREADY_OUT" || error.message === "FORFEIT_NO_LONGER_DUE")) {
+        return 0;
+      }
+      throw error;
+    }
+    return 1;
+  }
+  let forfeits = 0;
+  let previousMatchId: number | null = null;
+  for (let round = 0; round < MAX_BRACKET_FORFEITS; round += 1) {
+    const matchId = await forfeitDeletedEntryMatch(tournamentId, teamId);
+    // Rien d'ouvert, ou le même match encore rendu : la boucle s'arrête.
+    if (matchId === null || matchId === previousMatchId) break;
+    previousMatchId = matchId;
+    forfeits += 1;
+  }
+  return forfeits;
+}
+
+/** Ce qu'il faut pour rédiger la ligne de journal d'un retrait. */
+async function withdrawalLogFacts(tournamentId: number): Promise<{
+  name: string;
+  registered: number;
+  maxTeams: number;
+  participantType: ReturnType<typeof toParticipantType>;
+} | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & {
+    name: string;
+    max_teams: number;
+    participant_type: string;
+    registered: number;
+  })[]>(
+    `SELECT t.name, t.max_teams, t.participant_type,
+            (SELECT COUNT(*) FROM bg_tournament_registrations r WHERE r.tournament_id = t.id) AS registered
+       FROM bg_tournaments t WHERE t.id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    name: row.name,
+    registered: Number(row.registered),
+    maxTeams: Number(row.max_teams),
+    participantType: toParticipantType(row.participant_type),
+  };
+}
+
+/** Journal Discord d'un retrait ou d'un forfait dû à la suppression d'un compte (E5). Ne lève jamais. */
+export async function logDeletionWithdrawal(tournamentId: number, forfeited: boolean): Promise<void> {
+  try {
+    const facts = await withdrawalLogFacts(tournamentId);
+    if (!facts) return;
+    sendBotLog(
+      formatDeletionWithdrawalLog({
+        tournament: { id: tournamentId, name: facts.name },
+        // Nom jamais lu en tournoi individuel (« un joueur ») ; vide par prudence.
+        entrant: { name: "", participantType: facts.participantType },
+        registeredTeams: facts.registered,
+        maxTeams: facts.maxTeams,
+        forfeited,
+      }),
+      { tournamentId, category: "registrations" },
+    );
+  } catch (error) {
+    console.error("[account-deletion] ligne de journal du retrait non écrite", error);
+  }
+}
+
+/**
+ * Forfait de chaque entrée, une à une et au meilleur effort : un échec est dit
+ * et reporté au prochain passage, sans empêcher les suivantes. Jamais levé.
+ * Rend le nombre de tournois où un forfait a été posé.
+ */
+async function forfeitEntries(entries: readonly DeletionWithdrawal[]): Promise<number> {
+  let forfeited = 0;
+  for (const entry of entries) {
+    try {
+      const forfeits = await forfeitUnplayedSoloEntry(entry.tournamentId, entry.teamId);
+      if (forfeits > 0) {
+        forfeited += 1;
+        await logDeletionWithdrawal(entry.tournamentId, true);
+      }
+    } catch (error) {
+      console.error(
+        `[account-deletion] forfait de l'entrée ${entry.teamId} (tournoi ${entry.tournamentId}) reporté :`,
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+  return forfeited;
+}
+
+/** Les forfaits posés après le commit d'une demande, au meilleur effort ; jamais levé. */
+export async function forfeitSoloEntriesAfterCommit(entries: readonly DeletionWithdrawal[]): Promise<void> {
+  // Reportés au prochain passage horaire (`settleDeletedSoloEntries`) en cas d'échec.
+  await forfeitEntries(entries);
+}
+
+/**
+ * Rattrapage (E2) : applique la règle du jour aux comptes **déjà** supprimés
+ * (demande en cours ou suppression faite) — inscriptions solo à un tournoi pas
+ * encore commencé retirées, entrées jamais jouées d'un tournoi en cours
+ * forfaitées. Idempotent : un compte sans rien à retirer ni à forfaiter n'est
+ * pas touché, et un second passage ne trouve plus rien.
+ *
+ * Rend le nombre d'inscriptions retirées et de tournois forfaités.
+ */
+export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; forfeited: number }> {
+  const db = await getDatabase();
+  // Seuls les comptes qui ont **quelque chose** à faire : une inscription à
+  // retirer (tournoi pas commencé) ou une entrée en cours à forfaiter. Un
+  // compte dont l'entrée a joué reste inscrit à un tournoi en cours des
+  // semaines durant — le relever ici le ferait relire à chaque passage
+  // horaire de chaque processus. Borné : un lot par passage.
+  const [candidates] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT DISTINCT u.id
+       FROM bg_users u
+       JOIN bg_teams s ON s.solo_user_id = u.id
+       JOIN bg_tournament_registrations r ON r.team_id = s.id
+       JOIN bg_tournaments t ON t.id = r.tournament_id
+      WHERE u.is_deleted = 1
+        AND (
+          t.state IN ('UPCOMING', 'REGISTRATION')
+          OR (t.state = 'RUNNING' AND ${forfeitableEntrySql()})
+        )
+      ORDER BY u.id
+      LIMIT ${SETTLE_BATCH_SIZE}`,
+  );
+  const outcome = { withdrawn: 0, forfeited: 0 };
+  for (const candidate of candidates) {
+    const userId = Number(candidate.id);
+    try {
+      const withdrawn = await withdrawDeletedAccountRegistrations(userId);
+      outcome.withdrawn += withdrawn.length;
+      for (const entry of withdrawn) {
+        publishUpdatedEvent(entry.tournamentId);
+        await logDeletionWithdrawal(entry.tournamentId, false);
+      }
+      // Un tournoi qui échoue n'empêche pas les suivants du même compte.
+      outcome.forfeited += await forfeitEntries(await listForfeitableSoloEntries(db, userId));
+    } catch (error) {
+      console.error(
+        `[deleted-accounts] Inscriptions solo du compte #${userId} reportées au prochain passage :`,
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+  return outcome;
+}
+
+/**
+ * Une transaction par compte supprimé : tournois verrouillés d'abord (id
+ * croissant), puis le compte, relu supprimé sous son verrou.
+ */
+async function withdrawDeletedAccountRegistrations(userId: number): Promise<DeletionWithdrawal[]> {
+  const db = await getDatabase();
+  const tournamentIds = await listSoloRegistrationTournamentIds(db, userId);
+  if (tournamentIds.length === 0) return [];
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    for (const tournamentId of tournamentIds) await lockTournamentRow(connection, tournamentId);
+    const [locked] = await connection.execute<(RowDataPacket & { is_deleted: number })[]>(
+      `SELECT is_deleted FROM bg_users WHERE id = ? FOR UPDATE`,
+      [userId],
+    );
+    if (Number(locked[0]?.is_deleted ?? 0) !== 1) {
+      await connection.rollback();
+      return [];
+    }
+    const withdrawn = await withdrawSoloRegistrationsOn(
+      connection,
+      await loadSoloRegistrations(connection, userId),
+      new Set(tournamentIds),
+    );
+    await connection.commit();
+    return withdrawn;
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    throw error;
+  } finally {
+    connection.release();
+  }
+}

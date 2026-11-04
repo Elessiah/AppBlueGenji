@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import sharp, { type ResizeOptions } from "sharp";
+import { IMAGE_BLOCKED, isBlockedImage } from "@/lib/server/blocked-images";
 import { cropRectToRegion, type CropRect, type ImageUploadKind } from "@/lib/shared/image-crop";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
 
@@ -214,6 +215,12 @@ export async function storeImageBuffer(
   const resized = pipeline.resize(config.width, config.height, resizeOptions(config.fit));
 
   const output = await resized.webp({ quality: config.quality }).toBuffer();
+
+  // Avatar ou logo d'équipe : une image bloquée (avatar en quarantaine d'un
+  // compte effacé, `blocked-images.ts`) n'est pas reposée.
+  if ((kind === "avatar" || kind === "team-logo") && (await isBlockedImage(output, buffer))) {
+    throw new Error(IMAGE_BLOCKED);
+  }
 
   const hash = crypto.randomBytes(8).toString("hex");
   const filename = `${ownerId}-${hash}.webp`;

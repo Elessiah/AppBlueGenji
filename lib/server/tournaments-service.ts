@@ -31,6 +31,7 @@ export {
   // Scoring - public API
   reportMatchScorePublic as reportMatchScore,
   forfeitOwnMatchPublic as forfeitOwnMatch,
+  forfeitDeletedEntryMatchPublic as forfeitDeletedEntryMatch,
   // Admin
   checkDownstreamMatchesHaveNoScores,
   // Suppression définitive (administrateurs)

@@ -21,6 +21,8 @@
 export const SESSION_COOKIE_BASE = "bg_session";
 /** Nom nu du cookie d'état d'un aller-retour OAuth. */
 export const OAUTH_COOKIE_BASE = "bg_oauth";
+/** Nom nu du cookie du ticket de réactivation (compte en attente de suppression). */
+export const REACTIVATION_COOKIE_BASE = "bg_reactivation";
 export const HOST_COOKIE_PREFIX = "__Host-";
 
 /** Lu à chaque appel, pas figé au chargement du module (les tests le font varier). */
@@ -39,6 +41,15 @@ export function sessionCookieName(production = isProductionCookieEnv()): string 
 
 export function oauthCookieName(production = isProductionCookieEnv()): string {
   return hostCookieName(OAUTH_COOKIE_BASE, production);
+}
+
+/**
+ * Le ticket ouvre une session au clic « Réactiver mon compte » : même préfixe
+ * que la session, sans quoi un sous-domaine voisin pourrait y poser le ticket
+ * d'un autre compte (connexion forcée).
+ */
+export function reactivationCookieName(production = isProductionCookieEnv()): string {
+  return hostCookieName(REACTIVATION_COOKIE_BASE, production);
 }
 
 /**

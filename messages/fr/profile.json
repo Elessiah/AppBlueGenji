@@ -222,32 +222,33 @@
     "deleting": "Suppression…"
   },
   "deletion": {
-    "question": "Supprimer définitivement ton compte ?",
+    "question": "Supprimer ton compte ?",
     "confirm": "Supprimer mon compte",
     "pending": "Suppression…",
     "residual": "Comme pour tout compte supprimé, resteront les sauvegardes chiffrées du site ({backupDays} jours), la mention de ta suppression dans le journal qui permet de la rejouer après une restauration (au moins {journalDays} jours), l'empreinte de mesure d'audience décrite par la politique de confidentialité, tes données de connexion (adresse IP, date, moyen de connexion), que la loi impose de garder {logDays} jours, les annonces de tes matchs de tournoi individuel publiées dans le salon #live du Discord (et l'alerte de modération d'une annonce bloquée ou signalée par AutoMod), qui gardent ton pseudo jusqu'à leur suppression sur demande, et, si tu es membre du staff, la trace de tes gestes dans les journaux du serveur.",
-    "irreversible": "Cette action est irréversible.",
+    "irreversible": "La suppression deviendra définitive au bout de 30 jours : d'ici là, te reconnecter te permettra de réactiver ton compte. Dès la demande, ton compte sera montré anonyme partout, sans ton pseudo ni ton avatar ; la réactivation te les rendra.",
+    "handover": "Dès maintenant, tu quitteras tes équipes (la propriété passera à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre ; seul joueur, l'équipe deviendra fantôme si elle est engagée dans un tournoi pas terminé, sinon elle sera dissoute), tes tournois organisés passeront à un autre membre du staff quand quelqu'un pourra les reprendre, tes inscriptions à des tournois individuels pas encore commencés, tes casts de matchs pas encore terminés, tes désignations d'arbitre et tes invitations et demandes d'adhésion d'équipe en attente seront retirés et tes matchs restants d'un tournoi individuel en cours où tu n'as jamais joué seront perdus par forfait. Réactiver ton compte ne défera pas ces gestes.",
     "ownedTeamsFromTerms": "Depuis cette fenêtre, transférer ou dissoudre ton équipe demande d'abord d'accepter les conditions d'utilisation. Sans les accepter, tu peux demander à l'association un effacement complet (« Exercer vos droits », dans la politique de confidentialité).",
     "consequences": {
       "TOURNAMENTS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées.",
       "SOLO_REGISTRATIONS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es engagé dans un tournoi individuel déjà commencé ou terminé, où ton pseudo sert de nom d'engagé et sera remplacé par ce pseudo d'emprunt.",
       "ORGANIZED_TOURNAMENTS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es l'organisateur de tournois qui doivent garder un titulaire.",
       "OWNED_TEAMS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet.",
-      "NONE": "Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte et ton profil seront effacés entièrement, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées.",
-      "UNKNOWN": "Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, inscription à un tournoi individuel, équipe possédée, tournoi organisé), il sera rendu anonyme ou effacé entièrement."
+      "NONE": "Tu n'as joué aucun match ni laissé de tournoi sans repreneur : ton compte et ton profil seront effacés entièrement, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées.",
+      "UNKNOWN": "Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, inscription à un tournoi individuel, tournoi organisé), il sera rendu anonyme ou effacé entièrement."
     },
     "outcome": {
-      "TOURNAMENTS": "Compte supprimé. Tes statistiques restent conservées sous un pseudo d'emprunt.",
-      "SOLO_REGISTRATIONS": "Compte supprimé. Tes inscriptions en tournoi individuel portent désormais un pseudo d'emprunt.",
-      "ORGANIZED_TOURNAMENTS": "Compte supprimé. Tes tournois gardent un organisateur anonyme.",
-      "OWNED_TEAMS": "Compte supprimé. Ton équipe garde un propriétaire anonyme.",
-      "NONE": "Compte effacé. Ton compte, ton profil et tes éventuelles inscriptions à venir en tournoi individuel ont disparu du site ; seules restent les traces décrites par la politique de confidentialité et son registre (sauvegardes, journal des suppressions, mesure d'audience).",
-      "UNKNOWN": "Compte supprimé."
+      "TOURNAMENTS": "Suppression demandée. Tes statistiques resteront conservées sous un pseudo d'emprunt. Pour l'annuler, reconnecte-toi d'ici 30 jours et confirme la réactivation.",
+      "SOLO_REGISTRATIONS": "Suppression demandée. Tes inscriptions en tournoi individuel porteront un pseudo d'emprunt. Pour l'annuler, reconnecte-toi d'ici 30 jours et confirme la réactivation.",
+      "ORGANIZED_TOURNAMENTS": "Suppression demandée. Tes tournois garderont un organisateur anonyme. Pour l'annuler, reconnecte-toi d'ici 30 jours et confirme la réactivation.",
+      "OWNED_TEAMS": "Suppression demandée. Ton équipe gardera un propriétaire anonyme. Pour l'annuler, reconnecte-toi d'ici 30 jours et confirme la réactivation.",
+      "NONE": "Suppression demandée. Ton compte et ton profil seront effacés ; seules resteront les traces décrites par la politique de confidentialité et son registre (sauvegardes, journal des suppressions, mesure d'audience). Pour l'annuler, reconnecte-toi d'ici 30 jours et confirme la réactivation.",
+      "UNKNOWN": "Suppression demandée. Pour l'annuler, reconnecte-toi d'ici 30 jours et confirme la réactivation."
     },
     "errors": {
       "ACCOUNT_STILL_REFERENCED": "Ton compte a été rattaché à un tournoi ou à une équipe pendant la suppression. Réessaie : il sera alors anonymisé plutôt qu'effacé.",
       "fallback": "La suppression du compte a échoué. Réessaie dans un instant.",
-      "sessionGone": "Ta session est fermée : soit ton compte vient d'être supprimé, soit ta session a expiré. La page se recharge. Si ton compte existe encore, reconnecte-toi pour relancer la suppression ; s'il a été supprimé, une nouvelle connexion créerait un nouveau compte."
+      "sessionGone": "Ta session est fermée : soit ton compte vient d'être supprimé, soit ta session a expiré. La page se recharge. Si ta demande de suppression est enregistrée, te reconnecter d'ici 30 jours te permet de réactiver ton compte ; sinon, reconnecte-toi pour la relancer."
     }
   },
   "errors": {
@@ -413,7 +414,7 @@
     "exposure": {
       "admins": "Les administrateurs du site voient ton tag Discord en permanence.",
       "referees": "Les arbitres le voient uniquement quand tu es engagé dans un tournoi en cours ou à venir — plus après —, ou, pour un match que tu castes, dès que ses deux adversaires sont connus et jusqu'à sa fin.",
-      "match": "Les membres des deux équipes de ton match le voient dès que ses deux adversaires sont connus et jusqu'à sa fin, ses casters le temps du match seulement (de son départ à sa fin) — pour s'ajouter et créer le salon. Si tu castes un match, ses deux équipes, ses autres casters et son arbitre désigné voient le tien le temps du match seulement, dans les fenêtres « Contacts » et de lancement du match et sur sa page, et les autres arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page. Si tu es l'arbitre désigné d'un match, ses deux équipes voient le tien dès que ses deux adversaires sont connus et jusqu'à sa fin, ses casters le temps du match seulement, dans sa fenêtre « Contacts » et sur sa page — le temps du match seulement pour ses parties si tu le castes aussi, la règle des casters valant alors pour les autres arbitres (pour l'arbitrage : nécessaire au service une fois la version 7 des conditions acceptée, sans opposition propre — ton opposition d'arbitre, retenue, t'en retire toujours ; avant, au titre de l'intérêt légitime : tu peux t'y opposer par le formulaire de signalement, catégorie RGPD).",
+      "match": "Les membres des deux équipes de ton match le voient dès que ses deux adversaires sont connus et jusqu'à sa fin, ses casters le temps du match seulement (de son départ à sa fin) — pour s'ajouter et créer le salon. Si tu castes un match, ses deux équipes, ses autres casters et son arbitre désigné voient le tien le temps du match seulement, dans les fenêtres « Contacts » et de lancement du match et sur sa page, et les autres arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page. Si tu es l'arbitre désigné d'un match, ses deux équipes voient le tien dès que ses deux adversaires sont connus et jusqu'à sa fin, ses casters le temps du match seulement, dans sa fenêtre « Contacts » et sur sa page — le temps du match seulement pour ses parties si tu le castes aussi, la règle des casters valant alors pour les autres arbitres (pour l'arbitrage : nécessaire au service une fois la version 9 des conditions acceptée, sans opposition propre — ton opposition d'arbitre, retenue, t'en retire toujours ; avant, au titre de l'intérêt légitime : tu peux t'y opposer par le formulaire de signalement, catégorie RGPD).",
       "players": "Les autres joueurs du site ne le voient que si tu le rends visible dans tes réglages de confidentialité. Il n'apparaît sur aucune page publique. Que ton tag soit certifié (pastille ✅, sans le tag) se lit en revanche sur ta fiche par tout joueur connecté.",
       "undo": "Tu peux annuler à tout moment en retirant ton tag depuis « Mon profil » : la certification est perdue, et l'exposition avec elle. Une connexion par Discord réenregistre ensuite ton pseudo, mais sans le certifier : seul ce geste-ci le certifie."
     },
@@ -471,7 +472,7 @@
       "referees": "les arbitres, tant que tu es inscrit à un tournoi non terminé ;",
       "match": "les membres des deux équipes de ton match, dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match ;",
       "asCaster": "si tu castes un match : ses deux équipes, ses autres casters et son arbitre désigné le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et les autres arbitres dès que ses adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page ;",
-      "asReferee": "si tu es l'arbitre désigné d'un match : ses deux équipes dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match, dans sa fenêtre « Contacts » et sur sa page — la règle des casters si tu le castes aussi (pour l'arbitrage : nécessaire au service une fois la version 7 des conditions acceptée, sans opposition propre — ton opposition d'arbitre, retenue, t'en retire toujours ; avant, intérêt légitime : tu peux t'y opposer par le formulaire de signalement) ;",
+      "asReferee": "si tu es l'arbitre désigné d'un match : ses deux équipes dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match, dans sa fenêtre « Contacts » et sur sa page — la règle des casters si tu le castes aussi (pour l'arbitrage : nécessaire au service une fois la version 9 des conditions acceptée, sans opposition propre — ton opposition d'arbitre, retenue, t'en retire toujours ; avant, intérêt légitime : tu peux t'y opposer par le formulaire de signalement) ;",
       "players": "les autres joueurs, seulement si tu coches « Tag Discord » dans tes réglages de confidentialité.",
       "footer": "Personne d'autre."
     },

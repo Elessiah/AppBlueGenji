@@ -190,7 +190,7 @@ describe("lectures des identités de fiche", () => {
     execute.mockResolvedValue([[{ pseudo: "Nova", is_deleted: 0 }]]);
     await expect(getPlayerPageIdentity(9)).resolves.toEqual({ pseudo: "Nova", isDeleted: false });
     const [sql] = execute.mock.calls[0];
-    expect(sql).toMatch(/^SELECT pseudo, is_deleted FROM bg_users\b/);
+    expect(sql).toMatch(/^SELECT pseudo, is_deleted, deletion_requested_at FROM bg_users\b/);
   });
 
   it("rend null pour un compte introuvable", async () => {

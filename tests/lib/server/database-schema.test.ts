@@ -745,3 +745,12 @@ describe("Schéma — la liste des colonnes se lit sur le CREATE, pas sur ses li
     expect(declaredColumns("ALTER TABLE bg_demo ADD COLUMN x INT NULL")).toBeNull();
   });
 });
+
+describe("Schéma — index des comptes supprimés", () => {
+  it("bg_users_isDeletedIndex_inCreateTableAndRecentChanges", () => {
+    // Le rattrapage de démarrage et le passage horaire ne relèvent que les comptes
+    // supprimés : sans cet index, chaque démarrage parcourait toute la table.
+    expect(table("bg_users")).toContain("INDEX idx_bg_users_is_deleted (is_deleted)");
+    expect(sql).toContain("ALTER TABLE bg_users ADD INDEX idx_bg_users_is_deleted (is_deleted)");
+  });
+});

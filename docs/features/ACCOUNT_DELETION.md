@@ -590,6 +590,182 @@ suppression **après le commit** dans un journal hors de la base
 (`recordAccountDeletion`), que `npm run replay:deletions` rejoue sur la base
 restaurée. Voir `docs/features/BACKUP_DATA_PROTECTION.md`.
 
+## Suppression différée de trente jours (ERASURE-D2)
+
+> `requestAccountDeletion` (`lib/server/users/account-deletion-request.ts`),
+> `account-reactivation.ts`, `deleted-solo-entries.ts`,
+> `finalizeAccountDeletion` / `finalizeDueAccountDeletions`, `blocked-images.ts`.
+
+`DELETE /api/profile` **ne détruit plus rien** : le compte passe en attente
+(`is_deleted = 1` + `deletion_requested_at`), ce qui réutilise toutes les gardes
+`is_deleted = 0` existantes (session, notifications, annuaire, invitations par
+pseudo). La fiche joueur répond 404 même s'il a joué, et il compte parmi les
+joueurs sans fiche (`profileless-players`). Les sessions sont supprimées dans
+la transaction.
+
+### Anonyme dès la demande (décision du 2026-11-04)
+
+> `lib/server/users/account-deletion-hold.ts`, table `bg_account_deletion_holds`.
+
+Dès la demande, le compte est **montré anonyme partout** — résultats passés,
+classements, effectifs, pages de tournoi, entrée solo. Plutôt que de filtrer
+chaque lecture, `holdAccountIdentity` met le vrai pseudo et le chemin de
+l'avatar de côté (`bg_account_deletion_holds`, une ligne par compte) et pose
+sur `bg_users` un pseudo d'emprunt (`pickAnonymousPseudo`, en écartant ceux des
+comptes et des masques) et `avatar_url = NULL` **dans l'instruction même** qui
+pose `is_deleted = 1` (le balayage des gardes d'écriture n'en dispense qu'elle),
+puis renomme l'entrée solo (`syncSoloEntryIdentityOn`). Toute lecture qui joint
+`bg_users` montre donc déjà le faux nom, sans lien de fiche.
+
+- **Pseudo réservé** : `isPseudoHeldByOther` le refuse au renommage
+  (`PSEUDO_ALREADY_USED`) et `pseudoExists` à l'inscription.
+- **Réactivation** : `restoreAccountIdentity` relève la demande et rend pseudo et
+  avatar en une instruction, efface le masque et renomme l'entrée solo. Un
+  conflit (course avec un renommage, sauvegarde restaurée) rend le pseudo suivi
+  de « OG » (`reactivationPseudoCandidate` : « PseudoOG », puis « PseudoOG2 »…
+  jusqu'à « PseudoOG10 », en sautant les pseudos réservés par un masque ; début
+  raccourci pour tenir dans 40 caractères), modifiable dans Mon profil
+  (décision R3 du 2026-11-04, dite sur l'écran de réactivation FR + EN) ; ces
+  dix essais épuisés, le compte revit sous son pseudo d'emprunt.
+- **Journal à la réactivation** (décision R1) : `recordAccountReactivation`
+  remplace la ligne en attente par une ligne de réactivation, écrite
+  `{userId, accountCreatedAt, reactivatedAt, undoneRequestAt}` **sans**
+  `deletedAt` (`undoneRequestAt` : `deletion_requested_at` défait, tel que la
+  base le rend, comparé texte à texte — ni fuseau ni arrondi) : une version
+  antérieure du site (retour arrière) l'écarte comme illisible au lieu d'y lire
+  une suppression définitive (même rétention que les autres). Au rejeu,
+  `replayDecision` rend `REACTIVATE` si le compte est revenu en attente avec la
+  sauvegarde **sur une demande égale ou antérieure à celle défaite** (une
+  demande refaite après tient : `ALREADY_DELETED` ; revérifié sous verrou,
+  avec la date de création) —
+  `replayAccountReactivation` le réactive (même écriture, sans ticket ni
+  fenêtre, sans réécrire le journal) — et `ALREADY_ACTIVE` s'il est vivant.
+  Entre demande et réactivation d'un même compte, la ligne la plus récente
+  l'emporte ; une suppression définitive les rend caduques. Une ligne en
+  attente dont le compte revient **en attente** avec la sauvegarde (demande
+  défaite puis refaite) rend `REDATE` : `deletion_requested_at` reprend la date
+  du journal, pour que l'ancienne demande n'abrège pas la nouvelle fenêtre.
+- **Jour 30** : l'effacement supprime aussi le fichier d'avatar mis de côté ;
+  l'anonymisation efface le masque (cascade sur l'effacement).
+- **Organisateur sans repreneur** : même règle, anonyme dès la demande.
+- Un **forfait ou un retrait ordinaire** n'anonymise jamais personne
+  (`forfeit-never-anonymises.test.ts`).
+
+**Journal de rejeu** : la demande y entre en ligne `pending: true` (identifiant,
+date de création, date de la demande). Une restauration la rejoue comme une
+demande (`requestAccountDeletion(id, { requestedAt })`, trente jours comptés
+depuis l'origine) si la fenêtre est encore ouverte, sinon comme une suppression
+définitive. La réactivation la retire (`forgetPendingAccountDeletion`, ne lève
+jamais) ; à l'élagage, une ligne définitive remplace la ligne en attente du
+même compte.
+
+**Ce qui touche les autres se fait tout de suite, et la réactivation ne le
+défait pas** — une seule transaction, verrous dans l'ordre tournois
+(`lockTournamentRow`, id croissant) → compte (`FOR UPDATE`) → équipes :
+
+- **E3 — équipes.** Le compte quitte chaque équipe. Propriétaire : la propriété
+  reste à un autre `OWNER` s'il y en a, sinon passe au `MANAGER`, sinon au
+  `CAPITAINE`, sinon au membre le plus ancien
+  (`pickTeamSuccessor`, départage par l'id d'appartenance), avec l'avis
+  `OWNERSHIP`. Seul joueur : équipe **fantôme** si elle est inscrite à un tournoi
+  `UPCOMING`/`REGISTRATION`/`RUNNING`, sinon **dissoute** (`dissolveTeamOn`,
+  « Équipe dissoute #id »). Les candidats ne sont pas verrouillés côté compte
+  (inversion d'ordre évitée) ; seuls les comptes vivants héritent.
+- **Tournois organisés** : au compte vivant le plus ancien qui tient la
+  permission `tournaments` par un rôle, sinon à un administrateur — jamais à un
+  compte suspendu, qui ne se connecte pas. Seuls les tournois verrouillés en tête
+  de transaction changent de main (`WHERE … AND id IN (…)`) : un tournoi confié
+  entre le relevé et l'écriture reste à l'organisateur. Personne :
+  rien ne change ; le compte est anonyme dès la demande, puis anonymisé au jour 30.
+- **E1 — inscriptions solo.** Celles d'un tournoi pas encore commencé, sans
+  match, sont retirées (`withdrawSoloRegistrationsOn`). L'entrée d'un tournoi
+  `RUNNING` **jamais jouée** perd ses matchs restants par forfait **après** le
+  commit (`forfeitSoloEntriesAfterCommit` : `forfeitTournamentTeam` pour
+  SURVIVAL/SWISS/BG_SURVIE — une entrée déjà hors course n'est pas une erreur —,
+  sinon `forfeitDeletedEntryMatch` match par match : sous `lockTournamentRow`
+  puis le verrou du match, il relit tournoi `RUNNING`, compte en suppression,
+  entrée jamais jouée et match encore ouvert, puis tranche par
+  `adminResolveMatch` — un relevé hors verrou aurait pu « corriger » en forfait
+  un résultat que l'arbitre venait de saisir). « Jamais jouée » se lit **dans ce tournoi** (`pm.tournament_id`) :
+  l'entrée solo est unique pour tous les tournois du compte. Chaque forfait
+  relit d'abord `is_deleted` : un compte réactivé entre-temps garde ses matchs.
+  Cette relecture se fait **sur la transaction du forfait**, après le verrou du
+  tournoi, la ligne du compte prise `FOR UPDATE` (`lockDeletedSoloEntryStillForfeitable`,
+  passée à `forfeitTournamentTeam` comme `stillDue` — faux : `FORFEIT_NO_LONGER_DUE`,
+  rien n'est abandonné) : une réactivation qui arrive pendant attend le commit.
+  Le masque (`bg_account_deletion_holds`) s'écrit par une insertion simple après
+  retrait de l'ancien : un pseudo déjà mis de côté par un autre compte fait
+  échouer la demande au lieu de réécrire le masque de cet autre compte.
+  Un échec, ou un match d'aval dont l'adversaire n'est pas encore connu, est
+  repris par `settleDeletedSoloEntries`, relancé chaque heure avant les
+  suppressions définitives (et au rattrapage de démarrage).
+- Casts et arbitrages à venir retirés, invitations du compte annulées.
+- Après le commit, chaque tournoi de l'entrée solo est rediffusé (son nom
+  d'engagé vient de passer au pseudo d'emprunt) ; la réactivation rediffuse les
+  mêmes au retour du vrai pseudo, et efface dans sa transaction toutes les
+  sessions du compte (une connexion en cours au moment de la demande aurait
+  laissé une session qui revivrait avec lui). Une équipe propriétaire seule
+  devient fantôme ou dissoute selon ses inscriptions lues **verrouillantes**
+  (`LOCK IN SHARE MODE`, table seule) : une inscription validée pendant
+  l'attente du verrou de l'équipe est vue.
+
+**E5 / alerte.** Le journal Discord écrit « 🗑️ Compte supprimé » (catégorie
+`signups`, sans pseudo ni id) puis **une seule** ligne par tournoi retiré ou
+forfaité (`registrations`, « un joueur ») : le forfait d'une suppression passe
+`skipForfeitLog` à `forfeitTournamentTeam`, qui tait sa propre ligne de forfait.
+
+**E4 — réactivation.** Se reconnecter dans les trente jours n'ouvre pas de
+session : `createSession` (porte unique de toutes les connexions) pose un ticket
+`__Host-bg_reactivation` en production (`reactivationCookieName`, nom nu en développement ; jeton aléatoire, empreinte SHA-256 dans
+`bg_account_reactivation_tickets`, quinze minutes) et lève
+`AccountPendingDeletionError` ; le rappel OAuth et le code Discord renvoient vers
+`/connexion/reactivation`, qui dit ce qui n'est pas rendu. La connexion Discord
+(`createOrGetDiscordUser`) rend l'id d'une ligne en attente qui porte encore ce
+Discord, sans rien y écrire, pour atteindre ce point. Seul le clic
+« Réactiver mon compte » (`POST /api/auth/reactivate`) consomme le ticket, relit
+la fenêtre sous verrou et remet `is_deleted = 0`. **Un compte suspendu se
+réactive aussi** (décision du 2026-11-04) : `createSession` lit la demande en
+attente avant la suspension, la réactivation se fait, puis la session est
+refusée (`403 ACCOUNT_SUSPENDED` avec `reactivated: true`) ; l'écran dit la
+réactivation, puis la suspension. Au-delà de trente jours, la connexion est
+refusée (`ACCOUNT_DELETED`).
+
+**Jour 30.** `finalizeDueAccountDeletions` (horaire, paresseux, lancé par
+`getDatabase` sous `NEXT_RUNTIME`) appelle `finalizeAccountDeletion`, qui relit
+la fenêtre sous le verrou et retombe dans la règle habituelle (effacer ou
+anonymiser). Idempotent : un compte réactivé ou déjà traité rend `null`.
+L'anonymisation remet `deletion_requested_at` à `NULL`.
+
+**Coût et ordre des verrous (revue perf).** Le passage horaire (forfaits, puis
+suppressions définitives) tourne derrière le verrou nommé
+`bg_due_account_deletions` (`GET_LOCK`, sans attente) : un seul processus pm2 à
+la fois, les autres passent leur tour. Ses candidats sont filtrés en SQL (une
+inscription à retirer, ou une entrée en cours jamais jouée à forfaiter) et
+bornés à `SETTLE_BATCH_SIZE` ; `bg_users.is_deleted` est indexé. La demande et
+la suppression prennent `lockTournamentRow` **en premier**, par id croissant,
+sur tous les tournois qu'elles touchent — inscriptions solo, tournois organisés
+(demande), matchs castés, liés ou arbitrés (`listCastTournamentIds`) — avant le
+compte, puis les équipes ; les avatars en quarantaine sont lus et hachés
+**avant** la transaction (`hashImageFiles`), seule l'insertion des empreintes
+s'y fait.
+
+**E2 — rattrapage.** `reconcileDeletedAccounts` commence par
+`settleDeletedSoloEntries` : les comptes déjà supprimés gardant une inscription
+à un tournoi actif voient la règle E1 rejouée (retrait ou forfait), sans effet
+au second passage. Le reste du rattrapage ignore les comptes en attente.
+
+**E6 — avatar en quarantaine.** À l'effacement, l'empreinte SHA-256 du fichier
+en quarantaine (`bg_logo_quarantines` `HIDDEN`) entre dans
+`bg_blocked_image_hashes` (aucune colonne de compte) avant que la cascade
+n'emporte la ligne ; un avatar ou un logo dont l'image traitée **ou le fichier
+téléversé tel quel** y figure est refusé (`IMAGE_BLOCKED`) — le fichier brut
+compte, la copie exacte d'un avatar servi étant réencodée en d'autres octets.
+
+**Pseudo d'emprunt gardé au jour 30.** `anonymizeAccount` reprend le pseudo
+d'emprunt d'un compte en attente (`is_deleted = 1`, `deletion_requested_at`
+posé) au lieu d'en tirer un second : ses adversaires le voient sous ce nom
+depuis la demande. Un doublon (course) retombe sur un tirage.
+
 ## Voir aussi
 
 - `docs/AUTHORIZATION_RULES.md` — qui peut supprimer quoi.

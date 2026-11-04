@@ -91,8 +91,11 @@ describe("textes de l'effacement complet — D12", () => {
     );
   });
 
-  it("accountDeletionOutcome_null_mentionsUpcomingSoloRegistrations", () => {
-    expect(accountDeletionOutcome(null)).toContain("tes éventuelles inscriptions à venir en tournoi individuel");
+  it("accountDeletionOutcome_null_saysRequestedNotDone", () => {
+    // Les inscriptions à venir sont retirées dès la demande (la confirmation le
+    // dit) : l'issue annonce une demande, réversible trente jours.
+    expect(accountDeletionOutcome(null)).toMatch(/^Suppression demandée\./);
+    expect(accountDeletionOutcome(null)).toContain("d'ici 30 jours");
   });
 
   it("accountDeletionConfirmation_soloRegistrations_saysStartedTournament", () => {

@@ -1,6 +1,6 @@
 ﻿import { type AuthUser, clearSession, expireSessionCookies, getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
+import { requestAccountDeletion } from "@/lib/server/users/account-deletion-request";
 import { getFullProfile } from "@/lib/server/users/full-profile";
 import { updateOwnProfile } from "@/lib/server/users/profile-update";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
@@ -10,7 +10,7 @@ import { isProfileInputError } from "@/lib/shared/profile-input-errors";
 import { readJsonBody } from "@/lib/server/request-body";
 import type { FullProfileResponse } from "@/lib/shared/types";
 
-/** Les refus de `deleteOwnAccount` qui sortent tels quels : ils ont un sens pour l'écran. */
+/** Les refus de `requestAccountDeletion` qui sortent tels quels : ils ont un sens pour l'écran. */
 const ACCOUNT_DELETION_REFUSALS: ReadonlySet<string> = new Set([
   "ACCOUNT_STILL_REFERENCED",
   "USER_NOT_FOUND",
@@ -93,12 +93,13 @@ export async function DELETE() {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
 
-  let plan: Awaited<ReturnType<typeof deleteOwnAccount>>;
+  let plan: Awaited<ReturnType<typeof requestAccountDeletion>>;
   try {
     // Le plan voyage jusqu'à l'écran : « effacé » et « anonymisé » ne sont pas
-    // la même promesse, et le motif de la conservation encore moins — c'est le
-    // serveur qui vient de trancher les deux.
-    plan = await deleteOwnAccount(user.id);
+    // la même promesse, et le motif de la conservation encore moins. La
+    // suppression n'est définitive que trente jours plus tard (`finalAt`) : se
+    // reconnecter d'ici là la réactive (E4).
+    plan = await requestAccountDeletion(user.id);
   } catch (error) {
     // Deux refus nommés — la course sur une clé étrangère (le second essai
     // anonymisera) et un compte déjà introuvable. Tout le reste est une panne

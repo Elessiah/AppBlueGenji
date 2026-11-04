@@ -3,6 +3,7 @@ import {
   hostCookieName,
   legacyAuthCookieNames,
   oauthCookieName,
+  reactivationCookieName,
   sessionCookieName,
 } from "@/lib/shared/auth-cookies";
 
@@ -18,6 +19,16 @@ describe("hostCookieName", () => {
 
   it("hostCookieName_notProduction_keepsBareName", () => {
     expect(hostCookieName("bg_session", false)).toBe("bg_session");
+  });
+});
+
+describe("reactivationCookieName", () => {
+  it("reactivationCookieName_production_hostPrefixed", () => {
+    expect(reactivationCookieName(true)).toBe("__Host-bg_reactivation");
+  });
+
+  it("reactivationCookieName_development_bareName", () => {
+    expect(reactivationCookieName(false)).toBe("bg_reactivation");
   });
 });
 

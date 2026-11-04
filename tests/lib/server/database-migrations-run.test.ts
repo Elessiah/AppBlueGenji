@@ -906,6 +906,11 @@ describe("getDatabase — rattrapage des comptes supprimés", () => {
     const mock = jest.fn(reconcile);
     await jest.isolateModulesAsync(async () => {
       jest.doMock("@/lib/server/users/deleted-accounts", () => ({ reconcileDeletedAccounts: mock }));
+      // La passe horaire (forfaits puis suppressions définitives) part avec : sans ce double, elle
+      // rappellerait `getDatabase` et relancerait un rattrapage pendant le test suivant.
+      jest.doMock("@/lib/server/users/deleted-solo-entries", () => ({
+        settleDeletedSoloEntries: jest.fn(async () => ({ withdrawn: 0, forfeited: 0 })),
+      }));
       process.env.NEXT_RUNTIME = "nodejs";
       try {
         const fresh = await import("@/lib/server/database");

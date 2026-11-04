@@ -2,7 +2,8 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { ignoreMissingTable, isDuplicateEntryError, isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { type MatchWithdrawal, withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
-import { ANONYMOUS_PSEUDOS, pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
+import { pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
+import { loadTakenAnonymousPseudos } from "./account-deletion-hold";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
 import type { SoloRegistrationFact } from "@/lib/shared/account-deletion";
 import { resequenceSeeds } from "@/lib/server/tournaments/seeding";
@@ -105,16 +106,30 @@ async function resetOptionalColumn(
  *
  * Rend les matchs touchés (casts, liens, arbitrages), comme `eraseAccount`.
  */
-export async function anonymizeAccount(connection: PoolConnection, userId: number): Promise<MatchWithdrawal> {
-  const [takenRows] = await connection.execute<(RowDataPacket & { pseudo: string })[]>(
-    `SELECT pseudo FROM bg_users
-      WHERE id <> ?
-        AND pseudo IN (${ANONYMOUS_PSEUDOS.map(() => "?").join(", ")})`,
-    [userId, ...ANONYMOUS_PSEUDOS],
+/** Le pseudo d'emprunt d'un compte en attente de suppression (masque posé), sinon `null`. */
+async function readBorrowedPseudo(connection: PoolConnection, userId: number): Promise<string | null> {
+  const [rows] = await connection.execute<(RowDataPacket & { pseudo: string })[]>(
+    // Le masque doit exister : sans lui, rien ne prouve que le pseudo de la
+    // ligne est l'emprunt et non le vrai.
+    `SELECT u.pseudo FROM bg_users u
+       JOIN bg_account_deletion_holds h ON h.user_id = u.id
+      WHERE u.id = ? AND u.is_deleted = 1 AND u.deletion_requested_at IS NOT NULL
+      LIMIT 1`,
+    [userId],
   );
-  const taken = new Set(takenRows.map((row) => row.pseudo));
+  return rows[0]?.pseudo ?? null;
+}
+
+export async function anonymizeAccount(connection: PoolConnection, userId: number): Promise<MatchWithdrawal> {
+  // Pseudos portés, et pseudos réservés par un compte en attente de suppression
+  // (`account-deletion-hold.ts`) : sa réactivation doit pouvoir le lui rendre.
+  const taken = await loadTakenAnonymousPseudos(connection, userId);
+  // Compte en attente : il porte depuis la demande le pseudo d'emprunt sous
+  // lequel ses adversaires le voient depuis trente jours (`holdAccountIdentity`)
+  // — il le garde, au lieu d'en changer une seconde fois au jour 30.
+  const borrowed = await readBorrowedPseudo(connection, userId);
   for (let attempt = 0; ; attempt += 1) {
-    const pseudo = pickAnonymousPseudo(taken);
+    const pseudo = attempt === 0 && borrowed !== null ? borrowed : pickAnonymousPseudo(taken);
     try {
       await connection.execute(
         `UPDATE bg_users

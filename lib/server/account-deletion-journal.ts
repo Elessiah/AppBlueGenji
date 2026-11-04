@@ -5,6 +5,8 @@ import {
   formatJournalEntry,
   parseJournal,
   pruneJournal,
+  withReactivationEntry,
+  type AccountReactivationKey,
   type AccountDeletionEntry,
 } from "@/lib/shared/account-deletion-journal";
 
@@ -134,6 +136,39 @@ export function recordAccountDeletion(
     console.error(
       `[account-deletion-journal] suppression du compte #${entry.userId} non consignée (${filePath}) — ` +
         "elle ne serait pas rejouée après restauration d'une sauvegarde antérieure :",
+      error,
+    );
+  });
+}
+
+/**
+ * Consigne la **réactivation** d'un compte (décision R1 du 2026-11-04) : sa
+ * demande en attente cède la place à une ligne de réactivation, et ne lève
+ * jamais. Gardée, la demande ferait supprimer de nouveau, à la prochaine
+ * restauration, un compte que son titulaire a choisi de garder ; retirée sans
+ * trace, une sauvegarde prise pendant les trente jours ramènerait le compte en
+ * attente de suppression. La ligne de réactivation le fait réactiver au rejeu
+ * (`replayAccountDeletions`). Un échec est dit dans les journaux du serveur.
+ *
+ * `strict` : l'échec est levé au lieu d'être avalé — la réactivation écrit sa
+ * ligne **avant** son commit et s'annule si elle échoue (revue juridique #546,
+ * cycle 3) : une réactivation commitée sans ligne laisserait au journal la
+ * demande en attente, qu'une restauration rejouerait.
+ */
+export function recordAccountReactivation(
+  key: AccountReactivationKey,
+  options: { filePath?: string; now?: Date; strict?: boolean } = {},
+): Promise<void> {
+  const filePath = options.filePath ?? accountDeletionJournalPath();
+  const now = options.now ?? new Date();
+  const written = enqueue(async () => {
+    const current = await readAccountDeletionJournal(filePath);
+    await writeJournal(pruneJournal(withReactivationEntry(current.entries, key, now), now), filePath);
+  });
+  if (options.strict) return written;
+  return written.catch((error: unknown) => {
+    console.error(
+      `[account-deletion-journal] réactivation du compte #${key.userId} non consignée (${filePath}) :`,
       error,
     );
   });

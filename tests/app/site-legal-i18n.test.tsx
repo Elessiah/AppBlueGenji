@@ -111,8 +111,8 @@ describe("français : le texte qui fait foi ne bouge pas", () => {
   });
 
   it("la version des conditions n'avance pas pour une traduction", () => {
-    // Version 8 : condition d'arbitrage, pseudo de l'arbitre aux connectés, BattleTag tapé (EF-20, D2), pas une traduction.
-    expect(TERMS_VERSION).toBe(8);
+    // Version 9 : contacts de match, salons vocaux, suppression du compte (ERASURE-D2), pas une traduction.
+    expect(TERMS_VERSION).toBe(9);
   });
 });
 
@@ -373,10 +373,10 @@ describe("/rgpd : base légale de la conservation du choix des messages de match
 describe("/rgpd : retrait d'une inscription solo à venir à la suppression (D12)", () => {
   it("rgpd_soloWithdrawal_isConditionalOnNothingElseKeepingTheAccountFrAndEn", async () => {
     const fr = legalPageText(await render(PrivacyPage, "fr"));
-    expect(fr).toContain("ne retient pas la ligne à elle seule : si rien d'autre ne la retient, elle est retirée du tournoi avec le compte ; sinon, elle reste sous le pseudo d'emprunt.");
+    expect(fr).toContain("Ses inscriptions à un tournoi individuel qui n'a pas encore commencé, et où il n'a disputé aucun match, sont retirées dès la demande.");
     const en = legalPageText(await render(PrivacyPage, "en"));
     expect(en).toContain("or if it is an entrant in a solo tournament that has already started or ended");
-    expect(en).toContain("does not keep the row on its own: if nothing else keeps it, the registration is withdrawn from the tournament with the account; otherwise, it stays under the borrowed username.");
+    expect(en).toContain("Its registrations for a solo tournament that has not started yet, where it played no match, are withdrawn as soon as deletion is requested.");
     expect(en).not.toContain("in asolo");
   });
 });

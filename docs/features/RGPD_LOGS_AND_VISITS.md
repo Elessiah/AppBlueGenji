@@ -138,6 +138,13 @@ texte, effacée un jour après la fin de la soirée).
 L'historique du salon, écrit avant cette règle, est vidé à la main par
 l'association.
 
+## Suppression d'un compte
+
+La demande écrit « 🗑️ Compte supprimé — suppression demandée, définitive sous
+30 jours » (catégorie `signups`), sans pseudo ni identifiant ; chaque inscription
+retirée ou forfait qu'elle entraîne écrit une ligne « un joueur supprime son
+compte » (`registrations`) → `ACCOUNT_DELETION.md` § Suppression différée.
+
 ## Ailleurs
 
 Le registre des traitements (`/rgpd/registre`, fiches T05 et T06) et le

@@ -93,7 +93,9 @@ describe("branchements du moteur", () => {
       /entry\.kind === "tournament_started"\) \{\s*void notifyTournamentStart\(entry\.tournamentId\)/,
     );
     const index = stripLineComments(readSource("lib/server/tournaments/index.ts"));
-    expect(index).toMatch(/publishScoreReportedEvent\(tournamentId, matchId\);\s*void notifyScoreToConfirm\(matchId\);/);
+    expect(index).toMatch(
+      /publishScoreReportedEvent\(tournamentId, touchedMatchId\);\s*void notifyScoreToConfirm\(touchedMatchId\);/,
+    );
     expect(index).toMatch(/void dispatchMatchStartNotices\(\)/);
   });
 

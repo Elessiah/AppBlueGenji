@@ -164,6 +164,17 @@
       ]
     },
     {
+      "title": "Salons vocaux d'équipe",
+      "body": [
+        "Un tournoi peut activer l'option « Salons vocaux d'équipe » (éteinte par défaut, voir ses réglages). Elle fait alors partie de son <b>règlement</b> : à partir de {voiceLead} minutes avant l'heure de chaque match, le bot Discord de l'association ouvre un salon vocal de {voiceCapacity} places au nom de chacune des deux équipes, et chaque équipe s'y réunit avant de jouer."
+      ],
+      "bullets": [
+        "Le match ne se lance qu'une fois les deux salons pleins : jusque-là, il attend qu'un arbitre force son lancement. Si le bot ne répond pas, le match n'attend pas.",
+        "Le bot compte les personnes présentes dans chaque salon — un nombre, jamais qui. Ce comptage est anonyme : il ne sert qu'à retenir le lancement et n'est montré à personne (la page du match dit seulement si chaque salon est ouvert et si le match attend ses salons). Il repose sur l'intérêt légitime de l'association (bon déroulement des tournois).",
+        "Aucun salon n'est ouvert pour une entrée en tournoi individuel ni pour un match contre une équipe fantôme."
+      ]
+    },
+    {
       "title": "Format des matchs",
       "body": [
         "Le format des matchs (BO — nombre de maps au maximum — ou FT — nombre de maps à gagner) est fixé à la création et vaut pour tout le tournoi. Sans réglage, le score est libre."

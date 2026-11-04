@@ -241,3 +241,29 @@ describe("listPlayers — bilan mutualisé", () => {
     expect(newcomer).toMatchObject({ wins: 0, losses: 0, tournamentsCount: 0 });
   });
 });
+
+describe("listPlayers — suppression demandée (ERASURE-D2)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
+
+  it("listPlayers_pendingDeletionAccounts_filteredOutBySql", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[userRow()]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    await listPlayers(999);
+
+    expect(String(execute.mock.calls[0]?.[0])).toContain("WHERE deletion_requested_at IS NULL");
+  });
+
+  it("listPlayers_anonymizedAccount_stillListedAsDeleted", async () => {
+    const players = await runList([userRow({ is_deleted: 1 })], 999);
+
+    expect(players[0]?.isDeleted).toBe(true);
+  });
+});

@@ -52,9 +52,9 @@ describe("conditions d'utilisation", () => {
     expect(termsRequestFor(TERMS_VERSION + 1)).toBeNull();
   });
 
-  it("version 8 en vigueur le 31 octobre 2026 (acceptation par tout compte) : les versions 1 à 7 sont redemandées", () => {
-    expect(TERMS_VERSION).toBe(8);
-    expect(TERMS_UPDATED_AT).toBe("2026-10-31");
+  it("version 9 en vigueur le 6 novembre 2026 (acceptation par tout compte) : les versions 1 à 8 sont redemandées", () => {
+    expect(TERMS_VERSION).toBe(9);
+    expect(TERMS_UPDATED_AT).toBe("2026-11-06");
     expect(termsRequestFor(1)).toBe("UPDATED");
     expect(termsRequestFor(2)).toBe("UPDATED");
     expect(termsRequestFor(3)).toBe("UPDATED");
@@ -62,7 +62,8 @@ describe("conditions d'utilisation", () => {
     expect(termsRequestFor(5)).toBe("UPDATED");
     expect(termsRequestFor(6)).toBe("UPDATED");
     expect(termsRequestFor(7)).toBe("UPDATED");
-    expect(termsRequestFor(8)).toBeNull();
+    expect(termsRequestFor(8)).toBe("UPDATED");
+    expect(termsRequestFor(9)).toBeNull();
   });
 
   it("reconnaît les cinq écrans d'acceptation", () => {

@@ -405,6 +405,11 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // défaut ; la table `bg_match_voice_channels` est neuve, son `CREATE TABLE` suffit.
     `ALTER TABLE bg_tournaments ADD COLUMN team_voice_channels TINYINT(1) NOT NULL DEFAULT 0
        AFTER match_launch_phase`,
+    // Suppression de compte réversible 30 jours (`docs/features/ACCOUNT_DELETION.md`) ;
+    // les tables `bg_account_reactivation_tickets`, `bg_account_deletion_holds` et
+    // `bg_blocked_image_hashes` sont neuves, leur `CREATE TABLE` suffit.
+    `ALTER TABLE bg_users ADD COLUMN deletion_requested_at DATETIME NULL AFTER is_deleted`,
+    `ALTER TABLE bg_users ADD INDEX idx_bg_users_deletion_requested (deletion_requested_at)`,
     // EF-15 — la manche entre dans l'index de phase : les lectures verrouillantes
     // des manches postérieures (`laterRoundsHaveScoreInput`) et le `DELETE … AND
     // round_number = ?` du réappariement ne verrouillent plus que leurs manches,
@@ -426,6 +431,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // du décompte des terminés et du sous-ensemble des plus récents : sans
     // index, chaque reconstruction de la liste parcourait toute la table.
     `ALTER TABLE bg_tournaments ADD INDEX idx_bg_tournaments_start_visibility (start_visibility_at)`,
+    // ERASURE-D2 — le rattrapage de démarrage et le passage horaire ne relèvent que
+    // les comptes supprimés (une poignée) : sans index, chaque démarrage de chaque
+    // processus parcourait toute la table des comptes.
+    `ALTER TABLE bg_users ADD INDEX idx_bg_users_is_deleted (is_deleted)`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

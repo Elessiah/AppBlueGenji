@@ -1,4 +1,5 @@
 import { createSession } from "@/lib/server/auth";
+import { ACCOUNT_PENDING_DELETION, AccountPendingDeletionError } from "@/lib/server/users/account-reactivation";
 import { AccountSuspendedError, assertIdentityNotSuspended } from "@/lib/server/account-suspensions";
 import { ACCOUNT_SUSPENDED } from "@/lib/shared/account-suspension";
 import { DISCORD_CODE_VERIFY_RULE, enforceRateLimit, requestClientIp } from "@/lib/server/api-guard";
@@ -99,18 +100,31 @@ export async function POST(req: Request) {
 
     return ok({ success: true });
   } catch (error) {
-    // Le code vient d'être consommé : un compte neuf refusé faute de conditions
-    // acceptées devra en redemander un. Le cas se présente à un client qui
-    // contourne la case de `/connexion`, ou à un onglet chargé avant une
-    // nouvelle version des conditions (`termsVersion` absent ou ancien) : le
-    // refus (`TERMS_REQUIRED`) dit de recharger la page, qui les présente.
-    if ((error as Error).message === TERMS_REQUIRED) return fail(TERMS_REQUIRED, 400);
-    // Compte suspendu : l'exposé de la décision part dans le corps, que la page
-    // de connexion affiche — c'est le seul canal qui joigne un compte sans
-    // Discord rattaché, et le lecteur vient de prouver en être le titulaire.
-    if (error instanceof AccountSuspendedError) {
-      return fail(ACCOUNT_SUSPENDED, 403, { suspension: error.notice });
-    }
-    return fail((error as Error).message || "DISCORD_AUTH_FAILED", 500);
+    return signInFailure(error);
   }
+}
+
+/** Le refus d'une connexion par code, rendu à la page de connexion. */
+function signInFailure(error: unknown) {
+  // Le code vient d'être consommé : un compte neuf refusé faute de conditions
+  // acceptées devra en redemander un. Le cas se présente à un client qui
+  // contourne la case de `/connexion`, ou à un onglet chargé avant une
+  // nouvelle version des conditions (`termsVersion` absent ou ancien) : le
+  // refus (`TERMS_REQUIRED`) dit de recharger la page, qui les présente.
+  if ((error as Error).message === TERMS_REQUIRED) return fail(TERMS_REQUIRED, 400);
+  // Compte suspendu : l'exposé de la décision part dans le corps, que la page
+  // de connexion affiche — c'est le seul canal qui joigne un compte sans
+  // Discord rattaché, et le lecteur vient de prouver en être le titulaire.
+  if (error instanceof AccountSuspendedError) {
+    return fail(ACCOUNT_SUSPENDED, 403, { suspension: error.notice });
+  }
+  // Suppression demandée : la page de connexion ouvre l'écran de
+  // réactivation (ticket en cookie, `createSession`).
+  if (error instanceof AccountPendingDeletionError) return fail(ACCOUNT_PENDING_DELETION, 409);
+  // Un code (`MAJUSCULES_SOULIGNÉES`) passe tel quel ; toute autre phrase
+  // (texte du pilote SQL…) reste au journal, la réponse ne porte qu'un code.
+  const message = error instanceof Error ? error.message : "";
+  if (/^[A-Z][A-Z0-9_]*$/.test(message)) return fail(message, 500);
+  console.error("[discord-verify] connexion par code refusée", error);
+  return fail("DISCORD_AUTH_FAILED", 500);
 }

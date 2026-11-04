@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 // Le disque est simulé : on garde les octets écrits pour les relire avec sharp.
 const written = new Map<string, Buffer>();
+// Aucune image bloquée : le refus a son propre test (`image-upload-blocked.test.ts`).
+jest.mock("@/lib/server/blocked-images", () => ({ IMAGE_BLOCKED: "IMAGE_BLOCKED", isBlockedImage: jest.fn(async () => false) }));
 jest.mock("node:fs/promises", () => ({
   mkdir: jest.fn(async () => undefined),
   unlink: jest.fn(async () => undefined),
