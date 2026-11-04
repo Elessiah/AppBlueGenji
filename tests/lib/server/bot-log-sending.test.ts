@@ -118,8 +118,7 @@ describe("kind et catégories", () => {
     sendBotLog("inscription", { category: "signups" });
     sendBotLog("relevé", { category: "referee-digest" });
     await settle();
-    expect(postedMessages()).toEqual(["⚠️ Arbitrage à vérifier
-relevé"]);
+    expect(postedMessages()).toEqual(["🔔 Matchs à arbitrer\nrelevé"]);
     expect(pendingBotLogBatches()).toEqual(new Map([["log:global:signups", 1]]));
   });
 
