@@ -1022,8 +1022,9 @@ const BOT_VOICE_FETCH_TIMEOUT_MS = 5000;
  * Issue d'un appel « salon vocal ».
  *
  * - `ok` : réponse attendue (`channelId`, ou libération faite) ;
- * - `gone` : le bot ne suit plus ce salon (`404`) — supprimé à la main, sorti
- *   de la catégorie, ou déjà libéré puis effacé ;
+ * - `gone` : le bot ne suit plus ce salon (`404 VOICE_CHANNEL_NOT_TRACKED`) —
+ *   supprimé à la main, sorti de la catégorie, ou déjà libéré puis effacé ; un
+ *   autre `404` (route absente du bot, `INTERNAL_ROUTE_NOT_FOUND`) est un échec ;
  * - `failed` : bot injoignable, coupe-circuit ouvert, permission refusée,
  *   Discord indisponible, réponse illisible — redemandé au passage suivant.
  */
@@ -1049,7 +1050,10 @@ async function voiceCall<T>(
     });
     if (response.status === 404) {
       recordSuccess();
-      return { kind: "gone", code: await safeReadError(response) };
+      const code = await safeReadError(response);
+      // Seul « salon non suivi » vaut « déjà rendu » : une route absente (bot d'une autre
+      // version) fermerait sinon des lignes dont le salon reste sur Discord.
+      return code === "VOICE_CHANNEL_NOT_TRACKED" ? { kind: "gone", code } : { kind: "failed", code };
     }
     if (!response.ok) {
       // Un refus du bot lui-même (permission, catégorie, Discord) n'est pas une

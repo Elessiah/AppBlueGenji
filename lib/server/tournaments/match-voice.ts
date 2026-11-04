@@ -437,34 +437,13 @@ async function recheckOneChannel(row: OpenRow, touched: Set<number>): Promise<bo
   // Une panne ici ne dit rien du salon : il reste tel qu'il est, redemandé plus tard.
   if (ensured.kind !== "ok") return !BOT_TRANSPORT_FAILURES.has(ensured.code);
   if (ensured.value !== String(row.channel_id)) {
-    if (await replaceOpenChannel(row, ensured.value)) touched.add(Number(row.tournament_id));
-    // Ligne rendue entre-temps (autre processus, rechargement pm2) : le salon neuf n'a plus
-    // de match à servir, il est rendu aussitôt — la ligne rendue n'est jamais rouverte.
-    else await releaseVoiceChannel(ensured.value);
+    // Upsert qui rouvre, voulu : si la ligne a été rendue entre-temps (autre processus,
+    // rechargement pm2), le salon neuf existe déjà sur Discord ; la ligne le suit et le
+    // rendu de la même passe (après la revérification) le rend au bot, avec ses reprises.
+    await writeChannel(Number(row.match_id), Number(row.team_id), ensured.value);
+    touched.add(Number(row.tournament_id));
   }
   return true;
-}
-
-/**
- * Remplace le salon d'une ligne **encore ouverte** : `false` si elle a été rendue
- * (ou purgée) depuis sa lecture. Contrairement à `writeChannel`, jamais
- * d'insertion ni de réouverture. Une ligne restée ouverte que rien ne change
- * (déjà sur ce salon, écrit par un autre processus) compte comme ouverte.
- */
-async function replaceOpenChannel(row: OpenRow, channelId: string): Promise<boolean> {
-  const db = await getDatabase();
-  const params = [Number(row.match_id), Number(row.team_id)];
-  const [result] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_match_voice_channels SET channel_id = ?, failed_at = NULL
-      WHERE match_id = ? AND team_id = ? AND released_at IS NULL`,
-    [channelId, ...params],
-  );
-  if (Number(result.affectedRows) > 0) return true;
-  const [open] = await db.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_voice_channels WHERE match_id = ? AND team_id = ? AND released_at IS NULL`,
-    params,
-  );
-  return open.length > 0;
 }
 
 /** Rend `true` quand le canal vers le bot est en panne. */
