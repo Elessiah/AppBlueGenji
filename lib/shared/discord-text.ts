@@ -90,6 +90,21 @@ export function discordQuoted(value: string, locale: "fr" | "en"): string {
 }
 
 /**
+ * Un lien saisi (lien de diffusion d'un caster, déjà passé par
+ * `normalizeStreamUrl` et `liveAnnouncementUrl`) écrit dans un message
+ * Discord. Écrit entre chevrons, il se lit comme un seul lien, sans aperçu ;
+ * `[ ] ( )` sont encodés (`%XX`) pour qu'un chemin `…/[x](https://ailleurs)`
+ * ne fasse pas de lien masqué vers un autre hôte, comme `*`, `|`, la barre
+ * oblique inverse et l'accent grave (mise en forme), et `< >` pour que rien
+ * ne referme les chevrons. `_` et `~` restent tels quels : courants dans
+ * un nom de chaîne, sans effet entre chevrons.
+ */
+export function discordUrl(url: string): string {
+  const encoded = url.replace(/[[\]()*|\\`<>]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`);
+  return `<${encoded}>`;
+}
+
+/**
  * Texte libre sûr, cité ligne à ligne : ses sauts de ligne sont gardés (un
  * signalement se lit mieux en paragraphes), mais chaque ligne commence par
  * `> `, marque qu'aucune ligne rédigée par le site ne porte.

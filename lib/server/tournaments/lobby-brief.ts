@@ -73,7 +73,7 @@ import { roundAllowsTiebreak } from "@/lib/shared/round-plan";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { loadEligibleRefereeIds } from "./cast-eligibility";
 import { firstStreamUrlSql } from "./match-casters";
-import { normalizeStreamUrl } from "@/lib/shared/live-streams";
+import { liveAnnouncementUrl } from "@/lib/shared/live-announcements";
 import { formatLobbyBriefDm } from "./lobby-brief-dm";
 import { seedJoins } from "./match-host-seeds";
 import { playsMatchSql } from "./match-players";
@@ -124,7 +124,7 @@ export type LobbyBriefRow = RowDataPacket & {
   brief_pairing: string;
   /** Option « Salons vocaux d'équipe » du tournoi, et match suivi (ni solo, ni fantôme). */
   voice_tracked?: number | null;
-  /** Lien de diffusion public du match (`firstStreamUrlSql`), `null` sans live annonçable. */
+  /** Lien de diffusion public du match (`firstStreamUrlSql`), `null` sans live annonçable ou match pas annoncé casté (`live_trigger`). */
   stream_url?: string | null;
   host_team_id: number | null;
   team1_seed: number | null;
@@ -197,7 +197,11 @@ const NO_SCORE_SQL = "AND m.team1_score IS NULL AND m.team2_score IS NULL";
 
 type Db = Awaited<ReturnType<typeof getDatabase>>;
 
-/** Colonnes du brief, lues pour les candidats puis relues après chaque réservation. */
+/**
+ * Colonnes du brief, lues pour les candidats puis relues après chaque réservation.
+ * Le lien de diffusion reste tu tant que le match n'est pas annoncé casté
+ * (`live_trigger` vide), comme sur la page du match (`matchPageStreams`).
+ */
 const BRIEF_COLUMNS = `m.id, m.tournament_id, t.name AS tournament_name, t.participant_type, t.game,
             m.bracket, m.round_number, ${swissRoundSql("m", "t")},
             m.team1_id, m.team2_id, t1.name AS team1_name, t2.name AS team2_name,
@@ -206,7 +210,7 @@ const BRIEF_COLUMNS = `m.id, m.tournament_id, t.name AS tournament_name, t.parti
             m.launched_at, m.host_team_id, es1.rank AS team1_seed, es2.rank AS team2_seed,
             (t.team_voice_channels = 1 AND t.participant_type <> 'SOLO'
               AND t1.is_ghost = 0 AND t2.is_ghost = 0 AND m.start_at IS NOT NULL) AS voice_tracked,
-            ${firstStreamUrlSql("m")} AS stream_url,
+            CASE WHEN m.live_trigger IS NULL THEN NULL ELSE ${firstStreamUrlSql("m")} END AS stream_url,
             m.first_map, m.self_managed, m.referee_user_id, m.map_picks,
             (m.referee_user_id IS NOT NULL
               AND ${playsMatchSql("m.referee_user_id", "m.team1_id", "m.team2_id", "rp")}) AS referee_plays,
@@ -368,8 +372,9 @@ export function lobbyBriefSides(
     // la ligne du vocal n'est écrite que là, sinon elle annoncerait un salon
     // qui n'arrivera jamais.
     voice: Number(row.voice_tracked ?? 0) === 1,
-    // Un lien de diffusion vide ou fait d'invisibles n'est pas un lien.
-    streamUrl: normalizeStreamUrl(row.stream_url ?? null),
+    // Un lien de diffusion vide ou fait d'invisibles n'est pas un lien ; une page de redirection ou une
+    // adresse enfouie (`youtube.com/redirect?q=…`) est refusée comme dans une annonce #live.
+    streamUrl: liveAnnouncementUrl(row.stream_url ?? null, null),
     decision: refereeDecision({
       refereeAssigned: options.refereeAssigned,
       selfManaged: Number(row.self_managed ?? 0) === 1,

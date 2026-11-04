@@ -114,8 +114,8 @@ Vu de l'engagée du destinataire :
   jusqu'au seul renvoi ; aux longueurs maximales, le message est coupé (« … »).
 - **Match casté**, dès qu'un caster encore éligible est inscrit
   (`readMatchCasters`) : le **lien de diffusion** (« Diffusion : » / « Stream: », jamais « En direct » : rien n'est encore à l'antenne) quand il est public
-  (`firstStreamUrlSql`, `bg_match_streams`, repassé par `normalizeStreamUrl` —
-  tu sinon ; signes de mise en forme Discord encodés et lien entre chevrons, `discordUrl`, pour qu'un chemin ne fasse pas de lien masqué), l'invitation des casters, et le rappel de trier les joueurs par
+  (`firstStreamUrlSql`, `bg_match_streams`, tu tant que `live_trigger` est vide comme sur la page, repassé par `liveAnnouncementUrl` — pages de redirection refusées comme en #live —
+  tu sinon ; signes de mise en forme Discord encodés et lien entre chevrons, `discordUrl` de `discord-text.ts`, pour qu'un chemin ne fasse pas de lien masqué), l'invitation des casters, et le rappel de trier les joueurs par
   rôle. Hors Overwatch, où l'on ne s'invite pas par BattleTag, on « prévient »
   les casters au lieu de les « inviter » (décision 35, 2026-10-28 ;
   `battletagRelevantFor`), et le lien de la page ne parle plus de BattleTags.

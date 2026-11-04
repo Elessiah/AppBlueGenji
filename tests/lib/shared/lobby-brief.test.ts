@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { discordUrl, formatLobbyBriefDm, MAPS_LINE_MAX } from "@/lib/server/tournaments/lobby-brief-dm";
+import { formatLobbyBriefDm, MAPS_LINE_MAX } from "@/lib/server/tournaments/lobby-brief-dm";
 import { GAME_SETTINGS_TEXT, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
 import { GAME_SETTINGS } from "@/lib/shared/match-page";
 import enTournament from "@/messages/en/tournament.json";
@@ -124,20 +124,6 @@ describe("formatLobbyBriefDm", () => {
     expect(en).toContain("* Stream: <https://twitch.tv/bluegenji>");
     // Rien n'est encore à l'antenne quinze minutes avant : jamais « En direct » (CLAUDE.md).
     expect([fr.includes("En direct"), en.includes("Live on")]).toEqual([false, false]);
-  });
-
-  it("discordUrl_plainUrl_wrappedInAngleBracketsUnchanged", () => {
-    expect(discordUrl("https://twitch.tv/bluegenji")).toBe("<https://twitch.tv/bluegenji>");
-  });
-
-  it("discordUrl_maskedLinkInPath_bracketsAndParensEncoded", () => {
-    expect(discordUrl("https://twitch.tv/[x](https://evil.example)")).toBe(
-      "<https://twitch.tv/%5Bx%5D%28https://evil.example%29>",
-    );
-  });
-
-  it("discordUrl_markdownSigns_eachEncoded", () => {
-    expect(discordUrl("https://twitch.tv/a*_~|\\`b")).toBe("<https://twitch.tv/a%2A%5F%7E%7C%5C%60b>");
   });
 
   it("sans décision d'arbitrage, ne charge personne de créer la partie", () => {

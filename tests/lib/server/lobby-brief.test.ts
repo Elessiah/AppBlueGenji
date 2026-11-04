@@ -166,6 +166,30 @@ describe("dispatchLobbyBriefs", () => {
     expect(query.mock.calls[0][0]).toMatch(/AND t\.start_visibility_at <= NOW\(\)/);
   });
 
+  it("dueSql_matchNotAnnouncedCast_streamUrlNull", async () => {
+    const { query } = mockDb([]);
+    await dispatchLobbyBriefs();
+    // Lien tu tant que le match n'est pas annoncé casté, comme sur la page du match.
+    expect(query.mock.calls[0][0]).toMatch(/CASE WHEN m.live_trigger IS NULL THEN NULL ELSE/);
+  });
+
+  it("dispatchLobbyBriefs_redirectStreamUrl_noStreamInBrief", async () => {
+    mockDb([{ ...MATCH, stream_url: "https://www.youtube.com/redirect?q=https://phish.example" }]);
+
+    await dispatchLobbyBriefs();
+
+    // Page de redirection d'un hôte permis : refusée comme dans une annonce #live.
+    expect(jest.mocked(formatLobbyBriefDm).mock.calls[0][0].streamUrl).toBeNull();
+  });
+
+  it("dispatchLobbyBriefs_plainStreamUrl_streamKeptInBrief", async () => {
+    mockDb([{ ...MATCH, stream_url: "https://www.twitch.tv/bluegenji" }]);
+
+    await dispatchLobbyBriefs();
+
+    expect(jest.mocked(formatLobbyBriefDm).mock.calls[0][0].streamUrl).toBe("https://www.twitch.tv/bluegenji");
+  });
+
   it("voiceTracked_unscheduledMatch_noVoiceLine", async () => {
     const { query } = mockDb([]);
     await dispatchLobbyBriefs();

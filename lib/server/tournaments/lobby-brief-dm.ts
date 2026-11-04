@@ -13,7 +13,7 @@
  */
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { CHECK_IN_INVITE_URL } from "@/lib/shared/discord";
-import { discordInline } from "@/lib/shared/discord-text";
+import { discordInline, discordUrl } from "@/lib/shared/discord-text";
 import { localizedSiteUrl } from "@/lib/shared/dm-language";
 import { GAME_SETTINGS_TEXT, lobbyBriefNames, neutralizeQuotes, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
 import type { Locale } from "@/lib/shared/locales";
@@ -230,21 +230,6 @@ function mapsBlock(side: LobbyBriefSide, locale: Locale, quote: (name: string) =
   const firstMap =
     side.firstMap === null || withoutInvisibles(side.firstMap).trim() === "" ? text.noFirstMap : quote(side.firstMap);
   return [`* ${text.map(1, firstMap)}`];
-}
-
-/**
- * Un lien de diffusion sûr dans un message Discord. Le lien vient d'un caster
- * (`bg_match_streams`) : `normalizeStreamUrl` ne garde que les hôtes connus,
- * mais laisse dans le chemin `[ ] ( ) * _ ~ | \` et l'accent grave, que
- * Discord lirait comme mise en forme — `…/[x](https://ailleurs)` y ferait un
- * lien masqué vers un autre hôte. Ces signes sont donc encodés (`%XX`, même
- * adresse pour la plateforme), et le lien est écrit entre chevrons, que l'URL
- * ne peut pas refermer (`>` y est déjà encodé) : Discord le lit comme un seul
- * lien, sans aperçu.
- */
-export function discordUrl(url: string): string {
-  const encoded = url.replace(/[[\]()*_~|\\`<>]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`);
-  return `<${encoded}>`;
 }
 
 /** La section du cast : le lien de diffusion quand il est public, puis qui inviter. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { discordInline, discordQuote, discordQuoted } from "@/lib/shared/discord-text";
+import { discordInline, discordQuote, discordQuoted, discordUrl } from "@/lib/shared/discord-text";
 import { entrantLabel } from "@/lib/shared/log-privacy";
 import { buildIssueReportMessage } from "@/lib/shared/discord-notifications";
 import { formatTeamJoinRequestNotice } from "@/lib/shared/team-join-request-notice";
@@ -148,5 +148,22 @@ describe("discordQuoted", () => {
   it("discordQuoted_en_curlyQuotesAndNeutralised", () => {
     expect(discordQuoted("@everyone", "en")).toBe(`“${discordInline("@everyone")}”`);
     expect(discordQuoted("@everyone", "en")).not.toContain("“@everyone”");
+  });
+});
+
+describe("discordUrl", () => {
+  it("discordUrl_plainUrl_wrappedInAngleBracketsUnchanged", () => {
+    expect(discordUrl("https://twitch.tv/bluegenji")).toBe("<https://twitch.tv/bluegenji>");
+  });
+
+  it("discordUrl_maskedLinkInPath_bracketsAndParensEncoded", () => {
+    expect(discordUrl("https://twitch.tv/[x](https://evil.example)")).toBe(
+      "<https://twitch.tv/%5Bx%5D%28https://evil.example%29>",
+    );
+  });
+
+  it("discordUrl_formattingSigns_encodedButUnderscoreTildeKept", () => {
+    // `_` et `~` restent : courants dans un nom de chaîne, sans effet entre chevrons.
+    expect(discordUrl("https://twitch.tv/a_b~c*|\\`d")).toBe("<https://twitch.tv/a_b~c%2A%7C%5C%60d>");
   });
 });
