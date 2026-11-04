@@ -714,7 +714,7 @@ function VoiceSection({ voice, sides }: Readonly<{ voice: MatchVoiceInfo; sides:
       </InfoHintRow>
       {/* Une seule zone vivante, toujours montée : un texte changé dans une
           zone déjà présente est annoncé (monté avec son texte, il ne l'est pas). */}
-      <div aria-live="polite">
+      <div aria-live="polite" aria-atomic="false">
         <ul className={styles.voiceList}>
           {sides.map((pageSide) => {
             const state = side(pageSide.slot);
