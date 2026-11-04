@@ -56,7 +56,7 @@ et rien n'est compté.
   est ignorée.
 - **Affichage** : par équipe sur la page du match, pour ses parties et le staff, un
   état (`team1State` / `team2State`) : « bientôt ouvert » (`WAITING`), « ouvert »
-  (`OPEN`), « indisponible » (`FAILED`). Une ancienne charge (`COUNTED`/`UNCOUNTED`,
+  (`OPEN`), « indisponible, nouvelle tentative en cours » (`FAILED`). Une ancienne charge (`COUNTED`/`UNCOUNTED`,
   nombres, `pending`) se lit `OPEN`, sans le reste. La vue spectateur ne garde rien
   (`voice: null`).
 
