@@ -1141,7 +1141,7 @@ function RgpdFr({
             après sa création ou sa reprise — occupé, il reste jusqu&apos;à son rendu ; déplacé hors de la catégorie des matchs, le bot cesse de le
             suivre sans le supprimer et il relève de la modération du serveur — comme après une suppression par la modération ou un oubli par le bot, un nouveau salon est alors ouvert à
             l&apos;équipe si son match n&apos;a pas encore de score validé, est à moins de {VOICE_CHANNEL_LEAD_MINUTES} minutes de son horaire ou l&apos;a passé, et n&apos;a pas dépassé son horaire de plus de {VOICE_CHANNEL_LATE_HOURS} heures ; un match reporté
-            garde ses salons jusqu&apos;à son rendu), et le site efface sa ligne {VOICE_ROW_RETENTION_DAYS} jours après le rendu ou, si le bot ne le reprend pas, après sa clôture {VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création (hors les
+            garde ses salons jusqu&apos;à son rendu), et le site efface sa ligne {VOICE_ROW_RETENTION_DAYS} jours après le rendu ou, si le bot ne le reprend pas, après sa clôture {VOICE_BOT_UNRELEASED_MAX_HOURS} heures après la création du salon actuel (hors les
             copies de sauvegarde chiffrées). Le bot garde de chaque salon une fiche sans nom (identifiant du salon, numéros du match et de
             l&apos;équipe, heures de création et de rendu), effacée avec le salon ou quand il l&apos;oublie — gardée sans limite tant que le salon, jamais rendu, reste occupé, qu&apos;il le lit sans pouvoir le supprimer ou que
             Discord lui répond par une autre erreur — (hors les copies de sauvegarde chiffrées). Ses autres délais s&apos;entendent à un

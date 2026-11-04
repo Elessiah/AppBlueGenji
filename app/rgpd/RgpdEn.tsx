@@ -951,7 +951,7 @@ export function RgpdEn({
             after its creation or its reuse — occupied, it stays until it is handed back; moved out of the match category, the bot stops tracking it without deleting it
             and it falls to the server&apos;s moderation — as after a deletion by moderation or the bot forgetting it, a new channel is then opened for the team if its match
             has no confirmed score yet, is less than {VOICE_CHANNEL_LEAD_MINUTES} minutes from its time or past it, and is not more than {VOICE_CHANNEL_LATE_HOURS} hours past its time; a rescheduled match keeps its
-            channels until they are handed back), and the site erases its record {VOICE_ROW_RETENTION_DAYS} days after the hand-back or, if the bot does not take it back, after its closure {VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation (apart from the encrypted backup
+            channels until they are handed back), and the site erases its record {VOICE_ROW_RETENTION_DAYS} days after the hand-back or, if the bot does not take it back, after its closure {VOICE_BOT_UNRELEASED_MAX_HOURS} hours after the current channel was created (apart from the encrypted backup
             copies). The bot keeps for each channel a record with no name (channel identifier, numbers of the match and team, creation
             and hand-back times), erased with the channel or when it forgets it — kept with no limit while the channel, never handed back, stays occupied, or while it reads it without being able to delete
             it or while Discord answers it with another error — (apart from the encrypted backup copies). Its other periods
