@@ -3,7 +3,7 @@ import {
   firstTargetOverMax,
   focusIndexAfterRemoval,
   sameRoundKeys,
-  storedRoundSignature,
+  storedRoundsSignature,
   slotOverMax,
   vanishedRoundFallback,
 } from "@/app/(secured)/tournois/[id]/_lib/round-maps-editor";
@@ -110,24 +110,18 @@ describe("sameRoundKeys", () => {
   });
 });
 
-describe("storedRoundSignature", () => {
+describe("storedRoundsSignature", () => {
   const stored = (maps: string[][]) => [{ ...R1, slots: maps }];
 
-  it("storedRoundSignature_equalContentNewArray_sameSignature", () => {
-    expect(storedRoundSignature(stored([["a"]]), R1)).toBe(storedRoundSignature(stored([["a"]]), R1));
+  it("storedRoundsSignature_equalContentNewArray_sameSignature", () => {
+    expect(storedRoundsSignature(stored([["a"]]))).toBe(storedRoundsSignature(stored([["a"]])));
   });
 
-  it("storedRoundSignature_mapsChanged_signatureChanges", () => {
-    expect(storedRoundSignature(stored([["a"]]), R1)).not.toBe(storedRoundSignature(stored([["b"]]), R1));
+  it("storedRoundsSignature_mapsChanged_signatureChanges", () => {
+    expect(storedRoundsSignature(stored([["a"]]))).not.toBe(storedRoundsSignature(stored([["b"]])));
   });
 
-  it("storedRoundSignature_otherRoundChanged_signatureUnchanged", () => {
-    const other = { ...R2, slots: [["x"]] };
-
-    expect(storedRoundSignature([...stored([["a"]]), other], R1)).toBe(storedRoundSignature(stored([["a"]]), R1));
-  });
-
-  it("storedRoundSignature_noRound_isStable", () => {
-    expect(storedRoundSignature(stored([["a"]]), null)).toBe("null");
+  it("storedRoundsSignature_otherRoundAdded_signatureChanges", () => {
+    expect(storedRoundsSignature([...stored([["a"]]), { ...R2, slots: [["x"]] }])).not.toBe(storedRoundsSignature(stored([["a"]])));
   });
 });

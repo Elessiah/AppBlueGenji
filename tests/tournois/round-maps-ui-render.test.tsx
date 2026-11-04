@@ -165,7 +165,7 @@ describe("câblage de la fenêtre des cartes", () => {
   it("snapshot_staleTiebreaks_areTheStoredOnesThatAreNotActive", () => {
     const snapshot = readSource("lib/server/tournaments/snapshot.ts");
 
-    expect(snapshot).toContain("stored.filter((entry) => !activeSet.has(entry))");
+    expect(snapshot).toContain("stored.filter((entry) => !activeKeys.has(roundKeyId(entry)))");
   });
 
   it("snapshot_staleTiebreaks_omittedWhenNoneIsStale", () => {
