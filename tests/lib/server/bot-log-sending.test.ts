@@ -122,6 +122,15 @@ describe("kind et catégories", () => {
     expect(pendingBotLogBatches()).toEqual(new Map([["log:global:signups", 1]]));
   });
 
+  it("sendBotLog_scopeGetterThrows_neverThrows", () => {
+    const hostile = {
+      get tournamentId(): number {
+        throw new Error("scope");
+      },
+    };
+    expect(() => sendBotLog("ligne", hostile)).not.toThrow();
+  });
+
   it("sendBotLog_logCategory_waitsForTheWindow", async () => {
     jest.useFakeTimers();
     sendBotLog("cartes", { tournamentId: 3, category: "maps" });

@@ -650,3 +650,28 @@ describe("flushAll — réouverture", () => {
     expect(send).not.toHaveBeenCalledWith("rouvert", "general");
   });
 });
+
+describe("flushKeys — envoi déjà en route", () => {
+  it("flushKeys_batchAlreadySentAndSendSlow_resolvesOnlyWhenItsScopeChainEnds", async () => {
+    let release: () => void = () => undefined;
+    send.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+    batcher.add("k", "ligne");
+    void batcher.flush("k");
+    await settle();
+    const settled = jest.fn();
+    void batcher.flushKeys(["k"]).then(settled);
+    const otherScope = jest.fn();
+    void batcher.flushKeys(["autre"]).then(otherScope);
+    await settle();
+    expect(otherScope).toHaveBeenCalled();
+    expect(settled).not.toHaveBeenCalled();
+    release();
+    await settle();
+    expect(settled).toHaveBeenCalled();
+  });
+});

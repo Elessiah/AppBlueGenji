@@ -43,6 +43,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   resetRoundMapsNoticeState();
   jest.mocked(sendBotLog).mockReturnValue(undefined);
+  jest.mocked(flushBotLogBatch).mockResolvedValue();
   jest.spyOn(console, "error").mockImplementation(() => undefined);
 });
 
@@ -168,6 +169,12 @@ describe("flushRoundMapsNotice", () => {
     await flushRoundMapsNotice(7);
     expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 7, category: "maps" });
     expect(flushBotLogBatch).toHaveBeenCalledWith({ tournamentId: 7, category: "maps" });
+  });
+
+  it("flushRoundMapsNotice_logBatchFlushNeverEnds_stillResolves", async () => {
+    pool([dueRow([R2])]);
+    jest.mocked(flushBotLogBatch).mockReturnValue(new Promise<void>(() => undefined));
+    await expect(flushRoundMapsNotice(7)).resolves.toBe(true);
   });
 
   it("flushRoundMapsNotice_sweepAlreadyClaimedIt_returnsFalse", async () => {

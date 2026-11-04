@@ -1092,4 +1092,24 @@ describe("tour du journal et vidage avant alerte", () => {
       jest.useRealTimers();
     }
   });
+  it("flushBotLogs_previousTurnSettled_onlyItsOwnTurnTimer", async () => {
+    mockDb([[TOURNAMENT_ROW], [TOURNAMENT_ROW]]);
+    const first = fakeConnection();
+    queueBotLog(first, { kind: "tournament_started", tournamentId: 12 });
+    flushBotLogs(first);
+    await flushed();
+    await flushed();
+    const timers = jest.spyOn(globalThis, "setTimeout");
+    try {
+      const second = fakeConnection();
+      queueBotLog(second, { kind: "tournament_started", tournamentId: 12 });
+      flushBotLogs(second);
+      await flushed();
+      await flushed();
+      // Le tour précédent est rendu : seul le minuteur du tour de ce passage est posé.
+      expect(timers).toHaveBeenCalledTimes(1);
+    } finally {
+      timers.mockRestore();
+    }
+  });
 });
