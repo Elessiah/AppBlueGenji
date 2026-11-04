@@ -41,6 +41,15 @@ describe("penalizeEnduranceTeams", () => {
     expect(connection.execute).not.toHaveBeenCalled();
   });
 
+  it("penalizeEnduranceTeams_countInfinity_returnsZeroWithoutQuery", async () => {
+    const connection = standings(1, 2, 3);
+
+    const penalized = await penalizeEnduranceTeams(fakeConnection(connection), TOURNAMENT_ID, Infinity);
+
+    expect(penalized).toBe(0);
+    expect(connection.execute).not.toHaveBeenCalled();
+  });
+
   it("penalizeEnduranceTeams_countOne_penalizesTopTeamOnly", async () => {
     const connection = standings(7, 8, 9);
 

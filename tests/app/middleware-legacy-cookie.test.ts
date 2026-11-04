@@ -124,6 +124,21 @@ describe("middleware — politique CSP selon le serveur de développement", () =
     expect(scriptSrc()).toContain("'strict-dynamic'");
   });
 
+  // Forme compilée : Next inscrit un booléen (`define-env`), pas une chaîne.
+  it("middleware_inlinedTrueTurbopackFlag_dropsStrictDynamic", () => {
+    withEnv({ NODE_ENV: "development" });
+    Reflect.set(process.env, "TURBOPACK", true);
+
+    expect(scriptSrc()).not.toContain("'strict-dynamic'");
+  });
+
+  it("middleware_inlinedFalseTurbopackFlag_keepsStrictDynamic", () => {
+    withEnv({ NODE_ENV: "development" });
+    Reflect.set(process.env, "TURBOPACK", false);
+
+    expect(scriptSrc()).toContain("'strict-dynamic'");
+  });
+
   it("middleware_turbopackProduction_keepsStrictDynamic", () => {
     withEnv({ NODE_ENV: "production", TURBOPACK: "1" });
 
