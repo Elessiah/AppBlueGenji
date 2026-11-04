@@ -51,8 +51,8 @@ et rien n'est compté.
   échec du canal du bot (le salon en échec est redemandé après 10 s, derrière les
   salons plus anciennement vus : un salon lent n'ouvre pas chaque passe) ; un salon tout juste créé n'est pas redemandé dans la même passe.
   La création, la revérification et le rendu s'arrêtent chacun à la première panne du canal (la création en panne saute la revérification ; le rendu, indépendant, passe toujours), la suivante reprend ; les matchs dont un salon vient d'échouer passent après les autres dans le lot de création. Seule
-  une panne du canal (`BOT_CIRCUIT_OPEN`, `BOT_INTERNAL_UNREACHABLE`,
-  `BOT_VOICE_TIMEOUT`) arrête une passe ; le refus du bot pour un salon (code
+  une panne du canal ou du bot entier (`BOT_CIRCUIT_OPEN`, `BOT_INTERNAL_UNREACHABLE`,
+  `BOT_VOICE_TIMEOUT`, `INTERNAL_ERROR`, `INTERNAL_ROUTE_NOT_FOUND`) arrête une passe ; le refus du bot pour un salon (code
   `VOICE_*`) ne retient que ce salon : les autres sont traités, et il garde son
   horodatage (redemandé après la minute, jamais en tête de file).
 - **Panne du bot** : `failed_at` noté, une ligne pm2 sans donnée de joueur, une
@@ -60,7 +60,8 @@ et rien n'est compté.
   `VOICE_RETRY_SECONDS` (60 s), en fin de file.
 - **Rendu** : le balayage rend les salons d'un match terminé, forfait, annulé,
   sorti du programme (heure retirée), d'un match où entre une entrée solo ou une
-  équipe fantôme, d'un tournoi terminé ou qui a éteint l'option ; un match
+  équipe fantôme, d'un tournoi qui n'est plus en cours (terminé, ou retombé avant
+  son départ) ou qui a éteint l'option ; un match
   simplement reporté garde les siens. `VOICE_CHANNEL_NOT_TRACKED` = déjà fait. Une
   ligne rendue est effacée 7 jours après (purge au plus une fois par heure, par lots de 200 jusqu'à épuisement de l'arriéré, 10 lots au plus par passe ; tant qu'il en reste, reprise une minute plus tard ; faite après la publication et même si une étape du bot échoue).
 - **Lecture** : `loadMatchVoiceInfos` ne lit que les lignes non rendues des matchs
