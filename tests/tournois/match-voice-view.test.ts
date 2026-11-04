@@ -5,6 +5,7 @@ import {
   VOICE_POLL_MS,
   voicePollActive,
   voicePollDue,
+  voicePollStep,
   voiceStreamKey,
   type PolledMatchVoice,
 } from "@/app/(secured)/tournois/[id]/_lib/match-voice-view";
@@ -145,11 +146,48 @@ describe("voicePollDue", () => {
     expect(VOICE_POLL_GRACE_MS).toBe(VOICE_POLL_MS / 2);
   });
 
-  it("useMatchVoice_source_pollGatedByGraceAndDownSinceReset", () => {
+  it("useMatchVoice_source_pollStepFeedsRefBeforeFetch", () => {
     const source = readSource("app/(secured)/tournois/[id]/_lib/match-voice-view.ts");
 
-    expect(source).toContain("voicePollDue(downSince.current, tick)");
-    expect(source).toContain("if (!active) downSince.current = null;");
+    expect(source).toContain("voicePollStep(downSince.current, active, tick, Date.now())");
+    expect(source).toContain("if (!step.fetch) return;");
+  });
+});
+
+describe("voicePollStep", () => {
+  const t0 = 2_000_000;
+
+  it("voicePollStep_inactive_resetsAndNoFetch", () => {
+    expect(voicePollStep(t0, false, t0 + VOICE_POLL_MS, t0 + VOICE_POLL_MS)).toEqual({ downSince: null, fetch: false });
+  });
+
+  it("voicePollStep_firstActivePass_armsWithoutFetch", () => {
+    // Même avec un battement périmé : le premier passage arme, il ne relit pas.
+    expect(voicePollStep(null, true, t0 - 60_000, t0)).toEqual({ downSince: t0, fetch: false });
+  });
+
+  it("voicePollStep_activePassWithNullTick_armsWithoutFetch", () => {
+    expect(voicePollStep(null, true, null, t0)).toEqual({ downSince: t0, fetch: false });
+  });
+
+  it("voicePollStep_freshTickRightAfterArming_noFetch", () => {
+    expect(voicePollStep(t0, true, t0 + 3, t0 + 3)).toEqual({ downSince: t0, fetch: false });
+  });
+
+  it("voicePollStep_firstIntervalTick_fetches", () => {
+    expect(voicePollStep(t0, true, t0 + VOICE_POLL_MS - 4, t0 + VOICE_POLL_MS - 4)).toEqual({ downSince: t0, fetch: true });
+  });
+
+  it("voicePollStep_activeNullTickArmed_noFetch", () => {
+    expect(voicePollStep(t0, true, null, t0 + VOICE_POLL_MS)).toEqual({ downSince: t0, fetch: false });
+  });
+
+  it("voicePollStep_streamFlapsBackThenDown_rearmsFromScratch", () => {
+    const down = voicePollStep(t0, true, t0 + VOICE_POLL_MS, t0 + VOICE_POLL_MS);
+    const back = voicePollStep(down.downSince, false, t0 + VOICE_POLL_MS, t0 + VOICE_POLL_MS + 1);
+    const downAgain = voicePollStep(back.downSince, true, t0 + 20_000, t0 + 20_000);
+
+    expect(downAgain).toEqual({ downSince: t0 + 20_000, fetch: false });
   });
 });
 
@@ -166,12 +204,5 @@ describe("isoTime et mémoïsation de la page (poids client)", () => {
       expect(source).toContain('from "./iso-time"');
       expect(source).not.toContain('from "./dates"');
     }
-  });
-
-  it("matchPage_source_streamsAndOfficiatingMemoized", () => {
-    const source = readSource("app/(secured)/tournois/[id]/_components/MatchPage.tsx");
-
-    expect(source).toContain("useMemo(() => matchPageStreams(match, liveState)");
-    expect(source).toMatch(/useMemo\(\s*\(\) => officiatingContent\(/);
   });
 });

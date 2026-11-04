@@ -31,6 +31,23 @@ export function voicePollDue(downSince: number | null, now: number): boolean {
   return downSince !== null && now - downSince >= VOICE_POLL_GRACE_MS;
 }
 
+/**
+ * Un pas de la porte REST, d'un seul tenant (aucun ordre d'effets à tenir) :
+ * `downSince` est remis à zéro dès que la relecture n'a plus lieu d'être,
+ * posé au premier passage une fois due (ce passage-là ne relit pas), puis
+ * `fetch` dit si ce battement relit.
+ */
+export function voicePollStep(
+  downSince: number | null,
+  active: boolean,
+  tick: number | null,
+  now: number,
+): { downSince: number | null; fetch: boolean } {
+  if (!active) return { downSince: null, fetch: false };
+  if (downSince === null) return { downSince: now, fetch: false };
+  return { downSince, fetch: tick !== null && voicePollDue(downSince, tick) };
+}
+
 /** Relecture REST rangée avec l'instantané qu'elle a vu : elle ne vaut que pour lui. */
 export type PolledMatchVoice = {
   matchId: number;
@@ -99,15 +116,13 @@ export function useMatchVoice(
   const active = voicePollActive(voice, streamLive);
   const tick = useClock(VOICE_POLL_MS, active);
 
-  // Depuis quand le flux est coupé (relecture due) ; remis à zéro dès qu'elle n'a plus lieu d'être.
+  // Depuis quand le flux est coupé (relecture due) ; voir `voicePollStep`.
   const downSince = useRef<number | null>(null);
-  useEffect(() => {
-    if (!active) downSince.current = null;
-    else downSince.current ??= Date.now();
-  }, [active]);
 
   useEffect(() => {
-    if (tick === null || !active || !voicePollDue(downSince.current, tick)) return;
+    const step = voicePollStep(downSince.current, active, tick, Date.now());
+    downSince.current = step.downSince;
+    if (!step.fetch) return;
     // Rangée avec l'instantané vu au départ : un instantané publié pendant la
     // requête la rend caduque.
     const seen = streamKey.current;
