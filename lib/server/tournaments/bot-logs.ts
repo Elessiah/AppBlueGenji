@@ -295,7 +295,12 @@ const staffValidatedMatches = new WeakMap<PoolConnection, Set<number>>();
  * Le tour vit sur `globalThis`, comme les lots : Next charge le module une fois
  * par bundle (routes, instrumentation), et deux copies auraient deux tours.
  */
-const logOrderState = globalThis as typeof globalThis & { __bgBotLogOrder?: Promise<void> };
+const logOrderState = globalThis as typeof globalThis & {
+  __bgBotLogOrder?: Promise<void>;
+  /** Tours déjà rendus : le passage suivant ne pose pas de minuteur pour les attendre. */
+  __bgBotLogSettled?: WeakSet<Promise<void>>;
+};
+const settledTurns = (logOrderState.__bgBotLogSettled ??= new WeakSet<Promise<void>>());
 
 /**
  * Attente maximale du passage précédent : une lecture bloquée ne retient pas le
@@ -465,7 +470,8 @@ async function deliverLogLinesInTurn(
   releaseTurn: () => void,
 ): Promise<void> {
   try {
-    await waitAtMost(previousTurn, BOT_LOG_ORDER_WAIT_MS);
+    // Le plus souvent le tour précédent est déjà rendu : pas de minuteur pour rien.
+    if (!settledTurns.has(previousTurn)) await waitAtMost(previousTurn, BOT_LOG_ORDER_WAIT_MS);
     for (const line of resolved) {
       if (line.channel !== "REFEREE") {
         try {
@@ -513,17 +519,19 @@ export function flushBotLogs(connection: PoolConnection): void {
   const previousTurn = logOrderState.__bgBotLogOrder ?? Promise.resolve();
   let releaseTurn: () => void = () => undefined;
   if (hasLogLines) {
-    logOrderState.__bgBotLogOrder = new Promise<void>((resolve) => {
+    const turn: Promise<void> = new Promise<void>((resolve) => {
       // Une lecture qui traîne ne retient pas les passages suivants : le tour est
       // rendu au bout de BOT_LOG_ORDER_WAIT_MS, ses lignes rejoignent leur lot
       // dès qu'elles sont résolues.
-      const timer = setTimeout(resolve, BOT_LOG_ORDER_WAIT_MS);
+      const timer = setTimeout(() => releaseTurn(), BOT_LOG_ORDER_WAIT_MS);
       timer.unref?.();
       releaseTurn = () => {
         clearTimeout(timer);
+        settledTurns.add(turn);
         resolve();
       };
     });
+    logOrderState.__bgBotLogOrder = turn;
   }
 
   // Une manche dont le désaccord vient d'être annoncé n'a pas besoin de son

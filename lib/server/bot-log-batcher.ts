@@ -201,14 +201,25 @@ export function createBotLogBatcher(options: BotLogBatcherOptions): BotLogBatche
     return next;
   }
 
+  /** Fin des envois déjà en cours des portées de `keys` (un lot parti n'est pas encore arrivé). */
+  function inFlight(keys: readonly string[]): Promise<void> {
+    const tails = new Set<Promise<void>>();
+    for (const key of keys) {
+      const tail = chains.get(scopeOf(key));
+      if (tail) tails.add(tail);
+    }
+    return Promise.all(tails).then(() => undefined);
+  }
+
   function flushKeys(keys: readonly string[]): Promise<void> {
-    if (batches.size === 0) return Promise.resolve();
     const taken: Array<[string, Batch]> = [];
     for (const key of new Set(keys)) {
       const batch = take(key);
       if (batch) taken.push([key, batch]);
     }
-    if (taken.length === 0) return Promise.resolve();
+    // Rien en attente : les lots déjà partis de la portée sont peut-être encore
+    // en route, et ce qui les suit (une alerte) ne doit pas les doubler.
+    if (taken.length === 0) return inFlight(keys);
     taken.sort(([, a], [, b]) => a.order - b.order);
     return Promise.all(taken.map(([key, batch]) => dispatch(key, batch))).then(() => undefined);
   }
