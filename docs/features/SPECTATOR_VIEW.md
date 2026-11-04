@@ -182,7 +182,8 @@ lui-même).
   (`Content-Encoding: gzip`, `Vary: Accept-Encoding` ; Next ne recompresse pas
   une réponse déjà encodée) ; une compression qui échoue (mémoire) ne donne pas
   un 500 : la route sert le corps brut, avec l'`ETag` du codage réellement servi,
-  et un client gzip qui revalide avec cet `ETag` brut reçoit un 304 ;
+  et un client gzip qui revalide avec cet `ETag` brut reçoit un 304, refus de
+  reconstruction compris (`refusedRead`) ;
 - le cache commun purge ses entrées échues toutes les 10 s au plus
   (`CACHE_SWEEP_INTERVAL_MS`, à l'écriture), et non plus seulement au plafond
   de 500 : un parcours de tournois ne laisse plus d'instantanés en mémoire
@@ -298,7 +299,7 @@ liens de chaîne d'un match, horaire) suit la durée de vie de la copie, comme u
 renommage d'équipe ou un compte supprimé (choix de l'auteur, délai déclaré dans
 `/rgpd`). Un membre connecté arrivant par une mise en page préchargée ne voit
 pas la fiche publique : `MemberRelay` seul est rendu, à la place de `children`,
-jusqu'au `router.replace` ; un repli « Ouverture du tournoi… » (`login.authGate.redirecting`) évite la page vide si le renvoi tarde. `admit` est consulté avant `cached`, jamais dans le chargeur partagé : le refus d'un réseau plafonné n'est pas servi aux appelants qui rejoignent la lecture en vol.
+jusqu'au `router.replace` ; un repli « Ouverture du tournoi… » (`login.authGate.redirecting`), lien vers la fiche membre du tournoi, évite la page vide et l'impasse si le renvoi tarde ou échoue. `admit` est consulté avant `cached`, jamais dans le chargeur partagé : le refus d'un réseau plafonné n'est pas servi aux appelants qui rejoignent la lecture en vol.
 
 **Règles du mode** — le « ? » de la fiche (`RulesHelpFab`) mène à
 `/regles/<mode>?tournoi=<id>`. Sans session aussi, les réglages du tournoi
