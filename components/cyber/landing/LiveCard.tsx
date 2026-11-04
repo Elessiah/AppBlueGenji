@@ -204,29 +204,40 @@ export function slideLoadsLogos(index: number, active: number, count: number, fe
   return featured || slideNearActive(index, active, count);
 }
 
-/** Deux valeurs d'un match identiques : primitives égales, ou objets (manche, format) de même contenu. */
-function sameField(left: unknown, right: unknown): boolean {
+/**
+ * Deux valeurs de même contenu : primitives égales, ou objets et tableaux dont
+ * chaque clé est égale en profondeur. Sans `JSON.stringify` (deux sérialisations
+ * par diapositive à chaque relève, même sans changement) et sans dépendre de
+ * l'ordre des clés.
+ */
+function sameValue(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true;
   if (typeof left !== "object" || typeof right !== "object" || left === null || right === null) return false;
-  return JSON.stringify(left) === JSON.stringify(right);
+  // Seuls objets simples et tableaux se comparent par contenu : une `Date`, une
+  // `Map` ou une instance (aucune clé énumérable) ne se disent jamais égales à tort.
+  const proto: unknown = Object.getPrototypeOf(left);
+  if (proto !== Object.getPrototypeOf(right) || (proto !== Object.prototype && proto !== Array.prototype)) return false;
+  const leftKeys = Object.keys(left);
+  return (
+    leftKeys.length === Object.keys(right).length
+    && leftKeys.every(
+      (key) =>
+        Object.hasOwn(right, key)
+        && sameValue((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key]),
+    )
+  );
 }
 
 /**
  * Comparateur de `memo` pour une diapositive : chaque relève du direct (flux ou
  * REST de secours) remplace `live.matches` par des objets neufs, si bien que la
  * comparaison par référence refaisait toutes les diapositives à chaque relève,
- * même sans changement. Le match se compare donc **champ par champ**.
+ * même sans changement. Les props se comparent donc **par valeur, toutes
+ * clés** : une prop ajoutée plus tard à `MatchSlideProps` (comme un champ du
+ * match) est comparée sans qu'il faille penser à ce fichier.
  */
 export function sameSlideProps(previous: Readonly<MatchSlideProps>, next: Readonly<MatchSlideProps>): boolean {
-  if (previous.clock !== next.clock || previous.showLogos !== next.showLogos || previous.spectator !== next.spectator) {
-    return false;
-  }
-  if (previous.match === next.match) return true;
-  const keys = Object.keys(next.match) as (keyof LandingLiveMatch)[];
-  return (
-    keys.length === Object.keys(previous.match).length
-    && keys.every((key) => sameField(previous.match[key], next.match[key]))
-  );
+  return previous === next || sameValue(previous, next);
 }
 
 /**

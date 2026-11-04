@@ -134,7 +134,7 @@ export async function deliverRefereeChange(change: RefereeChange, options: Refer
   // s'oppose ; seule cette ligne, sans nombre, part sur Discord.
   // Hors de ce retrait en série (`takenOver`), la ligne du match part, motif générique.
   const silent = options.log === false || (change.kind === "OBJECTION_RELEASED" && !change.takenOver);
-  const log = silent ? Promise.resolve() : sendBotLog(
+  if (!silent) sendBotLog(
     formatRefereeChangeLog({
       tournament: match.tournament,
       matchId: match.matchId,
@@ -148,33 +148,27 @@ export async function deliverRefereeChange(change: RefereeChange, options: Refer
     { tournamentId: match.tournament.id, category: refereeLogCategory(change) },
   );
   const notice = refereeReleaseNotice(change);
-  if (!notice) {
-    await log;
-    return;
-  }
+  if (!notice) return;
   const recipients = await loadNotificationRecipients([notice.refereeId], "certified");
-  await Promise.all([
-    log,
-    notifyUsers(recipients, {
-      topic: "REFEREE_RELEASED",
-      push: (locale) =>
-        refereeReleasedPush(
-          {
-            tournamentId: match.tournament.id,
-            tournamentName: match.tournament.name,
-            matchId: match.matchId,
-            bracket: match.bracket,
-            roundNumber: match.roundNumber,
-            swiss: match.swiss,
-            team1Name: row.team1_name,
-            team2Name: row.team2_name,
-            solo: match.participantType === "SOLO",
-            reason: notice.reason,
-          },
-          locale,
-        ),
-    }),
-  ]);
+  await notifyUsers(recipients, {
+    topic: "REFEREE_RELEASED",
+    push: (locale) =>
+      refereeReleasedPush(
+        {
+          tournamentId: match.tournament.id,
+          tournamentName: match.tournament.name,
+          matchId: match.matchId,
+          bracket: match.bracket,
+          roundNumber: match.roundNumber,
+          swiss: match.swiss,
+          team1Name: row.team1_name,
+          team2Name: row.team2_name,
+          solo: match.participantType === "SOLO",
+          reason: notice.reason,
+        },
+        locale,
+      ),
+  });
 }
 
 /** Options d'une annonce : `log: false` tait la ligne du journal (geste groupé). */

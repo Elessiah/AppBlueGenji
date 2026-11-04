@@ -7,8 +7,13 @@ import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tourn
 import { FinishedCard } from "@/app/(secured)/tournois/cards/FinishedCard";
 import { RegistrationCard } from "@/app/(secured)/tournois/cards/RegistrationCard";
 import { RunningCard } from "@/app/(secured)/tournois/cards/RunningCard";
+import { StateCard } from "@/app/(secured)/tournois/cards/StateCard";
 import { UpcomingCard } from "@/app/(secured)/tournois/cards/UpcomingCard";
-import { priorityBannerIds } from "@/app/(secured)/tournois/cards/card-image";
+import {
+  CARD_IMAGE_SIZES,
+  priorityBannerIds,
+  RUNNING_CARD_IMAGE_SIZES,
+} from "@/app/(secured)/tournois/cards/card-image";
 import type { TournamentImage } from "@/lib/shared/tournament-image";
 import type { TournamentCard, TournamentState } from "@/lib/shared/types";
 import { tournamentCard } from "../helpers/tournament-card";
@@ -64,6 +69,13 @@ describe("TournamentImageEmblem", () => {
     expect(imgTags(markup)[0]).toContain('alt=""');
   });
 
+  it("donne à `sizes` la largeur d'affichage, sans la doubler (le navigateur multiplie par la densité)", () => {
+    const markup = renderToStaticMarkup(<TournamentImageEmblem image={logo} size={40} />);
+    // Un logo de 40 px : le srcset en choisit un de 96w en DPR 2, pas de 256w.
+    expect(imgTags(markup)[0]).toContain('sizes="40px"');
+    expect(imgTags(markup)[0]).not.toContain('sizes="80px"');
+  });
+
   it("ne rend rien pour une illustration ni sans image", () => {
     expect(renderToStaticMarkup(<TournamentImageEmblem image={cover} size={40} />)).toBe("");
     expect(renderToStaticMarkup(<TournamentImageEmblem image={null} size={40} />)).toBe("");
@@ -104,6 +116,50 @@ describe("cartes de /tournois", () => {
   it("l'image reste dans la carte : aucune seconde ancre", () => {
     const markup = renderToStaticMarkup(<RegistrationCard t={card({ image: cover })} />);
     expect(markup.match(/<a\b/g)).toHaveLength(1);
+  });
+
+  it("le bandeau des cartes d'une section à trois colonnes suit la grille (≈ 400 px), pas 720 px", () => {
+    expect(CARD_IMAGE_SIZES).toBe("(max-width: 720px) 100vw, (max-width: 1080px) 50vw, 400px");
+    const markup = renderToStaticMarkup(<RegistrationCard t={card({ state: "REGISTRATION", image: cover })} />);
+    expect(imgTags(markup)[0]).toContain(`sizes="${CARD_IMAGE_SIZES}"`);
+  });
+
+  it("la carte « en cours » garde ses deux colonnes : des `sizes` plus larges", () => {
+    const markup = renderToStaticMarkup(<RunningCard t={card({ state: "RUNNING", image: cover })} />);
+    expect(imgTags(markup)[0]).toContain(`sizes="${RUNNING_CARD_IMAGE_SIZES}"`);
+    expect(RUNNING_CARD_IMAGE_SIZES).toContain("580px");
+  });
+
+  it("une carte « en cours » rangée dans une grille à trois colonnes reprend les `sizes` standard", () => {
+    const markup = renderToStaticMarkup(<StateCard t={card({ state: "RUNNING", image: cover })} />);
+    expect(imgTags(markup)[0]).toContain(`sizes="${CARD_IMAGE_SIZES}"`);
+  });
+
+  it.each([
+    ["en cours", RunningCard],
+    ["inscriptions", RegistrationCard],
+    ["terminé", FinishedCard],
+  ])("la carte %s est mémoïsée : une frappe dans la recherche ne la redessine pas", (_, Card) => {
+    expect((Card as unknown as { $$typeof: symbol }).$$typeof).toBe(Symbol.for("react.memo"));
+  });
+
+  it("l'aiguillage StateCard n'est pas mémoïsé : il ne doit pas figer le visage d'une carte « à venir »", () => {
+    expect((StateCard as unknown as { $$typeof?: symbol }).$$typeof).not.toBe(Symbol.for("react.memo"));
+  });
+
+  it("la carte « à venir » juge son visage à chaque rendu mais dessine sous `memo`", () => {
+    const hour = 3_600_000;
+    const iso = (offset: number) => new Date(Date.now() + offset).toISOString();
+    const announced = renderToStaticMarkup(
+      <UpcomingCard t={card({ state: "UPCOMING", registrationOpenAt: iso(hour), registrationCloseAt: iso(2 * hour) })} />,
+    );
+    const locked = renderToStaticMarkup(
+      <UpcomingCard t={card({ state: "UPCOMING", registrationOpenAt: iso(-2 * hour), registrationCloseAt: iso(-hour) })} />,
+    );
+    // Le visage dépend de l'heure, calculée hors du `memo` : il change sans que
+    // la carte change de référence.
+    expect(announced).not.toBe(locked);
+    expect(UpcomingCard).not.toHaveProperty("$$typeof");
   });
 });
 

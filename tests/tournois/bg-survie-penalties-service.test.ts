@@ -57,8 +57,8 @@ function makeConn(options: {
     }
     if (query.includes("FROM bg_endurance_penalties")) return [[], []];
     // Verrou du retrait : une manche postérieure porte-t-elle une saisie ?
-    if (query.startsWith("SELECT COUNT(*) AS c FROM bg_matches") && query.includes("round_number > ?")) {
-      return [[{ c: options.lastRoundWithInput ? 1 : 0 }], []];
+    if (query.startsWith("SELECT id FROM bg_matches") && query.includes("round_number > ?")) {
+      return [options.lastRoundWithInput ? [{ id: 900 }] : [], []];
     }
     if (query.includes("SELECT status FROM bg_endurance_standings")) {
       return [status === null ? [] : [{ status }], []];
@@ -67,7 +67,9 @@ function makeConn(options: {
     return [[], []];
   });
 
-  const conn = { execute } as never as PoolConnection;
+  // Attente bornée de la lecture des manches (`withShortLockWait`).
+  const query = jest.fn(async () => [[], []]);
+  const conn = { execute, query } as never as PoolConnection;
   return { conn, calls, execute };
 }
 
@@ -217,6 +219,22 @@ describe("liftEndurancePenalty", () => {
       query.startsWith("SELECT team_id, points, round_number FROM bg_endurance_penalties"),
     );
     expect(select?.[1]).toEqual([15, 7]);
+  });
+
+  // ERREUR.txt EF-15 (revue) : aucune lecture d'instantané avant celle,
+  // verrouillée, des manches suivantes (`ER_CHECKREAD` sous MariaDB).
+  it("liftEndurancePenalty_penaltyRead_isLockingBeforeLaterRounds", async () => {
+    const { conn, calls } = makeConn({
+      penalties: [{ team_id: 42, points: 3, round_number: 2 }],
+    });
+    await liftEndurancePenalty(7, 15, conn);
+
+    const selectIndex = calls.findIndex(([query]) =>
+      query.startsWith("SELECT team_id, points, round_number FROM bg_endurance_penalties"),
+    );
+    const roundsIndex = calls.findIndex(([query]) => query.startsWith("SELECT id FROM bg_matches"));
+    expect(calls[selectIndex][0]).toMatch(/LIMIT 1 FOR UPDATE$/);
+    expect(selectIndex).toBeLessThan(roundsIndex);
   });
 
   it("refuse une sanction introuvable", async () => {

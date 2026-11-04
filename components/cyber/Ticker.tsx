@@ -1,12 +1,12 @@
 "use client";
 
 import { memo, useState, type ReactNode } from "react";
-import { useLandingText } from "@/components/i18n/landing-text";
+import { FR_TICKER_LABELS, type TickerControls } from "@/lib/shared/ticker-labels";
 import type { TickerItem, TickerOutcome, TickerResultSide } from "@/lib/shared/ticker-items";
 import styles from "./Ticker.module.css";
 
 /** Libellés du bandeau et de son bouton (espace `landing.ticker`). */
-export type TickerLabels = Readonly<Record<"label" | "resume" | "pause" | "resumeShort" | "pauseShort", string>>;
+export type TickerLabels = Readonly<TickerControls>;
 
 /** Classe d'un camp selon son issue : forfait et nul restent neutres. */
 const OUTCOME_CLASS: Record<TickerOutcome, string | undefined> = {
@@ -96,8 +96,9 @@ interface TickerProps {
   /** Phrases, résultats et champions (`lib/shared/ticker-items.ts`), déjà rédigés. */
   items: readonly TickerItem[];
   /**
-   * Libellés venus d'un autre écran que l'accueil (`/tournois`, lot 8a), qui
-   * ne pose pas le fournisseur de l'accueil. Sans eux : `useLandingText()`.
+   * Libellés de la langue de l'écran. Sans eux : le français
+   * (`FR_TICKER_LABELS`) — le bandeau ne lit pas le dictionnaire de l'accueil,
+   * qui partirait sinon tout entier dans le paquet de chaque liste qui le monte.
    */
   labels?: TickerLabels;
 }
@@ -124,11 +125,10 @@ interface TickerProps {
  */
 function TickerView({ items, labels }: Readonly<TickerProps>) {
   const [paused, setPaused] = useState(false);
-  const landing = useLandingText();
-  const t = (key: `ticker.${keyof TickerLabels}`) => (labels ? labels[key.slice("ticker.".length) as keyof TickerLabels] : landing.t(key));
+  const text = labels ?? FR_TICKER_LABELS;
 
   return (
-    <div className={styles.ticker} role="marquee" aria-label={t("ticker.label")} data-paused={paused ? "true" : undefined}>
+    <div className={styles.ticker} role="marquee" aria-label={text.label} data-paused={paused ? "true" : undefined}>
       <div className={styles.track}>
         {[0, 1].map((copy) => (
           <div key={copy} className={styles.copy} aria-hidden={copy === 1 ? true : undefined}>
@@ -146,8 +146,8 @@ function TickerView({ items, labels }: Readonly<TickerProps>) {
       <button
         type="button"
         className={styles.pause}
-        aria-label={paused ? t("ticker.resume") : t("ticker.pause")}
-        title={paused ? t("ticker.resumeShort") : t("ticker.pauseShort")}
+        aria-label={paused ? text.resume : text.pause}
+        title={paused ? text.resumeShort : text.pauseShort}
         onClick={() => setPaused((value) => !value)}
       >
         <span aria-hidden="true">{paused ? "▶" : "❚❚"}</span>

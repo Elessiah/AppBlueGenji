@@ -14,6 +14,8 @@ import type { ReactElement } from "react";
 let mockLocale: "fr" | "en" = "en";
 jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => mockLocale }));
 jest.mock("@/lib/server/auth", () => ({ getCurrentUser: jest.fn(async () => null) }));
+let mockDocument = "1";
+jest.mock("next/headers", () => ({ headers: async () => new Headers({ "x-bg-document": mockDocument }) }));
 jest.mock("@/lib/server/tournaments-service", () => ({ getVisibleTournamentCard: jest.fn() }));
 jest.mock("next/navigation", () => ({
   usePathname: () => "/en/tournois/1",
@@ -25,7 +27,7 @@ jest.mock("next/navigation", () => ({
 import { renderToStaticMarkup } from "react-dom/server";
 import { createTranslator } from "next-intl";
 import DetailLayout, { generateMetadata } from "@/app/(secured)/tournois/[id]/layout";
-import { TournamentSheetText } from "@/app/(secured)/tournois/[id]/_components/TournamentSheetText";
+import { TournamentSheetText, tournamentSheetEnglish } from "@/app/(secured)/tournois/[id]/_components/TournamentSheetText";
 import { TournamentHeader } from "@/app/(secured)/tournois/[id]/_components/TournamentHeader";
 import { TournamentProgress, stageCountdownText } from "@/app/(secured)/tournois/[id]/_components/TournamentProgress";
 import { LiveIndicator } from "@/app/(secured)/tournois/[id]/_components/LiveIndicator";
@@ -39,8 +41,11 @@ import { EnduranceView } from "@/app/(secured)/tournois/[id]/_components/Enduran
 import { RegistrationsPanel } from "@/app/(secured)/tournois/[id]/_components/RegistrationsPanel";
 import { MatchPlanningPanel } from "@/app/(secured)/tournois/[id]/_components/MatchPlanningPanel";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
-import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MatchMapDetails";
+import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MapResultList";
 import { FR_VIEWS_TEXT } from "@/app/(secured)/tournois/[id]/_lib/views-text";
+import { FR_ENDURANCE_TEXT } from "@/app/(secured)/tournois/[id]/_lib/endurance-text";
+import { FR_ENDURANCE_CHART_TEXT } from "@/app/(secured)/tournois/[id]/_lib/endurance-chart-text";
+import "@/tests/helpers/lazy-tournament-texts";
 import { EntrantProvider } from "@/app/(secured)/tournois/[id]/_lib/entrant-link";
 import { registrationConditionsText } from "@/app/(secured)/tournois/[id]/_lib/header-meta";
 import { phaseFormatLabel, phaseStateLabel } from "@/app/(secured)/tournois/[id]/_lib/phases";
@@ -93,7 +98,12 @@ import { bracketMatch } from "../helpers/bracket-match";
 import { tournamentCard } from "../helpers/tournament-card";
 import { tournamentDetail } from "../helpers/tournament-detail";
 
-const EN = tournamentPageText("en", tournamentPageMessages(messagesFor("en")));
+const EN_CATALOG = messagesFor("en");
+/** La fiche anglaise complétée de toutes ses vues, comme chacune la lit (`useTournamentViewText`). */
+const EN = tournamentPageText("en", tournamentPageMessages(EN_CATALOG), {
+  ...EN_CATALOG.tournamentViews,
+  endurance: { ...EN_CATALOG.tournamentEndurance.endurance, ...EN_CATALOG.tournamentEnduranceChart.endurance },
+});
 const noop = () => undefined;
 
 /** Retire les éléments annoncés `lang="fr"` (imbrication comprise). */
@@ -318,25 +328,47 @@ describe("route et référencement", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(null);
   });
 
-  it("la mise en page ne sérialise que les espaces client, sous /en seulement", async () => {
+  it("la mise en page ne sérialise que les espaces client, sous /en et au chargement complet d'un lecteur connecté", async () => {
     // La mise en page délègue aux textes communs aux deux espaces de la fiche.
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
+    mockDocument = "1";
     const layout = await DetailLayout({ children: <TournamentLoading /> });
     expect(layout.type).toBe(TournamentSheetText);
-    const sheetText = (props: unknown) => TournamentSheetText(props as Parameters<typeof TournamentSheetText>[0]);
-    const en = sheetText(layout.props);
-    const messages = (en.props as { messages?: Record<string, unknown> }).messages;
+    const messages = (layout.props as { messages?: { page: Record<string, unknown>; actions: Record<string, unknown> } }).messages;
     expect(messages).toBeDefined();
-    for (const serverOnly of ["meta", "settings", "share"]) expect(messages).not.toHaveProperty(serverOnly);
-    // 20 500 : « Arbitre : <pseudo> » (MATCH-UI-NAMES) a passé l'ancien plafond de 20 000 de quelques octets.
-    // 21 500 : les ~1 Ko de textes du graphique d'endurance ajoutés par EF-11 (sélection pleine, lecteurs
-    // d'écran) voyagent encore ici ; l'entrée ERREUR.txt « endurance.chart* sous /en » (charger l'espace avec
-    // le morceau du graphique) les en retirera, et ce plafond redescendra avec elle.
-    expect(JSON.stringify(messages).length).toBeLessThan(21_500);
-    expect(renderToStaticMarkup(en)).toContain("Loading the tournament…");
+    for (const serverOnly of ["meta", "settings", "share"]) expect(messages?.page).not.toHaveProperty(serverOnly);
+    // Les vues (suisse, survie, endurance, graphique) voyagent avec leur morceau, jamais avec la fiche.
+    for (const part of TOURNAMENT_VIEW_PARTS) expect(messages?.page).not.toHaveProperty(part);
+    expect(Object.keys(messages?.actions ?? {}).sort()).toEqual(["actions", "errors"]);
+    // 20 500 : « Arbitre : <pseudo> » (MATCH-UI-NAMES) a passé l'ancien plafond de 20 000 de quelques
+    // octets ; sans les vues (EF-17), l'espace de la fiche redescend sous 15 000.
+    expect(JSON.stringify(messages?.page).length).toBeLessThan(15_000);
+    const sheetText = (props: unknown) => TournamentSheetText(props as Parameters<typeof TournamentSheetText>[0]);
+    expect(renderToStaticMarkup(sheetText(layout.props))).toContain("Loading the tournament…");
+    // Réponse du routeur (navigation, `router.refresh()`) : rien n'est sérialisé.
+    mockDocument = "0";
+    expect(await tournamentSheetEnglish("en")).toBeUndefined();
+    expect(((await DetailLayout({ children: null })).props as { messages?: unknown }).messages).toBeUndefined();
+    // En-tête absent ou autre que « 1 » : rien non plus.
+    mockDocument = "";
+    expect(await tournamentSheetEnglish("en")).toBeUndefined();
+    // Chargement complet sans session : la carte « Connexion requise » remplace la page, rien n'est sérialisé.
+    mockDocument = "1";
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
+    expect(await tournamentSheetEnglish("en")).toBeUndefined();
+    // Page sans compte : toujours l'anglais (robots, aperçus de lien, navigation sans écran d'attente).
+    expect(await tournamentSheetEnglish("en", true)).toEqual(messages);
+    mockDocument = "0";
+    expect(await tournamentSheetEnglish("en", true)).toEqual(messages);
+    mockDocument = "";
+    expect(await tournamentSheetEnglish("en", true)).toEqual(messages);
+    // En français, jamais rien.
+    mockDocument = "1";
+    expect(await tournamentSheetEnglish("fr", true)).toBeUndefined();
     mockLocale = "fr";
-    const fr = sheetText((await DetailLayout({ children: <TournamentLoading /> })).props);
+    const fr = await DetailLayout({ children: <TournamentLoading /> });
     expect((fr.props as { messages?: unknown }).messages).toBeUndefined();
-    expect(renderToStaticMarkup(fr)).toContain("Chargement du tournoi…");
+    expect(renderToStaticMarkup(sheetText(fr.props))).toContain("Chargement du tournoi…");
   });
 });
 
@@ -815,11 +847,20 @@ describe("performance — le français des vues voyage avec la vue", () => {
       formatMessage("fr", fr.swiss.summary, { round: "1", total: "3", count: 2 }),
     );
     expect(FR_VIEWS_TEXT.t("survival.everyRound")).toBe(fr.survival.everyRound);
-    expect(FR_VIEWS_TEXT.t("endurance.regionDone")).toBe(fr.endurance.regionDone);
-    // Une vue lit aussi la clé d'une autre (colonne « Équipe » de l'endurance).
     expect(FR_VIEWS_TEXT.t("swiss.team")).toBe(fr.swiss.team);
+    // BlueGenji Survie a son texte à part : ni la ronde suisse ni la survie par coupes ne l'emportent.
+    expect(FR_VIEWS_TEXT.t("endurance.regionDone")).toBe("endurance.regionDone");
+    expect(FR_ENDURANCE_TEXT.t("endurance.regionDone")).toBe(messagesFor("fr").tournamentEndurance.endurance.regionDone);
+    // Le graphique a le sien : la vue ne l'emporte pas, lui lit aussi les clés de la vue.
+    const chart = messagesFor("fr").tournamentEnduranceChart.endurance;
+    expect(FR_ENDURANCE_TEXT.t("endurance.chartClear")).toBe("endurance.chartClear");
+    expect(FR_ENDURANCE_CHART_TEXT.t("endurance.chartClear")).toBe(chart.chartClear);
+    expect(FR_ENDURANCE_CHART_TEXT.t("endurance.regionDone")).toBe(FR_ENDURANCE_TEXT.t("endurance.regionDone"));
+    // Le titre du volet, rendu volet replié, reste dans la vue.
+    expect(FR_ENDURANCE_TEXT.t("endurance.chartTitle")).toBe(messagesFor("fr").tournamentEndurance.endurance.chartTitle);
     // Le reste de la fiche reste lisible depuis une vue.
     expect(FR_VIEWS_TEXT.t("loading")).toBe(FR_TOURNAMENT_PAGE_TEXT.t("loading"));
+    expect(FR_ENDURANCE_TEXT.t("loading")).toBe(FR_TOURNAMENT_PAGE_TEXT.t("loading"));
   });
 
   it("toute clé littérale lue par une vue existe dans son texte français", () => {
@@ -834,17 +875,25 @@ describe("performance — le français des vues voyage avec la vue", () => {
     ];
     const keys = files.flatMap((file) => [...read(file).matchAll(/\bt\("([a-zA-Z.]+)"/g)].map((m) => m[1]));
     expect(keys.length).toBeGreaterThan(50);
-    const missing = keys.filter((key) => messageAt({ ...FR_TOURNAMENT_PAGE_MESSAGES, ...messagesFor("fr").tournamentViews }, key) === undefined);
+    const fr = messagesFor("fr");
+    const missing = keys.filter((key) => messageAt({ ...FR_TOURNAMENT_PAGE_MESSAGES, ...fr.tournamentViews, ...fr.tournamentEndurance }, key) === undefined);
     expect(missing).toEqual([]);
   });
 
   it("les vues lisent leur texte par useTournamentViewText, la fiche ne les importe qu'à la demande", () => {
-    expect(read("_components/SwissView.tsx")).toContain("useTournamentViewText(FR_VIEWS_TEXT)");
-    expect(read("_components/SurvivalView.tsx")).toContain("useTournamentViewText(FR_VIEWS_TEXT)");
-    expect(read("_components/EnduranceView.tsx")).toContain("useTournamentViewText(FR_VIEWS_TEXT)");
-    expect(read("_components/EnduranceRoundPanels.tsx")).toContain("useTournamentViewText(FR_VIEWS_TEXT)");
-    const page = read("page.tsx");
-    expect(page).not.toContain("_lib/views-text");
-    expect(page).not.toContain("tournamentViews.json");
+    expect(read("_components/SwissView.tsx")).toContain("useTournamentViewText(FR_VIEWS_TEXT, ENGLISH_VIEWS)");
+    expect(read("_components/SurvivalView.tsx")).toContain("useTournamentViewText(FR_VIEWS_TEXT, ENGLISH_VIEWS)");
+    expect(read("_components/EnduranceView.tsx")).toContain("useTournamentViewText(FR_ENDURANCE_TEXT, ENGLISH_ENDURANCE)");
+    expect(read("_components/EnduranceRoundPanels.tsx")).toContain("useTournamentViewText(FR_ENDURANCE_TEXT, ENGLISH_ENDURANCE)");
+    expect(read("_components/EnduranceChart.tsx")).toContain("useTournamentViewText(FR_ENDURANCE_CHART_TEXT, ENGLISH_ENDURANCE_CHART)");
+    // Les vues suisse et survie n'importent pas le texte de l'endurance, ni l'endurance celui du graphique.
+    for (const file of ["_components/SwissView.tsx", "_components/SurvivalView.tsx"]) expect(read(file)).not.toContain("endurance-text");
+    expect(read("_components/EnduranceView.tsx")).not.toContain("endurance-chart-text");
+    for (const file of ["page.tsx", "_components/TournamentSheet.tsx"]) {
+      const page = read(file);
+      for (const module of ["_lib/views-text", "_lib/endurance-text", "_lib/endurance-chart-text", "tournamentViews.json", "tournamentEndurance"]) {
+        expect(page).not.toContain(module);
+      }
+    }
   });
 });

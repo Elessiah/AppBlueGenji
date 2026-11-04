@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useTournamentsText } from "@/components/i18n/tournaments-text";
 import { localizedMatchFormatLabel, participantLabel } from "@/lib/shared/tournaments-text";
 import type { TournamentCard } from "@/lib/shared/types";
@@ -20,7 +21,7 @@ interface RegistrationCardProps {
  * qui tranche (`registerBlockedNotice`). Un plateau plein, lui, se lit sur la
  * carte : c'est le seul refus qui ne dépend de personne.
  */
-export function RegistrationCard({ t, priority }: Readonly<RegistrationCardProps>) {
+export const RegistrationCard = memo(function RegistrationCard({ t, priority }: Readonly<RegistrationCardProps>) {
   const text = useTournamentsText();
   const fill = registrationFill(t);
 
@@ -63,4 +64,4 @@ export function RegistrationCard({ t, priority }: Readonly<RegistrationCardProps
       </div>
     </TournamentCardFrame>
   );
-}
+});

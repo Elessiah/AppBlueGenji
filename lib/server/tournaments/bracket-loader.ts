@@ -166,9 +166,15 @@ type MatchRow = RowDataPacket & {
 const orNull = (value: number | string | null) => (value === null ? null : Number(value));
 
 /**
- * Tous les matchs du tournoi, la manche se choisissant à la lecture
- * ({@link pickMiniBracketMatches}) : quelques centaines de lignes au plus,
- * lues une fois par quinze secondes pour toutes les visites.
+ * Les matchs de la **manche en cours de chaque tableau** de chaque phase (la
+ * première qui garde un match à jouer, sinon la dernière) ; le choix final
+ * entre phases, tableaux et manches reste à la lecture
+ * ({@link pickMiniBracketMatches}) et rend le même résultat que sur tous les
+ * matchs : une phase ou un tableau « garde un match à jouer » exactement quand
+ * sa manche retenue en garde un. La sous-requête ne lit que `bg_matches`
+ * (quelques centaines de lignes étroites au plus) ; les trois jointures, elles,
+ * ne portent plus que sur une manche — la vignette est relue à chaque écriture
+ * de tournoi (`landing-cache.ts`), le coût ne suit plus le nombre de matchs.
  *
  * `bg_matches` ne porte que l'identifiant des engagés : leur nom se lit dans
  * `bg_teams` (une entrée solo y a aussi sa ligne, à son pseudo). La requête
@@ -199,8 +205,18 @@ async function loadMiniBracketRows(tournamentId: number): Promise<MiniBracketRow
      LEFT JOIN bg_tournament_phases p ON p.id = m.phase_id
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
      LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
+     JOIN (
+       SELECT phase_id, bracket,
+              COALESCE(MIN(CASE WHEN status <> 'COMPLETED' THEN round_number END), MAX(round_number)) AS target_round
+         FROM bg_matches
+        WHERE tournament_id = ?
+        GROUP BY phase_id, bracket
+     ) target
+       ON target.bracket = m.bracket
+      AND target.phase_id <=> m.phase_id
+      AND target.target_round = m.round_number
      WHERE m.tournament_id = ?`,
-    [tournamentId],
+    [tournamentId, tournamentId],
   );
 
   return rows.map((row) => ({

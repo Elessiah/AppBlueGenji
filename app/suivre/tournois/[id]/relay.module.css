@@ -1,0 +1,8 @@
+/* Repli visible du renvoi vers la fiche membre (jamais une page vide). */
+.fallback {
+  display: block;
+  padding: clamp(48px, 12vh, 140px) 20px;
+  text-align: center;
+  line-height: 1.6;
+  color: var(--ink-mute);
+}

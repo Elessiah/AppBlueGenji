@@ -9,8 +9,8 @@
  * afficher un score périmé.
  */
 import { publishTournamentEvent } from "@/lib/server/live";
-import { invalidateLandingAggregates, invalidateLandingLive } from "@/lib/server/landing-cache";
-import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
+import { invalidateLandingAggregates, invalidateLandingLive, invalidateLandingMiniBrackets } from "@/lib/server/landing-cache";
+import { invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { invalidateTournamentLists } from "./list-cache";
 import { invalidateTournamentPreview } from "./preview-cache";
@@ -73,8 +73,11 @@ export function publishUpdatedEvent(tournamentId: number): void {
   invalidateLandingAggregates();
   // Le classement du site est un **rejeu** de tous les matchs : un tournoi
   // supprimé emporte ses rencontres, et toutes les cotes qu'elles avaient
-  // déplacées. Rien ne se répare tout seul dans un cache.
-  invalidateTeamRanking();
+  // déplacées. Rien ne se répare tout seul dans un cache. Les PNG d'aperçu, eux,
+  // suivent la fenêtre des scores : avancée, salon vocal, horaire d'arbitrage
+  // publient ici à chaque match. La suppression, elle, vide tout aussitôt
+  // (`./deletion`, `invalidateTeamRanking`).
+  invalidateTeamRankingForScore();
   // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.
   invalidateStats();
   publishTournamentEvent({
@@ -117,6 +120,33 @@ export function publishMatchUpdatedEvent(
 }
 
 /**
+ * Classement d'un tournoi **rejoué sans qu'aucun résultat de match change**
+ * (annulation d'un abandon, retrait d'une pénalité d'endurance). Le classement
+ * du site, les statistiques et les agrégats de l'accueil qui ne lisent que des
+ * matchs clos restent en cache. Le rejeu peut en revanche réécrire des colonnes
+ * de `bg_tournaments` (manche d'endurance courante, phase), le classement que
+ * lisent les listes, et reposer les matchs d'une manche périmée : instantané,
+ * aperçu, listes, direct et mini-arbres de l'accueil sont oubliés. Une seule
+ * règle pour les deux gestes.
+ */
+export function publishStandingsReplayedEvent(tournamentId: number): void {
+  scheduleMatchStartNotices();
+  scheduleLiveEveningRefresh();
+  // Tout est oublié avant de réveiller les abonnés : un abonné réveillé le
+  // premier relirait l'aperçu ou la liste d'avant le rejeu.
+  invalidateTournamentSnapshot(tournamentId);
+  invalidateTournamentPreview(tournamentId);
+  invalidateTournamentLists();
+  invalidateLandingLive();
+  invalidateLandingMiniBrackets();
+  publishTournamentEvent({
+    type: "match_updated",
+    tournamentId,
+    emittedAt: new Date().toISOString(),
+  });
+}
+
+/**
  * Un score a bougé.
  *
  * On oublie l'instantané du tournoi, **pas les listes** : un score ne touche ni
@@ -138,7 +168,7 @@ export function publishScoreReportedEvent(tournamentId: number, matchId: number)
   scheduleMatchStartNotices();
   scheduleLiveEveningRefresh();
   invalidateTournamentSnapshot(tournamentId);
-  invalidateTeamRanking();
+  invalidateTeamRankingForScore();
   // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.
   invalidateStats();
   publishTournamentEvent({
@@ -154,7 +184,7 @@ export function publishScoreResolvedEvent(tournamentId: number, matchId: number)
   scheduleMatchStartNotices();
   scheduleLiveEveningRefresh();
   invalidateTournamentSnapshot(tournamentId);
-  invalidateTeamRanking();
+  invalidateTeamRankingForScore();
   // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.
   invalidateStats();
   publishTournamentEvent({

@@ -26,6 +26,8 @@ import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { toIso } from "@/lib/server/serialization";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { visibleText } from "@/lib/shared/visible-text";
+import { canToggleRefereeScheduling } from "@/lib/shared/match-planning";
+import type { TournamentState } from "@/lib/shared/types";
 import {
   VOICE_CHANNEL_LEAD_MINUTES,
   VOICE_ROW_RETENTION_DAYS,
@@ -70,15 +72,16 @@ function channelState(row: VoiceRow | undefined, now: number): VoiceChannelState
 
 /**
  * État **affiché** d'un salon : le dernier nombre compté, même ancien — un
- * « 0/5 » sur un salon plein dont le comptage date tromperait la page. Seul le
- * verrou (`pending`) suit la fraîcheur.
+ * « 0/5 » sur un salon plein dont le comptage date tromperait la page. La
+ * panne, elle, se lit comme au verrou (récente seulement) : « indisponible,
+ * le match n'attend pas » ne se dit que tant que le verrou est réellement levé.
  */
-function shownChannelState(row: VoiceRow | undefined): VoiceChannelState | null {
+function shownChannelState(row: VoiceRow | undefined, now: number): VoiceChannelState | null {
   if (!row || row.released_at !== null) return null;
   return {
     channelId: row.channel_id ?? null,
     members: row.members === null ? null : Number(row.members),
-    failed: row.failed_at !== null,
+    failed: row.failed_at !== null && voiceObservationFresh(toIso(row.failed_at), now),
   };
 }
 
@@ -207,7 +210,7 @@ export async function loadMatchVoiceInfos(
     const row1 = rowFor(rows, match.id, match.team1Id);
     const row2 = rowFor(rows, match.id, match.team2Id);
     const base = { enabled, startAt: match.startAt, team1: team(match.team1Id), team2: team(match.team2Id) };
-    const info = matchVoiceInfo({ ...base, team1Channel: shownChannelState(row1), team2Channel: shownChannelState(row2) });
+    const info = matchVoiceInfo({ ...base, team1Channel: shownChannelState(row1, now), team2Channel: shownChannelState(row2, now) });
     if (!info) continue;
     // Le verrou se lit comme au lancement (`voiceGateBlocksLaunch`) : observations récentes seules.
     const pending = voiceGatePending({ ...base, team1Channel: channelState(row1, now), team2Channel: channelState(row2, now) });
@@ -528,8 +531,11 @@ export type TeamVoiceChannelsResult = {
 };
 
 /**
- * Allume ou éteint l'option « Salons vocaux d'équipe », dans **tout** état du
- * tournoi (décision de l'utilisateur, 2026-11-02).
+ * Allume ou éteint l'option « Salons vocaux d'équipe », à tout moment jusqu'à
+ * la clôture du tournoi, en cours compris (décision de l'utilisateur,
+ * 2026-11-02) — même règle que la planification par l'arbitrage
+ * (`canToggleRefereeScheduling`), que le formulaire applique déjà : un tournoi
+ * terminé n'a plus de match à qui ouvrir un salon.
  *
  * - Allumée en cours de tournoi : les matchs à plus d'un quart d'heure ont
  *   leurs salons à T−15 ; ceux déjà dans le quart d'heure, et pas encore
@@ -538,17 +544,18 @@ export type TeamVoiceChannelsResult = {
  * - Éteinte : le verrou tombe aussitôt pour tout match non lancé (l'entretien
  *   est rejoué ici), et les salons existants sont rendus au bot.
  *
- * @throws `TOURNAMENT_NOT_FOUND`
+ * @throws `TOURNAMENT_NOT_FOUND` | `TOURNAMENT_FINISHED`
  */
 export async function setTeamVoiceChannels(tournamentId: number, enabled: boolean): Promise<TeamVoiceChannelsResult> {
   const result = await inTransaction(async (connection) => {
     // Verrou en toute première instruction (piège `REPEATABLE READ`).
     await lockTournamentRow(connection, tournamentId);
     const [rows] = await connection.execute<
-      (RowDataPacket & { name: string; state: string; team_voice_channels: number | null })[]
+      (RowDataPacket & { name: string; state: TournamentState; team_voice_channels: number | null })[]
     >(`SELECT name, state, team_voice_channels FROM bg_tournaments WHERE id = ? LIMIT 1`, [tournamentId]);
     const tournament = rows[0];
     if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
+    if (!canToggleRefereeScheduling(tournament.state)) throw new Error("TOURNAMENT_FINISHED");
     const changed = (Number(tournament.team_voice_channels ?? 0) === 1) !== enabled;
     if (changed) {
       await connection.execute(`UPDATE bg_tournaments SET team_voice_channels = ? WHERE id = ?`, [
@@ -592,8 +599,8 @@ type SingleMatchRow = RowDataPacket & {
 };
 
 /**
- * État des salons d'un match pour la page du match, qui le relit tant que le
- * verrou tient (`GET /api/matches/[matchId]/voice`) : la lecture REST de
+ * État des salons d'un match pour la page du match, qui le relit, flux coupé
+ * seulement (`GET /api/matches/[matchId]/voice`) : la lecture REST de
  * secours de `TournamentMatch.voice`. Lit la base seulement — le comptage
  * auprès du bot reste au balayage, qu'elle relance sans l'attendre : autant
  * de lecteurs qu'on voudra, jamais plus d'un appel au bot par salon et par

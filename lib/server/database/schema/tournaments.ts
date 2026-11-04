@@ -94,6 +94,7 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_bg_tournaments_state (state),
       INDEX idx_bg_tournaments_start_at (start_at),
+      INDEX idx_bg_tournaments_start_visibility (start_visibility_at),
       CONSTRAINT fk_bg_tournaments_organizer FOREIGN KEY (organizer_user_id)
         REFERENCES bg_users(id) ON DELETE RESTRICT
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -185,7 +186,7 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       INDEX idx_bg_matches_tournament (tournament_id),
       INDEX idx_bg_matches_status_updated (status, updated_at),
       INDEX idx_bg_matches_round (round_number),
-      INDEX idx_bg_matches_phase (tournament_id, phase_id),
+      INDEX idx_bg_matches_phase_round (tournament_id, phase_id, round_number),
       INDEX idx_bg_matches_live (live_trigger, status),
       INDEX idx_bg_matches_caster (caster_user_id),
       INDEX idx_bg_matches_referee (referee_user_id),

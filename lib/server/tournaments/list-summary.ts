@@ -74,7 +74,12 @@ async function loadChampions(
   return champions;
 }
 
-type TournamentMetaRow = RowDataPacket & {
+/**
+ * Colonnes de `bg_tournaments` que lit l'avancement d'un tournoi en cours. La
+ * liste les porte déjà (`index.ts`) : les relire ici coûtait un aller-retour
+ * SQL de plus, en série, à chaque reconstruction.
+ */
+export type TournamentMetaRow = RowDataPacket & {
   id: number;
   swiss_total_rounds: number | null;
   swiss_current_round: number;
@@ -103,10 +108,35 @@ type PhaseSqlRow = RowDataPacket & {
   swiss_total_rounds: number | null;
 };
 
+/**
+ * Colonnes d'avancement des tournois `ids` : celles que l'appelant a déjà lues
+ * avec la liste (`known`), et — pour qui n'a pas ces colonnes (appelant sans la
+ * liste, ligne manquante) — une relecture en base de ceux-là seulement.
+ */
+async function loadTournamentMeta(
+  db: Pool,
+  ids: readonly number[],
+  known?: ReadonlyMap<number, TournamentMetaRow>,
+): Promise<Map<number, TournamentMetaRow>> {
+  const metaById = new Map<number, TournamentMetaRow>(known ?? []);
+  const missingIds = known ? ids.filter((id) => !known.has(id)) : ids;
+  if (!missingIds.length) return metaById;
+  const [metaRows] = await db.execute<TournamentMetaRow[]>(
+    `SELECT id, swiss_total_rounds, swiss_current_round, current_phase_id,
+            endurance_current_round, endurance_max_rounds, endurance_playoff_size,
+            endurance_playoffs_started
+     FROM bg_tournaments WHERE id IN (${sqlPlaceholders(missingIds.length)})`,
+    [...missingIds],
+  );
+  for (const row of metaRows) metaById.set(Number(row.id), row);
+  return metaById;
+}
+
 /** Avancement de chaque tournoi en cours listé. */
 async function loadRunningProgress(
   db: Pool,
   cards: readonly Pick<TournamentCard, "id" | "format">[],
+  knownMeta?: ReadonlyMap<number, TournamentMetaRow>,
 ): Promise<Map<number, number | null>> {
   const progress = new Map<number, number | null>();
   if (!cards.length) return progress;
@@ -121,14 +151,7 @@ async function loadRunningProgress(
   const enduranceIds = idsOf(["BG_SURVIE"]);
   const multiIds = idsOf(["MULTI"]);
 
-  const [metaRows] = await db.execute<TournamentMetaRow[]>(
-    `SELECT id, swiss_total_rounds, swiss_current_round, current_phase_id,
-            endurance_current_round, endurance_max_rounds, endurance_playoff_size,
-            endurance_playoffs_started
-     FROM bg_tournaments WHERE id IN (${sqlPlaceholders(ids.length)})`,
-    ids,
-  );
-  const metaById = new Map(metaRows.map((row) => [Number(row.id), row]));
+  const metaById = await loadTournamentMeta(db, ids, knownMeta);
   const cappedEnduranceIds = cards
     .filter((card) => card.format === "BG_SURVIE")
     .filter((card) => Number(metaById.get(card.id)?.endurance_max_rounds ?? 0) > 0)
@@ -234,13 +257,15 @@ async function loadRunningProgress(
 export async function loadCardSummaries(
   db: Pool,
   cards: readonly TournamentCard[],
+  /** Colonnes d'avancement déjà lues avec la liste, par identifiant de tournoi. */
+  runningMeta?: ReadonlyMap<number, TournamentMetaRow>,
 ): Promise<Map<number, Partial<CardSummary>>> {
   const finishedIds = cards.filter((card) => card.state === "FINISHED").map((card) => card.id);
   const running = cards.filter((card) => card.state === "RUNNING");
 
   const [champions, progress] = await Promise.all([
     loadChampions(db, finishedIds),
-    loadRunningProgress(db, running),
+    loadRunningProgress(db, running, runningMeta),
   ]);
 
   const summaries = new Map<number, Partial<CardSummary>>();

@@ -138,6 +138,24 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // d'abord sur la colonne (`ER_DUP_FIELDNAME`, toléré).
     `ALTER TABLE bg_discord_login_challenges ADD COLUMN lookup_hash CHAR(64) NULL AFTER discord_id,
        ADD UNIQUE INDEX uniq_bg_challenges_lookup (lookup_hash)`,
+    // EF-14 — usage d'un code (connexion ou rattachement d'un tag) : un code
+    // de certification ne connecte pas, un code de connexion ne certifie pas.
+    // `NULL` le temps de la migration : les défis d'avant sont marqués consommés
+    // juste après (le joueur redemande un code). Les bases neuves la créent `NOT NULL`.
+    `ALTER TABLE bg_discord_login_challenges ADD COLUMN purpose ENUM('LOGIN', 'HANDLE') NULL AFTER handle`,
+    // Puis `NOT NULL`, comme sur une base neuve : sous le `sql_mode` strict par
+    // défaut de MySQL 8 et de MariaDB, une insertion qui oublierait l'usage
+    // échoue partout, au lieu d'émettre en production un code refusé de tous.
+    // Les défis d'avant sont **marqués consommés**, jamais supprimés : ils
+    // comptent encore dans les plafonds de codes du compte (une suppression les
+    // remettrait à zéro au déploiement, doublant le budget du jour). Le
+    // redémarrage pm2 arrête l'ancien processus avant de lancer le neuf : aucune
+    // insertion sans usage ne suit le `MODIFY`. **Retour arrière** : une version
+    // d'avant EF-14 n'écrit pas l'usage et n'émet plus aucun code sur cette base
+    // (`docs/DEPLOYMENT.md`). Rejouées, les deux ne changent rien.
+    `UPDATE bg_discord_login_challenges SET purpose = 'LOGIN', consumed_at = COALESCE(consumed_at, NOW())
+       WHERE purpose IS NULL`,
+    `ALTER TABLE bg_discord_login_challenges MODIFY purpose ENUM('LOGIN', 'HANDLE') NOT NULL`,
     // Cible d'un signalement réellement prévenue : le délai de reprévenance et
     // le plafond de l'auteur ne comptent plus que les messages partis. `NULL`
     // pour les lignes d'avant, **sans remplissage** — on ne sait pas lesquelles
@@ -392,6 +410,27 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // sont neuves, leur `CREATE TABLE` suffit.
     `ALTER TABLE bg_users ADD COLUMN deletion_requested_at DATETIME NULL AFTER is_deleted`,
     `ALTER TABLE bg_users ADD INDEX idx_bg_users_deletion_requested (deletion_requested_at)`,
+    // EF-15 — la manche entre dans l'index de phase : les lectures verrouillantes
+    // des manches postérieures (`laterRoundsHaveScoreInput`) et le `DELETE … AND
+    // round_number = ?` du réappariement ne verrouillent plus que leurs manches,
+    // et non toute la phase et ses intervalles. `idx_bg_matches_phase`, préfixe
+    // strict du nouvel index, part **dans la même instruction** : un `ALTER`
+    // est atomique, l'ancien index ne tombe donc jamais sans que le nouveau
+    // soit posé (pose refusée — verrou, disque — : les deux restent ; déjà
+    // jouée, ou base neuve sans l'ancien index : `ER_CANT_DROP_FIELD_OR_KEY`,
+    // les listes de retrait étant vérifiées d'abord — un no-op, la pose seule
+    // ci-dessous garantit le nouvel index).
+    `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round (tournament_id, phase_id, round_number),
+       DROP INDEX idx_bg_matches_phase`,
+    // Base où l'ancien index manquait : l'échange tombe sur son `DROP`
+    // (`ER_CANT_DROP_FIELD_OR_KEY`, toléré) et ne pose rien — la pose seule le
+    // rattrape. Partout ailleurs, `ER_DUP_KEYNAME`, un no-op.
+    `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_phase_round (tournament_id, phase_id, round_number)`,
+    // EF-16 — la visibilité (`start_visibility_at <= ?`, ou `> ?` pour les
+    // invisibles du staff) borne toutes les lectures de la liste des tournois,
+    // du décompte des terminés et du sous-ensemble des plus récents : sans
+    // index, chaque reconstruction de la liste parcourait toute la table.
+    `ALTER TABLE bg_tournaments ADD INDEX idx_bg_tournaments_start_visibility (start_visibility_at)`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

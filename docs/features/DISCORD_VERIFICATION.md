@@ -115,9 +115,12 @@ dans le modèle de permissions.
 
 **C'est celle de la connexion, ni plus ni moins** : un code à six chiffres reçu
 en message privé sur le compte revendiqué. `bg_discord_login_challenges` est
-réutilisée telle quelle, avec ses deux bornes en base (cinq essais par code, cinq
+réutilisée, avec ses deux bornes en base (cinq essais par code, cinq
 codes par quart d'heure, cf. `docs/AUTHORIZATION_RULES.md` §1.1). Un second
-mécanisme de secret, moins éprouvé, n'aurait rien apporté.
+mécanisme de secret, moins éprouvé, n'aurait rien apporté. Le défi porte son
+usage (`purpose = 'HANDLE'`, EF-14) : un code de connexion n'y est pas accepté,
+et un code de certification n'ouvre pas de session — le message du bot dit
+qu'il ne connecte pas (`BOT_DM_LANGUAGE.md`).
 
 **La connexion prouve, elle ne certifie pas.** Se connecter par Discord — bouton
 OAuth ou code en message privé — prouve que le compte Discord appartient au

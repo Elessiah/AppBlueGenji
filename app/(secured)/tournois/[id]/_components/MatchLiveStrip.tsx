@@ -1,9 +1,8 @@
 "use client";
 
 import {
-  isMatchCastable,
+  castWithoutStartAt,
   PLATFORM_LABELS,
-  requiresMatchStartAt,
   streamLinkText,
   streamPlatform,
 } from "@/lib/shared/live-streams";
@@ -144,11 +143,7 @@ export function MatchLiveStrip({
   const spectator = useSpectatorView();
 
   const hasStartAt = formatMatchStartAt(match.startAt) !== null;
-  const missingStartAt =
-    requiresMatchStartAt(match.liveTrigger) &&
-    !hasStartAt &&
-    isMatchCastable(match) &&
-    (canManage || canSchedule);
+  const missingStartAt = castWithoutStartAt(match) && (canManage || canSchedule);
   const matchLabel = versusText(text, match.team1Name ?? text.t("match.tbd"), match.team2Name ?? text.t("match.tbd"));
 
   if (state === "OFF" && !hasStartAt && !missingStartAt) return null;

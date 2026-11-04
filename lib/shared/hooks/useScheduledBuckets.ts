@@ -17,13 +17,17 @@ import { nextBucketsChangeAt, rescheduleBuckets } from "@/lib/shared/tournament-
  * pas de sondage à la seconde, et rien du tout si plus rien ne doit bouger.
  */
 export function useScheduledBuckets(buckets: TournamentBuckets): TournamentBuckets {
-  const [now, setNow] = useState(() => Date.now());
-
-  // Recale l'horloge à chaque nouvelle réponse du serveur : sans cela, une
-  // liste rechargée resterait interprétée avec l'heure du rendu précédent.
-  useEffect(() => {
-    setNow(Date.now());
-  }, [buckets]);
+  // L'horloge est rattachée aux paniers qu'elle a lus : à chaque nouvelle
+  // réponse du serveur, elle est recalée **pendant le rendu** (état ajusté
+  // plutôt qu'un effet) — sans cela, une liste rechargée resterait interprétée
+  // avec l'heure du rendu précédent, et avec un effet, chaque ouverture de
+  // porte ou relecture modifiée coûtait un second rendu complet de la page.
+  const [clock, setClock] = useState(() => ({ buckets, now: Date.now() }));
+  let { now } = clock;
+  if (clock.buckets !== buckets) {
+    now = Date.now();
+    setClock({ buckets, now });
+  }
 
   useEffect(() => {
     const at = nextBucketsChangeAt(buckets, now);
@@ -38,7 +42,7 @@ export function useScheduledBuckets(buckets: TournamentBuckets): TournamentBucke
     // de veille — redonnerait sinon la même frontière, avec un délai nul : le
     // couple minuteur/rendu tournerait en boucle serrée jusqu'à ce que l'heure
     // rattrape.
-    const timer = setTimeout(() => setNow(Math.max(at, Date.now())), delay);
+    const timer = setTimeout(() => setClock({ buckets, now: Math.max(at, Date.now()) }), delay);
     return () => clearTimeout(timer);
   }, [buckets, now]);
 

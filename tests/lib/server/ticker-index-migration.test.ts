@@ -22,7 +22,7 @@ describe("index (status, updated_at) de bg_matches", () => {
 
   it("sert la requête du bandeau, qui filtre par statut et trie par date de mise à jour", () => {
     const service = read("lib/server/landing-service.ts");
-    expect(service).toMatch(/WHERE m\.status = 'COMPLETED'[\s\S]*ORDER BY m\.updated_at DESC\s+LIMIT 3/);
+    expect(service).toMatch(/WHERE m\.status = 'COMPLETED'[\s\S]*ORDER BY m\.updated_at DESC\s+LIMIT \$\{TICKER_RESULT_FETCH\}/);
   });
 });
 

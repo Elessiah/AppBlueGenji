@@ -1,8 +1,8 @@
 {
   "meta": {
     "indexTitle": "Règles des tournois",
-    "indexDescription": "Les règles de chaque mode BlueGenji : élimination simple et double, BlueGenji Survie, Survie, ronde suisse et multi-phases — schémas et cas particuliers.",
-    "indexShareDescription": "Les règles de chaque mode de tournoi, expliquées avec des schémas : élimination simple et double, BlueGenji Survie, Survie, ronde suisse, multi-phases.",
+    "indexDescription": "Les règles de chaque mode BlueGenji : élimination simple et double, BlueGenji Survie, Survie par coupes, ronde suisse et multi-phases — schémas et cas particuliers.",
+    "indexShareDescription": "Les règles de chaque mode de tournoi, expliquées avec des schémas : élimination simple et double, BlueGenji Survie, Survie par coupes, ronde suisse, multi-phases.",
     "modeTitle": "Règles : {mode}",
     "unknownModeDescription": "Les règles de chaque mode de tournoi BlueGenji."
   },
@@ -98,7 +98,7 @@
       "legendBottom": "Groupe de queue"
     },
     "survival": {
-      "ariaLabel": "Mode Survie : classement unique, appariement par paires adjacentes et coupe des deux dernières.",
+      "ariaLabel": "Mode Survie par coupes : classement unique, appariement par paires adjacentes et coupe des deux dernières.",
       "standings": "Classement de la manche",
       "versus": "vs",
       "pairing": "1 vs 2, 3 vs 4…",
@@ -115,11 +115,11 @@
       "legendPlayIn": "Barrage"
     },
     "multi": {
-      "ariaLabel": "Tournoi multi-phases : chaque phase affine l'effectif. Phase 1 : Ronde suisse 128→64, Phase 2 : Survie 64→16, Phase 3 : Double élimination 16→1.",
+      "ariaLabel": "Tournoi multi-phases : chaque phase affine l'effectif. Phase 1 : Ronde suisse 128→64, Phase 2 : Survie par coupes 64→16, Phase 3 : Double élimination 16→1.",
       "phase": "Phase {number}",
       "finalPhase": "Phase finale",
       "swiss": "RONDE SUISSE",
-      "survival": "SURVIE",
+      "survival": "SURVIE PAR COUPES",
       "double": "DOUBLE ÉLIM.",
       "line1": "Chaque phase joue indépendamment et ne transmet",
       "line2": "que ses qualifiées à la suivante. Formats combinables",
@@ -647,12 +647,12 @@
         "La qualification peut être fixe (un nombre d'équipes) ou adaptative (un pourcentage de l'effectif réel).",
         "La dernière phase désigne la championne ; les autres équipes sont classées par la phase la plus avancée qu'elles ont atteinte, puis par leur rang dans cette phase."
       ],
-      "diagramCaption": "Exemple : ronde suisse (128 → 64), survie (64 → 16), double élimination (16 → 1). Chaque phase affine le podium.",
+      "diagramCaption": "Exemple : ronde suisse (128 → 64), survie par coupes (64 → 16), double élimination (16 → 1). Chaque phase affine le podium.",
       "sections": [
         {
           "title": "Enchaînement des phases",
           "body": [
-            "Le tournoi se divise en une succession de phases numérotées. Chaque phase joue indépendamment dans son format (simple élimination, double élimination, suisse, survie) et établit son propre classement."
+            "Le tournoi se divise en une succession de phases numérotées. Chaque phase joue indépendamment dans son format (simple élimination, double élimination, suisse, survie par coupes) et établit son propre classement."
           ],
           "bullets": [
             "Seules les qualifiées de la phase N accèdent à la phase N+1.",
@@ -673,10 +673,10 @@
         {
           "title": "Combinaisons possibles",
           "body": [
-            "La ronde suisse et la survie coupent naturellement l'effectif et peuvent commencer une cascade. La double élimination est autorisée uniquement en phase finale (elle demande trop de matchs pour être utilisée en amont)."
+            "La ronde suisse et la survie par coupes coupent naturellement l'effectif et peuvent commencer une cascade. La double élimination est autorisée uniquement en phase finale (elle demande trop de matchs pour être utilisée en amont)."
           ],
           "bullets": [
-            "Exemple viable : ronde suisse → survie → simple élimination.",
+            "Exemple viable : ronde suisse → survie par coupes → simple élimination.",
             "Exemple viable : simple élimination → double élimination (dernière phase).",
             "Non viable : ronde suisse → double élimination (sauf si c'est la dernière phase)."
           ]

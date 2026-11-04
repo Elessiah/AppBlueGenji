@@ -38,7 +38,7 @@ export type ForfeitWindowOptions = {
 
 /**
  * Engagés `FORFEIT` dont l'abandon s'annule encore : aucune manche postérieure
- * à la leur ne porte de saisie. Même règle que `laterRoundHasInput` (manche de
+ * à la leur ne porte de saisie. Même règle que `laterRoundsHaveScoreInput` (manche de
  * sortie absente = 1) ; au plus une lecture, et aucune sans ligne forfait,
  * hors fenêtre (`options.open`) ou avec la borne déjà connue
  * (`options.lastInputRound`).

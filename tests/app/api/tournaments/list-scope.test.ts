@@ -105,12 +105,18 @@ describe("GET /api/tournaments — portée", () => {
     expect(service.listTournamentBuckets).toHaveBeenCalledWith(null, {});
   });
 
-  it("combine portée et recherche", async () => {
+  it("ignore le paramètre `search` : la portée seule est transmise, jamais un terme libre", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
 
     await get("/api/tournaments?scope=hidden&search=Marvel");
 
-    expect(service.listTournamentBuckets).toHaveBeenCalledWith("Marvel", { hiddenOnly: true });
+    expect(service.listTournamentBuckets).toHaveBeenCalledWith(null, { hiddenOnly: true });
+  });
+
+  it("ne laisse pas `search` contourner la liste publique mutualisée", async () => {
+    await get("/api/tournaments?search=Marvel&finished=all");
+
+    expect(service.listTournamentBuckets).toHaveBeenCalledWith(null, { allFinished: true });
   });
 
   it("refuse un visiteur non connecté", async () => {

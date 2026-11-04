@@ -64,12 +64,12 @@ import {
   rollbackStageText,
 } from "@/app/(secured)/tournois/[id]/_lib/actions-text";
 import {
-  FR_DIALOGS_TEXT,
   adminProposalText,
   mapViolationText,
   scoreBlockerText,
   scoreViolationText,
 } from "@/app/(secured)/tournois/[id]/_lib/dialogs-text";
+import { FR_DIALOGS_TEXT } from "@/tests/helpers/lazy-tournament-texts";
 import { matchCardActionList, matchCardActionName } from "@/app/(secured)/tournois/[id]/_lib/match-card-actions";
 import { registerBlockedNotice } from "@/app/(secured)/tournois/[id]/_lib/register-entry";
 import { registrationConfirmText } from "@/app/(secured)/tournois/[id]/_lib/registration-confirm";
@@ -83,7 +83,7 @@ import { EntrantContactsPanel } from "@/app/(secured)/tournois/[id]/_components/
 import { GhostRegistrationDialog } from "@/app/(secured)/tournois/[id]/_components/GhostRegistrationDialog";
 import { IssueReportDialog } from "@/app/(secured)/tournois/[id]/_components/IssueReportDialog";
 import { MatchLiveDialog } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
-import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MatchMapDetails";
+import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MapResultList";
 import { MatchPlanningPanel } from "@/app/(secured)/tournois/[id]/_components/MatchPlanningPanel";
 import { MatchReplayDialog } from "@/app/(secured)/tournois/[id]/_components/MatchReplayDialog";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";

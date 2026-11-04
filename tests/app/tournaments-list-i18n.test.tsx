@@ -17,6 +17,8 @@ jest.mock("@/components/ui/toast", () => ({
   useToast: () => ({ showError: () => undefined, showSuccess: () => undefined }),
 }));
 jest.mock("@/app/(secured)/_shared/BgCanvas", () => ({ BgCanvas: () => null }));
+// La page lit le droit staff sur le serveur (`getCurrentUser`) : un lecteur sans droit.
+jest.mock("@/lib/server/auth", () => ({ getCurrentUser: async () => null }));
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { createTranslator } from "next-intl";
@@ -47,6 +49,7 @@ import {
   localizedMatchFormatLabel,
   tournamentLabel,
   tournamentsClientMessages,
+  tournamentsSharedMessages,
   tournamentsText,
 } from "@/lib/shared/tournaments-text";
 import type { TournamentBuckets, TournamentFormat } from "@/lib/shared/types";
@@ -128,9 +131,16 @@ describe("route et référencement", () => {
 });
 
 describe("mise en page — dictionnaire du navigateur", () => {
-  it("sous /en, ne sérialise que les espaces client (ni `meta`)", async () => {
-    const html = renderToStaticMarkup(await TournamentsLayout({ children: <TournamentsList /> }));
+  it("sous /en, la mise en page ne sérialise aucun texte : la fiche porte les siens, la liste aussi", async () => {
+    const layout = TournamentsLayout({ children: null });
+    expect(layout).toBeNull();
+    expect(Object.keys(tournamentsSharedMessages(messagesFor("en"))).sort((a, b) => a.localeCompare(b))).toEqual(["labels", "matchFormat", "participants", "rulesHelp"]);
+    // La page de la liste pose les siens, et rend toute la liste en anglais sous la mise en page.
+    const page = await TournamentsPage();
+    expect((page.props as { messages?: unknown }).messages).toEqual(tournamentsClientMessages(messagesFor("en")));
+    const html = renderToStaticMarkup(TournamentsLayout({ children: page }));
     expect(html).toContain("Search for a tournament");
+    expect(html).toContain('aria-label="News feed"');
     const client = tournamentsClientMessages(messagesFor("en"));
     expect(Object.keys(client).sort((a, b) => a.localeCompare(b))).toEqual(
       ["cards", "labels", "list", "matchFormat", "participants", "rulesHelp", "ticker", "tickerControls"],
@@ -140,15 +150,15 @@ describe("mise en page — dictionnaire du navigateur", () => {
 
   it("en français, rien n'est passé : le texte est celui du paquet", async () => {
     mockLocale = "fr";
-    const layout = await TournamentsLayout({ children: <TournamentsList /> });
-    expect((layout.props as { messages?: unknown }).messages).toBeUndefined();
+    const layout = TournamentsLayout({ children: <TournamentsList canManage={false} /> });
+    expect(((await TournamentsPage()).props as { messages?: unknown }).messages).toBeUndefined();
     expect(renderToStaticMarkup(layout)).toContain("Rechercher un tournoi");
   });
 });
 
 describe("page — rendu anglais", () => {
-  it("n'a plus un mot de français, liens dans la langue de la page", () => {
-    const html = inEnglish(<TournamentsPage />);
+  it("n'a plus un mot de français, liens dans la langue de la page", async () => {
+    const html = inEnglish(await TournamentsPage());
     const text = readable(html);
     expect(text).not.toMatch(FRENCH_WORDS);
     expect(text).not.toMatch(ACCENTED);
@@ -164,8 +174,9 @@ describe("page — rendu anglais", () => {
     expect(html).toContain('aria-label="Tournament rules"');
   });
 
-  it("français inchangé hors fournisseur", () => {
-    const html = renderToStaticMarkup(<TournamentsPage />);
+  it("français inchangé sans préfixe", async () => {
+    mockLocale = "fr";
+    const html = renderToStaticMarkup(await TournamentsPage());
     expect(html).toContain("PLATEFORME · TOURNOIS");
     expect(html).toContain('placeholder="Rechercher un tournoi, un format…"');
     expect(html).toContain("Chargement des tournois…");
@@ -291,7 +302,7 @@ describe("carte « Connexion requise »", () => {
 
 describe("le français des messages égale les tables d'origine", () => {
   it("sections, effectifs, modes des règles, notation des matchs", () => {
-    const fr = messagesFor("fr").tournaments;
+    const fr = { ...messagesFor("fr").tournaments, ...messagesFor("fr").tournamentsShared };
     expect(fr.list.sections).toEqual(PAGE_SECTION_TITLES);
     expect(fr.list.sectionNav).toEqual(PAGE_SECTION_NAV_LABELS);
     expect(fr.rulesHelp.modes).toEqual(RULE_MODE_LABELS_FR);
@@ -323,7 +334,7 @@ describe("tournaments — équivalence avec next-intl, message par message", () 
   }
 
   it.each(LOCALES.map((locale) => [locale]))("%s", (locale) => {
-    const messages = leaves(messagesFor(locale).tournaments);
+    const messages = [...leaves(messagesFor(locale).tournaments), ...leaves(messagesFor(locale).tournamentsShared)];
     expect(messages.length).toBeGreaterThanOrEqual(80);
     for (const { key, source } of messages) {
       const reference = createTranslator({ locale, messages: { m: source }, timeZone: SITE_TIME_ZONE });

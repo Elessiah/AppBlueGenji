@@ -20,23 +20,30 @@ import { getDatabase } from "@/lib/server/database";
  */
 export async function listMyActiveTournamentIds(userId: number): Promise<number[]> {
   const db = await getDatabase();
+  const now = new Date();
+  // Deux branches réunies par `UNION` (qui dédoublonne), chacune **partant des
+  // lignes du joueur** — son entrée solo (`uniq_bg_teams_solo_user`), ses
+  // appartenances d'équipe actuelles (`idx_bg_team_members_user_id`) — pour
+  // remonter à leurs inscriptions. La forme `… OR EXISTS (…)` parcourait au
+  // contraire toutes les inscriptions des tournois non terminés.
   const [rows] = await db.execute<(RowDataPacket & { tournament_id: number })[]>(
-    `SELECT DISTINCT r.tournament_id
-       FROM bg_tournament_registrations r
+    `SELECT r.tournament_id
+       FROM bg_teams e
+       JOIN bg_tournament_registrations r ON r.team_id = e.id
        JOIN bg_tournaments t ON t.id = r.tournament_id
-       JOIN bg_teams e ON e.id = r.team_id
-      WHERE t.start_visibility_at <= ?
+      WHERE e.solo_user_id = ?
+        AND t.start_visibility_at <= ?
         AND t.state <> 'FINISHED'
-        AND (
-          e.solo_user_id = ?
-          OR EXISTS (
-            SELECT 1 FROM bg_team_members tm
-             WHERE tm.team_id = r.team_id
-               AND tm.user_id = ?
-               AND tm.left_at IS NULL
-          )
-        )`,
-    [new Date(), userId, userId],
+      UNION
+     SELECT r.tournament_id
+       FROM bg_team_members tm
+       JOIN bg_tournament_registrations r ON r.team_id = tm.team_id
+       JOIN bg_tournaments t ON t.id = r.tournament_id
+      WHERE tm.user_id = ?
+        AND tm.left_at IS NULL
+        AND t.start_visibility_at <= ?
+        AND t.state <> 'FINISHED'`,
+    [userId, now, userId, now],
   );
   return rows.map((row) => Number(row.tournament_id));
 }

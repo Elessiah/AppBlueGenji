@@ -36,6 +36,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { ignoreMissingTable } from "@/lib/server/mysql-errors";
+import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { publishUpdatedEvent } from "./notifications";
 import { invalidateSpectatorSnapshot } from "./snapshot";
@@ -205,6 +206,10 @@ export async function deleteTournament(tournamentId: number): Promise<DeletedTou
     // La page sans compte ne garde pas un tournoi qui n'existe plus : sa réponse
     // publique, que les écritures n'invalident pas, part ici.
     invalidateSpectatorSnapshot(tournamentId);
+    // Le podium et les cartes d'aperçu ne gardent pas, même une minute, les
+    // cotes de rencontres qui n'existent plus (`publishUpdatedEvent` n'en vide
+    // les PNG qu'une fois par fenêtre).
+    invalidateTeamRanking();
 
     return deleted;
   } catch (error) {

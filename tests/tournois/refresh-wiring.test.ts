@@ -152,7 +152,9 @@ describe("liste des tournois — sans flux SSE", () => {
     expect(listPage).toContain("refreshCadenceFor({ isStaff: isAdmin }).listIntervalMs");
     // Un incident réseau passager ne doit pas couvrir l'écran de notifications,
     // pas plus qu'une requête abandonnée par le rafraîchissement suivant.
-    expect(listPage).toContain("if (signal?.aborted || silent) return;");
+    // (Seule une session partie passe avant : elle fait relire la page.)
+    expect(listPage).toContain("if (signal?.aborted) return;");
+    expect(listPage).toMatch(/if \(silent\) return;\s*\/\/[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*showError\(t\("list\.loadFailed"\)\);/);
   });
 
   it("fait basculer les états sans requête, bandeau compris", () => {
@@ -161,7 +163,11 @@ describe("liste des tournois — sans flux SSE", () => {
     // Une seule horloge, un seul minuteur : les deux jeux se recouvrent presque
     // entièrement.
     expect(listPage).toContain("useScheduledBuckets(viewBuckets)");
-    expect(listPage).toContain("items={listLoaded ? buildTickerItems(scheduledBuckets, text) : NO_TICKER_ITEMS}");
+    // Tableau mémoïsé : sans cela, le `memo` du bandeau ne servait jamais et
+    // chaque frappe reformatait et redessinait les deux copies de la piste.
+    expect(listPage).toContain("() => (listLoaded ? buildTickerItems(scheduledBuckets, text) : NO_TICKER_ITEMS),");
+    expect(listPage).toContain("[listLoaded, scheduledBuckets, text],");
+    expect(listPage).toContain("<Ticker items={tickerItems} labels={text.tickerLabels} />");
   });
 
   it("rafraîchit aussi la section des invisibles", () => {
@@ -226,9 +232,14 @@ describe("lectures serveur — ce qui garde le cache utile", () => {
     // réserver une place d'un pool de 25 pour ne rien en faire doublerait la
     // pression à chaque connexion SSE. La lecture d'équipe reste donc **hors**
     // de `withConnection`, qui n'habille que la branche individuelle.
-    expect(index).toContain("const activeTeam = isSolo ? null : await getUserActiveTeam(userId);");
-    expect(index).toContain("const myTeamId = isSolo");
-    expect(index).toMatch(/const myTeamId = isSolo\s*\?\s*await withConnection\(/);
+    // `resolveViewerEntrant`, partagé avec la relecture des propositions d'un
+    // match (ERREUR.txt EF-15) : le contexte du lecteur n'en passe aucune (sa
+    // lecture d'équipe ouvre sa propre requête), la relecture d'un match passe
+    // la sienne (une seule place du pool, revue perf #542).
+    expect(index).toMatch(/if \(!isSoloTournament\(snapshot\.card\.participantType\)\) \{\s*const activeTeam = await getUserActiveTeam\(userId, connection\);/);
+    expect(index).toContain("await resolveViewerEntrant({ card: tournament }, userId, connection)");
+    expect(index).toContain("const myTeamId = connection ? await resolve(connection) : await withConnection(resolve);");
+    expect(index).toContain("const { activeTeam, myTeamId } = await resolveViewerEntrant(snapshot, userId);");
   });
 });
 describe("compteur de visites — déduplication dans l'onglet", () => {

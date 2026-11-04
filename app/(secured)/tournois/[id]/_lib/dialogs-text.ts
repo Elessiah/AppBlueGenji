@@ -1,7 +1,9 @@
-import frTournamentDialogs from "@/messages/fr/tournamentDialogs.json";
-import enTournamentDialogs from "@/messages/en/tournamentDialogs.json";
 import { tournamentDialogsText, type TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
 import { useTournamentActionsLocale } from "@/components/i18n/tournament-actions-text";
+import { onceLoader, type OnceLoader } from "@/lib/shared/lazy-component";
+import { suspendOn } from "@/components/i18n/suspend-on-loader";
+import type { Locale } from "@/lib/shared/locales";
+import { documentLocale } from "@/lib/shared/document-locale";
 import {
   matchFormatLabel,
   matchMaxMaps,
@@ -14,20 +16,47 @@ import type { TournamentGame } from "@/lib/shared/types";
 import type { PendingScoreProposal, ScoreFormBlocker } from "./score-form";
 
 /**
- * Français des fenêtres d'action de la fiche (lot 8b), chargées à la demande
- * (`dynamic()` dans `page.tsx`) : importé par les fenêtres seules, il voyage
- * avec leurs morceaux plutôt qu'avec le premier chargement de la fiche — un
- * seul module pour toutes (un JSON est un module unique pour le bundler).
- * L'anglais voyage de même : le servir par la mise en page l'enverrait à
- * chaque lecteur de `/en`, fenêtre ouverte ou non. Le fournisseur ne donne que
- * la langue.
+ * Textes des fenêtres d'action de la fiche (lot 8b), chargées à la demande
+ * (`dynamic()` dans `TournamentSheet.tsx`) : **chaque langue dans son propre
+ * morceau**, chargé avec la première fenêtre ouverte — un lecteur de `/en` ne
+ * télécharge jamais le français des fenêtres, ni l'inverse (un JSON est un seul
+ * module pour le bundler : importés tous deux ici, ils partaient ensemble). Le
+ * servir par la mise en page l'enverrait à chaque lecteur de `/en`, fenêtre
+ * ouverte ou non. Le fournisseur ne donne que la langue.
  */
-export const FR_DIALOGS_TEXT: TournamentDialogsText = tournamentDialogsText("fr", frTournamentDialogs);
-const EN_DIALOGS_TEXT: TournamentDialogsText = tournamentDialogsText("en", enTournamentDialogs);
+export const DIALOGS_TEXT_LOADERS: Readonly<Record<Locale, OnceLoader<TournamentDialogsText>>> = {
+  fr: /* @__PURE__ */ onceLoader(() =>
+    import("@/messages/fr/tournamentDialogs.json").then((module) => tournamentDialogsText("fr", module.default)),
+  ),
+  en: /* @__PURE__ */ onceLoader(() =>
+    import("@/messages/en/tournamentDialogs.json").then((module) => tournamentDialogsText("en", module.default)),
+  ),
+};
 
-/** Textes des fenêtres d'action, dans la langue de la page. */
+/** Les textes des fenêtres dans `locale`, chargés une fois pour la session. */
+export function loadDialogsText(locale: Locale): Promise<TournamentDialogsText> {
+  return DIALOGS_TEXT_LOADERS[locale].load();
+}
+
+/**
+ * Enveloppe le chargement d'une fenêtre (`dynamic()`) : ses textes, dans la
+ * langue du document, partent **en même temps** que son morceau, et la fenêtre
+ * ne se monte qu'une fois les deux là. Un échec des textes rejette comme celui
+ * du morceau — `orReload` recharge alors la page.
+ */
+export function withDialogsText<T>(load: Promise<T>, locale: Locale = documentLocale()): Promise<T> {
+  return Promise.all([load, loadDialogsText(locale)]).then(([module]) => module);
+}
+
+/**
+ * Textes des fenêtres d'action, dans la langue de la page. Déjà chargés en
+ * temps normal ({@link withDialogsText}) ; sinon (langue du fournisseur autre
+ * que celle du document), la fenêtre suspend le temps du chargement — l'attente
+ * de son `dynamic()` s'affiche (`suspendOn`).
+ */
 export function useDialogsText(): TournamentDialogsText {
-  return useTournamentActionsLocale() === "en" ? EN_DIALOGS_TEXT : FR_DIALOGS_TEXT;
+  const loader = DIALOGS_TEXT_LOADERS[useTournamentActionsLocale() === "en" ? "en" : "fr"];
+  return loader.loaded() ?? suspendOn(loader);
 }
 
 /**

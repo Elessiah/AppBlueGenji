@@ -778,6 +778,7 @@ function buildLaunchInfo(
     casters,
     referee,
     selfManaged: Number(row.self_managed ?? 0) === 1,
+    battletagRelevant: battletagRelevantFor(row.tournament_game),
     viewer: {
       role: party.role,
       canDeclareReady: party.canDeclareReady,

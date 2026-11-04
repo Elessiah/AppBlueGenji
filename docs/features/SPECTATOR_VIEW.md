@@ -165,9 +165,9 @@ lui-même).
   quel que soit le nombre de visiteurs. Une écriture ne **réveille** pas les visiteurs sans
   compte et n'**invalide** pas cette réponse : sa durée de vie, allongée sous la
   charge, est ce qui protège la machine d'un tournoi animé (choix de l'auteur ;
-  ce délai, 150 s au pire, est déclaré dans `/rgpd`). Seule la
-  **suppression** du tournoi la retire (`invalidateSpectatorSnapshot`,
-  `deletion.ts`). Une lecture froide lit d'abord la **carte** du tournoi (une
+  ce délai, 150 s au pire, est déclaré dans `/rgpd`). Seules la
+  **suppression** du tournoi et son **édition** par le staff la retirent
+  (`invalidateSpectatorSnapshot`, `deletion.ts`, `edit.ts`, `image.ts`). Une lecture froide lit d'abord la **carte** du tournoi (une
   requête indexée, `isSpectatorTournamentPublic`, mutualisée en vol entre les
   lectures simultanées et jamais gardée) : un identifiant inconnu ou pas encore
   publié s'arrête là, sans faire construire d'instantané. Si l'instantané des
@@ -180,7 +180,10 @@ lui-même).
   `WeakMap`, la boucle d'événements des salons SSE n'est plus bloquée par un
   corps d'environ 1 Mo) pour tous les lecteurs qui l'acceptent
   (`Content-Encoding: gzip`, `Vary: Accept-Encoding` ; Next ne recompresse pas
-  une réponse déjà encodée) ;
+  une réponse déjà encodée) ; une compression qui échoue (mémoire) ne donne pas
+  un 500 : la route sert le corps brut, avec l'`ETag` du codage réellement servi,
+  et un client gzip qui revalide avec cet `ETag` brut reçoit un 304, refus de
+  reconstruction compris (`refusedRead`) ;
 - le cache commun purge ses entrées échues toutes les 10 s au plus
   (`CACHE_SWEEP_INTERVAL_MS`, à l'écriture), et non plus seulement au plafond
   de 500 : un parcours de tournois ne laisse plus d'instantanés en mémoire
@@ -224,7 +227,10 @@ lui-même).
     copie existe ou non** : elle ne dit pas si quelqu'un d'autre vient de lire
     ce tournoi, et un réseau sans jeton ne tire plus de corps de la copie
     (bande passante plafonnée). Seul un client qui détient déjà la version de
-    la copie (`If-None-Match`) reçoit un `304` ; l'instantané des membres
+    la copie (`If-None-Match` exact, jamais le joker `*`, qui dirait sinon si
+    la copie existe : `holdsExactEtag`) reçoit un `304`, qui ne pèse pas dans
+    la charge (`recordSpectatorRead` sauté : les sondages d'un réseau refusé
+    n'allongent pas l'attente des autres) ; l'instantané des membres
     chaud ne coûte rien et se sert donc toujours ;
   - le chargeur **revérifie** la chaleur de l'instantané des membres : si elle
     est tombée entre le contrôle de `beforeLoad` et la lecture, le jeton et la
@@ -279,8 +285,25 @@ page sans compte, l'encart lit la **carte seule**
 150 s, sinon la carte (une requête indexée) gardée 10 s — jamais une
 reconstruction de l'instantané entier payée par le réseau d'un robot d'aperçu.
 L'état en est **recalculé depuis les dates** (la copie garde celui de sa
-construction). Chaque rendu de page sans session compte dans
-`SPECTATOR_READ_RULE` ; au plafond, encart ou page générale.
+construction). Seule une lecture **en base** de la carte prend un jeton de
+`SPECTATOR_READ_RULE` (`admit`, consulté dans le chargeur du cache de carte) :
+une carte servie par la copie ou par le cache de carte ne coûte rien, et la page
+d'un match d'un tournoi publié (mise en page du tournoi + du match) n'épuise plus
+le plafond deux fois plus vite (un « introuvable », jamais gardé, reprend un jeton
+à chaque lecture) ; les réglages de `/regles/<mode>?tournoi=` suivent la même règle
+(`publicTournamentSnapshot` ne consulte `admit` que si la réponse publique
+n'est ni fraîche en cache ni en vol : une reconstruction en prend un) ; au
+plafond, la copie échue de moins de 150 s si elle existe (sans base, comme
+l'encart), sinon encart ou page générale. `admit` est un paramètre **obligatoire** des deux lectures : un appelant ne contourne pas le plafond par oubli. Toute **édition** d'un
+tournoi (`updateTournament` : nom, description, dates ; image posée, recadrée ou retirée, `image.ts`, évincée **avant** l'effacement de l'ancien fichier ; lien de chaîne, `setTournamentLiveUrl`) l’évince aussitôt
+(`invalidateSpectatorSnapshot` vide la réponse publique et la carte d'encart) :
+un nom ou une description retirés par le staff ne restent pas en aperçu. Le
+périmètre est **la carte du tournoi** : ce qui vit sur les matchs (antenne,
+liens de chaîne d'un match, horaire) suit la durée de vie de la copie, comme un
+renommage d'équipe ou un compte supprimé (choix de l'auteur, délai déclaré dans
+`/rgpd`). Un membre connecté arrivant par une mise en page préchargée ne voit
+pas la fiche publique : `MemberRelay` seul est rendu, à la place de `children`,
+jusqu'au `router.replace` ; un repli « Ouverture du tournoi… » (`login.authGate.redirecting`), lien vers la fiche membre du tournoi, évite la page vide et l'impasse si le renvoi tarde ou échoue. `admit` est consulté avant `cached`, jamais dans le chargeur partagé : le refus d'un réseau plafonné n'est pas servi aux appelants qui rejoignent la lecture en vol.
 
 **Règles du mode** — le « ? » de la fiche (`RulesHelpFab`) mène à
 `/regles/<mode>?tournoi=<id>`. Sans session aussi, les réglages du tournoi

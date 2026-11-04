@@ -266,11 +266,11 @@ describe("startDiscordVerification — le compte Google", () => {
       expiresAt: "2026-09-20T12:10:00.000Z",
     });
     expect(result).not.toHaveProperty("discordId");
-    expect(createChallengeMock).toHaveBeenCalledWith("900000000000000002", "keryan");
+    expect(createChallengeMock).toHaveBeenCalledWith("900000000000000002", "keryan", "handle");
     // Tag pas encore prouvé : jamais la langue du demandeur (compte 7, "en"),
     // celle du compte qui porte déjà ce Discord — ici aucun, donc bilingue.
     expect(jest.mocked(accountLocaleForDiscordId)).toHaveBeenCalledWith("900000000000000002");
-    expect(sendMock).toHaveBeenCalledWith("900000000000000002", "123456", null);
+    expect(sendMock).toHaveBeenCalledWith("900000000000000002", "123456", null, "handle");
     // Rien n'est certifié avant le code.
     expect(db.writes).toHaveLength(0);
   });
@@ -328,7 +328,7 @@ describe("confirmDiscordVerification", () => {
 
     expect(result).toEqual({ tag: "keryan" });
     // Le défi est désigné par son jeton ; l'identifiant vient de sa ligne.
-    expect(consumeMock).toHaveBeenCalledWith(CHALLENGE, "123456");
+    expect(consumeMock).toHaveBeenCalledWith(CHALLENGE, "123456", "handle");
     expect(db.state.discord_pseudo).toBe("keryan");
     expect(db.state.discord_verified_at).not.toBeNull();
   });

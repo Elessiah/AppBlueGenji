@@ -1,3 +1,4 @@
+import type { DiscordCodePurpose } from "@/lib/shared/discord-code-purpose";
 import type {
   BotStats,
   BotStatus,
@@ -10,7 +11,7 @@ import { normalizeBotServersPayload, normalizeBotStats } from "@/lib/shared/bot-
 import type { LiveMentionTarget } from "@/lib/shared/live-announcements";
 import type { Locale } from "@/lib/shared/locales";
 import { BOT_LOG_CATEGORIES, botLogHeader, botLogKind, DEFAULT_BOT_LOG_CATEGORY, type BotLogCategory } from "@/lib/shared/bot-log-category";
-import { botLogBatchKey } from "@/lib/shared/bot-log-batch";
+import { botLogBatchKey, botLogBatchScopeOfKey, botLogTournamentId } from "@/lib/shared/bot-log-batch";
 import { createBotLogBatcher, type BotLogBatcher } from "@/lib/server/bot-log-batcher";
 
 const DEFAULT_BOT_INTERNAL_HOST = "127.0.0.1";
@@ -220,11 +221,20 @@ export async function resolveDiscordUser(handle: string): Promise<string> {
 }
 
 /**
- * Envoie le code de connexion en message privé. Le bot le rédige lui-même :
+ * Envoie un code Discord en message privé. Le bot le rédige lui-même :
  * dans la langue du compte (`locale`) quand le compte existe, sinon (`null`)
  * en un message bilingue, français puis anglais (`BOT_DM_LANGUAGE.md`).
+ * `purpose` dit ce que le code permet : se connecter (`login`), ou rattacher
+ * un tag Discord à un compte (`handle`) — le bot rédige alors un message qui
+ * dit que le code ne connecte pas (un bot plus ancien l'ignore et envoie le
+ * texte de connexion).
  */
-export async function sendDiscordLoginCode(discordId: string, code: string, locale: Locale | null): Promise<void> {
+export async function sendDiscordLoginCode(
+  discordId: string,
+  code: string,
+  locale: Locale | null,
+  purpose: DiscordCodePurpose,
+): Promise<void> {
   const baseUrl = resolveBotInternalUrl();
 
   let response: Response;
@@ -235,7 +245,7 @@ export async function sendDiscordLoginCode(discordId: string, code: string, loca
         "content-type": "application/json",
         ...getInternalHeaders(),
       },
-      body: JSON.stringify({ discordId, code, locale }),
+      body: JSON.stringify({ discordId, code, locale, purpose }),
       cache: "no-store",
       signal: AbortSignal.timeout(BOT_LOGIN_FETCH_TIMEOUT_MS),
     });
@@ -291,14 +301,27 @@ const BOT_LOG_CHANNEL = "log";
 
 // Le lot vit sur `globalThis`, pas dans ce module : Next peut charger le module
 // une fois par bundle (routes, `instrumentation.ts`), et l'arrêt propre doit
-// voir les mêmes lots que les routes qui les remplissent.
-const batcherState = globalThis as typeof globalThis & { __bgBotLogBatcher?: BotLogBatcher };
-const botLogBatcher = (batcherState.__bgBotLogBatcher ??= createBotLogBatcher({ send: postBotLog, header: botLogHeader }));
+// voir les mêmes lots que les routes qui les remplissent. Le transport, lui, est
+// relu à chaque envoi : le dernier module chargé (rechargement à chaud en dev)
+// y pose le sien, avec son propre état du coupe-circuit.
+const batcherState = globalThis as typeof globalThis & {
+  __bgBotLogBatcher?: BotLogBatcher;
+  __bgBotLogTransport?: typeof postBotLog;
+};
+batcherState.__bgBotLogTransport = postBotLog;
+const botLogBatcher = (batcherState.__bgBotLogBatcher ??= createBotLogBatcher({
+  send: (message, category) => (batcherState.__bgBotLogTransport ?? postBotLog)(message, category),
+  header: botLogHeader,
+  scopeOf: botLogBatchScopeOfKey,
+}));
 
 /** Rattachement d'une ligne du journal, pour la ranger dans le bon lot. */
 export type BotLogScope = {
-  /** Tournoi dont la ligne relève : un lot par tournoi, jamais mêlé à un autre. */
-  tournamentId?: number | null;
+  /**
+   * Tournoi dont la ligne relève : un lot par tournoi, jamais mêlé à un autre.
+   * Un identifiant relu en chaîne vaut le même tournoi (`botLogTournamentId`).
+   */
+  tournamentId?: number | string | null;
   /**
    * Type du geste : un lot ne mêle jamais deux catégories, et la catégorie
    * décide de la nature de l'appel (`log` silencieux, `alert` qui notifie).
@@ -307,26 +330,64 @@ export type BotLogScope = {
   category?: BotLogCategory;
 };
 
+/** Vidages d'alerte déjà demandés dans le tour courant, par tournoi (ou catégorie hors tournoi). */
+// Sur `globalThis`, comme le lot : deux copies du module (routes, instrumentation)
+// partagent la même rafale.
+const alertFlushState = globalThis as typeof globalThis & { __bgBotLogAlertFlushes?: Set<string> };
+const scheduledAlertFlushes = (alertFlushState.__bgBotLogAlertFlushes ??= new Set<string>());
+
+/**
+ * Fait partir une alerte **à la fin du tour synchrone** : une rafale d'alertes
+ * d'un même geste (huit casters désinscrits d'un coup) n'envoie qu'un message, et
+ * non un par ligne. Avec un tournoi, ses lignes en attente partent avec l'alerte,
+ * qui les explique ; sans tournoi rien ne l'explique, et seul son propre lot part,
+ * pas le lot commun du salon (inscriptions, modération).
+ */
+function scheduleAlertFlush(tournamentId: number | string | null | undefined, category: BotLogCategory): void {
+  const id = botLogTournamentId(tournamentId);
+  const key = id === null ? `category:${category}` : `tournament:${id}`;
+  if (scheduledAlertFlushes.has(key)) return;
+  scheduledAlertFlushes.add(key);
+  void Promise.resolve().then(() => {
+    scheduledAlertFlushes.delete(key);
+    return flushBotLogBatch(id === null ? { category } : { tournamentId: id });
+  }).catch(() => undefined);
+}
+
 /**
  * Demande une ligne au journal Discord du bot.
  *
  * Elle ne part **pas** tout de suite : elle rejoint le lot de son salon et de
  * son tournoi, envoyé en un message après 5 min sans nouvelle ligne ou dès
- * 5 lignes (`docs/features/LOG_BATCHING.md`). Se résout aussitôt, ne lève
- * jamais : le bot reste optionnel.
+ * 5 lignes (`docs/features/LOG_BATCHING.md`). Une ligne d'**alerte**
+ * (`botLogKind(category) === "alert"` : relevé des arbitres, arbitre qui joue)
+ * part, elle, tout de suite — elle appelle quelqu'un à agir — avec les lignes
+ * de son tournoi en attente, qui l'expliquent. Synchrone, ne lève
+ * jamais : le bot reste optionnel, et l'envoi se fait plus tard, hors de
+ * l'appelant.
  */
-export async function sendBotLog(message: string, scope: BotLogScope = {}): Promise<void> {
-  const category = scope.category ?? DEFAULT_BOT_LOG_CATEGORY;
-  botLogBatcher.add(botLogBatchKey(BOT_LOG_CHANNEL, scope.tournamentId, category), message, category);
+export function sendBotLog(message: string, scope: BotLogScope = {}): void {
+  try {
+    const category = scope.category ?? DEFAULT_BOT_LOG_CATEGORY;
+    const key = botLogBatchKey(BOT_LOG_CHANNEL, scope.tournamentId, category);
+    botLogBatcher.add(key, message, category);
+    if (botLogKind(category) !== "alert") return;
+    scheduleAlertFlush(scope.tournamentId, category);
+  } catch {
+    // Meilleur effort : un journal manquant ne fait jamais échouer un geste déjà validé.
+  }
 }
 
 /**
  * Envoie tout de suite le lot du journal d'un tournoi (écran des cartes fermé,
- * par exemple) : celui de la catégorie demandée, sinon tous ceux du tournoi.
+ * par exemple) : celui de la catégorie demandée, sinon tous ceux du tournoi,
+ * **dans l'ordre d'arrivée de leur première ligne**. Les lots quittent l'attente
+ * dès l'appel (une ligne demandée ensuite ouvre un nouveau lot) ; la promesse
+ * se résout une fois envoyés.
  */
-export async function flushBotLogBatch(scope: BotLogScope = {}): Promise<void> {
+export function flushBotLogBatch(scope: BotLogScope = {}): Promise<void> {
   const categories = scope.category ? [scope.category] : BOT_LOG_CATEGORIES;
-  await Promise.all(categories.map((category) => botLogBatcher.flush(botLogBatchKey(BOT_LOG_CHANNEL, scope.tournamentId, category))));
+  return botLogBatcher.flushKeys(categories.map((category) => botLogBatchKey(BOT_LOG_CHANNEL, scope.tournamentId, category)));
 }
 
 /** Envoie tous les lots du journal en attente : arrêt propre du serveur. */
@@ -334,15 +395,6 @@ export function flushAllBotLogBatches(): Promise<void> {
   return botLogBatcher.flushAll();
 }
 
-/** Lignes du journal en attente, par lot. Réservé aux tests et au diagnostic. */
-export function pendingBotLogBatches(): Map<string, number> {
-  return botLogBatcher.pending();
-}
-
-/** Abandonne les lots du journal en attente. Réservé aux tests. */
-export function resetBotLogBatches(): void {
-  botLogBatcher.reset();
-}
 
 /**
  * Pousse la fréquentation du site au bot Discord, qui la conserve et la sert à

@@ -166,6 +166,12 @@ tient le vrai ticker de résultats, avec un score. La ligne dit maintenant
 un tournoi à 46 entrées `RUNNING` (le cas du jeu de test) ne monopolisait
 sinon plus le bandeau.
 
+## Coût de rendu (EF-16)
+
+Cartes sous `memo`, dates par formateurs `Intl` en cache, `sizes` des bandeaux
+calés sur la grille, pastille pulsée en anneau `transform`/`opacity` : voir
+`TOURNAMENT_LIST_TOOLBAR.md` § Chargement et coût de rendu.
+
 ## Notes reprises de CLAUDE.md
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).

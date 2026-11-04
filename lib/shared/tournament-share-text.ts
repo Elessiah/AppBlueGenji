@@ -20,7 +20,7 @@ import {
 import type { Messages } from "./i18n-messages";
 import type { TournamentCard } from "./types";
 
-function shareDate(iso: string, text: ReturnType<typeof scopedText<Messages["tournament"]["share"]>>): string | null {
+function shareDate(iso: string, text: ReturnType<typeof scopedText<Messages["tournamentServer"]["share"]>>): string | null {
   const time = Date.parse(iso);
   if (!Number.isFinite(time)) return null;
   const date = new Date(time);
@@ -29,7 +29,7 @@ function shareDate(iso: string, text: ReturnType<typeof scopedText<Messages["tou
   return text.t("date", { day, hour });
 }
 
-function scheduleKey(card: TournamentCard, now: number): { key: keyof Messages["tournament"]["share"]["schedule"]; iso: string } {
+function scheduleKey(card: TournamentCard, now: number): { key: keyof Messages["tournamentServer"]["share"]["schedule"]; iso: string } {
   if (card.state === "FINISHED") return { key: "FINISHED", iso: card.startAt };
   if (card.state === "RUNNING") return { key: "RUNNING", iso: card.startAt };
   if (card.state === "REGISTRATION") return { key: "REGISTRATION", iso: card.registrationCloseAt };
@@ -42,11 +42,11 @@ function scheduleKey(card: TournamentCard, now: number): { key: keyof Messages["
 export function localizedTournamentShareDescription(
   card: TournamentCard,
   locale: Locale,
-  messages: Pick<Messages, "tournament" | "labels">,
+  messages: Pick<Messages, "tournamentServer" | "labels">,
   now: number = Date.now(),
 ): string {
   if (locale === "fr") return tournamentShareDescription(card, now);
-  const text = scopedText(locale, messages.tournament.share);
+  const text = scopedText(locale, messages.tournamentServer.share);
   const counts = { registered: String(card.registeredTeams), max: String(card.maxTeams) };
   const parts = [
     text.t(`states.${card.state}`),

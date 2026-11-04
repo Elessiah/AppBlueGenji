@@ -31,6 +31,7 @@ import {
 } from "./validation";
 import { insertPhases } from "./phases-repository";
 import { publishUpdatedEvent } from "./notifications";
+import { invalidateSpectatorSnapshot } from "./snapshot";
 
 /** Valeurs éditables d'un tournoi. Dates en ISO, comme partout côté client. */
 export type EditableTournamentValues = {
@@ -379,6 +380,11 @@ export async function updateTournament(
     connection.release();
   }
 
+  // La page sans compte ne garde ni sa réponse publique ni sa carte d'encart :
+  // un nom ou une description retirés par le staff (insulte, coordonnées)
+  // restaient sinon servis en aperçu jusqu'à 150 s (copie) et 10 s (carte).
+  // Une édition est un geste rare du staff : une reconstruction de plus.
+  invalidateSpectatorSnapshot(tournamentId);
   publishUpdatedEvent(tournamentId);
   return { previousName, name };
 }

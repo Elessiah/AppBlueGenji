@@ -1,16 +1,5 @@
 import { randomInt } from "node:crypto";
-import { isTransactionAborted } from "@/lib/server/mysql-errors";
-
-/**
- * MariaDB (11.6.2 et plus, `innodb_snapshot_isolation`) refuse d'écrire une
- * ligne changée depuis l'image lue par la transaction : `ER_CHECKREAD` (1020).
- * Rejouer la transaction entière relit l'état récent — même remède qu'un
- * interblocage.
- */
-export function isSnapshotConflict(error: unknown): boolean {
-  const code = (error as { code?: unknown; errno?: unknown } | null) ?? null;
-  return code?.code === "ER_CHECKREAD" || code?.errno === 1020;
-}
+import { isSnapshotConflict, isTransactionAborted } from "@/lib/server/mysql-errors";
 
 const DEADLOCK_ATTEMPTS = 3;
 

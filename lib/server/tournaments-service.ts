@@ -44,6 +44,8 @@ export {
   // Sa lecture légère — la carte seule, même règle de visibilité.
   getVisibleTournamentCard,
   getTournamentViewerContext,
+  // Relecture légère des propositions d'un match (dialogues de score).
+  getViewerMatchProposals,
   invalidateTournamentSnapshot,
   invalidateTournamentLists,
   // Public API (matching old API expectations)

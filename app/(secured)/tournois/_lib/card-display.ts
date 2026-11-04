@@ -10,6 +10,7 @@
 import { computeTournamentProgress } from "@/lib/shared/tournament-progress";
 import type { TournamentCard, TournamentFormat } from "@/lib/shared/types";
 import { DEFAULT_LOCALE, INTL_LOCALE, type Locale } from "@/lib/shared/locales";
+import { cached } from "@/lib/shared/intl-cache";
 import { FR_TOURNAMENTS_TEXT, type TournamentsText } from "@/lib/shared/tournaments-text";
 
 /**
@@ -98,12 +99,31 @@ export function formatCardDate(iso: string | null, withTime: boolean, locale: Lo
   if (!iso) return "—";
   const date = new Date(iso);
   if (!Number.isFinite(date.getTime())) return "—";
-  return date.toLocaleString(INTL_LOCALE[locale], {
-    day: locale === "fr" ? "2-digit" : "numeric",
-    month: "short",
-    year: "numeric",
-    ...(withTime ? { hour: "2-digit", minute: "2-digit", hourCycle: "h23" } : {}),
-  });
+  return cardDateFormat(locale, withTime).format(date);
+}
+
+/**
+ * Un formateur par langue et par variante (avec ou sans l'heure) : une carte
+ * en formate deux ou trois à chaque rendu, et `toLocaleString` avec des
+ * options reconstruit un `Intl.DateTimeFormat` à chaque appel. Le fuseau reste
+ * celui du lecteur, lu à la création, comme les autres
+ * formateurs mis en cache du site (`lib/shared/intl-cache.ts`) : un changement de
+ * fuseau de l'appareil se lit au rechargement.
+ */
+const CARD_DATE_FORMATS: Record<"date" | "dateTime", Map<Locale, Intl.DateTimeFormat>> = {
+  date: new Map(),
+  dateTime: new Map(),
+};
+
+function cardDateFormat(locale: Locale, withTime: boolean): Intl.DateTimeFormat {
+  return cached(CARD_DATE_FORMATS[withTime ? "dateTime" : "date"], locale, (key) =>
+    new Intl.DateTimeFormat(INTL_LOCALE[key], {
+      day: key === "fr" ? "2-digit" : "numeric",
+      month: "short",
+      year: "numeric",
+      ...(withTime ? { hour: "2-digit", minute: "2-digit", hourCycle: "h23" } : {}),
+    }),
+  );
 }
 
 /** Date et heure d'un coup d'envoi dans le bandeau anglais : `formatCardDate` avec l'heure. */

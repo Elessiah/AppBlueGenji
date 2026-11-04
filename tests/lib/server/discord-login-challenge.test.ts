@@ -35,6 +35,7 @@ type Challenge = {
   discord_id: string;
   lookup_hash: string | null;
   code_hash: string;
+  purpose: "LOGIN" | "HANDLE" | null;
   expires_at: Date;
   consumed_at: Date | null;
   attempts: number;
@@ -80,19 +81,23 @@ function fakeDb(
     return 1;
   };
 
+  // Lecture par compte : `AND purpose = ?` n'y prend que le dernier de l'usage demandé.
+  const accountRead = (purpose: unknown): Challenge[] =>
+    state !== null && state.purpose === purpose ? [{ ...state }] : [];
+
   const runner = (origin: "pool" | "tx") =>
     jest.fn(async (sql: string, params: unknown[] = []) => {
       const q = String(sql).replace(/\s+/g, " ").trim();
       trace.push({ origin, sql: q });
 
       if (q.startsWith("SELECT id, discord_id, code_hash")) {
-        return [state === null ? [] : [{ ...state }], []];
+        return [accountRead(params[1]), []];
       }
 
       // Lecture par jeton de défi : la clause `NOT EXISTS` écarte un défi
       // qu'un plus récent a remplacé.
       if (q.startsWith("SELECT c.id, c.discord_id, c.code_hash")) {
-        const matches = state !== null && state.lookup_hash === params[0] && !newerChallengeExists;
+        const matches = state !== null && state.lookup_hash === params[0] && state.purpose === params[1] && !newerChallengeExists;
         return [matches ? [{ ...state }] : [], []];
       }
 
@@ -107,7 +112,9 @@ function fakeDb(
       }
 
       if (q.startsWith("UPDATE bg_discord_login_challenges SET consumed_at = NOW()")) {
-        if (state !== null) state.consumed_at = new Date();
+        if (state === null || state.code_hash !== params[1]) return [{ affectedRows: 0 }, []];
+        state.consumed_at = new Date();
+        state.code_hash = "";
         return [{ affectedRows: 1 }, []];
       }
 
@@ -158,6 +165,7 @@ function pendingChallenge(overrides: Partial<Challenge> = {}): Challenge {
     discord_id: "123",
     lookup_hash: hash(TOKEN),
     code_hash: hash("424242"),
+    purpose: "LOGIN",
     expires_at: new Date(Date.now() + 600_000),
     consumed_at: null,
     attempts: 0,
@@ -272,7 +280,7 @@ describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
 
   it("délivre tant que la fenêtre n'est pas pleine", async () => {
     fakeDb(null, MAX_DISCORD_CODES_PER_WINDOW - 1);
-    const challenge = await createDiscordLoginChallenge("123");
+    const challenge = await createDiscordLoginChallenge("123", null, "login");
     expect(challenge.code).toMatch(/^\d{6}$/);
   });
 
@@ -281,14 +289,14 @@ describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
     // laisse vider (`bucket.clear()`) par qui lui fabrique assez de clés.
     const { trace } = fakeDb(null, MAX_DISCORD_CODES_PER_WINDOW);
 
-    await expect(createDiscordLoginChallenge("123")).rejects.toThrow("TOO_MANY_CODE_REQUESTS");
+    await expect(createDiscordLoginChallenge("123", null, "login")).rejects.toThrow("TOO_MANY_CODE_REQUESTS");
     expect(trace.some(({ sql }) => sql.startsWith("INSERT"))).toBe(false);
   });
 
   it("rend le verrou et la connexion quand il refuse", async () => {
     const { lifecycle } = fakeDb(null, MAX_DISCORD_CODES_PER_WINDOW);
 
-    await expect(createDiscordLoginChallenge("123")).rejects.toThrow("TOO_MANY_CODE_REQUESTS");
+    await expect(createDiscordLoginChallenge("123", null, "login")).rejects.toThrow("TOO_MANY_CODE_REQUESTS");
 
     // Un verrou nommé survit à la requête : non rendu, il ferait attendre le
     // prochain appelant jusqu'au délai complet.
@@ -305,7 +313,7 @@ describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
     // verrou rendu.
     const { trace, lifecycle, connection, execute } = fakeDb(null, 0);
 
-    await createDiscordLoginChallenge("123");
+    await createDiscordLoginChallenge("123", null, "login");
 
     const count = trace.find(({ sql }) => sql.startsWith("SELECT SUM(created_at >"))!;
     const insert = trace.find(({ sql }) => sql.startsWith("INSERT"))!;
@@ -324,7 +332,7 @@ describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
     // Deux joueurs qui demandent un code au même instant ne s'attendent pas.
     const { connection } = fakeDb(null, 0);
 
-    await createDiscordLoginChallenge("123456789012345678");
+    await createDiscordLoginChallenge("123456789012345678", null, "login");
 
     const [, params] = connection.query.mock.calls[0] as unknown as [string, unknown[]];
     expect(String(params[0])).toContain("123456789012345678");
@@ -337,13 +345,13 @@ describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
     // sens sûr : passer outre délivrerait un code de plus sans l'avoir compté.
     const { trace } = fakeDb(null, 0, false);
 
-    await expect(createDiscordLoginChallenge("123")).rejects.toThrow("TOO_MANY_CODE_REQUESTS");
+    await expect(createDiscordLoginChallenge("123", null, "login")).rejects.toThrow("TOO_MANY_CODE_REQUESTS");
     expect(trace.some(({ sql }) => sql.startsWith("INSERT"))).toBe(false);
   });
 
   it("compte sur la fenêtre et sur la journée annoncées", async () => {
     const { connection } = fakeDb(null, 0);
-    await createDiscordLoginChallenge("123");
+    await createDiscordLoginChallenge("123", null, "login");
 
     const count = connection.execute.mock.calls.find(([sql]) =>
       String(sql).replace(/\s+/g, " ").trim().startsWith("SELECT SUM(created_at >"),
@@ -357,25 +365,25 @@ describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
     // deux. Le plafond du jour borne ce que la patience rapporte.
     const { trace } = fakeDb(null, 0, true, MAX_DISCORD_CODES_PER_DAY);
 
-    await expect(createDiscordLoginChallenge("123")).rejects.toThrow("TOO_MANY_CODE_REQUESTS_TODAY");
+    await expect(createDiscordLoginChallenge("123", null, "login")).rejects.toThrow("TOO_MANY_CODE_REQUESTS_TODAY");
     expect(trace.some(({ sql }) => sql.startsWith("INSERT"))).toBe(false);
   });
 
   it("délivre sous le plafond journalier", async () => {
     fakeDb(null, 0, true, MAX_DISCORD_CODES_PER_DAY - 1);
-    await expect(createDiscordLoginChallenge("123")).resolves.toMatchObject({ challengeId: 7 });
+    await expect(createDiscordLoginChallenge("123", null, "login")).resolves.toMatchObject({ challengeId: 7 });
   });
 
   it("nomme le plafond journalier avant celui du quart d'heure", async () => {
     // Les deux pleins : c'est le refus qui dit d'attendre le plus qui compte,
     // sans quoi le joueur réessaierait dans quinze minutes pour rien.
     fakeDb(null, MAX_DISCORD_CODES_PER_WINDOW, true, MAX_DISCORD_CODES_PER_DAY);
-    await expect(createDiscordLoginChallenge("123")).rejects.toThrow("TOO_MANY_CODE_REQUESTS_TODAY");
+    await expect(createDiscordLoginChallenge("123", null, "login")).rejects.toThrow("TOO_MANY_CODE_REQUESTS_TODAY");
   });
 
   it("garde au moins une journée de codes : la purge n'efface rien qu'on compte encore", async () => {
     const { execute } = fakeDb(null, 0);
-    await createDiscordLoginChallenge("123");
+    await createDiscordLoginChallenge("123", null, "login");
 
     const [, params] = execute.mock.calls.find(([sql]) =>
       String(sql).replace(/\s+/g, " ").trim().startsWith("DELETE FROM bg_discord_login_challenges"),
@@ -389,19 +397,19 @@ describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
     // ne vise aucun compte en particulier : il n'a rien à faire sous un verrou
     // qui, lui, en désigne un.
     const { trace } = fakeDb(null, 0);
-    await createDiscordLoginChallenge("123");
+    await createDiscordLoginChallenge("123", null, "login");
 
     const purge = trace.find(({ sql }) => sql.startsWith("DELETE FROM bg_discord_login_challenges"))!;
     expect(purge.origin).toBe("pool");
   });
 
   it("ne périme **pas** les codes précédents : il n'y a rien à écrire", async () => {
-    // `verifyDiscordChallenge` ne lit que le dernier émis : le précédent est
+    // Seul le dernier défi émis vaut (`consumeDiscordLoginChallenge`) : le précédent est
     // déjà inatteignable, marquer son `consumed_at` ne changerait rien
     // d'observable. Les périmer *avant* l'envoi laissait en revanche le joueur
     // sans code du tout quand le bot était injoignable.
     const { trace } = fakeDb(null, 0);
-    await createDiscordLoginChallenge("123");
+    await createDiscordLoginChallenge("123", null, "login");
 
     expect(
       trace.some(({ sql }) =>
@@ -412,7 +420,7 @@ describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
 
   it("rend un code à six chiffres", async () => {
     fakeDb(null, 0);
-    const challenge = await createDiscordLoginChallenge("123");
+    const challenge = await createDiscordLoginChallenge("123", null, "login");
     expect(challenge.code).toMatch(/^\d{6}$/);
   });
 });
@@ -449,7 +457,7 @@ describe("consumeDiscordLoginChallenge — le défi désigné par son jeton", ()
     // ici, qu'il réapparaît — une fois la preuve faite.
     fakeDb(pendingChallenge({ id: 9, discord_id: "555" }));
 
-    await expect(consumeDiscordLoginChallenge(TOKEN, "424242")).resolves.toEqual({
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toEqual({
       discordId: "555",
       handle: null,
     });
@@ -458,7 +466,7 @@ describe("consumeDiscordLoginChallenge — le défi désigné par son jeton", ()
   it("refuse un code faux sans rien rendre, et décompte l'essai", async () => {
     const { state } = fakeDb(pendingChallenge({ id: 9 }));
 
-    await expect(consumeDiscordLoginChallenge(TOKEN, "000000")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge(TOKEN, "000000", "login")).resolves.toBeNull();
     expect(state!.attempts).toBe(1);
   });
 
@@ -466,46 +474,46 @@ describe("consumeDiscordLoginChallenge — le défi désigné par son jeton", ()
     const { state } = fakeDb(pendingChallenge({ id: 9 }));
 
     for (let i = 0; i < MAX_DISCORD_CODE_ATTEMPTS; i += 1) {
-      await consumeDiscordLoginChallenge(TOKEN, "000000");
+      await consumeDiscordLoginChallenge(TOKEN, "000000", "login");
     }
 
     expect(state!.consumed_at).not.toBeNull();
-    await expect(consumeDiscordLoginChallenge(TOKEN, "424242")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toBeNull();
   });
 
   it("refuse un défi inconnu", async () => {
     fakeDb(pendingChallenge({ id: 9 }));
-    await expect(consumeDiscordLoginChallenge(OTHER_TOKEN, "424242")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge(OTHER_TOKEN, "424242", "login")).resolves.toBeNull();
   });
 
   it("refuse un défi remplacé par un plus récent : seul le dernier code émis vaut", async () => {
     fakeDb(pendingChallenge({ id: 9 }), 0, true, 0, true);
-    await expect(consumeDiscordLoginChallenge(TOKEN, "424242")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toBeNull();
   });
 
   it("écarte le défi remplacé **dans la requête**", async () => {
     const { execute } = fakeDb(pendingChallenge({ id: 9 }));
-    await consumeDiscordLoginChallenge(TOKEN, "424242");
+    await consumeDiscordLoginChallenge(TOKEN, "424242", "login");
 
     const [sql, params] = execute.mock.calls.find(([q]) =>
       String(q).replace(/\s+/g, " ").trim().startsWith("SELECT c.id"),
     ) as [string, unknown[]];
     const read = sql.replace(/\s+/g, " ");
     // Le jeton n'est jamais écrit ni cherché en clair : seule son empreinte l'est.
-    expect(params).toEqual([hash(TOKEN)]);
+    expect(params).toEqual([hash(TOKEN), "LOGIN"]);
     expect(read).toContain("NOT EXISTS");
     expect(read).toContain("newer.id > c.id");
   });
 
   it("refuse un défi expiré", async () => {
     fakeDb(pendingChallenge({ id: 9, expires_at: new Date(Date.now() - 1000) }));
-    await expect(consumeDiscordLoginChallenge(TOKEN, "424242")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toBeNull();
   });
 
   it("refuse sans rien lire un jeton mal formé (l'ancien numéro de ligne compris)", async () => {
     const { execute } = fakeDb(pendingChallenge({ id: 9 }));
 
-    await expect(consumeDiscordLoginChallenge("9", "424242")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge("9", "424242", "login")).resolves.toBeNull();
     expect(execute).not.toHaveBeenCalled();
   });
 });
@@ -519,9 +527,9 @@ describe("jeton de défi", () => {
     // Le numéro de ligne, séquentiel, se devinait : cinq codes faux sur chacun
     // des derniers numéros brûlaient tous les codes en vol du site.
     const first = fakeDb(null, 0);
-    const a = await createDiscordLoginChallenge("123");
+    const a = await createDiscordLoginChallenge("123", null, "login");
     fakeDb(null, 0);
-    const b = await createDiscordLoginChallenge("123");
+    const b = await createDiscordLoginChallenge("123", null, "login");
 
     expect(isDiscordChallengeToken(a.challengeToken)).toBe(true);
     expect(a.challengeToken).not.toBe(b.challengeToken);
@@ -540,5 +548,132 @@ describe("jeton de défi", () => {
     ["rien", undefined],
   ])("refuse %s", (_label, value) => {
     expect(isDiscordChallengeToken(value)).toBe(false);
+  });
+});
+
+describe("consumeDiscordLoginChallenge — usage du code (EF-14)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("consumeDiscordLoginChallenge_handleCodeAtLogin_rejectedWithoutAttempt", async () => {
+    // Le message d'un code de certification dit qu'il ne connecte pas : la
+    // connexion le refuse, sans même le comparer.
+    const { state } = fakeDb(pendingChallenge({ id: 9, purpose: "HANDLE" }));
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toBeNull();
+    expect(state!.attempts).toBe(0);
+  });
+
+  it("consumeDiscordLoginChallenge_tokenRead_scopedToRequestedPurpose", async () => {
+    const { execute } = fakeDb(pendingChallenge({ id: 9, purpose: "HANDLE" }));
+
+    await consumeDiscordLoginChallenge(TOKEN, "424242", "handle");
+
+    const [sql, params] = execute.mock.calls.find(([q]) =>
+      String(q).replace(/\s+/g, " ").trim().startsWith("SELECT c.id"),
+    ) as [string, unknown[]];
+    expect(sql.replace(/\s+/g, " ")).toContain("WHERE c.lookup_hash = ? AND c.purpose = ?");
+    expect(params).toEqual([hash(TOKEN), "HANDLE"]);
+  });
+
+  it("consumeDiscordLoginChallenge_loginCodeAtCertification_rejected", async () => {
+    fakeDb(pendingChallenge({ id: 9, purpose: "LOGIN" }));
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "handle")).resolves.toBeNull();
+  });
+
+  it("consumeDiscordLoginChallenge_matchingHandlePurpose_accepted", async () => {
+    fakeDb(pendingChallenge({ id: 9, discord_id: "555", purpose: "HANDLE" }));
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "handle")).resolves.toEqual({ discordId: "555", handle: null });
+  });
+
+  it("consumeDiscordLoginChallenge_legacyNullPurpose_rejected", async () => {
+    // Défi sans usage : la lecture `purpose = ?` ne le prend pas (le joueur redemande un code).
+    const { state } = fakeDb(pendingChallenge({ id: 9, discord_id: "555", purpose: null }));
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toBeNull();
+    expect(state!.attempts).toBe(0);
+  });
+
+  it("consumeDiscordLoginChallenge_supersession_scopedToSamePurpose", async () => {
+    // Une demande de connexion anonyme n'annule pas le code de certification attendu.
+    const first = fakeDb(pendingChallenge({ id: 9, purpose: "HANDLE" }));
+    await consumeDiscordLoginChallenge(TOKEN, "424242", "handle");
+
+    const read = String(first.execute.mock.calls.find(([q]) => String(q).includes("NOT EXISTS"))?.[0]);
+    expect(read).toContain("newer.purpose = c.purpose");
+  });
+
+  it("createDiscordLoginChallenge_handlePurpose_storedInInsert", async () => {
+    const handle = fakeDb(null, 0);
+    await createDiscordLoginChallenge("123", "nova", "handle");
+    const login = fakeDb(null, 0);
+    await createDiscordLoginChallenge("123", null, "login");
+
+    const insertParams = (db: typeof handle) =>
+      (db.connection.execute.mock.calls.find(([q]) => String(q).trim().startsWith("INSERT")) as unknown as [string, unknown[]])[1];
+    expect(insertParams(handle)[4]).toBe("HANDLE");
+    expect(insertParams(login)[4]).toBe("LOGIN");
+  });
+
+  it("consumeDiscordLoginChallenge_rightCodeConsumedConcurrently_secondRequestRejected", async () => {
+    // Deux requêtes de front, même jeton, bon code : une seule obtient la preuve.
+    const { execute, state } = fakeDb(pendingChallenge());
+    const base = execute.getMockImplementation()!;
+    execute.mockImplementation(async (sql: string, params?: unknown[]) => {
+      const result = await base(sql, params);
+      // L'autre requête consomme la ligne juste après notre réservation.
+      if (String(sql).includes("attempts = attempts + 1")) {
+        state!.consumed_at = new Date();
+        state!.code_hash = "";
+      }
+      return result;
+    });
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toBeNull();
+  });
+
+  it("consumeDiscordLoginChallenge_rightCode_consumeGuardedByReadHash", async () => {
+    const { execute, state } = fakeDb(pendingChallenge());
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.not.toBeNull();
+
+    const consume = statementsOf(execute).find((q) => q.startsWith("UPDATE bg_discord_login_challenges SET consumed_at = NOW()"));
+    expect(consume).toContain("SET consumed_at = NOW(), code_hash = '' WHERE id = ? AND code_hash = ?");
+    expect(state!.code_hash).toBe("");
+  });
+
+  it("consumeDiscordLoginChallenge_rightCodeOnLastAttempt_accepted", async () => {
+    // La réservation du dernier essai pose déjà `consumed_at` : le code juste passe quand même.
+    const { state } = fakeDb(pendingChallenge({ attempts: MAX_DISCORD_CODE_ATTEMPTS - 1 }));
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.not.toBeNull();
+    expect(state!.attempts).toBe(MAX_DISCORD_CODE_ATTEMPTS);
+  });
+
+  it("verifyDiscordChallenge_rightCodeOnLastAttempt_accepted", async () => {
+    fakeDb(pendingChallenge({ attempts: MAX_DISCORD_CODE_ATTEMPTS - 1 }));
+
+    await expect(verifyDiscordChallenge("123", "424242")).resolves.toBe(true);
+  });
+
+  it("verifyDiscordChallenge_accountRead_scopedToLoginPurpose", async () => {
+    // La lecture par compte ne prend que les défis de connexion (filtre `purpose` dans la requête).
+    const { execute } = fakeDb(pendingChallenge());
+
+    await expect(verifyDiscordChallenge("123", "424242")).resolves.toBe(true);
+
+    const call = execute.mock.calls.find(([q]) => String(q).replace(/\s+/g, " ").trim().startsWith("SELECT id, discord_id, code_hash"));
+    expect(String(call?.[0]).replace(/\s+/g, " ")).toContain("WHERE discord_id = ? AND purpose = ?");
+    expect(call?.[1]).toEqual(["123", "LOGIN"]);
+  });
+
+  it("verifyDiscordChallenge_onlyHandleCodePending_rejectedWithoutAttempt", async () => {
+    const { state } = fakeDb(pendingChallenge({ purpose: "HANDLE" }));
+
+    await expect(verifyDiscordChallenge("123", "424242")).resolves.toBe(false);
+    expect(state!.attempts).toBe(0);
   });
 });

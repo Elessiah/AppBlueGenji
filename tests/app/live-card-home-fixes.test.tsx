@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   type MatchSlideProps,
@@ -230,6 +230,43 @@ describe("sameSlideProps", () => {
 
   it("sameSlideProps_nestedRoundChanged_renders", () => {
     expect(sameSlideProps(props(), props({ match: match(1, { round: { kind: "round", number: 2 } }) }))).toBe(false);
+  });
+
+  it("sameSlideProps_sameReference_skipsRender", () => {
+    const same = props();
+    expect(sameSlideProps(same, same)).toBe(true);
+  });
+
+  it("sameSlideProps_matchKeysInOtherOrder_skipsRender", () => {
+    const reordered = Object.fromEntries(Object.entries(match(1)).reverse()) as ReturnType<typeof match>;
+    expect(sameSlideProps(props(), props({ match: reordered }))).toBe(true);
+  });
+
+  it("sameSlideProps_extraPropOnNext_renders", () => {
+    // Une prop ajoutée plus tard à `MatchSlideProps` est comparée sans toucher au comparateur.
+    const withExtra = { ...props(), later: 1 } as MatchSlideProps;
+    expect(sameSlideProps(props(), withExtra)).toBe(false);
+    expect(sameSlideProps(withExtra, { ...props(), later: 2 } as MatchSlideProps)).toBe(false);
+    expect(sameSlideProps(withExtra, { ...props(), later: 1 } as MatchSlideProps)).toBe(true);
+  });
+
+  it("sameSlideProps_arrayVersusObject_renders", () => {
+    const withArray = props({ match: { ...match(1), extra: [1] } as ReturnType<typeof match> });
+    const withObject = props({ match: { ...match(1), extra: { 0: 1 } } as ReturnType<typeof match> });
+    expect(sameSlideProps(withArray, withObject)).toBe(false);
+  });
+
+  it("sameSlideProps_differentDatesOrMaps_neverEqualByMistake", () => {
+    const at = (value: unknown) => props({ match: { ...match(1), extra: value } as ReturnType<typeof match> });
+    expect(sameSlideProps(at(new Date(1)), at(new Date(2)))).toBe(false);
+    expect(sameSlideProps(at(new Map([[1, 1]])), at(new Map([[2, 2]])))).toBe(false);
+  });
+
+  it("sameSlideProps_equalContent_doesNotSerialize", () => {
+    const stringify = jest.spyOn(JSON, "stringify");
+    sameSlideProps(props(), props());
+    expect(stringify).not.toHaveBeenCalled();
+    stringify.mockRestore();
   });
 
   it("sameSlideProps_clockLogosOrSpectatorChanged_renders", () => {

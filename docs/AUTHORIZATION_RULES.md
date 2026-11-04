@@ -97,8 +97,9 @@ Un `OWNER` d'équipe n'a **aucun** pouvoir sur la plateforme.
   décompte des essais reste, lui, porté par le code en base — changer d'IP n'en
   donne pas un de plus.
 
-  Un code neuf **rend le précédent inatteignable par sa seule existence** :
-  `verifyDiscordChallenge` ne lit que le **dernier émis**. Rien n'est écrit, donc
+  Un code neuf **rend le précédent du même usage inatteignable par sa seule
+  existence** : `consumeDiscordLoginChallenge` refuse un défi qu'un plus récent
+  du même usage (`purpose`) a remplacé. Rien n'est écrit, donc
   rien ne peut échouer à mi-chemin — et le geste symétrique est ce qui compte :
   un envoi raté **supprime** sa ligne (`discardDiscordChallenge`), sans quoi la
   mort-née resterait la dernière et masquerait le code que le joueur tient de sa

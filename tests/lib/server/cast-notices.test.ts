@@ -55,7 +55,7 @@ const RECIPIENT = { userId: CASTER, discord: { discordId: "100000000000000009", 
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(sendBotLog).mockResolvedValue();
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
   jest.mocked(loadNotificationRecipients).mockResolvedValue([RECIPIENT]);
   jest
     .mocked(notifyUsers)
@@ -334,13 +334,11 @@ describe("announceCastChange", () => {
       expect(loggedLine()).toContain("Cast réservé");
     });
 
-    it("announceCastChange_newBurstWhileClosingInFlight_leadingAfterClosing", async () => {
+    it("announceCastChange_newBurstRightAfterClosing_leadingAfterClosing", async () => {
+      // `sendBotLog` range la ligne sans rien attendre : la fermeture de la
+      // rafale est faite dès que sa ligne est au lot, et la rafale suivante
+      // s'écrit après elle.
       mockMatch(matchRow());
-      let finishClosing: () => void = () => undefined;
-      jest
-        .mocked(sendBotLog)
-        .mockResolvedValueOnce()
-        .mockImplementationOnce(() => new Promise<void>((resolve) => (finishClosing = resolve)));
       announceCastChange(claimed);
       announceCastChange(released);
       jest.useRealTimers();
@@ -348,9 +346,6 @@ describe("announceCastChange", () => {
       const closing = flushCastToggles();
       await settle();
       announceCastChange(claimed);
-      await settle();
-      expect(lines()).toHaveLength(2);
-      finishClosing();
       await closing;
       await settle();
       await settle();

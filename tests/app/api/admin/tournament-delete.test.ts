@@ -25,7 +25,7 @@ describe("DELETE /api/admin/tournaments/[id]", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(deleteTournament).mockResolvedValue({ id: 7, name: "BlueGenji Open" });
-    jest.mocked(sendBotLog).mockResolvedValue(undefined);
+    jest.mocked(sendBotLog).mockReturnValue(undefined);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -105,7 +105,9 @@ describe("DELETE /api/admin/tournaments/[id]", () => {
     await del("7");
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
-    const message = jest.mocked(sendBotLog).mock.calls[0][0] as string;
+    const [message, scope] = jest.mocked(sendBotLog).mock.calls[0];
+    // Les lignes du tournoi en attente partent dans le même lot, avant la suppression.
+    expect(scope).toEqual({ category: "admin", tournamentId: 7 });
     expect(message).toContain("BlueGenji Open");
     expect(message).toContain("#7");
     // L'administrateur n'est pas nommé sur Discord…
@@ -123,16 +125,5 @@ describe("DELETE /api/admin/tournaments/[id]", () => {
     expect(audit).toContain("[staff-audit]");
     expect(audit).toContain("Root (#1)");
     info.mockRestore();
-  });
-
-  it("reste un succès si le bot est injoignable", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(sendBotLog).mockRejectedValue(new Error("ECONNREFUSED"));
-
-    // Le tournoi est déjà supprimé : un bot muet ne doit pas transformer un
-    // succès en erreur côté administrateur.
-    const res = await del("7");
-
-    expect(res.status).toBe(200);
   });
 });

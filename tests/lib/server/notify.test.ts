@@ -17,6 +17,7 @@ import {
   toNotificationRecipient,
 } from "@/lib/server/notify";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
+import { recipientRow } from "../../helpers/recipient-row";
 
 const PUSH = () => ({ title: "t", body: "b", url: "/" });
 /** Message privé de test : sa langue se lit dans le texte. */
@@ -207,6 +208,77 @@ describe("notifyUsers", () => {
   });
 });
 
+describe("notifyUsers — langue portée et rédaction avant envoi (EF-14)", () => {
+  it("notifyUsers_dmWriterThrows_rejectsBeforeAnyPush", async () => {
+    const throwing = () => {
+      throw new RangeError("Invalid time value");
+    };
+
+    await expect(
+      notifyUsers([{ userId: 1, discord: { discordId: "1", handle: null, label: "A" } }], {
+        topic: "MATCH_REMINDER",
+        push: PUSH,
+        discord: { message: throwing, context: "match-reminder" },
+      }),
+    ).rejects.toThrow("Invalid time value");
+    expect(pushToUsers).not.toHaveBeenCalled();
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("notifyUsers_recipientsCarryLocale_noLocaleQuery", async () => {
+    const query = accountLocales([]);
+
+    await notifyUsers(
+      [
+        { userId: 1, discord: { discordId: "1", handle: null, label: "A" }, locale: "en" },
+        { userId: 2, discord: { discordId: "2", handle: null, label: "B" }, locale: "en" },
+      ],
+      { topic: "MATCH_REMINDER", push: PUSH, discord: { message: DM, context: "ctx" } },
+    );
+
+    expect(query).not.toHaveBeenCalled();
+    expect(jest.mocked(pushDiscordDirectMessages).mock.calls).toEqual([
+      ["m-en", [{ discordId: "1", handle: null, label: "A" }, { discordId: "2", handle: null, label: "B" }], "ctx"],
+    ]);
+  });
+
+  it("notifyUsers_writerThrowsForUnusedLocale_sentInNeededLocale", async () => {
+    const frOnly = (locale: string) => {
+      if (locale !== "fr") throw new RangeError("no en text");
+      return "m-fr";
+    };
+
+    await notifyUsers([{ userId: 1, discord: { discordId: "1", handle: null, label: "A" }, locale: "fr" }], {
+      topic: "MATCH_REMINDER",
+      push: PUSH,
+      discord: { message: frOnly, context: "ctx" },
+    });
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledWith("m-fr", [{ discordId: "1", handle: null, label: "A" }], "ctx");
+    expect(pushToUsers).toHaveBeenCalled();
+  });
+
+  it("toNotificationRecipient_rowWithLocale_localeCarried", () => {
+    const row = recipientRow({ id: 7, pseudo: "Iris", discord_id: "7", locale: "en" });
+
+    expect(toNotificationRecipient(row, "proven").locale).toBe("en");
+  });
+
+  it("notifyUsers_mixedCarriedAndMissingLocale_readsOnlyMissing", async () => {
+    const query = accountLocales([{ id: 2, locale: "fr" }]);
+
+    await notifyUsers(
+      [
+        { userId: 1, discord: { discordId: "1", handle: null, label: "A" }, locale: "en" },
+        { userId: 2, discord: { discordId: "2", handle: null, label: "B" } },
+      ],
+      { topic: "MATCH_REMINDER", push: PUSH, discord: { message: DM, context: "ctx" } },
+    );
+
+    expect(query.mock.calls[0][1]).toEqual([2]);
+  });
+});
+
 describe("notifyUsers — sujet réservé à une permission", () => {
   it("remet tous les destinataires à pushToUsers, qui juge la permission sur ses propres lignes : aucune lecture des droits ici", async () => {
     const query = accountLocales([{ id: 5, locale: "fr" }]);
@@ -283,13 +355,7 @@ describe("notifyStaff", () => {
 });
 
 describe("destinataires", () => {
-  const row = {
-    id: 5,
-    pseudo: "Nova",
-    discord_id: null,
-    discord_pseudo: "nova",
-    discord_verified_at: null,
-  } as unknown as Parameters<typeof toNotificationRecipient>[0];
+  const row = recipientRow({ id: 5, pseudo: "Nova", discord_pseudo: "nova" });
 
   it("n'écrit jamais à un tag saisi, quelle que soit la portée", () => {
     expect(toNotificationRecipient(row, "proven")).toEqual({ userId: 5, discord: null });
@@ -297,23 +363,23 @@ describe("destinataires", () => {
   });
 
   it("certified : un tag certifié seul ouvre le canal, avec l'identifiant du compte qui l'a certifié", () => {
-    const certified = { ...row, discord_id: "1", discord_verified_at: "2026-09-01" } as typeof row;
+    const certified = { ...row, discord_id: "1", discord_verified_at: "2026-09-01" };
     expect(toNotificationRecipient(certified, "certified")).toEqual({
       userId: 5,
       discord: { discordId: "1", handle: "nova", label: "Nova" },
     });
     // Identifiant rattaché sans tag certifié : pas de message de match (contre le spam).
-    expect(toNotificationRecipient({ ...row, discord_id: "1" } as typeof row, "certified")).toEqual({
+    expect(toNotificationRecipient({ ...row, discord_id: "1" }, "certified")).toEqual({
       userId: 5,
       discord: null,
     });
   });
 
   it("prend le tag certifié et l'identifiant comme preuves", () => {
-    expect(toNotificationRecipient({ ...row, discord_verified_at: "2026-09-01" } as typeof row, "proven").discord?.handle).toBe(
+    expect(toNotificationRecipient({ ...row, discord_verified_at: "2026-09-01" }, "proven").discord?.handle).toBe(
       "nova",
     );
-    expect(toNotificationRecipient({ ...row, discord_id: "1" } as typeof row, "proven").discord).toEqual({
+    expect(toNotificationRecipient({ ...row, discord_id: "1" }, "proven").discord).toEqual({
       discordId: "1",
       handle: null,
       label: "Nova",

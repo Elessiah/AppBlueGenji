@@ -6,7 +6,7 @@ import { createBureauMember, listBureauMembers, updateBureauMember } from "@/lib
 import { clearCache } from "@/lib/server/cache";
 import { createRecruitmentAd, getRecruitmentSpotlight, listRecruitmentAds } from "@/lib/server/recruitment-service";
 import { createSponsor } from "@/lib/server/sponsors-service";
-import { type SqlMock, type SqlQuery, fakePool } from "../../helpers/sql-double";
+import { type SqlMock, type SqlQuery, connectionMock, fakeConnection, fakePool } from "../../helpers/sql-double";
 
 /**
  * Lot 5b de l'i18n : l'anglais des contenus saisis par le staff
@@ -18,7 +18,12 @@ jest.mock("@/lib/server/database");
 
 async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  // La connexion de transaction (`updateAboutStat`) partage le même `execute`.
+  const connection = connectionMock();
+  connection.execute = execute;
+  jest.mocked(getDatabase).mockResolvedValue(
+    fakePool({ execute, getConnection: jest.fn(async () => fakeConnection(connection)) }),
+  );
 }
 
 beforeEach(() => {

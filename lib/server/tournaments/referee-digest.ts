@@ -265,7 +265,7 @@ export async function dispatchRefereeDigest(now: Date = new Date()): Promise<num
   await notifyStaff({
     topic: "REFEREE_DIGEST",
     discord: async () => {
-      await sendBotLog(line, { category: "referee-digest" });
+      sendBotLog(line, { category: "referee-digest" });
       return null;
     },
     push: (locale) =>

@@ -1,6 +1,6 @@
 "use client";
 
-import { canHaveReplay, visibleReplayUrl } from "@/lib/shared/match-replay";
+import { visibleReplayUrl } from "@/lib/shared/match-replay";
 import type { BracketMatch } from "@/lib/shared/types";
 import styles from "./MatchReplayStrip.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
@@ -12,7 +12,8 @@ import { versusText } from "@/lib/shared/tournament-page-text";
  * entière du bandeau est le lien, pour qu'on ne puisse pas le manquer.
  *
  * Le bouton qui pose, modifie ou retire le lien (permission `live`) vit dans le
- * pied d'action de la carte (`MatchCardActions`), sous `canEditReplay`. Le lien
+ * pied d'action de la carte (`MatchCardActions`), sous `canEditReplay`
+ * (`lib/shared/match-replay.ts`). Le lien
  * stocké n'est pas montré tel quel : `visibleReplayUrl` le tait sur un match
  * rouvert par un retour en arrière — le staff garde alors son bouton, pour
  * pouvoir retirer un lien qui ne correspondrait plus.
@@ -45,9 +46,4 @@ export function MatchReplayStrip({ match }: Readonly<{ match: BracketMatch }>) {
       </a>
     </div>
   );
-}
-
-/** Le lecteur (permission `live`) peut-il poser, modifier ou retirer la rediff ? */
-export function canEditReplay(match: BracketMatch, canManage: boolean): boolean {
-  return canManage && (canHaveReplay(match) || match.replayUrl !== null);
 }

@@ -53,7 +53,8 @@ export async function DELETE(
         registeredTeams: removed.registeredTeams,
         maxTeams: removed.maxTeams,
       }),
-      { id: user.id, pseudo: user.pseudo }, undefined, "registrations",
+      { id: user.id, pseudo: user.pseudo },
+      { category: "registrations", tournamentId: removed.tournamentId },
     );
 
     return ok({ removed });

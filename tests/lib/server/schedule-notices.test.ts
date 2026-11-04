@@ -133,7 +133,7 @@ describe("notifyMatchScheduleChange — première date", () => {
 
     await notifyMatchScheduleChange(change());
 
-    expect(publishStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR, undefined, "schedule");
+    expect(publishStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR, expect.objectContaining({ category: "schedule" }));
     expect(auditStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR);
     const line = logLine();
     expect(line).toContain("🗓️ Match programmé — « Coupe BlueGenji » (#7)");
@@ -611,7 +611,7 @@ describe("notifyMatchScheduleChange — horaire retiré", () => {
     expect(push.body).toMatch(/^L'horaire du .+ \(heure de Paris\) est retiré\. Les Renards contre Team Nova · Coupe BlueGenji, Tableau perdants · manche 2\.$/);
     expect(push.tag).toBe("rencontre-42-schedule");
     expect(resolvePush(staffCall().push, "en").title).toBe("Match time removed");
-    expect(publishStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR, undefined, "schedule");
+    expect(publishStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR, expect.objectContaining({ category: "schedule" }));
     expect(auditStaffAction).toHaveBeenCalledWith(expect.any(String), ACTOR);
     const line = logLine();
     expect(line).toMatch(/^🗓️ Horaire retiré — « Coupe BlueGenji » \(#7\)/u);

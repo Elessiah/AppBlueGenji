@@ -1,9 +1,11 @@
 import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MatchReplayStrip, canEditReplay } from "@/app/(secured)/tournois/[id]/_components/MatchReplayStrip";
+import { MatchReplayStrip } from "@/app/(secured)/tournois/[id]/_components/MatchReplayStrip";
+import { canEditReplay } from "@/lib/shared/match-replay";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import type { BracketMatch } from "@/lib/shared/types";
 import { bracketMatch } from "../helpers/bracket-match";
+import { readSource } from "../helpers/read-source";
 
 /**
  * Bandeau « Rediff disponible » sous un match terminé : visible de tous dès
@@ -101,5 +103,15 @@ describe("rediff — édition par la permission live", () => {
   ])("n'offre rien sur %s", (_label, overrides) => {
     expect(canEditReplay({ ...played, ...overrides }, true)).toBe(false);
     expect(render({ ...played, ...overrides }, true)).toBe("");
+  });
+});
+
+describe("canEditReplay — logique pure", () => {
+  it("matchCardModel_source_readsReplayRuleFromSharedLib", () => {
+    // Le modèle de la carte ne dépend d'aucun composant : la règle vit dans `lib/shared`.
+    const source = readSource("app/(secured)/tournois/[id]/_lib/match-card-model.ts");
+
+    expect(source).toContain('import { canEditReplay } from "@/lib/shared/match-replay";');
+    expect(source).not.toContain("_components/");
   });
 });

@@ -41,7 +41,7 @@ async function mockDb(execute: jest.Mock<SqlQuery>) {
 /** Répond à la requête de liste, puis selon la table interrogée. */
 function listing(summaryRows: (sql: string) => unknown[] | Error) {
   return jest.fn<SqlQuery>(async (sql: string) => {
-    if (sql.includes("COUNT(r.id)")) return [LIST_ROWS, undefined];
+    if (sql.includes("registered_teams")) return [LIST_ROWS, undefined];
     const rows = summaryRows(sql);
     if (rows instanceof Error) throw rows;
     return [rows, undefined];

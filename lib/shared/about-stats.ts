@@ -31,6 +31,13 @@ export type AboutStatInput = {
 };
 
 /**
+ * Carte telle que la reçoit une route : `valueEn` n'y est pas encore tenu
+ * d'être un texte — c'est {@link validateAboutStatInput} qui refuse le reste
+ * (`VALUE_EN_INVALID`), et le type oblige chaque appelant à passer par elle.
+ */
+export type AboutStatRequestInput = Omit<AboutStatInput, "valueEn"> & { valueEn?: unknown };
+
+/**
  * Cartes affichées sous le titre « L'association » tant qu'aucune ligne n'existe
  * en base (ou si la base est injoignable). Les `id` négatifs marquent ces cartes
  * « de secours » comme non modifiables côté interface. Partagé client/serveur.
@@ -65,7 +72,7 @@ function cleanField(raw: unknown): unknown {
  * Valide et normalise une carte (valeur + titre). Les deux champs sont requis ;
  * la valeur anglaise est facultative (rognée, vide → `null`).
  */
-export function validateAboutStatInput(input: AboutStatInput): AboutStatValidationResult {
+export function validateAboutStatInput(input: AboutStatRequestInput): AboutStatValidationResult {
   const cleanValue = cleanField(input.value);
   const cleanLabel = cleanField(input.label);
   const value = typeof cleanValue === "string" ? cleanValue : "";
@@ -73,6 +80,12 @@ export function validateAboutStatInput(input: AboutStatInput): AboutStatValidati
 
   if (!value) return { ok: false, error: "VALUE_REQUIRED" };
   if (value.length > ABOUT_STAT_VALUE_MAX) return { ok: false, error: "VALUE_TOO_LONG" };
+  // Un `valueEn` mal typé (nombre, objet, booléen) est refusé : le lire « vide »
+  // effaçait en silence la valeur anglaise enregistrée.
+  const rawValueEn: unknown = input.valueEn;
+  if (rawValueEn !== undefined && rawValueEn !== null && typeof rawValueEn !== "string") {
+    return { ok: false, error: "VALUE_EN_INVALID" };
+  }
   const valueEn = englishOrNull(cleanField(input.valueEn));
   if (valueEn !== null && valueEn.length > ABOUT_STAT_VALUE_MAX) return { ok: false, error: "VALUE_EN_TOO_LONG" };
   if (!label) return { ok: false, error: "LABEL_REQUIRED" };
@@ -94,11 +107,15 @@ export function aboutStatValue(stat: Pick<AboutStat, "value" | "valueEn">, local
 
 /**
  * Sous `/en`, la valeur affichée est-elle du français ? Seulement sans anglais
- * saisi **et** quand elle porte des lettres : « 12 » ou « 100% » se lisent
- * aussi bien en anglais, un `lang="fr"` les ferait prononcer en français.
+ * saisi **et** quand elle porte des mots ({@link valueHasWords}) : « 12 », « 100% »
+ * ou « 4 200 € » se lisent aussi bien en anglais, un `lang="fr"` les ferait
+ * prononcer en français. La marque « EN » du staff est plus large, à dessein
+ * (`aboutStatValueNeedsEnglish` : elle y ajoute la typographie française, que
+ * la page anglaise afficherait telle quelle) — les deux notions partagent ici
+ * leur définition des « mots ».
  */
 export function aboutStatValueIsFrench(stat: Pick<AboutStat, "value" | "valueEn">, locale: Locale): boolean {
-  return locale !== DEFAULT_LOCALE && !hasEnglish(stat.valueEn) && /\p{L}/u.test(stat.value);
+  return locale !== DEFAULT_LOCALE && !hasEnglish(stat.valueEn) && valueHasWords(stat.value);
 }
 
 /**
@@ -108,6 +125,16 @@ export function aboutStatValueIsFrench(stat: Pick<AboutStat, "value" | "valueEn"
  */
 const FRENCH_NUMBER_FORMAT = /\d[ \u00a0\u2009\u202f]\d{3}(?!\d)|\d,(?!\d{3}(?!\d))\d|\d\s*€|\d\s+%/u;
 
+/** La valeur porte-t-elle des mots (une lettre au moins) ? */
+function valueHasWords(value: string): boolean {
+  return /\p{L}/u.test(value);
+}
+
+/** Écrite en français pour l'œil : des mots, ou une typographie française. */
+function valueIsWrittenFrench(value: string): boolean {
+  return valueHasWords(value) || FRENCH_NUMBER_FORMAT.test(value);
+}
+
 /**
  * La valeur attend-elle une valeur anglaise ? Sans anglais saisi, quand elle
  * porte des mots (`aboutStatValueIsFrench`) ou s'écrit à la française
@@ -115,7 +142,7 @@ const FRENCH_NUMBER_FORMAT = /\d[ \u00a0\u2009\u202f]\d{3}(?!\d)|\d,(?!\d{3}(?!\
  * « €4200 » se lisent aussi bien en anglais.
  */
 export function aboutStatValueNeedsEnglish(stat: Pick<AboutStat, "value" | "valueEn">): boolean {
-  return !hasEnglish(stat.valueEn) && (/\p{L}/u.test(stat.value) || FRENCH_NUMBER_FORMAT.test(stat.value));
+  return !hasEnglish(stat.valueEn) && valueIsWrittenFrench(stat.value);
 }
 
 /**
@@ -149,6 +176,7 @@ export const ABOUT_STAT_FIELD_ERRORS = {
   VALUE_REQUIRED: "value",
   VALUE_TOO_LONG: "value",
   VALUE_EN_TOO_LONG: "valueEn",
+  VALUE_EN_INVALID: "valueEn",
   LABEL_REQUIRED: "label",
   LABEL_TOO_LONG: "label",
   LABEL_EN_REQUIRED: "labelEn",
@@ -162,6 +190,7 @@ const ABOUT_STAT_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   VALUE_REQUIRED: "La valeur est requise.",
   VALUE_TOO_LONG: `Valeur trop longue (${ABOUT_STAT_VALUE_MAX} caractères maximum).`,
   VALUE_EN_TOO_LONG: `Valeur anglaise trop longue (${ABOUT_STAT_VALUE_MAX} caractères maximum).`,
+  VALUE_EN_INVALID: "La valeur anglaise doit être un texte.",
   LABEL_REQUIRED: "Le titre est requis.",
   LABEL_TOO_LONG: `Titre trop long (${ABOUT_STAT_LABEL_MAX} caractères maximum).`,
   PAYLOAD_TOO_LARGE: "Envoi trop volumineux.",

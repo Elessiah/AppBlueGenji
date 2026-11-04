@@ -59,6 +59,10 @@ export function middleware(request: NextRequest) {
 
   const policy = contentSecurityPolicy(nonce, {
     dev: process.env.NODE_ENV === "development",
+    // Next le remplace à la compilation par un booléen (`define-env`, `true`
+    // sous Turbopack) ; lu à l'exécution, c'est la chaîne "1". `Boolean()`
+    // couvre les deux formes — ni `=== "1"` ni `=== true` ne les couvrirait.
+    turbopack: Boolean(process.env.TURBOPACK),
   });
 
   const requestHeaders = localizedRequestHeaders(request, locale, path);

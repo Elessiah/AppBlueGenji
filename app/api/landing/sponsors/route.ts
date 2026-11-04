@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createSponsor, listSponsors } from "@/lib/server/sponsors-service";
 import { readJsonBody } from "@/lib/server/request-body";
@@ -39,6 +40,6 @@ export async function POST(req: Request) {
     });
     return ok({ sponsor }, 201);
   } catch (e) {
-    return fail((e as Error).message || "SPONSOR_CREATE_FAILED", 400);
+    return fail(serviceErrorCode(e, "SPONSOR_CREATE_FAILED"), 400);
   }
 }

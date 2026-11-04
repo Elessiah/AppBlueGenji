@@ -20,7 +20,18 @@ describe("lectures d'une carte de tournoi", () => {
     "carte d'un tournoi (repository.ts)": read("lib/server/tournaments/repository.ts"),
   };
 
-  it.each(Object.entries(readers))("%s sélectionne et regroupe les quatre colonnes", (_, source) => {
+  it("liste des tournois (index.ts) sélectionne les quatre colonnes, sans les regrouper", () => {
+    // Les inscriptions se comptent dans une table dérivée : plus de `GROUP BY`
+    // sur les colonnes du tournoi (voir `list-scope`).
+    const source = readers["liste des tournois (index.ts)"];
+    const end = source.indexOf("AS registered_teams");
+    expect(end).toBeGreaterThan(0);
+    const selectPart = source.slice(0, end);
+    for (const column of IMAGE_COLUMNS) expect(selectPart).toContain(`t.${column},`);
+  });
+
+  it("carte d'un tournoi (repository.ts) sélectionne et regroupe les quatre colonnes", () => {
+    const source = readers["carte d'un tournoi (repository.ts)"];
     const query = source.match(/COALESCE\(COUNT\(r\.id\), 0\) AS registered_teams[\s\S]*?GROUP BY([\s\S]*?)(`|ORDER BY)/);
     expect(query).not.toBeNull();
     const selectPart = source.slice(0, source.indexOf(query![0]));

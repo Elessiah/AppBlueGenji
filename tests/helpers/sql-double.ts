@@ -42,6 +42,7 @@ export function connectionMock() {
     commit: jest.fn<() => Promise<void>>(),
     rollback: jest.fn<() => Promise<void>>(),
     release: jest.fn<() => void>(),
+    destroy: jest.fn<() => void>(),
   };
 }
 

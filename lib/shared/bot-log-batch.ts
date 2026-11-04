@@ -38,13 +38,67 @@ function endsWithOpenEscape(text: string): boolean {
   return count % 2 === 1;
 }
 
+/** Un blanc (espace, tabulation…), où une rangée peut se couper sans briser un mot ni une adresse. */
+export function isBlank(char: string): boolean {
+  if (char.length !== 1) return false;
+  const code = char.charCodeAt(0);
+  if (code <= 0x20) return code === 0x20 || (code >= 0x09 && code <= 0x0d);
+  return code >= 0xa0 && UNICODE_BLANKS.has(code);
+}
+
+/** Les blancs au-delà de l'ASCII que `\s` reconnaît (contrôle de parité dans les tests). */
+const UNICODE_BLANKS: ReadonlySet<number> = new Set([
+  0xa0, 0x1680, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff,
+  0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200a,
+]);
+
+/**
+ * Point de coupe reculé au dernier blanc de `current`, quand la coupe tomberait
+ * au milieu d'une suite sans espace (un mot, une adresse que `discordQuote`
+ * laisse cliquable) : rend le morceau à pousser et le reste à reporter, ou
+ * `null` quand reculer ne sert à rien (pas de blanc après la marque de
+ * citation, coupe déjà sur un blanc, reste trop long, échappement ouvert).
+ */
+function backOffToBlank(
+  current: string,
+  next: string,
+  prefix: string,
+  maxChars: number,
+): { piece: string; rest: string } | null {
+  if (isBlank(next) || isBlank(current.at(-1) ?? " ")) return null;
+  // Le blanc de la marque de citation n'est pas un point de coupe, même quand
+  // la limite est trop courte pour la répéter.
+  const floor = Math.max(prefix.length, current.startsWith(QUOTE_PREFIX) ? QUOTE_PREFIX.length : 0);
+  let index = current.length - 1;
+  while (index >= floor && !isBlank(current[index])) index -= 1;
+  if (index <= floor) return null;
+  const piece = current.slice(0, index);
+  const rest = current.slice(index + 1);
+  if (endsWithOpenEscape(piece) || prefix.length + rest.length + next.length > maxChars) return null;
+  return { piece, rest };
+}
+
+/**
+ * Coupe franche au caractère : rend le morceau à pousser et le début du
+ * suivant. Une barre oblique inverse qui échappe encore passe au morceau suivant.
+ */
+function hardCut(current: string, prefix: string): { piece: string; rest: string } {
+  if (endsWithOpenEscape(current) && current.length > prefix.length + 1) {
+    return { piece: current.slice(0, -1), rest: prefix + BACKSLASH };
+  }
+  return { piece: current, rest: prefix };
+}
+
 /**
  * Coupe une rangée trop longue en morceaux d'au plus `maxChars`, sans couper un
  * caractère **ni une séquence d'échappement** : la barre oblique inverse qui
  * neutralise `<`, `*` ou `` ` `` (`discordInline`, `discordQuote`) reste collée
  * au caractère qu'elle échappe — sinon le morceau suivant, qui ouvre un nouveau
- * message, commencerait par un `<@&rôle>` actif. Une rangée citée (`> `) reste
- * citée dans chacun de ses morceaux.
+ * message, commencerait par un `<@&rôle>` actif. La coupe recule au dernier
+ * blanc quand elle tomberait au milieu d'un mot ou d'une adresse (un lien
+ * tronqué resterait cliquable) ; une suite sans blanc plus longue que la limite
+ * se coupe au caractère. Une rangée citée (`> `) reste citée dans chacun de ses
+ * morceaux.
  */
 function splitLongRow(row: string, maxChars: number): string[] {
   const prefix = row.startsWith(QUOTE_PREFIX) && maxChars > QUOTE_PREFIX.length + 2 ? QUOTE_PREFIX : "";
@@ -52,13 +106,10 @@ function splitLongRow(row: string, maxChars: number): string[] {
   let current = "";
   for (const char of row) {
     if (current.length + char.length > maxChars) {
-      let carry = "";
-      if (endsWithOpenEscape(current) && current.length > prefix.length + 1) {
-        carry = BACKSLASH;
-        current = current.slice(0, -1);
-      }
-      pieces.push(current);
-      current = prefix + carry;
+      const backOff = backOffToBlank(current, char, prefix, maxChars);
+      const cut = backOff ? { piece: backOff.piece, rest: prefix + backOff.rest } : hardCut(current, prefix);
+      pieces.push(cut.piece);
+      current = cut.rest;
     }
     current += char;
   }
@@ -104,7 +155,9 @@ export const BOT_LOG_CONTINUATION_LEAD = "(suite)";
  * autant de lignes par message que la limite le permet. Une ligne n'est coupée
  * que si elle dépasse seule la limite — entre ses rangées d'abord, jamais au
  * milieu d'une séquence d'échappement — et chaque message qui en poursuit une
- * s'ouvre sur {@link BOT_LOG_CONTINUATION_LEAD}. Les lignes vides sont ignorées.
+ * s'ouvre sur {@link BOT_LOG_CONTINUATION_LEAD}. Les lignes vides (ou faites de
+ * blancs) sont ignorées ; les autres partent sans leurs rangées vides de tête
+ * ni leurs blancs de fin, indentation comprise.
  */
 export function packBotLogLines(lines: readonly string[], maxChars: number = BOT_LOG_MESSAGE_MAX_CHARS): string[] {
   const limit = Math.max(2, Math.floor(maxChars));
@@ -129,7 +182,9 @@ export function packBotLogLines(lines: readonly string[], maxChars: number = BOT
     }
   };
   for (const raw of lines) {
-    const line = raw.trim();
+    // Les rangées vides en tête et les blancs de fin tombent ; l'indentation de
+    // la première rangée reste.
+    const line = raw.replace(/^(?:[ \t]*\r?\n)+/u, "").trimEnd();
     if (!line) continue;
     if (line.length <= limit) {
       push(line, false);
@@ -142,17 +197,40 @@ export function packBotLogLines(lines: readonly string[], maxChars: number = BOT
 }
 
 /**
- * Clé d'un lot : le salon de destination, le tournoi quand la ligne en relève,
- * puis la **catégorie** du geste — un lot ne mêle jamais deux types de ligne.
+ * Identifiant de tournoi d'une ligne, ou `null` : un entier positif, y compris
+ * reçu en chaîne (colonne relue de MySQL) — sans quoi la ligne tomberait dans le
+ * lot commun du salon, hors de l'ordre de son tournoi.
+ */
+export function botLogTournamentId(tournamentId: number | string | null | undefined): number | null {
+  if (tournamentId === null || tournamentId === undefined) return null;
+  if (typeof tournamentId === "string" && !/^\d+$/.test(tournamentId.trim())) return null;
+  const id = Number(tournamentId);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+/**
+ * Portée d'un lot : le salon de destination et le tournoi quand la ligne en
+ * relève. Les lots d'une portée partent dans l'ordre où ils se sont formés.
+ */
+export function botLogBatchScope(channel: string, tournamentId?: number | string | null): string {
+  const id = botLogTournamentId(tournamentId);
+  return id === null ? `${channel}:global` : `${channel}:tournament:${id}`;
+}
+
+/** Portée d'une clé de {@link botLogBatchKey} : tout ce qui précède la catégorie. */
+export function botLogBatchScopeOfKey(key: string): string {
+  const cut = key.lastIndexOf(":");
+  return cut > 0 ? key.slice(0, cut) : key;
+}
+
+/**
+ * Clé d'un lot : sa portée ({@link botLogBatchScope}), puis la **catégorie** du
+ * geste — un lot ne mêle jamais deux types de ligne.
  */
 export function botLogBatchKey(
   channel: string,
-  tournamentId?: number | null,
+  tournamentId?: number | string | null,
   category: BotLogCategory = DEFAULT_BOT_LOG_CATEGORY,
 ): string {
-  const scope =
-    typeof tournamentId === "number" && Number.isInteger(tournamentId) && tournamentId > 0
-      ? `${channel}:tournament:${tournamentId}`
-      : `${channel}:global`;
-  return `${scope}:${category}`;
+  return `${botLogBatchScope(channel, tournamentId)}:${category}`;
 }

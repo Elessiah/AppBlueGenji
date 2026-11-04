@@ -1,7 +1,4 @@
 {
-  "meta": {
-    "fallbackTitle": "Tournoi"
-  },
   "participants": {
     "soloBadge": "Individuel",
     "TEAM": {
@@ -287,6 +284,7 @@
     "scheduledSr": " — début le {date}",
     "lobby": "Lancement",
     "ready": "prêts",
+    "voicePending": "salons vocaux à remplir",
     "launched": "Lancé",
     "hostTitle": "Équipe qui crée le salon en jeu (côté gauche)",
     "hostSr": "Équipe hôte : ",
@@ -336,90 +334,6 @@
     "titleOff": "Planification des matchs",
     "descriptionOn": "Chaque match attend qu'un arbitre ou un admin fixe sa date (« À planifier »), puis reste « En attente de départ » jusqu'à l'heure dite, où il entre en lancement.",
     "descriptionOff": "Désactivée : un match sans date entre en lancement dès que ses deux engagés sont connus."
-  },
-  "settings": {
-    "groups": {
-      "tournament": "Tournoi",
-      "conditions": "Conditions d'inscription"
-    },
-    "yes": "Oui",
-    "no": "Non",
-    "none": "Aucun",
-    "drawAllowed": "{label} · match nul possible",
-    "seeding": {
-      "MANUAL": "Fixé par l'arbitrage",
-      "RANKING": "Classement du site",
-      "REGISTRATION": "Ordre des inscriptions"
-    },
-    "requirement": {
-      "NONE": "Aucun joueur",
-      "ANY_PLAYER": "Au moins un joueur",
-      "ALL_PLAYERS": "Tous les joueurs"
-    },
-    "general": {
-      "game": "Jeu",
-      "mode": "Mode",
-      "participants": "Participants",
-      "participantsSolo": "Joueurs (tournoi individuel)",
-      "participantsTeam": "Équipes",
-      "maxTeam": "{count, plural, one {# équipe} other {# équipes}}",
-      "maxSolo": "{count, plural, one {# joueur} other {# joueurs}}",
-      "maxLabel": "Effectif maximal",
-      "matchFormat": "Format des matchs",
-      "seeding": "Ordre de départ",
-      "launchPhase": "Phase de lancement des matchs",
-      "teamVoice": "Salons vocaux d'équipe"
-    },
-    "conditions": {
-      "minRoster": "Effectif minimal du roster",
-      "minRosterValue": "{count, plural, one {# joueur} other {# joueurs}}",
-      "discord": "Tag Discord certifié",
-      "blizzard": "Compte Battle.net rattaché"
-    },
-    "mode": {
-      "thirdPlace": "Petite finale",
-      "roundsBeforeFirstCut": "Manches avant la 1ʳᵉ coupe",
-      "roundsPerCut": "Manches entre deux coupes",
-      "swissRounds": "Nombre de rondes",
-      "swissRoundsAtLaunch": "Fixé au lancement",
-      "scoring": "Barème",
-      "swissScoring": "Victoire {win} · nul {draw} · défaite {loss} · exemption {bye}",
-      "startPoints": "Capital de départ",
-      "startPointsValue": "{count, plural, one {# point} other {# points}}",
-      "enduranceScoring": "+{win} par map gagnée · −{loss} par map perdue",
-      "playoffSize": "Qualifiées pour les play-offs",
-      "maxRounds": "Plafond de manches qualificatives",
-      "earlyExit": "Sortie anticipée « hors course »",
-      "playoffFormat": "Format des play-offs",
-      "phase": "Phase {position}",
-      "phaseNamed": "Phase {position} — {name}",
-      "phaseChampion": "Désigne la championne",
-      "phasePercent": "{value} % qualifiées",
-      "phaseCount": "{count, plural, one {# qualifiée} other {# qualifiées}}",
-      "phaseSwissRounds": "{count, plural, one {# ronde} other {# rondes}}",
-      "phaseFirstCut": "1ʳᵉ coupe après {count, plural, one {# manche} other {# manches}}",
-      "phaseEveryRound": "puis à chaque manche",
-      "phaseEveryN": "puis toutes les {count} manches",
-      "phaseThirdPlace": "petite finale"
-    }
-  },
-  "share": {
-    "states": {
-      "UPCOMING": "Prochainement",
-      "REGISTRATION": "Inscriptions ouvertes",
-      "RUNNING": "Tournoi en cours",
-      "FINISHED": "Tournoi terminé"
-    },
-    "engagedTeam": "{registered}/{max} équipes engagées",
-    "engagedSolo": "{registered}/{max} joueurs engagés",
-    "schedule": {
-      "FINISHED": "Joué le {date}",
-      "RUNNING": "En cours depuis le {date}",
-      "REGISTRATION": "Inscriptions jusqu'au {date}",
-      "OPENS": "Inscriptions dès le {date}",
-      "KICKOFF": "Coup d'envoi le {date}"
-    },
-    "date": "{day} à {hour}"
   },
   "matchPage": {
     "backToTournament": "Retour au tournoi",

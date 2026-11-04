@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useTournamentsText } from "@/components/i18n/tournaments-text";
 import { localizedMatchFormatLabel, participantLabel } from "@/lib/shared/tournaments-text";
 import type { TournamentCard } from "@/lib/shared/types";
@@ -21,7 +22,7 @@ interface FinishedCardProps {
  * La carte se ternit par ses **couleurs** (`data-state="done"`), jamais par une
  * opacité : celle-ci faisait passer les textes atténués sous 4,5:1.
  */
-export function FinishedCard({ t, priority }: Readonly<FinishedCardProps>) {
+export const FinishedCard = memo(function FinishedCard({ t, priority }: Readonly<FinishedCardProps>) {
   const text = useTournamentsText();
   const finishDate = formatCardDate(t.finishedAt ?? t.startAt, false, text.locale);
 
@@ -66,4 +67,4 @@ export function FinishedCard({ t, priority }: Readonly<FinishedCardProps>) {
       </div>
     </TournamentCardFrame>
   );
-}
+});

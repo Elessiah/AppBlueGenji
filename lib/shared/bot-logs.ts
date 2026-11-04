@@ -480,6 +480,11 @@ export function formatMatchResultLog(context: {
    * doit le dire — « A vs B » seul se lirait comme un résultat manquant.
    */
   doubleForfeit?: boolean;
+  /**
+   * Tranché par « Valider le résultat » : la ligne le dit, sans nommer
+   * personne (« le staff »), à la place d'une ligne 🛠️ à part.
+   */
+  staffValidated?: boolean;
 }): string {
   const round = matchRoundLabel(context.bracket, context.roundNumber, context.swiss);
   // Un forfait prononcé par un arbitre laisse les deux scores à `null` : la
@@ -490,7 +495,8 @@ export function formatMatchResultLog(context: {
     context.team1Score === null || context.team2Score === null
       ? `${team1} vs ${team2}`
       : `${team1} ${context.team1Score}–${context.team2Score} ${team2}`;
-  return `${lead("🏁", "Match terminé", context.tournament)} · ${round} : ${score}${forfeitNote(context)}.`;
+  const validated = context.staffValidated ? ` — résultat validé par ${ANONYMOUS_STAFF_LABEL}` : "";
+  return `${lead("🏁", "Match terminé", context.tournament)} · ${round} : ${score}${forfeitNote(context)}${validated}.`;
 }
 
 /** Mention de forfait accolée au score d'une fin de match, vide sans forfait. */
@@ -774,8 +780,6 @@ export function formatCastChangeLog(context: {
  * Gestes du staff sur un match qui ne laissaient aucune trace
  * (`docs/features/STAFF_ACTION_LOGS.md`) :
  *
- * - `RESULT_VALIDATED` — « Valider le résultat » (score, forfait ou double
- *   forfait tranché par l'arbitrage) ;
  * - `SCORES_SAVED` — « Enregistrer » : avancement noté sans trancher ;
  * - `FORCE_LAUNCHED` — lancement forcé du match ;
  * - `HOST_SET` / `HOST_CLEARED` — hôte du salon désigné ou retiré ;
@@ -785,7 +789,6 @@ export function formatCastChangeLog(context: {
  * - `REPLAY_SET` / `REPLAY_REMOVED` — lien de rediffusion posé ou retiré.
  */
 export type StaffMatchAction =
-  | "RESULT_VALIDATED"
   | "SCORES_SAVED"
   | "FORCE_LAUNCHED"
   | "HOST_SET"
@@ -798,7 +801,6 @@ export type StaffMatchAction =
   | "REPLAY_REMOVED";
 
 const STAFF_MATCH_ACTION_WORDING: Record<StaffMatchAction, string> = {
-  RESULT_VALIDATED: "Résultat validé",
   SCORES_SAVED: "Score enregistré",
   FORCE_LAUNCHED: "Lancement forcé",
   HOST_SET: "Hôte désigné",

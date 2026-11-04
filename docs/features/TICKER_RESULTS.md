@@ -32,8 +32,9 @@ est bâtie sur `lib/shared/match-outcome.ts` (double forfait, nul), comme les
 fiches. Un **vainqueur enregistré** qui désigne un camp est suivi, comme l'arbre
 et le classement : le forfait nominatif ne sert alors qu'à marquer l'*autre*
 camp « forfait » plutôt que « perdant ». Une ligne incohérente — vainqueur =
-camp forfait — dit ce camp « forfait » et donne la victoire à l'autre : un camp
-forfait n'a pas gagné (il s'affichait « ✓ » et l'autre « perdant »). Sans
+camp forfait — **n'affiche aucun vainqueur** (deux `none`) : l'arbre et le
+classement créditent `winner_team_id`, le bandeau ne les contredit plus ; à
+scores inégaux la ligne est alors écartée comme toute ligne sans issue propre. Sans
 vainqueur propre au match, un forfait nominatif donne la victoire à son
 adversaire. Un forfait se chiffre au
 score plein du format du tournoi (`tickerScores`, `forfeitMapCount` : FT3 →
@@ -52,7 +53,10 @@ vainqueur, forfait, double forfait, ou nul à scores égaux (comme
 `playedMatchSql`) : une ligne close sans rien de cela se serait lue « A 0 — B 0
 (sans vainqueur) ». Une ligne sans issue propre aux scores **inégaux** (vainqueur
 hors des deux camps, équipe remplacée après le rapport) est écartée au
-chargement : elle se serait lue « Alpha 3 — Beta 0 (sans vainqueur) ». Résultats, inscriptions et champions ne lisent que les
+chargement, en code, **après** la limite de la requête : celle-ci lit donc 12 lignes
+(`TICKER_RESULT_FETCH`, même parcours d'index par `updated_at`) et le bandeau en
+garde les 3 premières valides (`TICKER_RESULT_COUNT`) — une ligne écartée ne coûte
+plus une place jamais remplie. Elle se serait lue « Alpha 3 — Beta 0 (sans vainqueur) ». Résultats, inscriptions et champions ne lisent que les
 tournois **publiés** (`start_visibility_at <= NOW()`, comme le compteur de
 l'accueil) : un tournoi encore masqué n'y montre ni nom, ni engagés, ni score.
 Aucune donnée nouvelle n'est collectée : trois colonnes déjà publiques (tournois publiés seulement) et le

@@ -38,7 +38,11 @@ demandé** (décision de l'utilisateur, 2026-11-03 : même règle pour caster,
 par lot (`readMatchCasters`, brief du salon) se font par jeu. Conditions
 relues en base à chaque geste (`loadRefereeEligibility`, jamais les rôles d'une
 session). Il **peut caster** le match, il **ne peut pas le jouer**
-(`REFEREE_IS_PLAYER`).
+(`REFEREE_IS_PLAYER`) : l'inscription comme caster ne refuse que qui joue le
+match (`claimMatchCast` → `resolveTeamParty`, jamais `resolveMatchParty`, qui
+rendrait l'arbitre `MATCH_REFEREE` — refus `CASTER_IS_PLAYER` corrigé le
+2026-11-04) ; il s'inscrit sans « Prêt » de caster (un « Prêt » d'arbitre peut
+dater d'un cycle révolu) et son clic suivant, en caster, donne les deux.
 
 Le retrait de l'arbitre (volontaire/staff, d'office, opposition retenue) passe
 par un seul assistant, `clearMatchReferee` (`match-launch.ts`) : arbitre et

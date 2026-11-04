@@ -33,6 +33,7 @@ import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 import { requiresMatchStartAt } from "@/lib/shared/live-streams";
 import { bracketMatch } from "../helpers/bracket-match";
+import "@/tests/helpers/lazy-tournament-texts";
 
 const EN = messagesFor("en");
 const noop = () => undefined;

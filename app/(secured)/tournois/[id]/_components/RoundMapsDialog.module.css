@@ -137,6 +137,35 @@
   cursor: pointer;
 }
 
+/* Au toucher, une case de 28 px serrée à 4 px de la suivante se rate : 44 px de cible (WCAG 2.5.5). */
+@media (pointer: coarse) {
+  .options {
+    gap: 8px 12px;
+  }
+
+  .option {
+    min-height: 44px;
+  }
+}
+
+.stale {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.staleItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
 .customRow,
 .copyRow {
   display: flex;

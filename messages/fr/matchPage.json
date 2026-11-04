@@ -1,6 +1,7 @@
 {
   "header": {
     "scoreLabel": "Score : {team1} {score1}, {team2} {score2}",
+    "forfeitLabel": "{team1} contre {team2} : forfait de {team}",
     "versus": "VS",
     "completed": "Terminé",
     "winner": "Victoire de {team}",
@@ -41,7 +42,11 @@
   "voice": {
     "title": "Salons vocaux",
     "count": "Salon vocal : {count}/{capacity}",
+    "countFull": "Salon vocal : {count}/{capacity} · complet",
     "notCreated": "Salon vocal : bientôt ouvert",
+    "uncounted": "Salon vocal : pas encore compté",
+    "failed": "Salon vocal : indisponible",
+    "failedNote": "Un salon est indisponible : le match n'attend pas les salons.",
     "waiting": "Le match se lance quand les deux salons sont pleins.",
     "hint": "Un quart d'heure avant le match, le bot Discord ouvre un salon vocal de {capacity} places par équipe ; le lancement attend que les deux soient pleins."
   }

@@ -52,7 +52,7 @@ import {
 } from "./repository";
 import { invalidateTournamentLists } from "./list-cache";
 import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
-import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
+import { invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
@@ -61,7 +61,7 @@ import { ACTIONABLE_EXPIRED_REPORT_SQL } from "./score-report-sql";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { pickChampion } from "@/lib/shared/tournament-card-summary";
 import { computeRunningRatio } from "@/lib/shared/tournament-progress";
-import { applyMapRules } from "@/lib/shared/round-maps";
+import { applyMapRules, roundKeyId, type RoundTiebreak } from "@/lib/shared/round-maps";
 import { loadMapRules } from "./round-maps";
 import { applicableTiebreaks } from "@/lib/shared/round-plan";
 import { withoutRefereeKeys } from "./referee-names";
@@ -138,16 +138,27 @@ export function spectatorSnapshotCacheKey(tournamentId: number): string {
  *
  * La réponse publique, elle, **reste** : sa durée de vie, allongée sous la
  * charge, est précisément ce qui protège la machine d'un tournoi animé — chaque
- * score la reconstruirait sinon. Elle ne part qu'avec le tournoi
- * ({@link invalidateSpectatorSnapshot}, à la suppression).
+ * score la reconstruirait sinon. Elle ne part qu'avec le tournoi ou une édition
+ * du staff ({@link invalidateSpectatorSnapshot}).
  */
 export function invalidateTournamentSnapshot(tournamentId: number): void {
   invalidateCached(cacheKey(tournamentId));
 }
 
-/** Oublie la réponse publique d'un tournoi : il vient d'être supprimé. */
+/** Clé de la carte d'encart d'un tournoi (`publicTournamentCard`), posée ici pour la même raison. */
+export function spectatorCardCacheKey(tournamentId: number): string {
+  return `spectator-card:${tournamentId}`;
+}
+
+/**
+ * Oublie la réponse publique d'un tournoi **et** sa carte d'encart : il vient
+ * d'être supprimé ou édité par le staff (`updateTournament` : nom, description,
+ * dates) — sans cela, l'ancien titre et l'ancienne description restaient servis
+ * en aperçu jusqu'à 150 s (copie) et 10 s (carte).
+ */
 export function invalidateSpectatorSnapshot(tournamentId: number): void {
   invalidateCached(spectatorSnapshotCacheKey(tournamentId));
+  invalidateCached(spectatorCardCacheKey(tournamentId));
 }
 
 /**
@@ -276,7 +287,8 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
     if (syncResult.stateChanged || syncResult.contentChanged) {
       invalidateTournamentLists();
       invalidateLandingAggregates();
-      invalidateTeamRanking();
+      // PNG d'aperçu au plus une fois par fenêtre, comme les scores (`invalidateTeamRankingForScore`).
+      invalidateTeamRankingForScore();
       invalidateStats();
     }
 
@@ -487,14 +499,18 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     const storedMapRules = await loadMapRules(connection, tournamentId, tournament);
     // Map de départage : celles des seuls tours éligibles (play-offs en vrai
     // best of 3) — un réglage resté d'un format changé depuis n'est pas montré.
+    const activeTiebreaks = applicableTiebreaks(storedMapRules.tiebreaks, {
+      format: card.format,
+      matchFormat: card.matchFormat,
+      endurancePlayoffFormat: card.endurancePlayoffFormat,
+      phases: phasesDetail?.phases ?? null,
+    });
+    // Les inactives restent portées : le staff peut les retirer (`RoundMapsDialog`).
+    // Champ omis quand rien n'est périmé (le cas courant) : les spectateurs ne le portent pas.
     const mapRules = {
       ...storedMapRules,
-      tiebreaks: applicableTiebreaks(storedMapRules.tiebreaks, {
-        format: card.format,
-        matchFormat: card.matchFormat,
-        endurancePlayoffFormat: card.endurancePlayoffFormat,
-        phases: phasesDetail?.phases ?? null,
-      }),
+      tiebreaks: activeTiebreaks,
+      ...staleTiebreaksField(storedMapRules.tiebreaks, activeTiebreaks),
     };
     const mappedMatches = attachMatchMaps(
       applyMapRules(matches.map((row) =>
@@ -583,6 +599,13 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
   } finally {
     connection.release();
   }
+}
+
+/** `{ staleTiebreaks }` quand des réglages stockés ne sont plus actifs, `{}` sinon. */
+function staleTiebreaksField(stored: readonly RoundTiebreak[], active: readonly RoundTiebreak[]): { staleTiebreaks?: RoundTiebreak[] } {
+  const activeKeys = new Set(active.map(roundKeyId));
+  const stale = stored.filter((entry) => !activeKeys.has(roundKeyId(entry)));
+  return stale.length > 0 ? { staleTiebreaks: stale } : {};
 }
 
 /**

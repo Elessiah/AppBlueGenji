@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { isDeadlockMessage } from "@/lib/server/mysql-errors";
+import { isContentionMessage } from "@/lib/server/mysql-errors";
 import { CONCURRENT_UPDATE_RETRY, publicErrorCode } from "@/lib/shared/api-error-code";
 
 export type ApiError = { error: string };
@@ -38,6 +38,9 @@ export function fail<T extends object = Record<string, never>>(
   // Même chemin pour un corps non déclaré JSON (`readJsonBody`) : c'est un
   // refus de la requête, jamais une panne du serveur.
   if (message === "UNSUPPORTED_CONTENT_TYPE") status = 415;
+  // Contention déjà ramenée à son code par la route (`serviceErrorCode`) :
+  // le même 409 que le message brut reconnu plus bas.
+  if (message === CONCURRENT_UPDATE_RETRY) status = 409;
   // Interblocage : InnoDB a défait la transaction de cette requête au profit
   // d'une écriture concurrente (saisie de score contre réordonnancement du
   // seeding, par exemple). Rien n'est écrit, et ce n'est ni une panne ni une
@@ -45,8 +48,15 @@ export function fail<T extends object = Record<string, never>>(
   // Posé ici, il vaut pour toute route qui transmet le message de l'erreur
   // (`fail(error.message, …)`, le motif courant) — pas pour celles qui le
   // remplacent par un code fixe avant d'appeler `fail()`.
-  if (isDeadlockMessage(message)) {
-    console.warn(`[api] écriture annulée par un interblocage, rendue en ${CONCURRENT_UPDATE_RETRY} :`, message);
+  //
+  // Même traitement pour les autres contentions passagères qu'un rejeu n'a pas
+  // vaincues (`isContentionMessage`, liste unique) : ligne changée depuis l'instantané
+  // sous MariaDB (`ER_CHECKREAD`) et verrou venu trop tard
+  // (`ER_LOCK_WAIT_TIMEOUT`). Sans elles ici, la saisie d'arbitrage, le report
+  // d'un engagé, la programmation ou les rappels rendaient un 500 générique
+  // pour la même contention que l'interblocage rend en « réessaie ».
+  if (isContentionMessage(message)) {
+    console.warn(`[api] écriture annulée par une écriture concurrente, rendue en ${CONCURRENT_UPDATE_RETRY} :`, message);
     return NextResponse.json({ ...details, error: CONCURRENT_UPDATE_RETRY } as ApiError & Partial<T>, {
       status: 409,
     });

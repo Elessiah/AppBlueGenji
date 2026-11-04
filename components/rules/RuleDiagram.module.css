@@ -20,6 +20,12 @@
   height: auto;
 }
 
+/* 520 × 760 / 680 : le schéma multi-phases (viewBox 760) garde, sur téléphone,
+   l'échelle qu'il avait à 680. À recalculer si son viewBox change. */
+.svgMulti {
+  min-width: 582px;
+}
+
 .caption {
   margin: 12px 2px 0;
   font-size: 12.5px;

@@ -49,7 +49,7 @@ import { SpectatorViewProvider } from "@/components/spectator-view";
 import { PodiumTiersProvider } from "@/components/podium-tiers";
 import { buildPodiumTiers } from "@/lib/shared/podium-tiers";
 import { EntrantLink, EntrantProvider } from "@/app/(secured)/tournois/[id]/_lib/entrant-link";
-import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MatchMapDetails";
+import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MapResultList";
 import { LiveIndicator } from "@/app/(secured)/tournois/[id]/_components/LiveIndicator";
 import { TournamentHeader } from "@/app/(secured)/tournois/[id]/_components/TournamentHeader";
 import { TournamentLoading } from "@/app/(secured)/tournois/[id]/_components/TournamentLoading";
@@ -257,7 +257,7 @@ describe("page sans compte — mise en page", () => {
     // Une lecture de la réponse publique (route) laisse sa copie, état stocké « à venir ».
     await getSpectatorPayload(12, 0, null);
 
-    const card = await publicTournamentCard(12);
+    const card = await publicTournamentCard(12, () => true);
     expect(card?.state).toBe("REGISTRATION");
   });
 
@@ -281,7 +281,11 @@ describe("page sans compte — mise en page", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
     mockPathname = null;
     const html = renderToStaticMarkup(await SpectatorLayout({ children: <p>plateau</p>, ...params("12") }));
-    expect(html).toContain("plateau");
+    // La fiche publique n'est pas rendue (elle s'hydraterait, SSE et sondage REST compris, avant le renvoi).
+    expect(html).not.toContain("plateau");
+    expect(html).toContain("<main");
+    // Repli visible si le renvoi tarde : jamais une page vide, ni une impasse.
+    expect(html).toContain('<output class="fallback"><a href="/tournois/12">Ouverture du tournoi…</a></output>');
     expect(redirect).not.toHaveBeenCalled();
   });
 
@@ -527,9 +531,10 @@ describe("liens publics vers un tournoi", () => {
 
 describe("textes de la fiche", () => {
   it("les deux espaces posent les mêmes textes, par un seul composant", () => {
-    expect(readSource("app/(secured)/tournois/[id]/layout.tsx")).toContain("<TournamentSheetText locale={await requestLocale()}>");
+    // Espace connecté : l'anglais au chargement complet d'un lecteur connecté ; sans compte : tout chargement complet.
+    expect(readSource("app/(secured)/tournois/[id]/layout.tsx")).toContain("<TournamentSheetText locale={locale} messages={await tournamentSheetEnglish(locale)}>");
     const spectator = readSource("app/suivre/tournois/[id]/layout.tsx");
-    expect(spectator).toContain("<TournamentSheetText locale={locale}>");
+    expect(spectator).toContain("<TournamentSheetText locale={locale} messages={await tournamentSheetEnglish(locale, true)}>");
     expect(spectator).not.toContain("TournamentPageTextProvider");
     expect(spectator).not.toContain("TournamentActionsTextProvider");
   });

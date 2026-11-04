@@ -53,14 +53,13 @@ export type GoogleProfilePayload = {
  * décider : l'`INSERT` vient de rendre un `insertId`, donc le joueur est neuf.
  *
  * Au meilleur effort et sans être attendue, comme tout le journal : un bot
- * endormi n'allonge pas une connexion et ne la fait pas échouer. `sendBotLog`
- * avale déjà ses erreurs ; le `catch` ne couvre que le rejet qu'une version
- * future pourrait laisser passer, qui deviendrait sinon un rejet non traité.
+ * endormi n'allonge pas une connexion et ne la fait pas échouer — `sendBotLog`
+ * ne fait que ranger la ligne dans son lot, synchrone, et ne lève jamais.
  */
 function announcePlayerSignup(provider: PlayerSignupProvider): void {
   // Ni pseudo ni identifiant : le canal Discord ne nomme aucun joueur
   // (`lib/shared/log-privacy.ts`).
-  void sendBotLog(formatPlayerSignupLog({ provider }), { category: "signups" }).catch(() => undefined);
+  sendBotLog(formatPlayerSignupLog({ provider }), { category: "signups" });
 }
 
 /**

@@ -1,24 +1,50 @@
-import { TournamentActionsTextProvider } from "@/components/i18n/tournament-actions-text";
-import { TournamentPageTextProvider } from "@/components/i18n/tournament-page-text";
+import { TournamentSheetTextGate, type TournamentSheetEnglish } from "@/components/i18n/tournament-sheet-text-gate";
 import { messagesFor } from "@/lib/server/i18n-messages";
+import { englishOnDocumentLoad } from "@/lib/server/layout-messages";
+import type { Messages } from "@/lib/shared/i18n-messages";
 import type { Locale } from "@/lib/shared/locales";
 import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text";
 import { tournamentPageMessages } from "@/lib/shared/tournament-page-text";
+import { tournamentsSharedMessages } from "@/lib/shared/tournaments-text";
+
+function sheetEnglish(messages: Messages): TournamentSheetEnglish {
+  return { page: tournamentPageMessages(messages), actions: tournamentActionsMessages(messages), shared: tournamentsSharedMessages(messages) };
+}
+
+/**
+ * L'anglais de la fiche d'un tournoi que sa mise en page sérialise : l'espace
+ * `tournament` (sans ses parties serveur ni les vues, qui voyagent avec elles),
+ * les gestes (lot 8b : refus, boutons, fenêtres d'action) et les textes communs
+ * avec la liste (`tournamentsSharedMessages`), sous `/en` et
+ * **au seul chargement complet** d'une page — une réponse du routeur
+ * (navigation, préchargement, `router.refresh()` après un geste) n'en porte
+ * aucun, le client gardant celui de la session ou le chargeant par son morceau
+ * (`TournamentSheetTextGate`). Espace connecté : lecteur connecté seulement
+ * (`englishOnDocumentLoad`, la carte « Connexion requise » remplace sinon la
+ * page) ; page sans compte (`spectator`) : **toujours** sous `/en` — son rendu
+ * serveur doit être en anglais pour tout client (robot d'indexation, aperçu de
+ * lien, qui ne disent pas « document »), et sa coquille publique ne doit pas
+ * céder la place à l'écran d'attente lors d'une navigation.
+ */
+export async function tournamentSheetEnglish(locale: Locale, spectator = false): Promise<TournamentSheetEnglish | undefined> {
+  if (!spectator) return englishOnDocumentLoad(locale, sheetEnglish);
+  return locale === "en" ? sheetEnglish(messagesFor("en")) : undefined;
+}
 
 /**
  * Textes de la fiche d'un tournoi, communs à ses deux espaces (connecté et sans
- * compte) : rien en français (déjà dans le paquet), l'espace `tournament` (sans
- * ses parties serveur) et les gestes (lot 8b : refus, boutons, fenêtres
- * d'action) sous `/en` seulement. Un espace de textes ajouté à la fiche
- * s'ajoute ici, et les deux pages le reçoivent.
+ * compte) : rien en français (déjà dans le paquet), l'anglais reçu de
+ * {@link tournamentSheetEnglish} sous `/en`. Un espace de textes ajouté à la
+ * fiche s'ajoute ici, et les deux pages le reçoivent.
  */
-export function TournamentSheetText({ locale, children }: Readonly<{ locale: Locale; children: React.ReactNode }>) {
-  const catalog = locale === "en" ? messagesFor(locale) : null;
+export function TournamentSheetText({
+  locale,
+  messages,
+  children,
+}: Readonly<{ locale: Locale; messages?: TournamentSheetEnglish; children: React.ReactNode }>) {
   return (
-    <TournamentPageTextProvider locale={locale} messages={catalog ? tournamentPageMessages(catalog) : undefined}>
-      <TournamentActionsTextProvider locale={locale} messages={catalog ? tournamentActionsMessages(catalog) : undefined}>
-        {children}
-      </TournamentActionsTextProvider>
-    </TournamentPageTextProvider>
+    <TournamentSheetTextGate locale={locale} messages={messages}>
+      {children}
+    </TournamentSheetTextGate>
   );
 }

@@ -62,4 +62,7 @@ const SAVE_SCORES_ERROR_STATUS: ReadonlyMap<string, number> = new Map([
   // invalide, pas une panne — le contrôle n'est possible qu'une fois le
   // match chargé, donc à l'intérieur du service.
   ["INVALID_FORFEIT_TEAM_ID", 400],
+  // Saisie mal formée (`mapEntryOf`, jugée dès la lecture préalable) : un
+  // corps invalide, pas une panne.
+  ["INVALID_REQUEST", 400],
 ]);

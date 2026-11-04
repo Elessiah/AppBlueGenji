@@ -89,6 +89,7 @@
     "EMPTY_PATCH": "No changes to save.",
     "TOURNAMENT_UPDATE_FAILED": "Error while editing the tournament.",
     "TOURNAMENT_CREATE_FAILED": "The tournament couldn't be created.",
+    "TOURNAMENT_LIST_FAILED": "Couldn't load the tournaments.",
     "ROLLBACK_NOTHING_TO_UNDO": "Nothing left to undo: no score is entered on this board.",
     "ROLLBACK_TOURNAMENT_NOT_STARTED": "The tournament hasn't started yet: it has no round to undo.",
     "ROLLBACK_ROUND_CHANGED": "The current round changed while the dialog was open: the board just refreshed, check the scores again before retrying.",

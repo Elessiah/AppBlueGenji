@@ -103,7 +103,7 @@ describe("doubles SQL", () => {
 
   it("fournit une connexion dont chaque membre est un mock distinct", () => {
     const connection = connectionMock();
-    expect(new Set(Object.values(connection)).size).toBe(6);
+    expect(new Set(Object.values(connection)).size).toBe(7);
     expect(jest.isMockFunction(connection.commit)).toBe(true);
   });
 });

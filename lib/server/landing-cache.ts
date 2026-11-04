@@ -115,5 +115,14 @@ export function invalidateLandingTeamViews(): void {
   invalidateLandingLeaderboards();
   invalidateCached(`${PREFIX}${LANDING_TICKER_KEY}`);
   invalidateLandingCounters();
+  invalidateLandingMiniBrackets();
+}
+
+/**
+ * Oublie les seuls mini-arbres de l'accueil : pour une écriture qui repose des
+ * appariements sans changer aucun résultat — l'annulation d'un abandon
+ * (`FORFEIT_CANCELLATION.md`).
+ */
+export function invalidateLandingMiniBrackets(): void {
   invalidateCachedPrefix(`${PREFIX}${LANDING_MINI_BRACKET_KEY_PREFIX}`);
 }

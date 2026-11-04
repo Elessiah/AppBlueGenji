@@ -1,10 +1,14 @@
 import { itemRoutes } from "@/lib/server/admin-collection-routes";
 import { deleteAboutStat, updateAboutStat } from "@/lib/server/about-stats-service";
 
-/** `valueEn` : absent → `undefined` (conservé) ; présent sans texte → `null` (effacé). */
-function valueEnOf(body: Record<string, unknown>): string | null | undefined {
+/**
+ * `valueEn` : absent → `undefined` (conservé) ; présent → tel quel, et c'est la
+ * validation (`validateAboutStatInput`) qui refuse un type qui n'est pas un
+ * texte (`VALUE_EN_INVALID`) — plutôt que de le lire « vide » et d'effacer.
+ */
+function valueEnOf(body: Record<string, unknown>): unknown {
   if (!("valueEn" in body)) return undefined;
-  return typeof body.valueEn === "string" ? body.valueEn : null;
+  return body.valueEn;
 }
 
 export const { PUT, DELETE } = itemRoutes({

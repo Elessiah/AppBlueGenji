@@ -42,7 +42,8 @@ function pool(select: unknown[], claimed = 1, phases: unknown[] = []) {
 beforeEach(() => {
   jest.clearAllMocks();
   resetRoundMapsNoticeState();
-  jest.mocked(sendBotLog).mockResolvedValue();
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
+  jest.mocked(flushBotLogBatch).mockResolvedValue();
   jest.spyOn(console, "error").mockImplementation(() => undefined);
 });
 
@@ -140,12 +141,6 @@ describe("dispatchDueRoundMapsNotices", () => {
     await expect(dispatchDueRoundMapsNotices()).resolves.toBe(0);
   });
 
-  it("dispatchDueRoundMapsNotices_botFails_stillResolves", async () => {
-    pool([dueRow([R2])]);
-    jest.mocked(sendBotLog).mockRejectedValue(new Error("bot"));
-    await expect(dispatchDueRoundMapsNotices()).resolves.toBe(1);
-  });
-
   it("dispatchDueRoundMapsNotices_unreadablePendingRounds_sendsNothing", async () => {
     pool([{ ...dueRow([]), rounds_json: "oups" }]);
     await expect(dispatchDueRoundMapsNotices()).resolves.toBe(0);
@@ -174,6 +169,12 @@ describe("flushRoundMapsNotice", () => {
     await flushRoundMapsNotice(7);
     expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 7, category: "maps" });
     expect(flushBotLogBatch).toHaveBeenCalledWith({ tournamentId: 7, category: "maps" });
+  });
+
+  it("flushRoundMapsNotice_logBatchFlushNeverEnds_stillResolves", async () => {
+    pool([dueRow([R2])]);
+    jest.mocked(flushBotLogBatch).mockReturnValue(new Promise<void>(() => undefined));
+    await expect(flushRoundMapsNotice(7)).resolves.toBe(true);
   });
 
   it("flushRoundMapsNotice_sweepAlreadyClaimedIt_returnsFalse", async () => {

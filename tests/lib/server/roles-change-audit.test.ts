@@ -17,14 +17,14 @@ describe("publishRolesChange", () => {
     expect(publishStaffAction).toHaveBeenCalledWith(
       ROLES_CHANGE_DISCORD_LINE,
       { id: 1, pseudo: "Test_Admin" },
-      "🛡️ Rôles de plateforme du compte #7 enregistrés : Arbitre.",
+      { auditLine: "🛡️ Rôles de plateforme du compte #7 enregistrés : Arbitre.", category: "admin" },
     );
   });
 
   it("publishRolesChange_ownAccount_pm2LineSaysOwnAccount", () => {
     publishRolesChange({ id: 1, pseudo: "Test_Admin" }, 1, ["ADMIN"]);
 
-    const [, , auditLine] = jest.mocked(publishStaffAction).mock.calls[0];
+    const [, , { auditLine }] = jest.mocked(publishStaffAction).mock.calls[0];
     expect(auditLine).toBe("🛡️ Rôles de plateforme de son propre compte (#1) enregistrés : Administrateur.");
   });
 

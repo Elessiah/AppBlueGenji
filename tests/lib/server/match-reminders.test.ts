@@ -1510,7 +1510,10 @@ describe("messages privés de match coupés par le joueur (droit d'opposition)",
     const calls = jest.mocked(pushDiscordDirectMessages).mock.calls;
     expect(calls).toHaveLength(1);
     expect((calls[0][1] as { label: string }[]).map((r) => r.label)).toEqual(["Kiro", "Ayla"]);
-    expect(jest.mocked(pushToUsers).mock.calls.map((call) => call[0])).toEqual([[1, 2], [3]]);
+    // Les deux engagées partent en même temps : l'ordre des push n'est pas garanti.
+    const pushedTo = jest.mocked(pushToUsers).mock.calls.map((call) => call[0]);
+    expect(pushedTo).toHaveLength(2);
+    expect(pushedTo).toEqual(expect.arrayContaining([[1, 2], [3]]));
   });
 
   it("opposé et sans appareil abonné : plus un destinataire du tout", async () => {

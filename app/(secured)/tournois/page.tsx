@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { localeAlternates, localeHref } from "@/lib/shared/locales";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
+import { getCurrentUser } from "@/lib/server/auth";
+import { can } from "@/lib/shared/permissions";
+import { tournamentsClientMessages } from "@/lib/shared/tournaments-text";
+import { TournamentsTextProvider } from "@/components/i18n/tournaments-text";
 import TournamentsList from "./TournamentsList";
 
 /**
@@ -26,6 +30,20 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function TournamentsPage() {
-  return <TournamentsList />;
+/**
+ * Le droit staff (`tournaments`) se lit ici, sur le serveur, où la mise en page
+ * de l'espace sécurisé l'a déjà résolu (`getCurrentUser` est mémoïsé par
+ * requête) : le client n'a plus à le redemander (`/api/auth/me`), et « Créer »
+ * comme la section des invisibles sont là dès le premier rendu.
+ */
+export default async function TournamentsPage() {
+  const [user, locale] = await Promise.all([getCurrentUser(), requestLocale()]);
+  // Les espaces de la liste, de ses cartes et du bandeau, sous `/en` seulement :
+  // la mise en page ne pose que les espaces communs à toutes les pages.
+  const messages = locale === "en" ? tournamentsClientMessages(messagesFor(locale)) : undefined;
+  return (
+    <TournamentsTextProvider locale={locale} messages={messages}>
+      <TournamentsList canManage={can(user, "tournaments")} />
+    </TournamentsTextProvider>
+  );
 }

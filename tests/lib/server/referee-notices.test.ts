@@ -59,7 +59,7 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(sendBotLog).mockResolvedValue();
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
   jest.mocked(loadNotificationRecipients).mockResolvedValue([RECIPIENT]);
   jest
     .mocked(notifyUsers)

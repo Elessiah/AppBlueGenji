@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
 import {
   LANDING_READ_RULE,
+  MATCH_PROPOSALS_READ_RULE,
   STREAM_OPEN_RULE,
   TOURNAMENT_READ_RULE,
   VISIT_REQUEST_RULE,
@@ -173,6 +174,7 @@ describe("plafonds des routes", () => {
   it("garde des seaux distincts par route", () => {
     const names = [
       TOURNAMENT_READ_RULE,
+      MATCH_PROPOSALS_READ_RULE,
       LANDING_READ_RULE,
       STREAM_OPEN_RULE,
       VISIT_REQUEST_RULE,
@@ -183,7 +185,7 @@ describe("plafonds des routes", () => {
   it("rassemble tous les plafonds au même endroit", () => {
     // Un plafond déclaré dans son fichier de route échapperait à cet inventaire
     // — et donc à toute vérification de cohérence.
-    for (const rule of [TOURNAMENT_READ_RULE, LANDING_READ_RULE, STREAM_OPEN_RULE, VISIT_REQUEST_RULE]) {
+    for (const rule of [TOURNAMENT_READ_RULE, MATCH_PROPOSALS_READ_RULE, LANDING_READ_RULE, STREAM_OPEN_RULE, VISIT_REQUEST_RULE]) {
       expect(rule.limit).toBeGreaterThan(0);
       expect(rule.windowMs).toBeGreaterThan(0);
     }

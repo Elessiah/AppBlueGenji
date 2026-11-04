@@ -14,14 +14,14 @@ const route = read("app/api/tournaments/route.ts");
 
 describe("page tournois — section « Tournois invisibles »", () => {
   it("ne demande les invisibles qu'au staff tournois", () => {
-    expect(page).toContain('fetchBuckets("/api/tournaments?scope=hidden", signal)');
+    expect(page).toContain('fetchBuckets("/api/tournaments?scope=hidden", signal, "no-store")');
     // Un joueur ne déclenche même pas la requête : elle lui serait refusée.
     // Sans permission : la section est vidée et la requête n'est pas envoyée.
     // Le tableau vide n'est réécrit que s'il ne l'est pas déjà, pour ne pas
     // redessiner la page à chaque rafraîchissement de fond.
     expect(page).toMatch(/if \(!isAdmin\) \{[\s\S]{0,400}?setHiddenTournaments\([\s\S]{0,120}?return;\s*\}/);
     // La permission commande le chargement : elle est dans ses dépendances.
-    expect(page).toMatch(/\[isAdmin, showError\],\s*\);/);
+    expect(page).toMatch(/\[isAdmin, router, showError, t\],\s*\);/);
   });
 
   it("charge les invisibles à part de la liste publique", () => {
@@ -30,7 +30,7 @@ describe("page tournois — section « Tournois invisibles »", () => {
     // rafraîchissement de fond), mais elle reste étrangère aux invisibles.
     const start = page.indexOf("const load = useCallback(");
     expect(start).toBeGreaterThan(-1);
-    const end = page.indexOf("[showError, wantFinishedArchive],", start);
+    const end = page.indexOf("[router, showError, t, wantFinishedArchive],", start);
     expect(end).toBeGreaterThan(start);
     const publicLoad = page.slice(start, end);
 
@@ -61,7 +61,7 @@ describe("page tournois — section « Tournois invisibles »", () => {
   it("applique la recherche et le filtre de jeu aux invisibles", () => {
     // La recherche (coûteuse) n'est faite qu'une fois, dans `queryFilteredHidden` ;
     // le filtre de jeu (une comparaison de chaîne) s'applique ensuite par-dessus.
-    expect(page).toContain("filterTournamentsByQuery(viewHidden, query, formatName)");
+    expect(page).toContain("filterTournamentsByQuery(viewHidden, deferredQuery, formatName)");
     expect(page).toContain("filterTournamentsByGame(queryFilteredHidden, gameFilter)");
   });
 
@@ -102,5 +102,60 @@ describe("StateCard", () => {
     expect(stateCard).toMatch(/state === "FINISHED"\) return <FinishedCard/);
     // Défaut : « à venir », l'état de l'immense majorité des tournois invisibles.
     expect(stateCard).toMatch(/return <UpcomingCard t=\{t\}( priority=\{priority\})? \/>;\s*\}/);
+  });
+});
+
+describe("StateCard — rendu non filtré", () => {
+  it("n'est pas sous memo : UpcomingCard juge son visage à l'heure du rendu du parent", () => {
+    expect(stateCard).not.toMatch(/\bmemo\b\(/);
+    expect(stateCard).not.toMatch(/from "react"/);
+    expect(stateCard).toMatch(/export function StateCard\(/);
+  });
+});
+
+describe("page tournois — échecs de lecture de la liste", () => {
+  it("retombe sur un code quand la réponse n'est pas du JSON (page d'erreur du proxy)", () => {
+    expect(page).toMatch(
+      /async function fetchBuckets\([\s\S]{0,900}?await response\.json\(\)\.catch\(\(\) => \(\{\}\)\)[\s\S]{0,300}?"TOURNAMENT_LIST_FAILED"/,
+    );
+  });
+
+  it("vide les invisibles sans toast et fait relire le droit au serveur quand il est refusé", () => {
+    expect(page).toMatch(
+      /if \(code === "FORBIDDEN" \|\| code === "UNAUTHORIZED"\) \{\s*setHiddenTournaments\([^\n]*\);\s*router\.refresh\(\);\s*return;\s*\}/,
+    );
+  });
+
+  it("le droit staff reste celui du serveur : aucun drapeau local qui survivrait à un droit rendu", () => {
+    expect(page).toContain("const isAdmin = canManage;");
+    expect(page).not.toContain("staffRevoked");
+    expect(page).toContain("const router = useLocaleRouter();");
+    // Le droit relu commande aussi « Créer » et la cadence staff.
+    expect(page).toContain("refreshCadenceFor({ isStaff: isAdmin })");
+    expect(page).toMatch(/\{isAdmin && \(/);
+  });
+
+  it("une session partie sur la liste publique fait relire la page, sans toast « réessaie »", () => {
+    expect(page).toMatch(
+      /if \(signal\?\.aborted\) return;[\s\S]{0,200}?if \(\(e as Error\)\.message === "UNAUTHORIZED"\) \{\s*router\.refresh\(\);\s*return;\s*\}\s*if \(silent\) return;/,
+    );
+  });
+
+  it("signale les autres échecs des invisibles par une phrase traduite, sauf en lecture de fond", () => {
+    expect(page).toMatch(/return;\s*\}\s*if \(silent\) return;\s*showError\(t\("list\.hiddenLoadFailed"\)\);/);
+  });
+
+  it("demande les invisibles sans copie gardée par le navigateur, la liste publique en revalidation", () => {
+    expect(page).toContain('const response = await fetch(url, { cache, signal });');
+    expect(page).toContain('cache: "no-cache" | "no-store" = "no-cache",');
+  });
+
+  it("lit « Mes tournois » sans lever d'erreur de syntaxe sur une page d'erreur HTML", () => {
+    expect(page).toMatch(/async function fetchMyTournamentIds\([\s\S]{0,300}?await response\.json\(\)\.catch\(\(\) => \(\{\}\)\)/);
+  });
+
+  it("signale l'échec de la liste par une phrase traduite, jamais par le message brut", () => {
+    expect(page).toMatch(/if \(silent\) return;[\s\S]{0,300}?showError\(t\("list\.loadFailed"\)\);/);
+    expect(page).not.toContain("showError((e as Error).message)");
   });
 });

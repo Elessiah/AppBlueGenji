@@ -32,6 +32,8 @@
       "replayCode": "Replay code",
       "replayCodeOptional": "Replay code (optional)",
       "scoreOf": "Map {index}, score of ",
+      "scoreOfNamed": "Map {index}: {name}, score of ",
+      "scoreOfTiebreak": "Tiebreak map: {name}, score of ",
       "remove": "Remove map {index}",
       "summary": "Match score",
       "violation": {
@@ -49,7 +51,8 @@
         "belowFree": "Incomplete score."
       },
       "tiebreakNamed": "Tiebreak map: {name}",
-      "tiebreakNamedPrefix": "Tiebreak map: {name}, "
+      "tiebreakNamedPrefix": "Tiebreak map: {name}, ",
+      "tiebreakRow": "Map {index}: this is the tiebreak map, {name}."
     },
     "admin": {
       "title": "Match score",

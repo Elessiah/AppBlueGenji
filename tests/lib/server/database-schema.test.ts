@@ -125,7 +125,7 @@ describe("Schéma — les clés primaires portent la phase", () => {
 
 describe("Schéma — les index repliés sont bien là", () => {
   it.each([
-    ["bg_matches", "idx_bg_matches_phase (tournament_id, phase_id)"],
+    ["bg_matches", "idx_bg_matches_phase_round (tournament_id, phase_id, round_number)"],
     ["bg_matches", "idx_bg_matches_live (live_trigger, status)"],
     ["bg_teams", "uniq_bg_teams_tag (tag)"],
     ["bg_teams", "uniq_bg_teams_solo_user (solo_user_id)"],
@@ -238,6 +238,21 @@ describe("Schéma — la règle des deux endroits", () => {
   it("ajoute la valeur anglaise des chiffres de l'association, aux deux endroits", () => {
     expect(table("bg_about_stats")).toMatch(/value_en VARCHAR\(40\) NULL/);
     expect(migrations).toMatch(/ALTER TABLE bg_about_stats ADD COLUMN value_en VARCHAR\(40\) NULL AFTER value/);
+  });
+
+  it("recentSchemaChanges_challengePurpose_tightenedToNotNullAfterLegacyRowsConsumed", () => {
+    // Comme une base neuve : une insertion sans usage échoue aussi en production.
+    const added = migrations.indexOf("ADD COLUMN purpose ENUM('LOGIN', 'HANDLE') NULL");
+    const consumed = migrations.indexOf("SET purpose = 'LOGIN', consumed_at = COALESCE(consumed_at, NOW())");
+    const tightened = migrations.indexOf("MODIFY purpose ENUM('LOGIN', 'HANDLE') NOT NULL");
+    expect(added).toBeGreaterThan(-1);
+    expect(consumed).toBeGreaterThan(added);
+    expect(tightened).toBeGreaterThan(consumed);
+  });
+
+  it("recentSchemaChanges_challengePurpose_legacyRowsKeptForCodeQuotas", () => {
+    // Supprimées, elles remettraient à zéro les plafonds de codes au déploiement.
+    expect(migrations).not.toContain("DELETE FROM bg_discord_login_challenges WHERE purpose IS NULL");
   });
 
   it("porte des instructions entières, et non des triplets table/colonne/type", () => {

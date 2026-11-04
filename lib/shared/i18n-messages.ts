@@ -25,8 +25,12 @@ import type frVolunteers from "@/messages/fr/volunteers.json";
 import type frRecruitment from "@/messages/fr/recruitment.json";
 import type frLegal from "@/messages/fr/legal.json";
 import type frTournaments from "@/messages/fr/tournaments.json";
+import type frTournamentsShared from "@/messages/fr/tournamentsShared.json";
 import type frTournament from "@/messages/fr/tournament.json";
+import type frTournamentServer from "@/messages/fr/tournamentServer.json";
 import type frTournamentViews from "@/messages/fr/tournamentViews.json";
+import type frTournamentEndurance from "@/messages/fr/tournamentEndurance.json";
+import type frTournamentEnduranceChart from "@/messages/fr/tournamentEnduranceChart.json";
 import type frTournamentErrors from "@/messages/fr/tournamentErrors.json";
 import type frTournamentActions from "@/messages/fr/tournamentActions.json";
 import type frTournamentDialogs from "@/messages/fr/tournamentDialogs.json";
@@ -47,7 +51,7 @@ import type frPushMessages from "@/messages/fr/pushMessages.json";
 import type frRoundMaps from "@/messages/fr/roundMaps.json";
 import type frMatchPage from "@/messages/fr/matchPage.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "certifyPrompt", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push", "pushMessages", "roundMaps", "matchPage"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournamentsShared", "tournament", "tournamentServer", "tournamentViews", "tournamentEndurance", "tournamentEnduranceChart", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "certifyPrompt", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push", "pushMessages", "roundMaps", "matchPage"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -79,14 +83,39 @@ export type Messages = {
   legal: typeof frLegal;
   /** Tournois — consultation (lot 8a) : liste, cartes, fiche — `lib/shared/tournaments-text.ts`. */
   tournaments: typeof frTournaments;
+  /**
+   * Textes de la liste que lit aussi la fiche (effectifs, format de match, aide
+   * des règles), dans leur fichier : l'anglais de la fiche ne charge que ceux-là,
+   * sans la liste ni ses cartes — `lib/shared/tournaments-text.ts`.
+   */
+  tournamentsShared: typeof frTournamentsShared;
   /** Fiche d'un tournoi (lot 8a-2) et réglages `?tournoi=` des règles — `lib/shared/tournament-page-text.ts`. */
   tournament: typeof frTournament;
   /**
-   * Vues de la fiche chargées à la demande (suisse, survie, endurance) : un
-   * fichier à part, pour que leur français voyage avec leur morceau et non avec
-   * le premier chargement — `app/(secured)/tournois/[id]/_lib/views-text.ts`.
+   * Parties de la fiche lues côté serveur seulement (`meta`, `settings`,
+   * `share` : titre de repli, réglages des règles, description d'un lien) :
+   * un fichier à part, pour qu'elles ne partent jamais dans le morceau anglais
+   * de la fiche (`components/i18n/tournament-sheet-text-gate.tsx`).
+   */
+  tournamentServer: typeof frTournamentServer;
+  /**
+   * Vues de la fiche chargées à la demande (ronde suisse, survie par coupes) :
+   * un fichier à part, pour que leurs textes voyagent avec leur morceau et non
+   * avec le premier chargement — `app/(secured)/tournois/[id]/_lib/views-text.ts`.
    */
   tournamentViews: typeof frTournamentViews;
+  /**
+   * Vue BlueGenji Survie (espace `endurance`), dans son fichier : ses textes ne
+   * partent qu'avec la vue d'un tournoi `BG_SURVIE` —
+   * `app/(secured)/tournois/[id]/_lib/endurance-text.ts`.
+   */
+  tournamentEndurance: typeof frTournamentEndurance;
+  /**
+   * Graphique d'évolution de BlueGenji Survie (`endurance.chart*`, hors titre du
+   * volet) : ses textes ne partent qu'avec le morceau du graphique, volet
+   * ouvert — `app/(secured)/tournois/[id]/_lib/endurance-chart-text.ts`.
+   */
+  tournamentEnduranceChart: typeof frTournamentEnduranceChart;
   /**
    * Refus des écrans de tournoi (lot 8b) : un code d'API → une phrase. Lu par
    * la fiche, la création et l'édition — `app/(secured)/tournois/[id]/_lib/error-map.ts`.

@@ -394,6 +394,15 @@ listes pour lui.
 colonne de `bg_tournaments`, les inscrites ou le tirage ; `publishScore…Event`
 si elle change un résultat ; `publishMatchUpdatedEvent` sinon.
 
+Deux écritures de score y passent aussi (ERREUR.txt EF-15) : « Enregistrer »
+de l'arbitrage, qui note l'avancement d'un match sans jamais le clore — ni
+classement du site ni statistiques ne comptent un match non `COMPLETED`
+(`playedMatchSql`), et aucun moteur à classement ne le rejoue, si bien que la
+sauvegarde ne lance plus aucune réconciliation —, et l'annulation d'un abandon
+(`FORFEIT_CANCELLATION.md`), qui ne change aucun résultat : instantané, aperçu,
+listes et mini-arbres de l'accueil (son rejeu peut réécrire la manche
+courante), jamais le classement du site, les statistiques ni les leaderboards.
+
 ### L'entretien passif réconcilie ce qu'il tranche
 
 `syncTournamentState` arbitre les reports de score dont le délai a expiré. En

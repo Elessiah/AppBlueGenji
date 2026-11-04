@@ -284,7 +284,7 @@ describe("copie périmée et corps compressé", () => {
 describe("publicTournamentSnapshot", () => {
   it("rend l'instantané public, sans la version des membres", async () => {
     mockedSnapshot.mockResolvedValue(tournamentSnapshot({ version: "membres-v7" }));
-    expect(await publicTournamentSnapshot(5, 0, CLIENT)).not.toHaveProperty("version");
+    expect(await publicTournamentSnapshot(5, 0, CLIENT, () => true)).not.toHaveProperty("version");
   });
 
   it("refus : la copie récente s'il y en a une, sinon null", async () => {
@@ -296,13 +296,60 @@ describe("publicTournamentSnapshot", () => {
     jest.setSystemTime(3_000_000 + 20_000);
     await spendAllTokens();
 
-    expect(await publicTournamentSnapshot(100, 0, CLIENT)).not.toBeNull();
-    expect(await publicTournamentSnapshot(77, 0, CLIENT)).toBeNull();
+    expect(await publicTournamentSnapshot(100, 0, CLIENT, () => true)).not.toBeNull();
+    expect(await publicTournamentSnapshot(77, 0, CLIENT, () => true)).toBeNull();
   });
 
   it("base injoignable : null, sans lever", async () => {
     mockedSnapshot.mockRejectedValue(new Error("ECONNREFUSED"));
-    await expect(publicTournamentSnapshot(5, 0, CLIENT)).resolves.toBeNull();
+    await expect(publicTournamentSnapshot(5, 0, CLIENT, () => true)).resolves.toBeNull();
+  });
+
+  it("publicTournamentSnapshot_freshCopy_doesNotConsultAdmit", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot());
+    await getSpectatorPayload(5, 0, CLIENT);
+    const admit = jest.fn(() => false);
+
+    const actual = await publicTournamentSnapshot(5, 0, CLIENT, admit);
+
+    expect(actual).not.toBeNull();
+    expect(admit).not.toHaveBeenCalled();
+  });
+
+  it("publicTournamentSnapshot_coldAndRefused_returnsNullWithoutLoading", async () => {
+    const admit = jest.fn(() => false);
+
+    const actual = await publicTournamentSnapshot(5, 0, CLIENT, admit);
+
+    expect(actual).toBeNull();
+    expect(admit).toHaveBeenCalledTimes(1);
+    expect(mockedSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("publicTournamentSnapshot_expiredCopyAndRefused_returnsCopyWithoutLoading", async () => {
+    jest.useFakeTimers({ now: 3_000_000, ...FAKE_CLOCK });
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot());
+    await getSpectatorPayload(5, 0, CLIENT);
+    // Échue (15 s au calme), mais dans l'âge déclaré de la copie.
+    jest.setSystemTime(3_000_000 + 20_000);
+    mockedSnapshot.mockClear();
+    const admit = jest.fn(() => false);
+
+    const actual = await publicTournamentSnapshot(5, 0, CLIENT, admit);
+
+    expect(actual).not.toBeNull();
+    expect(admit).toHaveBeenCalledTimes(1);
+    expect(mockedSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("publicTournamentSnapshot_coldAndAdmitted_builds", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot());
+    const admit = jest.fn(() => true);
+
+    const actual = await publicTournamentSnapshot(5, 0, CLIENT, admit);
+
+    expect(actual).not.toBeNull();
+    expect(admit).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -385,8 +432,8 @@ describe("publicTournamentCard", () => {
   it("lit la carte seule, gardée quelques secondes : jamais l'instantané entier", async () => {
     jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 5, name: "Cup" }));
 
-    expect((await publicTournamentCard(5))?.name).toBe("Cup");
-    await publicTournamentCard(5);
+    expect((await publicTournamentCard(5, () => true))?.name).toBe("Cup");
+    await publicTournamentCard(5, () => true);
 
     expect(getVisibleTournamentCard).toHaveBeenCalledTimes(1);
     expect(mockedSnapshot).not.toHaveBeenCalled();
@@ -395,13 +442,72 @@ describe("publicTournamentCard", () => {
   it("ne garde pas un introuvable : un tournoi publié une seconde plus tard s'ouvre aussitôt", async () => {
     jest.mocked(getVisibleTournamentCard).mockResolvedValueOnce(null).mockResolvedValue(tournamentCard({ id: 5 }));
 
-    expect(await publicTournamentCard(5)).toBeNull();
-    expect(await publicTournamentCard(5)).not.toBeNull();
+    expect(await publicTournamentCard(5, () => true)).toBeNull();
+    expect(await publicTournamentCard(5, () => true)).not.toBeNull();
+  });
+
+  it("consulte `admit` seulement avant une lecture en base, une fois pour des lectures en vol ou en cache", async () => {
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 5 }));
+    const admit = jest.fn(() => true);
+
+    await publicTournamentCard(5, admit);
+    await publicTournamentCard(5, admit);
+
+    expect(admit).toHaveBeenCalledTimes(1);
+    expect(getVisibleTournamentCard).toHaveBeenCalledTimes(1);
+  });
+
+  it("refusée par `admit` : null, sans lire la base, et sans garder le refus", async () => {
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 5 }));
+
+    expect(await publicTournamentCard(5, () => false)).toBeNull();
+    expect(getVisibleTournamentCard).not.toHaveBeenCalled();
+    expect(await publicTournamentCard(5, () => true)).not.toBeNull();
+  });
+
+  it("lecture déjà en vol : rejointe sans consulter `admit`, et le refus d'un appelant n'est pas partagé", async () => {
+    let finish: (card: ReturnType<typeof tournamentCard>) => void = (_card) => undefined;
+    jest.mocked(getVisibleTournamentCard).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const first = publicTournamentCard(5, () => true);
+    const admitJoiner = jest.fn(() => false);
+    const joiner = publicTournamentCard(5, admitJoiner);
+    finish(tournamentCard({ id: 5 }));
+    expect((await first)?.id).toBe(5);
+    expect((await joiner)?.id).toBe(5);
+    expect(admitJoiner).not.toHaveBeenCalled();
+  });
+
+  it("copie récente : `admit` n'est pas consulté", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ card: tournamentCard({ id: 5 }) }));
+    await getSpectatorPayload(5, 0, CLIENT);
+    const admit = jest.fn(() => false);
+
+    expect(await publicTournamentCard(5, admit)).not.toBeNull();
+    expect(admit).not.toHaveBeenCalled();
+  });
+
+  it("dépublié : l'éviction vide la carte d'encart (10 s) et la copie (150 s)", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ card: tournamentCard({ id: 5, name: "Avant" }) }));
+    await getSpectatorPayload(5, 0, CLIENT);
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(null);
+
+    invalidateSpectatorSnapshot(5);
+
+    expect(await publicTournamentCard(5, () => true)).toBeNull();
+  });
+
+  it("l'éviction oublie aussi une carte gardée par le cache de carte seul", async () => {
+    jest.mocked(getVisibleTournamentCard).mockResolvedValueOnce(tournamentCard({ id: 5, name: "Gardée" })).mockResolvedValue(null);
+    expect((await publicTournamentCard(5, () => true))?.name).toBe("Gardée");
+
+    invalidateSpectatorSnapshot(5);
+
+    expect(await publicTournamentCard(5, () => true)).toBeNull();
   });
 
   it("rend null quand la base ne répond pas", async () => {
     jest.mocked(getVisibleTournamentCard).mockRejectedValue(new Error("ECONNREFUSED"));
-    expect(await publicTournamentCard(5)).toBeNull();
+    expect(await publicTournamentCard(5, () => true)).toBeNull();
   });
 
   it("préfère la copie récente de la réponse publique, état recalculé depuis les dates", async () => {
@@ -417,7 +523,7 @@ describe("publicTournamentCard", () => {
     await getSpectatorPayload(5, 0, CLIENT);
     jest.mocked(getVisibleTournamentCard).mockClear();
 
-    const card = await publicTournamentCard(5);
+    const card = await publicTournamentCard(5, () => true);
 
     expect(card?.name).toBe("Copie");
     expect(card?.state).toBe("REGISTRATION");

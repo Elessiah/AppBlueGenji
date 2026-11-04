@@ -122,7 +122,7 @@ describe("Phase survie d'un multi-phases", () => {
     expect(survival).toMatch(/export function SurvivalRounds\b/);
     expect(survival).toContain("<SurvivalRounds");
     expect(page).toContain(
-      'const SurvivalRounds = dynamic(() => orReload(import("./SurvivalView").then((m) => m.SurvivalRounds)), { ssr: false });',
+      'const SurvivalRounds = dynamic(() => orReload(withViewText(import("./SurvivalView").then((m) => m.SurvivalRounds), ENGLISH_VIEWS)), { ssr: false });',
     );
   });
 });
@@ -218,7 +218,7 @@ describe("Phase suisse d'un multi-phases", () => {
   it("les rondes sont un export du module de la vue suisse, chargé à la demande", () => {
     expect(swiss).toMatch(/export function SwissRounds\b/);
     expect(page).toContain(
-      'const SwissRounds = dynamic(() => orReload(import("./SwissView").then((m) => m.SwissRounds)), { ssr: false });',
+      'const SwissRounds = dynamic(() => orReload(withViewText(import("./SwissView").then((m) => m.SwissRounds), ENGLISH_VIEWS)), { ssr: false });',
     );
   });
 });

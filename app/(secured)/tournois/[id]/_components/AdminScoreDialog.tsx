@@ -29,7 +29,7 @@ import {
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { MapScoreList, mapFieldIds } from "./MapScoreList";
-import { MapResultList } from "./MatchMapDetails";
+import { MapResultList } from "./MapResultList";
 import mapStyles from "./MatchMapDetails.module.css";
 import {
   isMapTouched,
@@ -69,8 +69,6 @@ interface AdminScoreDialogProps {
   match: BracketMatch;
   /** Détail des propositions en attente (contexte du lecteur, `MAP_SCORES.md`). */
   proposals?: MatchProposalMaps[];
-  /** Relit le contexte du lecteur quand une proposition a changé. */
-  onRefreshProposals?: () => void | Promise<unknown>;
   /** Nom des cartes fixées du match (`matchMapNames`) : « Map 1 : Ilios ». */
   mapNames?: ReadonlyArray<string | null>;
   /** Map de départage du tour (vrai best of 3), `null` sans réglage. */
@@ -80,7 +78,6 @@ interface AdminScoreDialogProps {
 }
 
 const NO_PROPOSALS: MatchProposalMaps[] = [];
-const NO_REFRESH = () => undefined;
 
 /** Résultat déjà enregistré, en une phrase — ou `null` s'il n'y en a pas. */
 function storedResultLabel(text: TournamentDialogsText, match: BracketMatch, team1: string, team2: string): string | null {
@@ -129,6 +126,13 @@ function storedResultLabel(text: TournamentDialogsText, match: BracketMatch, tea
  */
 /** Lignes de maps adressables par `useFieldErrors` — au-delà de tout plafond. */
 const MAP_FIELD_ID_SLOTS = 32;
+
+/**
+ * Table des `id` de champs de maps (32 lignes × 3 champs), calculée une fois au
+ * chargement du module : elle ne dépend de rien, et le dialogue la reconstruisait
+ * à chaque rendu — chaque frappe, chaque trame du flux.
+ */
+const ADMIN_MAP_FIELD_IDS = mapFieldIds("admin-score", MAP_FIELD_ID_SLOTS);
 
 /**
  * Infobulle d'un bouton, dans l'ordre de la phrase sous les boutons : détail
@@ -265,7 +269,6 @@ function PendingReportPanel({ text, pending, team1, team2, paused, loading, adop
 export function AdminScoreDialog({
   match: liveMatch,
   proposals = NO_PROPOSALS,
-  onRefreshProposals = NO_REFRESH,
   mapNames,
   tiebreakMap = null,
   onClose,
@@ -276,7 +279,7 @@ export function AdminScoreDialog({
   const { t } = text;
   // Propositions complétées de leur détail map par map : l'arbitre s'ouvre sur
   // les maps de la proposition unique, et voit celles des deux en désaccord.
-  const match = useProposalMaps(liveMatch, proposals, onRefreshProposals);
+  const { match, proposals: readableProposals } = useProposalMaps(liveMatch, proposals);
   // Aucun score avant le lancement, arbitrage compris (`isScoreEntryOpen`) :
   // la phase suit l'horloge, si bien que le dialogue ouvert sur un match « en
   // attente de départ » s'ouvre de lui-même à l'heure dite.
@@ -285,7 +288,7 @@ export function AdminScoreDialog({
   const scoreEntryClosed = SCORE_ENTRY_CLOSED_PHASES.includes(launchPhase);
   // Déclaré avant le formulaire : un refus de map s'y rattache à son champ.
   // Les `id` couvrent tout plafond de lignes possible (`mapListLimit`).
-  const mapFieldErrors = useFieldErrors<string>({}, mapFieldIds("admin-score", MAP_FIELD_ID_SLOTS));
+  const mapFieldErrors = useFieldErrors<string>({}, ADMIN_MAP_FIELD_IDS);
   const form = useScoreForm(match, {
     scoreEntryClosed,
     onMapRefusal: (field, message) => mapFieldErrors.flag(mapFieldKey(field.index, field.field), message),
@@ -298,7 +301,7 @@ export function AdminScoreDialog({
   // l'arbitre ne doit pas les ressaisir. Les boutons de score attendent qu'il
   // arrive.
   const awaitingDetail =
-    proposalsNeedRefresh(liveMatch, proposals) &&
+    proposalsNeedRefresh(liveMatch, readableProposals) &&
     !form.maps.some(isMapTouched) &&
     form.forfeitTeamId === undefined &&
     !form.doubleForfeit;
@@ -344,6 +347,9 @@ export function AdminScoreDialog({
   // reste lisible et reprenable, et « Enregistrer » la suspend
   // (`SCORE_DISPUTE_LOCK.md` § Arbitre et report seul).
   const pendingReport = pendingReportFor(match, team1, team2);
+  // Libellé du résultat enregistré, calculé une fois par rendu : le rappel sous
+  // les champs et la confirmation d'une correction le lisent tous deux.
+  const storedLabel = storedResultLabel(text, match, team1, team2);
   // Ce qui est en base ne se rappelle que s'il ne se lit pas déjà dans les
   // champs : un match tranché (les champs ne disent pas qui a gagné), une
   // saisie en cours qui recouvre l'ancienne valeur, ou un report suspendu —
@@ -354,7 +360,7 @@ export function AdminScoreDialog({
     isMatchDoubleForfeit(match) ||
     form.dirty ||
     pendingReport !== null
-      ? storedResultLabel(text, match, team1, team2)
+      ? storedLabel
       : null;
   // Avant le lancement, la raison est déjà dite en tête du dialogue : la
   // répéter sous les boutons doublerait la même phrase.
@@ -381,7 +387,6 @@ export function AdminScoreDialog({
   // Correction d'un match déjà tranché : l'écriture attend la confirmation
   // (`scoreCorrectionNeedsConfirmation`), le premier résultat part directement.
   const [confirmingCorrection, setConfirmingCorrection] = useState<"save" | "resolve" | null>(null);
-  const storedLabel = storedResultLabel(text, match, team1, team2);
   // Un autre arbitre écrit pendant qu'on lit la confirmation : l'avertissement
   // de conflit s'affiche dans le dialogue de score, que la confirmation
   // recouvre. On la referme à **chaque** changement du résultat stocké (et non
@@ -520,7 +525,7 @@ export function AdminScoreDialog({
               team1={team1}
               team2={team2}
               paused={match.scoreAutoValidationPaused}
-              loading={proposalsNeedRefresh(liveMatch, proposals)}
+              loading={proposalsNeedRefresh(liveMatch, readableProposals)}
               adopted={form.forfeitTeamId === undefined && !form.doubleForfeit && formHoldsReport(form.maps, pendingReport.report)}
               submitting={form.submitting}
               onAdopt={() => {

@@ -1396,6 +1396,50 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     expect(state.match?.referee_ready_at).toBeNull();
   });
 
+  it("claimMatchCast_designatedReferee_isRegisteredAsCaster", async () => {
+    // Cas de production : l'arbitre désigné qui s'inscrit pour caster son match.
+    state.match = matchState({ referee_user_id: REFEREE });
+    await claimMatchCast(42, REFEREE, true);
+    expect(state.match?.casters).toEqual([{ user_id: REFEREE, stream_id: 1, ready_at: null }]);
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, casterId: REFEREE, replacedCasterId: null });
+  });
+
+  it("claimMatchCast_readyReferee_registersWithoutReadyAndKeepsRefereeReady", async () => {
+    // Le « Prêt » d'arbitre peut dater d'un cycle révolu : il n'est pas recopié.
+    state.match = matchState({ referee_user_id: REFEREE, referee_ready_at: STAMP });
+    await claimMatchCast(42, REFEREE, true);
+    expect(state.match?.casters).toEqual([{ user_id: REFEREE, stream_id: 1, ready_at: null }]);
+    expect(state.match?.referee_ready_at).toBe(STAMP);
+  });
+
+  it("setMatchReady_refereeCaster_setsBothReadiesInOneClick", async () => {
+    state.match = matchState({ referee_user_id: REFEREE, caster_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    await setMatchReady(42, REFEREE, true);
+    expect(casterReadyOf(state)).toBe(STAMP);
+    expect(state.match?.referee_ready_at).toBe(STAMP);
+    expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("releaseMatchCast_refereeCaster_staysRefereeWithReady", async () => {
+    state.match = matchState({ referee_user_id: REFEREE, referee_ready_at: STAMP, caster_user_id: REFEREE, caster_ready_at: STAMP });
+    await releaseMatchCast(42, REFEREE, false);
+    expect(state.match?.casters).toEqual([]);
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+    expect(state.match?.referee_ready_at).toBe(STAMP);
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "RELEASED", matchId: 42, casterId: REFEREE, byStaff: false });
+  });
+
+  it("claimMatchCast_playerWhoIsAlsoReferee_stillRefused", async () => {
+    // Joueur 1 de l'équipe 1, resté inscrit comme arbitre : jouer prime.
+    state.users[1] = { ...refereeUser };
+    state.match = matchState({ referee_user_id: 1 });
+    state.writes = [];
+    await expect(claimMatchCast(42, 1, true)).rejects.toThrow("CASTER_IS_PLAYER");
+    expect(state.match?.casters).toEqual([]);
+    expect(announceCastChange).not.toHaveBeenCalled();
+  });
+
   it("un arbitre qui rejoint une équipe du match sans changer l'appariement n'est plus attendu", async () => {
     state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP });
     state.memberships.push({ userId: REFEREE, teamId: TEAM2, roles: ["DPS"] });

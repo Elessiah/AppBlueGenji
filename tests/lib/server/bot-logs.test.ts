@@ -8,6 +8,8 @@ import { flushBotLogBatch } from "@/lib/server/bot-integration";
 import {
   discardBotLogs,
   flushBotLogs,
+  markResultValidatedByStaff,
+  MAX_PENDING_PER_TRANSACTION,
   queueBotLog,
   resolveBotLogs,
 } from "@/lib/server/tournaments/bot-logs";
@@ -62,7 +64,7 @@ function mockDb(rows: unknown[][]): SqlMock {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(sendBotLog).mockResolvedValue(undefined);
+  jest.mocked(sendBotLog).mockReturnValue(undefined);
 });
 
 describe("file par transaction", () => {
@@ -100,7 +102,7 @@ describe("file par transaction", () => {
     expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("Coup d'envoi");
   });
 
-  it("flushBotLogs_tournamentFinished_flushesTheResultsBatchFirst", async () => {
+  it("flushBotLogs_tournamentFinished_flushesEveryBatchOfTheTournamentFirst", async () => {
     const connection = fakeConnection();
     mockDb([[TOURNAMENT_ROW]]);
     const order: string[] = [];
@@ -115,8 +117,123 @@ describe("file par transaction", () => {
     flushBotLogs(connection);
     await new Promise((resolve) => setImmediate(resolve));
 
-    expect(flushBotLogBatch).toHaveBeenCalledWith({ tournamentId: 12, category: "results" });
+    // Tous les lots du tournoi (résultats, lancement, forfait), pas les seuls résultats.
+    expect(flushBotLogBatch).toHaveBeenCalledWith({ tournamentId: 12 });
     expect(order).toEqual(["flush-results", "send"]);
+  });
+
+  it("flushBotLogs_matchResult_tournamentBatchFlushedBeforeTheResult", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+    const order: string[] = [];
+    jest.mocked(flushBotLogBatch).mockImplementation(async () => {
+      order.push("flush-tournament");
+    });
+    jest.mocked(sendBotLog).mockImplementation(() => {
+      order.push("send");
+    });
+
+    queueBotLog(connection, { kind: "match_finished", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(flushBotLogBatch).toHaveBeenCalledWith({ tournamentId: 12, category: "tournament" });
+    expect(order).toEqual(["flush-tournament", "send"]);
+  });
+
+  it("flushBotLogs_twoCommits_secondLinesWaitForTheFirstCommitsLines", async () => {
+    let releaseTournament: () => void = () => undefined;
+    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
+      params?.[0] === 12
+        ? new Promise((resolve) => {
+            releaseTournament = () => resolve([[TOURNAMENT_ROW]]);
+          })
+        : Promise.resolve([[MATCH_ROW]]),
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const first = fakeConnection();
+    const second = fakeConnection();
+
+    queueBotLog(first, { kind: "tournament_started", tournamentId: 12 });
+    queueBotLog(second, { kind: "match_finished", matchId: 31 });
+    flushBotLogs(first);
+    flushBotLogs(second);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(sendBotLog).not.toHaveBeenCalled();
+
+    releaseTournament();
+    await new Promise((resolve) => setImmediate(resolve));
+    const messages = jest.mocked(sendBotLog).mock.calls.map(([message]) => message);
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toContain("Coup d'envoi");
+    expect(messages[1]).toContain("Match terminé");
+  });
+
+  it("flushBotLogs_tournamentIdReadAsString_batchedInItsTournament", async () => {
+    const connection = fakeConnection();
+    mockDb([[{ ...MATCH_ROW, tournament_id: "12" }]]);
+
+    queueBotLog(connection, { kind: "match_finished", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 12, category: "results" });
+  });
+
+  it("markResultValidatedByStaff_resultLineSaysTheStaffValidatedIt", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+
+    markResultValidatedByStaff(connection, 31);
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("résultat validé par le staff");
+  });
+
+  it("markResultValidatedByStaff_queueFull_validationStillLogged", async () => {
+    const connection = fakeConnection();
+    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(async (_sql, params) =>
+      params?.includes(31) ? [[MATCH_ROW]] : [[]],
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    for (let teamId = 1; teamId <= MAX_PENDING_PER_TRANSACTION; teamId += 1) {
+      queueBotLog(connection, { kind: "forfeit", tournamentId: 12, teamId });
+    }
+
+    markResultValidatedByStaff(connection, 31);
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const messages = jest.mocked(sendBotLog).mock.calls.map(([message]) => message);
+    expect(messages.some((message) => message.includes("résultat validé par le staff"))).toBe(true);
+  });
+
+  it("markResultValidatedByStaff_resultAlreadyQueued_oneLineOnly", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+
+    queueBotLog(connection, { kind: "match_finished", matchId: 31 });
+    markResultValidatedByStaff(connection, 31);
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("résultat validé par le staff");
+  });
+
+  it("discardBotLogs_staffValidation_forgottenWithTheTransaction", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+
+    markResultValidatedByStaff(connection, 31);
+    discardBotLogs(connection);
+    queueBotLog(connection, { kind: "match_finished", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).not.toContain("validé");
   });
 
   it("flushBotLogs_tournamentStarted_noResultsFlush", async () => {
@@ -204,7 +321,9 @@ describe("file par transaction", () => {
   it("n'échoue jamais quand le bot est injoignable", async () => {
     const connection = fakeConnection();
     mockDb([[TOURNAMENT_ROW]]);
-    jest.mocked(sendBotLog).mockRejectedValue(new Error("ECONNREFUSED"));
+    jest.mocked(sendBotLog).mockImplementation(() => {
+      throw new Error("ECONNREFUSED");
+    });
 
     queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
     expect(() => flushBotLogs(connection)).not.toThrow();

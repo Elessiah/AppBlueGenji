@@ -69,7 +69,11 @@ export function useAutoRefresh(
   // rendu ne doit pas relancer le minuteur.
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
-  const lastRunAtRef = useRef(0);
+  // La page a lu sa donnée en se montant : sans cet horodatage, un onglet
+  // ouvert en arrière-plan relançait toutes les lectures à son premier
+  // affichage, quelques secondes après les premières. Un appelant qui ne lit
+  // qu'à l'activation (`runOnEnable`) part de zéro : c'est le hook qui lit.
+  const lastRunAtRef = useRef(runOnEnable ? 0 : Date.now());
   const freshAtRef = useRef(freshAt);
   freshAtRef.current = freshAt;
 
