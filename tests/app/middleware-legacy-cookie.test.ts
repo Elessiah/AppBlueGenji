@@ -139,8 +139,8 @@ describe("middleware — politique CSP selon le serveur de développement", () =
     expect(scriptSrc()).toContain("'strict-dynamic'");
   });
 
-  // Les hôtes viennent de `siteHosts` (`Host`, `X-Forwarded-Host`, URL) et non
-  // du seul `nextUrl.origin`, que `next dev` réécrit en `localhost`.
+  // Les hôtes viennent de `requestHosts` (`Host`, `X-Forwarded-Host`, URL — sans
+  // `APP_URL`) et non du seul `nextUrl.origin`, que `next dev` réécrit en `localhost`.
   const scriptSrcWithHeaders = (headers: Record<string, string>) =>
     (middleware(new NextRequest("https://bluegenji.test/tournois", { headers })).headers.get(CSP_HEADER) ?? "")
       .split("; ")
