@@ -55,7 +55,7 @@ ouvrir de fausse section.
 * Cartes suivantes : …
 
 ## Match casté
-* En direct sur <lien du live>
+* Diffusion : <lien du stream>
 * Invitez les casters inscrits (leurs contacts sont sur la page du match).
 * Triez les joueurs par rôle dans le salon.
 
@@ -113,9 +113,9 @@ Vu de l'engagée du destinataire :
   `DISCORD_MESSAGE_MAX` (2 000), le bloc des cartes cède par paliers de 30
   jusqu'au seul renvoi ; aux longueurs maximales, le message est coupé (« … »).
 - **Match casté**, dès qu'un caster encore éligible est inscrit
-  (`readMatchCasters`) : le **lien du live** quand il est public
+  (`readMatchCasters`) : le **lien de diffusion** (« Diffusion : » / « Stream: », jamais « En direct » : rien n'est encore à l'antenne) quand il est public
   (`firstStreamUrlSql`, `bg_match_streams`, repassé par `normalizeStreamUrl` —
-  tu sinon), l'invitation des casters, et le rappel de trier les joueurs par
+  tu sinon ; signes de mise en forme Discord encodés et lien entre chevrons, `discordUrl`, pour qu'un chemin ne fasse pas de lien masqué), l'invitation des casters, et le rappel de trier les joueurs par
   rôle. Hors Overwatch, où l'on ne s'invite pas par BattleTag, on « prévient »
   les casters au lieu de les « inviter » (décision 35, 2026-10-28 ;
   `battletagRelevantFor`), et le lien de la page ne parle plus de BattleTags.

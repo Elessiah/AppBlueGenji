@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { formatLobbyBriefDm, MAPS_LINE_MAX } from "@/lib/server/tournaments/lobby-brief-dm";
+import { discordUrl, formatLobbyBriefDm, MAPS_LINE_MAX } from "@/lib/server/tournaments/lobby-brief-dm";
 import { GAME_SETTINGS_TEXT, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
 import { GAME_SETTINGS } from "@/lib/shared/match-page";
 import enTournament from "@/messages/en/tournament.json";
@@ -108,15 +108,36 @@ describe("formatLobbyBriefDm", () => {
     expect(referee).toContain("* Invitez les casters inscrits (leurs contacts sont sur la page du match).");
     expect(referee).toContain("* Triez les joueurs par rôle dans le salon.");
     expect(referee).toContain("* Ajoute l'arbitre désigné en jeu : il invitera les joueurs dans le salon.");
-    // Sans live annonçable, aucune ligne « En direct ».
-    expect(referee).not.toContain("En direct");
-    const live = formatLobbyBriefDm(side({ cast: true, streamUrl: "https://twitch.tv/bluegenji" }), URL);
-    expect(live).toContain("* En direct sur https://twitch.tv/bluegenji");
-    expect(formatLobbyBriefDm(side({ cast: true, streamUrl: "https://twitch.tv/bluegenji" }), URL, "en")).toContain(
-      "* Live on https://twitch.tv/bluegenji",
-    );
+    // Sans lien de diffusion public, aucune ligne de diffusion.
+    expect(referee).not.toContain("Diffusion");
     // Un live sans cast inscrit n'ouvre pas la section.
     expect(formatLobbyBriefDm(side({ streamUrl: "https://twitch.tv/bluegenji" }), URL)).not.toContain("## Match casté");
+  });
+
+  it("formatLobbyBriefDm_castWithStream_streamLineFrEnNoLiveWording", () => {
+    const cast = side({ cast: true, streamUrl: "https://twitch.tv/bluegenji" });
+
+    const fr = formatLobbyBriefDm(cast, URL);
+    const en = formatLobbyBriefDm(cast, URL, "en");
+
+    expect(fr).toContain("* Diffusion : <https://twitch.tv/bluegenji>");
+    expect(en).toContain("* Stream: <https://twitch.tv/bluegenji>");
+    // Rien n'est encore à l'antenne quinze minutes avant : jamais « En direct » (CLAUDE.md).
+    expect([fr.includes("En direct"), en.includes("Live on")]).toEqual([false, false]);
+  });
+
+  it("discordUrl_plainUrl_wrappedInAngleBracketsUnchanged", () => {
+    expect(discordUrl("https://twitch.tv/bluegenji")).toBe("<https://twitch.tv/bluegenji>");
+  });
+
+  it("discordUrl_maskedLinkInPath_bracketsAndParensEncoded", () => {
+    expect(discordUrl("https://twitch.tv/[x](https://evil.example)")).toBe(
+      "<https://twitch.tv/%5Bx%5D%28https://evil.example%29>",
+    );
+  });
+
+  it("discordUrl_markdownSigns_eachEncoded", () => {
+    expect(discordUrl("https://twitch.tv/a*_~|\\`b")).toBe("<https://twitch.tv/a%2A%5F%7E%7C%5C%60b>");
   });
 
   it("sans décision d'arbitrage, ne charge personne de créer la partie", () => {

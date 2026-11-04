@@ -127,7 +127,7 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
         "Cartes suivantes : l'équipe qui a gagné la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
     },
     tiebreak: "Map de départage (jouée seulement si la série est à égalité après les 3 maps) : ",
-    live: (url) => `En direct sur ${url}`,
+    live: (url) => `Diffusion : ${url}`,
     inviteCasters: "Invitez les casters inscrits (leurs contacts sont sur la page du match).",
     notifyCasters: "Prévenez les casters inscrits (leurs contacts sont sur la page du match).",
     sortByRole: "Triez les joueurs par rôle dans le salon.",
@@ -167,7 +167,7 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
       WINNER: "Next maps: the team that won the previous map bans first; on a draw, same order as on the previous map.",
     },
     tiebreak: "Tiebreak map (played only if the series is level after the 3 maps): ",
-    live: (url) => `Live on ${url}`,
+    live: (url) => `Stream: ${url}`,
     inviteCasters: "Invite the signed-up casters (their contacts are on the match page).",
     notifyCasters: "Notify the signed-up casters (their contacts are on the match page).",
     sortByRole: "Sort the players by role in the lobby.",
@@ -232,14 +232,29 @@ function mapsBlock(side: LobbyBriefSide, locale: Locale, quote: (name: string) =
   return [`* ${text.map(1, firstMap)}`];
 }
 
-/** La section du cast : le live quand il est public, puis qui inviter. */
+/**
+ * Un lien de diffusion sûr dans un message Discord. Le lien vient d'un caster
+ * (`bg_match_streams`) : `normalizeStreamUrl` ne garde que les hôtes connus,
+ * mais laisse dans le chemin `[ ] ( ) * _ ~ | \` et l'accent grave, que
+ * Discord lirait comme mise en forme — `…/[x](https://ailleurs)` y ferait un
+ * lien masqué vers un autre hôte. Ces signes sont donc encodés (`%XX`, même
+ * adresse pour la plateforme), et le lien est écrit entre chevrons, que l'URL
+ * ne peut pas refermer (`>` y est déjà encodé) : Discord le lit comme un seul
+ * lien, sans aperçu.
+ */
+export function discordUrl(url: string): string {
+  const encoded = url.replace(/[[\]()*_~|\\`<>]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`);
+  return `<${encoded}>`;
+}
+
+/** La section du cast : le lien de diffusion quand il est public, puis qui inviter. */
 function castBlock(side: LobbyBriefSide, locale: Locale): string[] {
   const text = DM_TEXT[locale];
   const invite = battletagRelevantFor(side.game) ? text.inviteCasters : text.notifyCasters;
   return [
     "",
     text.castSection,
-    ...(side.streamUrl ? [`* ${text.live(side.streamUrl)}`] : []),
+    ...(side.streamUrl ? [`* ${text.live(discordUrl(side.streamUrl))}`] : []),
     `* ${invite}`,
     `* ${text.sortByRole}`,
   ];
