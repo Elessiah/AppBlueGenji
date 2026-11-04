@@ -92,8 +92,9 @@ export default async function SpectatorTournamentLayout({
     <TournamentSheetText locale={locale} messages={await tournamentSheetEnglish(locale, true)}>
       <SpectatorViewProvider>
         <PublicPageShell>
-          {relay && <MemberRelay tournamentId={tournamentId} />}
-          <div className="page-shell">{children}</div>
+          {/* Renvoi dû : la fiche publique n'est pas rendue à la place de `children` — elle
+              s'hydratait (SSE, sondage REST) avant que `router.replace` n'ait mené au membre. */}
+          {relay ? <MemberRelay tournamentId={tournamentId} /> : <div className="page-shell">{children}</div>}
         </PublicPageShell>
       </SpectatorViewProvider>
     </TournamentSheetText>

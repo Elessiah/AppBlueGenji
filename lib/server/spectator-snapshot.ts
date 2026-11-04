@@ -32,7 +32,7 @@ import { createHash } from "node:crypto";
 import { refundRateToken, SPECTATOR_REBUILD_RULE, takeRateToken } from "@/lib/server/api-guard";
 import { cached, cachedStale } from "@/lib/server/cache";
 import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
-import { isTournamentSnapshotWarm, spectatorSnapshotCacheKey } from "@/lib/server/tournaments/snapshot";
+import { isTournamentSnapshotWarm, spectatorCardCacheKey, spectatorSnapshotCacheKey } from "@/lib/server/tournaments/snapshot";
 import {
   SPECTATOR_MAX_COPY_AGE_MS,
   spectatorCacheTtlMs,
@@ -287,16 +287,25 @@ export const SPECTATOR_CARD_TTL_MS = 10_000;
  * L'état est **recalculé depuis les dates** à chaque lecture : la copie garde
  * celui de sa construction (jusqu'à 150 s), et un lien partagé juste après
  * l'ouverture des inscriptions ne dirait plus « à venir ». `null` : introuvable,
- * ou base injoignable — l'appelant se rabat sur l'encart général.
+ * lecture refusée par `admit`, ou base injoignable — l'appelant se rabat sur
+ * l'encart général.
+ *
+ * @param admit Appelé **seulement** avant une lecture en base ; `false` : refusée.
  */
-export async function publicTournamentCard(tournamentId: number): Promise<TournamentCard | null> {
+export async function publicTournamentCard(
+  tournamentId: number,
+  admit: () => boolean = () => true,
+): Promise<TournamentCard | null> {
   const copy = staleSpectatorPayload(tournamentId);
   if (copy) return { ...copy.snapshot.card, state: computeTournamentState(copy.snapshot.card) };
   try {
     return await cached(
-      `spectator-card:${tournamentId}`,
+      spectatorCardCacheKey(tournamentId),
       (card: TournamentCard | null) => (card ? SPECTATOR_CARD_TTL_MS : 0),
-      () => getVisibleTournamentCard(tournamentId),
+      // `admit` (le plafond des lectures publiques) n'est consulté qu'ici, quand
+      // la lecture **touche la base** : une carte servie par la copie ou par ce
+      // cache ne prend aucun jeton. Refusé : `null`, jamais gardé (TTL 0).
+      () => (admit() ? getVisibleTournamentCard(tournamentId) : Promise.resolve(null)),
     );
   } catch {
     return null;

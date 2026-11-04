@@ -16,6 +16,7 @@ import { SHARE_ACCENT_COLORS, ShareMotifIcon } from "@/components/og/share-motif
 import { ShareTeamMark } from "@/components/og/share-team-mark";
 import { messagesFor } from "./i18n-messages";
 import { shareCardLogo } from "./share-card-logo";
+import { shareImageOptions } from "./share-card-fonts";
 import { loadSharePodium } from "./share-podium";
 import { cachedShareImage, type ShareImagePool } from "./share-image-cache";
 import { findShareTeam, loadShareTeam, TEAM_SHARE_LOGO_SIZE } from "./share-team";
@@ -125,7 +126,7 @@ export async function buildPageShareImage(key: string, locale: Locale): Promise<
           }
           logoSrc={logoSrc}
         />,
-        { ...SHARE_CARD_SIZE, headers: { "cache-control": PODIUM_CARD_CACHE_CONTROL } },
+        await shareImageOptions({ ...SHARE_CARD_SIZE, headers: { "cache-control": PODIUM_CARD_CACHE_CONTROL } }),
       );
     }
   }
@@ -141,7 +142,7 @@ export async function buildPageShareImage(key: string, locale: Locale): Promise<
           entries={entries}
           logoSrc={logoSrc}
         />,
-        { ...SHARE_CARD_SIZE, headers: { "cache-control": PODIUM_CARD_CACHE_CONTROL } },
+        await shareImageOptions({ ...SHARE_CARD_SIZE, headers: { "cache-control": PODIUM_CARD_CACHE_CONTROL } }),
       );
     }
   }
@@ -157,7 +158,7 @@ export async function buildPageShareImage(key: string, locale: Locale): Promise<
       motif={card.motif ? <ShareMotifIcon motif={card.motif} color={accent} /> : undefined}
       logoSrc={logoSrc}
     />,
-    {
+    await shareImageOptions({
       ...SHARE_CARD_SIZE,
       headers: {
         // Sans podium, la carte du classement attend le prochain ; une équipe
@@ -165,6 +166,6 @@ export async function buildPageShareImage(key: string, locale: Locale): Promise<
         "cache-control":
           key === PODIUM_CARD_KEY || teamId !== null ? PODIUM_CARD_CACHE_CONTROL : STATIC_CARD_CACHE_CONTROL,
       },
-    },
+    }),
   );
 }

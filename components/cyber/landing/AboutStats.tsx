@@ -20,7 +20,16 @@ import styles from "./AboutStats.module.css";
 // l'ouvre, le code de ses champs ne part pas chez les autres visiteurs.
 const AboutStatEditor = dynamic(
   () => orReload(import("./AboutStatEditor").then((m) => m.AboutStatEditor)),
-  { ssr: false },
+  {
+    ssr: false,
+    // Retour visible pendant le chargement du morceau (réseau lent) : sans lui,
+    // le clic sur « Modifier » semblait sans effet. Gestion en français (D4).
+    loading: () => (
+      <output className={styles.editorLoading} lang="fr">
+        Ouverture de l&apos;éditeur…
+      </output>
+    ),
+  },
 );
 
 interface AboutStatsProps {

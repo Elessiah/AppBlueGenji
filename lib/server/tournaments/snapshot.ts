@@ -145,9 +145,20 @@ export function invalidateTournamentSnapshot(tournamentId: number): void {
   invalidateCached(cacheKey(tournamentId));
 }
 
-/** Oublie la réponse publique d'un tournoi : il vient d'être supprimé. */
+/** Clé de la carte d'encart d'un tournoi (`publicTournamentCard`), posée ici pour la même raison. */
+export function spectatorCardCacheKey(tournamentId: number): string {
+  return `spectator-card:${tournamentId}`;
+}
+
+/**
+ * Oublie la réponse publique d'un tournoi **et** sa carte d'encart : il vient
+ * d'être supprimé ou dépublié (`startVisibilityAt` repoussé dans le futur) —
+ * sans cela, son titre et sa description restaient servis en aperçu jusqu'à
+ * 150 s (copie) et 10 s (carte).
+ */
 export function invalidateSpectatorSnapshot(tournamentId: number): void {
   invalidateCached(spectatorSnapshotCacheKey(tournamentId));
+  invalidateCached(spectatorCardCacheKey(tournamentId));
 }
 
 /**

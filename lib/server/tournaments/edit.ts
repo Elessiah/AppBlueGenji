@@ -31,6 +31,7 @@ import {
 } from "./validation";
 import { insertPhases } from "./phases-repository";
 import { publishUpdatedEvent } from "./notifications";
+import { invalidateSpectatorSnapshot } from "./snapshot";
 
 /** Valeurs éditables d'un tournoi. Dates en ISO, comme partout côté client. */
 export type EditableTournamentValues = {
@@ -243,6 +244,14 @@ export async function loadEditableTournament(
 }
 
 /**
+ * Dépublié (visibilité repoussée dans le futur) : la page sans compte ne garde
+ * ni sa réponse publique ni sa carte d'encart (titre, description).
+ */
+function evictIfUnpublished(tournamentId: number, startVisibilityAt: string | undefined): void {
+  if (Date.parse(startVisibilityAt ?? "") > Date.now()) invalidateSpectatorSnapshot(tournamentId);
+}
+
+/**
  * Applique un patch d'édition. Rend le nom du tournoi **d'avant** et celui
  * qu'il vient d'écrire, lus sous le verrou de la ligne : le journal du staff
  * cite l'un et nomme le tournoi sous l'autre, même si un second renommage
@@ -379,6 +388,7 @@ export async function updateTournament(
     connection.release();
   }
 
+  evictIfUnpublished(tournamentId, patch.startVisibilityAt);
   publishUpdatedEvent(tournamentId);
   return { previousName, name };
 }

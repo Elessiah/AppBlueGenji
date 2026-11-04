@@ -173,8 +173,14 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   if (gzipped) {
     // Compressé une fois pour tous ses lecteurs ; Next laisse passer une
     // réponse déjà encodée sans la recompresser.
-    const bytes = await gzippedSpectatorBody(payload);
-    return new Response(bytes, { status: 200, headers: { ...jsonHeaders, "Content-Encoding": "gzip" } });
+    // Une compression qui échoue (mémoire) ne fait pas un 500 non structuré : repli
+    // sur le corps brut, avec l'`ETag` du codage réellement servi.
+    try {
+      const bytes = await gzippedSpectatorBody(payload);
+      return new Response(bytes, { status: 200, headers: { ...jsonHeaders, "Content-Encoding": "gzip" } });
+    } catch {
+      return new Response(payload.body, { status: 200, headers: { ...jsonHeaders, ETag: etagOf(payload, false) } });
+    }
   }
   return new Response(payload.body, { status: 200, headers: jsonHeaders });
 }

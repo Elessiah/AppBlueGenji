@@ -48,8 +48,35 @@ export function cachedRanking<T>(key: string, loader: () => Promise<T>): Promise
 export function invalidateTeamRanking(): void {
   invalidateCachedPrefix(PREFIX);
   invalidateLandingLeaderboards();
-  // Le podium et les cartes nominatives d'aperçu sont rendus depuis ces entrées.
+  // Le podium et les cartes nominatives d'aperçu sont rendus depuis ces entrées,
+  // mais un score ne les vide qu'**au plus une fois par fenêtre** (ci-dessous).
+  invalidateRankingShareImagesForScore();
+}
+
+/** Dernier vidage des PNG d'aperçu pour cause de score (`Date.now()`), 0 = jamais. */
+let lastScoreShareFlushAt = 0;
+
+/**
+ * Vide les PNG d'aperçu tirés du classement, au plus une fois par
+ * {@link RANKING_TTL_MS} pour les **scores**. Un soir de tournoi chargé, chaque
+ * score vidait tous les PNG : les rendus Satori/`sharp` du Raspberry Pi suivaient
+ * le nombre de matchs au lieu d'un par fenêtre. Un PNG gardé après un score non
+ * vidé n'a que l'âge de sa propre échéance (60 s) de retard — la même fenêtre
+ * que l'aperçu avait avant. Les écritures d'**identité** (nom, logo, liste :
+ * {@link invalidateRankingLists}) vident toujours aussitôt, sans passer par ici.
+ */
+function invalidateRankingShareImagesForScore(): void {
+  const now = Date.now();
+  if (lastScoreShareFlushAt !== 0 && now - lastScoreShareFlushAt >= 0 && now - lastScoreShareFlushAt < RANKING_TTL_MS) {
+    return;
+  }
+  lastScoreShareFlushAt = now;
   invalidateRankingShareImages();
+}
+
+/** Remet la fenêtre de vidage à zéro — pour les tests seulement. */
+export function resetScoreShareFlushForTests(): void {
+  lastScoreShareFlushAt = 0;
 }
 
 /**

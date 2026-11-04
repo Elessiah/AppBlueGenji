@@ -131,9 +131,10 @@
   color: var(--pink-400);
 }
 
+/* Entre les victoires et les défaites : « 3–1 N–2 ». */
 .draws {
   color: var(--ink-dim);
-  margin-left: 6px;
+  white-space: nowrap;
 }
 
 .empty {
