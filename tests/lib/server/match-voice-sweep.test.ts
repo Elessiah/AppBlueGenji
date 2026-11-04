@@ -190,6 +190,23 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toHaveLength(1);
   });
 
+  it("dispatchMatchVoiceChannels_releaseRefusedByBot_continuesWithNextRow", async () => {
+    const { writes } = database({
+      releasable: [
+        { match_id: 42, team_id: 1, channel_id: "901", tournament_id: 7 },
+        { match_id: 43, team_id: 1, channel_id: "902", tournament_id: 7 },
+      ],
+    });
+    jest
+      .mocked(releaseVoiceChannel)
+      .mockResolvedValueOnce({ kind: "failed", code: "VOICE_DISCORD_REFUSED" })
+      .mockResolvedValue({ kind: "ok", value: true });
+    await dispatchMatchVoiceChannels();
+    expect(releaseVoiceChannel).toHaveBeenCalledTimes(2);
+    expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toHaveLength(1);
+    expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()")).map((w) => w.params)).toEqual([[43, 1]]);
+  });
+
   it("dispatchMatchVoiceChannels_releaseNotTracked_marksReleased", async () => {
     const { writes } = database({ releasable: [releasable] });
     jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "gone", code: "VOICE_CHANNEL_NOT_TRACKED" });
@@ -523,6 +540,18 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
       .mockResolvedValueOnce({ kind: "failed", code: "BOT_INTERNAL_UNREACHABLE" })
       .mockResolvedValue({ kind: "ok", value: "901" });
     await dispatchMatchVoiceChannels();
+    await dispatchMatchVoiceChannels(true);
+    expect(ensureVoiceChannel).toHaveBeenCalledTimes(2);
+  });
+
+  it("dispatchMatchVoiceChannels_recheckRefusedForOneChannel_checksTheOthersAndKeepsStamp", async () => {
+    database({ openDue: openRows(2) });
+    jest
+      .mocked(ensureVoiceChannel)
+      .mockResolvedValueOnce({ kind: "failed", code: "VOICE_PERMISSION_DENIED" })
+      .mockResolvedValue({ kind: "ok", value: "90" });
+    await dispatchMatchVoiceChannels();
+    expect(ensureVoiceChannel).toHaveBeenCalledTimes(2);
     await dispatchMatchVoiceChannels(true);
     expect(ensureVoiceChannel).toHaveBeenCalledTimes(2);
   });
