@@ -7,8 +7,9 @@ import { can } from "@/lib/shared/permissions";
 
 /**
  * Salons vocaux d'équipe d'un match (`docs/features/MATCH_VOICE.md`) : l'état
- * de chaque salon, jamais qui s'y trouve ni combien — la porte REST de `TournamentMatch.voice`, que la page du match relit flux
- * coupé seulement. Connecté seulement.
+ * de chaque salon, jamais qui s'y trouve ni combien — la porte REST de
+ * `TournamentMatch.voice`, que la page du match relit flux coupé seulement.
+ * Connecté seulement.
  *
  * La lecture ne sollicite jamais le bot : elle relance le balayage (étranglé),
  * qui crée ou rend les salons et publie un changement par le flux.

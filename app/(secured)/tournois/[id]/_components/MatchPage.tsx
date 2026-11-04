@@ -712,8 +712,9 @@ function VoiceSection({ voice, sides }: Readonly<{ voice: MatchVoiceInfo; sides:
           <p>{page.t("voice.hint", { capacity: VOICE_CHANNEL_CAPACITY })}</p>
         </InfoHint>
       </InfoHintRow>
-      {/* Une seule zone vivante, toujours montée : un texte changé dans une
-          zone déjà présente est annoncé (monté avec son texte, il ne l'est pas). */}
+      {/* Une seule zone vivante pour les deux salons : un état qui change dans
+          la section déjà présente est annoncé ; l'apparition de la section
+          elle-même (région montée avec son texte) ne l'est pas, voulu. */}
       <div aria-live="polite" aria-atomic="false">
         <ul className={styles.voiceList}>
           {sides.map((pageSide) => {
