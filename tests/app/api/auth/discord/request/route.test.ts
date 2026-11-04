@@ -149,7 +149,7 @@ describe("POST /api/auth/discord/request", () => {
 
   it("efface le code mort-né quand l'envoi échoue", async () => {
     // **Rendre au code déjà reçu sa place de dernier.**
-    // `verifyDiscordChallenge` ne lit que le dernier émis : laissée en base, la
+    // Seul le dernier défi émis vaut (`consumeDiscordLoginChallenge`) : laissée en base, la
     // ligne dont le message privé n'est jamais parti ferait refuser le code que
     // le joueur tient de sa demande précédente — et lui brûlerait ses cinq
     // essais sur la mauvaise ligne.

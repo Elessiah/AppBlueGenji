@@ -240,14 +240,19 @@ describe("Schéma — la règle des deux endroits", () => {
     expect(migrations).toMatch(/ALTER TABLE bg_about_stats ADD COLUMN value_en VARCHAR\(40\) NULL AFTER value/);
   });
 
-  it("recentSchemaChanges_challengePurpose_tightenedToNotNullAfterLegacyRowsDropped", () => {
+  it("recentSchemaChanges_challengePurpose_tightenedToNotNullAfterLegacyRowsConsumed", () => {
     // Comme une base neuve : une insertion sans usage échoue aussi en production.
     const added = migrations.indexOf("ADD COLUMN purpose ENUM('LOGIN', 'HANDLE') NULL");
-    const dropped = migrations.indexOf("DELETE FROM bg_discord_login_challenges WHERE purpose IS NULL");
+    const consumed = migrations.indexOf("SET purpose = 'LOGIN', consumed_at = COALESCE(consumed_at, NOW())");
     const tightened = migrations.indexOf("MODIFY purpose ENUM('LOGIN', 'HANDLE') NOT NULL");
     expect(added).toBeGreaterThan(-1);
-    expect(dropped).toBeGreaterThan(added);
-    expect(tightened).toBeGreaterThan(dropped);
+    expect(consumed).toBeGreaterThan(added);
+    expect(tightened).toBeGreaterThan(consumed);
+  });
+
+  it("recentSchemaChanges_challengePurpose_legacyRowsKeptForCodeQuotas", () => {
+    // Supprimées, elles remettraient à zéro les plafonds de codes au déploiement.
+    expect(migrations).not.toContain("DELETE FROM bg_discord_login_challenges WHERE purpose IS NULL");
   });
 
   it("porte des instructions entières, et non des triplets table/colonne/type", () => {

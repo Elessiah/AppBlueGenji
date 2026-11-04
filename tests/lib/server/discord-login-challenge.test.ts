@@ -402,7 +402,7 @@ describe("createDiscordLoginChallenge — nombre de codes délivrables", () => {
   });
 
   it("ne périme **pas** les codes précédents : il n'y a rien à écrire", async () => {
-    // `verifyDiscordChallenge` ne lit que le dernier émis : le précédent est
+    // Seul le dernier défi émis vaut (`consumeDiscordLoginChallenge`) : le précédent est
     // déjà inatteignable, marquer son `consumed_at` ne changerait rien
     // d'observable. Les périmer *avant* l'envoi laissait en revanche le joueur
     // sans code du tout quand le bot était injoignable.
@@ -605,7 +605,7 @@ describe("consumeDiscordLoginChallenge — usage du code (EF-14)", () => {
   });
 
   it("verifyDiscordChallenge_accountRead_scopedToLoginPurpose", async () => {
-    // Un code de certification plus récent ne masque pas le code de connexion du même compte.
+    // La lecture par compte ne prend que les défis de connexion (filtre `purpose` dans la requête).
     const { execute } = fakeDb(pendingChallenge());
 
     await expect(verifyDiscordChallenge("123", "424242")).resolves.toBe(true);
