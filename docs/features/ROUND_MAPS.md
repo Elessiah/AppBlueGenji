@@ -138,7 +138,7 @@ série est à égalité après les trois maps régulières, sinon inutilisée.
   elle ne déciderait rien). **Aucune règle de score ne change** (`MAP_SCORES.md`) :
   cette ligne existait déjà (map nulle rejouée) et le vainqueur doit toujours atteindre deux
   maps ; les rejeux des classements sont intacts.
-- **Brief du salon** : ligne « Map de départage (jouée seulement si la série est à
+- **Check-in du match** : ligne « Map de départage (jouée seulement si la série est à
   égalité après les 3 maps) : « … » » (FR / EN, `briefTiebreakMap`), sans pseudo.
 - **Bans** (choix documenté, règlement §10 inchangé) : la map de départage suit
   la règle des cartes suivantes du tournoi (`next_ban_rule`, par défaut le
@@ -233,11 +233,12 @@ au pool.
   `DELETE … WHERE changes = ?` : pas de doublon, pas de changement perdu.
 - Journal du staff anonyme (`formatRoundMapsSummaryLog`, `formatMapRulesLog`, choix
   `MAP_PICKED*` de `referee-notices`) : aucune personne nommée.
-- Brief du salon (`MATCH_LOBBY_BRIEF.md`) : ligne « Cartes : » quand la manche
-  est réglée, ordre des bans de la carte 1, règle des cartes suivantes. La ligne
-  des cartes est coupée à un créneau entier au-delà de `MAPS_LINE_MAX` (700
-  caractères) et renvoie à la page du match : neuf pools de vingt cartes
-  dépasseraient les 2 000 caractères d'un message Discord.
+- Check-in du match (`MATCH_LOBBY_BRIEF.md`) : bloc « Déroulé des maps » quand la manche
+  est réglée, ordre des bans de la carte 1, règle des cartes suivantes. Le bloc
+  des cartes est coupé à un créneau entier au-delà de `MAPS_LINE_MAX` (420
+  caractères, abaissé avec la fusion du check-in, plus long qu'un brief) et
+  renvoie à la page du match : neuf pools de vingt cartes dépasseraient les
+  2 000 caractères d'un message Discord.
 - L'instantané lit les règles de ban avec la ligne du tournoi qu'il charge déjà
   (`loadMapRules(connection, id, tournamentRow)`) ; `applyMapRules` indexe les
   tours (`roundKeyId`) au lieu d'un parcours par match.

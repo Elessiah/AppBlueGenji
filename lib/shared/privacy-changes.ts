@@ -1579,6 +1579,24 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui reste : pour savoir si un salon est vide et le supprimer, le bot tient toujours en mémoire, sans l'enregistrer, l'état vocal des membres du serveur Discord de l'association ; rien de nouveau n'est collecté. C'est toujours au titre de l'intérêt légitime (bon déroulement des tournois).",
     ],
   },
+  {
+    // MATCH-CHECKIN (décisions de l'utilisateur du 2026-11-04) : le brief du
+    // salon et le rappel des règles de l'autogestion fusionnent en un seul
+    // message, le « check-in du match », envoyé 15 minutes avant le coup
+    // d'envoi (à défaut d'horaire, à l'ouverture du salon) et à **tous les
+    // joueurs** des deux engagées, et non plus aux seuls gestionnaires : les
+    // destinataires s'élargissent et le moment change, donc à annoncer.
+    id: "2026-11-check-in-du-match",
+    publishedAt: "2026-11-06",
+    title: "Check-in du match : un seul message, 15 minutes avant, à tous les membres des engagées",
+    links: [MATCH_DM_PARAGRAPH_LINK],
+    summary:
+      "Le message des réglages du salon devient le « check-in du match » : il part désormais 15 minutes avant le coup d'envoi, et à tous les membres des deux engagées — plus seulement à qui gère une équipe.",
+    details: [
+      "Ce qui change : le moment (15 minutes avant le coup d'envoi, au lieu de l'ouverture du salon — sauf si le salon ouvre plus tôt, et pour un match sans horaire, qui gardent l'ouverture du salon) et les destinataires (tous les membres des deux engagées — joueurs, coachs et managers compris —, et plus seulement leurs propriétaires et managers). Le message dit aussi de rejoindre le salon vocal de son équipe et le salon de check-in, les paramètres de partie, le déroulé des maps, le lien de diffusion du match s'il est public, le rappel de saisir les scores et à qui signaler un problème.",
+      "Ce qui ne change pas : il ne contient toujours ni BattleTag, ni tag Discord, ni pseudo de joueur (en tournoi individuel, il dit « toi » et « ton adversaire ») ; le message privé ne part qu'à un tag Discord certifié et se coupe, comme les autres messages de match, par la case « Messages privés Discord de mes matchs » de « Mon profil » ; le sujet de la notification push, « Réglages du salon », devient « Check-in du match » : actif par défaut sur un appareil abonné, il se coupe dans « Mon profil ».",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

@@ -8,7 +8,7 @@
     "bodyLaunched": "{pairing} · {tournament}. Have a good game!"
   },
   "lobbyBrief": {
-    "title": "Lobby open: match settings",
+    "title": "Match check-in: settings",
     "titleLaunched": "Match started: game settings",
     "body": "Left (host): {left} · Right (1st ban): {right} · 1st map: {map}.",
     "bodyCast": "Cast match: sort the players by role. Left (host): {left} · Right (1st ban): {right} · 1st map: {map}.",

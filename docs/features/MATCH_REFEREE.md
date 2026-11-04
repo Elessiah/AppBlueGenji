@@ -35,7 +35,7 @@ ni BattleTag ni « ajoute-le en jeu » (décision 35) et **aucun Battle.net
 demandé** (décision de l'utilisateur, 2026-11-03 : même règle pour caster,
 `castBlockReason`). Le jeu est celui du tournoi du match
 (`LaunchMatchBaseRow.tournament_game`, `MatchCastExtras.game`) ; les lectures
-par lot (`readMatchCasters`, brief du salon) se font par jeu. Conditions
+par lot (`readMatchCasters`, check-in du match) se font par jeu. Conditions
 relues en base à chaque geste (`loadRefereeEligibility`, jamais les rôles d'une
 session). Il **peut caster** le match, il **ne peut pas le jouer**
 (`REFEREE_IS_PLAYER`) : l'inscription comme caster ne refuse que qui joue le
@@ -136,7 +136,7 @@ n'arrête pas les autres ; il est compté, et la route répond 500
 relit l'opposition sous le verrou du match (ordre match puis compte, celui de
 `writeReferee`) : levée pendant le balayage, elle ne retire plus rien.
 L'instantané (`refereeKept`, jointure `referee_objection_at`), la lecture de la
-modale (`keepEligibleReferees`) et le brief du salon (`loadEligibleRefereeIds`)
+modale (`keepEligibleReferees`) et le check-in du match (`loadEligibleRefereeIds`)
 relisent aussi l'opposition : un balayage resté incomplet ne laisse pas
 l'arbitre visible d'un match à jouer — ni rôle `MATCH_REFEREE`, ni contacts
 des casters, ni nom aux parties —, et la lecture de la modale rattrape le
@@ -240,9 +240,11 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
 
 ## Annonces
 
-- **Brief du salon** aux propriétaires et managers des deux engagées, à
-  l'ouverture du salon : hôte à gauche, droite, première carte, premier ban,
-  tri par rôle si casté, arbitre désigné ou autogestion (`MATCH_LOBBY_BRIEF.md`).
+- **Check-in du match** à tous les joueurs des deux engagées, 15 minutes avant
+  le coup d'envoi (à défaut d'horaire, à l'ouverture du salon) : vocal d'équipe
+  et salon de check-in, hôte à gauche, droite, qui crée la partie, paramètres
+  de partie, déroulé des maps et bans, cast, saisie des scores
+  (`MATCH_LOBBY_BRIEF.md`).
 
 - **Journal du staff** (`formatRefereeChangeLog`) : prise, désignation,
   remplacement, retrait (par lui-même, par le staff, d'office), autogestion,

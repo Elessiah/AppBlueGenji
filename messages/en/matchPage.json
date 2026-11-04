@@ -37,7 +37,8 @@
     "maps": "Maps and bans",
     "officiating": "Officiating",
     "casts": "Casts",
-    "connection": "Connection info"
+    "connection": "Connection info",
+    "gameSettings": "Game settings"
   },
   "voice": {
     "title": "Voice channels",

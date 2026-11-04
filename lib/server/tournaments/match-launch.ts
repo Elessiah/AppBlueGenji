@@ -233,8 +233,15 @@ async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchR
   // repartiraient à la réouverture — comme pour un lancement défait.
   // Première adoption (empreinte vide) : aucune réservation n'a pu être posée,
   // et le DELETE prendrait un verrou d'intervalle inutile sous le verrou du match.
+  // Le check-in de l'appariement qui arrive, déjà parti 15 minutes avant
+  // l'horaire (avant toute ouverture, `./lobby-brief`), reste réservé : sinon il
+  // repartirait à l'ouverture du salon.
   if (row.launch_pairing !== null) {
-    await connection.execute(`DELETE FROM bg_match_start_notices WHERE match_id = ?`, [row.id]);
+    await connection.execute(
+      `DELETE FROM bg_match_start_notices
+       WHERE match_id = ? AND NOT (pairing = ? AND phase IN ('LOBBY_BRIEF_1', 'LOBBY_BRIEF_2'))`,
+      [row.id, key],
+    );
   }
   row.launch_pairing = key;
   row.lobby_opened_at = null;

@@ -477,28 +477,31 @@ describe("page d'un match — arbitrage × lecteur", () => {
       expect(html).toContain("Juge#3333");
       expect(visible(html)).toContain("À ajouter en ami");
       expect(html).not.toContain("À inviter dans la partie");
-      expect(html).not.toContain("Killcam");
+      // Arbitre désigné : pas d'aide-mémoire d'autogestion (les paramètres de
+      // partie, eux, ont leur section et restent lus).
+      expect(html).not.toContain("Réglez les paramètres de la partie.");
     }
   });
 
-  it("autogestion Overwatch : les trois réglages en sous-liste de l'étape des paramètres", () => {
+  it("les paramètres de partie ont leur section, pour tout le monde et pour tous les jeux", () => {
+    // Lus sans compte comme par un joueur, en Overwatch comme en Marvel Rivals.
+    for (const viewer of ["public", "other", "player", "staff"] as const) {
+      const html = visible(render(match(), viewer));
+      expect(html).toContain("Paramètres de partie Paramètres compétitifs Killcam désactivée Pause lors de la déconnexion d'un joueur");
+    }
+    const mr = visible(render(match(), "player", false, "fr", EMPTY_MAP_RULES, "MR"));
+    expect(mr).toContain("Paramètres de partie Paramètres compétitifs Killcam désactivée");
+  });
+
+  it("les paramètres de partie en anglais", () => {
+    const html = visible(render(match(), "player", false, "en"));
+    expect(html).toContain("Game settings Competitive settings Killcam disabled Pause when a player disconnects");
+  });
+
+  it("l'étape des paramètres ne répète pas la liste : la section la porte une seule fois", () => {
     const html = render(match({ selfManaged: true }), "player");
-    const nested = /Réglez les paramètres de la partie\.\s*<ul[^>]*>(.*?)<\/ul>/.exec(html);
-    expect(nested).not.toBeNull();
-    expect(visible(nested?.[1] ?? "")).toBe(
-      " Paramètres compétitifs Killcam désactivée Pause lors de la déconnexion d'un joueur ",
-    );
-  });
-
-  it("autogestion Overwatch en anglais : les trois réglages traduits", () => {
-    const html = visible(render(match({ selfManaged: true }), "player", false, "en"));
-    expect(html).toContain("Competitive settings Killcam disabled Pause when a player disconnects");
-  });
-
-  it("autogestion Marvel Rivals : l'étape reste, sans la sous-liste Overwatch", () => {
-    const html = visible(render(match({ selfManaged: true }), "player", false, "fr", EMPTY_MAP_RULES, "MR"));
-    expect(html).toContain("Réglez les paramètres de la partie.");
-    expect(html).not.toContain("Killcam");
+    expect(/Réglez les paramètres de la partie\.\s*<ul[^>]*>/.test(html)).toBe(false);
+    expect(visible(html).match(/Paramètres compétitifs/g)).toHaveLength(1);
   });
 
   it("autogestion : l'aide-mémoire pour qui organise le match, l'invitation des casters avec un caster", () => {
@@ -521,7 +524,8 @@ describe("page d'un match — arbitrage × lecteur", () => {
       // La description neutre des faits clés, pas les consignes à l'impératif.
       expect(html).toContain("Autogestion");
       expect(html).not.toContain("Réglez les paramètres de la partie.");
-      expect(html).not.toContain("Killcam");
+      // Les paramètres de partie restent lus : ils ne sont pas une consigne d'organisation.
+      expect(html).toContain("Paramètres de partie");
     }
   });
 

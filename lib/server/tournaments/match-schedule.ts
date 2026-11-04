@@ -393,6 +393,16 @@ export async function setMatchStartAt(
         await connection.execute(`DELETE FROM bg_match_start_notices WHERE match_id = ?`, [matchId]);
       }
       const previousStartAt = toIso(row.start_at);
+      // Nouvelle heure sans salon ouvert : le check-in parti 15 minutes avant
+      // l'ancienne (`./lobby-brief`) est rendu, pour repartir avant la nouvelle.
+      if (!leaving && previousStartAt !== startAt) {
+        await connection.execute(
+          `DELETE FROM bg_match_start_notices
+           WHERE match_id = ? AND phase IN ('LOBBY_BRIEF_1', 'LOBBY_BRIEF_2')
+             AND EXISTS (SELECT 1 FROM bg_matches m WHERE m.id = ? AND m.lobby_opened_at IS NULL)`,
+          [matchId, matchId],
+        );
+      }
       const told =
         previousStartAt === startAt
           ? NOTHING_TOLD

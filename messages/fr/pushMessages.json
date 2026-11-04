@@ -8,7 +8,7 @@
     "bodyLaunched": "{pairing} · {tournament}. Bonne partie !"
   },
   "lobbyBrief": {
-    "title": "Salon ouvert : réglages du match",
+    "title": "Check-in du match : réglages",
     "titleLaunched": "Match lancé : réglages de la partie",
     "body": "Gauche (hôte) : {left} · Droite (1er ban) : {right} · 1re carte : {map}.",
     "bodyCast": "Match casté : trie les joueurs par rôle. Gauche (hôte) : {left} · Droite (1er ban) : {right} · 1re carte : {map}.",

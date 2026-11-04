@@ -580,14 +580,17 @@ describe("setMatchReady — appariement réécrit sur place", () => {
     expect(state.match?.launched_at).toBeNull();
   });
 
-  it("adoptCurrentPairing_pairingChanged_startNoticeClaimsOfTheMatchDeleted", async () => {
+  it("adoptCurrentPairing_pairingChanged_deletesAllButCurrentPairingCheckIn", async () => {
     // A:B → A:C → A:B : les réservations de l'appariement qui revient ne doivent
-    // pas faire taire l'appel aux « Prêt » ni le brief du salon.
+    // pas faire taire l'appel aux « Prêt » ; son check-in, parti 15 minutes avant
+    // l'horaire, reste réservé pour ne pas repartir à l'ouverture du salon.
     state.match = matchState({ launch_pairing: `${TEAM1}:30` });
 
     await setMatchReady(42, 1, true);
 
-    expect(state.writes).toContain("DELETE FROM bg_match_start_notices WHERE match_id = ? [42]");
+    expect(state.writes).toContain(
+      `DELETE FROM bg_match_start_notices WHERE match_id = ? AND NOT (pairing = ? AND phase IN ('LOBBY_BRIEF_1', 'LOBBY_BRIEF_2')) [42,"${TEAM1}:${TEAM2}"]`,
+    );
   });
 
   it("adoptCurrentPairing_firstAdoption_noStartNoticeDelete", async () => {

@@ -254,13 +254,15 @@
   font-size: 13px;
 }
 
-.stepSettings {
-  margin: 4px 0 0;
+/* Paramètres de partie : la liste de la section, lue par tout le monde. */
+.gameSettings {
+  margin: 0;
   padding-left: 18px;
   list-style: disc;
   display: grid;
-  gap: 2px;
-  color: var(--ink-mute);
+  gap: 4px;
+  color: var(--ink-soft);
+  font-size: 13px;
 }
 
 .streams {
