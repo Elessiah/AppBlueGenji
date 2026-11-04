@@ -43,6 +43,15 @@ describe("bot-integration — salons vocaux", () => {
     await expect(releaseVoiceChannel("123456789")).resolves.toMatchObject({ kind: "failed" });
   });
 
+  it("releaseVoiceChannel_nonStringErrorCode_returnsFallbackCode", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(json(500, { error: { code: "X" } }));
+    const outcome = await releaseVoiceChannel("123456789");
+    // Ni TypeError, ni panne de transport inventée : un refus avec un code en chaîne.
+    expect(outcome.kind).toBe("failed");
+    expect(outcome).not.toEqual({ kind: "failed", code: "BOT_INTERNAL_UNREACHABLE" });
+    expect(typeof (outcome as { code: unknown }).code).toBe("string");
+  });
+
   it("releaseVoiceChannel_unreachable_returnsFailed", async () => {
     jest.spyOn(global, "fetch").mockRejectedValue(new TypeError("fetch failed"));
     await expect(releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "failed", code: "BOT_INTERNAL_UNREACHABLE" });

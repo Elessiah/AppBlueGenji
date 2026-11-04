@@ -133,6 +133,14 @@ describe("dispatchMatchVoiceChannels — création", () => {
     expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
   });
 
+  it("dispatchMatchVoiceChannels_botInternalErrorOnCreate_stopsRemainingCalls", async () => {
+    // Erreur du bot hors route (`INTERNAL_ERROR`) : le bot entier est en panne, pas un salon.
+    database({ due: [dueMatch, { ...dueMatch, id: 43 }] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "INTERNAL_ERROR" });
+    await dispatchMatchVoiceChannels();
+    expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
+  });
+
   it("dispatchMatchVoiceChannels_botDownOnCreate_skipsRecheckButStillReleases", async () => {
     const { execute } = database({ due: [dueMatch], openDue: [{ match_id: 9, team_id: 1, channel_id: "5", tournament_id: 7, team_name: "Gamma" }] });
     jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "BOT_VOICE_TIMEOUT" });
@@ -231,6 +239,20 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toHaveLength(1);
   });
 
+  it("dispatchMatchVoiceChannels_releaseRouteMissing_stopsReleasePass", async () => {
+    // Bot d'une autre version sans la route : la passe s'arrête, aucune ligne n'est close.
+    const { writes } = database({
+      releasable: [
+        { match_id: 42, team_id: 1, channel_id: "901", tournament_id: 7 },
+        { match_id: 43, team_id: 1, channel_id: "902", tournament_id: 7 },
+      ],
+    });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "failed", code: "INTERNAL_ROUTE_NOT_FOUND" });
+    await dispatchMatchVoiceChannels();
+    expect(releaseVoiceChannel).toHaveBeenCalledTimes(1);
+    expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()"))).toEqual([]);
+  });
+
   it("dispatchMatchVoiceChannels_releaseRefusedByBot_continuesWithNextRow", async () => {
     const { writes } = database({
       releasable: [
@@ -274,6 +296,11 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     expect(RELEASABLE_SQL).toContain(`v.failed_at <= NOW() - INTERVAL ${VOICE_RETRY_SECONDS} SECOND`);
     expect(RELEASABLE_SQL).toContain("x.solo_user_id IS NOT NULL OR COALESCE(x.is_ghost, 0) = 1");
     expect(RELEASABLE_SQL).toContain("m.start_at IS NULL");
+  });
+
+  it("dispatchMatchVoiceChannels_releasableQuery_releasesTournamentsNoLongerRunning", () => {
+    expect(RELEASABLE_SQL).toContain("t.state <> 'RUNNING'");
+    expect(RELEASABLE_SQL).not.toContain("t.state = 'FINISHED'");
   });
 
   it("dispatchMatchVoiceChannels_releasableQuery_releasesMatchesPastTheLateWindow", () => {
