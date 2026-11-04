@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { NextRequest } from "next/server";
 import { LEGACY_GOOGLE_ONE_TAP_COOKIE, middleware } from "@/middleware";
+import { CSP_HEADER } from "@/lib/shared/csp";
 import { SUSPENSION_NOTICE_COOKIE, SUSPENSION_NOTICE_HEADER } from "@/lib/shared/account-suspension";
 
 function request(cookie?: string): NextRequest {
@@ -93,5 +94,39 @@ describe("middleware — cookies d'authentification d'avant le préfixe __Host-"
     const setCookie = response.headers.get("set-cookie") ?? "";
     expect(setCookie).toMatch(/bg_session=;/);
     expect(setCookie).toContain("Path=/connexion");
+  });
+});
+
+describe("middleware — politique CSP selon le serveur de développement", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+  // Sous Jest, le middleware n'est pas compilé par Next : `process.env.TURBOPACK`
+  // se lit tel quel, et `Boolean("1")` vaut ce que Next y aurait inscrit.
+  const withEnv = (env: { NODE_ENV: string; TURBOPACK?: string }) => {
+    const { TURBOPACK: _ignored, ...rest } = process.env;
+    jest.replaceProperty(process, "env", { ...rest, ...env });
+  };
+  const scriptSrc = () =>
+    (middleware(request()).headers.get(CSP_HEADER) ?? "")
+      .split("; ")
+      .find((part) => part.startsWith("script-src ")) ?? "";
+
+  it("middleware_turbopackDev_dropsStrictDynamic", () => {
+    withEnv({ NODE_ENV: "development", TURBOPACK: "1" });
+
+    expect(scriptSrc()).not.toContain("'strict-dynamic'");
+  });
+
+  it("middleware_webpackDev_keepsStrictDynamic", () => {
+    withEnv({ NODE_ENV: "development" });
+
+    expect(scriptSrc()).toContain("'strict-dynamic'");
+  });
+
+  it("middleware_turbopackProduction_keepsStrictDynamic", () => {
+    withEnv({ NODE_ENV: "production", TURBOPACK: "1" });
+
+    expect(scriptSrc()).toContain("'strict-dynamic'");
   });
 });

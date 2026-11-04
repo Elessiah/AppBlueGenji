@@ -165,12 +165,4 @@ describe("contentSecurityPolicy — dev Turbopack", () => {
     expect(scriptSrc).toContain("'strict-dynamic'");
   });
 
-  it("middleware_turbopackFlag_readsCompileTimeBoolean", () => {
-    // Next remplace `process.env.TURBOPACK` par un booléen à la compilation :
-    // une comparaison à "1" ne serait jamais vraie dans le middleware.
-    const source = readFileSync(join(__dirname, "..", "..", "..", "middleware.ts"), "utf8");
-
-    expect(source).toContain("turbopack: Boolean(process.env.TURBOPACK)");
-    expect(source).not.toMatch(/process\.env\.TURBOPACK\s*===/);
-  });
 });

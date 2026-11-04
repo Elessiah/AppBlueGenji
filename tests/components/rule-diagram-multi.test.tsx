@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -42,13 +42,36 @@ describe("RuleDiagramFigure — MULTI", () => {
   });
 });
 
-describe("messages/fr/rules.json", () => {
-  it("frRules_cutMode_neverBareSurvie", () => {
-    const source = readFileSync(path.join(process.cwd(), "messages/fr/rules.json"), "utf8");
+/** Toutes les valeurs texte d'un catalogue, clés exclues (`"survival": {…}` est un nom de clé). */
+function catalogueStrings(locale: "fr" | "en"): string[] {
+  const dir = path.join(process.cwd(), "messages", locale);
+  const strings: string[] = [];
+  const walk = (value: unknown): void => {
+    if (typeof value === "string") strings.push(value);
+    else if (value && typeof value === "object") Object.values(value).forEach(walk);
+  };
+  for (const file of readdirSync(dir).filter((name) => name.endsWith(".json"))) {
+    walk(JSON.parse(readFileSync(path.join(dir, file), "utf8")));
+  }
+  return strings;
+}
 
-    // Tout « Survie » qui n'est pas « BlueGenji Survie » est « Survie par coupes ».
-    const bare = source.match(/(?<!BlueGenji )\b[Ss](?:urvie|URVIE)\b(?! par coupes| PAR COUPES)/g);
+// Glossaire I18N.md : le mode à coupes se nomme « Survie par coupes » /
+// « Survival (cuts) », jamais « Survie » seul, à côté de « BlueGenji Survie ».
+describe("nom du mode à coupes dans les catalogues", () => {
+  it("frCatalogues_cutMode_neverBareSurvie", () => {
+    const bare = catalogueStrings("fr").filter((text) =>
+      /(?<!BlueGenji )\b[Ss](?:urvie|URVIE)\b(?! par coupes| PAR COUPES)/.test(text),
+    );
 
-    expect(bare).toBeNull();
+    expect(bare).toEqual([]);
+  });
+
+  it("enCatalogues_cutMode_neverBareSurvival", () => {
+    const bare = catalogueStrings("en").filter((text) =>
+      /(?<!BlueGenji's )\b[Ss](?:urvival|URVIVAL)\b(?! \(cuts\)| \(CUTS\))/.test(text),
+    );
+
+    expect(bare).toEqual([]);
   });
 });

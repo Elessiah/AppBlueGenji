@@ -80,14 +80,42 @@ describe("penalizeEnduranceTeams", () => {
     expect(penalty).toHaveBeenCalledTimes(2);
   });
 
-  it("penalizeEnduranceTeams_teamAlreadyOut_stopsAndReturnsCount", async () => {
+  it("penalizeEnduranceTeams_teamAlreadyOut_skipsToNextActiveTeam", async () => {
+    const connection = standings(7, 8, 9);
+    penalty
+      .mockResolvedValueOnce({ reason: "Test_ retard au check-in" })
+      .mockRejectedValueOnce(new Error("TEAM_ALREADY_OUT"));
+
+    const penalized = await penalizeEnduranceTeams(fakeConnection(connection), TOURNAMENT_ID, 2);
+
+    expect(penalized).toBe(2);
+    expect(penalty.mock.calls.map((call) => call[1])).toEqual([7, 8, 9]);
+  });
+
+  it("penalizeEnduranceTeams_limitReached_stopsBeforeRemainingRows", async () => {
+    const connection = standings(7, 8, 9);
+
+    await penalizeEnduranceTeams(fakeConnection(connection), TOURNAMENT_ID, 2);
+
+    expect(penalty.mock.calls.map((call) => call[1])).toEqual([7, 8]);
+  });
+
+  it("penalizeEnduranceTeams_tournamentNotRunning_stopsAndReturnsCount", async () => {
     const connection = standings(7, 8);
-    penalty.mockRejectedValueOnce(new Error("TEAM_ALREADY_OUT"));
+    penalty.mockRejectedValueOnce(new Error("TOURNAMENT_NOT_RUNNING"));
 
     const penalized = await penalizeEnduranceTeams(fakeConnection(connection), TOURNAMENT_ID, 2);
 
     expect(penalized).toBe(0);
     expect(penalty).toHaveBeenCalledTimes(1);
+  });
+
+  it("penalizeEnduranceTeams_penaltiesUnavailable_rethrows", async () => {
+    const connection = standings(7, 8);
+    const missingTable = new Error("PENALTIES_UNAVAILABLE");
+    penalty.mockRejectedValueOnce(missingTable);
+
+    await expect(penalizeEnduranceTeams(fakeConnection(connection), TOURNAMENT_ID, 2)).rejects.toBe(missingTable);
   });
 
   it("penalizeEnduranceTeams_unexpectedError_rethrows", async () => {
