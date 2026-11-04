@@ -47,7 +47,8 @@ fiche.
 
 La page ne reprend plus la carte du plateau : un **en-tête**, une grille de
 **faits clés**, puis deux colonnes de sections (une seule sous 900 px, et
-quand l'une est vide). Textes propres à la page : espace de noms `matchPage`
+quand la colonne de droite n'a rien à dire : elle n'est alors pas rendue,
+`data-columns="1"` sur la grille, sans `:has()`). Textes propres à la page : espace de noms `matchPage`
 (`messages/{fr,en}/matchPage.json`, chargé à part — `useMatchPageText`), les
 anciennes clés `tournament.matchPage.*` restant pour les sections.
 
@@ -55,8 +56,9 @@ anciennes clés `tournament.matchPage.*` restant pour les sections.
    d'affichage **dans l'ordre des côtés** (hôte à gauche, `matchPageSides`),
    chaque engagé par `EntrantName` (case vide « BYE » ou « TBD » comme la carte, logo 40 px, nom qui passe à la ligne, logo
    au-dessus du nom sous 560 px) ; score au centre (`matchPageHeaderScore`,
-   « FF » sur forfait, « VS » avant tout score ; nom accessible « Score : A x,
-   B y »). Dessous : vainqueur, nul ou double forfait, horaire, état de
+   « FF » sur forfait, « VS » avant tout score ; texte pour lecteur d'écran
+   « Score : x à y » — les noms se lisent déjà de part et d'autre —, « Forfait de A »
+   sur forfait, rien sur double forfait, que la pastille d'état dit). Dessous : vainqueur, nul ou double forfait, horaire, état de
    diffusion (`pill-live` seulement à l'antenne, « Cast annoncé » sinon), date
    manquante (staff), rediffusion et proposition de score en attente.
 2. **Faits clés** (`KeyFacts`, `components/cyber/` — la grille des pages de
@@ -118,7 +120,9 @@ l'arbitre désigné (`withGameBattletag`, `match-launch-info.ts`, jeu lu par
 `battletagRelevantFor`) — ni à la page, ni à la modale de lancement, ni à la
 fenêtre « Contacts », staff compris. Les fiches n'en dessinent pas la ligne
 (`CasterCard`, `RefereeCard`), la page tait les deux consignes « À inviter » et
-titre « Contacts des casters » (tag Discord certifié seul). Les contacts des
+titre « Contacts des casters » (tag Discord certifié seul). La page lit ce choix
+dans la charge de lancement (`MatchLaunchInfo.battletagRelevant`, posé par le
+serveur), jamais dans le jeu de la fiche : une seule source. Les contacts des
 équipes perdent aussi le leur hors Overwatch (décision 38, `sideContacts`,
 `MATCH_LAUNCH.md` § Les contacts présentés).
 

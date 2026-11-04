@@ -9,10 +9,11 @@ salons pleins.
 
 | Fichier | Rôle |
 | --- | --- |
-| `lib/shared/match-voice.ts` | Pur : constantes (`VOICE_CHANNEL_LEAD_MINUTES` = 15, `VOICE_CHANNEL_CAPACITY` = 5, `VOICE_ROW_RETENTION_DAYS` = 7), clé `match:<matchId>:team:<teamId>`, échéance, verrou (`voiceGatePending`), forme publique (`matchVoiceInfo`, `parseMatchVoiceInfo`) |
+| `lib/shared/match-voice.ts` | Pur : constantes (`VOICE_CHANNEL_LEAD_MINUTES` = 15, `VOICE_CHANNEL_CAPACITY` = 5, `VOICE_ROW_RETENTION_DAYS` = 7), clé `match:<matchId>:team:<teamId>`, échéance, verrou (`voiceGatePending`), forme publique (`matchVoiceInfo`, `shownVoiceSide`, `voiceSideFull`, `parseMatchVoiceInfo`) |
+| `app/(secured)/tournois/[id]/_lib/match-voice-view.ts` | Page du match : source qui fait foi entre instantané et relecture REST (`currentMatchVoice`, `voiceStreamKey`), relecture flux coupé seulement (`voicePollActive`, `useMatchVoice`) |
 | `lib/server/tournaments/match-voice.ts` | Balayage (`dispatchMatchVoiceChannels`), verrou lu en transaction (`voiceGateBlocksLaunch`), bascule (`setTeamVoiceChannels`), lectures (`loadMatchVoiceInfos`, `readMatchVoice`) |
 | `lib/server/bot-integration.ts` | `ensureVoiceChannel`, `countVoiceChannel`, `releaseVoiceChannel` (`VoiceCallOutcome` : `ok` / `gone` / `failed`) |
-| `PUT /api/admin/tournaments/[id]/voice-channels` | Bascule de l'option, permission `tournaments`, à tout état (y compris en cours) ; journalisée comme geste du staff sur un tournoi (`TEAM_VOICE_ON` / `TEAM_VOICE_OFF`, `STAFF_ACTION_LOGS.md` : auteur anonyme, rien dans pm2) quand elle change |
+| `PUT /api/admin/tournaments/[id]/voice-channels` | Bascule de l'option, permission `tournaments`, jusqu'à la fin du tournoi (y compris en cours ; tournoi terminé : 409 `TOURNAMENT_FINISHED`, comme le formulaire) ; limite par compte (`TEAM_VOICE_TOGGLE_RULE`, 30 par 5 min) ; journalisée comme geste du staff sur un tournoi (`TEAM_VOICE_ON` / `TEAM_VOICE_OFF`, `STAFF_ACTION_LOGS.md` : auteur anonyme, rien dans pm2) quand elle change |
 | `GET /api/matches/[matchId]/voice` | Porte REST de secours du compteur (connecté, tournoi publié ; `MATCH_VOICE_READ_RULE`) |
 | `bg_match_voice_channels` | Une ligne par (match, équipe) : `channel_id`, `members`, `counted_at`, `failed_at`, `released_at` |
 
@@ -42,9 +43,13 @@ salons pleins.
   puis revenu) ne lance rien et une panne ancienne ne lève plus le verrou — le
   balayage suivant tranche. L'affichage garde le dernier nombre compté. Un comptage
   redevenu frais compte comme un changement (publication + entretien rejoué).
-- **Relecture de la page du match** : tant que l'instantané porte `voice` (match dû,
-  pas encore lancé), verrou tenu ou non — un comptage qui vieillit n'est annoncé par
-  aucune écriture, la relecture relance le balayage qui le rafraîchit.
+- **Relecture de la page du match** : **flux coupé seulement** (`isLive` de la fiche),
+  toutes les 10 s, tant que la source qui fait foi porte `voice` (match dû, pas encore
+  lancé), verrou tenu ou non. Flux sain, chaque comptage est déjà publié dans
+  l'instantané ; le balayage reste porté par le trafic (listes de tournois,
+  `/api/me/match-launches`). Une réponse REST `null` (match lancé, option éteinte) fait
+  taire la section jusqu'au prochain instantané ; une réponse sans clé `voice` est
+  ignorée.
 - **Côté client** : `useMatchLaunchPhase` relaie `voice.pending` à `matchLaunchPhase`,
   si bien qu'un match retenu sans phase de lancement reste « programmé » (pas de
   formulaire de score, bouton « Forcer le lancement » pour l'arbitrage).
@@ -59,9 +64,12 @@ salons pleins.
   `inTransaction`, `lockTournamentRow` en première instruction.
 - **Nom du salon** : le nom d'équipe passe par `visibleText` avant d'aller au bot
   (`UNTRUSTED_NAMES.md`), qui le nettoie encore.
-- **Affichage** : « Salon vocal : n/5 » par équipe sur la page du match, pour ses
-  parties et le staff, par l'instantané (SSE) **et** la porte REST interrogée toutes
-  les 10 s tant que le verrou attend (`useClock`). Le nombre voyage dans
+- **Affichage** : par équipe sur la page du match, pour ses parties et le staff, un
+  état (`team1State` / `team2State`) : « bientôt ouvert » (`WAITING`, pas de salon),
+  « pas encore compté » (`UNCOUNTED`), « n/5 » puis « 5/5 · complet » (`COUNTED`),
+  « indisponible » (`FAILED`, panne fraîche : une note dit que le match n'attend pas
+  les salons). Tant que le verrou retient le match, le badge de lancement (carte et
+  faits clés) ajoute « salons vocaux à remplir ». Le nombre voyage dans
   l'instantané commun : tout membre connecté qui suit le tournoi peut le lire (le
   RGPD le dit) ; la vue spectateur retire les compteurs et ne garde que `pending`.
   Un match dû dont aucun salon n'est encore créé se montre en attente, comme le
@@ -91,4 +99,6 @@ Le bot doit avoir **Gérer les salons** sur la catégorie des matchs
 
 `tests/lib/shared/match-voice.test.ts`, `tests/lib/server/match-voice-sweep.test.ts`,
 `tests/lib/server/bot-integration-voice.test.ts`, `tests/app/api/match-voice-routes.test.ts`,
-describe « verrou des salons vocaux d'équipe » de `tests/lib/server/match-launch.test.ts`.
+describe « verrou des salons vocaux d'équipe » de `tests/lib/server/match-launch.test.ts`,
+`tests/tournois/match-voice-view.test.ts`, describe « salons vocaux d'équipe » de
+`tests/tournois/match-page-render.test.tsx`.
