@@ -792,8 +792,9 @@ export async function claimMatchCast(
       if (row.casters.some((caster) => caster.userId === userId)) {
         return { tournamentId: Number(row.tournament_id), claimed: false };
       }
-      const party = await resolveMatchParty(connection, row, userId);
-      if (party) throw new Error("CASTER_IS_PLAYER");
+      // Seul **jouer** le match ferme le cast : l'arbitre désigné peut le
+      // caster (`resolveMatchParty` le rendrait `MATCH_REFEREE`, à tort refusé).
+      if (await resolveTeamParty(connection, row, userId)) throw new Error("CASTER_IS_PLAYER");
 
       let streamId: number;
       if ("streamId" in castTarget) {
@@ -810,9 +811,13 @@ export async function claimMatchCast(
         );
         streamId = Number(created.insertId);
       }
+      // L'arbitre désigné déjà prêt qui caste aussi garde ce « Prêt » : un seul
+      // vaut pour les deux, comme pour le caster qui devient arbitre (`writeReferee`).
+      const refereeReadyAt =
+        row.refereeEligible && nullableId(row.referee_user_id) === userId ? (row.referee_ready_at ?? null) : null;
       await connection.execute(
-        `INSERT INTO bg_match_casters (match_id, user_id, stream_id, ready_at) VALUES (?, ?, ?, NULL)`,
-        [matchId, userId, streamId],
+        `INSERT INTO bg_match_casters (match_id, user_id, stream_id, ready_at) VALUES (?, ?, ?, ?)`,
+        [matchId, userId, streamId, refereeReadyAt],
       );
       return { tournamentId: Number(row.tournament_id), claimed: true };
     }),
