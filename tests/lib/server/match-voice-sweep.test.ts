@@ -235,6 +235,23 @@ describe("dispatchMatchVoiceChannels — création", () => {
     expect(console.warn).toHaveBeenCalledTimes(2);
   });
 
+  it("dispatchMatchVoiceChannels_ensureFailsOnReleasedRow_restartsCreationTime", async () => {
+    const released = { ...openRow(1, "901"), released_at: new Date() };
+    const { writes } = database({ due: [dueMatch], voiceRows: [released] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "failed", code: "VOICE_PERMISSION_DENIED" });
+    await dispatchMatchVoiceChannels();
+    const reopen = writes.find((w) => w.sql.includes("ON DUPLICATE KEY") && w.sql.includes("failed_at = NOW()"));
+    expect(reopen?.sql).toContain("created_at = IF(released_at IS NULL, created_at, NOW())");
+  });
+
+  it("dispatchMatchVoiceChannels_channelRecorded_restartsCreationTimeOnReopenOrNewChannel", async () => {
+    const { writes } = database({ due: [dueMatch] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    await dispatchMatchVoiceChannels();
+    const insert = writes.find((w) => w.sql.startsWith("INSERT") && w.sql.includes("VALUES(channel_id)"));
+    expect(insert?.sql).toContain("created_at = IF(released_at IS NOT NULL OR NOT (channel_id <=> VALUES(channel_id)), NOW(), created_at)");
+  });
+
   it("dispatchMatchVoiceChannels_dueQuery_boundsLatenessRetriesAndSkipsOpenChannels", () => {
     expect(DUE_CHANNELS_SQL).toContain(`m.start_at >= NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR`);
     expect(DUE_CHANNELS_SQL).toContain(`v.failed_at > NOW() - INTERVAL ${VOICE_RETRY_SECONDS} SECOND`);
@@ -366,9 +383,16 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toHaveLength(0);
   });
 
-  it("dispatchMatchVoiceChannels_releaseOutagePastBotNet_keepsRowOpen", async () => {
-    // Bot injoignable : rien ne dit que son filet a tourné, la ligne attend.
+  it("dispatchMatchVoiceChannels_releaseWholeBotRefusalPastBotNet_closesRow", async () => {
+    // Droit retiré au bot pendant des jours : la ligne ne reste pas pour toujours.
     const { writes } = database({ releasable: [{ ...releasable, bot_expired: 1 }] });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "failed", code: "VOICE_MISSING_PERMISSIONS" });
+    await dispatchMatchVoiceChannels();
+    expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()"))).toHaveLength(1);
+  });
+
+  it("dispatchMatchVoiceChannels_releaseOutageBeforeBotNet_keepsRowOpen", async () => {
+    const { writes } = database({ releasable: [{ ...releasable, bot_expired: 0 }] });
     jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "failed", code: "BOT_CIRCUIT_OPEN" });
     await dispatchMatchVoiceChannels();
     expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()"))).toHaveLength(0);
