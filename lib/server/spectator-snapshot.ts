@@ -162,9 +162,11 @@ export async function getSpectatorPayload(
   client: string | null,
 ): Promise<SpectatorPayload | null> {
   // Choix assumé (décision de l'auteur, `SPECTATOR_VIEW.md`) : seules la
-  // suppression du tournoi et son édition par le staff (`updateTournament`,
-  // image du tournoi) retirent cette réponse — un nom, une description ou une
-  // bannière retirés ne restent pas servis. Un renommage d'équipe, un avatar retiré
+  // suppression du tournoi et l'édition par le staff de **sa carte** (`updateTournament`,
+  // image du tournoi, lien de chaîne du tournoi) retirent cette réponse — un nom,
+  // une description, une bannière ou un lien retirés ne restent pas servis. Ce
+  // qui vit sur les matchs (antenne, liens de chaîne d'un match, horaire), un
+  // renommage d'équipe, un avatar retiré
   // ou un compte supprimé attendent son expiration (15 s au calme, 150 s sous
   // la charge ou pour un tournoi terminé) — c'est elle qui protège la machine
   // d'un tournoi animé. Un tournoi publié ne redevient jamais invisible :

@@ -12,7 +12,8 @@
  * Chaque lecture **en base** compte dans le plafond des lectures publiques
  * (`SPECTATOR_READ_RULE`) : une boucle sur des identifiants ne coûte plus une
  * lecture de carte par requête sans limite ; une carte ou une réponse publique
- * servie depuis un cache ne prend aucun jeton. Au plafond : `null`, l'encart ou la page générale.
+ * **fraîche** en cache (ou en vol) ne prend aucun jeton — une copie échue servie
+ * en repli, ou un « introuvable » (jamais gardé), en prend un. Au plafond : `null`, l'encart ou la page générale.
  */
 import { headers } from "next/headers";
 import { clientIpFromHeaders, clientNetworkKey, enforceRateLimit, SPECTATOR_READ_RULE } from "@/lib/server/api-guard";
@@ -29,8 +30,9 @@ export async function publicTournamentCardForRequest(tournamentId: number): Prom
   const client = clientNetworkKey(clientIpFromHeaders(await headers()));
   // Un jeton du plafond seulement quand la carte **touche la base** : une carte
   // servie par la copie ou le cache de carte ne coûte rien, et la page d'un
-  // match (deux mises en page, deux lectures) n'épuise plus le plafond deux
-  // fois plus vite.
+  // match d'un tournoi publié (deux mises en page, deux lectures) n'épuise plus
+  // le plafond deux fois plus vite. Un « introuvable » n'est pas gardé : chaque
+  // lecture en reprend un.
   return publicTournamentCard(tournamentId, () => !enforceRateLimit(SPECTATOR_READ_RULE, client));
 }
 
