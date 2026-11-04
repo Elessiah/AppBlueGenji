@@ -37,7 +37,8 @@
     "maps": "Maps et bans",
     "officiating": "Arbitrage",
     "casts": "Casts",
-    "connection": "Infos de connexion"
+    "connection": "Infos de connexion",
+    "gameSettings": "Paramètres de partie"
   },
   "voice": {
     "title": "Salons vocaux",

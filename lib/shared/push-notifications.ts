@@ -46,8 +46,8 @@ export const PUSH_TOPICS = {
     audience: null,
   },
   MATCH_LOBBY_BRIEF: {
-    label: "Réglages du salon",
-    description: "À l'ouverture du salon d'un match que tu gères (propriétaire ou manager d'une équipe, joueur d'un tournoi individuel) : qui joue à gauche (hôte) et à droite, la première carte, le premier ban et, s'il est casté, le rappel de trier les joueurs par rôle.",
+    label: "Check-in du match",
+    description: "15 minutes avant le coup d'envoi d'un match que tu joues (ou, à défaut d'horaire, à l'ouverture de son salon) : qui joue à gauche (hôte) et à droite, la première carte, le premier ban et, s'il est casté, le rappel de trier les joueurs par rôle.",
     audience: null,
   },
   SCORE_TO_CONFIRM: {

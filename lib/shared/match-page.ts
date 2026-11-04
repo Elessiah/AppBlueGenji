@@ -186,8 +186,20 @@ export function firstMapFieldFollows(current: string | null, edited: boolean, sa
 /** Étapes de l'autogestion, dans l'ordre (spécification de l'utilisateur, 2026-10-26). */
 export const SELF_MANAGEMENT_STEPS = ["hostCreates", "managersInvite", "settings", "inviteCasters"] as const;
 
-/** Réglages de la partie d'un match Overwatch en autogestion (sous l'étape « settings »). */
-export const OW_SELF_MANAGEMENT_SETTINGS = ["competitive", "killcamOff", "pauseOnDisconnect"] as const;
+/**
+ * Les paramètres de partie, **dans l'ordre**, pour tous les jeux (décision de
+ * l'utilisateur, 2026-11-04 : « exactement ces trois lignes »). Auparavant
+ * propres à Overwatch, ils ne dépendent plus du jeu.
+ *
+ * **Seule liste** : la page les rend par leurs clés de traduction
+ * (`matchPage.gameSettings.*`), le check-in du match par les siennes
+ * (`GAME_SETTINGS_TEXT`, `lib/shared/lobby-brief.ts`) — l'ordre et le contenu
+ * viennent d'ici, et un test tient les deux ensemble.
+ */
+export const GAME_SETTINGS = ["competitive", "killcamOff", "pauseOnDisconnect"] as const;
+
+/** Un paramètre de partie, par son identifiant. */
+export type GameSetting = (typeof GAME_SETTINGS)[number];
 
 export type SelfManagementStep = (typeof SELF_MANAGEMENT_STEPS)[number];
 

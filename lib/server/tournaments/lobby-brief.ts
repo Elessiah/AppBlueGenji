@@ -1,12 +1,20 @@
 /**
- * Brief du salon (`MATCH_LOBBY_BRIEF`, `docs/features/MATCH_LOBBY_BRIEF.md`) :
- * quand le salon d'un match s'ouvre, ceux qui gèrent chaque engagée reçoivent
- * les réglages de la partie par message privé Discord et notification push.
+ * Check-in du match (`MATCH_LOBBY_BRIEF`, `docs/features/MATCH_LOBBY_BRIEF.md`) :
+ * **15 minutes avant le coup d'envoi**, les joueurs des deux engagées reçoivent
+ * le check-in du match par message privé Discord et notification push — vocal
+ * d'équipe, qui héberge, paramètres de partie, déroulé des maps, cast, saisie
+ * des scores et à qui s'adresser en cas de problème.
  *
- * **Pourquoi un balayage.** Comme l'appel aux « Prêt » (`./player-pushes`),
- * l'ouverture du salon (`lobby_opened_at`) est posée par des transactions qui
- * n'ont pas à connaître les notifications. Le balayage relit après coup les
- * salons ouverts récemment, lit d'un coup les destinataires de tous les côtés,
+ * **Deux repères, un seul message** (décision de l'utilisateur, 2026-11-04).
+ * L'horaire du match donne le quart d'heure (`LOBBY_BRIEF_LEAD_MINUTES`) ; un
+ * match **sans horaire** n'en a pas, et son check-in part à l'ouverture du
+ * salon, comme avant la fusion. Les deux repères partagent la même réservation :
+ * un match programmé puis ouvert n'est briefé qu'une fois.
+ *
+ * **Pourquoi un balayage.** Next.js n'a pas d'ordonnanceur, et l'ouverture du
+ * salon (`lobby_opened_at`) est posée par des transactions qui n'ont pas à
+ * connaître les notifications. Le balayage relit ce qui est dû, lit d'un coup
+ * les destinataires de tous les côtés,
  * puis, **côté par côté**, réserve le brief dans `bg_match_start_notices`
  * (phases `LOBBY_BRIEF_1` / `LOBBY_BRIEF_2`, une par engagée et par
  * appariement — deux balayages concurrents n'envoient qu'une fois), relit les
@@ -21,10 +29,12 @@
  * n'a rien reçu (messages privés coupés, tag non certifié, push éteint) n'est
  * pas compté comme briefé, et pm2 le dit.
  *
- * Destinataires : `OWNER` et `MANAGER` de chaque équipe (`loadEntrantManagerIds`),
- * le joueur d'une entrée solo, personne pour une fantôme (réservation gardée).
- * Une vraie équipe sans gestionnaire actif n'est pas réservée : pm2 le dit une
- * fois, et un manager ajouté dans la fenêtre est briefé. Le message privé est
+ * Destinataires : **tous les joueurs** de chaque engagée (`loadEntrantPlayerIds` :
+ * membres actifs d'une équipe, le joueur d'une entrée solo), personne pour une
+ * fantôme (réservation gardée) — le check-in demande à chacun de rejoindre le
+ * vocal de son équipe, pas seulement à qui la gère (décision de l'utilisateur,
+ * 2026-11-04). Une vraie équipe sans joueur actif n'est pas réservée : pm2 le
+ * dit une fois, et un joueur ajouté dans la fenêtre est briefé. Le message privé est
  * un message de match : l'interrupteur « messages privés de mes matchs » de
  * « Mon profil » le coupe, et seul un tag Discord certifié le reçoit ; le push a
  * son propre sujet.
@@ -33,14 +43,14 @@ import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import {
-  loadEntrantManagerIds,
+  loadEntrantPlayerIds,
   loadNotificationRecipients,
   notifyUsers,
   type NotificationRecipient,
 } from "@/lib/server/notify";
 import { siteUrl } from "@/lib/server/site-url";
 import { throttledSweep } from "@/lib/server/throttled-sweep";
-import type { LobbyBriefSide } from "@/lib/shared/lobby-brief";
+import { LOBBY_BRIEF_LEAD_MINUTES, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
 import { LOCALES, type Locale } from "@/lib/shared/locales";
 import type { PushContent } from "@/lib/shared/push-notifications";
 import type { TournamentGame } from "@/lib/shared/types";
@@ -62,6 +72,8 @@ import { parseMatchFormat } from "@/lib/shared/match-format";
 import { roundAllowsTiebreak } from "@/lib/shared/round-plan";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { loadEligibleRefereeIds } from "./cast-eligibility";
+import { firstStreamUrlSql } from "./match-casters";
+import { normalizeStreamUrl } from "@/lib/shared/live-streams";
 import { formatLobbyBriefDm } from "./lobby-brief-dm";
 import { seedJoins } from "./match-host-seeds";
 import { playsMatchSql } from "./match-players";
@@ -85,6 +97,15 @@ export function lobbyBriefPhase(slot: LobbyBriefSlot): string {
  */
 const LOBBY_BRIEF_WINDOW_MINUTES = LAUNCH_AUTO_DELAY_MINUTES + 5;
 
+/**
+ * Au-delà de son horaire, un match programmé n'est plus briefé par l'horaire.
+ *
+ * Large à dessein : un match retenu par les salons vocaux (`MATCH_VOICE.md`)
+ * n'ouvre aucun salon, et son horaire est le seul repère qu'il ait. Le
+ * check-in ne part malgré tout qu'une fois — la réservation s'en charge.
+ */
+const LOBBY_BRIEF_LATE_MINUTES = 120;
+
 export type LobbyBriefRow = RowDataPacket & {
   id: number;
   tournament_id: number;
@@ -98,7 +119,13 @@ export type LobbyBriefRow = RowDataPacket & {
   team2_id: number;
   team1_name: string;
   team2_name: string;
-  launch_pairing: string;
+  launch_pairing: string | null;
+  /** Appariement courant (`team1_id:team2_id`) : la clé de la réservation, posée avant toute ouverture de salon. */
+  brief_pairing: string;
+  /** Option « Salons vocaux d'équipe » du tournoi, et match suivi (ni solo, ni fantôme). */
+  voice_tracked?: number | null;
+  /** Lien de diffusion public du match (`firstStreamUrlSql`), `null` sans live annonçable. */
+  stream_url?: string | null;
   host_team_id: number | null;
   team1_seed: number | null;
   team2_seed: number | null;
@@ -175,7 +202,11 @@ const BRIEF_COLUMNS = `m.id, m.tournament_id, t.name AS tournament_name, t.parti
             m.bracket, m.round_number, ${swissRoundSql("m", "t")},
             m.team1_id, m.team2_id, t1.name AS team1_name, t2.name AS team2_name,
             t1.is_ghost AS team1_ghost, t2.is_ghost AS team2_ghost,
-            m.launch_pairing, m.launched_at, m.host_team_id, es1.rank AS team1_seed, es2.rank AS team2_seed,
+            m.launch_pairing, CONCAT(m.team1_id, ':', m.team2_id) AS brief_pairing,
+            m.launched_at, m.host_team_id, es1.rank AS team1_seed, es2.rank AS team2_seed,
+            (t.team_voice_channels = 1 AND t.participant_type <> 'SOLO'
+              AND t1.is_ghost = 0 AND t2.is_ghost = 0) AS voice_tracked,
+            ${firstStreamUrlSql("m")} AS stream_url,
             m.first_map, m.self_managed, m.referee_user_id, m.map_picks,
             (m.referee_user_id IS NOT NULL
               AND ${playsMatchSql("m.referee_user_id", "m.team1_id", "m.team2_id", "rp")}) AS referee_plays,
@@ -198,12 +229,27 @@ const BRIEF_FROM = `FROM bg_matches m
        ${seedJoins("m")}`;
 
 /**
- * Salon ouvert pour l'appariement courant, comme l'appel aux « Prêt » : un
- * salon ouvert pour une paire que le moteur a depuis remplacée ne compte pas.
+ * Un match dû : jouable, pas un bye, sans score, et **dans son quart d'heure**
+ * — par son horaire (`LOBBY_BRIEF_LEAD_MINUTES`, borné par
+ * `LOBBY_BRIEF_LATE_MINUTES`) ou, à défaut d'horaire, par l'ouverture de son
+ * salon (`LOBBY_BRIEF_WINDOW_MINUTES`).
+ *
+ * L'appariement **n'est pas** comparé à `launch_pairing` : il est vide tant
+ * qu'aucun lancement n'a été adopté (`adoptCurrentPairing`), et le check-in
+ * part avant l'ouverture du salon. La réservation porte l'appariement courant
+ * (`brief_pairing`) : un réappariement change la clé, et `adoptCurrentPairing`
+ * efface de son côté les réservations du match quand il remplace une empreinte
+ * déjà posée.
+ *
+ * Toutes les bornes sont des instants de la base (`NOW()`), comme les fenêtres
+ * de l'appel aux « Prêt » : le brief ne se compare à aucun instant du processus.
  */
-const OPEN_LOBBY_SQL = `m.status = 'READY' AND m.is_bye = 0
-        AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
-        AND m.lobby_opened_at IS NOT NULL ${NO_SCORE_SQL}`;
+const BRIEF_DUE_SQL = `m.status = 'READY' AND m.is_bye = 0 ${NO_SCORE_SQL}
+        AND ((m.start_at IS NOT NULL
+              AND m.start_at <= NOW() + INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE
+              AND m.start_at > NOW() - INTERVAL ${LOBBY_BRIEF_LATE_MINUTES} MINUTE)
+          OR (m.lobby_opened_at IS NOT NULL
+              AND m.lobby_opened_at > NOW() - INTERVAL ${LOBBY_BRIEF_WINDOW_MINUTES} MINUTE))`;
 
 /**
  * Réserve un côté **si le salon est toujours ouvert pour cet appariement** :
@@ -222,12 +268,13 @@ const OPEN_LOBBY_SQL = `m.status = 'READY' AND m.is_bye = 0
  *   l'erreur remonte — sinon ce côté ne serait jamais briefé pour cet appariement.
  */
 async function claimLobbyBrief(db: Db, row: LobbyBriefRow, slot: LobbyBriefSlot): Promise<number | null> {
-  const key = [Number(row.id), String(row.launch_pairing), lobbyBriefPhase(slot)];
+  const key = [Number(row.id), String(row.brief_pairing), lobbyBriefPhase(slot)];
   try {
     const [result] = await db.execute(
       `INSERT IGNORE INTO bg_match_start_notices (match_id, pairing, phase)
-       SELECT m.id, m.launch_pairing, ? FROM bg_matches m
-        WHERE m.id = ? AND m.launch_pairing = ? AND ${OPEN_LOBBY_SQL}`,
+       SELECT m.id, CONCAT(m.team1_id, ':', m.team2_id), ? FROM bg_matches m
+        JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
+        WHERE m.id = ? AND CONCAT(m.team1_id, ':', m.team2_id) = ? AND ${BRIEF_DUE_SQL}`,
       [key[2], key[0], key[1]],
     );
     const { affectedRows, insertId } = result as { affectedRows?: number; insertId?: number };
@@ -312,6 +359,12 @@ export function lobbyBriefSides(
     tiebreakMap: briefTiebreakMap(row),
     nextBan: parseNextBanRule(row.next_ban_rule),
     cast: options.cast,
+    // Le bot n'ouvre de salon vocal que pour un match suivi (`MATCH_VOICE.md`) :
+    // la ligne du vocal n'est écrite que là, sinon elle annoncerait un salon
+    // qui n'arrivera jamais.
+    voice: Number(row.voice_tracked ?? 0) === 1,
+    // Un lien de diffusion vide ou fait d'invisibles n'est pas un lien.
+    streamUrl: normalizeStreamUrl(row.stream_url ?? null),
     decision: refereeDecision({
       refereeAssigned: options.refereeAssigned,
       selfManaged: Number(row.self_managed ?? 0) === 1,
@@ -364,8 +417,8 @@ async function rereadBriefRow(
   const [rows] = await db.query<(LobbyBriefRow & { claim_kept: number })[]>(
     `SELECT ${BRIEF_COLUMNS},
             EXISTS (SELECT 1 FROM bg_match_start_notices n WHERE n.id = ?) AS claim_kept
-       ${BRIEF_FROM} WHERE m.id = ? AND m.launch_pairing = ? AND ${OPEN_LOBBY_SQL}`,
-    [claimId, Number(row.id), String(row.launch_pairing)],
+       ${BRIEF_FROM} WHERE m.id = ? AND CONCAT(m.team1_id, ':', m.team2_id) = ? AND ${BRIEF_DUE_SQL}`,
+    [claimId, Number(row.id), String(row.brief_pairing)],
   );
   return rows[0] ?? null;
 }
@@ -433,17 +486,17 @@ async function sendSideBrief(
   }
 }
 
-/** Une même équipe sans gestionnaire n'est dite qu'une fois dans pm2 par appariement. */
+/** Une même équipe sans joueur actif n'est dite qu'une fois dans pm2 par appariement. */
 const NO_MANAGER_LOGGED = new Set<string>();
 const NO_MANAGER_LOGGED_MAX = 1000;
 
 function logNoManager(row: LobbyBriefRow, slot: LobbyBriefSlot): void {
-  const key = `${Number(row.id)}:${String(row.launch_pairing)}:${slot}`;
+  const key = `${Number(row.id)}:${String(row.brief_pairing)}:${slot}`;
   if (NO_MANAGER_LOGGED.has(key)) return;
   if (NO_MANAGER_LOGGED.size >= NO_MANAGER_LOGGED_MAX) NO_MANAGER_LOGGED.clear();
   NO_MANAGER_LOGGED.add(key);
   console.error(
-    `[lobby-brief] match ${Number(row.id)} : une engagée n'a aucun gestionnaire actif (OWNER/MANAGER), brief en attente d'un gestionnaire`,
+    `[lobby-brief] match ${Number(row.id)} : une engagée n'a aucun joueur actif, check-in en attente d'un joueur`,
   );
 }
 
@@ -464,9 +517,9 @@ type SweepContext = {
 type MatchBrief = { sent: number; retry: number[]; closed: number[]; lost: boolean; error?: unknown };
 
 /**
- * Gestionnaires d'un côté : `null` pour une vraie équipe sans gestionnaire —
- * pas de réservation, un manager ajouté dans la fenêtre sera briefé au
- * balayage suivant (pm2 le dit une fois).
+ * Joueurs d'un côté : `null` pour une vraie équipe sans joueur actif — pas de
+ * réservation, un joueur ajouté dans la fenêtre sera briefé au balayage
+ * suivant (pm2 le dit une fois).
  */
 function sideManagers(
   row: LobbyBriefRow,
@@ -590,12 +643,12 @@ async function runLobbyBriefSweep(): Promise<number> {
   const db = await getDatabase();
   const [rows] = await db.query<LobbyBriefRow[]>(
     `SELECT ${BRIEF_COLUMNS} ${BRIEF_FROM}
-      WHERE ${OPEN_LOBBY_SQL}
-        AND m.lobby_opened_at > NOW() - INTERVAL ? MINUTE
+      WHERE ${BRIEF_DUE_SQL}
         AND (SELECT COUNT(*) FROM bg_match_start_notices n
-              WHERE n.match_id = m.id AND n.pairing = m.launch_pairing AND n.phase IN (?, ?)) < 2
+              WHERE n.match_id = m.id AND n.pairing = CONCAT(m.team1_id, ':', m.team2_id)
+                AND n.phase IN (?, ?)) < 2
       ORDER BY m.id`,
-    [LOBBY_BRIEF_WINDOW_MINUTES, lobbyBriefPhase(1), lobbyBriefPhase(2)],
+    [lobbyBriefPhase(1), lobbyBriefPhase(2)],
   );
   if (rows.length === 0) {
     // Lecture commune réussie : la panne qui avait armé une relance est passée.
@@ -606,19 +659,19 @@ async function runLobbyBriefSweep(): Promise<number> {
   // Destinataires de tous les côtés en deux lectures, **avant** toute
   // réservation : une panne ici ne réserve rien, et arme le balayage suivant
   // (`onError`, dans la limite des relances).
-  const memberships = await loadEntrantManagerIds(rows.flatMap((row) => [Number(row.team1_id), Number(row.team2_id)]));
+  const memberships = await loadEntrantPlayerIds(rows.flatMap((row) => [Number(row.team1_id), Number(row.team2_id)]));
   const recipients = await loadNotificationRecipients([...memberships.values()].flat(), "certified", { matchDm: true });
   retries.delete(SWEEP_RETRY_KEY);
-  // Gestionnaires dont le compte vit encore : un compte supprimé (anonymisé)
-  // garde son appartenance mais ne reçoit plus rien — une équipe qui n'a que
-  // lui reste « sans gestionnaire », non réservée, pour qu'un manager ajouté
-  // dans la fenêtre soit briefé.
+  // Joueurs dont le compte vit encore : un compte supprimé (anonymisé) garde
+  // son appartenance mais ne reçoit plus rien — une équipe qui n'a que lui
+  // reste « sans joueur », non réservée, pour qu'un joueur ajouté dans la
+  // fenêtre soit briefé.
   const live = new Set(recipients.map((recipient) => recipient.userId));
   const managers = new Map(
     [...memberships].map(([teamId, userIds]) => [teamId, userIds.filter((userId) => live.has(userId))]),
   );
-  // Un match dont aucun côté n'a de quoi partir (vraies équipes sans
-  // gestionnaire, seules à attendre) ne coûte ni casteurs ni arbitres : il
+  // Un match dont aucun côté n'a de quoi partir (vraies équipes sans joueur
+  // actif, seules à attendre) ne coûte ni casteurs ni arbitres : il
   // reste candidat toute la fenêtre, et ces lectures seraient refaites à
   // chaque balayage pour rien.
   const hasRecipients = (teamId: number, ghost: number | null | undefined) =>
@@ -705,7 +758,7 @@ const SWEEP_RETRY_KEY = "sweep";
 const retries = new Map<string, number>();
 
 function matchRetryKey(row: LobbyBriefRow): string {
-  return `${Number(row.id)}:${String(row.launch_pairing)}`;
+  return `${Number(row.id)}:${String(row.brief_pairing)}`;
 }
 
 const sweeps = throttledSweep({

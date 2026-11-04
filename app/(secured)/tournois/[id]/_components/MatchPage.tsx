@@ -28,7 +28,7 @@ import {
   matchPageSides,
   matchPageStreams,
   selfManagementSteps,
-  OW_SELF_MANAGEMENT_SETTINGS,
+  GAME_SETTINGS,
   type MatchPageSide,
 } from "@/lib/shared/match-page";
 import { FIRST_MAP_MAX_LENGTH, normalizeFirstMap, refereeNameOf } from "@/lib/shared/match-referee";
@@ -46,7 +46,7 @@ import {
 import { visibleText } from "@/lib/shared/visible-text";
 import { canPickMatchMap, firstBanOrder, roundMapsOf, roundTiebreakOf, shownMapName } from "@/lib/shared/round-maps";
 import { roundMaxMaps } from "@/lib/shared/round-plan";
-import type { BracketMatch, TournamentDetail, TournamentGame } from "@/lib/shared/types";
+import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
 import { useLiveControls } from "../_lib/live-context";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
@@ -640,6 +640,31 @@ function MapsSection({
 }
 
 /**
+ * Paramètres de partie : les mêmes pour tous les jeux et pour tous les matchs
+ * (décision de l'utilisateur, 2026-11-04). Lue par **tout le monde**, y
+ * compris sans compte : ce sont les règles de la partie, pas une consigne
+ * d'organisation — l'aide-mémoire de l'autogestion les reprend pour qui
+ * organise le match, et le check-in du match les écrit sur Discord
+ * (`docs/features/MATCH_LOBBY_BRIEF.md`). Une seule liste
+ * (`GAME_SETTINGS`), trois rendus.
+ */
+function GameSettingsSection() {
+  const { t } = useTournamentPageText();
+  const page = useMatchPageText();
+  const titleId = useId();
+  return (
+    <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
+      <SectionTitle id={titleId}>{page.t("sections.gameSettings")}</SectionTitle>
+      <ul className={styles.gameSettings}>
+        {GAME_SETTINGS.map((setting) => (
+          <li key={setting}>{t(`matchPage.gameSettings.${setting}`)}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
  * Infos de connexion du match (`docs/features/MATCH_PAGE_CONNECT.md`) : les
  * fiches des deux engagées, avec leurs contacts comme dans la fenêtre
  * « Contacts » (qui garde l'ordre du tableau ; la page met l'hôte en tête),
@@ -762,14 +787,12 @@ function officiatingShown(content: ReturnType<typeof officiatingContent>): boole
  */
 function OfficiatingSection({
   match,
-  game,
   staff,
   launch,
   onCopy,
   forParties,
 }: Readonly<{
   match: BracketMatch;
-  game: TournamentGame;
   staff: boolean;
   /**
    * Le lecteur organise-t-il le match (joueur, caster inscrit, staff) ? Les
@@ -805,18 +828,10 @@ function OfficiatingSection({
       )}
       {showSteps && (
         <ol className={styles.steps} aria-label={t("matchPage.stepsLabel")}>
+          {/* Les paramètres de la partie ont leur propre section, lue par tout
+              le monde : l'étape y renvoie plutôt que de les répéter. */}
           {selfManagementSteps(match.casters.length).map((step) => (
-            <li key={step}>
-              {t(`matchPage.steps.${step}`)}
-              {/* Réglages propres à Overwatch : rien à lister pour Marvel Rivals. */}
-              {step === "settings" && game === "OW" && (
-                <ul className={styles.stepSettings}>
-                  {OW_SELF_MANAGEMENT_SETTINGS.map((setting) => (
-                    <li key={setting}>{t(`matchPage.owSettings.${setting}`)}</li>
-                  ))}
-                </ul>
-              )}
-            </li>
+            <li key={step}>{t(`matchPage.steps.${step}`)}</li>
           ))}
         </ol>
       )}
@@ -1096,6 +1111,7 @@ function MatchPageContent({
               )
             }
           />
+          <GameSettingsSection />
         </div>
         {rightColumn && (
           <div className={styles.column}>
@@ -1103,7 +1119,6 @@ function MatchPageContent({
             <ConnectionSection launch={shownLaunch} onCopy={onCopy} />
             <OfficiatingSection
               match={match}
-              game={detail.card.game}
               staff={canSchedule}
               forParties={organizes}
               launch={shownLaunch}

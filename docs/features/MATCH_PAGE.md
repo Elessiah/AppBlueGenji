@@ -94,11 +94,9 @@ anciennes clés `tournament.matchPage.*` restant pour les sections.
    à l'impératif, aux seuls lecteurs qui organisent le match (joueur, caster
    inscrit, staff — les autres, spectateurs de /suivre compris, lisent
    l'autogestion dans les faits clés) (l'hôte crée la partie, les managers s'invitent, les paramètres, les casters
-   — cette étape seulement avec un caster, `selfManagementSteps`) ; à
-   l'étape des paramètres, un match **Overwatch** liste en sous-liste
-   (`<ul>` imbriquée, `OW_SELF_MANAGEMENT_SETTINGS`) : paramètres compétitifs,
-   killcam désactivée, pause lors de la déconnexion d'un joueur (clés
-   `matchPage.owSettings.*`, FR et EN) — rien pour Marvel Rivals ; ni le DM de
+   — cette étape seulement avec un caster, `selfManagementSteps`) ; l'étape
+   des paramètres **renvoie à la section « Paramètres de partie »** (point 8),
+   qui les porte une seule fois pour tout le monde ; ni le DM de
    lancement ni le bot ne reprennent cette étape ; ou, au
    **staff seul**, « Aucune décision ». Rien sur un match terminé ou une
    exemption. Prendre, rendre ou confier l'arbitrage reste le geste de la carte
@@ -111,6 +109,16 @@ anciennes clés `tournament.matchPage.*` restant pour les sections.
    tant que le match n'est pas annoncé casté. Puis les fiches des casters, BattleTag marqué
    « À inviter — obligatoire » (pas sur sa propre fiche) sous « Casters à
    inviter ».
+8. **Paramètres de partie** (`GameSettingsSection`, colonne de gauche après
+   « Maps et bans ») : mode compétitif, pas de killcam, pause à la déconnexion
+   — **les mêmes pour tous les jeux** (décision du 2026-11-04 ; auparavant
+   propres à Overwatch et logés dans l'aide-mémoire de l'autogestion), lus par
+   **tout le monde**, sans compte compris : ce sont les règles de la partie,
+   pas une consigne d'organisation. Liste unique `GAME_SETTINGS`
+   (`lib/shared/match-page.ts`), rendue par les clés
+   `matchPage.gameSettings.*` (FR et EN) sous le titre
+   `matchPage.sections.gameSettings` ; le check-in du match les écrit sur
+   Discord à partir de la même liste (`MATCH_LOBBY_BRIEF.md`).
 
 ## Hors Overwatch (décision 35, 2026-10-28)
 

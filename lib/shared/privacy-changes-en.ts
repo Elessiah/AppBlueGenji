@@ -810,6 +810,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Terms of use: version 9, in force since 6 November 2026, says so in its “Account” and “Match contacts” sections. A window presents it to you until you have accepted it: accepting it lets you keep using the site.",
     ],
   },
+  "2026-11-check-in-du-match": {
+    linkLabels: ["Read the “Match Discord direct messages” paragraph"],
+    title: "Match check-in: one message, 15 minutes before, to every player",
+    summary:
+      "The lobby settings message becomes the “match check-in”: it is now sent 15 minutes before kickoff, and to every player of both entrants — no longer only to those who manage a team.",
+    details: [
+      "What changes: when it is sent (15 minutes before kickoff, instead of when the lobby opens; a match with no time keeps the lobby opening) and who receives it (every player of both entrants, no longer only their owners and managers). The message also tells you to join your team's voice channel and the check-in channel, and gives the game settings, the map order, the match's stream link when it is public, the reminder to enter the scores and who to report a problem to.",
+      "What does not change: it still contains no BattleTag, no Discord tag and no player username (in a solo tournament, it says “you” and “your opponent”); the direct message only goes to a certified Discord tag and is turned off, like the other match messages, with the “Discord direct messages about my matches” box in “My profile”; the push notification keeps its topic, which you can turn off in “My profile”.",
+    ],
+  },
 };
 
 /**

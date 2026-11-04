@@ -26,7 +26,8 @@ salons pleins.
   d'office attendent les deux salons à 5/5 ; sans elle, le match se lance quand
   l'heure est passée **et** les deux salons pleins (affiché `SCHEDULED` d'ici là).
   Sans phase, un match retenu n'ouvre aucun lancement (`lobby_opened_at` reste vide :
-  ni appel aux « Prêt », ni brief du salon).
+  ni appel aux « Prêt », ni check-in du match par le salon — mais son horaire
+  le déclenche quand même, 15 min avant le coup d'envoi, `MATCH_LOBBY_BRIEF.md`).
   Le lancement forcé par l'arbitrage passe toujours.
 - **Panne du bot** : le verrou se lève (`failed_at`), une ligne pm2 sans donnée de
   joueur (`[match-voice] match <id> : bot indisponible (<code>) — verrou du lancement levé`),

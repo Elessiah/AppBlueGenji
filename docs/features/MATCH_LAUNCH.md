@@ -291,7 +291,8 @@ d'elle-même à l'heure de départ d'un match en attente et à son lancement
 d'office (`nextRoomWakeAt`), au lieu d'attendre son filet de cinq minutes.
 
 L'ouverture du salon (`lobby_opened_at`) déclenche aussi, après coup, le
-**brief du salon** aux propriétaires et managers (`MATCH_LOBBY_BRIEF.md`).
+**check-in du match** quand il n'a pas d'horaire — avec un horaire, il est
+déjà parti 15 minutes avant le coup d'envoi (`MATCH_LOBBY_BRIEF.md`).
 
 ## S'inscrire pour caster
 

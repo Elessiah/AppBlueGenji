@@ -22,7 +22,7 @@ jest.mock("@/lib/server/tournaments/player-pushes", () => ({ readMatchCasters: j
 jest.mock("@/lib/server/tournaments/cast-eligibility", () => ({ loadEligibleRefereeIds: jest.fn() }));
 
 import { getDatabase } from "@/lib/server/database";
-import { loadEntrantManagerIds, loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
+import { loadEntrantPlayerIds, loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
 import { readMatchCasters } from "@/lib/server/tournaments/player-pushes";
 import {
@@ -49,6 +49,9 @@ const MATCH = {
   team1_name: "Renards",
   team2_name: "Nova",
   launch_pairing: "1:2",
+  brief_pairing: "1:2",
+  voice_tracked: 0,
+  stream_url: null,
   host_team_id: null,
   team1_seed: null,
   team2_seed: null,
@@ -72,7 +75,7 @@ function mockDb(candidates: Record<string, unknown>[], claims: boolean[] = [], r
   const queue = [...claims];
   let nextId = 100;
   const query = jest.fn<SqlQuery>(async (sql, params) => {
-    if (/WHERE m\.id = \? AND m\.launch_pairing = \?/.test(sql)) {
+    if (/WHERE m\.id = \? AND CONCAT\(m\.team1_id, ':', m\.team2_id\) = \?/.test(sql)) {
       const id = Number((params as unknown[])[1]);
       if (!reread.has(id)) return [candidates.filter((row) => row.id === id).map((row) => ({ ...row, claim_kept: 1 }))];
       const row = reread.get(id);
@@ -113,7 +116,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   resetLobbyBriefThrottle();
   siteRoot.failFor = null;
-  jest.mocked(loadEntrantManagerIds).mockResolvedValue(
+  jest.mocked(loadEntrantPlayerIds).mockResolvedValue(
     new Map([
       [1, [10, 11]],
       [2, [20]],
@@ -137,25 +140,31 @@ afterEach(() => {
 });
 
 describe("dispatchLobbyBriefs", () => {
-  it("ne lit que les salons ouverts récemment, de l'appariement courant, pas encore briefés", async () => {
+  it("ne lit que les matchs dus — par leur horaire ou, à défaut, par leur salon — pas encore briefés", async () => {
     const { query } = mockDb([]);
     expect(await dispatchLobbyBriefs()).toBe(0);
     const [sql, params] = query.mock.calls[0];
     expect(sql).toMatch(/t\.state = 'RUNNING'/);
     expect(sql).toMatch(/m\.status = 'READY' AND m\.is_bye = 0/);
-    expect(sql).toMatch(/m\.launch_pairing = CONCAT\(m\.team1_id, ':', m\.team2_id\)/);
-    expect(sql).toMatch(/m\.lobby_opened_at > NOW\(\) - INTERVAL \? MINUTE/);
+    // Le quart d'heure avant le coup d'envoi : le repère de principe.
+    expect(sql).toMatch(/m\.start_at <= NOW\(\) \+ INTERVAL 15 MINUTE/);
+    expect(sql).toMatch(/m\.start_at > NOW\(\) - INTERVAL 120 MINUTE/);
+    // Sans horaire, le salon : le repli d'avant la fusion.
+    expect(sql).toMatch(/OR \(m\.lobby_opened_at IS NOT NULL\s+AND m\.lobby_opened_at > NOW\(\) - INTERVAL 20 MINUTE\)/);
+    // L'appariement n'est pas comparé à `launch_pairing` : il est vide avant tout lancement.
+    expect(sql).not.toMatch(/m\.launch_pairing = CONCAT/);
     // Un match qui porte un score est joué : aucun salon à régler.
     expect(sql).toMatch(/AND m\.team1_score IS NULL AND m\.team2_score IS NULL/);
     // Un match reste candidat tant qu'un de ses deux côtés n'est pas réservé.
     expect(sql).toMatch(/n\.phase IN \(\?, \?\)\) < 2/);
-    expect(params).toEqual([20, "LOBBY_BRIEF_1", "LOBBY_BRIEF_2"]);
+    expect(params).toEqual(["LOBBY_BRIEF_1", "LOBBY_BRIEF_2"]);
     expect(lobbyBriefPhase(2).length).toBeLessThanOrEqual(16);
     expect(notifyUsers).not.toHaveBeenCalled();
   });
 
   it("dispatchLobbyBriefs_twoSides_recipientsReadOnceThenEachSideClaimedAndSent", async () => {
-    const { execute } = mockDb([MATCH]);
+    // En autogestion : chaque côté lit son rôle dans la création de la partie.
+    const { execute } = mockDb([{ ...MATCH, self_managed: 1 }]);
 
     expect(await dispatchLobbyBriefs()).toBe(2);
 
@@ -163,7 +172,7 @@ describe("dispatchLobbyBriefs", () => {
       ["LOBBY_BRIEF_1", 40, "1:2"],
       ["LOBBY_BRIEF_2", 40, "1:2"],
     ]);
-    expect(loadEntrantManagerIds).toHaveBeenCalledWith([1, 2]);
+    expect(loadEntrantPlayerIds).toHaveBeenCalledWith([1, 2]);
     // Une seule lecture pour tous les côtés ; message de match : tag certifié seul.
     expect(loadNotificationRecipients).toHaveBeenCalledTimes(1);
     expect(loadNotificationRecipients).toHaveBeenCalledWith([10, 11, 20], "certified", { matchDm: true });
@@ -171,14 +180,23 @@ describe("dispatchLobbyBriefs", () => {
     expect(team1.userIds).toEqual([10, 11]);
     expect(team1.notification.topic).toBe("MATCH_LOBBY_BRIEF");
     expect(team1.notification.discord?.context).toBe("lobby-brief");
-    expect(team1.dm()).toContain("Le salon de ton match « Renards » contre « Nova » est ouvert");
-    expect(team1.dm()).toContain("• Gauche (hôte) : « Renards »");
-    expect(team1.dm()).toContain("• Droite (1er ban) : « Nova »");
+    expect(team1.dm()).toContain("# Check-in du match « Renards » Vs « Nova »");
+    expect(team1.dm()).toContain("coup d'envoi dans moins de 15 minutes");
+    expect(team1.dm()).toContain("* Gauche (hôte) : « Renards » · Droite : « Nova »");
+    // Les paramètres de partie, les mêmes pour tous les jeux.
+    expect(team1.dm()).toContain("## Paramètres de partie\n* Mode compétitif\n* Pas de killcam\n* Pause à la déconnexion");
+    expect(team1.dm()).toContain("N'oubliez pas de rentrer les scores");
+    expect(team1.dm()).toContain("pinguez le rôle @Arbitre sur Discord");
+    expect(team1.dm()).toContain("GL HF :)");
     expect(team1.dm()).toContain("https://bluegenji.test/tournois/4/matchs/40");
     expect(team1.push().url).toBe("/tournois/4/matchs/40");
     expect(team2.userIds).toEqual([20]);
-    expect(team2.dm()).toContain("ton match « Nova » contre « Renards »");
-    expect(team2.dm("en")).toContain("• Left (host): “Renards”");
+    expect(team2.dm()).toContain("# Check-in du match « Nova » Vs « Renards »");
+    // L'hôte crée la partie, l'autre vérifie les réglages.
+    expect(team1.dm()).toContain("**C'est à ton équipe de créer la partie.**");
+    expect(team2.dm()).toContain("L'équipe hôte crée la partie");
+    expect(team2.dm("en")).toContain("* Left (host): “Renards” · Right: “Nova”");
+    expect(team2.dm("en")).toContain("## Game settings\n* Competitive mode\n* No killcam\n* Pause on disconnect");
   });
 
   it("dispatchLobbyBriefs_eachSide_claimedThenSentBeforeTheNextClaim", async () => {
@@ -204,11 +222,12 @@ describe("dispatchLobbyBriefs", () => {
     expect(await dispatchLobbyBriefs()).toBe(0);
     const [sql] = execute.mock.calls[0];
     // La réservation relit le match dans la même instruction.
-    expect(sql).toMatch(/INSERT IGNORE INTO bg_match_start_notices \(match_id, pairing, phase\)\s+SELECT m\.id, m\.launch_pairing, \? FROM bg_matches m/);
-    expect(sql).toMatch(/m\.id = \? AND m\.launch_pairing = \? AND m\.status = 'READY' AND m\.is_bye = 0/);
-    expect(sql).toMatch(/m\.lobby_opened_at IS NOT NULL AND m\.team1_score IS NULL AND m\.team2_score IS NULL/);
-    // Réapparié entre-temps (équipes changées, `launch_pairing` resté) : rien pour les anciennes équipes.
-    expect(sql).toMatch(/AND m\.launch_pairing = CONCAT\(m\.team1_id, ':', m\.team2_id\)/);
+    expect(sql).toMatch(/INSERT IGNORE INTO bg_match_start_notices \(match_id, pairing, phase\)\s+SELECT m\.id, CONCAT\(m\.team1_id, ':', m\.team2_id\), \? FROM bg_matches m/);
+    // Le tournoi doit toujours être en cours, comme à la lecture des candidats.
+    expect(sql).toMatch(/JOIN bg_tournaments t ON t\.id = m\.tournament_id AND t\.state = 'RUNNING'/);
+    // Réapparié entre-temps : la clé est l'appariement courant, rien pour les anciennes équipes.
+    expect(sql).toMatch(/WHERE m\.id = \? AND CONCAT\(m\.team1_id, ':', m\.team2_id\) = \? AND m\.status = 'READY'/);
+    expect(sql).toMatch(/AND m\.team1_score IS NULL AND m\.team2_score IS NULL/);
     expect(sql).not.toMatch(/VALUES/);
     expect(notifyUsers).not.toHaveBeenCalled();
   });
@@ -224,13 +243,15 @@ describe("dispatchLobbyBriefs", () => {
 
     await dispatchLobbyBriefs();
 
-    expect(sends()[0].dm()).toContain("🎮 BlueGenji — Ton match « Renards » contre « Nova » est lancé (");
-    expect(sends()[0].dm()).toContain("• Gauche (hôte) : « Renards »");
+    expect(sends()[0].dm()).toContain("# Check-in du match « Renards » Vs « Nova »");
+    expect(sends()[0].dm()).toContain("match lancé.*");
+    expect(sends()[0].dm()).not.toContain("coup d'envoi dans moins de 15 minutes");
+    expect(sends()[0].dm()).toContain("* Gauche (hôte) : « Renards »");
     expect(sends()[0].push().title).toBe("Match lancé : réglages de la partie");
   });
 
   it("dispatchLobbyBriefs_ghostOpponent_claimKeptOnlyRealTeamBriefedWithoutMutualInviteLine", async () => {
-    jest.mocked(loadEntrantManagerIds).mockResolvedValue(new Map([[1, [10]]]));
+    jest.mocked(loadEntrantPlayerIds).mockResolvedValue(new Map([[1, [10]]]));
     const { execute } = mockDb([{ ...MATCH, team2_ghost: 1, self_managed: 1 }]);
 
     expect(await dispatchLobbyBriefs()).toBe(1);
@@ -243,13 +264,13 @@ describe("dispatchLobbyBriefs", () => {
 
   it("dispatchLobbyBriefs_realTeamWithoutManager_notClaimedAndLoggedOncePerPairing", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
-    jest.mocked(loadEntrantManagerIds).mockResolvedValue(new Map([[2, [20]]]));
+    jest.mocked(loadEntrantPlayerIds).mockResolvedValue(new Map([[2, [20]]]));
     const { execute } = mockDb([MATCH]);
 
     expect(await dispatchLobbyBriefs()).toBe(1);
 
     expect(execute.mock.calls.map(([, params]) => params)).toEqual([["LOBBY_BRIEF_2", 40, "1:2"]]);
-    expect(logged(error, "aucun gestionnaire actif")).toBe(true);
+    expect(logged(error, "aucun joueur actif")).toBe(true);
     // Balayage suivant : toujours sans gestionnaire, pm2 ne le redit pas.
     error.mockClear();
     jest.useFakeTimers({ now: Date.now() + 60_000, doNotFake: ["setTimeout", "clearTimeout"] });
@@ -259,12 +280,12 @@ describe("dispatchLobbyBriefs", () => {
     } finally {
       jest.useRealTimers();
     }
-    expect(logged(error, "aucun gestionnaire actif")).toBe(false);
+    expect(logged(error, "aucun joueur actif")).toBe(false);
     error.mockRestore();
   });
 
   it("dispatchLobbyBriefs_noSideCanBeBriefed_castersAndRefereesNotRead", async () => {
-    jest.mocked(loadEntrantManagerIds).mockResolvedValue(new Map());
+    jest.mocked(loadEntrantPlayerIds).mockResolvedValue(new Map());
     jest.spyOn(console, "error").mockImplementation(() => undefined);
     const { execute } = mockDb([{ ...MATCH, referee_user_id: 9 }]);
 
@@ -277,7 +298,7 @@ describe("dispatchLobbyBriefs", () => {
   });
 
   it("en tournoi individuel, le joueur reçoit le brief sans aucun pseudo", async () => {
-    jest.mocked(loadEntrantManagerIds).mockResolvedValue(
+    jest.mocked(loadEntrantPlayerIds).mockResolvedValue(
       new Map([
         [1, [10]],
         [2, [20]],
@@ -290,7 +311,10 @@ describe("dispatchLobbyBriefs", () => {
         expect(text).not.toMatch(/PseudoA|PseudoB/);
       }
     }
-    expect(sends()[0].dm()).toContain("• Gauche (hôte) : toi");
+    expect(sends()[0].dm()).toContain("# Check-in de ton match");
+    expect(sends()[0].dm()).toContain("* Gauche (hôte) : toi · Droite : ton adversaire");
+    // Jamais de salon vocal pour une entrée solo (`MATCH_VOICE.md`).
+    expect(sends()[0].dm()).not.toContain("salon vocal");
   });
 
   it("dispatchLobbyBriefs_marvelRivalsTournament_dmSpeaksOfNoBattletag", async () => {
@@ -301,8 +325,10 @@ describe("dispatchLobbyBriefs", () => {
 
     expect(query.mock.calls[0][0]).toMatch(/t\.game/);
     const dm = sends()[0].dm();
-    expect(dm).toContain("• Arbitre désigné : il invitera les joueurs dans le salon.");
+    expect(dm).toContain("* L'arbitre désigné invitera les joueurs dans le salon.");
     expect(dm).not.toContain("BattleTag");
+    // Hors Overwatch, on ne s'invite pas par BattleTag : on prévient les casters.
+    expect(dm).not.toContain("Ajoute l'arbitre désigné en jeu");
   });
 
   it("suit l'hôte choisi, la tête de série en BG Survie, le cast et l'arbitre encore éligible", async () => {
@@ -315,15 +341,19 @@ describe("dispatchLobbyBriefs", () => {
     ]);
     await dispatchLobbyBriefs();
     const [m40, , m41, , m42] = sends();
-    expect(m40.dm()).toContain("• Gauche (hôte) : « Nova »");
-    expect(m40.dm()).toContain("• Bans de la carte 1 : « Renards » d'abord, puis « Nova »");
-    expect(m40.dm()).toContain("Match casté");
-    expect(m40.dm()).toContain("Arbitre désigné");
-    expect(m41.dm()).toContain("• Gauche (hôte) : « Nova »");
-    expect(m41.dm()).toContain("Autogestion");
-    expect(m41.dm()).not.toContain("Match casté");
-    // Arbitre devenu inéligible : rien n'est promis.
-    expect(m42.dm()).not.toMatch(/Arbitre|Autogestion/);
+    expect(m40.dm()).toContain("* Gauche (hôte) : « Nova » · Droite : « Renards »");
+    expect(m40.dm()).toContain("* Bans de la carte 1 : « Renards » d'abord, puis « Nova ».");
+    expect(m40.dm()).toContain("## Match casté");
+    expect(m40.dm()).toContain("Un arbitre est désigné pour votre match.");
+    expect(m40.dm()).toContain("Ajoute l'arbitre désigné en jeu");
+    // Avec un arbitre, personne n'est chargé de créer la partie.
+    expect(m40.dm()).not.toContain("créer la partie");
+    expect(m41.dm()).toContain("* Gauche (hôte) : « Nova » · Droite : « Renards »");
+    expect(m41.dm()).toContain("**Votre match est en autogestion.**");
+    expect(m41.dm()).not.toContain("## Match casté");
+    // Arbitre devenu inéligible : rien n'est promis, et la décision reste neutre.
+    expect(m42.dm()).toContain("Voici les éléments importants à savoir avant le coup d'envoi.");
+    expect(m42.dm()).not.toMatch(/arbitre désigné|autogestion/);
     expect(loadEligibleRefereeIds).toHaveBeenCalledWith(expect.anything(), [9, 8], expect.any(String));
   });
 
@@ -337,7 +367,7 @@ describe("dispatchLobbyBriefs", () => {
     expect(query.mock.calls[0][0]).toMatch(/rptm\.user_id = m\.referee_user_id/);
     expect(query.mock.calls[0][0]).toMatch(/rptm\.team_id IN \(m\.team1_id, m\.team2_id\)/);
     expect(query.mock.calls[0][0]).toMatch(/rpst\.solo_user_id = m\.referee_user_id AND rpst\.id IN \(m\.team1_id, m\.team2_id\)/);
-    expect(sends()[0].dm()).not.toContain("Arbitre");
+    expect(sends()[0].dm()).not.toContain("arbitre désigné");
   });
 
   it("dispatchLobbyBriefs_settingsChangedBeforeClaim_rereadSettingsBriefed", async () => {
@@ -352,11 +382,11 @@ describe("dispatchLobbyBriefs", () => {
 
     // Une relecture par côté réservé.
     expect(query).toHaveBeenCalledTimes(3);
-    expect(sends()[0].dm()).toContain("• Gauche (hôte) : « Nova »");
+    expect(sends()[0].dm()).toContain("* Gauche (hôte) : « Nova »");
     expect(sends()[0].dm()).toContain("« Busan »");
     // Arbitre désigné entre les deux lectures : sa condition est lue à part.
     expect(loadEligibleRefereeIds).toHaveBeenLastCalledWith(expect.anything(), [5], expect.any(String));
-    expect(sends()[0].dm()).toContain("Arbitre désigné");
+    expect(sends()[0].dm()).toContain("Un arbitre est désigné pour votre match.");
   });
 
   it("dispatchLobbyBriefs_rereadFails_claimReleasedByIdNothingSentRetryArmed", async () => {
@@ -471,12 +501,12 @@ describe("dispatchLobbyBriefs", () => {
     error.mockRestore();
   });
 
-  it("une panne de lecture des casters ou des arbitres ne prive pas les managers du brief", async () => {
+  it("une panne de lecture des casters ou des arbitres ne prive pas les joueurs du check-in", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(loadEligibleRefereeIds).mockRejectedValue(new Error("DB_DOWN"));
     mockDb([{ ...MATCH, referee_user_id: 9 }]);
     expect(await dispatchLobbyBriefs()).toBe(2);
-    expect(sends()[0].dm()).not.toContain("Arbitre");
+    expect(sends()[0].dm()).not.toContain("arbitre désigné");
     error.mockRestore();
   });
 
@@ -789,7 +819,7 @@ describe("dispatchLobbyBriefs", () => {
     expect(await dispatchLobbyBriefs()).toBe(1);
 
     expect(execute.mock.calls.map(([, params]) => params)).toEqual([["LOBBY_BRIEF_2", 40, "1:2"]]);
-    expect(logged(error, "aucun gestionnaire actif")).toBe(true);
+    expect(logged(error, "aucun joueur actif")).toBe(true);
     error.mockRestore();
   });
 

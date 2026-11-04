@@ -210,7 +210,7 @@ fenêtre d'acceptation (`TermsAccountDeletion`). Annoncée par l'entrée
 `2026-10-conditions-v7-casters-et-arbitre` (FR et EN) ; l'entrée
 `2026-10-arbitre-designe-des-matchs`, en production depuis #487 (intérêt
 légitime, opposition), n'est pas réécrite.
-Conditions du bot (article 01) et registre T08 : réglages du salon et avis
+Conditions du bot (article 01) et registre T08 : check-in du match et avis
 du retrait d'un cast parmi les messages remis. **Tout compte la réaccepte** dans la fenêtre
 bloquante.
 
