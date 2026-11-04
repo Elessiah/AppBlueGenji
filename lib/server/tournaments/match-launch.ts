@@ -401,6 +401,14 @@ async function lockLaunchMatch(
 }
 
 
+/** Le lecteur est-il l'arbitre désigné du match, et le reste-t-il (`refereeEligible`) ? */
+function isEligibleReferee(
+  row: { referee_user_id?: number | null; refereeEligible?: boolean },
+  userId: number,
+): boolean {
+  return row.refereeEligible === true && nullableId(row.referee_user_id ?? null) === userId;
+}
+
 /** Partie que le lecteur représente dans ce match, et sa qualité à y agir. */
 export type MatchParty = { role: LaunchViewerRole; canDeclareReady: boolean };
 
@@ -435,7 +443,7 @@ export async function resolveMatchParty(
   }
   // L'arbitre désigné, tant qu'il remplit la condition d'arbitrage. Un arbitre
   // qui caste aussi lit en caster : un seul « Prêt » vaut pour les deux.
-  if (match.refereeEligible && match.referee_user_id != null && Number(match.referee_user_id) === userId) {
+  if (isEligibleReferee(match, userId)) {
     return { role: "MATCH_REFEREE", canDeclareReady: true };
   }
   return null;
@@ -553,7 +561,7 @@ async function writeCasterReady(
   ]);
   const readyAt = ready ? new Date() : null;
   for (const caster of row.casters) if (caster.userId === userId) caster.readyAt = readyAt;
-  const alsoReferee = row.refereeEligible && Number(row.referee_user_id) === userId;
+  const alsoReferee = isEligibleReferee(row, userId);
   if (alsoReferee) row.referee_ready_at = readyAt;
   const refereeReady = alsoReferee ? `, referee_ready_at = ${stamp}` : "";
   await connection.execute(
@@ -792,8 +800,9 @@ export async function claimMatchCast(
       if (row.casters.some((caster) => caster.userId === userId)) {
         return { tournamentId: Number(row.tournament_id), claimed: false };
       }
-      const party = await resolveMatchParty(connection, row, userId);
-      if (party) throw new Error("CASTER_IS_PLAYER");
+      // Seul **jouer** le match ferme le cast : l'arbitre désigné peut le
+      // caster (`resolveMatchParty` le rendrait `MATCH_REFEREE`, à tort refusé).
+      if (await resolveTeamParty(connection, row, userId)) throw new Error("CASTER_IS_PLAYER");
 
       let streamId: number;
       if ("streamId" in castTarget) {
@@ -810,6 +819,9 @@ export async function claimMatchCast(
         );
         streamId = Number(created.insertId);
       }
+      // Inscrit sans « Prêt », arbitre désigné compris : un « Prêt » d'arbitre
+      // peut dater d'un cycle de lancement révolu (report, appariement). Son
+      // clic suivant, en caster, donne les deux (`writeCasterReady`).
       await connection.execute(
         `INSERT INTO bg_match_casters (match_id, user_id, stream_id, ready_at) VALUES (?, ?, ?, NULL)`,
         [matchId, userId, streamId],
