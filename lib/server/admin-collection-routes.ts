@@ -15,8 +15,9 @@ import { can, type Permission } from "@/lib/shared/permissions";
  * Déroulé, dans cet ordre : session (401 `UNAUTHORIZED`), permission
  * (403 `FORBIDDEN`), identifiant (400 `INVALID_ID`), corps JSON
  * (400 `INVALID_BODY`), puis le service — dont le message d'erreur devient le
- * code renvoyé (404 pour l'élément introuvable, 400 sinon, le code de repli
- * quand le message est vide).
+ * code renvoyé s'il a la forme d'un code du site (404 pour l'élément
+ * introuvable, 400 sinon) ; tout autre message (vide, texte d'un pilote) donne
+ * le code de repli, journalisé.
  */
 
 type JsonBody = Record<string, unknown>;

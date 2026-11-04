@@ -161,8 +161,10 @@ export async function getSpectatorPayload(
   level: SpectatorLoadLevel,
   client: string | null,
 ): Promise<SpectatorPayload | null> {
-  // Choix assumé (décision de l'auteur, `SPECTATOR_VIEW.md`) : seule la
-  // suppression du tournoi retire cette réponse. Un renommage, un avatar retiré
+  // Choix assumé (décision de l'auteur, `SPECTATOR_VIEW.md`) : seules la
+  // suppression du tournoi et son édition par le staff (`updateTournament`,
+  // image du tournoi) retirent cette réponse — un nom, une description ou une
+  // bannière retirés ne restent pas servis. Un renommage d'équipe, un avatar retiré
   // ou un compte supprimé attendent son expiration (15 s au calme, 150 s sous
   // la charge ou pour un tournoi terminé) — c'est elle qui protège la machine
   // d'un tournoi animé. Un tournoi publié ne redevient jamais invisible :
