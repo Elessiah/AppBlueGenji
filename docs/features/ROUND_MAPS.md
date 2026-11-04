@@ -125,7 +125,7 @@ série est à égalité après les trois maps régulières, sinon inutilisée.
   le sens ne change pas), filtrée par l'éligibilité courante
   (`applicableTiebreaks`) : un format changé depuis masque le réglage sans
   l'effacer. Ces réglages inactifs restent portés par l'instantané
-  (`mapRules.staleTiebreaks`) : `RoundMapsDialog` les liste (« Maps de départage
+  (`mapRules.staleTiebreaks`, champ omis quand il n'y en a pas) : `RoundMapsDialog` les liste (« Maps de départage
   inactives ») avec un bouton « Retirer » (retirer est permis sur toute clé).
 - **Écran** : section « Map de départage » de `RoundMapsDialog` (formulaire à
   part, liste d'Overwatch suggérée, saisie libre, « Enregistrer » / « Retirer »),

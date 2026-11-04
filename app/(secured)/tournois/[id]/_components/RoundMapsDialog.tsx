@@ -52,6 +52,8 @@ import {
   toggleMapInSlot,
   vanishedRoundFallback,
   type SlotEdit,
+  sameRoundKeys,
+  storedRoundSignature,
 } from "../_lib/round-maps-editor";
 import { useRoundMapsText, type RoundMapsText } from "../_lib/round-maps-text";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
@@ -75,6 +77,14 @@ export function dialogRounds(detail: TournamentDetail): RoundKey[] {
     roundKeysOf(detail.matches),
     detail.mapRules.rounds,
   );
+}
+
+/** Tours de la fenêtre, référence conservée tant que la liste ne change pas (un instantané n'en change pas toujours). */
+function useStableRounds(detail: TournamentDetail): RoundKey[] {
+  const planned = useMemo(() => dialogRounds(detail), [detail]);
+  const stable = useRef(planned);
+  if (!sameRoundKeys(stable.current, planned)) stable.current = planned;
+  return stable.current;
 }
 
 /** Libellé d'un tour : phase, tableau (hors tableau principal), numéro ; play-offs à part. */
@@ -481,6 +491,9 @@ function TiebreakForm({
  * Maps de départage gardées en base sur des tours que le format n'autorise
  * plus : ni montrées ni jouées, mais le staff doit pouvoir les retirer.
  */
+/** Liste vide partagée : une référence neuve à chaque rendu relancerait l'effet de focus. */
+const NO_STALE_TIEBREAKS: readonly RoundTiebreak[] = [];
+
 function StaleTiebreaks({
   items,
   roundLabel,
@@ -585,7 +598,9 @@ export function RoundMapsDialog({
   const tournamentId = detail.card.id;
   const rules = detail.mapRules;
   const overwatch = detail.card.game !== "MR";
-  const rounds = useMemo(() => dialogRounds(detail), [detail]);
+  // Les tours ne changent pas à chaque instantané : sans cette stabilité, chaque image du flux
+  // redonnerait de nouvelles références au tour affiché et relancerait les effets qui en dépendent.
+  const rounds = useStableRounds(detail);
 
   // Une seule annonce Discord par série d'enregistrements : à la fermeture de
   // l'écran on demande son envoi tout de suite, en listant les tours écrits ici
@@ -635,7 +650,9 @@ export function RoundMapsDialog({
   });
   const clearSlotError = fieldErrors.clear;
   // Un refus ne survit pas à ce qui l'a causé : cartes, cible, tour affiché ou réglages du serveur changés.
-  useEffect(() => clearSlotError(), [slots, copyTarget, roundId, rules.rounds, clearSlotError]);
+  // Seules les cartes enregistrées de ce tour comptent : un instantané qui ne les touche pas laisse le refus.
+  const storedKey = storedRoundSignature(rules.rounds, round);
+  useEffect(() => clearSlotError(), [slots, copyTarget, roundId, storedKey, clearSlotError]);
 
   // L'instantané change sous la fenêtre (autre membre du staff, ou son propre
   // envoi) : règles et cartes suivent le serveur tant qu'elles n'ont pas été
@@ -1110,7 +1127,7 @@ export function RoundMapsDialog({
         )}
 
         <StaleTiebreaks
-          items={rules.staleTiebreaks ?? []}
+          items={rules.staleTiebreaks ?? NO_STALE_TIEBREAKS}
           roundLabel={roundLabel}
           tournamentId={tournamentId}
           busy={busy}

@@ -190,3 +190,13 @@ export function vanishedRoundFallback(rounds: readonly RoundKey[], roundId: stri
   if (!first) return roundId === "" ? null : "";
   return roundKeyId(first);
 }
+
+/** Deux listes de tours désignent-elles les mêmes tours, dans le même ordre ? */
+export function sameRoundKeys(a: readonly RoundKey[], b: readonly RoundKey[]): boolean {
+  return a.length === b.length && a.every((round, index) => roundKeyId(round) === roundKeyId(b[index]));
+}
+
+/** Empreinte des cartes enregistrées d'un tour : change quand elles changent, pas à chaque instantané. */
+export function storedRoundSignature(rounds: readonly RoundMapConfig[], round: RoundKey | null): string {
+  return JSON.stringify(round ? roundMapsOf(rounds, round) : null);
+}
