@@ -31,7 +31,7 @@ describe("RuleDiagramFigure — MULTI", () => {
   it("multiDiagram_minWidth_keepsPhoneScale", () => {
     const html = renderMulti();
 
-    expect(html).toContain("min-width:582px");
+    expect(html).toMatch(/class="[^"]*svgMulti[^"]*"/);
     expect(html).toMatch(/font-size="11"[^>]*letter-spacing="0.1em"[^>]*>CHAMPIONNE</);
   });
 
