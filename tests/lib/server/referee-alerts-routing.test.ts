@@ -9,6 +9,7 @@ import {
   dropQueuedRefereeAlerts,
   flushBotLogs,
   ALERT_FLUSH_WAIT_MS,
+  BOT_LOG_ORDER_WAIT_MS,
   markMatchResolved,
   queueBotLog,
   queueRefereeAlert,
@@ -290,7 +291,7 @@ describe("routage vers deux transports", () => {
   // partir quand même.
   it("poursuit la file quand pushRefereeAlert rend null (bot injoignable)", async () => {
     const connection = fakeConnection();
-    mockDb([[MATCH_ROW], [TOURNAMENT_ROW]]);
+    mockDb([[TOURNAMENT_ROW], [MATCH_ROW]]);
     jest.mocked(pushRefereeAlert).mockResolvedValue(null);
 
     queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
@@ -1052,5 +1053,43 @@ describe("tour du journal et vidage avant alerte", () => {
     await flushed();
 
     expect(jest.mocked(flushBotLogBatch).mock.calls).toEqual([[{ tournamentId: 12 }], [{ tournamentId: 13 }]]);
+  });
+  it("flushBotLogs_alertAndSlowLogLineSamePass_alertSentWithoutWaitingForTheLine", async () => {
+    const connection = fakeConnection();
+    const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>((_sql, params) =>
+      params?.[0] === 12 ? new Promise(() => undefined) : Promise.resolve([[MATCH_ROW]]),
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
+    queueBotLog(connection, { kind: "score_conflict", matchId: 31 });
+    flushBotLogs(connection);
+    await flushed();
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+    jest.mocked(sendBotLog).mockClear();
+  });
+
+  it("flushBotLogs_lineResolutionHangs_turnReleasedAfterTheBound", async () => {
+    jest.useFakeTimers({ doNotFake: ["setImmediate", "nextTick", "queueMicrotask"] });
+    try {
+      const connection = fakeConnection();
+      const execute = jest.fn<(sql: string, params?: unknown[]) => Promise<unknown>>(() => new Promise(() => undefined));
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+      queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
+      flushBotLogs(connection);
+      const turn = order.__bgBotLogOrder;
+      let released = false;
+      void turn?.then(() => {
+        released = true;
+      });
+      await jest.advanceTimersByTimeAsync(BOT_LOG_ORDER_WAIT_MS - 1);
+      expect(released).toBe(false);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(released).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

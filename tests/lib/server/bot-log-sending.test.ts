@@ -113,6 +113,16 @@ describe("kind et catégories", () => {
     expect(pendingBotLogBatches()).toEqual(new Map([["log:tournament:4:referees", 1]]));
   });
 
+  it("sendBotLog_alertWithoutTournament_globalLotsNotFlushed", async () => {
+    jest.useFakeTimers();
+    sendBotLog("inscription", { category: "signups" });
+    sendBotLog("relevé", { category: "referee-digest" });
+    await settle();
+    expect(postedMessages()).toEqual(["⚠️ Arbitrage à vérifier
+relevé"]);
+    expect(pendingBotLogBatches()).toEqual(new Map([["log:global:signups", 1]]));
+  });
+
   it("sendBotLog_logCategory_waitsForTheWindow", async () => {
     jest.useFakeTimers();
     sendBotLog("cartes", { tournamentId: 3, category: "maps" });

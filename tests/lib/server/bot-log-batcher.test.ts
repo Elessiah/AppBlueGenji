@@ -633,3 +633,20 @@ describe("flushAll — lignes tardives", () => {
     expect(send.mock.calls.length).toBeGreaterThan(1);
   });
 });
+
+describe("flushAll — réouverture", () => {
+  it("flushAll_calledTwice_reopenPushedBackByTheSecondCall", async () => {
+    await batcher.flushAll();
+    jest.advanceTimersByTime(CLOSING_GRACE_MS - 4_000);
+    await batcher.flushAll();
+    // Le premier minuteur aurait échu ici : le second appel l'a repoussé.
+    jest.advanceTimersByTime(5_000);
+    batcher.add("k", "encore à l'arrêt");
+    await settle();
+    expect(send).toHaveBeenCalledWith("encore à l'arrêt", "general");
+    jest.advanceTimersByTime(CLOSING_GRACE_MS);
+    batcher.add("k2", "rouvert");
+    await settle();
+    expect(send).not.toHaveBeenCalledWith("rouvert", "general");
+  });
+});
