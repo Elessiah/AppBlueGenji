@@ -162,6 +162,8 @@ describe("bouton « Contacts » de la carte", () => {
       showCastConfig: false,
       showLiveConfig: false,
       liveConfigured: false,
+      showReplay: false,
+      hasReplay: false,
       canReport: true,
       showMatchPage: false,
     });

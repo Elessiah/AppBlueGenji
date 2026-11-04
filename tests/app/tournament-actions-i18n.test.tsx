@@ -331,7 +331,7 @@ describe("français inchangé — les messages égalent les textes d'origine", (
     expect(fr(frActions.cardActions.reportPending, { score1: 2, score2: 1, reporter: fr(frActions.cardActions.reportSide, { side: 2 }) })).toBe(pendingReportNotice(pending));
     expect(frActions.cardActions.reportConflict).toBe(pendingReportNotice({ ...pending, team1Report: report }));
     const launch: Parameters<typeof matchCardActionList>[0]["launch"] = { ...LAUNCH_ALL, isCaster: false };
-    const input: Parameters<typeof matchCardActionList>[0] = { playerScoreLabel: null, launch, inLobby: true, adminScoreLabel: null, showSchedule: true, hasStartAt: true, showCastConfig: true, showLiveConfig: true, liveConfigured: false, canReport: true, showMatchPage: true };
+    const input: Parameters<typeof matchCardActionList>[0] = { playerScoreLabel: null, launch, inLobby: true, adminScoreLabel: null, showSchedule: true, hasStartAt: true, showCastConfig: true, showLiveConfig: true, liveConfigured: false, showReplay: false, hasReplay: false, canReport: true, showMatchPage: true };
     expect(matchCardActionList(input).map((a) => a.label)).toEqual([
       "Ouvrir le lancement", "Contacts", "Page du match", "Planifier", "Modifier la date", "Forcer le lancement", "Changer l'équipe hôte", "Arbitrage", "Caster ce match", "Configurer ma diffusion", "Retirer le caster", "Diffuser ce match", "Signaler un problème",
     ]);

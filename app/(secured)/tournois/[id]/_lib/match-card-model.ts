@@ -1,6 +1,7 @@
 import type { BracketMatch } from "@/lib/shared/types";
 import { SCORE_ENTRY_CLOSED_PHASES, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { canConfigureLive, type MatchLiveState } from "@/lib/shared/live-streams";
+import { canEditReplay } from "@/lib/shared/match-replay";
 import { offersCastSettings } from "@/lib/shared/cast-settings";
 import { canReportOwnMatch } from "@/lib/shared/match-card-viewer";
 import {
@@ -132,6 +133,11 @@ export function useMatchCardModel(
     myTeamId,
     launchPhase: launchPhaseEnabled,
   });
+  const showCastConfig = offersCastSettings(match, launch.isCaster, canManage);
+  // La diffusion de l'organisation reste au staff `tournaments` ; ses routes
+  // (`/api/admin/matches/[id]/live`, rediff) demandent aussi `live` : sans les
+  // deux, le bouton ne mènerait qu'à des refus.
+  const showLiveConfig = canSchedule && canManage && canConfigureLive(match);
   // Toutes les actions, rangées par `MatchCardActions` : une principale
   // visible, le reste derrière « Plus d'actions » (`MATCH_CARD_LAYOUT.md`).
   const actions = matchCardActionList(
@@ -147,11 +153,14 @@ export function useMatchCardModel(
       // Un seul bouton de cast sur la carte : « Caster ce match » devient
       // « Configurer ma diffusion » une fois inscrit, et l'antenne comme la
       // rediff vivent dans cette fenêtre (`docs/features/CAST_SETTINGS.md`).
-      showCastConfig: offersCastSettings(match, launch.isCaster, canManage),
-      // La diffusion de l'organisation reste au staff `tournaments` : un
-      // porteur de `live` qui ne caste pas n'en règle plus aucune.
-      showLiveConfig: canSchedule && canConfigureLive(match),
+      showCastConfig,
+      showLiveConfig,
       liveConfigured: match.liveTrigger !== null,
+      // Un match joué sans diffusion marquée n'ouvre aucune des deux fenêtres :
+      // sa rediff garde son entrée sur la carte, pour le même staff que la
+      // diffusion de l'organisation (`tournaments` et `live`).
+      showReplay: !showCastConfig && !showLiveConfig && canSchedule && canEditReplay(match, canManage),
+      hasReplay: match.replayUrl !== null,
       canReport: canReportMatch,
       showMatchPage,
     },

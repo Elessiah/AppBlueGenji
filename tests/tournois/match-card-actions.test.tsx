@@ -44,6 +44,8 @@ const NOTHING: MatchCardActionInput = {
   showCastConfig: false,
   showLiveConfig: false,
   liveConfigured: false,
+  showReplay: false,
+  hasReplay: false,
   canReport: false,
   showMatchPage: false,
 };

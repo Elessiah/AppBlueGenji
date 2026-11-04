@@ -18,7 +18,7 @@ Code : `lib/shared/cast-settings.ts` (règles pures),
 | **Caster ce match** | permission `live`, match castable hors du sien, pas déjà caster | `CastClaimDialog` |
 | **Configurer ma diffusion** | **caster inscrit** de ce match, s'il reste quelque chose à régler (`offersCastSettings`) | `CastSettingsDialog` |
 | **Retirer le caster** | permission `tournaments`, et un **autre** caster que le lecteur | confirmation existante (avis au caster, `CAST_NOTICES.md`) |
-| **Diffuser ce match / Configurer la diffusion** | permission `tournaments` | `MatchLiveDialog` (diffusion de l'organisation) |
+| **Diffuser ce match / Configurer la diffusion** | permissions `tournaments` **et** `live` (ses routes, `/api/admin/matches/[id]/live` et la rediff, demandent `live`) | `MatchLiveDialog` (diffusion de l'organisation) |
 
 Trois conséquences voulues :
 
@@ -30,7 +30,10 @@ Trois conséquences voulues :
 - « Lancer / Couper le direct » et « Ajouter / Modifier la rediff » quittent la
   carte aussi : ils vivent dans les **deux** fenêtres de diffusion (celle du
   caster et celle du staff), la rediff gardant sa propre fenêtre
-  (`MatchReplayDialog`), ouverte depuis elles.
+  (`MatchReplayDialog`), ouverte depuis elles. Seule exception : un match
+  joué **sans diffusion marquée** n'ouvre aucune des deux fenêtres
+  (`canConfigureLive` faux, aucun caster) ; « Ajouter / Modifier la rediff »
+  reste alors sur la carte pour ce même staff (`tournaments` et `live`).
 
 ## S'inscrire : « Caster ce match »
 
@@ -140,4 +143,8 @@ mode du match dans la transaction qui l'inscrit.
 transmis, lien de l'organisation refusé), `tests/lib/server/match-launch.test.ts`
 (inscription : lien de l'organisation, mode inchangé ou non castable),
 `tests/lib/server/cast-settings.test.ts` (lien obligatoire au réglage),
+`tests/app/api/match-caster-settings-route.test.ts` (GET de son cast, PUT : champs
+présents seuls, types, lien de l'organisation refusé, refus traduits),
+`tests/tournois/match-card-roles.test.tsx` (diffusion sans `live`, rediff d'un
+match joué non diffusé),
 `tests/lib/server/match-casters.test.ts` (BattleTag de cast à l'anonymisation).

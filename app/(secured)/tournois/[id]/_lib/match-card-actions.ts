@@ -30,6 +30,7 @@ export type MatchCardActionId =
   | "castConfig"
   | "releaseCast"
   | "liveConfig"
+  | "replay"
   | "report";
 
 export type MatchCardActionTone = "primary" | "staff" | "warn" | "neutral";
@@ -65,12 +66,20 @@ export type MatchCardActionInput = {
    */
   showCastConfig: boolean;
   /**
-   * « Configurer la diffusion » de l'organisation : permission `tournaments`
-   * seule — un porteur de `live` qui ne caste pas n'a plus de diffusion à
-   * régler.
+   * « Configurer la diffusion » de l'organisation : permission `tournaments`,
+   * avec `live` que ses routes demandent — un porteur de `live` seul qui ne
+   * caste pas n'a plus de diffusion à régler.
    */
   showLiveConfig: boolean;
   liveConfigured: boolean;
+  /**
+   * « Ajouter / Modifier la rediff » sur la carte : seulement quand aucune des
+   * deux fenêtres de diffusion ne s'offre — un match joué sans diffusion
+   * marquée garde ainsi une entrée vers sa rediff (permissions `tournaments`
+   * et `live`, celles de la diffusion de l'organisation).
+   */
+  showReplay: boolean;
+  hasReplay: boolean;
   canReport: boolean;
   /**
    * « Page du match » offerte : pas sur la page elle-même, pas sur une
@@ -119,6 +128,7 @@ export function matchCardActionList(
       either(input.liveConfigured, t("cardActions.configureStream"), t("cardActions.streamMatch")),
       "neutral",
     ],
+    [input.showReplay, "replay", either(input.hasReplay, t("cardActions.editReplay"), t("cardActions.addReplay")), "neutral"],
     [input.canReport, "report", t("header.reportIssue"), "neutral"],
   ];
   return rows

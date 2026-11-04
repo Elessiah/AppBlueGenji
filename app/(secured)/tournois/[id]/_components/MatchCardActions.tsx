@@ -18,6 +18,7 @@ import {
   Radio,
   Scale,
   Settings,
+  Film,
   TriangleAlert,
   Users,
   type LucideIcon,
@@ -103,6 +104,7 @@ const ICONS: Record<MatchCardActionId, LucideIcon> = {
   castConfig: Radio,
   releaseCast: MicOff,
   liveConfig: Settings,
+  replay: Film,
   report: TriangleAlert,
 };
 
@@ -415,7 +417,7 @@ export function MatchCardActions({
   onReport: () => void;
 }>) {
   const spectator = useSpectatorView();
-  const { openSchedule, openConfig, castBlock, launchPhase: launchPhaseEnabled, viewerUserId } = useLiveControls();
+  const { openSchedule, openConfig, openReplay, castBlock, launchPhase: launchPhaseEnabled, viewerUserId } = useLiveControls();
   const { showError, showSuccess } = useToast();
   const mapError = useMapError();
   const errorsText = useErrorsText();
@@ -633,6 +635,7 @@ export function MatchCardActions({
     // diffusion » (`docs/features/CAST_SETTINGS.md`).
     releaseCast: () => openRelease(),
     liveConfig: () => openConfig(match),
+    replay: () => openReplay(match),
     report: onReport,
   };
 

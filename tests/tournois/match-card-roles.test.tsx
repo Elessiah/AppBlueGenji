@@ -158,6 +158,20 @@ describe("MatchRow — chaque public retrouve ses actions", () => {
   });
 
   it("diffusion : le staff `tournaments` garde la diffusion de l'organisation", () => {
-    expect(card(launched(), { canSchedule: true })).toContain('data-action="liveConfig"');
+    expect(card(launched(), { canSchedule: true, canManage: true })).toContain('data-action="liveConfig"');
+  });
+
+  it("matchCard_tournamentsWithoutLive_noLiveConfig", () => {
+    // Les routes de la diffusion (`/api/admin/matches/[id]/live`) demandent `live` :
+    // sans elle, le bouton ne mènerait qu'à des refus.
+    expect(card(launched(), { canSchedule: true })).not.toContain('data-action="liveConfig"');
+  });
+
+  it("matchCard_playedUncastMatchForOrganisationStaff_offersReplay", () => {
+    // Joué sans diffusion marquée : aucune fenêtre de diffusion ne s'ouvre, la
+    // rediff garde son entrée sur la carte.
+    const html = card(played, { canSchedule: true, canManage: true });
+    expect(html).toContain("Ajouter la rediff : Alpha contre Bravo");
+    expect(html).not.toContain('data-action="liveConfig"');
   });
 });

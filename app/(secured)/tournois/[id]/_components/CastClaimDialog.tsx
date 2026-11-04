@@ -109,7 +109,10 @@ export function CastClaimDialog({
   const urlMissing = separate && url.trim() === "";
   const urlRefused = separate && castUrlInvalid(url);
   const battletagRefused = castBattletagInvalid(battletag);
-  const triggerRefused = separate && castTriggerNeedsDate(trigger, match.startAt);
+  // Le mode du match, laissé tel quel, ne se réécrit pas (le serveur l'ignore) :
+  // un « à la date de début » sans date, posé par le staff, ne bloque pas
+  // l'inscription.
+  const triggerRefused = separate && trigger !== match.liveTrigger && castTriggerNeedsDate(trigger, match.startAt);
   // « A, B et C » / "A, B, and C" : la conjonction de la langue de la page.
   const casterList = useMemo(() => new Intl.ListFormat(locale, { style: "long", type: "conjunction" }), [locale]);
 
