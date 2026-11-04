@@ -48,7 +48,7 @@ import {
 import { hasPendingStateTransition, syncTournamentState } from "@/lib/server/tournaments/state";
 import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
 import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
-import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
+import { invalidateTeamRanking, invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { getDatabase } from "@/lib/server/database";
 import { loadMapsByMatch } from "@/lib/server/tournaments/match-maps";
@@ -394,7 +394,9 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
 
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
 
-    expect(invalidateTeamRanking).toHaveBeenCalled();
+    // PNG d'aperçu au plus une fois par fenêtre : jamais le vidage complet.
+    expect(invalidateTeamRankingForScore).toHaveBeenCalled();
+    expect(invalidateTeamRanking).not.toHaveBeenCalled();
     expect(invalidateStats).toHaveBeenCalled();
     expect(invalidateLandingAggregates).toHaveBeenCalled();
   });
@@ -410,7 +412,9 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
 
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
 
-    expect(invalidateTeamRanking).toHaveBeenCalled();
+    // PNG d'aperçu au plus une fois par fenêtre : jamais le vidage complet.
+    expect(invalidateTeamRankingForScore).toHaveBeenCalled();
+    expect(invalidateTeamRanking).not.toHaveBeenCalled();
     expect(invalidateStats).toHaveBeenCalled();
     expect(invalidateLandingAggregates).toHaveBeenCalled();
   });
@@ -429,7 +433,7 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
 
     expect(invalidateTournamentLists).not.toHaveBeenCalled();
-    expect(invalidateTeamRanking).not.toHaveBeenCalled();
+    expect(invalidateTeamRankingForScore).not.toHaveBeenCalled();
     expect(invalidateStats).not.toHaveBeenCalled();
     expect(invalidateLandingAggregates).not.toHaveBeenCalled();
   });
