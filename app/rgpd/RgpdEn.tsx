@@ -949,7 +949,7 @@ export function RgpdEn({
             server&apos;s moderation deletes it; a channel never handed back is deleted if it is empty {VOICE_BOT_UNRELEASED_MAX_HOURS} hours
             after its creation or its reuse — occupied, it stays until it is handed back; moved out of the match category, the bot stops tracking it without deleting it
             and it falls to the server&apos;s moderation — as after a deletion by moderation or the bot forgetting it, a new channel is then opened for the team if its match
-            has not launched yet; a rescheduled match keeps its
+            is not over yet; a rescheduled match keeps its
             channels until they are handed back), and the site erases its record {VOICE_ROW_RETENTION_DAYS} days after the hand-back (apart from the encrypted backup
             copies). The bot keeps for each channel a record with no name (channel identifier, numbers of the match and team, creation
             and hand-back times), erased with the channel or when it forgets it — kept with no limit while the channel, never handed back, stays occupied, or while it reads it without being able to delete

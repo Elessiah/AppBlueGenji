@@ -38,6 +38,11 @@ et rien n'est compté.
 - **Salon supprimé à la main** : les salons ouverts des matchs dus sont redemandés au
   bot par leur clé au plus une fois par minute et par salon (`OPEN_DUE_CHANNELS_SQL`) ;
   le bot rend le même, ou un neuf s'il a disparu — jamais qui s'y trouve.
+  Un match où entre une entrée solo ou une fantôme n'est plus revérifié (il est rendu).
+  Le salon neuf ne remplace que sur une ligne **encore ouverte** (`UPDATE … WHERE
+  released_at IS NULL`, jamais l'upsert de création qui rouvre) : rendue entre-temps
+  (autre processus, rechargement pm2), la ligne reste close et le salon neuf est rendu
+  aussitôt au bot.
   Coût borné : au plus 5 appels au bot en parallèle, 80 salons par passe (les
   plus anciennement vus d'abord, aucun n'est affamé), arrêt de la passe au premier
   échec du canal du bot (le salon en échec est redemandé après 10 s, derrière les

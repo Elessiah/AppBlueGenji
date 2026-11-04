@@ -1139,7 +1139,7 @@ function RgpdFr({
             modération du serveur le supprime ; un salon jamais rendu est supprimé s&apos;il est vide {VOICE_BOT_UNRELEASED_MAX_HOURS} heures
             après sa création ou sa reprise — occupé, il reste jusqu&apos;à son rendu ; déplacé hors de la catégorie des matchs, le bot cesse de le
             suivre sans le supprimer et il relève de la modération du serveur — comme après une suppression par la modération ou un oubli par le bot, un nouveau salon est alors ouvert à
-            l&apos;équipe si son match n&apos;est pas encore lancé ; un match reporté
+            l&apos;équipe si son match n&apos;est pas encore terminé ; un match reporté
             garde ses salons jusqu&apos;à son rendu), et le site efface sa ligne {VOICE_ROW_RETENTION_DAYS} jours après le rendu (hors les
             copies de sauvegarde chiffrées). Le bot garde de chaque salon une fiche sans nom (identifiant du salon, numéros du match et de
             l&apos;équipe, heures de création et de rendu), effacée avec le salon ou quand il l&apos;oublie — gardée sans limite tant que le salon, jamais rendu, reste occupé, qu&apos;il le lit sans pouvoir le supprimer ou que
