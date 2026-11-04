@@ -13,6 +13,7 @@
  * this module.
  */
 
+import { VOICE_CHANNEL_LATE_HOURS } from "@/lib/shared/match-voice";
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
@@ -816,8 +817,8 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "Team voice channels no longer hold a match's launch, and the bot no longer counts the people present: for each channel, the site only keeps its identifier and its times — neither who is in it nor how many.",
     details: [
-      `What changes: a match with channels launches as in any other tournament, whether they are full or not; its page only says whether each channel is open. The number of people present is no longer requested from the bot, and the one already kept is erased with its column (apart from the encrypted backup copies, ${BACKUP_RETENTION_DAYS} days at most).`,
-      "What stays: to know whether a channel is empty and delete it, the bot still holds in memory, without recording it, the voice state of the members of the association's Discord server; nothing new is collected. The channel is also handed back when a solo entry or a ghost team enters the match. It still rests on legitimate interest (smooth running of tournaments).",
+      `What changes: a match with channels launches as in any other tournament, whether they are full or not; its page only says whether each channel is open. The number of people present is no longer requested from the bot, and the one already kept is erased with its column (apart from the encrypted backup copies, ${BACKUP_RETENTION_DAYS} days at most). The channel is now also handed back when a solo entry or a ghost team enters the match, or when the match is left without a score ${VOICE_CHANNEL_LATE_HOURS} hours after its time; while it is open, the site asks the bot for it again, under the team's name, at most once a minute, to reopen one if it was deleted.`,
+      "What stays: to know whether a channel is empty and delete it, the bot still holds in memory, without recording it, the voice state of the members of the association's Discord server; nothing new is collected. It still rests on legitimate interest (smooth running of tournaments).",
     ],
   },
 };
