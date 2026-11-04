@@ -34,6 +34,9 @@ et rien n'est compté.
   un appel au bot**. Une passe vérifie d'abord qu'il y a quelque chose à faire
   (`SWEEP_NEEDED_SQL`). Une bascule pendant une passe en demande une de plus
   (`dispatchMatchVoiceChannels(true)`), jouée à la fin de la passe en cours.
+- **Salon supprimé à la main** : les salons ouverts des matchs dus sont redemandés au
+  bot par leur clé au plus une fois par minute et par salon (`OPEN_DUE_CHANNELS_SQL`) ;
+  le bot rend le même, ou un neuf s'il a disparu — jamais qui s'y trouve.
 - **Panne du bot** : `failed_at` noté, une ligne pm2 sans donnée de joueur, une
   seule par panne ; création comme rendu réessayés au plus une fois par
   `VOICE_RETRY_SECONDS` (60 s), en fin de file.
@@ -43,7 +46,9 @@ et rien n'est compté.
   simplement reporté garde les siens. `VOICE_CHANNEL_NOT_TRACKED` = déjà fait. Une
   ligne rendue est effacée 7 jours après (purge au plus une fois par heure).
 - **Lecture** : `loadMatchVoiceInfos` ne lit que les lignes non rendues des matchs
-  demandés, et seulement quand l'option est allumée **et** le tournoi en cours.
+  demandés, et seulement quand l'option est allumée **et** le tournoi en cours ; un
+  match prêt ou au score en attente de confirmation les montre, lancé ou non. Un rendu
+  refusé sur un salon encore ouvert le laisse « ouvert ».
 - **Relecture de la page du match** : **flux coupé seulement** (`isLive` de la fiche),
   toutes les 10 s, tant que la source qui fait foi porte `voice` ; la relecture lue à
   l'instant où le flux se coupe est sautée (`voicePollDue`). Une réponse REST `null`
