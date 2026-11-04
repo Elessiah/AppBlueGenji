@@ -22,7 +22,7 @@ import { GET } from "@/app/og/[locale]/[card]/route";
 
 type FakeImageResponse = Response & {
   element: ReactElement;
-  options: { width: number; height: number; headers: Record<string, string> };
+  options: { width: number; height: number; headers: Record<string, string>; fonts: { name: string; weight: number }[] };
 };
 
 jest.mock("next/og", () => ({
@@ -62,6 +62,17 @@ beforeEach(() => {
   jest.mocked(loadShareTeam).mockReset().mockResolvedValue(null);
   jest.mocked(findShareTeam).mockReset().mockResolvedValue(null);
   clearShareImageCache();
+});
+
+describe("buildPageShareImage — polices", () => {
+  it("buildPageShareImage_anyCard_passesInterRegularAndBold", async () => {
+    for (const key of ["ranking", "association"]) {
+      const rendered = await render(key);
+      const fonts = rendered?.image.options.fonts ?? [];
+      expect(new Set(fonts.map((font) => font.name))).toEqual(new Set(["Inter"]));
+      expect(new Set(fonts.map((font) => font.weight))).toEqual(new Set([400, 700]));
+    }
+  });
 });
 
 describe("renderPageShareImage — coût d'un rendu", () => {

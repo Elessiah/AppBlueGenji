@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { processAndStoreImage } from "@/lib/server/image-upload";
 import { toServedUploadUrl } from "@/lib/shared/uploads";
@@ -34,6 +35,6 @@ export async function POST(req: Request) {
     const diskPath = await processAndStoreImage(file, "sponsor-banner", user.id, crop.crop);
     return ok({ bannerUrl: toServedUploadUrl(diskPath) });
   } catch (error) {
-    return fail((error as Error).message || "BANNER_UPLOAD_FAILED", 400);
+    return fail(serviceErrorCode(error, "BANNER_UPLOAD_FAILED"), 400);
   }
 }

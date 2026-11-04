@@ -12,6 +12,7 @@ const invalidateLanding = jest.fn();
 const invalidateLandingLive = jest.fn();
 const invalidateMiniBrackets = jest.fn();
 const invalidateRanking = jest.fn();
+const invalidateRankingFull = jest.fn();
 const invalidateStats = jest.fn();
 const publishEvent = jest.fn();
 
@@ -34,7 +35,8 @@ jest.mock("@/lib/server/landing-cache", () => ({
 }));
 
 jest.mock("@/lib/server/ranking-cache", () => ({
-  invalidateTeamRanking: () => invalidateRanking(),
+  invalidateTeamRanking: () => invalidateRankingFull(),
+  invalidateTeamRankingForScore: () => invalidateRanking(),
 }));
 
 jest.mock("@/lib/server/stats-cache", () => ({
@@ -72,6 +74,7 @@ beforeEach(() => {
   invalidateLandingLive.mockReset();
   invalidateMiniBrackets.mockReset();
   invalidateRanking.mockReset();
+  invalidateRankingFull.mockReset();
   invalidateStats.mockReset();
   publishEvent.mockReset();
 });
@@ -81,6 +84,15 @@ afterEach(() => {
 });
 
 describe("notifications — invalidation des caches", () => {
+  it("publishUpdatedEvent_any_usesThrottledRankingInvalidation", () => {
+    // Avancée, salon vocal, horaire d'arbitrage publient ici à chaque match :
+    // les PNG d'aperçu suivent la fenêtre des scores, pas un vidage complet.
+    publishUpdatedEvent(7);
+
+    expect(invalidateRanking).toHaveBeenCalledTimes(1);
+    expect(invalidateRankingFull).not.toHaveBeenCalled();
+  });
+
   it("oublie l'instantané, les listes, l'aperçu, la vitrine et le classement à une mise à jour", () => {
     publishUpdatedEvent(7);
     expect(invalidateSnapshot).toHaveBeenCalledWith(7);

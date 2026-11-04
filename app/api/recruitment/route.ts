@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/server/auth";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createRecruitmentAd, listRecruitmentAds } from "@/lib/server/recruitment-service";
 import { can } from "@/lib/shared/permissions";
@@ -33,6 +34,6 @@ export async function POST(req: Request) {
     const ad = await createRecruitmentAd(recruitmentAdInputFromBody(body));
     return ok({ ad }, 201);
   } catch (e) {
-    return fail((e as Error).message || "RECRUITMENT_CREATE_FAILED", 400);
+    return fail(serviceErrorCode(e, "RECRUITMENT_CREATE_FAILED"), 400);
   }
 }

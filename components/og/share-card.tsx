@@ -283,7 +283,7 @@ export function ShareCardFrame({
         overflow: "hidden",
         backgroundColor: SHARE_CARD_COLORS.background,
         color: SHARE_CARD_COLORS.ink,
-        fontFamily: "sans-serif",
+        fontFamily: "Inter, sans-serif",
       }}
     >
       <Glows />

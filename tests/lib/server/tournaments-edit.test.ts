@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
+jest.mock("@/lib/server/tournaments/snapshot");
 
 import { getDatabase } from "@/lib/server/database";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { invalidateSpectatorSnapshot } from "@/lib/server/tournaments/snapshot";
 import { loadEditableTournament, updateTournament } from "@/lib/server/tournaments/edit";
 import { fakePool } from "../../helpers/sql-double";
 
@@ -119,6 +121,29 @@ describe("updateTournament", () => {
     expect(connection.commit).toHaveBeenCalledTimes(1);
     expect(publishUpdatedEvent).toHaveBeenCalledTimes(1);
     expect(publishUpdatedEvent).toHaveBeenCalledWith(1);
+  });
+
+  it("repousse la visibilité dans le futur : évince la réponse publique et la carte d'encart", async () => {
+    await updateTournament(1, { startVisibilityAt: new Date(Date.now() + 24 * HOUR).toISOString() });
+    expect(invalidateSpectatorSnapshot).toHaveBeenCalledTimes(1);
+    expect(invalidateSpectatorSnapshot).toHaveBeenCalledWith(1);
+  });
+
+  it("updateTournament_visibleTournamentDescriptionEdit_evictsSpectatorCopy", async () => {
+    rowToReturn = hiddenRow({ start_visibility_at: past });
+
+    await updateTournament(1, { description: "Description corrigée" });
+
+    expect(invalidateSpectatorSnapshot).toHaveBeenCalledTimes(1);
+    expect(invalidateSpectatorSnapshot).toHaveBeenCalledWith(1);
+  });
+
+  it("updateTournament_refusedEdit_evictsNothing", async () => {
+    rowToReturn = null;
+
+    await expect(updateTournament(1, { name: "Autre nom" })).rejects.toThrow("TOURNAMENT_NOT_FOUND");
+
+    expect(invalidateSpectatorSnapshot).not.toHaveBeenCalled();
   });
 
   it("verrouille la ligne pendant la modification", async () => {

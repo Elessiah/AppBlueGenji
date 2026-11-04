@@ -12,8 +12,8 @@
  * Une écriture ne réveille pas les visiteurs sans compte et n'invalide pas cette
  * réponse : sa durée de vie, allongée sous la charge, est ce qui protège la
  * machine d'un tournoi animé — au plus une reconstruction par tournoi et par
- * durée de vie, quel que soit le nombre de visiteurs. Seule la suppression du
- * tournoi la retire (`invalidateSpectatorSnapshot`).
+ * durée de vie, quel que soit le nombre de visiteurs. Seules la suppression du
+ * tournoi et son édition par le staff la retirent (`invalidateSpectatorSnapshot`).
  *
  * **Ce que coûte une reconstruction, et qui la paie** — tout se décide ici, sur
  * le chemin même où `cached` lance le chargeur (`beforeLoad`), jamais par un
@@ -30,9 +30,9 @@ import { gzip } from "node:zlib";
 import { promisify } from "node:util";
 import { createHash } from "node:crypto";
 import { refundRateToken, SPECTATOR_REBUILD_RULE, takeRateToken } from "@/lib/server/api-guard";
-import { cached, cachedStale } from "@/lib/server/cache";
+import { cached, cachedStale, isCachedOrLoading } from "@/lib/server/cache";
 import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
-import { isTournamentSnapshotWarm, spectatorSnapshotCacheKey } from "@/lib/server/tournaments/snapshot";
+import { isTournamentSnapshotWarm, spectatorCardCacheKey, spectatorSnapshotCacheKey } from "@/lib/server/tournaments/snapshot";
 import {
   SPECTATOR_MAX_COPY_AGE_MS,
   spectatorCacheTtlMs,
@@ -161,8 +161,12 @@ export async function getSpectatorPayload(
   level: SpectatorLoadLevel,
   client: string | null,
 ): Promise<SpectatorPayload | null> {
-  // Choix assumé (décision de l'auteur, `SPECTATOR_VIEW.md`) : seule la
-  // suppression du tournoi retire cette réponse. Un renommage, un avatar retiré
+  // Choix assumé (décision de l'auteur, `SPECTATOR_VIEW.md`) : seules la
+  // suppression du tournoi et l'édition par le staff de **sa carte** (`updateTournament`,
+  // image du tournoi, lien de chaîne du tournoi) retirent cette réponse — un nom,
+  // une description, une bannière ou un lien retirés ne restent pas servis. Ce
+  // qui vit sur les matchs (antenne, liens de chaîne d'un match, horaire), un
+  // renommage d'équipe, un avatar retiré
   // ou un compte supprimé attendent son expiration (15 s au calme, 150 s sous
   // la charge ou pour un tournoi terminé) — c'est elle qui protège la machine
   // d'un tournoi animé. Un tournoi publié ne redevient jamais invisible :
@@ -256,14 +260,27 @@ export async function getSpectatorPayload(
  * Le tournoi tel que le voit le public, pour une page rendue sans session
  * (encart d'un lien, réglages de la page des règles) : la même réponse
  * mutualisée, au même prix pour le réseau qui la demande. `null` : introuvable,
- * reconstruction refusée sans copie récente, ou base injoignable — l'appelant
- * se rabat sur sa version générale.
+ * reconstruction refusée sans copie récente, lecture refusée par `admit`, ou
+ * base injoignable — l'appelant se rabat sur sa version générale.
+ *
+ * @param admit Appelé **seulement** quand la réponse n'est ni fraîche en cache
+ *   ni en vol (comme {@link publicTournamentCard}) ; `false` : refusée.
+ *   **Obligatoire** : un appelant ne contourne pas le plafond des lectures
+ *   publiques par oubli (`spectator-request.ts` le pose).
  */
 export async function publicTournamentSnapshot(
   tournamentId: number,
   level: SpectatorLoadLevel,
   client: string | null,
+  admit: () => boolean,
 ): Promise<PublicTournamentView | null> {
+  // Une réponse déjà servie à d'autres ne coûte pas de jeton du plafond des
+  // lectures publiques : seuls les rendus qui la (re)construisent le paient.
+  // Au plafond, la copie échue de moins de 150 s se sert encore, sans base —
+  // comme l'encart (`publicTournamentCard`) du même réseau.
+  if (!isCachedOrLoading(spectatorSnapshotCacheKey(tournamentId)) && !admit()) {
+    return staleSpectatorPayload(tournamentId)?.snapshot ?? null;
+  }
   try {
     return (await getSpectatorPayload(tournamentId, level, client))?.snapshot ?? null;
   } catch (error) {
@@ -287,14 +304,28 @@ export const SPECTATOR_CARD_TTL_MS = 10_000;
  * L'état est **recalculé depuis les dates** à chaque lecture : la copie garde
  * celui de sa construction (jusqu'à 150 s), et un lien partagé juste après
  * l'ouverture des inscriptions ne dirait plus « à venir ». `null` : introuvable,
- * ou base injoignable — l'appelant se rabat sur l'encart général.
+ * lecture refusée par `admit`, ou base injoignable — l'appelant se rabat sur
+ * l'encart général.
+ *
+ * @param admit Appelé **seulement** avant une lecture en base ; `false` : refusée.
+ *   **Obligatoire**, comme pour {@link publicTournamentSnapshot}.
  */
-export async function publicTournamentCard(tournamentId: number): Promise<TournamentCard | null> {
+export async function publicTournamentCard(
+  tournamentId: number,
+  admit: () => boolean,
+): Promise<TournamentCard | null> {
   const copy = staleSpectatorPayload(tournamentId);
   if (copy) return { ...copy.snapshot.card, state: computeTournamentState(copy.snapshot.card) };
+  const key = spectatorCardCacheKey(tournamentId);
+  // `admit` (le plafond des lectures publiques) n'est consulté que quand la
+  // lecture **touche la base** : ni une carte déjà en cache, ni une lecture déjà
+  // en vol (qu'on rejoint) ne prennent de jeton. Consulté **avant** `cached`,
+  // sans attente entre les deux : un refus ne devient jamais le résultat commun
+  // d'une lecture en vol que d'autres, non plafonnés, auraient rejointe.
+  if (!isCachedOrLoading(key) && !admit()) return null;
   try {
     return await cached(
-      `spectator-card:${tournamentId}`,
+      key,
       (card: TournamentCard | null) => (card ? SPECTATOR_CARD_TTL_MS : 0),
       () => getVisibleTournamentCard(tournamentId),
     );

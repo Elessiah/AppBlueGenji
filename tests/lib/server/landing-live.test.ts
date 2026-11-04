@@ -5,6 +5,7 @@ jest.mock("@/lib/server/tournaments-service");
 jest.mock("@/lib/server/tournaments/live-streams");
 
 import { getLandingLive } from "@/lib/server/landing-service";
+import * as profilelessPlayers from "@/lib/server/users/profileless-players";
 import { clearCache } from "@/lib/server/cache";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { findBroadcastingTournament } from "@/lib/server/tournaments/live-streams";
@@ -532,6 +533,43 @@ describe("getLandingLive — seeds du match mis en avant", () => {
       expect(live?.currentMatch?.team2Seed).toBe(3);
       expect(String(query.mock.calls[1][0])).toContain(tables[format]);
     }
+  });
+
+  it("lance la lecture des joueurs sans fiche avec celle des rangs figés, sans l'attendre", async () => {
+    const profileless = jest.spyOn(profilelessPlayers, "loadProfilelessPlayerIds").mockResolvedValue([]);
+    const { getDatabase } = await import("@/lib/server/database");
+    let releaseFrozen: (value: unknown) => void = (_value) => undefined;
+    const frozenRead = new Promise((resolve) => {
+      releaseFrozen = resolve;
+    });
+    const query = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ team1_seed: 1, team2_seed: 2 })]])
+      .mockReturnValueOnce(frozenRead);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: query }));
+    jest.mocked(listTournamentBuckets).mockResolvedValue(buckets([card(1, "Coupe A", "SWISS")]));
+
+    const pending = getLandingLive();
+    for (let i = 0; i < 20 && query.mock.calls.length < 2; i += 1) await Promise.resolve();
+
+    // La lecture des rangs figés est en vol, celle des joueurs sans fiche est déjà partie.
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(profileless).toHaveBeenCalledTimes(1);
+    releaseFrozen([[{ team_id: 11, seed: 7 }]]);
+    expect((await pending)?.currentMatch?.team1Seed).toBe(7);
+  });
+
+  it("une panne des rangs figés ne laisse aucun rejet non traité côté joueurs sans fiche", async () => {
+    jest.spyOn(profilelessPlayers, "loadProfilelessPlayerIds").mockResolvedValue([]);
+    const { getDatabase } = await import("@/lib/server/database");
+    const query = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ team1_seed: 1, team2_seed: 2 })]])
+      .mockRejectedValueOnce(new Error("down"));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: query }));
+    jest.mocked(listTournamentBuckets).mockResolvedValue(buckets([card(1, "Coupe A", "SWISS")]));
+
+    await expect(getLandingLive()).resolves.toBeNull();
   });
 
   it("n'invente aucun seed quand le rang figé manque", async () => {

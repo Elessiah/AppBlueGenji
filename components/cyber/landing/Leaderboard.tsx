@@ -106,7 +106,7 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
         </div>
       </div>
 
-      <div className={styles.table} role="table" aria-label={t("leaderboard.tableLabel")} aria-busy={loading}>
+      <div className={`${styles.table} ${rows.some((row) => row.draws > 0) ? styles.withDraws : ""}`} role="table" aria-label={t("leaderboard.tableLabel")} aria-busy={loading}>
         <div className={styles.tableHead} role="row">
           <span role="columnheader">#</span>
           <span role="columnheader">{t("leaderboard.team")}</span>
@@ -138,15 +138,18 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
                 <span className={styles.wl} role="cell">
                   <span className={styles.wins}>{row.wins}</span>
                   <span className={styles.losses}>–</span>
+                  {/* Les nuls, s'il y en a, **entre** les victoires et les défaites : « 3–1 N–2 » se lit V–N–D (une équipe classée sur un seul nul lisait « 0–0 »). La lettre seule n'est pas explicite : titre au survol sur le texte visible (masqué aux lecteurs d'écran), texte long lu à voix. */}
+                  {row.draws > 0 ? (
+                    <>
+                      <span className={styles.draws}>
+                        <span aria-hidden="true" title={t("leaderboard.drawsLabel", { count: row.draws })}>{t("leaderboard.draws", { count: String(row.draws) })}</span>
+                        <span className="sr-only">{t("leaderboard.drawsLabel", { count: row.draws })}</span>
+                      </span>
+                      <span className={styles.losses}>–</span>
+                    </>
+                  ) : null}
                   {/* Une défaite se lit dans sa couleur ; zéro reste neutre. */}
                   <span className={row.losses > 0 ? "result-loss" : styles.losses}>{row.losses}</span>
-                  {/* Les nuls, s'il y en a : une équipe classée sur un seul nul lisait « 0–0 ». */}
-                  {row.draws > 0 ? (
-                    <span className={styles.draws}>
-                      <span aria-hidden="true">{t("leaderboard.draws", { count: String(row.draws) })}</span>
-                      <span className="sr-only">{t("leaderboard.drawsLabel", { count: row.draws })}</span>
-                    </span>
-                  ) : null}
                 </span>
                 <span className="num" role="cell">{row.points}</span>
                 <span className={`${styles.trend} ${trendClass}`} role="cell">

@@ -3,11 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/image-upload");
+jest.mock("@/lib/server/ranking-cache");
 
 import { deleteTournament } from "@/lib/server/tournaments/deletion";
 import { getDatabase } from "@/lib/server/database";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { deleteStoredImage } from "@/lib/server/image-upload";
+import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
 import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
 type ExecuteMock = SqlMock;
@@ -156,6 +158,25 @@ describe("deleteTournament", () => {
     // puis réveille la salle du flux, qui ferme les connexions faute
     // d'instantané (`docs/features/REALTIME_REFRESH.md`).
     expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("deleteTournament_success_flushesFullRanking", async () => {
+    mockExistingTournament();
+
+    await deleteTournament(7);
+
+    // `publishUpdatedEvent` ne vide les PNG d'aperçu qu'une fois par fenêtre :
+    // la suppression, elle, vide tout aussitôt.
+    expect(invalidateTeamRanking).toHaveBeenCalledTimes(1);
+  });
+
+  it("deleteTournament_failedDeletion_keepsRanking", async () => {
+    const execute = jest.fn(async () => [[]]) as unknown as ExecuteMock;
+    mockConnection(execute);
+
+    await expect(deleteTournament(999)).rejects.toThrow("TOURNAMENT_NOT_FOUND");
+
+    expect(invalidateTeamRanking).not.toHaveBeenCalled();
   });
 
   it("remonte TOURNAMENT_NOT_FOUND sans rien effacer", async () => {

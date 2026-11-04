@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { createAboutStat, listAboutStats } from "@/lib/server/about-stats-service";
 import { bodyReadRefusal, readJsonBody } from "@/lib/server/request-body";
@@ -28,12 +29,13 @@ export async function POST(req: Request) {
   try {
     const stat = await createAboutStat({
       value: typeof body.value === "string" ? body.value : "",
-      valueEn: typeof body.valueEn === "string" ? body.valueEn : null,
+      // Un type qui n'est pas un texte est refusé par la validation (`VALUE_EN_INVALID`).
+      valueEn: body.valueEn ?? null,
       label: typeof body.label === "string" ? body.label : "",
       labelEn: typeof body.labelEn === "string" ? body.labelEn : null,
     });
     return ok({ stat }, 201);
   } catch (e) {
-    return fail((e as Error).message || "ABOUT_STAT_CREATE_FAILED", 400);
+    return fail(serviceErrorCode(e, "ABOUT_STAT_CREATE_FAILED"), 400);
   }
 }

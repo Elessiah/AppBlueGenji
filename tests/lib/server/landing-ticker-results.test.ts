@@ -188,12 +188,39 @@ describe("getLandingTicker — issue et noms calculés au chargement", () => {
     expect(item.sr).toBeNull();
   });
 
-  it("forfait de l'adversaire d'un vainqueur enregistré : « forfait » ; vainqueur = camp forfait : ce camp « forfait », l'autre gagne", async () => {
-    await mockTicker([resultRow({ winner_team_id: 1, forfeit_team_id: 2 }, 1), resultRow({ winner_team_id: 1, forfeit_team_id: 1 }, 2)]);
-    // Le plus récent d'abord (minute 2 : vainqueur = camp forfait, incohérent).
-    const [incoherent, forfeit] = results((await getLandingTicker()).items);
+  it("forfait de l'adversaire d'un vainqueur enregistré : « forfait » pour ce camp, victoire au vainqueur", async () => {
+    await mockTicker([resultRow({ winner_team_id: 1, forfeit_team_id: 2 }, 1)]);
+    const [forfeit] = results((await getLandingTicker()).items);
     expect(forfeit.sides.map((side) => side.outcome)).toEqual(["win", "forfeit"]);
-    expect(incoherent.sides.map((side) => side.outcome)).toEqual(["forfeit", "win"]);
+  });
+
+  it("vainqueur = camp forfait (incohérent) : aucun vainqueur, la ligne à scores inégaux est écartée, celle à scores égaux ne donne aucun gagnant", async () => {
+    await mockTicker([
+      resultRow({ winner_team_id: 1, forfeit_team_id: 1, team1_score: 2, team2_score: 1 }, 3),
+      resultRow({ winner_team_id: 1, forfeit_team_id: 1, team1_score: 1, team2_score: 1 }, 2),
+    ]);
+    const shown = results((await getLandingTicker()).items);
+    expect(shown).toHaveLength(1);
+    expect(shown[0].sides.map((side) => side.outcome)).toEqual(["none", "none"]);
+  });
+
+  it("lit plus de lignes que montrées : une ligne écartée ne coûte pas une place", async () => {
+    const valid = (minute: number) => resultRow({ winner_team_id: 1 }, minute);
+    const foreignWinner = (minute: number) => resultRow({ winner_team_id: 77, team1_score: 3, team2_score: 0 }, minute);
+    const execute = await mockTicker([foreignWinner(9), valid(8), foreignWinner(7), valid(6), valid(5), valid(4)]);
+    const shown = results((await getLandingTicker()).items);
+    expect(String(execute.mock.calls[0][0])).toMatch(/LIMIT 12/);
+    expect(shown).toHaveLength(3);
+  });
+
+  it("n'affiche jamais plus de trois résultats, même si la lecture en rend davantage", async () => {
+    await mockTicker(Array.from({ length: 8 }, (_, index) => resultRow({}, 50 - index)));
+    expect(results((await getLandingTicker()).items)).toHaveLength(3);
+  });
+
+  it("moins de trois lignes valides : montre celles qui existent", async () => {
+    await mockTicker([resultRow({ winner_team_id: 77, team1_score: 3, team2_score: 0 }, 5), resultRow({}, 4)]);
+    expect(results((await getLandingTicker()).items)).toHaveLength(1);
   });
 
   it("un seul chargement sert les deux langues, sans relire la base", async () => {
@@ -390,8 +417,8 @@ describe("getLandingTicker — lectures et repli (EF-24)", () => {
   });
 
   it("getLandingTicker_manyEntries_keepsTenItems", async () => {
-    const many = Array.from({ length: 12 }, (_, index) => resultRow({}, index));
-    await mockReads({ results: many });
+    const many = Array.from({ length: 12 }, (_, index) => ({ title: `Actu ${index}`, created_at: new Date(`2026-10-04T10:${String(index).padStart(2, "0")}:00Z`) }));
+    await mockReads({ news: many });
     expect((await getLandingTicker()).items).toHaveLength(10);
   });
 });

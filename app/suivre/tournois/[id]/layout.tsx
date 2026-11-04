@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/server/auth";
+import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { publicTournamentCardForRequest } from "@/lib/server/spectator-request";
 import { tournamentPageMetadata } from "@/lib/server/tournament-metadata";
 import { PATHNAME_HEADER, SEARCH_HEADER } from "@/lib/shared/csp";
 import { memberPathForSpectatorPath } from "@/lib/shared/spectator-member-path";
 import { localeHref } from "@/lib/shared/locales";
+import styles from "./relay.module.css";
 import {
   forwardedSearch,
   parseTournamentId,
@@ -16,6 +18,7 @@ import {
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { SpectatorViewProvider } from "@/components/spectator-view";
 import { MemberRelay } from "./_components/MemberRelay";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { TournamentSheetText, tournamentSheetEnglish } from "@/app/(secured)/tournois/[id]/_components/TournamentSheetText";
 
 type LayoutProps = {
@@ -92,8 +95,21 @@ export default async function SpectatorTournamentLayout({
     <TournamentSheetText locale={locale} messages={await tournamentSheetEnglish(locale, true)}>
       <SpectatorViewProvider>
         <PublicPageShell>
-          {relay && <MemberRelay tournamentId={tournamentId} />}
-          <div className="page-shell">{children}</div>
+          {/* Renvoi dû : la fiche publique n'est pas rendue à la place de `children` — elle
+              s'hydratait (SSE, sondage REST) avant que `router.replace` n'ait mené au membre. */}
+          {relay ? (
+            <div className="page-shell">
+              <MemberRelay tournamentId={tournamentId} />
+              {/* Repli visible si le renvoi tarde ou échoue : jamais une page vide, ni une
+                  impasse — le texte mène à la fiche membre du tournoi (le chemin exact
+                  du match n'est pas connu ici, faute d'en-tête). */}
+              <output className={styles.fallback}>
+                <LocaleLink href={`/tournois/${tournamentId}`}>{messagesFor(locale).login.authGate.redirecting}</LocaleLink>
+              </output>
+            </div>
+          ) : (
+            <div className="page-shell">{children}</div>
+          )}
         </PublicPageShell>
       </SpectatorViewProvider>
     </TournamentSheetText>
