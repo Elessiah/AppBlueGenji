@@ -192,8 +192,8 @@ const FINAL_PENALTY_REFUSALS: ReadonlySet<string> = new Set(["ENDURANCE_PLAYOFFS
  * équipes en lice du haut du classement (une par équipe). Le rejeu les
  * applique à la manche courante, comme une sanction prononcée à l'écran.
  * Le nombre de pénalités se compte en code, jamais par un `LIMIT` interpolé :
- * une valeur non numérique ou inférieure à 1 ne pose rien, une décimale est
- * arrondie à l'entier inférieur.
+ * une valeur non numérique, infinie ou inférieure à 1 ne pose rien, une
+ * décimale est arrondie à l'entier inférieur.
  *
  * Exportée pour les tests.
  */
@@ -203,7 +203,7 @@ export async function penalizeEnduranceTeams(
   count: number
 ): Promise<number> {
   const limit = Math.floor(count);
-  if (Number.isNaN(limit) || limit <= 0) return 0;
+  if (!Number.isFinite(limit) || limit <= 0) return 0;
   const [rows] = await connection.execute<(RowDataPacket & { team_id: number })[]>(
     `SELECT team_id FROM bg_endurance_standings
        WHERE tournament_id = ? AND status = 'ACTIVE'
