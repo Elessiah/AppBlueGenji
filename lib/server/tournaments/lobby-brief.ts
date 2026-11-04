@@ -98,13 +98,13 @@ export function lobbyBriefPhase(slot: LobbyBriefSlot): string {
 const LOBBY_BRIEF_WINDOW_MINUTES = LAUNCH_AUTO_DELAY_MINUTES + 5;
 
 /**
- * Au-delà de son horaire, un match programmé n'est plus briefé par l'horaire.
- *
- * Large à dessein : un match retenu par les salons vocaux (`MATCH_VOICE.md`)
- * n'ouvre aucun salon, et son horaire est le seul repère qu'il ait. Le
- * check-in ne part malgré tout qu'une fois — la réservation s'en charge.
+ * Au-delà de son horaire, un match programmé n'est plus briefé par l'horaire :
+ * même fenêtre que le salon. Un match devenu jouable en retard (manche
+ * précédente longue) reçoit encore son check-in ; un match commencé depuis
+ * longtemps sans phase de lancement n'en reçoit pas en pleine partie (au
+ * déploiement, ou après un réappariement).
  */
-const LOBBY_BRIEF_LATE_MINUTES = 120;
+const LOBBY_BRIEF_LATE_MINUTES = LOBBY_BRIEF_WINDOW_MINUTES;
 
 export type LobbyBriefRow = RowDataPacket & {
   id: number;
@@ -205,7 +205,7 @@ const BRIEF_COLUMNS = `m.id, m.tournament_id, t.name AS tournament_name, t.parti
             m.launch_pairing, CONCAT(m.team1_id, ':', m.team2_id) AS brief_pairing,
             m.launched_at, m.host_team_id, es1.rank AS team1_seed, es2.rank AS team2_seed,
             (t.team_voice_channels = 1 AND t.participant_type <> 'SOLO'
-              AND t1.is_ghost = 0 AND t2.is_ghost = 0) AS voice_tracked,
+              AND t1.is_ghost = 0 AND t2.is_ghost = 0 AND m.start_at IS NOT NULL) AS voice_tracked,
             ${firstStreamUrlSql("m")} AS stream_url,
             m.first_map, m.self_managed, m.referee_user_id, m.map_picks,
             (m.referee_user_id IS NOT NULL
@@ -234,9 +234,12 @@ const BRIEF_FROM = `FROM bg_matches m
  * `LOBBY_BRIEF_LATE_MINUTES`) ou, à défaut d'horaire, par l'ouverture de son
  * salon (`LOBBY_BRIEF_WINDOW_MINUTES`).
  *
- * L'appariement **n'est pas** comparé à `launch_pairing` : il est vide tant
- * qu'aucun lancement n'a été adopté (`adoptCurrentPairing`), et le check-in
- * part avant l'ouverture du salon. La réservation porte l'appariement courant
+ * Par l'horaire, l'appariement **n'est pas** comparé à `launch_pairing` : il
+ * est vide tant qu'aucun lancement n'a été adopté (`adoptCurrentPairing`), et
+ * le check-in part avant l'ouverture du salon. Par le salon, il l'est : un salon
+ * ouvert pour un appariement remplacé (correction de score) ne vaut rien pour le
+ * nouveau. Un tournoi masqué de nouveau (`start_visibility_at` à venir) n'envoie
+ * rien, comme les salons vocaux : son nom et ses équipes ne sortent pas. La réservation porte l'appariement courant
  * (`brief_pairing`) : un réappariement change la clé, et `adoptCurrentPairing`
  * efface de son côté les réservations du match quand il remplace une empreinte
  * déjà posée.
@@ -245,10 +248,12 @@ const BRIEF_FROM = `FROM bg_matches m
  * de l'appel aux « Prêt » : le brief ne se compare à aucun instant du processus.
  */
 const BRIEF_DUE_SQL = `m.status = 'READY' AND m.is_bye = 0 ${NO_SCORE_SQL}
+        AND t.start_visibility_at <= NOW()
         AND ((m.start_at IS NOT NULL
               AND m.start_at <= NOW() + INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE
               AND m.start_at > NOW() - INTERVAL ${LOBBY_BRIEF_LATE_MINUTES} MINUTE)
           OR (m.lobby_opened_at IS NOT NULL
+              AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
               AND m.lobby_opened_at > NOW() - INTERVAL ${LOBBY_BRIEF_WINDOW_MINUTES} MINUTE))`;
 
 /**

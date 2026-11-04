@@ -249,6 +249,54 @@ describe("formatLobbyBriefDm — cartes du round", () => {
     expect(text.length).toBeLessThan(2000);
   });
 
+  it("formatLobbyBriefDm_longNamesAndFullMaps_cappedAtDiscordLimitFr", () => {
+    const longest = (prefix: string) => `${prefix}${"x".repeat(60 - prefix.length)}`;
+    const pool = ["Lijiang Tower", "Busan", "Nepal", "Oasis", "Antarctic Peninsula"];
+    const maps = Array.from({ length: 5 }, (_, index) => ({ number: index + 1, kind: "POOL" as const, map: null, candidates: pool }));
+    const long = side({
+      tournamentName: longest("Coupe"),
+      teamName: longest("Renards"),
+      opponentName: longest("Nova"),
+      maps,
+      tiebreakMap: "New Junk City",
+      cast: true,
+      streamUrl: "https://twitch.tv/bluegenji",
+      voice: true,
+      decision: "SELF_MANAGED",
+    });
+
+    const text = formatLobbyBriefDm(long, URL);
+
+    // Plus long que 2 000 caractères, Discord refuserait le message : les cartes cèdent l'excédent.
+    expect(text.length).toBeLessThanOrEqual(2000);
+    expect(text).toContain("* Suite des cartes sur la page du match.");
+    // Le pied du message reste entier.
+    expect(text.endsWith("GL HF :)")).toBe(true);
+  });
+
+  it("formatLobbyBriefDm_longNamesAndFullMaps_cappedAtDiscordLimitEn", () => {
+    const longest = (prefix: string) => `${prefix}${"x".repeat(60 - prefix.length)}`;
+    const pool = ["Lijiang Tower", "Busan", "Nepal", "Oasis", "Antarctic Peninsula"];
+    const maps = Array.from({ length: 5 }, (_, index) => ({ number: index + 1, kind: "POOL" as const, map: null, candidates: pool }));
+    const long = side({
+      tournamentName: longest("Cup"),
+      teamName: longest("Foxes"),
+      opponentName: longest("Nova"),
+      maps,
+      tiebreakMap: "New Junk City",
+      cast: true,
+      streamUrl: "https://twitch.tv/bluegenji",
+      voice: true,
+      decision: "SELF_MANAGED",
+    });
+
+    const text = formatLobbyBriefDm(long, URL, "en");
+
+    expect(text.length).toBeLessThanOrEqual(2000);
+    expect(text).toContain("* More maps on the match page.");
+    expect(text.endsWith("GL HF :)")).toBe(true);
+  });
+
   it("formatLobbyBriefDm_mapsOverMaxInEnglish_pointsToMatchPage", () => {
     const pool = Array.from({ length: 20 }, (_, index) => `Map-${String(index).padStart(2, "0")}-${"x".repeat(50)}`);
     const maps = Array.from({ length: 9 }, (_, index) => ({ number: index + 1, kind: "POOL" as const, map: null, candidates: pool }));

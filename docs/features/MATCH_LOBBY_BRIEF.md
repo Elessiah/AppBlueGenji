@@ -108,7 +108,9 @@ Vu de l'engagée du destinataire :
   cartes suivantes, et la map de départage s'il y en a une. Le bloc est borné
   par `MAPS_LINE_MAX` (420) : au-delà, il s'arrête à un créneau entier et
   renvoie à la page du match — un message de plus de 2 000 caractères ne
-  serait pas remis par Discord.
+  serait pas remis par Discord. Si des noms longs (équipes, tournoi, lien de
+  diffusion) font malgré tout passer le message au-delà de
+  `DISCORD_MESSAGE_MAX` (2 000), le bloc des cartes cède l'excédent.
 - **Match casté**, dès qu'un caster encore éligible est inscrit
   (`readMatchCasters`) : le **lien du live** quand il est public
   (`firstStreamUrlSql`, `bg_match_streams`, repassé par `normalizeStreamUrl` —
@@ -152,23 +154,32 @@ partagé avec les départs de match), appelé aux mêmes endroits que les dépar
 de match (publication d'un évènement de tournoi, entretien de l'instantané qui
 ouvre un lancement, lecture de la liste des tournois).
 
-- Candidats (`BRIEF_DUE_SQL`) : tournoi `RUNNING`, match `READY` non exempt et
+- Candidats (`BRIEF_DUE_SQL`) : tournoi `RUNNING` **et publié**
+  (`start_visibility_at` passé, comme les salons vocaux : un tournoi masqué de
+  nouveau ne fait sortir ni son nom ni ses équipes), match `READY` non exempt et
   **sans score** (un match noté que le staff replanifie est tenu pour lancé,
   sans salon), et **dû** — soit par son horaire (`start_at` dans les
   15 minutes qui viennent, et pas plus vieux que `LOBBY_BRIEF_LATE_MINUTES`,
-  120 min : un match retenu par ses salons vocaux n'ouvre aucun salon et son
-  horaire est son seul repère), soit par `lobby_opened_at` des 20 dernières
-  minutes (délai du lancement d'office + 5), le repli des matchs sans horaire.
+  la même fenêtre de 20 min que le salon : un match devenu jouable en retard
+  reçoit encore son check-in, un match commencé depuis longtemps — au
+  déploiement, après un réappariement — n'en reçoit pas en pleine partie),
+  soit par `lobby_opened_at` des 20 dernières minutes (délai du lancement
+  d'office + 5) **pour l'appariement courant** (`launch_pairing`), le repli des
+  matchs sans horaire.
   Toutes les bornes sont des instants de la base (`NOW()`), comme les fenêtres
   de l'appel aux « Prêt ».
-- **L'appariement n'est pas comparé à `launch_pairing`** : cette empreinte est
+- **Par l'horaire, l'appariement n'est pas comparé à `launch_pairing`** : cette empreinte est
   vide tant qu'aucun lancement n'a été adopté (`adoptCurrentPairing`), et le
   check-in part avant l'ouverture du salon. La réservation porte donc
   l'**appariement courant** (`CONCAT(team1_id, ':', team2_id)`, colonne
   `brief_pairing`) : un réappariement change la clé, et `adoptCurrentPairing`
   efface de son côté les réservations du match quand il remplace une empreinte
-  déjà posée (la première adoption, empreinte vide, n'efface rien — la
-  réservation posée à H-15 survit à l'ouverture du salon).
+  déjà posée, **sauf le check-in de l'appariement qui arrive** (déjà parti à
+  H-15, il ne repart pas à l'ouverture du salon ; la première adoption,
+  empreinte vide, n'efface rien). Une **nouvelle heure** sans salon ouvert
+  (`match-schedule`) rend le check-in réservé : il repart 15 minutes avant la
+  nouvelle. Le vocal n'est annoncé qu'à un match qui a son horaire (le bot n'en
+  ouvre pas d'autre).
 - **Réservation** `bg_match_start_notices` phases `LOBBY_BRIEF_1` /
   `LOBBY_BRIEF_2`, une par engagée et par appariement (`INSERT IGNORE …
   SELECT` qui relit le match **et son tournoi** : encore dû, sans score, même
@@ -190,7 +201,8 @@ ouvre un lancement, lecture de la liste des tournois).
   qu'un côté est libre. Un réappariement est un autre appariement (nouveau
   brief) ; un lancement défait (horaire changé, retour à planifier) **ou un
   appariement réécrit sur place** (`adoptCurrentPairing`, A:B → A:C → A:B)
-  efface les réservations du match : le salon rouvert est briefé de nouveau.
+  efface les réservations du match (le réappariement sur place garde le
+  check-in de l'appariement qui arrive) : le salon rouvert est briefé de nouveau.
   Le balayage des départs ne compte que ses phases `LOBBY` / `LAUNCHED`, et
   comme le brief ignore un match qui porte déjà un score (candidats et
   réservation).

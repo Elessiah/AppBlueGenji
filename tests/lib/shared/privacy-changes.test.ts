@@ -2546,11 +2546,11 @@ describe("Registre — suppression du compte (D12, D13)", () => {
   });
 });
 
-// EF-43 : dernière entrée, pour tous les comptes ; l'entrée publiée du 4 novembre reste telle quelle.
+// EF-43 : entrée qui suit la v9, pour tous les comptes ; l'entrée publiée du 4 novembre reste telle quelle.
 describe("PRIVACY_CHANGES — salons vocaux sans comptage ni attente (EF-43)", () => {
-  const voiceEntry = () => PRIVACY_CHANGES.at(-1)!;
+  const voiceEntry = () => PRIVACY_CHANGES.find((c) => c.id === "2026-11-salons-vocaux-sans-comptage")!;
 
-  it("privacyChanges_voiceWithoutCount_isLastEntryDated1106ForAllAccounts", () => {
+  it("privacyChanges_voiceWithoutCount_followsTermsV9Dated1106ForAllAccounts", () => {
     const entry = voiceEntry();
     expect(entry.id).toBe("2026-11-salons-vocaux-sans-comptage");
     expect([entry.id.length <= PRIVACY_CHANGE_ID_MAX_LENGTH, entry.asksTermsAcceptance, privacyChangeReachesAccount(entry, {}), isPrivacyPolicyVersion(entry)]).toEqual([true, undefined, true, true]);

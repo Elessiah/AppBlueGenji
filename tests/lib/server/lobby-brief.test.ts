@@ -148,16 +148,29 @@ describe("dispatchLobbyBriefs", () => {
     expect(sql).toMatch(/m\.status = 'READY' AND m\.is_bye = 0/);
     // Le quart d'heure avant le coup d'envoi : le repère de principe.
     expect(sql).toMatch(/m\.start_at <= NOW\(\) \+ INTERVAL 15 MINUTE/);
-    expect(sql).toMatch(/m\.start_at > NOW\(\) - INTERVAL 120 MINUTE/);
+    // En retard, même fenêtre que le salon : pas de check-in en pleine partie.
+    expect(sql).toMatch(/m\.start_at > NOW\(\) - INTERVAL 20 MINUTE/);
     // Sans horaire, le salon : le repli d'avant la fusion.
-    expect(sql).toMatch(/OR \(m\.lobby_opened_at IS NOT NULL\s+AND m\.lobby_opened_at > NOW\(\) - INTERVAL 20 MINUTE\)/);
-    // L'appariement n'est pas comparé à `launch_pairing` : il est vide avant tout lancement.
-    expect(sql).not.toMatch(/m\.launch_pairing = CONCAT/);
+    expect(sql).toMatch(/OR \(m\.lobby_opened_at IS NOT NULL\s+AND m\.launch_pairing = CONCAT\(m\.team1_id, ':', m\.team2_id\)\s+AND m\.lobby_opened_at > NOW\(\) - INTERVAL 20 MINUTE\)/);
     // Un match qui porte un score est joué : aucun salon à régler.
     expect(sql).toMatch(/AND m\.team1_score IS NULL AND m\.team2_score IS NULL/);
     // Un match reste candidat tant qu'un de ses deux côtés n'est pas réservé.
     expect(sql).toMatch(/n\.phase IN \(\?, \?\)\) < 2/);
     expect(params).toEqual(["LOBBY_BRIEF_1", "LOBBY_BRIEF_2"]);
+  });
+
+  it("dueSql_hiddenTournament_notDue", async () => {
+    const { query } = mockDb([]);
+    await dispatchLobbyBriefs();
+    // Un tournoi masqué de nouveau n'envoie ni son nom ni ses équipes, comme les salons vocaux.
+    expect(query.mock.calls[0][0]).toMatch(/AND t\.start_visibility_at <= NOW\(\)/);
+  });
+
+  it("voiceTracked_unscheduledMatch_noVoiceLine", async () => {
+    const { query } = mockDb([]);
+    await dispatchLobbyBriefs();
+    // Le bot n'ouvre de salon qu'à un match qui a son horaire (`MATCH_VOICE.md`).
+    expect(query.mock.calls[0][0]).toMatch(/AND m\.start_at IS NOT NULL\) AS voice_tracked/);
     expect(lobbyBriefPhase(2).length).toBeLessThanOrEqual(16);
     expect(notifyUsers).not.toHaveBeenCalled();
   });

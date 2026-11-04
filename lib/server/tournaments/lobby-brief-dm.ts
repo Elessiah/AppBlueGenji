@@ -37,6 +37,13 @@ function quoted(value: string, locale: Locale): string {
  */
 export const MAPS_LINE_MAX = 420;
 
+/**
+ * Longueur au plus d'un message Discord. Des noms longs (équipes, tournoi) et
+ * un lien de diffusion peuvent la faire passer même sous `MAPS_LINE_MAX` : le
+ * bloc des cartes est alors raccourci d'autant (`formatLobbyBriefDm`).
+ */
+export const DISCORD_MESSAGE_MAX = 2000;
+
 type TournamentText = {
   /** Titre du message : « Check-in du match … ». */
   title: (subject: string) => string;
@@ -196,8 +203,8 @@ function creationLine(side: LobbyBriefSide, locale: Locale): string | null {
   return side.hosting ? text.createGame : text.checkSettings;
 }
 
-/** Les cartes de la manche, une puce par créneau, coupées à `MAPS_LINE_MAX`. */
-function mapBullets(side: LobbyBriefSide, locale: Locale, quote: (name: string) => string): string[] {
+/** Les cartes de la manche, une puce par créneau, coupées à `budget` (au plus `MAPS_LINE_MAX`). */
+function mapBullets(side: LobbyBriefSide, locale: Locale, quote: (name: string) => string, budget: number): string[] {
   const text = DM_TEXT[locale];
   const bullets: string[] = [];
   let used = 0;
@@ -205,7 +212,7 @@ function mapBullets(side: LobbyBriefSide, locale: Locale, quote: (name: string) 
     const shown = slot.map === null ? text.toChoose(slot.candidates.map(quote).join(", ")) : quote(slot.map);
     const bullet = `* ${text.map(slot.number, shown)}`;
     // Coupé à un créneau entier : jamais au milieu d'un nom cité.
-    if (used + bullet.length > MAPS_LINE_MAX) {
+    if (used + bullet.length > budget) {
       bullets.push(`* ${text.moreMaps}`);
       return bullets;
     }
@@ -216,9 +223,9 @@ function mapBullets(side: LobbyBriefSide, locale: Locale, quote: (name: string) 
 }
 
 /** Le bloc des cartes : celles de la manche si elle est réglée, sinon la première carte seule. */
-function mapsBlock(side: LobbyBriefSide, locale: Locale, quote: (name: string) => string): string[] {
+function mapsBlock(side: LobbyBriefSide, locale: Locale, quote: (name: string) => string, budget: number): string[] {
   const text = DM_TEXT[locale];
-  if (side.maps.length > 0) return mapBullets(side, locale, quote);
+  if (side.maps.length > 0) return mapBullets(side, locale, quote, budget);
   // Une carte vide ou faite d'invisibles retombe sur le même repli que la notification.
   const firstMap =
     side.firstMap === null || withoutInvisibles(side.firstMap).trim() === "" ? text.noFirstMap : quote(side.firstMap);
@@ -245,6 +252,13 @@ function castBlock(side: LobbyBriefSide, locale: Locale): string[] {
  * tue plutôt que de pointer vers une adresse inventée (`siteUrl`).
  */
 export function formatLobbyBriefDm(side: LobbyBriefSide, url: string | null, locale: Locale = "fr"): string {
+  const full = buildLobbyBriefDm(side, url, locale, MAPS_LINE_MAX);
+  if (full.length <= DISCORD_MESSAGE_MAX) return full;
+  // Trop long : le bloc des cartes cède l'excédent (la page du match les donne toutes).
+  return buildLobbyBriefDm(side, url, locale, Math.max(0, MAPS_LINE_MAX - (full.length - DISCORD_MESSAGE_MAX)));
+}
+
+function buildLobbyBriefDm(side: LobbyBriefSide, url: string | null, locale: Locale, mapsBudget: number): string {
   const text = DM_TEXT[locale];
   const quote = (name: string) => quoted(name, locale);
   const names = lobbyBriefNames(side, locale, quote);
@@ -271,7 +285,7 @@ export function formatLobbyBriefDm(side: LobbyBriefSide, url: string | null, loc
     ...GAME_SETTINGS.map((setting) => `* ${GAME_SETTINGS_TEXT[locale][setting]}`),
     "",
     text.mapsSection,
-    ...mapsBlock(side, locale, quote),
+    ...mapsBlock(side, locale, quote, mapsBudget),
     `* ${text.firstBan(names.ban, names.banNext)}`,
     `* ${text.nextBans[side.nextBan]}`,
     ...(side.tiebreakMap ? [`* ${text.tiebreak}${quote(side.tiebreakMap)}`] : []),
