@@ -140,10 +140,11 @@ describe("loadNotificationRecipients — option matchDm", () => {
     expect(recipient).toEqual({ userId: 1, discord: { discordId: "555", handle: "kiro", label: "Kiro" } });
   });
 
-  it("loadNotificationRecipients_matchDmBothColumnsMissing_thirdAttemptPlain", async () => {
+  it("loadNotificationRecipients_matchDmBothColumnsMissing_fourthAttemptPlain", async () => {
     const missing = Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
     const query = jest
       .fn<SqlQuery>()
+      .mockRejectedValueOnce(missing)
       .mockRejectedValueOnce(missing)
       .mockRejectedValueOnce(missing)
       .mockResolvedValueOnce([[ROWS[0]], []]);
@@ -151,8 +152,25 @@ describe("loadNotificationRecipients — option matchDm", () => {
 
     await loadNotificationRecipients([1], "certified", { matchDm: true });
 
-    expect(query).toHaveBeenCalledTimes(3);
-    expect(String(query.mock.calls[2][0])).not.toMatch(/match_dm_enabled|locale/);
+    expect(query).toHaveBeenCalledTimes(4);
+    expect(String(query.mock.calls[3][0])).not.toMatch(/match_dm_enabled|locale/);
+  });
+
+  it("loadNotificationRecipients_onlyMatchDmColumnMissing_localeStillRead", async () => {
+    // L'opposition ne peut pas être lue : la langue l'est encore, sans seconde lecture.
+    const missing = Object.assign(new Error("Unknown column 'match_dm_enabled'"), { code: "ER_BAD_FIELD_ERROR" });
+    const query = jest
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(missing)
+      .mockRejectedValueOnce(missing)
+      .mockResolvedValueOnce([[{ ...ROWS[0], locale: "en" }], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    const [recipient] = await loadNotificationRecipients([1], "certified", { matchDm: true });
+
+    expect(String(query.mock.calls[2][0])).toMatch(/, locale\b/);
+    expect(String(query.mock.calls[2][0])).not.toMatch(/match_dm_enabled/);
+    expect(recipient.locale).toBe("en");
   });
 
   it("laisse passer toute autre erreur de lecture", async () => {
