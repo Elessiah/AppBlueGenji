@@ -140,8 +140,8 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
        ADD UNIQUE INDEX uniq_bg_challenges_lookup (lookup_hash)`,
     // EF-14 — usage d'un code (connexion ou rattachement d'un tag) : un code
     // de certification ne connecte pas, un code de connexion ne certifie pas.
-    // `NULL` pour les défis d'avant (dix minutes de vie) : refusés partout, le
-    // joueur redemande un code. Les bases neuves la créent `NOT NULL`.
+    // `NULL` le temps de la migration : les défis d'avant sont marqués consommés
+    // juste après (le joueur redemande un code). Les bases neuves la créent `NOT NULL`.
     `ALTER TABLE bg_discord_login_challenges ADD COLUMN purpose ENUM('LOGIN', 'HANDLE') NULL AFTER handle`,
     // Puis `NOT NULL`, comme sur une base neuve : sous le `sql_mode` strict par
     // défaut de MySQL 8 et de MariaDB, une insertion qui oublierait l'usage

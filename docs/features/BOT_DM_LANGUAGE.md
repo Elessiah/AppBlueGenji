@@ -59,11 +59,11 @@ prouvé et peut désigner quelqu'un d'autre. Sans compte rattaché, bilingue. La
 langue n'est lue qu'**après** l'insertion du défi : un refus de quota ne dépend
 pas de l'existence d'un compte rattaché. `purpose: "handle"` (certification ou
 changement de tag) fait rédiger au bot un texte qui dit que le code rattache un
-tag et ne connecte pas ; `"login"` par défaut (un bot plus ancien l'ignore).
+tag et ne connecte pas ; `"login"` sinon, toujours explicite (un bot plus ancien l'ignore).
 L'usage est aussi gardé sur le défi (`bg_discord_login_challenges.purpose`,
 `LOGIN` / `HANDLE`) : un code de certification est refusé à la connexion, et
-l'inverse, sans consommer d'essai (`NULL` : défi d'avant la colonne, refusé —
-le joueur redemande un code). « Seul le dernier code vaut » se lit par usage :
+l'inverse, sans consommer d'essai (les défis d'avant la colonne sont marqués
+consommés par la migration — le joueur redemande un code). « Seul le dernier code vaut » se lit par usage :
 une demande de connexion n'annule pas le code de certification en attente.
 
 ## Ce que vaut une `locale` absente
