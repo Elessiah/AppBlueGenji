@@ -105,7 +105,7 @@ export const MATCH_CONTACTS_READ_RULE: RateLimitRule = {
   windowMs: 60_000,
 };
 
-/** Compteur des salons vocaux d'un match, relu toutes les 10 s par sa page tant que le verrou tient. */
+/** Compteur des salons vocaux d'un match, relu toutes les 10 s par sa page, flux coupé seulement (30 par minute et par compte : trois onglets sans flux en prennent dix-huit). */
 export const MATCH_VOICE_READ_RULE: RateLimitRule = {
   name: "match-voice-read",
   limit: 30,

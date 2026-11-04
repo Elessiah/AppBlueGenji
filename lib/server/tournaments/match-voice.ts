@@ -599,8 +599,8 @@ type SingleMatchRow = RowDataPacket & {
 };
 
 /**
- * État des salons d'un match pour la page du match, qui le relit tant que le
- * verrou tient (`GET /api/matches/[matchId]/voice`) : la lecture REST de
+ * État des salons d'un match pour la page du match, qui le relit, flux coupé
+ * seulement (`GET /api/matches/[matchId]/voice`) : la lecture REST de
  * secours de `TournamentMatch.voice`. Lit la base seulement — le comptage
  * auprès du bot reste au balayage, qu'elle relance sans l'attendre : autant
  * de lecteurs qu'on voudra, jamais plus d'un appel au bot par salon et par
