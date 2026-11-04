@@ -210,7 +210,7 @@ fenêtre d'acceptation (`TermsAccountDeletion`). Annoncée par l'entrée
 `2026-10-conditions-v7-casters-et-arbitre` (FR et EN) ; l'entrée
 `2026-10-arbitre-designe-des-matchs`, en production depuis #487 (intérêt
 légitime, opposition), n'est pas réécrite.
-Conditions du bot (article 01) et registre T08 : check-in du match et avis
+Conditions du bot (article 01) et registre T08 : réglages du salon et avis
 du retrait d'un cast parmi les messages remis. **Tout compte la réaccepte** dans la fenêtre
 bloquante.
 
@@ -257,7 +257,9 @@ parties (fonctionnement minimum nécessaire), troisième paragraphe réécrit (t
 `/rgpd#salons-vocaux`, et paragraphe des **salons vocaux d'équipe** (règle du
 tournoi, comptage anonyme sur l'intérêt légitime, sans droit d'opposition). Section « Compte » — la suppression et ses
 suites (ERASURE-D2). Conditions du bot, article 01 (`bot-legal-content.ts`) —
-invitations, reprises de fantôme et propriétés d'équipe transférées. Annoncée
+invitations, reprises de fantôme et propriétés d'équipe transférées ; le
+« check-in du match » y remplace les « réglages du salon » (MATCH-CHECKIN,
+#558, avant la mise en ligne de la version 9, entrée `2026-11-check-in-du-match`). Annoncée
 par `2026-11-conditions-v9-contacts-et-suppression` ; **tout compte la
 réaccepte** dans la fenêtre bloquante.
 

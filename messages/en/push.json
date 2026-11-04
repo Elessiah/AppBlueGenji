@@ -6,7 +6,7 @@
     },
     "MATCH_LOBBY_BRIEF": {
       "label": "Match check-in",
-      "description": "15 minutes before the kickoff of a match you play (or, when it has no time, when its lobby opens): who plays on the left (host) and on the right, the first map, the first ban and, if it is cast, the reminder to sort the players by role."
+      "description": "15 minutes before the kickoff of a match of your team (or when its lobby opens, if that comes earlier or it has no time): who plays on the left (host) and on the right, the first map, the first ban and, if it is cast, the reminder to sort the players by role."
     },
     "SCORE_TO_CONFIRM": {
       "label": "Score to confirm",

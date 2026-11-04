@@ -548,14 +548,14 @@ describe("politique du bot — check-in du match (MATCH-CHECKIN)", () => {
   const en = JSON.stringify(PRIVACY_POLICY.en);
 
   it("liste le brief parmi les messages remis, certifiés et opposables, avec sa base (FR et EN)", () => {
-    expect(fr).toContain("check-in d'un match envoyé aux joueurs de ses engagées, avis envoyé à un caster dont l'inscription est retirée par un autre que lui, alerte d'arbitrage");
+    expect(fr).toContain("check-in d'un match envoyé aux membres de ses engagées, avis envoyé à un caster dont l'inscription est retirée par un autre que lui, alerte d'arbitrage");
     expect(fr).toContain("(code, horaire, rappel, retrait d'un match, check-in du match, retrait d'un cast, avis de modération");
     expect(fr).toContain("ceux des matchs (horaire, rappel, retrait d'un match, check-in du match, retrait d'un cast) ne partent qu'aux comptes dont le tag Discord est certifié");
-    expect(fr).toContain("intérêt légitime pour les messages privés de match d'un joueur (horaire, rappels, « Match retiré »), le check-in du match envoyé aux joueurs de ses engagées et l'avis envoyé à un caster dont l'inscription est retirée par un autre que lui, auxquels chacun s'oppose");
-    expect(en).toContain("check-in of a match sent to the players of its entrants, notice to a caster that someone else removed their registration for a match, referee alert");
+    expect(fr).toContain("intérêt légitime pour les messages privés de match d'un joueur (horaire, rappels, « Match retiré »), le check-in du match envoyé aux membres de ses engagées et l'avis envoyé à un caster dont l'inscription est retirée par un autre que lui, auxquels chacun s'oppose");
+    expect(en).toContain("check-in of a match sent to the members of its entrants, notice to a caster that someone else removed their registration for a match, referee alert");
     expect(en).toContain("(code, match time, reminder, removal from a match, match check-in, removal of a cast, moderation notice");
     expect(en).toContain("those about matches (time, reminder, removal from a match, match check-in, removal of a cast) only go to accounts with a Discord tag certified");
-    expect(en).toContain("the match check-in sent to the players of its entrants and the notice sent to a caster whose registration someone else removes, which each of them objects to");
+    expect(en).toContain("the match check-in sent to the members of its entrants and the notice sent to a caster whose registration someone else removes, which each of them objects to");
   });
 });
 
@@ -564,7 +564,7 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
   const en = JSON.stringify(PRIVACY_POLICY.en);
 
   it("déclare l'avis de retrait d'un match parmi les messages remis (FR et EN)", () => {
-    expect(fr).toContain("horaire ou rappel de match, avis de retrait d'un match (« Match retiré »), check-in d'un match envoyé aux joueurs de ses engagées");
+    expect(fr).toContain("horaire ou rappel de match, avis de retrait d'un match (« Match retiré »), check-in d'un match envoyé aux membres de ses engagées");
     expect(fr).toContain("(code, horaire, rappel, retrait d'un match, check-in du match, retrait d'un cast, avis de modération");
     expect(en).toContain("match time or reminder, notice of removal from a match (“Match retiré”), check-in of a match");
     expect(en).toContain("(code, match time, reminder, removal from a match, match check-in, removal of a cast, moderation notice");
@@ -583,7 +583,7 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
     expect(JSON.stringify(TERMS_OF_SERVICE.en)).toContain("— these match messages only to accounts with a Discord tag certified on the website —");
   });
 
-  // TERMS v7 : l'article 01 des conditions du bot cite le check-in du match
+  // TERMS v7 citait les réglages du salon ; la v9 (MATCH-CHECKIN) cite le check-in du match
   // (MATCH-REFEREE MR-4) parmi les messages de match remis, réservés aux tags
   // certifiés comme les autres ; datée du lendemain de la mise en ligne du 28 octobre.
   it("les conditions du bot citent le check-in du match parmi les messages de match remis (FR et EN)", () => {

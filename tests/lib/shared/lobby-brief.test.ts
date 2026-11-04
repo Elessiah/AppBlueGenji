@@ -531,7 +531,7 @@ describe("check-in du match — registre des traitements (T04, T12)", () => {
     const enBrief = en.subPurposes.find((line) => line.includes("the match check-in"))!;
     // Le moment : le quart d'heure, et le repli sur l'ouverture du salon.
     expect(frBrief).toContain("15 minutes avant le coup d'envoi d'un match");
-    expect(frBrief).toContain("à défaut d'horaire, à l'ouverture de son salon");
+    expect(frBrief).toContain("ou à l'ouverture de son salon si elle vient plus tôt ou si le match n'a pas d'horaire");
     expect(frBrief).toContain("(de nouveau s'il rouvre, par exemple après un changement d'horaire)");
     // Les destinataires : tous les joueurs, et plus les seuls gestionnaires.
     expect(frBrief).toContain("tous les joueurs de chacune de ses engagées");
@@ -540,8 +540,8 @@ describe("check-in du match — registre des traitements (T04, T12)", () => {
     expect(enBrief).toContain("every player of each of its entrants");
     expect(enBrief).toContain("without any BattleTag, Discord tag or player username");
     expect(enBrief).toContain("(again if it reopens, for instance after a change of time)");
-    expect(fr.legalBasis).toContain("le check-in du match envoyé aux joueurs de ses engagées");
-    expect(en.legalBasis).toContain("the match check-in sent to the players of its entrants");
+    expect(fr.legalBasis).toContain("le check-in du match envoyé aux membres de ses engagées");
+    expect(en.legalBasis).toContain("the match check-in sent to the members of its entrants");
     const frPushActivity = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T12")!;
     const enPushActivity = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T12")!;
     expect(frPushActivity.subPurposes.join(" ")).toContain("Check-in de ses matchs");
@@ -563,9 +563,9 @@ describe("check-in du match — changement de politique (PRIVACY_CHANGES)", () =
     const fr = PRIVACY_CHANGES.find((change) => change.id === ID)!;
     const en = PRIVACY_CHANGES_EN[ID];
     expect(fr.details.join(" ")).toContain("15 minutes avant le coup d'envoi, au lieu de l'ouverture du salon");
-    expect(fr.details.join(" ")).toContain("tous les joueurs des deux engagées, et plus seulement leurs propriétaires et managers");
+    expect(fr.details.join(" ")).toContain("tous les membres des deux engagées — joueurs, coachs et managers compris —, et plus seulement leurs propriétaires et managers");
     expect(en.details.join(" ")).toContain("15 minutes before kickoff, instead of when the lobby opens");
-    expect(en.details.join(" ")).toContain("every player of both entrants, no longer only their owners and managers");
+    expect(en.details.join(" ")).toContain("every member of both entrants — players, coaches and managers included —, no longer only their owners and managers");
     // Ce qui ne change pas reste dit : aucun pseudo, et l'interrupteur de « Mon profil ».
     expect(fr.details.join(" ")).toContain("ni BattleTag, ni tag Discord, ni pseudo de joueur");
     expect(en.details.join(" ")).toContain("no BattleTag, no Discord tag and no player username");

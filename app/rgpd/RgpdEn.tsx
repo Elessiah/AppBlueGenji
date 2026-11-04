@@ -831,7 +831,7 @@ export function RgpdEn({
         <div className={styles.prose}>
           <p>
             You can be notified on your phone or computer of the start of your matches, of a score to confirm or confirmed automatically without an answer, of a
-            tournament&apos;s kickoff, of your match times (set, changed or removed) and their reminders, of the check-in of a match you play, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers), and of what
+            tournament&apos;s kickoff, of your match times (set, changed or removed) and their reminders, of the check-in of a match of your team, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers), and of what
             concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, disputes settled, results corrected,
             opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the start of the match they cast and of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission.{" "}
             <strong>Nothing is sent without your action</strong>: notifications are turned on device by device,
@@ -875,10 +875,11 @@ export function RgpdEn({
             language, when
             the time of one of your matches is set, changed or removed, for its reminders (24 h and 10 h before),
             when you are removed from a match and, if you cast, when your caster registration for a match is removed
-            by the staff or automatically (with the reason) and, if you manage an entered team (owner or manager) or play
-            a solo tournament, when the lobby of a match opens (again if it reopens, for instance after a change of time), the game settings (team on the left —
-            the host — and on the right, first map, first ban, sorting the players by role if the match is cast, assigned
-            referee or self-management), with the team names, the tournament, the round and the link to the match page, without any BattleTag,
+            by the staff or automatically (with the reason) and, if you are a member of an entered team (player, coach or manager) or play
+            a solo tournament, 15 minutes before a match kicks off — or when its lobby opens, if that comes earlier or the match has no time, again if it reopens —, the match
+            check-in (joining your team&apos;s voice channel and the check-in channel, team on the left — the host — and on the right, game settings, map order and
+            ban order, sorting the players by role if the match is cast, assigned referee or self-management, the match&apos;s stream link when it is public,
+            the reminder to enter the scores and who to report a problem to), with the team names, the tournament, the round and the link to the match page, without any BattleTag,
             Discord tag or player username (in a solo tournament, the message names neither you nor your opponent) — only if your Discord tag is <strong>certified</strong>: an
             uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam (your push notifications are still sent). These messages
             are based on the association&apos;s{" "}

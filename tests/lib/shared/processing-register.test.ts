@@ -146,7 +146,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     // Décision du 2026-10-14 : le staff est prévenu en exécution du service ;
     // les messages de match des joueurs restent d'intérêt légitime, opposables.
     expect(t04.legalBasis).toMatch(/exécution du service[^;]*programme d'arbitrage adressés au staff/);
-    expect(t04.legalBasis).toMatch(/intérêt légitime[^;]*rappels de match envoyés aux joueurs, le check-in du match envoyé aux joueurs de ses engagées, et l'avis du retrait de son inscription envoyé à un caster, avec un droit d'opposition \(art\. 21\) honoré par un interrupteur de « Mon profil »/);
+    expect(t04.legalBasis).toMatch(/intérêt légitime[^;]*rappels de match envoyés aux joueurs, le check-in du match envoyé aux membres de ses engagées, et l'avis du retrait de son inscription envoyé à un caster, avec un droit d'opposition \(art\. 21\) honoré par un interrupteur de « Mon profil »/);
     expect(t04.subPurposes.join(" ")).toMatch(/couper ces messages privés depuis « Mon profil »/);
     // L'avis « Match retiré de ton programme » est l'un des messages coupés par l'interrupteur.
     expect(t04.subPurposes.join(" ")).toMatch(/l'avis qu'un match quitte son programme/);
@@ -266,8 +266,8 @@ describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
 
   // Revue de #491 (TERMS v7) : T08 liste aussi les réglages du salon (MR-4) et l'avis du retrait d'un cast (LN-1), comme les conditions du bot.
   it("T08 remet l'avis « Match retiré », le check-in du match et l'avis du retrait d'un cast, et nomme les modérateurs destinataires d'une alerte AutoMod", () => {
-    expect(fr("T08").subPurposes.join(" ")).toMatch(/horaires et rappels de match, avis de retrait d'un match \(« Match retiré »\), check-in d'un match envoyé aux joueurs de ses engagées et avis envoyé à un caster dont l'inscription est retirée par un autre que lui \(ces messages de match aux seuls tags Discord certifiés\), avis de modération/);
-    expect(en("T08").subPurposes.join(" ")).toMatch(/match times and reminders, notices of removal from a match \(“Match retiré”\), the check-in of a match sent to the players of its entrants and the notice sent to a caster whose registration for a match is removed by someone else \(these match messages to certified Discord tags only\), moderation notices/);
+    expect(fr("T08").subPurposes.join(" ")).toMatch(/horaires et rappels de match, avis de retrait d'un match \(« Match retiré »\), check-in d'un match envoyé aux membres de ses engagées et avis envoyé à un caster dont l'inscription est retirée par un autre que lui \(ces messages de match aux seuls tags Discord certifiés\), avis de modération/);
+    expect(en("T08").subPurposes.join(" ")).toMatch(/match times and reminders, notices of removal from a match \(“Match retiré”\), the check-in of a match sent to the members of its entrants and the notice sent to a caster whose registration for a match is removed by someone else \(these match messages to certified Discord tags only\), moderation notices/);
     expect(fr("T08").recipients).toContain("Modérateurs du serveur Discord de l'association, si une règle AutoMod de Discord bloque ou signale une annonce #live (traitement T16)");
     expect(en("T08").recipients).toContain("Moderators of the association's Discord server, if a Discord AutoMod rule blocks or flags a #live announcement (processing activity T16)");
   });
