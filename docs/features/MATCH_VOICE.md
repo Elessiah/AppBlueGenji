@@ -65,7 +65,11 @@ et rien n'est compté.
   horodatage (redemandé après la minute, jamais en tête de file).
 - **Panne du bot** : `failed_at` noté, une ligne pm2 sans donnée de joueur, une
   seule par panne ; création comme rendu réessayés au plus une fois par
-  `VOICE_RETRY_SECONDS` (60 s), en fin de file.
+  `VOICE_RETRY_SECONDS` (60 s), en fin de file — par équipe : une création échouée
+  n'est pas redemandée avant ce délai même quand l'autre équipe ramène le match
+  (`backing_off`, calculé par la base). Un rendu refusé par le bot donne une ligne
+  pm2 `rendu du salon vocal refusé (CODE)` par salon et par code (mémoire du
+  processus, oubliée à la clôture de la ligne) ; une panne du canal n'en donne pas.
 - **Rendu** : le balayage rend les salons d'un match terminé, forfait, annulé,
   sorti du programme (heure retirée), d'un match où entre une entrée solo ou une
   équipe fantôme, d'un tournoi qui n'est plus en cours (terminé, ou retombé avant
