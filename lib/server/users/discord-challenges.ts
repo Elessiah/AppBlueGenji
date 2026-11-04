@@ -4,10 +4,7 @@ import { getDatabase } from "@/lib/server/database";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { DISCORD_CODE_VALIDITY_MINUTES } from "@/lib/shared/processing-register";
 import { normalizeDiscordHandle } from "./tag-normalization";
-import type { DiscordCodePurpose } from "@/lib/server/bot-integration";
-
-/** Valeur de `purpose` en base pour chaque usage d'un code. */
-const PURPOSE_COLUMN: Record<DiscordCodePurpose, "LOGIN" | "HANDLE"> = { login: "LOGIN", handle: "HANDLE" };
+import { DISCORD_CODE_PURPOSE_COLUMN as PURPOSE_COLUMN, type DiscordCodePurpose } from "@/lib/shared/discord-code-purpose";
 
 /*
  * Codes de connexion Discord envoyés en message privé : création sous quotas,
@@ -218,8 +215,8 @@ const DISCORD_CODE_LOCK_TIMEOUT_SECONDS = 1;
  */
 export async function createDiscordLoginChallenge(
   discordId: string,
-  handle?: string | null,
-  purpose: DiscordCodePurpose = "login",
+  handle: string | null | undefined,
+  purpose: DiscordCodePurpose,
 ): Promise<DiscordChallenge> {
   const db = await getDatabase();
   const code = randomCode();
@@ -369,9 +366,10 @@ export async function consumeDiscordChallenge(
  * connexions et certifications de tag confondues, sans connaître personne.
  * Seule l'empreinte du jeton est en base.
  *
- * La règle « seul le dernier code émis vaut » est gardée : un défi que suit un
- * défi plus récent pour le même compte est refusé, exactement comme
- * {@link consumeDiscordChallenge} ne le lirait jamais.
+ * La règle « seul le dernier code émis vaut » est gardée **par usage** : un
+ * défi que suit un défi plus récent du même usage pour le même compte est
+ * refusé. Une demande de connexion (anonyme) n'annule donc pas le code de
+ * certification qu'attend le joueur, ni l'inverse.
  */
 export async function consumeDiscordLoginChallenge(
   challengeToken: string,
@@ -388,6 +386,7 @@ export async function consumeDiscordLoginChallenge(
        AND NOT EXISTS (
          SELECT 1 FROM bg_discord_login_challenges newer
          WHERE newer.discord_id = c.discord_id AND newer.id > c.id
+           AND newer.purpose <=> c.purpose
        )
      LIMIT 1`,
     [hashCode(challengeToken)],
@@ -403,7 +402,7 @@ type ChallengeRow = RowDataPacket & {
   discord_id: string;
   code_hash: string;
   handle: string | null;
-  /** `NULL` : défi antérieur à la colonne, accepté pour les deux usages. */
+  /** `NULL` : défi antérieur à la colonne (dix minutes de vie), refusé pour les deux usages. */
   purpose: "LOGIN" | "HANDLE" | null;
   expires_at: Date;
   consumed_at: Date | null;
@@ -424,8 +423,9 @@ async function settleChallengeAttempt(
   // certification dit qu'il ne connecte pas : accepté par la connexion, il
   // ouvrirait le compte de qui le transmet en confiance (et l'inverse
   // rattacherait son Discord à un autre compte). Refusé sans réserver d'essai :
-  // le code n'est pas comparé, rien n'est appris.
-  if (challenge.purpose && challenge.purpose !== PURPOSE_COLUMN[purpose]) return null;
+  // le code n'est pas comparé, rien n'est appris. Un défi sans usage (antérieur
+  // à la colonne) est refusé aussi : le joueur redemande un code.
+  if (challenge.purpose !== PURPOSE_COLUMN[purpose]) return null;
   if (challenge.consumed_at !== null) return null;
   if (new Date(challenge.expires_at).getTime() < Date.now()) return null;
 

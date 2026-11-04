@@ -97,7 +97,7 @@ export async function createAccountTables(db: Pool): Promise<void> {
       discord_id VARCHAR(40) NOT NULL,
       lookup_hash CHAR(64) NULL,
       handle VARCHAR(64) NULL,
-      purpose ENUM('LOGIN', 'HANDLE') NULL,
+      purpose ENUM('LOGIN', 'HANDLE') NOT NULL,
       code_hash CHAR(64) NOT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       expires_at DATETIME NOT NULL,

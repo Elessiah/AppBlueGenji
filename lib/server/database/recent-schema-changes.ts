@@ -140,7 +140,8 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
        ADD UNIQUE INDEX uniq_bg_challenges_lookup (lookup_hash)`,
     // EF-14 — usage d'un code (connexion ou rattachement d'un tag) : un code
     // de certification ne connecte pas, un code de connexion ne certifie pas.
-    // `NULL` pour les défis d'avant (quinze minutes de vie) : acceptés partout.
+    // `NULL` pour les défis d'avant (dix minutes de vie) : refusés partout, le
+    // joueur redemande un code. Les bases neuves la créent `NOT NULL`.
     `ALTER TABLE bg_discord_login_challenges ADD COLUMN purpose ENUM('LOGIN', 'HANDLE') NULL AFTER handle`,
     // Cible d'un signalement réellement prévenue : le délai de reprévenance et
     // le plafond de l'auteur ne comptent plus que les messages partis. `NULL`

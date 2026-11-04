@@ -1,3 +1,4 @@
+import type { DiscordCodePurpose } from "@/lib/shared/discord-code-purpose";
 import type {
   BotStats,
   BotStatus,
@@ -224,7 +225,7 @@ export async function resolveDiscordUser(handle: string): Promise<string> {
  * rattacher un tag Discord à un compte (`handle`) — le bot rédige alors un
  * message qui dit que le code ne connecte pas.
  */
-export type DiscordCodePurpose = "login" | "handle";
+export type { DiscordCodePurpose } from "@/lib/shared/discord-code-purpose";
 
 /**
  * Envoie le code de connexion en message privé. Le bot le rédige lui-même :

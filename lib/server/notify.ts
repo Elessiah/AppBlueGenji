@@ -325,7 +325,9 @@ export async function loadNotificationRecipients(
   // **avant** le réglage : une langue absente ne fait jamais perdre une
   // opposition aux messages de match (RGPD, article 21).
   const matchDm = options.matchDm === true;
-  const attempts: [boolean, boolean][] = matchDm ? [[true, true], [true, false], [false, false]] : [[false, true], [false, false]];
+  const attempts: [boolean, boolean][] = matchDm
+    ? [[true, true], [true, false], [false, true], [false, false]]
+    : [[false, true], [false, false]];
   const rows = await firstReadable(attempts, ([withMatchDm, withLocale]) => select(withMatchDm, withLocale));
   return rows.map((row) => {
     const recipient = toNotificationRecipient(row, reach);

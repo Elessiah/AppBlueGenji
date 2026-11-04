@@ -75,7 +75,7 @@ export async function POST(req: Request) {
     if (throttled) return throttled;
 
     // Le tag part avec le défi : c'est lui qui sera enregistré (non certifié)
-    // si le code revient juste (`consumeDiscordChallenge`). Un identifiant numérique n'en
+    // si le code revient juste (`consumeDiscordLoginChallenge`). Un identifiant numérique n'en
     // est pas un, `normalizeDiscordHandle` le laisse tomber.
     const challenge = await createDiscordLoginChallenge(discordId, handle, "login");
 
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
     } catch (error) {
       // **Un envoi raté n'a produit aucun code**, et la base doit le dire.
       //
-      // `verifyDiscordChallenge` ne lit que le **dernier émis** : laissée là, la
+      // `consumeDiscordLoginChallenge` ne lit que le **dernier émis** : laissée là, la
       // ligne mort-née ferait refuser le code que le joueur tient de la demande
       // précédente — refusé comme invalide, et chaque essai brûlant le quota de
       // la mauvaise ligne. Le supprimer rend au code déjà reçu sa place de
