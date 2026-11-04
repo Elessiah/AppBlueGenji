@@ -687,7 +687,7 @@ Toute personne qui rejoint un salon vocal d'équipe sur le serveur Discord de l'
 Membres du serveur Discord de l'association présents dans l'un de ses salons vocaux, dont le bot tient la présence en mémoire pour savoir si un salon de match est vide
 Membres des autres serveurs où le bot est présent, présents dans l'un de leurs salons vocaux : seule la fiche de membre jointe à leur état vocal est gardée en mémoire
 Données
-Identifiant Discord du salon de chaque équipe d'un match, numéros du match et de l'équipe, heure d'une éventuelle panne du bot, heures de création et de rendu du salon — jamais qui est présent, ni combien
+Identifiant Discord du salon de chaque équipe d'un match, numéros du match et de l'équipe, heure d'une éventuelle panne du bot ou d'un rendu refusé, heures de création et de rendu du salon — jamais qui est présent, ni combien
 Nom de l'équipe, transmis au bot pour nommer le salon
 État vocal (identifiant Discord du membre et de sa session vocale, salon où il se trouve, micro ou son coupés par lui ou par la modération, partage d'écran ou caméra actifs, demande de parole et mise en sourdine de scène), avec la fiche de membre que Discord y joint (sa fiche sur le serveur, dont pseudo, surnom, avatar, rôles, dates d'arrivée et de boost, exclusion temporaire), des membres du serveur Discord de l'association, tenu en mémoire par le bot pour savoir si un salon est vide, jamais enregistré ni transmis au site
 Fiche du salon chez le bot : identifiant du salon, clé du match et de l'équipe (des numéros, aucun nom), heures de création et de rendu
@@ -713,4 +713,4 @@ Accès au serveur réservé au responsable technique (authentification par clé 
 Chiffrement des échanges (HTTPS)
 Droits d'administration par rôle, limités à ce que chaque mission exige
 Aucune présence : ni identifiant, ni pseudo, ni nombre des personnes présentes n'est demandé au bot, reçu ou journalisé par le site
-Le bot n'est appelé que par le balayage du serveur, au plus une fois toutes les 10 secondes (aussitôt quand l'arbitrage change l'option), jamais pour chaque lecteur, et seulement pour créer un salon, le redemander (environ une fois par minute, dix secondes après un échec, ce qui en ouvre un neuf s'il a été supprimé) ou le rendre — jamais pour savoir qui s'y trouve, ni combien
+Le bot n'est appelé que par le balayage du serveur, au plus une fois toutes les 10 secondes (aussitôt quand l'arbitrage change l'option), jamais pour chaque lecteur, et seulement pour créer un salon, le redemander (environ une fois par minute, ce qui en ouvre un neuf s'il a été supprimé) ou le rendre — jamais pour savoir qui s'y trouve, ni combien

@@ -1523,8 +1523,8 @@ const ACTIVITIES = registerActivities({
         "Members of the other servers the bot is on, present in one of their voice channels: only the member profile attached to their voice state is kept in memory"),
     ],
     dataCategories: [
-      frEn("Identifiant Discord du salon de chaque équipe d'un match, numéros du match et de l'équipe, heure d'une éventuelle panne du bot, heures de création et de rendu du salon — jamais qui est présent, ni combien",
-        "Discord identifier of each team's channel for a match, numbers of the match and team, time of any bot outage, creation and hand-back times of the channel — never who is present, nor how many"),
+      frEn("Identifiant Discord du salon de chaque équipe d'un match, numéros du match et de l'équipe, heure d'une éventuelle panne du bot ou d'un rendu refusé, heures de création et de rendu du salon — jamais qui est présent, ni combien",
+        "Discord identifier of each team's channel for a match, numbers of the match and team, time of any bot outage or refused hand-back, creation and hand-back times of the channel — never who is present, nor how many"),
       frEn("Nom de l'équipe, transmis au bot pour nommer le salon",
         "Team name, sent to the bot to name the channel"),
       frEn("État vocal (identifiant Discord du membre et de sa session vocale, salon où il se trouve, micro ou son coupés par lui ou par la modération, partage d'écran ou caméra actifs, demande de parole et mise en sourdine de scène), avec la fiche de membre que Discord y joint (sa fiche sur le serveur, dont pseudo, surnom, avatar, rôles, dates d'arrivée et de boost, exclusion temporaire), des membres du serveur Discord de l'association, tenu en mémoire par le bot pour savoir si un salon est vide, jamais enregistré ni transmis au site",
@@ -1566,8 +1566,8 @@ const ACTIVITIES = registerActivities({
       ...COMMON_SECURITY,
       frEn("Aucune présence : ni identifiant, ni pseudo, ni nombre des personnes présentes n'est demandé au bot, reçu ou journalisé par le site",
         "No presence data: neither the identifier, the username nor the number of the people present is requested from the bot, received or logged by the site"),
-      frEn(`Le bot n'est appelé que par le balayage du serveur, au plus une fois toutes les ${VOICE_SWEEP_THROTTLE_SECONDS} secondes (aussitôt quand l'arbitrage change l'option), jamais pour chaque lecteur, et seulement pour créer un salon, le redemander (environ une fois par minute, dix secondes après un échec, ce qui en ouvre un neuf s'il a été supprimé) ou le rendre — jamais pour savoir qui s'y trouve, ni combien`,
-        `The bot is only called by the server's sweep, at most once every ${VOICE_SWEEP_THROTTLE_SECONDS} seconds (immediately when referees change the option), never for each viewer, and only to create a channel, ask for it again (about once a minute, ten seconds after a failure, which opens a new one if it was deleted) or hand it back — never to know who is in it, nor how many`),
+      frEn(`Le bot n'est appelé que par le balayage du serveur, au plus une fois toutes les ${VOICE_SWEEP_THROTTLE_SECONDS} secondes (aussitôt quand l'arbitrage change l'option), jamais pour chaque lecteur, et seulement pour créer un salon, le redemander (environ une fois par minute, ce qui en ouvre un neuf s'il a été supprimé) ou le rendre — jamais pour savoir qui s'y trouve, ni combien`,
+        `The bot is only called by the server's sweep, at most once every ${VOICE_SWEEP_THROTTLE_SECONDS} seconds (immediately when referees change the option), never for each viewer, and only to create a channel, ask for it again (about once a minute, which opens a new one if it was deleted) or hand it back — never to know who is in it, nor how many`),
     ],
   },
 });
