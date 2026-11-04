@@ -196,7 +196,7 @@ export function sameRoundKeys(a: readonly RoundKey[], b: readonly RoundKey[]): b
   return a.length === b.length && a.every((round, index) => roundKeyId(round) === roundKeyId(b[index]));
 }
 
-/** Empreinte des cartes enregistrées d'un tour : change quand elles changent, pas à chaque instantané. */
-export function storedRoundSignature(rounds: readonly RoundMapConfig[], round: RoundKey | null): string {
-  return JSON.stringify(round ? roundMapsOf(rounds, round) : null);
+/** Empreinte des cartes enregistrées de tous les tours : change quand elles changent, pas à chaque instantané. */
+export function storedRoundsSignature(rounds: readonly RoundMapConfig[]): string {
+  return JSON.stringify(rounds);
 }

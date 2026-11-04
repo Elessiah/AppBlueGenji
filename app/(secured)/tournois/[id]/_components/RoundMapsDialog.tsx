@@ -53,7 +53,7 @@ import {
   vanishedRoundFallback,
   type SlotEdit,
   sameRoundKeys,
-  storedRoundSignature,
+  storedRoundsSignature,
 } from "../_lib/round-maps-editor";
 import { useRoundMapsText, type RoundMapsText } from "../_lib/round-maps-text";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
@@ -650,8 +650,8 @@ export function RoundMapsDialog({
   });
   const clearSlotError = fieldErrors.clear;
   // Un refus ne survit pas à ce qui l'a causé : cartes, cible, tour affiché ou réglages du serveur changés.
-  // Seules les cartes enregistrées de ce tour comptent : un instantané qui ne les touche pas laisse le refus.
-  const storedKey = storedRoundSignature(rules.rounds, round);
+  // Un instantané qui ne change aucune carte enregistrée (tour affiché, cible de copie…) laisse le refus.
+  const storedKey = useMemo(() => storedRoundsSignature(rules.rounds), [rules.rounds]);
   useEffect(() => clearSlotError(), [slots, copyTarget, roundId, storedKey, clearSlotError]);
 
   // L'instantané change sous la fenêtre (autre membre du staff, ou son propre

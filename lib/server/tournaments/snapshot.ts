@@ -61,7 +61,7 @@ import { ACTIONABLE_EXPIRED_REPORT_SQL } from "./score-report-sql";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { pickChampion } from "@/lib/shared/tournament-card-summary";
 import { computeRunningRatio } from "@/lib/shared/tournament-progress";
-import { applyMapRules, type RoundTiebreak } from "@/lib/shared/round-maps";
+import { applyMapRules, roundKeyId, type RoundTiebreak } from "@/lib/shared/round-maps";
 import { loadMapRules } from "./round-maps";
 import { applicableTiebreaks } from "@/lib/shared/round-plan";
 import { withoutRefereeKeys } from "./referee-names";
@@ -591,8 +591,8 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
 
 /** `{ staleTiebreaks }` quand des réglages stockés ne sont plus actifs, `{}` sinon. */
 function staleTiebreaksField(stored: readonly RoundTiebreak[], active: readonly RoundTiebreak[]): { staleTiebreaks?: RoundTiebreak[] } {
-  const activeSet = new Set(active);
-  const stale = stored.filter((entry) => !activeSet.has(entry));
+  const activeKeys = new Set(active.map(roundKeyId));
+  const stale = stored.filter((entry) => !activeKeys.has(roundKeyId(entry)));
   return stale.length > 0 ? { staleTiebreaks: stale } : {};
 }
 
