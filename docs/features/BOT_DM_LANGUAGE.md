@@ -28,8 +28,8 @@ langues.
 | Diagnostics au titulaire du bot (repli du canal de logs, sauvegardes, assistant d'installation, ménage des journaux) | bot | français — journaux d'exploitation, pas des messages à un joueur |
 
 **Site.** Chaque message privé est une fonction de la langue (`LocalizedDm`,
-`lib/shared/dm-language.ts`). `notifyUsers` rédige le message dans les
-trois formes (`fr`, `en`, bilingue) **avant** tout départ — un rédacteur qui lève
+`lib/shared/dm-language.ts`). `notifyUsers` rédige le message dans
+chaque langue de ses destinataires (`fr`, `en`, bilingue sans langue connue) **avant** tout départ — un rédacteur qui lève
 fait échouer la notification sans qu'aucun push ne soit parti —, prend la langue
 que le chargeur a lue avec la ligne (`loadNotificationRecipients`,
 `NotificationRecipient.locale`), relit `bg_users.locale` des seuls autres
