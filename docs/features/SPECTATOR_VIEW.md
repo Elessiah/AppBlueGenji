@@ -292,8 +292,9 @@ d'un match d'un tournoi publié (mise en page du tournoi + du match) n'épuise p
 le plafond deux fois plus vite (un « introuvable », jamais gardé, reprend un jeton
 à chaque lecture) ; les réglages de `/regles/<mode>?tournoi=` suivent la même règle
 (`publicTournamentSnapshot` ne consulte `admit` que si la réponse publique
-n'est ni fraîche en cache ni en vol : une copie échue servie en repli en prend
-un) ; au plafond, encart ou page générale. Toute **édition** d'un
+n'est ni fraîche en cache ni en vol : une reconstruction en prend un) ; au
+plafond, la copie échue de moins de 150 s si elle existe (sans base, comme
+l'encart), sinon encart ou page générale. Toute **édition** d'un
 tournoi (`updateTournament` : nom, description, dates ; image posée, recadrée ou retirée, `image.ts` ; lien de chaîne, `setTournamentLiveUrl`) l’évince aussitôt
 (`invalidateSpectatorSnapshot` vide la réponse publique et la carte d'encart) :
 un nom ou une description retirés par le staff ne restent pas en aperçu. Le
