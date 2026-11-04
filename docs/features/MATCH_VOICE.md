@@ -42,7 +42,7 @@ et rien n'est compté.
   plus anciennement vus d'abord, aucun n'est affamé), arrêt de la passe au premier
   échec du canal du bot (le salon en échec est redemandé après 10 s, derrière les
   salons plus anciennement vus : un salon lent n'ouvre pas chaque passe) ; un salon tout juste créé n'est pas redemandé dans la même passe.
-  La création et le rendu s'arrêtent aussi à la première panne du canal (la passe suivante reprend) ; les matchs dont un salon vient d'échouer passent après les autres dans le lot de création. Seule
+  La création, la revérification et le rendu s'arrêtent à la première panne du canal : une seule attente par passe, la suivante reprend ; les matchs dont un salon vient d'échouer passent après les autres dans le lot de création. Seule
   une panne du canal (`BOT_CIRCUIT_OPEN`, `BOT_INTERNAL_UNREACHABLE`,
   `BOT_VOICE_TIMEOUT`) arrête une passe ; le refus du bot pour un salon (code
   `VOICE_*`) ne retient que ce salon : les autres sont traités, et il garde son
