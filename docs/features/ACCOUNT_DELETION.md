@@ -651,7 +651,10 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   « Équipe dissoute #id »). Les candidats ne sont pas verrouillés côté compte
   (inversion d'ordre évitée) ; seuls les comptes vivants héritent.
 - **Tournois organisés** : au compte vivant le plus ancien qui tient la
-  permission `tournaments` par un rôle, sinon à un administrateur. Personne :
+  permission `tournaments` par un rôle, sinon à un administrateur — jamais à un
+  compte suspendu, qui ne se connecte pas. Seuls les tournois verrouillés en tête
+  de transaction changent de main (`WHERE … AND id IN (…)`) : un tournoi confié
+  entre le relevé et l'écriture reste à l'organisateur. Personne :
   rien ne change ; le compte est anonyme dès la demande, puis anonymisé au jour 30.
 - **E1 — inscriptions solo.** Celles d'un tournoi pas encore commencé, sans
   match, sont retirées (`withdrawSoloRegistrationsOn`). L'entrée d'un tournoi
@@ -665,6 +668,13 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   un résultat que l'arbitre venait de saisir). « Jamais jouée » se lit **dans ce tournoi** (`pm.tournament_id`) :
   l'entrée solo est unique pour tous les tournois du compte. Chaque forfait
   relit d'abord `is_deleted` : un compte réactivé entre-temps garde ses matchs.
+  Cette relecture se fait **sur la transaction du forfait**, après le verrou du
+  tournoi, la ligne du compte prise `FOR UPDATE` (`lockDeletedSoloEntryStillForfeitable`,
+  passée à `forfeitTournamentTeam` comme `stillDue` — faux : `FORFEIT_NO_LONGER_DUE`,
+  rien n'est abandonné) : une réactivation qui arrive pendant attend le commit.
+  Le masque (`bg_account_deletion_holds`) s'écrit par une insertion simple après
+  retrait de l'ancien : un pseudo déjà mis de côté par un autre compte fait
+  échouer la demande au lieu de réécrire le masque de cet autre compte.
   Un échec, ou un match d'aval dont l'adversaire n'est pas encore connu, est
   repris par `settleDeletedSoloEntries`, relancé chaque heure avant les
   suppressions définitives (et au rattrapage de démarrage).
