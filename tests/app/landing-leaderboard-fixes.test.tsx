@@ -119,6 +119,19 @@ describe("Leaderboard — nuls et entrées", () => {
     expect(render({ draws: 0 })).not.toContain('class="draws"');
   });
 
+  it("Leaderboard_anyRowWithDraws_widensScoreColumnWithModifierClass", () => {
+    const markup = renderToStaticMarkup(
+      <ToastProvider>
+        <Leaderboard initialRows={[leaderboardRow({ teamId: 1 }), leaderboardRow({ teamId: 2, rank: 2, draws: 1 })]} />
+      </ToastProvider>,
+    );
+    expect(markup).toContain('class="table withDraws"');
+  });
+
+  it("Leaderboard_noRowWithDraws_keepsOrdinaryScoreColumn", () => {
+    expect(render({ draws: 0 })).not.toContain("withDraws");
+  });
+
   it("Leaderboard_newEntry_usesItsOwnTrendColour", () => {
     const markup = render({ trend: "new" });
     expect(markup).toContain("trendNew");
