@@ -194,6 +194,7 @@ export const DUE_CHANNELS_SQL = `SELECT m.id, m.tournament_id, m.team1_id, m.tea
   JOIN bg_teams t1 ON t1.id = m.team1_id
   JOIN bg_teams t2 ON t2.id = m.team2_id
  WHERE t.state = 'RUNNING' AND t.team_voice_channels = 1
+   AND t.start_visibility_at <= NOW()
    AND m.status IN ('READY', 'AWAITING_CONFIRMATION') AND m.start_at IS NOT NULL
    AND m.start_at <= NOW() + INTERVAL ${VOICE_CHANNEL_LEAD_MINUTES} MINUTE
    AND m.start_at >= NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
@@ -468,6 +469,7 @@ export const OPEN_DUE_CHANNELS_SQL = `SELECT v.match_id, v.team_id, v.channel_id
   JOIN bg_teams t2 ON t2.id = m.team2_id
  WHERE v.released_at IS NULL AND v.channel_id IS NOT NULL
    AND t.state = 'RUNNING' AND t.team_voice_channels = 1
+   AND t.start_visibility_at <= NOW()
    AND m.status IN ('READY', 'AWAITING_CONFIRMATION') AND m.start_at IS NOT NULL
    AND m.start_at <= NOW() + INTERVAL ${VOICE_CHANNEL_LEAD_MINUTES} MINUTE
    AND m.start_at >= NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
