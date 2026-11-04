@@ -131,14 +131,22 @@ describe("classement", () => {
 
   it("resserre les colonnes chiffrées en mobile", () => {
     expect(blockFor(/\.row\s*\{/, mediaBlock(leaderboard, "(max-width: 720px)"))).toMatch(
-      /grid-template-columns:\s*24px minmax\(0, 1fr\) 56px 40px 30px\s*;/,
+      /grid-template-columns:\s*24px minmax\(0, 1fr\) var\(--wl-col\) 40px 30px\s*;/,
     );
+  });
+
+  it("fixe la colonne V–D par jeton, élargie quand un nul est affiché", () => {
+    const mobile = mediaBlock(leaderboard, "(max-width: 720px)");
+    expect(blockFor(/\.table\s*\{/, leaderboard)).toMatch(/--wl-col:\s*70px\s*;/);
+    expect(blockFor(/\.withDraws\s*\{/, leaderboard)).toMatch(/--wl-col:\s*100px\s*;/);
+    expect(blockFor(/\.table\s*\{/, mobile)).toMatch(/--wl-col:\s*56px\s*;/);
+    expect(blockFor(/\.withDraws\s*\{/, mobile)).toMatch(/--wl-col:\s*90px\s*;/);
   });
 
   it("cède la colonne de tendance au nom sous 400 px", () => {
     const narrow = mediaBlock(leaderboard, "(max-width: 400px)");
     expect(blockFor(/\.row\s*\{/, narrow)).toMatch(
-      /grid-template-columns:\s*24px minmax\(0, 1fr\) 56px 40px\s*;/,
+      /grid-template-columns:\s*24px minmax\(0, 1fr\) var\(--wl-col\) 40px\s*;/,
     );
     expect(blockFor(/\.trendHead\s*\{/, narrow)).toMatch(/display:\s*none\s*;/);
     expect(readSource("components/cyber/landing/Leaderboard.tsx")).toContain(
