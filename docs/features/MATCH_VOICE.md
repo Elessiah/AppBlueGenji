@@ -57,7 +57,7 @@ et rien n'est compté.
   La création, la revérification et le rendu s'arrêtent chacun à la première panne du canal (la création en panne saute la revérification ; le rendu, indépendant, passe toujours), la suivante reprend ; les matchs dont un salon vient d'échouer passent après les autres dans le lot de création. Seule
   une panne du canal ou du bot entier (`BOT_CIRCUIT_OPEN`, `BOT_INTERNAL_UNREACHABLE`,
   `BOT_VOICE_TIMEOUT`, `INTERNAL_ERROR`, `INTERNAL_ROUTE_NOT_FOUND`, `BOT_INTERNAL_REQUEST_FAILED` —
-  réponse sans code lisible —, `UNAUTHORIZED`, `INTERNAL_API_TOKEN_NOT_CONFIGURED`,
+  réponse sans code lisible —, `BOT_VOICE_BAD_RESPONSE` — 2xx au corps illisible —, `UNAUTHORIZED`, `INTERNAL_API_TOKEN_NOT_CONFIGURED`,
   `DISCORD_NOT_READY` : jeton refusé ou absent, bot pas connecté à Discord ;
   `VOICE_CATEGORY_UNAVAILABLE`, `VOICE_MISSING_PERMISSIONS`, `VOICE_STORAGE_ERROR`,
   `VOICE_INTERNAL_ERROR` : refus qui vaut pour tous les salons) arrête une passe ; le refus du bot pour un salon (autre
