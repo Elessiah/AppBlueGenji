@@ -1419,6 +1419,13 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     expect(state.match?.casters).toEqual([{ user_id: REFEREE, stream_id: 1, ready_at: null }]);
   });
 
+  it("claimMatchCast_readyFromStalePairing_doesNotCopyReady", async () => {
+    // « Prêt » donné pour un appariement révolu (score corrigé depuis).
+    state.match = matchState({ referee_user_id: REFEREE, referee_ready_at: STAMP, launch_pairing: `${TEAM1}:30` });
+    await claimMatchCast(42, REFEREE, true);
+    expect(state.match?.casters).toEqual([{ user_id: REFEREE, stream_id: 1, ready_at: null }]);
+  });
+
   it("setMatchReady_refereeCaster_setsBothReadiesInOneClick", async () => {
     state.match = matchState({ referee_user_id: REFEREE, caster_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
     await setMatchReady(42, REFEREE, true);

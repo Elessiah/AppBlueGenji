@@ -401,6 +401,14 @@ async function lockLaunchMatch(
 }
 
 
+/** Le lecteur est-il l'arbitre désigné du match, et le reste-t-il (`refereeEligible`) ? */
+function isEligibleReferee(
+  row: { referee_user_id?: number | null; refereeEligible?: boolean },
+  userId: number,
+): boolean {
+  return row.refereeEligible === true && nullableId(row.referee_user_id ?? null) === userId;
+}
+
 /** Partie que le lecteur représente dans ce match, et sa qualité à y agir. */
 export type MatchParty = { role: LaunchViewerRole; canDeclareReady: boolean };
 
@@ -435,7 +443,7 @@ export async function resolveMatchParty(
   }
   // L'arbitre désigné, tant qu'il remplit la condition d'arbitrage. Un arbitre
   // qui caste aussi lit en caster : un seul « Prêt » vaut pour les deux.
-  if (match.refereeEligible && match.referee_user_id != null && Number(match.referee_user_id) === userId) {
+  if (isEligibleReferee(match, userId)) {
     return { role: "MATCH_REFEREE", canDeclareReady: true };
   }
   return null;
@@ -553,7 +561,7 @@ async function writeCasterReady(
   ]);
   const readyAt = ready ? new Date() : null;
   for (const caster of row.casters) if (caster.userId === userId) caster.readyAt = readyAt;
-  const alsoReferee = row.refereeEligible && Number(row.referee_user_id) === userId;
+  const alsoReferee = isEligibleReferee(row, userId);
   if (alsoReferee) row.referee_ready_at = readyAt;
   const refereeReady = alsoReferee ? `, referee_ready_at = ${stamp}` : "";
   await connection.execute(
@@ -813,8 +821,9 @@ export async function claimMatchCast(
       }
       // L'arbitre désigné déjà prêt qui caste aussi garde ce « Prêt » : un seul
       // vaut pour les deux, comme pour le caster qui devient arbitre (`writeReferee`).
-      const refereeReadyAt =
-        row.refereeEligible && nullableId(row.referee_user_id) === userId ? (row.referee_ready_at ?? null) : null;
+      // Un « Prêt » d'un appariement révolu ne se recopie pas.
+      const pairingCurrent = launchStateIsCurrent(row.launch_pairing ?? null, nullableId(row.team1_id), nullableId(row.team2_id));
+      const refereeReadyAt = pairingCurrent && isEligibleReferee(row, userId) ? row.referee_ready_at : null;
       await connection.execute(
         `INSERT INTO bg_match_casters (match_id, user_id, stream_id, ready_at) VALUES (?, ?, ?, ?)`,
         [matchId, userId, streamId, refereeReadyAt],
