@@ -112,7 +112,8 @@ function fakeDb(
       }
 
       if (q.startsWith("UPDATE bg_discord_login_challenges SET consumed_at = NOW()")) {
-        if (state !== null) state.consumed_at = new Date();
+        if (state === null || state.consumed_at !== null) return [{ affectedRows: 0 }, []];
+        state.consumed_at = new Date();
         return [{ affectedRows: 1 }, []];
       }
 
@@ -589,7 +590,7 @@ describe("consumeDiscordLoginChallenge — usage du code (EF-14)", () => {
     await consumeDiscordLoginChallenge(TOKEN, "424242", "handle");
 
     const read = String(first.execute.mock.calls.find(([q]) => String(q).includes("NOT EXISTS"))?.[0]);
-    expect(read).toContain("newer.purpose <=> c.purpose");
+    expect(read).toContain("newer.purpose = c.purpose");
   });
 
   it("createDiscordLoginChallenge_handlePurpose_storedInInsert", async () => {
@@ -602,6 +603,29 @@ describe("consumeDiscordLoginChallenge — usage du code (EF-14)", () => {
       (db.connection.execute.mock.calls.find(([q]) => String(q).trim().startsWith("INSERT")) as unknown as [string, unknown[]])[1];
     expect(insertParams(handle)[4]).toBe("HANDLE");
     expect(insertParams(login)[4]).toBe("LOGIN");
+  });
+
+  it("consumeDiscordLoginChallenge_rightCodeConsumedConcurrently_secondRequestRejected", async () => {
+    // Deux requêtes de front, même jeton, bon code : une seule obtient la preuve.
+    const { execute, state } = fakeDb(pendingChallenge());
+    const base = execute.getMockImplementation()!;
+    execute.mockImplementation(async (sql: string, params?: unknown[]) => {
+      const result = await base(sql, params);
+      // L'autre requête consomme la ligne juste après notre réservation.
+      if (String(sql).includes("attempts = attempts + 1")) state!.consumed_at = new Date();
+      return result;
+    });
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.toBeNull();
+  });
+
+  it("consumeDiscordLoginChallenge_rightCode_consumeGuardedByConsumedAtIsNull", async () => {
+    const { execute } = fakeDb(pendingChallenge());
+
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242", "login")).resolves.not.toBeNull();
+
+    const consume = statementsOf(execute).find((q) => q.startsWith("UPDATE bg_discord_login_challenges SET consumed_at = NOW()"));
+    expect(consume).toContain("WHERE id = ? AND consumed_at IS NULL");
   });
 
   it("verifyDiscordChallenge_accountRead_scopedToLoginPurpose", async () => {

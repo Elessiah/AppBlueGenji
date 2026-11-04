@@ -332,7 +332,7 @@ describe("POST /api/auth/discord/request", () => {
     expect(response.status).toBe(200);
     expect(resolveDiscordUserMock).toHaveBeenCalledWith("keryan");
     // Le tag part **avec** le défi : c'est lui que la certification écrira si le
-    // code revient juste (`consumeDiscordChallenge`), et il doit être celui qui a
+    // code revient juste (`consumeDiscordLoginChallenge`), et il doit être celui qui a
     // servi à la résolution, pas celui qu'un second appel renverrait.
     expect(createDiscordLoginChallengeMock).toHaveBeenCalledWith("999888777666555444", "keryan", "login");
     expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("999888777666555444", "654321", null, "login");
