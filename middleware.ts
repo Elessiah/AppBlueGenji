@@ -40,6 +40,21 @@ export const LEGACY_SUSPENSION_NOTICE_PATH = "/connexion";
  * `app/` est unique — n'est pas faite ici mais par `next.config.ts`
  * (`rewrites`), sur la foi de cet en-tête : voir {@link forward}.
  */
+/** Hôte nu (nom, IPv4 ou IPv6 entre crochets), port facultatif — rien qui puisse clore une directive CSP. */
+const PLAIN_HOST = /^(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:.]+\])(?::\d{1,5})?$/;
+
+/**
+ * Origine que voit le navigateur, pour borner `script-src` sous le dev
+ * Turbopack. Elle se lit sur l'en-tête `Host` et non sur `nextUrl.origin`,
+ * que `next dev` réécrit en `localhost` : ouverte sur `127.0.0.1`, la page
+ * aurait vu tous ses morceaux refusés. Un `Host` qui n'est pas un hôte nu
+ * (`;`, espace…) est écarté et `'self'` reste.
+ */
+function scriptOrigin(request: NextRequest): string | undefined {
+  const host = request.headers.get("host") ?? "";
+  return PLAIN_HOST.test(host) ? `${request.nextUrl.protocol}//${host}` : undefined;
+}
+
 export function middleware(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/api/")) return guardApiRequest(request);
 
@@ -63,6 +78,7 @@ export function middleware(request: NextRequest) {
     // sous Turbopack) ; lu à l'exécution, c'est la chaîne "1". `Boolean()`
     // couvre les deux formes — ni `=== "1"` ni `=== true` ne les couvrirait.
     turbopack: Boolean(process.env.TURBOPACK),
+    origin: scriptOrigin(request),
   });
 
   const requestHeaders = localizedRequestHeaders(request, locale, path);
