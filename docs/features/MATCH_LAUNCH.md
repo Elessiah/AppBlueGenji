@@ -305,8 +305,8 @@ Trois conditions de plus que la permission :
   dans son salon. Le bouton reste visible mais annonce ce qui manque, plutôt que
   de mener à un 409 ;
 - un joueur du match ne le caste pas (`CASTER_IS_PLAYER`) ; seul **jouer** le
-  match ferme le cast (`resolveTeamParty`) : l'arbitre désigné peut le caster,
-  et un « Prêt » d'arbitre déjà donné vaut pour son inscription. L'inscription se
+  match ferme le cast (`resolveTeamParty`) : l'arbitre désigné peut le caster ;
+  inscrit sans « Prêt », son clic suivant donne les deux. L'inscription se
   fait aussi sur un match aux créneaux encore vides, où rien ne peut être
   vérifié : quand l'appariement arrive et compte l'équipe du caster, son
   inscription est retirée (`adoptCurrentPairing`), et d'ici là le rôle de joueur

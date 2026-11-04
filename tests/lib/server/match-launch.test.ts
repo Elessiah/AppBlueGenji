@@ -263,7 +263,7 @@ function applyCasterWrite(match: MatchState, sql: string, params: unknown[]): vo
     const ids = params.slice(1).map(Number);
     match.casters = match.casters.filter((caster) => !ids.includes(caster.user_id));
   } else if (sql.startsWith("INSERT INTO bg_match_casters")) {
-    match.casters.push({ user_id: Number(params[1]), stream_id: Number(params[2]), ready_at: (params[3] as string | null) ?? null });
+    match.casters.push({ user_id: Number(params[1]), stream_id: Number(params[2]), ready_at: null });
   }
 }
 
@@ -1405,25 +1405,12 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, casterId: REFEREE, replacedCasterId: null });
   });
 
-  it("claimMatchCast_readyReferee_keepsReadyAsCaster", async () => {
-    state.match = matchState({ referee_user_id: REFEREE, referee_ready_at: STAMP });
-    await claimMatchCast(42, REFEREE, true);
-    expect(state.match?.casters).toEqual([{ user_id: REFEREE, stream_id: 1, ready_at: STAMP }]);
-  });
-
-  it("claimMatchCast_ineligibleRefereeReady_doesNotCopyReady", async () => {
-    // Plus de rôle d'arbitre, mais toujours la permission `live` (l'appelant la donne).
-    state.users[REFEREE] = { ...refereeUser, platform_roles_json: null };
+  it("claimMatchCast_readyReferee_registersWithoutReadyAndKeepsRefereeReady", async () => {
+    // Le « Prêt » d'arbitre peut dater d'un cycle révolu : il n'est pas recopié.
     state.match = matchState({ referee_user_id: REFEREE, referee_ready_at: STAMP });
     await claimMatchCast(42, REFEREE, true);
     expect(state.match?.casters).toEqual([{ user_id: REFEREE, stream_id: 1, ready_at: null }]);
-  });
-
-  it("claimMatchCast_readyFromStalePairing_doesNotCopyReady", async () => {
-    // « Prêt » donné pour un appariement révolu (score corrigé depuis).
-    state.match = matchState({ referee_user_id: REFEREE, referee_ready_at: STAMP, launch_pairing: `${TEAM1}:30` });
-    await claimMatchCast(42, REFEREE, true);
-    expect(state.match?.casters).toEqual([{ user_id: REFEREE, stream_id: 1, ready_at: null }]);
+    expect(state.match?.referee_ready_at).toBe(STAMP);
   });
 
   it("setMatchReady_refereeCaster_setsBothReadiesInOneClick", async () => {

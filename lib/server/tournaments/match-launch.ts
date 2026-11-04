@@ -819,14 +819,12 @@ export async function claimMatchCast(
         );
         streamId = Number(created.insertId);
       }
-      // L'arbitre désigné déjà prêt qui caste aussi garde ce « Prêt » : un seul
-      // vaut pour les deux, comme pour le caster qui devient arbitre (`writeReferee`).
-      // Un « Prêt » d'un appariement révolu ne se recopie pas.
-      const pairingCurrent = launchStateIsCurrent(row.launch_pairing ?? null, nullableId(row.team1_id), nullableId(row.team2_id));
-      const refereeReadyAt = pairingCurrent && isEligibleReferee(row, userId) ? row.referee_ready_at : null;
+      // Inscrit sans « Prêt », arbitre désigné compris : un « Prêt » d'arbitre
+      // peut dater d'un cycle de lancement révolu (report, appariement). Son
+      // clic suivant, en caster, donne les deux (`writeCasterReady`).
       await connection.execute(
-        `INSERT INTO bg_match_casters (match_id, user_id, stream_id, ready_at) VALUES (?, ?, ?, ?)`,
-        [matchId, userId, streamId, refereeReadyAt],
+        `INSERT INTO bg_match_casters (match_id, user_id, stream_id, ready_at) VALUES (?, ?, ?, NULL)`,
+        [matchId, userId, streamId],
       );
       return { tournamentId: Number(row.tournament_id), claimed: true };
     }),
