@@ -20,7 +20,7 @@ function standings(...teamIds: number[]) {
 describe("penalizeEnduranceTeams", () => {
   beforeEach(() => {
     penalty.mockReset();
-    penalty.mockResolvedValue(undefined);
+    penalty.mockResolvedValue({ reason: "Test_ retard au check-in" });
   });
 
   it("penalizeEnduranceTeams_countZero_returnsZeroWithoutQuery", async () => {
@@ -72,7 +72,7 @@ describe("penalizeEnduranceTeams", () => {
 
   it("penalizeEnduranceTeams_playoffsStarted_stopsAndReturnsCount", async () => {
     const connection = standings(7, 8, 9);
-    penalty.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("ENDURANCE_PLAYOFFS_STARTED"));
+    penalty.mockResolvedValueOnce({ reason: "Test_ retard au check-in" }).mockRejectedValueOnce(new Error("ENDURANCE_PLAYOFFS_STARTED"));
 
     const penalized = await penalizeEnduranceTeams(fakeConnection(connection), TOURNAMENT_ID, 3);
 
