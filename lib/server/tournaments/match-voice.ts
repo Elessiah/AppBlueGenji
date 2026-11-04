@@ -32,6 +32,7 @@ import {
   VOICE_RETRY_SECONDS,
   VOICE_ROW_RETENTION_DAYS,
   VOICE_SWEEP_THROTTLE_SECONDS,
+  VOICE_BOT_UNRELEASED_MAX_HOURS,
   matchVoiceInfo,
   voiceChannelKey,
   voiceChannelsDue,
@@ -166,6 +167,8 @@ type ReleaseRow = RowDataPacket & {
   team_id: number;
   channel_id: string | null;
   tournament_id: number | null;
+  /** Ligne créée il y a plus de `VOICE_BOT_UNRELEASED_MAX_HOURS` : le filet du bot a passé. */
+  bot_expired?: number | null;
 };
 
 /**
@@ -215,7 +218,8 @@ export const DUE_CHANNELS_SQL = `SELECT m.id, m.tournament_id, m.team1_id, m.tea
  * redemandé. Le bot supprime le salon s'il est vide, sinon dès qu'il se vide
  * (et ses balayages font filet).
  */
-export const RELEASABLE_SQL = `SELECT v.match_id, v.team_id, v.channel_id, m.tournament_id
+export const RELEASABLE_SQL = `SELECT v.match_id, v.team_id, v.channel_id, m.tournament_id,
+       (v.created_at < NOW() - INTERVAL ${VOICE_BOT_UNRELEASED_MAX_HOURS} HOUR) AS bot_expired
   FROM bg_match_voice_channels v
   LEFT JOIN bg_matches m ON m.id = v.match_id
   LEFT JOIN bg_tournaments t ON t.id = m.tournament_id
@@ -384,6 +388,12 @@ async function releaseOne(row: ReleaseRow): Promise<"closed" | "kept" | "down"> 
     if (sweep.releaseLogged.size >= VOICE_RELEASE_LOG_MEMORY) sweep.releaseLogged.clear();
     sweep.releaseLogged.set(key, released.code);
     logReleaseFailure(Number(row.match_id), released.code);
+  }
+  // Refus sans fin d'un salon : passé le filet du bot (salon non rendu supprimé de son côté),
+  // la ligne se clôt au lieu d'être redemandée chaque minute et gardée pour toujours.
+  if (!down && Number(row.bot_expired ?? 0) === 1) {
+    sweep.releaseLogged.delete(key);
+    return "closed";
   }
   // Redemandé après `VOICE_RETRY_SECONDS`, en fin de file : un rendu qui échoue n'affame pas les autres.
   await run(
