@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useId, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { offersCastRelease } from "@/lib/shared/cast-settings";
-import { canConfigureLive, canToggleOnAir, type MatchLiveTrigger } from "@/lib/shared/live-streams";
+import { canToggleOnAir, isMatchCastable, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import { canEditReplay } from "@/lib/shared/match-replay";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
@@ -124,7 +124,10 @@ export function CastSettingsDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [match.id]);
 
-  const configurable = canConfigureLive(match);
+  // Le mode ne s'offre que sur un match encore castable : sur un score saisi,
+  // le serveur ne prend plus que « non casté », que ce champ n'offre pas
+  // (`assertCastTriggerWritable`) — chaque choix y serait refusé.
+  const configurable = isMatchCastable(match);
   const streamEditable = cast !== null && !cast.staffStream;
   const urlRefused = streamEditable && castUrlInvalid(url);
   const urlMissing = streamEditable && url.trim() === "";
