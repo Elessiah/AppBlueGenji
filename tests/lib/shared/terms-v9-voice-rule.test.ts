@@ -70,10 +70,10 @@ describe("PRIVACY_CHANGES — conditions d'utilisation, version 9", () => {
 
     expect(fr).toContain("le compte est montré anonyme partout");
     expect(fr).toContain("un compte suspendu peut aussi être réactivé, et revient suspendu");
-    expect(fr).toContain("remplacée dans ce journal, à la réactivation, par la date de celle-ci");
+    expect(fr).toContain("remplacée dans ce journal, à la réactivation, par une ligne qui porte la date de celle-ci et celle de la demande défaite");
     expect(en).toContain("the account is shown as anonymous everywhere");
     expect(en).toContain("a suspended account can be reactivated too, and comes back suspended");
-    expect(en).toContain("replaced in that log, on reactivation, by the date of the reactivation");
+    expect(en).toContain("replaced in that log, on reactivation, by a line carrying the date of the reactivation and that of the undone request");
     expect(PRIVACY_CHANGES_EN[TERMS_V9_ID].details).toHaveLength(change(TERMS_V9_ID).details.length);
   });
 

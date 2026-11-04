@@ -1,6 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
+import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
+import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
+import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 import { TERMS_SECTIONS } from "@/lib/shared/terms-of-use";
 import { TERMS_SECTIONS_EN } from "@/lib/shared/terms-of-use-en";
 import frLogin from "@/messages/fr/login.json";
@@ -93,5 +96,50 @@ describe("/rgpd et historique", () => {
   it("reactivationMessages_kept_mentionsOGSuffixFrAndEn", () => {
     expect(frLogin.reactivation.kept).toContain("si ton pseudo a été pris entre-temps, il te revient suivi de « OG »");
     expect(enLogin.reactivation.kept).toContain("if your username was taken in the meantime, it comes back followed by “OG”");
+  });
+});
+
+// Revue juridique #546 (reprise, cycle 2) : ligne de réactivation et suffixe « OG » déclarés partout.
+describe("revue juridique — réactivation journalisée et pseudo « OG »", () => {
+  const v9Fr = () => PRIVACY_CHANGES.find((c) => c.id === TERMS_V9_ID)?.details.join("\n") ?? "";
+  const v9En = () => PRIVACY_CHANGES_EN[TERMS_V9_ID].details.join("\n");
+
+  it("termsAccount_pseudoTakenCaveat_mentionsOGFrAndEn", () => {
+    expect(section(TERMS_SECTIONS, "compte")).toContain("pris malgré tout, il revient suivi de « OG »");
+    expect(section(TERMS_SECTIONS_EN, "compte")).toContain("if taken all the same, it comes back followed by “OG”");
+  });
+
+  it("privacyChangesV9_deletionDetail_pseudoOGCaveatFrAndEn", () => {
+    expect(v9Fr()).toContain("pris malgré tout, le pseudo revient suivi de « OG »");
+    expect(v9En()).toContain("if taken all the same, the username comes back followed by “OG”");
+  });
+
+  it("privacyChangesV9_dataDetail_reactivationLineCarriesUndoneRequestDateFrAndEn", () => {
+    expect(v9Fr()).toContain("par une ligne qui porte la date de celle-ci et celle de la demande défaite");
+    expect(v9En()).toContain("by a line carrying the date of the reactivation and that of the undone request");
+  });
+
+  it("rgpdPage_reactivationLineAndOGCaveat_frAndEn", () => {
+    const fr = readSource("app/rgpd/page.tsx");
+    const en = readSource("app/rgpd/RgpdEn.tsx");
+
+    expect(fr).toContain("celle de la demande défaite");
+    expect(fr).toContain("le pseudo suivi de « OG » s&apos;il a tout de même été pris");
+    expect(en).toContain("that of the undone request");
+    expect(en).toContain("the username followed by “OG” if it was taken all the same");
+  });
+
+  it("processingRegister_requestedDeletion_reactivationLineDatesRetentionAndOGFrAndEn", () => {
+    const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.retention.join("\n") ?? "";
+    const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.retention.join("\n") ?? "";
+
+    expect(fr).toContain(
+      `une ligne portant sa date et celle de la demande défaite, gardée ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours`,
+    );
+    expect(fr).toContain("rendu suivi de « OG » s'il a tout de même été pris");
+    expect(en).toContain(
+      `a line carrying its date and that of the undone request, kept ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} days`,
+    );
+    expect(en).toContain("given back followed by “OG” if it was taken all the same");
   });
 });

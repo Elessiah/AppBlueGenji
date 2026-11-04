@@ -307,10 +307,10 @@ export function RgpdEn({
           confirmation (a suspended account can be reactivated too: it comes back suspended). As soon as it is
           requested, it is shown as anonymous wherever it appeared (borrowed username, no avatar or player-page
           link: past results, rankings, rosters, tournament pages); its real username, which stays reserved for
-          it, and its avatar are kept apart for reactivation only, which gives them back, and erased at the end
+          it, and its avatar are kept apart for reactivation only, which gives them back (the username followed by “OG” if it was taken all the same), and erased at the end
           of that time. The request is also recorded in the off-database log that replays deletions after a
           backup is restored (account identifier and creation date, date of the request), and replaced, on
-          reactivation, by the date of the reactivation (kept like the other lines), so that a restored backup does not
+          reactivation, by a line carrying the date of the reactivation and that of the undone request (kept like the other lines), so that a restored backup does not
           bring the account back as pending deletion. As soon as it is requested, and without being undone by reactivation, it leaves its
           teams (ownership goes to a co-owner, else a manager, else a captain, else another member; a team of which it was the
           only player becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
