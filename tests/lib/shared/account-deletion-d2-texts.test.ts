@@ -94,8 +94,8 @@ describe("/rgpd et historique", () => {
 
   // Décision R3 du 2026-11-04 : l'écran de réactivation dit le suffixe « OG ».
   it("reactivationMessages_kept_mentionsOGSuffixFrAndEn", () => {
-    expect(frLogin.reactivation.kept).toContain("si ton pseudo a été pris entre-temps, il te revient suivi de « OG »");
-    expect(enLogin.reactivation.kept).toContain("if your username was taken in the meantime, it comes back followed by “OG”");
+    expect(frLogin.reactivation.kept).toContain("si ton pseudo a été pris entre-temps, il te revient, raccourci au besoin, suivi de « OG »");
+    expect(enLogin.reactivation.kept).toContain("if your username was taken in the meantime, it comes back, shortened if needed, followed by “OG”");
   });
 });
 
@@ -105,13 +105,13 @@ describe("revue juridique — réactivation journalisée et pseudo « OG »", ()
   const v9En = () => PRIVACY_CHANGES_EN[TERMS_V9_ID].details.join("\n");
 
   it("termsAccount_pseudoTakenCaveat_mentionsOGFrAndEn", () => {
-    expect(section(TERMS_SECTIONS, "compte")).toContain("pris malgré tout, il revient suivi de « OG »");
-    expect(section(TERMS_SECTIONS_EN, "compte")).toContain("if taken all the same, it comes back followed by “OG”");
+    expect(section(TERMS_SECTIONS, "compte")).toContain("pris malgré tout, il revient, raccourci au besoin, suivi de « OG »");
+    expect(section(TERMS_SECTIONS_EN, "compte")).toContain("if taken all the same, it comes back, shortened if needed, followed by “OG”");
   });
 
   it("privacyChangesV9_deletionDetail_pseudoOGCaveatFrAndEn", () => {
-    expect(v9Fr()).toContain("pris malgré tout, le pseudo revient suivi de « OG »");
-    expect(v9En()).toContain("if taken all the same, the username comes back followed by “OG”");
+    expect(v9Fr()).toContain("pris malgré tout, le pseudo revient, raccourci au besoin, suivi de « OG »");
+    expect(v9En()).toContain("if taken all the same, the username comes back, shortened if needed, followed by “OG”");
   });
 
   it("privacyChangesV9_dataDetail_reactivationLineCarriesUndoneRequestDateFrAndEn", () => {
@@ -124,9 +124,9 @@ describe("revue juridique — réactivation journalisée et pseudo « OG »", ()
     const en = readSource("app/rgpd/RgpdEn.tsx");
 
     expect(fr).toContain("celle de la demande défaite");
-    expect(fr).toContain("le pseudo suivi de « OG » s&apos;il a tout de même été pris");
+    expect(fr).toContain("le pseudo, raccourci au besoin, suivi de « OG » s&apos;il a tout de même été pris");
     expect(en).toContain("that of the undone request");
-    expect(en).toContain("the username followed by “OG” if it was taken all the same");
+    expect(en).toContain("the username, shortened if needed, followed by “OG” if it was taken all the same");
   });
 
   it("processingRegister_requestedDeletion_reactivationLineDatesRetentionAndOGFrAndEn", () => {
@@ -136,10 +136,43 @@ describe("revue juridique — réactivation journalisée et pseudo « OG »", ()
     expect(fr).toContain(
       `une ligne portant sa date et celle de la demande défaite, gardée ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours`,
     );
-    expect(fr).toContain("rendu suivi de « OG » s'il a tout de même été pris");
+    expect(fr).toContain("rendu, raccourci au besoin, suivi de « OG » s'il a tout de même été pris");
     expect(en).toContain(
       `a line carrying its date and that of the undone request, kept ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} days`,
     );
-    expect(en).toContain("given back followed by “OG” if it was taken all the same");
+    expect(en).toContain("given back, shortened if needed, followed by “OG” if it was taken all the same");
+  });
+});
+
+// Revue juridique #546, cycle 4 : raccourcissement du pseudo, réactivation au
+// journal du staff, base de l'empreinte d'un avatar retiré.
+describe("revue juridique cycle 4", () => {
+  const v9Fr = () => PRIVACY_CHANGES.find((c) => c.id === TERMS_V9_ID)?.details.join("\n") ?? "";
+  const v9En = () => PRIVACY_CHANGES_EN[TERMS_V9_ID].details.join("\n");
+
+  it("rgpdPage_staffLog_namesReactivationAndPerTournamentLineForWithdrawalsOnlyFrAndEn", () => {
+    expect(readSource("app/rgpd/page.tsx")).toContain("sa réactivation et chaque retrait ou forfait qu&apos;elle entraîne (une ligne par tournoi pour ceux-ci)");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("its reactivation and each withdrawal or forfeit it causes (one line per tournament for those)");
+  });
+
+  it("privacyChangesV9_staffLog_perTournamentLineForWithdrawalsOnlyFrAndEn", () => {
+    expect(v9Fr()).toContain("note les suppressions demandées et leurs réactivations, ainsi que les retraits ou forfaits qu'elles entraînent, en une ligne par tournoi pour ceux-ci");
+    expect(v9En()).toContain("records requested deletions and their reactivations, as well as the withdrawals or forfeits they cause, in one line per tournament for those");
+  });
+
+  it("processingRegisterT01_avatarHash_hasPurposeFrAndEn", () => {
+    const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.subPurposes.join("\n") ?? "";
+    const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.subPurposes.join("\n") ?? "";
+
+    expect(fr).toContain("Refuser la remise en ligne d'un avatar déjà retiré par la modération");
+    expect(en).toContain("Refusing the re-upload of an avatar already removed by moderation");
+  });
+
+  it("processingRegisterT01_avatarHash_legitimateInterestBasisFrAndEn", () => {
+    const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.legalBasis ?? "";
+    const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.legalBasis ?? "";
+
+    expect(fr).toContain("intérêt légitime (modération : refuser la remise en ligne d'une image déjà retirée) pour l'empreinte d'un avatar retiré");
+    expect(en).toContain("legitimate interest (moderation: refusing the re-upload of an image already removed) for the hash of a removed avatar");
   });
 });

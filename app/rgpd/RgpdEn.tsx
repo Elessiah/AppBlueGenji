@@ -307,7 +307,7 @@ export function RgpdEn({
           confirmation (a suspended account can be reactivated too: it comes back suspended). As soon as it is
           requested, it is shown as anonymous wherever it appeared (borrowed username, no avatar or player-page
           link: past results, rankings, rosters, tournament pages); its real username, which stays reserved for
-          it, and its avatar are kept apart for reactivation only, which gives them back (the username followed by “OG” if it was taken all the same — “OG2”, “OG3”… up to “OG10” if those are taken too, failing that the borrowed username), and erased at the end
+          it, and its avatar are kept apart for reactivation only, which gives them back (the username, shortened if needed, followed by “OG” if it was taken all the same — “OG2”, “OG3”… up to “OG10” if those are taken too, failing that the borrowed username), and erased at the end
           of that time. The request is also recorded in the off-database log that replays deletions after a
           backup is restored (account identifier and creation date, date of the request), and replaced, on
           reactivation, by a line carrying the date of the reactivation and that of the undone request (kept like the other lines), so that a restored backup does not
@@ -318,7 +318,7 @@ export function RgpdEn({
           tournament where it never played are lost by forfeit. At the end of that time, the account is erased
           if it left nothing behind, anonymized (borrowed username) otherwise. On erasure, the hash (SHA-256) of
           an avatar removed by moderation is kept, with no link to any account, to refuse it being uploaded
-          again. The staff log on Discord records the request and each withdrawal or forfeit it causes (one line per tournament), without
+          again. The staff log on Discord records the request, its reactivation and each withdrawal or forfeit it causes (one line per tournament for those), without
           naming the player (“a player”) (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
         </p>
       </section>

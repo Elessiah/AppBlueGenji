@@ -417,7 +417,7 @@ function RgpdFr({
           explicite (un compte suspendu peut aussi être réactivé : il revient suspendu). Dès la demande, il est
           montré anonyme partout où il paraissait (pseudo d&apos;emprunt, sans avatar ni lien de fiche : résultats
           passés, classements, effectifs, pages de tournoi) ; son vrai pseudo, qui lui reste réservé, et son avatar
-          sont gardés à part pour la seule réactivation, qui les lui rend (le pseudo suivi de « OG » s&apos;il a tout de même été pris — « OG2 », « OG3 »… jusqu&apos;à « OG10 » si ceux-là le sont aussi, à défaut le pseudo d&apos;emprunt), et effacés au terme du délai. La demande
+          sont gardés à part pour la seule réactivation, qui les lui rend (le pseudo, raccourci au besoin, suivi de « OG » s&apos;il a tout de même été pris — « OG2 », « OG3 »… jusqu&apos;à « OG10 » si ceux-là le sont aussi, à défaut le pseudo d&apos;emprunt), et effacés au terme du délai. La demande
           est aussi notée au journal hors base qui rejoue les suppressions après la restauration d&apos;une
           sauvegarde (identifiant et date de création du compte, date de la demande), et y est remplacée, à la
           réactivation, par une ligne qui porte la date de celle-ci et celle de la demande défaite (gardée comme les autres lignes), pour qu&apos;une sauvegarde restaurée ne
@@ -428,8 +428,8 @@ function RgpdFr({
           cours où il n&apos;a jamais joué sont perdus par forfait. Au terme du délai, le compte est effacé
           s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. À l&apos;effacement,
           l&apos;empreinte (SHA-256) d&apos;un avatar retiré par la modération est gardée, sans lien avec
-          aucun compte, pour en refuser la remise en ligne. Le journal du staff sur Discord note la demande
-          et chaque retrait ou forfait qu&apos;elle entraîne (une ligne par tournoi), sans nommer le joueur (« un joueur ») (
+          aucun compte, pour en refuser la remise en ligne. Le journal du staff sur Discord note la demande,
+          sa réactivation et chaque retrait ou forfait qu&apos;elle entraîne (une ligne par tournoi pour ceux-ci), sans nommer le joueur (« un joueur ») (
           <Link href="/rgpd/registre#t05">registre, T05</Link>).
         </p>
       </section>
