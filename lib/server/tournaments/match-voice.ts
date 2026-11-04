@@ -197,7 +197,8 @@ export const DUE_CHANNELS_SQL = `SELECT m.id, m.tournament_id, m.team1_id, m.tea
  * Salons à rendre au bot : match joué (score confirmé) ou disparu, match
  * retombé en attente ou sorti du programme (heure retirée), équipe sortie de
  * l'appariement, entrée solo ou fantôme dans le match, tournoi terminé ou
- * option éteinte. Un rendu refusé attend `VOICE_RETRY_SECONDS` avant d'être
+ * option éteinte, match resté sans score passé `VOICE_CHANNEL_LATE_HOURS` (sans
+ * quoi sa ligne resterait ouverte et la passe ne s'arrêterait plus au garde-fou). Un rendu refusé attend `VOICE_RETRY_SECONDS` avant d'être
  * redemandé. Le bot supprime le salon s'il est vide, sinon dès qu'il se vide
  * (et ses balayages font filet).
  */
@@ -210,6 +211,7 @@ export const RELEASABLE_SQL = `SELECT v.match_id, v.team_id, v.channel_id, m.tou
         OR v.failed_at <= NOW() - INTERVAL ${VOICE_RETRY_SECONDS} SECOND)
    AND (m.id IS NULL OR t.id IS NULL
         OR m.status IN ('COMPLETED', 'PENDING') OR m.start_at IS NULL
+        OR m.start_at < NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
         OR t.state = 'FINISHED' OR t.team_voice_channels = 0
         OR NOT (v.team_id <=> m.team1_id OR v.team_id <=> m.team2_id)
         OR EXISTS (SELECT 1 FROM bg_teams x
