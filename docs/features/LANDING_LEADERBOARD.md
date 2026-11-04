@@ -24,7 +24,7 @@ Marvel Rivals. Corrections apportées à un audit UI/UX antérieur
   entre les victoires et les défaites (« 3–1 N–2 », « 3–1 D–2 » en anglais), avec
   le texte long en `title` et lu à voix (`leaderboard.drawsLabel`).
   Dès qu'**une** ligne du tableau a un nul, le tableau porte `withDraws` : la colonne
-  V–D passe à `--wl-col` large (100 px, 82 px en mobile) et le score à 13 px, pour
+  V–D passe à `--wl-col` large (100 px, 90 px en mobile) et le score à 13 px (12 px en mobile), pour
   toutes les lignes (alignement conservé) — sinon « 12–3 N–4 » débordait sur les points.
 
 - Le dernier filtre **chargé avec succès** est gardé dans une ref
