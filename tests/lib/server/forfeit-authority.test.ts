@@ -175,4 +175,20 @@ describe("forfeitTournamentTeamPublic — qualité pour désengager", () => {
     expect(flushBotLogs).not.toHaveBeenCalled();
     expect(discardBotLogs).toHaveBeenCalledTimes(1);
   });
+
+  it("forfeitTournamentTeam_stillDueFalse_throwsAndRollsBack", async () => {
+    // Suppression d'un compte : relu sous le verrou du tournoi, le compte a été
+    // réactivé entre-temps — rien n'est abandonné.
+    const connection = mockConnection();
+    const stillDue = jest.fn(async (_connection: unknown) => false);
+
+    await expect(
+      forfeitTournamentTeamPublic(TOURNAMENT_ID, TEAM_ID, null, undefined, { skipForfeitLog: true, stillDue }),
+    ).rejects.toThrow("FORFEIT_NO_LONGER_DUE");
+
+    expect(stillDue).toHaveBeenCalledWith(connection);
+    expect(forfeitEngineMock).not.toHaveBeenCalled();
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).not.toHaveBeenCalled();
+  });
 });

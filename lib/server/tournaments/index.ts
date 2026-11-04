@@ -1740,13 +1740,16 @@ export async function forfeitTournamentTeamPublic(
   actor?: StaffActor,
   // La suppression d'un compte écrit sa propre ligne, qui dit aussi le forfait
   // (`logDeletionWithdrawal`) : une seule ligne au journal, pas deux.
-  options: { skipForfeitLog?: boolean } = {},
+  // `stillDue`, relu sur la transaction juste après le verrou du tournoi :
+  // faux, rien n'est abandonné (`FORFEIT_NO_LONGER_DUE`) — la suppression d'un
+  // compte s'assure ainsi qu'il n'a pas été réactivé entre-temps.
+  options: { skipForfeitLog?: boolean; stillDue?: (connection: PoolConnection) => Promise<boolean> } = {},
 ): Promise<void> {
   // Verrous tournoi puis manches, quand « Valider le résultat » prend la manche
   // puis le tournoi (réconciliation) : un interblocage se rejoue
   // (`retryOnDeadlock`) au lieu de renvoyer l'arbitre à son clic.
   const settledDisputes = await retryOnDeadlock(() =>
-    forfeitTournamentTeamOnce(tournamentId, teamId, actingUserId, actor, options.skipForfeitLog === true),
+    forfeitTournamentTeamOnce(tournamentId, teamId, actingUserId, actor, options.skipForfeitLog === true, options.stillDue),
   );
   // Sans attendre (meilleur effort, ne lève jamais), une fois l'abandon acquis.
   // Seul l'abandon imposé à l'**adversaire** de l'arbitre le sert : retirer sa
@@ -1768,6 +1771,7 @@ async function forfeitTournamentTeamOnce(
   actingUserId: number | null,
   actor: StaffActor | undefined,
   skipForfeitLog = false,
+  stillDue?: (connection: PoolConnection) => Promise<boolean>,
 ): Promise<DisputeBeforeResolution[]> {
   const db = await getDatabase();
   const connection = await db.getConnection();
@@ -1779,6 +1783,7 @@ async function forfeitTournamentTeamOnce(
     // ci-dessous et le droit relu ensuite le sont sur l'état que l'abandon
     // écrit, pas sur un instantané figé avant l'attente du verrou.
     await lockTournamentRow(connection, tournamentId);
+    if (stillDue && !(await stillDue(connection))) throw new Error("FORFEIT_NO_LONGER_DUE");
     const openMatches = actingUserId === null && actor ? await lockOpenMatches(connection, tournamentId, teamId) : [];
 
     // Droit relu **dans la transaction**, comme à l'inscription

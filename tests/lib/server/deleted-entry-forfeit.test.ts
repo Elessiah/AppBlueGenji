@@ -4,7 +4,10 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/admin", () => ({ adminResolveMatch: jest.fn() }));
 
 import { adminResolveMatch } from "@/lib/server/tournaments/admin";
-import { forfeitDeletedEntryNextMatch } from "@/lib/server/tournaments/deleted-entry-forfeit";
+import {
+  forfeitDeletedEntryNextMatch,
+  lockDeletedSoloEntryStillForfeitable,
+} from "@/lib/server/tournaments/deleted-entry-forfeit";
 import { fakeConnection } from "../../helpers/sql-double";
 
 /*
@@ -13,7 +16,7 @@ import { fakeConnection } from "../../helpers/sql-double";
  * « corrigé » en forfait.
  */
 
-type Options = { state?: string; entryDeleted?: boolean; openMatch?: number | null };
+type Options = { state?: string; entryDeleted?: boolean; neverPlayed?: boolean; openMatch?: number | null };
 
 function fakeTx(options: Options) {
   const queries: string[] = [];
@@ -21,8 +24,11 @@ function fakeTx(options: Options) {
     const q = String(sql).replace(/\s+/g, " ").trim();
     queries.push(q);
     if (q.startsWith("SELECT state FROM bg_tournaments")) return [[{ state: options.state ?? "RUNNING" }]];
-    if (q.startsWith("SELECT u.is_deleted FROM bg_teams s")) {
-      return [options.entryDeleted === false ? [] : [{ is_deleted: 1 }]];
+    if (q.startsWith("SELECT s.solo_user_id FROM bg_teams s")) {
+      return [options.neverPlayed === false ? [] : [{ solo_user_id: 70 }]];
+    }
+    if (q.startsWith("SELECT is_deleted FROM bg_users")) {
+      return [[{ is_deleted: options.entryDeleted === false ? 0 : 1 }]];
     }
     if (q.startsWith("SELECT id FROM bg_matches")) {
       const id = options.openMatch === undefined ? 101 : options.openMatch;
@@ -75,5 +81,27 @@ describe("forfeitDeletedEntryNextMatch", () => {
     const matchQuery = queries.find((q) => q.startsWith("SELECT id FROM bg_matches"));
     expect(matchQuery).toContain("FOR UPDATE");
     expect(matchQuery).not.toContain("JOIN");
+  });
+});
+
+describe("lockDeletedSoloEntryStillForfeitable", () => {
+  it("lockDeletedSoloEntryStillForfeitable_pendingNeverPlayed_trueAndLocksUserAlone", async () => {
+    const { connection, queries } = fakeTx({});
+
+    expect(await lockDeletedSoloEntryStillForfeitable(connection, 4, 40)).toBe(true);
+    expect(queries[1]).toBe("SELECT is_deleted FROM bg_users WHERE id = ? FOR UPDATE");
+  });
+
+  it("lockDeletedSoloEntryStillForfeitable_entryPlayed_falseWithoutUserLock", async () => {
+    const { connection, queries } = fakeTx({ neverPlayed: false });
+
+    expect(await lockDeletedSoloEntryStillForfeitable(connection, 4, 40)).toBe(false);
+    expect(queries).toHaveLength(1);
+  });
+
+  it("lockDeletedSoloEntryStillForfeitable_reactivated_false", async () => {
+    const { connection } = fakeTx({ entryDeleted: false });
+
+    expect(await lockDeletedSoloEntryStillForfeitable(connection, 4, 40)).toBe(false);
   });
 });

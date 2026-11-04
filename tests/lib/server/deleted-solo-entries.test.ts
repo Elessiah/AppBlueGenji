@@ -61,6 +61,9 @@ function fakeDb(options: Options) {
   return execute;
 }
 
+/** L'abandon d'une suppression : une seule ligne au journal, et relu sous verrou. */
+const DELETION_FORFEIT = expect.objectContaining({ skipForfeitLog: true, stillDue: expect.any(Function) });
+
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(sendBotLog).mockReturnValue(undefined);
@@ -71,7 +74,7 @@ describe("forfeitUnplayedSoloEntry", () => {
     fakeDb({ format: "SWISS" });
 
     expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(1);
-    expect(forfeitTournamentTeam).toHaveBeenCalledWith(4, 40, null, undefined, { skipForfeitLog: true });
+    expect(forfeitTournamentTeam).toHaveBeenCalledWith(4, 40, null, undefined, DELETION_FORFEIT);
     expect(forfeitDeletedEntryMatch).not.toHaveBeenCalled();
   });
 
@@ -80,7 +83,7 @@ describe("forfeitUnplayedSoloEntry", () => {
 
     await forfeitUnplayedSoloEntry(4, 40);
 
-    expect(forfeitTournamentTeam).toHaveBeenCalledWith(4, 40, null, undefined, { skipForfeitLog: true });
+    expect(forfeitTournamentTeam).toHaveBeenCalledWith(4, 40, null, undefined, DELETION_FORFEIT);
   });
 
   it("forfeitUnplayedSoloEntry_bracket_savesForfeitPerReadyMatch", async () => {
@@ -124,6 +127,13 @@ describe("forfeitUnplayedSoloEntry — compte réactivé", () => {
   it("forfeitUnplayedSoloEntry_alreadyOut_zeroWithoutError", async () => {
     fakeDb({ format: "SURVIVAL" });
     jest.mocked(forfeitTournamentTeam).mockRejectedValueOnce(new Error("TEAM_ALREADY_OUT"));
+
+    expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(0);
+  });
+
+  it("forfeitUnplayedSoloEntry_noLongerDueUnderLock_returnsZero", async () => {
+    fakeDb({ format: "SWISS" });
+    jest.mocked(forfeitTournamentTeam).mockRejectedValueOnce(new Error("FORFEIT_NO_LONGER_DUE"));
 
     expect(await forfeitUnplayedSoloEntry(4, 40)).toBe(0);
   });
@@ -180,7 +190,7 @@ describe("settleDeletedSoloEntries", () => {
     fakeDb({ candidates: [7], forfeitable: [{ tournament_id: 4, team_id: 40 }], format: "SWISS" });
 
     expect(await settleDeletedSoloEntries()).toEqual({ withdrawn: 0, forfeited: 1 });
-    expect(forfeitTournamentTeam).toHaveBeenCalledWith(4, 40, null, undefined, { skipForfeitLog: true });
+    expect(forfeitTournamentTeam).toHaveBeenCalledWith(4, 40, null, undefined, DELETION_FORFEIT);
     expect(sendBotLog).toHaveBeenCalledTimes(1);
   });
 
@@ -197,7 +207,7 @@ describe("settleDeletedSoloEntries", () => {
     jest.mocked(forfeitTournamentTeam).mockRejectedValueOnce(new Error("TEAM_ALREADY_OUT"));
 
     expect(await settleDeletedSoloEntries()).toEqual({ withdrawn: 0, forfeited: 1 });
-    expect(forfeitTournamentTeam).toHaveBeenLastCalledWith(5, 40, null, undefined, { skipForfeitLog: true });
+    expect(forfeitTournamentTeam).toHaveBeenLastCalledWith(5, 40, null, undefined, DELETION_FORFEIT);
     log.mockRestore();
   });
 

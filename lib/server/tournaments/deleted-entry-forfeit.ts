@@ -4,6 +4,36 @@ import { adminResolveMatch } from "./admin";
 import { lockTournamentRow } from "./registration";
 
 /**
+ * L'entrée solo appartient toujours à un compte en suppression et n'a toujours
+ * pas joué dans ce tournoi — relu sur la transaction du forfait, après le
+ * verrou du tournoi, la ligne du compte **verrouillée** (`FOR UPDATE`, table
+ * seule) : une réactivation commitée avant est vue, une réactivation qui
+ * arrive pendant attend le commit du forfait, au lieu qu'un compte réactivé
+ * perde son tournoi sur un relevé périmé.
+ */
+export async function lockDeletedSoloEntryStillForfeitable(
+  connection: Pick<PoolConnection, "execute">,
+  tournamentId: number,
+  teamId: number,
+): Promise<boolean> {
+  const [entries] = await connection.execute<(RowDataPacket & { solo_user_id: number | null })[]>(
+    `SELECT s.solo_user_id
+       FROM bg_teams s
+      WHERE s.id = ?
+        AND ${soloEntryNeverPlayedSql("?", "?")}
+      LIMIT 1`,
+    [teamId, tournamentId, teamId, teamId],
+  );
+  const soloUserId = entries[0]?.solo_user_id ?? null;
+  if (soloUserId === null) return false;
+  const [users] = await connection.execute<(RowDataPacket & { is_deleted: number })[]>(
+    `SELECT is_deleted FROM bg_users WHERE id = ? FOR UPDATE`,
+    [soloUserId],
+  );
+  return Number(users[0]?.is_deleted ?? 0) === 1;
+}
+
+/**
  * Forfait du prochain match à jouer de l'entrée solo d'un compte en
  * suppression (E1, `docs/features/ACCOUNT_DELETION.md`), sur la transaction de
  * l'appelant (`forfeitDeletedEntryMatchPublic`, qui enchaîne réconciliations et
@@ -31,16 +61,7 @@ export async function forfeitDeletedEntryNextMatch(
   );
   if (tournaments[0]?.state !== "RUNNING") return null;
 
-  const [entries] = await connection.execute<(RowDataPacket & { is_deleted: number })[]>(
-    `SELECT u.is_deleted
-       FROM bg_teams s
-       JOIN bg_users u ON u.id = s.solo_user_id
-      WHERE s.id = ?
-        AND ${soloEntryNeverPlayedSql("?", "?")}
-      LIMIT 1`,
-    [teamId, tournamentId, teamId, teamId],
-  );
-  if (Number(entries[0]?.is_deleted ?? 0) !== 1) return null;
+  if (!(await lockDeletedSoloEntryStillForfeitable(connection, tournamentId, teamId))) return null;
 
   // Table seule, sans jointure (MariaDB) : le verrou ne porte que sur le match.
   const [matches] = await connection.execute<(RowDataPacket & { id: number })[]>(

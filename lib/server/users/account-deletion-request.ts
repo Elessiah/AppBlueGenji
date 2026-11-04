@@ -24,6 +24,7 @@ import { invalidateStats } from "@/lib/server/stats-cache";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
+import { activeSuspensionSql } from "@/lib/server/suspension-sql";
 import { withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
 import { lockMemberRoles, writeActiveMembership } from "@/lib/server/teams/access";
 import { dissolveTeamOn } from "@/lib/server/teams/dissolution";
@@ -221,7 +222,11 @@ async function leaveTeamOn(connection: PoolConnection, teamId: number, userId: n
   return departure;
 }
 
-/** Le compte vivant le plus ancien, autre que `userId`, qui tient la permission `tournaments` (rôle, sinon administrateur). */
+/**
+ * Le compte vivant le plus ancien, autre que `userId`, qui tient la permission
+ * `tournaments` (rôle, sinon administrateur). Un compte suspendu ne se connecte
+ * pas : il ne reprend rien.
+ */
 async function findOrganizerSuccessor(
   connection: Pick<PoolConnection, "execute">,
   userId: number,
@@ -236,6 +241,10 @@ async function findOrganizerSuccessor(
       WHERE u.is_deleted = 0
         AND u.id <> ?
         AND (u.is_admin = 1 OR ${roleSql})
+        AND NOT EXISTS (
+          SELECT 1 FROM bg_account_suspensions s
+           WHERE s.user_id = u.id AND ${activeSuspensionSql("s")}
+        )
       ORDER BY (${roleSql}) DESC, u.created_at, u.id
       LIMIT 1`,
     [userId],
@@ -255,21 +264,28 @@ async function listOrganizedTournamentIds(
   return rows.map((row) => Number(row.id));
 }
 
-/** Les tournois organisés par le compte passent à un autre membre du staff ; rend les tournois touchés. */
+/**
+ * Les tournois organisés par le compte passent à un autre membre du staff ;
+ * rend les tournois touchés. Seuls ceux déjà verrouillés (`lockedIds`, lus
+ * avant la transaction) changent de main : un tournoi confié entre-temps reste
+ * à l'organisateur, plutôt que d'être écrit sans son verrou.
+ */
 async function handOverOrganizedTournaments(
   connection: Pick<PoolConnection, "execute">,
   userId: number,
+  lockedIds: ReadonlySet<number>,
 ): Promise<number[]> {
-  const organized = await listOrganizedTournamentIds(connection, userId);
+  const organized = (await listOrganizedTournamentIds(connection, userId)).filter((id) => lockedIds.has(id));
   if (organized.length === 0) return [];
   const successor = await findOrganizerSuccessor(connection, userId);
   // Personne à qui les confier : rien ne change (décision requise), et le
   // compte sera anonymisé et non effacé, l'organisateur le retenant.
   if (successor === null) return [];
-  await connection.execute(`UPDATE bg_tournaments SET organizer_user_id = ? WHERE organizer_user_id = ?`, [
-    successor,
-    userId,
-  ]);
+  await connection.execute(
+    `UPDATE bg_tournaments SET organizer_user_id = ?
+      WHERE organizer_user_id = ? AND id IN (${organized.map(() => "?").join(", ")})`,
+    [successor, userId, ...organized],
+  );
   return organized;
 }
 
@@ -393,7 +409,7 @@ export async function requestAccountDeletion(
     for (const teamId of await listActiveTeamIds(connection, userId)) {
       departures.push(await leaveTeamOn(connection, teamId, userId));
     }
-    organizedHandedOver = await handOverOrganizedTournaments(connection, userId);
+    organizedHandedOver = await handOverOrganizedTournaments(connection, userId, new Set(soloTournaments));
     // Il ne castera ni n'arbitrera plus rien à venir ; les matchs joués gardent
     // leur cast jusqu'à la suppression définitive.
     castTournaments = (await withdrawUserCasts(connection, userId, false)).tournamentIds;

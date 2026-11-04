@@ -122,6 +122,27 @@ describe("holdAccountIdentity", () => {
     expect(syncSoloEntryIdentityOn).toHaveBeenCalledWith(expect.anything(), 7);
   });
 
+  it("holdAccountIdentity_living_dropsPreviousHoldThenPlainInsert", async () => {
+    const connection = transaction({ live: { pseudo: "Kerya", avatar_url: AVATAR } });
+
+    await holdAccountIdentity(fakeConnection(connection), 7, REQUESTED);
+
+    const writes = sqlOf(connection).filter((q) => q.sql.includes("bg_account_deletion_holds") && !q.sql.startsWith("SELECT"));
+    expect(writes[0]).toEqual({ sql: "DELETE FROM bg_account_deletion_holds WHERE user_id = ?", params: [7] });
+    expect(writes[1].sql).toBe("INSERT INTO bg_account_deletion_holds (user_id, pseudo, avatar_url) VALUES (?, ?, ?)");
+  });
+
+  it("holdAccountIdentity_pseudoHeldByOtherAccount_throwsDuplicate", async () => {
+    const connection = transaction({ live: { pseudo: "Nova", avatar_url: AVATAR } });
+    // Lecture du compte, ancien masque retiré, puis l'insertion refusée.
+    failCall(connection, 3, duplicate());
+
+    await expect(holdAccountIdentity(fakeConnection(connection), 7, REQUESTED)).rejects.toMatchObject({
+      code: "ER_DUP_ENTRY",
+    });
+    expect(updatesOf(connection)).toEqual([]);
+  });
+
   it("holdAccountIdentity_alreadyDeleted_falseAndNothingWritten", async () => {
     const connection = transaction({ live: null });
 
@@ -132,8 +153,9 @@ describe("holdAccountIdentity", () => {
 
   it("holdAccountIdentity_borrowedPseudoTaken_retriesWithAnotherPseudo", async () => {
     const connection = transaction({ live: { pseudo: "Kerya", avatar_url: null } });
-    // Lecture du compte, masque, pseudos pris, puis le premier UPDATE refusé.
-    failCall(connection, 4, duplicate());
+    // Lecture du compte, ancien masque retiré, masque, pseudos pris, puis le
+    // premier UPDATE refusé.
+    failCall(connection, 5, duplicate());
 
     expect(await holdAccountIdentity(fakeConnection(connection), 7, REQUESTED)).toBe(true);
 

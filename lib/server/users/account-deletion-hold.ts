@@ -65,11 +65,16 @@ export async function holdAccountIdentity(
   );
   const current = rows[0];
   if (!current) return false;
-  await connection.execute(
-    `INSERT INTO bg_account_deletion_holds (user_id, pseudo, avatar_url) VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE pseudo = VALUES(pseudo), avatar_url = VALUES(avatar_url)`,
-    [userId, current.pseudo, current.avatar_url ?? null],
-  );
+  // Un masque resté d'une demande antérieure cède la place ; puis une insertion
+  // simple : un pseudo déjà mis de côté par un autre compte fait échouer la
+  // demande (doublon), au lieu de réécrire en silence le masque de cet autre
+  // compte (`ON DUPLICATE KEY` jouerait sur les deux clés uniques).
+  await connection.execute(`DELETE FROM bg_account_deletion_holds WHERE user_id = ?`, [userId]);
+  await connection.execute(`INSERT INTO bg_account_deletion_holds (user_id, pseudo, avatar_url) VALUES (?, ?, ?)`, [
+    userId,
+    current.pseudo,
+    current.avatar_url ?? null,
+  ]);
   const taken = await loadTakenAnonymousPseudos(connection, userId);
   for (let attempt = 0; ; attempt += 1) {
     const pseudo = pickAnonymousPseudo(taken);

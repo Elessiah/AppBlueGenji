@@ -72,6 +72,8 @@ type Options = {
   deadMembers?: number[];
   activeTournament?: boolean;
   organized?: number[];
+  /** Les tournois organisés relus dans la transaction, s'ils diffèrent du relevé d'avant. */
+  organizedLater?: number[];
   organizerSuccessor?: number | null;
   failOn?: string;
 };
@@ -85,6 +87,13 @@ function livingMembers(options: Options) {
 
 function organizerRows(options: Options) {
   return options.organizerSuccessor ? [{ id: options.organizerSuccessor }] : [];
+}
+
+/** Le premier relevé (avant la transaction) lit `organized`, les suivants `organizedLater` s'il est donné. */
+function organizedRows(options: Options, queries: { sql: string }[]) {
+  const reads = queries.filter((entry) => entry.sql.startsWith("SELECT id FROM bg_tournaments WHERE organizer_user_id"));
+  const ids = reads.length > 1 && options.organizedLater ? options.organizedLater : (options.organized ?? []);
+  return ids.map((id) => ({ id }));
 }
 
 function fakeDb(options: Options) {
@@ -102,9 +111,7 @@ function fakeDb(options: Options) {
     if (q.startsWith("SELECT id FROM bg_users WHERE is_deleted = 0 AND id IN")) return [livingMembers(options)];
     if (q.startsWith("SELECT u.id FROM bg_users u")) return [organizerRows(options)];
     if (q.startsWith("SELECT 1 FROM bg_tournament_registrations r")) return [options.activeTournament ? [{ 1: 1 }] : []];
-    if (q.startsWith("SELECT id FROM bg_tournaments WHERE organizer_user_id")) {
-      return [(options.organized ?? []).map((id) => ({ id }))];
-    }
+    if (q.startsWith("SELECT id FROM bg_tournaments WHERE organizer_user_id")) return [organizedRows(options, queries)];
     return [{ affectedRows: 1 }];
   });
   const connection = {
@@ -346,7 +353,27 @@ describe("requestAccountDeletion — tournois organisés", () => {
     await requestAccountDeletion(7);
 
     const handover = queries.find((q) => q.sql.startsWith("UPDATE bg_tournaments SET organizer_user_id = ?"));
-    expect(handover?.params).toEqual([21, 7]);
+    expect(handover?.sql).toContain("WHERE organizer_user_id = ? AND id IN (?, ?)");
+    expect(handover?.params).toEqual([21, 7, 11, 12]);
+  });
+
+  it("requestAccountDeletion_tournamentAssignedAfterPreRead_notHandedOver", async () => {
+    const { queries } = fakeDb({ organized: [11], organizedLater: [11, 12], organizerSuccessor: 21 });
+
+    await requestAccountDeletion(7);
+
+    const handover = queries.find((q) => q.sql.startsWith("UPDATE bg_tournaments SET organizer_user_id = ?"));
+    expect(handover?.params).toEqual([21, 7, 11]);
+  });
+
+  it("findOrganizerSuccessor_query_excludesActivelySuspendedAccounts", async () => {
+    const { queries } = fakeDb({ organized: [11], organizerSuccessor: 21 });
+
+    await requestAccountDeletion(7);
+
+    const lookup = queries.find((q) => q.sql.startsWith("SELECT u.id FROM bg_users u"));
+    expect(lookup?.sql).toContain("NOT EXISTS ( SELECT 1 FROM bg_account_suspensions s WHERE s.user_id = u.id");
+    expect(lookup?.sql).toContain("s.lifted_at IS NULL");
   });
 
   it("requestAccountDeletion_organizerWithoutSuccessor_leavesTournamentsUnchanged", async () => {

@@ -159,15 +159,25 @@ const MAX_BRACKET_FORFEITS = 64;
  */
 export async function forfeitUnplayedSoloEntry(tournamentId: number, teamId: number): Promise<number> {
   const { forfeitDeletedEntryMatch, forfeitTournamentTeam } = await import("@/lib/server/tournaments-service");
+  const { lockDeletedSoloEntryStillForfeitable } = await import("@/lib/server/tournaments/deleted-entry-forfeit");
   const format = await engineFormat(tournamentId);
   if (format !== null && ABANDON_FORMATS.has(format)) {
     if (!(await entryStillForfeitable(tournamentId, teamId))) return 0;
     try {
       // Une seule ligne au journal : celle de la suppression, qui dit le forfait.
-      await forfeitTournamentTeam(tournamentId, teamId, null, undefined, { skipForfeitLog: true });
+      // Relu une seconde fois sous le verrou du tournoi et du compte : le
+      // premier relevé, hors transaction, ne ferme pas la course d'une
+      // réactivation.
+      await forfeitTournamentTeam(tournamentId, teamId, null, undefined, {
+        skipForfeitLog: true,
+        stillDue: (connection) => lockDeletedSoloEntryStillForfeitable(connection, tournamentId, teamId),
+      });
     } catch (error) {
-      // Déjà hors course (abandon antérieur, passage précédent) : rien à faire.
-      if (error instanceof Error && error.message === "TEAM_ALREADY_OUT") return 0;
+      // Déjà hors course (abandon antérieur, passage précédent), ou plus dû
+      // (compte réactivé, manche jouée) : rien à faire.
+      if (error instanceof Error && (error.message === "TEAM_ALREADY_OUT" || error.message === "FORFEIT_NO_LONGER_DUE")) {
+        return 0;
+      }
       throw error;
     }
     return 1;
