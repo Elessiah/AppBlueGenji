@@ -131,7 +131,8 @@ export function CastSettingsDialog({
   const battletagRefused = castBattletagInvalid(battletag);
   // Seul un mode choisi ici s'envoie : celui du match, même sans sa date, ne
   // bloque pas l'enregistrement d'un lien ou d'un BattleTag.
-  const triggerRefused = configurable && pickedTrigger !== null && castTriggerNeedsDate(trigger, match.startAt);
+  const triggerRefused =
+    configurable && pickedTrigger !== null && pickedTrigger !== match.liveTrigger && castTriggerNeedsDate(trigger, match.startAt);
   // La rediff garde sa fenêtre (`MatchReplayDialog`), celle du staff de
   // diffusion : une seule définition du lien YouTube et de ses refus.
   const replayable = canEditReplay(match, true);

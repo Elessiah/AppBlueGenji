@@ -74,6 +74,13 @@ describe("offersCastSettings", () => {
     expect(offersCastSettings(match(), true, true)).toBe(true);
   });
 
+  it("offersCastSettings_awaitingConfirmationUncast_stillOffersForRelease", () => {
+    // Plus rien à régler, mais « Ne plus caster » vit dans la fenêtre : le
+    // caster d'un match pas encore joué doit pouvoir se retirer.
+    const awaiting = match({ status: "AWAITING_CONFIRMATION" as MatchStatus });
+    expect(offersCastSettings(awaiting, true, false)).toBe(true);
+  });
+
   it("offerte au caster d'un match joué tant qu'il reste la rediff", () => {
     const played = match({ status: "COMPLETED" as MatchStatus });
     expect(offersCastSettings(played, true, true)).toBe(true);
