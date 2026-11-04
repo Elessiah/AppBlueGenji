@@ -32,7 +32,7 @@ describe("bot-integration — salons vocaux", () => {
     await expect(releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "gone", code: "VOICE_CHANNEL_NOT_TRACKED" });
   });
 
-  // Un 404 étranger compte au coupe-circuit : module neuf à chaque test.
+  // Module neuf à chaque test : coupe-circuit fermé.
   it("releaseVoiceChannel_routeMissing404_returnsFailed", async () => {
     const bot = await freshBotIntegration();
     // Bot d'une autre version sans la route : jamais « déjà rendu », la ligne reste ouverte.
@@ -103,11 +103,12 @@ describe("bot-integration — salons vocaux, coupe-circuit", () => {
     expect(bot.isBotCircuitOpen()).toBe(true);
   });
 
-  it("releaseVoiceChannel_threeRouteMissing404s_opensCircuit", async () => {
+  it("releaseVoiceChannel_threeRouteMissing404s_doesNotOpenCircuit", async () => {
     const bot = await freshBotIntegration();
+    // Écart de version des seules routes vocales : le journal et les annonces restent servis.
     jest.spyOn(global, "fetch").mockResolvedValue(json(404, { error: "INTERNAL_ROUTE_NOT_FOUND" }));
     for (let call = 0; call < 3; call++) await bot.releaseVoiceChannel("123456789");
-    expect(bot.isBotCircuitOpen()).toBe(true);
+    expect(bot.isBotCircuitOpen()).toBe(false);
   });
 
   it("releaseVoiceChannel_notTracked404BetweenFailures_resetsCircuit", async () => {

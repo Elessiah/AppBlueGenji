@@ -126,9 +126,16 @@ describe("dispatchMatchVoiceChannels — création", () => {
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
-  // Panne du canal ou du bot entier (`INTERNAL_ERROR` hors route, page d'erreur d'un proxy) :
-  // jamais un refus propre à un salon.
-  it.each(["BOT_VOICE_TIMEOUT", "INTERNAL_ERROR", "BOT_INTERNAL_REQUEST_FAILED"])(
+  // Panne du canal ou du bot entier (`INTERNAL_ERROR` hors route, page d'erreur d'un proxy,
+  // jeton refusé ou absent, bot pas connecté à Discord) : jamais un refus propre à un salon.
+  it.each([
+    "BOT_VOICE_TIMEOUT",
+    "INTERNAL_ERROR",
+    "BOT_INTERNAL_REQUEST_FAILED",
+    "UNAUTHORIZED",
+    "INTERNAL_API_TOKEN_NOT_CONFIGURED",
+    "DISCORD_NOT_READY",
+  ])(
     "dispatchMatchVoiceChannels_botDownOnCreate_%s_stopsRemainingCalls",
     async (code) => {
       database({ due: [dueMatch, { ...dueMatch, id: 43 }] });
@@ -248,6 +255,15 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     await dispatchMatchVoiceChannels();
     expect(releaseVoiceChannel).toHaveBeenCalledTimes(1);
     expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()"))).toEqual([]);
+  });
+
+  it("dispatchMatchVoiceChannels_releaseInvalidChannelId_closesRowWithoutRetry", async () => {
+    // Un identifiant que le bot ne suivra jamais : la ligne se clôt (et sera purgée).
+    const { writes } = database({ releasable: [{ match_id: 42, team_id: 1, channel_id: "901", tournament_id: 7 }] });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "failed", code: "INVALID_CHANNEL_ID" });
+    await dispatchMatchVoiceChannels();
+    expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toEqual([]);
+    expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()")).map((w) => w.params)).toEqual([[42, 1]]);
   });
 
   it("dispatchMatchVoiceChannels_releaseRefusedByBot_continuesWithNextRow", async () => {
