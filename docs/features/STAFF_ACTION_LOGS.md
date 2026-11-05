@@ -31,7 +31,7 @@ n'appellent l'intervention de personne.
 | `PATCH /api/admin/matches/[id]/scores` | `SCORES_SAVED` | Score enregistré |
 | `POST /api/admin/matches/[id]/launch` | `FORCE_LAUNCHED` | Lancement forcé |
 | `PUT /api/admin/matches/[id]/host` | `HOST_SET` / `HOST_CLEARED` | Hôte désigné / retiré (seulement quand l'hôte change) |
-| `PUT /api/admin/matches/[id]/live` | `LIVE_CONFIGURED` / `LIVE_REMOVED` (déclencheur `null`) | Diffusion réglée / retirée |
+| `PUT /api/admin/matches/[id]/live` | `LIVE_CONFIGURED` / `LIVE_REMOVED` (déclencheur `null`) | Diffusion réglée / retirée — rien d'annoncé si la requête n'écrit rien (`changed`) |
 | `POST /api/admin/matches/[id]/live` | `ON_AIR` / `OFF_AIR` | Mis à l'antenne / Retiré de l'antenne (seulement quand l'état change) |
 | `PUT /api/admin/matches/[id]/replay` | `REPLAY_SET` / `REPLAY_REMOVED` | Rediffusion ajoutée / retirée (seulement quand le lien change) |
 | `PATCH /api/tournaments/[id]/edit` | `EDITED` | Tournoi modifié (ancien nom entre parenthèses quand le nom change) |

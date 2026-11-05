@@ -178,21 +178,24 @@ export function MatchLiveDialog({
   // reposé par qui le tient) : la case et le choix reprennent le mode du match.
   // Sans quoi la case « casté », cochée à l'ouverture sur un mode verrouillé,
   // le resterait une fois ce mode retiré — et Enregistrer recasterait le match.
-  const [seenTrigger, setSeenTrigger] = useState(match.liveTrigger);
-  if (seenTrigger !== match.liveTrigger) {
-    setSeenTrigger(match.liveTrigger);
-    setStreamed(match.liveTrigger !== null);
-    setTrigger(match.liveTrigger ?? "MANUAL");
-  }
   // Le lien du stream du staff, que ce réglage écrit — jamais celui qu'un
   // caster a ouvert (lecture partielle sans streams : le premier lien).
-  const [liveUrl, setLiveUrl] = useState(
-    (match.streams.length > 0 ? staffStream(match.streams)?.liveUrl : match.liveUrl) ?? "",
-  );
+  const currentStaffUrl = (match.streams.length > 0 ? staffStream(match.streams)?.liveUrl : match.liveUrl) ?? "";
+  const [liveUrl, setLiveUrl] = useState(currentStaffUrl);
   // Fausse par défaut (protection des données dès la conception) : un lien
   // n'est celui de l'organisation — gardé après la suppression du compte de qui
   // le pose — que si ce membre le coche ; rien ne se déduit de ce qu'il caste.
   const [organisationLink, setOrganisationLink] = useState(false);
+  const [seenTrigger, setSeenTrigger] = useState(match.liveTrigger);
+  if (seenTrigger !== match.liveTrigger) {
+    // Le lien aussi : un mode retiré a effacé celui du staff, que la fenêtre
+    // ne doit pas reposer à l'enregistrement.
+    setSeenTrigger(match.liveTrigger);
+    setStreamed(match.liveTrigger !== null);
+    setTrigger(match.liveTrigger ?? "MANUAL");
+    setLiveUrl(currentStaffUrl);
+    setOrganisationLink(false);
+  }
   // Médiation : les liens des streams des casters, que l'arbitre seul édite.
   const casterList = useMemo(() => new Intl.ListFormat(text.locale, { style: "long", type: "conjunction" }), [text.locale]);
   const casterStreams = referee ? casterStreamsOf(match, casterList) : [];

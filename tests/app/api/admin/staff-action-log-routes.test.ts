@@ -81,8 +81,8 @@ describe("gestes du staff sur un match", () => {
     ["lancement forcé", "FORCE_LAUNCHED", () => launchRoute(jsonReq("POST", {}), match), () => jest.mocked(forceLaunchMatch).mockResolvedValue()],
     ["hôte désigné", "HOST_SET", () => hostRoute(jsonReq("PUT", { teamId: 3 }), match), () => jest.mocked(setMatchHost).mockResolvedValue(true)],
     ["hôte retiré", "HOST_CLEARED", () => hostRoute(jsonReq("PUT", { teamId: null }), match), () => jest.mocked(setMatchHost).mockResolvedValue(true)],
-    ["diffusion réglée", "LIVE_CONFIGURED", () => matchLiveRoute(jsonReq("PUT", { trigger: "MANUAL", liveUrl: null }), match), () => jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null })],
-    ["diffusion retirée", "LIVE_REMOVED", () => matchLiveRoute(jsonReq("PUT", { trigger: null, liveUrl: null }), match), () => jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: "MANUAL" })],
+    ["diffusion réglée", "LIVE_CONFIGURED", () => matchLiveRoute(jsonReq("PUT", { trigger: "MANUAL", liveUrl: null }), match), () => jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true })],
+    ["diffusion retirée", "LIVE_REMOVED", () => matchLiveRoute(jsonReq("PUT", { trigger: null, liveUrl: null }), match), () => jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: "MANUAL", changed: true })],
     ["mis à l'antenne", "ON_AIR", () => onAirRoute(jsonReq("POST", { onAir: true }), match), () => jest.mocked(setMatchOnAir).mockResolvedValue(true)],
     ["retiré de l'antenne", "OFF_AIR", () => onAirRoute(jsonReq("POST", { onAir: false }), match), () => jest.mocked(setMatchOnAir).mockResolvedValue(true)],
     ["rediffusion ajoutée", "REPLAY_SET", () => replayRoute(jsonReq("PUT", { replayUrl: "https://youtu.be/x" }), match), () => jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: "https://youtu.be/x", changed: true })],
@@ -111,7 +111,7 @@ describe("gestes du staff sur un match", () => {
   it("un caster sans permission tournois est écrit « un caster », jamais « le staff »", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     jest.mocked(setMatchOnAir).mockResolvedValue(true);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: "AUTO" });
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: "AUTO", changed: true });
     jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: "https://youtu.be/x", changed: true });
     expect((await onAirRoute(jsonReq("POST", { onAir: true }), match)).status).toBe(200);
     expect((await matchLiveRoute(jsonReq("PUT", { trigger: null }), match)).status).toBe(200);

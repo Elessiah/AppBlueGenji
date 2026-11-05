@@ -116,7 +116,12 @@ type LockedLiveMatch = {
 export type MatchLiveAccess = Pick<LiveTriggerActor, "isAdmin" | "manages"> & { live: boolean };
 
 /** Résultat d'un réglage : le mode d'avant, pour dire au journal ce qui a changé. */
-export type MatchLiveOutcome = { previousTrigger: MatchLiveTrigger | null };
+/**
+ * `previousTrigger` : le mode d'avant ; `changed` : la requête a-t-elle écrit
+ * quelque chose (mode, lien du staff, lien d'un caster) — un réglage
+ * réenregistré tel quel ne s'annonce pas au journal du staff.
+ */
+export type MatchLiveOutcome = { previousTrigger: MatchLiveTrigger | null; changed: boolean };
 
 /**
  * Refus d'un lien de stream de caster, qui dit **quel** stream (`streamId`) :
@@ -232,8 +237,9 @@ function assertConfigurable(row: MatchLiveRow, trigger: MatchLiveTrigger | null)
  * appel direct ne pose pas un lien sur un match que l'écran garde fermé. Déjà
  * casté, il ne peut plus qu'être démarqué (`assertConfigurable`).
  *
- * Rend le mode d'avant (`MatchLiveOutcome`) : le journal ne dit « retiré »
- * que d'un mode qui l'était vraiment.
+ * Rend le mode d'avant et si quelque chose a été écrit (`MatchLiveOutcome`) :
+ * le journal ne dit « retiré » que d'un mode qui l'était vraiment, et rien
+ * d'un réglage réenregistré tel quel.
  *
  * @throws `MATCH_NOT_FOUND` | `INVALID_LIVE_TRIGGER` | `INVALID_STREAM_URL`
  *         | `MATCH_START_AT_REQUIRED` | `MATCH_NOT_CASTABLE` | `NOT_MATCH_REFEREE`
@@ -285,10 +291,14 @@ export async function setMatchLiveConfig(
         throw new Error("MATCH_START_AT_REQUIRED");
       }
       let streams: MatchStreamRow[] | undefined;
+      // Une écriture de lien rend une nouvelle liste : la même, rien d'écrit.
+      let changed = triggerChanges;
       // Les liens des casters d'abord : le lien du staff qui suit habille un
       // stream sans lien, jamais celui qu'un caster vient de recevoir ici.
       if (config.streamLinks !== undefined && config.streamLinks.length > 0) {
-        streams = await setCasterStreamLinks(connection, matchId, config.streamLinks);
+        const locked = await lockMatchStreams(connection, matchId);
+        streams = await setCasterStreamLinks(connection, matchId, config.streamLinks, locked);
+        changed = changed || streams !== locked;
       }
       if (trigger === null && hold.trigger === null) {
         // Match sans mode : l'arbitre n'y corrige que les liens des casters —
@@ -319,13 +329,15 @@ export async function setMatchLiveConfig(
         // Un stream de caster dont l'arbitre vient d'effacer le lien reste au
         // caster : le lien du staff ne s'y pose pas.
         const edited = new Set((config.streamLinks ?? []).map((link) => link.streamId));
-        streams = await setStaffStreamUrl(connection, matchId, url, config.setter, streams, edited);
+        const before = streams ?? (await lockMatchStreams(connection, matchId));
+        streams = await setStaffStreamUrl(connection, matchId, url, config.setter, before, edited);
+        changed = changed || streams !== before;
       }
       // Les streams déjà lus sous verrou (et mis à jour en mémoire) ne sont pas
       // relus : deux lectures verrouillantes, non quatre.
       await pruneMatchStreams(connection, matchId, { streams });
       await connection.commit();
-      return { previousTrigger: hold.trigger };
+      return { previousTrigger: hold.trigger, changed };
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -392,7 +404,7 @@ async function lockLiveMatch(
  * changé, même lien) ne le prend ni à un caster, ni à l'organisation.
  *
  * Rend les streams du match **tels qu'ils sont après l'écriture**, pour le
- * ménage qui suit.
+ * ménage qui suit — la liste reçue elle-même si rien n'est écrit.
  */
 async function setStaffStreamUrl(
   connection: PoolConnection,
@@ -528,8 +540,9 @@ async function setCasterStreamLinks(
   connection: PoolConnection,
   matchId: number,
   links: readonly MatchStreamLinkEdit[],
+  locked: MatchStreamRow[],
 ): Promise<MatchStreamRow[]> {
-  let streams = await lockMatchStreams(connection, matchId);
+  let streams = locked;
   for (const link of links) {
     const target = streams.find((stream) => stream.id === link.streamId && !stream.staff);
     if (!target) throw new StreamLinkError("STREAM_NOT_FOUND", link.streamId);

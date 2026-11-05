@@ -80,7 +80,7 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
 
   it("un membre de l'organisation décoche « lien de l'organisation » : c'est sa propre chaîne", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null });
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true });
 
     const res = await putMatchLive(
       matchReq("PUT", { trigger: "AUTO", liveUrl: "kick.com/bg", organisationLink: false }),
@@ -202,7 +202,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
 
   it("accepte un CASTER — c'est tout l'intérêt du rôle", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null });
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true });
 
     const res = await putMatchLive(
       matchReq("PUT", { trigger: "MANUAL", liveUrl: "kick.com/bg" }),
@@ -221,7 +221,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
 
   it("accepte un arbitre — il cumule tournaments et live", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null });
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true });
     expect((await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"))).status).toBe(
       200,
     );
@@ -237,7 +237,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
 
   it("PUT_tournamentsMemberOrganisationLinkTrue_marksOrganisationLink", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null });
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true });
 
     const res = await putMatchLive(
       matchReq("PUT", { trigger: "AUTO", liveUrl: "kick.com/bg", organisationLink: true }),
@@ -304,7 +304,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
 
   it("PUT_clearWithoutPreviousTrigger_logsConfigured", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null });
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true });
 
     await putMatchLive(matchReq("PUT", { trigger: null, streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/x" }] }), matchParams("42"));
 
@@ -312,11 +312,11 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     expect(announceStaffMatchAction).toHaveBeenCalledWith(42, "LIVE_CONFIGURED", undefined);
   });
 
-  it("PUT_noOpSaveOnUnmarkedMatch_noAnnouncement", async () => {
+  it("PUT_nothingWritten_noAnnouncement", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null });
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: "MANUAL", changed: false });
 
-    const res = await putMatchLive(matchReq("PUT", { trigger: null }), matchParams("42"));
+    const res = await putMatchLive(matchReq("PUT", { trigger: "MANUAL", liveUrl: null }), matchParams("42"));
 
     // Rien d'écrit : aucune action de staff annoncée.
     expect(res.status).toBe(200);
@@ -325,7 +325,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
 
   it("PUT_clearWithPreviousTrigger_logsRemoved", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: "AUTO" });
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: "AUTO", changed: true });
 
     await putMatchLive(matchReq("PUT", { trigger: null }), matchParams("42"));
 
@@ -350,7 +350,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
 
   it("démarque le match quand trigger est absent ou null", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null });
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true });
 
     await putMatchLive(matchReq("PUT", {}), matchParams("42"));
     expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
@@ -363,7 +363,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
 
   it("accepte le mode START_TIME", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null });
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true });
 
     const res = await putMatchLive(matchReq("PUT", { trigger: "START_TIME" }), matchParams("42"));
 

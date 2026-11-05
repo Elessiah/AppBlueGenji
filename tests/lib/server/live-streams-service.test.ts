@@ -741,6 +741,42 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.streams).toEqual([{ ...dbStream(4, "https://twitch.tv/neuve"), link_user_id: 13 }]);
   });
 
+  it("setMatchLiveConfig_resaveSameTriggerAndLink_changedFalse", async () => {
+    // Réglage réenregistré tel quel : rien d'écrit, rien à annoncer.
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL" }), [dbStream(6, "https://twitch.tv/orga", true)]);
+    await mockLiveDb(world);
+
+    const outcome = await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/orga", setter: ORGANISER_5, access: STAFF });
+
+    expect(outcome).toEqual({ previousTrigger: "MANUAL", changed: false });
+    expect(world.state.matchWrites).toEqual([]);
+    expect(world.state.streams).toEqual([dbStream(6, "https://twitch.tv/orga", true)]);
+  });
+
+  it("setMatchLiveConfig_sameTriggerNewStaffLink_changedTrue", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL" }), [dbStream(6, "https://twitch.tv/orga", true)]);
+    await mockLiveDb(world);
+
+    const outcome = await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/neuve", setter: ORGANISER_5, access: STAFF });
+
+    expect(outcome.changed).toBe(true);
+  });
+
+  it("setMatchLiveConfig_refereeLinksOnlyOnUnmarkedMatch_changedTrue", async () => {
+    const world = liveWorld(matchRow({ kept_referee_user_id: 9 }), [dbStream(4, null)], [{ user_id: 12, stream_id: 4 }]);
+    await mockLiveDb(world);
+
+    const outcome = await setMatchLiveConfig(42, {
+      trigger: null,
+      liveUrl: null,
+      setter: { userId: 9, asOrganisation: false },
+      access: STAFF,
+      streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/x" }],
+    });
+
+    expect(outcome).toEqual({ previousTrigger: null, changed: true });
+  });
+
   it("setMatchLiveConfig_liveStaffWithEmptyStreamLinks_savesConfig", async () => {
     const world = liveWorld(matchRow({ live_trigger: "AUTO" }));
     await mockLiveDb(world);
@@ -916,7 +952,7 @@ describe("setMatchLiveConfig", () => {
 
     const outcome = await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: null, setter: ORGANISER_5, access: STAFF });
 
-    expect(outcome).toEqual({ previousTrigger: "AUTO" });
+    expect(outcome).toEqual({ previousTrigger: "AUTO", changed: true });
   });
 
   it("setMatchLiveConfig_hiddenOwnerMode_staffChangesIt", async () => {

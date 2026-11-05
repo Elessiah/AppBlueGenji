@@ -71,13 +71,23 @@ export function markViewerReferee(
   matches: readonly Pick<BracketMatch, "id" | "refereeKey" | "status">[],
 ): MatchRefereeName[] {
   let marked = false;
+  // Une empreinte par match, calculée une fois pour les deux boucles.
+  const keys = new Map<number, string>();
+  const keyOf = (matchId: number): string => {
+    let key = keys.get(matchId);
+    if (key === undefined) {
+      key = refereeKey(matchId, viewerUserId);
+      keys.set(matchId, key);
+    }
+    return key;
+  };
   const out = names.map((name): MatchRefereeName => {
-    if (refereeKey(name.matchId, viewerUserId) !== name.refereeKey) return name;
+    if (keyOf(name.matchId) !== name.refereeKey) return name;
     marked = true;
     return { ...name, mine: true as const };
   });
   for (const match of matches) {
-    if (!showsRefereeName(match) || match.refereeKey !== refereeKey(match.id, viewerUserId)) continue;
+    if (!showsRefereeName(match) || match.refereeKey !== keyOf(match.id)) continue;
     if (out.some((name) => name.matchId === match.id && name.refereeKey === match.refereeKey)) continue;
     marked = true;
     out.push({ matchId: match.id, refereeKey: match.refereeKey, pseudo: "", mine: true });

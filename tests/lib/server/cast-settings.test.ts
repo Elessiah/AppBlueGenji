@@ -107,6 +107,15 @@ describe("applyCastTrigger — inscription et maître tu", () => {
     expect(row.live_trigger).toBe("MANUAL");
   });
 
+  it("applyCastTrigger_unchangedTriggerOnNonCastableMatch_throwsMatchNotCastable", async () => {
+    // Renvoyé tel quel sur un match joué : le lien qui l'accompagne est refusé avec lui.
+    const execute = jest.fn<SqlQuery>();
+    const row = Object.assign(ownedRow(), { status: "COMPLETED" });
+
+    await expect(applyCastTrigger(fakeConnection({ execute }), row, "MANUAL", 12)).rejects.toThrow("MATCH_NOT_CASTABLE");
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it("applyCastTrigger_coCasterOnNonCastableMatch_throwsMatchNotCastable", async () => {
     // La vraie raison d'abord : le match ne se caste plus.
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12, 13));

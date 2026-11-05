@@ -117,7 +117,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
     // l'organisation le dit « de l'organisation » (case de la fenêtre, décochée
     // par défaut) : la suppression de son compte retire sa chaîne à lui, jamais
     // celle de l'organisation (`withdrawUserCasts`).
-    const { previousTrigger } = await setMatchLiveConfig(matchId, {
+    const { previousTrigger, changed } = await setMatchLiveConfig(matchId, {
       trigger,
       liveUrl: parsed.liveUrl,
       setter: { userId: user.id, asOrganisation: organisation && parsed.organisationLink },
@@ -125,9 +125,8 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
       ...(streamLinks === undefined ? {} : { streamLinks }),
     });
     const removed = trigger === null && previousTrigger !== null;
-    // Rien d'écrit (match sans mode laissé sans mode, aucun lien de caster) : rien à annoncer.
-    const unchanged = trigger === null && previousTrigger === null && (streamLinks?.length ?? 0) === 0;
-    if (!unchanged) {
+    // Rien d'écrit (réglage réenregistré tel quel) : rien à annoncer.
+    if (changed) {
       announceStaffMatchAction(matchId, removed ? "LIVE_REMOVED" : "LIVE_CONFIGURED", staffActionAuthor(user));
     }
     return ok({ trigger });

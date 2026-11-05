@@ -128,7 +128,12 @@ export async function applyCastTrigger(
 ): Promise<boolean> {
   if (trigger !== null && !isMatchLiveTrigger(trigger)) throw new Error("INVALID_LIVE_TRIGGER");
   const current = row.live_trigger ?? null;
-  if (trigger === current) return true;
+  if (trigger === current) {
+    // Renvoyé tel quel, le mode n'écrit rien, mais le match doit toujours se
+    // caster : un score déclaré ferme aussi le lien qui l'accompagne.
+    assertCastTriggerWritable(row, trigger);
+    return true;
+  }
   const matchId = Number(row.id);
   const actor = { userId, ...access };
   const { hold, shown } = await castTriggerHold(connection, row, trigger === null ? null : userId);

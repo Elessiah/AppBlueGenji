@@ -580,6 +580,16 @@ describe("refusedCasterField — le refus rattaché au lien du stream désigné"
   });
 });
 
+describe("Fenêtre de diffusion — mode changé pendant qu'elle est ouverte", () => {
+  it("MatchLiveDialog_triggerChangedWhileOpen_resetsLinkAndOrganisation", () => {
+    // Un mode retiré a effacé le lien du staff : la fenêtre ne le repose pas.
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
+    const reset = dialog.slice(dialog.indexOf("if (seenTrigger !== match.liveTrigger)"));
+    expect(reset.slice(0, reset.indexOf("}"))).toContain("setLiveUrl(currentStaffUrl);");
+    expect(reset.slice(0, reset.indexOf("}"))).toContain("setOrganisationLink(false);");
+  });
+});
+
 describe("Fenêtre de diffusion — le stream d'un caster disparu", () => {
   it("casterStreamGone_frAndEn_present", () => {
     expect(frDialogs.live.casterStreamGone).toContain("rouvre la fenêtre");
