@@ -385,7 +385,7 @@
       "noStartAt": "Aucune date de début n'est fixée sur ce match : l'antenne à l'heure dite demande d'abord un horaire.",
       "autoStop": "Le direct s'arrête tout seul dès qu'un score est saisi.",
       "url": "Lien de ma chaîne",
-      "urlHint": "Plateformes acceptées : {platforms}. Ce lien est obligatoire : sans lui, ton stream n'apparaîtrait ni sur la carte du match, ni sur sa page, ni dans l'annonce du direct. Un lien que tu fournis ici est retiré du match si ton compte est supprimé ; un lien enregistré que tu ne changes pas garde son origine.",
+      "urlHint": "Plateformes acceptées : {platforms}. Ce lien est obligatoire : sans lui, ton stream n'apparaîtrait ni sur la carte du match, ni sur sa page, ni dans l'annonce du direct. Un lien que tu fournis ici est retiré du match si ton compte est supprimé, sauf s'il est marqué comme lien de l'organisation ; un lien enregistré que tu ne changes pas garde son origine.",
       "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}.",
       "urlStaff": "Tu co-castes le stream de l'organisation : son lien se règle dans la configuration de la diffusion.",
       "battletag": "BattleTag pour ce cast (facultatif)",
