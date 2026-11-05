@@ -221,7 +221,10 @@ export async function setMatchLiveConfig(
   // ferme la porte (`assertConfigurable`).
   const row = await loadMatchLiveRow(matchId);
   assertConfigurable(row, config.trigger);
-  if (requiresMatchStartAt(config.trigger) && row.start_at === null) {
+  // Un mode inchangé (renvoyé tel quel par une fenêtre où il est verrouillé)
+  // ne redemande pas sa date : retirée depuis par le staff, elle bloquerait
+  // le lien du staff et ceux des casters.
+  if (config.trigger !== (row.live_trigger ?? null) && requiresMatchStartAt(config.trigger) && row.start_at === null) {
     throw new Error("MATCH_START_AT_REQUIRED");
   }
 
@@ -263,7 +266,7 @@ export async function setMatchLiveConfig(
       assertConfigurable(current, trigger);
       // Rejugé lui aussi : une date de début retirée entre les deux lectures
       // poserait une antenne à l'heure dite qui ne s'ouvrirait jamais.
-      if (requiresMatchStartAt(trigger) && locked[0].start_at === null) {
+      if (triggerChanges && requiresMatchStartAt(trigger) && locked[0].start_at === null) {
         throw new Error("MATCH_START_AT_REQUIRED");
       }
       let streams: MatchStreamRow[] | undefined;

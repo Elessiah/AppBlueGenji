@@ -1,6 +1,7 @@
 /**
- * Porte des routes de diffusion d'un match (`/api/admin/matches/[id]/live`
- * et sa rediff) : qui y entre, et la lecture des liens que l'arbitre règle.
+ * Porte de la route de diffusion d'un match (`/api/admin/matches/[id]/live`) :
+ * qui y entre, et la lecture des liens que l'arbitre règle. La rediff
+ * (`…/replay`) n'y passe pas : elle reste à la seule permission `live`.
  */
 import type { AuthUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";

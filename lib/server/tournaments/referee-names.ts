@@ -60,10 +60,13 @@ export function withoutRefereeKeys<T extends { refereeKey: string | null }>(matc
  * Garde la même référence si rien n'est marqué.
  */
 export function markViewerReferee(names: MatchRefereeName[], viewerUserId: number): MatchRefereeName[] {
-  if (!names.some((name) => refereeKey(name.matchId, viewerUserId) === name.refereeKey)) return names;
-  return names.map((name) =>
-    refereeKey(name.matchId, viewerUserId) === name.refereeKey ? { ...name, mine: true } : name,
-  );
+  let marked = false;
+  const out = names.map((name): MatchRefereeName => {
+    if (refereeKey(name.matchId, viewerUserId) !== name.refereeKey) return name;
+    marked = true;
+    return { ...name, mine: true as const };
+  });
+  return marked ? out : names;
 }
 
 /**

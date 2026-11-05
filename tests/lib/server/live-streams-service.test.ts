@@ -582,6 +582,17 @@ describe("setMatchLiveConfig", () => {
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
+  it("setMatchLiveConfig_unchangedStartTimeWithoutDate_savesStaffLink", async () => {
+    // Mode d'un caster renvoyé tel quel (verrouillé) après que le staff a retiré la date.
+    const world = liveWorld(matchRow({ live_trigger: "START_TIME", live_trigger_user_id: 12, start_at: null }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: "twitch.tv/orga", setter: ORGANISER_5, access: STAFF });
+
+    expect(world.state.matchWrites).toEqual([]);
+    expect(world.state.streams).toEqual([dbStream(1, "https://twitch.tv/orga", true)]);
+  });
+
   it("refuse une URL hors liste blanche sans rien écrire", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[matchRow()]]);
     await mockDb(execute);

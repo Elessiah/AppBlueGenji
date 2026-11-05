@@ -162,7 +162,9 @@ quand il quitte le match (`releaseMatchCast`), quand il en est retiré d'office
 (`dropTriggerOwner` : il rejoint une équipe du match, devient inéligible),
 quand un autre change le mode ou le retire, et à la suppression de son compte
 (`match-casters.ts`, tous les matchs dont il a posé le mode, castés ou non).
-À l'inscription, un mode verrouillé n'est pas envoyé (`castClaimBody`). Il
+À l'inscription, un mode verrouillé n'est pas envoyé (`castClaimBody`) ; la
+configuration du direct le renvoie tel quel, et un mode inchangé ne redemande
+pas sa date de début (retirée depuis, elle bloquerait les liens). Il
 figure dans l'export (`liveTriggers`, `listOwnMatchRoles`).
 
 ## L'arbitre désigné, médiateur de la diffusion

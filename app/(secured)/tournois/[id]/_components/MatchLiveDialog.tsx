@@ -127,14 +127,16 @@ export function MatchLiveDialog({
   const [casterLinks, setCasterLinks] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
 
+  // Mode verrouillé : le champ suit le mode du match, posé par un autre.
+  const showUrl = triggerLocked ? match.liveTrigger !== null : streamed;
   const urlTouched = liveUrl.trim().length > 0;
-  // Conditionné à `streamed`, comme `triggerNeedsDate` : décocher la case
-  // n'envoie plus l'URL (`liveUrl: null`) et démonte le champ. Sans cette garde,
-  // une saisie fautive laissée derrière soi bloquerait le décochage avec un
-  // champ devenu invisible.
-  const urlInvalid = streamed && urlTouched && !isValidStreamUrl(liveUrl);
+  // Conditionné au champ affiché : décocher la case n'envoie plus l'URL
+  // (`liveUrl: null`) et démonte le champ. Sans cette garde, une saisie fautive
+  // laissée derrière soi bloquerait le décochage avec un champ devenu invisible.
+  const urlInvalid = showUrl && urlTouched && !isValidStreamUrl(liveUrl);
+  // Seuls les liens saisis : un lien de caster déjà en base ne bloque pas l'envoi.
   const invalidCasterLink = casterStreams.some((stream) => {
-    const value = (casterLinks[stream.id] ?? stream.liveUrl ?? "").trim();
+    const value = (casterLinks[stream.id] ?? "").trim();
     return value !== "" && !isValidStreamUrl(value);
   });
   // « À la date de début » n'a pas de frontière à franchir sans date : le
@@ -203,8 +205,6 @@ export function MatchLiveDialog({
       setBusy(false);
     }
   };
-
-  const showUrl = triggerLocked ? match.liveTrigger !== null : streamed;
 
   return (
     <TournamentDialogFrame
@@ -324,7 +324,7 @@ export function MatchLiveDialog({
                 aria-describedby={urlInvalid ? "match-live-url-error match-live-url-hint" : "match-live-url-hint"}
               />
               {urlInvalid && (
-                <p id="match-live-url-error" style={{ margin: "6px 0 0", fontSize: 12, color: "rgba(255,74,92,0.95)" }}>
+                <p id="match-live-url-error" style={{ margin: "6px 0 0", fontSize: 12, color: "var(--danger)" }}>
                   {t("live.urlInvalid", { platforms })}
                 </p>
               )}
@@ -378,8 +378,9 @@ export function MatchLiveDialog({
               </InfoHintRow>
             </legend>
             {casterStreams.map((stream) => {
-              const value = casterLinks[stream.id] ?? stream.liveUrl ?? "";
-              const invalid = value.trim() !== "" && !isValidStreamUrl(value);
+              const typed = casterLinks[stream.id];
+              const value = typed ?? stream.liveUrl ?? "";
+              const invalid = typed !== undefined && typed.trim() !== "" && !isValidStreamUrl(typed);
               const inputId = `match-live-caster-link-${stream.id}`;
               return (
                 <div className="field" key={stream.id}>
@@ -396,7 +397,7 @@ export function MatchLiveDialog({
                     aria-describedby={invalid ? `${inputId}-error` : undefined}
                   />
                   {invalid && (
-                    <p id={`${inputId}-error`} style={{ margin: "6px 0 0", fontSize: 12, color: "rgba(255,74,92,0.95)" }}>
+                    <p id={`${inputId}-error`} style={{ margin: "6px 0 0", fontSize: 12, color: "var(--danger)" }}>
                       {t("live.urlInvalid", { platforms })}
                     </p>
                   )}
