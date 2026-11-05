@@ -272,8 +272,16 @@
     "urlOwnChannel": "The link entered here is your own channel: it is removed from the match if your account is deleted.",
     "organisationLink": "This link is the organisation's",
     "organisationLinkSubject": "organisation link",
-    "organisationLinkHint": "Ticked, the link stays on the match whatever happens to your account. Unticked, it is your own channel: it is removed from the match if your account is deleted. A saved link you leave unchanged keeps its origin.",
-    "urlHint": "Leave empty to flag the match without a live setup link: its Discord announcement will then point to the first link opened by a caster, otherwise to the tournament's official channel, or will not be posted if it has none. Accepted platforms: {platforms}."
+    "organisationLinkHint": "Ticked, the link does not go with your account: it goes with this stream once no caster holds it any more. Unticked, it is your own channel, removed from the match if your account is deleted.",
+    "urlHint": "Left empty, the Discord announcement points to the first link opened by a caster, otherwise to the tournament's official channel (accepted platforms: {platforms}).",
+    "urlSubject": "match channel",
+    "triggerLocked": "Going on air set by the match's caster: {mode}.",
+    "triggerLockedHint": "Only the caster who set it, the match's referee or an admin can change or clear it.",
+    "casterLinks": "Casters' links",
+    "casterLinksSubject": "casters' links",
+    "casterLinksHint": "As the match's referee, you can correct or clear a caster's link. A cleared link is no longer tied to anyone.",
+    "casterLink": "Stream of {casters}",
+    "casterLinkNobody": "no caster"
   },
   "replay": {
     "removed": "Replay removed.",

@@ -132,6 +132,8 @@
     "STREAM_URL_REQUIRED": "Your channel link is required to open your own stream: without a link it would show nowhere.",
     "INVALID_CAST_BATTLETAG": "Invalid cast BattleTag: 64 characters at most, and visible characters.",
     "CAST_STREAM_NOT_OWNED": "This stream belongs to the organisation: its link is set in the broadcast configuration.",
+    "LIVE_TRIGGER_NOT_OWNED": "The on-air mode belongs to the caster who set it: only they, the match referee or an admin can change it.",
+    "INVALID_STREAM_LINKS": "Invalid stream links.",
     "INVALID_CAST_SETTINGS": "Invalid broadcast settings.",
     "MATCH_CAST_SETTINGS_FAILED": "Your broadcast settings could not be saved. Try again in a moment.",
     "INVALID_ORGANISATION_LINK": "The “organisation's link” choice is invalid.",

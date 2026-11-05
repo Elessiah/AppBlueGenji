@@ -1084,22 +1084,37 @@ async function voiceCall<T>(
 }
 
 /** Identifiant Discord tel que le bot le rend : chiffres seulement. */
-function readChannelId(payload: unknown): string | null {
-  const id = (payload as { channelId?: unknown } | null)?.channelId;
-  return typeof id === "string" && /^\d{5,32}$/.test(id) ? id : null;
+const DISCORD_SNOWFLAKE = /^\d{5,32}$/;
+
+/** Salon rendu par le bot : son identifiant, et son serveur (lien montré à l'équipe). */
+export type EnsuredVoiceChannel = { channelId: string; guildId: string | null };
+
+/**
+ * Lit la réponse de création : `channelId` obligatoire ; `guildId` facultatif
+ * (un bot d'avant le 2026-11-06 ne le rend pas — le salon n'a alors pas de lien).
+ */
+function readEnsuredChannel(payload: unknown): EnsuredVoiceChannel | null {
+  const { channelId, guildId } = (payload ?? {}) as { channelId?: unknown; guildId?: unknown };
+  if (typeof channelId !== "string" || !DISCORD_SNOWFLAKE.test(channelId)) return null;
+  return {
+    channelId,
+    guildId: typeof guildId === "string" && DISCORD_SNOWFLAKE.test(guildId) ? guildId : null,
+  };
 }
 
 /**
  * Crée (ou retrouve, même `key`) le salon vocal d'une équipe. `name` : le nom
  * de l'équipe seulement — jamais un pseudo (aucun salon pour une entrée solo).
  */
-export function ensureVoiceChannel(key: string, name: string): Promise<VoiceCallOutcome<string>> {
-  return voiceCall("POST", "/internal/voice/channels", { key, name }, readChannelId);
+export function ensureVoiceChannel(key: string, name: string): Promise<VoiceCallOutcome<EnsuredVoiceChannel>> {
+  return voiceCall("POST", "/internal/voice/channels", { key, name }, readEnsuredChannel);
 }
 
 /**
- * Rend un salon au bot : supprimé s'il est vide, sinon dès qu'il se vide.
- * `gone` (`404 VOICE_CHANNEL_NOT_TRACKED`) vaut « déjà fait ».
+ * Rend un salon au bot : supprimé s'il est vide, sinon dès qu'il se vide. Un
+ * salon déjà parti (supprimé par la modération, déjà rendu) répond `ok` depuis
+ * le 2026-11-06 ; `gone` (`404 VOICE_CHANNEL_NOT_TRACKED`, bot plus ancien)
+ * vaut toujours « déjà fait ».
  */
 export function releaseVoiceChannel(channelId: string): Promise<VoiceCallOutcome<true>> {
   return voiceCall("POST", `/internal/voice/channels/${encodeURIComponent(channelId)}/release`, {}, (payload) =>

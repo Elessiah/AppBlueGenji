@@ -13,6 +13,8 @@ import {
   staffStream,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
+import { viewerMayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
+import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import { canEditReplay } from "@/lib/shared/match-replay";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
 import { useActionsText } from "../_lib/actions-text";
@@ -35,22 +37,43 @@ interface MatchLiveDialogProps {
   canSpeakForOrganisation: boolean;
 }
 
+/** Les streams des casters d'un match (jamais celui du staff), avec qui les tient. */
+function casterStreamsOf(match: BracketMatch): { id: number; liveUrl: string | null; casters: string }[] {
+  return match.streams
+    .filter((stream) => !stream.staff)
+    .map((stream) => ({
+      id: stream.id,
+      liveUrl: stream.liveUrl,
+      casters: match.casters
+        .filter((caster) => caster.streamId === stream.id)
+        .map((caster) => caster.pseudo)
+        .join(", "),
+    }));
+}
+
 /**
- * Configuration de diffusion d'un match, pour la permission `live`.
+ * Configuration de diffusion d'un match, pour le staff `tournaments` + `live`
+ * et pour l'**arbitre désigné** de ce match (médiateur).
  *
  * Un match n'est jamais casté par défaut et n'hérite jamais de la chaîne
  * officielle du tournoi : le lien saisi ici est celui de la chaîne qui montre
  * **ce** match, éventuellement celle d'un streamer indépendant.
  *
- * Depuis `docs/features/CAST_SETTINGS.md`, la carte n'offre plus l'antenne ni
- * la rediff : elles vivent ici pour le staff `tournaments`, comme elles vivent
- * dans « Configurer ma diffusion » pour un caster.
+ * Le mode d'antenne posé par un caster ne se change ici que par lui, l'arbitre
+ * du match ou un admin (`mayChangeLiveTrigger`) : pour les autres il se lit
+ * sans se modifier. L'arbitre seul corrige ou efface les liens des casters
+ * (`docs/features/CAST_SETTINGS.md` § Médiation de l'arbitre).
  *
  * Voile, cadre et comportement modal : `TournamentDialogFrame`. `busy`
  * verrouille Échap pendant l'envoi : une modale en train d'écrire ne se
  * referme pas.
  */
-export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisation }: Readonly<MatchLiveDialogProps>) {
+export function MatchLiveDialog({
+  match,
+  onClose,
+  onSaved,
+  canSpeakForOrganisation,
+}: Readonly<MatchLiveDialogProps>) {
   const { showError, showSuccess } = useToast();
   const mapError = useMapError();
   const text = useDialogsText();
@@ -58,7 +81,16 @@ export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisati
   // Libellés déjà rédigés pour le pied d'action de la carte (antenne, rediff) :
   // les mêmes mots ici, dans le seul espace qui les porte.
   const actions = useActionsText();
-  const { openReplay } = useLiveControls();
+  const { openReplay, viewerUserId, viewerIsAdmin, refereeNames, canSchedule } = useLiveControls();
+  const referee = viewerRefereesMatch(match, refereeNames);
+  // Même règle que le serveur (`LIVE_TRIGGER_NOT_OWNED`) : un mode verrouillé
+  // se montre sans contrôle, plutôt qu'un bouton qui mène à un refus.
+  const triggerLocked = !viewerMayChangeLiveTrigger(match, {
+    userId: viewerUserId,
+    isAdmin: viewerIsAdmin,
+    manages: canSchedule,
+    referees: referee,
+  });
   const onAir = useMatchLiveState(match) === "LIVE";
   const [streamed, setStreamed] = useState(match.liveTrigger !== null);
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "MANUAL");
@@ -71,6 +103,11 @@ export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisati
   // n'est celui de l'organisation — gardé après la suppression du compte de qui
   // le pose — que si ce membre le coche ; rien ne se déduit de ce qu'il caste.
   const [organisationLink, setOrganisationLink] = useState(false);
+  // Médiation : les liens des streams des casters, que l'arbitre seul édite.
+  const casterStreams = referee ? casterStreamsOf(match) : [];
+  const [casterLinks, setCasterLinks] = useState<Record<number, string>>(() =>
+    Object.fromEntries(casterStreams.map((stream) => [stream.id, stream.liveUrl ?? ""])),
+  );
   const [busy, setBusy] = useState(false);
 
   const urlTouched = liveUrl.trim().length > 0;
@@ -79,6 +116,10 @@ export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisati
   // une saisie fautive laissée derrière soi bloquerait le décochage avec un
   // champ devenu invisible.
   const urlInvalid = streamed && urlTouched && !isValidStreamUrl(liveUrl);
+  const invalidCasterLink = casterStreams.some((stream) => {
+    const value = (casterLinks[stream.id] ?? "").trim();
+    return value !== "" && !isValidStreamUrl(value);
+  });
   // « À la date de début » n'a pas de frontière à franchir sans date : le
   // serveur refuse ce couple en 409, l'interface le désactive en amont plutôt
   // que de laisser le staff buter dessus. La date se fixe avec la permission
@@ -91,7 +132,8 @@ export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisati
   // bloqué sur `START_TIME` et « Enregistrer » sur désactivé.
   const startAtLabel = formatMatchStartAt(match.startAt, text.locale);
   const startAtMissing = startAtLabel === null;
-  const triggerNeedsDate = streamed && requiresMatchStartAt(trigger) && startAtMissing;
+  const triggerNeedsDate = !triggerLocked && streamed && requiresMatchStartAt(trigger) && startAtMissing;
+  const platforms = LIVE_PLATFORMS.join(", ");
 
   /** Ouvre ou coupe l'antenne (mode manuel), sans quitter la fenêtre. */
   const toggleAir = async () => {
@@ -113,24 +155,37 @@ export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisati
     }
   };
 
+  /** Les liens de casters changés par l'arbitre (`undefined` : aucun). */
+  const changedCasterLinks = () => {
+    const changed = casterStreams
+      .map((stream) => ({ streamId: stream.id, liveUrl: (casterLinks[stream.id] ?? "").trim() || null }))
+      .filter((edit) => edit.liveUrl !== (casterStreams.find((s) => s.id === edit.streamId)?.liveUrl ?? null));
+    return changed.length === 0 ? undefined : changed;
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (urlInvalid || triggerNeedsDate) return;
+    if (urlInvalid || triggerNeedsDate || invalidCasterLink) return;
 
+    // Mode verrouillé : renvoyé tel quel, le serveur n'y voit aucun changement.
+    const chosenTrigger = streamed ? trigger : null;
+    const sentTrigger = triggerLocked ? match.liveTrigger : chosenTrigger;
+    const streamLinks = changedCasterLinks();
     setBusy(true);
     try {
       const response = await fetch(`/api/admin/matches/${match.id}/live`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          trigger: streamed ? trigger : null,
-          liveUrl: streamed ? liveUrl.trim() || null : null,
+          trigger: sentTrigger,
+          liveUrl: sentTrigger === null ? null : liveUrl.trim() || null,
           ...(canSpeakForOrganisation ? { organisationLink } : {}),
+          ...(streamLinks === undefined ? {} : { streamLinks }),
         }),
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "MATCH_LIVE_UPDATE_FAILED");
-      showSuccess(streamed ? t("live.saved") : t("live.removed"));
+      showSuccess(sentTrigger === null ? t("live.removed") : t("live.saved"));
       onSaved();
       onClose();
     } catch (error) {
@@ -139,6 +194,8 @@ export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisati
       setBusy(false);
     }
   };
+
+  const showUrl = triggerLocked ? match.liveTrigger !== null : streamed;
 
   return (
     <TournamentDialogFrame
@@ -156,76 +213,102 @@ export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisati
           {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
         </p>
 
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            margin: "18px 0",
-            fontSize: 14,
-            color: "var(--ink, #e6ebf2)",
-            cursor: "pointer",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={streamed}
-            onChange={(e) => setStreamed(e.target.checked)}
-          />
-          {/* NOSONAR S6772 — label en flex avec `gap` */}
-          {t("live.streamed")}
-        </label>
+        {triggerLocked && match.liveTrigger !== null ? (
+          <InfoHintRow inline>
+            <p style={{ margin: "18px 0", fontSize: 14, color: "var(--ink, #e6ebf2)" }}>
+              {t("live.triggerLocked", { mode: t(`live.triggers.${match.liveTrigger}`) })}
+            </p>
+            <InfoHint id="match-live-locked-hint" subject={t("live.trigger")}>
+              <p>{t("live.triggerLockedHint")}</p>
+            </InfoHint>
+          </InfoHintRow>
+        ) : (
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              margin: "18px 0",
+              fontSize: 14,
+              color: "var(--ink, #e6ebf2)",
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={streamed}
+              onChange={(e) => setStreamed(e.target.checked)}
+            />
+            {/* NOSONAR S6772 — label en flex avec `gap` */}
+            {t("live.streamed")}
+          </label>
+        )}
 
-        {streamed && (
+        {showUrl && (
           <>
-            <fieldset style={{ border: "none", padding: 0, margin: "0 0 16px" }}>
-              <legend
-                style={{
-                  fontSize: 12,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  color: "var(--ink-quiet, #9aa4b2)",
-                  padding: 0,
-                  marginBottom: 8,
-                }}
-              >
-                {t("live.trigger")}
-              </legend>
-              {MATCH_LIVE_TRIGGERS.map((option) => {
-                const disabled = requiresMatchStartAt(option) && startAtMissing;
-                return (
-                  <label
-                    key={option}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      fontSize: 13,
-                      color: disabled ? "var(--ink-quiet, #9aa4b2)" : "var(--ink-soft, #c3ccd8)",
-                      marginBottom: 6,
-                      cursor: disabled ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="match-live-trigger"
-                      value={option}
-                      checked={trigger === option}
-                      disabled={disabled}
-                      onChange={() => setTrigger(option)}
-                    />
-                    {t(`live.triggers.${option}`)}
-                    {requiresMatchStartAt(option) && startAtLabel && ` (${startAtLabel})`}
-                  </label>
-                );
-              })}
-              <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--ink-quiet, #9aa4b2)" }}>
-                {startAtMissing ? t("live.noStartAt") : t("live.autoStop")}
-              </p>
-            </fieldset>
+            {!triggerLocked && (
+              <fieldset style={{ border: "none", padding: 0, margin: "0 0 16px" }}>
+                <legend
+                  style={{
+                    fontSize: 12,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    color: "var(--ink-quiet, #9aa4b2)",
+                    padding: 0,
+                    marginBottom: 8,
+                  }}
+                >
+                  <InfoHintRow>
+                    {t("live.trigger")}
+                    <InfoHint id="match-live-trigger-hint" subject={t("live.trigger")}>
+                      <p>{t("live.autoStop")}</p>
+                    </InfoHint>
+                  </InfoHintRow>
+                </legend>
+                {MATCH_LIVE_TRIGGERS.map((option) => {
+                  const disabled = requiresMatchStartAt(option) && startAtMissing;
+                  return (
+                    <label
+                      key={option}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 13,
+                        color: disabled ? "var(--ink-quiet, #9aa4b2)" : "var(--ink-soft, #c3ccd8)",
+                        marginBottom: 6,
+                        cursor: disabled ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="match-live-trigger"
+                        value={option}
+                        checked={trigger === option}
+                        disabled={disabled}
+                        onChange={() => setTrigger(option)}
+                      />
+                      {t(`live.triggers.${option}`)}
+                      {requiresMatchStartAt(option) && startAtLabel && ` (${startAtLabel})`}
+                    </label>
+                  );
+                })}
+                {startAtMissing && (
+                  <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--ink-quiet, #9aa4b2)" }}>
+                    {t("live.noStartAt")}
+                  </p>
+                )}
+              </fieldset>
+            )}
 
             <div className="field">
-              <label htmlFor="match-live-url">{t("live.url")}</label>
+              <InfoHintRow>
+                <label htmlFor="match-live-url">{t("live.url")}</label>
+                <InfoHint id="match-live-url-hint" subject={t("live.urlSubject")}>
+                  <p>{t("live.urlHint", { platforms })}</p>
+                  {!canSpeakForOrganisation && <p>{t("live.urlOwnChannel")}</p>}
+                </InfoHint>
+              </InfoHintRow>
               <input
                 id="match-live-url"
                 value={liveUrl}
@@ -233,21 +316,13 @@ export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisati
                 maxLength={MAX_STREAM_URL_LENGTH}
                 placeholder="https://twitch.tv/…"
                 aria-invalid={urlInvalid}
-                aria-describedby="match-live-url-hint"
+                aria-describedby={urlInvalid ? "match-live-url-error match-live-url-hint" : "match-live-url-hint"}
               />
-              <p
-                id="match-live-url-hint"
-                style={{
-                  margin: "6px 0 0",
-                  fontSize: 12,
-                  color: urlInvalid ? "rgba(255,74,92,0.95)" : "var(--ink-quiet, #9aa4b2)",
-                }}
-              >
-                {urlInvalid
-                  ? t("live.urlInvalid", { platforms: LIVE_PLATFORMS.join(", ") })
-                  : t("live.urlHint", { platforms: LIVE_PLATFORMS.join(", ") })}
-                {!canSpeakForOrganisation && ` ${t("live.urlOwnChannel")}`}
-              </p>
+              {urlInvalid && (
+                <p id="match-live-url-error" style={{ margin: "6px 0 0", fontSize: 12, color: "rgba(255,74,92,0.95)" }}>
+                  {t("live.urlInvalid", { platforms })}
+                </p>
+              )}
               {canSpeakForOrganisation && urlTouched && (
                 <InfoHintRow inline>
                   <label
@@ -275,6 +350,55 @@ export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisati
               )}
             </div>
           </>
+        )}
+
+        {/* Médiation de l'arbitre : les liens des casters, corrigés ou effacés. */}
+        {casterStreams.length > 0 && (
+          <fieldset style={{ border: "none", padding: 0, margin: "0 0 16px" }}>
+            <legend
+              style={{
+                fontSize: 12,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                color: "var(--ink-quiet, #9aa4b2)",
+                padding: 0,
+                marginBottom: 8,
+              }}
+            >
+              <InfoHintRow>
+                {t("live.casterLinks")}
+                <InfoHint id="match-live-caster-links-hint" subject={t("live.casterLinksSubject")}>
+                  <p>{t("live.casterLinksHint")}</p>
+                </InfoHint>
+              </InfoHintRow>
+            </legend>
+            {casterStreams.map((stream) => {
+              const value = casterLinks[stream.id] ?? "";
+              const invalid = value.trim() !== "" && !isValidStreamUrl(value);
+              const inputId = `match-live-caster-link-${stream.id}`;
+              return (
+                <div className="field" key={stream.id}>
+                  <label htmlFor={inputId}>
+                    {t("live.casterLink", { casters: stream.casters || t("live.casterLinkNobody") })}
+                  </label>
+                  <input
+                    id={inputId}
+                    value={value}
+                    onChange={(e) => setCasterLinks((links) => ({ ...links, [stream.id]: e.target.value }))}
+                    maxLength={MAX_STREAM_URL_LENGTH}
+                    placeholder="https://twitch.tv/…"
+                    aria-invalid={invalid}
+                    aria-describedby={invalid ? `${inputId}-error` : undefined}
+                  />
+                  {invalid && (
+                    <p id={`${inputId}-error`} style={{ margin: "6px 0 0", fontSize: 12, color: "rgba(255,74,92,0.95)" }}>
+                      {t("live.urlInvalid", { platforms })}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </fieldset>
         )}
 
         {/* Antenne (mode manuel) et rediff : la carte ne les porte plus. */}
@@ -325,7 +449,7 @@ export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisati
           <button
             type="submit"
             className="btn"
-            disabled={busy || urlInvalid || triggerNeedsDate}
+            disabled={busy || urlInvalid || triggerNeedsDate || invalidCasterLink}
             style={{ padding: "8px 20px", fontSize: 13 }}
           >
             {busy ? t("schedule.saving") : t("schedule.save")}

@@ -385,11 +385,11 @@
       "noStartAt": "This match has no start time yet: going on air at a set time needs a schedule first.",
       "autoStop": "The stream stops by itself as soon as a score is entered.",
       "url": "My channel link",
-      "urlHint": "Accepted platforms: {platforms}. This link is required: without it your stream would show neither on the match card, nor on its page, nor in the live announcement. A link you provide here is removed from the match if your account is deleted, unless it is marked as the organisation's link; a saved link you do not change keeps its origin.",
+      "urlHint": "Required: without it, your stream shows neither on the match nor in the live announcement (accepted platforms: {platforms}). It is removed from the match if your account is deleted, unless it is marked as the organisation's link.",
       "urlInvalid": "Link not recognized. Accepted platforms: {platforms}.",
       "urlStaff": "You are co-casting the organisation's stream: its link is set in the broadcast configuration.",
       "battletag": "BattleTag for this cast (optional)",
-      "battletagHint": "The account you will be in game with for this match: it replaces your profile BattleTag in the “Contacts” window and on the match page. Leave empty to keep your profile one. Nobody verifies it.",
+      "battletagHint": "The account you will play on: it replaces your profile's in “Contacts” and on the match page. Left empty, your profile's stays; nobody checks it.",
       "battletagInvalid": "Invalid BattleTag: 64 characters at most, and visible characters.",
       "organisationLink": "This link is the organisation's",
       "organisationLinkSubject": "organisation link",
@@ -397,7 +397,11 @@
       "air": "On air",
       "airHint": "In manual mode, the stream is opened and closed here. It stops anyway as soon as a score is entered.",
       "replay": "Replay",
-      "replayHint": "The replay link is added once the match has been played; a “Replay available” strip then shows under the match, visible to everyone."
+      "replayHint": "The replay link is added once the match is played; a “Replay available” strip then shows under the match.",
+      "urlSubject": "my channel link",
+      "battletagSubject": "cast BattleTag",
+      "triggerLocked": "Going on air set by someone else: {mode}.",
+      "triggerLockedHint": "Only the caster who set it, the match's referee or an admin can change or clear it."
     }
   },
   "planning": {

@@ -1,10 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useId, useState } from "react";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { offersCastRelease } from "@/lib/shared/cast-settings";
 import { canToggleOnAir, isMatchCastable, type MatchLiveTrigger } from "@/lib/shared/live-streams";
+import { viewerMayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
+import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import { canEditReplay } from "@/lib/shared/match-replay";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
@@ -79,7 +82,15 @@ export function CastSettingsDialog({
   const { t } = actionText;
   const errorsText = useErrorsText();
   const { showError, showSuccess } = useToast();
-  const { canSchedule, openReplay } = useLiveControls();
+  const { canSchedule, openReplay, viewerUserId, viewerIsAdmin, refereeNames } = useLiveControls();
+  // Le mode posé par un autre caster (ou par le staff) se lit sans se changer
+  // (`LIVE_TRIGGER_NOT_OWNED`) : un co-caster ne décide pas pour celui qui l'a posé.
+  const triggerLocked = !viewerMayChangeLiveTrigger(match, {
+    userId: viewerUserId,
+    isAdmin: viewerIsAdmin,
+    manages: canSchedule,
+    referees: viewerRefereesMatch(match, refereeNames),
+  });
   const game = useTournamentGame();
   const titleId = useId();
   const urlId = useId();
@@ -137,7 +148,11 @@ export function CastSettingsDialog({
   // Seul un mode choisi ici s'envoie : celui du match, même sans sa date, ne
   // bloque pas l'enregistrement d'un lien ou d'un BattleTag.
   const triggerRefused =
-    configurable && pickedTrigger !== null && pickedTrigger !== match.liveTrigger && castTriggerNeedsDate(trigger, match.startAt);
+    configurable &&
+    !triggerLocked &&
+    pickedTrigger !== null &&
+    pickedTrigger !== match.liveTrigger &&
+    castTriggerNeedsDate(trigger, match.startAt);
   // La rediff garde sa fenêtre (`MatchReplayDialog`), celle du staff de
   // diffusion : une seule définition du lien YouTube et de ses refus.
   const replayable = canEditReplay(match, true);
@@ -153,7 +168,9 @@ export function CastSettingsDialog({
       // Un seul envoi pour le cast ; la rediff a sa route (celle du staff de
       // diffusion), et n'est envoyée que si elle a changé.
       const settings: Record<string, unknown> = {};
-      if (configurable && pickedTrigger !== null && pickedTrigger !== match.liveTrigger) settings.trigger = pickedTrigger;
+      if (configurable && !triggerLocked && pickedTrigger !== null && pickedTrigger !== match.liveTrigger) {
+        settings.trigger = pickedTrigger;
+      }
       if (streamEditable && url.trim() !== (cast.liveUrl ?? "")) {
         settings.liveUrl = url.trim() === "" ? null : url.trim();
         if (canSchedule && organisationLink) settings.organisationLink = true;
@@ -232,7 +249,12 @@ export function CastSettingsDialog({
 
             {configurable && (
               <>
-                <CastTriggerField trigger={trigger} startAt={match.startAt} onChange={setTrigger} />
+                <CastTriggerField
+                  trigger={trigger}
+                  startAt={match.startAt}
+                  onChange={setTrigger}
+                  locked={triggerLocked}
+                />
                 {canSchedule && streamEditable && urlChanged && url.trim() !== "" && (
                   <CastOrganisationLinkField checked={organisationLink} onChange={setOrganisationLink} />
                 )}
@@ -241,7 +263,12 @@ export function CastSettingsDialog({
 
             {canToggleOnAir(match) && (
               <div className={styles.section}>
-                <p className={styles.sectionTitle}>{t("cardActions.castSettings.air")}</p>
+                <InfoHintRow>
+                  <p className={styles.sectionTitle}>{t("cardActions.castSettings.air")}</p>
+                  <InfoHint id={`${titleId}-air`} subject={t("cardActions.castSettings.air")}>
+                    <p>{t("cardActions.castSettings.airHint")}</p>
+                  </InfoHint>
+                </InfoHintRow>
                 <button
                   type="button"
                   className={onAir ? "btn ghost" : "btn"}
@@ -250,7 +277,6 @@ export function CastSettingsDialog({
                 >
                   {onAir ? t("cardActions.stopLive") : t("cardActions.startLive")}
                 </button>
-                <p className={styles.hint}>{t("cardActions.castSettings.airHint")}</p>
               </div>
             )}
 
@@ -268,7 +294,12 @@ export function CastSettingsDialog({
 
             {replayable && (
               <div className={styles.section}>
-                <p className={styles.sectionTitle}>{t("cardActions.castSettings.replay")}</p>
+                <InfoHintRow>
+                  <p className={styles.sectionTitle}>{t("cardActions.castSettings.replay")}</p>
+                  <InfoHint id={`${titleId}-replay`} subject={t("cardActions.castSettings.replay")}>
+                    <p>{t("cardActions.castSettings.replayHint")}</p>
+                  </InfoHint>
+                </InfoHintRow>
                 <button
                   type="button"
                   className="btn ghost"
@@ -282,7 +313,6 @@ export function CastSettingsDialog({
                 >
                   {match.replayUrl === null ? t("cardActions.addReplay") : t("cardActions.editReplay")}
                 </button>
-                <p className={styles.hint}>{t("cardActions.castSettings.replayHint")}</p>
               </div>
             )}
           </>

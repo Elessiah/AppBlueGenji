@@ -22,6 +22,7 @@ import {
   fatalFailure,
   INITIAL_LIVE_STATE,
   shareRefereeNames,
+  shareVoiceLinks,
   shareUnchanged,
   shouldCommitFetched,
   shouldRefreshViewerContext,
@@ -33,6 +34,7 @@ import { announceViewerChanges } from "../_lib/live-alerts";
 import { openLiveConnection } from "../_lib/live-connection";
 import { createLiveRenderGate, createQuietStream } from "../_lib/live-render-gate";
 import { missingRefereeNamesKey, parseRefereeNames, refereeNamesImprove } from "@/lib/shared/match-referee";
+import { missingVoiceLinksKey, parseVoiceLinks } from "@/lib/shared/match-voice";
 
 /** Plafond d'un `setTimeout` (~24,8 jours) : au-delà, il se déclencherait tout de suite. */
 const MAX_TIMEOUT_MS = 2_147_483_647;
@@ -205,6 +207,7 @@ export function useTournamentLive(tournamentId: number) {
               ...payload,
               ...shareUnchanged(current, payload),
               refereeNames: shareRefereeNames(current.refereeNames, payload.refereeNames),
+              voiceLinks: shareVoiceLinks(current.voiceLinks, payload.voiceLinks),
             }
           : payload;
         commit({ tier: stateRef.current.tier, detail });
@@ -323,6 +326,55 @@ export function useTournamentLive(tournamentId: number) {
   );
 
   /**
+   * Liens des salons vocaux de son équipe (`TournamentViewerContext.voiceLinks`) :
+   * arrivés avec le contexte, ils ne suivent pas un salon ouvert depuis. Un
+   * salon de son côté ouvert sans lien connu déclenche **une** relecture légère,
+   * étalée comme celle des pseudos, par ensemble de matchs manquants.
+   */
+  const voiceAttemptRef = useRef("");
+  const voiceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshVoiceLinks = useCallback(() => {
+    const detail = stateRef.current.detail;
+    if (!detail) return;
+    const missing = missingVoiceLinksKey(detail.matches, detail.myTeamId, detail.voiceLinks);
+    if (missing === "" || missing === voiceAttemptRef.current || voiceTimerRef.current !== null) return;
+    voiceAttemptRef.current = missing;
+    const forTournament = detail.card.id;
+    const retryLater = () => {
+      if (voiceAttemptRef.current === missing) voiceAttemptRef.current = "";
+    };
+    voiceTimerRef.current = setTimeout(() => {
+      voiceTimerRef.current = null;
+      void (async () => {
+        try {
+          const response = await fetch(`/api/tournaments/${forTournament}/voice-links`, { cache: "no-store" });
+          if (!response.ok) {
+            retryLater();
+            return;
+          }
+          const payload = (await response.json()) as { voiceLinks?: unknown };
+          const links = parseVoiceLinks(payload.voiceLinks);
+          const current = stateRef.current;
+          if (links === null || !current.detail || current.detail.card.id !== forTournament) return;
+          commit({ ...current, detail: { ...current.detail, voiceLinks: shareVoiceLinks(current.detail.voiceLinks, links) } });
+        } catch {
+          // Réseau coupé : le salon reste dit « ouvert », le prochain instantané relit.
+          retryLater();
+        }
+      })();
+    }, Math.random() * REFEREE_NAMES_SPREAD_MS); // NOSONAR typescript:S2245 — étalement de charge, aucune sécurité en jeu
+  }, [commit]);
+
+  useEffect(
+    () => () => {
+      if (voiceTimerRef.current !== null) clearTimeout(voiceTimerRef.current);
+      voiceTimerRef.current = null;
+      voiceAttemptRef.current = "";
+    },
+    [tournamentId],
+  );
+
+  /**
    * Message du flux : intégré tout de suite, puis — pour qui en a un — aperçu
    * du plateau relu quand il a bougé.
    */
@@ -341,9 +393,12 @@ export function useTournamentLive(tournamentId: number) {
       // `force` : on vient de commiter cette version, la déduplication par
       // version rejetterait la relecture avant d'en avoir pris l'aperçu.
       if (stalePreview) void load(true, true);
-      else if (message.type === "snapshot") refreshRefereeNames();
+      else if (message.type === "snapshot") {
+        refreshRefereeNames();
+        refreshVoiceLinks();
+      }
     },
-    [commit, load, refreshRefereeNames],
+    [commit, load, refreshRefereeNames, refreshVoiceLinks],
   );
 
   useEffect(() => {

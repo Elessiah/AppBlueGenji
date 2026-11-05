@@ -449,3 +449,11 @@
   gap: 2px 10px;
   min-width: 0;
 }
+
+/* Lien vers le salon de son équipe : ses membres seuls le voient. */
+.voiceLink {
+  font-size: 13px;
+  color: var(--blue-300);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

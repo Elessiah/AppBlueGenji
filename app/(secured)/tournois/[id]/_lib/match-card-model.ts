@@ -2,6 +2,7 @@ import type { BracketMatch } from "@/lib/shared/types";
 import { SCORE_ENTRY_CLOSED_PHASES, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { canConfigureLive, type MatchLiveState } from "@/lib/shared/live-streams";
 import { canEditReplay } from "@/lib/shared/match-replay";
+import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import { offersCastSettings } from "@/lib/shared/cast-settings";
 import { canReportOwnMatch } from "@/lib/shared/match-card-viewer";
 import {
@@ -88,8 +89,15 @@ export function useMatchCardModel(
   // Engagé du lecteur : déjà porté par `LiveContext` (diffusion, casting) — on
   // le relit ici plutôt que d'en garder une seconde copie sur le contexte de
   // signalement, qui décrirait la même donnée depuis deux sources.
-  const { myTeamId, refereeScheduling, launchPhase: launchPhaseEnabled, canManage, canSchedule, viewerUserId } =
-    useLiveControls();
+  const {
+    myTeamId,
+    refereeScheduling,
+    launchPhase: launchPhaseEnabled,
+    canManage,
+    canSchedule,
+    viewerUserId,
+    refereeNames,
+  } = useLiveControls();
   // Phase de lancement, calculée **une fois par carte** et transmise aux deux
   // bandeaux : chacun posait sinon sa propre minuterie sur l'heure de départ —
   // trois `setTimeout` par match programmé, sur un plateau qui en compte 254.
@@ -136,8 +144,10 @@ export function useMatchCardModel(
   const showCastConfig = offersCastSettings(match, launch.isCaster, canManage);
   // La diffusion de l'organisation reste au staff `tournaments` ; ses routes
   // (`/api/admin/matches/[id]/live`, rediff) demandent aussi `live` : sans les
-  // deux, le bouton ne mènerait qu'à des refus.
-  const showLiveConfig = canSchedule && canManage && canConfigureLive(match);
+  // deux, le bouton ne mènerait qu'à des refus. L'arbitre désigné du match
+  // (médiateur) y est admis pour **ce** match (`mayConfigureMatchLive`).
+  const showLiveConfig =
+    canConfigureLive(match) && ((canSchedule && canManage) || viewerRefereesMatch(match, refereeNames));
   // Toutes les actions, rangées par `MatchCardActions` : une principale
   // visible, le reste derrière « Plus d'actions » (`MATCH_CARD_LAYOUT.md`).
   const actions = matchCardActionList(

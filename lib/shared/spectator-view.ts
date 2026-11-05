@@ -305,6 +305,8 @@ export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnaps
       // Salons vocaux d'équipe : sans compte, rien — ni l'ouverture des
       // salons ni leur panne (le lancement n'en dépend pas).
       voice: match.voice === undefined ? undefined : null,
+      // Le caster maître du mode d'antenne est un compte : tu, comme les casters.
+      liveTriggerCasterId: match.liveTriggerCasterId === undefined ? undefined : null,
       casters: match.casters.map((caster, index) => ({
         ...caster,
         userId: SPECTATOR_HIDDEN_USER_ID - index,
@@ -350,6 +352,8 @@ export const SPECTATOR_VIEWER_CONTEXT: Readonly<TournamentViewerContext> = Objec
   certificationPrompt: null,
   // Sans compte, l'arbitre reste « Arbitre désigné » (décision 52).
   refereeNames: [],
+  // Sans compte, aucune équipe : aucun salon.
+  voiceLinks: [],
 });
 
 /**

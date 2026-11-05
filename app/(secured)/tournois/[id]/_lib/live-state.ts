@@ -136,9 +136,13 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     const refereeNames = state.detail
       ? shareRefereeNames(state.detail.refereeNames, message.viewer.refereeNames)
       : message.viewer.refereeNames;
+    // Même partage pour les liens de salon : `LiveProvider` les diffuse aussi.
+    const voiceLinks = state.detail
+      ? shareVoiceLinks(state.detail.voiceLinks, message.viewer.voiceLinks)
+      : message.viewer.voiceLinks;
     return {
       tier: message.tier,
-      detail: { ...snapshot, ...message.viewer, refereeNames, ...kept },
+      detail: { ...snapshot, ...message.viewer, refereeNames, voiceLinks, ...kept },
     };
   }
 
@@ -189,6 +193,10 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     // repère à son empreinte (`refereeKey`) et se relit par la lecture REST
     // (`missingRefereeNamesKey`, MATCH_REFEREE.md).
     refereeNames: state.detail.refereeNames,
+    // Liens des salons de son équipe : rejoués tels quels ; un salon ouvert
+    // depuis se repère à l'instantané (`missingVoiceLinksKey`) et se relit par
+    // la lecture légère (MATCH_VOICE.md).
+    voiceLinks: state.detail.voiceLinks,
     // L'aperçu du plateau n'arrive qu'à la connexion, comme le reste du contexte
     // du lecteur : le flux ne le transporte pas, il est réservé au staff et au
     // cast (`docs/features/TOURNAMENT_PREVIEW.md`).
@@ -254,6 +262,14 @@ export function shareRefereeNames(
   next: TournamentViewerContext["refereeNames"],
 ): TournamentViewerContext["refereeNames"] {
   return sameValue(previous, next) ? previous : next;
+}
+
+/** Liens de salon d'une relecture : la liste précédente elle-même quand rien n'a bougé. */
+export function shareVoiceLinks(
+  previous: TournamentViewerContext["voiceLinks"] | undefined,
+  next: TournamentViewerContext["voiceLinks"],
+): TournamentViewerContext["voiceLinks"] {
+  return previous !== undefined && sameValue(previous, next) ? previous : next;
 }
 
 /**

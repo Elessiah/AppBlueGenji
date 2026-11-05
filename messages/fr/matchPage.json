@@ -45,6 +45,8 @@
     "notCreated": "Salon vocal : bientôt ouvert",
     "open": "Salon vocal : ouvert",
     "failed": "Salon vocal : indisponible, nouvelle tentative en cours",
-    "hint": "Un quart d'heure avant le match, le bot Discord ouvre un salon vocal de {capacity} places par équipe ; le lancement du match ne dépend pas des salons."
+    "hint": "Un quart d'heure avant le match, le bot Discord ouvre un salon vocal de {capacity} places par équipe ; le lancement du match ne dépend pas des salons.",
+    "join": "Rejoindre notre salon",
+    "joinLabel": "Rejoindre notre salon vocal sur Discord (nouvel onglet)"
   }
 }

@@ -14,7 +14,12 @@ import { useMatchContacts } from "@/components/match-launch/MatchContactsDialog"
 import { SharedMatchContactsContext } from "@/components/match-launch/shared-match-contacts";
 import { launchSidesLaterText, refereeLaterText, useLaunchText } from "@/components/match-launch/launch-text";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
-import { VOICE_CHANNEL_CAPACITY, type MatchVoiceInfo, type MatchVoiceSideState } from "@/lib/shared/match-voice";
+import {
+  VOICE_CHANNEL_CAPACITY,
+  ownVoiceLink,
+  type MatchVoiceInfo,
+  type MatchVoiceSideState,
+} from "@/lib/shared/match-voice";
 import {
   MATCH_LAUNCH_REFRESH_EVENT,
   connectionReader,
@@ -603,19 +608,24 @@ function MapsSection({
   // Un match en une seule carte n'a pas de « cartes suivantes » : la règle n'y dirait rien.
   const singleMap = roundMaxMaps(detail.card, match.roundNumber) === 1;
   const picking = canPick && editable;
+  let banOrderValue: ReactNode = <Muted>{t("matchPage.opponentsPending")}</Muted>;
+  if (banSide && banOrder) {
+    const value = rm.t("page.banOrderValue", { first: banName, second: otherName });
+    // L'arbitre crée la partie : la moins bonne tête de série bannit la
+    // première, quelle que soit la règle du tournoi.
+    banOrderValue = match.refereeAssigned ? (
+      <DecisionValue value={value} subject={rm.t("page.banOrder")} hintId={`${titleId}-ban`} hint={rm.t("page.refereeHostBan")} />
+    ) : (
+      value
+    );
+  }
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
       <SectionTitle id={titleId}>{page.t("sections.maps")}</SectionTitle>
       <dl className={styles.rules}>
         <div>
           <dt>{rm.t("page.banOrder")}</dt>
-          <dd>
-            {banSide && banOrder ? (
-              rm.t("page.banOrderValue", { first: banName, second: otherName })
-            ) : (
-              <Muted>{t("matchPage.opponentsPending")}</Muted>
-            )}
-          </dd>
+          <dd>{banOrderValue}</dd>
         </div>
         {!singleMap && (
           <div>
@@ -724,10 +734,20 @@ export function voiceRowText(page: ReturnType<typeof useMatchPageText>, state: M
  * « Salon vocal : ouvert » par équipe, aux parties du match et au staff. L'état
  * vient de `useMatchVoice` (instantané, relecture REST flux coupé) : la page
  * le lit une fois, pour la section comme pour la grille.
+ *
+ * Les membres d'une équipe voient en plus le lien vers **leur** salon, tant
+ * qu'il est ouvert (`ownVoiceLink`, contexte du lecteur) : jamais celui de
+ * l'adversaire, que le serveur ne leur envoie d'ailleurs pas.
  */
-function VoiceSection({ voice, sides }: Readonly<{ voice: MatchVoiceInfo; sides: [PageSide, PageSide] }>) {
+function VoiceSection({
+  voice,
+  sides,
+  match,
+}: Readonly<{ voice: MatchVoiceInfo; sides: [PageSide, PageSide]; match: BracketMatch }>) {
   const page = useMatchPageText();
   const titleId = useId();
+  const { myTeamId, voiceLinks } = useLiveControls();
+  const ownLink = ownVoiceLink({ ...match, voice }, myTeamId, voiceLinks);
   const side = (slot: 1 | 2) => (slot === 1 ? voice.team1State : voice.team2State);
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
@@ -748,6 +768,18 @@ function VoiceSection({ voice, sides }: Readonly<{ voice: MatchVoiceInfo; sides:
               <li key={pageSide.slot} className={styles.voiceRow}>
                 <SideName side={pageSide} logoSize={20} truncate />
                 <span className={styles.factNote}>{voiceRowText(page, state)}</span>
+                {ownLink !== null && pageSide.teamId === myTeamId && (
+                  <a
+                    href={ownLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.voiceLink}
+                    // Le texte visible ouvre le nom accessible (WCAG 2.5.3).
+                    aria-label={page.t("voice.joinLabel")}
+                  >
+                    {page.t("voice.join")}
+                  </a>
+                )}
               </li>
             );
           })}
@@ -1107,7 +1139,7 @@ function MatchPageContent({
         </div>
         {rightColumn && (
           <div className={styles.column}>
-            {voice && <VoiceSection voice={voice} sides={sides} />}
+            {voice && <VoiceSection voice={voice} sides={sides} match={match} />}
             <ConnectionSection launch={shownLaunch} onCopy={onCopy} />
             <OfficiatingSection
               match={match}

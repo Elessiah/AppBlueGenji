@@ -18,7 +18,8 @@
     "scaleHint": "These maps apply to every match of the round: the map is no longer entered match by match. “Reset the round” brings back the per-match entry.",
     "resetConfirmBody": "This round's maps are removed for all its matches: the map is entered match by match again. Picks already made on matches stay.",
     "tiebreak": "Tiebreak map",
-    "tiebreakHint": "Playoff round played as a real Bo3: a map played only if the series is level after the 3 maps. Bans follow the next-maps rule."
+    "tiebreakHint": "Playoff round played as a real Bo3: a map played only if the series is level after the 3 maps. Bans follow the next-maps rule.",
+    "refereeHostBan": "The designated referee creates the game: the team that is not the top seed bans first."
   },
   "sheet": {
     "title": "Maps and bans",

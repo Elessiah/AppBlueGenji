@@ -6,6 +6,8 @@ import { useOptionalToast } from "@/components/ui/toast";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { PLATFORM_LABELS, streamPlatform, type MatchLiveTrigger } from "@/lib/shared/live-streams";
+import { viewerMayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
+import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import type { BracketMatch } from "@/lib/shared/types";
 import {
   castClaimBody,
@@ -61,13 +63,24 @@ export function CastClaimDialog({
   onClose,
   onClaim,
 }: Readonly<{
-  match: Pick<BracketMatch, "streams" | "casters" | "startAt" | "liveTrigger">;
+  match: Pick<
+    BracketMatch,
+    "id" | "status" | "refereeKey" | "streams" | "casters" | "startAt" | "liveTrigger" | "liveTriggerCasterId"
+  >;
   matchLabel: string;
   onClose: () => void;
   onClaim: (body: CastClaimBody) => Promise<CastClaimOutcome>;
 }>) {
   const { t, locale } = useActionsText();
-  const { canSchedule } = useLiveControls();
+  const { canSchedule, viewerUserId, viewerIsAdmin, refereeNames } = useLiveControls();
+  // Mode déjà posé par un autre caster : il se lit, il ne se change pas à
+  // l'inscription (`LIVE_TRIGGER_NOT_OWNED`) — le corps le renvoie tel quel.
+  const triggerLocked = !viewerMayChangeLiveTrigger(match, {
+    userId: viewerUserId,
+    isAdmin: viewerIsAdmin,
+    manages: canSchedule,
+    referees: viewerRefereesMatch(match, refereeNames),
+  });
   const game = useTournamentGame();
   const name = useId();
   const urlId = useId();
@@ -182,7 +195,7 @@ export function CastClaimDialog({
             invalid={urlRefused || fieldErrors.invalidField === "url"}
             fieldError={fieldErrors.message("url")}
           />
-          <CastTriggerField trigger={trigger} startAt={match.startAt} onChange={setTrigger} />
+          <CastTriggerField trigger={trigger} startAt={match.startAt} onChange={setTrigger} locked={triggerLocked} />
           {canSchedule && url.trim() !== "" && (
             <CastOrganisationLinkField checked={organisationLink} onChange={setOrganisationLink} />
           )}
