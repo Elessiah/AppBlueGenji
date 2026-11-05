@@ -859,7 +859,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "A match's live mode can now only be changed by the caster who set it, the match's assigned referee or an administrator. The assigned referee can also edit the links of their match's casters and configure the organizers' broadcast.",
     details: [
-      "What the site keeps: the account of the caster who set the live mode, with the match; it is erased when that caster leaves the match, when the mode changes hands or is removed, or when their account is deleted, and it appears in the export of your data.",
+      "What the site keeps: the account of the caster who set the live mode, with the match; it is erased when that caster leaves the match or no longer meets the conditions to cast it, when the mode is removed, or when their account is deleted — the assigned referee or an administrator who changes the mode leaves it with them —, and it appears in the export of your data.",
       "Who sets what: a mode set by the staff stays with the staff; a co-caster can no longer change someone else's. The assigned referee of a match, for that match only, sees and edits its casters' links and the configuration of the organizers' broadcast — the referee of another match cannot.",
     ],
   },

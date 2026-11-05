@@ -176,7 +176,7 @@ tel quel et la notification le dit (`triggerSkipped`,
 `cardActions.castingTriggerKept`, FR/EN). Le propriétaire est effacé
 quand il quitte le match (`releaseMatchCast`), quand il en est retiré d'office
 (`dropTriggerOwner` : il rejoint une équipe du match, devient inéligible),
-quand un autre change le mode ou le retire, et à la suppression de son compte
+quand le mode est retiré ou changé pendant qu'il n'est plus montré, et à la suppression de son compte — l'arbitre ou un admin qui le change le lui laisse
 (`match-casters.ts`, tous les matchs dont il a posé le mode, castés ou non).
 À l'inscription, un mode verrouillé n'est pas envoyé (`castClaimBody`) ; la
 configuration du direct le renvoie tel quel, et un mode inchangé ne redemande

@@ -848,6 +848,17 @@ describe("claimMatchCast", () => {
     expect(state.match.casters.map((caster) => caster.user_id)).toEqual([901, 902, CASTER]);
   });
 
+  it("claimMatchCast_hiddenCasterStreamLaunchedOnPreviousPairing_throwsStreamNotFound", async () => {
+    state.users[CASTER] = verified;
+    // Le lancement d'un appariement d'avant ne vaut pas pour celui-ci : le caster tu le reste.
+    state.users[901] = { ...ELIGIBLE_CASTER, platform_roles_json: null };
+    state.match = matchState({ caster_user_id: 901, launched_at: STAMP, launch_pairing: `${TEAM1}:999` });
+
+    await expect(claimMatchCast(42, CASTER, true, { streamId: 1 })).rejects.toThrow("STREAM_NOT_FOUND");
+
+    expect(state.writes).toEqual([]);
+  });
+
   it("rejoint le stream du staff sans caster, et tout stream d'un match lancé", async () => {
     state.users[CASTER] = verified;
     state.match = matchState({ streams: [{ id: 1, live_url: "https://twitch.tv/officiel", staff_owned: 1 }] });

@@ -16,6 +16,7 @@ import { parseRoles, toIso } from "@/lib/server/serialization";
 import {
   allPartiesReady,
   canDeclareTeamReady,
+  castBeforeLaunch,
   castBlockReason,
   currentLaunchState,
   isAutoLaunchDue,
@@ -749,7 +750,8 @@ export type CastTarget = { streamId: number } | { liveUrl: string };
  * l'attente du verrou du match est vue.
  */
 async function streamShown(connection: PoolConnection, row: LaunchMatchRow, stream: MatchStreamRow): Promise<boolean> {
-  const settled = row.launched_at !== null;
+  // Lancé sur **cet** appariement seulement, comme l'instantané (`castBeforeLaunch`).
+  const settled = !castBeforeLaunch(row);
   const holders = row.casters.filter((caster) => caster.streamId === stream.id).map((caster) => caster.userId);
   let held = false;
   if (!stream.staff && !settled && holders.length > 0) {

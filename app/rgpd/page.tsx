@@ -1256,8 +1256,9 @@ function RgpdFr({
             posé dans cette configuration avant que le site n&apos;enregistre qui le fournit n&apos;a pas d&apos;auteur
             connu et reste au match.{" "}
             Le moment où un match passe à l&apos;antenne (« mode d&apos;antenne ») ne se change ou ne se retire que par le
-            caster qui l&apos;a posé — le site garde son compte avec le match, l&apos;efface quand il quitte le match, que le mode
-            change de mains ou est retiré, ou que son compte est supprimé —, par l&apos;arbitre désigné du match ou par un
+            caster qui l&apos;a posé — le site garde son compte avec le match, l&apos;efface quand il quitte le match ou ne remplit plus la condition
+            pour le caster, que le mode est retiré, ou que son compte est supprimé, et le lui laisse quand l&apos;arbitre
+            désigné ou un administrateur change le mode —, par l&apos;arbitre désigné du match ou par un
             administrateur ; un mode posé par le staff reste au staff. L&apos;arbitre désigné d&apos;un match peut aussi, pour ce
             seul match, modifier ou retirer le lien d&apos;un caster et configurer la diffusion de l&apos;organisation.{" "}
             Un caster peut aussi donner, pour un cast précis, un <strong>BattleTag propre à ce

@@ -1050,8 +1050,8 @@ export function RgpdEn({
             stream once no caster holds it any more. A link set in that configuration before the site recorded who provided it has no
             known author and stays with the match.{" "}
             When a match goes live (“live mode”) can only be changed or removed by the caster who set it — the site keeps
-            their account with the match and erases it when they leave the match, when the mode changes hands or is removed, or
-            when their account is deleted —, by the match&apos;s assigned referee or by an administrator; a mode set by the staff
+            their account with the match and erases it when they leave the match or no longer meet the conditions to cast it, when the mode is removed, or when
+            their account is deleted, and leaves it with them when the assigned referee or an administrator changes the mode —, by the match&apos;s assigned referee or by an administrator; a mode set by the staff
             stays with the staff. The assigned referee of a match can also, for that match only, edit or remove a caster&apos;s
             link and configure the organizers&apos; broadcast.{" "}
             A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which

@@ -1647,7 +1647,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Le mode d'antenne d'un match ne se change plus que par le caster qui l'a posé, l'arbitre désigné du match ou un administrateur. L'arbitre désigné peut aussi modifier les liens des casters de son match et configurer la diffusion de l'organisation.",
     details: [
-      "Ce que le site garde : le compte du caster qui a posé le mode d'antenne, avec le match ; il est effacé quand ce caster quitte le match, que le mode change de mains ou est retiré, ou que son compte est supprimé, et figure dans l'export de tes données.",
+      "Ce que le site garde : le compte du caster qui a posé le mode d'antenne, avec le match ; il est effacé quand ce caster quitte le match ou ne remplit plus la condition pour le caster, que le mode est retiré, ou que son compte est supprimé — l'arbitre désigné ou un administrateur qui change le mode le lui laisse —, et figure dans l'export de tes données.",
       "Qui règle quoi : un mode posé par le staff reste au staff ; un co-caster ne peut plus changer celui d'un autre. L'arbitre désigné d'un match, pour ce seul match, voit et modifie les liens de ses casters et la configuration de la diffusion de l'organisation — l'arbitre d'un autre match, non.",
     ],
   },
