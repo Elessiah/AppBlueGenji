@@ -452,13 +452,6 @@ export function attachMatchMaps(
 }
 
 /**
- * Un caster ne remplit plus la condition (`live` + identité) et le match
- * attend encore son lancement : l'instantané le tait — il ne retient plus de
- * « Prêt », et la lecture de la modale retire son inscription. Un match lancé
- * ou joué garde ses casters : on ne réécrit ni une diffusion en cours ni
- * l'histoire.
- */
-/**
  * Le caster maître du mode d'antenne, s'il caste encore le match et y est
  * montré (`casters`) : son identifiant y est déjà public. Un maître que
  * l'instantané tait (caster tu, devenu inéligible) ou parti n'en est plus un
@@ -476,6 +469,13 @@ function liveTriggerOwnerFields(
   return { liveTriggerCasterId: shown ? Number(owner) : null };
 }
 
+/**
+ * Un caster ne remplit plus la condition (`live` + identité) et le match
+ * attend encore son lancement : l'instantané le tait — il ne retient plus de
+ * « Prêt », et la lecture de la modale retire son inscription. Un match lancé
+ * ou joué garde ses casters : on ne réécrit ni une diffusion en cours ni
+ * l'histoire.
+ */
 function casterWithdrawn(row: MatchRow, caster: MatchCasterRow, game: TournamentGame): boolean {
   if (!castBeforeLaunch(row)) return false;
   return castEligibilityBlock(caster.eligibility, game) !== null;

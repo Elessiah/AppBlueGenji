@@ -115,9 +115,8 @@ type LockedLiveMatch = {
 /** Ce qu'un appelant des gestes de diffusion établit de ses droits. */
 export type MatchLiveAccess = Pick<LiveTriggerActor, "isAdmin" | "manages"> & { live: boolean };
 
-/** Résultat d'un réglage : le mode d'avant, pour dire au journal ce qui a changé. */
 /**
- * `previousTrigger` : le mode d'avant ; `changed` : la requête a-t-elle écrit
+ * Résultat d'un réglage. `previousTrigger` : le mode d'avant ; `changed` : la requête a-t-elle écrit
  * quelque chose (mode, lien du staff, lien d'un caster) — un réglage
  * réenregistré tel quel ne s'annonce pas au journal du staff.
  */

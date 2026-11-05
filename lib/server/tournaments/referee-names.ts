@@ -86,9 +86,11 @@ export function markViewerReferee(
     marked = true;
     return { ...name, mine: true as const };
   });
+  // Les entrées déjà là, par match et empreinte : une recherche, pas un parcours par match.
+  const listed = new Set(out.map((name) => `${name.matchId}:${name.refereeKey}`));
   for (const match of matches) {
     if (!showsRefereeName(match) || match.refereeKey !== keyOf(match.id)) continue;
-    if (out.some((name) => name.matchId === match.id && name.refereeKey === match.refereeKey)) continue;
+    if (listed.has(`${match.id}:${match.refereeKey}`)) continue;
     marked = true;
     out.push({ matchId: match.id, refereeKey: match.refereeKey, pseudo: "", mine: true });
   }
