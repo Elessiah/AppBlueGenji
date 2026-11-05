@@ -27,6 +27,8 @@ describe("setCasterStreamUrl", () => {
 function ownedRow() {
   return {
     id: 42,
+    tournament_game: "OW",
+    launched_at: null,
     status: "READY",
     start_at: null,
     live_trigger: "MANUAL",
@@ -38,31 +40,81 @@ function ownedRow() {
   } as unknown as LaunchMatchRow;
 }
 
+/** Compte qui remplit la condition du cast (admin, identités certifiées). */
+const ELIGIBLE = {
+  discord_verified_at: new Date("2026-01-01T00:00:00Z"),
+  discord_pseudo: "voix",
+  blizzard_sub: "bnet",
+  overwatch_battletag: "Voix#1234",
+  overwatch_battletag_typed: 0,
+  is_deleted: 0,
+  is_admin: 1,
+  platform_roles_json: null,
+};
+
+/** Lecture des casters montrés : `ids` y castent, éligibles. */
+function shownRows(...ids: number[]) {
+  return [ids.map((id) => ({ user_id: id, ...ELIGIBLE })), []];
+}
+
 describe("applyCastTrigger", () => {
   it("applyCastTrigger_coCaster_throwsNotOwnedWithoutWrite", async () => {
-    const execute = jest.fn<SqlQuery>();
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12, 13));
 
     await expect(applyCastTrigger(fakeConnection({ execute }), ownedRow(), "AUTO", 13)).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
-    expect(execute).not.toHaveBeenCalled();
+    // La seule lecture des casters montrés : aucune écriture.
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it("applyCastTrigger_designatedReferee_changesTriggerOwnerlessForNonCaster", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12)).mockResolvedValue([{ affectedRows: 1 }, []]);
     const row = ownedRow();
 
     await applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 9, { isAdmin: false, manages: true });
 
-    expect(execute.mock.calls[0][1]).toEqual(["AUTO", 9, 42]);
+    // Hors des casters, il pose le mode sans le tenir.
+    expect(execute.mock.calls[1][1]).toEqual(["AUTO", null, 42]);
     expect(row.live_trigger).toBe("AUTO");
   });
 
   it("applyCastTrigger_ineligibleReferee_refused", async () => {
-    const execute = jest.fn<SqlQuery>();
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12));
     const row = Object.assign(ownedRow(), { refereeEligible: false });
 
     await expect(
       applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 9, { isAdmin: false, manages: true }),
     ).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
+  });
+});
+
+describe("applyCastTrigger — inscription et maître tu", () => {
+  it("applyCastTrigger_notAllowedWithSkip_returnsFalseWithoutWrite", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12, 13));
+    const row = ownedRow();
+
+    await expect(applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 13, undefined, true)).resolves.toBe(false);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(row.live_trigger).toBe("MANUAL");
+  });
+
+  it("applyCastTrigger_hiddenOwner_staffCasterTakesMode", async () => {
+    // Le maître 12 n'est plus montré : le mode revient au staff, dont 13, qui le caste.
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(13)).mockResolvedValue([{ affectedRows: 1 }, []]);
+    const row = ownedRow();
+
+    await expect(applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 13, { isAdmin: false, manages: true })).resolves.toBe(true);
+    expect(execute.mock.calls[1][1]).toEqual(["AUTO", 13, 42]);
+  });
+
+  it("applyCastSettings_skipLockedTrigger_reportsTriggerSkipped", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12, 13));
+
+    const outcome = await applyCastSettings(fakeConnection({ execute }), ownedRow(), 13, 5, {
+      trigger: "AUTO",
+      skipLockedTrigger: true,
+    });
+
+    expect(outcome).toEqual({ triggerSkipped: true });
   });
 });
 

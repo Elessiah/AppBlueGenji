@@ -71,6 +71,7 @@ import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { loadRoundSlots } from "./round-map-slots";
 import { inTransaction } from "./transaction";
+import { nullableId } from "@/lib/shared/nullable-id";
 
 /** La ligne d'un match telle que le lancement la lit, sans ses casters. */
 export type LaunchMatchBaseRow = RowDataPacket & {
@@ -150,10 +151,6 @@ const LAUNCH_MATCH_FROM = `
   JOIN bg_tournaments t ON t.id = m.tournament_id
   LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
   LEFT JOIN bg_teams t2 ON t2.id = m.team2_id`;
-
-function nullableId(value: number | null): number | null {
-  return value === null ? null : Number(value);
-}
 
 /**
  * L'état de lancement de la ligne **valable pour son appariement courant**
@@ -821,7 +818,9 @@ async function releaseIneligibleCasters(
  *   | `INVALID_CAST_BATTLETAG` | `LIVE_TRIGGER_NOT_OWNED`
  *
  * `access` (admin, permission `tournaments`) décide s'il peut changer un mode
- * d'antenne déjà posé par un autre (`mayChangeLiveTrigger`).
+ * d'antenne déjà posé par un autre (`mayChangeLiveTrigger`). Un mode qu'un
+ * autre a posé pendant que la fenêtre était ouverte ne refuse pas
+ * l'inscription : il reste tel quel, et le résultat le dit (`triggerSkipped`).
  */
 export async function claimMatchCast(
   matchId: number,
@@ -830,7 +829,7 @@ export async function claimMatchCast(
   target: CastTarget,
   settings: CastSettings = {},
   access: CastAccess = PLAIN_CAST_ACCESS,
-): Promise<void> {
+): Promise<{ triggerSkipped: boolean }> {
   const castTarget: CastTarget = target;
   // Le lien est jugé avant toute lecture : un refus ne coûte rien. Un stream
   // ouvert sans lien n'apparaissait sur aucune vue et n'annonçait rien : le
@@ -844,7 +843,7 @@ export async function claimMatchCast(
   if (settings.battletag !== undefined) parseCastBattletagInput(settings.battletag);
   // Deux inscriptions simultanées se croisent sur les verrous d'intervalle
   // d'InnoDB : l'interblocage se rejoue.
-  const { tournamentId, claimed } = await retryOnDeadlock(() =>
+  const { tournamentId, claimed, triggerSkipped } = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       // Ligne du compte verrouillée en première instruction, avant le match —
       // l'ordre de la suppression de compte (compte, puis ses matchs).
@@ -858,7 +857,7 @@ export async function claimMatchCast(
       if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
       if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
       if (row.casters.some((caster) => caster.userId === userId)) {
-        return { tournamentId: Number(row.tournament_id), claimed: false };
+        return { tournamentId: Number(row.tournament_id), claimed: false, triggerSkipped: false };
       }
       // Seul **jouer** le match ferme le cast : l'arbitre désigné peut le
       // caster (`resolveMatchParty` le rendrait `MATCH_REFEREE`, à tort refusé).
@@ -905,8 +904,15 @@ export async function claimMatchCast(
         settings.trigger === undefined || settings.trigger === (row.live_trigger ?? null) || !castable
           ? undefined
           : settings.trigger;
-      await applyCastSettings(connection, row, userId, streamId, { ...settings, trigger, liveUrl: undefined }, access);
-      return { tournamentId: Number(row.tournament_id), claimed: true };
+      const outcome = await applyCastSettings(
+        connection,
+        row,
+        userId,
+        streamId,
+        { ...settings, trigger, liveUrl: undefined, skipLockedTrigger: true },
+        access,
+      );
+      return { tournamentId: Number(row.tournament_id), claimed: true, triggerSkipped: outcome.triggerSkipped };
     }),
   );
   // Une inscription change ce que montrent l'accueil et ses bandeaux (un
@@ -915,6 +921,7 @@ export async function claimMatchCast(
   publishMatchUpdatedEvent(tournamentId, { landingLive: claimed });
   // Après le commit : journal du staff. Aucune place n'est reprise à personne.
   if (claimed) announceCastChange({ kind: "CLAIMED", matchId, casterId: userId, replacedCasterId: null });
+  return { triggerSkipped };
 }
 
 /**

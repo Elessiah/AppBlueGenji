@@ -27,11 +27,12 @@ import {
   isMatchRefereeActor,
   liveTriggerOwnerAfter,
   mayChangeLiveTrigger,
-  nullableUserId as nullableId,
   type LiveTriggerActor,
+  type LiveTriggerHold,
 } from "@/lib/shared/live-trigger-owner";
+import { nullableId } from "@/lib/shared/nullable-id";
 import type { MatchStatus, TournamentGame } from "@/lib/shared/types";
-import { loadRefereeStanding } from "./cast-eligibility";
+import { loadRefereeStanding, loadShownCasterIds } from "./cast-eligibility";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { playsMatchSql } from "./match-players";
 import { lockMatchStreams, pruneMatchStreams, staffStream, type MatchStreamRow } from "./match-casters";
@@ -60,7 +61,7 @@ export type MatchLiveConfig = {
    * permission `tournaments`, et `live` — sans elle, l'appelant n'entre qu'en
    * arbitre désigné du match, ce qui se relit sous le verrou (`NOT_MATCH_REFEREE`).
    */
-  access: Pick<LiveTriggerActor, "isAdmin" | "manages"> & { live: boolean };
+  access: MatchLiveAccess;
   /**
    * Liens des streams **des casters**, que seul l'arbitre désigné du match
    * modifie ou efface (médiation, `docs/features/CAST_SETTINGS.md`) ; absent :
@@ -97,13 +98,36 @@ type MatchLiveRow = RowDataPacket & {
   live_trigger: MatchLiveTrigger | null;
   live_started_at: Date | string | null;
   live_trigger_user_id?: number | null;
-  /** Arbitre désigné **retenu** (sans opposition sur un match à jouer), `null` sinon. */
-  kept_referee_user_id?: number | null;
-  team1_id: number | null;
-  team2_id: number | null;
-  launched_at: Date | string | null;
-  launch_pairing: string | null;
+  launched_at?: Date | string | null;
 };
+
+/** Ce que le verrou d'un réglage de diffusion établit (`lockLiveMatch`). */
+type LockedLiveMatch = {
+  row: MatchLiveRow;
+  game: TournamentGame;
+  /** Qui tient le mode, tel que la règle le juge (`lib/shared/live-trigger-owner.ts`). */
+  hold: LiveTriggerHold;
+};
+
+/** Ce qu'un appelant des gestes de diffusion établit de ses droits. */
+export type MatchLiveAccess = Pick<LiveTriggerActor, "isAdmin" | "manages"> & { live: boolean };
+
+/** Résultat d'un réglage : le mode d'avant, pour dire au journal ce qui a changé. */
+export type MatchLiveOutcome = { previousTrigger: MatchLiveTrigger | null };
+
+/**
+ * Refus d'un lien de stream de caster, qui dit **quel** stream (`streamId`) :
+ * la fenêtre rattache le refus à son champ (`useFieldErrors`).
+ */
+export class StreamLinkError extends Error {
+  constructor(
+    code: "STREAM_NOT_FOUND" | "INVALID_STREAM_URL",
+    readonly streamId: number,
+  ) {
+    super(code);
+    this.name = "StreamLinkError";
+  }
+}
 
 type BroadcastRow = RowDataPacket & {
   tournament_id: number;
@@ -205,13 +229,17 @@ function assertConfigurable(row: MatchLiveRow, trigger: MatchLiveTrigger | null)
  * appel direct ne pose pas un lien sur un match que l'écran garde fermé. Déjà
  * casté, il ne peut plus qu'être démarqué (`assertConfigurable`).
  *
+ * Rend le mode d'avant (`MatchLiveOutcome`) : le journal ne dit « retiré »
+ * que d'un mode qui l'était vraiment.
+ *
  * @throws `MATCH_NOT_FOUND` | `INVALID_LIVE_TRIGGER` | `INVALID_STREAM_URL`
- *         | `MATCH_START_AT_REQUIRED` | `MATCH_NOT_CASTABLE`
+ *         | `MATCH_START_AT_REQUIRED` | `MATCH_NOT_CASTABLE` | `NOT_MATCH_REFEREE`
+ *         | `LIVE_TRIGGER_NOT_OWNED` | `STREAM_NOT_FOUND` (`StreamLinkError`)
  */
 export async function setMatchLiveConfig(
   matchId: number,
   config: MatchLiveConfig,
-): Promise<void> {
+): Promise<MatchLiveOutcome> {
   if (config.trigger !== null && !isMatchLiveTrigger(config.trigger)) {
     throw new Error("INVALID_LIVE_TRIGGER");
   }
@@ -230,43 +258,27 @@ export async function setMatchLiveConfig(
 
   const trigger = config.trigger;
   const url = parseStreamUrlInput(trigger === null ? null : config.liveUrl);
+  const actor: LiveTriggerActor = {
+    userId: config.setter.userId,
+    isAdmin: config.access.isAdmin,
+    manages: config.access.manages,
+  };
 
   // Les verrous d'intervalle des streams et des casters peuvent opposer deux
   // matchs voisins (inscription, ménage) : la transaction se rejoue.
-  await retryOnDeadlock(() => withConnection(async (connection) => {
+  const outcome = await retryOnDeadlock(() => withConnection(async (connection) => {
     await connection.beginTransaction();
     try {
       // Verrou du match d'abord, puis ses streams et casters : le même ordre
       // que l'inscription d'un caster (`claimMatchCast`).
-      const [locked] = await connection.execute<MatchLiveRow[]>(
-        `SELECT id, tournament_id, status, start_at, live_trigger, live_started_at, live_trigger_user_id,
-           ${KEPT_REFEREE_SQL} AS kept_referee_user_id
-         FROM bg_matches WHERE id = ? FOR UPDATE`,
-        [matchId],
-      );
-      if (locked.length === 0) throw new Error("MATCH_NOT_FOUND");
-      const current = locked[0];
-      const actor: LiveTriggerActor = {
-        userId: config.setter.userId,
-        isAdmin: config.access.isAdmin,
-        manages: config.access.manages,
-      };
-      // L'arbitre qui se réclame du match doit encore pouvoir arbitrer.
-      if (
-        actor.manages &&
-        nullableId(current.kept_referee_user_id) === actor.userId &&
-        !(await refereeQualifies(connection, actor.userId, Number(current.tournament_id)))
-      ) {
-        current.kept_referee_user_id = null;
-      }
-      const triggerChanges = assertLiveConfigAllowed(current, actor, trigger, {
+      const { row: current, game, hold } = await lockLiveMatch(connection, matchId, actor);
+      const triggerChanges = assertLiveConfigAllowed(current, hold, actor, trigger, {
         editsStreamLinks: config.streamLinks !== undefined,
         live: config.access.live,
       });
-      assertConfigurable(current, trigger);
       // Rejugé lui aussi : une date de début retirée entre les deux lectures
       // poserait une antenne à l'heure dite qui ne s'ouvrirait jamais.
-      if (triggerChanges && requiresMatchStartAt(trigger) && locked[0].start_at === null) {
+      if (triggerChanges && requiresMatchStartAt(trigger) && current.start_at === null) {
         throw new Error("MATCH_START_AT_REQUIRED");
       }
       let streams: MatchStreamRow[] | undefined;
@@ -287,9 +299,11 @@ export async function setMatchLiveConfig(
         streams = streams?.map((stream) => (stream.staff ? { ...stream, liveUrl: null } : stream));
       } else {
         if (triggerChanges) {
-          // Posé par un caster du match, le mode est le sien ; par le staff,
-          // l'arbitre ou un admin qui ne le caste pas, il reste au staff.
-          const owner = liveTriggerOwnerAfter(trigger, actor, await castsMatch(connection, matchId, actor.userId));
+          // Posé par un caster montré du match, le mode est le sien ; par le
+          // staff, l'arbitre ou un admin qui ne le caste pas (ou un caster tu),
+          // il reste au staff.
+          const casts = await loadShownCasterIds(connection, matchId, [actor.userId], game, beforeLaunch(current));
+          const owner = liveTriggerOwnerAfter(trigger, actor, casts.has(actor.userId));
           await connection.execute(
             trigger === "MANUAL"
               ? `UPDATE bg_matches SET live_trigger = ?, live_trigger_user_id = ? WHERE id = ?`
@@ -306,6 +320,7 @@ export async function setMatchLiveConfig(
       // relus : deux lectures verrouillantes, non quatre.
       await pruneMatchStreams(connection, matchId, { streams });
       await connection.commit();
+      return { previousTrigger: hold.trigger };
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -313,6 +328,53 @@ export async function setMatchLiveConfig(
   }));
 
   publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
+  return outcome;
+}
+
+/** Le match n'est ni lancé ni joué : ses casters inéligibles sont tus (`casterWithdrawn`). */
+function beforeLaunch(row: Pick<MatchLiveRow, "status" | "launched_at">): boolean {
+  return row.status !== "COMPLETED" && (row.launched_at ?? null) === null;
+}
+
+/**
+ * Verrouille la ligne du match — **seule**, sans jointure ni sous-requête : la
+ * production tourne sous MariaDB, et les sous-requêtes d'une lecture
+ * verrouillante y pourraient verrouiller les tables lues — puis lit, d'une
+ * lecture ordinaire faite **après** le verrou (donc à jour), le jeu du tournoi
+ * et l'arbitre retenu, et juge qui tient le mode :
+ * - le propriétaire n'en est un que s'il caste encore le match **en caster
+ *   montré** (`loadShownCasterIds`) — l'interface, qui ne nomme que lui
+ *   (`liveTriggerCasterId`), juge le même ; un caster tu ou parti laisse le
+ *   mode au staff, sans attendre qu'un chemin de retrait efface la colonne ;
+ * - l'arbitre n'est retenu que pour l'acteur qui se réclame de lui et remplit
+ *   encore la condition d'arbitrage (`refereeQualifies`).
+ */
+async function lockLiveMatch(
+  connection: PoolConnection,
+  matchId: number,
+  actor: LiveTriggerActor,
+): Promise<LockedLiveMatch> {
+  const [locked] = await connection.execute<MatchLiveRow[]>(
+    `SELECT id, tournament_id, status, start_at, live_trigger, live_started_at, live_trigger_user_id, launched_at
+     FROM bg_matches WHERE id = ? FOR UPDATE`,
+    [matchId],
+  );
+  if (locked.length === 0) throw new Error("MATCH_NOT_FOUND");
+  const row = locked[0];
+  const kept = await loadKeptReferee(connection, matchId);
+  if (kept === null) throw new Error("MATCH_NOT_FOUND");
+  const trigger = row.live_trigger ?? null;
+  const ownerId = trigger === null ? null : nullableId(row.live_trigger_user_id);
+  const shown = await loadShownCasterIds(connection, matchId, [ownerId], kept.game, beforeLaunch(row));
+  const refereeId =
+    actor.manages && kept.refereeId === actor.userId && (await refereeQualifies(connection, actor.userId, kept.game))
+      ? actor.userId
+      : null;
+  return {
+    row,
+    game: kept.game,
+    hold: { trigger, ownerId: ownerId !== null && shown.has(ownerId) ? ownerId : null, refereeId },
+  };
 }
 
 /**
@@ -359,14 +421,35 @@ async function setStaffStreamUrl(
  * L'arbitre désigné **retenu** du match, en SQL, pour la médiation de la
  * diffusion : sur un match à jouer seulement (`PENDING`/`READY`, comme
  * l'interface, `showsRefereeName` — un score déclaré clôt la médiation), sans
- * opposition retenue, et jamais un compte qui joue le match. Sa condition
+ * opposition retenue, et — avant le lancement — jamais un compte qui joue le
+ * match : la règle de l'instantané (`refereeKept`) et du verrou du lancement
+ * (`lockLaunchMatch`), une fois le match lancé, garde son arbitre. Sa condition
  * d'arbitrage (`refereeQualifies`) se relit à part.
  */
 const KEPT_REFEREE_SQL = `CASE
-  WHEN bg_matches.status IN ('PENDING', 'READY')
-    AND NOT EXISTS (SELECT 1 FROM bg_users ru WHERE ru.id = bg_matches.referee_user_id AND ru.referee_objection_at IS NOT NULL)
-    AND NOT ${playsMatchSql("bg_matches.referee_user_id", "bg_matches.team1_id", "bg_matches.team2_id", "kr")}
-  THEN bg_matches.referee_user_id ELSE NULL END`;
+  WHEN m.status IN ('PENDING', 'READY')
+    AND NOT EXISTS (SELECT 1 FROM bg_users ru WHERE ru.id = m.referee_user_id AND ru.referee_objection_at IS NOT NULL)
+    AND (m.launched_at IS NOT NULL OR NOT ${playsMatchSql("m.referee_user_id", "m.team1_id", "m.team2_id", "kr")})
+  THEN m.referee_user_id ELSE NULL END`;
+
+/**
+ * Le jeu du tournoi et l'arbitre retenu du match (`KEPT_REFEREE_SQL`), en une
+ * lecture **ordinaire** (jamais verrouillante : elle lit d'autres tables).
+ * `null` : match ou tournoi introuvable.
+ */
+async function loadKeptReferee(
+  executor: Pick<PoolConnection, "execute">,
+  matchId: number,
+): Promise<{ game: TournamentGame; refereeId: number | null } | null> {
+  const [rows] = await executor.execute<(RowDataPacket & { game: TournamentGame; kept: number | null })[]>(
+    `SELECT t.game, ${KEPT_REFEREE_SQL} AS kept
+     FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id
+     WHERE m.id = ? LIMIT 1`,
+    [matchId],
+  );
+  if (rows.length === 0) return null;
+  return { game: rows[0].game, refereeId: nullableId(rows[0].kept) };
+}
 
 /**
  * L'arbitre retenu remplit-il encore la condition d'arbitrage du jeu du
@@ -376,24 +459,10 @@ const KEPT_REFEREE_SQL = `CASE
 async function refereeQualifies(
   executor: Pick<PoolConnection, "execute">,
   refereeId: number,
-  tournamentId: number,
+  game: TournamentGame,
 ): Promise<boolean> {
-  const [rows] = await executor.execute<(RowDataPacket & { game: TournamentGame })[]>(
-    `SELECT game FROM bg_tournaments WHERE id = ? LIMIT 1`,
-    [tournamentId],
-  );
-  if (rows.length === 0) return false;
-  const standing = await loadRefereeStanding(executor, refereeId, rows[0].game);
+  const standing = await loadRefereeStanding(executor, refereeId, game);
   return standing.block === null && !standing.objection;
-}
-
-/** `userId` caste-t-il ce match ? Lu sous le verrou du match que tient l'appelant. */
-async function castsMatch(connection: PoolConnection, matchId: number, userId: number): Promise<boolean> {
-  const [rows] = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_casters WHERE match_id = ? AND user_id = ? LIMIT 1`,
-    [matchId, userId],
-  );
-  return rows.length > 0;
 }
 
 /**
@@ -405,46 +474,48 @@ async function castsMatch(connection: PoolConnection, matchId: number, userId: n
 export async function isDesignatedMatchReferee(matchId: number, userId: number, manages: boolean): Promise<boolean> {
   if (!manages) return false;
   const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { kept: number | null; tournament_id: number })[]>(
-    `SELECT ${KEPT_REFEREE_SQL} AS kept, tournament_id FROM bg_matches WHERE id = ? LIMIT 1`,
-    [matchId],
-  );
-  if (rows.length === 0 || nullableId(rows[0].kept) !== userId) return false;
-  return refereeQualifies(db, userId, Number(rows[0].tournament_id));
+  const kept = await loadKeptReferee(db, matchId);
+  if (kept?.refereeId !== userId) return false;
+  return refereeQualifies(db, userId, kept.game);
 }
 
 /**
- * Qui règle quoi, sous le verrou du match : le mode d'antenne déjà posé par
- * un autre ne change pas (`LIVE_TRIGGER_NOT_OWNED`) — seuls son caster,
- * l'arbitre désigné et un admin le changent ou le retirent —, et seul
- * l'arbitre désigné touche aux liens des casters (`NOT_MATCH_REFEREE`). Sans
- * `live`, l'appelant n'a passé la porte qu'en arbitre de ce match : il doit
- * l'être encore (désignation changée entre la porte et le verrou).
+ * Qui règle quoi, sous le verrou du match. Sans `live`, l'appelant n'a passé
+ * la porte qu'en arbitre de ce match : il doit l'être encore (désignation
+ * changée entre la porte et le verrou, `NOT_MATCH_REFEREE`). Puis le match
+ * doit accepter ce réglage (`MATCH_NOT_CASTABLE`, jugé avant la propriété : un
+ * match fermé l'est pour tous). Le mode d'antenne déjà posé par un autre ne
+ * change pas (`LIVE_TRIGGER_NOT_OWNED`) — seuls son caster, l'arbitre désigné
+ * et un admin le changent ou le retirent —, et seul l'arbitre désigné touche
+ * aux liens des casters (`NOT_MATCH_REFEREE`).
  * Rend vrai si le mode change.
  */
 function assertLiveConfigAllowed(
   current: MatchLiveRow,
+  hold: LiveTriggerHold,
   actor: LiveTriggerActor,
   trigger: MatchLiveTrigger | null,
   { editsStreamLinks, live }: { editsStreamLinks: boolean; live: boolean },
 ): boolean {
-  const hold = {
-    trigger: current.live_trigger ?? null,
-    ownerId: nullableId(current.live_trigger_user_id),
-    refereeId: nullableId(current.kept_referee_user_id),
-  };
-  if (!live && !isMatchRefereeActor(hold, actor)) throw new Error("NOT_MATCH_REFEREE");
+  const referee = isMatchRefereeActor(hold, actor);
+  if (!live && !referee) throw new Error("NOT_MATCH_REFEREE");
+  assertConfigurable(current, trigger);
   const triggerChanges = trigger !== hold.trigger;
   if (triggerChanges && !mayChangeLiveTrigger(hold, actor)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
-  if (editsStreamLinks && !isMatchRefereeActor(hold, actor)) throw new Error("NOT_MATCH_REFEREE");
+  if (editsStreamLinks && !referee) throw new Error("NOT_MATCH_REFEREE");
   return triggerChanges;
 }
 
 /**
  * Médiation de l'arbitre : pose ou efface le lien des streams **des casters**
- * (jamais celui du staff, réglé par `setStaffStreamUrl`). Un lien posé garde
- * son rattachement (le caster qui l'a fourni) ; effacé, il n'est plus à
- * personne. Un lien inchangé n'est pas réécrit.
+ * (jamais celui du staff, réglé par `setStaffStreamUrl`). Un lien corrigé
+ * garde son rattachement (le caster qui l'a fourni) ; posé sur un stream qui
+ * n'en avait pas, il est rattaché au caster qui tient ce stream (le premier
+ * inscrit) — jamais `NULL`, qui le dirait de l'organisation et le garderait
+ * après le compte du caster ; effacé, il n'est plus à personne. Un lien
+ * inchangé n'est pas réécrit.
+ *
+ * Un refus dit quel stream (`StreamLinkError`), pour son champ.
  *
  * @throws `STREAM_NOT_FOUND` | `INVALID_STREAM_URL`
  */
@@ -456,18 +527,51 @@ async function setCasterStreamLinks(
   let streams = await lockMatchStreams(connection, matchId);
   for (const link of links) {
     const target = streams.find((stream) => stream.id === link.streamId && !stream.staff);
-    if (!target) throw new Error("STREAM_NOT_FOUND");
-    const url = parseStreamUrlInput(link.liveUrl);
+    if (!target) throw new StreamLinkError("STREAM_NOT_FOUND", link.streamId);
+    const url = streamLinkUrl(link);
     if (target.liveUrl === url) continue;
-    await connection.execute(
-      url === null
-        ? `UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE id = ? AND match_id = ? AND staff_owned = 0`
-        : `UPDATE bg_match_streams SET live_url = ? WHERE id = ? AND match_id = ? AND staff_owned = 0`,
-      url === null ? [target.id, matchId] : [url, target.id, matchId],
-    );
+    if (url === null) {
+      await connection.execute(
+        `UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE id = ? AND match_id = ? AND staff_owned = 0`,
+        [target.id, matchId],
+      );
+    } else if (target.liveUrl === null) {
+      await connection.execute(
+        `UPDATE bg_match_streams SET live_url = ?, link_user_id = ? WHERE id = ? AND match_id = ? AND staff_owned = 0`,
+        [url, await streamHolder(connection, matchId, target.id), target.id, matchId],
+      );
+    } else {
+      await connection.execute(
+        `UPDATE bg_match_streams SET live_url = ? WHERE id = ? AND match_id = ? AND staff_owned = 0`,
+        [url, target.id, matchId],
+      );
+    }
     streams = streams.map((stream) => (stream.id === target.id ? { ...stream, liveUrl: url } : stream));
   }
   return streams;
+}
+
+/** Le lien saisi pour un stream de caster, ou le refus rattaché à ce stream. */
+function streamLinkUrl(link: MatchStreamLinkEdit): string | null {
+  try {
+    return parseStreamUrlInput(link.liveUrl);
+  } catch {
+    throw new StreamLinkError("INVALID_STREAM_URL", link.streamId);
+  }
+}
+
+/**
+ * Le caster qui tient ce stream (le premier inscrit), `null` sans caster.
+ * Lecture ordinaire et séparée : l'écriture du lien ne verrouille ainsi que
+ * sa table (`bg_match_streams`) ; les casters du match ne changent que sous
+ * le verrou de sa ligne, que l'appelant tient.
+ */
+async function streamHolder(connection: PoolConnection, matchId: number, streamId: number): Promise<number | null> {
+  const [rows] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
+    `SELECT user_id FROM bg_match_casters WHERE match_id = ? AND stream_id = ? ORDER BY created_at, user_id LIMIT 1`,
+    [matchId, streamId],
+  );
+  return rows.length === 0 ? null : Number(rows[0].user_id);
 }
 
 /**
@@ -487,41 +591,55 @@ function linkProvider(setter: MatchLiveSetter): number | null {
  * ni sur un match qui n'est pas jouable ou dont le score est déjà saisi — dans
  * ces cas la fermeture est déjà acquise par dérivation.
  *
+ * Ouvrir ou couper l'antenne, c'est décider du mode manuel : la même règle que
+ * le changer (`mayChangeLiveTrigger`, décision 2) — son caster, l'arbitre
+ * désigné ou un admin, et le staff `tournaments` pour un mode sans
+ * propriétaire. Un co-caster ne coupe pas l'antenne d'un autre
+ * (`LIVE_TRIGGER_NOT_OWNED`). Tout se juge sous le verrou de la ligne du match
+ * (`lockLiveMatch`) : l'arbitre sans `live` retiré entre la porte et
+ * l'écriture est refusé (`NOT_MATCH_REFEREE`).
+ *
  * @returns `true` quand l'antenne a changé d'état — un second clic sur « à
  *   l'antenne » ne change rien, et le journal du staff ne le note pas.
- * @throws `MATCH_NOT_FOUND` | `LIVE_TRIGGER_NOT_MANUAL` | `MATCH_NOT_LIVE_READY`
+ * @throws `MATCH_NOT_FOUND` | `NOT_MATCH_REFEREE` | `LIVE_TRIGGER_NOT_MANUAL`
+ *   | `LIVE_TRIGGER_NOT_OWNED` | `MATCH_NOT_LIVE_READY`
  */
-export async function setMatchOnAir(matchId: number, onAir: boolean): Promise<boolean> {
-  const row = await loadMatchLiveRow(matchId);
+export async function setMatchOnAir(
+  matchId: number,
+  onAir: boolean,
+  userId: number,
+  access: MatchLiveAccess,
+): Promise<boolean> {
+  const actor: LiveTriggerActor = { userId, isAdmin: access.isAdmin, manages: access.manages };
+  const result = await withConnection(async (connection) => {
+    await connection.beginTransaction();
+    try {
+      const { row, hold } = await lockLiveMatch(connection, matchId, actor);
+      if (!access.live && !isMatchRefereeActor(hold, actor)) throw new Error("NOT_MATCH_REFEREE");
+      if (row.live_trigger !== "MANUAL") throw new Error("LIVE_TRIGGER_NOT_MANUAL");
+      if (!mayChangeLiveTrigger(hold, actor)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
+      if (onAir && row.status !== "READY") throw new Error("MATCH_NOT_LIVE_READY");
+      // Déjà dans cet état (second clic, deux clics simultanés) : rien d'écrit,
+      // l'heure de mise à l'antenne n'est pas réécrite.
+      const changed = onAir ? row.live_started_at === null : row.live_started_at !== null;
+      if (changed) {
+        await connection.execute(
+          onAir
+            ? `UPDATE bg_matches SET live_started_at = ? WHERE id = ?`
+            : `UPDATE bg_matches SET live_started_at = NULL WHERE id = ?`,
+          onAir ? [new Date(), matchId] : [matchId],
+        );
+      }
+      await connection.commit();
+      return { changed, tournamentId: Number(row.tournament_id) };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    }
+  });
 
-  if (row.live_trigger !== "MANUAL") throw new Error("LIVE_TRIGGER_NOT_MANUAL");
-  if (onAir && row.status !== "READY") throw new Error("MATCH_NOT_LIVE_READY");
-
-  const db = await getDatabase();
-  // L'état de départ est relu dans la condition : un second clic ne réécrit pas
-  // l'heure de mise à l'antenne, et deux clics simultanés ne changent l'état qu'une fois ;
-  // le statut et le déclencheur aussi : un match validé, ou passé en automatique, entre la
-  // lecture et l'écriture ne change pas d'antenne.
-  const [result] = await db.execute(
-    onAir
-      ? `UPDATE bg_matches SET live_started_at = ?
-         WHERE id = ? AND live_started_at IS NULL AND status = 'READY' AND live_trigger = 'MANUAL'`
-      : `UPDATE bg_matches SET live_started_at = NULL
-         WHERE id = ? AND live_started_at IS NOT NULL AND live_trigger = 'MANUAL'`,
-    onAir ? [new Date(), matchId] : [matchId],
-  );
-  const changed = Number((result as { affectedRows?: number }).affectedRows ?? 0) > 0;
-  if (!changed) {
-    // Rien d'écrit : antenne déjà dans cet état, ou garde tombée entre la lecture
-    // et l'écriture — celle-ci se dit par son refus, jamais par un faux succès.
-    const now = await loadMatchLiveRow(matchId);
-    if (now.live_trigger !== "MANUAL") throw new Error("LIVE_TRIGGER_NOT_MANUAL");
-    if (onAir && now.status !== "READY") throw new Error("MATCH_NOT_LIVE_READY");
-    return false;
-  }
-
-  publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
-  return true;
+  if (result.changed) publishMatchUpdatedEvent(result.tournamentId, { landingLive: true });
+  return result.changed;
 }
 
 /**

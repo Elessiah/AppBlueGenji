@@ -40,7 +40,6 @@ export function bracketMatch(overrides: Partial<BracketMatch> = {}): BracketMatc
     startAt: null,
     liveTrigger: null,
     liveTriggerCasterId: null,
-    liveTriggerOwnerHidden: false,
     liveUrl: null,
     streams: [],
     liveStartedAt: null,

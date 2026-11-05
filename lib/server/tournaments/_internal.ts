@@ -20,6 +20,7 @@ import { currentLaunchState, launchReadiness, launchStateIsCurrent } from "@/lib
 import { firstBanTeamId, matchHostTeamId, refereeHostedFirstBanTeamId } from "@/lib/shared/match-referee";
 import { parseMapPicks } from "@/lib/shared/round-maps";
 import { visibleText } from "@/lib/shared/visible-text";
+import { nullableId } from "@/lib/shared/nullable-id";
 import { localizeBracketPlaceholder } from "@/lib/shared/bracket-placeholders";
 import { castEligibilityBlock, refereeEligibilityBlock } from "./cast-eligibility";
 import type { MatchCasterRow, MatchStreamRow } from "./match-casters";
@@ -450,10 +451,6 @@ export function attachMatchMaps(
   });
 }
 
-function nullableId(value: number | null | undefined): number | null {
-  return value === null || value === undefined ? null : Number(value);
-}
-
 /**
  * Un caster ne remplit plus la condition (`live` + identité) et le match
  * attend encore son lancement : l'instantané le tait — il ne retient plus de
@@ -464,19 +461,19 @@ function nullableId(value: number | null | undefined): number | null {
 /**
  * Le caster maître du mode d'antenne, s'il caste encore le match et y est
  * montré (`casters`) : son identifiant y est déjà public. Un maître que
- * l'instantané tait (caster retiré de l'affichage, pas encore rendu) n'est
- * pas nommé, seulement signalé (`liveTriggerOwnerHidden`) : le serveur le
- * tient toujours pour maître (`lib/shared/live-trigger-owner.ts`).
+ * l'instantané tait (caster tu, devenu inéligible) ou parti n'en est plus un
+ * — le serveur juge de même (`loadShownCasterIds`) : le mode revient au staff,
+ * et redevient le sien dès qu'il est montré de nouveau.
  */
 function liveTriggerOwnerFields(
   row: MatchRow,
   casters: readonly MatchCasterRow[],
   game: TournamentGame,
-): Pick<BracketMatch, "liveTriggerCasterId" | "liveTriggerOwnerHidden"> {
+): Pick<BracketMatch, "liveTriggerCasterId"> {
   const owner = row.live_trigger_user_id ?? null;
   if (owner === null || row.live_trigger === null) return { liveTriggerCasterId: null };
   const shown = casters.some((caster) => caster.userId === Number(owner) && !casterWithdrawn(row, caster, game));
-  return shown ? { liveTriggerCasterId: Number(owner) } : { liveTriggerCasterId: null, liveTriggerOwnerHidden: true };
+  return { liveTriggerCasterId: shown ? Number(owner) : null };
 }
 
 function casterWithdrawn(row: MatchRow, caster: MatchCasterRow, game: TournamentGame): boolean {
@@ -513,6 +510,16 @@ function refereeKept(row: MatchRow, game: TournamentGame): boolean {
   );
 }
 
+/** Premier ban d'un match arbitré : la règle de l'arbitre hôte, tant qu'il n'est pas joué. */
+function refereeFirstBan(
+  status: MatchRow["status"],
+  team1Id: number | null,
+  team2Id: number | null,
+  seeds: { team1: number | null; team2: number | null },
+): number | null {
+  return status === "COMPLETED" ? null : refereeHostedFirstBanTeamId(team1Id, team2Id, seeds);
+}
+
 /** Champs du lancement d'un match (`lib/shared/match-launch.ts`). */
 function mapMatchLaunch(row: MatchRow, allCasters: readonly MatchCasterRow[], game: TournamentGame) {
   const team1Id = nullableId(row.team1_id);
@@ -547,8 +554,11 @@ function mapMatchLaunch(row: MatchRow, allCasters: readonly MatchCasterRow[], ga
     hostTeamId,
     // L'arbitre désigné crée la partie : la moins bonne tête de série bannit la
     // première, quelle que soit la règle du tournoi (`applyMapRules` la garde).
+    // Un match arbitré déjà joué n'en dit rien : rien ne garde l'ordre
+    // réellement suivi (la règle a changé avec l'arbitre hôte), et la page
+    // n'affirme pas un ordre qui n'a peut-être pas été appliqué.
     firstBanTeamId: referee
-      ? refereeHostedFirstBanTeamId(team1Id, team2Id, seeds)
+      ? refereeFirstBan(row.status, team1Id, team2Id, seeds)
       : firstBanTeamId(hostTeamId, team1Id, team2Id),
     refereeAssigned: referee,
     // Empreinte de la désignation, jusqu'à la fin du match : la fenêtre

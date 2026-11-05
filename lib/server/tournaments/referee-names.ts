@@ -22,7 +22,7 @@ import { cached } from "@/lib/server/cache";
 import { withConnection } from "@/lib/server/database";
 import { visibleText } from "@/lib/shared/visible-text";
 import { showsRefereeName } from "@/lib/shared/match-referee";
-import type { MatchRefereeName, TournamentSnapshot } from "@/lib/shared/types";
+import type { BracketMatch, MatchRefereeName, TournamentSnapshot } from "@/lib/shared/types";
 
 /**
  * Secret tenu sur `globalThis` : une seconde évaluation du module (rechargement
@@ -57,15 +57,31 @@ export function withoutRefereeKeys<T extends { refereeKey: string | null }>(matc
  * Marque (`mine`) les désignations dont le lecteur est l'arbitre : la liste
  * lue est commune à tous les membres (mise en cache), la marque se pose après,
  * par lecteur — elle ne nomme personne de plus, seulement le lecteur à lui-même.
+ *
+ * La marque ne dépend pas du pseudo : un arbitre dont le pseudo ne s'affiche
+ * pas (`visibleText` vide, absent de la liste commune) est reconnu sur
+ * l'empreinte des matchs montrés (`matches`) et reçoit une entrée **sans
+ * pseudo** (`""`, lue « Arbitre désigné » : `refereeNameOf`) — sans quoi la
+ * médiation que le serveur lui accorde n'aurait aucun bouton.
  * Garde la même référence si rien n'est marqué.
  */
-export function markViewerReferee(names: MatchRefereeName[], viewerUserId: number): MatchRefereeName[] {
+export function markViewerReferee(
+  names: MatchRefereeName[],
+  viewerUserId: number,
+  matches: readonly Pick<BracketMatch, "id" | "refereeKey" | "status">[],
+): MatchRefereeName[] {
   let marked = false;
   const out = names.map((name): MatchRefereeName => {
     if (refereeKey(name.matchId, viewerUserId) !== name.refereeKey) return name;
     marked = true;
     return { ...name, mine: true as const };
   });
+  for (const match of matches) {
+    if (!showsRefereeName(match) || match.refereeKey !== refereeKey(match.id, viewerUserId)) continue;
+    if (out.some((name) => name.matchId === match.id && name.refereeKey === match.refereeKey)) continue;
+    marked = true;
+    out.push({ matchId: match.id, refereeKey: match.refereeKey, pseudo: "", mine: true });
+  }
   return marked ? out : names;
 }
 

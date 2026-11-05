@@ -43,6 +43,11 @@ type Executor = Pick<PoolConnection, "execute">;
 const CAST_ELIGIBILITY_COLUMNS = `discord_verified_at, discord_pseudo, blizzard_sub, overwatch_battletag, overwatch_battletag_typed,
         is_deleted, is_admin, platform_roles_json`;
 
+/** Les mêmes, préfixées de l'alias `u` de `bg_users` (lecture jointe). */
+const QUALIFIED_CAST_ELIGIBILITY_COLUMNS = CAST_ELIGIBILITY_COLUMNS.split(",")
+  .map((column) => `u.${column.trim()}`)
+  .join(", ");
+
 /** Identité d'un caster lue sur sa ligne ; un compte absent ou supprimé n'en a aucune. */
 export function casterIdentityOf(row: CasterIdentityFields | undefined): CasterIdentity {
   if (!row || Number(row.is_deleted) === 1) return { discordVerified: false, blizzardLinked: false };
@@ -115,6 +120,36 @@ export async function loadCastBlocks(
   );
   const byId = new Map(rows.map((row) => [Number(row.id), row]));
   return new Map(ids.map((id) => [id, castEligibilityBlock(byId.get(id), game)]));
+}
+
+/**
+ * Les comptes de la liste qui castent ce match **en caster montré**, comme
+ * l'instantané (`casterWithdrawn`) : inscrits sur le match et, tant qu'il n'est
+ * ni lancé ni joué (`beforeLaunch`), remplissant encore la condition du cast.
+ * Un caster tu (devenu inéligible, pas encore retiré) ne tient pas le mode
+ * d'antenne (`lib/shared/live-trigger-owner.ts`) : le serveur et l'interface,
+ * qui ne le nomme pas, jugent alors le même propriétaire.
+ */
+export async function loadShownCasterIds(
+  executor: Executor,
+  matchId: number,
+  userIds: readonly (number | null)[],
+  game: TournamentGame,
+  beforeLaunch: boolean,
+): Promise<Set<number>> {
+  const ids = [...new Set(userIds.filter((id): id is number => id !== null))];
+  if (ids.length === 0) return new Set();
+  const [rows] = await executor.execute<(CastEligibilityRow & { user_id: number })[]>(
+    `SELECT mc.user_id, ${QUALIFIED_CAST_ELIGIBILITY_COLUMNS}
+       FROM bg_match_casters mc LEFT JOIN bg_users u ON u.id = mc.user_id
+      WHERE mc.match_id = ? AND mc.user_id IN (${ids.map(() => "?").join(", ")})`,
+    [matchId, ...ids],
+  );
+  return new Set(
+    rows
+      .filter((row) => !beforeLaunch || castEligibilityBlock(row.is_deleted === null ? undefined : row, game) === null)
+      .map((row) => Number(row.user_id)),
+  );
 }
 
 /**

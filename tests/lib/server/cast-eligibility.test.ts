@@ -8,6 +8,7 @@ import {
   loadRefereeEligibility,
   loadRefereePermission,
   loadRefereeStanding,
+  loadShownCasterIds,
   refereeObjectionUpheld,
   type CastEligibilityFields,
 } from "@/lib/server/tournaments/cast-eligibility";
@@ -172,16 +173,15 @@ describe("mapMatch — casters inscrits et condition du cast", () => {
     const match = mapMatch(row({ live_trigger: "MANUAL", live_trigger_user_id: 900 }), { casters: [caster(900)] });
 
     expect(match.liveTriggerCasterId).toBe(900);
-    expect(match.liveTriggerOwnerHidden).toBeUndefined();
   });
 
-  it("mapMatch_ownerNotShown_hiddenFlagWithoutId", () => {
+  it("mapMatch_ownerNotShown_noOwner", () => {
     const match = mapMatch(row({ live_trigger: "MANUAL", live_trigger_user_id: 900 }), {
       casters: [caster(900, { blizzard_sub: null })],
     });
 
     expect(match.liveTriggerCasterId).toBeNull();
-    expect(match.liveTriggerOwnerHidden).toBe(true);
+    expect(Object.keys(match)).not.toContain("liveTriggerOwnerHidden");
   });
 });
 
@@ -216,6 +216,15 @@ describe("mapMatch — arbitre désigné dans l'instantané (`docs/features/MATC
   it("mapMatchLaunch_completedMatch_hasNullRefereeKey", () => {
     const match = mapMatch(row({ ...eligible, status: "COMPLETED" }));
     expect(match.refereeKey).toBeNull();
+  });
+
+  it("mapMatch_completedRefereedMatch_noFirstBan", () => {
+    // L'ordre réellement suivi n'est pas gardé : un match joué n'en affirme aucun.
+    expect(mapMatch(row({ ...eligible, status: "COMPLETED", team1_seed: 1, team2_seed: 4 })).firstBanTeamId).toBeNull();
+  });
+
+  it("mapMatch_pendingRefereedMatch_lowerSeedBansFirst", () => {
+    expect(mapMatch(row({ ...eligible, status: "PENDING", team1_seed: 1, team2_seed: 4 })).firstBanTeamId).toBe(2);
   });
 
   it("mapMatchLaunch_pendingMatch_hasRefereeKey", () => {
@@ -470,5 +479,52 @@ describe("loadCastBlocks", () => {
     const execute = jest.fn<SqlQuery>();
     await expect(loadCastBlocks(fakeConnection({ execute }), [], "OW")).resolves.toEqual(new Map());
     expect(execute).not.toHaveBeenCalled();
+  });
+});
+
+describe("loadShownCasterIds", () => {
+  const ADMIN_CASTER = { ...ELIGIBLE, is_admin: 1, platform_roles_json: null };
+  const PLAYER = { ...ELIGIBLE, platform_roles_json: JSON.stringify([]) };
+
+  it("loadShownCasterIds_noIds_returnsEmptyWithoutQuery", async () => {
+    const execute = jest.fn<SqlQuery>();
+
+    await expect(loadShownCasterIds(fakeConnection({ execute }), 42, [null], "OW", true)).resolves.toEqual(new Set());
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("loadShownCasterIds_beforeLaunchIneligibleCaster_excluded", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([
+      [
+        { user_id: 12, ...ADMIN_CASTER },
+        { user_id: 13, ...PLAYER },
+      ],
+      [],
+    ]);
+
+    await expect(loadShownCasterIds(fakeConnection({ execute }), 42, [12, 13], "OW", true)).resolves.toEqual(new Set([12]));
+  });
+
+  it("loadShownCasterIds_afterLaunchIneligibleCaster_kept", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([
+      [
+        { user_id: 12, ...ADMIN_CASTER },
+        { user_id: 13, ...PLAYER },
+      ],
+      [],
+    ]);
+
+    await expect(loadShownCasterIds(fakeConnection({ execute }), 42, [12, 13], "OW", false)).resolves.toEqual(
+      new Set([12, 13]),
+    );
+  });
+
+  it("loadShownCasterIds_duplicateIds_asksOnce", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[], []]);
+
+    await loadShownCasterIds(fakeConnection({ execute }), 42, [12, 12], "OW", true);
+
+    expect(String(execute.mock.calls[0][0])).toContain("mc.user_id IN (?)");
+    expect(execute.mock.calls[0][1]).toEqual([42, 12]);
   });
 });

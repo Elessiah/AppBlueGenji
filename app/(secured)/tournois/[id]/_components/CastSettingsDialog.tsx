@@ -262,7 +262,9 @@ export function CastSettingsDialog({
               </>
             )}
 
-            {canToggleOnAir(match) && (
+            {/* L'antenne d'un mode manuel suit la règle du mode (décision 2) : un
+                co-caster ne l'ouvre ni ne la coupe pour le caster qui l'a posé. */}
+            {canToggleOnAir(match) && !triggerLocked && (
               <div className={styles.section}>
                 <InfoHintRow>
                   <p className={styles.sectionTitle}>{t("cardActions.castSettings.air")}</p>

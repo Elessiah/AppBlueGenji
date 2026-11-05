@@ -211,7 +211,8 @@ export function refereeNameOf(
 ): string | null {
   if (!showsRefereeName(match)) return null;
   const entry = names.find((name) => name.matchId === match.id && name.refereeKey === match.refereeKey);
-  return entry ? entry.pseudo : null;
+  // Une entrée sans pseudo (arbitre reconnu de lui seul, `markViewerReferee`) ne nomme personne.
+  return entry && entry.pseudo !== "" ? entry.pseudo : null;
 }
 
 /**

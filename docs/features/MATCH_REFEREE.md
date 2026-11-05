@@ -174,6 +174,9 @@ la règle de ban du tournoi (`refereeHostedFirstBanTeamId`,
 `lib/shared/match-referee.ts`, posé dans l'instantané par `_internal.ts` ;
 `applyMapRules` garde ce choix pour un match `refereeAssigned`). La page du
 match l'explique derrière un `InfoHint` (`roundMaps.page.refereeHostBan`, FR/EN).
+Un match arbitré **déjà joué** (`COMPLETED`) n'affirme aucun premier ban
+(`firstBanTeamId` nul) : l'ordre réellement suivi n'est pas gardé, et la
+règle a changé avec l'arbitre hôte.
 
 ## Ce que chacun voit
 

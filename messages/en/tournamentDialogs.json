@@ -259,14 +259,11 @@
     "removed": "Match removed from the stream.",
     "title": "Match stream",
     "streamed": "This match is being cast",
-    "trigger": "Going on air",
     "triggers": {
       "AUTO": "Automatically when the match starts",
       "START_TIME": "At the match's start date",
       "MANUAL": "Manual (on-air button)"
     },
-    "noStartAt": "No start date is set for this match: going on air at the set time needs a time first.",
-    "autoStop": "The live stops on its own as soon as a score is entered.",
     "url": "Match channel (optional)",
     "urlInvalid": "Link not recognized. Accepted platforms: {platforms}.",
     "urlOwnChannel": "The link entered here is your own channel: it is removed from the match if your account is deleted.",
@@ -275,8 +272,6 @@
     "organisationLinkHint": "Ticked, the link stays on the match whatever happens to your account. Unticked, it is your own channel, removed from the match if your account is deleted.",
     "urlHint": "Left empty, the Discord announcement points to the first link opened by a caster, otherwise to the tournament's official channel (accepted platforms: {platforms}).",
     "urlSubject": "match channel",
-    "triggerLocked": "Going on air set by the match's caster: {mode}.",
-    "triggerLockedHint": "Only the caster who set it, the match's referee or an admin can change or clear it — the organisers too when no caster holds it.",
     "casterLinks": "Casters' links",
     "casterLinksSubject": "casters' links",
     "casterLinksHint": "As the match's referee, you can correct or clear a caster's link. A cleared link is no longer tied to anyone.",

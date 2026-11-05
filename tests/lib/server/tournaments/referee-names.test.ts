@@ -159,15 +159,29 @@ describe("markViewerReferee", () => {
       { matchId: 6, refereeKey: refereeKey(6, 3), pseudo: "Autre" },
     ];
 
-    expect(markViewerReferee(names, 9)).toEqual([
+    expect(markViewerReferee(names, 9, [])).toEqual([
       { matchId: 5, refereeKey: refereeKey(5, 9), pseudo: "Arbitre", mine: true },
       { matchId: 6, refereeKey: refereeKey(6, 3), pseudo: "Autre" },
     ]);
   });
 
+  it("markViewerReferee_viewerRefereeWithoutName_appendsEmptyMineEntry", () => {
+    // Son pseudo n'est pas lisible (compte tu) : il se reconnaît quand même.
+    const match = bracketMatch({ id: 5, status: "READY", refereeKey: refereeKey(5, 9) });
+
+    expect(markViewerReferee([], 9, [match])).toEqual([{ matchId: 5, refereeKey: refereeKey(5, 9), pseudo: "", mine: true }]);
+  });
+
+  it("markViewerReferee_otherRefereesMatch_appendsNothing", () => {
+    const names: { matchId: number; refereeKey: string; pseudo: string }[] = [];
+    const match = bracketMatch({ id: 5, status: "READY", refereeKey: refereeKey(5, 3) });
+
+    expect(markViewerReferee(names, 9, [match])).toBe(names);
+  });
+
   it("markViewerReferee_viewerRefereesNothing_returnsSameList", () => {
     const names = [{ matchId: 5, refereeKey: refereeKey(5, 9), pseudo: "Arbitre" }];
 
-    expect(markViewerReferee(names, 3)).toBe(names);
+    expect(markViewerReferee(names, 3, [])).toBe(names);
   });
 });

@@ -66,7 +66,7 @@ export function CastClaimDialog({
 }: Readonly<{
   match: Pick<
     BracketMatch,
-    "id" | "status" | "refereeKey" | "streams" | "casters" | "startAt" | "liveTrigger" | "liveTriggerCasterId" | "liveTriggerOwnerHidden"
+    "id" | "status" | "refereeKey" | "streams" | "casters" | "startAt" | "liveTrigger" | "liveTriggerCasterId"
   >;
   matchLabel: string;
   onClose: () => void;

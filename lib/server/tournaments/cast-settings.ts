@@ -22,7 +22,9 @@ import {
   requiresMatchStartAt,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
-import { liveTriggerOwnerAfter, mayChangeLiveTrigger, nullableUserId } from "@/lib/shared/live-trigger-owner";
+import { liveTriggerOwnerAfter, mayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
+import { nullableId } from "@/lib/shared/nullable-id";
+import { loadShownCasterIds } from "./cast-eligibility";
 import { lockMatchStreams, pruneMatchStreams, type MatchStreamRow } from "./match-casters";
 // Type seul : aucune dépendance d'exécution vers le lancement, qui importe ce
 // module (le verrou de la ligne du match et la transaction y vivent).
@@ -46,7 +48,17 @@ export type CastSettings = {
    * (`MatchLiveSetter.asOrganisation`).
    */
   asOrganisation?: boolean;
+  /**
+   * Inscription : un mode d'antenne qu'un autre a posé **entre-temps** (la
+   * fenêtre le croyait libre) est laissé tel quel, sans refuser l'inscription
+   * (`CastSettingsOutcome.triggerSkipped`) — l'inscription est le geste, le
+   * mode n'en est qu'un réglage.
+   */
+  skipLockedTrigger?: boolean;
 };
+
+/** Ce que les réglages ont fait : `triggerSkipped`, le mode laissé à qui le tient (`skipLockedTrigger`). */
+export type CastSettingsOutcome = { triggerSkipped: boolean };
 
 /**
  * Ce que la route établit du caster pour la règle du mode d'antenne
@@ -85,12 +97,15 @@ export function assertCastTriggerWritable(row: LaunchMatchRow, trigger: MatchLiv
 /**
  * Pose le mode d'antenne du match, sous le verrou de sa ligne que l'appelant
  * tient déjà, pour `userId` — un caster du match, qui en devient le
- * propriétaire (`live_trigger_user_id`).
+ * propriétaire (`live_trigger_user_id`) s'il y est montré (un caster tu,
+ * devenu inéligible, ne tient rien).
  *
  * Un mode inchangé n'écrit rien. Un mode déjà posé ne change que pour son
  * propriétaire, l'arbitre désigné ou un admin (`mayChangeLiveTrigger`) :
  * `LIVE_TRIGGER_NOT_OWNED` sinon — un co-caster ne décide pas pour celui qui
- * l'a posé.
+ * l'a posé. Le propriétaire ne compte que s'il caste encore le match en
+ * caster montré (`loadShownCasterIds`), la règle de l'instantané : parti ou
+ * tu, il laisse le mode au staff. `skip` : rend `false` au lieu de refuser.
  *
  * Les deux effacements de la configuration du staff (`setMatchLiveConfig`) sont
  * repris mot pour mot : démarquer le match referme son antenne, et un mode qui
@@ -108,20 +123,20 @@ export async function applyCastTrigger(
   trigger: MatchLiveTrigger | null,
   userId: number,
   access: CastAccess = PLAIN_CAST_ACCESS,
-): Promise<void> {
+  skip = false,
+): Promise<boolean> {
   if (trigger !== null && !isMatchLiveTrigger(trigger)) throw new Error("INVALID_LIVE_TRIGGER");
   const current = row.live_trigger ?? null;
-  if (trigger === current) return;
-  const actor = { userId, ...access };
-  const hold = {
-    trigger: current,
-    ownerId: nullableUserId(row.live_trigger_user_id),
-    refereeId: row.refereeEligible ? nullableUserId(row.referee_user_id) : null,
-  };
-  if (!mayChangeLiveTrigger(hold, actor)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
-  assertCastTriggerWritable(row, trigger);
+  if (trigger === current) return true;
   const matchId = Number(row.id);
-  const owner = liveTriggerOwnerAfter(trigger, actor, true);
+  const actor = { userId, ...access };
+  const { hold, shown } = await castTriggerHold(connection, row, trigger === null ? null : userId);
+  if (!mayChangeLiveTrigger(hold, actor)) {
+    if (skip) return false;
+    throw new Error("LIVE_TRIGGER_NOT_OWNED");
+  }
+  assertCastTriggerWritable(row, trigger);
+  const owner = liveTriggerOwnerAfter(trigger, actor, shown.has(userId));
   if (trigger === null) {
     await connection.execute(
       `UPDATE bg_matches SET live_trigger = NULL, live_trigger_user_id = NULL, live_started_at = NULL WHERE id = ?`,
@@ -138,6 +153,25 @@ export async function applyCastTrigger(
   row.live_trigger = trigger;
   row.live_trigger_user_id = owner;
   if (trigger !== "MANUAL") row.live_started_at = null;
+  return true;
+}
+
+/**
+ * Qui tient le mode d'antenne posé sur `row` : son propriétaire s'il y est un
+ * caster montré, et l'arbitre désigné éligible. `shown` dit aussi si
+ * `candidateId` (qui pose le nouveau mode) y est montré.
+ */
+async function castTriggerHold(connection: PoolConnection, row: LaunchMatchRow, candidateId: number | null) {
+  const current = row.live_trigger ?? null;
+  const ownerId = current === null ? null : nullableId(row.live_trigger_user_id);
+  const beforeLaunch = row.status !== "COMPLETED" && (row.launched_at ?? null) === null;
+  const shown = await loadShownCasterIds(connection, Number(row.id), [ownerId, candidateId], row.tournament_game, beforeLaunch);
+  const hold = {
+    trigger: current,
+    ownerId: ownerId !== null && shown.has(ownerId) ? ownerId : null,
+    refereeId: row.refereeEligible ? nullableId(row.referee_user_id) : null,
+  };
+  return { hold, shown };
 }
 
 /**
@@ -212,9 +246,11 @@ export async function applyCastSettings(
   streamId: number,
   settings: CastSettings,
   access: CastAccess = PLAIN_CAST_ACCESS,
-): Promise<void> {
+): Promise<CastSettingsOutcome> {
   const matchId = Number(row.id);
-  if (settings.trigger !== undefined) await applyCastTrigger(connection, row, settings.trigger, userId, access);
+  const triggerSkipped =
+    settings.trigger !== undefined &&
+    !(await applyCastTrigger(connection, row, settings.trigger, userId, access, settings.skipLockedTrigger === true));
   let streams: MatchStreamRow[] | undefined;
   if (settings.liveUrl !== undefined) {
     const url = parseStreamUrlInput(settings.liveUrl);
@@ -235,6 +271,7 @@ export async function applyCastSettings(
   // : l'inscription ne passe jamais de lien) : les relire sous `FOR UPDATE`
   // verrouillerait l'intervalle de `bg_match_casters` des matchs voisins.
   if (streams !== undefined) await pruneMatchStreams(connection, matchId, { streams, casters: row.casters });
+  return { triggerSkipped };
 }
 
 /** Ce qu'un caster lit de **son** cast pour le régler (`CastSettingsDialog`). */

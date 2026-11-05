@@ -148,16 +148,24 @@ unique, pure, `lib/shared/live-trigger-owner.ts` (`mayChangeLiveTrigger`,
 
 Propriétaire écrit (`liveTriggerOwnerAfter`) : le caster du match qui le pose,
 lui seul ; personne quand il est posé par qui ne caste pas (staff, admin,
-arbitre, porteur de la seule permission `live`). Un propriétaire que
-l'instantané tait (caster devenu inéligible) n'y est pas nommé mais signalé
-(`liveTriggerOwnerHidden`) : l'interface garde le mode verrouillé. L'arbitre reconnu est l'arbitre
+arbitre, porteur de la seule permission `live`, caster tu). Le propriétaire
+ne compte que s'il est un caster **montré** du match (`loadShownCasterIds` au
+serveur, `liveTriggerCasterId` dans l'instantané : il caste encore et, avant
+le lancement, remplit la condition du cast) : parti ou tu, il laisse le mode
+au staff, et le retrouve dès qu'il est montré de nouveau. L'arbitre reconnu est l'arbitre
 **retenu** (sans opposition), qui **ne joue pas** le match (`KEPT_REFEREE_SQL`)
 et remplit encore la condition d'arbitrage du jeu (`refereeQualifies`).
 
 Refus serveur, sous le verrou du match : 403 `LIVE_TRIGGER_NOT_OWNED` (PUT
 `…/caster`, `POST` qui rejoint un stream avec `trigger`, route
 `/api/admin/matches/[id]/live`). Les contrôles sont **cachés** à qui ne peut
-pas (`CastSettingsFields`, `MatchLiveDialog`). Le propriétaire est effacé
+pas (`CastSettingsFields`, `MatchLiveDialog`). **Ouvrir ou couper l'antenne**
+d'un mode `MANUAL` suit la même règle (`setMatchOnAir`, sous le verrou du
+match) : un co-caster ne la bascule pas pour le mode d'un autre (403
+`LIVE_TRIGGER_NOT_OWNED`), et le bouton lui est caché. Une inscription dont le
+mode a été posé entre-temps par un autre n'est pas refusée : le mode reste
+tel quel et la notification le dit (`triggerSkipped`,
+`cardActions.castingTriggerKept`, FR/EN). Le propriétaire est effacé
 quand il quitte le match (`releaseMatchCast`), quand il en est retiré d'office
 (`dropTriggerOwner` : il rejoint une équipe du match, devient inéligible),
 quand un autre change le mode ou le retire, et à la suppression de son compte
@@ -168,6 +176,12 @@ pas sa date de début (retirée depuis, elle bloquerait les liens). Il
 figure dans l'export (`liveTriggers`, `listOwnMatchRoles`).
 
 ## L'arbitre désigné, médiateur de la diffusion
+
+Un lien qu'il pose sur un stream de caster sans lien est rattaché au premier
+caster de ce stream (`link_user_id`, effacé avec son compte) ; un lien refusé
+(`INVALID_STREAM_URL`, `STREAM_NOT_FOUND`) rend le `streamId` fautif, que la
+fenêtre rattache à son champ (`aria-invalid`, `FieldErrorText`). Le journal du
+staff ne dit « retiré » (`LIVE_REMOVED`) que d'un mode qui était posé.
 
 L'arbitre désigné **de ce match** (et lui seul : celui d'un autre match est
 refusé, 403), tant que le match est à jouer (`PENDING`/`READY` : un score

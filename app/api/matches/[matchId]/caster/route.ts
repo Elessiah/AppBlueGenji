@@ -83,8 +83,10 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   if (settings.asOrganisation === true && !can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
   try {
-    await claimMatchCast(matchId, user.id, can(user, "live"), target, settings, castAccess(user));
-    return ok({ casterUserId: user.id });
+    // `triggerSkipped` : le mode d'antenne, posé entre-temps par un autre, est
+    // resté le sien — l'inscription, elle, est faite.
+    const { triggerSkipped } = await claimMatchCast(matchId, user.id, can(user, "live"), target, settings, castAccess(user));
+    return ok({ casterUserId: user.id, triggerSkipped });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_CAST_CLAIM_FAILED");
   }

@@ -31,5 +31,5 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   if (!snapshot) return fail("TOURNAMENT_NOT_FOUND", 404);
 
   // Marque par lecteur (`mine`) : l'arbitre désigné y reconnaît ses matchs.
-  return ok({ refereeNames: markViewerReferee(await loadRefereeNames(snapshot), user.id) });
+  return ok({ refereeNames: markViewerReferee(await loadRefereeNames(snapshot), user.id, snapshot.matches) });
 }

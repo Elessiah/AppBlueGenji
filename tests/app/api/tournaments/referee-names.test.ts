@@ -94,6 +94,6 @@ describe("GET /api/tournaments/[id]/referee-names", () => {
 
     expect(await res.json()).toEqual({ refereeNames: [{ matchId: 5, refereeKey: "k", pseudo: "Alpha", mine: true }] });
     // Le lecteur lui-même, jamais un identifiant lu dans la requête.
-    expect(markViewerReferee).toHaveBeenCalledWith([{ matchId: 5, refereeKey: "k", pseudo: "Alpha" }], 3);
+    expect(markViewerReferee).toHaveBeenCalledWith([{ matchId: 5, refereeKey: "k", pseudo: "Alpha" }], 3, expect.any(Array));
   });
 });

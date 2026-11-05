@@ -259,14 +259,11 @@
     "removed": "Match retiré de la diffusion.",
     "title": "Diffusion du match",
     "streamed": "Ce match est casté",
-    "trigger": "Passage à l'antenne",
     "triggers": {
       "AUTO": "Automatique au démarrage du match",
       "START_TIME": "À la date de début du match",
       "MANUAL": "Manuel (bouton d'antenne)"
     },
-    "noStartAt": "Aucune date de début n'est fixée sur ce match : l'antenne à l'heure dite demande d'abord un horaire.",
-    "autoStop": "Le direct s'arrête tout seul dès qu'un score est saisi.",
     "url": "Chaîne du match (facultatif)",
     "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}.",
     "urlOwnChannel": "Le lien saisi ici est celui de ta chaîne : il est retiré du match si ton compte est supprimé.",
@@ -275,8 +272,6 @@
     "organisationLinkHint": "Coché, le lien reste sur le match quoi qu'il arrive à ton compte. Décoché, c'est ta propre chaîne, retirée du match si ton compte est supprimé.",
     "urlHint": "Vide, l'annonce Discord renvoie au premier lien ouvert par un caster, sinon à la chaîne officielle du tournoi (plateformes acceptées : {platforms}).",
     "urlSubject": "chaîne du match",
-    "triggerLocked": "Passage à l'antenne réglé par le caster du match : {mode}.",
-    "triggerLockedHint": "Seuls le caster qui l'a posé, l'arbitre du match ou un admin le changent ou le retirent — l'organisation aussi quand aucun caster ne le tient.",
     "casterLinks": "Liens des casters",
     "casterLinksSubject": "liens des casters",
     "casterLinksHint": "Arbitre du match, tu peux corriger ou effacer le lien d'un caster. Un lien effacé n'est plus rattaché à personne.",

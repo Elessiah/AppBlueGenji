@@ -1,14 +1,16 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
+import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
+import { fieldAria } from "@/lib/shared/field-errors";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import {
   canToggleOnAir,
   isMatchCastable,
   isValidStreamUrl,
   LIVE_PLATFORMS,
-  MATCH_LIVE_TRIGGERS,
   MAX_STREAM_URL_LENGTH,
   requiresMatchStartAt,
   staffStream,
@@ -24,6 +26,7 @@ import { formatMatchStartAt } from "@/lib/shared/match-schedule";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
 import { useDialogsText } from "../_lib/dialogs-text";
+import { CastTriggerField } from "./CastSettingsFields";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 
 interface MatchLiveDialogProps {
@@ -81,18 +84,55 @@ export function lockedOnClosedMatch(
   return triggerLocked && match.liveTrigger !== null && !isMatchCastable(match);
 }
 
-/** Les streams des casters d'un match (jamais celui du staff), avec qui les tient. */
-function casterStreamsOf(match: BracketMatch): { id: number; liveUrl: string | null; casters: string }[] {
+/**
+ * Les streams des casters d'un match (jamais celui du staff), avec qui les
+ * tient — « A, B et C » / "A, B, and C" par `list` (`Intl.ListFormat` de la
+ * langue de la page).
+ */
+export function casterStreamsOf(
+  match: Pick<BracketMatch, "streams" | "casters">,
+  list: Pick<Intl.ListFormat, "format">,
+): { id: number; liveUrl: string | null; casters: string }[] {
   return match.streams
     .filter((stream) => !stream.staff)
     .map((stream) => ({
       id: stream.id,
       liveUrl: stream.liveUrl,
-      casters: match.casters
-        .filter((caster) => caster.streamId === stream.id)
-        .map((caster) => caster.pseudo)
-        .join(", "),
+      casters: list.format(match.casters.filter((caster) => caster.streamId === stream.id).map((caster) => caster.pseudo)),
     }));
+}
+
+/** Champ de la fenêtre que vise un refus : le lien du staff, ou le lien d'un stream de caster. */
+type LiveField = "url" | `caster-${number}`;
+
+/** Le lien du staff : le seul refus de lien sans stream désigné. */
+const LIVE_FIELD_ERRORS = { INVALID_STREAM_URL: "url" } as const;
+
+const URL_INPUT_ID = "match-live-url";
+
+/** Identifiant du champ de lien d'un stream de caster. */
+function casterLinkInputId(streamId: number): string {
+  return `match-live-caster-link-${streamId}`;
+}
+
+/**
+ * Le champ que vise un refus du serveur : le stream de caster qu'il nomme
+ * (`streamId`, refus d'un lien de médiation), sinon `null` — le code seul dit
+ * alors s'il vise le lien du staff (`LIVE_FIELD_ERRORS`).
+ */
+export function refusedCasterField(payload: { streamId?: unknown }): LiveField | null {
+  const id = payload.streamId;
+  return typeof id === "number" && Number.isInteger(id) ? `caster-${id}` : null;
+}
+
+/** Refus du serveur qui garde le stream qu'il désigne. */
+class LiveRefusal extends Error {
+  constructor(
+    code: string,
+    readonly field: LiveField | null,
+  ) {
+    super(code);
+  }
 }
 
 /**
@@ -138,6 +178,16 @@ export function MatchLiveDialog({
   const onAir = useMatchLiveState(match) === "LIVE";
   const [streamed, setStreamed] = useState(match.liveTrigger !== null);
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "MANUAL");
+  // Le mode du match changé pendant que la fenêtre est ouverte (retiré ou
+  // reposé par qui le tient) : la case et le choix reprennent le mode du match.
+  // Sans quoi la case « casté », cochée à l'ouverture sur un mode verrouillé,
+  // le resterait une fois ce mode retiré — et Enregistrer recasterait le match.
+  const [seenTrigger, setSeenTrigger] = useState(match.liveTrigger);
+  if (seenTrigger !== match.liveTrigger) {
+    setSeenTrigger(match.liveTrigger);
+    setStreamed(match.liveTrigger !== null);
+    setTrigger(match.liveTrigger ?? "MANUAL");
+  }
   // Le lien du stream du staff, que ce réglage écrit — jamais celui qu'un
   // caster a ouvert (lecture partielle sans streams : le premier lien).
   const [liveUrl, setLiveUrl] = useState(
@@ -148,10 +198,15 @@ export function MatchLiveDialog({
   // le pose — que si ce membre le coche ; rien ne se déduit de ce qu'il caste.
   const [organisationLink, setOrganisationLink] = useState(false);
   // Médiation : les liens des streams des casters, que l'arbitre seul édite.
-  const casterStreams = referee ? casterStreamsOf(match) : [];
+  const casterList = useMemo(() => new Intl.ListFormat(text.locale, { style: "long", type: "conjunction" }), [text.locale]);
+  const casterStreams = referee ? casterStreamsOf(match, casterList) : [];
   // Seules les saisies de l'arbitre ; un champ intouché montre le lien actuel.
   const [casterLinks, setCasterLinks] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
+  // Un refus du serveur rattaché à son champ (`ACCESSIBILITY_FORM_ERRORS_STATEMENT.md`).
+  const fieldIds: Record<LiveField, string> = { url: URL_INPUT_ID };
+  for (const stream of casterStreams) fieldIds[`caster-${stream.id}`] = casterLinkInputId(stream.id);
+  const fieldErrors = useFieldErrors<LiveField>(LIVE_FIELD_ERRORS, fieldIds);
 
   // Mode verrouillé : le champ suit le mode du match, posé par un autre.
   const showUrl = triggerLocked ? match.liveTrigger !== null : streamed;
@@ -175,10 +230,12 @@ export function MatchLiveDialog({
   // passé en `START_TIME` puis privé de sa date deviendrait indécastable — les
   // radios sont masquées quand la case est décochée, donc `trigger` resterait
   // bloqué sur `START_TIME` et « Enregistrer » sur désactivé.
-  const startAtLabel = formatMatchStartAt(match.startAt, text.locale);
-  const startAtMissing = startAtLabel === null;
+  const startAtMissing = formatMatchStartAt(match.startAt, text.locale) === null;
   const triggerNeedsDate = !triggerLocked && streamed && changedTriggerNeedsDate(match.liveTrigger, trigger, startAtMissing);
   const platforms = LIVE_PLATFORMS.join(", ");
+  // L'antenne d'un mode manuel suit la règle du mode (décision 2) : un
+  // co-caster ne l'ouvre ni ne la coupe pour le caster qui l'a posé.
+  const airToggle = canToggleOnAir(match) && !triggerLocked;
 
   /** Ouvre ou coupe l'antenne (mode manuel), sans quitter la fenêtre. */
   const toggleAir = async () => {
@@ -220,16 +277,27 @@ export function MatchLiveDialog({
           ...(streamLinks === undefined ? {} : { streamLinks }),
         }),
       });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "MATCH_LIVE_UPDATE_FAILED");
-      showSuccess(sentTrigger === null ? t("live.removed") : t("live.saved"));
+      const payload = (await response.json().catch(() => ({}))) as { error?: string; streamId?: unknown };
+      if (!response.ok) throw new LiveRefusal(payload.error || "MATCH_LIVE_UPDATE_FAILED", refusedCasterField(payload));
+      // « Retiré » seulement d'un mode qui était posé : corriger les liens des
+      // casters d'un match sans mode n'en retire aucun.
+      showSuccess(sentTrigger === null && match.liveTrigger !== null ? t("live.removed") : t("live.saved"));
       onSaved();
       onClose();
     } catch (error) {
-      showError(mapError((error as Error).message));
+      reportRefusal(error);
     } finally {
       setBusy(false);
     }
+  };
+
+  /** Un refus : notifié, et rattaché au champ qu'il désigne (lien d'un caster, sinon par son code). */
+  const reportRefusal = (error: unknown) => {
+    const message = mapError((error as Error).message);
+    showError(message);
+    const field = error instanceof LiveRefusal ? error.field : null;
+    if (field !== null && field in fieldIds) fieldErrors.flag(field, message);
+    else fieldErrors.report((error as Error).message, message);
   };
 
   return (
@@ -249,14 +317,10 @@ export function MatchLiveDialog({
         </p>
 
         {triggerLocked && match.liveTrigger !== null ? (
-          <InfoHintRow inline>
-            <p style={{ margin: "18px 0", fontSize: 14, color: "var(--ink, #e6ebf2)" }}>
-              {t("live.triggerLocked", { mode: t(`live.triggers.${match.liveTrigger}`) })}
-            </p>
-            <InfoHint id="match-live-locked-hint" subject={t("live.trigger")}>
-              <p>{t("live.triggerLockedHint")}</p>
-            </InfoHint>
-          </InfoHintRow>
+          // Le mode verrouillé se lit sans contrôle, avec les mots des réglages du caster.
+          <div style={{ margin: "18px 0" }}>
+            <CastTriggerField trigger={match.liveTrigger} startAt={match.startAt} onChange={setTrigger} locked />
+          </div>
         ) : (
           <label
             style={{
@@ -281,56 +345,7 @@ export function MatchLiveDialog({
 
         {showUrl && (
           <>
-            {!triggerLocked && (
-              <fieldset style={{ border: "none", padding: 0, margin: "0 0 16px" }}>
-                <legend
-                  style={{
-                    fontSize: 12,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    color: "var(--ink-quiet, #9aa4b2)",
-                    padding: 0,
-                    marginBottom: 8,
-                  }}
-                >
-                  <InfoHintRow>
-                    {t("live.trigger")}
-                    <InfoHint id="match-live-trigger-hint" subject={t("live.trigger")}>
-                      <p>{t("live.autoStop")}</p>
-                      {startAtMissing && <p>{t("live.noStartAt")}</p>}
-                    </InfoHint>
-                  </InfoHintRow>
-                </legend>
-                {MATCH_LIVE_TRIGGERS.map((option) => {
-                  const disabled = requiresMatchStartAt(option) && startAtMissing;
-                  return (
-                    <label
-                      key={option}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        fontSize: 13,
-                        color: disabled ? "var(--ink-quiet, #9aa4b2)" : "var(--ink-soft, #c3ccd8)",
-                        marginBottom: 6,
-                        cursor: disabled ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      <input
-                        type="radio"
-                        name="match-live-trigger"
-                        value={option}
-                        checked={trigger === option}
-                        disabled={disabled}
-                        onChange={() => setTrigger(option)}
-                      />
-                      {t(`live.triggers.${option}`)}
-                      {requiresMatchStartAt(option) && startAtLabel && ` (${startAtLabel})`}
-                    </label>
-                  );
-                })}
-              </fieldset>
-            )}
+            {!triggerLocked && <CastTriggerField trigger={trigger} startAt={match.startAt} onChange={setTrigger} />}
 
             <div className="field">
               <InfoHintRow>
@@ -341,19 +356,28 @@ export function MatchLiveDialog({
                 </InfoHint>
               </InfoHintRow>
               <input
-                id="match-live-url"
+                id={URL_INPUT_ID}
                 value={liveUrl}
-                onChange={(e) => setLiveUrl(e.target.value)}
+                onChange={(e) => {
+                  setLiveUrl(e.target.value);
+                  fieldErrors.clear("url");
+                }}
                 maxLength={MAX_STREAM_URL_LENGTH}
                 placeholder="https://twitch.tv/…"
-                aria-invalid={urlInvalid}
-                aria-describedby={urlInvalid ? "match-live-url-error match-live-url-hint" : "match-live-url-hint"}
+                // Refus d'avance ou du serveur : lu avant l'aide (`fieldAria`).
+                {...fieldAria(
+                  URL_INPUT_ID,
+                  urlInvalid || fieldErrors.invalidField === "url",
+                  urlInvalid && "match-live-url-invalid",
+                  "match-live-url-hint",
+                )}
               />
               {urlInvalid && (
-                <p id="match-live-url-error" style={{ margin: "6px 0 0", fontSize: 12, color: "var(--danger)" }}>
+                <p id="match-live-url-invalid" style={{ margin: "6px 0 0", fontSize: 12, color: "var(--danger)" }}>
                   {t("live.urlInvalid", { platforms })}
                 </p>
               )}
+              <FieldErrorText fieldId={URL_INPUT_ID} message={fieldErrors.message("url")} />
               {canSpeakForOrganisation && urlTouched && (
                 <InfoHintRow inline>
                   <label
@@ -407,7 +431,8 @@ export function MatchLiveDialog({
               const typed = casterLinks[stream.id];
               const value = typed ?? stream.liveUrl ?? "";
               const invalid = typed !== undefined && typed.trim() !== "" && !isValidStreamUrl(typed);
-              const inputId = `match-live-caster-link-${stream.id}`;
+              const field: LiveField = `caster-${stream.id}`;
+              const inputId = casterLinkInputId(stream.id);
               return (
                 <div className="field" key={stream.id}>
                   <label htmlFor={inputId}>
@@ -416,17 +441,20 @@ export function MatchLiveDialog({
                   <input
                     id={inputId}
                     value={value}
-                    onChange={(e) => setCasterLinks((links) => ({ ...links, [stream.id]: e.target.value }))}
+                    onChange={(e) => {
+                      setCasterLinks((links) => ({ ...links, [stream.id]: e.target.value }));
+                      fieldErrors.clear(field);
+                    }}
                     maxLength={MAX_STREAM_URL_LENGTH}
                     placeholder="https://twitch.tv/…"
-                    aria-invalid={invalid}
-                    aria-describedby={invalid ? `${inputId}-error` : undefined}
+                    {...fieldAria(inputId, invalid || fieldErrors.invalidField === field, invalid && `${inputId}-invalid`)}
                   />
                   {invalid && (
-                    <p id={`${inputId}-error`} style={{ margin: "6px 0 0", fontSize: 12, color: "var(--danger)" }}>
+                    <p id={`${inputId}-invalid`} style={{ margin: "6px 0 0", fontSize: 12, color: "var(--danger)" }}>
                       {t("live.urlInvalid", { platforms })}
                     </p>
                   )}
+                  <FieldErrorText fieldId={inputId} message={fieldErrors.message(field)} />
                 </div>
               );
             })}
@@ -434,7 +462,7 @@ export function MatchLiveDialog({
         )}
 
         {/* Antenne (mode manuel) et rediff : la carte ne les porte plus. */}
-        {canToggleOnAir(match) && (
+        {airToggle && (
           <div style={{ margin: "0 0 14px" }}>
             <button
               type="button"

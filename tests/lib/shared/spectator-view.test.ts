@@ -326,13 +326,6 @@ describe("ce que lit le visiteur sans compte", () => {
     expect(snapshot.matches[0].team1Ready).toBe(true);
   });
 
-  it("spectatorSnapshot_ownerHidden_dropsFlag", () => {
-    const snapshot = tournamentSnapshot({ matches: [bracketMatch({ id: 1, liveTriggerOwnerHidden: true })] });
-
-    expect(spectatorSnapshot(snapshot).matches[0].liveTriggerOwnerHidden).toBeUndefined();
-    expect(snapshot.matches[0].liveTriggerOwnerHidden).toBe(true);
-  });
-
   it("tait l'instant des bascules « prêt » : ni updatedAt ni ouverture du salon", () => {
     const snapshot = tournamentSnapshot({
       matches: [bracketMatch({ id: 1, updatedAt: "2026-01-01T10:00:07.000Z", lobbyOpenedAt: "2026-01-01T09:58:41.000Z" })],
@@ -511,7 +504,6 @@ const MATCH_FIELDS = {
   // Le caster maître du mode d'antenne est un compte : retiré, comme les casters.
   liveTriggerCasterId: "retiré",
   // Dirait qu'un caster a été tu : retiré sans compte.
-  liveTriggerOwnerHidden: "retiré",
   liveUrl: "public",
   streams: "public",
   lobbyOpenedAt: "public",

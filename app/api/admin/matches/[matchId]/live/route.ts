@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { setMatchLiveConfig, setMatchOnAir } from "@/lib/server/tournaments/live-streams";
+import { setMatchLiveConfig, setMatchOnAir, StreamLinkError } from "@/lib/server/tournaments/live-streams";
 import { mayConfigureMatchLive, parseStreamLinks } from "@/lib/server/tournaments/live-access";
 import { isMatchLiveTrigger, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import type { MatchStreamLinkEdit } from "@/lib/server/tournaments/live-streams";
@@ -15,6 +15,10 @@ function parseMatchId(raw: string): number | null {
 
 function mapLiveError(error: unknown) {
   const message = (error as Error).message;
+  // Un lien de caster refusé dit lequel : la fenêtre rattache le refus à son champ.
+  if (error instanceof StreamLinkError) {
+    return fail(message, message === "STREAM_NOT_FOUND" ? 404 : 400, { streamId: error.streamId });
+  }
   if (message === "MATCH_NOT_FOUND") return fail(message, 404);
   if (message === "LIVE_TRIGGER_NOT_OWNED") return fail(message, 403);
   if (message === "NOT_MATCH_REFEREE") return fail(message, 403);
@@ -79,7 +83,12 @@ function parseMatchLiveBody(body: {
  * l'arbitre désigné ou un admin (`LIVE_TRIGGER_NOT_OWNED`, 403). L'arbitre
  * désigné du match est admis même sans `live`, et lui seul peut envoyer
  * `streamLinks: [{ streamId, liveUrl }]` — les liens des streams des casters
- * (`NOT_MATCH_REFEREE`, 403, pour tout autre).
+ * (`NOT_MATCH_REFEREE`, 403, pour tout autre) ; un lien refusé rend le
+ * `streamId` fautif avec son code.
+ *
+ * Le journal du staff ne dit « retiré » (`LIVE_REMOVED`) que d'un mode qui
+ * était posé : un arbitre qui corrige les seuls liens des casters d'un match
+ * sans mode règle la diffusion, il ne la retire pas.
  */
 export async function PUT(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -108,14 +117,15 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
     // l'organisation le dit « de l'organisation » (case de la fenêtre, décochée
     // par défaut) : la suppression de son compte retire sa chaîne à lui, jamais
     // celle de l'organisation (`withdrawUserCasts`).
-    await setMatchLiveConfig(matchId, {
+    const { previousTrigger } = await setMatchLiveConfig(matchId, {
       trigger,
       liveUrl: parsed.liveUrl,
       setter: { userId: user.id, asOrganisation: organisation && parsed.organisationLink },
       access: { isAdmin: user.isAdmin, manages: organisation, live: can(user, "live") },
       ...(streamLinks === undefined ? {} : { streamLinks }),
     });
-    announceStaffMatchAction(matchId, trigger === null ? "LIVE_REMOVED" : "LIVE_CONFIGURED", staffActionAuthor(user));
+    const removed = trigger === null && previousTrigger !== null;
+    announceStaffMatchAction(matchId, removed ? "LIVE_REMOVED" : "LIVE_CONFIGURED", staffActionAuthor(user));
     return ok({ trigger });
   } catch (error) {
     return mapLiveError(error);
@@ -124,7 +134,9 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
 
 /**
  * Ouvre ou ferme l'antenne d'un match en mode `MANUAL`.
- * Corps : `{ onAir: boolean }`.
+ * Corps : `{ onAir: boolean }`. Même règle que le changement du mode : son
+ * caster, l'arbitre désigné ou un admin (le staff `tournaments` pour un mode
+ * sans propriétaire) — `LIVE_TRIGGER_NOT_OWNED` (403) pour un co-caster.
  */
 export async function POST(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -140,7 +152,8 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
 
   try {
     // Un double clic (déjà à l'antenne, ou déjà hors antenne) ne se journalise pas.
-    if (await setMatchOnAir(matchId, body.onAir)) {
+    const access = { isAdmin: user.isAdmin, manages: can(user, "tournaments"), live: can(user, "live") };
+    if (await setMatchOnAir(matchId, body.onAir, user.id, access)) {
       announceStaffMatchAction(matchId, body.onAir ? "ON_AIR" : "OFF_AIR", staffActionAuthor(user));
     }
     return ok({ onAir: body.onAir });

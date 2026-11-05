@@ -3,7 +3,6 @@ import {
   isMatchRefereeActor,
   liveTriggerOwnerAfter,
   mayChangeLiveTrigger,
-  nullableUserId,
   viewerMayChangeLiveTrigger,
 } from "@/lib/shared/live-trigger-owner";
 
@@ -81,16 +80,12 @@ describe("viewerMayChangeLiveTrigger", () => {
     expect(viewerMayChangeLiveTrigger(match, { userId: 12, isAdmin: false, manages: false, referees: false })).toBe(true);
   });
 
-  it("viewerMayChangeLiveTrigger_ownerHiddenStaffViewer_false", () => {
-    const hidden = { liveTrigger: "MANUAL" as const, liveTriggerCasterId: null, liveTriggerOwnerHidden: true };
+  it("viewerMayChangeLiveTrigger_ownerNotShownStaffViewer_true", () => {
+    // Un maître tu ou parti n'est pas nommé : le mode revient au staff, comme au serveur.
+    const unnamed = { liveTrigger: "MANUAL" as const, liveTriggerCasterId: null };
 
-    expect(viewerMayChangeLiveTrigger(hidden, { userId: 9, isAdmin: false, manages: true, referees: false })).toBe(false);
-  });
-
-  it("viewerMayChangeLiveTrigger_ownerHiddenAdminViewer_true", () => {
-    const hidden = { liveTrigger: "MANUAL" as const, liveTriggerCasterId: null, liveTriggerOwnerHidden: true };
-
-    expect(viewerMayChangeLiveTrigger(hidden, { userId: 1, isAdmin: true, manages: true, referees: false })).toBe(true);
+    expect(viewerMayChangeLiveTrigger(unnamed, { userId: 9, isAdmin: false, manages: true, referees: false })).toBe(true);
+    expect(viewerMayChangeLiveTrigger(unnamed, { userId: 13, isAdmin: false, manages: false, referees: false })).toBe(false);
   });
 });
 
@@ -117,13 +112,3 @@ describe("liveTriggerOwnerAfter", () => {
   });
 });
 
-describe("nullableUserId", () => {
-  it("nullableUserId_bigintString_number", () => {
-    expect(nullableUserId("12")).toBe(12);
-  });
-
-  it("nullableUserId_nullOrMissing_null", () => {
-    expect(nullableUserId(null)).toBeNull();
-    expect(nullableUserId(undefined)).toBeNull();
-  });
-});

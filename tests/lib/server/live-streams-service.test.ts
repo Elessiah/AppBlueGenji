@@ -14,6 +14,7 @@ import {
   setMatchLiveConfig,
   setMatchOnAir,
   setTournamentLiveUrl,
+  StreamLinkError,
 } from "@/lib/server/tournaments/live-streams";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { invalidateSpectatorSnapshot } from "@/lib/server/tournaments/snapshot";
@@ -36,6 +37,28 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     live_started_at: null,
     ...overrides,
   };
+}
+
+/** Un caster du match dans les bases simulées ; `eligible: false` : tu (inéligible). */
+type WorldCaster = { user_id: number; stream_id: number; eligible?: boolean };
+
+/** Colonnes d'un compte qui remplit la condition du cast (admin, identités certifiées). */
+const ELIGIBLE_CASTER = {
+  discord_verified_at: new Date("2026-01-01T00:00:00Z"),
+  discord_pseudo: "voix",
+  blizzard_sub: "bnet",
+  overwatch_battletag: "Voix#1234",
+  overwatch_battletag_typed: 0,
+  is_deleted: 0,
+  is_admin: 1,
+  platform_roles_json: null,
+};
+
+/** Réponse de `loadShownCasterIds` : les casters demandés, avec leur condition. */
+function shownCasterRows(casters: readonly WorldCaster[], ids: readonly unknown[]) {
+  return casters
+    .filter((caster) => ids.includes(caster.user_id))
+    .map((caster) => ({ user_id: caster.user_id, ...ELIGIBLE_CASTER, is_admin: caster.eligible === false ? 0 : 1 }));
 }
 
 beforeEach(() => {
@@ -172,16 +195,17 @@ describe("setMatchLiveConfig", () => {
   function liveWorld(
     row: Record<string, unknown>,
     streams: StreamState[] = [],
-    casters: { user_id: number; stream_id: number }[] = [],
+    casters: WorldCaster[] = [],
   ) {
     const state = { streams: streams.map((stream) => ({ ...stream })), casters, matchWrites: [] as [string, unknown[]][] };
     const execute = jest.fn<SqlQuery>(async (rawSql, rawParams) => {
       const sql = rawSql.replace(/\s+/g, " ").trim();
       const params = (rawParams ?? []) as unknown[];
       if (sql.startsWith("SELECT id, tournament_id, status")) return [[{ ...row }]];
-      if (sql === "SELECT game FROM bg_tournaments WHERE id = ? LIMIT 1") return [[{ game: "OW" }]];
-      if (sql.startsWith("SELECT 1 FROM bg_match_casters")) {
-        return [state.casters.filter((caster) => caster.user_id === params[1]).map(() => ({ 1: 1 }))];
+      if (sql.startsWith("SELECT t.game,")) return [[{ game: "OW", kept: row.kept_referee_user_id ?? null }]];
+      if (sql.startsWith("SELECT mc.user_id,")) return [shownCasterRows(state.casters, params.slice(1))];
+      if (sql.startsWith("SELECT user_id FROM bg_match_casters WHERE match_id = ? AND stream_id = ?")) {
+        return [state.casters.filter((caster) => caster.stream_id === params[1]).slice(0, 1)];
       }
       if (sql.startsWith("UPDATE bg_matches")) {
         state.matchWrites.push([sql, params]);
@@ -230,6 +254,10 @@ describe("setMatchLiveConfig", () => {
     "UPDATE bg_match_streams SET live_url = ? WHERE id = ? AND match_id = ? AND staff_owned = 0": (state, params) => {
       const stream = byId(state, params[1]);
       if (stream) stream.live_url = params[0] as string;
+    },
+    "UPDATE bg_match_streams SET live_url = ?, link_user_id = ? WHERE id = ? AND match_id = ? AND staff_owned = 0": (state, params) => {
+      const stream = byId(state, params[2]);
+      if (stream) setStream(stream, params[0] as string, params[1] as number | null);
     },
   };
 
@@ -433,7 +461,9 @@ describe("setMatchLiveConfig", () => {
   });
 
   it("laisse démarquer un match terminé encore casté : une diffusion posée ne devient pas ineffaçable", async () => {
-    const world = liveWorld(matchRow({ status: "COMPLETED", live_trigger: "AUTO", live_trigger_user_id: 12 }), [dbStream(1, "https://twitch.tv/x", true)]);
+    const world = liveWorld(matchRow({ status: "COMPLETED", live_trigger: "AUTO", live_trigger_user_id: 12 }), [dbStream(1, "https://twitch.tv/x", true)], [
+      { user_id: 12, stream_id: 7 },
+    ]);
     await mockLiveDb(world);
 
     await setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: CASTER_12, access: LIVE_ONLY });
@@ -694,9 +724,9 @@ describe("setMatchLiveConfig", () => {
 
     await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
 
-    const locked = world.execute.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.includes("FOR UPDATE") && sql.includes("kept_referee_user_id"));
-    expect(locked).toContain("krtm.user_id = bg_matches.referee_user_id");
-    expect(locked).toContain("krst.solo_user_id = bg_matches.referee_user_id");
+    const kept = world.execute.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.includes("AS kept"));
+    expect(kept).toContain("krtm.user_id = m.referee_user_id");
+    expect(kept).toContain("krst.solo_user_id = m.referee_user_id");
   });
 
   it("setMatchLiveConfig_lockedRead_keepsRefereeOnlyOnMatchToPlay", async () => {
@@ -705,8 +735,8 @@ describe("setMatchLiveConfig", () => {
 
     await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
 
-    const locked = world.execute.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.includes("FOR UPDATE") && sql.includes("kept_referee_user_id"));
-    expect(locked).toContain("bg_matches.status IN ('PENDING', 'READY')");
+    const kept = world.execute.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.includes("AS kept"));
+    expect(kept).toContain("m.status IN ('PENDING', 'READY')");
   });
 
   it("setMatchLiveConfig_refereeLinksAndStaffUrlTogether_staffUrlDoesNotTakeCasterStream", async () => {
@@ -723,8 +753,8 @@ describe("setMatchLiveConfig", () => {
       streamLinks: [{ streamId: 4, liveUrl: "kick.com/caster" }],
     });
 
-    // Le stream du caster garde son lien ; celui du staff en ouvre un autre.
-    expect(world.state.streams.find((stream) => stream.id === 4)).toEqual(dbStream(4, "https://kick.com/caster"));
+    // Le stream du caster garde son lien, rattaché à son caster ; celui du staff en ouvre un autre.
+    expect(world.state.streams.find((stream) => stream.id === 4)).toEqual({ ...dbStream(4, "https://kick.com/caster"), link_user_id: 12 });
     expect(world.state.streams.find((stream) => stream.id === 5)?.live_url).toBe("https://twitch.tv/orga");
   });
 
@@ -775,6 +805,173 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", null, 42]]]);
   });
 
+  it("setMatchLiveConfig_triggerChanged_returnsPreviousTrigger", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "AUTO" }));
+    await mockLiveDb(world);
+
+    const outcome = await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: null, setter: ORGANISER_5, access: STAFF });
+
+    expect(outcome).toEqual({ previousTrigger: "AUTO" });
+  });
+
+  it("setMatchLiveConfig_hiddenOwnerMode_staffChangesIt", async () => {
+    // Le maître 12 n'est plus caster du match : le mode revient au staff.
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", null, 42]]]);
+  });
+
+  it("setMatchLiveConfig_ineligibleOwnerBeforeLaunch_staffChangesIt", async () => {
+    // Le maître caste encore, mais tu (inéligible) : il ne tient plus le mode.
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }), [dbStream(4, null)], [
+      { user_id: 12, stream_id: 4, eligible: false },
+    ]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", null, 42]]]);
+  });
+
+  it("setMatchLiveConfig_shownOwnerMode_staffRefused", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }), [dbStream(4, null)], [
+      { user_id: 12, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF }),
+    ).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
+    expect(world.state.matchWrites).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_invalidCasterLink_throwsStreamLinkErrorWithStreamId", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", kept_referee_user_id: 9 }), [dbStream(4, null)], [
+      { user_id: 12, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    const refusal = setMatchLiveConfig(42, {
+      trigger: "MANUAL",
+      liveUrl: null,
+      setter: { userId: 9, asOrganisation: false },
+      access: STAFF,
+      streamLinks: [{ streamId: 4, liveUrl: "https://exemple.com/x" }],
+    });
+
+    await expect(refusal).rejects.toBeInstanceOf(StreamLinkError);
+    await expect(refusal).rejects.toMatchObject({ message: "INVALID_STREAM_URL", streamId: 4 });
+  });
+
+  describe("setMatchOnAir", () => {
+    /** La seule permission `live` (caster), ou le staff `tournaments`. */
+    const LIVE_ACCESS = { isAdmin: false, manages: false, live: true };
+    const STAFF_ACCESS = { isAdmin: false, manages: true, live: true };
+
+    /** Match MANUAL posé par le caster 12, montré sur le stream 4 ; co-caster 13 sur le stream 5. */
+    function ownedWorld(overrides: Record<string, unknown> = {}) {
+      return liveWorld(
+        matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12, ...overrides }),
+        [dbStream(4, "https://twitch.tv/a"), dbStream(5, "https://twitch.tv/b")],
+        [
+          { user_id: 12, stream_id: 4 },
+          { user_id: 13, stream_id: 5 },
+        ],
+      );
+    }
+
+    it("setMatchOnAir_coCasterOnOwnersMode_throwsNotOwned", async () => {
+      const world = ownedWorld();
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 13, LIVE_ACCESS)).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
+      expect(world.state.matchWrites).toEqual([]);
+      expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    });
+
+    it("setMatchOnAir_owner_opensAntennaAndPublishes", async () => {
+      const world = ownedWorld();
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 12, LIVE_ACCESS)).resolves.toBe(true);
+
+      expect(world.state.matchWrites).toEqual([["UPDATE bg_matches SET live_started_at = ? WHERE id = ?", [expect.any(Date), 42]]]);
+      expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
+    });
+
+    it("setMatchOnAir_ownerCloses_clearsStartedAt", async () => {
+      const world = ownedWorld({ live_started_at: new Date("2026-11-05T20:00:00Z") });
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, false, 12, LIVE_ACCESS)).resolves.toBe(true);
+
+      expect(world.state.matchWrites).toEqual([["UPDATE bg_matches SET live_started_at = NULL WHERE id = ?", [42]]]);
+    });
+
+    it("setMatchOnAir_hiddenOwner_staffAllowed", async () => {
+      const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }));
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 5, STAFF_ACCESS)).resolves.toBe(true);
+    });
+
+    it("setMatchOnAir_withoutLiveNorReferee_throwsNotMatchReferee", async () => {
+      const world = ownedWorld();
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 5, { isAdmin: false, manages: true, live: false })).rejects.toThrow(
+        "NOT_MATCH_REFEREE",
+      );
+    });
+
+    it("setMatchOnAir_designatedRefereeWithoutLive_allowed", async () => {
+      const world = ownedWorld({ kept_referee_user_id: 9 });
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 9, { isAdmin: false, manages: true, live: false })).resolves.toBe(true);
+    });
+
+    it("setMatchOnAir_notManual_throwsNotManual", async () => {
+      const world = ownedWorld({ live_trigger: "AUTO" });
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 12, LIVE_ACCESS)).rejects.toThrow("LIVE_TRIGGER_NOT_MANUAL");
+    });
+
+    it("setMatchOnAir_openOnPendingMatch_throwsNotLiveReady", async () => {
+      const world = ownedWorld({ status: "PENDING" });
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 12, LIVE_ACCESS)).rejects.toThrow("MATCH_NOT_LIVE_READY");
+    });
+
+    it("setMatchOnAir_alreadyOnAir_returnsFalseWithoutWriteOrPublish", async () => {
+      const world = ownedWorld({ live_started_at: new Date("2026-11-05T20:00:00Z") });
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 12, LIVE_ACCESS)).resolves.toBe(false);
+      expect(world.state.matchWrites).toEqual([]);
+      expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    });
+
+    it("setMatchOnAir_unknownMatch_throwsMatchNotFound", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
+      const connection = fakeConnection({
+        execute,
+        beginTransaction: async () => undefined,
+        commit: async () => undefined,
+        rollback: async () => undefined,
+      });
+      const { withConnection } = await import("@/lib/server/database");
+      jest.mocked(withConnection).mockImplementation((run) => run(connection));
+
+      await expect(setMatchOnAir(999, true, 12, LIVE_ACCESS)).rejects.toThrow("MATCH_NOT_FOUND");
+    });
+  });
+
   it("refuse un match inconnu", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
@@ -799,7 +996,7 @@ describe("isDesignatedMatchReferee", () => {
     await mockDb(execute);
 
     await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
-    expect(String(execute.mock.calls[0][0])).toContain("bg_matches.status IN ('PENDING', 'READY')");
+    expect(String(execute.mock.calls[0][0])).toContain("m.status IN ('PENDING', 'READY')");
   });
 
   it("isDesignatedMatchReferee_keptReferee_true", async () => {
@@ -816,10 +1013,8 @@ describe("isDesignatedMatchReferee", () => {
     await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
   });
 
-  it("isDesignatedMatchReferee_unknownTournament_false", async () => {
-    await mockDb(
-      jest.fn<SqlQuery>().mockResolvedValueOnce([[{ kept: 9, tournament_id: 7 }], []]).mockResolvedValueOnce([[], []]),
-    );
+  it("isDesignatedMatchReferee_unknownMatch_false", async () => {
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([[], []]));
 
     await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
     expect(loadRefereeStanding).not.toHaveBeenCalled();
@@ -831,89 +1026,6 @@ describe("isDesignatedMatchReferee", () => {
 
     await expect(isDesignatedMatchReferee(42, 9, false)).resolves.toBe(false);
     expect(execute).not.toHaveBeenCalled();
-  });
-});
-
-describe("setMatchOnAir", () => {
-  it("ouvre l'antenne d'un match MANUAL jouable", async () => {
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL" })]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
-    await mockDb(execute);
-
-    await setMatchOnAir(42, true);
-
-    const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
-    expect(sql).toMatch(/UPDATE bg_matches SET live_started_at = \?/);
-    expect(params[0]).toBeInstanceOf(Date);
-    expect(params[1]).toBe(42);
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
-    // Un réglage d'antenne ne touche que le plateau et le direct de l'accueil.
-    expect(publishUpdatedEvent).not.toHaveBeenCalled();
-  });
-
-  it("referme l'antenne en reposant NULL", async () => {
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: new Date() })]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
-    await mockDb(execute);
-
-    await setMatchOnAir(42, false);
-
-    const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
-    expect(sql).toContain("live_started_at = NULL");
-    expect(sql).toContain("live_started_at IS NOT NULL");
-    expect(params).toEqual([42]);
-  });
-
-  it("referme l'antenne même sur un match déjà noté — nettoyage toujours permis", async () => {
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([
-        [matchRow({ live_trigger: "MANUAL", status: "COMPLETED", live_started_at: new Date() })],
-      ])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
-    await mockDb(execute);
-
-    await expect(setMatchOnAir(42, false)).resolves.toBe(true);
-  });
-
-  it("refuse d'ouvrir l'antenne sur un match en AUTO", async () => {
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "AUTO" })]]);
-    await mockDb(execute);
-
-    await expect(setMatchOnAir(42, true)).rejects.toThrow("LIVE_TRIGGER_NOT_MANUAL");
-    expect(execute).toHaveBeenCalledTimes(1);
-  });
-
-  it("refuse d'ouvrir l'antenne sur un match non casté", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[matchRow()]]);
-    await mockDb(execute);
-
-    await expect(setMatchOnAir(42, true)).rejects.toThrow("LIVE_TRIGGER_NOT_MANUAL");
-  });
-
-  it("refuse d'ouvrir l'antenne sur un match pas encore jouable ou déjà noté", async () => {
-    for (const status of ["PENDING", "AWAITING_CONFIRMATION", "COMPLETED"]) {
-      const execute = jest
-        .fn<SqlQuery>()
-        .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", status })]]);
-      await mockDb(execute);
-
-      await expect(setMatchOnAir(42, true)).rejects.toThrow("MATCH_NOT_LIVE_READY");
-      expect(execute).toHaveBeenCalledTimes(1);
-    }
-  });
-
-  it("refuse un match inconnu", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
-    await mockDb(execute);
-
-    await expect(setMatchOnAir(999, true)).rejects.toThrow("MATCH_NOT_FOUND");
   });
 });
 
@@ -1053,67 +1165,5 @@ describe("findBroadcastingTournament", () => {
     await mockDb(execute);
 
     expect(await findBroadcastingTournament()).toBeNull();
-  });
-});
-
-describe("setMatchOnAir — changement d'état", () => {
-  /** Lecture, UPDATE conditionnel (lignes touchées), puis relecture si rien n'a changé. */
-  function liveRows(before: Record<string, unknown>, affectedRows: number, after: Record<string, unknown> = before) {
-    return jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[matchRow(before)]])
-      .mockResolvedValueOnce([{ affectedRows }])
-      .mockResolvedValueOnce([[matchRow(after)]]);
-  }
-
-  it("setMatchOnAir_alreadyOnAir_returnsFalse", async () => {
-    const execute = liveRows({ live_trigger: "MANUAL", live_started_at: new Date() }, 0);
-    await mockDb(execute);
-    await expect(setMatchOnAir(42, true)).resolves.toBe(false);
-    // L'heure de mise à l'antenne n'est pas réécrite : la condition la garde.
-    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND live_started_at IS NULL");
-    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
-  });
-
-  it("setMatchOnAir_concurrentSecondClick_returnsFalse", async () => {
-    // Les deux clics ont lu l'antenne fermée ; seul le premier UPDATE trouve la ligne.
-    await mockDb(liveRows({ live_trigger: "MANUAL", live_started_at: null }, 0, { live_trigger: "MANUAL", live_started_at: new Date() }));
-    await expect(setMatchOnAir(42, true)).resolves.toBe(false);
-  });
-
-  it("setMatchOnAir_matchCompletedBeforeWrite_throwsNotLiveReady", async () => {
-    // Lu READY, validé avant l'UPDATE : la condition sur le statut ne trouve plus la ligne.
-    const execute = liveRows({ live_trigger: "MANUAL", live_started_at: null }, 0, {
-      live_trigger: "MANUAL",
-      live_started_at: null,
-      status: "COMPLETED",
-    });
-    await mockDb(execute);
-    await expect(setMatchOnAir(42, true)).rejects.toThrow("MATCH_NOT_LIVE_READY");
-    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND status = 'READY'");
-    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND live_trigger = 'MANUAL'");
-    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
-  });
-
-  it("setMatchOnAir_triggerSwitchedToAutoBeforeOffAirWrite_throwsNotManual", async () => {
-    // Lu MANUAL à l'antenne, passé en automatique avant l'UPDATE : la ligne n'est plus trouvée.
-    const execute = liveRows({ live_trigger: "MANUAL", live_started_at: new Date() }, 0, {
-      live_trigger: "AUTO",
-      live_started_at: new Date(),
-    });
-    await mockDb(execute);
-    await expect(setMatchOnAir(42, false)).rejects.toThrow("LIVE_TRIGGER_NOT_MANUAL");
-    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND live_trigger = 'MANUAL'");
-    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
-  });
-
-  it("setMatchOnAir_offAir_switchOn_returnsTrue", async () => {
-    await mockDb(liveRows({ live_trigger: "MANUAL", live_started_at: null }, 1));
-    await expect(setMatchOnAir(42, true)).resolves.toBe(true);
-  });
-
-  it("setMatchOnAir_alreadyOffAir_returnsFalse", async () => {
-    await mockDb(liveRows({ live_trigger: "MANUAL", live_started_at: null }, 0));
-    await expect(setMatchOnAir(42, false)).resolves.toBe(false);
   });
 });

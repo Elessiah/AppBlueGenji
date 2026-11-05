@@ -11,7 +11,9 @@
  * s'est retiré — n'a pas de propriétaire : il reste au staff `tournaments`.
  * Seul un caster du match devient propriétaire du mode qu'il pose : posé par
  * qui ne le caste pas (staff, admin, arbitre, porteur de la seule `live`), le
- * mode reste au staff.
+ * mode reste au staff. Un caster tu (devenu inéligible avant le lancement) ou
+ * parti ne tient plus le mode, que le serveur et l'interface rendent au staff.
+ * Ouvrir ou couper l'antenne d'un mode manuel suit la même règle.
  *
  * Module pur : la même règle sert le serveur (sous le verrou du match) et
  * l'interface (contrôles cachés), jamais deux définitions.
@@ -66,26 +68,21 @@ export type LiveTriggerViewer = {
 };
 
 /**
- * Propriétaire que l'instantané tait (`liveTriggerOwnerHidden` : caster retiré
- * mais pas encore rendu) : un identifiant qu'aucun compte ne porte, pour que
- * l'interface garde le mode verrouillé comme le serveur.
- */
-const HIDDEN_OWNER = -1;
-
-/**
- * Le lecteur peut-il changer le mode d'antenne de ce match ? La règle du
- * serveur (`mayChangeLiveTrigger`), lue sur l'instantané : le propriétaire y
- * est `liveTriggerCasterId` (ou tu, `liveTriggerOwnerHidden`). Faux sans compte.
+ * Le lecteur peut-il changer le mode d'antenne de ce match (ou ouvrir et
+ * couper son antenne) ? La règle du serveur (`mayChangeLiveTrigger`), lue sur
+ * l'instantané : le propriétaire y est `liveTriggerCasterId`, nommé tant qu'il
+ * y est montré — le serveur ne tient pas non plus pour maître un caster tu ou
+ * parti (`loadShownCasterIds`). Faux sans compte.
  */
 export function viewerMayChangeLiveTrigger(
-  match: { liveTrigger: MatchLiveTrigger | null; liveTriggerCasterId?: number | null; liveTriggerOwnerHidden?: boolean },
+  match: { liveTrigger: MatchLiveTrigger | null; liveTriggerCasterId?: number | null },
   viewer: LiveTriggerViewer,
 ): boolean {
   if (viewer.userId === null) return false;
   return mayChangeLiveTrigger(
     {
       trigger: match.liveTrigger,
-      ownerId: match.liveTriggerCasterId ?? (match.liveTriggerOwnerHidden === true ? HIDDEN_OWNER : null),
+      ownerId: match.liveTriggerCasterId ?? null,
       refereeId: viewer.referees ? viewer.userId : null,
     },
     { userId: viewer.userId, isAdmin: viewer.isAdmin, manages: viewer.manages },
@@ -106,9 +103,4 @@ export function liveTriggerOwnerAfter(
 ): number | null {
   if (next === null || !actorCasts) return null;
   return actor.userId;
-}
-
-/** Un identifiant de compte lu en base (`BIGINT` nul ou non). */
-export function nullableUserId(value: number | string | null | undefined): number | null {
-  return value === null || value === undefined ? null : Number(value);
 }

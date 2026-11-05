@@ -350,6 +350,14 @@ function readRoundRows(state: World, sql: string): [unknown, unknown[]] | null {
 
 /** Lectures de `bg_users` : un compte, ou un lot (éligibilité des casters), `null` pour les autres requêtes. */
 function readUserRows(state: World, sql: string, params: unknown[]): unknown[] | null {
+  if (sql.startsWith("SELECT mc.user_id,")) {
+    // Casters montrés (`loadShownCasterIds`) : ceux du match, avec leur compte.
+    const ids = params.slice(1).map(Number);
+    const rows = (state.match?.casters ?? [])
+      .filter((caster) => ids.includes(caster.user_id))
+      .map((caster) => ({ user_id: caster.user_id, ...state.users[caster.user_id] }));
+    return [rows, []];
+  }
   if (sql.includes("FROM bg_users WHERE id IN (")) {
     const rows = params.map(Number).flatMap((id) => (state.users[id] ? [{ id, ...state.users[id] }] : []));
     return [rows, []];
@@ -885,7 +893,7 @@ describe("claimMatchCast", () => {
   it("claimMatchCast_marvelRivalsWithoutBattlenet_isAccepted", async () => {
     state.match = { ...state.match!, tournament_game: "MR", game: "MR" };
     state.users[CASTER] = { ...verified, blizzard_sub: null, overwatch_battletag: null };
-    await expect(claimMatchCast(42, CASTER, true, OWN_STREAM)).resolves.toBeUndefined();
+    await expect(claimMatchCast(42, CASTER, true, OWN_STREAM)).resolves.toEqual({ triggerSkipped: false });
   });
 
   it("claimMatchCast_marvelRivalsWithoutDiscord_stillRefused", async () => {

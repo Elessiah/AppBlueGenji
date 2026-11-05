@@ -1297,7 +1297,7 @@ export async function getTournamentViewerContext(
   // Pseudo des arbitres désignés : à tout membre connecté (les deux portes qui
   // servent ce contexte exigent une session), jamais dans l'instantané diffusé.
   // Les mêmes pour tous : lus une fois par version d'instantané.
-  const refereeNames = markViewerReferee(await loadRefereeNames(snapshot), userId);
+  const refereeNames = markViewerReferee(await loadRefereeNames(snapshot), userId, snapshot.matches);
 
   return {
     preview,

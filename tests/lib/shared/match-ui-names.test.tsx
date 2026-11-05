@@ -50,6 +50,11 @@ describe("refereeNameOf", () => {
     expect(refereeNameOf(shown(5, "k5"), NAMES)).toBe("Juge");
   });
 
+  it("refereeNameOf_emptyPseudo_returnsNull", () => {
+    // Entrée de l'arbitre reconnu de lui seul (`markViewerReferee`) : elle ne nomme personne.
+    expect(refereeNameOf(shown(5, "k5"), [{ matchId: 5, refereeKey: "k5", pseudo: "" }])).toBeNull();
+  });
+
   it("refereeNameOf_staleKey_returnsNull", () => {
     expect(refereeNameOf(shown(5, "k-nouveau"), NAMES)).toBeNull();
   });

@@ -77,16 +77,21 @@ const CastSettingsDialog = dynamic(
   { ssr: false },
 );
 
+/** Envoie le geste, ou lève son code. */
 async function send(url: string, method: string, body?: unknown): Promise<void> {
+  await request(url, method, body);
+}
+
+/** Envoie le geste ; rend le corps de la réponse (`{}` s'il est illisible), ou lève son code. */
+async function request(url: string, method: string, body?: unknown): Promise<Record<string, unknown>> {
   const response = await fetch(url, {
     method,
     headers: body === undefined ? undefined : { "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(payload.error || "UNKNOWN");
-  }
+  const payload = (await response.json().catch(() => ({}))) as Record<string, unknown> & { error?: string };
+  if (!response.ok) throw new Error(payload.error || "UNKNOWN");
+  return payload;
 }
 
 const ICONS: Record<MatchCardActionId, LucideIcon> = {
@@ -576,8 +581,9 @@ export function MatchCardActions({
 
   const claim = async (body: CastClaimBody): Promise<CastClaimOutcome> => {
     try {
-      await send(`/api/matches/${match.id}/caster`, "POST", body);
-      showSuccess(t("cardActions.casting"));
+      const payload = await request(`/api/matches/${match.id}/caster`, "POST", body);
+      // Le mode d'antenne choisi a été posé entre-temps par un autre : inscrit quand même, sans lui.
+      showSuccess(t(payload.triggerSkipped === true ? "cardActions.castingTriggerKept" : "cardActions.casting"));
       claimedRef.current = true;
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
       return { ok: true };

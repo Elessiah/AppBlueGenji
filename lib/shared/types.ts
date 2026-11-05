@@ -660,12 +660,6 @@ export type BracketMatch = {
    */
   liveTriggerCasterId?: number | null;
   /**
-   * Le mode a un caster maître que l'instantané ne montre pas (inscription
-   * retirée de l'affichage, pas encore rendue) : l'interface le garde
-   * verrouillé, comme le serveur (`viewerMayChangeLiveTrigger`).
-   */
-  liveTriggerOwnerHidden?: boolean;
-  /**
    * **Premier** lien de diffusion du match (le stream le plus ancien qui en a
    * un) — celui des vues compactes ; `null` = casté sans lien public. Tous les
    * liens sont dans `streams`.

@@ -307,8 +307,6 @@ export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnaps
       voice: match.voice === undefined ? undefined : null,
       // Le caster maître du mode d'antenne est un compte : tu, comme les casters.
       liveTriggerCasterId: match.liveTriggerCasterId === undefined ? undefined : null,
-      // Ni son retrait : qu'un caster ait été tu ne regarde pas un visiteur.
-      liveTriggerOwnerHidden: undefined,
       casters: match.casters.map((caster, index) => ({
         ...caster,
         userId: SPECTATOR_HIDDEN_USER_ID - index,
