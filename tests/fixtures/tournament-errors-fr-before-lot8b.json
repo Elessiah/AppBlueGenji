@@ -1,5 +1,5 @@
 {
-  "count": 202,
+  "count": 204,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "ADMIN_RESOLVE_FAILED": "Erreur lors de la résolution du match.",
@@ -203,6 +203,8 @@
     "TOURNAMENT_UPDATE_FAILED": "Erreur lors de la modification du tournoi.",
     "UNAUTHORIZED": "Ta session a expiré. Reconnecte-toi pour suivre le tournoi en direct.",
     "UNSUPPORTED_CONTENT_TYPE": "Requête refusée. Recharge la page, puis réessaie.",
-    "USER_NOT_FOUND": "Compte introuvable."
+    "USER_NOT_FOUND": "Compte introuvable.",
+    "INVALID_STREAM_LINKS": "Liens des streams invalides.",
+    "LIVE_TRIGGER_NOT_OWNED": "Le mode de passage à l'antenne appartient au caster qui l'a posé : seuls lui, l'arbitre du match ou un admin le changent."
   }
 }

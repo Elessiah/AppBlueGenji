@@ -105,6 +105,7 @@ const viewer = (overrides: Partial<TournamentViewerContext> = {}): TournamentVie
   canRegister: false,
   matchProposals: [],
   refereeNames: [],
+  voiceLinks: [],
   certificationPrompt: null,
   // Qualité pour engager son équipe : le cas ordinaire. Le refus a son propre
   // test — sans ce défaut, tous les autres testeraient le mauvais refus.

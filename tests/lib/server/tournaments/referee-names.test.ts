@@ -5,7 +5,7 @@ jest.mock("@/lib/server/cache", () => ({ cached: jest.fn() }));
 
 import { cached } from "@/lib/server/cache";
 import { withConnection } from "@/lib/server/database";
-import { loadRefereeNames, refereeKey, withoutRefereeKeys } from "@/lib/server/tournaments/referee-names";
+import { loadRefereeNames, markViewerReferee, refereeKey, withoutRefereeKeys } from "@/lib/server/tournaments/referee-names";
 import { bracketMatch } from "../../../helpers/bracket-match";
 import { connectionMock, fakeConnection } from "../../../helpers/sql-double";
 import { tournamentCard } from "../../../helpers/tournament-card";
@@ -149,5 +149,25 @@ describe("withoutRefereeKeys", () => {
     const matches = [bracketMatch({ id: 5, refereeKey: null })];
 
     expect(withoutRefereeKeys(matches)).toBe(matches);
+  });
+});
+
+describe("markViewerReferee", () => {
+  it("markViewerReferee_viewerRefereesOneMatch_marksOnlyThatMatch", () => {
+    const names = [
+      { matchId: 5, refereeKey: refereeKey(5, 9), pseudo: "Arbitre" },
+      { matchId: 6, refereeKey: refereeKey(6, 3), pseudo: "Autre" },
+    ];
+
+    expect(markViewerReferee(names, 9)).toEqual([
+      { matchId: 5, refereeKey: refereeKey(5, 9), pseudo: "Arbitre", mine: true },
+      { matchId: 6, refereeKey: refereeKey(6, 3), pseudo: "Autre" },
+    ]);
+  });
+
+  it("markViewerReferee_viewerRefereesNothing_returnsSameList", () => {
+    const names = [{ matchId: 5, refereeKey: refereeKey(5, 9), pseudo: "Arbitre" }];
+
+    expect(markViewerReferee(names, 3)).toBe(names);
   });
 });

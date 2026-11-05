@@ -85,6 +85,7 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
       trigger: "AUTO",
       liveUrl: "kick.com/bg",
       setter: { userId: arbitre.id, asOrganisation: false },
+      access: { isAdmin: false, manages: true },
     });
   });
 
@@ -207,6 +208,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "MANUAL",
       liveUrl: "kick.com/bg",
       setter: { userId: caster.id, asOrganisation: false },
+      access: { isAdmin: false, manages: false },
     });
   });
 
@@ -222,6 +224,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "AUTO",
       liveUrl: null,
       setter: { userId: arbitre.id, asOrganisation: false },
+      access: { isAdmin: false, manages: true },
     });
   });
 
@@ -239,7 +242,40 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "AUTO",
       liveUrl: "kick.com/bg",
       setter: { userId: arbitre.id, asOrganisation: true },
+      access: { isAdmin: false, manages: true },
     });
+  });
+
+  it("PUT_otherMatchRefereeStreamLinks_returns403", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchLiveConfig).mockRejectedValue(new Error("NOT_MATCH_REFEREE"));
+
+    const res = await putMatchLive(
+      matchReq("PUT", { trigger: "MANUAL", streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/x" }] }),
+      matchParams("42"),
+    );
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "NOT_MATCH_REFEREE" });
+  });
+
+  it("PUT_coCasterChangesTrigger_returns403", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setMatchLiveConfig).mockRejectedValue(new Error("LIVE_TRIGGER_NOT_OWNED"));
+
+    const res = await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"));
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "LIVE_TRIGGER_NOT_OWNED" });
+  });
+
+  it("PUT_invalidStreamLinks_returns400", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+
+    const res = await putMatchLive(matchReq("PUT", { trigger: "MANUAL", streamLinks: "x" }), matchParams("42"));
+
+    expect(res.status).toBe(400);
+    expect(setMatchLiveConfig).not.toHaveBeenCalled();
   });
 
   it("rejette un community manager avec 403", async () => {
@@ -258,6 +294,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: null,
       liveUrl: null,
       setter: { userId: caster.id, asOrganisation: false },
+      access: { isAdmin: false, manages: false },
     });
   });
 
@@ -272,6 +309,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "START_TIME",
       liveUrl: null,
       setter: { userId: caster.id, asOrganisation: false },
+      access: { isAdmin: false, manages: false },
     });
   });
 

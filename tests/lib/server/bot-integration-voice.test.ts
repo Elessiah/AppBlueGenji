@@ -13,7 +13,10 @@ describe("bot-integration — salons vocaux", () => {
   it("ensureVoiceChannel_created_sendsKeyAndNameAndReturnsChannelId", async () => {
     const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(json(201, { channelId: "123456789" }));
 
-    await expect(ensureVoiceChannel("match:42:team:1", "Alpha")).resolves.toEqual({ kind: "ok", value: "123456789" });
+    await expect(ensureVoiceChannel("match:42:team:1", "Alpha")).resolves.toEqual({
+      kind: "ok",
+      value: { channelId: "123456789", guildId: null },
+    });
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toMatch(/\/internal\/voice\/channels$/);
     expect(JSON.parse(String(init?.body))).toEqual({ key: "match:42:team:1", name: "Alpha" });

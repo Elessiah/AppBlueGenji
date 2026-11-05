@@ -40,6 +40,7 @@ export function tournamentViewerContext(
     preview: null,
     matchProposals: [],
     refereeNames: [],
+    voiceLinks: [],
     canRegister: false,
     canRegisterEntrant: true,
     registrationBlock: null,

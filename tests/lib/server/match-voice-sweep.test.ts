@@ -84,22 +84,22 @@ describe("dispatchMatchVoiceChannels — création", () => {
 
   it("dispatchMatchVoiceChannels_dueMatch_createsBothChannelsAndPublishes", async () => {
     const { writes } = database({ due: [dueMatch] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValueOnce({ kind: "ok", value: "901" }).mockResolvedValueOnce({ kind: "ok", value: "902" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValueOnce({ kind: "ok", value: { channelId: "901", guildId: null } }).mockResolvedValueOnce({ kind: "ok", value: { channelId: "902", guildId: null } });
     await dispatchMatchVoiceChannels();
     expect(jest.mocked(ensureVoiceChannel).mock.calls).toEqual([
       ["match:42:team:1", "Alpha"],
       ["match:42:team:2", "Beta"],
     ]);
     expect(writes.filter((w) => w.sql.startsWith("INSERT")).map((w) => w.params)).toEqual([
-      [42, 1, "901"],
-      [42, 2, "902"],
+      [42, 1, "901", null],
+      [42, 2, "902", null],
     ]);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
   it("dispatchMatchVoiceChannels_channelAlreadyOpen_asksBotOnlyForMissingSide", async () => {
     database({ due: [dueMatch], voiceRows: [openRow(1, "901")] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "902" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: "902", guildId: null } });
     await dispatchMatchVoiceChannels();
     expect(jest.mocked(ensureVoiceChannel).mock.calls).toEqual([["match:42:team:2", "Beta"]]);
   });
@@ -108,9 +108,9 @@ describe("dispatchMatchVoiceChannels — création", () => {
     database({ due: [dueMatch] });
     jest
       .mocked(ensureVoiceChannel)
-      .mockResolvedValueOnce({ kind: "ok", value: "901" })
+      .mockResolvedValueOnce({ kind: "ok", value: { channelId: "901", guildId: null } })
       .mockResolvedValueOnce({ kind: "failed", code: "INVALID_VOICE_CHANNEL_NAME" })
-      .mockResolvedValueOnce({ kind: "ok", value: "902" });
+      .mockResolvedValueOnce({ kind: "ok", value: { channelId: "902", guildId: null } });
     await dispatchMatchVoiceChannels();
     expect(jest.mocked(ensureVoiceChannel).mock.calls[2]).toEqual(["match:42:team:2", VOICE_FALLBACK_CHANNEL_NAME]);
   });
@@ -178,14 +178,14 @@ describe("dispatchMatchVoiceChannels — création", () => {
   it("dispatchMatchVoiceChannels_teamCreateFailedWithinBackoff_asksOnlyOtherTeam", async () => {
     // L'autre équipe ramène le match dans la passe : le délai de l'équipe en échec tient.
     database({ due: [dueMatch], voiceRows: [{ ...openRow(1, "x"), channel_id: null, failed_at: "2026-11-04 19:00:00", backing_off: 1 }] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "902" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: "902", guildId: null } });
     await dispatchMatchVoiceChannels();
     expect(jest.mocked(ensureVoiceChannel).mock.calls).toEqual([["match:42:team:2", "Beta"]]);
   });
 
   it("dispatchMatchVoiceChannels_voiceRowsQuery_computesBackoffInDatabase", async () => {
     const { execute } = database({ due: [dueMatch] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: "901", guildId: null } });
     await dispatchMatchVoiceChannels();
     const voiceRowsSql = execute.mock.calls.map(([sql]) => sql).find((sql) => sql.includes("AS backing_off"));
     expect(voiceRowsSql).toContain(`failed_at > NOW() - INTERVAL ${VOICE_RETRY_SECONDS} SECOND`);
@@ -197,7 +197,7 @@ describe("dispatchMatchVoiceChannels — création", () => {
     jest
       .mocked(ensureVoiceChannel)
       .mockResolvedValueOnce({ kind: "failed", code: "VOICE_DISCORD_ERROR" })
-      .mockResolvedValueOnce({ kind: "ok", value: "902" });
+      .mockResolvedValueOnce({ kind: "ok", value: { channelId: "902", guildId: null } });
     await dispatchMatchVoiceChannels();
     expect(jest.mocked(ensureVoiceChannel).mock.calls.map(([key]) => key)).toEqual(["match:42:team:1", "match:42:team:2"]);
   });
@@ -246,7 +246,7 @@ describe("dispatchMatchVoiceChannels — création", () => {
 
   it("dispatchMatchVoiceChannels_channelRecorded_restartsCreationTimeOnReopenOrNewChannel", async () => {
     const { writes } = database({ due: [dueMatch] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: "901", guildId: null } });
     await dispatchMatchVoiceChannels();
     const insert = writes.find((w) => w.sql.startsWith("INSERT") && w.sql.includes("VALUES(channel_id)"));
     expect(insert?.sql).toContain("created_at = IF(released_at IS NOT NULL OR NOT (channel_id <=> VALUES(channel_id)), NOW(), created_at)");
@@ -264,7 +264,7 @@ describe("dispatchMatchVoiceChannels — création", () => {
       due: [dueMatch],
       releasable: [{ match_id: 9, team_id: 3, channel_id: "903", tournament_id: 7 }],
     });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: "901", guildId: null } });
     jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "ok", value: true });
     await dispatchMatchVoiceChannels();
     expect(getConnection).not.toHaveBeenCalled();
@@ -272,7 +272,7 @@ describe("dispatchMatchVoiceChannels — création", () => {
 
   it("dispatchMatchVoiceChannels_teamNameWithInvisibles_sendsVisibleText", async () => {
     database({ due: [{ ...dueMatch, team1_name: "Al​pha" }] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: "901", guildId: null } });
     await dispatchMatchVoiceChannels();
     expect(jest.mocked(ensureVoiceChannel).mock.calls[0][1]).toBe("Alpha");
   });
@@ -502,7 +502,7 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
 
   it("dispatchMatchVoiceChannels_touchedAndPurge_publishesBeforePurging", async () => {
     const { execute } = database({ due: [dueMatch] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: "901", guildId: null } });
     await dispatchMatchVoiceChannels();
     const publishedAt = jest.mocked(publishMatchUpdatedEvent).mock.invocationCallOrder[0]!;
     const purgeAt = execute.mock.invocationCallOrder[execute.mock.calls.findIndex(([sql]) => sql.startsWith("DELETE"))]!;
@@ -792,10 +792,10 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
 
   it("dispatchMatchVoiceChannels_openChannelDeletedByHand_recordsNewChannelAndPublishes", async () => {
     const { writes } = database({ openDue: [open] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "905" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: "905", guildId: null } });
     await dispatchMatchVoiceChannels();
     expect(jest.mocked(ensureVoiceChannel).mock.calls).toEqual([["match:42:team:1", "Alpha"]]);
-    expect(writes.filter((w) => w.sql.startsWith("INSERT")).map((w) => w.params)).toEqual([[42, 1, "905"]]);
+    expect(writes.filter((w) => w.sql.startsWith("INSERT")).map((w) => w.params)).toEqual([[42, 1, "905", null]]);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
@@ -807,7 +807,7 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
       .mockRejectedValueOnce(new Error("ER_BAD"))
       .mockImplementationOnce(async () => {
         await new Promise((resolve) => setTimeout(resolve, 5));
-        return { kind: "ok", value: "907" };
+        return { kind: "ok", value: { channelId: "907", guildId: null } };
       });
     await dispatchMatchVoiceChannels();
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(8);
@@ -816,7 +816,7 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
   it("dispatchMatchVoiceChannels_matchFinishedDuringRecheck_newChannelHandedBackInSamePass", async () => {
     // Ligne rouverte par la revérification (rendue entre-temps) : le rendu de la même passe la rend.
     database({ openDue: [open], releasable: [{ match_id: 42, team_id: 1, channel_id: "905", tournament_id: 7 }] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "905" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: "905", guildId: null } });
     jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "ok", value: true });
     await dispatchMatchVoiceChannels();
     expect(releaseVoiceChannel).toHaveBeenCalledWith("905");
@@ -832,7 +832,7 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
 
   it("dispatchMatchVoiceChannels_openChannelStillThere_writesNothing", async () => {
     const { writes } = database({ openDue: [open] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: "901", guildId: null } });
     await dispatchMatchVoiceChannels();
     expect(writes.filter((w) => w.sql.startsWith("INSERT"))).toEqual([]);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
@@ -840,7 +840,7 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
 
   it("dispatchMatchVoiceChannels_openChannelRecheckedWithinAMinute_asksBotOnce", async () => {
     database({ openDue: [open] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: "901", guildId: null } });
     await dispatchMatchVoiceChannels();
     await dispatchMatchVoiceChannels(true);
     expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
@@ -859,7 +859,7 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
     const clock = jest.spyOn(Date, "now").mockReturnValue(start);
     jest.mocked(ensureVoiceChannel)
       .mockResolvedValueOnce({ kind: "failed", code: "BOT_INTERNAL_UNREACHABLE" })
-      .mockResolvedValue({ kind: "ok", value: "901" });
+      .mockResolvedValue({ kind: "ok", value: { channelId: "901", guildId: null } });
     await dispatchMatchVoiceChannels();
     clock.mockReturnValue(start + 11_000);
     await dispatchMatchVoiceChannels(true);
@@ -882,14 +882,14 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
     const start = Date.now();
     const clock = jest.spyOn(Date, "now").mockReturnValue(start);
     database({ openDue: [first!] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: first!.channel_id });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: first!.channel_id, guildId: null } });
     await dispatchMatchVoiceChannels();
     clock.mockReturnValue(start + 55_000);
     database({ openDue: [first!, second!] });
     jest.mocked(ensureVoiceChannel).mockResolvedValueOnce({ kind: "failed", code: "BOT_VOICE_TIMEOUT" });
     await dispatchMatchVoiceChannels(true);
     const failedKey = jest.mocked(ensureVoiceChannel).mock.calls.at(-1)![0];
-    jest.mocked(ensureVoiceChannel).mockReset().mockResolvedValue({ kind: "ok", value: "90" });
+    jest.mocked(ensureVoiceChannel).mockReset().mockResolvedValue({ kind: "ok", value: { channelId: "90", guildId: null } });
     clock.mockReturnValue(start + 66_000);
     await dispatchMatchVoiceChannels(true);
     const keys = jest.mocked(ensureVoiceChannel).mock.calls.map(([key]) => key);
@@ -902,7 +902,7 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
     jest
       .mocked(ensureVoiceChannel)
       .mockResolvedValueOnce({ kind: "failed", code: "VOICE_PERMISSION_DENIED" })
-      .mockResolvedValue({ kind: "ok", value: "90" });
+      .mockResolvedValue({ kind: "ok", value: { channelId: "90", guildId: null } });
     await dispatchMatchVoiceChannels();
     expect(ensureVoiceChannel).toHaveBeenCalledTimes(2);
     await dispatchMatchVoiceChannels(true);
@@ -931,7 +931,7 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
       peak = Math.max(peak, inFlight);
       await new Promise((resolve) => setTimeout(resolve, 5));
       inFlight -= 1;
-      return { kind: "ok", value: `9${Number(key.split(":")[1]) - 100}` };
+      return { kind: "ok", value: { channelId: `9${Number(key.split(":")[1]) - 100}`, guildId: null } };
     });
     await dispatchMatchVoiceChannels();
     expect(ensureVoiceChannel).toHaveBeenCalledTimes(6);
@@ -949,7 +949,7 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
     database({ openDue: openRows(100) });
     jest.mocked(ensureVoiceChannel).mockImplementation(async (key) => ({
       kind: "ok",
-      value: `9${Number(key.split(":")[1]) - 100}`,
+      value: { channelId: `9${Number(key.split(":")[1]) - 100}`, guildId: null },
     }));
     await dispatchMatchVoiceChannels();
     expect(ensureVoiceChannel).toHaveBeenCalledTimes(80);
@@ -965,7 +965,7 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
 
   it("dispatchMatchVoiceChannels_recheckWindowNotFull_readsFromStartEachPass", async () => {
     const { execute } = database({ openDue: [open] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: "901", guildId: null } });
     await dispatchMatchVoiceChannels();
     await dispatchMatchVoiceChannels(true);
     expect(openDueParams(execute)).toEqual([
@@ -977,7 +977,7 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
   it("dispatchMatchVoiceChannels_recheckWindowFull_nextPassStartsAfterLastRow", async () => {
     // 400 salons (matchs 100 à 499) : la fenêtre est pleine, la suivante tourne.
     const { execute } = database({ openDue: openRows(400) });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "90" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: "90", guildId: null } });
     await dispatchMatchVoiceChannels();
     await dispatchMatchVoiceChannels(true);
     expect(openDueParams(execute)).toEqual([
@@ -990,7 +990,7 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
     jest.spyOn(Date, "now").mockReturnValue(Date.now());
     const windowA = openRows(400);
     const windowB = openRows(400).map((row) => ({ ...row, match_id: row.match_id + 1000 }));
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "90" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: "90", guildId: null } });
     database({ openDue: windowA });
     await dispatchMatchVoiceChannels();
     const checkedFirst = jest.mocked(ensureVoiceChannel).mock.calls.map(([key]) => key);
@@ -1007,7 +1007,7 @@ describe("dispatchMatchVoiceChannels — salons ouverts revérifiés", () => {
 
   it("dispatchMatchVoiceChannels_channelCreatedThisPass_notAskedAgainByRecheck", async () => {
     database({ due: [dueMatch], openDue: [{ ...open, match_id: 42, team_id: 1 }] });
-    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: { channelId: "901", guildId: null } });
     await dispatchMatchVoiceChannels();
     expect(jest.mocked(ensureVoiceChannel).mock.calls.map(([key]) => key)).toEqual([
       "match:42:team:1",

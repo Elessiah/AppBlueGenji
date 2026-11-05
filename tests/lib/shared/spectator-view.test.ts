@@ -501,6 +501,8 @@ const MATCH_FIELDS = {
   launchedAt: "public",
   liveStartedAt: "public",
   liveTrigger: "public",
+  // Le caster maître du mode d'antenne est un compte : retiré, comme les casters.
+  liveTriggerCasterId: "retiré",
   liveUrl: "public",
   streams: "public",
   lobbyOpenedAt: "public",

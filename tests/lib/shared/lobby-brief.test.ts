@@ -35,14 +35,13 @@ function side(overrides: Partial<LobbyBriefSide> = {}): LobbyBriefSide {
     maps: [],
     nextBan: "LOSER",
     cast: false,
-    decision: "UNDECIDED",
     ...overrides,
   };
 }
 
 /** Un côté aux noms d'équipe de 60 caractères, casté, avec vocal, en autogestion : le plus long message. */
 function cappedSide(overrides: Partial<LobbyBriefSide>): LobbyBriefSide {
-  return side({ teamName: "R".repeat(60), opponentName: "N".repeat(60), cast: true, voice: true, decision: "SELF_MANAGED", ...overrides });
+  return side({ teamName: "R".repeat(60), opponentName: "N".repeat(60), cast: true, voice: true, ...overrides });
 }
 
 /** Le message complet attendu, pour les assertions exactes. */
@@ -50,7 +49,7 @@ const INVITE = "https://discord.gg/Sgdh3p4VhC";
 
 describe("formatLobbyBriefDm", () => {
   it("écrit le check-in en français : titre, préparation, paramètres, maps et pied", () => {
-    expect(formatLobbyBriefDm(side({ decision: "SELF_MANAGED" }), URL)).toBe(
+    expect(formatLobbyBriefDm(side(), URL)).toBe(
       [
         "# Check-in du match « Renards » Vs « Nova »",
         "*Manche 2 · « Coupe » — coup d'envoi dans moins de 15 minutes.*",
@@ -82,7 +81,7 @@ describe("formatLobbyBriefDm", () => {
   });
 
   it("vu du côté qui n'héberge pas : l'adversaire à gauche, et les réglages à vérifier", () => {
-    const text = formatLobbyBriefDm(side({ hosting: false, banFirst: true, decision: "SELF_MANAGED" }), URL);
+    const text = formatLobbyBriefDm(side({ hosting: false, banFirst: true }), URL);
     expect(text).toContain("* Gauche (hôte) : « Nova » · Droite : « Renards »");
     expect(text).toContain("* L'équipe hôte crée la partie : **vérifie les paramètres** avant de lancer.");
     expect(text).toContain("* Bans de la carte 1 : « Renards » d'abord, puis « Nova ».");
@@ -102,14 +101,13 @@ describe("formatLobbyBriefDm", () => {
   });
 
   it("dit la carte pas encore fixée et la section du cast, avec le live quand il est public", () => {
-    const referee = formatLobbyBriefDm(side({ firstMap: null, cast: true, decision: "REFEREE" }), URL);
-    expect(referee).toContain("* Map 1 : pas encore fixée");
-    expect(referee).toContain("## Match casté");
-    expect(referee).toContain("* Invitez les casters inscrits (leurs contacts sont sur la page du match).");
-    expect(referee).toContain("* Triez les joueurs par rôle dans le salon.");
-    expect(referee).toContain("* Ajoute l'arbitre désigné en jeu : il invitera les joueurs dans le salon.");
+    const cast = formatLobbyBriefDm(side({ firstMap: null, cast: true }), URL);
+    expect(cast).toContain("* Map 1 : pas encore fixée");
+    expect(cast).toContain("## Match casté");
+    expect(cast).toContain("* Invitez les casters inscrits (leurs contacts sont sur la page du match).");
+    expect(cast).toContain("* Triez les joueurs par rôle dans le salon.");
     // Sans lien de diffusion public, aucune ligne de diffusion.
-    expect(referee).not.toContain("Diffusion");
+    expect(cast).not.toContain("Diffusion");
     // Un live sans cast inscrit n'ouvre pas la section.
     expect(formatLobbyBriefDm(side({ streamUrl: "https://twitch.tv/bluegenji" }), URL)).not.toContain("## Match casté");
   });
@@ -126,14 +124,17 @@ describe("formatLobbyBriefDm", () => {
     expect([fr.includes("En direct"), en.includes("Live on")]).toEqual([false, false]);
   });
 
-  it("sans décision d'arbitrage, ne charge personne de créer la partie", () => {
-    const text = formatLobbyBriefDm(side(), URL);
-    expect(text).toContain("Voici les éléments importants à savoir avant le coup d'envoi.");
-    expect(text).not.toMatch(/créer la partie|arbitre désigné|autogestion/i);
+  it("formatLobbyBriefDm_selfManagedOnly_neverMentionsAReferee", () => {
+    // Le check-in ne part qu'en autogestion (`lobby-brief.ts`) : aucune ouverture d'arbitre ni de match sans décision.
+    for (const locale of ["fr", "en"] as const) {
+      const text = formatLobbyBriefDm(side(), URL, locale);
+      expect(text).not.toMatch(/arbitre désigné|assigned referee|avant le coup d'envoi\.$|before kickoff\.$/m);
+    }
+    expect(formatLobbyBriefDm(side(), URL)).toContain("**Votre match est en autogestion.**");
   });
 
   it("en anglais, avec le lien passé par la langue du compte", () => {
-    const text = formatLobbyBriefDm(side({ cast: true, decision: "SELF_MANAGED", firstMap: null }), URL, "en");
+    const text = formatLobbyBriefDm(side({ cast: true, firstMap: null }), URL, "en");
     expect(text).toBe(
       [
         "# “Renards” Vs “Nova” check-in",
@@ -169,25 +170,23 @@ describe("formatLobbyBriefDm", () => {
     );
   });
 
-  it("formatLobbyBriefDm_marvelRivalsReferee_noBattletagNorInGameAdd", () => {
-    const fr = formatLobbyBriefDm(side({ game: "MR", decision: "REFEREE" }), URL);
-    const en = formatLobbyBriefDm(side({ game: "MR", decision: "REFEREE" }), URL, "en");
+  it("formatLobbyBriefDm_marvelRivals_noBattletagInContactsLine", () => {
+    const fr = formatLobbyBriefDm(side({ game: "MR" }), URL);
+    const en = formatLobbyBriefDm(side({ game: "MR" }), URL, "en");
 
-    expect(fr).toContain("* L'arbitre désigné invitera les joueurs dans le salon.");
     expect(fr).toContain(`*Vous pouvez retrouver les contacts sur la page du match : ${URL}*`);
-    expect(en).toContain("* The assigned referee will invite the players to the lobby.");
     expect(en).toContain(`*You can find the contacts on the match page: ${localizedSiteUrl(URL, "en")}*`);
     for (const text of [fr, en]) {
-      expect(text).not.toMatch(/BattleTag|Ajoute l'arbitre|Add the assigned/);
+      expect(text).not.toMatch(/BattleTag/);
     }
   });
 
   it("formatLobbyBriefDm_marvelRivalsCast_notifiesCastersInsteadOfInviting", () => {
-    const fr = formatLobbyBriefDm(side({ game: "MR", decision: "SELF_MANAGED", cast: true }), URL);
+    const fr = formatLobbyBriefDm(side({ game: "MR", cast: true }), URL);
 
     expect(fr).toContain("* Prévenez les casters inscrits (leurs contacts sont sur la page du match).");
     expect(fr).not.toContain("Invitez les casters");
-    expect(formatLobbyBriefDm(side({ game: "MR", decision: "SELF_MANAGED", cast: true }), URL, "en")).toContain(
+    expect(formatLobbyBriefDm(side({ game: "MR", cast: true }), URL, "en")).toContain(
       "* Notify the signed-up casters",
     );
   });
@@ -199,7 +198,6 @@ describe("formatLobbyBriefDm", () => {
       opponentName: "PseudoB",
       hosting: false,
       banFirst: true,
-      decision: "SELF_MANAGED",
     });
     const fr = formatLobbyBriefDm(solo, URL);
     const en = formatLobbyBriefDm(solo, URL, "en");
@@ -213,6 +211,26 @@ describe("formatLobbyBriefDm", () => {
     expect(en).toContain("# Your match check-in");
     expect(en).toContain("* Left (host): your opponent · Right: you");
     expect(en).toContain("* Map 1 bans: you first, then your opponent.");
+  });
+
+  it("formatLobbyBriefDm_soloOpponentHosts_youCheckTheSettings", () => {
+    const solo = side({ solo: true, hosting: false });
+
+    // ERREUR.txt (#558) : un engagé solo n'a pas d'équipe — la ligne parle de lui.
+    expect(formatLobbyBriefDm(solo, URL)).toContain("* Ton adversaire crée la partie : **vérifie les paramètres** avant de lancer.");
+    expect(formatLobbyBriefDm(solo, URL, "en")).toContain("* Your opponent creates the game: **check the settings** before starting.");
+  });
+
+  it("formatLobbyBriefDm_soloHosting_youCreateTheGame", () => {
+    const solo = side({ solo: true, hosting: true });
+
+    const fr = formatLobbyBriefDm(solo, URL);
+    const en = formatLobbyBriefDm(solo, URL, "en");
+
+    expect(fr).toContain("* **C'est à toi de créer la partie.**");
+    expect(en).toContain("* **You create the game.**");
+    expect(fr).not.toContain("ton équipe de créer");
+    expect(en).not.toContain("Your team creates");
   });
 
   it("n'écrit ni BattleTag ni tag Discord, et neutralise les textes saisis (noms, carte)", () => {
@@ -250,7 +268,7 @@ describe("formatLobbyBriefDm — cartes du round", () => {
     const pool = Array.from({ length: 20 }, (_, index) => `Carte-${String(index).padStart(2, "0")}-${"x".repeat(50)}`);
     const maps = Array.from({ length: 9 }, (_, index) => ({ number: index + 1, kind: "POOL" as const, map: null, candidates: pool }));
 
-    const text = formatLobbyBriefDm(side({ maps, cast: true, decision: "SELF_MANAGED", voice: true }), URL);
+    const text = formatLobbyBriefDm(side({ maps, cast: true, voice: true }), URL);
 
     const lines = text.split("\n");
     const section = lines.slice(lines.indexOf("## Déroulé des maps") + 1);
@@ -338,12 +356,13 @@ describe("formatLobbyBriefDm — EF-32", () => {
   });
 
   it("formatLobbyBriefDm_selfManagedAgainstGhost_noCreationLine", () => {
-    const text = formatLobbyBriefDm(side({ decision: "SELF_MANAGED", opponentGhost: true }), URL);
+    const text = formatLobbyBriefDm(side({ opponentGhost: true }), URL);
 
     expect(text).not.toContain("créer la partie");
     expect(text).not.toContain("autogestion");
-    expect(formatLobbyBriefDm(side({ decision: "REFEREE", opponentGhost: true }), URL)).toContain(
-      "Un arbitre est désigné pour votre match.",
+    expect(text).toContain("Voici les éléments importants à savoir avant le coup d'envoi.");
+    expect(formatLobbyBriefDm(side({ opponentGhost: true }), URL, "en")).toContain(
+      "Here is what you need to know before kickoff.",
     );
   });
 
@@ -530,29 +549,43 @@ describe("check-in du match — registre des traitements (T04, T12)", () => {
     const frBrief = fr.subPurposes.find((line) => line.includes("le check-in du match"))!;
     const enBrief = en.subPurposes.find((line) => line.includes("the match check-in"))!;
     // Le moment : le quart d'heure, et le repli sur l'ouverture du salon.
-    expect(frBrief).toContain("15 minutes avant le coup d'envoi d'un match");
+    expect(frBrief).toContain("15 minutes avant son coup d'envoi");
     expect(frBrief).toContain("ou à l'ouverture de son salon si elle vient plus tôt ou si le match n'a pas d'horaire");
-    expect(frBrief).toContain("(de nouveau s'il rouvre, par exemple après un changement d'horaire)");
-    // Les destinataires : tous les joueurs, et plus les seuls gestionnaires.
-    expect(frBrief).toContain("tous les joueurs de chacune de ses engagées");
+    // Autogestion seulement, une seule fois, aux gérants (CAST-FOLLOWUP, décision du 2026-11-05).
+    expect(frBrief).toContain("pour un match en autogestion seulement (aucun pour un match arbitré ou sans décision d'arbitrage)");
+    expect(frBrief).toContain("une seule fois par match et par engagée (ni un changement d'horaire, ni un lancement annulé, ni un réappariement ne le renvoient");
+    expect(frBrief).toContain("à ceux qui gèrent chacune de ses engagées (propriétaire et managers d'une équipe, joueur d'une entrée solo");
+    expect(frBrief).not.toContain("tous les joueurs");
     expect(frBrief).toContain("sans BattleTag, tag Discord ni pseudo de joueur");
-    expect(enBrief).toContain("15 minutes before a match kicks off");
-    expect(enBrief).toContain("every player of each of its entrants");
+    expect(enBrief).toContain("15 minutes before it kicks off");
+    expect(enBrief).toContain("for a self-managed match only (none for a refereed match or one with no refereeing decision)");
+    expect(enBrief).toContain("once per match and per entrant (neither a change of time, nor a cancelled launch, nor a re-pairing sends it again");
+    expect(enBrief).toContain("to those who manage each of its entrants (owner and managers of a team, the player of a solo entry");
+    expect(enBrief).not.toContain("every player");
     expect(enBrief).toContain("without any BattleTag, Discord tag or player username");
-    expect(enBrief).toContain("(again if it reopens, for instance after a change of time)");
-    expect(fr.legalBasis).toContain("le check-in du match envoyé aux membres de ses engagées");
-    expect(en.legalBasis).toContain("the match check-in sent to the members of its entrants");
+    expect(fr.legalBasis).toContain("le check-in d'un match en autogestion envoyé à ceux qui gèrent ses engagées (ou au joueur d'une entrée individuelle)");
+    expect(en.legalBasis).toContain("the check-in of a self-managed match sent to those who manage its entrants (or to the player of a solo entry)");
     const frPushActivity = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T12")!;
     const enPushActivity = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T12")!;
-    expect(frPushActivity.subPurposes.join(" ")).toContain("Check-in de ses matchs");
-    expect(enPushActivity.subPurposes.join(" ")).toContain("Check-in of their matches");
+    expect(frPushActivity.subPurposes.join(" ")).toContain("Check-in de ses matchs en autogestion, pour le propriétaire et les managers d'une engagée");
+    expect(enPushActivity.subPurposes.join(" ")).toContain("Check-in of their self-managed matches, for the owner and managers of an entrant");
+  });
+
+  it("processingRegister_T16_namesTheCheckInRecipientsOfTheStreamLink", () => {
+    const fr = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T16")!;
+    const en = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T16")!;
+
+    // ERREUR.txt (#558, juridique) : le lien de diffusion part aussi dans le check-in.
+    expect(fr.recipients.join(" ")).toContain("Propriétaire et managers des engagées d'un match en autogestion (ou le joueur d'une entrée individuelle), par son check-in");
+    expect(en.recipients.join(" ")).toContain("Owner and managers of the entrants of a self-managed match (or the player of a solo entry), through its check-in");
   });
 
   it("déclare la garde des réservations du check-in, en français et en anglais", () => {
     const fr = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")!;
     const en = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")!;
-    expect(fr.retention.join(" ")).toContain("celles du check-in du match (match, appariement et engagée) : jusqu'à la réouverture du salon (lancement annulé, horaire changé, retour arrière), sinon avec le match");
-    expect(en.retention.join(" ")).toContain("those of match check-ins sent (match, pairing and entrant): until the lobby reopens (launch cancelled, time changed, rollback), otherwise with the match");
+    // Jamais deux fois : la trace reste avec le match, seul un retour arrière l'efface.
+    expect(fr.retention.join(" ")).toContain("celles du check-in du match (match et engagée) : conservées avec le match, pour qu'il ne parte jamais deux fois — seul un retour arrière du tournoi les efface");
+    expect(en.retention.join(" ")).toContain("those of match check-ins sent (match and entrant): kept with the match, so that it never goes out twice — only a rollback of the tournament erases them");
   });
 });
 

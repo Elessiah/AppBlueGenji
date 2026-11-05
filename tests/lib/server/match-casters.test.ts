@@ -122,6 +122,10 @@ function applyWithdrawWrites(state: WorldState, sql: string, params: unknown[]):
     for (const s of provided) Object.assign(s, { live_url: null, link_user_id: null });
     return [{ affectedRows: provided.length }];
   }
+  // Le mode d'antenne qu'il avait posé n'est plus à lui (`live_trigger_user_id`).
+  if (sql.startsWith("UPDATE bg_matches SET live_trigger_user_id = NULL WHERE live_trigger_user_id = ? AND id IN")) {
+    return [{ affectedRows: 0 }];
+  }
   if (sql.startsWith("UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL WHERE referee_user_id = ? AND id IN")) {
     const refereed = state.matches.filter((m) => m.referee_user_id === userId && ids.includes(m.id));
     for (const m of refereed) Object.assign(m, { referee_user_id: null, referee_ready_at: null });
@@ -254,6 +258,15 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
     expect(w.state.casters).toEqual([{ user_id: 9, stream_id: 3 }]);
     // Le lien de sa chaîne part avec lui ; le stream partagé reste.
     expect(w.state.streams).toEqual([{ id: 3, live_url: "https://twitch.tv/match" }]);
+  });
+
+  it("withdrawUserCasts_accountLeaves_releasesLiveTriggerOwnership", async () => {
+    const w = world([{ id: 4, live_url: "https://kick.com/sa-chaine" }], [{ user_id: 12, stream_id: 4 }]);
+
+    await withdrawUserCasts(w.connection, 12, true);
+
+    // Le mode d'antenne qu'il avait posé n'est plus à personne : il revient au staff.
+    expect(w.sqls()).toContain("UPDATE bg_matches SET live_trigger_user_id = NULL WHERE live_trigger_user_id = ? AND id IN (?)");
   });
 
   it("le stream qu'il avait ouvert part, même s'il porte le premier lien du match", async () => {

@@ -58,6 +58,7 @@ function sampleExport(): PersonalDataExport {
     casts: [],
     providedStreamLinks: [],
     refereeAssignments: [],
+    liveTriggers: [],
     suspensions: [],
     termsAcceptances: [],
     reports: [],

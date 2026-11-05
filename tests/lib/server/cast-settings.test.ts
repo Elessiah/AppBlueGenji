@@ -2,7 +2,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 
-import { applyCastSettings, setCasterStreamUrl } from "@/lib/server/tournaments/cast-settings";
+import { applyCastSettings, applyCastTrigger, setCasterStreamUrl } from "@/lib/server/tournaments/cast-settings";
 import type { LaunchMatchRow } from "@/lib/server/tournaments/match-launch";
 import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
 
@@ -20,6 +20,49 @@ describe("setCasterStreamUrl", () => {
     await expect(setCasterStreamUrl(fakeConnection({ execute }), 42, 5, null, 900)).rejects.toThrow("STREAM_URL_REQUIRED");
     // La seule lecture des streams : aucune écriture.
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** Match casté en MANUAL par le caster 12, arbitre désigné 9 (éligible). */
+function ownedRow() {
+  return {
+    id: 42,
+    status: "READY",
+    start_at: null,
+    live_trigger: "MANUAL",
+    live_trigger_user_id: 12,
+    live_started_at: null,
+    referee_user_id: 9,
+    refereeEligible: true,
+    casters: [],
+  } as unknown as LaunchMatchRow;
+}
+
+describe("applyCastTrigger", () => {
+  it("applyCastTrigger_coCaster_throwsNotOwnedWithoutWrite", async () => {
+    const execute = jest.fn<SqlQuery>();
+
+    await expect(applyCastTrigger(fakeConnection({ execute }), ownedRow(), "AUTO", 13)).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("applyCastTrigger_designatedReferee_changesTriggerOwnerlessForNonCaster", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+    const row = ownedRow();
+
+    await applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 9, { isAdmin: false, manages: true });
+
+    expect(execute.mock.calls[0][1]).toEqual(["AUTO", 9, 42]);
+    expect(row.live_trigger).toBe("AUTO");
+  });
+
+  it("applyCastTrigger_ineligibleReferee_refused", async () => {
+    const execute = jest.fn<SqlQuery>();
+    const row = Object.assign(ownedRow(), { refereeEligible: false });
+
+    await expect(
+      applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 9, { isAdmin: false, manages: true }),
+    ).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
   });
 });
 

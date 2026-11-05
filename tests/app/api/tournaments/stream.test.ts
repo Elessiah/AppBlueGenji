@@ -82,6 +82,7 @@ function viewerWith(overrides: Partial<TournamentViewerContext> = {}): Tournamen
     canRegister: false,
     matchProposals: [],
     refereeNames: [],
+    voiceLinks: [],
     canRegisterEntrant: true,
     registrationBlock: null,
     myTeamId: null,

@@ -582,16 +582,16 @@ describe("setMatchReady — appariement réécrit sur place", () => {
     expect(state.match?.launched_at).toBeNull();
   });
 
-  it("adoptCurrentPairing_pairingChanged_deletesAllButCurrentPairingCheckIn", async () => {
+  it("adoptCurrentPairing_pairingChanged_deletesAllButCheckIns", async () => {
     // A:B → A:C → A:B : les réservations de l'appariement qui revient ne doivent
-    // pas faire taire l'appel aux « Prêt » ; son check-in, parti 15 minutes avant
-    // l'horaire, reste réservé pour ne pas repartir à l'ouverture du salon.
+    // pas faire taire l'appel aux « Prêt » ; les check-in (par engagée) restent
+    // réservés : un réappariement ne les renvoie pas.
     state.match = matchState({ launch_pairing: `${TEAM1}:30` });
 
     await setMatchReady(42, 1, true);
 
     expect(state.writes).toContain(
-      `DELETE FROM bg_match_start_notices WHERE match_id = ? AND NOT (pairing = ? AND phase IN ('LOBBY_BRIEF_1', 'LOBBY_BRIEF_2')) [42,"${TEAM1}:${TEAM2}"]`,
+      `DELETE FROM bg_match_start_notices WHERE match_id = ? AND phase NOT LIKE 'LOBBY_BRIEF%' [42]`,
     );
   });
 
@@ -770,7 +770,7 @@ describe("claimMatchCast", () => {
     state.users[CASTER] = verified;
     state.issued = [];
     await claimMatchCast(42, CASTER, true, OWN_STREAM, { trigger: "AUTO" });
-    expect(state.issued).toContain("UPDATE bg_matches SET live_trigger = ?, live_started_at = NULL WHERE id = ?");
+    expect(state.issued).toContain("UPDATE bg_matches SET live_trigger = ?, live_trigger_user_id = ?, live_started_at = NULL WHERE id = ?");
   });
 
   it("ouvre un stream à part avec son lien, normalisé : l'accueil relit", async () => {
@@ -1012,7 +1012,7 @@ describe("releaseMatchCast", () => {
     state.issued = [];
     await releaseMatchCast(42, CASTER, false);
     expect(state.match?.streams).toEqual([]);
-    expect(state.issued).toContain("UPDATE bg_matches SET live_trigger = NULL, live_started_at = NULL WHERE id = ?");
+    expect(state.issued).toContain("UPDATE bg_matches SET live_trigger = NULL, live_trigger_user_id = NULL, live_started_at = NULL WHERE id = ?");
   });
 
   it("releaseMatchCast_staffStreamWithLinkRemains_keepsTrigger", async () => {

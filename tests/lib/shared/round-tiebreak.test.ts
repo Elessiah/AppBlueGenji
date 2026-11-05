@@ -249,7 +249,6 @@ function side(overrides: Partial<LobbyBriefSide> = {}): LobbyBriefSide {
     maps: [],
     nextBan: "LOSER",
     cast: false,
-    decision: "UNDECIDED",
     ...overrides,
   };
 }
