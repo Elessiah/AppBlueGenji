@@ -90,7 +90,7 @@ describe("matchVoiceInfo", () => {
   it("matchVoiceInfo_tracked_returnsSideStatesOnly", () => {
     const actual = matchVoiceInfo(match(), open, { channelId: null, failed: true });
 
-    expect(actual).toEqual({ team1State: "OPEN", team2State: "FAILED" });
+    expect(actual).toEqual({ team1State: "OPEN", team2State: "FAILED", team1Rev: "187t" });
   });
 
   it("matchVoiceInfo_noRows_waitingBothSides", () => {

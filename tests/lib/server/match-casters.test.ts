@@ -79,7 +79,14 @@ describe("orphanStreamIds — ce qui part quand un caster s'en va", () => {
 
 type WorldStream = { id: number; live_url: string | null; staff_owned?: number; link_user_id?: number | null; match_id?: number };
 type WorldCaster = { user_id: number; stream_id: number; match_id?: number };
-type WorldMatch = { id: number; tournament_id: number; status: string; referee_user_id: number | null; referee_ready_at: string | null };
+type WorldMatch = {
+  id: number;
+  tournament_id: number;
+  status: string;
+  referee_user_id: number | null;
+  referee_ready_at: string | null;
+  live_trigger_user_id?: number | null;
+};
 
 const matchOf = (row: { match_id?: number }) => row.match_id ?? 42;
 const flat = (sql: string) => sql.replace(/\s+/g, " ").trim();
@@ -97,6 +104,9 @@ function readWithdrawRows(state: WorldState, sql: string, params: unknown[]): un
   }
   if (sql === "SELECT id AS match_id FROM bg_matches WHERE referee_user_id = ? ORDER BY id") {
     return [state.matches.filter((m) => m.referee_user_id === userId).map((m) => ({ match_id: m.id }))];
+  }
+  if (sql === "SELECT id AS match_id FROM bg_matches WHERE live_trigger_user_id = ? ORDER BY id") {
+    return [state.matches.filter((m) => m.live_trigger_user_id === userId).map((m) => ({ match_id: m.id }))];
   }
   if (sql.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
     state.locked.push(params as number[]);
@@ -124,7 +134,9 @@ function applyWithdrawWrites(state: WorldState, sql: string, params: unknown[]):
   }
   // Le mode d'antenne qu'il avait posé n'est plus à lui (`live_trigger_user_id`).
   if (sql.startsWith("UPDATE bg_matches SET live_trigger_user_id = NULL WHERE live_trigger_user_id = ? AND id IN")) {
-    return [{ affectedRows: 0 }];
+    const owned = state.matches.filter((m) => m.live_trigger_user_id === userId && ids.includes(m.id));
+    for (const m of owned) m.live_trigger_user_id = null;
+    return [{ affectedRows: owned.length }];
   }
   if (sql.startsWith("UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL WHERE referee_user_id = ? AND id IN")) {
     const refereed = state.matches.filter((m) => m.referee_user_id === userId && ids.includes(m.id));
@@ -260,13 +272,16 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
     expect(w.state.streams).toEqual([{ id: 3, live_url: "https://twitch.tv/match" }]);
   });
 
-  it("withdrawUserCasts_accountLeaves_releasesLiveTriggerOwnership", async () => {
-    const w = world([{ id: 4, live_url: "https://kick.com/sa-chaine" }], [{ user_id: 12, stream_id: 4 }]);
+  it("withdrawUserCasts_ownerOfUncastMatchTrigger_releasesOwnershipAndTouchesMatch", async () => {
+    // Le mode du match 43, posé sans le caster (permission `live` seule).
+    const other = { id: 43, tournament_id: 5, status: "READY", referee_user_id: null, referee_ready_at: null, live_trigger_user_id: 12 };
+    const w = world([], [], false, [other]);
 
-    await withdrawUserCasts(w.connection, 12, true);
+    const result = await withdrawUserCasts(w.connection, 12, true);
 
-    // Le mode d'antenne qu'il avait posé n'est plus à personne : il revient au staff.
-    expect(w.sqls()).toContain("UPDATE bg_matches SET live_trigger_user_id = NULL WHERE live_trigger_user_id = ? AND id IN (?)");
+    expect(w.state.matches.find((m) => m.id === 43)?.live_trigger_user_id).toBeNull();
+    expect(w.state.locked).toEqual([[43]]);
+    expect(result).toEqual({ matchIds: [43], tournamentIds: [5] });
   });
 
   it("le stream qu'il avait ouvert part, même s'il porte le premier lien du match", async () => {
@@ -318,8 +333,8 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
   it("ne touche à rien pour un compte qui ne caste rien et n'a fourni aucun lien", async () => {
     const w = world([{ id: 3, live_url: "https://twitch.tv/autre", link_user_id: 9 }], [{ user_id: 9, stream_id: 3 }]);
     expect(await withdrawUserCasts(w.connection, 12, true)).toEqual(untouched);
-    // Les trois lectures (casts, liens, arbitrages), rien d'autre.
-    expect(w.execute).toHaveBeenCalledTimes(3);
+    // Les quatre lectures (casts, liens, arbitrages, modes d'antenne), rien d'autre.
+    expect(w.execute).toHaveBeenCalledTimes(4);
   });
 });
 

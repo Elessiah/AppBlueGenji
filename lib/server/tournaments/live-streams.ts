@@ -27,10 +27,13 @@ import {
   isMatchRefereeActor,
   liveTriggerOwnerAfter,
   mayChangeLiveTrigger,
+  nullableUserId as nullableId,
   type LiveTriggerActor,
 } from "@/lib/shared/live-trigger-owner";
-import type { MatchStatus } from "@/lib/shared/types";
+import type { MatchStatus, TournamentGame } from "@/lib/shared/types";
+import { loadRefereeStanding } from "./cast-eligibility";
 import { retryOnDeadlock } from "./deadlock-retry";
+import { playsMatchSql } from "./match-players";
 import { lockMatchStreams, pruneMatchStreams, staffStream, type MatchStreamRow } from "./match-casters";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
 import { invalidateSpectatorSnapshot } from "./snapshot";
@@ -240,6 +243,14 @@ export async function setMatchLiveConfig(
       if (locked.length === 0) throw new Error("MATCH_NOT_FOUND");
       const current = locked[0];
       const actor: LiveTriggerActor = { userId: config.setter.userId, ...config.access };
+      // L'arbitre qui se réclame du match doit encore pouvoir arbitrer.
+      if (
+        actor.manages &&
+        nullableId(current.kept_referee_user_id) === actor.userId &&
+        !(await refereeQualifies(connection, actor.userId, Number(current.tournament_id)))
+      ) {
+        current.kept_referee_user_id = null;
+      }
       const triggerChanges = assertLiveConfigAllowed(current, actor, trigger, config.streamLinks !== undefined);
       assertConfigurable(current, trigger);
       // Rejugé lui aussi : une date de début retirée entre les deux lectures
@@ -248,6 +259,11 @@ export async function setMatchLiveConfig(
         throw new Error("MATCH_START_AT_REQUIRED");
       }
       let streams: MatchStreamRow[] | undefined;
+      // Les liens des casters d'abord : le lien du staff qui suit habille un
+      // stream sans lien, jamais celui qu'un caster vient de recevoir ici.
+      if (config.streamLinks !== undefined && config.streamLinks.length > 0) {
+        streams = await setCasterStreamLinks(connection, matchId, config.streamLinks);
+      }
       if (trigger === null) {
         await connection.execute(
           `UPDATE bg_matches SET live_trigger = NULL, live_trigger_user_id = NULL, live_started_at = NULL WHERE id = ?`,
@@ -257,6 +273,7 @@ export async function setMatchLiveConfig(
           `UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE match_id = ? AND staff_owned = 1`,
           [matchId],
         );
+        streams = streams?.map((stream) => (stream.staff ? { ...stream, liveUrl: null } : stream));
       } else {
         if (triggerChanges) {
           // Posé par un caster du match, le mode est le sien ; par le staff,
@@ -269,10 +286,7 @@ export async function setMatchLiveConfig(
             [trigger, owner, matchId],
           );
         }
-        streams = await setStaffStreamUrl(connection, matchId, url, config.setter);
-      }
-      if (config.streamLinks !== undefined && config.streamLinks.length > 0) {
-        streams = await setCasterStreamLinks(connection, matchId, config.streamLinks, streams);
+        streams = await setStaffStreamUrl(connection, matchId, url, config.setter, streams);
       }
       // Les streams déjà lus sous verrou (et mis à jour en mémoire) ne sont pas
       // relus : deux lectures verrouillantes, non quatre.
@@ -306,8 +320,9 @@ async function setStaffStreamUrl(
   matchId: number,
   url: string | null,
   setter: MatchLiveSetter,
+  known?: MatchStreamRow[],
 ): Promise<MatchStreamRow[]> {
-  const streams = await lockMatchStreams(connection, matchId);
+  const streams = known ?? (await lockMatchStreams(connection, matchId));
   const target = staffStream(streams);
   if (target !== null && (target.staff || url !== null)) {
     if (target.liveUrl === url && target.staff) return streams;
@@ -327,16 +342,33 @@ async function setStaffStreamUrl(
 
 /**
  * L'arbitre désigné **retenu** du match, en SQL : sans opposition retenue sur
- * un match à jouer (un match joué garde son arbitre, comme l'instantané).
+ * un match à jouer (un match joué garde son arbitre, comme l'instantané), et
+ * jamais un compte qui joue le match. Sa condition d'arbitrage (`refereeQualifies`)
+ * se relit à part.
  */
 const KEPT_REFEREE_SQL = `CASE
-  WHEN bg_matches.status = 'COMPLETED'
-    OR NOT EXISTS (SELECT 1 FROM bg_users ru WHERE ru.id = bg_matches.referee_user_id AND ru.referee_objection_at IS NOT NULL)
+  WHEN (bg_matches.status = 'COMPLETED'
+    OR NOT EXISTS (SELECT 1 FROM bg_users ru WHERE ru.id = bg_matches.referee_user_id AND ru.referee_objection_at IS NOT NULL))
+    AND NOT ${playsMatchSql("bg_matches.referee_user_id", "bg_matches.team1_id", "bg_matches.team2_id", "kr")}
   THEN bg_matches.referee_user_id ELSE NULL END`;
 
-/** Un identifiant lu en base, nul ou non. */
-function nullableId(value: number | string | null | undefined): number | null {
-  return value === null || value === undefined ? null : Number(value);
+/**
+ * L'arbitre retenu remplit-il encore la condition d'arbitrage du jeu du
+ * tournoi (`loadRefereeStanding`) ? Un arbitre devenu inéligible ne règle
+ * plus la diffusion, comme il ne mène plus la partie.
+ */
+async function refereeQualifies(
+  executor: Pick<PoolConnection, "execute">,
+  refereeId: number,
+  tournamentId: number,
+): Promise<boolean> {
+  const [rows] = await executor.execute<(RowDataPacket & { game: TournamentGame })[]>(
+    `SELECT game FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  if (rows.length === 0) return false;
+  const standing = await loadRefereeStanding(executor, refereeId, rows[0].game);
+  return standing.block === null && !standing.objection;
 }
 
 /** `userId` caste-t-il ce match ? Lu sous le verrou du match que tient l'appelant. */
@@ -357,11 +389,12 @@ async function castsMatch(connection: PoolConnection, matchId: number, userId: n
 export async function isDesignatedMatchReferee(matchId: number, userId: number, manages: boolean): Promise<boolean> {
   if (!manages) return false;
   const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { kept: number | null })[]>(
-    `SELECT ${KEPT_REFEREE_SQL} AS kept FROM bg_matches WHERE id = ? LIMIT 1`,
+  const [rows] = await db.execute<(RowDataPacket & { kept: number | null; tournament_id: number })[]>(
+    `SELECT ${KEPT_REFEREE_SQL} AS kept, tournament_id FROM bg_matches WHERE id = ? LIMIT 1`,
     [matchId],
   );
-  return rows.length > 0 && nullableId(rows[0].kept) === userId;
+  if (rows.length === 0 || nullableId(rows[0].kept) !== userId) return false;
+  return refereeQualifies(db, userId, Number(rows[0].tournament_id));
 }
 
 /**
@@ -400,9 +433,8 @@ async function setCasterStreamLinks(
   connection: PoolConnection,
   matchId: number,
   links: readonly MatchStreamLinkEdit[],
-  known: MatchStreamRow[] | undefined,
 ): Promise<MatchStreamRow[]> {
-  let streams = known ?? (await lockMatchStreams(connection, matchId, true));
+  let streams = await lockMatchStreams(connection, matchId);
   for (const link of links) {
     const target = streams.find((stream) => stream.id === link.streamId && !stream.staff);
     if (!target) throw new Error("STREAM_NOT_FOUND");

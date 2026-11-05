@@ -672,7 +672,7 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
       .mockResolvedValueOnce([[openRow(1, "901"), { ...openRow(2, "x"), channel_id: null, failed_at: new Date() }], []])
       .mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), true, [ready()]);
-    expect(infos.get(42)).toEqual({ team1State: "OPEN", team2State: "FAILED" });
+    expect(infos.get(42)).toEqual({ team1State: "OPEN", team2State: "FAILED", team1Rev: "16br" });
     const [sql, params] = connection.execute.mock.calls[0];
     expect(sql).toContain("WHERE match_id IN (?)");
     expect(params).toEqual([42]);
@@ -705,14 +705,14 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
     connection.execute.mockResolvedValueOnce([[openRow(1, "901"), openRow(2, "902")], []]).mockResolvedValueOnce([teams, []]);
     const launched = { ...ready(), launchedAt: new Date().toISOString() };
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), true, [launched]);
-    expect(infos.get(42)).toEqual({ team1State: "OPEN", team2State: "OPEN" });
+    expect(infos.get(42)).toEqual({ team1State: "OPEN", team2State: "OPEN", team1Rev: "16br", team2Rev: "16my" });
   });
 
   it("loadMatchVoiceInfos_scoreAwaitingConfirmation_stillShown", async () => {
     const connection = connectionMock();
     connection.execute.mockResolvedValueOnce([[openRow(1, "901")], []]).mockResolvedValueOnce([teams, []]);
     const infos = await loadMatchVoiceInfos(fakeConnection(connection), true, [{ ...ready(), status: "AWAITING_CONFIRMATION" }]);
-    expect(infos.get(42)).toEqual({ team1State: "OPEN", team2State: "WAITING" });
+    expect(infos.get(42)).toEqual({ team1State: "OPEN", team2State: "WAITING", team1Rev: "16br" });
   });
 
   it("loadMatchVoiceInfos_completedMatch_isNotShown", async () => {

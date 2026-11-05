@@ -134,6 +134,14 @@ describe("castClaimBody — le corps envoyé à POST /api/matches/[id]/caster", 
       castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", trigger: "MANUAL", organisationLink: true }),
     ).toEqual({ liveUrl: "twitch.tv/voix", battletag: null, trigger: "MANUAL", organisationLink: true });
   });
+
+  it("castClaimBody_lockedTrigger_omitsTrigger", () => {
+    // Mode posé par un autre caster : le corps ne le porte pas, rien à refuser.
+    expect(castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", trigger: undefined })).toEqual({
+      liveUrl: "twitch.tv/voix",
+      battletag: null,
+    });
+  });
 });
 
 /** La fenêtre telle que la voit un caster connecté (compte 4), mode d'antenne réglable. */

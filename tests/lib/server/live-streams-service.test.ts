@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/snapshot");
+jest.mock("@/lib/server/tournaments/cast-eligibility", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/tournaments/cast-eligibility")>("@/lib/server/tournaments/cast-eligibility"),
+  loadRefereeStanding: jest.fn(),
+}));
 
 import {
   findBroadcastingTournament,
@@ -13,6 +17,7 @@ import {
 } from "@/lib/server/tournaments/live-streams";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { invalidateSpectatorSnapshot } from "@/lib/server/tournaments/snapshot";
+import { loadRefereeStanding } from "@/lib/server/tournaments/cast-eligibility";
 import { type SqlQuery, type SqlMock, fakeConnection, fakePool } from "../../helpers/sql-double";
 
 async function mockDb(execute: SqlMock) {
@@ -35,6 +40,8 @@ function matchRow(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Un arbitre retenu remplit, par défaut, la condition d'arbitrage.
+  jest.mocked(loadRefereeStanding).mockResolvedValue({ block: null, objection: false });
 });
 afterEach(() => {
   jest.restoreAllMocks();
@@ -170,6 +177,7 @@ describe("setMatchLiveConfig", () => {
       const sql = rawSql.replace(/\s+/g, " ").trim();
       const params = (rawParams ?? []) as unknown[];
       if (sql.startsWith("SELECT id, tournament_id, status")) return [[{ ...row }]];
+      if (sql === "SELECT game FROM bg_tournaments WHERE id = ? LIMIT 1") return [[{ game: "OW" }]];
       if (sql.startsWith("SELECT 1 FROM bg_match_casters")) {
         return [state.casters.filter((caster) => caster.user_id === params[1]).map(() => ({ 1: 1 }))];
       }
@@ -636,6 +644,55 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.streams).toEqual([dbStream(4, "https://twitch.tv/neuve")]);
   });
 
+  it("setMatchLiveConfig_ownRefereeNoLongerEligible_refusedWithoutWrite", async () => {
+    jest.mocked(loadRefereeStanding).mockResolvedValue({ block: "NOT_REFEREE", objection: false });
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12, kept_referee_user_id: 9 }), [
+      dbStream(4, "https://kick.com/voix"),
+    ]);
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, {
+        trigger: "MANUAL",
+        liveUrl: null,
+        setter: { userId: 9, asOrganisation: false },
+        access: STAFF,
+        streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/neuve" }],
+      }),
+    ).rejects.toThrow("NOT_MATCH_REFEREE");
+    expect(world.state.streams).toEqual([dbStream(4, "https://kick.com/voix")]);
+  });
+
+  it("setMatchLiveConfig_lockedRead_excludesRefereeWhoPlaysMatch", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "AUTO" }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
+
+    const locked = world.execute.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.includes("FOR UPDATE") && sql.includes("kept_referee_user_id"));
+    expect(locked).toContain("krtm.user_id = bg_matches.referee_user_id");
+    expect(locked).toContain("krst.solo_user_id = bg_matches.referee_user_id");
+  });
+
+  it("setMatchLiveConfig_refereeLinksAndStaffUrlTogether_staffUrlDoesNotTakeCasterStream", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", kept_referee_user_id: 9 }), [dbStream(4, null)], [
+      { user_id: 12, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, {
+      trigger: "MANUAL",
+      liveUrl: "twitch.tv/orga",
+      setter: { userId: 9, asOrganisation: true },
+      access: STAFF,
+      streamLinks: [{ streamId: 4, liveUrl: "kick.com/caster" }],
+    });
+
+    // Le stream du caster garde son lien ; celui du staff en ouvre un autre.
+    expect(world.state.streams.find((stream) => stream.id === 4)).toEqual(dbStream(4, "https://kick.com/caster"));
+    expect(world.state.streams.find((stream) => stream.id === 5)?.live_url).toBe("https://twitch.tv/orga");
+  });
+
   it("refuse un match inconnu", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
@@ -656,9 +713,26 @@ describe("isDesignatedMatchReferee", () => {
   });
 
   it("isDesignatedMatchReferee_keptReferee_true", async () => {
-    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[{ kept: "9" }], []]));
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[{ kept: "9", tournament_id: 7, game: "OW" }], []]));
 
     await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(true);
+    expect(loadRefereeStanding).toHaveBeenCalledWith(expect.anything(), 9, "OW");
+  });
+
+  it("isDesignatedMatchReferee_keptRefereeIneligible_false", async () => {
+    jest.mocked(loadRefereeStanding).mockResolvedValue({ block: "NOT_REFEREE", objection: false });
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[{ kept: 9, tournament_id: 7, game: "OW" }], []]));
+
+    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
+  });
+
+  it("isDesignatedMatchReferee_unknownTournament_false", async () => {
+    await mockDb(
+      jest.fn<SqlQuery>().mockResolvedValueOnce([[{ kept: 9, tournament_id: 7 }], []]).mockResolvedValueOnce([[], []]),
+    );
+
+    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
+    expect(loadRefereeStanding).not.toHaveBeenCalled();
   });
 
   it("isDesignatedMatchReferee_withoutTournamentsPermission_falseWithoutRead", async () => {

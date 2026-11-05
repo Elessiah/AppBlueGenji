@@ -36,6 +36,7 @@ import {
   matchVoiceInfo,
   ownVoiceOpen,
   voiceChannelKey,
+  voiceChannelRevision,
   voiceChannelUrl,
   voiceChannelsDue,
   type MatchVoiceInfo,
@@ -168,7 +169,8 @@ export async function loadViewerVoiceLinks(
   const links: MatchVoiceLink[] = [];
   for (const row of rows) {
     const url = voiceChannelUrl(String(row.guild_id), String(row.channel_id));
-    if (url !== null) links.push({ matchId: Number(row.match_id), url });
+    const rev = voiceChannelRevision(String(row.channel_id));
+    if (url !== null && rev !== null) links.push({ matchId: Number(row.match_id), url, rev });
   }
   return links;
 }

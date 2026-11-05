@@ -370,7 +370,10 @@ export async function withdrawUserCasts(
     `SELECT DISTINCT match_id FROM bg_match_streams WHERE link_user_id = ? ORDER BY match_id`,
   );
   const refereed = await matchIdsOf(`SELECT id AS match_id FROM bg_matches WHERE referee_user_id = ? ORDER BY id`);
-  const candidates = [...new Set([...casts, ...links, ...refereed])].sort((a, b) => a - b);
+  // Les matchs dont il a posé le mode d'antenne, castés ou non (un porteur de
+  // `live` en est propriétaire sans caster) : verrouillés avec les autres.
+  const triggered = await matchIdsOf(`SELECT id AS match_id FROM bg_matches WHERE live_trigger_user_id = ? ORDER BY id`);
+  const candidates = [...new Set([...casts, ...links, ...refereed, ...triggered])].sort((a, b) => a - b);
   if (candidates.length === 0) return { matchIds: [], tournamentIds: [] };
 
   const [locked] = await connection.execute<WithdrawnMatchRow[]>(
@@ -406,14 +409,13 @@ export async function withdrawUserCasts(
     );
   }
   // Le mode d'antenne qu'il avait posé reste au match, sans propriétaire : il
-  // revient au staff (`lib/shared/live-trigger-owner.ts`). Seul un caster en est
-  // propriétaire : ses matchs sont parmi ceux qu'il caste, déjà verrouillés.
-  const castMatches = matchIds.filter((id) => casts.has(id));
-  if (castMatches.length > 0) {
+  // revient au staff (`lib/shared/live-trigger-owner.ts`).
+  const triggersToDrop = matchIds.filter((id) => triggered.has(id));
+  if (triggersToDrop.length > 0) {
     await connection.execute(
       `UPDATE bg_matches SET live_trigger_user_id = NULL
-        WHERE live_trigger_user_id = ? AND id IN (${placeholders(castMatches)})`,
-      [userId, ...castMatches],
+        WHERE live_trigger_user_id = ? AND id IN (${placeholders(triggersToDrop)})`,
+      [userId, ...triggersToDrop],
     );
   }
   if (refereesToDrop.length > 0) {
@@ -426,7 +428,7 @@ export async function withdrawUserCasts(
   await pruneStreamsOf(connection, [...new Set([...castsToDrop, ...linksToDrop])].sort((a, b) => a - b));
   // Seuls les matchs réellement modifiés : un cast gardé sur un match joué
   // (anonymisation) n'en fait pas partie.
-  const touched = new Set([...castsToDrop, ...linksToDrop, ...refereesToDrop]);
+  const touched = new Set([...castsToDrop, ...linksToDrop, ...refereesToDrop, ...triggersToDrop]);
   const touchedRows = locked.filter((row) => touched.has(Number(row.id)));
   return {
     matchIds: touchedRows.map((row) => Number(row.id)),

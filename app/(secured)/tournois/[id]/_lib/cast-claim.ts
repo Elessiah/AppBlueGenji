@@ -32,8 +32,8 @@ export type CastClaimInput = {
   url: string;
   /** BattleTag de ce cast, vide = celui du compte. */
   battletag: string;
-  /** Mode d'antenne choisi (stream propre). */
-  trigger: MatchLiveTrigger;
+  /** Mode d'antenne choisi (stream propre) ; absent quand il n'est pas le sien à changer. */
+  trigger?: MatchLiveTrigger;
   /** Case « lien de l'organisation » (permission `tournaments`). */
   organisationLink: boolean;
 };
@@ -78,7 +78,7 @@ export function castClaimBody(choice: CastClaimChoice, input: CastClaimInput): C
   return {
     liveUrl: input.url.trim(),
     battletag,
-    trigger: input.trigger,
+    ...(input.trigger === undefined ? {} : { trigger: input.trigger }),
     ...(input.organisationLink ? { organisationLink: true } : {}),
   };
 }

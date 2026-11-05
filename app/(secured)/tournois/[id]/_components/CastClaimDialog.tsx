@@ -74,7 +74,7 @@ export function CastClaimDialog({
   const { t, locale } = useActionsText();
   const { canSchedule, viewerUserId, viewerIsAdmin, refereeNames } = useLiveControls();
   // Mode déjà posé par un autre caster : il se lit, il ne se change pas à
-  // l'inscription (`LIVE_TRIGGER_NOT_OWNED`) — le corps le renvoie tel quel.
+  // l'inscription (`LIVE_TRIGGER_NOT_OWNED`) — le corps ne le porte pas.
   const triggerLocked = !viewerMayChangeLiveTrigger(match, {
     userId: viewerUserId,
     isAdmin: viewerIsAdmin,
@@ -131,7 +131,7 @@ export function CastClaimDialog({
 
   const confirm = async (): Promise<boolean> => {
     if (choice === null) return false;
-    const outcome = await onClaim(castClaimBody(choice, { url, battletag, trigger, organisationLink }));
+    const outcome = await onClaim(castClaimBody(choice, { url, battletag, trigger: triggerLocked ? undefined : trigger, organisationLink }));
     if (!outcome.ok) fieldErrors.report(outcome.code, outcome.message);
     return outcome.ok;
   };

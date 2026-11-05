@@ -113,6 +113,13 @@ lien est formé de `guild_id` (colonne neuve, fournie par le bot à la
 création ; nulle sur les salons ouverts avant, qui n'ont donc pas de lien) et
 `channel_id` (`voiceChannelUrl`). Textes FR/EN `matchPage.json`.
 
+**Salon recréé** : l'instantané porte, par côté ouvert, une révision
+(`team1Rev` / `team2Rev`, `voiceChannelRevision` : 16 bits d'une empreinte
+FNV-1a de l'identifiant — de quoi voir le changement, trop peu pour retrouver
+l'identifiant). Chaque lien porte la sienne (`rev`) : un lien d'une autre
+révision n'est plus montré (`ownVoiceLink`) et sa clé change
+(`missingVoiceLinksKey` : `matchId:rev`), ce qui relance la lecture légère.
+
 Comportements gardés et documentés (décisions du 2026-11-05) :
 
 - un rendu ou une revérification **refusés** par le bot pour ce salon

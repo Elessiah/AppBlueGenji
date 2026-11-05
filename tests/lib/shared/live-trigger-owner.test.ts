@@ -3,6 +3,7 @@ import {
   isMatchRefereeActor,
   liveTriggerOwnerAfter,
   mayChangeLiveTrigger,
+  nullableUserId,
   viewerMayChangeLiveTrigger,
 } from "@/lib/shared/live-trigger-owner";
 
@@ -83,14 +84,34 @@ describe("viewerMayChangeLiveTrigger", () => {
 
 describe("liveTriggerOwnerAfter", () => {
   it("liveTriggerOwnerAfter_casterPoses_ownsIt", () => {
-    expect(liveTriggerOwnerAfter("AUTO", { userId: 12 }, true)).toBe(12);
+    expect(liveTriggerOwnerAfter("AUTO", { userId: 12, ...STAFF }, true)).toBe(12);
   });
 
-  it("liveTriggerOwnerAfter_nonCasterPoses_staysOwnerless", () => {
-    expect(liveTriggerOwnerAfter("AUTO", { userId: 9 }, false)).toBeNull();
+  it("liveTriggerOwnerAfter_staffNotCasting_staysOwnerless", () => {
+    expect(liveTriggerOwnerAfter("AUTO", { userId: 9, ...STAFF }, false)).toBeNull();
+  });
+
+  it("liveTriggerOwnerAfter_adminNotCasting_staysOwnerless", () => {
+    expect(liveTriggerOwnerAfter("AUTO", { userId: 1, isAdmin: true, manages: true }, false)).toBeNull();
+  });
+
+  it("liveTriggerOwnerAfter_liveOnlyNotCasting_ownsIt", () => {
+    // Sans quoi il ne pourrait plus changer son propre réglage (mode sans propriétaire = staff).
+    expect(liveTriggerOwnerAfter("AUTO", { userId: 13, ...LIVE_ONLY }, false)).toBe(13);
   });
 
   it("liveTriggerOwnerAfter_triggerRemoved_null", () => {
-    expect(liveTriggerOwnerAfter(null, { userId: 12 }, true)).toBeNull();
+    expect(liveTriggerOwnerAfter(null, { userId: 12, ...LIVE_ONLY }, true)).toBeNull();
+  });
+});
+
+describe("nullableUserId", () => {
+  it("nullableUserId_bigintString_number", () => {
+    expect(nullableUserId("12")).toBe(12);
+  });
+
+  it("nullableUserId_nullOrMissing_null", () => {
+    expect(nullableUserId(null)).toBeNull();
+    expect(nullableUserId(undefined)).toBeNull();
   });
 });

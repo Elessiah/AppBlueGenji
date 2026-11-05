@@ -287,6 +287,7 @@ async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchR
     [row.id, ...playing],
   );
   row.casters = row.casters.filter((caster) => !playing.includes(caster.userId));
+  await dropTriggerOwner(connection, row, playing);
   await pruneMatchStreams(connection, Number(row.id), { casters: row.casters });
   for (const casterId of playing) {
     // Annoncé comme tout retrait d'office (journal du staff, avis au caster),
@@ -294,6 +295,24 @@ async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchR
     // `flushBotLogs` pour l'entretien.
     queueCastChange(connection, { kind: "AUTO_RELEASED", matchId: Number(row.id), casterId, reason: "JOINED_TEAM" });
   }
+}
+
+/**
+ * Un caster retiré d'office qui avait posé le mode d'antenne n'en est plus le
+ * propriétaire : le mode reste au match et revient au staff
+ * (`lib/shared/live-trigger-owner.ts`), comme au départ volontaire
+ * (`releaseMatchCast`). Sans quoi le staff et les co-casters resteraient
+ * refusés (`LIVE_TRIGGER_NOT_OWNED`) au nom d'un caster parti.
+ */
+async function dropTriggerOwner(
+  connection: PoolConnection,
+  row: LaunchMatchRow,
+  leaving: readonly number[],
+): Promise<void> {
+  const owner = nullableId(row.live_trigger_user_id);
+  if (owner === null || !leaving.includes(owner)) return;
+  await connection.execute(`UPDATE bg_matches SET live_trigger_user_id = NULL WHERE id = ?`, [row.id]);
+  row.live_trigger_user_id = null;
 }
 
 /** L'arbitre désigné joue-t-il le match ? Réponse du verrou quand il l'a calculée. */
@@ -765,6 +784,11 @@ async function releaseIneligibleCasters(
     [row.id, ...leaving.map((caster) => caster.userId)],
   );
   row.casters = row.casters.filter((caster) => blocks.get(caster.userId) === null);
+  await dropTriggerOwner(
+    connection,
+    row,
+    leaving.map((caster) => caster.userId),
+  );
   await pruneMatchStreams(connection, Number(row.id), { casters: row.casters });
   for (const caster of leaving) {
     queueCastChange(connection, {
@@ -1049,6 +1073,7 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
       }
 
       await connection.execute(`DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?`, [matchId, casterId]);
+      await dropTriggerOwner(connection, row, [casterId]);
       await pruneMatchStreams(connection, matchId, {
         casters: row.casters.filter((caster) => caster.userId !== casterId),
       });

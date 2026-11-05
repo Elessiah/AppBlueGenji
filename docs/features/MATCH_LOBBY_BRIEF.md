@@ -37,7 +37,9 @@ Trois changements de fond par rapport au brief du salon :
   d'arbitrage (leurs `DELETE` excluent `phase LIKE 'LOBBY_BRIEF%'`). Un
   réappariement n'en renvoie pas à l'engagée restée ; celle qui arrive reçoit
   le sien. Les anciennes réservations (`LOBBY_BRIEF_1`/`_2`, clé
-  `team1:team2`) restent honorées (`LEGACY_BRIEF_SQL`). Seul le **retour
+  `team1:team2`) restent honorées (`LEGACY_BRIEF_SQL`), par engagée et quel
+  que soit l'adversaire d'alors — la sélection des candidats
+  (`sideBriefedSql`) juge comme la réservation. Seul le **retour
   arrière** du tournoi (`rollback.ts`) les efface encore — il rejoue le match.
 - Les sections ci-dessous qui parlent d'arbitre désigné, de « tous les
   joueurs » ou d'une réservation rendue à la réouverture du salon décrivent

@@ -77,6 +77,8 @@ type MatchState = {
   first_map: string | null;
   /** Mode d'antenne du match (`bg_matches.live_trigger`), absent = non casté. */
   live_trigger?: string | null;
+  /** Le caster qui a posé le mode (`bg_matches.live_trigger_user_id`). */
+  live_trigger_user_id?: number | null;
   /** `bg_match_casters` du match, dans l'ordre d'inscription. */
   casters: CasterState[];
   /** `bg_match_streams` du match (`staff_owned` : 1 = stream du staff). */
@@ -630,6 +632,25 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
       reason: "JOINED_TEAM",
     });
     expect(announceCastChange).not.toHaveBeenCalled();
+  });
+
+  it("maintainMatchLaunches_casterJoinedTeamOwnedTrigger_releasesOwnership", async () => {
+    state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
+    state.match = matchState({ launch_pairing: null, caster_user_id: CASTER, live_trigger: "AUTO", live_trigger_user_id: CASTER });
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    // Le mode reste au match, au staff : plus au nom d'un caster parti.
+    expect(state.writes).toContain("UPDATE bg_matches SET live_trigger_user_id = NULL WHERE id = ?");
+  });
+
+  it("maintainMatchLaunches_releasedCasterNotOwner_keepsOwner", async () => {
+    state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
+    state.match = matchState({ launch_pairing: null, caster_user_id: CASTER, live_trigger: "AUTO", live_trigger_user_id: 901 });
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    expect(state.writes).not.toContain("UPDATE bg_matches SET live_trigger_user_id = NULL WHERE id = ?");
   });
 
   it("garde un caster étranger aux deux équipes", async () => {
@@ -1257,6 +1278,15 @@ describe("releaseIneligibleCast", () => {
     expect(announceCastChange).not.toHaveBeenCalled();
   });
 
+  it("releaseIneligibleCast_ownerOfTrigger_releasesOwnership", async () => {
+    state.users[CASTER] = ineligible;
+    state.match = matchState({ caster_user_id: CASTER, live_trigger: "MANUAL", live_trigger_user_id: CASTER });
+
+    await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
+
+    expect(state.writes).toContain("UPDATE bg_matches SET live_trigger_user_id = NULL WHERE id = ?");
+  });
+
   it("garde un compte redevenu éligible", async () => {
     state.users[CASTER] = ELIGIBLE_CASTER;
     state.match = matchState({ caster_user_id: CASTER });
@@ -1860,6 +1890,15 @@ describe("casters devenus inéligibles : retirés au lancement (EF-29)", () => {
       expect.anything(),
       expect.objectContaining({ kind: "AUTO_RELEASED", casterId: CASTER, reason: "INELIGIBLE" }),
     );
+  });
+
+  it("forceLaunchMatch_ineligibleTriggerOwner_releasesOwnership", async () => {
+    state.users[CASTER] = INELIGIBLE;
+    state.match = matchState({ caster_user_id: CASTER, live_trigger: "AUTO", live_trigger_user_id: CASTER });
+
+    await forceLaunchMatch(42);
+
+    expect(state.writes).toContain("UPDATE bg_matches SET live_trigger_user_id = NULL WHERE id = ?");
   });
 
   it("forceLaunchMatch_eligibleCaster_keepsIt", async () => {

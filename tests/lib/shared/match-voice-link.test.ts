@@ -2,7 +2,9 @@ import { describe, expect, it } from "@jest/globals";
 import {
   missingVoiceLinksKey,
   ownVoiceLink,
+  parseMatchVoiceInfo,
   parseVoiceLinks,
+  voiceChannelRevision,
   voiceChannelUrl,
 } from "@/lib/shared/match-voice";
 
@@ -50,11 +52,69 @@ describe("ownVoiceLink", () => {
 describe("missingVoiceLinksKey", () => {
   it("missingVoiceLinksKey_openWithoutLink_listsMatchIds", () => {
     const other = { id: 43, team1Id: 20, team2Id: 10, voice: bothOpen };
-    expect(missingVoiceLinksKey([match, other], 10, [{ matchId: 42, url: URL }])).toBe("43");
+    expect(missingVoiceLinksKey([match, other], 10, [{ matchId: 42, url: URL }])).toBe("43:");
+  });
+
+  it("missingVoiceLinksKey_channelRecreated_listsMatchWithNewRevision", () => {
+    const recreated = { ...match, voice: { ...bothOpen, team1Rev: "b2" } };
+
+    expect(missingVoiceLinksKey([recreated], 10, [{ matchId: 42, url: URL, rev: "a1" }])).toBe("42:b2");
+  });
+
+  it("missingVoiceLinksKey_sameRevision_empty", () => {
+    const current = { ...match, voice: { ...bothOpen, team1Rev: "a1" } };
+
+    expect(missingVoiceLinksKey([current], 10, [{ matchId: 42, url: URL, rev: "a1" }])).toBe("");
   });
 
   it("missingVoiceLinksKey_noTeam_empty", () => {
     expect(missingVoiceLinksKey([match], null, [])).toBe("");
+  });
+});
+
+describe("ownVoiceLink — salon recréé", () => {
+  it("ownVoiceLink_staleRevision_null", () => {
+    // Le salon d'avant a été supprimé : son lien ne mène plus nulle part.
+    const recreated = { ...match, voice: { ...bothOpen, team1Rev: "b2" } };
+
+    expect(ownVoiceLink(recreated, 10, [{ matchId: 42, url: URL, rev: "a1" }])).toBeNull();
+  });
+
+  it("ownVoiceLink_matchingRevision_returnsUrl", () => {
+    const current = { ...match, voice: { ...bothOpen, team2Rev: "a1" } };
+
+    expect(ownVoiceLink(current, 20, [{ matchId: 42, url: URL, rev: "a1" }])).toBe(URL);
+  });
+});
+
+describe("voiceChannelRevision", () => {
+  it("voiceChannelRevision_sameChannel_stable", () => {
+    expect(voiceChannelRevision(CHANNEL)).toBe("ulg");
+  });
+
+  it("voiceChannelRevision_otherChannel_differs", () => {
+    expect(voiceChannelRevision("1300000000000000002")).not.toBe("ulg");
+  });
+
+  it("voiceChannelRevision_noChannel_null", () => {
+    expect(voiceChannelRevision(null)).toBeNull();
+  });
+});
+
+describe("parseMatchVoiceInfo — révisions", () => {
+  it("parseMatchVoiceInfo_wellFormedRevision_kept", () => {
+    expect(parseMatchVoiceInfo({ team1State: "OPEN", team2State: "OPEN", team1Rev: "ulg" })).toEqual({
+      team1State: "OPEN",
+      team2State: "OPEN",
+      team1Rev: "ulg",
+    });
+  });
+
+  it("parseMatchVoiceInfo_malformedRevision_dropped", () => {
+    expect(parseMatchVoiceInfo({ team1State: "OPEN", team2State: "OPEN", team2Rev: "1300000000000000001" })).toEqual({
+      team1State: "OPEN",
+      team2State: "OPEN",
+    });
   });
 });
 
@@ -68,6 +128,18 @@ describe("parseVoiceLinks", () => {
         null,
       ]),
     ).toEqual([{ matchId: 42, url: URL }]);
+  });
+
+  it("parseVoiceLinks_revision_keptWhenWellFormed", () => {
+    expect(
+      parseVoiceLinks([
+        { matchId: 42, url: URL, rev: "ulg" },
+        { matchId: 43, url: URL, rev: "<b>" },
+      ]),
+    ).toEqual([
+      { matchId: 42, url: URL, rev: "ulg" },
+      { matchId: 43, url: URL },
+    ]);
   });
 
   it("parseVoiceLinks_notArray_null", () => {

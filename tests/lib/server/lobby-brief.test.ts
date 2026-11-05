@@ -156,10 +156,20 @@ describe("dispatchLobbyBriefs", () => {
     // Un match qui porte un score est joué : aucun salon à régler.
     expect(sql).toMatch(/AND m\.team1_score IS NULL AND m\.team2_score IS NULL/);
     // Un match reste candidat tant qu'une de ses deux engagées n'est pas réservée
-    // (clé : l'id de l'engagée, l'ancien format compté pour l'appariement courant).
-    expect(sql).toMatch(/n\.phase = \? AND n\.pairing IN \(CAST\(m\.team1_id AS CHAR\), CAST\(m\.team2_id AS CHAR\)\)/);
-    expect(sql).toMatch(/n\.pairing = CONCAT\(m\.team1_id, ':', m\.team2_id\)\)\)\) < 2/);
-    expect(params).toEqual(["LOBBY_BRIEF"]);
+    // (clé : l'id de l'engagée ; l'ancien format compté par engagée, comme à la réservation).
+    expect(sql).toMatch(/n\.phase = \? AND n\.pairing = CAST\(m\.team1_id AS CHAR\)/);
+    expect(sql).toMatch(/n\.phase = \? AND n\.pairing = CAST\(m\.team2_id AS CHAR\)/);
+    expect(params).toEqual(["LOBBY_BRIEF", "LOBBY_BRIEF"]);
+  });
+
+  it("dispatchLobbyBriefs_legacyReservation_matchesClaimGuardPerTeam", async () => {
+    const { query } = mockDb([]);
+    await dispatchLobbyBriefs();
+    const sql = String(query.mock.calls[0][0]);
+    // Un brief de l'ancien format vaut pour son engagée quel que soit l'adversaire d'alors.
+    expect(sql).toMatch(/n\.phase = 'LOBBY_BRIEF_1' AND n\.pairing LIKE CONCAT\(m\.team1_id, ':%'\)/);
+    expect(sql).toMatch(/n\.phase = 'LOBBY_BRIEF_2' AND n\.pairing LIKE CONCAT\('%:', m\.team2_id\)/);
+    expect(sql).not.toMatch(/< 2/);
   });
 
   it("dueSql_hiddenTournament_notDue", async () => {

@@ -22,7 +22,7 @@ import {
   requiresMatchStartAt,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
-import { liveTriggerOwnerAfter, mayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
+import { liveTriggerOwnerAfter, mayChangeLiveTrigger, nullableUserId } from "@/lib/shared/live-trigger-owner";
 import { lockMatchStreams, pruneMatchStreams, type MatchStreamRow } from "./match-casters";
 // Type seul : aucune dépendance d'exécution vers le lancement, qui importe ce
 // module (le verrou de la ligne du match et la transaction y vivent).
@@ -138,11 +138,6 @@ export async function applyCastTrigger(
   row.live_trigger = trigger;
   row.live_trigger_user_id = owner;
   if (trigger !== "MANUAL") row.live_started_at = null;
-}
-
-/** Un identifiant de compte lu en base (`BIGINT` nul ou non). */
-function nullableUserId(value: number | string | null | undefined): number | null {
-  return value === null || value === undefined ? null : Number(value);
 }
 
 /**

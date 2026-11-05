@@ -40,7 +40,7 @@ describe("loadViewerVoiceLinks", () => {
       10,
     );
 
-    expect(links).toEqual([{ matchId: 42, url: `https://discord.com/channels/${GUILD}/1300000000000000001` }]);
+    expect(links).toEqual([{ matchId: 42, url: `https://discord.com/channels/${GUILD}/1300000000000000001`, rev: "ulg" }]);
     const [sql, params] = execute.mock.calls[0];
     // Filtré sur l'équipe du lecteur, et seulement les matchs où elle joue.
     expect(sql).toContain("WHERE team_id = ?");

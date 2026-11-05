@@ -115,6 +115,20 @@ const LEGACY_BRIEF_SQL = `EXISTS (SELECT 1 FROM bg_match_start_notices o
                 AND ((o.phase = 'LOBBY_BRIEF_1' AND o.pairing LIKE CONCAT(?, ':%'))
                   OR (o.phase = 'LOBBY_BRIEF_2' AND o.pairing LIKE CONCAT('%:', ?))))`;
 
+/**
+ * L'engagée `team` (expression SQL) du match `m` est-elle déjà réservée — au
+ * format courant (`?` = `LOBBY_BRIEF_PHASE`) ou à l'ancien, **comme le juge
+ * la réservation** (`LEGACY_BRIEF_SQL`) : un côté que la réservation refuserait
+ * ne garde pas le match candidat à chaque balayage.
+ */
+function sideBriefedSql(team: string): string {
+  return `EXISTS (SELECT 1 FROM bg_match_start_notices n
+              WHERE n.match_id = m.id
+                AND ((n.phase = ? AND n.pairing = CAST(${team} AS CHAR))
+                  OR (n.phase = 'LOBBY_BRIEF_1' AND n.pairing LIKE CONCAT(${team}, ':%'))
+                  OR (n.phase = 'LOBBY_BRIEF_2' AND n.pairing LIKE CONCAT('%:', ${team}))))`;
+}
+
 /** Id de l'engagée de ce côté, clé de sa réservation. */
 function slotTeamId(row: LobbyBriefRow, slot: LobbyBriefSlot): number {
   return Number(slot === 1 ? row.team1_id : row.team2_id);
@@ -662,13 +676,9 @@ async function runLobbyBriefSweep(): Promise<number> {
   const [rows] = await db.query<LobbyBriefRow[]>(
     `SELECT ${BRIEF_COLUMNS} ${BRIEF_FROM}
       WHERE ${BRIEF_DUE_SQL}
-        AND (SELECT COUNT(*) FROM bg_match_start_notices n
-              WHERE n.match_id = m.id
-                AND ((n.phase = ? AND n.pairing IN (CAST(m.team1_id AS CHAR), CAST(m.team2_id AS CHAR)))
-                  OR (n.phase IN ('LOBBY_BRIEF_1', 'LOBBY_BRIEF_2')
-                      AND n.pairing = CONCAT(m.team1_id, ':', m.team2_id)))) < 2
+        AND NOT (${sideBriefedSql("m.team1_id")} AND ${sideBriefedSql("m.team2_id")})
       ORDER BY m.id`,
-    [LOBBY_BRIEF_PHASE],
+    [LOBBY_BRIEF_PHASE, LOBBY_BRIEF_PHASE],
   );
   if (rows.length === 0) {
     // Lecture commune réussie : la panne qui avait armé une relance est passée.
