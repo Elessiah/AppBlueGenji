@@ -393,7 +393,7 @@
       "battletagInvalid": "Invalid BattleTag: 64 characters at most, and visible characters.",
       "organisationLink": "This link is the organisation's",
       "organisationLinkSubject": "organisation link",
-      "organisationLinkHint": "Checked, the link stays on the match whatever happens to your account. Unchecked, it is your own channel: it is removed from the match if your account is deleted. A link already saved that you do not change keeps its origin.",
+      "organisationLinkHint": "Checked, the link does not go with your account: it goes with this stream once no caster holds it any more. Unchecked, it is your own channel: it is removed from the match if your account is deleted. A link already saved that you do not change keeps its origin.",
       "air": "On air",
       "airHint": "In manual mode, the stream is opened and closed here. It stops anyway as soon as a score is entered.",
       "replay": "Replay",
