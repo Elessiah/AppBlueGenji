@@ -1,8 +1,10 @@
 # Check-in du match (MATCH-CHECKIN, ex-brief du salon MR-4)
 
-**15 minutes avant le coup d'envoi** d'un match, tous les joueurs de ses deux
-engagées reçoivent son **check-in** : un seul message, en message privé Discord
-et en notification push (sujet `MATCH_LOBBY_BRIEF`, « Check-in du match »).
+**15 minutes avant le coup d'envoi** d'un match **en autogestion**, ceux qui
+gèrent ses deux engagées (propriétaire et managers, ou le joueur d'une entrée
+solo) reçoivent son **check-in** : un seul message, en message privé Discord
+et en notification push (sujet `MATCH_LOBBY_BRIEF`, « Check-in du match »),
+**une seule fois par match et par engagée**.
 
 Spécification : décisions de l'utilisateur du 2026-10-26 et du 2026-10-27
 (`MATCH_REFEREE.md`), **refondues le 2026-11-04** — le brief du salon et le
@@ -14,8 +16,32 @@ Trois changements de fond par rapport au brief du salon :
 | | Avant (MR-4) | Maintenant |
 | --- | --- | --- |
 | Moment | ouverture du salon (coup d'envoi) | **15 min avant le coup d'envoi** ; à défaut d'horaire, l'ouverture du salon |
-| Destinataires | `OWNER` et `MANAGER` d'une équipe | **tous les joueurs** des deux engagées |
+| Destinataires | `OWNER` et `MANAGER` d'une équipe | `OWNER` et `MANAGER` (CAST-FOLLOWUP ; tous les joueurs du 2026-11-04 au 2026-11-05) |
 | Contenu | réglages de la partie | check-in complet (vocal, paramètres, maps, cast, scores, problème) |
+
+## CAST-FOLLOWUP (décisions du 2026-11-05)
+
+- **Autogestion seulement** : `BRIEF_DUE_SQL` exige `m.self_managed = 1 AND
+  m.referee_user_id IS NULL`, à la lecture des candidats **et** dans la
+  réservation (même instruction). Un match arbitré ou sans décision
+  d'arbitrage ne reçoit rien ; les lignes « arbitre désigné » et l'ouverture
+  neutre « sans décision » ont disparu du message (l'ouverture neutre reste
+  contre une fantôme, `introGhost`).
+- **Aux gérants** : `loadEntrantManagerIds` (propriétaire et managers,
+  `hasTeamManagementRole` ; le joueur d'une entrée solo), et non plus
+  `loadEntrantPlayerIds`.
+- **Jamais deux fois** : la réservation est faite par engagée — phase
+  `LOBBY_BRIEF` (`LOBBY_BRIEF_PHASE`), `pairing` = l'id de l'engagée — et
+  n'est plus rendue ni par une nouvelle heure (`match-schedule`), ni par un
+  lancement défait, ni par `adoptCurrentPairing` ou le replanificateur
+  d'arbitrage (leurs `DELETE` excluent `phase LIKE 'LOBBY_BRIEF%'`). Un
+  réappariement n'en renvoie pas à l'engagée restée ; celle qui arrive reçoit
+  le sien. Les anciennes réservations (`LOBBY_BRIEF_1`/`_2`, clé
+  `team1:team2`) restent honorées (`LEGACY_BRIEF_SQL`). Seul le **retour
+  arrière** du tournoi (`rollback.ts`) les efface encore — il rejoue le match.
+- Les sections ci-dessous qui parlent d'arbitre désigné, de « tous les
+  joueurs » ou d'une réservation rendue à la réouverture du salon décrivent
+  l'état du 2026-11-04, remplacé par ces règles.
 
 **Un match sans horaire n'a pas de repère H-15** : son check-in part à
 l'ouverture du salon, comme avant la fusion (`LOBBY_BRIEF_LEAD_MINUTES`,
@@ -269,6 +295,12 @@ Trois conséquences sur l'existant :
 
 ## RGPD
 
+CAST-FOLLOWUP : destinataires restreints (autogestion, gérants) et trace
+gardée avec le match — registre T04 (sous-finalité, garde, push), T08, T12,
+`/rgpd` FR/EN, politique du bot (LegalTerms régénérés dans la PR du bot) et
+une entrée `2026-11-check-in-aux-gerants` (FR/EN) qui complète, sans la
+réécrire, `2026-11-check-in-du-match`.
+
 Message de match : registre T04 (sous-finalité, intérêt légitime opposable par
 l'interrupteur de « Mon profil ») et T12 (sujet push), `/rgpd` FR/EN
 § « Messages privés Discord de match », politique de confidentialité du bot
@@ -289,6 +321,14 @@ pas. `REGISTER_UPDATED_AT` avance, et la référence du français
 la même PR.
 
 ## Tests
+
+CAST-FOLLOWUP : `dueSql_refereedOrUndecidedMatch_notDue`,
+`dispatchLobbyBriefs_claim_requiresSelfManagedInTheSameStatement`,
+réservation par engagée et anciennes réservations honorées
+(`tests/lib/server/lobby-brief.test.ts`), heure changée sans rendu
+(`match-schedule-service.test.ts`), réappariement qui garde les check-ins
+(`match-launch.test.ts`, `referee-scheduling.test.ts`), message sans arbitre
+(`tests/lib/shared/lobby-brief.test.ts`).
 
 `tests/lib/shared/lobby-brief.test.ts` (message complet FR et EN au caractère
 près, vocal écrit ou tu, section du cast et lien du live, pas de ligne de

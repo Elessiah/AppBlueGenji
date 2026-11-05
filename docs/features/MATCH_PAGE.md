@@ -123,6 +123,15 @@ anciennes clés `tournament.matchPage.*` restant pour les sections.
    `matchPage.sections.gameSettings` ; le check-in du match les écrit sur
    Discord à partir de la même liste (`MATCH_LOBBY_BRIEF.md`).
 
+### CAST-FOLLOWUP
+
+- **Salon vocal de son équipe** : un membre d'une équipe du match voit le lien
+  de son propre salon tant qu'il est ouvert (`ownVoiceLink`, contexte du
+  lecteur) — jamais celui de l'adversaire (`MATCH_VOICE.md` § Lien du salon).
+- **Premier ban d'un match arbitré** : quand l'arbitre désigné crée la partie,
+  la section « Maps et bans » le dit derrière un `InfoHint`
+  (`roundMaps.page.refereeHostBan`, `MATCH_REFEREE.md` § Hôte et premier ban).
+
 ## Hors Overwatch (décision 35, 2026-10-28)
 
 En Marvel Rivals, on ne s'invite pas par BattleTag : la lecture des contacts

@@ -132,6 +132,43 @@ Le BattleTag de cast figure dans l'export des données du caster
 l'anonymisation d'un compte (`withdrawUserCasts`, `includeCompleted` faux),
 l'inscription reste mais son `cast_battletag` est effacé.
 
+## Qui règle le mode d'antenne
+
+CAST-FOLLOWUP (décisions du 2026-11-05). Le mode d'antenne
+(`bg_matches.live_trigger`) est commun à tous les streams du match : le
+caster qui le pose en devient le propriétaire (`live_trigger_user_id`). Règle
+unique, pure, `lib/shared/live-trigger-owner.ts` (`mayChangeLiveTrigger`,
+`viewerMayChangeLiveTrigger` pour l'interface) :
+
+- match pas encore casté (`live_trigger` nul) : le premier à le poser ;
+- **admin** de la plateforme ou **arbitre désigné** du match (permission
+  `tournaments`, condition de l'arbitrage) : toujours ;
+- mode d'un caster : lui seul — un co-caster est refusé ;
+- mode sans propriétaire (posé par le staff, caster parti) : le staff `tournaments`.
+
+Refus serveur, sous le verrou du match : 403 `LIVE_TRIGGER_NOT_OWNED` (PUT
+`…/caster`, `POST` qui rejoint un stream avec `trigger`, route
+`/api/admin/matches/[id]/live`). Les contrôles sont **cachés** à qui ne peut
+pas (`CastSettingsFields`, `MatchLiveDialog`). Le propriétaire est effacé
+quand il quitte le match (`releaseMatchCast`), quand un autre change le mode
+ou le retire, et à la suppression de son compte (`match-casters.ts`). Il
+figure dans l'export (`liveTriggers`, `listOwnMatchRoles`).
+
+## L'arbitre désigné, médiateur de la diffusion
+
+L'arbitre désigné **de ce match** (et lui seul : celui d'un autre match est
+refusé, 403) entre sur `/api/admin/matches/[id]/live` et `…/replay` sans la
+permission `live` (`mayConfigureMatchLive`, `lib/server/tournaments/live-access.ts`) :
+il configure la diffusion de l'organisation et modifie ou retire le lien d'un
+caster (`streamLinks: [{ streamId, liveUrl }]`, lu par `parseStreamLinks`,
+400 `INVALID_STREAM_LINKS`). Le bouton de la carte du match lui est montré
+(`markViewerReferee`, contexte du lecteur).
+
+**Lien de l'organisation, gardé** : le stream dont le lien est celui de
+l'organisation part avec son dernier caster (`pruneMatchStreams`) — comportement
+conservé (décision du 2026-11-05) ; le lien posé dans la configuration du
+direct du match reste au match.
+
 ## Verrous
 
 Tout passe par le verrou de la ligne du match, pris en **première instruction**

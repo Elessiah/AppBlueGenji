@@ -101,6 +101,28 @@ et rien n'est compté.
   nombres, `pending`) se lit `OPEN`, sans le reste. La vue spectateur ne garde rien
   (`voice: null`).
 
+## Lien du salon
+
+CAST-FOLLOWUP : sur la page du match, chaque membre d'une équipe voit le lien
+de **son propre salon** tant qu'il est ouvert — jamais celui de l'adversaire,
+jamais un spectateur. C'est un **droit du lecteur**, câblé sur les deux portes
+(`REALTIME_REFRESH.md`) : `TournamentViewerContext.voiceLinks` (flux SSE et
+REST du détail, `loadViewerVoiceLinks`), et `GET /api/tournaments/[id]/voice-links`
+pour un salon ouvert depuis le dernier contexte (`missingVoiceLinksKey`). Le
+lien est formé de `guild_id` (colonne neuve, fournie par le bot à la
+création ; nulle sur les salons ouverts avant, qui n'ont donc pas de lien) et
+`channel_id` (`voiceChannelUrl`). Textes FR/EN `matchPage.json`.
+
+Comportements gardés et documentés (décisions du 2026-11-05) :
+
+- un rendu ou une revérification **refusés** par le bot pour ce salon
+  laissent la ligne **ouverte** (`failed_at` noté), redemandée après
+  la fenêtre de revérification (`OPEN_DUE_CHANNELS_SQL`, au plus une fois par minute) ;
+- un salon **supprimé par la modération** est recréé à la revérification
+  suivante, dans la fenêtre du match ;
+- le bot répond **succès** au rendu d'un salon déjà disparu ou jamais suivi
+  (`{ released: true, deleted: true }`) : la ligne se clôt (PR du bot).
+
 ## Formulaire
 
 Case « Salons vocaux d'équipe » (`TeamVoiceChannelsField`) dans le formulaire du
@@ -119,6 +141,10 @@ est vide. Base : **intérêt légitime** (bon déroulement des tournois). La rè
 
 Les conditions d'utilisation v9, pas encore en ligne, ont été reformulées sur place par
 EF-43 (ni attente ni comptage, aucune mention d'opposition) : `TERMS_VERSION` reste 9.
+CAST-FOLLOWUP (identifiant du serveur, lien montré à l'équipe) : `/rgpd`, registre T18
+et `PRIVACY_CHANGES` (`2026-11-check-in-aux-gerants`) le disent ; la phrase des
+conditions v9, désormais en ligne (« que son identifiant et ses horaires », « dit
+seulement si chaque salon est ouvert »), attend une **décision** de l'utilisateur.
 
 La politique de confidentialité du bot (`lib/shared/bot-legal-content.ts`, copiée dans
 `LegalTerms/` du bot) décrit aussi ces salons (données, base, durées, destinataires) et
