@@ -385,7 +385,7 @@
       "noStartAt": "This match has no start time yet: going on air at a set time needs a schedule first.",
       "autoStop": "The stream stops by itself as soon as a score is entered.",
       "url": "My channel link",
-      "urlHint": "Accepted platforms: {platforms}. This link is required: without it your stream would show neither on the match card, nor on its page, nor in the live announcement. It is removed from the match if your account is deleted.",
+      "urlHint": "Accepted platforms: {platforms}. This link is required: without it your stream would show neither on the match card, nor on its page, nor in the live announcement. A link you provide here is removed from the match if your account is deleted; a saved link you do not change keeps its origin.",
       "urlInvalid": "Link not recognized. Accepted platforms: {platforms}.",
       "urlStaff": "You are co-casting the organisation's stream: its link is set in the broadcast configuration.",
       "battletag": "BattleTag for this cast (optional)",
