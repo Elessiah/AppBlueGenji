@@ -57,9 +57,10 @@ export type MatchLiveConfig = {
   setter: MatchLiveSetter;
   /**
    * Ses droits sur le mode d'antenne (`mayChangeLiveTrigger`) : admin,
-   * permission `tournaments`. L'arbitrage du match se relit sous le verrou.
+   * permission `tournaments`, et `live` — sans elle, l'appelant n'entre qu'en
+   * arbitre désigné du match, ce qui se relit sous le verrou (`NOT_MATCH_REFEREE`).
    */
-  access: Pick<LiveTriggerActor, "isAdmin" | "manages">;
+  access: Pick<LiveTriggerActor, "isAdmin" | "manages"> & { live: boolean };
   /**
    * Liens des streams **des casters**, que seul l'arbitre désigné du match
    * modifie ou efface (médiation, `docs/features/CAST_SETTINGS.md`) ; absent :
@@ -242,7 +243,11 @@ export async function setMatchLiveConfig(
       );
       if (locked.length === 0) throw new Error("MATCH_NOT_FOUND");
       const current = locked[0];
-      const actor: LiveTriggerActor = { userId: config.setter.userId, ...config.access };
+      const actor: LiveTriggerActor = {
+        userId: config.setter.userId,
+        isAdmin: config.access.isAdmin,
+        manages: config.access.manages,
+      };
       // L'arbitre qui se réclame du match doit encore pouvoir arbitrer.
       if (
         actor.manages &&
@@ -251,7 +256,10 @@ export async function setMatchLiveConfig(
       ) {
         current.kept_referee_user_id = null;
       }
-      const triggerChanges = assertLiveConfigAllowed(current, actor, trigger, config.streamLinks !== undefined);
+      const triggerChanges = assertLiveConfigAllowed(current, actor, trigger, {
+        editsStreamLinks: config.streamLinks !== undefined,
+        live: config.access.live,
+      });
       assertConfigurable(current, trigger);
       // Rejugé lui aussi : une date de début retirée entre les deux lectures
       // poserait une antenne à l'heure dite qui ne s'ouvrirait jamais.
@@ -286,7 +294,10 @@ export async function setMatchLiveConfig(
             [trigger, owner, matchId],
           );
         }
-        streams = await setStaffStreamUrl(connection, matchId, url, config.setter, streams);
+        // Un stream de caster dont l'arbitre vient d'effacer le lien reste au
+        // caster : le lien du staff ne s'y pose pas.
+        const edited = new Set((config.streamLinks ?? []).map((link) => link.streamId));
+        streams = await setStaffStreamUrl(connection, matchId, url, config.setter, streams, edited);
       }
       // Les streams déjà lus sous verrou (et mis à jour en mémoire) ne sont pas
       // relus : deux lectures verrouillantes, non quatre.
@@ -321,9 +332,10 @@ async function setStaffStreamUrl(
   url: string | null,
   setter: MatchLiveSetter,
   known?: MatchStreamRow[],
+  casterOwned: ReadonlySet<number> = new Set(),
 ): Promise<MatchStreamRow[]> {
   const streams = known ?? (await lockMatchStreams(connection, matchId));
-  const target = staffStream(streams);
+  const target = staffStream(streams.filter((stream) => stream.staff || !casterOwned.has(stream.id)));
   if (target !== null && (target.staff || url !== null)) {
     if (target.liveUrl === url && target.staff) return streams;
     await connection.execute(
@@ -401,20 +413,23 @@ export async function isDesignatedMatchReferee(matchId: number, userId: number, 
  * Qui règle quoi, sous le verrou du match : le mode d'antenne déjà posé par
  * un autre ne change pas (`LIVE_TRIGGER_NOT_OWNED`) — seuls son caster,
  * l'arbitre désigné et un admin le changent ou le retirent —, et seul
- * l'arbitre désigné touche aux liens des casters (`NOT_MATCH_REFEREE`).
+ * l'arbitre désigné touche aux liens des casters (`NOT_MATCH_REFEREE`). Sans
+ * `live`, l'appelant n'a passé la porte qu'en arbitre de ce match : il doit
+ * l'être encore (désignation changée entre la porte et le verrou).
  * Rend vrai si le mode change.
  */
 function assertLiveConfigAllowed(
   current: MatchLiveRow,
   actor: LiveTriggerActor,
   trigger: MatchLiveTrigger | null,
-  editsStreamLinks: boolean,
+  { editsStreamLinks, live }: { editsStreamLinks: boolean; live: boolean },
 ): boolean {
   const hold = {
     trigger: current.live_trigger ?? null,
     ownerId: nullableId(current.live_trigger_user_id),
     refereeId: nullableId(current.kept_referee_user_id),
   };
+  if (!live && !isMatchRefereeActor(hold, actor)) throw new Error("NOT_MATCH_REFEREE");
   const triggerChanges = trigger !== hold.trigger;
   if (triggerChanges && !mayChangeLiveTrigger(hold, actor)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
   if (editsStreamLinks && !isMatchRefereeActor(hold, actor)) throw new Error("NOT_MATCH_REFEREE");

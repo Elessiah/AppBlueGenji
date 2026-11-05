@@ -80,6 +80,18 @@ describe("viewerMayChangeLiveTrigger", () => {
   it("viewerMayChangeLiveTrigger_ownerViewer_true", () => {
     expect(viewerMayChangeLiveTrigger(match, { userId: 12, isAdmin: false, manages: false, referees: false })).toBe(true);
   });
+
+  it("viewerMayChangeLiveTrigger_ownerHiddenStaffViewer_false", () => {
+    const hidden = { liveTrigger: "MANUAL" as const, liveTriggerCasterId: null, liveTriggerOwnerHidden: true };
+
+    expect(viewerMayChangeLiveTrigger(hidden, { userId: 9, isAdmin: false, manages: true, referees: false })).toBe(false);
+  });
+
+  it("viewerMayChangeLiveTrigger_ownerHiddenAdminViewer_true", () => {
+    const hidden = { liveTrigger: "MANUAL" as const, liveTriggerCasterId: null, liveTriggerOwnerHidden: true };
+
+    expect(viewerMayChangeLiveTrigger(hidden, { userId: 1, isAdmin: true, manages: true, referees: false })).toBe(true);
+  });
 });
 
 describe("liveTriggerOwnerAfter", () => {
@@ -95,9 +107,9 @@ describe("liveTriggerOwnerAfter", () => {
     expect(liveTriggerOwnerAfter("AUTO", { userId: 1, isAdmin: true, manages: true }, false)).toBeNull();
   });
 
-  it("liveTriggerOwnerAfter_liveOnlyNotCasting_ownsIt", () => {
-    // Sans quoi il ne pourrait plus changer son propre réglage (mode sans propriétaire = staff).
-    expect(liveTriggerOwnerAfter("AUTO", { userId: 13, ...LIVE_ONLY }, false)).toBe(13);
+  it("liveTriggerOwnerAfter_liveOnlyNotCasting_staysOwnerless", () => {
+    // Seul un caster du match en devient propriétaire : la page ne sait montrer qu'un caster.
+    expect(liveTriggerOwnerAfter("AUTO", { userId: 13, ...LIVE_ONLY }, false)).toBeNull();
   });
 
   it("liveTriggerOwnerAfter_triggerRemoved_null", () => {

@@ -147,9 +147,10 @@ unique, pure, `lib/shared/live-trigger-owner.ts` (`mayChangeLiveTrigger`,
 - mode sans propriétaire (posé par le staff, caster parti) : le staff `tournaments`.
 
 Propriétaire écrit (`liveTriggerOwnerAfter`) : le caster du match qui le pose,
-ou le porteur de la seule permission `live` qui le pose sans caster (sans quoi
-il ne pourrait plus revenir sur son réglage) ; personne quand c'est le staff
-`tournaments` ou un admin qui ne caste pas. L'arbitre reconnu est l'arbitre
+lui seul ; personne quand il est posé par qui ne caste pas (staff, admin,
+arbitre, porteur de la seule permission `live`). Un propriétaire que
+l'instantané tait (caster devenu inéligible) n'y est pas nommé mais signalé
+(`liveTriggerOwnerHidden`) : l'interface garde le mode verrouillé. L'arbitre reconnu est l'arbitre
 **retenu** (sans opposition), qui **ne joue pas** le match (`KEPT_REFEREE_SQL`)
 et remplit encore la condition d'arbitrage du jeu (`refereeQualifies`).
 
@@ -167,13 +168,15 @@ figure dans l'export (`liveTriggers`, `listOwnMatchRoles`).
 ## L'arbitre désigné, médiateur de la diffusion
 
 L'arbitre désigné **de ce match** (et lui seul : celui d'un autre match est
-refusé, 403) entre sur `/api/admin/matches/[id]/live` et `…/replay` sans la
-permission `live` (`mayConfigureMatchLive`, `lib/server/tournaments/live-access.ts`) :
+refusé, 403) entre sur `/api/admin/matches/[id]/live` sans la permission
+`live` (`mayConfigureMatchLive`, `lib/server/tournaments/live-access.ts`), et y
+est relu sous le verrou du match (`NOT_MATCH_REFEREE` s'il ne l'est plus) ; la
+rediff (`…/replay`) reste à la permission `live` :
 il configure la diffusion de l'organisation et modifie ou retire le lien d'un
 caster (`streamLinks: [{ streamId, liveUrl }]`, lu par `parseStreamLinks`,
 400 `INVALID_STREAM_LINKS`). Les liens des casters s'écrivent **avant** celui
 de l'organisation : celui-ci n'habille jamais un stream de caster qui vient
-de recevoir son lien dans la même requête. Le bouton de la carte du match lui est montré
+de recevoir son lien — ni celui dont il vient d'effacer le lien — dans la même requête. Le bouton de la carte du match lui est montré
 (`markViewerReferee`, contexte du lecteur).
 
 **Lien de l'organisation, gardé** : le stream dont le lien est celui de

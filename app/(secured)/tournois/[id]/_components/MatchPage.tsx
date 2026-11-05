@@ -14,12 +14,7 @@ import { useMatchContacts } from "@/components/match-launch/MatchContactsDialog"
 import { SharedMatchContactsContext } from "@/components/match-launch/shared-match-contacts";
 import { launchSidesLaterText, refereeLaterText, useLaunchText } from "@/components/match-launch/launch-text";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
-import {
-  VOICE_CHANNEL_CAPACITY,
-  ownVoiceLink,
-  type MatchVoiceInfo,
-  type MatchVoiceSideState,
-} from "@/lib/shared/match-voice";
+import { VOICE_CHANNEL_CAPACITY, type MatchVoiceInfo, type MatchVoiceSideState } from "@/lib/shared/match-voice";
 import {
   MATCH_LAUNCH_REFRESH_EVENT,
   connectionReader,
@@ -734,20 +729,10 @@ export function voiceRowText(page: ReturnType<typeof useMatchPageText>, state: M
  * « Salon vocal : ouvert » par équipe, aux parties du match et au staff. L'état
  * vient de `useMatchVoice` (instantané, relecture REST flux coupé) : la page
  * le lit une fois, pour la section comme pour la grille.
- *
- * Les membres d'une équipe voient en plus le lien vers **leur** salon, tant
- * qu'il est ouvert (`ownVoiceLink`, contexte du lecteur) : jamais celui de
- * l'adversaire, que le serveur ne leur envoie d'ailleurs pas.
  */
-function VoiceSection({
-  voice,
-  sides,
-  match,
-}: Readonly<{ voice: MatchVoiceInfo; sides: [PageSide, PageSide]; match: BracketMatch }>) {
+function VoiceSection({ voice, sides }: Readonly<{ voice: MatchVoiceInfo; sides: [PageSide, PageSide] }>) {
   const page = useMatchPageText();
   const titleId = useId();
-  const { myTeamId, voiceLinks } = useLiveControls();
-  const ownLink = ownVoiceLink({ ...match, voice }, myTeamId, voiceLinks);
   const side = (slot: 1 | 2) => (slot === 1 ? voice.team1State : voice.team2State);
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
@@ -768,18 +753,6 @@ function VoiceSection({
               <li key={pageSide.slot} className={styles.voiceRow}>
                 <SideName side={pageSide} logoSize={20} truncate />
                 <span className={styles.factNote}>{voiceRowText(page, state)}</span>
-                {ownLink !== null && pageSide.teamId === myTeamId && (
-                  <a
-                    href={ownLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.voiceLink}
-                    // Le texte visible ouvre le nom accessible (WCAG 2.5.3).
-                    aria-label={page.t("voice.joinLabel")}
-                  >
-                    {page.t("voice.join")}
-                  </a>
-                )}
               </li>
             );
           })}
@@ -1139,7 +1112,7 @@ function MatchPageContent({
         </div>
         {rightColumn && (
           <div className={styles.column}>
-            {voice && <VoiceSection voice={voice} sides={sides} match={match} />}
+            {voice && <VoiceSection voice={voice} sides={sides} />}
             <ConnectionSection launch={shownLaunch} onCopy={onCopy} />
             <OfficiatingSection
               match={match}

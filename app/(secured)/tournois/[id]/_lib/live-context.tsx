@@ -3,7 +3,6 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import type { CastBlock } from "@/lib/shared/match-launch";
 import type { BracketMatch, MatchRefereeName } from "@/lib/shared/types";
-import type { MatchVoiceLink } from "@/lib/shared/match-voice";
 
 type LiveControls = {
   /** Le viewer porte-t-il la permission `live` (ADMIN, ARBITRE, CASTER) ? */
@@ -50,15 +49,9 @@ type LiveControls = {
    * vide sur la page sans compte, qui lit « Arbitre désigné » (`refereeNameOf`).
    */
   refereeNames: readonly MatchRefereeName[];
-  /**
-   * Liens des salons vocaux de l'équipe du lecteur (contexte du lecteur,
-   * `MATCH_VOICE.md`) ; vide sans équipe ou sur la page sans compte.
-   */
-  voiceLinks: readonly MatchVoiceLink[];
 };
 
 const NO_REFEREE_NAMES: readonly MatchRefereeName[] = [];
-const NO_VOICE_LINKS: readonly MatchVoiceLink[] = [];
 
 const LiveContext = createContext<LiveControls>({
   canManage: false,
@@ -74,7 +67,6 @@ const LiveContext = createContext<LiveControls>({
   castBlock: "NOT_CASTER",
   openReplay: () => undefined,
   refereeNames: NO_REFEREE_NAMES,
-  voiceLinks: NO_VOICE_LINKS,
 });
 
 /**
@@ -100,13 +92,11 @@ export function LiveProvider({
   castBlock,
   openReplay,
   refereeNames = NO_REFEREE_NAMES,
-  voiceLinks = NO_VOICE_LINKS,
   children,
 }: Readonly<
-  Omit<LiveControls, "refereeNames" | "viewerIsAdmin" | "voiceLinks"> & {
+  Omit<LiveControls, "refereeNames" | "viewerIsAdmin"> & {
     refereeNames?: LiveControls["refereeNames"];
     viewerIsAdmin?: boolean;
-    voiceLinks?: LiveControls["voiceLinks"];
     children: ReactNode;
   }
 >) {
@@ -124,7 +114,6 @@ export function LiveProvider({
       castBlock,
       openReplay,
       refereeNames,
-      voiceLinks,
     }),
     [
       canManage,
@@ -139,7 +128,6 @@ export function LiveProvider({
       castBlock,
       openReplay,
       refereeNames,
-      voiceLinks,
     ],
   );
   return <LiveContext.Provider value={value}>{children}</LiveContext.Provider>;

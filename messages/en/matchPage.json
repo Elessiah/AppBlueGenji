@@ -45,8 +45,6 @@
     "notCreated": "Voice channel: opening soon",
     "open": "Voice channel: open",
     "failed": "Voice channel: unavailable, trying again",
-    "hint": "Fifteen minutes before the match, the Discord bot opens a {capacity}-seat voice channel per team; the match launch doesn't depend on the channels.",
-    "join": "Join our channel",
-    "joinLabel": "Join our channel on Discord (new tab)"
+    "hint": "Fifteen minutes before the match, the Discord bot opens a {capacity}-seat voice channel per team; the match launch doesn't depend on the channels."
   }
 }

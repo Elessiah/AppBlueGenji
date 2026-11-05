@@ -64,13 +64,9 @@ Il est donc scindé en deux :
   du flux gardent le tableau précédent à contenu égal (`shareRefereeNames`) : `LiveProvider` ne
   redessine pas le plateau pour des pseudos inchangés.
 
-  Les **liens des salons vocaux de l'équipe du lecteur** (`voiceLinks`,
-  CAST-FOLLOWUP, `MATCH_VOICE.md` § Lien du salon) y vivent aussi, **propres à
-  une personne** : jamais dans l'instantané, posés par le flux et par le REST
-  de secours ; un salon ouvert depuis le dernier contexte est relu par
-  `GET /api/tournaments/[id]/voice-links` (`missingVoiceLinksKey`). De même, le
-  nom d'arbitre désigné marqué pour le lecteur (`markViewerReferee`), qui lui
-  montre le bouton de diffusion de son match.
+  Le nom d'arbitre désigné y est marqué pour le lecteur (`markViewerReferee`,
+  CAST-FOLLOWUP), **propre à une personne** : il montre à l'arbitre le bouton de
+  diffusion de son match, posé par le flux et par le REST de secours.
 
 `TournamentDetail = TournamentSnapshot & TournamentViewerContext` : les
 appelants existants ne voient aucune différence.

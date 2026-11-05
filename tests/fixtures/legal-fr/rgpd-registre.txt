@@ -684,7 +684,6 @@ Réunir chaque équipe d'un match dans un salon vocal Discord dédié avant son 
 Sous-finalités
 Demander au bot Discord de l'association, à partir de 15 minutes avant l'heure d'un match (ou dès l'option allumée, pour un match déjà dans ce délai), un salon vocal de 5 places par équipe dans la catégorie des matchs de son serveur, au nom de l'équipe — jamais pour une entrée en tournoi individuel (son nom serait un pseudo) ni pour un match contre une équipe fantôme
 Dire aux parties du match (membres des deux équipes, casters) et au staff, sur la page du match, si chaque salon est ouvert — le site ne demande jamais au bot qui se trouve dans un salon, ni combien
-Donner aux membres de chaque équipe, sur la page du match, le lien de leur propre salon tant qu'il est ouvert — jamais celui de l'adversaire, ni à qui n'est pas membre de l'équipe
 Rendre les salons au bot quand le match est terminé (score validé), annulé, retombé en attente, sorti du programme ou resté sans score validé 24 heures après son horaire, quand l'équipe sort de l'appariement, quand une entrée en tournoi individuel ou une équipe fantôme entre dans le match, ou quand le tournoi n'est plus en cours (terminé, ou ramené avant son départ), est de nouveau masqué ou éteint l'option ; le bot supprime un salon dès qu'il est vide
 Base légale
 Intérêt légitime (bon déroulement des tournois : réunir chaque équipe avant son match) ; rejoindre un salon reste un choix, sans effet sur le lancement du match ; le site ne garde ni qui se trouve dans un salon, ni combien
@@ -694,7 +693,7 @@ Toute personne qui rejoint un salon vocal d'équipe sur le serveur Discord de l'
 Membres du serveur Discord de l'association présents dans l'un de ses salons vocaux, dont le bot tient la présence en mémoire pour savoir si un salon de match est vide
 Membres des autres serveurs où le bot est présent, présents dans l'un de leurs salons vocaux : seule la fiche de membre jointe à leur état vocal est gardée en mémoire
 Données
-Identifiant Discord du salon de chaque équipe d'un match et de son serveur (pour en former le lien), numéros du match et de l'équipe, heure d'une éventuelle panne du bot ou d'un rendu refusé, heures de création et de rendu du salon — jamais qui est présent, ni combien
+Identifiant Discord du salon de chaque équipe d'un match, numéros du match et de l'équipe, heure d'une éventuelle panne du bot ou d'un rendu refusé, heures de création et de rendu du salon — jamais qui est présent, ni combien
 Nom de l'équipe, transmis au bot pour nommer le salon
 État vocal (identifiant Discord du membre et de sa session vocale, salon où il se trouve, micro ou son coupés par lui ou par la modération, partage d'écran ou caméra actifs, demande de parole et mise en sourdine de scène), avec la fiche de membre que Discord y joint (sa fiche sur le serveur, dont pseudo, surnom, avatar, rôles, dates d'arrivée et de boost, exclusion temporaire), des membres du serveur Discord de l'association, tenu en mémoire par le bot pour savoir si un salon est vide, jamais enregistré ni transmis au site
 Fiche du salon chez le bot : identifiant du salon, clé du match et de l'équipe (des numéros, aucun nom), heures de création et de rendu
@@ -709,7 +708,6 @@ Autres délais du bot (hors le plafond d'un salon rendu, qui l'inclut) : chacun 
 Journal d'audit du serveur sur Discord : création et suppression de chaque salon, avec son nom, pour la durée que Discord fixe
 Destinataires
 Membres des deux équipes d'un match, ses casters et le staff, à qui la page du match dit si chaque salon est ouvert
-Membres de chaque équipe, à qui la page du match donne le lien de leur seul salon
 Autres membres connectés, qui peuvent lire ces mêmes états dans les données du tournoi — un visiteur sans compte n'en lit rien
 Membres du serveur Discord de l'association autorisés dans la catégorie des matchs, qui voient le salon et ses occupants sur Discord
 Administration du serveur Discord de l'association, qui lit dans le journal d'audit de Discord la création et la suppression de chaque salon, avec son nom

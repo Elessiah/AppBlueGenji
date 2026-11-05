@@ -384,7 +384,7 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
     phasePosition: row.phase_position == null ? null : Number(row.phase_position),
     startAt: toIso(row.start_at ?? null),
     liveTrigger: row.live_trigger ?? null,
-    liveTriggerCasterId: liveTriggerCasterId(row, extras.casters ?? [], game),
+    ...liveTriggerOwnerFields(row, extras.casters ?? [], game),
     liveUrl: normalizeStreamUrl(firstStreamUrl(shown)),
     // Revalidés à la lecture, comme le premier lien.
     streams: shown
@@ -463,14 +463,20 @@ function nullableId(value: number | null | undefined): number | null {
  */
 /**
  * Le caster maître du mode d'antenne, s'il caste encore le match et y est
- * montré (`casters`) : son identifiant y est déjà public. Sinon `null` — le
- * mode est au staff (`lib/shared/live-trigger-owner.ts`).
+ * montré (`casters`) : son identifiant y est déjà public. Un maître que
+ * l'instantané tait (caster retiré de l'affichage, pas encore rendu) n'est
+ * pas nommé, seulement signalé (`liveTriggerOwnerHidden`) : le serveur le
+ * tient toujours pour maître (`lib/shared/live-trigger-owner.ts`).
  */
-function liveTriggerCasterId(row: MatchRow, casters: readonly MatchCasterRow[], game: TournamentGame): number | null {
+function liveTriggerOwnerFields(
+  row: MatchRow,
+  casters: readonly MatchCasterRow[],
+  game: TournamentGame,
+): Pick<BracketMatch, "liveTriggerCasterId" | "liveTriggerOwnerHidden"> {
   const owner = row.live_trigger_user_id ?? null;
-  if (owner === null || row.live_trigger === null) return null;
+  if (owner === null || row.live_trigger === null) return { liveTriggerCasterId: null };
   const shown = casters.some((caster) => caster.userId === Number(owner) && !casterWithdrawn(row, caster, game));
-  return shown ? Number(owner) : null;
+  return shown ? { liveTriggerCasterId: Number(owner) } : { liveTriggerCasterId: null, liveTriggerOwnerHidden: true };
 }
 
 function casterWithdrawn(row: MatchRow, caster: MatchCasterRow, game: TournamentGame): boolean {

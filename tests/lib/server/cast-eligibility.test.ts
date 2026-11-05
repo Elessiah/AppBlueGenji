@@ -167,6 +167,22 @@ describe("mapMatch — casters inscrits et condition du cast", () => {
       10, 11,
     ]);
   });
+
+  it("mapMatch_ownerShownCaster_exposesId", () => {
+    const match = mapMatch(row({ live_trigger: "MANUAL", live_trigger_user_id: 900 }), { casters: [caster(900)] });
+
+    expect(match.liveTriggerCasterId).toBe(900);
+    expect(match.liveTriggerOwnerHidden).toBeUndefined();
+  });
+
+  it("mapMatch_ownerNotShown_hiddenFlagWithoutId", () => {
+    const match = mapMatch(row({ live_trigger: "MANUAL", live_trigger_user_id: 900 }), {
+      casters: [caster(900, { blizzard_sub: null })],
+    });
+
+    expect(match.liveTriggerCasterId).toBeNull();
+    expect(match.liveTriggerOwnerHidden).toBe(true);
+  });
 });
 
 describe("mapMatch — arbitre désigné dans l'instantané (`docs/features/MATCH_REFEREE.md`)", () => {

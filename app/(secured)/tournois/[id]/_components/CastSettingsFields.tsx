@@ -32,6 +32,19 @@ export function castBattletagInvalid(value: string): boolean {
 }
 
 /**
+ * Le mode que montre `CastTriggerField` : verrouillé, celui **du match** (que
+ * le flux tient à jour), jamais le choix local de la fenêtre, figé à son
+ * ouverture ; sinon le choix local.
+ */
+export function lockedTrigger(
+  locked: boolean,
+  matchTrigger: MatchLiveTrigger | null,
+  picked: MatchLiveTrigger,
+): MatchLiveTrigger {
+  return locked && matchTrigger !== null ? matchTrigger : picked;
+}
+
+/**
  * Le mode choisi demande-t-il une date de début que le match n'a pas ? Le
  * serveur refuse ce couple (`MATCH_START_AT_REQUIRED`) : la fenêtre désarme en
  * amont plutôt que de laisser buter dessus.
@@ -107,7 +120,8 @@ export function CastUrlField({
  *
  * `locked` : le mode appartient à un autre (le caster qui l'a posé, ou le
  * staff — `viewerMayChangeLiveTrigger`) ; il se lit sans contrôle, plutôt
- * qu'un choix que le serveur refuserait (`LIVE_TRIGGER_NOT_OWNED`).
+ * qu'un choix que le serveur refuserait (`LIVE_TRIGGER_NOT_OWNED`). L'appelant
+ * passe alors le mode **du match** (`lockedTrigger`), jamais son choix local.
  */
 export function CastTriggerField({
   trigger,
@@ -146,6 +160,7 @@ export function CastTriggerField({
           {t("cardActions.castSettings.trigger")}
           <InfoHint id={hintId} subject={t("cardActions.castSettings.trigger")}>
             <p>{t("cardActions.castSettings.autoStop")}</p>
+            {startAtMissing && <p>{t("cardActions.castSettings.noStartAt")}</p>}
           </InfoHint>
         </InfoHintRow>
       </legend>
@@ -167,7 +182,6 @@ export function CastTriggerField({
           </label>
         );
       })}
-      {startAtMissing && <p className={styles.hint}>{t("cardActions.castSettings.noStartAt")}</p>}
     </fieldset>
   );
 }

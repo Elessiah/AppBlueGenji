@@ -503,6 +503,8 @@ const MATCH_FIELDS = {
   liveTrigger: "public",
   // Le caster maître du mode d'antenne est un compte : retiré, comme les casters.
   liveTriggerCasterId: "retiré",
+  // Simple drapeau, aucun compte : le mode a un maître non montré.
+  liveTriggerOwnerHidden: "public",
   liveUrl: "public",
   streams: "public",
   lobbyOpenedAt: "public",

@@ -188,8 +188,7 @@ import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
-import { dispatchMatchVoiceChannels, loadViewerVoiceLinks } from "./match-voice";
-import type { MatchVoiceLink } from "@/lib/shared/match-voice";
+import { dispatchMatchVoiceChannels } from "./match-voice";
 import { dispatchDueRoundMapsNotices } from "./round-maps-notice";
 import { dispatchMatchStartNotices, notifyScoreToConfirm } from "./player-pushes";
 import { dispatchLobbyBriefs } from "./lobby-brief";
@@ -1300,10 +1299,6 @@ export async function getTournamentViewerContext(
   // Les mêmes pour tous : lus une fois par version d'instantané.
   const refereeNames = markViewerReferee(await loadRefereeNames(snapshot), userId);
 
-  // Salon vocal de son équipe : à ses membres seuls (`myTeamId`), jamais dans
-  // l'instantané diffusé. Aucune lecture sans salon ouvert de son côté.
-  const voiceLinks = await loadViewerVoiceLinks(snapshot.matches, myTeamId);
-
   return {
     preview,
     // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
@@ -1325,18 +1320,7 @@ export async function getTournamentViewerContext(
     matchProposals,
     certificationPrompt,
     refereeNames,
-    voiceLinks,
   };
-}
-
-/**
- * Liens des salons vocaux de l'équipe du lecteur (`TournamentViewerContext.voiceLinks`),
- * pour la relecture légère qui suit un salon ouvert depuis le contexte
- * (`GET /api/tournaments/[id]/voice-links`).
- */
-export async function getViewerVoiceLinks(snapshot: TournamentSnapshot, userId: number): Promise<MatchVoiceLink[]> {
-  const { myTeamId } = await resolveViewerEntrant(snapshot, userId);
-  return loadViewerVoiceLinks(snapshot.matches, myTeamId);
 }
 
 /**

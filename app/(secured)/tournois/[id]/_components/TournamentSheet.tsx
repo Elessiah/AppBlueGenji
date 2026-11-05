@@ -1252,7 +1252,6 @@ function TournamentSheetView({
         castBlock={detail.castBlock}
         openReplay={openMatchReplay}
         refereeNames={detail.refereeNames}
-        voiceLinks={detail.voiceLinks}
       >
       {/* Le bouton **par match** suit la règle de `frozen` : le plateau affiché
           ne bouge plus, et signaler « ce match » depuis une manche périmée

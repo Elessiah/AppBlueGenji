@@ -85,7 +85,7 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
       trigger: "AUTO",
       liveUrl: "kick.com/bg",
       setter: { userId: arbitre.id, asOrganisation: false },
-      access: { isAdmin: false, manages: true },
+      access: { isAdmin: false, manages: true, live: true },
     });
   });
 
@@ -208,7 +208,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "MANUAL",
       liveUrl: "kick.com/bg",
       setter: { userId: caster.id, asOrganisation: false },
-      access: { isAdmin: false, manages: false },
+      access: { isAdmin: false, manages: false, live: true },
     });
   });
 
@@ -224,7 +224,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "AUTO",
       liveUrl: null,
       setter: { userId: arbitre.id, asOrganisation: false },
-      access: { isAdmin: false, manages: true },
+      access: { isAdmin: false, manages: true, live: true },
     });
   });
 
@@ -242,7 +242,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "AUTO",
       liveUrl: "kick.com/bg",
       setter: { userId: arbitre.id, asOrganisation: true },
-      access: { isAdmin: false, manages: true },
+      access: { isAdmin: false, manages: true, live: true },
     });
   });
 
@@ -294,7 +294,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: null,
       liveUrl: null,
       setter: { userId: caster.id, asOrganisation: false },
-      access: { isAdmin: false, manages: false },
+      access: { isAdmin: false, manages: false, live: true },
     });
   });
 
@@ -309,7 +309,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "START_TIME",
       liveUrl: null,
       setter: { userId: caster.id, asOrganisation: false },
-      access: { isAdmin: false, manages: false },
+      access: { isAdmin: false, manages: false, live: true },
     });
   });
 

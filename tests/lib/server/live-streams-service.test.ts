@@ -146,8 +146,10 @@ describe("setMatchLiveConfig", () => {
   const OWN_CHANNEL_5 = { userId: 5, asOrganisation: false };
   const ORGANISER_7 = { userId: 7, asOrganisation: true };
   /** Droits sur le mode d'antenne : la seule permission `live`, ou le staff `tournaments`. */
-  const LIVE_ONLY = { isAdmin: false, manages: false };
-  const STAFF = { isAdmin: false, manages: true };
+  const LIVE_ONLY = { isAdmin: false, manages: false, live: true };
+  const STAFF = { isAdmin: false, manages: true, live: true };
+  /** Le staff `tournaments` sans `live` : n'entre que comme arbitre désigné du match. */
+  const REFEREE_ONLY = { isAdmin: false, manages: true, live: false };
 
   /**
    * Base à état pour le réglage d'un match : sa ligne, ses streams et ses
@@ -210,26 +212,38 @@ describe("setMatchLiveConfig", () => {
     return stream;
   }
 
+  type StreamWrite = (state: { streams: StreamState[] }, params: unknown[]) => void;
+  const byId = (state: { streams: StreamState[] }, id: unknown) => state.streams.find((candidate) => candidate.id === id);
+  /** Écritures exactes sur `bg_match_streams`, rejouées sur l'état. */
+  const STREAM_WRITES: Record<string, StreamWrite> = {
+    "UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE match_id = ? AND staff_owned = 1": (state) => {
+      for (const stream of state.streams) if (stream.staff_owned === 1) setStream(stream, null, null);
+    },
+    "UPDATE bg_match_streams SET live_url = ?, staff_owned = 1, link_user_id = ? WHERE id = ?": (state, params) => {
+      const stream = byId(state, params[2]);
+      if (stream) setStream(Object.assign(stream, { staff_owned: 1 }), params[0] as string | null, params[1] as number | null);
+    },
+    "UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE id = ? AND match_id = ? AND staff_owned = 0": (state, params) => {
+      const stream = byId(state, params[0]);
+      if (stream) setStream(stream, null, null);
+    },
+    "UPDATE bg_match_streams SET live_url = ? WHERE id = ? AND match_id = ? AND staff_owned = 0": (state, params) => {
+      const stream = byId(state, params[1]);
+      if (stream) stream.live_url = params[0] as string;
+    },
+  };
+
   /** Écritures sur `bg_match_streams`, rejouées sur l'état. */
   function writeStreams(state: { streams: StreamState[] }, sql: string, params: unknown[]) {
-    if (sql === "UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE match_id = ? AND staff_owned = 1") {
-      for (const stream of state.streams) if (stream.staff_owned === 1) setStream(stream, null, null);
-      return [{ affectedRows: 1 }];
-    }
-    if (sql === "UPDATE bg_match_streams SET live_url = ?, staff_owned = 1, link_user_id = ? WHERE id = ?") {
-      const stream = state.streams.find((candidate) => candidate.id === params[2]);
-      if (stream) setStream(Object.assign(stream, { staff_owned: 1 }), params[0] as string | null, params[1] as number | null);
+    const write = STREAM_WRITES[sql];
+    if (write) {
+      write(state, params);
       return [{ affectedRows: 1 }];
     }
     if (sql === "INSERT INTO bg_match_streams (match_id, live_url, staff_owned, link_user_id) VALUES (?, ?, 1, ?)") {
       const id = Math.max(0, ...state.streams.map((stream) => stream.id)) + 1;
       state.streams.push(setStream(dbStream(id, null, true), params[1] as string | null, params[2] as number | null));
       return [{ affectedRows: 1, insertId: id }];
-    }
-    if (sql === "UPDATE bg_match_streams SET live_url = ? WHERE id = ? AND match_id = ? AND staff_owned = 0") {
-      const stream = state.streams.find((candidate) => candidate.id === params[1]);
-      if (stream) stream.live_url = params[0] as string;
-      return [{ affectedRows: 1 }];
     }
     if (sql.startsWith("DELETE FROM bg_match_streams")) {
       const ids = params.slice(1);
@@ -691,6 +705,53 @@ describe("setMatchLiveConfig", () => {
     // Le stream du caster garde son lien ; celui du staff en ouvre un autre.
     expect(world.state.streams.find((stream) => stream.id === 4)).toEqual(dbStream(4, "https://kick.com/caster"));
     expect(world.state.streams.find((stream) => stream.id === 5)?.live_url).toBe("https://twitch.tv/orga");
+  });
+
+  it("setMatchLiveConfig_refereeClearsCasterLinkWithStaffUrl_staffUrlOpensOwnStream", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", kept_referee_user_id: 9 }), [dbStream(4, "https://kick.com/caster")], [
+      { user_id: 12, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, {
+      trigger: "MANUAL",
+      liveUrl: "twitch.tv/orga",
+      setter: { userId: 9, asOrganisation: true },
+      access: STAFF,
+      streamLinks: [{ streamId: 4, liveUrl: "" }],
+    });
+
+    expect(world.state.streams.find((stream) => stream.id === 4)).toEqual(dbStream(4, null));
+    expect(world.state.streams.find((stream) => stream.id === 5)).toEqual(dbStream(5, "https://twitch.tv/orga", true));
+  });
+
+  it("setMatchLiveConfig_nonLiveCallerNoLongerReferee_refusedWithoutWrite", async () => {
+    jest.mocked(loadRefereeStanding).mockResolvedValue({ block: "NOT_REFEREE", objection: false });
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", kept_referee_user_id: 9 }));
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: { userId: 9, asOrganisation: true }, access: REFEREE_ONLY }),
+    ).rejects.toThrow("NOT_MATCH_REFEREE");
+    expect(world.state.matchWrites).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_nonLiveCallerStillReferee_writesTriggerWithoutOwner", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", kept_referee_user_id: 9 }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: { userId: 9, asOrganisation: true }, access: REFEREE_ONLY });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", null, 42]]]);
+  });
+
+  it("setMatchLiveConfig_liveOnlyNotCastingSetsTrigger_ownerNull", async () => {
+    const world = liveWorld(matchRow());
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: { userId: 13, asOrganisation: false }, access: LIVE_ONLY });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", null, 42]]]);
   });
 
   it("refuse un match inconnu", async () => {

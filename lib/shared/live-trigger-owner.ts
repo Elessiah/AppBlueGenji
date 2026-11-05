@@ -9,8 +9,9 @@
  * l'**arbitre désigné** du match (médiateur) et un **admin** le changent ou le
  * retirent. Un mode posé par le staff — ou dont le caster qui l'avait posé
  * s'est retiré — n'a pas de propriétaire : il reste au staff `tournaments`.
- * Un porteur de la seule permission `live` qui le pose en est le propriétaire,
- * qu'il caste le match ou non.
+ * Seul un caster du match devient propriétaire du mode qu'il pose : posé par
+ * qui ne le caste pas (staff, admin, arbitre, porteur de la seule `live`), le
+ * mode reste au staff.
  *
  * Module pur : la même règle sert le serveur (sous le verrou du match) et
  * l'interface (contrôles cachés), jamais deux définitions.
@@ -65,19 +66,26 @@ export type LiveTriggerViewer = {
 };
 
 /**
+ * Propriétaire que l'instantané tait (`liveTriggerOwnerHidden` : caster retiré
+ * mais pas encore rendu) : un identifiant qu'aucun compte ne porte, pour que
+ * l'interface garde le mode verrouillé comme le serveur.
+ */
+const HIDDEN_OWNER = -1;
+
+/**
  * Le lecteur peut-il changer le mode d'antenne de ce match ? La règle du
  * serveur (`mayChangeLiveTrigger`), lue sur l'instantané : le propriétaire y
- * est `liveTriggerCasterId`. Faux sans compte.
+ * est `liveTriggerCasterId` (ou tu, `liveTriggerOwnerHidden`). Faux sans compte.
  */
 export function viewerMayChangeLiveTrigger(
-  match: { liveTrigger: MatchLiveTrigger | null; liveTriggerCasterId?: number | null },
+  match: { liveTrigger: MatchLiveTrigger | null; liveTriggerCasterId?: number | null; liveTriggerOwnerHidden?: boolean },
   viewer: LiveTriggerViewer,
 ): boolean {
   if (viewer.userId === null) return false;
   return mayChangeLiveTrigger(
     {
       trigger: match.liveTrigger,
-      ownerId: match.liveTriggerCasterId ?? null,
+      ownerId: match.liveTriggerCasterId ?? (match.liveTriggerOwnerHidden === true ? HIDDEN_OWNER : null),
       refereeId: viewer.referees ? viewer.userId : null,
     },
     { userId: viewer.userId, isAdmin: viewer.isAdmin, manages: viewer.manages },
@@ -85,19 +93,19 @@ export function viewerMayChangeLiveTrigger(
 }
 
 /**
- * Le propriétaire à écrire quand `actor` pose `next` : `null` quand le match
- * n'est plus casté, ou quand le mode est posé par le staff `tournaments` ou un
- * admin qui ne caste pas le match — il reste alors au staff. Un porteur de la
- * seule permission `live` qui le pose sans caster le match en devient le
- * propriétaire : sans quoi il ne pourrait plus revenir sur son propre réglage.
+ * Le propriétaire à écrire quand `actor` pose `next` : lui s'il caste le
+ * match ; `null` quand le match n'est plus casté ou que le mode est posé par
+ * qui ne le caste pas — il reste alors au staff. L'instantané ne nomme que le
+ * caster montré (`liveTriggerCasterId`) : un propriétaire qui ne caste pas
+ * serait invisible à l'interface, qui offrirait un réglage refusé.
  */
 export function liveTriggerOwnerAfter(
   next: MatchLiveTrigger | null,
   actor: LiveTriggerActor,
   actorCasts: boolean,
 ): number | null {
-  if (next === null) return null;
-  return actorCasts || (!actor.manages && !actor.isAdmin) ? actor.userId : null;
+  if (next === null || !actorCasts) return null;
+  return actor.userId;
 }
 
 /** Un identifiant de compte lu en base (`BIGINT` nul ou non). */

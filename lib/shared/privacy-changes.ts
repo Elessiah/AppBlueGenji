@@ -1621,19 +1621,17 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   {
     // CAST-FOLLOWUP (décision de l'utilisateur du 2026-11-05) : le check-in du
     // match ne part plus qu'en autogestion et à ceux qui gèrent les engagées,
-    // une seule fois par match ; les membres d'une équipe voient le lien de
-    // leur seul salon vocal. Destinataires restreints, donnée nouvelle (le
-    // serveur du salon) : à annoncer. L'entrée « 2026-11-check-in-du-match »,
+    // une seule fois par match. Destinataires restreints : à annoncer.
+    // L'entrée « 2026-11-check-in-du-match »,
     // publiée, ne se réécrit pas — celle-ci la complète.
     id: "2026-11-check-in-aux-gerants",
     publishedAt: "2026-11-06",
     title: "Check-in du match : en autogestion seulement, à ceux qui gèrent l'équipe",
-    links: [MATCH_DM_PARAGRAPH_LINK, { href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }],
+    links: [MATCH_DM_PARAGRAPH_LINK],
     summary:
-      "Le check-in du match ne part plus que pour un match en autogestion, et seulement au propriétaire et aux managers de chaque équipe (ou au joueur d'un tournoi individuel), une seule fois par match. Sur la page du match, chaque équipe trouve le lien de son propre salon vocal.",
+      "Le check-in du match ne part plus que pour un match en autogestion, et seulement au propriétaire et aux managers de chaque équipe (ou au joueur d'un tournoi individuel), une seule fois par match.",
     details: [
       "Ce qui change pour le check-in : un match arbitré ou sans décision d'arbitrage n'en reçoit plus ; joueurs et coachs d'une équipe n'en reçoivent plus, seuls son propriétaire et ses managers. Il ne part qu'une fois par match et par engagée : ni un changement d'horaire, ni un lancement annulé, ni un réappariement ne le renvoient. Le site garde la trace de cet envoi (match et engagée) avec le match ; seul un retour arrière du tournoi l'efface.",
-      "Ce qui change pour les salons vocaux : le site garde aussi l'identifiant du serveur Discord de chaque salon, pour en former le lien. Ce lien n'est montré qu'aux membres de l'équipe à qui le salon est ouvert, tant qu'il l'est — jamais à l'adversaire ni à qui n'est pas membre de l'équipe.",
       "Ce qui ne change pas : le contenu du check-in (sans BattleTag, tag Discord ni pseudo de joueur), le message privé réservé à un tag Discord certifié, et la case « Messages privés Discord de mes matchs » de « Mon profil » pour s'y opposer.",
     ],
   },

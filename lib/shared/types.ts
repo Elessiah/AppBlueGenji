@@ -6,7 +6,7 @@ import type { ConnectionMethod } from "./account-connections";
 import type { MatchFormat } from "./match-format";
 import type { MatchLiveTrigger } from "./live-streams";
 import type { CastBlock } from "./match-launch";
-import type { MatchVoiceInfo, MatchVoiceLink } from "./match-voice";
+import type { MatchVoiceInfo } from "./match-voice";
 import type { CertificationPrompt } from "./certification-prompt";
 import type { ParticipantType } from "./participants";
 import type { TournamentMapRules } from "./round-maps";
@@ -660,6 +660,12 @@ export type BracketMatch = {
    */
   liveTriggerCasterId?: number | null;
   /**
+   * Le mode a un caster maître que l'instantané ne montre pas (inscription
+   * retirée de l'affichage, pas encore rendue) : l'interface le garde
+   * verrouillé, comme le serveur (`viewerMayChangeLiveTrigger`).
+   */
+  liveTriggerOwnerHidden?: boolean;
+  /**
    * **Premier** lien de diffusion du match (le stream le plus ancien qui en a
    * un) — celui des vues compactes ; `null` = casté sans lien public. Tous les
    * liens sont dans `streams`.
@@ -899,13 +905,6 @@ export type TournamentViewerContext = {
    * désigné » et relit le contexte (`missingRefereeNamesKey`).
    */
   refereeNames: MatchRefereeName[];
-  /**
-   * Lien Discord du salon vocal de **l'équipe du lecteur**, par match où il est
-   * ouvert (`docs/features/MATCH_VOICE.md` § Lien du salon) : jamais celui de
-   * l'adversaire, jamais à qui n'est pas de l'équipe, jamais dans l'instantané.
-   * Un salon ouvert depuis se relit par la lecture légère (`missingVoiceLinksKey`).
-   */
-  voiceLinks: MatchVoiceLink[];
 };
 
 /** Pseudo de l'arbitre d'un match, lié à l'empreinte de sa désignation. */

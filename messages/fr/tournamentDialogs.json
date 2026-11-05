@@ -272,7 +272,7 @@
     "urlOwnChannel": "Le lien saisi ici est celui de ta chaîne : il est retiré du match si ton compte est supprimé.",
     "organisationLink": "Ce lien est celui de l'organisation",
     "organisationLinkSubject": "lien de l'organisation",
-    "organisationLinkHint": "Coché, le lien ne part pas avec ton compte : il part avec ce stream quand plus aucun caster ne le tient. Décoché, c'est ta propre chaîne, retirée du match si ton compte est supprimé.",
+    "organisationLinkHint": "Coché, le lien reste sur le match quoi qu'il arrive à ton compte. Décoché, c'est ta propre chaîne, retirée du match si ton compte est supprimé.",
     "urlHint": "Vide, l'annonce Discord renvoie au premier lien ouvert par un caster, sinon à la chaîne officielle du tournoi (plateformes acceptées : {platforms}).",
     "urlSubject": "chaîne du match",
     "triggerLocked": "Passage à l'antenne réglé par le caster du match : {mode}.",

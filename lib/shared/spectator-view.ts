@@ -352,8 +352,6 @@ export const SPECTATOR_VIEWER_CONTEXT: Readonly<TournamentViewerContext> = Objec
   certificationPrompt: null,
   // Sans compte, l'arbitre reste « Arbitre désigné » (décision 52).
   refereeNames: [],
-  // Sans compte, aucune équipe : aucun salon.
-  voiceLinks: [],
 });
 
 /**

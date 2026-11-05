@@ -133,13 +133,6 @@ export type MatchVoiceSideState = "WAITING" | "OPEN" | "FAILED";
 export type MatchVoiceInfo = {
   team1State: MatchVoiceSideState;
   team2State: MatchVoiceSideState;
-  /**
-   * Révision du salon ouvert de chaque côté (`voiceChannelRevision`) : change
-   * quand le salon est recréé (supprimé par la modération), sans rien dire de
-   * son identifiant. Absente : salon pas ouvert, ou ancienne charge.
-   */
-  team1Rev?: string;
-  team2Rev?: string;
 };
 
 /** Ce que la page montre d'un salon : son état seul. */
@@ -149,27 +142,6 @@ export function shownVoiceSide(channel: VoiceChannelState | null): MatchVoiceSid
   return "OPEN";
 }
 
-/**
- * Révision publique d'un salon : 16 bits d'une empreinte (FNV-1a) de son
- * identifiant. Assez pour voir qu'un salon a été recréé ; trop peu pour
- * retrouver l'identifiant, qui reste réservé à l'équipe (`MatchVoiceLink`).
- */
-export function voiceChannelRevision(channelId: string | null): string | null {
-  if (channelId === null) return null;
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < channelId.length; index += 1) {
-    hash = Math.imul(hash ^ channelId.charCodeAt(index), 0x01000193) >>> 0;
-  }
-  return (hash & 0xffff).toString(36);
-}
-
-/** Révision d'un côté ouvert, en champ facultatif de `MatchVoiceInfo`. */
-function sideRevision(key: "team1Rev" | "team2Rev", channel: VoiceChannelState | null): Partial<MatchVoiceInfo> {
-  if (shownVoiceSide(channel) !== "OPEN") return {};
-  const rev = voiceChannelRevision(channel?.channelId ?? null);
-  return rev === null ? {} : { [key]: rev };
-}
-
 /** Rendu de l'instantané pour un match suivi, `null` sinon. */
 export function matchVoiceInfo(
   input: VoiceMatchInput,
@@ -177,12 +149,7 @@ export function matchVoiceInfo(
   team2Channel: VoiceChannelState | null,
 ): MatchVoiceInfo | null {
   if (!voiceTracked(input)) return null;
-  return {
-    team1State: shownVoiceSide(team1Channel),
-    team2State: shownVoiceSide(team2Channel),
-    ...sideRevision("team1Rev", team1Channel),
-    ...sideRevision("team2Rev", team2Channel),
-  };
+  return { team1State: shownVoiceSide(team1Channel), team2State: shownVoiceSide(team2Channel) };
 }
 
 const SIDE_STATES: readonly MatchVoiceSideState[] = ["WAITING", "OPEN", "FAILED"];
@@ -199,116 +166,5 @@ export function parseMatchVoiceInfo(value: unknown): MatchVoiceInfo | null {
     if (entry === "COUNTED" || entry === "UNCOUNTED") return "OPEN";
     return SIDE_STATES.find((candidate) => candidate === entry) ?? "WAITING";
   };
-  const rev = (entry: unknown) => (typeof entry === "string" && VOICE_REV.test(entry) ? entry : undefined);
-  const team1Rev = rev(raw.team1Rev);
-  const team2Rev = rev(raw.team2Rev);
-  return {
-    team1State: state(raw.team1State),
-    team2State: state(raw.team2State),
-    ...(team1Rev === undefined ? {} : { team1Rev }),
-    ...(team2Rev === undefined ? {} : { team2Rev }),
-  };
-}
-
-/** Forme d'une révision (`voiceChannelRevision`). */
-const VOICE_REV = /^[0-9a-z]{1,4}$/;
-
-/* ── Lien du salon de son équipe ─────────────────────────────────────────── */
-
-/**
- * Lien du salon vocal d'**une** équipe sur un match, pour ses seuls membres
- * (`TournamentViewerContext.voiceLinks`) : jamais dans l'instantané diffusé,
- * jamais le salon de l'adversaire.
- */
-export type MatchVoiceLink = {
-  matchId: number;
-  url: string;
-  /** Révision du salon de ce lien (`voiceChannelRevision`) : un salon recréé en a une autre. */
-  rev?: string;
-};
-
-/** Identifiant Discord (serveur ou salon) tel que le bot le rend : chiffres seulement. */
-const DISCORD_ID = /^\d{5,32}$/;
-
-/** Lien Discord d'un salon, `null` si un identifiant n'en est pas un. */
-export function voiceChannelUrl(guildId: string | null, channelId: string | null): string | null {
-  if (guildId === null || channelId === null || !DISCORD_ID.test(guildId) || !DISCORD_ID.test(channelId)) return null;
-  return `https://discord.com/channels/${guildId}/${channelId}`;
-}
-
-/** Ce qu'il faut d'un match pour savoir si le salon de l'équipe du lecteur est ouvert. */
-type VoiceLinkedMatch = {
-  id: number;
-  team1Id: number | null;
-  team2Id: number | null;
-  voice?: MatchVoiceInfo | null;
-};
-
-/** Le salon de `teamId` est-il ouvert sur ce match (instantané) ? */
-export function ownVoiceOpen(match: VoiceLinkedMatch, teamId: number | null): boolean {
-  if (teamId === null || !match.voice) return false;
-  if (match.team1Id === teamId) return match.voice.team1State === "OPEN";
-  if (match.team2Id === teamId) return match.voice.team2State === "OPEN";
-  return false;
-}
-
-/** Révision du salon de `teamId` sur ce match, telle que l'instantané la dit. */
-function ownVoiceRevision(match: VoiceLinkedMatch, teamId: number): string | undefined {
-  if (match.team1Id === teamId) return match.voice?.team1Rev;
-  if (match.team2Id === teamId) return match.voice?.team2Rev;
-  return undefined;
-}
-
-/**
- * Le lien connu de ce salon, s'il est à jour : un lien d'une autre révision
- * mène à un salon supprimé depuis (recréé par le balayage).
- */
-function currentVoiceLink(
-  match: VoiceLinkedMatch,
-  teamId: number,
-  links: readonly MatchVoiceLink[],
-): MatchVoiceLink | undefined {
-  const rev = ownVoiceRevision(match, teamId);
-  return links.find((link) => link.matchId === match.id && (rev === undefined || link.rev === undefined || link.rev === rev));
-}
-
-/** Lien du salon de l'équipe du lecteur sur ce match, `null` s'il n'y en a pas (ou plus). */
-export function ownVoiceLink(
-  match: VoiceLinkedMatch,
-  teamId: number | null,
-  links: readonly MatchVoiceLink[],
-): string | null {
-  if (teamId === null || !ownVoiceOpen(match, teamId)) return null;
-  return currentVoiceLink(match, teamId, links)?.url ?? null;
-}
-
-/**
- * Matchs dont le salon de l'équipe du lecteur est ouvert sans lien connu, en
- * une clé stable (`""` : rien ne manque). Une nouvelle clé déclenche **une**
- * relecture légère ; la même ne la relance pas (salon d'avant le lien, sans
- * serveur connu). Un salon recréé change de révision, donc de clé.
- */
-export function missingVoiceLinksKey(
-  matches: readonly VoiceLinkedMatch[],
-  teamId: number | null,
-  links: readonly MatchVoiceLink[],
-): string {
-  if (teamId === null) return "";
-  return matches
-    .filter((match) => ownVoiceOpen(match, teamId) && currentVoiceLink(match, teamId, links) === undefined)
-    .map((match) => `${match.id}:${ownVoiceRevision(match, teamId) ?? ""}`)
-    .join(",");
-}
-
-/** Liens reçus d'une réponse (forme contrôlée), `null` si ce n'en est pas une liste. */
-export function parseVoiceLinks(value: unknown): MatchVoiceLink[] | null {
-  if (!Array.isArray(value)) return null;
-  const links: MatchVoiceLink[] = [];
-  for (const item of value as unknown[]) {
-    if (!item || typeof item !== "object") continue;
-    const { matchId, url, rev } = item as Record<string, unknown>;
-    if (typeof matchId !== "number" || typeof url !== "string" || !url.startsWith("https://discord.com/channels/")) continue;
-    links.push(typeof rev === "string" && VOICE_REV.test(rev) ? { matchId, url, rev } : { matchId, url });
-  }
-  return links;
+  return { team1State: state(raw.team1State), team2State: state(raw.team2State) };
 }

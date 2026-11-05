@@ -844,13 +844,12 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
   },
   "2026-11-check-in-aux-gerants": {
-    linkLabels: ["Read the “Match Discord direct messages” paragraph", "Read the “Team voice channels” paragraph"],
+    linkLabels: ["Read the “Match Discord direct messages” paragraph"],
     title: "Match check-in: self-managed matches only, to those who manage the team",
     summary:
-      "The match check-in is now only sent for a self-managed match, and only to the owner and managers of each team (or the player of a solo tournament), once per match. On the match page, each team finds the link to its own voice channel.",
+      "The match check-in is now only sent for a self-managed match, and only to the owner and managers of each team (or the player of a solo tournament), once per match.",
     details: [
       "What changes for the check-in: a refereed match or one with no refereeing decision no longer receives one; a team's players and coaches no longer receive it, only its owner and managers. It is sent only once per match and per entrant: neither a change of time, nor a cancelled launch, nor a re-pairing sends it again. The site keeps the record of that sending (match and entrant) with the match; only a rollback of the tournament erases it.",
-      "What changes for voice channels: the site also keeps the identifier of each channel's Discord server, to build its link. That link is only shown to the members of the team the channel is opened for, while it is open — never to the opponent nor to anyone who is not a member of the team.",
       "What does not change: the content of the check-in (no BattleTag, Discord tag or player username), the direct message reserved for a certified Discord tag, and the “Discord direct messages about my matches” box in “My profile” to object to it.",
     ],
   },

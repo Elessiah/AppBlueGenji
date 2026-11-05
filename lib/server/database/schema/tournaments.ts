@@ -263,8 +263,6 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       match_id BIGINT NOT NULL,
       team_id BIGINT NOT NULL,
       channel_id VARCHAR(32) NULL,
-      -- Serveur Discord du salon, rendu par le bot : le lien montré aux joueurs.
-      guild_id VARCHAR(32) NULL,
       failed_at DATETIME NULL,
       released_at DATETIME NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

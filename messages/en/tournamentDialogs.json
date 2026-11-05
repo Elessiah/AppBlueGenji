@@ -272,7 +272,7 @@
     "urlOwnChannel": "The link entered here is your own channel: it is removed from the match if your account is deleted.",
     "organisationLink": "This link is the organisation's",
     "organisationLinkSubject": "organisation link",
-    "organisationLinkHint": "Ticked, the link does not go with your account: it goes with this stream once no caster holds it any more. Unticked, it is your own channel, removed from the match if your account is deleted.",
+    "organisationLinkHint": "Ticked, the link stays on the match whatever happens to your account. Unticked, it is your own channel, removed from the match if your account is deleted.",
     "urlHint": "Left empty, the Discord announcement points to the first link opened by a caster, otherwise to the tournament's official channel (accepted platforms: {platforms}).",
     "urlSubject": "match channel",
     "triggerLocked": "Going on air set by the match's caster: {mode}.",

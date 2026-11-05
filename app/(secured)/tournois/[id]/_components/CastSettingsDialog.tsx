@@ -23,6 +23,7 @@ import {
   CastUrlField,
   castBattletagInvalid,
   castTriggerNeedsDate,
+  lockedTrigger,
   castUrlInvalid,
 } from "./CastSettingsFields";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
@@ -250,7 +251,7 @@ export function CastSettingsDialog({
             {configurable && (
               <>
                 <CastTriggerField
-                  trigger={trigger}
+                  trigger={lockedTrigger(triggerLocked, match.liveTrigger, trigger)}
                   startAt={match.startAt}
                   onChange={setTrigger}
                   locked={triggerLocked}

@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { setMatchReplayUrl } from "@/lib/server/tournaments/match-replay";
-import { mayConfigureMatchLive } from "@/lib/server/tournaments/live-access";
+import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
 import { announceStaffMatchAction, staffActionAuthor } from "@/lib/server/tournaments/staff-action-logs";
 
@@ -14,18 +14,17 @@ function parseMatchId(raw: string): number | null {
  * Pose (ou efface) le lien YouTube de la rediff d'un match terminé.
  * Corps : `{ replayUrl: string | null }` — `null` (ou chaîne vide) efface.
  *
- * Réservé à la permission `live` (admin, arbitre, caster) et à l'arbitre
- * désigné du match, comme la diffusion en direct dont la rediff est la suite
- * (`mayConfigureMatchLive`).
+ * Réservé à la permission `live` (admin, arbitre, caster), comme la diffusion
+ * en direct dont la rediff est la suite.
  */
 export async function PUT(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
+  if (!can(user, "live")) return fail("FORBIDDEN", 403);
 
   const { matchId: rawMatchId } = await context.params;
   const matchId = parseMatchId(rawMatchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
-  if (!(await mayConfigureMatchLive(user, matchId))) return fail("FORBIDDEN", 403);
 
   const body = (await readJsonBody(req).catch(() => ({}))) as { replayUrl?: unknown };
   const raw = body.replayUrl ?? null;

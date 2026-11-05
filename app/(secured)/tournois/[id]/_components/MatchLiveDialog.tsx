@@ -81,7 +81,7 @@ export function MatchLiveDialog({
   // Libellés déjà rédigés pour le pied d'action de la carte (antenne, rediff) :
   // les mêmes mots ici, dans le seul espace qui les porte.
   const actions = useActionsText();
-  const { openReplay, viewerUserId, viewerIsAdmin, refereeNames, canSchedule } = useLiveControls();
+  const { openReplay, viewerUserId, viewerIsAdmin, refereeNames, canSchedule, canManage } = useLiveControls();
   const referee = viewerRefereesMatch(match, refereeNames);
   // Même règle que le serveur (`LIVE_TRIGGER_NOT_OWNED`) : un mode verrouillé
   // se montre sans contrôle, plutôt qu'un bouton qui mène à un refus.
@@ -262,6 +262,7 @@ export function MatchLiveDialog({
                     {t("live.trigger")}
                     <InfoHint id="match-live-trigger-hint" subject={t("live.trigger")}>
                       <p>{t("live.autoStop")}</p>
+                      {startAtMissing && <p>{t("live.noStartAt")}</p>}
                     </InfoHint>
                   </InfoHintRow>
                 </legend>
@@ -293,11 +294,6 @@ export function MatchLiveDialog({
                     </label>
                   );
                 })}
-                {startAtMissing && (
-                  <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--ink-quiet, #9aa4b2)" }}>
-                    {t("live.noStartAt")}
-                  </p>
-                )}
               </fieldset>
             )}
 
@@ -415,7 +411,7 @@ export function MatchLiveDialog({
             </button>
           </div>
         )}
-        {canEditReplay(match, true) && (
+        {canEditReplay(match, canManage) && (
           <div style={{ margin: "0 0 14px" }}>
             <button
               type="button"

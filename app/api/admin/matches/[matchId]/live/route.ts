@@ -112,7 +112,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
       trigger,
       liveUrl: parsed.liveUrl,
       setter: { userId: user.id, asOrganisation: organisation && parsed.organisationLink },
-      access: { isAdmin: user.isAdmin, manages: organisation },
+      access: { isAdmin: user.isAdmin, manages: organisation, live: can(user, "live") },
       ...(streamLinks === undefined ? {} : { streamLinks }),
     });
     announceStaffMatchAction(matchId, trigger === null ? "LIVE_REMOVED" : "LIVE_CONFIGURED", staffActionAuthor(user));

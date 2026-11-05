@@ -1520,8 +1520,6 @@ const ACTIVITIES = registerActivities({
         `Asking the association's Discord bot, from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before a match's time (or as soon as the option is turned on, for a match already within that window), for a ${VOICE_CHANNEL_CAPACITY}-seat voice channel per team in its server's match category, named after the team — never for a solo entry (its name would be a username) nor for a match against a ghost team`),
       frEn("Dire aux parties du match (membres des deux équipes, casters) et au staff, sur la page du match, si chaque salon est ouvert — le site ne demande jamais au bot qui se trouve dans un salon, ni combien",
         "Telling the match's parties (members of both teams, casters) and staff, on the match page, whether each channel is open — the site never asks the bot who is in a channel, nor how many"),
-      frEn("Donner aux membres de chaque équipe, sur la page du match, le lien de leur propre salon tant qu'il est ouvert — jamais celui de l'adversaire, ni à qui n'est pas membre de l'équipe",
-        "Giving the members of each team, on the match page, the link to their own channel while it is open — never the opponent's, nor to anyone who is not a member of the team"),
       frEn(`Rendre les salons au bot quand le match est terminé (score validé), annulé, retombé en attente, sorti du programme ou resté sans score validé ${VOICE_CHANNEL_LATE_HOURS} heures après son horaire, quand l'équipe sort de l'appariement, quand une entrée en tournoi individuel ou une équipe fantôme entre dans le match, ou quand le tournoi n'est plus en cours (terminé, ou ramené avant son départ), est de nouveau masqué ou éteint l'option ; le bot supprime un salon dès qu'il est vide`,
         `Handing the channels back to the bot when the match is finished (score confirmed), cancelled, back to waiting, taken off the schedule or left without a confirmed score ${VOICE_CHANNEL_LATE_HOURS} hours after its time, when the team leaves the pairing, when a solo entry or a ghost team enters the match, or when the tournament is no longer running (finished, or moved back before its start), is hidden again or turns the option off; the bot deletes a channel as soon as it is empty`),
     ],
@@ -1537,8 +1535,8 @@ const ACTIVITIES = registerActivities({
         "Members of the other servers the bot is on, present in one of their voice channels: only the member profile attached to their voice state is kept in memory"),
     ],
     dataCategories: [
-      frEn("Identifiant Discord du salon de chaque équipe d'un match et de son serveur (pour en former le lien), numéros du match et de l'équipe, heure d'une éventuelle panne du bot ou d'un rendu refusé, heures de création et de rendu du salon — jamais qui est présent, ni combien",
-        "Discord identifier of each team's channel for a match and of its server (to build its link), numbers of the match and team, time of any bot outage or refused hand-back, creation and hand-back times of the channel — never who is present, nor how many"),
+      frEn("Identifiant Discord du salon de chaque équipe d'un match, numéros du match et de l'équipe, heure d'une éventuelle panne du bot ou d'un rendu refusé, heures de création et de rendu du salon — jamais qui est présent, ni combien",
+        "Discord identifier of each team's channel for a match, numbers of the match and team, time of any bot outage or refused hand-back, creation and hand-back times of the channel — never who is present, nor how many"),
       frEn("Nom de l'équipe, transmis au bot pour nommer le salon",
         "Team name, sent to the bot to name the channel"),
       frEn("État vocal (identifiant Discord du membre et de sa session vocale, salon où il se trouve, micro ou son coupés par lui ou par la modération, partage d'écran ou caméra actifs, demande de parole et mise en sourdine de scène), avec la fiche de membre que Discord y joint (sa fiche sur le serveur, dont pseudo, surnom, avatar, rôles, dates d'arrivée et de boost, exclusion temporaire), des membres du serveur Discord de l'association, tenu en mémoire par le bot pour savoir si un salon est vide, jamais enregistré ni transmis au site",
@@ -1564,8 +1562,6 @@ const ACTIVITIES = registerActivities({
     recipients: [
       frEn("Membres des deux équipes d'un match, ses casters et le staff, à qui la page du match dit si chaque salon est ouvert",
         "Members of both teams of a match, its casters and staff, whom the match page tells whether each channel is open"),
-      frEn("Membres de chaque équipe, à qui la page du match donne le lien de leur seul salon",
-        "Members of each team, whom the match page gives the link to their own channel only"),
       frEn("Autres membres connectés, qui peuvent lire ces mêmes états dans les données du tournoi — un visiteur sans compte n'en lit rien",
         "Other signed-in members, who can read those same states in the tournament's data — a visitor without an account reads none of it"),
       frEn("Membres du serveur Discord de l'association autorisés dans la catégorie des matchs, qui voient le salon et ses occupants sur Discord",

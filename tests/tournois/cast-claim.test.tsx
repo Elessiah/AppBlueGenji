@@ -29,6 +29,7 @@ jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: ()
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { CastClaimDialog } from "@/app/(secured)/tournois/[id]/_components/CastClaimDialog";
+import { lockedTrigger } from "@/app/(secured)/tournois/[id]/_components/CastSettingsFields";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import { matchStreamLinks } from "@/app/(secured)/tournois/[id]/_components/MatchLiveStrip";
 import { castClaimBody, castClaimChoiceKey, castClaimChoices } from "@/app/(secured)/tournois/[id]/_lib/cast-claim";
@@ -499,5 +500,19 @@ describe("Fenêtre « Caster » — l'aide du lien du caster", () => {
     expect(frActions.cardActions.castSettings.battletagHint).toContain("personne ne le vérifie");
     expect(enActions.cardActions.castSettings.battletagHint).toContain("it replaces your profile's");
     expect(enActions.cardActions.castSettings.battletagHint).toContain("nobody checks it");
+  });
+});
+
+describe("lockedTrigger — un mode verrouillé montre celui du match", () => {
+  it("lockedTrigger_lockedWithMatchTrigger_returnsMatchTrigger", () => {
+    expect(lockedTrigger(true, "AUTO", "MANUAL")).toBe("AUTO");
+  });
+
+  it("lockedTrigger_notLocked_returnsPicked", () => {
+    expect(lockedTrigger(false, "AUTO", "MANUAL")).toBe("MANUAL");
+  });
+
+  it("lockedTrigger_lockedMatchUncast_returnsPicked", () => {
+    expect(lockedTrigger(true, null, "MANUAL")).toBe("MANUAL");
   });
 });

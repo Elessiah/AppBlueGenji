@@ -125,9 +125,6 @@ anciennes clés `tournament.matchPage.*` restant pour les sections.
 
 ### CAST-FOLLOWUP
 
-- **Salon vocal de son équipe** : un membre d'une équipe du match voit le lien
-  de son propre salon tant qu'il est ouvert (`ownVoiceLink`, contexte du
-  lecteur) — jamais celui de l'adversaire (`MATCH_VOICE.md` § Lien du salon).
 - **Premier ban d'un match arbitré** : quand l'arbitre désigné crée la partie,
   la section « Maps et bans » le dit derrière un `InfoHint`
   (`roundMaps.page.refereeHostBan`, `MATCH_REFEREE.md` § Hôte et premier ban).

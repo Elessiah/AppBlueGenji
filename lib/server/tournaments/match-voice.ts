@@ -18,7 +18,7 @@
  */
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
-import { ensureVoiceChannel, releaseVoiceChannel, type EnsuredVoiceChannel } from "@/lib/server/bot-integration";
+import { ensureVoiceChannel, releaseVoiceChannel } from "@/lib/server/bot-integration";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { toIso } from "@/lib/server/serialization";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
@@ -34,13 +34,9 @@ import {
   VOICE_SWEEP_THROTTLE_SECONDS,
   VOICE_BOT_UNRELEASED_MAX_HOURS,
   matchVoiceInfo,
-  ownVoiceOpen,
   voiceChannelKey,
-  voiceChannelRevision,
-  voiceChannelUrl,
   voiceChannelsDue,
   type MatchVoiceInfo,
-  type MatchVoiceLink,
   type VoiceChannelState,
 } from "@/lib/shared/match-voice";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
@@ -136,43 +132,6 @@ export async function loadMatchVoiceInfos(
     if (info) result.set(match.id, info);
   }
   return result;
-}
-
-type VoiceLinkRow = RowDataPacket & { match_id: number; channel_id: string; guild_id: string };
-
-/**
- * Liens des salons de **l'équipe du lecteur** (`TournamentViewerContext.voiceLinks`),
- * pour les matchs de l'instantané où ce salon est ouvert : jamais le salon de
- * l'adversaire, jamais à qui n'est pas de l'équipe (`myTeamId` vient de son
- * appartenance). Aucune lecture sans salon ouvert ; un salon sans serveur connu
- * (ouvert avant le 2026-11-06) n'a pas de lien.
- */
-export async function loadViewerVoiceLinks(
-  matches: readonly { id: number; team1Id: number | null; team2Id: number | null; voice?: MatchVoiceInfo | null }[],
-  myTeamId: number | null,
-): Promise<MatchVoiceLink[]> {
-  if (myTeamId === null) return [];
-  const matchIds = matches.filter((match) => ownVoiceOpen(match, myTeamId)).map((match) => match.id);
-  if (matchIds.length === 0) return [];
-  let rows: VoiceLinkRow[];
-  try {
-    rows = await run<VoiceLinkRow[]>(
-      `SELECT match_id, channel_id, guild_id FROM bg_match_voice_channels
-        WHERE team_id = ? AND match_id IN (${sqlPlaceholders(matchIds.length)})
-          AND released_at IS NULL AND channel_id IS NOT NULL AND guild_id IS NOT NULL`,
-      [myTeamId, ...matchIds],
-    );
-  } catch (error) {
-    if (isMissingTableError(error)) return [];
-    throw error;
-  }
-  const links: MatchVoiceLink[] = [];
-  for (const row of rows) {
-    const url = voiceChannelUrl(String(row.guild_id), String(row.channel_id));
-    const rev = voiceChannelRevision(String(row.channel_id));
-    if (url !== null && rev !== null) links.push({ matchId: Number(row.match_id), url, rev });
-  }
-  return links;
 }
 
 /* ── Balayage ─────────────────────────────────────────────────────────────── */
@@ -314,7 +273,7 @@ function logReleaseFailure(matchId: number, code: string): void {
 }
 
 /** Exécution sur le pool : la connexion est rendue aussitôt, jamais tenue pendant un appel au bot. */
-async function run<T extends RowDataPacket[]>(sql: string, params: (string | number | null)[] = []): Promise<T> {
+async function run<T extends RowDataPacket[]>(sql: string, params: (string | number)[] = []): Promise<T> {
   const db = await getDatabase();
   const [rows] = await db.execute<T>(sql, params);
   return rows;
@@ -322,15 +281,14 @@ async function run<T extends RowDataPacket[]>(sql: string, params: (string | num
 
 // Ligne rouverte ou salon remplacé : `created_at` repart (âge du salon courant, lu par
 // `bot_expired` et dit « heure de création » par T18) ; lu avant les autres affectations.
-// `guild_id` : le serveur du salon, d'où le lien montré aux seuls joueurs de l'équipe.
-async function writeChannel(matchId: number, teamId: number, channel: EnsuredVoiceChannel): Promise<void> {
+async function writeChannel(matchId: number, teamId: number, channelId: string): Promise<void> {
   await run(
-    `INSERT INTO bg_match_voice_channels (match_id, team_id, channel_id, guild_id, failed_at, released_at)
-     VALUES (?, ?, ?, ?, NULL, NULL)
+    `INSERT INTO bg_match_voice_channels (match_id, team_id, channel_id, failed_at, released_at)
+     VALUES (?, ?, ?, NULL, NULL)
      ON DUPLICATE KEY UPDATE
        created_at = IF(released_at IS NOT NULL OR NOT (channel_id <=> VALUES(channel_id)), NOW(), created_at),
-       channel_id = VALUES(channel_id), guild_id = VALUES(guild_id), failed_at = NULL, released_at = NULL`,
-    [matchId, teamId, channel.channelId, channel.guildId],
+       channel_id = VALUES(channel_id), failed_at = NULL, released_at = NULL`,
+    [matchId, teamId, channelId],
   );
 }
 
@@ -347,7 +305,6 @@ async function writeFailure(matchId: number, teamId: number): Promise<void> {
      ON DUPLICATE KEY UPDATE
        created_at = IF(released_at IS NULL, created_at, NOW()),
        channel_id = IF(released_at IS NULL, channel_id, NULL),
-       guild_id = IF(released_at IS NULL, guild_id, NULL),
        failed_at = NOW(), released_at = NULL`,
     [matchId, teamId],
   );
@@ -519,7 +476,7 @@ const VOICE_RECHECK_FORGET_MS = 10 * 60_000;
  * neuf s'il a été supprimé à la main — seul moyen pour le site de le savoir,
  * sans jamais demander qui s'y trouve.
  */
-export const OPEN_DUE_CHANNELS_SQL = `SELECT v.match_id, v.team_id, v.channel_id, v.guild_id, m.tournament_id,
+export const OPEN_DUE_CHANNELS_SQL = `SELECT v.match_id, v.team_id, v.channel_id, m.tournament_id,
        IF(v.team_id <=> m.team1_id, t1.name, t2.name) AS team_name
   FROM bg_match_voice_channels v
   JOIN bg_matches m ON m.id = v.match_id
@@ -554,14 +511,7 @@ const VOICE_RECHECK_CONCURRENCY = 5;
 /** Au plus tant de salons revérifiés par passe, les plus anciennement vus d'abord. */
 const VOICE_RECHECK_BATCH = VOICE_SWEEP_BATCH * 2;
 
-type OpenRow = RowDataPacket & {
-  match_id: number;
-  team_id: number;
-  channel_id: string;
-  guild_id?: string | null;
-  tournament_id: number;
-  team_name: string;
-};
+type OpenRow = RowDataPacket & { match_id: number; team_id: number; channel_id: string; tournament_id: number; team_name: string };
 
 /**
  * Revérifie un salon ouvert ; `false` si le canal vers le bot est en panne (le reste de la
@@ -577,11 +527,7 @@ async function recheckOneChannel(row: OpenRow, touched: Set<number>): Promise<bo
   // Un refus propre au salon non plus : la ligne reste ouverte (le salon suit
   // sur la page), et la revérification suivante redemande (MATCH_VOICE.md).
   if (ensured.kind !== "ok") return !BOT_TRANSPORT_FAILURES.has(ensured.code);
-  // Salon recréé par le bot (supprimé par la modération) : la ligne suit le
-  // neuf ; même salon dont le serveur manquait (ligne d'avant le lien) : il s'ajoute.
-  const knownGuild = row.guild_id === null || row.guild_id === undefined ? null : String(row.guild_id);
-  const guildLearnt = ensured.value.guildId !== null && ensured.value.guildId !== knownGuild;
-  if (ensured.value.channelId !== String(row.channel_id) || guildLearnt) {
+  if (ensured.value !== String(row.channel_id)) {
     // Upsert qui rouvre, voulu : si la ligne a été rendue entre-temps (autre processus,
     // rechargement pm2), le salon neuf existe déjà sur Discord ; la ligne le suit et le
     // rendu de la même passe (après la revérification) le rend au bot, avec ses reprises.
