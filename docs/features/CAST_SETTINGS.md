@@ -153,7 +153,8 @@ médie pour le caster, il ne lui retire pas le mode — ou reste au staff s'il
 n'en avait pas (`liveTriggerOwnerAfter`). Le propriétaire
 ne compte que s'il est un caster **montré** du match (`loadShownCasterIds` au
 serveur, `liveTriggerCasterId` dans l'instantané : il caste encore et, avant
-le lancement, remplit la condition du cast) : parti ou tu, il laisse le mode
+le lancement — `castBeforeLaunch`, qui ne compte pas le lancement d'un appariement
+d'avant — remplit la condition du cast) : parti ou tu, il laisse le mode
 au staff, et le retrouve dès qu'il est montré de nouveau. L'arbitre reconnu est l'arbitre
 **retenu** (sans opposition), qui **ne joue pas** le match (`KEPT_REFEREE_SQL`)
 et remplit encore la condition d'arbitrage du jeu (`refereeQualifies`).

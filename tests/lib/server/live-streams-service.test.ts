@@ -832,6 +832,16 @@ describe("setMatchLiveConfig", () => {
     expect(kept).toContain("m.status IN ('PENDING', 'READY')");
   });
 
+  it("setMatchLiveConfig_lockedRead_launchedBranchRequiresCurrentPairing", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "AUTO" }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
+
+    const kept = world.execute.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.includes("AS kept"));
+    expect(kept).toContain("m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)");
+  });
+
   it("setMatchLiveConfig_refereeLinksAndStaffUrlTogether_staffUrlDoesNotTakeCasterStream", async () => {
     const world = liveWorld(matchRow({ live_trigger: "MANUAL", kept_referee_user_id: 9 }), [dbStream(4, null)], [
       { user_id: 12, stream_id: 4 },

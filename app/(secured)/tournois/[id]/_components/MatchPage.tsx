@@ -606,9 +606,9 @@ function MapsSection({
   // Un match arbitré suit la règle de l'arbitre hôte (`firstBanTeamId`), pas
   // celle du tournoi : seul le côté qui bannit en premier décide de la ligne.
   const banKnown = banSide !== null && (match.refereeAssigned || banOrder !== null);
-  // Deux adversaires connus sans premier ban (match arbitré déjà joué, exemption) :
+  // Match arbitré, deux adversaires connus, sans premier ban (déjà joué) :
   // la ligne se tait, comme le fait clé — jamais « adversaires à venir ».
-  const showBanOrder = banKnown || match.team1Id === null || match.team2Id === null;
+  const showBanOrder = banKnown || !match.refereeAssigned || match.team1Id === null || match.team2Id === null;
   let banOrderValue: ReactNode = <Muted>{t("matchPage.opponentsPending")}</Muted>;
   if (banKnown) {
     const value = rm.t("page.banOrderValue", { first: banName, second: otherName });

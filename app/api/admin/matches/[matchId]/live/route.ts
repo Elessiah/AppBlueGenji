@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/lib/server/auth";
+import { getCurrentUser, type AuthUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { setMatchLiveConfig, setMatchOnAir, StreamLinkError } from "@/lib/server/tournaments/live-streams";
 import { mayConfigureMatchLive, parseStreamLinks } from "@/lib/server/tournaments/live-access";
@@ -11,6 +11,18 @@ import { announceStaffMatchAction, staffActionAuthor } from "@/lib/server/tourna
 function parseMatchId(raw: string): number | null {
   const matchId = Number(raw);
   return Number.isInteger(matchId) && matchId > 0 ? matchId : null;
+}
+
+/**
+ * La porte de la route : `live`, ou l'arbitre désigné du match. Elle lit la
+ * base pour l'arbitre : une panne y rend un code (500), jamais une erreur nue.
+ */
+async function liveGate(user: AuthUser, matchId: number): Promise<Response | null> {
+  try {
+    return (await mayConfigureMatchLive(user, matchId)) ? null : fail("FORBIDDEN", 403);
+  } catch {
+    return fail("MATCH_LIVE_UPDATE_FAILED", 500);
+  }
 }
 
 function mapLiveError(error: unknown) {
@@ -97,7 +109,8 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const { matchId: rawMatchId } = await context.params;
   const matchId = parseMatchId(rawMatchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
-  if (!(await mayConfigureMatchLive(user, matchId))) return fail("FORBIDDEN", 403);
+  const gate = await liveGate(user, matchId);
+  if (gate !== null) return gate;
 
   const body = (await readJsonBody(req).catch(() => ({}))) as {
     trigger?: unknown;
@@ -148,7 +161,8 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   const { matchId: rawMatchId } = await context.params;
   const matchId = parseMatchId(rawMatchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
-  if (!(await mayConfigureMatchLive(user, matchId))) return fail("FORBIDDEN", 403);
+  const gate = await liveGate(user, matchId);
+  if (gate !== null) return gate;
 
   const body = (await readJsonBody(req).catch(() => ({}))) as { onAir?: unknown };
   if (typeof body.onAir !== "boolean") return fail("INVALID_ON_AIR", 400);

@@ -363,6 +363,12 @@ describe("page d'un match — cartes du round et bans", () => {
     expect(text).not.toContain("Adversaires à venir");
   });
 
+  it("MatchMaps_unrefereedMatchWithoutFirstBan_keepsBanOrderRow", () => {
+    // Hors arbitrage, la ligne reste : seul un match arbitré joué la tait.
+    const text = visible(render(match({ hostTeamId: null, firstBanTeamId: null }), "public"));
+    expect(text).toContain("Bans de la carte 1");
+  });
+
   it("MatchMaps_pendingRefereedMatch_showsRefereeBanOrder", () => {
     const text = visible(render(match({ refereeAssigned: true, firstBanTeamId: BRAVO }), "public"));
     expect(text).toContain("Bans de la carte 1 Bravo d'abord, puis Alpha");

@@ -21,6 +21,7 @@ import {
   setTournamentLiveUrl,
   StreamLinkError,
 } from "@/lib/server/tournaments/live-streams";
+import * as liveAccess from "@/lib/server/tournaments/live-access";
 import { announceStaffMatchAction } from "@/lib/server/tournaments/staff-action-logs";
 import { authUser } from "../../../helpers/auth-user";
 
@@ -310,6 +311,29 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
 
     // Corriger les liens d'un match sans mode ne retire aucune diffusion.
     expect(announceStaffMatchAction).toHaveBeenCalledWith(42, "LIVE_CONFIGURED", undefined);
+  });
+
+  it("PUT_gateReadFails_returns500Code", async () => {
+    // Panne de la lecture de l'arbitre à la porte : un code, jamais une erreur nue.
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    jest.spyOn(liveAccess, "mayConfigureMatchLive").mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+
+    const res = await putMatchLive(matchReq("PUT", { trigger: "AUTO", liveUrl: null }), matchParams("42"));
+
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({ error: "MATCH_LIVE_UPDATE_FAILED" });
+    expect(setMatchLiveConfig).not.toHaveBeenCalled();
+  });
+
+  it("POST_gateReadFails_returns500Code", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    jest.spyOn(liveAccess, "mayConfigureMatchLive").mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+
+    const res = await postMatchOnAir(matchReq("POST", { onAir: true }), matchParams("42"));
+
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({ error: "MATCH_LIVE_UPDATE_FAILED" });
+    expect(setMatchOnAir).not.toHaveBeenCalled();
   });
 
   it("PUT_nothingWritten_noAnnouncement", async () => {

@@ -21,6 +21,7 @@
  * même règle.
  */
 
+import { nullableId } from "./nullable-id";
 import type { MatchStatus, TeamRole, TournamentGame } from "./types";
 import { isoTime } from "./iso-time";
 
@@ -51,8 +52,20 @@ export type MatchLaunchPhase = "NONE" | "TO_PLAN" | "SCHEDULED" | "LOBBY" | "LAU
  * seule définition pour l'instantané (`_internal.ts`) et les gestes du serveur
  * (`live-streams.ts`, `cast-settings.ts`) : ils jugent le même maître du mode.
  */
-export function castBeforeLaunch(match: { status: string; launched_at?: Date | string | null }): boolean {
-  return match.status !== "COMPLETED" && (match.launched_at ?? null) === null;
+export function castBeforeLaunch(match: {
+  status: string;
+  launched_at?: Date | string | null;
+  launch_pairing?: string | null;
+  team1_id?: number | string | null;
+  team2_id?: number | string | null;
+}): boolean {
+  if (match.status === "COMPLETED") return false;
+  if ((match.launched_at ?? null) === null) return true;
+  // Un lancement d'un appariement d'avant (réappariement pas encore adopté)
+  // ne vaut pas pour celui-ci : la règle de `currentLaunchState`, quand la
+  // lecture porte l'empreinte.
+  if (match.launch_pairing === undefined) return false;
+  return !launchStateIsCurrent(match.launch_pairing, nullableId(match.team1_id), nullableId(match.team2_id));
 }
 
 /** Ce que la règle a besoin de savoir d'un match. */

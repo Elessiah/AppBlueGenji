@@ -100,6 +100,9 @@ type MatchLiveRow = RowDataPacket & {
   live_started_at: Date | string | null;
   live_trigger_user_id?: number | null;
   launched_at?: Date | string | null;
+  launch_pairing?: string | null;
+  team1_id?: number | null;
+  team2_id?: number | null;
 };
 
 /** Ce que le verrou d'un réglage de diffusion établit (`lockLiveMatch`). */
@@ -366,7 +369,8 @@ async function lockLiveMatch(
   actor: LiveTriggerActor,
 ): Promise<LockedLiveMatch> {
   const [locked] = await connection.execute<MatchLiveRow[]>(
-    `SELECT id, tournament_id, status, start_at, live_trigger, live_started_at, live_trigger_user_id, launched_at
+    `SELECT id, tournament_id, status, start_at, live_trigger, live_started_at, live_trigger_user_id, launched_at,
+            launch_pairing, team1_id, team2_id
      FROM bg_matches WHERE id = ? FOR UPDATE`,
     [matchId],
   );
@@ -443,7 +447,8 @@ async function setStaffStreamUrl(
  */
 const KEPT_REFEREE_SQL = `CASE
   WHEN m.status IN ('PENDING', 'READY')
-    AND (m.launched_at IS NOT NULL OR NOT ${playsMatchSql("m.referee_user_id", "m.team1_id", "m.team2_id", "kr")})
+    AND ((m.launched_at IS NOT NULL AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id))
+      OR NOT ${playsMatchSql("m.referee_user_id", "m.team1_id", "m.team2_id", "kr")})
   THEN m.referee_user_id ELSE NULL END`;
 
 /**
