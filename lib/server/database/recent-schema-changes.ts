@@ -446,6 +446,17 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // `ALGORITHM=COPY` : la table est reconstruite, les nombres quittent ses pages
     // (un retrait « instantané » de MariaDB les y laisserait jusqu'à la réécriture).
     `ALTER TABLE bg_match_voice_channels DROP COLUMN members, DROP COLUMN counted_at, ALGORITHM=COPY`,
+    // CAST-FOLLOWUP — le caster qui a posé le mode d'antenne
+    // (`docs/features/CAST_SETTINGS.md` § Qui règle le mode d'antenne) : nul
+    // partout au départ — un mode déjà posé reste au staff `tournaments`.
+    `ALTER TABLE bg_matches ADD COLUMN live_trigger_user_id BIGINT NULL AFTER live_trigger`,
+    // Son index, à part : l'export (`match-roles-export.ts`) et la suppression
+    // d'un compte le cherchent par ce compte.
+    `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_live_trigger_user (live_trigger_user_id)`,
+    // CAST-FOLLOWUP — serveur Discord d'un salon vocal d'équipe, pour le lien
+    // montré à ses joueurs (`docs/features/MATCH_VOICE.md`) : nul sur les salons
+    // déjà ouverts (aucun lien), rempli à la prochaine création.
+    `ALTER TABLE bg_match_voice_channels ADD COLUMN guild_id VARCHAR(32) NULL AFTER channel_id`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {
