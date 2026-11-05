@@ -1610,11 +1610,12 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     title: "Un BattleTag propre à un cast",
     links: [{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }],
     summary:
-      "Si tu castes un match, tu peux donner, en t'inscrivant ou dans « Configurer ma diffusion », un BattleTag propre à ce cast : c'est lui, et non celui de ton profil, qui est montré aux parties du match. Laissé vide, rien ne change. Ouvrir ton propre stream demande désormais le lien de ta chaîne.",
+      "Si tu castes un match, tu peux donner, en t'inscrivant ou dans « Configurer ma diffusion », un BattleTag propre à ce cast : c'est lui, et non celui de ton profil, qui est montré aux parties du match et aux arbitres. Laissé vide, rien ne change. Ouvrir ton propre stream demande désormais le lien de ta chaîne.",
     details: [
       "Ce que le site garde : le BattleTag que tu tapes pour ce cast, avec ton inscription de caster sur ce match ; il part avec elle (retrait du cast, suppression de ton compte) et n'est jamais recopié sur ton profil ; il figure dans l'export de tes données, avec cette inscription.",
       "À qui il est montré, et quand : exactement comme le BattleTag de ton profil l'était — dans les fenêtres « Contacts » et de lancement et sur la page du match, aux membres de ses deux équipes et à ses autres casters le temps du match seulement, à son arbitre désigné et aux arbitres (permission « tournois ») dès que ses deux adversaires sont connus, dans un tournoi Overwatch seulement, au titre de l'exécution du service. Personne ne le vérifie : il n'est jamais présenté comme un BattleTag prouvé, et le réglage « BattleTag OW » de ton profil ne le masque pas — c'est toi qui le donnes, pour ce match.",
       "Le lien de ta chaîne devient obligatoire pour ouvrir ton propre stream sur un match (il était facultatif) : il est publié avec le match, comme avant, et part comme avant (paragraphe « Retransmission des matchs »). Rejoindre un stream existant n'en demande pas.",
+      "Un membre de l'organisation qui caste peut aussi indiquer, en ouvrant son propre stream ou dans « Configurer ma diffusion », que son lien est celui de l'organisation : ce lien ne part alors pas avec son compte, mais avec ce stream quand plus aucun caster ne le tient.",
     ],
   },
 ];

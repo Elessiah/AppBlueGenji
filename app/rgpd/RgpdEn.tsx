@@ -1045,7 +1045,9 @@ export function RgpdEn({
             caster provided, there or when opening their stream, also goes when their account is deleted, played
             matches included, even if another caster still holds that stream; a member of the organizers states, when
             setting the link, whether it is the organizers&apos; link — it then stays with the match, even if that
-            member casts it — or their own channel, which goes with their account. A link set in that configuration before the site recorded who provided it has no
+            member casts it — or their own channel, which goes with their account. They can also state it when opening their own
+            stream or in “Configure my broadcast”: that link then does not go with their account, but with that
+            stream once no caster holds it any more. A link set in that configuration before the site recorded who provided it has no
             known author and stays with the match.{" "}
             A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which
             then replaces their profile one wherever the latter was shown (“Contacts” and launch windows, match
