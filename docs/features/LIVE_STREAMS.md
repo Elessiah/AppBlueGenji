@@ -19,9 +19,13 @@ l'accueil, annonce #live, détection « à l'antenne » — c'est le **premier l
 lien) : le comportement d'avant, pour le premier stream. Avant le lancement, le stream d'un caster qui ne remplit
 plus la condition du cast est tu, lien compris. La carte d'un match ne garde que le premier lien, suivi de « +N » vers
 la page du match (`MATCH_PAGE.md`), qui montre tous les streams, chacun avec ses casters.
-Un lien de stream porte le nom de sa chaîne (`streamChannelName`). La configuration du direct par le staff règle le lien de
+Un lien de stream porte le nom de sa chaîne (`streamChannelName`). La configuration du direct règle le lien de
 son propre stream (`staff_owned`), jamais celui qu'un caster a ouvert ; « pas
-de cast » n'efface que ce lien du staff. Le stream d'un caster part, avec son
+de cast » n'efface que ce lien du staff. Depuis `CAST_SETTINGS.md`, cette
+configuration est réservée à la permission `tournaments` (la diffusion de
+l'organisation) ; un **caster** règle la sienne — le lien de son stream, le mode
+d'antenne du match, l'antenne, la rediff — dans « Configurer ma diffusion », et
+le lien de son stream est **obligatoire**. Le stream d'un caster part, avec son
 lien, quand plus aucun caster ne le tient ; le lien qu'un caster a fourni
 (`link_user_id` : en ouvrant son stream, ou dans la configuration du direct
 quand celui qui le pose le dit sa propre chaîne : toujours sans la permission `tournaments`, case « lien de l'organisation » décochée avec elle, par défaut) part aussi à la suppression de son compte,

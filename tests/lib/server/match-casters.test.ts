@@ -112,6 +112,11 @@ function applyWithdrawWrites(state: WorldState, sql: string, params: unknown[]):
     state.casters = state.casters.filter((c) => !(c.user_id === userId && ids.includes(matchOf(c))));
     return [{ affectedRows: 1 }];
   }
+  // Le BattleTag de cast d'un cast gardé (anonymisation) : la base n'en modélise
+  // pas la valeur, l'instruction se lit dans `sqls()`.
+  if (sql === "UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL") {
+    return [{ affectedRows: 1 }];
+  }
   if (sql.startsWith("UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE link_user_id = ? AND match_id IN")) {
     const provided = state.streams.filter((s) => s.link_user_id === userId && ids.includes(matchOf(s)));
     for (const s of provided) Object.assign(s, { live_url: null, link_user_id: null });
@@ -276,6 +281,20 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
     expect(w.sqls().some((sql) => sql.startsWith("DELETE"))).toBe(false);
   });
 
+  it("withdrawUserCasts_keptCompletedCast_clearsCastBattletag", async () => {
+    const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }], true);
+    await withdrawUserCasts(w.connection, 12, false);
+    // Le cast reste sur le match joué, son BattleTag de cast part avec le compte.
+    expect(w.state.casters).toEqual([{ user_id: 12, stream_id: 4 }]);
+    expect(w.sqls()).toContain("UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL");
+  });
+
+  it("withdrawUserCasts_allCastsDropped_noBattletagUpdate", async () => {
+    const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }]);
+    await withdrawUserCasts(w.connection, 12, false);
+    expect(w.sqls().some((sql) => sql.includes("cast_battletag"))).toBe(false);
+  });
+
   it("effacement : le cast d'un match joué part aussi", async () => {
     const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }], true);
     expect(await withdrawUserCasts(w.connection, 12, true)).toEqual(touched42);
@@ -429,16 +448,18 @@ describe("withdrawUserCasts — plusieurs matchs, arbitrages", () => {
 });
 
 describe("parseCastTarget — corps de POST /api/matches/[id]/caster", () => {
-  it("rejoindre un stream, ouvrir le sien avec ou sans lien", () => {
+  it("rejoindre un stream, ou ouvrir le sien avec le lien de sa chaîne", () => {
     expect(parseCastTarget({ streamId: 3 })).toEqual({ streamId: 3 });
     expect(parseCastTarget({ liveUrl: "twitch.tv/x" })).toEqual({ liveUrl: "twitch.tv/x" });
-    expect(parseCastTarget({ liveUrl: null })).toEqual({ liveUrl: null });
-    expect(parseCastTarget({})).toEqual({ liveUrl: null });
-    expect(parseCastTarget(null)).toEqual({ liveUrl: null });
+    // Aucune cible : le lien d'un stream propre est obligatoire
+    // (`docs/features/CAST_SETTINGS.md`), un corps vide ne choisit rien.
+    expect(parseCastTarget({ liveUrl: null })).toBeNull();
+    expect(parseCastTarget({})).toBeNull();
+    expect(parseCastTarget(null)).toBeNull();
   });
 
   it("refuse les deux à la fois, un identifiant mal formé et un lien qui n'est pas du texte", () => {
-    expect(parseCastTarget({ streamId: 3, liveUrl: null })).toBeNull();
+    expect(parseCastTarget({ streamId: 3, liveUrl: "twitch.tv/x" })).toBeNull();
     for (const streamId of ["3", 0, -1, 1.5, null]) expect(parseCastTarget({ streamId })).toBeNull();
     expect(parseCastTarget({ liveUrl: 12 })).toBeNull();
   });

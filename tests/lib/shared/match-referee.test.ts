@@ -11,12 +11,7 @@ import { allPartiesReady, readyCount } from "@/lib/shared/match-launch";
 import { noRefereeAlertKey, refereeAlertKey } from "@/lib/server/tournaments/bot-logs";
 import { botEventChannel, formatNoRefereeAlert } from "@/lib/shared/referee-alerts";
 import { formatRefereeChangeLog, formatRoundSelfManagementLog } from "@/lib/shared/bot-logs";
-import {
-  firstBanTeamName,
-  launchStripControls,
-  refereeStripState,
-  type LaunchStripViewer,
-} from "@/app/(secured)/tournois/[id]/_lib/launch-strip";
+import { launchStripControls, type LaunchStripViewer } from "@/app/(secured)/tournois/[id]/_lib/launch-strip";
 import {
   refereeConfirmTone,
   refereeDialogActions,
@@ -185,23 +180,9 @@ describe("journal de l'arbitrage", () => {
 describe("bandeau de la carte : ce qu'il dit de l'arbitrage", () => {
   const match = bracketMatch({ status: "READY", team1Id: 10, team2Id: 20, team1Name: "Alpha", team2Name: "Bravo", hostTeamId: 10, firstBanTeamId: 20 });
 
-  it("« Arbitre désigné » ou « Autogestion » pour tous, « Sans arbitre » au staff seul", () => {
-    expect(refereeStripState({ ...match, refereeAssigned: true }, "LOBBY", false)).toBe("REFEREE");
-    expect(refereeStripState({ ...match, selfManaged: true }, "SCHEDULED", false)).toBe("SELF_MANAGED");
-    expect(refereeStripState(match, "LOBBY", false)).toBeNull();
-    expect(refereeStripState(match, "LOBBY", true)).toBe("UNDECIDED");
-  });
-
-  it("rien sur un match joué ou sans phase", () => {
-    expect(refereeStripState({ ...match, status: "COMPLETED", refereeAssigned: true }, "LAUNCHED", true)).toBeNull();
-    expect(refereeStripState({ ...match, refereeAssigned: true }, "NONE", true)).toBeNull();
-  });
-
-  it("nomme l'équipe qui bannit la première", () => {
-    expect(firstBanTeamName(match)).toBe("Bravo");
-    expect(firstBanTeamName({ ...match, firstBanTeamId: null })).toBeNull();
-  });
-
+  // L'arbitrage, l'hôte, le premier ban et la carte de départ ne sont plus
+  // dits par la carte (`docs/features/MATCH_CARD_LAYOUT.md`) : la page du match
+  // les porte en toutes lettres (`useOfficiatingFact`, `MatchKeyFacts`).
   it("« Arbitrage » : permission `tournaments`, match à jouer, jamais un bye", () => {
     const viewer: LaunchStripViewer = { canManage: false, canSchedule: true, viewerUserId: 1, myTeamId: null };
     expect(launchStripControls(match, "LOBBY", viewer).showReferee).toBe(true);

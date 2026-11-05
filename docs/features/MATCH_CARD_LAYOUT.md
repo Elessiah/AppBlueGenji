@@ -22,9 +22,20 @@ De haut en bas, par ordre d'importance :
    visée par une ancre garde son anneau.
 2. Mention « Match nul » / « Double forfait » (inchangée).
 3. **Zone d'état** (`.meta`, 12 px) — `MatchLiveStrip` (horaire, « sans date »
-   pour le staff, en direct / programmé, lien de la chaîne) puis
-   `MatchLaunchStrip` (phase, équipe hôte, caster). Ces deux bandeaux
-   **n'ont plus de bouton**. Vide, la zone disparaît avec son filet (`:empty`).
+   pour le staff, en direct / programmé, lien de la chaîne et « +N » vers la
+   page du match) puis `MatchLaunchStrip` (la **pastille de phase, seule**).
+   Ces deux bandeaux **n'ont plus de bouton**. Vide, la zone disparaît avec son
+   filet (`:empty`).
+
+   **Ce que la carte ne dit plus** (demande de l'utilisateur du 2026-11-04) :
+   l'équipe hôte, l'équipe qui bannit la première, la carte de départ, l'arbitre
+   désigné ou l'autogestion (« Sans arbitre » du staff comprise) et les casters.
+   À 260 px, ils tenaient sur autant de lignes qu'ils étaient et noyaient les
+   engagés, le score et l'action. Tous sont dits **en toutes lettres** sur la
+   page du match (`MatchKeyFacts` : hôte, premier ban, arbitrage, maps, format,
+   côtés, casters, lancement), à laquelle chaque carte mène. Seuls restent sur
+   la carte l'horaire, l'état de diffusion avec **les liens des chaînes**, la
+   phase, la rediff et le pied d'action.
 4. Bandeau « Rediff disponible » (lien seul) et proposition de score en attente.
 5. **Pied d'action** (`MatchCardActions`) — une action principale pleine
    largeur et, s'il reste des actions, un bouton « Plus d'actions » (⋯).
@@ -49,11 +60,10 @@ lire les drapeaux déjà calculés (`launchStripControls`, `canToggleOnAir`,
 | Programmer une date / Modifier la date | `tournaments`, hors `TO_PLAN` | `MatchScheduleDialog` |
 | Forcer le lancement | `tournaments`, phases `TO_PLAN`/`SCHEDULED`/`LOBBY` | **`ConfirmActionDialog`** puis `POST …/launch` |
 | Changer l'équipe hôte | `tournaments` | `PUT …/host` |
-| Caster ce match | `live`, match castable hors du sien, sans caster | `POST …/caster` (`aria-disabled` + motif si identité manquante) |
-| Ne plus caster / Retirer le caster | caster inscrit / `tournaments` | `DELETE …/caster` |
-| Lancer / Couper le direct | `live`, mode `MANUAL` | `POST …/live` |
-| Diffuser ce match / Configurer la diffusion | `live` | configuration du direct |
-| Ajouter / Modifier la rediff | `live` (`canEditReplay`) | dialogue de rediff |
+| Caster ce match | `live`, match castable hors du sien, pas déjà caster | fenêtre d'inscription (`aria-disabled` + motif si identité manquante) |
+| Configurer ma diffusion | **caster inscrit** de ce match (`offersCastSettings`) | `CastSettingsDialog` — lien, antenne, rediff, BattleTag du cast, « Ne plus caster » → `CAST_SETTINGS.md` |
+| Retirer le caster | `tournaments`, et un **autre** caster que le lecteur | `DELETE …/caster` |
+| Diffuser ce match / Configurer la diffusion | `tournaments` | configuration du direct de l'organisation (antenne et rediff comprises) |
 | Page du match | tous, sauf sous la page elle-même et sur une exemption | **lien** vers la page du match (`MATCH_PAGE.md`) — la seule action qui navigue |
 | Signaler un problème | engagé inscrit, sur **son** match | signalement |
 

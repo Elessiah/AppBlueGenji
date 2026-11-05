@@ -45,8 +45,10 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
 - Les **joueurs du match ne sont pas prévenus** (décision 3).
 - Sur la carte de match, « Retirer le caster » (staff) passe par une
   `ConfirmActionDialog` qui dit que le caster sera prévenu, avec le motif
-  « décision du staff » : l'avis ne se reprend pas. « Ne plus caster » (le
-  caster lui-même, qui n'est prévenu de rien) part sans confirmation.
+  « décision du staff » : l'avis ne se reprend pas — la carte ne l'offre qu'à
+  l'arbitrage et sur un **autre** caster. « Ne plus caster » (le caster
+  lui-même, qui n'est prévenu de rien) part sans confirmation, depuis sa fenêtre
+  « Configurer ma diffusion » (`CAST_SETTINGS.md`).
 - La case « Messages privés Discord de mes matchs » (`/profil`) coupe aussi ce
   message privé : son aide (`matchDms.hint`, FR et EN) le dit.
 

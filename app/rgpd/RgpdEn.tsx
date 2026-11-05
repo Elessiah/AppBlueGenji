@@ -1039,14 +1039,22 @@ export function RgpdEn({
           <p id="retransmission">
             <strong>Match streaming.</strong> A tournament match may be streamed live and recorded on{" "}
             <strong>YouTube, Twitch or Kick</strong>, on the association&apos;s channel or that of one or more
-            casters: each caster joins a stream of the match or opens their own, with its own link (optional),
+            casters: each caster joins a stream of the match or opens their own, with their channel link (required),
             published with the match; the channel name, read from that link (often the caster&apos;s username), is its visible text. That stream goes, with its link, once no caster holds it any more; only the link
             set in the match&apos;s live configuration (by the organizers or a caster) stays with the match. The link a
             caster provided, there or when opening their stream, also goes when their account is deleted, played
             matches included, even if another caster still holds that stream; a member of the organizers states, when
             setting the link, whether it is the organizers&apos; link — it then stays with the match, even if that
-            member casts it — or their own channel, which goes with their account. A link set in that configuration before the site recorded who provided it has no
+            member casts it — or their own channel, which goes with their account. They can also state it when opening their own
+            stream or in “Configure my broadcast”: that link then does not go with their account, but with that
+            stream once no caster holds it any more. A link set in that configuration before the site recorded who provided it has no
             known author and stays with the match.{" "}
+            A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which
+            then replaces their profile one wherever the latter was shown (“Contacts” and launch windows, match
+            page: to the same people at the same times — parties to the match and referees —, in an Overwatch tournament only): it is kept with their caster
+            registration, goes with it, is never copied onto their profile nor presented as proven, and the “OW
+            BattleTag” setting of the profile does not hide it — the caster is the one giving it, for this match,
+            as part of the performance of the service (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).{" "}
             {STREAM_NOTICE_SHOWN_EN} This processing is based on the association&apos;s legitimate interest in
             promoting its competitions. <EnglishLegalText text={STREAM_NOTICE_OBJECTION_EN} /> A replay link that shows the player is then
             removed from the site, and a video published by the association&apos;s channel is hidden or deleted.
@@ -1071,7 +1079,7 @@ export function RgpdEn({
             site: the site only keeps the trace of a match&apos;s announcement when it goes on air
             (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>), which appears, in a solo tournament,
             in the export of your data — neither the text of the message nor the list of scheduled matches it gives. Your
-            caster registrations (with your “Ready”), the channel links you provided and the matches you are the assigned
+            caster registrations (with your “Ready” and the BattleTag you gave for that cast), the channel links you provided and the matches you are the assigned
             referee of also appear in the export of your data. These
             announcements stay in the channel as long as the #live channel exists; when a caster&apos;s account is deleted,
             the message of an evening still under way is updated without their channel link if it keeps another link —

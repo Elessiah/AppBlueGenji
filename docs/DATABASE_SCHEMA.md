@@ -129,6 +129,7 @@ Ce qu'elle contient aujourd'hui :
 | — (MATCH-VOICE) | `bg_tournaments`, `bg_match_voice_channels` | `team_voice_channels` (`TINYINT`, 0 par défaut) — option « Salons vocaux d'équipe ». Table neuve `bg_match_voice_channels` (créée par son seul `CREATE TABLE`) : une ligne par (match, équipe), clé primaire `(match_id, team_id)`, `channel_id`, `failed_at`, `released_at` ; effacée 7 jours après `released_at` (`MATCH_VOICE.md`) |
 | — (EF-43) | `bg_match_voice_channels` | `DROP COLUMN members, DROP COLUMN counted_at, ALGORITHM=COPY` (table reconstruite) — le nombre de présents n'est plus gardé (`MATCH_VOICE.md`) |
 | — (BO3-TIEBREAK) | `bg_tournament_round_maps` | `tiebreak_map` — `VARCHAR(64) NULL` : map de départage d'un tour de play-offs en vrai Bo3, jouée seulement sur une série à égalité ; une ligne qui ne porte qu'elle a `slots_json = '[]'` (`ROUND_MAPS.md`) |
+| — (CAST-SETTINGS) | `bg_match_casters` | `cast_battletag` — `VARCHAR(64) NULL` : BattleTag qu'un caster donne pour **ce** cast, montré à la place de celui de son compte (Overwatch seulement), jamais vérifié ni recopié sur le profil ; part avec l'inscription, remis à `NULL` sur un cast gardé à l'anonymisation, rendu dans l'export (`CAST_SETTINGS.md`, registre T04) |
 
 `bg_matches.launched_at` n'est **pas** dans la liste, et c'est volontaire : son
 ajout s'accompagne d'un **remplissage** (les matchs déjà jouables au déploiement

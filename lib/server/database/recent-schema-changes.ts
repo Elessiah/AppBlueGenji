@@ -435,6 +435,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // les comptes supprimés (une poignée) : sans index, chaque démarrage de chaque
     // processus parcourait toute la table des comptes.
     `ALTER TABLE bg_users ADD INDEX idx_bg_users_is_deleted (is_deleted)`,
+    // CAST-SETTINGS — BattleTag donné pour un cast précis
+    // (`docs/features/CAST_SETTINGS.md`) : nul partout au départ, donc aucun
+    // remplissage — un cast sans tag propre montre celui du compte, comme avant.
+    `ALTER TABLE bg_match_casters ADD COLUMN cast_battletag VARCHAR(64) NULL AFTER ready_at`,
     // EF-43 — le lancement ne dépend plus des salons vocaux d'équipe
     // (`docs/features/MATCH_VOICE.md`) : le site ne compte plus personne, le
     // nombre et sa date partent. Déjà jouée ou base neuve :

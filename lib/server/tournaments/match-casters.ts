@@ -63,6 +63,13 @@ export type MatchCasterLink = {
   userId: number;
   streamId: number;
   readyAt: Date | string | null;
+  /**
+   * BattleTag donné pour **ce** cast (`docs/features/CAST_SETTINGS.md`), jamais
+   * vérifié ; `null` = celui de son compte. Absent des lectures qui ne le lisent
+   * pas (verrou du lancement, instantané) : seule la présentation d'un match en
+   * a besoin.
+   */
+  castBattletag?: string | null;
 };
 
 /** Un caster et ce qu'il faut pour rejouer sa condition (`castEligibilityBlock`). */
@@ -83,6 +90,8 @@ type CasterLinkRow = RowDataPacket & {
   user_id: number;
   stream_id: number;
   ready_at: Date | string | null;
+  /** Absente des lectures qui ne la demandent pas (`toLink` la laisse alors absente). */
+  cast_battletag?: string | null;
 };
 
 type CasterUserRow = CasterLinkRow & CastEligibilityFields & { pseudo: string };
@@ -104,12 +113,16 @@ function groupByMatch<T extends { matchId: number }>(items: readonly T[]): Map<n
 }
 
 function toLink(row: CasterLinkRow): MatchCasterLink {
-  return {
+  const link: MatchCasterLink = {
     matchId: Number(row.match_id),
     userId: Number(row.user_id),
     streamId: Number(row.stream_id),
     readyAt: row.ready_at ?? null,
   };
+  // Lue seule par la présentation d'un match : une lecture qui ne la demande
+  // pas laisse le champ **absent**, et non à `null` — qui dirait « aucun tag ».
+  if (row.cast_battletag !== undefined) link.castBattletag = row.cast_battletag ?? null;
+  return link;
 }
 
 function toStream(row: StreamRow): MatchStreamRow {
@@ -157,7 +170,7 @@ export async function loadCasterLinks(
   const ids = [...new Set(matchIds)];
   if (ids.length === 0) return new Map();
   const [rows] = await executor.execute<CasterLinkRow[]>(
-    `SELECT match_id, user_id, stream_id, ready_at FROM bg_match_casters
+    `SELECT match_id, user_id, stream_id, ready_at, cast_battletag FROM bg_match_casters
      WHERE match_id IN (${placeholders(ids)}) ORDER BY match_id, created_at, user_id`,
     ids,
   );
@@ -375,6 +388,14 @@ export async function withdrawUserCasts(
     await connection.execute(
       `DELETE FROM bg_match_casters WHERE user_id = ? AND match_id IN (${placeholders(castsToDrop)})`,
       [userId, ...castsToDrop],
+    );
+  }
+  // Un cast gardé sur un match joué (anonymisation) ne garde pas son
+  // BattleTag de cast : il part avec le compte (`CAST_SETTINGS.md`).
+  if (casts.size > castsToDrop.length) {
+    await connection.execute(
+      `UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL`,
+      [userId],
     );
   }
   if (linksToDrop.length > 0) {

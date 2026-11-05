@@ -1046,7 +1046,6 @@ describe("page d'un match — mise en page (CSS)", () => {
     }
   });
 
-  it("launchFact_longPseudoWraps", () => {
-    expect(rule(css("MatchLaunchStrip.module.css"), ".fact")).toContain("overflow-wrap: anywhere");
-  });
+  // Les faits du bandeau (hôte, carte, arbitre, casters) ont quitté la carte
+  // (`docs/features/MATCH_CARD_LAYOUT.md`) : plus de classe `.fact` à border.
 });

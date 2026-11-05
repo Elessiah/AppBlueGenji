@@ -831,6 +831,18 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: it still contains no BattleTag, no Discord tag and no player username (in a solo tournament, it says “you” and “your opponent”); the direct message only goes to a certified Discord tag and is turned off, like the other match messages, with the “Discord direct messages about my matches” box in “My profile”; the push notification topic, “Lobby settings”, becomes “Match check-in”: on by default on a subscribed device, it is turned off in “My profile”.",
     ],
   },
+  "2026-11-battletag-de-cast": {
+    linkLabels: ["Read the “Match streaming” paragraph"],
+    title: "A BattleTag of its own for a cast",
+    summary:
+      "If you cast a match, you can give a BattleTag of its own for that cast, when signing up or in “Configure my broadcast”: that one, and not your profile's, is shown to the parties of the match and to the referees. Left empty, nothing changes. Opening your own stream now requires your channel link.",
+    details: [
+      "What the site keeps: the BattleTag you type for that cast, with your caster registration on that match; it goes with it (leaving the cast, deleting your account) and is never copied onto your profile; it appears in the export of your data, with that registration.",
+      "Who it is shown to, and when: exactly as your profile BattleTag was — in the “Contacts” and launch windows and on the match page, to the members of both its teams and its other casters only while the match is being played, to its designated referee and to the referees (“tournaments” permission) as soon as both its opponents are known, in an Overwatch tournament only, as part of the performance of the service. Nobody verifies it: it is never presented as a proven BattleTag, and the “OW BattleTag” setting of your profile does not hide it — you are the one giving it, for this match.",
+      "Your channel link becomes required to open your own stream on a match (it was optional): it is published with the match, as before, and goes as before (“Match streaming” paragraph). Joining an existing stream does not require one.",
+      "A member of the organizers who casts can also state, when opening their own stream or in “Configure my broadcast”, that their link is the organizers' one: that link then does not go with their account, but with that stream once no caster holds it any more.",
+    ],
+  },
 };
 
 /**

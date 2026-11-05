@@ -142,7 +142,36 @@ describe("MatchRow — chaque public retrouve ses actions", () => {
     expect(html).toContain("Score verrouillé");
   });
 
-  it("diffusion : la rediff d'un match joué reste offerte", () => {
-    expect(card(played, { canManage: true })).toContain("Ajouter la rediff : Alpha contre Bravo");
+  it("diffusion : la carte n'offre plus la rediff — elle vit dans les fenêtres de diffusion", () => {
+    // `docs/features/CAST_SETTINGS.md` : un porteur de `live` qui ne caste pas
+    // n'a plus de réglage de diffusion sur la carte.
+    const html = card(played, { canManage: true });
+    expect(html).not.toContain('data-action="replay"');
+    expect(html).not.toContain('data-action="castConfig"');
+    expect(html).not.toContain('data-action="liveConfig"');
+  });
+
+  it("diffusion : le caster d'un match joué garde « Configurer ma diffusion » (rediff comprise)", () => {
+    // `viewerUserId` du fournisseur : 1.
+    const mine = bracketMatch({ ...played, casters: [{ userId: 1, pseudo: "Moi", streamId: 1, ready: false }] });
+    expect(card(mine, { canManage: true })).toContain("Configurer ma diffusion : Alpha contre Bravo");
+  });
+
+  it("diffusion : le staff `tournaments` garde la diffusion de l'organisation", () => {
+    expect(card(launched(), { canSchedule: true, canManage: true })).toContain('data-action="liveConfig"');
+  });
+
+  it("matchCard_tournamentsWithoutLive_noLiveConfig", () => {
+    // Les routes de la diffusion (`/api/admin/matches/[id]/live`) demandent `live` :
+    // sans elle, le bouton ne mènerait qu'à des refus.
+    expect(card(launched(), { canSchedule: true })).not.toContain('data-action="liveConfig"');
+  });
+
+  it("matchCard_playedUncastMatchForOrganisationStaff_offersReplay", () => {
+    // Joué sans diffusion marquée : aucune fenêtre de diffusion ne s'ouvre, la
+    // rediff garde son entrée sur la carte.
+    const html = card(played, { canSchedule: true, canManage: true });
+    expect(html).toContain("Ajouter la rediff : Alpha contre Bravo");
+    expect(html).not.toContain('data-action="liveConfig"');
   });
 });

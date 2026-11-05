@@ -1,9 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import {
-  hostTeamName,
-  launchStripControls,
-  type LaunchStripViewer,
-} from "@/app/(secured)/tournois/[id]/_lib/launch-strip";
+import { launchStripControls, type LaunchStripViewer } from "@/app/(secured)/tournois/[id]/_lib/launch-strip";
 import type { MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { bracketMatch, matchCaster } from "../helpers/bracket-match";
 
@@ -54,7 +50,9 @@ describe("launchStripControls", () => {
     const casted = bracketMatch({ ...match, casters: [matchCaster({ userId: 5 }), matchCaster({ userId: 1 })] });
     const controls = launchStripControls(casted, "LOBBY", nobody);
     expect(controls.isCaster).toBe(true);
-    expect(controls.showRelease).toBe(true);
+    // Son retrait a quitté la carte : « Ne plus caster » vit dans
+    // « Configurer ma diffusion » (`docs/features/CAST_SETTINGS.md`).
+    expect(controls.showRelease).toBe(false);
     // Déjà caster : rien de plus à rejoindre.
     expect(launchStripControls(casted, "LOBBY", { ...nobody, canManage: true }).showClaim).toBe(false);
   });
@@ -76,16 +74,16 @@ describe("launchStripControls", () => {
     expect(launchStripControls(bracketMatch({ ...casted, status: "COMPLETED" }), "NONE", referee).showRelease).toBe(false);
   });
 
-  it("un arbitre qui caste aussi le match peut retirer un autre caster, jamais seul face à lui-même", () => {
+  it("un arbitre qui caste aussi le match retire un autre caster, jamais lui-même depuis la carte", () => {
     const coCast = bracketMatch({ ...match, casters: [matchCaster({ userId: 1 }), matchCaster({ userId: 5 })] });
     const refereeCaster = launchStripControls(coCast, "LOBBY", referee);
     expect(refereeCaster.isCaster).toBe(true);
-    expect(refereeCaster.releasesOthers).toBe(true);
-    // Seul caster du match : il ne retire que lui-même.
+    expect(refereeCaster.showRelease).toBe(true);
+    // Seul caster du match : « Ne plus caster » vit dans « Configurer ma diffusion ».
     const alone = bracketMatch({ ...match, casters: [matchCaster({ userId: 1 })] });
-    expect(launchStripControls(alone, "LOBBY", referee).releasesOthers).toBe(false);
+    expect(launchStripControls(alone, "LOBBY", referee).showRelease).toBe(false);
     // Sans la permission d'arbitrage, jamais.
-    expect(launchStripControls(coCast, "LOBBY", nobody).releasesOthers).toBe(false);
+    expect(launchStripControls(coCast, "LOBBY", nobody).showRelease).toBe(false);
   });
 
   it("n'offre pas de caster un bye ni son propre match", () => {
@@ -96,17 +94,9 @@ describe("launchStripControls", () => {
     expect(launchStripControls(match, "LOBBY", caster).showClaim).toBe(true);
   });
 
-  it("n'annonce aucun hôte hors du cycle de lancement", () => {
-    expect(launchStripControls(match, "NONE", referee).showHost).toBe(false);
+  it("ne change l'hôte que dans le cycle de lancement", () => {
+    expect(launchStripControls(match, "NONE", referee).showHostSwap).toBe(false);
     expect(launchStripControls(match, "TO_PLAN", referee).showHostSwap).toBe(true);
-  });
-});
-
-describe("hostTeamName", () => {
-  it("nomme l'hôte désigné, et rien sans hôte", () => {
-    expect(hostTeamName(match)).toBe("Bravo");
-    expect(hostTeamName(bracketMatch({ ...match, hostTeamId: 10 }))).toBe("Alpha");
-    expect(hostTeamName(bracketMatch({ ...match, hostTeamId: null }))).toBeNull();
   });
 });
 

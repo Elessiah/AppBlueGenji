@@ -215,6 +215,7 @@
     "force": "Force the launch",
     "hostSwap": "Change the host team",
     "claimCast": "Cast this match",
+    "castConfig": "Configure my broadcast",
     "stopCasting": "Stop casting",
     "removeCaster": "Remove the caster",
     "stopLive": "End the live",
@@ -271,10 +272,7 @@
       "joinMatchStream": "Join the match stream",
       "noLink": "no link",
       "separate": "Open my own stream",
-      "url": "My stream link (optional)",
-      "urlHint": "Accepted platforms: {platforms}. Your link shows on the match once the staff has marked it as cast; without a link, your stream does not appear on the match card.",
-      "gone": "This stream no longer exists: pick another one.",
-      "urlInvalid": "Link not recognized. Accepted platforms: {platforms}."
+      "gone": "This stream no longer exists: pick another one."
     },
     "forceConfirm": {
       "title": "Force the launch of {match}?",
@@ -371,6 +369,35 @@
           "confirm": "Uphold the objection"
         }
       }
+    },
+    "castSettings": {
+      "title": "My broadcast",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "saved": "Your broadcast settings have been saved.",
+      "trigger": "Going on air",
+      "triggers": {
+        "AUTO": "Automatically when the match starts",
+        "START_TIME": "At the match start time",
+        "MANUAL": "Manual (on-air button)"
+      },
+      "noStartAt": "This match has no start time yet: going on air at a set time needs a schedule first.",
+      "autoStop": "The stream stops by itself as soon as a score is entered.",
+      "url": "My channel link",
+      "urlHint": "Accepted platforms: {platforms}. This link is required: without it your stream would show neither on the match card, nor on its page, nor in the live announcement. A link you provide here is removed from the match if your account is deleted, unless it is marked as the organisation's link; a saved link you do not change keeps its origin.",
+      "urlInvalid": "Link not recognized. Accepted platforms: {platforms}.",
+      "urlStaff": "You are co-casting the organisation's stream: its link is set in the broadcast configuration.",
+      "battletag": "BattleTag for this cast (optional)",
+      "battletagHint": "The account you will be in game with for this match: it replaces your profile BattleTag in the “Contacts” window and on the match page. Leave empty to keep your profile one. Nobody verifies it.",
+      "battletagInvalid": "Invalid BattleTag: 64 characters at most, and visible characters.",
+      "organisationLink": "This link is the organisation's",
+      "organisationLinkSubject": "organisation link",
+      "organisationLinkHint": "Checked, the link does not go with your account: it goes with this stream once no caster holds it any more. Unchecked, it is your own channel: it is removed from the match if your account is deleted. A link already saved that you do not change keeps its origin.",
+      "air": "On air",
+      "airHint": "In manual mode, the stream is opened and closed here. It stops anyway as soon as a score is entered.",
+      "replay": "Replay",
+      "replayHint": "The replay link is added once the match has been played; a “Replay available” strip then shows under the match, visible to everyone."
     }
   },
   "planning": {

@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
 import {
+  canToggleOnAir,
   isValidStreamUrl,
   LIVE_PLATFORMS,
   MATCH_LIVE_TRIGGERS,
@@ -12,6 +13,10 @@ import {
   staffStream,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
+import { canEditReplay } from "@/lib/shared/match-replay";
+import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
+import { useActionsText } from "../_lib/actions-text";
+import { useLiveControls } from "../_lib/live-context";
 import { formatMatchStartAt } from "@/lib/shared/match-schedule";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
@@ -37,6 +42,10 @@ interface MatchLiveDialogProps {
  * officielle du tournoi : le lien saisi ici est celui de la chaîne qui montre
  * **ce** match, éventuellement celle d'un streamer indépendant.
  *
+ * Depuis `docs/features/CAST_SETTINGS.md`, la carte n'offre plus l'antenne ni
+ * la rediff : elles vivent ici pour le staff `tournaments`, comme elles vivent
+ * dans « Configurer ma diffusion » pour un caster.
+ *
  * Voile, cadre et comportement modal : `TournamentDialogFrame`. `busy`
  * verrouille Échap pendant l'envoi : une modale en train d'écrire ne se
  * referme pas.
@@ -46,6 +55,11 @@ export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisati
   const mapError = useMapError();
   const text = useDialogsText();
   const { t } = text;
+  // Libellés déjà rédigés pour le pied d'action de la carte (antenne, rediff) :
+  // les mêmes mots ici, dans le seul espace qui les porte.
+  const actions = useActionsText();
+  const { openReplay } = useLiveControls();
+  const onAir = useMatchLiveState(match) === "LIVE";
   const [streamed, setStreamed] = useState(match.liveTrigger !== null);
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "MANUAL");
   // Le lien du stream du staff, que ce réglage écrit — jamais celui qu'un
@@ -78,6 +92,26 @@ export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisati
   const startAtLabel = formatMatchStartAt(match.startAt, text.locale);
   const startAtMissing = startAtLabel === null;
   const triggerNeedsDate = streamed && requiresMatchStartAt(trigger) && startAtMissing;
+
+  /** Ouvre ou coupe l'antenne (mode manuel), sans quitter la fenêtre. */
+  const toggleAir = async () => {
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/admin/matches/${match.id}/live`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ onAir: !onAir }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "MATCH_LIVE_UPDATE_FAILED");
+      showSuccess(onAir ? actions.t("cardActions.airClosed") : actions.t("cardActions.airOpened"));
+      onSaved();
+    } catch (error) {
+      showError(mapError((error as Error).message));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -241,6 +275,41 @@ export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisati
               )}
             </div>
           </>
+        )}
+
+        {/* Antenne (mode manuel) et rediff : la carte ne les porte plus. */}
+        {canToggleOnAir(match) && (
+          <div style={{ margin: "0 0 14px" }}>
+            <button
+              type="button"
+              className={onAir ? "btn ghost" : "btn"}
+              disabled={busy}
+              style={{ padding: "8px 18px", fontSize: 13 }}
+              onClick={() => void toggleAir()}
+            >
+              {onAir ? actions.t("cardActions.stopLive") : actions.t("cardActions.startLive")}
+            </button>
+          </div>
+        )}
+        {canEditReplay(match, true) && (
+          <div style={{ margin: "0 0 14px" }}>
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={busy}
+              style={{ padding: "8px 18px", fontSize: 13 }}
+              onClick={() => {
+                // Une autre modale : celle-ci se ferme d'abord, les deux ne se
+                // disputent pas le piège de focus.
+                onClose();
+                openReplay(match);
+              }}
+            >
+              {match.replayUrl === null
+                ? actions.t("cardActions.addReplay")
+                : actions.t("cardActions.editReplay")}
+            </button>
+          </div>
         )}
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>

@@ -1244,15 +1244,24 @@ function RgpdFr({
             <strong>Retransmission des matchs.</strong> Un match de tournoi peut être diffusé en
             direct et enregistré sur <strong>YouTube, Twitch ou Kick</strong>, par la chaîne de l&apos;association
             ou d&apos;un ou plusieurs casters : chaque caster rejoint un stream du match ou ouvre le sien,
-            avec son propre lien (facultatif), publié avec le match ; le nom de la chaîne, lu dans ce lien (souvent le pseudo du caster), en est le texte visible. Ce stream part, avec son lien, quand
+            avec le lien de sa chaîne (obligatoire), publié avec le match ; le nom de la chaîne, lu dans ce lien (souvent le pseudo du caster), en est le texte visible. Ce stream part, avec son lien, quand
             plus aucun caster ne le tient ; seul le lien posé dans la configuration du direct du match (par
             l&apos;organisation ou un caster) reste au match. Le lien qu&apos;un caster a fourni, là ou en ouvrant
             son stream, part aussi à la suppression de son compte, matchs joués compris, même si un autre caster
             tient encore ce stream ; un membre de l&apos;organisation y indique, en posant le lien, s&apos;il est celui de
             l&apos;organisation — il reste alors au match, même si ce membre le caste — ou sa propre chaîne,
-            qui part avec son compte. Un lien
+            qui part avec son compte. Il peut l&apos;indiquer aussi en ouvrant son propre stream ou dans
+            « Configurer ma diffusion » : ce lien ne part alors pas avec son compte, mais avec ce stream quand
+            plus aucun caster ne le tient. Un lien
             posé dans cette configuration avant que le site n&apos;enregistre qui le fournit n&apos;a pas d&apos;auteur
             connu et reste au match.{" "}
+            Un caster peut aussi donner, pour un cast précis, un <strong>BattleTag propre à ce
+            match</strong>, qui remplace alors celui de son profil là où ce dernier était montré (fenêtres
+            « Contacts » et de lancement, page du match : aux mêmes personnes et aux mêmes moments — parties
+            du match et arbitres —, dans un tournoi Overwatch seulement) : il est gardé avec son inscription de caster, part avec elle, n&apos;est jamais
+            recopié sur son profil ni présenté comme prouvé, et le réglage « BattleTag OW » du profil ne le
+            masque pas — c&apos;est le caster qui le donne, pour ce match, au titre de l&apos;exécution du
+            service (<Link href="/rgpd/registre#t04">registre, T04</Link>).{" "}
             {STREAM_NOTICE_SHOWN} Ce traitement repose sur l&apos;intérêt
             légitime de l&apos;association à faire connaître ses compétitions.{" "}
             {STREAM_NOTICE_OBJECTION} Un lien de rediffusion qui montre le joueur est alors
@@ -1281,7 +1290,7 @@ function RgpdFr({
             le site : le site ne garde que la trace de l&apos;annonce d&apos;un match à son passage à l&apos;antenne
             (<Link href="/rgpd/registre#t16">registre, T16</Link>), qui figure, en tournoi individuel, dans
             l&apos;export de vos données — ni le texte du message, ni la liste des matchs programmés qu&apos;il donne. Vos
-            inscriptions de caster (avec votre « Prêt »), les liens de chaîne que vous avez fournis et les matchs dont vous
+            inscriptions de caster (avec votre « Prêt » et le BattleTag que vous avez donné pour ce cast), les liens de chaîne que vous avez fournis et les matchs dont vous
             êtes l&apos;arbitre désigné figurent aussi dans l&apos;export de vos données. Ces annonces restent dans le salon tant
             que le salon #live existe ; à la suppression du compte d&apos;un caster, le message d&apos;une soirée encore en
             cours est remis à jour sans le lien de sa chaîne s&apos;il garde un autre lien — sinon, ou une fois la soirée

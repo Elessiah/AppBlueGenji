@@ -1216,7 +1216,15 @@ export type PersonalDataExport = {
    * Inscriptions de caster du titulaire (`bg_match_casters`) : match, tournoi,
    * stream tenu, « Prêt » et date d'inscription — gardées avec un match joué.
    */
-  casts: { matchId: number; tournamentId: number; streamId: number; readyAt: string | null; createdAt: string | null }[];
+  casts: {
+    matchId: number;
+    tournamentId: number;
+    streamId: number;
+    readyAt: string | null;
+    createdAt: string | null;
+    /** BattleTag donné pour ce cast (`bg_match_casters.cast_battletag`), `null` = celui du compte. */
+    castBattletag: string | null;
+  }[];
   /**
    * Liens de chaîne qu'il a fournis sur un match (`bg_match_streams.link_user_id`,
    * T16), avec la date du stream.

@@ -1597,6 +1597,27 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : il ne contient toujours ni BattleTag, ni tag Discord, ni pseudo de joueur (en tournoi individuel, il dit « toi » et « ton adversaire ») ; le message privé ne part qu'à un tag Discord certifié et se coupe, comme les autres messages de match, par la case « Messages privés Discord de mes matchs » de « Mon profil » ; le sujet de la notification push, « Réglages du salon », devient « Check-in du match » : actif par défaut sur un appareil abonné, il se coupe dans « Mon profil ».",
     ],
   },
+  {
+    // CAST-SETTINGS (demande de l'utilisateur du 2026-11-04) : un caster peut
+    // donner, pour un cast précis, un BattleTag autre que celui de son compte
+    // (`bg_match_casters.cast_battletag`). Donnée nouvelle, montrée aux mêmes
+    // personnes et aux mêmes moments que celui du compte — seuls les casters
+    // sont concernés, d'où le public. Publiée le lendemain de la mise en ligne
+    // prévue, l'heure du déploiement n'étant pas connue (§ Dates corrigées).
+    audience: "LIVE_STAFF",
+    id: "2026-11-battletag-de-cast",
+    publishedAt: "2026-11-06",
+    title: "Un BattleTag propre à un cast",
+    links: [{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }],
+    summary:
+      "Si tu castes un match, tu peux donner, en t'inscrivant ou dans « Configurer ma diffusion », un BattleTag propre à ce cast : c'est lui, et non celui de ton profil, qui est montré aux parties du match et aux arbitres. Laissé vide, rien ne change. Ouvrir ton propre stream demande désormais le lien de ta chaîne.",
+    details: [
+      "Ce que le site garde : le BattleTag que tu tapes pour ce cast, avec ton inscription de caster sur ce match ; il part avec elle (retrait du cast, suppression de ton compte) et n'est jamais recopié sur ton profil ; il figure dans l'export de tes données, avec cette inscription.",
+      "À qui il est montré, et quand : exactement comme le BattleTag de ton profil l'était — dans les fenêtres « Contacts » et de lancement et sur la page du match, aux membres de ses deux équipes et à ses autres casters le temps du match seulement, à son arbitre désigné et aux arbitres (permission « tournois ») dès que ses deux adversaires sont connus, dans un tournoi Overwatch seulement, au titre de l'exécution du service. Personne ne le vérifie : il n'est jamais présenté comme un BattleTag prouvé, et le réglage « BattleTag OW » de ton profil ne le masque pas — c'est toi qui le donnes, pour ce match.",
+      "Le lien de ta chaîne devient obligatoire pour ouvrir ton propre stream sur un match (il était facultatif) : il est publié avec le match, comme avant, et part comme avant (paragraphe « Retransmission des matchs »). Rejoindre un stream existant n'en demande pas.",
+      "Un membre de l'organisation qui caste peut aussi indiquer, en ouvrant son propre stream ou dans « Configurer ma diffusion », que son lien est celui de l'organisation : ce lien ne part alors pas avec son compte, mais avec ce stream quand plus aucun caster ne le tient.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

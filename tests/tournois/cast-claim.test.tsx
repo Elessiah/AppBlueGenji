@@ -106,16 +106,32 @@ describe("castClaimChoices — un choix par stream, puis « ouvrir le sien »", 
 });
 
 describe("castClaimBody — le corps envoyé à POST /api/matches/[id]/caster", () => {
-  it("rejoindre : le stream seul, aucun lien même saisi", () => {
-    expect(castClaimBody({ kind: "JOIN", streamId: 4, liveUrl: null, casterPseudos: [] }, "twitch.tv/x")).toEqual({
-      streamId: 4,
+  const input = { url: "", battletag: "", trigger: "AUTO" as const, organisationLink: false };
+
+  it("rejoindre : le stream seul, aucun lien ni mode même saisis", () => {
+    expect(
+      castClaimBody({ kind: "JOIN", streamId: 4, liveUrl: null, casterPseudos: [] }, { ...input, url: "twitch.tv/x" }),
+    ).toEqual({ streamId: 4, battletag: null });
+  });
+
+  it("le BattleTag du cast suit les deux choix, rogné ; vide = celui du compte", () => {
+    expect(
+      castClaimBody({ kind: "JOIN", streamId: 4, liveUrl: null, casterPseudos: [] }, { ...input, battletag: " Voix#2100 " }),
+    ).toEqual({ streamId: 4, battletag: "Voix#2100" });
+    expect(castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", battletag: "  " })).toMatchObject({
+      battletag: null,
     });
   });
 
-  it("à part : le lien rogné, ou null quand il est vide", () => {
-    expect(castClaimBody({ kind: "SEPARATE" }, "  twitch.tv/voix ")).toEqual({ liveUrl: "twitch.tv/voix" });
-    expect(castClaimBody({ kind: "SEPARATE" }, "   ")).toEqual({ liveUrl: null });
-    expect(castClaimBody({ kind: "SEPARATE" }, "")).toEqual({ liveUrl: null });
+  it("à part : le lien rogné, le mode d'antenne, et l'origine du lien seulement si elle est dite", () => {
+    expect(castClaimBody({ kind: "SEPARATE" }, { ...input, url: "  twitch.tv/voix " })).toEqual({
+      liveUrl: "twitch.tv/voix",
+      battletag: null,
+      trigger: "AUTO",
+    });
+    expect(
+      castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", trigger: "MANUAL", organisationLink: true }),
+    ).toEqual({ liveUrl: "twitch.tv/voix", battletag: null, trigger: "MANUAL", organisationLink: true });
   });
 });
 
@@ -179,11 +195,14 @@ describe("CastClaimDialog — rendu", () => {
     expect(renderDialog("fr", one)).toContain("Co-caster avec Voix<");
   });
 
-  it("un match sans stream ouvre la fenêtre avec le seul choix « ouvrir mon propre stream » et son champ de lien", () => {
+  it("un match sans stream ouvre la fenêtre avec le seul choix « ouvrir mon propre stream », son champ de lien et le mode d'antenne", () => {
     const html = renderDialog("fr", bracketMatch());
-    expect(html.match(/type="radio"/g)).toHaveLength(1);
+    // Un seul choix de stream, et les trois modes de passage à l'antenne que
+    // « ouvrir mon propre stream » règle du même geste (`CAST_SETTINGS.md`).
+    expect(html.match(/type="radio"/g)).toHaveLength(4);
     expect(html).toContain("Ouvrir mon propre stream");
     expect(html).toContain('inputMode="url"');
+    expect(html).toContain("Passage à l&#x27;antenne");
   });
 
   it("l'annonce du stream disparu est une zone vive toujours montée, vide tant que le choix existe", () => {
@@ -233,7 +252,7 @@ describe("CastClaimDialog — un stream choisi qui disparaît", () => {
   it("n'est pas remplacé en silence par le premier : plus rien n'est choisi, l'envoi est désarmé", () => {
     expectContains(source, [
       "choices.find((option) => castClaimChoiceKey(option) === choiceKey) ?? null;",
-      "disabled={choice === null || urlInvalid}",
+      "disabled={choice === null || urlMissing || urlRefused || battletagRefused || triggerRefused}",
       "if (choice === null) return false;",
     ]);
   });
@@ -290,14 +309,22 @@ describe("MatchCardActions — branchements du cast", () => {
     ]);
   });
 
-  it("le staff choisit le caster retiré, désigné par ?userId= ; le caster se retire sans paramètre", () => {
+  it("le staff choisit le caster retiré, désigné par ?userId= ; le caster se retire depuis sa fenêtre", () => {
     expectContains(card, [
       "/api/matches/${match.id}/caster?userId=${encodeURIComponent(",
-      'send(`/api/matches/${match.id}/caster`, "DELETE")',
       "{match.casters.length > 1 && (",
     ]);
-    // Un arbitre qui caste aussi le match passe par ce choix, lui compris.
-    expect(card).toContain("if (!isCaster || releasesOthers) {");
+    // La carte ne porte plus le retrait du lecteur lui-même : « Ne plus
+    // caster » vit dans « Configurer ma diffusion » (`CAST_SETTINGS.md`).
+    expect(card).toContain("releaseCast: () => openRelease(),");
+    const settings = readSource("app/(secured)/tournois/[id]/_components/CastSettingsDialog.tsx");
+    expect(settings).toContain('fetch(`/api/matches/${match.id}/caster`, { method: "DELETE" })');
+  });
+
+  it("la case « lien de l'organisation » n'est offerte que pour un lien modifié (sinon l'envoi l'ignorerait)", () => {
+    const settings = readSource("app/(secured)/tournois/[id]/_components/CastSettingsDialog.tsx");
+    expect(settings).toContain("canSchedule && streamEditable && urlChanged && url.trim() !== \"\" && (");
+    expect(settings).toContain("if (canSchedule && organisationLink) settings.organisationLink = true;");
   });
 
   it("le caster à retirer est fixé à l'ouverture ; parti entre-temps, la fenêtre se ferme au lieu d'en viser un autre", () => {
@@ -377,9 +404,9 @@ describe("Textes de caster — pluriel, parité FR/EN, clé retirée", () => {
   const read = (locale: string, file: string) =>
     JSON.parse(readSource(`messages/${locale}/${file}.json`)) as Record<string, any>;
 
-  it("l'aide du lien ne promet plus un bouton « Regarder » (FR et EN)", () => {
-    expect(frActions.cardActions.claimDialog.urlHint).toContain("sans lien, ton stream n'apparaît pas sur la carte du match.");
-    expect(enActions.cardActions.claimDialog.urlHint).toContain("without a link, your stream does not appear on the match card.");
+  it("l'aide du lien dit qu'il est obligatoire, et où il paraît (FR et EN)", () => {
+    expect(frActions.cardActions.castSettings.urlHint).toContain("Ce lien est obligatoire");
+    expect(enActions.cardActions.castSettings.urlHint).toContain("This link is required");
     expect(frActions.cardActions.claimDialog.gone).toBe("Ce stream n'existe plus : choisis-en un autre.");
     expect(enActions.cardActions.claimDialog.gone).toBe("This stream no longer exists: pick another one.");
   });
@@ -424,12 +451,15 @@ describe("Textes de caster — pluriel, parité FR/EN, clé retirée", () => {
 });
 
 describe("Fenêtre « Caster » — l'aide du lien du caster", () => {
-  it("prévient que le lien ne s'affiche qu'une fois le match marqué casté par le staff (FR et EN)", () => {
-    expect(frActions.cardActions.claimDialog.urlHint).toContain(
-      "Ton lien s'affiche sur le match une fois que le staff l'a marqué comme casté",
-    );
-    expect(enActions.cardActions.claimDialog.urlHint).toContain(
-      "Your link shows on the match once the staff has marked it as cast",
-    );
+  it("dit où le lien paraît, et qu'il part avec le compte (FR et EN)", () => {
+    expect(frActions.cardActions.castSettings.urlHint).toContain("ni sur la carte du match, ni sur sa page");
+    expect(enActions.cardActions.castSettings.urlHint).toContain("neither on the match card, nor on its page");
+  });
+
+  it("le BattleTag du cast dit qu'il remplace celui du profil et que personne ne le vérifie (FR et EN)", () => {
+    expect(frActions.cardActions.castSettings.battletagHint).toContain("remplace le BattleTag de ton profil");
+    expect(frActions.cardActions.castSettings.battletagHint).toContain("Personne ne le vérifie.");
+    expect(enActions.cardActions.castSettings.battletagHint).toContain("replaces your profile BattleTag");
+    expect(enActions.cardActions.castSettings.battletagHint).toContain("Nobody verifies it.");
   });
 });

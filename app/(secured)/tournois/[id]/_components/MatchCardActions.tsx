@@ -9,7 +9,6 @@ import {
   CalendarPlus,
   Ellipsis,
   Eye,
-  Film,
   FileText,
   Info,
   Mic,
@@ -19,6 +18,7 @@ import {
   Radio,
   Scale,
   Settings,
+  Film,
   TriangleAlert,
   Users,
   type LucideIcon,
@@ -70,6 +70,13 @@ const CastClaimDialog = dynamic(() => orReload(import("./CastClaimDialog").then(
   ssr: false,
 });
 
+// Chargée au premier clic sur « Configurer ma diffusion » : seul un caster du
+// match l'ouvre, et elle embarque ses champs et son CSS.
+const CastSettingsDialog = dynamic(
+  () => orReload(import("./CastSettingsDialog").then((m) => m.CastSettingsDialog)),
+  { ssr: false },
+);
+
 async function send(url: string, method: string, body?: unknown): Promise<void> {
   const response = await fetch(url, {
     method,
@@ -94,8 +101,8 @@ const ICONS: Record<MatchCardActionId, LucideIcon> = {
   hostSwap: ArrowLeftRight,
   referee: Scale,
   claimCast: Mic,
+  castConfig: Radio,
   releaseCast: MicOff,
-  onAir: Radio,
   liveConfig: Settings,
   replay: Film,
   report: TriangleAlert,
@@ -397,9 +404,6 @@ export function MatchCardActions({
   phase,
   actions,
   matchLabel,
-  isCaster,
-  releasesOthers = false,
-  onAir,
   onPlayerScore,
   onAdminScore,
   onReport,
@@ -408,15 +412,6 @@ export function MatchCardActions({
   phase: MatchLaunchPhase;
   actions: readonly MatchCardAction[];
   matchLabel: string;
-  /** Le lecteur est un des casters inscrits (« Ne plus caster » plutôt que « Retirer le caster »). */
-  isCaster: boolean;
-  /**
-   * L'arbitrage peut retirer un autre caster que le lecteur : « Retirer le
-   * caster » fait choisir, lecteur compris, même s'il caste aussi le match.
-   */
-  releasesOthers?: boolean;
-  /** Le direct est ouvert : le bouton d'antenne le coupe. */
-  onAir: boolean;
   onPlayerScore: () => void;
   onAdminScore: () => void;
   onReport: () => void;
@@ -454,6 +449,9 @@ export function MatchCardActions({
   // Le choix du stream ne survit pas non plus à l'action (match lancé, joué…).
   const hasClaimCast = actions.some((a) => a.id === "claimCast");
   const [claimOpen, setClaimOpen] = useConfirmWhile(hasClaimCast);
+  // La fenêtre de réglages ne survit pas à son action (cast repris par le
+  // staff, match joué sans rediff possible) : l'instantané la referme.
+  const [settingsOpen, setSettingsOpen] = useConfirmWhile(actions.some((a) => a.id === "castConfig"));
   const claimedRef = useFocusAfterClaim(hasClaimCast, rootRef, toggleRef);
   // Les contacts ne restent pas affichés quand le match ne les offre plus
   // (terminé, caster retiré, tournoi clos) : l'instantané du flux retire
@@ -631,22 +629,11 @@ export function MatchCardActions({
       // seule règle (`castClaimChoices`) décide donc des choix, jamais deux.
       setClaimOpen(true);
     },
-    releaseCast: () => {
-      // Le caster qui se retire lui-même n'est prévenu de rien : pas de
-      // confirmation. Le staff qui retire un caster lui envoie un avis.
-      if (!isCaster || releasesOthers) {
-        openRelease();
-        return;
-      }
-      void run(() => send(`/api/matches/${match.id}/caster`, "DELETE"), t("cardActions.notCasting"));
-    },
-    onAir: () => {
-      void run(
-        () => send(`/api/admin/matches/${match.id}/live`, "POST", { onAir: !onAir }),
-        onAir ? t("cardActions.airClosed") : t("cardActions.airOpened"),
-        false,
-      );
-    },
+    castConfig: () => setSettingsOpen(true),
+    // La carte ne porte plus que le retrait d'un **autre** caster, par le staff
+    // (qui lui envoie un avis) : « Ne plus caster » vit dans « Configurer ma
+    // diffusion » (`docs/features/CAST_SETTINGS.md`).
+    releaseCast: () => openRelease(),
     liveConfig: () => openConfig(match),
     replay: () => openReplay(match),
     report: onReport,
@@ -654,7 +641,7 @@ export function MatchCardActions({
 
   // Gestes qui écrivent eux-mêmes (sans modale) : désactivés pendant un envoi.
   const writes = (id: MatchCardActionId) =>
-    id === "hostSwap" || id === "claimCast" || id === "releaseCast" || id === "onAir" || id === "force";
+    id === "hostSwap" || id === "claimCast" || id === "releaseCast" || id === "force";
 
   const renderButton = (action: MatchCardAction, inMenu: boolean) => {
     const Icon = action.readOnly ? Eye : ICONS[action.id];
@@ -812,6 +799,14 @@ export function MatchCardActions({
       )}
       {claimOpen && (
         <CastClaimDialog match={match} matchLabel={matchLabel} onClose={() => setClaimOpen(false)} onClaim={claim} />
+      )}
+      {settingsOpen && (
+        <CastSettingsDialog
+          match={match}
+          matchLabel={matchLabel}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={() => window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT))}
+        />
       )}
       {refereeOpen && viewerUserId !== null && (
         <RefereeDialog

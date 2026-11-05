@@ -1,0 +1,56 @@
+/*
+ * Champs partagés des deux fenêtres de cast (`CastSettingsFields`) :
+ * l'inscription (`CastClaimDialog`) et les réglages (`CastSettingsDialog`).
+ * Mêmes jetons que le reste de la fiche ; aucune animation.
+ */
+.group {
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.optionOff {
+  color: var(--ink-quiet);
+  cursor: not-allowed;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.hint,
+.hintInvalid {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.hint {
+  color: var(--ink-quiet);
+}
+
+.hintInvalid {
+  color: var(--danger);
+}

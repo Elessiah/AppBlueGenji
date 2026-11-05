@@ -27,7 +27,7 @@ describe("listOwnMatchRoles", () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[
-        { match_id: 5, tournament_id: 2, stream_id: 3, ready_at: new Date("2026-10-20T18:00:00Z"), created_at: new Date("2026-10-20T17:00:00Z") },
+        { match_id: 5, tournament_id: 2, stream_id: 3, ready_at: new Date("2026-10-20T18:00:00Z"), created_at: new Date("2026-10-20T17:00:00Z"), cast_battletag: "Voix#2100" },
       ]])
       .mockResolvedValueOnce([[
         { match_id: 5, tournament_id: 2, live_url: "https://twitch.tv/voix", created_at: new Date("2026-10-20T17:00:00Z") },
@@ -36,7 +36,8 @@ describe("listOwnMatchRoles", () => {
     await mockDb(execute);
 
     expect(await listOwnMatchRoles(12)).toEqual({
-      casts: [{ matchId: 5, tournamentId: 2, streamId: 3, readyAt: "2026-10-20T18:00:00.000Z", createdAt: "2026-10-20T17:00:00.000Z" }],
+      // Le BattleTag de cast est une donnée gardée : l'export la rend (art. 15).
+      casts: [{ matchId: 5, tournamentId: 2, streamId: 3, readyAt: "2026-10-20T18:00:00.000Z", createdAt: "2026-10-20T17:00:00.000Z", castBattletag: "Voix#2100" }],
       providedStreamLinks: [{ matchId: 5, tournamentId: 2, liveUrl: "https://twitch.tv/voix", createdAt: "2026-10-20T17:00:00.000Z" }],
       refereeAssignments: [{ matchId: 6, tournamentId: 2, readyAt: null }],
     });

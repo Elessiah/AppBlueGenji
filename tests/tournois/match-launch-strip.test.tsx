@@ -96,40 +96,28 @@ const lobby = (overrides: Partial<BracketMatch> = {}) =>
   });
 
 describe("MatchLaunchStrip — ce que tout le monde lit", () => {
-  it("annonce le lancement, le décompte des « Prêt » et l'équipe hôte", () => {
+  it("annonce le lancement et le décompte des « Prêt »", () => {
     const html = render(lobby({ team1Ready: true }));
     expect(html).toContain("Lancement");
     expect(html).toContain(">1/2<");
-    expect(html).toContain("Équipe hôte : ");
-    expect(html).toContain("Alpha");
   });
 
-  it("compte le caster inscrit parmi les parties attendues", () => {
+  it("compte le caster inscrit parmi les parties attendues, sans le nommer", () => {
     const html = render(lobby({ casters: [matchCaster({ userId: 9, pseudo: "Voix" })] }));
     expect(html).toContain(">0/3<");
-    expect(html).toContain("Voix");
-    expect(html).toContain("attendu");
+    // La carte ne dit plus les casters : la page du match les nomme
+    // (`docs/features/MATCH_CARD_LAYOUT.md`).
+    expect(html).not.toContain("Voix");
   });
 
-  it("compte et nomme chaque co-caster, avec son « Prêt »", () => {
+  it("ne dit plus l'hôte, la carte de départ ni l'arbitrage : la page du match les porte", () => {
     const html = render(
-      lobby({
-        team1Ready: true,
-        casters: [
-          matchCaster({ userId: 9, pseudo: "Voix", ready: true }),
-          matchCaster({ userId: 10, pseudo: "Echo", streamId: 2 }),
-        ],
-      }),
+      lobby({ hostTeamId: 20, firstMap: "Ilios", refereeAssigned: true, selfManaged: false }),
     );
-    expect(html).toContain(">2/4<");
-    expect(html).toContain("Voix");
-    expect(html).toContain("Echo");
-    expect(html).toContain("prêt");
-    expect(html).toContain("attendu");
-  });
-
-  it("nomme l'hôte désigné, équipe 2 comprise", () => {
-    expect(render(lobby({ hostTeamId: 20 }))).toContain("Bravo");
+    expect(html).not.toContain("Équipe hôte");
+    expect(html).not.toContain("Bravo");
+    expect(html).not.toContain("Ilios");
+    expect(html).not.toContain("Arbitre");
   });
 
   it("dit « Lancé » sur un match parti et encore à jouer", () => {
@@ -176,9 +164,13 @@ describe("pied d'action — boutons du lancement selon le lecteur", () => {
     ).toContain('data-action="claimCast"');
   });
 
-  it("laisse le caster se retirer, et l'arbitrage retirer un caster", () => {
+  it("donne au caster sa fenêtre de réglages, et à l'arbitrage le retrait d'un autre caster", () => {
     const mine = lobby({ casters: [matchCaster({ userId: 1, pseudo: "Moi" })] });
-    expect(card(mine, { viewerUserId: 1 })).toContain("Ne plus caster");
+    // « Ne plus caster » a quitté la carte : il vit dans « Configurer ma
+    // diffusion » (`docs/features/CAST_SETTINGS.md`).
+    const own = card(mine, { viewerUserId: 1, canManage: true });
+    expect(own).toContain("Configurer ma diffusion");
+    expect(own).not.toContain('data-action="releaseCast"');
     expect(card(lobby({ casters: [matchCaster({ userId: 5, pseudo: "Autre" })] }), { canSchedule: true })).toContain(
       "Retirer le caster",
     );
@@ -245,53 +237,18 @@ describe("MatchLaunchStrip — planification par l'arbitrage", () => {
   });
 });
 
-describe("MatchLaunchStrip — nom de l'arbitre (MATCH-UI-NAMES, décisions 47 et 52)", () => {
-  const refereed = () => lobby({ refereeAssigned: true, refereeKey: "k-juge" });
-
-  it("MatchLaunchStrip_nameKnown_showsArbitreColonPseudo", () => {
-    const html = render(refereed(), { refereeNames: [{ matchId: 42, refereeKey: "k-juge", pseudo: "Juge" }] });
-
-    expect(html).toContain("Arbitre : Juge");
-  });
-
-  it("MatchLaunchStrip_nameUnknown_showsArbitreDesigne", () => {
-    const html = render(refereed());
-
-    expect(html).toContain("Arbitre désigné");
-    expect(html).not.toContain("Arbitre : ");
-  });
-
+/**
+ * L'arbitrage, l'hôte, le premier ban, la carte de départ et les casters ont
+ * quitté la carte (`docs/features/MATCH_CARD_LAYOUT.md`) : leur rendu se teste
+ * sur la page du match (`match-page-render.test.tsx`). Reste ici ce que la
+ * pastille de phase dit encore.
+ */
+describe("MatchLaunchStrip — décompte des « Prêt »", () => {
   it("MatchLaunchStrip_referee_isNotCountedInReadyTally", () => {
-    const html = render(refereed());
+    // Le « Prêt » de l'arbitre désigné n'entre pas dans le décompte public
+    // (décision 47) : deux équipes attendues, pas trois.
+    const html = render(lobby({ refereeAssigned: true, refereeKey: "k-juge" }));
 
     expect(html).toContain(">0/2<");
-  });
-});
-
-describe("MatchLaunchStrip — faits lisibles (EF-30)", () => {
-  const renderStaff = (match: BracketMatch) =>
-    providers(
-      { canSchedule: true },
-      <MatchLaunchStrip match={match} phase={matchLaunchPhase({ ...match, refereeScheduling: false }, Date.now())} staff />,
-    );
-
-  it("MatchLaunchStrip_undecided_warningToneAndScreenReaderTexts", () => {
-    const html = renderStaff(lobby({ refereeAssigned: false, selfManaged: false }));
-
-    expect(html).toMatch(/<span class="alert" title="Ni arbitre ni autogestion : une décision est attendue">/);
-    expect(html).toContain('<span class="sr-only">Attention : </span> Sans arbitre');
-    expect(html).toContain('<span class="sr-only"> (ni arbitre ni autogestion : une décision est attendue)</span>');
-  });
-
-  it("MatchLaunchStrip_firstMap_titleCarriesFullName", () => {
-    const html = render(lobby({ firstMap: "Une très longue carte au nom vraiment interminable" }));
-
-    expect(html).toContain('title="Première carte, fixée par l&#x27;arbitrage : Une très longue carte au nom vraiment interminable"');
-  });
-
-  it("MatchLaunchStrip_host_titleSaysLeftSide", () => {
-    const html = render(lobby());
-
-    expect(html).toContain('title="Équipe qui crée le salon en jeu (côté gauche)"');
   });
 });

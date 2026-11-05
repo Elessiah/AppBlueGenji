@@ -28,10 +28,8 @@ const NO_LAUNCH: LaunchStripControls = {
   showContacts: false,
   showClaim: false,
   showRelease: false,
-  releasesOthers: false,
   showPlan: false,
   showForce: false,
-  showHost: false,
   showHostSwap: false,
   showReferee: false,
 };
@@ -43,8 +41,7 @@ const NOTHING: MatchCardActionInput = {
   adminScoreLabel: null,
   showSchedule: false,
   hasStartAt: false,
-  showOnAir: false,
-  onAir: false,
+  showCastConfig: false,
   showLiveConfig: false,
   liveConfigured: false,
   showReplay: false,
@@ -65,22 +62,19 @@ describe("matchCardActionList — chaque drapeau donne son action, rien de plus"
       playerScoreLabel: "Saisir le score",
       launch: {
         isCaster: true,
-        releasesOthers: false,
         showOpen: true,
         showContacts: true,
         showClaim: true,
         showRelease: true,
         showPlan: true,
         showForce: true,
-        showHost: true,
         showHostSwap: true,
         showReferee: true,
       },
       adminScoreLabel: "Éditer le score",
       showSchedule: true,
-      showOnAir: true,
+      showCastConfig: true,
       showLiveConfig: true,
-      showReplay: true,
       canReport: true,
     });
     expect(all).toEqual([
@@ -94,31 +88,25 @@ describe("matchCardActionList — chaque drapeau donne son action, rien de plus"
       "hostSwap",
       "referee",
       "claimCast",
+      "castConfig",
       "releaseCast",
-      "onAir",
       "liveConfig",
-      "replay",
       "report",
     ]);
   });
 
-  it("dit le geste selon l'état : date, antenne, diffusion, rediff, caster", () => {
+  it("dit le geste selon l'état : date, diffusion, cast", () => {
     const labels = (input: Partial<MatchCardActionInput>) =>
       matchCardActionList({ ...NOTHING, ...input }).map((a) => a.label);
     expect(labels({ showSchedule: true })).toEqual(["Programmer une date"]);
     expect(labels({ showSchedule: true, hasStartAt: true })).toEqual(["Modifier la date"]);
-    expect(labels({ showOnAir: true })).toEqual(["Lancer le direct"]);
-    expect(labels({ showOnAir: true, onAir: true })).toEqual(["Couper le direct"]);
     expect(labels({ showLiveConfig: true })).toEqual(["Diffuser ce match"]);
     expect(labels({ showLiveConfig: true, liveConfigured: true })).toEqual(["Configurer la diffusion"]);
-    expect(labels({ showReplay: true })).toEqual(["Ajouter la rediff"]);
-    expect(labels({ showReplay: true, hasReplay: true })).toEqual(["Modifier la rediff"]);
+    expect(labels({ showCastConfig: true })).toEqual(["Configurer ma diffusion"]);
+    // La carte ne porte plus que le retrait d'un **autre** caster, par le staff :
+    // « Ne plus caster » vit dans « Configurer ma diffusion ».
     expect(labels({ launch: { ...NO_LAUNCH, showRelease: true } })).toEqual(["Retirer le caster"]);
-    expect(labels({ launch: { ...NO_LAUNCH, showRelease: true, isCaster: true } })).toEqual(["Ne plus caster"]);
-    // Arbitre qui caste aussi : il choisit le caster retiré, lui compris.
-    expect(labels({ launch: { ...NO_LAUNCH, showRelease: true, isCaster: true, releasesOthers: true } })).toEqual([
-      "Retirer le caster",
-    ]);
+    expect(labels({ launch: { ...NO_LAUNCH, showRelease: true, isCaster: true } })).toEqual(["Retirer le caster"]);
     expect(labels({ launch: { ...NO_LAUNCH, showOpen: true }, inLobby: true })).toEqual(["Ouvrir le lancement"]);
     expect(labels({ launch: { ...NO_LAUNCH, showOpen: true } })).toEqual(["Infos du match"]);
     expect(labels({ launch: { ...NO_LAUNCH, showReferee: true } })).toEqual(["Arbitrage"]);
@@ -155,14 +143,14 @@ describe("groupMatchCardActions — une principale, le reste au menu", () => {
 
   it("met en avant le score d'arbitrage d'un match lancé", () => {
     const { primary, more } = groupMatchCardActions(
-      list({ adminScoreLabel: "Éditer le score", showSchedule: true, showOnAir: true }),
+      list({ adminScoreLabel: "Éditer le score", showSchedule: true, showCastConfig: true }),
     );
     expect(primary?.id).toBe("adminScore");
-    expect(more.map((a) => a.id)).toEqual(["schedule", "onAir"]);
+    expect(more.map((a) => a.id)).toEqual(["schedule", "castConfig"]);
   });
 
   it("n'a pas de principale quand seules restent des actions secondaires", () => {
-    const { primary, more } = groupMatchCardActions(list({ showOnAir: true, showLiveConfig: true }));
+    const { primary, more } = groupMatchCardActions(list({ showCastConfig: true, showLiveConfig: true }));
     expect(primary).toBeNull();
     expect(more).toHaveLength(2);
   });
@@ -171,7 +159,7 @@ describe("groupMatchCardActions — une principale, le reste au menu", () => {
     const actions = list({
       playerScoreLabel: "Saisir le score",
       adminScoreLabel: "Éditer le score",
-      showReplay: true,
+      showLiveConfig: true,
       canReport: true,
     });
     const { primary, more } = groupMatchCardActions(actions);
@@ -206,8 +194,6 @@ function renderFooter(actions: Partial<MatchCardActionInput>, castBlock: CastBlo
           phase="LOBBY"
           actions={matchCardActionList({ ...NOTHING, ...actions })}
           matchLabel="Alpha contre Bravo"
-          isCaster={false}
-          onAir={false}
           onPlayerScore={() => undefined}
           onAdminScore={() => undefined}
           onReport={() => undefined}
@@ -258,10 +244,10 @@ describe("MatchCardActions — rendu du pied", () => {
   });
 
   it("replié : la principale seule est montée, aucun panneau", () => {
-    const html = renderFooter({ adminScoreLabel: "Éditer le score", showSchedule: true, showOnAir: true });
+    const html = renderFooter({ adminScoreLabel: "Éditer le score", showSchedule: true, showCastConfig: true });
     expect(html).toContain('data-action="adminScore"');
     expect(html).not.toContain('data-action="schedule"');
-    expect(html).not.toContain('data-action="onAir"');
+    expect(html).not.toContain('data-action="castConfig"');
     const toggle = /<button[^>]*aria-expanded="false"[^>]*>/.exec(html);
     expect(toggle).not.toBeNull();
     expect(toggle?.[0]).toContain('aria-label="Plus d&#x27;actions : Alpha contre Bravo"');
@@ -270,7 +256,7 @@ describe("MatchCardActions — rendu du pied", () => {
   });
 
   it("sans principale : « Plus d'actions » prend la largeur et montre son libellé", () => {
-    const html = renderFooter({ showOnAir: true, showLiveConfig: true });
+    const html = renderFooter({ showCastConfig: true, showLiveConfig: true });
     expect(html).toMatch(/aria-expanded="false"[\s\S]*Plus d&#x27;actions<\/span>/);
     expect(html).not.toContain('class="sr-only">Plus d');
   });
@@ -525,9 +511,11 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
     expect(source).toContain("<ConfirmActionDialog");
   });
 
-  it("le staff qui retire un caster confirme d'abord (le caster est prévenu) ; le caster qui se retire seul, non", () => {
-    // Un caster du staff qui peut aussi retirer les autres choisit d'abord qui.
-    expect(source).toMatch(/releaseCast: \(\) => \{[\s\S]*?if \(!isCaster \|\| releasesOthers\) \{\s*openRelease\(\);\s*return;/);
+  it("le staff qui retire un caster confirme d'abord : le caster est prévenu", () => {
+    // La carte ne porte plus que ce retrait-là (un **autre** caster) : le
+    // caster qui se retire lui-même le fait depuis « Configurer ma diffusion »
+    // (`docs/features/CAST_SETTINGS.md`), sans confirmation.
+    expect(source).toContain("releaseCast: () => openRelease(),");
     expect(source).toContain('t("cardActions.releaseConfirm.title", { match: matchLabel })');
     expect(source).toContain('t("cardActions.releaseConfirm.body", { caster: releasedCaster.pseudo })');
     // Refermée si l'action disparaît (instantané du flux), comme « Forcer ».

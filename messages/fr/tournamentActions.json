@@ -215,6 +215,7 @@
     "force": "Forcer le lancement",
     "hostSwap": "Changer l'équipe hôte",
     "claimCast": "Caster ce match",
+    "castConfig": "Configurer ma diffusion",
     "stopCasting": "Ne plus caster",
     "removeCaster": "Retirer le caster",
     "stopLive": "Couper le direct",
@@ -271,10 +272,7 @@
       "joinMatchStream": "Rejoindre le stream du match",
       "noLink": "sans lien",
       "separate": "Ouvrir mon propre stream",
-      "url": "Lien de mon stream (facultatif)",
-      "urlHint": "Plateformes acceptées : {platforms}. Ton lien s'affiche sur le match une fois que le staff l'a marqué comme casté ; sans lien, ton stream n'apparaît pas sur la carte du match.",
-      "gone": "Ce stream n'existe plus : choisis-en un autre.",
-      "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}."
+      "gone": "Ce stream n'existe plus : choisis-en un autre."
     },
     "forceConfirm": {
       "title": "Forcer le lancement de {match} ?",
@@ -371,6 +369,35 @@
           "confirm": "Retenir l'opposition"
         }
       }
+    },
+    "castSettings": {
+      "title": "Ma diffusion",
+      "save": "Enregistrer",
+      "saving": "Enregistrement…",
+      "cancel": "Annuler",
+      "saved": "Réglages de ta diffusion enregistrés.",
+      "trigger": "Passage à l'antenne",
+      "triggers": {
+        "AUTO": "Automatique au démarrage du match",
+        "START_TIME": "À la date de début du match",
+        "MANUAL": "Manuel (bouton d'antenne)"
+      },
+      "noStartAt": "Aucune date de début n'est fixée sur ce match : l'antenne à l'heure dite demande d'abord un horaire.",
+      "autoStop": "Le direct s'arrête tout seul dès qu'un score est saisi.",
+      "url": "Lien de ma chaîne",
+      "urlHint": "Plateformes acceptées : {platforms}. Ce lien est obligatoire : sans lui, ton stream n'apparaîtrait ni sur la carte du match, ni sur sa page, ni dans l'annonce du direct. Un lien que tu fournis ici est retiré du match si ton compte est supprimé, sauf s'il est marqué comme lien de l'organisation ; un lien enregistré que tu ne changes pas garde son origine.",
+      "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}.",
+      "urlStaff": "Tu co-castes le stream de l'organisation : son lien se règle dans la configuration de la diffusion.",
+      "battletag": "BattleTag pour ce cast (facultatif)",
+      "battletagHint": "Le compte sur lequel tu seras en jeu pour ce match : il remplace le BattleTag de ton profil dans la fenêtre « Contacts » et sur la page du match. Laisser vide pour garder celui de ton profil. Personne ne le vérifie.",
+      "battletagInvalid": "BattleTag invalide : 64 caractères au plus, et des caractères visibles.",
+      "organisationLink": "Ce lien est celui de l'organisation",
+      "organisationLinkSubject": "lien de l'organisation",
+      "organisationLinkHint": "Coché, le lien ne part pas avec ton compte : il part avec ce stream quand plus aucun caster ne le tient. Décoché, c'est ta propre chaîne : elle est retirée du match si ton compte est supprimé. Un lien déjà enregistré que tu ne changes pas garde son origine.",
+      "air": "Antenne",
+      "airHint": "En mode manuel, le direct s'ouvre et se coupe ici. Il s'arrête de toute façon dès qu'un score est saisi.",
+      "replay": "Rediff",
+      "replayHint": "Le lien de la rediff s'ajoute une fois la rencontre jouée ; un bandeau « Rediff disponible » s'affiche alors sous le match, visible de tous."
     }
   },
   "planning": {

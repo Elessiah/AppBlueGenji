@@ -640,6 +640,11 @@ function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: L
   if (!user || Number(user.is_deleted) !== 0) return null;
   const discordTag = user.discord_verified_at !== null ? user.discord_pseudo : null;
   const relevant = battletagRelevantFor(game);
+  // BattleTag donné pour **ce** cast (`docs/features/CAST_SETTINGS.md`) : il
+  // passe devant celui du compte — le caster l'a tapé pour ce match, c'est le
+  // compte sur lequel il sera en jeu —, et n'est **jamais** vérifié : personne
+  // ne l'a prouvé, pas même un Battle.net rattaché au compte.
+  const castBattletag = caster.castBattletag ?? null;
   const contact = ctx.exposesCaster
     ? filterContact(
         {
@@ -648,11 +653,15 @@ function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: L
           roles: [],
           discordTag,
           // Hors Overwatch le BattleTag n'est pas même lu (`withGameBattletag` le jetterait).
-          battletag: relevant ? user.overwatch_battletag : null,
-          battletagVerified: relevant && battletagFromBlizzard(user),
+          battletag: relevant ? (castBattletag ?? user.overwatch_battletag) : null,
+          battletagVerified: relevant && castBattletag === null && battletagFromBlizzard(user),
         },
         ctx.viewer,
-        Number(user.visible_overwatch) === 1,
+        // Un tag donné pour ce cast est une divulgation volontaire, pour ce
+        // match : le réglage « BattleTag OW » du profil ne le masque pas (il ne
+        // masque que celui du compte). Les deux ne sortent de toute façon que
+        // dans la fenêtre des contacts (`sharesLiveMatch`).
+        castBattletag !== null || Number(user.visible_overwatch) === 1,
       )
     : null;
   return withGameBattletag(
