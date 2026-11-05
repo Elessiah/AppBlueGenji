@@ -35,8 +35,19 @@ function tournament(overrides: RowOverrides<TournamentRow> = {}): TournamentRow 
   });
 }
 
+const MARKS_DELETE = "DELETE FROM bg_lobby_brief_marks";
+
+/** Les effacements de marques de check-in envoyées, avec leurs paramètres. */
+function markDeletes(): [string, unknown][] {
+  return execute.mock.calls
+    .filter(([sql]) => String(sql).startsWith(MARKS_DELETE))
+    .map(([sql, params]) => [String(sql), params]);
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
+  execute.mockReset();
+  execute.mockResolvedValue([[], []]);
   jest.mocked(loadRegisteredTeamIds).mockResolvedValue([1, 2, 3, 4]);
   jest.mocked(loadPhaseTeamIds).mockResolvedValue([1, 2, 3, 4]);
   jest.mocked(hasExistingMatches).mockResolvedValue(false);
@@ -125,5 +136,59 @@ describe("createBracketIfMissing — l'annonce revient à l'appelant", () => {
     });
 
     expect(result).toEqual({ finished: false, created: false });
+  });
+});
+
+/**
+ * Un plateau reconstruit tire de nouvelles rencontres : la marque « check-in
+ * envoyé » d'une place (`bg_lobby_brief_marks`) privait sinon l'engagée du
+ * check-in de son vrai match. Seule la reconstruction les efface.
+ */
+describe("createBracketIfMissing — marques de check-in d'un plateau reconstruit", () => {
+  it("createBracketIfMissing_staleTournamentBracketRebuilt_forgetsTournamentMarks", async () => {
+    jest.mocked(hasExistingMatches).mockResolvedValue(true);
+
+    await createBracketIfMissing(connection, tournament({ bracket_size: 8 }));
+
+    expect(markDeletes()).toEqual([[`${MARKS_DELETE} WHERE tournament_id = ?`, [5]]]);
+  });
+
+  it("createBracketIfMissing_stalePhaseBracketRebuilt_forgetsPhaseMarksOnly", async () => {
+    execute.mockImplementation(async (sql) =>
+      String(sql).includes("bracket_size FROM bg_tournament_phases")
+        ? [[{ c: 1, bracket_size: 8 }], []]
+        : [[], []],
+    );
+
+    await createBracketIfMissing(connection, tournament({ format: "MULTI" }), {
+      phaseId: 3,
+      format: "SINGLE",
+    });
+
+    expect(markDeletes()).toEqual([[`${MARKS_DELETE} WHERE tournament_id = ? AND phase_id = ?`, [5, 3]]]);
+  });
+
+  it("createBracketIfMissing_bracketStillCurrent_keepsMarks", async () => {
+    jest.mocked(hasExistingMatches).mockResolvedValue(true);
+
+    await createBracketIfMissing(connection, tournament({ bracket_size: 4 }));
+
+    expect(markDeletes()).toEqual([]);
+  });
+
+  it("createBracketIfMissing_markDeleteFails_rebuildsAndLogs", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(hasExistingMatches).mockResolvedValue(true);
+    execute.mockImplementation(async (sql) => {
+      if (String(sql).startsWith(MARKS_DELETE)) throw new Error("DB_DOWN");
+      return [[], []];
+    });
+
+    const result = await createBracketIfMissing(connection, tournament({ bracket_size: 8 }));
+
+    expect(result).toEqual({ finished: false, created: true });
+    expect(createSingleEliminationBracket).toHaveBeenCalled();
+    expect(error.mock.calls.some(([message]) => String(message).includes("non effacées"))).toBe(true);
+    error.mockRestore();
   });
 });

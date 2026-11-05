@@ -46,7 +46,8 @@ Trois changements de fond par rapport au brief du salon :
   place du match (tournoi, phase, tableau, manche, numéro) ; réservation
   (`briefMarkSql`) et balayage la lisent — le check-in ne repart jamais deux
   fois (décision de l'utilisateur du 2026-11-05). Elle part avec le tournoi
-  ou l'engagée.
+  ou l'engagée, et quand un tableau périmé est reconstruit (`discardStaleBracket`
+  → `forgetLobbyBriefMarks`) : ses rencontres sont nouvelles.
 - Les sections ci-dessous qui parlent d'arbitre désigné, de « tous les
   joueurs » ou d'une réservation rendue à la réouverture du salon décrivent
   l'état du 2026-11-04, remplacé par ces règles.
