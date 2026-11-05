@@ -37,6 +37,24 @@ interface MatchLiveDialogProps {
   canSpeakForOrganisation: boolean;
 }
 
+/**
+ * Les liens de casters que l'arbitre a **touchés** et qui diffèrent du lien
+ * actuel (`undefined` : aucun). Un stream arrivé, ou dont le caster a changé
+ * le lien, pendant que la fenêtre est ouverte n'est jamais renvoyé : seule une
+ * saisie de l'arbitre devient une modification.
+ */
+export function casterLinkEdits(
+  streams: readonly { id: number; liveUrl: string | null }[],
+  typed: Readonly<Record<number, string>>,
+): { streamId: number; liveUrl: string | null }[] | undefined {
+  const edits = streams
+    .filter((stream) => typed[stream.id] !== undefined)
+    .map((stream) => ({ streamId: stream.id, liveUrl: typed[stream.id].trim() || null, current: stream.liveUrl }))
+    .filter((edit) => edit.liveUrl !== edit.current)
+    .map(({ streamId, liveUrl }) => ({ streamId, liveUrl }));
+  return edits.length === 0 ? undefined : edits;
+}
+
 /** Les streams des casters d'un match (jamais celui du staff), avec qui les tient. */
 function casterStreamsOf(match: BracketMatch): { id: number; liveUrl: string | null; casters: string }[] {
   return match.streams
@@ -105,9 +123,8 @@ export function MatchLiveDialog({
   const [organisationLink, setOrganisationLink] = useState(false);
   // Médiation : les liens des streams des casters, que l'arbitre seul édite.
   const casterStreams = referee ? casterStreamsOf(match) : [];
-  const [casterLinks, setCasterLinks] = useState<Record<number, string>>(() =>
-    Object.fromEntries(casterStreams.map((stream) => [stream.id, stream.liveUrl ?? ""])),
-  );
+  // Seules les saisies de l'arbitre ; un champ intouché montre le lien actuel.
+  const [casterLinks, setCasterLinks] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
 
   const urlTouched = liveUrl.trim().length > 0;
@@ -117,7 +134,7 @@ export function MatchLiveDialog({
   // champ devenu invisible.
   const urlInvalid = streamed && urlTouched && !isValidStreamUrl(liveUrl);
   const invalidCasterLink = casterStreams.some((stream) => {
-    const value = (casterLinks[stream.id] ?? "").trim();
+    const value = (casterLinks[stream.id] ?? stream.liveUrl ?? "").trim();
     return value !== "" && !isValidStreamUrl(value);
   });
   // « À la date de début » n'a pas de frontière à franchir sans date : le
@@ -155,14 +172,6 @@ export function MatchLiveDialog({
     }
   };
 
-  /** Les liens de casters changés par l'arbitre (`undefined` : aucun). */
-  const changedCasterLinks = () => {
-    const changed = casterStreams
-      .map((stream) => ({ streamId: stream.id, liveUrl: (casterLinks[stream.id] ?? "").trim() || null }))
-      .filter((edit) => edit.liveUrl !== (casterStreams.find((s) => s.id === edit.streamId)?.liveUrl ?? null));
-    return changed.length === 0 ? undefined : changed;
-  };
-
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (urlInvalid || triggerNeedsDate || invalidCasterLink) return;
@@ -170,7 +179,7 @@ export function MatchLiveDialog({
     // Mode verrouillé : renvoyé tel quel, le serveur n'y voit aucun changement.
     const chosenTrigger = streamed ? trigger : null;
     const sentTrigger = triggerLocked ? match.liveTrigger : chosenTrigger;
-    const streamLinks = changedCasterLinks();
+    const streamLinks = casterLinkEdits(casterStreams, casterLinks);
     setBusy(true);
     try {
       const response = await fetch(`/api/admin/matches/${match.id}/live`, {
@@ -369,7 +378,7 @@ export function MatchLiveDialog({
               </InfoHintRow>
             </legend>
             {casterStreams.map((stream) => {
-              const value = casterLinks[stream.id] ?? "";
+              const value = casterLinks[stream.id] ?? stream.liveUrl ?? "";
               const invalid = value.trim() !== "" && !isValidStreamUrl(value);
               const inputId = `match-live-caster-link-${stream.id}`;
               return (

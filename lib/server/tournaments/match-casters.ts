@@ -370,8 +370,8 @@ export async function withdrawUserCasts(
     `SELECT DISTINCT match_id FROM bg_match_streams WHERE link_user_id = ? ORDER BY match_id`,
   );
   const refereed = await matchIdsOf(`SELECT id AS match_id FROM bg_matches WHERE referee_user_id = ? ORDER BY id`);
-  // Les matchs dont il a posé le mode d'antenne, castés ou non (un porteur de
-  // `live` en est propriétaire sans caster) : verrouillés avec les autres.
+  // Tous les matchs dont il tient le mode d'antenne, quel que soit leur état :
+  // la référence à son compte part avec lui (effacement), verrouillés avec les autres.
   const triggered = await matchIdsOf(`SELECT id AS match_id FROM bg_matches WHERE live_trigger_user_id = ? ORDER BY id`);
   const candidates = [...new Set([...casts, ...links, ...refereed, ...triggered])].sort((a, b) => a - b);
   if (candidates.length === 0) return { matchIds: [], tournamentIds: [] };

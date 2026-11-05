@@ -30,6 +30,7 @@ jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: ()
 import { renderToStaticMarkup } from "react-dom/server";
 import { CastClaimDialog } from "@/app/(secured)/tournois/[id]/_components/CastClaimDialog";
 import { lockedTrigger } from "@/app/(secured)/tournois/[id]/_components/CastSettingsFields";
+import { casterLinkEdits } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import { matchStreamLinks } from "@/app/(secured)/tournois/[id]/_components/MatchLiveStrip";
 import { castClaimBody, castClaimChoiceKey, castClaimChoices } from "@/app/(secured)/tournois/[id]/_lib/cast-claim";
@@ -514,5 +515,29 @@ describe("lockedTrigger — un mode verrouillé montre celui du match", () => {
 
   it("lockedTrigger_lockedMatchUncast_returnsPicked", () => {
     expect(lockedTrigger(true, null, "MANUAL")).toBe("MANUAL");
+  });
+});
+
+describe("casterLinkEdits — seules les saisies de l'arbitre partent", () => {
+  const casterStream = { id: 4, liveUrl: "https://kick.com/b" };
+
+  it("casterLinkEdits_untouchedStreamArrivedLater_notSent", () => {
+    expect(casterLinkEdits([casterStream], {})).toBeUndefined();
+  });
+
+  it("casterLinkEdits_typedNewLink_sentTrimmed", () => {
+    expect(casterLinkEdits([casterStream], { 4: "  twitch.tv/x " })).toEqual([{ streamId: 4, liveUrl: "twitch.tv/x" }]);
+  });
+
+  it("casterLinkEdits_typedEmpty_clearsLink", () => {
+    expect(casterLinkEdits([casterStream], { 4: "  " })).toEqual([{ streamId: 4, liveUrl: null }]);
+  });
+
+  it("casterLinkEdits_typedSameAsCurrent_undefined", () => {
+    expect(casterLinkEdits([casterStream], { 4: "https://kick.com/b" })).toBeUndefined();
+  });
+
+  it("casterLinkEdits_typedStreamGone_notSent", () => {
+    expect(casterLinkEdits([], { 4: "twitch.tv/x" })).toBeUndefined();
   });
 });
