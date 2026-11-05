@@ -107,6 +107,22 @@ describe("applyCastTrigger — inscription et maître tu", () => {
     expect(row.live_trigger).toBe("MANUAL");
   });
 
+  it("applyCastTrigger_coCasterOnNonCastableMatch_throwsMatchNotCastable", async () => {
+    // La vraie raison d'abord : le match ne se caste plus.
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12, 13));
+    const row = Object.assign(ownedRow(), { status: "COMPLETED" });
+
+    await expect(applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 13)).rejects.toThrow("MATCH_NOT_CASTABLE");
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("applyCastTrigger_skipOnNonCastableMatch_returnsFalse", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12, 13));
+    const row = Object.assign(ownedRow(), { status: "COMPLETED" });
+
+    await expect(applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 13, undefined, true)).resolves.toBe(false);
+  });
+
   it("applyCastTrigger_hiddenOwner_staffCasterTakesMode", async () => {
     // Le maître 12 n'est plus montré : le mode revient au staff, dont 13, qui le caste.
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(13)).mockResolvedValue([{ affectedRows: 1 }, []]);

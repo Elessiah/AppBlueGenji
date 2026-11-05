@@ -132,11 +132,12 @@ export async function applyCastTrigger(
   const matchId = Number(row.id);
   const actor = { userId, ...access };
   const { hold, shown } = await castTriggerHold(connection, row, trigger === null ? null : userId);
-  if (!mayChangeLiveTrigger(hold, actor)) {
-    if (skip) return false;
-    throw new Error("LIVE_TRIGGER_NOT_OWNED");
-  }
+  const owns = mayChangeLiveTrigger(hold, actor);
+  if (!owns && skip) return false;
+  // Un match qui ne se caste plus le dit d'abord : le refus de propriété
+  // tairait la vraie raison.
   assertCastTriggerWritable(row, trigger);
+  if (!owns) throw new Error("LIVE_TRIGGER_NOT_OWNED");
   const owner = liveTriggerOwnerAfter(trigger, actor, shown.has(userId));
   if (trigger === null) {
     await connection.execute(

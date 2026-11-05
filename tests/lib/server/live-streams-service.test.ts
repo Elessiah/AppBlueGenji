@@ -683,7 +683,8 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.streams).toEqual([dbStream(4, "https://kick.com/voix")]);
   });
 
-  it("setMatchLiveConfig_ownRefereeEditsStreamLinks_rewritesCasterLink", async () => {
+  it("setMatchLiveConfig_ownRefereeEditsStreamLinks_rebindsLinkToStreamHolder", async () => {
+    // Lien posé au nom de l'organisation : celui que l'arbitre corrige revient au caster qui tient le stream.
     const world = liveWorld(
       matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12, kept_referee_user_id: 9 }),
       [dbStream(4, "https://kick.com/voix")],
@@ -699,7 +700,22 @@ describe("setMatchLiveConfig", () => {
       streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/neuve" }],
     });
 
-    expect(world.state.streams).toEqual([dbStream(4, "https://twitch.tv/neuve")]);
+    expect(world.state.streams).toEqual([{ ...dbStream(4, "https://twitch.tv/neuve"), link_user_id: 12 }]);
+  });
+
+  it("setMatchLiveConfig_liveStaffWithEmptyStreamLinks_savesConfig", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "AUTO" }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, {
+      trigger: "MANUAL",
+      liveUrl: null,
+      setter: { userId: 3, asOrganisation: true },
+      access: STAFF,
+      streamLinks: [],
+    });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["MANUAL", null, 42]]]);
   });
 
   it("setMatchLiveConfig_ownRefereeNoLongerEligible_refusedWithoutWrite", async () => {
@@ -1024,6 +1040,17 @@ describe("setMatchLiveConfig", () => {
 
       await expect(setMatchOnAir(42, true, 13, LIVE_ACCESS)).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
       expect(world.state.matchWrites).toEqual([]);
+    });
+
+    it("setMatchOnAir_actorWithoutTournaments_readsGameWithoutRefereeSql", async () => {
+      const world = ownedWorld();
+      await mockLiveDb(world);
+
+      await setMatchOnAir(42, true, 12, LIVE_ACCESS);
+
+      const gameRead = world.execute.mock.calls.find(([sql]) => String(sql).startsWith("SELECT t.game,"));
+      expect(String(gameRead?.[0])).toContain("NULL AS kept");
+      expect(String(gameRead?.[0])).not.toContain("referee_user_id");
     });
 
     it("setMatchOnAir_deadlockOnce_retriesAndSucceeds", async () => {

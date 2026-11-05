@@ -276,7 +276,7 @@ export async function setMatchLiveConfig(
       // que l'inscription d'un caster (`claimMatchCast`).
       const { row: current, hold, actorShown } = await lockLiveMatch(connection, matchId, actor);
       const triggerChanges = assertLiveConfigAllowed(current, hold, actor, trigger, {
-        editsStreamLinks: config.streamLinks !== undefined,
+        editsStreamLinks: config.streamLinks !== undefined && config.streamLinks.length > 0,
         live: config.access.live,
       });
       // Rejugé lui aussi : une date de début retirée entre les deux lectures
@@ -361,7 +361,8 @@ async function lockLiveMatch(
   );
   if (locked.length === 0) throw new Error("MATCH_NOT_FOUND");
   const row = locked[0];
-  const kept = await loadKeptReferee(connection, matchId);
+  // Sans `tournaments`, l'acteur n'arbitre pas : le jeu seul se lit.
+  const kept = await loadKeptReferee(connection, matchId, actor.manages);
   if (kept === null) throw new Error("MATCH_NOT_FOUND");
   const trigger = row.live_trigger ?? null;
   const ownerId = trigger === null ? null : nullableId(row.live_trigger_user_id);
@@ -437,14 +438,16 @@ const KEPT_REFEREE_SQL = `CASE
 /**
  * Le jeu du tournoi et l'arbitre retenu du match (`KEPT_REFEREE_SQL`), en une
  * lecture **ordinaire** (jamais verrouillante : elle lit d'autres tables).
- * `null` : match ou tournoi introuvable.
+ * `null` : match ou tournoi introuvable. `withReferee` faux : le jeu seul, sans
+ * les sous-requêtes de l'arbitre (`refereeId` toujours `null`).
  */
 async function loadKeptReferee(
   executor: Pick<PoolConnection, "execute">,
   matchId: number,
+  withReferee = true,
 ): Promise<{ game: TournamentGame; refereeId: number | null } | null> {
   const [rows] = await executor.execute<(RowDataPacket & { game: TournamentGame; kept: number | null })[]>(
-    `SELECT t.game, ${KEPT_REFEREE_SQL} AS kept
+    `SELECT t.game, ${withReferee ? KEPT_REFEREE_SQL : "NULL"} AS kept
      FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id
      WHERE m.id = ? LIMIT 1`,
     [matchId],
@@ -537,19 +540,16 @@ async function setCasterStreamLinks(
         `UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE id = ? AND match_id = ? AND staff_owned = 0`,
         [target.id, matchId],
       );
-    } else if (target.liveUrl === null) {
-      // Un stream que plus aucun caster ne tient attend le ménage : son lien
-      // n'aurait personne à qui se rattacher, et passerait pour l'organisation.
+    } else {
+      // Le lien saisi par l'arbitre revient au caster qui tient le stream —
+      // jamais à l'organisation ni à un caster parti. Un stream que plus aucun
+      // caster ne tient attend le ménage : son lien n'aurait personne à qui se
+      // rattacher.
       const holder = await streamHolder(connection, matchId, target.id);
       if (holder === null) throw new StreamLinkError("STREAM_NOT_FOUND", target.id);
       await connection.execute(
         `UPDATE bg_match_streams SET live_url = ?, link_user_id = ? WHERE id = ? AND match_id = ? AND staff_owned = 0`,
         [url, holder, target.id, matchId],
-      );
-    } else {
-      await connection.execute(
-        `UPDATE bg_match_streams SET live_url = ? WHERE id = ? AND match_id = ? AND staff_owned = 0`,
-        [url, target.id, matchId],
       );
     }
     streams = streams.map((stream) => (stream.id === target.id ? { ...stream, liveUrl: url } : stream));

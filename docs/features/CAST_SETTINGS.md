@@ -199,7 +199,10 @@ de l'organisation : celui-ci n'habille jamais un stream de caster qui vient
 de recevoir son lien — ni celui dont il vient d'effacer le lien — dans la même requête.
 La fenêtre n'envoie que les liens que l'arbitre a saisis (`casterLinkEdits`) : un
 stream arrivé, ou un lien changé par son caster pendant qu'elle est ouverte,
-n'est ni effacé ni remis à l'ancien. Le bouton de la carte du match lui est montré
+n'est ni effacé ni remis à l'ancien. Un lien qu'il pose se rattache au caster qui tient le
+stream (`streamHolder`), jamais à l'organisation ni à un caster parti ; un stream
+que plus aucun caster ne tient le refuse (`STREAM_NOT_FOUND`). Une liste vide
+(`streamLinks: []`) ne compte pas comme une édition. Le bouton de la carte du match lui est montré
 (`markViewerReferee`, contexte du lecteur).
 
 **Lien de l'organisation, gardé** : le stream dont le lien est celui de
