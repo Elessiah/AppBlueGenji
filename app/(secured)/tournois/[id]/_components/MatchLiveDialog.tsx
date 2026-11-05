@@ -5,6 +5,7 @@ import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
 import {
   canToggleOnAir,
+  isMatchCastable,
   isValidStreamUrl,
   LIVE_PLATFORMS,
   MATCH_LIVE_TRIGGERS,
@@ -66,6 +67,18 @@ export function changedTriggerNeedsDate(
   startAtMissing: boolean,
 ): boolean {
   return chosen !== current && requiresMatchStartAt(chosen) && startAtMissing;
+}
+
+/**
+ * Rien à enregistrer : le mode, verrouillé, est renvoyé tel quel, et le
+ * serveur refuse tout mode sur un match qui n'est plus castable (score
+ * déclaré) — seul qui tient le mode peut encore le retirer.
+ */
+export function lockedOnClosedMatch(
+  triggerLocked: boolean,
+  match: Pick<BracketMatch, "status" | "liveTrigger" | "liveStartedAt" | "launchedAt">,
+): boolean {
+  return triggerLocked && match.liveTrigger !== null && !isMatchCastable(match);
 }
 
 /** Les streams des casters d'un match (jamais celui du staff), avec qui les tient. */
@@ -468,7 +481,7 @@ export function MatchLiveDialog({
           <button
             type="submit"
             className="btn"
-            disabled={busy || urlInvalid || triggerNeedsDate || invalidCasterLink}
+            disabled={busy || urlInvalid || triggerNeedsDate || invalidCasterLink || lockedOnClosedMatch(triggerLocked, match)}
             style={{ padding: "8px 20px", fontSize: 13 }}
           >
             {busy ? t("schedule.saving") : t("schedule.save")}

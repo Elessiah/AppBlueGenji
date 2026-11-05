@@ -30,7 +30,7 @@ jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: ()
 import { renderToStaticMarkup } from "react-dom/server";
 import { CastClaimDialog } from "@/app/(secured)/tournois/[id]/_components/CastClaimDialog";
 import { lockedTrigger } from "@/app/(secured)/tournois/[id]/_components/CastSettingsFields";
-import { casterLinkEdits, changedTriggerNeedsDate } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
+import { casterLinkEdits, changedTriggerNeedsDate, lockedOnClosedMatch } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import { matchStreamLinks } from "@/app/(secured)/tournois/[id]/_components/MatchLiveStrip";
 import { castClaimBody, castClaimChoiceKey, castClaimChoices } from "@/app/(secured)/tournois/[id]/_lib/cast-claim";
@@ -570,5 +570,19 @@ describe("changedTriggerNeedsDate — seul un mode changé redemande sa date", (
 
   it("changedTriggerNeedsDate_switchToManualWithoutDate_false", () => {
     expect(changedTriggerNeedsDate(null, "MANUAL", true)).toBe(false);
+  });
+});
+
+describe("lockedOnClosedMatch — rien à enregistrer sur un match fermé au mode verrouillé", () => {
+  it("lockedOnClosedMatch_lockedModeScoreDeclared_true", () => {
+    expect(lockedOnClosedMatch(true, bracketMatch({ status: "AWAITING_CONFIRMATION", liveTrigger: "MANUAL" }))).toBe(true);
+  });
+
+  it("lockedOnClosedMatch_lockedModeMatchToPlay_false", () => {
+    expect(lockedOnClosedMatch(true, bracketMatch({ status: "READY", liveTrigger: "MANUAL" }))).toBe(false);
+  });
+
+  it("lockedOnClosedMatch_notLockedScoreDeclared_false", () => {
+    expect(lockedOnClosedMatch(false, bracketMatch({ status: "COMPLETED", liveTrigger: "MANUAL" }))).toBe(false);
   });
 });
