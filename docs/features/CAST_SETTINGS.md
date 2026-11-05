@@ -155,7 +155,9 @@ ne compte que s'il est un caster **montré** du match (`loadShownCasterIds` au
 serveur, `liveTriggerCasterId` dans l'instantané : il caste encore et, avant
 le lancement — `castBeforeLaunch`, qui ne compte pas le lancement d'un appariement
 d'avant — remplit la condition du cast) : parti ou tu, il laisse le mode
-au staff, et le retrouve dès qu'il est montré de nouveau. L'arbitre reconnu est l'arbitre
+au staff, et le retrouve dès qu'il est montré de nouveau — sauf si le mode a
+changé entre-temps : ce changement est celui du staff. Un maître montré garde
+son mode même quand l'arbitre ou un admin qui caste aussi le match le change. L'arbitre reconnu est l'arbitre
 **retenu** (sans opposition), qui **ne joue pas** le match (`KEPT_REFEREE_SQL`)
 et remplit encore la condition d'arbitrage du jeu (`refereeQualifies`).
 

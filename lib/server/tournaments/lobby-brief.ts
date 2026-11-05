@@ -533,7 +533,7 @@ function logNoManager(row: LobbyBriefRow, slot: LobbyBriefSlot): void {
 type SweepContext = {
   managers: Map<number, number[]>;
   recipients: readonly NotificationRecipient[];
-  briefSides: (row: LobbyBriefRow) => Promise<{ teamId: number; side: LobbyBriefSide }[]>;
+  briefSides: (row: LobbyBriefRow) => { teamId: number; side: LobbyBriefSide }[];
 };
 
 /**
@@ -713,7 +713,7 @@ async function runLobbyBriefSweep(): Promise<number> {
   );
 
   /** Les deux côtés d'un match relu. */
-  const briefSides = async (row: LobbyBriefRow) =>
+  const briefSides = (row: LobbyBriefRow) =>
     lobbyBriefSides(row, { cast: (castersByMatch.get(Number(row.id)) ?? []).length > 0 });
 
   let sent = 0;

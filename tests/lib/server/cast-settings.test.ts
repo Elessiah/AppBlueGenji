@@ -77,6 +77,14 @@ describe("applyCastTrigger", () => {
     expect(row.live_trigger).toBe("AUTO");
   });
 
+  it("applyCastTrigger_castingRefereeChangesCasterMode_keepsCasterOwner", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12, 9)).mockResolvedValue([{ affectedRows: 1 }, []]);
+
+    await applyCastTrigger(fakeConnection({ execute }), ownedRow(), "AUTO", 9, { isAdmin: false, manages: true });
+
+    expect(execute.mock.calls[1][1]).toEqual(["AUTO", 12, 42]);
+  });
+
   it("applyCastTrigger_refereeOnAwaitingConfirmation_refusedNotOwned", async () => {
     // Score déclaré : la médiation est close, comme sur la route du staff.
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12));

@@ -147,6 +147,11 @@ describe("liveTriggerOwnerAfter", () => {
     expect(liveTriggerOwnerAfter("AUTO", { userId: 9, ...STAFF }, false, 12)).toBe(12);
   });
 
+  it("liveTriggerOwnerAfter_castingRefereeWithShownOwner_keepsOwner", () => {
+    // L'arbitre qui caste aussi le match médie : il ne prend pas le mode du caster.
+    expect(liveTriggerOwnerAfter("AUTO", { userId: 9, ...STAFF }, true, 12)).toBe(12);
+  });
+
   it("liveTriggerOwnerAfter_triggerRemovedWithKeptOwner_null", () => {
     expect(liveTriggerOwnerAfter(null, { userId: 9, ...STAFF }, false, 12)).toBeNull();
   });

@@ -718,6 +718,22 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", 12, 42]]]);
   });
 
+  it("setMatchLiveConfig_castingRefereeChangesCasterMode_keepsCasterOwner", async () => {
+    const world = liveWorld(
+      matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12, kept_referee_user_id: 9 }),
+      [dbStream(4, null), dbStream(5, null)],
+      [
+        { user_id: 12, stream_id: 4 },
+        { user_id: 9, stream_id: 5 },
+      ],
+    );
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: { userId: 9, asOrganisation: true }, access: STAFF });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", 12, 42]]]);
+  });
+
   it("setMatchLiveConfig_refereeCorrectsLinkOfStillCastingProvider_keepsProvider", async () => {
     // Le co-caster inscrit en second a fourni le lien : il le garde.
     const world = liveWorld(
