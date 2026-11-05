@@ -103,6 +103,7 @@ type MatchLiveRow = RowDataPacket & {
   launch_pairing?: string | null;
   team1_id?: number | null;
   team2_id?: number | null;
+  referee_user_id?: number | null;
 };
 
 /** Ce que le verrou d'un réglage de diffusion établit (`lockLiveMatch`). */
@@ -346,7 +347,8 @@ export async function setMatchLiveConfig(
     }
   }));
 
-  publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
+  // Rien d'écrit : aucun instantané à rebâtir ni à pousser.
+  if (outcome.changed) publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
   return outcome;
 }
 
@@ -370,14 +372,16 @@ async function lockLiveMatch(
 ): Promise<LockedLiveMatch> {
   const [locked] = await connection.execute<MatchLiveRow[]>(
     `SELECT id, tournament_id, status, start_at, live_trigger, live_started_at, live_trigger_user_id, launched_at,
-            launch_pairing, team1_id, team2_id
+            launch_pairing, team1_id, team2_id, referee_user_id
      FROM bg_matches WHERE id = ? FOR UPDATE`,
     [matchId],
   );
   if (locked.length === 0) throw new Error("MATCH_NOT_FOUND");
   const row = locked[0];
-  // Sans `tournaments`, l'acteur n'arbitre pas : le jeu seul se lit.
-  const kept = await loadKeptReferee(connection, matchId, actor.manages);
+  // Sans `tournaments`, ou s'il n'est pas l'arbitre désigné, l'acteur n'arbitre
+  // pas ce match : le jeu seul se lit, sans les sous-requêtes de l'arbitre.
+  const designated = actor.manages && nullableId(row.referee_user_id ?? null) === actor.userId;
+  const kept = await loadKeptReferee(connection, matchId, designated);
   if (kept === null) throw new Error("MATCH_NOT_FOUND");
   const trigger = row.live_trigger ?? null;
   const ownerId = trigger === null ? null : nullableId(row.live_trigger_user_id);

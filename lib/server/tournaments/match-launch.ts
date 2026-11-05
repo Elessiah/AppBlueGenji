@@ -351,6 +351,19 @@ const LAUNCH_MATCH_OWN_COLUMNS = `
  * d'une manche lisent d'abord leurs candidats), seule la lecture verrouillante
  * est *courante* et elle est gardée.
  */
+/**
+ * L'arbitre peut-il encore « jouer le match » ? Avant un lancement **de cet
+ * appariement** (un lancement d'avant un réappariement ne compte pas) — la
+ * règle de `castBeforeLaunch` et de `KEPT_REFEREE_SQL`, sans exclure un match
+ * joué, dont la lecture ne change pas.
+ */
+function refereePlayCounts(base: LaunchMatchBaseRow): boolean {
+  return (
+    base.launched_at === null ||
+    !launchStateIsCurrent(base.launch_pairing ?? null, nullableId(base.team1_id), nullableId(base.team2_id))
+  );
+}
+
 async function lockLaunchMatch(
   connection: PoolConnection,
   matchId: number,
@@ -411,7 +424,7 @@ async function lockLaunchMatch(
   if (refereeId !== null) {
     const standing = await loadRefereeStanding(connection, refereeId, base.tournament_game);
     const plays =
-      standing.block === null && !standing.objection && base.launched_at === null
+      standing.block === null && !standing.objection && refereePlayCounts(base)
         ? (await resolveTeamParty(connection, base, refereeId)) !== null
         : null;
     refereeStanding = { ...standing, plays };

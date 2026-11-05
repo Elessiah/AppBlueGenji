@@ -104,14 +104,22 @@ export type LobbyBriefSlot = 1 | 2;
 export const LOBBY_BRIEF_PHASE = "LOBBY_BRIEF";
 
 /**
+ * Une réservation à l'ancien format (`LOBBY_BRIEF_1` / `_2`, rangée par
+ * position) tient-elle l'engagée `team` ? Une seule écriture pour la
+ * réservation et le balayage : ils jugent le même côté réservé.
+ */
+function legacyBriefSql(alias: string, team: string): string {
+  return `(${alias}.phase = 'LOBBY_BRIEF_1' AND ${alias}.pairing LIKE CONCAT(${team}, ':%'))
+                  OR (${alias}.phase = 'LOBBY_BRIEF_2' AND ${alias}.pairing LIKE CONCAT('%:', ${team}))`;
+}
+
+/**
  * Une réservation de l'ancien format (`LOBBY_BRIEF_1` / `_2`, clé
  * `team1_id:team2_id`) déjà posée pour l'engagée `?` du match `m` : elle
  * vaut réservation, le check-in ne repart pas au déploiement.
  */
 const LEGACY_BRIEF_SQL = `EXISTS (SELECT 1 FROM bg_match_start_notices o
-              WHERE o.match_id = m.id
-                AND ((o.phase = 'LOBBY_BRIEF_1' AND o.pairing LIKE CONCAT(?, ':%'))
-                  OR (o.phase = 'LOBBY_BRIEF_2' AND o.pairing LIKE CONCAT('%:', ?))))`;
+              WHERE o.match_id = m.id AND (${legacyBriefSql("o", "?")}))`;
 
 /**
  * L'engagée `team` (expression SQL) du match `m` est-elle déjà réservée — au
@@ -122,9 +130,7 @@ const LEGACY_BRIEF_SQL = `EXISTS (SELECT 1 FROM bg_match_start_notices o
 function sideBriefedSql(team: string): string {
   return `EXISTS (SELECT 1 FROM bg_match_start_notices n
               WHERE n.match_id = m.id
-                AND ((n.phase = ? AND n.pairing = CONCAT(${team}, ''))
-                  OR (n.phase = 'LOBBY_BRIEF_1' AND n.pairing LIKE CONCAT(${team}, ':%'))
-                  OR (n.phase = 'LOBBY_BRIEF_2' AND n.pairing LIKE CONCAT('%:', ${team}))))`;
+                AND ((n.phase = ? AND n.pairing = CONCAT(${team}, '')) OR ${legacyBriefSql("n", team)}))`;
 }
 
 /** Id de l'engagée de ce côté, clé de sa réservation. */

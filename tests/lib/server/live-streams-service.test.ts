@@ -35,6 +35,8 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     start_at: null,
     live_trigger: null,
     live_started_at: null,
+    // L'arbitre désigné : celui que la lecture retient, sauf mention contraire.
+    referee_user_id: overrides.kept_referee_user_id ?? null,
     ...overrides,
   };
 }
@@ -769,6 +771,16 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.streams).toEqual([dbStream(6, "https://twitch.tv/orga", true)]);
   });
 
+  it("setMatchLiveConfig_resaveUnchanged_publishesNoEvent", async () => {
+    // Rien d'écrit : aucun instantané rebâti ni poussé aux lecteurs.
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL" }), [dbStream(6, "https://twitch.tv/orga", true)]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/orga", setter: ORGANISER_5, access: STAFF });
+
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
   it("setMatchLiveConfig_sameTriggerNewStaffLink_changedTrue", async () => {
     const world = liveWorld(matchRow({ live_trigger: "MANUAL" }), [dbStream(6, "https://twitch.tv/orga", true)]);
     await mockLiveDb(world);
@@ -827,8 +839,20 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.streams).toEqual([dbStream(4, "https://kick.com/voix")]);
   });
 
+  it("setMatchLiveConfig_actorNotDesignatedReferee_readsGameWithoutRefereeSql", async () => {
+    // L'acteur avec `tournaments` qui n'est pas l'arbitre désigné : la lecture
+    // ne paie pas les sous-requêtes de l'arbitre, sous le verrou du match.
+    const world = liveWorld(matchRow({ live_trigger: "AUTO", referee_user_id: 9 }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
+
+    const game = world.execute.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.startsWith("SELECT t.game,"));
+    expect(game).toContain("NULL AS kept");
+  });
+
   it("setMatchLiveConfig_lockedRead_excludesRefereeWhoPlaysMatch", async () => {
-    const world = liveWorld(matchRow({ live_trigger: "AUTO" }));
+    const world = liveWorld(matchRow({ live_trigger: "AUTO", referee_user_id: 5 }));
     await mockLiveDb(world);
 
     await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
@@ -839,7 +863,7 @@ describe("setMatchLiveConfig", () => {
   });
 
   it("setMatchLiveConfig_lockedRead_keepsRefereeOnlyOnMatchToPlay", async () => {
-    const world = liveWorld(matchRow({ live_trigger: "AUTO" }));
+    const world = liveWorld(matchRow({ live_trigger: "AUTO", referee_user_id: 5 }));
     await mockLiveDb(world);
 
     await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
@@ -849,7 +873,7 @@ describe("setMatchLiveConfig", () => {
   });
 
   it("setMatchLiveConfig_lockedRead_launchedBranchRequiresCurrentPairing", async () => {
-    const world = liveWorld(matchRow({ live_trigger: "AUTO" }));
+    const world = liveWorld(matchRow({ live_trigger: "AUTO", referee_user_id: 5 }));
     await mockLiveDb(world);
 
     await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });

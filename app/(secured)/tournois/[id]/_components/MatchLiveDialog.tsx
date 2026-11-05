@@ -187,15 +187,6 @@ export function MatchLiveDialog({
   // le pose — que si ce membre le coche ; rien ne se déduit de ce qu'il caste.
   const [organisationLink, setOrganisationLink] = useState(false);
   const [seenTrigger, setSeenTrigger] = useState(match.liveTrigger);
-  if (seenTrigger !== match.liveTrigger) {
-    // Le lien aussi : un mode retiré a effacé celui du staff, que la fenêtre
-    // ne doit pas reposer à l'enregistrement.
-    setSeenTrigger(match.liveTrigger);
-    setStreamed(match.liveTrigger !== null);
-    setTrigger(match.liveTrigger ?? "MANUAL");
-    setLiveUrl(currentStaffUrl);
-    setOrganisationLink(false);
-  }
   // Médiation : les liens des streams des casters, que l'arbitre seul édite.
   const casterList = useMemo(() => new Intl.ListFormat(text.locale, { style: "long", type: "conjunction" }), [text.locale]);
   const casterStreams = referee ? casterStreamsOf(match, casterList) : [];
@@ -206,6 +197,18 @@ export function MatchLiveDialog({
   const fieldIds: Record<LiveField, string> = { url: URL_INPUT_ID };
   for (const stream of casterStreams) fieldIds[`caster-${stream.id}`] = casterLinkInputId(stream.id);
   const fieldErrors = useFieldErrors<LiveField>(LIVE_FIELD_ERRORS, fieldIds);
+  if (seenTrigger !== match.liveTrigger) {
+    // Les liens aussi : un mode retiré a effacé celui du staff, que la fenêtre
+    // ne doit pas reposer à l'enregistrement ; les saisies des liens des
+    // casters et leurs refus ne survivent pas à l'état qu'ils visaient.
+    setSeenTrigger(match.liveTrigger);
+    setStreamed(match.liveTrigger !== null);
+    setTrigger(match.liveTrigger ?? "MANUAL");
+    setLiveUrl(currentStaffUrl);
+    setOrganisationLink(false);
+    setCasterLinks({});
+    fieldErrors.clear();
+  }
 
   // Mode verrouillé : le champ suit le mode du match, posé par un autre.
   const showUrl = triggerLocked ? match.liveTrigger !== null : streamed;

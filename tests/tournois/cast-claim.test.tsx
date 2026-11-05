@@ -588,6 +588,15 @@ describe("Fenêtre de diffusion — mode changé pendant qu'elle est ouverte", (
     expect(reset.slice(0, reset.indexOf("}"))).toContain("setLiveUrl(currentStaffUrl);");
     expect(reset.slice(0, reset.indexOf("}"))).toContain("setOrganisationLink(false);");
   });
+
+  it("MatchLiveDialog_triggerChangedWhileOpen_clearsCasterLinksAndFieldErrors", () => {
+    // Les saisies des liens des casters et leurs refus visaient l'état d'avant.
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
+    const reset = dialog.slice(dialog.indexOf("if (seenTrigger !== match.liveTrigger)"));
+    const block = reset.slice(0, reset.indexOf("\n  }"));
+    expect(block).toContain("setCasterLinks({});");
+    expect(block).toContain("fieldErrors.clear();");
+  });
 });
 
 describe("Fenêtre de diffusion — le stream d'un caster disparu", () => {

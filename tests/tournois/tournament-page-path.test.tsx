@@ -145,7 +145,7 @@ describe("confirmations des gestes sans retour", () => {
       expect(body).toContain("return false;");
     }
     expect(launchStrip).toContain(
-      "const run = async (action: () => Promise<void>, success: string, refresh = true): Promise<boolean> => {",
+      "const run = async (action: () => Promise<unknown>, success: string, refresh = true): Promise<boolean> => {",
     );
   });
 

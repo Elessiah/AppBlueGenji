@@ -1696,6 +1696,23 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     });
   });
 
+  it("releaseIneligibleReferee_launchedOnPreviousPairingRefereeJoinedTeam_releasesWithJoinedTeam", async () => {
+    // Le lancement d'un appariement d'avant ne vaut pas pour celui-ci : l'arbitre
+    // qui joue désormais le match ne compte plus, comme avant tout lancement.
+    state.memberships.push({ userId: REFEREE, teamId: TEAM2, roles: ["DPS"] });
+    state.match = matchState({ referee_user_id: REFEREE, launched_at: STAMP, launch_pairing: `${TEAM1}:999` });
+
+    expect(await releaseIneligibleReferee(42, REFEREE)).toBe(true);
+
+    expect(state.match?.referee_user_id).toBeNull();
+    expect(announceRefereeChange).toHaveBeenCalledWith({
+      kind: "AUTO_RELEASED",
+      matchId: 42,
+      refereeId: REFEREE,
+      reason: "JOINED_TEAM",
+    });
+  });
+
   it("garde un arbitre éligible qui ne joue pas le match", async () => {
     state.match = matchState({ referee_user_id: REFEREE });
     expect(await releaseIneligibleReferee(42, REFEREE)).toBe(false);
