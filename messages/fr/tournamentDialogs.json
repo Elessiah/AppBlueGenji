@@ -276,7 +276,7 @@
     "urlHint": "Vide, l'annonce Discord renvoie au premier lien ouvert par un caster, sinon à la chaîne officielle du tournoi (plateformes acceptées : {platforms}).",
     "urlSubject": "chaîne du match",
     "triggerLocked": "Passage à l'antenne réglé par le caster du match : {mode}.",
-    "triggerLockedHint": "Seuls le caster qui l'a posé, l'arbitre du match ou un admin le changent ou le retirent.",
+    "triggerLockedHint": "Seuls le caster qui l'a posé, l'arbitre du match ou un admin le changent ou le retirent — l'organisation aussi quand aucun caster ne le tient.",
     "casterLinks": "Liens des casters",
     "casterLinksSubject": "liens des casters",
     "casterLinksHint": "Arbitre du match, tu peux corriger ou effacer le lien d'un caster. Un lien effacé n'est plus rattaché à personne.",

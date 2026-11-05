@@ -205,6 +205,6 @@
     "UNSUPPORTED_CONTENT_TYPE": "Requête refusée. Recharge la page, puis réessaie.",
     "USER_NOT_FOUND": "Compte introuvable.",
     "INVALID_STREAM_LINKS": "Liens des streams invalides.",
-    "LIVE_TRIGGER_NOT_OWNED": "Le mode de passage à l'antenne appartient au caster qui l'a posé : seuls lui, l'arbitre du match ou un admin le changent."
+    "LIVE_TRIGGER_NOT_OWNED": "Le mode de passage à l'antenne appartient au caster qui l'a posé : seuls lui, l'arbitre du match ou un admin le changent — l'organisation aussi quand aucun caster ne le tient."
   }
 }

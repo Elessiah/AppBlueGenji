@@ -774,7 +774,7 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   STREAM_URL_REQUIRED: "Le lien de ta chaîne est obligatoire pour ouvrir ton propre stream : sans lien, il n'apparaîtrait nulle part.",
   INVALID_CAST_BATTLETAG: "BattleTag de cast invalide : 64 caractères au plus, et des caractères visibles.",
   CAST_STREAM_NOT_OWNED: "Ce stream est celui de l'organisation : son lien se règle dans la configuration de la diffusion.",
-  LIVE_TRIGGER_NOT_OWNED: "Le mode de passage à l'antenne appartient au caster qui l'a posé : seuls lui, l'arbitre du match ou un admin le changent.",
+  LIVE_TRIGGER_NOT_OWNED: "Le mode de passage à l'antenne appartient au caster qui l'a posé : seuls lui, l'arbitre du match ou un admin le changent — l'organisation aussi quand aucun caster ne le tient.",
   INVALID_CAST_SETTINGS: "Réglages de diffusion invalides.",
   MATCH_NOT_CASTABLE: "Ce match ne peut plus être diffusé.",
   MATCH_CAST_SETTINGS_FAILED: "Tes réglages de diffusion n'ont pas pu être enregistrés. Réessaie dans un instant.",

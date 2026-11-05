@@ -401,7 +401,7 @@
       "urlSubject": "my channel link",
       "battletagSubject": "cast BattleTag",
       "triggerLocked": "Going on air set by someone else: {mode}.",
-      "triggerLockedHint": "Only the caster who set it, the match's referee or an admin can change or clear it."
+      "triggerLockedHint": "Only the caster who set it, the match's referee or an admin can change or clear it — the organisers too when no caster holds it."
     }
   },
   "planning": {

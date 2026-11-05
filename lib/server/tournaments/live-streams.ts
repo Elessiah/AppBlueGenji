@@ -356,14 +356,15 @@ async function setStaffStreamUrl(
 }
 
 /**
- * L'arbitre désigné **retenu** du match, en SQL : sans opposition retenue sur
- * un match à jouer (un match joué garde son arbitre, comme l'instantané), et
- * jamais un compte qui joue le match. Sa condition d'arbitrage (`refereeQualifies`)
- * se relit à part.
+ * L'arbitre désigné **retenu** du match, en SQL, pour la médiation de la
+ * diffusion : sur un match à jouer seulement (`PENDING`/`READY`, comme
+ * l'interface, `showsRefereeName` — un score déclaré clôt la médiation), sans
+ * opposition retenue, et jamais un compte qui joue le match. Sa condition
+ * d'arbitrage (`refereeQualifies`) se relit à part.
  */
 const KEPT_REFEREE_SQL = `CASE
-  WHEN (bg_matches.status = 'COMPLETED'
-    OR NOT EXISTS (SELECT 1 FROM bg_users ru WHERE ru.id = bg_matches.referee_user_id AND ru.referee_objection_at IS NOT NULL))
+  WHEN bg_matches.status IN ('PENDING', 'READY')
+    AND NOT EXISTS (SELECT 1 FROM bg_users ru WHERE ru.id = bg_matches.referee_user_id AND ru.referee_objection_at IS NOT NULL)
     AND NOT ${playsMatchSql("bg_matches.referee_user_id", "bg_matches.team1_id", "bg_matches.team2_id", "kr")}
   THEN bg_matches.referee_user_id ELSE NULL END`;
 

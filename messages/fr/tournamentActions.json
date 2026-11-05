@@ -401,7 +401,7 @@
       "urlSubject": "lien de ma chaîne",
       "battletagSubject": "BattleTag du cast",
       "triggerLocked": "Passage à l'antenne réglé par un autre : {mode}.",
-      "triggerLockedHint": "Seuls le caster qui l'a posé, l'arbitre du match ou un admin le changent ou le retirent."
+      "triggerLockedHint": "Seuls le caster qui l'a posé, l'arbitre du match ou un admin le changent ou le retirent — l'organisation aussi quand aucun caster ne le tient."
     }
   },
   "planning": {

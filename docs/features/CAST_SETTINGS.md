@@ -170,7 +170,8 @@ figure dans l'export (`liveTriggers`, `listOwnMatchRoles`).
 ## L'arbitre désigné, médiateur de la diffusion
 
 L'arbitre désigné **de ce match** (et lui seul : celui d'un autre match est
-refusé, 403) entre sur `/api/admin/matches/[id]/live` sans la permission
+refusé, 403), tant que le match est à jouer (`PENDING`/`READY` : un score
+déclaré clôt la médiation, comme à l'interface), entre sur `/api/admin/matches/[id]/live` sans la permission
 `live` (`mayConfigureMatchLive`, `lib/server/tournaments/live-access.ts`), et y
 est relu sous le verrou du match (`NOT_MATCH_REFEREE` s'il ne l'est plus) ; la
 rediff (`…/replay`) reste à la permission `live` :

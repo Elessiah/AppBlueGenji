@@ -276,7 +276,7 @@
     "urlHint": "Left empty, the Discord announcement points to the first link opened by a caster, otherwise to the tournament's official channel (accepted platforms: {platforms}).",
     "urlSubject": "match channel",
     "triggerLocked": "Going on air set by the match's caster: {mode}.",
-    "triggerLockedHint": "Only the caster who set it, the match's referee or an admin can change or clear it.",
+    "triggerLockedHint": "Only the caster who set it, the match's referee or an admin can change or clear it — the organisers too when no caster holds it.",
     "casterLinks": "Casters' links",
     "casterLinksSubject": "casters' links",
     "casterLinksHint": "As the match's referee, you can correct or clear a caster's link. A cleared link is no longer tied to anyone.",

@@ -699,6 +699,16 @@ describe("setMatchLiveConfig", () => {
     expect(locked).toContain("krst.solo_user_id = bg_matches.referee_user_id");
   });
 
+  it("setMatchLiveConfig_lockedRead_keepsRefereeOnlyOnMatchToPlay", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "AUTO" }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
+
+    const locked = world.execute.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.includes("FOR UPDATE") && sql.includes("kept_referee_user_id"));
+    expect(locked).toContain("bg_matches.status IN ('PENDING', 'READY')");
+  });
+
   it("setMatchLiveConfig_refereeLinksAndStaffUrlTogether_staffUrlDoesNotTakeCasterStream", async () => {
     const world = liveWorld(matchRow({ live_trigger: "MANUAL", kept_referee_user_id: 9 }), [dbStream(4, null)], [
       { user_id: 12, stream_id: 4 },
@@ -782,6 +792,14 @@ describe("isDesignatedMatchReferee", () => {
 
     await expect(isDesignatedMatchReferee(43, 3, true)).resolves.toBe(false);
     expect(execute.mock.calls[0][1]).toEqual([43]);
+  });
+
+  it("isDesignatedMatchReferee_playedMatch_queryRestrictsToMatchToPlay", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ kept: null }], []]);
+    await mockDb(execute);
+
+    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
+    expect(String(execute.mock.calls[0][0])).toContain("bg_matches.status IN ('PENDING', 'READY')");
   });
 
   it("isDesignatedMatchReferee_keptReferee_true", async () => {

@@ -43,6 +43,8 @@ import frActions from "@/messages/fr/tournamentActions.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 import enActions from "@/messages/en/tournamentActions.json";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
+import frErrors from "@/messages/fr/tournamentErrors.json";
+import enErrors from "@/messages/en/tournamentErrors.json";
 
 const globalWithDocument = globalThis as { document?: unknown };
 const hadDocument = "document" in globalWithDocument;
@@ -539,5 +541,16 @@ describe("casterLinkEdits — seules les saisies de l'arbitre partent", () => {
 
   it("casterLinkEdits_typedStreamGone_notSent", () => {
     expect(casterLinkEdits([], { 4: "twitch.tv/x" })).toBeUndefined();
+  });
+});
+
+describe("Mode d'antenne verrouillé — qui peut le changer", () => {
+  it("triggerLockedHint_ownerlessMode_namesOrganisers", () => {
+    expect(frActions.cardActions.castSettings.triggerLockedHint).toContain("l'organisation aussi quand aucun caster ne le tient");
+    expect(enActions.cardActions.castSettings.triggerLockedHint).toContain("the organisers too when no caster holds it");
+    expect(frDialogs.live.triggerLockedHint).toContain("l'organisation aussi quand aucun caster ne le tient");
+    expect(enDialogs.live.triggerLockedHint).toContain("the organisers too when no caster holds it");
+    expect(frErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("l'organisation aussi quand aucun caster ne le tient");
+    expect(enErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("the organisers too when no caster holds it");
   });
 });
