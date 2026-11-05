@@ -583,9 +583,9 @@ describe("check-in du match — registre des traitements (T04, T12)", () => {
   it("déclare la garde des réservations du check-in, en français et en anglais", () => {
     const fr = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")!;
     const en = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")!;
-    // Jamais deux fois : la trace reste avec le match, seul un retour arrière l'efface.
-    expect(fr.retention.join(" ")).toContain("celles du check-in du match (match et engagée) : conservées avec le match, pour qu'il ne parte jamais deux fois — seul un retour arrière du tournoi les efface");
-    expect(en.retention.join(" ")).toContain("those of match check-ins sent (match and entrant): kept with the match, so that it never goes out twice — only a rollback of the tournament erases them");
+    // Jamais deux fois : la trace reste avec le tournoi, même quand un retour arrière recrée le match.
+    expect(fr.retention.join(" ")).toContain("celles du check-in du match (match et engagée, et la place du match dans le tournoi — phase, tableau, manche, numéro) : conservées avec le tournoi, pour qu'il ne parte jamais deux fois, même quand un retour arrière efface puis recrée le match ; effacées avec le tournoi ou l'engagée");
+    expect(en.retention.join(" ")).toContain("those of match check-ins sent (match and entrant, and the match's place in the tournament — phase, bracket, round, number): kept with the tournament, so that it never goes out twice, even when a rollback erases and recreates the match; erased with the tournament or the entrant");
   });
 });
 

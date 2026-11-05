@@ -771,6 +771,53 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.streams).toEqual([dbStream(6, "https://twitch.tv/orga", true)]);
   });
 
+  it("setMatchLiveConfig_liveHolderChangesStaffLinkOnOtherCasterMode_throwsLiveTriggerNotOwned", async () => {
+    // Décision 2 : le lien du staff suit le mode d'un autre caster montré.
+    const world = liveWorld(
+      matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }),
+      [dbStream(6, "https://twitch.tv/orga", true), dbStream(7, "https://twitch.tv/voix")],
+      [{ user_id: 12, stream_id: 7 }],
+    );
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/autre", setter: ORGANISER_5, access: LIVE_ONLY }),
+    ).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
+
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchLiveConfig_liveHolderResendsSameStaffLinkOnOtherCasterMode_passes", async () => {
+    const world = liveWorld(
+      matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }),
+      [dbStream(6, "https://twitch.tv/orga", true), dbStream(7, "https://twitch.tv/voix")],
+      [{ user_id: 12, stream_id: 7 }],
+    );
+    await mockLiveDb(world);
+
+    const outcome = await setMatchLiveConfig(42, {
+      trigger: "MANUAL",
+      liveUrl: "twitch.tv/orga",
+      setter: ORGANISER_5,
+      access: LIVE_ONLY,
+    });
+
+    expect(outcome.changed).toBe(false);
+  });
+
+  it("setMatchLiveConfig_ownerChangesStaffLinkOnOwnMode_writes", async () => {
+    const world = liveWorld(
+      matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }),
+      [dbStream(6, "https://twitch.tv/orga", true), dbStream(7, "https://twitch.tv/voix")],
+      [{ user_id: 12, stream_id: 7 }],
+    );
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/neuve", setter: CASTER_12, access: LIVE_ONLY });
+
+    expect(world.state.streams.find((stream) => stream.id === 6)?.live_url).toBe("https://twitch.tv/neuve");
+  });
+
   it("setMatchLiveConfig_resaveUnchanged_publishesNoEvent", async () => {
     // Rien d'écrit : aucun instantané rebâti ni poussé aux lecteurs.
     const world = liveWorld(matchRow({ live_trigger: "MANUAL" }), [dbStream(6, "https://twitch.tv/orga", true)]);

@@ -122,15 +122,30 @@ const LEGACY_BRIEF_SQL = `EXISTS (SELECT 1 FROM bg_match_start_notices o
               WHERE o.match_id = m.id AND (${legacyBriefSql("o", "?")}))`;
 
 /**
+ * Le check-in de l'engagée `team` (expression SQL) est-il déjà parti pour la
+ * **place** du match `m` (`bg_lobby_brief_marks`) ? La marque survit au match :
+ * un retour arrière ou une manche régénérée efface le match et ses
+ * réservations, la place et l'engagée restent — le check-in ne repart jamais
+ * deux fois.
+ */
+function briefMarkSql(team: string): string {
+  return `EXISTS (SELECT 1 FROM bg_lobby_brief_marks k
+              WHERE k.tournament_id = m.tournament_id AND k.phase_id = m.phase_id
+                AND k.bracket = m.bracket AND k.round_number = m.round_number
+                AND k.match_number = m.match_number AND k.team_id = ${team})`;
+}
+
+/**
  * L'engagée `team` (expression SQL) du match `m` est-elle déjà réservée — au
  * format courant (`?` = `LOBBY_BRIEF_PHASE`) ou à l'ancien, **comme le juge
  * la réservation** (`LEGACY_BRIEF_SQL`) : un côté que la réservation refuserait
  * ne garde pas le match candidat à chaque balayage.
  */
 function sideBriefedSql(team: string): string {
-  return `EXISTS (SELECT 1 FROM bg_match_start_notices n
+  return `(EXISTS (SELECT 1 FROM bg_match_start_notices n
               WHERE n.match_id = m.id
-                AND ((n.phase = ? AND n.pairing = CONCAT(${team}, '')) OR ${legacyBriefSql("n", team)}))`;
+                AND ((n.phase = ? AND n.pairing = CONCAT(${team}, '')) OR ${legacyBriefSql("n", team)}))
+            OR ${briefMarkSql(team)})`;
 }
 
 /** Id de l'engagée de ce côté, clé de sa réservation. */
@@ -327,8 +342,9 @@ async function claimLobbyBrief(db: Db, row: LobbyBriefRow, slot: LobbyBriefSlot)
        SELECT m.id, ?, ? FROM bg_matches m
         JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
         WHERE m.id = ? AND CONCAT(m.team1_id, ':', m.team2_id) = ? AND ${BRIEF_DUE_SQL}
-          AND NOT ${LEGACY_BRIEF_SQL}`,
-      [teamKey, LOBBY_BRIEF_PHASE, key[0], String(row.brief_pairing), teamKey, teamKey],
+          AND NOT ${LEGACY_BRIEF_SQL}
+          AND NOT ${briefMarkSql("?")}`,
+      [teamKey, LOBBY_BRIEF_PHASE, key[0], String(row.brief_pairing), teamKey, teamKey, teamKey],
     );
     const { affectedRows, insertId } = result as { affectedRows?: number; insertId?: number };
     return affectedRows === 1 && insertId ? Number(insertId) : null;
@@ -339,6 +355,24 @@ async function claimLobbyBrief(db: Db, row: LobbyBriefRow, slot: LobbyBriefSlot)
       console.error(`[lobby-brief] réservation interrompue du match ${key[0]} non rendue`, releaseError);
     }
     throw error;
+  }
+}
+
+/**
+ * Marque le check-in d'un côté comme parti, par la place du match
+ * (`briefMarkSql`) : posée dès qu'un envoi a pu partir (`sent`, `unreached`,
+ * `failed` — la réservation, elle aussi, reste). Jamais d'exception : une
+ * marque manquée laisse la réservation, qui suffit tant que le match existe.
+ */
+async function markBriefSent(db: Db, matchId: number, teamId: number): Promise<void> {
+  try {
+    await db.execute(
+      `INSERT IGNORE INTO bg_lobby_brief_marks (tournament_id, phase_id, bracket, round_number, match_number, team_id)
+       SELECT m.tournament_id, m.phase_id, m.bracket, m.round_number, m.match_number, ? FROM bg_matches m WHERE m.id = ?`,
+      [teamId, matchId],
+    );
+  } catch (error) {
+    console.error(`[lobby-brief] check-in du match ${matchId} parti sans marque durable`, error);
   }
 }
 
@@ -599,12 +633,15 @@ async function briefClaimedSide(
 ): Promise<SideOutcome | "lost" | "closed"> {
   const sides = await freshSides(db, row, claimId, context);
   if (typeof sides === "string") return sides;
-  return sendSideBrief(
+  const outcome = await sendSideBrief(
     Number(row.id),
     context.recipients.filter((recipient) => userIds.includes(recipient.userId)),
     sides[slot - 1].side,
     siteUrl(matchPageHref(Number(row.tournament_id), Number(row.id))),
   );
+  // Rien n'est parti (`retry`) : la réservation est rendue, aucune marque.
+  if (outcome !== "retry") await markBriefSent(db, Number(row.id), slotTeamId(row, slot));
+  return outcome;
 }
 
 /** Issue d'un côté au balayage : réservation posée (ou non) et ce qu'il en est advenu. */

@@ -267,6 +267,7 @@
     "url": "Chaîne du match (facultatif)",
     "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}.",
     "urlOwnChannel": "Le lien saisi ici est celui de ta chaîne : il est retiré du match si ton compte est supprimé.",
+    "urlLocked": "Ce lien suit le mode du caster qui l'a posé : seuls lui, l'arbitre du match ou un admin le changent.",
     "organisationLink": "Ce lien est celui de l'organisation",
     "organisationLinkSubject": "lien de l'organisation",
     "organisationLinkHint": "Coché, le lien reste sur le match quoi qu'il arrive à ton compte. Décoché, c'est ta propre chaîne, retirée du match si ton compte est supprimé.",

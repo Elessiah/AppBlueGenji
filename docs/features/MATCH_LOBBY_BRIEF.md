@@ -39,8 +39,14 @@ Trois changements de fond par rapport au brief du salon :
   le sien. Les anciennes réservations (`LOBBY_BRIEF_1`/`_2`, clé
   `team1:team2`) restent honorées (`LEGACY_BRIEF_SQL`), par engagée et quel
   que soit l'adversaire d'alors — la sélection des candidats
-  (`sideBriefedSql`) juge comme la réservation. Seul le **retour
-  arrière** du tournoi (`rollback.ts`) les efface encore — il rejoue le match.
+  (`sideBriefedSql`) juge comme la réservation. Un match effacé puis
+  recréé (retour arrière `rollback.ts`, manche régénérée) perd ses
+  réservations, pas sa **marque durable** : `bg_lobby_brief_marks`, posée
+  par `markBriefSent` dès qu'un envoi a pu partir, tient l'engagée par la
+  place du match (tournoi, phase, tableau, manche, numéro) ; réservation
+  (`briefMarkSql`) et balayage la lisent — le check-in ne repart jamais deux
+  fois (décision de l'utilisateur du 2026-11-05). Elle part avec le tournoi
+  ou l'engagée.
 - Les sections ci-dessous qui parlent d'arbitre désigné, de « tous les
   joueurs » ou d'une réservation rendue à la réouverture du salon décrivent
   l'état du 2026-11-04, remplacé par ces règles.

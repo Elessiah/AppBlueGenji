@@ -329,12 +329,9 @@ export async function setMatchLiveConfig(
             [trigger, owner, matchId],
           );
         }
-        // Un stream de caster dont l'arbitre vient d'effacer le lien reste au
-        // caster : le lien du staff ne s'y pose pas.
-        const edited = new Set((config.streamLinks ?? []).map((link) => link.streamId));
-        const before = streams ?? (await lockMatchStreams(connection, matchId));
-        streams = await setStaffStreamUrl(connection, matchId, url, config.setter, before, edited);
-        changed = changed || streams !== before;
+        const staff = await writeStaffLink(connection, matchId, url, config, streams, hold, actor);
+        streams = staff.streams;
+        changed = changed || staff.written;
       }
       // Les streams déjà lus sous verrou (et mis à jour en mémoire) ne sont pas
       // relus : deux lectures verrouillantes, non quatre.
@@ -350,6 +347,35 @@ export async function setMatchLiveConfig(
   // Rien d'écrit : aucun instantané à rebâtir ni à pousser.
   if (outcome.changed) publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
   return outcome;
+}
+
+/**
+ * Pose le lien du staff (`setStaffStreamUrl`) sur les streams déjà lus sous
+ * verrou (`known`) ou relus ici. Un stream de caster dont l'arbitre vient
+ * d'effacer le lien reste au caster : le lien du staff ne s'y pose pas. Le
+ * lien suit le mode : celui d'un autre caster montré ne se change que par lui,
+ * l'arbitre retenu ou un admin (décision 2) — un lien renvoyé tel quel
+ * n'écrit rien et passe.
+ *
+ * @throws `LIVE_TRIGGER_NOT_OWNED`
+ */
+async function writeStaffLink(
+  connection: PoolConnection,
+  matchId: number,
+  url: string | null,
+  config: MatchLiveConfig,
+  known: MatchStreamRow[] | undefined,
+  hold: LiveTriggerHold,
+  actor: LiveTriggerActor,
+): Promise<{ streams: MatchStreamRow[]; written: boolean }> {
+  const edited = new Set((config.streamLinks ?? []).map((link) => link.streamId));
+  const before = known ?? (await lockMatchStreams(connection, matchId));
+  const streams = await setStaffStreamUrl(connection, matchId, url, config.setter, before, edited);
+  const written = streams !== before;
+  if (written && hold.ownerId !== null && !mayChangeLiveTrigger(hold, actor)) {
+    throw new Error("LIVE_TRIGGER_NOT_OWNED");
+  }
+  return { streams, written };
 }
 
 /**

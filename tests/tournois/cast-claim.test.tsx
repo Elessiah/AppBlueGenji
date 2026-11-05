@@ -599,6 +599,21 @@ describe("Fenêtre de diffusion — mode changé pendant qu'elle est ouverte", (
   });
 });
 
+describe("Fenêtre de diffusion — lien du staff sur le mode d'un autre caster", () => {
+  it("MatchLiveDialog_linkOwnedByOtherCaster_readOnlyWithHintAndNoOrganisationBox", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
+    expect(dialog).toContain("const linkLocked = staffLinkLocked(triggerLocked, match);");
+    expect(dialog).toContain("readOnly={linkLocked}");
+    expect(dialog).toContain('{linkLocked && <p>{t("live.urlLocked")}</p>}');
+    expect(dialog).toContain("{canSpeakForOrganisation && urlTouched && !linkLocked && (");
+  });
+
+  it("urlLocked_frAndEn_present", () => {
+    expect(frDialogs.live.urlLocked).toContain("seuls lui, l'arbitre du match ou un admin le changent");
+    expect(enDialogs.live.urlLocked).toContain("only they, the match referee or an admin can change it");
+  });
+});
+
 describe("Fenêtre de diffusion — le stream d'un caster disparu", () => {
   it("casterStreamGone_frAndEn_present", () => {
     expect(frDialogs.live.casterStreamGone).toContain("rouvre la fenêtre");

@@ -90,6 +90,7 @@ function mockDb(candidates: Record<string, unknown>[], claims: boolean[] = [], r
       return [claimed ? { affectedRows: 1, insertId: nextId++ } : { affectedRows: 0, insertId: 0 }];
     }
     if (sql.startsWith("DELETE FROM bg_match_start_notices")) return [{ affectedRows: 1 }];
+    if (sql.startsWith("INSERT IGNORE INTO bg_lobby_brief_marks")) return [{ affectedRows: 1 }];
     throw new Error(`requête inattendue : ${sql}`);
   });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
@@ -98,6 +99,15 @@ function mockDb(candidates: Record<string, unknown>[], claims: boolean[] = [], r
 
 function releases(execute: ReturnType<typeof mockDb>["execute"]) {
   return execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE FROM bg_match_start_notices"));
+}
+
+/** Paramètres des réservations seules (les marques durables du check-in sont à part). */
+function claimParams(execute: ReturnType<typeof mockDb>["execute"]) {
+  return execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_start_notices")).map(([, params]) => params);
+}
+
+function marks(execute: ReturnType<typeof mockDb>["execute"]) {
+  return execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_lobby_brief_marks"));
 }
 
 function logged(error: { mock: { calls: unknown[][] } }, text: string): boolean {
@@ -175,6 +185,81 @@ describe("dispatchLobbyBriefs", () => {
     expect(sql).not.toMatch(/< 2/);
   });
 
+  it("dispatchLobbyBriefs_sweep_skipsSideWithDurableMark", async () => {
+    const { query } = mockDb([]);
+    await dispatchLobbyBriefs();
+    const sql = String(query.mock.calls[0][0]).replace(/\s+/g, " ");
+    // Une engagée déjà briefée à cette place (match recréé par un retour arrière) n'est plus candidate.
+    expect(sql).toContain("FROM bg_lobby_brief_marks k WHERE k.tournament_id = m.tournament_id AND k.phase_id = m.phase_id");
+    expect(sql).toContain("k.match_number = m.match_number AND k.team_id = m.team1_id");
+    expect(sql).toContain("k.match_number = m.match_number AND k.team_id = m.team2_id");
+  });
+
+  it("dispatchLobbyBriefs_claim_refusedWhenMatchPlaceAlreadyMarked", async () => {
+    const { execute } = mockDb([MATCH]);
+    await dispatchLobbyBriefs();
+    const claim = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
+    expect(claim).toContain(
+      "AND NOT EXISTS (SELECT 1 FROM bg_lobby_brief_marks k WHERE k.tournament_id = m.tournament_id AND k.phase_id = m.phase_id AND k.bracket = m.bracket AND k.round_number = m.round_number AND k.match_number = m.match_number AND k.team_id = ?)",
+    );
+  });
+
+  it("dispatchLobbyBriefs_sideSent_durableMarkWrittenWithTeamAndMatch", async () => {
+    const { execute } = mockDb([MATCH]);
+
+    await dispatchLobbyBriefs();
+
+    expect(marks(execute).map(([, params]) => params)).toEqual([
+      [1, 40],
+      [2, 40],
+    ]);
+  });
+
+  it("dispatchLobbyBriefs_briefNotRendered_noDurableMark", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(formatLobbyBriefDm).mockImplementationOnce(() => {
+      throw new Error("RENDER");
+    });
+    const { execute } = mockDb([MATCH]);
+
+    await dispatchLobbyBriefs();
+
+    // Rien n'est parti du côté 1 : sa réservation est rendue, aucune marque ; le côté 2 en a une.
+    expect(marks(execute).map(([, params]) => params)).toEqual([[2, 40]]);
+    error.mockRestore();
+  });
+
+  it("dispatchLobbyBriefs_sendThrows_markStillWritten", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(notifyUsers).mockRejectedValueOnce(new Error("PUSH_DOWN"));
+    const { execute } = mockDb([MATCH]);
+
+    await dispatchLobbyBriefs();
+
+    // Une partie a pu partir : la marque est posée, jamais deux fois.
+    expect(marks(execute).map(([, params]) => params)).toEqual([
+      [1, 40],
+      [2, 40],
+    ]);
+    error.mockRestore();
+  });
+
+  it("dispatchLobbyBriefs_markWriteFails_sideStillCountedAndLogged", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const { execute } = mockDb([MATCH]);
+    const base = execute.getMockImplementation()!;
+    execute.mockImplementation(async (sql, params) => {
+      if (sql.startsWith("INSERT IGNORE INTO bg_lobby_brief_marks")) throw new Error("DB_DOWN");
+      return base(sql, params);
+    });
+
+    expect(await dispatchLobbyBriefs()).toBe(2);
+
+    expect(logged(error, "parti sans marque durable")).toBe(true);
+    expect(releases(execute)).toHaveLength(0);
+    error.mockRestore();
+  });
+
   it("dueSql_hiddenTournament_notDue", async () => {
     const { query } = mockDb([]);
     await dispatchLobbyBriefs();
@@ -221,9 +306,9 @@ describe("dispatchLobbyBriefs", () => {
 
     expect(await dispatchLobbyBriefs()).toBe(2);
 
-    expect(execute.mock.calls.map(([, params]) => params)).toEqual([
-      ["1", "LOBBY_BRIEF", 40, "1:2", "1", "1"],
-      ["2", "LOBBY_BRIEF", 40, "1:2", "2", "2"],
+    expect(claimParams(execute)).toEqual([
+      ["1", "LOBBY_BRIEF", 40, "1:2", "1", "1", "1"],
+      ["2", "LOBBY_BRIEF", 40, "1:2", "2", "2", "2"],
     ]);
     expect(loadEntrantManagerIds).toHaveBeenCalledWith([1, 2]);
     // Une seule lecture pour tous les côtés ; message de match : tag certifié seul.
@@ -257,7 +342,7 @@ describe("dispatchLobbyBriefs", () => {
     const { execute } = mockDb([MATCH]);
     const insert = execute.getMockImplementation()!;
     execute.mockImplementation(async (sql, params) => {
-      if (sql.startsWith("INSERT IGNORE")) order.push(`claim ${String((params as unknown[])[0])}`);
+      if (sql.startsWith("INSERT IGNORE INTO bg_match_start_notices")) order.push(`claim ${String((params as unknown[])[0])}`);
       return insert(sql, params);
     });
     jest.mocked(notifyUsers).mockImplementation(async (recipients) => {
@@ -312,7 +397,7 @@ describe("dispatchLobbyBriefs", () => {
     expect(await dispatchLobbyBriefs()).toBe(1);
 
     // Les deux côtés réservés : la fantôme garde la sienne, le match quitte les candidats.
-    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE"))).toHaveLength(2);
+    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_start_notices"))).toHaveLength(2);
     expect(sends().map((send) => send.userIds)).toEqual([[10]]);
     expect(sends()[0].dm()).not.toContain("Autogestion");
   });
@@ -324,7 +409,7 @@ describe("dispatchLobbyBriefs", () => {
 
     expect(await dispatchLobbyBriefs()).toBe(1);
 
-    expect(execute.mock.calls.map(([, params]) => params)).toEqual([["2", "LOBBY_BRIEF", 40, "1:2", "2", "2"]]);
+    expect(claimParams(execute)).toEqual([["2", "LOBBY_BRIEF", 40, "1:2", "2", "2", "2"]]);
     expect(logged(error, "aucun gérant actif")).toBe(true);
     // Balayage suivant : toujours sans gestionnaire, pm2 ne le redit pas.
     error.mockClear();
@@ -578,7 +663,7 @@ describe("dispatchLobbyBriefs", () => {
     const base = execute.getMockImplementation()!;
     let inserts = 0;
     execute.mockImplementation(async (sql, params) => {
-      if (sql.startsWith("INSERT IGNORE")) {
+      if (sql.startsWith("INSERT IGNORE INTO bg_match_start_notices")) {
         inserts += 1;
         if (inserts === 1) throw new Error("CONNECTION_LOST");
       }
@@ -654,7 +739,7 @@ describe("dispatchLobbyBriefs", () => {
       jest.mocked(notifyUsers).mockClear();
       const second = mockDb([MATCH], [true, false]);
       await jest.advanceTimersByTimeAsync(10_000);
-      expect(second.execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE"))).toHaveLength(2);
+      expect(second.execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_start_notices"))).toHaveLength(2);
       expect(sends().map((send) => send.userIds)).toEqual([[10, 11]]);
     } finally {
       jest.useRealTimers();
@@ -715,7 +800,7 @@ describe("dispatchLobbyBriefs", () => {
     expect(await dispatchLobbyBriefs()).toBe(0);
 
     expect(notifyUsers).not.toHaveBeenCalled();
-    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE"))).toHaveLength(1);
+    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_start_notices"))).toHaveLength(1);
     expect(releases(execute).map(([sql, params]) => [sql, params])).toEqual([
       ["DELETE FROM bg_match_start_notices WHERE id IN (?)", [100]],
     ]);
@@ -857,7 +942,7 @@ describe("dispatchLobbyBriefs", () => {
 
     expect(await dispatchLobbyBriefs()).toBe(1);
 
-    expect(execute.mock.calls.map(([, params]) => params)).toEqual([["2", "LOBBY_BRIEF", 40, "1:2", "2", "2"]]);
+    expect(claimParams(execute)).toEqual([["2", "LOBBY_BRIEF", 40, "1:2", "2", "2", "2"]]);
     expect(logged(error, "aucun gérant actif")).toBe(true);
     error.mockRestore();
   });

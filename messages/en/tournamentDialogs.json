@@ -267,6 +267,7 @@
     "url": "Match channel (optional)",
     "urlInvalid": "Link not recognized. Accepted platforms: {platforms}.",
     "urlOwnChannel": "The link entered here is your own channel: it is removed from the match if your account is deleted.",
+    "urlLocked": "This link follows the mode of the caster who set it: only they, the match referee or an admin can change it.",
     "organisationLink": "This link is the organisation's",
     "organisationLinkSubject": "organisation link",
     "organisationLinkHint": "Ticked, the link stays on the match whatever happens to your account. Unticked, it is your own channel, removed from the match if your account is deleted.",

@@ -1631,7 +1631,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Le check-in du match ne part plus que pour un match en autogestion, et seulement au propriétaire et aux managers de chaque équipe (ou au joueur d'un tournoi individuel), une seule fois par match.",
     details: [
-      "Ce qui change pour le check-in : un match arbitré ou sans décision d'arbitrage n'en reçoit plus ; joueurs et coachs d'une équipe n'en reçoivent plus, seuls son propriétaire et ses managers. Il ne part qu'une fois par match et par engagée : ni un changement d'horaire, ni un lancement annulé, ni un réappariement ne le renvoient. Le site garde la trace de cet envoi (match et engagée) avec le match ; seul un retour arrière du tournoi l'efface.",
+      "Ce qui change pour le check-in : un match arbitré ou sans décision d'arbitrage n'en reçoit plus ; joueurs et coachs d'une équipe n'en reçoivent plus, seuls son propriétaire et ses managers. Il ne part qu'une fois par match et par engagée : ni un changement d'horaire, ni un lancement annulé, ni un réappariement ne le renvoient. Le site garde la trace de cet envoi (le match, sa place dans le tournoi et l'engagée) avec le tournoi : même un retour arrière qui efface puis recrée le match ne le renvoie pas ; elle part avec le tournoi ou l'engagée.",
       "Ce qui ne change pas : le contenu du check-in (sans BattleTag, tag Discord ni pseudo de joueur), le message privé réservé à un tag Discord certifié, et la case « Messages privés Discord de mes matchs » de « Mon profil » pour s'y opposer.",
     ],
   },

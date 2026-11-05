@@ -85,6 +85,14 @@ export function lockedOnClosedMatch(
 }
 
 /**
+ * Le lien du staff suit le mode d'un autre caster montré : lu, pas écrit, par
+ * qui ne peut pas changer ce mode (décision 2, même règle que le serveur).
+ */
+export function staffLinkLocked(triggerLocked: boolean, match: Pick<BracketMatch, "liveTriggerCasterId">): boolean {
+  return triggerLocked && (match.liveTriggerCasterId ?? null) !== null;
+}
+
+/**
  * Les streams des casters d'un match (jamais celui du staff), avec qui les
  * tient — « A, B et C » / "A, B, and C" par `list` (`Intl.ListFormat` de la
  * langue de la page).
@@ -171,6 +179,7 @@ export function MatchLiveDialog({
   // se montre sans contrôle, plutôt qu'un bouton qui mène à un refus.
   const viewer = { userId: viewerUserId, isAdmin: viewerIsAdmin, manages: canSchedule, referees: referee };
   const triggerLocked = !viewerMayChangeLiveTrigger(match, viewer);
+  const linkLocked = staffLinkLocked(triggerLocked, match);
   const onAir = useMatchLiveState(match) === "LIVE";
   const [streamed, setStreamed] = useState(match.liveTrigger !== null);
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "MANUAL");
@@ -357,11 +366,13 @@ export function MatchLiveDialog({
                 <InfoHint id="match-live-url-hint" subject={t("live.urlSubject")}>
                   <p>{t("live.urlHint", { platforms })}</p>
                   {!canSpeakForOrganisation && <p>{t("live.urlOwnChannel")}</p>}
+                  {linkLocked && <p>{t("live.urlLocked")}</p>}
                 </InfoHint>
               </InfoHintRow>
               <input
                 id={URL_INPUT_ID}
                 value={liveUrl}
+                readOnly={linkLocked}
                 onChange={(e) => {
                   setLiveUrl(e.target.value);
                   fieldErrors.clear("url");
@@ -382,7 +393,7 @@ export function MatchLiveDialog({
                 </p>
               )}
               <FieldErrorText fieldId={URL_INPUT_ID} message={fieldErrors.message("url")} />
-              {canSpeakForOrganisation && urlTouched && (
+              {canSpeakForOrganisation && urlTouched && !linkLocked && (
                 <InfoHintRow inline>
                   <label
                     style={{

@@ -849,7 +849,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "The match check-in is now only sent for a self-managed match, and only to the owner and managers of each team (or the player of a solo tournament), once per match.",
     details: [
-      "What changes for the check-in: a refereed match or one with no refereeing decision no longer receives one; a team's players and coaches no longer receive it, only its owner and managers. It is sent only once per match and per entrant: neither a change of time, nor a cancelled launch, nor a re-pairing sends it again. The site keeps the record of that sending (match and entrant) with the match; only a rollback of the tournament erases it.",
+      "What changes for the check-in: a refereed match or one with no refereeing decision no longer receives one; a team's players and coaches no longer receive it, only its owner and managers. It is sent only once per match and per entrant: neither a change of time, nor a cancelled launch, nor a re-pairing sends it again. The site keeps the record of that sending (the match, its place in the tournament and the entrant) with the tournament: even a rollback that erases and recreates the match does not send it again; the record goes with the tournament or the entrant.",
       "What does not change: the content of the check-in (no BattleTag, Discord tag or player username), the direct message reserved for a certified Discord tag, and the “Discord direct messages about my matches” box in “My profile” to object to it.",
     ],
   },
