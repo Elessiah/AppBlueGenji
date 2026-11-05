@@ -27,6 +27,7 @@ import {
   isMatchRefereeActor,
   liveTriggerOwnerAfter,
   mayChangeLiveTrigger,
+  mayToggleOnAir,
   type LiveTriggerActor,
   type LiveTriggerHold,
 } from "@/lib/shared/live-trigger-owner";
@@ -289,7 +290,10 @@ export async function setMatchLiveConfig(
       if (config.streamLinks !== undefined && config.streamLinks.length > 0) {
         streams = await setCasterStreamLinks(connection, matchId, config.streamLinks);
       }
-      if (trigger === null) {
+      if (trigger === null && hold.trigger === null) {
+        // Match sans mode : l'arbitre n'y corrige que les liens des casters —
+        // rien à démarquer (ni mode, ni lien du staff, sans mode lui non plus).
+      } else if (trigger === null) {
         await connection.execute(
           `UPDATE bg_matches SET live_trigger = NULL, live_trigger_user_id = NULL, live_started_at = NULL WHERE id = ?`,
           [matchId],
@@ -534,9 +538,13 @@ async function setCasterStreamLinks(
         [target.id, matchId],
       );
     } else if (target.liveUrl === null) {
+      // Un stream que plus aucun caster ne tient attend le ménage : son lien
+      // n'aurait personne à qui se rattacher, et passerait pour l'organisation.
+      const holder = await streamHolder(connection, matchId, target.id);
+      if (holder === null) throw new StreamLinkError("STREAM_NOT_FOUND", target.id);
       await connection.execute(
         `UPDATE bg_match_streams SET live_url = ?, link_user_id = ? WHERE id = ? AND match_id = ? AND staff_owned = 0`,
-        [url, await streamHolder(connection, matchId, target.id), target.id, matchId],
+        [url, holder, target.id, matchId],
       );
     } else {
       await connection.execute(
@@ -614,10 +622,10 @@ export async function setMatchOnAir(
   const result = await retryOnDeadlock(() => withConnection(async (connection) => {
     await connection.beginTransaction();
     try {
-      const { row, hold } = await lockLiveMatch(connection, matchId, actor);
+      const { row, hold, actorShown } = await lockLiveMatch(connection, matchId, actor);
       if (!access.live && !isMatchRefereeActor(hold, actor)) throw new Error("NOT_MATCH_REFEREE");
       if (row.live_trigger !== "MANUAL") throw new Error("LIVE_TRIGGER_NOT_MANUAL");
-      if (!mayChangeLiveTrigger(hold, actor)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
+      if (!mayToggleOnAir(hold, actor, actorShown)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
       if (onAir && row.status !== "READY") throw new Error("MATCH_NOT_LIVE_READY");
       // Déjà dans cet état (second clic, deux clics simultanés) : rien d'écrit,
       // l'heure de mise à l'antenne n'est pas réécrite.

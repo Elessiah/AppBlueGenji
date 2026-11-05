@@ -356,6 +356,18 @@ describe("page d'un match — cartes du round et bans", () => {
     expect(lobby).not.toContain("Cartes du tour");
   });
 
+  it("MatchMaps_playedRefereedMatch_hidesBanOrderRow", () => {
+    // Match arbitré déjà joué : aucun premier ban affirmé, ni « adversaires à venir ».
+    const text = visible(render(match({ status: "COMPLETED", refereeAssigned: true, firstBanTeamId: null }), "public"));
+    expect(text).not.toContain("Bans de la carte 1");
+    expect(text).not.toContain("Adversaires à venir");
+  });
+
+  it("MatchMaps_pendingRefereedMatch_showsRefereeBanOrder", () => {
+    const text = visible(render(match({ refereeAssigned: true, firstBanTeamId: BRAVO }), "public"));
+    expect(text).toContain("Bans de la carte 1 Bravo d'abord, puis Alpha");
+  });
+
   it("règle du gagnant : le texte des cartes suivantes suit le réglage", () => {
     expect(visible(render(match(), "public", false, "fr", { ...EMPTY_MAP_RULES, nextBan: "WINNER" }))).toContain(
       "L'équipe qui a gagné la carte précédente bannit en premier",

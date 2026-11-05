@@ -580,6 +580,15 @@ describe("refusedCasterField — le refus rattaché au lien du stream désigné"
   });
 });
 
+describe("Fenêtre de diffusion — le stream d'un caster disparu", () => {
+  it("casterStreamGone_frAndEn_present", () => {
+    expect(frDialogs.live.casterStreamGone).toContain("rouvre la fenêtre");
+    expect(enDialogs.live.casterStreamGone).toContain("reopen the window");
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
+    expect(dialog).toContain('code === "STREAM_NOT_FOUND" ? t("live.casterStreamGone")');
+  });
+});
+
 describe("Inscription — un mode posé entre-temps par un autre", () => {
   it("claim_triggerSkipped_saysTheModeStayed", () => {
     const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");

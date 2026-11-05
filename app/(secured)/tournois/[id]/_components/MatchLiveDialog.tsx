@@ -16,7 +16,7 @@ import {
   staffStream,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
-import { viewerMayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
+import { viewerMayChangeLiveTrigger, viewerMayToggleOnAir } from "@/lib/shared/live-trigger-owner";
 import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import { canEditReplay } from "@/lib/shared/match-replay";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
@@ -169,12 +169,8 @@ export function MatchLiveDialog({
   const referee = viewerRefereesMatch(match, refereeNames);
   // Même règle que le serveur (`LIVE_TRIGGER_NOT_OWNED`) : un mode verrouillé
   // se montre sans contrôle, plutôt qu'un bouton qui mène à un refus.
-  const triggerLocked = !viewerMayChangeLiveTrigger(match, {
-    userId: viewerUserId,
-    isAdmin: viewerIsAdmin,
-    manages: canSchedule,
-    referees: referee,
-  });
+  const viewer = { userId: viewerUserId, isAdmin: viewerIsAdmin, manages: canSchedule, referees: referee };
+  const triggerLocked = !viewerMayChangeLiveTrigger(match, viewer);
   const onAir = useMatchLiveState(match) === "LIVE";
   const [streamed, setStreamed] = useState(match.liveTrigger !== null);
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "MANUAL");
@@ -235,7 +231,7 @@ export function MatchLiveDialog({
   const platforms = LIVE_PLATFORMS.join(", ");
   // L'antenne d'un mode manuel suit la règle du mode (décision 2) : un
   // co-caster ne l'ouvre ni ne la coupe pour le caster qui l'a posé.
-  const airToggle = canToggleOnAir(match) && !triggerLocked;
+  const airToggle = canToggleOnAir(match) && viewerMayToggleOnAir(match, viewer);
 
   /** Ouvre ou coupe l'antenne (mode manuel), sans quitter la fenêtre. */
   const toggleAir = async () => {
@@ -293,7 +289,9 @@ export function MatchLiveDialog({
 
   /** Un refus : notifié, et rattaché au champ qu'il désigne (lien d'un caster, sinon par son code). */
   const reportRefusal = (error: unknown) => {
-    const message = mapError((error as Error).message);
+    const code = (error as Error).message;
+    // Le stream d'un caster disparu : la fenêtre n'a pas de choix de stream, elle se rouvre.
+    const message = code === "STREAM_NOT_FOUND" ? t("live.casterStreamGone") : mapError(code);
     showError(message);
     const field = error instanceof LiveRefusal ? error.field : null;
     if (field !== null && field in fieldIds) fieldErrors.flag(field, message);

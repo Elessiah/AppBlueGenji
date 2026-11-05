@@ -603,8 +603,14 @@ function MapsSection({
   // Un match en une seule carte n'a pas de « cartes suivantes » : la règle n'y dirait rien.
   const singleMap = roundMaxMaps(detail.card, match.roundNumber) === 1;
   const picking = canPick && editable;
+  // Un match arbitré suit la règle de l'arbitre hôte (`firstBanTeamId`), pas
+  // celle du tournoi : seul le côté qui bannit en premier décide de la ligne.
+  const banKnown = banSide !== null && (match.refereeAssigned || banOrder !== null);
+  // Deux adversaires connus sans premier ban (match arbitré déjà joué, exemption) :
+  // la ligne se tait, comme le fait clé — jamais « adversaires à venir ».
+  const showBanOrder = banKnown || match.team1Id === null || match.team2Id === null;
   let banOrderValue: ReactNode = <Muted>{t("matchPage.opponentsPending")}</Muted>;
-  if (banSide && banOrder) {
+  if (banKnown) {
     const value = rm.t("page.banOrderValue", { first: banName, second: otherName });
     // L'arbitre crée la partie : la moins bonne tête de série bannit la
     // première, quelle que soit la règle du tournoi.
@@ -618,10 +624,12 @@ function MapsSection({
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
       <SectionTitle id={titleId}>{page.t("sections.maps")}</SectionTitle>
       <dl className={styles.rules}>
-        <div>
-          <dt>{rm.t("page.banOrder")}</dt>
-          <dd>{banOrderValue}</dd>
-        </div>
+        {showBanOrder && (
+          <div>
+            <dt>{rm.t("page.banOrder")}</dt>
+            <dd>{banOrderValue}</dd>
+          </div>
+        )}
         {!singleMap && (
           <div>
             <dt>{rm.t("page.nextBans")}</dt>

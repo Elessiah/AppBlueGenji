@@ -276,7 +276,8 @@
     "casterLinksSubject": "casters' links",
     "casterLinksHint": "As the match's referee, you can correct or clear a caster's link. A cleared link is no longer tied to anyone.",
     "casterLink": "Stream of {casters}",
-    "casterLinkNobody": "no caster"
+    "casterLinkNobody": "no caster",
+    "casterStreamGone": "This caster stream no longer exists on this match: reopen the window to see the current streams."
   },
   "replay": {
     "removed": "Replay removed.",

@@ -85,12 +85,10 @@ import {
 import { parseMatchFormat } from "@/lib/shared/match-format";
 import { roundAllowsTiebreak } from "@/lib/shared/round-plan";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
-
 import { firstStreamUrlSql } from "./match-casters";
 import { liveAnnouncementUrl } from "@/lib/shared/live-announcements";
 import { formatLobbyBriefDm } from "./lobby-brief-dm";
 import { seedJoins } from "./match-host-seeds";
-
 import { readMatchCasters } from "./player-pushes";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
@@ -180,7 +178,6 @@ export type LobbyBriefRow = RowDataPacket & {
   /** Engagées fantômes (`is_ghost`) : personne à briefer de ce côté. */
   team1_ghost?: number | null;
   team2_ghost?: number | null;
-
   /** Cartes choisies au-delà de la carte 1, et créneaux de la manche (`ROUND_MAPS.md`). */
   map_picks?: string | null;
   round_slots_json?: string | null;

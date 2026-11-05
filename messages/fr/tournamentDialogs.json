@@ -276,7 +276,8 @@
     "casterLinksSubject": "liens des casters",
     "casterLinksHint": "Arbitre du match, tu peux corriger ou effacer le lien d'un caster. Un lien effacé n'est plus rattaché à personne.",
     "casterLink": "Stream de {casters}",
-    "casterLinkNobody": "aucun caster"
+    "casterLinkNobody": "aucun caster",
+    "casterStreamGone": "Ce stream de caster n'existe plus sur ce match : rouvre la fenêtre pour voir les streams à jour."
   },
   "replay": {
     "removed": "Rediff retirée.",

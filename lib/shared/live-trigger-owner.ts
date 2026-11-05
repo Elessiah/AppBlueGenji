@@ -58,6 +58,19 @@ export function mayChangeLiveTrigger(hold: LiveTriggerHold, actor: LiveTriggerAc
   return actor.manages;
 }
 
+/**
+ * L'acteur peut-il ouvrir ou couper l'antenne d'un mode `MANUAL` ? Qui peut
+ * changer le mode (`mayChangeLiveTrigger`) ; et, sur un mode **sans maître**
+ * (caster parti, mode posé avant la règle), tout caster montré du match
+ * (`actorCasts`) — personne d'autre n'y décide pour lui, et le match ne reste
+ * pas hors antenne en attendant le staff. Le mode d'un autre caster, lui, ne
+ * se bascule pas (décision 2).
+ */
+export function mayToggleOnAir(hold: LiveTriggerHold, actor: LiveTriggerActor, actorCasts: boolean): boolean {
+  if (mayChangeLiveTrigger(hold, actor)) return true;
+  return hold.ownerId === null && actorCasts;
+}
+
 /** Ce que l'interface sait du lecteur pour la même règle. */
 export type LiveTriggerViewer = {
   userId: number | null;
@@ -87,6 +100,25 @@ export function viewerMayChangeLiveTrigger(
     },
     { userId: viewer.userId, isAdmin: viewer.isAdmin, manages: viewer.manages },
   );
+}
+
+/**
+ * Le lecteur peut-il ouvrir ou couper l'antenne de ce match ? `mayToggleOnAir`
+ * lue sur l'instantané : un caster montré du match (`casters`) bascule un mode
+ * sans maître. Faux sans compte.
+ */
+export function viewerMayToggleOnAir(
+  match: {
+    liveTrigger: MatchLiveTrigger | null;
+    liveTriggerCasterId?: number | null;
+    casters: readonly { userId: number }[];
+  },
+  viewer: LiveTriggerViewer,
+): boolean {
+  if (viewer.userId === null) return false;
+  if (viewerMayChangeLiveTrigger(match, viewer)) return true;
+  const userId = viewer.userId;
+  return (match.liveTriggerCasterId ?? null) === null && match.casters.some((caster) => caster.userId === userId);
 }
 
 /**
