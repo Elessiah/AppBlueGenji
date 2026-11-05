@@ -55,6 +55,19 @@ export function casterLinkEdits(
   return edits.length === 0 ? undefined : edits;
 }
 
+/**
+ * Le mode choisi manque-t-il de la date de début qu'il exige ? Un mode
+ * inchangé ne la redemande pas : le serveur l'accepte (date retirée depuis),
+ * et les liens restent réglables.
+ */
+export function changedTriggerNeedsDate(
+  current: MatchLiveTrigger | null,
+  chosen: MatchLiveTrigger,
+  startAtMissing: boolean,
+): boolean {
+  return chosen !== current && requiresMatchStartAt(chosen) && startAtMissing;
+}
+
 /** Les streams des casters d'un match (jamais celui du staff), avec qui les tient. */
 function casterStreamsOf(match: BracketMatch): { id: number; liveUrl: string | null; casters: string }[] {
   return match.streams
@@ -151,7 +164,7 @@ export function MatchLiveDialog({
   // bloqué sur `START_TIME` et « Enregistrer » sur désactivé.
   const startAtLabel = formatMatchStartAt(match.startAt, text.locale);
   const startAtMissing = startAtLabel === null;
-  const triggerNeedsDate = !triggerLocked && streamed && requiresMatchStartAt(trigger) && startAtMissing;
+  const triggerNeedsDate = !triggerLocked && streamed && changedTriggerNeedsDate(match.liveTrigger, trigger, startAtMissing);
   const platforms = LIVE_PLATFORMS.join(", ");
 
   /** Ouvre ou coupe l'antenne (mode manuel), sans quitter la fenêtre. */

@@ -30,7 +30,7 @@ jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: ()
 import { renderToStaticMarkup } from "react-dom/server";
 import { CastClaimDialog } from "@/app/(secured)/tournois/[id]/_components/CastClaimDialog";
 import { lockedTrigger } from "@/app/(secured)/tournois/[id]/_components/CastSettingsFields";
-import { casterLinkEdits } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
+import { casterLinkEdits, changedTriggerNeedsDate } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import { matchStreamLinks } from "@/app/(secured)/tournois/[id]/_components/MatchLiveStrip";
 import { castClaimBody, castClaimChoiceKey, castClaimChoices } from "@/app/(secured)/tournois/[id]/_lib/cast-claim";
@@ -552,5 +552,23 @@ describe("Mode d'antenne verrouillé — qui peut le changer", () => {
     expect(enDialogs.live.triggerLockedHint).toContain("the organisers too when no caster holds it");
     expect(frErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("l'organisation aussi quand aucun caster ne le tient");
     expect(enErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("the organisers too when no caster holds it");
+  });
+});
+
+describe("changedTriggerNeedsDate — seul un mode changé redemande sa date", () => {
+  it("changedTriggerNeedsDate_unchangedStartTimeWithoutDate_false", () => {
+    expect(changedTriggerNeedsDate("START_TIME", "START_TIME", true)).toBe(false);
+  });
+
+  it("changedTriggerNeedsDate_switchToStartTimeWithoutDate_true", () => {
+    expect(changedTriggerNeedsDate("MANUAL", "START_TIME", true)).toBe(true);
+  });
+
+  it("changedTriggerNeedsDate_switchToStartTimeWithDate_false", () => {
+    expect(changedTriggerNeedsDate("MANUAL", "START_TIME", false)).toBe(false);
+  });
+
+  it("changedTriggerNeedsDate_switchToManualWithoutDate_false", () => {
+    expect(changedTriggerNeedsDate(null, "MANUAL", true)).toBe(false);
   });
 });
