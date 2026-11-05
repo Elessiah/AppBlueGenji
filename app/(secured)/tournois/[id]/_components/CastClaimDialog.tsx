@@ -6,6 +6,8 @@ import { useOptionalToast } from "@/components/ui/toast";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { PLATFORM_LABELS, streamPlatform, type MatchLiveTrigger } from "@/lib/shared/live-streams";
+import { viewerMayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
+import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import type { BracketMatch } from "@/lib/shared/types";
 import {
   castClaimBody,
@@ -24,6 +26,7 @@ import {
   CastUrlField,
   castBattletagInvalid,
   castTriggerNeedsDate,
+  lockedTrigger,
   castUrlInvalid,
 } from "./CastSettingsFields";
 import styles from "./CastClaimDialog.module.css";
@@ -61,13 +64,24 @@ export function CastClaimDialog({
   onClose,
   onClaim,
 }: Readonly<{
-  match: Pick<BracketMatch, "streams" | "casters" | "startAt" | "liveTrigger">;
+  match: Pick<
+    BracketMatch,
+    "id" | "status" | "refereeKey" | "streams" | "casters" | "startAt" | "liveTrigger" | "liveTriggerCasterId"
+  >;
   matchLabel: string;
   onClose: () => void;
   onClaim: (body: CastClaimBody) => Promise<CastClaimOutcome>;
 }>) {
   const { t, locale } = useActionsText();
-  const { canSchedule } = useLiveControls();
+  const { canSchedule, viewerUserId, viewerIsAdmin, refereeNames } = useLiveControls();
+  // Mode déjà posé par un autre caster : il se lit, il ne se change pas à
+  // l'inscription (`LIVE_TRIGGER_NOT_OWNED`) — le corps ne le porte pas.
+  const triggerLocked = !viewerMayChangeLiveTrigger(match, {
+    userId: viewerUserId,
+    isAdmin: viewerIsAdmin,
+    manages: canSchedule,
+    referees: viewerRefereesMatch(match, refereeNames),
+  });
   const game = useTournamentGame();
   const name = useId();
   const urlId = useId();
@@ -112,13 +126,13 @@ export function CastClaimDialog({
   // Le mode du match, laissé tel quel, ne se réécrit pas (le serveur l'ignore) :
   // un « à la date de début » sans date, posé par le staff, ne bloque pas
   // l'inscription.
-  const triggerRefused = separate && trigger !== match.liveTrigger && castTriggerNeedsDate(trigger, match.startAt);
+  const triggerRefused = separate && !triggerLocked && trigger !== match.liveTrigger && castTriggerNeedsDate(trigger, match.startAt);
   // « A, B et C » / "A, B, and C" : la conjonction de la langue de la page.
   const casterList = useMemo(() => new Intl.ListFormat(locale, { style: "long", type: "conjunction" }), [locale]);
 
   const confirm = async (): Promise<boolean> => {
     if (choice === null) return false;
-    const outcome = await onClaim(castClaimBody(choice, { url, battletag, trigger, organisationLink }));
+    const outcome = await onClaim(castClaimBody(choice, { url, battletag, trigger: triggerLocked ? undefined : trigger, organisationLink }));
     if (!outcome.ok) fieldErrors.report(outcome.code, outcome.message);
     return outcome.ok;
   };
@@ -182,7 +196,7 @@ export function CastClaimDialog({
             invalid={urlRefused || fieldErrors.invalidField === "url"}
             fieldError={fieldErrors.message("url")}
           />
-          <CastTriggerField trigger={trigger} startAt={match.startAt} onChange={setTrigger} />
+          <CastTriggerField trigger={lockedTrigger(triggerLocked, match.liveTrigger, trigger)} startAt={match.startAt} onChange={setTrigger} locked={triggerLocked} />
           {canSchedule && url.trim() !== "" && (
             <CastOrganisationLinkField checked={organisationLink} onChange={setOrganisationLink} />
           )}

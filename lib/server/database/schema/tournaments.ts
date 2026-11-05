@@ -161,6 +161,9 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       score_validation_paused_at DATETIME NULL,
       start_at DATETIME NULL,
       live_trigger ENUM('AUTO', 'START_TIME', 'MANUAL') NULL,
+      -- Caster qui a posé le mode d'antenne (docs/features/CAST_SETTINGS.md) :
+      -- lui seul, l'arbitre désigné ou un admin le changent ensuite.
+      live_trigger_user_id BIGINT NULL,
       live_url VARCHAR(255) NULL,
       live_started_at DATETIME NULL,
       host_team_id BIGINT NULL,
@@ -190,6 +193,7 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       INDEX idx_bg_matches_live (live_trigger, status),
       INDEX idx_bg_matches_caster (caster_user_id),
       INDEX idx_bg_matches_referee (referee_user_id),
+      INDEX idx_bg_matches_live_trigger_user (live_trigger_user_id),
       INDEX idx_bg_matches_start_at (start_at),
       CONSTRAINT fk_bg_matches_tournament FOREIGN KEY (tournament_id)
         REFERENCES bg_tournaments(id) ON DELETE CASCADE,

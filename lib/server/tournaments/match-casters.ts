@@ -45,12 +45,15 @@ const CAST_ELIGIBLE_SQL = `(COALESCE(u.is_deleted, 0) = 0
  * remplit plus la condition, avant le lancement : `casterWithdrawn`) ne donne
  * pas le premier lien : l'accueil et l'annonce #live n'envoient jamais vers la
  * chaîne d'un caster que le site ne montre plus. Le stream du staff, un match
- * lancé ou joué gardent leurs liens.
+ * lancé ou joué gardent leurs liens — lancé **sur son appariement courant**,
+ * comme le juge l'instantané (`castBeforeLaunch`).
  */
 export function firstStreamUrlSql(alias: string): string {
   return `(SELECT fs.live_url FROM bg_match_streams fs
            WHERE fs.match_id = ${alias}.id AND fs.live_url IS NOT NULL
-             AND (fs.staff_owned = 1 OR ${alias}.status = 'COMPLETED' OR ${alias}.launched_at IS NOT NULL
+             AND (fs.staff_owned = 1 OR ${alias}.status = 'COMPLETED'
+                  OR (${alias}.launched_at IS NOT NULL
+                      AND ${alias}.launch_pairing = CONCAT(${alias}.team1_id, ':', ${alias}.team2_id))
                   OR EXISTS (SELECT 1 FROM bg_match_casters fc JOIN bg_users u ON u.id = fc.user_id
                              WHERE fc.match_id = fs.match_id AND fc.stream_id = fs.id
                                AND ${CAST_ELIGIBLE_SQL}))
@@ -370,7 +373,10 @@ export async function withdrawUserCasts(
     `SELECT DISTINCT match_id FROM bg_match_streams WHERE link_user_id = ? ORDER BY match_id`,
   );
   const refereed = await matchIdsOf(`SELECT id AS match_id FROM bg_matches WHERE referee_user_id = ? ORDER BY id`);
-  const candidates = [...new Set([...casts, ...links, ...refereed])].sort((a, b) => a - b);
+  // Tous les matchs dont il tient le mode d'antenne, quel que soit leur état :
+  // la référence à son compte part avec lui (effacement), verrouillés avec les autres.
+  const triggered = await matchIdsOf(`SELECT id AS match_id FROM bg_matches WHERE live_trigger_user_id = ? ORDER BY id`);
+  const candidates = [...new Set([...casts, ...links, ...refereed, ...triggered])].sort((a, b) => a - b);
   if (candidates.length === 0) return { matchIds: [], tournamentIds: [] };
 
   const [locked] = await connection.execute<WithdrawnMatchRow[]>(
@@ -405,6 +411,16 @@ export async function withdrawUserCasts(
       [userId, ...linksToDrop],
     );
   }
+  // Le mode d'antenne qu'il avait posé reste au match, sans propriétaire : il
+  // revient au staff (`lib/shared/live-trigger-owner.ts`).
+  const triggersToDrop = matchIds.filter((id) => triggered.has(id));
+  if (triggersToDrop.length > 0) {
+    await connection.execute(
+      `UPDATE bg_matches SET live_trigger_user_id = NULL
+        WHERE live_trigger_user_id = ? AND id IN (${placeholders(triggersToDrop)})`,
+      [userId, ...triggersToDrop],
+    );
+  }
   if (refereesToDrop.length > 0) {
     await connection.execute(
       `UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL
@@ -415,7 +431,7 @@ export async function withdrawUserCasts(
   await pruneStreamsOf(connection, [...new Set([...castsToDrop, ...linksToDrop])].sort((a, b) => a - b));
   // Seuls les matchs réellement modifiés : un cast gardé sur un match joué
   // (anonymisation) n'en fait pas partie.
-  const touched = new Set([...castsToDrop, ...linksToDrop, ...refereesToDrop]);
+  const touched = new Set([...castsToDrop, ...linksToDrop, ...refereesToDrop, ...triggersToDrop]);
   const touchedRows = locked.filter((row) => touched.has(Number(row.id)));
   return {
     matchIds: touchedRows.map((row) => Number(row.id)),

@@ -5,6 +5,7 @@ import {
   autoLaunchAt,
   canDeclareTeamReady,
   canPlayersReportScore,
+  castBeforeLaunch,
   connectionReader,
   castBlockReason,
   identityBlockIsDiscordOnly,
@@ -630,5 +631,30 @@ describe("identityComplete / identityBlockIsDiscordOnly — dispense nommée, ja
 
   it("identityBlockIsDiscordOnly_overwatch_false", () => {
     expect(identityBlockIsDiscordOnly("OW")).toBe(false);
+  });
+});
+
+describe("castBeforeLaunch — la condition du cast se rejoue jusqu'au lancement", () => {
+  it("castBeforeLaunch_readyNotLaunched_true", () => {
+    expect(castBeforeLaunch({ status: "READY", launched_at: null })).toBe(true);
+  });
+
+  it("castBeforeLaunch_launched_false", () => {
+    expect(castBeforeLaunch({ status: "READY", launched_at: new Date("2026-11-05T20:00:00Z") })).toBe(false);
+  });
+
+  it("castBeforeLaunch_launchedOnPreviousPairing_true", () => {
+    // Réappariement pas encore adopté : le lancement d'avant ne vaut pas pour ce match.
+    const launched = new Date("2026-11-05T20:00:00Z");
+    expect(castBeforeLaunch({ status: "READY", launched_at: launched, launch_pairing: "5:9", team1_id: 7, team2_id: 5 })).toBe(true);
+  });
+
+  it("castBeforeLaunch_launchedOnCurrentPairing_false", () => {
+    const launched = new Date("2026-11-05T20:00:00Z");
+    expect(castBeforeLaunch({ status: "READY", launched_at: launched, launch_pairing: "7:5", team1_id: 7, team2_id: 5 })).toBe(false);
+  });
+
+  it("castBeforeLaunch_completed_false", () => {
+    expect(castBeforeLaunch({ status: "COMPLETED" })).toBe(false);
   });
 });

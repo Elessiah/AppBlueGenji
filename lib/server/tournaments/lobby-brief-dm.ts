@@ -52,10 +52,9 @@ type TournamentText = {
   /** Sous-titre : manche, tournoi et état (coup d'envoi proche, ou match lancé). */
   subtitle: (round: string, tournament: string) => string;
   subtitleLaunched: (round: string, tournament: string) => string;
-  /** Phrase d'ouverture, selon la décision d'arbitrage. */
+  /** Phrase d'ouverture : l'autogestion, ou neutre contre une fantôme. */
   introSelfManaged: string;
-  introReferee: string;
-  introUndecided: string;
+  introGhost: string;
   /** Le lien de la page du match, en italique sous l'ouverture. */
   contacts: (url: string) => string;
   contactsNoBattletag: (url: string) => string;
@@ -71,8 +70,9 @@ type TournamentText = {
   seats: (left: string, right: string) => string;
   createGame: string;
   checkSettings: string;
-  referee: string;
-  refereeNoBattletag: string;
+  /** Les mêmes en tournoi individuel : un engagé solo n'a pas d'équipe. */
+  createGameSolo: string;
+  checkSettingsSolo: string;
   /** Lignes des cartes. */
   map: (number: number, shown: string) => string;
   noFirstMap: string;
@@ -100,8 +100,7 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     subtitle: (round, tournament) => `*${round} · ${tournament} — coup d'envoi dans moins de 15 minutes.*`,
     subtitleLaunched: (round, tournament) => `*${round} · ${tournament} — match lancé.*`,
     introSelfManaged: "**Votre match est en autogestion.** Voici les éléments importants à savoir.",
-    introReferee: "**Un arbitre est désigné pour votre match.** Voici les éléments importants à savoir.",
-    introUndecided: "Voici les éléments importants à savoir avant le coup d'envoi.",
+    introGhost: "Voici les éléments importants à savoir avant le coup d'envoi.",
     contacts: (url) => `*Les contacts et les BattleTags à inviter sont sur la page du match : ${url}*`,
     contactsNoBattletag: (url) => `*Vous pouvez retrouver les contacts sur la page du match : ${url}*`,
     beforeKickoff: "## Avant le coup d'envoi",
@@ -113,8 +112,8 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     seats: (left, right) => `Gauche (hôte) : ${left} · Droite : ${right}`,
     createGame: "**C'est à ton équipe de créer la partie.**",
     checkSettings: "L'équipe hôte crée la partie : **vérifie les paramètres** avant de lancer.",
-    referee: "Ajoute l'arbitre désigné en jeu : il invitera les joueurs dans le salon.",
-    refereeNoBattletag: "L'arbitre désigné invitera les joueurs dans le salon.",
+    createGameSolo: "**C'est à toi de créer la partie.**",
+    checkSettingsSolo: "Ton adversaire crée la partie : **vérifie les paramètres** avant de lancer.",
     map: (number, shown) => `Map ${number} : ${shown}`,
     noFirstMap: "pas encore fixée",
     toChoose: (pool) => `à choisir parmi ${pool}`,
@@ -142,8 +141,7 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     subtitle: (round, tournament) => `*${round} · ${tournament} — kickoff in less than 15 minutes.*`,
     subtitleLaunched: (round, tournament) => `*${round} · ${tournament} — match started.*`,
     introSelfManaged: "**Your match is self-managed.** Here is what you need to know.",
-    introReferee: "**A referee is assigned to your match.** Here is what you need to know.",
-    introUndecided: "Here is what you need to know before kickoff.",
+    introGhost: "Here is what you need to know before kickoff.",
     contacts: (url) => `*The contacts and the BattleTags to invite are on the match page: ${url}*`,
     contactsNoBattletag: (url) => `*You can find the contacts on the match page: ${url}*`,
     beforeKickoff: "## Before kickoff",
@@ -155,8 +153,8 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
     seats: (left, right) => `Left (host): ${left} · Right: ${right}`,
     createGame: "**Your team creates the game.**",
     checkSettings: "The host team creates the game: **check the settings** before starting.",
-    referee: "Add the assigned referee in game: they will invite the players to the lobby.",
-    refereeNoBattletag: "The assigned referee will invite the players to the lobby.",
+    createGameSolo: "**You create the game.**",
+    checkSettingsSolo: "Your opponent creates the game: **check the settings** before starting.",
     map: (number, shown) => `Map ${number}: ${shown}`,
     noFirstMap: "not set yet",
     toChoose: (pool) => `to choose from ${pool}`,
@@ -177,29 +175,24 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
   },
 };
 
-/** La phrase d'ouverture : ce que dit la décision d'arbitrage, ou rien de plus. */
+/**
+ * La phrase d'ouverture. Le check-in ne part que pour un match en autogestion
+ * (`./lobby-brief`) ; contre une fantôme, personne en face : « autogestion »
+ * n'apprend rien à qui n'a pas d'adversaire à inviter, l'ouverture reste neutre.
+ */
 function introLine(side: LobbyBriefSide, locale: Locale): string {
   const text = DM_TEXT[locale];
-  if (side.decision === "REFEREE") return text.introReferee;
-  // Contre une fantôme, personne en face : « autogestion » n'apprend rien à
-  // qui n'a pas d'adversaire à inviter, l'ouverture reste neutre.
-  if (side.decision === "SELF_MANAGED" && !side.opponentGhost) return text.introSelfManaged;
-  return text.introUndecided;
+  return side.opponentGhost ? text.introGhost : text.introSelfManaged;
 }
 
 /**
- * Qui crée la partie : en autogestion, l'hôte le fait et l'autre vérifie les
- * réglages ; avec un arbitre désigné, c'est lui qui invite — la ligne le dit à
- * la place. **Sans décision d'arbitrage, aucune ligne** : charger l'hôte
- * trancherait à la place du staff, qui en est averti à part (comme avant la
- * fusion du check-in). Contre une fantôme, personne en face non plus.
+ * Qui crée la partie : l'hôte le fait, l'autre vérifie les réglages. Contre
+ * une fantôme, personne en face : aucune ligne.
  */
 function creationLine(side: LobbyBriefSide, locale: Locale): string | null {
   const text = DM_TEXT[locale];
-  if (side.decision === "REFEREE") {
-    return battletagRelevantFor(side.game) ? text.referee : text.refereeNoBattletag;
-  }
-  if (side.decision !== "SELF_MANAGED" || side.opponentGhost) return null;
+  if (side.opponentGhost) return null;
+  if (side.solo) return side.hosting ? text.createGameSolo : text.checkSettingsSolo;
   return side.hosting ? text.createGame : text.checkSettings;
 }
 

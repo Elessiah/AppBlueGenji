@@ -14,6 +14,7 @@ import { tryAutoResolveByes } from "./byes";
 import { detachDownstreamOutcome } from "./bracket-cascade";
 import { SINGLE_REPORT_SQL } from "./score-report-sql";
 import { laterRoundsHaveScoreInput } from "./bg-survie/round-progress";
+import { nullableId } from "@/lib/shared/nullable-id";
 import { assertForfeitBelongsToMatch, assertMatchSavable, mapEntryOf } from "./save-guard";
 
 interface DependentMatchRow extends RowDataPacket {
@@ -109,10 +110,6 @@ type CurrentMatchRow = RowDataPacket & {
   format: TournamentFormat;
 };
 
-/** Identifiant facultatif d'une ligne : `NULL` reste `null`. */
-function nullableId(value: number | null): number | null {
-  return value === null ? null : Number(value);
-}
 
 /** Un match dépendant de celui-ci porte-t-il la moindre saisie ? */
 function dependentsHaveScoreInput(

@@ -114,10 +114,12 @@ export async function setRefereeScheduling(
         // (`./player-pushes`) part avec lui : sans ce ménage, la réservation
         // (match, appariement, LOBBY) survivrait, et le lancement rouvert à
         // l'heure planifiée ne préviendrait plus personne. Avant l'`UPDATE`,
-        // qui ne change rien aux conditions mais les rend moins lisibles.
+        // qui ne change rien aux conditions mais les rend moins lisibles. Le
+        // check-in (`LOBBY_BRIEF%`, `./lobby-brief`) reste : une fois par match.
         await connection.execute(
           `DELETE FROM bg_match_start_notices
-           WHERE match_id IN (SELECT id FROM bg_matches
+           WHERE phase NOT LIKE 'LOBBY_BRIEF%'
+             AND match_id IN (SELECT id FROM bg_matches
                               WHERE ${resetCandidates} AND NOT ${SCORE_NOTED_SQL})`,
           [tournamentId],
         );

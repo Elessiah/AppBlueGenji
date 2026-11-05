@@ -3,15 +3,22 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/snapshot");
+jest.mock("@/lib/server/tournaments/cast-eligibility", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/tournaments/cast-eligibility")>("@/lib/server/tournaments/cast-eligibility"),
+  loadRefereeStanding: jest.fn(),
+}));
 
 import {
   findBroadcastingTournament,
+  isDesignatedMatchReferee,
   setMatchLiveConfig,
   setMatchOnAir,
   setTournamentLiveUrl,
+  StreamLinkError,
 } from "@/lib/server/tournaments/live-streams";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { invalidateSpectatorSnapshot } from "@/lib/server/tournaments/snapshot";
+import { loadRefereeStanding } from "@/lib/server/tournaments/cast-eligibility";
 import { type SqlQuery, type SqlMock, fakeConnection, fakePool } from "../../helpers/sql-double";
 
 async function mockDb(execute: SqlMock) {
@@ -28,12 +35,38 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     start_at: null,
     live_trigger: null,
     live_started_at: null,
+    // L'arbitre désigné : celui que la lecture retient, sauf mention contraire.
+    referee_user_id: overrides.kept_referee_user_id ?? null,
     ...overrides,
   };
 }
 
+/** Un caster du match dans les bases simulées ; `eligible: false` : tu (inéligible). */
+type WorldCaster = { user_id: number; stream_id: number; eligible?: boolean };
+
+/** Colonnes d'un compte qui remplit la condition du cast (admin, identités certifiées). */
+const ELIGIBLE_CASTER = {
+  discord_verified_at: new Date("2026-01-01T00:00:00Z"),
+  discord_pseudo: "voix",
+  blizzard_sub: "bnet",
+  overwatch_battletag: "Voix#1234",
+  overwatch_battletag_typed: 0,
+  is_deleted: 0,
+  is_admin: 1,
+  platform_roles_json: null,
+};
+
+/** Réponse de `loadShownCasterIds` : les casters demandés, avec leur condition. */
+function shownCasterRows(casters: readonly WorldCaster[], ids: readonly unknown[]) {
+  return casters
+    .filter((caster) => ids.includes(caster.user_id))
+    .map((caster) => ({ user_id: caster.user_id, ...ELIGIBLE_CASTER, is_admin: caster.eligible === false ? 0 : 1 }));
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
+  // Un arbitre retenu remplit, par défaut, la condition d'arbitrage.
+  jest.mocked(loadRefereeStanding).mockResolvedValue({ block: null, objection: false });
 });
 afterEach(() => {
   jest.restoreAllMocks();
@@ -137,6 +170,11 @@ describe("setMatchLiveConfig", () => {
   /** Le même membre, qui dit poser sa propre chaîne (case décochée). */
   const OWN_CHANNEL_5 = { userId: 5, asOrganisation: false };
   const ORGANISER_7 = { userId: 7, asOrganisation: true };
+  /** Droits sur le mode d'antenne : la seule permission `live`, ou le staff `tournaments`. */
+  const LIVE_ONLY = { isAdmin: false, manages: false, live: true };
+  const STAFF = { isAdmin: false, manages: true, live: true };
+  /** Le staff `tournaments` sans `live` : n'entre que comme arbitre désigné du match. */
+  const REFEREE_ONLY = { isAdmin: false, manages: true, live: false };
 
   /**
    * Base à état pour le réglage d'un match : sa ligne, ses streams et ses
@@ -159,13 +197,22 @@ describe("setMatchLiveConfig", () => {
   function liveWorld(
     row: Record<string, unknown>,
     streams: StreamState[] = [],
-    casters: { user_id: number; stream_id: number }[] = [],
+    casters: WorldCaster[] = [],
   ) {
     const state = { streams: streams.map((stream) => ({ ...stream })), casters, matchWrites: [] as [string, unknown[]][] };
     const execute = jest.fn<SqlQuery>(async (rawSql, rawParams) => {
       const sql = rawSql.replace(/\s+/g, " ").trim();
       const params = (rawParams ?? []) as unknown[];
       if (sql.startsWith("SELECT id, tournament_id, status")) return [[{ ...row }]];
+      if (sql.startsWith("SELECT t.game,")) return [[{ game: "OW", kept: row.kept_referee_user_id ?? null }]];
+      if (sql.startsWith("SELECT mc.user_id,")) return [shownCasterRows(state.casters, params.slice(1))];
+      if (sql.startsWith("SELECT mc.user_id FROM bg_match_casters mc")) {
+        // Le fournisseur actuel d'abord, s'il caste encore ce stream ; puis l'ordre d'inscription.
+        const provider = state.streams.find((stream) => stream.id === params[1])?.link_user_id;
+        const onStream = state.casters.filter((caster) => caster.stream_id === params[1]);
+        const kept = onStream.filter((caster) => caster.user_id === provider);
+        return [(kept.length > 0 ? kept : onStream).slice(0, 1)];
+      }
       if (sql.startsWith("UPDATE bg_matches")) {
         state.matchWrites.push([sql, params]);
         return [{ affectedRows: 1 }];
@@ -195,15 +242,36 @@ describe("setMatchLiveConfig", () => {
     return stream;
   }
 
+  type StreamWrite = (state: { streams: StreamState[] }, params: unknown[]) => void;
+  const byId = (state: { streams: StreamState[] }, id: unknown) => state.streams.find((candidate) => candidate.id === id);
+  /** Écritures exactes sur `bg_match_streams`, rejouées sur l'état. */
+  const STREAM_WRITES: Record<string, StreamWrite> = {
+    "UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE match_id = ? AND staff_owned = 1": (state) => {
+      for (const stream of state.streams) if (stream.staff_owned === 1) setStream(stream, null, null);
+    },
+    "UPDATE bg_match_streams SET live_url = ?, staff_owned = 1, link_user_id = ? WHERE id = ?": (state, params) => {
+      const stream = byId(state, params[2]);
+      if (stream) setStream(Object.assign(stream, { staff_owned: 1 }), params[0] as string | null, params[1] as number | null);
+    },
+    "UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE id = ? AND match_id = ? AND staff_owned = 0": (state, params) => {
+      const stream = byId(state, params[0]);
+      if (stream) setStream(stream, null, null);
+    },
+    "UPDATE bg_match_streams SET live_url = ? WHERE id = ? AND match_id = ? AND staff_owned = 0": (state, params) => {
+      const stream = byId(state, params[1]);
+      if (stream) stream.live_url = params[0] as string;
+    },
+    "UPDATE bg_match_streams SET live_url = ?, link_user_id = ? WHERE id = ? AND match_id = ? AND staff_owned = 0": (state, params) => {
+      const stream = byId(state, params[2]);
+      if (stream) setStream(stream, params[0] as string, params[1] as number | null);
+    },
+  };
+
   /** Écritures sur `bg_match_streams`, rejouées sur l'état. */
   function writeStreams(state: { streams: StreamState[] }, sql: string, params: unknown[]) {
-    if (sql === "UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE match_id = ? AND staff_owned = 1") {
-      for (const stream of state.streams) if (stream.staff_owned === 1) setStream(stream, null, null);
-      return [{ affectedRows: 1 }];
-    }
-    if (sql === "UPDATE bg_match_streams SET live_url = ?, staff_owned = 1, link_user_id = ? WHERE id = ?") {
-      const stream = state.streams.find((candidate) => candidate.id === params[2]);
-      if (stream) setStream(Object.assign(stream, { staff_owned: 1 }), params[0] as string | null, params[1] as number | null);
+    const write = STREAM_WRITES[sql];
+    if (write) {
+      write(state, params);
       return [{ affectedRows: 1 }];
     }
     if (sql === "INSERT INTO bg_match_streams (match_id, live_url, staff_owned, link_user_id) VALUES (?, ?, 1, ?)") {
@@ -229,14 +297,14 @@ describe("setMatchLiveConfig", () => {
     const world = liveWorld(matchRow());
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "kick.com/bg", setter: ORGANISER_5 });
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "kick.com/bg", setter: ORGANISER_5, access: STAFF });
 
     const [sql, params] = world.state.matchWrites[0];
-    expect(sql).toBe("UPDATE bg_matches SET live_trigger = ? WHERE id = ?");
+    expect(sql).toBe("UPDATE bg_matches SET live_trigger = ?, live_trigger_user_id = ? WHERE id = ?");
     // L'antenne n'est PAS touchée en MANUAL : une reconfiguration en cours de
     // direct ne doit pas couper l'antenne déjà ouverte.
     expect(sql).not.toMatch(/live_started_at/);
-    expect(params).toEqual(["MANUAL", 42]);
+    expect(params).toEqual(["MANUAL", null, 42]);
     expect(world.state.streams).toEqual([dbStream(1, "https://kick.com/bg", true)]);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
     // Un réglage d'antenne ne touche que le plateau et le direct de l'accueil.
@@ -251,7 +319,7 @@ describe("setMatchLiveConfig", () => {
     );
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/neuve", setter: ORGANISER_5 });
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/neuve", setter: ORGANISER_5, access: STAFF });
 
     expect(world.state.streams).toEqual([
       dbStream(3, "https://twitch.tv/neuve", true),
@@ -265,7 +333,7 @@ describe("setMatchLiveConfig", () => {
     ]);
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/bluegenji", setter: ORGANISER_5 });
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/bluegenji", setter: ORGANISER_5, access: STAFF });
 
     expect(world.state.streams).toEqual([
       dbStream(3, "https://kick.com/voix"),
@@ -274,27 +342,30 @@ describe("setMatchLiveConfig", () => {
   });
 
   it("rattache au caster le lien qu'il pose sans être de l'organisation ; un réglage réenregistré ne le lui prend pas", async () => {
-    const world = liveWorld(matchRow());
+    const row = matchRow();
+    const world = liveWorld(row);
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/voix", setter: CASTER_12 });
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/voix", setter: CASTER_12, access: LIVE_ONLY });
     expect(world.state.streams).toEqual([{ ...dbStream(1, "https://twitch.tv/voix", true), link_user_id: 12 }]);
 
     // Le même lien, réenregistré par l'organisation (mode changé) : il reste au caster.
-    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/voix", setter: ORGANISER_7 });
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/voix", setter: ORGANISER_7, access: STAFF });
     expect(world.state.streams).toEqual([{ ...dbStream(1, "https://twitch.tv/voix", true), link_user_id: 12 }]);
 
     // Un autre lien, posé par l'organisation : c'est le sien.
-    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/bluegenji", setter: ORGANISER_7 });
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/bluegenji", setter: ORGANISER_7, access: STAFF });
     expect(world.state.streams).toEqual([dbStream(1, "https://twitch.tv/bluegenji", true)]);
 
     // Et un caster qui le réenregistre tel quel ne le prend pas.
-    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/bluegenji", setter: CASTER_12 });
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/bluegenji", setter: CASTER_12, access: LIVE_ONLY });
     expect(world.state.streams).toEqual([dbStream(1, "https://twitch.tv/bluegenji", true)]);
 
-    // Démarquer efface lien et fournisseur.
-    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/voix", setter: CASTER_12 });
-    await setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: CASTER_12 });
+    // Démarquer efface lien et fournisseur (le match porte alors le mode du caster 12).
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/voix", setter: CASTER_12, access: LIVE_ONLY });
+    Object.assign(row, { live_trigger: "MANUAL", live_trigger_user_id: 12 });
+    world.state.casters.push({ user_id: 12, stream_id: 7 });
+    await setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: CASTER_12, access: LIVE_ONLY });
     expect(world.state.streams).toEqual([]);
   });
 
@@ -303,7 +374,7 @@ describe("setMatchLiveConfig", () => {
     const world = liveWorld(matchRow(), [dbStream(3, null)], [{ user_id: 5, stream_id: 3 }]);
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/bluegenji", setter: ORGANISER_5 });
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/bluegenji", setter: ORGANISER_5, access: STAFF });
 
     expect(world.state.streams).toEqual([dbStream(3, "https://twitch.tv/bluegenji", true)]);
   });
@@ -312,10 +383,10 @@ describe("setMatchLiveConfig", () => {
     const world = liveWorld(matchRow(), [dbStream(3, null)], [{ user_id: 5, stream_id: 3 }]);
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/arbitre", setter: OWN_CHANNEL_5 });
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/arbitre", setter: OWN_CHANNEL_5, access: STAFF });
     expect(world.state.streams).toEqual([{ ...dbStream(3, "https://twitch.tv/arbitre", true), link_user_id: 5 }]);
 
-    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/arbitre", setter: ORGANISER_7 });
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/arbitre", setter: ORGANISER_7, access: STAFF });
     expect(world.state.streams).toEqual([{ ...dbStream(3, "https://twitch.tv/arbitre", true), link_user_id: 5 }]);
   });
 
@@ -324,13 +395,13 @@ describe("setMatchLiveConfig", () => {
     await mockLiveDb(world);
 
     // Le membre 5 n'est plus (ou n'a jamais été) caster : sa chaîne propre lui reste rattachée.
-    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/arbitre", setter: OWN_CHANNEL_5 });
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/arbitre", setter: OWN_CHANNEL_5, access: STAFF });
     expect(world.state.streams).toEqual([{ ...dbStream(1, "https://twitch.tv/arbitre", true), link_user_id: 5 }]);
     // Réenregistré tel quel en tant qu'organisation : le lien inchangé garde son fournisseur.
-    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/arbitre", setter: ORGANISER_5 });
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/arbitre", setter: ORGANISER_5, access: STAFF });
     expect(world.state.streams).toEqual([{ ...dbStream(1, "https://twitch.tv/arbitre", true), link_user_id: 5 }]);
     // Un lien neuf, dit de l'organisation, n'a aucun fournisseur.
-    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/bluegenji", setter: ORGANISER_5 });
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/bluegenji", setter: ORGANISER_5, access: STAFF });
     expect(world.state.streams).toEqual([dbStream(1, "https://twitch.tv/bluegenji", true)]);
   });
 
@@ -340,7 +411,7 @@ describe("setMatchLiveConfig", () => {
       await mockLiveDb(world);
 
       await expect(
-        setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/x", setter: CASTER_12 }),
+        setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/x", setter: CASTER_12, access: LIVE_ONLY }),
       ).rejects.toThrow("MATCH_NOT_CASTABLE");
       expect(world.state.matchWrites).toEqual([]);
     }
@@ -361,18 +432,18 @@ describe("setMatchLiveConfig", () => {
     });
 
     await expect(
-      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/x", setter: CASTER_12 }),
+      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/x", setter: CASTER_12, access: LIVE_ONLY }),
     ).rejects.toThrow("MATCH_NOT_CASTABLE");
     expect(world.state.streams).toEqual([]);
     expect(world.state.matchWrites).toEqual([]);
   });
 
   it("setMatchLiveConfig_playedMatchAlreadyMarked_refusesNewLinkOrMode", async () => {
-    const world = liveWorld(matchRow({ status: "COMPLETED", live_trigger: "AUTO" }), [dbStream(1, "https://twitch.tv/x", true)]);
+    const world = liveWorld(matchRow({ status: "COMPLETED", live_trigger: "AUTO", live_trigger_user_id: 12 }), [dbStream(1, "https://twitch.tv/x", true)]);
     await mockLiveDb(world);
 
     await expect(
-      setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/me", setter: CASTER_12 }),
+      setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/me", setter: CASTER_12, access: LIVE_ONLY }),
     ).rejects.toThrow("MATCH_NOT_CASTABLE");
     expect(world.state.matchWrites).toEqual([]);
     expect(world.state.streams[0]?.live_url).toBe("https://twitch.tv/x");
@@ -393,16 +464,18 @@ describe("setMatchLiveConfig", () => {
     });
 
     await expect(
-      setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: null, setter: ORGANISER_5 }),
+      setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: null, setter: ORGANISER_5, access: STAFF }),
     ).rejects.toThrow("MATCH_START_AT_REQUIRED");
     expect(world.state.matchWrites).toEqual([]);
   });
 
   it("laisse démarquer un match terminé encore casté : une diffusion posée ne devient pas ineffaçable", async () => {
-    const world = liveWorld(matchRow({ status: "COMPLETED", live_trigger: "AUTO" }), [dbStream(1, "https://twitch.tv/x", true)]);
+    const world = liveWorld(matchRow({ status: "COMPLETED", live_trigger: "AUTO", live_trigger_user_id: 12 }), [dbStream(1, "https://twitch.tv/x", true)], [
+      { user_id: 12, stream_id: 7 },
+    ]);
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: CASTER_12 });
+    await setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: CASTER_12, access: LIVE_ONLY });
 
     expect(world.state.streams).toEqual([]);
   });
@@ -413,7 +486,7 @@ describe("setMatchLiveConfig", () => {
     ]);
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/neuve", setter: ORGANISER_5 });
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/neuve", setter: ORGANISER_5, access: STAFF });
 
     const reads = (table: string) =>
       world.execute.mock.calls.filter(([sql]) => String(sql).includes(`FROM ${table}`) && String(sql).includes("FOR UPDATE"));
@@ -425,7 +498,7 @@ describe("setMatchLiveConfig", () => {
     const world = liveWorld(matchRow(), [dbStream(3, null)], [{ user_id: 9, stream_id: 3 }]);
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/match", setter: ORGANISER_5 });
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/match", setter: ORGANISER_5, access: STAFF });
 
     expect(world.state.streams).toEqual([dbStream(3, "https://twitch.tv/match", true)]);
   });
@@ -434,11 +507,11 @@ describe("setMatchLiveConfig", () => {
     const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_started_at: new Date() }));
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5 });
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
 
     const [sql, params] = world.state.matchWrites[0];
     expect(sql).toMatch(/live_started_at = NULL/);
-    expect(params).toEqual(["AUTO", 42]);
+    expect(params).toEqual(["AUTO", null, 42]);
   });
 
   it("referme l'antenne en passant en START_TIME — c'est l'horloge qui décide", async () => {
@@ -451,18 +524,18 @@ describe("setMatchLiveConfig", () => {
     );
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: null, setter: ORGANISER_5 });
+    await setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: null, setter: ORGANISER_5, access: STAFF });
 
     const [sql, params] = world.state.matchWrites[0];
     expect(sql).toMatch(/live_started_at = NULL/);
-    expect(params).toEqual(["START_TIME", 42]);
+    expect(params).toEqual(["START_TIME", null, 42]);
   });
 
   it("laisse démarquer un match sans date — l'impasse doit rester réversible", async () => {
     const world = liveWorld(matchRow({ start_at: null, live_trigger: "START_TIME" }));
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: ORGANISER_5 });
+    await setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: ORGANISER_5, access: STAFF });
 
     expect(world.state.matchWrites[0][1]).toEqual([42]);
   });
@@ -475,11 +548,11 @@ describe("setMatchLiveConfig", () => {
     );
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: null, liveUrl: "https://twitch.tv/x", setter: ORGANISER_5 });
+    await setMatchLiveConfig(42, { trigger: null, liveUrl: "https://twitch.tv/x", setter: ORGANISER_5, access: STAFF });
 
     const [sql, params] = world.state.matchWrites[0];
     // Sans cet effacement, une remise en MANUAL rouvrirait une antenne fantôme.
-    expect(sql).toMatch(/live_trigger = NULL, live_started_at = NULL/);
+    expect(sql).toMatch(/live_trigger = NULL, live_trigger_user_id = NULL, live_started_at = NULL/);
     expect(params).toEqual([42]);
     // Le stream du staff, sans lien ni caster, part ; celui du caster garde sa
     // chaîne, qu'une remise en diffusion retrouve.
@@ -490,9 +563,9 @@ describe("setMatchLiveConfig", () => {
     const world = liveWorld(matchRow());
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "", setter: ORGANISER_5 });
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "", setter: ORGANISER_5, access: STAFF });
 
-    expect(world.state.matchWrites[0][1]).toEqual(["MANUAL", 42]);
+    expect(world.state.matchWrites[0][1]).toEqual(["MANUAL", null, 42]);
     expect(world.state.streams).toEqual([]);
   });
 
@@ -500,7 +573,7 @@ describe("setMatchLiveConfig", () => {
     const world = liveWorld(matchRow({ live_trigger: "AUTO" }), [dbStream(3, "https://twitch.tv/match", true)]);
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5 });
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
 
     expect(world.state.streams).toEqual([]);
   });
@@ -509,7 +582,7 @@ describe("setMatchLiveConfig", () => {
     const world = liveWorld(matchRow({ live_trigger: "AUTO" }), [dbStream(3, null)], [{ user_id: 9, stream_id: 3 }]);
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5 });
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
 
     expect(world.state.streams).toEqual([dbStream(3, null)]);
   });
@@ -530,7 +603,7 @@ describe("setMatchLiveConfig", () => {
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: world.execute }));
     jest.mocked(withConnection).mockImplementation((run) => run(failing));
 
-    await expect(setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/x", setter: ORGANISER_5 })).rejects.toThrow("base injoignable");
+    await expect(setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/x", setter: ORGANISER_5, access: STAFF })).rejects.toThrow("base injoignable");
     expect(rollback).toHaveBeenCalledTimes(1);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
@@ -541,11 +614,22 @@ describe("setMatchLiveConfig", () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[matchRow({ start_at: null })]]);
     await mockDb(execute);
 
-    await expect(setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: null, setter: ORGANISER_5 })).rejects.toThrow(
+    await expect(setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: null, setter: ORGANISER_5, access: STAFF })).rejects.toThrow(
       "MATCH_START_AT_REQUIRED",
     );
     expect(execute).toHaveBeenCalledTimes(1);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchLiveConfig_unchangedStartTimeWithoutDate_savesStaffLink", async () => {
+    // Mode d'un caster renvoyé tel quel (verrouillé) après que le staff a retiré la date.
+    const world = liveWorld(matchRow({ live_trigger: "START_TIME", live_trigger_user_id: 12, start_at: null }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: "twitch.tv/orga", setter: ORGANISER_5, access: STAFF });
+
+    expect(world.state.matchWrites).toEqual([]);
+    expect(world.state.streams).toEqual([dbStream(1, "https://twitch.tv/orga", true)]);
   });
 
   it("refuse une URL hors liste blanche sans rien écrire", async () => {
@@ -553,7 +637,7 @@ describe("setMatchLiveConfig", () => {
     await mockDb(execute);
 
     await expect(
-      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "https://exemple.com/live", setter: ORGANISER_5 }),
+      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "https://exemple.com/live", setter: ORGANISER_5, access: STAFF }),
     ).rejects.toThrow("INVALID_STREAM_URL");
     expect(execute).toHaveBeenCalledTimes(1);
   });
@@ -567,101 +651,671 @@ describe("setMatchLiveConfig", () => {
         trigger: "SOMETIMES" as never,
         liveUrl: null,
         setter: ORGANISER_5,
+        access: STAFF,
       }),
     ).rejects.toThrow("INVALID_LIVE_TRIGGER");
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it("setMatchLiveConfig_coCasterChangesOwnersTrigger_refusedWithoutWrite", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }), [dbStream(4, "https://kick.com/voix")], [
+      { user_id: 12, stream_id: 4 },
+      { user_id: 13, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: { userId: 13, asOrganisation: false }, access: LIVE_ONLY }),
+    ).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
+    expect(world.state.matchWrites).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_otherMatchRefereeEditsStreamLinks_refused", async () => {
+    // Arbitre (staff) d'un autre match : l'arbitre retenu de celui-ci est 9.
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12, kept_referee_user_id: 9 }), [
+      dbStream(4, "https://kick.com/voix"),
+    ]);
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, {
+        trigger: "MANUAL",
+        liveUrl: null,
+        setter: OWN_CHANNEL_5,
+        access: STAFF,
+        streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/autre" }],
+      }),
+    ).rejects.toThrow("NOT_MATCH_REFEREE");
+    expect(world.state.streams).toEqual([dbStream(4, "https://kick.com/voix")]);
+  });
+
+  it("setMatchLiveConfig_ownRefereeEditsStreamLinks_rebindsLinkToStreamHolder", async () => {
+    // Lien posé au nom de l'organisation : celui que l'arbitre corrige revient au caster qui tient le stream.
+    const world = liveWorld(
+      matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12, kept_referee_user_id: 9 }),
+      [dbStream(4, "https://kick.com/voix")],
+      [{ user_id: 12, stream_id: 4 }],
+    );
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, {
+      trigger: "MANUAL",
+      liveUrl: null,
+      setter: { userId: 9, asOrganisation: false },
+      access: STAFF,
+      streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/neuve" }],
+    });
+
+    expect(world.state.streams).toEqual([{ ...dbStream(4, "https://twitch.tv/neuve"), link_user_id: 12 }]);
+  });
+
+  it("setMatchLiveConfig_refereeChangesCasterMode_keepsCasterOwner", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12, kept_referee_user_id: 9 }), [dbStream(4, null)], [
+      { user_id: 12, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: { userId: 9, asOrganisation: true }, access: STAFF });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", 12, 42]]]);
+  });
+
+  it("setMatchLiveConfig_castingRefereeChangesCasterMode_keepsCasterOwner", async () => {
+    const world = liveWorld(
+      matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12, kept_referee_user_id: 9 }),
+      [dbStream(4, null), dbStream(5, null)],
+      [
+        { user_id: 12, stream_id: 4 },
+        { user_id: 9, stream_id: 5 },
+      ],
+    );
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: { userId: 9, asOrganisation: true }, access: STAFF });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", 12, 42]]]);
+  });
+
+  it("setMatchLiveConfig_refereeCorrectsLinkOfStillCastingProvider_keepsProvider", async () => {
+    // Le co-caster inscrit en second a fourni le lien : il le garde.
+    const world = liveWorld(
+      matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12, kept_referee_user_id: 9 }),
+      [{ ...dbStream(4, "https://kick.com/voix"), link_user_id: 13 }],
+      [
+        { user_id: 12, stream_id: 4 },
+        { user_id: 13, stream_id: 4 },
+      ],
+    );
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, {
+      trigger: "MANUAL",
+      liveUrl: null,
+      setter: { userId: 9, asOrganisation: false },
+      access: STAFF,
+      streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/neuve" }],
+    });
+
+    expect(world.state.streams).toEqual([{ ...dbStream(4, "https://twitch.tv/neuve"), link_user_id: 13 }]);
+  });
+
+  it("setMatchLiveConfig_resaveSameTriggerAndLink_changedFalse", async () => {
+    // Réglage réenregistré tel quel : rien d'écrit, rien à annoncer.
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL" }), [dbStream(6, "https://twitch.tv/orga", true)]);
+    await mockLiveDb(world);
+
+    const outcome = await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/orga", setter: ORGANISER_5, access: STAFF });
+
+    expect(outcome).toEqual({ previousTrigger: "MANUAL", changed: false });
+    expect(world.state.matchWrites).toEqual([]);
+    expect(world.state.streams).toEqual([dbStream(6, "https://twitch.tv/orga", true)]);
+  });
+
+  it("setMatchLiveConfig_liveHolderChangesStaffLinkOnOtherCasterMode_throwsLiveTriggerNotOwned", async () => {
+    // Décision 2 : le lien du staff suit le mode d'un autre caster montré.
+    const world = liveWorld(
+      matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }),
+      [dbStream(6, "https://twitch.tv/orga", true), dbStream(7, "https://twitch.tv/voix")],
+      [{ user_id: 12, stream_id: 7 }],
+    );
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/autre", setter: ORGANISER_5, access: LIVE_ONLY }),
+    ).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
+
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchLiveConfig_liveHolderResendsSameStaffLinkOnOtherCasterMode_passes", async () => {
+    const world = liveWorld(
+      matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }),
+      [dbStream(6, "https://twitch.tv/orga", true), dbStream(7, "https://twitch.tv/voix")],
+      [{ user_id: 12, stream_id: 7 }],
+    );
+    await mockLiveDb(world);
+
+    const outcome = await setMatchLiveConfig(42, {
+      trigger: "MANUAL",
+      liveUrl: "twitch.tv/orga",
+      setter: ORGANISER_5,
+      access: LIVE_ONLY,
+    });
+
+    expect(outcome.changed).toBe(false);
+  });
+
+  it("setMatchLiveConfig_ownerChangesStaffLinkOnOwnMode_writes", async () => {
+    const world = liveWorld(
+      matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }),
+      [dbStream(6, "https://twitch.tv/orga", true), dbStream(7, "https://twitch.tv/voix")],
+      [{ user_id: 12, stream_id: 7 }],
+    );
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/neuve", setter: CASTER_12, access: LIVE_ONLY });
+
+    expect(world.state.streams.find((stream) => stream.id === 6)?.live_url).toBe("https://twitch.tv/neuve");
+  });
+
+  it("setMatchLiveConfig_resaveUnchanged_publishesNoEvent", async () => {
+    // Rien d'écrit : aucun instantané rebâti ni poussé aux lecteurs.
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL" }), [dbStream(6, "https://twitch.tv/orga", true)]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/orga", setter: ORGANISER_5, access: STAFF });
+
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchLiveConfig_sameTriggerNewStaffLink_changedTrue", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL" }), [dbStream(6, "https://twitch.tv/orga", true)]);
+    await mockLiveDb(world);
+
+    const outcome = await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/neuve", setter: ORGANISER_5, access: STAFF });
+
+    expect(outcome.changed).toBe(true);
+  });
+
+  it("setMatchLiveConfig_refereeLinksOnlyOnUnmarkedMatch_changedTrue", async () => {
+    const world = liveWorld(matchRow({ kept_referee_user_id: 9 }), [dbStream(4, null)], [{ user_id: 12, stream_id: 4 }]);
+    await mockLiveDb(world);
+
+    const outcome = await setMatchLiveConfig(42, {
+      trigger: null,
+      liveUrl: null,
+      setter: { userId: 9, asOrganisation: false },
+      access: STAFF,
+      streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/x" }],
+    });
+
+    expect(outcome).toEqual({ previousTrigger: null, changed: true });
+  });
+
+  it("setMatchLiveConfig_liveStaffWithEmptyStreamLinks_savesConfig", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "AUTO" }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, {
+      trigger: "MANUAL",
+      liveUrl: null,
+      setter: { userId: 3, asOrganisation: true },
+      access: STAFF,
+      streamLinks: [],
+    });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["MANUAL", null, 42]]]);
+  });
+
+  it("setMatchLiveConfig_ownRefereeNoLongerEligible_refusedWithoutWrite", async () => {
+    jest.mocked(loadRefereeStanding).mockResolvedValue({ block: "NOT_REFEREE", objection: false });
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12, kept_referee_user_id: 9 }), [
+      dbStream(4, "https://kick.com/voix"),
+    ]);
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, {
+        trigger: "MANUAL",
+        liveUrl: null,
+        setter: { userId: 9, asOrganisation: false },
+        access: STAFF,
+        streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/neuve" }],
+      }),
+    ).rejects.toThrow("NOT_MATCH_REFEREE");
+    expect(world.state.streams).toEqual([dbStream(4, "https://kick.com/voix")]);
+  });
+
+  it("setMatchLiveConfig_actorNotDesignatedReferee_readsGameWithoutRefereeSql", async () => {
+    // L'acteur avec `tournaments` qui n'est pas l'arbitre désigné : la lecture
+    // ne paie pas les sous-requêtes de l'arbitre, sous le verrou du match.
+    const world = liveWorld(matchRow({ live_trigger: "AUTO", referee_user_id: 9 }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
+
+    const game = world.execute.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.startsWith("SELECT t.game,"));
+    expect(game).toContain("NULL AS kept");
+  });
+
+  it("setMatchLiveConfig_lockedRead_excludesRefereeWhoPlaysMatch", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "AUTO", referee_user_id: 5 }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
+
+    const kept = world.execute.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.includes("AS kept"));
+    expect(kept).toContain("krtm.user_id = m.referee_user_id");
+    expect(kept).toContain("krst.solo_user_id = m.referee_user_id");
+  });
+
+  it("setMatchLiveConfig_lockedRead_keepsRefereeOnlyOnMatchToPlay", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "AUTO", referee_user_id: 5 }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
+
+    const kept = world.execute.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.includes("AS kept"));
+    expect(kept).toContain("m.status IN ('PENDING', 'READY')");
+  });
+
+  it("setMatchLiveConfig_lockedRead_launchedBranchRequiresCurrentPairing", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "AUTO", referee_user_id: 5 }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
+
+    const kept = world.execute.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.includes("AS kept"));
+    expect(kept).toContain("m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)");
+  });
+
+  it("setMatchLiveConfig_refereeLinksAndStaffUrlTogether_staffUrlDoesNotTakeCasterStream", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", kept_referee_user_id: 9 }), [dbStream(4, null)], [
+      { user_id: 12, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, {
+      trigger: "MANUAL",
+      liveUrl: "twitch.tv/orga",
+      setter: { userId: 9, asOrganisation: true },
+      access: STAFF,
+      streamLinks: [{ streamId: 4, liveUrl: "kick.com/caster" }],
+    });
+
+    // Le stream du caster garde son lien, rattaché à son caster ; celui du staff en ouvre un autre.
+    expect(world.state.streams.find((stream) => stream.id === 4)).toEqual({ ...dbStream(4, "https://kick.com/caster"), link_user_id: 12 });
+    expect(world.state.streams.find((stream) => stream.id === 5)?.live_url).toBe("https://twitch.tv/orga");
+  });
+
+  it("setMatchLiveConfig_refereeClearsCasterLinkWithStaffUrl_staffUrlOpensOwnStream", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", kept_referee_user_id: 9 }), [dbStream(4, "https://kick.com/caster")], [
+      { user_id: 12, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, {
+      trigger: "MANUAL",
+      liveUrl: "twitch.tv/orga",
+      setter: { userId: 9, asOrganisation: true },
+      access: STAFF,
+      streamLinks: [{ streamId: 4, liveUrl: "" }],
+    });
+
+    expect(world.state.streams.find((stream) => stream.id === 4)).toEqual(dbStream(4, null));
+    expect(world.state.streams.find((stream) => stream.id === 5)).toEqual(dbStream(5, "https://twitch.tv/orga", true));
+  });
+
+  it("setMatchLiveConfig_nonLiveCallerNoLongerReferee_refusedWithoutWrite", async () => {
+    jest.mocked(loadRefereeStanding).mockResolvedValue({ block: "NOT_REFEREE", objection: false });
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", kept_referee_user_id: 9 }));
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: { userId: 9, asOrganisation: true }, access: REFEREE_ONLY }),
+    ).rejects.toThrow("NOT_MATCH_REFEREE");
+    expect(world.state.matchWrites).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_nonLiveCallerStillReferee_writesTriggerWithoutOwner", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", kept_referee_user_id: 9 }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: { userId: 9, asOrganisation: true }, access: REFEREE_ONLY });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", null, 42]]]);
+  });
+
+  it("setMatchLiveConfig_liveOnlyNotCastingSetsTrigger_ownerNull", async () => {
+    const world = liveWorld(matchRow());
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: { userId: 13, asOrganisation: false }, access: LIVE_ONLY });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", null, 42]]]);
+  });
+
+  it("setMatchLiveConfig_casterSetsMode_readsOwnerAndActorOnce", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "AUTO", live_trigger_user_id: 12 }), [dbStream(4, null)], [
+      { user_id: 12, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: null, setter: CASTER_12, access: LIVE_ONLY });
+
+    const shownReads = world.execute.mock.calls.filter(([sql]) => String(sql).includes("SELECT mc.user_id"));
+    expect(shownReads).toHaveLength(1);
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["MANUAL", 12, 42]]]);
+  });
+
+  it("setMatchLiveConfig_refereeLinkOnStreamWithoutCaster_throwsStreamNotFound", async () => {
+    // Le dernier caster du stream est parti : le lien n'aurait personne à qui se rattacher.
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", kept_referee_user_id: 9 }), [dbStream(4, null)]);
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, {
+        trigger: "MANUAL",
+        liveUrl: null,
+        setter: { userId: 9, asOrganisation: false },
+        access: STAFF,
+        streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/x" }],
+      }),
+    ).rejects.toMatchObject({ message: "STREAM_NOT_FOUND", streamId: 4 });
+    expect(world.state.streams).toEqual([dbStream(4, null)]);
+  });
+
+  it("setMatchLiveConfig_linksOnlyOnUnmarkedMatch_noUnmarkWrites", async () => {
+    const world = liveWorld(matchRow({ kept_referee_user_id: 9 }), [dbStream(4, null), dbStream(6, "https://twitch.tv/orga", true)], [
+      { user_id: 12, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, {
+      trigger: null,
+      liveUrl: null,
+      setter: { userId: 9, asOrganisation: false },
+      access: STAFF,
+      streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/x" }],
+    });
+
+    expect(world.state.matchWrites).toEqual([]);
+    expect(world.state.streams.find((stream) => stream.id === 6)?.live_url).toBe("https://twitch.tv/orga");
+  });
+
+  it("setMatchLiveConfig_triggerChanged_returnsPreviousTrigger", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "AUTO" }));
+    await mockLiveDb(world);
+
+    const outcome = await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: null, setter: ORGANISER_5, access: STAFF });
+
+    expect(outcome).toEqual({ previousTrigger: "AUTO", changed: true });
+  });
+
+  it("setMatchLiveConfig_hiddenOwnerMode_staffChangesIt", async () => {
+    // Le maître 12 n'est plus caster du match : le mode revient au staff.
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", null, 42]]]);
+  });
+
+  it("setMatchLiveConfig_ineligibleOwnerBeforeLaunch_staffChangesIt", async () => {
+    // Le maître caste encore, mais tu (inéligible) : il ne tient plus le mode.
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }), [dbStream(4, null)], [
+      { user_id: 12, stream_id: 4, eligible: false },
+    ]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", null, 42]]]);
+  });
+
+  it("setMatchLiveConfig_shownOwnerMode_staffRefused", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }), [dbStream(4, null)], [
+      { user_id: 12, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF }),
+    ).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
+    expect(world.state.matchWrites).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_invalidCasterLink_throwsStreamLinkErrorWithStreamId", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", kept_referee_user_id: 9 }), [dbStream(4, null)], [
+      { user_id: 12, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    const refusal = setMatchLiveConfig(42, {
+      trigger: "MANUAL",
+      liveUrl: null,
+      setter: { userId: 9, asOrganisation: false },
+      access: STAFF,
+      streamLinks: [{ streamId: 4, liveUrl: "https://exemple.com/x" }],
+    });
+
+    await expect(refusal).rejects.toBeInstanceOf(StreamLinkError);
+    await expect(refusal).rejects.toMatchObject({ message: "INVALID_STREAM_URL", streamId: 4 });
+  });
+
+  describe("setMatchOnAir", () => {
+    /** La seule permission `live` (caster), ou le staff `tournaments`. */
+    const LIVE_ACCESS = { isAdmin: false, manages: false, live: true };
+    const STAFF_ACCESS = { isAdmin: false, manages: true, live: true };
+
+    /** Match MANUAL posé par le caster 12, montré sur le stream 4 ; co-caster 13 sur le stream 5. */
+    function ownedWorld(overrides: Record<string, unknown> = {}) {
+      return liveWorld(
+        matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12, ...overrides }),
+        [dbStream(4, "https://twitch.tv/a"), dbStream(5, "https://twitch.tv/b")],
+        [
+          { user_id: 12, stream_id: 4 },
+          { user_id: 13, stream_id: 5 },
+        ],
+      );
+    }
+
+    it("setMatchOnAir_coCasterOnOwnersMode_throwsNotOwned", async () => {
+      const world = ownedWorld();
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 13, LIVE_ACCESS)).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
+      expect(world.state.matchWrites).toEqual([]);
+      expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    });
+
+    it("setMatchOnAir_owner_opensAntennaAndPublishes", async () => {
+      const world = ownedWorld();
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 12, LIVE_ACCESS)).resolves.toBe(true);
+
+      expect(world.state.matchWrites).toEqual([["UPDATE bg_matches SET live_started_at = ? WHERE id = ?", [expect.any(Date), 42]]]);
+      expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
+    });
+
+    it("setMatchOnAir_ownerCloses_clearsStartedAt", async () => {
+      const world = ownedWorld({ live_started_at: new Date("2026-11-05T20:00:00Z") });
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, false, 12, LIVE_ACCESS)).resolves.toBe(true);
+
+      expect(world.state.matchWrites).toEqual([["UPDATE bg_matches SET live_started_at = NULL WHERE id = ?", [42]]]);
+    });
+
+    it("setMatchOnAir_hiddenOwner_staffAllowed", async () => {
+      const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }));
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 5, STAFF_ACCESS)).resolves.toBe(true);
+    });
+
+    it("setMatchOnAir_withoutLiveNorReferee_throwsNotMatchReferee", async () => {
+      const world = ownedWorld();
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 5, { isAdmin: false, manages: true, live: false })).rejects.toThrow(
+        "NOT_MATCH_REFEREE",
+      );
+    });
+
+    it("setMatchOnAir_designatedRefereeWithoutLive_allowed", async () => {
+      const world = ownedWorld({ kept_referee_user_id: 9 });
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 9, { isAdmin: false, manages: true, live: false })).resolves.toBe(true);
+    });
+
+    it("setMatchOnAir_notManual_throwsNotManual", async () => {
+      const world = ownedWorld({ live_trigger: "AUTO" });
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 12, LIVE_ACCESS)).rejects.toThrow("LIVE_TRIGGER_NOT_MANUAL");
+    });
+
+    it("setMatchOnAir_openOnPendingMatch_throwsNotLiveReady", async () => {
+      const world = ownedWorld({ status: "PENDING" });
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 12, LIVE_ACCESS)).rejects.toThrow("MATCH_NOT_LIVE_READY");
+    });
+
+    it("setMatchOnAir_alreadyOnAir_returnsFalseWithoutWriteOrPublish", async () => {
+      const world = ownedWorld({ live_started_at: new Date("2026-11-05T20:00:00Z") });
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 12, LIVE_ACCESS)).resolves.toBe(false);
+      expect(world.state.matchWrites).toEqual([]);
+      expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    });
+
+    it("setMatchOnAir_ownerlessModeShownCaster_allowed", async () => {
+      // Le maître est parti : le caster qui reste ouvre l'antenne sans attendre le staff.
+      const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: null }), [dbStream(5, "https://twitch.tv/b")], [
+        { user_id: 13, stream_id: 5 },
+      ]);
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 13, LIVE_ACCESS)).resolves.toBe(true);
+    });
+
+    it("setMatchOnAir_ownerlessModeLiveNonCaster_throwsNotOwned", async () => {
+      const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: null }));
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 13, LIVE_ACCESS)).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
+      expect(world.state.matchWrites).toEqual([]);
+    });
+
+    it("setMatchOnAir_actorWithoutTournaments_readsGameWithoutRefereeSql", async () => {
+      const world = ownedWorld();
+      await mockLiveDb(world);
+
+      await setMatchOnAir(42, true, 12, LIVE_ACCESS);
+
+      const gameRead = world.execute.mock.calls.find(([sql]) => String(sql).startsWith("SELECT t.game,"));
+      expect(String(gameRead?.[0])).toContain("NULL AS kept");
+      expect(String(gameRead?.[0])).not.toContain("referee_user_id");
+    });
+
+    it("setMatchOnAir_deadlockOnce_retriesAndSucceeds", async () => {
+      const world = ownedWorld();
+      await mockLiveDb(world);
+      const real = world.execute.getMockImplementation()!;
+      world.execute.mockImplementationOnce(async () => {
+        throw Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+      });
+      world.execute.mockImplementation(real);
+
+      await expect(setMatchOnAir(42, true, 12, LIVE_ACCESS)).resolves.toBe(true);
+      expect(world.state.matchWrites).toHaveLength(1);
+    });
+
+    it("setMatchOnAir_unknownMatch_throwsMatchNotFound", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
+      const connection = fakeConnection({
+        execute,
+        beginTransaction: async () => undefined,
+        commit: async () => undefined,
+        rollback: async () => undefined,
+      });
+      const { withConnection } = await import("@/lib/server/database");
+      jest.mocked(withConnection).mockImplementation((run) => run(connection));
+
+      await expect(setMatchOnAir(999, true, 12, LIVE_ACCESS)).rejects.toThrow("MATCH_NOT_FOUND");
+    });
+  });
+
   it("refuse un match inconnu", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
-    await expect(setMatchLiveConfig(999, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5 })).rejects.toThrow(
+    await expect(setMatchLiveConfig(999, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF })).rejects.toThrow(
       "MATCH_NOT_FOUND",
     );
   });
 });
 
-describe("setMatchOnAir", () => {
-  it("ouvre l'antenne d'un match MANUAL jouable", async () => {
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL" })]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+describe("isDesignatedMatchReferee", () => {
+  it("isDesignatedMatchReferee_refereeOfAnotherMatch_false", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ kept: 9 }], []]);
     await mockDb(execute);
 
-    await setMatchOnAir(42, true);
-
-    const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
-    expect(sql).toMatch(/UPDATE bg_matches SET live_started_at = \?/);
-    expect(params[0]).toBeInstanceOf(Date);
-    expect(params[1]).toBe(42);
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
-    // Un réglage d'antenne ne touche que le plateau et le direct de l'accueil.
-    expect(publishUpdatedEvent).not.toHaveBeenCalled();
+    await expect(isDesignatedMatchReferee(43, 3, true)).resolves.toBe(false);
+    expect(execute.mock.calls[0][1]).toEqual([43]);
   });
 
-  it("referme l'antenne en reposant NULL", async () => {
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: new Date() })]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+  it("isDesignatedMatchReferee_playedMatch_queryRestrictsToMatchToPlay", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ kept: null }], []]);
     await mockDb(execute);
 
-    await setMatchOnAir(42, false);
-
-    const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
-    expect(sql).toContain("live_started_at = NULL");
-    expect(sql).toContain("live_started_at IS NOT NULL");
-    expect(params).toEqual([42]);
+    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
+    expect(String(execute.mock.calls[0][0])).toContain("m.status IN ('PENDING', 'READY')");
   });
 
-  it("referme l'antenne même sur un match déjà noté — nettoyage toujours permis", async () => {
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([
-        [matchRow({ live_trigger: "MANUAL", status: "COMPLETED", live_started_at: new Date() })],
-      ])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+  it("isDesignatedMatchReferee_keptReferee_true", async () => {
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[{ kept: "9", tournament_id: 7, game: "OW" }], []]));
+
+    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(true);
+    expect(loadRefereeStanding).toHaveBeenCalledWith(expect.anything(), 9, "OW");
+  });
+
+  it("isDesignatedMatchReferee_keptRefereeIneligible_false", async () => {
+    jest.mocked(loadRefereeStanding).mockResolvedValue({ block: "NOT_REFEREE", objection: false });
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[{ kept: 9, tournament_id: 7, game: "OW" }], []]));
+
+    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
+  });
+
+  it("isDesignatedMatchReferee_keptRefereeWithObjection_false", async () => {
+    // L'opposition retenue se relit avec la condition d'arbitrage, plus dans le SQL.
+    jest.mocked(loadRefereeStanding).mockResolvedValue({ block: null, objection: true });
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ kept: 9, game: "OW" }], []]);
     await mockDb(execute);
 
-    await expect(setMatchOnAir(42, false)).resolves.toBe(true);
+    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
+    expect(String(execute.mock.calls[0][0])).not.toContain("referee_objection_at");
   });
 
-  it("refuse d'ouvrir l'antenne sur un match en AUTO", async () => {
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "AUTO" })]]);
+  it("isDesignatedMatchReferee_unknownMatch_false", async () => {
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([[], []]));
+
+    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
+    expect(loadRefereeStanding).not.toHaveBeenCalled();
+  });
+
+  it("isDesignatedMatchReferee_withoutTournamentsPermission_falseWithoutRead", async () => {
+    const execute = jest.fn<SqlQuery>();
     await mockDb(execute);
 
-    await expect(setMatchOnAir(42, true)).rejects.toThrow("LIVE_TRIGGER_NOT_MANUAL");
-    expect(execute).toHaveBeenCalledTimes(1);
-  });
-
-  it("refuse d'ouvrir l'antenne sur un match non casté", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[matchRow()]]);
-    await mockDb(execute);
-
-    await expect(setMatchOnAir(42, true)).rejects.toThrow("LIVE_TRIGGER_NOT_MANUAL");
-  });
-
-  it("refuse d'ouvrir l'antenne sur un match pas encore jouable ou déjà noté", async () => {
-    for (const status of ["PENDING", "AWAITING_CONFIRMATION", "COMPLETED"]) {
-      const execute = jest
-        .fn<SqlQuery>()
-        .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", status })]]);
-      await mockDb(execute);
-
-      await expect(setMatchOnAir(42, true)).rejects.toThrow("MATCH_NOT_LIVE_READY");
-      expect(execute).toHaveBeenCalledTimes(1);
-    }
-  });
-
-  it("refuse un match inconnu", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
-    await mockDb(execute);
-
-    await expect(setMatchOnAir(999, true)).rejects.toThrow("MATCH_NOT_FOUND");
+    await expect(isDesignatedMatchReferee(42, 9, false)).resolves.toBe(false);
+    expect(execute).not.toHaveBeenCalled();
   });
 });
 
@@ -801,67 +1455,5 @@ describe("findBroadcastingTournament", () => {
     await mockDb(execute);
 
     expect(await findBroadcastingTournament()).toBeNull();
-  });
-});
-
-describe("setMatchOnAir — changement d'état", () => {
-  /** Lecture, UPDATE conditionnel (lignes touchées), puis relecture si rien n'a changé. */
-  function liveRows(before: Record<string, unknown>, affectedRows: number, after: Record<string, unknown> = before) {
-    return jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[matchRow(before)]])
-      .mockResolvedValueOnce([{ affectedRows }])
-      .mockResolvedValueOnce([[matchRow(after)]]);
-  }
-
-  it("setMatchOnAir_alreadyOnAir_returnsFalse", async () => {
-    const execute = liveRows({ live_trigger: "MANUAL", live_started_at: new Date() }, 0);
-    await mockDb(execute);
-    await expect(setMatchOnAir(42, true)).resolves.toBe(false);
-    // L'heure de mise à l'antenne n'est pas réécrite : la condition la garde.
-    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND live_started_at IS NULL");
-    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
-  });
-
-  it("setMatchOnAir_concurrentSecondClick_returnsFalse", async () => {
-    // Les deux clics ont lu l'antenne fermée ; seul le premier UPDATE trouve la ligne.
-    await mockDb(liveRows({ live_trigger: "MANUAL", live_started_at: null }, 0, { live_trigger: "MANUAL", live_started_at: new Date() }));
-    await expect(setMatchOnAir(42, true)).resolves.toBe(false);
-  });
-
-  it("setMatchOnAir_matchCompletedBeforeWrite_throwsNotLiveReady", async () => {
-    // Lu READY, validé avant l'UPDATE : la condition sur le statut ne trouve plus la ligne.
-    const execute = liveRows({ live_trigger: "MANUAL", live_started_at: null }, 0, {
-      live_trigger: "MANUAL",
-      live_started_at: null,
-      status: "COMPLETED",
-    });
-    await mockDb(execute);
-    await expect(setMatchOnAir(42, true)).rejects.toThrow("MATCH_NOT_LIVE_READY");
-    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND status = 'READY'");
-    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND live_trigger = 'MANUAL'");
-    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
-  });
-
-  it("setMatchOnAir_triggerSwitchedToAutoBeforeOffAirWrite_throwsNotManual", async () => {
-    // Lu MANUAL à l'antenne, passé en automatique avant l'UPDATE : la ligne n'est plus trouvée.
-    const execute = liveRows({ live_trigger: "MANUAL", live_started_at: new Date() }, 0, {
-      live_trigger: "AUTO",
-      live_started_at: new Date(),
-    });
-    await mockDb(execute);
-    await expect(setMatchOnAir(42, false)).rejects.toThrow("LIVE_TRIGGER_NOT_MANUAL");
-    expect((execute.mock.calls[1] as [string, unknown[]])[0]).toContain("AND live_trigger = 'MANUAL'");
-    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
-  });
-
-  it("setMatchOnAir_offAir_switchOn_returnsTrue", async () => {
-    await mockDb(liveRows({ live_trigger: "MANUAL", live_started_at: null }, 1));
-    await expect(setMatchOnAir(42, true)).resolves.toBe(true);
-  });
-
-  it("setMatchOnAir_alreadyOffAir_returnsFalse", async () => {
-    await mockDb(liveRows({ live_trigger: "MANUAL", live_started_at: null }, 0));
-    await expect(setMatchOnAir(42, false)).resolves.toBe(false);
   });
 });

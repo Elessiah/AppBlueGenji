@@ -207,7 +207,7 @@ import {
   type DisputeBeforeResolution,
 } from "./dispute-self-resolution";
 import { loadViewerCastBlock } from "./match-launch";
-import { loadRefereeNames } from "./referee-names";
+import { loadRefereeNames, markViewerReferee } from "./referee-names";
 import {
   cachedCertificationPrompt,
   finalCertificationPrompt,
@@ -1297,7 +1297,7 @@ export async function getTournamentViewerContext(
   // Pseudo des arbitres désignés : à tout membre connecté (les deux portes qui
   // servent ce contexte exigent une session), jamais dans l'instantané diffusé.
   // Les mêmes pour tous : lus une fois par version d'instantané.
-  const refereeNames = await loadRefereeNames(snapshot);
+  const refereeNames = markViewerReferee(await loadRefereeNames(snapshot), userId, snapshot.matches);
 
   return {
     preview,

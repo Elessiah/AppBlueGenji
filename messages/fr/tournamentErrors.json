@@ -132,6 +132,8 @@
     "STREAM_URL_REQUIRED": "Le lien de ta chaîne est obligatoire pour ouvrir ton propre stream : sans lien, il n'apparaîtrait nulle part.",
     "INVALID_CAST_BATTLETAG": "BattleTag de cast invalide : 64 caractères au plus, et des caractères visibles.",
     "CAST_STREAM_NOT_OWNED": "Ce stream est celui de l'organisation : son lien se règle dans la configuration de la diffusion.",
+    "LIVE_TRIGGER_NOT_OWNED": "Le mode de passage à l'antenne appartient au caster qui l'a posé : seuls lui, l'arbitre du match ou un admin le changent — l'organisation aussi quand aucun caster ne le tient.",
+    "INVALID_STREAM_LINKS": "Liens des streams invalides.",
     "INVALID_CAST_SETTINGS": "Réglages de diffusion invalides.",
     "MATCH_CAST_SETTINGS_FAILED": "Tes réglages de diffusion n'ont pas pu être enregistrés. Réessaie dans un instant.",
     "INVALID_ORGANISATION_LINK": "Le choix « lien de l'organisation » est invalide.",

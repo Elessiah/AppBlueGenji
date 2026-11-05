@@ -524,6 +524,8 @@ async function recheckOneChannel(row: OpenRow, touched: Set<number>): Promise<bo
     ensured = await ensureVoiceChannel(key, VOICE_FALLBACK_CHANNEL_NAME);
   }
   // Une panne ici ne dit rien du salon : il reste tel qu'il est, redemandé plus tard.
+  // Un refus propre au salon non plus : la ligne reste ouverte (le salon suit
+  // sur la page), et la revérification suivante redemande (MATCH_VOICE.md).
   if (ensured.kind !== "ok") return !BOT_TRANSPORT_FAILURES.has(ensured.code);
   if (ensured.value !== String(row.channel_id)) {
     // Upsert qui rouvre, voulu : si la ligne a été rendue entre-temps (autre processus,

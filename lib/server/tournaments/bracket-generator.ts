@@ -43,6 +43,26 @@ async function loadExistingBracket(
   };
 }
 
+/**
+ * Oublie les check-ins envoyés du plateau supprimé (`bg_lobby_brief_marks`) :
+ * un plateau reconstruit tire de nouvelles rencontres (adversaires, horaires),
+ * et une marque laissée à la même place priverait l'engagée du check-in de
+ * son vrai match. Un retour arrière, lui, garde les marques (le check-in ne
+ * repart jamais deux fois pour le même match). Jamais d'exception : le
+ * plateau se reconstruit quand même.
+ */
+async function forgetLobbyBriefMarks(
+  connection: PoolConnection,
+  where: string,
+  params: number[],
+): Promise<void> {
+  try {
+    await connection.execute(`DELETE FROM bg_lobby_brief_marks WHERE ${where}`, params);
+  } catch (error) {
+    console.error(`[lobby-brief] marques du plateau ${params.join(":")} non effacées`, error);
+  }
+}
+
 /** Supprime le plateau périmé — celui de la phase, ou celui du tournoi. */
 async function discardStaleBracket(
   connection: PoolConnection,
@@ -54,9 +74,11 @@ async function discardStaleBracket(
   if (phaseId > 0) {
     await noteDeletedMatches(connection, "tournament_id = ? AND phase_id = ?", [tournamentId, phaseId]);
     await deletePhaseMatches(connection, tournamentId, phaseId);
+    await forgetLobbyBriefMarks(connection, "tournament_id = ? AND phase_id = ?", [tournamentId, phaseId]);
   } else {
     await noteDeletedMatches(connection, "tournament_id = ?", [tournamentId]);
     await deleteAllMatches(connection, tournamentId);
+    await forgetLobbyBriefMarks(connection, "tournament_id = ?", [tournamentId]);
   }
 }
 

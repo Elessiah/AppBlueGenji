@@ -1098,8 +1098,10 @@ export function ensureVoiceChannel(key: string, name: string): Promise<VoiceCall
 }
 
 /**
- * Rend un salon au bot : supprimé s'il est vide, sinon dès qu'il se vide.
- * `gone` (`404 VOICE_CHANNEL_NOT_TRACKED`) vaut « déjà fait ».
+ * Rend un salon au bot : supprimé s'il est vide, sinon dès qu'il se vide. Un
+ * salon déjà parti (supprimé par la modération, déjà rendu) répond `ok` depuis
+ * le 2026-11-06 ; `gone` (`404 VOICE_CHANNEL_NOT_TRACKED`, bot plus ancien)
+ * vaut toujours « déjà fait ».
  */
 export function releaseVoiceChannel(channelId: string): Promise<VoiceCallOutcome<true>> {
   return voiceCall("POST", `/internal/voice/channels/${encodeURIComponent(channelId)}/release`, {}, (payload) =>

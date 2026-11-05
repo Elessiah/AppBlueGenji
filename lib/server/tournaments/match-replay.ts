@@ -13,6 +13,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { canHaveReplay, normalizeReplayUrl } from "@/lib/shared/match-replay";
 import type { MatchStatus } from "@/lib/shared/types";
+import { nullableId } from "@/lib/shared/nullable-id";
 import { publishMatchUpdatedEvent } from "./notifications";
 
 type MatchReplayRow = RowDataPacket & {
@@ -25,7 +26,6 @@ type MatchReplayRow = RowDataPacket & {
   double_forfeit: number | null;
 };
 
-const nullableId = (value: number | null): number | null => (value === null ? null : Number(value));
 
 /** La ligne lue décrit-elle une rencontre réellement disputée ? (`canHaveReplay`) */
 function isReplayableRow(row: MatchReplayRow): boolean {

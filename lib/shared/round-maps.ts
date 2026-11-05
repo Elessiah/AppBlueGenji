@@ -365,6 +365,8 @@ export function firstBanOrder(
  * Applique les règles du tournoi au plateau de l'instantané : première carte
  * affichée (l'imposée l'emporte) et équipe du premier ban selon la règle.
  * Un match sans réglage garde sa carte ; la règle par défaut ne change rien.
+ * Un match dont l'arbitre désigné crée la partie (`refereeAssigned`) garde son
+ * premier ban (`refereeHostedFirstBanTeamId`) : aucune équipe n'y héberge.
  */
 export function applyMapRules<
   M extends {
@@ -376,6 +378,7 @@ export function applyMapRules<
     team2Id: number | null;
     firstMap: string | null;
     firstBanTeamId: number | null;
+    refereeAssigned?: boolean;
   },
 >(matches: readonly M[], rules: TournamentMapRules): M[] {
   if (rules.rounds.length === 0 && rules.firstBan === DEFAULT_FIRST_BAN_RULE) return [...matches];
@@ -384,7 +387,9 @@ export function applyMapRules<
   return matches.map((match) => {
     const round = byRound.get(roundKeyId(match)) ?? null;
     const firstMap = round ? effectiveFirstMap(round.slots, match.firstMap) : match.firstMap;
-    const firstBanTeamId = firstBanTeamFor(rules.firstBan, match.hostTeamId, match.team1Id, match.team2Id);
+    const firstBanTeamId = match.refereeAssigned
+      ? match.firstBanTeamId
+      : firstBanTeamFor(rules.firstBan, match.hostTeamId, match.team1Id, match.team2Id);
     if (firstMap === match.firstMap && firstBanTeamId === match.firstBanTeamId) return match;
     return { ...match, firstMap, firstBanTeamId };
   });

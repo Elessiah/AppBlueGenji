@@ -19,15 +19,15 @@ jest.mock("@/lib/server/tournaments/lobby-brief-dm", () => {
   return { ...actual, formatLobbyBriefDm: jest.fn(actual.formatLobbyBriefDm) };
 });
 jest.mock("@/lib/server/tournaments/player-pushes", () => ({ readMatchCasters: jest.fn() }));
-jest.mock("@/lib/server/tournaments/cast-eligibility", () => ({ loadEligibleRefereeIds: jest.fn() }));
+
 
 import { getDatabase } from "@/lib/server/database";
-import { loadEntrantPlayerIds, loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
-import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibility";
+import { loadEntrantManagerIds, loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
+
 import { readMatchCasters } from "@/lib/server/tournaments/player-pushes";
 import {
   dispatchLobbyBriefs,
-  lobbyBriefPhase,
+  LOBBY_BRIEF_PHASE,
   resetLobbyBriefThrottle,
 } from "@/lib/server/tournaments/lobby-brief";
 import { formatLobbyBriefDm } from "@/lib/server/tournaments/lobby-brief-dm";
@@ -56,7 +56,8 @@ const MATCH = {
   team1_seed: null,
   team2_seed: null,
   first_map: "Ilios",
-  self_managed: 0,
+  // Le check-in ne part qu'en autogestion (décision du 2026-11-05).
+  self_managed: 1,
   referee_user_id: null,
 };
 
@@ -89,6 +90,7 @@ function mockDb(candidates: Record<string, unknown>[], claims: boolean[] = [], r
       return [claimed ? { affectedRows: 1, insertId: nextId++ } : { affectedRows: 0, insertId: 0 }];
     }
     if (sql.startsWith("DELETE FROM bg_match_start_notices")) return [{ affectedRows: 1 }];
+    if (sql.startsWith("INSERT IGNORE INTO bg_lobby_brief_marks")) return [{ affectedRows: 1 }];
     throw new Error(`requête inattendue : ${sql}`);
   });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
@@ -97,6 +99,15 @@ function mockDb(candidates: Record<string, unknown>[], claims: boolean[] = [], r
 
 function releases(execute: ReturnType<typeof mockDb>["execute"]) {
   return execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE FROM bg_match_start_notices"));
+}
+
+/** Paramètres des réservations seules (les marques durables du check-in sont à part). */
+function claimParams(execute: ReturnType<typeof mockDb>["execute"]) {
+  return execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_start_notices")).map(([, params]) => params);
+}
+
+function marks(execute: ReturnType<typeof mockDb>["execute"]) {
+  return execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_lobby_brief_marks"));
 }
 
 function logged(error: { mock: { calls: unknown[][] } }, text: string): boolean {
@@ -116,7 +127,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   resetLobbyBriefThrottle();
   siteRoot.failFor = null;
-  jest.mocked(loadEntrantPlayerIds).mockResolvedValue(
+  jest.mocked(loadEntrantManagerIds).mockResolvedValue(
     new Map([
       [1, [10, 11]],
       [2, [20]],
@@ -126,7 +137,7 @@ beforeEach(() => {
     ids.map((userId) => ({ userId, discord: { discordId: String(userId), handle: null, label: `u${userId}` } })),
   );
   jest.mocked(readMatchCasters).mockResolvedValue(new Map());
-  jest.mocked(loadEligibleRefereeIds).mockResolvedValue(new Set());
+
   jest.mocked(notifyUsers).mockResolvedValue({
     discord: { sent: 1, unresolved: [], failed: [] },
     discordUnreachedUserIds: [],
@@ -154,9 +165,99 @@ describe("dispatchLobbyBriefs", () => {
     expect(sql).toMatch(/OR \(m\.lobby_opened_at IS NOT NULL\s+AND m\.launch_pairing = CONCAT\(m\.team1_id, ':', m\.team2_id\)\s+AND m\.lobby_opened_at > NOW\(\) - INTERVAL 20 MINUTE\)/);
     // Un match qui porte un score est joué : aucun salon à régler.
     expect(sql).toMatch(/AND m\.team1_score IS NULL AND m\.team2_score IS NULL/);
-    // Un match reste candidat tant qu'un de ses deux côtés n'est pas réservé.
-    expect(sql).toMatch(/n\.phase IN \(\?, \?\)\) < 2/);
-    expect(params).toEqual(["LOBBY_BRIEF_1", "LOBBY_BRIEF_2"]);
+    // Un match reste candidat tant qu'une de ses deux engagées n'est pas réservée
+    // (clé : l'id de l'engagée ; l'ancien format compté par engagée, comme à la réservation).
+    // `CONCAT(…, '')`, jamais `CAST(… AS CHAR)` : sa collation de connexion
+    // heurterait celle de la colonne (« Illegal mix of collations »).
+    expect(sql).toMatch(/n\.phase = \? AND n\.pairing = CONCAT\(m\.team1_id, ''\)/);
+    expect(sql).toMatch(/n\.phase = \? AND n\.pairing = CONCAT\(m\.team2_id, ''\)/);
+    expect(sql).not.toContain("AS CHAR");
+    expect(params).toEqual(["LOBBY_BRIEF", "LOBBY_BRIEF"]);
+  });
+
+  it("dispatchLobbyBriefs_legacyReservation_matchesClaimGuardPerTeam", async () => {
+    const { query } = mockDb([]);
+    await dispatchLobbyBriefs();
+    const sql = String(query.mock.calls[0][0]);
+    // Un brief de l'ancien format vaut pour son engagée quel que soit l'adversaire d'alors.
+    expect(sql).toMatch(/n\.phase = 'LOBBY_BRIEF_1' AND n\.pairing LIKE CONCAT\(m\.team1_id, ':%'\)/);
+    expect(sql).toMatch(/n\.phase = 'LOBBY_BRIEF_2' AND n\.pairing LIKE CONCAT\('%:', m\.team2_id\)/);
+    expect(sql).not.toMatch(/< 2/);
+  });
+
+  it("dispatchLobbyBriefs_sweep_skipsSideWithDurableMark", async () => {
+    const { query } = mockDb([]);
+    await dispatchLobbyBriefs();
+    const sql = String(query.mock.calls[0][0]).replace(/\s+/g, " ");
+    // Une engagée déjà briefée à cette place (match recréé par un retour arrière) n'est plus candidate.
+    expect(sql).toContain("FROM bg_lobby_brief_marks k WHERE k.tournament_id = m.tournament_id AND k.phase_id = m.phase_id");
+    expect(sql).toContain("k.match_number = m.match_number AND k.team_id = m.team1_id");
+    expect(sql).toContain("k.match_number = m.match_number AND k.team_id = m.team2_id");
+  });
+
+  it("dispatchLobbyBriefs_claim_refusedWhenMatchPlaceAlreadyMarked", async () => {
+    const { execute } = mockDb([MATCH]);
+    await dispatchLobbyBriefs();
+    const claim = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
+    expect(claim).toContain(
+      "AND NOT EXISTS (SELECT 1 FROM bg_lobby_brief_marks k WHERE k.tournament_id = m.tournament_id AND k.phase_id = m.phase_id AND k.bracket = m.bracket AND k.round_number = m.round_number AND k.match_number = m.match_number AND k.team_id = ?)",
+    );
+  });
+
+  it("dispatchLobbyBriefs_sideSent_durableMarkWrittenWithTeamAndMatch", async () => {
+    const { execute } = mockDb([MATCH]);
+
+    await dispatchLobbyBriefs();
+
+    expect(marks(execute).map(([, params]) => params)).toEqual([
+      [1, 40],
+      [2, 40],
+    ]);
+  });
+
+  it("dispatchLobbyBriefs_briefNotRendered_noDurableMark", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(formatLobbyBriefDm).mockImplementationOnce(() => {
+      throw new Error("RENDER");
+    });
+    const { execute } = mockDb([MATCH]);
+
+    await dispatchLobbyBriefs();
+
+    // Rien n'est parti du côté 1 : sa réservation est rendue, aucune marque ; le côté 2 en a une.
+    expect(marks(execute).map(([, params]) => params)).toEqual([[2, 40]]);
+    error.mockRestore();
+  });
+
+  it("dispatchLobbyBriefs_sendThrows_markStillWritten", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(notifyUsers).mockRejectedValueOnce(new Error("PUSH_DOWN"));
+    const { execute } = mockDb([MATCH]);
+
+    await dispatchLobbyBriefs();
+
+    // Une partie a pu partir : la marque est posée, jamais deux fois.
+    expect(marks(execute).map(([, params]) => params)).toEqual([
+      [1, 40],
+      [2, 40],
+    ]);
+    error.mockRestore();
+  });
+
+  it("dispatchLobbyBriefs_markWriteFails_sideStillCountedAndLogged", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const { execute } = mockDb([MATCH]);
+    const base = execute.getMockImplementation()!;
+    execute.mockImplementation(async (sql, params) => {
+      if (sql.startsWith("INSERT IGNORE INTO bg_lobby_brief_marks")) throw new Error("DB_DOWN");
+      return base(sql, params);
+    });
+
+    expect(await dispatchLobbyBriefs()).toBe(2);
+
+    expect(logged(error, "parti sans marque durable")).toBe(true);
+    expect(releases(execute)).toHaveLength(0);
+    error.mockRestore();
   });
 
   it("dueSql_hiddenTournament_notDue", async () => {
@@ -195,7 +296,7 @@ describe("dispatchLobbyBriefs", () => {
     await dispatchLobbyBriefs();
     // Le bot n'ouvre de salon qu'à un match qui a son horaire (`MATCH_VOICE.md`).
     expect(query.mock.calls[0][0]).toMatch(/AND m\.start_at IS NOT NULL\) AS voice_tracked/);
-    expect(lobbyBriefPhase(2).length).toBeLessThanOrEqual(16);
+    expect(LOBBY_BRIEF_PHASE.length).toBeLessThanOrEqual(16);
     expect(notifyUsers).not.toHaveBeenCalled();
   });
 
@@ -205,11 +306,11 @@ describe("dispatchLobbyBriefs", () => {
 
     expect(await dispatchLobbyBriefs()).toBe(2);
 
-    expect(execute.mock.calls.map(([, params]) => params)).toEqual([
-      ["LOBBY_BRIEF_1", 40, "1:2"],
-      ["LOBBY_BRIEF_2", 40, "1:2"],
+    expect(claimParams(execute)).toEqual([
+      ["1", "LOBBY_BRIEF", 40, "1:2", "1", "1", "1"],
+      ["2", "LOBBY_BRIEF", 40, "1:2", "2", "2", "2"],
     ]);
-    expect(loadEntrantPlayerIds).toHaveBeenCalledWith([1, 2]);
+    expect(loadEntrantManagerIds).toHaveBeenCalledWith([1, 2]);
     // Une seule lecture pour tous les côtés ; message de match : tag certifié seul.
     expect(loadNotificationRecipients).toHaveBeenCalledTimes(1);
     expect(loadNotificationRecipients).toHaveBeenCalledWith([10, 11, 20], "certified", { matchDm: true });
@@ -241,7 +342,7 @@ describe("dispatchLobbyBriefs", () => {
     const { execute } = mockDb([MATCH]);
     const insert = execute.getMockImplementation()!;
     execute.mockImplementation(async (sql, params) => {
-      if (sql.startsWith("INSERT IGNORE")) order.push(`claim ${String((params as unknown[])[0])}`);
+      if (sql.startsWith("INSERT IGNORE INTO bg_match_start_notices")) order.push(`claim ${String((params as unknown[])[0])}`);
       return insert(sql, params);
     });
     jest.mocked(notifyUsers).mockImplementation(async (recipients) => {
@@ -251,7 +352,7 @@ describe("dispatchLobbyBriefs", () => {
 
     await dispatchLobbyBriefs();
 
-    expect(order).toEqual(["claim LOBBY_BRIEF_1", "send 10,11", "claim LOBBY_BRIEF_2", "send 20"]);
+    expect(order).toEqual(["claim 1", "send 10,11", "claim 2", "send 20"]);
   });
 
   it("ne réserve que si le salon est encore ouvert pour cet appariement et ces équipes (lancement défait ou réappariement entre-temps : rien)", async () => {
@@ -259,7 +360,9 @@ describe("dispatchLobbyBriefs", () => {
     expect(await dispatchLobbyBriefs()).toBe(0);
     const [sql] = execute.mock.calls[0];
     // La réservation relit le match dans la même instruction.
-    expect(sql).toMatch(/INSERT IGNORE INTO bg_match_start_notices \(match_id, pairing, phase\)\s+SELECT m\.id, CONCAT\(m\.team1_id, ':', m\.team2_id\), \? FROM bg_matches m/);
+    expect(sql).toMatch(/INSERT IGNORE INTO bg_match_start_notices \(match_id, pairing, phase\)\s+SELECT m\.id, \?, \? FROM bg_matches m/);
+    // Une réservation de l'ancien format (`LOBBY_BRIEF_1` / `_2`) vaut pour son engagée.
+    expect(sql).toMatch(/AND NOT EXISTS \(SELECT 1 FROM bg_match_start_notices o/);
     // Le tournoi doit toujours être en cours, comme à la lecture des candidats.
     expect(sql).toMatch(/JOIN bg_tournaments t ON t\.id = m\.tournament_id AND t\.state = 'RUNNING'/);
     // Réapparié entre-temps : la clé est l'appariement courant, rien pour les anciennes équipes.
@@ -288,26 +391,26 @@ describe("dispatchLobbyBriefs", () => {
   });
 
   it("dispatchLobbyBriefs_ghostOpponent_claimKeptOnlyRealTeamBriefedWithoutMutualInviteLine", async () => {
-    jest.mocked(loadEntrantPlayerIds).mockResolvedValue(new Map([[1, [10]]]));
+    jest.mocked(loadEntrantManagerIds).mockResolvedValue(new Map([[1, [10]]]));
     const { execute } = mockDb([{ ...MATCH, team2_ghost: 1, self_managed: 1 }]);
 
     expect(await dispatchLobbyBriefs()).toBe(1);
 
     // Les deux côtés réservés : la fantôme garde la sienne, le match quitte les candidats.
-    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE"))).toHaveLength(2);
+    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_start_notices"))).toHaveLength(2);
     expect(sends().map((send) => send.userIds)).toEqual([[10]]);
     expect(sends()[0].dm()).not.toContain("Autogestion");
   });
 
   it("dispatchLobbyBriefs_realTeamWithoutManager_notClaimedAndLoggedOncePerPairing", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
-    jest.mocked(loadEntrantPlayerIds).mockResolvedValue(new Map([[2, [20]]]));
+    jest.mocked(loadEntrantManagerIds).mockResolvedValue(new Map([[2, [20]]]));
     const { execute } = mockDb([MATCH]);
 
     expect(await dispatchLobbyBriefs()).toBe(1);
 
-    expect(execute.mock.calls.map(([, params]) => params)).toEqual([["LOBBY_BRIEF_2", 40, "1:2"]]);
-    expect(logged(error, "aucun joueur actif")).toBe(true);
+    expect(claimParams(execute)).toEqual([["2", "LOBBY_BRIEF", 40, "1:2", "2", "2", "2"]]);
+    expect(logged(error, "aucun gérant actif")).toBe(true);
     // Balayage suivant : toujours sans gestionnaire, pm2 ne le redit pas.
     error.mockClear();
     jest.useFakeTimers({ now: Date.now() + 60_000, doNotFake: ["setTimeout", "clearTimeout"] });
@@ -317,25 +420,24 @@ describe("dispatchLobbyBriefs", () => {
     } finally {
       jest.useRealTimers();
     }
-    expect(logged(error, "aucun joueur actif")).toBe(false);
+    expect(logged(error, "aucun gérant actif")).toBe(false);
     error.mockRestore();
   });
 
-  it("dispatchLobbyBriefs_noSideCanBeBriefed_castersAndRefereesNotRead", async () => {
-    jest.mocked(loadEntrantPlayerIds).mockResolvedValue(new Map());
+  it("dispatchLobbyBriefs_noSideCanBeBriefed_castersNotRead", async () => {
+    jest.mocked(loadEntrantManagerIds).mockResolvedValue(new Map());
     jest.spyOn(console, "error").mockImplementation(() => undefined);
-    const { execute } = mockDb([{ ...MATCH, referee_user_id: 9 }]);
+    const { execute } = mockDb([MATCH]);
 
     expect(await dispatchLobbyBriefs()).toBe(0);
 
     expect(execute).not.toHaveBeenCalled();
     expect(readMatchCasters).toHaveBeenCalledWith(expect.anything(), []);
-    expect(loadEligibleRefereeIds).not.toHaveBeenCalled();
     jest.mocked(console.error).mockRestore();
   });
 
   it("en tournoi individuel, le joueur reçoit le brief sans aucun pseudo", async () => {
-    jest.mocked(loadEntrantPlayerIds).mockResolvedValue(
+    jest.mocked(loadEntrantManagerIds).mockResolvedValue(
       new Map([
         [1, [10]],
         [2, [20]],
@@ -355,64 +457,60 @@ describe("dispatchLobbyBriefs", () => {
   });
 
   it("dispatchLobbyBriefs_marvelRivalsTournament_dmSpeaksOfNoBattletag", async () => {
-    jest.mocked(loadEligibleRefereeIds).mockResolvedValue(new Set([9]));
-    const { query } = mockDb([{ ...MATCH, game: "MR", referee_user_id: 9 }]);
+    jest.mocked(readMatchCasters).mockResolvedValue(new Map([[40, [7]]]));
+    const { query } = mockDb([{ ...MATCH, game: "MR" }]);
 
     await dispatchLobbyBriefs();
 
     expect(query.mock.calls[0][0]).toMatch(/t\.game/);
     const dm = sends()[0].dm();
-    expect(dm).toContain("* L'arbitre désigné invitera les joueurs dans le salon.");
     expect(dm).not.toContain("BattleTag");
     // Hors Overwatch, on ne s'invite pas par BattleTag : on prévient les casters.
-    expect(dm).not.toContain("Ajoute l'arbitre désigné en jeu");
+    expect(dm).toContain("* Prévenez les casters inscrits");
   });
 
-  it("suit l'hôte choisi, la tête de série en BG Survie, le cast et l'arbitre encore éligible", async () => {
+  it("suit l'hôte choisi, la tête de série en BG Survie et le cast", async () => {
     jest.mocked(readMatchCasters).mockResolvedValue(new Map([[40, [7]]]));
-    jest.mocked(loadEligibleRefereeIds).mockResolvedValue(new Set([9]));
     mockDb([
-      { ...MATCH, host_team_id: 2, referee_user_id: 9 },
-      { ...MATCH, id: 41, team1_seed: 4, team2_seed: 1, self_managed: 1 },
-      { ...MATCH, id: 42, referee_user_id: 8 },
+      { ...MATCH, host_team_id: 2 },
+      { ...MATCH, id: 41, team1_seed: 4, team2_seed: 1 },
     ]);
     await dispatchLobbyBriefs();
-    const [m40, , m41, , m42] = sends();
+    const [m40, , m41] = sends();
     expect(m40.dm()).toContain("* Gauche (hôte) : « Nova » · Droite : « Renards »");
+    // Règle par défaut : celle qui n'héberge pas bannit la première.
     expect(m40.dm()).toContain("* Bans de la carte 1 : « Renards » d'abord, puis « Nova ».");
     expect(m40.dm()).toContain("## Match casté");
-    expect(m40.dm()).toContain("Un arbitre est désigné pour votre match.");
-    expect(m40.dm()).toContain("Ajoute l'arbitre désigné en jeu");
-    // Avec un arbitre, personne n'est chargé de créer la partie.
-    expect(m40.dm()).not.toContain("créer la partie");
+    expect(m40.dm()).toContain("**Votre match est en autogestion.**");
+    expect(m40.dm()).toContain("L'équipe hôte crée la partie");
     expect(m41.dm()).toContain("* Gauche (hôte) : « Nova » · Droite : « Renards »");
-    expect(m41.dm()).toContain("**Votre match est en autogestion.**");
     expect(m41.dm()).not.toContain("## Match casté");
-    // Arbitre devenu inéligible : rien n'est promis, et la décision reste neutre.
-    expect(m42.dm()).toContain("Voici les éléments importants à savoir avant le coup d'envoi.");
-    expect(m42.dm()).not.toMatch(/arbitre désigné|autogestion/);
-    expect(loadEligibleRefereeIds).toHaveBeenCalledWith(expect.anything(), [9, 8], expect.any(String));
   });
 
-  it("dispatchLobbyBriefs_refereePlaysTheMatch_noRefereeLine", async () => {
-    jest.mocked(loadEligibleRefereeIds).mockResolvedValue(new Set([9]));
-    const { query } = mockDb([{ ...MATCH, referee_user_id: 9, referee_plays: 1 }]);
+  it("dueSql_refereedOrUndecidedMatch_notDue", async () => {
+    const { query } = mockDb([]);
 
     await dispatchLobbyBriefs();
 
-    // Même règle que l'éligibilité des matchs (`playsMatchSql`) : membre actif ou joueur solo.
-    expect(query.mock.calls[0][0]).toMatch(/rptm\.user_id = m\.referee_user_id/);
-    expect(query.mock.calls[0][0]).toMatch(/rptm\.team_id IN \(m\.team1_id, m\.team2_id\)/);
-    expect(query.mock.calls[0][0]).toMatch(/rpst\.solo_user_id = m\.referee_user_id AND rpst\.id IN \(m\.team1_id, m\.team2_id\)/);
-    expect(sends()[0].dm()).not.toContain("arbitre désigné");
+    // Autogestion seulement (décision du 2026-11-05) : un match arbitré ou sans
+    // décision ne reçoit aucun check-in, ni à la lecture ni à la réservation.
+    expect(query.mock.calls[0][0]).toMatch(/AND m\.self_managed = 1 AND m\.referee_user_id IS NULL/);
+  });
+
+  it("dispatchLobbyBriefs_claim_requiresSelfManagedInTheSameStatement", async () => {
+    const { execute } = mockDb([MATCH]);
+
+    await dispatchLobbyBriefs();
+
+    // Une autogestion retirée entre la lecture et la réservation : rien n'est réservé.
+    expect(execute.mock.calls[0][0]).toMatch(/AND m\.self_managed = 1 AND m\.referee_user_id IS NULL/);
   });
 
   it("dispatchLobbyBriefs_settingsChangedBeforeClaim_rereadSettingsBriefed", async () => {
-    jest.mocked(loadEligibleRefereeIds).mockImplementation(async (_db, ids) => new Set(ids.filter((id) => id === 5)));
     const { query } = mockDb(
       [MATCH],
       [],
-      new Map([[40, { ...MATCH, host_team_id: 2, first_map: "Busan", referee_user_id: 5 }]]),
+      new Map([[40, { ...MATCH, host_team_id: 2, first_map: "Busan" }]]),
     );
 
     await dispatchLobbyBriefs();
@@ -421,9 +519,6 @@ describe("dispatchLobbyBriefs", () => {
     expect(query).toHaveBeenCalledTimes(3);
     expect(sends()[0].dm()).toContain("* Gauche (hôte) : « Nova »");
     expect(sends()[0].dm()).toContain("« Busan »");
-    // Arbitre désigné entre les deux lectures : sa condition est lue à part.
-    expect(loadEligibleRefereeIds).toHaveBeenLastCalledWith(expect.anything(), [5], expect.any(String));
-    expect(sends()[0].dm()).toContain("Un arbitre est désigné pour votre match.");
   });
 
   it("dispatchLobbyBriefs_rereadFails_claimReleasedByIdNothingSentRetryArmed", async () => {
@@ -538,14 +633,6 @@ describe("dispatchLobbyBriefs", () => {
     error.mockRestore();
   });
 
-  it("une panne de lecture des casters ou des arbitres ne prive pas les joueurs du check-in", async () => {
-    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
-    jest.mocked(loadEligibleRefereeIds).mockRejectedValue(new Error("DB_DOWN"));
-    mockDb([{ ...MATCH, referee_user_id: 9 }]);
-    expect(await dispatchLobbyBriefs()).toBe(2);
-    expect(sends()[0].dm()).not.toContain("arbitre désigné");
-    error.mockRestore();
-  });
 
   it("dispatchLobbyBriefs_managersOrRecipientsUnreadable_nothingClaimed", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
@@ -576,7 +663,7 @@ describe("dispatchLobbyBriefs", () => {
     const base = execute.getMockImplementation()!;
     let inserts = 0;
     execute.mockImplementation(async (sql, params) => {
-      if (sql.startsWith("INSERT IGNORE")) {
+      if (sql.startsWith("INSERT IGNORE INTO bg_match_start_notices")) {
         inserts += 1;
         if (inserts === 1) throw new Error("CONNECTION_LOST");
       }
@@ -587,7 +674,7 @@ describe("dispatchLobbyBriefs", () => {
 
     // Le côté interrompu du 40 est rendu par sa clé ; le 41 part quand même.
     expect(releases(execute).map(([sql, params]) => [sql, params])).toEqual([
-      ["DELETE FROM bg_match_start_notices WHERE match_id = ? AND pairing = ? AND phase = ?", [40, "1:2", "LOBBY_BRIEF_1"]],
+      ["DELETE FROM bg_match_start_notices WHERE match_id = ? AND pairing = ? AND phase = ?", [40, "1", "LOBBY_BRIEF"]],
     ]);
     expect(notifyUsers).toHaveBeenCalledTimes(2);
     expect(logged(error, "brief du match 40 interrompu")).toBe(true);
@@ -652,7 +739,7 @@ describe("dispatchLobbyBriefs", () => {
       jest.mocked(notifyUsers).mockClear();
       const second = mockDb([MATCH], [true, false]);
       await jest.advanceTimersByTimeAsync(10_000);
-      expect(second.execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE"))).toHaveLength(2);
+      expect(second.execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_start_notices"))).toHaveLength(2);
       expect(sends().map((send) => send.userIds)).toEqual([[10, 11]]);
     } finally {
       jest.useRealTimers();
@@ -713,7 +800,7 @@ describe("dispatchLobbyBriefs", () => {
     expect(await dispatchLobbyBriefs()).toBe(0);
 
     expect(notifyUsers).not.toHaveBeenCalled();
-    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE"))).toHaveLength(1);
+    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_start_notices"))).toHaveLength(1);
     expect(releases(execute).map(([sql, params]) => [sql, params])).toEqual([
       ["DELETE FROM bg_match_start_notices WHERE id IN (?)", [100]],
     ]);
@@ -855,21 +942,20 @@ describe("dispatchLobbyBriefs", () => {
 
     expect(await dispatchLobbyBriefs()).toBe(1);
 
-    expect(execute.mock.calls.map(([, params]) => params)).toEqual([["LOBBY_BRIEF_2", 40, "1:2"]]);
-    expect(logged(error, "aucun joueur actif")).toBe(true);
+    expect(claimParams(execute)).toEqual([["2", "LOBBY_BRIEF", 40, "1:2", "2", "2", "2"]]);
+    expect(logged(error, "aucun gérant actif")).toBe(true);
     error.mockRestore();
   });
 
-  it("dispatchLobbyBriefs_allManagersDeleted_castersAndRefereesNotRead", async () => {
+  it("dispatchLobbyBriefs_allManagersDeleted_castersNotRead", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(loadNotificationRecipients).mockResolvedValue([]);
-    const { execute } = mockDb([{ ...MATCH, referee_user_id: 9 }]);
+    const { execute } = mockDb([MATCH]);
 
     expect(await dispatchLobbyBriefs()).toBe(0);
 
     expect(execute).not.toHaveBeenCalled();
     expect(readMatchCasters).toHaveBeenCalledWith(expect.anything(), []);
-    expect(loadEligibleRefereeIds).not.toHaveBeenCalled();
     error.mockRestore();
   });
 

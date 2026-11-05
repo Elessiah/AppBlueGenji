@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments-service");
-jest.mock("@/lib/server/tournaments/referee-names", () => ({ loadRefereeNames: jest.fn() }));
+jest.mock("@/lib/server/tournaments/referee-names", () => ({ loadRefereeNames: jest.fn(), markViewerReferee: jest.fn() }));
 jest.mock("@/lib/server/api-guard", () => ({
   ...jest.requireActual<typeof import("@/lib/server/api-guard")>("@/lib/server/api-guard"),
   enforceRateLimit: jest.fn(),
@@ -13,7 +13,7 @@ import { GET } from "@/app/api/tournaments/[id]/referee-names/route";
 import { enforceRateLimit } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
-import { loadRefereeNames } from "@/lib/server/tournaments/referee-names";
+import { loadRefereeNames, markViewerReferee } from "@/lib/server/tournaments/referee-names";
 import { authUser } from "../../../helpers/auth-user";
 import { tournamentSnapshot } from "../../../helpers/tournament-detail";
 
@@ -29,6 +29,7 @@ beforeEach(() => {
   jest.mocked(enforceRateLimit).mockReturnValue(null);
   jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(tournamentSnapshot());
   jest.mocked(loadRefereeNames).mockResolvedValue([{ matchId: 5, refereeKey: "k", pseudo: "Alpha" }]);
+  jest.mocked(markViewerReferee).mockImplementation((names) => names);
 });
 
 describe("GET /api/tournaments/[id]/referee-names", () => {
@@ -84,5 +85,15 @@ describe("GET /api/tournaments/[id]/referee-names", () => {
     await get("7");
 
     expect(getVisibleTournamentSnapshot).toHaveBeenCalledWith(7, { canManage: true });
+  });
+
+  it("GET_viewerRefereesMatch_marksHisMatches", async () => {
+    jest.mocked(markViewerReferee).mockReturnValue([{ matchId: 5, refereeKey: "k", pseudo: "Alpha", mine: true }]);
+
+    const res = await get("7");
+
+    expect(await res.json()).toEqual({ refereeNames: [{ matchId: 5, refereeKey: "k", pseudo: "Alpha", mine: true }] });
+    // Le lecteur lui-même, jamais un identifiant lu dans la requête.
+    expect(markViewerReferee).toHaveBeenCalledWith([{ matchId: 5, refereeKey: "k", pseudo: "Alpha" }], 3, expect.any(Array));
   });
 });

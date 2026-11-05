@@ -77,6 +77,8 @@ type MatchState = {
   first_map: string | null;
   /** Mode d'antenne du match (`bg_matches.live_trigger`), absent = non casté. */
   live_trigger?: string | null;
+  /** Le caster qui a posé le mode (`bg_matches.live_trigger_user_id`). */
+  live_trigger_user_id?: number | null;
   /** `bg_match_casters` du match, dans l'ordre d'inscription. */
   casters: CasterState[];
   /** `bg_match_streams` du match (`staff_owned` : 1 = stream du staff). */
@@ -348,6 +350,14 @@ function readRoundRows(state: World, sql: string): [unknown, unknown[]] | null {
 
 /** Lectures de `bg_users` : un compte, ou un lot (éligibilité des casters), `null` pour les autres requêtes. */
 function readUserRows(state: World, sql: string, params: unknown[]): unknown[] | null {
+  if (sql.startsWith("SELECT mc.user_id,")) {
+    // Casters montrés (`loadShownCasterIds`) : ceux du match, avec leur compte.
+    const ids = params.slice(1).map(Number);
+    const rows = (state.match?.casters ?? [])
+      .filter((caster) => ids.includes(caster.user_id))
+      .map((caster) => ({ user_id: caster.user_id, ...state.users[caster.user_id] }));
+    return [rows, []];
+  }
   if (sql.includes("FROM bg_users WHERE id IN (")) {
     const rows = params.map(Number).flatMap((id) => (state.users[id] ? [{ id, ...state.users[id] }] : []));
     return [rows, []];
@@ -582,16 +592,16 @@ describe("setMatchReady — appariement réécrit sur place", () => {
     expect(state.match?.launched_at).toBeNull();
   });
 
-  it("adoptCurrentPairing_pairingChanged_deletesAllButCurrentPairingCheckIn", async () => {
+  it("adoptCurrentPairing_pairingChanged_deletesAllButCheckIns", async () => {
     // A:B → A:C → A:B : les réservations de l'appariement qui revient ne doivent
-    // pas faire taire l'appel aux « Prêt » ; son check-in, parti 15 minutes avant
-    // l'horaire, reste réservé pour ne pas repartir à l'ouverture du salon.
+    // pas faire taire l'appel aux « Prêt » ; les check-in (par engagée) restent
+    // réservés : un réappariement ne les renvoie pas.
     state.match = matchState({ launch_pairing: `${TEAM1}:30` });
 
     await setMatchReady(42, 1, true);
 
     expect(state.writes).toContain(
-      `DELETE FROM bg_match_start_notices WHERE match_id = ? AND NOT (pairing = ? AND phase IN ('LOBBY_BRIEF_1', 'LOBBY_BRIEF_2')) [42,"${TEAM1}:${TEAM2}"]`,
+      `DELETE FROM bg_match_start_notices WHERE match_id = ? AND phase NOT LIKE 'LOBBY_BRIEF%' [42]`,
     );
   });
 
@@ -630,6 +640,25 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
       reason: "JOINED_TEAM",
     });
     expect(announceCastChange).not.toHaveBeenCalled();
+  });
+
+  it("maintainMatchLaunches_casterJoinedTeamOwnedTrigger_releasesOwnership", async () => {
+    state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
+    state.match = matchState({ launch_pairing: null, caster_user_id: CASTER, live_trigger: "AUTO", live_trigger_user_id: CASTER });
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    // Le mode reste au match, au staff : plus au nom d'un caster parti.
+    expect(state.writes).toContain("UPDATE bg_matches SET live_trigger_user_id = NULL WHERE id = ?");
+  });
+
+  it("maintainMatchLaunches_releasedCasterNotOwner_keepsOwner", async () => {
+    state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
+    state.match = matchState({ launch_pairing: null, caster_user_id: CASTER, live_trigger: "AUTO", live_trigger_user_id: 901 });
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    expect(state.writes).not.toContain("UPDATE bg_matches SET live_trigger_user_id = NULL WHERE id = ?");
   });
 
   it("garde un caster étranger aux deux équipes", async () => {
@@ -770,7 +799,7 @@ describe("claimMatchCast", () => {
     state.users[CASTER] = verified;
     state.issued = [];
     await claimMatchCast(42, CASTER, true, OWN_STREAM, { trigger: "AUTO" });
-    expect(state.issued).toContain("UPDATE bg_matches SET live_trigger = ?, live_started_at = NULL WHERE id = ?");
+    expect(state.issued).toContain("UPDATE bg_matches SET live_trigger = ?, live_trigger_user_id = ?, live_started_at = NULL WHERE id = ?");
   });
 
   it("ouvre un stream à part avec son lien, normalisé : l'accueil relit", async () => {
@@ -819,6 +848,17 @@ describe("claimMatchCast", () => {
     expect(state.match.casters.map((caster) => caster.user_id)).toEqual([901, 902, CASTER]);
   });
 
+  it("claimMatchCast_hiddenCasterStreamLaunchedOnPreviousPairing_throwsStreamNotFound", async () => {
+    state.users[CASTER] = verified;
+    // Le lancement d'un appariement d'avant ne vaut pas pour celui-ci : le caster tu le reste.
+    state.users[901] = { ...ELIGIBLE_CASTER, platform_roles_json: null };
+    state.match = matchState({ caster_user_id: 901, launched_at: STAMP, launch_pairing: `${TEAM1}:999` });
+
+    await expect(claimMatchCast(42, CASTER, true, { streamId: 1 })).rejects.toThrow("STREAM_NOT_FOUND");
+
+    expect(state.writes).toEqual([]);
+  });
+
   it("rejoint le stream du staff sans caster, et tout stream d'un match lancé", async () => {
     state.users[CASTER] = verified;
     state.match = matchState({ streams: [{ id: 1, live_url: "https://twitch.tv/officiel", staff_owned: 1 }] });
@@ -864,7 +904,7 @@ describe("claimMatchCast", () => {
   it("claimMatchCast_marvelRivalsWithoutBattlenet_isAccepted", async () => {
     state.match = { ...state.match!, tournament_game: "MR", game: "MR" };
     state.users[CASTER] = { ...verified, blizzard_sub: null, overwatch_battletag: null };
-    await expect(claimMatchCast(42, CASTER, true, OWN_STREAM)).resolves.toBeUndefined();
+    await expect(claimMatchCast(42, CASTER, true, OWN_STREAM)).resolves.toEqual({ triggerSkipped: false });
   });
 
   it("claimMatchCast_marvelRivalsWithoutDiscord_stillRefused", async () => {
@@ -1012,7 +1052,7 @@ describe("releaseMatchCast", () => {
     state.issued = [];
     await releaseMatchCast(42, CASTER, false);
     expect(state.match?.streams).toEqual([]);
-    expect(state.issued).toContain("UPDATE bg_matches SET live_trigger = NULL, live_started_at = NULL WHERE id = ?");
+    expect(state.issued).toContain("UPDATE bg_matches SET live_trigger = NULL, live_trigger_user_id = NULL, live_started_at = NULL WHERE id = ?");
   });
 
   it("releaseMatchCast_staffStreamWithLinkRemains_keepsTrigger", async () => {
@@ -1255,6 +1295,15 @@ describe("releaseIneligibleCast", () => {
     expect(casterOf(state)).toBe(before);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
     expect(announceCastChange).not.toHaveBeenCalled();
+  });
+
+  it("releaseIneligibleCast_ownerOfTrigger_releasesOwnership", async () => {
+    state.users[CASTER] = ineligible;
+    state.match = matchState({ caster_user_id: CASTER, live_trigger: "MANUAL", live_trigger_user_id: CASTER });
+
+    await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
+
+    expect(state.writes).toContain("UPDATE bg_matches SET live_trigger_user_id = NULL WHERE id = ?");
   });
 
   it("garde un compte redevenu éligible", async () => {
@@ -1658,6 +1707,23 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     });
   });
 
+  it("releaseIneligibleReferee_launchedOnPreviousPairingRefereeJoinedTeam_releasesWithJoinedTeam", async () => {
+    // Le lancement d'un appariement d'avant ne vaut pas pour celui-ci : l'arbitre
+    // qui joue désormais le match ne compte plus, comme avant tout lancement.
+    state.memberships.push({ userId: REFEREE, teamId: TEAM2, roles: ["DPS"] });
+    state.match = matchState({ referee_user_id: REFEREE, launched_at: STAMP, launch_pairing: `${TEAM1}:999` });
+
+    expect(await releaseIneligibleReferee(42, REFEREE)).toBe(true);
+
+    expect(state.match?.referee_user_id).toBeNull();
+    expect(announceRefereeChange).toHaveBeenCalledWith({
+      kind: "AUTO_RELEASED",
+      matchId: 42,
+      refereeId: REFEREE,
+      reason: "JOINED_TEAM",
+    });
+  });
+
   it("garde un arbitre éligible qui ne joue pas le match", async () => {
     state.match = matchState({ referee_user_id: REFEREE });
     expect(await releaseIneligibleReferee(42, REFEREE)).toBe(false);
@@ -1860,6 +1926,15 @@ describe("casters devenus inéligibles : retirés au lancement (EF-29)", () => {
       expect.anything(),
       expect.objectContaining({ kind: "AUTO_RELEASED", casterId: CASTER, reason: "INELIGIBLE" }),
     );
+  });
+
+  it("forceLaunchMatch_ineligibleTriggerOwner_releasesOwnership", async () => {
+    state.users[CASTER] = INELIGIBLE;
+    state.match = matchState({ caster_user_id: CASTER, live_trigger: "AUTO", live_trigger_user_id: CASTER });
+
+    await forceLaunchMatch(42);
+
+    expect(state.writes).toContain("UPDATE bg_matches SET live_trigger_user_id = NULL WHERE id = ?");
   });
 
   it("forceLaunchMatch_eligibleCaster_keepsIt", async () => {

@@ -29,7 +29,6 @@
  */
 import type { Locale } from "./locales";
 import type { GameSetting } from "./match-page";
-import type { RefereeDecision } from "./match-referee";
 import type { NextBanRule, ResolvedMapSlot } from "./round-maps";
 import type { TournamentGame } from "./types";
 
@@ -84,7 +83,6 @@ export type LobbyBriefSide = {
    * est alors tue plutôt que d'annoncer un live introuvable.
    */
   streamUrl?: string | null;
-  decision: RefereeDecision;
 };
 
 /**

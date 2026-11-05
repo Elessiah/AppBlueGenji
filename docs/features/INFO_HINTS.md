@@ -178,3 +178,7 @@ feuille de style), `tests/app/info-hints-account.test.ts` et
 câblage des `aria-describedby`). Un test qui vérifie qu'un écran n'offre
 « aucun geste » retire d'abord les boutons « i » du balisage
 (`tests/helpers/info-hint-markup.ts`).
+
+CAST-FOLLOWUP : les paragraphes explicatifs des fenêtres du cast
+(`CastClaimDialog`, `CastSettingsDialog`, `CastSettingsFields`,
+`MatchLiveDialog`) passent derrière `<InfoHint>`.

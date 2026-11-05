@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/tournaments/live-streams");
+jest.mock("@/lib/server/tournaments/live-streams", () => ({
+  ...jest.createMockFromModule<typeof import("@/lib/server/tournaments/live-streams")>("@/lib/server/tournaments/live-streams"),
+  // La vraie classe d'erreur : la route la reconnaît par `instanceof`.
+  StreamLinkError: jest.requireActual<typeof import("@/lib/server/tournaments/live-streams")>("@/lib/server/tournaments/live-streams")
+    .StreamLinkError,
+}));
 jest.mock("@/lib/server/tournaments/staff-action-logs");
 
 import { PUT as putTournamentLive } from "@/app/api/admin/tournaments/[id]/live/route";
@@ -14,7 +19,10 @@ import {
   setMatchLiveConfig,
   setMatchOnAir,
   setTournamentLiveUrl,
+  StreamLinkError,
 } from "@/lib/server/tournaments/live-streams";
+import * as liveAccess from "@/lib/server/tournaments/live-access";
+import { announceStaffMatchAction } from "@/lib/server/tournaments/staff-action-logs";
 import { authUser } from "../../../helpers/auth-user";
 
 const player = authUser({ id: 2, isAdmin: false, roles: [] });
@@ -73,7 +81,7 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
 
   it("un membre de l'organisation décoche « lien de l'organisation » : c'est sa propre chaîne", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue(undefined);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true });
 
     const res = await putMatchLive(
       matchReq("PUT", { trigger: "AUTO", liveUrl: "kick.com/bg", organisationLink: false }),
@@ -85,6 +93,7 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
       trigger: "AUTO",
       liveUrl: "kick.com/bg",
       setter: { userId: arbitre.id, asOrganisation: false },
+      access: { isAdmin: false, manages: true, live: true },
     });
   });
 
@@ -194,7 +203,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
 
   it("accepte un CASTER — c'est tout l'intérêt du rôle", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue(undefined);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true });
 
     const res = await putMatchLive(
       matchReq("PUT", { trigger: "MANUAL", liveUrl: "kick.com/bg" }),
@@ -207,12 +216,13 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "MANUAL",
       liveUrl: "kick.com/bg",
       setter: { userId: caster.id, asOrganisation: false },
+      access: { isAdmin: false, manages: false, live: true },
     });
   });
 
   it("accepte un arbitre — il cumule tournaments et live", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue(undefined);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true });
     expect((await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"))).status).toBe(
       200,
     );
@@ -222,12 +232,13 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "AUTO",
       liveUrl: null,
       setter: { userId: arbitre.id, asOrganisation: false },
+      access: { isAdmin: false, manages: true, live: true },
     });
   });
 
   it("PUT_tournamentsMemberOrganisationLinkTrue_marksOrganisationLink", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue(undefined);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true });
 
     const res = await putMatchLive(
       matchReq("PUT", { trigger: "AUTO", liveUrl: "kick.com/bg", organisationLink: true }),
@@ -239,7 +250,119 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "AUTO",
       liveUrl: "kick.com/bg",
       setter: { userId: arbitre.id, asOrganisation: true },
+      access: { isAdmin: false, manages: true, live: true },
     });
+  });
+
+  it("PUT_otherMatchRefereeStreamLinks_returns403", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchLiveConfig).mockRejectedValue(new Error("NOT_MATCH_REFEREE"));
+
+    const res = await putMatchLive(
+      matchReq("PUT", { trigger: "MANUAL", streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/x" }] }),
+      matchParams("42"),
+    );
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "NOT_MATCH_REFEREE" });
+  });
+
+  it("PUT_coCasterChangesTrigger_returns403", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setMatchLiveConfig).mockRejectedValue(new Error("LIVE_TRIGGER_NOT_OWNED"));
+
+    const res = await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"));
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "LIVE_TRIGGER_NOT_OWNED" });
+  });
+
+  it("PUT_invalidCasterLink_returns400WithStreamId", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchLiveConfig).mockRejectedValue(new StreamLinkError("INVALID_STREAM_URL", 4));
+
+    const res = await putMatchLive(
+      matchReq("PUT", { trigger: "MANUAL", streamLinks: [{ streamId: 4, liveUrl: "exemple.com/x" }] }),
+      matchParams("42"),
+    );
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: "INVALID_STREAM_URL", streamId: 4 });
+  });
+
+  it("PUT_unknownCasterStream_returns404WithStreamId", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchLiveConfig).mockRejectedValue(new StreamLinkError("STREAM_NOT_FOUND", 9));
+
+    const res = await putMatchLive(
+      matchReq("PUT", { trigger: "MANUAL", streamLinks: [{ streamId: 9, liveUrl: "twitch.tv/x" }] }),
+      matchParams("42"),
+    );
+
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toMatchObject({ error: "STREAM_NOT_FOUND", streamId: 9 });
+  });
+
+  it("PUT_clearWithoutPreviousTrigger_logsConfigured", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true });
+
+    await putMatchLive(matchReq("PUT", { trigger: null, streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/x" }] }), matchParams("42"));
+
+    // Corriger les liens d'un match sans mode ne retire aucune diffusion.
+    expect(announceStaffMatchAction).toHaveBeenCalledWith(42, "LIVE_CONFIGURED", undefined);
+  });
+
+  it("PUT_gateReadFails_returns500Code", async () => {
+    // Panne de la lecture de l'arbitre à la porte : un code, jamais une erreur nue.
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    jest.spyOn(liveAccess, "mayConfigureMatchLive").mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+
+    const res = await putMatchLive(matchReq("PUT", { trigger: "AUTO", liveUrl: null }), matchParams("42"));
+
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({ error: "MATCH_LIVE_UPDATE_FAILED" });
+    expect(setMatchLiveConfig).not.toHaveBeenCalled();
+  });
+
+  it("POST_gateReadFails_returns500Code", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    jest.spyOn(liveAccess, "mayConfigureMatchLive").mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+
+    const res = await postMatchOnAir(matchReq("POST", { onAir: true }), matchParams("42"));
+
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({ error: "MATCH_LIVE_UPDATE_FAILED" });
+    expect(setMatchOnAir).not.toHaveBeenCalled();
+  });
+
+  it("PUT_nothingWritten_noAnnouncement", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: "MANUAL", changed: false });
+
+    const res = await putMatchLive(matchReq("PUT", { trigger: "MANUAL", liveUrl: null }), matchParams("42"));
+
+    // Rien d'écrit : aucune action de staff annoncée.
+    expect(res.status).toBe(200);
+    expect(announceStaffMatchAction).not.toHaveBeenCalled();
+  });
+
+  it("PUT_clearWithPreviousTrigger_logsRemoved", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: "AUTO", changed: true });
+
+    await putMatchLive(matchReq("PUT", { trigger: null }), matchParams("42"));
+
+    expect(announceStaffMatchAction).toHaveBeenCalledWith(42, "LIVE_REMOVED", undefined);
+  });
+
+  it("PUT_invalidStreamLinks_returns400", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+
+    const res = await putMatchLive(matchReq("PUT", { trigger: "MANUAL", streamLinks: "x" }), matchParams("42"));
+
+    expect(res.status).toBe(400);
+    expect(setMatchLiveConfig).not.toHaveBeenCalled();
   });
 
   it("rejette un community manager avec 403", async () => {
@@ -251,19 +374,20 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
 
   it("démarque le match quand trigger est absent ou null", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue(undefined);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true });
 
     await putMatchLive(matchReq("PUT", {}), matchParams("42"));
     expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
       trigger: null,
       liveUrl: null,
       setter: { userId: caster.id, asOrganisation: false },
+      access: { isAdmin: false, manages: false, live: true },
     });
   });
 
   it("accepte le mode START_TIME", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue(undefined);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true });
 
     const res = await putMatchLive(matchReq("PUT", { trigger: "START_TIME" }), matchParams("42"));
 
@@ -272,6 +396,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "START_TIME",
       liveUrl: null,
       setter: { userId: caster.id, asOrganisation: false },
+      access: { isAdmin: false, manages: false, live: true },
     });
   });
 
@@ -353,7 +478,7 @@ describe("POST /api/admin/matches/[matchId]/live", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ onAir: true });
-    expect(setMatchOnAir).toHaveBeenCalledWith(42, true);
+    expect(setMatchOnAir).toHaveBeenCalledWith(42, true, caster.id, { isAdmin: false, manages: false, live: true });
   });
 
   it("referme l'antenne", async () => {
@@ -361,7 +486,7 @@ describe("POST /api/admin/matches/[matchId]/live", () => {
     jest.mocked(setMatchOnAir).mockResolvedValue(true);
 
     await postMatchOnAir(matchReq("POST", { onAir: false }), matchParams("42"));
-    expect(setMatchOnAir).toHaveBeenCalledWith(42, false);
+    expect(setMatchOnAir).toHaveBeenCalledWith(42, false, caster.id, { isAdmin: false, manages: false, live: true });
   });
 
   it("exige un onAir booléen — une chaîne « false » ne doit pas ouvrir l'antenne", async () => {
@@ -386,5 +511,15 @@ describe("POST /api/admin/matches/[matchId]/live", () => {
     expect(
       (await postMatchOnAir(matchReq("POST", { onAir: true }), matchParams("42"))).status,
     ).toBe(409);
+  });
+
+  it("POST_coCasterOnOwnersMode_returns403NotOwned", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setMatchOnAir).mockRejectedValue(new Error("LIVE_TRIGGER_NOT_OWNED"));
+
+    const res = await postMatchOnAir(matchReq("POST", { onAir: true }), matchParams("42"));
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "LIVE_TRIGGER_NOT_OWNED" });
   });
 });

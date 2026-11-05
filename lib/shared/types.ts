@@ -654,6 +654,12 @@ export type BracketMatch = {
   /** Mode de passage à l'antenne ; `null` = match non casté. */
   liveTrigger: MatchLiveTrigger | null;
   /**
+   * Le caster qui a posé ce mode et en reste maître (`lib/shared/live-trigger-owner.ts`) :
+   * son identifiant, déjà public parmi `casters` ; `null` (ou absent) quand le mode
+   * est au staff — posé par lui, ou son caster parti.
+   */
+  liveTriggerCasterId?: number | null;
+  /**
    * **Premier** lien de diffusion du match (le stream le plus ancien qui en a
    * un) — celui des vues compactes ; `null` = casté sans lien public. Tous les
    * liens sont dans `streams`.
@@ -896,7 +902,17 @@ export type TournamentViewerContext = {
 };
 
 /** Pseudo de l'arbitre d'un match, lié à l'empreinte de sa désignation. */
-export type MatchRefereeName = { matchId: number; refereeKey: string; pseudo: string };
+export type MatchRefereeName = {
+  matchId: number;
+  refereeKey: string;
+  pseudo: string;
+  /**
+   * Le lecteur est-il cet arbitre ? Posé par lecteur, après la lecture commune
+   * (`markViewerReferee`) : ouvre la configuration de diffusion du match à son
+   * arbitre (`docs/features/CAST_SETTINGS.md` § Médiation de l'arbitre).
+   */
+  mine?: true;
+};
 
 /** Proposition map par map d'un engagé, datée de son dépôt. */
 export type ProposalMaps = { reportedAt: string; maps: MatchMapResult[] };
@@ -1232,6 +1248,8 @@ export type PersonalDataExport = {
   providedStreamLinks: { matchId: number; tournamentId: number; liveUrl: string | null; createdAt: string | null }[];
   /** Matchs dont il est l'arbitre désigné (`bg_matches.referee_user_id`, T04), avec son « Prêt ». */
   refereeAssignments: { matchId: number; tournamentId: number; readyAt: string | null }[];
+  /** Matchs dont il a posé le mode d'antenne (`bg_matches.live_trigger_user_id`, T16). */
+  liveTriggers: { matchId: number; tournamentId: number; liveTrigger: string | null }[];
   /**
    * Suspensions du compte encore conservées (`lib/shared/account-suspension.ts`) :
    * faits retenus, clause invoquée et dates — jamais qui les a prononcées.

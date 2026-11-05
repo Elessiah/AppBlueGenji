@@ -136,6 +136,8 @@ describe("setRefereeScheduling", () => {
     expect(notices?.sql).toContain("start_at IS NULL");
     expect(notices?.sql).toContain("NOT (team1_score IS NOT NULL OR team2_score IS NOT NULL)");
     expect(notices?.params).toEqual([7]);
+    // Le check-in déjà parti ne repart pas au nouveau lancement.
+    expect(notices?.sql).toContain("phase NOT LIKE 'LOBBY_BRIEF%'");
   });
 
   it("ne touche à aucune notification quand on éteint l'option", async () => {

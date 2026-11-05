@@ -337,6 +337,7 @@ export async function getMatchRows(
       m.phase_id,
       m.start_at,
       m.live_trigger,
+      m.live_trigger_user_id,
       m.live_started_at,
       m.host_team_id,
       m.lobby_opened_at,

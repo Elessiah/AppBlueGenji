@@ -110,6 +110,34 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
     // Table déjà présente, ou création refusée : les départs se taisent.
   }
 
+  // Check-in d'un match envoyé à une engagée, par **place** du match dans le
+  // tournoi (phase, tableau, manche, numéro) et non par son id : un match
+  // effacé puis recréé (retour arrière, régénération d'une manche) garde la
+  // marque, et le check-in ne repart jamais deux fois — décision de
+  // l'utilisateur du 2026-11-05 (`docs/features/MATCH_LOBBY_BRIEF.md`). Part
+  // avec le tournoi ou l'engagée.
+  try {
+    await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_lobby_brief_marks (
+        tournament_id BIGINT NOT NULL,
+        phase_id BIGINT NOT NULL,
+        bracket VARCHAR(16) NOT NULL,
+        round_number INT NOT NULL,
+        match_number INT NOT NULL,
+        team_id BIGINT NOT NULL,
+        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (tournament_id, phase_id, bracket, round_number, match_number, team_id),
+        KEY idx_bg_lobby_brief_marks_team (team_id),
+        CONSTRAINT fk_bg_lobby_brief_marks_tournament FOREIGN KEY (tournament_id)
+          REFERENCES bg_tournaments(id) ON DELETE CASCADE,
+        CONSTRAINT fk_bg_lobby_brief_marks_team FOREIGN KEY (team_id)
+          REFERENCES bg_teams(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch {
+    // Table déjà présente, ou création refusée.
+  }
+
   // Réservation d'une annonce de live sur Discord (#live, `@everyone`) : une
   // par match et par affiche (`pairing` : les deux engagés sans ordre, `5:7`)
   // — `docs/features/LIVE_STREAMS.md`. Même mécanique :

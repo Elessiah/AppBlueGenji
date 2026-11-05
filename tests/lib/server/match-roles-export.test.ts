@@ -7,7 +7,7 @@ jest.mock("@/lib/server/database");
 /**
  * Les matchs où le titulaire a tenu un rôle, dans son export
  * (`docs/features/RGPD_DATA_RIGHTS.md`) : inscriptions de caster, liens de
- * chaîne fournis, arbitrages désignés.
+ * chaîne fournis, arbitrages désignés, modes d'antenne posés.
  */
 
 async function mockDb(execute: SqlMock) {
@@ -32,7 +32,8 @@ describe("listOwnMatchRoles", () => {
       .mockResolvedValueOnce([[
         { match_id: 5, tournament_id: 2, live_url: "https://twitch.tv/voix", created_at: new Date("2026-10-20T17:00:00Z") },
       ]])
-      .mockResolvedValueOnce([[{ id: 6, tournament_id: 2, referee_ready_at: null }]]);
+      .mockResolvedValueOnce([[{ id: 6, tournament_id: 2, referee_ready_at: null }]])
+      .mockResolvedValueOnce([[{ id: 7, tournament_id: 2, live_trigger: "MANUAL" }]]);
     await mockDb(execute);
 
     expect(await listOwnMatchRoles(12)).toEqual({
@@ -40,6 +41,8 @@ describe("listOwnMatchRoles", () => {
       casts: [{ matchId: 5, tournamentId: 2, streamId: 3, readyAt: "2026-10-20T18:00:00.000Z", createdAt: "2026-10-20T17:00:00.000Z", castBattletag: "Voix#2100" }],
       providedStreamLinks: [{ matchId: 5, tournamentId: 2, liveUrl: "https://twitch.tv/voix", createdAt: "2026-10-20T17:00:00.000Z" }],
       refereeAssignments: [{ matchId: 6, tournamentId: 2, readyAt: null }],
+      // Le compte qui a posé le mode d'antenne est une donnée gardée (CAST-FOLLOWUP).
+      liveTriggers: [{ matchId: 7, tournamentId: 2, liveTrigger: "MANUAL" }],
     });
   });
 
@@ -49,16 +52,17 @@ describe("listOwnMatchRoles", () => {
 
     await listOwnMatchRoles(12);
 
-    expect(execute.mock.calls.map(([, params]) => params)).toEqual([[12], [12], [12]]);
+    expect(execute.mock.calls.map(([, params]) => params)).toEqual([[12], [12], [12], [12]]);
     expect(execute.mock.calls[0][0]).toMatch(/WHERE c\.user_id = \?/);
     expect(execute.mock.calls[1][0]).toMatch(/WHERE s\.link_user_id = \?/);
     expect(execute.mock.calls[2][0]).toMatch(/WHERE referee_user_id = \?/);
+    expect(execute.mock.calls[3][0]).toMatch(/WHERE live_trigger_user_id = \?/);
   });
 
   it("listOwnMatchRoles_noRole_returnsEmptyLists", async () => {
     await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
 
-    expect(await listOwnMatchRoles(12)).toEqual({ casts: [], providedStreamLinks: [], refereeAssignments: [] });
+    expect(await listOwnMatchRoles(12)).toEqual({ casts: [], providedStreamLinks: [], refereeAssignments: [], liveTriggers: [] });
   });
 
   it("listOwnMatchRoles_missingTable_returnsEmptyForThatReadOnly", async () => {
@@ -66,7 +70,8 @@ describe("listOwnMatchRoles", () => {
       .fn<SqlQuery>()
       .mockRejectedValueOnce(missingTable())
       .mockResolvedValueOnce([[]])
-      .mockResolvedValueOnce([[{ id: 6, tournament_id: 2, referee_ready_at: null }]]);
+      .mockResolvedValueOnce([[{ id: 6, tournament_id: 2, referee_ready_at: null }]])
+      .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     const roles = await listOwnMatchRoles(12);
@@ -80,10 +85,27 @@ describe("listOwnMatchRoles", () => {
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[]])
       .mockRejectedValueOnce(unknownColumn())
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     expect((await listOwnMatchRoles(12)).providedStreamLinks).toEqual([]);
+  });
+
+  it("listOwnMatchRoles_liveTriggerColumnMissing_returnsEmptyTriggersOnly", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ id: 6, tournament_id: 2, referee_ready_at: null }]])
+      .mockRejectedValueOnce(unknownColumn());
+    await mockDb(execute);
+
+    const roles = await listOwnMatchRoles(12);
+
+    // Migration CAST-FOLLOWUP pas encore jouée : l'export part quand même.
+    expect(roles.liveTriggers).toEqual([]);
+    expect(roles.refereeAssignments).toEqual([{ matchId: 6, tournamentId: 2, readyAt: null }]);
   });
 
   it("listOwnMatchRoles_otherFailure_rethrows", async () => {

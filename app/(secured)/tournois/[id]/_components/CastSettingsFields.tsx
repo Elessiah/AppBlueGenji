@@ -32,6 +32,19 @@ export function castBattletagInvalid(value: string): boolean {
 }
 
 /**
+ * Le mode que montre `CastTriggerField` : verrouillé, celui **du match** (que
+ * le flux tient à jour), jamais le choix local de la fenêtre, figé à son
+ * ouverture ; sinon le choix local.
+ */
+export function lockedTrigger(
+  locked: boolean,
+  matchTrigger: MatchLiveTrigger | null,
+  picked: MatchLiveTrigger,
+): MatchLiveTrigger {
+  return locked && matchTrigger !== null ? matchTrigger : picked;
+}
+
+/**
  * Le mode choisi demande-t-il une date de début que le match n'a pas ? Le
  * serveur refuse ce couple (`MATCH_START_AT_REQUIRED`) : la fenêtre désarme en
  * amont plutôt que de laisser buter dessus.
@@ -65,10 +78,19 @@ export function CastUrlField({
 }>) {
   const { t } = useActionsText();
   const hintId = useId();
+  const infoId = useId();
   const locked = readOnlyNote !== undefined;
+  // Une ligne sous le champ seulement pour un refus ou un stream en lecture :
+  // l'explication vit derrière le « i » (`INFO_HINTS.md`).
+  const note = invalid ? t("cardActions.castSettings.urlInvalid", { platforms: CAST_PLATFORMS }) : (readOnlyNote ?? null);
   return (
     <div className="field">
-      <label htmlFor={id}>{t("cardActions.castSettings.url")}</label>
+      <InfoHintRow>
+        <label htmlFor={id}>{t("cardActions.castSettings.url")}</label>
+        <InfoHint id={infoId} subject={t("cardActions.castSettings.urlSubject")}>
+          <p>{t("cardActions.castSettings.urlHint", { platforms: CAST_PLATFORMS })}</p>
+        </InfoHint>
+      </InfoHintRow>
       <input
         id={id}
         value={value}
@@ -78,13 +100,13 @@ export function CastUrlField({
         placeholder="https://twitch.tv/…"
         readOnly={locked}
         // Le refus est lu avant l'aide (`fieldAria`), et l'aide reste lisible.
-        {...fieldAria(id, invalid, hintId)}
+        {...fieldAria(id, invalid, note === null ? null : hintId, infoId)}
       />
-      <p id={hintId} className={invalid ? styles.hintInvalid : styles.hint}>
-        {invalid
-          ? t("cardActions.castSettings.urlInvalid", { platforms: CAST_PLATFORMS })
-          : (readOnlyNote ?? t("cardActions.castSettings.urlHint", { platforms: CAST_PLATFORMS }))}
-      </p>
+      {note !== null && (
+        <p id={hintId} className={invalid ? styles.hintInvalid : styles.hint}>
+          {note}
+        </p>
+      )}
       <FieldErrorText fieldId={id} message={fieldError ?? null} />
     </div>
   );
@@ -95,23 +117,53 @@ export function CastUrlField({
  * caster comme il l'était par la configuration du direct. « À la date de début »
  * reste désarmé tant que le match n'a pas d'horaire : la date se pose avec la
  * permission `tournaments`.
+ *
+ * `locked` : le mode appartient à un autre (le caster qui l'a posé, ou le
+ * staff — `viewerMayChangeLiveTrigger`) ; il se lit sans contrôle, plutôt
+ * qu'un choix que le serveur refuserait (`LIVE_TRIGGER_NOT_OWNED`). L'appelant
+ * passe alors le mode **du match** (`lockedTrigger`), jamais son choix local.
  */
 export function CastTriggerField({
   trigger,
   startAt,
   onChange,
+  locked = false,
 }: Readonly<{
   trigger: MatchLiveTrigger;
   startAt: BracketMatch["startAt"];
   onChange: (trigger: MatchLiveTrigger) => void;
+  locked?: boolean;
 }>) {
   const { t, locale } = useActionsText();
   const name = useId();
+  const hintId = useId();
   const startAtLabel = formatMatchStartAt(startAt, locale);
   const startAtMissing = startAtLabel === null;
+  if (locked) {
+    return (
+      <InfoHintRow inline>
+        <p className={styles.locked}>
+          {t("cardActions.castSettings.triggerLocked", {
+            mode: t(`cardActions.castSettings.triggers.${trigger}`),
+          })}
+        </p>
+        <InfoHint id={hintId} subject={t("cardActions.castSettings.trigger")}>
+          <p>{t("cardActions.castSettings.triggerLockedHint")}</p>
+        </InfoHint>
+      </InfoHintRow>
+    );
+  }
   return (
     <fieldset className={styles.group}>
-      <legend className={styles.legend}>{t("cardActions.castSettings.trigger")}</legend>
+      <legend className={styles.legend}>
+        <InfoHintRow>
+          {t("cardActions.castSettings.trigger")}
+          <InfoHint id={hintId} subject={t("cardActions.castSettings.trigger")}>
+            <p>{t("cardActions.castSettings.autoStop")}</p>
+            {startAtMissing && <p>{t("cardActions.castSettings.noStartAt")}</p>}
+          </InfoHint>
+        </InfoHintRow>
+      </legend>
       {MATCH_LIVE_TRIGGERS.map((option) => {
         const off = requiresMatchStartAt(option) && startAtMissing;
         return (
@@ -130,9 +182,6 @@ export function CastTriggerField({
           </label>
         );
       })}
-      <p className={styles.hint}>
-        {startAtMissing ? t("cardActions.castSettings.noStartAt") : t("cardActions.castSettings.autoStop")}
-      </p>
     </fieldset>
   );
 }
@@ -151,23 +200,29 @@ export function CastBattletagField({
 }: Readonly<{ id: string; value: string; onChange: (value: string) => void; invalid: boolean }>) {
   const { t } = useActionsText();
   const hintId = useId();
+  const infoId = useId();
   return (
     <div className="field">
-      <label htmlFor={id}>{t("cardActions.castSettings.battletag")}</label>
+      <InfoHintRow>
+        <label htmlFor={id}>{t("cardActions.castSettings.battletag")}</label>
+        <InfoHint id={infoId} subject={t("cardActions.castSettings.battletagSubject")}>
+          <p>{t("cardActions.castSettings.battletagHint")}</p>
+        </InfoHint>
+      </InfoHintRow>
       <input
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         maxLength={MAX_CAST_BATTLETAG_LENGTH}
         placeholder="Pseudo#1234"
-        aria-describedby={hintId}
+        aria-describedby={invalid ? `${hintId} ${infoId}` : infoId}
         aria-invalid={invalid ? true : undefined}
       />
-      <p id={hintId} className={invalid ? styles.hintInvalid : styles.hint}>
-        {invalid
-          ? t("cardActions.castSettings.battletagInvalid")
-          : t("cardActions.castSettings.battletagHint")}
-      </p>
+      {invalid && (
+        <p id={hintId} className={styles.hintInvalid}>
+          {t("cardActions.castSettings.battletagInvalid")}
+        </p>
+      )}
     </div>
   );
 }

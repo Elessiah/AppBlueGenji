@@ -115,6 +115,21 @@ export function firstBanTeamId(
   return hostTeamId === team1Id ? team2Id : team1Id;
 }
 
+/**
+ * Premier ban d'un match **dont l'arbitre désigné crée la partie** : l'équipe
+ * qui n'est pas la meilleure tête de série (`matchHostTeamId` sans l'hôte choisi
+ * par le staff — rang d'endurance en BlueGenji Survie, phase finale, sinon
+ * l'équipe 1), quelle que soit la règle de premier ban du tournoi : aucune
+ * équipe n'héberge. `null` tant qu'un adversaire manque.
+ */
+export function refereeHostedFirstBanTeamId(
+  team1Id: number | null,
+  team2Id: number | null,
+  seeds?: { team1: number | null; team2: number | null },
+): number | null {
+  return firstBanTeamId(matchHostTeamId(null, team1Id, team2Id, seeds), team1Id, team2Id);
+}
+
 /** Un match entré en lancement sans arbitre ni autogestion, avant son alerte. */
 export type NoRefereeCandidate = {
   matchId: number;
@@ -169,7 +184,7 @@ export function groupNoRefereeAlerts(candidates: readonly NoRefereeCandidate[]):
 }
 
 /** Pseudo d'arbitre lié à l'empreinte de sa désignation (`TournamentViewerContext.refereeNames`). */
-type RefereeNameEntry = { matchId: number; refereeKey: string; pseudo: string };
+type RefereeNameEntry = { matchId: number; refereeKey: string; pseudo: string; mine?: true };
 
 /** Ce qu'il faut d'un match pour savoir s'il nomme son arbitre. */
 type RefereeNamedMatch = { id: number; refereeKey: string | null; status: MatchStatus };
@@ -196,7 +211,21 @@ export function refereeNameOf(
 ): string | null {
   if (!showsRefereeName(match)) return null;
   const entry = names.find((name) => name.matchId === match.id && name.refereeKey === match.refereeKey);
-  return entry ? entry.pseudo : null;
+  // Une entrée sans pseudo (arbitre reconnu de lui seul, `markViewerReferee`) ne nomme personne.
+  return entry && entry.pseudo !== "" ? entry.pseudo : null;
+}
+
+/**
+ * Le lecteur est-il l'arbitre désigné **montré** de ce match (`mine` posé par
+ * `markViewerReferee`, même empreinte que l'instantané) ? Ouvre la
+ * configuration de diffusion (médiation, `CAST_SETTINGS.md`). Comme le pseudo,
+ * vaut tant que le score n'est pas déclaré (`showsRefereeName`).
+ */
+export function viewerRefereesMatch(match: RefereeNamedMatch, names: readonly RefereeNameEntry[]): boolean {
+  if (!showsRefereeName(match)) return false;
+  return names.some(
+    (name) => name.matchId === match.id && name.refereeKey === match.refereeKey && name.mine === true,
+  );
 }
 
 /**
@@ -210,9 +239,20 @@ export function missingRefereeNamesKey(
 ): string {
   const missing: string[] = [];
   for (const match of matches) {
-    if (showsRefereeName(match) && refereeNameOf(match, names) === null) missing.push(`${match.id}:${match.refereeKey}`);
+    if (refereeNameMissing(match, names)) missing.push(`${match.id}:${match.refereeKey}`);
   }
   return missing.join(",");
+}
+
+/**
+ * Désignation montrée que `names` ne résout pas : ni pseudo, ni marque de
+ * l'arbitre lui-même (`mine`, posée même quand son pseudo n'est pas lisible —
+ * `markViewerReferee` : la relire n'apprendrait rien de plus).
+ */
+function refereeNameMissing(match: RefereeNamedMatch, names: readonly RefereeNameEntry[]): boolean {
+  if (!showsRefereeName(match)) return false;
+  const entry = names.find((name) => name.matchId === match.id && name.refereeKey === match.refereeKey);
+  return entry === undefined || (entry.pseudo === "" && entry.mine !== true);
 }
 
 /** Nombre de désignations montrées dont le pseudo manque dans `names`. */
@@ -222,7 +262,7 @@ function missingRefereeNamesCount(
 ): number {
   let missing = 0;
   for (const match of matches) {
-    if (showsRefereeName(match) && refereeNameOf(match, names) === null) missing += 1;
+    if (refereeNameMissing(match, names)) missing += 1;
   }
   return missing;
 }
@@ -247,9 +287,9 @@ export function parseRefereeNames(value: unknown): RefereeNameEntry[] | null {
   const names: RefereeNameEntry[] = [];
   for (const item of value as unknown[]) {
     if (!item || typeof item !== "object") continue;
-    const { matchId, refereeKey, pseudo } = item as Record<string, unknown>;
+    const { matchId, refereeKey, pseudo, mine } = item as Record<string, unknown>;
     if (typeof matchId !== "number" || typeof refereeKey !== "string" || typeof pseudo !== "string") continue;
-    names.push({ matchId, refereeKey, pseudo });
+    names.push(mine === true ? { matchId, refereeKey, pseudo, mine } : { matchId, refereeKey, pseudo });
   }
   return names;
 }

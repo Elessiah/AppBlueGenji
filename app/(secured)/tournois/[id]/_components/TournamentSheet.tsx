@@ -1247,6 +1247,7 @@ function TournamentSheetView({
         openConfig={openMatchLive}
         openSchedule={openMatchSchedule}
         viewerUserId={detail.viewerUserId}
+        viewerIsAdmin={detail.canDelete}
         myTeamId={detail.myTeamId}
         castBlock={detail.castBlock}
         openReplay={openMatchReplay}

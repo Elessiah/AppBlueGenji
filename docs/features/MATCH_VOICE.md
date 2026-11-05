@@ -101,6 +101,21 @@ et rien n'est compté.
   nombres, `pending`) se lit `OPEN`, sans le reste. La vue spectateur ne garde rien
   (`voice: null`).
 
+## Comportements gardés (CAST-FOLLOWUP)
+
+La page du match ne montre **aucun lien** vers les salons (décision du
+2026-11-05 : les conditions v9 restent exactes) — leur état seul.
+
+Comportements gardés et documentés (décisions du 2026-11-05) :
+
+- un rendu ou une revérification **refusés** par le bot pour ce salon
+  laissent la ligne **ouverte** (`failed_at` noté), redemandée après
+  la fenêtre de revérification (`OPEN_DUE_CHANNELS_SQL`, au plus une fois par minute) ;
+- un salon **supprimé par la modération** est recréé à la revérification
+  suivante, dans la fenêtre du match ;
+- le bot répond **succès** au rendu d'un salon déjà disparu ou jamais suivi
+  (`{ released: true, deleted: true }`) : la ligne se clôt (PR du bot).
+
 ## Formulaire
 
 Case « Salons vocaux d'équipe » (`TeamVoiceChannelsField`) dans le formulaire du

@@ -28,6 +28,7 @@ import type { MatchStatus } from "@/lib/shared/types";
 import { toIso } from "@/lib/server/serialization";
 import type { StaffActor } from "@/lib/shared/log-privacy";
 import { retryOnDeadlock } from "./deadlock-retry";
+import { nullableId } from "@/lib/shared/nullable-id";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { notifyMatchScheduleChange } from "./schedule-notices";
 
@@ -306,10 +307,6 @@ async function restoreHeldMarks(
 
 type MarkRow = RowDataPacket & { offset_key: string; start_at: Date | string | null };
 
-/** Identifiant d'une place de la manche (`null` : vide). */
-function nullableId(value: number | string | null): number | null {
-  return value === null ? null : Number(value);
-}
 /**
  * Ce que les joueurs ont reçu (`TOLD`) et ce qui a été poussé aux arbitres
  * (`STAFF`), lus sous les verrous de l'écriture de la date.
@@ -386,23 +383,17 @@ export async function setMatchStartAt(
       ]);
       // Lancement défait : la notification de départ réservée pour lui
       // (`./player-pushes`) part avec, pour que la nouvelle heure prévienne de
-      // nouveau les joueurs.
+      // nouveau les joueurs. Le check-in (`LOBBY_BRIEF%`, `./lobby-brief`)
+      // reste : il ne part qu'une fois par match, quelle que soit l'heure.
       if (leaving && !scoreNoted) {
         // Le « Prêt » de chaque caster tombe avec ceux des équipes.
         await connection.execute(`UPDATE bg_match_casters SET ready_at = NULL WHERE match_id = ?`, [matchId]);
-        await connection.execute(`DELETE FROM bg_match_start_notices WHERE match_id = ?`, [matchId]);
-      }
-      const previousStartAt = toIso(row.start_at);
-      // Nouvelle heure sans salon ouvert : le check-in parti 15 minutes avant
-      // l'ancienne (`./lobby-brief`) est rendu, pour repartir avant la nouvelle.
-      if (!leaving && previousStartAt !== startAt) {
         await connection.execute(
-          `DELETE FROM bg_match_start_notices
-           WHERE match_id = ? AND phase IN ('LOBBY_BRIEF_1', 'LOBBY_BRIEF_2')
-             AND EXISTS (SELECT 1 FROM bg_matches m WHERE m.id = ? AND m.lobby_opened_at IS NULL)`,
-          [matchId, matchId],
+          `DELETE FROM bg_match_start_notices WHERE match_id = ? AND phase NOT LIKE 'LOBBY_BRIEF%'`,
+          [matchId],
         );
       }
+      const previousStartAt = toIso(row.start_at);
       const told =
         previousStartAt === startAt
           ? NOTHING_TOLD

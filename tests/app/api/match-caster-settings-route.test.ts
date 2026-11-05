@@ -72,7 +72,13 @@ describe("PUT /api/matches/[matchId]/caster", () => {
     const res = await casterPut(jsonRequest("PUT", { trigger: "MANUAL", battletag: null }), params("42"));
     expect(res.status).toBe(200);
     // Le lien, absent du corps, n'est pas touché.
-    expect(setCastSettings).toHaveBeenCalledWith(42, 4, true, { trigger: "MANUAL", battletag: null });
+    expect(setCastSettings).toHaveBeenCalledWith(
+      42,
+      4,
+      true,
+      { trigger: "MANUAL", battletag: null },
+      { isAdmin: false, manages: false },
+    );
   });
 
   it("casterPut_wrongFieldType_returns400", async () => {
@@ -96,6 +102,7 @@ describe("PUT /api/matches/[matchId]/caster", () => {
     ["MATCH_ALREADY_COMPLETED", 409],
     ["CAST_STREAM_NOT_OWNED", 409],
     ["NOT_MATCH_CASTER", 403],
+    ["LIVE_TRIGGER_NOT_OWNED", 403],
   ])("casterPut_serviceRefuses_%s_maps to %i", async (code, status) => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     jest.mocked(setCastSettings).mockRejectedValue(new Error(code));

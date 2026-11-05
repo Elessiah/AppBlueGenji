@@ -128,6 +128,7 @@ Ce qu'elle contient aujourd'hui :
 | — (cartes par manche) | `bg_tournaments`, `bg_matches` | `first_ban_rule` (`NON_HOST`/`HOST`), `next_ban_rule` (`LOSER`/`WINNER`), `next_pick_rule` (`LOSER`/`FREE`) ; `bg_matches.map_picks` (JSON des cartes choisies au-delà de la 1re). Table neuve `bg_tournament_round_maps` (créée par son seul `CREATE TABLE`) : créneaux d'une manche, clé unique `(tournament_id, phase_id, bracket, round_number)` (`ROUND_MAPS.md`). Table neuve `bg_round_maps_notices` : annonce Discord en attente, une ligne par tournoi (`tournament_id`, `rounds_json`, `changes`, `send_after`) |
 | — (MATCH-VOICE) | `bg_tournaments`, `bg_match_voice_channels` | `team_voice_channels` (`TINYINT`, 0 par défaut) — option « Salons vocaux d'équipe ». Table neuve `bg_match_voice_channels` (créée par son seul `CREATE TABLE`) : une ligne par (match, équipe), clé primaire `(match_id, team_id)`, `channel_id`, `failed_at`, `released_at` ; effacée 7 jours après `released_at` (`MATCH_VOICE.md`) |
 | — (EF-43) | `bg_match_voice_channels` | `DROP COLUMN members, DROP COLUMN counted_at, ALGORITHM=COPY` (table reconstruite) — le nombre de présents n'est plus gardé (`MATCH_VOICE.md`) |
+| — (CAST-FOLLOWUP) | `bg_matches` | `live_trigger_user_id` (`BIGINT NULL`, index `idx_bg_matches_live_trigger_user`) — caster qui a posé le mode d'antenne (`CAST_SETTINGS.md`) |
 | — (BO3-TIEBREAK) | `bg_tournament_round_maps` | `tiebreak_map` — `VARCHAR(64) NULL` : map de départage d'un tour de play-offs en vrai Bo3, jouée seulement sur une série à égalité ; une ligne qui ne porte qu'elle a `slots_json = '[]'` (`ROUND_MAPS.md`) |
 | — (CAST-SETTINGS) | `bg_match_casters` | `cast_battletag` — `VARCHAR(64) NULL` : BattleTag qu'un caster donne pour **ce** cast, montré à la place de celui de son compte (Overwatch seulement), jamais vérifié ni recopié sur le profil ; part avec l'inscription, remis à `NULL` sur un cast gardé à l'anonymisation, rendu dans l'export (`CAST_SETTINGS.md`, registre T04) |
 
@@ -282,11 +283,12 @@ C'est `reportSchemaFailure` qui l'applique, aux deux migrations. Le cas nominal
 ne journalise rien : il se produit à chaque démarrage, et une ligne par entrée
 noierait la seule qui compte.
 
-**Huit `CREATE TABLE` ne suivent pas cette règle**, et ce n'est pas un oubli :
+**Neuf `CREATE TABLE` ne suivent pas cette règle**, et ce n'est pas un oubli :
 `bg_match_reminders`, `bg_referee_alerts`, `bg_endurance_penalties`, les trois
 tables des notifications push (`bg_push_subscriptions`, `bg_push_topic_optouts`,
 `bg_match_start_notices` — `docs/features/PUSH_NOTIFICATIONS.md`) et les
-annonces de live (`bg_live_announcements`, `bg_live_evenings` — `docs/features/LIVE_STREAMS.md`) gardent un
+annonces de live (`bg_live_announcements`, `bg_live_evenings` — `docs/features/LIVE_STREAMS.md`) et les
+marques durables du check-in (`bg_lobby_brief_marks` — `docs/features/MATCH_LOBBY_BRIEF.md`) gardent un
 `catch` muet, parce que c'est le contrat qu'`isMissingTableError` décrit et sur
 lequel s'appuient les chemins de notification, `tournaments/deletion.ts`,
 `tournaments/rollback.ts` et les lectures des sanctions de `tournaments/bg-survie/` (`replay-inputs.ts`, `meta.ts`, `penalties.ts`)

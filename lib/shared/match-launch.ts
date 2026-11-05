@@ -21,6 +21,7 @@
  * même règle.
  */
 
+import { nullableId } from "./nullable-id";
 import type { MatchStatus, TeamRole, TournamentGame } from "./types";
 import { isoTime } from "./iso-time";
 
@@ -44,6 +45,28 @@ export const LAUNCH_AUTO_DELAY_MINUTES = 15;
  * - `LAUNCHED` : lancé, les scores peuvent être reportés.
  */
 export type MatchLaunchPhase = "NONE" | "TO_PLAN" | "SCHEDULED" | "LOBBY" | "LAUNCHED";
+
+/**
+ * Le match n'est ni lancé ni joué : la condition du cast et de l'arbitrage s'y
+ * rejoue encore (un caster ou un arbitre qui ne la remplit plus est tu). Une
+ * seule définition pour l'instantané (`_internal.ts`) et les gestes du serveur
+ * (`live-streams.ts`, `cast-settings.ts`) : ils jugent le même maître du mode.
+ */
+export function castBeforeLaunch(match: {
+  status: string;
+  launched_at?: Date | string | null;
+  launch_pairing?: string | null;
+  team1_id?: number | string | null;
+  team2_id?: number | string | null;
+}): boolean {
+  if (match.status === "COMPLETED") return false;
+  if ((match.launched_at ?? null) === null) return true;
+  // Un lancement d'un appariement d'avant (réappariement pas encore adopté)
+  // ne vaut pas pour celui-ci : la règle de `currentLaunchState`, quand la
+  // lecture porte l'empreinte.
+  if (match.launch_pairing === undefined) return false;
+  return !launchStateIsCurrent(match.launch_pairing, nullableId(match.team1_id), nullableId(match.team2_id));
+}
 
 /** Ce que la règle a besoin de savoir d'un match. */
 export type MatchLaunchInput = {
@@ -774,6 +797,7 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   STREAM_URL_REQUIRED: "Le lien de ta chaîne est obligatoire pour ouvrir ton propre stream : sans lien, il n'apparaîtrait nulle part.",
   INVALID_CAST_BATTLETAG: "BattleTag de cast invalide : 64 caractères au plus, et des caractères visibles.",
   CAST_STREAM_NOT_OWNED: "Ce stream est celui de l'organisation : son lien se règle dans la configuration de la diffusion.",
+  LIVE_TRIGGER_NOT_OWNED: "Le mode de passage à l'antenne appartient au caster qui l'a posé : seuls lui, l'arbitre du match ou un admin le changent — l'organisation aussi quand aucun caster ne le tient.",
   INVALID_CAST_SETTINGS: "Réglages de diffusion invalides.",
   MATCH_NOT_CASTABLE: "Ce match ne peut plus être diffusé.",
   MATCH_CAST_SETTINGS_FAILED: "Tes réglages de diffusion n'ont pas pu être enregistrés. Réessaie dans un instant.",

@@ -548,14 +548,14 @@ describe("politique du bot — check-in du match (MATCH-CHECKIN)", () => {
   const en = JSON.stringify(PRIVACY_POLICY.en);
 
   it("liste le brief parmi les messages remis, certifiés et opposables, avec sa base (FR et EN)", () => {
-    expect(fr).toContain("check-in d'un match envoyé aux membres de ses engagées, avis envoyé à un caster dont l'inscription est retirée par un autre que lui, alerte d'arbitrage");
+    expect(fr).toContain("check-in d'un match en autogestion envoyé à ceux qui gèrent ses engagées (ou au joueur d'une entrée individuelle), avis envoyé à un caster dont l'inscription est retirée par un autre que lui, alerte d'arbitrage");
     expect(fr).toContain("(code, horaire, rappel, retrait d'un match, check-in du match, retrait d'un cast, avis de modération");
     expect(fr).toContain("ceux des matchs (horaire, rappel, retrait d'un match, check-in du match, retrait d'un cast) ne partent qu'aux comptes dont le tag Discord est certifié");
-    expect(fr).toContain("intérêt légitime pour les messages privés de match d'un joueur (horaire, rappels, « Match retiré »), le check-in du match envoyé aux membres de ses engagées et l'avis envoyé à un caster dont l'inscription est retirée par un autre que lui, auxquels chacun s'oppose");
-    expect(en).toContain("check-in of a match sent to the members of its entrants, notice to a caster that someone else removed their registration for a match, referee alert");
+    expect(fr).toContain("intérêt légitime pour les messages privés de match d'un joueur (horaire, rappels, « Match retiré »), le check-in d'un match en autogestion envoyé à ceux qui gèrent ses engagées (ou au joueur d'une entrée individuelle) et l'avis envoyé à un caster dont l'inscription est retirée par un autre que lui, auxquels chacun s'oppose");
+    expect(en).toContain("check-in of a self-managed match sent to those who manage its entrants (or to the player of a solo entry), notice to a caster that someone else removed their registration for a match, referee alert");
     expect(en).toContain("(code, match time, reminder, removal from a match, match check-in, removal of a cast, moderation notice");
     expect(en).toContain("those about matches (time, reminder, removal from a match, match check-in, removal of a cast) only go to accounts with a Discord tag certified");
-    expect(en).toContain("the match check-in sent to the members of its entrants and the notice sent to a caster whose registration someone else removes, which each of them objects to");
+    expect(en).toContain("the check-in of a self-managed match sent to those who manage its entrants (or to the player of a solo entry) and the notice sent to a caster whose registration someone else removes, which each of them objects to");
   });
 });
 
@@ -564,9 +564,9 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
   const en = JSON.stringify(PRIVACY_POLICY.en);
 
   it("déclare l'avis de retrait d'un match parmi les messages remis (FR et EN)", () => {
-    expect(fr).toContain("horaire ou rappel de match, avis de retrait d'un match (« Match retiré »), check-in d'un match envoyé aux membres de ses engagées");
+    expect(fr).toContain("horaire ou rappel de match, avis de retrait d'un match (« Match retiré »), check-in d'un match en autogestion envoyé à ceux qui gèrent ses engagées (ou au joueur d'une entrée individuelle)");
     expect(fr).toContain("(code, horaire, rappel, retrait d'un match, check-in du match, retrait d'un cast, avis de modération");
-    expect(en).toContain("match time or reminder, notice of removal from a match (“Match retiré”), check-in of a match");
+    expect(en).toContain("match time or reminder, notice of removal from a match (“Match retiré”), check-in of a self-managed match sent to those who manage its entrants (or to the player of a solo entry)");
     expect(en).toContain("(code, match time, reminder, removal from a match, match check-in, removal of a cast, moderation notice");
   });
 

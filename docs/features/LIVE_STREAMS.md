@@ -114,7 +114,8 @@ Choisis **par match**, au moment où on le marque comme casté :
   aux tournois étalés sur plusieurs jours, où un match peut être jouable des
   heures avant que le cast commence. Le clic écrit sous condition
   (`setMatchOnAir` : déclencheur `MANUAL`, match `READY` pour ouvrir, état de
-  départ) : un match validé ou passé en `AUTO` entre la lecture et l'écriture
+  départ, et le droit sur le mode relu sous le verrou — un co-caster ne
+  bascule pas l'antenne du mode d'un autre, `CAST_SETTINGS.md`) : un match validé ou passé en `AUTO` entre la lecture et l'écriture
   est refusé (`MATCH_NOT_LIVE_READY`, `LIVE_TRIGGER_NOT_MANUAL`, 409), jamais
   rendu comme un succès ; un second clic ne change rien et n'est pas journalisé.
 

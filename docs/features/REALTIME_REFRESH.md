@@ -64,6 +64,10 @@ Il est donc scindé en deux :
   du flux gardent le tableau précédent à contenu égal (`shareRefereeNames`) : `LiveProvider` ne
   redessine pas le plateau pour des pseudos inchangés.
 
+  Le nom d'arbitre désigné y est marqué pour le lecteur (`markViewerReferee`,
+  CAST-FOLLOWUP), **propre à une personne** : il montre à l'arbitre le bouton de
+  diffusion de son match, posé par le flux et par le REST de secours.
+
 `TournamentDetail = TournamentSnapshot & TournamentViewerContext` : les
 appelants existants ne voient aucune différence.
 

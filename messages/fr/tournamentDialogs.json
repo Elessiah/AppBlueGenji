@@ -259,21 +259,26 @@
     "removed": "Match retiré de la diffusion.",
     "title": "Diffusion du match",
     "streamed": "Ce match est casté",
-    "trigger": "Passage à l'antenne",
     "triggers": {
       "AUTO": "Automatique au démarrage du match",
       "START_TIME": "À la date de début du match",
       "MANUAL": "Manuel (bouton d'antenne)"
     },
-    "noStartAt": "Aucune date de début n'est fixée sur ce match : l'antenne à l'heure dite demande d'abord un horaire.",
-    "autoStop": "Le direct s'arrête tout seul dès qu'un score est saisi.",
     "url": "Chaîne du match (facultatif)",
     "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}.",
     "urlOwnChannel": "Le lien saisi ici est celui de ta chaîne : il est retiré du match si ton compte est supprimé.",
+    "urlLocked": "Ce lien suit le mode du caster qui l'a posé : seuls lui, l'arbitre du match ou un admin le changent.",
     "organisationLink": "Ce lien est celui de l'organisation",
     "organisationLinkSubject": "lien de l'organisation",
-    "organisationLinkHint": "Coché, le lien reste sur le match quoi qu'il arrive à ton compte. Décoché, c'est ta propre chaîne : elle est retirée du match si ton compte est supprimé. Un lien déjà enregistré que tu ne changes pas garde son origine.",
-    "urlHint": "Laisser vide pour signaler le match sans lien de configuration du direct : son annonce sur Discord renverra alors au premier lien ouvert par un caster, à défaut à la chaîne officielle du tournoi, ou ne partira pas s'il n'en a pas. Plateformes acceptées : {platforms}."
+    "organisationLinkHint": "Coché, le lien reste sur le match quoi qu'il arrive à ton compte. Décoché, c'est ta propre chaîne, retirée du match si ton compte est supprimé.",
+    "urlHint": "Vide, l'annonce Discord renvoie au premier lien ouvert par un caster, sinon à la chaîne officielle du tournoi (plateformes acceptées : {platforms}).",
+    "urlSubject": "chaîne du match",
+    "casterLinks": "Liens des casters",
+    "casterLinksSubject": "liens des casters",
+    "casterLinksHint": "Arbitre du match, tu peux corriger ou effacer le lien d'un caster. Un lien effacé n'est plus rattaché à personne.",
+    "casterLink": "Stream de {casters}",
+    "casterLinkNobody": "aucun caster",
+    "casterStreamGone": "Ce stream de caster n'existe plus sur ce match : rouvre la fenêtre pour voir les streams à jour."
   },
   "replay": {
     "removed": "Rediff retirée.",

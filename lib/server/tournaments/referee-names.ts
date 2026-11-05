@@ -22,7 +22,7 @@ import { cached } from "@/lib/server/cache";
 import { withConnection } from "@/lib/server/database";
 import { visibleText } from "@/lib/shared/visible-text";
 import { showsRefereeName } from "@/lib/shared/match-referee";
-import type { MatchRefereeName, TournamentSnapshot } from "@/lib/shared/types";
+import type { BracketMatch, MatchRefereeName, TournamentSnapshot } from "@/lib/shared/types";
 
 /**
  * Secret tenu sur `globalThis` : une seconde évaluation du module (rechargement
@@ -51,6 +51,50 @@ export function refereeKey(matchId: number, refereeUserId: number): string {
 export function withoutRefereeKeys<T extends { refereeKey: string | null }>(matches: T[]): T[] {
   if (!matches.some((match) => match.refereeKey !== null)) return matches;
   return matches.map((match) => (match.refereeKey === null ? match : { ...match, refereeKey: null }));
+}
+
+/**
+ * Marque (`mine`) les désignations dont le lecteur est l'arbitre : la liste
+ * lue est commune à tous les membres (mise en cache), la marque se pose après,
+ * par lecteur — elle ne nomme personne de plus, seulement le lecteur à lui-même.
+ *
+ * La marque ne dépend pas du pseudo : un arbitre dont le pseudo ne s'affiche
+ * pas (`visibleText` vide, absent de la liste commune) est reconnu sur
+ * l'empreinte des matchs montrés (`matches`) et reçoit une entrée **sans
+ * pseudo** (`""`, lue « Arbitre désigné » : `refereeNameOf`) — sans quoi la
+ * médiation que le serveur lui accorde n'aurait aucun bouton.
+ * Garde la même référence si rien n'est marqué.
+ */
+export function markViewerReferee(
+  names: MatchRefereeName[],
+  viewerUserId: number,
+  matches: readonly Pick<BracketMatch, "id" | "refereeKey" | "status">[],
+): MatchRefereeName[] {
+  let marked = false;
+  // Une empreinte par match, calculée une fois pour les deux boucles.
+  const keys = new Map<number, string>();
+  const keyOf = (matchId: number): string => {
+    let key = keys.get(matchId);
+    if (key === undefined) {
+      key = refereeKey(matchId, viewerUserId);
+      keys.set(matchId, key);
+    }
+    return key;
+  };
+  const out = names.map((name): MatchRefereeName => {
+    if (keyOf(name.matchId) !== name.refereeKey) return name;
+    marked = true;
+    return { ...name, mine: true as const };
+  });
+  // Les entrées déjà là, par match et empreinte : une recherche, pas un parcours par match.
+  const listed = new Set(out.map((name) => `${name.matchId}:${name.refereeKey}`));
+  for (const match of matches) {
+    if (!showsRefereeName(match) || match.refereeKey !== keyOf(match.id)) continue;
+    if (listed.has(`${match.id}:${match.refereeKey}`)) continue;
+    marked = true;
+    out.push({ matchId: match.id, refereeKey: match.refereeKey, pseudo: "", mine: true });
+  }
+  return marked ? out : names;
 }
 
 /**

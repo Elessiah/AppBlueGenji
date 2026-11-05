@@ -152,6 +152,10 @@ série est à égalité après les trois maps régulières, sinon inutilisée.
 
 ## Préséance
 
+Match avec arbitre désigné : l'ordre du premier ban ne suit pas
+`first_ban_rule` — la non-tête de série bannit la première
+(`MATCH_REFEREE.md` § Hôte et premier ban).
+
 - Une carte 1 **imposée** l'emporte sur `first_map` à l'affichage
   (`effectiveFirstMap`, appliquée à l'instantané par `applyMapRules`) ; la valeur
   stockée n'est pas réécrite : retirer le réglage la rend.

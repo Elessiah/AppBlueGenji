@@ -5,7 +5,7 @@ import { toIso } from "@/lib/server/serialization";
 import type { PersonalDataExport } from "@/lib/shared/types";
 
 /** Ce que l'export dit des matchs où le compte a tenu un rôle (caster, arbitre). */
-export type OwnMatchRoles = Pick<PersonalDataExport, "casts" | "providedStreamLinks" | "refereeAssignments">;
+export type OwnMatchRoles = Pick<PersonalDataExport, "casts" | "providedStreamLinks" | "refereeAssignments" | "liveTriggers">;
 
 type Db = Awaited<ReturnType<typeof getDatabase>>;
 
@@ -30,8 +30,9 @@ async function tolerantRows<T extends RowDataPacket>(db: Db, sql: string, userId
  * BattleTag qu'il a donné pour ce cast), les
  * liens de chaîne qu'il a fournis (`bg_match_streams.link_user_id`, registre
  * T16) et ses arbitrages désignés (`bg_matches.referee_user_id`, avec son
- * « Prêt », registre T04) — ce que le site garde avec le match. Trois
- * lectures, chacune par l'index du compte.
+ * « Prêt », registre T04) et les modes d'antenne qu'il a posés
+ * (`bg_matches.live_trigger_user_id`, registre T16) — ce que le site garde avec
+ * le match. Quatre lectures, chacune par l'index du compte.
  */
 export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> {
   const db = await getDatabase();
@@ -69,6 +70,11 @@ export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> 
     `SELECT id, tournament_id, referee_ready_at FROM bg_matches WHERE referee_user_id = ? ORDER BY id`,
     userId,
   );
+  const triggers = await tolerantRows<RowDataPacket & { id: number; tournament_id: number; live_trigger: string | null }>(
+    db,
+    `SELECT id, tournament_id, live_trigger FROM bg_matches WHERE live_trigger_user_id = ? ORDER BY id`,
+    userId,
+  );
   return {
     casts: casts.map((row) => ({
       matchId: Number(row.match_id),
@@ -88,6 +94,11 @@ export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> 
       matchId: Number(row.id),
       tournamentId: Number(row.tournament_id),
       readyAt: toIso(row.referee_ready_at),
+    })),
+    liveTriggers: triggers.map((row) => ({
+      matchId: Number(row.id),
+      tournamentId: Number(row.tournament_id),
+      liveTrigger: row.live_trigger ?? null,
     })),
   };
 }

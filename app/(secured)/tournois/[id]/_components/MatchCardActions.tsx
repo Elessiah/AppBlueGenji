@@ -77,16 +77,16 @@ const CastSettingsDialog = dynamic(
   { ssr: false },
 );
 
-async function send(url: string, method: string, body?: unknown): Promise<void> {
+/** Envoie le geste ; rend le corps de la réponse (`{}` s'il est illisible), ou lève son code. */
+async function request(url: string, method: string, body?: unknown): Promise<Record<string, unknown>> {
   const response = await fetch(url, {
     method,
     headers: body === undefined ? undefined : { "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(payload.error || "UNKNOWN");
-  }
+  const payload = (await response.json().catch(() => ({}))) as Record<string, unknown> & { error?: string };
+  if (!response.ok) throw new Error(payload.error || "UNKNOWN");
+  return payload;
 }
 
 const ICONS: Record<MatchCardActionId, LucideIcon> = {
@@ -576,8 +576,9 @@ export function MatchCardActions({
 
   const claim = async (body: CastClaimBody): Promise<CastClaimOutcome> => {
     try {
-      await send(`/api/matches/${match.id}/caster`, "POST", body);
-      showSuccess(t("cardActions.casting"));
+      const payload = await request(`/api/matches/${match.id}/caster`, "POST", body);
+      // Le mode d'antenne choisi a été posé entre-temps par un autre : inscrit quand même, sans lui.
+      showSuccess(t(payload.triggerSkipped === true ? "cardActions.castingTriggerKept" : "cardActions.casting"));
       claimedRef.current = true;
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
       return { ok: true };
@@ -589,7 +590,7 @@ export function MatchCardActions({
     }
   };
 
-  const run = async (action: () => Promise<void>, success: string, refresh = true): Promise<boolean> => {
+  const run = async (action: () => Promise<unknown>, success: string, refresh = true): Promise<boolean> => {
     setBusy(true);
     try {
       await action();
@@ -616,7 +617,7 @@ export function MatchCardActions({
     force: () => setConfirmForce(true),
     hostSwap: () => {
       const next = match.hostTeamId === match.team1Id ? match.team2Id : match.team1Id;
-      void run(() => send(`/api/admin/matches/${match.id}/host`, "PUT", { teamId: next }), t("cardActions.hostChanged"));
+      void run(() => request(`/api/admin/matches/${match.id}/host`, "PUT", { teamId: next }), t("cardActions.hostChanged"));
     },
     referee: () => setRefereeOpen(true),
     claimCast: () => {
@@ -764,7 +765,7 @@ export function MatchCardActions({
           confirmLabel={t("cardActions.forceConfirm.confirm")}
           pendingLabel={t("cardActions.forceConfirm.pending")}
           onClose={() => setConfirmForce(false)}
-          onConfirm={() => run(() => send(`/api/admin/matches/${match.id}/launch`, "POST"), t("cardActions.forceConfirm.success"))}
+          onConfirm={() => run(() => request(`/api/admin/matches/${match.id}/launch`, "POST"), t("cardActions.forceConfirm.success"))}
         >
           {/* Sans phase de lancement, aucun « Prêt » n'est attendu : forcer
               n'avance que l'heure (et, à planifier, seul l'avis suit). */}
@@ -788,7 +789,7 @@ export function MatchCardActions({
             markOwnRelease(true);
             const done = await run(
               () =>
-                send(`/api/matches/${match.id}/caster?userId=${encodeURIComponent(String(releasedCaster.userId))}`, "DELETE"),
+                request(`/api/matches/${match.id}/caster?userId=${encodeURIComponent(String(releasedCaster.userId))}`, "DELETE"),
               self ? t("cardActions.notCasting") : t("cardActions.casterRemoved"),
             );
             // Refusé : la fenêtre reste ouverte, un départ ultérieur du caster doit se dire.

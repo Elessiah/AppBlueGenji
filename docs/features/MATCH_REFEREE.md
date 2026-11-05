@@ -168,6 +168,16 @@ d'endurance, `match-host-seeds.ts`, jointures partagées par l'instantané et la
 modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
 **bannit la première** (`firstBanTeamId`, `null` tant qu'un adversaire manque).
 
+**Quand un arbitre désigné crée la partie** (CAST-FOLLOWUP), l'équipe qui
+n'est **pas** la meilleure tête de série bannit la première, quelle que soit
+la règle de ban du tournoi (`refereeHostedFirstBanTeamId`,
+`lib/shared/match-referee.ts`, posé dans l'instantané par `_internal.ts` ;
+`applyMapRules` garde ce choix pour un match `refereeAssigned`). La page du
+match l'explique derrière un `InfoHint` (`roundMaps.page.refereeHostBan`, FR/EN).
+Un match arbitré **déjà joué** (`COMPLETED`) n'affirme aucun premier ban
+(`firstBanTeamId` nul) : l'ordre réellement suivi n'est pas gardé, et la
+règle a changé avec l'arbitre hôte.
+
 ## Ce que chacun voit
 
 - **Instantané public** (`TournamentSnapshot`) : `refereeAssigned`,

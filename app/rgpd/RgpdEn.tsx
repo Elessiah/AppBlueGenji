@@ -831,7 +831,7 @@ export function RgpdEn({
         <div className={styles.prose}>
           <p>
             You can be notified on your phone or computer of the start of your matches, of a score to confirm or confirmed automatically without an answer, of a
-            tournament&apos;s kickoff, of your match times (set, changed or removed) and their reminders, of the check-in of a match of your team or of your solo tournament, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers), and of what
+            tournament&apos;s kickoff, of your match times (set, changed or removed) and their reminders, of the check-in of a self-managed match of a team you manage (owner or manager) or of your solo tournament, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers), and of what
             concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, disputes settled, results corrected,
             opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the start of the match they cast and of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission.{" "}
             <strong>Nothing is sent without your action</strong>: notifications are turned on device by device,
@@ -875,10 +875,10 @@ export function RgpdEn({
             language, when
             the time of one of your matches is set, changed or removed, for its reminders (24 h and 10 h before),
             when you are removed from a match and, if you cast, when your caster registration for a match is removed
-            by the staff or automatically (with the reason) and, if you are a member of an entered team (player, coach or manager) or play
-            a solo tournament, 15 minutes before a match kicks off — or when its lobby opens, if that comes earlier or the match has no time, again if it reopens —, the match
-            check-in (joining your team&apos;s voice channel and the check-in channel, team on the left — the host — and on the right, game settings, map order and
-            ban order, sorting the players by role if the match is cast, assigned referee or self-management, the match&apos;s stream link when it is public,
+            by the staff or automatically (with the reason) and, if you manage an entered team (owner or manager) or play
+            a solo tournament, for a self-managed match only (none for a refereed match or one with no refereeing decision), 15 minutes before it kicks off — or when its lobby opens,
+            if that comes earlier or the match has no time —, once per match, the match check-in (joining your team&apos;s voice channel and the check-in channel, team on the left — the host — and on the right, game settings, map order and
+            ban order, sorting the players by role if the match is cast, self-management, the match&apos;s stream link when it is public,
             the reminder to enter the scores and who to report a problem to), with the team names, the tournament, the round and the link to the match page, without any BattleTag,
             Discord tag or player username (in a solo tournament, the message names neither you nor your opponent) — only if your Discord tag is <strong>certified</strong>: an
             uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam (your push notifications are still sent). These messages
@@ -1049,6 +1049,11 @@ export function RgpdEn({
             stream or in “Configure my broadcast”: that link then does not go with their account, but with that
             stream once no caster holds it any more. A link set in that configuration before the site recorded who provided it has no
             known author and stays with the match.{" "}
+            When a match goes live (“live mode”) can only be changed or removed by the caster who set it — the site keeps
+            their account with the match and erases it when they leave the match or no longer meet the conditions to cast it, when the mode is removed, or when
+            their account is deleted, and leaves it with them when the assigned referee or an administrator changes the mode —, by the match&apos;s assigned referee or by an administrator; a mode set by the staff
+            stays with the staff. The assigned referee of a match can also, for that match only, edit or remove a caster&apos;s
+            link and configure the organizers&apos; broadcast.{" "}
             A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which
             then replaces their profile one wherever the latter was shown (“Contacts” and launch windows, match
             page: to the same people at the same times — parties to the match and referees —, in an Overwatch tournament only): it is kept with their caster
@@ -1079,8 +1084,8 @@ export function RgpdEn({
             site: the site only keeps the trace of a match&apos;s announcement when it goes on air
             (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>), which appears, in a solo tournament,
             in the export of your data — neither the text of the message nor the list of scheduled matches it gives. Your
-            caster registrations (with your “Ready” and the BattleTag you gave for that cast), the channel links you provided and the matches you are the assigned
-            referee of also appear in the export of your data. These
+            caster registrations (with your “Ready” and the BattleTag you gave for that cast), the channel links you provided, the matches you are the assigned
+            referee of and those whose live mode you set also appear in the export of your data. These
             announcements stay in the channel as long as the #live channel exists; when a caster&apos;s account is deleted,
             the message of an evening still under way is updated without their channel link if it keeps another link —
             otherwise, or once the evening has ended, it keeps it. The team, player or caster concerned can

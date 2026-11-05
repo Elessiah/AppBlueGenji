@@ -248,6 +248,7 @@
     "lockedReason": ": la manche suivante a déjà des scores, le résultat de ce match ne peut plus être modifié.",
     "hostChanged": "Équipe hôte modifiée.",
     "casting": "Tu castes ce match.",
+    "castingTriggerKept": "Tu castes ce match. Le passage à l'antenne, réglé entre-temps par un autre, n'a pas changé.",
     "notCasting": "Tu ne castes plus ce match.",
     "casterRemoved": "Caster retiré.",
     "airClosed": "Antenne fermée.",
@@ -385,11 +386,11 @@
       "noStartAt": "Aucune date de début n'est fixée sur ce match : l'antenne à l'heure dite demande d'abord un horaire.",
       "autoStop": "Le direct s'arrête tout seul dès qu'un score est saisi.",
       "url": "Lien de ma chaîne",
-      "urlHint": "Plateformes acceptées : {platforms}. Ce lien est obligatoire : sans lui, ton stream n'apparaîtrait ni sur la carte du match, ni sur sa page, ni dans l'annonce du direct. Un lien que tu fournis ici est retiré du match si ton compte est supprimé, sauf s'il est marqué comme lien de l'organisation ; un lien enregistré que tu ne changes pas garde son origine.",
+      "urlHint": "Obligatoire : sans lui, ton stream n'apparaît ni sur le match ni dans l'annonce du direct (plateformes acceptées : {platforms}). Il est retiré du match si ton compte est supprimé, sauf s'il est marqué comme lien de l'organisation.",
       "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}.",
       "urlStaff": "Tu co-castes le stream de l'organisation : son lien se règle dans la configuration de la diffusion.",
       "battletag": "BattleTag pour ce cast (facultatif)",
-      "battletagHint": "Le compte sur lequel tu seras en jeu pour ce match : il remplace le BattleTag de ton profil dans la fenêtre « Contacts » et sur la page du match. Laisser vide pour garder celui de ton profil. Personne ne le vérifie.",
+      "battletagHint": "Le compte sur lequel tu seras en jeu : il remplace celui de ton profil dans « Contacts » et sur la page du match. Vide, celui de ton profil reste ; personne ne le vérifie.",
       "battletagInvalid": "BattleTag invalide : 64 caractères au plus, et des caractères visibles.",
       "organisationLink": "Ce lien est celui de l'organisation",
       "organisationLinkSubject": "lien de l'organisation",
@@ -397,7 +398,11 @@
       "air": "Antenne",
       "airHint": "En mode manuel, le direct s'ouvre et se coupe ici. Il s'arrête de toute façon dès qu'un score est saisi.",
       "replay": "Rediff",
-      "replayHint": "Le lien de la rediff s'ajoute une fois la rencontre jouée ; un bandeau « Rediff disponible » s'affiche alors sous le match, visible de tous."
+      "replayHint": "Le lien de la rediff s'ajoute une fois la rencontre jouée ; un bandeau « Rediff disponible » s'affiche alors sous le match.",
+      "urlSubject": "lien de ma chaîne",
+      "battletagSubject": "BattleTag du cast",
+      "triggerLocked": "Passage à l'antenne réglé par un autre : {mode}.",
+      "triggerLockedHint": "Seuls le caster qui l'a posé, l'arbitre du match ou un admin le changent ou le retirent — l'organisation aussi quand aucun caster ne le tient."
     }
   },
   "planning": {

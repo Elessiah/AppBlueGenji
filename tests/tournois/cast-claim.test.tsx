@@ -29,6 +29,15 @@ jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: ()
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { CastClaimDialog } from "@/app/(secured)/tournois/[id]/_components/CastClaimDialog";
+import { lockedTrigger } from "@/app/(secured)/tournois/[id]/_components/CastSettingsFields";
+import {
+  casterLinkEdits,
+  casterStreamsOf,
+  changedTriggerNeedsDate,
+  lockedOnClosedMatch,
+  refusedCasterField,
+} from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
+import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import { matchStreamLinks } from "@/app/(secured)/tournois/[id]/_components/MatchLiveStrip";
 import { castClaimBody, castClaimChoiceKey, castClaimChoices } from "@/app/(secured)/tournois/[id]/_lib/cast-claim";
 import { TournamentActionsTextProvider } from "@/components/i18n/tournament-actions-text";
@@ -40,6 +49,8 @@ import frActions from "@/messages/fr/tournamentActions.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 import enActions from "@/messages/en/tournamentActions.json";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
+import frErrors from "@/messages/fr/tournamentErrors.json";
+import enErrors from "@/messages/en/tournamentErrors.json";
 
 const globalWithDocument = globalThis as { document?: unknown };
 const hadDocument = "document" in globalWithDocument;
@@ -133,6 +144,41 @@ describe("castClaimBody — le corps envoyé à POST /api/matches/[id]/caster", 
       castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", trigger: "MANUAL", organisationLink: true }),
     ).toEqual({ liveUrl: "twitch.tv/voix", battletag: null, trigger: "MANUAL", organisationLink: true });
   });
+
+  it("castClaimBody_lockedTrigger_omitsTrigger", () => {
+    // Mode posé par un autre caster : le corps ne le porte pas, rien à refuser.
+    expect(castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", trigger: undefined })).toEqual({
+      liveUrl: "twitch.tv/voix",
+      battletag: null,
+    });
+  });
+});
+
+/** La fenêtre telle que la voit un caster connecté (compte 4), mode d'antenne réglable. */
+function renderAsCaster(match: typeof TWO_STREAMS) {
+  effects.armed = true;
+  return renderToStaticMarkup(
+    <LiveProvider
+      canManage={false}
+      canSchedule={false}
+      refereeScheduling={false}
+      launchPhase
+      openConfig={() => undefined}
+      openSchedule={() => undefined}
+      openReplay={() => undefined}
+      viewerUserId={4}
+      myTeamId={null}
+      castBlock={null}
+    >
+      <CastClaimDialog match={match} matchLabel="Alpha contre Bravo" onClose={() => undefined} onClaim={async () => ({ ok: true })} />
+    </LiveProvider>,
+  );
+}
+
+it("CastClaimDialog_triggerPosedByAnotherCaster_showsItWithoutRadios", () => {
+  const html = renderAsCaster(bracketMatch({ liveTrigger: "AUTO", liveTriggerCasterId: 9 }));
+  // Le mode du caster 9 se lit sans se changer : seul le choix du stream reste en bouton radio.
+  expect(html.match(/name="[^"]*" value="(AUTO|START_TIME|MANUAL)"/g)).toBeNull();
 });
 
 function renderDialog(locale: "fr" | "en", match: typeof TWO_STREAMS = TWO_STREAMS) {
@@ -196,7 +242,7 @@ describe("CastClaimDialog — rendu", () => {
   });
 
   it("un match sans stream ouvre la fenêtre avec le seul choix « ouvrir mon propre stream », son champ de lien et le mode d'antenne", () => {
-    const html = renderDialog("fr", bracketMatch());
+    const html = renderAsCaster(bracketMatch());
     // Un seul choix de stream, et les trois modes de passage à l'antenne que
     // « ouvrir mon propre stream » règle du même geste (`CAST_SETTINGS.md`).
     expect(html.match(/type="radio"/g)).toHaveLength(4);
@@ -384,8 +430,8 @@ describe("MatchCardActions — branchements du cast", () => {
 
 describe("Configuration du direct — l'aide du lien", () => {
   it("dit qu'un champ vide laisse le premier lien d'un caster à l'annonce (FR et EN)", () => {
-    expect(frDialogs.live.urlHint).toContain("sans lien de configuration du direct : son annonce sur Discord renverra alors au premier lien ouvert par un caster");
-    expect(enDialogs.live.urlHint).toContain("without a live setup link: its Discord announcement will then point to the first link opened by a caster");
+    expect(frDialogs.live.urlHint).toContain("Vide, l'annonce Discord renvoie au premier lien ouvert par un caster");
+    expect(enDialogs.live.urlHint).toContain("Left empty, the Discord announcement points to the first link opened by a caster");
   });
 
   it("ne déduit plus la provenance du lien de ce que le poseur caste : la case « lien de l'organisation » la dit (FR et EN)", () => {
@@ -405,8 +451,8 @@ describe("Textes de caster — pluriel, parité FR/EN, clé retirée", () => {
     JSON.parse(readSource(`messages/${locale}/${file}.json`)) as Record<string, any>;
 
   it("l'aide du lien dit qu'il est obligatoire, et où il paraît (FR et EN)", () => {
-    expect(frActions.cardActions.castSettings.urlHint).toContain("Ce lien est obligatoire");
-    expect(enActions.cardActions.castSettings.urlHint).toContain("This link is required");
+    expect(frActions.cardActions.castSettings.urlHint).toContain("Obligatoire");
+    expect(enActions.cardActions.castSettings.urlHint).toContain("Required");
     expect(frActions.cardActions.claimDialog.gone).toBe("Ce stream n'existe plus : choisis-en un autre.");
     expect(enActions.cardActions.claimDialog.gone).toBe("This stream no longer exists: pick another one.");
   });
@@ -452,14 +498,180 @@ describe("Textes de caster — pluriel, parité FR/EN, clé retirée", () => {
 
 describe("Fenêtre « Caster » — l'aide du lien du caster", () => {
   it("dit où le lien paraît, et qu'il part avec le compte (FR et EN)", () => {
-    expect(frActions.cardActions.castSettings.urlHint).toContain("ni sur la carte du match, ni sur sa page");
-    expect(enActions.cardActions.castSettings.urlHint).toContain("neither on the match card, nor on its page");
+    expect(frActions.cardActions.castSettings.urlHint).toContain("ni sur le match ni dans l'annonce du direct");
+    expect(frActions.cardActions.castSettings.urlHint).toContain("retiré du match si ton compte est supprimé");
+    expect(enActions.cardActions.castSettings.urlHint).toContain("neither on the match nor in the live announcement");
+    expect(enActions.cardActions.castSettings.urlHint).toContain("removed from the match if your account is deleted");
   });
 
   it("le BattleTag du cast dit qu'il remplace celui du profil et que personne ne le vérifie (FR et EN)", () => {
-    expect(frActions.cardActions.castSettings.battletagHint).toContain("remplace le BattleTag de ton profil");
-    expect(frActions.cardActions.castSettings.battletagHint).toContain("Personne ne le vérifie.");
-    expect(enActions.cardActions.castSettings.battletagHint).toContain("replaces your profile BattleTag");
-    expect(enActions.cardActions.castSettings.battletagHint).toContain("Nobody verifies it.");
+    expect(frActions.cardActions.castSettings.battletagHint).toContain("il remplace celui de ton profil");
+    expect(frActions.cardActions.castSettings.battletagHint).toContain("personne ne le vérifie");
+    expect(enActions.cardActions.castSettings.battletagHint).toContain("it replaces your profile's");
+    expect(enActions.cardActions.castSettings.battletagHint).toContain("nobody checks it");
+  });
+});
+
+describe("lockedTrigger — un mode verrouillé montre celui du match", () => {
+  it("lockedTrigger_lockedWithMatchTrigger_returnsMatchTrigger", () => {
+    expect(lockedTrigger(true, "AUTO", "MANUAL")).toBe("AUTO");
+  });
+
+  it("lockedTrigger_notLocked_returnsPicked", () => {
+    expect(lockedTrigger(false, "AUTO", "MANUAL")).toBe("MANUAL");
+  });
+
+  it("lockedTrigger_lockedMatchUncast_returnsPicked", () => {
+    expect(lockedTrigger(true, null, "MANUAL")).toBe("MANUAL");
+  });
+});
+
+describe("casterLinkEdits — seules les saisies de l'arbitre partent", () => {
+  const casterStream = { id: 4, liveUrl: "https://kick.com/b" };
+
+  it("casterLinkEdits_untouchedStreamArrivedLater_notSent", () => {
+    expect(casterLinkEdits([casterStream], {})).toBeUndefined();
+  });
+
+  it("casterLinkEdits_typedNewLink_sentTrimmed", () => {
+    expect(casterLinkEdits([casterStream], { 4: "  twitch.tv/x " })).toEqual([{ streamId: 4, liveUrl: "twitch.tv/x" }]);
+  });
+
+  it("casterLinkEdits_typedEmpty_clearsLink", () => {
+    expect(casterLinkEdits([casterStream], { 4: "  " })).toEqual([{ streamId: 4, liveUrl: null }]);
+  });
+
+  it("casterLinkEdits_typedSameAsCurrent_undefined", () => {
+    expect(casterLinkEdits([casterStream], { 4: "https://kick.com/b" })).toBeUndefined();
+  });
+
+  it("casterLinkEdits_typedStreamGone_notSent", () => {
+    expect(casterLinkEdits([], { 4: "twitch.tv/x" })).toBeUndefined();
+  });
+});
+
+describe("casterStreamsOf — les streams des casters, leurs voix en liste", () => {
+  const list = new Intl.ListFormat("fr", { type: "conjunction" });
+
+  it("casterStreamsOf_staffAndCasterStreams_keepsCasterStreamsWithTheirCasters", () => {
+    const match = bracketMatch({
+      streams: [
+        { id: 1, liveUrl: "https://twitch.tv/orga", staff: true },
+        { id: 4, liveUrl: null, staff: false },
+      ],
+      casters: [matchCaster({ userId: 12, pseudo: "Voix", streamId: 4 }), matchCaster({ userId: 13, pseudo: "Écho", streamId: 4 })],
+    });
+
+    expect(casterStreamsOf(match, list)).toEqual([{ id: 4, liveUrl: null, casters: "Voix et Écho" }]);
+  });
+});
+
+describe("refusedCasterField — le refus rattaché au lien du stream désigné", () => {
+  it("refusedCasterField_integerStreamId_returnsCasterField", () => {
+    expect(refusedCasterField({ streamId: 4 })).toBe("caster-4");
+  });
+
+  it("refusedCasterField_missingStreamId_returnsNull", () => {
+    expect(refusedCasterField({})).toBeNull();
+  });
+
+  it("refusedCasterField_nonIntegerStreamId_returnsNull", () => {
+    expect(refusedCasterField({ streamId: "4" })).toBeNull();
+  });
+});
+
+describe("Fenêtre de diffusion — mode changé pendant qu'elle est ouverte", () => {
+  it("MatchLiveDialog_triggerChangedWhileOpen_resetsLinkAndOrganisation", () => {
+    // Un mode retiré a effacé le lien du staff : la fenêtre ne le repose pas.
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
+    const reset = dialog.slice(dialog.indexOf("if (seenTrigger !== match.liveTrigger)"));
+    expect(reset.slice(0, reset.indexOf("}"))).toContain("setLiveUrl(currentStaffUrl);");
+    expect(reset.slice(0, reset.indexOf("}"))).toContain("setOrganisationLink(false);");
+  });
+
+  it("MatchLiveDialog_triggerChangedWhileOpen_clearsCasterLinksAndFieldErrors", () => {
+    // Les saisies des liens des casters et leurs refus visaient l'état d'avant.
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
+    const reset = dialog.slice(dialog.indexOf("if (seenTrigger !== match.liveTrigger)"));
+    const block = reset.slice(0, reset.indexOf("\n  }"));
+    expect(block).toContain("setCasterLinks({});");
+    expect(block).toContain("fieldErrors.clear();");
+  });
+});
+
+describe("Fenêtre de diffusion — lien du staff sur le mode d'un autre caster", () => {
+  it("MatchLiveDialog_linkOwnedByOtherCaster_readOnlyWithHintAndNoOrganisationBox", () => {
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
+    expect(dialog).toContain("const linkLocked = staffLinkLocked(triggerLocked, match);");
+    expect(dialog).toContain("readOnly={linkLocked}");
+    expect(dialog).toContain('{linkLocked && <p>{t("live.urlLocked")}</p>}');
+    expect(dialog).toContain("{canSpeakForOrganisation && urlTouched && !linkLocked && (");
+  });
+
+  it("urlLocked_frAndEn_present", () => {
+    expect(frDialogs.live.urlLocked).toContain("seuls lui, l'arbitre du match ou un admin le changent");
+    expect(enDialogs.live.urlLocked).toContain("only they, the match referee or an admin can change it");
+  });
+});
+
+describe("Fenêtre de diffusion — le stream d'un caster disparu", () => {
+  it("casterStreamGone_frAndEn_present", () => {
+    expect(frDialogs.live.casterStreamGone).toContain("rouvre la fenêtre");
+    expect(enDialogs.live.casterStreamGone).toContain("reopen the window");
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
+    expect(dialog).toContain('code === "STREAM_NOT_FOUND" ? t("live.casterStreamGone")');
+  });
+});
+
+describe("Inscription — un mode posé entre-temps par un autre", () => {
+  it("claim_triggerSkipped_saysTheModeStayed", () => {
+    const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
+    expect(card).toContain('payload.triggerSkipped === true ? "cardActions.castingTriggerKept" : "cardActions.casting"');
+    expect(frActions.cardActions.castingTriggerKept).toContain("n'a pas changé");
+    expect(enActions.cardActions.castingTriggerKept).toContain("stayed as it was");
+  });
+});
+
+describe("Mode d'antenne verrouillé — qui peut le changer", () => {
+  it("triggerLockedHint_ownerlessMode_namesOrganisers", () => {
+    expect(frActions.cardActions.castSettings.triggerLockedHint).toContain("l'organisation aussi quand aucun caster ne le tient");
+    expect(enActions.cardActions.castSettings.triggerLockedHint).toContain("the organisers too when no caster holds it");
+    // La fenêtre de diffusion lit le mode verrouillé avec les mêmes mots (`CastTriggerField`).
+    expect(frDialogs.live).not.toHaveProperty("triggerLockedHint");
+    expect(enDialogs.live).not.toHaveProperty("triggerLockedHint");
+    expect(frErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("l'organisation aussi quand aucun caster ne le tient");
+    expect(enErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("the organisers too when no caster holds it");
+  });
+});
+
+describe("changedTriggerNeedsDate — seul un mode changé redemande sa date", () => {
+  it("changedTriggerNeedsDate_unchangedStartTimeWithoutDate_false", () => {
+    expect(changedTriggerNeedsDate("START_TIME", "START_TIME", true)).toBe(false);
+  });
+
+  it("changedTriggerNeedsDate_switchToStartTimeWithoutDate_true", () => {
+    expect(changedTriggerNeedsDate("MANUAL", "START_TIME", true)).toBe(true);
+  });
+
+  it("changedTriggerNeedsDate_switchToStartTimeWithDate_false", () => {
+    expect(changedTriggerNeedsDate("MANUAL", "START_TIME", false)).toBe(false);
+  });
+
+  it("changedTriggerNeedsDate_switchToManualWithoutDate_false", () => {
+    expect(changedTriggerNeedsDate(null, "MANUAL", true)).toBe(false);
+  });
+});
+
+describe("lockedOnClosedMatch — rien à enregistrer sur un match fermé au mode verrouillé", () => {
+  it("lockedOnClosedMatch_lockedModeScoreDeclared_true", () => {
+    expect(lockedOnClosedMatch(true, bracketMatch({ status: "AWAITING_CONFIRMATION", liveTrigger: "MANUAL" }))).toBe(true);
+  });
+
+  it("lockedOnClosedMatch_lockedModeMatchToPlay_false", () => {
+    expect(lockedOnClosedMatch(true, bracketMatch({ status: "READY", liveTrigger: "MANUAL" }))).toBe(false);
+  });
+
+  it("lockedOnClosedMatch_notLockedScoreDeclared_false", () => {
+    expect(lockedOnClosedMatch(false, bracketMatch({ status: "COMPLETED", liveTrigger: "MANUAL" }))).toBe(false);
   });
 });

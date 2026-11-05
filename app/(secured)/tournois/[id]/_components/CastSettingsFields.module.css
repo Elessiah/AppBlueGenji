@@ -54,3 +54,10 @@
 .hintInvalid {
   color: var(--danger);
 }
+
+/* Mode d'antenne posé par un autre : lu, sans contrôle. */
+.locked {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
