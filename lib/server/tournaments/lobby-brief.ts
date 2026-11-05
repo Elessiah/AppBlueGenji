@@ -16,11 +16,20 @@
  * connaître les notifications. Le balayage relit ce qui est dû, lit d'un coup
  * les destinataires de tous les côtés,
  * puis, **côté par côté**, réserve le brief dans `bg_match_start_notices`
- * (phases `LOBBY_BRIEF_1` / `LOBBY_BRIEF_2`, une par engagée et par
- * appariement — deux balayages concurrents n'envoient qu'une fois), relit les
- * réglages du match et l'envoie : un arrêt du processus entre deux côtés ne
+ * (phase `LOBBY_BRIEF`, une par **match et engagée** — l'id de l'engagée tient
+ * lieu d'appariement ; deux balayages concurrents n'envoient qu'une fois), relit
+ * les réglages du match et l'envoie : un arrêt du processus entre deux côtés ne
  * laisse au plus qu'une réservation sans envoi. Mêmes déclencheurs que les
  * départs de match.
+ *
+ * **Jamais deux fois** (2026-11-06) : une fois parti, le check-in d'une engagée
+ * pour ce match ne repart plus — ni sur une nouvelle heure (même dans le quart
+ * d'heure), ni sur un lancement défait, ni sur un réappariement (l'engagée qui
+ * reste n'est pas rebriefée, celle qui arrive reçoit le sien). Les ménages de
+ * `bg_match_start_notices` (`match-schedule`, `match-launch`,
+ * `referee-scheduling`) épargnent donc les phases `LOBBY_BRIEF%`. Les
+ * réservations de l'ancien format (`LOBBY_BRIEF_1` / `_2`, clé
+ * `team1_id:team2_id`) valent encore pour leur engagée.
  *
  * **Indépendant du push** : le message privé part même quand les notifications
  * push sont éteintes (clés absentes). Bot injoignable : le push part quand même,
@@ -29,12 +38,17 @@
  * n'a rien reçu (messages privés coupés, tag non certifié, push éteint) n'est
  * pas compté comme briefé, et pm2 le dit.
  *
- * Destinataires : **tous les joueurs** de chaque engagée (`loadEntrantPlayerIds` :
- * membres actifs d'une équipe, le joueur d'une entrée solo), personne pour une
- * fantôme (réservation gardée) — le check-in demande à chacun de rejoindre le
- * vocal de son équipe, pas seulement à qui la gère (décision de l'utilisateur,
- * 2026-11-04). Une vraie équipe sans joueur actif n'est pas réservée : pm2 le
- * dit une fois, et un joueur ajouté dans la fenêtre est briefé. Le message privé est
+ * **Autogestion seulement** (décision de l'utilisateur, 2026-11-05) : le
+ * check-in ne part que pour un match en autogestion (`self_managed = 1`, sans
+ * arbitre désigné, dans `BRIEF_DUE_SQL`) — un match arbitré ou sans décision
+ * n'en reçoit aucun, l'arbitre ou le staff mène la partie.
+ *
+ * Destinataires : **ceux qui gèrent** chaque engagée (`loadEntrantManagerIds` :
+ * `OWNER` et `MANAGER` d'une équipe, le joueur d'une entrée solo), personne
+ * pour une fantôme (réservation gardée) — ce sont eux qui créent la partie et
+ * relaient au reste de l'équipe (décision de l'utilisateur, 2026-11-05). Une
+ * vraie équipe sans gérant actif n'est pas réservée : pm2 le dit une fois, et
+ * un gérant nommé dans la fenêtre est briefé. Le message privé est
  * un message de match : l'interrupteur « messages privés de mes matchs » de
  * « Mon profil » le coupe, et seul un tag Discord certifié le reçoit ; le push a
  * son propre sujet.
@@ -43,7 +57,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import {
-  loadEntrantPlayerIds,
+  loadEntrantManagerIds,
   loadNotificationRecipients,
   notifyUsers,
   type NotificationRecipient,
@@ -56,7 +70,7 @@ import type { PushContent } from "@/lib/shared/push-notifications";
 import type { TournamentGame } from "@/lib/shared/types";
 import { LAUNCH_AUTO_DELAY_MINUTES } from "@/lib/shared/match-launch";
 import { matchPageHref } from "@/lib/shared/match-anchor";
-import { matchHostTeamId, refereeDecision } from "@/lib/shared/match-referee";
+import { matchHostTeamId } from "@/lib/shared/match-referee";
 import { lobbyBriefPush } from "@/lib/shared/push-messages";
 import {
   effectiveFirstMap,
@@ -71,12 +85,12 @@ import {
 import { parseMatchFormat } from "@/lib/shared/match-format";
 import { roundAllowsTiebreak } from "@/lib/shared/round-plan";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
-import { loadEligibleRefereeIds } from "./cast-eligibility";
+
 import { firstStreamUrlSql } from "./match-casters";
 import { liveAnnouncementUrl } from "@/lib/shared/live-announcements";
 import { formatLobbyBriefDm } from "./lobby-brief-dm";
 import { seedJoins } from "./match-host-seeds";
-import { playsMatchSql } from "./match-players";
+
 import { readMatchCasters } from "./player-pushes";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
@@ -84,11 +98,26 @@ import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 export type LobbyBriefSlot = 1 | 2;
 
 /**
- * Phase de la réservation dans `bg_match_start_notices`, une par engagée : un
- * côté en échec rend la sienne sans toucher à l'autre (16 caractères au plus).
+ * Phase de la réservation dans `bg_match_start_notices` (16 caractères au
+ * plus) ; sa colonne `pairing` porte l'id de l'engagée briefée : un côté en
+ * échec rend la sienne sans toucher à l'autre, et la clé ne change ni avec
+ * l'horaire ni avec l'adversaire.
  */
-export function lobbyBriefPhase(slot: LobbyBriefSlot): string {
-  return `LOBBY_BRIEF_${slot}`;
+export const LOBBY_BRIEF_PHASE = "LOBBY_BRIEF";
+
+/**
+ * Une réservation de l'ancien format (`LOBBY_BRIEF_1` / `_2`, clé
+ * `team1_id:team2_id`) déjà posée pour l'engagée `?` du match `m` : elle
+ * vaut réservation, le check-in ne repart pas au déploiement.
+ */
+const LEGACY_BRIEF_SQL = `EXISTS (SELECT 1 FROM bg_match_start_notices o
+              WHERE o.match_id = m.id
+                AND ((o.phase = 'LOBBY_BRIEF_1' AND o.pairing LIKE CONCAT(?, ':%'))
+                  OR (o.phase = 'LOBBY_BRIEF_2' AND o.pairing LIKE CONCAT('%:', ?))))`;
+
+/** Id de l'engagée de ce côté, clé de sa réservation. */
+function slotTeamId(row: LobbyBriefRow, slot: LobbyBriefSlot): number {
+  return Number(slot === 1 ? row.team1_id : row.team2_id);
 }
 
 /**
@@ -137,11 +166,7 @@ export type LobbyBriefRow = RowDataPacket & {
   /** Engagées fantômes (`is_ghost`) : personne à briefer de ce côté. */
   team1_ghost?: number | null;
   team2_ghost?: number | null;
-  /**
-   * L'arbitre désigné est devenu membre actif (ou joueur solo) d'une des deux
-   * engagées depuis sa désignation : le brief n'annonce pas un arbitre qui joue.
-   */
-  referee_plays?: number | null;
+
   /** Cartes choisies au-delà de la carte 1, et créneaux de la manche (`ROUND_MAPS.md`). */
   map_picks?: string | null;
   round_slots_json?: string | null;
@@ -212,8 +237,6 @@ const BRIEF_COLUMNS = `m.id, m.tournament_id, t.name AS tournament_name, t.parti
               AND t1.is_ghost = 0 AND t2.is_ghost = 0 AND m.start_at IS NOT NULL) AS voice_tracked,
             CASE WHEN m.live_trigger IS NULL THEN NULL ELSE ${firstStreamUrlSql("m")} END AS stream_url,
             m.first_map, m.self_managed, m.referee_user_id, m.map_picks,
-            (m.referee_user_id IS NOT NULL
-              AND ${playsMatchSql("m.referee_user_id", "m.team1_id", "m.team2_id", "rp")}) AS referee_plays,
             t.first_ban_rule, t.next_ban_rule,
             (SELECT rm.slots_json FROM bg_tournament_round_maps rm
               WHERE rm.tournament_id = m.tournament_id AND rm.phase_id = m.phase_id
@@ -243,15 +266,15 @@ const BRIEF_FROM = `FROM bg_matches m
  * le check-in part avant l'ouverture du salon. Par le salon, il l'est : un salon
  * ouvert pour un appariement remplacé (correction de score) ne vaut rien pour le
  * nouveau. Un tournoi masqué de nouveau (`start_visibility_at` à venir) n'envoie
- * rien, comme les salons vocaux : son nom et ses équipes ne sortent pas. La réservation porte l'appariement courant
- * (`brief_pairing`) : un réappariement change la clé, et `adoptCurrentPairing`
- * efface de son côté les réservations du match quand il remplace une empreinte
- * déjà posée.
+ * rien, comme les salons vocaux : son nom et ses équipes ne sortent pas. La
+ * réservation porte l'engagée, pas l'appariement : ni `adoptCurrentPairing` ni
+ * une nouvelle heure ne l'effacent.
  *
  * Toutes les bornes sont des instants de la base (`NOW()`), comme les fenêtres
  * de l'appel aux « Prêt » : le brief ne se compare à aucun instant du processus.
  */
 const BRIEF_DUE_SQL = `m.status = 'READY' AND m.is_bye = 0 ${NO_SCORE_SQL}
+        AND m.self_managed = 1 AND m.referee_user_id IS NULL
         AND t.start_visibility_at <= NOW()
         AND ((m.start_at IS NOT NULL
               AND m.start_at <= NOW() + INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE
@@ -261,7 +284,9 @@ const BRIEF_DUE_SQL = `m.status = 'READY' AND m.is_bye = 0 ${NO_SCORE_SQL}
               AND m.lobby_opened_at > NOW() - INTERVAL ${LOBBY_BRIEF_WINDOW_MINUTES} MINUTE))`;
 
 /**
- * Réserve un côté **si le salon est toujours ouvert pour cet appariement** :
+ * Réserve un côté — clé (match, id de l'engagée, `LOBBY_BRIEF`), une seule
+ * instruction et `affectedRows` — **si le salon est toujours ouvert pour cet
+ * appariement** et qu'aucune réservation de l'ancien format ne couvre l'engagée :
  * la condition relit le match dans l'instruction même. Entre la lecture des
  * candidats et la réservation, un lancement défait (`match-schedule`,
  * `referee-scheduling`) efface les réservations et referme le salon ; une
@@ -277,14 +302,16 @@ const BRIEF_DUE_SQL = `m.status = 'READY' AND m.is_bye = 0 ${NO_SCORE_SQL}
  *   l'erreur remonte — sinon ce côté ne serait jamais briefé pour cet appariement.
  */
 async function claimLobbyBrief(db: Db, row: LobbyBriefRow, slot: LobbyBriefSlot): Promise<number | null> {
-  const key = [Number(row.id), String(row.brief_pairing), lobbyBriefPhase(slot)];
+  const teamKey = String(slotTeamId(row, slot));
+  const key = [Number(row.id), teamKey, LOBBY_BRIEF_PHASE];
   try {
     const [result] = await db.execute(
       `INSERT IGNORE INTO bg_match_start_notices (match_id, pairing, phase)
-       SELECT m.id, CONCAT(m.team1_id, ':', m.team2_id), ? FROM bg_matches m
+       SELECT m.id, ?, ? FROM bg_matches m
         JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
-        WHERE m.id = ? AND CONCAT(m.team1_id, ':', m.team2_id) = ? AND ${BRIEF_DUE_SQL}`,
-      [key[2], key[0], key[1]],
+        WHERE m.id = ? AND CONCAT(m.team1_id, ':', m.team2_id) = ? AND ${BRIEF_DUE_SQL}
+          AND NOT ${LEGACY_BRIEF_SQL}`,
+      [teamKey, LOBBY_BRIEF_PHASE, key[0], String(row.brief_pairing), teamKey, teamKey],
     );
     const { affectedRows, insertId } = result as { affectedRows?: number; insertId?: number };
     return affectedRows === 1 && insertId ? Number(insertId) : null;
@@ -320,29 +347,14 @@ async function releaseQuietly(db: Db, claimIds: readonly number[]): Promise<bool
   }
 }
 
-/** Les arbitres de la liste qui remplissent encore la condition ; une panne n'en compte aucun. */
-async function readEligibleReferees(
-  db: Db,
-  ids: readonly number[],
-  game: TournamentGame,
-): Promise<Set<number>> {
-  if (ids.length === 0) return new Set();
-  try {
-    return await loadEligibleRefereeIds(db, ids, game);
-  } catch (error) {
-    console.error("[lobby-brief] lecture des arbitres impossible, brief sans arbitre", error);
-    return new Set();
-  }
-}
-
 /**
- * Les deux côtés du brief d'un match : chaque engagée lit « ton équipe contre
- * l'autre ». `refereeAssigned` : un arbitre est désigné, remplit la condition
- * et ne joue pas le match.
+ * Les deux côtés du brief d'un match en autogestion : chaque engagée lit « ton
+ * équipe contre l'autre ». Aucun arbitre n'y crée la partie : l'hôte la crée,
+ * le premier ban suit la règle du tournoi.
  */
 export function lobbyBriefSides(
   row: LobbyBriefRow,
-  options: { cast: boolean; refereeAssigned: boolean },
+  options: { cast: boolean },
 ): { teamId: number; side: LobbyBriefSide }[] {
   const team1Id = Number(row.team1_id);
   const team2Id = Number(row.team2_id);
@@ -375,10 +387,6 @@ export function lobbyBriefSides(
     // Un lien de diffusion vide ou fait d'invisibles n'est pas un lien ; une page de redirection ou une
     // adresse enfouie (`youtube.com/redirect?q=…`) est refusée comme dans une annonce #live.
     streamUrl: liveAnnouncementUrl(row.stream_url ?? null, null),
-    decision: refereeDecision({
-      refereeAssigned: options.refereeAssigned,
-      selfManaged: Number(row.self_managed ?? 0) === 1,
-    }),
   };
   return [
     {
@@ -496,7 +504,7 @@ async function sendSideBrief(
   }
 }
 
-/** Une même équipe sans joueur actif n'est dite qu'une fois dans pm2 par appariement. */
+/** Une même équipe sans gérant actif n'est dite qu'une fois dans pm2 par appariement. */
 const NO_MANAGER_LOGGED = new Set<string>();
 const NO_MANAGER_LOGGED_MAX = 1000;
 
@@ -506,7 +514,7 @@ function logNoManager(row: LobbyBriefRow, slot: LobbyBriefSlot): void {
   if (NO_MANAGER_LOGGED.size >= NO_MANAGER_LOGGED_MAX) NO_MANAGER_LOGGED.clear();
   NO_MANAGER_LOGGED.add(key);
   console.error(
-    `[lobby-brief] match ${Number(row.id)} : une engagée n'a aucun joueur actif, check-in en attente d'un joueur`,
+    `[lobby-brief] match ${Number(row.id)} : une engagée n'a aucun gérant actif, check-in en attente d'un gérant`,
   );
 }
 
@@ -527,8 +535,8 @@ type SweepContext = {
 type MatchBrief = { sent: number; retry: number[]; closed: number[]; lost: boolean; error?: unknown };
 
 /**
- * Joueurs d'un côté : `null` pour une vraie équipe sans joueur actif — pas de
- * réservation, un joueur ajouté dans la fenêtre sera briefé au balayage
+ * Gérants d'un côté : `null` pour une vraie équipe sans gérant actif — pas de
+ * réservation, un gérant nommé dans la fenêtre sera briefé au balayage
  * suivant (pm2 le dit une fois).
  */
 function sideManagers(
@@ -536,7 +544,7 @@ function sideManagers(
   slot: LobbyBriefSlot,
   context: SweepContext,
 ): { ghost: boolean; userIds: number[] } | null {
-  const teamId = Number(slot === 1 ? row.team1_id : row.team2_id);
+  const teamId = slotTeamId(row, slot);
   const ghost = Number((slot === 1 ? row.team1_ghost : row.team2_ghost) ?? 0) === 1;
   const userIds = context.managers.get(teamId) ?? [];
   if (!ghost && userIds.length === 0) {
@@ -655,10 +663,12 @@ async function runLobbyBriefSweep(): Promise<number> {
     `SELECT ${BRIEF_COLUMNS} ${BRIEF_FROM}
       WHERE ${BRIEF_DUE_SQL}
         AND (SELECT COUNT(*) FROM bg_match_start_notices n
-              WHERE n.match_id = m.id AND n.pairing = CONCAT(m.team1_id, ':', m.team2_id)
-                AND n.phase IN (?, ?)) < 2
+              WHERE n.match_id = m.id
+                AND ((n.phase = ? AND n.pairing IN (CAST(m.team1_id AS CHAR), CAST(m.team2_id AS CHAR)))
+                  OR (n.phase IN ('LOBBY_BRIEF_1', 'LOBBY_BRIEF_2')
+                      AND n.pairing = CONCAT(m.team1_id, ':', m.team2_id)))) < 2
       ORDER BY m.id`,
-    [lobbyBriefPhase(1), lobbyBriefPhase(2)],
+    [LOBBY_BRIEF_PHASE],
   );
   if (rows.length === 0) {
     // Lecture commune réussie : la panne qui avait armé une relance est passée.
@@ -669,19 +679,19 @@ async function runLobbyBriefSweep(): Promise<number> {
   // Destinataires de tous les côtés en deux lectures, **avant** toute
   // réservation : une panne ici ne réserve rien, et arme le balayage suivant
   // (`onError`, dans la limite des relances).
-  const memberships = await loadEntrantPlayerIds(rows.flatMap((row) => [Number(row.team1_id), Number(row.team2_id)]));
+  const memberships = await loadEntrantManagerIds(rows.flatMap((row) => [Number(row.team1_id), Number(row.team2_id)]));
   const recipients = await loadNotificationRecipients([...memberships.values()].flat(), "certified", { matchDm: true });
   retries.delete(SWEEP_RETRY_KEY);
-  // Joueurs dont le compte vit encore : un compte supprimé (anonymisé) garde
+  // Gérants dont le compte vit encore : un compte supprimé (anonymisé) garde
   // son appartenance mais ne reçoit plus rien — une équipe qui n'a que lui
-  // reste « sans joueur », non réservée, pour qu'un joueur ajouté dans la
+  // reste « sans gérant », non réservée, pour qu'un gérant nommé dans la
   // fenêtre soit briefé.
   const live = new Set(recipients.map((recipient) => recipient.userId));
   const managers = new Map(
     [...memberships].map(([teamId, userIds]) => [teamId, userIds.filter((userId) => live.has(userId))]),
   );
-  // Un match dont aucun côté n'a de quoi partir (vraies équipes sans joueur
-  // actif, seules à attendre) ne coûte ni casteurs ni arbitres : il
+  // Un match dont aucun côté n'a de quoi partir (vraies équipes sans gérant
+  // actif, seules à attendre) ne coûte aucune lecture des casteurs : il
   // reste candidat toute la fenêtre, et ces lectures seraient refaites à
   // chaque balayage pour rien.
   const hasRecipients = (teamId: number, ghost: number | null | undefined) =>
@@ -694,37 +704,10 @@ async function runLobbyBriefSweep(): Promise<number> {
     db,
     briefable.map((row) => ({ id: Number(row.id), game: row.game })),
   );
-  // La condition d'arbitrage dépend du jeu (Battle.net en Overwatch seulement) :
-  // les arbitres lus se retiennent par jeu.
-  const refereeIdsOf = (list: readonly LobbyBriefRow[], game: TournamentGame) =>
-    list.flatMap((row) => (row.referee_user_id === null || row.game !== game ? [] : [Number(row.referee_user_id)]));
-  const games = new Set<TournamentGame>(briefable.map((row) => row.game));
-  const checkedReferees = new Map<TournamentGame, Set<number>>();
-  const eligibleReferees = new Map<TournamentGame, Set<number>>();
-  await Promise.all(
-    [...games].map(async (game) => {
-      const ids = new Set(refereeIdsOf(briefable, game));
-      checkedReferees.set(game, ids);
-      eligibleReferees.set(game, await readEligibleReferees(db, [...ids], game));
-    }),
-  );
 
-  /** Les deux côtés d'un match relu ; un arbitre désigné depuis la première lecture est lu à part. */
-  const briefSides = async (row: LobbyBriefRow) => {
-    // Un jeu absent de la première lecture garde ses ensembles : la relecture d'un arbitre ne se fait qu'une fois.
-    const checked = checkedReferees.get(row.game) ?? new Set<number>();
-    const eligible = eligibleReferees.get(row.game) ?? new Set<number>();
-    checkedReferees.set(row.game, checked);
-    eligibleReferees.set(row.game, eligible);
-    const unread = refereeIdsOf([row], row.game).filter((id) => !checked.has(id));
-    for (const id of unread) checked.add(id);
-    for (const id of await readEligibleReferees(db, unread, row.game)) eligible.add(id);
-    const refereeId = row.referee_user_id === null ? null : Number(row.referee_user_id);
-    return lobbyBriefSides(row, {
-      cast: (castersByMatch.get(Number(row.id)) ?? []).length > 0,
-      refereeAssigned: refereeId !== null && eligible.has(refereeId) && Number(row.referee_plays ?? 0) !== 1,
-    });
-  };
+  /** Les deux côtés d'un match relu. */
+  const briefSides = async (row: LobbyBriefRow) =>
+    lobbyBriefSides(row, { cast: (castersByMatch.get(Number(row.id)) ?? []).length > 0 });
 
   let sent = 0;
   const toRelease: number[] = [];

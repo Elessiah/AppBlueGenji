@@ -168,3 +168,78 @@ export function parseMatchVoiceInfo(value: unknown): MatchVoiceInfo | null {
   };
   return { team1State: state(raw.team1State), team2State: state(raw.team2State) };
 }
+
+/* ── Lien du salon de son équipe ─────────────────────────────────────────── */
+
+/**
+ * Lien du salon vocal d'**une** équipe sur un match, pour ses seuls membres
+ * (`TournamentViewerContext.voiceLinks`) : jamais dans l'instantané diffusé,
+ * jamais le salon de l'adversaire.
+ */
+export type MatchVoiceLink = { matchId: number; url: string };
+
+/** Identifiant Discord (serveur ou salon) tel que le bot le rend : chiffres seulement. */
+const DISCORD_ID = /^\d{5,32}$/;
+
+/** Lien Discord d'un salon, `null` si un identifiant n'en est pas un. */
+export function voiceChannelUrl(guildId: string | null, channelId: string | null): string | null {
+  if (guildId === null || channelId === null || !DISCORD_ID.test(guildId) || !DISCORD_ID.test(channelId)) return null;
+  return `https://discord.com/channels/${guildId}/${channelId}`;
+}
+
+/** Ce qu'il faut d'un match pour savoir si le salon de l'équipe du lecteur est ouvert. */
+type VoiceLinkedMatch = {
+  id: number;
+  team1Id: number | null;
+  team2Id: number | null;
+  voice?: MatchVoiceInfo | null;
+};
+
+/** Le salon de `teamId` est-il ouvert sur ce match (instantané) ? */
+export function ownVoiceOpen(match: VoiceLinkedMatch, teamId: number | null): boolean {
+  if (teamId === null || !match.voice) return false;
+  if (match.team1Id === teamId) return match.voice.team1State === "OPEN";
+  if (match.team2Id === teamId) return match.voice.team2State === "OPEN";
+  return false;
+}
+
+/** Lien du salon de l'équipe du lecteur sur ce match, `null` s'il n'y en a pas (ou plus). */
+export function ownVoiceLink(
+  match: VoiceLinkedMatch,
+  teamId: number | null,
+  links: readonly MatchVoiceLink[],
+): string | null {
+  if (!ownVoiceOpen(match, teamId)) return null;
+  return links.find((link) => link.matchId === match.id)?.url ?? null;
+}
+
+/**
+ * Matchs dont le salon de l'équipe du lecteur est ouvert sans lien connu, en
+ * une clé stable (`""` : rien ne manque). Une nouvelle clé déclenche **une**
+ * relecture légère ; la même ne la relance pas (salon d'avant le lien, sans
+ * serveur connu).
+ */
+export function missingVoiceLinksKey(
+  matches: readonly VoiceLinkedMatch[],
+  teamId: number | null,
+  links: readonly MatchVoiceLink[],
+): string {
+  if (teamId === null) return "";
+  return matches
+    .filter((match) => ownVoiceOpen(match, teamId) && !links.some((link) => link.matchId === match.id))
+    .map((match) => match.id)
+    .join(",");
+}
+
+/** Liens reçus d'une réponse (forme contrôlée), `null` si ce n'en est pas une liste. */
+export function parseVoiceLinks(value: unknown): MatchVoiceLink[] | null {
+  if (!Array.isArray(value)) return null;
+  const links: MatchVoiceLink[] = [];
+  for (const item of value as unknown[]) {
+    if (!item || typeof item !== "object") continue;
+    const { matchId, url } = item as Record<string, unknown>;
+    if (typeof matchId !== "number" || typeof url !== "string" || !url.startsWith("https://discord.com/channels/")) continue;
+    links.push({ matchId, url });
+  }
+  return links;
+}

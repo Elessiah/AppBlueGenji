@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { enforceRateLimit, TOURNAMENT_READ_RULE } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
-import { loadRefereeNames } from "@/lib/server/tournaments/referee-names";
+import { loadRefereeNames, markViewerReferee } from "@/lib/server/tournaments/referee-names";
 import { can } from "@/lib/shared/permissions";
 
 /**
@@ -30,5 +30,6 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   const snapshot = await getVisibleTournamentSnapshot(tournamentId, { canManage: can(user, "tournaments") });
   if (!snapshot) return fail("TOURNAMENT_NOT_FOUND", 404);
 
-  return ok({ refereeNames: await loadRefereeNames(snapshot) });
+  // Marque par lecteur (`mine`) : l'arbitre désigné y reconnaît ses matchs.
+  return ok({ refereeNames: markViewerReferee(await loadRefereeNames(snapshot), user.id) });
 }

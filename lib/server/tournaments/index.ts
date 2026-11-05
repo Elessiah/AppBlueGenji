@@ -188,7 +188,8 @@ import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
-import { dispatchMatchVoiceChannels } from "./match-voice";
+import { dispatchMatchVoiceChannels, loadViewerVoiceLinks } from "./match-voice";
+import type { MatchVoiceLink } from "@/lib/shared/match-voice";
 import { dispatchDueRoundMapsNotices } from "./round-maps-notice";
 import { dispatchMatchStartNotices, notifyScoreToConfirm } from "./player-pushes";
 import { dispatchLobbyBriefs } from "./lobby-brief";
@@ -207,7 +208,7 @@ import {
   type DisputeBeforeResolution,
 } from "./dispute-self-resolution";
 import { loadViewerCastBlock } from "./match-launch";
-import { loadRefereeNames } from "./referee-names";
+import { loadRefereeNames, markViewerReferee } from "./referee-names";
 import {
   cachedCertificationPrompt,
   finalCertificationPrompt,
@@ -1297,7 +1298,11 @@ export async function getTournamentViewerContext(
   // Pseudo des arbitres désignés : à tout membre connecté (les deux portes qui
   // servent ce contexte exigent une session), jamais dans l'instantané diffusé.
   // Les mêmes pour tous : lus une fois par version d'instantané.
-  const refereeNames = await loadRefereeNames(snapshot);
+  const refereeNames = markViewerReferee(await loadRefereeNames(snapshot), userId);
+
+  // Salon vocal de son équipe : à ses membres seuls (`myTeamId`), jamais dans
+  // l'instantané diffusé. Aucune lecture sans salon ouvert de son côté.
+  const voiceLinks = await loadViewerVoiceLinks(snapshot.matches, myTeamId);
 
   return {
     preview,
@@ -1320,7 +1325,18 @@ export async function getTournamentViewerContext(
     matchProposals,
     certificationPrompt,
     refereeNames,
+    voiceLinks,
   };
+}
+
+/**
+ * Liens des salons vocaux de l'équipe du lecteur (`TournamentViewerContext.voiceLinks`),
+ * pour la relecture légère qui suit un salon ouvert depuis le contexte
+ * (`GET /api/tournaments/[id]/voice-links`).
+ */
+export async function getViewerVoiceLinks(snapshot: TournamentSnapshot, userId: number): Promise<MatchVoiceLink[]> {
+  const { myTeamId } = await resolveViewerEntrant(snapshot, userId);
+  return loadViewerVoiceLinks(snapshot.matches, myTeamId);
 }
 
 /**

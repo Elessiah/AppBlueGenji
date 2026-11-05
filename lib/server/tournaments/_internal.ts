@@ -17,7 +17,7 @@ import {
 import { normalizeReplayUrl } from "@/lib/shared/match-replay";
 import { parseTournamentImage } from "@/lib/shared/tournament-image";
 import { currentLaunchState, launchReadiness, launchStateIsCurrent } from "@/lib/shared/match-launch";
-import { firstBanTeamId, matchHostTeamId } from "@/lib/shared/match-referee";
+import { firstBanTeamId, matchHostTeamId, refereeHostedFirstBanTeamId } from "@/lib/shared/match-referee";
 import { parseMapPicks } from "@/lib/shared/round-maps";
 import { visibleText } from "@/lib/shared/visible-text";
 import { localizeBracketPlaceholder } from "@/lib/shared/bracket-placeholders";
@@ -148,6 +148,8 @@ export type MatchRow = RowDataPacket & {
   start_at: Date | null;
   /** NULL = match non casté (cf. `lib/shared/live-streams.ts`). */
   live_trigger: MatchLiveTrigger | null;
+  /** Caster maître du mode d'antenne (`lib/shared/live-trigger-owner.ts`) — absent des lectures partielles. */
+  live_trigger_user_id?: number | null;
   live_started_at: Date | null;
   /** Lancement (`lib/shared/match-launch.ts`) — absents des lectures partielles. */
   host_team_id?: number | null;
@@ -382,6 +384,7 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
     phasePosition: row.phase_position == null ? null : Number(row.phase_position),
     startAt: toIso(row.start_at ?? null),
     liveTrigger: row.live_trigger ?? null,
+    liveTriggerCasterId: liveTriggerCasterId(row, extras.casters ?? [], game),
     liveUrl: normalizeStreamUrl(firstStreamUrl(shown)),
     // Revalidés à la lecture, comme le premier lien.
     streams: shown
@@ -458,6 +461,18 @@ function nullableId(value: number | null | undefined): number | null {
  * ou joué garde ses casters : on ne réécrit ni une diffusion en cours ni
  * l'histoire.
  */
+/**
+ * Le caster maître du mode d'antenne, s'il caste encore le match et y est
+ * montré (`casters`) : son identifiant y est déjà public. Sinon `null` — le
+ * mode est au staff (`lib/shared/live-trigger-owner.ts`).
+ */
+function liveTriggerCasterId(row: MatchRow, casters: readonly MatchCasterRow[], game: TournamentGame): number | null {
+  const owner = row.live_trigger_user_id ?? null;
+  if (owner === null || row.live_trigger === null) return null;
+  const shown = casters.some((caster) => caster.userId === Number(owner) && !casterWithdrawn(row, caster, game));
+  return shown ? Number(owner) : null;
+}
+
 function casterWithdrawn(row: MatchRow, caster: MatchCasterRow, game: TournamentGame): boolean {
   if (row.status === "COMPLETED" || (row.launched_at ?? null) !== null) return false;
   return castEligibilityBlock(caster.eligibility, game) !== null;
@@ -519,14 +534,16 @@ function mapMatchLaunch(row: MatchRow, allCasters: readonly MatchCasterRow[], ga
     casters: casters.map((caster) => ({ userId: caster.userId, readyAt: current ? toIso(caster.readyAt) : null })),
     referee: referee ? { readyAt: current ? toIso(row.referee_ready_at ?? null) : null } : null,
   });
-  const hostTeamId = matchHostTeamId(nullableId(row.host_team_id), team1Id, team2Id, {
-    team1: nullableId(row.team1_seed),
-    team2: nullableId(row.team2_seed),
-  });
+  const seeds = { team1: nullableId(row.team1_seed), team2: nullableId(row.team2_seed) };
+  const hostTeamId = matchHostTeamId(nullableId(row.host_team_id), team1Id, team2Id, seeds);
   const firstMap = row.first_map ? visibleText(row.first_map) : "";
   return {
     hostTeamId,
-    firstBanTeamId: firstBanTeamId(hostTeamId, team1Id, team2Id),
+    // L'arbitre désigné crée la partie : la moins bonne tête de série bannit la
+    // première, quelle que soit la règle du tournoi (`applyMapRules` la garde).
+    firstBanTeamId: referee
+      ? refereeHostedFirstBanTeamId(team1Id, team2Id, seeds)
+      : firstBanTeamId(hostTeamId, team1Id, team2Id),
     refereeAssigned: referee,
     // Empreinte de la désignation, jusqu'à la fin du match : la fenêtre
     // « Contacts » s'y relit quand l'arbitre change. Le pseudo aux membres

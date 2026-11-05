@@ -54,6 +54,19 @@ export function withoutRefereeKeys<T extends { refereeKey: string | null }>(matc
 }
 
 /**
+ * Marque (`mine`) les désignations dont le lecteur est l'arbitre : la liste
+ * lue est commune à tous les membres (mise en cache), la marque se pose après,
+ * par lecteur — elle ne nomme personne de plus, seulement le lecteur à lui-même.
+ * Garde la même référence si rien n'est marqué.
+ */
+export function markViewerReferee(names: MatchRefereeName[], viewerUserId: number): MatchRefereeName[] {
+  if (!names.some((name) => refereeKey(name.matchId, viewerUserId) === name.refereeKey)) return names;
+  return names.map((name) =>
+    refereeKey(name.matchId, viewerUserId) === name.refereeKey ? { ...name, mine: true } : name,
+  );
+}
+
+/**
  * Durée de vie des pseudos lus pour une version d'instantané : la clé porte la
  * version, toute écriture en fait une autre ; la durée ne sert qu'à absorber
  * une vague d'ouvertures de flux (tous les membres lisent les mêmes pseudos).
