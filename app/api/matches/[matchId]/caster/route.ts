@@ -11,6 +11,13 @@ import {
   parseMatchIdParam,
 } from "@/lib/server/tournaments/match-launch-routes";
 import { can } from "@/lib/shared/permissions";
+import type { AuthUser } from "@/lib/server/auth";
+import type { CastAccess } from "@/lib/server/tournaments/cast-settings";
+
+/** Ses droits sur un mode d'antenne déjà posé (`lib/shared/live-trigger-owner.ts`). */
+function castAccess(user: AuthUser): CastAccess {
+  return { isAdmin: user.isAdmin, manages: can(user, "tournaments") };
+}
 
 const STATUSES: Readonly<Record<string, number>> = {
   NOT_CASTER: 403,
@@ -25,6 +32,7 @@ const STATUSES: Readonly<Record<string, number>> = {
   STREAM_URL_REQUIRED: 400,
   INVALID_CAST_BATTLETAG: 400,
   INVALID_LIVE_TRIGGER: 400,
+  LIVE_TRIGGER_NOT_OWNED: 403,
   MATCH_NOT_CASTABLE: 409,
   MATCH_START_AT_REQUIRED: 409,
   CAST_STREAM_NOT_OWNED: 409,
@@ -75,7 +83,7 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   if (settings.asOrganisation === true && !can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
   try {
-    await claimMatchCast(matchId, user.id, can(user, "live"), target, settings);
+    await claimMatchCast(matchId, user.id, can(user, "live"), target, settings, castAccess(user));
     return ok({ casterUserId: user.id });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_CAST_CLAIM_FAILED");
@@ -122,7 +130,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   if (settings.asOrganisation === true && !can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
   try {
-    await setCastSettings(matchId, user.id, can(user, "live"), settings);
+    await setCastSettings(matchId, user.id, can(user, "live"), settings, castAccess(user));
     return ok({ casterUserId: user.id });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_CAST_SETTINGS_FAILED");

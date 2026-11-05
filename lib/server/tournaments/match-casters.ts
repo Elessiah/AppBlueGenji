@@ -405,6 +405,17 @@ export async function withdrawUserCasts(
       [userId, ...linksToDrop],
     );
   }
+  // Le mode d'antenne qu'il avait posé reste au match, sans propriétaire : il
+  // revient au staff (`lib/shared/live-trigger-owner.ts`). Seul un caster en est
+  // propriétaire : ses matchs sont parmi ceux qu'il caste, déjà verrouillés.
+  const castMatches = matchIds.filter((id) => casts.has(id));
+  if (castMatches.length > 0) {
+    await connection.execute(
+      `UPDATE bg_matches SET live_trigger_user_id = NULL
+        WHERE live_trigger_user_id = ? AND id IN (${placeholders(castMatches)})`,
+      [userId, ...castMatches],
+    );
+  }
   if (refereesToDrop.length > 0) {
     await connection.execute(
       `UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL

@@ -22,6 +22,7 @@ import {
   requiresMatchStartAt,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
+import { liveTriggerOwnerAfter, mayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
 import { lockMatchStreams, pruneMatchStreams, type MatchStreamRow } from "./match-casters";
 // Type seul : aucune dépendance d'exécution vers le lancement, qui importe ce
 // module (le verrou de la ligne du match et la transaction y vivent).
@@ -48,6 +49,18 @@ export type CastSettings = {
 };
 
 /**
+ * Ce que la route établit du caster pour la règle du mode d'antenne
+ * (`lib/shared/live-trigger-owner.ts`) : admin, permission `tournaments`.
+ */
+export type CastAccess = {
+  isAdmin: boolean;
+  manages: boolean;
+};
+
+/** Sans droit particulier : un caster ordinaire. */
+export const PLAIN_CAST_ACCESS: CastAccess = { isAdmin: false, manages: false };
+
+/**
  * Le match accepte-t-il encore ce mode d'antenne ? Même verdict que la
  * configuration du staff (`assertConfigurable`) : un match dont le score est
  * saisi ne se démarque que, et un mode posé sur lui remplacerait le lien d'un
@@ -71,7 +84,13 @@ export function assertCastTriggerWritable(row: LaunchMatchRow, trigger: MatchLiv
 
 /**
  * Pose le mode d'antenne du match, sous le verrou de sa ligne que l'appelant
- * tient déjà.
+ * tient déjà, pour `userId` — un caster du match, qui en devient le
+ * propriétaire (`live_trigger_user_id`).
+ *
+ * Un mode inchangé n'écrit rien. Un mode déjà posé ne change que pour son
+ * propriétaire, l'arbitre désigné ou un admin (`mayChangeLiveTrigger`) :
+ * `LIVE_TRIGGER_NOT_OWNED` sinon — un co-caster ne décide pas pour celui qui
+ * l'a posé.
  *
  * Les deux effacements de la configuration du staff (`setMatchLiveConfig`) sont
  * repris mot pour mot : démarquer le match referme son antenne, et un mode qui
@@ -81,30 +100,49 @@ export function assertCastTriggerWritable(row: LaunchMatchRow, trigger: MatchLiv
  * pas la chaîne de l'organisation (seule sa fenêtre à elle le fait).
  *
  * @throws `INVALID_LIVE_TRIGGER` | `MATCH_NOT_CASTABLE` | `MATCH_START_AT_REQUIRED`
+ *   | `LIVE_TRIGGER_NOT_OWNED`
  */
 export async function applyCastTrigger(
   connection: PoolConnection,
   row: LaunchMatchRow,
   trigger: MatchLiveTrigger | null,
+  userId: number,
+  access: CastAccess = PLAIN_CAST_ACCESS,
 ): Promise<void> {
   if (trigger !== null && !isMatchLiveTrigger(trigger)) throw new Error("INVALID_LIVE_TRIGGER");
+  const current = row.live_trigger ?? null;
+  if (trigger === current) return;
+  const actor = { userId, ...access };
+  const hold = {
+    trigger: current,
+    ownerId: nullableUserId(row.live_trigger_user_id),
+    refereeId: row.refereeEligible ? nullableUserId(row.referee_user_id) : null,
+  };
+  if (!mayChangeLiveTrigger(hold, actor)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
   assertCastTriggerWritable(row, trigger);
   const matchId = Number(row.id);
+  const owner = liveTriggerOwnerAfter(trigger, actor, true);
   if (trigger === null) {
     await connection.execute(
-      `UPDATE bg_matches SET live_trigger = NULL, live_started_at = NULL WHERE id = ?`,
+      `UPDATE bg_matches SET live_trigger = NULL, live_trigger_user_id = NULL, live_started_at = NULL WHERE id = ?`,
       [matchId],
     );
   } else {
     await connection.execute(
       trigger === "MANUAL"
-        ? `UPDATE bg_matches SET live_trigger = ? WHERE id = ?`
-        : `UPDATE bg_matches SET live_trigger = ?, live_started_at = NULL WHERE id = ?`,
-      [trigger, matchId],
+        ? `UPDATE bg_matches SET live_trigger = ?, live_trigger_user_id = ? WHERE id = ?`
+        : `UPDATE bg_matches SET live_trigger = ?, live_trigger_user_id = ?, live_started_at = NULL WHERE id = ?`,
+      [trigger, owner, matchId],
     );
   }
   row.live_trigger = trigger;
+  row.live_trigger_user_id = owner;
   if (trigger !== "MANUAL") row.live_started_at = null;
+}
+
+/** Un identifiant de compte lu en base (`BIGINT` nul ou non). */
+function nullableUserId(value: number | string | null | undefined): number | null {
+  return value === null || value === undefined ? null : Number(value);
 }
 
 /**
@@ -178,9 +216,10 @@ export async function applyCastSettings(
   userId: number,
   streamId: number,
   settings: CastSettings,
+  access: CastAccess = PLAIN_CAST_ACCESS,
 ): Promise<void> {
   const matchId = Number(row.id);
-  if (settings.trigger !== undefined) await applyCastTrigger(connection, row, settings.trigger);
+  if (settings.trigger !== undefined) await applyCastTrigger(connection, row, settings.trigger, userId, access);
   let streams: MatchStreamRow[] | undefined;
   if (settings.liveUrl !== undefined) {
     const url = parseStreamUrlInput(settings.liveUrl);
