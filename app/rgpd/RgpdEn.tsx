@@ -831,7 +831,7 @@ export function RgpdEn({
         <div className={styles.prose}>
           <p>
             You can be notified on your phone or computer of the start of your matches, of a score to confirm or confirmed automatically without an answer, of a
-            tournament&apos;s kickoff, of your match times (set, changed or removed) and their reminders, of the check-in of a match of your team or of your solo tournament, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers), and of what
+            tournament&apos;s kickoff, of your match times (set, changed or removed) and their reminders, of the check-in of a self-managed match of a team you manage (owner or manager) or of your solo tournament, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers), and of what
             concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, disputes settled, results corrected,
             opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the start of the match they cast and of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission.{" "}
             <strong>Nothing is sent without your action</strong>: notifications are turned on device by device,
@@ -875,10 +875,10 @@ export function RgpdEn({
             language, when
             the time of one of your matches is set, changed or removed, for its reminders (24 h and 10 h before),
             when you are removed from a match and, if you cast, when your caster registration for a match is removed
-            by the staff or automatically (with the reason) and, if you are a member of an entered team (player, coach or manager) or play
-            a solo tournament, 15 minutes before a match kicks off — or when its lobby opens, if that comes earlier or the match has no time, again if it reopens —, the match
-            check-in (joining your team&apos;s voice channel and the check-in channel, team on the left — the host — and on the right, game settings, map order and
-            ban order, sorting the players by role if the match is cast, assigned referee or self-management, the match&apos;s stream link when it is public,
+            by the staff or automatically (with the reason) and, if you manage an entered team (owner or manager) or play
+            a solo tournament, for a self-managed match only (none for a refereed match or one with no refereeing decision), 15 minutes before it kicks off — or when its lobby opens,
+            if that comes earlier or the match has no time —, once per match, the match check-in (joining your team&apos;s voice channel and the check-in channel, team on the left — the host — and on the right, game settings, map order and
+            ban order, sorting the players by role if the match is cast, self-management, the match&apos;s stream link when it is public,
             the reminder to enter the scores and who to report a problem to), with the team names, the tournament, the round and the link to the match page, without any BattleTag,
             Discord tag or player username (in a solo tournament, the message names neither you nor your opponent) — only if your Discord tag is <strong>certified</strong>: an
             uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam (your push notifications are still sent). These messages
@@ -944,7 +944,7 @@ export function RgpdEn({
             association&apos;s Discord bot opens, from {VOICE_CHANNEL_LEAD_MINUTES} minutes before a match&apos;s time (on the site&apos;s first pass within that
             window), a {VOICE_CHANNEL_CAPACITY}-seat voice channel for each of its two teams, named after the team — never for a solo
             entry, whose name would be a username, nor for a match against a ghost team. The match&apos;s launch doesn&apos;t depend on them: it launches as in any other tournament. To know whether a channel is empty, the bot holds in memory, at all times (option on or not), without ever recording it, the voice state (Discord identifier of the member and of their voice session, channel they are in, microphone or sound muted by them or by moderation, screen sharing or camera on, request to speak and stage suppression), with the member profile Discord attaches to it (their profile on the server, including username, nickname, avatar, roles, join and boost dates, timeout), of the members of the association&apos;s Discord server, as Discord sends it — that of the other servers it is
-            on reaches it too, but it does not keep it (the attached member profile, it does: in memory, kept up to date by Discord, lost when the bot stops); the site only receives and keeps the channel&apos;s identifier, the numbers of the match and team, the times of creation and of hand-back (or of a bot outage or a refused hand-back), never who is in a channel, nor how many: the match page only tells its parties and staff whether each channel is open, which any signed-in member can read; a visitor without an account sees none of it. The channel is handed back to the bot when the match is finished (score confirmed),
+            on reaches it too, but it does not keep it (the attached member profile, it does: in memory, kept up to date by Discord, lost when the bot stops); the site only receives and keeps the identifier of the channel and of its Discord server, the numbers of the match and team, the times of creation and of hand-back (or of a bot outage or a refused hand-back), never who is in a channel, nor how many: the match page only tells its parties and staff whether each channel is open, which any signed-in member can read; a visitor without an account sees none of it. The members of each team also find there the link to their own channel while it is open — never the opponent&apos;s. The channel is handed back to the bot when the match is finished (score confirmed),
             cancelled, back to waiting, taken off the schedule or left without a confirmed score {VOICE_CHANNEL_LATE_HOURS} hours after its time, when the team leaves the pairing, when a solo entry or a ghost team enters the match, or when the tournament is no longer running (finished, or moved back before its start), is hidden again or turns the option off; the bot deletes it as soon as it is
             empty (within {VOICE_BOT_RELEASED_MAX_HOURS} hours and {VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest, even if occupied, while the bot is running; if Discord prevents it, it retries at every sweep, and if it can no longer read the channel{" "}
             {VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation or its reuse, it forgets it: the channel then stays until the
@@ -1049,6 +1049,11 @@ export function RgpdEn({
             stream or in “Configure my broadcast”: that link then does not go with their account, but with that
             stream once no caster holds it any more. A link set in that configuration before the site recorded who provided it has no
             known author and stays with the match.{" "}
+            When a match goes live (“live mode”) can only be changed or removed by the caster who set it — the site keeps
+            their account with the match and erases it when they leave the match, when the mode changes hands or is removed, or
+            when their account is deleted —, by the match&apos;s assigned referee or by an administrator; a mode set by the staff
+            stays with the staff. The assigned referee of a match can also, for that match only, edit or remove a caster&apos;s
+            link and configure the organizers&apos; broadcast.{" "}
             A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which
             then replaces their profile one wherever the latter was shown (“Contacts” and launch windows, match
             page: to the same people at the same times — parties to the match and referees —, in an Overwatch tournament only): it is kept with their caster
@@ -1079,8 +1084,8 @@ export function RgpdEn({
             site: the site only keeps the trace of a match&apos;s announcement when it goes on air
             (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>), which appears, in a solo tournament,
             in the export of your data — neither the text of the message nor the list of scheduled matches it gives. Your
-            caster registrations (with your “Ready” and the BattleTag you gave for that cast), the channel links you provided and the matches you are the assigned
-            referee of also appear in the export of your data. These
+            caster registrations (with your “Ready” and the BattleTag you gave for that cast), the channel links you provided, the matches you are the assigned
+            referee of and those whose live mode you set also appear in the export of your data. These
             announcements stay in the channel as long as the #live channel exists; when a caster&apos;s account is deleted,
             the message of an evening still under way is updated without their channel link if it keeps another link —
             otherwise, or once the evening has ended, it keeps it. The team, player or caster concerned can

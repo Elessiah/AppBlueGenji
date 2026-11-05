@@ -1618,6 +1618,41 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Un membre de l'organisation qui caste peut aussi indiquer, en ouvrant son propre stream ou dans « Configurer ma diffusion », que son lien est celui de l'organisation : ce lien ne part alors pas avec son compte, mais avec ce stream quand plus aucun caster ne le tient.",
     ],
   },
+  {
+    // CAST-FOLLOWUP (décision de l'utilisateur du 2026-11-05) : le check-in du
+    // match ne part plus qu'en autogestion et à ceux qui gèrent les engagées,
+    // une seule fois par match ; les membres d'une équipe voient le lien de
+    // leur seul salon vocal. Destinataires restreints, donnée nouvelle (le
+    // serveur du salon) : à annoncer. L'entrée « 2026-11-check-in-du-match »,
+    // publiée, ne se réécrit pas — celle-ci la complète.
+    id: "2026-11-check-in-aux-gerants",
+    publishedAt: "2026-11-06",
+    title: "Check-in du match : en autogestion seulement, à ceux qui gèrent l'équipe",
+    links: [MATCH_DM_PARAGRAPH_LINK, { href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }],
+    summary:
+      "Le check-in du match ne part plus que pour un match en autogestion, et seulement au propriétaire et aux managers de chaque équipe (ou au joueur d'un tournoi individuel), une seule fois par match. Sur la page du match, chaque équipe trouve le lien de son propre salon vocal.",
+    details: [
+      "Ce qui change pour le check-in : un match arbitré ou sans décision d'arbitrage n'en reçoit plus ; joueurs et coachs d'une équipe n'en reçoivent plus, seuls son propriétaire et ses managers. Il ne part qu'une fois par match et par engagée : ni un changement d'horaire, ni un lancement annulé, ni un réappariement ne le renvoient. Le site garde la trace de cet envoi (match et engagée) avec le match ; seul un retour arrière du tournoi l'efface.",
+      "Ce qui change pour les salons vocaux : le site garde aussi l'identifiant du serveur Discord de chaque salon, pour en former le lien. Ce lien n'est montré qu'aux membres de l'équipe à qui le salon est ouvert, tant qu'il l'est — jamais à l'adversaire ni à qui n'est pas membre de l'équipe.",
+      "Ce qui ne change pas : le contenu du check-in (sans BattleTag, tag Discord ni pseudo de joueur), le message privé réservé à un tag Discord certifié, et la case « Messages privés Discord de mes matchs » de « Mon profil » pour s'y opposer.",
+    ],
+  },
+  {
+    // CAST-FOLLOWUP : le compte du caster qui pose le mode d'antenne
+    // (`bg_matches.live_trigger_user_id`) est gardé, et l'arbitre désigné
+    // règle la diffusion de son match. Seuls casters et arbitres sont concernés.
+    audience: "LIVE_STAFF",
+    id: "2026-11-mode-d-antenne-et-arbitre",
+    publishedAt: "2026-11-06",
+    title: "Mode d'antenne : réservé à qui l'a posé, et l'arbitre désigné règle la diffusion",
+    links: [{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }],
+    summary:
+      "Le mode d'antenne d'un match ne se change plus que par le caster qui l'a posé, l'arbitre désigné du match ou un administrateur. L'arbitre désigné peut aussi modifier les liens des casters de son match et configurer la diffusion de l'organisation.",
+    details: [
+      "Ce que le site garde : le compte du caster qui a posé le mode d'antenne, avec le match ; il est effacé quand ce caster quitte le match, que le mode change de mains ou est retiré, ou que son compte est supprimé, et figure dans l'export de tes données.",
+      "Qui règle quoi : un mode posé par le staff reste au staff ; un co-caster ne peut plus changer celui d'un autre. L'arbitre désigné d'un match, pour ce seul match, voit et modifie les liens de ses casters et la configuration de la diffusion de l'organisation — l'arbitre d'un autre match, non.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

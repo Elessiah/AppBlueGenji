@@ -275,7 +275,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // connexion, au même titre que les deux suivants. La finalité le dit, parce
     // que c'est ce qui explique qu'on ne puisse pas retirer le dernier.
     finalite:
-      "Moyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires, rappels, retrait de match, check-in d'un match de ton équipe ou de ton tournoi individuel, et retrait de ton cast — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, invitation d'une équipe, reprise d'équipe proposée ou propriété de ton équipe reçue, avis de suspension ou de modération, information sur tes données). Retirable depuis Mon profil tant qu'il t'en reste un autre",
+      "Moyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (horaires, rappels, retrait de match, check-in d'un match en autogestion d'une équipe que tu gères ou de ton tournoi individuel, et retrait de ton cast — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, invitation d'une équipe, reprise d'équipe proposée ou propriété de ton équipe reçue, avis de suspension ou de modération, information sur tes données). Retirable depuis Mon profil tant qu'il t'en reste un autre",
     base: CONTRAT,
     extraBases: [
       { base: INTERET_LEGITIME, scope: MATCH_TIME_DM_SCOPE },
