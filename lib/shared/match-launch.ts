@@ -45,6 +45,16 @@ export const LAUNCH_AUTO_DELAY_MINUTES = 15;
  */
 export type MatchLaunchPhase = "NONE" | "TO_PLAN" | "SCHEDULED" | "LOBBY" | "LAUNCHED";
 
+/**
+ * Le match n'est ni lancé ni joué : la condition du cast et de l'arbitrage s'y
+ * rejoue encore (un caster ou un arbitre qui ne la remplit plus est tu). Une
+ * seule définition pour l'instantané (`_internal.ts`) et les gestes du serveur
+ * (`live-streams.ts`, `cast-settings.ts`) : ils jugent le même maître du mode.
+ */
+export function castBeforeLaunch(match: { status: string; launched_at?: Date | string | null }): boolean {
+  return match.status !== "COMPLETED" && (match.launched_at ?? null) === null;
+}
+
 /** Ce que la règle a besoin de savoir d'un match. */
 export type MatchLaunchInput = {
   status: MatchStatus;

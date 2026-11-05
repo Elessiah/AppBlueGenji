@@ -124,7 +124,7 @@ const LEGACY_BRIEF_SQL = `EXISTS (SELECT 1 FROM bg_match_start_notices o
 function sideBriefedSql(team: string): string {
   return `EXISTS (SELECT 1 FROM bg_match_start_notices n
               WHERE n.match_id = m.id
-                AND ((n.phase = ? AND n.pairing = CAST(${team} AS CHAR))
+                AND ((n.phase = ? AND n.pairing = CONCAT(${team}, ''))
                   OR (n.phase = 'LOBBY_BRIEF_1' AND n.pairing LIKE CONCAT(${team}, ':%'))
                   OR (n.phase = 'LOBBY_BRIEF_2' AND n.pairing LIKE CONCAT('%:', ${team}))))`;
 }

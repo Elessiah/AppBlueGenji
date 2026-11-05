@@ -5,6 +5,7 @@ import {
   autoLaunchAt,
   canDeclareTeamReady,
   canPlayersReportScore,
+  castBeforeLaunch,
   connectionReader,
   castBlockReason,
   identityBlockIsDiscordOnly,
@@ -630,5 +631,19 @@ describe("identityComplete / identityBlockIsDiscordOnly — dispense nommée, ja
 
   it("identityBlockIsDiscordOnly_overwatch_false", () => {
     expect(identityBlockIsDiscordOnly("OW")).toBe(false);
+  });
+});
+
+describe("castBeforeLaunch — la condition du cast se rejoue jusqu'au lancement", () => {
+  it("castBeforeLaunch_readyNotLaunched_true", () => {
+    expect(castBeforeLaunch({ status: "READY", launched_at: null })).toBe(true);
+  });
+
+  it("castBeforeLaunch_launched_false", () => {
+    expect(castBeforeLaunch({ status: "READY", launched_at: new Date("2026-11-05T20:00:00Z") })).toBe(false);
+  });
+
+  it("castBeforeLaunch_completed_false", () => {
+    expect(castBeforeLaunch({ status: "COMPLETED" })).toBe(false);
   });
 });

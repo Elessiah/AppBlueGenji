@@ -77,6 +77,16 @@ describe("applyCastTrigger", () => {
     expect(row.live_trigger).toBe("AUTO");
   });
 
+  it("applyCastTrigger_refereeOnAwaitingConfirmation_refusedNotOwned", async () => {
+    // Score déclaré : la médiation est close, comme sur la route du staff.
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12));
+    const row = Object.assign(ownedRow(), { status: "AWAITING_CONFIRMATION" });
+
+    await expect(
+      applyCastTrigger(fakeConnection({ execute }), row, null, 9, { isAdmin: false, manages: true }),
+    ).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
+  });
+
   it("applyCastTrigger_ineligibleReferee_refused", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12));
     const row = Object.assign(ownedRow(), { refereeEligible: false });

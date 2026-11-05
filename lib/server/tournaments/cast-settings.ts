@@ -23,6 +23,7 @@ import {
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
 import { liveTriggerOwnerAfter, mayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
+import { castBeforeLaunch } from "@/lib/shared/match-launch";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { loadShownCasterIds } from "./cast-eligibility";
 import { lockMatchStreams, pruneMatchStreams, type MatchStreamRow } from "./match-casters";
@@ -164,12 +165,14 @@ export async function applyCastTrigger(
 async function castTriggerHold(connection: PoolConnection, row: LaunchMatchRow, candidateId: number | null) {
   const current = row.live_trigger ?? null;
   const ownerId = current === null ? null : nullableId(row.live_trigger_user_id);
-  const beforeLaunch = row.status !== "COMPLETED" && (row.launched_at ?? null) === null;
-  const shown = await loadShownCasterIds(connection, Number(row.id), [ownerId, candidateId], row.tournament_game, beforeLaunch);
+  const shown = await loadShownCasterIds(connection, Number(row.id), [ownerId, candidateId], row.tournament_game, castBeforeLaunch(row));
+  // L'arbitre ne médie qu'un match à jouer — la règle de la route du staff
+  // (`KEPT_REFEREE_SQL`) : un score déclaré clôt la médiation.
+  const mediates = row.refereeEligible && (row.status === "PENDING" || row.status === "READY");
   const hold = {
     trigger: current,
     ownerId: ownerId !== null && shown.has(ownerId) ? ownerId : null,
-    refereeId: row.refereeEligible ? nullableId(row.referee_user_id) : null,
+    refereeId: mediates ? nullableId(row.referee_user_id) : null,
   };
   return { hold, shown };
 }

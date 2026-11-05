@@ -805,6 +805,19 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", null, 42]]]);
   });
 
+  it("setMatchLiveConfig_casterSetsMode_readsOwnerAndActorOnce", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "AUTO", live_trigger_user_id: 12 }), [dbStream(4, null)], [
+      { user_id: 12, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: null, setter: CASTER_12, access: LIVE_ONLY });
+
+    const shownReads = world.execute.mock.calls.filter(([sql]) => String(sql).includes("SELECT mc.user_id"));
+    expect(shownReads).toHaveLength(1);
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["MANUAL", 12, 42]]]);
+  });
+
   it("setMatchLiveConfig_triggerChanged_returnsPreviousTrigger", async () => {
     const world = liveWorld(matchRow({ live_trigger: "AUTO" }));
     await mockLiveDb(world);
@@ -955,6 +968,19 @@ describe("setMatchLiveConfig", () => {
       await expect(setMatchOnAir(42, true, 12, LIVE_ACCESS)).resolves.toBe(false);
       expect(world.state.matchWrites).toEqual([]);
       expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    });
+
+    it("setMatchOnAir_deadlockOnce_retriesAndSucceeds", async () => {
+      const world = ownedWorld();
+      await mockLiveDb(world);
+      const real = world.execute.getMockImplementation()!;
+      world.execute.mockImplementationOnce(async () => {
+        throw Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+      });
+      world.execute.mockImplementation(real);
+
+      await expect(setMatchOnAir(42, true, 12, LIVE_ACCESS)).resolves.toBe(true);
+      expect(world.state.matchWrites).toHaveLength(1);
     });
 
     it("setMatchOnAir_unknownMatch_throwsMatchNotFound", async () => {

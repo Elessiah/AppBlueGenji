@@ -60,6 +60,16 @@ describe("refereeNameOf", () => {
   });
 });
 
+describe("missingRefereeNamesKey — l'arbitre reconnu de lui seul", () => {
+  it("missingRefereeNamesKey_mineEntryWithoutPseudo_notMissing", () => {
+    expect(missingRefereeNamesKey([shown(5, "k5")], [{ matchId: 5, refereeKey: "k5", pseudo: "", mine: true }])).toBe("");
+  });
+
+  it("missingRefereeNamesKey_emptyPseudoNotMine_missing", () => {
+    expect(missingRefereeNamesKey([shown(5, "k5")], [{ matchId: 5, refereeKey: "k5", pseudo: "" }])).toBe("5:k5");
+  });
+});
+
 describe("missingRefereeNamesKey", () => {
   it("missingRefereeNamesKey_awaitingConfirmationWithoutName_isNotMissing", () => {
     expect(missingRefereeNamesKey([shown(6, "k6", "AWAITING_CONFIRMATION")], NAMES)).toBe("");
@@ -92,6 +102,11 @@ describe("refereeNamesImprove", () => {
 
   it("refereeNamesImprove_incomingNamesMissingDesignation_returnsTrue", () => {
     expect(refereeNamesImprove(shownB, [], namedB)).toBe(true);
+  });
+
+  it("refereeNamesImprove_incomingMineEntryWithoutPseudo_returnsTrue", () => {
+    // L'arbitre au pseudo illisible se reconnaît : la réponse est gardée.
+    expect(refereeNamesImprove(shownB, [], [{ matchId: 5, refereeKey: "kB", pseudo: "", mine: true }])).toBe(true);
   });
 
   it("refereeNamesImprove_sameCoverage_returnsFalse", () => {

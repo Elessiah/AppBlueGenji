@@ -157,8 +157,11 @@ describe("dispatchLobbyBriefs", () => {
     expect(sql).toMatch(/AND m\.team1_score IS NULL AND m\.team2_score IS NULL/);
     // Un match reste candidat tant qu'une de ses deux engagées n'est pas réservée
     // (clé : l'id de l'engagée ; l'ancien format compté par engagée, comme à la réservation).
-    expect(sql).toMatch(/n\.phase = \? AND n\.pairing = CAST\(m\.team1_id AS CHAR\)/);
-    expect(sql).toMatch(/n\.phase = \? AND n\.pairing = CAST\(m\.team2_id AS CHAR\)/);
+    // `CONCAT(…, '')`, jamais `CAST(… AS CHAR)` : sa collation de connexion
+    // heurterait celle de la colonne (« Illegal mix of collations »).
+    expect(sql).toMatch(/n\.phase = \? AND n\.pairing = CONCAT\(m\.team1_id, ''\)/);
+    expect(sql).toMatch(/n\.phase = \? AND n\.pairing = CONCAT\(m\.team2_id, ''\)/);
+    expect(sql).not.toContain("AS CHAR");
     expect(params).toEqual(["LOBBY_BRIEF", "LOBBY_BRIEF"]);
   });
 

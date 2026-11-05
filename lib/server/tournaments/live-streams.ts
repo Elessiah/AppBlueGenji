@@ -22,7 +22,7 @@ import {
   requiresMatchStartAt,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
-import { launchPairingKey } from "@/lib/shared/match-launch";
+import { castBeforeLaunch, launchPairingKey } from "@/lib/shared/match-launch";
 import {
   isMatchRefereeActor,
   liveTriggerOwnerAfter,
@@ -107,6 +107,8 @@ type LockedLiveMatch = {
   game: TournamentGame;
   /** Qui tient le mode, tel que la règle le juge (`lib/shared/live-trigger-owner.ts`). */
   hold: LiveTriggerHold;
+  /** L'auteur du geste est-il un caster montré du match (`loadShownCasterIds`) ? */
+  actorShown: boolean;
 };
 
 /** Ce qu'un appelant des gestes de diffusion établit de ses droits. */
@@ -271,7 +273,7 @@ export async function setMatchLiveConfig(
     try {
       // Verrou du match d'abord, puis ses streams et casters : le même ordre
       // que l'inscription d'un caster (`claimMatchCast`).
-      const { row: current, game, hold } = await lockLiveMatch(connection, matchId, actor);
+      const { row: current, hold, actorShown } = await lockLiveMatch(connection, matchId, actor);
       const triggerChanges = assertLiveConfigAllowed(current, hold, actor, trigger, {
         editsStreamLinks: config.streamLinks !== undefined,
         live: config.access.live,
@@ -302,8 +304,7 @@ export async function setMatchLiveConfig(
           // Posé par un caster montré du match, le mode est le sien ; par le
           // staff, l'arbitre ou un admin qui ne le caste pas (ou un caster tu),
           // il reste au staff.
-          const casts = await loadShownCasterIds(connection, matchId, [actor.userId], game, beforeLaunch(current));
-          const owner = liveTriggerOwnerAfter(trigger, actor, casts.has(actor.userId));
+          const owner = liveTriggerOwnerAfter(trigger, actor, actorShown);
           await connection.execute(
             trigger === "MANUAL"
               ? `UPDATE bg_matches SET live_trigger = ?, live_trigger_user_id = ? WHERE id = ?`
@@ -329,11 +330,6 @@ export async function setMatchLiveConfig(
 
   publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
   return outcome;
-}
-
-/** Le match n'est ni lancé ni joué : ses casters inéligibles sont tus (`casterWithdrawn`). */
-function beforeLaunch(row: Pick<MatchLiveRow, "status" | "launched_at">): boolean {
-  return row.status !== "COMPLETED" && (row.launched_at ?? null) === null;
 }
 
 /**
@@ -365,7 +361,8 @@ async function lockLiveMatch(
   if (kept === null) throw new Error("MATCH_NOT_FOUND");
   const trigger = row.live_trigger ?? null;
   const ownerId = trigger === null ? null : nullableId(row.live_trigger_user_id);
-  const shown = await loadShownCasterIds(connection, matchId, [ownerId], kept.game, beforeLaunch(row));
+  // Le maître et l'auteur en une lecture : qui tient le mode, et qui le tiendra.
+  const shown = await loadShownCasterIds(connection, matchId, [ownerId, actor.userId], kept.game, castBeforeLaunch(row));
   const refereeId =
     actor.manages && kept.refereeId === actor.userId && (await refereeQualifies(connection, actor.userId, kept.game))
       ? actor.userId
@@ -374,6 +371,7 @@ async function lockLiveMatch(
     row,
     game: kept.game,
     hold: { trigger, ownerId: ownerId !== null && shown.has(ownerId) ? ownerId : null, refereeId },
+    actorShown: shown.has(actor.userId),
   };
 }
 
@@ -611,7 +609,9 @@ export async function setMatchOnAir(
   access: MatchLiveAccess,
 ): Promise<boolean> {
   const actor: LiveTriggerActor = { userId, isAdmin: access.isAdmin, manages: access.manages };
-  const result = await withConnection(async (connection) => {
+  // Le verrou du match puis la lecture de ses casters : l'ordre de
+  // `setMatchLiveConfig`, rejoué comme lui sur un interblocage.
+  const result = await retryOnDeadlock(() => withConnection(async (connection) => {
     await connection.beginTransaction();
     try {
       const { row, hold } = await lockLiveMatch(connection, matchId, actor);
@@ -636,7 +636,7 @@ export async function setMatchOnAir(
       await connection.rollback();
       throw error;
     }
-  });
+  }));
 
   if (result.changed) publishMatchUpdatedEvent(result.tournamentId, { landingLive: true });
   return result.changed;

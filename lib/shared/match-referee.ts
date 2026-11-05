@@ -239,9 +239,20 @@ export function missingRefereeNamesKey(
 ): string {
   const missing: string[] = [];
   for (const match of matches) {
-    if (showsRefereeName(match) && refereeNameOf(match, names) === null) missing.push(`${match.id}:${match.refereeKey}`);
+    if (refereeNameMissing(match, names)) missing.push(`${match.id}:${match.refereeKey}`);
   }
   return missing.join(",");
+}
+
+/**
+ * Désignation montrée que `names` ne résout pas : ni pseudo, ni marque de
+ * l'arbitre lui-même (`mine`, posée même quand son pseudo n'est pas lisible —
+ * `markViewerReferee` : la relire n'apprendrait rien de plus).
+ */
+function refereeNameMissing(match: RefereeNamedMatch, names: readonly RefereeNameEntry[]): boolean {
+  if (!showsRefereeName(match)) return false;
+  const entry = names.find((name) => name.matchId === match.id && name.refereeKey === match.refereeKey);
+  return entry === undefined || (entry.pseudo === "" && entry.mine !== true);
 }
 
 /** Nombre de désignations montrées dont le pseudo manque dans `names`. */
@@ -251,7 +262,7 @@ function missingRefereeNamesCount(
 ): number {
   let missing = 0;
   for (const match of matches) {
-    if (showsRefereeName(match) && refereeNameOf(match, names) === null) missing += 1;
+    if (refereeNameMissing(match, names)) missing += 1;
   }
   return missing;
 }

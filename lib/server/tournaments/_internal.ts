@@ -16,7 +16,7 @@ import {
 } from "@/lib/shared/live-streams";
 import { normalizeReplayUrl } from "@/lib/shared/match-replay";
 import { parseTournamentImage } from "@/lib/shared/tournament-image";
-import { currentLaunchState, launchReadiness, launchStateIsCurrent } from "@/lib/shared/match-launch";
+import { castBeforeLaunch, currentLaunchState, launchReadiness, launchStateIsCurrent } from "@/lib/shared/match-launch";
 import { firstBanTeamId, matchHostTeamId, refereeHostedFirstBanTeamId } from "@/lib/shared/match-referee";
 import { parseMapPicks } from "@/lib/shared/round-maps";
 import { visibleText } from "@/lib/shared/visible-text";
@@ -339,7 +339,7 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
   const shown = shownStreams(
     extras.streams ?? [],
     heldStreams,
-    row.status === "COMPLETED" || (row.launched_at ?? null) !== null,
+    !castBeforeLaunch(row),
   );
   return {
     id: Number(row.id),
@@ -477,7 +477,7 @@ function liveTriggerOwnerFields(
 }
 
 function casterWithdrawn(row: MatchRow, caster: MatchCasterRow, game: TournamentGame): boolean {
-  if (row.status === "COMPLETED" || (row.launched_at ?? null) !== null) return false;
+  if (!castBeforeLaunch(row)) return false;
   return castEligibilityBlock(caster.eligibility, game) !== null;
 }
 
@@ -491,8 +491,7 @@ function refereeKept(row: MatchRow, game: TournamentGame): boolean {
   if (row.referee_user_id === null || row.referee_user_id === undefined) return false;
   // Avant le départ, l'arbitre qui joue désormais le match ne compte plus — la
   // même règle que le verrou du lancement (`lockLaunchMatch`).
-  const beforeStart = row.status !== "COMPLETED" && (row.launched_at ?? null) === null;
-  if (beforeStart && Number(row.referee_plays_match ?? 0) === 1) return false;
+  if (castBeforeLaunch(row) && Number(row.referee_plays_match ?? 0) === 1) return false;
   // Opposition retenue : plus montré sur un match à jouer, même si un retrait
   // en série l'a manqué (un match joué garde son arbitre, comme en base).
   if (row.status !== "COMPLETED" && (row.referee_objection_at ?? null) !== null) return false;
