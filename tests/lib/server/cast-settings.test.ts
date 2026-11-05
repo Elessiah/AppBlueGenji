@@ -66,14 +66,14 @@ describe("applyCastTrigger", () => {
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
-  it("applyCastTrigger_designatedReferee_changesTriggerOwnerlessForNonCaster", async () => {
+  it("applyCastTrigger_designatedReferee_changesTriggerKeepingCasterOwner", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12)).mockResolvedValue([{ affectedRows: 1 }, []]);
     const row = ownedRow();
 
     await applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 9, { isAdmin: false, manages: true });
 
-    // Hors des casters, il pose le mode sans le tenir.
-    expect(execute.mock.calls[1][1]).toEqual(["AUTO", null, 42]);
+    // Hors des casters, il médie : le mode reste au caster qui l'a posé.
+    expect(execute.mock.calls[1][1]).toEqual(["AUTO", 12, 42]);
     expect(row.live_trigger).toBe("AUTO");
   });
 

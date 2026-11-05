@@ -28,6 +28,7 @@ import type { MatchStatus } from "@/lib/shared/types";
 import { toIso } from "@/lib/server/serialization";
 import type { StaffActor } from "@/lib/shared/log-privacy";
 import { retryOnDeadlock } from "./deadlock-retry";
+import { nullableId } from "@/lib/shared/nullable-id";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { notifyMatchScheduleChange } from "./schedule-notices";
 
@@ -306,10 +307,6 @@ async function restoreHeldMarks(
 
 type MarkRow = RowDataPacket & { offset_key: string; start_at: Date | string | null };
 
-/** Identifiant d'une place de la manche (`null` : vide). */
-function nullableId(value: number | string | null): number | null {
-  return value === null ? null : Number(value);
-}
 /**
  * Ce que les joueurs ont reçu (`TOLD`) et ce qui a été poussé aux arbitres
  * (`STAFF`), lus sous les verrous de l'écriture de la date.

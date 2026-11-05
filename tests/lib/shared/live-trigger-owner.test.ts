@@ -142,6 +142,15 @@ describe("liveTriggerOwnerAfter", () => {
     expect(liveTriggerOwnerAfter("AUTO", { userId: 13, ...LIVE_ONLY }, false)).toBeNull();
   });
 
+  it("liveTriggerOwnerAfter_refereeNotCastingWithKeptOwner_keepsOwner", () => {
+    // L'arbitre médie pour le caster : le mode reste au caster qui l'a posé.
+    expect(liveTriggerOwnerAfter("AUTO", { userId: 9, ...STAFF }, false, 12)).toBe(12);
+  });
+
+  it("liveTriggerOwnerAfter_triggerRemovedWithKeptOwner_null", () => {
+    expect(liveTriggerOwnerAfter(null, { userId: 9, ...STAFF }, false, 12)).toBeNull();
+  });
+
   it("liveTriggerOwnerAfter_triggerRemoved_null", () => {
     expect(liveTriggerOwnerAfter(null, { userId: 12, ...LIVE_ONLY }, true)).toBeNull();
   });

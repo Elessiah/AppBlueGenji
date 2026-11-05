@@ -147,8 +147,10 @@ unique, pure, `lib/shared/live-trigger-owner.ts` (`mayChangeLiveTrigger`,
 - mode sans propriétaire (posé par le staff, caster parti) : le staff `tournaments`.
 
 Propriétaire écrit (`liveTriggerOwnerAfter`) : le caster du match qui le pose,
-lui seul ; personne quand il est posé par qui ne caste pas (staff, admin,
-arbitre, porteur de la seule permission `live`, caster tu). Le propriétaire
+lui seul ; posé par qui ne caste pas (staff, admin, arbitre, porteur de la
+seule permission `live`, caster tu), il garde son maître montré — l'arbitre
+médie pour le caster, il ne lui retire pas le mode — ou reste au staff s'il
+n'en avait pas (`liveTriggerOwnerAfter`). Le propriétaire
 ne compte que s'il est un caster **montré** du match (`loadShownCasterIds` au
 serveur, `liveTriggerCasterId` dans l'instantané : il caste encore et, avant
 le lancement, remplit la condition du cast) : parti ou tu, il laisse le mode

@@ -125,7 +125,11 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
       ...(streamLinks === undefined ? {} : { streamLinks }),
     });
     const removed = trigger === null && previousTrigger !== null;
-    announceStaffMatchAction(matchId, removed ? "LIVE_REMOVED" : "LIVE_CONFIGURED", staffActionAuthor(user));
+    // Rien d'écrit (match sans mode laissé sans mode, aucun lien de caster) : rien à annoncer.
+    const unchanged = trigger === null && previousTrigger === null && (streamLinks?.length ?? 0) === 0;
+    if (!unchanged) {
+      announceStaffMatchAction(matchId, removed ? "LIVE_REMOVED" : "LIVE_CONFIGURED", staffActionAuthor(user));
+    }
     return ok({ trigger });
   } catch (error) {
     return mapLiveError(error);

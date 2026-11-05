@@ -138,7 +138,7 @@ export async function applyCastTrigger(
   // tairait la vraie raison.
   assertCastTriggerWritable(row, trigger);
   if (!owns) throw new Error("LIVE_TRIGGER_NOT_OWNED");
-  const owner = liveTriggerOwnerAfter(trigger, actor, shown.has(userId));
+  const owner = liveTriggerOwnerAfter(trigger, actor, shown.has(userId), hold.ownerId);
   if (trigger === null) {
     await connection.execute(
       `UPDATE bg_matches SET live_trigger = NULL, live_trigger_user_id = NULL, live_started_at = NULL WHERE id = ?`,

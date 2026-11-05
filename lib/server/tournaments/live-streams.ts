@@ -307,8 +307,8 @@ export async function setMatchLiveConfig(
         if (triggerChanges) {
           // Posé par un caster montré du match, le mode est le sien ; par le
           // staff, l'arbitre ou un admin qui ne le caste pas (ou un caster tu),
-          // il reste au staff.
-          const owner = liveTriggerOwnerAfter(trigger, actor, actorShown);
+          // il garde son maître montré, ou reste au staff.
+          const owner = liveTriggerOwnerAfter(trigger, actor, actorShown, hold.ownerId);
           await connection.execute(
             trigger === "MANUAL"
               ? `UPDATE bg_matches SET live_trigger = ?, live_trigger_user_id = ? WHERE id = ?`
@@ -423,15 +423,15 @@ async function setStaffStreamUrl(
 /**
  * L'arbitre désigné **retenu** du match, en SQL, pour la médiation de la
  * diffusion : sur un match à jouer seulement (`PENDING`/`READY`, comme
- * l'interface, `showsRefereeName` — un score déclaré clôt la médiation), sans
- * opposition retenue, et — avant le lancement — jamais un compte qui joue le
+ * l'interface, `showsRefereeName` — un score déclaré clôt la médiation) et —
+ * avant le lancement — jamais un compte qui joue le
  * match : la règle de l'instantané (`refereeKept`) et du verrou du lancement
  * (`lockLaunchMatch`), une fois le match lancé, garde son arbitre. Sa condition
- * d'arbitrage (`refereeQualifies`) se relit à part.
+ * d'arbitrage et son opposition retenue (`refereeQualifies`, qui tolère une
+ * base sans la colonne de l'opposition) se relisent à part.
  */
 const KEPT_REFEREE_SQL = `CASE
   WHEN m.status IN ('PENDING', 'READY')
-    AND NOT EXISTS (SELECT 1 FROM bg_users ru WHERE ru.id = m.referee_user_id AND ru.referee_objection_at IS NOT NULL)
     AND (m.launched_at IS NOT NULL OR NOT ${playsMatchSql("m.referee_user_id", "m.team1_id", "m.team2_id", "kr")})
   THEN m.referee_user_id ELSE NULL END`;
 
@@ -514,11 +514,11 @@ function assertLiveConfigAllowed(
 /**
  * Médiation de l'arbitre : pose ou efface le lien des streams **des casters**
  * (jamais celui du staff, réglé par `setStaffStreamUrl`). Un lien corrigé
- * garde son rattachement (le caster qui l'a fourni) ; posé sur un stream qui
- * n'en avait pas, il est rattaché au caster qui tient ce stream (le premier
- * inscrit) — jamais `NULL`, qui le dirait de l'organisation et le garderait
- * après le compte du caster ; effacé, il n'est plus à personne. Un lien
- * inchangé n'est pas réécrit.
+ * garde son rattachement tant que son fournisseur caste encore ce stream ;
+ * sinon (lien vide, de l'organisation, ou d'un caster parti), il est rattaché
+ * au caster qui tient ce stream (le premier inscrit) — jamais `NULL`, qui le
+ * dirait de l'organisation et le garderait après le compte du caster ; effacé,
+ * il n'est plus à personne. Un lien inchangé n'est pas réécrit.
  *
  * Un refus dit quel stream (`StreamLinkError`), pour son champ.
  *
@@ -567,14 +567,18 @@ function streamLinkUrl(link: MatchStreamLinkEdit): string | null {
 }
 
 /**
- * Le caster qui tient ce stream (le premier inscrit), `null` sans caster.
+ * Le caster à qui rattacher le lien de ce stream : son fournisseur actuel
+ * (`link_user_id`) s'il le caste encore, sinon le premier inscrit ; `null`
+ * sans caster.
  * Lecture ordinaire et séparée : l'écriture du lien ne verrouille ainsi que
  * sa table (`bg_match_streams`) ; les casters du match ne changent que sous
  * le verrou de sa ligne, que l'appelant tient.
  */
 async function streamHolder(connection: PoolConnection, matchId: number, streamId: number): Promise<number | null> {
   const [rows] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
-    `SELECT user_id FROM bg_match_casters WHERE match_id = ? AND stream_id = ? ORDER BY created_at, user_id LIMIT 1`,
+    `SELECT mc.user_id FROM bg_match_casters mc
+     LEFT JOIN bg_match_streams s ON s.id = mc.stream_id AND s.link_user_id = mc.user_id
+     WHERE mc.match_id = ? AND mc.stream_id = ? ORDER BY s.id IS NULL, mc.created_at, mc.user_id LIMIT 1`,
     [matchId, streamId],
   );
   return rows.length === 0 ? null : Number(rows[0].user_id);

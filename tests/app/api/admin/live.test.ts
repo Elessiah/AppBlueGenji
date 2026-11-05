@@ -312,6 +312,17 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     expect(announceStaffMatchAction).toHaveBeenCalledWith(42, "LIVE_CONFIGURED", undefined);
   });
 
+  it("PUT_noOpSaveOnUnmarkedMatch_noAnnouncement", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null });
+
+    const res = await putMatchLive(matchReq("PUT", { trigger: null }), matchParams("42"));
+
+    // Rien d'écrit : aucune action de staff annoncée.
+    expect(res.status).toBe(200);
+    expect(announceStaffMatchAction).not.toHaveBeenCalled();
+  });
+
   it("PUT_clearWithPreviousTrigger_logsRemoved", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: "AUTO" });

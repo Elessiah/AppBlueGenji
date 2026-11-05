@@ -204,8 +204,12 @@ describe("setMatchLiveConfig", () => {
       if (sql.startsWith("SELECT id, tournament_id, status")) return [[{ ...row }]];
       if (sql.startsWith("SELECT t.game,")) return [[{ game: "OW", kept: row.kept_referee_user_id ?? null }]];
       if (sql.startsWith("SELECT mc.user_id,")) return [shownCasterRows(state.casters, params.slice(1))];
-      if (sql.startsWith("SELECT user_id FROM bg_match_casters WHERE match_id = ? AND stream_id = ?")) {
-        return [state.casters.filter((caster) => caster.stream_id === params[1]).slice(0, 1)];
+      if (sql.startsWith("SELECT mc.user_id FROM bg_match_casters mc")) {
+        // Le fournisseur actuel d'abord, s'il caste encore ce stream ; puis l'ordre d'inscription.
+        const provider = state.streams.find((stream) => stream.id === params[1])?.link_user_id;
+        const onStream = state.casters.filter((caster) => caster.stream_id === params[1]);
+        const kept = onStream.filter((caster) => caster.user_id === provider);
+        return [(kept.length > 0 ? kept : onStream).slice(0, 1)];
       }
       if (sql.startsWith("UPDATE bg_matches")) {
         state.matchWrites.push([sql, params]);
@@ -703,6 +707,40 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.streams).toEqual([{ ...dbStream(4, "https://twitch.tv/neuve"), link_user_id: 12 }]);
   });
 
+  it("setMatchLiveConfig_refereeChangesCasterMode_keepsCasterOwner", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12, kept_referee_user_id: 9 }), [dbStream(4, null)], [
+      { user_id: 12, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: { userId: 9, asOrganisation: true }, access: STAFF });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", 12, 42]]]);
+  });
+
+  it("setMatchLiveConfig_refereeCorrectsLinkOfStillCastingProvider_keepsProvider", async () => {
+    // Le co-caster inscrit en second a fourni le lien : il le garde.
+    const world = liveWorld(
+      matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12, kept_referee_user_id: 9 }),
+      [{ ...dbStream(4, "https://kick.com/voix"), link_user_id: 13 }],
+      [
+        { user_id: 12, stream_id: 4 },
+        { user_id: 13, stream_id: 4 },
+      ],
+    );
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, {
+      trigger: "MANUAL",
+      liveUrl: null,
+      setter: { userId: 9, asOrganisation: false },
+      access: STAFF,
+      streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/neuve" }],
+    });
+
+    expect(world.state.streams).toEqual([{ ...dbStream(4, "https://twitch.tv/neuve"), link_user_id: 13 }]);
+  });
+
   it("setMatchLiveConfig_liveStaffWithEmptyStreamLinks_savesConfig", async () => {
     const world = liveWorld(matchRow({ live_trigger: "AUTO" }));
     await mockLiveDb(world);
@@ -1120,6 +1158,16 @@ describe("isDesignatedMatchReferee", () => {
     await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[{ kept: 9, tournament_id: 7, game: "OW" }], []]));
 
     await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
+  });
+
+  it("isDesignatedMatchReferee_keptRefereeWithObjection_false", async () => {
+    // L'opposition retenue se relit avec la condition d'arbitrage, plus dans le SQL.
+    jest.mocked(loadRefereeStanding).mockResolvedValue({ block: null, objection: true });
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ kept: 9, game: "OW" }], []]);
+    await mockDb(execute);
+
+    await expect(isDesignatedMatchReferee(42, 9, true)).resolves.toBe(false);
+    expect(String(execute.mock.calls[0][0])).not.toContain("referee_objection_at");
   });
 
   it("isDesignatedMatchReferee_unknownMatch_false", async () => {

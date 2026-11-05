@@ -123,16 +123,19 @@ export function viewerMayToggleOnAir(
 
 /**
  * Le propriétaire à écrire quand `actor` pose `next` : lui s'il caste le
- * match ; `null` quand le match n'est plus casté ou que le mode est posé par
- * qui ne le caste pas — il reste alors au staff. L'instantané ne nomme que le
- * caster montré (`liveTriggerCasterId`) : un propriétaire qui ne caste pas
- * serait invisible à l'interface, qui offrirait un réglage refusé.
+ * match ; `null` quand le match n'est plus casté. Posé par qui ne le caste pas
+ * (arbitre, admin, staff), le mode garde son maître actuel (`keptOwner`, un
+ * caster montré) — l'arbitre médie pour lui, il ne le lui retire pas — ou
+ * reste au staff s'il n'en avait pas. L'instantané ne nomme que le caster
+ * montré (`liveTriggerCasterId`) : un propriétaire qui ne caste pas serait
+ * invisible à l'interface, qui offrirait un réglage refusé.
  */
 export function liveTriggerOwnerAfter(
   next: MatchLiveTrigger | null,
   actor: LiveTriggerActor,
   actorCasts: boolean,
+  keptOwner: number | null = null,
 ): number | null {
-  if (next === null || !actorCasts) return null;
-  return actor.userId;
+  if (next === null) return null;
+  return actorCasts ? actor.userId : keptOwner;
 }
