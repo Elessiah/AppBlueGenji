@@ -38,7 +38,7 @@ pipeline de `CLAUDE.md`.
 2. **Ajouter une tâche** : même chemin, à la suite, même format (critère,
    constat, à faire), avec le numéro qui suit le dernier attribué — relu sur
    `main` au moment du push et avancé dans le même commit. Les numéros ne
-   sont **pas** réattribués : **dernier numéro attribué — 23**.
+   sont **pas** réattribués : **dernier numéro attribué — 25**.
 3. **Abandonner une tâche** (ou ne la régler qu'en partie) : la remettre ici
    par un commit direct sur `main`, sous son numéro d'origine. La PR qui règle
    une tâche n'a rien à retirer de ce fichier.
@@ -62,3 +62,15 @@ pipeline de `CLAUDE.md`.
 - **Critère** : RGAA 7.5 (messages de statut), WCAG 4.1.3.
 - **Constat** : `app/(secured)/joueurs/PlayersList.tsx` — après un clic sur une pastille ou un filtre de rôle, le nombre de résultats change sans être annoncé (pas d'`aria-live`), et une combinaison sans résultat (« Sans équipe » + un rôle) laisse une grille vide avec « 0 joueurs » seulement (relevé en revue de la PR #466).
 - **À faire** : compteur dans une région `aria-live="polite"` et message d'état vide traduit (FR et EN) ; même traitement sur `/equipes`.
+
+## 24. Case à pourvoir de l'arbre : la bordure porte seule le sens, sous 3:1
+
+- **Critère** : RGAA 3.2 (contraste des composants d'interface), WCAG 1.4.11.
+- **Constat** : `app/(secured)/tournois/[id]/_components/MatchRow.module.css` (`.ghostCard`) — un créneau de tour à venir de l'arbre BlueGenji Survie retire le fond de la carte et ne se distingue plus d'une rencontre que par une bordure **pointillée** : mesurée sur le fond du volet, elle donne environ 1,3:1 en thème par défaut, environ 3,0:1 seulement quand « Contraste renforcé » est coché. Le remplissage ne porte donc plus rien, et un réglage désactivé par défaut ne devrait pas être nécessaire pour percevoir la distinction (relevé en revue UI/UX de la PR #562).
+- **À faire** : un jeton de contour propre au créneau à pourvoir, assez opaque pour tenir 3:1 sans « Contraste renforcé », ou porter la distinction ailleurs que sur le seul trait.
+
+## 25. Case à pourvoir de l'arbre : ni nom ni rôle pour un lecteur d'écran
+
+- **Critère** : RGAA 9.2 / 11.6 (regroupement), WCAG 1.3.1, 4.1.2.
+- **Constat** : `app/(secured)/tournois/[id]/_components/GhostMatchCard.tsx` — la carte d'un tour à venir est faite de deux `div` nus, sans rôle ni nom accessible : le parcours linéaire donne « Demi finale 1, TBD, tiret, TBD, tiret », le tiret étant de surcroît dans un `<strong>`, qui lui prête une importance qu'il n'a pas. Une rencontre à venir d'un tableau à élimination s'annonce de la même façon, mais elle offre au moins un lien « Page du match » qui la nomme ; la case à pourvoir n'a rien (relevé en revue UI/UX de la PR #562).
+- **À faire** : `role="group"` et `aria-label` construit du stade et du numéro (« Demi-finale 1, adversaires à déterminer »), tiret masqué aux technologies d'assistance ; traiter dans la foulée la rencontre à venir d'un tableau à élimination, qui a le même manque.
