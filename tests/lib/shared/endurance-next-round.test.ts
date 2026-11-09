@@ -602,6 +602,13 @@ describe("previewEnduranceNextRound — fin de la phase qualificative", () => {
     ).toBeNull();
   });
 
+  it("n'annonce rien à la dernière manche d'un plafond en saisie libre", () => {
+    const config = { ...DEFAULT_ENDURANCE_CONFIG, maxRounds: 2 };
+    const matches = [record(2, 1, 1, 2)];
+    expect(previewEnduranceNextRound(input({ format: null, currentRound: 2, config, matches }))).toBeNull();
+    expect(previewEnduranceNextRound(input({ format: null, currentRound: 1, config, matches: [record(1, 1, 1, 2)] }))).not.toBeNull();
+  });
+
   it("garde l'aperçu qualificatif quand la fin n'est pas acquise", () => {
     const preview = previewEnduranceNextRound(
       input({

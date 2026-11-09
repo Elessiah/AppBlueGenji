@@ -75,7 +75,9 @@ export function previewEnduranceNextRound(
     const pendingMatches = input.matches.filter(
       (match) => match.round === round && match.status !== "COMPLETED",
     ).length;
-    if (round < 1 || pendingMatches === 0) return null;
+    // La dernière manche d'un plafond n'a pas de suivante : l'arbre suit.
+    const lastFreeRound = config.maxRounds !== null && round >= config.maxRounds;
+    if (round < 1 || pendingMatches === 0 || lastFreeRound) return null;
     return {
       round: round + 1,
       stageCertain: false,

@@ -118,11 +118,14 @@ const SLOT_FIELD_ERRORS = { INVALID_ROUND_MAPS: "slots" } as const satisfies Rec
  * ce tour si l'éligibilité disparaît ensuite ; changer de tour l'oublie.
  */
 function useTiebreakShown(round: RoundKey | null, allowed: boolean): boolean {
-  const shownFor = useRef<string | null>(null);
   const id = round ? roundKeyId(round) : null;
-  if (shownFor.current !== id) shownFor.current = null;
-  if (allowed && id !== null) shownFor.current = id;
-  return shownFor.current !== null;
+  const [shownFor, setShownFor] = useState<string | null>(null);
+  // Ajustement d'état pendant le rendu (motif React prévu pour cela) : pas de réécriture d'une ref.
+  let current = shownFor;
+  if (current !== null && current !== id) current = null;
+  if (allowed && id !== null) current = id;
+  if (current !== shownFor) setShownFor(current);
+  return current !== null;
 }
 
 /** Témoin d'un formulaire modifié et pas encore enregistré, annoncé au lecteur d'écran. */
@@ -498,7 +501,7 @@ function TiebreakForm({
           >
             {t("dialog.tiebreakRemove")}
           </button>
-          <button type="submit" className="btn ghost" aria-disabled={busy || !dirty || undefined}>
+          <button type="submit" className="btn ghost" aria-disabled={busy || !dirty || !allowed || undefined}>
             {t("dialog.tiebreakSave")}
           </button>
         </div>
@@ -759,6 +762,12 @@ export function RoundMapsDialog({
   // Un flux qui change le format du tour pendant la saisie ne démonte pas la
   // section (focus sur le body, texte perdu) : elle reste, grisée, avec son message.
   const showTiebreak = useTiebreakShown(round, tiebreakAllowed);
+  // Le tour dont le formulaire reste affiché, grisé, ne s'y retrouve pas aussi dans la liste des cartes périmées.
+  const greyedRoundId = round && showTiebreak && !tiebreakAllowed ? roundKeyId(round) : null;
+  const staleTiebreaks = useMemo(() => {
+    const items = rules.staleTiebreaks ?? NO_STALE_TIEBREAKS;
+    return greyedRoundId === null ? items : items.filter((item) => roundKeyId(item) !== greyedRoundId);
+  }, [rules.staleTiebreaks, greyedRoundId]);
 
   const optionLabel = (key: RoundKey) => {
     const config = roundMapsOf(rules.rounds, key);
@@ -1151,7 +1160,7 @@ export function RoundMapsDialog({
         )}
 
         <StaleTiebreaks
-          items={rules.staleTiebreaks ?? NO_STALE_TIEBREAKS}
+          items={staleTiebreaks}
           roundLabel={roundLabel}
           tournamentId={tournamentId}
           busy={busy}
