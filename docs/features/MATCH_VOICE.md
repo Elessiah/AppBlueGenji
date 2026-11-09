@@ -76,7 +76,10 @@ et rien n'est compté.
   Le budget est lu avant de prendre un salon dans la file : aucun n'en sort sans être vérifié.
 - **Passe forcée pendant l'attente** : une bascule (`dispatchMatchVoiceChannels(true)`) pendant
   `botDownUntil` tente quand même le rendu (option éteinte : les noms d'équipes quittent Discord
-  sans attendre) ; création et revérification attendent la fin du délai.
+  sans attendre), **une fois par panne** (`forcedDuringBackoff`) : des bascules répétées ne
+  rappellent pas un bot en panne ; création et revérification attendent la fin du délai.
+- **Coupe-circuit ouvert** (`BOT_CIRCUIT_OPEN`, journal ou annonces en panne) à la création : le bot
+  n'a pas été appelé — ni « indisponible » sur la page, ni ligne pm2 ; la passe s'arrête.
 - **Panne du bot** : `failed_at` noté, une ligne pm2 sans donnée de joueur, une
   seule par panne ; création comme rendu réessayés au plus une fois par
   `VOICE_RETRY_SECONDS` (60 s), en fin de file — par équipe : une création échouée
@@ -100,12 +103,15 @@ et rien n'est compté.
 - **Ligne sans salon** (création expirée ou réponse illisible, alors que le bot a pu créer le
   salon) : rendue par sa clé (`releaseVoiceChannelByKey`, `POST /internal/voice/keys/release`),
   jamais close sans appel au bot. Un bot plus ancien sans cette route (`INTERNAL_ROUTE_NOT_FOUND`
-  au rendu par clé) ne vaut refus que de cette ligne : les rendus par identifiant passent, sans
+  au rendu par clé — tout 404 autre que `VOICE_CHANNEL_NOT_TRACKED` s'y lit ainsi, même
+  illisible : mandataire, page HTML) ne vaut refus que de cette ligne : les rendus par identifiant passent, sans
   attente du bot ; la ligne attend sa mise à jour (ou son filet de 48 h).
 - **Clôture gardée** : `released_at` et `failed_at` ne s'écrivent que si la ligne porte encore le
   salon rendu (`channel_id <=> ?`) — un salon neuf écrit entre-temps par un autre processus reste
   ouvert, rendu plus tard ; rien n'est publié si la ligne n'a pas changé. Une revérification qui
-  retrouve le **même** salon sur une ligne déjà rendue (rendu annulé par le bot) rouvre la ligne,
+  retrouve le **même** salon sur une ligne rendue **avant** la demande au bot (`released_at` au plus
+  tard à la seconde de la demande ; rendue après, le bot a reçu ce rendu après la reprise et le salon
+  reste rendu) rouvre la ligne (rendu annulé par le bot),
   rendue de nouveau dans la même passe (une seule lecture par passe pour tous les salons
   retrouvés, une écriture seulement pour une ligne rendue).
 - **Étapes indépendantes** : une création ou une revérification en erreur n'empêche pas le
@@ -141,6 +147,9 @@ et rien n'est compté.
   (`voice: null`). L'état (`WAITING` / `OPEN` / `FAILED`) n'est pas une donnée personnelle et se
   déduit de ce qui est public (option, heure du match) : il voyage dans l'instantané commun et la
   porte REST pour tout lecteur du tournoi ; seul l'affichage est réservé aux parties et au staff.
+  L'état apparaît sur le flux avec la première écriture d'une passe (salon créé ou en échec) :
+  le seul passage d'une heure (publication du tournoi, échéance d'un match) ne republie pas
+  l'instantané ; la relecture REST, flux coupé, le lit à l'instant.
 
 ## Comportements gardés (CAST-FOLLOWUP)
 

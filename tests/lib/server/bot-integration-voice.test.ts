@@ -83,6 +83,34 @@ describe("bot-integration — salons vocaux", () => {
     await expect(bot.releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "unavailable", code: "BOT_INTERNAL_REQUEST_FAILED" });
   });
 
+  it("releaseVoiceChannelByKey_unreadable404_returnsRouteMissing", async () => {
+    const bot = await freshBotIntegration();
+    // Mandataire ou bot sans la route qui répond une page HTML : refus de cette ligne seulement.
+    jest.spyOn(global, "fetch").mockResolvedValue(new Response("<html>Cannot POST</html>", { status: 404 }));
+    await expect(bot.releaseVoiceChannelByKey("match:42:team:1")).resolves.toEqual({
+      kind: "unavailable",
+      code: "INTERNAL_ROUTE_NOT_FOUND",
+    });
+  });
+
+  it("releaseVoiceChannelByKey_foreignNotFound404_returnsRouteMissing", async () => {
+    const bot = await freshBotIntegration();
+    jest.spyOn(global, "fetch").mockResolvedValue(json(404, { error: "NOT_FOUND" }));
+    await expect(bot.releaseVoiceChannelByKey("match:42:team:1")).resolves.toEqual({
+      kind: "unavailable",
+      code: "INTERNAL_ROUTE_NOT_FOUND",
+    });
+  });
+
+  it("releaseVoiceChannelByKey_notTracked404_returnsGone", async () => {
+    const bot = await freshBotIntegration();
+    jest.spyOn(global, "fetch").mockResolvedValue(json(404, { error: "VOICE_CHANNEL_NOT_TRACKED" }));
+    await expect(bot.releaseVoiceChannelByKey("match:42:team:1")).resolves.toEqual({
+      kind: "gone",
+      code: "VOICE_CHANNEL_NOT_TRACKED",
+    });
+  });
+
   it("releaseVoiceChannel_foreignNotFound404_returnsRequestFailedCode", async () => {
     const bot = await freshBotIntegration();
     // Le 404 d'un autre service (bot mal routé) : un code de transport, qui arrête le balayage.

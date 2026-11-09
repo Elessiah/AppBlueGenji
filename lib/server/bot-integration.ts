@@ -1072,11 +1072,18 @@ function voiceRefusal(code: string): { kind: "failed" | "unavailable"; code: str
  * 404-là sont rendus sous un code de transport qui arrête le balayage (la passe
  * s'arrête au premier), sans compter au coupe-circuit, partagé par toutes les fonctions du bot : un
  * écart de version des seules routes vocales ne coupe ni le journal ni les annonces.
+ * `anyRouteMissing` (rendu par clé) : tout autre 404, lisible ou non (mandataire, page
+ * HTML), se lit `INTERNAL_ROUTE_NOT_FOUND` — la route manque, et le balayage n'en fait
+ * qu'un refus de la ligne au lieu d'arrêter tous les rendus.
  */
-async function voiceNotFoundOutcome(response: Response): Promise<{ kind: "gone" | "unavailable"; code: string }> {
+async function voiceNotFoundOutcome(
+  response: Response,
+  anyRouteMissing: boolean,
+): Promise<{ kind: "gone" | "unavailable"; code: string }> {
   const code = await safeReadError(response);
   if (code !== "VOICE_CHANNEL_NOT_TRACKED") {
-    return { kind: "unavailable", code: code === "INTERNAL_ROUTE_NOT_FOUND" ? code : "BOT_INTERNAL_REQUEST_FAILED" };
+    const routeMissing = anyRouteMissing || code === "INTERNAL_ROUTE_NOT_FOUND";
+    return { kind: "unavailable", code: routeMissing ? "INTERNAL_ROUTE_NOT_FOUND" : "BOT_INTERNAL_REQUEST_FAILED" };
   }
   recordSuccess();
   return { kind: "gone", code };
@@ -1087,6 +1094,7 @@ async function voiceCall<T>(
   path: string,
   body: unknown,
   read: (payload: unknown) => T | null,
+  anyNotFoundIsRouteMissing = false,
 ): Promise<VoiceCallOutcome<T>> {
   if (isCircuitOpen()) return { kind: "unavailable", code: "BOT_CIRCUIT_OPEN" };
   try {
@@ -1097,7 +1105,7 @@ async function voiceCall<T>(
       cache: "no-store",
       signal: AbortSignal.timeout(BOT_VOICE_FETCH_TIMEOUT_MS),
     });
-    if (response.status === 404) return await voiceNotFoundOutcome(response);
+    if (response.status === 404) return await voiceNotFoundOutcome(response, anyNotFoundIsRouteMissing);
     if (!response.ok) {
       // Un refus du bot lui-même (permission, catégorie, Discord) n'est pas une
       // panne du canal interne : seul un 5xx de transport compte au coupe-circuit.
@@ -1150,9 +1158,10 @@ function readReleased(payload: unknown): true | null {
  * Rend au bot le salon d'une **clé** (`POST /internal/voice/keys/release`) : pour
  * une ligne sans identifiant de salon (création expirée ou réponse illisible),
  * alors que le bot a pu créer le salon. Une clé sans salon suivi répond `ok`. Un
- * bot plus ancien, sans la route, répond `INTERNAL_ROUTE_NOT_FOUND` (`unavailable` ; le
- * balayage n'en fait qu'un refus de cette ligne, `match-voice.ts`).
+ * bot plus ancien, sans la route, répond `INTERNAL_ROUTE_NOT_FOUND` — tout 404 autre que
+ * `VOICE_CHANNEL_NOT_TRACKED` se lit ainsi ici, même illisible (`unavailable` ; le balayage
+ * n'en fait qu'un refus de cette ligne, `match-voice.ts`).
  */
 export function releaseVoiceChannelByKey(key: string): Promise<VoiceCallOutcome<true>> {
-  return voiceCall("POST", "/internal/voice/keys/release", { key }, readReleased);
+  return voiceCall("POST", "/internal/voice/keys/release", { key }, readReleased, true);
 }

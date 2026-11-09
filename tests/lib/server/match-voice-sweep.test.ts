@@ -1186,7 +1186,9 @@ describe("dispatchMatchVoiceChannels — bot indisponible, budget, journal", () 
     const { writes } = database({ openDue: [open], releasedSame: [{ match_id: 42, team_id: 1 }], reopened: 1 });
     jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
     await dispatchMatchVoiceChannels();
-    expect(writes.filter((w) => w.sql.includes("released_at IS NOT NULL")).map((w) => w.params)).toEqual([[42, 1, "901"]]);
+    expect(writes.filter((w) => w.sql.startsWith("UPDATE") && w.sql.includes("released_at IS NOT NULL")).map((w) => w.params)).toEqual([
+      [42, 1, "901", 0],
+    ]);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
@@ -1321,6 +1323,39 @@ describe("dispatchMatchVoiceChannels — bot indisponible, budget, journal", () 
       [0, 0, 0],
       [0, 0, 0],
     ]);
+  });
+
+  it("dispatchMatchVoiceChannels_recheckSameId_reopensOnlyRowsReleasedBeforeAsk", async () => {
+    // Rendue après la demande au bot, la ligne garde son rendu (le bot l'a reçu après la reprise).
+    const { execute } = database({ openDue: [open] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "ok", value: "901" });
+    await dispatchMatchVoiceChannels();
+    const reopenRead = execute.mock.calls.find(([sql]) => sql.startsWith("SELECT match_id, team_id"));
+    expect(reopenRead?.[0]).toContain("released_at <= NOW() - INTERVAL ? SECOND");
+    expect(reopenRead?.[1]).toEqual([42, 1, "901", 0]);
+  });
+
+  it("dispatchMatchVoiceChannels_createCircuitOpen_noFailureWriteNoLogNoPublish", async () => {
+    const { writes } = database({ due: [dueMatch] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "BOT_CIRCUIT_OPEN" });
+    await dispatchMatchVoiceChannels();
+    expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
+    expect(writes.filter((w) => w.sql.includes("INSERT INTO bg_match_voice_channels"))).toEqual([]);
+    expect(console.warn).not.toHaveBeenCalled();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("dispatchMatchVoiceChannels_secondForcedPassSameBackoff_callsNothing", async () => {
+    database({ releasable: [releasable] });
+    const start = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(start);
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "VOICE_DISCORD_UNAVAILABLE" });
+    await dispatchMatchVoiceChannels();
+    clock.mockReturnValue(start + 11_000);
+    await dispatchMatchVoiceChannels(true);
+    clock.mockReturnValue(start + 22_000);
+    await dispatchMatchVoiceChannels(true);
+    expect(releaseVoiceChannel).toHaveBeenCalledTimes(2);
   });
 
   it("DUE_CHANNELS_SQL_eachTeamRule_writtenOnce", () => {
