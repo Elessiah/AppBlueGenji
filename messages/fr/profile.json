@@ -388,12 +388,13 @@
     "unlinkedSessionsFailed": "{removed} Tes autres sessions n'ont pas pu être fermées : utilise « Déconnecter mes autres sessions ».",
     "sessions": {
       "unknown": "Les sessions ouvertes sur tes autres appareils n'ont pas encore été comptées.",
-      "none": "Aucune autre session n'est ouverte : rien à fermer.",
+      "none": "Aucune autre session n'est ouverte : seul cet appareil est connecté à ton compte.",
       "open": "{count, plural, one {1 autre session est ouverte} other {{count} autres sessions sont ouvertes}} sur d'autres navigateurs ou appareils.",
       "revokedNone": "Aucune autre session n'était ouverte.",
       "revoked": "{count, plural, one {1 autre session a été fermée} other {{count} autres sessions ont été fermées}}.",
       "revoke": "Déconnecter mes autres sessions",
-      "revoking": "Fermeture…"
+      "revoking": "Fermeture…",
+      "nothingToClose": "Aucune autre session à fermer : seul cet appareil est connecté à ton compte."
     },
     "blizzardBadge": "Ta fiche le signale par une pastille « BattleTag vérifié », même masqué (sans le montrer).",
     "battletagPointer": "Saisir mon BattleTag",

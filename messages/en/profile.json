@@ -388,12 +388,13 @@
     "unlinkedSessionsFailed": "{removed} Your other sessions couldn't be closed: use “Log out my other sessions”.",
     "sessions": {
       "unknown": "The sessions open on your other devices haven't been counted yet.",
-      "none": "No other session is open: nothing to close.",
+      "none": "No other session is open: only this device is logged in to your account.",
       "open": "{count, plural, one {1 other session is open} other {{count} other sessions are open}} on other browsers or devices.",
       "revokedNone": "No other session was open.",
       "revoked": "{count, plural, one {1 other session was closed} other {{count} other sessions were closed}}.",
       "revoke": "Log out my other sessions",
-      "revoking": "Closing…"
+      "revoking": "Closing…",
+      "nothingToClose": "No other session to close: only this device is logged in to your account."
     },
     "blizzardBadge": "Your player page marks it with a “Verified BattleTag” badge, even when hidden (without showing it).",
     "battletagPointer": "Enter my BattleTag",

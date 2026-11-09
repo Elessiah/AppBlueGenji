@@ -193,7 +193,7 @@ describe("vocabulaire Lier / Lié", () => {
       ["connections", "retry"],
       ["connections", "retryLabel"],
       ["connections", "reading"],
-      ["connections", "sessions", "none"],
+      ["connections", "sessions", "nothingToClose"],
       ["discord", "readFailed"],
       ["invitations", "gone"],
       ["invitations", "loadFailed"],
@@ -215,7 +215,7 @@ describe("vocabulaire Lier / Lié", () => {
 describe("gestes refusés et reliquats du profil", () => {
   it("otherSessionsPanel_nothingToClose_activationSaysSo", () => {
     const src = read("app/(secured)/profil/OtherSessionsPanel.tsx");
-    expect(src).toContain('showError(text.t("connections.sessions.none"))');
+    expect(src).toContain('showError(text.t("connections.sessions.nothingToClose"))');
     expect(src).toContain("aria-disabled={busy || count === 0 || undefined}");
   });
 

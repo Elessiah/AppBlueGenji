@@ -126,6 +126,10 @@ export function SelfRolesField({
       }
       // Les rôles confirmés par le serveur, jamais ceux cochés à l'écran : une réponse
       // sans corps lisible vaut échec, pas succès.
+      if (!Array.isArray(payload.roles)) {
+        // L'enregistrement a peut-être abouti sans que la réponse le dise : la session est relue.
+        router.refresh();
+      }
       if (!Array.isArray(payload.roles)) throw new CodedError("ROLES_UPDATE_FAILED", t("platformRoles.errors.fallback"));
       showSuccess(t("platformRoles.saved"));
       onSaved(payload.roles);
