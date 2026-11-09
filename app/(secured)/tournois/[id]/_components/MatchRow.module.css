@@ -207,6 +207,19 @@
   background: transparent;
 }
 
+/* Texte **en retrait**, et c'est une correction de hiérarchie, pas une
+   coquetterie : la ligne d'une rencontre tranchée passe en `--ink-mute`
+   (`.decided`), si bien qu'une case à pourvoir, qui héritait de `--ink`,
+   sortait plus lumineuse que les quarts de finale joués de la colonne voisine.
+   Sur cet arbre les tours posés sont par construction joués et les tours à
+   venir sont des cases vides : l'œil tombait donc **toujours** d'abord sur ce
+   qui ne porte aucune information. Par jeton, jamais par `opacity` — et
+   `--ink-quiet` reste très au-dessus de 4,5:1. */
+.ghostCard .row,
+.ghostCard .score {
+  color: var(--ink-quiet);
+}
+
 /* Les deux classes, et non `.ghostCard` seule : la règle de survol de la carte
    porte un `:not()`, dont l'argument compte dans sa spécificité — un sélecteur
    d'une seule classe perdait contre elle, et la case vide gardait le halo bleu

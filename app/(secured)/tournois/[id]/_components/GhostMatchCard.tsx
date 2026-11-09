@@ -2,6 +2,7 @@
 
 import { EntrantName } from "./EntrantName";
 import styles from "./MatchRow.module.css";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 
 /**
  * Créneau d'un tour **à venir** de l'arbre final.
@@ -23,6 +24,9 @@ import styles from "./MatchRow.module.css";
  * connecteurs dessus.
  */
 export function GhostMatchCard() {
+  const text = useTournamentPageText();
+  const tbd = text.t("match.tbd");
+
   return (
     <div className={`${styles.card} ${styles.ghostCard}`}>
       {[1, 2].map((side) => (
@@ -30,7 +34,7 @@ export function GhostMatchCard() {
           {/* Même passage que la carte réelle : la case d'emblème vide garde sa
               place, pour que les noms des deux cartes commencent au même
               endroit d'une colonne à l'autre. */}
-          <EntrantName teamId={null} name="TBD" className={styles.name} />
+          <EntrantName teamId={null} name={tbd} className={styles.name} />
           <strong className={styles.score}>-</strong>
         </div>
       ))}
