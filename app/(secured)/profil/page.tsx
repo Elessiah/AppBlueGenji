@@ -393,6 +393,7 @@ export default function ProfilePage() {
   useEffect(() => {
     void loadInvitations();
     void loadDiscordState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // « Certifier mon tag » de la fenêtre proposée à la connexion, pour un tag
