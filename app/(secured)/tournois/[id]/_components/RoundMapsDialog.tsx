@@ -128,6 +128,17 @@ function useTiebreakShown(round: RoundKey | null, allowed: boolean): boolean {
   return current !== null;
 }
 
+/** Section « Map de départage » : paraît-elle, et quelles cartes périmées la suivent. */
+function useTiebreakSection(
+  stale: readonly RoundTiebreak[] | undefined,
+  round: RoundKey | null,
+  allowed: boolean,
+): { showTiebreak: boolean; staleTiebreaks: readonly RoundTiebreak[] } {
+  const showTiebreak = useTiebreakShown(round, allowed);
+  const staleTiebreaks = useStaleTiebreaks(stale, round, showTiebreak && !allowed);
+  return { showTiebreak, staleTiebreaks };
+}
+
 /** Témoin d'un formulaire modifié et pas encore enregistré, annoncé au lecteur d'écran. */
 function UnsavedNote({ dirty, text }: Readonly<{ dirty: boolean; text: string }>) {
   return (
@@ -517,6 +528,19 @@ function TiebreakForm({
 /** Liste vide partagée : une référence neuve à chaque rendu relancerait l'effet de focus. */
 const NO_STALE_TIEBREAKS: readonly RoundTiebreak[] = [];
 
+/** Cartes périmées à lister : le tour dont le formulaire reste affiché, grisé (`greyed`), n'y figure pas aussi. */
+function useStaleTiebreaks(
+  stale: readonly RoundTiebreak[] | undefined,
+  round: RoundKey | null,
+  greyed: boolean,
+): readonly RoundTiebreak[] {
+  const greyedId = round && greyed ? roundKeyId(round) : null;
+  return useMemo(() => {
+    const items = stale ?? NO_STALE_TIEBREAKS;
+    return greyedId === null ? items : items.filter((item) => roundKeyId(item) !== greyedId);
+  }, [stale, greyedId]);
+}
+
 function StaleTiebreaks({
   items,
   roundLabel,
@@ -761,13 +785,8 @@ export function RoundMapsDialog({
   const tiebreakAllowed = round !== null && roundAllowsTiebreak(tiebreakTournament, round);
   // Un flux qui change le format du tour pendant la saisie ne démonte pas la
   // section (focus sur le body, texte perdu) : elle reste, grisée, avec son message.
-  const showTiebreak = useTiebreakShown(round, tiebreakAllowed);
+  const { showTiebreak, staleTiebreaks } = useTiebreakSection(rules.staleTiebreaks, round, tiebreakAllowed);
   // Le tour dont le formulaire reste affiché, grisé, ne s'y retrouve pas aussi dans la liste des cartes périmées.
-  const greyedRoundId = round && showTiebreak && !tiebreakAllowed ? roundKeyId(round) : null;
-  const staleTiebreaks = useMemo(() => {
-    const items = rules.staleTiebreaks ?? NO_STALE_TIEBREAKS;
-    return greyedRoundId === null ? items : items.filter((item) => roundKeyId(item) !== greyedRoundId);
-  }, [rules.staleTiebreaks, greyedRoundId]);
 
   const optionLabel = (key: RoundKey) => {
     const config = roundMapsOf(rules.rounds, key);

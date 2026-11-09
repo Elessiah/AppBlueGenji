@@ -179,7 +179,7 @@ describe("câblage de la fenêtre des cartes", () => {
 
     expect(source).toContain("if (!sameRoundKeys(stable.current, planned)) stable.current = planned;");
     expect(source).toContain("[slots, copyTarget, roundId, storedKey, clearSlotError]");
-    expect(source).toContain("[rules.staleTiebreaks, greyedRoundId]");
+    expect(source).toContain("[stale, greyedId]");
   });
 
   it("mapPick_optimisticValue_expiresWithoutASnapshot", () => {
@@ -283,7 +283,7 @@ describe("câblage de la fenêtre des cartes", () => {
     {
       name: "tiebreakForm_keepsMountedAndResyncsAfterSave",
       file: "RoundMapsDialog.tsx",
-      present: ["useTiebreakShown(round, tiebreakAllowed)", "aria-disabled={busy || !dirty || !allowed || undefined}", "allowed={tiebreakAllowed}", 'setValue(map ?? "")', 't("dialog.tiebreakUnavailable")'],
+      present: ["useTiebreakSection(rules.staleTiebreaks, round, tiebreakAllowed)", "aria-disabled={busy || !dirty || !allowed || undefined}", "allowed={tiebreakAllowed}", 'setValue(map ?? "")', 't("dialog.tiebreakUnavailable")'],
       absent: [],
     },
     {
