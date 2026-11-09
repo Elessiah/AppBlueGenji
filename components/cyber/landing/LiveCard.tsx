@@ -571,13 +571,15 @@ export function LiveCard({ live, nextUpcomingISO, spectator = false }: Readonly<
             <span className={styles.viewers}>
               {/* Un nombre nu ne dit rien à un lecteur d'écran : le libellé
                   entier lui est lu, l'icône et le chiffre restent visuels. Le
-                  `title` (lu à l'écran au survol) est posé sur le chiffre caché,
-                  pour que le libellé ne soit pas annoncé deux fois. */}
-              <Users size={12} aria-hidden="true" />
-              <span className="sr-only">{t("live.viewers", { count: visibleViewers })}</span>
-              <span className="mono" aria-hidden="true" title={t("live.viewers", { count: visibleViewers })}>
-                {visibleViewers}
+                  `title` (lu à l'écran au survol) couvre l'icône et le chiffre ;
+                  le texte masqué, lui, porte la lecture d'écran. */}
+              <span className={styles.viewersGroup} title={t("live.viewers", { count: visibleViewers })}>
+                <Users size={12} aria-hidden="true" />
+                <span className="mono" aria-hidden="true">
+                  {visibleViewers}
+                </span>
               </span>
+              <span className="sr-only">{t("live.viewers", { count: visibleViewers })}</span>
             </span>
           )}
         </div>

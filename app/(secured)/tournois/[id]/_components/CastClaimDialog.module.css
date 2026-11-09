@@ -23,6 +23,17 @@
   cursor: pointer;
 }
 
+.gone {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.gone:empty {
+  display: none;
+}
+
 .detail {
   color: var(--ink-quiet);
 }

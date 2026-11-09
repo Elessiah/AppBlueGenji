@@ -109,8 +109,8 @@ export function CastClaimDialog({
   const castable = isMatchCastable({ ...match, liveStartedAt: null, launchedAt: null });
   const fieldsetRef = useRef<HTMLFieldSetElement>(null);
   const gone = choice === null;
-  // Le refus se notifie aussi en bas à gauche (règle des erreurs) : le texte
-  // de la modale explique seulement pourquoi « Caster ce match » est désarmé.
+  // Le refus se notifie aussi en bas à gauche (règle des erreurs) ; le texte
+  // de la modale, lui, reste et explique pourquoi « Caster ce match » est désarmé.
   const toast = useOptionalToast();
   const goneMessage = t("cardActions.claimDialog.gone");
   const notifyGone = useRef({ toast, goneMessage });
@@ -140,7 +140,7 @@ export function CastClaimDialog({
   const confirm = async (): Promise<boolean> => {
     if (choice === null) return false;
     const outcome = await onClaim(
-      castClaimBody(choice, { url, battletag, trigger: triggerLocked || !castable ? undefined : trigger}),
+      castClaimBody(choice, { url, battletag, trigger: triggerLocked || !castable ? undefined : trigger }),
     );
     if (!outcome.ok) fieldErrors.report(outcome.code, outcome.message);
     return outcome.ok;
@@ -190,14 +190,12 @@ export function CastClaimDialog({
           );
         })}
       </fieldset>
-      {/* Repli sans notifications (lecteur d'écran seul) : sous un
-          ToastProvider, le toast l'annonce déjà — une seconde zone vive la
-          ferait entendre deux fois. */}
-      {toast ? null : (
-        <output className="sr-only" aria-live="polite">
-          {gone ? t("cardActions.claimDialog.gone") : ""}
-        </output>
-      )}
+      {/* Le choix disparu reste dit dans la modale tant qu'il faut rechoisir
+          (le toast s'efface seul) : c'est aussi la zone vive du repli sans
+          notifications — sous un ToastProvider, une seule voix l'annonce. */}
+      <output className={styles.gone} aria-live={toast ? "off" : "polite"}>
+        {gone ? goneMessage : ""}
+      </output>
       {separate && (
         <>
           <CastUrlField

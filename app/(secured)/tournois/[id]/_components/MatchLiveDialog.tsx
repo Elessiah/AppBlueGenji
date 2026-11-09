@@ -121,7 +121,25 @@ function useResyncedStaffUrl(current: string) {
     setSeen(current);
     if (liveUrl === seen) setLiveUrl(current);
   }
-  return [liveUrl, setLiveUrl] as const;
+  /** Repart du lien actuel quoi qu'il y ait de saisi (le mode du match a changé). */
+  const reset = () => {
+    setSeen(current);
+    setLiveUrl(current);
+  };
+  return [liveUrl, setLiveUrl, reset] as const;
+}
+
+/**
+ * La case « casté » est grisée quand elle ne mène qu'à un refus : un mode sans
+ * maître (`LIVE_TRIGGER_NOT_OWNED`) ou un match joué jamais casté, qui ne se
+ * marque plus (`MATCH_NOT_CASTABLE`).
+ */
+function streamedBoxDisabled(
+  match: Pick<BracketMatch, "liveTrigger" | "liveTriggerCasterId">,
+  viewer: Parameters<typeof viewerMayUnmarkLiveTrigger>[1],
+  castable: boolean,
+): boolean {
+  return !viewerMayUnmarkLiveTrigger(match, viewer) || (!castable && match.liveTrigger === null);
 }
 
 /** Le champ du lien du staff : il suit le mode du match quand ce mode est verrouillé, la case sinon. */
@@ -193,12 +211,13 @@ export function casterStreamsOf(
 }
 
 /** Champ de la fenêtre que vise un refus : le lien du staff, ou le lien d'un stream de caster. */
-type LiveField = "url" | `caster-${number}`;
+type LiveField = "url" | "streamed" | `caster-${number}`;
 
-/** Le lien du staff : le seul refus de lien sans stream désigné. */
-const LIVE_FIELD_ERRORS = { INVALID_STREAM_URL: "url" } as const;
+/** Refus sans stream désigné : le lien du staff, ou la case « casté » d'un match qui ne l'est plus. */
+const LIVE_FIELD_ERRORS = { INVALID_STREAM_URL: "url", MATCH_NOT_STREAMED: "streamed" } as const;
 
 const URL_INPUT_ID = "match-live-url";
+const STREAMED_INPUT_ID = "match-live-streamed";
 
 /** Identifiant du champ de lien d'un stream de caster. */
 function casterLinkInputId(streamId: number): string {
@@ -269,18 +288,18 @@ export function MatchLiveDialog({
   const onAir = useMatchLiveState(match) === "LIVE";
   const [streamed, setStreamed] = useState(match.liveTrigger !== null);
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "MANUAL");
-  // Le mode du match changé pendant que la fenêtre est ouverte (retiré ou
-  // reposé par qui le tient) : la case et le choix reprennent le mode du match.
-  // Sans quoi la case « casté », cochée à l'ouverture sur un mode verrouillé,
-  // le resterait une fois ce mode retiré — et Enregistrer recasterait le match.
   // Le lien du stream du staff, que ce réglage écrit — jamais celui qu'un
   // caster a ouvert (lecture partielle sans streams : le premier lien).
   const currentStaffUrl = (match.streams.length > 0 ? staffStream(match.streams)?.liveUrl : match.liveUrl) ?? "";
-  const [liveUrl, setLiveUrl] = useResyncedStaffUrl(currentStaffUrl);
+  const [liveUrl, setLiveUrl, resetLiveUrl] = useResyncedStaffUrl(currentStaffUrl);
   // Fausse par défaut (protection des données dès la conception) : un lien
   // n'est celui de l'organisation — gardé après la suppression du compte de qui
   // le pose — que si ce membre le coche ; rien ne se déduit de ce qu'il caste.
   const [organisationLink, setOrganisationLink] = useState(false);
+  // Le mode du match changé pendant que la fenêtre est ouverte (retiré ou
+  // reposé par qui le tient) : la case et le choix reprennent le mode du match.
+  // Sans quoi la case « casté », cochée à l'ouverture sur un mode verrouillé,
+  // le resterait une fois ce mode retiré — et Enregistrer recasterait le match.
   const [seenTrigger, setSeenTrigger] = useState(match.liveTrigger);
   // Médiation : les liens des streams des casters, que l'arbitre seul édite.
   const casterList = useMemo(() => new Intl.ListFormat(text.locale, { style: "long", type: "conjunction" }), [text.locale]);
@@ -289,7 +308,7 @@ export function MatchLiveDialog({
   const [casterLinks, setCasterLinks] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
   // Un refus du serveur rattaché à son champ (`ACCESSIBILITY_FORM_ERRORS_STATEMENT.md`).
-  const fieldIds: Record<LiveField, string> = { url: URL_INPUT_ID };
+  const fieldIds: Record<LiveField, string> = { url: URL_INPUT_ID, streamed: STREAMED_INPUT_ID };
   for (const stream of casterStreams) fieldIds[`caster-${stream.id}`] = casterLinkInputId(stream.id);
   const fieldErrors = useFieldErrors<LiveField>(LIVE_FIELD_ERRORS, fieldIds);
   if (seenTrigger !== match.liveTrigger) {
@@ -299,7 +318,7 @@ export function MatchLiveDialog({
     setSeenTrigger(match.liveTrigger);
     setStreamed(match.liveTrigger !== null);
     setTrigger(match.liveTrigger ?? "MANUAL");
-    setLiveUrl(currentStaffUrl);
+    resetLiveUrl();
     setOrganisationLink(false);
     setCasterLinks({});
     fieldErrors.clear();
@@ -405,17 +424,24 @@ export function MatchLiveDialog({
         ) : (
           <label className={`${styles.streamed} ${styles.checkRow}`}>
             <input
+              id={STREAMED_INPUT_ID}
               type="checkbox"
               checked={streamed}
               // Un mode sans maître ne se démarque que par l'arbitre ou le staff
-              // (`LIVE_TRIGGER_NOT_OWNED` au serveur).
-              disabled={!viewerMayUnmarkLiveTrigger(match, viewer)}
-              onChange={(e) => setStreamed(e.target.checked)}
+              // (`LIVE_TRIGGER_NOT_OWNED` au serveur) ; un match joué jamais
+              // casté ne se marque plus (`MATCH_NOT_CASTABLE`) : case grisée.
+              disabled={streamedBoxDisabled(match, viewer, castable)}
+              onChange={(e) => {
+                setStreamed(e.target.checked);
+                fieldErrors.clear("streamed");
+              }}
+              {...fieldAria(STREAMED_INPUT_ID, fieldErrors.invalidField === "streamed")}
             />
             {/* NOSONAR S6772 — label en flex avec `gap` */}
             {t("live.streamed")}
           </label>
         )}
+        <FieldErrorText fieldId={STREAMED_INPUT_ID} message={fieldErrors.message("streamed")} />
 
         {showUrl && (
           <>

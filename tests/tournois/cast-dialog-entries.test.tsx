@@ -200,4 +200,29 @@ describe("MatchLiveDialog — match joué (ERREUR.txt EF-29 #528, CAST-FOLLOWUP 
     expect(live).not.toContain("style={{");
     expect(live).not.toMatch(/var\(--[a-z-]+, #/);
   });
+
+  it("MatchLiveDialog_notStreamedRefusal_attachedToTheStreamedCheckbox", () => {
+    const live = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
+    expect(live).toContain('MATCH_NOT_STREAMED: "streamed"');
+    expect(live).toContain("{...fieldAria(STREAMED_INPUT_ID, fieldErrors.invalidField === \"streamed\")}");
+    expect(live).toContain('<FieldErrorText fieldId={STREAMED_INPUT_ID} message={fieldErrors.message("streamed")} />');
+  });
+
+  it("MatchLiveDialog_neverCastClosedMatch_checkboxDisabled", () => {
+    const live = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
+    expect(live).toContain("streamedBoxDisabled(match, viewer, castable)");
+    expect(live).toContain("(!castable && match.liveTrigger === null)");
+  });
+
+  it("MatchLiveDialog_modeChange_resetsLinkThroughTheHook", () => {
+    const live = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
+    expect(live).toContain("resetLiveUrl();");
+    expect(live).not.toContain("setLiveUrl(currentStaffUrl)");
+  });
+
+  it("MATCH_NOT_STREAMED_enText_quotesTheDialogLabel", () => {
+    const enErrors = JSON.parse(readSource("messages/en/tournamentErrors.json")) as { errors?: Record<string, string> } & Record<string, unknown>;
+    const text = JSON.stringify(enErrors);
+    expect(text).toContain(`“${enDialogs.live.streamed}”`);
+  });
 });

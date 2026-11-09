@@ -114,9 +114,12 @@ describe("LiveCard — audience", () => {
     expect(renderEn(live([match(1)], 128))).toContain('title="128 people following the tournament"');
   });
 
-  it("LiveCard_viewersTooltip_onHiddenNumberOnly", () => {
-    // Le `title` sur le conteneur doublait l'annonce de la copie `sr-only`.
-    expect(render(live([match(1)], 128))).toContain('aria-hidden="true" title="128 personnes suivent le tournoi">128</span>');
+  it("LiveCard_viewersTooltip_coversIconAndNumberNotScreenReaderCopy", () => {
+    // L'infobulle couvre l'icône et le chiffre ; la copie `sr-only`, hors du groupe, la porte seule aux lecteurs d'écran.
+    const html = render(live([match(1)], 128));
+    expect(html).toMatch(/<span class="[^"]*viewersGroup[^"]*" title="128 personnes suivent le tournoi"><svg[^>]*aria-hidden="true"/);
+    expect(html).toContain('<span class="mono" aria-hidden="true">128</span>');
+    expect(html).not.toContain('aria-hidden="true" title="128');
   });
 
   it("sous le seuil, ni nombre ni libellé", () => {

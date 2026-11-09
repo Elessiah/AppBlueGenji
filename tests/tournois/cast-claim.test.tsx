@@ -264,7 +264,7 @@ describe("CastClaimDialog — rendu", () => {
   });
 
   it("sans notifications, l'annonce du stream disparu est une zone vive montée, vide tant que le choix existe", () => {
-    expect(renderDialog("fr")).toContain('</fieldset><output class="sr-only" aria-live="polite"></output>');
+    expect(renderDialog("fr")).toMatch(/<\/fieldset><output class="[^"]*gone[^"]*" aria-live="polite"><\/output>/);
   });
 
   it("CastClaimDialog_underToastProvider_noSecondLiveRegion", () => {
@@ -279,7 +279,8 @@ describe("CastClaimDialog — rendu", () => {
       </ToastProvider>,
     );
 
-    expect(html).not.toContain('<output class="sr-only" aria-live="polite">');
+    // Une seule voix : le toast ; la zone du texte persistant se tait.
+    expect(html).not.toMatch(/<output[^>]*aria-live="polite"/);
   });
 
   it("le champ du lien n'apparaît qu'en choisissant son propre stream", () => {
@@ -334,7 +335,7 @@ describe("CastClaimDialog — un stream choisi qui disparaît", () => {
     expectContains(source, [
       "if (!gone || document.activeElement !== document.body) return;",
       'fieldsetRef.current?.querySelector<HTMLInputElement>("input[type=radio]")?.focus();',
-      '{gone ? t("cardActions.claimDialog.gone") : ""}',
+      '{gone ? goneMessage : ""}',
     ]);
   });
 
@@ -615,7 +616,7 @@ describe("Fenêtre de diffusion — mode changé pendant qu'elle est ouverte", (
     // Un mode retiré a effacé le lien du staff : la fenêtre ne le repose pas.
     const dialog = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
     const reset = dialog.slice(dialog.indexOf("if (seenTrigger !== match.liveTrigger)"));
-    expect(reset.slice(0, reset.indexOf("}"))).toContain("setLiveUrl(currentStaffUrl);");
+    expect(reset.slice(0, reset.indexOf("}"))).toContain("resetLiveUrl();");
     expect(reset.slice(0, reset.indexOf("}"))).toContain("setOrganisationLink(false);");
   });
 
