@@ -114,8 +114,60 @@ describe("play-offs — le vrai arbre, et non une liste de cartes", () => {
   it("laisse le comportement d'origine aux tableaux qui portent leurs liens", () => {
     // La prop est **optionnelle** : sans elle, l'arbre lit `nextWinnerMatchId`
     // comme il l'a toujours fait. Une élimination simple ne doit rien changer.
-    expect(TREE).toContain("resolveNextMatchId?: (match: BracketMatch) => number | null");
-    expect(TREE).toContain("(match.nextWinnerMatchId ?? match.nextLoserMatchId)");
+    expect(TREE).toContain("resolveNextMatchId?: (slot: BracketSlotRef) => number | null");
+    expect(TREE).toContain("(slot.match.nextWinnerMatchId ?? slot.match.nextLoserMatchId)");
+  });
+
+  it("montre l'arbre entier dès l'ouverture, cases à pourvoir comprises", () => {
+    // Le moteur ne pose qu'un tour à la fois : sans les créneaux à pourvoir,
+    // l'arbre se réduit à sa première colonne et rien ne dit où mène un quart
+    // de finale.
+    expect(VIEW).toContain("endurancePlayoffGhostSlots(");
+    expect(VIEW).toContain("ghostSlots={playoffGhosts}");
+    // Un tournoi clos n'annonce plus de tour : deux demi-finales perdues sur
+    // double forfait closent le tournoi sans que la finale soit posée.
+    expect(VIEW).toContain("endurancePlayoffGhostSlots(decisive, isFinished)");
+    // La pastille annonce la taille du volet, cases à pourvoir comprises —
+    // « 0 match » sur un volet qui en dessine sept n'était juste pour personne.
+    expect(SECTIONS).toContain("sectionMatches.length + sectionGhosts.length");
+    expect(VIEW).toContain("endurancePlayoffLinks(decisive, playoffGhosts)");
+    expect(SECTIONS).toContain("ghostSlots={sectionGhosts}");
+    expect(TREE).toContain("<GhostMatchCard />");
+  });
+
+  it("ne fait pas passer une case à pourvoir pour une rencontre", () => {
+    // Rien ne se qualifie depuis un créneau que personne n'occupe, et un volet
+    // qui n'en porte que ne réserve pas la colonne des badges — deux cent
+    // trente pixels de défilement vides.
+    expect(TREE).toContain("if (slot.match === null) return null;");
+    expect(TREE).toContain("const hasQualifyBadges =");
+    expect(TREE).toContain("{hasQualifyBadges && (");
+    // La carte vide n'a ni ancre publique, ni action, ni arbitrage.
+    const ghost = read("_components", "GhostMatchCard.tsx");
+    expect(ghost).not.toContain("matchAnchorId");
+    expect(ghost).not.toContain("MatchCardActions");
+    expect(ghost).not.toContain("onOpenAdminModal");
+  });
+
+  it("mène à une case à pourvoir quand c'est elle qui est annoncée", () => {
+    // Au-delà de trois tours, le premier volet annonce « Qualifié en demi-
+    // finale » avant que ce tour soit posé : une destination cherchée parmi les
+    // seules rencontres laissait le badge inerte.
+    expect(SECTIONS).toContain("(ghostSlots ?? []).find((slot) => slot.id === destId)?.roundNumber");
+  });
+
+  it("n'offre pas le survol d'une carte ouvrable à une case vide", () => {
+    // La règle de survol de la carte porte un `:not()`, dont l'argument compte
+    // dans sa spécificité : un sélecteur d'une seule classe perdait contre elle.
+    const css = read("_components", "MatchRow.module.css");
+    expect(css).toContain(".card.ghostCard:hover");
+  });
+
+  it("laisse les tableaux à élimination sans aucune case à pourvoir", () => {
+    // La prop est optionnelle : un tableau qui naît entier n'en passe pas, et
+    // son rendu ne change donc pas d'un pixel.
+    expect(TREE).toContain("ghostSlots?: readonly BracketSlotRef[]");
+    expect(TREE).toContain("...(ghostSlots ?? [])");
   });
 });
 

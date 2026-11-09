@@ -10,6 +10,26 @@ export const ACCENT: Record<BracketType, string> = {
   THIRD_PLACE: "var(--ink-mute, #93a3b2)",
 };
 
+/**
+ * Ce que l'arbre a besoin de savoir d'un créneau — **réel ou à pourvoir**.
+ *
+ * Un tableau à élimination naît entier : tous ses créneaux sont des rencontres,
+ * et ce repère se confond avec `BracketMatch`. L'arbre final de BlueGenji
+ * Survie, lui, pousse un tour à la fois : les tours à venir n'ont pas encore de
+ * rencontre à montrer, mais ils ont une **place** dans le dessin — sans quoi
+ * l'arbre se réduit à sa première colonne, et rien ne dit où mène un quart de
+ * finale.
+ *
+ * Un créneau à pourvoir porte un identifiant **négatif**
+ * (`endurancePlayoffGhostSlots`) : il ne sert qu'à relier les traits entre eux,
+ * et aucune rencontre ne peut le porter.
+ */
+export interface BracketSlotRef {
+  id: number;
+  roundNumber: number;
+  matchNumber: number;
+}
+
 export interface BracketSection {
   /**
    * Clé d'identité du volet, pour piloter l'état ouvert/fermé.
@@ -107,10 +127,12 @@ export function buildSections(
   const totalRounds = roundNums.length;
   if (totalRounds === 0) return [];
 
-  // Le découpage porte sur les tours **posés** (on ne fait pas un volet pour ce
-  // qui n'existe pas), mais les stades se nomment sur le nombre de tours
-  // **prévus** : « quart de finale » n'a de sens que rapporté à la fin du
-  // tableau. Les deux ne coïncident que si le plateau naît complet.
+  // Le découpage porte sur les tours que l'appelant lui passe — rencontres
+  // posées **et** créneaux à pourvoir, depuis que l'arbre de BlueGenji Survie
+  // se montre entier (`BracketSections`). Les stades, eux, se nomment sur le
+  // nombre de tours **prévus** : « quart de finale » n'a de sens que rapporté à
+  // la fin du tableau, et un tableau à élimination, qui naît complet, ne passe
+  // pas ce compte du tout.
   const stageTotal = Math.max(plannedRounds ?? totalRounds, totalRounds);
 
   if (bracketType === "GRAND" || bracketType === "THIRD_PLACE") {

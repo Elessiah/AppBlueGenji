@@ -66,17 +66,20 @@ describe("isMatchScoreLocked", () => {
 describe("câblage dans les vues du plateau", () => {
   const row = readSource("app/(secured)/tournois/[id]/_components/MatchRow.tsx");
   const views = [
-    ["BracketTree.tsx", "format"],
-    ["EnduranceRoundPanels.tsx", "format"],
+    // L'arbre rend des **créneaux** (une rencontre posée, ou la place d'une à
+    // venir) : l'identifiant du verrou se lit donc sur le créneau, et non sur
+    // une carte qui peut ne pas exister.
+    ["BracketTree.tsx", "format", "slot.id"],
+    ["EnduranceRoundPanels.tsx", "format", "match.id"],
     // Survie et ronde suisse : colonnes communes, format passé par la vue.
-    ["RoundColumns.tsx", "format"],
+    ["RoundColumns.tsx", "format", "match.id"],
   ] as const;
 
   it("lit le verrou mutualisé au lieu de convertir tout le plateau par carte", () => {
-    for (const [file, format] of views) {
+    for (const [file, format, id] of views) {
       const source = readSource(`app/(secured)/tournois/[id]/_components/${file}`);
       expect(source).toContain(
-        `scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, ${format})}`,
+        `scoreLocked={isMatchScoreLocked(${id}, allTournamentMatches, ${format})}`,
       );
       expect(source).not.toMatch(/allMatches=/);
     }
