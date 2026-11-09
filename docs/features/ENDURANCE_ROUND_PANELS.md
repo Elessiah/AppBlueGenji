@@ -281,10 +281,10 @@ L'arbre des play-offs hérite du même mécanisme, puisqu'il passe par
   nombre de tours annoncé.
 - `tests/tournois/endurance-round-panels-wiring.test.ts` — câblage : les cartes
   passent par `MatchRow`, l'ancre déplie le volet, les play-offs empruntent
-  `BracketSections` avec les liens dérivés et les créneaux à pourvoir (qui ne
-  comptent ni dans la pastille ni dans les badges de qualification, et que les
-  tableaux à élimination ne reçoivent jamais), et le chrome des volets est
-  partagé.
+  `BracketSections` avec les liens dérivés et les créneaux à pourvoir (comptés
+  dans la pastille du volet, absents des badges de qualification, tus sous un
+  tournoi clos, et que les tableaux à élimination ne reçoivent jamais), et le
+  chrome des volets est partagé.
 - `tests/tournois/bracket-sections.test.ts` — un arbre qui ne porte pas encore
   tous ses tours : stades nommés sur le compte prévu, clé de section stable
   quand un tour la rejoint, et découpage inchangé pour les tableaux complets.

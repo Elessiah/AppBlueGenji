@@ -235,9 +235,12 @@ export function BracketTree({
               <div style={{ width: CARD_W, flexShrink: 0 }}>
                 {roundSlots.map((slot) => {
                   const label = matchLabel(slot.matchNumber, globalIdx);
-                  // Un créneau à pourvoir porte un identifiant négatif : il ne
-                  // peut donc jamais être la cible d'un défilement, qui ne
-                  // nomme que des rencontres.
+                  // La marque « ★ Votre match » ne vise qu'une rencontre, et
+                  // un créneau à pourvoir porte un identifiant négatif : il ne
+                  // peut donc jamais la porter. Un **défilement**, lui, peut
+                  // bien l'atteindre — c'est ce que fait le badge
+                  // « Qualifié en X » vers un tour pas encore posé —, d'où le
+                  // `ref` enregistré pour tous les créneaux, juste en dessous.
                   const isTarget = slot.id === scrollTargetMatchId;
                   return (
                     <div

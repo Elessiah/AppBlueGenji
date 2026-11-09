@@ -25,8 +25,11 @@ interface BracketSectionsProps {
    * (`endurancePlayoffGhostSlots`) : ils prennent place dans le découpage en
    * volets comme dans l'arbre, où ils se dessinent vides.
    *
-   * Ils ne comptent nulle part ailleurs : la pastille d'un volet annonce ses
-   * **rencontres**, et le volet ouvert d'office se décide sur elles.
+   * Ils comptent dans la **pastille** d'un volet, qui annonce la taille du
+   * tableau — c'est déjà ce qu'elle fait sur une élimination, dont les tours à
+   * venir sont de vraies rencontres sans engagées. Le volet ouvert d'office,
+   * lui, se décide sur les seules rencontres posées : une case à pourvoir
+   * n'est rien qu'on vienne voir.
    */
   ghostSlots?: readonly BracketSlotRef[];
   allTournamentMatches: BracketMatch[];
