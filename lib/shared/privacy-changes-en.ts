@@ -853,6 +853,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: the content of the check-in (no BattleTag, Discord tag or player username), the direct message reserved for a certified Discord tag, and the “Discord direct messages about my matches” box in “My profile” to object to it.",
     ],
   },
+  "2026-11-annonce-nouveau-match": {
+    linkLabels: ["Read the “Match Discord direct messages” paragraph", "Read the “Push notifications” section"],
+    title: "Notice of a new match",
+    summary:
+      "When a round ends and both opponents of one of your matches are known, you are told: the opposing team, the time if it is set and the link to the match page, by Discord direct message and push notification.",
+    details: [
+      "Who is told: all members of both teams (or the player of a solo tournament, without the message naming their opponent), once per match; a tournament's first round is not announced, the kickoff covers it. No username, BattleTag or Discord tag appears in it, only team names.",
+      "Push notifications: this new topic, “New match”, is on by default on devices already subscribed, like every topic; you can turn it off in “My profile”. Discord direct message: only if your tag is certified, on the basis of legitimate interest (smooth running of tournaments); the “Discord direct messages about my matches” box in “My profile” turns it off with the others.",
+      "What the site keeps: for each announced match, its place in the tournament and the numbers of both teams, with the tournament (erased with it), so it is never announced twice. Nothing new is collected about your account.",
+    ],
+  },
   "2026-11-mode-d-antenne-et-arbitre": {
     linkLabels: ["Read the “Match streaming” paragraph"],
     title: "Live mode: kept for whoever set it, and the assigned referee sets up the broadcast",

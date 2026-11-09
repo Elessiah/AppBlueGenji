@@ -60,6 +60,11 @@ export const PUSH_TOPICS = {
     description: "Un tournoi où ton équipe est inscrite vient de commencer.",
     audience: null,
   },
+  NEW_MATCH: {
+    label: "Nouveau match",
+    description: "Une manche se termine et l'adversaire de ton prochain match (équipe dont tu es membre, ou ton tournoi individuel) est connu : qui tu affrontes, l'horaire s'il est posé et le lien du match. La première manche d'un tournoi n'est pas annoncée : le coup d'envoi la couvre.",
+    audience: null,
+  },
   MATCH_REMINDER: {
     label: "Horaires et rappels de match",
     description: "L'horaire d'un match quand il est posé, changé ou retiré, puis des rappels 24 h et 10 h avant le coup d'envoi (avec le lien du check-in).",

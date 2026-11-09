@@ -567,8 +567,8 @@ describe("langue du compte (lot 9-3)", () => {
     expect(fr.hint).toMatch(/quand un match quitte ton programme/);
     // La case coupe aussi l'avis de retrait du cast (CAST_NOTICES.md) : l'aide le dit.
     const en = (await import("@/messages/en/profile.json")).default.matchDms;
-    expect(fr.hint).toMatch(/quand ton inscription de caster sur un match est retirée par un autre que toi/);
-    expect(en.hint).toMatch(/when someone else removes your caster registration for a match/);
+    expect(fr.hint).toMatch(/quand ton inscription de caster sur un match est retirée par le staff ou d'office \(avec le motif\)/);
+    expect(en.hint).toMatch(/when your caster registration for a match is removed by the staff or automatically \(with the reason\)/);
     // Et le brief du salon (MATCH_LOBBY_BRIEF.md) : l'aide le dit aussi.
     expect(fr.hint).toMatch(/15 minutes avant un match en autogestion d'une équipe que tu gères ou de ton tournoi individuel — ou à l'ouverture de son salon, si elle vient plus tôt — \(check-in du match\), et pour ses rappels \(24 h et 10 h avant\)/);
     expect(en.hint).toMatch(/15 minutes before a self-managed match of a team you manage or of your solo tournament — or when its lobby opens, if that comes earlier — \(match check-in\), and for its reminders \(24 h and 10 h before\)/);

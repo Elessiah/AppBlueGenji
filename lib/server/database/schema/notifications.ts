@@ -138,6 +138,49 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
     // Table déjà présente, ou création refusée.
   }
 
+  // Annonce d'un nouveau match (`docs/features/NEW_MATCH_NOTICE.md`) : une par
+  // place du match (phase, tableau, manche, numéro) et par affiche (`pairing`,
+  // les deux engagées sans ordre, `5:7`). La place plutôt que l'id : un match
+  // effacé puis recréé avec la même affiche n'est pas réannoncé. `skipped` : la
+  // place était déjà jouable quand le tournoi a été vu pour la première fois en
+  // cours (première manche, couverte par le coup d'envoi ; matchs d'avant le
+  // déploiement). Part avec le tournoi.
+  try {
+    await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_new_match_notices (
+        tournament_id BIGINT NOT NULL,
+        phase_id BIGINT NOT NULL,
+        bracket VARCHAR(16) NOT NULL,
+        round_number INT NOT NULL,
+        match_number INT NOT NULL,
+        pairing VARCHAR(48) NOT NULL,
+        skipped TINYINT(1) NOT NULL DEFAULT 0,
+        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (tournament_id, phase_id, bracket, round_number, match_number, pairing),
+        CONSTRAINT fk_bg_new_match_notices_tournament FOREIGN KEY (tournament_id)
+          REFERENCES bg_tournaments(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch {
+    // Table déjà présente, ou création refusée : les annonces se taisent.
+  }
+
+  // Tournoi en cours dont les matchs déjà jouables ont été marqués `skipped`
+  // (ligne de départ des annonces de nouveau match). Retirée quand le tournoi
+  // quitte l'état « en cours ».
+  try {
+    await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_new_match_baselines (
+        tournament_id BIGINT NOT NULL PRIMARY KEY,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_bg_new_match_baselines_tournament FOREIGN KEY (tournament_id)
+          REFERENCES bg_tournaments(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch {
+    // Table déjà présente, ou création refusée.
+  }
+
   // Réservation d'une annonce de live sur Discord (#live, `@everyone`) : une
   // par match et par affiche (`pairing` : les deux engagés sans ordre, `5:7`)
   // — `docs/features/LIVE_STREAMS.md`. Même mécanique :

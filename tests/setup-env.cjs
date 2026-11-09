@@ -30,3 +30,10 @@ jest.mock("@/lib/server/tournaments/lobby-brief", () => ({
   ...jest.requireActual("@/lib/server/tournaments/lobby-brief"),
   dispatchLobbyBriefs: jest.fn(async () => 0),
 }));
+
+// Annonce des nouveaux matchs (`dispatchNewMatchNotices`) : même raison, même
+// remède ; ses propres tests le rétablissent par `jest.unmock`.
+jest.mock("@/lib/server/tournaments/new-match-notices", () => ({
+  ...jest.requireActual("@/lib/server/tournaments/new-match-notices"),
+  dispatchNewMatchNotices: jest.fn(async () => 0),
+}));

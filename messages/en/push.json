@@ -16,6 +16,10 @@
       "label": "Tournament kickoff",
       "description": "A tournament your team is registered for has just started."
     },
+    "NEW_MATCH": {
+      "label": "New match",
+      "description": "A round ends and the opponent of your next match (a team you belong to, or your solo tournament) is known: who you face, the time if it is set, and the match link. A tournament's first round is not announced: the kickoff covers it."
+    },
     "MATCH_REMINDER": {
       "label": "Match times and reminders",
       "description": "A match time when it is set, changed or removed, then reminders 24 h and 10 h before kickoff (with the check-in link)."

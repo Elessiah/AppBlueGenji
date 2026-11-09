@@ -283,12 +283,13 @@ C'est `reportSchemaFailure` qui l'applique, aux deux migrations. Le cas nominal
 ne journalise rien : il se produit à chaque démarrage, et une ligne par entrée
 noierait la seule qui compte.
 
-**Neuf `CREATE TABLE` ne suivent pas cette règle**, et ce n'est pas un oubli :
+**Onze `CREATE TABLE` ne suivent pas cette règle**, et ce n'est pas un oubli :
 `bg_match_reminders`, `bg_referee_alerts`, `bg_endurance_penalties`, les trois
 tables des notifications push (`bg_push_subscriptions`, `bg_push_topic_optouts`,
 `bg_match_start_notices` — `docs/features/PUSH_NOTIFICATIONS.md`) et les
 annonces de live (`bg_live_announcements`, `bg_live_evenings` — `docs/features/LIVE_STREAMS.md`) et les
-marques durables du check-in (`bg_lobby_brief_marks` — `docs/features/MATCH_LOBBY_BRIEF.md`) gardent un
+marques durables du check-in (`bg_lobby_brief_marks` — `docs/features/MATCH_LOBBY_BRIEF.md`) et les
+annonces de nouveau match (`bg_new_match_notices`, `bg_new_match_baselines` — `docs/features/NEW_MATCH_NOTICE.md`) gardent un
 `catch` muet, parce que c'est le contrat qu'`isMissingTableError` décrit et sur
 lequel s'appuient les chemins de notification, `tournaments/deletion.ts`,
 `tournaments/rollback.ts` et les lectures des sanctions de `tournaments/bg-survie/` (`replay-inputs.ts`, `meta.ts`, `penalties.ts`)

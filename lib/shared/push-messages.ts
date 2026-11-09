@@ -297,6 +297,42 @@ export function matchReminderPush(
   };
 }
 
+/** Un match dont les deux engagées viennent d'être connues (`NEW_MATCH`). */
+export type NewMatchSide = MatchSide & {
+  bracket: string;
+  roundNumber: number;
+  swiss?: boolean;
+  /** Horaire posé, `null` sinon. */
+  startAt: string | Date | null;
+};
+
+/**
+ * Nouveau match (`NEW_MATCH`, `lib/server/tournaments/new-match-notices.ts`) :
+ * une manche s'est jouée et l'adversaire du prochain match est connu. Noms
+ * d'équipe seulement ; en tournoi individuel, « Ton match ». Le lien ouvre la
+ * page du match, dans la langue du destinataire. Étiquette propre : il ne
+ * remplace ni l'appel aux « Prêt », ni l'annonce d'un horaire.
+ */
+export function newMatchPush(side: NewMatchSide, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  const values = {
+    pairing: pairing(side, text),
+    tournament: withoutInvisibles(side.tournamentName),
+    round: pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss),
+  };
+  const unscheduledKey = side.solo ? "newMatch.bodyUnscheduledSolo" : "newMatch.bodyUnscheduled";
+  const body =
+    side.startAt === null
+      ? text.t(unscheduledKey, values)
+      : text.t("newMatch.body", { ...values, start: pushMatchStart(side.startAt, locale) });
+  return {
+    title: text.t("newMatch.title"),
+    body: clipPushText(body, PUSH_BODY_MAX),
+    url: localeHref(matchPageHref(side.tournamentId, side.matchId), locale),
+    tag: `${matchTag(side.matchId)}-new`,
+  };
+}
+
 /**
  * Horaire retiré par l'arbitrage : `side.startAt` porte l'horaire qui ne vaut
  * plus. Même étiquette que l'annonce, qu'il remplace sur l'appareil.

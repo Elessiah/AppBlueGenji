@@ -17,6 +17,12 @@
     "noMap": "not set yet",
     "quoted": "“{name}”"
   },
+  "newMatch": {
+    "title": "New match",
+    "body": "{pairing} · {tournament}, {round}. Kickoff {start} (Paris time).",
+    "bodyUnscheduled": "{pairing} · {tournament}, {round}. No time set yet: get organised with your team.",
+    "bodyUnscheduledSolo": "{pairing} · {tournament}, {round}. No time set yet: keep an eye on the match page."
+  },
   "matchReminder": {
     "title": "Match in {offset}",
     "titleScheduled": "Match scheduled",

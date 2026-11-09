@@ -1651,6 +1651,23 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Qui règle quoi : un mode posé par le staff reste au staff ; un co-caster ne peut plus changer celui d'un autre. L'arbitre désigné d'un match, pour ce seul match, voit et modifie les liens de ses casters et la configuration de la diffusion de l'organisation — l'arbitre d'un autre match, non.",
     ],
   },
+  {
+    // NEW-MATCH-NOTIF (demande de l'utilisateur du 2026-11-09) : annonce d'un
+    // nouveau match aux membres des deux équipes (push `NEW_MATCH`, actif
+    // d'office sur les appareils abonnés — décision D5 —, et message privé de
+    // match). Pour tous les comptes. Datée du déploiement prévu (2026-11-10).
+    id: "2026-11-annonce-nouveau-match",
+    publishedAt: "2026-11-10",
+    title: "Annonce d'un nouveau match",
+    links: [MATCH_DM_PARAGRAPH_LINK, { href: "/rgpd#notifications", label: "Lire la section « Notifications push »" }],
+    summary:
+      "Quand une manche se termine et que les deux adversaires d'un de tes matchs sont connus, tu es prévenu : l'équipe adverse, l'horaire s'il est posé et le lien de la page du match, en message privé Discord et en notification push.",
+    details: [
+      "Qui est prévenu : tous les membres des deux équipes (ou le joueur d'un tournoi individuel, sans que le message nomme son adversaire), une seule fois par match ; la première manche d'un tournoi n'est pas annoncée, le coup d'envoi la couvre. Aucun pseudo, BattleTag ni tag Discord n'y figure, seulement des noms d'équipe.",
+      "Notifications push : ce nouveau sujet, « Nouveau match », est actif d'office sur les appareils déjà abonnés, comme tout sujet ; tu peux le couper dans « Mon profil ». Message privé Discord : seulement si ton tag est certifié, au titre de l'intérêt légitime (bon déroulement des tournois) ; la case « Messages privés Discord de mes matchs » de « Mon profil » le coupe avec les autres.",
+      "Ce que le site garde : pour chaque match annoncé, sa place dans le tournoi et les numéros des deux équipes, avec le tournoi (effacés avec lui), pour ne jamais l'annoncer deux fois. Rien de nouveau n'est collecté sur ton compte.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */
