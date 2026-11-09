@@ -862,7 +862,7 @@ describe("setMatchLiveConfig", () => {
     );
     await mockLiveDb(world);
 
-    await expect(setMatchLiveConfig(42, { trigger: null, setter: CASTER_12, access: LIVE_ONLY })).rejects.toThrow(
+    await expect(setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: CASTER_12, access: LIVE_ONLY })).rejects.toThrow(
       "STAFF_STREAM_FORBIDDEN",
     );
     expect(world.state.matchWrites).toEqual([]);
@@ -874,7 +874,7 @@ describe("setMatchLiveConfig", () => {
     ]);
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: null, setter: CASTER_12, access: LIVE_ONLY });
+    await setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: CASTER_12, access: LIVE_ONLY });
 
     expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = NULL"), [42]]]);
   });
