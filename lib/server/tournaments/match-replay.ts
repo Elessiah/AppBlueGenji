@@ -11,10 +11,12 @@
  * `live` n'y touche que sur **son** cast ; le staff `tournaments` (dont
  * l'arbitre désigné) sur tout match (décision du 2026-11-09).
  */
-import type { RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { canHaveReplay, normalizeReplayUrl } from "@/lib/shared/match-replay";
-import type { MatchStatus } from "@/lib/shared/types";
+import { castBeforeLaunch } from "@/lib/shared/match-launch";
+import type { MatchStatus, TournamentGame } from "@/lib/shared/types";
 import { nullableId } from "@/lib/shared/nullable-id";
+import { loadShownCasterIds } from "./cast-eligibility";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { inTransaction } from "./transaction";
@@ -27,7 +29,24 @@ type MatchReplayRow = RowDataPacket & {
   team2_id: number | null;
   forfeit_team_id: number | null;
   double_forfeit: number | null;
+  launched_at: Date | null;
+  launch_pairing: string | null;
 };
+
+/**
+ * Le lecteur caste-t-il ce match **et y est-il montré** ? Avant le lancement
+ * (match rouvert), un caster tu (`loadShownCasterIds` : condition du cast
+ * perdue) ne règle plus la rediff, pas même pour l'effacer.
+ */
+async function castsShownOn(connection: PoolConnection, row: MatchReplayRow, userId: number): Promise<boolean> {
+  const [games] = await connection.execute<(RowDataPacket & { game: TournamentGame })[]>(
+    `SELECT game FROM bg_tournaments WHERE id = ?`,
+    [Number(row.tournament_id)],
+  );
+  const game = games[0]?.game ?? "OW";
+  const shown = await loadShownCasterIds(connection, Number(row.id), [userId], game, castBeforeLaunch(row));
+  return shown.has(userId);
+}
 
 
 /** La ligne lue décrit-elle une rencontre réellement disputée ? (`canHaveReplay`) */
@@ -74,18 +93,15 @@ export async function setMatchReplayUrl(
   const { row, result } = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       const [rows] = await connection.execute<MatchReplayRow[]>(
-        `SELECT id, tournament_id, status, team1_id, team2_id, forfeit_team_id, double_forfeit
+        `SELECT id, tournament_id, status, team1_id, team2_id, forfeit_team_id, double_forfeit,
+                launched_at, launch_pairing
            FROM bg_matches WHERE id = ? FOR UPDATE`,
         [matchId],
       );
       if (rows.length === 0) throw new Error("MATCH_NOT_FOUND");
       const locked = rows[0];
-      if (!actor.manages) {
-        const [casts] = await connection.execute<RowDataPacket[]>(
-          `SELECT 1 FROM bg_match_casters WHERE match_id = ? AND user_id = ? LIMIT 1`,
-          [matchId, actor.userId],
-        );
-        if (casts.length === 0) throw new Error("NOT_MATCH_CASTER");
+      if (!actor.manages && !(await castsShownOn(connection, locked, actor.userId))) {
+        throw new Error("NOT_MATCH_CASTER");
       }
       if (replayUrl !== null && !isReplayableRow(locked)) throw new Error("MATCH_NOT_REPLAYABLE");
       // L'effacement n'a aucune condition d'état ; la pose, lue sous le verrou,

@@ -32,6 +32,24 @@ const playedRow = {
   team2_id: 2,
   forfeit_team_id: null,
   double_forfeit: 0,
+  launched_at: "2026-01-01 20:00:00",
+  launch_pairing: "1:2",
+};
+
+/** Le jeu du tournoi, relu pour juger la condition du cast d'un porteur de la seule `live`. */
+const GAME = [[{ game: "OW" }]];
+
+/** Colonnes d'un caster qui remplit la condition du cast (admin, identités certifiées). */
+const ELIGIBLE = {
+  user_id: 12,
+  discord_verified_at: new Date("2026-01-01T00:00:00Z"),
+  discord_pseudo: "voix",
+  blizzard_sub: "bnet",
+  overwatch_battletag: "Voix#1234",
+  overwatch_battletag_typed: 0,
+  is_deleted: 0,
+  is_admin: 1,
+  platform_roles_json: null,
 };
 
 /**
@@ -54,12 +72,14 @@ afterEach(() => {
 
 describe("setMatchReplayUrl", () => {
   it("setMatchReplayUrl_notCaster_rollsBackWithoutWriting", async () => {
-    const connection = await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([[playedRow]]).mockResolvedValueOnce([[]]));
+    const connection = await mockDb(
+      jest.fn<SqlQuery>().mockResolvedValueOnce([[playedRow]]).mockResolvedValueOnce(GAME).mockResolvedValueOnce([[]]),
+    );
 
     await expect(setMatchReplayUrl(42, VIDEO, LIVE_ONLY_12)).rejects.toThrow("NOT_MATCH_CASTER");
     expect(connection.rollback).toHaveBeenCalled();
     expect(connection.commit).not.toHaveBeenCalled();
-    expect(connection.execute).toHaveBeenCalledTimes(2);
+    expect(connection.execute).toHaveBeenCalledTimes(3);
   });
 
   it("setMatchReplayUrl_success_locksMatchAndCommits", async () => {
@@ -77,20 +97,49 @@ describe("setMatchReplayUrl", () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[playedRow]])
-      .mockResolvedValueOnce([[{ 1: 1 }]])
+      .mockResolvedValueOnce(GAME)
+      .mockResolvedValueOnce([[ELIGIBLE]])
       .mockResolvedValue([{ affectedRows: 1, changedRows: 1 }]);
     await mockDb(execute);
 
     expect(await setMatchReplayUrl(42, VIDEO, LIVE_ONLY_12)).toEqual({ replayUrl: VIDEO, changed: true });
-    expect(execute.mock.calls[1]).toEqual([expect.stringContaining("FROM bg_match_casters"), [42, 12]]);
+    expect(execute.mock.calls[1]).toEqual([expect.stringContaining("FROM bg_tournaments"), [7]]);
+    expect(execute.mock.calls[2]).toEqual([expect.stringContaining("FROM bg_match_casters"), [42, 12]]);
+  });
+
+  it("setMatchReplayUrl_mutedCasterOnReopenedMatch_throwsNotMatchCaster", async () => {
+    // Match rouvert (avant lancement) : le caster tu (condition perdue) n'efface plus la rediff.
+    const reopened = { ...playedRow, status: "READY", launched_at: null, launch_pairing: null };
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[reopened]])
+      .mockResolvedValueOnce(GAME)
+      .mockResolvedValueOnce([[{ ...ELIGIBLE, is_admin: 0 }]]);
+    await mockDb(execute);
+
+    await expect(setMatchReplayUrl(42, null, LIVE_ONLY_12)).rejects.toThrow("NOT_MATCH_CASTER");
+    expect(execute).toHaveBeenCalledTimes(3);
+  });
+
+  it("setMatchReplayUrl_shownCasterOnReopenedMatch_clearsLink", async () => {
+    const reopened = { ...playedRow, status: "READY", launched_at: null, launch_pairing: null };
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[reopened]])
+      .mockResolvedValueOnce(GAME)
+      .mockResolvedValueOnce([[ELIGIBLE]])
+      .mockResolvedValue([{ affectedRows: 1, changedRows: 1 }]);
+    await mockDb(execute);
+
+    expect(await setMatchReplayUrl(42, null, LIVE_ONLY_12)).toEqual({ replayUrl: null, changed: true });
   });
 
   it("setMatchReplayUrl_liveOnlyNotCasterOfMatch_throwsNotMatchCaster", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[playedRow]]).mockResolvedValueOnce([[]]);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[playedRow]]).mockResolvedValueOnce(GAME).mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await expect(setMatchReplayUrl(42, VIDEO, LIVE_ONLY_12)).rejects.toThrow("NOT_MATCH_CASTER");
-    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute).toHaveBeenCalledTimes(3);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
