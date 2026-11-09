@@ -195,3 +195,12 @@ export function diffPlatformRoles(
 export function roleChangeNeedsConfirmation(change: PlatformRoleChange): boolean {
   return change.granted.length > 0 || change.removed.length > 0;
 }
+
+/**
+ * Le ton de la confirmation d'un changement de rôles : « danger » dès qu'un rôle
+ * se perd ou que l'administration est accordée — la même règle pour « Mes
+ * rôles » et pour la fiche d'un joueur.
+ */
+export function roleChangeTone(change: PlatformRoleChange): "danger" | "primary" {
+  return change.removed.length > 0 || change.granted.includes("ADMIN") ? "danger" : "primary";
+}

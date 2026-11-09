@@ -113,7 +113,8 @@
     "verifiedAlt": "Verified Discord tag",
     "verifiedTitle": "Verified Discord tag: this player proved they own this Discord account.",
     "alreadyVerified": "Your Discord tag is already verified.",
-    "unverifiedDetails": "Without verification, the organizers can't reach you during a tournament: verify it so they can."
+    "unverifiedDetails": "Without verification, the organizers can't reach you during a tournament: verify it so they can.",
+    "readFailed": "Your Discord status could not be read."
   },
   "privacy": {
     "visibleTitle": "Visible to other players",
@@ -166,7 +167,9 @@
     "accepted": "Invitation accepted.",
     "refused": "Invitation declined.",
     "acceptLabel": "Accept the invitation from {team}",
-    "refuseLabel": "Decline the invitation from {team}"
+    "refuseLabel": "Decline the invitation from {team}",
+    "gone": "This invitation no longer exists: it was withdrawn or handled elsewhere.",
+    "loadFailed": "Your invitations could not be read. Reload the page."
   },
   "platformRoles": {
     "legend": "My platform roles",
@@ -200,7 +203,8 @@
       "INVALID_PAYLOAD": "The role selection is invalid.",
       "USER_NOT_FOUND": "Your account can't be found.",
       "fallback": "Updating your roles failed."
-    }
+    },
+    "nothingToSave": "No role has changed: tick or untick a role before saving."
   },
   "stats": {
     "tournamentsPlayed": "Tournaments played",
@@ -389,9 +393,17 @@
       "revokedNone": "No other session was open.",
       "revoked": "{count, plural, one {1 other session was closed} other {{count} other sessions were closed}}.",
       "revoke": "Log out my other sessions",
-      "revoking": "Closing…"
+      "revoking": "Closing…",
+      "nothingToClose": "No other session to close: only this device is logged in to your account."
     },
-    "blizzardBadge": "Your player page marks it with a “Verified BattleTag” badge, even when hidden (without showing it)."
+    "blizzardBadge": "Your player page marks it with a “Verified BattleTag” badge, even when hidden (without showing it).",
+    "battletagPointer": "Enter my BattleTag",
+    "loadFailed": "Your linked accounts could not be read.",
+    "retryLabel": "Try again to read my linked accounts",
+    "reading": "Reading…",
+    "battletagPointerMissing": "The “Overwatch BattleTag” field is not shown yet: try again in a moment.",
+    "discordRowRetryLabel": "Try again (Discord status, accounts list)",
+    "retry": "Try again"
   },
   "battletagNotice": {
     "eyebrow": "VISIBILITY · BATTLETAG",

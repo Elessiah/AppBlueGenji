@@ -19,6 +19,7 @@ import { useAppLocale } from "@/components/i18n/locale-context";
 import { DiscordInviteLink } from "./_components/DiscordInviteLink";
 import { discordVerificationErrorMessage } from "./discord-errors";
 import { ScrollArea } from "@/components/cyber";
+import { takeSubmit } from "@/lib/shared/take-submit";
 
 /** Les lignes de l'exposition, dans l'ordre du registre (`DISCORD_VERIFICATION_EXPOSURE`, testé). */
 export const EXPOSURE_KEYS = ["admins", "referees", "match", "players", "undo"] as const;
@@ -96,7 +97,8 @@ export function DiscordVerificationDialog({
   };
 
   const requestVerification = async (event: FormEvent) => {
-    event.preventDefault();
+    // Envoi gardé dans la fenêtre : il ne remonte pas jusqu'au formulaire du profil.
+    takeSubmit(event);
     // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici,
     // par une référence lue sans attendre de rendu — Entrée puis clic dans le même instant
     // enverraient sinon deux demandes (un essai du code brûlé ; revue de sécurité du lot 9-2).
@@ -140,7 +142,8 @@ export function DiscordVerificationDialog({
   };
 
   const confirmVerification = async (event: FormEvent) => {
-    event.preventDefault();
+    // Envoi gardé dans la fenêtre : il ne remonte pas jusqu'au formulaire du profil.
+    takeSubmit(event);
     // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici,
     // par une référence lue sans attendre de rendu — Entrée puis clic dans le même instant
     // enverraient sinon deux demandes (un essai du code brûlé ; revue de sécurité du lot 9-2).

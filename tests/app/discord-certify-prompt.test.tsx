@@ -309,7 +309,7 @@ describe("textes (certifyPrompt) — FR et EN", () => {
     expect(certifyPromptRowsFor(seen, ONE_CLICK)).toEqual([...seen]);
     expect(certifyPromptRowsFor([], DIALOG_UNLINKED)).toEqual([]);
     expect(SOURCE).toContain("{certifyPromptRowsFor(rows, prompt).map((row) => (");
-    expect(fr.rows.link.with).toContain("Le code reçu en message privé le rattache, si ce Discord n'est pas déjà rattaché à un autre compte");
+    expect(fr.rows.link.with).toContain("Le code reçu en message privé le lie, si ce Discord n'est pas déjà lié à un autre compte");
     expect(en.rows.link.with).toContain("The code received by direct message links it, unless that Discord is already linked to another account");
   });
 

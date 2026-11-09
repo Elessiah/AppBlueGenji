@@ -140,7 +140,7 @@ export function discordTagLockNotice(state: {
     // distinguer : l'état et le geste, sans inventer la cause. Les boutons sont
     // **nommés**, jamais situés : un module pur ne connaît pas la mise en page.
     return {
-      status: "Compte Discord rattaché, sans pseudo enregistré : l'organisation ne peut pas te joindre.",
+      status: "Compte Discord lié, sans pseudo enregistré : l'organisation ne peut pas te joindre.",
       details: ["Utilise « Enregistrer mon tag » ou « Mettre à jour mon pseudo », ou reconnecte-toi par Discord."],
       audience: false,
     };
@@ -151,7 +151,7 @@ export function discordTagLockNotice(state: {
     // **Pas de « pour ne plus être joignable »** ici : personne ne voit ce tag.
     // Le retrait reste offert par le bouton d'à côté, sans rien à promettre.
     return {
-      status: "Compte Discord rattaché, pseudo non certifié : personne ne le voit.",
+      status: "Compte Discord lié, pseudo non certifié : personne ne le voit.",
       details: ["Te connecter par Discord ne le certifie pas : c'est « Certifier mon tag » qui le fait. Tu peux aussi le retirer.", rename],
       audience: true,
     };
@@ -160,7 +160,7 @@ export function discordTagLockNotice(state: {
   // (`DISCORD_TAG_AUDIENCE`, `identity-sharing.ts`) et partagée avec
   // `/connexion` : l'écran la joint à la place de la recopier.
   return {
-    status: "Compte Discord rattaché, pseudo certifié.",
+    status: "Compte Discord lié, pseudo certifié.",
     details: [rename, "Un nouveau pseudo arrive non certifié, à certifier de nouveau. Pour ne plus être joignable, retire-le."],
     audience: true,
   };

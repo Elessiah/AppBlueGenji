@@ -132,7 +132,7 @@ export function battletagLockNotice(state: {
     };
   }
   const change =
-    "Pour en changer, retire Blizzard des « Applications connectées » (après avoir ajouté un autre moyen de connexion si c'est le seul), puis rattache le bon compte.";
+    "Pour en changer, retire Blizzard des « Applications connectées » (après avoir ajouté un autre moyen de connexion si c'est le seul), puis lie le bon compte.";
   // Verrouillé et rattaché : le BattleTag vient de Blizzard (un Battle.net
   // sans BattleTag laisse le champ ouvert, `checkBattletagEdit`).
   return {

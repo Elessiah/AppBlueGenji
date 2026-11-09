@@ -154,6 +154,7 @@ function identityContext(
   blizzardLinked: boolean | null,
   battletagFromBlizzard: boolean | undefined,
   onCertifyDiscord: () => void,
+  discordRead: { failed: boolean; reading: boolean; retry: () => void },
 ): IdentityContext {
   return {
     discordKnown: discordState.linked !== null,
@@ -162,6 +163,9 @@ function identityContext(
     battletagKnown: battletagFromBlizzard !== undefined,
     battletagFromBlizzard: blizzardLinked === true && battletagFromBlizzard === true,
     onCertifyDiscord,
+    discordReadFailed: discordRead.failed,
+    discordReading: discordRead.reading,
+    onRetryDiscord: discordRead.retry,
   };
 }
 
@@ -301,16 +305,28 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const saving = useRef(false);
   const [invitations, setInvitations] = useState<{ id: number; teamId: number; teamName: string; ownership?: boolean }[]>([]);
+  // Vrai dès que la liste a été **lue** : « aucune invitation » ne se dit pas avant.
+  const [invitationsLoaded, setInvitationsLoaded] = useState(false);
 
   const loadInvitations = async () => {
     try {
       const res = await fetch("/api/me/invitations", { cache: "no-store" });
-      if (!res.ok) return;
+      if (!res.ok) {
+        invitationsReadFailed();
+        return;
+      }
       const payload = (await res.json()) as { invitations?: { id: number; teamId: number; teamName: string; ownership?: boolean }[] };
       setInvitations(payload.invitations ?? []);
+      setInvitationsLoaded(true);
     } catch {
-      // silencieux
+      invitationsReadFailed();
     }
+  };
+  // Une lecture ratée se dit : sans cela, la section manque sans un mot (lien `#invitations` compris).
+  const invitationsReadFailed = () => {
+    // Le lien `#invitations` a eu sa réponse (la panne) : une lecture réussie plus tard ne la rejoue pas.
+    if (requestedSection.current === "invitations") sectionHonoured.current = true;
+    showError(t("invitations.loadFailed"));
   };
 
   // **Vrai dès le premier rendu** : une lecture part au montage, et partir de
@@ -318,6 +334,8 @@ export default function ProfilePage() {
   // l'écran annonçait une panne de lecture avant d'avoir essayé quoi que ce
   // soit.
   const [discordStateBusy, setDiscordStateBusy] = useState(true);
+  // La dernière lecture de l'état Discord a échoué : la ligne Discord et le champ proposent de la refaire.
+  const [discordReadFailed, setDiscordReadFailed] = useState(false);
 
   /**
    * Le numéro de la **dernière lecture lancée**.
@@ -336,9 +354,18 @@ export default function ProfilePage() {
   const loadDiscordState = async () => {
     const seq = (discordReadSeq.current += 1);
     setDiscordStateBusy(true);
+    // Une lecture dépassée ne dit rien ; la dernière dit la panne (notification) et la retient.
+    const fail = () => {
+      if (seq !== discordReadSeq.current) return;
+      setDiscordReadFailed(true);
+      showError(t("discord.readFailed"));
+    };
     try {
       const res = await fetch("/api/profile/discord", { cache: "no-store" });
-      if (!res.ok) return;
+      if (!res.ok) {
+        fail();
+        return;
+      }
       const payload = (await res.json()) as {
         tag: string | null;
         verified: boolean;
@@ -349,10 +376,12 @@ export default function ProfilePage() {
       // ce que l'écran affiche déjà.
       if (seq !== discordReadSeq.current) return;
       setDiscordState(payload);
+      setDiscordReadFailed(false);
     } catch {
-      // Silencieux, mais **pas anodin** : l'état reste `linked: null`, donc le
-      // champ reste verrouillé. Le reste du formulaire s'enregistre normalement,
-      // et le bouton « Réessayer » ci-dessous rouvre le seul chemin fermé.
+      // **Pas anodin** : l'état reste `linked: null`, donc le champ reste verrouillé.
+      // La panne se dit, le reste du formulaire s'enregistre normalement, et les
+      // boutons « Réessayer » (champ et ligne Discord) rouvrent le chemin fermé.
+      fail();
     } finally {
       // L'attente ne se lève que sur la **dernière** lecture : la dépassée qui
       // rentre la première rouvrait sinon « Réessayer » alors qu'une lecture
@@ -364,6 +393,7 @@ export default function ProfilePage() {
   useEffect(() => {
     void loadInvitations();
     void loadDiscordState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // « Certifier mon tag » de la fenêtre proposée à la connexion, pour un tag
@@ -497,10 +527,18 @@ export default function ProfilePage() {
     // Une section conditionnelle peut n'être pas encore là : on retentera au
     // prochain rendu plutôt que de tenir le saut pour fait.
     const target = document.getElementById(sectionId);
-    if (!target) return;
+    if (!target) {
+      // Les invitations lues sans que celle du lien y soit (retirée, ou traitée
+      // ailleurs) : le lien ne mène nulle part, la page le dit et reste en haut.
+      if (sectionId === "invitations" && invitationsLoaded) {
+        sectionHonoured.current = true;
+        showError(t("invitations.gone"));
+      }
+      return;
+    }
     sectionHonoured.current = true;
     target.scrollIntoView({ block: "start" });
-  }, [data, invitations.length]);
+  }, [data, invitations.length, invitationsLoaded, showError, t]);
 
   // Un lien de la page même vers une ancienne ancre (`#discord`, `#connexions`) :
   // aucun élément ne la porte plus, le navigateur ne défilerait pas.
@@ -745,6 +783,7 @@ export default function ProfilePage() {
   const {
     connections,
     pending: connectionsPending,
+    failed: connectionsFailed,
     reload: reloadConnections,
   } = useAccountConnections();
   // `null` n'est pas « aucun rattachement » mais « pas encore lue » : le verrou
@@ -957,10 +996,21 @@ export default function ProfilePage() {
 
         <ProfileSection section={sectionById.comptes}>
           <ConnectedAppsSection
-            identity={identityContext(discordState, blizzardLinked, data?.profile.battletagFromBlizzard, () =>
-              setVerifyOpen(true),
+            identity={identityContext(
+              discordState,
+              blizzardLinked,
+              data?.profile.battletagFromBlizzard,
+              () => setVerifyOpen(true),
+              {
+                failed: discordReadFailed,
+                reading: discordStateBusy,
+                retry: () => {
+                  if (!discordStateBusy) void loadDiscordState();
+                },
+              },
             )}
             connections={connections}
+            connectionsFailed={connectionsFailed}
             reload={reloadConnections}
             onChanged={loadDiscordState}
             onDiscordTagChanged={(tag) => {

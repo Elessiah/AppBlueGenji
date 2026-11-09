@@ -14,13 +14,13 @@ import {
 describe("connectionSuccessMessage", () => {
   it("annonce un rattachement quand l'application est neuve", () => {
     expect(connectionSuccessMessage("GOOGLE", false)).toBe(
-      "Google est maintenant rattaché à ton compte.",
+      "Google est maintenant lié à ton compte.",
     );
   });
 
   it("n'annonce pas un rattachement à qui l'était déjà", () => {
     const message = connectionSuccessMessage("DISCORD", true);
-    expect(message).not.toMatch(/maintenant rattaché/);
+    expect(message).not.toMatch(/maintenant lié/);
     expect(message).toMatch(/pseudo/);
   });
 
@@ -29,7 +29,7 @@ describe("connectionSuccessMessage", () => {
   });
 
   it("garde une phrase quand le fournisseur est illisible", () => {
-    expect(connectionSuccessMessage(null, false)).toBe("Application rattachée.");
+    expect(connectionSuccessMessage(null, false)).toBe("Application liée.");
     expect(connectionSuccessMessage(null, true)).toBe("Application reconfirmée.");
   });
 });

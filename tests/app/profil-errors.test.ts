@@ -21,7 +21,7 @@ import { discordVerificationErrorMessage } from "@/app/(secured)/profil/discord-
 describe("profileErrorMessage", () => {
   it("traduit le refus du tag verrouillé", () => {
     const message = profileErrorMessage("DISCORD_TAG_LOCKED");
-    expect(message).toContain("rattaché");
+    expect(message).toContain("lié");
     expect(message).toContain("retire-le");
   });
 

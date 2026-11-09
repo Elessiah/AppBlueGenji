@@ -13,7 +13,7 @@
  * porte ferme aussi les autres sessions (le parent incrémente `version` pour
  * que le compte soit relu), et c'est ici qu'on refait le geste s'il a échoué.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { connectionErrorMessage, otherSessionsSummary, sessionsRevokedMessage } from "./connection-errors";
 import { useProfileText } from "@/components/i18n/profile-text";
@@ -29,19 +29,44 @@ export function OtherSessionsPanel({ version }: Readonly<{ version: number }>): 
   const text = useProfileText();
   const [count, setCount] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  // Relecture du compte en cours (garde par référence : deux activations rapprochées n'en lancent qu'une).
+  const checking = useRef(false);
 
-  const load = useCallback(async (signal?: AbortSignal) => {
+  /** Relit le nombre d'autres sessions ; `null` quand la lecture échoue ou est abandonnée. */
+  const load = useCallback(async (signal?: AbortSignal): Promise<number | null> => {
     try {
       const res = await fetch("/api/profile/sessions", { signal, cache: "no-store" });
       if (!res.ok) throw new Error(await readError(res));
       const payload = (await res.json()) as { otherSessions: number };
-      if (!signal?.aborted) setCount(payload.otherSessions);
+      if (signal?.aborted) return null;
+      setCount(payload.otherSessions);
+      return payload.otherSessions;
     } catch {
       // Silencieux : la ligne dit « pas encore compté », et le bouton reste
       // offert — fermer ne dépend pas d'avoir compté.
       if (!signal?.aborted) setCount(null);
+      return null;
     }
   }, []);
+
+  /**
+   * Le compte lu au chargement peut être périmé (une session ouverte depuis) : à 0, on le
+   * relit avant de dire « rien à fermer », et on ferme si une session est apparue.
+   */
+  const activate = async () => {
+    if (busy) return;
+    if (count !== 0) {
+      void revoke();
+      return;
+    }
+    if (checking.current) return;
+    checking.current = true;
+    const fresh = await load();
+    checking.current = false;
+    // Une session est apparue, ou le compte reste illisible : fermer ne dépend pas d'avoir compté.
+    if (fresh === 0) showError(text.t("connections.sessions.nothingToClose"));
+    else void revoke();
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -74,7 +99,7 @@ export function OtherSessionsPanel({ version }: Readonly<{ version: number }>): 
       <button
         type="button"
         className={`btn ghost ${s.sessionsButton}`}
-        onClick={() => !busy && count !== 0 && void revoke()}
+        onClick={() => void activate()}
         aria-disabled={busy || count === 0 || undefined}
         aria-busy={busy || undefined}
         aria-describedby="other-sessions-summary"

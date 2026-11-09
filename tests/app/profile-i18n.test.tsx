@@ -207,6 +207,9 @@ const IDENTITY = {
   battletagKnown: true,
   battletagFromBlizzard: false,
   onCertifyDiscord: () => undefined,
+  discordReadFailed: false,
+  discordReading: false,
+  onRetryDiscord: () => undefined,
 };
 
 const CONNECTION_SETS: AccountConnection[][] = [
@@ -355,12 +358,12 @@ describe("français inchangé — profil", () => {
     // ne rend plus que des codes) : chaque cas, et le refus.
     const FR_BOT_NOTES = {
       HANDLE: "Pseudo Discord : keryan",
-      LINKED_BY_CODE: "Rattaché par code en message privé",
+      LINKED_BY_CODE: "Lié par code en message privé",
       LINKED_BY_BUTTON:
-        "Rattaché par le bouton Discord, à retirer sur sa ligne. Le code en message privé met ici ton pseudo à jour.",
+        "Lié par le bouton Discord, à retirer sur sa ligne. Le code en message privé met ici ton pseudo à jour.",
       LINKED_ELSEWHERE:
-        "Discord rattaché, à retirer sur sa ligne. Le code en message privé met ici ton pseudo à jour.",
-      NOT_LINKED: "Rattache Discord sans écran d'autorisation : le bot BlueGenji t'envoie un code en message privé.",
+        "Discord lié, à retirer sur sa ligne. Le code en message privé met ici ton pseudo à jour.",
+      NOT_LINKED: "Lie Discord sans écran d'autorisation : le bot BlueGenji t'envoie un code en message privé.",
     } as const;
     for (const [noteCode, note] of Object.entries(FR_BOT_NOTES) as Array<[keyof typeof FR_BOT_NOTES, string]>) {
       expect(discordBotRowText(FR_PROFILE, { noteCode, handle: "keryan", refusalCode: null })).toEqual({ note, refusal: null });
@@ -651,7 +654,7 @@ describe("langue du compte (lot 9-3)", () => {
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
     expect(connectionSuccessMessage("DISCORD", false)).toBe(
-      "Discord est maintenant rattaché à ton compte. Certifie ton tag (section Discord) : sans certification, aucun message privé de match ne te parvient.",
+      "Discord est maintenant lié à ton compte. Certifie ton tag (section Discord) : sans certification, aucun message privé de match ne te parvient.",
     );
     expect(connectionSuccessMessage("DISCORD", false, EN_PROFILE)).toMatch(/ Verify your tag \(Discord section\): without verification, no match direct message reaches you\.$/);
     expect(connectionSuccessMessage("GOOGLE", false)).not.toMatch(/Certifie/);

@@ -15,6 +15,7 @@ import { useProfileText } from "@/components/i18n/profile-text";
 import { DiscordInviteLink } from "./_components/DiscordInviteLink";
 import { discordHandleUpdateErrorMessage } from "./discord-errors";
 import { ScrollArea } from "@/components/cyber";
+import { takeSubmit } from "@/lib/shared/take-submit";
 
 const FIELD_IDS = {
   handle: "discord-bot-handle",
@@ -66,7 +67,8 @@ export function DiscordBotHandleDialog({
   };
 
   const requestCode = async (event: FormEvent) => {
-    event.preventDefault();
+    // Envoi gardé dans la fenêtre : il ne remonte pas jusqu'au formulaire du profil.
+    takeSubmit(event);
     // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici,
     // par une référence lue sans attendre de rendu — Entrée puis clic dans le même instant
     // enverraient sinon deux demandes (un essai du code brûlé ; revue de sécurité du lot 9-2).
@@ -101,7 +103,8 @@ export function DiscordBotHandleDialog({
   };
 
   const confirmCode = async (event: FormEvent) => {
-    event.preventDefault();
+    // Envoi gardé dans la fenêtre : il ne remonte pas jusqu'au formulaire du profil.
+    takeSubmit(event);
     // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici,
     // par une référence lue sans attendre de rendu — Entrée puis clic dans le même instant
     // enverraient sinon deux demandes (un essai du code brûlé ; revue de sécurité du lot 9-2).
