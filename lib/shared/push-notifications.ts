@@ -62,12 +62,12 @@ export const PUSH_TOPICS = {
   },
   NEW_MATCH: {
     label: "Nouveau match",
-    description: "L'adversaire de ton prochain match (équipe dont tu es membre, ou ton tournoi individuel) est connu : qui tu affrontes, l'horaire s'il est posé et le lien du match.",
+    description: "L'adversaire de ton prochain match (équipe dont tu es membre, ou ton tournoi individuel) est connu : qui tu affrontes (sans le nommer en tournoi individuel), l'horaire s'il est posé et le lien du match.",
     audience: null,
   },
   MATCH_REMINDER: {
     label: "Horaires et rappels de match",
-    description: "L'horaire d'un match quand il est posé, changé ou retiré, puis des rappels 24 h et 10 h avant le coup d'envoi (avec le lien du check-in).",
+    description: "L'horaire d'un match quand il est posé, changé ou retiré (celui déjà posé quand l'adversaire est connu part avec « Nouveau match »), puis des rappels 24 h et 10 h avant le coup d'envoi (avec le lien du check-in).",
     audience: null,
   },
   TEAM_JOIN_REQUEST: {

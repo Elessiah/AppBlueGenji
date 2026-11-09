@@ -616,8 +616,8 @@ describe("annonce d'un nouveau match — textes légaux (revue juridique de #569
   it("registerT04_retention_newMatchRecordsListAnnouncedTimeAndSkippedMark", () => {
     const fr = t04.retention.find((line) => line.includes("annonce d'un nouveau match"));
     const en = t04En.retention.find((line) => line.includes("notice of a new match"));
-    expect(fr).toMatch(/horaire annoncé et, pour un match déjà apparié à la mise en service, la marque qu'il n'a pas été annoncé/);
-    expect(en).toMatch(/the announced time and, for a match already paired when the feature went live, the mark that it was not announced/);
+    expect(fr).toMatch(/horaire annoncé et date de l'annonce, ou la marque qu'il n'a pas été annoncé — match déjà apparié à la mise en service, adversaire dissous, envoi échoué trois fois\)/);
+    expect(en).toMatch(/the announced time and the date of the notice, or the mark that it was not announced — match already paired when the feature went live, opponent dissolved, sending failed three times\)/);
     expect(en).not.toMatch(/never goes out twice, erased with it/);
   });
 
@@ -636,6 +636,20 @@ describe("annonce d'un nouveau match — textes légaux (revue juridique de #569
     expect(en.details.join("\n")).toContain("once per match and pairing");
     expect(en.details.join("\n")).toContain("the announced time");
     expect(en.details).toHaveLength(fr.details.length);
+  });
+
+  it("registerT04_categoriesAndPushRecipients_coverNewMatchRecordsAndAllMembers", () => {
+    expect(t04.dataCategories).toContain("Annonces d'un nouveau match : place du match dans le tournoi, numéros des deux engagées, horaire annoncé et date de l'annonce, ou marque d'un match non annoncé");
+    expect(t04En.dataCategories).toContain("New-match announcements: the match's place in the tournament, numbers of both entrants, announced time and date of the announcement, or the mark of a match not announced");
+    expect(t04.recipients.join("\n")).toContain("membre d'une équipe engagée, joueur d'un tournoi individuel : nouveau match");
+    expect(t04En.recipients.join("\n")).toContain("member of an entered team, player of a solo tournament: new match");
+  });
+
+  it("privacyChange_newMatchEntry_excludesGhostAndDissolvedTeamsInFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === "2026-11-annonce-nouveau-match")!;
+    const en = PRIVACY_CHANGES_EN["2026-11-annonce-nouveau-match"];
+    expect(fr.details[0]).toContain("personne pour une équipe fantôme, et rien pour un match contre une équipe dissoute");
+    expect(en.details[0]).toContain("nobody for a ghost team, and nothing for a match against a dissolved team");
   });
 
   it("donneesProfil_matchDmChoice_mentionsNewMatchInFrAndEn", () => {
