@@ -122,42 +122,7 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
   }
 
   for (const candidate of candidates) {
-    const userId = Number(candidate.id);
-    const connection = await db.getConnection();
-    try {
-      await connection.beginTransaction();
-      const [locked] = await connection.execute<(RowDataPacket & {
-        pseudo: string;
-        is_deleted: 0 | 1;
-        is_admin: 0 | 1;
-        platform_roles_json: unknown;
-      })[]>(
-        `SELECT pseudo, is_deleted, is_admin, platform_roles_json
-           FROM bg_users WHERE id = ? FOR UPDATE`,
-        [userId],
-      );
-      const row = locked[0];
-      if (!row || Number(row.is_deleted) !== 1) {
-        await connection.rollback();
-        continue;
-      }
-      const { gesture, tournamentIds } = await settleDeletedAccount(connection, userId, row);
-      await connection.commit();
-      if (gesture) outcome[gesture] += 1;
-      for (const tournamentId of tournamentIds) touchedTournaments.add(tournamentId);
-    } catch (error) {
-      // Sur une connexion morte — la panne même qu'on traite —, l'annulation
-      // lève à son tour : sans garde, elle sortirait de la boucle et laisserait
-      // tous les comptes suivants au prochain démarrage.
-      await connection.rollback().catch(() => {});
-      outcome.failed += 1;
-      console.error(
-        `[deleted-accounts] Rattrapage du compte #${userId} reporté au prochain démarrage :`,
-        error instanceof Error ? error.message : error,
-      );
-    } finally {
-      connection.release();
-    }
+    await reconcileOneAccount(db, Number(candidate.id), outcome, touchedTournaments);
   }
 
   // Même raison que la suppression elle-même (`deleteOwnAccount`) : les vues
@@ -173,6 +138,54 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
     }
   }
   return outcome;
+}
+
+/**
+ * Un compte repéré, dans **sa** transaction : relu sous le verrou de sa
+ * ligne, réglé, puis compté une fois commité. Ne lève jamais : l'échec de l'un
+ * n'empêche pas les autres (compté dans `failed`).
+ */
+async function reconcileOneAccount(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  userId: number,
+  outcome: DeletedAccountsReconciliation,
+  touchedTournaments: Set<number>,
+): Promise<void> {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [locked] = await connection.execute<(RowDataPacket & {
+      pseudo: string;
+      is_deleted: 0 | 1;
+      is_admin: 0 | 1;
+      platform_roles_json: unknown;
+    })[]>(
+      `SELECT pseudo, is_deleted, is_admin, platform_roles_json
+         FROM bg_users WHERE id = ? FOR UPDATE`,
+      [userId],
+    );
+    const row = locked[0];
+    if (!row || Number(row.is_deleted) !== 1) {
+      await connection.rollback();
+      return;
+    }
+    const { gesture, tournamentIds } = await settleDeletedAccount(connection, userId, row);
+    await connection.commit();
+    if (gesture) outcome[gesture] += 1;
+    for (const tournamentId of tournamentIds) touchedTournaments.add(tournamentId);
+  } catch (error) {
+    // Sur une connexion morte — la panne même qu'on traite —, l'annulation
+    // lève à son tour : sans garde, elle sortirait de la boucle et laisserait
+    // tous les comptes suivants au prochain démarrage.
+    await connection.rollback().catch(() => {});
+    outcome.failed += 1;
+    console.error(
+      `[deleted-accounts] Rattrapage du compte #${userId} reporté au prochain démarrage :`,
+      error instanceof Error ? error.message : error,
+    );
+  } finally {
+    connection.release();
+  }
 }
 
 /** Les comptes dont la finalisation a échoué, et quand : écartés de la file un temps. */

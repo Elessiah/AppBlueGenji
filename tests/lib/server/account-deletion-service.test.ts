@@ -72,13 +72,12 @@ const STARTED_REGISTRATION: SoloRegistrationRow = {
 
 /**
  * Les instructions de la **transaction** : sans les relevés lus sur le pool
- * avant elle (tournois de l'entrée solo et des matchs nommant le compte,
- * avatars en quarantaine ; le double partage `execute`).
+ * avant elle (tournois de l'entrée solo et des matchs nommant le compte ;
+ * le double partage `execute`).
  */
 const BEFORE_TRANSACTION = [
   "SELECT DISTINCT r.tournament_id",
   "SELECT m.tournament_id FROM bg_matches m JOIN bg_match_casters",
-  "SELECT logo_url FROM bg_logo_quarantines",
 ];
 const inTransaction = (queries: Query[]) => queries.filter((q) => !BEFORE_TRANSACTION.some((prefix) => q.sql.startsWith(prefix)));
 
@@ -912,14 +911,17 @@ describe("deleteOwnAccount — verrous et lectures avant la transaction", () => 
     expect(tx[1].sql).toContain("FROM bg_users WHERE id = ? FOR UPDATE");
   });
 
-  it("deleteOwnAccount_quarantinedAvatars_readBeforeTakingAPoolConnectionAndNotInTransaction", async () => {
-    const { execute, getConnection, queries } = fakeDb(EMPTY);
+  // D6 : les avatars en quarantaine se relisent sous le verrou du compte, dans la transaction.
+  it("deleteOwnAccount_quarantinedAvatars_readInTransactionAfterAccountLock", async () => {
+    const { queries } = fakeDb(EMPTY);
 
     await deleteOwnAccount(7);
 
-    const read = execute.mock.calls.findIndex(([sql]) => String(sql).includes("FROM bg_logo_quarantines"));
-    expect(execute.mock.invocationCallOrder[read]).toBeLessThan(getConnection.mock.invocationCallOrder[0]);
-    expect(has(inTransaction(queries), "FROM bg_logo_quarantines")).toBe(false);
+    const tx = inTransaction(queries);
+    const lock = tx.findIndex((q) => q.sql.includes("FROM bg_users WHERE id = ? FOR UPDATE"));
+    const read = tx.findIndex((q) => q.sql.includes("FROM bg_logo_quarantines"));
+    expect(lock).toBeGreaterThanOrEqual(0);
+    expect(read).toBeGreaterThan(lock);
   });
 });
 
