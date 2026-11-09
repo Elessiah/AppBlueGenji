@@ -80,16 +80,22 @@ async function databaseNow(connection: PoolConnection): Promise<number> {
   return new Date(rows[0].db_now).getTime();
 }
 
+/** Match jouable (prêt ou score en attente de confirmation) entre deux équipes : seul à pouvoir montrer des salons. */
+function voicePlayable(match: VoiceSnapshotMatch): boolean {
+  return (match.status === "READY" || match.status === "AWAITING_CONFIRMATION") && match.team1Id !== null && match.team2Id !== null;
+}
+
 /**
  * États des salons des matchs d'un tournoi pour l'instantané, jugés à l'heure de la base
- * (`databaseNow`), lue seulement si l'option peut valoir (allumée, tournoi en cours) : vide sinon.
+ * (`databaseNow`), lue seulement si l'option peut valoir (allumée, tournoi en cours) et qu'un
+ * match est jouable — une reconstruction sans salon possible ne coûte aucune lecture : vide sinon.
  */
 export async function loadTournamentVoiceInfos(
   connection: PoolConnection,
   tournament: { teamVoiceChannels: boolean; state: string; startVisibilityAt: string | null },
   matches: readonly VoiceSnapshotMatch[],
 ): Promise<Map<number, MatchVoiceInfo>> {
-  if (!tournament.teamVoiceChannels || tournament.state !== "RUNNING") return new Map();
+  if (!tournament.teamVoiceChannels || tournament.state !== "RUNNING" || !matches.some(voicePlayable)) return new Map();
   const now = await databaseNow(connection);
   return loadMatchVoiceInfos(connection, voiceOptionLive(tournament, now), matches, now);
 }
@@ -121,13 +127,7 @@ export async function loadMatchVoiceInfos(
 ): Promise<Map<number, MatchVoiceInfo>> {
   const result = new Map<number, MatchVoiceInfo>();
   if (!enabled) return result;
-  const candidates = matches.filter(
-    (match) =>
-      (match.status === "READY" || match.status === "AWAITING_CONFIRMATION") &&
-      match.team1Id !== null &&
-      match.team2Id !== null &&
-      voiceChannelsDue(match.startAt, now),
-  );
+  const candidates = matches.filter((match) => voicePlayable(match) && voiceChannelsDue(match.startAt, now));
   if (candidates.length === 0) return result;
   const matchIds = candidates.map((match) => match.id);
   let rows: VoiceRow[];
@@ -502,7 +502,8 @@ async function createTeamChannel(
 }
 
 /** Issue du rendu d'une ligne : la clore, et arrêter le rendu (bot indisponible). */
-type ReleaseVerdict = { close: boolean; stop: boolean };
+/** `keyRouteMissing` : la route de rendu par clé manque (bot plus ancien, mandataire) — plus demandée dans la passe. */
+type ReleaseVerdict = { close: boolean; stop: boolean; keyRouteMissing?: boolean };
 
 /**
  * Refus qui closent la ligne : salon déjà supprimé (`gone`), identifiant (`INVALID_CHANNEL_ID`)
@@ -538,6 +539,7 @@ async function releaseOne(row: ReleaseRow): Promise<ReleaseVerdict> {
   // global éventuel n'est pas rejournalisé.
   if (answer.kind !== "unavailable") botAnswered();
   const released = keyRouteMissing(row, answer);
+  const routeMissing = released !== answer;
   // `gone` (`VOICE_CHANNEL_NOT_TRACKED`) : déjà supprimé, rien de plus à faire ; un refus de
   // `VOICE_RELEASE_CLOSING_CODES` ne sera jamais suivi : la ligne se clôt aussi.
   if (released.kind === "ok" || released.kind === "gone" || VOICE_RELEASE_CLOSING_CODES.has(released.code)) {
@@ -564,7 +566,17 @@ async function releaseOne(row: ReleaseRow): Promise<ReleaseVerdict> {
      WHERE match_id = ? AND team_id = ? AND released_at IS NULL AND channel_id <=> ?`,
     [matchId, Number(row.team_id), row.channel_id === null ? null : String(row.channel_id)],
   );
-  return { close: false, stop: down };
+  return { close: false, stop: down, keyRouteMissing: routeMissing };
+}
+
+/** Clôt une ligne rendue, si elle porte encore ce salon ; son tournoi est republié. */
+async function closeReleasedRow(row: ReleaseRow, touched: Set<number>): Promise<void> {
+  const [result] = await runWrite(
+    `UPDATE bg_match_voice_channels SET released_at = NOW()
+     WHERE match_id = ? AND team_id = ? AND released_at IS NULL AND channel_id <=> ?`,
+    [Number(row.match_id), Number(row.team_id), row.channel_id === null ? null : String(row.channel_id)],
+  );
+  if (Number(result.affectedRows) > 0 && row.tournament_id !== null) touched.add(Number(row.tournament_id));
 }
 
 /**
@@ -575,16 +587,14 @@ async function releaseOne(row: ReleaseRow): Promise<ReleaseVerdict> {
  */
 async function releaseChannels(touched: Set<number>): Promise<boolean> {
   const rows = await run<ReleaseRow[]>(RELEASABLE_SQL);
+  // Route par clé absente : les autres lignes sans salon attendent la passe suivante, sans appel
+  // (un mandataire mal routé n'est pas appelé pour chaque ligne).
+  let keyRouteGone = false;
   for (const row of rows) {
+    if (keyRouteGone && row.channel_id === null) continue;
     const verdict = await releaseOne(row);
-    if (verdict.close) {
-      const [result] = await runWrite(
-        `UPDATE bg_match_voice_channels SET released_at = NOW()
-         WHERE match_id = ? AND team_id = ? AND released_at IS NULL AND channel_id <=> ?`,
-        [Number(row.match_id), Number(row.team_id), row.channel_id === null ? null : String(row.channel_id)],
-      );
-      if (Number(result.affectedRows) > 0 && row.tournament_id !== null) touched.add(Number(row.tournament_id));
-    }
+    if (verdict.keyRouteMissing) keyRouteGone = true;
+    if (verdict.close) await closeReleasedRow(row, touched);
     if (verdict.stop) return true;
   }
   return false;
@@ -1093,7 +1103,8 @@ export async function readMatchVoice(matchId: number, staff: boolean): Promise<M
       [matchId],
     );
     const match = rows[0];
-    if (!match || !canViewTournament({ startVisibilityAt: match.start_visibility_at }, { canManage: staff })) {
+    // Contrôle d'accès à l'heure de la base, comme l'option et l'échéance : une seule horloge.
+    if (!match || !canViewTournament({ startVisibilityAt: match.start_visibility_at }, { canManage: staff }, new Date(match.db_now))) {
       return undefined;
     }
     // Après le contrôle d'accès : un lecteur qui ne voit pas le match ne lance aucune passe.

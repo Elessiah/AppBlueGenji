@@ -729,6 +729,13 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
     expect(connection.execute).not.toHaveBeenCalled();
   });
 
+  it("loadTournamentVoiceInfos_noPlayableMatch_returnsEmptyWithoutReadingClock", async () => {
+    const connection = connectionMock();
+    const infos = await loadTournamentVoiceInfos(fakeConnection(connection), runningTournament, [{ ...ready(), status: "COMPLETED" }]);
+    expect(infos.size).toBe(0);
+    expect(connection.execute).not.toHaveBeenCalled();
+  });
+
   it("loadTournamentVoiceInfos_databaseClockBeforePublication_returnsEmptyAfterClockOnly", async () => {
     // L'application est passé la publication, pas la base : la base fait foi.
     const connection = connectionMock();
@@ -900,6 +907,12 @@ describe("readMatchVoice (porte REST)", () => {
     matchRow({ start_visibility_at: new Date(Date.now() - 60_000), db_now: new Date(Date.now() - 2 * 60_000) });
     await expect(readMatchVoice(42, true)).resolves.toBeNull();
     await dispatchMatchVoiceChannels();
+  });
+
+  it("readMatchVoice_databaseClockBeforePublicationForNonStaff_returnsUndefined", async () => {
+    // Contrôle d'accès à l'heure de la base : l'application en avance ne révèle pas le match.
+    matchRow({ start_visibility_at: new Date(Date.now() - 60_000), db_now: new Date(Date.now() - 2 * 60_000) });
+    await expect(readMatchVoice(42, false)).resolves.toBeUndefined();
   });
 
   it("readMatchVoice_tournamentNotRunning_returnsNull", async () => {
@@ -1339,6 +1352,29 @@ describe("dispatchMatchVoiceChannels — bot indisponible, budget, journal", () 
     expect(releaseVoiceChannel).toHaveBeenCalledWith("902");
     expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()")).map((w) => w.params)).toEqual([[42, 1, null]]);
     expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()")).map((w) => w.params)).toEqual([[43, 1, "902"]]);
+  });
+
+  it("dispatchMatchVoiceChannels_keyRouteMissing_otherKeyRowsSkippedThisPass", async () => {
+    // Route par clé absente (mandataire mal routé, bot ancien) : une seule demande par passe.
+    const { writes } = database({
+      releasable: [
+        { ...releasable, channel_id: null },
+        { ...releasable, match_id: 43, channel_id: null },
+        { ...releasable, match_id: 44, channel_id: "903" },
+      ],
+    });
+    jest.mocked(releaseVoiceChannelByKey).mockResolvedValue({ kind: "unavailable", code: "INTERNAL_ROUTE_NOT_FOUND" });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "ok", value: true });
+    await dispatchMatchVoiceChannels();
+    expect(jest.mocked(releaseVoiceChannelByKey).mock.calls).toEqual([["match:42:team:1"]]);
+    expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()")).map((w) => w.params)).toEqual([[44, 1, "903"]]);
+  });
+
+  it("dispatchMatchVoiceChannels_keyRouteAnswered_nextKeyRowStillAsked", async () => {
+    database({ releasable: [{ ...releasable, channel_id: null }, { ...releasable, match_id: 43, channel_id: null }] });
+    jest.mocked(releaseVoiceChannelByKey).mockResolvedValue({ kind: "failed", code: "VOICE_DISCORD_ERROR" });
+    await dispatchMatchVoiceChannels();
+    expect(releaseVoiceChannelByKey).toHaveBeenCalledTimes(2);
   });
 
   it("dispatchMatchVoiceChannels_keyRouteMissing_noBotBackoff", async () => {
