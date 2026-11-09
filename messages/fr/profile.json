@@ -114,7 +114,7 @@
     "verifiedTitle": "Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord.",
     "alreadyVerified": "Ton tag Discord est déjà certifié.",
     "unverifiedDetails": "Sans certification, l'organisation ne peut pas te joindre pendant un tournoi : certifie-le pour qu'elle le puisse.",
-    "readFailed": "L'état de ton Discord n'a pas pu être lu. Réessaie."
+    "readFailed": "L'état de ton Discord n'a pas pu être lu."
   },
   "privacy": {
     "visibleTitle": "Visible par les autres joueurs",

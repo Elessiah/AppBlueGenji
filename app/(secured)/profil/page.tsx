@@ -323,7 +323,11 @@ export default function ProfilePage() {
     }
   };
   // Une lecture ratée se dit : sans cela, la section manque sans un mot (lien `#invitations` compris).
-  const invitationsReadFailed = () => showError(t("invitations.loadFailed"));
+  const invitationsReadFailed = () => {
+    // Le lien `#invitations` a eu sa réponse (la panne) : une lecture réussie plus tard ne la rejoue pas.
+    sectionHonoured.current = true;
+    showError(t("invitations.loadFailed"));
+  };
 
   // **Vrai dès le premier rendu** : une lecture part au montage, et partir de
   // `false` laissait une fenêtre — entre le premier rendu et l'effet — où

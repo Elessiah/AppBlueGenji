@@ -114,7 +114,7 @@
     "verifiedTitle": "Verified Discord tag: this player proved they own this Discord account.",
     "alreadyVerified": "Your Discord tag is already verified.",
     "unverifiedDetails": "Without verification, the organizers can't reach you during a tournament: verify it so they can.",
-    "readFailed": "Your Discord status could not be read. Try again."
+    "readFailed": "Your Discord status could not be read."
   },
   "privacy": {
     "visibleTitle": "Visible to other players",

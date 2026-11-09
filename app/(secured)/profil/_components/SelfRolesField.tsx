@@ -105,7 +105,7 @@ export function SelfRolesField({
       // La case reste cochée : au toucher, il n'y a ni curseur « interdit » ni « i » ouvert,
       // donc le geste refusé dit sa raison.
       const now = Date.now();
-      if (now - lastLockedNotice.current > 3000) {
+      if (now - lastLockedNotice.current > 1500) {
         lastLockedNotice.current = now;
         showError(t("platformRoles.adminLocked"));
       }

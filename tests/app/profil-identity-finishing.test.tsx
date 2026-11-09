@@ -218,6 +218,8 @@ describe("gestes refusés et reliquats du profil", () => {
     const src = read("app/(secured)/profil/OtherSessionsPanel.tsx");
     expect(src).toContain('showError(text.t("connections.sessions.nothingToClose"))');
     expect(src).toContain("aria-disabled={busy || count === 0 || undefined}");
+    // Le compte lu peut être périmé : à 0, il est relu avant de refuser.
+    expect(src).toContain("const fresh = await load();");
   });
 
   it("selfRolesField_source_closesAndRefreshesOnDefinitiveRefusal", () => {

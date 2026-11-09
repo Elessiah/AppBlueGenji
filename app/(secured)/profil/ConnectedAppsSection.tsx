@@ -582,7 +582,7 @@ function BattletagPointer({
 function focusBattletagField(): boolean {
   const field = document.getElementById("profile-battletag");
   // Absent, désactivé ou caché : le geste ne mènerait nulle part, et le dit.
-  if (!(field instanceof HTMLInputElement) || field.disabled || !field.offsetParent) return false;
+  if (!(field instanceof HTMLInputElement) || field.disabled || field.getClientRects().length === 0) return false;
   field.scrollIntoView({ block: "center" });
   field.focus();
   return true;
