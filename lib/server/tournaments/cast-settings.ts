@@ -27,7 +27,7 @@ import { castBeforeLaunch } from "@/lib/shared/match-launch";
 import type { TournamentGame } from "@/lib/shared/types";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { loadShownCasterIds } from "./cast-eligibility";
-import { hasStaffLink, lockMatchStreams, pruneMatchStreams, streamLinkHolder, type MatchStreamRow } from "./match-casters";
+import { hasStaffLink, lockMatchStreams, pruneMatchStreams, type MatchStreamRow } from "./match-casters";
 // Type seul : aucune dépendance d'exécution vers le lancement, qui importe ce
 // module (le verrou de la ligne du match et la transaction y vivent).
 import type { LaunchMatchRow } from "./match-launch";
@@ -237,9 +237,8 @@ export async function setCasterStreamUrl(
   // remplace par cette route, staff compris (l'arbitre le corrige dans la
   // configuration du direct).
   if (target.liveUrl !== null) {
-    const holderId = await streamLinkHolder(connection, streamId);
-    const ownedByOrganisation = holderId === null;
-    if (ownedByOrganisation ? !manages : holderId !== linkUserId && (await showsOnStream(connection, matchId, streamId, holderId, visibility))) {
+    const holder = await streamHolderCasting(connection, matchId, streamId);
+    if (holder.userId === null ? !manages : holder.userId !== linkUserId && (await showsOnStream(connection, matchId, holder.userId, holder.casts, visibility))) {
       throw new Error("CAST_STREAM_NOT_OWNED");
     }
   }
@@ -253,27 +252,42 @@ export async function setCasterStreamUrl(
 /** Ce qui dit si un caster est montré (`loadShownCasterIds`) : le jeu du match, et s'il est encore avant le lancement. */
 export type CastVisibility = { game: TournamentGame; beforeLaunch: boolean };
 
+/** Qui a fourni le lien d'un stream (`null` = l'organisation), et s'il caste encore ce stream. */
+type StreamHolder = { userId: number | null; casts: boolean };
+
 /**
- * `userId` caste-t-il encore ce stream du match **en caster montré** (lecture
- * sous le verrou du match) ? Un caster tu (condition du cast perdue, pas encore
- * retiré) ne garde pas son lien contre un co-caster montré : il ne pourrait
- * lui-même plus le changer (`assertShownCaster`).
+ * Le fournisseur du lien d'un stream et sa présence parmi les casters de ce
+ * stream, **en une lecture** sous le verrou du match.
+ */
+async function streamHolderCasting(connection: PoolConnection, matchId: number, streamId: number): Promise<StreamHolder> {
+  const [rows] = await connection.execute<RowDataPacket[]>(
+    `SELECT s.link_user_id,
+            EXISTS (SELECT 1 FROM bg_match_casters mc
+                     WHERE mc.match_id = ? AND mc.stream_id = s.id AND mc.user_id = s.link_user_id) AS holder_casts
+       FROM bg_match_streams s WHERE s.id = ? LIMIT 1`,
+    [matchId, streamId],
+  );
+  const raw = rows[0]?.link_user_id;
+  return { userId: raw === null || raw === undefined ? null : Number(raw), casts: Number(rows[0]?.holder_casts ?? 0) === 1 };
+}
+
+/**
+ * Le fournisseur du lien caste-t-il encore ce stream du match **en caster
+ * montré** ? Un caster tu (condition du cast perdue, pas encore retiré) ne
+ * garde pas son lien contre un co-caster montré : il ne pourrait lui-même plus
+ * le changer (`assertShownCaster`).
  */
 async function showsOnStream(
   connection: PoolConnection,
   matchId: number,
-  streamId: number,
-  userId: number,
+  holderId: number,
+  casts: boolean,
   visibility: CastVisibility,
 ): Promise<boolean> {
-  const [rows] = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_casters WHERE match_id = ? AND stream_id = ? AND user_id = ? LIMIT 1`,
-    [matchId, streamId, userId],
-  );
-  if (rows.length === 0) return false;
+  if (!casts) return false;
   if (!visibility.beforeLaunch) return true;
-  const shown = await loadShownCasterIds(connection, matchId, [userId], visibility.game, true);
-  return shown.has(userId);
+  const shown = await loadShownCasterIds(connection, matchId, [holderId], visibility.game, true);
+  return shown.has(holderId);
 }
 
 /**

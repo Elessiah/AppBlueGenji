@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   canConfigureLive,
   firstStreamUrl,
+  parseOrganisationLink,
   parseStreamUrlInput,
   shownStreams,
   canToggleOnAir,
@@ -177,6 +178,23 @@ describe("isMatchLiveTrigger", () => {
       expect(MATCH_LIVE_TRIGGER_LABELS[trigger]).toBeTruthy();
     }
     expect(MATCH_LIVE_TRIGGERS).toHaveLength(3);
+  });
+});
+
+describe("parseOrganisationLink", () => {
+  it("parseOrganisationLink_absent_returnsFalse", () => {
+    expect(parseOrganisationLink(undefined)).toBe(false);
+  });
+
+  it("parseOrganisationLink_boolean_returnsItself", () => {
+    expect(parseOrganisationLink(true)).toBe(true);
+    expect(parseOrganisationLink(false)).toBe(false);
+  });
+
+  it("parseOrganisationLink_nonBoolean_returnsNull", () => {
+    expect(parseOrganisationLink("true")).toBeNull();
+    expect(parseOrganisationLink(1)).toBeNull();
+    expect(parseOrganisationLink(null)).toBeNull();
   });
 });
 

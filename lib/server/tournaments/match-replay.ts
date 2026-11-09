@@ -41,7 +41,9 @@ type MatchReplayRow = RowDataPacket & {
 async function castsShownOn(connection: PoolConnection, row: MatchReplayRow, userId: number): Promise<boolean> {
   const beforeLaunch = castBeforeLaunch(row);
   // Le jeu ne sert qu'à la condition du cast, jugée avant le lancement
-  // seulement : un match joué ou lancé ne le relit pas.
+  // seulement : un match joué ou lancé ne le relit pas. Il n'entre pas dans la
+  // lecture verrouillée du match (sous-requête) : sous MariaDB, un `FOR UPDATE`
+  // ne doit lire qu'une table.
   const game = beforeLaunch ? await tournamentGame(connection, Number(row.tournament_id)) : "OW";
   const shown = await loadShownCasterIds(connection, Number(row.id), [userId], game, beforeLaunch);
   return shown.has(userId);

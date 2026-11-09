@@ -286,6 +286,13 @@ function readCastRows(state: World, sql: string, params: unknown[]): unknown[] |
     );
     return [linked.map(() => ({ 1: 1 })), []];
   }
+  if (sql.includes("AS holder_casts")) {
+    const stream = (match?.streams ?? []).find((candidate) => candidate.id === Number(params[1]));
+    if (!stream) return [[], []];
+    const holderId = stream.link_user_id ?? null;
+    const casts = (match?.casters ?? []).some((caster) => caster.stream_id === stream.id && caster.user_id === holderId);
+    return [[{ link_user_id: holderId, holder_casts: casts ? 1 : 0 }], []];
+  }
   if (sql.startsWith("SELECT link_user_id FROM bg_match_streams WHERE id = ?")) {
     return [(match?.streams ?? []).filter((stream) => stream.id === Number(params[0])).map((stream) => ({ link_user_id: stream.link_user_id ?? null })), []];
   }

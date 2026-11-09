@@ -116,6 +116,17 @@ function announcesBody(req: Request): boolean {
 }
 
 /**
+ * Vrai si le corps est d'un autre type que JSON et peut ne pas être vide : un
+ * `Content-Type` non JSON sans `Content-Length: 0`, ou un corps annoncé non
+ * vide sans type JSON.
+ */
+function declaresForeignBody(req: Request): boolean {
+  const type = req.headers.get("content-type");
+  if (isJsonContentType(type)) return false;
+  return announcesBody(req) || (type !== null && req.headers.get("content-length")?.trim() !== "0");
+}
+
+/**
  * Corps JSON **facultatif** : un corps vide — `Content-Length: 0`, ou aucun
  * octet lu d'un envoi fragmenté ou HTTP/2 sans longueur — vaut `{}`, sans
  * exiger de `Content-Type` ; un corps non vide passe par les mêmes gardes que
@@ -129,8 +140,9 @@ export async function readOptionalJsonBody(
   maxBytes: number = JSON_BODY_MAX_BYTES,
 ): Promise<{ body: unknown } | { refusal: string }> {
   try {
-    // Un corps annoncé non vide d'un autre type est refusé sans être lu.
-    if (announcesBody(req) && !isJsonContentType(req.headers.get("content-type"))) {
+    // Un corps d'un autre type déclaré est refusé sans être lu — annoncé non
+    // vide, ou fragmenté sans longueur : seul un `Content-Length: 0` passe.
+    if (declaresForeignBody(req)) {
       throw new Error(UNSUPPORTED_CONTENT_TYPE);
     }
     const bytes = await readBodyBytes(req, maxBytes);

@@ -61,6 +61,17 @@ export const MATCH_LIVE_TRIGGER_LABELS: Record<MatchLiveTrigger, string> = {
 };
 
 /**
+ * Lit la clé `organisationLink` d'un corps (configuration du direct, réglages
+ * du caster) : absente vaut `false`, un booléen vaut lui-même, toute autre
+ * valeur (`"true"`, `1`, `null`…) est illisible (`null`, 400
+ * `INVALID_ORGANISATION_LINK`).
+ */
+export function parseOrganisationLink(value: unknown): boolean | null {
+  if (value === undefined) return false;
+  return typeof value === "boolean" ? value : null;
+}
+
+/**
  * Ce mode a-t-il besoin d'une date de début sur le match ?
  *
  * Seul `START_TIME` en dépend, et il en dépend totalement : sans date, il n'a

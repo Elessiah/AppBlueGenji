@@ -2,7 +2,7 @@ import { getCurrentUser, type AuthUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { setMatchLiveConfig, setMatchOnAir, StreamLinkError } from "@/lib/server/tournaments/live-streams";
 import { mayConfigureMatchLive, parseStreamLinks } from "@/lib/server/tournaments/live-access";
-import { isMatchLiveTrigger, type MatchLiveTrigger } from "@/lib/shared/live-streams";
+import { isMatchLiveTrigger, parseOrganisationLink, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import type { MatchStreamLinkEdit } from "@/lib/server/tournaments/live-streams";
 import { can } from "@/lib/shared/permissions";
 import { castOverseer } from "@/lib/shared/live-trigger-owner";
@@ -75,15 +75,14 @@ function parseMatchLiveBody(body: {
   if (body.liveUrl !== null && body.liveUrl !== undefined && typeof body.liveUrl !== "string") {
     return "INVALID_STREAM_URL";
   }
-  if (body.organisationLink !== undefined && typeof body.organisationLink !== "boolean") {
-    return "INVALID_ORGANISATION_LINK";
-  }
+  const organisationLink = parseOrganisationLink(body.organisationLink);
+  if (organisationLink === null) return "INVALID_ORGANISATION_LINK";
   const streamLinks = parseStreamLinks(body.streamLinks);
   if (streamLinks === null) return "INVALID_STREAM_LINKS";
   return {
     trigger,
     liveUrl: body.liveUrl as string | null | undefined,
-    organisationLink: body.organisationLink === true,
+    organisationLink,
     streamLinks,
   };
 }

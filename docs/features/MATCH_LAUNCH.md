@@ -362,8 +362,11 @@ match** : la provenance se *dit* (`MatchLiveSetter.asOrganisation`, champ
 `tournaments` ; jamais dite par un caster, 403 `STAFF_STREAM_FORBIDDEN` sur
 `…/caster`, décision D7 du 2026-11-09), elle ne se déduit
 plus de l'inscription (décision 48, EF-29). Un réglage du direct
-réenregistré avec le même lien ne change pas son fournisseur ; un lien neuf prend
-celui que dit celui qui le pose. Limite : un lien posé avant
+réenregistré avec le même lien ne change pas son fournisseur — sauf quand
+**son fournisseur lui-même** le dit désormais de l'organisation (case cochée) :
+seul le rattachement tombe (`planStaffStreamUrl`, plan `origin`), le lien ne
+partira plus avec son compte ; l'inverse passe par un lien neuf. Un lien neuf
+prend celui que dit celui qui le pose. Limite : un lien posé avant
 `link_user_id` (ancien `live_url`, migré en stream du staff) n'a pas de
 fournisseur connu — impossible à retrouver — et reste comme lien de
 l'organisation. Les liens posés avant EF-29 par un membre qui castait le match

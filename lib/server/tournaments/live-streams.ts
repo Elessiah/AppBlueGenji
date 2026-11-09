@@ -36,7 +36,7 @@ import type { MatchStatus, TournamentGame } from "@/lib/shared/types";
 import { loadRefereeStanding, loadShownCasterIds } from "./cast-eligibility";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { playsMatchSql } from "./match-players";
-import { hasStaffLink, lockMatchStreams, pruneMatchStreams, staffStream, type MatchStreamRow } from "./match-casters";
+import { hasStaffLink, lockMatchStreams, pruneMatchStreams, staffStream, streamLinkHolder, type MatchStreamRow } from "./match-casters";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
 import { invalidateSpectatorSnapshot } from "./snapshot";
 
@@ -459,7 +459,7 @@ async function writeStaffLink(
   const edited = new Set((config.streamLinks ?? []).map((link) => link.streamId));
   const before = known ?? (await lockMatchStreams(connection, matchId));
   // Décidé **avant** d'écrire : un refus n'a rien à défaire.
-  const plan = await planStaffStreamUrl(connection, matchId, url, config.setter.userId, before, edited);
+  const plan = await planStaffStreamUrl(connection, matchId, url, config.setter, before, edited);
   if (plan.kind === "none") return { streams: before, written: false };
   if (!actor.manages && !isMatchRefereeActor(hold, actor)) throw new Error("STAFF_STREAM_FORBIDDEN");
   if (hold.ownerId !== null && !mayChangeLiveTrigger(hold, actor)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
@@ -513,8 +513,11 @@ async function lockLiveMatch(
   };
 }
 
-/** Ce que la pose du lien du staff écrira : rien, le stream `id`, ou un stream neuf. */
-type StaffStreamPlan = { kind: "none" } | { kind: "update"; id: number } | { kind: "insert" };
+/**
+ * Ce que la pose du lien du staff écrira : rien, le stream `id`, un stream neuf,
+ * ou — lien inchangé — le seul rattachement du lien à l'organisation (`origin`).
+ */
+type StaffStreamPlan = { kind: "none" } | { kind: "update"; id: number } | { kind: "insert" } | { kind: "origin"; id: number };
 
 /**
  * Décide, **sans écrire**, où va le lien du stream du staff (`staffStream`).
@@ -531,13 +534,25 @@ async function planStaffStreamUrl(
   connection: PoolConnection,
   matchId: number,
   url: string | null,
-  setterId: number,
+  setter: MatchLiveSetter,
   streams: readonly MatchStreamRow[],
   casterOwned: ReadonlySet<number>,
 ): Promise<StaffStreamPlan> {
+  const setterId = setter.userId;
   const candidates = streams.filter((stream) => stream.staff || !casterOwned.has(stream.id));
   const staff = candidates.find((stream) => stream.staff);
-  if (staff) return staff.liveUrl === url ? { kind: "none" } : { kind: "update", id: staff.id };
+  if (staff) {
+    if (staff.liveUrl !== url) return { kind: "update", id: staff.id };
+    // Lien inchangé, que **son fournisseur** dit maintenant de l'organisation :
+    // seul son rattachement change (il ne partira plus avec son compte). Un
+    // autre membre qui réenregistre tel quel ne donne pas à l'organisation la
+    // chaîne d'autrui ; et l'inverse ne se dit pas — la case, décochée par
+    // défaut, ne distingue pas « le mien » de « rien dit ».
+    if (url !== null && setter.asOrganisation && (await streamLinkHolder(connection, staff.id)) === setter.userId) {
+      return { kind: "origin", id: staff.id };
+    }
+    return { kind: "none" };
+  }
   if (url === null) return { kind: "none" };
   if (!candidates.some((stream) => stream.liveUrl === null)) return { kind: "insert" };
   // Le premier stream sans lien qu'aucun autre ne tient — la règle partagée
@@ -570,6 +585,10 @@ async function applyStaffStreamPlan(
   streams: MatchStreamRow[],
   plan: Exclude<StaffStreamPlan, { kind: "none" }>,
 ): Promise<MatchStreamRow[]> {
+  if (plan.kind === "origin") {
+    await connection.execute(`UPDATE bg_match_streams SET link_user_id = NULL WHERE id = ? AND staff_owned = 1`, [plan.id]);
+    return streams;
+  }
   if (plan.kind === "update") {
     await connection.execute(
       `UPDATE bg_match_streams SET live_url = ?, staff_owned = 1, link_user_id = ? WHERE id = ?`,

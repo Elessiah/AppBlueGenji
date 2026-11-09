@@ -247,6 +247,35 @@ describe("readOptionalJsonBody — corps facultatif (ERREUR.txt EF-29 #528)", ()
     expect(req.bodyUsed).toBe(false);
   });
 
+  it("readOptionalJsonBody_chunkedBodyWithForeignType_refusedWithoutReading", async () => {
+    let pulls = 0;
+    const req = new Request("http://localhost/api/test", {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: new ReadableStream<Uint8Array>({
+        pull(controller) {
+          pulls += 1;
+          controller.enqueue(encode("{}"));
+          controller.close();
+        },
+      }),
+      duplex: "half",
+    } as RequestInit);
+
+    await expect(readOptionalJsonBody(req, "REFUS")).resolves.toEqual({ refusal: UNSUPPORTED_CONTENT_TYPE });
+    expect(req.bodyUsed).toBe(false);
+    expect(pulls).toBeLessThanOrEqual(1);
+  });
+
+  it("readOptionalJsonBody_foreignTypeWithZeroLength_returnsEmptyObject", async () => {
+    const req = new Request("http://localhost/api/test", {
+      method: "POST",
+      headers: { "content-type": "text/plain", "content-length": "0" },
+    });
+
+    await expect(readOptionalJsonBody(req, "REFUS")).resolves.toEqual({ body: {} });
+  });
+
   it("readOptionalJsonBody_tooLarge_returnsPayloadTooLarge", async () => {
     const req = new Request("http://localhost/api/test", {
       method: "POST",

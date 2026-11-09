@@ -776,21 +776,12 @@ describe("deleteOwnAccount — les matchs qui le nommaient sont rafraîchis", ()
     ]);
   });
 
-  it("deleteOwnAccount_committed_forgetsCachedRefereeNames", async () => {
-    const { connection } = fakeDb(EMPTY);
+  it("deleteOwnAccount_committed_keepsWholeRefereeNamesCache", async () => {
+    // Le retrait de l'arbitrage change la version des instantanés : la clé du
+    // cache change d'elle-même, rien n'est vidé pour tous les tournois.
+    fakeDb(EMPTY);
 
     await deleteOwnAccount(7);
-
-    expect(forgetRefereeNames).toHaveBeenCalledTimes(1);
-    expect(jest.mocked(forgetRefereeNames).mock.invocationCallOrder[0]).toBeGreaterThan(
-      connection.commit.mock.invocationCallOrder[0],
-    );
-  });
-
-  it("deleteOwnAccount_rolledBack_doesNotForgetNames", async () => {
-    fakeDb({ ...EMPTY, played: 1 }, { refereed: [{ matchId: 5, tournamentId: 3 }], failOn: "UPDATE bg_users SET pseudo" });
-
-    await expect(deleteOwnAccount(7)).rejects.toThrow();
 
     expect(forgetRefereeNames).not.toHaveBeenCalled();
   });

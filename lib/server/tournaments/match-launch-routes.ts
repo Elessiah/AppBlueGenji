@@ -1,7 +1,7 @@
 import { fail } from "@/lib/server/http";
 import { isContentionError } from "@/lib/server/mysql-errors";
 import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
-import { isMatchLiveTrigger } from "@/lib/shared/live-streams";
+import { isMatchLiveTrigger, parseOrganisationLink } from "@/lib/shared/live-streams";
 import type { CastSettings } from "./cast-settings";
 import type { CastTarget } from "./match-launch";
 
@@ -108,9 +108,8 @@ export function parseCastSettings(body: unknown): CastSettings | null {
  * route de la configuration du direct.
  */
 export function castOrganisationLinkRefusal(body: unknown): { code: string; status: number } | null {
-  if (typeof body !== "object" || body === null || !("organisationLink" in body)) return null;
-  const value = (body as { organisationLink: unknown }).organisationLink;
-  if (value === false) return null;
-  if (value === true) return { code: "STAFF_STREAM_FORBIDDEN", status: 403 };
-  return { code: "INVALID_ORGANISATION_LINK", status: 400 };
+  if (typeof body !== "object" || body === null) return null;
+  const value = parseOrganisationLink((body as { organisationLink?: unknown }).organisationLink);
+  if (value === null) return { code: "INVALID_ORGANISATION_LINK", status: 400 };
+  return value ? { code: "STAFF_STREAM_FORBIDDEN", status: 403 } : null;
 }
