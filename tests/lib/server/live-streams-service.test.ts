@@ -371,8 +371,13 @@ describe("setMatchLiveConfig", () => {
     await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/voix", setter: OWN_CHANNEL_5, access: STAFF });
     expect(world.state.streams).toEqual([{ ...dbStream(1, "https://twitch.tv/voix", true), link_user_id: 5 }]);
 
-    // Le même lien, réenregistré par l'organisation (mode changé) : il reste au membre.
-    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/voix", setter: ORGANISER_7, access: STAFF });
+    // Le même lien, dit de l'organisation par un autre (mode changé) : refusé, il reste au membre.
+    await expect(
+      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/voix", setter: ORGANISER_7, access: STAFF }),
+    ).rejects.toThrow("ORGANISATION_LINK_NOT_PROVIDER");
+    expect(world.state.streams).toEqual([{ ...dbStream(1, "https://twitch.tv/voix", true), link_user_id: 5 }]);
+    // Réenregistré case décochée : le mode change, le lien reste au membre.
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/voix", setter: { userId: 7, asOrganisation: false }, access: STAFF });
     expect(world.state.streams).toEqual([{ ...dbStream(1, "https://twitch.tv/voix", true), link_user_id: 5 }]);
 
     // Un autre lien, posé par l'organisation : c'est le sien.
@@ -401,13 +406,27 @@ describe("setMatchLiveConfig", () => {
     expect(outcome.changed).toBe(true);
   });
 
-  it("setMatchLiveConfig_otherMemberMarksUnchangedLinkAsOrganisation_keepsProvider", async () => {
+  it("setMatchLiveConfig_otherMemberMarksUnchangedLinkAsOrganisation_throwsAndKeepsProvider", async () => {
+    // La case cochée sur le lien d'autrui est refusée, jamais ignorée derrière un succès.
     const world = liveWorld(matchRow({ live_trigger: "MANUAL" }), [{ ...dbStream(1, "https://twitch.tv/voix", true), link_user_id: 5 }]);
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/voix", setter: ORGANISER_7, access: STAFF });
+    await expect(
+      setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/voix", setter: ORGANISER_7, access: STAFF }),
+    ).rejects.toThrow("ORGANISATION_LINK_NOT_PROVIDER");
 
     expect(world.state.streams).toEqual([{ ...dbStream(1, "https://twitch.tv/voix", true), link_user_id: 5 }]);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchLiveConfig_memberMarksUnchangedOrganisationLinkAsOrganisation_changesNothing", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL" }), [dbStream(1, "https://twitch.tv/bluegenji", true)]);
+    await mockLiveDb(world);
+
+    const outcome = await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/bluegenji", setter: ORGANISER_7, access: STAFF });
+
+    expect(outcome.changed).toBe(false);
+    expect(world.state.streams).toEqual([dbStream(1, "https://twitch.tv/bluegenji", true)]);
   });
 
   it("setMatchLiveConfig_unchangedOrganisationLinkSavedAsOwnChannel_readsNoProvider", async () => {
@@ -437,7 +456,7 @@ describe("setMatchLiveConfig", () => {
     await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/arbitre", setter: OWN_CHANNEL_5, access: STAFF });
     expect(world.state.streams).toEqual([{ ...dbStream(3, "https://twitch.tv/arbitre", true), link_user_id: 5 }]);
 
-    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/arbitre", setter: ORGANISER_7, access: STAFF });
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/arbitre", setter: { userId: 7, asOrganisation: false }, access: STAFF });
     expect(world.state.streams).toEqual([{ ...dbStream(3, "https://twitch.tv/arbitre", true), link_user_id: 5 }]);
   });
 

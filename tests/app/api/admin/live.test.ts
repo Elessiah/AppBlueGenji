@@ -289,6 +289,19 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     await expect(res.json()).resolves.toMatchObject({ error: "STAFF_STREAM_FORBIDDEN" });
   });
 
+  it("PUT_memberMarksOthersUnchangedLinkAsOrganisation_returns409", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchLiveConfig).mockRejectedValue(new Error("ORGANISATION_LINK_NOT_PROVIDER"));
+
+    const res = await putMatchLive(
+      matchReq("PUT", { trigger: "AUTO", liveUrl: "twitch.tv/x", organisationLink: true }),
+      matchParams("42"),
+    );
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ error: "ORGANISATION_LINK_NOT_PROVIDER" });
+  });
+
   it("PUT_coCasterChangesTrigger_returns403", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     jest.mocked(setMatchLiveConfig).mockRejectedValue(new Error("LIVE_TRIGGER_NOT_OWNED"));

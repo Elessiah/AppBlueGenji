@@ -210,28 +210,28 @@ describe("forgetRefereeNames", () => {
 });
 
 describe("forgetRefereeNamesOf", () => {
-  it("forgetRefereeNamesOf_refereesShownMatch_invalidatesPrefix", async () => {
-    connection.query.mockResolvedValue([[{ 1: 1 }]]);
+  it("forgetRefereeNamesOf_refereesShownMatches_invalidatesOnlyTheirTournaments", async () => {
+    connection.query.mockResolvedValue([[{ tournament_id: 7 }, { tournament_id: 9 }]]);
 
-    await forgetRefereeNamesOf(9);
+    await forgetRefereeNamesOf(4);
 
-    expect(connection.query).toHaveBeenCalledWith(expect.stringContaining("referee_user_id = ? AND status IN ('PENDING', 'READY')"), [9]);
-    expect(invalidateCachedPrefix).toHaveBeenCalledWith("referee-names:");
+    expect(connection.query).toHaveBeenCalledWith(expect.stringContaining("referee_user_id = ? AND status IN ('PENDING', 'READY')"), [4]);
+    expect(jest.mocked(invalidateCachedPrefix).mock.calls).toEqual([["referee-names:7:"], ["referee-names:9:"]]);
   });
 
   it("forgetRefereeNamesOf_refereesNothingShown_keepsCache", async () => {
     connection.query.mockResolvedValue([[]]);
 
-    await forgetRefereeNamesOf(9);
+    await forgetRefereeNamesOf(4);
 
     expect(invalidateCachedPrefix).not.toHaveBeenCalled();
   });
 
-  it("forgetRefereeNamesOf_readFails_invalidatesAnyway", async () => {
+  it("forgetRefereeNamesOf_readFails_invalidatesWholeCache", async () => {
     const errorLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
     connection.query.mockRejectedValue(new Error("ECONNRESET"));
 
-    await forgetRefereeNamesOf(9);
+    await forgetRefereeNamesOf(4);
 
     expect(invalidateCachedPrefix).toHaveBeenCalledWith("referee-names:");
     errorLog.mockRestore();

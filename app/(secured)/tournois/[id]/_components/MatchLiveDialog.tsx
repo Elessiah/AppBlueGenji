@@ -337,7 +337,7 @@ export function casterStreamsOf(
 type LiveField = "url" | "streamed" | `caster-${number}`;
 
 /** Refus sans stream désigné : le lien du staff, ou la case « casté » d'un match qui ne l'est plus. */
-const LIVE_FIELD_ERRORS = { INVALID_STREAM_URL: "url", MATCH_NOT_STREAMED: "streamed" } as const;
+const LIVE_FIELD_ERRORS = { INVALID_STREAM_URL: "url", ORGANISATION_LINK_NOT_PROVIDER: "url", MATCH_NOT_STREAMED: "streamed" } as const;
 
 const URL_INPUT_ID = "match-live-url";
 const STREAMED_INPUT_ID = "match-live-streamed";

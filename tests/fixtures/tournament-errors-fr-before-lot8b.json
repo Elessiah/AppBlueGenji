@@ -1,5 +1,5 @@
 {
-  "count": 212,
+  "count": 213,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "ADMIN_RESOLVE_FAILED": "Erreur lors de la résolution du match.",
@@ -180,6 +180,7 @@
     "SEEDING_REORDER_FAILED": "Erreur lors de l'enregistrement du nouvel ordre.",
     "SOLO_ENTRY_NAME_UNAVAILABLE": "Ton pseudo est déjà utilisé comme nom d'équipe : change-le avant de t'inscrire.",
     "STAFF_STREAM_FORBIDDEN": "Le lien de l'organisation ne se règle que par son staff : le tien se règle dans « Configurer ma diffusion ».",
+    "ORGANISATION_LINK_NOT_PROVIDER": "Ce lien est celui d'un autre membre : lui seul peut le dire de l'organisation. Saisis le lien de l'organisation pour le remplacer.",
     "STREAM_NOT_FOUND": "Ce stream n'existe plus sur ce match : choisis-en un autre.",
     "STREAM_URL_REQUIRED": "Le lien de ta chaîne est obligatoire pour ouvrir ton propre stream : sans lien, il n'apparaîtrait nulle part.",
     "TEAM_ALREADY_DELETED": "Cet engagé a été dissous.",

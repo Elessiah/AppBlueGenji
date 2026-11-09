@@ -119,26 +119,26 @@ export function forgetRefereeNames(): void {
 }
 
 /**
- * Oublie les pseudos d'arbitre en cache **si ce compte arbitre un match dont
- * le nom se montre** (score pas encore déclaré, `showsRefereeName`) : un
- * joueur qui se renomme ne vide pas le cache de tous les tournois. Une lecture
- * indexée (`idx_bg_matches_referee`) ; si elle échoue, le cache est oublié
- * quand même — un ancien pseudo n'est jamais servi faute de l'avoir lue.
+ * Oublie les pseudos d'arbitre en cache **des seuls tournois où ce compte
+ * arbitre un match dont le nom se montre** (score pas encore déclaré,
+ * `showsRefereeName`) : un joueur qui se renomme ne vide rien, un arbitre ne
+ * vide que ses tournois. Une lecture indexée (`idx_bg_matches_referee`) ; si
+ * elle échoue, tout le cache est oublié — un ancien pseudo n'est jamais servi
+ * faute de l'avoir lue.
  */
 export async function forgetRefereeNamesOf(userId: number): Promise<void> {
   try {
-    const referees = await withConnection(async (connection) => {
+    await withConnection(async (connection) => {
       const [found] = await connection.query<RowDataPacket[]>(
-        `SELECT 1 FROM bg_matches WHERE referee_user_id = ? AND status IN ('PENDING', 'READY') LIMIT 1`,
+        `SELECT DISTINCT tournament_id FROM bg_matches WHERE referee_user_id = ? AND status IN ('PENDING', 'READY')`,
         [userId],
       );
-      return found.length > 0;
+      for (const row of found) invalidateCachedPrefix(`${REFEREE_NAMES_CACHE_PREFIX}${Number(row.tournament_id)}:`);
     });
-    if (!referees) return;
   } catch (error) {
     console.error("[referee-names] lecture des matchs arbitrés impossible", error);
+    forgetRefereeNames();
   }
-  forgetRefereeNames();
 }
 
 type RefereeNameRow = RowDataPacket & { id: number; referee_user_id: number; pseudo: string };

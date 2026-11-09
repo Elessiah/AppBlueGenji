@@ -250,7 +250,7 @@ function assertConfigurable(row: MatchLiveRow, trigger: MatchLiveTrigger | null,
  * @throws `MATCH_NOT_FOUND` | `INVALID_LIVE_TRIGGER` | `INVALID_STREAM_URL`
  *         | `MATCH_START_AT_REQUIRED` | `MATCH_NOT_CASTABLE` | `NOT_MATCH_REFEREE`
  *         | `LIVE_TRIGGER_NOT_OWNED` | `STREAM_NOT_FOUND` (`StreamLinkError`)
- *         | `STAFF_STREAM_FORBIDDEN` | `MATCH_NOT_STREAMED`
+ *         | `STAFF_STREAM_FORBIDDEN` | `MATCH_NOT_STREAMED` | `ORGANISATION_LINK_NOT_PROVIDER`
  */
 export async function setMatchLiveConfig(
   matchId: number,
@@ -301,12 +301,12 @@ export async function setMatchLiveConfig(
       const { row: current, hold, actorShown } = await lockLiveMatch(connection, matchId, actor);
       // Le rôle d'abord : un appelant sans droit reçoit son refus, jamais
       // celui du mode (`MATCH_NOT_STREAMED`) que `lockedTrigger` jugerait.
-      assertLiveActor(hold, actor, config.access.live, actorShown);
+      const referee = assertLiveActor(hold, actor, config.access.live, actorShown);
       const trigger = lockedTrigger(config, hold);
       const url = parseStreamUrlInput(trigger === null ? null : (config.liveUrl ?? null));
       const triggerChanges = assertLiveConfigAllowed(current, hold, actor, trigger, {
         editsStreamLinks,
-        live: config.access.live,
+        referee,
         actorShown,
         keepsMode,
       });
@@ -549,11 +549,14 @@ async function planStaffStreamUrl(
     if (staff.liveUrl !== url) return { kind: "update", id: staff.id };
     // Lien inchangé, que **son fournisseur** dit maintenant de l'organisation :
     // seul son rattachement change (il ne partira plus avec son compte). Un
-    // autre membre qui réenregistre tel quel ne donne pas à l'organisation la
-    // chaîne d'autrui ; et l'inverse ne se dit pas — la case, décochée par
+    // autre membre ne donne pas à l'organisation la chaîne d'autrui : la case
+    // cochée est refusée (`ORGANISATION_LINK_NOT_PROVIDER`), jamais ignorée
+    // derrière un succès. L'inverse ne se dit pas — la case, décochée par
     // défaut, ne distingue pas « le mien » de « rien dit ».
-    if (url !== null && setter.asOrganisation && (await streamLinkHolder(connection, matchId, staff.id)).userId === setter.userId) {
-      return { kind: "origin", id: staff.id };
+    if (url !== null && setter.asOrganisation) {
+      const holder = (await streamLinkHolder(connection, matchId, staff.id)).userId;
+      if (holder === setter.userId) return { kind: "origin", id: staff.id };
+      if (holder !== null) throw new Error("ORGANISATION_LINK_NOT_PROVIDER");
     }
     return { kind: "none" };
   }
@@ -699,12 +702,11 @@ function assertLiveConfigAllowed(
   trigger: MatchLiveTrigger | null,
   {
     editsStreamLinks,
-    live,
+    referee,
     actorShown,
     keepsMode,
-  }: { editsStreamLinks: boolean; live: boolean; actorShown: boolean; keepsMode: boolean },
+  }: { editsStreamLinks: boolean; referee: boolean; actorShown: boolean; keepsMode: boolean },
 ): boolean {
-  const referee = assertLiveActor(hold, actor, live, actorShown);
   assertConfigurable(current, trigger, keepsMode);
   const triggerChanges = trigger !== hold.trigger;
   if (triggerChanges && !mayChangeLiveTrigger(hold, actor, actorShown)) throw new Error("LIVE_TRIGGER_NOT_OWNED");

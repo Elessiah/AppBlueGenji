@@ -238,8 +238,10 @@ export async function setCasterStreamUrl(
   // configuration du direct).
   if (target.liveUrl !== null) {
     const holder = await streamLinkHolder(connection, matchId, streamId);
-    if (holder.userId === null ? !manages : holder.userId !== linkUserId && (await showsOnStream(connection, matchId, holder.userId, holder.casts, visibility))) {
-      throw new Error(holder.userId === null ? "CAST_STREAM_NOT_OWNED" : "CAST_STREAM_LINK_HELD");
+    if (holder.userId === null) {
+      if (!manages) throw new Error("CAST_STREAM_NOT_OWNED");
+    } else if (holder.userId !== linkUserId && (await showsOnStream(connection, matchId, holder.userId, holder.casts, visibility))) {
+      throw new Error("CAST_STREAM_LINK_HELD");
     }
   }
   await connection.execute(

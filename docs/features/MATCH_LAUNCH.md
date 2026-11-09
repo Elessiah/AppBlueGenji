@@ -365,7 +365,9 @@ plus de l'inscription (décision 48, EF-29). Un réglage du direct
 réenregistré avec le même lien ne change pas son fournisseur — sauf quand
 **son fournisseur lui-même** le dit désormais de l'organisation (case cochée) :
 seul le rattachement tombe (`planStaffStreamUrl`, plan `origin`), le lien ne
-partira plus avec son compte ; l'inverse passe par un lien neuf. Un lien neuf
+partira plus avec son compte ; un autre membre qui coche la case sur ce lien
+inchangé est refusé (409 `ORGANISATION_LINK_NOT_PROVIDER`, jamais ignoré derrière
+un succès) ; l'inverse passe par un lien neuf. Un lien neuf
 prend celui que dit celui qui le pose. Limite : un lien posé avant
 `link_user_id` (ancien `live_url`, migré en stream du staff) n'a pas de
 fournisseur connu — impossible à retrouver — et reste comme lien de
