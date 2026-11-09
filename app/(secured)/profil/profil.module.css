@@ -617,4 +617,6 @@
 .rowAction {
   padding: 4px 12px;
   font-size: 12px;
+  /* Cible tactile d'au moins 24 px (WCAG 2.5.8), côte à côte sur 375 px. */
+  min-height: 28px;
 }

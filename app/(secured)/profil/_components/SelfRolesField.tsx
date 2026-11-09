@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Coche } from "@/components/Coche";
 import { useProfileText, type ProfileText } from "@/components/i18n/profile-text";
 import { useLocaleRouter } from "@/components/i18n/locale-navigation";
@@ -87,6 +87,8 @@ export function SelfRolesField({
   const [selected, setSelected] = useState<PlatformRole[]>(() => [...roles]);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<PlatformRoleChange | null>(null);
+  // Une case verrouillée tapée en rafale ne doit pas empiler la même notification.
+  const lastLockedNotice = useRef(0);
 
   // Resynchronise la sélection quand les rôles **enregistrés** changent — sur
   // leur contenu, pas sur l'identité du tableau : toute autre mise à jour du
@@ -102,7 +104,11 @@ export function SelfRolesField({
     if (role === "ADMIN") {
       // La case reste cochée : au toucher, il n'y a ni curseur « interdit » ni « i » ouvert,
       // donc le geste refusé dit sa raison.
-      showError(t("platformRoles.adminLocked"));
+      const now = Date.now();
+      if (now - lastLockedNotice.current > 3000) {
+        lastLockedNotice.current = now;
+        showError(t("platformRoles.adminLocked"));
+      }
       return;
     }
     // Une erreur rattachée à la case Administrateur ne survit pas à un nouveau choix.

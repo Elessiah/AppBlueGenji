@@ -399,10 +399,10 @@
     "blizzardBadge": "Your player page marks it with a “Verified BattleTag” badge, even when hidden (without showing it).",
     "battletagPointer": "Enter my BattleTag",
     "loadFailed": "Your linked accounts could not be read.",
-    "retry": "Try again",
     "retryLabel": "Try again to read my linked accounts",
     "reading": "Reading…",
-    "battletagPointerMissing": "The “Overwatch BattleTag” field is not shown yet: try again in a moment."
+    "battletagPointerMissing": "The “Overwatch BattleTag” field is not shown yet: try again in a moment.",
+    "discordRowRetryLabel": "Try again (Discord status, accounts list)"
   },
   "battletagNotice": {
     "eyebrow": "VISIBILITY · BATTLETAG",

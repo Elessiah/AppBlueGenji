@@ -98,14 +98,15 @@ describe("lecture en panne", () => {
 
   it("connectedApps_listFailed_saysItAndOffersRetry", () => {
     const html = render(null, IDENTITY, true);
-    expect(html).toContain("Tes comptes liés n&#x27;ont pas pu être lus.");
-    expect(html).toContain('aria-label="Réessayer de lire mes comptes liés"');
+    // Pas de phrase d'erreur en ligne (notification) : le bouton porte le texte visible.
+    expect(html).not.toContain("n&#x27;ont pas pu être lus");
+    expect(html).toContain("Réessayer de lire mes comptes liés");
     expect(html).not.toContain("Chargement…");
   });
 
   it("connectedApps_discordReadFailed_rowOffersRetry", () => {
     const html = render([google, discord(true)], { ...IDENTITY, discordKnown: false, discordReadFailed: true });
-    expect(html).toContain('aria-label="Réessayer la lecture de l&#x27;état Discord"');
+    expect(html).toContain('aria-label="Réessayer la lecture de l&#x27;état Discord (liste des comptes)"');
   });
 
   it("connectedApps_discordReading_retryIsAriaDisabledAndLabelled", () => {
@@ -190,8 +191,8 @@ describe("vocabulaire Lier / Lié", () => {
     const keys = [
       ["connections", "battletagPointer"],
       ["connections", "loadFailed"],
-      ["connections", "retry"],
       ["connections", "retryLabel"],
+      ["connections", "discordRowRetryLabel"],
       ["connections", "reading"],
       ["connections", "sessions", "nothingToClose"],
       ["discord", "readFailed"],
@@ -235,6 +236,7 @@ describe("gestes refusés et reliquats du profil", () => {
     expect(src).toContain('showError(t("invitations.gone"))');
     expect(src).toContain("invitationsLoaded");
     expect(src).toContain('showError(t("invitations.loadFailed"))');
+    expect(src).not.toContain('window.location.hash === "#invitations") showError');
   });
 
   it("roleChangeTone_grantedAdminOrRemoved_isDanger", () => {

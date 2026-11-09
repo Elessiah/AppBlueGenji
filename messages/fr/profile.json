@@ -399,10 +399,10 @@
     "blizzardBadge": "Ta fiche le signale par une pastille « BattleTag vérifié », même masqué (sans le montrer).",
     "battletagPointer": "Saisir mon BattleTag",
     "loadFailed": "Tes comptes liés n'ont pas pu être lus.",
-    "retry": "Réessayer",
     "retryLabel": "Réessayer de lire mes comptes liés",
     "reading": "Lecture…",
-    "battletagPointerMissing": "Le champ « BattleTag Overwatch » n'est pas encore affiché : réessaie dans un instant."
+    "battletagPointerMissing": "Le champ « BattleTag Overwatch » n'est pas encore affiché : réessaie dans un instant.",
+    "discordRowRetryLabel": "Réessayer la lecture de l'état Discord (liste des comptes)"
   },
   "battletagNotice": {
     "eyebrow": "VISIBILITÉ · BATTLETAG",

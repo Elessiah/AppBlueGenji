@@ -547,7 +547,7 @@ function DiscordRetryButton({
       className={`btn ${s.rowAction}`}
       onClick={() => !identity.discordReading && identity.onRetryDiscord()}
       aria-disabled={identity.discordReading || undefined}
-      aria-label={busyAriaLabel(identity.discordReading, t("discord.retryLabel"))}
+      aria-label={busyAriaLabel(identity.discordReading, t("connections.discordRowRetryLabel"))}
       aria-describedby={detailsId}
     >
       {identity.discordReading ? t("discord.reading") : t("discord.retry")}
@@ -581,7 +581,8 @@ function BattletagPointer({
 /** Amène le lecteur au champ « BattleTag Overwatch » de la section, sous la liste. */
 function focusBattletagField(): boolean {
   const field = document.getElementById("profile-battletag");
-  if (!field) return false;
+  // Absent, désactivé ou caché : le geste ne mènerait nulle part, et le dit.
+  if (!(field instanceof HTMLInputElement) || field.disabled || !field.offsetParent) return false;
   field.scrollIntoView({ block: "center" });
   field.focus();
   return true;
@@ -612,18 +613,14 @@ function ConnectionsUnread({
   };
   return (
     <div className={s.actionsRow}>
-      <p id="connections-load-failed" className={s.hint}>
-        {t("connections.loadFailed")}
-      </p>
+      {/* Pas de phrase d'erreur en ligne : la panne est dite par notification (hook). */}
       <button
         type="button"
         className={`btn ${s.rowAction}`}
         onClick={() => void retry()}
         aria-disabled={retrying || undefined}
-        aria-label={busyAriaLabel(retrying, t("connections.retryLabel"))}
-        aria-describedby="connections-load-failed"
       >
-        {retrying ? t("connections.reading") : t("connections.retry")}
+        {retrying ? t("connections.reading") : t("connections.retryLabel")}
       </button>
     </div>
   );

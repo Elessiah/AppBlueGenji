@@ -310,7 +310,7 @@ export function suspendedLoginMessage(endsAt: string | null | undefined): string
   const date = endsAt ? new Date(endsAt) : null;
   const span = date && !Number.isNaN(date.getTime()) ? suspensionSpan(date) : "pour une durée indéterminée";
   return (
-    `Ce compte est suspendu ${span}. Le motif t'a été envoyé en message privé Discord si ton compte y est rattaché. ` +
+    `Ce compte est suspendu ${span}. Le motif t'a été envoyé en message privé Discord si ton compte y est lié. ` +
     `Pour contester : ${suspensionContestText(null)} — puis, le cas échéant, le juge compétent.`
   );
 }
