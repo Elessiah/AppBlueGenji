@@ -132,7 +132,8 @@ BO 5 à égalités ouvertes sans format de play-offs propre (« 6ᵉ map »).
 - **Instantané** : `mapRules.tiebreaks` (liste séparée de `mapRules.rounds`, dont
   le sens ne change pas), filtrée par l'éligibilité courante
   (`applicableTiebreaks`) : un format changé depuis masque le réglage sans
-  l'effacer. Ces réglages inactifs restent portés par l'instantané
+  l'effacer (l'ouverture à tous les formats, TIEBREAK-ALL, réactive d'elle-même un
+  réglage resté d'un ancien Bo3 sur un tour de play-offs passé en BO 5 / FT 3). Ces réglages inactifs restent portés par l'instantané
   (`mapRules.staleTiebreaks`, champ omis quand il n'y en a pas) : `RoundMapsDialog` les liste (« Maps de départage
   inactives ») avec un bouton « Retirer » (retirer est permis sur toute clé).
 - **Écran** : section « Map de départage » de `RoundMapsDialog` (formulaire à

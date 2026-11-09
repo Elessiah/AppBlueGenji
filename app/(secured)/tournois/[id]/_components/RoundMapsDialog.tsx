@@ -368,7 +368,7 @@ const MapNamesDatalist = memo(function MapNamesDatalist({ id }: Readonly<{ id: s
 
 /**
  * Map de départage d'un tour de play-offs à format défini : une carte,
- * imposée, jouée seulement si la série est à égalité après les trois maps.
+ * imposée, jouée en map N + 1 seulement si la série est à égalité après les N maps.
  * Un champ (liste d'Overwatch suggérée, saisie libre), « Enregistrer » et
  * « Retirer ». Suit le serveur tant que le champ n'a pas été modifié.
  */

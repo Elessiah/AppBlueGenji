@@ -502,8 +502,8 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     // Cartes par manche et règles de ban, dans l'instantané commun : flux et
     // REST de secours les portent ensemble (`docs/features/ROUND_MAPS.md`).
     const storedMapRules = await loadMapRules(connection, tournamentId, tournament);
-    // Map de départage : celles des seuls tours éligibles (play-offs en vrai
-    // best of 3) — un réglage resté d'un format changé depuis n'est pas montré.
+    // Map de départage : celles des seuls tours éligibles (play-offs à format
+    // défini) — un réglage resté d'un format changé depuis n'est pas montré.
     const activeTiebreaks = applicableTiebreaks(storedMapRules.tiebreaks, {
       format: card.format,
       matchFormat: card.matchFormat,

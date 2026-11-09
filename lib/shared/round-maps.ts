@@ -91,8 +91,8 @@ export type TournamentMapRules = {
   rounds: RoundMapConfig[];
   /**
    * Map de départage des tours de play-offs à format défini (une par tour au
-   * plus, imposée) : jouée seulement si la série est à égalité après les trois
-   * maps régulières. L'instantané ne porte que celles de tours **éligibles**
+   * plus, imposée) : jouée en map N + 1 seulement si la série est à égalité
+   * après les N maps régulières. L'instantané ne porte que celles de tours **éligibles**
    * (`applicableTiebreaks`, `round-plan.ts`).
    */
   tiebreaks: RoundTiebreak[];
