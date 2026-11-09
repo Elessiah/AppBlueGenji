@@ -57,15 +57,6 @@ export async function replayAccountDeletions(
     alreadyPending: 0,
     failed: 0,
   };
-  const counters: Record<ReplayDecision, keyof ReplayReport> = {
-    REPLAY: "replayed",
-    ABSENT: "absent",
-    ALREADY_DELETED: "alreadyDeleted",
-    OTHER_ACCOUNT: "otherAccount",
-    REACTIVATE: "reactivated",
-    ALREADY_ACTIVE: "alreadyActive",
-    REDATE: "replayed",
-  };
 
   // Séquentiel : chaque suppression prend le verrou de sa ligne et ouvre sa
   // transaction, rien ne presse, et l'ordre du journal est celui des faits.
@@ -73,13 +64,16 @@ export async function replayAccountDeletions(
     const restored = await readRestoredRow(db, entry.userId);
     const decision = replayDecision(entry, restored);
 
-    if (await handleStateDecision(db, decision, entry, restored, report, log, options.dryRun === true)) continue;
-
+    if (decision === "REACTIVATE") {
+      await handleReactivation(entry, report, log, options.dryRun === true);
+      continue;
+    }
+    if (decision === "REDATE") {
+      await handleRedate(db, entry, restored, report, log, options.dryRun === true);
+      continue;
+    }
     if (decision !== "REPLAY") {
-      report[counters[decision]] += 1;
-      if (decision === "OTHER_ACCOUNT") {
-        log(`  ≠ #${entry.userId} — identifiant réattribué à un autre compte, laissé intact`);
-      }
+      countDecision(decision, entry, report, log);
       continue;
     }
 
@@ -97,6 +91,33 @@ export async function replayAccountDeletions(
   }
 
   return report;
+}
+
+/** Décisions comptées telles quelles, sans écriture. */
+type CountedDecision = Exclude<ReplayDecision, "REPLAY" | "REACTIVATE" | "REDATE">;
+
+/** Les décisions qui ne font que se compter ; les autres ont leur traitement. */
+const COUNTERS: Record<CountedDecision, keyof ReplayReport> = {
+  ABSENT: "absent",
+  ALREADY_DELETED: "alreadyDeleted",
+  OTHER_ACCOUNT: "otherAccount",
+  ALREADY_ACTIVE: "alreadyActive",
+  SUPERSEDED: "superseded",
+};
+
+/** Compte une décision sans écriture, et dit celles qu'un exploitant doit voir. */
+function countDecision(
+  decision: CountedDecision,
+  entry: AccountDeletionEntry,
+  report: ReplayReport,
+  log: (line: string) => void,
+): void {
+  report[COUNTERS[decision]] += 1;
+  if (decision === "OTHER_ACCOUNT") {
+    log(`  ≠ #${entry.userId} — identifiant réattribué à un autre compte, laissé intact`);
+  } else if (decision === "SUPERSEDED") {
+    log(`  = #${entry.userId} — demande postérieure à la réactivation, laissée en place`);
+  }
 }
 
 /** L'état du compte dans la base restaurée, ou `null` s'il n'y figure pas. */
@@ -137,25 +158,22 @@ async function handleReactivation(
   log(`  · #${entry.userId} — réactivé le ${entry.deletedAt}, à réactiver (au plus, selon l'état relu sous verrou)`);
 }
 
-/** Réactivation ou demande à redater : traitée ici (`true`), sinon laissée au rejeu ordinaire. */
-async function handleStateDecision(
-  db: Awaited<ReturnType<typeof getDatabase>>,
-  decision: ReplayDecision,
-  entry: AccountDeletionEntry,
-  restored: RestoredAccountRow | null,
-  report: ReplayReport,
-  log: (line: string) => void,
-  dryRun: boolean,
-): Promise<boolean> {
-  if (decision === "REACTIVATE") {
-    await handleReactivation(entry, report, log, dryRun);
-    return true;
-  }
-  if (decision === "REDATE") {
-    await handleRedate(db, entry, restored, report, log, dryRun);
-    return true;
-  }
-  return false;
+/**
+ * Ce que le rejeu d'une demande à redater fera — **une seule** règle pour le
+ * vrai passage et la simulation. La redate ne va que vers l'avant (la plus
+ * récente des deux demandes tient, comparée à la seconde) ; la suppression
+ * définitive suit si la fenêtre de **cette** demande est close (relue ensuite
+ * sous verrou par `finalizeAccountDeletion`).
+ */
+export function redatePlan(
+  journalAt: Date,
+  restoredAt: string | null,
+  now: number = Date.now(),
+): { redate: boolean; finalize: boolean } {
+  const restored = restoredAt === null ? Number.NaN : new Date(restoredAt).getTime();
+  const restoredNewer = Number.isFinite(restored) && restored >= journalAt.getTime();
+  const effective = restoredNewer ? new Date(restored) : journalAt;
+  return { redate: !restoredNewer, finalize: !isReactivationWindowOpen(effective, now) };
 }
 
 /**
@@ -176,9 +194,9 @@ async function handleRedate(
   dryRun: boolean,
 ): Promise<void> {
   const requestedAt = toWholeSecond(new Date(entry.deletedAt));
-  const windowOpen = isReactivationWindowOpen(entry.deletedAt);
+  const plan = redatePlan(requestedAt, restored?.deletionRequestedAt ?? null);
   if (dryRun) {
-    simulateRedate(entry, restored, requestedAt, windowOpen, report, log);
+    simulateRedate(entry, plan, report, log);
     return;
   }
   try {
@@ -189,11 +207,11 @@ async function handleRedate(
       [requestedAt, entry.userId, entry.accountCreatedAt, requestedAt],
     );
     const redated = Number(result.affectedRows) === 1;
-    if (!windowOpen) {
-      const plan = await finalizeAccountDeletion(entry.userId, { accountCreatedAt: entry.accountCreatedAt });
-      if (plan) {
+    if (plan.finalize) {
+      const finalized = await finalizeAccountDeletion(entry.userId, { accountCreatedAt: entry.accountCreatedAt });
+      if (finalized) {
         report.replayed += 1;
-        log(`  ✓ #${entry.userId} — ${plan.mode === "ERASE" ? "effacé" : "anonymisé"} (fenêtre close)`);
+        log(`  ✓ #${entry.userId} — ${finalized.mode === "ERASE" ? "effacé" : "anonymisé"} (fenêtre close)`);
         return;
       }
     }
@@ -209,27 +227,19 @@ async function handleRedate(
   }
 }
 
-/** `handleRedate` en simulation : compte et dit, sans rien écrire. */
+/** `handleRedate` en simulation : compte et dit, sans rien écrire (`redatePlan`). */
 function simulateRedate(
   entry: AccountDeletionEntry,
-  restored: RestoredAccountRow | null,
-  requestedAt: Date,
-  windowOpen: boolean,
+  plan: { redate: boolean; finalize: boolean },
   report: ReplayReport,
   log: (line: string) => void,
 ): void {
-  // Même partage que le vrai passage : la demande retenue est la plus récente
-  // des deux (la redate ne va que vers l'avant) ; la finalisation ne tombe que
-  // si **sa** fenêtre est close, sinon elle n'est redatée que si plus ancienne.
-  const restoredAt = restored?.deletionRequestedAt ? new Date(restored.deletionRequestedAt).getTime() : Number.NaN;
-  const restoredNewer = Number.isFinite(restoredAt) && restoredAt >= requestedAt.getTime();
-  const effectiveOpen = restoredNewer ? isReactivationWindowOpen(new Date(restoredAt)) : windowOpen;
-  if (!effectiveOpen) {
+  if (plan.finalize) {
     report.replayed += 1;
     log(`  · #${entry.userId} — serait supprimé (demande du ${entry.deletedAt}, fenêtre close)`);
     return;
   }
-  if (restoredNewer) {
+  if (!plan.redate) {
     report.alreadyPending += 1;
     return;
   }

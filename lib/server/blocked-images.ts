@@ -90,16 +90,37 @@ export async function blockImageHashes(
  * (décision D6) — à appeler **après** le commit qui les retire et **avant**
  * l'`unlink` : le fichier doit encore se lire. Hors transaction, sans verrou :
  * chaque empreinte est une insertion autonome. **Ne lève jamais** : la
- * suppression est faite, un échec ici ne la défait pas et se consigne.
+ * suppression est faite, un échec ici ne la défait pas. L'insertion est
+ * retentée une fois ; si elle échoue encore, les empreintes elles-mêmes sont
+ * consignées (pm2) — le fichier part juste après et elles ne se recalculeraient
+ * plus —, pour qu'un exploitant les pose à la main. Une empreinte n'identifie
+ * personne.
  */
 export async function blockRemovedImageFiles(absolutePaths: readonly string[]): Promise<void> {
   if (absolutePaths.length === 0) return;
+  let hashes: string[];
   try {
-    const hashes = await hashImageFiles(absolutePaths);
-    if (hashes.length === 0) return;
-    const db = await getDatabase();
-    await blockImageHashes(db, hashes);
+    hashes = await hashImageFiles(absolutePaths);
   } catch (error) {
-    console.error("[moderation] empreinte de l'image supprimée non bloquée", error);
+    console.error("[moderation] empreinte de l'image supprimée non calculée", error);
+    return;
+  }
+  if (hashes.length === 0) return;
+  for (let attempt = 1; attempt <= BLOCK_ATTEMPTS; attempt += 1) {
+    try {
+      const db = await getDatabase();
+      await blockImageHashes(db, hashes);
+      return;
+    } catch (error) {
+      if (attempt === BLOCK_ATTEMPTS) {
+        console.error(
+          `[moderation] empreintes à bloquer à la main (bg_blocked_image_hashes) : ${hashes.join(", ")}`,
+          error,
+        );
+      }
+    }
   }
 }
+
+/** Insertion de l'empreinte : une tentative, puis une reprise (verrou ou pool saturé passagers). */
+const BLOCK_ATTEMPTS = 2;

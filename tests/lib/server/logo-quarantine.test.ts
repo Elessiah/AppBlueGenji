@@ -762,7 +762,12 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
           ],
         ],
       ],
-      [[/FROM bg_logo_quarantines q/, (params) => [[quarantineRow({ id: (params as number[])[0] })]]], [/SET status = 'PURGED'/, () => [{}]]],
+      [
+        [/AS contested FROM bg_logo_quarantines q WHERE q\.id/, () => [[{ contested: 0 }]]],
+        [/SELECT status FROM bg_reports WHERE id = \? FOR UPDATE/, () => [[{ status: "OPEN" }]]],
+        [/FROM bg_logo_quarantines q/, (params) => [[quarantineRow({ id: (params as number[])[0] })]]],
+        [/SET status = 'PURGED'/, () => [{}]],
+      ],
     );
     await expect(purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"))).resolves.toBe(2);
     const purged = connection.execute.mock.calls.filter(([sql]) => /SET status = 'PURGED'/.test(sql)).map(([, p]) => p);
@@ -781,6 +786,8 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
         { id: 30, purge_after: new Date("2026-06-30T00:00:00Z"), report_id: 12, report_status: "RESOLVED", contested: 1 },
       ]]]],
       [
+        [/AS contested FROM bg_logo_quarantines q WHERE q\.id/, () => [[{ contested: 1 }]]],
+        [/SELECT status FROM bg_reports WHERE id = \? FOR UPDATE/, () => [[{ status: "RESOLVED" }]]],
         [/FROM bg_logo_quarantines q/, () => [[quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR })]]],
         [/SET status = 'PURGED'/, () => [{}]],
       ],
@@ -798,12 +805,48 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
         { id: 30, purge_after: new Date("2026-06-30T00:00:00Z"), report_id: 12, report_status: "OPEN", contested: 0 },
       ]]]],
       [
+        [/AS contested FROM bg_logo_quarantines q WHERE q\.id/, () => [[{ contested: 0 }]]],
+        [/SELECT status FROM bg_reports WHERE id = \? FOR UPDATE/, () => [[{ status: "OPEN" }]]],
         [/FROM bg_logo_quarantines q/, () => [[quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR })]]],
         [/SET status = 'PURGED'/, () => [{}]],
       ],
     );
 
     await purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"));
+
+    expect(blockRemovedImageFiles).toHaveBeenCalledWith([HIDDEN_AVATAR]);
+  });
+
+  // Revue sécurité #571, cycle 2 : une contestation déposée après la relève est
+  // vue sous verrou — rien n'est supprimé ni bloqué.
+  it("purgeDueQuarantines_contestFiledAfterScan_skipsUnderLock", async () => {
+    install(
+      [[/FROM bg_logo_quarantines q\s+LEFT JOIN bg_reports r/, () => [[
+        { id: 30, purge_after: new Date("2026-06-30T00:00:00Z"), report_id: 12, report_status: "OPEN", contested: 0 },
+      ]]]],
+      [
+        [/AS contested FROM bg_logo_quarantines q WHERE q\.id/, () => [[{ contested: 1 }]]],
+        [/SELECT status FROM bg_reports WHERE id = \? FOR UPDATE/, () => [[{ status: "OPEN" }]]],
+        [/FROM bg_logo_quarantines q/, () => [[quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR })]]],
+        [/SET status = 'PURGED'/, () => [{}]],
+      ],
+    );
+
+    await expect(purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"))).resolves.toBe(0);
+
+    expect(connection.execute.mock.calls.some(([sql]) => /SET status = 'PURGED'/.test(sql))).toBe(false);
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(unlink).not.toHaveBeenCalled();
+    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
+  });
+
+  it("purgeQuarantinedLogo_byStaff_neverRereadsContest", async () => {
+    install([], [
+      [/FROM bg_logo_quarantines q/, () => [[quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR })]]],
+      [/SET status = 'PURGED'/, () => [{}]],
+    ]);
+
+    await expect(purgeQuarantinedLogo(30, actor)).resolves.toBe(true);
 
     expect(blockRemovedImageFiles).toHaveBeenCalledWith([HIDDEN_AVATAR]);
   });

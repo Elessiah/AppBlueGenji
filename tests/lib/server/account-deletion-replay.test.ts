@@ -5,7 +5,7 @@ jest.mock("@/lib/server/users/account-deletion");
 jest.mock("@/lib/server/users/account-deletion-request", () => ({ requestAccountDeletion: jest.fn() }));
 jest.mock("@/lib/server/users/account-reactivation", () => ({ replayAccountReactivation: jest.fn() }));
 
-import { replayAccountDeletions } from "@/lib/server/account-deletion-replay";
+import { redatePlan, replayAccountDeletions } from "@/lib/server/account-deletion-replay";
 import { getDatabase } from "@/lib/server/database";
 import { deleteOwnAccount, finalizeAccountDeletion } from "@/lib/server/users/account-deletion";
 import { requestAccountDeletion } from "@/lib/server/users/account-deletion-request";
@@ -266,13 +266,16 @@ describe("replayAccountDeletions — réactivation (décision R1)", () => {
   });
 
   // Revue sécurité #546, cycle 8 : une demande refaite après la réactivation tient.
-  it("replayAccountDeletions_reactivatedEntryLaterRequest_notReactivated", async () => {
+  // Revue sécurité #571, cycle 2 : une demande postérieure, toujours en attente,
+  // n'est pas « déjà supprimée ».
+  it("replayAccountDeletions_reactivatedEntryLaterRequest_countedSuperseded", async () => {
     restoredDb({ 7: { ...pendingRow, deletion_requested_at: "2026-11-05 10:00:00" } });
 
     const report = await replayAccountDeletions([reactivated], { log });
 
     expect(replayAccountReactivation).not.toHaveBeenCalled();
-    expect(report).toMatchObject({ alreadyDeleted: 1, reactivated: 0 });
+    expect(report).toMatchObject({ superseded: 1, alreadyDeleted: 0, reactivated: 0 });
+    expect(lines.join("\n")).toContain("demande postérieure");
   });
 
   it("replayAccountDeletions_reactivatedEntryAliveRow_alreadyActive", async () => {
@@ -460,5 +463,37 @@ describe("replayAccountDeletions — demande à redater", () => {
 
     expect(report).toMatchObject({ failed: 1, replayed: 0 });
     expect(lines.join("\n")).toContain("DB_DOWN");
+  });
+});
+
+// Revue sécurité #571, cycle 2 : une seule règle pour le vrai passage et la simulation.
+describe("redatePlan", () => {
+  const DAY = 24 * 3600 * 1000;
+  const now = Date.parse("2026-11-09T12:00:00Z");
+  const daysAgo = (days: number) => new Date(now - days * DAY);
+
+  it("redatePlan_restoredOlderJournalOpen_redatesWithoutFinalizing", () => {
+    expect(redatePlan(daysAgo(2), daysAgo(10).toISOString(), now)).toEqual({ redate: true, finalize: false });
+  });
+
+  it("redatePlan_restoredNewerAndOpen_neitherRedatesNorFinalizes", () => {
+    expect(redatePlan(daysAgo(40), daysAgo(5).toISOString(), now)).toEqual({ redate: false, finalize: false });
+  });
+
+  it("redatePlan_restoredNewerButClosed_finalizes", () => {
+    expect(redatePlan(daysAgo(40), daysAgo(35).toISOString(), now)).toEqual({ redate: false, finalize: true });
+  });
+
+  it("redatePlan_restoredOlderJournalClosed_redatesAndFinalizes", () => {
+    expect(redatePlan(daysAgo(40), daysAgo(45).toISOString(), now)).toEqual({ redate: true, finalize: true });
+  });
+
+  it("redatePlan_sameSecond_notRedated", () => {
+    const at = daysAgo(2);
+    expect(redatePlan(at, at.toISOString(), now).redate).toBe(false);
+  });
+
+  it("redatePlan_noRestoredDate_followsJournal", () => {
+    expect(redatePlan(daysAgo(2), null, now)).toEqual({ redate: true, finalize: false });
   });
 });

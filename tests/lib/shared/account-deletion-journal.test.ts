@@ -318,13 +318,13 @@ describe("réactivation journalisée (décision R1)", () => {
   });
 
   // Revue sécurité #546, cycle 8 : une nouvelle demande, postérieure, reste en attente.
-  it("replayDecision_restoredRequestLaterThanUndone_alreadyDeleted", () => {
-    expect(replayDecision(reactivated, pendingRow("2026-11-05 10:00:00"))).toBe("ALREADY_DELETED");
+  it("replayDecision_restoredRequestLaterThanUndone_superseded", () => {
+    expect(replayDecision(reactivated, pendingRow("2026-11-05 10:00:00"))).toBe("SUPERSEDED");
   });
 
   // Revue sécurité #546, cycle 9 : comparaison à la seconde, sans fuseau.
-  it("replayDecision_restoredRequestSameSecondLater_alreadyDeleted", () => {
-    expect(replayDecision(reactivated, pendingRow("2026-11-01 10:00:01"))).toBe("ALREADY_DELETED");
+  it("replayDecision_restoredRequestSameSecondLater_superseded", () => {
+    expect(replayDecision(reactivated, pendingRow("2026-11-01 10:00:01"))).toBe("SUPERSEDED");
   });
 
   // Revue sécurité #546, cycle 9 : une demande défaite puis refaite reprend la date du journal.

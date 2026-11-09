@@ -107,6 +107,35 @@ describe("blockRemovedImageFiles", () => {
     expect(error).toHaveBeenCalled();
     error.mockRestore();
   });
+
+  // Revue sécurité #571, cycle 2 : le fichier part juste après — un échec passager
+  // est repris, un échec durable laisse l'empreinte dans le journal pour la poser.
+  it("blockRemovedImageFiles_transientDatabaseError_retriedOnce", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "bg-blocked-")), "avatar.webp");
+    writeFileSync(file, IMAGE);
+    const execute = jest.fn<SqlQuery>()
+      .mockRejectedValueOnce(new Error("LOCK_WAIT_TIMEOUT"))
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await blockRemovedImageFiles([file]);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("blockRemovedImageFiles_persistentDatabaseError_logsHashForManualBlock", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "bg-blocked-")), "avatar.webp");
+    writeFileSync(file, IMAGE);
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("DB_DOWN"));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await blockRemovedImageFiles([file]);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(String(error.mock.calls[0][0])).toContain(imageSha256(IMAGE));
+    error.mockRestore();
+  });
 });
 
 describe("hashImageFiles", () => {

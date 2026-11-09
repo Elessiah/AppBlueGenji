@@ -911,9 +911,11 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
  * Supprime définitivement une image en quarantaine — par l'association (avant
  * l'échéance, contestation rejetée) ou d'office (échéance passée).
  *
- * `blockHash` (vrai par défaut) : l'empreinte d'un avatar est bloquée (D6).
- * La purge d'office d'un avatar **contesté** le passe à faux : rien n'y dit
- * que la modération l'a écarté — la contestation a pu être acceptée sans que
+ * Par le staff, l'empreinte d'un avatar est bloquée (D6). D'office
+ * (`actor` nul), l'échéance et la contestation sont **relues sous verrou**
+ * (`autoPurgeStillDue`) : rien n'est fait si la purge ne tient plus (rend
+ * `false`), et l'empreinte d'un avatar contesté n'est pas bloquée — rien n'y
+ * dit que la modération l'a écarté, la contestation a pu être acceptée sans que
  * le rétablissement aboutisse (`USER_HAS_NEW_AVATAR`).
  *
  * @throws QUARANTINE_NOT_FOUND
@@ -922,14 +924,24 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
 export async function purgeQuarantinedLogo(
   quarantineId: number,
   actor: ReportPerson | null,
-  options: { blockHash?: boolean } = {},
-): Promise<void> {
+  options: { now?: Date } = {},
+): Promise<boolean> {
   const db = await getDatabase();
   const connection = await db.getConnection();
   let row: QuarantineRow;
+  let blockHash = true;
   try {
     await connection.beginTransaction();
     row = await lockQuarantine(connection, quarantineId);
+    const check =
+      actor === null
+        ? await autoPurgeStillDue(connection, row, options.now ?? new Date())
+        : { due: true, blockHash: true };
+    if (!check.due) {
+      await connection.rollback();
+      return false;
+    }
+    blockHash = check.blockHash;
     await connection.execute(
       `UPDATE bg_logo_quarantines SET status = 'PURGED', closed_at = NOW() WHERE id = ?`,
       [quarantineId],
@@ -953,7 +965,7 @@ export async function purgeQuarantinedLogo(
     // Un avatar supprimé (contestation rejetée, ou échéance passée sans
     // contestation) : son empreinte est bloquée avant que le fichier ne parte (décision D6). Le
     // masquage seul ne bloquait rien.
-    if (!isTeam && options.blockHash !== false) await blockRemovedImageFiles([files.quarantined]);
+    if (!isTeam && blockHash) await blockRemovedImageFiles([files.quarantined]);
     await unlinkIfPresent(files.quarantined).catch((error) => {
       console.error("[moderation] fichier en quarantaine non effacé", error);
     });
@@ -975,6 +987,55 @@ export async function purgeQuarantinedLogo(
   } else {
     console.info(`[moderation] ${line} à l'échéance de sa quarantaine.`);
   }
+  return true;
+}
+
+/**
+ * Contestation **de personne visée** qui retient l'image (voir
+ * `purgeDueQuarantines`) — `q` désigne la quarantaine.
+ */
+const TARGET_CONTEST_SQL = `EXISTS (SELECT 1 FROM bg_reports c
+                    WHERE c.parent_report_id = q.report_id
+                      AND (c.contest_role IS NULL OR c.contest_role = 'TARGET')
+                      -- L'auteur ne conteste qu'un dossier archivé : ce qui
+                      -- précède sa contestation était tranché, et la
+                      -- réouverture qu'elle provoque ne remet rien en attente.
+                      AND c.id > COALESCE((SELECT MAX(n.id) FROM bg_reports n
+                                           WHERE n.parent_report_id = q.report_id
+                                             AND n.contest_role = 'NOTIFIER'), 0))`;
+
+/**
+ * La purge d'office tient-elle encore, relue **sous verrou** ? Le signalement
+ * d'origine est verrouillé comme le fait `createContest` : une contestation
+ * déposée depuis la relève de `purgeDueQuarantines` est vue, une contestation
+ * qui arrive ensuite attend la fin de la purge. `blockHash` : seul un avatar
+ * jamais contesté est réputé supprimé par la modération (D6).
+ */
+async function autoPurgeStillDue(
+  connection: PoolConnection,
+  row: QuarantineRow,
+  now: Date,
+): Promise<{ due: boolean; blockHash: boolean }> {
+  let reportStatus: string | null = null;
+  if (row.report_id !== null) {
+    const [reports] = await connection.execute<(RowDataPacket & { status: string })[]>(
+      `SELECT status FROM bg_reports WHERE id = ? FOR UPDATE`,
+      [row.report_id],
+    );
+    reportStatus = reports[0]?.status ?? null;
+  }
+  const [contests] = await connection.execute<(RowDataPacket & { contested: number })[]>(
+    `SELECT ${TARGET_CONTEST_SQL} AS contested FROM bg_logo_quarantines q WHERE q.id = ?`,
+    [row.id],
+  );
+  const contested = Number(contests[0]?.contested) === 1;
+  const due = canAutoPurgeLogo({
+    purgeAfter: new Date(row.purge_after),
+    now,
+    contested,
+    reportSettled: row.report_id === null || reportStatus === null || reportStatus === "RESOLVED",
+  });
+  return { due, blockHash: !contested };
 }
 
 type DueRow = RowDataPacket & {
@@ -1012,15 +1073,7 @@ export async function purgeDueQuarantines(now: Date = new Date()): Promise<numbe
   const db = await getDatabase();
   const [rows] = await db.execute<DueRow[]>(
     `SELECT q.id, q.purge_after, q.report_id, r.status AS report_status,
-            EXISTS (SELECT 1 FROM bg_reports c
-                    WHERE c.parent_report_id = q.report_id
-                      AND (c.contest_role IS NULL OR c.contest_role = 'TARGET')
-                      -- L'auteur ne conteste qu'un dossier archivé : ce qui
-                      -- précède sa contestation était tranché, et la
-                      -- réouverture qu'elle provoque ne remet rien en attente.
-                      AND c.id > COALESCE((SELECT MAX(n.id) FROM bg_reports n
-                                           WHERE n.parent_report_id = q.report_id
-                                             AND n.contest_role = 'NOTIFIER'), 0)) AS contested
+            ${TARGET_CONTEST_SQL} AS contested
      FROM bg_logo_quarantines q
      LEFT JOIN bg_reports r ON r.id = q.report_id
      WHERE q.status = 'HIDDEN' AND q.purge_after <= ?`,
@@ -1036,11 +1089,9 @@ export async function purgeDueQuarantines(now: Date = new Date()): Promise<numbe
     });
     if (!due) continue;
     try {
-      // Contesté puis tranché sans purge par le staff : l'issue n'est pas
-      // écrite, l'empreinte n'est pas bloquée (D6 : seulement une suppression
-      // décidée par la modération).
-      await purgeQuarantinedLogo(Number(row.id), null, { blockHash: Number(row.contested) !== 1 });
-      purged += 1;
+      // Relue sous verrou par la purge elle-même (contestation déposée
+      // entre-temps, empreinte à bloquer ou non) : cette relève ne fait que trier.
+      if (await purgeQuarantinedLogo(Number(row.id), null, { now })) purged += 1;
     } catch (error) {
       // Rétablie ou supprimée entre-temps : rien à faire.
       if ((error as Error).message !== "QUARANTINE_CLOSED") throw error;

@@ -276,7 +276,12 @@ export type ReplayDecision =
    * reprise de celle du journal (une demande plus ancienne, défaite puis
    * refaite, raccourcirait sinon la nouvelle fenêtre).
    */
-  | "REDATE";
+  | "REDATE"
+  /**
+   * Réactivé depuis, mais revenu en attente d'une demande **postérieure** à
+   * celle que la réactivation défaisait : cette demande tient (réactivable).
+   */
+  | "SUPERSEDED";
 
 /**
  * Faut-il rejouer cette suppression sur la base restaurée ?
@@ -294,7 +299,8 @@ export function replayDecision(
   if (row.createdAt !== entry.accountCreatedAt) return "OTHER_ACCOUNT";
   if (entry.reactivated) {
     if (!row.isDeleted) return "ALREADY_ACTIVE";
-    return reactivationUndoes(entry, row) ? "REACTIVATE" : "ALREADY_DELETED";
+    if (reactivationUndoes(entry, row)) return "REACTIVATE";
+    return row.pendingDeletion && row.deletionRequestedAt ? "SUPERSEDED" : "ALREADY_DELETED";
   }
   if (entry.pending && row.pendingDeletion) return "REDATE";
   if (row.isDeleted) return "ALREADY_DELETED";

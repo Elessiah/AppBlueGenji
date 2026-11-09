@@ -654,8 +654,11 @@ puis renomme l'entrée solo (`syncSoloEntryIdentityOn`). Toute lecture qui joint
   `ALREADY_ACTIVE`, `SUPERSEDED`, `GONE` — déjà supprimé, compté
   `alreadyDeleted` —, `ABSENT` ou `OTHER_ACCOUNT` — identifiant réattribué,
   compté `otherAccount`) et `alreadyPending` (demande déjà à jour, partagée de
-  même en simulation, qui retient la plus récente des deux demandes pour dire
-  « serait supprimé »). Le chemin `REPLAY` passe aussi `accountCreatedAt` à
+  même en simulation : une seule règle, `redatePlan`, sert le vrai passage et la
+  simulation — la plus récente des deux demandes tient, et la suppression
+  définitive suit si **sa** fenêtre est close). Une réactivation dont la base
+  restaurée porte une demande postérieure rend `SUPERSEDED` dès la lecture
+  (compté `superseded`, jamais « déjà supprimé »). Le chemin `REPLAY` passe aussi `accountCreatedAt` à
   `requestAccountDeletion` et `deleteOwnAccount` : sous le verrou, une autre
   ligne lève `ACCOUNT_REASSIGNED`, comptée `otherAccount`, sans rien écrire ; la simulation compte les réactivations « au plus ». Une ligne de réactivation
   ne remplace que les lignes en attente **antérieures ou simultanées** du compte
@@ -687,7 +690,10 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   `OWNERSHIP` — aucun avis ni écriture quand un autre `OWNER` **actif** la
   garde ; un compte sous suspension en cours, copropriétaire compris, n'hérite
   qu'à défaut de tout membre actif (un `MANAGER` actif reçoit la propriété
-  plutôt qu'un copropriétaire suspendu, qui garde la sienne). Seul joueur : équipe **fantôme** si elle est inscrite à un tournoi
+  plutôt qu'un copropriétaire suspendu, qui garde la sienne). Si **tous** les
+  membres restants sont suspendus, le meilleur d'entre eux hérite quand même :
+  une suspension se lève et la propriété se reprend alors, une dissolution ne
+  se défait pas (choix assumé, revue sécurité #571). Seul joueur : équipe **fantôme** si elle est inscrite à un tournoi
   `UPCOMING`/`REGISTRATION`/`RUNNING`, sinon **dissoute** (`dissolveTeamOn`,
   « Équipe dissoute #id »). Les candidats ne sont pas verrouillés côté compte
   (inversion d'ordre évitée) ; seuls les comptes vivants héritent.
@@ -779,10 +785,18 @@ colonne de compte) **quand la modération le supprime** — sans délai depuis u
 signalement (`deleteUserAvatarForReport`), depuis la fiche
 (`DELETE /api/admin/users/[id]/avatar`), ou à la fin de sa quarantaine
 (`purgeQuarantinedLogo` : contestation rejetée, ou échéance passée **sans
-contestation** — la purge d'office d'un avatar contesté puis tranché ne bloque
-rien, l'issue n'étant pas écrite) —, après le commit et avant que le fichier ne
+contestation** — la purge d'office relit échéance et contestation **sous
+verrou** (signalement d'origine verrouillé comme le fait `createContest`) : une
+contestation déposée entre-temps arrête la purge, et un avatar contesté puis
+tranché n'est pas bloqué, l'issue n'étant pas écrite ; le staff qui rejette
+une contestation supprime l'image lui-même, ce qui la bloque) —, après le commit et avant que le fichier ne
 parte (`removeModeratedAvatarFile` / `blockRemovedImageFiles`, ne lèvent
-jamais ; toute adresse d'avatar téléversé, ancien nom de fichier compris). Un avatar seulement **masqué** (`HIDDEN`) se conteste encore : il n'est
+jamais ; toute adresse d'avatar téléversé, ancien nom de fichier compris ;
+l'insertion est retentée une fois, puis les empreintes sont consignées dans
+pm2 pour être posées à la main, le fichier partant juste après). Le blocage
+vaut aussi pour la copie d'un avatar de fournisseur (OAuth) : une image
+retirée ne revient pas par la connexion suivante ; une copie importée naît
+masquée, un refus y laisse la pastille à initiale. Un avatar seulement **masqué** (`HIDDEN`) se conteste encore : il n'est
 pas bloqué, et l'effacement d'un compte n'en bloque plus aucun — il relève ses
 fichiers en quarantaine **sous le verrou du compte** et les supprime après le
 commit. Un avatar ou un logo dont l'image traitée **ou le fichier téléversé tel
