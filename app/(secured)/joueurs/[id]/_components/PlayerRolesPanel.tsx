@@ -9,6 +9,7 @@ import {
   ROLE_LABELS,
   diffPlatformRoles,
   roleChangeNeedsConfirmation,
+  roleChangeTone,
   type PlatformRole,
   type PlatformRoleChange,
 } from "@/lib/shared/permissions";
@@ -134,7 +135,7 @@ export function PlayerRolesPanel({
           title={`Modifier les rôles de ${pseudo} ?`}
           confirmLabel="Enregistrer les rôles"
           pendingLabel="Enregistrement…"
-          tone={pendingChange.removed.length > 0 || pendingChange.granted.includes("ADMIN") ? "danger" : "primary"}
+          tone={roleChangeTone(pendingChange)}
           onClose={() => setPendingChange(null)}
           onConfirm={saveRoles}
         >

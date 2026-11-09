@@ -14,6 +14,7 @@ import {
   PLATFORM_ROLES,
   diffPlatformRoles,
   roleChangeNeedsConfirmation,
+  roleChangeTone,
   type PlatformRole,
   type PlatformRoleChange,
 } from "@/lib/shared/permissions";
@@ -36,6 +37,17 @@ const SELF_ROLES_ERROR_CODES = [
   "USER_NOT_FOUND",
 ] as const;
 type SelfRolesErrorCode = (typeof SELF_ROLES_ERROR_CODES)[number];
+
+/**
+ * Les refus qui ne se lèvent pas en réessayant : la session ou le droit a changé
+ * depuis l'affichage. La confirmation se ferme et la session est relue.
+ */
+const DEFINITIVE_REFUSALS: ReadonlySet<string> = new Set([
+  "UNAUTHORIZED",
+  "FORBIDDEN",
+  "CANNOT_MODIFY_SELF",
+  "USER_NOT_FOUND",
+]);
 
 /** Phrase d'un refus ; repli générique pour tout autre code (jamais le code brut). */
 export function selfRolesErrorMessage(code: string, text: ProfileText): string {
@@ -86,7 +98,15 @@ export function SelfRolesField({
   }, [savedKey]);
 
   const toggle = (role: PlatformRole) => {
-    if (role === "ADMIN" || busy) return;
+    if (busy) return;
+    if (role === "ADMIN") {
+      // La case reste cochée : au toucher, il n'y a ni curseur « interdit » ni « i » ouvert,
+      // donc le geste refusé dit sa raison.
+      showError(t("platformRoles.adminLocked"));
+      return;
+    }
+    // Une erreur rattachée à la case Administrateur ne survit pas à un nouveau choix.
+    fieldErrors.clear();
     setSelected((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]));
   };
 
@@ -104,15 +124,27 @@ export function SelfRolesField({
         const code = payload.error || "ROLES_UPDATE_FAILED";
         throw new CodedError(code, selfRolesErrorMessage(code, text));
       }
+      // Les rôles confirmés par le serveur, jamais ceux cochés à l'écran : une réponse
+      // sans corps lisible vaut échec, pas succès.
+      if (!Array.isArray(payload.roles)) throw new CodedError("ROLES_UPDATE_FAILED", t("platformRoles.errors.fallback"));
       showSuccess(t("platformRoles.saved"));
-      onSaved(payload.roles ?? selected);
+      onSaved(payload.roles);
       router.refresh();
       return true;
     } catch (e) {
       const message = e instanceof CodedError ? e.message : t("platformRoles.errors.fallback");
-      fieldErrors.report(errorCode(e), message);
+      const code = errorCode(e) ?? "ROLES_UPDATE_FAILED";
       showError(message);
-      return false;
+      if (DEFINITIVE_REFUSALS.has(code)) {
+        // Rien ne sert de rester sur une confirmation qui ne peut plus aboutir.
+        setPending(null);
+        router.refresh();
+        return true;
+      }
+      // Le focus doit aller à la case, pas derrière la confirmation encore ouverte.
+      if (code === "CANNOT_REMOVE_OWN_ADMIN") setPending(null);
+      fieldErrors.report(code, message);
+      return code === "CANNOT_REMOVE_OWN_ADMIN";
     } finally {
       setBusy(false);
     }
@@ -172,7 +204,11 @@ export function SelfRolesField({
           aria-busy={busy || undefined}
           aria-disabled={busy || !dirty || undefined}
           onClick={() => {
-            if (busy || !dirty) return;
+            if (busy) return;
+            if (!dirty) {
+              showError(t("platformRoles.nothingToSave"));
+              return;
+            }
             setPending(change);
           }}
         >
@@ -184,7 +220,7 @@ export function SelfRolesField({
           title={t("platformRoles.confirmTitle")}
           confirmLabel={t("platformRoles.save")}
           pendingLabel={t("platformRoles.saving")}
-          tone={pending.removed.length > 0 ? "danger" : "primary"}
+          tone={roleChangeTone(pending)}
           onClose={() => setPending(null)}
           onConfirm={save}
         >

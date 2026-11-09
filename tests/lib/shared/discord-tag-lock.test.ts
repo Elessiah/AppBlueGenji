@@ -55,7 +55,7 @@ describe("checkDiscordTagEdit", () => {
 describe("discordTagLockNotice", () => {
   it("dit qu'un tag certifié l'est, et joint la liste de ceux qui le lisent", () => {
     const notice = discordTagLockNotice({ tag: "keryan", verified: true, linked: true });
-    expect(notice.status).toContain("rattaché");
+    expect(notice.status).toContain("lié");
     expect(notice.status).toContain("certifié");
     expect(notice.audience).toBe(true);
   });
@@ -152,7 +152,7 @@ describe("discordTagLockNotice — rattachement inconnu", () => {
   });
 
   it("n'affirme ni le rattachement ni son absence", () => {
-    expect(all(notice)).not.toContain("rattaché");
+    expect(all(notice)).not.toContain("lié");
     expect(all(notice)).not.toContain("certifié");
     expect(notice.audience).toBe(false);
   });

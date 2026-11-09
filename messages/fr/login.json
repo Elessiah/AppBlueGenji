@@ -70,7 +70,7 @@
     "params": "Connexion {provider} interrompue. Relance la connexion depuis cette page.",
     "state": "Session de connexion expirée ou invalide. Relance la connexion.",
     "oauth": "Échec de la connexion {provider}. Réessaie dans un instant.",
-    "session": "Tu dois être connecté pour rattacher une application. Connecte-toi, puis réessaie.",
+    "session": "Tu dois être connecté pour lier une application. Connecte-toi, puis réessaie.",
     "terms": "Pour créer ton compte, accepte les conditions d'utilisation, puis relance la connexion."
   },
   "suspension": {

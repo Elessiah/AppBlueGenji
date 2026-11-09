@@ -261,3 +261,12 @@ Les sections « Comptes de jeu », « Discord » et « Applications connectées 
 - La section est **dans le formulaire** (les champs BattleTag, Marvel et tag Discord suivent la liste, avant les sessions) ; la fenêtre du code du bot, portée dans `document.body`, enverrait sinon son `submit` jusqu'au formulaire : `onSubmit` ignore tout envoi dont la cible n'est pas le formulaire.
 - Les anciennes ancres `#jeux`, `#discord`, `#connexions` mènent à `#comptes` (`PROFILE_SECTION_ALIASES`) : des liens déjà envoyés les utilisent.
 - L'introduction passe derrière un « i » ; aucune donnée collectée ni aucun lecteur ne change (pas de modification légale).
+
+## Finitions des comptes liés (PROFILE-IDENTITY-UX 2)
+
+- **Vocabulaire** : « Lier / Lié / Liaison » partout dans le profil et ses textes partagés (`messages/fr/profile.json`, `account-connections`, `discord-tag-lock`, `battletag-lock`, `identity-sharing`). L'anglais disait déjà « link ».
+- **Battle.net lié sans BattleTag** : la ligne propose « Saisir mon BattleTag », qui amène au champ (`#profile-battletag`).
+- **Pastille d'état** : ni zone d'annonce ni focus ; l'état est lu une fois, par `aria-describedby` des boutons de la ligne.
+- **Lecture en panne** : la liste des comptes (`useAccountConnections`, `failed`) et l'état Discord (`discordReadFailed`) disent la panne par notification et proposent « Réessayer » (liste, ligne Discord, champ).
+- **Fenêtres du code** : leurs formulaires prennent leur envoi par `takeSubmit` (`lib/shared/take-submit.ts`) — il ne remonte pas au formulaire du profil qui les contient ; tous les boutons de la section sont `type="button"` (testé).
+- **Gestes refusés** : « Déconnecter mes autres sessions » à 0 session, case « Administrateur » verrouillée, « Enregistrer mes rôles » sans écart et lien `#invitations` sans invitation disent leur raison par notification ; un refus définitif des rôles ferme la confirmation et relit la session ; une réponse sans `roles` vaut échec.

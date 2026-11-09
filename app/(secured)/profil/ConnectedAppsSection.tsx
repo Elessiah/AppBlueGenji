@@ -72,6 +72,12 @@ export type IdentityContext = {
   battletagFromBlizzard: boolean;
   /** Ouvre la fenêtre de certification du tag Discord. */
   onCertifyDiscord: () => void;
+  /** La lecture de l'état Discord a échoué : la ligne Discord propose de la refaire. */
+  discordReadFailed: boolean;
+  /** Une lecture de l'état Discord est en cours (le bouton « Réessayer » patiente). */
+  discordReading: boolean;
+  /** Relit l'état Discord. */
+  onRetryDiscord: () => void;
 };
 
 type StateKey = "UNLINKED" | "LINKED" | "LINKED_TO_CERTIFY" | "LINKED_NO_BATTLETAG" | "CERTIFIED";
@@ -132,6 +138,12 @@ export function ConnectedAppsSection({
    * liste vide — qui se lirait « aucune application », l'inverse de la vérité.
    */
   connections,
+  /**
+   * La lecture de la liste a échoué (et la liste reste `null`) : la section dit
+   * la panne et propose de recommencer, au lieu d'annoncer « Chargement… » à
+   * perpétuité.
+   */
+  connectionsFailed = false,
   /** Relit la liste après une écriture, pour les **deux** lecteurs à la fois. */
   reload,
   /**
@@ -163,6 +175,7 @@ export function ConnectedAppsSection({
   identity: IdentityContext;
   children?: React.ReactNode;
   connections: AccountConnection[] | null;
+  connectionsFailed?: boolean;
   reload: () => Promise<void>;
   onChanged?: () => void;
   onDiscordTagChanged?: (tag: string) => void;
@@ -257,7 +270,7 @@ export function ConnectedAppsSection({
       </InfoHintRow>
 
       {connections === null ? (
-        <p style={{ fontSize: 13, color: "var(--ink-quiet)", margin: 0 }}>{text.t("connections.loading")}</p>
+        <ConnectionsUnread failed={connectionsFailed} reload={reload} />
       ) : (
         <div className="table-like">
           {connections.map((rawConnection) => (
@@ -360,7 +373,9 @@ function ConnectionRow({
                 className={`${s.connectionDot} ${connection.linked ? s.connectionDotOn : ""}`}
               />
               <strong style={{ fontSize: 14 }}>{label}</strong>
-              <Pill variant={pillVariant} id={stateId} role="status" tabIndex={-1}>{stateWord}</Pill>
+              {/* Ni zone d'annonce ni focus : l'état est déjà lu par `aria-describedby` des
+                  boutons de la ligne, et le geste qui le change s'annonce par notification. */}
+              <Pill variant={pillVariant} id={stateId}>{stateWord}</Pill>
             </span>
             <ProviderHint provider={connection.provider} />
           </InfoHintRow>
@@ -405,6 +420,8 @@ function ConnectionRow({
         <ConnectionActions
           connection={connection}
           action={action}
+          stateKey={key}
+          identity={identity}
           refusal={refusal}
           busy={busy}
           detailsId={`${stateId} ${detailsId}`}
@@ -430,6 +447,8 @@ function ConnectionRow({
 function ConnectionActions({
   connection,
   action,
+  stateKey: key,
+  identity,
   refusal,
   busy,
   detailsId,
@@ -439,6 +458,8 @@ function ConnectionActions({
 }: Readonly<{
   connection: AccountConnection;
   action: IdentityStep["action"];
+  stateKey: StateKey;
+  identity: IdentityContext;
   refusal: ReturnType<typeof checkConnectionUnlink>;
   busy: OAuthProvider | null;
   detailsId: string;
@@ -454,6 +475,8 @@ function ConnectionActions({
   const label = OAUTH_PROVIDER_LABELS[connection.provider];
   return (
     <span style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
+      <DiscordRetryButton connection={connection} identity={identity} detailsId={detailsId} />
+      <BattletagPointer stateKey={key} detailsId={detailsId} />
       {action === "CERTIFY" || action === "REGISTER" ? (
         <button
           type="button"
@@ -500,6 +523,107 @@ function ConnectionActions({
         </a>
       )}
     </span>
+  );
+}
+
+/** « Réessayer » de la ligne Discord dont l'état n'a pas pu être lu. */
+function DiscordRetryButton({
+  connection,
+  identity,
+  detailsId,
+}: Readonly<{
+  connection: AccountConnection;
+  identity: IdentityContext;
+  detailsId: string;
+}>): React.ReactElement | null {
+  const { t } = useProfileText();
+  // Discord lié dont l'état n'a pas pu être lu : le geste suivant est inconnu, la ligne
+  // propose de relire plutôt que de se taire.
+  if (connection.provider !== "DISCORD" || !connection.linked || identity.discordKnown) return null;
+  if (!identity.discordReadFailed) return null;
+  return (
+    <button
+      type="button"
+      className="btn"
+      onClick={() => !identity.discordReading && identity.onRetryDiscord()}
+      aria-disabled={identity.discordReading || undefined}
+      aria-label={busyAriaLabel(identity.discordReading, t("discord.retryLabel"))}
+      aria-describedby={detailsId}
+      style={{ padding: "4px 12px", fontSize: 12 }}
+    >
+      {identity.discordReading ? t("discord.reading") : t("discord.retry")}
+    </button>
+  );
+}
+
+/** « Saisir mon BattleTag » : Battle.net est lié mais n'en donne aucun, le champ est plus bas. */
+function BattletagPointer({
+  stateKey,
+  detailsId,
+}: Readonly<{ stateKey: StateKey; detailsId: string }>): React.ReactElement | null {
+  const { t } = useProfileText();
+  if (stateKey !== "LINKED_NO_BATTLETAG") return null;
+  return (
+    <button
+      type="button"
+      className="btn"
+      onClick={focusBattletagField}
+      aria-describedby={detailsId}
+      style={{ padding: "4px 12px", fontSize: 12 }}
+    >
+      {t("connections.battletagPointer")}
+    </button>
+  );
+}
+
+/** Amène le lecteur au champ « BattleTag Overwatch » de la section, sous la liste. */
+function focusBattletagField(): void {
+  const field = document.getElementById("profile-battletag");
+  if (!field) return;
+  field.scrollIntoView({ block: "center" });
+  field.focus();
+}
+
+/**
+ * La liste n'est pas là : en cours de lecture, ou la lecture a échoué — auquel cas
+ * « Chargement… » mentirait. Le bouton rejoue la lecture ; la notification de la
+ * panne vient du hook (`useAccountConnections`).
+ */
+function ConnectionsUnread({
+  failed,
+  reload,
+}: Readonly<{ failed: boolean; reload: () => Promise<void> }>): React.ReactElement {
+  const { t } = useProfileText();
+  const [retrying, setRetrying] = useState(false);
+  if (!failed) {
+    return <p style={{ fontSize: 13, color: "var(--ink-quiet)", margin: 0 }}>{t("connections.loading")}</p>;
+  }
+  const retry = async () => {
+    if (retrying) return;
+    setRetrying(true);
+    try {
+      await reload();
+    } finally {
+      setRetrying(false);
+    }
+  };
+  return (
+    <div className={s.actionsRow}>
+      <p id="connections-load-failed" className={s.hint}>
+        {t("connections.loadFailed")}
+      </p>
+      <button
+        type="button"
+        className="btn ghost"
+        onClick={() => void retry()}
+        aria-disabled={retrying || undefined}
+        aria-label={busyAriaLabel(retrying, t("connections.retryLabel"))}
+        aria-describedby="connections-load-failed"
+        style={{ padding: "4px 12px", fontSize: 12 }}
+      >
+        {retrying ? t("connections.reading") : t("connections.retry")}
+      </button>
+    </div>
   );
 }
 

@@ -30,6 +30,9 @@ const IDENTITY = {
   battletagKnown: true,
   battletagFromBlizzard: false,
   onCertifyDiscord: () => undefined,
+  discordReadFailed: false,
+  discordReading: false,
+  onRetryDiscord: () => undefined,
 };
 
 const google = (linked: boolean): AccountConnection => ({ provider: "GOOGLE", linked, method: null, handle: null });
@@ -80,7 +83,7 @@ describe("ConnectedAppsSection — rendu des lignes", () => {
 
   it("nomme la porte Discord et la joint à la description du bouton", () => {
     const html = render([google(true), discord(true, "OAUTH", "nova"), blizzard(false)]);
-    expect(html).toContain("Rattaché par le bouton Discord");
+    expect(html).toContain("Lié par le bouton Discord");
     expect(html).toContain('id="connection-method-discord"');
     expect(html).toContain('aria-describedby="connection-state-discord connection-details-discord connection-method-discord"');
   });
@@ -88,7 +91,7 @@ describe("ConnectedAppsSection — rendu des lignes", () => {
   it("rattachement Discord par code : la ligne du bouton propose d'ajouter l'autorisation", () => {
     const html = render([google(true), discord(true, "DM_CODE", "nova"), blizzard(false)]);
     expect(html).toContain(
-      "Ton Discord est rattaché par code. Le bouton y ajoute l&#x27;autorisation Discord — avec le même compte Discord.",
+      "Ton Discord est lié par code. Le bouton y ajoute l&#x27;autorisation Discord — avec le même compte Discord.",
     );
     expect(html).toContain('aria-label="Lier Discord à mon compte"');
     expect(html).not.toContain('id="connection-method-discord"');

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AccountConnection } from "@/lib/shared/account-connections";
+import { useProfileText } from "@/components/i18n/profile-text";
+import { useToast } from "@/components/ui/toast";
 
 /**
  * Les moyens de connexion du compte, chargés **une fois pour la page**.
@@ -28,8 +30,13 @@ import type { AccountConnection } from "@/lib/shared/account-connections";
 export function useAccountConnections(): {
   connections: AccountConnection[] | null;
   pending: boolean;
+  /** La dernière lecture a échoué et la liste reste inconnue : la section propose de réessayer. */
+  failed: boolean;
   reload: () => Promise<void>;
 } {
+  const { showError } = useToast();
+  const text = useProfileText();
+  const [failed, setFailed] = useState(false);
   const [connections, setConnections] = useState<AccountConnection[] | null>(null);
   const [pending, setPending] = useState(true);
   /**
@@ -46,27 +53,41 @@ export function useAccountConnections(): {
   const reload = useCallback(async () => {
     const seq = (readSeq.current += 1);
     setPending(true);
+    // Une lecture ratée ne pèse que si elle est la dernière : la dépassée ne dit rien.
+    const fail = () => {
+      if (seq !== readSeq.current) return;
+      setFailed(true);
+      showError(text.t("connections.loadFailed"));
+    };
     try {
       const res = await fetch("/api/profile/connections", { cache: "no-store" });
-      if (!res.ok) return;
+      if (!res.ok) {
+        fail();
+        return;
+      }
       const payload = (await res.json()) as { connections?: AccountConnection[] };
       if (seq !== readSeq.current) return;
       setConnections(payload.connections ?? []);
+      setFailed(false);
     } catch {
-      // Silencieux, mais **pas anodin** : la liste reste `null`, donc le champ
-      // verrouillé reste verrouillé. Le reste du profil s'enregistre
-      // normalement — le `PATCH` n'emporte le BattleTag que s'il a changé — et
-      // c'est le serveur qui tranche de toute façon.
+      // **Pas anodin** : la liste reste `null`, donc le champ verrouillé reste
+      // verrouillé. La panne se dit (notification) et la section propose de
+      // relire ; le reste du profil s'enregistre normalement — le `PATCH`
+      // n'emporte le BattleTag que s'il a changé — et le serveur tranche.
+      fail();
     } finally {
       // L'attente ne se lève que sur la **dernière** : la dépassée qui rentre la
       // première ferait annoncer une panne pendant qu'une lecture court encore.
       if (seq === readSeq.current) setPending(false);
     }
+    // `showError` et `text` changent d'identité à chaque rendu du fournisseur : la lecture
+    // ne doit pas se rejouer pour autant (`useEffect` ci-dessous la lance une fois).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     void reload();
   }, [reload]);
 
-  return { connections, pending, reload };
+  return { connections, pending, failed, reload };
 }

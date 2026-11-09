@@ -102,7 +102,7 @@ export function connectionUnlinkRefusalMessage(
   provider: OAuthProvider,
 ): string {
   const label = OAUTH_PROVIDER_LABELS[provider];
-  if (refusal === "NOT_LINKED") return `Aucun compte ${label} n'est rattaché.`;
+  if (refusal === "NOT_LINKED") return `Aucun compte ${label} n'est lié.`;
   return `Impossible de retirer ${label} : c'est ton dernier moyen de connexion. Ajoutes-en un autre d'abord.`;
 }
 
@@ -152,8 +152,8 @@ export function connectionMethodLabel(connection: AccountConnection): string | n
   if (!connection.linked || connection.method === null) return null;
   if (connection.provider !== "DISCORD") return null;
   return connection.method === "OAUTH"
-    ? "Rattaché par le bouton Discord"
-    : "Rattaché par code en message privé";
+    ? "Lié par le bouton Discord"
+    : "Lié par code en message privé";
 }
 
 /** Libellé de la ligne du bot dans « Applications connectées ». */

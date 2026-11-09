@@ -1,5 +1,6 @@
 "use client";
 
+import { takeSubmit } from "@/lib/shared/take-submit";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
@@ -66,7 +67,8 @@ export function DiscordBotHandleDialog({
   };
 
   const requestCode = async (event: FormEvent) => {
-    event.preventDefault();
+    // Envoi gardé dans la fenêtre : il ne remonte pas jusqu'au formulaire du profil.
+    takeSubmit(event);
     // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici,
     // par une référence lue sans attendre de rendu — Entrée puis clic dans le même instant
     // enverraient sinon deux demandes (un essai du code brûlé ; revue de sécurité du lot 9-2).
@@ -101,7 +103,8 @@ export function DiscordBotHandleDialog({
   };
 
   const confirmCode = async (event: FormEvent) => {
-    event.preventDefault();
+    // Envoi gardé dans la fenêtre : il ne remonte pas jusqu'au formulaire du profil.
+    takeSubmit(event);
     // Bouton en `aria-disabled` pendant l'envoi (le focus reste dans la modale) : la garde est ici,
     // par une référence lue sans attendre de rendu — Entrée puis clic dans le même instant
     // enverraient sinon deux demandes (un essai du code brûlé ; revue de sécurité du lot 9-2).
