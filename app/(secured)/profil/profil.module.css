@@ -442,6 +442,7 @@
 
 .connectionName {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -596,4 +597,18 @@
 .inviteOwnership {
   color: var(--ink-soft);
   font-size: 12px;
+}
+
+/* Les champs d'identifiants qui suivent la liste des comptes liés. */
+.accountFields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.subTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
 }

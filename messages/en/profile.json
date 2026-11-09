@@ -14,21 +14,13 @@
       "title": "Identity",
       "lead": "Your username and avatar, visible wherever you play."
     },
-    "jeux": {
-      "title": "Game accounts",
-      "lead": "The IDs that let other players add you."
-    },
-    "discord": {
-      "title": "Discord",
-      "lead": "The tag the organizers use to reach you during a tournament."
+    "comptes": {
+      "title": "Game identities and linked accounts",
+      "lead": "Link your accounts, then verify them: a linked account alone doesn't make you reachable."
     },
     "confidentialite": {
       "title": "Privacy",
       "lead": "What others see of you, and whether teams can approach you."
-    },
-    "connexions": {
-      "title": "Connected apps",
-      "lead": "The doors you use to get into the site, and the sessions still open."
     },
     "notifications": {
       "title": "Notifications",
@@ -72,7 +64,8 @@
     "battletagPlaceholder": "Username#1234",
     "marvel": "Marvel Rivals tag",
     "gameTagNotice": "Only used to add you in game, never for statistics.",
-    "blizzardNotice": "If you link Battle.net, Blizzard fills in this field and updates it at every login, replacing what you typed. If it gives none, what you typed stays, without the “verified” mark."
+    "blizzardNotice": "If you link Battle.net, Blizzard fills in this field and updates it at every login, replacing what you typed. If it gives none, what you typed stays, without the “verified” mark.",
+    "blizzardLinkedNoTag": "Battle.net is linked but gave you no BattleTag: what you type stays, without the “verified” mark."
   },
   "battletagLock": {
     "pending": "Reading your connected apps… The field is read-only meanwhile.",
@@ -313,12 +306,21 @@
     "fallback": "Updating your username failed. Try again in a moment."
   },
   "connections": {
-    "intro": "No password: your account opens through these apps. Link several; the last one can't be removed.",
+    "fieldsHeading": "My game IDs",
+    "heading": "My linked accounts",
+    "intro": "No password: your account opens through these apps. For each identity one step follows: Link, then Verify. Link several; the last one can't be removed.",
     "loading": "Loading…",
     "notes": {
       "GOOGLE": "One-click login. No email address is saved.",
       "DISCORD": "Login, verification of your tag, and match time notices and reminders by direct message.",
       "BLIZZARD": "Login, and your BattleTag kept up to date by Blizzard."
+    },
+    "state": {
+      "UNLINKED": "Not linked",
+      "LINKED": "Linked",
+      "LINKED_TO_CERTIFY": "Linked, to verify",
+      "LINKED_NO_BATTLETAG": "Linked, BattleTag not verified",
+      "CERTIFIED": "Verified"
     },
     "linked": "Linked",
     "handleLine": "{label}: {handle}",
@@ -401,7 +403,7 @@
     "asCaster": "<strong>Both teams and the other casters of a match you cast</strong>, only while the match is being played (from its start to its end).",
     "asReferee": "<strong>Both teams and the casters of a match you are the assigned referee of</strong>, from the moment both its opponents are known to its end for the teams (only while the match is being played if you also cast it), only while the match is being played for the casters.",
     "staff": "<strong>Referees and administrators</strong>, in the same “Contacts” window of the tournament's matches: at the same times as both teams for a match you play, from the moment both its opponents are known until its end for a match you cast or referee (the launch window only opens for the teams, the casters and the assigned referee; the page of a match you cast or referee repeats it at the same times, and that of a match where you are a team contact to those who are parties to it) — never anywhere else.",
-    "outro": "To stop sharing it entirely, you have to clear the field — but your opponents will then no longer be able to add you in game. And if a Blizzard account is linked, it controls this field: you have to remove it first (after adding another way to log in if it is your only one).",
+    "outro": "To stop sharing it entirely, you have to clear the field — but your opponents will then no longer be able to add you in game. And if this BattleTag comes from a linked Blizzard account, that account controls this field: you have to remove it first (after adding another way to log in if it is your only one).",
     "ok": "Got it"
   },
   "verify": {

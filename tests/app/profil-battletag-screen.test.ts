@@ -88,7 +88,7 @@ describe("champ BattleTag — le verrou à l'écran", () => {
     expect(page).toContain("connections === null");
     expect(page).toMatch(/isBattletagLocked\(\{\s*linked: blizzardLinked,/);
     // Seul un BattleTag venu de Battle.net verrouille ; un tag tapé reste ouvert (D3).
-    expect(page).toContain("verified: data?.profile.battletagVerified !== false");
+    expect(page).toContain("verified: data?.profile.battletagFromBlizzard !== false");
   });
 });
 
@@ -128,7 +128,7 @@ describe("« Applications connectées » — la porte du rattachement Discord", 
     // Un lecteur d'écran qui parcourt les contrôles ne rencontre jamais le
     // texte voisin : la porte doit entrer dans la description du bouton.
     expect(section).toContain(
-      "aria-describedby={methodLabel ? `${detailsId} ${methodId}` : detailsId}",
+      "aria-describedby={methodId ? `${detailsId} ${methodId}` : detailsId}",
     );
   });
 

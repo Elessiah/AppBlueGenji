@@ -68,28 +68,16 @@ export const PROFILE_SECTIONS = [
     tone: "blue",
   },
   {
-    id: "jeux",
-    title: "Comptes de jeu",
-    lead: "Les identifiants qui permettent aux autres joueurs de t'ajouter.",
+    id: "comptes",
+    title: "Identités de jeu et comptes liés",
+    lead: "Lie tes comptes, puis certifie-les : un compte lié seul ne suffit pas à te rendre joignable.",
     tone: "violet",
-  },
-  {
-    id: "discord",
-    title: "Discord",
-    lead: "Le tag par lequel l'organisation te joint pendant un tournoi.",
-    tone: "cyan",
   },
   {
     id: "confidentialite",
     title: "Confidentialité",
     lead: "Ce que les autres voient de toi, et si les équipes peuvent te démarcher.",
     tone: "teal",
-  },
-  {
-    id: "connexions",
-    title: "Applications connectées",
-    lead: "Les portes par lesquelles tu entres sur le site, et les sessions encore ouvertes.",
-    tone: "blue",
   },
   {
     id: "notifications",
@@ -142,6 +130,17 @@ export const PROFILE_SECTION_BY_ID = Object.fromEntries(
 ) as Record<ProfileSectionId, ProfileSection>;
 
 /**
+ * Les anciennes ancres des trois sections réunies en « comptes » : des liens
+ * déjà envoyés (`/profil#discord`, `/profil#connexions`, notifications, textes
+ * de /rgpd) y mènent encore.
+ */
+export const PROFILE_SECTION_ALIASES: Readonly<Record<string, ProfileSectionId>> = {
+  jeux: "comptes",
+  discord: "comptes",
+  connexions: "comptes",
+};
+
+/**
  * L'ancre désignée par un fragment d'URL, si c'en est bien une.
  *
  * Un fragment revient du navigateur : il ne sert à désigner un élément qu'une
@@ -149,7 +148,8 @@ export const PROFILE_SECTION_BY_ID = Object.fromEntries(
  * `null`.
  */
 export function profileSectionIdFromHash(hash: string): ProfileSectionId | null {
-  const id = hash.startsWith("#") ? hash.slice(1) : hash;
+  const raw = hash.startsWith("#") ? hash.slice(1) : hash;
+  const id = Object.hasOwn(PROFILE_SECTION_ALIASES, raw) ? PROFILE_SECTION_ALIASES[raw] : raw;
   const match = PROFILE_SECTIONS.find((section) => section.id === id);
   return match ? match.id : null;
 }

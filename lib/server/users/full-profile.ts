@@ -108,6 +108,11 @@ async function hasNoPlayerPage(isDeleted: boolean, pending: boolean, userId: num
   return pending || !(await deletedAccountHasStats(userId));
 }
 
+/** Une donnée réservée au titulaire : `undefined` pour tout autre lecteur. */
+function onlyForSelf<T>(isSelf: boolean, value: T): T | undefined {
+  return isSelf ? value : undefined;
+}
+
 export async function getFullProfile(
   viewer: ProfileViewer,
   targetUserId: number,
@@ -218,6 +223,10 @@ export async function getFullProfile(
   // Même règle pour le BattleTag : masqué, il s'affiche « Masqué ✅ » à tout
   // lecteur de la fiche (`canSeeBattletagVerification`).
   profile.battletagVerified = canSeeBattletagVerification() && battletagVerified;
+  // Pour son propre profil seulement : la provenance du BattleTag (Blizzard ou saisi)
+  // que l'écran lit pour verrouiller le champ, sans dépendre de la règle de la pastille
+  // publique ci-dessus.
+  profile.battletagFromBlizzard = onlyForSelf(isSelf, battletagVerified);
 
   const [timelineRows] = await db.execute<TeamTimelineRow[]>(
     `SELECT

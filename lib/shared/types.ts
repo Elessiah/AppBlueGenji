@@ -318,6 +318,8 @@ export type PublicUserProfile = {
    * `canSeeBattletagVerification`.
    */
   battletagVerified?: boolean;
+  /** Profil du lecteur seulement : le BattleTag enregistré vient de Blizzard (verrou du champ). */
+  battletagFromBlizzard?: boolean;
   // Enriched fields for /joueurs listing
   /**
    * Compte anonymisé (`bg_users.is_deleted`).

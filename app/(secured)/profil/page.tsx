@@ -23,6 +23,7 @@ import { precheckImageUpload } from "@/lib/shared/image-upload-errors";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
 import { PSEUDO_MAX_LENGTH } from "@/lib/shared/pseudo";
 import {
+  PROFILE_SECTION_ALIASES,
   PROFILE_SECTION_BY_ID,
   profileSectionIdFromHash,
   visibleProfileSections,
@@ -50,7 +51,7 @@ import { SelfRolesSection } from "./_components/SelfRolesField";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { useCertifyRequest } from "./useCertifyRequest";
 import { certifiedFromProfileEvent } from "@/lib/shared/discord-certify-prompt";
-import { ConnectedAppsSection } from "./ConnectedAppsSection";
+import { ConnectedAppsSection, type IdentityContext } from "./ConnectedAppsSection";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
 import { BattletagVisibilityNotice } from "./BattletagVisibilityNotice";
 import { useAccountConnections } from "./useAccountConnections";
@@ -141,7 +142,27 @@ function battletagFieldNotice(
   state: { linked: boolean | null; pending: boolean },
 ): BattletagLockNotice {
   if (locked) return battletagLockText(text, state);
+  // Battle.net rattaché sans BattleTag fourni : « Si tu rattaches… » serait
+  // faux, le champ dit pourquoi le tag saisi reste non certifié.
+  if (state.linked === true) return { status: text.t("games.blizzardLinkedNoTag"), details: [] };
   return { status: text.t("games.gameTagNotice"), details: [text.t("games.blizzardNotice")] };
+}
+
+/** Ce que la liste des comptes lit à la page pour dire l'étape de chaque identité. */
+function identityContext(
+  discordState: DiscordState,
+  blizzardLinked: boolean | null,
+  battletagFromBlizzard: boolean | undefined,
+  onCertifyDiscord: () => void,
+): IdentityContext {
+  return {
+    discordKnown: discordState.linked !== null,
+    discordHasTag: !!discordState.tag,
+    discordVerified: discordState.verified,
+    battletagKnown: battletagFromBlizzard !== undefined,
+    battletagFromBlizzard: blizzardLinked === true && battletagFromBlizzard === true,
+    onCertifyDiscord,
+  };
 }
 
 /** Le « i » a-t-il quelque chose à dire ? */
@@ -481,7 +502,24 @@ export default function ProfilePage() {
     target.scrollIntoView({ block: "start" });
   }, [data, invitations.length]);
 
+  // Un lien de la page même vers une ancienne ancre (`#discord`, `#connexions`) :
+  // aucun élément ne la porte plus, le navigateur ne défilerait pas.
+  useEffect(() => {
+    const onHashChange = (event: HashChangeEvent) => {
+      const raw = new URL(event.newURL).hash.slice(1);
+      // Une ancre du registre défile d'elle-même : seules les anciennes ont besoin d'aide.
+      if (!Object.hasOwn(PROFILE_SECTION_ALIASES, raw)) return;
+      document.getElementById(PROFILE_SECTION_ALIASES[raw])?.scrollIntoView({ block: "start" });
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
   const onSubmit = async (event: FormEvent) => {
+    // Les fenêtres de la section des comptes (code du bot) sont des formulaires
+    // portés dans `document.body`, mais React fait remonter leur envoi jusqu'ici :
+    // seul l'envoi de ce formulaire enregistre le profil.
+    if (event.target !== event.currentTarget) return;
     event.preventDefault();
     // Une sauvegarde à la fois (Entrée puis clic, double clic) : la seconde partirait
     // avec des références pas encore réalignées (revue de sécurité du lot 9-2).
@@ -718,7 +756,7 @@ export default function ProfilePage() {
     linked: blizzardLinked,
     // Profil pas encore lu : origine inconnue, verrouillé comme un
     // rattachement inconnu (`checkBattletagEdit`).
-    verified: data?.profile.battletagVerified !== false,
+    verified: data?.profile.battletagFromBlizzard !== false,
   });
   const battletagNotice = battletagFieldNotice(text, battletagLocked, {
     linked: blizzardLinked,
@@ -766,7 +804,6 @@ export default function ProfilePage() {
         setTagRemovalDms((matchDmShown.current ?? data?.matchDmEnabled) !== false);
         setConfirmingTagRemoval(true);
       }}
-      setVerifyOpen={setVerifyOpen}
     />
   );
 
@@ -799,6 +836,8 @@ export default function ProfilePage() {
             // Une fenêtre de proposition encore en attente (conditions à
             // accepter) ne doit plus s'ouvrir pour un tag désormais certifié.
             window.dispatchEvent(certifiedFromProfileEvent());
+            // Le bouton « Certifier » de la ligne disparaît : le focus passe à la pastille d'état.
+            window.setTimeout(() => document.getElementById("connection-state-discord")?.focus(), 60);
           }}
         />
       )}
@@ -916,115 +955,141 @@ export default function ProfilePage() {
           </div>
         </ProfileSection>
 
-        <ProfileSection section={sectionById.jeux}>
-          <div className="form-grid">
+        <ProfileSection section={sectionById.comptes}>
+          <ConnectedAppsSection
+            identity={identityContext(discordState, blizzardLinked, data?.profile.battletagFromBlizzard, () =>
+              setVerifyOpen(true),
+            )}
+            connections={connections}
+            reload={reloadConnections}
+            onChanged={loadDiscordState}
+            onDiscordTagChanged={(tag) => {
+              // Le pseudo vient d'être écrit en base par le code du bot : le champ
+              // (verrouillé sous un Discord rattaché) **et** sa référence suivent,
+              // sans quoi l'écran montrerait l'ancien pseudo jusqu'au rechargement.
+              setDiscordPseudo(tag);
+              setSavedDiscordPseudo(tag);
+              // Un pseudo qui change perd sa certification (comme côté serveur) :
+              // l'écran ne la garde pas si la relecture de l'état Discord échoue.
+              // Le profil chargé aussi : il sert de repli quand cette lecture échoue.
+              setDiscordState((prev) => (prev.tag === tag ? prev : { ...prev, tag, verified: false }));
+              setData((prev) =>
+                prev && prev.profile.discordPseudo !== tag
+                  ? { ...prev, profile: { ...prev.profile, discordVerified: false } }
+                  : prev,
+              );
+            }}
+            onDiscordUnlinked={() => {
+              setDiscordState((prev) => ({ ...prev, linked: false, verified: false, attested: false }));
+              setData((prev) => (prev ? { ...prev, profile: { ...prev.profile, discordVerified: false } } : prev));
+            }}
+          >
+            <div className="form-grid">
+              <div className="field">
+                <InfoHintRow>
+                  <label htmlFor="profile-battletag">{t("games.battletag")}</label>
+                  {/* Le détail (Blizzard, verrou, qui lit un BattleTag masqué) derrière le « i » :
+                      l'avertissement sur le masquage y reste dans les deux cas, verrouillé ou non. */}
+                  <InfoHint id="profile-battletag-more" subject={t("games.battletag")}>
+                    <HintDetails lines={battletagNotice.details} />
+                    <AudienceList lines={hiddenBattletagAudienceText(text)} />
+                  </InfoHint>
+                </InfoHintRow>
+                <input
+                  id="profile-battletag"
+                  value={overwatchBattletag}
+                  onChange={(e) => {
+                    setOverwatchBattletag(e.target.value);
+                    fieldErrors.clear("battletag");
+                  }}
+                  placeholder={t("games.battletagPlaceholder")}
+                  {...fieldErrors.aria("battletag", "profile-battletag-hint", "profile-battletag-more")}
+                  /* Un compte Blizzard rattaché possède son BattleTag : le champ
+                     le montre, il ne le prend plus. `readOnly` et non `disabled`
+                     — la valeur reste lisible au lecteur d'écran et atteignable
+                     au clavier, ce qu'un champ désactivé perd. */
+                  readOnly={battletagLocked}
+                  aria-readonly={battletagLocked || undefined}
+                />
+                <FieldErrorText fieldId={PROFILE_FIELD_IDS.battletag} message={fieldErrors.message("battletag")} />
+                {/* Verrouillé, l'état du module ; ouvert, la finalité (`battletagFieldNotice`). */}
+                <p id="profile-battletag-hint" className={s.hint}>
+                  {battletagNotice.status}
+                </p>
+              </div>
+              <div className="field">
+                <label htmlFor="profile-marvel">{t("games.marvel")}</label>
+                <input
+                  id="profile-marvel"
+                  value={marvelRivalsTag}
+                  onChange={(e) => setMarvelRivalsTag(e.target.value)}
+                  aria-describedby="profile-marvel-hint"
+                />
+                <p id="profile-marvel-hint" className={s.hint}>
+                  {t("games.gameTagNotice")}
+                </p>
+              </div>
+            </div>
             <div className="field">
               <InfoHintRow>
-                <label htmlFor="profile-battletag">{t("games.battletag")}</label>
-                {/* Le détail (Blizzard, verrou, qui lit un BattleTag masqué) derrière le « i » :
-                    l'avertissement sur le masquage y reste dans les deux cas, verrouillé ou non. */}
-                <InfoHint id="profile-battletag-more" subject={t("games.battletag")}>
-                  <HintDetails lines={battletagNotice.details} />
-                  <AudienceList lines={hiddenBattletagAudienceText(text)} />
-                </InfoHint>
+                <label htmlFor="profile-discord">
+                  <span className={s.fieldLabelRow}>
+                    {t("discord.label")}
+                    {discordState.verified ? <VerifiedBadge labels={verifiedBadgeLabels(text)} /> : null}
+                  </span>
+                </label>
+                <DiscordFieldHint notice={discordNotice} text={text} />
               </InfoHintRow>
               <input
-                id="profile-battletag"
-                value={overwatchBattletag}
+                id="profile-discord"
+                value={discordPseudo}
                 onChange={(e) => {
-                  setOverwatchBattletag(e.target.value);
-                  fieldErrors.clear("battletag");
+                  setDiscordPseudo(e.target.value);
+                  fieldErrors.clear("discord");
                 }}
-                placeholder={t("games.battletagPlaceholder")}
-                {...fieldErrors.aria("battletag", "profile-battletag-hint", "profile-battletag-more")}
-                /* Un compte Blizzard rattaché possède son BattleTag : le champ
-                   le montre, il ne le prend plus. `readOnly` et non `disabled`
-                   — la valeur reste lisible au lecteur d'écran et atteignable
-                   au clavier, ce qu'un champ désactivé perd. */
-                readOnly={battletagLocked}
-                aria-readonly={battletagLocked || undefined}
+                placeholder={t("discord.placeholder")}
+                {...fieldErrors.aria("discord", "profile-discord-hint", discordHasMore && "profile-discord-more")}
+                /* Un compte Discord rattaché possède son tag : le champ le
+                   montre, il ne le prend plus. `readOnly` et non `disabled` —
+                   la valeur reste lisible au lecteur d'écran et atteignable au
+                   clavier, ce qu'un champ désactivé perd. */
+                readOnly={discordLocked}
+                aria-readonly={discordLocked || undefined}
               />
-              <FieldErrorText fieldId={PROFILE_FIELD_IDS.battletag} message={fieldErrors.message("battletag")} />
-              {/* Verrouillé, l'état du module ; ouvert, la finalité (`battletagFieldNotice`). */}
-              <p id="profile-battletag-hint" className={s.hint}>
-                {battletagNotice.status}
+              <FieldErrorText fieldId={PROFILE_FIELD_IDS.discord} message={fieldErrors.message("discord")} />
+              {discordLocked ? (
+                discordLockedActions
+              ) : (
+                <div className={s.actionsRow}>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setVerifyOpen(true)}
+                    /* « Recertifier » seul ne dit pas quoi : le libellé
+                       accessible commence par le texte visible (WCAG 2.5.3) et
+                       ajoute l'objet. */
+                    aria-label={
+                      discordState.verified
+                        ? t("discord.recertifyLabel")
+                        : t("discord.certifyLabel")
+                    }
+                    style={{ padding: "7px 14px", fontSize: 12 }}
+                  >
+                    {discordState.verified ? t("discord.recertify") : t("discord.certify")}
+                  </button>
+                </div>
+              )}
+              {/* **Deux cas seulement, et non trois.** Un tag certifié appartient
+                  forcément à un compte rattaché — `writeVerifiedTag` écrit
+                  `discord_id`, et détacher Discord décertifie —, donc `verified`
+                  implique `discordLocked` : la branche « certifié, non verrouillé »
+                  ne pouvait jamais être atteinte. C'est l'état du verrou qui énonce
+                  alors l'exposition (`discordNotice`). */}
+              <p id="profile-discord-hint" className={s.hint}>
+                {discordNotice.status}
               </p>
             </div>
-            <div className="field">
-              <label htmlFor="profile-marvel">{t("games.marvel")}</label>
-              <input
-                id="profile-marvel"
-                value={marvelRivalsTag}
-                onChange={(e) => setMarvelRivalsTag(e.target.value)}
-                aria-describedby="profile-marvel-hint"
-              />
-              <p id="profile-marvel-hint" className={s.hint}>
-                {t("games.gameTagNotice")}
-              </p>
-            </div>
-          </div>
-        </ProfileSection>
-
-        <ProfileSection section={sectionById.discord}>
-          <div className="field">
-            <InfoHintRow>
-              <label htmlFor="profile-discord">
-                <span className={s.fieldLabelRow}>
-                  {t("discord.label")}
-                  {discordState.verified ? <VerifiedBadge labels={verifiedBadgeLabels(text)} /> : null}
-                </span>
-              </label>
-              <DiscordFieldHint notice={discordNotice} text={text} />
-            </InfoHintRow>
-            <input
-              id="profile-discord"
-              value={discordPseudo}
-              onChange={(e) => {
-                setDiscordPseudo(e.target.value);
-                fieldErrors.clear("discord");
-              }}
-              placeholder={t("discord.placeholder")}
-              {...fieldErrors.aria("discord", "profile-discord-hint", discordHasMore && "profile-discord-more")}
-              /* Un compte Discord rattaché possède son tag : le champ le
-                 montre, il ne le prend plus. `readOnly` et non `disabled` —
-                 la valeur reste lisible au lecteur d'écran et atteignable au
-                 clavier, ce qu'un champ désactivé perd. */
-              readOnly={discordLocked}
-              aria-readonly={discordLocked || undefined}
-            />
-            <FieldErrorText fieldId={PROFILE_FIELD_IDS.discord} message={fieldErrors.message("discord")} />
-            {discordLocked ? (
-              discordLockedActions
-            ) : (
-              <div className={s.actionsRow}>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => setVerifyOpen(true)}
-                  /* « Recertifier » seul ne dit pas quoi : le libellé
-                     accessible commence par le texte visible (WCAG 2.5.3) et
-                     ajoute l'objet. */
-                  aria-label={
-                    discordState.verified
-                      ? t("discord.recertifyLabel")
-                      : t("discord.certifyLabel")
-                  }
-                  style={{ padding: "7px 14px", fontSize: 12 }}
-                >
-                  {discordState.verified ? t("discord.recertify") : t("discord.certify")}
-                </button>
-              </div>
-            )}
-            {/* **Deux cas seulement, et non trois.** Un tag certifié appartient
-                forcément à un compte rattaché — `writeVerifiedTag` écrit
-                `discord_id`, et détacher Discord décertifie —, donc `verified`
-                implique `discordLocked` : la branche « certifié, non verrouillé »
-                ne pouvait jamais être atteinte. C'est l'état du verrou qui énonce
-                alors l'exposition (`discordNotice`). */}
-            <p id="profile-discord-hint" className={s.hint}>
-              {discordNotice.status}
-            </p>
-          </div>
+          </ConnectedAppsSection>
         </ProfileSection>
 
         <ProfileSection section={sectionById.confidentialite}>
@@ -1089,34 +1154,6 @@ export default function ProfilePage() {
           </button>
         </div>
       </form>
-
-      <ProfileSection section={sectionById.connexions}>
-        <ConnectedAppsSection
-          connections={connections}
-          reload={reloadConnections}
-          onChanged={loadDiscordState}
-          onDiscordTagChanged={(tag) => {
-            // Le pseudo vient d'être écrit en base par le code du bot : le champ
-            // (verrouillé sous un Discord rattaché) **et** sa référence suivent,
-            // sans quoi l'écran montrerait l'ancien pseudo jusqu'au rechargement.
-            setDiscordPseudo(tag);
-            setSavedDiscordPseudo(tag);
-            // Un pseudo qui change perd sa certification (comme côté serveur) :
-            // l'écran ne la garde pas si la relecture de l'état Discord échoue.
-            // Le profil chargé aussi : il sert de repli quand cette lecture échoue.
-            setDiscordState((prev) => (prev.tag === tag ? prev : { ...prev, tag, verified: false }));
-            setData((prev) =>
-              prev && prev.profile.discordPseudo !== tag
-                ? { ...prev, profile: { ...prev.profile, discordVerified: false } }
-                : prev,
-            );
-          }}
-          onDiscordUnlinked={() => {
-            setDiscordState((prev) => ({ ...prev, linked: false, verified: false, attested: false }));
-            setData((prev) => (prev ? { ...prev, profile: { ...prev.profile, discordVerified: false } } : prev));
-          }}
-        />
-      </ProfileSection>
 
       <ProfileSection section={sectionById.notifications}>
         <PushNotificationsPanel />
@@ -1252,7 +1289,6 @@ interface DiscordLockedActionsProps {
   loadDiscordState: () => Promise<void>;
   discordTagBusy: boolean;
   onDiscordTagRemove: () => void;
-  setVerifyOpen: (open: boolean) => void;
 }
 
 /**
@@ -1274,7 +1310,6 @@ function DiscordLockedActions({
   loadDiscordState,
   discordTagBusy,
   onDiscordTagRemove,
-  setVerifyOpen,
 }: Readonly<DiscordLockedActionsProps>) {
   const { t } = useProfileText();
   return discordState.linked !== true ? (
@@ -1295,40 +1330,22 @@ function DiscordLockedActions({
       discordState={discordState}
       discordTagBusy={discordTagBusy}
       onDiscordTagRemove={onDiscordTagRemove}
-      setVerifyOpen={setVerifyOpen}
     />
   );
 }
 
-/** Rattaché : certifier (ou enregistrer) le tag, et le retirer. */
+/** Rattaché : retirer le tag (la certification se propose sur la ligne Discord de la liste). */
 function DiscordLinkedActions({
   discordState,
   discordTagBusy,
   onDiscordTagRemove,
-  setVerifyOpen,
 }: Readonly<Omit<DiscordLockedActionsProps, "discordStateBusy" | "loadDiscordState">>) {
   const { t } = useProfileText();
-  /* Sans tag enregistré il n'y a rien à *certifier* : le
-     geste est d'en poser un — le dialogue renvoie alors
-     chez Discord, qui nomme le pseudo, que le joueur
-     certifie ensuite d'un clic. Avec un tag nommé par
-     Discord, le dialogue certifie d'un clic. */
-  const certify = discordState.tag
-    ? { label: t("discord.certify"), ariaLabel: t("discord.certifyLabel") }
-    : { label: t("discord.register"), ariaLabel: t("discord.registerLabel") };
+  /* Le geste « Certifier » (ou « Enregistrer mon tag » sans tag) vit sur la ligne
+     Discord de la liste des comptes, qui est le seul endroit où il se propose : ici
+     deux boutons de même nom ouvraient la même fenêtre. */
   return (
     <div className={s.actionsRow}>
-      {discordState.verified ? null : (
-        <button
-          type="button"
-          className="btn"
-          onClick={() => setVerifyOpen(true)}
-          aria-label={certify.ariaLabel}
-          style={{ padding: "7px 14px", fontSize: 12 }}
-        >
-          {certify.label}
-        </button>
-      )}
       {discordState.tag ? (
         <button
           type="button"

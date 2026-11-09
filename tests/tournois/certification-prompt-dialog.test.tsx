@@ -87,7 +87,7 @@ describe("CertificationPromptDialog", () => {
     // « À certifier » : une étape refusable, en couleur d'information (décision 17).
     expect(html).toContain('class="pill pill-info">À certifier<');
     expect(html).not.toContain("pill-warning");
-    expect(html).toContain('href="/profil#connexions"');
+    expect(html).toContain('href="/profil#comptes"');
     expect(html).toContain("Ne plus voir");
   });
 
@@ -231,7 +231,7 @@ describe("CertificationPromptDialog", () => {
     const html = render(OW_MANAGER, "en");
     expect(html).toContain("Verify your BattleTag<");
     expect(html).toContain("Don&#x27;t show again");
-    expect(html).toContain('href="/en/profil#connexions"');
+    expect(html).toContain('href="/en/profil#comptes"');
     expect(html).not.toContain("Certifie");
     const mr = render(MR_TEAM, "en");
     expect(mr).toContain("Verify your Discord<");

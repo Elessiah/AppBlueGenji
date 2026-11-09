@@ -201,7 +201,7 @@ describe("PROFILE_SECTION_BY_ID", () => {
  */
 describe("profileSectionIdFromHash", () => {
   it("reconnaît une ancre du registre, avec ou sans dièse", () => {
-    expect(profileSectionIdFromHash("#connexions")).toBe("connexions");
+    expect(profileSectionIdFromHash("#comptes")).toBe("comptes");
     expect(profileSectionIdFromHash("compte")).toBe("compte");
   });
 
@@ -215,6 +215,23 @@ describe("profileSectionIdFromHash", () => {
     expect(profileSectionIdFromHash("#inconnu")).toBeNull();
     expect(profileSectionIdFromHash("#compte-title")).toBeNull();
     expect(profileSectionIdFromHash("##compte")).toBeNull();
+  });
+});
+
+describe("Les anciennes ancres de la section réunie", () => {
+  it("défilent aussi pour un lien de la page même, et les gestes de la liste ne soumettent pas le formulaire", () => {
+    expect(page).toContain('addEventListener("hashchange", onHashChange)');
+    for (const file of ["ConnectedAppsSection.tsx", "OtherSessionsPanel.tsx"]) {
+      const src = readFileSync(join(ROOT, "app/(secured)/profil", file), "utf8");
+      const buttons = src.match(/<button[^>]*>/g) ?? [];
+      for (const tag of buttons) expect(tag).toContain('type="button"');
+    }
+  });
+
+  it("Certifier ne se propose qu'une fois : sur la ligne Discord, pas aussi dans le champ", () => {
+    const linkedActions = page.slice(page.indexOf("function DiscordLinkedActions("));
+    expect(linkedActions).not.toContain("discord.certify");
+    expect(linkedActions).not.toContain("discord.register");
   });
 });
 

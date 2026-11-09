@@ -200,6 +200,15 @@ const connection = (provider: OAuthProvider, overrides: Partial<AccountConnectio
   ...overrides,
 });
 
+const IDENTITY = {
+  discordKnown: true,
+  discordHasTag: false,
+  discordVerified: false,
+  battletagKnown: true,
+  battletagFromBlizzard: false,
+  onCertifyDiscord: () => undefined,
+};
+
 const CONNECTION_SETS: AccountConnection[][] = [
   OAUTH_PROVIDERS.map((p) => connection(p)),
   [connection("GOOGLE", { linked: true }), connection("DISCORD", { linked: true, method: "DM_CODE", handle: "nova" }), connection("BLIZZARD")],
@@ -568,7 +577,7 @@ describe("langue du compte (lot 9-3)", () => {
   it("interrupteur des messages privés de match : sans tag certifié, une ligne le dit (FR et EN), liée à la case et à la certification", async () => {
     const en = inEnglish(<MatchDmField initial discordReachable={false} />);
     expect(en).toContain("Without a verified Discord tag, these messages can&#x27;t reach you (anti-spam).");
-    expect(en).toMatch(/<a href="#discord" class="[^"]*hintLink[^"]*">Verify my Discord tag<\/a>/);
+    expect(en).toMatch(/<a href="#comptes" class="[^"]*hintLink[^"]*">Verify my Discord tag<\/a>/);
     expect(en).toContain('aria-describedby="profile-match-dms-hint profile-match-dms-unreachable"');
     expect(en).toContain('id="profile-match-dms-unreachable"');
     expectEnglish(en);
@@ -760,21 +769,22 @@ describe("anglais — écrans", () => {
       </>,
     );
     expect(html).toContain("Loading your profile…");
-    expect(html).toContain("Connected apps");
+    expect(html).toContain("Game identities and linked accounts");
     expect(html).toContain("Log out");
     expectEnglish(html);
   });
 
   it("applications connectées, chaque état", () => {
     for (const set of CONNECTION_SETS) {
-      const html = inEnglish(<ConnectedAppsSection connections={set} reload={async () => undefined} />);
+      const html = inEnglish(<ConnectedAppsSection identity={IDENTITY} connections={set} reload={async () => undefined} />);
       expect(html).toContain("Discord bot (direct-message code)");
       expectEnglish(html);
     }
-    expect(inEnglish(<ConnectedAppsSection connections={null} reload={async () => undefined} />)).toContain("Loading…");
+    expect(inEnglish(<ConnectedAppsSection identity={IDENTITY} connections={null} reload={async () => undefined} />)).toContain("Loading…");
     // Pseudo du fournisseur et pseudo vu par le bot, nettoyés (commande de direction, largeur nulle) : revue de sécurité du lot 9-2.
     const trapped = inEnglish(
       <ConnectedAppsSection
+        identity={IDENTITY}
         connections={[connection("GOOGLE", { linked: true }), connection("DISCORD", { linked: true, method: "OAUTH", handle: "no\u202Eva\u200B" }), connection("BLIZZARD", { linked: true, handle: "\u202ENova#1234" })]}
         reload={async () => undefined}
       />,
@@ -784,15 +794,15 @@ describe("anglais — écrans", () => {
     const fallback = renderToStaticMarkup(
       <AppLocaleProvider locale="en">
         <ProfileTextProvider locale="fr">
-          <ConnectedAppsSection connections={CONNECTION_SETS[0]} reload={async () => undefined} />
+          <ConnectedAppsSection identity={IDENTITY} connections={CONNECTION_SETS[0]} reload={async () => undefined} />
         </ProfileTextProvider>
       </AppLocaleProvider>,
     );
-    expect(fallback).toContain("Rattacher");
+    expect(fallback).toContain("Lier");
     expect(fallback).toMatch(/href="\/api\/auth\/[a-z]+\/start\?lang=en&amp;intent=link"/u);
     expect(trapped).toContain("nova");
     expect(discordBotRowText(FR_PROFILE, { noteCode: "HANDLE", handle: "kery\u202Ean", refusalCode: null }).note).not.toMatch(/\u202E/u);
-    const linkHtml = inEnglish(<ConnectedAppsSection connections={CONNECTION_SETS[0]} reload={async () => undefined} />);
+    const linkHtml = inEnglish(<ConnectedAppsSection identity={IDENTITY} connections={CONNECTION_SETS[0]} reload={async () => undefined} />);
     // Le rattachement emporte la langue : retour sur `/en/profil`.
     expect(linkHtml).toContain("/api/auth/google/start?lang=en&amp;intent=link");
     expect(inEnglish(<OtherSessionsPanel version={0} />)).toContain("Log out my other sessions");

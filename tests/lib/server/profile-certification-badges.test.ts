@@ -119,6 +119,22 @@ describe("pastille BattleTag vérifié", () => {
   });
 });
 
+describe("provenance du BattleTag (verrou du champ du titulaire)", () => {
+  it("est donnée au titulaire seulement, vraie sous Battle.net", async () => {
+    profileDb(userRow({ blizzard_linked: 1 }));
+    const own = await getFullProfile({ id: 7 }, 7);
+    expect(own?.profile.battletagFromBlizzard).toBe(true);
+    const other = await getFullProfile({ id: 20 }, 7);
+    expect(other?.profile.battletagFromBlizzard).toBeUndefined();
+  });
+
+  it("est fausse pour un BattleTag saisi", async () => {
+    profileDb(userRow({ blizzard_linked: 0 }));
+    const own = await getFullProfile({ id: 7 }, 7);
+    expect(own?.profile.battletagFromBlizzard).toBe(false);
+  });
+});
+
 describe("pastille Discord certifié", () => {
   it.each([
     ["certifié d'un clic (tag nommé par Discord)", "OAUTH"],
