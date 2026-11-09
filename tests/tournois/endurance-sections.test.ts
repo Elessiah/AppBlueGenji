@@ -326,6 +326,17 @@ describe("endurancePlayoffGhostSlots", () => {
     expect(endurancePlayoffGhostSlots([])).toEqual([]);
   });
 
+  it("n'annonce plus de tour sous un tournoi clos", () => {
+    // Deux demi-finales closes sur un double forfait ne qualifient personne :
+    // `advancePlayoffsOneStep` clôt le tournoi sur le classement de
+    // qualification **sans poser la finale**. Le dernier tour portant toujours
+    // deux rencontres, la prédiction annonçait une finale TBD sous un tableau
+    // terminé.
+    const posed = [...playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 4), ...playoffRoundOfSize(PLAYOFF_ROUND_OFFSET + 1, 2)];
+    expect(endurancePlayoffGhostSlots(posed)).toHaveLength(1);
+    expect(endurancePlayoffGhostSlots(posed, true)).toEqual([]);
+  });
+
   it("arrondit vers le haut sur un plateau qui n'est pas une puissance de deux", () => {
     // Trois rencontres au premier tour : deux au suivant (un vainqueur passe le
     // tour), puis la finale.

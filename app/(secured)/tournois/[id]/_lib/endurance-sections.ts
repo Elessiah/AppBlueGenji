@@ -249,8 +249,22 @@ function ghostSlotId(roundNumber: number, matchNumber: number): number {
  * Les créneaux rendus s'arrêtent à la finale, et la liste est **vide** tant que
  * l'arbre n'a pas commencé comme une fois la finale posée : il n'y a alors plus
  * rien à annoncer.
+ *
+ * **Un tournoi clos n'annonce plus rien non plus**, et ce n'est pas une
+ * précaution de principe : deux demi-finales closes sur un double forfait ne
+ * qualifient personne, `advancePlayoffsOneStep` clôt alors le tournoi sur le
+ * classement de qualification **sans jamais poser la finale**. Le dernier tour
+ * posé portant toujours deux rencontres, la prédiction `ceil(n/2)` annonçait
+ * une finale `TBD` – `TBD` sous un tableau terminé, traits compris. Tant que le
+ * tournoi vit, prédire un tour de trop ne coûte rien — il arrivera ; une fois
+ * clos, plus rien n'arrive.
  */
-export function endurancePlayoffGhostSlots(decisive: BracketMatch[]): BracketSlotRef[] {
+export function endurancePlayoffGhostSlots(
+  decisive: BracketMatch[],
+  tournamentFinished = false,
+): BracketSlotRef[] {
+  if (tournamentFinished) return [];
+
   const rounds = [...new Set(decisive.map((match) => match.roundNumber))];
   if (rounds.length === 0) return [];
 
@@ -285,10 +299,16 @@ export function endurancePlayoffGhostSlots(decisive: BracketMatch[]): BracketSlo
  * au serveur.
  *
  * Les créneaux à pourvoir ({@link endurancePlayoffGhostSlots}) se passent en
- * second argument : la règle d'appariement est la même qu'ils portent une
- * rencontre ou non, et c'est elle qui fait descendre le trait d'un quart de
- * finale jusqu'à la case vide de sa demie. Sans eux — un appel qui ne les
- * donne pas —, le trait s'arrête au bord de la carte, comme avant.
+ * second argument : la règle de position vaut qu'ils portent une rencontre ou
+ * non, et c'est elle qui fait descendre le trait d'un quart de finale jusqu'à
+ * la case vide de sa demie. Sans eux — un appel qui ne les donne pas —, le
+ * trait s'arrête au bord de la carte, comme avant.
+ *
+ * **Une réserve, antérieure à ce calcul** : le moteur *saute* une paire dont
+ * les deux créneaux ont été vidés par un double forfait (`pair.length === 0`
+ * dans `planNextPlayoffRound`), ce qui décale d'un cran les rencontres qui
+ * suivent — là où ce module garde `floor(i/2)`. Deux doubles forfaits voisins
+ * font donc des traits faux ; c'est consigné dans `ERREUR.txt`.
  */
 export function endurancePlayoffLinks(
   decisive: BracketMatch[],

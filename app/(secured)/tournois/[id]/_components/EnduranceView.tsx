@@ -260,7 +260,7 @@ export function EnduranceView({
   // Les tours que le moteur n'a pas encore posés : l'arbre se montre entier dès
   // l'ouverture des play-offs, cases vides comprises, plutôt que de se réduire
   // à sa première colonne jusqu'à ce que les quarts soient joués.
-  const playoffGhosts = endurancePlayoffGhostSlots(decisive);
+  const playoffGhosts = endurancePlayoffGhostSlots(decisive, isFinished);
   const playoffLinks = endurancePlayoffLinks(decisive, playoffGhosts);
   const resolvePlayoffNext = (slot: BracketSlotRef) => playoffLinks.get(slot.id) ?? null;
   // Les tours de l'arbre naissent un à un : sans ce compte, les quarts de finale

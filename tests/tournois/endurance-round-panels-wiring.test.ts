@@ -124,16 +124,24 @@ describe("play-offs — le vrai arbre, et non une liste de cartes", () => {
     // de finale.
     expect(VIEW).toContain("endurancePlayoffGhostSlots(");
     expect(VIEW).toContain("ghostSlots={playoffGhosts}");
+    // Un tournoi clos n'annonce plus de tour : deux demi-finales perdues sur
+    // double forfait closent le tournoi sans que la finale soit posée.
+    expect(VIEW).toContain("endurancePlayoffGhostSlots(decisive, isFinished)");
+    // La pastille annonce la taille du volet, cases à pourvoir comprises —
+    // « 0 match » sur un volet qui en dessine sept n'était juste pour personne.
+    expect(SECTIONS).toContain("sectionMatches.length + sectionGhosts.length");
     expect(VIEW).toContain("endurancePlayoffLinks(decisive, playoffGhosts)");
     expect(SECTIONS).toContain("ghostSlots={sectionGhosts}");
     expect(TREE).toContain("<GhostMatchCard />");
   });
 
   it("ne fait pas passer une case à pourvoir pour une rencontre", () => {
-    // La pastille d'un volet compte les matchs à jouer, pas les places vides,
-    // et rien ne se qualifie depuis un créneau que personne n'occupe.
-    expect(SECTIONS).toContain("const matchCount = sectionMatches.length;");
+    // Rien ne se qualifie depuis un créneau que personne n'occupe, et un volet
+    // qui n'en porte que ne réserve pas la colonne des badges — deux cent
+    // trente pixels de défilement vides.
     expect(TREE).toContain("if (slot.match === null) return null;");
+    expect(TREE).toContain("const hasQualifyBadges =");
+    expect(TREE).toContain("{hasQualifyBadges && (");
     // La carte vide n'a ni ancre publique, ni action, ni arbitrage.
     const ghost = read("_components", "GhostMatchCard.tsx");
     expect(ghost).not.toContain("matchAnchorId");

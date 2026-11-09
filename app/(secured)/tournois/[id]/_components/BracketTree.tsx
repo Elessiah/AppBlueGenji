@@ -165,6 +165,14 @@ export function BracketTree({
     roundNums.map((rn) => [rn, totalH / slotsByRound.get(rn)!.length]),
   );
 
+  // Badges « Qualifié en X » : seulement si le dernier tour du volet porte au
+  // moins une rencontre. Un volet qui se termine sur des cases à pourvoir
+  // (plateau de plus de huit, dont un volet peut naître entièrement à pourvoir)
+  // n'a aucun badge à poser, et réservait pourtant leur colonne — deux cent
+  // trente pixels de défilement horizontal parfaitement vides.
+  const hasQualifyBadges =
+    qualifyLabel !== null && (slotsByRound.get(roundNums.at(-1)!) ?? []).some((s) => s.match !== null);
+
   // Stade nommé à partir de la fin du tableau complet (index global).
   // Même règle que les volets (`stageKey`), libellés dans la langue de la page.
   const roundLabel = (globalIdx: number) => {
@@ -339,7 +347,7 @@ export function BracketTree({
         );
       })}
 
-      {qualifyLabel && (
+      {hasQualifyBadges && (
         <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
           <div style={{ height: 26 }} />
           <div style={{ width: CONN_W + BADGE_W, height: totalH, flexShrink: 0, position: "relative" }}>

@@ -183,9 +183,14 @@ export function BracketSections({
           const sectionGhosts = (ghostSlots ?? []).filter((slot) =>
             section.rounds.includes(slot.roundNumber),
           );
-          // La pastille compte les **rencontres**, pas les cases vides : une
-          // place à pourvoir n'est pas un match de plus à jouer.
-          const matchCount = sectionMatches.length;
+          // La pastille compte les **créneaux**, cases à pourvoir comprises :
+          // c'est la taille du volet, et c'est déjà ce qu'elle annonce sur un
+          // tableau à élimination, dont les tours à venir sont de vraies
+          // rencontres sans engagées. Ne compter que les rencontres posées
+          // faisait annoncer « 0 match » à un volet qui en dessine sept — le
+          // cas d'un plateau de plus de huit, dont le second volet naît
+          // entièrement à pourvoir.
+          const matchCount = sectionMatches.length + sectionGhosts.length;
           const hasMyMatch = myNext !== null && section.rounds.includes(myNext.roundNumber);
           const panelId = `${regionBaseId}-${section.key.replace(/\s+/g, "-")}`;
 

@@ -129,10 +129,22 @@ passer pour une :
 | --- | --- |
 | un identifiant **négatif**, qu'aucune rencontre ne peut porter | d'ancre `#match-…` — il n'a pas d'adresse publique |
 | une place dans sa colonne, et les traits qui y mènent | d'action, d'arbitrage ni de planification |
-| une case d'emblème vide, pour aligner les noms d'une colonne à l'autre | de ligne dans la pastille du volet, qui compte les matchs à jouer |
+| une case d'emblème vide, pour aligner les noms d'une colonne à l'autre | de badge « Qualifié en X » — la rencontre qui l'occupera n'existe pas |
 
-Il ne porte pas non plus de badge « Qualifié en X » : la rencontre qui
-l'occupera n'existe pas, et le badge annoncerait une suite à une case vide.
+Il compte **en revanche** dans la pastille du volet, qui annonce la taille du
+tableau et non le nombre de matchs jouables : c'est déjà ce qu'elle fait sur un
+tableau à élimination, dont les tours à venir sont de vraies rencontres sans
+engagées. Au-delà de huit qualifiées, un volet entier peut naître à pourvoir —
+il annonçait alors « 0 match » en dessinant sept cartes. Un tel volet ne réserve
+pas non plus la colonne des badges, qui serait vide (`hasQualifyBadges`).
+
+**Un tournoi clos n'annonce plus aucun tour.** Deux demi-finales closes sur un
+double forfait ne qualifient personne : `advancePlayoffsOneStep` clôt alors le
+tournoi sur le classement de qualification **sans jamais poser la finale**. Le
+dernier tour portant toujours deux rencontres, la prédiction `ceil(n/2)`
+affichait une finale `TBD` – `TBD` sous un tableau terminé. Tant que le tournoi
+vit, prédire un tour de trop ne coûte rien — il arrivera ; une fois clos, plus
+rien n'arrive, d'où le `isFinished` que lui passe `EnduranceView`.
 
 Conséquence heureuse : le découpage en volets **ne se réorganise plus** en cours
 de route, puisque l'arbre naît avec tous ses tours. La clé stable et l'ouverture
@@ -202,6 +214,13 @@ Deux garde-fous à retenir :
 - **Un appel sans créneaux ne lie rien au-delà du dernier tour posé.** C'est le
   comportement d'origine, et c'est celui des tableaux à élimination, qui
   n'en passent aucun : le trait s'arrête au bord de la carte.
+
+Une **réserve antérieure** à tout cela : le moteur saute une paire dont les deux
+créneaux ont été vidés par un double forfait (`pair.length === 0` dans
+`planNextPlayoffRound`), ce qui décale d'un cran les rencontres suivantes, là où
+le module garde `floor(i/2)`. Deux doubles forfaits voisins font donc des traits
+faux, et la prédiction annonce un tour plus large qu'il ne naîtra. Consigné dans
+`ERREUR.txt`.
 
 Si la règle d'appariement du moteur changeait, c'est `endurancePlayoffLinks`
 qu'il faudrait suivre — d'où un test qui la compare à la structure réellement
