@@ -67,6 +67,7 @@ import { siteUrl } from "@/lib/server/site-url";
 import { tournamentPageUrl } from "./app-url";
 import { onPoster, toPoster, type PosterRow } from "./match-poster";
 import { dispatchRefereeDigest } from "./referee-digest";
+import { NEW_MATCH_PENDING_SQL } from "./new-match-sql";
 import { claimDatedMark, releaseDatedMarks } from "./reminder-marks";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
@@ -1005,6 +1006,9 @@ async function runSweep(now: Date): Promise<number> {
   // premier palier : au-delà, seule une manche jamais vue (à annoncer) est lue.
   // Une manche dont le palier ouvert est déjà pris attend l'ouverture du
   // suivant sans être relue (`WAITING_OFFSETS`).
+  // Une manche qui attend l'annonce de son nouveau match n'est pas lue : cette
+  // annonce porte l'horaire et pose elle-même les marques (« Match programmé »
+  // ne part pas en double, `NEW_MATCH_NOTICE.md`).
   const waiting = WAITING_OFFSETS.map(
     () => `
         AND NOT EXISTS (SELECT 1 FROM bg_match_reminders sent
@@ -1014,6 +1018,7 @@ async function runSweep(now: Date): Promise<number> {
   const [matches] = await db.query<SweepMatchRow[]>(
     `${SWEEP_MATCH_SELECT}
         AND m.start_at <= ?
+        AND NOT ${NEW_MATCH_PENDING_SQL}
         AND NOT EXISTS (SELECT 1 FROM bg_match_reminders done
                          WHERE done.match_id = m.id AND done.offset_key = ?)${waiting}
      HAVING m.start_at <= ? OR seen_mark = 0`,
@@ -1022,6 +1027,7 @@ async function runSweep(now: Date): Promise<number> {
       MATCH_TOLD_KEY,
       now,
       inSeconds(now, Math.round(MATCH_REMINDER_LOOKAHEAD_MS / 1000)),
+      now,
       LAST_REMINDER_KEY,
       ...WAITING_OFFSETS.flatMap(({ key, nextOpensSeconds }) => [key, inSeconds(now, nextOpensSeconds)]),
       inSeconds(now, FIRST_REMINDER_LEAD_SECONDS),

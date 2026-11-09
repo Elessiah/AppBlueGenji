@@ -145,7 +145,7 @@
     "label": "Messages privés Discord de mes matchs",
     "notCertified": "Sans tag Discord certifié, ces messages ne peuvent pas te parvenir (contre le spam).",
     "certifyLink": "Certifier mon tag Discord",
-    "hint": "Activés par défaut : le bot t'écrit en privé quand l'horaire d'un de tes matchs est posé, changé ou retiré, quand un match quitte ton programme, quand un nouveau match t'attend (adversaire connu, hors première manche), quand ton inscription de caster sur un match est retirée par le staff ou d'office (avec le motif), 15 minutes avant un match en autogestion d'une équipe que tu gères ou de ton tournoi individuel — ou à l'ouverture de son salon, si elle vient plus tôt — (check-in du match), et pour ses rappels (24 h et 10 h avant). Les notifications push et les messages reçus comme arbitre n'en dépendent pas.",
+    "hint": "Activés par défaut : le bot t'écrit en privé quand l'horaire d'un de tes matchs est posé, changé ou retiré, quand un match quitte ton programme, quand un nouveau match t'attend (adversaire connu), quand ton inscription de caster sur un match est retirée par le staff ou d'office (avec le motif), 15 minutes avant un match en autogestion d'une équipe que tu gères ou de ton tournoi individuel — ou à l'ouverture de son salon, si elle vient plus tôt — (check-in du match), et pour ses rappels (24 h et 10 h avant). Les notifications push et les messages reçus comme arbitre n'en dépendent pas.",
     "enabled": "Messages privés de match activés.",
     "enabledNotCertified": "Messages privés de match activés : ils partiront une fois ton tag Discord certifié.",
     "disabled": "Messages privés de match coupés."

@@ -18,7 +18,7 @@
     },
     "NEW_MATCH": {
       "label": "New match",
-      "description": "A round ends and the opponent of your next match (a team you belong to, or your solo tournament) is known: who you face, the time if it is set, and the match link. A tournament's first round is not announced: the kickoff covers it."
+      "description": "The opponent of your next match (a team you belong to, or your solo tournament) is known: who you face, the time if it is set, and the match link."
     },
     "MATCH_REMINDER": {
       "label": "Match times and reminders",

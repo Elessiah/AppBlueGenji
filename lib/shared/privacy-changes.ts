@@ -1663,7 +1663,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Quand une manche se termine et que les deux adversaires d'un de tes matchs sont connus, tu es prévenu : l'équipe adverse, l'horaire s'il est posé et le lien de la page du match, en message privé Discord et en notification push.",
     details: [
-      "Qui est prévenu : tous les membres des deux équipes (ou le joueur d'un tournoi individuel, sans que le message nomme son adversaire), une seule fois par match ; la première manche d'un tournoi n'est pas annoncée, le coup d'envoi la couvre. Aucun pseudo, BattleTag ni tag Discord n'y figure, seulement des noms d'équipe.",
+      "Qui est prévenu : tous les membres des deux équipes (ou le joueur d'un tournoi individuel, sans que le message nomme son adversaire), une seule fois par match, dès que les deux adversaires sont connus, première manche comprise ; si l'horaire est déjà posé, l'annonce le donne et « Match programmé » ne part pas en plus. Aucun pseudo, BattleTag ni tag Discord n'y figure, seulement des noms d'équipe.",
       "Notifications push : ce nouveau sujet, « Nouveau match », est actif d'office sur les appareils déjà abonnés, comme tout sujet ; tu peux le couper dans « Mon profil ». Message privé Discord : seulement si ton tag est certifié, au titre de l'intérêt légitime (bon déroulement des tournois) ; la case « Messages privés Discord de mes matchs » de « Mon profil » le coupe avec les autres.",
       "Ce que le site garde : pour chaque match annoncé, sa place dans le tournoi et les numéros des deux équipes, avec le tournoi (effacés avec lui), pour ne jamais l'annoncer deux fois. Rien de nouveau n'est collecté sur ton compte.",
     ],

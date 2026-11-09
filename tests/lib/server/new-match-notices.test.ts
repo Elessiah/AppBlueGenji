@@ -36,15 +36,15 @@ const MATCH = {
 type Db = { execute: jest.Mock<SqlQuery>; query: jest.Mock<SqlQuery> };
 
 /**
- * Base simulée : `unbased` = tournois en cours sans ligne de départ ;
+ * Base simulée : `installed` = clé de mise en service déjà posée ;
  * `candidates` = matchs à annoncer ; `claims` = issue de chaque réservation.
  */
-function mockDb(options: { unbased?: number[]; candidates?: object[]; claims?: boolean[] } = {}): Db {
+function mockDb(options: { installed?: boolean; candidates?: object[]; claims?: boolean[] } = {}): Db {
   const claims = [...(options.claims ?? [])];
   const execute = jest.fn<SqlQuery>(async (sql) => {
-    if (sql.startsWith("DELETE b FROM bg_new_match_baselines")) return [{ affectedRows: 0 }];
-    if (sql.startsWith("SELECT t.id FROM bg_tournaments")) return [(options.unbased ?? []).map((id) => ({ id }))];
-    if (sql.startsWith("INSERT IGNORE INTO bg_new_match_baselines")) return [{ affectedRows: 1 }];
+    if (sql.startsWith("SELECT 1 FROM bg_settings")) return [options.installed === false ? [] : [{ 1: 1 }]];
+    if (sql.startsWith("INSERT IGNORE INTO bg_settings")) return [{ affectedRows: 1 }];
+    if (sql.trim().startsWith("INSERT IGNORE INTO bg_match_reminders")) return [{ affectedRows: 1 }];
     if (sql.startsWith("INSERT IGNORE INTO bg_new_match_notices")) {
       if (sql.includes(", 1\n")) return [{ affectedRows: 3 }];
       const claimed = claims.length > 0 ? claims.shift() : true;
@@ -55,6 +55,12 @@ function mockDb(options: { unbased?: number[]; candidates?: object[]; claims?: b
   const query = jest.fn<SqlQuery>(async () => [options.candidates ?? []]);
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, query }));
   return { execute, query };
+}
+
+function reminderMarks(db: Db): unknown[] {
+  return db.execute.mock.calls
+    .filter(([sql]) => sql.trim().startsWith("INSERT IGNORE INTO bg_match_reminders"))
+    .map(([, params]) => (params as unknown[])[1]);
 }
 
 function recipient(userId: number, discord = true) {
@@ -86,27 +92,68 @@ afterEach(() => {
 });
 
 describe("dispatchNewMatchNotices", () => {
-  it("dispatch_firstSightOfRunningTournament_marksExistingMatchesSkippedThenBaseline", async () => {
-    const db = mockDb({ unbased: [4] });
+  it("installNewMatchNotices_firstRun_marksPairedMatchesSkippedThenSetsKey", async () => {
+    const db = mockDb({ installed: false });
 
     await dispatchNewMatchNotices();
 
-    const statements = db.execute.mock.calls.map(([sql]) => sql.split("\n")[0].trim());
+    const statements = db.execute.mock.calls.map(([sql]) => sql.trim().split("\n")[0]);
     const skipIndex = statements.findIndex((sql) => sql.startsWith("INSERT IGNORE INTO bg_new_match_notices"));
-    const baselineIndex = statements.findIndex((sql) => sql.startsWith("INSERT IGNORE INTO bg_new_match_baselines"));
+    const keyIndex = statements.findIndex((sql) => sql.startsWith("INSERT IGNORE INTO bg_settings"));
     expect(skipIndex).toBeGreaterThan(-1);
-    expect(baselineIndex).toBeGreaterThan(skipIndex);
-    expect(notifyUsers).not.toHaveBeenCalled();
+    expect(keyIndex).toBeGreaterThan(skipIndex);
   });
 
-  it("layNewMatchBaselines_firstSight_skipsOnlyFirstRoundOfMainBracket", async () => {
-    const db = mockDb({ unbased: [4] });
+  it("installNewMatchNotices_alreadyInstalled_marksNothing", async () => {
+    const db = mockDb({ candidates: [] });
 
     await dispatchNewMatchNotices();
 
-    const skip = db.execute.mock.calls.find(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_new_match_notices"));
-    expect(skip?.[0]).toContain("m.round_number = 1 AND m.bracket NOT IN ('LOWER', 'GRAND')");
-    expect(skip?.[1]).toEqual([4, 4]);
+    expect(db.execute.mock.calls.some(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_new_match_notices"))).toBe(false);
+  });
+
+  it("dispatch_firstRoundMatch_isAnnounced", async () => {
+    mockDb({ candidates: [{ ...MATCH, round_number: 1 }] });
+
+    const sides = await dispatchNewMatchNotices();
+
+    expect(sides).toBe(2);
+  });
+
+  it("dispatch_unscheduledMatch_setsNoReminderMarks", async () => {
+    const db = mockDb({ candidates: [MATCH] });
+
+    await dispatchNewMatchNotices();
+
+    expect(reminderMarks(db)).toEqual([]);
+  });
+
+  it("dispatch_scheduledMatch_marksSeenAndToldBeforeClaimSoNoMatchScheduled", async () => {
+    const db = mockDb({ candidates: [{ ...MATCH, start_at: new Date(Date.now() + 3 * 24 * 3600 * 1000) }] });
+
+    await dispatchNewMatchNotices();
+
+    expect(reminderMarks(db)).toEqual(["SEEN", "TOLD"]);
+    const order = db.execute.mock.calls.map(([sql]) => sql.trim().split("\n")[0]);
+    expect(order.findIndex((sql) => sql.startsWith("INSERT IGNORE INTO bg_match_reminders"))).toBeLessThan(
+      order.findIndex((sql) => sql.startsWith("INSERT IGNORE INTO bg_new_match_notices")),
+    );
+  });
+
+  it("dispatch_scheduledWithinReminderWindow_consumesOpenedReminders", async () => {
+    const db = mockDb({ candidates: [{ ...MATCH, start_at: new Date(Date.now() + 5 * 3600 * 1000) }] });
+
+    await dispatchNewMatchNotices();
+
+    expect(reminderMarks(db)).toEqual(expect.arrayContaining(["SEEN", "TOLD", "P1D"]));
+  });
+
+  it("dispatch_scheduledMatch_pushCarriesTheTime", async () => {
+    mockDb({ candidates: [{ ...MATCH, start_at: new Date("2099-11-14T19:00:00.000Z") }] });
+
+    await dispatchNewMatchNotices();
+
+    expect(resolvePush(jest.mocked(notifyUsers).mock.calls[0][1].push).body).toContain("Coup d'envoi");
   });
 
   it("dispatch_pastStartNotLaunched_stillAnnounceable", async () => {
@@ -124,14 +171,6 @@ describe("dispatchNewMatchNotices", () => {
 
     const message = jest.mocked(notifyUsers).mock.calls[0][1].discord?.message("fr") ?? "";
     expect(message).toContain("<https://bluegenji.test/profil#notifications>");
-  });
-
-  it("layNewMatchBaselines_finishedTournament_keepsBaselineSoReopenAnnouncesRematches", async () => {
-    const db = mockDb();
-
-    await dispatchNewMatchNotices();
-
-    expect(db.execute.mock.calls[0][0]).toContain("WHERE t.state IN ('UPCOMING', 'REGISTRATION')");
   });
 
   it("dispatch_noCandidates_sendsNothing", async () => {

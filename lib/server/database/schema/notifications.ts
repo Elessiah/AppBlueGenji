@@ -152,10 +152,9 @@ ${MATCH_PLACE_COLUMNS}        team_id BIGINT NOT NULL,
   // Annonce d'un nouveau match (`docs/features/NEW_MATCH_NOTICE.md`) : une par
   // place du match (phase, tableau, manche, numéro) et par affiche (`pairing`,
   // les deux engagées sans ordre, `5:7`). La place plutôt que l'id : un match
-  // effacé puis recréé avec la même affiche n'est pas réannoncé. `skipped` : la
-  // place était déjà jouable quand le tournoi a été vu pour la première fois en
-  // cours (première manche du tableau principal, couverte par le coup
-  // d'envoi). Part avec le tournoi.
+  // effacé puis recréé avec la même affiche n'est pas réannoncé. `skipped` : match
+  // déjà apparié à la mise en service (clé `new_match_notices_since` de
+  // `bg_settings`). Part avec le tournoi.
   await createQuietly(db, `
       CREATE TABLE IF NOT EXISTS bg_new_match_notices (
 ${MATCH_PLACE_COLUMNS}        pairing VARCHAR(48) NOT NULL,
@@ -163,18 +162,6 @@ ${MATCH_PLACE_COLUMNS}        pairing VARCHAR(48) NOT NULL,
         sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (tournament_id, phase_id, bracket, round_number, match_number, pairing),
         CONSTRAINT fk_bg_new_match_notices_tournament FOREIGN KEY (tournament_id)
-          REFERENCES bg_tournaments(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `);
-
-  // Tournoi en cours dont les matchs déjà jouables ont été marqués `skipped`
-  // (ligne de départ des annonces de nouveau match). Retirée seulement si le tournoi
-  // est ramené avant son départ.
-  await createQuietly(db, `
-      CREATE TABLE IF NOT EXISTS bg_new_match_baselines (
-        tournament_id BIGINT NOT NULL PRIMARY KEY,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT fk_bg_new_match_baselines_tournament FOREIGN KEY (tournament_id)
           REFERENCES bg_tournaments(id) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);

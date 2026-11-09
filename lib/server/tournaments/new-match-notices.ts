@@ -21,11 +21,13 @@
  * engagées, deux balayages concurrents : un seul envoi. Une autre affiche à la
  * même place (retour arrière puis autre vainqueur) est un autre match, annoncé.
  *
- * **Première manche : rien.** Le coup d'envoi du tournoi (`TOURNAMENT_START`)
- * la couvre. La première fois qu'un tournoi en cours est vu, tout ce qui a
- * déjà ses deux engagées est marqué `skipped` (ligne de départ,
- * `bg_new_match_baselines`) — ce qui couvre aussi les matchs d'avant le
- * déploiement.
+ * **Toutes les manches**, première comprise (décision du 2026-11-09). Seuls
+ * les matchs déjà appariés à la mise en service (`installNewMatchNotices`)
+ * sont marqués `skipped`.
+ *
+ * **Horaire déjà posé** : l'annonce le porte, et les marques des rappels sont
+ * posées d'abord (`coverMatchSchedule`) — pas de « Match programmé » en double
+ * ; le balayage des rappels attend l'annonce (`NEW_MATCH_PENDING_SQL`).
  */
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
@@ -40,35 +42,23 @@ import {
 import { toIso } from "@/lib/server/serialization";
 import { siteUrl } from "@/lib/server/site-url";
 import { throttledSweep } from "@/lib/server/throttled-sweep";
-import { MATCH_DM_SETTINGS_PATH } from "@/lib/shared/discord-notifications";
+import {
+  MATCH_DM_SETTINGS_PATH,
+  MATCH_SEEN_KEY,
+  MATCH_TOLD_KEY,
+  openedMatchReminders,
+} from "@/lib/shared/discord-notifications";
 import { matchPageHref } from "@/lib/shared/match-anchor";
 import { newMatchPush, type NewMatchSide } from "@/lib/shared/push-messages";
 import { formatNewMatchDm } from "./new-match-dm";
+import { ANNOUNCEABLE_SQL, MARKED_SQL, PAIRING_SQL } from "./new-match-sql";
+import { claimDatedMark } from "./reminder-marks";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
 /** Étranglement du balayage, comme le check-in et les départs de match. */
 const NEW_MATCH_THROTTLE_MS = 10_000;
 /** Matchs annoncés au plus par passage ; le reste attend le suivant. */
 export const NEW_MATCH_BATCH = 50;
-
-/** L'affiche d'un match : ses deux engagées, sans ordre (`5:7`). */
-export const PAIRING_SQL = "CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))";
-
-/** Le match a-t-il déjà une marque (envoyée ou `skipped`) pour cette place et cette affiche ? */
-const MARKED_SQL = `EXISTS (SELECT 1 FROM bg_new_match_notices n
-   WHERE n.tournament_id = m.tournament_id AND n.phase_id = m.phase_id AND n.bracket = m.bracket
-     AND n.round_number = m.round_number AND n.match_number = m.match_number AND n.pairing = ${PAIRING_SQL})`;
-
-/**
- * Un match à annoncer : tournoi en cours et publié, deux engagées connues et
- * distinctes, ni exempt, ni joué, ni lancé (un horaire dépassé par une manche en
- * retard s'annonce quand même : c'est là qu'il presse). Lu pour les candidats **et** dans la
- * réservation.
- */
-const ANNOUNCEABLE_SQL = `t.state = 'RUNNING' AND t.start_visibility_at <= NOW()
-  AND m.is_bye = 0 AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL AND m.team1_id <> m.team2_id
-  AND m.status IN ('PENDING', 'READY') AND m.team1_score IS NULL AND m.team2_score IS NULL
-  AND m.launched_at IS NULL`;
 
 export type NewMatchCandidateRow = RowDataPacket & {
   id: number;
@@ -87,43 +77,57 @@ export type NewMatchCandidateRow = RowDataPacket & {
   team2_ghost: number;
 };
 
+/** Clé `bg_settings` : instant de mise en service des annonces. */
+export const NEW_MATCH_SINCE_KEY = "new_match_notices_since";
+
+let installed = false;
+
 /**
- * Ligne de départ : un tournoi en cours vu pour la première fois (avec au moins
- * un match) voit sa **première manche** (première phase, tableau principal)
- * marquée `skipped` — l'avis de coup d'envoi la couvre —, puis reçoit sa
- * ligne. Les marques d'abord : une ligne visible implique ses marques. Le
- * repère est la manche, pas l'instant du premier balayage : un balayage en
- * retard n'avale pas une manche 2 déjà appariée. Seul un tournoi ramené avant
- * son départ perd sa ligne ; un tournoi terminé puis rouvert la garde, et les
- * revanches d'une correction s'annoncent.
+ * Mise en service, **une seule fois** par base : les matchs déjà appariés des
+ * tournois en cours à cet instant (d'avant le déploiement) sont marqués
+ * `skipped`, puis la clé est posée (marques d'abord : une clé visible implique
+ * ses marques). Ensuite, tout match apparié est annoncé, première manche
+ * comprise.
  */
-export async function layNewMatchBaselines(db: Pool): Promise<number> {
-  await db.execute(
-    `DELETE b FROM bg_new_match_baselines b
-       JOIN bg_tournaments t ON t.id = b.tournament_id
-      WHERE t.state IN ('UPCOMING', 'REGISTRATION')`,
-  );
-  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT t.id FROM bg_tournaments t
-       LEFT JOIN bg_new_match_baselines b ON b.tournament_id = t.id
-      WHERE t.state = 'RUNNING' AND b.tournament_id IS NULL
-        AND EXISTS (SELECT 1 FROM bg_matches m WHERE m.tournament_id = t.id)`,
-  );
-  for (const row of rows) {
-    const tournamentId = Number(row.id);
+export async function installNewMatchNotices(db: Pool): Promise<void> {
+  if (installed) return;
+  const [rows] = await db.execute<RowDataPacket[]>(`SELECT 1 FROM bg_settings WHERE setting_key = ?`, [
+    NEW_MATCH_SINCE_KEY,
+  ]);
+  if (rows.length === 0) {
     await db.execute(
       `INSERT IGNORE INTO bg_new_match_notices
          (tournament_id, phase_id, bracket, round_number, match_number, pairing, skipped)
        SELECT m.tournament_id, m.phase_id, m.bracket, m.round_number, m.match_number, ${PAIRING_SQL}, 1
          FROM bg_matches m
-        WHERE m.tournament_id = ? AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
-          AND m.round_number = 1 AND m.bracket NOT IN ('LOWER', 'GRAND')
-          AND m.phase_id = (SELECT MIN(f.phase_id) FROM bg_matches f WHERE f.tournament_id = ?)`,
-      [tournamentId, tournamentId],
+         JOIN bg_tournaments t ON t.id = m.tournament_id
+        WHERE t.state = 'RUNNING' AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL`,
     );
-    await db.execute(`INSERT IGNORE INTO bg_new_match_baselines (tournament_id) VALUES (?)`, [tournamentId]);
+    await db.execute(
+      `INSERT IGNORE INTO bg_settings (setting_key, setting_value) VALUES (?, DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'))`,
+      [NEW_MATCH_SINCE_KEY],
+    );
   }
-  return rows.length;
+  installed = true;
+}
+
+/**
+ * L'horaire d'un match annoncé avec sa date : les marques du balayage des
+ * rappels sont posées **avant** la réservation, comme si « Match programmé »
+ * était parti — observation, horaire reçu, paliers déjà ouverts. L'annonce
+ * porte l'horaire ; « Match programmé » ne part plus que pour une
+ * (re)programmation ultérieure. Une marque déjà prise (concurrence) est laissée.
+ */
+export async function coverMatchSchedule(row: NewMatchCandidateRow, now: Date = new Date()): Promise<void> {
+  if (row.start_at === null) return;
+  const match = {
+    id: Number(row.id),
+    start_at: row.start_at,
+    team1_id: Number(row.team1_id),
+    team2_id: Number(row.team2_id),
+  };
+  const keys = [MATCH_SEEN_KEY, MATCH_TOLD_KEY, ...openedMatchReminders(row.start_at, now).map((offset) => offset.key)];
+  for (const key of keys) await claimDatedMark(match, key);
 }
 
 async function loadCandidates(db: Pool): Promise<NewMatchCandidateRow[]> {
@@ -134,7 +138,6 @@ async function loadCandidates(db: Pool): Promise<NewMatchCandidateRow[]> {
             t1.is_ghost AS team1_ghost, t2.is_ghost AS team2_ghost
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
-       JOIN bg_new_match_baselines b ON b.tournament_id = m.tournament_id
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
       WHERE ${ANNOUNCEABLE_SQL} AND NOT ${MARKED_SQL}
@@ -219,7 +222,7 @@ async function announce(
 
 async function sweepNewMatches(): Promise<number> {
   const db = await getDatabase();
-  await layNewMatchBaselines(db);
+  await installNewMatchNotices(db);
   const candidates = await loadCandidates(db);
   if (candidates.length === 0) return 0;
   // Destinataires lus pour tous les matchs **avant** toute réservation : une
@@ -233,6 +236,7 @@ async function sweepNewMatches(): Promise<number> {
   const recipientsById = new Map(recipients.map((recipient) => [recipient.userId, recipient]));
   let announced = 0;
   for (const row of candidates) {
+    await coverMatchSchedule(row);
     if (!(await claimNewMatchNotice(db, Number(row.id), Number(row.team1_id), Number(row.team2_id)))) continue;
     try {
       announced += await announce(row, playersByTeam, recipientsById);
@@ -267,4 +271,5 @@ export async function dispatchNewMatchNotices(): Promise<number> {
 /** Remet l'étranglement à zéro. Réservé aux tests. */
 export function resetNewMatchNoticeThrottle(): void {
   sweeps.reset();
+  installed = false;
 }

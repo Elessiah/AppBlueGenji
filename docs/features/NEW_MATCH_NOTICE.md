@@ -62,18 +62,22 @@ tournoi, `affectedRows`), avant l'envoi. Ainsi :
   consomme rien ; un bot injoignable consomme l'annonce (journal pm2), comme les
   rappels — une annonce manquée ne se répète pas en boucle.
 
-## Première manche
+## Première manche et horaire déjà posé (décisions du 2026-11-09)
 
-Le coup d'envoi (`TOURNAMENT_START`) couvre la première manche : elle n'est
-pas annoncée. Mécanique : la première fois qu'un tournoi en cours (avec au
-moins un match) est vu, les matchs de sa **première manche** (première phase,
-hors `LOWER`/`GRAND`) qui ont leurs deux engagées sont marqués `skipped`, puis
-la ligne `bg_new_match_baselines` est posée (marques d'abord). Le repère est la
-manche, non l'instant du balayage : un balayage tardif n'avale pas une manche 2
-déjà appariée (au déploiement, les manches suivantes déjà appariées d'un
-tournoi en cours sont donc annoncées une fois). Seul un tournoi ramené avant
-son départ (`UPCOMING`/`REGISTRATION`) perd sa ligne ; terminé puis rouvert
-(correction, retour arrière), il la garde et les revanches s'annoncent.
+- **Toutes les manches sont annoncées**, première comprise. Seuls les matchs
+  déjà appariés à la **mise en service** sont marqués `skipped`
+  (`installNewMatchNotices`, une fois par base : marques d'abord, puis la clé
+  `new_match_notices_since` de `bg_settings`).
+- **L'annonce part à l'appariement**, avant qu'on puisse programmer le match :
+  tout évènement de tournoi publié après commit relance le balayage (10 s
+  d'étranglement au plus).
+- **Horaire déjà posé** (programme de manche fixé à l'avance) : l'annonce le
+  donne, et `coverMatchSchedule` pose d'abord les marques des rappels
+  (observation `SEEN`, horaire reçu `TOLD`, paliers déjà ouverts) — « Match
+  programmé » ne part pas pour cet horaire. Le balayage des rappels ignore un
+  match qui attend son annonce (`NEW_MATCH_PENDING_SQL`,
+  `lib/server/tournaments/new-match-sql.ts`). « Match programmé » ne part que
+  pour une (re)programmation ultérieure (`setMatchStartAt`).
 
 ## Réglages
 
@@ -83,8 +87,3 @@ est **actif d'office** sur les appareils déjà abonnés (décision D5 du
 2026-11-09), ce que disent `/rgpd`, le registre (T12) et l'entrée
 `2026-11-annonce-nouveau-match` de `PRIVACY_CHANGES`.
 
-## Recouvrement connu
-
-Un match **daté** qui reçoit ses deux engagées reçoit aussi l'annonce de son
-horaire (« Match programmé », `MATCH_REMINDER`, balayage des rappels) : deux
-messages au même moment. Décision requise (garder les deux, ou taire l'un).

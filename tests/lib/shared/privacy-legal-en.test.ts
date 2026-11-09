@@ -193,7 +193,7 @@ describe("register (EN): #live username, match DMs, refereeing schedule basis", 
     expect(sheet("T16").recipients).toHaveLength(PROCESSING_ACTIVITIES.find((x) => x.ref === "T16")!.recipients.length);
     expect(sheet("T04").legalBasis).toMatch(/legal obligation \(GDPR, art\. 6\.1\.c\) for keeping their choice about match direct messages \(keeping it is what allows their objection to keep being honoured, art\. 21 and 12\)/);
     expect(sheet("T04").legalBasis).not.toMatch(/the player's own|player's legitimate interest/);
-    expect(sheet("T04").legalBasis).toMatch(/for match time notices, the notice that a match leaves their schedule, the notice of a new match \(opponent, time and link, except the first round\) and match reminders sent to players/);
+    expect(sheet("T04").legalBasis).toMatch(/for match time notices, the notice that a match leaves their schedule, the notice of a new match \(opponent, time and link, first round included\) and match reminders sent to players/);
     expect(sheet("T04").dataSubjects).toContain("Any account holder, for their match direct messages choice");
     expect(sheet("T08").recipients).toHaveLength(PROCESSING_ACTIVITIES.find((x) => x.ref === "T08")!.recipients.length);
     expect(sheet("T05").legalBasis).toMatch(/sending the refereeing schedule to referees and administrators falls under performance of the service \(T04\)/);
