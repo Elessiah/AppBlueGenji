@@ -40,6 +40,7 @@ import {
 import { toIso } from "@/lib/server/serialization";
 import { siteUrl } from "@/lib/server/site-url";
 import { throttledSweep } from "@/lib/server/throttled-sweep";
+import { MATCH_DM_SETTINGS_PATH } from "@/lib/shared/discord-notifications";
 import { matchPageHref } from "@/lib/shared/match-anchor";
 import { newMatchPush, type NewMatchSide } from "@/lib/shared/push-messages";
 import { formatNewMatchDm } from "./new-match-dm";
@@ -51,7 +52,7 @@ const NEW_MATCH_THROTTLE_MS = 10_000;
 export const NEW_MATCH_BATCH = 50;
 
 /** L'affiche d'un match : ses deux engagées, sans ordre (`5:7`). */
-const PAIRING_SQL = "CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))";
+export const PAIRING_SQL = "CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))";
 
 /** Le match a-t-il déjà une marque (envoyée ou `skipped`) pour cette place et cette affiche ? */
 const MARKED_SQL = `EXISTS (SELECT 1 FROM bg_new_match_notices n
@@ -60,14 +61,14 @@ const MARKED_SQL = `EXISTS (SELECT 1 FROM bg_new_match_notices n
 
 /**
  * Un match à annoncer : tournoi en cours et publié, deux engagées connues et
- * distinctes, ni exempt, ni joué, ni lancé, et pas un horaire déjà passé (le
- * départ du match a ses propres avis). Lu pour les candidats **et** dans la
+ * distinctes, ni exempt, ni joué, ni lancé (un horaire dépassé par une manche en
+ * retard s'annonce quand même : c'est là qu'il presse). Lu pour les candidats **et** dans la
  * réservation.
  */
 const ANNOUNCEABLE_SQL = `t.state = 'RUNNING' AND t.start_visibility_at <= NOW()
   AND m.is_bye = 0 AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL AND m.team1_id <> m.team2_id
   AND m.status IN ('PENDING', 'READY') AND m.team1_score IS NULL AND m.team2_score IS NULL
-  AND m.launched_at IS NULL AND (m.start_at IS NULL OR m.start_at > NOW())`;
+  AND m.launched_at IS NULL`;
 
 export type NewMatchCandidateRow = RowDataPacket & {
   id: number;
@@ -88,16 +89,19 @@ export type NewMatchCandidateRow = RowDataPacket & {
 
 /**
  * Ligne de départ : un tournoi en cours vu pour la première fois (avec au moins
- * un match) voit tous ses matchs déjà jouables marqués `skipped`, puis reçoit
- * sa ligne. Les marques d'abord : une ligne visible implique ses marques. Un
- * tournoi qui quitte l'état « en cours » perd sa ligne (rouvert, il en reçoit
- * une nouvelle).
+ * un match) voit sa **première manche** (première phase, tableau principal)
+ * marquée `skipped` — l'avis de coup d'envoi la couvre —, puis reçoit sa
+ * ligne. Les marques d'abord : une ligne visible implique ses marques. Le
+ * repère est la manche, pas l'instant du premier balayage : un balayage en
+ * retard n'avale pas une manche 2 déjà appariée. Seul un tournoi ramené avant
+ * son départ perd sa ligne ; un tournoi terminé puis rouvert la garde, et les
+ * revanches d'une correction s'annoncent.
  */
 export async function layNewMatchBaselines(db: Pool): Promise<number> {
   await db.execute(
     `DELETE b FROM bg_new_match_baselines b
        JOIN bg_tournaments t ON t.id = b.tournament_id
-      WHERE t.state <> 'RUNNING'`,
+      WHERE t.state IN ('UPCOMING', 'REGISTRATION')`,
   );
   const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
     `SELECT t.id FROM bg_tournaments t
@@ -112,8 +116,10 @@ export async function layNewMatchBaselines(db: Pool): Promise<number> {
          (tournament_id, phase_id, bracket, round_number, match_number, pairing, skipped)
        SELECT m.tournament_id, m.phase_id, m.bracket, m.round_number, m.match_number, ${PAIRING_SQL}, 1
          FROM bg_matches m
-        WHERE m.tournament_id = ? AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL`,
-      [tournamentId],
+        WHERE m.tournament_id = ? AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
+          AND m.round_number = 1 AND m.bracket NOT IN ('LOWER', 'GRAND')
+          AND m.phase_id = (SELECT MIN(f.phase_id) FROM bg_matches f WHERE f.tournament_id = ?)`,
+      [tournamentId, tournamentId],
     );
     await db.execute(`INSERT IGNORE INTO bg_new_match_baselines (tournament_id) VALUES (?)`, [tournamentId]);
   }
@@ -184,6 +190,7 @@ async function announce(
   recipientsById: Map<number, NotificationRecipient>,
 ): Promise<number> {
   const url = siteUrl(matchPageHref(Number(row.tournament_id), Number(row.id)));
+  const settingsUrl = siteUrl(MATCH_DM_SETTINGS_PATH);
   // Un compte qui serait des deux côtés n'est prévenu qu'une fois, du premier.
   const told = new Set<number>();
   let sides = 0;
@@ -200,7 +207,7 @@ async function announce(
     const report = await notifyUsers(recipients, {
       topic: "NEW_MATCH",
       push: (locale) => newMatchPush(match, locale),
-      discord: { message: (locale) => formatNewMatchDm(match, url, locale), context: "new-match" },
+      discord: { message: (locale) => formatNewMatchDm(match, url, locale, settingsUrl), context: "new-match" },
     });
     if (report.discord === null && report.discordUnreachedUserIds.length > 0) {
       console.error(`[new-match] bot injoignable, message privé perdu (match ${row.id})`);

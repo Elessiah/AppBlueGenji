@@ -787,7 +787,8 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
   comme atteint (pas de marque d'horaire reçu).
 - **Messages couverts** : annonce d'horaire (`match-scheduled`), horaire retiré
   (`match-schedule-cleared`), rappels 24 h et 10 h / check-in
-  (`match-reminder`), « Match retiré » (`match-withdrawn`). Non couverts : les
+  (`match-reminder`), « Match retiré » (`match-withdrawn`), nouveau match
+  (`new-match`, `NEW_MATCH_NOTICE.md`). Non couverts : les
   messages privés au compte hors match (modération, logo, données, demande
   d'adhésion), et tout envoi au staff (`notifyStaff`).
 - **Ligne de fin** (LEGAL-FOLLOWUP-444) : chacun de ces messages se termine par

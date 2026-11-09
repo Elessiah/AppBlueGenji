@@ -7,7 +7,8 @@ s'organisent.
 ## Ce qui part
 
 Dès que les **deux engagées** d'un match sont connues (match `PENDING` ou
-`READY`, ni exempt, sans score, pas lancé, horaire absent ou encore devant,
+`READY`, ni exempt, sans score, pas lancé — un horaire déjà dépassé par une manche en retard
+s'annonce quand même —,
 tournoi `RUNNING` et publié), **tous les membres actifs** de chaque équipe
 (`loadEntrantPlayerIds` ; le joueur d'une entrée solo ; personne pour une
 fantôme ; comptes supprimés écartés) reçoivent, vu de leur engagée :
@@ -20,7 +21,9 @@ fantôme ; comptes supprimés écartés) reçoivent, vu de leur engagée :
 - un **message privé Discord** (`formatNewMatchDm`,
   `lib/server/tournaments/new-match-dm.ts`) : titre, manche et tournoi,
   « Ton équipe « A » affronte « B » », horaire ou son absence, lien absolu de
-  la page du match (tu sans `APP_URL`), rappel de s'organiser. Message privé
+  la page du match (tu sans `APP_URL`), rappel de s'organiser, puis la ligne
+d'opposition `matchDmOptOutLine` (où couper ces messages) comme tout message
+privé de match. Message privé
   **de match** : tag Discord certifié seulement, coupé par la case « Messages
   privés Discord de mes matchs » (`loadNotificationRecipients(…, "certified",
   { matchDm: true })`).
@@ -63,10 +66,14 @@ tournoi, `affectedRows`), avant l'envoi. Ainsi :
 
 Le coup d'envoi (`TOURNAMENT_START`) couvre la première manche : elle n'est
 pas annoncée. Mécanique : la première fois qu'un tournoi en cours (avec au
-moins un match) est vu, tous ses matchs qui ont déjà leurs deux engagées sont
-marqués `skipped`, puis la ligne `bg_new_match_baselines` est posée (marques
-d'abord). Cela couvre aussi les tournois en cours au déploiement. Un tournoi qui
-quitte `RUNNING` perd sa ligne ; rouvert, il en reçoit une nouvelle.
+moins un match) est vu, les matchs de sa **première manche** (première phase,
+hors `LOWER`/`GRAND`) qui ont leurs deux engagées sont marqués `skipped`, puis
+la ligne `bg_new_match_baselines` est posée (marques d'abord). Le repère est la
+manche, non l'instant du balayage : un balayage tardif n'avale pas une manche 2
+déjà appariée (au déploiement, les manches suivantes déjà appariées d'un
+tournoi en cours sont donc annoncées une fois). Seul un tournoi ramené avant
+son départ (`UPCOMING`/`REGISTRATION`) perd sa ligne ; terminé puis rouvert
+(correction, retour arrière), il la garde et les revanches s'annoncent.
 
 ## Réglages
 

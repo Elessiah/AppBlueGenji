@@ -53,6 +53,16 @@ describe("formatNewMatchDm", () => {
     expect(formatNewMatchDm(SIDE, null, "fr")).not.toContain("Page du match");
   });
 
+  it("format_settingsUrl_endsWithOptOutLine", () => {
+    const text = formatNewMatchDm(SIDE, URL, "fr", "https://bluegenji.test/profil#notifications");
+
+    expect(text).toMatch(/<https:\/\/bluegenji\.test\/profil#notifications>$/);
+  });
+
+  it("format_noSettingsUrl_stillEndsWithOptOutSentence", () => {
+    expect(formatNewMatchDm(SIDE, URL, "en")).toMatch(/You can turn off these direct messages.*$/);
+  });
+
   it("format_markdownInTeamName_isNeutralised", () => {
     const text = formatNewMatchDm({ ...SIDE, opponentName: "**Nova** @everyone" }, URL, "fr");
 

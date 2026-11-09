@@ -200,7 +200,7 @@ describe("DONNEES_PROFIL", () => {
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord username")?.finalite).toMatch(/bot codes by direct message \(login, linking, certification\), bot notifications \(certified tag only\)/);
     // La certification filtre les messages de match : la base de ceux-ci (intérêt légitime) y figure.
     expect(DONNEES_PROFIL.find((d) => d.donnee === "Certification du pseudo Discord")?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE });
-    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Certification of the Discord username")?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: "match time notices, reminders, match removal notices, match check-ins and cast removal notices by direct message" });
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Certification of the Discord username")?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: "match time notices, reminders, match removal notices, match check-ins, new match announcements and cast removal notices by direct message" });
     // L'ID sert aussi, certifié ou non, aux avis passant par la portée « proven ».
     const id = DONNEES_PROFIL.find((d) => d.donnee === "ID Discord");
     expect(id?.finalite).toMatch(/horaires, rappels, retrait de match, check-in d'un match en autogestion d'une équipe que tu gères ou de ton tournoi individuel, et retrait de ton cast — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, invitation d'une équipe, reprise d'équipe proposée ou propriété de ton équipe reçue, avis de suspension ou de modération, information sur tes données/);
@@ -493,11 +493,11 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
   it("le droit d'opposition les nomme, en français et en anglais", () => {
     expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toContain(MATCH_TIME_DM_SCOPE);
     expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toContain(
-      "match time notices, reminders, match removal notices, match check-ins and cast removal notices by direct message",
+      "match time notices, reminders, match removal notices, match check-ins, new match announcements and cast removal notices by direct message",
     );
     // L'avis « Match retiré » et la case de Mon profil (revue juridique #444) ;
     // check-in du match (MATCH-CHECKIN) et retrait d'un cast (revue juridique de #491).
-    expect(MATCH_TIME_DM_SCOPE).toBe("annonces d'horaire, rappels, avis de retrait de match, check-in du match et avis du retrait d'un cast en message privé");
+    expect(MATCH_TIME_DM_SCOPE).toBe("annonces d'horaire, rappels, avis de retrait de match, check-in du match, annonces d'un nouveau match et avis du retrait d'un cast en message privé");
     expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/case « Messages privés Discord de mes matchs » de Mon profil/);
     expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/“Discord direct messages about my matches” box in My profile/);
   });
@@ -567,7 +567,7 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
   it("la portée est traduite en anglais", () => {
     const entry = DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID");
     expect(entry?.extraBases).toEqual([
-      { base: "Intérêt légitime", scope: "match time notices, reminders, match removal notices, match check-ins and cast removal notices by direct message" },
+      { base: "Intérêt légitime", scope: "match time notices, reminders, match removal notices, match check-ins, new match announcements and cast removal notices by direct message" },
       { base: "Intérêt légitime", scope: "suspension or moderation notices by direct message" },
       { base: "Obligation légale", scope: "information about your data by direct message" },
     ]);

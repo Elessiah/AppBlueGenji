@@ -99,12 +99,39 @@ describe("dispatchNewMatchNotices", () => {
     expect(notifyUsers).not.toHaveBeenCalled();
   });
 
-  it("layNewMatchBaselines_eachSweep_dropsBaselinesOfNonRunningTournaments", async () => {
+  it("layNewMatchBaselines_firstSight_skipsOnlyFirstRoundOfMainBracket", async () => {
+    const db = mockDb({ unbased: [4] });
+
+    await dispatchNewMatchNotices();
+
+    const skip = db.execute.mock.calls.find(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_new_match_notices"));
+    expect(skip?.[0]).toContain("m.round_number = 1 AND m.bracket NOT IN ('LOWER', 'GRAND')");
+    expect(skip?.[1]).toEqual([4, 4]);
+  });
+
+  it("dispatch_pastStartNotLaunched_stillAnnounceable", async () => {
+    const db = mockDb({ candidates: [MATCH] });
+
+    await dispatchNewMatchNotices();
+
+    expect(db.query.mock.calls[0][0]).not.toContain("m.start_at > NOW()");
+  });
+
+  it("dispatch_dm_endsWithOptOutLink", async () => {
+    mockDb({ candidates: [MATCH] });
+
+    await dispatchNewMatchNotices();
+
+    const message = jest.mocked(notifyUsers).mock.calls[0][1].discord?.message("fr") ?? "";
+    expect(message).toContain("<https://bluegenji.test/profil#notifications>");
+  });
+
+  it("layNewMatchBaselines_finishedTournament_keepsBaselineSoReopenAnnouncesRematches", async () => {
     const db = mockDb();
 
     await dispatchNewMatchNotices();
 
-    expect(db.execute.mock.calls[0][0]).toContain("WHERE t.state <> 'RUNNING'");
+    expect(db.execute.mock.calls[0][0]).toContain("WHERE t.state IN ('UPCOMING', 'REGISTRATION')");
   });
 
   it("dispatch_noCandidates_sendsNothing", async () => {

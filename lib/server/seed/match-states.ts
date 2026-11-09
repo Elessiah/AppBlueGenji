@@ -11,6 +11,7 @@ import { matchMaxMaps, matchWinsRequired } from "@/lib/shared/match-format";
 import { mapListLimit } from "@/lib/shared/match-maps";
 import { SEED_TOURNAMENT_PREFIX, type ReportStateCounts, type TournamentDef } from "./cases";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
+import { layNewMatchBaselines } from "@/lib/server/tournaments/new-match-notices";
 
 // Transforme des matchs READY en états intermédiaires du cycle de report :
 //  · pendingReports  → une seule équipe a reporté, délai en cours
@@ -497,29 +498,12 @@ function seedMapSequence(team1Wins: number, team2Wins: number): [number, number]
 
 /**
  * Annonce d'un nouveau match (`docs/features/NEW_MATCH_NOTICE.md`) : chaque
- * tournoi de test en cours reçoit sa ligne de départ avec la **seule première
- * manche** marquée `skipped`, comme si le tournoi avait été vu à son coup
- * d'envoi. Les matchs des manches suivantes déjà jouables sont donc annoncés au
- * premier balayage local (bot injoignable : push seul, message privé perdu,
- * journal pm2).
+ * tournoi de test en cours reçoit sa ligne de départ comme au premier balayage
+ * de production (`layNewMatchBaselines` : première manche du tableau principal
+ * marquée `skipped`). Les matchs des manches suivantes déjà jouables sont donc
+ * annoncés au premier balayage local (bot injoignable : push seul, message
+ * privé perdu, journal pm2).
  */
 export async function applyNewMatchNoticeCases(db: Pool): Promise<void> {
-  const prefix = `${SEED_TOURNAMENT_PREFIX}%`;
-  await db.execute(
-    `INSERT IGNORE INTO bg_new_match_notices
-       (tournament_id, phase_id, bracket, round_number, match_number, pairing, skipped)
-     SELECT m.tournament_id, m.phase_id, m.bracket, m.round_number, m.match_number,
-            CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)), 1
-       FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id
-      WHERE t.state = 'RUNNING' AND t.name LIKE ? AND m.round_number = 1
-        AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL`,
-    [prefix],
-  );
-  await db.execute(
-    `INSERT IGNORE INTO bg_new_match_baselines (tournament_id)
-     SELECT t.id FROM bg_tournaments t
-      WHERE t.state = 'RUNNING' AND t.name LIKE ?
-        AND EXISTS (SELECT 1 FROM bg_matches m WHERE m.tournament_id = t.id)`,
-    [prefix],
-  );
+  await layNewMatchBaselines(db);
 }

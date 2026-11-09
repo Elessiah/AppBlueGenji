@@ -9,7 +9,7 @@
  * de pseudo, de BattleTag ni de tag Discord. FR/EN en dur comme les autres
  * messages privés (`docs/features/BOT_DM_LANGUAGE.md`).
  */
-import { formatMatchStartIn } from "@/lib/shared/discord-notifications";
+import { formatMatchStartIn, matchDmOptOutLine } from "@/lib/shared/discord-notifications";
 import { discordInline } from "@/lib/shared/discord-text";
 import { localizedSiteUrl } from "@/lib/shared/dm-language";
 import { neutralizeQuotes } from "@/lib/shared/lobby-brief";
@@ -49,8 +49,15 @@ const DM_TEXT = {
  * @param url Page du match, adresse absolue en français (`localizedSiteUrl` la
  *   passe sous `/en`) ; `null` quand la racine du site est inconnue — la ligne
  *   du lien est alors tue plutôt que de pointer vers une adresse inventée.
+ * @param settingsUrl Réglage des messages de match (`MATCH_DM_SETTINGS_PATH`),
+ *   rappelé en dernière ligne comme tout message privé de match.
  */
-export function formatNewMatchDm(side: NewMatchSide, url: string | null, locale: Locale = "fr"): string {
+export function formatNewMatchDm(
+  side: NewMatchSide,
+  url: string | null,
+  locale: Locale = "fr",
+  settingsUrl: string | null = null,
+): string {
   const text = DM_TEXT[locale];
   const round = pushRoundLabel(side.bracket, side.roundNumber, locale, side.swiss);
   return [
@@ -62,5 +69,7 @@ export function formatNewMatchDm(side: NewMatchSide, url: string | null, locale:
     ...(url === null ? [] : [text.link(localizedSiteUrl(url, locale))]),
     "",
     side.solo ? text.organiseSolo : text.organise,
+    "",
+    matchDmOptOutLine(settingsUrl, locale),
   ].join("\n");
 }
