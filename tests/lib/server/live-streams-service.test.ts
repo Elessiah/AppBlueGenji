@@ -171,10 +171,10 @@ describe("setMatchLiveConfig", () => {
   const OWN_CHANNEL_5 = { userId: 5, asOrganisation: false };
   const ORGANISER_7 = { userId: 7, asOrganisation: true };
   /** Droits sur le mode d'antenne : la seule permission `live`, ou le staff `tournaments`. */
-  const LIVE_ONLY = { isAdmin: false, manages: false, live: true };
-  const STAFF = { isAdmin: false, manages: true, live: true };
+  const LIVE_ONLY = { oversees: false, manages: false, live: true };
+  const STAFF = { oversees: true, manages: true, live: true };
   /** Le staff `tournaments` sans `live` : n'entre que comme arbitre désigné du match. */
-  const REFEREE_ONLY = { isAdmin: false, manages: true, live: false };
+  const REFEREE_ONLY = { oversees: false, manages: true, live: false };
 
   /**
    * Base à état pour le réglage d'un match : sa ligne, ses streams et ses
@@ -812,8 +812,9 @@ describe("setMatchLiveConfig", () => {
     expect(outcome.changed).toBe(false);
   });
 
-  it("setMatchLiveConfig_staffChangesStaffLinkOnOtherCasterMode_throwsLiveTriggerNotOwned", async () => {
-    // Décision 2 : le lien du staff suit le mode d'un autre caster montré.
+  it("setMatchLiveConfig_tournamentsWithoutLiveOnOtherCasterMode_throwsNotMatchReferee", async () => {
+    // Décision 2 : le lien du staff suit le mode d'un autre caster montré —
+    // sauf pour le staff `tournaments` + `live` (`oversees`, décision du 2026-11-09).
     const world = liveWorld(
       matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }),
       [dbStream(6, "https://twitch.tv/orga", true), dbStream(7, "https://twitch.tv/voix")],
@@ -822,8 +823,20 @@ describe("setMatchLiveConfig", () => {
     await mockLiveDb(world);
 
     await expect(
-      setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/autre", setter: ORGANISER_5, access: STAFF }),
-    ).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
+      setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/autre", setter: ORGANISER_5, access: REFEREE_ONLY }),
+    ).rejects.toThrow("NOT_MATCH_REFEREE");
+  });
+
+  it("setMatchLiveConfig_overseerChangesOtherCasterMode_writesIt", async () => {
+    // Décision du 2026-11-09 : le staff `tournaments` + `live` règle tout cast.
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }), [dbStream(4, null)], [
+      { user_id: 12, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", 12, 42]]]);
   });
 
   it("setMatchLiveConfig_liveOnlyOwnerChangesStaffLink_throwsStaffStreamForbidden", async () => {
@@ -1188,15 +1201,15 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["AUTO", null, 42]]]);
   });
 
-  it("setMatchLiveConfig_shownOwnerMode_staffRefused", async () => {
+  it("setMatchLiveConfig_shownOwnerMode_tournamentsWithoutLiveNotRefereeRefused", async () => {
     const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12 }), [dbStream(4, null)], [
       { user_id: 12, stream_id: 4 },
     ]);
     await mockLiveDb(world);
 
     await expect(
-      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: STAFF }),
-    ).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
+      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null, setter: ORGANISER_5, access: REFEREE_ONLY }),
+    ).rejects.toThrow("NOT_MATCH_REFEREE");
     expect(world.state.matchWrites).toEqual([]);
   });
 
@@ -1220,8 +1233,8 @@ describe("setMatchLiveConfig", () => {
 
   describe("setMatchOnAir", () => {
     /** La seule permission `live` (caster), ou le staff `tournaments`. */
-    const LIVE_ACCESS = { isAdmin: false, manages: false, live: true };
-    const STAFF_ACCESS = { isAdmin: false, manages: true, live: true };
+    const LIVE_ACCESS = { oversees: false, manages: false, live: true };
+    const STAFF_ACCESS = { oversees: true, manages: true, live: true };
 
     /** Match MANUAL posé par le caster 12, montré sur le stream 4 ; co-caster 13 sur le stream 5. */
     function ownedWorld(overrides: Record<string, unknown> = {}) {
@@ -1239,7 +1252,7 @@ describe("setMatchLiveConfig", () => {
       const world = ownedWorld({ live_trigger: "AUTO" });
       await mockLiveDb(world);
 
-      await expect(setMatchOnAir(42, true, 9, { isAdmin: false, manages: true, live: false })).rejects.toThrow(
+      await expect(setMatchOnAir(42, true, 9, { oversees: false, manages: true, live: false })).rejects.toThrow(
         "LIVE_TRIGGER_NOT_MANUAL",
       );
     });
@@ -1283,7 +1296,7 @@ describe("setMatchLiveConfig", () => {
       const world = ownedWorld();
       await mockLiveDb(world);
 
-      await expect(setMatchOnAir(42, true, 5, { isAdmin: false, manages: true, live: false })).rejects.toThrow(
+      await expect(setMatchOnAir(42, true, 5, { oversees: false, manages: true, live: false })).rejects.toThrow(
         "NOT_MATCH_REFEREE",
       );
     });
@@ -1292,7 +1305,7 @@ describe("setMatchLiveConfig", () => {
       const world = ownedWorld({ kept_referee_user_id: 9 });
       await mockLiveDb(world);
 
-      await expect(setMatchOnAir(42, true, 9, { isAdmin: false, manages: true, live: false })).resolves.toBe(true);
+      await expect(setMatchOnAir(42, true, 9, { oversees: false, manages: true, live: false })).resolves.toBe(true);
     });
 
     it("setMatchOnAir_notManual_throwsNotManual", async () => {

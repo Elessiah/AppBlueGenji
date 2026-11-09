@@ -11,12 +11,14 @@ import {
   parseMatchIdParam,
 } from "@/lib/server/tournaments/match-launch-routes";
 import { can } from "@/lib/shared/permissions";
+import { castOverseer } from "@/lib/shared/live-trigger-owner";
 import type { AuthUser } from "@/lib/server/auth";
 import type { CastAccess } from "@/lib/server/tournaments/cast-settings";
 
 /** Ses droits sur un mode d'antenne déjà posé (`lib/shared/live-trigger-owner.ts`). */
 function castAccess(user: AuthUser): CastAccess {
-  return { isAdmin: user.isAdmin, manages: can(user, "tournaments") };
+  const manages = can(user, "tournaments");
+  return { oversees: castOverseer(manages, can(user, "live")), manages };
 }
 
 const STATUSES: Readonly<Record<string, number>> = {

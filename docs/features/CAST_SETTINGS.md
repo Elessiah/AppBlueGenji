@@ -68,7 +68,10 @@ Fenêtre du caster, sur **son** cast :
   (`MATCH_START_AT_REQUIRED`) ;
 - **antenne** (mode manuel) : ouvrir ou couper, sans quitter la fenêtre ;
 - **BattleTag pour ce cast** (Overwatch seulement) ;
-- **rediff**, une fois la rencontre jouée : ouvre `MatchReplayDialog` ;
+- **rediff**, une fois la rencontre jouée : ouvre `MatchReplayDialog` — la
+  seule `live` ne règle que la rediff de **son** cast (`NOT_MATCH_CASTER`,
+  403), le staff `tournaments` (dont l'arbitre désigné) toutes (décision du
+  2026-11-09) ;
 - **« Ne plus caster »** : `DELETE …/caster`, sans confirmation (le caster qui se
   retire lui-même n'est prévenu de rien, `CAST_NOTICES.md`) — refusé sur un match
   terminé, où le bouton n'est pas offert (`offersCastRelease`).
@@ -77,6 +80,11 @@ La fenêtre lit à l'ouverture `GET /api/matches/[id]/caster`
 (`loadOwnCastSettings`) : le BattleTag d'un cast **ne voyage pas** dans
 l'instantané du plateau, commun à tous les lecteurs. Un échec de cette lecture
 (place reprise entre-temps) referme la fenêtre en le disant.
+
+Elle relit aussi l'origine du lien (`organisationLink`) : la case « Ce lien
+est celui de l'organisation » s'ouvre telle qu'enregistrée et se coche ou se
+décoche **seule**, lien inchangé (`setCasterLinkOrigin`, décision du
+2026-11-09).
 
 Pendant cette lecture, la fenêtre dit « Lecture de ton cast… » (`aria-busy`).
 Sur un match **joué** (`COMPLETED`), lien et BattleTag ne s'offrent plus
@@ -151,8 +159,10 @@ caster qui le pose en devient le propriétaire (`live_trigger_user_id`). Règle
 unique, pure, `lib/shared/live-trigger-owner.ts` (`mayChangeLiveTrigger`,
 `viewerMayChangeLiveTrigger` pour l'interface) :
 
-- **admin** de la plateforme ou **arbitre désigné** du match (permission
-  `tournaments`, condition de l'arbitrage) : toujours ;
+- **staff `tournaments` et `live`** (`castOverseer`, champ `oversees`) ou
+  **arbitre désigné** du match (permission `tournaments`, condition de
+  l'arbitrage) : toujours — aucun `isAdmin` codé en dur (décision du
+  2026-11-09 ; un admin passe par ses permissions) ;
 - mode d'un caster : lui seul — un co-caster est refusé ;
 - match pas encore casté, ou mode sans propriétaire (posé par le staff,
   caster parti) : le staff `tournaments` et les casters **montrés** du match ;

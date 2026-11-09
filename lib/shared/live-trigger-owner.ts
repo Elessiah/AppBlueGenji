@@ -23,11 +23,23 @@
  */
 import type { MatchLiveTrigger } from "./live-streams";
 
+/**
+ * Le lecteur (ou l'acteur) règle-t-il **tout** cast du match ? Le staff qui
+ * porte à la fois `tournaments` et `live` — jamais un `isAdmin` codé en dur
+ * (décision du 2026-11-09).
+ */
+export function castOverseer(manages: boolean, live: boolean): boolean {
+  return manages && live;
+}
+
 /** Qui demande le changement. */
 export type LiveTriggerActor = {
   userId: number;
-  /** Admin de la plateforme : la règle admin s'applique ici (décision du 2026-11-05). */
-  isAdmin: boolean;
+  /**
+   * Staff `tournaments` **et** `live` : règle tout cast du match, sans exception
+   * codée sur l'admin (décision du 2026-11-09, `castOverseer`).
+   */
+  oversees: boolean;
   /** Permission `tournaments` (staff de l'organisation). */
   manages: boolean;
 };
@@ -50,14 +62,14 @@ export function isMatchRefereeActor(hold: Pick<LiveTriggerHold, "refereeId">, ac
  * L'acteur peut-il changer (ou retirer) le mode d'antenne ? `actorCasts` :
  * l'acteur caste le match en caster montré.
  *
- * - admin ou arbitre désigné : toujours ;
+ * - staff `tournaments` + `live` (`oversees`) ou arbitre désigné : toujours ;
  * - mode d'un caster : lui seul ;
  * - pas encore de mode, ou mode sans propriétaire (posé par le staff, caster
  *   parti) : le staff `tournaments` et les casters montrés du match — jamais
  *   un porteur de la seule `live` qui ne le caste pas.
  */
 export function mayChangeLiveTrigger(hold: LiveTriggerHold, actor: LiveTriggerActor, actorCasts = false): boolean {
-  if (actor.isAdmin || isMatchRefereeActor(hold, actor)) return true;
+  if (actor.oversees || isMatchRefereeActor(hold, actor)) return true;
   if (hold.ownerId !== null) return hold.ownerId === actor.userId;
   return actor.manages || actorCasts;
 }
@@ -76,7 +88,7 @@ export function mayToggleOnAir(hold: LiveTriggerHold, actor: LiveTriggerActor, a
 /** Ce que l'interface sait du lecteur pour la même règle (`liveTriggerViewer`). */
 export type LiveTriggerViewer = {
   userId: number | null;
-  isAdmin: boolean;
+  oversees: boolean;
   manages: boolean;
   /** Le lecteur est l'arbitre désigné montré du match (`viewerRefereesMatch`). */
   referees: boolean;
@@ -88,12 +100,12 @@ export type LiveTriggerViewer = {
  * ajouté ici l'est pour toutes. `referees` : `viewerRefereesMatch`.
  */
 export function liveTriggerViewer(
-  controls: { viewerUserId: number | null; viewerIsAdmin: boolean; canSchedule: boolean },
+  controls: { viewerUserId: number | null; canManage: boolean; canSchedule: boolean },
   referees: boolean,
 ): LiveTriggerViewer {
   return {
     userId: controls.viewerUserId,
-    isAdmin: controls.viewerIsAdmin,
+    oversees: castOverseer(controls.canSchedule, controls.canManage),
     manages: controls.canSchedule,
     referees,
   };
@@ -124,7 +136,7 @@ export function viewerMayChangeLiveTrigger(
       ownerId: match.liveTriggerCasterId ?? null,
       refereeId: viewer.referees ? viewer.userId : null,
     },
-    { userId, isAdmin: viewer.isAdmin, manages: viewer.manages },
+    { userId, oversees: viewer.oversees, manages: viewer.manages },
     viewerCasts ?? match.casters.some((caster) => caster.userId === userId),
   );
 }

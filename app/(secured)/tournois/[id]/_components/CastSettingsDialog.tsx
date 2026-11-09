@@ -38,7 +38,14 @@ const CAST_FIELD_ERRORS = {
 } as const;
 
 /** Ce que la fenêtre a lu du cast du lecteur (`GET /api/matches/[id]/caster`). */
-type OwnCast = { streamId: number; liveUrl: string | null; staffStream: boolean; battletag: string | null };
+type OwnCast = {
+  streamId: number;
+  liveUrl: string | null;
+  staffStream: boolean;
+  battletag: string | null;
+  /** Le lien est dit « de l'organisation » : la case s'ouvre cochée. */
+  organisationLink?: boolean;
+};
 
 /** Envoi d'un corps JSON ; le refus porte le code du serveur. */
 async function send(url: string, method: "PUT" | "POST", body: unknown, fallback: string): Promise<void> {
@@ -124,6 +131,7 @@ export function CastSettingsDialog({
         setCast(payload);
         setUrl(payload.liveUrl ?? "");
         setBattletag(payload.battletag ?? "");
+        setOrganisationLink(payload.organisationLink === true);
       } catch (error) {
         if (!alive) return;
         showError(fail((error as Error).message));
@@ -155,7 +163,11 @@ export function CastSettingsDialog({
   const battletagChanged = cast !== null && !played && battletag.trim() !== (cast.battletag ?? "");
   const triggerChanged = configurable && !triggerLocked && pickedTrigger !== null && pickedTrigger !== match.liveTrigger;
   // « Enregistrer » sans rien de changé n'a rien à dire : il reste désarmé.
-  const dirty = triggerChanged || (streamEditable && urlChanged) || battletagChanged;
+  // La case « lien de l'organisation » : un membre `tournaments`, sur son
+  // stream à lien ; elle se coche ou se décoche aussi seule (lien inchangé).
+  const originOffered = canSchedule && streamEditable && url.trim() !== "";
+  const originChanged = cast !== null && originOffered && organisationLink !== (cast.organisationLink === true);
+  const dirty = triggerChanged || (streamEditable && urlChanged) || battletagChanged || originChanged;
   // Seul un mode choisi ici s'envoie : celui du match, même sans sa date, ne
   // bloque pas l'enregistrement d'un lien ou d'un BattleTag.
   const triggerRefused =
@@ -182,8 +194,9 @@ export function CastSettingsDialog({
       if (triggerChanged) settings.trigger = pickedTrigger;
       if (streamEditable && urlChanged) {
         settings.liveUrl = url.trim() === "" ? null : url.trim();
-        if (canSchedule && organisationLink) settings.organisationLink = true;
       }
+      // L'origine du lien se dit avec un lien changé, ou seule (case touchée).
+      if (originOffered && (urlChanged || originChanged)) settings.organisationLink = organisationLink;
       if (battletagChanged) settings.battletag = battletag.trim() === "" ? null : battletag.trim();
       await send(`/api/matches/${match.id}/caster`, "PUT", settings, "MATCH_CAST_SETTINGS_FAILED");
       showSuccess(t("cardActions.castSettings.saved"));
@@ -253,7 +266,7 @@ export function CastSettingsDialog({
 
             {/* Hors du bloc du mode : sur un match non castable, un membre de
                 l'organisation qui change son lien dit encore de qui il est. */}
-            {canSchedule && streamEditable && urlChanged && url.trim() !== "" && (
+            {originOffered && (
               <CastOrganisationLinkField checked={organisationLink} onChange={setOrganisationLink} />
             )}
 

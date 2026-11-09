@@ -5,6 +5,7 @@ import { mayConfigureMatchLive, parseStreamLinks } from "@/lib/server/tournament
 import { isMatchLiveTrigger, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import type { MatchStreamLinkEdit } from "@/lib/server/tournaments/live-streams";
 import { can } from "@/lib/shared/permissions";
+import { castOverseer } from "@/lib/shared/live-trigger-owner";
 import { readJsonBody } from "@/lib/server/request-body";
 import { announceStaffMatchAction, staffActionAuthor } from "@/lib/server/tournaments/staff-action-logs";
 
@@ -144,7 +145,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
       trigger,
       liveUrl: parsed.liveUrl,
       setter: { userId: user.id, asOrganisation: organisation && parsed.organisationLink },
-      access: { isAdmin: user.isAdmin, manages: organisation, live: can(user, "live") },
+      access: { oversees: castOverseer(organisation, can(user, "live")), manages: organisation, live: can(user, "live") },
       ...(streamLinks === undefined ? {} : { streamLinks }),
     });
     const removed = trigger === null && previousTrigger !== null;
@@ -180,7 +181,8 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
 
   try {
     // Un double clic (déjà à l'antenne, ou déjà hors antenne) ne se journalise pas.
-    const access = { isAdmin: user.isAdmin, manages: can(user, "tournaments"), live: can(user, "live") };
+    const manages = can(user, "tournaments");
+    const access = { oversees: castOverseer(manages, can(user, "live")), manages, live: can(user, "live") };
     if (await setMatchOnAir(matchId, body.onAir, user.id, access)) {
       announceStaffMatchAction(matchId, body.onAir ? "ON_AIR" : "OFF_AIR", staffActionAuthor(user));
     }

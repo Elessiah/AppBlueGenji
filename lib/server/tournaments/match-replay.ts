@@ -7,7 +7,9 @@
  * reste du plateau.
  *
  * Réservé à la permission `live` (admin, arbitre, caster) : c'est la suite
- * naturelle du cast, que pose déjà ce même public.
+ * naturelle du cast, que pose déjà ce même public. Un porteur de la seule
+ * `live` n'y touche que sur **son** cast ; le staff `tournaments` (dont
+ * l'arbitre désigné) sur tout match (décision du 2026-11-09).
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
@@ -50,11 +52,16 @@ function isReplayableRow(row: MatchReplayRow): boolean {
  * @returns le lien normalisé (`null` s'il a été effacé), et `changed` : le
  *   lien a changé — effacer un lien jamais posé, ou reposer le même, ne change
  *   rien, et le journal du staff ne le note pas.
- * @throws `INVALID_REPLAY_URL` | `MATCH_NOT_FOUND` | `MATCH_NOT_REPLAYABLE`
+ * `actor.manages` : permission `tournaments` — tout match ; sans elle, l'acteur
+ * doit caster ce match (`NOT_MATCH_CASTER`).
+ *
+ * @throws `INVALID_REPLAY_URL` | `MATCH_NOT_FOUND` | `MATCH_NOT_REPLAYABLE` |
+ *   `NOT_MATCH_CASTER`
  */
 export async function setMatchReplayUrl(
   matchId: number,
   rawUrl: string | null,
+  actor: { userId: number; manages: boolean },
 ): Promise<{ replayUrl: string | null; changed: boolean }> {
   const blank = rawUrl === null || rawUrl.trim() === "";
   const replayUrl = blank ? null : normalizeReplayUrl(rawUrl);
@@ -68,6 +75,13 @@ export async function setMatchReplayUrl(
   );
   if (rows.length === 0) throw new Error("MATCH_NOT_FOUND");
   const row = rows[0];
+  if (!actor.manages) {
+    const [casts] = await db.execute<RowDataPacket[]>(
+      `SELECT 1 FROM bg_match_casters WHERE match_id = ? AND user_id = ? LIMIT 1`,
+      [matchId, actor.userId],
+    );
+    if (casts.length === 0) throw new Error("NOT_MATCH_CASTER");
+  }
 
   if (replayUrl !== null && !isReplayableRow(row)) throw new Error("MATCH_NOT_REPLAYABLE");
 

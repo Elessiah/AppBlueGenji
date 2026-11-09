@@ -108,20 +108,20 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     jest.mocked(claimMatchCast).mockResolvedValue({ triggerSkipped: false });
     expect((await casterPost(jsonRequest("POST", link), params("42"))).status).toBe(200);
-    expect(claimMatchCast).toHaveBeenCalledWith(42, 4, true, link, {}, { isAdmin: false, manages: false });
+    expect(claimMatchCast).toHaveBeenCalledWith(42, 4, true, link, {}, { oversees: false, manages: false });
 
 
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(claimMatchCast).mockRejectedValue(new Error("NOT_CASTER"));
     expect((await casterPost(jsonRequest("POST", link), params("42"))).status).toBe(403);
-    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 2, false, link, {}, { isAdmin: false, manages: false });
+    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 2, false, link, {}, { oversees: false, manages: false });
   });
 
   it("transmet le stream choisi et les réglages du même geste", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     jest.mocked(claimMatchCast).mockResolvedValue({ triggerSkipped: false });
     expect((await casterPost(jsonRequest("POST", { streamId: 7 }), params("42"))).status).toBe(200);
-    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 4, true, { streamId: 7 }, {}, { isAdmin: false, manages: false });
+    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 4, true, { streamId: 7 }, {}, { oversees: false, manages: false });
     expect(
       (await casterPost(
         jsonRequest("POST", { liveUrl: "https://twitch.tv/voix", trigger: "AUTO", battletag: "Voix#2100" }),
@@ -134,7 +134,7 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
       true,
       { liveUrl: "https://twitch.tv/voix" },
       { trigger: "AUTO", battletag: "Voix#2100" },
-      { isAdmin: false, manages: false },
+      { oversees: false, manages: false },
     );
   });
 

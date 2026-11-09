@@ -924,7 +924,9 @@ export async function claimMatchCast(
         row,
         userId,
         streamId,
-        { ...settings, trigger, liveUrl: undefined, skipLockedTrigger: true },
+        // Lien et origine sont déjà posés avec le stream neuf (ci-dessus) ; un
+        // stream rejoint n'est pas le sien à dire « de l'organisation ».
+        { ...settings, trigger, liveUrl: undefined, asOrganisation: undefined, skipLockedTrigger: true },
         access,
       );
       return { tournamentId: Number(row.tournament_id), claimed: true, triggerSkipped: outcome.triggerSkipped };

@@ -7,6 +7,11 @@ import { setMatchReplayUrl } from "@/lib/server/tournaments/match-replay";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
+/** Staff `tournaments` : toute rediff, sans lecture des casters. */
+const STAFF = { userId: 5, manages: true };
+/** Porteur de la seule `live`. */
+const LIVE_ONLY_12 = { userId: 12, manages: false };
+
 const VIDEO = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
 
 async function mockDb(execute: SqlMock) {
@@ -43,11 +48,41 @@ afterEach(() => {
 });
 
 describe("setMatchReplayUrl", () => {
+  it("setMatchReplayUrl_liveOnlyCasterOfMatch_writesLink", async () => {
+    // Décision du 2026-11-09 : la seule `live` règle la rediff de **son** cast.
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[playedRow]])
+      .mockResolvedValueOnce([[{ 1: 1 }]])
+      .mockResolvedValue([{ affectedRows: 1, changedRows: 1 }]);
+    await mockDb(execute);
+
+    expect(await setMatchReplayUrl(42, VIDEO, LIVE_ONLY_12)).toEqual({ replayUrl: VIDEO, changed: true });
+    expect(execute.mock.calls[1]).toEqual([expect.stringContaining("FROM bg_match_casters"), [42, 12]]);
+  });
+
+  it("setMatchReplayUrl_liveOnlyNotCasterOfMatch_throwsNotMatchCaster", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[playedRow]]).mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    await expect(setMatchReplayUrl(42, VIDEO, LIVE_ONLY_12)).rejects.toThrow("NOT_MATCH_CASTER");
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchReplayUrl_staff_skipsCasterRead", async () => {
+    const execute = found();
+    await mockDb(execute);
+
+    await setMatchReplayUrl(42, VIDEO, STAFF);
+    expect(execute.mock.calls.some(([sql]) => String(sql).includes("bg_match_casters"))).toBe(false);
+  });
+
   it("enregistre un lien normalisé, borné aux matchs terminés, et réveille les pages", async () => {
     const execute = found();
     await mockDb(execute);
 
-    expect(await setMatchReplayUrl(42, "youtu.be/dQw4w9WgXcQ")).toEqual({
+    expect(await setMatchReplayUrl(42, "youtu.be/dQw4w9WgXcQ", STAFF)).toEqual({
       replayUrl: "https://youtu.be/dQw4w9WgXcQ",
       changed: true,
     });
@@ -64,7 +99,7 @@ describe("setMatchReplayUrl", () => {
       const execute = found({ ...playedRow, status: "READY" });
       await mockDb(execute);
 
-      expect(await setMatchReplayUrl(42, raw)).toEqual({ replayUrl: null, changed: true });
+      expect(await setMatchReplayUrl(42, raw, STAFF)).toEqual({ replayUrl: null, changed: true });
       const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
       expect(sql).toMatch(/SET replay_url = NULL WHERE id = \?$/);
       expect(params).toEqual([42]);
@@ -76,7 +111,7 @@ describe("setMatchReplayUrl", () => {
     const execute = found();
     await mockDb(execute);
 
-    await expect(setMatchReplayUrl(42, "https://www.twitch.tv/bluegenji")).rejects.toThrow(
+    await expect(setMatchReplayUrl(42, "https://www.twitch.tv/bluegenji", STAFF)).rejects.toThrow(
       "INVALID_REPLAY_URL",
     );
     expect(execute).not.toHaveBeenCalled();
@@ -87,7 +122,7 @@ describe("setMatchReplayUrl", () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
-    await expect(setMatchReplayUrl(42, VIDEO)).rejects.toThrow("MATCH_NOT_FOUND");
+    await expect(setMatchReplayUrl(42, VIDEO, STAFF)).rejects.toThrow("MATCH_NOT_FOUND");
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
@@ -100,7 +135,7 @@ describe("setMatchReplayUrl", () => {
     const execute = found({ ...playedRow, ...overrides });
     await mockDb(execute);
 
-    await expect(setMatchReplayUrl(42, VIDEO)).rejects.toThrow("MATCH_NOT_REPLAYABLE");
+    await expect(setMatchReplayUrl(42, VIDEO, STAFF)).rejects.toThrow("MATCH_NOT_REPLAYABLE");
     expect(execute).toHaveBeenCalledTimes(1);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
@@ -109,7 +144,7 @@ describe("setMatchReplayUrl", () => {
     const execute = found(playedRow, 0);
     await mockDb(execute);
 
-    await expect(setMatchReplayUrl(42, VIDEO)).rejects.toThrow("MATCH_NOT_REPLAYABLE");
+    await expect(setMatchReplayUrl(42, VIDEO, STAFF)).rejects.toThrow("MATCH_NOT_REPLAYABLE");
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 });
@@ -117,19 +152,19 @@ describe("setMatchReplayUrl", () => {
 describe("setMatchReplayUrl — changement", () => {
   it("setMatchReplayUrl_clearNeverSet_changedFalse", async () => {
     await mockDb(found(playedRow, 1, 0));
-    expect(await setMatchReplayUrl(42, null)).toEqual({ replayUrl: null, changed: false });
+    expect(await setMatchReplayUrl(42, null, STAFF)).toEqual({ replayUrl: null, changed: false });
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("setMatchReplayUrl_concurrentClear_secondChangedFalse", async () => {
     // Deux effacements simultanés : la ligne est trouvée, mais déjà vide au second.
     await mockDb(found(playedRow, 1, 0));
-    expect((await setMatchReplayUrl(42, "")).changed).toBe(false);
+    expect((await setMatchReplayUrl(42, "", STAFF)).changed).toBe(false);
   });
 
   it("setMatchReplayUrl_sameUrl_changedFalse", async () => {
     await mockDb(found(playedRow, 1, 0));
-    expect(await setMatchReplayUrl(42, "youtu.be/dQw4w9WgXcQ")).toEqual({
+    expect(await setMatchReplayUrl(42, "youtu.be/dQw4w9WgXcQ", STAFF)).toEqual({
       replayUrl: "https://youtu.be/dQw4w9WgXcQ",
       changed: false,
     });

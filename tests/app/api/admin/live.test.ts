@@ -93,7 +93,7 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
       trigger: "AUTO",
       liveUrl: "kick.com/bg",
       setter: { userId: arbitre.id, asOrganisation: false },
-      access: { isAdmin: false, manages: true, live: true },
+      access: { oversees: true, manages: true, live: true },
     });
   });
 
@@ -216,7 +216,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "MANUAL",
       liveUrl: "kick.com/bg",
       setter: { userId: caster.id, asOrganisation: false },
-      access: { isAdmin: false, manages: false, live: true },
+      access: { oversees: false, manages: false, live: true },
     });
   });
 
@@ -232,7 +232,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "AUTO",
       liveUrl: undefined,
       setter: { userId: arbitre.id, asOrganisation: false },
-      access: { isAdmin: false, manages: true, live: true },
+      access: { oversees: true, manages: true, live: true },
     });
   });
 
@@ -250,7 +250,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "AUTO",
       liveUrl: "kick.com/bg",
       setter: { userId: arbitre.id, asOrganisation: true },
-      access: { isAdmin: false, manages: true, live: true },
+      access: { oversees: true, manages: true, live: true },
     });
   });
 
@@ -401,7 +401,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: null,
       liveUrl: null,
       setter: { userId: caster.id, asOrganisation: false },
-      access: { isAdmin: false, manages: false, live: true },
+      access: { oversees: false, manages: false, live: true },
     });
   });
 
@@ -417,7 +417,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: undefined,
       liveUrl: undefined,
       setter: { userId: caster.id, asOrganisation: false },
-      access: { isAdmin: false, manages: false, live: true },
+      access: { oversees: false, manages: false, live: true },
     });
   });
 
@@ -432,7 +432,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "START_TIME",
       liveUrl: undefined,
       setter: { userId: caster.id, asOrganisation: false },
-      access: { isAdmin: false, manages: false, live: true },
+      access: { oversees: false, manages: false, live: true },
     });
   });
 
@@ -514,7 +514,7 @@ describe("POST /api/admin/matches/[matchId]/live", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ onAir: true });
-    expect(setMatchOnAir).toHaveBeenCalledWith(42, true, caster.id, { isAdmin: false, manages: false, live: true });
+    expect(setMatchOnAir).toHaveBeenCalledWith(42, true, caster.id, { oversees: false, manages: false, live: true });
   });
 
   it("referme l'antenne", async () => {
@@ -522,7 +522,7 @@ describe("POST /api/admin/matches/[matchId]/live", () => {
     jest.mocked(setMatchOnAir).mockResolvedValue(true);
 
     await postMatchOnAir(matchReq("POST", { onAir: false }), matchParams("42"));
-    expect(setMatchOnAir).toHaveBeenCalledWith(42, false, caster.id, { isAdmin: false, manages: false, live: true });
+    expect(setMatchOnAir).toHaveBeenCalledWith(42, false, caster.id, { oversees: false, manages: false, live: true });
   });
 
   it("exige un onAir booléen — une chaîne « false » ne doit pas ouvrir l'antenne", async () => {

@@ -15,7 +15,8 @@ function parseMatchId(raw: string): number | null {
  * Corps : `{ replayUrl: string | null }` — `null` (ou chaîne vide) efface.
  *
  * Réservé à la permission `live` (admin, arbitre, caster), comme la diffusion
- * en direct dont la rediff est la suite.
+ * en direct dont la rediff est la suite : la seule `live` ne règle que la rediff
+ * de **son** cast (403 `NOT_MATCH_CASTER`), le staff `tournaments` toutes.
  */
 export async function PUT(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -31,7 +32,10 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   if (raw !== null && typeof raw !== "string") return fail("INVALID_REPLAY_URL", 400);
 
   try {
-    const { replayUrl, changed } = await setMatchReplayUrl(matchId, raw);
+    const { replayUrl, changed } = await setMatchReplayUrl(matchId, raw, {
+      userId: user.id,
+      manages: can(user, "tournaments"),
+    });
     // Un geste sans effet (retirer un lien jamais posé, reposer le même) ne se journalise pas.
     if (changed) {
       announceStaffMatchAction(matchId, replayUrl === null ? "REPLAY_REMOVED" : "REPLAY_SET", staffActionAuthor(user));
@@ -40,6 +44,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   } catch (error) {
     const message = (error as Error).message;
     if (message === "MATCH_NOT_FOUND") return fail(message, 404);
+    if (message === "NOT_MATCH_CASTER") return fail(message, 403);
     if (message === "INVALID_REPLAY_URL") return fail(message, 400);
     if (message === "MATCH_NOT_REPLAYABLE") return fail(message, 409);
     return fail("MATCH_REPLAY_UPDATE_FAILED", 500);

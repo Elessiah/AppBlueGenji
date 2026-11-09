@@ -117,7 +117,7 @@ type LockedLiveMatch = {
 };
 
 /** Ce qu'un appelant des gestes de diffusion établit de ses droits. */
-export type MatchLiveAccess = Pick<LiveTriggerActor, "isAdmin" | "manages"> & { live: boolean };
+export type MatchLiveAccess = Pick<LiveTriggerActor, "oversees" | "manages"> & { live: boolean };
 
 /**
  * Résultat d'un réglage. `previousTrigger` : le mode d'avant ; `changed` : la requête a-t-elle écrit
@@ -279,7 +279,7 @@ export async function setMatchLiveConfig(
   parseStreamUrlInput(requested === null ? null : (config.liveUrl ?? null));
   const actor: LiveTriggerActor = {
     userId: config.setter.userId,
-    isAdmin: config.access.isAdmin,
+    oversees: config.access.oversees,
     manages: config.access.manages,
   };
 
@@ -360,7 +360,7 @@ async function unmarkLive(
   hold: LiveTriggerHold,
   actor: LiveTriggerActor,
 ): Promise<void> {
-  const staffSide = actor.manages || actor.isAdmin || isMatchRefereeActor(hold, actor);
+  const staffSide = actor.manages || isMatchRefereeActor(hold, actor);
   if (!staffSide && hold.ownerId !== actor.userId && (await hasStaffLink(connection, matchId))) {
     throw new Error("STAFF_STREAM_FORBIDDEN");
   }
@@ -424,7 +424,7 @@ async function writeStaffLink(
   const before = known ?? (await lockMatchStreams(connection, matchId));
   const streams = await setStaffStreamUrl(connection, matchId, url, config.setter, before, edited);
   const written = streams !== before;
-  if (written && !actor.manages && !actor.isAdmin && !isMatchRefereeActor(hold, actor)) {
+  if (written && !actor.manages && !isMatchRefereeActor(hold, actor)) {
     throw new Error("STAFF_STREAM_FORBIDDEN");
   }
   if (written && hold.ownerId !== null && !mayChangeLiveTrigger(hold, actor)) {
@@ -608,7 +608,7 @@ function assertLiveConfigAllowed(
 ): boolean {
   const referee = isMatchRefereeActor(hold, actor);
   if (!live && !referee) throw new Error("NOT_MATCH_REFEREE");
-  if (!referee && !actor.manages && !actor.isAdmin && !actorShown) throw new Error("NOT_MATCH_CASTER");
+  if (!referee && !actor.manages && !actorShown) throw new Error("NOT_MATCH_CASTER");
   assertConfigurable(current, trigger);
   const triggerChanges = trigger !== hold.trigger;
   if (triggerChanges && !mayChangeLiveTrigger(hold, actor, actorShown)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
@@ -726,7 +726,7 @@ export async function setMatchOnAir(
   userId: number,
   access: MatchLiveAccess,
 ): Promise<boolean> {
-  const actor: LiveTriggerActor = { userId, isAdmin: access.isAdmin, manages: access.manages };
+  const actor: LiveTriggerActor = { userId, oversees: access.oversees, manages: access.manages };
   // Le verrou du match puis la lecture de ses casters : l'ordre de
   // `setMatchLiveConfig`, rejoué comme lui sur un interblocage.
   const result = await retryOnDeadlock(() => withConnection(async (connection) => {

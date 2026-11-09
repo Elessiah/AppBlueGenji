@@ -66,12 +66,12 @@ export type CastSettingsOutcome = { triggerSkipped: boolean };
  * (`lib/shared/live-trigger-owner.ts`) : admin, permission `tournaments`.
  */
 export type CastAccess = {
-  isAdmin: boolean;
+  oversees: boolean;
   manages: boolean;
 };
 
 /** Sans droit particulier : un caster ordinaire. */
-export const PLAIN_CAST_ACCESS: CastAccess = { isAdmin: false, manages: false };
+export const PLAIN_CAST_ACCESS: CastAccess = { oversees: false, manages: false };
 
 /**
  * Le match accepte-t-il encore ce mode d'antenne ? Même verdict que la
@@ -229,6 +229,34 @@ export async function setCasterStreamUrl(
 }
 
 /**
+ * Dit (ou retire) le lien du stream que **tient** ce caster « de
+ * l'organisation », **sans** changer le lien : `linkUserId` `null` = celui de
+ * l'organisation, sinon le sien (`withdrawUserCasts` l'emporte avec son
+ * compte). Les mêmes gardes que `setCasterStreamUrl` : jamais le stream du
+ * staff, jamais un stream sans lien. `known` : les streams déjà lus sous verrou.
+ *
+ * @throws `STREAM_NOT_FOUND` | `CAST_STREAM_NOT_OWNED` | `STREAM_URL_REQUIRED`
+ */
+export async function setCasterLinkOrigin(
+  connection: PoolConnection,
+  matchId: number,
+  streamId: number,
+  linkUserId: number | null,
+  known?: MatchStreamRow[],
+): Promise<MatchStreamRow[]> {
+  const streams = known ?? (await lockMatchStreams(connection, matchId, true));
+  const target = streams.find((stream) => stream.id === streamId);
+  if (!target) throw new Error("STREAM_NOT_FOUND");
+  if (!casterStreamEditable(target)) throw new Error("CAST_STREAM_NOT_OWNED");
+  if (target.liveUrl === null) throw new Error("STREAM_URL_REQUIRED");
+  await connection.execute(
+    `UPDATE bg_match_streams SET link_user_id = ? WHERE id = ? AND staff_owned = 0`,
+    [linkUserId, streamId],
+  );
+  return streams;
+}
+
+/**
  * Écrit le BattleTag de cast d'un caster (`bg_match_casters.cast_battletag`).
  * `null` l'efface : le BattleTag de son compte reprend sa place.
  */
@@ -275,6 +303,12 @@ export async function applyCastSettings(
       settings.asOrganisation === true ? null : userId,
     );
   }
+  // L'origine du lien se dit aussi seule, lien inchangé (case cochée ou
+  // décochée sans toucher l'URL, décision du 2026-11-09) : un lien inchangé
+  // n'est pas réécrit par `setCasterStreamUrl`, son origine l'est ici.
+  if (settings.asOrganisation !== undefined) {
+    streams = await setCasterLinkOrigin(connection, matchId, streamId, settings.asOrganisation ? null : userId, streams);
+  }
   if (settings.battletag !== undefined) {
     await writeCastBattletag(connection, matchId, userId, parseCastBattletagInput(settings.battletag));
   }
@@ -298,6 +332,8 @@ export type OwnCastSettings = {
   staffStream: boolean;
   /** BattleTag donné pour ce cast, `null` = celui de son compte. */
   battletag: string | null;
+  /** Son lien est dit « de l'organisation » (`link_user_id` vide sur son stream). */
+  organisationLink: boolean;
 };
 
 type OwnCastRow = RowDataPacket & {
@@ -305,6 +341,7 @@ type OwnCastRow = RowDataPacket & {
   cast_battletag: string | null;
   live_url: string | null;
   staff_owned: number;
+  link_user_id: number | null;
 };
 
 /**
@@ -320,7 +357,7 @@ type OwnCastRow = RowDataPacket & {
 export async function loadOwnCastSettings(matchId: number, userId: number): Promise<OwnCastSettings> {
   const db = await getDatabase();
   const [rows] = await db.execute<OwnCastRow[]>(
-    `SELECT c.stream_id, c.cast_battletag, s.live_url, s.staff_owned
+    `SELECT c.stream_id, c.cast_battletag, s.live_url, s.staff_owned, s.link_user_id
      FROM bg_match_casters c
      JOIN bg_match_streams s ON s.match_id = c.match_id AND s.id = c.stream_id
      WHERE c.match_id = ? AND c.user_id = ? LIMIT 1`,
@@ -333,5 +370,6 @@ export async function loadOwnCastSettings(matchId: number, userId: number): Prom
     liveUrl: row.live_url ?? null,
     staffStream: Number(row.staff_owned) === 1,
     battletag: row.cast_battletag ?? null,
+    organisationLink: Number(row.staff_owned) !== 1 && row.live_url !== null && row.link_user_id === null,
   };
 }

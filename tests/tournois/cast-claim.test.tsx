@@ -379,10 +379,13 @@ describe("MatchCardActions — branchements du cast", () => {
     expect(settings).toContain('fetch(`/api/matches/${match.id}/caster`, { method: "DELETE" })');
   });
 
-  it("la case « lien de l'organisation » n'est offerte que pour un lien modifié (sinon l'envoi l'ignorerait)", () => {
+  it("CastSettingsDialog_organisationBox_offeredOnLinkedStreamAndSentAlone", () => {
+    // Décision du 2026-11-09 : la case se coche ou se décoche seule, lien inchangé ; relue à l'ouverture.
     const settings = readSource("app/(secured)/tournois/[id]/_components/CastSettingsDialog.tsx");
-    expect(settings).toContain("canSchedule && streamEditable && urlChanged && url.trim() !== \"\" && (");
-    expect(settings).toContain("if (canSchedule && organisationLink) settings.organisationLink = true;");
+    expect(settings).toContain('const originOffered = canSchedule && streamEditable && url.trim() !== "";');
+    expect(settings).toContain("if (originOffered && (urlChanged || originChanged)) settings.organisationLink = organisationLink;");
+    expect(settings).toContain("setOrganisationLink(payload.organisationLink === true);");
+    expect(settings).toContain("|| originChanged;");
   });
 
   it("le caster à retirer est fixé à l'ouverture ; parti entre-temps, la fenêtre se ferme au lieu d'en viser un autre", () => {

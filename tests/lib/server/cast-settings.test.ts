@@ -2,9 +2,16 @@ import { describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 
-import { applyCastSettings, applyCastTrigger, setCasterStreamUrl } from "@/lib/server/tournaments/cast-settings";
+import { getDatabase } from "@/lib/server/database";
+import {
+  applyCastSettings,
+  applyCastTrigger,
+  loadOwnCastSettings,
+  setCasterLinkOrigin,
+  setCasterStreamUrl,
+} from "@/lib/server/tournaments/cast-settings";
 import type { LaunchMatchRow } from "@/lib/server/tournaments/match-launch";
-import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
+import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /**
  * Lien du stream d'un caster (`lib/server/tournaments/cast-settings.ts`,
@@ -70,7 +77,7 @@ describe("applyCastTrigger", () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12)).mockResolvedValue([{ affectedRows: 1 }, []]);
     const row = ownedRow();
 
-    await applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 9, { isAdmin: false, manages: true });
+    await applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 9, { oversees: false, manages: true });
 
     // Hors des casters, il médie : le mode reste au caster qui l'a posé.
     expect(execute.mock.calls[1][1]).toEqual(["AUTO", 12, 42]);
@@ -80,7 +87,7 @@ describe("applyCastTrigger", () => {
   it("applyCastTrigger_castingRefereeChangesCasterMode_keepsCasterOwner", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12, 9)).mockResolvedValue([{ affectedRows: 1 }, []]);
 
-    await applyCastTrigger(fakeConnection({ execute }), ownedRow(), "AUTO", 9, { isAdmin: false, manages: true });
+    await applyCastTrigger(fakeConnection({ execute }), ownedRow(), "AUTO", 9, { oversees: false, manages: true });
 
     expect(execute.mock.calls[1][1]).toEqual(["AUTO", 12, 42]);
   });
@@ -91,7 +98,7 @@ describe("applyCastTrigger", () => {
     const row = Object.assign(ownedRow(), { status: "AWAITING_CONFIRMATION" });
 
     await expect(
-      applyCastTrigger(fakeConnection({ execute }), row, null, 9, { isAdmin: false, manages: true }),
+      applyCastTrigger(fakeConnection({ execute }), row, null, 9, { oversees: false, manages: true }),
     ).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
   });
 
@@ -100,7 +107,7 @@ describe("applyCastTrigger", () => {
     const row = Object.assign(ownedRow(), { refereeEligible: false });
 
     await expect(
-      applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 9, { isAdmin: false, manages: true }),
+      applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 9, { oversees: false, manages: true }),
     ).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
   });
 });
@@ -145,7 +152,7 @@ describe("applyCastTrigger — inscription et maître tu", () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(13)).mockResolvedValue([{ affectedRows: 1 }, []]);
     const row = ownedRow();
 
-    await expect(applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 13, { isAdmin: false, manages: true })).resolves.toBe(true);
+    await expect(applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 13, { oversees: false, manages: true })).resolves.toBe(true);
     expect(execute.mock.calls[1][1]).toEqual(["AUTO", 13, 42]);
   });
 
@@ -173,5 +180,85 @@ describe("applyCastSettings", () => {
 
     const statements = execute.mock.calls.map((call) => String(call[0]));
     expect(statements.some((sql) => sql.includes("FROM bg_match_casters"))).toBe(false);
+  });
+});
+
+/** Le stream 5 du caster 900, avec son lien. */
+const OWN_LINKED = { id: 5, match_id: 42, live_url: "https://twitch.tv/voix", staff_owned: 0 };
+
+describe("setCasterLinkOrigin — l'origine du lien dite seule (décision du 2026-11-09)", () => {
+  it("setCasterLinkOrigin_ownLinkedStream_clearsLinkUserId", async () => {
+    const execute = jest.fn<SqlQuery>();
+    execute.mockResolvedValueOnce([[OWN_LINKED], []]);
+    execute.mockResolvedValue([{ affectedRows: 1 }, []]);
+
+    await setCasterLinkOrigin(fakeConnection({ execute }), 42, 5, null);
+
+    expect(execute.mock.calls[1]).toEqual([expect.stringContaining("SET link_user_id = ?"), [null, 5]]);
+  });
+
+  it("setCasterLinkOrigin_staffStream_throwsCastStreamNotOwned", async () => {
+    const execute = jest.fn<SqlQuery>();
+    execute.mockResolvedValueOnce([[{ ...OWN_LINKED, staff_owned: 1 }], []]);
+
+    await expect(setCasterLinkOrigin(fakeConnection({ execute }), 42, 5, null)).rejects.toThrow("CAST_STREAM_NOT_OWNED");
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("setCasterLinkOrigin_streamWithoutLink_throwsStreamUrlRequired", async () => {
+    const execute = jest.fn<SqlQuery>();
+    execute.mockResolvedValueOnce([[{ ...OWN_LINKED, live_url: null }], []]);
+
+    await expect(setCasterLinkOrigin(fakeConnection({ execute }), 42, 5, null)).rejects.toThrow("STREAM_URL_REQUIRED");
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("setCasterLinkOrigin_unknownStream_throwsStreamNotFound", async () => {
+    const execute = jest.fn<SqlQuery>();
+    execute.mockResolvedValueOnce([[OWN_LINKED], []]);
+
+    await expect(setCasterLinkOrigin(fakeConnection({ execute }), 42, 6, null)).rejects.toThrow("STREAM_NOT_FOUND");
+  });
+
+  it("applyCastSettings_organisationAloneTrue_setsOriginWithoutRewritingUrl", async () => {
+    const execute = jest.fn<SqlQuery>();
+    execute.mockResolvedValueOnce([[OWN_LINKED], []]);
+    execute.mockResolvedValue([{ affectedRows: 1 }, []]);
+    const row = { id: 42, casters: [{ matchId: 42, userId: 900, streamId: 5, readyAt: null }] } as unknown as LaunchMatchRow;
+
+    await applyCastSettings(fakeConnection({ execute }), row, 900, 5, { asOrganisation: true });
+
+    const statements = execute.mock.calls.map((call) => String(call[0]));
+    expect(statements.some((sql) => sql.includes("SET live_url"))).toBe(false);
+    expect(execute.mock.calls[1]).toEqual([expect.stringContaining("SET link_user_id = ?"), [null, 5]]);
+  });
+
+  it("applyCastSettings_organisationAloneFalse_attachesLinkToCaster", async () => {
+    const execute = jest.fn<SqlQuery>();
+    execute.mockResolvedValueOnce([[OWN_LINKED], []]);
+    execute.mockResolvedValue([{ affectedRows: 1 }, []]);
+    const row = { id: 42, casters: [{ matchId: 42, userId: 900, streamId: 5, readyAt: null }] } as unknown as LaunchMatchRow;
+
+    await applyCastSettings(fakeConnection({ execute }), row, 900, 5, { asOrganisation: false });
+
+    expect(execute.mock.calls[1]).toEqual([expect.stringContaining("SET link_user_id = ?"), [900, 5]]);
+  });
+});
+
+describe("loadOwnCastSettings — la case relue à l'ouverture", () => {
+  const ownRow = { stream_id: 5, cast_battletag: null, live_url: "https://twitch.tv/voix", staff_owned: 0 };
+
+  it("loadOwnCastSettings_linkWithoutOwner_organisationLinkTrue", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...ownRow, link_user_id: null }], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await expect(loadOwnCastSettings(42, 900)).resolves.toMatchObject({ organisationLink: true });
+  });
+
+  it("loadOwnCastSettings_linkOwned_organisationLinkFalse", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...ownRow, link_user_id: 900 }], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await expect(loadOwnCastSettings(42, 900)).resolves.toMatchObject({ organisationLink: false });
   });
 });
