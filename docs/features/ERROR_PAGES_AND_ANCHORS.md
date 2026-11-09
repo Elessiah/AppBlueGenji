@@ -70,7 +70,8 @@ application/x-www-form-urlencoded` + `Next-Action` -> 500).
 - `middleware.ts` (`isServerActionCall`) : tout `POST` portant `Next-Action`
   est refusé en 404 sans corps, avant tout rendu — le bruit « Server Reference
   ID » disparaît avec lui.
-- `PublicPageShell` s'enveloppe de `EnsureToastProvider` (`components/ui/toast.tsx`) :
-  fournisseur ajouté seulement s'il n'y en a pas au-dessus. `useToast` reste
-  strict, un oubli réel de fournisseur se voit toujours.
+- `app/not-found.tsx` s'enveloppe de `EnsureToastProvider` (`components/ui/toast.tsx`) :
+  fournisseur ajouté seulement s'il n'y en a pas au-dessus, et sur cette seule
+  page (pas dans `PublicPageShell`, partagé). `useToast` reste strict, un oubli
+  réel du fournisseur racine se voit toujours sur les autres pages.
 - Tests : `tests/app/toast-outside-layout.test.tsx`.

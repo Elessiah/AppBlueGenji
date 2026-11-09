@@ -3,6 +3,7 @@ import { CyberButton } from "@/components/cyber";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { ErrorPanel } from "@/components/error-page/ErrorPanel";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { EnsureToastProvider } from "@/components/ui/toast";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { NOT_FOUND_LINKS, errorPageTitle, notFoundCopy } from "@/lib/shared/error-pages";
@@ -29,18 +30,25 @@ export async function generateMetadata(): Promise<Metadata> {
  * proche. Dans la langue de la page, dans le gabarit de la vitrine (en-tête,
  * pied de page), avec des chemins de retour — la page par défaut de Next n'en
  * avait aucun.
+ *
+ * Enveloppée de `EnsureToastProvider` : Next la rend aussi **sans** la mise en
+ * page racine (réponse à une requête d'action inconnue), et le pied de page
+ * appelle `useToast()`. Seule cette page en a besoin — les autres pages vitrine
+ * restent sous le fournisseur racine, dont un oubli doit se voir.
  */
 export default async function NotFound() {
   const t = await shellTranslate();
   return (
-    <PublicPageShell>
-      <ErrorPanel copy={notFoundCopy(t)} referenceLabel={t("errorPages.reference")}>
-        {NOT_FOUND_LINKS.map((link, index) => (
-          <CyberButton key={link.href} asChild variant={index === 0 ? "primary" : "ghost"}>
-            <LocaleLink href={link.href}>{t(link.labelKey)}</LocaleLink>
-          </CyberButton>
-        ))}
-      </ErrorPanel>
-    </PublicPageShell>
+    <EnsureToastProvider>
+      <PublicPageShell>
+        <ErrorPanel copy={notFoundCopy(t)} referenceLabel={t("errorPages.reference")}>
+          {NOT_FOUND_LINKS.map((link, index) => (
+            <CyberButton key={link.href} asChild variant={index === 0 ? "primary" : "ghost"}>
+              <LocaleLink href={link.href}>{t(link.labelKey)}</LocaleLink>
+            </CyberButton>
+          ))}
+        </ErrorPanel>
+      </PublicPageShell>
+    </EnsureToastProvider>
   );
 }

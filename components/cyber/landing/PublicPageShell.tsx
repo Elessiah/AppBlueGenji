@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { PublicHeader } from "./PublicHeader";
 import { PublicFooter } from "./PublicFooter";
-import { EnsureToastProvider } from "@/components/ui/toast";
 
 /**
  * Gabarit des pages vitrine : en-tête, contenu principal, pied de page —
@@ -18,17 +17,13 @@ import { EnsureToastProvider } from "@/components/ui/toast";
  * (`position: relative; z-index: 1`) au-dessus du fond, et l'en-tête collant
  * (`z-index: 30`), sorti de ce contexte, reste au-dessus du contenu — son menu
  * burger compris, qui ne dépend que de lui.
- *
- * Le gabarit s'assure d'un fournisseur de notifications (`EnsureToastProvider`) :
- * Next le rend aussi sans la mise en page racine (page d'introuvable servie en
- * réponse à une requête d'action inconnue), et le pied de page en a besoin.
  */
 export function PublicPageShell({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <EnsureToastProvider>
+    <>
       <PublicHeader />
       <main style={{ position: "relative", zIndex: 1 }}>{children}</main>
       <PublicFooter />
-    </EnsureToastProvider>
+    </>
   );
 }

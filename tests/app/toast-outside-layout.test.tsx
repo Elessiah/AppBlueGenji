@@ -5,8 +5,10 @@ import { NextRequest } from "next/server";
 import { middleware } from "@/middleware";
 import { EnsureToastProvider, ToastProvider, useToast } from "@/components/ui/toast";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
+import NotFound from "@/app/not-found";
 
 jest.mock("next/navigation", () => ({ usePathname: () => "/" }));
+jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => "fr" }));
 // Doublure du pied de page : comme le vrai (`FooterContact`), elle appelle `useToast()`.
 jest.mock("@/components/cyber/landing/PublicHeader", () => ({ PublicHeader: () => <header>en-tête</header> }));
 jest.mock("@/components/cyber/landing/PublicFooter", () => ({
@@ -42,9 +44,20 @@ describe("middleware — requêtes d'action inconnues", () => {
     });
     expect(response.status).toBe(403);
   });
+
+  it("refuse en 404, sans la laisser passer, une écriture /api/ inter-sites portant Next-Action", () => {
+    const response = call("/api/tournaments/1/register", "POST", {
+      "next-action": "x",
+      "sec-fetch-site": "cross-site",
+      origin: "https://evil.example",
+    });
+    expect(response.status).toBe(404);
+    expect(passedThrough(response)).toBe(false);
+    expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+  });
 });
 
-describe("EnsureToastProvider et PublicPageShell hors mise en page racine", () => {
+describe("EnsureToastProvider et page d'introuvable hors mise en page racine", () => {
   it("useToast reste strict sans fournisseur", () => {
     const Bare = () => {
       useToast();
@@ -55,14 +68,27 @@ describe("EnsureToastProvider et PublicPageShell hors mise en page racine", () =
     spy.mockRestore();
   });
 
-  it("le gabarit des pages vitrine rend sans fournisseur racine", () => {
-    const html = renderToStaticMarkup(
-      <PublicPageShell>
-        <h1>Introuvable</h1>
-      </PublicPageShell>,
-    );
+  it("la page d'introuvable rend sans fournisseur racine", async () => {
+    const html = renderToStaticMarkup(await NotFound());
     expect(html).toContain("<footer>pied</footer>");
-    expect(html).toContain("<h1>Introuvable</h1>");
+    expect(html).toContain("Page introuvable");
+  });
+
+  it("la page d'introuvable sous le fournisseur racine n'ajoute pas de seconde zone d'annonce", async () => {
+    const html = renderToStaticMarkup(<ToastProvider>{await NotFound()}</ToastProvider>);
+    expect(html.match(/role="status"/g)).toHaveLength(1);
+  });
+
+  it("le gabarit partagé ne masque pas l'absence du fournisseur racine", () => {
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    expect(() =>
+      renderToStaticMarkup(
+        <PublicPageShell>
+          <h1>Contenu</h1>
+        </PublicPageShell>,
+      ),
+    ).toThrow("useToast doit être utilisé dans ToastProvider");
+    spy.mockRestore();
   });
 
   it("n'ajoute pas de second fournisseur sous celui de la page", () => {
