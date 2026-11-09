@@ -79,6 +79,9 @@ describe("POST /api/matches/[matchId]/ready", () => {
     ["MATCH_NOT_IN_LOBBY", 409],
     ["NOT_MATCH_PARTY", 403],
     ["NOT_TEAM_READY_ROLE", 403],
+    ["NOT_CASTER", 403],
+    ["CASTER_IDENTITY_REQUIRED", 403],
+    ["CASTER_DISCORD_REQUIRED", 403],
   ])("traduit %s en %i", async (code, status) => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(setMatchReady).mockRejectedValue(new Error(code));
@@ -236,7 +239,7 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
     ["STREAM_NOT_FOUND", 409],
     ["INVALID_STREAM_URL", 400],
     ["CASTER_IS_PLAYER", 409],
-    ["MATCH_ALREADY_COMPLETED", 409],
+    ["MATCH_CAST_CLOSED", 409],
     ["MATCH_NOT_FOUND", 404],
   ])("traduit le refus %s en %i", async (code, status) => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);

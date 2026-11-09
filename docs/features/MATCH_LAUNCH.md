@@ -335,7 +335,7 @@ sienne), si bien que le lancement n'attend plus son « Prêt ». Sur un match
 **déjà lancé**, rien n'attend plus : l'inscription reste (on ne retire pas un
 caster en pleine diffusion pour un tag retouché), seuls ses contacts sont tus. Les deux autres
 chemins d'un caster suivent la même règle (`lib/server/tournaments/cast-eligibility.ts`) :
-son « Prêt » est refusé (`resolveMatchParty` → `NOT_MATCH_PARTY`) et le
+son « Prêt » est refusé avec le motif du blocage (`notPartyReason` → `NOT_CASTER` / `CASTER_IDENTITY_REQUIRED` / `CASTER_DISCORD_REQUIRED`, 403) et le
 balayage des notifications ne l'appelle plus au départ du match. Voir
 `docs/AUTHORIZATION_RULES.md` §4.5.
 

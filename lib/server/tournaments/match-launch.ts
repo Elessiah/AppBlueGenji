@@ -464,6 +464,21 @@ export type MatchParty = { role: LaunchViewerRole; canDeclareReady: boolean };
  * Le lecteur est-il partie de ce match — joueur d'une des deux engagées
  * (appartenance **en cours**, ou entrée solo), ou un de ses casters ?
  */
+/**
+ * Motif du refus d'un lecteur sans rôle au match : un caster inscrit devenu
+ * inéligible reçoit le code de blocage du cast (`CastBlock`), qui lui dit quoi
+ * régler, plutôt qu'un `NOT_MATCH_PARTY` muet.
+ */
+async function notPartyReason(
+  connection: PoolConnection,
+  match: { casters: readonly Pick<MatchCasterLink, "userId">[]; tournament_game: TournamentGame | null },
+  userId: number,
+): Promise<string> {
+  if (!match.casters.some((caster) => caster.userId === userId)) return "NOT_MATCH_PARTY";
+  const block = (await loadCastBlocks(connection, [userId], match.tournament_game ?? "OW")).get(userId) ?? null;
+  return block ?? "NOT_MATCH_PARTY";
+}
+
 export async function resolveMatchParty(
   connection: PoolConnection,
   match: {
@@ -621,6 +636,7 @@ async function writeCasterReady(
  *
  * @throws `MATCH_NOT_FOUND` | `TOURNAMENT_NOT_RUNNING` | `MATCH_ALREADY_LAUNCHED`
  *   | `MATCH_NOT_IN_LOBBY` | `NOT_MATCH_PARTY` | `NOT_TEAM_READY_ROLE`
+ *   | `CastBlock` (caster inscrit devenu inéligible)
  */
 export async function setMatchReady(
   matchId: number,
@@ -639,7 +655,7 @@ export async function setMatchReady(
     // Lu après l'adoption, qui peut défaire l'ouverture d'un autre appariement.
     const lobbyWasOpen = row.lobby_opened_at !== null;
     const party = await resolveMatchParty(connection, row, userId);
-    if (!party) throw new Error("NOT_MATCH_PARTY");
+    if (!party) throw new Error(await notPartyReason(connection, row, userId));
     if (!party.canDeclareReady) throw new Error("NOT_TEAM_READY_ROLE");
 
     if (party.role === "CASTER") {

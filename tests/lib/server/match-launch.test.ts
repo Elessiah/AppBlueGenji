@@ -499,14 +499,14 @@ describe("setMatchReady", () => {
     expect(state.match?.casters.map((caster) => caster.ready_at)).toEqual([STAMP, null]);
   });
 
-  it.each<[string, Partial<typeof ELIGIBLE_CASTER>]>([
-    ["sans la permission `live`", { platform_roles_json: JSON.stringify(["RECRUTEUR"]) }],
-    ["au tag décertifié", { discord_verified_at: null }],
-    ["sans Battle.net", { blizzard_sub: null }],
-  ])("refuse le « Prêt » d'un caster inscrit %s", async (_label, overrides) => {
+  it.each<[string, Partial<typeof ELIGIBLE_CASTER>, string]>([
+    ["sans la permission `live`", { platform_roles_json: JSON.stringify(["RECRUTEUR"]) }, "NOT_CASTER"],
+    ["au tag décertifié", { discord_verified_at: null }, "CASTER_IDENTITY_REQUIRED"],
+    ["sans Battle.net", { blizzard_sub: null }, "CASTER_IDENTITY_REQUIRED"],
+  ])("refuse le « Prêt » d'un caster inscrit %s, avec le motif du blocage", async (_label, overrides, code) => {
     state.match = matchState({ team2_ready_at: STAMP, caster_user_id: CASTER });
     state.users[CASTER] = { ...ELIGIBLE_CASTER, ...overrides };
-    await expect(setMatchReady(42, CASTER, true)).rejects.toThrow("NOT_MATCH_PARTY");
+    await expect(setMatchReady(42, CASTER, true)).rejects.toThrow(code);
     expect(casterReadyOf(state)).toBeNull();
   });
 
@@ -1970,6 +1970,22 @@ describe("casters devenus inéligibles : retirés au lancement (EF-29)", () => {
 
     expect(casterOf(state)).toBe(CASTER);
     expect(queueCastChange).not.toHaveBeenCalled();
+  });
+
+  it("setMatchReady_ineligibleCaster_refusedWithBlockReason", async () => {
+    state.users[CASTER] = INELIGIBLE;
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await expect(setMatchReady(42, CASTER, true)).rejects.toThrow("NOT_CASTER");
+
+    expect(casterReadyOf(state)).toBeNull();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchReady_strangerNotCaster_throwsNotMatchParty", async () => {
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await expect(setMatchReady(42, 999, true)).rejects.toThrow("NOT_MATCH_PARTY");
   });
 
   it("setMatchReady_ineligibleCoCaster_doesNotBlockTheLaunch", async () => {
