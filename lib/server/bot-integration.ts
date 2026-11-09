@@ -1129,7 +1129,9 @@ async function voiceCall<T>(
 /** Identifiant Discord tel que le bot le rend : chiffres seulement. */
 function readChannelId(payload: unknown): string | null {
   const id = (payload as { channelId?: unknown } | null)?.channelId;
-  return typeof id === "string" && /^\d{5,32}$/.test(id) ? id : null;
+  // Même motif que le bot (`parseChannelId`) : un identifiant qu'il refuserait au rendu
+  // (`INVALID_CHANNEL_ID`, qui clôt la ligne) n'est jamais gardé.
+  return typeof id === "string" && /^\d{17,20}$/.test(id) ? id : null;
 }
 
 /**

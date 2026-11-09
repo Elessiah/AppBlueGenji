@@ -91,9 +91,10 @@ function voicePlayable(match: VoiceSnapshotMatch): boolean {
 
 /**
  * États des salons des matchs d'un tournoi pour l'instantané, jugés à l'heure de la base, lue
- * avec les salons des matchs jouables en une requête (`ClockedVoiceRow`) — seulement si l'option
- * peut valoir (allumée, tournoi en cours) et qu'un match est jouable : une reconstruction sans
- * salon possible ne coûte aucune lecture, vide sinon.
+ * avec les salons ouverts des matchs jouables en une requête (`ClockedVoiceRow`, par clé primaire
+ * — une ligne n'existe que pour un match dont les salons ont été dus). Sans option allumée, tournoi
+ * en cours ni match jouable : aucune lecture. Sinon une seule, même avant la publication ou
+ * l'échéance (jugées sur l'heure qu'elle rapporte), dont les lignes sont alors écartées.
  */
 export async function loadTournamentVoiceInfos(
   connection: PoolConnection,
@@ -146,7 +147,7 @@ export async function loadMatchVoiceInfos(
   connection: PoolConnection,
   enabled: boolean,
   matches: readonly VoiceSnapshotMatch[],
-  now: number = Date.now(),
+  now: number,
 ): Promise<Map<number, MatchVoiceInfo>> {
   const result = new Map<number, MatchVoiceInfo>();
   if (!enabled) return result;
@@ -319,7 +320,8 @@ export const DUE_CHANNELS_SQL = `SELECT d.id, d.tournament_id, d.team1_id, d.tea
  * option éteinte, match resté sans score passé `VOICE_CHANNEL_LATE_HOURS` (sans
  * quoi sa ligne resterait ouverte et la passe ne s'arrêterait plus au garde-fou). Un rendu refusé (ou
  * une création échouée) attend `VOICE_RETRY_SECONDS` avant d'être redemandé ; passé
- * `VOICE_BOT_UNRELEASED_MAX_HOURS` sans rendu, `VOICE_STUCK_RETRY_SECONDS` (attente bornée : la ligne
+ * `VOICE_BOT_UNRELEASED_MAX_HOURS` sans rendu, `VOICE_STUCK_RETRY_SECONDS` si le dernier échec visait ce
+ * salon (`failed_wide = 0` ; une panne du bot entier garde l'attente courte) (attente bornée : la ligne
  * n'est jamais close tant que le salon peut exister). Le bot supprime le salon s'il est vide, sinon dès qu'il se vide
  * (et ses balayages font filet).
  */
@@ -330,7 +332,8 @@ export const RELEASABLE_SQL = `SELECT v.match_id, v.team_id, v.channel_id, m.tou
   LEFT JOIN bg_tournaments t ON t.id = m.tournament_id
  WHERE v.released_at IS NULL
    AND (v.failed_at IS NULL
-        OR v.failed_at <= NOW() - INTERVAL IF(v.created_at < NOW() - INTERVAL ${VOICE_BOT_UNRELEASED_MAX_HOURS} HOUR,
+        OR v.failed_at <= NOW() - INTERVAL IF(v.created_at < NOW() - INTERVAL ${VOICE_BOT_UNRELEASED_MAX_HOURS} HOUR
+                                                AND v.failed_wide = 0,
                                               ${VOICE_STUCK_RETRY_SECONDS}, ${VOICE_RETRY_SECONDS}) SECOND)
    AND (m.id IS NULL OR t.id IS NULL
         OR m.status IN ('COMPLETED', 'PENDING') OR m.start_at IS NULL
@@ -473,7 +476,7 @@ async function writeChannel(matchId: number, teamId: number, channelId: string):
      VALUES (?, ?, ?, NULL, NULL)
      ON DUPLICATE KEY UPDATE
        created_at = IF(released_at IS NOT NULL OR NOT (channel_id <=> VALUES(channel_id)), NOW(), created_at),
-       channel_id = VALUES(channel_id), failed_at = NULL, released_at = NULL`,
+       channel_id = VALUES(channel_id), failed_at = NULL, failed_wide = 0, released_at = NULL`,
     [matchId, teamId, channelId],
   );
 }
@@ -491,7 +494,7 @@ async function writeFailure(matchId: number, teamId: number): Promise<void> {
      ON DUPLICATE KEY UPDATE
        created_at = IF(released_at IS NULL, created_at, NOW()),
        channel_id = IF(released_at IS NULL, channel_id, NULL),
-       failed_at = NOW(), released_at = NULL`,
+       failed_at = NOW(), failed_wide = 0, released_at = NULL`,
     [matchId, teamId],
   );
 }
@@ -594,26 +597,41 @@ async function releaseOne(row: ReleaseRow): Promise<ReleaseVerdict> {
     // salon qui reste sur Discord, et pourquoi).
     logRefusalOnce(`release:${key}`, released.code, () => logReleaseFailure(matchId, released.code));
   }
-  // Salon toujours pas rendu passé `VOICE_BOT_UNRELEASED_MAX_HOURS` : la ligne reste (le salon peut
-  // exister), redemandée toutes les `VOICE_STUCK_RETRY_SECONDS` ; une seule ligne pm2 pour ce salon.
-  if (Number(row.bot_expired ?? 0) === 1) logRefusalOnce(`stuck:${key}`, "STUCK", () => logStuckRelease(matchId));
+  // Salon toujours pas rendu passé `VOICE_BOT_UNRELEASED_MAX_HOURS` et refusé pour lui-même : la
+  // ligne reste (le salon peut exister), redemandée toutes les `VOICE_STUCK_RETRY_SECONDS` ; une
+  // seule ligne pm2 pour ce salon. Une panne du bot entier n'en donne pas (attente courte,
+  // `noteBotRefusal` l'a déjà dite).
+  if (!down && Number(row.bot_expired ?? 0) === 1) logRefusalOnce(`stuck:${key}`, "STUCK", () => logStuckRelease(matchId));
   await stampReleaseFailure(row, down);
   return { close: false, stop: down, keyRouteMissing: routeMissing };
 }
 
 /**
- * Note l'échec du rendu d'une ligne : redemandée après `VOICE_RETRY_SECONDS`, en fin de file (un
- * rendu qui échoue n'affame pas les autres) ; passé `VOICE_BOT_UNRELEASED_MAX_HOURS`, après
- * `VOICE_STUCK_RETRY_SECONDS` — sauf panne du bot entier (`botWide`) : rien ne vise ce salon, il
- * garde l'attente courte. Seulement si la ligne porte encore ce salon (autre processus).
+ * Note l'échec du rendu d'une ligne à son heure vraie (`failed_at = NOW()`) : redemandée après
+ * `VOICE_RETRY_SECONDS`, en fin de file (un rendu qui échoue n'affame pas les autres). `botWide`
+ * (`failed_wide`) : panne du bot entier — rien ne vise ce salon, `RELEASABLE_SQL` lui garde
+ * l'attente courte même passé `VOICE_BOT_UNRELEASED_MAX_HOURS` (la règle est jugée à la relecture,
+ * pas à l'écriture). Seulement si la ligne porte encore ce salon (autre processus).
  */
 async function stampReleaseFailure(row: ReleaseRow, botWide: boolean): Promise<void> {
   await runWrite(
-    `UPDATE bg_match_voice_channels
-        SET failed_at = IF(? AND created_at < NOW() - INTERVAL ${VOICE_BOT_UNRELEASED_MAX_HOURS} HOUR,
-                           NOW() - INTERVAL ${VOICE_STUCK_RETRY_SECONDS - VOICE_RETRY_SECONDS} SECOND, NOW())
+    `UPDATE bg_match_voice_channels SET failed_at = NOW(), failed_wide = ?
      WHERE match_id = ? AND team_id = ? AND released_at IS NULL AND channel_id <=> ?`,
     [botWide ? 1 : 0, Number(row.match_id), Number(row.team_id), row.channel_id === null ? null : String(row.channel_id)],
+  );
+}
+
+/**
+ * Lignes sans salon écartées faute de route par clé : repoussées en une instruction (refus propre
+ * à chacune), sans quoi elles resteraient en tête de file et occuperaient le lot de chaque passe.
+ */
+async function stampSkippedKeyRows(rows: readonly ReleaseRow[]): Promise<void> {
+  if (rows.length === 0) return;
+  await runWrite(
+    `UPDATE bg_match_voice_channels SET failed_at = NOW(), failed_wide = 0
+     WHERE released_at IS NULL AND channel_id IS NULL
+       AND (match_id, team_id) IN (${rows.map(() => "(?, ?)").join(", ")})`,
+    rows.flatMap((row) => [Number(row.match_id), Number(row.team_id)]),
   );
 }
 
@@ -636,20 +654,24 @@ async function closeReleasedRow(row: ReleaseRow, touched: Set<number>): Promise<
 async function releaseChannels(touched: Set<number>): Promise<boolean> {
   const rows = await run<ReleaseRow[]>(RELEASABLE_SQL);
   // Route par clé absente : les autres lignes sans salon attendent la passe suivante, sans appel
-  // (un mandataire mal routé n'est pas appelé pour chaque ligne), repoussées comme la première —
-  // sans quoi elles resteraient en tête de file et occuperaient le lot de chaque passe.
+  // (un mandataire mal routé n'est pas appelé pour chaque ligne), repoussées comme la première.
   let keyRouteGone = false;
-  for (const row of rows) {
-    if (keyRouteGone && row.channel_id === null) {
-      await stampReleaseFailure(row, false);
-      continue;
+  const skipped: ReleaseRow[] = [];
+  try {
+    for (const row of rows) {
+      if (keyRouteGone && row.channel_id === null) {
+        skipped.push(row);
+        continue;
+      }
+      const verdict = await releaseOne(row);
+      if (verdict.keyRouteMissing) keyRouteGone = true;
+      if (verdict.close) await closeReleasedRow(row, touched);
+      if (verdict.stop) return true;
     }
-    const verdict = await releaseOne(row);
-    if (verdict.keyRouteMissing) keyRouteGone = true;
-    if (verdict.close) await closeReleasedRow(row, touched);
-    if (verdict.stop) return true;
+    return false;
+  } finally {
+    await stampSkippedKeyRows(skipped);
   }
-  return false;
 }
 
 /**
@@ -769,7 +791,7 @@ async function reopenReleasedRows(same: readonly SameChannel[], touched: Set<num
     );
     if (!found) continue;
     const [result] = await runWrite(
-      `UPDATE bg_match_voice_channels SET created_at = NOW(), failed_at = NULL, released_at = NULL
+      `UPDATE bg_match_voice_channels SET created_at = NOW(), failed_at = NULL, failed_wide = 0, released_at = NULL
        WHERE released_at IS NOT NULL AND ${releasedBeforeAsk}`,
       keyOf(found),
     );

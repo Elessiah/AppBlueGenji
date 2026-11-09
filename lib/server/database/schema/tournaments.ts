@@ -254,7 +254,8 @@ export async function createTournamentTables(db: Pool): Promise<void> {
   // Salons vocaux d'équipe d'un match (`docs/features/MATCH_VOICE.md`) : une
   // ligne par (match, équipe), l'identifiant du salon que le bot a créé —
   // jamais qui s'y trouve, ni combien. `failed_at` : le dernier appel au bot
-  // pour ce salon a échoué (redemandé une minute plus tard) ; `released_at` :
+  // pour ce salon a échoué (redemandé une minute plus tard) ; `failed_wide` : cet
+  // échec était une panne du bot entier (l'attente reste courte passé 48 h) ; `released_at` :
   // le salon a été rendu au bot. Sans clé
   // étrangère : un match effacé laisse sa ligne, que le balayage rend au bot
   // (sinon le salon resterait sur Discord jusqu'au filet de 48 h du bot).
@@ -264,6 +265,7 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       team_id BIGINT NOT NULL,
       channel_id VARCHAR(32) NULL,
       failed_at DATETIME NULL,
+      failed_wide TINYINT(1) NOT NULL DEFAULT 0,
       released_at DATETIME NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (match_id, team_id),

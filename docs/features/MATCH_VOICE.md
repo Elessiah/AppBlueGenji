@@ -101,13 +101,16 @@ et rien n'est compté.
   pm2 `salon vocal toujours pas rendu après 48 h (nouvel essai toutes les 1 h)` par salon ; un bot
   indisponible arrête la passe (les lignes suivantes attendent). Seul un refus **propre au salon**
   mène à l'attente d'une heure : une panne du bot entier (`unavailable` : limite de débit,
-  transport, stockage) garde l'attente courte (`failed_at` antidaté de l'écart des deux attentes),
-  et un coupe-circuit ouvert (`BOT_CIRCUIT_OPEN`, bot jamais appelé) n'écrit rien. `created_at`
+  transport, stockage) garde l'attente courte (`failed_wide = 1`, jugé par `RELEASABLE_SQL` à la
+  relecture : une ligne qui passe les 48 h entre-temps n'y perd rien ; `failed_at` reste l'heure
+  vraie de l'échec) et ne donne pas la ligne pm2 « toujours pas rendu », et un coupe-circuit
+  ouvert (`BOT_CIRCUIT_OPEN`, bot jamais appelé) n'écrit rien. `created_at`
   repart quand la ligne est rouverte ou que le salon change.
 - **Une seule horloge** : l'option (publication du tournoi) et l'échéance des salons se jugent sur
   l'heure de la base (`NOW()` : lue par `loadTournamentVoiceInfos` dans la même requête que les
   salons des matchs jouables — aucun aller-retour de plus, aucune lecture sans match jouable ;
-  `db_now` lu avec le match pour la porte REST), comme les requêtes du balayage — une application
+  `db_now` lu avec le match pour la porte REST, passé à `loadMatchVoiceInfos` qui n'a pas
+  d'heure par défaut), comme les requêtes du balayage — une application
   en avance ne montre pas un salon que la base n'ouvre pas encore. Le **contrôle d'accès** de la
   porte REST reste à l'heure de l'application, comme la fiche et le flux (`canViewTournament`) :
   les deux portes rendent le même 404 à un tournoi pas encore publié.
@@ -116,7 +119,7 @@ et rien n'est compté.
   jamais close sans appel au bot. Un bot plus ancien sans cette route (`INTERNAL_ROUTE_NOT_FOUND`
   au rendu par clé — tout 404 autre que `VOICE_CHANNEL_NOT_TRACKED` s'y lit ainsi, même
   illisible : mandataire, page HTML) ne vaut refus que de cette ligne : les rendus par identifiant passent, sans
-  attente du bot ; la ligne attend sa mise à jour (redemandée toutes les heures passé 48 h) ; les autres lignes sans salon de la passe n'appellent plus cette route (un mandataire mal routé n'est pas appelé pour chacune) mais sont repoussées comme la première (elles n'occupent pas le lot de chaque passe).
+  attente du bot ; la ligne attend sa mise à jour (redemandée toutes les heures passé 48 h) ; les autres lignes sans salon de la passe n'appellent plus cette route (un mandataire mal routé n'est pas appelé pour chacune) mais sont repoussées comme la première, en une instruction (elles n'occupent pas le lot de chaque passe).
 - **Clôture gardée** : `released_at` et `failed_at` ne s'écrivent que si la ligne porte encore le
   salon rendu (`channel_id <=> ?`) — un salon neuf écrit entre-temps par un autre processus reste
   ouvert, rendu plus tard ; rien n'est publié si la ligne n'a pas changé. Une revérification qui

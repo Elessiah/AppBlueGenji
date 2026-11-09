@@ -448,6 +448,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // `ALGORITHM=COPY` : la table est reconstruite, les nombres quittent ses pages
     // (un retrait « instantané » de MariaDB les y laisserait jusqu'à la réécriture).
     `ALTER TABLE bg_match_voice_channels DROP COLUMN members, DROP COLUMN counted_at, ALGORITHM=COPY`,
+    // MATCH-VOICE — dernier échec de rendu dû à une panne du bot entier
+    // (`docs/features/MATCH_VOICE.md`) : `0` partout au départ, aucun remplissage —
+    // une ligne déjà en échec garde la règle d'avant jusqu'à son prochain essai.
+    `ALTER TABLE bg_match_voice_channels ADD COLUMN failed_wide TINYINT(1) NOT NULL DEFAULT 0 AFTER failed_at`,
     // CAST-FOLLOWUP — le caster qui a posé le mode d'antenne
     // (`docs/features/CAST_SETTINGS.md` § Qui règle le mode d'antenne) : nul
     // partout au départ — un mode déjà posé reste au staff `tournaments`.

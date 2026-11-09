@@ -48,12 +48,30 @@ describe("bot-integration — salons vocaux", () => {
   });
 
   it("ensureVoiceChannel_created_sendsKeyAndNameAndReturnsChannelId", async () => {
-    const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(json(201, { channelId: "123456789" }));
+    const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(json(201, { channelId: "123456789012345678" }));
 
-    await expect(ensureVoiceChannel("match:42:team:1", "Alpha")).resolves.toEqual({ kind: "ok", value: "123456789" });
+    await expect(ensureVoiceChannel("match:42:team:1", "Alpha")).resolves.toEqual({ kind: "ok", value: "123456789012345678" });
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toMatch(/\/internal\/voice\/channels$/);
     expect(JSON.parse(String(init?.body))).toEqual({ key: "match:42:team:1", name: "Alpha" });
+  });
+
+  it("ensureVoiceChannel_channelIdShorterThanSnowflake_notKept", async () => {
+    // Le bot refuserait cet identifiant au rendu (`INVALID_CHANNEL_ID`, qui clôt la ligne) : jamais gardé.
+    jest.spyOn(global, "fetch").mockResolvedValue(json(201, { channelId: "1234567890123456" }));
+    const outcome = await ensureVoiceChannel("match:42:team:1", "Alpha");
+    expect(outcome.kind).not.toBe("ok");
+  });
+
+  it("ensureVoiceChannel_channelIdLongerThanSnowflake_notKept", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(json(201, { channelId: "123456789012345678901" }));
+    const outcome = await ensureVoiceChannel("match:42:team:1", "Alpha");
+    expect(outcome.kind).not.toBe("ok");
+  });
+
+  it("ensureVoiceChannel_twentyDigitChannelId_kept", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(json(201, { channelId: "12345678901234567890" }));
+    await expect(ensureVoiceChannel("match:42:team:1", "Alpha")).resolves.toEqual({ kind: "ok", value: "12345678901234567890" });
   });
 
   it("ensureVoiceChannel_missingPermissions_returnsUnavailable", async () => {
@@ -66,7 +84,7 @@ describe("bot-integration — salons vocaux", () => {
 
   it("releaseVoiceChannel_notTracked_returnsGone", async () => {
     jest.spyOn(global, "fetch").mockResolvedValue(json(404, { error: "VOICE_CHANNEL_NOT_TRACKED" }));
-    await expect(releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "gone", code: "VOICE_CHANNEL_NOT_TRACKED" });
+    await expect(releaseVoiceChannel("123456789012345678")).resolves.toEqual({ kind: "gone", code: "VOICE_CHANNEL_NOT_TRACKED" });
   });
 
   // Module neuf à chaque test : coupe-circuit fermé.
@@ -107,7 +125,7 @@ describe("bot-integration — salons vocaux", () => {
 
   it("releaseVoiceChannel_nonStringErrorCode_returnsFallbackCode", async () => {
     jest.spyOn(global, "fetch").mockResolvedValue(json(500, { error: { code: "X" } }));
-    const outcome = await releaseVoiceChannel("123456789");
+    const outcome = await releaseVoiceChannel("123456789012345678");
     // Ni TypeError, ni panne de transport inventée : un code en chaîne (réponse illisible du bot entier).
     expect(outcome).toEqual({ kind: "unavailable", code: "BOT_INTERNAL_REQUEST_FAILED" });
     expect(outcome).not.toEqual({ kind: "unavailable", code: "BOT_INTERNAL_UNREACHABLE" });
@@ -117,12 +135,12 @@ describe("bot-integration — salons vocaux", () => {
   it("releaseVoiceChannel_unreadable500_returnsRequestFailedCode", async () => {
     jest.spyOn(global, "fetch").mockResolvedValue(new Response("<html>502 Bad Gateway</html>", { status: 502 }));
     // La page du proxy n'est jamais recopiée comme code.
-    await expect(releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "unavailable", code: "BOT_INTERNAL_REQUEST_FAILED" });
+    await expect(releaseVoiceChannel("123456789012345678")).resolves.toEqual({ kind: "unavailable", code: "BOT_INTERNAL_REQUEST_FAILED" });
   });
 
   it("releaseVoiceChannel_unreachable_returnsFailed", async () => {
     jest.spyOn(global, "fetch").mockRejectedValue(new TypeError("fetch failed"));
-    await expect(releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "unavailable", code: "BOT_INTERNAL_UNREACHABLE" });
+    await expect(releaseVoiceChannel("123456789012345678")).resolves.toEqual({ kind: "unavailable", code: "BOT_INTERNAL_UNREACHABLE" });
   });
 });
 
@@ -147,7 +165,7 @@ function htmlNotFound() {
 async function freshRelease(route: "id" | "key", response: Response) {
   const bot = await freshBotIntegration();
   jest.spyOn(global, "fetch").mockResolvedValue(response);
-  return route === "id" ? bot.releaseVoiceChannel("123456789") : bot.releaseVoiceChannelByKey("match:42:team:1");
+  return route === "id" ? bot.releaseVoiceChannel("123456789012345678") : bot.releaseVoiceChannelByKey("match:42:team:1");
 }
 
 describe("bot-integration — salons vocaux, coupe-circuit", () => {
@@ -159,7 +177,7 @@ describe("bot-integration — salons vocaux, coupe-circuit", () => {
       .mockRejectedValueOnce(new TypeError("fetch failed"))
       .mockResolvedValueOnce(json(404, { error: "INTERNAL_ROUTE_NOT_FOUND" }))
       .mockRejectedValueOnce(new TypeError("fetch failed"));
-    for (let call = 0; call < 4; call++) await bot.releaseVoiceChannel("123456789");
+    for (let call = 0; call < 4; call++) await bot.releaseVoiceChannel("123456789012345678");
     expect(bot.isBotCircuitOpen()).toBe(true);
   });
 
@@ -167,7 +185,7 @@ describe("bot-integration — salons vocaux, coupe-circuit", () => {
     const bot = await freshBotIntegration();
     // Écart de version des seules routes vocales : le journal et les annonces restent servis.
     jest.spyOn(global, "fetch").mockResolvedValue(json(404, { error: "INTERNAL_ROUTE_NOT_FOUND" }));
-    for (let call = 0; call < 3; call++) await bot.releaseVoiceChannel("123456789");
+    for (let call = 0; call < 3; call++) await bot.releaseVoiceChannel("123456789012345678");
     expect(bot.isBotCircuitOpen()).toBe(false);
   });
 
@@ -179,7 +197,7 @@ describe("bot-integration — salons vocaux, coupe-circuit", () => {
       .mockRejectedValueOnce(new TypeError("fetch failed"))
       .mockResolvedValueOnce(json(404, { error: "VOICE_CHANNEL_NOT_TRACKED" }))
       .mockRejectedValueOnce(new TypeError("fetch failed"));
-    for (let call = 0; call < 4; call++) await bot.releaseVoiceChannel("123456789");
+    for (let call = 0; call < 4; call++) await bot.releaseVoiceChannel("123456789012345678");
     expect(bot.isBotCircuitOpen()).toBe(false);
   });
 });
