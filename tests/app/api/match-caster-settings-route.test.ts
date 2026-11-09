@@ -39,7 +39,7 @@ describe("GET /api/matches/[matchId]/caster", () => {
 
   it("casterGet_registeredCaster_returnsOwnSettingsOnly", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
-    jest.mocked(loadOwnCastSettings).mockResolvedValue({ streamId: 3, liveUrl: "https://twitch.tv/voix", staffStream: false, battletag: "Voix#2100", organisationLink: false });
+    jest.mocked(loadOwnCastSettings).mockResolvedValue({ streamId: 3, liveUrl: "https://twitch.tv/voix", staffStream: false, battletag: "Voix#2100" });
     const res = await casterGet(jsonRequest("GET"), params("42"));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ streamId: 3, battletag: "Voix#2100" });
@@ -89,12 +89,22 @@ describe("PUT /api/matches/[matchId]/caster", () => {
     expect(setCastSettings).toHaveBeenCalledWith(42, 3, true, { trigger: "AUTO" }, { oversees: true, manages: true });
   });
 
-  it("casterPut_organisationLinkFalseAlone_allowedForCaster", async () => {
+  it("casterPut_organisationLinkFalseAlone_returns403StaffStreamForbidden", async () => {
+    // Décision D7 du 2026-11-09 : un caster ne dit jamais l'origine de son lien, quelle que soit la valeur.
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
-    jest.mocked(setCastSettings).mockResolvedValue();
     const res = await casterPut(jsonRequest("PUT", { organisationLink: false }), params("42"));
-    expect(res.status).toBe(200);
-    expect(setCastSettings).toHaveBeenCalledWith(42, 4, true, { asOrganisation: false }, { oversees: false, manages: false });
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "STAFF_STREAM_FORBIDDEN" });
+    expect(setCastSettings).not.toHaveBeenCalled();
+  });
+
+  it("casterPut_organisationLinkFromTournamentsStaff_returns403StaffStreamForbidden", async () => {
+    // Le staff `tournaments` qui caste règle le lien de l'organisation dans la configuration du direct, pas ici.
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 3, roles: ["ARBITRE"] }));
+    const res = await casterPut(jsonRequest("PUT", { liveUrl: "https://twitch.tv/voix", organisationLink: true }), params("42"));
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "STAFF_STREAM_FORBIDDEN" });
+    expect(setCastSettings).not.toHaveBeenCalled();
   });
 
   it("casterPut_wrongFieldType_returns400", async () => {
@@ -109,7 +119,7 @@ describe("PUT /api/matches/[matchId]/caster", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     const res = await casterPut(jsonRequest("PUT", { liveUrl: "https://twitch.tv/voix", organisationLink: true }), params("42"));
     expect(res.status).toBe(403);
-    await expect(res.json()).resolves.toMatchObject({ error: "FORBIDDEN" });
+    await expect(res.json()).resolves.toMatchObject({ error: "STAFF_STREAM_FORBIDDEN" });
     expect(setCastSettings).not.toHaveBeenCalled();
   });
 

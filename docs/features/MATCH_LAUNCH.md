@@ -358,7 +358,9 @@ tient encore : le stream reste à ce co-caster, sans lien. Le lien de
 l'organisation (`link_user_id` nul : posé par un membre de l'organisation avec la
 case cochée) n'est jamais touché, **même si ce membre caste le
 match** : la provenance se *dit* (`MatchLiveSetter.asOrganisation`, champ
-`organisationLink` du PUT, 403 sans la permission `tournaments`), elle ne se déduit
+`organisationLink` du PUT de la configuration du direct, 403 sans la permission
+`tournaments` ; jamais dite par un caster, 403 `STAFF_STREAM_FORBIDDEN` sur
+`…/caster`, décision D7 du 2026-11-09), elle ne se déduit
 plus de l'inscription (décision 48, EF-29). Un réglage du direct
 réenregistré avec le même lien ne change pas son fournisseur ; un lien neuf prend
 celui que dit celui qui le pose. Limite : un lien posé avant
@@ -377,7 +379,8 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   rejoindre un stream du match (co-cast), `{ liveUrl }` pour ouvrir le sien —
   le lien est **obligatoire** depuis `CAST_SETTINGS.md` (`STREAM_URL_REQUIRED`,
   400 : un stream sans lien n'apparaissait nulle part), et le corps porte en
-  plus les réglages du même geste (`trigger`, `battletag`, `organisationLink`).
+  plus les réglages du même geste (`trigger`, `battletag` ; `organisationLink`
+  est refusé, 403 `STAFF_STREAM_FORBIDDEN`).
   Les deux cibles à la fois, aucune, un identifiant mal formé ou un lien qui
   n'est pas du texte : `INVALID_CAST_TARGET` (400) ; un stream d'un autre match,
   disparu, ou tu (avant le lancement, aucun de ses casters ne remplit plus la

@@ -117,7 +117,7 @@ describe("castClaimChoices — un choix par stream, puis « ouvrir le sien »", 
 });
 
 describe("castClaimBody — le corps envoyé à POST /api/matches/[id]/caster", () => {
-  const input = { url: "", battletag: "", trigger: "AUTO" as const, organisationLink: false };
+  const input = { url: "", battletag: "", trigger: "AUTO" as const };
 
   it("rejoindre : le stream seul, aucun lien ni mode même saisis", () => {
     expect(
@@ -141,8 +141,8 @@ describe("castClaimBody — le corps envoyé à POST /api/matches/[id]/caster", 
       trigger: "AUTO",
     });
     expect(
-      castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", trigger: "MANUAL", organisationLink: true }),
-    ).toEqual({ liveUrl: "twitch.tv/voix", battletag: null, trigger: "MANUAL", organisationLink: true });
+      castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", trigger: "MANUAL" }),
+    ).toEqual({ liveUrl: "twitch.tv/voix", battletag: null, trigger: "MANUAL" });
   });
 
   it("castClaimBody_lockedTrigger_omitsTrigger", () => {
@@ -379,13 +379,13 @@ describe("MatchCardActions — branchements du cast", () => {
     expect(settings).toContain('fetch(`/api/matches/${match.id}/caster`, { method: "DELETE" })');
   });
 
-  it("CastSettingsDialog_organisationBox_offeredOnLinkedStreamAndSentAlone", () => {
-    // Décision du 2026-11-09 : la case se coche ou se décoche seule, lien inchangé ; relue à l'ouverture.
-    const settings = readSource("app/(secured)/tournois/[id]/_components/CastSettingsDialog.tsx");
-    expect(settings).toContain("castLinkOrigin(cast, canSchedule && streamEditable, url, organisationLink)");
-    expect(settings).toContain("if (originOffered && (urlChanged || originChanged)) settings.organisationLink = organisationLink;");
-    expect(settings).toContain("setOrganisationLink(payload.organisationLink === true);");
-    expect(settings).toContain("|| originChanged;");
+  it("CastDialogs_organisationBox_neverOfferedToCaster", () => {
+    // Décision D7 du 2026-11-09 : la case quitte les fenêtres du caster (la configuration du direct la garde).
+    for (const file of ["CastSettingsDialog.tsx", "CastClaimDialog.tsx", "CastSettingsFields.tsx"]) {
+      const source = readSource(`app/(secured)/tournois/[id]/_components/${file}`);
+      expect(source).not.toContain("organisationLink");
+      expect(source).not.toContain("CastOrganisationLinkField");
+    }
   });
 
   it("le caster à retirer est fixé à l'ouverture ; parti entre-temps, la fenêtre se ferme au lieu d'en viser un autre", () => {

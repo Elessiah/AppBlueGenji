@@ -74,7 +74,6 @@ function readField<T>(
 }
 
 const isString = (value: unknown): value is string => typeof value === "string";
-const isBoolean = (value: unknown): value is boolean => typeof value === "boolean";
 
 /**
  * Réglages du cast lus dans un corps de requête (`CastSettings`) : chaque champ
@@ -83,9 +82,6 @@ const isBoolean = (value: unknown): value is boolean => typeof value === "boolea
  * (« plus casté », « le BattleTag de mon compte ») ; un lien `null` est refusé
  * au réglage (`STREAM_URL_REQUIRED`).
  *
- * `asOrganisation` ne s'accorde qu'à la permission `tournaments` : la route le
- * refuse aux autres (403), jamais en silence (`MatchLiveSetter`).
- *
  * Rend `null` sur un type inattendu : le refus est `INVALID_CAST_SETTINGS`.
  */
 export function parseCastSettings(body: unknown): CastSettings | null {
@@ -93,14 +89,20 @@ export function parseCastSettings(body: unknown): CastSettings | null {
   const trigger = readField(raw, "trigger", isMatchLiveTrigger);
   const liveUrl = readField(raw, "liveUrl", isString);
   const battletag = readField(raw, "battletag", isString);
-  const organisationLink = readField(raw, "organisationLink", isBoolean);
-  // `null` n'est pas un choix : l'origine du lien se dit, ou ne se dit pas.
   if (trigger === INVALID || liveUrl === INVALID || battletag === INVALID) return null;
-  if (organisationLink === INVALID || organisationLink === null) return null;
   const settings: CastSettings = {};
   if (trigger !== undefined) settings.trigger = trigger;
   if (liveUrl !== undefined) settings.liveUrl = liveUrl;
   if (battletag !== undefined) settings.battletag = battletag;
-  if (organisationLink !== undefined) settings.asOrganisation = organisationLink;
   return settings;
+}
+
+/**
+ * Le corps d'un caster dit l'origine de son lien (`organisationLink`) : un
+ * caster ne dit jamais un lien « de l'organisation » (décision du 2026-11-09),
+ * seul le staff le fait dans la configuration du direct. La route le refuse
+ * (403 `STAFF_STREAM_FORBIDDEN`), quelle que soit la valeur, jamais en silence.
+ */
+export function castBodyNamesOrganisationLink(body: unknown): boolean {
+  return typeof body === "object" && body !== null && "organisationLink" in body;
 }

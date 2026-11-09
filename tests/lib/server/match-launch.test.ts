@@ -780,13 +780,6 @@ describe("claimMatchCast", () => {
     expect(state.issued[0]).toMatch(/FROM bg_users WHERE id = \? LIMIT 1 LOCK IN SHARE MODE$/);
   });
 
-  it("claimMatchCast_ownStreamAsOrganisation_streamHasNoLinkUser", async () => {
-    state.users[CASTER] = verified;
-    await claimMatchCast(42, CASTER, true, OWN_STREAM, { asOrganisation: true });
-    // Le lien de l'organisation reste au match : aucun compte ne l'emporte.
-    expect(state.match?.streams).toEqual([{ id: 1, live_url: "https://twitch.tv/voix" }]);
-  });
-
   it("claimMatchCast_awaitingConfirmationWithTrigger_registersWithoutWritingTrigger", async () => {
     state.users[CASTER] = verified;
     state.match = matchState({ status: "AWAITING_CONFIRMATION" });

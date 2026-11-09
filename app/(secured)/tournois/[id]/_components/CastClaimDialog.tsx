@@ -21,7 +21,6 @@ import { useLiveControls } from "../_lib/live-context";
 import { useTournamentGame } from "../_lib/match-format-context";
 import {
   CastBattletagField,
-  CastOrganisationLinkField,
   CastTriggerField,
   CastUrlField,
   castBattletagInvalid,
@@ -78,7 +77,6 @@ export function CastClaimDialog({
 }>) {
   const { t, locale } = useActionsText();
   const controls = useLiveControls();
-  const { canSchedule } = controls;
   // Mode déjà posé par un autre caster : il se lit, il ne se change pas à
   // l'inscription (`LIVE_TRIGGER_NOT_OWNED`) — le corps ne le porte pas. Le
   // lecteur s'inscrit : il est jugé en caster du match.
@@ -104,7 +102,6 @@ export function CastClaimDialog({
   // Un match déjà casté garde son mode ; sinon « automatique au démarrage »,
   // qui ne demande plus un clic à l'heure dite.
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "AUTO");
-  const [organisationLink, setOrganisationLink] = useState(false);
   const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId, battletag: battletagId });
   // Un match dont le score est saisi s'inscrit encore, mais son mode ne bouge
   // plus (`isMatchCastable`) : le choix n'est pas offert, ni envoyé.
@@ -142,7 +139,7 @@ export function CastClaimDialog({
   const confirm = async (): Promise<boolean> => {
     if (choice === null) return false;
     const outcome = await onClaim(
-      castClaimBody(choice, { url, battletag, trigger: triggerLocked || !castable ? undefined : trigger, organisationLink }),
+      castClaimBody(choice, { url, battletag, trigger: triggerLocked || !castable ? undefined : trigger}),
     );
     if (!outcome.ok) fieldErrors.report(outcome.code, outcome.message);
     return outcome.ok;
@@ -215,9 +212,6 @@ export function CastClaimDialog({
               onChange={setTrigger}
               locked={triggerLocked}
             />
-          )}
-          {canSchedule && url.trim() !== "" && (
-            <CastOrganisationLinkField checked={organisationLink} onChange={setOrganisationLink} />
           )}
         </>
       )}

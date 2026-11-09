@@ -26,6 +26,7 @@ import { dispatchMatchVoiceChannels } from "@/lib/server/tournaments/match-voice
 import { dispatchLobbyBriefs } from "@/lib/server/tournaments/lobby-brief";
 import { GET as contactsGet } from "@/app/api/matches/[matchId]/contacts/route";
 import type { LaunchSide, MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { castBodyNamesOrganisationLink, parseCastSettings } from "@/lib/server/tournaments/match-launch-routes";
 import { authUser } from "../../helpers/auth-user";
 
 const player = authUser({ id: 2, roles: [] });
@@ -146,14 +147,26 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
     expect(claimMatchCast).not.toHaveBeenCalled();
   });
 
-  it("refuse le lien de l'organisation sans la permission `tournaments`", async () => {
+  it("refuse le lien de l'organisation à tout caster (décision D7 du 2026-11-09)", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     const res = await casterPost(
       jsonRequest("POST", { liveUrl: "https://twitch.tv/voix", organisationLink: true }),
       params("42"),
     );
     expect(res.status).toBe(403);
-    await expect(res.json()).resolves.toMatchObject({ error: "FORBIDDEN" });
+    await expect(res.json()).resolves.toMatchObject({ error: "STAFF_STREAM_FORBIDDEN" });
+    expect(claimMatchCast).not.toHaveBeenCalled();
+  });
+
+  it("casterPost_organisationLinkFalse_returns403StaffStreamForbidden", async () => {
+    // Décision D7 du 2026-11-09 : la clé suffit, quelle que soit sa valeur.
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    const res = await casterPost(
+      jsonRequest("POST", { liveUrl: "https://twitch.tv/voix", organisationLink: false }),
+      params("42"),
+    );
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "STAFF_STREAM_FORBIDDEN" });
     expect(claimMatchCast).not.toHaveBeenCalled();
   });
 
@@ -448,5 +461,24 @@ describe("GET /api/matches/[matchId]/contacts", () => {
     const res = await contactsGet(request(), params("42"));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "MATCH_CONTACTS_READ_FAILED" });
+  });
+});
+
+describe("castBodyNamesOrganisationLink / parseCastSettings — décision D7 du 2026-11-09", () => {
+  it("castBodyNamesOrganisationLink_bodyWithKey_returnsTrue", () => {
+    expect(castBodyNamesOrganisationLink({ organisationLink: false })).toBe(true);
+  });
+
+  it("castBodyNamesOrganisationLink_bodyWithoutKey_returnsFalse", () => {
+    expect(castBodyNamesOrganisationLink({ trigger: "AUTO" })).toBe(false);
+  });
+
+  it("castBodyNamesOrganisationLink_notAnObject_returnsFalse", () => {
+    expect(castBodyNamesOrganisationLink(null)).toBe(false);
+    expect(castBodyNamesOrganisationLink("organisationLink")).toBe(false);
+  });
+
+  it("parseCastSettings_organisationLinkPresent_neverSetsOrigin", () => {
+    expect(parseCastSettings({ battletag: "Voix#1234", organisationLink: true })).toEqual({ battletag: "Voix#1234" });
   });
 });

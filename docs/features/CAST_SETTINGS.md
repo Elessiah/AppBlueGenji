@@ -43,17 +43,17 @@ Trois conséquences voulues :
   stream sans lien n'apparaissait ni sur la carte, ni sur la page du match, ni
   dans l'annonce #live : il ne servait à rien et laissait croire le contraire.
   Ce choix porte en plus, du **même geste et dans la même transaction**, le mode
-  de passage à l'antenne du match et, pour la permission `tournaments`, l'origine
-  du lien (case « lien de l'organisation », décochée par défaut).
+  de passage à l'antenne du match. Le lien est **toujours** celui du caster
+  (`link_user_id`) : un caster ne dit jamais un lien « de l'organisation »
+  (décision D7 du 2026-11-09) — seule la configuration du direct
+  (`MatchLiveDialog`, staff et arbitre désigné) le dit.
 - Le **BattleTag du cast** suit les deux choix : il parle du caster, non de son
   stream (un co-caster paraît lui aussi dans les contacts).
 
 Une inscription déjà acquise (rejouée) ne réécrit **aucun** réglage. Le mode
 d'antenne envoyé à l'inscription ne s'écrit que s'il **change** et que le match
 est encore castable (`isMatchCastable`) : un match dont le score attend sa
-confirmation s'inscrit toujours, son mode ne bouge plus. Un lien dit de
-l'organisation n'est rattaché à **aucun** compte (`link_user_id` nul) : il reste
-au match quand le staff qui l'a posé part.
+confirmation s'inscrit toujours, son mode ne bouge plus.
 
 ## « Configurer ma diffusion »
 
@@ -81,10 +81,10 @@ La fenêtre lit à l'ouverture `GET /api/matches/[id]/caster`
 l'instantané du plateau, commun à tous les lecteurs. Un échec de cette lecture
 (place reprise entre-temps) referme la fenêtre en le disant.
 
-Elle relit aussi l'origine du lien (`organisationLink`) : la case « Ce lien
-est celui de l'organisation » s'ouvre telle qu'enregistrée et se coche ou se
-décoche **seule**, lien inchangé (`setCasterLinkOrigin`, décision du
-2026-11-09).
+Elle n'offre **pas** la case « Ce lien est celui de l'organisation » (décision
+D7 du 2026-11-09) : un lien changé ici est rattaché au caster. Un lien qu'un
+caster avait dit de l'organisation avant ce changement le reste, et ne se
+remplace que par le staff (`CAST_STREAM_NOT_OWNED`).
 
 Pendant cette lecture, la fenêtre dit « Lecture de ton cast… » (`aria-busy`).
 Sur un match **joué** (`COMPLETED`), lien et BattleTag ne s'offrent plus
@@ -127,12 +127,12 @@ cette fenêtre et à celle du staff.
 | Route | Qui | Corps |
 | --- | --- | --- |
 | `GET …/caster` | caster inscrit | — → `{ streamId, liveUrl, staffStream, battletag }` |
-| `POST …/caster` | permission `live` | `{ streamId }` ou `{ liveUrl }` (obligatoire), plus `trigger`, `battletag`, `organisationLink` |
-| `PUT …/caster` | caster inscrit | `trigger`, `liveUrl`, `battletag`, `organisationLink` — **chaque champ absent n'est pas touché** |
+| `POST …/caster` | permission `live` | `{ streamId }` ou `{ liveUrl }` (obligatoire), plus `trigger`, `battletag` |
+| `PUT …/caster` | caster inscrit | `trigger`, `liveUrl`, `battletag` — **chaque champ absent n'est pas touché** |
 | `DELETE …/caster` | le caster, ou `tournaments` pour un autre | `?userId=` |
 
-`organisationLink: true` sans la permission `tournaments` : 403, jamais ignoré
-en silence. Les refus des réglages portent leur code
+Un corps qui porte `organisationLink` (quelle que soit sa valeur, quel que soit
+le lecteur) : 403 `STAFF_STREAM_FORBIDDEN`, jamais ignoré en silence. Les refus des réglages portent leur code
 (`tournamentErrors.json` FR et EN, `LAUNCH_ERROR_MESSAGES`) :
 `STREAM_URL_REQUIRED`, `INVALID_CAST_BATTLETAG`, `CAST_STREAM_NOT_OWNED`,
 `INVALID_CAST_SETTINGS`, `MATCH_NOT_CASTABLE`, `MATCH_START_AT_REQUIRED`.
@@ -177,18 +177,14 @@ son lien se règle dans « Configurer ma diffusion »). Il ne change ni ne déma
 le mode du staff tant que le stream de l'organisation porte un lien
 (`STAFF_STREAM_FORBIDDEN`, sur les deux routes ; le champ du lien du staff lui
 est en lecture seule), et son démarquage n'efface **jamais** le lien de
-l'organisation (seul le staff le fait, décision 1 du 2026-11-09). La case « lien
-de l'organisation » ne change d'état que pour le fournisseur du lien (vers
-l'organisation) ou le staff `tournaments` (rattaché alors à qui décoche) : un
-co-caster ne s'attribue pas le lien d'un autre (`CAST_STREAM_NOT_OWNED`) ;
-renvoyée telle quelle, elle n'écrit rien ; un lien dit de l'organisation ne
-se remplace que par le staff (`CAST_STREAM_NOT_OWNED`). Un mode sans maître (posé par
+l'organisation (seul le staff le fait, décision 1 du 2026-11-09). Un lien dit
+de l'organisation ne se remplace que par le staff (`CAST_STREAM_NOT_OWNED`). Un mode sans maître (posé par
 le staff, ou dont le maître n'est plus montré) ne se démarque que par l'arbitre
 du match ou le staff `tournaments` + `live` (`mayUnmarkLiveTrigger`,
 `LIVE_TRIGGER_NOT_OWNED`, décision du 2026-11-09 ; la case « casté » lui est
 désactivée), et l'antenne du mode du staff au lien de l'organisation ne se
 bascule pas non plus par lui (`STAFF_STREAM_FORBIDDEN`). Un caster tu ne règle
-plus le lien ni son origine (`NOT_MATCH_CASTER`). Le stream d'un caster dont le
+plus le lien (`NOT_MATCH_CASTER`). Le stream d'un caster dont le
 lien est dit de l'organisation part avec son dernier caster (décision du
 2026-11-05, voulu). Retirer un autre caster
 (`DELETE …/caster?userId=`) demande `tournaments` + `live` (`castOverseer`) ;

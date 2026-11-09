@@ -4,6 +4,7 @@ import { bodyReadRefusal, readJsonBody } from "@/lib/server/request-body";
 import { loadOwnCastSettings } from "@/lib/server/tournaments/cast-settings";
 import { claimMatchCast, releaseMatchCast, setCastSettings } from "@/lib/server/tournaments/match-launch";
 import {
+  castBodyNamesOrganisationLink,
   isPositiveId,
   launchFailure,
   parseCastSettings,
@@ -60,8 +61,8 @@ async function castBody(req: Request): Promise<{ body: unknown } | { refusal: st
  * Corps : `{ streamId: number }` (co-caster un stream du match) ou
  * `{ liveUrl: string }` (ouvrir son propre stream — le lien est
  * **obligatoire**, un stream sans lien n'apparaissant sur aucune vue), plus les
- * réglages du même geste (`parseCastSettings` : `trigger`, `battletag`,
- * `organisationLink`), appliqués dans la même transaction
+ * réglages du même geste (`parseCastSettings` : `trigger`, `battletag`),
+ * appliqués dans la même transaction
  * (`docs/features/CAST_SETTINGS.md`). Un corps **illisible** (JSON cassé, trop
  * lourd, mauvais type) est refusé, jamais pris pour un corps vide.
  */
@@ -81,9 +82,9 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   // Le lien est la **cible** de l'inscription (`target`), pas un réglage : le
   // repasser réécrirait le stream qui vient d'être ouvert avec.
   delete settings.liveUrl;
-  // Le lien de l'organisation engage l'organisation : seule la permission
-  // `tournaments` le dit, et le refus est explicite (jamais ignoré en silence).
-  if (settings.asOrganisation === true && !can(user, "tournaments")) return fail("FORBIDDEN", 403);
+  // Un caster ne dit jamais un lien « de l'organisation » (décision du
+  // 2026-11-09) : refus explicite, jamais ignoré en silence.
+  if (castBodyNamesOrganisationLink(read.body)) return fail("STAFF_STREAM_FORBIDDEN", 403);
 
   try {
     // `triggerSkipped` : le mode d'antenne, posé entre-temps par un autre, est
@@ -132,7 +133,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   if ("refusal" in read) return fail(read.refusal, 400);
   const settings = parseCastSettings(read.body);
   if (settings === null) return fail("INVALID_CAST_SETTINGS", 400);
-  if (settings.asOrganisation === true && !can(user, "tournaments")) return fail("FORBIDDEN", 403);
+  if (castBodyNamesOrganisationLink(read.body)) return fail("STAFF_STREAM_FORBIDDEN", 403);
 
   try {
     await setCastSettings(matchId, user.id, can(user, "live"), settings, castAccess(user));

@@ -237,29 +237,3 @@ export function CastBattletagField({
     </div>
   );
 }
-
-/**
- * Case « ce lien est celui de l'organisation » : la permission `tournaments`
- * seule la voit (l'appelant ne la monte que pour elle), décochée par défaut —
- * un lien n'est celui de l'organisation que si son auteur le dit
- * (`MatchLiveSetter`).
- */
-export function CastOrganisationLinkField({
-  checked,
-  onChange,
-}: Readonly<{ checked: boolean; onChange: (checked: boolean) => void }>) {
-  const { t } = useActionsText();
-  const hintId = useId();
-  return (
-    <InfoHintRow inline>
-      <label className={styles.row}>
-        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-        {/* NOSONAR S6772 — label en flex avec `gap` */}
-        {t("cardActions.castSettings.organisationLink")}
-      </label>
-      <InfoHint id={hintId} subject={t("cardActions.castSettings.organisationLinkSubject")}>
-        <p>{t("cardActions.castSettings.organisationLinkHint")}</p>
-      </InfoHint>
-    </InfoHintRow>
-  );
-}

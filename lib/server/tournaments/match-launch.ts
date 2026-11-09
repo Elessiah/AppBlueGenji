@@ -886,12 +886,11 @@ export async function claimMatchCast(
         streamId = castTarget.streamId;
       } else {
         // Le lien est rattaché à celui qui le fournit : son effacement de
-        // compte le retire (`withdrawUserCasts`) — sauf le lien dit de
-        // l'organisation (`asOrganisation`, permission `tournaments` vérifiée
-        // par la route), qui reste au match comme celui du staff.
+        // compte le retire (`withdrawUserCasts`). Un caster ne dit jamais un
+        // lien « de l'organisation » (décision du 2026-11-09).
         const [created] = await connection.execute<ResultSetHeader>(
           `INSERT INTO bg_match_streams (match_id, live_url, link_user_id) VALUES (?, ?, ?)`,
-          [matchId, liveUrl, liveUrl === null || settings.asOrganisation === true ? null : userId],
+          [matchId, liveUrl, liveUrl === null ? null : userId],
         );
         streamId = Number(created.insertId);
       }
@@ -924,9 +923,8 @@ export async function claimMatchCast(
         row,
         userId,
         streamId,
-        // Lien et origine sont déjà posés avec le stream neuf (ci-dessus) ; un
-        // stream rejoint n'est pas le sien à dire « de l'organisation ».
-        { ...settings, trigger, liveUrl: undefined, asOrganisation: undefined, skipLockedTrigger: true },
+        // Le lien est déjà posé avec le stream neuf (ci-dessus).
+        { ...settings, trigger, liveUrl: undefined, skipLockedTrigger: true },
         access,
       );
       return { tournamentId: Number(row.tournament_id), claimed: true, triggerSkipped: outcome.triggerSkipped };
