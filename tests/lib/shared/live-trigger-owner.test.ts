@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  mayUnmarkLiveTrigger,
+  viewerMayUnmarkLiveTrigger,
   castOverseer,
   isMatchRefereeActor,
   liveTriggerOwnerAfter,
@@ -232,5 +234,56 @@ describe("castOverseer — staff qui règle tout cast (décision du 2026-11-09)"
   it("viewerMayChangeLiveTrigger_overseerOnOtherCasterMode_true", () => {
     const match = { liveTrigger: "MANUAL" as const, liveTriggerCasterId: 12, casters: [{ userId: 12 }] };
     expect(viewerMayChangeLiveTrigger(match, { userId: 5, oversees: true, manages: true, referees: false })).toBe(true);
+  });
+});
+
+describe("mayUnmarkLiveTrigger — démarquer (décision du 2026-11-09)", () => {
+  const ownerless = { trigger: "AUTO" as const, ownerId: null, refereeId: 9 };
+
+  it("mayUnmarkLiveTrigger_owner_true", () => {
+    expect(mayUnmarkLiveTrigger(ownedByCaster12, { userId: 12, ...LIVE_ONLY })).toBe(true);
+  });
+
+  it("mayUnmarkLiveTrigger_liveOnlyOnOwnerlessMode_false", () => {
+    expect(mayUnmarkLiveTrigger(ownerless, { userId: 13, ...LIVE_ONLY })).toBe(false);
+  });
+
+  it("mayUnmarkLiveTrigger_overseer_true", () => {
+    expect(mayUnmarkLiveTrigger(ownerless, { userId: 5, oversees: true, manages: true })).toBe(true);
+  });
+
+  it("mayUnmarkLiveTrigger_designatedReferee_true", () => {
+    expect(mayUnmarkLiveTrigger(ownerless, { userId: 9, ...STAFF })).toBe(true);
+  });
+});
+
+describe("viewerMayChangeLiveTrigger — mode du staff au lien de l'organisation", () => {
+  const viewer13 = { userId: 13, oversees: false, manages: false, referees: false };
+  const ownerless = { liveTrigger: "AUTO" as const, liveTriggerCasterId: null, casters: [{ userId: 13 }] };
+
+  it("viewerMayChangeLiveTrigger_liveOnlyShownWithStaffLink_false", () => {
+    const match = { ...ownerless, streams: [{ liveUrl: "https://twitch.tv/orga", staff: true }] };
+    expect(viewerMayChangeLiveTrigger(match, viewer13)).toBe(false);
+  });
+
+  it("viewerMayChangeLiveTrigger_liveOnlyShownWithoutStaffLink_true", () => {
+    const match = { ...ownerless, streams: [{ liveUrl: null, staff: true }] };
+    expect(viewerMayChangeLiveTrigger(match, viewer13)).toBe(true);
+  });
+});
+
+describe("viewerMayUnmarkLiveTrigger", () => {
+  const viewer13 = { userId: 13, oversees: false, manages: false, referees: false };
+
+  it("viewerMayUnmarkLiveTrigger_liveOnlyOnOwnerlessMode_false", () => {
+    expect(viewerMayUnmarkLiveTrigger({ liveTrigger: "AUTO", liveTriggerCasterId: null }, viewer13)).toBe(false);
+  });
+
+  it("viewerMayUnmarkLiveTrigger_ownMode_true", () => {
+    expect(viewerMayUnmarkLiveTrigger({ liveTrigger: "AUTO", liveTriggerCasterId: 13 }, viewer13)).toBe(true);
+  });
+
+  it("viewerMayUnmarkLiveTrigger_unmarkedMatch_true", () => {
+    expect(viewerMayUnmarkLiveTrigger({ liveTrigger: null }, viewer13)).toBe(true);
   });
 });

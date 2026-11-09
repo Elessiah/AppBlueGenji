@@ -22,7 +22,7 @@ import {
   requiresMatchStartAt,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
-import { liveTriggerOwnerAfter, mayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
+import { liveTriggerOwnerAfter, mayChangeLiveTrigger, mayUnmarkLiveTrigger } from "@/lib/shared/live-trigger-owner";
 import { castBeforeLaunch } from "@/lib/shared/match-launch";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { loadShownCasterIds } from "./cast-eligibility";
@@ -141,7 +141,8 @@ export async function applyCastTrigger(
   // sans maître lui revient s'il le change (décision du 2026-11-05) — s'il est
   // montré (le candidat de l'inscription l'est) : un caster tu ne décide pas,
   // comme sur la route du staff (`setMatchLiveConfig`).
-  const owns = mayChangeLiveTrigger(hold, actor, shown.has(userId));
+  // Démarquer : son maître, l'arbitre ou le staff seulement (`mayUnmarkLiveTrigger`).
+  const owns = mayChangeLiveTrigger(hold, actor, shown.has(userId)) && (trigger !== null || mayUnmarkLiveTrigger(hold, actor));
   // Le mode du staff qui porte le lien de l'organisation n'est pas à un porteur
   // de la seule `live` (décision 1 du 2026-11-09, `assertStaffModeKept`).
   const staffMode = owns && !access.manages && hold.ownerId !== userId && (await hasStaffLink(connection, matchId));
@@ -169,6 +170,12 @@ export async function applyCastTrigger(
   row.live_trigger_user_id = owner;
   if (trigger !== "MANUAL") row.live_started_at = null;
   return true;
+}
+
+/** @throws `NOT_MATCH_CASTER` quand `userId` n'est pas un caster montré du match. */
+async function assertShownCaster(connection: PoolConnection, row: LaunchMatchRow, userId: number): Promise<void> {
+  const shown = await loadShownCasterIds(connection, Number(row.id), [userId], row.tournament_game, castBeforeLaunch(row));
+  if (!shown.has(userId)) throw new Error("NOT_MATCH_CASTER");
 }
 
 /**
@@ -320,6 +327,11 @@ export async function applyCastSettings(
     settings.trigger !== undefined &&
     !(await applyCastTrigger(connection, row, settings.trigger, userId, access, settings.skipLockedTrigger === true));
   let streams: MatchStreamRow[] | undefined;
+  // Le lien d'un stream (et son origine) ne se règle que par un caster montré :
+  // un caster tu ne réécrit pas le lien public d'un stream qu'il partage.
+  if ((settings.liveUrl !== undefined || settings.asOrganisation !== undefined) && !access.oversees) {
+    await assertShownCaster(connection, row, userId);
+  }
   if (settings.liveUrl !== undefined) {
     const url = parseStreamUrlInput(settings.liveUrl);
     streams = await setCasterStreamUrl(

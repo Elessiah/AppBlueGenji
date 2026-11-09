@@ -182,7 +182,15 @@ de l'organisation » ne change d'état que pour le fournisseur du lien (vers
 l'organisation) ou le staff `tournaments` (rattaché alors à qui décoche) : un
 co-caster ne s'attribue pas le lien d'un autre (`CAST_STREAM_NOT_OWNED`) ;
 renvoyée telle quelle, elle n'écrit rien ; un lien dit de l'organisation ne
-se remplace que par le staff (`CAST_STREAM_NOT_OWNED`). Retirer un autre caster
+se remplace que par le staff (`CAST_STREAM_NOT_OWNED`). Un mode sans maître (posé par
+le staff, ou dont le maître n'est plus montré) ne se démarque que par l'arbitre
+du match ou le staff `tournaments` + `live` (`mayUnmarkLiveTrigger`,
+`LIVE_TRIGGER_NOT_OWNED`, décision du 2026-11-09 ; la case « casté » lui est
+désactivée), et l'antenne du mode du staff au lien de l'organisation ne se
+bascule pas non plus par lui (`STAFF_STREAM_FORBIDDEN`). Un caster tu ne règle
+plus le lien ni son origine (`NOT_MATCH_CASTER`). Le stream d'un caster dont le
+lien est dit de l'organisation part avec son dernier caster (décision du
+2026-11-05, voulu). Retirer un autre caster
 (`DELETE …/caster?userId=`) demande `tournaments` + `live` (`castOverseer`) ;
 la rediff s'écrit sous le verrou du match. Dans « Configurer
 ma diffusion », seul un caster **montré** prend un mode sans maître. Un corps sans clé

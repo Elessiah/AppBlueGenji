@@ -75,6 +75,17 @@ export function mayChangeLiveTrigger(hold: LiveTriggerHold, actor: LiveTriggerAc
 }
 
 /**
+ * L'acteur peut-il **démarquer** le match (retirer son mode) ? Son maître,
+ * l'arbitre désigné ou le staff (`tournaments` + `live`, `oversees`) ; un mode
+ * sans maître (posé par le staff, ou dont le maître n'est plus montré) ne se
+ * retire pas par la seule `live` (décision du 2026-11-09).
+ */
+export function mayUnmarkLiveTrigger(hold: LiveTriggerHold, actor: LiveTriggerActor): boolean {
+  if (actor.oversees || isMatchRefereeActor(hold, actor)) return true;
+  return hold.ownerId !== null && hold.ownerId === actor.userId;
+}
+
+/**
  * L'acteur peut-il ouvrir ou couper l'antenne d'un mode `MANUAL` ? La règle
  * du mode (`mayChangeLiveTrigger`) : sur un mode **sans maître**, tout
  * caster montré du match la bascule — le match ne reste pas hors antenne en
@@ -123,6 +134,7 @@ export function viewerMayChangeLiveTrigger(
     liveTrigger: MatchLiveTrigger | null;
     liveTriggerCasterId?: number | null;
     casters: readonly { userId: number }[];
+    streams?: readonly { liveUrl: string | null; staff: boolean }[];
   },
   viewer: LiveTriggerViewer,
   /** Le lecteur caste-t-il le match ? Par défaut : nommé parmi ses casters ; vrai à l'inscription. */
@@ -130,6 +142,9 @@ export function viewerMayChangeLiveTrigger(
 ): boolean {
   if (viewer.userId === null) return false;
   const userId = viewer.userId;
+  // Le mode du staff qui porte le lien de l'organisation n'est pas à la seule
+  // `live` (`STAFF_STREAM_FORBIDDEN` au serveur, décision 1 du 2026-11-09).
+  if (staffModeLockedFor(match, viewer, userId)) return false;
   return mayChangeLiveTrigger(
     {
       trigger: match.liveTrigger,
@@ -139,6 +154,32 @@ export function viewerMayChangeLiveTrigger(
     { userId, oversees: viewer.oversees, manages: viewer.manages },
     viewerCasts ?? match.casters.some((caster) => caster.userId === userId),
   );
+}
+
+/**
+ * Le lecteur peut-il démarquer ce match ? La règle du serveur
+ * (`mayUnmarkLiveTrigger`) sur l'instantané ; vrai sur un match sans mode.
+ */
+export function viewerMayUnmarkLiveTrigger(
+  match: { liveTrigger: MatchLiveTrigger | null; liveTriggerCasterId?: number | null },
+  viewer: LiveTriggerViewer,
+): boolean {
+  if (match.liveTrigger === null) return true;
+  if (viewer.userId === null) return false;
+  return mayUnmarkLiveTrigger(
+    { trigger: match.liveTrigger, ownerId: match.liveTriggerCasterId ?? null, refereeId: viewer.referees ? viewer.userId : null },
+    { userId: viewer.userId, oversees: viewer.oversees, manages: viewer.manages },
+  );
+}
+
+/** Le stream de l'organisation porte un lien que ce lecteur (ni staff, ni arbitre, ni maître) ne touche pas. */
+function staffModeLockedFor(
+  match: { liveTriggerCasterId?: number | null; streams?: readonly { liveUrl: string | null; staff: boolean }[] },
+  viewer: LiveTriggerViewer,
+  userId: number,
+): boolean {
+  if (viewer.manages || viewer.referees || (match.liveTriggerCasterId ?? null) === userId) return false;
+  return (match.streams ?? []).some((stream) => stream.staff && stream.liveUrl !== null);
 }
 
 /**

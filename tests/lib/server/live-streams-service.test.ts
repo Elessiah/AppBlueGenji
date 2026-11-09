@@ -892,8 +892,8 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["MANUAL", 12, 42]]]);
   });
 
-  it("setMatchLiveConfig_liveOnlyCasterUnmarksWithStaffLink_throwsStaffStreamForbidden", async () => {
-    // Démarquer efface le lien de l'organisation : la seule `live` n'y touche pas.
+  it("setMatchLiveConfig_liveOnlyCasterUnmarksOwnerlessModeWithStaffLink_throwsNotOwned", async () => {
+    // Un mode sans maître ne se démarque pas par la seule `live` (décision du 2026-11-09).
     const world = liveWorld(
       matchRow({ live_trigger: "AUTO", live_trigger_user_id: null }),
       [dbStream(6, "https://twitch.tv/orga", true), dbStream(7, "https://twitch.tv/voix")],
@@ -902,20 +902,21 @@ describe("setMatchLiveConfig", () => {
     await mockLiveDb(world);
 
     await expect(setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: CASTER_12, access: LIVE_ONLY })).rejects.toThrow(
-      "STAFF_STREAM_FORBIDDEN",
+      "LIVE_TRIGGER_NOT_OWNED",
     );
     expect(world.state.matchWrites).toEqual([]);
   });
 
-  it("setMatchLiveConfig_liveOnlyCasterUnmarksWithoutStaffLink_unmarks", async () => {
+  it("setMatchLiveConfig_liveOnlyCasterUnmarksOrphanModeWithoutStaffLink_throwsNotOwned", async () => {
     const world = liveWorld(matchRow({ live_trigger: "AUTO", live_trigger_user_id: null }), [dbStream(7, "https://twitch.tv/voix")], [
       { user_id: 12, stream_id: 7 },
     ]);
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: CASTER_12, access: LIVE_ONLY });
-
-    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = NULL"), [42]]]);
+    await expect(setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: CASTER_12, access: LIVE_ONLY })).rejects.toThrow(
+      "LIVE_TRIGGER_NOT_OWNED",
+    );
+    expect(world.state.matchWrites).toEqual([]);
   });
 
   it("setMatchLiveConfig_triggerUndefinedWithLink_writesLinkOnCurrentMode", async () => {
@@ -1290,6 +1291,18 @@ describe("setMatchLiveConfig", () => {
       await expect(setMatchOnAir(42, true, 13, LIVE_ACCESS)).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
       expect(world.state.matchWrites).toEqual([]);
       expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    });
+
+    it("setMatchOnAir_liveOnlyShownOnStaffModeWithLink_throwsStaffStreamForbidden", async () => {
+      const world = liveWorld(
+        matchRow({ live_trigger: "MANUAL", live_trigger_user_id: null }),
+        [dbStream(3, "https://twitch.tv/orga", true), dbStream(5, "https://twitch.tv/b")],
+        [{ user_id: 13, stream_id: 5 }],
+      );
+      await mockLiveDb(world);
+
+      await expect(setMatchOnAir(42, true, 13, LIVE_ACCESS)).rejects.toThrow("STAFF_STREAM_FORBIDDEN");
+      expect(world.state.matchWrites).toEqual([]);
     });
 
     it("setMatchOnAir_owner_opensAntennaAndPublishes", async () => {

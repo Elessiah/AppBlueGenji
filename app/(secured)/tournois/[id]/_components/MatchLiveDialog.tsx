@@ -16,7 +16,12 @@ import {
   staffStream,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
-import { liveTriggerViewer, viewerMayChangeLiveTrigger, viewerMayToggleOnAir } from "@/lib/shared/live-trigger-owner";
+import {
+  liveTriggerViewer,
+  viewerMayChangeLiveTrigger,
+  viewerMayToggleOnAir,
+  viewerMayUnmarkLiveTrigger,
+} from "@/lib/shared/live-trigger-owner";
 import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import { canEditReplay } from "@/lib/shared/match-replay";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
@@ -357,6 +362,9 @@ export function MatchLiveDialog({
             <input
               type="checkbox"
               checked={streamed}
+              // Un mode sans maître ne se démarque que par l'arbitre ou le staff
+              // (`LIVE_TRIGGER_NOT_OWNED` au serveur).
+              disabled={!viewerMayUnmarkLiveTrigger(match, viewer)}
               onChange={(e) => setStreamed(e.target.checked)}
             />
             {/* NOSONAR S6772 — label en flex avec `gap` */}

@@ -28,6 +28,7 @@ import {
   liveTriggerOwnerAfter,
   mayChangeLiveTrigger,
   mayToggleOnAir,
+  mayUnmarkLiveTrigger,
   type LiveTriggerActor,
   type LiveTriggerHold,
 } from "@/lib/shared/live-trigger-owner";
@@ -365,6 +366,7 @@ async function unmarkLive(
   actor: LiveTriggerActor,
   known: MatchStreamRow[] | undefined,
 ): Promise<MatchStreamRow[] | undefined> {
+  if (!mayUnmarkLiveTrigger(hold, actor)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
   await assertStaffModeKept(connection, matchId, hold, actor);
   const staffSide = actor.manages || isMatchRefereeActor(hold, actor);
   await connection.execute(
@@ -753,6 +755,8 @@ export async function setMatchOnAir(
       if (row.live_trigger !== "MANUAL") throw new Error("LIVE_TRIGGER_NOT_MANUAL");
       if (!access.live && !isMatchRefereeActor(hold, actor)) throw new Error("NOT_MATCH_REFEREE");
       if (!mayToggleOnAir(hold, actor, actorShown)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
+      // L'antenne du mode du staff qui porte le lien de l'organisation non plus.
+      await assertStaffModeKept(connection, matchId, hold, actor);
       if (onAir && row.status !== "READY") throw new Error("MATCH_NOT_LIVE_READY");
       // Déjà dans cet état (second clic, deux clics simultanés) : rien d'écrit,
       // l'heure de mise à l'antenne n'est pas réécrite.

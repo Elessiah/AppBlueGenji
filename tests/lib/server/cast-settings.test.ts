@@ -136,17 +136,13 @@ describe("applyCastTrigger", () => {
 });
 
 describe("applyCastTrigger — inscription et maître tu", () => {
-  it("applyCastTrigger_shownCasterRemovesOwnerlessMode_unmarks", async () => {
-    // Mode posé par le staff (sans maître) : un caster montré le retire.
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce(shownRows(13))
-      .mockResolvedValueOnce([[], []])
-      .mockResolvedValue([{ affectedRows: 1 }, []]);
+  it("applyCastTrigger_shownCasterRemovesOwnerlessMode_throwsNotOwned", async () => {
+    // Décision du 2026-11-09 : un mode sans maître ne se démarque que par l'arbitre ou le staff.
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(13));
     const row = { ...ownedRow(), live_trigger: "AUTO", live_trigger_user_id: null } as LaunchMatchRow;
 
-    await expect(applyCastTrigger(fakeConnection({ execute }), row, null, 13)).resolves.toBe(true);
-    expect(execute.mock.calls[2][0]).toContain("SET live_trigger = NULL");
+    await expect(applyCastTrigger(fakeConnection({ execute }), row, null, 13)).rejects.toThrow("LIVE_TRIGGER_NOT_OWNED");
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it("applyCastTrigger_liveOnlyShownOnStaffModeWithLink_throwsStaffStreamForbidden", async () => {
@@ -154,7 +150,7 @@ describe("applyCastTrigger — inscription et maître tu", () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(13)).mockResolvedValueOnce([[{ 1: 1 }], []]);
     const row = { ...ownedRow(), live_trigger: "AUTO", live_trigger_user_id: null } as LaunchMatchRow;
 
-    await expect(applyCastTrigger(fakeConnection({ execute }), row, null, 13)).rejects.toThrow("STAFF_STREAM_FORBIDDEN");
+    await expect(applyCastTrigger(fakeConnection({ execute }), row, "MANUAL", 13)).rejects.toThrow("STAFF_STREAM_FORBIDDEN");
     expect(execute).toHaveBeenCalledTimes(2);
   });
 
@@ -225,6 +221,8 @@ describe("applyCastSettings", () => {
   it("applyCastSettings_newLink_doesNotReReadCastersUnderLock", async () => {
     const execute = jest.fn<SqlQuery>();
     // Lecture des streams, puis l'écriture du lien, puis (aucun orphelin) rien d'autre.
+    // Caster montré, puis lecture des streams.
+    execute.mockResolvedValueOnce(shownRows(900));
     execute.mockResolvedValueOnce([[{ id: 5, match_id: 42, live_url: "https://twitch.tv/a", staff_owned: 0 }], []]);
     // Attribution du lien en place : le sien.
     execute.mockResolvedValueOnce([[{ link_user_id: 900 }], []]);
@@ -233,8 +231,20 @@ describe("applyCastSettings", () => {
 
     await applyCastSettings(fakeConnection({ execute }), row, 900, 5, { liveUrl: "https://twitch.tv/b" });
 
+    // La seule lecture des casters est celle des casters montrés.
     const statements = execute.mock.calls.map((call) => String(call[0]));
-    expect(statements.some((sql) => sql.includes("FROM bg_match_casters"))).toBe(false);
+    expect(statements.filter((sql) => sql.includes("FROM bg_match_casters"))).toHaveLength(1);
+  });
+
+  it("applyCastSettings_hiddenCasterSetsLink_throwsNotMatchCaster", async () => {
+    // Un caster tu ne réécrit pas le lien public d'un stream qu'il partage.
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows());
+    const row = { ...ownedRow(), casters: [{ matchId: 42, userId: 900, streamId: 5, readyAt: null }] } as LaunchMatchRow;
+
+    await expect(applyCastSettings(fakeConnection({ execute }), row, 900, 5, { liveUrl: "https://twitch.tv/b" })).rejects.toThrow(
+      "NOT_MATCH_CASTER",
+    );
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -339,11 +349,16 @@ describe("setCasterLinkOrigin — l'origine du lien dite seule (décision du 202
 
   it("applyCastSettings_liveOnlyCoCasterOnOrganisationStream_throwsCastStreamNotOwned", async () => {
     // Un co-caster de la seule `live` ne s'attribue pas le lien de l'organisation.
-    const execute = originDb(null);
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(shownRows(900))
+      .mockResolvedValueOnce([[OWN_LINKED], []])
+      .mockResolvedValueOnce(heldBy(null));
+    const row = { ...ownedRow(), casters: CAST_ROW.casters } as LaunchMatchRow;
 
-    await expect(
-      applyCastSettings(fakeConnection({ execute }), CAST_ROW, 900, 5, { asOrganisation: false }),
-    ).rejects.toThrow("CAST_STREAM_NOT_OWNED");
+    await expect(applyCastSettings(fakeConnection({ execute }), row, 900, 5, { asOrganisation: false })).rejects.toThrow(
+      "CAST_STREAM_NOT_OWNED",
+    );
   });
 });
 
