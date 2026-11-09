@@ -283,7 +283,7 @@ describe("câblage de la fenêtre des cartes", () => {
     {
       name: "tiebreakForm_keepsMountedAndResyncsAfterSave",
       file: "RoundMapsDialog.tsx",
-      present: ["useTiebreakSection(rules.staleTiebreaks, round, tiebreakAllowed)", "aria-disabled={busy || !dirty || !allowed || undefined}", "allowed={tiebreakAllowed}", 'setValue(map ?? "")', 't("dialog.tiebreakUnavailable")'],
+      present: ["useTiebreakSection(rules.staleTiebreaks, round, tiebreakAllowed)", "aria-disabled={busy || !dirty || !allowed || undefined}", 'fieldErrors.aria("tiebreak", !allowed && unavailableId)', "allowed={tiebreakAllowed}", 'setValue(map ?? "")', 't("dialog.tiebreakUnavailable")'],
       absent: [],
     },
     {

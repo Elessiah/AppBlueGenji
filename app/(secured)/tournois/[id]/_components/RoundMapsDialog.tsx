@@ -427,6 +427,7 @@ function TiebreakForm({
   const ids = useId();
   const inputId = `${ids}-tiebreak`;
   const listId = `${ids}-tiebreak-maps`;
+  const unavailableId = `${ids}-tiebreak-unavailable`;
   const [value, setValue] = useState(saved ?? "");
   const fieldErrors = useFieldErrors(TIEBREAK_FIELD_ERRORS, { tiebreak: inputId });
   const synced = useRef(saved);
@@ -486,18 +487,20 @@ function TiebreakForm({
             list={overwatch ? listId : undefined}
             readOnly={!allowed || undefined}
             aria-disabled={!allowed || undefined}
-            {...fieldErrors.aria("tiebreak")}
+            {...fieldErrors.aria("tiebreak", !allowed && unavailableId)}
             onChange={(event) => {
               setValue(event.target.value);
               fieldErrors.clear();
             }}
           />
           <FieldErrorText fieldId={inputId} message={fieldErrors.message("tiebreak")} />
+          <output id={unavailableId} className={styles.muted}>
+            {allowed ? "" : t("dialog.tiebreakUnavailable")}
+          </output>
           {overwatch && <MapNamesDatalist id={listId} />}
         </div>
         <div className={styles.actions}>
           <UnsavedNote dirty={dirty} text={t("dialog.unsaved")} />
-          <output className={styles.muted}>{allowed ? "" : t("dialog.tiebreakUnavailable")}</output>
           {/* Toujours monté : après un retrait réussi il n'y a plus rien à retirer, mais un
               bouton démonté laisserait tomber le focus sur le <body> (WCAG 2.4.3). */}
           <button
@@ -786,7 +789,6 @@ export function RoundMapsDialog({
   // Un flux qui change le format du tour pendant la saisie ne démonte pas la
   // section (focus sur le body, texte perdu) : elle reste, grisée, avec son message.
   const { showTiebreak, staleTiebreaks } = useTiebreakSection(rules.staleTiebreaks, round, tiebreakAllowed);
-  // Le tour dont le formulaire reste affiché, grisé, ne s'y retrouve pas aussi dans la liste des cartes périmées.
 
   const optionLabel = (key: RoundKey) => {
     const config = roundMapsOf(rules.rounds, key);
