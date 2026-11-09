@@ -8,9 +8,9 @@ import type { BracketMatch } from "@/lib/shared/types";
  * quelle source fait foi — l'instantané du flux ou la relecture REST de
  * secours — et quand relire.
  *
- * Deux portes (`REALTIME_REFRESH.md`) : l'état de chaque salon (jamais le
- * nombre de personnes) arrive dans l'instantané (`BracketMatch.voice`, poussé
- * par le flux quand il change). La page ne
+ * Deux portes (`REALTIME_REFRESH.md`) : l'état de chaque salon (en attente,
+ * ouvert, indisponible — le site ne sait rien de qui s'y trouve) arrive dans
+ * l'instantané (`BracketMatch.voice`, poussé par le flux quand il change). La page ne
  * relit `GET /api/matches/[id]/voice` que **flux coupé** : flux sain, chaque
  * changement d'état est déjà publié, et une relecture par lecteur toutes les dix
  * secondes ne ferait que charger le serveur. Le balayage, lui, reste porté par

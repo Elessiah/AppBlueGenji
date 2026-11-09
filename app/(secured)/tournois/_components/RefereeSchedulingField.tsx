@@ -59,7 +59,7 @@ export function RefereeSchedulingField({
               ? "referee-scheduling-more referee-scheduling-hint referee-scheduling-warning"
               : "referee-scheduling-more referee-scheduling-hint"
           }
-          style={{ marginTop: 2 }}
+          className="checkbox-card-input"
         />
         <div style={{ flex: 1, minWidth: 0 }}>
           <InfoHintRow>

@@ -50,7 +50,7 @@ export function LaunchPhaseField({
           onChange={(e) => onChange(e.target.checked)}
           aria-labelledby="launch-phase-label"
           {...aria}
-          style={{ marginTop: 2 }}
+          className="checkbox-card-input"
         />
         <div style={{ flex: 1, minWidth: 0 }}>
           <InfoHintRow>

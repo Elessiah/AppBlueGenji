@@ -402,7 +402,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Map de départage d'un tour de play-offs à format défini (`ROUND_MAPS.md`).
     `ALTER TABLE bg_tournament_round_maps ADD COLUMN tiebreak_map VARCHAR(64) NULL AFTER slots_json`,
     // Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) : option éteinte par
-    // défaut ; la table `bg_match_voice_channels` est neuve, son `CREATE TABLE` suffit.
+    // défaut ; la table `bg_match_voice_channels` est créée par son `CREATE TABLE`,
+    // puis allégée plus bas (`DROP COLUMN members, counted_at`) sur les bases où une
+    // version précédente l'avait créée avec ces colonnes.
     `ALTER TABLE bg_tournaments ADD COLUMN team_voice_channels TINYINT(1) NOT NULL DEFAULT 0
        AFTER match_launch_phase`,
     // Suppression de compte réversible 30 jours (`docs/features/ACCOUNT_DELETION.md`) ;
