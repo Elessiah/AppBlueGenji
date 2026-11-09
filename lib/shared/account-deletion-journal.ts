@@ -108,6 +108,14 @@ function isIsoDate(value: unknown): value is string {
   return typeof value === "string" && Number.isFinite(Date.parse(value));
 }
 
+/**
+ * Une date telle que MariaDB la rend (`dateStrings`, `DATETIME(0)`) : seule
+ * forme que `undoneRequestAt` peut prendre, comparée ensuite texte à texte —
+ * une ligne abîmée (« 9 », ISO à « T ») passerait sinon pour antérieure ou
+ * postérieure à tort.
+ */
+const STORED_DATETIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+
 /** Ligne lue : suppression ou demande (`deletedAt`), ou réactivation (`reactivatedAt` seul). */
 function readEntry(value: unknown): AccountDeletionEntry | null {
   if (!value || typeof value !== "object") return null;
@@ -123,7 +131,7 @@ function readEntry(value: unknown): AccountDeletionEntry | null {
   if (v.deletedAt === undefined) {
     const undone = v.undoneRequestAt;
     if (!isIsoDate(v.reactivatedAt) || v.pending !== undefined) return null;
-    if (typeof undone !== "string" || undone.length === 0) return null;
+    if (typeof undone !== "string" || !STORED_DATETIME.test(undone)) return null;
     return { ...key, deletedAt: v.reactivatedAt, reactivated: true, undoneRequestAt: undone };
   }
   if (!isIsoDate(v.deletedAt) || v.reactivatedAt !== undefined || v.undoneRequestAt !== undefined) return null;
@@ -203,16 +211,22 @@ export function pruneJournal(
 /**
  * Réactivation : la demande en attente du compte (ou une réactivation plus
  * ancienne) cède la place à une ligne de réactivation datée de `reactivatedAt` ;
- * les autres lignes restent.
+ * les autres lignes restent — y compris une ligne en attente **plus récente**
+ * (écrivain concurrent, horloge décalée), que `pruneJournal` garde ensuite
+ * comme la plus récente.
  */
 export function withReactivationEntry(
   entries: readonly AccountDeletionEntry[],
   key: AccountReactivationKey,
   reactivatedAt: Date,
 ): AccountDeletionEntry[] {
+  const at = reactivatedAt.getTime();
   const others = entries.filter(
     (entry) =>
-      isFinalEntry(entry) || entry.userId !== key.userId || entry.accountCreatedAt !== key.accountCreatedAt,
+      isFinalEntry(entry) ||
+      entry.userId !== key.userId ||
+      entry.accountCreatedAt !== key.accountCreatedAt ||
+      Date.parse(entry.deletedAt) > at,
   );
   return [
     ...others,

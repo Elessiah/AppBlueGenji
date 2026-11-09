@@ -7,7 +7,7 @@ jest.mock("@/lib/server/users/account-reactivation", () => ({ replayAccountReact
 
 import { replayAccountDeletions } from "@/lib/server/account-deletion-replay";
 import { getDatabase } from "@/lib/server/database";
-import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
+import { deleteOwnAccount, finalizeAccountDeletion } from "@/lib/server/users/account-deletion";
 import { requestAccountDeletion } from "@/lib/server/users/account-deletion-request";
 import { replayAccountReactivation } from "@/lib/server/users/account-reactivation";
 import type { AccountDeletionEntry } from "@/lib/shared/account-deletion-journal";
@@ -60,6 +60,8 @@ describe("replayAccountDeletions", () => {
       otherAccount: 0,
       reactivated: 0,
       alreadyActive: 0,
+      superseded: 0,
+      alreadyPending: 0,
       failed: 0,
     });
     expect(lines.join("\n")).toContain("effacé");
@@ -86,6 +88,8 @@ describe("replayAccountDeletions", () => {
       otherAccount: 1,
       reactivated: 0,
       alreadyActive: 0,
+      superseded: 0,
+      alreadyPending: 0,
       failed: 0,
     });
     expect(lines.join("\n")).toContain("#3");
@@ -128,6 +132,8 @@ describe("replayAccountDeletions", () => {
       otherAccount: 0,
       reactivated: 0,
       alreadyActive: 0,
+      superseded: 0,
+      alreadyPending: 0,
       failed: 0,
     });
     expect(execute).not.toHaveBeenCalled();
@@ -216,7 +222,7 @@ describe("replayAccountDeletions — réactivation (décision R1)", () => {
 
   it("replayAccountDeletions_reactivatedEntryPendingRow_callsReplayReactivation", async () => {
     restoredDb({ 7: pendingRow });
-    jest.mocked(replayAccountReactivation).mockResolvedValue(true);
+    jest.mocked(replayAccountReactivation).mockResolvedValue("REACTIVATED");
 
     const report = await replayAccountDeletions([reactivated], { log });
 
@@ -255,6 +261,26 @@ describe("replayAccountDeletions — réactivation (décision R1)", () => {
     expect(report).toMatchObject({ alreadyActive: 1, reactivated: 0 });
   });
 
+  // Revue sécurité #546, cycle 9 : un refus relu sous verrou n'est pas « déjà réactivé ».
+  it("replayAccountDeletions_replayReactivationSuperseded_countedApart", async () => {
+    restoredDb({ 7: pendingRow });
+    jest.mocked(replayAccountReactivation).mockResolvedValue("SUPERSEDED");
+
+    const report = await replayAccountDeletions([reactivated], { log });
+
+    expect(report).toMatchObject({ superseded: 1, alreadyActive: 0, reactivated: 0 });
+    expect(lines.join("\n")).toContain("demande postérieure");
+  });
+
+  it("replayAccountDeletions_replayReactivationAlreadyActiveUnderLock_alreadyActive", async () => {
+    restoredDb({ 7: pendingRow });
+    jest.mocked(replayAccountReactivation).mockResolvedValue("ALREADY_ACTIVE");
+
+    const report = await replayAccountDeletions([reactivated], { log });
+
+    expect(report).toMatchObject({ alreadyActive: 1, superseded: 0, reactivated: 0 });
+  });
+
   it("replayAccountDeletions_replayReactivationThrows_failedCounted", async () => {
     restoredDb({ 7: pendingRow });
     jest.mocked(replayAccountReactivation).mockRejectedValue(new Error("DB_DOWN"));
@@ -269,28 +295,57 @@ describe("replayAccountDeletions — réactivation (décision R1)", () => {
 // Revue sécurité #546, cycle 9 : demande défaite puis refaite, revenue avec la
 // sauvegarde sous sa date d'origine — la date du journal (la plus récente) la remplace.
 describe("replayAccountDeletions — demande à redater", () => {
-  const pending: AccountDeletionEntry = { ...entry(7), pending: true, deletedAt: "2026-11-03T09:00:00.000Z" };
+  const DAY = 24 * 3600 * 1000;
+  // Fenêtre ouverte : demande d'il y a deux jours, à la milliseconde près.
+  const recent = new Date(Math.floor((Date.now() - 2 * DAY) / 1000) * 1000 + 123);
+  const pending: AccountDeletionEntry = { ...entry(7), pending: true, deletedAt: recent.toISOString() };
+  const wholeSecond = new Date(Math.floor(recent.getTime() / 1000) * 1000);
   const pendingRow = { created_at: CREATED, is_deleted: 1, deletion_requested_at: "2026-10-01 10:00:00" };
 
-  it("replayAccountDeletions_pendingEntryPendingRowDifferentDate_redatedCountedReplayed", async () => {
+  it("replayAccountDeletions_pendingEntryPendingRowOlderDate_redatedForwardOnlyAtWholeSecond", async () => {
     const execute = restoredDb({ 7: pendingRow }, { affectedRows: 1 });
 
     const report = await replayAccountDeletions([pending], { log });
 
     const update = execute.mock.calls.find(([sql]) => sql.startsWith("UPDATE"));
-    expect(update?.[1]).toEqual([new Date(pending.deletedAt), 7, CREATED, new Date(pending.deletedAt)]);
+    expect(update?.[0]).toContain("deletion_requested_at < ?");
+    expect(update?.[1]).toEqual([wholeSecond, 7, CREATED, wholeSecond]);
     expect(requestAccountDeletion).not.toHaveBeenCalled();
     expect(deleteOwnAccount).not.toHaveBeenCalled();
-    expect(report).toMatchObject({ replayed: 1, alreadyDeleted: 0 });
+    expect(finalizeAccountDeletion).not.toHaveBeenCalled();
+    expect(report).toMatchObject({ replayed: 1, alreadyDeleted: 0, alreadyPending: 0 });
     expect(lines.join("\n")).toContain("redatée");
   });
 
-  it("replayAccountDeletions_pendingEntryPendingRowSameDate_alreadyDeleted", async () => {
+  it("replayAccountDeletions_pendingEntrySameOrLaterDate_alreadyPendingNotDeleted", async () => {
     restoredDb({ 7: pendingRow }, { affectedRows: 0 });
 
     const report = await replayAccountDeletions([pending], { log });
 
-    expect(report).toMatchObject({ replayed: 0, alreadyDeleted: 1 });
+    expect(report).toMatchObject({ replayed: 0, alreadyDeleted: 0, alreadyPending: 1 });
+  });
+
+  it("replayAccountDeletions_pendingEntryWindowClosed_finalizedAtOnce", async () => {
+    restoredDb({ 7: pendingRow }, { affectedRows: 1 });
+    jest.mocked(finalizeAccountDeletion).mockResolvedValue({ mode: "ANONYMIZE", reason: "TOURNAMENTS" });
+    const old: AccountDeletionEntry = { ...pending, deletedAt: new Date(Date.now() - 40 * DAY).toISOString() };
+
+    const report = await replayAccountDeletions([old], { log });
+
+    expect(finalizeAccountDeletion).toHaveBeenCalledWith(7);
+    expect(report).toMatchObject({ replayed: 1, alreadyPending: 0 });
+    expect(lines.join("\n")).toContain("anonymisé (fenêtre close)");
+  });
+
+  it("replayAccountDeletions_pendingEntryWindowClosedNotDueUnderLock_countsRedate", async () => {
+    restoredDb({ 7: pendingRow }, { affectedRows: 1 });
+    jest.mocked(finalizeAccountDeletion).mockResolvedValue(null);
+    const old: AccountDeletionEntry = { ...pending, deletedAt: new Date(Date.now() - 40 * DAY).toISOString() };
+
+    const report = await replayAccountDeletions([old], { log });
+
+    expect(report).toMatchObject({ replayed: 1 });
+    expect(lines.join("\n")).toContain("redatée");
   });
 
   it("replayAccountDeletions_redateDryRun_countsWithoutWriting", async () => {
@@ -301,6 +356,16 @@ describe("replayAccountDeletions — demande à redater", () => {
     expect(execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE"))).toBe(false);
     expect(report.replayed).toBe(1);
     expect(lines.join("\n")).toContain("à redater");
+  });
+
+  it("replayAccountDeletions_redateDryRunWindowClosed_saysDeletion", async () => {
+    restoredDb({ 7: pendingRow });
+    const old: AccountDeletionEntry = { ...pending, deletedAt: new Date(Date.now() - 40 * DAY).toISOString() };
+
+    await replayAccountDeletions([old], { dryRun: true, log });
+
+    expect(lines.join("\n")).toContain("serait supprimé");
+    expect(finalizeAccountDeletion).not.toHaveBeenCalled();
   });
 
   it("replayAccountDeletions_redateThrows_failedCounted", async () => {

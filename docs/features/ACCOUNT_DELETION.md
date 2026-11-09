@@ -644,7 +644,17 @@ puis renomme l'entrée solo (`syncSoloEntryIdentityOn`). Toute lecture qui joint
   l'emporte ; une suppression définitive les rend caduques. Une ligne en
   attente dont le compte revient **en attente** avec la sauvegarde (demande
   défaite puis refaite) rend `REDATE` : `deletion_requested_at` reprend la date
-  du journal, pour que l'ancienne demande n'abrège pas la nouvelle fenêtre.
+  du journal, pour que l'ancienne demande n'abrège pas la nouvelle fenêtre —
+  **vers l'avant seulement** (`deletion_requested_at < ?`, date tronquée à la
+  seconde), et la suppression définitive suit aussitôt si la fenêtre du journal
+  est close (`finalizeAccountDeletion`). Le rapport du rejeu distingue
+  `superseded` (réactivation non rejouée, une demande postérieure tient, relue
+  sous verrou : `replayAccountReactivation` rend `REACTIVATED`,
+  `ALREADY_ACTIVE` ou `SUPERSEDED`) et `alreadyPending` (demande déjà à jour) ;
+  la simulation compte les réactivations « au plus ». Une ligne de réactivation
+  ne remplace que les lignes en attente **antérieures ou simultanées** du compte
+  (`withReactivationEntry`), et `undoneRequestAt` n'est lu que sous la forme
+  rendue par la base (`AAAA-MM-JJ HH:MM:SS`), toute autre ligne étant écartée.
 - **Jour 30** : l'effacement supprime aussi le fichier d'avatar mis de côté ;
   l'anonymisation efface le masque (cascade sur l'effacement).
 - **Organisateur sans repreneur** : même règle, anonyme dès la demande.

@@ -225,14 +225,19 @@ export async function reactivateAccount(
  * un compte réactivé depuis la sauvegarde, revenu avec elle en attente de
  * suppression, est réactivé de nouveau — même écriture que la réactivation
  * (pseudo, avatar, sessions retirées), sans ticket ni fenêtre : elle a eu lieu.
- * N'écrit pas le journal (sa ligne de réactivation y est déjà). Rend `true` si
- * le compte est réactivé.
+ * N'écrit pas le journal (sa ligne de réactivation y est déjà). Rend l'issue
+ * relue sous verrou : `REACTIVATED`, `ALREADY_ACTIVE` (compte vivant) ou
+ * `SUPERSEDED` (compte absent, autre compte, ou demande postérieure à celle que
+ * la réactivation défaisait — elle tient).
  */
-export async function replayAccountReactivation(entry: AccountDeletionEntry): Promise<boolean> {
+export type ReplayedReactivation = "REACTIVATED" | "ALREADY_ACTIVE" | "SUPERSEDED";
+
+export async function replayAccountReactivation(entry: AccountDeletionEntry): Promise<ReplayedReactivation> {
   const userId = entry.userId;
   const db = await getDatabase();
   const connection = await db.getConnection();
   let restored = false;
+  let alive = false;
   try {
     await connection.beginTransaction();
     const [locked] = await connection.execute<(RowDataPacket & {
@@ -241,6 +246,7 @@ export async function replayAccountReactivation(entry: AccountDeletionEntry): Pr
       created_at: string;
     })[]>(`SELECT is_deleted, deletion_requested_at, created_at FROM bg_users WHERE id = ? FOR UPDATE`, [userId]);
     const row = locked[0];
+    alive = !!row && String(row.created_at) === entry.accountCreatedAt && Number(row.is_deleted) === 0;
     // Revérifié sous verrou : même compte, et demande que la réactivation défait.
     const undoes =
       !!row &&
@@ -267,5 +273,6 @@ export async function replayAccountReactivation(entry: AccountDeletionEntry): Pr
     invalidateStats();
     await republishSoloEntryTournaments(userId);
   }
-  return restored;
+  if (restored) return "REACTIVATED";
+  return alive ? "ALREADY_ACTIVE" : "SUPERSEDED";
 }

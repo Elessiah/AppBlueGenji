@@ -1,6 +1,6 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
+import { deleteOwnAccount, finalizeAccountDeletion } from "@/lib/server/users/account-deletion";
 import { requestAccountDeletion } from "@/lib/server/users/account-deletion-request";
 import { replayAccountReactivation } from "@/lib/server/users/account-reactivation";
 import { isReactivationWindowOpen } from "@/lib/shared/account-deletion";
@@ -20,6 +20,10 @@ export interface ReplayReport {
   reactivated: number;
   /** Comptes réactivés depuis la sauvegarde et déjà vivants dans la base restaurée. */
   alreadyActive: number;
+  /** Réactivations non rejouées : une demande postérieure tient, relue sous verrou. */
+  superseded: number;
+  /** Demandes en attente déjà à la bonne date (ou plus récente) : rien à redater. */
+  alreadyPending: number;
   failed: number;
 }
 
@@ -49,6 +53,8 @@ export async function replayAccountDeletions(
     otherAccount: 0,
     reactivated: 0,
     alreadyActive: 0,
+    superseded: 0,
+    alreadyPending: 0,
     failed: 0,
   };
   const counters: Record<ReplayDecision, keyof ReplayReport> = {
@@ -124,8 +130,10 @@ async function handleReactivation(
     await replayReactivation(entry, report, log);
     return;
   }
+  // Au plus : le vrai rejeu relit l'état sous verrou et peut finir « déjà
+  // réactivé » ou « demande postérieure ».
   report.reactivated += 1;
-  log(`  · #${entry.userId} — réactivé le ${entry.deletedAt}, à réactiver`);
+  log(`  · #${entry.userId} — réactivé le ${entry.deletedAt}, à réactiver (au plus, selon l'état relu sous verrou)`);
 }
 
 /** Réactivation ou demande à redater : traitée ici (`true`), sinon laissée au rejeu ordinaire. */
@@ -150,7 +158,11 @@ async function handleStateDecision(
 
 /**
  * Demande en attente revenue en attente : sa date reprend celle du journal,
- * qui garde la plus récente (`pruneJournal`). Rien à faire si elle y est déjà.
+ * qui garde la plus récente (`pruneJournal`). Seulement **vers l'avant** : une
+ * ligne plus ancienne que la demande restaurée (journal en échec entre-temps)
+ * abrégerait sa fenêtre. Comparée à la seconde (`DATETIME(0)`). Fenêtre du
+ * journal déjà close : la suppression définitive suit aussitôt, comme au chemin
+ * `REPLAY`, sans attendre la passe horaire.
  */
 async function handleRedate(
   db: Awaited<ReturnType<typeof getDatabase>>,
@@ -159,29 +171,48 @@ async function handleRedate(
   log: (line: string) => void,
   dryRun: boolean,
 ): Promise<void> {
-  const requestedAt = new Date(entry.deletedAt);
+  const requestedAt = toWholeSecond(new Date(entry.deletedAt));
+  const windowOpen = isReactivationWindowOpen(entry.deletedAt);
   if (dryRun) {
     report.replayed += 1;
-    log(`  · #${entry.userId} — demande de suppression à redater au ${entry.deletedAt}`);
+    log(
+      windowOpen
+        ? `  · #${entry.userId} — demande de suppression à redater au ${entry.deletedAt} (si plus récente)`
+        : `  · #${entry.userId} — serait supprimé (demande du ${entry.deletedAt}, fenêtre close)`,
+    );
     return;
   }
   try {
     const [result] = await db.execute<ResultSetHeader>(
       `UPDATE bg_users SET deletion_requested_at = ?
         WHERE id = ? AND created_at = ? AND is_deleted = 1
-          AND deletion_requested_at IS NOT NULL AND deletion_requested_at <> ?`,
+          AND deletion_requested_at IS NOT NULL AND deletion_requested_at < ?`,
       [requestedAt, entry.userId, entry.accountCreatedAt, requestedAt],
     );
-    if (Number(result.affectedRows) === 1) {
+    const redated = Number(result.affectedRows) === 1;
+    if (!windowOpen) {
+      const plan = await finalizeAccountDeletion(entry.userId);
+      if (plan) {
+        report.replayed += 1;
+        log(`  ✓ #${entry.userId} — ${plan.mode === "ERASE" ? "effacé" : "anonymisé"} (fenêtre close)`);
+        return;
+      }
+    }
+    if (redated) {
       report.replayed += 1;
       log(`  ✓ #${entry.userId} — demande de suppression redatée`);
     } else {
-      report.alreadyDeleted += 1;
+      report.alreadyPending += 1;
     }
   } catch (error) {
     report.failed += 1;
     log(`  ✗ #${entry.userId} — échec : ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+/** La date sans ses millisecondes : `deletion_requested_at` est un `DATETIME(0)`. */
+function toWholeSecond(date: Date): Date {
+  return new Date(Math.floor(date.getTime() / 1000) * 1000);
 }
 
 /** Rejoue une réactivation (décision R1), et la compte. */
@@ -191,11 +222,15 @@ async function replayReactivation(
   log: (line: string) => void,
 ): Promise<void> {
   try {
-    if (await replayAccountReactivation(entry)) {
+    const outcome = await replayAccountReactivation(entry);
+    if (outcome === "REACTIVATED") {
       report.reactivated += 1;
       log(`  ✓ #${entry.userId} — réactivé`);
-    } else {
+    } else if (outcome === "ALREADY_ACTIVE") {
       report.alreadyActive += 1;
+    } else {
+      report.superseded += 1;
+      log(`  = #${entry.userId} — demande postérieure à la réactivation, laissée en place`);
     }
   } catch (error) {
     report.failed += 1;

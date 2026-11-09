@@ -337,7 +337,7 @@ describe("replayAccountReactivation", () => {
   it("replayAccountReactivation_pendingRow_restoresAndRevokesSessions", async () => {
     const connection = transaction({ locked: lockedPending });
 
-    expect(await replayAccountReactivation(reactivation)).toBe(true);
+    expect(await replayAccountReactivation(reactivation)).toBe("REACTIVATED");
 
     expect(restoreAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7);
     const sqls = connection.execute.mock.calls.map(([sql]) => String(sql));
@@ -348,10 +348,10 @@ describe("replayAccountReactivation", () => {
     expect(recordAccountReactivation).not.toHaveBeenCalled();
   });
 
-  it("replayAccountReactivation_aliveRow_falseWithoutRestore", async () => {
+  it("replayAccountReactivation_aliveRow_alreadyActiveWithoutRestore", async () => {
     const connection = transaction({ locked: { is_deleted: 0, deletion_requested_at: null, created_at: CREATED } });
 
-    expect(await replayAccountReactivation(reactivation)).toBe(false);
+    expect(await replayAccountReactivation(reactivation)).toBe("ALREADY_ACTIVE");
 
     expect(restoreAccountIdentity).not.toHaveBeenCalled();
     expect(connection.commit).toHaveBeenCalled();
@@ -369,19 +369,19 @@ describe("replayAccountReactivation", () => {
   });
 
   // Revue sécurité #546, cycle 9 : revérifié sous verrou.
-  it("replayAccountReactivation_laterRequestUnderLock_falseWithoutRestore", async () => {
+  it("replayAccountReactivation_laterRequestUnderLock_supersededWithoutRestore", async () => {
     const connection = transaction({ locked: { ...lockedPending, deletion_requested_at: "2026-11-05 10:00:00" } });
 
-    expect(await replayAccountReactivation(reactivation)).toBe(false);
+    expect(await replayAccountReactivation(reactivation)).toBe("SUPERSEDED");
 
     expect(restoreAccountIdentity).not.toHaveBeenCalled();
     expect(connection.commit).toHaveBeenCalled();
   });
 
-  it("replayAccountReactivation_otherCreatedAt_falseWithoutRestore", async () => {
+  it("replayAccountReactivation_otherCreatedAt_supersededWithoutRestore", async () => {
     transaction({ locked: { ...lockedPending, created_at: "2026-09-22 08:00:00" } });
 
-    expect(await replayAccountReactivation(reactivation)).toBe(false);
+    expect(await replayAccountReactivation(reactivation)).toBe("SUPERSEDED");
 
     expect(restoreAccountIdentity).not.toHaveBeenCalled();
   });

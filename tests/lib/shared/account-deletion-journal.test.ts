@@ -210,6 +210,22 @@ describe("réactivation journalisée (décision R1)", () => {
     expect(withReactivationEntry([otherCreation], key, reactivatedAt)).toEqual([otherCreation, reactivated]);
   });
 
+  // Revue sécurité #546, cycle 9 : une demande plus récente que la réactivation reste.
+  it("withReactivationEntry_laterPendingLine_keptAndWinsAtPrune", () => {
+    const later = entry({ pending: true, deletedAt: "2026-11-04T10:00:00.000Z" });
+
+    const written = withReactivationEntry([later], key, reactivatedAt);
+
+    expect(written).toEqual([later, reactivated]);
+    expect(pruneJournal(written, now)).toEqual([later]);
+  });
+
+  it("withReactivationEntry_pendingLineAtSameInstant_replaced", () => {
+    const same = entry({ pending: true, deletedAt: "2026-11-03T09:00:00.000Z" });
+
+    expect(withReactivationEntry([same], key, reactivatedAt)).toEqual([reactivated]);
+  });
+
   it("withReactivationEntry_finalLineOfSameAccount_kept", () => {
     const final = entry();
 
@@ -252,6 +268,16 @@ describe("réactivation journalisée (décision R1)", () => {
 
     expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
   });
+
+  // Revue sécurité #546, cycle 10 : seule la forme rendue par la base est admise.
+  it.each<[string]>([["9"], ["2026-11-01T10:00:00.000Z"], ["2026-11-01 10:00"], [" 2026-11-01 10:00:00"]])(
+    "parseJournal_undoneRequestAtMalformed_rejected (%s)",
+    (undone) => {
+      const line = JSON.stringify({ ...key, reactivatedAt: "2026-11-03T09:00:00.000Z", undoneRequestAt: undone });
+
+      expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+    },
+  );
 
   it("parseJournal_deletionLineWithUndoneRequestAt_rejected", () => {
     const line = JSON.stringify({ ...entry(), undoneRequestAt: "2026-11-01 10:00:00" });
