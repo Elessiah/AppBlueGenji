@@ -16,7 +16,7 @@
     },
     "comptes": {
       "title": "Game identities and linked accounts",
-      "lead": "Link your accounts, then certify them: a linked account alone doesn't make you reachable."
+      "lead": "Link your accounts, then verify them: a linked account alone doesn't make you reachable."
     },
     "confidentialite": {
       "title": "Privacy",
@@ -307,7 +307,7 @@
   },
   "connections": {
     "heading": "My linked accounts",
-    "intro": "No password: your account opens through these apps. For each identity one step follows: Link, then Certify. Link several; the last one can't be removed.",
+    "intro": "No password: your account opens through these apps. For each identity one step follows: Link, then Verify. Link several; the last one can't be removed.",
     "loading": "Loading…",
     "notes": {
       "GOOGLE": "One-click login. No email address is saved.",
@@ -317,9 +317,9 @@
     "state": {
       "UNLINKED": "Not linked",
       "LINKED": "Linked",
-      "LINKED_TO_CERTIFY": "Linked, to certify",
-      "LINKED_NO_BATTLETAG": "Linked, BattleTag not certified",
-      "CERTIFIED": "Certified"
+      "LINKED_TO_CERTIFY": "Linked, to verify",
+      "LINKED_NO_BATTLETAG": "Linked, BattleTag not verified",
+      "CERTIFIED": "Verified"
     },
     "blizzardNoTag": "Battle.net gave you no BattleTag: the one you type below stays uncertified.",
     "linked": "Linked",

@@ -219,8 +219,8 @@ describe("profileSectionIdFromHash", () => {
 });
 
 describe("Les anciennes ancres de la section réunie", () => {
-  it("restent de vraies cibles dans la page, et les gestes de la liste ne soumettent pas le formulaire", () => {
-    expect(page).toContain("Object.keys(PROFILE_SECTION_ALIASES).map");
+  it("défilent aussi pour un lien de la page même, et les gestes de la liste ne soumettent pas le formulaire", () => {
+    expect(page).toContain('addEventListener("hashchange", onHashChange)');
     for (const file of ["ConnectedAppsSection.tsx", "OtherSessionsPanel.tsx"]) {
       const src = readFileSync(join(ROOT, "app/(secured)/profil", file), "utf8");
       const buttons = src.match(/<button[^>]*>/g) ?? [];

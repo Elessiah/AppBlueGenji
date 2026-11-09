@@ -60,7 +60,7 @@ describe("ConnectedAppsSection — rendu des lignes", () => {
     // La pastille et qui lit un BattleTag masqué : derrière le « i » de la ligne.
     expect(html).toContain('aria-controls="connection-more-blizzard"');
     expect(html).toContain("BattleTag vérifié");
-    expect(html).toContain('aria-describedby="connection-details-blizzard"');
+    expect(html).toContain('aria-describedby="connection-state-blizzard connection-details-blizzard"');
   });
 
   it("dit la dernière porte au lieu du bouton Retirer", () => {
@@ -82,7 +82,7 @@ describe("ConnectedAppsSection — rendu des lignes", () => {
     const html = render([google(true), discord(true, "OAUTH", "nova"), blizzard(false)]);
     expect(html).toContain("Rattaché par le bouton Discord");
     expect(html).toContain('id="connection-method-discord"');
-    expect(html).toContain('aria-describedby="connection-details-discord connection-method-discord"');
+    expect(html).toContain('aria-describedby="connection-state-discord connection-details-discord connection-method-discord"');
   });
 
   it("rattachement Discord par code : la ligne du bouton propose d'ajouter l'autorisation", () => {
@@ -94,10 +94,10 @@ describe("ConnectedAppsSection — rendu des lignes", () => {
     expect(html).not.toContain('id="connection-method-discord"');
   });
 
-  it("dit « Rattaché » sans pseudo à afficher", () => {
+  it("dit « Lié » sans pseudo à afficher", () => {
     const html = render([google(true), discord(false), blizzard(true)]);
-    expect(html).toMatch(/id="connection-details-google"[^>]*>Rattaché</);
-    expect(html).toMatch(/id="connection-details-blizzard"[^>]*>Rattaché</);
+    expect(html).toMatch(/id="connection-details-google"[^>]*>Lié</);
+    expect(html).toMatch(/id="connection-details-blizzard"[^>]*>Lié</);
   });
 
   it("rend la ligne du bot sous celle de Discord, et seulement elle", () => {

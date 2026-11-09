@@ -307,7 +307,7 @@
   },
   "connections": {
     "heading": "Mes comptes liés",
-    "intro": "Pas de mot de passe : ton compte s'ouvre par ces applications. Pour chaque identité, un seul geste suit : Lier, puis Certifier. Rattaches-en plusieurs ; la dernière ne peut pas être retirée.",
+    "intro": "Pas de mot de passe : ton compte s'ouvre par ces applications. Pour chaque identité, un seul geste suit : Lier, puis Certifier. Lie-en plusieurs ; la dernière ne peut pas être retirée.",
     "loading": "Chargement…",
     "notes": {
       "GOOGLE": "Connexion en un clic. Aucune adresse n'est enregistrée.",
@@ -322,7 +322,7 @@
       "CERTIFIED": "Certifié"
     },
     "blizzardNoTag": "Battle.net ne t'a donné aucun BattleTag : celui que tu saisis plus bas reste non certifié.",
-    "linked": "Rattaché",
+    "linked": "Lié",
     "handleLine": "{label} : {handle}",
     "handleLabels": {
       "DISCORD": "Tag Discord",

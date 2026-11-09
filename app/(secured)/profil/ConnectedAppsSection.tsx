@@ -79,7 +79,7 @@ type StateKey = "UNLINKED" | "LINKED" | "LINKED_TO_CERTIFY" | "LINKED_NO_BATTLET
 const STAGE_PILL: Record<StateKey, PillVariant> = {
   UNLINKED: "neutral",
   LINKED_TO_CERTIFY: "warning",
-  LINKED_NO_BATTLETAG: "warning",
+  LINKED_NO_BATTLETAG: "info",
   LINKED: "info",
   CERTIFIED: "success",
 };
@@ -114,7 +114,9 @@ function rowStage(
 function stateKey(provider: OAuthProvider, step: IdentityStep): StateKey {
   if (step.stage === "UNLINKED" || step.stage === "CERTIFIED") return step.stage;
   if (!step.certifiable) return "LINKED";
-  return provider === "DISCORD" ? "LINKED_TO_CERTIFY" : "LINKED_NO_BATTLETAG";
+  if (provider === "BLIZZARD") return "LINKED_NO_BATTLETAG";
+  // Sans tag à certifier, le geste est d'en poser un : « à certifier » serait faux.
+  return step.action === "CERTIFY" ? "LINKED_TO_CERTIFY" : "LINKED";
 }
 
 export function ConnectedAppsSection({
@@ -249,7 +251,7 @@ export function ConnectedAppsSection({
   return (
     <>
       <InfoHintRow>
-        <strong style={{ fontSize: 14 }}>{text.t("connections.heading")}</strong>
+        <h3 className={s.subTitle}>{text.t("connections.heading")}</h3>
         <InfoHint id="connections-intro-more" subject={text.t("connections.heading")}>
           <p>{text.t("connections.intro")}</p>
         </InfoHint>
@@ -328,6 +330,7 @@ function ConnectionRow({
   const label = OAUTH_PROVIDER_LABELS[connection.provider];
   const slug = OAUTH_PROVIDER_SLUGS[connection.provider];
   const detailsId = `connection-details-${slug}`;
+  const stateId = `connection-state-${slug}`;
   const methodId = `connection-method-${slug}`;
   // Calculé une fois : la condition et le rendu doivent dire la même
   // chose, et le module est la seule autorité sur « y a-t-il quelque
@@ -353,7 +356,7 @@ function ConnectionRow({
                 className={`${s.connectionDot} ${connection.linked ? s.connectionDotOn : ""}`}
               />
               <strong style={{ fontSize: 14 }}>{label}</strong>
-              <Pill variant={pillVariant}>{stateWord}</Pill>
+              <Pill variant={pillVariant} id={stateId}>{stateWord}</Pill>
             </span>
             <ProviderHint provider={connection.provider} />
           </InfoHintRow>
@@ -405,7 +408,7 @@ function ConnectionRow({
           action={action}
           refusal={refusal}
           busy={busy}
-          detailsId={detailsId}
+          detailsId={`${stateId} ${detailsId}`}
           methodId={methodLabel ? methodId : null}
           onCertify={identity.onCertifyDiscord}
           onUnlink={onUnlink}

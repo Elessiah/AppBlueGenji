@@ -23,7 +23,6 @@ import { precheckImageUpload } from "@/lib/shared/image-upload-errors";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
 import { PSEUDO_MAX_LENGTH } from "@/lib/shared/pseudo";
 import {
-  PROFILE_SECTION_ALIASES,
   PROFILE_SECTION_BY_ID,
   profileSectionIdFromHash,
   visibleProfileSections,
@@ -502,6 +501,17 @@ export default function ProfilePage() {
     target.scrollIntoView({ block: "start" });
   }, [data, invitations.length]);
 
+  // Un lien de la page même vers une ancienne ancre (`#discord`, `#connexions`) :
+  // aucun élément ne la porte plus, le navigateur ne défilerait pas.
+  useEffect(() => {
+    const onHashChange = (event: HashChangeEvent) => {
+      const id = profileSectionIdFromHash(new URL(event.newURL).hash);
+      document.getElementById(id ?? "")?.scrollIntoView({ block: "start" });
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
   const onSubmit = async (event: FormEvent) => {
     // Les fenêtres de la section des comptes (code du bot) sont des formulaires
     // portés dans `document.body`, mais React fait remonter leur envoi jusqu'ici :
@@ -941,11 +951,6 @@ export default function ProfilePage() {
         </ProfileSection>
 
         <ProfileSection section={sectionById.comptes}>
-          {/* Les anciennes ancres restent des cibles réelles : un lien de la page
-              même (`#discord`) défile sans passer par le saut rejoué au chargement. */}
-          {Object.keys(PROFILE_SECTION_ALIASES).map((id) => (
-            <span key={id} id={id} />
-          ))}
           <ConnectedAppsSection
             identity={identityContext(discordState, blizzardLinked, data?.profile.battletagFromBlizzard, () =>
               setVerifyOpen(true),
