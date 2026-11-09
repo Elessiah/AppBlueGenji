@@ -14,7 +14,6 @@ jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: ()
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { CastBattletagField, CastTriggerField } from "@/app/(secured)/tournois/[id]/_components/CastSettingsFields";
-import { bracketMatch } from "../helpers/bracket-match";
 import { readSource } from "../helpers/read-source";
 import frActions from "@/messages/fr/tournamentActions.json";
 import enActions from "@/messages/en/tournamentActions.json";

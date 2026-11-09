@@ -228,9 +228,9 @@ export function CastSettingsDialog({
         <p className={styles.subtitle}>{matchLabel}</p>
 
         {cast === null && (
-          <p className={styles.subtitle} role="status" aria-busy="true">
+          <output className={styles.loading} aria-busy="true">
             {t("cardActions.castSettings.loading")}
-          </p>
+          </output>
         )}
 
         {cast !== null && played && <p className={styles.subtitle}>{t("cardActions.castSettings.played")}</p>}
