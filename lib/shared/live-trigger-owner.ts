@@ -8,12 +8,15 @@
  * Une fois posé, seuls le **caster qui l'a posé** (`live_trigger_user_id`),
  * l'**arbitre désigné** du match (médiateur) et un **admin** le changent ou le
  * retirent. Un mode posé par le staff — ou dont le caster qui l'avait posé
- * s'est retiré — n'a pas de propriétaire : il reste au staff `tournaments`.
- * Seul un caster du match devient propriétaire du mode qu'il pose : posé par
- * qui ne le caste pas (staff, admin, arbitre, porteur de la seule `live`), le
- * mode reste au staff. Un caster tu (devenu inéligible avant le lancement) ou
- * parti ne tient plus le mode, que le serveur et l'interface rendent au staff.
- * Ouvrir ou couper l'antenne d'un mode manuel suit la même règle.
+ * s'est retiré — n'a pas de propriétaire : le staff `tournaments` le change,
+ * et un caster montré du match aussi, qui en devient alors le maître
+ * (décision du 2026-11-05). Seul un caster du match devient propriétaire du
+ * mode qu'il pose : posé par qui ne le caste pas (staff, admin, arbitre), le
+ * mode reste au staff. Un porteur de la seule `live` ne règle que **son**
+ * cast : sans caster le match, il n'en pose ni n'en change le mode. Un caster
+ * tu (devenu inéligible avant le lancement) ou parti ne tient plus le mode,
+ * que le serveur et l'interface rendent au staff. Ouvrir ou couper l'antenne
+ * d'un mode manuel suit la même règle.
  *
  * Module pur : la même règle sert le serveur (sous le verrou du match) et
  * l'interface (contrôles cachés), jamais deux définitions.
@@ -44,34 +47,33 @@ export function isMatchRefereeActor(hold: Pick<LiveTriggerHold, "refereeId">, ac
 }
 
 /**
- * L'acteur peut-il changer (ou retirer) le mode d'antenne ?
+ * L'acteur peut-il changer (ou retirer) le mode d'antenne ? `actorCasts` :
+ * l'acteur caste le match en caster montré.
  *
- * - match pas encore casté (`trigger` nul) : le premier à le poser le peut ;
  * - admin ou arbitre désigné : toujours ;
  * - mode d'un caster : lui seul ;
- * - mode sans propriétaire (posé par le staff, ou caster parti) : le staff `tournaments`.
+ * - pas encore de mode, ou mode sans propriétaire (posé par le staff, caster
+ *   parti) : le staff `tournaments` et les casters montrés du match — jamais
+ *   un porteur de la seule `live` qui ne le caste pas.
  */
-export function mayChangeLiveTrigger(hold: LiveTriggerHold, actor: LiveTriggerActor): boolean {
-  if (hold.trigger === null) return true;
+export function mayChangeLiveTrigger(hold: LiveTriggerHold, actor: LiveTriggerActor, actorCasts = false): boolean {
   if (actor.isAdmin || isMatchRefereeActor(hold, actor)) return true;
   if (hold.ownerId !== null) return hold.ownerId === actor.userId;
-  return actor.manages;
+  return actor.manages || actorCasts;
 }
 
 /**
- * L'acteur peut-il ouvrir ou couper l'antenne d'un mode `MANUAL` ? Qui peut
- * changer le mode (`mayChangeLiveTrigger`) ; et, sur un mode **sans maître**
- * (caster parti, mode posé avant la règle), tout caster montré du match
- * (`actorCasts`) — personne d'autre n'y décide pour lui, et le match ne reste
- * pas hors antenne en attendant le staff. Le mode d'un autre caster, lui, ne
- * se bascule pas (décision 2).
+ * L'acteur peut-il ouvrir ou couper l'antenne d'un mode `MANUAL` ? La règle
+ * du mode (`mayChangeLiveTrigger`) : sur un mode **sans maître**, tout
+ * caster montré du match la bascule — le match ne reste pas hors antenne en
+ * attendant le staff. Le mode d'un autre caster, lui, ne se bascule pas
+ * (décision 2).
  */
 export function mayToggleOnAir(hold: LiveTriggerHold, actor: LiveTriggerActor, actorCasts: boolean): boolean {
-  if (mayChangeLiveTrigger(hold, actor)) return true;
-  return hold.ownerId === null && actorCasts;
+  return mayChangeLiveTrigger(hold, actor, actorCasts);
 }
 
-/** Ce que l'interface sait du lecteur pour la même règle. */
+/** Ce que l'interface sait du lecteur pour la même règle (`liveTriggerViewer`). */
 export type LiveTriggerViewer = {
   userId: number | null;
   isAdmin: boolean;
@@ -81,6 +83,23 @@ export type LiveTriggerViewer = {
 };
 
 /**
+ * Le lecteur tel que la règle le lit, bâti d'un seul endroit pour les trois
+ * fenêtres (inscription, réglages du caster, diffusion du staff) : un champ
+ * ajouté ici l'est pour toutes. `referees` : `viewerRefereesMatch`.
+ */
+export function liveTriggerViewer(
+  controls: { viewerUserId: number | null; viewerIsAdmin: boolean; canSchedule: boolean },
+  referees: boolean,
+): LiveTriggerViewer {
+  return {
+    userId: controls.viewerUserId,
+    isAdmin: controls.viewerIsAdmin,
+    manages: controls.canSchedule,
+    referees,
+  };
+}
+
+/**
  * Le lecteur peut-il changer le mode d'antenne de ce match (ou ouvrir et
  * couper son antenne) ? La règle du serveur (`mayChangeLiveTrigger`), lue sur
  * l'instantané : le propriétaire y est `liveTriggerCasterId`, nommé tant qu'il
@@ -88,38 +107,33 @@ export type LiveTriggerViewer = {
  * parti (`loadShownCasterIds`). Faux sans compte.
  */
 export function viewerMayChangeLiveTrigger(
-  match: { liveTrigger: MatchLiveTrigger | null; liveTriggerCasterId?: number | null },
-  viewer: LiveTriggerViewer,
-): boolean {
-  if (viewer.userId === null) return false;
-  return mayChangeLiveTrigger(
-    {
-      trigger: match.liveTrigger,
-      ownerId: match.liveTriggerCasterId ?? null,
-      refereeId: viewer.referees ? viewer.userId : null,
-    },
-    { userId: viewer.userId, isAdmin: viewer.isAdmin, manages: viewer.manages },
-  );
-}
-
-/**
- * Le lecteur peut-il ouvrir ou couper l'antenne de ce match ? `mayToggleOnAir`
- * lue sur l'instantané : un caster montré du match (`casters`) bascule un mode
- * sans maître. Faux sans compte.
- */
-export function viewerMayToggleOnAir(
   match: {
     liveTrigger: MatchLiveTrigger | null;
     liveTriggerCasterId?: number | null;
     casters: readonly { userId: number }[];
   },
   viewer: LiveTriggerViewer,
+  /** Le lecteur caste-t-il le match ? Par défaut : nommé parmi ses casters ; vrai à l'inscription. */
+  viewerCasts?: boolean,
 ): boolean {
   if (viewer.userId === null) return false;
-  if (viewerMayChangeLiveTrigger(match, viewer)) return true;
   const userId = viewer.userId;
-  return (match.liveTriggerCasterId ?? null) === null && match.casters.some((caster) => caster.userId === userId);
+  return mayChangeLiveTrigger(
+    {
+      trigger: match.liveTrigger,
+      ownerId: match.liveTriggerCasterId ?? null,
+      refereeId: viewer.referees ? viewer.userId : null,
+    },
+    { userId, isAdmin: viewer.isAdmin, manages: viewer.manages },
+    viewerCasts ?? match.casters.some((caster) => caster.userId === userId),
+  );
 }
+
+/**
+ * Le lecteur peut-il ouvrir ou couper l'antenne de ce match ? La règle du mode
+ * (`viewerMayChangeLiveTrigger`), comme au serveur. Faux sans compte.
+ */
+export const viewerMayToggleOnAir = viewerMayChangeLiveTrigger;
 
 /**
  * Le propriétaire à écrire quand `actor` pose `next` (`null` quand le match

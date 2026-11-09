@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   isMatchRefereeActor,
   liveTriggerOwnerAfter,
+  liveTriggerViewer,
   mayChangeLiveTrigger,
   mayToggleOnAir,
   viewerMayChangeLiveTrigger,
@@ -53,7 +54,25 @@ describe("viewerMayToggleOnAir", () => {
 
 describe("mayChangeLiveTrigger", () => {
   it("mayChangeLiveTrigger_noTriggerYet_firstCasterMayPose", () => {
-    expect(mayChangeLiveTrigger({ trigger: null, ownerId: null, refereeId: null }, { userId: 13, ...LIVE_ONLY })).toBe(true);
+    expect(mayChangeLiveTrigger({ trigger: null, ownerId: null, refereeId: null }, { userId: 13, ...LIVE_ONLY }, true)).toBe(true);
+  });
+
+  it("mayChangeLiveTrigger_noTriggerLiveOnlyNotCasting_refused", () => {
+    // Décision du 2026-11-05 : un porteur de la seule `live` ne règle que son cast.
+    expect(mayChangeLiveTrigger({ trigger: null, ownerId: null, refereeId: null }, { userId: 13, ...LIVE_ONLY }, false)).toBe(false);
+  });
+
+  it("mayChangeLiveTrigger_noTriggerStaffNotCasting_allowed", () => {
+    expect(mayChangeLiveTrigger({ trigger: null, ownerId: null, refereeId: null }, { userId: 5, ...STAFF })).toBe(true);
+  });
+
+  it("mayChangeLiveTrigger_ownerlessTriggerShownCaster_allowed", () => {
+    // Un caster qui change un mode sans maître en devient le maître (liveTriggerOwnerAfter).
+    expect(mayChangeLiveTrigger({ trigger: "AUTO", ownerId: null, refereeId: null }, { userId: 13, ...LIVE_ONLY }, true)).toBe(true);
+  });
+
+  it("mayChangeLiveTrigger_otherCastersModeEvenWhenCasting_refused", () => {
+    expect(mayChangeLiveTrigger(ownedByCaster12, { userId: 13, ...LIVE_ONLY }, true)).toBe(false);
   });
 
   it("mayChangeLiveTrigger_coCaster_refused", () => {
@@ -96,8 +115,32 @@ describe("isMatchRefereeActor", () => {
   });
 });
 
+describe("liveTriggerViewer", () => {
+  it("liveTriggerViewer_controls_mapsEveryField", () => {
+    expect(liveTriggerViewer({ viewerUserId: 7, viewerIsAdmin: true, canSchedule: false }, true)).toEqual({
+      userId: 7,
+      isAdmin: true,
+      manages: false,
+      referees: true,
+    });
+  });
+});
+
 describe("viewerMayChangeLiveTrigger", () => {
-  const match = { liveTrigger: "MANUAL" as const, liveTriggerCasterId: 12 };
+  const match = { liveTrigger: "MANUAL" as const, liveTriggerCasterId: 12, casters: [{ userId: 12 }, { userId: 13 }] };
+
+  it("viewerMayChangeLiveTrigger_unsetModeLiveOnlyNotCasting_false", () => {
+    const unset = { liveTrigger: null, liveTriggerCasterId: null, casters: [] };
+
+    expect(viewerMayChangeLiveTrigger(unset, { userId: 13, isAdmin: false, manages: false, referees: false })).toBe(false);
+  });
+
+  it("viewerMayChangeLiveTrigger_unsetModeClaimingViewer_true", () => {
+    // À l'inscription, le lecteur est jugé en caster du match.
+    const unset = { liveTrigger: null, liveTriggerCasterId: null, casters: [] };
+
+    expect(viewerMayChangeLiveTrigger(unset, { userId: 13, isAdmin: false, manages: false, referees: false }, true)).toBe(true);
+  });
 
   it("viewerMayChangeLiveTrigger_anonymous_false", () => {
     expect(viewerMayChangeLiveTrigger(match, { userId: null, isAdmin: false, manages: false, referees: false })).toBe(false);
@@ -117,10 +160,16 @@ describe("viewerMayChangeLiveTrigger", () => {
 
   it("viewerMayChangeLiveTrigger_ownerNotShownStaffViewer_true", () => {
     // Un maître tu ou parti n'est pas nommé : le mode revient au staff, comme au serveur.
-    const unnamed = { liveTrigger: "MANUAL" as const, liveTriggerCasterId: null };
+    const unnamed = { liveTrigger: "MANUAL" as const, liveTriggerCasterId: null, casters: [] };
 
     expect(viewerMayChangeLiveTrigger(unnamed, { userId: 9, isAdmin: false, manages: true, referees: false })).toBe(true);
     expect(viewerMayChangeLiveTrigger(unnamed, { userId: 13, isAdmin: false, manages: false, referees: false })).toBe(false);
+  });
+
+  it("viewerMayChangeLiveTrigger_ownerlessNamedCaster_true", () => {
+    const ownerless = { liveTrigger: "AUTO" as const, liveTriggerCasterId: null, casters: [{ userId: 13 }] };
+
+    expect(viewerMayChangeLiveTrigger(ownerless, { userId: 13, isAdmin: false, manages: false, referees: false })).toBe(true);
   });
 });
 

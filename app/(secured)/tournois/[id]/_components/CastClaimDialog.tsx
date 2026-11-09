@@ -6,7 +6,7 @@ import { useOptionalToast } from "@/components/ui/toast";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { PLATFORM_LABELS, streamPlatform, type MatchLiveTrigger } from "@/lib/shared/live-streams";
-import { viewerMayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
+import { liveTriggerViewer, viewerMayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
 import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import type { BracketMatch } from "@/lib/shared/types";
 import {
@@ -73,15 +73,16 @@ export function CastClaimDialog({
   onClaim: (body: CastClaimBody) => Promise<CastClaimOutcome>;
 }>) {
   const { t, locale } = useActionsText();
-  const { canSchedule, viewerUserId, viewerIsAdmin, refereeNames } = useLiveControls();
+  const controls = useLiveControls();
+  const { canSchedule } = controls;
   // Mode déjà posé par un autre caster : il se lit, il ne se change pas à
-  // l'inscription (`LIVE_TRIGGER_NOT_OWNED`) — le corps ne le porte pas.
-  const triggerLocked = !viewerMayChangeLiveTrigger(match, {
-    userId: viewerUserId,
-    isAdmin: viewerIsAdmin,
-    manages: canSchedule,
-    referees: viewerRefereesMatch(match, refereeNames),
-  });
+  // l'inscription (`LIVE_TRIGGER_NOT_OWNED`) — le corps ne le porte pas. Le
+  // lecteur s'inscrit : il est jugé en caster du match.
+  const triggerLocked = !viewerMayChangeLiveTrigger(
+    match,
+    liveTriggerViewer(controls, viewerRefereesMatch(match, controls.refereeNames)),
+    true,
+  );
   const game = useTournamentGame();
   const name = useId();
   const urlId = useId();

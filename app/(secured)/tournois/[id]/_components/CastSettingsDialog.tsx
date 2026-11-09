@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { offersCastRelease } from "@/lib/shared/cast-settings";
 import { canToggleOnAir, isMatchCastable, type MatchLiveTrigger } from "@/lib/shared/live-streams";
-import { viewerMayChangeLiveTrigger, viewerMayToggleOnAir } from "@/lib/shared/live-trigger-owner";
+import { liveTriggerViewer, viewerMayChangeLiveTrigger, viewerMayToggleOnAir } from "@/lib/shared/live-trigger-owner";
 import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import { canEditReplay } from "@/lib/shared/match-replay";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
@@ -83,15 +83,11 @@ export function CastSettingsDialog({
   const { t } = actionText;
   const errorsText = useErrorsText();
   const { showError, showSuccess } = useToast();
-  const { canSchedule, openReplay, viewerUserId, viewerIsAdmin, refereeNames } = useLiveControls();
-  // Le mode posé par un autre caster (ou par le staff) se lit sans se changer
+  const controls = useLiveControls();
+  const { openReplay, viewerUserId, canSchedule } = controls;
+  // Le mode posé par un autre caster se lit sans se changer
   // (`LIVE_TRIGGER_NOT_OWNED`) : un co-caster ne décide pas pour celui qui l'a posé.
-  const viewer = {
-    userId: viewerUserId,
-    isAdmin: viewerIsAdmin,
-    manages: canSchedule,
-    referees: viewerRefereesMatch(match, refereeNames),
-  };
+  const viewer = liveTriggerViewer(controls, viewerRefereesMatch(match, controls.refereeNames));
   const triggerLocked = !viewerMayChangeLiveTrigger(match, viewer);
   // L'antenne : la règle du mode, et le caster montré sur un mode sans maître.
   const airAllowed = viewerMayToggleOnAir(match, viewer);

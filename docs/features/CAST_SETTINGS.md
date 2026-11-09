@@ -140,15 +140,26 @@ caster qui le pose en devient le propriétaire (`live_trigger_user_id`). Règle
 unique, pure, `lib/shared/live-trigger-owner.ts` (`mayChangeLiveTrigger`,
 `viewerMayChangeLiveTrigger` pour l'interface) :
 
-- match pas encore casté (`live_trigger` nul) : le premier à le poser ;
 - **admin** de la plateforme ou **arbitre désigné** du match (permission
   `tournaments`, condition de l'arbitrage) : toujours ;
 - mode d'un caster : lui seul — un co-caster est refusé ;
-- mode sans propriétaire (posé par le staff, caster parti) : le staff `tournaments`.
+- match pas encore casté, ou mode sans propriétaire (posé par le staff,
+  caster parti) : le staff `tournaments` et les casters **montrés** du match ;
+  le caster qui le change en devient le maître (décision du 2026-11-05).
+
+**Porteur de la seule `live`** (ni staff `tournaments`, ni admin, ni arbitre)
+— décision du 2026-11-05 : la route `/api/admin/matches/[id]/live` garde
+`live` pour porte, mais il n'y règle que **son** cast : sans caster le match
+(en caster montré), tout réglage est refusé (`NOT_MATCH_CASTER`, 403) ; le
+lien du stream du staff ne lui est pas ouvert (`STAFF_STREAM_FORBIDDEN`, 403 —
+son lien se règle dans « Configurer ma diffusion »). Un corps sans clé
+`trigger` (ou `liveUrl`) laisse le mode (ou le lien du staff) tel quel. Les
+trois fenêtres bâtissent le lecteur par `liveTriggerViewer` ; l'inscription
+le juge en caster (`viewerCasts`).
 
 Propriétaire écrit (`liveTriggerOwnerAfter`) : le caster du match qui le pose,
-lui seul ; posé par qui ne caste pas (staff, admin, arbitre, porteur de la
-seule permission `live`, caster tu), il garde son maître montré — l'arbitre
+lui seul ; posé par qui ne caste pas (staff, admin, arbitre, caster tu), il
+garde son maître montré — l'arbitre
 médie pour le caster, il ne lui retire pas le mode — ou reste au staff s'il
 n'en avait pas (`liveTriggerOwnerAfter`). Le propriétaire
 ne compte que s'il est un caster **montré** du match (`loadShownCasterIds` au

@@ -16,7 +16,7 @@ import {
   staffStream,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
-import { viewerMayChangeLiveTrigger, viewerMayToggleOnAir } from "@/lib/shared/live-trigger-owner";
+import { liveTriggerViewer, viewerMayChangeLiveTrigger, viewerMayToggleOnAir } from "@/lib/shared/live-trigger-owner";
 import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import { canEditReplay } from "@/lib/shared/match-replay";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
@@ -173,11 +173,12 @@ export function MatchLiveDialog({
   // Libellés déjà rédigés pour le pied d'action de la carte (antenne, rediff) :
   // les mêmes mots ici, dans le seul espace qui les porte.
   const actions = useActionsText();
-  const { openReplay, viewerUserId, viewerIsAdmin, refereeNames, canSchedule, canManage } = useLiveControls();
+  const controls = useLiveControls();
+  const { openReplay, refereeNames, canManage } = controls;
   const referee = viewerRefereesMatch(match, refereeNames);
   // Même règle que le serveur (`LIVE_TRIGGER_NOT_OWNED`) : un mode verrouillé
   // se montre sans contrôle, plutôt qu'un bouton qui mène à un refus.
-  const viewer = { userId: viewerUserId, isAdmin: viewerIsAdmin, manages: canSchedule, referees: referee };
+  const viewer = liveTriggerViewer(controls, referee);
   const triggerLocked = !viewerMayChangeLiveTrigger(match, viewer);
   const linkLocked = staffLinkLocked(triggerLocked, match);
   const onAir = useMatchLiveState(match) === "LIVE";
