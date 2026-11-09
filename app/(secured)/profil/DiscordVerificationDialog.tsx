@@ -1,6 +1,5 @@
 "use client";
 
-import { takeSubmit } from "@/lib/shared/take-submit";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
@@ -20,6 +19,7 @@ import { useAppLocale } from "@/components/i18n/locale-context";
 import { DiscordInviteLink } from "./_components/DiscordInviteLink";
 import { discordVerificationErrorMessage } from "./discord-errors";
 import { ScrollArea } from "@/components/cyber";
+import { takeSubmit } from "@/lib/shared/take-submit";
 
 /** Les lignes de l'exposition, dans l'ordre du registre (`DISCORD_VERIFICATION_EXPOSURE`, testé). */
 export const EXPOSURE_KEYS = ["admins", "referees", "match", "players", "undo"] as const;

@@ -196,6 +196,8 @@ describe("vocabulaire Lier / Lié", () => {
       ["connections", "sessions", "none"],
       ["discord", "readFailed"],
       ["invitations", "gone"],
+      ["invitations", "loadFailed"],
+      ["connections", "battletagPointerMissing"],
       ["platformRoles", "nothingToSave"],
     ];
     for (const lang of ["fr", "en"] as const) {
@@ -232,6 +234,7 @@ describe("gestes refusés et reliquats du profil", () => {
     const src = read("app/(secured)/profil/page.tsx");
     expect(src).toContain('showError(t("invitations.gone"))');
     expect(src).toContain("invitationsLoaded");
+    expect(src).toContain('showError(t("invitations.loadFailed"))');
   });
 
   it("roleChangeTone_grantedAdminOrRemoved_isDanger", () => {

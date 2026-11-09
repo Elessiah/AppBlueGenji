@@ -612,3 +612,9 @@
   font-size: 14px;
   font-weight: 700;
 }
+
+/* Bouton d'action compact d'une ligne de la liste des comptes (repères, « Réessayer »). */
+.rowAction {
+  padding: 4px 12px;
+  font-size: 12px;
+}

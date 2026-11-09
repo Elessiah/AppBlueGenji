@@ -311,13 +311,21 @@ export default function ProfilePage() {
   const loadInvitations = async () => {
     try {
       const res = await fetch("/api/me/invitations", { cache: "no-store" });
-      if (!res.ok) return;
+      if (!res.ok) {
+        invitationsReadFailed();
+        return;
+      }
       const payload = (await res.json()) as { invitations?: { id: number; teamId: number; teamName: string; ownership?: boolean }[] };
       setInvitations(payload.invitations ?? []);
       setInvitationsLoaded(true);
     } catch {
-      // silencieux
+      invitationsReadFailed();
     }
+  };
+  // Une lecture ratée ne se tait que pour qui n'attend rien d'elle : un lien `#invitations`
+  // qui ne mène nulle part sans un mot est le cas à dire.
+  const invitationsReadFailed = () => {
+    if (window.location.hash === "#invitations") showError(t("invitations.loadFailed"));
   };
 
   // **Vrai dès le premier rendu** : une lecture part au montage, et partir de

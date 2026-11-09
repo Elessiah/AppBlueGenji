@@ -168,7 +168,8 @@
     "refused": "Invitation refusée.",
     "acceptLabel": "Accepter l'invitation de {team}",
     "refuseLabel": "Refuser l'invitation de {team}",
-    "gone": "Cette invitation n'existe plus : elle a été retirée ou traitée ailleurs."
+    "gone": "Cette invitation n'existe plus : elle a été retirée ou traitée ailleurs.",
+    "loadFailed": "Tes invitations n'ont pas pu être lues. Recharge la page."
   },
   "platformRoles": {
     "legend": "Mes rôles de plateforme",
@@ -399,7 +400,8 @@
     "loadFailed": "Tes comptes liés n'ont pas pu être lus.",
     "retry": "Réessayer",
     "retryLabel": "Réessayer de lire mes comptes liés",
-    "reading": "Lecture…"
+    "reading": "Lecture…",
+    "battletagPointerMissing": "Le champ « BattleTag Overwatch » n'est pas encore affiché : réessaie dans un instant."
   },
   "battletagNotice": {
     "eyebrow": "VISIBILITÉ · BATTLETAG",

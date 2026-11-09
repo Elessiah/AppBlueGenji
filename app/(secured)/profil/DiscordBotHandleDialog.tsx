@@ -1,6 +1,5 @@
 "use client";
 
-import { takeSubmit } from "@/lib/shared/take-submit";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
@@ -16,6 +15,7 @@ import { useProfileText } from "@/components/i18n/profile-text";
 import { DiscordInviteLink } from "./_components/DiscordInviteLink";
 import { discordHandleUpdateErrorMessage } from "./discord-errors";
 import { ScrollArea } from "@/components/cyber";
+import { takeSubmit } from "@/lib/shared/take-submit";
 
 const FIELD_IDS = {
   handle: "discord-bot-handle",

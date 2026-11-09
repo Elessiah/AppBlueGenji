@@ -544,12 +544,11 @@ function DiscordRetryButton({
   return (
     <button
       type="button"
-      className="btn"
+      className={`btn ${s.rowAction}`}
       onClick={() => !identity.discordReading && identity.onRetryDiscord()}
       aria-disabled={identity.discordReading || undefined}
       aria-label={busyAriaLabel(identity.discordReading, t("discord.retryLabel"))}
       aria-describedby={detailsId}
-      style={{ padding: "4px 12px", fontSize: 12 }}
     >
       {identity.discordReading ? t("discord.reading") : t("discord.retry")}
     </button>
@@ -562,14 +561,17 @@ function BattletagPointer({
   detailsId,
 }: Readonly<{ stateKey: StateKey; detailsId: string }>): React.ReactElement | null {
   const { t } = useProfileText();
+  const { showError } = useToast();
   if (stateKey !== "LINKED_NO_BATTLETAG") return null;
   return (
     <button
       type="button"
-      className="btn"
-      onClick={focusBattletagField}
+      className={`btn ${s.rowAction}`}
+      onClick={() => {
+        // Le champ n'est pas encore là (profil en lecture) : le geste le dit au lieu de se taire.
+        if (!focusBattletagField()) showError(t("connections.battletagPointerMissing"));
+      }}
       aria-describedby={detailsId}
-      style={{ padding: "4px 12px", fontSize: 12 }}
     >
       {t("connections.battletagPointer")}
     </button>
@@ -577,11 +579,12 @@ function BattletagPointer({
 }
 
 /** Amène le lecteur au champ « BattleTag Overwatch » de la section, sous la liste. */
-function focusBattletagField(): void {
+function focusBattletagField(): boolean {
   const field = document.getElementById("profile-battletag");
-  if (!field) return;
+  if (!field) return false;
   field.scrollIntoView({ block: "center" });
   field.focus();
+  return true;
 }
 
 /**
@@ -614,12 +617,11 @@ function ConnectionsUnread({
       </p>
       <button
         type="button"
-        className="btn ghost"
+        className={`btn ${s.rowAction}`}
         onClick={() => void retry()}
         aria-disabled={retrying || undefined}
         aria-label={busyAriaLabel(retrying, t("connections.retryLabel"))}
         aria-describedby="connections-load-failed"
-        style={{ padding: "4px 12px", fontSize: 12 }}
       >
         {retrying ? t("connections.reading") : t("connections.retry")}
       </button>

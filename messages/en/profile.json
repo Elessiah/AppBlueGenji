@@ -168,7 +168,8 @@
     "refused": "Invitation declined.",
     "acceptLabel": "Accept the invitation from {team}",
     "refuseLabel": "Decline the invitation from {team}",
-    "gone": "This invitation no longer exists: it was withdrawn or handled elsewhere."
+    "gone": "This invitation no longer exists: it was withdrawn or handled elsewhere.",
+    "loadFailed": "Your invitations could not be read. Reload the page."
   },
   "platformRoles": {
     "legend": "My platform roles",
@@ -399,7 +400,8 @@
     "loadFailed": "Your linked accounts could not be read.",
     "retry": "Try again",
     "retryLabel": "Try again to read my linked accounts",
-    "reading": "Reading…"
+    "reading": "Reading…",
+    "battletagPointerMissing": "The “Overwatch BattleTag” field is not shown yet: try again in a moment."
   },
   "battletagNotice": {
     "eyebrow": "VISIBILITY · BATTLETAG",
