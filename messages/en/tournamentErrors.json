@@ -124,6 +124,7 @@
     "UNAUTHORIZED": "Your session has expired. Log in again to follow the tournament in real time.",
     "INVALID_STREAM_URL": "Stream link not recognized (Twitch, YouTube or Kick expected).",
     "INVALID_LIVE_BODY": "Unreadable broadcast settings: reload the page and try again.",
+    "MATCH_NOT_STREAMED": "This match is no longer streamed: tick “This match is streamed” to set its link.",
     "INVALID_LIVE_TRIGGER": "Invalid on-air mode.",
     "LIVE_TRIGGER_NOT_MANUAL": "This match goes on air automatically: there's nothing to toggle.",
     "MATCH_NOT_LIVE_READY": "Only a playable match with no score entered can go on air.",

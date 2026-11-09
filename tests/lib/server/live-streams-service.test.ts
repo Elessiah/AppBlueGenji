@@ -223,6 +223,10 @@ describe("setMatchLiveConfig", () => {
       if (sql.startsWith("SELECT match_id, user_id, stream_id, ready_at FROM bg_match_casters")) {
         return [state.casters.map((caster) => ({ ...caster, match_id: row.id, ready_at: null }))];
       }
+      if (sql.startsWith("SELECT 1 FROM bg_match_casters WHERE stream_id = ? AND user_id <> ?")) {
+        const others = state.casters.filter((caster) => caster.stream_id === params[0] && caster.user_id !== params[1]);
+        return [others.map(() => ({ 1: 1 }))];
+      }
       if (sql.startsWith("SELECT 1 FROM bg_match_streams")) {
         // Lien de l'organisation présent ? (démarquage par la seule `live`)
         // `link_user_id: null` explicite = lien de caster dit de l'organisation.
@@ -543,13 +547,43 @@ describe("setMatchLiveConfig", () => {
     expect(reads("bg_match_casters")).toHaveLength(1);
   });
 
-  it("pose le lien sur le stream sans lien d'un caster déjà inscrit, qui devient celui du staff", async () => {
+  it("setMatchLiveConfig_emptyStreamHeldByCaster_opensStaffStreamInstead", async () => {
     const world = liveWorld(matchRow(), [dbStream(3, null)], [{ user_id: 9, stream_id: 3 }]);
     await mockLiveDb(world);
 
     await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/match", setter: ORGANISER_5, access: STAFF });
 
+    // Le stream vidé reste à son caster ; le staff ouvre le sien.
+    expect(world.state.streams).toEqual([dbStream(3, null), dbStream(4, "https://twitch.tv/match", true)]);
+  });
+
+  it("setMatchLiveConfig_emptyStreamHeldByNobody_becomesStaffStream", async () => {
+    const world = liveWorld(matchRow(), [dbStream(3, null)]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/match", setter: ORGANISER_5, access: STAFF });
+
     expect(world.state.streams).toEqual([dbStream(3, "https://twitch.tv/match", true)]);
+  });
+
+  it("setMatchLiveConfig_linkWithoutTriggerOnUnmarkedMatch_throwsMatchNotStreamed", async () => {
+    const world = liveWorld(matchRow({ live_trigger: null }));
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: undefined, liveUrl: "twitch.tv/orga", setter: ORGANISER_5, access: STAFF }),
+    ).rejects.toThrow("MATCH_NOT_STREAMED");
+    expect(world.state.streams).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_clearedLinkWithoutTriggerOnUnmarkedMatch_passes", async () => {
+    const world = liveWorld(matchRow({ live_trigger: null }));
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: undefined, liveUrl: null, setter: ORGANISER_5, access: STAFF }),
+    ).resolves.toBeDefined();
+    expect(world.state.streams).toEqual([]);
   });
 
   it("referme l'antenne en passant en AUTO — elle n'y a plus de sens", async () => {
@@ -897,6 +931,8 @@ describe("setMatchLiveConfig", () => {
     ).rejects.toThrow("STAFF_STREAM_FORBIDDEN");
     // La transaction est annulée (rollback) : rien n'est publié.
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    // Refusé avant toute écriture : le lien du staff n'a pas été touché.
+    expect(world.execute.mock.calls.some(([sql]) => String(sql).includes("UPDATE bg_match_streams"))).toBe(false);
   });
 
   it("setMatchLiveConfig_liveOnlyCasterOnOwnerlessMode_becomesOwner", async () => {

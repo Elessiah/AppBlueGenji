@@ -44,6 +44,7 @@ function mapLiveError(error: unknown) {
   if (message === "MATCH_NOT_LIVE_READY") return fail(message, 409);
   if (message === "MATCH_START_AT_REQUIRED") return fail(message, 409);
   if (message === "MATCH_NOT_CASTABLE") return fail(message, 409);
+  if (message === "MATCH_NOT_STREAMED") return fail(message, 409);
   return fail(message || "MATCH_LIVE_UPDATE_FAILED", 500);
 }
 
