@@ -52,12 +52,19 @@ tableau, manche, numéro) + **affiche** (`LEAST:GREATEST` des deux engagées),
 relue puis posée avant l'envoi : lecture **non verrouillante** du match, de son
 tournoi et de ses équipes (un `INSERT … SELECT` les verrouillerait en partage
 face au moteur qui tient le verrou du tournoi), puis `INSERT IGNORE … VALUES`
-— la clé primaire et `affectedRows` tranchent entre deux balayages — puis
-**relue encore** : un match changé entre-temps voit sa réservation rendue, et
-le passage suivant l'annonce tel qu'il est, à ses équipes du moment. La ligne
-garde l'horaire annoncé (`start_at`). Les marques de rappel posées avant
-(`INSERT IGNORE … VALUES`, sans relire le match) sont rendues si le match a
-changé, gardées si un autre balayage a pris la réservation. Ainsi :
+— la clé primaire et `affectedRows` tranchent entre deux balayages ; seul le
+contrôle de clé étrangère attend brièvement le tournoi, et une attente de
+verrou ne compte jamais comme un échec du match — puis **relue encore**
+(engagées, équipes non dissoutes, état ; pas l'horaire : un horaire posé après
+l'insertion part en « Match programmé ») : un match changé entre-temps voit sa
+réservation rendue, et le passage suivant l'annonce tel qu'il est, à ses
+équipes du moment. La ligne
+garde l'horaire annoncé (`start_at`). Les marques de rappel posées avant (une
+seule `INSERT IGNORE … VALUES`, sans relire le match) sont rendues si le match
+a changé — seulement si toutes ont été prises là —, gardées si un autre
+balayage a pris la réservation. Un match contre une équipe dissoute n'est pas
+annoncé (marqué `skipped`). Si la table ne peut être créée, les migrations le
+journalisent sans tomber, et les rappels ne l'attendent pas. Ainsi :
 
 - deux balayages concurrents, une relance : un seul envoi ;
 - un réappariement du même match avec la même affiche, ou un match effacé puis
@@ -71,8 +78,9 @@ changé, gardées si un autre balayage a pris la réservation. Ainsi :
 - destinataires lus **match par match, juste après** sa réservation (quatre
   matchs à la fois), au plus près de l'envoi : un membre parti entre-temps
   n'est plus prévenu ; une panne avant l'envoi rend la réservation et les
-  marques (le passage suivant réessaie) ; au troisième échec d'affilée, le
-  match est marqué `skipped` (ses rappels donneront l'horaire) ;
+  marques (le passage suivant réessaie) ; au troisième échec d'affilée, l'affiche
+  lue (mêmes engagées) est marquée `skipped` (ses rappels donneront l'horaire) ;
+  un match sorti des candidats oublie ses échecs ;
 - l'erreur d'un match ne retient pas les autres, l'échec d'envoi d'une équipe
   ne retient pas l'autre ; un bot injoignable consomme l'annonce (journal pm2,
   nombre de messages perdus seulement), comme les rappels — une annonce

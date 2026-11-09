@@ -1,5 +1,6 @@
 import type { Pool } from "mysql2/promise";
 import { createTable } from "../declared-tables";
+import { setNewMatchNoticesAvailable } from "../../tournaments/new-match-sql";
 
 /**
  * Place d'un match dans son tournoi (phase, tableau, manche, numéro) : la clé
@@ -154,10 +155,12 @@ ${MATCH_PLACE_COLUMNS}        team_id BIGINT NOT NULL,
   // les deux engagées sans ordre, `5:7`). La place plutôt que l'id : un match
   // effacé puis recréé avec la même affiche n'est pas réannoncé. `skipped` : match
   // déjà apparié à la mise en service (clé `new_match_notices_since` de
-  // `bg_settings`). Part avec le tournoi. Créée **sans** `catch` muet : le
-  // balayage des rappels la lit (`newMatchPendingSql`), son absence les
-  // ferait taire tous.
-  await createTable(db, `
+  // `bg_settings`). Part avec le tournoi. Un échec ne fait pas tomber la base
+  // (journal pm2) : il éteint l'annonce, et les lectures qui l'attendent
+  // (`newMatchPendingSql`, `newMatchToldSql`) cessent de la lire — les rappels
+  // partent comme avant.
+  try {
+    await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_new_match_notices (
 ${MATCH_PLACE_COLUMNS}        pairing VARCHAR(48) NOT NULL,
         skipped TINYINT(1) NOT NULL DEFAULT 0,
@@ -168,6 +171,11 @@ ${MATCH_PLACE_COLUMNS}        pairing VARCHAR(48) NOT NULL,
           REFERENCES bg_tournaments(id) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+    setNewMatchNoticesAvailable(true);
+  } catch (error) {
+    setNewMatchNoticesAvailable(false);
+    console.error("[migrations] bg_new_match_notices non créée — annonces de nouveau match éteintes", error);
+  }
 
   // Réservation d'une annonce de live sur Discord (#live, `@everyone`) : une
   // par match et par affiche (`pairing` : les deux engagés sans ordre, `5:7`)

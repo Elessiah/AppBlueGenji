@@ -49,7 +49,7 @@ import {
 } from "./reminder-marks";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 import { dispatchNewMatchNotices } from "./new-match-notices";
-import { NEW_MATCH_TOLD_SQL, newMatchPendingSql } from "./new-match-sql";
+import { newMatchPendingSql, newMatchToldSql } from "./new-match-sql";
 
 type ScheduledMatchInfoRow = RowDataPacket &
   MatchNotice & {
@@ -157,7 +157,7 @@ async function loadMatchInfo(matchId: number): Promise<ScheduledMatchInfoRow | n
             m.start_at, m.team1_id, m.team2_id,
             t.name AS tournament_name, t.participant_type, ${swissRoundSql("m", "t")},
             t1.name AS team1_name, t2.name AS team2_name,
-            ${newMatchPendingSql("NOW()")} AS new_match_pending, ${NEW_MATCH_TOLD_SQL} AS new_match_told
+            ${newMatchPendingSql("NOW()")} AS new_match_pending, ${newMatchToldSql()} AS new_match_told
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
        LEFT JOIN bg_teams t1 ON t1.id = m.team1_id

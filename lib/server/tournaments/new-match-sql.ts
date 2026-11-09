@@ -10,6 +10,18 @@
 /** L'affiche d'un match : ses deux engagées, sans ordre (`5:7`). */
 export const PAIRING_SQL = "CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))";
 
+let noticesAvailable = true;
+
+/**
+ * La table des annonces a-t-elle pu être créée ? Posé par les migrations
+ * (`database/schema/notifications.ts`). Sans elle, les rappels et « Match
+ * programmé » ne l'attendent pas (`newMatchPendingSql`, `newMatchToldSql`
+ * rendent faux) : seule l'annonce se tait.
+ */
+export function setNewMatchNoticesAvailable(available: boolean): void {
+  noticesAvailable = available;
+}
+
 /** Une réservation existe-t-elle pour la place et l'affiche du match (`extra` : condition de plus sur `n`) ? */
 function noticeAtPlaceSql(extra = ""): string {
   return `EXISTS (SELECT 1 FROM bg_new_match_notices n
@@ -51,6 +63,8 @@ export const NEW_MATCH_HEARTBEAT_MINUTES = 5;
  *            **deux fois**.
  */
 export function newMatchPendingSql(now: "NOW()" | "?"): string {
+  // Table absente : faux, en gardant le nombre de `?` attendu par l'appelant.
+  if (!noticesAvailable) return now === "?" ? "(? IS NULL AND ? IS NULL AND FALSE)" : "FALSE";
   return `(${announceableSql(now)} AND NOT ${MARKED_SQL}
   AND EXISTS (SELECT 1 FROM bg_settings hb WHERE hb.setting_key = 'new_match_sweep_at'
     AND hb.setting_value >= DATE_FORMAT(${now} - INTERVAL ${NEW_MATCH_HEARTBEAT_MINUTES} MINUTE, '%Y-%m-%d %H:%i:%s')))`;
@@ -60,4 +74,6 @@ export function newMatchPendingSql(now: "NOW()" | "?"): string {
  * L'annonce de nouveau match envoyée pour cette affiche portait déjà l'horaire
  * actuel du match : « Match programmé » ne la double pas.
  */
-export const NEW_MATCH_TOLD_SQL = noticeAtPlaceSql(" AND n.skipped = 0 AND n.start_at <=> m.start_at");
+export function newMatchToldSql(): string {
+  return noticesAvailable ? noticeAtPlaceSql(" AND n.skipped = 0 AND n.start_at <=> m.start_at") : "FALSE";
+}

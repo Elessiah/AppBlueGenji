@@ -32,7 +32,7 @@
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { failureReason } from "@/lib/server/failure-reason";
-import { isMissingTableError } from "@/lib/server/mysql-errors";
+import { isContentionError, isMissingTableError } from "@/lib/server/mysql-errors";
 import {
   loadEntrantPlayerIds,
   loadNotificationRecipients,
@@ -79,6 +79,9 @@ export type NewMatchCandidateRow = RowDataPacket & {
   team2_name: string;
   team1_ghost: number;
   team2_ghost: number;
+  /** L'équipe a été dissoute (`deleted_at`) : le match n'est pas annoncé. */
+  team1_deleted: number;
+  team2_deleted: number;
 };
 
 /** Clé `bg_settings` : instant de mise en service des annonces. */
@@ -154,9 +157,11 @@ export async function installNewMatchNotices(db: Pool): Promise<void> {
  * Le palier du check-in (10 h) n'est **jamais** pris ici : l'annonce ne porte
  * pas le check-in, le rappel de 10 h le portera.
  *
- * Insertion de valeurs, sans relire le match (un `INSERT … SELECT` le
- * verrouillerait en partage face au moteur) : c'est la réservation qui suit qui
- * relit le match, et ses marques sont rendues si elle échoue.
+ * Une seule insertion de valeurs, sans relire le match : c'est la réservation
+ * qui suit qui le relit. Les marques ne sont dites prises ici (à rendre si le
+ * match a changé) que si **toutes** l'ont été ; sinon une autre écriture en
+ * tenait déjà, et aucune n'est rendue (les marques suivent l'horaire et
+ * l'affiche : un changement les remet de toute façon à zéro).
  *
  * @returns les marques prises ici, à rendre si la réservation échoue.
  */
@@ -173,15 +178,12 @@ export async function coverMatchSchedule(
       .map((offset) => offset.key)
       .filter((key) => key !== CHECK_IN_REMINDER_KEY),
   ];
-  const claimed: string[] = [];
-  for (const key of keys) {
-    const [result] = await db.execute(
-      `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at) VALUES (?, ?, ?)`,
-      [Number(row.id), key, row.start_at],
-    );
-    if ((result as { affectedRows?: number }).affectedRows === 1) claimed.push(key);
-  }
-  return claimed;
+  const [result] = await db.query(
+    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)
+     VALUES ${keys.map(() => "(?, ?, ?)").join(", ")}`,
+    keys.flatMap((key) => [Number(row.id), key, row.start_at]),
+  );
+  return (result as { affectedRows?: number }).affectedRows === keys.length ? keys : [];
 }
 
 async function loadCandidates(db: Pool): Promise<NewMatchCandidateRow[]> {
@@ -189,7 +191,8 @@ async function loadCandidates(db: Pool): Promise<NewMatchCandidateRow[]> {
     `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.team1_id, m.team2_id, m.start_at,
             t.name AS tournament_name, t.participant_type, ${swissRoundSql("m", "t")},
             t1.name AS team1_name, t2.name AS team2_name,
-            t1.is_ghost AS team1_ghost, t2.is_ghost AS team2_ghost
+            t1.is_ghost AS team1_ghost, t2.is_ghost AS team2_ghost,
+            t1.deleted_at IS NOT NULL AS team1_deleted, t2.deleted_at IS NOT NULL AS team2_deleted
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
        JOIN bg_teams t1 ON t1.id = m.team1_id
@@ -203,25 +206,26 @@ async function loadCandidates(db: Pool): Promise<NewMatchCandidateRow[]> {
 
 /**
  * Le match est-il toujours celui qui a été lu — mêmes engagées (existantes,
- * fantômes ou non comme lues), même horaire — et reste-t-il à annoncer ?
- * Lecture simple, non verrouillante.
+ * non dissoutes, fantômes ou non comme lues), même horaire (`withStart`) — et
+ * reste-t-il à annoncer ? Lecture simple, non verrouillante.
  *
  * @returns sa place, ou `null` s'il a changé.
  */
-async function currentPlace(db: Pool, row: NewMatchCandidateRow): Promise<PlaceRow | null> {
+async function currentPlace(db: Pool, row: NewMatchCandidateRow, withStart: boolean): Promise<PlaceRow | null> {
   const [places] = await db.execute<PlaceRow[]>(
     `${PLACE_SELECT}
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
-      WHERE m.id = ? AND m.team1_id = ? AND m.team2_id = ? AND m.start_at <=> ?
-        AND t1.is_ghost = ? AND t2.is_ghost = ? AND ${ANNOUNCEABLE_SQL}`,
+      WHERE m.id = ? AND m.team1_id = ? AND m.team2_id = ?${withStart ? " AND m.start_at <=> ?" : ""}
+        AND t1.is_ghost = ? AND t2.is_ghost = ? AND t1.deleted_at IS NULL AND t2.deleted_at IS NULL
+        AND ${ANNOUNCEABLE_SQL}`,
     [
       Number(row.id),
       Number(row.team1_id),
       Number(row.team2_id),
-      row.start_at,
+      ...(withStart ? [row.start_at] : []),
       Number(row.team1_ghost),
       Number(row.team2_ghost),
     ],
@@ -235,22 +239,31 @@ function placeParams(place: PlaceRow): Array<string | number> {
 
 const PLACE_WHERE = `tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? AND match_number = ? AND pairing = ?`;
 
-/** Issue d'une réservation : prise, match changé depuis la lecture, ou déjà prise ailleurs. */
-export type NewMatchClaim = { kind: "claimed"; place: PlaceRow } | { kind: "changed" } | { kind: "taken" };
+/**
+ * Issue d'une réservation : prise ; match changé avant (`changed`) ou après
+ * l'insertion (`stale`, réservation à rendre) ; déjà prise ailleurs (`taken`).
+ */
+export type NewMatchClaim =
+  | { kind: "claimed"; place: PlaceRow }
+  | { kind: "stale"; place: PlaceRow }
+  | { kind: "changed" }
+  | { kind: "taken" };
 
 /**
  * Réserve l'annonce **si le match est toujours celui qui a été lu**, puis le
- * relit : un réappariement, un score, un horaire posé ou une équipe supprimée
- * entre la lecture et la réservation — ou entre la relecture et l'insertion —
- * rend la réservation (`changed`), et le passage suivant annonce le match tel
- * qu'il est, à ses équipes du moment. Lectures simples (non verrouillantes) et
- * insertion de valeurs : un `INSERT … SELECT` verrouillerait en partage le
- * match et le tournoi, face au moteur qui tient le verrou du tournoi. La clé
+ * relit : un réappariement, un score, un lancement ou une équipe supprimée ou
+ * dissoute après l'insertion rend la réservation (`stale`), et le passage
+ * suivant annonce le match tel qu'il est, à ses équipes du moment. Un horaire
+ * posé après l'insertion ne la rend pas : « Match programmé » le dira (la
+ * réservation est visible, l'annonce porte l'ancien horaire). Lectures
+ * simples (non verrouillantes) et insertion de valeurs — l'insertion attend
+ * seulement, brièvement, le contrôle de clé étrangère sur le tournoi ; pas de
+ * verrou partagé tenu sur le match ou le tournoi par une lecture. La clé
  * primaire tranche seule entre deux balayages concurrents (`taken`). L'horaire
  * annoncé est gardé (`start_at`) : « Match programmé » ne le redit pas.
  */
 export async function claimNewMatchNotice(db: Pool, row: NewMatchCandidateRow): Promise<NewMatchClaim> {
-  const place = await currentPlace(db, row);
+  const place = await currentPlace(db, row, true);
   if (!place) return { kind: "changed" };
   const [result] = await db.execute(
     `INSERT IGNORE INTO bg_new_match_notices
@@ -259,9 +272,7 @@ export async function claimNewMatchNotice(db: Pool, row: NewMatchCandidateRow): 
     [...placeParams(place), row.start_at],
   );
   if ((result as { affectedRows?: number }).affectedRows !== 1) return { kind: "taken" };
-  if (await currentPlace(db, row)) return { kind: "claimed", place };
-  await dropReservation(db, place);
-  return { kind: "changed" };
+  return (await currentPlace(db, row, false)) ? { kind: "claimed", place } : { kind: "stale", place };
 }
 
 async function dropReservation(db: Pool, place: PlaceRow): Promise<void> {
@@ -343,24 +354,52 @@ const failures = new Map<number, number>();
  * marqué `skipped` : il ne retient plus ses rappels, qui donneront l'horaire.
  */
 async function noteFailure(db: Pool, row: NewMatchCandidateRow, error: unknown): Promise<void> {
+  // Une attente de verrou (le moteur écrivait) n'est pas une panne du match.
+  if (isContentionError(error)) {
+    console.error(`[new-match] annonce différée (match ${row.id}, verrou)`, failureReason(error));
+    return;
+  }
   const count = (failures.get(Number(row.id)) ?? 0) + 1;
   failures.set(Number(row.id), count);
   console.error(`[new-match] annonce en échec (match ${row.id}, essai ${count})`, failureReason(error));
   if (count < NEW_MATCH_MAX_FAILURES) return;
   failures.delete(Number(row.id));
   try {
-    const [places] = await db.execute<PlaceRow[]>(`${PLACE_SELECT} FROM bg_matches m WHERE m.id = ?`, [Number(row.id)]);
-    const place = places[0];
-    if (!place) return;
-    await db.execute(
-      `INSERT IGNORE INTO bg_new_match_notices
-         (tournament_id, phase_id, bracket, round_number, match_number, pairing, skipped)
-       VALUES (?, ?, ?, ?, ?, ?, 1)`,
-      placeParams(place),
-    );
+    await markSkipped(db, row);
   } catch (giveUpError) {
     console.error(`[new-match] abandon non marqué (match ${row.id})`, failureReason(giveUpError));
   }
+}
+
+/**
+ * Marque `skipped` l'affiche **lue** (mêmes engagées) : un match réapparié
+ * entre-temps garde sa nouvelle affiche à annoncer.
+ */
+async function markSkipped(db: Pool, row: NewMatchCandidateRow): Promise<void> {
+  const [places] = await db.execute<PlaceRow[]>(
+    `${PLACE_SELECT} FROM bg_matches m WHERE m.id = ? AND m.team1_id = ? AND m.team2_id = ?`,
+    [Number(row.id), Number(row.team1_id), Number(row.team2_id)],
+  );
+  const place = places[0];
+  if (!place) return;
+  await db.execute(
+    `INSERT IGNORE INTO bg_new_match_notices
+       (tournament_id, phase_id, bracket, round_number, match_number, pairing, skipped)
+     VALUES (?, ?, ?, ?, ?, ?, 1)`,
+    placeParams(place),
+  );
+}
+
+/** Rendu au mieux, chaque geste à part : l'échec de l'un n'empêche pas l'autre. */
+async function undoClaim(db: Pool, row: NewMatchCandidateRow, reserved: PlaceRow | null, covered: string[]) {
+  if (reserved) {
+    try {
+      await dropReservation(db, reserved);
+    } catch (error) {
+      console.error(`[new-match] réservation non rendue (match ${row.id})`, failureReason(error));
+    }
+  }
+  if (row.start_at !== null) await releaseDatedMarks(Number(row.id), covered, row.start_at);
 }
 
 /**
@@ -375,12 +414,18 @@ async function sweepOne(db: Pool, row: NewMatchCandidateRow): Promise<number> {
   let covered: string[] = [];
   let reserved: PlaceRow | null = null;
   try {
+    // Une équipe dissoute : rien à annoncer (son nom n'est plus qu'un
+    // libellé), et le match ne retient pas ses rappels.
+    if (Number(row.team1_deleted) === 1 || Number(row.team2_deleted) === 1) {
+      await markSkipped(db, row);
+      return 0;
+    }
     covered = await coverMatchSchedule(db, row);
     const claim = await claimNewMatchNotice(db, row);
     // Prise ailleurs : ce balayage-là s'en charge, avec les marques qu'il tient.
     if (claim.kind === "taken") return 0;
-    if (claim.kind === "changed") {
-      if (row.start_at !== null) await releaseDatedMarks(Number(row.id), covered, row.start_at);
+    if (claim.kind !== "claimed") {
+      await undoClaim(db, row, claim.kind === "stale" ? claim.place : null, covered);
       return 0;
     }
     reserved = claim.place;
@@ -392,12 +437,7 @@ async function sweepOne(db: Pool, row: NewMatchCandidateRow): Promise<number> {
     failures.delete(Number(row.id));
     return await announce(row, playersByTeam, recipientsById);
   } catch (error) {
-    try {
-      if (reserved) await dropReservation(db, reserved);
-      if (row.start_at !== null) await releaseDatedMarks(Number(row.id), covered, row.start_at);
-    } catch {
-      // Rendu au mieux : le journal ci-dessous dit l'échec.
-    }
+    await undoClaim(db, row, reserved, covered);
     await noteFailure(db, row, error);
     return 0;
   }
@@ -437,6 +477,11 @@ async function sweepNewMatches(): Promise<number> {
     announced += await sweepOne(db, row);
   });
   lastRunOk = true;
+  // Un match sorti des candidats (joué, lancé, réapparié) oublie ses échecs.
+  const current = new Set(candidates.map((row) => Number(row.id)));
+  for (const matchId of failures.keys()) {
+    if (!current.has(matchId)) failures.delete(matchId);
+  }
   // Lot plein : il en reste peut-être, le passage suivant les prendra.
   if (candidates.length === NEW_MATCH_BATCH) sweeps.schedule(NEW_MATCH_THROTTLE_MS);
   return announced;
