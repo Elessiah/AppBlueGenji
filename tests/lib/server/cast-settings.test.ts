@@ -81,15 +81,18 @@ describe("setCasterStreamUrl", () => {
     expect(execute.mock.calls[2]).toEqual([expect.stringContaining("SET live_url = ?"), ["https://twitch.tv/neuf", 900, 5]]);
   });
 
-  it("setCasterStreamUrl_staffReplacesCoCasterLink_writesWithoutHolderRead", async () => {
+  it("setCasterStreamUrl_staffReplacesCoCasterLinkStillOnStream_throwsCastStreamNotOwned", async () => {
+    // Le staff qui co-caste ne réécrit pas, par la route du caster, la chaîne d'un autre caster.
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[{ id: 5, match_id: 42, live_url: "https://twitch.tv/autre", staff_owned: 0 }], []])
-      .mockResolvedValue([{ affectedRows: 1 }, []]);
+      .mockResolvedValueOnce([[{ link_user_id: 901 }], []])
+      .mockResolvedValueOnce([[{ 1: 1 }], []]);
 
-    await setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/neuf", 900, true);
-
-    expect(execute).toHaveBeenCalledTimes(2);
+    await expect(setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/neuf", 900, true)).rejects.toThrow(
+      "CAST_STREAM_NOT_OWNED",
+    );
+    expect(execute).toHaveBeenCalledTimes(3);
   });
 
   it("setCasterStreamUrl_liveOnlyDressesStreamWithoutLink_writesWithoutHolderRead", async () => {
@@ -107,11 +110,12 @@ describe("setCasterStreamUrl", () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[{ id: 5, match_id: 42, live_url: "https://twitch.tv/org", staff_owned: 0 }], []])
+      .mockResolvedValueOnce([[{ link_user_id: null }], []])
       .mockResolvedValue([{ affectedRows: 1 }, []]);
 
     await setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/neuf", 900, true);
 
-    expect(execute.mock.calls[1]).toEqual([expect.stringContaining("SET live_url = ?"), ["https://twitch.tv/neuf", 900, 5]]);
+    expect(execute.mock.calls[2]).toEqual([expect.stringContaining("SET live_url = ?"), ["https://twitch.tv/neuf", 900, 5]]);
   });
 });
 

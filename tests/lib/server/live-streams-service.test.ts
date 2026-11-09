@@ -483,6 +483,35 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.matchWrites).toEqual([]);
   });
 
+  it("setMatchLiveConfig_playedMarkedMatchEmptyBody_throwsMatchNotCastable", async () => {
+    // Un corps qui ne change rien (ni mode, ni lien du staff, ni lien de caster) n'ouvre pas un match joué.
+    const world = liveWorld(
+      matchRow({ status: "COMPLETED", live_trigger: "AUTO", live_trigger_user_id: 12 }),
+      [dbStream(1, "https://twitch.tv/x", true), dbStream(4, null)],
+      [{ user_id: 12, stream_id: 1 }],
+    );
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: undefined, liveUrl: undefined, setter: CASTER_12, access: LIVE_ONLY }),
+    ).rejects.toThrow("MATCH_NOT_CASTABLE");
+    expect(world.state.streams).toHaveLength(2);
+    expect(world.state.matchWrites).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_playedMarkedMatchEmptyStreamLinks_throwsMatchNotCastable", async () => {
+    const world = liveWorld(
+      matchRow({ status: "AWAITING_CONFIRMATION", live_trigger: "AUTO", live_trigger_user_id: 12 }),
+      [dbStream(1, "https://twitch.tv/x", true), dbStream(4, null)],
+    );
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: undefined, liveUrl: undefined, setter: ORGANISER_5, access: STAFF, streamLinks: [] }),
+    ).rejects.toThrow("MATCH_NOT_CASTABLE");
+    expect(world.state.streams).toHaveLength(2);
+  });
+
   it("setMatchLiveConfig_playedUnmarkedMatchCasterLinksOnly_throwsMatchNotCastable", async () => {
     const world = liveWorld(matchRow({ status: "COMPLETED", kept_referee_user_id: 9 }), [dbStream(4, "https://kick.com/voix")], [
       { user_id: 12, stream_id: 4 },

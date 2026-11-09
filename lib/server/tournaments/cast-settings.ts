@@ -197,8 +197,8 @@ async function castTriggerHold(connection: PoolConnection, row: LaunchMatchRow, 
  *
  * Jamais celui du staff (`casterStreamEditable`) : un caster qui a rejoint « le
  * stream du match » lit la chaîne de l'organisation, il ne la réécrit pas
- * (`CAST_STREAM_NOT_OWNED`) ; ni, sans `tournaments`, le lien qu'un co-caster
- * encore sur le stream a fourni (celui d'un caster parti se reprend). Le lien posé lui est rattaché (`link_user_id`) et
+ * (`CAST_STREAM_NOT_OWNED`) ; ni le lien qu'un co-caster encore sur le stream
+ * a fourni, staff compris (celui d'un caster parti se reprend). Le lien posé lui est rattaché (`link_user_id`) et
  * part avec son compte (`withdrawUserCasts`) : un caster ne dit jamais un lien
  * « de l'organisation » (décision du 2026-11-09), seul le staff le fait dans la
  * configuration du direct (`setMatchLiveConfig`).
@@ -230,11 +230,14 @@ export async function setCasterStreamUrl(
   // la configuration du staff (`planStaffStreamUrl` puis `applyStaffStreamPlan`, live-streams.ts).
   if (target.liveUrl === url) return streams;
   // Un lien dit de l'organisation ne se remplace que par le staff : la seule
-  // `live` ne l'efface pas en posant le sien. Pas plus le lien qu'un co-caster
-  // encore sur ce stream a fourni : il pointe sa chaîne, et lui est rattaché.
-  if (!manages && target.liveUrl !== null) {
+  // `live` ne l'efface pas en posant le sien. Le lien qu'un co-caster encore sur
+  // ce stream a fourni pointe sa chaîne, et lui est rattaché : nul ne le
+  // remplace par cette route, staff compris (l'arbitre le corrige dans la
+  // configuration du direct).
+  if (target.liveUrl !== null) {
     const holderId = await streamLinkHolder(connection, streamId);
-    if (holderId === null || (holderId !== linkUserId && (await castsStream(connection, matchId, streamId, holderId)))) {
+    const ownedByOrganisation = holderId === null;
+    if (ownedByOrganisation ? !manages : holderId !== linkUserId && (await castsStream(connection, matchId, streamId, holderId))) {
       throw new Error("CAST_STREAM_NOT_OWNED");
     }
   }

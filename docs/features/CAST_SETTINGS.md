@@ -62,8 +62,9 @@ Fenêtre du caster, sur **son** cast :
 - **lien de sa chaîne** — celui du stream qu'il tient ; le stream du staff se
   lit seulement (`CAST_STREAM_NOT_OWNED` au serveur, champ en lecture seule avec
   sa note dans la fenêtre). Le lien qu'un co-caster encore sur le stream a
-  fourni ne se remplace que par lui ou le staff `tournaments`
-  (`CAST_STREAM_NOT_OWNED`) ; celui d'un caster parti se reprend. Le lien reste
+  fourni ne se remplace que par lui (`CAST_STREAM_NOT_OWNED`, staff compris :
+  l'arbitre le corrige dans la configuration du direct) ; celui d'un caster
+  parti se reprend. Le lien reste
   obligatoire : pour s'en défaire, on ne caste plus (un `liveUrl` vide ou nul :
   `STREAM_URL_REQUIRED`) ;
 - **passage à l'antenne** du match (`AUTO` / `START_TIME` / `MANUAL`), avec la

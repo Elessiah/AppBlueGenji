@@ -63,6 +63,47 @@ describe("POST /api/matches/[matchId]/ready", () => {
     expect(setMatchReady).not.toHaveBeenCalled();
   });
 
+  it("readyPost_brokenJson_returns400InvalidReadyValue", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    const req = new Request("http://localhost/api/matches/42/ready", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{pas du json",
+    });
+    const res = await readyPost(req, params("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_READY_VALUE" });
+    expect(setMatchReady).not.toHaveBeenCalled();
+  });
+
+  it("readyPost_jsonNull_returns400InvalidReadyValue", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    const res = await readyPost(jsonRequest("POST", null), params("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_READY_VALUE" });
+  });
+
+  it("readyPost_payloadTooLarge_returns413", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    const res = await readyPost(jsonRequest("POST", { ready: true, pad: "x".repeat(300 * 1024) }), params("42"));
+    expect(res.status).toBe(413);
+    await expect(res.json()).resolves.toEqual({ error: "PAYLOAD_TOO_LARGE" });
+    expect(setMatchReady).not.toHaveBeenCalled();
+  });
+
+  it("readyPost_nonJsonContentType_returns415", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    const req = new Request("http://localhost/api/matches/42/ready", {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: JSON.stringify({ ready: true }),
+    });
+    const res = await readyPost(req, params("42"));
+    expect(res.status).toBe(415);
+    await expect(res.json()).resolves.toEqual({ error: "UNSUPPORTED_CONTENT_TYPE" });
+    expect(setMatchReady).not.toHaveBeenCalled();
+  });
+
   it("transmet le « Prêt » et rend l'issue", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(setMatchReady).mockResolvedValue({ launched: true });

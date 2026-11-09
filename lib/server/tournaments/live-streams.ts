@@ -265,8 +265,10 @@ export async function setMatchLiveConfig(
   // celui du match, relu sous le verrou.
   const row = await loadMatchLiveRow(matchId);
   const requested = config.trigger === undefined ? (row.live_trigger ?? null) : config.trigger;
-  // Ni mode ni lien du staff envoyés : seuls les liens des casters changent.
-  const keepsMode = config.trigger === undefined && config.liveUrl === undefined;
+  // Ni mode ni lien du staff envoyés, mais des liens de casters : seuls eux
+  // changent. Un corps qui ne change rien n'ouvre pas un match joué.
+  const keepsMode =
+    config.trigger === undefined && config.liveUrl === undefined && (config.streamLinks?.length ?? 0) > 0;
   assertConfigurable(row, requested, keepsMode);
   // Un mode inchangé (renvoyé tel quel par une fenêtre où il est verrouillé)
   // ne redemande pas sa date : retirée depuis par le staff, elle bloquerait
