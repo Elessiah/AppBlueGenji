@@ -98,13 +98,19 @@ export function parseCastSettings(body: unknown): CastSettings | null {
 }
 
 /**
- * Le corps d'un caster dit-il son lien « de l'organisation »
- * (`organisationLink: true`) ? Un caster ne le dit jamais (décision du
- * 2026-11-09), seul le staff le fait dans la configuration du direct : la
- * route le refuse (403 `STAFF_STREAM_FORBIDDEN`), jamais en silence.
- * `false` — sa propre chaîne, ce que vaut tout lien de caster — passe : une
- * fenêtre ouverte avant la mise à jour l'envoie encore.
+ * Refus que vaut la clé `organisationLink` d'un corps de caster, ou `null`.
+ * Un caster ne dit jamais son lien « de l'organisation » (décision du
+ * 2026-11-09), seul le staff le fait dans la configuration du direct : `true`
+ * est refusé (403 `STAFF_STREAM_FORBIDDEN`), jamais en silence. `false` — sa
+ * propre chaîne, ce que vaut tout lien de caster — passe : une fenêtre ouverte
+ * avant la mise à jour l'envoie encore. Toute autre valeur (`"true"`, `1`,
+ * `null`…) est illisible (400 `INVALID_ORGANISATION_LINK`), comme sur la
+ * route de la configuration du direct.
  */
-export function castBodyNamesOrganisationLink(body: unknown): boolean {
-  return typeof body === "object" && body !== null && (body as { organisationLink?: unknown }).organisationLink === true;
+export function castOrganisationLinkRefusal(body: unknown): { code: string; status: number } | null {
+  if (typeof body !== "object" || body === null || !("organisationLink" in body)) return null;
+  const value = (body as { organisationLink: unknown }).organisationLink;
+  if (value === false) return null;
+  if (value === true) return { code: "STAFF_STREAM_FORBIDDEN", status: 403 };
+  return { code: "INVALID_ORGANISATION_LINK", status: 400 };
 }

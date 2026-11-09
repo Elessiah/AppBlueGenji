@@ -26,7 +26,7 @@ import { dispatchMatchVoiceChannels } from "@/lib/server/tournaments/match-voice
 import { dispatchLobbyBriefs } from "@/lib/server/tournaments/lobby-brief";
 import { GET as contactsGet } from "@/app/api/matches/[matchId]/contacts/route";
 import type { LaunchSide, MatchLaunchInfo } from "@/lib/shared/match-launch";
-import { castBodyNamesOrganisationLink, parseCastSettings } from "@/lib/server/tournaments/match-launch-routes";
+import { castOrganisationLinkRefusal, parseCastSettings } from "@/lib/server/tournaments/match-launch-routes";
 import { authUser } from "../../helpers/auth-user";
 
 const player = authUser({ id: 2, roles: [] });
@@ -158,6 +158,17 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
     );
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toMatchObject({ error: "STAFF_STREAM_FORBIDDEN" });
+    expect(claimMatchCast).not.toHaveBeenCalled();
+  });
+
+  it("casterPost_organisationLinkNotBoolean_returns400InvalidOrganisationLink", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    const res = await casterPost(
+      jsonRequest("POST", { liveUrl: "https://twitch.tv/voix", organisationLink: "true" }),
+      params("42"),
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_ORGANISATION_LINK" });
     expect(claimMatchCast).not.toHaveBeenCalled();
   });
 
@@ -467,22 +478,31 @@ describe("GET /api/matches/[matchId]/contacts", () => {
   });
 });
 
-describe("castBodyNamesOrganisationLink / parseCastSettings — décision D7 du 2026-11-09", () => {
-  it("castBodyNamesOrganisationLink_organisationLinkTrue_returnsTrue", () => {
-    expect(castBodyNamesOrganisationLink({ organisationLink: true })).toBe(true);
+describe("castOrganisationLinkRefusal / parseCastSettings — décision D7 du 2026-11-09", () => {
+  it("castOrganisationLinkRefusal_organisationLinkTrue_returns403StaffStreamForbidden", () => {
+    expect(castOrganisationLinkRefusal({ organisationLink: true })).toEqual({ code: "STAFF_STREAM_FORBIDDEN", status: 403 });
   });
 
-  it("castBodyNamesOrganisationLink_organisationLinkFalseFromOldTab_returnsFalse", () => {
-    expect(castBodyNamesOrganisationLink({ organisationLink: false })).toBe(false);
+  it("castOrganisationLinkRefusal_organisationLinkFalseFromOldTab_returnsNull", () => {
+    expect(castOrganisationLinkRefusal({ organisationLink: false })).toBeNull();
   });
 
-  it("castBodyNamesOrganisationLink_bodyWithoutKey_returnsFalse", () => {
-    expect(castBodyNamesOrganisationLink({ trigger: "AUTO" })).toBe(false);
+  it("castOrganisationLinkRefusal_bodyWithoutKey_returnsNull", () => {
+    expect(castOrganisationLinkRefusal({ trigger: "AUTO" })).toBeNull();
   });
 
-  it("castBodyNamesOrganisationLink_notAnObject_returnsFalse", () => {
-    expect(castBodyNamesOrganisationLink(null)).toBe(false);
-    expect(castBodyNamesOrganisationLink("organisationLink")).toBe(false);
+  it("castOrganisationLinkRefusal_notAnObject_returnsNull", () => {
+    expect(castOrganisationLinkRefusal(null)).toBeNull();
+    expect(castOrganisationLinkRefusal("organisationLink")).toBeNull();
+  });
+
+  it.each<[string, unknown]>([
+    ["chaîne true", "true"],
+    ["nombre 1", 1],
+    ["null", null],
+    ["objet", {}],
+  ])("castOrganisationLinkRefusal_%s_returns400InvalidOrganisationLink", (_label, value) => {
+    expect(castOrganisationLinkRefusal({ organisationLink: value })).toEqual({ code: "INVALID_ORGANISATION_LINK", status: 400 });
   });
 
   it("parseCastSettings_organisationLinkPresent_neverSetsOrigin", () => {

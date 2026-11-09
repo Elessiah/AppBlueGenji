@@ -61,8 +61,11 @@ Fenêtre du caster, sur **son** cast :
 
 - **lien de sa chaîne** — celui du stream qu'il tient ; le stream du staff se
   lit seulement (`CAST_STREAM_NOT_OWNED` au serveur, champ en lecture seule avec
-  sa note dans la fenêtre). Le lien reste obligatoire : pour s'en défaire, on ne
-  caste plus (un `liveUrl` vide ou nul : `STREAM_URL_REQUIRED`) ;
+  sa note dans la fenêtre). Le lien qu'un co-caster encore sur le stream a
+  fourni ne se remplace que par lui ou le staff `tournaments`
+  (`CAST_STREAM_NOT_OWNED`) ; celui d'un caster parti se reprend. Le lien reste
+  obligatoire : pour s'en défaire, on ne caste plus (un `liveUrl` vide ou nul :
+  `STREAM_URL_REQUIRED`) ;
 - **passage à l'antenne** du match (`AUTO` / `START_TIME` / `MANUAL`), avec la
   même garde que la fenêtre du staff : `START_TIME` demande une date de début
   (`MATCH_START_AT_REQUIRED`) ;
@@ -133,7 +136,8 @@ cette fenêtre et à celle du staff.
 
 Un corps qui dit `organisationLink: true` (quel que soit le lecteur) : 403
 `STAFF_STREAM_FORBIDDEN`, jamais ignoré en silence ; `false` (sa propre chaîne,
-qu'envoie encore une fenêtre ouverte avant la mise à jour) passe sans effet. Les refus des réglages portent leur code
+qu'envoie encore une fenêtre ouverte avant la mise à jour) passe sans effet ; toute
+autre valeur (`"true"`, `1`, `null`) : 400 `INVALID_ORGANISATION_LINK`. Les refus des réglages portent leur code
 (`tournamentErrors.json` FR et EN, `LAUNCH_ERROR_MESSAGES`) :
 `STREAM_URL_REQUIRED`, `INVALID_CAST_BATTLETAG`, `CAST_STREAM_NOT_OWNED`,
 `INVALID_CAST_SETTINGS`, `MATCH_NOT_CASTABLE`, `MATCH_START_AT_REQUIRED`.

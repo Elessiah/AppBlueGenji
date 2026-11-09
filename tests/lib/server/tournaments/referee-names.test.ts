@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database", () => ({ withConnection: jest.fn() }));
-jest.mock("@/lib/server/cache", () => ({ cached: jest.fn() }));
+jest.mock("@/lib/server/cache", () => ({ cached: jest.fn(), invalidateCachedPrefix: jest.fn() }));
 
-import { cached } from "@/lib/server/cache";
+import { cached, invalidateCachedPrefix } from "@/lib/server/cache";
 import { withConnection } from "@/lib/server/database";
-import { loadRefereeNames, markViewerReferee, refereeKey, withoutRefereeKeys } from "@/lib/server/tournaments/referee-names";
+import { forgetRefereeNames, loadRefereeNames, markViewerReferee, refereeKey, withoutRefereeKeys } from "@/lib/server/tournaments/referee-names";
 import { bracketMatch } from "../../../helpers/bracket-match";
 import { connectionMock, fakeConnection } from "../../../helpers/sql-double";
 import { tournamentCard } from "../../../helpers/tournament-card";
@@ -198,5 +198,13 @@ describe("markViewerReferee", () => {
     const names = [{ matchId: 5, refereeKey: refereeKey(5, 9), pseudo: "Arbitre" }];
 
     expect(markViewerReferee(names, 3, [])).toBe(names);
+  });
+});
+
+describe("forgetRefereeNames", () => {
+  it("forgetRefereeNames_called_invalidatesRefereeNamesPrefix", () => {
+    forgetRefereeNames();
+
+    expect(invalidateCachedPrefix).toHaveBeenCalledWith("referee-names:");
   });
 });

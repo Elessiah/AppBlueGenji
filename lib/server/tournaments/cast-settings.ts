@@ -197,7 +197,8 @@ async function castTriggerHold(connection: PoolConnection, row: LaunchMatchRow, 
  *
  * Jamais celui du staff (`casterStreamEditable`) : un caster qui a rejoint « le
  * stream du match » lit la chaîne de l'organisation, il ne la réécrit pas
- * (`CAST_STREAM_NOT_OWNED`). Le lien posé lui est rattaché (`link_user_id`) et
+ * (`CAST_STREAM_NOT_OWNED`) ; ni, sans `tournaments`, le lien qu'un co-caster
+ * encore sur le stream a fourni (celui d'un caster parti se reprend). Le lien posé lui est rattaché (`link_user_id`) et
  * part avec son compte (`withdrawUserCasts`) : un caster ne dit jamais un lien
  * « de l'organisation » (décision du 2026-11-09), seul le staff le fait dans la
  * configuration du direct (`setMatchLiveConfig`).
@@ -229,15 +230,28 @@ export async function setCasterStreamUrl(
   // la configuration du staff (`planStaffStreamUrl` puis `applyStaffStreamPlan`, live-streams.ts).
   if (target.liveUrl === url) return streams;
   // Un lien dit de l'organisation ne se remplace que par le staff : la seule
-  // `live` ne l'efface pas en posant le sien.
-  if (!manages && target.liveUrl !== null && (await streamLinkHolder(connection, streamId)) === null) {
-    throw new Error("CAST_STREAM_NOT_OWNED");
+  // `live` ne l'efface pas en posant le sien. Pas plus le lien qu'un co-caster
+  // encore sur ce stream a fourni : il pointe sa chaîne, et lui est rattaché.
+  if (!manages && target.liveUrl !== null) {
+    const holderId = await streamLinkHolder(connection, streamId);
+    if (holderId === null || (holderId !== linkUserId && (await castsStream(connection, matchId, streamId, holderId)))) {
+      throw new Error("CAST_STREAM_NOT_OWNED");
+    }
   }
   await connection.execute(
     `UPDATE bg_match_streams SET live_url = ?, link_user_id = ? WHERE id = ? AND staff_owned = 0`,
     [url, linkUserId, streamId],
   );
   return streams.map((stream) => (stream.id === streamId ? { ...stream, liveUrl: url } : stream));
+}
+
+/** `userId` caste-t-il encore ce stream du match (lecture sous le verrou du match) ? */
+async function castsStream(connection: PoolConnection, matchId: number, streamId: number, userId: number): Promise<boolean> {
+  const [rows] = await connection.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_match_casters WHERE match_id = ? AND stream_id = ? AND user_id = ? LIMIT 1`,
+    [matchId, streamId, userId],
+  );
+  return rows.length > 0;
 }
 
 /**

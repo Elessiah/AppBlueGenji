@@ -116,6 +116,18 @@ describe("PUT /api/matches/[matchId]/caster", () => {
     expect(setCastSettings).not.toHaveBeenCalled();
   });
 
+  it.each<[string, unknown]>([
+    ["string", "true"],
+    ["number", 1],
+    ["null", null],
+  ])("casterPut_organisationLinkNotBoolean_%s_returns400InvalidOrganisationLink", async (_label, value) => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    const res = await casterPut(jsonRequest("PUT", { liveUrl: "https://twitch.tv/voix", organisationLink: value }), params("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_ORGANISATION_LINK" });
+    expect(setCastSettings).not.toHaveBeenCalled();
+  });
+
   it("casterPut_emptyChunkedBodyWithoutType_savesNothingAndSucceeds", async () => {
     // Corps vide sans `Content-Length` (fragmenté, HTTP/2) : aucun réglage, pas un refus.
     jest.mocked(getCurrentUser).mockResolvedValue(caster);

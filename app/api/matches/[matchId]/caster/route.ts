@@ -4,7 +4,7 @@ import { readOptionalJsonBody } from "@/lib/server/request-body";
 import { loadOwnCastSettings } from "@/lib/server/tournaments/cast-settings";
 import { claimMatchCast, releaseMatchCast, setCastSettings } from "@/lib/server/tournaments/match-launch";
 import {
-  castBodyNamesOrganisationLink,
+  castOrganisationLinkRefusal,
   isPositiveId,
   launchFailure,
   parseCastSettings,
@@ -79,7 +79,8 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   delete settings.liveUrl;
   // Un caster ne dit jamais un lien « de l'organisation » (décision du
   // 2026-11-09) : refus explicite, jamais ignoré en silence.
-  if (castBodyNamesOrganisationLink(read.body)) return fail("STAFF_STREAM_FORBIDDEN", 403);
+  const organisationRefusal = castOrganisationLinkRefusal(read.body);
+  if (organisationRefusal) return fail(organisationRefusal.code, organisationRefusal.status);
 
   try {
     // `triggerSkipped` : le mode d'antenne, posé entre-temps par un autre, est
@@ -128,7 +129,8 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   if ("refusal" in read) return fail(read.refusal, 400);
   const settings = parseCastSettings(read.body);
   if (settings === null) return fail("INVALID_CAST_SETTINGS", 400);
-  if (castBodyNamesOrganisationLink(read.body)) return fail("STAFF_STREAM_FORBIDDEN", 403);
+  const organisationRefusal = castOrganisationLinkRefusal(read.body);
+  if (organisationRefusal) return fail(organisationRefusal.code, organisationRefusal.status);
 
   try {
     await setCastSettings(matchId, user.id, can(user, "live"), settings, castAccess(user));

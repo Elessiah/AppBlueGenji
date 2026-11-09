@@ -457,7 +457,7 @@ async function writeStaffLink(
   const edited = new Set((config.streamLinks ?? []).map((link) => link.streamId));
   const before = known ?? (await lockMatchStreams(connection, matchId));
   // Décidé **avant** d'écrire : un refus n'a rien à défaire.
-  const plan = await planStaffStreamUrl(connection, url, config.setter.userId, before, edited);
+  const plan = await planStaffStreamUrl(connection, matchId, url, config.setter.userId, before, edited);
   if (plan.kind === "none") return { streams: before, written: false };
   if (!actor.manages && !isMatchRefereeActor(hold, actor)) throw new Error("STAFF_STREAM_FORBIDDEN");
   if (hold.ownerId !== null && !mayChangeLiveTrigger(hold, actor)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
@@ -527,6 +527,7 @@ type StaffStreamPlan = { kind: "none" } | { kind: "update"; id: number } | { kin
  */
 async function planStaffStreamUrl(
   connection: PoolConnection,
+  matchId: number,
   url: string | null,
   setterId: number,
   streams: readonly MatchStreamRow[],
@@ -536,22 +537,23 @@ async function planStaffStreamUrl(
   const target = staffStream(candidates);
   if (target?.staff) return target.liveUrl === url ? { kind: "none" } : { kind: "update", id: target.id };
   if (url === null) return { kind: "none" };
-  // Chaque stream sans lien, dans l'ordre : le premier qu'aucun autre ne tient.
-  for (const stream of candidates) {
-    if (stream.liveUrl === null && !(await streamHeldByOther(connection, stream.id, setterId))) {
-      return { kind: "update", id: stream.id };
-    }
-  }
-  return { kind: "insert" };
+  const unlinked = candidates.filter((stream) => stream.liveUrl === null);
+  if (unlinked.length === 0) return { kind: "insert" };
+  // Le premier stream sans lien qu'aucun autre ne tient : une seule lecture,
+  // jamais une par stream, sous le verrou du match.
+  const heldByOthers = await streamsHeldByOthers(connection, matchId, setterId);
+  const free = unlinked.find((stream) => !heldByOthers.has(stream.id));
+  return free === undefined ? { kind: "insert" } : { kind: "update", id: free.id };
 }
 
-/** Un autre caster que `userId` tient-il ce stream (lecture sous le verrou du match) ? */
-async function streamHeldByOther(connection: PoolConnection, streamId: number, userId: number): Promise<boolean> {
+/** Les streams du match qu'un autre caster que `userId` tient (lecture sous le verrou du match). */
+async function streamsHeldByOthers(connection: PoolConnection, matchId: number, userId: number): Promise<Set<number>> {
   const [rows] = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_casters WHERE stream_id = ? AND user_id <> ? LIMIT 1`,
-    [streamId, userId],
+    `SELECT DISTINCT stream_id FROM bg_match_casters
+      WHERE match_id = ? AND user_id <> ? AND stream_id IS NOT NULL`,
+    [matchId, userId],
   );
-  return rows.length > 0;
+  return new Set(rows.map((row) => Number(row.stream_id)));
 }
 
 /**

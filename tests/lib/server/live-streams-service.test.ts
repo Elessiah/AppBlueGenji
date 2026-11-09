@@ -199,7 +199,7 @@ describe("setMatchLiveConfig", () => {
     streams: StreamState[] = [],
     casters: WorldCaster[] = [],
   ) {
-    const state = { streams: streams.map((stream) => ({ ...stream })), casters, matchWrites: [] as [string, unknown[]][] };
+    const state = { streams: streams.map((stream) => ({ ...stream })), casters, matchWrites: [] as [string, unknown[]][], heldReads: 0 };
     const execute = jest.fn<SqlQuery>(async (rawSql, rawParams) => {
       const sql = rawSql.replace(/\s+/g, " ").trim();
       const params = (rawParams ?? []) as unknown[];
@@ -223,9 +223,10 @@ describe("setMatchLiveConfig", () => {
       if (sql.startsWith("SELECT match_id, user_id, stream_id, ready_at FROM bg_match_casters")) {
         return [state.casters.map((caster) => ({ ...caster, match_id: row.id, ready_at: null }))];
       }
-      if (sql.startsWith("SELECT 1 FROM bg_match_casters WHERE stream_id = ? AND user_id <> ?")) {
-        const others = state.casters.filter((caster) => caster.stream_id === params[0] && caster.user_id !== params[1]);
-        return [others.map(() => ({ 1: 1 }))];
+      if (sql.startsWith("SELECT DISTINCT stream_id FROM bg_match_casters WHERE match_id = ? AND user_id <> ?")) {
+        state.heldReads += 1;
+        const held = state.casters.filter((caster) => caster.user_id !== params[1] && caster.stream_id !== null);
+        return [[...new Set(held.map((caster) => caster.stream_id))].map((streamId) => ({ stream_id: streamId }))];
       }
       if (sql.startsWith("SELECT 1 FROM bg_match_streams")) {
         // Lien de l'organisation présent ? (démarquage par la seule `live`)
@@ -603,6 +604,40 @@ describe("setMatchLiveConfig", () => {
     await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/match", setter: ORGANISER_5, access: STAFF });
 
     expect(world.state.streams).toEqual([dbStream(3, null), dbStream(5, "https://twitch.tv/match", true)]);
+  });
+
+  it("setMatchLiveConfig_severalEmptyStreamsHeld_readsHoldersOnce", async () => {
+    const world = liveWorld(
+      matchRow(),
+      [dbStream(3, null), dbStream(5, null), dbStream(6, null)],
+      [{ user_id: 9, stream_id: 3 }, { user_id: 10, stream_id: 5 }],
+    );
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/match", setter: ORGANISER_5, access: STAFF });
+
+    // Une seule lecture des casters qui tiennent un stream, quel que soit le nombre de streams vides.
+    expect(world.state.heldReads).toBe(1);
+    expect(world.state.streams[2]).toEqual(dbStream(6, "https://twitch.tv/match", true));
+  });
+
+  it("setMatchLiveConfig_noEmptyStream_opensStaffStreamWithoutReadingHolders", async () => {
+    const world = liveWorld(matchRow(), [dbStream(3, "https://twitch.tv/caster")], [{ user_id: 9, stream_id: 3 }]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/match", setter: ORGANISER_5, access: STAFF });
+
+    expect(world.state.heldReads).toBe(0);
+    expect(world.state.streams).toEqual([dbStream(3, "https://twitch.tv/caster"), dbStream(4, "https://twitch.tv/match", true)]);
+  });
+
+  it("setMatchLiveConfig_emptyStreamHeldOnlyBySetter_dressesIt", async () => {
+    const world = liveWorld(matchRow(), [dbStream(3, null)], [{ user_id: 5, stream_id: 3 }]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/match", setter: ORGANISER_5, access: STAFF });
+
+    expect(world.state.streams).toEqual([dbStream(3, "https://twitch.tv/match", true)]);
   });
 
   it("setMatchLiveConfig_emptyStreamHeldByNobody_becomesStaffStream", async () => {

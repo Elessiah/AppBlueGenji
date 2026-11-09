@@ -20,6 +20,7 @@ import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { playedMatchSql } from "@/lib/shared/ranking";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
+import { forgetRefereeNames } from "@/lib/server/tournaments/referee-names";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 import { dropDeletionHold, readDeletionHold } from "./account-deletion-hold";
 
@@ -542,6 +543,8 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
   // prochaine écriture du match ; l'évènement remet aussi à jour le message
   // #live de la soirée (`publishMatchUpdatedEvent`), qui portait ce lien.
   for (const tournamentId of touchedTournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  // Son pseudo d'arbitre ne reste pas servi depuis le cache des pseudos.
+  forgetRefereeNames();
 
   // Le plateau des tournois dont l'inscription solo est partie (D12) : la liste
   // des engagés, l'aperçu du tirage et les instantanés ouverts.

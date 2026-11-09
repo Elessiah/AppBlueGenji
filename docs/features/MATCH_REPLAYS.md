@@ -28,6 +28,9 @@ disparaître sans écriture — et le rejouer le fait revenir.
 
 - `null` ou chaîne vide **efface**, sans condition d'état : retirer un lien posé
   par erreur ne dépend de rien.
+- Un corps illisible (JSON cassé : 400 `INVALID_REPLAY_URL` ; trop lourd : 413 ;
+  autre type que JSON : 415), vide ou sans la clé `replayUrl` est **refusé** —
+  jamais pris pour un effacement.
 - Poser un lien exige `canHaveReplay` (`409 MATCH_NOT_REPLAYABLE`), et le statut
   est **relu dans l'`UPDATE`** (`AND status = 'COMPLETED'`) : un retour en
   arrière passé entre la lecture et l'écriture ne laisse pas un lien se poser

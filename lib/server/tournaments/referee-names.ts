@@ -18,7 +18,7 @@
  */
 import { createHmac, randomBytes } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
-import { cached } from "@/lib/server/cache";
+import { cached, invalidateCachedPrefix } from "@/lib/server/cache";
 import { withConnection } from "@/lib/server/database";
 import { visibleText } from "@/lib/shared/visible-text";
 import { showsRefereeName } from "@/lib/shared/match-referee";
@@ -105,6 +105,19 @@ export function markViewerReferee(
  */
 const REFEREE_NAMES_TTL_MS = 30_000;
 
+/** Préfixe des clés de cache des pseudos d'arbitre (`loadRefereeNames`). */
+const REFEREE_NAMES_CACHE_PREFIX = "referee-names:";
+
+/**
+ * Oublie tous les pseudos d'arbitre en cache. Un geste qui retire un nom sans
+ * forcément changer la version d'un instantané — opposition retenue (son
+ * balayage peut échouer en partie), compte supprimé — l'appelle : le pseudo
+ * ne reste pas servi jusqu'à l'échéance du cache.
+ */
+export function forgetRefereeNames(): void {
+  invalidateCachedPrefix(REFEREE_NAMES_CACHE_PREFIX);
+}
+
 type RefereeNameRow = RowDataPacket & { id: number; referee_user_id: number; pseudo: string };
 
 /**
@@ -123,7 +136,7 @@ export async function loadRefereeNames(snapshot: TournamentSnapshot): Promise<Ma
     if (showsRefereeName(match) && match.refereeKey !== null) shown.set(match.id, match.refereeKey);
   }
   if (shown.size === 0) return [];
-  return cached(`referee-names:${snapshot.card.id}:${snapshot.version}`, REFEREE_NAMES_TTL_MS, async () => {
+  return cached(`${REFEREE_NAMES_CACHE_PREFIX}${snapshot.card.id}:${snapshot.version}`, REFEREE_NAMES_TTL_MS, async () => {
     // Les seuls matchs montrés : ni les joués ni les autres ne sont lus.
     const ids = [...shown.keys()];
     const rows = await withConnection(async (connection) => {

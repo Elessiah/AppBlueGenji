@@ -5,7 +5,12 @@ jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/tournaments/notifications");
+jest.mock("@/lib/server/tournaments/referee-names", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/tournaments/referee-names")>("@/lib/server/tournaments/referee-names"),
+  forgetRefereeNames: jest.fn(),
+}));
 
+import { forgetRefereeNames } from "@/lib/server/tournaments/referee-names";
 import {
   loadSoloRegistrations,
   deleteOwnAccount,
@@ -769,6 +774,25 @@ describe("deleteOwnAccount — les matchs qui le nommaient sont rafraîchis", ()
       [3, { landingLive: true }],
       [4, { landingLive: true }],
     ]);
+  });
+
+  it("deleteOwnAccount_committed_forgetsCachedRefereeNames", async () => {
+    const { connection } = fakeDb(EMPTY);
+
+    await deleteOwnAccount(7);
+
+    expect(forgetRefereeNames).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(forgetRefereeNames).mock.invocationCallOrder[0]).toBeGreaterThan(
+      connection.commit.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("deleteOwnAccount_rolledBack_doesNotForgetNames", async () => {
+    fakeDb({ ...EMPTY, played: 1 }, { refereed: [{ matchId: 5, tournamentId: 3 }], failOn: "UPDATE bg_users SET pseudo" });
+
+    await expect(deleteOwnAccount(7)).rejects.toThrow();
+
+    expect(forgetRefereeNames).not.toHaveBeenCalled();
   });
 
   it("deleteOwnAccount_noMatchRole_publishesNothing", async () => {
