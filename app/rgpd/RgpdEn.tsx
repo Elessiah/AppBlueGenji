@@ -313,7 +313,7 @@ export function RgpdEn({
           backup is restored (account identifier and creation date, date of the request), and replaced, on
           reactivation, by a line carrying the date of the reactivation and that of the undone request (kept like the other lines), so that a restored backup does not
           bring the account back as pending deletion. As soon as it is requested, and without being undone by reactivation, it leaves its
-          teams (ownership goes to a co-owner, else a manager, else a captain, else another member; a team of which it was the
+          teams (ownership goes to a co-owner, else a manager, else a captain, else another member, a suspended member coming only after all the others; a team of which it was the
           only player becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
           disbanded otherwise), its organised tournaments go to another staff member when someone can take them over, its registrations for a solo tournament that hasn&apos;t started yet are withdrawn, its casts of matches not yet completed, its referee assignments and its pending team invitations and join requests are withdrawn and its remaining matches in a running solo
           tournament where it never played are lost by forfeit. At the end of that time, the account is erased
@@ -779,11 +779,12 @@ export function RgpdEn({
             </li>
             <li>
               When moderation <strong>deletes</strong> an avatar — immediately, from the player&apos;s page, when
-              rejecting a challenge, or automatically at the end of a hiding without a challenge —, whether the
+              the staff after a hiding (challenge rejected, or before the deadline), or automatically at the end of
+              a hiding without a challenge —, whether the
               account is active or pending deletion, the hash (SHA-256) of the image is kept, without time limit and
               with no link to any account, to refuse it being uploaded again, as an avatar or as a team logo; the
-              file is only erased if nothing else on the site points to it. An avatar that is only hidden, which
-              can still be contested, leaves none; neither does a deleted team logo.
+              file is only erased if nothing else on the site points to it. An avatar that is only hidden leaves
+              none as long as it is not deleted; neither does a deleted team logo.
             </li>
           </ul>
           <p>

@@ -864,6 +864,18 @@ Comportement actuel gardé, à trancher avec la politique D6 :
   masquer ou le supprimer, alors que les conditions v9 publiées (immuables) et
   l'entrée `PRIVACY_CHANGES` du 2026-11-06 disent que la réactivation le rend —
   nouvelle version des conditions, ou retrait de ce geste ?
+- Même avatar mis de côté : masqué ou supprimé par la modération, le joueur
+  en attente n'en reçoit **aucun avis** (`userRecipient` écarte
+  `is_deleted = 1`), alors que `/rgpd` § Signalements promet motifs et voies de
+  recours (DSA art. 17) — prévenir à la réactivation, ou le dire dans les
+  textes ?
+- Conditions v9 publiées (immuables) : elles disent qu'un avatar retiré que
+  l'effacement emporte ne peut être reposé, et donnent l'ordre de reprise
+  d'une équipe sans le rang des membres suspendus — D6 et la règle de
+  succession les contredisent (un avatar seulement masqué n'est plus bloqué) :
+  nouvelle version des conditions ?
+- L'avatar mis de côté reste servi à son adresse pendant les 30 jours :
+  entrée ERREUR.txt existante (`holdAccountIdentity`, revue #546).
 
 **Textes légaux (D6).** Registre T01 (finalité, base légale, catégorie
 « Empreintes … des avatars supprimés par la modération », conservation dès la

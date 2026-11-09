@@ -184,7 +184,19 @@ describe("blockRemovedImageFiles — insertion et fichiers manquants", () => {
     await blockRemovedImageFiles([join(tmpdir(), "bg-absent-avatar.webp")]);
 
     expect(execute).not.toHaveBeenCalled();
-    expect(String(error.mock.calls[0][0])).toContain("empreinte non bloquée (1 fichier(s)) : bg-absent-avatar.webp");
+    expect(String(error.mock.calls[0][0])).toContain("empreinte non bloquée (1 fichier(s)) : avatar.webp");
+    error.mockRestore();
+  });
+
+  it("blockRemovedImageFiles_quarantinedFileMissing_logsNameWithoutAccountIds", async () => {
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>() }));
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await blockRemovedImageFiles([join(tmpdir(), "user-42-42-abc123.webp")]);
+
+    const line = String(error.mock.calls[0][0]);
+    expect(line).toContain(": abc123.webp");
+    expect(line).not.toContain("42");
     error.mockRestore();
   });
 

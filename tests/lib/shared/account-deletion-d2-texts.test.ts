@@ -223,23 +223,41 @@ describe("D6 — empreinte d'un avatar supprimé par la modération", () => {
 
   it("registerT01_avatarHashRetention_keptFromDeletionNotForHiddenFrAndEn", () => {
     expect(t01Retention()).toContain("gardée dès cette suppression, sans limite de durée");
-    expect(t01Retention()).toContain("un avatar seulement masqué, qui se conteste encore, n'en laisse aucune");
+    expect(t01Retention()).toContain("un avatar seulement masqué n'en laisse aucune tant qu'il n'est pas supprimé");
     expect(t01Retention()).not.toContain("emporté par l'effacement d'un compte");
     expect(t01RetentionEn()).toContain("kept from that deletion, without time limit");
-    expect(t01RetentionEn()).toContain("an avatar that is only hidden, which can still be contested, leaves none");
+    expect(t01RetentionEn()).toContain("an avatar that is only hidden leaves none as long as it is not deleted");
     expect(t01RetentionEn()).not.toContain("carried off by the erasure of an account");
   });
 
   it("registerT01_avatarHashRetention_namesRejectedChallengeAndSharedFileFrAndEn", () => {
-    expect(t01Retention()).toContain("par le staff qui rejette une contestation, ou d'office au terme d'un masquage sans contestation");
+    expect(t01Retention()).toContain("par le staff qui le supprime définitivement après un masquage (contestation rejetée, ou avant l'échéance), ou d'office au terme d'un masquage sans contestation");
     expect(t01Retention()).toContain("le fichier lui-même n'est effacé que si rien d'autre sur le site ne le désigne");
-    expect(t01RetentionEn()).toContain("by the staff rejecting a challenge, or automatically at the end of a hiding without a challenge");
+    expect(t01RetentionEn()).toContain("by the staff permanently deleting it after a hiding (challenge rejected, or before the deadline), or automatically at the end of a hiding without a challenge");
     expect(t01RetentionEn()).toContain("the file itself is only erased if nothing else on the site points to it");
   });
 
   it("registerT01_heldAvatar_moderationCanStillActFrAndEn", () => {
     expect(t01Retention()).toContain("la modération peut encore masquer, rétablir ou supprimer cet avatar");
     expect(t01RetentionEn()).toContain("moderation can still hide, restore or delete that avatar");
+  });
+
+  it("registerModeration_avatarHash_crossReferencesT01FrAndEn", () => {
+    const fr = PROCESSING_ACTIVITIES.flatMap((a) => a.dataCategories).join(" ");
+    const en = PROCESSING_ACTIVITIES_EN.flatMap((a) => a.dataCategories).join(" ");
+
+    expect(fr).toContain("empreinte (SHA-256) d'un avatar supprimé, sans lien avec aucun compte, gardée sans limite de durée pour en refuser la remise en ligne (décrite au registre T01)");
+    expect(en).toContain("hash (SHA-256) of a deleted avatar, with no link to any account, kept without time limit to refuse it being uploaded again (described in record T01)");
+  });
+
+  it("deletionNotice_heldAvatar_reactivationMayNotReturnModeratedAvatarFrAndEn", () => {
+    expect(frProfile.deletion.irreversible).toContain("sauf un avatar que la modération aurait supprimé entre-temps");
+    expect(enProfile.deletion.irreversible).toContain("except an avatar moderation deleted in the meantime");
+  });
+
+  it("deletionNotice_handover_suspendedMemberInheritsLastFrAndEn", () => {
+    expect(frProfile.deletion.handover).toContain("un membre suspendu ne passant qu'après tous les autres");
+    expect(enProfile.deletion.handover).toContain("a suspended member coming only after all the others");
   });
 
   it("rgpdPage_accountDeletion_hashKeptOnModerationDeletionNotErasureFrAndEn", () => {

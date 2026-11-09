@@ -1683,9 +1683,9 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#suppression-du-compte", label: "Lire le paragraphe « Suppression du compte »" },
     ],
     summary:
-      "L'empreinte d'un avatar que la modération supprime est désormais gardée dès cette suppression, et non plus à l'effacement du compte, pour en refuser la remise en ligne. Un avatar seulement masqué, qui se conteste encore, n'en laisse plus aucune.",
+      "L'empreinte d'un avatar que la modération supprime est désormais gardée dès cette suppression, et non plus à l'effacement du compte, pour en refuser la remise en ligne. Un avatar seulement masqué n'en laisse plus aucune tant qu'il n'est pas supprimé.",
     details: [
-      "Ce que le site garde : l'empreinte (SHA-256) de l'image, sans lien avec aucun compte et sans limite de durée, quand la modération supprime un avatar — sans délai, depuis la fiche du joueur, en rejetant une contestation, ou d'office au terme d'un masquage sans contestation —, que le compte soit actif ou en attente de suppression. Elle sert seulement à refuser la remise en ligne de la même image, comme avatar ou comme logo d'équipe ; le fichier n'est effacé que si rien d'autre sur le site ne le désigne.",
+      "Ce que le site garde : l'empreinte (SHA-256) de l'image, sans lien avec aucun compte et sans limite de durée, quand la modération supprime un avatar — sans délai, depuis la fiche du joueur, par le staff après un masquage (contestation rejetée, ou avant l'échéance), ou d'office au terme d'un masquage sans contestation —, que le compte soit actif ou en attente de suppression. Elle sert seulement à refuser la remise en ligne de la même image, comme avatar ou comme logo d'équipe ; le fichier n'est effacé que si rien d'autre sur le site ne le désigne.",
       "À l'effacement d'un compte, seule est prise ou gardée l'empreinte d'un avatar que la modération avait déjà supprimé ; l'avatar seulement masqué part avec le compte, sans laisser d'empreinte. Un logo d'équipe supprimé ne laisse pas d'empreinte non plus.",
       "Pendant les 30 jours d'une suppression demandée, la modération peut masquer, rétablir ou supprimer l'avatar mis de côté pour la réactivation, comme celui d'un compte actif.",
     ],

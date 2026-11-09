@@ -107,7 +107,7 @@ export async function blockRemovedImageFiles(absolutePaths: readonly string[]): 
     ),
   );
   const hashes = read.flatMap((entry) => (entry.sha === null ? [] : [entry.sha]));
-  const missing = read.filter((entry) => entry.sha === null).map((entry) => path.basename(entry.file));
+  const missing = read.filter((entry) => entry.sha === null).map((entry) => anonymousFileName(entry.file));
   if (missing.length > 0) {
     // Un fichier que la modération supprime manquait déjà (course avec une
     // rotation, effacement à la main) : son image n'est pas bloquée et
@@ -131,6 +131,15 @@ export async function blockRemovedImageFiles(absolutePaths: readonly string[]): 
       }
     }
   }
+}
+
+/**
+ * Le nom d'un fichier sans les identifiants de compte qu'il porte
+ * (`user-<id>-<id>-<empreinte>.webp` → `<empreinte>.webp`) : le journal pm2 ne
+ * relie pas un compte à une décision de modération.
+ */
+function anonymousFileName(file: string): string {
+  return path.basename(file).split("-").pop() ?? "";
 }
 
 /** Insertion de l'empreinte : une tentative, puis une reprise (verrou ou pool saturé passagers). */

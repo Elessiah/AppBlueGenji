@@ -423,7 +423,7 @@ function RgpdFr({
           sauvegarde (identifiant et date de création du compte, date de la demande), et y est remplacée, à la
           réactivation, par une ligne qui porte la date de celle-ci et celle de la demande défaite (gardée comme les autres lignes), pour qu&apos;une sauvegarde restaurée ne
           ramène pas le compte en attente de suppression. Dès la demande, et sans retour à la réactivation, il quitte ses équipes (la propriété
-          passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre ; une équipe dont il était le seul
+          passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre, un membre suspendu ne passant qu&apos;après tous les autres ; une équipe dont il était le seul
           joueur devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute
           sinon), ses tournois organisés passent à un autre membre du staff quand quelqu&apos;un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore terminés, ses désignations d&apos;arbitre et ses invitations et demandes d&apos;adhésion d&apos;équipe en attente sont retirés et ses matchs restants d&apos;un tournoi individuel en
           cours où il n&apos;a jamais joué sont perdus par forfait. Au terme du délai, le compte est effacé
@@ -958,12 +958,12 @@ function RgpdFr({
             </li>
             <li>
               Quand la modération <strong>supprime</strong> un avatar — sans délai, depuis la fiche du
-              joueur, en rejetant une contestation, ou d&apos;office au terme d&apos;un masquage sans
-              contestation —, que le compte soit actif ou en attente de suppression, l&apos;empreinte
+              joueur, par le staff après un masquage (contestation rejetée, ou avant l&apos;échéance), ou
+              d&apos;office au terme d&apos;un masquage sans contestation —, que le compte soit actif ou en attente de suppression, l&apos;empreinte
               (SHA-256) de l&apos;image est gardée, sans limite de durée et sans lien avec aucun compte,
               pour en refuser la remise en ligne, comme avatar ou comme logo d&apos;équipe ; le fichier
               n&apos;est effacé que si rien d&apos;autre sur le site ne le désigne. Un avatar seulement
-              masqué, qui se conteste encore, n&apos;en laisse aucune ; un logo d&apos;équipe supprimé non
+              masqué n&apos;en laisse aucune tant qu&apos;il n&apos;est pas supprimé ; un logo d&apos;équipe supprimé non
               plus.
             </li>
           </ul>
