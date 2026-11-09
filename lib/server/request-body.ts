@@ -109,6 +109,12 @@ export async function readJsonBody(req: Request, maxBytes: number = JSON_BODY_MA
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
+/** Vrai si `Content-Length` annonce un corps non vide. */
+function announcesBody(req: Request): boolean {
+  const length = Number(req.headers.get("content-length") ?? "0");
+  return Number.isFinite(length) && length > 0;
+}
+
 /**
  * Corps JSON **facultatif** : un corps vide — `Content-Length: 0`, ou aucun
  * octet lu d'un envoi fragmenté ou HTTP/2 sans longueur — vaut `{}`, sans
@@ -123,6 +129,10 @@ export async function readOptionalJsonBody(
   maxBytes: number = JSON_BODY_MAX_BYTES,
 ): Promise<{ body: unknown } | { refusal: string }> {
   try {
+    // Un corps annoncé non vide d'un autre type est refusé sans être lu.
+    if (announcesBody(req) && !isJsonContentType(req.headers.get("content-type"))) {
+      throw new Error(UNSUPPORTED_CONTENT_TYPE);
+    }
     const bytes = await readBodyBytes(req, maxBytes);
     if (bytes.byteLength === 0) return { body: {} };
     if (!isJsonContentType(req.headers.get("content-type"))) throw new Error(UNSUPPORTED_CONTENT_TYPE);

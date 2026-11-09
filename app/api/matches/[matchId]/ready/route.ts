@@ -13,8 +13,8 @@ const STATUSES: Readonly<Record<string, number>> = {
   NOT_TEAM_READY_ROLE: 403,
   // Caster devenu inéligible : le motif du blocage du cast.
   NOT_CASTER: 403,
-  CASTER_IDENTITY_REQUIRED: 403,
-  CASTER_DISCORD_REQUIRED: 403,
+  CASTER_IDENTITY_REQUIRED: 409,
+  CASTER_DISCORD_REQUIRED: 409,
 };
 
 /**

@@ -577,6 +577,23 @@ describe("PUT/POST /api/admin/matches/[id]/live — corps illisible (ERREUR.txt 
     expect(announceStaffMatchAction).not.toHaveBeenCalled();
   });
 
+  it.each<[string, string]>([
+    ["null", "null"],
+    ["un nombre", "42"],
+    ["un tableau", "[]"],
+  ])("putMatchLive_jsonNotAnObject_%s_returns400InvalidLiveBody", async (_label, body) => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    const req = new Request("http://localhost/api/admin/matches/42/live", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body,
+    });
+    const res = await putMatchLive(req, matchParams("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: "INVALID_LIVE_BODY" });
+    expect(setMatchLiveConfig).not.toHaveBeenCalled();
+  });
+
   it("postMatchOnAir_brokenJson_returns400InvalidLiveBody", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     const res = await postMatchOnAir(brokenReq("POST"), matchParams("42"));

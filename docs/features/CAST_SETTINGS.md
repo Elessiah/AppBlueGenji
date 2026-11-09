@@ -131,8 +131,9 @@ cette fenêtre et à celle du staff.
 | `PUT …/caster` | caster inscrit | `trigger`, `liveUrl`, `battletag` — **chaque champ absent n'est pas touché** |
 | `DELETE …/caster` | le caster, ou `tournaments` pour un autre | `?userId=` |
 
-Un corps qui porte `organisationLink` (quelle que soit sa valeur, quel que soit
-le lecteur) : 403 `STAFF_STREAM_FORBIDDEN`, jamais ignoré en silence. Les refus des réglages portent leur code
+Un corps qui dit `organisationLink: true` (quel que soit le lecteur) : 403
+`STAFF_STREAM_FORBIDDEN`, jamais ignoré en silence ; `false` (sa propre chaîne,
+qu'envoie encore une fenêtre ouverte avant la mise à jour) passe sans effet. Les refus des réglages portent leur code
 (`tournamentErrors.json` FR et EN, `LAUNCH_ERROR_MESSAGES`) :
 `STREAM_URL_REQUIRED`, `INVALID_CAST_BATTLETAG`, `CAST_STREAM_NOT_OWNED`,
 `INVALID_CAST_SETTINGS`, `MATCH_NOT_CASTABLE`, `MATCH_START_AT_REQUIRED`.

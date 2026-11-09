@@ -461,6 +461,45 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.streams[0]?.live_url).toBe("https://twitch.tv/x");
   });
 
+  it("setMatchLiveConfig_playedMarkedMatchCasterLinksOnly_refereeCorrectsLink", async () => {
+    // Match joué resté marqué : la fenêtre n'envoie que les liens des casters (mode et lien du staff absents).
+    const world = liveWorld(
+      matchRow({ status: "COMPLETED", live_trigger: "AUTO", live_trigger_user_id: 12, kept_referee_user_id: 9 }),
+      [dbStream(4, "https://kick.com/voix")],
+      [{ user_id: 12, stream_id: 4 }],
+    );
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, {
+      trigger: undefined,
+      liveUrl: undefined,
+      setter: { userId: 9, asOrganisation: false },
+      access: STAFF,
+      streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/neuve" }],
+    });
+
+    expect(world.state.streams).toEqual([{ ...dbStream(4, "https://twitch.tv/neuve"), link_user_id: 12 }]);
+    expect(world.state.matchWrites).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_playedUnmarkedMatchCasterLinksOnly_throwsMatchNotCastable", async () => {
+    const world = liveWorld(matchRow({ status: "COMPLETED", kept_referee_user_id: 9 }), [dbStream(4, "https://kick.com/voix")], [
+      { user_id: 12, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, {
+        trigger: undefined,
+        liveUrl: undefined,
+        setter: { userId: 9, asOrganisation: false },
+        access: STAFF,
+        streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/neuve" }],
+      }),
+    ).rejects.toThrow("MATCH_NOT_CASTABLE");
+    expect(world.state.streams[0]?.live_url).toBe("https://kick.com/voix");
+  });
+
   it("setMatchLiveConfig_startAtClearedBeforeLock_rejectsStartTimeUnderLock", async () => {
     const row = matchRow({ start_at: "2026-11-02 20:00:00" });
     const world = liveWorld(row);
@@ -555,6 +594,15 @@ describe("setMatchLiveConfig", () => {
 
     // Le stream vidé reste à son caster ; le staff ouvre le sien.
     expect(world.state.streams).toEqual([dbStream(3, null), dbStream(4, "https://twitch.tv/match", true)]);
+  });
+
+  it("setMatchLiveConfig_firstEmptyStreamHeldSecondFree_dressesSecondInsteadOfOpening", async () => {
+    const world = liveWorld(matchRow(), [dbStream(3, null), dbStream(5, null)], [{ user_id: 9, stream_id: 3 }]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/match", setter: ORGANISER_5, access: STAFF });
+
+    expect(world.state.streams).toEqual([dbStream(3, null), dbStream(5, "https://twitch.tv/match", true)]);
   });
 
   it("setMatchLiveConfig_emptyStreamHeldByNobody_becomesStaffStream", async () => {

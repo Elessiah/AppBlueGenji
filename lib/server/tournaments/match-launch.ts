@@ -448,7 +448,6 @@ async function lockLaunchMatch(
   return row;
 }
 
-
 /** Le lecteur est-il l'arbitre désigné du match, et le reste-t-il (`refereeEligible`) ? */
 function isEligibleReferee(
   row: { referee_user_id?: number | null; refereeEligible?: boolean },
@@ -460,56 +459,62 @@ function isEligibleReferee(
 /** Partie que le lecteur représente dans ce match, et sa qualité à y agir. */
 export type MatchParty = { role: LaunchViewerRole; canDeclareReady: boolean };
 
+/** Le match tel que le juge `resolveMatchParty`. */
+type PartyMatch = {
+  team1_id: number | null;
+  team2_id: number | null;
+  casters: readonly Pick<MatchCasterLink, "userId">[];
+  referee_user_id?: number | null;
+  refereeEligible?: boolean;
+  /**
+   * Jeu du tournoi, requis : un appelant qui l'oublie ne compile pas. `null`
+   * (sans casters à juger) retombe sur Overwatch, la règle la plus stricte.
+   */
+  tournament_game: TournamentGame | null;
+};
+
 /**
  * Le lecteur est-il partie de ce match — joueur d'une des deux engagées
- * (appartenance **en cours**, ou entrée solo), ou un de ses casters ?
+ * (appartenance **en cours**, ou entrée solo), un de ses casters, ou son
+ * arbitre désigné ?
  */
-/**
- * Motif du refus d'un lecteur sans rôle au match : un caster inscrit devenu
- * inéligible reçoit le code de blocage du cast (`CastBlock`), qui lui dit quoi
- * régler, plutôt qu'un `NOT_MATCH_PARTY` muet.
- */
-async function notPartyReason(
-  connection: PoolConnection,
-  match: { casters: readonly Pick<MatchCasterLink, "userId">[]; tournament_game: TournamentGame | null },
-  userId: number,
-): Promise<string> {
-  if (!match.casters.some((caster) => caster.userId === userId)) return "NOT_MATCH_PARTY";
-  const block = (await loadCastBlocks(connection, [userId], match.tournament_game ?? "OW")).get(userId) ?? null;
-  return block ?? "NOT_MATCH_PARTY";
-}
-
 export async function resolveMatchParty(
   connection: PoolConnection,
-  match: {
-    team1_id: number | null;
-    team2_id: number | null;
-    casters: readonly Pick<MatchCasterLink, "userId">[];
-    referee_user_id?: number | null;
-    refereeEligible?: boolean;
-    /**
-     * Jeu du tournoi, requis : un appelant qui l'oublie ne compile pas. `null`
-     * (sans casters à juger) retombe sur Overwatch, la règle la plus stricte.
-     */
-    tournament_game: TournamentGame | null;
-  },
+  match: PartyMatch,
   userId: number,
 ): Promise<MatchParty | null> {
+  const party = await resolvePartyOrRefusal(connection, match, userId);
+  return typeof party === "string" ? null : party;
+}
+
+/**
+ * `resolveMatchParty`, ou le motif du refus : un caster inscrit devenu
+ * inéligible reçoit le code de blocage du cast (`CastBlock`), qui lui dit quoi
+ * régler, plutôt qu'un `NOT_MATCH_PARTY` muet — sans relire son éligibilité.
+ */
+async function resolvePartyOrRefusal(
+  connection: PoolConnection,
+  match: PartyMatch,
+  userId: number,
+): Promise<MatchParty | string> {
   // Le rôle de joueur prime : qui joue le match ne le caste pas, même si une
   // inscription faite avant que son équipe n'arrive est encore en base.
   const team = await resolveTeamParty(connection, match, userId);
   if (team) return team;
+  let refusal = "NOT_MATCH_PARTY";
   if (match.casters.some((caster) => caster.userId === userId)) {
     // Une inscription ne vaut que tant que son titulaire remplit la condition
     // du cast : un compte privé de `live` ou d'identité ne déclare plus rien.
-    if ((await loadCastEligibility(connection, userId, match.tournament_game ?? "OW")) === null) return { role: "CASTER", canDeclareReady: true };
+    const block = await loadCastEligibility(connection, userId, match.tournament_game ?? "OW");
+    if (block === null) return { role: "CASTER", canDeclareReady: true };
+    refusal = block;
   }
   // L'arbitre désigné, tant qu'il remplit la condition d'arbitrage. Un arbitre
   // qui caste aussi lit en caster : un seul « Prêt » vaut pour les deux.
   if (isEligibleReferee(match, userId)) {
     return { role: "MATCH_REFEREE", canDeclareReady: true };
   }
-  return null;
+  return refusal;
 }
 
 /** Le lecteur joue-t-il ce match — appartenance en cours, ou entrée solo ? */
@@ -654,8 +659,8 @@ export async function setMatchReady(
     await adoptCurrentPairing(connection, row);
     // Lu après l'adoption, qui peut défaire l'ouverture d'un autre appariement.
     const lobbyWasOpen = row.lobby_opened_at !== null;
-    const party = await resolveMatchParty(connection, row, userId);
-    if (!party) throw new Error(await notPartyReason(connection, row, userId));
+    const party = await resolvePartyOrRefusal(connection, row, userId);
+    if (typeof party === "string") throw new Error(party);
     if (!party.canDeclareReady) throw new Error("NOT_TEAM_READY_ROLE");
 
     if (party.role === "CASTER") {

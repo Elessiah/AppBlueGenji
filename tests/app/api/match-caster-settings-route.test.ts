@@ -89,13 +89,22 @@ describe("PUT /api/matches/[matchId]/caster", () => {
     expect(setCastSettings).toHaveBeenCalledWith(42, 3, true, { trigger: "AUTO" }, { oversees: true, manages: true });
   });
 
-  it("casterPut_organisationLinkFalseAlone_returns403StaffStreamForbidden", async () => {
-    // Décision D7 du 2026-11-09 : un caster ne dit jamais l'origine de son lien, quelle que soit la valeur.
+  it("casterPut_organisationLinkTrue_returns403StaffStreamForbidden", async () => {
+    // Décision D7 du 2026-11-09 : un caster ne dit jamais son lien « de l'organisation ».
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
-    const res = await casterPut(jsonRequest("PUT", { organisationLink: false }), params("42"));
+    const res = await casterPut(jsonRequest("PUT", { liveUrl: "twitch.tv/voix", organisationLink: true }), params("42"));
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toMatchObject({ error: "STAFF_STREAM_FORBIDDEN" });
     expect(setCastSettings).not.toHaveBeenCalled();
+  });
+
+  it("casterPut_organisationLinkFalseFromOldTab_ignored", async () => {
+    // Une fenêtre ouverte avant D7 envoie encore `false` (sa propre chaîne) : la clé est ignorée.
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setCastSettings).mockResolvedValue();
+    const res = await casterPut(jsonRequest("PUT", { trigger: "AUTO", organisationLink: false }), params("42"));
+    expect(res.status).toBe(200);
+    expect(jest.mocked(setCastSettings).mock.calls[0]?.[3]).toEqual({ trigger: "AUTO" });
   });
 
   it("casterPut_organisationLinkFromTournamentsStaff_returns403StaffStreamForbidden", async () => {

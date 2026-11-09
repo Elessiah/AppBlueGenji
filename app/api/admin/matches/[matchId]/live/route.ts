@@ -96,7 +96,11 @@ function parseMatchLiveBody(body: {
 async function readLiveRecord(req: Request): Promise<Record<string, unknown> | Response> {
   const read = await readOptionalJsonBody(req, "INVALID_LIVE_BODY");
   if ("refusal" in read) return fail(read.refusal, 400);
-  return typeof read.body === "object" && read.body !== null ? (read.body as Record<string, unknown>) : {};
+  // Un JSON qui n'est pas un objet (`null`, nombre, chaîne, tableau) n'est pas
+  // un réglage : refusé, jamais pris pour un corps vide.
+  const body = read.body;
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return fail("INVALID_LIVE_BODY", 400);
+  return body as Record<string, unknown>;
 }
 
 /** Le réglage lu et vérifié, ou la réponse de refus (400). */

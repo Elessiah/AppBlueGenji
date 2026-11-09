@@ -98,11 +98,13 @@ export function parseCastSettings(body: unknown): CastSettings | null {
 }
 
 /**
- * Le corps d'un caster dit l'origine de son lien (`organisationLink`) : un
- * caster ne dit jamais un lien « de l'organisation » (décision du 2026-11-09),
- * seul le staff le fait dans la configuration du direct. La route le refuse
- * (403 `STAFF_STREAM_FORBIDDEN`), quelle que soit la valeur, jamais en silence.
+ * Le corps d'un caster dit-il son lien « de l'organisation »
+ * (`organisationLink: true`) ? Un caster ne le dit jamais (décision du
+ * 2026-11-09), seul le staff le fait dans la configuration du direct : la
+ * route le refuse (403 `STAFF_STREAM_FORBIDDEN`), jamais en silence.
+ * `false` — sa propre chaîne, ce que vaut tout lien de caster — passe : une
+ * fenêtre ouverte avant la mise à jour l'envoie encore.
  */
 export function castBodyNamesOrganisationLink(body: unknown): boolean {
-  return typeof body === "object" && body !== null && "organisationLink" in body;
+  return typeof body === "object" && body !== null && (body as { organisationLink?: unknown }).organisationLink === true;
 }

@@ -250,6 +250,11 @@ describe("LiveCard — casse des chaînes (décision 53)", () => {
     expect(splitChannelText("Regarder BlueGenji", "BlueGenji")).toEqual({ before: "Regarder ", channel: "BlueGenji", after: "" });
   });
 
+  it("splitChannelText_channelAlsoInsidePrefix_wrapsTheTrailingChannel", () => {
+    expect(splitChannelText("Regarder der", "der")).toEqual({ before: "Regarder ", channel: "der", after: "" });
+    expect(splitChannelText("Watch at", "at")).toEqual({ before: "Watch ", channel: "at", after: "" });
+  });
+
   it("splitChannelText_noChannelOrAbsent_returnsNull", () => {
     expect(splitChannelText("Regarder sur Twitch", null)).toBeNull();
     expect(splitChannelText("Regarder sur Twitch", "bluegenji")).toBeNull();

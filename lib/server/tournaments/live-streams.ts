@@ -200,16 +200,18 @@ async function loadMatchLiveRow(matchId: number): Promise<MatchLiveRow> {
  * (`canConfigureLive`). Un match joué (ou en attente de confirmation) déjà
  * marqué ne reste ouvert que pour être **démarqué** (`trigger: null`) : y
  * changer le mode ou le lien remplacerait le lien d'un match joué — celui de
- * l'organisation compris — par la chaîne de qui le pose.
+ * l'organisation compris — par la chaîne de qui le pose. Un réglage qui laisse
+ * mode et lien du staff tels quels (`keepsMode` : seuls les liens des casters)
+ * y reste permis : l'arbitre corrige encore le lien d'un caster.
  */
-function assertConfigurable(row: MatchLiveRow, trigger: MatchLiveTrigger | null): void {
+function assertConfigurable(row: MatchLiveRow, trigger: MatchLiveTrigger | null, keepsMode = false): void {
   const match = {
     status: row.status,
     liveTrigger: row.live_trigger,
     liveStartedAt: row.live_started_at,
     launchedAt: null,
   };
-  const configurable = trigger === null ? canConfigureLive(match) : isMatchCastable(match);
+  const configurable = trigger === null || keepsMode ? canConfigureLive(match) : isMatchCastable(match);
   if (!configurable) throw new Error("MATCH_NOT_CASTABLE");
 }
 
@@ -263,7 +265,9 @@ export async function setMatchLiveConfig(
   // celui du match, relu sous le verrou.
   const row = await loadMatchLiveRow(matchId);
   const requested = config.trigger === undefined ? (row.live_trigger ?? null) : config.trigger;
-  assertConfigurable(row, requested);
+  // Ni mode ni lien du staff envoyés : seuls les liens des casters changent.
+  const keepsMode = config.trigger === undefined && config.liveUrl === undefined;
+  assertConfigurable(row, requested, keepsMode);
   // Un mode inchangé (renvoyé tel quel par une fenêtre où il est verrouillé)
   // ne redemande pas sa date : retirée depuis par le staff, elle bloquerait
   // le lien du staff et ceux des casters.
@@ -298,6 +302,7 @@ export async function setMatchLiveConfig(
         editsStreamLinks,
         live: config.access.live,
         actorShown,
+        keepsMode,
       });
       // Rejugé lui aussi : une date de début retirée entre les deux lectures
       // poserait une antenne à l'heure dite qui ne s'ouvrirait jamais.
@@ -527,11 +532,15 @@ async function planStaffStreamUrl(
   streams: readonly MatchStreamRow[],
   casterOwned: ReadonlySet<number>,
 ): Promise<StaffStreamPlan> {
-  const target = staffStream(streams.filter((stream) => stream.staff || !casterOwned.has(stream.id)));
+  const candidates = streams.filter((stream) => stream.staff || !casterOwned.has(stream.id));
+  const target = staffStream(candidates);
   if (target?.staff) return target.liveUrl === url ? { kind: "none" } : { kind: "update", id: target.id };
   if (url === null) return { kind: "none" };
-  if (target !== null && !(await streamHeldByOther(connection, target.id, setterId))) {
-    return { kind: "update", id: target.id };
+  // Chaque stream sans lien, dans l'ordre : le premier qu'aucun autre ne tient.
+  for (const stream of candidates) {
+    if (stream.liveUrl === null && !(await streamHeldByOther(connection, stream.id, setterId))) {
+      return { kind: "update", id: stream.id };
+    }
   }
   return { kind: "insert" };
 }
@@ -657,12 +666,17 @@ function assertLiveConfigAllowed(
   hold: LiveTriggerHold,
   actor: LiveTriggerActor,
   trigger: MatchLiveTrigger | null,
-  { editsStreamLinks, live, actorShown }: { editsStreamLinks: boolean; live: boolean; actorShown: boolean },
+  {
+    editsStreamLinks,
+    live,
+    actorShown,
+    keepsMode,
+  }: { editsStreamLinks: boolean; live: boolean; actorShown: boolean; keepsMode: boolean },
 ): boolean {
   const referee = isMatchRefereeActor(hold, actor);
   if (!live && !referee) throw new Error("NOT_MATCH_REFEREE");
   if (!referee && !actor.manages && !actorShown) throw new Error("NOT_MATCH_CASTER");
-  assertConfigurable(current, trigger);
+  assertConfigurable(current, trigger, keepsMode);
   const triggerChanges = trigger !== hold.trigger;
   if (triggerChanges && !mayChangeLiveTrigger(hold, actor, actorShown)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
   if (editsStreamLinks && !referee) throw new Error("NOT_MATCH_REFEREE");

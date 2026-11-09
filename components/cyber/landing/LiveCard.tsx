@@ -95,11 +95,13 @@ export function streamBannerText(t: LandingT, platformName: string | null, chann
 
 /**
  * Le texte du bouton découpé autour du nom de la chaîne : seul ce nom garde ses
- * majuscules (`keepCase`), « Regarder » suit les capitales du bandeau.
+ * majuscules (`keepCase`), « Regarder » suit les capitales du bandeau. Le nom
+ * clôt le texte des deux langues : cherché depuis la fin, un nom contenu dans
+ * « Regarder » ou « Watch » (« der », « at ») ne s'y accroche pas.
  */
 export function splitChannelText(text: string, channel: string | null): { before: string; channel: string; after: string } | null {
   if (!channel) return null;
-  const at = text.indexOf(channel);
+  const at = text.lastIndexOf(channel);
   if (at < 0) return null;
   return { before: text.slice(0, at), channel, after: text.slice(at + channel.length) };
 }

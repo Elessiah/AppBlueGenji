@@ -80,8 +80,8 @@ describe("POST /api/matches/[matchId]/ready", () => {
     ["NOT_MATCH_PARTY", 403],
     ["NOT_TEAM_READY_ROLE", 403],
     ["NOT_CASTER", 403],
-    ["CASTER_IDENTITY_REQUIRED", 403],
-    ["CASTER_DISCORD_REQUIRED", 403],
+    ["CASTER_IDENTITY_REQUIRED", 409],
+    ["CASTER_DISCORD_REQUIRED", 409],
   ])("traduit %s en %i", async (code, status) => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(setMatchReady).mockRejectedValue(new Error(code));
@@ -161,16 +161,16 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
     expect(claimMatchCast).not.toHaveBeenCalled();
   });
 
-  it("casterPost_organisationLinkFalse_returns403StaffStreamForbidden", async () => {
-    // Décision D7 du 2026-11-09 : la clé suffit, quelle que soit sa valeur.
+  it("casterPost_organisationLinkFalseFromOldTab_claimsWithoutOrigin", async () => {
+    // Une fenêtre ouverte avant D7 envoie encore `false` (sa propre chaîne) : sans effet.
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(claimMatchCast).mockResolvedValue({ triggerSkipped: false });
     const res = await casterPost(
       jsonRequest("POST", { liveUrl: "https://twitch.tv/voix", organisationLink: false }),
       params("42"),
     );
-    expect(res.status).toBe(403);
-    await expect(res.json()).resolves.toMatchObject({ error: "STAFF_STREAM_FORBIDDEN" });
-    expect(claimMatchCast).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(claimMatchCast).toHaveBeenCalled();
   });
 
   it("refuse un corps illisible au lieu de le prendre pour un corps vide", async () => {
@@ -468,8 +468,12 @@ describe("GET /api/matches/[matchId]/contacts", () => {
 });
 
 describe("castBodyNamesOrganisationLink / parseCastSettings — décision D7 du 2026-11-09", () => {
-  it("castBodyNamesOrganisationLink_bodyWithKey_returnsTrue", () => {
-    expect(castBodyNamesOrganisationLink({ organisationLink: false })).toBe(true);
+  it("castBodyNamesOrganisationLink_organisationLinkTrue_returnsTrue", () => {
+    expect(castBodyNamesOrganisationLink({ organisationLink: true })).toBe(true);
+  });
+
+  it("castBodyNamesOrganisationLink_organisationLinkFalseFromOldTab_returnsFalse", () => {
+    expect(castBodyNamesOrganisationLink({ organisationLink: false })).toBe(false);
   });
 
   it("castBodyNamesOrganisationLink_bodyWithoutKey_returnsFalse", () => {

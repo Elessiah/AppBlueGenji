@@ -226,7 +226,7 @@ export async function setCasterStreamUrl(
   if (!casterStreamEditable(target)) throw new Error("CAST_STREAM_NOT_OWNED");
   if (url === null) throw new Error("STREAM_URL_REQUIRED");
   // Un lien inchangé n'est pas réécrit : il reste à qui l'a fourni, comme dans
-  // la configuration du staff (`setStaffStreamUrl`).
+  // la configuration du staff (`planStaffStreamUrl` puis `applyStaffStreamPlan`, live-streams.ts).
   if (target.liveUrl === url) return streams;
   // Un lien dit de l'organisation ne se remplace que par le staff : la seule
   // `live` ne l'efface pas en posant le sien.
