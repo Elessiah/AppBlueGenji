@@ -66,13 +66,17 @@ export type IdentityContext = {
   discordKnown: boolean;
   discordHasTag: boolean;
   discordVerified: boolean;
+  /** Le profil est-il lu ? Sinon, la provenance du BattleTag est inconnue et rien ne s'en dit. */
+  battletagKnown: boolean;
   /** Le BattleTag enregistré vient de Blizzard (et non d'une saisie). */
   battletagFromBlizzard: boolean;
   /** Ouvre la fenêtre de certification du tag Discord. */
   onCertifyDiscord: () => void;
 };
 
-const STAGE_PILL: Record<string, PillVariant> = {
+type StateKey = "UNLINKED" | "LINKED" | "LINKED_TO_CERTIFY" | "LINKED_NO_BATTLETAG" | "CERTIFIED";
+
+const STAGE_PILL: Record<StateKey, PillVariant> = {
   UNLINKED: "neutral",
   LINKED_TO_CERTIFY: "warning",
   LINKED_NO_BATTLETAG: "warning",
@@ -88,23 +92,26 @@ const STAGE_PILL: Record<string, PillVariant> = {
 function rowStage(
   connection: AccountConnection,
   identity: IdentityContext,
-): { action: IdentityStep["action"]; key: string; blizzardNoTag: boolean } {
+): { action: IdentityStep["action"]; key: StateKey; blizzardNoTag: boolean } {
   const step = identityStep(connection.provider, {
     linked: connection.linked,
     discordHasTag: identity.discordHasTag,
     discordVerified: identity.discordVerified,
     battletagFromBlizzard: identity.battletagFromBlizzard,
   });
-  const unread = connection.provider === "DISCORD" && connection.linked && !identity.discordKnown;
+  const unread =
+    connection.linked &&
+    ((connection.provider === "DISCORD" && !identity.discordKnown) ||
+      (connection.provider === "BLIZZARD" && !identity.battletagKnown));
   return {
-    action: unread && step.action !== "LINK" ? null : step.action,
+    action: unread ? null : step.action,
     key: unread ? "LINKED" : stateKey(connection.provider, step),
-    blizzardNoTag: connection.provider === "BLIZZARD" && step.stage === "LINKED",
+    blizzardNoTag: !unread && connection.provider === "BLIZZARD" && step.stage === "LINKED",
   };
 }
 
 /** La clé de `connections.state` qui dit l'étape. */
-function stateKey(provider: OAuthProvider, step: IdentityStep): string {
+function stateKey(provider: OAuthProvider, step: IdentityStep): StateKey {
   if (step.stage === "UNLINKED" || step.stage === "CERTIFIED") return step.stage;
   if (!step.certifiable) return "LINKED";
   return provider === "DISCORD" ? "LINKED_TO_CERTIFY" : "LINKED_NO_BATTLETAG";
@@ -330,8 +337,8 @@ function ConnectionRow({
   // L'étape se lit sur le rattachement **réel** (Discord lié par code compte), non
   // sur la porte du bouton : sinon « Non lié » côté bouton masquerait le tag à certifier.
   const { action, key, blizzardNoTag } = rowStage(rawConnection, identity);
-  const stateWord = t(`connections.state.${key}` as Parameters<typeof t>[0]);
-  const pillVariant = STAGE_PILL[key] ?? "neutral";
+  const stateWord = t(`connections.state.${key}`);
+  const pillVariant = STAGE_PILL[key];
   return (
     <>
       <div className={`table-row ${s.connectionRow}`}>
@@ -438,59 +445,59 @@ function ConnectionActions({
   onUnlink: (provider: OAuthProvider) => void;
 }>): React.ReactElement {
   const { t } = useProfileText();
-  const locale = useAppLocale();
-  const label = OAUTH_PROVIDER_LABELS[connection.provider];
   // La langue de l'adresse (seule l'URL dit la langue) pour l'aller-retour OAuth : si
   // l'anglais du profil n'a pas pu se charger, le texte retombe sur le français, mais
   // le lecteur de `/en/profil` doit y revenir (revue de sécurité du lot 9-2).
+  const locale = useAppLocale();
+  const label = OAUTH_PROVIDER_LABELS[connection.provider];
   return (
-        <span style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
-          {action === "CERTIFY" || action === "REGISTER" ? (
-            <button
-              type="button"
-              className="btn"
-              onClick={onCertify}
-              aria-label={t(action === "CERTIFY" ? "discord.certifyLabel" : "discord.registerLabel")}
-              aria-describedby={detailsId}
-              style={{ padding: "4px 12px", fontSize: 12 }}
-            >
-              {t(action === "CERTIFY" ? "discord.certify" : "discord.register")}
-            </button>
-          ) : null}
-          {connection.linked && refusal !== "LAST_CONNECTION" ? (
-            <button
-              type="button"
-              className="btn ghost"
-              /* `aria-disabled`, pas `disabled` : le focus reste sur le bouton pendant le geste. */
-              aria-disabled={busy !== null || undefined}
-              onClick={() => busy === null && onUnlink(connection.provider)}
-              aria-label={busyAriaLabel(busy === connection.provider, t("connections.unlinkLabel", { label }))}
-              /* La **porte** fait partie de ce qui décrit ce bouton :
-                 laissée hors de la description, elle n'était lue par
-                 personne au clavier — un lecteur d'écran qui parcourt
-                 les contrôles ne rencontre jamais le texte voisin. */
-              aria-describedby={methodId ? `${detailsId} ${methodId}` : detailsId}
-              style={{ padding: "4px 12px", fontSize: 12 }}
-            >
-              {busy === connection.provider ? t("connections.unlinking") : t("connections.unlink")}
-            </button>
-          ) : null}
-          {connection.linked ? null : (
-            <a
-              className={action === "LINK" ? "btn" : "btn ghost"}
-              href={oauthStartPath(connection.provider, { intent: "LINK", locale })}
-              aria-label={t("connections.linkLabel", { label })}
-              /* Ce que le fournisseur apporte tient dans la ligne d'à
-                 côté : `aria-describedby` la rattache au contrôle plutôt
-                 que de la laisser en texte voisin, qu'un lecteur d'écran
-                 parcourant les liens ne rencontre jamais. */
-              aria-describedby={detailsId}
-              style={{ padding: "4px 12px", fontSize: 12 }}
-            >
-              {t("connections.link")}
-            </a>
-          )}
-        </span>
+    <span style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
+      {action === "CERTIFY" || action === "REGISTER" ? (
+        <button
+          type="button"
+          className="btn"
+          onClick={onCertify}
+          aria-label={t(action === "CERTIFY" ? "discord.certifyLabel" : "discord.registerLabel")}
+          aria-describedby={detailsId}
+          style={{ padding: "4px 12px", fontSize: 12 }}
+        >
+          {t(action === "CERTIFY" ? "discord.certify" : "discord.register")}
+        </button>
+      ) : null}
+      {connection.linked && refusal !== "LAST_CONNECTION" ? (
+        <button
+          type="button"
+          className="btn ghost"
+          /* `aria-disabled`, pas `disabled` : le focus reste sur le bouton pendant le geste. */
+          aria-disabled={busy !== null || undefined}
+          onClick={() => busy === null && onUnlink(connection.provider)}
+          aria-label={busyAriaLabel(busy === connection.provider, t("connections.unlinkLabel", { label }))}
+          /* La **porte** fait partie de ce qui décrit ce bouton :
+             laissée hors de la description, elle n'était lue par
+             personne au clavier — un lecteur d'écran qui parcourt
+             les contrôles ne rencontre jamais le texte voisin. */
+          aria-describedby={methodId ? `${detailsId} ${methodId}` : detailsId}
+          style={{ padding: "4px 12px", fontSize: 12 }}
+        >
+          {busy === connection.provider ? t("connections.unlinking") : t("connections.unlink")}
+        </button>
+      ) : null}
+      {connection.linked ? null : (
+        <a
+          className={action === "LINK" ? "btn" : "btn ghost"}
+          href={oauthStartPath(connection.provider, { intent: "LINK", locale })}
+          aria-label={t("connections.linkLabel", { label })}
+          /* Ce que le fournisseur apporte tient dans la ligne d'à
+             côté : `aria-describedby` la rattache au contrôle plutôt
+             que de la laisser en texte voisin, qu'un lecteur d'écran
+             parcourant les liens ne rencontre jamais. */
+          aria-describedby={detailsId}
+          style={{ padding: "4px 12px", fontSize: 12 }}
+        >
+          {t("connections.link")}
+        </a>
+      )}
+    </span>
   );
 }
 

@@ -218,6 +218,23 @@ describe("profileSectionIdFromHash", () => {
   });
 });
 
+describe("Les anciennes ancres de la section réunie", () => {
+  it("restent de vraies cibles dans la page, et les gestes de la liste ne soumettent pas le formulaire", () => {
+    expect(page).toContain("Object.keys(PROFILE_SECTION_ALIASES).map");
+    for (const file of ["ConnectedAppsSection.tsx", "OtherSessionsPanel.tsx"]) {
+      const src = readFileSync(join(ROOT, "app/(secured)/profil", file), "utf8");
+      const buttons = src.match(/<button[^>]*>/g) ?? [];
+      for (const tag of buttons) expect(tag).toContain('type="button"');
+    }
+  });
+
+  it("Certifier ne se propose qu'une fois : sur la ligne Discord, pas aussi dans le champ", () => {
+    const linkedActions = page.slice(page.indexOf("function DiscordLinkedActions("));
+    expect(linkedActions).not.toContain("discord.certify");
+    expect(linkedActions).not.toContain("discord.register");
+  });
+});
+
 describe("La page rejoue le saut vers l'ancre", () => {
   it("lit le fragment par la fonction du registre", () => {
     expect(page).toContain("profileSectionIdFromHash(window.location.hash)");

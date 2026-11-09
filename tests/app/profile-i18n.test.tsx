@@ -204,6 +204,7 @@ const IDENTITY = {
   discordKnown: true,
   discordHasTag: false,
   discordVerified: false,
+  battletagKnown: true,
   battletagFromBlizzard: false,
   onCertifyDiscord: () => undefined,
 };

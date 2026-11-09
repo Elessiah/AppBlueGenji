@@ -94,7 +94,7 @@ export function teamHasContact(members: readonly CertificationIdentity[], battle
  * passe devant : c'est par lui que l'organisation joint un joueur.
  */
 export function certificationProfileHref(prompt: Pick<CertificationPrompt, "discordVerified">): string {
-  return prompt.discordVerified ? "/profil#connexions" : CERTIFY_PROFILE_HREF;
+  return prompt.discordVerified ? "/profil#comptes" : CERTIFY_PROFILE_HREF;
 }
 
 /**

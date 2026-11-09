@@ -27,6 +27,7 @@ const IDENTITY = {
   discordKnown: true,
   discordHasTag: false,
   discordVerified: false,
+  battletagKnown: true,
   battletagFromBlizzard: false,
   onCertifyDiscord: () => undefined,
 };
@@ -134,6 +135,12 @@ describe("ConnectedAppsSection — état et geste suivant", () => {
     const html = render([google(true), blizzard(true)], IDENTITY);
     expect(html).toContain("Lié, BattleTag non certifié");
     expect(html).toContain("Battle.net ne t&#x27;a donné aucun BattleTag");
+  });
+
+  it("Battle.net lié, profil pas encore lu : ni avertissement ni pastille d'alerte", () => {
+    const html = render([google(true), blizzard(true)], { ...IDENTITY, battletagKnown: false });
+    expect(html).not.toContain("Lié, BattleTag non certifié");
+    expect(html).not.toContain("aucun BattleTag");
   });
 
   it("non lié : pastille Non lié et bouton Lier", () => {

@@ -23,6 +23,7 @@ import { precheckImageUpload } from "@/lib/shared/image-upload-errors";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
 import { PSEUDO_MAX_LENGTH } from "@/lib/shared/pseudo";
 import {
+  PROFILE_SECTION_ALIASES,
   PROFILE_SECTION_BY_ID,
   profileSectionIdFromHash,
   visibleProfileSections,
@@ -147,7 +148,6 @@ function battletagFieldNotice(
   return { status: text.t("games.gameTagNotice"), details: [text.t("games.blizzardNotice")] };
 }
 
-/** Le « i » a-t-il quelque chose à dire ? */
 /** Ce que la liste des comptes lit à la page pour dire l'étape de chaque identité. */
 function identityContext(
   discordState: DiscordState,
@@ -159,11 +159,13 @@ function identityContext(
     discordKnown: discordState.linked !== null,
     discordHasTag: !!discordState.tag,
     discordVerified: discordState.verified,
+    battletagKnown: battletagFromBlizzard !== undefined,
     battletagFromBlizzard: blizzardLinked === true && battletagFromBlizzard === true,
     onCertifyDiscord,
   };
 }
 
+/** Le « i » a-t-il quelque chose à dire ? */
 function hasHintDetails(notice: DiscordTagLockNotice): boolean {
   return notice.details.length > 0 || notice.audience;
 }
@@ -789,7 +791,6 @@ export default function ProfilePage() {
         setTagRemovalDms((matchDmShown.current ?? data?.matchDmEnabled) !== false);
         setConfirmingTagRemoval(true);
       }}
-      setVerifyOpen={setVerifyOpen}
     />
   );
 
@@ -940,6 +941,11 @@ export default function ProfilePage() {
         </ProfileSection>
 
         <ProfileSection section={sectionById.comptes}>
+          {/* Les anciennes ancres restent des cibles réelles : un lien de la page
+              même (`#discord`) défile sans passer par le saut rejoué au chargement. */}
+          {Object.keys(PROFILE_SECTION_ALIASES).map((id) => (
+            <span key={id} id={id} />
+          ))}
           <ConnectedAppsSection
             identity={identityContext(discordState, blizzardLinked, data?.profile.battletagFromBlizzard, () =>
               setVerifyOpen(true),
@@ -1273,7 +1279,6 @@ interface DiscordLockedActionsProps {
   loadDiscordState: () => Promise<void>;
   discordTagBusy: boolean;
   onDiscordTagRemove: () => void;
-  setVerifyOpen: (open: boolean) => void;
 }
 
 /**
@@ -1295,7 +1300,6 @@ function DiscordLockedActions({
   loadDiscordState,
   discordTagBusy,
   onDiscordTagRemove,
-  setVerifyOpen,
 }: Readonly<DiscordLockedActionsProps>) {
   const { t } = useProfileText();
   return discordState.linked !== true ? (
@@ -1316,40 +1320,22 @@ function DiscordLockedActions({
       discordState={discordState}
       discordTagBusy={discordTagBusy}
       onDiscordTagRemove={onDiscordTagRemove}
-      setVerifyOpen={setVerifyOpen}
     />
   );
 }
 
-/** Rattaché : certifier (ou enregistrer) le tag, et le retirer. */
+/** Rattaché : retirer le tag (la certification se propose sur la ligne Discord de la liste). */
 function DiscordLinkedActions({
   discordState,
   discordTagBusy,
   onDiscordTagRemove,
-  setVerifyOpen,
 }: Readonly<Omit<DiscordLockedActionsProps, "discordStateBusy" | "loadDiscordState">>) {
   const { t } = useProfileText();
-  /* Sans tag enregistré il n'y a rien à *certifier* : le
-     geste est d'en poser un — le dialogue renvoie alors
-     chez Discord, qui nomme le pseudo, que le joueur
-     certifie ensuite d'un clic. Avec un tag nommé par
-     Discord, le dialogue certifie d'un clic. */
-  const certify = discordState.tag
-    ? { label: t("discord.certify"), ariaLabel: t("discord.certifyLabel") }
-    : { label: t("discord.register"), ariaLabel: t("discord.registerLabel") };
+  /* Le geste « Certifier » (ou « Enregistrer mon tag » sans tag) vit sur la ligne
+     Discord de la liste des comptes, qui est le seul endroit où il se propose : ici
+     deux boutons de même nom ouvraient la même fenêtre. */
   return (
     <div className={s.actionsRow}>
-      {discordState.verified ? null : (
-        <button
-          type="button"
-          className="btn"
-          onClick={() => setVerifyOpen(true)}
-          aria-label={certify.ariaLabel}
-          style={{ padding: "7px 14px", fontSize: 12 }}
-        >
-          {certify.label}
-        </button>
-      )}
       {discordState.tag ? (
         <button
           type="button"

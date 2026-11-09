@@ -177,7 +177,7 @@ describe("fermeture pour l'onglet, et « Ne plus voir » qui vit sur le compte (
 
 it("mène au dialogue de certification Discord si le tag manque, sinon à « Applications connectées »", () => {
   expect(certificationProfileHref({ discordVerified: false })).toBe("/profil?certifier=discord");
-  expect(certificationProfileHref({ discordVerified: true })).toBe("/profil#connexions");
+  expect(certificationProfileHref({ discordVerified: true })).toBe("/profil#comptes");
 });
 
 describe("liveCertificationPrompt", () => {
