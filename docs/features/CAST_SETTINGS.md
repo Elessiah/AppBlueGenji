@@ -217,7 +217,7 @@ d'un mode `MANUAL` suit la même règle (`setMatchOnAir`, sous le verrou du
 match) : un co-caster ne la bascule pas pour le mode d'un autre (403
 `LIVE_TRIGGER_NOT_OWNED`), et le bouton lui est caché. Sur un mode **sans maître**
 (caster parti, mode d'avant la règle), tout caster montré du match ouvre et
-coupe l'antenne (`mayToggleOnAir`, `viewerMayToggleOnAir`) : le match ne reste
+coupe l'antenne (la règle du mode : `mayChangeLiveTrigger`, `viewerMayChangeLiveTrigger`) : le match ne reste
 pas hors antenne en attendant le staff ; changer ce mode reste au staff. Une inscription dont le
 mode a été posé entre-temps par un autre n'est pas refusée : le mode reste
 tel quel et la notification le dit (`triggerSkipped`,

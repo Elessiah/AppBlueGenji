@@ -19,7 +19,6 @@ import {
 import {
   liveTriggerViewer,
   viewerMayChangeLiveTrigger,
-  viewerMayToggleOnAir,
   viewerMayUnmarkLiveTrigger,
 } from "@/lib/shared/live-trigger-owner";
 import { viewerRefereesMatch } from "@/lib/shared/match-referee";
@@ -335,7 +334,7 @@ export function MatchLiveDialog({
   const platforms = LIVE_PLATFORMS.join(", ");
   // L'antenne d'un mode manuel suit la règle du mode (décision 2) : un
   // co-caster ne l'ouvre ni ne la coupe pour le caster qui l'a posé.
-  const airToggle = canToggleOnAir(match) && viewerMayToggleOnAir(match, viewer);
+  const airToggle = canToggleOnAir(match) && viewerMayChangeLiveTrigger(match, viewer);
 
   /** Ouvre ou coupe l'antenne (mode manuel), sans quitter la fenêtre. */
   const toggleAir = useOnAirToggle(match.id, onAir, { setBusy, onDone: onSaved });

@@ -27,7 +27,6 @@ import {
   isMatchRefereeActor,
   liveTriggerOwnerAfter,
   mayChangeLiveTrigger,
-  mayToggleOnAir,
   mayUnmarkLiveTrigger,
   type LiveTriggerActor,
   type LiveTriggerHold,
@@ -784,7 +783,8 @@ export async function setMatchOnAir(
       // pourquoi, quel que soit l'auteur.
       if (row.live_trigger !== "MANUAL") throw new Error("LIVE_TRIGGER_NOT_MANUAL");
       if (!access.live && !isMatchRefereeActor(hold, actor)) throw new Error("NOT_MATCH_REFEREE");
-      if (!mayToggleOnAir(hold, actor, actorShown)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
+      // L'antenne suit la règle du mode : sur un mode sans maître, tout caster montré la bascule.
+      if (!mayChangeLiveTrigger(hold, actor, actorShown)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
       // L'antenne du mode du staff qui porte le lien de l'organisation non plus.
       await assertStaffModeKept(connection, matchId, hold, actor);
       if (onAir && row.status !== "READY") throw new Error("MATCH_NOT_LIVE_READY");

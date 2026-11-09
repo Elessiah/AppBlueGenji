@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { offersCastRelease } from "@/lib/shared/cast-settings";
 import { canToggleOnAir, isMatchCastable, type MatchLiveTrigger } from "@/lib/shared/live-streams";
-import { liveTriggerViewer, viewerMayChangeLiveTrigger, viewerMayToggleOnAir } from "@/lib/shared/live-trigger-owner";
+import { liveTriggerViewer, viewerMayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
 import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import { canEditReplay } from "@/lib/shared/match-replay";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
@@ -94,8 +94,6 @@ export function CastSettingsDialog({
   // (`LIVE_TRIGGER_NOT_OWNED`) : un co-caster ne décide pas pour celui qui l'a posé.
   const viewer = liveTriggerViewer(controls, viewerRefereesMatch(match, controls.refereeNames));
   const triggerLocked = !viewerMayChangeLiveTrigger(match, viewer);
-  // L'antenne : la règle du mode, et le caster montré sur un mode sans maître.
-  const airAllowed = viewerMayToggleOnAir(match, viewer);
   const game = useTournamentGame();
   const titleId = useId();
   const urlId = useId();
@@ -264,7 +262,7 @@ export function CastSettingsDialog({
 
             {/* L'antenne d'un mode manuel suit la règle du mode (décision 2) : un
                 co-caster ne l'ouvre ni ne la coupe pour le caster qui l'a posé. */}
-            {canToggleOnAir(match) && airAllowed && (
+            {canToggleOnAir(match) && !triggerLocked && (
               <div className={styles.section}>
                 <InfoHintRow>
                   <p className={styles.sectionTitle}>{t("cardActions.castSettings.air")}</p>
