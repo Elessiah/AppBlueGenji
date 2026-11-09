@@ -19,7 +19,7 @@ commit : `lib/server/tournaments/referee-notices.ts`. Fenêtre du staff :
 | Colonne | Rôle |
 | --- | --- |
 | `referee_user_id` | arbitre désigné, `NULL` sinon ; clé étrangère `ON DELETE SET NULL`, index `idx_bg_matches_referee` |
-| `referee_ready_at` | son « Prêt », remis à zéro à chaque désignation |
+| `referee_ready_at` | son « Prêt », remis à zéro à chaque désignation et quand un report (ou la planification par arbitre) fait quitter le lancement au match |
 | `self_managed` | autogestion (`0`/`1`), exclusive de l'arbitre |
 | `first_map` | première carte saisie par le staff (64 caractères, `visibleText`) |
 

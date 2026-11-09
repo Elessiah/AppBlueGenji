@@ -145,7 +145,7 @@ export async function setRefereeScheduling(
         const [update] = await connection.execute<ResultSetHeader>(
           `UPDATE bg_matches
            SET lobby_opened_at = NULL, launched_at = NULL, team1_ready_at = NULL,
-               team2_ready_at = NULL
+               team2_ready_at = NULL, referee_ready_at = NULL
            WHERE ${resetCandidates} AND NOT ${SCORE_NOTED_SQL}`,
           [tournamentId],
         );
