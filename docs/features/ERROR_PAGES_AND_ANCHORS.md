@@ -56,3 +56,21 @@ balaie. Le sommaire collant des règles se pose à `--sticky-header-h`.
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
 - **Pages d'erreur et arrivée des ancres** (`app/not-found.tsx`, `app/error.tsx`, `app/global-error.tsx` + `lib/shared/error-pages.ts` ; `lib/shared/sticky-header.ts` + `components/sticky-header-offset.tsx`) : 404 et erreurs d'exécution en français, dans le thème du site, avec des chemins de retour (la 404 passe par `PublicPageShell`). Les ancres s'arrêtent sous l'en-tête collant par **une** règle, `html { scroll-padding-top }`, calée sur la hauteur **mesurée** de l'en-tête (`data-sticky-header` → `--sticky-header-h`) — jamais de `scroll-margin-top` en pixels sur une cible, un balayage le refuse. Voir `docs/features/ERROR_PAGES_AND_ANCHORS.md`.
+
+## Requêtes d'action inconnues (`Next-Action`)
+
+Le site n'a aucune Server Action (REST seulement). Un scanner qui poste un
+`Next-Action` forgé faisait pourtant rendre à Next, hors de la mise en page
+racine, une page d'introuvable dont le pied de page appelait `useToast()` sans
+`ToastProvider` : « useToast doit être utilisé dans ToastProvider » au journal
+du site, avec les lignes « Server Reference ID did not match the expected
+format » (reproduit en production locale : `POST` + `Content-Type:
+application/x-www-form-urlencoded` + `Next-Action` -> 500).
+
+- `middleware.ts` (`isServerActionCall`) : tout `POST` portant `Next-Action`
+  est refusé en 404 sans corps, avant tout rendu — le bruit « Server Reference
+  ID » disparaît avec lui.
+- `PublicPageShell` s'enveloppe de `EnsureToastProvider` (`components/ui/toast.tsx`) :
+  fournisseur ajouté seulement s'il n'y en a pas au-dessus. `useToast` reste
+  strict, un oubli réel de fournisseur se voit toujours.
+- Tests : `tests/app/toast-outside-layout.test.tsx`.

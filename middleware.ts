@@ -41,6 +41,7 @@ export const LEGACY_SUSPENSION_NOTICE_PATH = "/connexion";
  * (`rewrites`), sur la foi de cet en-tête : voir {@link forward}.
  */
 export function middleware(request: NextRequest) {
+  if (isServerActionCall(request)) return new NextResponse(null, { status: 404 });
   if (request.nextUrl.pathname.startsWith("/api/")) return guardApiRequest(request);
 
   const { locale, path, prefixed } = splitLocalePrefix(request.nextUrl.pathname);
@@ -123,6 +124,16 @@ export function middleware(request: NextRequest) {
     response.headers.append("set-cookie", `${SUSPENSION_NOTICE_COOKIE}=; Path=${LEGACY_SUSPENSION_NOTICE_PATH}; Max-Age=0`);
   }
   return response;
+}
+
+/**
+ * Appel d'une Server Action : le site n'en a aucune (REST seulement, `/api/*`),
+ * donc tout `Next-Action` vient d'un scanner. Refusé en **404** avant tout
+ * rendu : Next cherchait sinon l'identifiant (« Server Reference ID did not
+ * match » au journal) et rendait une page d'erreur pour un corps de formulaire.
+ */
+function isServerActionCall(request: NextRequest): boolean {
+  return request.method === "POST" && request.headers.has("next-action");
 }
 
 /**

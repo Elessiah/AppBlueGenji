@@ -12,6 +12,7 @@ jest.mock("@/components/cyber/landing/PublicFooter", () => ({
 }));
 
 import { renderToStaticMarkup } from "react-dom/server";
+import { ToastProvider } from "@/components/ui/toast";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { focusLeftMenu } from "@/components/cyber/landing/PublicNavMenu";
 import { ROOT, cssRules, globals, stripComments, subjectCompound, walk } from "./_lib/style-sweep";
@@ -25,14 +26,18 @@ const sources = (dir: string, suffix: string) =>
 
 describe("PublicPageShell — en-tête et pied de page hors de <main>", () => {
   const html = renderToStaticMarkup(
-    <PublicPageShell>
-      <h1>Contenu</h1>
-    </PublicPageShell>,
+    // Sous le fournisseur de la mise en page racine, comme en service.
+    <ToastProvider>
+      <PublicPageShell>
+        <h1>Contenu</h1>
+      </PublicPageShell>
+    </ToastProvider>,
   );
 
   it("rend l'en-tête, le contenu puis le pied de page, en frères", () => {
     expect(html).toBe(
-      '<header>en-tête</header><main style="position:relative;z-index:1"><h1>Contenu</h1></main><footer>pied</footer>',
+      '<header>en-tête</header><main style="position:relative;z-index:1"><h1>Contenu</h1></main><footer>pied</footer>' +
+        '<div class="sr-only" role="status" aria-live="polite"></div><div class="sr-only" role="alert" aria-live="assertive"></div>',
     );
   });
 });
