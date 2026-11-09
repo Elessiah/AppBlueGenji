@@ -219,13 +219,18 @@ function shownFailed(teamColumn: "team1_id" | "team2_id"): string {
  * `VOICE_CHANNEL_LATE_HOURS`), lancé ou non (le lancement n'en dépend pas), deux
  * équipes réelles — **jamais** une entrée solo (le nom du salon serait un
  * pseudo) ni une fantôme. Un match dont les deux salons sont ouverts n'est
- * plus relu (`HAVING` sur les colonnes calculées : chaque sous-requête n'est écrite
- * qu'une fois ; sans `GROUP BY`, `HAVING` filtre ligne à ligne, avant `LIMIT`).
+ * plus relu (table dérivée filtrée sur les colonnes calculées : chaque sous-requête n'est
+ * écrite qu'une fois, sans `HAVING` hors `GROUP BY`, extension propre au moteur).
  */
-export const DUE_CHANNELS_SQL = `SELECT m.id, m.tournament_id, m.team1_id, m.team2_id,
+export const DUE_CHANNELS_SQL = `SELECT d.id, d.tournament_id, d.team1_id, d.team2_id, d.team1_name, d.team2_name,
+       d.team1_ask, d.team2_ask, d.team1_failed, d.team2_failed
+  FROM (SELECT m.id, m.tournament_id, m.team1_id, m.team2_id, m.start_at,
        t1.name AS team1_name, t2.name AS team2_name,
        ${needsChannel("team1_id")} AS team1_ask, ${needsChannel("team2_id")} AS team2_ask,
-       ${shownFailed("team1_id")} AS team1_failed, ${shownFailed("team2_id")} AS team2_failed
+       ${shownFailed("team1_id")} AS team1_failed, ${shownFailed("team2_id")} AS team2_failed,
+       EXISTS (SELECT 1 FROM bg_match_voice_channels f
+                WHERE f.match_id = m.id AND f.released_at IS NULL AND f.channel_id IS NULL
+                  AND f.failed_at IS NOT NULL) AS create_failed
   FROM bg_matches m
   JOIN bg_tournaments t ON t.id = m.tournament_id
   JOIN bg_teams t1 ON t1.id = m.team1_id
@@ -236,11 +241,9 @@ export const DUE_CHANNELS_SQL = `SELECT m.id, m.tournament_id, m.team1_id, m.tea
    AND m.start_at <= NOW() + INTERVAL ${VOICE_CHANNEL_LEAD_MINUTES} MINUTE
    AND m.start_at >= NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
    AND t1.solo_user_id IS NULL AND t2.solo_user_id IS NULL
-   AND COALESCE(t1.is_ghost, 0) = 0 AND COALESCE(t2.is_ghost, 0) = 0
-HAVING team1_ask OR team2_ask
- ORDER BY EXISTS (SELECT 1 FROM bg_match_voice_channels f
-                  WHERE f.match_id = m.id AND f.released_at IS NULL AND f.channel_id IS NULL
-                    AND f.failed_at IS NOT NULL), m.start_at, m.id
+   AND COALESCE(t1.is_ghost, 0) = 0 AND COALESCE(t2.is_ghost, 0) = 0) d
+ WHERE d.team1_ask OR d.team2_ask
+ ORDER BY d.create_failed, d.start_at, d.id
  LIMIT ${VOICE_SWEEP_BATCH}`;
 
 /**
@@ -327,8 +330,8 @@ function logRecheckFailure(matchId: number, code: string): void {
 }
 
 /**
- * Ligne de pm2 d'un refus du bot entier (`VOICE_*` de `VOICE_UNAVAILABLE_CODES` : permission,
- * catégorie, stockage) au rendu ou à la revérification : une par code, de nouveau
+ * Ligne de pm2 d'un refus du bot entier (code du bot dans `VOICE_UNAVAILABLE_CODES` : jeton,
+ * permission, catégorie, stockage) au rendu ou à la revérification : une par code, de nouveau
  * journalisée après une réponse du bot (`botAnswered`).
  */
 function logBotRefusal(code: string): void {
@@ -338,9 +341,13 @@ function logBotRefusal(code: string): void {
 /** Sujet du refus du bot entier dans `refusalLogged`. */
 const BOT_REFUSAL_SUBJECT = "bot";
 
-/** Refus du bot entier : journalisé une fois par code ; une panne du canal (transport) ne l'est pas. */
+/**
+ * Refus du bot entier (code envoyé par le bot : `VOICE_*`, `UNAUTHORIZED`,
+ * `INTERNAL_API_TOKEN_NOT_CONFIGURED`…) : journalisé une fois par code ; une panne du canal
+ * (transport, codes `BOT_*` posés par le site) ne l'est pas.
+ */
 function noteBotRefusal(code: string): void {
-  if (code.startsWith("VOICE_")) logRefusalOnce(BOT_REFUSAL_SUBJECT, code, () => logBotRefusal(code));
+  if (!code.startsWith("BOT_")) logRefusalOnce(BOT_REFUSAL_SUBJECT, code, () => logBotRefusal(code));
 }
 
 /** Le bot a répondu pour un salon : son prochain refus global sera de nouveau journalisé. */
@@ -474,11 +481,12 @@ function keyRouteMissing(row: ReleaseRow, outcome: VoiceCallOutcome<boolean>): V
 async function releaseOne(row: ReleaseRow): Promise<ReleaseVerdict> {
   const matchId = Number(row.match_id);
   const key = voiceChannelKey(matchId, Number(row.team_id));
-  const released = keyRouteMissing(
-    row,
-    row.channel_id === null ? await releaseVoiceChannelByKey(key) : await releaseVoiceChannel(String(row.channel_id)),
-  );
-  if (released.kind !== "unavailable") botAnswered();
+  const answer =
+    row.channel_id === null ? await releaseVoiceChannelByKey(key) : await releaseVoiceChannel(String(row.channel_id));
+  // Route par clé absente (bot plus ancien) : le bot n'a pas répondu pour ce salon, son refus
+  // global éventuel n'est pas rejournalisé.
+  if (answer.kind !== "unavailable") botAnswered();
+  const released = keyRouteMissing(row, answer);
   // `gone` (`VOICE_CHANNEL_NOT_TRACKED`) : déjà supprimé, rien de plus à faire ; un refus de
   // `VOICE_RELEASE_CLOSING_CODES` ne sera jamais suivi : la ligne se clôt aussi.
   if (released.kind === "ok" || released.kind === "gone" || VOICE_RELEASE_CLOSING_CODES.has(released.code)) {
@@ -732,14 +740,17 @@ async function recheckOpenChannels(touched: Set<number>, deadline: number): Prom
     }
   };
   const worker = async (): Promise<void> => {
-    for (let next = queue.shift(); next && !botDown && Date.now() < deadline; next = queue.shift()) {
+    // Budget et panne vérifiés avant de prendre un salon : aucun n'est retiré de la file sans être vérifié.
+    while (!botDown && Date.now() < deadline) {
+      const next = queue.shift();
+      if (!next) return;
       await checkOne(next);
     }
   };
   // Un premier appel seul : une coupure d'une seconde n'en fait échouer qu'un (le
   // coupe-circuit, partagé par le journal et les annonces, ne compte qu'un échec).
-  const first = queue.shift();
-  if (first && Date.now() < deadline) await checkOne(first);
+  const first = Date.now() < deadline ? queue.shift() : undefined;
+  if (first) await checkOne(first);
   if (!botDown) {
     // Tous les ouvriers finissent avant que la passe ne rende la main : aucun n'écrit après
     // la publication de `touched`, ni ne chevauche la passe suivante.
@@ -815,8 +826,12 @@ async function askDueChannels(touched: Set<number>, deadline: number): Promise<A
   }
 }
 
-/** Une passe : les tournois dont la page change s'ajoutent à `touched` (publiés par l'appelant, même si la passe échoue). */
-async function runSweep(touched: Set<number>): Promise<void> {
+/**
+ * Une passe : les tournois dont la page change s'ajoutent à `touched` (publiés par l'appelant, même si la passe échoue).
+ * `forced` : passe demandée par une bascule (`dispatchMatchVoiceChannels(true)`) — pendant l'attente d'un bot
+ * indisponible, elle tente quand même le rendu (option éteinte : les noms d'équipes quittent Discord sans attendre).
+ */
+async function runSweep(touched: Set<number>, forced: boolean): Promise<void> {
   let needed: (RowDataPacket & { due: number | null; open_rows: number | null })[];
   try {
     needed = await run(SWEEP_NEEDED_SQL);
@@ -833,13 +848,15 @@ async function runSweep(touched: Set<number>): Promise<void> {
     sweep.nextRecheckAt = 0;
   }
   try {
-    // Bot indisponible à la passe précédente : aucun appel avant `VOICE_BOT_BACKOFF_MS`.
-    if (Date.now() < sweep.botDownUntil) return;
+    // Bot indisponible à la passe précédente : aucun appel avant `VOICE_BOT_BACKOFF_MS`, sauf le rendu
+    // d'une passe forcée (la création et la revérification attendent).
+    const backoff = Date.now() < sweep.botDownUntil;
+    if (backoff && !forced) return;
     const deadline = Date.now() + VOICE_PASS_BUDGET_MS;
     // Bot en panne : la revérification est sautée (une seule attente de plus), la suivante reprend le reste.
     // Le rendu a son propre arrêt sur panne et ne dépend ni de la création ni de la revérification :
     // même si l'une d'elles échoue, il passe (la rétention n'attend pas), puis l'erreur remonte.
-    const ask: AskOutcome = due ? await askDueChannels(touched, deadline) : { down: false, failure: null };
+    const ask: AskOutcome = due && !backoff ? await askDueChannels(touched, deadline) : { down: false, failure: null };
     let releaseDown = false;
     try {
       if (due || open) releaseDown = await releaseChannels(touched);
@@ -874,9 +891,12 @@ export function dispatchMatchVoiceChannels(rerun = false): Promise<void> {
   sweep.lastAt = Date.now();
   sweep.pending = (async () => {
     try {
+      // La première passe n'est forcée que si l'appelant l'est ; les suivantes viennent toutes d'une bascule.
+      let forced = rerun;
       do {
         sweep.again = false;
-        await runSweep(new Set<number>());
+        await runSweep(new Set<number>(), forced);
+        forced = true;
       } while (sweep.again);
       sweep.again = false;
     } catch (error) {

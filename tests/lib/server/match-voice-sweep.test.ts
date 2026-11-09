@@ -239,7 +239,8 @@ describe("dispatchMatchVoiceChannels — création", () => {
   });
 
   it("dispatchMatchVoiceChannels_dueQuery_asksMatchesWithAFailedSideAfterTheOthers", () => {
-    expect(DUE_CHANNELS_SQL).toMatch(/ORDER BY EXISTS \(SELECT 1 FROM bg_match_voice_channels f[\s\S]*f\.channel_id IS NULL[\s\S]*f\.failed_at IS NOT NULL\), m\.start_at, m\.id/);
+    expect(DUE_CHANNELS_SQL).toMatch(/EXISTS \(SELECT 1 FROM bg_match_voice_channels f[\s\S]*f\.channel_id IS NULL[\s\S]*f\.failed_at IS NOT NULL\) AS create_failed/);
+    expect(DUE_CHANNELS_SQL).toContain("ORDER BY d.create_failed, d.start_at, d.id");
   });
 
   it("dispatchMatchVoiceChannels_ensureFailsAgain_neitherLogsNorPublishes", async () => {
@@ -1324,7 +1325,98 @@ describe("dispatchMatchVoiceChannels — bot indisponible, budget, journal", () 
 
   it("DUE_CHANNELS_SQL_eachTeamRule_writtenOnce", () => {
     expect(DUE_CHANNELS_SQL.match(/NOT EXISTS/g)).toHaveLength(2);
-    expect(DUE_CHANNELS_SQL).toContain("HAVING team1_ask OR team2_ask");
+  });
+
+  it("DUE_CHANNELS_SQL_derivedTable_filtersAskColumnsWithoutHaving", () => {
+    // `HAVING` hors `GROUP BY` : extension du moteur, la production tourne sous MariaDB.
+    expect(DUE_CHANNELS_SQL).not.toContain("HAVING");
+    expect(DUE_CHANNELS_SQL).toContain("WHERE d.team1_ask OR d.team2_ask");
+  });
+
+  it("dispatchMatchVoiceChannels_releaseUnauthorized_logsBotRefusalOnce", async () => {
+    database({ releasable: [releasable] });
+    const start = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(start);
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "UNAUTHORIZED" });
+    await dispatchMatchVoiceChannels();
+    clock.mockReturnValue(start + (VOICE_RETRY_SECONDS + 1) * 1000);
+    await dispatchMatchVoiceChannels(true);
+    expect(releaseVoiceChannel).toHaveBeenCalledTimes(2);
+    expect(jest.mocked(console.warn).mock.calls).toEqual([
+      ["[match-voice] bot vocal : refus pour tous les salons (UNAUTHORIZED)"],
+    ]);
+  });
+
+  it("dispatchMatchVoiceChannels_recheckTokenNotConfigured_logsBotRefusal", async () => {
+    database({ openDue: [open] });
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "INTERNAL_API_TOKEN_NOT_CONFIGURED" });
+    await dispatchMatchVoiceChannels();
+    expect(jest.mocked(console.warn).mock.calls).toEqual([
+      ["[match-voice] bot vocal : refus pour tous les salons (INTERNAL_API_TOKEN_NOT_CONFIGURED)"],
+    ]);
+  });
+
+  it("dispatchMatchVoiceChannels_keyRouteMissingBetweenBotRefusals_logsRefusalOnce", async () => {
+    database({ releasable: [{ ...releasable, channel_id: null }, { ...releasable, match_id: 43, channel_id: "902" }] });
+    const start = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(start);
+    jest.mocked(releaseVoiceChannelByKey).mockResolvedValue({ kind: "unavailable", code: "INTERNAL_ROUTE_NOT_FOUND" });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "VOICE_MISSING_PERMISSIONS" });
+    await dispatchMatchVoiceChannels();
+    clock.mockReturnValue(start + (VOICE_RETRY_SECONDS + 1) * 1000);
+    await dispatchMatchVoiceChannels(true);
+    expect(releaseVoiceChannel).toHaveBeenCalledTimes(2);
+    expect(
+      jest.mocked(console.warn).mock.calls.filter(([line]) => String(line).includes("refus pour tous les salons")),
+    ).toEqual([["[match-voice] bot vocal : refus pour tous les salons (VOICE_MISSING_PERMISSIONS)"]]);
+  });
+
+  it("dispatchMatchVoiceChannels_recheckBudgetExhaustedNearWindowEnd_rereadsSameWindow", async () => {
+    // Fenêtre pleine vérifiée par lots de 80 : à la cinquième passe, le budget s'épuise avec
+    // cinq salons encore en file — aucun n'est retiré sans être vérifié, la fenêtre est relue.
+    const { execute } = database({ openDue: openRows(400) });
+    const start = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(start);
+    jest.mocked(ensureVoiceChannel).mockImplementation(async () => {
+      if (jest.mocked(ensureVoiceChannel).mock.calls.length === 395) clock.mockReturnValue(start + 20_001);
+      return { kind: "ok", value: "901" };
+    });
+    await dispatchMatchVoiceChannels(true);
+    await dispatchMatchVoiceChannels(true);
+    await dispatchMatchVoiceChannels(true);
+    await dispatchMatchVoiceChannels(true);
+    await dispatchMatchVoiceChannels(true);
+    await dispatchMatchVoiceChannels(true);
+    expect(execute.mock.calls.filter(([sql]) => sql === OPEN_DUE_CHANNELS_SQL).at(-1)?.[1]).toEqual([0, 0, 0]);
+  });
+
+  it("dispatchMatchVoiceChannels_forcedPassDuringBackoff_releasesWithoutCreating", async () => {
+    database({ due: [dueMatch], releasable: [releasable] });
+    const start = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(start);
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "BOT_INTERNAL_UNREACHABLE" });
+    jest
+      .mocked(releaseVoiceChannel)
+      .mockResolvedValueOnce({ kind: "unavailable", code: "BOT_INTERNAL_UNREACHABLE" })
+      .mockResolvedValueOnce({ kind: "ok", value: true });
+    await dispatchMatchVoiceChannels();
+    clock.mockReturnValue(start + 11_000);
+    await dispatchMatchVoiceChannels(true);
+    expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
+    expect(releaseVoiceChannel).toHaveBeenCalledTimes(2);
+  });
+
+  it("dispatchMatchVoiceChannels_unforcedPassDuringBackoff_callsNothing", async () => {
+    database({ due: [dueMatch], releasable: [releasable] });
+    const start = Date.now();
+    const clock = jest.spyOn(Date, "now").mockReturnValue(start);
+    jest.mocked(ensureVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "BOT_INTERNAL_UNREACHABLE" });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "BOT_INTERNAL_UNREACHABLE" });
+    await dispatchMatchVoiceChannels();
+    clock.mockReturnValue(start + 11_000);
+    await dispatchMatchVoiceChannels();
+    expect(ensureVoiceChannel).toHaveBeenCalledTimes(1);
+    expect(releaseVoiceChannel).toHaveBeenCalledTimes(1);
   });
 
   it("dispatchMatchVoiceChannels_releaseUnavailablePastBotNetBeforeForget_keepsRowAndStops", async () => {

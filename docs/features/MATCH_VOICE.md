@@ -73,6 +73,10 @@ et rien n'est compté.
   traités, et il garde son horodatage (redemandé après la minute, jamais en tête de file).
 - **Budget d'une passe** : 20 s (`VOICE_PASS_BUDGET_MS`) pour la création et la revérification ;
   contre un bot lent (mais sous son délai), la passe s'arrête là, le rendu passe, la suivante reprend.
+  Le budget est lu avant de prendre un salon dans la file : aucun n'en sort sans être vérifié.
+- **Passe forcée pendant l'attente** : une bascule (`dispatchMatchVoiceChannels(true)`) pendant
+  `botDownUntil` tente quand même le rendu (option éteinte : les noms d'équipes quittent Discord
+  sans attendre) ; création et revérification attendent la fin du délai.
 - **Panne du bot** : `failed_at` noté, une ligne pm2 sans donnée de joueur, une
   seule par panne ; création comme rendu réessayés au plus une fois par
   `VOICE_RETRY_SECONDS` (60 s), en fin de file — par équipe : une création échouée
@@ -81,10 +85,12 @@ et rien n'est compté.
   `team1_failed` / `team2_failed` : panne déjà montrée, pas de seconde ligne pm2). Un rendu
   refusé par le bot donne une ligne pm2 `rendu du salon vocal refusé (CODE)` par salon et
   par code, une revérification refusée `revérification du salon vocal refusée (CODE)` par
-  salon et par code, un refus `VOICE_*` du bot entier (rendu ou revérification)
+  salon et par code, un refus du bot entier (code envoyé par le bot : `VOICE_*`, `UNAUTHORIZED`,
+  `INTERNAL_API_TOKEN_NOT_CONFIGURED`… ; jamais un code `BOT_*` du transport ; rendu ou revérification)
   `bot vocal : refus pour tous les salons (CODE)` une seule fois par code, de nouveau dès que le
   bot a répondu pour un salon (mémoire du processus bornée à 1 000 entrées, oubliée à la clôture
-  de la ligne) ; une panne du canal n'en donne pas.
+  de la ligne) ; une panne du canal n'en donne pas. Une route par clé absente (bot plus ancien)
+  ne compte pas comme une réponse du bot : le refus global n'est pas rejournalisé.
 - **Refus de rendu sans fin** : passé `VOICE_BOT_UNRELEASED_MAX_HOURS` (48 h) depuis la création de la
   ligne (filet du bot), un rendu **refusé** (`failed`) clôt la ligne au lieu de la redemander
   chaque minute ; un bot **indisponible** ne la clôt que passé `VOICE_BOT_ABANDONED_MAX_HOURS`
@@ -132,7 +138,9 @@ et rien n'est compté.
   état (`team1State` / `team2State`) : « bientôt ouvert » (`WAITING`), « ouvert »
   (`OPEN`), « indisponible, nouvelle tentative en cours » (`FAILED`). Une ancienne charge (`COUNTED`/`UNCOUNTED`,
   nombres, `pending`) se lit `OPEN`, sans le reste. La vue spectateur ne garde rien
-  (`voice: null`).
+  (`voice: null`). L'état (`WAITING` / `OPEN` / `FAILED`) n'est pas une donnée personnelle et se
+  déduit de ce qui est public (option, heure du match) : il voyage dans l'instantané commun et la
+  porte REST pour tout lecteur du tournoi ; seul l'affichage est réservé aux parties et au staff.
 
 ## Comportements gardés (CAST-FOLLOWUP)
 
@@ -176,7 +184,9 @@ renvoie à `/rgpd#salons-vocaux` (T18).
 ## Côté bot
 
 Le bot doit avoir **Gérer les salons** sur la catégorie des matchs
-(`676735851119640577`) ; il supprime un salon vide une fois rendu (au plus tard
+(`676735851119640577`). Les salons héritent des permissions de la catégorie (aucune
+permission propre à une équipe : le bot ne reçoit aucun compte de joueur) — qui peut les
+rejoindre se règle sur la catégorie (décision requise, `ERREUR.txt`) ; il supprime un salon vide une fois rendu (au plus tard
 24 h après), et un salon jamais rendu resté vide 48 h. La route de comptage
 (`/internal/voice/channels/:id/count`) est retirée (EF-43). Le rendu par clé
 (`POST /internal/voice/keys/release`) arrive avec la PR du bot de ce lot. Déployer le bot avant
