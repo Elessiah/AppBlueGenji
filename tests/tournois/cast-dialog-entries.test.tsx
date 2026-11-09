@@ -14,7 +14,7 @@ jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: ()
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { CastBattletagField, CastTriggerField } from "@/app/(secured)/tournois/[id]/_components/CastSettingsFields";
-import { mayEditReplay } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
+import { closedMatchUnchanged, mayEditReplay, matchLiveBody } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
 import { readSource } from "../helpers/read-source";
 import frActions from "@/messages/fr/tournamentActions.json";
 import enActions from "@/messages/en/tournamentActions.json";
@@ -142,5 +142,62 @@ describe("MatchLiveDialog — la seule `live` (revue sécurité #564)", () => {
     for (const messages of [frDialogs, enDialogs]) {
       expect(messages.live.urlStaffOnly).toEqual(expect.any(String));
     }
+  });
+});
+
+describe("MatchLiveDialog — match joué (ERREUR.txt EF-29 #528, CAST-FOLLOWUP cycle 19 c)", () => {
+  const played = { status: "COMPLETED" as const, liveTrigger: "AUTO" as const, liveStartedAt: null, launchedAt: null };
+  const open = { ...played, status: "READY" as const };
+  const link = [{ streamId: 3, liveUrl: "https://twitch.tv/b" }];
+
+  it("closedMatchUnchanged_playedStillMarkedNoLinkEdit_true", () => {
+    expect(closedMatchUnchanged(played, true, false)).toBe(true);
+  });
+
+  it("closedMatchUnchanged_playedUnmarked_false", () => {
+    expect(closedMatchUnchanged(played, false, false)).toBe(false);
+  });
+
+  it("closedMatchUnchanged_playedWithCasterLinkEdit_false", () => {
+    expect(closedMatchUnchanged(played, true, true)).toBe(false);
+  });
+
+  it("closedMatchUnchanged_castableMatch_false", () => {
+    expect(closedMatchUnchanged(open, true, false)).toBe(false);
+  });
+
+  it("matchLiveBody_playedKeptMarked_sendsOnlyCasterLinks", () => {
+    expect(matchLiveBody({ castable: false, trigger: "AUTO", liveUrl: "https://twitch.tv/a", organisationLink: true, streamLinks: link })).toEqual({
+      streamLinks: link,
+    });
+  });
+
+  it("matchLiveBody_playedUnmarked_sendsNullTriggerAndLink", () => {
+    expect(matchLiveBody({ castable: false, trigger: null, liveUrl: "https://twitch.tv/a", organisationLink: undefined, streamLinks: undefined })).toEqual({
+      trigger: null,
+      liveUrl: null,
+    });
+  });
+
+  it("matchLiveBody_castable_sendsTrimmedLinkAndOrigin", () => {
+    expect(matchLiveBody({ castable: true, trigger: "MANUAL", liveUrl: "  https://twitch.tv/a ", organisationLink: false, streamLinks: undefined })).toEqual({
+      trigger: "MANUAL",
+      liveUrl: "https://twitch.tv/a",
+      organisationLink: false,
+    });
+  });
+
+  it("matchLiveBody_castableEmptyLink_sendsNullLink", () => {
+    expect(matchLiveBody({ castable: true, trigger: "AUTO", liveUrl: " ", organisationLink: undefined, streamLinks: undefined })).toEqual({
+      trigger: "AUTO",
+      liveUrl: null,
+    });
+  });
+
+  it("MatchLiveDialog_staffLink_resyncedWhenUntouchedAndNoInlineStyle", () => {
+    const live = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
+    expect(live).toContain("if (liveUrl === seen) setLiveUrl(current);");
+    expect(live).not.toContain("style={{");
+    expect(live).not.toMatch(/var\(--[a-z-]+, #/);
   });
 });

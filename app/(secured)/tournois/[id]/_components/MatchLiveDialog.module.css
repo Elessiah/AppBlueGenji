@@ -7,3 +7,69 @@
   padding: 8px 18px;
   font-size: 13px;
 }
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.pairing {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--ink-quiet);
+}
+
+.streamed {
+  margin: 18px 0;
+}
+
+/* Libellé d'une case : la case garde le style de globals.css (CHECKBOX_STYLES.md). */
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.organisation {
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.invalid {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.casterLinks {
+  border: none;
+  padding: 0;
+  margin: 0 0 16px;
+}
+
+.casterLinksLegend {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-quiet);
+  padding: 0;
+  margin-bottom: 8px;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.submitButton {
+  padding: 8px 20px;
+  font-size: 13px;
+}
