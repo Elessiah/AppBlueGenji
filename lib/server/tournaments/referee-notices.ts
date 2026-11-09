@@ -88,12 +88,20 @@ export function refereeLogCategory(change: RefereeChange): BotLogCategory {
     case "AUTO_RELEASED":
       return "staff-removal";
     case "ASSIGNED":
-      return change.replacedRefereeId === null ? "referees" : "staff-removal";
     case "SELF_MANAGED":
       return change.replacedRefereeId === null ? "referees" : "staff-removal";
-    default:
+    case "TAKEN":
+    case "FIRST_MAP":
+    case "MAP_PICK":
       return "referees";
+    default:
+      return assertNever(change);
   }
+}
+
+/** Contrôle d'exhaustivité : un nouveau cas de `RefereeChange` ne compile pas sans sa catégorie. */
+function assertNever(change: never): never {
+  throw new Error(`changement d'arbitrage inconnu : ${JSON.stringify(change)}`);
 }
 
 /**

@@ -43,7 +43,7 @@ import {
 import { rankEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { attachMatchMaps, mapCard, mapMatch, type TournamentRow } from "./_internal";
 import { loadMapsByMatch } from "./match-maps";
-import { loadMatchCasters, loadMatchStreams } from "./match-casters";
+import { loadMatchCasters, loadMatchStreams, type MatchCasterRow } from "./match-casters";
 import {
   getMatchRows,
   getRegistrationRows,
@@ -498,7 +498,9 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     // Tout caster tient un stream (`stream_id`, clé étrangère) : sans stream
     // sur le plateau, il n'a aucun caster à lire.
     const castersByMatch =
-      streamsByMatch.size === 0 ? new Map() : await loadMatchCasters(connection, matchIds);
+      streamsByMatch.size === 0
+        ? new Map<number, MatchCasterRow[]>()
+        : await loadMatchCasters(connection, matchIds);
     // Cartes par manche et règles de ban, dans l'instantané commun : flux et
     // REST de secours les portent ensemble (`docs/features/ROUND_MAPS.md`).
     const storedMapRules = await loadMapRules(connection, tournamentId, tournament);

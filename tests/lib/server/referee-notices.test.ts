@@ -118,6 +118,13 @@ describe("refereeLogCategory — un retrait alerte, le reste reste une trace", (
     expect(refereeLogCategory(change)).toBe(category);
   });
 
+  it("refereeLogCategory_unknownKind_throws", () => {
+    // Une ligne venue d'ailleurs (version plus récente) : jamais classée en silence.
+    const unknown = JSON.parse('{"kind":"UNKNOWN","matchId":1}') as RefereeChange;
+
+    expect(() => refereeLogCategory(unknown)).toThrow("changement d'arbitrage inconnu");
+  });
+
   it.each<[RefereeChange]>([
     [{ kind: "RELEASED", matchId: 42, refereeId: REFEREE, byStaff: false }],
     [{ kind: "RELEASED", matchId: 42, refereeId: REFEREE, byStaff: true }],
