@@ -619,8 +619,9 @@ function ConnectionsUnread({
         className={`btn ${s.rowAction}`}
         onClick={() => void retry()}
         aria-disabled={retrying || undefined}
+        aria-label={busyAriaLabel(retrying, t("connections.retryLabel"))}
       >
-        {retrying ? t("connections.reading") : t("connections.retryLabel")}
+        {retrying ? t("connections.reading") : t("connections.retry")}
       </button>
     </div>
   );

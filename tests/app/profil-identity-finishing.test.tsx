@@ -100,7 +100,8 @@ describe("lecture en panne", () => {
     const html = render(null, IDENTITY, true);
     // Pas de phrase d'erreur en ligne (notification) : le bouton porte le texte visible.
     expect(html).not.toContain("n&#x27;ont pas pu être lus");
-    expect(html).toContain("Réessayer de lire mes comptes liés");
+    expect(html).toContain('aria-label="Réessayer de lire mes comptes liés"');
+    expect(html).toContain(">Réessayer<");
     expect(html).not.toContain("Chargement…");
   });
 
@@ -191,6 +192,7 @@ describe("vocabulaire Lier / Lié", () => {
     const keys = [
       ["connections", "battletagPointer"],
       ["connections", "loadFailed"],
+      ["connections", "retry"],
       ["connections", "retryLabel"],
       ["connections", "discordRowRetryLabel"],
       ["connections", "reading"],
@@ -220,6 +222,7 @@ describe("gestes refusés et reliquats du profil", () => {
     expect(src).toContain("aria-disabled={busy || count === 0 || undefined}");
     // Le compte lu peut être périmé : à 0, il est relu avant de refuser.
     expect(src).toContain("const fresh = await load();");
+    expect(src).toContain("if (fresh === 0) showError(");
   });
 
   it("selfRolesField_source_closesAndRefreshesOnDefinitiveRefusal", () => {

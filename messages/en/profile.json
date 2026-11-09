@@ -402,7 +402,8 @@
     "retryLabel": "Try again to read my linked accounts",
     "reading": "Reading…",
     "battletagPointerMissing": "The “Overwatch BattleTag” field is not shown yet: try again in a moment.",
-    "discordRowRetryLabel": "Try again (Discord status, accounts list)"
+    "discordRowRetryLabel": "Try again (Discord status, accounts list)",
+    "retry": "Try again"
   },
   "battletagNotice": {
     "eyebrow": "VISIBILITY · BATTLETAG",

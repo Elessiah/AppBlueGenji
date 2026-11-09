@@ -63,7 +63,9 @@ export function OtherSessionsPanel({ version }: Readonly<{ version: number }>): 
     checking.current = true;
     const fresh = await load();
     checking.current = false;
-    if (fresh === 0 || fresh === null) showError(text.t("connections.sessions.nothingToClose"));
+    // Une session est apparue, ou le compte reste illisible : fermer ne dépend pas d'avoir compté.
+    if (fresh === 0) showError(text.t("connections.sessions.nothingToClose"));
+    else void revoke();
   };
 
   useEffect(() => {

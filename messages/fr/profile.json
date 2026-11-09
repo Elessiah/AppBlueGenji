@@ -402,7 +402,8 @@
     "retryLabel": "Réessayer de lire mes comptes liés",
     "reading": "Lecture…",
     "battletagPointerMissing": "Le champ « BattleTag Overwatch » n'est pas encore affiché : réessaie dans un instant.",
-    "discordRowRetryLabel": "Réessayer la lecture de l'état Discord (liste des comptes)"
+    "discordRowRetryLabel": "Réessayer la lecture de l'état Discord (liste des comptes)",
+    "retry": "Réessayer"
   },
   "battletagNotice": {
     "eyebrow": "VISIBILITÉ · BATTLETAG",
