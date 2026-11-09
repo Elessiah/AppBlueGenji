@@ -321,7 +321,6 @@
       "LINKED_NO_BATTLETAG": "Lié, BattleTag non certifié",
       "CERTIFIED": "Certifié"
     },
-    "blizzardNoTag": "Battle.net ne t'a donné aucun BattleTag : celui que tu saisis plus bas reste non certifié.",
     "linked": "Lié",
     "handleLine": "{label} : {handle}",
     "handleLabels": {
@@ -349,7 +348,7 @@
       "linkedByButton": "Rattaché par le bouton Discord, à retirer sur sa ligne. Le code en message privé met ici ton pseudo à jour.",
       "linkedElsewhere": "Discord rattaché, à retirer sur sa ligne. Le code en message privé met ici ton pseudo à jour.",
       "notLinked": "Rattache Discord sans écran d'autorisation : le bot BlueGenji t'envoie un code en message privé.",
-      "linkByCode": "Rattacher par code",
+      "linkByCode": "Lier par code",
       "updateHandle": "Mettre à jour mon pseudo",
       "disconnect": "Se déconnecter",
       "disconnectLabel": "Se déconnecter du bot Discord",

@@ -92,7 +92,7 @@ const STAGE_PILL: Record<StateKey, PillVariant> = {
 function rowStage(
   connection: AccountConnection,
   identity: IdentityContext,
-): { action: IdentityStep["action"]; key: StateKey; blizzardNoTag: boolean } {
+): { action: IdentityStep["action"]; key: StateKey } {
   const step = identityStep(connection.provider, {
     linked: connection.linked,
     discordHasTag: identity.discordHasTag,
@@ -106,7 +106,6 @@ function rowStage(
   return {
     action: unread ? null : step.action,
     key: unread ? "LINKED" : stateKey(connection.provider, step),
-    blizzardNoTag: !unread && connection.provider === "BLIZZARD" && step.stage === "LINKED",
   };
 }
 
@@ -339,7 +338,7 @@ function ConnectionRow({
   const details = connectionDetails(text, connection, discordByCode);
   // L'étape se lit sur le rattachement **réel** (Discord lié par code compte), non
   // sur la porte du bouton : sinon « Non lié » côté bouton masquerait le tag à certifier.
-  const { action, key, blizzardNoTag } = rowStage(rawConnection, identity);
+  const { action, key } = rowStage(rawConnection, identity);
   const stateWord = t(`connections.state.${key}`);
   const pillVariant = STAGE_PILL[key];
   return (
@@ -356,18 +355,13 @@ function ConnectionRow({
                 className={`${s.connectionDot} ${connection.linked ? s.connectionDotOn : ""}`}
               />
               <strong style={{ fontSize: 14 }}>{label}</strong>
-              <Pill variant={pillVariant} id={stateId}>{stateWord}</Pill>
+              <Pill variant={pillVariant} id={stateId} role="status" tabIndex={-1}>{stateWord}</Pill>
             </span>
             <ProviderHint provider={connection.provider} />
           </InfoHintRow>
           <span id={detailsId} style={{ fontSize: 11, color: "var(--ink-quiet)", lineHeight: 1.5 }}>
             {details}
           </span>
-          {blizzardNoTag ? (
-            <span style={{ fontSize: 11, color: "var(--ink-dim)", lineHeight: 1.5 }}>
-              {t("connections.blizzardNoTag")}
-            </span>
-          ) : null}
           {/*
             **Ce que « Rattaché » ne disait pas.** Discord a deux portes
             — le bouton, et le code reçu en message privé — et elles ne

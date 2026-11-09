@@ -23,6 +23,7 @@ import { precheckImageUpload } from "@/lib/shared/image-upload-errors";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
 import { PSEUDO_MAX_LENGTH } from "@/lib/shared/pseudo";
 import {
+  PROFILE_SECTION_ALIASES,
   PROFILE_SECTION_BY_ID,
   profileSectionIdFromHash,
   visibleProfileSections,
@@ -505,8 +506,10 @@ export default function ProfilePage() {
   // aucun élément ne la porte plus, le navigateur ne défilerait pas.
   useEffect(() => {
     const onHashChange = (event: HashChangeEvent) => {
-      const id = profileSectionIdFromHash(new URL(event.newURL).hash);
-      document.getElementById(id ?? "")?.scrollIntoView({ block: "start" });
+      const raw = new URL(event.newURL).hash.slice(1);
+      // Une ancre du registre défile d'elle-même : seules les anciennes ont besoin d'aide.
+      if (!Object.hasOwn(PROFILE_SECTION_ALIASES, raw)) return;
+      document.getElementById(PROFILE_SECTION_ALIASES[raw])?.scrollIntoView({ block: "start" });
     };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
@@ -833,6 +836,8 @@ export default function ProfilePage() {
             // Une fenêtre de proposition encore en attente (conditions à
             // accepter) ne doit plus s'ouvrir pour un tag désormais certifié.
             window.dispatchEvent(certifiedFromProfileEvent());
+            // Le bouton « Certifier » de la ligne disparaît : le focus passe à la pastille d'état.
+            requestAnimationFrame(() => document.getElementById("connection-state-discord")?.focus());
           }}
         />
       )}

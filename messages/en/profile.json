@@ -65,7 +65,7 @@
     "marvel": "Marvel Rivals tag",
     "gameTagNotice": "Only used to add you in game, never for statistics.",
     "blizzardNotice": "If you link Battle.net, Blizzard fills in this field and updates it at every login, replacing what you typed. If it gives none, what you typed stays, without the “verified” mark.",
-    "blizzardLinkedNoTag": "Battle.net is linked but gave you no BattleTag: what you type stays, without the \"verified\" mark."
+    "blizzardLinkedNoTag": "Battle.net is linked but gave you no BattleTag: what you type stays, without the “verified” mark."
   },
   "battletagLock": {
     "pending": "Reading your connected apps… The field is read-only meanwhile.",
@@ -321,7 +321,6 @@
       "LINKED_NO_BATTLETAG": "Linked, BattleTag not verified",
       "CERTIFIED": "Verified"
     },
-    "blizzardNoTag": "Battle.net gave you no BattleTag: the one you type below stays uncertified.",
     "linked": "Linked",
     "handleLine": "{label}: {handle}",
     "handleLabels": {

@@ -29,7 +29,7 @@ function visibleLines(profile: typeof frProfile, login: typeof frLogin, players:
     "discord.unverifiedHint": profile.discord.unverifiedHint,
     "privacy.discordPending": profile.privacy.discordPending,
     "privacy.discordNoTag": profile.privacy.discordNoTag,
-    "connections.blizzardNoTag": profile.connections.blizzardNoTag,
+    
     "games.blizzardLinkedNoTag": profile.games.blizzardLinkedNoTag,
     "connections.notes.BLIZZARD": profile.connections.notes.BLIZZARD,
     "connections.bot.linkedByButton": profile.connections.bot.linkedByButton,

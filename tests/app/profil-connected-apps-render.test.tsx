@@ -131,10 +131,9 @@ describe("ConnectedAppsSection — état et geste suivant", () => {
     expect(html).not.toContain("Certifier mon tag Discord");
   });
 
-  it("Battle.net lié sans BattleTag de Blizzard : le dit", () => {
+  it("Battle.net lié sans BattleTag de Blizzard : la pastille le dit", () => {
     const html = render([google(true), blizzard(true)], IDENTITY);
     expect(html).toContain("Lié, BattleTag non certifié");
-    expect(html).toContain("Battle.net ne t&#x27;a donné aucun BattleTag");
   });
 
   it("Battle.net lié, profil pas encore lu : ni avertissement ni pastille d'alerte", () => {
