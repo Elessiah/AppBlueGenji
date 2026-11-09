@@ -5,6 +5,14 @@ import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
 import { announceStaffMatchAction, staffActionAuthor } from "@/lib/server/tournaments/staff-action-logs";
 
+/** Refus codés du service, et leur statut ; tout autre échec est un 500. */
+const REPLAY_ERROR_STATUSES: Readonly<Record<string, number>> = {
+  MATCH_NOT_FOUND: 404,
+  NOT_MATCH_CASTER: 403,
+  INVALID_REPLAY_URL: 400,
+  MATCH_NOT_REPLAYABLE: 409,
+};
+
 function parseMatchId(raw: string): number | null {
   const matchId = Number(raw);
   return Number.isInteger(matchId) && matchId > 0 ? matchId : null;
@@ -43,10 +51,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
     return ok({ replayUrl });
   } catch (error) {
     const message = (error as Error).message;
-    if (message === "MATCH_NOT_FOUND") return fail(message, 404);
-    if (message === "NOT_MATCH_CASTER") return fail(message, 403);
-    if (message === "INVALID_REPLAY_URL") return fail(message, 400);
-    if (message === "MATCH_NOT_REPLAYABLE") return fail(message, 409);
-    return fail("MATCH_REPLAY_UPDATE_FAILED", 500);
+    const status = REPLAY_ERROR_STATUSES[message];
+    return status === undefined ? fail("MATCH_REPLAY_UPDATE_FAILED", 500) : fail(message, status);
   }
 }

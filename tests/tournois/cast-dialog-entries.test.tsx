@@ -14,6 +14,7 @@ jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: ()
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { CastBattletagField, CastTriggerField } from "@/app/(secured)/tournois/[id]/_components/CastSettingsFields";
+import { castLinkOrigin } from "@/app/(secured)/tournois/[id]/_components/CastSettingsDialog";
 import { readSource } from "../helpers/read-source";
 import frActions from "@/messages/fr/tournamentActions.json";
 import enActions from "@/messages/en/tournamentActions.json";
@@ -115,5 +116,23 @@ describe("Textes ajoutés — FR et EN", () => {
       expect(messages.cardActions.castSettings.loading).toEqual(expect.any(String));
       expect(messages.cardActions.castSettings.played).toEqual(expect.any(String));
     }
+  });
+});
+
+describe("castLinkOrigin — la case « lien de l'organisation » (décision du 2026-11-09)", () => {
+  it("castLinkOrigin_checkedAloneOnOwnLink_offeredAndChanged", () => {
+    expect(castLinkOrigin({ organisationLink: false }, true, "https://twitch.tv/voix", true)).toEqual({ offered: true, changed: true });
+  });
+
+  it("castLinkOrigin_sameAsStored_notChanged", () => {
+    expect(castLinkOrigin({ organisationLink: true }, true, "https://twitch.tv/voix", true)).toEqual({ offered: true, changed: false });
+  });
+
+  it("castLinkOrigin_emptyLink_notOffered", () => {
+    expect(castLinkOrigin({ organisationLink: false }, true, "  ", true)).toEqual({ offered: false, changed: false });
+  });
+
+  it("castLinkOrigin_notAllowed_notOffered", () => {
+    expect(castLinkOrigin({ organisationLink: false }, false, "https://twitch.tv/voix", true)).toEqual({ offered: false, changed: false });
   });
 });

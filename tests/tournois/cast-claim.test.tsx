@@ -382,7 +382,7 @@ describe("MatchCardActions — branchements du cast", () => {
   it("CastSettingsDialog_organisationBox_offeredOnLinkedStreamAndSentAlone", () => {
     // Décision du 2026-11-09 : la case se coche ou se décoche seule, lien inchangé ; relue à l'ouverture.
     const settings = readSource("app/(secured)/tournois/[id]/_components/CastSettingsDialog.tsx");
-    expect(settings).toContain('const originOffered = canSchedule && streamEditable && url.trim() !== "";');
+    expect(settings).toContain("castLinkOrigin(cast, canSchedule && streamEditable, url, organisationLink)");
     expect(settings).toContain("if (originOffered && (urlChanged || originChanged)) settings.organisationLink = organisationLink;");
     expect(settings).toContain("setOrganisationLink(payload.organisationLink === true);");
     expect(settings).toContain("|| originChanged;");

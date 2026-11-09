@@ -38,6 +38,21 @@ const CAST_FIELD_ERRORS = {
 } as const;
 
 /** Ce que la fenêtre a lu du cast du lecteur (`GET /api/matches/[id]/caster`). */
+/**
+ * La case « lien de l'organisation » : offerte à qui la peut dire (`allowed` :
+ * membre `tournaments`, sur son stream) dès qu'un lien est saisi ; changée
+ * quand elle diffère de l'origine relue (`OwnCast.organisationLink`).
+ */
+export function castLinkOrigin(
+  cast: Pick<OwnCast, "organisationLink"> | null,
+  allowed: boolean,
+  url: string,
+  checked: boolean,
+): { offered: boolean; changed: boolean } {
+  const offered = allowed && url.trim() !== "";
+  return { offered, changed: cast !== null && offered && checked !== (cast.organisationLink === true) };
+}
+
 type OwnCast = {
   streamId: number;
   liveUrl: string | null;
@@ -165,8 +180,7 @@ export function CastSettingsDialog({
   // « Enregistrer » sans rien de changé n'a rien à dire : il reste désarmé.
   // La case « lien de l'organisation » : un membre `tournaments`, sur son
   // stream à lien ; elle se coche ou se décoche aussi seule (lien inchangé).
-  const originOffered = canSchedule && streamEditable && url.trim() !== "";
-  const originChanged = cast !== null && originOffered && organisationLink !== (cast.organisationLink === true);
+  const { offered: originOffered, changed: originChanged } = castLinkOrigin(cast, canSchedule && streamEditable, url, organisationLink);
   const dirty = triggerChanged || (streamEditable && urlChanged) || battletagChanged || originChanged;
   // Seul un mode choisi ici s'envoie : celui du match, même sans sa date, ne
   // bloque pas l'enregistrement d'un lien ou d'un BattleTag.
