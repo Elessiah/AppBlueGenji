@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { EntrantName } from "./EntrantName";
 import styles from "./MatchRow.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
@@ -22,8 +23,15 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
  * Le gabarit est celui de `MatchRow`, dont elle emprunte les styles : la
  * largeur d'une carte est celle de la colonne de `BracketTree`, qui trace ses
  * connecteurs dessus.
+ *
+ * **Mémorisée**, comme `MatchRow` et pour la même raison : l'instantané du flux
+ * garde la référence des matchs qu'il n'a pas changés, si bien qu'un « Prêt »
+ * ne redessine qu'une carte. Un composant nu aurait rejoué **toutes** les cases
+ * à pourvoir de l'arbre à chaque instantané — sur un plateau de trente-deux
+ * qualifiées, quinze cartes vides pour une rencontre touchée. Elle ne prend
+ * aucune prop : la mémorisation y est donc totale.
  */
-export function GhostMatchCard() {
+export const GhostMatchCard = memo(function GhostMatchCard() {
   const text = useTournamentPageText();
   const tbd = text.t("match.tbd");
 
@@ -40,4 +48,4 @@ export function GhostMatchCard() {
       ))}
     </div>
   );
-}
+});
