@@ -433,7 +433,7 @@ function TiebreakForm({
       fieldErrors.flag("tiebreak", text);
       return;
     }
-    void send(value, t("dialog.tiebreakSaved"));
+    void send(visibleText(value), t("dialog.tiebreakSaved"));
   };
 
   return (

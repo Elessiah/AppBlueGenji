@@ -421,12 +421,6 @@ describe("page d'un match — cartes du round et bans", () => {
     expect(visible(render(match(), "public", false, "en", rules([], tiebreaks)))).toContain("Tiebreak map Busan");
   });
 
-  it("render_tiebreakSetOnCompletedMatch_noTiebreakFact", () => {
-    const tiebreaks = { tiebreaks: [{ phaseId: 0, bracket: "UPPER", roundNumber: 2, map: "Busan" }] };
-    const completed = match({ status: "COMPLETED", team1Score: 3, team2Score: 1, winnerTeamId: ALPHA });
-    expect(visible(render(completed, "public", false, "fr", rules([], tiebreaks)))).not.toContain("Map de départage");
-  });
-
   it("render_noTiebreak_noTiebreakFact", () => {
     expect(visible(render(match(), "public", false, "fr", rules([])))).not.toContain("Map de départage");
   });

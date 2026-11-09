@@ -393,11 +393,6 @@ function useOfficiatingFact(match: BracketMatch, decision: ReturnType<typeof mat
   return null;
 }
 
-/** Map de départage encore à venir : un match terminé n'en a plus, le fait disparaît. */
-function upcomingTiebreakOf(tiebreaks: Parameters<typeof roundTiebreakOf>[0], match: BracketMatch): string | null {
-  return match.status === "COMPLETED" ? null : roundTiebreakOf(tiebreaks, match);
-}
-
 /** Fait « Map de départage » : seulement quand le tour en règle une. */
 function tiebreakFacts(tiebreak: string | null, label: string, detail: string): KeyFact[] {
   return tiebreak === null ? [] : [{ id: "tiebreak", label, value: visibleText(tiebreak), detail }];
@@ -454,7 +449,7 @@ function MatchKeyFacts({
   const decision = matchPageDecision(match, staff);
   const mapFacts = matchPageMapFacts(detail.mapRules, match);
   const roundMapsText = useRoundMapsText();
-  const tiebreak = upcomingTiebreakOf(detail.mapRules.tiebreaks, match);
+  const tiebreak = roundTiebreakOf(detail.mapRules.tiebreaks, match);
   const pending = <Muted>{t("matchPage.opponentsPending")}</Muted>;
   // « Adversaires à venir » seulement quand une case attend encore son engagé ;
   // deux adversaires connus sans hôte désigné (lancement sans phase, exemption,
