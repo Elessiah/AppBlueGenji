@@ -19,8 +19,9 @@ import { finalizeDueAccountDeletions } from "@/lib/server/users/deleted-accounts
 import { fakePool } from "../../helpers/sql-double";
 
 /*
- * Suppression définitive au jour 30 (E4) et blocage de l'avatar en quarantaine
- * à l'effacement (E6). La fenêtre se relit sous le verrou du compte : une
+ * Suppression définitive au jour 30 (E4) ; l'avatar en quarantaine part avec
+ * l'effacement sans être bloqué (D6 : seule la suppression par la modération
+ * bloque une empreinte). La fenêtre se relit sous le verrou du compte : une
  * reconnexion qui vient de réactiver, ou une demande encore récente, ne tombe
  * pas.
  */
@@ -64,7 +65,6 @@ const wrote = (queries: string[], prefix: string) => queries.some((q) => q.start
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(hashImageFiles).mockImplementation(async (files) => files.map((file) => `sha:${file}`));
 });
 
 describe("finalizeAccountDeletion", () => {
@@ -107,21 +107,37 @@ describe("finalizeAccountDeletion", () => {
     expect(wrote(queries, "DELETE FROM bg_users")).toBe(false);
   });
 
-  it("finalizeAccountDeletion_eraseWithQuarantinedAvatar_blocksItsHash", async () => {
-    fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, quarantined: ["/api/uploads/avatars/7-abc.webp"] });
+  it("finalizeAccountDeletion_eraseWithHiddenAvatar_readsItUnderLockWithoutBlockingItsHash", async () => {
+    const { queries } = fakeDb({
+      locked: { is_deleted: 1, deletion_requested_at: DUE },
+      quarantined: ["/api/uploads/avatars/7-abc.webp"],
+    });
 
-    await finalizeAccountDeletion(7);
+    expect((await finalizeAccountDeletion(7))?.mode).toBe("ERASE");
 
-    expect(jest.mocked(hashImageFiles).mock.calls[0][0]).toEqual(["/quarantine/7-abc.webp"]);
-    expect(jest.mocked(blockImageHashes).mock.calls[0][1]).toEqual(["sha:/quarantine/7-abc.webp"]);
+    // D6 : un avatar seulement masqué se conteste encore, l'effacement ne le bloque pas.
+    expect(hashImageFiles).not.toHaveBeenCalled();
+    expect(blockImageHashes).not.toHaveBeenCalled();
+    // Relevé sous le verrou du compte, avant la ligne effacée.
+    const lock = queries.findIndex((q) => q.includes("FROM bg_users WHERE id = ? FOR UPDATE"));
+    const quarantine = queries.findIndex((q) => q.startsWith("SELECT logo_url FROM bg_logo_quarantines"));
+    const erase = queries.findIndex((q) => q.startsWith("DELETE FROM bg_users"));
+    expect(lock).toBeGreaterThanOrEqual(0);
+    expect(quarantine).toBeGreaterThan(lock);
+    expect(erase).toBeGreaterThan(quarantine);
   });
 
-  it("finalizeAccountDeletion_anonymize_doesNotBlockAvatar", async () => {
-    fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, played: 1, quarantined: ["/api/uploads/avatars/7-abc.webp"] });
+  it("finalizeAccountDeletion_anonymize_neitherReadsNorBlocksQuarantinedAvatar", async () => {
+    const { queries } = fakeDb({
+      locked: { is_deleted: 1, deletion_requested_at: DUE },
+      played: 1,
+      quarantined: ["/api/uploads/avatars/7-abc.webp"],
+    });
 
     await finalizeAccountDeletion(7);
 
     expect(blockImageHashes).not.toHaveBeenCalled();
+    expect(queries.some((q) => q.startsWith("SELECT logo_url FROM bg_logo_quarantines"))).toBe(false);
   });
 });
 

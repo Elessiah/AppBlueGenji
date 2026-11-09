@@ -8,6 +8,7 @@ jest.mock("node:fs/promises", () => ({
   mkdir: jest.fn(async () => undefined),
 }));
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/blocked-images");
 jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/staff-audit");
 jest.mock("@/lib/server/solo-entries-service");
@@ -25,6 +26,7 @@ jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://si
 
 import { copyFile, rename, unlink } from "node:fs/promises";
 import { getDatabase } from "@/lib/server/database";
+import { blockRemovedImageFiles } from "@/lib/server/blocked-images";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
@@ -237,6 +239,11 @@ describe("deleteUserAvatarForReport", () => {
     expect((purgeAfter as Date).getTime()).toBe(logoQuarantinePurgeDate(hiddenAt as Date).getTime());
 
     expect(unlink).toHaveBeenCalledWith(LIVE_AVATAR);
+    // D6 : supprimé par la modération, l'avatar est bloqué avant que le fichier ne parte.
+    expect(blockRemovedImageFiles).toHaveBeenCalledWith([LIVE_AVATAR]);
+    expect(jest.mocked(blockRemovedImageFiles).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(unlink).mock.invocationCallOrder[0],
+    );
     expect(view).toEqual(
       expect.objectContaining({ id: 40, targetType: "USER", targetId: 9, targetName: "Nova", status: "PURGED" }),
     );
@@ -690,6 +697,8 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     install([members], [[/FROM bg_logo_quarantines q/, () => [[quarantineRow()]]], [/SET status = 'PURGED'/, () => [{}]]]);
     await purgeQuarantinedLogo(30, actor);
     expect(unlink).toHaveBeenCalledWith(HIDDEN);
+    // Un logo d'équipe n'est pas bloqué (D6 ne vise que l'avatar).
+    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
     expect(jest.mocked(connection.commit).mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(unlink).mock.invocationCallOrder[0],
     );
@@ -724,6 +733,11 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     await purgeQuarantinedLogo(30, actor);
     await flush();
     expect(unlink).toHaveBeenCalledWith(HIDDEN_AVATAR);
+    // D6 : l'avatar supprimé est bloqué avant que le fichier en quarantaine ne parte.
+    expect(blockRemovedImageFiles).toHaveBeenCalledWith([HIDDEN_AVATAR]);
+    expect(jest.mocked(blockRemovedImageFiles).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(unlink).mock.invocationCallOrder[0],
+    );
     const [message, , context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(context).toBe("avatar-removed");
     expect(message).toContain("Ton avatar");

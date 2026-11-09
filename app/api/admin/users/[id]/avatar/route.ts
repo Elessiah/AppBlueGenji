@@ -1,7 +1,8 @@
 import { getCurrentUser } from "@/lib/server/auth";
+import { blockRemovedImageFiles } from "@/lib/server/blocked-images";
 import { fail, ok } from "@/lib/server/http";
 import { deleteStoredImage } from "@/lib/server/image-upload";
-import { notifyUserAvatarRemoved } from "@/lib/server/logo-quarantine";
+import { avatarFileLocations, notifyUserAvatarRemoved } from "@/lib/server/logo-quarantine";
 import { readJsonBody } from "@/lib/server/request-body";
 import { validateModerationReasonBody } from "@/lib/shared/logo-quarantine";
 import { publishStaffAction } from "@/lib/server/staff-audit";
@@ -40,6 +41,10 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
 
   try {
     const { removedAvatarUrl } = await removeUserAvatarAsModerator(userId);
+    // Supprimé par la modération : l'empreinte est bloquée avant que le fichier
+    // ne parte (décision D6), une adresse étrangère n'ayant rien à bloquer.
+    const located = avatarFileLocations(removedAvatarUrl, userId);
+    if (located) await blockRemovedImageFiles([located.live]);
     await deleteStoredImage(toDiskUploadPath(removedAvatarUrl)).catch((error) => {
       // La ligne ne désigne plus le fichier : il n'est plus servi par le site.
       // Un disque récalcitrant laisse un résidu, que l'on signale sans défaire

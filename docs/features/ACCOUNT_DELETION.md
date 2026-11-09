@@ -655,9 +655,10 @@ puis renomme l'entrée solo (`syncSoloEntryIdentityOn`). Toute lecture qui joint
 date de création, date de la demande). Une restauration la rejoue comme une
 demande (`requestAccountDeletion(id, { requestedAt })`, trente jours comptés
 depuis l'origine) si la fenêtre est encore ouverte, sinon comme une suppression
-définitive. La réactivation la retire (`forgetPendingAccountDeletion`, ne lève
-jamais) ; à l'élagage, une ligne définitive remplace la ligne en attente du
-même compte.
+définitive. La réactivation la remplace par une ligne de réactivation
+(`recordAccountReactivation`, décision R1 ci-dessus), rejouée par
+`replayAccountReactivation` puis `restoreAccountIdentity` ; à l'élagage, une
+ligne définitive remplace la ligne en attente du même compte.
 
 **Ce qui touche les autres se fait tout de suite, et la réactivation ne le
 défait pas** — une seule transaction, verrous dans l'ordre tournois
@@ -745,21 +746,28 @@ bornés à `SETTLE_BATCH_SIZE` ; `bg_users.is_deleted` est indexé. La demande e
 la suppression prennent `lockTournamentRow` **en premier**, par id croissant,
 sur tous les tournois qu'elles touchent — inscriptions solo, tournois organisés
 (demande), matchs castés, liés ou arbitrés (`listCastTournamentIds`) — avant le
-compte, puis les équipes ; les avatars en quarantaine sont lus et hachés
-**avant** la transaction (`hashImageFiles`), seule l'insertion des empreintes
-s'y fait.
+compte, puis les équipes ; les fichiers des avatars en quarantaine sont relevés
+sous le verrou du compte, sans lecture de fichier (rien n'est haché, D6).
 
 **E2 — rattrapage.** `reconcileDeletedAccounts` commence par
 `settleDeletedSoloEntries` : les comptes déjà supprimés gardant une inscription
 à un tournoi actif voient la règle E1 rejouée (retrait ou forfait), sans effet
 au second passage. Le reste du rattrapage ignore les comptes en attente.
 
-**E6 — avatar en quarantaine.** À l'effacement, l'empreinte SHA-256 du fichier
-en quarantaine (`bg_logo_quarantines` `HIDDEN`) entre dans
-`bg_blocked_image_hashes` (aucune colonne de compte) avant que la cascade
-n'emporte la ligne ; un avatar ou un logo dont l'image traitée **ou le fichier
-téléversé tel quel** y figure est refusé (`IMAGE_BLOCKED`) — le fichier brut
-compte, la copie exacte d'un avatar servi étant réencodée en d'autres octets.
+**E6 — avatar supprimé par la modération (revu par D6, 2026-11-09).**
+L'empreinte SHA-256 d'un avatar entre dans `bg_blocked_image_hashes` (aucune
+colonne de compte) **quand la modération le supprime** — sans délai depuis un
+signalement (`deleteUserAvatarForReport`), depuis la fiche
+(`DELETE /api/admin/users/[id]/avatar`), ou à la fin de sa quarantaine
+(`purgeQuarantinedLogo` : contestation rejetée ou échéance passée) —, après le
+commit et avant que le fichier ne parte (`blockRemovedImageFiles`, ne lève
+jamais). Un avatar seulement **masqué** (`HIDDEN`) se conteste encore : il n'est
+pas bloqué, et l'effacement d'un compte n'en bloque plus aucun — il relève ses
+fichiers en quarantaine **sous le verrou du compte** et les supprime après le
+commit. Un avatar ou un logo dont l'image traitée **ou le fichier téléversé tel
+quel** figure à la table est refusé (`IMAGE_BLOCKED`) — le fichier brut compte,
+la copie exacte d'un avatar servi étant réencodée en d'autres octets. Un logo
+d'équipe supprimé n'est pas bloqué.
 
 **Pseudo d'emprunt gardé au jour 30.** `anonymizeAccount` reprend le pseudo
 d'emprunt d'un compte en attente (`is_deleted = 1`, `deletion_requested_at`

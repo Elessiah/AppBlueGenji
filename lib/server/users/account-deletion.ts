@@ -10,7 +10,6 @@ import {
 } from "@/lib/shared/account-deletion";
 import { isReferencedRowError } from "@/lib/server/mysql-errors";
 import { avatarFileLocations } from "@/lib/server/logo-quarantine";
-import { blockImageHashes, hashImageFiles } from "@/lib/server/blocked-images";
 import { unlink } from "node:fs/promises";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
@@ -323,24 +322,26 @@ export async function finalizeAccountDeletion(userId: number): Promise<AccountDe
 }
 
 /**
- * Efface ou anonymise le compte selon le plan. À l'effacement, l'empreinte des
- * avatars en quarantaine est bloquée d'abord (E6) ; anonymisé, le compte n'est
- * plus en attente : la suppression est faite.
+ * Efface ou anonymise le compte selon le plan. À l'effacement, les fichiers des
+ * avatars en quarantaine sont relevés sous le verrou (la cascade emporte leurs
+ * lignes) ; aucune empreinte n'est bloquée : un avatar seulement **masqué** se
+ * conteste encore, seule sa suppression par la modération le bloque (décision
+ * D6, `lib/server/blocked-images.ts`). Anonymisé, le compte n'est plus en
+ * attente : la suppression est faite.
  */
 async function applyDeletionMode(
   connection: PoolConnection,
   userId: number,
   plan: AccountDeletionPlan,
   soloWithdrawals: readonly SoloRegistrationFact[],
-  quarantine: QuarantinedAvatars,
 ): Promise<{ withdrawal: { tournamentIds: number[] }; withdrawnFrom: number[]; quarantinedFiles: string[] }> {
   if (plan.mode === "ERASE") {
-    await blockImageHashes(connection, quarantine.hashes);
+    const quarantinedFiles = await loadQuarantinedAvatarFiles(connection, userId);
     const withdrawal = await eraseAccount(connection, userId, soloWithdrawals);
     return {
       withdrawal,
       withdrawnFrom: soloWithdrawals.map((registration) => registration.tournamentId),
-      quarantinedFiles: quarantine.files,
+      quarantinedFiles,
     };
   }
   const withdrawal = await anonymizeAccount(connection, userId);
@@ -364,23 +365,20 @@ function deletionIsDue(row: { is_deleted: 0 | 1; deletion_requested_at: StoredDa
   );
 }
 
-/** Les avatars en quarantaine du compte : leurs fichiers, et l'empreinte de ceux qui se lisent encore. */
-type QuarantinedAvatars = { files: string[]; hashes: string[] };
-
 /**
  * Les fichiers d'avatar en quarantaine du compte (signalés, masqués) — ce que
- * l'effacement emporte — et leurs empreintes (E6). Hors transaction : la lecture
- * des fichiers ne tient aucun verrou.
+ * l'effacement emporte. Lus **sous le verrou du compte**, dans la transaction
+ * qui efface : un avatar masqué pendant l'attente du verrou est vu, et son
+ * fichier part avec les autres après le commit.
  */
-async function loadQuarantinedAvatars(runner: SqlRunner, userId: number): Promise<QuarantinedAvatars> {
+async function loadQuarantinedAvatarFiles(runner: SqlRunner, userId: number): Promise<string[]> {
   const [rows] = await runner.execute<(RowDataPacket & { logo_url: string })[]>(
     `SELECT logo_url FROM bg_logo_quarantines WHERE user_id = ? AND status = 'HIDDEN' ORDER BY id`,
     [userId],
   );
-  const files = rows
+  return rows
     .map((row) => avatarFileLocations(row.logo_url, userId)?.quarantined ?? null)
     .filter((file): file is string => file !== null);
-  return { files, hashes: await hashImageFiles(files) };
 }
 
 async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<AccountDeletionPlan | null> {
@@ -395,9 +393,6 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
     await listSoloRegistrationTournamentIds(db, userId),
     await listCastTournamentIds(db, userId),
   );
-  // Les avatars en quarantaine, lus et hachés **avant** la connexion : un
-  // `readFile` par fichier ne se fait pas sous les verrous de la transaction.
-  const quarantine = await loadQuarantinedAvatars(db, userId);
   const connection = await db.getConnection();
   let plan: AccountDeletionPlan;
   // Le fichier de l'avatar, relevé **avant** l'effacement : la ligne partie, son
@@ -415,8 +410,8 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
   // Les tournois dont une inscription solo part avec le compte (D12) :
   // instantanés et aperçus à relire après le commit.
   let withdrawnFrom: number[] = [];
-  // Les avatars en quarantaine qu'emporte l'effacement : leur empreinte est
-  // bloquée dans la transaction (E6), le fichier part après le commit.
+  // Les avatars en quarantaine qu'emporte l'effacement : le fichier part après
+  // le commit.
   let quarantinedFiles: string[] = [];
 
   try {
@@ -481,7 +476,7 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
     // vers un compte, seulement une empreinte salée qu'on ne sait pas renverser
     // (`lib/server/site-visits-service.ts`).
 
-    const applied = await applyDeletionMode(connection, userId, plan, facts.soloWithdrawals, quarantine);
+    const applied = await applyDeletionMode(connection, userId, plan, facts.soloWithdrawals);
     quarantinedFiles = applied.quarantinedFiles;
     withdrawnFrom = applied.withdrawnFrom;
     const withdrawal = applied.withdrawal;

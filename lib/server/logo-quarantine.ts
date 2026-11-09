@@ -31,6 +31,7 @@
 import { copyFile, mkdir, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { blockRemovedImageFiles } from "@/lib/server/blocked-images";
 import { getDatabase } from "@/lib/server/database";
 // Logo d'équipe servi par le leaderboard de l'accueil et de `/classement`, le
 // podium et les cartes d'aperçu ; avatar recopié sur l'entrée solo, que nomment
@@ -434,6 +435,9 @@ export async function deleteUserAvatarForReport(
 
   const files = avatarFileLocations(avatarUrl, userId);
   if (files) {
+    // Supprimé par la modération : son empreinte est bloquée avant que le
+    // fichier ne parte (décision D6).
+    await blockRemovedImageFiles([files.live]);
     await unlinkIfPresent(files.live).catch((error) => {
       console.error("[moderation] fichier de l'avatar non effacé", error);
     });
@@ -925,6 +929,10 @@ export async function purgeQuarantinedLogo(quarantineId: number, actor: ReportPe
   // dans un dossier que rien ne sert.
   const files = isTeam ? logoFileLocations(row.logo_url, targetId) : avatarFileLocations(row.logo_url, targetId);
   if (files) {
+    // Un avatar supprimé (contestation rejetée ou échéance passée) : son
+    // empreinte est bloquée avant que le fichier ne parte (décision D6). Le
+    // masquage seul ne bloquait rien.
+    if (!isTeam) await blockRemovedImageFiles([files.quarantined]);
     await unlinkIfPresent(files.quarantined).catch((error) => {
       console.error("[moderation] fichier en quarantaine non effacé", error);
     });

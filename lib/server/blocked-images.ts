@@ -6,14 +6,18 @@ import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-erro
 
 /**
  * Empreintes d'images refusées au téléversement (`docs/features/ACCOUNT_DELETION.md`,
- * décision E6).
+ * décision E6, revue par D6 le 2026-11-09).
  *
- * Un compte effacé emporte son avatar **en quarantaine** (cascade de
- * `bg_logo_quarantines`) : l'image signalée disparaît, mais son empreinte reste,
- * et un nouveau compte ne peut pas la reposer telle quelle. L'empreinte est
- * celle de l'image **traitée** (le WebP que `storeImageBuffer` écrit) : le même
- * fichier, recadré de la même façon, ressort à l'identique ; un autre recadrage
- * ou une retouche y échappent — c'est un garde-fou, pas une modération.
+ * Un avatar que la modération **supprime** — sans délai, à l'échéance de sa
+ * quarantaine ou après une contestation rejetée, ou retiré depuis la fiche —
+ * laisse son empreinte ici avant que le fichier ne parte
+ * (`blockRemovedImageFiles`) : son titulaire, ou un autre compte, ne peut pas
+ * reposer la même image. Un avatar seulement **masqué** (quarantaine `HIDDEN`)
+ * se conteste encore : il n'est pas bloqué, même si son compte est effacé
+ * entre-temps. L'empreinte est celle du fichier tel qu'il était servi (le WebP
+ * que `storeImageBuffer` écrit) ; au téléversement, l'image traitée **et** le
+ * fichier brut sont comparés. Un autre recadrage ou une retouche y échappent —
+ * c'est un garde-fou, pas une modération.
  *
  * L'empreinte d'une image n'identifie personne ; aucune colonne ne désigne de
  * compte.
@@ -65,29 +69,37 @@ export async function hashImageFiles(absolutePaths: readonly string[]): Promise<
   return hashes.filter((sha): sha is string => sha !== null);
 }
 
-/** Pose ces empreintes, sur la connexion de la transaction qui emporte les images. */
+/** Pose ces empreintes (doublons ignorés), sur la connexion ou le pool donné. */
 export async function blockImageHashes(
   connection: Pick<PoolConnection, "execute">,
   hashes: readonly string[],
 ): Promise<void> {
-  for (const sha of hashes) {
-    await ignoreMissingTable(
-      connection.execute(`INSERT IGNORE INTO bg_blocked_image_hashes (sha256) VALUES (?)`, [sha]),
-    );
-  }
+  const unique = [...new Set(hashes)];
+  if (unique.length === 0) return;
+  // Une seule insertion multi-lignes : un aller-retour, quel que soit le nombre d'images.
+  await ignoreMissingTable(
+    connection.execute(
+      `INSERT IGNORE INTO bg_blocked_image_hashes (sha256) VALUES ${unique.map(() => "(?)").join(", ")}`,
+      unique,
+    ),
+  );
 }
 
 /**
- * Bloque les images de ces fichiers, sur la connexion de la transaction qui les
- * emporte ; rend les empreintes posées. Une transaction lit les fichiers
- * **avant** (`hashImageFiles`) et pose ensuite (`blockImageHashes`) : la lecture
- * ne tient alors aucun verrou.
+ * Bloque les images de ces fichiers, que la modération vient de supprimer
+ * (décision D6) — à appeler **après** le commit qui les retire et **avant**
+ * l'`unlink` : le fichier doit encore se lire. Hors transaction, sans verrou :
+ * chaque empreinte est une insertion autonome. **Ne lève jamais** : la
+ * suppression est faite, un échec ici ne la défait pas et se consigne.
  */
-export async function blockImageFiles(
-  connection: Pick<PoolConnection, "execute">,
-  absolutePaths: readonly string[],
-): Promise<string[]> {
-  const hashes = await hashImageFiles(absolutePaths);
-  await blockImageHashes(connection, hashes);
-  return hashes;
+export async function blockRemovedImageFiles(absolutePaths: readonly string[]): Promise<void> {
+  if (absolutePaths.length === 0) return;
+  try {
+    const hashes = await hashImageFiles(absolutePaths);
+    if (hashes.length === 0) return;
+    const db = await getDatabase();
+    await blockImageHashes(db, hashes);
+  } catch (error) {
+    console.error("[moderation] empreinte de l'image supprimée non bloquée", error);
+  }
 }
