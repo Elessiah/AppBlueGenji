@@ -152,6 +152,9 @@ BO 5 à égalités ouvertes sans format de play-offs propre (« 6ᵉ map »).
   de départage l'y porte — et le match a toujours un vainqueur
   (`checkMatchScores`) ; elle compte comme toute map gagnée, les rejeux des
   classements sont intacts.
+  Cas limites assumés : en BO 5 une map de départage nulle puis sa reprise nulle
+  épuisent la liste, et en BO 7 trois maps nulles laissent la série à 3-3 sans ligne
+  pour la map de départage — l'arbitrage tranche (règle existante, pas de ligne de plus).
 - **Check-in du match** : ligne « Map de départage (jouée seulement si la série est à
   égalité après les maps régulières) : « … » » (FR / EN, `briefTiebreakMap`), sans pseudo.
 - **Bans** (choix documenté, règlement §10 inchangé) : la map de départage suit
