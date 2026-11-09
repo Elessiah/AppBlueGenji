@@ -155,7 +155,7 @@ ${MATCH_PLACE_COLUMNS}        team_id BIGINT NOT NULL,
   // les deux engagées sans ordre, `5:7`). La place plutôt que l'id : un match
   // effacé puis recréé avec la même affiche n'est pas réannoncé. `skipped` : match
   // déjà apparié à la mise en service (clé `new_match_notices_since` de
-  // `bg_settings`). Part avec le tournoi. Un échec ne fait pas tomber la base
+  // `bg_settings`). Part avec le tournoi ou l'une des deux engagées (clés étrangères `team_low_id` / `team_high_id`). Un échec ne fait pas tomber la base
   // (journal pm2) : il éteint l'annonce, et les lectures qui l'attendent
   // (`newMatchPendingSql`, `newMatchToldSql`) cessent de la lire — les rappels
   // partent comme avant.
@@ -163,12 +163,20 @@ ${MATCH_PLACE_COLUMNS}        team_id BIGINT NOT NULL,
     await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_new_match_notices (
 ${MATCH_PLACE_COLUMNS}        pairing VARCHAR(48) NOT NULL,
+        team_low_id BIGINT NOT NULL,
+        team_high_id BIGINT NOT NULL,
         skipped TINYINT(1) NOT NULL DEFAULT 0,
         start_at DATETIME NULL,
         sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (tournament_id, phase_id, bracket, round_number, match_number, pairing),
+        KEY idx_bg_new_match_notices_low (team_low_id),
+        KEY idx_bg_new_match_notices_high (team_high_id),
         CONSTRAINT fk_bg_new_match_notices_tournament FOREIGN KEY (tournament_id)
-          REFERENCES bg_tournaments(id) ON DELETE CASCADE
+          REFERENCES bg_tournaments(id) ON DELETE CASCADE,
+        CONSTRAINT fk_bg_new_match_notices_low FOREIGN KEY (team_low_id)
+          REFERENCES bg_teams(id) ON DELETE CASCADE,
+        CONSTRAINT fk_bg_new_match_notices_high FOREIGN KEY (team_high_id)
+          REFERENCES bg_teams(id) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
     setNewMatchNoticesAvailable(true);

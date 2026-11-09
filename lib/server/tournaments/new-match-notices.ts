@@ -96,9 +96,12 @@ type PlaceRow = RowDataPacket & {
   round_number: number;
   match_number: number;
   pairing: string;
+  team_low_id: number;
+  team_high_id: number;
 };
 
-const PLACE_SELECT = `SELECT m.tournament_id, m.phase_id, m.bracket, m.round_number, m.match_number, ${PAIRING_SQL} AS pairing`;
+const PLACE_SELECT = `SELECT m.tournament_id, m.phase_id, m.bracket, m.round_number, m.match_number, ${PAIRING_SQL} AS pairing,
+  LEAST(m.team1_id, m.team2_id) AS team_low_id, GREATEST(m.team1_id, m.team2_id) AS team_high_id`;
 
 /** Lignes posées par instruction à la mise en service. */
 const INSTALL_CHUNK = 200;
@@ -128,16 +131,9 @@ export async function installNewMatchNotices(db: Pool): Promise<void> {
       const chunk = paired.slice(start, start + INSTALL_CHUNK);
       await db.query(
         `INSERT IGNORE INTO bg_new_match_notices
-           (tournament_id, phase_id, bracket, round_number, match_number, pairing, skipped)
-         VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?, 1)").join(", ")}`,
-        chunk.flatMap((place) => [
-          place.tournament_id,
-          place.phase_id,
-          place.bracket,
-          place.round_number,
-          place.match_number,
-          place.pairing,
-        ]),
+           (tournament_id, phase_id, bracket, round_number, match_number, pairing, team_low_id, team_high_id, skipped)
+         VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, 1)").join(", ")}`,
+        chunk.flatMap((place) => insertParams(place)),
       );
     }
     await db.execute(
@@ -237,6 +233,11 @@ function placeParams(place: PlaceRow): Array<string | number> {
   return [place.tournament_id, place.phase_id, place.bracket, place.round_number, place.match_number, place.pairing];
 }
 
+/** Place et engagées : la trace part avec l'une ou l'autre (clés étrangères). */
+function insertParams(place: PlaceRow): Array<string | number> {
+  return [...placeParams(place), place.team_low_id, place.team_high_id];
+}
+
 const PLACE_WHERE = `tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? AND match_number = ? AND pairing = ?`;
 
 /**
@@ -267,9 +268,9 @@ export async function claimNewMatchNotice(db: Pool, row: NewMatchCandidateRow): 
   if (!place) return { kind: "changed" };
   const [result] = await db.execute(
     `INSERT IGNORE INTO bg_new_match_notices
-       (tournament_id, phase_id, bracket, round_number, match_number, pairing, skipped, start_at)
-     VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
-    [...placeParams(place), row.start_at],
+       (tournament_id, phase_id, bracket, round_number, match_number, pairing, team_low_id, team_high_id, skipped, start_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+    [...insertParams(place), row.start_at],
   );
   if ((result as { affectedRows?: number }).affectedRows !== 1) return { kind: "taken" };
   return (await currentPlace(db, row, false)) ? { kind: "claimed", place } : { kind: "stale", place };
@@ -317,10 +318,32 @@ async function announceSide(
     }
     return true;
   } catch (error) {
-    // Réservation gardée : une annonce manquée ne se répète pas en boucle.
     console.error(`[new-match] annonce en échec (match ${row.id}, engagée ${side})`, failureReason(error));
     return false;
   }
+}
+
+/** Aucun envoi n'a abouti : la réservation est rendue et l'essai compté (`noteFailure`). */
+export class NewMatchSendFailed extends Error {
+  constructor(matchId: number) {
+    super(`new-match send failed (match ${matchId})`);
+    this.name = "NewMatchSendFailed";
+  }
+}
+
+/** Destinataires d'une engagée, hors comptes déjà prévenus ; aucun pour une fantôme (`GHOST_TEAMS.md`). */
+function sideRecipients(
+  row: NewMatchCandidateRow,
+  side: 1 | 2,
+  playersByTeam: Map<number, number[]>,
+  recipientsById: Map<number, NotificationRecipient>,
+  told: Set<number>,
+): NotificationRecipient[] {
+  if (Number(side === 1 ? row.team1_ghost : row.team2_ghost) === 1) return [];
+  const teamId = Number(side === 1 ? row.team1_id : row.team2_id);
+  return (playersByTeam.get(teamId) ?? [])
+    .filter((userId) => !told.has(userId))
+    .flatMap((userId) => recipientsById.get(userId) ?? []);
 }
 
 async function announce(
@@ -331,17 +354,17 @@ async function announce(
   // Un compte qui serait des deux côtés n'est prévenu qu'une fois, du premier.
   const told = new Set<number>();
   let sides = 0;
+  let failed = 0;
   for (const side of [1, 2] as const) {
-    // Une fantôme n'a personne à prévenir (`GHOST_TEAMS.md`).
-    if (Number(side === 1 ? row.team1_ghost : row.team2_ghost) === 1) continue;
-    const teamId = Number(side === 1 ? row.team1_id : row.team2_id);
-    const recipients = (playersByTeam.get(teamId) ?? [])
-      .filter((userId) => !told.has(userId))
-      .flatMap((userId) => recipientsById.get(userId) ?? []);
+    const recipients = sideRecipients(row, side, playersByTeam, recipientsById, told);
     if (recipients.length === 0) continue;
     for (const recipient of recipients) told.add(recipient.userId);
     if (await announceSide(row, side, recipients)) sides += 1;
+    else failed += 1;
   }
+  // Rien n'est parti : le passage suivant réessaie (au plus NEW_MATCH_MAX_FAILURES
+  // fois). Une engagée déjà prévenue garde la réservation : jamais deux annonces.
+  if (sides === 0 && failed > 0) throw new NewMatchSendFailed(Number(row.id));
   return sides;
 }
 
@@ -384,9 +407,9 @@ async function markSkipped(db: Pool, row: NewMatchCandidateRow): Promise<void> {
   if (!place) return;
   await db.execute(
     `INSERT IGNORE INTO bg_new_match_notices
-       (tournament_id, phase_id, bracket, round_number, match_number, pairing, skipped)
-     VALUES (?, ?, ?, ?, ?, ?, 1)`,
-    placeParams(place),
+       (tournament_id, phase_id, bracket, round_number, match_number, pairing, team_low_id, team_high_id, skipped)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+    insertParams(place),
   );
 }
 
@@ -434,8 +457,9 @@ async function sweepOne(db: Pool, row: NewMatchCandidateRow): Promise<number> {
       matchDm: true,
     });
     const recipientsById = new Map(recipients.map((recipient) => [recipient.userId, recipient]));
+    const told = await announce(row, playersByTeam, recipientsById);
     failures.delete(Number(row.id));
-    return await announce(row, playersByTeam, recipientsById);
+    return told;
   } catch (error) {
     await undoClaim(db, row, reserved, covered);
     await noteFailure(db, row, error);
@@ -474,7 +498,9 @@ async function sweepNewMatches(): Promise<number> {
   const candidates = await loadCandidates(db);
   let announced = 0;
   await inBatches(candidates, NEW_MATCH_CONCURRENCY, async (row) => {
-    announced += await sweepOne(db, row);
+    // Lu après l'attente : `announced += await …` relirait un total périmé en parallèle.
+    const sides = await sweepOne(db, row);
+    announced += sides;
   });
   lastRunOk = true;
   // Un match sorti des candidats (joué, lancé, réapparié) oublie ses échecs.

@@ -48,7 +48,10 @@ retour arrière et tableau reconstruit.
 ## Une seule fois
 
 Réservation `bg_new_match_notices`, clé = **place** du match (tournoi, phase,
-tableau, manche, numéro) + **affiche** (`LEAST:GREATEST` des deux engagées),
+tableau, manche, numéro) + **affiche** (`LEAST:GREATEST` des deux engagées,
+aussi en colonnes `team_low_id` / `team_high_id`, clés étrangères vers
+`bg_teams` : la trace part avec le tournoi **ou l'une des engagées**, comme le
+check-in),
 relue puis posée avant l'envoi : lecture **non verrouillante** du match, de son
 tournoi et de ses équipes (un `INSERT … SELECT` les verrouillerait en partage
 face au moteur qui tient le verrou du tournoi), puis `INSERT IGNORE … VALUES`
@@ -82,9 +85,14 @@ journalisent sans tomber, et les rappels ne l'attendent pas. Ainsi :
   lue (mêmes engagées) est marquée `skipped` (ses rappels donneront l'horaire) ;
   un match sorti des candidats oublie ses échecs ;
 - l'erreur d'un match ne retient pas les autres, l'échec d'envoi d'une équipe
-  ne retient pas l'autre ; un bot injoignable consomme l'annonce (journal pm2,
-  nombre de messages perdus seulement), comme les rappels — une annonce
-  manquée ne se répète pas en boucle.
+  ne retient pas l'autre ; si **aucun** envoi n'aboutit (`notifyUsers` lève pour
+  chaque engagée à prévenir), la réservation est rendue et l'essai compté comme
+  une panne (`NewMatchSendFailed` → `noteFailure`, `skipped` au troisième) ; une
+  engagée déjà prévenue garde la réservation (jamais deux annonces) ; un bot
+  injoignable consomme l'annonce (journal pm2, nombre de messages perdus
+  seulement), comme les rappels ;
+- le total du balayage s'additionne **après** chaque attente (`announced +=
+  await …` relirait un total périmé entre matchs traités en parallèle).
 
 ## Première manche et horaire déjà posé (décisions du 2026-11-09)
 

@@ -657,6 +657,29 @@ describe("annonce d'un nouveau match — textes légaux (revue juridique de #569
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID")?.finalite).toContain("new match announcements and removal of your cast");
   });
 
+  it("newMatchNoticesSchema_entrantColumns_cascadeWithEitherEntrant", () => {
+    const schema = readFileSync(join(process.cwd(), "lib", "server", "database", "schema", "notifications.ts"), "utf8");
+    const table = schema.slice(schema.indexOf("CREATE TABLE IF NOT EXISTS bg_new_match_notices"));
+    expect(table).toMatch(/FOREIGN KEY \(team_low_id\)\s+REFERENCES bg_teams\(id\) ON DELETE CASCADE/);
+    expect(table).toMatch(/FOREIGN KEY \(team_high_id\)\s+REFERENCES bg_teams\(id\) ON DELETE CASCADE/);
+  });
+
+  it("registerAndPrivacyChange_newMatchRecords_erasedWithEitherEntrantInFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === "2026-11-annonce-nouveau-match")!;
+    const en = PRIVACY_CHANGES_EN["2026-11-annonce-nouveau-match"];
+    expect(t04.retention.join("\n")).toContain("effacées avec lui ou avec l'une des deux engagées");
+    expect(t04En.retention.join("\n")).toContain("erased with it or with either entrant");
+    expect(fr.details[2]).toContain("effacé avec lui ou avec l'une des deux engagées");
+    expect(en.details[2]).toContain("erased with it or with either entrant");
+  });
+
+  it("privacyChange_newMatchTopicOff_disclosesTimeAtPairingGoesOnlyWithItInFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === "2026-11-annonce-nouveau-match")!;
+    const en = PRIVACY_CHANGES_EN["2026-11-annonce-nouveau-match"];
+    expect(fr.details[1]).toContain("l'horaire déjà posé à l'appariement ne part qu'avec lui");
+    expect(en.details[1]).toContain("a time already set at pairing is only sent with it");
+  });
+
   it("donneesProfil_matchDmChoice_mentionsNewMatchInFrAndEn", () => {
     expect(DONNEES_PROFIL.find((d) => d.donnee === "Choix des messages privés de match")?.finalite).toContain("l'annonce d'un nouveau match");
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Match direct messages choice")?.finalite).toContain("to announce a new match");
