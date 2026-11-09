@@ -26,25 +26,31 @@ async function liveGate(user: AuthUser, matchId: number): Promise<Response | nul
   }
 }
 
+/** Statut de chaque refus connu du réglage ; tout autre motif est une panne (500). */
+const LIVE_ERROR_STATUSES = new Map<string, number>(Object.entries({
+  MATCH_NOT_FOUND: 404,
+  LIVE_TRIGGER_NOT_OWNED: 403,
+  NOT_MATCH_REFEREE: 403,
+  NOT_MATCH_CASTER: 403,
+  STAFF_STREAM_FORBIDDEN: 403,
+  STREAM_NOT_FOUND: 404,
+  INVALID_STREAM_URL: 400,
+  INVALID_LIVE_TRIGGER: 400,
+  LIVE_TRIGGER_NOT_MANUAL: 409,
+  MATCH_NOT_LIVE_READY: 409,
+  MATCH_START_AT_REQUIRED: 409,
+  MATCH_NOT_CASTABLE: 409,
+  MATCH_NOT_STREAMED: 409,
+}));
+
 function mapLiveError(error: unknown) {
   const message = (error as Error).message;
   // Un lien de caster refusé dit lequel : la fenêtre rattache le refus à son champ.
   if (error instanceof StreamLinkError) {
     return fail(message, message === "STREAM_NOT_FOUND" ? 404 : 400, { streamId: error.streamId });
   }
-  if (message === "MATCH_NOT_FOUND") return fail(message, 404);
-  if (message === "LIVE_TRIGGER_NOT_OWNED") return fail(message, 403);
-  if (message === "NOT_MATCH_REFEREE") return fail(message, 403);
-  if (message === "NOT_MATCH_CASTER") return fail(message, 403);
-  if (message === "STAFF_STREAM_FORBIDDEN") return fail(message, 403);
-  if (message === "STREAM_NOT_FOUND") return fail(message, 404);
-  if (message === "INVALID_STREAM_URL") return fail(message, 400);
-  if (message === "INVALID_LIVE_TRIGGER") return fail(message, 400);
-  if (message === "LIVE_TRIGGER_NOT_MANUAL") return fail(message, 409);
-  if (message === "MATCH_NOT_LIVE_READY") return fail(message, 409);
-  if (message === "MATCH_START_AT_REQUIRED") return fail(message, 409);
-  if (message === "MATCH_NOT_CASTABLE") return fail(message, 409);
-  if (message === "MATCH_NOT_STREAMED") return fail(message, 409);
+  const status = LIVE_ERROR_STATUSES.get(message);
+  if (status !== undefined) return fail(message, status);
   return fail(message || "MATCH_LIVE_UPDATE_FAILED", 500);
 }
 
