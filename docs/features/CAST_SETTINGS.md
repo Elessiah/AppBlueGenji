@@ -163,7 +163,10 @@ unique, pure, `lib/shared/live-trigger-owner.ts` (`mayChangeLiveTrigger`,
 `live` pour porte, mais il n'y règle que **son** cast : sans caster le match
 (en caster montré), tout réglage est refusé (`NOT_MATCH_CASTER`, 403) ; le
 lien du stream du staff ne lui est pas ouvert (`STAFF_STREAM_FORBIDDEN`, 403 —
-son lien se règle dans « Configurer ma diffusion »). Un corps sans clé
+son lien se règle dans « Configurer ma diffusion »). Démarquer le match efface
+le lien de l'organisation : il ne le peut que sur **son** mode, jamais sur celui
+du staff tant qu'il porte un lien (`STAFF_STREAM_FORBIDDEN`). Dans « Configurer
+ma diffusion », seul un caster **montré** prend un mode sans maître. Un corps sans clé
 `trigger` (ou `liveUrl`) laisse le mode (ou le lien du staff) tel quel. Les
 trois fenêtres bâtissent le lecteur par `liveTriggerViewer` ; l'inscription
 le juge en caster (`viewerCasts`).

@@ -795,8 +795,16 @@ describe("claimMatchCast", () => {
     expect(state.issued.some((sql) => sql.includes("SET live_trigger"))).toBe(false);
   });
 
-  it("claimMatchCast_castableNewTrigger_writesTrigger", async () => {
+  it("claimMatchCast_mutedClaimerNewTrigger_leavesTrigger", async () => {
+    // Sans la permission `live` relue, le caster est tu : il ne décide pas du mode (`loadShownCasterIds`).
     state.users[CASTER] = verified;
+    state.issued = [];
+    await claimMatchCast(42, CASTER, true, OWN_STREAM, { trigger: "AUTO" });
+    expect(state.issued.some((sql) => sql.includes("SET live_trigger"))).toBe(false);
+  });
+
+  it("claimMatchCast_castableNewTrigger_writesTrigger", async () => {
+    state.users[CASTER] = { ...verified, platform_roles_json: JSON.stringify(["CASTER"]) };
     state.issued = [];
     await claimMatchCast(42, CASTER, true, OWN_STREAM, { trigger: "AUTO" });
     expect(state.issued).toContain("UPDATE bg_matches SET live_trigger = ?, live_trigger_user_id = ?, live_started_at = NULL WHERE id = ?");

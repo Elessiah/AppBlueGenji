@@ -223,6 +223,10 @@ describe("setMatchLiveConfig", () => {
       if (sql.startsWith("SELECT match_id, user_id, stream_id, ready_at FROM bg_match_casters")) {
         return [state.casters.map((caster) => ({ ...caster, match_id: row.id, ready_at: null }))];
       }
+      if (sql.startsWith("SELECT 1 FROM bg_match_streams")) {
+        // Lien de l'organisation présent ? (démarquage par la seule `live`)
+        return [state.streams.filter((stream) => stream.staff_owned === 1 && stream.live_url !== null).map(() => ({ 1: 1 }))];
+      }
       return writeStreams(state, sql, params);
     });
     const connection = fakeConnection({
@@ -847,6 +851,42 @@ describe("setMatchLiveConfig", () => {
     await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: null, setter: CASTER_12, access: LIVE_ONLY });
 
     expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = ?"), ["MANUAL", 12, 42]]]);
+  });
+
+  it("setMatchLiveConfig_liveOnlyCasterUnmarksWithStaffLink_throwsStaffStreamForbidden", async () => {
+    // Démarquer efface le lien de l'organisation : la seule `live` n'y touche pas.
+    const world = liveWorld(
+      matchRow({ live_trigger: "AUTO", live_trigger_user_id: null }),
+      [dbStream(6, "https://twitch.tv/orga", true), dbStream(7, "https://twitch.tv/voix")],
+      [{ user_id: 12, stream_id: 7 }],
+    );
+    await mockLiveDb(world);
+
+    await expect(setMatchLiveConfig(42, { trigger: null, setter: CASTER_12, access: LIVE_ONLY })).rejects.toThrow(
+      "STAFF_STREAM_FORBIDDEN",
+    );
+    expect(world.state.matchWrites).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_liveOnlyCasterUnmarksWithoutStaffLink_unmarks", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "AUTO", live_trigger_user_id: null }), [dbStream(7, "https://twitch.tv/voix")], [
+      { user_id: 12, stream_id: 7 },
+    ]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: null, setter: CASTER_12, access: LIVE_ONLY });
+
+    expect(world.state.matchWrites).toEqual([[expect.stringContaining("SET live_trigger = NULL"), [42]]]);
+  });
+
+  it("setMatchLiveConfig_triggerUndefinedWithLink_writesLinkOnCurrentMode", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "AUTO" }), [dbStream(6, null, true)]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: undefined, liveUrl: "twitch.tv/orga", setter: ORGANISER_5, access: STAFF });
+
+    expect(world.state.streams[0]?.live_url).toBe("https://twitch.tv/orga");
+    expect(world.state.matchWrites).toEqual([]);
   });
 
   it("setMatchLiveConfig_triggerAndLinkUndefined_writesNothing", async () => {

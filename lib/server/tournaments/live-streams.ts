@@ -272,7 +272,11 @@ export async function setMatchLiveConfig(
 
   // Lien absent : le lien du staff n'est pas touché (sauf démarquage).
   const keepStaffLink = config.liveUrl === undefined;
-  const url = parseStreamUrlInput(requested === null ? null : (config.liveUrl ?? null));
+  const editsStreamLinks = (config.streamLinks?.length ?? 0) > 0;
+  // Lu d'abord sur le mode demandé (un refus ne coûte rien), puis rejugé sous
+  // le verrou sur le mode appliqué : un mode posé entre les deux lectures ne
+  // fait pas perdre le lien envoyé.
+  parseStreamUrlInput(requested === null ? null : (config.liveUrl ?? null));
   const actor: LiveTriggerActor = {
     userId: config.setter.userId,
     isAdmin: config.access.isAdmin,
@@ -288,8 +292,9 @@ export async function setMatchLiveConfig(
       // que l'inscription d'un caster (`claimMatchCast`).
       const { row: current, hold, actorShown } = await lockLiveMatch(connection, matchId, actor);
       const trigger = config.trigger === undefined ? hold.trigger : config.trigger;
+      const url = parseStreamUrlInput(trigger === null ? null : (config.liveUrl ?? null));
       const triggerChanges = assertLiveConfigAllowed(current, hold, actor, trigger, {
-        editsStreamLinks: config.streamLinks !== undefined && config.streamLinks.length > 0,
+        editsStreamLinks,
         live: config.access.live,
         actorShown,
       });
@@ -303,7 +308,7 @@ export async function setMatchLiveConfig(
       let changed = triggerChanges;
       // Les liens des casters d'abord : le lien du staff qui suit habille un
       // stream sans lien, jamais celui qu'un caster vient de recevoir ici.
-      if (config.streamLinks !== undefined && config.streamLinks.length > 0) {
+      if (editsStreamLinks && config.streamLinks !== undefined) {
         const locked = await lockMatchStreams(connection, matchId);
         streams = await setCasterStreamLinks(connection, matchId, config.streamLinks, locked);
         changed = changed || streams !== locked;
@@ -312,14 +317,7 @@ export async function setMatchLiveConfig(
         // Match sans mode : l'arbitre n'y corrige que les liens des casters —
         // rien à démarquer (ni mode, ni lien du staff, sans mode lui non plus).
       } else if (trigger === null) {
-        await connection.execute(
-          `UPDATE bg_matches SET live_trigger = NULL, live_trigger_user_id = NULL, live_started_at = NULL WHERE id = ?`,
-          [matchId],
-        );
-        await connection.execute(
-          `UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE match_id = ? AND staff_owned = 1`,
-          [matchId],
-        );
+        await unmarkLive(connection, matchId, hold, actor);
         streams = streams?.map((stream) => (stream.staff ? { ...stream, liveUrl: null } : stream));
       } else {
         if (triggerChanges) {
@@ -348,6 +346,41 @@ export async function setMatchLiveConfig(
   // Rien d'écrit : aucun instantané à rebâtir ni à pousser.
   if (outcome.changed) publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
   return outcome;
+}
+
+/**
+ * Démarque le match : mode, maître et antenne, puis le lien de l'organisation.
+ * Démarquer efface ce lien : un porteur de la seule `live` ne le fait que sur
+ * **son** mode (il en est le maître) ; sur celui du staff, il n'y touche pas plus
+ * qu'en le réécrivant (`writeStaffLink`, `STAFF_STREAM_FORBIDDEN`).
+ */
+async function unmarkLive(
+  connection: PoolConnection,
+  matchId: number,
+  hold: LiveTriggerHold,
+  actor: LiveTriggerActor,
+): Promise<void> {
+  const staffSide = actor.manages || actor.isAdmin || isMatchRefereeActor(hold, actor);
+  if (!staffSide && hold.ownerId !== actor.userId && (await hasStaffLink(connection, matchId))) {
+    throw new Error("STAFF_STREAM_FORBIDDEN");
+  }
+  await connection.execute(
+    `UPDATE bg_matches SET live_trigger = NULL, live_trigger_user_id = NULL, live_started_at = NULL WHERE id = ?`,
+    [matchId],
+  );
+  await connection.execute(
+    `UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE match_id = ? AND staff_owned = 1`,
+    [matchId],
+  );
+}
+
+/** Le stream de l'organisation porte-t-il un lien (que le démarquage effacerait) ? */
+async function hasStaffLink(connection: PoolConnection, matchId: number): Promise<boolean> {
+  const [rows] = await connection.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_match_streams WHERE match_id = ? AND staff_owned = 1 AND live_url IS NOT NULL LIMIT 1`,
+    [matchId],
+  );
+  return rows.length > 0;
 }
 
 /** Écrit le mode posé et son maître ; un mode qui n'est plus manuel referme l'antenne. */

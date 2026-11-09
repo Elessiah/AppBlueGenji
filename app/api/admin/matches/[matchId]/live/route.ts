@@ -152,7 +152,8 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
     if (changed) {
       announceStaffMatchAction(matchId, removed ? "LIVE_REMOVED" : "LIVE_CONFIGURED", staffActionAuthor(user));
     }
-    return ok({ trigger });
+    // Mode absent du corps : inchangé, la réponse dit celui qui reste.
+    return ok({ trigger: trigger === undefined ? previousTrigger : trigger });
   } catch (error) {
     return mapLiveError(error);
   }

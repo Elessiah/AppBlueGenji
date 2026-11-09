@@ -410,7 +410,9 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: "AUTO", changed: true });
 
-    await putMatchLive(matchReq("PUT", {}), matchParams("42"));
+    const res = await putMatchLive(matchReq("PUT", {}), matchParams("42"));
+    // Mode absent : la réponse dit celui qui reste.
+    expect(await res.json()).toEqual({ trigger: "AUTO" });
     expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
       trigger: undefined,
       liveUrl: undefined,

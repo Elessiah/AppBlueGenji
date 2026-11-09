@@ -138,8 +138,10 @@ export async function applyCastTrigger(
   const actor = { userId, ...access };
   const { hold, shown } = await castTriggerHold(connection, row, trigger === null ? null : userId);
   // L'appelant caste le match (inscription ou réglage de son cast) : un mode
-  // sans maître lui revient s'il le change (décision du 2026-11-05).
-  const owns = mayChangeLiveTrigger(hold, actor, true);
+  // sans maître lui revient s'il le change (décision du 2026-11-05) — s'il est
+  // montré (le candidat de l'inscription l'est) : un caster tu ne décide pas,
+  // comme sur la route du staff (`setMatchLiveConfig`).
+  const owns = mayChangeLiveTrigger(hold, actor, shown.has(userId));
   if (!owns && skip) return false;
   // Un match qui ne se caste plus le dit d'abord : le refus de propriété
   // tairait la vraie raison.
