@@ -205,8 +205,8 @@ describe("DONNEES_PROFIL", () => {
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Certification of the Discord username")?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: "match time notices, reminders, match removal notices, match check-ins, new match announcements and cast removal notices by direct message" });
     // L'ID sert aussi, certifié ou non, aux avis passant par la portée « proven ».
     const id = DONNEES_PROFIL.find((d) => d.donnee === "ID Discord");
-    expect(id?.finalite).toMatch(/horaires, rappels, retrait de match, check-in d'un match en autogestion d'une équipe que tu gères ou de ton tournoi individuel, et retrait de ton cast — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, invitation d'une équipe, reprise d'équipe proposée ou propriété de ton équipe reçue, avis de suspension ou de modération, information sur tes données/);
-    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID")?.finalite).toMatch(/match times, reminders, removal, the check-in of a self-managed match of a team you manage or of your solo tournament, and removal of your cast — only if your tag is certified —, request to join a team you manage, a team's invitation, an offered team takeover or ownership of your team received, suspension or moderation notices, information about your data/);
+    expect(id?.finalite).toMatch(/horaires, rappels, retrait de match, check-in d'un match en autogestion d'une équipe que tu gères ou de ton tournoi individuel, annonce d'un nouveau match et retrait de ton cast — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, invitation d'une équipe, reprise d'équipe proposée ou propriété de ton équipe reçue, avis de suspension ou de modération, information sur tes données/);
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID")?.finalite).toMatch(/match times, reminders, removal, the check-in of a self-managed match of a team you manage or of your solo tournament, new match announcements and removal of your cast — only if your tag is certified —, request to join a team you manage, a team's invitation, an offered team takeover or ownership of your team received, suspension or moderation notices, information about your data/);
   });
 
   it("déclare, sur la certification, chaque public qu'elle ouvre — et celui qu'on choisit", () => {
@@ -616,8 +616,8 @@ describe("annonce d'un nouveau match — textes légaux (revue juridique de #569
   it("registerT04_retention_newMatchRecordsListAnnouncedTimeAndSkippedMark", () => {
     const fr = t04.retention.find((line) => line.includes("annonce d'un nouveau match"));
     const en = t04En.retention.find((line) => line.includes("notice of a new match"));
-    expect(fr).toMatch(/horaire annoncé et date de l'annonce, ou la marque qu'il n'a pas été annoncé — match déjà apparié à la mise en service, adversaire dissous, envoi échoué trois fois\)/);
-    expect(en).toMatch(/the announced time and the date of the notice, or the mark that it was not announced — match already paired when the feature went live, opponent dissolved, sending failed three times\)/);
+    expect(fr).toMatch(/horaire annoncé et date de la trace, ou la marque qu'il n'a pas été annoncé — match déjà apparié à la mise en service, adversaire dissous, envoi échoué trois fois\)/);
+    expect(en).toMatch(/the announced time and the date of the record, or the mark that it was not announced — match already paired when the feature went live, opponent dissolved, sending failed three times\)/);
     expect(en).not.toMatch(/never goes out twice, erased with it/);
   });
 
@@ -639,8 +639,8 @@ describe("annonce d'un nouveau match — textes légaux (revue juridique de #569
   });
 
   it("registerT04_categoriesAndPushRecipients_coverNewMatchRecordsAndAllMembers", () => {
-    expect(t04.dataCategories).toContain("Annonces d'un nouveau match : place du match dans le tournoi, numéros des deux engagées, horaire annoncé et date de l'annonce, ou marque d'un match non annoncé");
-    expect(t04En.dataCategories).toContain("New-match announcements: the match's place in the tournament, numbers of both entrants, announced time and date of the announcement, or the mark of a match not announced");
+    expect(t04.dataCategories).toContain("Annonces d'un nouveau match : place du match dans le tournoi, numéros des deux engagées, horaire annoncé et date de la trace, ou marque d'un match non annoncé");
+    expect(t04En.dataCategories).toContain("New-match announcements: the match's place in the tournament, numbers of both entrants, announced time and date of the record, or the mark of a match not announced");
     expect(t04.recipients.join("\n")).toContain("membre d'une équipe engagée, joueur d'un tournoi individuel : nouveau match");
     expect(t04En.recipients.join("\n")).toContain("member of an entered team, player of a solo tournament: new match");
   });
@@ -650,6 +650,11 @@ describe("annonce d'un nouveau match — textes légaux (revue juridique de #569
     const en = PRIVACY_CHANGES_EN["2026-11-annonce-nouveau-match"];
     expect(fr.details[0]).toContain("personne pour une équipe fantôme, et rien pour un match contre une équipe dissoute");
     expect(en.details[0]).toContain("nobody for a ghost team, and nothing for a match against a dissolved team");
+  });
+
+  it("donneesProfil_discordId_listsNewMatchDmInFrAndEn", () => {
+    expect(DONNEES_PROFIL.find((d) => d.donnee === "ID Discord")?.finalite).toContain("annonce d'un nouveau match et retrait de ton cast");
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID")?.finalite).toContain("new match announcements and removal of your cast");
   });
 
   it("donneesProfil_matchDmChoice_mentionsNewMatchInFrAndEn", () => {
