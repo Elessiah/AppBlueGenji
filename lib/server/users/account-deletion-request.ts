@@ -395,7 +395,7 @@ async function settleDeparture(userId: number, departure: TeamDeparture): Promis
  */
 export async function requestAccountDeletion(
   userId: number,
-  options: { requestedAt?: Date } = {},
+  options: { requestedAt?: Date; accountCreatedAt?: string } = {},
 ): Promise<AccountDeletionRequestOutcome> {
   const db = await getDatabase();
   const soloEntryTournaments = await listSoloRegistrationTournamentIds(db, userId);
@@ -423,6 +423,11 @@ export async function requestAccountDeletion(
       [userId],
     );
     if (locked.length === 0 || Number(locked[0].is_deleted) === 1) throw new Error("USER_NOT_FOUND");
+    // Rejeu du journal : la ligne verrouillée doit être ce compte-là
+    // (identifiant réattribué depuis la restauration → rien n'est écrit).
+    if (options.accountCreatedAt !== undefined && String(locked[0].created_at) !== options.accountCreatedAt) {
+      throw new Error("ACCOUNT_REASSIGNED");
+    }
     accountCreatedAt = String(locked[0].created_at);
 
     withdrawn = await withdrawSoloRegistrationsOn(

@@ -190,6 +190,17 @@ describe("requestAccountDeletion — le compte", () => {
     expect(sendBotLog).not.toHaveBeenCalled();
   });
 
+  // Revue sécurité #571 : le rejeu ne touche jamais la ligne d'un autre compte.
+  it("requestAccountDeletion_createdAtMismatchUnderLock_throwsAccountReassigned", async () => {
+    const { connection } = fakeDb({});
+
+    await expect(requestAccountDeletion(7, { accountCreatedAt: "2026-09-22 08:00:00" })).rejects.toThrow(
+      "ACCOUNT_REASSIGNED",
+    );
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(recordAccountDeletion).not.toHaveBeenCalled();
+  });
+
   it("requestAccountDeletion_nominal_marksPendingAndDeletesSessionsInTransaction", async () => {
     const { queries, connection } = fakeDb({});
 

@@ -93,11 +93,19 @@ describe("pickTeamSuccessor", () => {
   });
 
   // Revue de correction #571 : un copropriétaire suspendu garde l'équipe, rien ne change.
-  it("pickTeamSuccessor_suspendedCoOwner_picksCoOwnerOverActiveMember", () => {
+  // Revue sécurité #571 : l'équipe garde un propriétaire capable de se connecter.
+  it("pickTeamSuccessor_suspendedCoOwner_picksActiveMember", () => {
     const member = candidate({ userId: 2, roles: ["TANK"] });
     const coOwner = candidate({ userId: 3, roles: ["OWNER"], suspended: true });
 
-    expect(pickTeamSuccessor([member, coOwner])?.userId).toBe(3);
+    expect(pickTeamSuccessor([member, coOwner])?.userId).toBe(2);
+  });
+
+  it("pickTeamSuccessor_activeCoOwnerAndManager_picksCoOwner", () => {
+    const manager = candidate({ userId: 2, roles: ["MANAGER"] });
+    const coOwner = candidate({ userId: 3, roles: ["OWNER"] });
+
+    expect(pickTeamSuccessor([manager, coOwner])?.userId).toBe(3);
   });
 
   it("pickTeamSuccessor_onlySuspendedMembers_stillPicksBestOfThem", () => {

@@ -226,40 +226,57 @@ export async function reactivateAccount(
  * N'écrit pas le journal (sa ligne de réactivation y est déjà). Rend l'issue
  * relue sous verrou : `REACTIVATED`, `ALREADY_ACTIVE` (compte vivant),
  * `SUPERSEDED` (même compte toujours en attente, d'une demande postérieure à
- * celle que la réactivation défaisait — elle tient) ou `GONE` (compte absent,
- * identifiant réattribué, ou suppression déjà définitive).
+ * celle que la réactivation défaisait — elle tient), `GONE` (suppression déjà
+ * définitive), `ABSENT` (plus de ligne) ou `OTHER_ACCOUNT` (identifiant
+ * réattribué), relus sous verrou.
  */
-export type ReplayedReactivation = "REACTIVATED" | "ALREADY_ACTIVE" | "SUPERSEDED" | "GONE";
+export type ReplayedReactivation = "REACTIVATED" | "ALREADY_ACTIVE" | "SUPERSEDED" | "GONE" | "ABSENT" | "OTHER_ACCOUNT";
+
+type LockedAccountRow = RowDataPacket & {
+  is_deleted: 0 | 1;
+  deletion_requested_at: StoredDate;
+  created_at: string;
+};
+
+/**
+ * L'issue d'une réactivation rejouée, hors rétablissement, d'après la ligne
+ * relue sous verrou — `null` : même compte, en attente de la demande que la
+ * réactivation défait (à rétablir).
+ */
+function lockedReactivationOutcome(
+  entry: AccountDeletionEntry,
+  row: LockedAccountRow | undefined,
+): Exclude<ReplayedReactivation, "REACTIVATED"> | null {
+  if (!row) return "ABSENT";
+  if (String(row.created_at) !== entry.accountCreatedAt) return "OTHER_ACCOUNT";
+  const isDeleted = Number(row.is_deleted) === 1;
+  if (!isDeleted) return "ALREADY_ACTIVE";
+  const pendingDeletion = row.deletion_requested_at !== null;
+  const undoes = reactivationUndoes(entry, {
+    createdAt: String(row.created_at),
+    isDeleted,
+    pendingDeletion,
+    deletionRequestedAt: row.deletion_requested_at === null ? null : String(row.deletion_requested_at),
+  });
+  if (undoes) return null;
+  return pendingDeletion ? "SUPERSEDED" : "GONE";
+}
 
 export async function replayAccountReactivation(entry: AccountDeletionEntry): Promise<ReplayedReactivation> {
   const userId = entry.userId;
   const db = await getDatabase();
   const connection = await db.getConnection();
   let restored = false;
-  let alive = false;
-  let stillPending = false;
+  let outcome: Exclude<ReplayedReactivation, "REACTIVATED"> | null;
   try {
     await connection.beginTransaction();
-    const [locked] = await connection.execute<(RowDataPacket & {
-      is_deleted: 0 | 1;
-      deletion_requested_at: StoredDate;
-      created_at: string;
-    })[]>(`SELECT is_deleted, deletion_requested_at, created_at FROM bg_users WHERE id = ? FOR UPDATE`, [userId]);
-    const row = locked[0];
-    const sameAccount = !!row && String(row.created_at) === entry.accountCreatedAt;
-    alive = sameAccount && Number(row.is_deleted) === 0;
-    stillPending = sameAccount && Number(row.is_deleted) === 1 && row.deletion_requested_at !== null;
+    const [locked] = await connection.execute<LockedAccountRow[]>(
+      `SELECT is_deleted, deletion_requested_at, created_at FROM bg_users WHERE id = ? FOR UPDATE`,
+      [userId],
+    );
     // Revérifié sous verrou : même compte, et demande que la réactivation défait.
-    const undoes =
-      !!row &&
-      String(row.created_at) === entry.accountCreatedAt &&
-      reactivationUndoes(entry, {
-        createdAt: String(row.created_at),
-        isDeleted: Number(row.is_deleted) === 1,
-        pendingDeletion: Number(row.is_deleted) === 1 && row.deletion_requested_at !== null,
-        deletionRequestedAt: row.deletion_requested_at === null ? null : String(row.deletion_requested_at),
-      });
-    if (undoes) {
+    outcome = lockedReactivationOutcome(entry, locked[0]);
+    if (outcome === null) {
       restored = await restoreAccountIdentity(connection, userId);
       if (restored) await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
     }
@@ -270,12 +287,10 @@ export async function replayAccountReactivation(entry: AccountDeletionEntry): Pr
   } finally {
     connection.release();
   }
-  if (restored) {
-    invalidateTeamIdentityViews();
-    invalidateStats();
-    await republishSoloEntryTournaments(userId);
-  }
-  if (restored) return "REACTIVATED";
-  if (alive) return "ALREADY_ACTIVE";
-  return stillPending ? "SUPERSEDED" : "GONE";
+  // Rien à rétablir sous verrou : la demande, toujours en attente, tient.
+  if (!restored) return outcome ?? "SUPERSEDED";
+  invalidateTeamIdentityViews();
+  invalidateStats();
+  await republishSoloEntryTournaments(userId);
+  return "REACTIVATED";
 }

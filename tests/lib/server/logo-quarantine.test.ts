@@ -44,6 +44,7 @@ import {
   notifyTeamLogoRemoved,
   notifyUserAvatarRemoved,
   purgeDueQuarantines,
+  removeModeratedAvatarFile,
   purgeQuarantinedLogo,
   quarantineDirectory,
   quarantinedLogoFile,
@@ -772,6 +773,41 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
+  // Revue sécurité #571 (D6) : un avatar contesté puis tranché n'est pas dit supprimé
+  // par la modération — l'issue n'est pas écrite (contestation acceptée, rétablissement refusé).
+  it("purgeDueQuarantines_contestedSettledAvatar_purgesWithoutBlocking", async () => {
+    install(
+      [[/FROM bg_logo_quarantines q\s+LEFT JOIN bg_reports r/, () => [[
+        { id: 30, purge_after: new Date("2026-06-30T00:00:00Z"), report_id: 12, report_status: "RESOLVED", contested: 1 },
+      ]]]],
+      [
+        [/FROM bg_logo_quarantines q/, () => [[quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR })]]],
+        [/SET status = 'PURGED'/, () => [{}]],
+      ],
+    );
+
+    await expect(purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"))).resolves.toBe(1);
+
+    expect(unlink).toHaveBeenCalledWith(HIDDEN_AVATAR);
+    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
+  });
+
+  it("purgeDueQuarantines_uncontestedAvatar_blocksHash", async () => {
+    install(
+      [[/FROM bg_logo_quarantines q\s+LEFT JOIN bg_reports r/, () => [[
+        { id: 30, purge_after: new Date("2026-06-30T00:00:00Z"), report_id: 12, report_status: "OPEN", contested: 0 },
+      ]]]],
+      [
+        [/FROM bg_logo_quarantines q/, () => [[quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR })]]],
+        [/SET status = 'PURGED'/, () => [{}]],
+      ],
+    );
+
+    await purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"));
+
+    expect(blockRemovedImageFiles).toHaveBeenCalledWith([HIDDEN_AVATAR]);
+  });
+
   it("ne compte pas la contestation de l'auteur du signalement : elle ne défend pas l'image", async () => {
     install([[/FROM bg_logo_quarantines q\s+LEFT JOIN bg_reports r/, () => [[]]]]);
     await purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"));
@@ -783,6 +819,39 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     // La réouverture par l'auteur ne remet pas en attente ce qui était tranché :
     // seule une contestation de personne visée postérieure à la sienne compte.
     expect(sql).toMatch(/c\.id > COALESCE\(\(SELECT MAX\(n\.id\)[\s\S]*n\.contest_role = 'NOTIFIER'\), 0\)/);
+  });
+});
+
+describe("removeModeratedAvatarFile", () => {
+  // Revue sécurité #571 : tout avatar téléversé est bloqué avant d'être effacé,
+  // même sous un nom de fichier antérieur à la règle actuelle.
+  it("removeModeratedAvatarFile_legacyFilename_blocksThenUnlinks", async () => {
+    const legacy = path.join(process.cwd(), "public", "uploads", "avatars", "old.name.png");
+
+    await removeModeratedAvatarFile("/api/uploads/avatars/old.name.png");
+
+    expect(blockRemovedImageFiles).toHaveBeenCalledWith([legacy]);
+    expect(unlink).toHaveBeenCalledWith(legacy);
+    expect(jest.mocked(blockRemovedImageFiles).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(unlink).mock.invocationCallOrder[0],
+    );
+  });
+
+  it("removeModeratedAvatarFile_foreignUrl_noop", async () => {
+    await removeModeratedAvatarFile("https://cdn.discordapp.com/avatars/1/a.png");
+
+    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
+    expect(unlink).not.toHaveBeenCalled();
+  });
+
+  it("removeModeratedAvatarFile_unlinkFails_neverThrows", async () => {
+    jest.mocked(unlink).mockRejectedValueOnce(Object.assign(new Error("EACCES"), { code: "EACCES" }));
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(removeModeratedAvatarFile(AVATAR)).resolves.toBeUndefined();
+
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 });
 

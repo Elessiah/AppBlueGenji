@@ -651,9 +651,13 @@ puis renomme l'entrée solo (`syncSoloEntryIdentityOn`). Toute lecture qui joint
   création du compte). Le rapport du rejeu distingue
   `superseded` (réactivation non rejouée, une demande postérieure tient, relue
   sous verrou : `replayAccountReactivation` rend `REACTIVATED`,
-  `ALREADY_ACTIVE`, `SUPERSEDED` ou `GONE` — compte absent, réattribué ou déjà
-  supprimé, compté `alreadyDeleted`) et `alreadyPending` (demande déjà à jour,
-  partagée de même en simulation) ; la simulation compte les réactivations « au plus ». Une ligne de réactivation
+  `ALREADY_ACTIVE`, `SUPERSEDED`, `GONE` — déjà supprimé, compté
+  `alreadyDeleted` —, `ABSENT` ou `OTHER_ACCOUNT` — identifiant réattribué,
+  compté `otherAccount`) et `alreadyPending` (demande déjà à jour, partagée de
+  même en simulation, qui retient la plus récente des deux demandes pour dire
+  « serait supprimé »). Le chemin `REPLAY` passe aussi `accountCreatedAt` à
+  `requestAccountDeletion` et `deleteOwnAccount` : sous le verrou, une autre
+  ligne lève `ACCOUNT_REASSIGNED`, comptée `otherAccount`, sans rien écrire ; la simulation compte les réactivations « au plus ». Une ligne de réactivation
   ne remplace que les lignes en attente **antérieures ou simultanées** du compte
   (`withReactivationEntry`), et `undoneRequestAt` n'est lu que sous la forme
   rendue par la base (`AAAA-MM-JJ HH:MM:SS`), toute autre ligne étant écartée.
@@ -680,8 +684,10 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   reste à un autre `OWNER` s'il y en a, sinon passe au `MANAGER`, sinon au
   `CAPITAINE`, sinon au membre le plus ancien
   (`pickTeamSuccessor`, départage par l'id d'appartenance), avec l'avis
-  `OWNERSHIP` — aucun avis ni écriture quand un autre `OWNER` la garde (même
-  suspendu) ; hors copropriétaire, un compte sous suspension en cours n'hérite qu'à défaut de tout autre membre. Seul joueur : équipe **fantôme** si elle est inscrite à un tournoi
+  `OWNERSHIP` — aucun avis ni écriture quand un autre `OWNER` **actif** la
+  garde ; un compte sous suspension en cours, copropriétaire compris, n'hérite
+  qu'à défaut de tout membre actif (un `MANAGER` actif reçoit la propriété
+  plutôt qu'un copropriétaire suspendu, qui garde la sienne). Seul joueur : équipe **fantôme** si elle est inscrite à un tournoi
   `UPCOMING`/`REGISTRATION`/`RUNNING`, sinon **dissoute** (`dissolveTeamOn`,
   « Équipe dissoute #id »). Les candidats ne sont pas verrouillés côté compte
   (inversion d'ordre évitée) ; seuls les comptes vivants héritent.
@@ -772,9 +778,11 @@ L'empreinte SHA-256 d'un avatar entre dans `bg_blocked_image_hashes` (aucune
 colonne de compte) **quand la modération le supprime** — sans délai depuis un
 signalement (`deleteUserAvatarForReport`), depuis la fiche
 (`DELETE /api/admin/users/[id]/avatar`), ou à la fin de sa quarantaine
-(`purgeQuarantinedLogo` : contestation rejetée ou échéance passée) —, après le
-commit et avant que le fichier ne parte (`blockRemovedImageFiles`, ne lève
-jamais). Un avatar seulement **masqué** (`HIDDEN`) se conteste encore : il n'est
+(`purgeQuarantinedLogo` : contestation rejetée, ou échéance passée **sans
+contestation** — la purge d'office d'un avatar contesté puis tranché ne bloque
+rien, l'issue n'étant pas écrite) —, après le commit et avant que le fichier ne
+parte (`removeModeratedAvatarFile` / `blockRemovedImageFiles`, ne lèvent
+jamais ; toute adresse d'avatar téléversé, ancien nom de fichier compris). Un avatar seulement **masqué** (`HIDDEN`) se conteste encore : il n'est
 pas bloqué, et l'effacement d'un compte n'en bloque plus aucun — il relève ses
 fichiers en quarantaine **sous le verrou du compte** et les supprime après le
 commit. Un avatar ou un logo dont l'image traitée **ou le fichier téléversé tel

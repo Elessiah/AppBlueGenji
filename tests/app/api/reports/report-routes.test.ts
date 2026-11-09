@@ -8,7 +8,6 @@ jest.mock("@/lib/server/teams/identity");
 jest.mock("@/lib/server/users/avatar");
 jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/staff-audit");
-jest.mock("@/lib/server/blocked-images");
 
 import { POST as submitReport } from "@/app/api/reports/route";
 import { GET as searchTargets } from "@/app/api/reports/targets/route";
@@ -34,7 +33,7 @@ import {
   searchReportTargets,
 } from "@/lib/server/content-reports";
 import {
-  avatarFileLocations,
+  removeModeratedAvatarFile,
   deleteTeamLogoForReport,
   deleteUserAvatarForReport,
   hideTeamLogo,
@@ -48,7 +47,6 @@ import { managesTeam, recordTermsAcceptance } from "@/lib/server/terms-acceptanc
 import { removeTeamLogoAsModerator } from "@/lib/server/teams/identity";
 import { removeUserAvatarAsModerator } from "@/lib/server/users/avatar";
 import { deleteStoredImage } from "@/lib/server/image-upload";
-import { blockRemovedImageFiles } from "@/lib/server/blocked-images";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { REPORT_SUBMIT_RULE } from "@/lib/server/api-guard";
@@ -468,41 +466,21 @@ describe("DELETE /api/admin/users/[id]/avatar", () => {
       pseudo: "Nova",
       removedAvatarUrl: "/api/uploads/avatars/9-a.webp",
     });
-    jest.mocked(deleteStoredImage).mockResolvedValue(undefined);
+    jest.mocked(removeModeratedAvatarFile).mockResolvedValue(undefined);
 
     const res = await removeUserAvatar(withReason(), params("9"));
     expect(res.status).toBe(200);
-    expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/avatars/9-a.webp");
+    // Un seul geste bloque l'empreinte puis efface le fichier (D6).
+    expect(removeModeratedAvatarFile).toHaveBeenCalledWith("/api/uploads/avatars/9-a.webp");
+    expect(jest.mocked(removeUserAvatarAsModerator).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(removeModeratedAvatarFile).mock.invocationCallOrder[0],
+    );
     // Jamais le pseudo du joueur sur Discord (lib/shared/log-privacy.ts).
     expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("un joueur"), { id: 1, pseudo: "Admin" }, { category: "moderation" });
     expect(publishStaffAction).not.toHaveBeenCalledWith(expect.stringContaining("Nova"), expect.anything(), expect.anything());
     // Hors de tout signalement : le joueur est prévenu, sans lien de contestation.
     expect(notifyUserAvatarRemoved).toHaveBeenCalledWith(9, null, REASON);
     expect(publishStaffAction).not.toHaveBeenCalledWith(expect.stringContaining(REASON), expect.anything(), expect.anything());
-  });
-
-  it("bloque l'empreinte de l'avatar retiré avant d'effacer son fichier (D6)", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(removeUserAvatarAsModerator).mockResolvedValue({ pseudo: "Nova", removedAvatarUrl: "/api/uploads/avatars/9-a.webp" });
-    jest.mocked(avatarFileLocations).mockReturnValue({ live: "/abs/avatars/9-a.webp", quarantined: "/abs/q/user-9-9-a.webp" });
-    jest.mocked(deleteStoredImage).mockResolvedValue(undefined);
-
-    expect((await removeUserAvatar(withReason(), params("9"))).status).toBe(200);
-    expect(avatarFileLocations).toHaveBeenCalledWith("/api/uploads/avatars/9-a.webp", 9);
-    expect(blockRemovedImageFiles).toHaveBeenCalledWith(["/abs/avatars/9-a.webp"]);
-    expect(jest.mocked(blockRemovedImageFiles).mock.invocationCallOrder[0]).toBeLessThan(
-      jest.mocked(deleteStoredImage).mock.invocationCallOrder[0],
-    );
-  });
-
-  it("n'a rien à bloquer pour une adresse étrangère", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(removeUserAvatarAsModerator).mockResolvedValue({ pseudo: "Nova", removedAvatarUrl: "https://cdn.example/a.png" });
-    jest.mocked(avatarFileLocations).mockReturnValue(null);
-    jest.mocked(deleteStoredImage).mockResolvedValue(undefined);
-
-    expect((await removeUserAvatar(withReason(), params("9"))).status).toBe(200);
-    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
   });
 
   it.each<[string, number]>([

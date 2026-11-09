@@ -127,6 +127,25 @@ export function avatarFileLocations(
   };
 }
 
+/**
+ * Efface du disque l'avatar que la modération vient de **supprimer** (D6) :
+ * son empreinte est bloquée d'abord (le fichier doit encore se lire), puis le
+ * fichier part — un seul geste pour chaque chemin de retrait, qui ne peut donc
+ * pas effacer sans bloquer. Toute adresse d'avatar téléversé est couverte, y
+ * compris un nom de fichier antérieur à `LOGO_FILENAME` ; une adresse
+ * étrangère n'a rien à bloquer ni à effacer. Après le commit qui retire
+ * l'avatar ; **ne lève jamais** (un résidu sur le disque se consigne).
+ */
+export async function removeModeratedAvatarFile(avatarUrl: string): Promise<void> {
+  const relative = toDiskUploadPath(avatarUrl);
+  if (!relative?.startsWith(USER_UPLOAD_PREFIX) || relative.includes("..")) return;
+  const absolute = path.join(process.cwd(), "public", relative.replace(/^\/+/, ""));
+  await blockRemovedImageFiles([absolute]);
+  await unlinkIfPresent(absolute).catch((error) => {
+    console.error("[moderation] fichier de l'avatar non effacé", error);
+  });
+}
+
 /** Déplace un fichier, y compris d'un disque à l'autre (`EXDEV`). */
 async function moveFile(from: string, to: string): Promise<void> {
   await mkdir(path.dirname(to), { recursive: true });
@@ -433,15 +452,8 @@ export async function deleteUserAvatarForReport(
     connection.release();
   }
 
-  const files = avatarFileLocations(avatarUrl, userId);
-  if (files) {
-    // Supprimé par la modération : son empreinte est bloquée avant que le
-    // fichier ne parte (décision D6).
-    await blockRemovedImageFiles([files.live]);
-    await unlinkIfPresent(files.live).catch((error) => {
-      console.error("[moderation] fichier de l'avatar non effacé", error);
-    });
-  }
+  // Supprimé par la modération : empreinte bloquée, puis fichier effacé (D6).
+  await removeModeratedAvatarFile(avatarUrl);
 
   // L'avatar est le logo de l'entrée solo, nommée par les vues de la vitrine.
   invalidateLandingTeamViews();
@@ -899,10 +911,19 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
  * Supprime définitivement une image en quarantaine — par l'association (avant
  * l'échéance, contestation rejetée) ou d'office (échéance passée).
  *
+ * `blockHash` (vrai par défaut) : l'empreinte d'un avatar est bloquée (D6).
+ * La purge d'office d'un avatar **contesté** le passe à faux : rien n'y dit
+ * que la modération l'a écarté — la contestation a pu être acceptée sans que
+ * le rétablissement aboutisse (`USER_HAS_NEW_AVATAR`).
+ *
  * @throws QUARANTINE_NOT_FOUND
  * @throws QUARANTINE_CLOSED
  */
-export async function purgeQuarantinedLogo(quarantineId: number, actor: ReportPerson | null): Promise<void> {
+export async function purgeQuarantinedLogo(
+  quarantineId: number,
+  actor: ReportPerson | null,
+  options: { blockHash?: boolean } = {},
+): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
   let row: QuarantineRow;
@@ -929,10 +950,10 @@ export async function purgeQuarantinedLogo(quarantineId: number, actor: ReportPe
   // dans un dossier que rien ne sert.
   const files = isTeam ? logoFileLocations(row.logo_url, targetId) : avatarFileLocations(row.logo_url, targetId);
   if (files) {
-    // Un avatar supprimé (contestation rejetée ou échéance passée) : son
-    // empreinte est bloquée avant que le fichier ne parte (décision D6). Le
+    // Un avatar supprimé (contestation rejetée, ou échéance passée sans
+    // contestation) : son empreinte est bloquée avant que le fichier ne parte (décision D6). Le
     // masquage seul ne bloquait rien.
-    if (!isTeam) await blockRemovedImageFiles([files.quarantined]);
+    if (!isTeam && options.blockHash !== false) await blockRemovedImageFiles([files.quarantined]);
     await unlinkIfPresent(files.quarantined).catch((error) => {
       console.error("[moderation] fichier en quarantaine non effacé", error);
     });
@@ -1015,7 +1036,10 @@ export async function purgeDueQuarantines(now: Date = new Date()): Promise<numbe
     });
     if (!due) continue;
     try {
-      await purgeQuarantinedLogo(Number(row.id), null);
+      // Contesté puis tranché sans purge par le staff : l'issue n'est pas
+      // écrite, l'empreinte n'est pas bloquée (D6 : seulement une suppression
+      // décidée par la modération).
+      await purgeQuarantinedLogo(Number(row.id), null, { blockHash: Number(row.contested) !== 1 });
       purged += 1;
     } catch (error) {
       // Rétablie ou supprimée entre-temps : rien à faire.

@@ -416,9 +416,10 @@ function successorRank(roles: readonly string[]): number {
  * (E3) : un autre `OWNER` s'il y en a (rien ne change pour lui), sinon un
  * `MANAGER`, sinon un `CAPITAINE`, sinon un autre membre ; à rang
  * égal, le plus ancien dans l'équipe, puis la ligne d'appartenance la plus
- * ancienne. Hors copropriétaire (qui la garde, même suspendu : rien ne change),
- * un compte suspendu ne passe qu'à défaut de tout autre membre (comme la
- * reprise des tournois organisés, qui l'écarte). `null` : il était seul.
+ * ancienne. Un compte suspendu — copropriétaire compris — ne passe qu'à défaut
+ * de tout membre actif (comme la reprise des tournois organisés, qui l'écarte) :
+ * un `MANAGER` actif reçoit la propriété plutôt qu'un copropriétaire suspendu,
+ * qui garde la sienne. `null` : il était seul.
  */
 export function pickTeamSuccessor(candidates: readonly TeamSuccessorCandidate[]): TeamSuccessorCandidate | null {
   let best: TeamSuccessorCandidate | null = null;
@@ -429,8 +430,8 @@ export function pickTeamSuccessor(candidates: readonly TeamSuccessorCandidate[])
 }
 
 function compareSuccessors(a: TeamSuccessorCandidate, b: TeamSuccessorCandidate): number {
-  const owner = Number(b.roles.includes("OWNER")) - Number(a.roles.includes("OWNER"));
-  if (owner !== 0) return owner;
+  // Suspendu : derrière tout membre actif, copropriétaire compris — l'équipe
+  // doit garder un propriétaire capable de se connecter.
   const suspension = Number(a.suspended === true) - Number(b.suspended === true);
   if (suspension !== 0) return suspension;
   const rank = successorRank(a.roles) - successorRank(b.roles);

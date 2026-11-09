@@ -379,10 +379,18 @@ describe("replayAccountReactivation", () => {
   });
 
   // Revue de correction #571 : un autre compte n'est pas « une demande postérieure ».
-  it("replayAccountReactivation_otherCreatedAt_goneWithoutRestore", async () => {
+  it("replayAccountReactivation_otherCreatedAt_otherAccountWithoutRestore", async () => {
     transaction({ locked: { ...lockedPending, created_at: "2026-09-22 08:00:00" } });
 
-    expect(await replayAccountReactivation(reactivation)).toBe("GONE");
+    expect(await replayAccountReactivation(reactivation)).toBe("OTHER_ACCOUNT");
+
+    expect(restoreAccountIdentity).not.toHaveBeenCalled();
+  });
+
+  it("replayAccountReactivation_noRowUnderLock_absentWithoutRestore", async () => {
+    transaction({});
+
+    expect(await replayAccountReactivation(reactivation)).toBe("ABSENT");
 
     expect(restoreAccountIdentity).not.toHaveBeenCalled();
   });

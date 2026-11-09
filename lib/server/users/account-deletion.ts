@@ -309,9 +309,17 @@ export async function getAccountDeletionPlan(userId: number): Promise<AccountDel
  * Rend le plan appliqué — le mode **et** le motif —, pour que la route puisse
  * le dire au joueur : « tes statistiques restent » ne veut rien dire à qui n'en
  * a aucune et dont la ligne n'est retenue que par une équipe à transférer.
+ *
+ * `accountCreatedAt` (rejeu du journal) : la ligne verrouillée doit être ce
+ * compte-là, sans quoi rien n'est écrit (`ACCOUNT_REASSIGNED`).
+ *
+ * @throws USER_NOT_FOUND | ACCOUNT_REASSIGNED
  */
-export async function deleteOwnAccount(userId: number): Promise<AccountDeletionPlan> {
-  const plan = await deleteAccountNow(userId, false);
+export async function deleteOwnAccount(
+  userId: number,
+  options: { accountCreatedAt?: string } = {},
+): Promise<AccountDeletionPlan> {
+  const plan = await deleteAccountNow(userId, false, options.accountCreatedAt);
   if (plan === null) throw new Error("USER_NOT_FOUND");
   return plan;
 }
@@ -363,17 +371,12 @@ async function applyDeletionMode(
 }
 
 /** Une suite après le commit ; une erreur est consignée, jamais propagée (la suppression est faite). */
-function afterCommit(step: () => void, failure: string): void {
+export function afterCommit(step: () => void, failure: string): void {
   try {
     step();
   } catch (error) {
     console.error(`[account-deletion] ${failure} :`, error);
   }
-}
-
-/** Prévient un tournoi après le commit ; un écouteur qui lève est consigné, jamais propagé. */
-function publishAfterCommit(publish: () => void, tournamentId: number): void {
-  afterCommit(publish, `Tournoi #${tournamentId} non prévenu`);
 }
 
 /** La suppression définitive est due : demande relevée il y a trente jours ou plus, compte toujours en attente. */
@@ -489,6 +492,8 @@ async function deleteAccountNow(
       await connection.rollback();
       return null;
     }
+    // Rejeu d'une suppression immédiate : jamais la ligne d'un autre compte.
+    if (otherAccount) throw new Error("ACCOUNT_REASSIGNED");
     // Anonyme depuis la demande, le compte en attente n'a plus d'avatar sur sa
     // ligne : son chemin attend dans le masque (`account-deletion-hold.ts`).
     const hold = await readDeletionHold(connection, userId, true);
@@ -567,12 +572,14 @@ async function deleteAccountNow(
   // La suppression est commitée : un écouteur qui lève ne doit ni la faire lire
   // comme un échec, ni sauter le ménage de l'avatar et la ligne du journal.
   for (const tournamentId of touchedTournaments) {
-    publishAfterCommit(() => publishMatchUpdatedEvent(tournamentId, { landingLive: true }), tournamentId);
+    afterCommit(() => publishMatchUpdatedEvent(tournamentId, { landingLive: true }), `Tournoi #${tournamentId} non prévenu`);
   }
 
   // Le plateau des tournois dont l'inscription solo est partie (D12) : la liste
   // des engagés, l'aperçu du tirage et les instantanés ouverts.
-  for (const tournamentId of withdrawnFrom) publishAfterCommit(() => publishUpdatedEvent(tournamentId), tournamentId);
+  for (const tournamentId of withdrawnFrom) {
+    afterCommit(() => publishUpdatedEvent(tournamentId), `Tournoi #${tournamentId} non prévenu`);
+  }
 
   // L'accueil, lu sans compte, garde en cache des vues qui nomment l'entrée
   // solo du compte (bandeau, mini-arbre, leaderboard) et le compteur de

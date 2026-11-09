@@ -218,19 +218,23 @@ function simulateRedate(
   report: ReplayReport,
   log: (line: string) => void,
 ): void {
-  // Même partage que le vrai passage : une demande restaurée déjà à cette
-  // date, ou plus récente, ne serait pas redatée.
+  // Même partage que le vrai passage : la demande retenue est la plus récente
+  // des deux (la redate ne va que vers l'avant) ; la finalisation ne tombe que
+  // si **sa** fenêtre est close, sinon elle n'est redatée que si plus ancienne.
   const restoredAt = restored?.deletionRequestedAt ? new Date(restored.deletionRequestedAt).getTime() : Number.NaN;
-  if (windowOpen && Number.isFinite(restoredAt) && restoredAt >= requestedAt.getTime()) {
+  const restoredNewer = Number.isFinite(restoredAt) && restoredAt >= requestedAt.getTime();
+  const effectiveOpen = restoredNewer ? isReactivationWindowOpen(new Date(restoredAt)) : windowOpen;
+  if (!effectiveOpen) {
+    report.replayed += 1;
+    log(`  · #${entry.userId} — serait supprimé (demande du ${entry.deletedAt}, fenêtre close)`);
+    return;
+  }
+  if (restoredNewer) {
     report.alreadyPending += 1;
     return;
   }
   report.replayed += 1;
-  log(
-    windowOpen
-      ? `  · #${entry.userId} — demande de suppression à redater au ${entry.deletedAt} (si plus récente)`
-      : `  · #${entry.userId} — serait supprimé (demande du ${entry.deletedAt}, fenêtre close)`,
-  );
+  log(`  · #${entry.userId} — demande de suppression à redater au ${entry.deletedAt} (si plus récente)`);
 }
 
 /** La date sans ses millisecondes : `deletion_requested_at` est un `DATETIME(0)`. */
@@ -253,7 +257,12 @@ async function replayReactivation(
       report.alreadyActive += 1;
     } else if (outcome === "GONE") {
       report.alreadyDeleted += 1;
-      log(`  = #${entry.userId} — supprimé ou réattribué entre-temps, laissé tel quel`);
+      log(`  = #${entry.userId} — supprimé définitivement entre-temps, laissé tel quel`);
+    } else if (outcome === "ABSENT") {
+      report.absent += 1;
+    } else if (outcome === "OTHER_ACCOUNT") {
+      report.otherAccount += 1;
+      log(`  ≠ #${entry.userId} — identifiant réattribué à un autre compte, laissé intact`);
     } else {
       report.superseded += 1;
       log(`  = #${entry.userId} — demande postérieure à la réactivation, laissée en place`);
@@ -271,7 +280,10 @@ async function replayReactivation(
  */
 async function requestRestoredLiveAccount(entry: AccountDeletionEntry): Promise<void> {
   try {
-    await requestAccountDeletion(entry.userId, { requestedAt: new Date(entry.deletedAt) });
+    await requestAccountDeletion(entry.userId, {
+      requestedAt: new Date(entry.deletedAt),
+      accountCreatedAt: entry.accountCreatedAt,
+    });
   } catch (error) {
     if (error instanceof Error && error.message === "USER_NOT_FOUND") return;
     throw error;
@@ -289,7 +301,10 @@ async function replayDeletion(
     // comme une demande (anonyme dès ce moment, trente jours comptés depuis la
     // date d'origine) ; sa fenêtre déjà close, la suppression devient définitive.
     if (entry.pending && isReactivationWindowOpen(entry.deletedAt)) {
-      await requestAccountDeletion(entry.userId, { requestedAt: new Date(entry.deletedAt) });
+      await requestAccountDeletion(entry.userId, {
+        requestedAt: new Date(entry.deletedAt),
+        accountCreatedAt: entry.accountCreatedAt,
+      });
       report.replayed += 1;
       log(`  ✓ #${entry.userId} — demande de suppression rejouée`);
       return;
@@ -300,10 +315,16 @@ async function replayDeletion(
     // le registre (T01) : effacé directement, il laisserait un propriétaire
     // anonyme à ses équipes.
     await requestRestoredLiveAccount(entry);
-    const plan = await deleteOwnAccount(entry.userId);
+    const plan = await deleteOwnAccount(entry.userId, { accountCreatedAt: entry.accountCreatedAt });
     report.replayed += 1;
     log(`  ✓ #${entry.userId} — ${plan.mode === "ERASE" ? "effacé" : "anonymisé"}`);
   } catch (error) {
+    // Identifiant réattribué entre la lecture et le verrou : laissé intact.
+    if (error instanceof Error && error.message === "ACCOUNT_REASSIGNED") {
+      report.otherAccount += 1;
+      log(`  ≠ #${entry.userId} — identifiant réattribué à un autre compte, laissé intact`);
+      return;
+    }
     report.failed += 1;
     log(`  ✗ #${entry.userId} — échec : ${error instanceof Error ? error.message : String(error)}`);
   }

@@ -616,6 +616,28 @@ describe("deleteOwnAccount — transaction et verrou", () => {
   });
 });
 
+// Revue sécurité #571 : le rejeu ne touche jamais la ligne d'un autre compte.
+describe("deleteOwnAccount — identité revérifiée sous verrou", () => {
+  it("deleteOwnAccount_createdAtMismatchUnderLock_throwsAccountReassignedNoWrite", async () => {
+    const { connection } = fakeDb(EMPTY);
+
+    await expect(deleteOwnAccount(7, { accountCreatedAt: "2026-09-22 08:00:00" })).rejects.toThrow(
+      "ACCOUNT_REASSIGNED",
+    );
+
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(connection.commit).not.toHaveBeenCalled();
+  });
+
+  it("deleteOwnAccount_createdAtMatchesUnderLock_deletes", async () => {
+    const { connection } = fakeDb(EMPTY);
+
+    await deleteOwnAccount(7, { accountCreatedAt: "2026-01-02 03:04:05" });
+
+    expect(connection.commit).toHaveBeenCalled();
+  });
+});
+
 describe("deleteOwnAccount — le fichier de l'avatar", () => {
   it("efface la photo d'un compte effacé : sa ligne partie, plus rien ne la désigne", async () => {
     const { connection } = fakeDb(EMPTY, { avatarUrl: "/api/uploads/avatars/7-ab.webp" });

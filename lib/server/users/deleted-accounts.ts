@@ -3,7 +3,7 @@ import { getDatabase } from "@/lib/server/database";
 import { accountDeletionPlan } from "@/lib/shared/account-deletion";
 import { isLegacyDeletedPseudo } from "@/lib/shared/anonymous-pseudos";
 import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
-import { accountTraceSql, finalizeAccountDeletion, loadAccountTrace } from "./account-deletion";
+import { accountTraceSql, afterCommit, finalizeAccountDeletion, loadAccountTrace } from "./account-deletion";
 import { settleDeletedSoloEntries } from "./deleted-solo-entries";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
@@ -131,11 +131,7 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
   // Et les matchs qui le nommaient (caster, lien, arbitre), comme `deleteOwnAccount`.
   // Un écouteur qui lève ne transforme pas un rattrapage fait en échec.
   for (const tournamentId of touchedTournaments) {
-    try {
-      publishMatchUpdatedEvent(tournamentId, { landingLive: true });
-    } catch (error) {
-      console.error(`[deleted-accounts] Tournoi #${tournamentId} non prévenu :`, error);
-    }
+    afterCommit(() => publishMatchUpdatedEvent(tournamentId, { landingLive: true }), `Tournoi #${tournamentId} non prévenu`);
   }
   return outcome;
 }
