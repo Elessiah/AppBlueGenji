@@ -6,7 +6,8 @@ jest.mock("@/lib/server/image-upload");
 
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
-import { deleteUnreferencedUpload, isUploadReferenced } from "@/lib/server/stored-upload-cleanup";
+import path from "node:path";
+import { deleteUnreferencedUpload, isUploadReferenced, storedUploadAbsolutePath } from "@/lib/server/stored-upload-cleanup";
 
 /**
  * Remplacer ou supprimer une image effaçait l'ancienne adresse sans regarder ni
@@ -22,6 +23,30 @@ function mockDb(referencedBy: RegExp | null = null) {
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
 }
+
+// Revue sécurité #571, cycle 4 : une seule règle pour le fichier d'une image supprimée.
+describe("storedUploadAbsolutePath", () => {
+  it("storedUploadAbsolutePath_avatarUpload_returnsPublicFile", () => {
+    expect(storedUploadAbsolutePath("/api/uploads/avatars/9-abc.webp", "avatars")).toBe(
+      path.join(process.cwd(), "public", "uploads", "avatars", "9-abc.webp"),
+    );
+  });
+
+  it("storedUploadAbsolutePath_diskForm_returnsSameFile", () => {
+    expect(storedUploadAbsolutePath("/uploads/avatars/9-abc.webp", "avatars")).toBe(
+      path.join(process.cwd(), "public", "uploads", "avatars", "9-abc.webp"),
+    );
+  });
+
+  it.each<[string | null]>([
+    ["/api/uploads/teams/4-abc.webp"],
+    ["/api/uploads/avatars/../teams/4-abc.webp"],
+    ["https://cdn.discordapp.com/avatars/1/a.png"],
+    [null],
+  ])("storedUploadAbsolutePath_notAnAvatarUpload_null (%s)", (url) => {
+    expect(storedUploadAbsolutePath(url, "avatars")).toBeNull();
+  });
+});
 
 describe("deleteUnreferencedUpload", () => {
   beforeEach(() => {

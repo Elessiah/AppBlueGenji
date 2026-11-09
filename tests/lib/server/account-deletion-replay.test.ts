@@ -477,7 +477,7 @@ describe("replayAccountDeletions — demande à redater", () => {
   });
 
   /** Base dont la ligne change entre la lecture du rejeu et sa relecture (`next`, `null` : disparue). */
-  function rowChangesAfterFirstRead(next: typeof pendingRow | null) {
+  function rowChangesAfterFirstRead(next: { created_at: string; is_deleted: number; deletion_requested_at: string | null } | null) {
     let reads = 0;
     const execute = jest.fn(async (sql: string) => {
       if (sql.startsWith("UPDATE")) return [{ affectedRows: 0 }];
@@ -504,6 +504,23 @@ describe("replayAccountDeletions — demande à redater", () => {
     const report = await replayAccountDeletions([pending], { log });
 
     expect(report).toMatchObject({ absent: 1, alreadyPending: 0, replayed: 0 });
+  });
+
+  // Revue sécurité #571, cycle 4 : chaque état relu a son compteur.
+  it("replayAccountDeletions_redateNoRowsChangedAndAccountReactivated_countedAlreadyActive", async () => {
+    rowChangesAfterFirstRead({ ...pendingRow, is_deleted: 0, deletion_requested_at: null });
+
+    const report = await replayAccountDeletions([pending], { log });
+
+    expect(report).toMatchObject({ alreadyActive: 1, alreadyPending: 0, replayed: 0 });
+  });
+
+  it("replayAccountDeletions_redateNoRowsChangedAndAccountFinallyDeleted_countedAlreadyDeleted", async () => {
+    rowChangesAfterFirstRead({ ...pendingRow, deletion_requested_at: null });
+
+    const report = await replayAccountDeletions([pending], { log });
+
+    expect(report).toMatchObject({ alreadyDeleted: 1, alreadyPending: 0, replayed: 0 });
   });
 
   it("replayAccountDeletions_redateFinalizeReassigned_countedOtherAccount", async () => {

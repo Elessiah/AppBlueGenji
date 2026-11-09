@@ -12,12 +12,12 @@ import {
 import { isReferencedRowError } from "@/lib/server/mysql-errors";
 import { avatarFileLocations } from "@/lib/server/logo-quarantine";
 import { unlink } from "node:fs/promises";
-import path from "node:path";
 import { blockRemovedImageFiles } from "@/lib/server/blocked-images";
+import { storedUploadAbsolutePath } from "@/lib/server/stored-upload-cleanup";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { deleteStoredImage } from "@/lib/server/image-upload";
-import { toDiskUploadPath } from "@/lib/shared/uploads";
+import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { playedMatchSql } from "@/lib/shared/ranking";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
@@ -347,9 +347,10 @@ export async function finalizeAccountDeletion(
 /**
  * Efface ou anonymise le compte selon le plan. À l'effacement, les fichiers des
  * avatars en quarantaine sont relevés sous le verrou (la cascade emporte leurs
- * lignes) ; aucune empreinte n'est bloquée : un avatar seulement **masqué** se
- * conteste encore, seule sa suppression par la modération le bloque (décision
- * D6, `lib/server/blocked-images.ts`). Anonymisé, le compte n'est plus en
+ * lignes) sans que leur empreinte soit bloquée : un avatar seulement **masqué**
+ * se conteste encore (décision D6, `lib/server/blocked-images.ts`). Seul
+ * l'avatar du compte que la modération a **supprimé** (quarantaine `PURGED` à
+ * son adresse) est bloqué, par `deleteAccountNow` après le commit. Anonymisé, le compte n'est plus en
  * attente : la suppression est faite.
  */
 async function applyDeletionMode(
@@ -419,10 +420,12 @@ async function loadQuarantinedAvatarFiles(runner: SqlRunner, userId: number): Pr
  * compte : la cascade emporte ces lignes.
  */
 async function avatarRemovedByModeration(runner: SqlRunner, userId: number, avatarUrl: string | null): Promise<boolean> {
-  if (!avatarUrl) return false;
+  const disk = toDiskUploadPath(avatarUrl);
+  if (!disk) return false;
+  // Sous ses deux formes, servie et disque, comme `isUploadReferenced`.
   const [rows] = await runner.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_logo_quarantines WHERE user_id = ? AND status = 'PURGED' AND logo_url = ? LIMIT 1`,
-    [userId, avatarUrl],
+    `SELECT 1 FROM bg_logo_quarantines WHERE user_id = ? AND status = 'PURGED' AND logo_url IN (?, ?) LIMIT 1`,
+    [userId, toServedUploadUrl(disk), disk],
   );
   return rows.length > 0;
 }
@@ -645,9 +648,8 @@ async function deleteAccountNow(
   // par `/api/uploads/avatars/...`, donc une donnée personnelle publique que
   // plus aucune ligne ne désigne. L'échec est **avalé** : la suppression est
   // commitée, annoncer un refus au joueur serait faux.
-  if (orphanedAvatar && orphanedAvatarBlocked) {
-    await blockRemovedImageFiles([path.join(process.cwd(), "public", orphanedAvatar.replace(/^\/+/, ""))]);
-  }
+  const blockedFile = orphanedAvatarBlocked ? storedUploadAbsolutePath(orphanedAvatar, "avatars") : null;
+  if (blockedFile) await blockRemovedImageFiles([blockedFile]);
   try {
     await deleteStoredImage(orphanedAvatar);
   } catch {

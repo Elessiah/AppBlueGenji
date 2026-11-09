@@ -45,9 +45,13 @@ import { siteCanonicalBase } from "@/lib/server/site-url";
 import { toIso } from "@/lib/server/serialization";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
-import { takeHeldAvatar } from "@/lib/server/users/account-deletion-hold";
-import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
-import { isStoredUploadIn, toDiskUploadPath } from "@/lib/shared/uploads";
+import { readModeratableAvatar, setHeldAvatar } from "@/lib/server/users/account-deletion-hold";
+import {
+  deleteUnreferencedUpload,
+  isUploadReferenced,
+  storedUploadAbsolutePath,
+} from "@/lib/server/stored-upload-cleanup";
+import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { reportConcernedHref, type ReportCategory, type ReportPerson } from "@/lib/shared/content-reports";
 import { ANONYMOUS_PLAYER_LABEL } from "@/lib/shared/log-privacy";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
@@ -140,12 +144,22 @@ export function avatarFileLocations(
  * l'avatar ; **ne lève jamais** (un résidu sur le disque se consigne).
  */
 export async function removeModeratedAvatarFile(avatarUrl: string): Promise<void> {
-  const relative = isStoredUploadIn(avatarUrl, "avatars") ? toDiskUploadPath(avatarUrl) : null;
-  if (!relative) return;
-  await blockRemovedImageFiles([path.join(process.cwd(), "public", relative.replace(/^\/+/, ""))]);
+  const absolute = storedUploadAbsolutePath(avatarUrl, "avatars");
+  if (!absolute) return;
+  await blockRemovedImageFiles([absolute]);
   // Le fichier ne part que si plus aucune ligne ne le désigne : un autre compte
-  // (adresse recopiée), un masque de suppression, une quarantaine en cours.
-  // Son empreinte, elle, est bloquée dans tous les cas.
+  // (adresse recopiée), un partenaire ou un bénévole (adresse collée), un
+  // masque de suppression, une quarantaine en cours. Son empreinte, elle, est
+  // bloquée dans tous les cas ; un fichier gardé — donc encore servi — est dit
+  // dans pm2, pour qu'un exploitant retire l'autre usage.
+  const stillUsed = await isUploadReferenced(avatarUrl).catch((error: unknown) => {
+    console.error("[moderation] usages de l'avatar supprimé non relus, fichier gardé", error);
+    return true;
+  });
+  if (stillUsed) {
+    console.error(`[moderation] avatar supprimé encore désigné par une autre ligne, fichier gardé et servi : ${avatarUrl}`);
+    return;
+  }
   await deleteUnreferencedUpload(avatarUrl, "avatars");
 }
 
@@ -431,21 +445,13 @@ export async function deleteUserAvatarForReport(
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-    const [users] = await connection.execute<
-      (RowDataPacket & { pseudo: string; avatar_url: string | null; is_deleted: 0 | 1 })[]
-    >(`SELECT pseudo, avatar_url, is_deleted FROM bg_users WHERE id = ? FOR UPDATE`, [userId]);
-    if (users.length === 0) throw new Error("USER_HAS_NO_AVATAR");
-    pseudo = users[0].pseudo;
     // En attente de suppression : l'avatar attend dans le masque, toujours
     // servi — retiré là (D6), sans entrée solo à resynchroniser (déjà anonyme).
-    const pending = Number(users[0].is_deleted) === 1;
-    const removed = pending ? await takeHeldAvatar(connection, userId) : users[0].avatar_url;
-    if (!removed) throw new Error("USER_HAS_NO_AVATAR");
-    avatarUrl = removed;
-    if (!pending) {
-      await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ? AND is_deleted = 0`, [userId]);
-      await syncSoloEntryIdentityOn(connection, userId);
-    }
+    const avatar = await readModeratableAvatar(connection, userId, true);
+    if (!avatar?.avatarUrl) throw new Error("USER_HAS_NO_AVATAR");
+    pseudo = avatar.pseudo;
+    avatarUrl = avatar.avatarUrl;
+    await clearModeratedAvatar(connection, userId, avatar.pending);
     const [inserted] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_logo_quarantines
          (user_id, report_id, logo_url, hidden_by_user_id, hidden_at, purge_after, status, closed_at)
@@ -626,13 +632,12 @@ export async function hideUserAvatarForReport(
   const db = await getDatabase();
   const grounds = await assertTargeted(reportId, "USER", userId);
 
-  const [users] = await db.execute<(RowDataPacket & { pseudo: string; avatar_url: string | null })[]>(
-    `SELECT pseudo, avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
-    [userId],
-  );
-  if (users.length === 0 || !users[0].avatar_url) throw new Error("USER_HAS_NO_AVATAR");
-  const avatarUrl = users[0].avatar_url;
-  const pseudo = users[0].pseudo;
+  // Compte en attente de suppression : l'avatar du masque, toujours servi, se
+  // masque comme les autres (D6) — et se rétablit dans le masque.
+  const current = await readModeratableAvatar(db, userId, false);
+  if (!current?.avatarUrl) throw new Error("USER_HAS_NO_AVATAR");
+  const avatarUrl = current.avatarUrl;
+  const pseudo = current.pseudo;
   const files = avatarFileLocations(avatarUrl, userId);
   if (!files) throw new Error("AVATAR_NOT_MOVABLE");
 
@@ -649,13 +654,9 @@ export async function hideUserAvatarForReport(
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-    const [locked] = await connection.execute<(RowDataPacket & { avatar_url: string | null })[]>(
-      `SELECT avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
-      [userId],
-    );
-    if (locked.length === 0 || locked[0].avatar_url !== avatarUrl) throw new Error("AVATAR_CHANGED");
-    await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ? AND is_deleted = 0`, [userId]);
-    await syncSoloEntryIdentityOn(connection, userId);
+    const locked = await readModeratableAvatar(connection, userId, true);
+    if (locked?.avatarUrl !== avatarUrl || locked.pending !== current.pending) throw new Error("AVATAR_CHANGED");
+    await clearModeratedAvatar(connection, userId, locked.pending);
     const [inserted] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_logo_quarantines (user_id, report_id, logo_url, hidden_by_user_id, hidden_at, purge_after)
        VALUES (?, ?, ?, ?, ?, ?)`,
@@ -795,27 +796,9 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
     const isTeam = row.target_type === "TEAM";
     const targetId = Number(row.target_id);
 
-    // Deux instructions **statiques**, une par domaine — une SQL bâtie par
-    // interpolation de nom de table/colonne se dérobe au `grep`, et ce fichier
-    // tient par ailleurs à ce que chaque écriture reste une chaîne qu'on
-    // retrouve telle quelle dans le code (voir `hideTeamLogo`/
-    // `hideUserAvatarForReport`, qui ne partagent pas non plus leurs requêtes).
-    const [owners] = isTeam
-      ? await connection.execute<(RowDataPacket & { image_url: string | null })[]>(
-          `SELECT logo_url AS image_url FROM bg_teams WHERE id = ? FOR UPDATE`,
-          [targetId],
-        )
-      : // Un compte anonymisé n'a plus d'avatar à retrouver, et ne doit surtout
-        // pas en recevoir un par ce chemin : la condition l'exclut de la même
-        // façon qu'une ligne disparue (`QUARANTINE_NOT_FOUND`), sans quoi le
-        // rétablissement republierait une identité sur une ligne que la
-        // suppression a vidée.
-        await connection.execute<(RowDataPacket & { image_url: string | null })[]>(
-          `SELECT avatar_url AS image_url FROM bg_users WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
-          [targetId],
-        );
-    if (owners.length === 0) throw new Error("QUARANTINE_NOT_FOUND");
-    if (owners[0].image_url) throw new Error(isTeam ? "TEAM_HAS_NEW_LOGO" : "USER_HAS_NEW_AVATAR");
+    const owner = await lockRestoreOwner(connection, isTeam, targetId);
+    if (!owner) throw new Error("QUARANTINE_NOT_FOUND");
+    if (owner.imageUrl) throw new Error(isTeam ? "TEAM_HAS_NEW_LOGO" : "USER_HAS_NEW_AVATAR");
     const located = isTeam
       ? logoFileLocations(row.logo_url, targetId)
       : avatarFileLocations(row.logo_url, targetId);
@@ -826,7 +809,7 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
     // la quarantaine intacte, sans une base qui annoncerait une image absente.
     await moveFile(files.quarantined, files.live);
     try {
-      await writeRestoredImage(connection, row, isTeam, targetId);
+      await writeRestoredImage(connection, row, isTeam, targetId, owner.pending);
       await connection.execute(
         `UPDATE bg_logo_quarantines SET status = 'RESTORED', closed_at = NOW() WHERE id = ?`,
         [quarantineId],
@@ -854,15 +837,60 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
   await announceImageRestored(row, actor);
 }
 
-/** Remet l'adresse de l'image rétablie sur sa ligne, sous le verrou de la transaction. */
+/**
+ * La ligne qui recevra l'image rétablie, verrouillée — `null` si elle n'existe
+ * plus. Un compte anonymisé n'a plus d'avatar à retrouver, et ne doit surtout
+ * pas en recevoir un par ce chemin : il est exclu comme une ligne disparue
+ * (`QUARANTINE_NOT_FOUND`), sans quoi le rétablissement republierait une
+ * identité sur une ligne que la suppression a vidée. Un compte **en attente**
+ * reçoit l'avatar dans son masque (`pending`), jamais sur sa ligne anonyme.
+ * Deux instructions **statiques**, une par domaine — une SQL bâtie par
+ * interpolation de nom de table/colonne se dérobe au `grep`.
+ */
+async function lockRestoreOwner(
+  connection: PoolConnection,
+  isTeam: boolean,
+  targetId: number,
+): Promise<{ imageUrl: string | null; pending: boolean } | null> {
+  if (!isTeam) {
+    const avatar = await readModeratableAvatar(connection, targetId, true);
+    return avatar ? { imageUrl: avatar.avatarUrl, pending: avatar.pending } : null;
+  }
+  const [teams] = await connection.execute<(RowDataPacket & { logo_url: string | null })[]>(
+    `SELECT logo_url FROM bg_teams WHERE id = ? FOR UPDATE`,
+    [targetId],
+  );
+  return teams[0] ? { imageUrl: teams[0].logo_url, pending: false } : null;
+}
+
+/**
+ * Retire l'avatar que la modération atteint, sous le verrou de
+ * `readModeratableAvatar` : du masque pour un compte en attente (rien à
+ * resynchroniser, l'entrée solo est déjà anonyme), de la ligne sinon.
+ */
+async function clearModeratedAvatar(connection: PoolConnection, userId: number, pending: boolean): Promise<void> {
+  if (pending) {
+    await setHeldAvatar(connection, userId, null);
+    return;
+  }
+  await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ? AND is_deleted = 0`, [userId]);
+  await syncSoloEntryIdentityOn(connection, userId);
+}
+
+/** Remet l'adresse de l'image rétablie sur sa ligne (ou le masque), sous le verrou de la transaction. */
 async function writeRestoredImage(
   connection: PoolConnection,
   row: QuarantineRow,
   isTeam: boolean,
   targetId: number,
+  pending: boolean,
 ): Promise<void> {
   if (isTeam) {
     await connection.execute(`UPDATE bg_teams SET logo_url = ? WHERE id = ?`, [row.logo_url, targetId]);
+    return;
+  }
+  if (pending) {
+    await setHeldAvatar(connection, targetId, row.logo_url);
     return;
   }
   await connection.execute(`UPDATE bg_users SET avatar_url = ? WHERE id = ? AND is_deleted = 0`, [
@@ -1001,19 +1029,27 @@ export async function purgeQuarantinedLogo(
 
 /**
  * Contestation **de personne visée** qui retient l'image (voir
- * `purgeDueQuarantines`), sur le signalement que désigne `reportRef` :
- * `q.report_id` dans la relève, `?` (deux fois) sous verrou.
+ * `purgeDueQuarantines`) — `q` désigne la quarantaine. Même règle que
+ * `targetContestPending`, qui la rejoue sous verrou.
  */
-function targetContestSql(reportRef: string): string {
-  return `EXISTS (SELECT 1 FROM bg_reports c
-                    WHERE c.parent_report_id = ${reportRef}
+const TARGET_CONTEST_SQL = `EXISTS (SELECT 1 FROM bg_reports c
+                    WHERE c.parent_report_id = q.report_id
                       AND (c.contest_role IS NULL OR c.contest_role = 'TARGET')
                       -- L'auteur ne conteste qu'un dossier archivé : ce qui
                       -- précède sa contestation était tranché, et la
                       -- réouverture qu'elle provoque ne remet rien en attente.
                       AND c.id > COALESCE((SELECT MAX(n.id) FROM bg_reports n
-                                           WHERE n.parent_report_id = ${reportRef}
+                                           WHERE n.parent_report_id = q.report_id
                                              AND n.contest_role = 'NOTIFIER'), 0))`;
+
+/**
+ * `TARGET_CONTEST_SQL` sur les contestations d'un signalement lues sous verrou :
+ * une contestation de personne visée (`NULL` : d'avant la colonne) postérieure
+ * à la dernière de l'auteur.
+ */
+export function targetContestPending(contests: readonly { id: number; contest_role: string | null }[]): boolean {
+  const lastNotifier = Math.max(0, ...contests.filter((c) => c.contest_role === "NOTIFIER").map((c) => Number(c.id)));
+  return contests.some((c) => (c.contest_role === null || c.contest_role === "TARGET") && Number(c.id) > lastNotifier);
 }
 
 /**
@@ -1023,11 +1059,12 @@ function targetContestSql(reportRef: string): string {
  * qui arrive ensuite attend la fin de la purge. `blockHash` : seul un avatar
  * jamais contesté est réputé supprimé par la modération (D6).
  *
- * Deux instructions et non une : dans un `SELECT … FOR UPDATE`, une
- * sous-requête reste une lecture de l'instantané, qui ne verrait pas une
- * contestation commitée pendant l'attente du verrou ; lue **après** lui, la
- * contestation l'est à jour. Sans signalement d'origine, aucune contestation
- * n'est possible : rien n'est relu.
+ * Les contestations sont relues en **lecture courante** (`LOCK IN SHARE
+ * MODE`, sans sous-requête : dans une lecture verrouillante, une sous-requête
+ * resterait une lecture de l'instantané) : une contestation commitée pendant
+ * l'attente du verrou est vue quel que soit ce que la transaction a lu avant,
+ * et la règle est celle de la relève (`targetContestPending`). Sans
+ * signalement d'origine, aucune contestation n'est possible : rien n'est relu.
  */
 async function autoPurgeStillDue(
   connection: PoolConnection,
@@ -1042,11 +1079,11 @@ async function autoPurgeStillDue(
       [row.report_id],
     );
     reportStatus = reports[0]?.status ?? null;
-    const [contests] = await connection.execute<(RowDataPacket & { contested: number })[]>(
-      `SELECT ${targetContestSql("?")} AS contested`,
-      [row.report_id, row.report_id],
+    const [contests] = await connection.execute<(RowDataPacket & { id: number; contest_role: string | null })[]>(
+      `SELECT id, contest_role FROM bg_reports WHERE parent_report_id = ? LOCK IN SHARE MODE`,
+      [row.report_id],
     );
-    contested = Number(contests[0]?.contested) === 1;
+    contested = targetContestPending(contests);
   }
   const due = canAutoPurgeLogo({
     purgeAfter: new Date(row.purge_after),
@@ -1092,7 +1129,7 @@ export async function purgeDueQuarantines(now: Date = new Date()): Promise<numbe
   const db = await getDatabase();
   const [rows] = await db.execute<DueRow[]>(
     `SELECT q.id, q.purge_after, q.report_id, r.status AS report_status,
-            ${targetContestSql("q.report_id")} AS contested
+            ${TARGET_CONTEST_SQL} AS contested
      FROM bg_logo_quarantines q
      LEFT JOIN bg_reports r ON r.id = q.report_id
      WHERE q.status = 'HIDDEN' AND q.purge_after <= ?`,

@@ -385,6 +385,28 @@ describe("lignes illisibles gardées (parseJournal.preserved)", () => {
     expect(parseJournal('{"userId":7,"deletedAt":"hier"}').preserved).toEqual([]);
   });
 
+  // Revue sécurité #571, cycle 4 : seule une ligne aux champs du journal, datée d'un instant ISO, survit.
+  it("parseJournal_unreadableLineWithForeignKey_notPreserved", () => {
+    const line = '{"userId":7,"pseudo":"Nova","deletedAt":"2026-11-03T09:00:00.000Z","pending":"oui"}';
+
+    expect(parseJournal(line).preserved).toEqual([]);
+  });
+
+  it("parseJournal_unreadableLineWithLooseDate_notPreserved", () => {
+    expect(parseJournal('{"userId":7,"deletedAt":"9999","pending":"oui"}').preserved).toEqual([]);
+  });
+
+  it("parseJournal_unreadableArray_notPreserved", () => {
+    expect(parseJournal('["2026-11-03T09:00:00.000Z"]').preserved).toEqual([]);
+  });
+
+  it("prunePreservedLines_futureDated_dropped", () => {
+    const now = new Date("2026-11-09T00:00:00.000Z");
+    const future = { line: '{"c":1}', at: Date.parse("2099-01-01T00:00:00.000Z") };
+
+    expect(prunePreservedLines([future], now)).toEqual([]);
+  });
+
   it("prunePreservedLines_expiredDropped_duplicatesMerged", () => {
     const now = new Date("2026-11-09T00:00:00.000Z");
     const fresh = { line: '{"a":1}', at: Date.parse("2026-11-01T00:00:00.000Z") };

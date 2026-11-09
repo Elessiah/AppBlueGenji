@@ -669,11 +669,14 @@ puis renomme l'entrée solo (`syncSoloEntryIdentityOn`). Toute lecture qui joint
   quelle** à chaque réécriture du fichier, jusqu'à son échéance
   (`ParsedJournal.preserved`, `prunePreservedLines`) : un élagage ne perd pas
   la réactivation d'une version voisine ; une ligne tronquée, sans date sûre,
-  part. Revue sécurité #571, cycle 3 : une réactivation dont la demande est là
+  part. Seule survit une ligne aux **seuls champs du journal** (aucun pseudo ni
+  autre donnée ne s'y glisse), datée d'un instant ISO complet, et jamais au-delà
+  de maintenant (une date future ne viendrait jamais à échéance). Revue sécurité #571, cycle 3 : une réactivation dont la demande est là
   mais le masque manque lève `REACTIVATION_NOT_RESTORED` (rien d'écrit,
   compté `failed`, jamais `superseded`) ; une redate qui n'écrit rien relit la
   ligne — identifiant réattribué entre-temps : `otherAccount`, ligne disparue :
-  `absent` —, et `finalizeAccountDeletion` avec une autre date de création lève
+  `absent`, réactivée : `alreadyActive`, supprimée pour de bon :
+  `alreadyDeleted` —, et `finalizeAccountDeletion` avec une autre date de création lève
   `ACCOUNT_REASSIGNED` (compté `otherAccount`) au lieu de rendre `null`.
 - **Jour 30** : l'effacement supprime aussi le fichier d'avatar mis de côté ;
   l'anonymisation efface le masque (cascade sur l'effacement).
@@ -807,19 +810,26 @@ l'insertion est retentée une fois, puis les empreintes sont consignées dans
 pm2 pour être posées à la main, le fichier partant juste après ; un fichier
 déjà absent — course avec une rotation — est dit dans pm2, rien n'étant
 bloqué). L'empreinte est toujours bloquée, mais le fichier n'est effacé que si
-**plus aucune ligne** ne le désigne (`deleteUnreferencedUpload` : un autre
+**plus aucune ligne** ne le désigne (`isUploadReferenced` puis `deleteUnreferencedUpload` : un autre
 compte, une quarantaine masquée, ou le masque d'un compte en attente —
-`bg_account_deletion_holds` compte parmi les références). La relecture sous
-verrou de la purge d'office tient en deux instructions (verrou du signalement,
-puis contestation lue sur son identifiant) : dans un `SELECT … FOR UPDATE`, une
-sous-requête lirait l'instantané ; sans signalement d'origine, rien n'est
+`bg_account_deletion_holds` compte parmi les références) ; un fichier gardé
+reste servi, et pm2 le dit (« fichier gardé et servi ») pour qu'un exploitant
+retire l'autre usage. La relecture sous verrou de la purge d'office tient en
+deux instructions (verrou du signalement, puis contestations lues en **lecture
+courante**, `LOCK IN SHARE MODE` sans sous-requête, jugées par
+`targetContestPending`, même règle que la relève) : une contestation commitée
+pendant l'attente du verrou est vue ; sans signalement d'origine, rien n'est
 relu. **Compte en attente de suppression** (revue sécurité #571, cycle 3) : sa
 ligne est anonyme, mais son avatar attend la réactivation dans le masque,
-toujours servi — la modération l'y retire (`takeHeldAvatar`, depuis la fiche
-comme depuis un signalement, sans écriture sur `bg_users` ni entrée solo à
-resynchroniser), puis le bloque et l'efface comme ailleurs ; et l'effacement
-au jour 30 bloque l'avatar qu'il emporte si une quarantaine `PURGED` le
-désigne (supprimé par la modération), jamais un avatar seulement masqué. Le blocage
+toujours servi — la modération l'atteint par `readModeratableAvatar` : elle
+l'y supprime (depuis la fiche comme depuis un signalement), l'y **masque** et
+l'y **rétablit** (`setHeldAvatar`, sans écriture sur `bg_users` ni entrée solo
+à resynchroniser ; revue sécurité #571, cycle 4), puis le bloque et l'efface
+comme ailleurs ; un masque sans avatar répond `USER_HAS_NO_AVATAR`, un compte
+anonymisé (sans masque) reste introuvable. L'effacement au jour 30 bloque
+l'avatar qu'il emporte si une quarantaine `PURGED` le désigne sous l'une ou
+l'autre forme de l'adresse (servie `/api/uploads/…` ou disque `/uploads/…`),
+jamais un avatar seulement masqué. Le blocage
 vaut aussi pour la copie d'un avatar de fournisseur (OAuth) : une image
 retirée ne revient pas par la connexion suivante ; une copie importée naît
 masquée, un refus y laisse la pastille à initiale. Un avatar seulement **masqué** (`HIDDEN`) se conteste encore : il n'est

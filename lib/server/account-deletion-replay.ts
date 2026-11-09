@@ -233,8 +233,8 @@ async function handleRedate(
 
 /**
  * Rien de redaté : la demande était déjà à la bonne date — ou la ligne a
- * changé depuis sa lecture (supprimée, identifiant réattribué), relue pour le
- * dire au bon compteur.
+ * changé depuis sa lecture (supprimée, identifiant réattribué, réactivée,
+ * suppression devenue définitive), relue pour le dire au bon compteur.
  */
 async function countUnredated(
   db: Awaited<ReturnType<typeof getDatabase>>,
@@ -247,6 +247,10 @@ async function countUnredated(
     countDecision("ABSENT", entry, report, log);
   } else if (current.createdAt !== entry.accountCreatedAt) {
     countDecision("OTHER_ACCOUNT", entry, report, log);
+  } else if (!current.isDeleted) {
+    countDecision("ALREADY_ACTIVE", entry, report, log);
+  } else if (!current.pendingDeletion) {
+    countDecision("ALREADY_DELETED", entry, report, log);
   } else {
     report.alreadyPending += 1;
   }

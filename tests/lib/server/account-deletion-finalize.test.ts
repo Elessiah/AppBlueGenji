@@ -283,6 +283,16 @@ describe("finalizeDueAccountDeletions", () => {
     );
   });
 
+  // Revue sécurité #571, cycle 4 : la quarantaine se cherche sous les deux formes de l'adresse.
+  it("finalizeAccountDeletion_eraseWithHeldAvatar_looksUpPurgedQuarantineUnderBothForms", async () => {
+    const { execute } = fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, heldAvatar: "/uploads/avatars/7-abc.webp" });
+
+    await finalizeAccountDeletion(7);
+
+    const purged = execute.mock.calls.find(([sql]) => String(sql).includes("status = 'PURGED'"));
+    expect(purged?.[1]).toEqual([7, "/api/uploads/avatars/7-abc.webp", "/uploads/avatars/7-abc.webp"]);
+  });
+
   it("finalizeAccountDeletion_eraseWithHeldAvatarNeverModerated_doesNotBlock", async () => {
     fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, heldAvatar: "/api/uploads/avatars/7-abc.webp" });
 

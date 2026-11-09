@@ -161,18 +161,32 @@ export interface PreservedJournalLine {
   at: number;
 }
 
-/** La date d'une ligne JSON qu'on ne sait pas lire, si elle en porte une. */
+/** Seuls champs qu'une ligne du journal porte : rien qui désigne une personne. */
+const JOURNAL_KEYS = new Set(["userId", "accountCreatedAt", "deletedAt", "pending", "reactivatedAt", "undoneRequestAt", "reactivated"]);
+
+/** Date ISO complète, telle que `formatJournalEntry` l'écrit (`toISOString`). */
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
+
+/**
+ * La date d'une ligne JSON qu'on ne sait pas lire, si elle mérite d'être
+ * gardée : objet aux seuls champs du journal (aucun champ en plus ne survit
+ * à une réécriture), daté d'un instant ISO complet (`Date.parse` seul admet
+ * « 12 » ou « 9999 »).
+ */
 function unreadableLineDate(value: unknown): number | null {
-  if (!value || typeof value !== "object") return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const v = value as Record<string, unknown>;
-  if (isIsoDate(v.deletedAt)) return Date.parse(v.deletedAt);
-  if (isIsoDate(v.reactivatedAt)) return Date.parse(v.reactivatedAt);
-  return null;
+  if (!Object.keys(v).every((key) => JOURNAL_KEYS.has(key))) return null;
+  const dated = [v.deletedAt, v.reactivatedAt].find(
+    (date): date is string => typeof date === "string" && ISO_INSTANT.test(date),
+  );
+  return dated === undefined ? null : Date.parse(dated);
 }
 
 /**
  * Les lignes illisibles gardées encore dans leur durée de conservation, sans
- * doublon — même échéance que les autres (`pruneJournal`).
+ * doublon — même échéance que les autres (`pruneJournal`). Une ligne datée
+ * **après** `now` n'expirerait jamais : elle part.
  */
 export function prunePreservedLines(
   preserved: readonly PreservedJournalLine[],
@@ -180,7 +194,8 @@ export function prunePreservedLines(
   retentionDays: number = ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
 ): string[] {
   const cutoff = now.getTime() - retentionDays * 24 * 60 * 60 * 1000;
-  return [...new Set(preserved.filter((kept) => kept.at >= cutoff).map((kept) => kept.line))];
+  const latest = now.getTime();
+  return [...new Set(preserved.filter((kept) => kept.at >= cutoff && kept.at <= latest).map((kept) => kept.line))];
 }
 
 /**

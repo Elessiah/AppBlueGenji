@@ -229,9 +229,6 @@ export async function reactivateAccount(
  * celle que la réactivation défaisait — elle tient), `GONE` (suppression déjà
  * définitive), `ABSENT` (plus de ligne) ou `OTHER_ACCOUNT` (identifiant
  * réattribué), relus sous verrou.
- *
- * @throws REACTIVATION_NOT_RESTORED — la demande à défaire est là, mais pas son
- *   masque : rien n'est écrit, le rejeu compte un échec.
  */
 export type ReplayedReactivation = "REACTIVATED" | "ALREADY_ACTIVE" | "SUPERSEDED" | "GONE" | "ABSENT" | "OTHER_ACCOUNT";
 
@@ -265,6 +262,12 @@ function lockedReactivationOutcome(
   return pendingDeletion ? "SUPERSEDED" : "GONE";
 }
 
+/**
+ * Rejoue une réactivation journalisée (voir `ReplayedReactivation`).
+ *
+ * @throws REACTIVATION_NOT_RESTORED — l'écriture de réactivation n'a apparié
+ *   aucune ligne malgré le verrou : rien n'est écrit, le rejeu compte un échec.
+ */
 export async function replayAccountReactivation(entry: AccountDeletionEntry): Promise<ReplayedReactivation> {
   const userId = entry.userId;
   const db = await getDatabase();
@@ -281,8 +284,10 @@ export async function replayAccountReactivation(entry: AccountDeletionEntry): Pr
     outcome = lockedReactivationOutcome(entry, locked[0]);
     if (outcome === null) {
       restored = await restoreAccountIdentity(connection, userId);
-      // La demande à défaire est bien là, mais son masque manque : rien n'est
-      // rétabli — un échec à dire (`failed`), pas une demande qui tient.
+      // Sous le verrou, la ligne est en attente : l'écriture ne peut que
+      // l'apparier (un masque absent réactive sous le pseudo d'emprunt). Si
+      // elle n'apparie rien, c'est un échec à dire (`failed`), jamais une
+      // demande qui tiendrait.
       if (!restored) throw new Error("REACTIVATION_NOT_RESTORED");
       await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
     }
@@ -294,7 +299,7 @@ export async function replayAccountReactivation(entry: AccountDeletionEntry): Pr
     connection.release();
   }
   // Rien à rétablir sous verrou : l'issue relue le dit.
-  if (!restored) return outcome ?? "SUPERSEDED";
+  if (outcome !== null) return outcome;
   invalidateTeamIdentityViews();
   invalidateStats();
   await republishSoloEntryTournaments(userId);
