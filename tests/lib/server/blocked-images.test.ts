@@ -184,7 +184,7 @@ describe("blockRemovedImageFiles — insertion et fichiers manquants", () => {
     await blockRemovedImageFiles([join(tmpdir(), "bg-absent-avatar.webp")]);
 
     expect(execute).not.toHaveBeenCalled();
-    expect(String(error.mock.calls[0][0])).toContain("empreinte non bloquée (1 fichier(s))");
+    expect(String(error.mock.calls[0][0])).toContain("empreinte non bloquée (1 fichier(s)) : bg-absent-avatar.webp");
     error.mockRestore();
   });
 

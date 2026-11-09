@@ -860,10 +860,16 @@ Comportement actuel gardé, à trancher avec la politique D6 :
   contestation **qui aboutit** : `/rgpd` (§ Signalements) dit que l'image « peut
   être renvoyée », mais son empreinte reste bloquée, sans chemin de levée —
   lever le blocage à l'issue favorable, ou corriger le texte ?
+- Avatar mis de côté d'un compte en attente : la modération peut désormais le
+  masquer ou le supprimer, alors que les conditions v9 publiées (immuables) et
+  l'entrée `PRIVACY_CHANGES` du 2026-11-06 disent que la réactivation le rend —
+  nouvelle version des conditions, ou retrait de ce geste ?
 
 **Textes légaux (D6).** Registre T01 (finalité, base légale, catégorie
 « Empreintes … des avatars supprimés par la modération », conservation dès la
-suppression, avatar masqué exclu ; la modération atteint l'avatar mis de côté
+suppression — y compris par le staff qui rejette une contestation, pas à la
+purge d'office d'un avatar contesté —, avatar masqué exclu, fichier gardé s'il
+sert ailleurs ; la modération atteint l'avatar mis de côté
 d'un compte en attente), `/rgpd` FR+EN (§ Suppression du compte et
 § Signalements) et l'entrée `2026-11-empreinte-avatar-supprime` de
 `PRIVACY_CHANGES` (FR+EN), testés dans `account-deletion-d2-texts.test.ts`.

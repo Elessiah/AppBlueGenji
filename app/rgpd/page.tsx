@@ -429,8 +429,8 @@ function RgpdFr({
           cours où il n&apos;a jamais joué sont perdus par forfait. Au terme du délai, le compte est effacé
           s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. Pendant le délai, la
           modération peut encore masquer, rétablir ou supprimer l&apos;avatar gardé à part, comme celui
-          d&apos;un compte actif ; l&apos;effacement ne garde l&apos;empreinte d&apos;aucun avatar — seule
-          sa suppression par la modération en garde une (section <a href="#signalements">« Signalements »</a>). Le journal du staff sur Discord note la demande,
+          d&apos;un compte actif ; l&apos;effacement ne garde que l&apos;empreinte d&apos;un avatar que la
+          modération avait déjà supprimé (section <a href="#signalements">« Signalements »</a>). Le journal du staff sur Discord note la demande,
           sa réactivation et chaque retrait ou forfait qu&apos;elle entraîne (une ligne par tournoi pour ceux-ci), sans nommer le joueur (« un joueur ») (
           <Link href="/rgpd/registre#t05">registre, T05</Link>).
         </p>
@@ -958,11 +958,13 @@ function RgpdFr({
             </li>
             <li>
               Quand la modération <strong>supprime</strong> un avatar — sans délai, depuis la fiche du
-              joueur, ou au terme de son masquage —, que le compte soit actif ou en attente de
-              suppression, l&apos;empreinte (SHA-256) de l&apos;image est gardée, sans limite de durée et
-              sans lien avec aucun compte, pour en refuser la remise en ligne, comme avatar ou comme
-              logo d&apos;équipe. Un avatar seulement masqué, qui se conteste encore, n&apos;en laisse
-              aucune ; un logo d&apos;équipe supprimé non plus.
+              joueur, en rejetant une contestation, ou d&apos;office au terme d&apos;un masquage sans
+              contestation —, que le compte soit actif ou en attente de suppression, l&apos;empreinte
+              (SHA-256) de l&apos;image est gardée, sans limite de durée et sans lien avec aucun compte,
+              pour en refuser la remise en ligne, comme avatar ou comme logo d&apos;équipe ; le fichier
+              n&apos;est effacé que si rien d&apos;autre sur le site ne le désigne. Un avatar seulement
+              masqué, qui se conteste encore, n&apos;en laisse aucune ; un logo d&apos;équipe supprimé non
+              plus.
             </li>
           </ul>
           <p>

@@ -207,9 +207,9 @@ describe("D6 — empreinte d'un avatar supprimé par la modération", () => {
     const en = PRIVACY_CHANGES_EN[AVATAR_HASH_ID];
 
     expect(fr.summary).toContain("gardée dès cette suppression, et non plus à l'effacement du compte");
-    expect(fr.details[1]).toContain("À l'effacement d'un compte, plus aucune empreinte n'est prise");
+    expect(fr.details[1]).toContain("seule est prise ou gardée l'empreinte d'un avatar que la modération avait déjà supprimé");
     expect(en.summary).toContain("kept from that deletion, and no longer when the account is erased");
-    expect(en.details[1]).toContain("When an account is erased, no hash is taken any more");
+    expect(en.details[1]).toContain("only the hash of an avatar moderation had already deleted is taken or kept");
     expect(en.details).toHaveLength(fr.details.length);
   });
 
@@ -228,6 +228,13 @@ describe("D6 — empreinte d'un avatar supprimé par la modération", () => {
     expect(t01RetentionEn()).toContain("kept from that deletion, without time limit");
     expect(t01RetentionEn()).toContain("an avatar that is only hidden, which can still be contested, leaves none");
     expect(t01RetentionEn()).not.toContain("carried off by the erasure of an account");
+  });
+
+  it("registerT01_avatarHashRetention_namesRejectedChallengeAndSharedFileFrAndEn", () => {
+    expect(t01Retention()).toContain("par le staff qui rejette une contestation, ou d'office au terme d'un masquage sans contestation");
+    expect(t01Retention()).toContain("le fichier lui-même n'est effacé que si rien d'autre sur le site ne le désigne");
+    expect(t01RetentionEn()).toContain("by the staff rejecting a challenge, or automatically at the end of a hiding without a challenge");
+    expect(t01RetentionEn()).toContain("the file itself is only erased if nothing else on the site points to it");
   });
 
   it("registerT01_heldAvatar_moderationCanStillActFrAndEn", () => {

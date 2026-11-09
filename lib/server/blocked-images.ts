@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
@@ -96,14 +97,25 @@ async function blockImageHashes(hashes: readonly string[]): Promise<void> {
  */
 export async function blockRemovedImageFiles(absolutePaths: readonly string[]): Promise<void> {
   if (absolutePaths.length === 0) return;
-  // `hashImageFiles` ne lève pas : un fichier illisible est seulement omis.
-  const hashes = await hashImageFiles(absolutePaths);
-  const missing = absolutePaths.length - hashes.length;
-  if (missing > 0) {
+  // Chaque lecture est rattrapée : un fichier illisible est seulement omis.
+  const read = await Promise.all(
+    absolutePaths.map((file) =>
+      readFile(file).then(
+        (content) => ({ file, sha: imageSha256(content) as string | null }),
+        () => ({ file, sha: null }),
+      ),
+    ),
+  );
+  const hashes = read.flatMap((entry) => (entry.sha === null ? [] : [entry.sha]));
+  const missing = read.filter((entry) => entry.sha === null).map((entry) => path.basename(entry.file));
+  if (missing.length > 0) {
     // Un fichier que la modération supprime manquait déjà (course avec une
     // rotation, effacement à la main) : son image n'est pas bloquée et
-    // pourrait revenir — consigné pour qu'un exploitant le sache.
-    console.error(`[moderation] image supprimée introuvable, empreinte non bloquée (${missing} fichier(s))`);
+    // pourrait revenir — consigné, nom du fichier compris, pour qu'un
+    // exploitant le retrouve (sauvegarde) et pose son empreinte à la main.
+    console.error(
+      `[moderation] image supprimée introuvable, empreinte non bloquée (${missing.length} fichier(s)) : ${missing.join(", ")}`,
+    );
   }
   if (hashes.length === 0) return;
   for (let attempt = 1; attempt <= BLOCK_ATTEMPTS; attempt += 1) {

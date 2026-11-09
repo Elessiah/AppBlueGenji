@@ -879,10 +879,10 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     linkLabels: ["Read the “Reports” section", "Read the “Account deletion” paragraph"],
     title: "Avatar deleted by moderation: its hash is kept from the deletion",
     summary:
-      "The hash of an avatar that moderation deletes is now kept from that deletion, and no longer when the account is erased: the same image can no longer be uploaded again. An avatar that is only hidden, which can still be contested, no longer leaves any.",
+      "The hash of an avatar that moderation deletes is now kept from that deletion, and no longer when the account is erased, to refuse it being uploaded again. An avatar that is only hidden, which can still be contested, no longer leaves any.",
     details: [
-      "What the site keeps: the hash (SHA-256) of the image, with no link to any account and without time limit, when moderation deletes an avatar — immediately, from the player's page, or at the end of its hiding (without a challenge, or after a rejected challenge) —, whether the account is active or pending deletion. It only serves to refuse the same image being uploaded again, as an avatar or as a team logo.",
-      "When an account is erased, no hash is taken any more: an avatar that is only hidden leaves with the account, without leaving a hash. A deleted team logo leaves no hash either.",
+      "What the site keeps: the hash (SHA-256) of the image, with no link to any account and without time limit, when moderation deletes an avatar — immediately, from the player's page, when rejecting a challenge, or automatically at the end of a hiding without a challenge —, whether the account is active or pending deletion. It only serves to refuse the same image being uploaded again, as an avatar or as a team logo; the file is only erased if nothing else on the site points to it.",
+      "When an account is erased, only the hash of an avatar moderation had already deleted is taken or kept; an avatar that is only hidden leaves with the account, without leaving a hash. A deleted team logo leaves no hash either.",
       "During the 30 days of a requested deletion, moderation can hide, restore or delete the avatar set aside for reactivation, like that of an active account.",
     ],
   },
