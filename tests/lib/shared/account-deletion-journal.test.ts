@@ -5,6 +5,7 @@ import {
   formatJournalEntry,
   parseJournal,
   pruneJournal,
+  prunePreservedLines,
   replayDecision,
   withReactivationEntry,
   type AccountDeletionEntry,
@@ -22,7 +23,7 @@ describe("formatJournalEntry / parseJournal", () => {
     const line = formatJournalEntry(entry());
     expect(line.endsWith("\n")).toBe(true);
     expect(line.trim().includes("\n")).toBe(false);
-    expect(parseJournal(line)).toEqual({ entries: [entry()], invalidLines: 0 });
+    expect(parseJournal(line)).toMatchObject({ entries: [entry()], invalidLines: 0 });
   });
 
   it("n'écrit que les trois champs, même si l'objet en porte d'autres", () => {
@@ -31,8 +32,8 @@ describe("formatJournalEntry / parseJournal", () => {
   });
 
   it("un journal vide ou blanc ne contient rien", () => {
-    expect(parseJournal("")).toEqual({ entries: [], invalidLines: 0 });
-    expect(parseJournal("\n\n  \r\n")).toEqual({ entries: [], invalidLines: 0 });
+    expect(parseJournal("")).toMatchObject({ entries: [], invalidLines: 0 });
+    expect(parseJournal("\n\n  \r\n")).toMatchObject({ entries: [], invalidLines: 0 });
   });
 
   it("écarte une ligne tronquée sans perdre les autres", () => {
@@ -59,7 +60,7 @@ describe("formatJournalEntry / parseJournal", () => {
     ["[1,2,3]", "tableau"],
     ["null", "null"],
   ])("refuse %s (%s)", (line) => {
-    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+    expect(parseJournal(line)).toMatchObject({ entries: [], invalidLines: 1 });
   });
 });
 
@@ -266,7 +267,7 @@ describe("réactivation journalisée (décision R1)", () => {
   it("parseJournal_reactivationWithoutUndoneRequestAt_rejected", () => {
     const line = JSON.stringify({ userId: 7, accountCreatedAt: "2026-01-02 03:04:05", reactivatedAt: "2026-11-03T09:00:00.000Z" });
 
-    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+    expect(parseJournal(line)).toMatchObject({ entries: [], invalidLines: 1 });
   });
 
   // Revue sécurité #546, cycle 10 : seule la forme rendue par la base est admise.
@@ -275,38 +276,38 @@ describe("réactivation journalisée (décision R1)", () => {
     (undone) => {
       const line = JSON.stringify({ ...key, reactivatedAt: "2026-11-03T09:00:00.000Z", undoneRequestAt: undone });
 
-      expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+      expect(parseJournal(line)).toMatchObject({ entries: [], invalidLines: 1 });
     },
   );
 
   it("parseJournal_deletionLineWithUndoneRequestAt_rejected", () => {
     const line = JSON.stringify({ ...entry(), undoneRequestAt: "2026-11-01 10:00:00" });
 
-    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+    expect(parseJournal(line)).toMatchObject({ entries: [], invalidLines: 1 });
   });
 
   it("parseJournal_deletedAtAndReactivatedAt_rejected", () => {
     const line = JSON.stringify({ ...entry(), reactivatedAt: "2026-11-03T09:00:00.000Z" });
 
-    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+    expect(parseJournal(line)).toMatchObject({ entries: [], invalidLines: 1 });
   });
 
   it("parseJournal_reactivatedAtWithPending_rejected", () => {
     const line = JSON.stringify({ ...key, reactivatedAt: "2026-11-03T09:00:00.000Z", pending: true });
 
-    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+    expect(parseJournal(line)).toMatchObject({ entries: [], invalidLines: 1 });
   });
 
   it("parseJournal_legacyReactivatedFlag_rejected", () => {
     const line = JSON.stringify({ ...entry(), reactivated: true });
 
-    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+    expect(parseJournal(line)).toMatchObject({ entries: [], invalidLines: 1 });
   });
 
   it("parseJournal_invalidReactivatedAt_rejected", () => {
     const line = JSON.stringify({ ...key, reactivatedAt: "pas une date" });
 
-    expect(parseJournal(line)).toEqual({ entries: [], invalidLines: 1 });
+    expect(parseJournal(line)).toMatchObject({ entries: [], invalidLines: 1 });
   });
 
   it("replayDecision_restoredRequestEqualToUndone_reactivate", () => {
@@ -357,5 +358,38 @@ describe("réactivation journalisée (décision R1)", () => {
     expect(
       replayDecision(reactivated, { createdAt: "2026-09-22 08:00:00", isDeleted: true, pendingDeletion: true }),
     ).toBe("OTHER_ACCOUNT");
+  });
+});
+
+// Revue sécurité #571, cycle 3 : une ligne datée qu'on ne sait pas lire survit à la réécriture.
+describe("lignes illisibles gardées (parseJournal.preserved)", () => {
+  it("parseJournal_datedUnreadableLine_preservedVerbatim", () => {
+    const line = '{"userId":7,"accountCreatedAt":"2026-01-02 03:04:05","reactivatedAt":"2026-11-03T09:00:00.000Z","undoneRequestAt":"9"}';
+
+    expect(parseJournal(`  ${line}  \n`)).toEqual({
+      entries: [],
+      invalidLines: 1,
+      preserved: [{ line, at: Date.parse("2026-11-03T09:00:00.000Z") }],
+    });
+  });
+
+  it("parseJournal_truncatedLine_notPreserved", () => {
+    expect(parseJournal('{"userId":7,"deletedAt":"2026-11-03T09:00:00.000Z"')).toEqual({
+      entries: [],
+      invalidLines: 1,
+      preserved: [],
+    });
+  });
+
+  it("parseJournal_undatedUnreadableObject_notPreserved", () => {
+    expect(parseJournal('{"userId":7,"deletedAt":"hier"}').preserved).toEqual([]);
+  });
+
+  it("prunePreservedLines_expiredDropped_duplicatesMerged", () => {
+    const now = new Date("2026-11-09T00:00:00.000Z");
+    const fresh = { line: '{"a":1}', at: Date.parse("2026-11-01T00:00:00.000Z") };
+    const expired = { line: '{"b":1}', at: Date.parse("2025-01-01T00:00:00.000Z") };
+
+    expect(prunePreservedLines([fresh, expired, fresh], now)).toEqual(['{"a":1}']);
   });
 });

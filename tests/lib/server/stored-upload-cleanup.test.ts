@@ -111,4 +111,15 @@ describe("isUploadReferenced", () => {
     const quarantine = execute.mock.calls.map((c) => String(c[0])).find((sql) => sql.includes("bg_logo_quarantines"));
     expect(quarantine).toMatch(/status = 'HIDDEN'/);
   });
+
+  // Revue sécurité #571, cycle 3 : l'avatar mis de côté d'un compte en attente
+  // de suppression est encore désigné — il n'est pas effacé.
+  it("isUploadReferenced_heldAvatarOfPendingAccount_true", async () => {
+    const execute = mockDb(/FROM bg_account_deletion_holds WHERE avatar_url IN/);
+
+    expect(await isUploadReferenced("/api/uploads/avatars/42-a.webp")).toBe(true);
+
+    const hold = execute.mock.calls.find(([sql]) => sql.includes("bg_account_deletion_holds"));
+    expect(hold?.[1]).toEqual(["/api/uploads/avatars/42-a.webp", "/uploads/avatars/42-a.webp"]);
+  });
 });

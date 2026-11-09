@@ -229,6 +229,9 @@ export async function reactivateAccount(
  * celle que la réactivation défaisait — elle tient), `GONE` (suppression déjà
  * définitive), `ABSENT` (plus de ligne) ou `OTHER_ACCOUNT` (identifiant
  * réattribué), relus sous verrou.
+ *
+ * @throws REACTIVATION_NOT_RESTORED — la demande à défaire est là, mais pas son
+ *   masque : rien n'est écrit, le rejeu compte un échec.
  */
 export type ReplayedReactivation = "REACTIVATED" | "ALREADY_ACTIVE" | "SUPERSEDED" | "GONE" | "ABSENT" | "OTHER_ACCOUNT";
 
@@ -278,7 +281,10 @@ export async function replayAccountReactivation(entry: AccountDeletionEntry): Pr
     outcome = lockedReactivationOutcome(entry, locked[0]);
     if (outcome === null) {
       restored = await restoreAccountIdentity(connection, userId);
-      if (restored) await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
+      // La demande à défaire est bien là, mais son masque manque : rien n'est
+      // rétabli — un échec à dire (`failed`), pas une demande qui tient.
+      if (!restored) throw new Error("REACTIVATION_NOT_RESTORED");
+      await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
     }
     await connection.commit();
   } catch (error) {
@@ -287,7 +293,7 @@ export async function replayAccountReactivation(entry: AccountDeletionEntry): Pr
   } finally {
     connection.release();
   }
-  // Rien à rétablir sous verrou : la demande, toujours en attente, tient.
+  // Rien à rétablir sous verrou : l'issue relue le dit.
   if (!restored) return outcome ?? "SUPERSEDED";
   invalidateTeamIdentityViews();
   invalidateStats();

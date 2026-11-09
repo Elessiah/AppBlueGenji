@@ -12,6 +12,8 @@ import {
 import { isReferencedRowError } from "@/lib/server/mysql-errors";
 import { avatarFileLocations } from "@/lib/server/logo-quarantine";
 import { unlink } from "node:fs/promises";
+import path from "node:path";
+import { blockRemovedImageFiles } from "@/lib/server/blocked-images";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { deleteStoredImage } from "@/lib/server/image-upload";
@@ -329,8 +331,11 @@ export async function deleteOwnAccount(
  * demande a été annulée (réactivation) ou si ses trente jours ne sont pas
  * écoulés — relu sous le verrou du compte. Idempotent : un compte déjà effacé
  * ou anonymisé n'est plus en attente. Rend `null` quand rien n'est fait.
- * `accountCreatedAt` (rejeu du journal) : rien non plus si la ligne verrouillée
- * n'est pas ce compte-là (identifiant réattribué).
+ * `accountCreatedAt` (rejeu du journal) : si la ligne verrouillée n'est pas ce
+ * compte-là (identifiant réattribué), rien n'est écrit et `ACCOUNT_REASSIGNED`
+ * est levé.
+ *
+ * @throws ACCOUNT_REASSIGNED
  */
 export async function finalizeAccountDeletion(
   userId: number,
@@ -405,6 +410,64 @@ async function loadQuarantinedAvatarFiles(runner: SqlRunner, userId: number): Pr
     .filter((file): file is string => file !== null);
 }
 
+/**
+ * L'avatar que l'effacement emporte a-t-il été **supprimé par la modération**
+ * (quarantaine `PURGED` à son adresse) ? Alors son empreinte est bloquée avant
+ * que le fichier ne parte (D6) — un fichier qu'une suppression de modération
+ * n'aurait pas pu atteindre (course, écriture refaite) ne s'échappe pas par
+ * l'effacement. Un avatar seulement masqué ne l'est pas. Lu sous le verrou du
+ * compte : la cascade emporte ces lignes.
+ */
+async function avatarRemovedByModeration(runner: SqlRunner, userId: number, avatarUrl: string | null): Promise<boolean> {
+  if (!avatarUrl) return false;
+  const [rows] = await runner.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_logo_quarantines WHERE user_id = ? AND status = 'PURGED' AND logo_url = ? LIMIT 1`,
+    [userId, avatarUrl],
+  );
+  return rows.length > 0;
+}
+
+type LockedAccount = RowDataPacket & {
+  avatar_url: string | null;
+  discord_id: string | null;
+  created_at: string;
+  is_deleted: 0 | 1;
+  deletion_requested_at: StoredDate;
+};
+
+/**
+ * Verrouille la ligne du compte et dit si la suppression peut suivre. `null` :
+ * rien à faire (`onlyIfDue` — ligne disparue, ou fenêtre de réactivation
+ * relue sous le verrou encore ouverte : une reconnexion qui vient de réactiver
+ * le compte, ou une demande encore dans ses trente jours, ne tombe pas).
+ *
+ * @throws USER_NOT_FOUND — ligne absente, suppression immédiate.
+ * @throws ACCOUNT_REASSIGNED — rejeu : la ligne n'est pas ce compte-là ; levé
+ *   pour que le rejeu le compte comme tel (`otherAccount`), jamais comme une
+ *   demande à attendre.
+ */
+async function lockAccountForDeletion(
+  connection: PoolConnection,
+  userId: number,
+  onlyIfDue: boolean,
+  expectedCreatedAt: string | undefined,
+): Promise<LockedAccount | null> {
+  const [locked] = await connection.execute<LockedAccount[]>(
+    `SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at FROM bg_users WHERE id = ? FOR UPDATE`,
+    [userId],
+  );
+  const account = locked[0];
+  if (!account) {
+    if (onlyIfDue) return null;
+    throw new Error("USER_NOT_FOUND");
+  }
+  if (expectedCreatedAt !== undefined && String(account.created_at) !== expectedCreatedAt) {
+    throw new Error("ACCOUNT_REASSIGNED");
+  }
+  if (onlyIfDue && !deletionIsDue(account)) return null;
+  return account;
+}
+
 async function deleteAccountNow(
   userId: number,
   onlyIfDue: boolean,
@@ -428,6 +491,8 @@ async function deleteAccountNow(
   // se défait pas, et une transaction annulée rendrait un compte vivant sans sa
   // photo.
   let orphanedAvatar: string | null = null;
+  // Supprimé par la modération : bloqué avant d'être effacé (D6).
+  let orphanedAvatarBlocked = false;
   // La date de création, relue sous le verrou : c'est elle qui permet au rejeu
   // de reconnaître **ce** compte-là après une restauration, l'identifiant seul
   // pouvant avoir été réattribué (`lib/shared/account-deletion-journal.ts`).
@@ -473,32 +538,18 @@ async function deleteAccountNow(
     // son inscription et ses matchs, et ce qu'il perd est son propre historique
     // — ce qu'il venait de demander. Le fermer coûterait un verrou sur la ligne
     // de **chaque** membre à chaque inscription.
-    const [locked] = await connection.execute<(RowDataPacket & {
-      avatar_url: string | null;
-      discord_id: string | null;
-      created_at: string;
-      is_deleted: 0 | 1;
-      deletion_requested_at: StoredDate;
-    })[]>(
-      `SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at FROM bg_users WHERE id = ? FOR UPDATE`,
-      [userId],
-    );
-    if (locked.length === 0 && !onlyIfDue) throw new Error("USER_NOT_FOUND");
-    // La fenêtre de réactivation, relue sous le verrou : une reconnexion qui
-    // vient de réactiver le compte, ou une demande encore dans ses trente
-    // jours, ne tombe pas.
-    const otherAccount = expectedCreatedAt !== undefined && String(locked[0]?.created_at) !== expectedCreatedAt;
-    if (onlyIfDue && (!deletionIsDue(locked[0]) || otherAccount)) {
+    const account = await lockAccountForDeletion(connection, userId, onlyIfDue, expectedCreatedAt);
+    if (!account) {
       await connection.rollback();
       return null;
     }
-    // Rejeu d'une suppression immédiate : jamais la ligne d'un autre compte.
-    if (otherAccount) throw new Error("ACCOUNT_REASSIGNED");
     // Anonyme depuis la demande, le compte en attente n'a plus d'avatar sur sa
     // ligne : son chemin attend dans le masque (`account-deletion-hold.ts`).
     const hold = await readDeletionHold(connection, userId, true);
-    orphanedAvatar = toDiskUploadPath(locked[0].avatar_url ?? hold?.avatarUrl ?? null);
-    accountCreatedAt = String(locked[0].created_at);
+    const avatarUrl = account.avatar_url ?? hold?.avatarUrl ?? null;
+    orphanedAvatar = toDiskUploadPath(avatarUrl);
+    orphanedAvatarBlocked = await avatarRemovedByModeration(connection, userId, avatarUrl);
+    accountCreatedAt = String(account.created_at);
 
     const facts = await loadAccountDeletionFacts(connection, userId, new Set(soloTournaments));
     plan = accountDeletionPlan(facts.trace);
@@ -535,7 +586,7 @@ async function deleteAccountNow(
     // base indéfiniment, alors qu'on vient de promettre qu'il ne resterait rien.
     // C'est la même coordonnée que le tag, et le seul geste des deux modes qui
     // regarde une table hors de `bg_users`.
-    const discordId = locked[0].discord_id;
+    const discordId = account.discord_id;
     if (discordId) {
       await connection.execute(
         `DELETE FROM bg_discord_login_challenges WHERE discord_id = ?`,
@@ -594,6 +645,9 @@ async function deleteAccountNow(
   // par `/api/uploads/avatars/...`, donc une donnée personnelle publique que
   // plus aucune ligne ne désigne. L'échec est **avalé** : la suppression est
   // commitée, annoncer un refus au joueur serait faux.
+  if (orphanedAvatar && orphanedAvatarBlocked) {
+    await blockRemovedImageFiles([path.join(process.cwd(), "public", orphanedAvatar.replace(/^\/+/, ""))]);
+  }
   try {
     await deleteStoredImage(orphanedAvatar);
   } catch {

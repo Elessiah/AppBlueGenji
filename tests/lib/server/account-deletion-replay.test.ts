@@ -338,6 +338,17 @@ describe("replayAccountDeletions — réactivation (décision R1)", () => {
     expect(report).toMatchObject({ absent: 1, alreadyDeleted: 0 });
   });
 
+  // Revue sécurité #571, cycle 3 : un masque manquant se compte en échec, pas en demande qui tient.
+  it("replayAccountDeletions_reactivationRestoreFails_countedFailed", async () => {
+    restoredDb({ 7: pendingRow });
+    jest.mocked(replayAccountReactivation).mockRejectedValue(new Error("REACTIVATION_NOT_RESTORED"));
+
+    const report = await replayAccountDeletions([reactivated], { log });
+
+    expect(report).toMatchObject({ failed: 1, superseded: 0, reactivated: 0 });
+    expect(lines.join("\n")).toContain("REACTIVATION_NOT_RESTORED");
+  });
+
   it("replayAccountDeletions_replayReactivationThrows_failedCounted", async () => {
     restoredDb({ 7: pendingRow });
     jest.mocked(replayAccountReactivation).mockRejectedValue(new Error("DB_DOWN"));
@@ -463,6 +474,46 @@ describe("replayAccountDeletions — demande à redater", () => {
 
     expect(report).toMatchObject({ failed: 1, replayed: 0 });
     expect(lines.join("\n")).toContain("DB_DOWN");
+  });
+
+  /** Base dont la ligne change entre la lecture du rejeu et sa relecture (`next`, `null` : disparue). */
+  function rowChangesAfterFirstRead(next: typeof pendingRow | null) {
+    let reads = 0;
+    const execute = jest.fn(async (sql: string) => {
+      if (sql.startsWith("UPDATE")) return [{ affectedRows: 0 }];
+      reads += 1;
+      if (reads === 1) return [[pendingRow]];
+      return [next ? [next] : []];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  }
+
+  // Revue sécurité #571, cycle 3 : un identifiant réattribué n'est pas une demande à attendre.
+  it("replayAccountDeletions_redateNoRowsChangedAndIdReassigned_countedOtherAccount", async () => {
+    rowChangesAfterFirstRead({ ...pendingRow, created_at: "2026-11-08 08:00:00" });
+
+    const report = await replayAccountDeletions([pending], { log });
+
+    expect(report).toMatchObject({ otherAccount: 1, alreadyPending: 0, replayed: 0 });
+    expect(lines.join("\n")).toContain("identifiant réattribué");
+  });
+
+  it("replayAccountDeletions_redateNoRowsChangedAndRowGone_countedAbsent", async () => {
+    rowChangesAfterFirstRead(null);
+
+    const report = await replayAccountDeletions([pending], { log });
+
+    expect(report).toMatchObject({ absent: 1, alreadyPending: 0, replayed: 0 });
+  });
+
+  it("replayAccountDeletions_redateFinalizeReassigned_countedOtherAccount", async () => {
+    restoredDb({ 7: pendingRow }, { affectedRows: 0 });
+    jest.mocked(finalizeAccountDeletion).mockRejectedValue(new Error("ACCOUNT_REASSIGNED"));
+    const old: AccountDeletionEntry = { ...pending, deletedAt: new Date(Date.now() - 40 * DAY).toISOString() };
+
+    const report = await replayAccountDeletions([old], { log });
+
+    expect(report).toMatchObject({ otherAccount: 1, failed: 0, alreadyPending: 0 });
   });
 });
 

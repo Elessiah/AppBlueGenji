@@ -9,10 +9,12 @@ const AVATAR = "/api/uploads/avatars/9-a.webp";
 
 let connection: ReturnType<typeof connectionMock>;
 
-async function install(user: object | null) {
+async function install(user: object | null, heldAvatar: string | null = null) {
   const { getDatabase } = await import("@/lib/server/database");
   connection = connectionMock();
   connection.execute = jest.fn<SqlQuery>(async (sql) => {
+    if (/FROM bg_account_deletion_holds/.test(sql)) return [heldAvatar ? [{ pseudo: "Nova", avatar_url: heldAvatar }] : []];
+    if (/UPDATE bg_account_deletion_holds SET avatar_url = NULL/.test(sql)) return [{}];
     if (/FOR UPDATE/.test(sql)) return [user ? [user] : []];
     if (/UPDATE bg_users SET avatar_url = NULL/.test(sql)) return [{}];
     throw new Error(`requête inattendue : ${sql}`);
@@ -40,15 +42,31 @@ describe("removeUserAvatarAsModerator", () => {
     expect(syncSoloEntryIdentityOn).toHaveBeenCalledWith(expect.anything(), 9);
   });
 
-  it("refuse un compte inconnu, supprimé, ou sans avatar", async () => {
+  it("refuse un compte inconnu, supprimé sans masque, ou sans avatar", async () => {
     await install(null);
     await expect(removeUserAvatarAsModerator(9)).rejects.toThrow("USER_NOT_FOUND");
     expect(connection.rollback).toHaveBeenCalled();
 
-    await install({ pseudo: "Nova", avatar_url: AVATAR, is_deleted: 1 });
+    await install({ pseudo: "Anonyme", avatar_url: null, is_deleted: 1 });
     await expect(removeUserAvatarAsModerator(9)).rejects.toThrow("USER_NOT_FOUND");
+    expect(connection.rollback).toHaveBeenCalled();
 
     await install({ pseudo: "Nova", avatar_url: null, is_deleted: 0 });
     await expect(removeUserAvatarAsModerator(9)).rejects.toThrow("USER_HAS_NO_AVATAR");
+  });
+
+  // Revue sécurité #571, cycle 3 (D6) : un compte en attente de suppression
+  // garde son avatar dans le masque — la modération l'y retire.
+  it("removeUserAvatarAsModerator_pendingWithHeldAvatar_takesHeldAvatarAndCommits", async () => {
+    const { syncSoloEntryIdentityOn } = await import("@/lib/server/solo-entries-service");
+    await install({ pseudo: "Anonyme", avatar_url: null, is_deleted: 1 }, AVATAR);
+
+    await expect(removeUserAvatarAsModerator(9)).resolves.toEqual({ pseudo: "Anonyme", removedAvatarUrl: AVATAR });
+
+    expect(connection.commit).toHaveBeenCalled();
+    const sqls = connection.execute.mock.calls.map(([sql]) => String(sql));
+    expect(sqls).toContain("UPDATE bg_account_deletion_holds SET avatar_url = NULL WHERE user_id = ?");
+    expect(sqls.some((sql) => /UPDATE bg_users SET avatar_url/.test(sql))).toBe(false);
+    expect(syncSoloEntryIdentityOn).not.toHaveBeenCalled();
   });
 });

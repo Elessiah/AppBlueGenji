@@ -2,6 +2,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { syncSoloEntryIdentity, syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
+import { takeHeldAvatar } from "@/lib/server/users/account-deletion-hold";
 
 /**
  * Pose (ou retire) l'avatar d'un compte **vivant**, et dit si l'écriture a eu
@@ -73,6 +74,12 @@ export async function updateUserAvatar(
  * `bg_teams.logo_url`. Le fichier, lui, est effacé par l'appelant **après le
  * commit** (un `unlink` ne se défait pas).
  *
+ * Un compte **en attente de suppression** n'a plus d'avatar sur sa ligne
+ * (anonyme dès la demande), mais son fichier attend la réactivation dans le
+ * masque, toujours servi : c'est là qu'il est retiré (`takeHeldAvatar`,
+ * décision D6) — sans quoi demander la suppression mettrait l'image hors
+ * d'atteinte de la modération pendant trente jours.
+ *
  * @throws USER_NOT_FOUND
  * @throws USER_HAS_NO_AVATAR
  */
@@ -89,7 +96,15 @@ export async function removeUserAvatarAsModerator(
     // Un compte anonymisé n'a déjà plus d'avatar (`anonymizeAccount` le vide) ;
     // le traiter comme introuvable évite de distinguer un cas qui ne se produit
     // pas d'une ligne disparue.
-    if (rows.length === 0 || rows[0].is_deleted === 1) throw new Error("USER_NOT_FOUND");
+    if (rows.length === 0) throw new Error("USER_NOT_FOUND");
+    if (Number(rows[0].is_deleted) === 1) {
+      // En attente : l'avatar est dans le masque. Anonymisé (sans masque) :
+      // il n'y a plus rien, comme une ligne disparue.
+      const held = await takeHeldAvatar(connection, userId);
+      if (held === null) throw new Error("USER_NOT_FOUND");
+      await connection.commit();
+      return { pseudo: rows[0].pseudo, removedAvatarUrl: held };
+    }
     const avatarUrl = rows[0].avatar_url;
     if (!avatarUrl) throw new Error("USER_HAS_NO_AVATAR");
     await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ? AND is_deleted = 0`, [userId]);

@@ -6,8 +6,8 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getDatabase } from "@/lib/server/database";
-import { blockImageHashes, blockRemovedImageFiles, hashImageFiles, imageSha256, isBlockedImage } from "@/lib/server/blocked-images";
-import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
+import { blockRemovedImageFiles, hashImageFiles, imageSha256, isBlockedImage } from "@/lib/server/blocked-images";
+import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /*
  * E6 / D6 — l'empreinte d'un avatar supprimé par la modération reste, et refuse
@@ -82,15 +82,6 @@ describe("blockRemovedImageFiles", () => {
     expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE)]);
   });
 
-  it("blockRemovedImageFiles_unreadableFile_noQuery", async () => {
-    const execute = jest.fn<SqlQuery>();
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
-
-    await blockRemovedImageFiles([join(tmpdir(), "bg-absent-avatar.webp")]);
-
-    expect(execute).not.toHaveBeenCalled();
-  });
-
   it("blockRemovedImageFiles_noFile_noDatabase", async () => {
     await blockRemovedImageFiles([]);
 
@@ -153,36 +144,59 @@ describe("hashImageFiles", () => {
   });
 });
 
-describe("blockImageHashes", () => {
-  it("blockImageHashes_hashes_insertsEachIgnoringDuplicates", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+// Revue sécurité #571, cycle 3 : l'insertion n'est plus exportée, elle se vérifie par l'API publique.
+describe("blockRemovedImageFiles — insertion et fichiers manquants", () => {
+  function writeImage(content: Buffer): string {
+    const file = join(mkdtempSync(join(tmpdir(), "bg-blocked-")), "avatar.webp");
+    writeFileSync(file, content);
+    return file;
+  }
 
-    await blockImageHashes(fakeConnection({ execute }), ["aa", "bb"]);
+  it("blockRemovedImageFiles_duplicateHashes_insertedOnceInOneStatement", async () => {
+    const other = Buffer.from("autre image");
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await blockRemovedImageFiles([writeImage(IMAGE), writeImage(IMAGE), writeImage(other)]);
 
     expect(execute.mock.calls.map(([sql, params]) => [String(sql), params])).toEqual([
-      ["INSERT IGNORE INTO bg_blocked_image_hashes (sha256) VALUES (?), (?)", ["aa", "bb"]],
+      ["INSERT IGNORE INTO bg_blocked_image_hashes (sha256) VALUES (?), (?)", [imageSha256(IMAGE), imageSha256(other)]],
     ]);
   });
 
-  it("blockImageHashes_duplicateHashes_insertedOnce", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+  it("blockRemovedImageFiles_missingTable_doesNotThrow", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(missingTable);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
 
-    await blockImageHashes(fakeConnection({ execute }), ["aa", "aa"]);
+    await expect(blockRemovedImageFiles([writeImage(IMAGE)])).resolves.toBeUndefined();
 
-    expect(execute.mock.calls[0][1]).toEqual(["aa"]);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(error).not.toHaveBeenCalled();
+    error.mockRestore();
   });
 
-  it("blockImageHashes_noHash_noQuery", async () => {
+  it("blockRemovedImageFiles_fileMissing_logsErrorAndInsertsNothing", async () => {
     const execute = jest.fn<SqlQuery>();
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
 
-    await blockImageHashes(fakeConnection({ execute }), []);
+    await blockRemovedImageFiles([join(tmpdir(), "bg-absent-avatar.webp")]);
 
     expect(execute).not.toHaveBeenCalled();
+    expect(String(error.mock.calls[0][0])).toContain("empreinte non bloquée (1 fichier(s))");
+    error.mockRestore();
   });
 
-  it("blockImageHashes_missingTable_doesNotThrow", async () => {
-    const execute = jest.fn<SqlQuery>().mockRejectedValue(missingTable);
+  it("blockRemovedImageFiles_onePathMissing_logsAndBlocksTheOther", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
 
-    await expect(blockImageHashes(fakeConnection({ execute }), ["aa"])).resolves.toBeUndefined();
+    await blockRemovedImageFiles([join(tmpdir(), "bg-absent-avatar.webp"), writeImage(IMAGE)]);
+
+    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE)]);
+    expect(String(error.mock.calls[0][0])).toContain("empreinte non bloquée (1 fichier(s))");
+    error.mockRestore();
   });
 });

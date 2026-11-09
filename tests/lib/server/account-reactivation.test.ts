@@ -402,4 +402,18 @@ describe("replayAccountReactivation", () => {
 
     expect(restoreAccountIdentity).not.toHaveBeenCalled();
   });
+
+  // Revue sécurité #571, cycle 3 : un masque manquant n'est pas une demande qui
+  // tient — l'entrée échoue, rien n'est commité.
+  it("replayAccountReactivation_holdMissing_throwsReactivationNotRestoredAndRollsBack", async () => {
+    const connection = transaction({ locked: lockedPending });
+    jest.mocked(restoreAccountIdentity).mockResolvedValue(false);
+
+    await expect(replayAccountReactivation(reactivation)).rejects.toThrow("REACTIVATION_NOT_RESTORED");
+
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(connection.rollback).toHaveBeenCalled();
+    const sqls = connection.execute.mock.calls.map(([sql]) => String(sql));
+    expect(sqls).not.toContain("DELETE FROM bg_user_sessions WHERE user_id = ?");
+  });
 });

@@ -143,6 +143,44 @@ export interface ParsedJournal {
   entries: AccountDeletionEntry[];
   /** Lignes non vides qu'on n'a pas su lire — à signaler, jamais à rejouer. */
   invalidLines: number;
+  /**
+   * Parmi elles, les lignes JSON entières et datées (`deletedAt` ou
+   * `reactivatedAt`) que cette version ne sait pas lire — écrites par une
+   * version voisine, ou abîmées dans un seul champ. Gardées **telles quelles**
+   * à la réécriture du fichier, jusqu'à leur échéance : un élagage ne doit pas
+   * effacer une réactivation qu'une autre version saurait rejouer. Une ligne
+   * tronquée (JSON illisible) n'a pas de date sûre et n'est pas gardée.
+   */
+  preserved: PreservedJournalLine[];
+}
+
+/** Ligne illisible mais datée, recopiée à l'identique (`ParsedJournal.preserved`). */
+export interface PreservedJournalLine {
+  line: string;
+  /** Sa date (`deletedAt` ou `reactivatedAt`), en millisecondes. */
+  at: number;
+}
+
+/** La date d'une ligne JSON qu'on ne sait pas lire, si elle en porte une. */
+function unreadableLineDate(value: unknown): number | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (isIsoDate(v.deletedAt)) return Date.parse(v.deletedAt);
+  if (isIsoDate(v.reactivatedAt)) return Date.parse(v.reactivatedAt);
+  return null;
+}
+
+/**
+ * Les lignes illisibles gardées encore dans leur durée de conservation, sans
+ * doublon — même échéance que les autres (`pruneJournal`).
+ */
+export function prunePreservedLines(
+  preserved: readonly PreservedJournalLine[],
+  now: Date,
+  retentionDays: number = ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
+): string[] {
+  const cutoff = now.getTime() - retentionDays * 24 * 60 * 60 * 1000;
+  return [...new Set(preserved.filter((kept) => kept.at >= cutoff).map((kept) => kept.line))];
 }
 
 /**
@@ -152,22 +190,28 @@ export interface ParsedJournal {
  */
 export function parseJournal(text: string): ParsedJournal {
   const entries: AccountDeletionEntry[] = [];
+  const preserved: PreservedJournalLine[] = [];
   let invalidLines = 0;
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) continue;
+    let value: unknown;
     try {
-      const parsed = readEntry(JSON.parse(line));
-      if (parsed) {
-        entries.push(parsed);
-      } else {
-        invalidLines += 1;
-      }
+      value = JSON.parse(line);
     } catch {
       invalidLines += 1;
+      continue;
     }
+    const parsed = readEntry(value);
+    if (parsed) {
+      entries.push(parsed);
+      continue;
+    }
+    invalidLines += 1;
+    const at = unreadableLineDate(value);
+    if (at !== null) preserved.push({ line, at });
   }
-  return { entries, invalidLines };
+  return { entries, invalidLines, preserved };
 }
 
 /**

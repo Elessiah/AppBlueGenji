@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
 
@@ -69,16 +69,14 @@ export async function hashImageFiles(absolutePaths: readonly string[]): Promise<
   return hashes.filter((sha): sha is string => sha !== null);
 }
 
-/** Pose ces empreintes (doublons ignorés), sur la connexion ou le pool donné. */
-export async function blockImageHashes(
-  connection: Pick<PoolConnection, "execute">,
-  hashes: readonly string[],
-): Promise<void> {
+/** Pose ces empreintes (doublons ignorés), hors transaction, sur le pool. */
+async function blockImageHashes(hashes: readonly string[]): Promise<void> {
   const unique = [...new Set(hashes)];
   if (unique.length === 0) return;
+  const db = await getDatabase();
   // Une seule insertion multi-lignes : un aller-retour, quel que soit le nombre d'images.
   await ignoreMissingTable(
-    connection.execute(
+    db.execute(
       `INSERT IGNORE INTO bg_blocked_image_hashes (sha256) VALUES ${unique.map(() => "(?)").join(", ")}`,
       unique,
     ),
@@ -98,18 +96,19 @@ export async function blockImageHashes(
  */
 export async function blockRemovedImageFiles(absolutePaths: readonly string[]): Promise<void> {
   if (absolutePaths.length === 0) return;
-  let hashes: string[];
-  try {
-    hashes = await hashImageFiles(absolutePaths);
-  } catch (error) {
-    console.error("[moderation] empreinte de l'image supprimée non calculée", error);
-    return;
+  // `hashImageFiles` ne lève pas : un fichier illisible est seulement omis.
+  const hashes = await hashImageFiles(absolutePaths);
+  const missing = absolutePaths.length - hashes.length;
+  if (missing > 0) {
+    // Un fichier que la modération supprime manquait déjà (course avec une
+    // rotation, effacement à la main) : son image n'est pas bloquée et
+    // pourrait revenir — consigné pour qu'un exploitant le sache.
+    console.error(`[moderation] image supprimée introuvable, empreinte non bloquée (${missing} fichier(s))`);
   }
   if (hashes.length === 0) return;
   for (let attempt = 1; attempt <= BLOCK_ATTEMPTS; attempt += 1) {
     try {
-      const db = await getDatabase();
-      await blockImageHashes(db, hashes);
+      await blockImageHashes(hashes);
       return;
     } catch (error) {
       if (attempt === BLOCK_ATTEMPTS) {

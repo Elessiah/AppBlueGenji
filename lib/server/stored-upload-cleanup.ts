@@ -39,6 +39,8 @@ const REFERENCE_QUERIES = [
   "SELECT 1 FROM bg_sponsors WHERE logo_url IN (?, ?) OR banner_url IN (?, ?) LIMIT 1",
   "SELECT 1 FROM bg_benevoles WHERE photo_url IN (?, ?) LIMIT 1",
   "SELECT 1 FROM bg_logo_quarantines WHERE status = 'HIDDEN' AND logo_url IN (?, ?) LIMIT 1",
+  // Avatar d'un compte en attente de suppression, rendu s'il revient.
+  "SELECT 1 FROM bg_account_deletion_holds WHERE avatar_url IN (?, ?) LIMIT 1",
 ] as const;
 
 /**

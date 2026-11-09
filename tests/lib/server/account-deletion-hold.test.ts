@@ -8,6 +8,7 @@ import {
   isPseudoHeldByOther,
   loadTakenAnonymousPseudos,
   restoreAccountIdentity,
+  takeHeldAvatar,
 } from "@/lib/server/users/account-deletion-hold";
 import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
@@ -279,5 +280,36 @@ describe("restoreAccountIdentity", () => {
     expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe(false);
     expect(sqlOf(connection).some((q) => q.sql.startsWith("DELETE FROM bg_account_deletion_holds"))).toBe(false);
     expect(syncSoloEntryIdentityOn).not.toHaveBeenCalled();
+  });
+});
+
+// Revue sécurité #571, cycle 3 (D6) : la modération retire l'avatar mis de côté.
+describe("takeHeldAvatar", () => {
+  it("takeHeldAvatar_holdWithAvatar_clearsColumnAndReturnsUrl", async () => {
+    const connection = transaction({ hold: { pseudo: "Nova", avatar_url: AVATAR } });
+
+    expect(await takeHeldAvatar(fakeConnection(connection), 7)).toBe(AVATAR);
+
+    const sqls = connection.execute.mock.calls.map(([sql]) => String(sql).replace(/\s+/g, " ").trim());
+    expect(sqls).toEqual([
+      "SELECT pseudo, avatar_url FROM bg_account_deletion_holds WHERE user_id = ? LIMIT 1 FOR UPDATE",
+      "UPDATE bg_account_deletion_holds SET avatar_url = NULL WHERE user_id = ?",
+    ]);
+  });
+
+  it("takeHeldAvatar_holdWithoutAvatar_returnsNullWithoutWrite", async () => {
+    const connection = transaction({ hold: { pseudo: "Nova", avatar_url: null } });
+
+    expect(await takeHeldAvatar(fakeConnection(connection), 7)).toBeNull();
+
+    expect(connection.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("takeHeldAvatar_noHold_returnsNullWithoutWrite", async () => {
+    const connection = transaction({ hold: null });
+
+    expect(await takeHeldAvatar(fakeConnection(connection), 7)).toBeNull();
+
+    expect(connection.execute).toHaveBeenCalledTimes(1);
   });
 });

@@ -219,11 +219,36 @@ async function handleRedate(
       report.replayed += 1;
       log(`  ✓ #${entry.userId} — demande de suppression redatée`);
     } else {
-      report.alreadyPending += 1;
+      await countUnredated(db, entry, report, log);
     }
   } catch (error) {
+    if (error instanceof Error && error.message === "ACCOUNT_REASSIGNED") {
+      countDecision("OTHER_ACCOUNT", entry, report, log);
+      return;
+    }
     report.failed += 1;
     log(`  ✗ #${entry.userId} — échec : ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Rien de redaté : la demande était déjà à la bonne date — ou la ligne a
+ * changé depuis sa lecture (supprimée, identifiant réattribué), relue pour le
+ * dire au bon compteur.
+ */
+async function countUnredated(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  entry: AccountDeletionEntry,
+  report: ReplayReport,
+  log: (line: string) => void,
+): Promise<void> {
+  const current = await readRestoredRow(db, entry.userId);
+  if (current === null) {
+    countDecision("ABSENT", entry, report, log);
+  } else if (current.createdAt !== entry.accountCreatedAt) {
+    countDecision("OTHER_ACCOUNT", entry, report, log);
+  } else {
+    report.alreadyPending += 1;
   }
 }
 

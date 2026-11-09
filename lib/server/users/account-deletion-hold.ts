@@ -109,6 +109,20 @@ export async function readDeletionHold(runner: Runner, userId: number, lock = fa
   return rows[0] ? { pseudo: rows[0].pseudo, avatarUrl: rows[0].avatar_url ?? null } : null;
 }
 
+/**
+ * Retire, pour la modération, l'avatar mis de côté d'un compte en attente de
+ * suppression (décision D6) : sous le verrou du masque, la ligne n'en garde
+ * plus le chemin — une réactivation ne le rendra pas, l'effacement n'a plus de
+ * fichier à emporter. Rend l'adresse retirée, `null` s'il n'y en avait pas
+ * (ou pas de masque). Le fichier est effacé par l'appelant, après le commit.
+ */
+export async function takeHeldAvatar(connection: Runner, userId: number): Promise<string | null> {
+  const hold = await readDeletionHold(connection, userId, true);
+  if (!hold?.avatarUrl) return null;
+  await connection.execute(`UPDATE bg_account_deletion_holds SET avatar_url = NULL WHERE user_id = ?`, [userId]);
+  return hold.avatarUrl;
+}
+
 /** Efface le masque (suppression définitive : le vrai pseudo ne doit plus survivre nulle part). */
 export async function dropDeletionHold(runner: Runner, userId: number): Promise<void> {
   await runner.execute(`DELETE FROM bg_account_deletion_holds WHERE user_id = ?`, [userId]);

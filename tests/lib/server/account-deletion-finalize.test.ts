@@ -13,7 +13,8 @@ jest.mock("@/lib/server/logo-quarantine", () => ({
 }));
 
 import { getDatabase } from "@/lib/server/database";
-import { blockImageHashes, hashImageFiles } from "@/lib/server/blocked-images";
+import { blockRemovedImageFiles, hashImageFiles } from "@/lib/server/blocked-images";
+import { deleteStoredImage } from "@/lib/server/image-upload";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { closeUserStreams } from "@/lib/server/session-streams";
@@ -35,6 +36,17 @@ const RECENT = new Date(Date.now() - 3 * DAY);
 
 type Locked = { is_deleted: 0 | 1; deletion_requested_at: Date | null } | null;
 
+/** Masque d'un compte en attente et quarantaine supprimée à son adresse (D6). */
+function heldAvatarRows(q: string, options: { heldAvatar?: string; moderationPurged?: boolean }): object[] | null {
+  if (q.startsWith("SELECT pseudo, avatar_url FROM bg_account_deletion_holds")) {
+    return options.heldAvatar ? [{ pseudo: "Joueur", avatar_url: options.heldAvatar }] : [];
+  }
+  if (q.startsWith("SELECT 1 FROM bg_logo_quarantines WHERE user_id = ? AND status = 'PURGED'")) {
+    return options.moderationPurged ? [{ 1: 1 }] : [];
+  }
+  return null;
+}
+
 function fakeDb(options: {
   locked: Locked;
   played?: number;
@@ -44,6 +56,8 @@ function fakeDb(options: {
   rollbackFails?: boolean;
   failErase?: boolean;
   refereed?: { matchId: number; tournamentId: number }[];
+  heldAvatar?: string;
+  moderationPurged?: boolean;
 }) {
   const queries: string[] = [];
   const execute = jest.fn(async (sql: string, _params?: unknown[]) => {
@@ -64,6 +78,8 @@ function fakeDb(options: {
       return [options.locked ? [{ avatar_url: null, discord_id: null, created_at: "2026-01-02 03:04:05", ...options.locked }] : []];
     }
     if (q.includes("AS played")) return [[{ played: options.played ?? 0, organized: 0, owned: 0 }]];
+    const avatarRows = heldAvatarRows(q, options);
+    if (avatarRows) return [avatarRows];
     if (q.startsWith("SELECT logo_url FROM bg_logo_quarantines")) {
       return [(options.quarantined ?? []).map((logo_url) => ({ logo_url }))];
     }
@@ -138,7 +154,7 @@ describe("finalizeAccountDeletion", () => {
 
     // D6 : un avatar seulement masqué se conteste encore, l'effacement ne le bloque pas.
     expect(hashImageFiles).not.toHaveBeenCalled();
-    expect(blockImageHashes).not.toHaveBeenCalled();
+    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
     // Relevé sous le verrou du compte, avant la ligne effacée.
     const lock = queries.findIndex((q) => q.includes("FROM bg_users WHERE id = ? FOR UPDATE"));
     const quarantine = queries.findIndex((q) => q.startsWith("SELECT logo_url FROM bg_logo_quarantines"));
@@ -184,10 +200,13 @@ describe("finalizeAccountDeletion", () => {
   });
 
   // Revue de correction #571 : le rejeu ne finalise que le compte du journal.
-  it("finalizeAccountDeletion_otherCreatedAtUnderLock_nothingDone", async () => {
+  // Revue sécurité #571, cycle 3 : levé, pour que le rejeu compte un identifiant réattribué.
+  it("finalizeAccountDeletion_otherCreatedAtUnderLock_throwsAccountReassigned", async () => {
     const { connection } = fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE } });
 
-    expect(await finalizeAccountDeletion(7, { accountCreatedAt: "2025-05-05 05:05:05" })).toBeNull();
+    await expect(finalizeAccountDeletion(7, { accountCreatedAt: "2025-05-05 05:05:05" })).rejects.toThrow(
+      "ACCOUNT_REASSIGNED",
+    );
     expect(connection.rollback).toHaveBeenCalled();
     expect(recordAccountDeletion).not.toHaveBeenCalled();
   });
@@ -207,7 +226,7 @@ describe("finalizeAccountDeletion", () => {
 
     await finalizeAccountDeletion(7);
 
-    expect(blockImageHashes).not.toHaveBeenCalled();
+    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
     expect(queries.some((q) => q.startsWith("SELECT logo_url FROM bg_logo_quarantines"))).toBe(false);
   });
 });
@@ -243,5 +262,33 @@ describe("finalizeDueAccountDeletions", () => {
     expect(String(dueCalls[0][0])).not.toContain("NOT IN");
     expect(String(dueCalls[1][0])).toContain("id NOT IN (?)");
     expect(dueCalls[1][1]).toEqual([4242]);
+  });
+
+  // Revue sécurité #571, cycle 3 (D6) : un avatar que la modération a supprimé
+  // (quarantaine PURGED à son adresse) est bloqué avant que l'effacement ne l'emporte.
+  it("finalizeAccountDeletion_eraseWithModerationPurgedAvatar_blocksHashBeforeDeleting", async () => {
+    fakeDb({
+      locked: { is_deleted: 1, deletion_requested_at: DUE },
+      heldAvatar: "/api/uploads/avatars/7-abc.webp",
+      moderationPurged: true,
+    });
+
+    expect((await finalizeAccountDeletion(7))?.mode).toBe("ERASE");
+
+    expect(String(jest.mocked(blockRemovedImageFiles).mock.calls[0][0][0]).replace(/\\/g, "/")).toMatch(
+      /public\/uploads\/avatars\/7-abc\.webp$/,
+    );
+    expect(jest.mocked(blockRemovedImageFiles).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(deleteStoredImage).mock.invocationCallOrder[0],
+    );
+  });
+
+  it("finalizeAccountDeletion_eraseWithHeldAvatarNeverModerated_doesNotBlock", async () => {
+    fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, heldAvatar: "/api/uploads/avatars/7-abc.webp" });
+
+    expect((await finalizeAccountDeletion(7))?.mode).toBe("ERASE");
+
+    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
+    expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/avatars/7-abc.webp");
   });
 });

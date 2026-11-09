@@ -5,6 +5,7 @@ import {
   formatJournalEntry,
   parseJournal,
   pruneJournal,
+  prunePreservedLines,
   withReactivationEntry,
   type AccountReactivationKey,
   type AccountDeletionEntry,
@@ -29,7 +30,7 @@ export async function readAccountDeletionJournal(
   try {
     return parseJournal(await readFile(filePath, "utf8"));
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { entries: [], invalidLines: 0 };
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { entries: [], invalidLines: 0, preserved: [] };
     throw error;
   }
 }
@@ -53,7 +54,15 @@ function enqueue<T>(task: () => Promise<T>): Promise<T> {
   return run;
 }
 
-async function writeJournal(kept: readonly AccountDeletionEntry[], filePath: string): Promise<void> {
+/**
+ * Réécrit le fichier : les lignes lues, puis celles qu'on ne sait pas lire mais
+ * qui restent dans leur durée (`ParsedJournal.preserved`), à l'identique.
+ */
+async function writeJournal(
+  kept: readonly AccountDeletionEntry[],
+  preserved: readonly string[],
+  filePath: string,
+): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   // Écrit à côté puis renommé : la synchronisation horaire du bot copie le
   // fichier sans prévenir, et un renommage est la seule écriture qu'elle ne
@@ -61,13 +70,18 @@ async function writeJournal(kept: readonly AccountDeletionEntry[], filePath: str
   // Nom unique par écriture : même sérialisées, deux écritures ne doivent
   // jamais partager un fichier temporaire.
   const temp = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
-  await writeFile(temp, kept.map(formatJournalEntry).join(""), { encoding: "utf8", mode: 0o600 });
+  const content = kept.map(formatJournalEntry).join("") + preserved.map((line) => `${line}\n`).join("");
+  await writeFile(temp, content, { encoding: "utf8", mode: 0o600 });
   await rename(temp, filePath);
 }
 
 async function writeEntry(entry: AccountDeletionEntry, filePath: string, now: Date): Promise<void> {
   const current = await readAccountDeletionJournal(filePath);
-  await writeJournal(pruneJournal([...current.entries, entry], now), filePath);
+  await writeJournal(
+    pruneJournal([...current.entries, entry], now),
+    prunePreservedLines(current.preserved, now),
+    filePath,
+  );
 }
 
 /**
@@ -90,9 +104,10 @@ export function pruneAccountDeletionJournal(
   return enqueue(async () => {
     const current = await readAccountDeletionJournal(filePath);
     const kept = pruneJournal(current.entries, now);
-    const removed = current.entries.length - kept.length;
+    const preserved = prunePreservedLines(current.preserved, now);
+    const removed = current.entries.length - kept.length + (current.preserved.length - preserved.length);
     if (removed === 0) return 0;
-    await writeJournal(kept, filePath);
+    await writeJournal(kept, preserved, filePath);
     return removed;
   });
 }
@@ -163,7 +178,11 @@ export function recordAccountReactivation(
   const now = options.now ?? new Date();
   const written = enqueue(async () => {
     const current = await readAccountDeletionJournal(filePath);
-    await writeJournal(pruneJournal(withReactivationEntry(current.entries, key, now), now), filePath);
+    await writeJournal(
+      pruneJournal(withReactivationEntry(current.entries, key, now), now),
+      prunePreservedLines(current.preserved, now),
+      filePath,
+    );
   });
   if (options.strict) return written;
   return written.catch((error: unknown) => {
