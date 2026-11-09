@@ -14,6 +14,7 @@ jest.mock("@/lib/server/logo-quarantine", () => ({
 import { getDatabase } from "@/lib/server/database";
 import { blockImageHashes, hashImageFiles } from "@/lib/server/blocked-images";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
+import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { finalizeAccountDeletion } from "@/lib/server/users/account-deletion";
 import { finalizeDueAccountDeletions } from "@/lib/server/users/deleted-accounts";
 import { fakePool } from "../../helpers/sql-double";
@@ -32,12 +33,28 @@ const RECENT = new Date(Date.now() - 3 * DAY);
 
 type Locked = { is_deleted: 0 | 1; deletion_requested_at: Date | null } | null;
 
-function fakeDb(options: { locked: Locked; played?: number; quarantined?: string[]; due?: number[]; failLock?: boolean }) {
+function fakeDb(options: {
+  locked: Locked;
+  played?: number;
+  quarantined?: string[];
+  due?: number[];
+  failLock?: boolean;
+  rollbackFails?: boolean;
+  failErase?: boolean;
+  refereed?: { matchId: number; tournamentId: number }[];
+}) {
   const queries: string[] = [];
   const execute = jest.fn(async (sql: string, _params?: unknown[]) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
     queries.push(q);
     if (options.failLock && q.includes("FROM bg_users WHERE id = ? FOR UPDATE")) throw new Error("DB_DOWN");
+    if (options.failErase && q.startsWith("DELETE FROM bg_users")) throw new Error("ERASE_FAILED");
+    if (q.startsWith("SELECT id AS match_id FROM bg_matches WHERE referee_user_id = ?")) {
+      return [(options.refereed ?? []).map((match) => ({ match_id: match.matchId }))];
+    }
+    if (q.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
+      return [(options.refereed ?? []).map((match) => ({ id: match.matchId, tournament_id: match.tournamentId, status: "READY" }))];
+    }
     if (q.startsWith("SELECT id FROM bg_users WHERE is_deleted = 1 AND deletion_requested_at IS NOT NULL")) {
       return [(options.due ?? []).map((id) => ({ id }))];
     }
@@ -54,7 +71,9 @@ function fakeDb(options: { locked: Locked; played?: number; quarantined?: string
     execute,
     beginTransaction: jest.fn(async () => {}),
     commit: jest.fn(async () => {}),
-    rollback: jest.fn(async () => {}),
+    rollback: jest.fn(async () => {
+      if (options.rollbackFails) throw new Error("CONNECTION_LOST");
+    }),
     release: jest.fn(() => {}),
   };
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, getConnection: jest.fn(async () => connection) }));
@@ -125,6 +144,28 @@ describe("finalizeAccountDeletion", () => {
     expect(lock).toBeGreaterThanOrEqual(0);
     expect(quarantine).toBeGreaterThan(lock);
     expect(erase).toBeGreaterThan(quarantine);
+  });
+
+  // Revue perf #546 cycle 2 : l'annulation qui lève ne masque pas l'erreur d'origine.
+  it("finalizeAccountDeletion_rollbackThrows_originalErrorRethrown", async () => {
+    fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, failErase: true, rollbackFails: true });
+
+    await expect(finalizeAccountDeletion(7)).rejects.toThrow("ERASE_FAILED");
+  });
+
+  // Revue sécurité EF-21 #526 : un écouteur qui lève après le commit n'empêche
+  // ni le journal ni la réponse.
+  it("finalizeAccountDeletion_publishThrows_stillJournalsAndResolves", async () => {
+    fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, refereed: [{ matchId: 5, tournamentId: 3 }] });
+    jest.mocked(publishMatchUpdatedEvent).mockImplementation(() => {
+      throw new Error("LISTENER");
+    });
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    expect((await finalizeAccountDeletion(7))?.mode).toBe("ERASE");
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(3, { landingLive: true });
+    expect(recordAccountDeletion).toHaveBeenCalledWith(expect.objectContaining({ userId: 7 }));
+    error.mockRestore();
   });
 
   it("finalizeAccountDeletion_anonymize_neitherReadsNorBlocksQuarantinedAvatar", async () => {

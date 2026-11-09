@@ -360,8 +360,11 @@ export function reactivationDeadline(requestedAt: Date | string): Date {
   return new Date(new Date(requestedAt).getTime() + ACCOUNT_REACTIVATION_DAYS * DAY_MS);
 }
 
+/** Une date relue de la base (`dateStrings`), ou son absence. */
+export type StoredDate = Date | string | null;
+
 /** La suppression demandée à `requestedAt` est-elle encore réversible à `now` ? */
-export function isReactivationWindowOpen(requestedAt: Date | string | null, now: number = Date.now()): boolean {
+export function isReactivationWindowOpen(requestedAt: StoredDate, now: number = Date.now()): boolean {
   if (requestedAt === null) return false;
   const deadline = reactivationDeadline(requestedAt).getTime();
   return Number.isFinite(deadline) && now < deadline;

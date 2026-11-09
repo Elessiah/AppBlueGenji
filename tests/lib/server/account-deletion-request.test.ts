@@ -163,7 +163,7 @@ beforeEach(() => {
   jest.mocked(loadAccountTrace).mockResolvedValue(NO_TRACE);
   jest.mocked(withdrawSoloRegistrationsOn).mockResolvedValue([]);
   jest.mocked(listForfeitableSoloEntries).mockResolvedValue([]);
-  jest.mocked(forfeitSoloEntriesAfterCommit).mockResolvedValue(undefined);
+  jest.mocked(forfeitSoloEntriesAfterCommit).mockResolvedValue(0);
   jest.mocked(logDeletionWithdrawal).mockResolvedValue(undefined);
   jest.mocked(withdrawUserCasts).mockResolvedValue({ matchIds: [], tournamentIds: [] });
   jest.mocked(lockMemberRoles).mockResolvedValue(["OWNER", "DPS"]);
@@ -458,6 +458,7 @@ describe("requestAccountDeletion — journal et forfaits (E1, E5)", () => {
     jest.mocked(listForfeitableSoloEntries).mockResolvedValue([{ tournamentId: 5, teamId: 50 }]);
     jest.mocked(forfeitSoloEntriesAfterCommit).mockImplementation(async () => {
       order.push("forfeit");
+      return 1;
     });
     const { connection } = fakeDb({});
     connection.commit.mockImplementation(async () => {

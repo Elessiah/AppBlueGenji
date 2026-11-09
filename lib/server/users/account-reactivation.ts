@@ -6,6 +6,7 @@ import {
   isReactivationWindowOpen,
   REACTIVATION_TICKET_MINUTES,
   reactivationDeadline,
+  type StoredDate,
 } from "@/lib/shared/account-deletion";
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
 import { recordAccountReactivation } from "@/lib/server/account-deletion-journal";
@@ -42,9 +43,6 @@ export class AccountPendingDeletionError extends Error {
     this.name = "AccountPendingDeletionError";
   }
 }
-
-/** Une date relue de la base (`dateStrings`), ou son absence. */
-type StoredDate = string | Date | null;
 
 function hashTicket(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");

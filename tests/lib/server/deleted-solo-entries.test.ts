@@ -172,7 +172,7 @@ describe("forfeitSoloEntriesAfterCommit", () => {
     fakeDb({ format: "SWISS" });
     jest.mocked(forfeitTournamentTeam).mockRejectedValueOnce(new Error("ENGINE_DOWN"));
 
-    await expect(forfeitSoloEntriesAfterCommit([{ tournamentId: 4, teamId: 40 }])).resolves.toBeUndefined();
+    await expect(forfeitSoloEntriesAfterCommit([{ tournamentId: 4, teamId: 40 }])).resolves.toBe(0);
     expect(sendBotLog).not.toHaveBeenCalled();
     log.mockRestore();
   });

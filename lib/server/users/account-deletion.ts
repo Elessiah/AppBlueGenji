@@ -6,6 +6,7 @@ import {
   type AccountTrace,
   isReactivationWindowOpen,
   type SoloRegistrationFact,
+  type StoredDate,
   withdrawableSoloRegistrations,
 } from "@/lib/shared/account-deletion";
 import { isReferencedRowError } from "@/lib/server/mysql-errors";
@@ -87,7 +88,11 @@ export function accountTraceSql(): {
     // L'entrée solo compte dès qu'elle est **inscrite**, jouée ou non : son nom
     // d'engagé est le pseudo du joueur, et elle n'a pas de clé étrangère (une
     // cascade effacerait l'engagé, et avec lui l'historique des matchs) —
-    // effacer le compte la laisserait nommer quelqu'un qui n'existe plus. Une
+    // effacer le compte la laisserait nommer quelqu'un qui n'existe plus. Règle
+    // brute, d'avant D12 : la suppression (`loadAccountDeletionFacts`) la
+    // corrige ensuite en retirant les inscriptions à un tournoi pas encore
+    // commencé, sans match ; le rattrapage (`reconcileDeletedAccounts`) la
+    // garde telle quelle (conservateur). Une
     // entrée jamais inscrite part avec le compte (eraseAccount). Question à
     // part de `played` parce que sa phrase l'est : une inscription jamais
     // jouée ne laisse aucune statistique à conserver.
@@ -352,8 +357,14 @@ async function applyDeletionMode(
   return { withdrawal, withdrawnFrom: [], quarantinedFiles: [] };
 }
 
-/** Une date relue de la base (`dateStrings`), ou son absence. */
-type StoredDate = Date | string | null;
+/** Prévient un tournoi après le commit ; un écouteur qui lève est consigné, jamais propagé. */
+function publishAfterCommit(publish: () => void, tournamentId: number): void {
+  try {
+    publish();
+  } catch (error) {
+    console.error(`[account-deletion] Tournoi #${tournamentId} non prévenu :`, error);
+  }
+}
 
 /** La suppression définitive est due : demande relevée il y a trente jours ou plus, compte toujours en attente. */
 function deletionIsDue(row: { is_deleted: 0 | 1; deletion_requested_at: StoredDate } | undefined): boolean {
@@ -514,7 +525,9 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
 
     await connection.commit();
   } catch (error) {
-    await connection.rollback();
+    // Sur une connexion morte, l'annulation lève à son tour : gardée, pour que
+    // l'erreur d'origine (dont `ACCOUNT_STILL_REFERENCED`) reste celle rendue.
+    await connection.rollback().catch(() => {});
     // Une clé étrangère en `RESTRICT` peut encore refuser l'effacement : ses
     // contrôles lisent la dernière version commitée et non l'instantané de la
     // transaction, donc un tournoi créé après la lecture des traces retient la
@@ -536,11 +549,15 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
   // sinon son cast, le lien de sa chaîne ou « Arbitre désigné » jusqu'à la
   // prochaine écriture du match ; l'évènement remet aussi à jour le message
   // #live de la soirée (`publishMatchUpdatedEvent`), qui portait ce lien.
-  for (const tournamentId of touchedTournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  // La suppression est commitée : un écouteur qui lève ne doit ni la faire lire
+  // comme un échec, ni sauter le ménage de l'avatar et la ligne du journal.
+  for (const tournamentId of touchedTournaments) {
+    publishAfterCommit(() => publishMatchUpdatedEvent(tournamentId, { landingLive: true }), tournamentId);
+  }
 
   // Le plateau des tournois dont l'inscription solo est partie (D12) : la liste
   // des engagés, l'aperçu du tirage et les instantanés ouverts.
-  for (const tournamentId of withdrawnFrom) publishUpdatedEvent(tournamentId);
+  for (const tournamentId of withdrawnFrom) publishAfterCommit(() => publishUpdatedEvent(tournamentId), tournamentId);
 
   // L'accueil, lu sans compte, garde en cache des vues qui nomment l'entrée
   // solo du compte (bandeau, mini-arbre, leaderboard) et le compteur de

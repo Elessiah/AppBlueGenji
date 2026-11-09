@@ -25,27 +25,25 @@ export type DeletedAccountsReconciliation = {
 /**
  * Applique à un compte supprimé, verrouillé, la règle d'aujourd'hui : effacé
  * s'il n'a rien laissé, sinon anonymisé s'il porte encore l'ancien pseudo ou
- * des droits. Compte le geste dans `outcome` ; rend les tournois dont un match
+ * des droits. Rend le geste fait — compté par l'appelant **après** le commit,
+ * un commit en échec ne comptant pas deux fois — et les tournois dont un match
  * le nommait, à prévenir après le commit.
  */
 async function settleDeletedAccount(
   connection: PoolConnection,
   userId: number,
   row: { pseudo: string; is_admin: 0 | 1; platform_roles_json: unknown },
-  outcome: DeletedAccountsReconciliation,
-): Promise<number[]> {
+): Promise<{ gesture: "erased" | "renamed" | null; tournamentIds: number[] }> {
   const plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
   if (plan.mode === "ERASE") {
     const { tournamentIds } = await eraseAccount(connection, userId);
-    outcome.erased += 1;
-    return tournamentIds;
+    return { gesture: "erased", tournamentIds };
   }
   if (isLegacyDeletedPseudo(row.pseudo) || Number(row.is_admin) === 1 || row.platform_roles_json !== null) {
     const { tournamentIds } = await anonymizeAccount(connection, userId);
-    outcome.renamed += 1;
-    return tournamentIds;
+    return { gesture: "renamed", tournamentIds };
   }
-  return [];
+  return { gesture: null, tournamentIds: [] };
 }
 
 
@@ -143,8 +141,9 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
         await connection.rollback();
         continue;
       }
-      const tournamentIds = await settleDeletedAccount(connection, userId, row, outcome);
+      const { gesture, tournamentIds } = await settleDeletedAccount(connection, userId, row);
       await connection.commit();
+      if (gesture) outcome[gesture] += 1;
       for (const tournamentId of tournamentIds) touchedTournaments.add(tournamentId);
     } catch (error) {
       // Sur une connexion morte — la panne même qu'on traite —, l'annulation
@@ -165,7 +164,14 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
   // de l'accueil qui nomment une entrée solo ne gardent pas l'ancien pseudo.
   if (outcome.erased + outcome.renamed > 0) invalidateTeamIdentityViews();
   // Et les matchs qui le nommaient (caster, lien, arbitre), comme `deleteOwnAccount`.
-  for (const tournamentId of touchedTournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  // Un écouteur qui lève ne transforme pas un rattrapage fait en échec.
+  for (const tournamentId of touchedTournaments) {
+    try {
+      publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+    } catch (error) {
+      console.error(`[deleted-accounts] Tournoi #${tournamentId} non prévenu :`, error);
+    }
+  }
   return outcome;
 }
 

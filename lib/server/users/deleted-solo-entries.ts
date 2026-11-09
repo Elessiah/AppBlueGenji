@@ -247,9 +247,11 @@ export async function logDeletionWithdrawal(tournamentId: number, forfeited: boo
 /**
  * Forfait de chaque entrée, une à une et au meilleur effort : un échec est dit
  * et reporté au prochain passage, sans empêcher les suivantes. Jamais levé.
- * Rend le nombre de tournois où un forfait a été posé.
+ * Rend le nombre de tournois où un forfait a été posé. Appelé après le commit
+ * de la demande, et par le passage horaire (`settleDeletedSoloEntries`), qui
+ * reprend tout échec.
  */
-async function forfeitEntries(entries: readonly DeletionWithdrawal[]): Promise<number> {
+export async function forfeitSoloEntriesAfterCommit(entries: readonly DeletionWithdrawal[]): Promise<number> {
   let forfeited = 0;
   for (const entry of entries) {
     try {
@@ -266,12 +268,6 @@ async function forfeitEntries(entries: readonly DeletionWithdrawal[]): Promise<n
     }
   }
   return forfeited;
-}
-
-/** Les forfaits posés après le commit d'une demande, au meilleur effort ; jamais levé. */
-export async function forfeitSoloEntriesAfterCommit(entries: readonly DeletionWithdrawal[]): Promise<void> {
-  // Reportés au prochain passage horaire (`settleDeletedSoloEntries`) en cas d'échec.
-  await forfeitEntries(entries);
 }
 
 /**
@@ -315,7 +311,7 @@ export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; f
         await logDeletionWithdrawal(entry.tournamentId, false);
       }
       // Un tournoi qui échoue n'empêche pas les suivants du même compte.
-      outcome.forfeited += await forfeitEntries(await listForfeitableSoloEntries(db, userId));
+      outcome.forfeited += await forfeitSoloEntriesAfterCommit(await listForfeitableSoloEntries(db, userId));
     } catch (error) {
       console.error(
         `[deleted-accounts] Inscriptions solo du compte #${userId} reportées au prochain passage :`,
