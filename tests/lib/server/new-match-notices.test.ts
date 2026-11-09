@@ -227,7 +227,57 @@ describe("dispatchNewMatchNotices", () => {
     expect(sql).toContain("INSERT IGNORE INTO bg_new_match_notices");
     expect(sql).toContain("LEAST(m.team1_id, m.team2_id)");
     expect(sql).toContain("m.launched_at IS NULL");
-    expect(params).toEqual([40, 1, 2]);
+    expect(sql).toContain("JOIN bg_teams t1 ON t1.id = m.team1_id");
+    expect(sql).toContain("m.start_at <=> ?");
+    expect(params).toEqual([40, 1, 2, null, 0, 0]);
+  });
+
+  it("dispatch_scheduledWithinCheckInWindow_leavesCheckInReminderToTheSweep", async () => {
+    const db = mockDb({ candidates: [{ ...MATCH, start_at: new Date(Date.now() + 5 * 3600 * 1000) }] });
+
+    await dispatchNewMatchNotices();
+
+    expect(reminderMarks(db)).not.toContain("PT10H");
+  });
+
+  it("dispatch_markClaimThrows_continuesWithNextMatch", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const db = mockDb({
+      candidates: [
+        { ...MATCH, start_at: new Date(Date.now() + 3 * 24 * 3600 * 1000) },
+        { ...MATCH, id: 41, team1_id: 3, team2_id: 4 },
+      ],
+    });
+    const fallback = db.execute.getMockImplementation();
+    db.execute.mockImplementation(async (sql, params) => {
+      if (sql.trim().startsWith("INSERT IGNORE INTO bg_match_reminders")) throw new Error("ER_LOCK_DEADLOCK");
+      return fallback!(sql, params);
+    });
+
+    await dispatchNewMatchNotices();
+
+    expect(claimCalls(db).map(([, params]) => (params as unknown[])[0])).toEqual([41]);
+    expect(error).toHaveBeenCalledWith(expect.stringContaining("annonce en échec (match 40)"), expect.anything());
+    error.mockRestore();
+  });
+
+  it("dispatch_recipients_loadedPerMatchForItsTwoEntrants", async () => {
+    mockDb({ candidates: [MATCH, { ...MATCH, id: 41, team1_id: 3, team2_id: 4 }] });
+
+    await dispatchNewMatchNotices();
+
+    expect(loadEntrantPlayerIds).toHaveBeenCalledWith([1, 2]);
+    expect(loadEntrantPlayerIds).toHaveBeenCalledWith([3, 4]);
+  });
+
+  it("installNewMatchNotices_firstRun_skipsOnlyMatchesPairedBeforeProcessStart", async () => {
+    const db = mockDb({ installed: false });
+
+    await dispatchNewMatchNotices();
+
+    const [sql, params] = db.execute.mock.calls.find(([text]) => text.includes("m.updated_at < ?")) ?? [];
+    expect(sql).toContain("INSERT IGNORE INTO bg_new_match_notices");
+    expect(params).toEqual([expect.any(Date)]);
   });
 
   it("dispatch_ghostSide_skipsGhost", async () => {

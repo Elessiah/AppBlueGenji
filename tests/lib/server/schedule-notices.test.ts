@@ -19,6 +19,7 @@ import { forgetStaffPush, markStaffPushed, releaseStaffPush } from "@/lib/server
 import { notifyStaff } from "@/lib/server/notify";
 import { auditStaffAction, publishStaffAction } from "@/lib/server/staff-audit";
 import { announceMatchSchedule, announceMatchScheduleCleared } from "@/lib/server/tournaments/match-reminders";
+import { dispatchNewMatchNotices } from "@/lib/server/tournaments/new-match-notices";
 import {
   heldStartAt,
   announceDeletedMatchesToStaff,
@@ -142,6 +143,18 @@ describe("notifyMatchScheduleChange — première date", () => {
     expect(line).toContain("par le staff");
     expect(line).not.toContain("au lieu du");
     expect(line).not.toContain(ACTOR.pseudo);
+  });
+});
+
+describe("notifyMatchScheduleChange — annonce de nouveau match en attente", () => {
+  it("notifyMatchScheduleChange_newMatchNoticePending_noPlayerAnnouncementAndSweepTriggered", async () => {
+    mockMatch({ ...ROW, new_match_pending: 1 });
+
+    await notifyMatchScheduleChange(change());
+
+    expect(announceMatchSchedule).not.toHaveBeenCalled();
+    expect(dispatchNewMatchNotices).toHaveBeenCalledTimes(1);
+    expect(notifyStaff).toHaveBeenCalledTimes(1);
   });
 });
 

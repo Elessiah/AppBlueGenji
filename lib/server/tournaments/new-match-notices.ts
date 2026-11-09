@@ -42,7 +42,9 @@ import {
 import { toIso } from "@/lib/server/serialization";
 import { siteUrl } from "@/lib/server/site-url";
 import { throttledSweep } from "@/lib/server/throttled-sweep";
+import { inBatches } from "@/lib/shared/in-batches";
 import {
+  CHECK_IN_REMINDER_KEY,
   MATCH_DM_SETTINGS_PATH,
   MATCH_SEEN_KEY,
   MATCH_TOLD_KEY,
@@ -59,6 +61,8 @@ import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 const NEW_MATCH_THROTTLE_MS = 10_000;
 /** Matchs annoncés au plus par passage ; le reste attend le suivant. */
 export const NEW_MATCH_BATCH = 50;
+/** Matchs annoncés en parallèle, comme le balayage des rappels. */
+const NEW_MATCH_CONCURRENCY = 4;
 
 export type NewMatchCandidateRow = RowDataPacket & {
   id: number;
@@ -81,6 +85,12 @@ export type NewMatchCandidateRow = RowDataPacket & {
 export const NEW_MATCH_SINCE_KEY = "new_match_notices_since";
 
 let installed = false;
+/**
+ * Démarrage du processus (le déploiement le relance) : seuls les matchs
+ * appariés **avant** sont marqués `skipped` à la mise en service — un match
+ * apparié entre le redémarrage et le premier balayage reste annoncé.
+ */
+const PROCESS_STARTED_AT = new Date();
 
 /**
  * Mise en service, **une seule fois** par base : les matchs déjà appariés des
@@ -101,7 +111,9 @@ export async function installNewMatchNotices(db: Pool): Promise<void> {
        SELECT m.tournament_id, m.phase_id, m.bracket, m.round_number, m.match_number, ${PAIRING_SQL}, 1
          FROM bg_matches m
          JOIN bg_tournaments t ON t.id = m.tournament_id
-        WHERE t.state = 'RUNNING' AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL`,
+        WHERE t.state = 'RUNNING' AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
+          AND m.updated_at < ?`,
+      [PROCESS_STARTED_AT],
     );
     await db.execute(
       `INSERT IGNORE INTO bg_settings (setting_key, setting_value) VALUES (?, DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'))`,
@@ -117,6 +129,8 @@ export async function installNewMatchNotices(db: Pool): Promise<void> {
  * était parti — observation, horaire reçu, paliers déjà ouverts. L'annonce
  * porte l'horaire ; « Match programmé » ne part plus que pour une
  * (re)programmation ultérieure. Une marque déjà prise (concurrence) est laissée.
+ * Le palier du check-in (10 h) n'est **jamais** pris ici : l'annonce ne porte
+ * pas le check-in, le rappel de 10 h le portera.
  */
 export async function coverMatchSchedule(row: NewMatchCandidateRow, now: Date = new Date()): Promise<void> {
   if (row.start_at === null) return;
@@ -126,7 +140,13 @@ export async function coverMatchSchedule(row: NewMatchCandidateRow, now: Date = 
     team1_id: Number(row.team1_id),
     team2_id: Number(row.team2_id),
   };
-  const keys = [MATCH_SEEN_KEY, MATCH_TOLD_KEY, ...openedMatchReminders(row.start_at, now).map((offset) => offset.key)];
+  const keys = [
+    MATCH_SEEN_KEY,
+    MATCH_TOLD_KEY,
+    ...openedMatchReminders(row.start_at, now)
+      .map((offset) => offset.key)
+      .filter((key) => key !== CHECK_IN_REMINDER_KEY),
+  ];
   for (const key of keys) await claimDatedMark(match, key);
 }
 
@@ -148,25 +168,32 @@ async function loadCandidates(db: Pool): Promise<NewMatchCandidateRow[]> {
 }
 
 /**
- * Réserve l'annonce **si le match a toujours ces engagées et reste à
- * annoncer** : une instruction, relue dans l'instruction même. Un réappariement
- * ou un score entre la lecture et la réservation ne laisse ni annonce périmée,
- * ni annonce aux anciennes équipes.
+ * Réserve l'annonce **si le match est toujours celui qui a été lu** — mêmes
+ * engagées (existantes, fantômes ou non comme lues), même horaire — et reste à
+ * annoncer : une instruction, relue dans l'instruction même. Un réappariement,
+ * un score, un horaire posé ou une équipe supprimée entre la lecture et la
+ * réservation ne laisse ni annonce périmée, ni annonce aux anciennes équipes :
+ * le passage suivant relit le match.
  */
-export async function claimNewMatchNotice(
-  db: Pool,
-  matchId: number,
-  team1Id: number,
-  team2Id: number,
-): Promise<boolean> {
+export async function claimNewMatchNotice(db: Pool, row: NewMatchCandidateRow): Promise<boolean> {
   const [result] = await db.execute(
     `INSERT IGNORE INTO bg_new_match_notices
        (tournament_id, phase_id, bracket, round_number, match_number, pairing, skipped)
      SELECT m.tournament_id, m.phase_id, m.bracket, m.round_number, m.match_number, ${PAIRING_SQL}, 0
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
-      WHERE m.id = ? AND m.team1_id = ? AND m.team2_id = ? AND ${ANNOUNCEABLE_SQL}`,
-    [matchId, team1Id, team2Id],
+       JOIN bg_teams t1 ON t1.id = m.team1_id
+       JOIN bg_teams t2 ON t2.id = m.team2_id
+      WHERE m.id = ? AND m.team1_id = ? AND m.team2_id = ? AND m.start_at <=> ?
+        AND t1.is_ghost = ? AND t2.is_ghost = ? AND ${ANNOUNCEABLE_SQL}`,
+    [
+      Number(row.id),
+      Number(row.team1_id),
+      Number(row.team2_id),
+      row.start_at,
+      Number(row.team1_ghost),
+      Number(row.team2_ghost),
+    ],
   );
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
@@ -220,31 +247,39 @@ async function announce(
   return sides;
 }
 
+/**
+ * Un match : destinataires lus **avant** la réservation (une panne de lecture
+ * n'en consomme aucune) et au plus près de l'envoi (un membre parti pendant un
+ * long passage n'est plus prévenu). Comptes supprimés écartés par
+ * `loadNotificationRecipients` ; interrupteur des messages privés de match lu.
+ * Toute erreur reste à ce match.
+ */
+async function sweepOne(db: Pool, row: NewMatchCandidateRow): Promise<number> {
+  try {
+    const playersByTeam = await loadEntrantPlayerIds([Number(row.team1_id), Number(row.team2_id)]);
+    const recipients = await loadNotificationRecipients([...playersByTeam.values()].flat(), "certified", {
+      matchDm: true,
+    });
+    const recipientsById = new Map(recipients.map((recipient) => [recipient.userId, recipient]));
+    await coverMatchSchedule(row);
+    if (!(await claimNewMatchNotice(db, row))) return 0;
+    // Réservation gardée en cas d'échec : une annonce manquée ne se répète pas en boucle.
+    return await announce(row, playersByTeam, recipientsById);
+  } catch (error) {
+    console.error(`[new-match] annonce en échec (match ${row.id})`, failureReason(error));
+    return 0;
+  }
+}
+
 async function sweepNewMatches(): Promise<number> {
   const db = await getDatabase();
   await installNewMatchNotices(db);
   const candidates = await loadCandidates(db);
   if (candidates.length === 0) return 0;
-  // Destinataires lus pour tous les matchs **avant** toute réservation : une
-  // panne de lecture ne consomme aucune annonce. Comptes supprimés écartés par
-  // `loadNotificationRecipients` ; interrupteur des messages privés de match lu.
-  const teamIds = candidates.flatMap((row) => [Number(row.team1_id), Number(row.team2_id)]);
-  const playersByTeam = await loadEntrantPlayerIds(teamIds);
-  const recipients = await loadNotificationRecipients([...playersByTeam.values()].flat(), "certified", {
-    matchDm: true,
-  });
-  const recipientsById = new Map(recipients.map((recipient) => [recipient.userId, recipient]));
   let announced = 0;
-  for (const row of candidates) {
-    await coverMatchSchedule(row);
-    if (!(await claimNewMatchNotice(db, Number(row.id), Number(row.team1_id), Number(row.team2_id)))) continue;
-    try {
-      announced += await announce(row, playersByTeam, recipientsById);
-    } catch (error) {
-      // Réservation gardée : une annonce manquée ne se répète pas en boucle.
-      console.error(`[new-match] annonce en échec (match ${row.id})`, failureReason(error));
-    }
-  }
+  await inBatches(candidates, NEW_MATCH_CONCURRENCY, async (row) => {
+    announced += await sweepOne(db, row);
+  });
   // Lot plein : il en reste peut-être, le passage suivant les prendra.
   if (candidates.length === NEW_MATCH_BATCH) sweeps.schedule(NEW_MATCH_THROTTLE_MS);
   return announced;

@@ -58,8 +58,13 @@ tournoi, `affectedRows`), avant l'envoi. Ainsi :
   régénérée) : rien de plus ;
 - une autre affiche à la même place (retour arrière puis autre vainqueur) :
   c'est un autre adversaire, annoncé ;
-- destinataires lus **avant** toute réservation : une panne de lecture ne
-  consomme rien ; un bot injoignable consomme l'annonce (journal pm2), comme les
+- la réservation relit aussi l'horaire et les équipes (existantes, fantômes
+  ou non comme lues) : un horaire posé, une équipe supprimée entre la lecture
+  et la réservation font relire le match au passage suivant ;
+- destinataires lus **match par match, juste avant** sa réservation (quatre
+  matchs à la fois) : une panne de lecture ne consomme rien, et un membre parti
+  pendant un long passage n'est plus prévenu ; l'erreur d'un match (marque,
+  réservation, envoi) ne retient pas les autres ; un bot injoignable consomme l'annonce (journal pm2), comme les
   rappels — une annonce manquée ne se répète pas en boucle.
 
 ## Première manche et horaire déjà posé (décisions du 2026-11-09)
@@ -67,14 +72,24 @@ tournoi, `affectedRows`), avant l'envoi. Ainsi :
 - **Toutes les manches sont annoncées**, première comprise. Seuls les matchs
   déjà appariés à la **mise en service** sont marqués `skipped`
   (`installNewMatchNotices`, une fois par base : marques d'abord, puis la clé
-  `new_match_notices_since` de `bg_settings`).
+  `new_match_notices_since` de `bg_settings`) — et seulement ceux modifiés
+  avant le démarrage du processus (`updated_at`) : un match apparié entre le
+  redémarrage et le premier balayage reste annoncé.
 - **L'annonce part à l'appariement**, avant qu'on puisse programmer le match :
   tout évènement de tournoi publié après commit relance le balayage (10 s
   d'étranglement au plus).
 - **Horaire déjà posé** (programme de manche fixé à l'avance) : l'annonce le
   donne, et `coverMatchSchedule` pose d'abord les marques des rappels
-  (observation `SEEN`, horaire reçu `TOLD`, paliers déjà ouverts) — « Match
-  programmé » ne part pas pour cet horaire. Le balayage des rappels ignore un
+  (observation `SEEN`, horaire reçu `TOLD`, paliers déjà ouverts **sauf celui
+  du check-in**, 10 h : l'annonce ne porte pas le check-in, le rappel de 10 h
+  suit et le porte) — « Match programmé » ne part pas pour cet horaire. Un
+  horaire posé par un arbitre sur un match qui attend encore son annonce
+  (`setMatchStartAt` → `notifyMatchScheduleChange`) n'envoie pas non plus
+  « Match programmé » aux joueurs : il relance le balayage, et l'annonce porte
+  l'horaire (les arbitres sont prévenus comme d'habitude).
+- Couper le sujet `NEW_MATCH` (ou les messages privés de match) coupe aussi
+  l'horaire donné à l'appariement : seuls les rappels de 24 h et 10 h le
+  redonnent ensuite. Le balayage des rappels ignore un
   match qui attend son annonce (`NEW_MATCH_PENDING_SQL`,
   `lib/server/tournaments/new-match-sql.ts`). « Match programmé » ne part que
   pour une (re)programmation ultérieure (`setMatchStartAt`).

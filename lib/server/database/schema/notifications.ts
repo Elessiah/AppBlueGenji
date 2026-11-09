@@ -154,8 +154,10 @@ ${MATCH_PLACE_COLUMNS}        team_id BIGINT NOT NULL,
   // les deux engagées sans ordre, `5:7`). La place plutôt que l'id : un match
   // effacé puis recréé avec la même affiche n'est pas réannoncé. `skipped` : match
   // déjà apparié à la mise en service (clé `new_match_notices_since` de
-  // `bg_settings`). Part avec le tournoi.
-  await createQuietly(db, `
+  // `bg_settings`). Part avec le tournoi. Créée **sans** `catch` muet : le
+  // balayage des rappels la lit (`NEW_MATCH_PENDING_SQL`), son absence les
+  // ferait taire tous.
+  await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_new_match_notices (
 ${MATCH_PLACE_COLUMNS}        pairing VARCHAR(48) NOT NULL,
         skipped TINYINT(1) NOT NULL DEFAULT 0,
