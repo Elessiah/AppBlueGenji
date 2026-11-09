@@ -71,14 +71,18 @@ function rowFor<R extends VoiceRow>(rows: readonly R[], matchId: number, teamId:
 }
 
 /**
- * Heure de la base (ms) : la seule horloge des règles des salons (publication, échéance), celle
- * que lisent `DUE_CHANNELS_SQL`, `OPEN_DUE_CHANNELS_SQL` et `RELEASABLE_SQL` — un écart d'horloge
- * entre le site et la base ne fait pas diverger l'affichage du balayage.
+ * Ligne de l'instantané : l'heure de la base (`db_now`) — la seule horloge des règles des salons
+ * (option, échéance), celle que lisent `DUE_CHANNELS_SQL`, `OPEN_DUE_CHANNELS_SQL` et
+ * `RELEASABLE_SQL` — lue dans la même requête que les salons ; colonnes du salon nulles si aucun.
  */
-async function databaseNow(connection: PoolConnection): Promise<number> {
-  const [rows] = await connection.execute<(RowDataPacket & { db_now: Date | string })[]>("SELECT NOW() AS db_now");
-  return new Date(rows[0].db_now).getTime();
-}
+type ClockedVoiceRow = RowDataPacket & {
+  db_now: Date | string;
+  match_id: number | null;
+  team_id: number | null;
+  channel_id: string | null;
+  failed_at: Date | string | null;
+  released_at: Date | string | null;
+};
 
 /** Match jouable (prêt ou score en attente de confirmation) entre deux équipes : seul à pouvoir montrer des salons. */
 function voicePlayable(match: VoiceSnapshotMatch): boolean {
@@ -86,18 +90,37 @@ function voicePlayable(match: VoiceSnapshotMatch): boolean {
 }
 
 /**
- * États des salons des matchs d'un tournoi pour l'instantané, jugés à l'heure de la base
- * (`databaseNow`), lue seulement si l'option peut valoir (allumée, tournoi en cours) et qu'un
- * match est jouable — une reconstruction sans salon possible ne coûte aucune lecture : vide sinon.
+ * États des salons des matchs d'un tournoi pour l'instantané, jugés à l'heure de la base, lue
+ * avec les salons des matchs jouables en une requête (`ClockedVoiceRow`) — seulement si l'option
+ * peut valoir (allumée, tournoi en cours) et qu'un match est jouable : une reconstruction sans
+ * salon possible ne coûte aucune lecture, vide sinon.
  */
 export async function loadTournamentVoiceInfos(
   connection: PoolConnection,
   tournament: { teamVoiceChannels: boolean; state: string; startVisibilityAt: string | null },
   matches: readonly VoiceSnapshotMatch[],
 ): Promise<Map<number, MatchVoiceInfo>> {
-  if (!tournament.teamVoiceChannels || tournament.state !== "RUNNING" || !matches.some(voicePlayable)) return new Map();
-  const now = await databaseNow(connection);
-  return loadMatchVoiceInfos(connection, voiceOptionLive(tournament, now), matches, now);
+  const playableIds = matches.filter(voicePlayable).map((match) => match.id);
+  if (!tournament.teamVoiceChannels || tournament.state !== "RUNNING" || playableIds.length === 0) return new Map();
+  let rows: ClockedVoiceRow[];
+  try {
+    [rows] = await connection.execute<ClockedVoiceRow[]>(
+      `SELECT n.db_now, v.match_id, v.team_id, v.channel_id, v.failed_at, v.released_at
+       FROM (SELECT NOW() AS db_now) n
+       LEFT JOIN bg_match_voice_channels v
+         ON v.match_id IN (${sqlPlaceholders(playableIds.length)}) AND v.released_at IS NULL`,
+      playableIds,
+    );
+  } catch (error) {
+    // Table absente (création avalée au démarrage) : aucun salon.
+    if (isMissingTableError(error)) return new Map();
+    throw error;
+  }
+  const now = new Date(rows[0].db_now).getTime();
+  const enabled = voiceOptionLive(tournament, now);
+  const candidates = enabled ? matches.filter((match) => voicePlayable(match) && voiceChannelsDue(match.startAt, now)) : [];
+  const channelRows = rows.filter((row): row is ClockedVoiceRow & VoiceRow => row.match_id !== null);
+  return voiceInfosFromRows(connection, enabled, candidates, channelRows);
 }
 
 /** Ce que l'instantané lit d'un match pour dire l'état de ses salons. */
@@ -114,7 +137,7 @@ type VoiceTeamRow = RowDataPacket & { id: number; solo: number | null; ghost: nu
 /**
  * Salons des matchs d'un instantané, deux lectures pour les seuls matchs
  * concernés — et aucune quand l'option est éteinte, le tournoi pas en cours ou
- * pas encore publié (`enabled`, `voiceOptionLive`). `now` : l'heure de la base (`databaseNow`), la même
+ * pas encore publié (`enabled`, `voiceOptionLive`). `now` : l'heure de la base (`db_now`), la même
  * horloge que le balayage (`DUE_CHANNELS_SQL`), pour l'option comme pour l'échéance. Seul un match jouable (prêt ou score en attente de
  * confirmation), programmé, et dont les salons sont dus, en montre — lancé ou
  * non : le lancement n'en dépend pas, et les salons restent jusqu'au score.
@@ -143,6 +166,18 @@ export async function loadMatchVoiceInfos(
     if (isMissingTableError(error)) return result;
     throw error;
   }
+  return voiceInfosFromRows(connection, enabled, candidates, rows);
+}
+
+/** États des salons des matchs candidats (jouables, salons dus), d'après leurs lignes ouvertes. */
+async function voiceInfosFromRows(
+  connection: PoolConnection,
+  enabled: boolean,
+  candidates: readonly VoiceSnapshotMatch[],
+  rows: readonly VoiceRow[],
+): Promise<Map<number, MatchVoiceInfo>> {
+  const result = new Map<number, MatchVoiceInfo>();
+  if (candidates.length === 0) return result;
   const teamIds = [...new Set(candidates.flatMap((match) => [Number(match.team1Id), Number(match.team2Id)]))];
   const [teamRows] = await connection.execute<VoiceTeamRow[]>(
     `SELECT id, solo_user_id IS NOT NULL AS solo, is_ghost AS ghost FROM bg_teams WHERE id IN (${sqlPlaceholders(teamIds.length)})`,
@@ -535,6 +570,9 @@ async function releaseOne(row: ReleaseRow): Promise<ReleaseVerdict> {
   const key = voiceChannelKey(matchId, Number(row.team_id));
   const answer =
     row.channel_id === null ? await releaseVoiceChannelByKey(key) : await releaseVoiceChannel(String(row.channel_id));
+  // Coupe-circuit ouvert (journal, annonces) : le bot n'a pas été appelé, rien ne dit que ce rendu
+  // a échoué — la ligne n'est pas repoussée, la passe s'arrête (comme `createTeamChannel`).
+  if (answer.kind === "unavailable" && answer.code === "BOT_CIRCUIT_OPEN") return { close: false, stop: true };
   // Route par clé absente (bot plus ancien) : le bot n'a pas répondu pour ce salon, son refus
   // global éventuel n'est pas rejournalisé.
   if (answer.kind !== "unavailable") botAnswered();
@@ -559,14 +597,24 @@ async function releaseOne(row: ReleaseRow): Promise<ReleaseVerdict> {
   // Salon toujours pas rendu passé `VOICE_BOT_UNRELEASED_MAX_HOURS` : la ligne reste (le salon peut
   // exister), redemandée toutes les `VOICE_STUCK_RETRY_SECONDS` ; une seule ligne pm2 pour ce salon.
   if (Number(row.bot_expired ?? 0) === 1) logRefusalOnce(`stuck:${key}`, "STUCK", () => logStuckRelease(matchId));
-  // Redemandé après `VOICE_RETRY_SECONDS`, en fin de file : un rendu qui échoue n'affame pas
-  // les autres. Seulement si la ligne porte encore ce salon (autre processus).
-  await runWrite(
-    `UPDATE bg_match_voice_channels SET failed_at = NOW()
-     WHERE match_id = ? AND team_id = ? AND released_at IS NULL AND channel_id <=> ?`,
-    [matchId, Number(row.team_id), row.channel_id === null ? null : String(row.channel_id)],
-  );
+  await stampReleaseFailure(row, down);
   return { close: false, stop: down, keyRouteMissing: routeMissing };
+}
+
+/**
+ * Note l'échec du rendu d'une ligne : redemandée après `VOICE_RETRY_SECONDS`, en fin de file (un
+ * rendu qui échoue n'affame pas les autres) ; passé `VOICE_BOT_UNRELEASED_MAX_HOURS`, après
+ * `VOICE_STUCK_RETRY_SECONDS` — sauf panne du bot entier (`botWide`) : rien ne vise ce salon, il
+ * garde l'attente courte. Seulement si la ligne porte encore ce salon (autre processus).
+ */
+async function stampReleaseFailure(row: ReleaseRow, botWide: boolean): Promise<void> {
+  await runWrite(
+    `UPDATE bg_match_voice_channels
+        SET failed_at = IF(? AND created_at < NOW() - INTERVAL ${VOICE_BOT_UNRELEASED_MAX_HOURS} HOUR,
+                           NOW() - INTERVAL ${VOICE_STUCK_RETRY_SECONDS - VOICE_RETRY_SECONDS} SECOND, NOW())
+     WHERE match_id = ? AND team_id = ? AND released_at IS NULL AND channel_id <=> ?`,
+    [botWide ? 1 : 0, Number(row.match_id), Number(row.team_id), row.channel_id === null ? null : String(row.channel_id)],
+  );
 }
 
 /** Clôt une ligne rendue, si elle porte encore ce salon ; son tournoi est republié. */
@@ -588,10 +636,14 @@ async function closeReleasedRow(row: ReleaseRow, touched: Set<number>): Promise<
 async function releaseChannels(touched: Set<number>): Promise<boolean> {
   const rows = await run<ReleaseRow[]>(RELEASABLE_SQL);
   // Route par clé absente : les autres lignes sans salon attendent la passe suivante, sans appel
-  // (un mandataire mal routé n'est pas appelé pour chaque ligne).
+  // (un mandataire mal routé n'est pas appelé pour chaque ligne), repoussées comme la première —
+  // sans quoi elles resteraient en tête de file et occuperaient le lot de chaque passe.
   let keyRouteGone = false;
   for (const row of rows) {
-    if (keyRouteGone && row.channel_id === null) continue;
+    if (keyRouteGone && row.channel_id === null) {
+      await stampReleaseFailure(row, false);
+      continue;
+    }
     const verdict = await releaseOne(row);
     if (verdict.keyRouteMissing) keyRouteGone = true;
     if (verdict.close) await closeReleasedRow(row, touched);
@@ -1079,7 +1131,7 @@ type SingleMatchRow = RowDataPacket & {
   team_voice_channels: number | null;
   tournament_state: TournamentState;
   start_visibility_at: Date | string;
-  /** Heure de la base à la lecture : l'horloge des règles des salons (`databaseNow`). */
+  /** Heure de la base à la lecture : l'horloge des règles des salons (option, échéance). */
   db_now: Date | string;
 };
 
@@ -1103,15 +1155,16 @@ export async function readMatchVoice(matchId: number, staff: boolean): Promise<M
       [matchId],
     );
     const match = rows[0];
-    // Contrôle d'accès à l'heure de la base, comme l'option et l'échéance : une seule horloge.
-    if (!match || !canViewTournament({ startVisibilityAt: match.start_visibility_at }, { canManage: staff }, new Date(match.db_now))) {
+    // Contrôle d'accès à l'heure de l'application, comme la fiche et le flux (l'autre porte) : les
+    // deux portes rendent le même 404 ; seules l'option et l'échéance suivent l'heure de la base.
+    if (!match || !canViewTournament({ startVisibilityAt: match.start_visibility_at }, { canManage: staff })) {
       return undefined;
     }
     // Après le contrôle d'accès : un lecteur qui ne voit pas le match ne lance aucune passe.
     void dispatchMatchVoiceChannels();
     const team1Id = match.team1_id === null ? null : Number(match.team1_id);
     const team2Id = match.team2_id === null ? null : Number(match.team2_id);
-    // Horloge de la base, comme le balayage (`databaseNow`).
+    // Horloge de la base, comme le balayage et l'instantané (`ClockedVoiceRow`).
     const now = new Date(match.db_now).getTime();
     const enabled = voiceOptionLive(
       {

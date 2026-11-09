@@ -328,7 +328,7 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "BOT_VOICE_TIMEOUT" });
     await dispatchMatchVoiceChannels();
     expect(releaseVoiceChannel).toHaveBeenCalledTimes(1);
-    expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toHaveLength(1);
+    expect(writes.filter((w) => w.sql.includes("SET failed_at = IF("))).toHaveLength(1);
   });
 
   it("dispatchMatchVoiceChannels_releaseRouteMissing_stopsReleasePass", async () => {
@@ -350,7 +350,7 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     const { writes } = database({ releasable: [{ match_id: 42, team_id: 1, channel_id: "901", tournament_id: 7 }] });
     jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "failed", code: "INVALID_CHANNEL_ID" });
     await dispatchMatchVoiceChannels();
-    expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toEqual([]);
+    expect(writes.filter((w) => w.sql.includes("SET failed_at = IF("))).toEqual([]);
     expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()")).map((w) => w.params)).toEqual([[42, 1, "901"]]);
   });
 
@@ -367,7 +367,7 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
       .mockResolvedValue({ kind: "ok", value: true });
     await dispatchMatchVoiceChannels();
     expect(releaseVoiceChannel).toHaveBeenCalledTimes(2);
-    expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toHaveLength(1);
+    expect(writes.filter((w) => w.sql.includes("SET failed_at = IF("))).toHaveLength(1);
     expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()")).map((w) => w.params)).toEqual([[43, 1, "902"]]);
   });
 
@@ -408,7 +408,8 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "failed", code: "VOICE_DISCORD_ERROR" });
     await dispatchMatchVoiceChannels();
     expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()"))).toEqual([]);
-    expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()")).map((w) => w.params)).toEqual([[42, 1, "901"]]);
+    // Refus propre au salon : attente longue (drapeau « bot entier » à 0).
+    expect(writes.filter((w) => w.sql.includes("SET failed_at = IF(")).map((w) => w.params)).toEqual([[0, 42, 1, "901"]]);
   });
 
   it("dispatchMatchVoiceChannels_releaseRefusedPastBotNetTwice_logsStuckOnce", async () => {
@@ -435,7 +436,7 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "VOICE_MISSING_PERMISSIONS" });
     await dispatchMatchVoiceChannels();
     expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()"))).toEqual([]);
-    expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toHaveLength(1);
+    expect(writes.filter((w) => w.sql.includes("SET failed_at = IF("))).toHaveLength(1);
   });
 
   it("dispatchMatchVoiceChannels_releaseOutageBeforeBotNet_keepsRowOpen", async () => {
@@ -449,13 +450,37 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     expect(RELEASABLE_SQL).toContain("v.created_at < NOW() - INTERVAL 48 HOUR");
   });
 
-  it("dispatchMatchVoiceChannels_releaseTransportOutage_logsNoRefusal", async () => {
-    // Coupe-circuit ouvert : le bot n'a rien refusé, la ligne attend seulement son délai.
-    const { writes } = database({ releasable: [releasable] });
+  it("dispatchMatchVoiceChannels_releaseCircuitOpen_stopsWithoutStampOrLog", async () => {
+    // Coupe-circuit ouvert : le bot n'a pas été appelé, la ligne n'est pas repoussée (attente d'une
+    // heure évitée pour un salon bloqué), la passe s'arrête.
+    const { writes } = database({
+      releasable: [{ ...releasable, bot_expired: 1 }, { ...releasable, match_id: 43, channel_id: "902" }],
+    });
     jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "BOT_CIRCUIT_OPEN" });
     await dispatchMatchVoiceChannels();
     expect(console.warn).not.toHaveBeenCalled();
-    expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toHaveLength(1);
+    expect(releaseVoiceChannel).toHaveBeenCalledTimes(1);
+    expect(writes.filter((w) => w.sql.includes("SET failed_at"))).toEqual([]);
+  });
+
+  it("dispatchMatchVoiceChannels_releaseTransportOutage_logsNoRefusal", async () => {
+    // Panne du canal : le bot n'a rien refusé, aucune ligne pm2 ; attente courte (bot entier).
+    const { writes } = database({ releasable: [releasable] });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "BOT_INTERNAL_UNREACHABLE" });
+    await dispatchMatchVoiceChannels();
+    expect(console.warn).not.toHaveBeenCalled();
+    expect(writes.filter((w) => w.sql.includes("SET failed_at = IF(")).map((w) => w.params)).toEqual([[1, 42, 1, "901"]]);
+  });
+
+  it("dispatchMatchVoiceChannels_wholeBotOutageOnStuckRow_keepsShortRetry", async () => {
+    // Limite de débit de Discord sur un salon bloqué (> 48 h) : la panne ne vise pas ce salon,
+    // il reste à l'attente courte (drapeau 1 : `failed_at` antidaté de l'écart des deux attentes).
+    const { writes } = database({ releasable: [{ ...releasable, bot_expired: 1 }] });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "VOICE_DISCORD_UNAVAILABLE" });
+    await dispatchMatchVoiceChannels();
+    const stamp = writes.filter((w) => w.sql.includes("SET failed_at = IF("));
+    expect(stamp.map((w) => w.params)).toEqual([[1, 42, 1, "901"]]);
+    expect(stamp[0]?.sql).toContain("NOW() - INTERVAL 3540 SECOND");
   });
 
   it("dispatchMatchVoiceChannels_releaseClosedThenRefusedAgain_logsAgain", async () => {
@@ -483,7 +508,7 @@ describe("dispatchMatchVoiceChannels — libération et purge", () => {
     jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "BOT_VOICE_TIMEOUT" });
     await dispatchMatchVoiceChannels();
     expect(writes.some((w) => w.sql.includes("SET released_at = NOW()"))).toBe(false);
-    expect(writes.some((w) => w.sql.includes("SET failed_at = NOW()"))).toBe(true);
+    expect(writes.some((w) => w.sql.includes("SET failed_at = IF("))).toBe(true);
   });
 
   it("dispatchMatchVoiceChannels_rowWithoutChannel_releasedByKeyThenClosed", async () => {
@@ -736,23 +761,61 @@ describe("loadMatchVoiceInfos (instantané, les deux portes)", () => {
     expect(connection.execute).not.toHaveBeenCalled();
   });
 
-  it("loadTournamentVoiceInfos_databaseClockBeforePublication_returnsEmptyAfterClockOnly", async () => {
+  const noChannel = { match_id: null, team_id: null, channel_id: null, failed_at: null, released_at: null };
+
+  it("loadTournamentVoiceInfos_databaseClockBeforePublication_returnsEmptyAfterOneQuery", async () => {
     // L'application est passé la publication, pas la base : la base fait foi.
     const connection = connectionMock();
-    connection.execute.mockResolvedValueOnce([[{ db_now: new Date(Date.now() - 2 * 60_000) }], []]);
+    connection.execute.mockResolvedValueOnce([[{ db_now: new Date(Date.now() - 2 * 60_000), ...noChannel }], []]);
     const infos = await loadTournamentVoiceInfos(fakeConnection(connection), runningTournament, [ready()]);
     expect(infos.size).toBe(0);
-    expect(connection.execute.mock.calls.map(([sql]) => sql)).toEqual(["SELECT NOW() AS db_now"]);
+    expect(connection.execute).toHaveBeenCalledTimes(1);
   });
 
-  it("loadTournamentVoiceInfos_databaseClockInsideWindow_returnsStates", async () => {
+  it("loadTournamentVoiceInfos_databaseClockInsideWindow_readsClockWithChannelsInOneQuery", async () => {
+    // Pas d'aller-retour de plus pour l'horloge : elle vient avec les salons des matchs jouables.
     const connection = connectionMock();
     connection.execute
-      .mockResolvedValueOnce([[{ db_now: new Date() }], []])
-      .mockResolvedValueOnce([[openRow(1, "901")], []])
+      .mockResolvedValueOnce([[{ db_now: new Date(), ...openRow(1, "901") }], []])
+      .mockResolvedValueOnce([teams, []]);
+    const infos = await loadTournamentVoiceInfos(fakeConnection(connection), runningTournament, [ready(), { ...ready(), id: 43, status: "COMPLETED" }]);
+    expect(infos.get(42)).toEqual({ team1State: "OPEN", team2State: "WAITING" });
+    const [sql, params] = connection.execute.mock.calls[0];
+    expect(sql).toContain("FROM (SELECT NOW() AS db_now) n");
+    expect(sql).toContain("LEFT JOIN bg_match_voice_channels v");
+    expect(params).toEqual([42]);
+    expect(connection.execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("loadTournamentVoiceInfos_noChannelRow_showsWaitingFromClockRow", async () => {
+    const connection = connectionMock();
+    connection.execute
+      .mockResolvedValueOnce([[{ db_now: new Date(), ...noChannel }], []])
       .mockResolvedValueOnce([teams, []]);
     const infos = await loadTournamentVoiceInfos(fakeConnection(connection), runningTournament, [ready()]);
-    expect(infos.get(42)).toEqual({ team1State: "OPEN", team2State: "WAITING" });
+    expect(infos.get(42)).toEqual({ team1State: "WAITING", team2State: "WAITING" });
+  });
+
+  it("loadTournamentVoiceInfos_matchNotDueYet_returnsEmptyWithoutTeamQuery", async () => {
+    const connection = connectionMock();
+    connection.execute.mockResolvedValueOnce([[{ db_now: new Date(), ...noChannel }], []]);
+    const later = { ...ready(), startAt: new Date(Date.now() + 3 * 3_600_000).toISOString() };
+    const infos = await loadTournamentVoiceInfos(fakeConnection(connection), runningTournament, [later]);
+    expect(infos.size).toBe(0);
+    expect(connection.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("loadTournamentVoiceInfos_missingTable_returnsEmpty", async () => {
+    const connection = connectionMock();
+    connection.execute.mockRejectedValueOnce(Object.assign(new Error("no table"), { code: "ER_NO_SUCH_TABLE", errno: 1146 }));
+    const infos = await loadTournamentVoiceInfos(fakeConnection(connection), runningTournament, [ready()]);
+    expect(infos.size).toBe(0);
+  });
+
+  it("loadTournamentVoiceInfos_otherDatabaseError_throws", async () => {
+    const connection = connectionMock();
+    connection.execute.mockRejectedValueOnce(new Error("deadlock"));
+    await expect(loadTournamentVoiceInfos(fakeConnection(connection), runningTournament, [ready()])).rejects.toThrow("deadlock");
   });
 
   it("loadMatchVoiceInfos_disabled_returnsEmptyWithoutQuery", async () => {
@@ -909,10 +972,16 @@ describe("readMatchVoice (porte REST)", () => {
     await dispatchMatchVoiceChannels();
   });
 
-  it("readMatchVoice_databaseClockBeforePublicationForNonStaff_returnsUndefined", async () => {
-    // Contrôle d'accès à l'heure de la base : l'application en avance ne révèle pas le match.
-    matchRow({ start_visibility_at: new Date(Date.now() - 60_000), db_now: new Date(Date.now() - 2 * 60_000) });
+  it("readMatchVoice_appClockBeforePublicationDatabaseAfter_returnsUndefinedForNonStaff", async () => {
+    // Contrôle d'accès à l'heure de l'application, comme la fiche : une base en avance ne révèle pas le match.
+    matchRow({ start_visibility_at: new Date(Date.now() + 60_000), db_now: new Date(Date.now() + 2 * 60_000) });
     await expect(readMatchVoice(42, false)).resolves.toBeUndefined();
+  });
+
+  it("readMatchVoice_appClockAfterPublicationDatabaseBefore_returnsNullForNonStaff", async () => {
+    // Les deux portes s'accordent (la fiche est visible) ; l'option suit l'heure de la base : rien à montrer.
+    matchRow({ start_visibility_at: new Date(Date.now() - 60_000), db_now: new Date(Date.now() - 2 * 60_000) });
+    await expect(readMatchVoice(42, false)).resolves.toBeNull();
   });
 
   it("readMatchVoice_tournamentNotRunning_returnsNull", async () => {
@@ -1350,7 +1419,7 @@ describe("dispatchMatchVoiceChannels — bot indisponible, budget, journal", () 
     jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "ok", value: true });
     await dispatchMatchVoiceChannels();
     expect(releaseVoiceChannel).toHaveBeenCalledWith("902");
-    expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()")).map((w) => w.params)).toEqual([[42, 1, null]]);
+    expect(writes.filter((w) => w.sql.includes("SET failed_at = IF(")).map((w) => w.params)).toEqual([[0, 42, 1, null]]);
     expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()")).map((w) => w.params)).toEqual([[43, 1, "902"]]);
   });
 
@@ -1393,7 +1462,7 @@ describe("dispatchMatchVoiceChannels — bot indisponible, budget, journal", () 
     jest.mocked(releaseVoiceChannelByKey).mockResolvedValue({ kind: "failed", code: "INVALID_VOICE_KEY" });
     await dispatchMatchVoiceChannels();
     expect(writes.filter((w) => w.sql.includes("SET released_at = NOW()")).map((w) => w.params)).toEqual([[42, 1, null]]);
-    expect(writes.filter((w) => w.sql.includes("SET failed_at = NOW()"))).toEqual([]);
+    expect(writes.filter((w) => w.sql.includes("SET failed_at = IF("))).toEqual([]);
   });
 
   it("dispatchMatchVoiceChannels_botDownThenStuckRows_keptWithoutBotCall", async () => {
@@ -1568,7 +1637,7 @@ describe("dispatchMatchVoiceChannels — bot indisponible, budget, journal", () 
 
   it("dispatchMatchVoiceChannels_releaseUnavailablePastBotNet_logsStuckOnce", async () => {
     database({ releasable: [{ ...releasable, bot_expired: 1 }] });
-    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "BOT_CIRCUIT_OPEN" });
+    jest.mocked(releaseVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "BOT_INTERNAL_UNREACHABLE" });
     await dispatchMatchVoiceChannels();
     await dispatchMatchVoiceChannels(true);
     expect(jest.mocked(console.warn).mock.calls).toEqual([["[match-voice] match 42 : salon vocal toujours pas rendu après 48 h (nouvel essai toutes les 1 h)"]]);
@@ -1586,12 +1655,32 @@ describe("dispatchMatchVoiceChannels — bot indisponible, budget, journal", () 
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
+  it("dispatchMatchVoiceChannels_keyRouteMissing_skippedKeyRowsStampedWithoutCall", async () => {
+    // Les autres lignes sans salon ne rappellent pas la route absente, mais sont repoussées : elles
+    // ne restent pas en tête de file à occuper le lot de chaque passe.
+    const { writes } = database({
+      releasable: [
+        { ...releasable, channel_id: null },
+        { ...releasable, match_id: 43, channel_id: null },
+        { ...releasable, match_id: 44, channel_id: null },
+      ],
+    });
+    jest.mocked(releaseVoiceChannelByKey).mockResolvedValue({ kind: "unavailable", code: "INTERNAL_ROUTE_NOT_FOUND" });
+    await dispatchMatchVoiceChannels();
+    expect(releaseVoiceChannelByKey).toHaveBeenCalledTimes(1);
+    expect(writes.filter((w) => w.sql.includes("SET failed_at = IF(")).map((w) => w.params)).toEqual([
+      [0, 42, 1, null],
+      [0, 43, 1, null],
+      [0, 44, 1, null],
+    ]);
+  });
+
   it("dispatchMatchVoiceChannels_releaseByKeyUnavailable_keepsRowWithNullGuard", async () => {
     const { writes } = database({ releasable: [{ ...releasable, channel_id: null }] });
-    jest.mocked(releaseVoiceChannelByKey).mockResolvedValue({ kind: "unavailable", code: "BOT_CIRCUIT_OPEN" });
+    jest.mocked(releaseVoiceChannelByKey).mockResolvedValue({ kind: "unavailable", code: "BOT_INTERNAL_UNREACHABLE" });
     await dispatchMatchVoiceChannels();
-    const failedWrites = writes.filter((w) => w.sql.includes("SET failed_at = NOW()"));
-    expect(failedWrites.map((w) => w.params)).toEqual([[42, 1, null]]);
+    const failedWrites = writes.filter((w) => w.sql.includes("SET failed_at = IF("));
+    expect(failedWrites.map((w) => w.params)).toEqual([[1, 42, 1, null]]);
     expect(failedWrites[0]?.sql).toContain("channel_id <=> ?");
   });
 
