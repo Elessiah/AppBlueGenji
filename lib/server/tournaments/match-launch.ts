@@ -832,7 +832,7 @@ async function releaseIneligibleCasters(
  * acquise n'en réécrit rien.
  *
  * @throws `NOT_CASTER` | `CASTER_IDENTITY_REQUIRED` | `MATCH_NOT_FOUND`
- *   | `MATCH_ALREADY_COMPLETED` | `MATCH_NOT_LAUNCHABLE` | `CASTER_IS_PLAYER`
+ *   | `MATCH_CAST_CLOSED` | `MATCH_NOT_LAUNCHABLE` | `CASTER_IS_PLAYER`
  *   | `STREAM_NOT_FOUND` | `INVALID_STREAM_URL` | `STREAM_URL_REQUIRED`
  *   | `INVALID_LIVE_TRIGGER` | `MATCH_NOT_CASTABLE` | `MATCH_START_AT_REQUIRED`
  *   | `INVALID_CAST_BATTLETAG` | `LIVE_TRIGGER_NOT_OWNED`
@@ -874,7 +874,7 @@ export async function claimMatchCast(
       if (!row) throw new Error("MATCH_NOT_FOUND");
       const block = castBlockReason(hasLivePermission, identity, row.tournament_game);
       if (block) throw new Error(block);
-      if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+      if (row.status === "COMPLETED") throw new Error("MATCH_CAST_CLOSED");
       if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
       if (row.casters.some((caster) => caster.userId === userId)) {
         return { tournamentId: Number(row.tournament_id), claimed: false, triggerSkipped: false };
@@ -937,8 +937,8 @@ export async function claimMatchCast(
   );
   // Une inscription change ce que montrent l'accueil et ses bandeaux (un
   // lien neuf, ou un co-caster éligible dont le stream jusque-là tu devient
-  // visible) ; une inscription déjà acquise ne change rien.
-  publishMatchUpdatedEvent(tournamentId, { landingLive: claimed });
+  // visible) ; une inscription déjà acquise (double clic) ne change rien.
+  if (claimed) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   // Après le commit : journal du staff. Aucune place n'est reprise à personne.
   if (claimed) announceCastChange({ kind: "CLAIMED", matchId, casterId: userId, replacedCasterId: null });
   return { triggerSkipped };
@@ -959,7 +959,7 @@ export async function claimMatchCast(
  * s'écrivent que sous lui.
  *
  * @throws `NOT_CASTER` | `MATCH_NOT_FOUND` | `NOT_MATCH_CASTER`
- *   | `MATCH_ALREADY_COMPLETED` | `INVALID_LIVE_TRIGGER` | `MATCH_NOT_CASTABLE`
+ *   | `MATCH_CAST_CLOSED` | `INVALID_LIVE_TRIGGER` | `MATCH_NOT_CASTABLE`
  *   | `MATCH_START_AT_REQUIRED` | `INVALID_STREAM_URL` | `CAST_STREAM_NOT_OWNED`
  *   | `INVALID_CAST_BATTLETAG` | `STREAM_NOT_FOUND` | `LIVE_TRIGGER_NOT_OWNED`
  */
@@ -984,14 +984,16 @@ export async function setCastSettings(
       // Un match joué est de l'histoire : son mode, son lien et le BattleTag
       // qui a servi restent tels quels (l'inscription et le retrait refusent de
       // même de le réécrire). Sa rediff, elle, a sa propre route.
-      if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+      if (row.status === "COMPLETED") throw new Error("MATCH_CAST_CLOSED");
       await applyCastSettings(connection, row, userId, caster.streamId, settings, access);
       return Number(row.tournament_id);
     }),
   );
   // Un mode, un lien ou un stream retiré change ce que montrent l'accueil, ses
   // bandeaux et l'annonce #live : même éviction qu'une configuration du staff.
-  publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  // Le seul BattleTag (ou un corps vide) n'y change rien : pas d'éviction.
+  const landingLive = settings.trigger !== undefined || settings.liveUrl !== undefined;
+  publishMatchUpdatedEvent(tournamentId, { landingLive });
 }
 
 /**
@@ -1001,7 +1003,7 @@ export async function setCastSettings(
  * Si toutes les autres parties étaient prêtes et n'attendaient que lui, le
  * match part.
  *
- * @throws `MATCH_NOT_FOUND` | `NOT_MATCH_CASTER` | `MATCH_ALREADY_COMPLETED`
+ * @throws `MATCH_NOT_FOUND` | `NOT_MATCH_CASTER` | `MATCH_CAST_CLOSED`
  */
 export async function releaseMatchCast(
   matchId: number,
@@ -1019,7 +1021,7 @@ export async function releaseMatchCast(
       }
       // Un match joué est de l'histoire : l'inscription, son stream et son lien
       // restent (l'inscription et l'anonymisation refusent de même de le réécrire).
-      if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+      if (row.status === "COMPLETED") throw new Error("MATCH_CAST_CLOSED");
 
       await connection.execute(`DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?`, [matchId, casterId]);
       const remaining = row.casters.filter((caster) => caster.userId !== casterId);

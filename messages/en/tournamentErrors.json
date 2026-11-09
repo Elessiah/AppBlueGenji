@@ -131,6 +131,7 @@
     "MATCH_START_AT_REQUIRED": "Set the match's start date first so it can go on air at that time.",
     "MATCH_LIVE_UPDATE_FAILED": "Error while updating the stream.",
     "MATCH_NOT_CASTABLE": "This match can no longer be broadcast.",
+    "MATCH_CAST_CLOSED": "This match has been played: its cast can no longer change.",
     "STREAM_URL_REQUIRED": "Your channel link is required to open your own stream: without a link it would show nowhere.",
     "INVALID_CAST_BATTLETAG": "Invalid cast BattleTag: 64 characters at most, and visible characters.",
     "CAST_STREAM_NOT_OWNED": "This stream belongs to the organisation: its link is set in the broadcast configuration.",

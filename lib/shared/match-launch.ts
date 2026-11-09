@@ -809,6 +809,7 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   LIVE_TRIGGER_NOT_OWNED: "Le mode de passage à l'antenne appartient au caster qui l'a posé : seuls lui, l'arbitre du match ou un admin le changent — l'organisation aussi quand aucun caster ne le tient.",
   INVALID_CAST_SETTINGS: "Réglages de diffusion invalides.",
   MATCH_NOT_CASTABLE: "Ce match ne peut plus être diffusé.",
+  MATCH_CAST_CLOSED: "Ce match est joué : son cast ne change plus.",
   MATCH_CAST_SETTINGS_FAILED: "Tes réglages de diffusion n'ont pas pu être enregistrés. Réessaie dans un instant.",
   MATCH_START_AT_REQUIRED: "Fixe d'abord la date de début du match pour le faire passer à l'antenne à l'heure dite.",
   INVALID_LIVE_TRIGGER: "Mode de passage à l'antenne invalide.",

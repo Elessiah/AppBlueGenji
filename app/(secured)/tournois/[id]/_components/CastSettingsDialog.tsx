@@ -142,7 +142,7 @@ export function CastSettingsDialog({
   // le serveur ne prend plus que « non casté », que ce champ n'offre pas
   // (`assertCastTriggerWritable`) — chaque choix y serait refusé.
   const configurable = isMatchCastable(match);
-  // Un match joué ne prend plus ni lien ni BattleTag (`MATCH_ALREADY_COMPLETED`) :
+  // Un match joué ne prend plus ni lien ni BattleTag (`MATCH_CAST_CLOSED`) :
   // la fenêtre ne garde que la rediff et le retrait.
   const played = match.status === "COMPLETED";
   const streamEditable = cast !== null && !cast.staffStream && !played;

@@ -449,7 +449,7 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   du lancement** (`releaseIneligibleCasters` : « Prêt » d'un autre, lancement forcé, entretien) —
   le match n'attend plus un « Prêt » qui ne viendra pas, et un lancement d'office ne rend pas
   publics son pseudo ni le lien de sa chaîne. Un match déjà lancé garde ses casters. Retirer un
-  caster d'un match **joué** est refusé (`MATCH_ALREADY_COMPLETED`, 409) ; un retrait qui ne
+  caster d'un match **joué** est refusé (`MATCH_CAST_CLOSED`, 409, comme l'inscription et les réglages) ; une inscription déjà acquise (double clic) ou un retrait qui ne
   retire rien ne publie rien. L'éligibilité des co-casters se relit, à l'inscription, en une
   lecture courante par lot (`LOCK IN SHARE MODE`).
 - **Règle « stream montré »** : `shownStreams` / `firstStreamUrl` (`lib/shared/live-streams.ts`)

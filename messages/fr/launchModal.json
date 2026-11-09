@@ -39,6 +39,7 @@
     "INVALID_STREAM_LINKS": "Liens des streams invalides.",
     "INVALID_CAST_SETTINGS": "Réglages de diffusion invalides.",
     "MATCH_NOT_CASTABLE": "Ce match ne peut plus être diffusé.",
+    "MATCH_CAST_CLOSED": "Ce match est joué : son cast ne change plus.",
     "MATCH_CAST_SETTINGS_FAILED": "Tes réglages de diffusion n'ont pas pu être enregistrés. Réessaie dans un instant.",
     "MATCH_START_AT_REQUIRED": "Fixe d'abord la date de début du match pour le faire passer à l'antenne à l'heure dite.",
     "INVALID_LIVE_TRIGGER": "Mode de passage à l'antenne invalide.",

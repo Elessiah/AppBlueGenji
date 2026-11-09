@@ -1,5 +1,5 @@
 {
-  "count": 207,
+  "count": 208,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "ADMIN_RESOLVE_FAILED": "Erreur lors de la résolution du match.",
@@ -109,6 +109,7 @@
     "MATCH_FORMAT_MAX_MAPS_REQUIRES_DRAWS": "Abaisser le plafond de maps suppose les égalités : sans elles, une rencontre arrivée à égalité n'aurait plus aucun score enregistrable.",
     "MATCH_LIVE_UPDATE_FAILED": "Erreur lors de la mise à jour de la diffusion.",
     "MATCH_NOT_CASTABLE": "Ce match ne peut plus être diffusé.",
+    "MATCH_CAST_CLOSED": "Ce match est joué : son cast ne change plus.",
     "MATCH_NOT_FOUND": "Match introuvable.",
     "MATCH_NOT_IN_LAUNCH": "Le score ne se saisit qu'à partir du lancement du match : planifie-le ou attends son heure de début. Un forfait reste possible.",
     "MATCH_NOT_IN_LOBBY": "Ce match n'est pas en lancement.",

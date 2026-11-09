@@ -39,6 +39,7 @@
     "INVALID_STREAM_LINKS": "Invalid stream links.",
     "INVALID_CAST_SETTINGS": "Invalid broadcast settings.",
     "MATCH_NOT_CASTABLE": "This match can no longer be broadcast.",
+    "MATCH_CAST_CLOSED": "This match has been played: its cast can no longer change.",
     "MATCH_CAST_SETTINGS_FAILED": "Your broadcast settings could not be saved. Try again in a moment.",
     "MATCH_START_AT_REQUIRED": "Set the match start time first to put it on air at that time.",
     "INVALID_LIVE_TRIGGER": "Invalid on-air mode.",

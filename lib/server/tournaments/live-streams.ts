@@ -292,12 +292,7 @@ export async function setMatchLiveConfig(
       // Verrou du match d'abord, puis ses streams et casters : le même ordre
       // que l'inscription d'un caster (`claimMatchCast`).
       const { row: current, hold, actorShown } = await lockLiveMatch(connection, matchId, actor);
-      const trigger = config.trigger === undefined ? hold.trigger : config.trigger;
-      // Un lien envoyé sans mode, sur un match démarqué entre la lecture et le
-      // verrou : refusé, jamais ignoré derrière un succès.
-      if (config.trigger === undefined && trigger === null && (config.liveUrl ?? null) !== null) {
-        throw new Error("MATCH_NOT_STREAMED");
-      }
+      const trigger = lockedTrigger(config, hold);
       const url = parseStreamUrlInput(trigger === null ? null : (config.liveUrl ?? null));
       const triggerChanges = assertLiveConfigAllowed(current, hold, actor, trigger, {
         editsStreamLinks,
@@ -418,6 +413,18 @@ async function writeLiveTrigger(
       : `UPDATE bg_matches SET live_trigger = ?, live_trigger_user_id = ?, live_started_at = NULL WHERE id = ?`,
     [trigger, owner, matchId],
   );
+}
+
+/**
+ * Le mode visé, lu sous le verrou : celui du réglage, ou le mode en place quand
+ * le réglage n'en dit rien. Un lien envoyé sans mode, sur un match démarqué
+ * entre la lecture et le verrou, est refusé (`MATCH_NOT_STREAMED`) — jamais
+ * ignoré derrière un succès.
+ */
+function lockedTrigger(config: MatchLiveConfig, hold: LiveTriggerHold): MatchLiveTrigger | null {
+  if (config.trigger !== undefined) return config.trigger;
+  if (hold.trigger === null && (config.liveUrl ?? null) !== null) throw new Error("MATCH_NOT_STREAMED");
+  return hold.trigger;
 }
 
 /**

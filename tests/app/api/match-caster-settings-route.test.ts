@@ -136,7 +136,7 @@ describe("PUT /api/matches/[matchId]/caster", () => {
 
   it.each<[string, number]>([
     ["STREAM_URL_REQUIRED", 400],
-    ["MATCH_ALREADY_COMPLETED", 409],
+    ["MATCH_CAST_CLOSED", 409],
     ["CAST_STREAM_NOT_OWNED", 409],
     ["NOT_MATCH_CASTER", 403],
     ["LIVE_TRIGGER_NOT_OWNED", 403],

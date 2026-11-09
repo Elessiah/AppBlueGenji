@@ -31,6 +31,7 @@ import {
   releaseObjectingReferee,
   setMatchFirstMap,
   setMatchHost,
+  setCastSettings,
   setMatchReady,
   setMatchSelfManaged,
   setRoundSelfManaged,
@@ -978,7 +979,7 @@ describe("claimMatchCast", () => {
   it("refuse un match terminé ou une exemption", async () => {
     state.users[CASTER] = verified;
     state.match = matchState({ status: "COMPLETED" });
-    await expect(claimMatchCast(42, CASTER, true, OWN_STREAM)).rejects.toThrow("MATCH_ALREADY_COMPLETED");
+    await expect(claimMatchCast(42, CASTER, true, OWN_STREAM)).rejects.toThrow("MATCH_CAST_CLOSED");
     state.match = matchState({ is_bye: 1, team2_id: null });
     await expect(claimMatchCast(42, CASTER, true, OWN_STREAM)).rejects.toThrow("MATCH_NOT_LAUNCHABLE");
   });
@@ -2081,11 +2082,28 @@ describe("releaseMatchCast / claimMatchCast : gardes et publications (EF-29)", (
     state.match = matchState({ status: "COMPLETED", caster_user_id: CASTER });
     state.match.streams = [{ id: 1, live_url: "https://twitch.tv/caster", link_user_id: CASTER }];
 
-    await expect(releaseMatchCast(42, CASTER, false)).rejects.toThrow("MATCH_ALREADY_COMPLETED");
+    await expect(releaseMatchCast(42, CASTER, false)).rejects.toThrow("MATCH_CAST_CLOSED");
 
     expect(casterOf(state)).toBe(CASTER);
     expect(state.match?.streams).toHaveLength(1);
     expect(announceCastChange).not.toHaveBeenCalled();
+  });
+
+  it("setCastSettings_battletagOnly_publishesWithoutLandingRefresh", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await setCastSettings(42, CASTER, true, { battletag: "Voix#1234" });
+
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: false });
+  });
+
+  it("setCastSettings_completedMatch_throwsMatchCastClosed", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ status: "COMPLETED", caster_user_id: CASTER });
+
+    await expect(setCastSettings(42, CASTER, true, { battletag: "Voix#1234" })).rejects.toThrow("MATCH_CAST_CLOSED");
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("releaseMatchCast_notACaster_publishesNothing", async () => {
@@ -2097,13 +2115,14 @@ describe("releaseMatchCast / claimMatchCast : gardes et publications (EF-29)", (
     expect(announceCastChange).not.toHaveBeenCalled();
   });
 
-  it("claimMatchCast_alreadyCaster_publishesNoLandingRefresh", async () => {
+  it("claimMatchCast_alreadyCaster_publishesNothing", async () => {
     state.users[CASTER] = ELIGIBLE_CASTER;
     state.match = matchState({ caster_user_id: CASTER });
 
     await claimMatchCast(42, CASTER, true, OWN_STREAM);
 
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: false });
+    // Un double clic : rien n'est écrit, rien n'est publié.
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
     expect(announceCastChange).not.toHaveBeenCalled();
   });
 

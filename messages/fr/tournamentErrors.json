@@ -131,6 +131,7 @@
     "MATCH_START_AT_REQUIRED": "Fixe d'abord la date de début du match pour le faire passer à l'antenne à l'heure dite.",
     "MATCH_LIVE_UPDATE_FAILED": "Erreur lors de la mise à jour de la diffusion.",
     "MATCH_NOT_CASTABLE": "Ce match ne peut plus être diffusé.",
+    "MATCH_CAST_CLOSED": "Ce match est joué : son cast ne change plus.",
     "STREAM_URL_REQUIRED": "Le lien de ta chaîne est obligatoire pour ouvrir ton propre stream : sans lien, il n'apparaîtrait nulle part.",
     "INVALID_CAST_BATTLETAG": "BattleTag de cast invalide : 64 caractères au plus, et des caractères visibles.",
     "CAST_STREAM_NOT_OWNED": "Ce stream est celui de l'organisation : son lien se règle dans la configuration de la diffusion.",
