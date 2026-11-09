@@ -125,7 +125,7 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
       WINNER:
         "Cartes suivantes : l'équipe qui a gagné la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
     },
-    tiebreak: "Map de départage (jouée seulement si la série est à égalité après les 3 maps) : ",
+    tiebreak: "Map de départage (jouée seulement si la série est à égalité après les maps régulières) : ",
     live: (url) => `Diffusion : ${url}`,
     inviteCasters: "Invitez les casters inscrits (leurs contacts sont sur la page du match).",
     notifyCasters: "Prévenez les casters inscrits (leurs contacts sont sur la page du match).",
@@ -164,7 +164,7 @@ const DM_TEXT: Readonly<Record<Locale, TournamentText>> = {
       LOSER: "Next maps: the team that lost the previous map bans first; on a draw, same order as on the previous map.",
       WINNER: "Next maps: the team that won the previous map bans first; on a draw, same order as on the previous map.",
     },
-    tiebreak: "Tiebreak map (played only if the series is level after the 3 maps): ",
+    tiebreak: "Tiebreak map (played only if the series is level after the regular maps): ",
     live: (url) => `Stream: ${url}`,
     inviteCasters: "Invite the signed-up casters (their contacts are on the match page).",
     notifyCasters: "Notify the signed-up casters (their contacts are on the match page).",

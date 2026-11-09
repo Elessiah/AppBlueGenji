@@ -186,7 +186,7 @@
     "TEAM_NOT_IN_TOURNAMENT": "Cette équipe n'est pas inscrite à ce tournoi.",
     "TEAM_TOO_FEW_PLAYERS": "Ton équipe n'a pas assez de joueurs pour ce tournoi : recrute, puis réessaie.",
     "TERMS_ACCEPTANCE_REQUIRED": "Pour engager ton équipe, accepte d'abord les conditions d'utilisation (fenêtre ouverte à l'instant).",
-    "TIEBREAK_NOT_ALLOWED": "La map de départage ne se règle que sur un tour de play-offs en vrai Bo3 (premier à 2 maps).",
+    "TIEBREAK_NOT_ALLOWED": "La map de départage ne se règle que sur un tour de play-offs à format de match défini (BO ou FT).",
     "TOO_MANY_REQUESTS": "Trop de requêtes coup sur coup. Patiente quelques minutes.",
     "TOO_MANY_TEAMS": "Sélection trop large : inscris-les en plusieurs fois.",
     "TOURNAMENT_ADVANCE_FAILED": "Erreur lors de l'avancée du tournoi.",

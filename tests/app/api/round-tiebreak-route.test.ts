@@ -94,6 +94,16 @@ describe("PUT /api/admin/tournaments/[id]/round-tiebreak", () => {
     await expect(actual.json()).resolves.toEqual({ error: "INVALID_ROUND" });
   });
 
+  it("put_bodyWithoutMap_returns400InvalidTiebreakMap", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+
+    const actual = await PUT(put(ROUND), tournament("7"));
+
+    expect(actual.status).toBe(400);
+    await expect(actual.json()).resolves.toEqual({ error: "INVALID_TIEBREAK_MAP" });
+    expect(setRoundTiebreak).not.toHaveBeenCalled();
+  });
+
   it("put_roundNotBo3Playoff_returns400TiebreakNotAllowed", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     jest.mocked(setRoundTiebreak).mockRejectedValue(new Error("TIEBREAK_NOT_ALLOWED"));
@@ -112,6 +122,17 @@ describe("PUT /api/admin/tournaments/[id]/round-tiebreak", () => {
 
     expect(actual.status).toBe(400);
     await expect(actual.json()).resolves.toEqual({ error: "INVALID_TIEBREAK_MAP" });
+  });
+
+  it("put_nonTextMapAndMissingMap_returns400WithoutCallingService", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+
+    for (const body of [{ ...ROUND, map: 12 }, { ...ROUND, map: {} }, { ...ROUND }]) {
+      const actual = await PUT(put(body), tournament("7"));
+      expect(actual.status).toBe(400);
+      await expect(actual.json()).resolves.toEqual({ error: "INVALID_TIEBREAK_MAP" });
+    }
+    expect(setRoundTiebreak).not.toHaveBeenCalled();
   });
 
   it("put_missingTournament_returns404", async () => {

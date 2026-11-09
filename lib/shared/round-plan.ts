@@ -9,7 +9,7 @@
  */
 import { nextPowerOfTwo } from "./bracket-seeds";
 import { PLAYOFF_ROUND_OFFSET, tournamentMatchFormat } from "./bg-survie/rounds";
-import { isBestOfThree, matchMaxMaps, type MatchFormat } from "./match-format";
+import { formatAllowsTiebreak, matchMaxMaps, parseMatchFormat, type MatchFormat } from "./match-format";
 import { ROUND_MAP_SLOTS_MAX, roundKeysOf, type RoundKey, type RoundTiebreak } from "./round-maps";
 import { computeRecommendedRounds } from "./swiss";
 import { resolvePhaseQualifiers } from "./tournament-phases";
@@ -194,6 +194,42 @@ export type TiebreakTournament = {
   phases: ReadonlyArray<Pick<TournamentPhase, "id" | "format">> | null;
 };
 
+/** Colonnes de `bg_tournaments` d'où se lit un {@link TiebreakTournament}. */
+export type TiebreakTournamentColumns = {
+  format: TournamentFormat;
+  match_format_type?: unknown;
+  match_format_value?: unknown;
+  match_format_max_maps?: unknown;
+  match_format_draws?: unknown;
+  endurance_playoff_format_type?: unknown;
+  endurance_playoff_format_value?: unknown;
+};
+
+/**
+ * Ligne SQL → {@link TiebreakTournament} : **une** conversion, partagée par le
+ * serveur (pose, sous verrou) et le brief, pour qu'aucun des deux n'annonce
+ * un départage que l'autre refuse.
+ */
+export function tiebreakTournamentFromRow(
+  row: TiebreakTournamentColumns,
+  phases: TiebreakTournament["phases"],
+): TiebreakTournament {
+  return {
+    format: row.format,
+    matchFormat: parseMatchFormat(
+      row.match_format_type ?? null,
+      row.match_format_value ?? null,
+      row.match_format_max_maps ?? null,
+      row.match_format_draws ?? null,
+    ),
+    endurancePlayoffFormat: parseMatchFormat(
+      row.endurance_playoff_format_type ?? null,
+      row.endurance_playoff_format_value ?? null,
+    ),
+    phases,
+  };
+}
+
 const ELIMINATION_FORMATS: ReadonlySet<TournamentFormat | PhaseFormat> = new Set(["SINGLE", "DOUBLE"]);
 
 /**
@@ -217,12 +253,15 @@ export function isPlayoffRound(
 
 /**
  * Une map de départage se règle-t-elle sur ce tour ? Tour de play-offs **et**
- * format de match du tour en vrai best of 3 (`isBestOfThree` : ni FT 3, ni
- * score libre, ni égalités ouvertes). Le serveur et l'écran lisent cette règle.
+ * format de match défini, quelle que soit sa taille (BO 1 à BO 15, FT) —
+ * décision du 2026-11-09, `docs/features/ROUND_MAPS.md`. Ni score libre (aucune
+ * map régulière à compter), ni égalités ouvertes (un play-off les ferme
+ * toujours, `tournamentMatchFormat` ; le test reste un filet pour une ligne
+ * écrite à la main). Le serveur et l'écran lisent cette règle.
  */
 export function roundAllowsTiebreak(tournament: TiebreakTournament, round: RoundKey): boolean {
   if (!isPlayoffRound(tournament, round)) return false;
-  return isBestOfThree(
+  return formatAllowsTiebreak(
     tournamentMatchFormat(tournament.format, tournament.matchFormat, tournament.endurancePlayoffFormat, round.roundNumber),
   );
 }

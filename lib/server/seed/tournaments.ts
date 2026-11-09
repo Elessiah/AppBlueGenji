@@ -6,7 +6,7 @@
 import type { Pool, ResultSetHeader } from "mysql2/promise";
 import { matchWinsRequired } from "@/lib/shared/match-format";
 import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
-import type { SeedFormat, TournamentDef } from "./cases";
+import { SEED_TOURNAMENT_PREFIX, type SeedFormat, type TournamentDef } from "./cases";
 import { seedRng } from "./match-play";
 import {
   applyLiveStreams,
@@ -92,7 +92,7 @@ function seedTournamentInsertParams({
   const swissTotalRounds = isSwiss ? def.swissTotalRounds ?? null : null;
   return [
     organizerId,
-    `Test - ${def.name}`,
+    `${SEED_TOURNAMENT_PREFIX}${def.name}`,
     def.game,
     def.description === undefined
       ? `Tournoi test ${def.game} — ${def.state} — ${format}`

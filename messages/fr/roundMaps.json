@@ -18,7 +18,7 @@
     "scaleHint": "Ces cartes valent pour tous les matchs du tour : la carte ne se saisit plus match par match. « Réinitialiser le tour » rend la saisie par match.",
     "resetConfirmBody": "Les cartes de ce tour sont retirées pour tous ses matchs : la carte se saisit de nouveau match par match. Les choix déjà faits sur les matchs restent.",
     "tiebreak": "Map de départage",
-    "tiebreakHint": "Tour de play-offs en vrai Bo3 : une map jouée seulement si la série est à égalité après les 3 maps. Les bans suivent la règle des cartes suivantes.",
+    "tiebreakHint": "Tour de play-offs : une map de plus, jouée seulement si la série est à égalité après les maps régulières (maps nulles comprises). Les bans suivent la règle des cartes suivantes.",
     "refereeHostBan": "L'arbitre désigné crée la partie : l'équipe qui n'est pas la meilleure tête de série bannit la première."
   },
   "sheet": {
@@ -128,7 +128,7 @@
     },
     "roundClearedTiebreakKept": "Tour réinitialisé : cartes match par match. La map de départage reste.",
     "staleTiebreakTitle": "Maps de départage inactives",
-    "staleTiebreakHint": "Ces tours ne sont plus des play-offs en vrai Bo3 (format changé) : leur map de départage n'est ni montrée ni jouée. Retire-la pour la supprimer.",
+    "staleTiebreakHint": "Ces tours ne sont plus des play-offs à format de match défini (format changé) : leur map de départage n'est ni montrée ni jouée. Retire-la pour la supprimer.",
     "staleTiebreakItem": "{round} : {map}",
     "staleTiebreakRemove": "Retirer",
     "staleTiebreakRemoveLabel": "Retirer la map de départage de {round}"

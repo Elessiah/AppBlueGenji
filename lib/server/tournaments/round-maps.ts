@@ -34,8 +34,7 @@ import {
   type RoundTiebreak,
   type TournamentMapRules,
 } from "@/lib/shared/round-maps";
-import { parseMatchFormat } from "@/lib/shared/match-format";
-import { roundAllowsTiebreak } from "@/lib/shared/round-plan";
+import { roundAllowsTiebreak, tiebreakTournamentFromRow } from "@/lib/shared/round-plan";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { resolveMatchParty } from "./match-launch";
@@ -315,26 +314,13 @@ async function tiebreakAllowedUnderLock(
     );
     phases = phaseRows.map((phase) => ({ id: Number(phase.id), format: phase.format }));
   }
-  return roundAllowsTiebreak(
-    {
-      format: row.format,
-      matchFormat: parseMatchFormat(
-        row.match_format_type,
-        row.match_format_value,
-        row.match_format_max_maps,
-        row.match_format_draws,
-      ),
-      endurancePlayoffFormat: parseMatchFormat(row.endurance_playoff_format_type, row.endurance_playoff_format_value),
-      phases,
-    },
-    round,
-  );
+  return roundAllowsTiebreak(tiebreakTournamentFromRow(row, phases), round);
 }
 
 /**
  * Pose (ou retire, `null` / vide) la **map de départage** d'un tour de
- * play-offs en vrai best of 3 (`docs/features/ROUND_MAPS.md`) : jouée
- * seulement si la série est à égalité après les trois maps régulières. Une
+ * play-offs à format de match défini (`docs/features/ROUND_MAPS.md`) : jouée
+ * en N + 1 seulement si la série est à égalité après les N maps régulières. Une
  * carte, imposée ; les cartes du tour et leurs choix ne changent pas. Réservé
  * à l'arbitrage (permission `tournaments`, vérifiée par la route). Verrou du
  * tournoi en première instruction, format relu dessous ; retirer est permis

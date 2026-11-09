@@ -9,14 +9,16 @@ const STATUSES: Readonly<Record<string, number>> = {
 };
 
 /**
- * Map de départage d'un tour de play-offs en vrai best of 3
+ * Map de départage d'un tour de play-offs à format de match défini
  * (`docs/features/ROUND_MAPS.md`). Corps : `{ phaseId, bracket, roundNumber,
- * map: string | null }` — `null` (ou vide) la retire. Jouée seulement si la
- * série est à égalité après les trois maps régulières. Réservé à l'arbitrage
- * (`tournaments`).
+ * map: string | null }` — `null` (ou vide) la retire ; un corps sans `map` (ou à `map` non textuel) est
+ * refusé (`INVALID_TIEBREAK_MAP`). Jouée en N + 1 seulement si la série est à
+ * égalité après les N maps régulières. Réservé à l'arbitrage (`tournaments`).
  */
 export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
-  return roundMapsStaffPut(req, context, STATUSES, "ROUND_TIEBREAK_FAILED", async (tournamentId, body) => ({
-    map: await setRoundTiebreak(tournamentId, parseRoundKey(body), body.map),
-  }));
+  return roundMapsStaffPut(req, context, STATUSES, "ROUND_TIEBREAK_FAILED", async (tournamentId, body) => {
+    const round = parseRoundKey(body);
+    if (typeof body.map !== "string" && body.map !== null) throw new Error("INVALID_TIEBREAK_MAP");
+    return { map: await setRoundTiebreak(tournamentId, round, body.map) };
+  });
 }

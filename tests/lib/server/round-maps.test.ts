@@ -659,10 +659,10 @@ describe("setRoundTiebreak", () => {
     expect(connection.execute.mock.calls[0][0]).toMatch(/FROM bg_tournaments WHERE id = \? LIMIT 1 FOR UPDATE/);
   });
 
-  it("setRoundTiebreak_ft3Round_throwsTiebreakNotAllowed", async () => {
+  it("setRoundTiebreak_freeScoreRound_throwsTiebreakNotAllowed", async () => {
     route(connection.execute, [
       { pattern: /FOR UPDATE/, rows: [TOURNAMENT] },
-      { pattern: /SELECT format, match_format_type/, rows: [{ ...BO3_ROW, match_format_type: "FT" }] },
+      { pattern: /SELECT format, match_format_type/, rows: [{ ...BO3_ROW, match_format_type: null, match_format_value: null }] },
     ]);
 
     await expect(setRoundTiebreak(7, ROUND, "Busan")).rejects.toThrow("TIEBREAK_NOT_ALLOWED");
@@ -767,8 +767,12 @@ describe("briefTiebreakMap", () => {
     expect(briefTiebreakMap(briefRow())).toBe("Busan");
   });
 
-  it("briefTiebreakMap_ft3Row_returnsNull", () => {
-    expect(briefTiebreakMap(briefRow({ match_format_type: "FT" }))).toBeNull();
+  it("briefTiebreakMap_ft3Row_returnsMap", () => {
+    expect(briefTiebreakMap(briefRow({ match_format_type: "FT" }))).toBe("Busan");
+  });
+
+  it("briefTiebreakMap_freeScoreRow_returnsNull", () => {
+    expect(briefTiebreakMap(briefRow({ match_format_type: null, match_format_value: null }))).toBeNull();
   });
 
   it("briefTiebreakMap_noTiebreak_returnsNull", () => {

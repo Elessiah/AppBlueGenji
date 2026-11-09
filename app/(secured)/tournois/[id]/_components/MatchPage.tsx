@@ -491,7 +491,7 @@ function MatchKeyFacts({
       value: shownMapName(match.firstMap) ?? <Muted>{t("matchPage.firstMapUnset")}</Muted>,
     });
   }
-  // Map de départage du tour (play-offs en vrai Bo3) : lisible de tous, pas
+  // Map de départage du tour (play-offs, tout format défini) : lisible de tous, pas
   // seulement du staff ou de qui choisit dans un pool.
   facts.push(...tiebreakFacts(tiebreak, roundMapsText.t("page.tiebreak"), roundMapsText.t("page.tiebreakHint")));
   facts.push({
