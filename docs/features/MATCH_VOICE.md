@@ -94,18 +94,23 @@ et rien n'est compté.
   bot a répondu pour un salon (mémoire du processus bornée à 1 000 entrées, oubliée à la clôture
   de la ligne) ; une panne du canal n'en donne pas. Une route par clé absente (bot plus ancien)
   ne compte pas comme une réponse du bot : le refus global n'est pas rejournalisé.
-- **Refus de rendu sans fin** : passé `VOICE_BOT_UNRELEASED_MAX_HOURS` (48 h) depuis la création de la
-  ligne (filet du bot), un rendu **refusé** (`failed`) clôt la ligne au lieu de la redemander
-  chaque minute ; un bot **indisponible** ne la clôt que passé `VOICE_BOT_ABANDONED_MAX_HOURS`
-  (96 h, oubli du salon par le bot), et la passe s'arrête quand même : les lignes suivantes
-  n'appellent plus le bot, celles passées 96 h se closent toutes dans la passe ; `created_at` repart quand
-  la ligne est rouverte ou que le salon change.
+- **Refus de rendu sans fin** : une ligne n'est **jamais close** tant que son salon peut encore
+  exister (refus ou bot indisponible). Passé `VOICE_BOT_UNRELEASED_MAX_HOURS` (48 h) depuis sa
+  création, elle n'est plus redemandée que toutes les `VOICE_STUCK_RETRY_SECONDS` (1 h, attente
+  bornée calculée par la base dans `RELEASABLE_SQL`) au lieu de chaque minute, avec une seule ligne
+  pm2 `salon vocal toujours pas rendu après 48 h (nouvel essai toutes les 1 h)` par salon ; un bot
+  indisponible arrête la passe (les lignes suivantes attendent). `created_at` repart quand la
+  ligne est rouverte ou que le salon change.
+- **Une seule horloge** : la publication du tournoi et l'échéance des salons se jugent sur
+  l'heure de la base (`NOW()` : `databaseNow` pour l'instantané, `db_now` lu avec le match pour
+  la porte REST), comme les requêtes du balayage — une application en avance ne montre pas un
+  salon que la base n'ouvre pas encore.
 - **Ligne sans salon** (création expirée ou réponse illisible, alors que le bot a pu créer le
   salon) : rendue par sa clé (`releaseVoiceChannelByKey`, `POST /internal/voice/keys/release`),
   jamais close sans appel au bot. Un bot plus ancien sans cette route (`INTERNAL_ROUTE_NOT_FOUND`
   au rendu par clé — tout 404 autre que `VOICE_CHANNEL_NOT_TRACKED` s'y lit ainsi, même
   illisible : mandataire, page HTML) ne vaut refus que de cette ligne : les rendus par identifiant passent, sans
-  attente du bot ; la ligne attend sa mise à jour (ou son filet de 48 h).
+  attente du bot ; la ligne attend sa mise à jour (redemandée toutes les heures passé 48 h).
 - **Clôture gardée** : `released_at` et `failed_at` ne s'écrivent que si la ligne porte encore le
   salon rendu (`channel_id <=> ?`) — un salon neuf écrit entre-temps par un autre processus reste
   ouvert, rendu plus tard ; rien n'est publié si la ligne n'a pas changé. Une revérification qui

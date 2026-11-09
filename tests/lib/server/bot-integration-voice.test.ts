@@ -71,58 +71,38 @@ describe("bot-integration — salons vocaux", () => {
 
   // Module neuf à chaque test : coupe-circuit fermé.
   it("releaseVoiceChannel_routeMissing404_returnsFailed", async () => {
-    const bot = await freshBotIntegration();
     // Bot d'une autre version sans la route : jamais « déjà rendu », la ligne reste ouverte.
-    jest.spyOn(global, "fetch").mockResolvedValue(json(404, { error: "INTERNAL_ROUTE_NOT_FOUND" }));
-    await expect(bot.releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "unavailable", code: "INTERNAL_ROUTE_NOT_FOUND" });
+    await expect(freshRelease("id", json(404, { error: "INTERNAL_ROUTE_NOT_FOUND" }))).resolves.toEqual(ROUTE_MISSING);
   });
 
   it("releaseVoiceChannel_unreadable404_returnsRequestFailedCode", async () => {
-    const bot = await freshBotIntegration();
-    jest.spyOn(global, "fetch").mockResolvedValue(new Response("<html>Cannot POST</html>", { status: 404 }));
-    await expect(bot.releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "unavailable", code: "BOT_INTERNAL_REQUEST_FAILED" });
+    await expect(freshRelease("id", htmlNotFound())).resolves.toEqual(REQUEST_FAILED);
   });
 
   it("releaseVoiceChannelByKey_unreadable404_returnsRouteMissing", async () => {
-    const bot = await freshBotIntegration();
     // Mandataire ou bot sans la route qui répond une page HTML : refus de cette ligne seulement.
-    jest.spyOn(global, "fetch").mockResolvedValue(new Response("<html>Cannot POST</html>", { status: 404 }));
-    await expect(bot.releaseVoiceChannelByKey("match:42:team:1")).resolves.toEqual({
-      kind: "unavailable",
-      code: "INTERNAL_ROUTE_NOT_FOUND",
-    });
+    await expect(freshRelease("key", htmlNotFound())).resolves.toEqual(ROUTE_MISSING);
   });
 
   it("releaseVoiceChannelByKey_foreignNotFound404_returnsRouteMissing", async () => {
-    const bot = await freshBotIntegration();
-    jest.spyOn(global, "fetch").mockResolvedValue(json(404, { error: "NOT_FOUND" }));
-    await expect(bot.releaseVoiceChannelByKey("match:42:team:1")).resolves.toEqual({
-      kind: "unavailable",
-      code: "INTERNAL_ROUTE_NOT_FOUND",
-    });
+    await expect(freshRelease("key", json(404, { error: "NOT_FOUND" }))).resolves.toEqual(ROUTE_MISSING);
   });
 
   it("releaseVoiceChannelByKey_notTracked404_returnsGone", async () => {
-    const bot = await freshBotIntegration();
-    jest.spyOn(global, "fetch").mockResolvedValue(json(404, { error: "VOICE_CHANNEL_NOT_TRACKED" }));
-    await expect(bot.releaseVoiceChannelByKey("match:42:team:1")).resolves.toEqual({
+    await expect(freshRelease("key", json(404, { error: "VOICE_CHANNEL_NOT_TRACKED" }))).resolves.toEqual({
       kind: "gone",
       code: "VOICE_CHANNEL_NOT_TRACKED",
     });
   });
 
   it("releaseVoiceChannel_foreignNotFound404_returnsRequestFailedCode", async () => {
-    const bot = await freshBotIntegration();
     // Le 404 d'un autre service (bot mal routé) : un code de transport, qui arrête le balayage.
-    jest.spyOn(global, "fetch").mockResolvedValue(json(404, { error: "NOT_FOUND" }));
-    await expect(bot.releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "unavailable", code: "BOT_INTERNAL_REQUEST_FAILED" });
+    await expect(freshRelease("id", json(404, { error: "NOT_FOUND" }))).resolves.toEqual(REQUEST_FAILED);
   });
 
   it("releaseVoiceChannel_sentenceErrorCode_returnsRequestFailedCode", async () => {
-    const bot = await freshBotIntegration();
     // Une phrase (qui pourrait citer un salon ou un membre) n'est jamais reprise comme code.
-    jest.spyOn(global, "fetch").mockResolvedValue(json(503, { error: "Salon Equipe Bleue introuvable" }));
-    await expect(bot.releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "unavailable", code: "BOT_INTERNAL_REQUEST_FAILED" });
+    await expect(freshRelease("id", json(503, { error: "Salon Equipe Bleue introuvable" }))).resolves.toEqual(REQUEST_FAILED);
   });
 
   it("releaseVoiceChannel_nonStringErrorCode_returnsFallbackCode", async () => {
@@ -153,6 +133,21 @@ async function freshBotIntegration(): Promise<typeof import("@/lib/server/bot-in
     loaded = await import("@/lib/server/bot-integration");
   });
   return loaded!;
+}
+
+const ROUTE_MISSING = { kind: "unavailable", code: "INTERNAL_ROUTE_NOT_FOUND" };
+const REQUEST_FAILED = { kind: "unavailable", code: "BOT_INTERNAL_REQUEST_FAILED" };
+
+/** Page HTML d'un mandataire ou d'un serveur sans la route. */
+function htmlNotFound() {
+  return new Response("<html>Cannot POST</html>", { status: 404 });
+}
+
+/** Rendu par identifiant (`id`) ou par clé (`key`) d'un module neuf, le bot répondant `response`. */
+async function freshRelease(route: "id" | "key", response: Response) {
+  const bot = await freshBotIntegration();
+  jest.spyOn(global, "fetch").mockResolvedValue(response);
+  return route === "id" ? bot.releaseVoiceChannel("123456789") : bot.releaseVoiceChannelByKey("match:42:team:1");
 }
 
 describe("bot-integration — salons vocaux, coupe-circuit", () => {

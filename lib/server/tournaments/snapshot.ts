@@ -65,8 +65,7 @@ import { applyMapRules, roundKeyId, type RoundTiebreak } from "@/lib/shared/roun
 import { loadMapRules } from "./round-maps";
 import { applicableTiebreaks } from "@/lib/shared/round-plan";
 import { withoutRefereeKeys } from "./referee-names";
-import { loadMatchVoiceInfos } from "./match-voice";
-import { voiceOptionLive } from "@/lib/shared/match-voice";
+import { loadTournamentVoiceInfos } from "./match-voice";
 
 /**
  * Durée de vie d'un instantané. Volontairement courte : elle ne sert qu'à
@@ -527,7 +526,8 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     // option éteinte, hors tournoi en cours ni avant sa publication (`docs/features/MATCH_VOICE.md`).
     // Dans l'instantané commun — l'état de chaque salon, jamais qui —, servi
     // par les deux portes.
-    const voiceByMatch = await loadMatchVoiceInfos(connection, voiceOptionLive(card, Date.now()), mappedMatches);
+    // Horloge de la base, comme le balayage.
+    const voiceByMatch = await loadTournamentVoiceInfos(connection, card, mappedMatches);
     if (voiceByMatch.size > 0) {
       for (const match of mappedMatches) match.voice = voiceByMatch.get(match.id) ?? null;
     }
