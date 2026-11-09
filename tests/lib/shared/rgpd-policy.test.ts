@@ -25,6 +25,8 @@ import {
 import { DONNEES_PROFIL_EN, DROITS_EN } from "@/lib/shared/rgpd-policy-en";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
+import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 
 describe("clés de rendu de /rgpd", () => {
   // La page s'en sert comme `key` React : un doublon ferait confondre deux lignes.
@@ -599,5 +601,45 @@ describe("groupedExtraBases", () => {
       { base: "Exécution du contrat", scopes: ["portée B"] },
       { base: "Intérêt légitime", scopes: ["portée C"] },
     ]);
+  });
+});
+
+describe("annonce d'un nouveau match — textes légaux (revue juridique de #569)", () => {
+  const t04 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")!;
+  const t04En = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")!;
+
+  it("registerT04_purposes_listNewMatchAnnouncementInFrAndEn", () => {
+    expect(t04.subPurposes.join("\n")).toMatch(/Annoncer en message privé Discord et en push un nouveau match[^\n]*une seule fois par match et par affiche/);
+    expect(t04En.subPurposes.join("\n")).toMatch(/Announcing a new match[^\n]*once per match and pairing/);
+  });
+
+  it("registerT04_retention_newMatchRecordsListAnnouncedTimeAndSkippedMark", () => {
+    const fr = t04.retention.find((line) => line.includes("annonce d'un nouveau match"));
+    const en = t04En.retention.find((line) => line.includes("notice of a new match"));
+    expect(fr).toMatch(/horaire annoncé et, pour un match déjà apparié à la mise en service, la marque qu'il n'a pas été annoncé/);
+    expect(en).toMatch(/the announced time and, for a match already paired when the feature went live, the mark that it was not announced/);
+    expect(en).not.toMatch(/never goes out twice, erased with it/);
+  });
+
+  it("registerBotEntry_deliveries_includeNewMatchAnnouncement", () => {
+    const bot = PROCESSING_ACTIVITIES.find((activity) => activity.name === "Bot Discord BlueGenji")!;
+    const botEn = PROCESSING_ACTIVITIES_EN.find((activity) => activity.name === "BlueGenji Discord bot")!;
+    expect(bot.subPurposes.join("\n")).toContain("annonce d'un nouveau match aux membres de ses deux équipes");
+    expect(botEn.subPurposes.join("\n")).toContain("the announcement of a new match to the members of both its teams");
+  });
+
+  it("privacyChange_newMatchEntry_saysOncePerPairingAndAnnouncedTimeInFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === "2026-11-annonce-nouveau-match")!;
+    const en = PRIVACY_CHANGES_EN["2026-11-annonce-nouveau-match"];
+    expect(fr.details.join("\n")).toContain("une seule fois par match et par affiche");
+    expect(fr.details.join("\n")).toContain("l'horaire annoncé");
+    expect(en.details.join("\n")).toContain("once per match and pairing");
+    expect(en.details.join("\n")).toContain("the announced time");
+    expect(en.details).toHaveLength(fr.details.length);
+  });
+
+  it("donneesProfil_matchDmChoice_mentionsNewMatchInFrAndEn", () => {
+    expect(DONNEES_PROFIL.find((d) => d.donnee === "Choix des messages privés de match")?.finalite).toContain("l'annonce d'un nouveau match");
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Match direct messages choice")?.finalite).toContain("to announce a new match");
   });
 });
