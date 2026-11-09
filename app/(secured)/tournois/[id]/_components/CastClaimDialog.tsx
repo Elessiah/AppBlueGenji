@@ -5,7 +5,7 @@ import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useOptionalToast } from "@/components/ui/toast";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
-import { PLATFORM_LABELS, streamPlatform, type MatchLiveTrigger } from "@/lib/shared/live-streams";
+import { PLATFORM_LABELS, isMatchCastable, streamPlatform, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import { liveTriggerViewer, viewerMayChangeLiveTrigger } from "@/lib/shared/live-trigger-owner";
 import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import type { BracketMatch } from "@/lib/shared/types";
@@ -31,7 +31,11 @@ import {
 } from "./CastSettingsFields";
 import styles from "./CastClaimDialog.module.css";
 
-const CAST_FIELD_ERRORS = { INVALID_STREAM_URL: "url", STREAM_URL_REQUIRED: "url" } as const;
+const CAST_FIELD_ERRORS = {
+  INVALID_STREAM_URL: "url",
+  STREAM_URL_REQUIRED: "url",
+  INVALID_CAST_BATTLETAG: "battletag",
+} as const;
 
 /** Issue d'une inscription : le refus porte son code et la phrase déjà notifiée. */
 export type CastClaimOutcome = { ok: true } | { ok: false; code: string; message: string };
@@ -101,7 +105,10 @@ export function CastClaimDialog({
   // qui ne demande plus un clic à l'heure dite.
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "AUTO");
   const [organisationLink, setOrganisationLink] = useState(false);
-  const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId });
+  const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId, battletag: battletagId });
+  // Un match dont le score est saisi s'inscrit encore, mais son mode ne bouge
+  // plus (`isMatchCastable`) : le choix n'est pas offert, ni envoyé.
+  const castable = isMatchCastable({ ...match, liveStartedAt: null, launchedAt: null });
   const fieldsetRef = useRef<HTMLFieldSetElement>(null);
   const gone = choice === null;
   // Le refus se notifie aussi en bas à gauche (règle des erreurs) : le texte
@@ -127,13 +134,16 @@ export function CastClaimDialog({
   // Le mode du match, laissé tel quel, ne se réécrit pas (le serveur l'ignore) :
   // un « à la date de début » sans date, posé par le staff, ne bloque pas
   // l'inscription.
-  const triggerRefused = separate && !triggerLocked && trigger !== match.liveTrigger && castTriggerNeedsDate(trigger, match.startAt);
+  const triggerRefused =
+    separate && castable && !triggerLocked && trigger !== match.liveTrigger && castTriggerNeedsDate(trigger, match.startAt);
   // « A, B et C » / "A, B, and C" : la conjonction de la langue de la page.
   const casterList = useMemo(() => new Intl.ListFormat(locale, { style: "long", type: "conjunction" }), [locale]);
 
   const confirm = async (): Promise<boolean> => {
     if (choice === null) return false;
-    const outcome = await onClaim(castClaimBody(choice, { url, battletag, trigger: triggerLocked ? undefined : trigger, organisationLink }));
+    const outcome = await onClaim(
+      castClaimBody(choice, { url, battletag, trigger: triggerLocked || !castable ? undefined : trigger, organisationLink }),
+    );
     if (!outcome.ok) fieldErrors.report(outcome.code, outcome.message);
     return outcome.ok;
   };
@@ -182,7 +192,8 @@ export function CastClaimDialog({
           );
         })}
       </fieldset>
-      <output className={styles.gone} aria-live="polite">
+      {/* Annonce seule (lecteur d'écran) : le toast dit déjà la disparition à l'écran. */}
+      <output className="sr-only" aria-live="polite">
         {gone ? t("cardActions.claimDialog.gone") : ""}
       </output>
       {separate && (
@@ -197,7 +208,14 @@ export function CastClaimDialog({
             invalid={urlRefused || fieldErrors.invalidField === "url"}
             fieldError={fieldErrors.message("url")}
           />
-          <CastTriggerField trigger={lockedTrigger(triggerLocked, match.liveTrigger, trigger)} startAt={match.startAt} onChange={setTrigger} locked={triggerLocked} />
+          {castable && (
+            <CastTriggerField
+              trigger={lockedTrigger(triggerLocked, match.liveTrigger, trigger)}
+              startAt={match.startAt}
+              onChange={setTrigger}
+              locked={triggerLocked}
+            />
+          )}
           {canSchedule && url.trim() !== "" && (
             <CastOrganisationLinkField checked={organisationLink} onChange={setOrganisationLink} />
           )}
@@ -208,8 +226,12 @@ export function CastClaimDialog({
         <CastBattletagField
           id={battletagId}
           value={battletag}
-          onChange={setBattletag}
-          invalid={battletagRefused}
+          onChange={(next) => {
+            setBattletag(next);
+            fieldErrors.clear("battletag");
+          }}
+          invalid={battletagRefused || fieldErrors.invalidField === "battletag"}
+          fieldError={fieldErrors.message("battletag")}
         />
       )}
     </ConfirmActionDialog>

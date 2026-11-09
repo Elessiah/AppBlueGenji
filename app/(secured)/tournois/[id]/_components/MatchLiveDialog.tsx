@@ -25,6 +25,8 @@ import { useLiveControls } from "../_lib/live-context";
 import { formatMatchStartAt } from "@/lib/shared/match-schedule";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
+import { useOnAirToggle } from "../_lib/use-on-air-toggle";
+import styles from "./MatchLiveDialog.module.css";
 import { useDialogsText } from "../_lib/dialogs-text";
 import { CastTriggerField } from "./CastSettingsFields";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
@@ -250,24 +252,7 @@ export function MatchLiveDialog({
   const airToggle = canToggleOnAir(match) && viewerMayToggleOnAir(match, viewer);
 
   /** Ouvre ou coupe l'antenne (mode manuel), sans quitter la fenêtre. */
-  const toggleAir = async () => {
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/admin/matches/${match.id}/live`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ onAir: !onAir }),
-      });
-      const payload = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "MATCH_LIVE_UPDATE_FAILED");
-      showSuccess(onAir ? actions.t("cardActions.airClosed") : actions.t("cardActions.airOpened"));
-      onSaved();
-    } catch (error) {
-      showError(mapError((error as Error).message));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const toggleAir = useOnAirToggle(match.id, onAir, { setBusy, onDone: onSaved });
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -479,12 +464,11 @@ export function MatchLiveDialog({
 
         {/* Antenne (mode manuel) et rediff : la carte ne les porte plus. */}
         {airToggle && (
-          <div style={{ margin: "0 0 14px" }}>
+          <div className={styles.section}>
             <button
               type="button"
-              className={onAir ? "btn ghost" : "btn"}
+              className={`${onAir ? "btn ghost" : "btn"} ${styles.sectionButton}`}
               disabled={busy}
-              style={{ padding: "8px 18px", fontSize: 13 }}
               onClick={() => void toggleAir()}
             >
               {onAir ? actions.t("cardActions.stopLive") : actions.t("cardActions.startLive")}
@@ -492,12 +476,11 @@ export function MatchLiveDialog({
           </div>
         )}
         {canEditReplay(match, canManage) && (
-          <div style={{ margin: "0 0 14px" }}>
+          <div className={styles.section}>
             <button
               type="button"
-              className="btn ghost"
+              className={`btn ghost ${styles.sectionButton}`}
               disabled={busy}
-              style={{ padding: "8px 18px", fontSize: 13 }}
               onClick={() => {
                 // Une autre modale : celle-ci se ferme d'abord, les deux ne se
                 // disputent pas le piège de focus.

@@ -181,6 +181,17 @@ it("CastClaimDialog_triggerPosedByAnotherCaster_showsItWithoutRadios", () => {
   expect(html.match(/name="[^"]*" value="(AUTO|START_TIME|MANUAL)"/g)).toBeNull();
 });
 
+it("CastClaimDialog_scoreDeclared_noTriggerOffered", () => {
+  // Le score saisi, le mode ne bouge plus (`isMatchCastable`) : il n'est ni offert ni envoyé.
+  const html = renderAsCaster(bracketMatch({ status: "AWAITING_CONFIRMATION" }));
+  expect(html).toContain("Ouvrir mon propre stream");
+  expect(html).not.toContain('value="MANUAL"');
+});
+
+it("CastClaimDialog_matchToPlay_offersTrigger", () => {
+  expect(renderAsCaster(bracketMatch({ status: "READY" }))).toContain('value="MANUAL"');
+});
+
 function renderDialog(locale: "fr" | "en", match: typeof TWO_STREAMS = TWO_STREAMS) {
   effects.armed = true;
   const dialog = (
@@ -252,7 +263,8 @@ describe("CastClaimDialog — rendu", () => {
   });
 
   it("l'annonce du stream disparu est une zone vive toujours montée, vide tant que le choix existe", () => {
-    expect(renderDialog("fr")).toContain('<output class="gone" aria-live="polite"></output>');
+    // Annonce réservée au lecteur d'écran (`sr-only`) : le toast la dit déjà à l'écran.
+    expect(renderDialog("fr")).toContain('</fieldset><output class="sr-only" aria-live="polite"></output>');
   });
 
   it("le champ du lien n'apparaît qu'en choisissant son propre stream", () => {

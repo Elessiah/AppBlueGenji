@@ -1,0 +1,9 @@
+/* Fenêtre de diffusion du staff (`MatchLiveDialog`) : antenne et rediff. */
+.section {
+  margin: 0 0 14px;
+}
+
+.sectionButton {
+  padding: 8px 18px;
+  font-size: 13px;
+}
