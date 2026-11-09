@@ -197,8 +197,8 @@ règle a changé avec l'arbitre hôte.
   toutes les 10 s en lobby tant qu'un arbitre n'est pas prêt
   (`refereeReadyRereadDue`, `useClientPower().clocks`).
 - **Membre connecté** : `TournamentViewerContext.refereeNames`
-  (`{ matchId, refereeKey, pseudo }`, `loadRefereeNames`, cache 5 s par
-  version) — le bandeau et la page du match lisent « Arbitre : <pseudo> »
+  (`{ matchId, refereeKey, pseudo }`, `loadRefereeNames`, cache 30 s par
+  version, lecture des seuls matchs montrés) — le bandeau et la page du match lisent « Arbitre : <pseudo> »
   (`refereeNameOf`, pseudo par `visibleText`), sinon « Arbitre désigné ».
   Le contexte n'arrivant qu'à la connexion SSE ou par le GET REST, une
   empreinte sans nom (`missingRefereeNamesKey`) déclenche une seule relecture

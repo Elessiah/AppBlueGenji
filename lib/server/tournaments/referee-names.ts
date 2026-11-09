@@ -99,10 +99,11 @@ export function markViewerReferee(
 
 /**
  * Durée de vie des pseudos lus pour une version d'instantané : la clé porte la
- * version, toute écriture en fait une autre ; la durée ne sert qu'à absorber
- * une vague d'ouvertures de flux (tous les membres lisent les mêmes pseudos).
+ * version, toute écriture en fait une autre ; la durée absorbe les ouvertures
+ * de flux (tous les membres lisent les mêmes pseudos) sans tenir plus d'une
+ * demi-minute un pseudo changé depuis.
  */
-const REFEREE_NAMES_TTL_MS = 5_000;
+const REFEREE_NAMES_TTL_MS = 30_000;
 
 type RefereeNameRow = RowDataPacket & { id: number; referee_user_id: number; pseudo: string };
 
@@ -123,14 +124,17 @@ export async function loadRefereeNames(snapshot: TournamentSnapshot): Promise<Ma
   }
   if (shown.size === 0) return [];
   return cached(`referee-names:${snapshot.card.id}:${snapshot.version}`, REFEREE_NAMES_TTL_MS, async () => {
+    // Les seuls matchs montrés : ni les joués ni les autres ne sont lus.
+    const ids = [...shown.keys()];
     const rows = await withConnection(async (connection) => {
       const [result] = await connection.query<RefereeNameRow[]>(
         `SELECT m.id, m.referee_user_id, u.pseudo
            FROM bg_matches m
            JOIN bg_users u ON u.id = m.referee_user_id
-          WHERE m.tournament_id = ? AND m.referee_user_id IS NOT NULL
+          WHERE m.tournament_id = ? AND m.id IN (${ids.map(() => "?").join(", ")})
+            AND m.referee_user_id IS NOT NULL
             AND u.is_deleted = 0 AND u.referee_objection_at IS NULL`,
-        [snapshot.card.id],
+        [snapshot.card.id, ...ids],
       );
       return result;
     });

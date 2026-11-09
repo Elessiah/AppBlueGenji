@@ -118,8 +118,23 @@ describe("loadRefereeNames", () => {
 
     await loadRefereeNames(snapshotWith(bracketMatch({ id: 5, refereeKey: refereeKey(5, 9) })));
 
-    expect(jest.mocked(cached).mock.calls[0].slice(0, 2)).toEqual(["referee-names:7:v9", 5_000]);
-    expect(connection.query.mock.calls[0][1]).toEqual([7]);
+    expect(jest.mocked(cached).mock.calls[0].slice(0, 2)).toEqual(["referee-names:7:v9", 30_000]);
+    expect(connection.query.mock.calls[0][1]).toEqual([7, 5]);
+  });
+
+  it("loadRefereeNames_query_readsOnlyShownMatches", async () => {
+    rows();
+
+    await loadRefereeNames(
+      snapshotWith(
+        bracketMatch({ id: 5, refereeKey: refereeKey(5, 9) }),
+        bracketMatch({ id: 6, refereeKey: refereeKey(6, 9) }),
+        bracketMatch({ id: 8, status: "COMPLETED", refereeKey: refereeKey(8, 9) }),
+      ),
+    );
+
+    expect(String(connection.query.mock.calls[0][0])).toContain("m.id IN (?, ?)");
+    expect(connection.query.mock.calls[0][1]).toEqual([7, 5, 6]);
   });
 });
 
