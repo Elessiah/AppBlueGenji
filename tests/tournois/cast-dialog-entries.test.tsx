@@ -13,8 +13,8 @@ jest.mock("react-dom", () => {
 jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: () => ({ current: null }) }));
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { CastBattletagField, CastTriggerField } from "@/app/(secured)/tournois/[id]/_components/CastSettingsFields";
-import { closedMatchUnchanged, mayEditReplay, matchLiveBody } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
+import { CastBattletagField, CastTriggerField, CastUrlField } from "@/app/(secured)/tournois/[id]/_components/CastSettingsFields";
+import { closedMatchUnchanged, mayEditReplay, matchLiveBody, streamedBoxReason } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
 import { readSource } from "../helpers/read-source";
 import frActions from "@/messages/fr/tournamentActions.json";
 import enActions from "@/messages/en/tournamentActions.json";
@@ -46,6 +46,37 @@ describe("CastBattletagField — refus du serveur rattaché au champ", () => {
     const html = renderToStaticMarkup(<CastBattletagField id="bt" value="" onChange={() => undefined} invalid={false} />);
     expect(html).not.toContain("aria-invalid");
     expect(html).not.toContain('role="alert"');
+  });
+});
+
+describe("CastUrlField / CastBattletagField — une seule phrase de refus", () => {
+  it("CastUrlField_serverRefusal_noStaticFormatNote", () => {
+    const html = renderToStaticMarkup(
+      <CastUrlField id="u" value="x" onChange={() => undefined} invalid fieldError="Ce stream est celui de l'organisation" />,
+    );
+    expect(html).toContain("Ce stream est celui de l&#x27;organisation");
+    expect(html).not.toContain("Lien non reconnu");
+    expect(/<input[^>]*aria-describedby="[^"]*u-error/.test(html)).toBe(true);
+  });
+
+  it("CastUrlField_clientRefusal_showsFormatNote", () => {
+    const html = renderToStaticMarkup(<CastUrlField id="u" value="x" onChange={() => undefined} invalid />);
+    expect(html).toContain("Lien non reconnu");
+  });
+
+  it("CastUrlField_required_labelAndAriaRequired", () => {
+    const html = renderToStaticMarkup(<CastUrlField id="u" value="" onChange={() => undefined} invalid={false} required />);
+    expect(html).toContain("Lien de ma chaîne (obligatoire)");
+    expect(html).toContain('aria-required="true"');
+    const optional = renderToStaticMarkup(<CastUrlField id="u" value="" onChange={() => undefined} invalid={false} />);
+    expect(optional).not.toContain("aria-required");
+  });
+
+  it("CastBattletagField_serverRefusal_noStaticNote", () => {
+    const html = renderToStaticMarkup(
+      <CastBattletagField id="bt" value="x" onChange={() => undefined} invalid fieldError="BattleTag refusé" />,
+    );
+    expect(html).not.toContain("BattleTag invalide");
   });
 });
 
@@ -162,6 +193,26 @@ describe("MatchLiveDialog — match joué (ERREUR.txt EF-29 #528, CAST-FOLLOWUP 
     expect(closedMatchUnchanged(played, true, true)).toBe(false);
   });
 
+  it("closedMatchUnchanged_playedNeverCast_true", () => {
+    expect(closedMatchUnchanged({ ...played, liveTrigger: null }, false, false)).toBe(true);
+  });
+
+  it("closedMatchUnchanged_playedNeverCastWithCasterLinkEdit_false", () => {
+    expect(closedMatchUnchanged({ ...played, liveTrigger: null }, false, true)).toBe(false);
+  });
+
+  it("streamedBoxReason_enabledBox_null", () => {
+    expect(streamedBoxReason({ liveTrigger: null, liveTriggerCasterId: null }, false, true)).toBeNull();
+  });
+
+  it("streamedBoxReason_closedNeverCast_closed", () => {
+    expect(streamedBoxReason({ liveTrigger: null, liveTriggerCasterId: null }, true, false)).toBe("closed");
+  });
+
+  it("streamedBoxReason_ownerlessMode_orphan", () => {
+    expect(streamedBoxReason({ liveTrigger: "AUTO", liveTriggerCasterId: null }, true, true)).toBe("orphan");
+  });
+
   it("closedMatchUnchanged_castableMatch_false", () => {
     expect(closedMatchUnchanged(open, true, false)).toBe(false);
   });
@@ -204,8 +255,10 @@ describe("MatchLiveDialog — match joué (ERREUR.txt EF-29 #528, CAST-FOLLOWUP 
   it("MatchLiveDialog_notStreamedRefusal_attachedToTheStreamedCheckbox", () => {
     const live = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
     expect(live).toContain('MATCH_NOT_STREAMED: "streamed"');
-    expect(live).toContain("{...fieldAria(STREAMED_INPUT_ID, fieldErrors.invalidField === \"streamed\")}");
-    expect(live).toContain('<FieldErrorText fieldId={STREAMED_INPUT_ID} message={fieldErrors.message("streamed")} />');
+    expect(live).toContain("{...fieldAria(STREAMED_INPUT_ID, invalid, reason !== null && STREAMED_HINT_ID)}");
+    expect(live).toContain('<FieldErrorText fieldId={STREAMED_INPUT_ID} message={error} />');
+    // Sous un mode verrouillé la case n'existe pas : le refus n'y est pas rattaché.
+    expect(live).toContain('code === "MATCH_NOT_STREAMED" && triggerLocked && match.liveTrigger !== null');
   });
 
   it("MatchLiveDialog_neverCastClosedMatch_checkboxDisabled", () => {

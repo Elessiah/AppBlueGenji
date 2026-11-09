@@ -66,6 +66,7 @@ export function CastUrlField({
   invalid,
   fieldError,
   readOnlyNote,
+  required = false,
 }: Readonly<{
   id: string;
   value: string;
@@ -75,6 +76,8 @@ export function CastUrlField({
   fieldError?: string | null;
   /** Le stream est celui du staff : le lien se lit, il ne s'écrit pas ici. */
   readOnlyNote?: string;
+  /** Le lien est exigé pour valider (inscription) : dit dans le libellé et `aria-required`. */
+  required?: boolean;
 }>) {
   const { t } = useActionsText();
   const hintId = useId();
@@ -82,11 +85,14 @@ export function CastUrlField({
   const locked = readOnlyNote !== undefined;
   // Une ligne sous le champ seulement pour un refus ou un stream en lecture :
   // l'explication vit derrière le « i » (`INFO_HINTS.md`).
-  const note = invalid ? t("cardActions.castSettings.urlInvalid", { platforms: CAST_PLATFORMS }) : (readOnlyNote ?? null);
+  // Le refus du serveur porte sa propre phrase (`FieldErrorText`) : la note de
+  // format ne s'y ajoute pas, sinon le champ dirait deux choses contraires.
+  const formatNote = invalid && !fieldError;
+  const note = formatNote ? t("cardActions.castSettings.urlInvalid", { platforms: CAST_PLATFORMS }) : (readOnlyNote ?? null);
   return (
     <div className="field">
       <InfoHintRow>
-        <label htmlFor={id}>{t("cardActions.castSettings.url")}</label>
+        <label htmlFor={id}>{t(required ? "cardActions.castSettings.urlRequired" : "cardActions.castSettings.url")}</label>
         <InfoHint id={infoId} subject={t("cardActions.castSettings.urlSubject")}>
           <p>{t("cardActions.castSettings.urlHint", { platforms: CAST_PLATFORMS })}</p>
         </InfoHint>
@@ -99,11 +105,12 @@ export function CastUrlField({
         inputMode="url"
         placeholder="https://twitch.tv/…"
         readOnly={locked}
+        aria-required={required || undefined}
         // Le refus est lu avant l'aide (`fieldAria`), et l'aide reste lisible.
         {...fieldAria(id, invalid, note === null ? null : hintId, infoId)}
       />
       {note !== null && (
-        <p id={hintId} className={invalid ? styles.hintInvalid : styles.hint}>
+        <p id={hintId} className={formatNote ? styles.hintInvalid : styles.hint}>
           {note}
         </p>
       )}
@@ -226,9 +233,9 @@ export function CastBattletagField({
         maxLength={MAX_CAST_BATTLETAG_LENGTH}
         placeholder="Pseudo#1234"
         // Le refus est lu avant l'aide (`fieldAria`), comme pour le lien.
-        {...fieldAria(id, invalid, invalid ? hintId : null, infoId)}
+        {...fieldAria(id, invalid, invalid && !fieldError ? hintId : null, infoId)}
       />
-      {invalid && (
+      {invalid && !fieldError && (
         <p id={hintId} className={styles.hintInvalid}>
           {t("cardActions.castSettings.battletagInvalid")}
         </p>

@@ -386,6 +386,7 @@
       "noStartAt": "Aucune date de début n'est fixée sur ce match : l'antenne à l'heure dite demande d'abord un horaire.",
       "autoStop": "Le direct s'arrête tout seul dès qu'un score est saisi.",
       "url": "Lien de ma chaîne",
+      "urlRequired": "Lien de ma chaîne (obligatoire)",
       "urlHint": "Obligatoire : sans lui, ton stream n'apparaît ni sur le match ni dans l'annonce du direct (plateformes acceptées : {platforms}). Il est retiré du match si ton compte est supprimé, sauf s'il est marqué comme lien de l'organisation.",
       "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}.",
       "urlStaff": "Tu co-castes le stream de l'organisation : son lien se règle dans la configuration de la diffusion.",

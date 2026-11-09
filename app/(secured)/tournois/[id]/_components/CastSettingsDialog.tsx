@@ -237,17 +237,17 @@ export function CastSettingsDialog({
         {cast !== null && (
           <>
             {!played && (
-            <CastUrlField
-              id={urlId}
-              value={url}
-              onChange={(next) => {
-                setUrl(next);
-                fieldErrors.clear("url");
-              }}
-              invalid={urlRefused || fieldErrors.invalidField === "url"}
-              fieldError={fieldErrors.message("url")}
-              readOnlyNote={cast.staffStream ? t("cardActions.castSettings.urlStaff") : undefined}
-            />
+              <CastUrlField
+                id={urlId}
+                value={url}
+                onChange={(next) => {
+                  setUrl(next);
+                  fieldErrors.clear("url");
+                }}
+                invalid={urlRefused || fieldErrors.invalidField === "url"}
+                fieldError={fieldErrors.message("url")}
+                readOnlyNote={cast.staffStream ? t("cardActions.castSettings.urlStaff") : undefined}
+              />
             )}
 
             {configurable && (

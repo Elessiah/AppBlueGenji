@@ -259,6 +259,9 @@
     "removed": "Match removed from the stream.",
     "title": "Match stream",
     "streamed": "This match is being cast",
+    "streamedSubject": "the “being cast” box",
+    "streamedClosed": "This match's score is entered: it can no longer be cast.",
+    "streamedOrphan": "This mode no longer has a caster: only the match referee or staff can remove it.",
     "triggers": {
       "AUTO": "Automatically when the match starts",
       "START_TIME": "At the match's start date",

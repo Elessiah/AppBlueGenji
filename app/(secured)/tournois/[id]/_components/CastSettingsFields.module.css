@@ -32,14 +32,6 @@
   cursor: not-allowed;
 }
 
-.row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--ink-soft);
-  cursor: pointer;
-}
 
 .hint,
 .hintInvalid {

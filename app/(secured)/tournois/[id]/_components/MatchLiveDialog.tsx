@@ -130,6 +130,71 @@ function useResyncedStaffUrl(current: string) {
 }
 
 /**
+ * Pourquoi la case « casté » est grisée : le score est saisi sur un match
+ * jamais casté (`closed`), ou un mode sans maître que ce lecteur ne peut pas
+ * démarquer (`orphan`). `null` : la case se coche.
+ */
+export function streamedBoxReason(
+  match: Pick<BracketMatch, "liveTrigger" | "liveTriggerCasterId">,
+  disabled: boolean,
+  castable: boolean,
+): "closed" | "orphan" | null {
+  if (!disabled) return null;
+  return !castable && match.liveTrigger === null ? "closed" : "orphan";
+}
+
+/** La case « casté », son refus rattaché et, grisée, l'explication derrière un « i ». */
+function StreamedBox({
+  checked,
+  reason,
+  disabled,
+  invalid,
+  error,
+  onChange,
+}: Readonly<{
+  checked: boolean;
+  reason: "closed" | "orphan" | null;
+  disabled: boolean;
+  invalid: boolean;
+  error: string | null;
+  onChange: (checked: boolean) => void;
+}>) {
+  const { t } = useDialogsText();
+  const label = (
+    <label className={`${styles.streamed} ${styles.checkRow}`}>
+      <input
+        id={STREAMED_INPUT_ID}
+        type="checkbox"
+        checked={checked}
+        // Un mode sans maître ne se démarque que par l'arbitre ou le staff
+        // (`LIVE_TRIGGER_NOT_OWNED` au serveur) ; un match joué jamais casté ne
+        // se marque plus (`MATCH_NOT_CASTABLE`) : case grisée, avec son « i ».
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        {...fieldAria(STREAMED_INPUT_ID, invalid, reason !== null && STREAMED_HINT_ID)}
+      />
+      {/* NOSONAR S6772 — label en flex avec `gap` */}
+      {t("live.streamed")}
+    </label>
+  );
+  return (
+    <>
+      {reason === null ? (
+        label
+      ) : (
+        <InfoHintRow inline>
+          {label}
+          <InfoHint id={STREAMED_HINT_ID} subject={t("live.streamedSubject")}>
+            <p>{t(reason === "closed" ? "live.streamedClosed" : "live.streamedOrphan")}</p>
+          </InfoHint>
+        </InfoHintRow>
+      )}
+      <FieldErrorText fieldId={STREAMED_INPUT_ID} message={error} />
+    </>
+  );
+}
+
+/**
  * La case « casté » est grisée quand elle ne mène qu'à un refus : un mode sans
  * maître (`LIVE_TRIGGER_NOT_OWNED`) ou un match joué jamais casté, qui ne se
  * marque plus (`MATCH_NOT_CASTABLE`).
@@ -181,7 +246,8 @@ export function closedMatchUnchanged(
   streamed: boolean,
   casterLinksEdited: boolean,
 ): boolean {
-  return !isMatchCastable(match) && streamed && !casterLinksEdited;
+  // Marqué et resté coché, ou jamais marqué (case grisée) : rien à enregistrer.
+  return !isMatchCastable(match) && (streamed || match.liveTrigger === null) && !casterLinksEdited;
 }
 
 /**
@@ -218,6 +284,7 @@ const LIVE_FIELD_ERRORS = { INVALID_STREAM_URL: "url", MATCH_NOT_STREAMED: "stre
 
 const URL_INPUT_ID = "match-live-url";
 const STREAMED_INPUT_ID = "match-live-streamed";
+const STREAMED_HINT_ID = "match-live-streamed-hint";
 
 /** Identifiant du champ de lien d'un stream de caster. */
 function casterLinkInputId(streamId: number): string {
@@ -353,6 +420,7 @@ export function MatchLiveDialog({
   const platforms = LIVE_PLATFORMS.join(", ");
   // L'antenne d'un mode manuel suit la règle du mode (décision 2) : un
   // co-caster ne l'ouvre ni ne la coupe pour le caster qui l'a posé.
+  const streamedDisabled = streamedBoxDisabled(match, viewer, castable);
   const airToggle = canToggleOnAir(match) && viewerMayChangeLiveTrigger(match, viewer);
 
   /** Ouvre ou coupe l'antenne (mode manuel), sans quitter la fenêtre. */
@@ -397,7 +465,8 @@ export function MatchLiveDialog({
     showError(message);
     const field = error instanceof LiveRefusal ? error.field : null;
     if (field !== null && field in fieldIds) fieldErrors.flag(field, message);
-    else fieldErrors.report((error as Error).message, message);
+    // La case « casté » n'existe pas sous un mode verrouillé : rien à y rattacher.
+    else if (!(code === "MATCH_NOT_STREAMED" && triggerLocked && match.liveTrigger !== null)) fieldErrors.report(code, message);
   };
 
   return (
@@ -422,26 +491,18 @@ export function MatchLiveDialog({
             <CastTriggerField trigger={match.liveTrigger} startAt={match.startAt} onChange={setTrigger} locked />
           </div>
         ) : (
-          <label className={`${styles.streamed} ${styles.checkRow}`}>
-            <input
-              id={STREAMED_INPUT_ID}
-              type="checkbox"
-              checked={streamed}
-              // Un mode sans maître ne se démarque que par l'arbitre ou le staff
-              // (`LIVE_TRIGGER_NOT_OWNED` au serveur) ; un match joué jamais
-              // casté ne se marque plus (`MATCH_NOT_CASTABLE`) : case grisée.
-              disabled={streamedBoxDisabled(match, viewer, castable)}
-              onChange={(e) => {
-                setStreamed(e.target.checked);
-                fieldErrors.clear("streamed");
-              }}
-              {...fieldAria(STREAMED_INPUT_ID, fieldErrors.invalidField === "streamed")}
-            />
-            {/* NOSONAR S6772 — label en flex avec `gap` */}
-            {t("live.streamed")}
-          </label>
+          <StreamedBox
+            checked={streamed}
+            disabled={streamedDisabled}
+            reason={streamedBoxReason(match, streamedDisabled, castable)}
+            invalid={fieldErrors.invalidField === "streamed"}
+            error={fieldErrors.message("streamed")}
+            onChange={(next) => {
+              setStreamed(next);
+              fieldErrors.clear("streamed");
+            }}
+          />
         )}
-        <FieldErrorText fieldId={STREAMED_INPUT_ID} message={fieldErrors.message("streamed")} />
 
         {showUrl && (
           <>

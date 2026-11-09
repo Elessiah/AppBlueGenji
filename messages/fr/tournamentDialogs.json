@@ -259,6 +259,9 @@
     "removed": "Match retiré de la diffusion.",
     "title": "Diffusion du match",
     "streamed": "Ce match est casté",
+    "streamedSubject": "la case « casté »",
+    "streamedClosed": "Le score de ce match est saisi : il ne peut plus être casté.",
+    "streamedOrphan": "Ce mode n'a plus de caster : seuls l'arbitre du match ou le staff peuvent le retirer.",
     "triggers": {
       "AUTO": "Automatique au démarrage du match",
       "START_TIME": "À la date de début du match",

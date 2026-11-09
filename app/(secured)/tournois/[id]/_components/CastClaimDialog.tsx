@@ -199,6 +199,7 @@ export function CastClaimDialog({
       {separate && (
         <>
           <CastUrlField
+            required
             id={urlId}
             value={url}
             onChange={(next) => {
