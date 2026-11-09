@@ -5,7 +5,7 @@ jest.mock("@/lib/server/tournaments/notifications");
 
 import { setMatchReplayUrl } from "@/lib/server/tournaments/match-replay";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
-import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
+import { type SqlQuery, type SqlMock, connectionMock, fakeConnection } from "../../helpers/sql-double";
 
 /** Staff `tournaments` : toute rediff, sans lecture des casters. */
 const STAFF = { userId: 5, manages: true };
@@ -14,9 +14,12 @@ const LIVE_ONLY_12 = { userId: 12, manages: false };
 
 const VIDEO = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
 
+/** La transaction de la rediff : `execute` partagé, et la connexion rendue pour ses vérifications. */
 async function mockDb(execute: SqlMock) {
-  const { getDatabase } = await import("@/lib/server/database");
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  const { withConnection } = await import("@/lib/server/database");
+  const connection = { ...connectionMock(), execute };
+  jest.mocked(withConnection).mockImplementation((run) => run(fakeConnection(connection)));
+  return connection;
 }
 
 const playedRow = {
@@ -48,6 +51,25 @@ afterEach(() => {
 });
 
 describe("setMatchReplayUrl", () => {
+  it("setMatchReplayUrl_notCaster_rollsBackWithoutWriting", async () => {
+    const connection = await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([[playedRow]]).mockResolvedValueOnce([[]]));
+
+    await expect(setMatchReplayUrl(42, VIDEO, LIVE_ONLY_12)).rejects.toThrow("NOT_MATCH_CASTER");
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(connection.execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("setMatchReplayUrl_success_locksMatchAndCommits", async () => {
+    const connection = await mockDb(found());
+
+    await setMatchReplayUrl(42, VIDEO, STAFF);
+
+    // Le retrait d'un caster prend le même verrou : il ne passe plus entre contrôle et écriture.
+    expect(connection.execute.mock.calls[0][0]).toContain("FOR UPDATE");
+    expect(connection.commit).toHaveBeenCalled();
+  });
+
   it("setMatchReplayUrl_liveOnlyCasterOfMatch_writesLink", async () => {
     // Décision du 2026-11-09 : la seule `live` règle la rediff de **son** cast.
     const execute = jest

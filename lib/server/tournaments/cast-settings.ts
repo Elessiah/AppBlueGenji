@@ -136,7 +136,7 @@ export async function applyCastTrigger(
   }
   const matchId = Number(row.id);
   const actor = { userId, ...access };
-  const { hold, shown } = await castTriggerHold(connection, row, trigger === null ? null : userId);
+  const { hold, shown } = await castTriggerHold(connection, row, userId);
   // L'appelant caste le match (inscription ou réglage de son cast) : un mode
   // sans maître lui revient s'il le change (décision du 2026-11-05) — s'il est
   // montré (le candidat de l'inscription l'est) : un caster tu ne décide pas,
@@ -233,7 +233,10 @@ export async function setCasterStreamUrl(
  * l'organisation », **sans** changer le lien : `linkUserId` `null` = celui de
  * l'organisation, sinon le sien (`withdrawUserCasts` l'emporte avec son
  * compte). Les mêmes gardes que `setCasterStreamUrl` : jamais le stream du
- * staff, jamais un stream sans lien. `known` : les streams déjà lus sous verrou.
+ * staff, jamais un stream sans lien. Un changement d'origine n'est permis
+ * qu'au fournisseur du lien (vers l'organisation) ou au staff `tournaments`
+ * (`manages`, retour au fournisseur) ; l'état déjà dit n'écrit rien. `known` :
+ * les streams déjà lus sous verrou.
  *
  * @throws `STREAM_NOT_FOUND` | `CAST_STREAM_NOT_OWNED` | `STREAM_URL_REQUIRED`
  */
@@ -242,6 +245,8 @@ export async function setCasterLinkOrigin(
   matchId: number,
   streamId: number,
   linkUserId: number | null,
+  userId: number,
+  manages: boolean,
   known?: MatchStreamRow[],
 ): Promise<MatchStreamRow[]> {
   const streams = known ?? (await lockMatchStreams(connection, matchId, true));
@@ -249,6 +254,21 @@ export async function setCasterLinkOrigin(
   if (!target) throw new Error("STREAM_NOT_FOUND");
   if (!casterStreamEditable(target)) throw new Error("CAST_STREAM_NOT_OWNED");
   if (target.liveUrl === null) throw new Error("STREAM_URL_REQUIRED");
+  // Lu après le verrou des streams (et après l'écriture d'un lien neuf, même
+  // transaction) : l'attribution à jour.
+  const [origin] = await connection.execute<RowDataPacket[]>(
+    `SELECT link_user_id FROM bg_match_streams WHERE id = ? LIMIT 1`,
+    [streamId],
+  );
+  const holderId = nullableId(origin[0]?.link_user_id);
+  // Déjà dit tel quel : rien à écrire (le co-caster d'un stream qui renvoie
+  // l'état montré ne prend pas le lien d'un autre).
+  if ((linkUserId === null) === (holderId === null)) return streams;
+  // Seul le fournisseur du lien le dit « de l'organisation », et seul le staff
+  // `tournaments` le lui retire : un co-caster ne s'attribue pas le lien d'un
+  // autre (ni celui de l'organisation, qui partirait avec son compte).
+  const allowed = linkUserId === null ? holderId === userId : manages;
+  if (!allowed) throw new Error("CAST_STREAM_NOT_OWNED");
   await connection.execute(
     `UPDATE bg_match_streams SET link_user_id = ? WHERE id = ? AND staff_owned = 0`,
     [linkUserId, streamId],
@@ -307,7 +327,15 @@ export async function applyCastSettings(
   // décochée sans toucher l'URL, décision du 2026-11-09) : un lien inchangé
   // n'est pas réécrit par `setCasterStreamUrl`, son origine l'est ici.
   if (settings.asOrganisation !== undefined) {
-    streams = await setCasterLinkOrigin(connection, matchId, streamId, settings.asOrganisation ? null : userId, streams);
+    streams = await setCasterLinkOrigin(
+      connection,
+      matchId,
+      streamId,
+      settings.asOrganisation ? null : userId,
+      userId,
+      access.manages,
+      streams,
+    );
   }
   if (settings.battletag !== undefined) {
     await writeCastBattletag(connection, matchId, userId, parseCastBattletagInput(settings.battletag));

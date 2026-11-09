@@ -369,7 +369,7 @@ describe("setMatchLiveConfig", () => {
     await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/voix", setter: OWN_CHANNEL_5, access: STAFF });
     Object.assign(row, { live_trigger: "MANUAL", live_trigger_user_id: 12 });
     world.state.casters.push({ user_id: 12, stream_id: 7 });
-    await setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: CASTER_12, access: LIVE_ONLY });
+    await setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: ORGANISER_7, access: STAFF });
     expect(world.state.streams).toEqual([]);
   });
 
@@ -479,9 +479,22 @@ describe("setMatchLiveConfig", () => {
     ]);
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: CASTER_12, access: LIVE_ONLY });
+    await setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: ORGANISER_7, access: STAFF });
 
     expect(world.state.streams).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_liveOnlyOwnerUnmarks_keepsOrganisationLink", async () => {
+    // Décision 1 du 2026-11-09 : la seule `live` démarque son mode, jamais le lien de l'organisation.
+    const world = liveWorld(matchRow({ status: "COMPLETED", live_trigger: "AUTO", live_trigger_user_id: 12 }), [dbStream(1, "https://twitch.tv/x", true)], [
+      { user_id: 12, stream_id: 7 },
+    ]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: null, liveUrl: null, setter: CASTER_12, access: LIVE_ONLY });
+
+    expect(world.state.streams).toEqual([dbStream(1, "https://twitch.tv/x", true)]);
+    expect(world.state.matchWrites.some(([sql]) => sql.includes("SET live_trigger = NULL"))).toBe(true);
   });
 
   it("lit une seule fois chaque table sous verrou par réglage : les streams déjà lus ne sont pas relus par le ménage", async () => {

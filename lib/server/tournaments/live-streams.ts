@@ -317,8 +317,7 @@ export async function setMatchLiveConfig(
         // Match sans mode : l'arbitre n'y corrige que les liens des casters —
         // rien à démarquer (ni mode, ni lien du staff, sans mode lui non plus).
       } else if (trigger === null) {
-        await unmarkLive(connection, matchId, hold, actor);
-        streams = streams?.map((stream) => (stream.staff ? { ...stream, liveUrl: null } : stream));
+        streams = await unmarkLive(connection, matchId, hold, actor, streams);
       } else {
         if (triggerChanges) {
           // Posé par un caster montré du match, le mode est le sien ; par le
@@ -349,17 +348,22 @@ export async function setMatchLiveConfig(
 }
 
 /**
- * Démarque le match : mode, maître et antenne, puis le lien de l'organisation.
- * Démarquer efface ce lien : un porteur de la seule `live` ne le fait que sur
- * **son** mode (il en est le maître) ; sur celui du staff, il n'y touche pas plus
- * qu'en le réécrivant (`writeStaffLink`, `STAFF_STREAM_FORBIDDEN`).
+ * Démarque le match : mode, maître et antenne, puis — côté staff seulement —
+ * le lien de l'organisation. Un porteur de la seule `live` ne démarque que
+ * **son** mode (il en est le maître), et n'efface jamais ce lien (décision 1 du
+ * 2026-11-09, comme « Configurer ma diffusion », `applyCastTrigger`) ; sur le
+ * mode du staff qui porte ce lien, il n'y touche pas
+ * (`STAFF_STREAM_FORBIDDEN`, comme `writeStaffLink`).
+ *
+ * @returns les streams déjà lus (`known`), lien du staff effacé s'il l'a été.
  */
 async function unmarkLive(
   connection: PoolConnection,
   matchId: number,
   hold: LiveTriggerHold,
   actor: LiveTriggerActor,
-): Promise<void> {
+  known: MatchStreamRow[] | undefined,
+): Promise<MatchStreamRow[] | undefined> {
   const staffSide = actor.manages || isMatchRefereeActor(hold, actor);
   if (!staffSide && hold.ownerId !== actor.userId && (await hasStaffLink(connection, matchId))) {
     throw new Error("STAFF_STREAM_FORBIDDEN");
@@ -368,10 +372,12 @@ async function unmarkLive(
     `UPDATE bg_matches SET live_trigger = NULL, live_trigger_user_id = NULL, live_started_at = NULL WHERE id = ?`,
     [matchId],
   );
+  if (!staffSide) return known;
   await connection.execute(
     `UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE match_id = ? AND staff_owned = 1`,
     [matchId],
   );
+  return known?.map((stream) => (stream.staff ? { ...stream, liveUrl: null } : stream));
 }
 
 /** Le stream de l'organisation porte-t-il un lien (que le démarquage effacerait) ? */

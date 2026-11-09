@@ -113,6 +113,15 @@ describe("applyCastTrigger", () => {
 });
 
 describe("applyCastTrigger — inscription et maître tu", () => {
+  it("applyCastTrigger_shownCasterRemovesOwnerlessMode_unmarks", async () => {
+    // Mode posé par le staff (sans maître) : un caster montré le retire.
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(13)).mockResolvedValue([{ affectedRows: 1 }, []]);
+    const row = { ...ownedRow(), live_trigger: "AUTO", live_trigger_user_id: null } as LaunchMatchRow;
+
+    await expect(applyCastTrigger(fakeConnection({ execute }), row, null, 13)).resolves.toBe(true);
+    expect(execute.mock.calls[1][0]).toContain("SET live_trigger = NULL");
+  });
+
   it("applyCastTrigger_notAllowedWithSkip_returnsFalseWithoutWrite", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12, 13));
     const row = ownedRow();
@@ -186,22 +195,66 @@ describe("applyCastSettings", () => {
 /** Le stream 5 du caster 900, avec son lien. */
 const OWN_LINKED = { id: 5, match_id: 42, live_url: "https://twitch.tv/voix", staff_owned: 0 };
 
+/** Lecture de l'attribution du lien (`link_user_id`) du stream 5. */
+function heldBy(linkUserId: number | null) {
+  return [[{ link_user_id: linkUserId }], []];
+}
+
+/** Streams verrouillés, attribution, puis écritures. */
+function originDb(linkUserId: number | null) {
+  return jest
+    .fn<SqlQuery>()
+    .mockResolvedValueOnce([[OWN_LINKED], []])
+    .mockResolvedValueOnce(heldBy(linkUserId))
+    .mockResolvedValue([{ affectedRows: 1 }, []]);
+}
+
+const CAST_ROW = { id: 42, casters: [{ matchId: 42, userId: 900, streamId: 5, readyAt: null }] } as unknown as LaunchMatchRow;
+
 describe("setCasterLinkOrigin — l'origine du lien dite seule (décision du 2026-11-09)", () => {
-  it("setCasterLinkOrigin_ownLinkedStream_clearsLinkUserId", async () => {
-    const execute = jest.fn<SqlQuery>();
-    execute.mockResolvedValueOnce([[OWN_LINKED], []]);
-    execute.mockResolvedValue([{ affectedRows: 1 }, []]);
+  it("setCasterLinkOrigin_providerToOrganisation_clearsLinkUserId", async () => {
+    const execute = originDb(900);
 
-    await setCasterLinkOrigin(fakeConnection({ execute }), 42, 5, null);
+    await setCasterLinkOrigin(fakeConnection({ execute }), 42, 5, null, 900, true);
 
-    expect(execute.mock.calls[1]).toEqual([expect.stringContaining("SET link_user_id = ?"), [null, 5]]);
+    expect(execute.mock.calls[2]).toEqual([expect.stringContaining("SET link_user_id = ?"), [null, 5]]);
+  });
+
+  it("setCasterLinkOrigin_coCasterToOrganisation_throwsCastStreamNotOwned", async () => {
+    const execute = originDb(800);
+
+    await expect(setCasterLinkOrigin(fakeConnection({ execute }), 42, 5, null, 900, true)).rejects.toThrow("CAST_STREAM_NOT_OWNED");
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("setCasterLinkOrigin_liveOnlyClaimsOrganisationLink_throwsCastStreamNotOwned", async () => {
+    const execute = originDb(null);
+
+    await expect(setCasterLinkOrigin(fakeConnection({ execute }), 42, 5, 900, 900, false)).rejects.toThrow("CAST_STREAM_NOT_OWNED");
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("setCasterLinkOrigin_staffReturnsOrganisationLink_attachesToCaller", async () => {
+    const execute = originDb(null);
+
+    await setCasterLinkOrigin(fakeConnection({ execute }), 42, 5, 900, 900, true);
+
+    expect(execute.mock.calls[2]).toEqual([expect.stringContaining("SET link_user_id = ?"), [900, 5]]);
+  });
+
+  it("setCasterLinkOrigin_originAlreadyAsRequested_writesNothing", async () => {
+    const execute = originDb(800);
+
+    await setCasterLinkOrigin(fakeConnection({ execute }), 42, 5, 900, 900, false);
+
+    expect(execute).toHaveBeenCalledTimes(2);
   });
 
   it("setCasterLinkOrigin_staffStream_throwsCastStreamNotOwned", async () => {
     const execute = jest.fn<SqlQuery>();
     execute.mockResolvedValueOnce([[{ ...OWN_LINKED, staff_owned: 1 }], []]);
 
-    await expect(setCasterLinkOrigin(fakeConnection({ execute }), 42, 5, null)).rejects.toThrow("CAST_STREAM_NOT_OWNED");
+    await expect(setCasterLinkOrigin(fakeConnection({ execute }), 42, 5, null, 900, true)).rejects.toThrow("CAST_STREAM_NOT_OWNED");
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
@@ -209,7 +262,7 @@ describe("setCasterLinkOrigin — l'origine du lien dite seule (décision du 202
     const execute = jest.fn<SqlQuery>();
     execute.mockResolvedValueOnce([[{ ...OWN_LINKED, live_url: null }], []]);
 
-    await expect(setCasterLinkOrigin(fakeConnection({ execute }), 42, 5, null)).rejects.toThrow("STREAM_URL_REQUIRED");
+    await expect(setCasterLinkOrigin(fakeConnection({ execute }), 42, 5, null, 900, true)).rejects.toThrow("STREAM_URL_REQUIRED");
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
@@ -217,31 +270,34 @@ describe("setCasterLinkOrigin — l'origine du lien dite seule (décision du 202
     const execute = jest.fn<SqlQuery>();
     execute.mockResolvedValueOnce([[OWN_LINKED], []]);
 
-    await expect(setCasterLinkOrigin(fakeConnection({ execute }), 42, 6, null)).rejects.toThrow("STREAM_NOT_FOUND");
+    await expect(setCasterLinkOrigin(fakeConnection({ execute }), 42, 6, null, 900, true)).rejects.toThrow("STREAM_NOT_FOUND");
   });
 
   it("applyCastSettings_organisationAloneTrue_setsOriginWithoutRewritingUrl", async () => {
-    const execute = jest.fn<SqlQuery>();
-    execute.mockResolvedValueOnce([[OWN_LINKED], []]);
-    execute.mockResolvedValue([{ affectedRows: 1 }, []]);
-    const row = { id: 42, casters: [{ matchId: 42, userId: 900, streamId: 5, readyAt: null }] } as unknown as LaunchMatchRow;
+    const execute = originDb(900);
 
-    await applyCastSettings(fakeConnection({ execute }), row, 900, 5, { asOrganisation: true });
+    await applyCastSettings(fakeConnection({ execute }), CAST_ROW, 900, 5, { asOrganisation: true }, { oversees: true, manages: true });
 
     const statements = execute.mock.calls.map((call) => String(call[0]));
     expect(statements.some((sql) => sql.includes("SET live_url"))).toBe(false);
-    expect(execute.mock.calls[1]).toEqual([expect.stringContaining("SET link_user_id = ?"), [null, 5]]);
+    expect(execute.mock.calls[2]).toEqual([expect.stringContaining("SET link_user_id = ?"), [null, 5]]);
   });
 
-  it("applyCastSettings_organisationAloneFalse_attachesLinkToCaster", async () => {
-    const execute = jest.fn<SqlQuery>();
-    execute.mockResolvedValueOnce([[OWN_LINKED], []]);
-    execute.mockResolvedValue([{ affectedRows: 1 }, []]);
-    const row = { id: 42, casters: [{ matchId: 42, userId: 900, streamId: 5, readyAt: null }] } as unknown as LaunchMatchRow;
+  it("applyCastSettings_organisationAloneFalse_staffAttachesLinkToCaster", async () => {
+    const execute = originDb(null);
 
-    await applyCastSettings(fakeConnection({ execute }), row, 900, 5, { asOrganisation: false });
+    await applyCastSettings(fakeConnection({ execute }), CAST_ROW, 900, 5, { asOrganisation: false }, { oversees: true, manages: true });
 
-    expect(execute.mock.calls[1]).toEqual([expect.stringContaining("SET link_user_id = ?"), [900, 5]]);
+    expect(execute.mock.calls[2]).toEqual([expect.stringContaining("SET link_user_id = ?"), [900, 5]]);
+  });
+
+  it("applyCastSettings_liveOnlyCoCasterOnOrganisationStream_throwsCastStreamNotOwned", async () => {
+    // Un co-caster de la seule `live` ne s'attribue pas le lien de l'organisation.
+    const execute = originDb(null);
+
+    await expect(
+      applyCastSettings(fakeConnection({ execute }), CAST_ROW, 900, 5, { asOrganisation: false }),
+    ).rejects.toThrow("CAST_STREAM_NOT_OWNED");
   });
 });
 

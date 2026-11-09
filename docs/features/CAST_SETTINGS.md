@@ -173,9 +173,16 @@ unique, pure, `lib/shared/live-trigger-owner.ts` (`mayChangeLiveTrigger`,
 `live` pour porte, mais il n'y règle que **son** cast : sans caster le match
 (en caster montré), tout réglage est refusé (`NOT_MATCH_CASTER`, 403) ; le
 lien du stream du staff ne lui est pas ouvert (`STAFF_STREAM_FORBIDDEN`, 403 —
-son lien se règle dans « Configurer ma diffusion »). Démarquer le match efface
-le lien de l'organisation : il ne le peut que sur **son** mode, jamais sur celui
-du staff tant qu'il porte un lien (`STAFF_STREAM_FORBIDDEN`). Dans « Configurer
+son lien se règle dans « Configurer ma diffusion »). Il ne démarque que
+**son** mode, jamais celui du staff tant qu'il porte un lien
+(`STAFF_STREAM_FORBIDDEN`), et son démarquage n'efface **jamais** le lien de
+l'organisation (seul le staff le fait, décision 1 du 2026-11-09). La case « lien
+de l'organisation » ne change d'état que pour le fournisseur du lien (vers
+l'organisation) ou le staff `tournaments` (retour au fournisseur) : un
+co-caster ne s'attribue pas le lien d'un autre (`CAST_STREAM_NOT_OWNED`) ;
+renvoyée telle quelle, elle n'écrit rien. Retirer un autre caster
+(`DELETE …/caster?userId=`) demande `tournaments` + `live` (`castOverseer`) ;
+la rediff s'écrit sous le verrou du match. Dans « Configurer
 ma diffusion », seul un caster **montré** prend un mode sans maître. Un corps sans clé
 `trigger` (ou `liveUrl`) laisse le mode (ou le lien du staff) tel quel. Les
 trois fenêtres bâtissent le lecteur par `liveTriggerViewer` ; l'inscription

@@ -142,8 +142,8 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
 }
 
 /**
- * Se désinscrire — ou, pour l'arbitrage (`tournaments`), retirer un caster du
- * match : `?userId=` le désigne (absent : le lecteur lui-même).
+ * Se désinscrire — ou, pour le staff (`tournaments` + `live`, `castOverseer`),
+ * retirer un caster du match : `?userId=` le désigne (absent : le lecteur lui-même).
  */
 export async function DELETE(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -157,7 +157,7 @@ export async function DELETE(req: Request, context: { params: Promise<{ matchId:
   if (!isPositiveId(casterId)) return fail("INVALID_USER_ID", 400);
 
   try {
-    await releaseMatchCast(matchId, user.id, can(user, "tournaments"), casterId);
+    await releaseMatchCast(matchId, user.id, castAccess(user).oversees, casterId);
     return ok({ casterUserId: null });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_CAST_RELEASE_FAILED");
