@@ -10,10 +10,10 @@ et rien n'est compté.
 
 | Fichier | Rôle |
 | --- | --- |
-| `lib/shared/match-voice.ts` | Pur : constantes (`VOICE_CHANNEL_LEAD_MINUTES` = 15, `VOICE_CHANNEL_CAPACITY` = 5, `VOICE_ROW_RETENTION_DAYS` = 7, `VOICE_RETRY_SECONDS` = 60, `VOICE_CHANNEL_LATE_HOURS` = 24, durées du bot `VOICE_BOT_*`), clé `match:<matchId>:team:<teamId>`, échéance (`voiceChannelsDue`), suivi (`voiceTracked`), forme publique (`matchVoiceInfo`, `shownVoiceSide`, `parseMatchVoiceInfo`) |
+| `lib/shared/match-voice.ts` | Pur : constantes (`VOICE_CHANNEL_LEAD_MINUTES` = 15, `VOICE_CHANNEL_CAPACITY` = 5, `VOICE_ROW_RETENTION_DAYS` = 7, `VOICE_RETRY_SECONDS` = 60, `VOICE_CHANNEL_LATE_HOURS` = 24, durées du bot `VOICE_BOT_*`), clé `match:<matchId>:team:<teamId>`, échéance (`voiceChannelsDue`), option active (`voiceOptionLive` : allumée, tournoi en cours **et** publié — même règle pour l'instantané et la porte REST), suivi (`voiceTracked`), forme publique (`matchVoiceInfo`, `shownVoiceSide`, `parseMatchVoiceInfo`) |
 | `app/(secured)/tournois/[id]/_lib/match-voice-view.ts` | Page du match : source qui fait foi entre instantané et relecture REST (`currentMatchVoice`, `voiceStreamKey`), relecture flux coupé seulement (`voicePollActive`, `useMatchVoice`) |
 | `lib/server/tournaments/match-voice.ts` | Balayage (`dispatchMatchVoiceChannels`, `DUE_CHANNELS_SQL`, `RELEASABLE_SQL`), bascule (`setTeamVoiceChannels`), lectures (`loadMatchVoiceInfos`, `readMatchVoice`) |
-| `lib/server/bot-integration.ts` | `ensureVoiceChannel`, `releaseVoiceChannel` (`VoiceCallOutcome` : `ok` / `gone` / `failed`) |
+| `lib/server/bot-integration.ts` | `ensureVoiceChannel`, `releaseVoiceChannel`, `releaseVoiceChannelByKey` (`VoiceCallOutcome` : `ok` / `gone` / `failed` — refus propre au salon — / `unavailable` — bot indisponible pour tous les salons, `VOICE_UNAVAILABLE_CODES`, transport, coupe-circuit, réponse illisible) |
 | `PUT /api/admin/tournaments/[id]/voice-channels` | Bascule de l'option, permission `tournaments`, jusqu'à la fin du tournoi (y compris en cours ; tournoi terminé : 409 `TOURNAMENT_FINISHED`, comme le formulaire) ; limite par compte (`TEAM_VOICE_TOGGLE_RULE`, 30 par 5 min) ; journalisée comme geste du staff sur un tournoi (`TEAM_VOICE_ON` / `TEAM_VOICE_OFF`, `STAFF_ACTION_LOGS.md` : auteur anonyme, rien dans pm2) quand elle change |
 | `GET /api/matches/[matchId]/voice` | Porte REST de secours de `TournamentMatch.voice` (connecté ; tournoi visible selon `canViewTournament`, la règle de sa fiche ; `MATCH_VOICE_READ_RULE`) |
 | `bg_match_voice_channels` | Une ligne par (match, équipe) : `channel_id`, `failed_at`, `released_at` — ni qui est présent, ni combien (`members` et `counted_at` retirés, EF-43) |
@@ -50,32 +50,53 @@ et rien n'est compté.
   annonces), la ligne reste ouverte. Un rendu refusé pour `INVALID_CHANNEL_ID` clôt la
   ligne (le bot ne suivra jamais cet identifiant) au lieu d'être redemandé sans fin. Un code du bot
   n'est repris que s'il a la forme `[A-Z0-9_]{1,64}` — jamais une phrase.
-  Coût borné : au plus 5 appels au bot en parallèle, 80 salons par passe (les
+  Coût borné : la lecture des salons ouverts est sautée tant qu'aucun n'est dû (une
+  minute au plus, `nextRecheckAt` ; ses horodatages sont oubliés dès qu'aucun tournoi
+  n'a de salon dû) ; un premier appel seul, puis au plus 5 en parallèle, 80 salons par passe (les
   plus anciennement vus d'abord, aucun n'est affamé), arrêt de la passe au premier
   échec du canal du bot (le salon en échec est redemandé après 10 s, derrière les
   salons plus anciennement vus : un salon lent n'ouvre pas chaque passe) ; un salon tout juste créé n'est pas redemandé dans la même passe.
-  La création, la revérification et le rendu s'arrêtent chacun à la première panne du canal (la création en panne saute la revérification ; le rendu, indépendant, passe toujours), la suivante reprend ; les matchs dont un salon vient d'échouer passent après les autres dans le lot de création. Seule
-  une panne du canal ou du bot entier (`BOT_CIRCUIT_OPEN`, `BOT_INTERNAL_UNREACHABLE`,
-  `BOT_VOICE_TIMEOUT`, `INTERNAL_ERROR`, `INTERNAL_ROUTE_NOT_FOUND`, `BOT_INTERNAL_REQUEST_FAILED` —
-  réponse sans code lisible —, `BOT_VOICE_BAD_RESPONSE` — 2xx au corps illisible —, `UNAUTHORIZED`, `INTERNAL_API_TOKEN_NOT_CONFIGURED`,
-  `DISCORD_NOT_READY` : jeton refusé ou absent, bot pas connecté à Discord ;
-  `VOICE_CATEGORY_UNAVAILABLE`, `VOICE_MISSING_PERMISSIONS`, `VOICE_STORAGE_ERROR`,
-  `VOICE_INTERNAL_ERROR` : refus qui vaut pour tous les salons) arrête une passe ; le refus du bot pour un salon (autre
-  code `VOICE_*`, dont `VOICE_DISCORD_ERROR`) ne retient que ce salon : les autres sont traités, et il garde son
-  horodatage (redemandé après la minute, jamais en tête de file).
+  La création, la revérification et le rendu s'arrêtent chacun au premier `unavailable` (la création en panne saute la revérification ; le rendu, indépendant, passe toujours) ; les matchs dont un salon vient d'échouer à la création (ligne sans salon) passent après les autres dans le lot de création. Seul
+  `unavailable` — panne du canal ou du bot entier : `BOT_CIRCUIT_OPEN`, `BOT_INTERNAL_UNREACHABLE`,
+  `BOT_VOICE_TIMEOUT`, `BOT_INTERNAL_REQUEST_FAILED` (réponse sans code lisible),
+  `BOT_VOICE_BAD_RESPONSE` (2xx au corps illisible), et les codes de `VOICE_UNAVAILABLE_CODES` :
+  `INTERNAL_ERROR`, `INTERNAL_ROUTE_NOT_FOUND`, `UNAUTHORIZED`, `INTERNAL_API_TOKEN_NOT_CONFIGURED`,
+  `DISCORD_NOT_READY`, `VOICE_CATEGORY_UNAVAILABLE`, `VOICE_MISSING_PERMISSIONS`, `VOICE_STORAGE_ERROR`,
+  `VOICE_INTERNAL_ERROR`, `VOICE_DISCORD_UNAVAILABLE` (limite de débit ou panne de Discord) — arrête une
+  passe, et **aucune passe ne rappelle le bot avant `VOICE_RETRY_SECONDS`** (`botDownUntil`, mémoire du
+  processus ; les refus `VOICE_*` ne comptent pas au coupe-circuit partagé). Le refus du bot pour un
+  salon (`failed` : autre code, dont `VOICE_DISCORD_ERROR`) ne retient que ce salon : les autres sont
+  traités, et il garde son horodatage (redemandé après la minute, jamais en tête de file).
+- **Budget d'une passe** : 20 s (`VOICE_PASS_BUDGET_MS`) pour la création et la revérification ;
+  contre un bot lent (mais sous son délai), la passe s'arrête là, le rendu passe, la suivante reprend.
 - **Panne du bot** : `failed_at` noté, une ligne pm2 sans donnée de joueur, une
   seule par panne ; création comme rendu réessayés au plus une fois par
   `VOICE_RETRY_SECONDS` (60 s), en fin de file — par équipe : une création échouée
   n'est pas redemandée avant ce délai même quand l'autre équipe ramène le match
-  (`backing_off`, calculé par la base). Un rendu refusé par le bot donne une ligne
-  pm2 `rendu du salon vocal refusé (CODE)` par salon et par code (mémoire du
-  processus, oubliée à la clôture de la ligne) ; une panne du canal n'en donne pas.
-- **Refus de rendu sans fin** : passé `VOICE_BOT_UNRELEASED_MAX_HOURS` depuis la création de la
-  ligne (filet du bot), un rendu en échec (refus ou panne) clôt la ligne au lieu de la redemander
-  chaque minute ; `created_at` repart quand la ligne est rouverte ou que le salon change.
+  (`team1_ask` / `team2_ask`, calculés par la base dans `DUE_CHANNELS_SQL`, avec
+  `team1_failed` / `team2_failed` : panne déjà montrée, pas de seconde ligne pm2). Un rendu
+  refusé par le bot donne une ligne pm2 `rendu du salon vocal refusé (CODE)` par salon et
+  par code, une revérification refusée `revérification du salon vocal refusée (CODE)` par
+  salon et par code, un refus `VOICE_*` du bot entier au rendu une seule ligne par code
+  (mémoire du processus bornée à 1 000 entrées, oubliée à la clôture de la ligne) ; une
+  panne du canal n'en donne pas.
+- **Refus de rendu sans fin** : passé `VOICE_BOT_UNRELEASED_MAX_HOURS` (48 h) depuis la création de la
+  ligne (filet du bot), un rendu **refusé** (`failed`) clôt la ligne au lieu de la redemander
+  chaque minute ; un bot **indisponible** ne la clôt que passé `VOICE_BOT_ABANDONED_MAX_HOURS`
+  (96 h, oubli du salon par le bot), et la passe s'arrête quand même ; `created_at` repart quand
+  la ligne est rouverte ou que le salon change.
+- **Ligne sans salon** (création expirée ou réponse illisible, alors que le bot a pu créer le
+  salon) : rendue par sa clé (`releaseVoiceChannelByKey`, `POST /internal/voice/keys/release`),
+  jamais close sans appel au bot.
+- **Clôture gardée** : `released_at` et `failed_at` ne s'écrivent que si la ligne porte encore le
+  salon rendu (`channel_id <=> ?`) — un salon neuf écrit entre-temps par un autre processus reste
+  ouvert, rendu plus tard ; rien n'est publié si la ligne n'a pas changé. Une revérification qui
+  retrouve le **même** salon sur une ligne déjà rendue (rendu annulé par le bot) rouvre la ligne,
+  rendue de nouveau dans la même passe.
 - **Étapes indépendantes** : une création ou une revérification en erreur n'empêche pas le
-  rendu de la même passe (l'erreur remonte ensuite) ; la revérification attend tous ses
-  ouvriers avant de rendre la main, même si l'un échoue.
+  rendu de la même passe (l'erreur remonte ensuite ; si le rendu échoue aussi, celle de la
+  création est journalisée avant) ; la revérification attend tous ses ouvriers avant de rendre
+  la main, même si l'un échoue (le salon de l'ouvrier en erreur n'est pas « vu »).
 - **Tournoi pas encore publié** (`start_visibility_at` à venir) : aucun salon n'est
   créé ni redemandé (`DUE_CHANNELS_SQL`, `OPEN_DUE_CHANNELS_SQL`), et un salon déjà ouvert est
   rendu si le tournoi est de nouveau masqué (`RELEASABLE_SQL`) — les noms
@@ -85,9 +106,12 @@ et rien n'est compté.
   équipe fantôme, d'un tournoi qui n'est plus en cours (terminé, ou retombé avant
   son départ) ou qui a éteint l'option ; un match
   simplement reporté garde les siens. `VOICE_CHANNEL_NOT_TRACKED` = déjà fait. Une
-  ligne rendue est effacée 7 jours après (purge au plus une fois par heure, par lots de 200 jusqu'à épuisement de l'arriéré, 10 lots au plus par passe ; tant qu'il en reste, reprise une minute plus tard ; faite après la publication et même si une étape du bot échoue).
+  ligne rendue est effacée 7 jours après (purge au plus une fois par heure, par lots de 200 jusqu'à épuisement de l'arriéré, 10 lots au plus par passe ; tant qu'il en reste, ou si elle échoue, reprise une minute plus tard ; faite après la publication et même si une étape du bot échoue).
 - **Lecture** : `loadMatchVoiceInfos` ne lit que les lignes non rendues des matchs
-  demandés, et seulement quand l'option est allumée **et** le tournoi en cours ; un
+  demandés, et seulement quand l'option vaut (`voiceOptionLive` : allumée, tournoi en cours
+  **et** publié — un tournoi pas encore publié ne montre rien, même au staff, puisqu'aucun
+  salon ne s'y ouvre) ; une équipe absente de `bg_teams` se lit comme une fantôme (rien
+  n'est montré). La porte REST ne déclenche une passe qu'après le contrôle d'accès ; un
   match prêt ou au score en attente de confirmation les montre, lancé ou non. Un rendu
   refusé sur un salon encore ouvert le laisse « ouvert ».
 - **Relecture de la page du match** : **flux coupé seulement** (`isLive` de la fiche),
@@ -114,7 +138,8 @@ Comportements gardés et documentés (décisions du 2026-11-05) :
 - un salon **supprimé par la modération** est recréé à la revérification
   suivante, dans la fenêtre du match ;
 - le bot répond **succès** au rendu d'un salon déjà disparu ou jamais suivi
-  (`{ released: true, deleted: true }`) : la ligne se clôt (PR du bot).
+  (`{ released: true }` — le champ `deleted` est retiré : le site n'apprend pas si
+  le salon était vide) : la ligne se clôt (PR du bot).
 
 ## Formulaire
 
@@ -144,7 +169,10 @@ renvoie à `/rgpd#salons-vocaux` (T18).
 Le bot doit avoir **Gérer les salons** sur la catégorie des matchs
 (`676735851119640577`) ; il supprime un salon vide une fois rendu (au plus tard
 24 h après), et un salon jamais rendu resté vide 48 h. La route de comptage
-(`/internal/voice/channels/:id/count`) est retirée (EF-43). Déployer le bot avant le site.
+(`/internal/voice/channels/:id/count`) est retirée (EF-43). Le rendu par clé
+(`POST /internal/voice/keys/release`) arrive avec la PR du bot de ce lot. Déployer le bot avant
+le site : un bot plus ancien répond `INTERNAL_ROUTE_NOT_FOUND` (`unavailable`) et les lignes sans
+salon restent ouvertes jusqu'à sa mise à jour.
 
 ## Tests
 

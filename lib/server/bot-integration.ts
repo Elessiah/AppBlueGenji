@@ -1025,13 +1025,43 @@ const BOT_VOICE_FETCH_TIMEOUT_MS = 5000;
  *   supprimé à la main, sorti de la catégorie, ou déjà libéré puis effacé ; un
  *   autre `404` (route absente du bot, `INTERNAL_ROUTE_NOT_FOUND`, ou service mal
  *   routé, `BOT_INTERNAL_REQUEST_FAILED`) arrête le balayage sans compter au coupe-circuit ;
- * - `failed` : bot injoignable, coupe-circuit ouvert, permission refusée,
- *   Discord indisponible, réponse illisible — redemandé au passage suivant.
+ * - `failed` : refus du bot propre à ce salon (nom refusé, erreur de Discord sur
+ *   ce salon) — redemandé plus tard, les autres salons passent ;
+ * - `unavailable` : panne du canal vers le bot ou refus qui vaut pour tous les
+ *   salons (`VOICE_UNAVAILABLE_CODES`, transport, coupe-circuit, réponse
+ *   illisible) — le balayage s'arrête et attend avant de rappeler le bot.
  */
 export type VoiceCallOutcome<T> =
   | { kind: "ok"; value: T }
   | { kind: "gone"; code: string }
-  | { kind: "failed"; code: string };
+  | { kind: "failed"; code: string }
+  | { kind: "unavailable"; code: string };
+
+/**
+ * Codes du bot qui valent pour tous les salons : erreur hors route, route absente
+ * d'un bot d'une autre version, jeton refusé ou absent, bot pas connecté à Discord,
+ * catégorie absente, droit « Gérer les salons » retiré, stockage du bot en panne,
+ * erreur imprévue, limite de débit ou panne de Discord. Chaque salon suivant
+ * échouerait de même : le balayage s'arrête au premier.
+ */
+const VOICE_UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
+  "INTERNAL_ERROR",
+  "INTERNAL_ROUTE_NOT_FOUND",
+  "BOT_INTERNAL_REQUEST_FAILED",
+  "UNAUTHORIZED",
+  "INTERNAL_API_TOKEN_NOT_CONFIGURED",
+  "DISCORD_NOT_READY",
+  "VOICE_CATEGORY_UNAVAILABLE",
+  "VOICE_MISSING_PERMISSIONS",
+  "VOICE_STORAGE_ERROR",
+  "VOICE_INTERNAL_ERROR",
+  "VOICE_DISCORD_UNAVAILABLE",
+]);
+
+/** Refus d'un appel vocal : propre au salon, ou valant pour tout le bot. */
+function voiceRefusal(code: string): { kind: "failed" | "unavailable"; code: string } {
+  return { kind: VOICE_UNAVAILABLE_CODES.has(code) ? "unavailable" : "failed", code };
+}
 
 /**
  * Issue d'un `404` du bot vocal. Seul « salon non suivi » vaut « déjà rendu » (et
@@ -1041,10 +1071,10 @@ export type VoiceCallOutcome<T> =
  * s'arrête au premier), sans compter au coupe-circuit, partagé par toutes les fonctions du bot : un
  * écart de version des seules routes vocales ne coupe ni le journal ni les annonces.
  */
-async function voiceNotFoundOutcome(response: Response): Promise<{ kind: "gone" | "failed"; code: string }> {
+async function voiceNotFoundOutcome(response: Response): Promise<{ kind: "gone" | "unavailable"; code: string }> {
   const code = await safeReadError(response);
   if (code !== "VOICE_CHANNEL_NOT_TRACKED") {
-    return { kind: "failed", code: code === "INTERNAL_ROUTE_NOT_FOUND" ? code : "BOT_INTERNAL_REQUEST_FAILED" };
+    return { kind: "unavailable", code: code === "INTERNAL_ROUTE_NOT_FOUND" ? code : "BOT_INTERNAL_REQUEST_FAILED" };
   }
   recordSuccess();
   return { kind: "gone", code };
@@ -1056,7 +1086,7 @@ async function voiceCall<T>(
   body: unknown,
   read: (payload: unknown) => T | null,
 ): Promise<VoiceCallOutcome<T>> {
-  if (isCircuitOpen()) return { kind: "failed", code: "BOT_CIRCUIT_OPEN" };
+  if (isCircuitOpen()) return { kind: "unavailable", code: "BOT_CIRCUIT_OPEN" };
   try {
     const response = await fetch(`${resolveBotInternalUrl()}${path}`, {
       method,
@@ -1070,16 +1100,19 @@ async function voiceCall<T>(
       // Un refus du bot lui-même (permission, catégorie, Discord) n'est pas une
       // panne du canal interne : seul un 5xx de transport compte au coupe-circuit.
       const code = await safeReadError(response);
+      // Un refus valant pour tous les salons (catégorie, permission, stockage) n'est pas
+      // compté non plus : le balayage s'arrête et attend `VOICE_RETRY_SECONDS` avant de
+      // rappeler le bot (`match-voice.ts`), sans couper le journal ni les annonces.
       if (response.status >= 500 && !code.startsWith("VOICE_") && code !== "DISCORD_NOT_READY") recordFailure();
-      return { kind: "failed", code };
+      return voiceRefusal(code);
     }
     const value = read(await response.json().catch(() => null));
-    if (value === null) return { kind: "failed", code: "BOT_VOICE_BAD_RESPONSE" };
+    if (value === null) return { kind: "unavailable", code: "BOT_VOICE_BAD_RESPONSE" };
     recordSuccess();
     return { kind: "ok", value };
   } catch (error) {
     recordFailure();
-    return { kind: "failed", code: isTimeoutError(error) ? "BOT_VOICE_TIMEOUT" : "BOT_INTERNAL_UNREACHABLE" };
+    return { kind: "unavailable", code: isTimeoutError(error) ? "BOT_VOICE_TIMEOUT" : "BOT_INTERNAL_UNREACHABLE" };
   }
 }
 
@@ -1104,7 +1137,19 @@ export function ensureVoiceChannel(key: string, name: string): Promise<VoiceCall
  * vaut toujours « déjà fait ».
  */
 export function releaseVoiceChannel(channelId: string): Promise<VoiceCallOutcome<true>> {
-  return voiceCall("POST", `/internal/voice/channels/${encodeURIComponent(channelId)}/release`, {}, (payload) =>
-    (payload as { released?: unknown } | null)?.released === true ? true : null,
-  );
+  return voiceCall("POST", `/internal/voice/channels/${encodeURIComponent(channelId)}/release`, {}, readReleased);
+}
+
+function readReleased(payload: unknown): true | null {
+  return (payload as { released?: unknown } | null)?.released === true ? true : null;
+}
+
+/**
+ * Rend au bot le salon d'une **clé** (`POST /internal/voice/keys/release`) : pour
+ * une ligne sans identifiant de salon (création expirée ou réponse illisible),
+ * alors que le bot a pu créer le salon. Une clé sans salon suivi répond `ok`. Un
+ * bot plus ancien, sans la route, répond `INTERNAL_ROUTE_NOT_FOUND` (`unavailable`).
+ */
+export function releaseVoiceChannelByKey(key: string): Promise<VoiceCallOutcome<true>> {
+  return voiceCall("POST", "/internal/voice/keys/release", { key }, readReleased);
 }

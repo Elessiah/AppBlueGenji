@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
-import { ensureVoiceChannel, releaseVoiceChannel } from "@/lib/server/bot-integration";
+import { ensureVoiceChannel, releaseVoiceChannel, releaseVoiceChannelByKey } from "@/lib/server/bot-integration";
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -10,6 +10,43 @@ afterEach(() => {
 });
 
 describe("bot-integration — salons vocaux", () => {
+  it("releaseVoiceChannelByKey_released_postsKeyToKeysRouteAndReturnsOk", async () => {
+    const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(json(200, { released: true }));
+
+    await expect(releaseVoiceChannelByKey("match:42:team:1")).resolves.toEqual({ kind: "ok", value: true });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/internal\/voice\/keys\/release$/);
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(String(init?.body))).toEqual({ key: "match:42:team:1" });
+  });
+
+  it("releaseVoiceChannelByKey_oldBotWithoutRoute_returnsUnavailable", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(json(404, { error: "INTERNAL_ROUTE_NOT_FOUND" }));
+
+    await expect(releaseVoiceChannelByKey("match:42:team:1")).resolves.toEqual({
+      kind: "unavailable",
+      code: "INTERNAL_ROUTE_NOT_FOUND",
+    });
+  });
+
+  it("ensureVoiceChannel_channelSpecificDiscordError_returnsFailed", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(json(502, { error: "VOICE_DISCORD_ERROR" }));
+
+    await expect(ensureVoiceChannel("match:42:team:1", "Alpha")).resolves.toEqual({
+      kind: "failed",
+      code: "VOICE_DISCORD_ERROR",
+    });
+  });
+
+  it("ensureVoiceChannel_discordUnavailable_returnsUnavailable", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(json(503, { error: "VOICE_DISCORD_UNAVAILABLE" }));
+
+    await expect(ensureVoiceChannel("match:42:team:1", "Alpha")).resolves.toEqual({
+      kind: "unavailable",
+      code: "VOICE_DISCORD_UNAVAILABLE",
+    });
+  });
+
   it("ensureVoiceChannel_created_sendsKeyAndNameAndReturnsChannelId", async () => {
     const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(json(201, { channelId: "123456789" }));
 
@@ -19,10 +56,10 @@ describe("bot-integration — salons vocaux", () => {
     expect(JSON.parse(String(init?.body))).toEqual({ key: "match:42:team:1", name: "Alpha" });
   });
 
-  it("ensureVoiceChannel_missingPermissions_returnsFailed", async () => {
+  it("ensureVoiceChannel_missingPermissions_returnsUnavailable", async () => {
     jest.spyOn(global, "fetch").mockResolvedValue(json(503, { error: "VOICE_MISSING_PERMISSIONS" }));
     await expect(ensureVoiceChannel("match:42:team:1", "Alpha")).resolves.toEqual({
-      kind: "failed",
+      kind: "unavailable",
       code: "VOICE_MISSING_PERMISSIONS",
     });
   });
@@ -37,47 +74,47 @@ describe("bot-integration — salons vocaux", () => {
     const bot = await freshBotIntegration();
     // Bot d'une autre version sans la route : jamais « déjà rendu », la ligne reste ouverte.
     jest.spyOn(global, "fetch").mockResolvedValue(json(404, { error: "INTERNAL_ROUTE_NOT_FOUND" }));
-    await expect(bot.releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "failed", code: "INTERNAL_ROUTE_NOT_FOUND" });
+    await expect(bot.releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "unavailable", code: "INTERNAL_ROUTE_NOT_FOUND" });
   });
 
   it("releaseVoiceChannel_unreadable404_returnsRequestFailedCode", async () => {
     const bot = await freshBotIntegration();
     jest.spyOn(global, "fetch").mockResolvedValue(new Response("<html>Cannot POST</html>", { status: 404 }));
-    await expect(bot.releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "failed", code: "BOT_INTERNAL_REQUEST_FAILED" });
+    await expect(bot.releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "unavailable", code: "BOT_INTERNAL_REQUEST_FAILED" });
   });
 
   it("releaseVoiceChannel_foreignNotFound404_returnsRequestFailedCode", async () => {
     const bot = await freshBotIntegration();
     // Le 404 d'un autre service (bot mal routé) : un code de transport, qui arrête le balayage.
     jest.spyOn(global, "fetch").mockResolvedValue(json(404, { error: "NOT_FOUND" }));
-    await expect(bot.releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "failed", code: "BOT_INTERNAL_REQUEST_FAILED" });
+    await expect(bot.releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "unavailable", code: "BOT_INTERNAL_REQUEST_FAILED" });
   });
 
   it("releaseVoiceChannel_sentenceErrorCode_returnsRequestFailedCode", async () => {
     const bot = await freshBotIntegration();
     // Une phrase (qui pourrait citer un salon ou un membre) n'est jamais reprise comme code.
     jest.spyOn(global, "fetch").mockResolvedValue(json(503, { error: "Salon Equipe Bleue introuvable" }));
-    await expect(bot.releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "failed", code: "BOT_INTERNAL_REQUEST_FAILED" });
+    await expect(bot.releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "unavailable", code: "BOT_INTERNAL_REQUEST_FAILED" });
   });
 
   it("releaseVoiceChannel_nonStringErrorCode_returnsFallbackCode", async () => {
     jest.spyOn(global, "fetch").mockResolvedValue(json(500, { error: { code: "X" } }));
     const outcome = await releaseVoiceChannel("123456789");
-    // Ni TypeError, ni panne de transport inventée : un refus avec un code en chaîne.
-    expect(outcome.kind).toBe("failed");
-    expect(outcome).not.toEqual({ kind: "failed", code: "BOT_INTERNAL_UNREACHABLE" });
+    // Ni TypeError, ni panne de transport inventée : un code en chaîne (réponse illisible du bot entier).
+    expect(outcome).toEqual({ kind: "unavailable", code: "BOT_INTERNAL_REQUEST_FAILED" });
+    expect(outcome).not.toEqual({ kind: "unavailable", code: "BOT_INTERNAL_UNREACHABLE" });
     expect(typeof (outcome as { code: unknown }).code).toBe("string");
   });
 
   it("releaseVoiceChannel_unreadable500_returnsRequestFailedCode", async () => {
     jest.spyOn(global, "fetch").mockResolvedValue(new Response("<html>502 Bad Gateway</html>", { status: 502 }));
     // La page du proxy n'est jamais recopiée comme code.
-    await expect(releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "failed", code: "BOT_INTERNAL_REQUEST_FAILED" });
+    await expect(releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "unavailable", code: "BOT_INTERNAL_REQUEST_FAILED" });
   });
 
   it("releaseVoiceChannel_unreachable_returnsFailed", async () => {
     jest.spyOn(global, "fetch").mockRejectedValue(new TypeError("fetch failed"));
-    await expect(releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "failed", code: "BOT_INTERNAL_UNREACHABLE" });
+    await expect(releaseVoiceChannel("123456789")).resolves.toEqual({ kind: "unavailable", code: "BOT_INTERNAL_UNREACHABLE" });
   });
 });
 

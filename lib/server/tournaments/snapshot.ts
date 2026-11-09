@@ -66,6 +66,7 @@ import { loadMapRules } from "./round-maps";
 import { applicableTiebreaks } from "@/lib/shared/round-plan";
 import { withoutRefereeKeys } from "./referee-names";
 import { loadMatchVoiceInfos } from "./match-voice";
+import { voiceOptionLive } from "@/lib/shared/match-voice";
 
 /**
  * Durée de vie d'un instantané. Volontairement courte : elle ne sert qu'à
@@ -365,11 +366,6 @@ function encodeSnapshotFrame(
   };
 }
 
-/** Option « Salons vocaux d'équipe » allumée sur un tournoi en cours : seul cas où des salons se lisent. */
-function voiceOptionLive(card: { teamVoiceChannels: boolean; state: string }): boolean {
-  return card.teamVoiceChannels && card.state === "RUNNING";
-}
-
 async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFrame | null> {
   const tournament = await loadMaintainedRow(tournamentId);
   if (!tournament) return null;
@@ -528,10 +524,10 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
       await loadMapsByMatch(connection, matchIds),
     );
     // Salons vocaux d'équipe : une lecture pour tout le plateau, aucune
-    // option éteinte ni hors tournoi en cours (`docs/features/MATCH_VOICE.md`).
+    // option éteinte, hors tournoi en cours ni avant sa publication (`docs/features/MATCH_VOICE.md`).
     // Dans l'instantané commun — l'état de chaque salon, jamais qui —, servi
     // par les deux portes.
-    const voiceByMatch = await loadMatchVoiceInfos(connection, voiceOptionLive(card), mappedMatches);
+    const voiceByMatch = await loadMatchVoiceInfos(connection, voiceOptionLive(card, Date.now()), mappedMatches);
     if (voiceByMatch.size > 0) {
       for (const match of mappedMatches) match.voice = voiceByMatch.get(match.id) ?? null;
     }

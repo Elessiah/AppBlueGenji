@@ -7,6 +7,7 @@ import {
   shownVoiceSide,
   voiceChannelKey,
   voiceChannelsDue,
+  voiceOptionLive,
   voiceTracked,
   type VoiceMatchInput,
 } from "@/lib/shared/match-voice";
@@ -214,5 +215,30 @@ describe("textes des salons vocaux (FR + EN)", () => {
   it("messages_finishedVoiceError_frenchAndEnglish", () => {
     expect(frForm.edit.voiceErrors.TOURNAMENT_FINISHED).toBe(frForm.edit.planningErrors.TOURNAMENT_FINISHED);
     expect(enForm.edit.voiceErrors.TOURNAMENT_FINISHED).toBe(enForm.edit.planningErrors.TOURNAMENT_FINISHED);
+  });
+});
+
+describe("voiceOptionLive", () => {
+  const now = Date.parse("2026-11-09T20:00:00.000Z");
+  const live = { teamVoiceChannels: true, state: "RUNNING", startVisibilityAt: "2026-11-09T19:00:00.000Z" };
+
+  it("voiceOptionLive_runningPublishedEnabled_returnsTrue", () => {
+    expect(voiceOptionLive(live, now)).toBe(true);
+  });
+
+  it("voiceOptionLive_visibilityInFuture_returnsFalse", () => {
+    expect(voiceOptionLive({ ...live, startVisibilityAt: "2026-11-09T21:00:00.000Z" }, now)).toBe(false);
+  });
+
+  it("voiceOptionLive_visibilityNull_returnsFalse", () => {
+    expect(voiceOptionLive({ ...live, startVisibilityAt: null }, now)).toBe(false);
+  });
+
+  it("voiceOptionLive_optionOff_returnsFalse", () => {
+    expect(voiceOptionLive({ ...live, teamVoiceChannels: false }, now)).toBe(false);
+  });
+
+  it("voiceOptionLive_tournamentNotRunning_returnsFalse", () => {
+    expect(voiceOptionLive({ ...live, state: "FINISHED" }, now)).toBe(false);
   });
 });
