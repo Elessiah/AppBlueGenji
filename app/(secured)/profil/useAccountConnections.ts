@@ -37,6 +37,9 @@ export function useAccountConnections(): {
   const { showError } = useToast();
   const text = useProfileText();
   const [failed, setFailed] = useState(false);
+  // Les derniers `showError` et textes, lus à l'échec : `reload` est figé au montage.
+  const latest = useRef({ showError, text });
+  latest.current = { showError, text };
   const [connections, setConnections] = useState<AccountConnection[] | null>(null);
   const [pending, setPending] = useState(true);
   /**
@@ -57,7 +60,7 @@ export function useAccountConnections(): {
     const fail = () => {
       if (seq !== readSeq.current) return;
       setFailed(true);
-      showError(text.t("connections.loadFailed"));
+      latest.current.showError(latest.current.text.t("connections.loadFailed"));
     };
     try {
       const res = await fetch("/api/profile/connections", { cache: "no-store" });
@@ -80,9 +83,6 @@ export function useAccountConnections(): {
       // première ferait annoncer une panne pendant qu'une lecture court encore.
       if (seq === readSeq.current) setPending(false);
     }
-    // `showError` et `text` changent d'identité à chaque rendu du fournisseur : la lecture
-    // ne doit pas se rejouer pour autant (`useEffect` ci-dessous la lance une fois).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

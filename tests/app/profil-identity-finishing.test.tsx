@@ -127,7 +127,7 @@ describe("lecture en panne", () => {
 
   it("hooks_failedReads_toastAndKeepFlag", () => {
     expect(read("app/(secured)/profil/useAccountConnections.ts")).toContain(
-      'showError(text.t("connections.loadFailed"))',
+      'latest.current.showError(latest.current.text.t("connections.loadFailed"))',
     );
     const page = read("app/(secured)/profil/page.tsx");
     expect(page).toContain('showError(t("discord.readFailed"))');
@@ -213,7 +213,7 @@ describe("vocabulaire Lier / Lié", () => {
 describe("gestes refusés et reliquats du profil", () => {
   it("otherSessionsPanel_nothingToClose_activationSaysSo", () => {
     const src = read("app/(secured)/profil/OtherSessionsPanel.tsx");
-    expect(src).toContain('showSuccess(text.t("connections.sessions.none"))');
+    expect(src).toContain('showError(text.t("connections.sessions.none"))');
     expect(src).toContain("aria-disabled={busy || count === 0 || undefined}");
   });
 

@@ -77,7 +77,7 @@ export function OtherSessionsPanel({ version }: Readonly<{ version: number }>): 
         onClick={() => {
           if (busy) return;
           // Rien à fermer : le bouton reste focalisable (`aria-disabled`), donc l'activation le dit.
-          if (count === 0) showSuccess(text.t("connections.sessions.none"));
+          if (count === 0) showError(text.t("connections.sessions.none"));
           else void revoke();
         }}
         aria-disabled={busy || count === 0 || undefined}

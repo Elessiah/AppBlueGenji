@@ -138,6 +138,8 @@ export function SelfRolesField({
       if (DEFINITIVE_REFUSALS.has(code)) {
         // Rien ne sert de rester sur une confirmation qui ne peut plus aboutir.
         setPending(null);
+        // Les cases cochées ne valent plus rien : retour aux rôles enregistrés.
+        setSelected([...roles]);
         router.refresh();
         return true;
       }
