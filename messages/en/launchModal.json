@@ -44,6 +44,7 @@
     "MATCH_CAST_CLAIM_FAILED": "Your casting sign-up could not be saved. Try again in a moment.",
     "MATCH_CAST_RELEASE_FAILED": "Your cast withdrawal could not be saved. Try again in a moment.",
     "INVALID_CAST_TARGET": "Invalid cast target: reopen the window and try again.",
+    "UNAUTHORIZED": "Your session has expired: sign in again, then retry.",
     "MATCH_START_AT_REQUIRED": "Set the match start time first to put it on air at that time.",
     "INVALID_LIVE_TRIGGER": "Invalid on-air mode.",
     "MATCH_ALREADY_COMPLETED": "This match is over.",

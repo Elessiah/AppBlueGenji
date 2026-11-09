@@ -253,7 +253,7 @@ export function CastSettingsDialog({
                 }}
                 required={streamEditable}
                 missing={urlMissing}
-                invalid={urlRefused || urlMissing || fieldErrors.invalidField === "url"}
+                invalid={urlRefused || fieldErrors.invalidField === "url"}
                 fieldError={fieldErrors.message("url")}
                 readOnlyNote={cast.staffStream ? t("cardActions.castSettings.urlStaff") : undefined}
               />

@@ -63,6 +63,16 @@
   margin-bottom: 8px;
 }
 
+.saveHint {
+  margin-top: 16px;
+  text-align: right;
+}
+
+.saveNote {
+  font-size: 12px;
+  color: var(--ink-quiet);
+}
+
 .footer {
   display: flex;
   justify-content: flex-end;

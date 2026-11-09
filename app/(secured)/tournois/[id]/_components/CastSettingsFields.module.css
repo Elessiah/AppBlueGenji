@@ -34,9 +34,17 @@
 }
 
 
+.hint {
+  color: var(--ink-quiet);
+}
+
+.hint,
 .hintInvalid {
   margin: 6px 0 0;
   font-size: 12px;
+}
+
+.hintInvalid {
   color: var(--danger);
 }
 

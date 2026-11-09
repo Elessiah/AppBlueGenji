@@ -19,7 +19,7 @@ import enErrors from "@/messages/en/tournamentErrors.json";
 import frModal from "@/messages/fr/launchModal.json";
 import enModal from "@/messages/en/launchModal.json";
 import { LAUNCH_ERROR_MESSAGES } from "@/lib/shared/match-launch";
-import { closedMatchUnchanged, mayEditReplay, matchLiveBody, refusalHasField, saveBlockedReason, streamedBoxReason } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
+import { closedMatchUnchanged, mayEditReplay, matchLiveBody, ownRefusalKey, refusalHasField, saveBlockedReason, streamedBoxReason } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
 import { readSource } from "../helpers/read-source";
 import frActions from "@/messages/fr/tournamentActions.json";
 import enActions from "@/messages/en/tournamentActions.json";
@@ -110,10 +110,28 @@ describe("Raisons visibles et refus précis des fenêtres de cast", () => {
     expect(saveBlockedReason({ ...closed, status: "READY" }, false, true, false)).toBeNull();
   });
 
-  it("CastUrlField_missing_showsEmptyNoteAndInvalid", () => {
-    const html = renderToStaticMarkup(<CastUrlField id="u" value="" onChange={() => undefined} invalid missing required />);
+  it("CastUrlField_missing_showsCalmEmptyNoteWithoutInvalidState", () => {
+    const html = renderToStaticMarkup(<CastUrlField id="u" value="" onChange={() => undefined} invalid={false} missing required />);
     expect(html).toContain("obligatoire : remets-le");
-    expect(html).toContain('aria-invalid="true"');
+    expect(html).not.toContain("aria-invalid");
+    expect(html).not.toContain("hintInvalid");
+  });
+
+  it("CastUrlField_staffStream_helpSaysWhyNotRequired", () => {
+    const html = renderToStaticMarkup(
+      <CastUrlField id="u" value="" onChange={() => undefined} invalid={false} readOnlyNote="Note staff" />,
+    );
+    expect(html).not.toContain("Obligatoire : sans lui");
+  });
+
+  it("ownRefusalKey_sessionAndStream_ownTexts", () => {
+    expect(ownRefusalKey("UNAUTHORIZED")).toBe("live.sessionExpired");
+    expect(ownRefusalKey("STREAM_NOT_FOUND")).toBe("live.casterStreamGone");
+    expect(ownRefusalKey("INVALID_STREAM_URL")).toBeNull();
+    expect(frDialogs.live.sessionExpired).toContain("session a expiré");
+    expect(enDialogs.live.sessionExpired).toContain("session has expired");
+    expect(frModal.errors.UNAUTHORIZED).toContain("session a expiré");
+    expect(enModal.errors.UNAUTHORIZED).toContain("session has expired");
   });
 
   it("CastUrlField_staffNote_behindInfoHintNotPermanentParagraph", () => {

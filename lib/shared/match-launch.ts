@@ -814,6 +814,7 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   MATCH_CAST_CLAIM_FAILED: "Ton inscription comme caster n'a pas pu être enregistrée. Réessaie dans un instant.",
   MATCH_CAST_RELEASE_FAILED: "Ton retrait du cast n'a pas pu être enregistré. Réessaie dans un instant.",
   INVALID_CAST_TARGET: "Cible du cast invalide : rouvre la fenêtre et recommence.",
+
   MATCH_START_AT_REQUIRED: "Fixe d'abord la date de début du match pour le faire passer à l'antenne à l'heure dite.",
   INVALID_LIVE_TRIGGER: "Mode de passage à l'antenne invalide.",
   MATCH_ALREADY_COMPLETED: "Ce match est terminé.",

@@ -140,14 +140,19 @@ function saveHintId(reason: SaveReason): string | undefined {
   return reason === null ? undefined : SAVE_HINT_ID;
 }
 
-/** « i » qui dit pourquoi « Enregistrer » est désarmé ; rien quand il s'arme selon les saisies. */
+/** Rangée qui dit pourquoi « Enregistrer » est désarmé, l'explication derrière un « i » ; rien quand il s'arme selon les saisies. */
 function SaveBlockedHint({ reason }: Readonly<{ reason: SaveReason }>) {
   const { t } = useDialogsText();
   if (reason === null) return null;
   return (
-    <InfoHint id={SAVE_HINT_ID} subject={t("live.saveSubject")}>
-      <p>{t(reason === "locked" ? "live.saveClosedLocked" : "live.saveClosedUnchanged")}</p>
-    </InfoHint>
+    <div className={styles.saveHint}>
+      <InfoHintRow>
+        <span className={styles.saveNote}>{t("live.saveSubject")}</span>
+        <InfoHint id={SAVE_HINT_ID} subject={t("live.saveSubject")}>
+          <p>{t(reason === "locked" ? "live.saveClosedLocked" : "live.saveClosedUnchanged")}</p>
+        </InfoHint>
+      </InfoHintRow>
+    </div>
   );
 }
 
@@ -219,7 +224,7 @@ function StreamedBox({
       {reason === null ? (
         label
       ) : (
-        <InfoHintRow inline>
+        <InfoHintRow separated>
           {label}
           <InfoHint id={STREAMED_HINT_ID} subject={t("live.streamedSubject")}>
             <p>{t(reason === "closed" ? "live.streamedClosed" : "live.streamedOrphan")}</p>
@@ -337,6 +342,12 @@ function casterLinkInputId(streamId: number): string {
 export function refusedCasterField(payload: { streamId?: unknown }): LiveField | null {
   const id = payload.streamId;
   return typeof id === "number" && Number.isInteger(id) ? `caster-${id}` : null;
+}
+
+/** Refus que la fenêtre formule elle-même (la table commune dit autre chose, ou rien d'utile ici). */
+export function ownRefusalKey(code: string): "live.casterStreamGone" | "live.sessionExpired" | null {
+  if (code === "STREAM_NOT_FOUND") return "live.casterStreamGone";
+  return code === "UNAUTHORIZED" ? "live.sessionExpired" : null;
 }
 
 /**
@@ -508,7 +519,8 @@ export function MatchLiveDialog({
   const reportRefusal = (error: unknown) => {
     const code = (error as Error).message;
     // Le stream d'un caster disparu : la fenêtre n'a pas de choix de stream, elle se rouvre.
-    const message = code === "STREAM_NOT_FOUND" ? t("live.casterStreamGone") : mapError(code);
+    const ownKey = ownRefusalKey(code);
+    const message = ownKey === null ? mapError(code) : t(ownKey);
     showError(message);
     const field = error instanceof LiveRefusal ? error.field : null;
     if (field !== null && field in fieldIds) fieldErrors.flag(field, message);
@@ -686,8 +698,8 @@ export function MatchLiveDialog({
           </div>
         )}
 
+        <SaveBlockedHint reason={saveReason} />
         <div className={styles.footer}>
-          <SaveBlockedHint reason={saveReason} />
           <button type="button" className={`btn ghost ${styles.sectionButton}`} onClick={onClose} disabled={busy}>
             {t("score.cancel")}
           </button>

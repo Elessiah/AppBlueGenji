@@ -99,6 +99,8 @@ export function CastClaimDialog({
   // Le choix disparu est oublié : un stream qui reviendrait ne se recocherait pas seul.
   if (choice === null && choiceKey !== "") setChoiceKey("");
   const [url, setUrl] = useState("");
+  // Le rappel « lien obligatoire » n'apparaît qu'une fois le champ touché puis vidé.
+  const [urlTouched, setUrlTouched] = useState(false);
   const [battletag, setBattletag] = useState("");
   // Un match déjà casté garde son mode ; sinon « automatique au démarrage »,
   // qui ne demande plus un clic à l'heure dite.
@@ -200,10 +202,12 @@ export function CastClaimDialog({
         <>
           <CastUrlField
             required
+            missing={urlMissing && urlTouched}
             id={urlId}
             value={url}
             onChange={(next) => {
               setUrl(next);
+              setUrlTouched(true);
               fieldErrors.clear("url");
             }}
             invalid={urlRefused || fieldErrors.invalidField === "url"}

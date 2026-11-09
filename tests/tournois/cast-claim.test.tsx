@@ -650,7 +650,7 @@ describe("Fenêtre de diffusion — le stream d'un caster disparu", () => {
     expect(frDialogs.live.casterStreamGone).toContain("rouvre la fenêtre");
     expect(enDialogs.live.casterStreamGone).toContain("reopen the window");
     const dialog = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
-    expect(dialog).toContain('code === "STREAM_NOT_FOUND" ? t("live.casterStreamGone")');
+    expect(dialog).toContain('if (code === "STREAM_NOT_FOUND") return "live.casterStreamGone";');
   });
 });
 

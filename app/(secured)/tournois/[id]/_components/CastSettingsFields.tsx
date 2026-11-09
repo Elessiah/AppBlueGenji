@@ -86,24 +86,22 @@ export function CastUrlField({
   const hintId = useId();
   const infoId = useId();
   const locked = readOnlyNote !== undefined;
-  // Une ligne sous le champ seulement pour un refus ou un stream en lecture :
-  // l'explication vit derrière le « i » (`INFO_HINTS.md`).
+  // Une ligne sous le champ seulement pour un refus ou un lien vidé :
+  // l'explication, stream en lecture compris, vit derrière le « i » (`INFO_HINTS.md`).
   // Le refus du serveur porte sa propre phrase (`FieldErrorText`) : la note de
   // format ne s'y ajoute pas, sinon le champ dirait deux choses contraires.
   const formatNote = invalid && !fieldError;
   let note: string | null = null;
-  if (formatNote) {
-    note = missing
-      ? t("cardActions.castSettings.urlEmpty")
-      : t("cardActions.castSettings.urlInvalid", { platforms: CAST_PLATFORMS });
-  }
+  if (formatNote) note = t("cardActions.castSettings.urlInvalid", { platforms: CAST_PLATFORMS });
+  // Lien vidé : une note calme (pas une erreur avant l'envoi) qui dit pourquoi « Enregistrer » est désarmé.
+  else if (missing && !fieldError) note = t("cardActions.castSettings.urlEmpty");
   return (
     <div className="field">
       <InfoHintRow>
         <label htmlFor={id}>{t(required ? "cardActions.castSettings.urlRequired" : "cardActions.castSettings.url")}</label>
         <InfoHint id={infoId} subject={t("cardActions.castSettings.urlSubject")}>
-          <p>{t("cardActions.castSettings.urlHint", { platforms: CAST_PLATFORMS })}</p>
-          {readOnlyNote !== undefined && <p>{readOnlyNote}</p>}
+          {/* Stream de l'organisation : le lien se lit, l'aide dit d'abord pourquoi (pas « obligatoire »). */}
+          <p>{readOnlyNote ?? t("cardActions.castSettings.urlHint", { platforms: CAST_PLATFORMS })}</p>
         </InfoHint>
       </InfoHintRow>
       <input
@@ -119,7 +117,7 @@ export function CastUrlField({
         {...fieldAria(id, invalid, note === null ? null : hintId, infoId)}
       />
       {note !== null && (
-        <p id={hintId} className={styles.hintInvalid}>
+        <p id={hintId} className={formatNote ? styles.hintInvalid : styles.hint}>
           {note}
         </p>
       )}
