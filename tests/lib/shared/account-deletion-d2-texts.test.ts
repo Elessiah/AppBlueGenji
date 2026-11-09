@@ -232,9 +232,9 @@ describe("D6 — empreinte d'un avatar supprimé par la modération", () => {
 
   it("registerT01_avatarHashRetention_namesRejectedChallengeAndSharedFileFrAndEn", () => {
     expect(t01Retention()).toContain("par le staff qui le supprime définitivement après un masquage (contestation rejetée, ou avant l'échéance), ou d'office au terme d'un masquage sans contestation");
-    expect(t01Retention()).toContain("le fichier lui-même n'est effacé que si rien d'autre sur le site ne le désigne");
+    expect(t01Retention()).toContain("supprimé sans délai, son fichier n'est effacé que si rien d'autre sur le site ne le désigne");
     expect(t01RetentionEn()).toContain("by the staff permanently deleting it after a hiding (challenge rejected, or before the deadline), or automatically at the end of a hiding without a challenge");
-    expect(t01RetentionEn()).toContain("the file itself is only erased if nothing else on the site points to it");
+    expect(t01RetentionEn()).toContain("when deleted immediately, its file is only erased if nothing else on the site points to it");
   });
 
   it("registerT01_heldAvatar_moderationCanStillActFrAndEn", () => {
@@ -251,8 +251,23 @@ describe("D6 — empreinte d'un avatar supprimé par la modération", () => {
   });
 
   it("deletionNotice_heldAvatar_reactivationMayNotReturnModeratedAvatarFrAndEn", () => {
-    expect(frProfile.deletion.irreversible).toContain("sauf un avatar que la modération aurait supprimé entre-temps");
-    expect(enProfile.deletion.irreversible).toContain("except an avatar moderation deleted in the meantime");
+    expect(frProfile.deletion.irreversible).toContain("sauf un avatar que la modération aurait masqué ou supprimé entre-temps");
+    expect(enProfile.deletion.irreversible).toContain("except an avatar moderation hid or deleted in the meantime");
+  });
+
+  it("privacyChange_avatarHashEntry_namesReportDeletionAndHeldAvatarNotReturnedFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === AVATAR_HASH_ID)!;
+    const en = PRIVACY_CHANGES_EN[AVATAR_HASH_ID];
+
+    expect(fr.details[0]).toContain("sans délai, sur signalement ou depuis la fiche du joueur");
+    expect(fr.details[2]).toContain("masqué ou supprimé, il n'est pas rendu à la réactivation");
+    expect(en.details[0]).toContain("immediately, on a report or from the player's page");
+    expect(en.details[2]).toContain("once hidden or deleted, it is not given back on reactivation");
+  });
+
+  it("registerT01_heldAvatar_hiddenNotReturnedOnReactivationFrAndEn", () => {
+    expect(t01Retention()).toContain("masqué, il suit la règle des signalements et n'est pas rendu à la réactivation");
+    expect(t01RetentionEn()).toContain("once hidden, it follows the reports rule and is not given back on reactivation");
   });
 
   it("deletionNotice_handover_suspendedMemberInheritsLastFrAndEn", () => {

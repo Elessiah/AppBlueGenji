@@ -881,9 +881,9 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "The hash of an avatar that moderation deletes is now kept from that deletion, and no longer when the account is erased, to refuse it being uploaded again. An avatar that is only hidden no longer leaves any as long as it is not deleted.",
     details: [
-      "What the site keeps: the hash (SHA-256) of the image, with no link to any account and without time limit, when moderation deletes an avatar — immediately, from the player's page, by the staff after a hiding (challenge rejected, or before the deadline), or automatically at the end of a hiding without a challenge —, whether the account is active or pending deletion. It only serves to refuse the same image being uploaded again, as an avatar or as a team logo; the file is only erased if nothing else on the site points to it.",
+      "What the site keeps: the hash (SHA-256) of the image, with no link to any account and without time limit, when moderation deletes an avatar — immediately, on a report or from the player's page, by the staff after a hiding (challenge rejected, or before the deadline), or automatically at the end of a hiding without a challenge —, whether the account is active or pending deletion. It only serves to refuse the same image being uploaded again, as an avatar or as a team logo; when deleted immediately, its file is only erased if nothing else on the site points to it.",
       "When an account is erased, only the hash of an avatar moderation had already deleted is taken or kept; an avatar that is only hidden leaves with the account, without leaving a hash. A deleted team logo leaves no hash either.",
-      "During the 30 days of a requested deletion, moderation can hide, restore or delete the avatar set aside for reactivation, like that of an active account.",
+      "During the 30 days of a requested deletion, moderation can hide, restore or delete the avatar set aside for reactivation, like that of an active account; once hidden or deleted, it is not given back on reactivation.",
     ],
   },
 };

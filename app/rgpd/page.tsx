@@ -418,7 +418,7 @@ function RgpdFr({
           explicite (un compte suspendu peut aussi être réactivé : il revient suspendu). Dès la demande, il est
           montré anonyme partout où il paraissait (pseudo d&apos;emprunt, sans avatar ni lien de fiche : résultats
           passés, classements, effectifs, pages de tournoi) ; son vrai pseudo, qui lui reste réservé, et son avatar
-          sont gardés à part pour la seule réactivation, qui les lui rend (le pseudo, raccourci au besoin, suivi de « OG » s&apos;il a tout de même été pris — « OG2 », « OG3 »… jusqu&apos;à « OG10 » si ceux-là le sont aussi, à défaut le pseudo d&apos;emprunt), et effacés au terme du délai. La demande
+          sont gardés à part pour la seule réactivation, qui les lui rend (le pseudo, raccourci au besoin, suivi de « OG » s&apos;il a tout de même été pris — « OG2 », « OG3 »… jusqu&apos;à « OG10 » si ceux-là le sont aussi, à défaut le pseudo d&apos;emprunt ; l&apos;avatar, sauf si la modération l&apos;a masqué ou supprimé entre-temps), et effacés au terme du délai — un avatar masqué suit, lui, la règle des signalements. La demande
           est aussi notée au journal hors base qui rejoue les suppressions après la restauration d&apos;une
           sauvegarde (identifiant et date de création du compte, date de la demande), et y est remplacée, à la
           réactivation, par une ligne qui porte la date de celle-ci et celle de la demande défaite (gardée comme les autres lignes), pour qu&apos;une sauvegarde restaurée ne
@@ -957,12 +957,12 @@ function RgpdFr({
               décision pendant le même délai ; si elle aboutit, l&apos;image peut être renvoyée.
             </li>
             <li>
-              Quand la modération <strong>supprime</strong> un avatar — sans délai, depuis la fiche du
-              joueur, par le staff après un masquage (contestation rejetée, ou avant l&apos;échéance), ou
+              Quand la modération <strong>supprime</strong> un avatar — sans délai, sur signalement ou
+              depuis la fiche du joueur, par le staff après un masquage (contestation rejetée, ou avant l&apos;échéance), ou
               d&apos;office au terme d&apos;un masquage sans contestation —, que le compte soit actif ou en attente de suppression, l&apos;empreinte
               (SHA-256) de l&apos;image est gardée, sans limite de durée et sans lien avec aucun compte,
-              pour en refuser la remise en ligne, comme avatar ou comme logo d&apos;équipe ; le fichier
-              n&apos;est effacé que si rien d&apos;autre sur le site ne le désigne. Un avatar seulement
+              pour en refuser la remise en ligne, comme avatar ou comme logo d&apos;équipe  ; supprimé
+              sans délai, son fichier n&apos;est effacé que si rien d&apos;autre sur le site ne le désigne. Un avatar seulement
               masqué n&apos;en laisse aucune tant qu&apos;il n&apos;est pas supprimé ; un logo d&apos;équipe supprimé non
               plus.
             </li>

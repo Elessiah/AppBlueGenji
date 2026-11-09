@@ -308,8 +308,8 @@ export function RgpdEn({
           confirmation (a suspended account can be reactivated too: it comes back suspended). As soon as it is
           requested, it is shown as anonymous wherever it appeared (borrowed username, no avatar or player-page
           link: past results, rankings, rosters, tournament pages); its real username, which stays reserved for
-          it, and its avatar are kept apart for reactivation only, which gives them back (the username, shortened if needed, followed by “OG” if it was taken all the same — “OG2”, “OG3”… up to “OG10” if those are taken too, failing that the borrowed username), and erased at the end
-          of that time. The request is also recorded in the off-database log that replays deletions after a
+          it, and its avatar are kept apart for reactivation only, which gives them back (the username, shortened if needed, followed by “OG” if it was taken all the same — “OG2”, “OG3”… up to “OG10” if those are taken too, failing that the borrowed username; the avatar, unless moderation hid or deleted it in the meantime), and erased at the end
+          of that time — a hidden avatar follows the reports rule instead. The request is also recorded in the off-database log that replays deletions after a
           backup is restored (account identifier and creation date, date of the request), and replaced, on
           reactivation, by a line carrying the date of the reactivation and that of the undone request (kept like the other lines), so that a restored backup does not
           bring the account back as pending deletion. As soon as it is requested, and without being undone by reactivation, it leaves its
@@ -778,12 +778,13 @@ export function RgpdEn({
               challenge succeeds, the image can be uploaded again.
             </li>
             <li>
-              When moderation <strong>deletes</strong> an avatar — immediately, from the player&apos;s page, when
+              When moderation <strong>deletes</strong> an avatar — immediately, on a report or from the
+              player&apos;s page, when
               the staff after a hiding (challenge rejected, or before the deadline), or automatically at the end of
               a hiding without a challenge —, whether the
               account is active or pending deletion, the hash (SHA-256) of the image is kept, without time limit and
-              with no link to any account, to refuse it being uploaded again, as an avatar or as a team logo; the
-              file is only erased if nothing else on the site points to it. An avatar that is only hidden leaves
+              with no link to any account, to refuse it being uploaded again, as an avatar or as a team logo; when
+              deleted immediately, its file is only erased if nothing else on the site points to it. An avatar that is only hidden leaves
               none as long as it is not deleted; neither does a deleted team logo.
             </li>
           </ul>

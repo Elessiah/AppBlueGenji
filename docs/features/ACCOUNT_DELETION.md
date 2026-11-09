@@ -874,6 +874,12 @@ Comportement actuel gardé, à trancher avec la politique D6 :
   d'une équipe sans le rang des membres suspendus — D6 et la règle de
   succession les contredisent (un avatar seulement masqué n'est plus bloqué) :
   nouvelle version des conditions ?
+- Revue juridique #571, cycle 3 (non relu) : le blocage de l'empreinte n'est
+  pas garanti en cas d'échec (fichier déjà absent, insertion qui échoue deux
+  fois : consigné dans pm2 seulement ; adresse hors `avatars/` : rien) — faut-il
+  différer l'effacement du fichier jusqu'au blocage réussi ? La règle « fichier
+  gardé s'il sert ailleurs » ne vaut que pour la suppression sans délai (purge
+  et masquage ne la vérifient pas) — l'étendre ?
 - L'avatar mis de côté reste servi à son adresse pendant les 30 jours :
   entrée ERREUR.txt existante (`holdAccountIdentity`, revue #546).
 
