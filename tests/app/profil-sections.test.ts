@@ -201,7 +201,7 @@ describe("PROFILE_SECTION_BY_ID", () => {
  */
 describe("profileSectionIdFromHash", () => {
   it("reconnaît une ancre du registre, avec ou sans dièse", () => {
-    expect(profileSectionIdFromHash("#connexions")).toBe("connexions");
+    expect(profileSectionIdFromHash("#comptes")).toBe("comptes");
     expect(profileSectionIdFromHash("compte")).toBe("compte");
   });
 

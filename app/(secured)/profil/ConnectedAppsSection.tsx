@@ -37,6 +37,8 @@ import {
   oauthStartPath,
   type OAuthProvider,
 } from "@/lib/shared/oauth-providers";
+import { identityStep, type IdentityStep } from "@/lib/shared/identity-steps";
+import { Pill, type PillVariant } from "@/components/cyber/Pill";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { AudienceList, InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useAppLocale } from "@/components/i18n/locale-context";
@@ -54,6 +56,59 @@ import s from "./profil.module.css";
 import { busyAriaLabel } from "@/lib/shared/busy-aria-label";
 import { visibleText } from "@/lib/shared/visible-text";
 
+
+/**
+ * Ce que la liste lit à la page pour dire « lié », « à certifier » ou
+ * « certifié » — la certification n'est pas dans la liste des rattachements.
+ */
+export type IdentityContext = {
+  /** L'état Discord est-il lu ? Sinon, aucun geste de certification n'est proposé. */
+  discordKnown: boolean;
+  discordHasTag: boolean;
+  discordVerified: boolean;
+  /** Le BattleTag enregistré vient de Blizzard (et non d'une saisie). */
+  battletagFromBlizzard: boolean;
+  /** Ouvre la fenêtre de certification du tag Discord. */
+  onCertifyDiscord: () => void;
+};
+
+const STAGE_PILL: Record<string, PillVariant> = {
+  UNLINKED: "neutral",
+  LINKED_TO_CERTIFY: "warning",
+  LINKED_NO_BATTLETAG: "warning",
+  LINKED: "info",
+  CERTIFIED: "success",
+};
+
+/**
+ * L'étape d'une ligne : le geste suivant, la clé du mot d'état, et si Battle.net
+ * est lié sans BattleTag fourni. Tant que l'état Discord n'est pas lu, ni
+ * « certifié » ni « à certifier » ne se disent.
+ */
+function rowStage(
+  connection: AccountConnection,
+  identity: IdentityContext,
+): { action: IdentityStep["action"]; key: string; blizzardNoTag: boolean } {
+  const step = identityStep(connection.provider, {
+    linked: connection.linked,
+    discordHasTag: identity.discordHasTag,
+    discordVerified: identity.discordVerified,
+    battletagFromBlizzard: identity.battletagFromBlizzard,
+  });
+  const unread = connection.provider === "DISCORD" && connection.linked && !identity.discordKnown;
+  return {
+    action: unread && step.action !== "LINK" ? null : step.action,
+    key: unread ? "LINKED" : stateKey(connection.provider, step),
+    blizzardNoTag: connection.provider === "BLIZZARD" && step.stage === "LINKED",
+  };
+}
+
+/** La clé de `connections.state` qui dit l'étape. */
+function stateKey(provider: OAuthProvider, step: IdentityStep): string {
+  if (step.stage === "UNLINKED" || step.stage === "CERTIFIED") return step.stage;
+  if (!step.certifiable) return "LINKED";
+  return provider === "DISCORD" ? "LINKED_TO_CERTIFY" : "LINKED_NO_BATTLETAG";
+}
 
 export function ConnectedAppsSection({
   /**
@@ -92,7 +147,13 @@ export function ConnectedAppsSection({
    * Discord (qui se tait quand elle échoue).
    */
   onDiscordUnlinked,
+  /** Ce que la page sait déjà de la certification, pour dire le geste suivant. */
+  identity,
+  /** Le contenu qui suit la liste (les champs d'identifiants), avant les sessions. */
+  children,
 }: Readonly<{
+  identity: IdentityContext;
+  children?: React.ReactNode;
   connections: AccountConnection[] | null;
   reload: () => Promise<void>;
   onChanged?: () => void;
@@ -180,9 +241,12 @@ export function ConnectedAppsSection({
   */
   return (
     <>
-      <p className={`${s.hint} ${s.hintMuted}`} style={{ marginTop: 0, marginBottom: 16 }}>
-        {text.t("connections.intro")}
-      </p>
+      <InfoHintRow>
+        <strong style={{ fontSize: 14 }}>{text.t("connections.heading")}</strong>
+        <InfoHint id="connections-intro-more" subject={text.t("connections.heading")}>
+          <p>{text.t("connections.intro")}</p>
+        </InfoHint>
+      </InfoHintRow>
 
       {connections === null ? (
         <p style={{ fontSize: 13, color: "var(--ink-quiet)", margin: 0 }}>{text.t("connections.loading")}</p>
@@ -193,6 +257,7 @@ export function ConnectedAppsSection({
               key={rawConnection.provider}
               rawConnection={rawConnection}
               connections={connections}
+              identity={identity}
               busy={busy}
               onUnlink={(provider) => void unlink(provider)}
               onBotDialog={setBotDialog}
@@ -214,6 +279,8 @@ export function ConnectedAppsSection({
         />
       ) : null}
 
+      {children}
+
       <OtherSessionsPanel version={sessionsVersion} />
     </>
   );
@@ -226,10 +293,12 @@ export function ConnectedAppsSection({
 function ConnectionRow({
   rawConnection,
   connections,
+  identity,
   busy,
   onUnlink,
   onBotDialog,
 }: Readonly<{
+  identity: IdentityContext;
   rawConnection: AccountConnection;
   connections: AccountConnection[];
   busy: OAuthProvider | null;
@@ -238,10 +307,6 @@ function ConnectionRow({
 }>): React.ReactElement {
   const text = useProfileText();
   const { t } = text;
-  // La langue de l'adresse (seule l'URL dit la langue) pour l'aller-retour OAuth : si
-  // l'anglais du profil n'a pas pu se charger, le texte retombe sur le français, mais
-  // le lecteur de `/en/profil` doit y revenir (revue de sécurité du lot 9-2).
-  const locale = useAppLocale();
   // Discord a deux lignes pour une seule identité : la ligne du bouton
   // ne se dit rattachée que si ce n'est pas le code qui porte le
   // rattachement (`discordButtonLinked`) — sinon, c'est la ligne du bot
@@ -262,6 +327,11 @@ function ConnectionRow({
   // chose à dire ? ».
   const methodLabel = connection.linked ? connectionMethodText(text, connection) : null;
   const details = connectionDetails(text, connection, discordByCode);
+  // L'étape se lit sur le rattachement **réel** (Discord lié par code compte), non
+  // sur la porte du bouton : sinon « Non lié » côté bouton masquerait le tag à certifier.
+  const { action, key, blizzardNoTag } = rowStage(rawConnection, identity);
+  const stateWord = t(`connections.state.${key}` as Parameters<typeof t>[0]);
+  const pillVariant = STAGE_PILL[key] ?? "neutral";
   return (
     <>
       <div className={`table-row ${s.connectionRow}`}>
@@ -276,12 +346,18 @@ function ConnectionRow({
                 className={`${s.connectionDot} ${connection.linked ? s.connectionDotOn : ""}`}
               />
               <strong style={{ fontSize: 14 }}>{label}</strong>
+              <Pill variant={pillVariant}>{stateWord}</Pill>
             </span>
             <ProviderHint provider={connection.provider} />
           </InfoHintRow>
           <span id={detailsId} style={{ fontSize: 11, color: "var(--ink-quiet)", lineHeight: 1.5 }}>
             {details}
           </span>
+          {blizzardNoTag ? (
+            <span style={{ fontSize: 11, color: "var(--ink-dim)", lineHeight: 1.5 }}>
+              {t("connections.blizzardNoTag")}
+            </span>
+          ) : null}
           {/*
             **Ce que « Rattaché » ne disait pas.** Discord a deux portes
             — le bouton, et le code reçu en message privé — et elles ne
@@ -317,7 +393,70 @@ function ConnectionRow({
           ) : null}
         </div>
 
-        <span style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
+        <ConnectionActions
+          connection={connection}
+          action={action}
+          refusal={refusal}
+          busy={busy}
+          detailsId={detailsId}
+          methodId={methodLabel ? methodId : null}
+          onCertify={identity.onCertifyDiscord}
+          onUnlink={onUnlink}
+        />
+      </div>
+      {connection.provider === "DISCORD" ? (
+        <DiscordBotRow
+          connections={connections}
+          busy={busy !== null}
+          disconnecting={busy === "DISCORD"}
+          onUpdate={onBotDialog}
+          onDisconnect={() => onUnlink("DISCORD")}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/** Les gestes d'une ligne : le geste suivant en bouton principal, puis le retrait. */
+function ConnectionActions({
+  connection,
+  action,
+  refusal,
+  busy,
+  detailsId,
+  methodId,
+  onCertify,
+  onUnlink,
+}: Readonly<{
+  connection: AccountConnection;
+  action: IdentityStep["action"];
+  refusal: ReturnType<typeof checkConnectionUnlink>;
+  busy: OAuthProvider | null;
+  detailsId: string;
+  methodId: string | null;
+  onCertify: () => void;
+  onUnlink: (provider: OAuthProvider) => void;
+}>): React.ReactElement {
+  const { t } = useProfileText();
+  const locale = useAppLocale();
+  const label = OAUTH_PROVIDER_LABELS[connection.provider];
+  // La langue de l'adresse (seule l'URL dit la langue) pour l'aller-retour OAuth : si
+  // l'anglais du profil n'a pas pu se charger, le texte retombe sur le français, mais
+  // le lecteur de `/en/profil` doit y revenir (revue de sécurité du lot 9-2).
+  return (
+        <span style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
+          {action === "CERTIFY" || action === "REGISTER" ? (
+            <button
+              type="button"
+              className="btn"
+              onClick={onCertify}
+              aria-label={t(action === "CERTIFY" ? "discord.certifyLabel" : "discord.registerLabel")}
+              aria-describedby={detailsId}
+              style={{ padding: "4px 12px", fontSize: 12 }}
+            >
+              {t(action === "CERTIFY" ? "discord.certify" : "discord.register")}
+            </button>
+          ) : null}
           {connection.linked && refusal !== "LAST_CONNECTION" ? (
             <button
               type="button"
@@ -330,7 +469,7 @@ function ConnectionRow({
                  laissée hors de la description, elle n'était lue par
                  personne au clavier — un lecteur d'écran qui parcourt
                  les contrôles ne rencontre jamais le texte voisin. */
-              aria-describedby={methodLabel ? `${detailsId} ${methodId}` : detailsId}
+              aria-describedby={methodId ? `${detailsId} ${methodId}` : detailsId}
               style={{ padding: "4px 12px", fontSize: 12 }}
             >
               {busy === connection.provider ? t("connections.unlinking") : t("connections.unlink")}
@@ -338,7 +477,7 @@ function ConnectionRow({
           ) : null}
           {connection.linked ? null : (
             <a
-              className="btn"
+              className={action === "LINK" ? "btn" : "btn ghost"}
               href={oauthStartPath(connection.provider, { intent: "LINK", locale })}
               aria-label={t("connections.linkLabel", { label })}
               /* Ce que le fournisseur apporte tient dans la ligne d'à
@@ -352,17 +491,6 @@ function ConnectionRow({
             </a>
           )}
         </span>
-      </div>
-      {connection.provider === "DISCORD" ? (
-        <DiscordBotRow
-          connections={connections}
-          busy={busy !== null}
-          disconnecting={busy === "DISCORD"}
-          onUpdate={onBotDialog}
-          onDisconnect={() => onUnlink("DISCORD")}
-        />
-      ) : null}
-    </>
   );
 }
 

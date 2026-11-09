@@ -15,13 +15,21 @@ import type { AccountConnection } from "@/lib/shared/account-connections";
  * « Applications connectées », rendue côté serveur : ce que chaque ligne dit
  * et propose selon l'état des rattachements.
  */
-function render(connections: AccountConnection[] | null): string {
+function render(connections: AccountConnection[] | null, identity = IDENTITY): string {
   return renderToStaticMarkup(
     <ToastProvider>
-      <ConnectedAppsSection connections={connections} reload={async () => undefined} />
+      <ConnectedAppsSection identity={identity} connections={connections} reload={async () => undefined} />
     </ToastProvider>,
   );
 }
+
+const IDENTITY = {
+  discordKnown: true,
+  discordHasTag: false,
+  discordVerified: false,
+  battletagFromBlizzard: false,
+  onCertifyDiscord: () => undefined,
+};
 
 const google = (linked: boolean): AccountConnection => ({ provider: "GOOGLE", linked, method: null, handle: null });
 const blizzard = (linked: boolean, handle: string | null = null): AccountConnection => ({
@@ -45,8 +53,8 @@ describe("ConnectedAppsSection — rendu des lignes", () => {
 
   it("propose de rattacher un fournisseur absent, avec sa note", () => {
     const html = render([google(true), discord(false), blizzard(false)]);
-    expect(html).toContain('aria-label="Rattacher Discord à mon compte"');
-    expect(html).toContain('aria-label="Rattacher Blizzard à mon compte"');
+    expect(html).toContain('aria-label="Lier Discord à mon compte"');
+    expect(html).toContain('aria-label="Lier Blizzard à mon compte"');
     expect(html).toContain("Connexion, et ton BattleTag tenu à jour par Blizzard.");
     // La pastille et qui lit un BattleTag masqué : derrière le « i » de la ligne.
     expect(html).toContain('aria-controls="connection-more-blizzard"');
@@ -81,7 +89,7 @@ describe("ConnectedAppsSection — rendu des lignes", () => {
     expect(html).toContain(
       "Ton Discord est rattaché par code. Le bouton y ajoute l&#x27;autorisation Discord — avec le même compte Discord.",
     );
-    expect(html).toContain('aria-label="Rattacher Discord à mon compte"');
+    expect(html).toContain('aria-label="Lier Discord à mon compte"');
     expect(html).not.toContain('id="connection-method-discord"');
   });
 
@@ -96,5 +104,40 @@ describe("ConnectedAppsSection — rendu des lignes", () => {
     expect(html.match(/Bot Discord \(code par message privé\)/g)).toHaveLength(1);
     expect(html.indexOf("connection-details-discord")).toBeLessThan(html.indexOf("Bot Discord"));
     expect(html.indexOf("Bot Discord")).toBeLessThan(html.indexOf("connection-details-blizzard"));
+  });
+});
+
+describe("ConnectedAppsSection — état et geste suivant", () => {
+  it("Discord lié, tag à certifier : pastille et bouton Certifier", () => {
+    const html = render([google(true), discord(true, "OAUTH", "Tag#1"), blizzard(false)], { ...IDENTITY, discordHasTag: true });
+    expect(html).toContain("Lié, à certifier");
+    expect(html).toContain('aria-label="Certifier mon tag Discord"');
+  });
+
+  it("Discord lié sans tag : le bouton propose d'enregistrer", () => {
+    const html = render([google(true), discord(true, "OAUTH")], IDENTITY);
+    expect(html).toContain('aria-label="Enregistrer mon tag Discord"');
+  });
+
+  it("Discord certifié : pastille Certifié, aucun bouton Certifier", () => {
+    const html = render([google(true), discord(true, "OAUTH", "Tag#1")], { ...IDENTITY, discordHasTag: true, discordVerified: true });
+    expect(html).toContain("Certifié");
+    expect(html).not.toContain('aria-label="Certifier mon tag Discord"');
+  });
+
+  it("état Discord pas encore lu : aucun geste de certification", () => {
+    const html = render([google(true), discord(true, "OAUTH", "Tag#1")], { ...IDENTITY, discordKnown: false });
+    expect(html).not.toContain("Certifier mon tag Discord");
+  });
+
+  it("Battle.net lié sans BattleTag de Blizzard : le dit", () => {
+    const html = render([google(true), blizzard(true)], IDENTITY);
+    expect(html).toContain("Lié, BattleTag non certifié");
+    expect(html).toContain("Battle.net ne t&#x27;a donné aucun BattleTag");
+  });
+
+  it("non lié : pastille Non lié et bouton Lier", () => {
+    const html = render([google(true), blizzard(false)], IDENTITY);
+    expect(html).toContain("Non lié");
   });
 });

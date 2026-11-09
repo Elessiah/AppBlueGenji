@@ -14,21 +14,13 @@
       "title": "Identité",
       "lead": "Ton pseudo et ton avatar, visibles partout où tu joues."
     },
-    "jeux": {
-      "title": "Comptes de jeu",
-      "lead": "Les identifiants qui permettent aux autres joueurs de t'ajouter."
-    },
-    "discord": {
-      "title": "Discord",
-      "lead": "Le tag par lequel l'organisation te joint pendant un tournoi."
+    "comptes": {
+      "title": "Identités de jeu et comptes liés",
+      "lead": "Lie tes comptes, puis certifie-les : un compte lié seul ne suffit pas à te rendre joignable."
     },
     "confidentialite": {
       "title": "Confidentialité",
       "lead": "Ce que les autres voient de toi, et si les équipes peuvent te démarcher."
-    },
-    "connexions": {
-      "title": "Applications connectées",
-      "lead": "Les portes par lesquelles tu entres sur le site, et les sessions encore ouvertes."
     },
     "notifications": {
       "title": "Notifications",
@@ -72,7 +64,8 @@
     "battletagPlaceholder": "Pseudo#1234",
     "marvel": "Tag Marvel Rivals",
     "gameTagNotice": "Sert seulement à t'ajouter en jeu, jamais pour des statistiques.",
-    "blizzardNotice": "Si tu rattaches Battle.net, Blizzard remplit ce champ et le met à jour à chaque connexion, à la place de ta saisie. S'il n'en donne aucun, ta saisie reste, sans la mention « vérifié »."
+    "blizzardNotice": "Si tu rattaches Battle.net, Blizzard remplit ce champ et le met à jour à chaque connexion, à la place de ta saisie. S'il n'en donne aucun, ta saisie reste, sans la mention « vérifié ».",
+    "blizzardLinkedNoTag": "Battle.net est lié mais ne t'a donné aucun BattleTag : ta saisie reste, sans la mention « vérifié »."
   },
   "battletagLock": {
     "pending": "Lecture de tes applications connectées… Champ en lecture seule en attendant.",
@@ -313,13 +306,22 @@
     "fallback": "La mise à jour de ton pseudo a échoué. Réessaie dans un instant."
   },
   "connections": {
-    "intro": "Pas de mot de passe : ton compte s'ouvre par ces applications. Rattaches-en plusieurs ; la dernière ne peut pas être retirée.",
+    "heading": "Mes comptes liés",
+    "intro": "Pas de mot de passe : ton compte s'ouvre par ces applications. Pour chaque identité, un seul geste suit : Lier, puis Certifier. Rattaches-en plusieurs ; la dernière ne peut pas être retirée.",
     "loading": "Chargement…",
     "notes": {
       "GOOGLE": "Connexion en un clic. Aucune adresse n'est enregistrée.",
       "DISCORD": "Connexion, certification de ton tag, et annonce des horaires et rappels de match en message privé.",
       "BLIZZARD": "Connexion, et ton BattleTag tenu à jour par Blizzard."
     },
+    "state": {
+      "UNLINKED": "Non lié",
+      "LINKED": "Lié",
+      "LINKED_TO_CERTIFY": "Lié, à certifier",
+      "LINKED_NO_BATTLETAG": "Lié, BattleTag non certifié",
+      "CERTIFIED": "Certifié"
+    },
+    "blizzardNoTag": "Battle.net ne t'a donné aucun BattleTag : celui que tu saisis plus bas reste non certifié.",
     "linked": "Rattaché",
     "handleLine": "{label} : {handle}",
     "handleLabels": {
@@ -338,8 +340,8 @@
     "unlink": "Retirer",
     "unlinking": "Retrait…",
     "unlinkLabel": "Retirer {label} de mon compte",
-    "link": "Rattacher",
-    "linkLabel": "Rattacher {label} à mon compte",
+    "link": "Lier",
+    "linkLabel": "Lier {label} à mon compte",
     "bot": {
       "label": "Bot Discord (code par message privé)",
       "handleNote": "Pseudo Discord : {handle}",
@@ -401,7 +403,7 @@
     "asCaster": "<strong>Les deux équipes et les autres casters d'un match que tu castes</strong>, le temps du match seulement (de son départ à sa fin).",
     "asReferee": "<strong>Les deux équipes et les casters d'un match dont tu es l'arbitre désigné</strong>, dès que ses deux adversaires sont connus et jusqu'à sa fin pour les équipes (le temps du match seulement si tu le castes aussi), le temps du match seulement pour les casters.",
     "staff": "<strong>Les arbitres et les administrateurs</strong>, dans la même fenêtre « Contacts » des matchs du tournoi : aux mêmes moments que les deux équipes pour un match que tu joues, dès que ses deux adversaires sont connus et jusqu'à sa fin pour un match que tu castes ou arbitres (la fenêtre de lancement, elle, ne s'ouvre qu'aux équipes, aux casters et à l'arbitre désigné ; la page d'un match que tu castes ou arbitres le reprend aux mêmes moments, et celle d'un match où tu es contact d'équipe à ceux qui en sont parties) — jamais ailleurs.",
-    "outro": "Pour ne plus le communiquer du tout, il faut effacer le champ — mais tes adversaires ne pourront alors plus t'ajouter en jeu. Et si un compte Blizzard est rattaché, c'est lui qui tient ce champ : il faut le retirer d'abord (après avoir ajouté un autre moyen de connexion si c'est le seul).",
+    "outro": "Pour ne plus le communiquer du tout, il faut effacer le champ — mais tes adversaires ne pourront alors plus t'ajouter en jeu. Et si ce BattleTag vient d'un compte Blizzard rattaché, c'est lui qui tient ce champ : il faut le retirer d'abord (après avoir ajouté un autre moyen de connexion si c'est le seul).",
     "ok": "J'ai compris"
   },
   "verify": {

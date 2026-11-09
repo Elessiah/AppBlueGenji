@@ -153,7 +153,7 @@ export function MatchDmField({
       </InfoHintRow>
       {unreachable ? (
         <p id={UNREACHABLE_ID} className={s.hint}>
-          {t("matchDms.notCertified")} <a href="#discord" className={s.hintLink}>{t("matchDms.certifyLink")}</a>
+          {t("matchDms.notCertified")} <a href="#comptes" className={s.hintLink}>{t("matchDms.certifyLink")}</a>
         </p>
       ) : null}
     </div>
