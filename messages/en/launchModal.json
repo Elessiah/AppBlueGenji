@@ -64,7 +64,7 @@
     "INVALID_ROUND_MAPS": "Invalid maps: 9 maps at most per tournament round, 20 at most per pool, 64 characters per name.",
     "INVALID_MAP_RULES": "Invalid ban rule.",
     "INVALID_TIEBREAK_MAP": "Invalid tiebreak map name (64 characters at most).",
-    "TIEBREAK_NOT_ALLOWED": "A tiebreak map can only be set on a playoff round played as a real Bo3 (first to 2 maps).",
+    "TIEBREAK_NOT_ALLOWED": "A tiebreak map can only be set on a playoff round with a set match format (BO or FT).",
     "INVALID_MAP_PICK": "This map is not in the tournament round's pool.",
     "NOT_MAP_PICKER": "Only the referees and, when the match is self-managed, its teams choose the map.",
     "ROUND_MAPS_SET": "This tournament round has its maps set for the whole round: reset the round to enter the map match by match.",

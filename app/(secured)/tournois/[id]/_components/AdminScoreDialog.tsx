@@ -71,7 +71,7 @@ interface AdminScoreDialogProps {
   proposals?: MatchProposalMaps[];
   /** Nom des cartes fixées du match (`matchMapNames`) : « Map 1 : Ilios ». */
   mapNames?: ReadonlyArray<string | null>;
-  /** Map de départage du tour (vrai best of 3), `null` sans réglage. */
+  /** Map de départage du tour (play-offs à format défini), `null` sans réglage. */
   tiebreakMap?: string | null;
   onClose: () => void;
   onSubmitted: () => void;

@@ -41,6 +41,10 @@ Ils existent pour une raison précise : Overwatch et Marvel Rivals connaissent l
 [MATCH_DRAWS.md](./MATCH_DRAWS.md), y compris pourquoi ce mode joue **deux**
 formats — sa qualification tolère le nul, son arbre final exige un vainqueur.
 
+**Map de départage** : tout tour de play-offs à format défini (BO / FT, toute
+taille) peut en porter une, jouée en map N + 1 (N = `matchMaxMaps`) sur une série
+à égalité après les N maps régulières (`formatAllowsTiebreak`, `ROUND_MAPS.md`).
+
 ## Règles appliquées à la saisie
 
 Le module pur `lib/shared/match-format.ts` porte l'unique implémentation

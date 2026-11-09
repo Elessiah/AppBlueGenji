@@ -82,8 +82,7 @@ import {
   parseStoredTiebreak,
   resolveMatchMaps,
 } from "@/lib/shared/round-maps";
-import { parseMatchFormat } from "@/lib/shared/match-format";
-import { roundAllowsTiebreak } from "@/lib/shared/round-plan";
+import { roundAllowsTiebreak, tiebreakTournamentFromRow } from "@/lib/shared/round-plan";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { firstStreamUrlSql } from "./match-casters";
 import { liveAnnouncementUrl } from "@/lib/shared/live-announcements";
@@ -204,7 +203,7 @@ export type LobbyBriefRow = RowDataPacket & {
   round_slots_json?: string | null;
   first_ban_rule?: string | null;
   next_ban_rule?: string | null;
-  /** Map de départage du tour et ce qui dit si elle s'applique (play-offs en vrai best of 3). */
+  /** Map de départage du tour et ce qui dit si elle s'applique (play-offs à format défini). */
   round_tiebreak_map?: string | null;
   phase_id?: number | null;
   phase_format?: PhaseFormat | null;
@@ -226,22 +225,13 @@ export function briefTiebreakMap(row: LobbyBriefRow): string | null {
   if (map === null || !row.tournament_format) return null;
   const phaseId = Number(row.phase_id ?? 0);
   const allowed = roundAllowsTiebreak(
-    {
-      format: row.tournament_format,
-      matchFormat: parseMatchFormat(
-        row.match_format_type ?? null,
-        row.match_format_value ?? null,
-        row.match_format_max_maps ?? null,
-        row.match_format_draws ?? null,
-      ),
-      endurancePlayoffFormat: parseMatchFormat(
-        row.endurance_playoff_format_type ?? null,
-        row.endurance_playoff_format_value ?? null,
-      ),
-      phases: row.phase_format ? [{ id: phaseId, format: row.phase_format }] : null,
-    },
+    tiebreakTournamentFromRow(
+      { ...row, format: row.tournament_format },
+      row.phase_format ? [{ id: phaseId, format: row.phase_format }] : null,
+    ),
     { phaseId, bracket: String(row.bracket), roundNumber: Number(row.round_number) },
   );
+
   return allowed ? map : null;
 }
 

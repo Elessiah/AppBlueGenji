@@ -102,20 +102,28 @@ match (route `first-map`) : la permission `tournaments` suffit, comme pour tout
 réglage du tournoi. Seul le **choix dans un pool** de son match suit la règle
 des joueurs (ci-dessous).
 
-## Map de départage (play-offs en vrai Bo3)
+## Map de départage (play-offs, tout format)
 
-Un tour de **play-offs** en **vrai best of 3** (trois maps, premier à 2 :
-`BO3` ou `FT2`, égalités fermées, `isBestOfThree`) peut porter **une** map de
-départage (« Map de départage », EN « Tiebreak map ») : jouée **seulement** si la
-série est à égalité après les trois maps régulières, sinon inutilisée.
+Un tour de **play-offs** à **format de match défini**, quelle que soit sa taille
+(BO 1 à BO 15, FT ; `formatAllowsTiebreak` : ni score libre, ni égalités
+ouvertes) peut porter **une** map de départage (« Map de départage », EN
+« Tiebreak map ») : jouée en **map N + 1** (N = `matchMaxMaps`) **seulement** si
+la série est à égalité après les N maps régulières (maps nulles comprises),
+sinon inutilisée. Décision du 2026-11-09 (lot TIEBREAK-ALL) : d'abord réservée au
+vrai Bo3 (#533), elle s'ouvre à tous les formats — cas du tournoi BG Survie en
+BO 5 à égalités ouvertes sans format de play-offs propre (« 6ᵉ map »).
 
 - **Tours éligibles** (`roundAllowsTiebreak`, `lib/shared/round-plan.ts`, règle
   pure commune à l'écran, au serveur et au brief) : `SINGLE` / `DOUBLE` (phase 0,
   tous tableaux, petite finale comprise), une phase `SINGLE` / `DOUBLE` d'un
   `MULTI`, les play-offs de BG Survie (`roundNumber ≥ PLAYOFF_ROUND_OFFSET`, format
-  des play-offs). Jamais en suisse, en qualification, en `SURVIVAL`, en FT3 ni en
-  format à égalités ouvertes. Le format est celui du tour
-  (`tournamentMatchFormat`).
+  des play-offs). Jamais en suisse, en qualification, en `SURVIVAL`, en score
+  libre. Le format est celui du tour (`tournamentMatchFormat`) : un tour de
+  play-offs ferme **toujours** les égalités (`withoutDraws` au repli de BG Survie,
+  format de play-offs sans égalité), si bien qu'un tournoi à qualification en
+  BO 5 avec égalités joue ses play-offs en BO 5 égalités fermées et admet la map
+  de départage. La conversion ligne SQL → tournoi est unique
+  (`tiebreakTournamentFromRow`, pose et brief).
 - **Stockage** : colonne `bg_tournament_round_maps.tiebreak_map` (64 caractères,
   `visibleText`) ; une ligne qui ne porte que la map de départage a
   `slots_json = '[]'`. Retirer les cartes d'un tour garde la ligne si elle porte
@@ -132,14 +140,19 @@ série est à égalité après les trois maps régulières, sinon inutilisée.
   visible seulement sur un tour éligible ; le sélecteur de tours la signale. La
   page du match (`MatchRoundMaps`) l'affiche avec une bulle « i ». Elle figure aussi dans les **faits clés** de la page (`tiebreakFacts`),
   lisibles de tous (public, joueurs), pas seulement du staff ou de qui choisit.
-- **Saisie du score** (`MapScoreList`, `tiebreakRowIndex`) : la première ligne
-  jouée au-delà des trois maps régulières alors que la série est à **1-1** est
-  libellée « Map de départage : {nom} » (jamais à 0-0 après trois maps nulles :
-  elle ne déciderait rien). **Aucune règle de score ne change** (`MAP_SCORES.md`) :
-  cette ligne existait déjà (map nulle rejouée) et le vainqueur doit toujours atteindre deux
-  maps ; les rejeux des classements sont intacts.
+- **Saisie du score** (`MapScoreList`, `tiebreakRowIndex`, joueurs, arbitrage,
+  admin) : la première ligne jouée au-delà des N maps régulières alors que la
+  série est à égalité **à une map de l'objectif** (1-1 en BO 3, 2-2 en BO 5, 3-3
+  en BO 7 / FT 4) est libellée « Map de départage : {nom} » (jamais sur une
+  égalité plus basse — 0-0 après trois maps nulles en BO 3 : elle ne déciderait
+  rien, la map nulle se rejoue comme avant). **Aucune règle de score ne change**
+  (`MAP_SCORES.md`) : en play-offs (égalités fermées) la ligne N + 1 existait déjà
+  (`DRAWN_MAP_REPLAY_ALLOWANCE`), le vainqueur doit atteindre l'objectif — la map
+  de départage l'y porte — et le match a toujours un vainqueur
+  (`checkMatchScores`) ; elle compte comme toute map gagnée, les rejeux des
+  classements sont intacts.
 - **Check-in du match** : ligne « Map de départage (jouée seulement si la série est à
-  égalité après les 3 maps) : « … » » (FR / EN, `briefTiebreakMap`), sans pseudo.
+  égalité après les maps régulières) : « … » » (FR / EN, `briefTiebreakMap`), sans pseudo.
 - **Bans** (choix documenté, règlement §10 inchangé) : la map de départage suit
   la règle des cartes suivantes du tournoi (`next_ban_rule`, par défaut le
   perdant de la map précédente bannit en premier ; sur une map nulle, même ordre
@@ -261,8 +274,11 @@ Deux premiers tournois à lancement (`SEED_ROUND_MAP_CASES`,
 `lib/server/seed/match-states.ts`) : une manche à cinq cartes imposées (carte 1
 qui l'emporte sur la première carte de l'arbitre), une manche à pools en
 autogestion avec la carte 2 déjà choisie.
-« Test - BO3 Élimination » (vrai Bo3 en arbre) : map de départage « Busan » sur
-le tour 1 du tableau principal (`SEED_TIEBREAK_CASE`, `applyTiebreakCase`).
+Maps de départage (`SEED_TIEBREAK_CASES`, `applyTiebreakCases`, échec si un cas ne
+trouve aucun tour), posées sur le premier tour de play-offs qui a encore un match
+ouvert : « Test - BO3 Élimination » (vrai Bo3 en arbre), « Busan » ; « Test - BG
+Survie BO5 Égalités Départage » (qualification BO 5 à égalités ouvertes, sans format
+de play-offs propre), « Ilios ».
 
 ## Tests
 

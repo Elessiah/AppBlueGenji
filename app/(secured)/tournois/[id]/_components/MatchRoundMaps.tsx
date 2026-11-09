@@ -184,7 +184,7 @@ export function MatchRoundMaps({
     () => (round ? resolveMatchMaps(round.slots, match.firstMap, match.mapPicks) : []),
     [round, match.firstMap, match.mapPicks],
   );
-  // Map de départage du tour (play-offs en vrai best of 3) : l'instantané ne
+  // Map de départage du tour (play-offs à format défini) : l'instantané ne
   // porte que celles des tours éligibles.
   const tiebreak = roundTiebreakOf(rules.tiebreaks, match);
   const titleId = useId();

@@ -90,7 +90,7 @@ export type TournamentMapRules = {
   nextPick: NextPickRule;
   rounds: RoundMapConfig[];
   /**
-   * Map de départage des tours de play-offs en vrai best of 3 (une par tour au
+   * Map de départage des tours de play-offs à format défini (une par tour au
    * plus, imposée) : jouée seulement si la série est à égalité après les trois
    * maps régulières. L'instantané ne porte que celles de tours **éligibles**
    * (`applicableTiebreaks`, `round-plan.ts`).

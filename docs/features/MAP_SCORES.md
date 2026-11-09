@@ -81,11 +81,13 @@ avoir joué toutes ses maps : un 2-2 en BO5 n'est accepté qu'avec une cinquièm
 map nulle, sinon `MAP_LIST_INCOMPLETE` (contrôle décisif seulement — un
 enregistrement intermédiaire de l'arbitrage reste libre).
 
-**Map de départage** (`ROUND_MAPS.md`) : sur un tour de play-offs en vrai Bo3,
-la première ligne jouée au-delà de trois alors que la série est à 1-1 est libellée « Map de
+**Map de départage** (`ROUND_MAPS.md`) : sur un tour de play-offs à format défini
+(tout BO / FT, égalités toujours fermées en play-offs), la première ligne jouée
+au-delà des N maps régulières (N = `matchMaxMaps`) alors que la série est à
+égalité à une map de l'objectif (1-1 en BO 3, 2-2 en BO 5) est libellée « Map de
 départage : {nom} » (`tiebreakRowIndex`). Ce n'est qu'un libellé : les plafonds
-et le score dérivé ci-dessus ne changent pas, le vainqueur doit toujours gagner
-deux maps.
+(la ligne N + 1 tient dans `DRAWN_MAP_REPLAY_ALLOWANCE`) et le score dérivé
+ci-dessus ne changent pas, le vainqueur doit toujours atteindre l'objectif.
 
 Une ligne après la fin acquise (un camp a atteint l'objectif, ou toutes les maps
 d'un BO sans tiebreaker sont jouées) est refusée (`MAP_AFTER_DECISION`) : elle

@@ -157,6 +157,9 @@ export interface SeedMatchSchedule {
 
 // La matrice de cas : chaque ligne isole une combinaison état × format × effectif
 // × situation de match. Les commentaires disent ce que la ligne couvre.
+/** Préfixe du nom de tout tournoi seedé (`Test - <name>`). */
+export const SEED_TOURNAMENT_PREFIX = "Test - ";
+
 export const TOURNAMENTS: TournamentDef[] = [
   // ---- UPCOMING : annoncés, inscriptions pas encore ouvertes ---------------
   { name: "Vitrine Automne (à venir)", game: "OW", state: "UPCOMING", format: "SINGLE", teamCount: 0, maxTeams: 16, daysOffset: 30, image: { fit: "CONTAIN" } },
@@ -233,6 +236,9 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "BG Survie 12 Équipes", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: -3, endurancePoints: 3, endurancePlayoffSize: 8, playWaves: 2, teamOffset: 9 },
   { name: "BG Survie Play-offs", game: "MR", state: "RUNNING", format: "BG_SURVIE", teamCount: 10, maxTeams: 16, daysOffset: -5, endurancePoints: 2, endurancePlayoffSize: 8, playWaves: 4, teamOffset: 21 },
   { name: "BG Survie Impaire + Forfait", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 11, maxTeams: 16, daysOffset: -4, endurancePoints: 3, endurancePlayoffSize: 8, playWaves: 2, forfeits: 1, teamOffset: 33 },
+  // BO5 à égalités ouvertes, sans format de play-offs propre (cas du tournoi 19 de
+  // production) : son premier tour de play-offs porte une map de départage (`SEED_TIEBREAK_CASES`, `ROUND_MAPS.md`).
+  { name: "BG Survie BO5 Égalités Départage", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 10, maxTeams: 16, daysOffset: -5, endurancePoints: 2, endurancePlayoffSize: 8, playWaves: 4, teamOffset: 21, matchFormat: { type: "BO", value: 5 }, matchFormatDraws: true },
   { name: "BG Survie Terminée", game: "MR", state: "FINISHED", format: "BG_SURVIE", teamCount: 9, maxTeams: 16, daysOffset: -20, endurancePoints: 2, endurancePlayoffSize: 8, teamOffset: 45 },
   // Plafond de manches : gros capital (personne ne tombe à zéro) et format de
   // match connu, les deux conditions pour que la coupe mathématique se
@@ -457,7 +463,7 @@ export const TOURNAMENTS: TournamentDef[] = [
   // ronde suisse ou à la survie, et cohabite avec les tournois en score libre.
   { name: "BO5 Élimination", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 2, teamOffset: 30, matchFormat: { type: "BO", value: 5 } },
   { name: "FT3 Ronde Suisse", game: "MR", state: "RUNNING", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -3, playWaves: 2, swissTotalRounds: 3, teamOffset: 44, matchFormat: { type: "FT", value: 3 } },
-  // Vrai Bo3 en arbre : son tour 1 porte une map de départage (`SEED_TIEBREAK_CASE`, `ROUND_MAPS.md`).
+  // Vrai Bo3 en arbre : son tour 1 porte une map de départage (`SEED_TIEBREAK_CASES`, `ROUND_MAPS.md`).
   { name: "BO3 Élimination", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -2, playWaves: 1, teamOffset: 36, matchFormat: { type: "BO", value: 3 } },
   { name: "BO3 Survie (terminé)", game: "OW", state: "FINISHED", format: "SURVIVAL", teamCount: 8, maxTeams: 8, daysOffset: -20, survivalRoundsPerCut: 2, teamOffset: 58, matchFormat: { type: "BO", value: 3 } },
 ];

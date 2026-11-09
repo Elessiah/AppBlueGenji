@@ -55,9 +55,9 @@ interface MapScoreListProps {
    */
   mapNames?: ReadonlyArray<string | null>;
   /**
-   * Map de départage du tour (vrai best of 3, `ROUND_MAPS.md`) : la quatrième
-   * ligne, quand les trois premières laissent la série à égalité, lit « Map de
-   * départage : Ilios » (`tiebreakRowIndex`).
+   * Map de départage du tour (play-offs à format défini, `ROUND_MAPS.md`) : la
+   * ligne N + 1, quand les N maps régulières laissent la série à égalité, lit
+   * « Map de départage : Ilios » (`tiebreakRowIndex`).
    */
   tiebreakMap?: string | null;
 }

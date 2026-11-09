@@ -65,7 +65,7 @@ export type LobbyBriefSide = {
   firstMap: string | null;
   /** Cartes de la manche (`ROUND_MAPS.md`), vide sans réglage : on garde alors la seule première carte. */
   maps: ResolvedMapSlot[];
-  /** Map de départage du tour (play-offs en vrai best of 3), `null` sans réglage. */
+  /** Map de départage du tour (play-offs à format défini), `null` sans réglage. */
   tiebreakMap?: string | null;
   nextBan: NextBanRule;
   /** Au moins un caster inscrit (et éligible) : rappel du tri par rôle. */

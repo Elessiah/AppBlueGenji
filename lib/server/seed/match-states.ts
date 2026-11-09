@@ -9,7 +9,8 @@ import { normalizeStreamUrl } from "@/lib/shared/live-streams";
 import { normalizeReplayUrl } from "@/lib/shared/match-replay";
 import { matchMaxMaps, matchWinsRequired } from "@/lib/shared/match-format";
 import { mapListLimit } from "@/lib/shared/match-maps";
-import type { ReportStateCounts, TournamentDef } from "./cases";
+import { SEED_TOURNAMENT_PREFIX, type ReportStateCounts, type TournamentDef } from "./cases";
+import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 
 // Transforme des matchs READY en états intermédiaires du cycle de report :
 //  · pendingReports  → une seule équipe a reporté, délai en cours
@@ -286,19 +287,35 @@ export const SEED_ROUND_MAP_CASES: readonly (readonly (readonly string[])[] | un
   [["Ilios", "Nepal", "Busan"], ["King's Row", "Eichenwalde"], ["Numbani"], ["Oasis", "Lijiang Tower"], ["Dorado"]],
 ];
 /**
- * Map de départage seedée (`docs/features/ROUND_MAPS.md`) : tour 1 du tableau
- * principal du tournoi en vrai Bo3 nommé ici, sans cartes de tour.
+ * Maps de départage seedées (`docs/features/ROUND_MAPS.md`) : le premier tour
+ * de play-offs (premier tour de l'arbre, ou premier tour ≥
+ * `PLAYOFF_ROUND_OFFSET` en BG Survie) de chaque tournoi nommé ici. Le nom est
+ * le `name` de la définition (`cases.ts`), préfixé comme tout tournoi seedé.
  */
-export const SEED_TIEBREAK_CASE = { tournamentName: "Test - BO3 Élimination", map: "Busan" } as const;
+export const SEED_TIEBREAK_CASES = [
+  { caseName: "BO3 Élimination", map: "Busan" },
+  { caseName: "BG Survie BO5 Égalités Départage", map: "Ilios" },
+] as const;
 
-/** Pose la map de départage seedée (`SEED_TIEBREAK_CASE`). */
-export async function applyTiebreakCase(db: Pool): Promise<void> {
-  await db.execute(
-    `INSERT INTO bg_tournament_round_maps (tournament_id, phase_id, bracket, round_number, slots_json, tiebreak_map)
-     SELECT id, 0, 'UPPER', 1, '[]', ? FROM bg_tournaments WHERE name = ?
-     ON DUPLICATE KEY UPDATE tiebreak_map = VALUES(tiebreak_map)`,
-    [SEED_TIEBREAK_CASE.map, SEED_TIEBREAK_CASE.tournamentName],
-  );
+/**
+ * Pose les maps de départage seedées (`SEED_TIEBREAK_CASES`) sur la clé d'un
+ * match réel du tour. Échoue si un cas ne trouve aucun tour : un renommage ou
+ * un arbre non ouvert ferait sinon taire le cas en silence.
+ */
+export async function applyTiebreakCases(db: Pool): Promise<void> {
+  for (const tiebreakCase of SEED_TIEBREAK_CASES) {
+    const [result] = await db.execute<ResultSetHeader>(
+      `INSERT INTO bg_tournament_round_maps (tournament_id, phase_id, bracket, round_number, slots_json, tiebreak_map)
+       SELECT m.tournament_id, COALESCE(m.phase_id, 0), m.bracket, m.round_number, '[]', ?
+         FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id
+        WHERE t.name = ? AND (t.format <> 'BG_SURVIE' OR m.round_number >= ?)
+        ORDER BY m.status = 'COMPLETED', m.round_number, m.id
+        LIMIT 1
+       ON DUPLICATE KEY UPDATE tiebreak_map = VALUES(tiebreak_map)`,
+      [tiebreakCase.map, `${SEED_TOURNAMENT_PREFIX}${tiebreakCase.caseName}`, PLAYOFF_ROUND_OFFSET],
+    );
+    if (result.affectedRows === 0) throw new Error(`SEED_TIEBREAK_CASE_MISSING: ${tiebreakCase.caseName}`);
+  }
 }
 
 /** Choix seedé dans le pool de la carte 2 de la manche à pools. */

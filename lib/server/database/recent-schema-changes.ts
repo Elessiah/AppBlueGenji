@@ -399,7 +399,7 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // règle d'avant jusqu'à la prochaine connexion Battle.net.
     `ALTER TABLE bg_users ADD COLUMN overwatch_battletag_typed TINYINT(1) NOT NULL DEFAULT 0
        AFTER overwatch_battletag`,
-    // Map de départage d'un tour de play-offs en vrai best of 3 (`ROUND_MAPS.md`).
+    // Map de départage d'un tour de play-offs à format défini (`ROUND_MAPS.md`).
     `ALTER TABLE bg_tournament_round_maps ADD COLUMN tiebreak_map VARCHAR(64) NULL AFTER slots_json`,
     // Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) : option éteinte par
     // défaut ; la table `bg_match_voice_channels` est neuve, son `CREATE TABLE` suffit.
