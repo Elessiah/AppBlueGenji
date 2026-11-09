@@ -1,5 +1,5 @@
 {
-  "count": 208,
+  "count": 211,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "ADMIN_RESOLVE_FAILED": "Erreur lors de la résolution du match.",
@@ -53,6 +53,9 @@
     "INVALID_LAUNCH_PHASE": "Valeur invalide pour la phase de lancement des matchs : cochez ou décochez la case.",
     "INVALID_LIVE_BODY": "Réglage de la diffusion illisible : recharge la page puis réessaie.",
     "MATCH_NOT_STREAMED": "Ce match n'est plus casté : coche « Ce match est casté » pour poser son lien.",
+    "MATCH_CAST_CLAIM_FAILED": "Ton inscription comme caster n'a pas pu être enregistrée. Réessaie dans un instant.",
+    "MATCH_CAST_RELEASE_FAILED": "Ton retrait du cast n'a pas pu être enregistré. Réessaie dans un instant.",
+    "INVALID_CAST_TARGET": "Cible du cast invalide : rouvre la fenêtre et recommence.",
     "INVALID_LIVE_TRIGGER": "Mode de passage à l'antenne invalide.",
     "INVALID_MAPS": "Détail des maps illisible.",
     "INVALID_MAP_PICK": "Cette carte ne fait pas partie du pool du tour.",

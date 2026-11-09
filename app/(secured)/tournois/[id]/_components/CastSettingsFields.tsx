@@ -67,6 +67,7 @@ export function CastUrlField({
   fieldError,
   readOnlyNote,
   required = false,
+  missing = false,
 }: Readonly<{
   id: string;
   value: string;
@@ -78,6 +79,8 @@ export function CastUrlField({
   readOnlyNote?: string;
   /** Le lien est exigé pour valider (inscription) : dit dans le libellé et `aria-required`. */
   required?: boolean;
+  /** Le lien a été vidé alors qu'il est exigé : la note dit pourquoi « Enregistrer » est désarmé. */
+  missing?: boolean;
 }>) {
   const { t } = useActionsText();
   const hintId = useId();
@@ -88,13 +91,19 @@ export function CastUrlField({
   // Le refus du serveur porte sa propre phrase (`FieldErrorText`) : la note de
   // format ne s'y ajoute pas, sinon le champ dirait deux choses contraires.
   const formatNote = invalid && !fieldError;
-  const note = formatNote ? t("cardActions.castSettings.urlInvalid", { platforms: CAST_PLATFORMS }) : (readOnlyNote ?? null);
+  let note: string | null = null;
+  if (formatNote) {
+    note = missing
+      ? t("cardActions.castSettings.urlEmpty")
+      : t("cardActions.castSettings.urlInvalid", { platforms: CAST_PLATFORMS });
+  }
   return (
     <div className="field">
       <InfoHintRow>
         <label htmlFor={id}>{t(required ? "cardActions.castSettings.urlRequired" : "cardActions.castSettings.url")}</label>
         <InfoHint id={infoId} subject={t("cardActions.castSettings.urlSubject")}>
           <p>{t("cardActions.castSettings.urlHint", { platforms: CAST_PLATFORMS })}</p>
+          {readOnlyNote !== undefined && <p>{readOnlyNote}</p>}
         </InfoHint>
       </InfoHintRow>
       <input
@@ -110,7 +119,7 @@ export function CastUrlField({
         {...fieldAria(id, invalid, note === null ? null : hintId, infoId)}
       />
       {note !== null && (
-        <p id={hintId} className={formatNote ? styles.hintInvalid : styles.hint}>
+        <p id={hintId} className={styles.hintInvalid}>
           {note}
         </p>
       )}
@@ -164,15 +173,17 @@ export function CastTriggerField({
   }
   return (
     <fieldset className={styles.group}>
-      <legend className={styles.legend}>
-        <InfoHintRow>
+      {/* Légende en texte seul (nom du groupe) ; l'aide, hors légende. */}
+      <legend className="sr-only">{t("cardActions.castSettings.trigger")}</legend>
+      <InfoHintRow>
+        <span className={styles.legend} aria-hidden="true">
           {t("cardActions.castSettings.trigger")}
-          <InfoHint id={hintId} subject={t("cardActions.castSettings.trigger")}>
-            <p>{t("cardActions.castSettings.autoStop")}</p>
-            {startAtMissing && <p>{t("cardActions.castSettings.noStartAt")}</p>}
-          </InfoHint>
-        </InfoHintRow>
-      </legend>
+        </span>
+        <InfoHint id={hintId} subject={t("cardActions.castSettings.trigger")}>
+          <p>{t("cardActions.castSettings.autoStop")}</p>
+          {startAtMissing && <p>{t("cardActions.castSettings.noStartAt")}</p>}
+        </InfoHint>
+      </InfoHintRow>
       {MATCH_LIVE_TRIGGERS.map((option) => {
         const off = requiresMatchStartAt(option) && startAtMissing;
         return (

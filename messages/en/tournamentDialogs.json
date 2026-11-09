@@ -260,6 +260,9 @@
     "title": "Match stream",
     "streamed": "This match is being cast",
     "streamedSubject": "the “being cast” box",
+    "saveSubject": "why Save is disabled",
+    "saveClosedLocked": "The score is entered and the mode belongs to another caster: there is nothing to save here.",
+    "saveClosedUnchanged": "The score is entered: nothing to save while “This match is being cast” stays ticked. Untick it to remove the match from the broadcast.",
     "streamedClosed": "This match's score is entered: it can no longer be cast.",
     "streamedOrphan": "This mode no longer has a caster: only the match referee or staff can remove it.",
     "triggers": {

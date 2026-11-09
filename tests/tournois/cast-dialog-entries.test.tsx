@@ -14,7 +14,12 @@ jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: ()
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { CastBattletagField, CastTriggerField, CastUrlField } from "@/app/(secured)/tournois/[id]/_components/CastSettingsFields";
-import { closedMatchUnchanged, mayEditReplay, matchLiveBody, streamedBoxReason } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
+import frErrors from "@/messages/fr/tournamentErrors.json";
+import enErrors from "@/messages/en/tournamentErrors.json";
+import frModal from "@/messages/fr/launchModal.json";
+import enModal from "@/messages/en/launchModal.json";
+import { LAUNCH_ERROR_MESSAGES } from "@/lib/shared/match-launch";
+import { closedMatchUnchanged, mayEditReplay, matchLiveBody, refusalHasField, saveBlockedReason, streamedBoxReason } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
 import { readSource } from "../helpers/read-source";
 import frActions from "@/messages/fr/tournamentActions.json";
 import enActions from "@/messages/en/tournamentActions.json";
@@ -77,6 +82,82 @@ describe("CastUrlField / CastBattletagField — une seule phrase de refus", () =
       <CastBattletagField id="bt" value="x" onChange={() => undefined} invalid fieldError="BattleTag refusé" />,
     );
     expect(html).not.toContain("BattleTag invalide");
+  });
+});
+
+describe("Raisons visibles et refus précis des fenêtres de cast", () => {
+  const closed = { status: "COMPLETED" as const, liveTrigger: "AUTO" as const, liveStartedAt: null, launchedAt: null };
+
+  it("refusalHasField_notStreamedUnderLockedMode_false", () => {
+    expect(refusalHasField("MATCH_NOT_STREAMED", true)).toBe(false);
+    expect(refusalHasField("MATCH_NOT_STREAMED", false)).toBe(true);
+    expect(refusalHasField("INVALID_STREAM_URL", true)).toBe(true);
+  });
+
+  it("saveBlockedReason_closedLockedMode_locked", () => {
+    expect(saveBlockedReason(closed, true, true, false)).toBe("locked");
+  });
+
+  it("saveBlockedReason_closedStillTicked_unchanged", () => {
+    expect(saveBlockedReason(closed, false, true, false)).toBe("unchanged");
+  });
+
+  it("saveBlockedReason_closedWithLinkEdit_null", () => {
+    expect(saveBlockedReason(closed, false, true, true)).toBeNull();
+  });
+
+  it("saveBlockedReason_openMatch_null", () => {
+    expect(saveBlockedReason({ ...closed, status: "READY" }, false, true, false)).toBeNull();
+  });
+
+  it("CastUrlField_missing_showsEmptyNoteAndInvalid", () => {
+    const html = renderToStaticMarkup(<CastUrlField id="u" value="" onChange={() => undefined} invalid missing required />);
+    expect(html).toContain("obligatoire : remets-le");
+    expect(html).toContain('aria-invalid="true"');
+  });
+
+  it("CastUrlField_staffNote_behindInfoHintNotPermanentParagraph", () => {
+    const html = renderToStaticMarkup(
+      <CastUrlField id="u" value="" onChange={() => undefined} invalid={false} readOnlyNote="Note staff" />,
+    );
+    expect(html.match(/Note staff/g)).toHaveLength(1);
+    expect(html).not.toMatch(/<p id="[^"]*" class="[^"]*">Note staff/);
+  });
+
+  it("CastTriggerField_legend_plainTextHelpOutsideLegend", () => {
+    const html = renderToStaticMarkup(<CastTriggerField trigger="AUTO" startAt={null} onChange={() => undefined} />);
+    expect(html).toMatch(/<legend class="sr-only">[^<]+<\/legend>/);
+  });
+
+  it("MatchLiveDialog_source_noHardcodedTbdAndLegendPlain", () => {
+    const live = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
+    expect(live).not.toContain('"TBD"');
+    expect(live).toContain('t("schedule.tbd")');
+    expect(live).toContain('<legend className="sr-only">{t("live.casterLinks")}</legend>');
+    expect(live).toContain("aria-describedby={saveHintId(saveReason)}");
+    expect(live).toContain("<SaveBlockedHint reason={saveReason} />");
+  });
+
+  it("CastSettingsDialog_playedMatch_closeInsteadOfDeadSaveAndHintedNote", () => {
+    const settings = readSource(`${DIR}/_components/CastSettingsDialog.tsx`);
+    expect(settings).toContain('played ? t("cardActions.castSettings.close") : t("cardActions.castSettings.cancel")');
+    expect(settings).toContain("{!played && (");
+    expect(settings).toContain('t("cardActions.castSettings.playedTitle")');
+    expect(settings).toContain("missing={urlMissing}");
+  });
+
+  it("launchErrorText_castCodes_preciseFrAndEn", () => {
+    for (const code of ["MATCH_CAST_CLAIM_FAILED", "MATCH_CAST_RELEASE_FAILED", "INVALID_CAST_TARGET"]) {
+      expect(Object.keys(LAUNCH_ERROR_MESSAGES)).toContain(code);
+      expect(frErrors.codes).toHaveProperty(code);
+      expect(enErrors.codes).toHaveProperty(code);
+      expect(frModal.errors).toHaveProperty(code);
+      expect(enModal.errors).toHaveProperty(code);
+    }
+    expect(frActions.launch.sessionExpired).toContain("session a expiré");
+    expect(enActions.launch.sessionExpired).toContain("session has expired");
+    const text = readSource("app/(secured)/tournois/[id]/_lib/actions-text.ts");
+    expect(text).toContain('if (code === "UNAUTHORIZED") return text.t("launch.sessionExpired");');
   });
 });
 
@@ -258,7 +339,7 @@ describe("MatchLiveDialog — match joué (ERREUR.txt EF-29 #528, CAST-FOLLOWUP 
     expect(live).toContain("{...fieldAria(STREAMED_INPUT_ID, invalid, reason !== null && STREAMED_HINT_ID)}");
     expect(live).toContain('<FieldErrorText fieldId={STREAMED_INPUT_ID} message={error} />');
     // Sous un mode verrouillé la case n'existe pas : le refus n'y est pas rattaché.
-    expect(live).toContain('code === "MATCH_NOT_STREAMED" && triggerLocked && match.liveTrigger !== null');
+    expect(live).toContain("refusalHasField(code, triggerLocked && match.liveTrigger !== null)");
   });
 
   it("MatchLiveDialog_neverCastClosedMatch_checkboxDisabled", () => {

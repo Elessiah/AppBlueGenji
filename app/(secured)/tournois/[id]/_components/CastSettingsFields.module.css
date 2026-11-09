@@ -10,6 +10,7 @@
 }
 
 .legend {
+  display: block;
   margin-bottom: 8px;
   padding: 0;
   font-size: 12px;
@@ -33,17 +34,9 @@
 }
 
 
-.hint,
 .hintInvalid {
   margin: 6px 0 0;
   font-size: 12px;
-}
-
-.hint {
-  color: var(--ink-quiet);
-}
-
-.hintInvalid {
   color: var(--danger);
 }
 

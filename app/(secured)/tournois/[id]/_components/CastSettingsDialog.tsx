@@ -232,7 +232,14 @@ export function CastSettingsDialog({
           </output>
         )}
 
-        {cast !== null && played && <p className={styles.subtitle}>{t("cardActions.castSettings.played")}</p>}
+        {cast !== null && played && (
+          <InfoHintRow inline>
+            <p className={styles.subtitle}>{t("cardActions.castSettings.playedTitle")}</p>
+            <InfoHint id={`${titleId}-played`} subject={t("cardActions.castSettings.playedTitle")}>
+              <p>{t("cardActions.castSettings.played")}</p>
+            </InfoHint>
+          </InfoHintRow>
+        )}
 
         {cast !== null && (
           <>
@@ -244,7 +251,9 @@ export function CastSettingsDialog({
                   setUrl(next);
                   fieldErrors.clear("url");
                 }}
-                invalid={urlRefused || fieldErrors.invalidField === "url"}
+                required={streamEditable}
+                missing={urlMissing}
+                invalid={urlRefused || urlMissing || fieldErrors.invalidField === "url"}
                 fieldError={fieldErrors.message("url")}
                 readOnlyNote={cast.staffStream ? t("cardActions.castSettings.urlStaff") : undefined}
               />
@@ -333,11 +342,14 @@ export function CastSettingsDialog({
           )}
           <div className={styles.actions}>
             <button type="button" className={`btn ghost ${styles.button}`} onClick={onClose} disabled={busy}>
-              {t("cardActions.castSettings.cancel")}
+              {played ? t("cardActions.castSettings.close") : t("cardActions.castSettings.cancel")}
             </button>
-            <button type="submit" className={`btn ${styles.button}`} disabled={busy || blocked || cast === null}>
-              {busy ? t("cardActions.castSettings.saving") : t("cardActions.castSettings.save")}
-            </button>
+            {/* Un match joué ne prend plus ni lien, ni mode, ni BattleTag : rien à enregistrer. */}
+            {!played && (
+              <button type="submit" className={`btn ${styles.button}`} disabled={busy || blocked || cast === null}>
+                {busy ? t("cardActions.castSettings.saving") : t("cardActions.castSettings.save")}
+              </button>
+            )}
           </div>
         </div>
       </form>

@@ -200,7 +200,8 @@
   },
   "launch": {
     "fallback": "The action couldn't go through. Try again in a moment.",
-    "alreadyCompleted": "This match is over."
+    "alreadyCompleted": "This match is over.",
+    "sessionExpired": "Your session has expired: sign in again, then retry."
   },
   "cardActions": {
     "name": "{label}: {match}",
@@ -387,6 +388,9 @@
       "autoStop": "The stream stops by itself as soon as a score is entered.",
       "url": "My channel link",
       "urlRequired": "My channel link (required)",
+      "urlEmpty": "Your channel link is required: put it back, or cancel to keep the old one.",
+      "playedTitle": "Match played",
+      "close": "Close",
       "urlHint": "Required: without it, your stream shows neither on the match nor in the live announcement (accepted platforms: {platforms}). It is removed from the match if your account is deleted, unless it is marked as the organisation's link.",
       "urlInvalid": "Link not recognized. Accepted platforms: {platforms}.",
       "urlStaff": "You are co-casting the organisation's stream: its link is set in the broadcast configuration.",
