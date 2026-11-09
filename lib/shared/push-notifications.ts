@@ -62,7 +62,7 @@ export const PUSH_TOPICS = {
   },
   NEW_MATCH: {
     label: "Nouveau match",
-    description: "L'adversaire de ton prochain match (équipe dont tu es membre, ou ton tournoi individuel) est connu : qui tu affrontes (sans le nommer en tournoi individuel), l'horaire s'il est posé (donné ici seulement) et le lien du match.",
+    description: "L'adversaire de ton prochain match (équipe dont tu es membre, ou ton tournoi individuel) est connu : qui tu affrontes (sans le nommer en tournoi individuel), l'horaire s'il est posé (alors pas redit par « Horaires et rappels de match » avant les rappels) et le lien du match.",
     audience: null,
   },
   MATCH_REMINDER: {

@@ -81,7 +81,7 @@ journalisent sans tomber, et les rappels ne l'attendent pas. Ainsi :
 - destinataires lus **match par match, juste après** sa réservation (quatre
   matchs à la fois), au plus près de l'envoi : un membre parti entre-temps
   n'est plus prévenu ; une panne avant l'envoi rend la réservation et les
-  marques (le passage suivant réessaie) ; au troisième échec d'affilée, l'affiche
+  marques (le passage suivant réessaie) ; au troisième échec d'affilée (compté dans la mémoire du processus : un redémarrage le remet à zéro), l'affiche
   lue (mêmes engagées) est marquée `skipped` (ses rappels donneront l'horaire) ;
   un match sorti des candidats oublie ses échecs ;
 - l'erreur d'un match ne retient pas les autres, l'échec d'envoi d'une équipe

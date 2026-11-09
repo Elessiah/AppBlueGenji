@@ -616,8 +616,8 @@ describe("annonce d'un nouveau match — textes légaux (revue juridique de #569
   it("registerT04_retention_newMatchRecordsListAnnouncedTimeAndSkippedMark", () => {
     const fr = t04.retention.find((line) => line.includes("annonce d'un nouveau match"));
     const en = t04En.retention.find((line) => line.includes("notice of a new match"));
-    expect(fr).toMatch(/horaire annoncé et date de la trace, ou la marque qu'il n'a pas été annoncé — match déjà apparié à la mise en service, adversaire dissous, envoi échoué trois fois\)/);
-    expect(en).toMatch(/the announced time and the date of the record, or the mark that it was not announced — match already paired when the feature went live, opponent dissolved, sending failed three times\)/);
+    expect(fr).toMatch(/horaire annoncé et date de la trace, ou la marque qu'il n'a pas été annoncé — match déjà apparié à la mise en service, équipe dissoute, envoi échoué trois fois\)/);
+    expect(en).toMatch(/the announced time and the date of the record, or the mark that it was not announced — match already paired when the feature went live, team dissolved, sending failed three times\)/);
     expect(en).not.toMatch(/never goes out twice, erased with it/);
   });
 
@@ -648,8 +648,8 @@ describe("annonce d'un nouveau match — textes légaux (revue juridique de #569
   it("privacyChange_newMatchEntry_excludesGhostAndDissolvedTeamsInFrAndEn", () => {
     const fr = PRIVACY_CHANGES.find((change) => change.id === "2026-11-annonce-nouveau-match")!;
     const en = PRIVACY_CHANGES_EN["2026-11-annonce-nouveau-match"];
-    expect(fr.details[0]).toContain("personne pour une équipe fantôme, et rien pour un match contre une équipe dissoute");
-    expect(en.details[0]).toContain("nobody for a ghost team, and nothing for a match against a dissolved team");
+    expect(fr.details[0]).toContain("personne pour une équipe fantôme, et rien pour un match dont une équipe est dissoute");
+    expect(en.details[0]).toContain("nobody for a ghost team, and nothing for a match where a team is dissolved");
   });
 
   it("donneesProfil_discordId_listsNewMatchDmInFrAndEn", () => {
@@ -667,10 +667,10 @@ describe("annonce d'un nouveau match — textes légaux (revue juridique de #569
   it("registerAndPrivacyChange_newMatchRecords_erasedWithEitherEntrantInFrAndEn", () => {
     const fr = PRIVACY_CHANGES.find((change) => change.id === "2026-11-annonce-nouveau-match")!;
     const en = PRIVACY_CHANGES_EN["2026-11-annonce-nouveau-match"];
-    expect(t04.retention.join("\n")).toContain("effacées avec lui ou avec l'une des deux engagées");
-    expect(t04En.retention.join("\n")).toContain("erased with it or with either entrant");
-    expect(fr.details[2]).toContain("effacé avec lui ou avec l'une des deux engagées");
-    expect(en.details[2]).toContain("erased with it or with either entrant");
+    expect(t04.retention.join("\n")).toContain("effacées avec lui ou avec l'une des deux engagées une fois supprimée — une équipe dissoute reste au tournoi");
+    expect(t04En.retention.join("\n")).toContain("erased with it or with either entrant once deleted — a dissolved team stays in the tournament");
+    expect(fr.details[2]).toContain("effacé avec lui ou avec l'une des deux engagées une fois supprimée (une équipe dissoute reste au tournoi");
+    expect(en.details[2]).toContain("erased with it or with either entrant once deleted (a dissolved team stays in the tournament");
   });
 
   it("privacyChange_newMatchTopicOff_disclosesTimeAtPairingGoesOnlyWithItInFrAndEn", () => {

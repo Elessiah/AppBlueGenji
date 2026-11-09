@@ -18,7 +18,7 @@
     },
     "NEW_MATCH": {
       "label": "New match",
-      "description": "The opponent of your next match (a team you belong to, or your solo tournament) is known: who you face (not named in a solo tournament), the time if it is set (given here only), and the match link."
+      "description": "The opponent of your next match (a team you belong to, or your solo tournament) is known: who you face (not named in a solo tournament), the time if it is set (then not repeated by “Match times and reminders” before the reminders), and the match link."
     },
     "MATCH_REMINDER": {
       "label": "Match times and reminders",
