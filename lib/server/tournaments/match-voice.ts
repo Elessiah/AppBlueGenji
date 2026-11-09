@@ -219,7 +219,8 @@ function shownFailed(teamColumn: "team1_id" | "team2_id"): string {
  * `VOICE_CHANNEL_LATE_HOURS`), lancé ou non (le lancement n'en dépend pas), deux
  * équipes réelles — **jamais** une entrée solo (le nom du salon serait un
  * pseudo) ni une fantôme. Un match dont les deux salons sont ouverts n'est
- * plus relu.
+ * plus relu (`HAVING` sur les colonnes calculées : chaque sous-requête n'est écrite
+ * qu'une fois ; sans `GROUP BY`, `HAVING` filtre ligne à ligne, avant `LIMIT`).
  */
 export const DUE_CHANNELS_SQL = `SELECT m.id, m.tournament_id, m.team1_id, m.team2_id,
        t1.name AS team1_name, t2.name AS team2_name,
@@ -236,7 +237,7 @@ export const DUE_CHANNELS_SQL = `SELECT m.id, m.tournament_id, m.team1_id, m.tea
    AND m.start_at >= NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
    AND t1.solo_user_id IS NULL AND t2.solo_user_id IS NULL
    AND COALESCE(t1.is_ghost, 0) = 0 AND COALESCE(t2.is_ghost, 0) = 0
-   AND (${needsChannel("team1_id")} OR ${needsChannel("team2_id")})
+HAVING team1_ask OR team2_ask
  ORDER BY EXISTS (SELECT 1 FROM bg_match_voice_channels f
                   WHERE f.match_id = m.id AND f.released_at IS NULL AND f.channel_id IS NULL
                     AND f.failed_at IS NOT NULL), m.start_at, m.id
@@ -286,7 +287,7 @@ type SweepState = {
   checkedAt: Map<string, number>;
   /** Dernier salon (match, équipe) de la fenêtre lue : la suivante commence après lui. */
   recheckFrom: [number, number];
-  /** Dernier refus journalisé (`release:` / `recheck:` + clé du salon, ou `release:bot` → code) : une ligne pm2 par code. */
+  /** Dernier refus journalisé (`release:` / `recheck:` + clé du salon, ou `bot` → code) : une ligne pm2 par code. */
   refusalLogged: Map<string, string>;
   /** Bot indisponible pour tous les salons : pas d'appel avant cet instant (ms). */
   botDownUntil: number;
@@ -323,6 +324,28 @@ function logReleaseFailure(matchId: number, code: string): void {
 /** Ligne de pm2 d'une revérification refusée par le bot pour ce salon : une par salon et par code. */
 function logRecheckFailure(matchId: number, code: string): void {
   console.warn(`[match-voice] match ${matchId} : revérification du salon vocal refusée (${code})`);
+}
+
+/**
+ * Ligne de pm2 d'un refus du bot entier (`VOICE_*` de `VOICE_UNAVAILABLE_CODES` : permission,
+ * catégorie, stockage) au rendu ou à la revérification : une par code, de nouveau
+ * journalisée après une réponse du bot (`botAnswered`).
+ */
+function logBotRefusal(code: string): void {
+  console.warn(`[match-voice] bot vocal : refus pour tous les salons (${code})`);
+}
+
+/** Sujet du refus du bot entier dans `refusalLogged`. */
+const BOT_REFUSAL_SUBJECT = "bot";
+
+/** Refus du bot entier : journalisé une fois par code ; une panne du canal (transport) ne l'est pas. */
+function noteBotRefusal(code: string): void {
+  if (code.startsWith("VOICE_")) logRefusalOnce(BOT_REFUSAL_SUBJECT, code, () => logBotRefusal(code));
+}
+
+/** Le bot a répondu pour un salon : son prochain refus global sera de nouveau journalisé. */
+function botAnswered(): void {
+  sweep.refusalLogged.delete(BOT_REFUSAL_SUBJECT);
 }
 
 /** Refus retenus pour la journalisation : au-delà, la mémoire repart à vide. */
@@ -404,6 +427,7 @@ async function createTeamChannel(
 ): Promise<{ changed: boolean; down: boolean }> {
   const key = voiceChannelKey(matchId, teamId);
   const created = await ensureTeamChannel(key, teamName);
+  if (created.kind !== "unavailable") botAnswered();
   if (created.kind === "ok") {
     await writeChannel(matchId, teamId, created.value);
     // Le bot vient de répondre : pas de seconde demande identique dans la même passe.
@@ -420,6 +444,27 @@ async function createTeamChannel(
 type ReleaseVerdict = { close: boolean; stop: boolean };
 
 /**
+ * Refus qui closent la ligne : salon déjà supprimé (`gone`), identifiant (`INVALID_CHANNEL_ID`)
+ * ou clé (`INVALID_VOICE_KEY`) que le bot ne suivra jamais — redemandés sans fin sinon, et
+ * jamais purgés.
+ */
+const VOICE_RELEASE_CLOSING_CODES: ReadonlySet<string> = new Set(["INVALID_CHANNEL_ID", "INVALID_VOICE_KEY"]);
+
+/** Ligne déjà oubliée par le bot (`VOICE_BOT_ABANDONED_MAX_HOURS`) : close sans l'appeler, bot indisponible. */
+const abandonedVerdict = (row: ReleaseRow): ReleaseVerdict => ({ close: Number(row.bot_abandoned ?? 0) === 1, stop: true });
+
+/**
+ * Rendu par clé refusé faute de route (bot d'une version antérieure) : refus propre à cette
+ * ligne, pas panne du bot — les rendus par identifiant passent, la ligne attend la mise à jour
+ * du bot (ou son filet, `bot_expired`).
+ */
+function keyRouteMissing(row: ReleaseRow, outcome: VoiceCallOutcome<boolean>): VoiceCallOutcome<boolean> {
+  return row.channel_id === null && outcome.kind === "unavailable" && outcome.code === "INTERNAL_ROUTE_NOT_FOUND"
+    ? { kind: "failed", code: outcome.code }
+    : outcome;
+}
+
+/**
  * Rend le salon d'une ligne au bot. Une ligne sans identifiant (création expirée ou
  * illisible, alors que le bot a pu créer le salon) est rendue par sa clé. Ligne close :
  * rendu fait, salon déjà supprimé, identifiant jamais suivi, filet du bot passé sur un
@@ -429,12 +474,14 @@ type ReleaseVerdict = { close: boolean; stop: boolean };
 async function releaseOne(row: ReleaseRow): Promise<ReleaseVerdict> {
   const matchId = Number(row.match_id);
   const key = voiceChannelKey(matchId, Number(row.team_id));
-  const released =
-    row.channel_id === null ? await releaseVoiceChannelByKey(key) : await releaseVoiceChannel(String(row.channel_id));
-  // `gone` (`VOICE_CHANNEL_NOT_TRACKED`) : déjà supprimé, rien de plus à faire ; un
-  // identifiant que le bot refuse (`INVALID_CHANNEL_ID`) ne sera jamais suivi : la
-  // ligne se clôt aussi, au lieu d'être redemandée sans fin et jamais purgée.
-  if (released.kind === "ok" || released.kind === "gone" || released.code === "INVALID_CHANNEL_ID") {
+  const released = keyRouteMissing(
+    row,
+    row.channel_id === null ? await releaseVoiceChannelByKey(key) : await releaseVoiceChannel(String(row.channel_id)),
+  );
+  if (released.kind !== "unavailable") botAnswered();
+  // `gone` (`VOICE_CHANNEL_NOT_TRACKED`) : déjà supprimé, rien de plus à faire ; un refus de
+  // `VOICE_RELEASE_CLOSING_CODES` ne sera jamais suivi : la ligne se clôt aussi.
+  if (released.kind === "ok" || released.kind === "gone" || VOICE_RELEASE_CLOSING_CODES.has(released.code)) {
     forgetRefusals(key);
     return { close: true, stop: false };
   }
@@ -442,14 +489,12 @@ async function releaseOne(row: ReleaseRow): Promise<ReleaseVerdict> {
   if (down) {
     // Refus du bot entier (permission, catégorie, stockage) : une ligne pm2 par code, même
     // s'il arrête la passe ; une panne du canal (transport) n'en donne pas.
-    if (released.code.startsWith("VOICE_")) {
-      logRefusalOnce("release:bot", released.code, () => logReleaseFailure(matchId, released.code));
-    }
+    noteBotRefusal(released.code);
     // Une panne passagère n'est pas un refus de ce salon : la ligne n'est close que passé
     // l'oubli du bot (`VOICE_BOT_ABANDONED_MAX_HOURS`), et le rendu s'arrête quand même.
     if (Number(row.bot_abandoned ?? 0) === 1) {
       forgetRefusals(key);
-      return { close: true, stop: true };
+      return abandonedVerdict(row);
     }
   } else {
     // Rendu refusé passé le filet du bot (salon non rendu supprimé de son côté) : la ligne
@@ -475,13 +520,16 @@ async function releaseOne(row: ReleaseRow): Promise<ReleaseVerdict> {
 
 /**
  * Rend les salons à rendre ; `true` si le bot est indisponible (le rendu s'est arrêté).
+ * Bot indisponible, les lignes suivantes ne l'appellent plus ; celles qu'il a déjà oubliées
+ * (`bot_abandoned`) se closent quand même, toutes dans la passe.
  * Une ligne n'est close que si elle porte encore le salon rendu : un salon neuf écrit
  * entre-temps par la revérification d'un autre processus reste ouvert, rendu plus tard.
  */
 async function releaseChannels(touched: Set<number>): Promise<boolean> {
   const rows = await run<ReleaseRow[]>(RELEASABLE_SQL);
+  let down = false;
   for (const row of rows) {
-    const verdict = await releaseOne(row);
+    const verdict = down ? abandonedVerdict(row) : await releaseOne(row);
     if (verdict.close) {
       const db = await getDatabase();
       const [result] = await db.execute<ResultSetHeader>(
@@ -491,9 +539,9 @@ async function releaseChannels(touched: Set<number>): Promise<boolean> {
       );
       if (Number(result.affectedRows) > 0 && row.tournament_id !== null) touched.add(Number(row.tournament_id));
     }
-    if (verdict.stop) return true;
+    if (verdict.stop) down = true;
   }
-  return false;
+  return down;
 }
 
 /**
@@ -581,16 +629,28 @@ type OpenRow = RowDataPacket & { match_id: number; team_id: number; channel_id: 
 /**
  * Même salon rendu par le bot alors que la ligne a été rendue entre-temps (autre
  * processus, rechargement pm2) : le bot l'a repris (rendu annulé), la ligne est
- * rouverte pour que le rendu de la passe le rende de nouveau. `true` si rouverte.
+ * rouverte pour que le rendu de la passe le rende de nouveau. Une seule lecture par
+ * passe pour tous les salons retrouvés ; une écriture seulement pour une ligne rendue.
  */
-async function reopenReleasedRow(matchId: number, teamId: number, channelId: string): Promise<boolean> {
-  const db = await getDatabase();
-  const [result] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_match_voice_channels SET created_at = NOW(), failed_at = NULL, released_at = NULL
-     WHERE match_id = ? AND team_id = ? AND channel_id = ? AND released_at IS NOT NULL`,
-    [matchId, teamId, channelId],
+async function reopenReleasedRows(rows: readonly OpenRow[], touched: Set<number>): Promise<void> {
+  if (rows.length === 0) return;
+  const released = await run<(RowDataPacket & { match_id: number; team_id: number })[]>(
+    `SELECT match_id, team_id FROM bg_match_voice_channels
+      WHERE released_at IS NOT NULL
+        AND (${rows.map(() => "(match_id = ? AND team_id = ? AND channel_id = ?)").join(" OR ")})`,
+    rows.flatMap((row) => [Number(row.match_id), Number(row.team_id), String(row.channel_id)]),
   );
-  return Number(result.affectedRows) > 0;
+  for (const hit of released) {
+    const row = rows.find((open) => Number(open.match_id) === Number(hit.match_id) && Number(open.team_id) === Number(hit.team_id));
+    if (!row) continue;
+    const db = await getDatabase();
+    const [result] = await db.execute<ResultSetHeader>(
+      `UPDATE bg_match_voice_channels SET created_at = NOW(), failed_at = NULL, released_at = NULL
+       WHERE match_id = ? AND team_id = ? AND channel_id = ? AND released_at IS NOT NULL`,
+      [Number(row.match_id), Number(row.team_id), String(row.channel_id)],
+    );
+    if (Number(result.affectedRows) > 0) touched.add(Number(row.tournament_id));
+  }
 }
 
 /**
@@ -598,13 +658,18 @@ async function reopenReleasedRow(matchId: number, teamId: number, channelId: str
  * s'arrête alors). Un refus propre au salon le laisse tel quel, redemandé après
  * `VOICE_RECHECK_MS`, avec une ligne pm2 par salon et par code.
  */
-async function recheckOneChannel(row: OpenRow, touched: Set<number>): Promise<boolean> {
+async function recheckOneChannel(row: OpenRow, touched: Set<number>, sameId: OpenRow[]): Promise<boolean> {
   const matchId = Number(row.match_id);
   const teamId = Number(row.team_id);
   const key = voiceChannelKey(matchId, teamId);
   const ensured = await ensureTeamChannel(key, visibleText(String(row.team_name)));
-  // Une panne ici ne dit rien du salon : il reste tel qu'il est, redemandé plus tard.
-  if (ensured.kind === "unavailable") return false;
+  // Une panne ici ne dit rien du salon : il reste tel qu'il est, redemandé plus tard ; un
+  // refus du bot entier est journalisé une fois par code.
+  if (ensured.kind === "unavailable") {
+    noteBotRefusal(ensured.code);
+    return false;
+  }
+  botAnswered();
   // Un refus propre au salon non plus : la ligne reste ouverte (le salon suit
   // sur la page), et la revérification suivante redemande (MATCH_VOICE.md).
   if (ensured.kind !== "ok") {
@@ -618,8 +683,8 @@ async function recheckOneChannel(row: OpenRow, touched: Set<number>): Promise<bo
     // rendu de la même passe (après la revérification) le rend au bot, avec ses reprises.
     await writeChannel(matchId, teamId, ensured.value);
     touched.add(Number(row.tournament_id));
-  } else if (await reopenReleasedRow(matchId, teamId, ensured.value)) {
-    touched.add(Number(row.tournament_id));
+  } else {
+    sameId.push(row);
   }
   return true;
 }
@@ -637,8 +702,6 @@ async function recheckOpenChannels(touched: Set<number>, deadline: number): Prom
   const rows = await run<OpenRow[]>(OPEN_DUE_CHANNELS_SQL, [fromMatch, fromMatch, fromTeam]);
   const full = rows.length >= VOICE_RECHECK_WINDOW;
   const last = rows.at(-1);
-  // Fenêtre pleine : la suivante commence après son dernier salon ; sinon tout a été lu.
-  sweep.recheckFrom = full && last ? [Number(last.match_id), Number(last.team_id)] : [0, 0];
   const now = Date.now();
   const seen = new Set<string>();
   const due: { key: string; row: OpenRow }[] = [];
@@ -651,13 +714,14 @@ async function recheckOpenChannels(touched: Set<number>, deadline: number): Prom
   due.sort((a, b) => (sweep.checkedAt.get(a.key) ?? 0) - (sweep.checkedAt.get(b.key) ?? 0));
   let botDown = false;
   const queue = due.slice(0, VOICE_RECHECK_BATCH);
+  const sameId: OpenRow[] = [];
   const checkOne = async (next: { key: string; row: OpenRow }): Promise<void> => {
     sweep.checkedAt.set(next.key, Date.now());
     // Bot indisponible ou base en erreur (levée) : les autres ouvriers s'arrêtent, et ce
     // salon n'est pas « vu ».
     let reachable = false;
     try {
-      reachable = await recheckOneChannel(next.row, touched);
+      reachable = await recheckOneChannel(next.row, touched, sameId);
     } finally {
       if (!reachable) {
         botDown = true;
@@ -683,6 +747,13 @@ async function recheckOpenChannels(touched: Set<number>, deadline: number): Prom
     const failed = settled.find((result): result is PromiseRejectedResult => result.status === "rejected");
     if (failed) throw failed.reason;
   }
+  await reopenReleasedRows(sameId, touched);
+  // Fenêtre pleine et entièrement vérifiée : la suivante commence après son dernier salon ;
+  // tout lu : depuis le début. Passe arrêtée avant la fin (panne, budget, lot) : la même
+  // fenêtre est relue, ses salons non vérifiés ne sont pas sautés.
+  const windowDone = !botDown && queue.length === 0 && due.length <= VOICE_RECHECK_BATCH;
+  if (!full) sweep.recheckFrom = [0, 0];
+  else if (windowDone && last) sweep.recheckFrom = [Number(last.match_id), Number(last.team_id)];
   forgetRecheckStamps(full, seen);
   sweep.nextRecheckAt = full ? 0 : nextRecheckDue(seen);
   return botDown;

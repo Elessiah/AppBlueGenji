@@ -1055,6 +1055,8 @@ const VOICE_UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   "VOICE_MISSING_PERMISSIONS",
   "VOICE_STORAGE_ERROR",
   "VOICE_INTERNAL_ERROR",
+  // 429 ou 5xx de Discord sans code JSON : limite de débit ou panne qui vaut pour tous les
+  // salons — attendre `VOICE_RETRY_SECONDS` plutôt que de rappeler pour chacun.
   "VOICE_DISCORD_UNAVAILABLE",
 ]);
 
@@ -1148,7 +1150,8 @@ function readReleased(payload: unknown): true | null {
  * Rend au bot le salon d'une **clé** (`POST /internal/voice/keys/release`) : pour
  * une ligne sans identifiant de salon (création expirée ou réponse illisible),
  * alors que le bot a pu créer le salon. Une clé sans salon suivi répond `ok`. Un
- * bot plus ancien, sans la route, répond `INTERNAL_ROUTE_NOT_FOUND` (`unavailable`).
+ * bot plus ancien, sans la route, répond `INTERNAL_ROUTE_NOT_FOUND` (`unavailable` ; le
+ * balayage n'en fait qu'un refus de cette ligne, `match-voice.ts`).
  */
 export function releaseVoiceChannelByKey(key: string): Promise<VoiceCallOutcome<true>> {
   return voiceCall("POST", "/internal/voice/keys/release", { key }, readReleased);

@@ -47,8 +47,8 @@ et rien n'est compté.
   `404` (route absente, `INTERNAL_ROUTE_NOT_FOUND` ; tout autre code, ou un service
   mal routé, devient `BOT_INTERNAL_REQUEST_FAILED`) est une panne du canal : elle
   arrête la passe sans compter au coupe-circuit (partagé par le journal et les
-  annonces), la ligne reste ouverte. Un rendu refusé pour `INVALID_CHANNEL_ID` clôt la
-  ligne (le bot ne suivra jamais cet identifiant) au lieu d'être redemandé sans fin. Un code du bot
+  annonces), la ligne reste ouverte. Un rendu refusé pour `INVALID_CHANNEL_ID` ou `INVALID_VOICE_KEY` clôt la
+  ligne (le bot ne suivra jamais cet identifiant ni cette clé) au lieu d'être redemandé sans fin. Un code du bot
   n'est repris que s'il a la forme `[A-Z0-9_]{1,64}` — jamais une phrase.
   Coût borné : la lecture des salons ouverts est sautée tant qu'aucun n'est dû (une
   minute au plus, `nextRecheckAt` ; ses horodatages sont oubliés dès qu'aucun tournoi
@@ -56,13 +56,17 @@ et rien n'est compté.
   plus anciennement vus d'abord, aucun n'est affamé), arrêt de la passe au premier
   échec du canal du bot (le salon en échec est redemandé après 10 s, derrière les
   salons plus anciennement vus : un salon lent n'ouvre pas chaque passe) ; un salon tout juste créé n'est pas redemandé dans la même passe.
+  Fenêtre de 400 salons ouverts : la suivante ne commence après son dernier salon qu'une fois
+  tous ses salons dus vérifiés ; une passe arrêtée avant (panne, budget, lot de 80) relit la même
+  fenêtre, aucun salon n'est sauté.
   La création, la revérification et le rendu s'arrêtent chacun au premier `unavailable` (la création en panne saute la revérification ; le rendu, indépendant, passe toujours) ; les matchs dont un salon vient d'échouer à la création (ligne sans salon) passent après les autres dans le lot de création. Seul
   `unavailable` — panne du canal ou du bot entier : `BOT_CIRCUIT_OPEN`, `BOT_INTERNAL_UNREACHABLE`,
   `BOT_VOICE_TIMEOUT`, `BOT_INTERNAL_REQUEST_FAILED` (réponse sans code lisible),
   `BOT_VOICE_BAD_RESPONSE` (2xx au corps illisible), et les codes de `VOICE_UNAVAILABLE_CODES` :
   `INTERNAL_ERROR`, `INTERNAL_ROUTE_NOT_FOUND`, `UNAUTHORIZED`, `INTERNAL_API_TOKEN_NOT_CONFIGURED`,
   `DISCORD_NOT_READY`, `VOICE_CATEGORY_UNAVAILABLE`, `VOICE_MISSING_PERMISSIONS`, `VOICE_STORAGE_ERROR`,
-  `VOICE_INTERNAL_ERROR`, `VOICE_DISCORD_UNAVAILABLE` (limite de débit ou panne de Discord) — arrête une
+  `VOICE_INTERNAL_ERROR`, `VOICE_DISCORD_UNAVAILABLE` (limite de débit 429 ou panne 5xx de Discord, sans code JSON :
+  le suivant échouerait de même, d'où l'attente plutôt qu'un appel par salon) — arrête une
   passe, et **aucune passe ne rappelle le bot avant `VOICE_RETRY_SECONDS`** (`botDownUntil`, mémoire du
   processus ; les refus `VOICE_*` ne comptent pas au coupe-circuit partagé). Le refus du bot pour un
   salon (`failed` : autre code, dont `VOICE_DISCORD_ERROR`) ne retient que ce salon : les autres sont
@@ -77,22 +81,27 @@ et rien n'est compté.
   `team1_failed` / `team2_failed` : panne déjà montrée, pas de seconde ligne pm2). Un rendu
   refusé par le bot donne une ligne pm2 `rendu du salon vocal refusé (CODE)` par salon et
   par code, une revérification refusée `revérification du salon vocal refusée (CODE)` par
-  salon et par code, un refus `VOICE_*` du bot entier au rendu une seule ligne par code
-  (mémoire du processus bornée à 1 000 entrées, oubliée à la clôture de la ligne) ; une
-  panne du canal n'en donne pas.
+  salon et par code, un refus `VOICE_*` du bot entier (rendu ou revérification)
+  `bot vocal : refus pour tous les salons (CODE)` une seule fois par code, de nouveau dès que le
+  bot a répondu pour un salon (mémoire du processus bornée à 1 000 entrées, oubliée à la clôture
+  de la ligne) ; une panne du canal n'en donne pas.
 - **Refus de rendu sans fin** : passé `VOICE_BOT_UNRELEASED_MAX_HOURS` (48 h) depuis la création de la
   ligne (filet du bot), un rendu **refusé** (`failed`) clôt la ligne au lieu de la redemander
   chaque minute ; un bot **indisponible** ne la clôt que passé `VOICE_BOT_ABANDONED_MAX_HOURS`
-  (96 h, oubli du salon par le bot), et la passe s'arrête quand même ; `created_at` repart quand
+  (96 h, oubli du salon par le bot), et la passe s'arrête quand même : les lignes suivantes
+  n'appellent plus le bot, celles passées 96 h se closent toutes dans la passe ; `created_at` repart quand
   la ligne est rouverte ou que le salon change.
 - **Ligne sans salon** (création expirée ou réponse illisible, alors que le bot a pu créer le
   salon) : rendue par sa clé (`releaseVoiceChannelByKey`, `POST /internal/voice/keys/release`),
-  jamais close sans appel au bot.
+  jamais close sans appel au bot. Un bot plus ancien sans cette route (`INTERNAL_ROUTE_NOT_FOUND`
+  au rendu par clé) ne vaut refus que de cette ligne : les rendus par identifiant passent, sans
+  attente du bot ; la ligne attend sa mise à jour (ou son filet de 48 h).
 - **Clôture gardée** : `released_at` et `failed_at` ne s'écrivent que si la ligne porte encore le
   salon rendu (`channel_id <=> ?`) — un salon neuf écrit entre-temps par un autre processus reste
   ouvert, rendu plus tard ; rien n'est publié si la ligne n'a pas changé. Une revérification qui
   retrouve le **même** salon sur une ligne déjà rendue (rendu annulé par le bot) rouvre la ligne,
-  rendue de nouveau dans la même passe.
+  rendue de nouveau dans la même passe (une seule lecture par passe pour tous les salons
+  retrouvés, une écriture seulement pour une ligne rendue).
 - **Étapes indépendantes** : une création ou une revérification en erreur n'empêche pas le
   rendu de la même passe (l'erreur remonte ensuite ; si le rendu échoue aussi, celle de la
   création est journalisée avant) ; la revérification attend tous ses ouvriers avant de rendre
@@ -171,8 +180,8 @@ Le bot doit avoir **Gérer les salons** sur la catégorie des matchs
 24 h après), et un salon jamais rendu resté vide 48 h. La route de comptage
 (`/internal/voice/channels/:id/count`) est retirée (EF-43). Le rendu par clé
 (`POST /internal/voice/keys/release`) arrive avec la PR du bot de ce lot. Déployer le bot avant
-le site : un bot plus ancien répond `INTERNAL_ROUTE_NOT_FOUND` (`unavailable`) et les lignes sans
-salon restent ouvertes jusqu'à sa mise à jour.
+le site : un bot plus ancien répond `INTERNAL_ROUTE_NOT_FOUND` et les lignes sans
+salon restent ouvertes jusqu'à sa mise à jour (les autres rendus passent).
 
 ## Tests
 
