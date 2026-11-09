@@ -559,3 +559,29 @@ describe("POST /api/admin/matches/[matchId]/live", () => {
     await expect(res.json()).resolves.toMatchObject({ error: "LIVE_TRIGGER_NOT_OWNED" });
   });
 });
+
+describe("PUT/POST /api/admin/matches/[id]/live — corps illisible (ERREUR.txt EF-29 #528)", () => {
+  const brokenReq = (method: string) =>
+    new Request("http://localhost/api/admin/matches/42/live", {
+      method,
+      headers: { "content-type": "application/json" },
+      body: "{ pas du json",
+    });
+
+  it("putMatchLive_brokenJson_returns400InvalidLiveBody", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    const res = await putMatchLive(brokenReq("PUT"), matchParams("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: "INVALID_LIVE_BODY" });
+    expect(setMatchLiveConfig).not.toHaveBeenCalled();
+    expect(announceStaffMatchAction).not.toHaveBeenCalled();
+  });
+
+  it("postMatchOnAir_brokenJson_returns400InvalidLiveBody", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    const res = await postMatchOnAir(brokenReq("POST"), matchParams("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: "INVALID_LIVE_BODY" });
+    expect(setMatchOnAir).not.toHaveBeenCalled();
+  });
+});

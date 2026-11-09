@@ -8,6 +8,7 @@ import {
   readFormDataBody,
   readImageUploadForm,
   readJsonBody,
+  readOptionalJsonBody,
 } from "@/lib/server/request-body";
 import { IMAGE_UPLOAD_RULE } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
@@ -195,5 +196,52 @@ describe("readImageUploadForm", () => {
     expect((refused as Response).status).toBe(429);
     // Un autre compte n'en paie pas le prix.
     expect(await readImageUploadForm(upload(1), 8)).toBeInstanceOf(FormData);
+  });
+});
+
+describe("readOptionalJsonBody — corps facultatif (ERREUR.txt EF-29 #528)", () => {
+  const encode = (text: string) => new TextEncoder().encode(text);
+
+  it("readOptionalJsonBody_emptyChunkedBodyWithoutType_returnsEmptyObject", async () => {
+    // Envoi fragmenté sans `Content-Length` ni `Content-Type` : aucun octet lu vaut « pas de corps ».
+    await expect(readOptionalJsonBody(chunkedRequest([]), "REFUS")).resolves.toEqual({ body: {} });
+  });
+
+  it("readOptionalJsonBody_noBody_returnsEmptyObject", async () => {
+    const req = new Request("http://localhost/api/test", { method: "POST" });
+    await expect(readOptionalJsonBody(req, "REFUS")).resolves.toEqual({ body: {} });
+  });
+
+  it("readOptionalJsonBody_validJson_returnsParsedBody", async () => {
+    const req = new Request("http://localhost/api/test", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ trigger: "AUTO" }),
+    });
+    await expect(readOptionalJsonBody(req, "REFUS")).resolves.toEqual({ body: { trigger: "AUTO" } });
+  });
+
+  it("readOptionalJsonBody_brokenJson_returnsRouteRefusal", async () => {
+    const req = new Request("http://localhost/api/test", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{ pas du json",
+    });
+    await expect(readOptionalJsonBody(req, "REFUS")).resolves.toEqual({ refusal: "REFUS" });
+  });
+
+  it("readOptionalJsonBody_nonEmptyBodyWithoutJsonType_returnsUnsupportedContentType", async () => {
+    await expect(readOptionalJsonBody(chunkedRequest([encode("{}")]), "REFUS")).resolves.toEqual({
+      refusal: UNSUPPORTED_CONTENT_TYPE,
+    });
+  });
+
+  it("readOptionalJsonBody_tooLarge_returnsPayloadTooLarge", async () => {
+    const req = new Request("http://localhost/api/test", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "x".repeat(64) }),
+    });
+    await expect(readOptionalJsonBody(req, "REFUS", 16)).resolves.toEqual({ refusal: PAYLOAD_TOO_LARGE });
   });
 });

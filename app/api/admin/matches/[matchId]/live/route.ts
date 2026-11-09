@@ -6,7 +6,7 @@ import { isMatchLiveTrigger, type MatchLiveTrigger } from "@/lib/shared/live-str
 import type { MatchStreamLinkEdit } from "@/lib/server/tournaments/live-streams";
 import { can } from "@/lib/shared/permissions";
 import { castOverseer } from "@/lib/shared/live-trigger-owner";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readOptionalJsonBody } from "@/lib/server/request-body";
 import { announceStaffMatchAction, staffActionAuthor } from "@/lib/server/tournaments/staff-action-logs";
 
 function parseMatchId(raw: string): number | null {
@@ -123,7 +123,11 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const gate = await liveGate(user, matchId);
   if (gate !== null) return gate;
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as {
+  // Un corps illisible (JSON cassé, trop lourd, mauvais type) est refusé,
+  // jamais pris pour un corps vide.
+  const read = await readOptionalJsonBody(req, "INVALID_LIVE_BODY");
+  if ("refusal" in read) return fail(read.refusal, 400);
+  const body = (typeof read.body === "object" && read.body !== null ? read.body : {}) as {
     trigger?: unknown;
     liveUrl?: unknown;
     organisationLink?: unknown;
@@ -176,7 +180,9 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   const gate = await liveGate(user, matchId);
   if (gate !== null) return gate;
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as { onAir?: unknown };
+  const read = await readOptionalJsonBody(req, "INVALID_LIVE_BODY");
+  if ("refusal" in read) return fail(read.refusal, 400);
+  const body = (typeof read.body === "object" && read.body !== null ? read.body : {}) as { onAir?: unknown };
   if (typeof body.onAir !== "boolean") return fail("INVALID_ON_AIR", 400);
 
   try {

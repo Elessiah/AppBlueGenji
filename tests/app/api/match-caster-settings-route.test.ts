@@ -107,6 +107,17 @@ describe("PUT /api/matches/[matchId]/caster", () => {
     expect(setCastSettings).not.toHaveBeenCalled();
   });
 
+  it("casterPut_emptyChunkedBodyWithoutType_savesNothingAndSucceeds", async () => {
+    // Corps vide sans `Content-Length` (fragmenté, HTTP/2) : aucun réglage, pas un refus.
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setCastSettings).mockResolvedValue();
+    const body = new ReadableStream<Uint8Array>({ start: (controller) => controller.close() });
+    const req = new Request("http://localhost/api/matches/42/caster", { method: "PUT", body, duplex: "half" } as RequestInit);
+    const res = await casterPut(req, params("42"));
+    expect(res.status).toBe(200);
+    expect(setCastSettings).toHaveBeenCalledWith(42, 4, true, {}, { oversees: false, manages: false });
+  });
+
   it("casterPut_wrongFieldType_returns400", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     const res = await casterPut(jsonRequest("PUT", { battletag: 12 }), params("42"));

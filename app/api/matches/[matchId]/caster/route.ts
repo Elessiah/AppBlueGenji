@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { bodyReadRefusal, readJsonBody } from "@/lib/server/request-body";
+import { readOptionalJsonBody } from "@/lib/server/request-body";
 import { loadOwnCastSettings } from "@/lib/server/tournaments/cast-settings";
 import { claimMatchCast, releaseMatchCast, setCastSettings } from "@/lib/server/tournaments/match-launch";
 import {
@@ -44,13 +44,8 @@ const STATUSES: Readonly<Record<string, number>> = {
 };
 
 /** Corps de requête lu, ou le refus déjà formé (`bodyReadRefusal`). */
-async function castBody(req: Request): Promise<{ body: unknown } | { refusal: string }> {
-  if (req.body === null || req.headers.get("content-length") === "0") return { body: {} };
-  try {
-    return { body: await readJsonBody(req) };
-  } catch (error) {
-    return { refusal: bodyReadRefusal(error) ?? "INVALID_CAST_TARGET" };
-  }
+function castBody(req: Request): Promise<{ body: unknown } | { refusal: string }> {
+  return readOptionalJsonBody(req, "INVALID_CAST_TARGET");
 }
 
 /**

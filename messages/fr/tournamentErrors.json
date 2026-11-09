@@ -123,6 +123,7 @@
     "INVALID_PHASE_SURVIVAL_ROUNDS": "Cadence de survie invalide : 1 à 50 attendues.",
     "UNAUTHORIZED": "Ta session a expiré. Reconnecte-toi pour suivre le tournoi en direct.",
     "INVALID_STREAM_URL": "Lien de diffusion non reconnu (Twitch, YouTube ou Kick attendu).",
+    "INVALID_LIVE_BODY": "Réglage de la diffusion illisible : recharge la page puis réessaie.",
     "INVALID_LIVE_TRIGGER": "Mode de passage à l'antenne invalide.",
     "LIVE_TRIGGER_NOT_MANUAL": "Ce match passe à l'antenne automatiquement : il n'y a rien à basculer.",
     "MATCH_NOT_LIVE_READY": "L'antenne ne s'ouvre que sur un match jouable dont le score n'est pas saisi.",
