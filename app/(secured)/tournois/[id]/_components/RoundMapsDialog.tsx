@@ -458,7 +458,11 @@ function TiebreakForm({
     event.preventDefault();
     // Rien de changé : rien à envoyer (renvoyer la valeur en place n'écrirait que du bruit au journal),
     // et Entrée dans un champ intact ne réclame pas un nom que le bouton grisé ne demande pas.
-    if (busy || !dirty || !allowed) return;
+    if (busy || !dirty) return;
+    if (!allowed) {
+      showError(t("dialog.tiebreakUnavailable"));
+      return;
+    }
     if (visibleText(value) === "") {
       const text = t("dialog.tiebreakEmpty");
       showError(text);
@@ -486,7 +490,6 @@ function TiebreakForm({
             maxLength={FIRST_MAP_MAX_LENGTH}
             list={overwatch ? listId : undefined}
             readOnly={!allowed || undefined}
-            aria-disabled={!allowed || undefined}
             {...fieldErrors.aria("tiebreak", !allowed && unavailableId)}
             onChange={(event) => {
               setValue(event.target.value);

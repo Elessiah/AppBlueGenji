@@ -265,7 +265,7 @@ describe("câblage de la fenêtre des cartes", () => {
     {
       name: "untouchedFormsAndStaleRefusals_areHandledWithoutNoise",
       file: "RoundMapsDialog.tsx",
-      present: ["if (busy || !dirty || !allowed) return;", 'current?.kind === "close" ? current : null', "[slots, copyTarget, roundId, storedKey, clearSlotError]"],
+      present: ["if (busy || !dirty) return;", 'current?.kind === "close" ? current : null', "[slots, copyTarget, roundId, storedKey, clearSlotError]"],
       absent: [],
     },
     {
@@ -283,7 +283,7 @@ describe("câblage de la fenêtre des cartes", () => {
     {
       name: "tiebreakForm_keepsMountedAndResyncsAfterSave",
       file: "RoundMapsDialog.tsx",
-      present: ["useTiebreakSection(rules.staleTiebreaks, round, tiebreakAllowed)", "aria-disabled={busy || !dirty || !allowed || undefined}", 'fieldErrors.aria("tiebreak", !allowed && unavailableId)', "allowed={tiebreakAllowed}", 'setValue(map ?? "")', 't("dialog.tiebreakUnavailable")'],
+      present: ["useTiebreakSection(rules.staleTiebreaks, round, tiebreakAllowed)", "aria-disabled={busy || !dirty || !allowed || undefined}", "if (!allowed) {", 'fieldErrors.aria("tiebreak", !allowed && unavailableId)', "allowed={tiebreakAllowed}", 'setValue(map ?? "")', 't("dialog.tiebreakUnavailable")'],
       absent: [],
     },
     {

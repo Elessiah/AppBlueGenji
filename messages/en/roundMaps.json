@@ -18,7 +18,7 @@
     "scaleHint": "These maps apply to every match of the round: the map is no longer entered match by match. “Reset the round” brings back the per-match entry.",
     "resetConfirmBody": "This round's maps are removed for all its matches: the map is entered match by match again. Picks already made on matches stay.",
     "tiebreak": "Tiebreak map",
-    "tiebreakHint": "Playoff round: one extra map, played only if the series is level one map short of the win (drawn maps included). Bans follow the next-maps rule.",
+    "tiebreakHint": "Playoff round: one extra map, played only if both sides are one map away from winning (drawn maps included). Bans follow the next-maps rule.",
     "refereeHostBan": "The designated referee creates the game: the team that is not the top seed bans first."
   },
   "sheet": {
