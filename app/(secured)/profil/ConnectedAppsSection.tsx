@@ -287,7 +287,12 @@ export function ConnectedAppsSection({
         />
       ) : null}
 
-      {children ? <div className={s.accountFields}>{children}</div> : null}
+      {children ? (
+        <div className={s.accountFields}>
+          <h3 className={s.subTitle}>{text.t("connections.fieldsHeading")}</h3>
+          {children}
+        </div>
+      ) : null}
 
       <OtherSessionsPanel version={sessionsVersion} />
     </>

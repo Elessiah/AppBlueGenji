@@ -306,6 +306,7 @@
     "fallback": "La mise à jour de ton pseudo a échoué. Réessaie dans un instant."
   },
   "connections": {
+    "fieldsHeading": "Mes identifiants de jeu",
     "heading": "Mes comptes liés",
     "intro": "Pas de mot de passe : ton compte s'ouvre par ces applications. Pour chaque identité, un seul geste suit : Lier, puis Certifier. Lie-en plusieurs ; la dernière ne peut pas être retirée.",
     "loading": "Chargement…",

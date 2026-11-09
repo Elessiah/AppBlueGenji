@@ -858,7 +858,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Pour éviter le spam, le bot n'envoie plus les messages privés de tes matchs qu'aux comptes dont le tag Discord est certifié ; tes notifications push ne changent pas.",
     links: [
-      { href: "/profil#discord", label: "Voir mon tag Discord" },
+      { href: "/profil#comptes", label: "Voir mon tag Discord" },
       MATCH_DM_PARAGRAPH_LINK,
     ],
     details: [

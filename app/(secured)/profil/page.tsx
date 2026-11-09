@@ -837,7 +837,7 @@ export default function ProfilePage() {
             // accepter) ne doit plus s'ouvrir pour un tag désormais certifié.
             window.dispatchEvent(certifiedFromProfileEvent());
             // Le bouton « Certifier » de la ligne disparaît : le focus passe à la pastille d'état.
-            requestAnimationFrame(() => document.getElementById("connection-state-discord")?.focus());
+            window.setTimeout(() => document.getElementById("connection-state-discord")?.focus(), 60);
           }}
         />
       )}

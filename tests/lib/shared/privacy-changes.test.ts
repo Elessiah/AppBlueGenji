@@ -1120,7 +1120,7 @@ describe("PRIVACY_CHANGES — messages privés de match aux seuls tags certifié
     // L'avis part aussi aux comptes déjà certifiés : il leur dit que rien ne change.
     expect(fr).toMatch(/Si ton tag est déjà certifié, rien ne change pour toi ; sinon, certifie-le dans « Mon profil », section Discord/);
     expect(fr).toMatch(/notifications push ne changent pas/);
-    expect((entry.links ?? []).map(({ href }) => href)).toEqual(["/profil#discord", "/rgpd#messages-de-match"]);
+    expect((entry.links ?? []).map(({ href }) => href)).toEqual(["/profil#comptes", "/rgpd#messages-de-match"]);
     const en = [english.title, english.summary, ...english.details].join(" ");
     expect(en).toMatch(/certified Discord tag/);
     expect(en).toMatch(/An uncertified tag no longer receives any, whether it was typed by hand or linked by signing in with Discord/);

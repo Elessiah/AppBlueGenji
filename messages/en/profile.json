@@ -306,6 +306,7 @@
     "fallback": "Updating your username failed. Try again in a moment."
   },
   "connections": {
+    "fieldsHeading": "My game IDs",
     "heading": "My linked accounts",
     "intro": "No password: your account opens through these apps. For each identity one step follows: Link, then Verify. Link several; the last one can't be removed.",
     "loading": "Loading…",
