@@ -10,10 +10,15 @@
 /** L'affiche d'un match : ses deux engagées, sans ordre (`5:7`). */
 export const PAIRING_SQL = "CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))";
 
-/** Le match a-t-il déjà une marque (envoyée ou `skipped`) pour cette place et cette affiche ? */
-export const MARKED_SQL = `EXISTS (SELECT 1 FROM bg_new_match_notices n
+/** Une réservation existe-t-elle pour la place et l'affiche du match (`extra` : condition de plus sur `n`) ? */
+function noticeAtPlaceSql(extra = ""): string {
+  return `EXISTS (SELECT 1 FROM bg_new_match_notices n
    WHERE n.tournament_id = m.tournament_id AND n.phase_id = m.phase_id AND n.bracket = m.bracket
-     AND n.round_number = m.round_number AND n.match_number = m.match_number AND n.pairing = ${PAIRING_SQL})`;
+     AND n.round_number = m.round_number AND n.match_number = m.match_number AND n.pairing = ${PAIRING_SQL}${extra})`;
+}
+
+/** Le match a-t-il déjà une marque (envoyée ou `skipped`) pour cette place et cette affiche ? */
+export const MARKED_SQL = noticeAtPlaceSql();
 
 /**
  * Un match à annoncer : tournoi en cours et publié, deux engagées connues et
@@ -30,29 +35,29 @@ function announceableSql(now: string): string {
 
 export const ANNOUNCEABLE_SQL = announceableSql("NOW()");
 
-/** Délai au-delà duquel un match qui attend son annonce ne retient plus les rappels. */
-export const NEW_MATCH_PENDING_MINUTES = 30;
+/** Âge au-delà duquel le pouls du balayage des annonces ne retient plus les rappels. */
+export const NEW_MATCH_HEARTBEAT_MINUTES = 5;
 
 /**
- * Le match attend encore son annonce (à annoncer, sans marque), modifié depuis
- * moins de {@link NEW_MATCH_PENDING_MINUTES} minutes. Au-delà du délai
- * (balayage des annonces en panne), les rappels reprennent : un match ne perd
- * jamais ses rappels faute d'annonce.
+ * Le match attend encore son annonce (à annoncer, sans marque) **et** le
+ * balayage des annonces est vivant (pouls `new_match_sweep_at` de moins de
+ * {@link NEW_MATCH_HEARTBEAT_MINUTES} minutes, posé seulement après la mise en
+ * service). Balayage en panne ou pas encore en service : les rappels partent
+ * comme avant. Un match qui échoue d'affilée est marqué `skipped`
+ * (`new-match-notices.ts`) : il ne retient pas ses rappels non plus.
  *
  * @param now `NOW()` (horloge de la base), ou `?` quand l'appelant lit à son
  *            propre instant (le balayage des rappels) — le `?` revient alors
  *            **deux fois**.
  */
 export function newMatchPendingSql(now: "NOW()" | "?"): string {
-  return `(${announceableSql(now)}
-  AND m.updated_at > ${now} - INTERVAL ${NEW_MATCH_PENDING_MINUTES} MINUTE AND NOT ${MARKED_SQL})`;
+  return `(${announceableSql(now)} AND NOT ${MARKED_SQL}
+  AND EXISTS (SELECT 1 FROM bg_settings hb WHERE hb.setting_key = 'new_match_sweep_at'
+    AND hb.setting_value >= DATE_FORMAT(${now} - INTERVAL ${NEW_MATCH_HEARTBEAT_MINUTES} MINUTE, '%Y-%m-%d %H:%i:%s')))`;
 }
 
 /**
  * L'annonce de nouveau match envoyée pour cette affiche portait déjà l'horaire
  * actuel du match : « Match programmé » ne la double pas.
  */
-export const NEW_MATCH_TOLD_SQL = `EXISTS (SELECT 1 FROM bg_new_match_notices n
-   WHERE n.tournament_id = m.tournament_id AND n.phase_id = m.phase_id AND n.bracket = m.bracket
-     AND n.round_number = m.round_number AND n.match_number = m.match_number AND n.pairing = ${PAIRING_SQL}
-     AND n.skipped = 0 AND n.start_at <=> m.start_at)`;
+export const NEW_MATCH_TOLD_SQL = noticeAtPlaceSql(" AND n.skipped = 0 AND n.start_at <=> m.start_at");

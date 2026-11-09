@@ -52,9 +52,12 @@ tableau, manche, numéro) + **affiche** (`LEAST:GREATEST` des deux engagées),
 relue puis posée avant l'envoi : lecture **non verrouillante** du match, de son
 tournoi et de ses équipes (un `INSERT … SELECT` les verrouillerait en partage
 face au moteur qui tient le verrou du tournoi), puis `INSERT IGNORE … VALUES`
-— la clé primaire et `affectedRows` tranchent entre deux balayages. La ligne
-garde l'horaire annoncé (`start_at`). Si la réservation échoue, les marques de
-rappel que le passage venait de prendre sont rendues. Ainsi :
+— la clé primaire et `affectedRows` tranchent entre deux balayages — puis
+**relue encore** : un match changé entre-temps voit sa réservation rendue, et
+le passage suivant l'annonce tel qu'il est, à ses équipes du moment. La ligne
+garde l'horaire annoncé (`start_at`). Les marques de rappel posées avant
+(`INSERT IGNORE … VALUES`, sans relire le match) sont rendues si le match a
+changé, gardées si un autre balayage a pris la réservation. Ainsi :
 
 - deux balayages concurrents, une relance : un seul envoi ;
 - un réappariement du même match avec la même affiche, ou un match effacé puis
@@ -65,11 +68,15 @@ rappel que le passage venait de prendre sont rendues. Ainsi :
 - la réservation relit aussi l'horaire et les équipes (existantes, fantômes
   ou non comme lues) : un horaire posé, une équipe supprimée entre la lecture
   et la réservation font relire le match au passage suivant ;
-- destinataires lus **match par match, juste avant** sa réservation (quatre
-  matchs à la fois) : une panne de lecture ne consomme rien, et un membre parti
-  pendant un long passage n'est plus prévenu ; l'erreur d'un match (marque,
-  réservation, envoi) ne retient pas les autres ; un bot injoignable consomme l'annonce (journal pm2), comme les
-  rappels — une annonce manquée ne se répète pas en boucle.
+- destinataires lus **match par match, juste après** sa réservation (quatre
+  matchs à la fois), au plus près de l'envoi : un membre parti entre-temps
+  n'est plus prévenu ; une panne avant l'envoi rend la réservation et les
+  marques (le passage suivant réessaie) ; au troisième échec d'affilée, le
+  match est marqué `skipped` (ses rappels donneront l'horaire) ;
+- l'erreur d'un match ne retient pas les autres, l'échec d'envoi d'une équipe
+  ne retient pas l'autre ; un bot injoignable consomme l'annonce (journal pm2,
+  nombre de messages perdus seulement), comme les rappels — une annonce
+  manquée ne se répète pas en boucle.
 
 ## Première manche et horaire déjà posé (décisions du 2026-11-09)
 
@@ -93,9 +100,14 @@ rappel que le passage venait de prendre sont rendues. Ainsi :
   « Match programmé » aux joueurs : il relance le balayage, et l'annonce porte
   l'horaire (les arbitres sont prévenus comme d'habitude) ; de même quand
   l'annonce l'a déjà porté (`start_at` de la réservation, balayage passé entre
-  le commit et la relecture). L'attente ne retient les rappels que
-  30 minutes après la dernière modification du match : un balayage des
-  annonces en panne ne coupe jamais les rappels.
+  le commit et la relecture) **et que les joueurs ne tenaient encore aucun
+  horaire** : une date rendue à celle de l'annonce après une autre
+  reprogrammation s'annonce. L'attente ne retient les rappels que si le
+  balayage des annonces est vivant : pouls `new_match_sweep_at` de
+  `bg_settings`, posé en début de passage (une fois par minute au plus, et
+  seulement après un passage abouti et la mise en service), frais de moins de
+  5 minutes. Balayage en panne ou pas encore en service : les rappels partent
+  comme avant.
 - Couper le sujet `NEW_MATCH` (ou les messages privés de match) coupe aussi
   l'horaire donné à l'appariement : seuls les rappels de 24 h et 10 h le
   redonnent ensuite. Le balayage des rappels ignore un

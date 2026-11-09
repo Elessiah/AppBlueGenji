@@ -481,9 +481,11 @@ export async function notifyMatchScheduleChange(change: MatchScheduleChange): Pr
   // Un match qui attend l'annonce de nouveau match : c'est elle qui portera
   // l'horaire (`NEW_MATCH_NOTICE.md`), « Match programmé » ne la double pas —
   // ni quand un balayage l'a déjà envoyée avec cet horaire entre le commit et
-  // cette lecture.
+  // cette lecture — seulement si les joueurs ne tenaient encore aucun horaire :
+  // une date rendue à celle de l'annonce après une autre reprogrammation
+  // s'annonce (ils tiennent la seconde).
   const newMatchPending = Number(row.new_match_pending ?? 0) === 1;
-  const newMatchTold = Number(row.new_match_told ?? 0) === 1;
+  const newMatchTold = Number(row.new_match_told ?? 0) === 1 && !change.alreadyAnnounced;
   if (newMatchPending) void dispatchNewMatchNotices().catch(() => undefined);
   const results = await Promise.allSettled([
     announceable && !playersAlreadyHoldIt && !newMatchPending && !newMatchTold && ownsPlayerNotice(row, change)
