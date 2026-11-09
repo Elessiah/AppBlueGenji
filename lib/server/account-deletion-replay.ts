@@ -178,19 +178,7 @@ async function handleRedate(
   const requestedAt = toWholeSecond(new Date(entry.deletedAt));
   const windowOpen = isReactivationWindowOpen(entry.deletedAt);
   if (dryRun) {
-    // Même partage que le vrai passage : une demande restaurée déjà à cette
-    // date, ou plus récente, ne serait pas redatée.
-    const restoredAt = restored?.deletionRequestedAt ? new Date(restored.deletionRequestedAt).getTime() : Number.NaN;
-    if (windowOpen && Number.isFinite(restoredAt) && restoredAt >= requestedAt.getTime()) {
-      report.alreadyPending += 1;
-      return;
-    }
-    report.replayed += 1;
-    log(
-      windowOpen
-        ? `  · #${entry.userId} — demande de suppression à redater au ${entry.deletedAt} (si plus récente)`
-        : `  · #${entry.userId} — serait supprimé (demande du ${entry.deletedAt}, fenêtre close)`,
-    );
+    simulateRedate(entry, restored, requestedAt, windowOpen, report, log);
     return;
   }
   try {
@@ -219,6 +207,30 @@ async function handleRedate(
     report.failed += 1;
     log(`  ✗ #${entry.userId} — échec : ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+/** `handleRedate` en simulation : compte et dit, sans rien écrire. */
+function simulateRedate(
+  entry: AccountDeletionEntry,
+  restored: RestoredAccountRow | null,
+  requestedAt: Date,
+  windowOpen: boolean,
+  report: ReplayReport,
+  log: (line: string) => void,
+): void {
+  // Même partage que le vrai passage : une demande restaurée déjà à cette
+  // date, ou plus récente, ne serait pas redatée.
+  const restoredAt = restored?.deletionRequestedAt ? new Date(restored.deletionRequestedAt).getTime() : Number.NaN;
+  if (windowOpen && Number.isFinite(restoredAt) && restoredAt >= requestedAt.getTime()) {
+    report.alreadyPending += 1;
+    return;
+  }
+  report.replayed += 1;
+  log(
+    windowOpen
+      ? `  · #${entry.userId} — demande de suppression à redater au ${entry.deletedAt} (si plus récente)`
+      : `  · #${entry.userId} — serait supprimé (demande du ${entry.deletedAt}, fenêtre close)`,
+  );
 }
 
 /** La date sans ses millisecondes : `deletion_requested_at` est un `DATETIME(0)`. */
