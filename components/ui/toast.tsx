@@ -246,3 +246,16 @@ export function useToast() {
 export function useOptionalToast() {
   return useContext(ToastContext);
 }
+
+/**
+ * Fournit les notifications à un sous-arbre rendu **hors** de la mise en page
+ * racine, et laisse celles de la page quand elles existent. Next rend parfois
+ * la page d'introuvable sans la mise en page (réponse à une requête d'action
+ * inconnue : `Next-Action` forgé par un scanner) : un composant du pied de page
+ * appelait alors `useToast()` sans fournisseur et levait l'erreur au journal.
+ * `useToast` reste strict — un oubli réel de fournisseur doit toujours se voir.
+ */
+export function EnsureToastProvider({ children }: Readonly<{ children: ReactNode }>) {
+  const existing = useOptionalToast();
+  return existing ? <>{children}</> : <ToastProvider>{children}</ToastProvider>;
+}
