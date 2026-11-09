@@ -142,9 +142,15 @@ export function BracketSections({
       ? resolveNextMatchId(sourceMatch)
       : qualifyDestinationMatchId(sourceMatch);
     if (destId == null) return;
-    const dest = matches.find((m) => m.id === destId);
-    if (!dest) return;
-    const destSection = sections.find((s) => s.rounds.includes(dest.roundNumber));
+    // L'arrivée peut être un créneau **à pourvoir** : au-delà de trois tours, le
+    // premier volet d'un arbre de BlueGenji Survie annonce « Qualifié en demi-
+    // finale » alors que ce tour n'est pas encore posé. Chercher la destination
+    // parmi les seules rencontres rendait le badge inerte, sans rien dire.
+    const destRound =
+      matches.find((m) => m.id === destId)?.roundNumber ??
+      (ghostSlots ?? []).find((slot) => slot.id === destId)?.roundNumber;
+    if (destRound === undefined) return;
+    const destSection = sections.find((s) => s.rounds.includes(destRound));
     if (!destSection) return;
     setOpenKeys((prev) => new Set(prev).add(destSection.key));
     setScrollRequest({ matchId: destId, nonce: Date.now() });

@@ -141,6 +141,20 @@ describe("play-offs — le vrai arbre, et non une liste de cartes", () => {
     expect(ghost).not.toContain("onOpenAdminModal");
   });
 
+  it("mène à une case à pourvoir quand c'est elle qui est annoncée", () => {
+    // Au-delà de trois tours, le premier volet annonce « Qualifié en demi-
+    // finale » avant que ce tour soit posé : une destination cherchée parmi les
+    // seules rencontres laissait le badge inerte.
+    expect(SECTIONS).toContain("(ghostSlots ?? []).find((slot) => slot.id === destId)?.roundNumber");
+  });
+
+  it("n'offre pas le survol d'une carte ouvrable à une case vide", () => {
+    // La règle de survol de la carte porte un `:not()`, dont l'argument compte
+    // dans sa spécificité : un sélecteur d'une seule classe perdait contre elle.
+    const css = read("_components", "MatchRow.module.css");
+    expect(css).toContain(".card.ghostCard:hover");
+  });
+
   it("laisse les tableaux à élimination sans aucune case à pourvoir", () => {
     // La prop est optionnelle : un tableau qui naît entier n'en passe pas, et
     // son rendu ne change donc pas d'un pixel.

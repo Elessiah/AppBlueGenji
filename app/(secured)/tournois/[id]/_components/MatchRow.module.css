@@ -207,8 +207,12 @@
   background: transparent;
 }
 
+/* Les deux classes, et non `.ghostCard` seule : la règle de survol de la carte
+   porte un `:not()`, dont l'argument compte dans sa spécificité — un sélecteur
+   d'une seule classe perdait contre elle, et la case vide gardait le halo bleu
+   d'une carte qu'on peut ouvrir. */
 @media (hover: hover) and (pointer: fine) {
-  .ghostCard:hover {
+  .card.ghostCard:hover {
     border-color: var(--line-strong-cy);
     box-shadow: none;
   }
