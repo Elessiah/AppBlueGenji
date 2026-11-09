@@ -1669,6 +1669,27 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Le registre précise aussi ce que le site gardait déjà sans le dire : les traces d'envoi des départs de match (match, affiche et phase de l'annonce, avec leur date), conservées avec le match.",
     ],
   },
+  {
+    // ACCOUNT-DELETION (#571, décision D6 de l'utilisateur du 2026-11-09) :
+    // l'empreinte d'un avatar est gardée quand la modération le SUPPRIME (plus
+    // à l'effacement d'un compte, plus pour un avatar seulement masqué), et la
+    // modération atteint l'avatar mis de côté d'un compte en attente de
+    // suppression. Pour tous les comptes. Datée du déploiement prévu.
+    id: "2026-11-empreinte-avatar-supprime",
+    publishedAt: "2026-11-10",
+    title: "Avatar supprimé par la modération : son empreinte est gardée dès la suppression",
+    links: [
+      { href: "/rgpd#signalements", label: "Lire la section « Signalements »" },
+      { href: "/rgpd#suppression-du-compte", label: "Lire le paragraphe « Suppression du compte »" },
+    ],
+    summary:
+      "L'empreinte d'un avatar que la modération supprime est désormais gardée dès cette suppression, et non plus à l'effacement du compte : la même image ne peut plus être remise en ligne. Un avatar seulement masqué, qui se conteste encore, n'en laisse plus aucune.",
+    details: [
+      "Ce que le site garde : l'empreinte (SHA-256) de l'image, sans lien avec aucun compte et sans limite de durée, quand la modération supprime un avatar — sans délai, depuis la fiche du joueur, ou au terme de son masquage (sans contestation, ou contestation rejetée) —, que le compte soit actif ou en attente de suppression. Elle sert seulement à refuser la remise en ligne de la même image, comme avatar ou comme logo d'équipe.",
+      "À l'effacement d'un compte, plus aucune empreinte n'est prise : l'avatar seulement masqué part avec le compte, sans laisser d'empreinte. Un logo d'équipe supprimé ne laisse pas d'empreinte non plus.",
+      "Pendant les 30 jours d'une suppression demandée, la modération peut masquer, rétablir ou supprimer l'avatar mis de côté pour la réactivation, comme celui d'un compte actif.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

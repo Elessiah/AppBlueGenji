@@ -164,23 +164,84 @@ describe("revue juridique cycle 4", () => {
     const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.subPurposes.join("\n") ?? "";
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.subPurposes.join("\n") ?? "";
 
-    expect(fr).toContain("Refuser la remise en ligne, comme avatar ou comme logo d'équipe, d'un avatar déjà retiré par la modération");
-    expect(en).toContain("Refusing the re-upload, as an avatar or as a team logo, of an avatar already removed by moderation");
+    expect(fr).toContain("Refuser la remise en ligne, comme avatar ou comme logo d'équipe, d'un avatar supprimé par la modération, par son empreinte (SHA-256) gardée dès cette suppression");
+    expect(en).toContain("Refusing the re-upload, as an avatar or as a team logo, of an avatar deleted by moderation, through its hash (SHA-256) kept from that deletion");
   });
 
   it("processingRegisterT01_avatarHash_dataCategoryNamesAvatarsFrAndEn", () => {
     const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.dataCategories.join(" ") ?? "";
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.dataCategories.join(" ") ?? "";
 
-    expect(fr).toContain("empreintes (SHA-256) des avatars retirés par la modération");
-    expect(en).toContain("hashes (SHA-256) of avatars removed by moderation");
+    expect(fr).toContain("Empreintes (SHA-256) des avatars supprimés par la modération, sans lien avec aucun compte");
+    expect(en).toContain("Hashes (SHA-256) of avatars deleted by moderation, with no link to any account");
   });
 
   it("processingRegisterT01_avatarHash_legitimateInterestBasisFrAndEn", () => {
     const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.legalBasis ?? "";
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.legalBasis ?? "";
 
-    expect(fr).toContain("intérêt légitime (modération : refuser la remise en ligne d'une image déjà retirée) pour l'empreinte d'un avatar retiré");
-    expect(en).toContain("legitimate interest (moderation: refusing the re-upload of an image already removed) for the hash of a removed avatar");
+    expect(fr).toContain("intérêt légitime (modération : refuser la remise en ligne d'une image déjà retirée) pour l'empreinte d'un avatar supprimé par la modération");
+    expect(en).toContain("legitimate interest (moderation: refusing the re-upload of an image already removed) for the hash of an avatar deleted by moderation");
+  });
+});
+
+/*
+ * ACCOUNT-DELETION (#571, décision D6) : l'empreinte d'un avatar est gardée
+ * quand la modération le supprime, plus à l'effacement d'un compte.
+ */
+const AVATAR_HASH_ID = "2026-11-empreinte-avatar-supprime";
+const t01Retention = () => PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.retention.join("\n") ?? "";
+const t01RetentionEn = () => PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.retention.join("\n") ?? "";
+
+describe("D6 — empreinte d'un avatar supprimé par la modération", () => {
+  it("privacyChange_avatarHashEntry_publishedAtDeployDateForAllAccounts", () => {
+    const entry = PRIVACY_CHANGES.find((change) => change.id === AVATAR_HASH_ID);
+
+    expect(entry?.publishedAt).toBe("2026-11-10");
+    expect(entry?.audience).toBeUndefined();
+    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(AVATAR_HASH_ID);
+  });
+
+  it("privacyChange_avatarHashEntry_saysKeptFromModerationDeletionNotErasureFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === AVATAR_HASH_ID)!;
+    const en = PRIVACY_CHANGES_EN[AVATAR_HASH_ID];
+
+    expect(fr.summary).toContain("gardée dès cette suppression, et non plus à l'effacement du compte");
+    expect(fr.details[1]).toContain("À l'effacement d'un compte, plus aucune empreinte n'est prise");
+    expect(en.summary).toContain("kept from that deletion, and no longer when the account is erased");
+    expect(en.details[1]).toContain("When an account is erased, no hash is taken any more");
+    expect(en.details).toHaveLength(fr.details.length);
+  });
+
+  it("privacyChange_avatarHashEntry_linksToReportsAndDeletionAnchors", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === AVATAR_HASH_ID)!;
+    const en = PRIVACY_CHANGES_EN[AVATAR_HASH_ID];
+
+    expect(fr.links?.map((link) => link.href)).toEqual(["/rgpd#signalements", "/rgpd#suppression-du-compte"]);
+    expect(en.linkLabels).toHaveLength(2);
+  });
+
+  it("registerT01_avatarHashRetention_keptFromDeletionNotForHiddenFrAndEn", () => {
+    expect(t01Retention()).toContain("gardée dès cette suppression, sans limite de durée");
+    expect(t01Retention()).toContain("un avatar seulement masqué, qui se conteste encore, n'en laisse aucune");
+    expect(t01Retention()).not.toContain("emporté par l'effacement d'un compte");
+    expect(t01RetentionEn()).toContain("kept from that deletion, without time limit");
+    expect(t01RetentionEn()).toContain("an avatar that is only hidden, which can still be contested, leaves none");
+    expect(t01RetentionEn()).not.toContain("carried off by the erasure of an account");
+  });
+
+  it("registerT01_heldAvatar_moderationCanStillActFrAndEn", () => {
+    expect(t01Retention()).toContain("la modération peut encore masquer, rétablir ou supprimer cet avatar");
+    expect(t01RetentionEn()).toContain("moderation can still hide, restore or delete that avatar");
+  });
+
+  it("rgpdPage_accountDeletion_hashKeptOnModerationDeletionNotErasureFrAndEn", () => {
+    const fr = readSource("app/rgpd/page.tsx");
+    const en = readSource("app/rgpd/RgpdEn.tsx");
+
+    expect(fr).not.toContain("À l&apos;effacement,\n          l&apos;empreinte");
+    expect(fr).toContain("Quand la modération <strong>supprime</strong> un avatar");
+    expect(en).not.toContain("On erasure, the hash (SHA-256)");
+    expect(en).toContain("When moderation <strong>deletes</strong> an avatar");
   });
 });

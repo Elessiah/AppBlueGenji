@@ -317,9 +317,9 @@ export function RgpdEn({
           only player becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
           disbanded otherwise), its organised tournaments go to another staff member when someone can take them over, its registrations for a solo tournament that hasn&apos;t started yet are withdrawn, its casts of matches not yet completed, its referee assignments and its pending team invitations and join requests are withdrawn and its remaining matches in a running solo
           tournament where it never played are lost by forfeit. At the end of that time, the account is erased
-          if it left nothing behind, anonymized (borrowed username) otherwise. On erasure, the hash (SHA-256) of
-          an avatar removed by moderation is kept, with no link to any account, to refuse it being uploaded
-          again. The staff log on Discord records the request, its reactivation and each withdrawal or forfeit it causes (one line per tournament for those), without
+          if it left nothing behind, anonymized (borrowed username) otherwise. During that time, moderation can
+          still hide, restore or delete the avatar kept apart, like that of an active account; erasure keeps the
+          hash of no avatar — only its deletion by moderation keeps one (section <a href="#signalements">“Reports”</a>). The staff log on Discord records the request, its reactivation and each withdrawal or forfeit it causes (one line per tournament for those), without
           naming the player (“a player”) (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
         </p>
       </section>
@@ -776,6 +776,13 @@ export function RgpdEn({
               <strong>Manifestly illegal</strong> content can be deleted without a hiding period. The team or the
               player is notified in the same way and can contest the decision within the same period; if the
               challenge succeeds, the image can be uploaded again.
+            </li>
+            <li>
+              When moderation <strong>deletes</strong> an avatar — immediately, from the player&apos;s page, or at
+              the end of its hiding —, whether the account is active or pending deletion, the hash (SHA-256) of the
+              image is kept, without time limit and with no link to any account, to refuse it being uploaded again,
+              as an avatar or as a team logo. An avatar that is only hidden, which can still be contested, leaves
+              none; neither does a deleted team logo.
             </li>
           </ul>
           <p>

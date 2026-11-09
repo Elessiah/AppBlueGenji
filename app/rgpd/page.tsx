@@ -427,9 +427,10 @@ function RgpdFr({
           joueur devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute
           sinon), ses tournois organisés passent à un autre membre du staff quand quelqu&apos;un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore terminés, ses désignations d&apos;arbitre et ses invitations et demandes d&apos;adhésion d&apos;équipe en attente sont retirés et ses matchs restants d&apos;un tournoi individuel en
           cours où il n&apos;a jamais joué sont perdus par forfait. Au terme du délai, le compte est effacé
-          s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. À l&apos;effacement,
-          l&apos;empreinte (SHA-256) d&apos;un avatar retiré par la modération est gardée, sans lien avec
-          aucun compte, pour en refuser la remise en ligne. Le journal du staff sur Discord note la demande,
+          s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. Pendant le délai, la
+          modération peut encore masquer, rétablir ou supprimer l&apos;avatar gardé à part, comme celui
+          d&apos;un compte actif ; l&apos;effacement ne garde l&apos;empreinte d&apos;aucun avatar — seule
+          sa suppression par la modération en garde une (section <a href="#signalements">« Signalements »</a>). Le journal du staff sur Discord note la demande,
           sa réactivation et chaque retrait ou forfait qu&apos;elle entraîne (une ligne par tournoi pour ceux-ci), sans nommer le joueur (« un joueur ») (
           <Link href="/rgpd/registre#t05">registre, T05</Link>).
         </p>
@@ -954,6 +955,14 @@ function RgpdFr({
               Un contenu <strong>manifestement illicite</strong> peut être supprimé sans délai de
               masquage. L&apos;équipe ou le joueur en est prévenu de la même façon et peut contester la
               décision pendant le même délai ; si elle aboutit, l&apos;image peut être renvoyée.
+            </li>
+            <li>
+              Quand la modération <strong>supprime</strong> un avatar — sans délai, depuis la fiche du
+              joueur, ou au terme de son masquage —, que le compte soit actif ou en attente de
+              suppression, l&apos;empreinte (SHA-256) de l&apos;image est gardée, sans limite de durée et
+              sans lien avec aucun compte, pour en refuser la remise en ligne, comme avatar ou comme
+              logo d&apos;équipe. Un avatar seulement masqué, qui se conteste encore, n&apos;en laisse
+              aucune ; un logo d&apos;équipe supprimé non plus.
             </li>
           </ul>
           <p>

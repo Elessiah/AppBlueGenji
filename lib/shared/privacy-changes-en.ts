@@ -875,6 +875,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Who sets what: a mode set by the staff stays with the staff; a co-caster can no longer change someone else's. The assigned referee of a match, for that match only, sees and edits its casters' links and the configuration of the organizers' broadcast — the referee of another match cannot.",
     ],
   },
+  "2026-11-empreinte-avatar-supprime": {
+    linkLabels: ["Read the “Reports” section", "Read the “Account deletion” paragraph"],
+    title: "Avatar deleted by moderation: its hash is kept from the deletion",
+    summary:
+      "The hash of an avatar that moderation deletes is now kept from that deletion, and no longer when the account is erased: the same image can no longer be uploaded again. An avatar that is only hidden, which can still be contested, no longer leaves any.",
+    details: [
+      "What the site keeps: the hash (SHA-256) of the image, with no link to any account and without time limit, when moderation deletes an avatar — immediately, from the player's page, or at the end of its hiding (without a challenge, or after a rejected challenge) —, whether the account is active or pending deletion. It only serves to refuse the same image being uploaded again, as an avatar or as a team logo.",
+      "When an account is erased, no hash is taken any more: an avatar that is only hidden leaves with the account, without leaving a hash. A deleted team logo leaves no hash either.",
+      "During the 30 days of a requested deletion, moderation can hide, restore or delete the avatar set aside for reactivation, like that of an active account.",
+    ],
+  },
 };
 
 /**

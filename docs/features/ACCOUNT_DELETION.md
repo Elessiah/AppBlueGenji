@@ -856,6 +856,17 @@ Comportement actuel gardé, à trancher avec la politique D6 :
   n'étant pas écrite non plus.
 - Avatar par défaut d'un fournisseur (OAuth) : une fois bloqué, il l'est pour
   tous ceux qui partagent la même image (documenté, inchangé).
+- Suppression **sans délai** (signalement manifestement illicite, fiche) puis
+  contestation **qui aboutit** : `/rgpd` (§ Signalements) dit que l'image « peut
+  être renvoyée », mais son empreinte reste bloquée, sans chemin de levée —
+  lever le blocage à l'issue favorable, ou corriger le texte ?
+
+**Textes légaux (D6).** Registre T01 (finalité, base légale, catégorie
+« Empreintes … des avatars supprimés par la modération », conservation dès la
+suppression, avatar masqué exclu ; la modération atteint l'avatar mis de côté
+d'un compte en attente), `/rgpd` FR+EN (§ Suppression du compte et
+§ Signalements) et l'entrée `2026-11-empreinte-avatar-supprime` de
+`PRIVACY_CHANGES` (FR+EN), testés dans `account-deletion-d2-texts.test.ts`.
 
 ## Voir aussi
 
