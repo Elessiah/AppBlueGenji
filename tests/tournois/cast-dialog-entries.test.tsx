@@ -19,7 +19,7 @@ import enErrors from "@/messages/en/tournamentErrors.json";
 import frModal from "@/messages/fr/launchModal.json";
 import enModal from "@/messages/en/launchModal.json";
 import { LAUNCH_ERROR_MESSAGES } from "@/lib/shared/match-launch";
-import { closedMatchUnchanged, mayEditReplay, matchLiveBody, ownRefusalKey, refusalHasField, saveBlockedReason, streamedBoxReason } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
+import { closedMatchUnchanged, mayEditReplay, offersCasterLinks, matchLiveBody, ownRefusalKey, refusalHasField, saveBlockedReason, streamedBoxReason } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
 import { readSource } from "../helpers/read-source";
 import frActions from "@/messages/fr/tournamentActions.json";
 import enActions from "@/messages/en/tournamentActions.json";
@@ -296,8 +296,25 @@ describe("MatchLiveDialog — match joué (ERREUR.txt EF-29 #528, CAST-FOLLOWUP 
     expect(closedMatchUnchanged({ ...played, liveTrigger: null }, false, false)).toBe(true);
   });
 
-  it("closedMatchUnchanged_playedNeverCastWithCasterLinkEdit_false", () => {
-    expect(closedMatchUnchanged({ ...played, liveTrigger: null }, false, true)).toBe(false);
+  it("closedMatchUnchanged_playedNeverCastWithCasterLinkEdit_true", () => {
+    // Fermé au serveur (`MATCH_NOT_CASTABLE`) : rien à enregistrer, liens de casters compris.
+    expect(closedMatchUnchanged({ ...played, liveTrigger: null }, false, true)).toBe(true);
+  });
+
+  it("offersCasterLinks_playedNeverMarked_false", () => {
+    expect(offersCasterLinks({ ...played, liveTrigger: null }, true)).toBe(false);
+  });
+
+  it("offersCasterLinks_playedStillMarked_true", () => {
+    expect(offersCasterLinks(played, true)).toBe(true);
+  });
+
+  it("offersCasterLinks_castableUnmarked_true", () => {
+    expect(offersCasterLinks({ ...open, liveTrigger: null }, true)).toBe(true);
+  });
+
+  it("offersCasterLinks_notReferee_false", () => {
+    expect(offersCasterLinks(played, false)).toBe(false);
   });
 
   it("streamedBoxReason_enabledBox_null", () => {

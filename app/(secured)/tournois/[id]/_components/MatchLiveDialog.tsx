@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { fieldAria } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import {
+  canConfigureLive,
   canToggleOnAir,
   isMatchCastable,
   isValidStreamUrl,
@@ -14,6 +15,7 @@ import {
   MAX_STREAM_URL_LENGTH,
   requiresMatchStartAt,
   staffStream,
+  streamsHeldByOtherCasters,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
 import {
@@ -288,8 +290,21 @@ export function closedMatchUnchanged(
   streamed: boolean,
   casterLinksEdited: boolean,
 ): boolean {
-  // Marqué et resté coché, ou jamais marqué (case grisée) : rien à enregistrer.
-  return !isMatchCastable(match) && (streamed || match.liveTrigger === null) && !casterLinksEdited;
+  if (isMatchCastable(match)) return false;
+  // Jamais marqué (case grisée) : fermé, liens de casters compris
+  // (`offersCasterLinks`) — rien à enregistrer.
+  if (match.liveTrigger === null) return true;
+  // Marqué et resté coché, sans lien de caster corrigé : rien à enregistrer.
+  return streamed && !casterLinksEdited;
+}
+
+/**
+ * La fenêtre offre-t-elle à l'arbitre les liens des streams des casters ? Pas
+ * sur un match joué jamais marqué : le serveur l'a fermé (`canConfigureLive`,
+ * `MATCH_NOT_CASTABLE`), liens de casters compris.
+ */
+export function offersCasterLinks(match: ClosableMatch, referee: boolean): boolean {
+  return referee && canConfigureLive(match);
 }
 
 /**
@@ -414,7 +429,9 @@ export function MatchLiveDialog({
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "MANUAL");
   // Le lien du stream du staff, que ce réglage écrit — jamais celui qu'un
   // caster a ouvert (lecture partielle sans streams : le premier lien).
-  const currentStaffUrl = (match.streams.length > 0 ? staffStream(match.streams)?.liveUrl : match.liveUrl) ?? "";
+  // Le même stream que le serveur : jamais celui qu'un autre caster tient.
+  const heldByOthers = streamsHeldByOtherCasters(match.casters, controls.viewerUserId);
+  const currentStaffUrl = (match.streams.length > 0 ? staffStream(match.streams, heldByOthers)?.liveUrl : match.liveUrl) ?? "";
   const [liveUrl, setLiveUrl, resetLiveUrl] = useResyncedStaffUrl(currentStaffUrl);
   // Fausse par défaut (protection des données dès la conception) : un lien
   // n'est celui de l'organisation — gardé après la suppression du compte de qui
@@ -427,7 +444,7 @@ export function MatchLiveDialog({
   const [seenTrigger, setSeenTrigger] = useState(match.liveTrigger);
   // Médiation : les liens des streams des casters, que l'arbitre seul édite.
   const casterList = useMemo(() => new Intl.ListFormat(text.locale, { style: "long", type: "conjunction" }), [text.locale]);
-  const casterStreams = referee ? casterStreamsOf(match, casterList) : [];
+  const casterStreams = offersCasterLinks(match, referee) ? casterStreamsOf(match, casterList) : [];
   // Seules les saisies de l'arbitre ; un champ intouché montre le lien actuel.
   const [casterLinks, setCasterLinks] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);

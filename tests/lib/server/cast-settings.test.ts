@@ -18,12 +18,17 @@ import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-doubl
  * stream du caster deviendrait le premier stream sans lien, que le staff
  * prendrait pour le sien.
  */
+/** Match lancé (ou joué) : tout caster inscrit est montré, sans relire sa condition. */
+const LAUNCHED = { game: "OW", beforeLaunch: false } as const;
+/** Avant le lancement : la condition du cast dit qui est montré. */
+const BEFORE_LAUNCH = { game: "OW", beforeLaunch: true } as const;
+
 describe("setCasterStreamUrl", () => {
   it("setCasterStreamUrl_nullUrlOnOwnStream_throwsStreamUrlRequired", async () => {
     const execute = jest.fn<SqlQuery>();
     execute.mockResolvedValueOnce([[{ id: 5, match_id: 42, live_url: "https://twitch.tv/voix", staff_owned: 0 }], []]);
 
-    await expect(setCasterStreamUrl(fakeConnection({ execute }), 42, 5, null, 900, false)).rejects.toThrow("STREAM_URL_REQUIRED");
+    await expect(setCasterStreamUrl(fakeConnection({ execute }), 42, 5, null, 900, false, LAUNCHED)).rejects.toThrow("STREAM_URL_REQUIRED");
     // La seule lecture des streams : aucune écriture.
     expect(execute).toHaveBeenCalledTimes(1);
   });
@@ -34,7 +39,7 @@ describe("setCasterStreamUrl", () => {
       .mockResolvedValueOnce([[{ id: 5, match_id: 42, live_url: "https://twitch.tv/org", staff_owned: 0 }], []])
       .mockResolvedValueOnce([[{ link_user_id: null }], []]);
 
-    await expect(setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/moi", 900, false)).rejects.toThrow(
+    await expect(setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/moi", 900, false, LAUNCHED)).rejects.toThrow(
       "CAST_STREAM_NOT_OWNED",
     );
     expect(execute).toHaveBeenCalledTimes(2);
@@ -47,12 +52,41 @@ describe("setCasterStreamUrl", () => {
       .mockResolvedValueOnce([[{ link_user_id: 901 }], []])
       .mockResolvedValueOnce([[{ 1: 1 }], []]);
 
-    await expect(setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/moi", 900, false)).rejects.toThrow(
+    await expect(setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/moi", 900, false, LAUNCHED)).rejects.toThrow(
       "CAST_STREAM_NOT_OWNED",
     );
     expect(execute.mock.calls[2]).toEqual([expect.stringContaining("FROM bg_match_casters"), [42, 5, 901]]);
     // Aucune écriture.
     expect(execute).toHaveBeenCalledTimes(3);
+  });
+
+  it("setCasterStreamUrl_coCasterHiddenBeforeLaunch_shownCasterReplacesLink", async () => {
+    // Le fournisseur du lien, devenu inéligible (pas encore retiré), est tu : il ne garde pas son lien.
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 5, match_id: 42, live_url: "https://twitch.tv/tu", staff_owned: 0 }], []])
+      .mockResolvedValueOnce([[{ link_user_id: 901 }], []])
+      .mockResolvedValueOnce([[{ 1: 1 }], []])
+      .mockResolvedValueOnce([[{ user_id: 901, is_deleted: 0, discord_verified_at: null }], []])
+      .mockResolvedValue([{ affectedRows: 1 }, []]);
+
+    await setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/moi", 900, false, BEFORE_LAUNCH);
+
+    expect(execute.mock.calls[4]).toEqual([expect.stringContaining("SET live_url = ?"), ["https://twitch.tv/moi", 900, 5]]);
+  });
+
+  it("setCasterStreamUrl_coCasterShownBeforeLaunch_throwsCastStreamNotOwned", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 5, match_id: 42, live_url: "https://twitch.tv/autre", staff_owned: 0 }], []])
+      .mockResolvedValueOnce([[{ link_user_id: 901 }], []])
+      .mockResolvedValueOnce([[{ 1: 1 }], []])
+      .mockResolvedValueOnce([[{ user_id: 901, ...ELIGIBLE }], []]);
+
+    await expect(
+      setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/moi", 900, false, BEFORE_LAUNCH),
+    ).rejects.toThrow("CAST_STREAM_NOT_OWNED");
+    expect(execute).toHaveBeenCalledTimes(4);
   });
 
   it("setCasterStreamUrl_liveOnlyReplacesLinkOfDepartedCaster_writes", async () => {
@@ -63,7 +97,7 @@ describe("setCasterStreamUrl", () => {
       .mockResolvedValueOnce([[], []])
       .mockResolvedValue([{ affectedRows: 1 }, []]);
 
-    await setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/moi", 900, false);
+    await setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/moi", 900, false, LAUNCHED);
 
     expect(execute.mock.calls[3]).toEqual([expect.stringContaining("SET live_url = ?"), ["https://twitch.tv/moi", 900, 5]]);
   });
@@ -75,7 +109,7 @@ describe("setCasterStreamUrl", () => {
       .mockResolvedValueOnce([[{ link_user_id: 900 }], []])
       .mockResolvedValue([{ affectedRows: 1 }, []]);
 
-    await setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/neuf", 900, false);
+    await setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/neuf", 900, false, LAUNCHED);
 
     expect(execute).toHaveBeenCalledTimes(3);
     expect(execute.mock.calls[2]).toEqual([expect.stringContaining("SET live_url = ?"), ["https://twitch.tv/neuf", 900, 5]]);
@@ -89,7 +123,7 @@ describe("setCasterStreamUrl", () => {
       .mockResolvedValueOnce([[{ link_user_id: 901 }], []])
       .mockResolvedValueOnce([[{ 1: 1 }], []]);
 
-    await expect(setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/neuf", 900, true)).rejects.toThrow(
+    await expect(setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/neuf", 900, true, LAUNCHED)).rejects.toThrow(
       "CAST_STREAM_NOT_OWNED",
     );
     expect(execute).toHaveBeenCalledTimes(3);
@@ -101,7 +135,7 @@ describe("setCasterStreamUrl", () => {
       .mockResolvedValueOnce([[{ id: 5, match_id: 42, live_url: null, staff_owned: 0 }], []])
       .mockResolvedValue([{ affectedRows: 1 }, []]);
 
-    await setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/moi", 900, false);
+    await setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/moi", 900, false, LAUNCHED);
 
     expect(execute).toHaveBeenCalledTimes(2);
   });
@@ -113,7 +147,7 @@ describe("setCasterStreamUrl", () => {
       .mockResolvedValueOnce([[{ link_user_id: null }], []])
       .mockResolvedValue([{ affectedRows: 1 }, []]);
 
-    await setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/neuf", 900, true);
+    await setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/neuf", 900, true, LAUNCHED);
 
     expect(execute.mock.calls[2]).toEqual([expect.stringContaining("SET live_url = ?"), ["https://twitch.tv/neuf", 900, 5]]);
   });

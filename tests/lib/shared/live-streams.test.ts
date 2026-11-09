@@ -19,7 +19,9 @@ import {
   PLATFORM_LABELS,
   requiresMatchStartAt,
   resolveMatchLiveState,
+  staffStream,
   streamPlatform,
+  streamsHeldByOtherCasters,
   type MatchLiveInput,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
@@ -489,5 +491,38 @@ describe("firstStreamUrl", () => {
   it("ignore un stream du staff sans lien ; null sans aucun lien", () => {
     expect(firstStreamUrl([{ id: 1, liveUrl: null, staff: true }])).toBeNull();
     expect(firstStreamUrl([])).toBeNull();
+  });
+});
+
+describe("staffStream / streamsHeldByOtherCasters — même stream que le serveur", () => {
+  const stream = (id: number, liveUrl: string | null, staff = false) => ({ id, liveUrl, staff });
+
+  it("staffStream_staffStreamPresent_returnsIt", () => {
+    expect(staffStream([stream(1, null), stream(2, "https://twitch.tv/o", true)])?.id).toBe(2);
+  });
+
+  it("staffStream_noHeldSet_returnsFirstUnlinked", () => {
+    expect(staffStream([stream(1, "https://twitch.tv/c"), stream(2, null)])?.id).toBe(2);
+  });
+
+  it("staffStream_firstUnlinkedHeldByOther_returnsNextFree", () => {
+    expect(staffStream([stream(1, null), stream(2, null)], new Set([1]))?.id).toBe(2);
+  });
+
+  it("staffStream_everyUnlinkedHeld_returnsNull", () => {
+    expect(staffStream([stream(1, null)], new Set([1]))).toBeNull();
+  });
+
+  it("streamsHeldByOtherCasters_excludesViewerAndUnassigned", () => {
+    const casters = [
+      { userId: 4, streamId: 1 },
+      { userId: 5, streamId: 2 },
+      { userId: 6, streamId: null },
+    ];
+    expect([...streamsHeldByOtherCasters(casters, 4)]).toEqual([2]);
+  });
+
+  it("streamsHeldByOtherCasters_noViewer_allHeld", () => {
+    expect([...streamsHeldByOtherCasters([{ userId: 4, streamId: 1 }], null)]).toEqual([1]);
   });
 });

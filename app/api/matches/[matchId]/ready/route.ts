@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { setMatchReady } from "@/lib/server/tournaments/match-launch";
 import { launchFailure, parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
-import { bodyReadRefusal, readJsonBody } from "@/lib/server/request-body";
+import { readOptionalJsonObject } from "@/lib/server/request-body";
 
 const STATUSES: Readonly<Record<string, number>> = {
   MATCH_NOT_FOUND: 404,
@@ -32,16 +32,13 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
 
   // Un corps trop lourd (413) ou d'un autre type (415) garde son code ; un
   // corps illisible, vide ou sans booléen est un 400 `INVALID_READY_VALUE`.
-  let body: { ready?: unknown };
-  try {
-    body = ((await readJsonBody(req)) ?? {}) as { ready?: unknown };
-  } catch (error) {
-    return fail(bodyReadRefusal(error) ?? "INVALID_READY_VALUE", 400);
-  }
-  if (typeof body.ready !== "boolean") return fail("INVALID_READY_VALUE", 400);
+  const read = await readOptionalJsonObject(req, "INVALID_READY_VALUE");
+  if ("refusal" in read) return fail(read.refusal, 400);
+  const ready = read.body.ready;
+  if (typeof ready !== "boolean") return fail("INVALID_READY_VALUE", 400);
 
   try {
-    return ok(await setMatchReady(matchId, user.id, body.ready));
+    return ok(await setMatchReady(matchId, user.id, ready));
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_READY_FAILED");
   }

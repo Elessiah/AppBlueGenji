@@ -158,6 +158,23 @@ export async function readFormDataBody(
 }
 
 /**
+ * Corps JSON facultatif **en objet** (`readOptionalJsonBody`) : un JSON qui
+ * n'est pas un objet (`null`, nombre, chaîne, tableau) est refusé sous
+ * `refusal`, comme un corps illisible — jamais pris pour un corps vide.
+ */
+export async function readOptionalJsonObject(
+  req: Request,
+  refusal: string,
+  maxBytes: number = JSON_BODY_MAX_BYTES,
+): Promise<{ body: Record<string, unknown> } | { refusal: string }> {
+  const read = await readOptionalJsonBody(req, refusal, maxBytes);
+  if ("refusal" in read) return read;
+  const body = read.body;
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return { refusal };
+  return { body: body as Record<string, unknown> };
+}
+
+/**
  * Code d'un refus de lecture qui a **son propre statut** — `PAYLOAD_TOO_LARGE`
  * (413), `UNSUPPORTED_CONTENT_TYPE` (415), posés par `fail()` —, ou `null` pour
  * un corps simplement illisible (JSON invalide), que la route rend sous son

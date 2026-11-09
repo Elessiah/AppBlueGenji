@@ -24,6 +24,7 @@ import {
 } from "@/lib/shared/live-streams";
 import { liveTriggerOwnerAfter, mayChangeLiveTrigger, mayUnmarkLiveTrigger } from "@/lib/shared/live-trigger-owner";
 import { castBeforeLaunch } from "@/lib/shared/match-launch";
+import type { TournamentGame } from "@/lib/shared/types";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { loadShownCasterIds } from "./cast-eligibility";
 import { hasStaffLink, lockMatchStreams, pruneMatchStreams, streamLinkHolder, type MatchStreamRow } from "./match-casters";
@@ -220,6 +221,7 @@ export async function setCasterStreamUrl(
   url: string | null,
   linkUserId: number | null,
   manages: boolean,
+  visibility: CastVisibility,
 ): Promise<MatchStreamRow[]> {
   const streams = await lockMatchStreams(connection, matchId, true);
   const target = streams.find((stream) => stream.id === streamId);
@@ -237,7 +239,7 @@ export async function setCasterStreamUrl(
   if (target.liveUrl !== null) {
     const holderId = await streamLinkHolder(connection, streamId);
     const ownedByOrganisation = holderId === null;
-    if (ownedByOrganisation ? !manages : holderId !== linkUserId && (await castsStream(connection, matchId, streamId, holderId))) {
+    if (ownedByOrganisation ? !manages : holderId !== linkUserId && (await showsOnStream(connection, matchId, streamId, holderId, visibility))) {
       throw new Error("CAST_STREAM_NOT_OWNED");
     }
   }
@@ -248,13 +250,30 @@ export async function setCasterStreamUrl(
   return streams.map((stream) => (stream.id === streamId ? { ...stream, liveUrl: url } : stream));
 }
 
-/** `userId` caste-t-il encore ce stream du match (lecture sous le verrou du match) ? */
-async function castsStream(connection: PoolConnection, matchId: number, streamId: number, userId: number): Promise<boolean> {
+/** Ce qui dit si un caster est montré (`loadShownCasterIds`) : le jeu du match, et s'il est encore avant le lancement. */
+export type CastVisibility = { game: TournamentGame; beforeLaunch: boolean };
+
+/**
+ * `userId` caste-t-il encore ce stream du match **en caster montré** (lecture
+ * sous le verrou du match) ? Un caster tu (condition du cast perdue, pas encore
+ * retiré) ne garde pas son lien contre un co-caster montré : il ne pourrait
+ * lui-même plus le changer (`assertShownCaster`).
+ */
+async function showsOnStream(
+  connection: PoolConnection,
+  matchId: number,
+  streamId: number,
+  userId: number,
+  visibility: CastVisibility,
+): Promise<boolean> {
   const [rows] = await connection.execute<RowDataPacket[]>(
     `SELECT 1 FROM bg_match_casters WHERE match_id = ? AND stream_id = ? AND user_id = ? LIMIT 1`,
     [matchId, streamId, userId],
   );
-  return rows.length > 0;
+  if (rows.length === 0) return false;
+  if (!visibility.beforeLaunch) return true;
+  const shown = await loadShownCasterIds(connection, matchId, [userId], visibility.game, true);
+  return shown.has(userId);
 }
 
 /**
@@ -308,6 +327,7 @@ export async function applyCastSettings(
       url,
       userId,
       access.manages,
+      { game: row.tournament_game, beforeLaunch: castBeforeLaunch(row) },
     );
   }
   if (settings.battletag !== undefined) {

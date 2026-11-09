@@ -6,7 +6,7 @@ import { isMatchLiveTrigger, type MatchLiveTrigger } from "@/lib/shared/live-str
 import type { MatchStreamLinkEdit } from "@/lib/server/tournaments/live-streams";
 import { can } from "@/lib/shared/permissions";
 import { castOverseer } from "@/lib/shared/live-trigger-owner";
-import { readOptionalJsonBody } from "@/lib/server/request-body";
+import { readOptionalJsonObject } from "@/lib/server/request-body";
 import { announceStaffMatchAction, staffActionAuthor } from "@/lib/server/tournaments/staff-action-logs";
 
 function parseMatchId(raw: string): number | null {
@@ -94,13 +94,10 @@ function parseMatchLiveBody(body: {
  * de la lecture bornée), jamais pris pour un corps vide.
  */
 async function readLiveRecord(req: Request): Promise<Record<string, unknown> | Response> {
-  const read = await readOptionalJsonBody(req, "INVALID_LIVE_BODY");
-  if ("refusal" in read) return fail(read.refusal, 400);
   // Un JSON qui n'est pas un objet (`null`, nombre, chaîne, tableau) n'est pas
   // un réglage : refusé, jamais pris pour un corps vide.
-  const body = read.body;
-  if (typeof body !== "object" || body === null || Array.isArray(body)) return fail("INVALID_LIVE_BODY", 400);
-  return body as Record<string, unknown>;
+  const read = await readOptionalJsonObject(req, "INVALID_LIVE_BODY");
+  return "refusal" in read ? fail(read.refusal, 400) : read.body;
 }
 
 /** Le réglage lu et vérifié, ou la réponse de refus (400). */

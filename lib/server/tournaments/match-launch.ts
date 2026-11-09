@@ -1012,9 +1012,11 @@ export async function setCastSettings(
   );
   // Un mode, un lien ou un stream retiré change ce que montrent l'accueil, ses
   // bandeaux et l'annonce #live : même éviction qu'une configuration du staff.
-  // Le seul BattleTag (ou un corps vide) n'y change rien : pas d'éviction.
-  const landingLive = settings.trigger !== undefined || settings.liveUrl !== undefined;
-  publishMatchUpdatedEvent(tournamentId, { landingLive });
+  // Le seul BattleTag (absent de l'instantané) ou un corps vide n'y change
+  // rien : ni reconstruction de l'instantané, ni poussée aux lecteurs.
+  if (settings.trigger !== undefined || settings.liveUrl !== undefined) {
+    publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  }
 }
 
 /**

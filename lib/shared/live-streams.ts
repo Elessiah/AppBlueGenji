@@ -390,10 +390,34 @@ export function canConfigureLive(match: MatchLiveInput): boolean {
  * règle le lien (`setMatchLiveConfig`). Sans lui, le premier stream sans lien —
  * qu'un lien du staff vient habiller, comme `bg_matches.live_url` habillait le
  * cast d'avant les co-casters ; jamais le stream qu'un caster a ouvert avec le
- * lien de sa chaîne, que le staff écraserait.
+ * lien de sa chaîne, que le staff écraserait — ni le stream vidé qu'un autre
+ * caster tient encore (`heldByOthers`) : le serveur (`planStaffStreamUrl`) et la
+ * fenêtre désignent ainsi le même stream.
  */
-export function staffStream<T extends { liveUrl: string | null; staff: boolean }>(streams: readonly T[]): T | null {
-  return streams.find((stream) => stream.staff) ?? streams.find((stream) => stream.liveUrl === null) ?? null;
+export function staffStream<T extends { id: number; liveUrl: string | null; staff: boolean }>(
+  streams: readonly T[],
+  heldByOthers: ReadonlySet<number> = new Set(),
+): T | null {
+  return (
+    streams.find((stream) => stream.staff) ??
+    streams.find((stream) => stream.liveUrl === null && !heldByOthers.has(stream.id)) ??
+    null
+  );
+}
+
+/**
+ * Les streams d'un match qu'un autre caster que `viewerUserId` tient : ceux
+ * que le lien du staff n'habille jamais (`staffStream`).
+ */
+export function streamsHeldByOtherCasters(
+  casters: readonly { userId: number; streamId: number | null }[],
+  viewerUserId: number | null,
+): Set<number> {
+  const held = new Set<number>();
+  for (const caster of casters) {
+    if (caster.userId !== viewerUserId && caster.streamId !== null) held.add(caster.streamId);
+  }
+  return held;
 }
 
 /**

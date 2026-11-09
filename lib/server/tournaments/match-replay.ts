@@ -39,15 +39,22 @@ type MatchReplayRow = RowDataPacket & {
  * perdue) ne règle plus la rediff, pas même pour l'effacer.
  */
 async function castsShownOn(connection: PoolConnection, row: MatchReplayRow, userId: number): Promise<boolean> {
-  const [games] = await connection.execute<(RowDataPacket & { game: TournamentGame })[]>(
-    `SELECT game FROM bg_tournaments WHERE id = ?`,
-    [Number(row.tournament_id)],
-  );
-  const game = games[0]?.game ?? "OW";
-  const shown = await loadShownCasterIds(connection, Number(row.id), [userId], game, castBeforeLaunch(row));
+  const beforeLaunch = castBeforeLaunch(row);
+  // Le jeu ne sert qu'à la condition du cast, jugée avant le lancement
+  // seulement : un match joué ou lancé ne le relit pas.
+  const game = beforeLaunch ? await tournamentGame(connection, Number(row.tournament_id)) : "OW";
+  const shown = await loadShownCasterIds(connection, Number(row.id), [userId], game, beforeLaunch);
   return shown.has(userId);
 }
 
+/** Le jeu du tournoi (`OW` par défaut). */
+async function tournamentGame(connection: PoolConnection, tournamentId: number): Promise<TournamentGame> {
+  const [games] = await connection.execute<(RowDataPacket & { game: TournamentGame })[]>(
+    `SELECT game FROM bg_tournaments WHERE id = ?`,
+    [tournamentId],
+  );
+  return games[0]?.game ?? "OW";
+}
 
 /** La ligne lue décrit-elle une rencontre réellement disputée ? (`canHaveReplay`) */
 function isReplayableRow(row: MatchReplayRow): boolean {

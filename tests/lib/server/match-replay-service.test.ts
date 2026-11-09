@@ -73,13 +73,13 @@ afterEach(() => {
 describe("setMatchReplayUrl", () => {
   it("setMatchReplayUrl_notCaster_rollsBackWithoutWriting", async () => {
     const connection = await mockDb(
-      jest.fn<SqlQuery>().mockResolvedValueOnce([[playedRow]]).mockResolvedValueOnce(GAME).mockResolvedValueOnce([[]]),
+      jest.fn<SqlQuery>().mockResolvedValueOnce([[playedRow]]).mockResolvedValueOnce([[]]),
     );
 
     await expect(setMatchReplayUrl(42, VIDEO, LIVE_ONLY_12)).rejects.toThrow("NOT_MATCH_CASTER");
     expect(connection.rollback).toHaveBeenCalled();
     expect(connection.commit).not.toHaveBeenCalled();
-    expect(connection.execute).toHaveBeenCalledTimes(3);
+    expect(connection.execute).toHaveBeenCalledTimes(2);
   });
 
   it("setMatchReplayUrl_success_locksMatchAndCommits", async () => {
@@ -97,14 +97,14 @@ describe("setMatchReplayUrl", () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[playedRow]])
-      .mockResolvedValueOnce(GAME)
       .mockResolvedValueOnce([[ELIGIBLE]])
       .mockResolvedValue([{ affectedRows: 1, changedRows: 1 }]);
     await mockDb(execute);
 
     expect(await setMatchReplayUrl(42, VIDEO, LIVE_ONLY_12)).toEqual({ replayUrl: VIDEO, changed: true });
-    expect(execute.mock.calls[1]).toEqual([expect.stringContaining("FROM bg_tournaments"), [7]]);
-    expect(execute.mock.calls[2]).toEqual([expect.stringContaining("FROM bg_match_casters"), [42, 12]]);
+    // Match joué : le jeu, qui ne sert qu'à la condition du cast avant le lancement, n'est pas relu.
+    expect(execute.mock.calls.some(([sql]) => String(sql).includes("FROM bg_tournaments"))).toBe(false);
+    expect(execute.mock.calls[1]).toEqual([expect.stringContaining("FROM bg_match_casters"), [42, 12]]);
   });
 
   it("setMatchReplayUrl_mutedCasterOnReopenedMatch_throwsNotMatchCaster", async () => {
@@ -121,6 +121,21 @@ describe("setMatchReplayUrl", () => {
     expect(execute).toHaveBeenCalledTimes(3);
   });
 
+  it("setMatchReplayUrl_casterOnReopenedMatch_readsTournamentGame", async () => {
+    const reopened = { ...playedRow, status: "READY", launched_at: null, launch_pairing: null };
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[reopened]])
+      .mockResolvedValueOnce(GAME)
+      .mockResolvedValueOnce([[ELIGIBLE]])
+      .mockResolvedValue([{ affectedRows: 1, changedRows: 1 }]);
+    await mockDb(execute);
+
+    await setMatchReplayUrl(42, null, LIVE_ONLY_12);
+
+    expect(execute.mock.calls[1]).toEqual([expect.stringContaining("FROM bg_tournaments"), [7]]);
+  });
+
   it("setMatchReplayUrl_shownCasterOnReopenedMatch_clearsLink", async () => {
     const reopened = { ...playedRow, status: "READY", launched_at: null, launch_pairing: null };
     const execute = jest
@@ -135,11 +150,11 @@ describe("setMatchReplayUrl", () => {
   });
 
   it("setMatchReplayUrl_liveOnlyNotCasterOfMatch_throwsNotMatchCaster", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[playedRow]]).mockResolvedValueOnce(GAME).mockResolvedValueOnce([[]]);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[playedRow]]).mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await expect(setMatchReplayUrl(42, VIDEO, LIVE_ONLY_12)).rejects.toThrow("NOT_MATCH_CASTER");
-    expect(execute).toHaveBeenCalledTimes(3);
+    expect(execute).toHaveBeenCalledTimes(2);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 

@@ -2105,13 +2105,32 @@ describe("releaseMatchCast / claimMatchCast : gardes et publications (EF-29)", (
     expect(announceCastChange).not.toHaveBeenCalled();
   });
 
-  it("setCastSettings_battletagOnly_publishesWithoutLandingRefresh", async () => {
+  it("setCastSettings_battletagOnly_publishesNothing", async () => {
+    // Le BattleTag n'est pas dans l'instantané : ni reconstruction, ni poussée aux lecteurs.
     state.users[CASTER] = ELIGIBLE_CASTER;
     state.match = matchState({ caster_user_id: CASTER });
 
     await setCastSettings(42, CASTER, true, { battletag: "Voix#1234" });
 
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: false });
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setCastSettings_emptyBody_publishesNothing", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await setCastSettings(42, CASTER, true, {});
+
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setCastSettings_triggerSet_publishesWithLandingRefresh", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await setCastSettings(42, CASTER, true, { trigger: "AUTO" });
+
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
   });
 
   it("setCastSettings_completedMatch_throwsMatchCastClosed", async () => {

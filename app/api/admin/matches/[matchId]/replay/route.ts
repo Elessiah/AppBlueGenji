@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { setMatchReplayUrl } from "@/lib/server/tournaments/match-replay";
 import { can } from "@/lib/shared/permissions";
-import { readOptionalJsonBody } from "@/lib/server/request-body";
+import { readOptionalJsonObject } from "@/lib/server/request-body";
 import { announceStaffMatchAction, staffActionAuthor } from "@/lib/server/tournaments/staff-action-logs";
 
 /** Refus codés du service, et leur statut ; tout autre échec est un 500. */
@@ -38,13 +38,10 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
 
   // Un corps illisible (JSON cassé, trop lourd, mauvais type), vide ou sans
   // `replayUrl` est refusé, jamais pris pour un effacement du lien.
-  const read = await readOptionalJsonBody(req, "INVALID_REPLAY_URL");
+  const read = await readOptionalJsonObject(req, "INVALID_REPLAY_URL");
   if ("refusal" in read) return fail(read.refusal, 400);
-  const body = read.body;
-  if (typeof body !== "object" || body === null || Array.isArray(body) || !("replayUrl" in body)) {
-    return fail("INVALID_REPLAY_URL", 400);
-  }
-  const raw = (body as { replayUrl: unknown }).replayUrl ?? null;
+  if (!("replayUrl" in read.body)) return fail("INVALID_REPLAY_URL", 400);
+  const raw = read.body.replayUrl ?? null;
   if (raw !== null && typeof raw !== "string") return fail("INVALID_REPLAY_URL", 400);
 
   try {

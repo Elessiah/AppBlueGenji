@@ -92,7 +92,7 @@ remplace que par le staff (`CAST_STREAM_NOT_OWNED`).
 
 Pendant cette lecture, la fenêtre dit « Lecture de ton cast… » (`aria-busy`).
 Sur un match **joué** (`COMPLETED`), lien et BattleTag ne s'offrent plus
-(`MATCH_ALREADY_COMPLETED` au serveur) : il reste la rediff et le retrait.
+(`MATCH_CAST_CLOSED` au serveur, comme le retrait) : il reste la rediff.
 « Enregistrer » reste désarmé tant que rien n'a changé ; le lien n'est exigé
 que s'il est touché (un stream ouvert sans lien garde son BattleTag réglable).
 Un match démarqué n'a aucun mode coché. Un refus du BattleTag

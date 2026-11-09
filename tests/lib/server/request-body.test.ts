@@ -9,6 +9,7 @@ import {
   readImageUploadForm,
   readJsonBody,
   readOptionalJsonBody,
+  readOptionalJsonObject,
 } from "@/lib/server/request-body";
 import { IMAGE_UPLOAD_RULE } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
@@ -253,5 +254,37 @@ describe("readOptionalJsonBody — corps facultatif (ERREUR.txt EF-29 #528)", ()
       body: JSON.stringify({ text: "x".repeat(64) }),
     });
     await expect(readOptionalJsonBody(req, "REFUS", 16)).resolves.toEqual({ refusal: PAYLOAD_TOO_LARGE });
+  });
+});
+
+describe("readOptionalJsonObject — corps facultatif en objet", () => {
+  const json = (body: string) =>
+    new Request("http://localhost/api/test", { method: "POST", headers: { "content-type": "application/json" }, body });
+
+  it("readOptionalJsonObject_object_returnsBody", async () => {
+    await expect(readOptionalJsonObject(json('{"a":1}'), "REFUS")).resolves.toEqual({ body: { a: 1 } });
+  });
+
+  it("readOptionalJsonObject_emptyBody_returnsEmptyObject", async () => {
+    await expect(readOptionalJsonObject(chunkedRequest([]), "REFUS")).resolves.toEqual({ body: {} });
+  });
+
+  it.each<[string, string]>([
+    ["null", "null"],
+    ["tableau", "[1]"],
+    ["nombre", "3"],
+    ["chaîne", '"x"'],
+  ])("readOptionalJsonObject_%s_returnsRefusal", async (_label, body) => {
+    await expect(readOptionalJsonObject(json(body), "REFUS")).resolves.toEqual({ refusal: "REFUS" });
+  });
+
+  it("readOptionalJsonObject_brokenJson_returnsRefusal", async () => {
+    await expect(readOptionalJsonObject(json("{pas"), "REFUS")).resolves.toEqual({ refusal: "REFUS" });
+  });
+
+  it("readOptionalJsonObject_tooLarge_returnsPayloadTooLarge", async () => {
+    await expect(readOptionalJsonObject(json('"' + "x".repeat(64) + '"'), "REFUS", 16)).resolves.toEqual({
+      refusal: PAYLOAD_TOO_LARGE,
+    });
   });
 });

@@ -76,6 +76,15 @@ describe("POST /api/matches/[matchId]/ready", () => {
     expect(setMatchReady).not.toHaveBeenCalled();
   });
 
+  it("readyPost_emptyBody_returns400InvalidReadyValue", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    const req = new Request("http://localhost/api/matches/42/ready", { method: "POST" });
+    const res = await readyPost(req, params("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_READY_VALUE" });
+    expect(setMatchReady).not.toHaveBeenCalled();
+  });
+
   it("readyPost_jsonNull_returns400InvalidReadyValue", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     const res = await readyPost(jsonRequest("POST", null), params("42"));

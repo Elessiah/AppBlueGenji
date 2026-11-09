@@ -536,16 +536,14 @@ async function planStaffStreamUrl(
   casterOwned: ReadonlySet<number>,
 ): Promise<StaffStreamPlan> {
   const candidates = streams.filter((stream) => stream.staff || !casterOwned.has(stream.id));
-  const target = staffStream(candidates);
-  if (target?.staff) return target.liveUrl === url ? { kind: "none" } : { kind: "update", id: target.id };
+  const staff = candidates.find((stream) => stream.staff);
+  if (staff) return staff.liveUrl === url ? { kind: "none" } : { kind: "update", id: staff.id };
   if (url === null) return { kind: "none" };
-  const unlinked = candidates.filter((stream) => stream.liveUrl === null);
-  if (unlinked.length === 0) return { kind: "insert" };
-  // Le premier stream sans lien qu'aucun autre ne tient : une seule lecture,
-  // jamais une par stream, sous le verrou du match.
-  const heldByOthers = await streamsHeldByOthers(connection, matchId, setterId);
-  const free = unlinked.find((stream) => !heldByOthers.has(stream.id));
-  return free === undefined ? { kind: "insert" } : { kind: "update", id: free.id };
+  if (!candidates.some((stream) => stream.liveUrl === null)) return { kind: "insert" };
+  // Le premier stream sans lien qu'aucun autre ne tient — la règle partagée
+  // avec la fenêtre (`staffStream`) : une seule lecture, sous le verrou du match.
+  const free = staffStream(candidates, await streamsHeldByOthers(connection, matchId, setterId));
+  return free === null ? { kind: "insert" } : { kind: "update", id: free.id };
 }
 
 /** Les streams du match qu'un autre caster que `userId` tient (lecture sous le verrou du match). */
