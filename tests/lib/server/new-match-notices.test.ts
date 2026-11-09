@@ -33,6 +33,8 @@ const MATCH = {
   team2_ghost: 0,
 };
 
+const PLACE = { tournament_id: 4, phase_id: 1, bracket: "UPPER", round_number: 2, match_number: 1, pairing: "1:2" };
+
 type Db = { execute: jest.Mock<SqlQuery>; query: jest.Mock<SqlQuery> };
 
 /**
@@ -45,14 +47,19 @@ function mockDb(options: { installed?: boolean; candidates?: object[]; claims?: 
     if (sql.startsWith("SELECT 1 FROM bg_settings")) return [options.installed === false ? [] : [{ 1: 1 }]];
     if (sql.startsWith("INSERT IGNORE INTO bg_settings")) return [{ affectedRows: 1 }];
     if (sql.trim().startsWith("INSERT IGNORE INTO bg_match_reminders")) return [{ affectedRows: 1 }];
-    if (sql.startsWith("INSERT IGNORE INTO bg_new_match_notices")) {
-      if (sql.includes(", 1\n")) return [{ affectedRows: 3 }];
+    if (sql.startsWith("DELETE FROM bg_match_reminders")) return [{ affectedRows: 1 }];
+    if (sql.startsWith("SELECT m.tournament_id")) {
       const claimed = claims.length > 0 ? claims.shift() : true;
-      return [{ affectedRows: claimed ? 1 : 0 }];
+      return [claimed ? [PLACE] : []];
     }
+    if (sql.trim().startsWith("INSERT IGNORE INTO bg_new_match_notices")) return [{ affectedRows: 1 }];
     throw new Error(`requête inattendue : ${sql}`);
   });
-  const query = jest.fn<SqlQuery>(async () => [options.candidates ?? []]);
+  const query = jest.fn<SqlQuery>(async (sql) => {
+    if (sql.startsWith("SELECT m.tournament_id")) return [[PLACE, { ...PLACE, match_number: 2 }]];
+    if (sql.trim().startsWith("INSERT IGNORE INTO bg_new_match_notices")) return [{ affectedRows: 2 }];
+    return [options.candidates ?? []];
+  });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, query }));
   return { execute, query };
 }
@@ -69,7 +76,7 @@ function recipient(userId: number, discord = true) {
 
 function claimCalls(db: Db) {
   return db.execute.mock.calls.filter(
-    ([sql]) => sql.startsWith("INSERT IGNORE INTO bg_new_match_notices") && !sql.includes(", 1\n"),
+    ([sql]) => sql.startsWith("SELECT m.tournament_id"),
   );
 }
 
@@ -97,11 +104,10 @@ describe("dispatchNewMatchNotices", () => {
 
     await dispatchNewMatchNotices();
 
-    const statements = db.execute.mock.calls.map(([sql]) => sql.trim().split("\n")[0]);
-    const skipIndex = statements.findIndex((sql) => sql.startsWith("INSERT IGNORE INTO bg_new_match_notices"));
-    const keyIndex = statements.findIndex((sql) => sql.startsWith("INSERT IGNORE INTO bg_settings"));
+    const skipIndex = db.query.mock.calls.findIndex(([sql]) => sql.trim().startsWith("INSERT IGNORE INTO bg_new_match_notices"));
+    const keyIndex = db.execute.mock.calls.findIndex(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_settings"));
     expect(skipIndex).toBeGreaterThan(-1);
-    expect(keyIndex).toBeGreaterThan(skipIndex);
+    expect(db.execute.mock.invocationCallOrder[keyIndex]).toBeGreaterThan(db.query.mock.invocationCallOrder[skipIndex]);
   });
 
   it("installNewMatchNotices_alreadyInstalled_marksNothing", async () => {
@@ -109,7 +115,7 @@ describe("dispatchNewMatchNotices", () => {
 
     await dispatchNewMatchNotices();
 
-    expect(db.execute.mock.calls.some(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_new_match_notices"))).toBe(false);
+    expect(db.query.mock.calls.some(([sql]) => sql.trim().startsWith("INSERT IGNORE INTO bg_new_match_notices"))).toBe(false);
   });
 
   it("dispatch_firstRoundMatch_isAnnounced", async () => {
@@ -224,7 +230,7 @@ describe("dispatchNewMatchNotices", () => {
     await dispatchNewMatchNotices();
 
     const [sql, params] = claimCalls(db)[0];
-    expect(sql).toContain("INSERT IGNORE INTO bg_new_match_notices");
+    expect(sql).not.toContain("INSERT");
     expect(sql).toContain("LEAST(m.team1_id, m.team2_id)");
     expect(sql).toContain("m.launched_at IS NULL");
     expect(sql).toContain("JOIN bg_teams t1 ON t1.id = m.team1_id");
@@ -270,14 +276,50 @@ describe("dispatchNewMatchNotices", () => {
     expect(loadEntrantPlayerIds).toHaveBeenCalledWith([3, 4]);
   });
 
-  it("installNewMatchNotices_firstRun_skipsOnlyMatchesPairedBeforeProcessStart", async () => {
+  it("installNewMatchNotices_firstRun_insertsSkipValuesWithoutInsertSelect", async () => {
     const db = mockDb({ installed: false });
 
     await dispatchNewMatchNotices();
 
-    const [sql, params] = db.execute.mock.calls.find(([text]) => text.includes("m.updated_at < ?")) ?? [];
-    expect(sql).toContain("INSERT IGNORE INTO bg_new_match_notices");
-    expect(params).toEqual([expect.any(Date)]);
+    const [sql, params] =
+      db.query.mock.calls.find(([text]) => text.trim().startsWith("INSERT IGNORE INTO bg_new_match_notices")) ?? [];
+    expect(sql).toContain("VALUES (?, ?, ?, ?, ?, ?, 1), (?, ?, ?, ?, ?, ?, 1)");
+    expect(sql).not.toContain("SELECT");
+    expect(params).toEqual([4, 1, "UPPER", 2, 1, "1:2", 4, 1, "UPPER", 2, 2, "1:2"]);
+  });
+
+  it("claimNewMatchNotice_claimed_insertsPlaceWithAnnouncedStartAt", async () => {
+    const startAt = new Date(Date.now() + 3 * 24 * 3600 * 1000);
+    const db = mockDb({ candidates: [{ ...MATCH, start_at: startAt }] });
+
+    await dispatchNewMatchNotices();
+
+    const [, params] =
+      db.execute.mock.calls.find(([sql]) => sql.trim().startsWith("INSERT IGNORE INTO bg_new_match_notices")) ?? [];
+    expect(params).toEqual([4, 1, "UPPER", 2, 1, "1:2", startAt]);
+  });
+
+  it("dispatch_claimLostOnScheduledMatch_releasesTheReminderMarksItTook", async () => {
+    const startAt = new Date(Date.now() + 3 * 24 * 3600 * 1000);
+    const db = mockDb({ candidates: [{ ...MATCH, start_at: startAt }], claims: [false] });
+
+    await dispatchNewMatchNotices();
+
+    const [, params] = db.execute.mock.calls.find(([sql]) => sql.startsWith("DELETE FROM bg_match_reminders")) ?? [];
+    expect(params).toEqual([40, "SEEN", "TOLD", startAt]);
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("dispatch_someDmsUnreached_logsCountOnly", async () => {
+    jest.mocked(notifyUsers).mockResolvedValue({ ...SENT, discordUnreachedUserIds: [12] });
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    mockDb({ candidates: [MATCH] });
+
+    await dispatchNewMatchNotices();
+
+    expect(error).toHaveBeenCalledWith(expect.stringContaining("1 message(s) privé(s) perdu(s) (match 40)"));
+    expect(error).not.toHaveBeenCalledWith(expect.stringContaining("12"));
+    error.mockRestore();
   });
 
   it("dispatch_ghostSide_skipsGhost", async () => {

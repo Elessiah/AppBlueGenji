@@ -156,6 +156,26 @@ describe("notifyMatchScheduleChange — annonce de nouveau match en attente", ()
     expect(dispatchNewMatchNotices).toHaveBeenCalledTimes(1);
     expect(notifyStaff).toHaveBeenCalledTimes(1);
   });
+
+  it("notifyMatchScheduleChange_newMatchNoticeAlreadyCarriedThisTime_noPlayerAnnouncement", async () => {
+    mockMatch({ ...ROW, new_match_told: 1 });
+
+    await notifyMatchScheduleChange(change());
+
+    expect(announceMatchSchedule).not.toHaveBeenCalled();
+    expect(dispatchNewMatchNotices).not.toHaveBeenCalled();
+  });
+
+  it("notifyMatchScheduleChange_pendingRead_usesDatabaseClockAndAnnouncedTime", async () => {
+    const execute = mockMatch();
+
+    await notifyMatchScheduleChange(change());
+
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toContain("t.start_visibility_at <= NOW()");
+    expect(sql).toContain("n.start_at <=> m.start_at");
+    expect(params).toEqual([42]);
+  });
 });
 
 describe("notifyMatchScheduleChange — ronde suisse", () => {

@@ -683,7 +683,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     // du rappel 10 h (36 000 s) : sans cela, chaque passage la relirait et
     // re-tenterait sa marque « 24 h » pendant 14 heures.
     const at = (hours: number) => new Date(TWELVE_HOURS_BEFORE.getTime() + hours * 60 * 60 * 1000);
-    expect(params).toEqual(["SEEN", "TOLD", TWELVE_HOURS_BEFORE, at(48), TWELVE_HOURS_BEFORE, "PT10H", "P1D", at(10), at(24)]);
+    expect(params).toEqual(["SEEN", "TOLD", TWELVE_HOURS_BEFORE, at(48), TWELVE_HOURS_BEFORE, TWELVE_HOURS_BEFORE, "PT10H", "P1D", at(10), at(24)]);
     expect(sql).toMatch(
       /NOT EXISTS \(SELECT 1 FROM bg_match_reminders sent\s+WHERE sent\.match_id = m\.id AND sent\.offset_key = \?\s+AND m\.start_at > \?\)/,
     );

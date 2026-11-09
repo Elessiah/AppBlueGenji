@@ -49,8 +49,12 @@ retour arrière et tableau reconstruit.
 
 Réservation `bg_new_match_notices`, clé = **place** du match (tournoi, phase,
 tableau, manche, numéro) + **affiche** (`LEAST:GREATEST` des deux engagées),
-posée en une instruction (`INSERT IGNORE … SELECT` qui relit le match et son
-tournoi, `affectedRows`), avant l'envoi. Ainsi :
+relue puis posée avant l'envoi : lecture **non verrouillante** du match, de son
+tournoi et de ses équipes (un `INSERT … SELECT` les verrouillerait en partage
+face au moteur qui tient le verrou du tournoi), puis `INSERT IGNORE … VALUES`
+— la clé primaire et `affectedRows` tranchent entre deux balayages. La ligne
+garde l'horaire annoncé (`start_at`). Si la réservation échoue, les marques de
+rappel que le passage venait de prendre sont rendues. Ainsi :
 
 - deux balayages concurrents, une relance : un seul envoi ;
 - un réappariement du même match avec la même affiche, ou un match effacé puis
@@ -72,9 +76,10 @@ tournoi, `affectedRows`), avant l'envoi. Ainsi :
 - **Toutes les manches sont annoncées**, première comprise. Seuls les matchs
   déjà appariés à la **mise en service** sont marqués `skipped`
   (`installNewMatchNotices`, une fois par base : marques d'abord, puis la clé
-  `new_match_notices_since` de `bg_settings`) — et seulement ceux modifiés
-  avant le démarrage du processus (`updated_at`) : un match apparié entre le
-  redémarrage et le premier balayage reste annoncé.
+  `new_match_notices_since` de `bg_settings` ; lecture simple puis
+  insertion de valeurs par paquets). La mise en service a lieu au premier
+  balayage après le déploiement : un match apparié avant lui (déploiement de
+  nuit, hors match) compte parmi les anciens.
 - **L'annonce part à l'appariement**, avant qu'on puisse programmer le match :
   tout évènement de tournoi publié après commit relance le balayage (10 s
   d'étranglement au plus).
@@ -86,11 +91,15 @@ tournoi, `affectedRows`), avant l'envoi. Ainsi :
   horaire posé par un arbitre sur un match qui attend encore son annonce
   (`setMatchStartAt` → `notifyMatchScheduleChange`) n'envoie pas non plus
   « Match programmé » aux joueurs : il relance le balayage, et l'annonce porte
-  l'horaire (les arbitres sont prévenus comme d'habitude).
+  l'horaire (les arbitres sont prévenus comme d'habitude) ; de même quand
+  l'annonce l'a déjà porté (`start_at` de la réservation, balayage passé entre
+  le commit et la relecture). L'attente ne retient les rappels que
+  30 minutes après la dernière modification du match : un balayage des
+  annonces en panne ne coupe jamais les rappels.
 - Couper le sujet `NEW_MATCH` (ou les messages privés de match) coupe aussi
   l'horaire donné à l'appariement : seuls les rappels de 24 h et 10 h le
   redonnent ensuite. Le balayage des rappels ignore un
-  match qui attend son annonce (`NEW_MATCH_PENDING_SQL`,
+  match qui attend son annonce (`newMatchPendingSql`,
   `lib/server/tournaments/new-match-sql.ts`). « Match programmé » ne part que
   pour une (re)programmation ultérieure (`setMatchStartAt`).
 

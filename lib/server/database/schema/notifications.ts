@@ -155,12 +155,13 @@ ${MATCH_PLACE_COLUMNS}        team_id BIGINT NOT NULL,
   // effacé puis recréé avec la même affiche n'est pas réannoncé. `skipped` : match
   // déjà apparié à la mise en service (clé `new_match_notices_since` de
   // `bg_settings`). Part avec le tournoi. Créée **sans** `catch` muet : le
-  // balayage des rappels la lit (`NEW_MATCH_PENDING_SQL`), son absence les
+  // balayage des rappels la lit (`newMatchPendingSql`), son absence les
   // ferait taire tous.
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_new_match_notices (
 ${MATCH_PLACE_COLUMNS}        pairing VARCHAR(48) NOT NULL,
         skipped TINYINT(1) NOT NULL DEFAULT 0,
+        start_at DATETIME NULL,
         sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (tournament_id, phase_id, bracket, round_number, match_number, pairing),
         CONSTRAINT fk_bg_new_match_notices_tournament FOREIGN KEY (tournament_id)

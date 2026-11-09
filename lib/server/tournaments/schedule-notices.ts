@@ -49,12 +49,14 @@ import {
 } from "./reminder-marks";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 import { dispatchNewMatchNotices } from "./new-match-notices";
-import { NEW_MATCH_PENDING_SQL } from "./new-match-sql";
+import { NEW_MATCH_TOLD_SQL, newMatchPendingSql } from "./new-match-sql";
 
 type ScheduledMatchInfoRow = RowDataPacket &
   MatchNotice & {
     /** Le match attend encore l'annonce de nouveau match (`NEW_MATCH_NOTICE.md`). */
     new_match_pending?: number;
+    /** L'annonce de nouveau match a déjà porté l'horaire actuel. */
+    new_match_told?: number;
   };
 
 export type MatchScheduleChange = {
@@ -155,13 +157,13 @@ async function loadMatchInfo(matchId: number): Promise<ScheduledMatchInfoRow | n
             m.start_at, m.team1_id, m.team2_id,
             t.name AS tournament_name, t.participant_type, ${swissRoundSql("m", "t")},
             t1.name AS team1_name, t2.name AS team2_name,
-            ${NEW_MATCH_PENDING_SQL} AS new_match_pending
+            ${newMatchPendingSql("NOW()")} AS new_match_pending, ${NEW_MATCH_TOLD_SQL} AS new_match_told
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
        LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
        LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
       WHERE m.id = ? LIMIT 1`,
-    [new Date(), matchId],
+    [matchId],
   );
   return rows[0] ?? null;
 }
@@ -477,11 +479,14 @@ export async function notifyMatchScheduleChange(change: MatchScheduleChange): Pr
   const announceable = isAnnounceableSchedule(change);
   const playersAlreadyHoldIt = change.alreadyAnnounced && change.toldStartAt === startAt;
   // Un match qui attend l'annonce de nouveau match : c'est elle qui portera
-  // l'horaire (`NEW_MATCH_NOTICE.md`), « Match programmé » ne la double pas.
+  // l'horaire (`NEW_MATCH_NOTICE.md`), « Match programmé » ne la double pas —
+  // ni quand un balayage l'a déjà envoyée avec cet horaire entre le commit et
+  // cette lecture.
   const newMatchPending = Number(row.new_match_pending ?? 0) === 1;
+  const newMatchTold = Number(row.new_match_told ?? 0) === 1;
   if (newMatchPending) void dispatchNewMatchNotices().catch(() => undefined);
   const results = await Promise.allSettled([
-    announceable && !playersAlreadyHoldIt && !newMatchPending && ownsPlayerNotice(row, change)
+    announceable && !playersAlreadyHoldIt && !newMatchPending && !newMatchTold && ownsPlayerNotice(row, change)
       ? announceMatchSchedule(row, playerAnnouncement(change))
       : Promise.resolve(0),
     notifyReferees(row, { ...change, startAt }, announceable && stillCurrent(row, change)),

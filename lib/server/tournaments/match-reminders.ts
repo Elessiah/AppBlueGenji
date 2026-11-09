@@ -67,7 +67,7 @@ import { siteUrl } from "@/lib/server/site-url";
 import { tournamentPageUrl } from "./app-url";
 import { onPoster, toPoster, type PosterRow } from "./match-poster";
 import { dispatchRefereeDigest } from "./referee-digest";
-import { NEW_MATCH_PENDING_SQL } from "./new-match-sql";
+import { newMatchPendingSql } from "./new-match-sql";
 import { claimDatedMark, releaseDatedMarks } from "./reminder-marks";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
@@ -1018,7 +1018,7 @@ async function runSweep(now: Date): Promise<number> {
   const [matches] = await db.query<SweepMatchRow[]>(
     `${SWEEP_MATCH_SELECT}
         AND m.start_at <= ?
-        AND NOT ${NEW_MATCH_PENDING_SQL}
+        AND NOT ${newMatchPendingSql("?")}
         AND NOT EXISTS (SELECT 1 FROM bg_match_reminders done
                          WHERE done.match_id = m.id AND done.offset_key = ?)${waiting}
      HAVING m.start_at <= ? OR seen_mark = 0`,
@@ -1027,6 +1027,7 @@ async function runSweep(now: Date): Promise<number> {
       MATCH_TOLD_KEY,
       now,
       inSeconds(now, Math.round(MATCH_REMINDER_LOOKAHEAD_MS / 1000)),
+      now,
       now,
       LAST_REMINDER_KEY,
       ...WAITING_OFFSETS.flatMap(({ key, nextOpensSeconds }) => [key, inSeconds(now, nextOpensSeconds)]),

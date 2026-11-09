@@ -30,8 +30,29 @@ function announceableSql(now: string): string {
 
 export const ANNOUNCEABLE_SQL = announceableSql("NOW()");
 
+/** Délai au-delà duquel un match qui attend son annonce ne retient plus les rappels. */
+export const NEW_MATCH_PENDING_MINUTES = 30;
+
 /**
- * Le match attend encore son annonce (à annoncer, sans marque). Un seul `?` :
- * l'instant de lecture (le balayage des rappels passe le sien, pas `NOW()`).
+ * Le match attend encore son annonce (à annoncer, sans marque), modifié depuis
+ * moins de {@link NEW_MATCH_PENDING_MINUTES} minutes. Au-delà du délai
+ * (balayage des annonces en panne), les rappels reprennent : un match ne perd
+ * jamais ses rappels faute d'annonce.
+ *
+ * @param now `NOW()` (horloge de la base), ou `?` quand l'appelant lit à son
+ *            propre instant (le balayage des rappels) — le `?` revient alors
+ *            **deux fois**.
  */
-export const NEW_MATCH_PENDING_SQL = `(${announceableSql("?")} AND NOT ${MARKED_SQL})`;
+export function newMatchPendingSql(now: "NOW()" | "?"): string {
+  return `(${announceableSql(now)}
+  AND m.updated_at > ${now} - INTERVAL ${NEW_MATCH_PENDING_MINUTES} MINUTE AND NOT ${MARKED_SQL})`;
+}
+
+/**
+ * L'annonce de nouveau match envoyée pour cette affiche portait déjà l'horaire
+ * actuel du match : « Match programmé » ne la double pas.
+ */
+export const NEW_MATCH_TOLD_SQL = `EXISTS (SELECT 1 FROM bg_new_match_notices n
+   WHERE n.tournament_id = m.tournament_id AND n.phase_id = m.phase_id AND n.bracket = m.bracket
+     AND n.round_number = m.round_number AND n.match_number = m.match_number AND n.pairing = ${PAIRING_SQL}
+     AND n.skipped = 0 AND n.start_at <=> m.start_at)`;

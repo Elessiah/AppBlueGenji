@@ -453,6 +453,8 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Son index, à part : l'export (`match-roles-export.ts`) et la suppression
     // d'un compte le cherchent par ce compte.
     `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_live_trigger_user (live_trigger_user_id)`,
+    // PR #569 — horaire porté par l'annonce de nouveau match.
+    `ALTER TABLE bg_new_match_notices ADD COLUMN start_at DATETIME NULL AFTER skipped`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {
