@@ -16,7 +16,12 @@ import {
   staffStream,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
-import { viewerMayChangeLiveTrigger, viewerMayToggleOnAir } from "@/lib/shared/live-trigger-owner";
+import {
+  liveTriggerViewer,
+  viewerMayChangeLiveTrigger,
+  viewerMayToggleOnAir,
+  viewerMayUnmarkLiveTrigger,
+} from "@/lib/shared/live-trigger-owner";
 import { viewerRefereesMatch } from "@/lib/shared/match-referee";
 import { canEditReplay } from "@/lib/shared/match-replay";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
@@ -25,6 +30,8 @@ import { useLiveControls } from "../_lib/live-context";
 import { formatMatchStartAt } from "@/lib/shared/match-schedule";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
+import { useOnAirToggle } from "../_lib/use-on-air-toggle";
+import styles from "./MatchLiveDialog.module.css";
 import { useDialogsText } from "../_lib/dialogs-text";
 import { CastTriggerField } from "./CastSettingsFields";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
@@ -88,6 +95,25 @@ export function lockedOnClosedMatch(
  * Le lien du staff suit le mode d'un autre caster montré : lu, pas écrit, par
  * qui ne peut pas changer ce mode (décision 2, même règle que le serveur).
  */
+/**
+ * La rediff depuis cette fenêtre : la seule `live` ne règle que celle de son
+ * cast (`NOT_MATCH_CASTER` au serveur), le staff `tournaments` toutes.
+ */
+export function mayEditReplay(
+  match: { casters: readonly { userId: number }[] },
+  controls: { canManage: boolean; canSchedule: boolean; viewerUserId: number | null },
+): boolean {
+  if (!controls.canManage) return false;
+  return controls.canSchedule || match.casters.some((caster) => caster.userId === controls.viewerUserId);
+}
+
+/** Aide du lien du staff : verrouillé par le mode d'un autre, ou réservé au staff. */
+function StaffLinkHint({ staffSide, linkLocked }: Readonly<{ staffSide: boolean; linkLocked: boolean }>) {
+  const { t } = useDialogsText();
+  if (!staffSide) return <p>{t("live.urlStaffOnly")}</p>;
+  return linkLocked ? <p>{t("live.urlLocked")}</p> : null;
+}
+
 export function staffLinkLocked(triggerLocked: boolean, match: Pick<BracketMatch, "liveTriggerCasterId">): boolean {
   return triggerLocked && (match.liveTriggerCasterId ?? null) !== null;
 }
@@ -173,13 +199,17 @@ export function MatchLiveDialog({
   // Libellés déjà rédigés pour le pied d'action de la carte (antenne, rediff) :
   // les mêmes mots ici, dans le seul espace qui les porte.
   const actions = useActionsText();
-  const { openReplay, viewerUserId, viewerIsAdmin, refereeNames, canSchedule, canManage } = useLiveControls();
+  const controls = useLiveControls();
+  const { openReplay, refereeNames } = controls;
   const referee = viewerRefereesMatch(match, refereeNames);
   // Même règle que le serveur (`LIVE_TRIGGER_NOT_OWNED`) : un mode verrouillé
   // se montre sans contrôle, plutôt qu'un bouton qui mène à un refus.
-  const viewer = { userId: viewerUserId, isAdmin: viewerIsAdmin, manages: canSchedule, referees: referee };
+  const viewer = liveTriggerViewer(controls, referee);
   const triggerLocked = !viewerMayChangeLiveTrigger(match, viewer);
-  const linkLocked = staffLinkLocked(triggerLocked, match);
+  // Le lien de l'organisation n'est réglé que par le staff `tournaments` ou
+  // l'arbitre du match : la seule `live` le lit (`STAFF_STREAM_FORBIDDEN`).
+  const staffSide = canSpeakForOrganisation || referee;
+  const linkLocked = staffLinkLocked(triggerLocked, match) || !staffSide;
   const onAir = useMatchLiveState(match) === "LIVE";
   const [streamed, setStreamed] = useState(match.liveTrigger !== null);
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "MANUAL");
@@ -249,24 +279,7 @@ export function MatchLiveDialog({
   const airToggle = canToggleOnAir(match) && viewerMayToggleOnAir(match, viewer);
 
   /** Ouvre ou coupe l'antenne (mode manuel), sans quitter la fenêtre. */
-  const toggleAir = async () => {
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/admin/matches/${match.id}/live`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ onAir: !onAir }),
-      });
-      const payload = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "MATCH_LIVE_UPDATE_FAILED");
-      showSuccess(onAir ? actions.t("cardActions.airClosed") : actions.t("cardActions.airOpened"));
-      onSaved();
-    } catch (error) {
-      showError(mapError((error as Error).message));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const toggleAir = useOnAirToggle(match.id, onAir, { setBusy, onDone: onSaved });
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -349,6 +362,9 @@ export function MatchLiveDialog({
             <input
               type="checkbox"
               checked={streamed}
+              // Un mode sans maître ne se démarque que par l'arbitre ou le staff
+              // (`LIVE_TRIGGER_NOT_OWNED` au serveur).
+              disabled={!viewerMayUnmarkLiveTrigger(match, viewer)}
               onChange={(e) => setStreamed(e.target.checked)}
             />
             {/* NOSONAR S6772 — label en flex avec `gap` */}
@@ -365,8 +381,7 @@ export function MatchLiveDialog({
                 <label htmlFor="match-live-url">{t("live.url")}</label>
                 <InfoHint id="match-live-url-hint" subject={t("live.urlSubject")}>
                   <p>{t("live.urlHint", { platforms })}</p>
-                  {!canSpeakForOrganisation && <p>{t("live.urlOwnChannel")}</p>}
-                  {linkLocked && <p>{t("live.urlLocked")}</p>}
+                  <StaffLinkHint staffSide={staffSide} linkLocked={linkLocked} />
                 </InfoHint>
               </InfoHintRow>
               <input
@@ -478,25 +493,23 @@ export function MatchLiveDialog({
 
         {/* Antenne (mode manuel) et rediff : la carte ne les porte plus. */}
         {airToggle && (
-          <div style={{ margin: "0 0 14px" }}>
+          <div className={styles.section}>
             <button
               type="button"
-              className={onAir ? "btn ghost" : "btn"}
+              className={`${onAir ? "btn ghost" : "btn"} ${styles.sectionButton}`}
               disabled={busy}
-              style={{ padding: "8px 18px", fontSize: 13 }}
               onClick={() => void toggleAir()}
             >
               {onAir ? actions.t("cardActions.stopLive") : actions.t("cardActions.startLive")}
             </button>
           </div>
         )}
-        {canEditReplay(match, canManage) && (
-          <div style={{ margin: "0 0 14px" }}>
+        {canEditReplay(match, mayEditReplay(match, controls)) && (
+          <div className={styles.section}>
             <button
               type="button"
-              className="btn ghost"
+              className={`btn ghost ${styles.sectionButton}`}
               disabled={busy}
-              style={{ padding: "8px 18px", fontSize: 13 }}
               onClick={() => {
                 // Une autre modale : celle-ci se ferme d'abord, les deux ne se
                 // disputent pas le piège de focus.

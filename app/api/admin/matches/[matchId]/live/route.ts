@@ -5,6 +5,7 @@ import { mayConfigureMatchLive, parseStreamLinks } from "@/lib/server/tournament
 import { isMatchLiveTrigger, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import type { MatchStreamLinkEdit } from "@/lib/server/tournaments/live-streams";
 import { can } from "@/lib/shared/permissions";
+import { castOverseer } from "@/lib/shared/live-trigger-owner";
 import { readJsonBody } from "@/lib/server/request-body";
 import { announceStaffMatchAction, staffActionAuthor } from "@/lib/server/tournaments/staff-action-logs";
 
@@ -34,6 +35,8 @@ function mapLiveError(error: unknown) {
   if (message === "MATCH_NOT_FOUND") return fail(message, 404);
   if (message === "LIVE_TRIGGER_NOT_OWNED") return fail(message, 403);
   if (message === "NOT_MATCH_REFEREE") return fail(message, 403);
+  if (message === "NOT_MATCH_CASTER") return fail(message, 403);
+  if (message === "STAFF_STREAM_FORBIDDEN") return fail(message, 403);
   if (message === "STREAM_NOT_FOUND") return fail(message, 404);
   if (message === "INVALID_STREAM_URL") return fail(message, 400);
   if (message === "INVALID_LIVE_TRIGGER") return fail(message, 400);
@@ -45,8 +48,10 @@ function mapLiveError(error: unknown) {
 }
 
 type MatchLiveBody = {
-  trigger: MatchLiveTrigger | null;
-  liveUrl: string | null;
+  /** `undefined` (clé absente) : mode inchangé ; `null` explicite : retrait. */
+  trigger: MatchLiveTrigger | null | undefined;
+  /** `undefined` (clé absente) : lien du staff inchangé. */
+  liveUrl: string | null | undefined;
   organisationLink: boolean;
   streamLinks: MatchStreamLinkEdit[] | undefined;
 };
@@ -58,8 +63,8 @@ function parseMatchLiveBody(body: {
   organisationLink?: unknown;
   streamLinks?: unknown;
 }): MatchLiveBody | string {
-  const trigger = body.trigger ?? null;
-  if (trigger !== null && !isMatchLiveTrigger(trigger)) return "INVALID_LIVE_TRIGGER";
+  const trigger = body.trigger;
+  if (trigger !== null && trigger !== undefined && !isMatchLiveTrigger(trigger)) return "INVALID_LIVE_TRIGGER";
   if (body.liveUrl !== null && body.liveUrl !== undefined && typeof body.liveUrl !== "string") {
     return "INVALID_STREAM_URL";
   }
@@ -70,7 +75,7 @@ function parseMatchLiveBody(body: {
   if (streamLinks === null) return "INVALID_STREAM_LINKS";
   return {
     trigger,
-    liveUrl: (body.liveUrl as string | undefined) ?? null,
+    liveUrl: body.liveUrl as string | null | undefined,
     organisationLink: body.organisationLink === true,
     streamLinks,
   };
@@ -78,9 +83,11 @@ function parseMatchLiveBody(body: {
 
 /**
  * Configure la diffusion d'un match.
- * Corps : `{ trigger: "AUTO" | "START_TIME" | "MANUAL" | null, liveUrl?: string | null,
+ * Corps : `{ trigger?: "AUTO" | "START_TIME" | "MANUAL" | null, liveUrl?: string | null,
  * organisationLink?: boolean }`.
- * `trigger: null` démarque le match (et efface lien et antenne) ; `START_TIME`
+ * `trigger: null` démarque le match (et efface lien et antenne) ; une clé
+ * `trigger` (ou `liveUrl`) absente laisse le mode (ou le lien du staff) tel
+ * quel — un envoi des seuls `streamLinks` ne retire rien ; `START_TIME`
  * exige une date de début déjà posée sur le match (409 sinon) ; un match qui ne
  * peut plus passer à l'antenne et n'est pas déjà casté refuse tout réglage
  * (`MATCH_NOT_CASTABLE`, 409) ; déjà casté, il ne peut plus qu'être démarqué.
@@ -92,7 +99,11 @@ function parseMatchLiveBody(body: {
  * `true` est refusé (403) plutôt que silencieusement ignoré.
  *
  * Le mode d'antenne déjà posé ne change que pour le caster qui l'a posé,
- * l'arbitre désigné ou un admin (`LIVE_TRIGGER_NOT_OWNED`, 403). L'arbitre
+ * l'arbitre désigné ou un admin (`LIVE_TRIGGER_NOT_OWNED`, 403) ; sans
+ * maître, pour le staff `tournaments` et les casters du match, dont celui qui
+ * le change devient le maître. Un porteur de la seule `live` ne règle que son
+ * cast : sans caster le match, `NOT_MATCH_CASTER` (403) ; le lien du staff
+ * ne lui est pas ouvert (`STAFF_STREAM_FORBIDDEN`, 403). L'arbitre
  * désigné du match est admis même sans `live`, et lui seul peut envoyer
  * `streamLinks: [{ streamId, liveUrl }]` — les liens des streams des casters
  * (`NOT_MATCH_REFEREE`, 403, pour tout autre) ; un lien refusé rend le
@@ -134,7 +145,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
       trigger,
       liveUrl: parsed.liveUrl,
       setter: { userId: user.id, asOrganisation: organisation && parsed.organisationLink },
-      access: { isAdmin: user.isAdmin, manages: organisation, live: can(user, "live") },
+      access: { oversees: castOverseer(organisation, can(user, "live")), manages: organisation, live: can(user, "live") },
       ...(streamLinks === undefined ? {} : { streamLinks }),
     });
     const removed = trigger === null && previousTrigger !== null;
@@ -142,7 +153,8 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
     if (changed) {
       announceStaffMatchAction(matchId, removed ? "LIVE_REMOVED" : "LIVE_CONFIGURED", staffActionAuthor(user));
     }
-    return ok({ trigger });
+    // Mode absent du corps : inchangé, la réponse dit celui qui reste.
+    return ok({ trigger: trigger === undefined ? previousTrigger : trigger });
   } catch (error) {
     return mapLiveError(error);
   }
@@ -169,7 +181,8 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
 
   try {
     // Un double clic (déjà à l'antenne, ou déjà hors antenne) ne se journalise pas.
-    const access = { isAdmin: user.isAdmin, manages: can(user, "tournaments"), live: can(user, "live") };
+    const manages = can(user, "tournaments");
+    const access = { oversees: castOverseer(manages, can(user, "live")), manages, live: can(user, "live") };
     if (await setMatchOnAir(matchId, body.onAir, user.id, access)) {
       announceStaffMatchAction(matchId, body.onAir ? "ON_AIR" : "OFF_AIR", staffActionAuthor(user));
     }

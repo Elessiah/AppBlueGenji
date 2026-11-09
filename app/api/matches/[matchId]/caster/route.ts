@@ -11,12 +11,14 @@ import {
   parseMatchIdParam,
 } from "@/lib/server/tournaments/match-launch-routes";
 import { can } from "@/lib/shared/permissions";
+import { castOverseer } from "@/lib/shared/live-trigger-owner";
 import type { AuthUser } from "@/lib/server/auth";
 import type { CastAccess } from "@/lib/server/tournaments/cast-settings";
 
 /** Ses droits sur un mode d'antenne déjà posé (`lib/shared/live-trigger-owner.ts`). */
 function castAccess(user: AuthUser): CastAccess {
-  return { isAdmin: user.isAdmin, manages: can(user, "tournaments") };
+  const manages = can(user, "tournaments");
+  return { oversees: castOverseer(manages, can(user, "live")), manages };
 }
 
 const STATUSES: Readonly<Record<string, number>> = {
@@ -36,6 +38,7 @@ const STATUSES: Readonly<Record<string, number>> = {
   MATCH_NOT_CASTABLE: 409,
   MATCH_START_AT_REQUIRED: 409,
   CAST_STREAM_NOT_OWNED: 409,
+  STAFF_STREAM_FORBIDDEN: 403,
   NOT_MATCH_CASTER: 403,
 };
 
@@ -140,8 +143,8 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
 }
 
 /**
- * Se désinscrire — ou, pour l'arbitrage (`tournaments`), retirer un caster du
- * match : `?userId=` le désigne (absent : le lecteur lui-même).
+ * Se désinscrire — ou, pour le staff (`tournaments` + `live`, `castOverseer`),
+ * retirer un caster du match : `?userId=` le désigne (absent : le lecteur lui-même).
  */
 export async function DELETE(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -155,7 +158,7 @@ export async function DELETE(req: Request, context: { params: Promise<{ matchId:
   if (!isPositiveId(casterId)) return fail("INVALID_USER_ID", 400);
 
   try {
-    await releaseMatchCast(matchId, user.id, can(user, "tournaments"), casterId);
+    await releaseMatchCast(matchId, user.id, castAccess(user).oversees, casterId);
     return ok({ casterUserId: null });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_CAST_RELEASE_FAILED");

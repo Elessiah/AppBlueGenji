@@ -55,17 +55,6 @@ export function parseCastTarget(body: unknown): CastTarget | null {
 }
 
 /**
- * Réglages du cast lus dans un corps de requête (`CastSettings`) : chaque champ
- * **absent** reste absent — la fenêtre n'envoie que ce qu'elle montre, et un
- * champ qu'elle ne montre pas n'a pas à être touché. `null` est une valeur
- * (« plus casté », « aucun lien », « le BattleTag de mon compte »).
- *
- * `asOrganisation` ne s'accorde qu'à la permission `tournaments` : la route le
- * refuse aux autres (403), jamais en silence (`MatchLiveSetter`).
- *
- * Rend `null` sur un type inattendu : le refus est `INVALID_CAST_SETTINGS`.
- */
-/**
  * Un champ **présent** dans le corps, lu et contrôlé ; `undefined` quand il est
  * absent (il n'est alors pas touché), `null` étant une valeur. Rend
  * `INVALID` quand le type ne convient pas : chaque champ se juge seul, et
@@ -91,7 +80,8 @@ const isBoolean = (value: unknown): value is boolean => typeof value === "boolea
  * Réglages du cast lus dans un corps de requête (`CastSettings`) : chaque champ
  * **absent** reste absent — la fenêtre n'envoie que ce qu'elle montre, et un
  * champ qu'elle ne montre pas n'a pas à être touché. `null` est une valeur
- * (« plus casté », « aucun lien », « le BattleTag de mon compte »).
+ * (« plus casté », « le BattleTag de mon compte ») ; un lien `null` est refusé
+ * au réglage (`STREAM_URL_REQUIRED`).
  *
  * `asOrganisation` ne s'accorde qu'à la permission `tournaments` : la route le
  * refuse aux autres (403), jamais en silence (`MatchLiveSetter`).

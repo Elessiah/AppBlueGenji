@@ -93,7 +93,7 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
       trigger: "AUTO",
       liveUrl: "kick.com/bg",
       setter: { userId: arbitre.id, asOrganisation: false },
-      access: { isAdmin: false, manages: true, live: true },
+      access: { oversees: true, manages: true, live: true },
     });
   });
 
@@ -216,7 +216,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "MANUAL",
       liveUrl: "kick.com/bg",
       setter: { userId: caster.id, asOrganisation: false },
-      access: { isAdmin: false, manages: false, live: true },
+      access: { oversees: false, manages: false, live: true },
     });
   });
 
@@ -230,9 +230,9 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     // est le sien (protection par défaut) — jamais déduit de ce qu'il caste.
     expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
       trigger: "AUTO",
-      liveUrl: null,
+      liveUrl: undefined,
       setter: { userId: arbitre.id, asOrganisation: false },
-      access: { isAdmin: false, manages: true, live: true },
+      access: { oversees: true, manages: true, live: true },
     });
   });
 
@@ -250,7 +250,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       trigger: "AUTO",
       liveUrl: "kick.com/bg",
       setter: { userId: arbitre.id, asOrganisation: true },
-      access: { isAdmin: false, manages: true, live: true },
+      access: { oversees: true, manages: true, live: true },
     });
   });
 
@@ -265,6 +265,26 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
 
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toMatchObject({ error: "NOT_MATCH_REFEREE" });
+  });
+
+  it("PUT_liveOnlyNotCasting_returns403NotMatchCaster", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setMatchLiveConfig).mockRejectedValue(new Error("NOT_MATCH_CASTER"));
+
+    const res = await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"));
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "NOT_MATCH_CASTER" });
+  });
+
+  it("PUT_liveOnlyWritesStaffLink_returns403StaffStreamForbidden", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setMatchLiveConfig).mockRejectedValue(new Error("STAFF_STREAM_FORBIDDEN"));
+
+    const res = await putMatchLive(matchReq("PUT", { trigger: "AUTO", liveUrl: "twitch.tv/x" }), matchParams("42"));
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "STAFF_STREAM_FORBIDDEN" });
   });
 
   it("PUT_coCasterChangesTrigger_returns403", async () => {
@@ -372,16 +392,32 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     );
   });
 
-  it("démarque le match quand trigger est absent ou null", async () => {
+  it("PUT_triggerNull_unmarksMatch", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
-    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: null, changed: true });
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: "AUTO", changed: true });
 
-    await putMatchLive(matchReq("PUT", {}), matchParams("42"));
+    await putMatchLive(matchReq("PUT", { trigger: null, liveUrl: null }), matchParams("42"));
     expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
       trigger: null,
       liveUrl: null,
       setter: { userId: caster.id, asOrganisation: false },
-      access: { isAdmin: false, manages: false, live: true },
+      access: { oversees: false, manages: false, live: true },
+    });
+  });
+
+  it("PUT_triggerAndLiveUrlAbsent_leavesBothUnchanged", async () => {
+    // Un envoi des seuls liens des casters ne retire ni le mode ni le lien du staff.
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue({ previousTrigger: "AUTO", changed: true });
+
+    const res = await putMatchLive(matchReq("PUT", {}), matchParams("42"));
+    // Mode absent : la réponse dit celui qui reste.
+    expect(await res.json()).toEqual({ trigger: "AUTO" });
+    expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
+      trigger: undefined,
+      liveUrl: undefined,
+      setter: { userId: caster.id, asOrganisation: false },
+      access: { oversees: false, manages: false, live: true },
     });
   });
 
@@ -394,9 +430,9 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     expect(res.status).toBe(200);
     expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
       trigger: "START_TIME",
-      liveUrl: null,
+      liveUrl: undefined,
       setter: { userId: caster.id, asOrganisation: false },
-      access: { isAdmin: false, manages: false, live: true },
+      access: { oversees: false, manages: false, live: true },
     });
   });
 
@@ -478,7 +514,7 @@ describe("POST /api/admin/matches/[matchId]/live", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ onAir: true });
-    expect(setMatchOnAir).toHaveBeenCalledWith(42, true, caster.id, { isAdmin: false, manages: false, live: true });
+    expect(setMatchOnAir).toHaveBeenCalledWith(42, true, caster.id, { oversees: false, manages: false, live: true });
   });
 
   it("referme l'antenne", async () => {
@@ -486,7 +522,7 @@ describe("POST /api/admin/matches/[matchId]/live", () => {
     jest.mocked(setMatchOnAir).mockResolvedValue(true);
 
     await postMatchOnAir(matchReq("POST", { onAir: false }), matchParams("42"));
-    expect(setMatchOnAir).toHaveBeenCalledWith(42, false, caster.id, { isAdmin: false, manages: false, live: true });
+    expect(setMatchOnAir).toHaveBeenCalledWith(42, false, caster.id, { oversees: false, manages: false, live: true });
   });
 
   it("exige un onAir booléen — une chaîne « false » ne doit pas ouvrir l'antenne", async () => {

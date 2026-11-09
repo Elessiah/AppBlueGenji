@@ -129,7 +129,8 @@ export function CastTriggerField({
   onChange,
   locked = false,
 }: Readonly<{
-  trigger: MatchLiveTrigger;
+  /** `null` : aucun mode coché (match démarqué) — chaque choix se clique. */
+  trigger: MatchLiveTrigger | null;
   startAt: BracketMatch["startAt"];
   onChange: (trigger: MatchLiveTrigger) => void;
   locked?: boolean;
@@ -140,6 +141,7 @@ export function CastTriggerField({
   const startAtLabel = formatMatchStartAt(startAt, locale);
   const startAtMissing = startAtLabel === null;
   if (locked) {
+    if (trigger === null) return null;
     return (
       <InfoHintRow inline>
         <p className={styles.locked}>
@@ -197,7 +199,15 @@ export function CastBattletagField({
   value,
   onChange,
   invalid,
-}: Readonly<{ id: string; value: string; onChange: (value: string) => void; invalid: boolean }>) {
+  fieldError,
+}: Readonly<{
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  invalid: boolean;
+  /** Refus du serveur rattaché au champ (`INVALID_CAST_BATTLETAG`, `useFieldErrors`). */
+  fieldError?: string | null;
+}>) {
   const { t } = useActionsText();
   const hintId = useId();
   const infoId = useId();
@@ -215,14 +225,15 @@ export function CastBattletagField({
         onChange={(e) => onChange(e.target.value)}
         maxLength={MAX_CAST_BATTLETAG_LENGTH}
         placeholder="Pseudo#1234"
-        aria-describedby={invalid ? `${hintId} ${infoId}` : infoId}
-        aria-invalid={invalid ? true : undefined}
+        // Le refus est lu avant l'aide (`fieldAria`), comme pour le lien.
+        {...fieldAria(id, invalid, invalid ? hintId : null, infoId)}
       />
       {invalid && (
         <p id={hintId} className={styles.hintInvalid}>
           {t("cardActions.castSettings.battletagInvalid")}
         </p>
       )}
+      <FieldErrorText fieldId={id} message={fieldError ?? null} />
     </div>
   );
 }

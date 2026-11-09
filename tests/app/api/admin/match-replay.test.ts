@@ -62,7 +62,18 @@ describe("PUT /api/admin/matches/[matchId]/replay — permissions", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ replayUrl: VIDEO });
-    expect(setMatchReplayUrl).toHaveBeenCalledWith(42, VIDEO);
+    expect(setMatchReplayUrl).toHaveBeenCalledWith(42, VIDEO, { userId: user.id, manages: user !== caster });
+  });
+
+  it("PUT_liveOnlyNotCaster_returns403NotMatchCaster", async () => {
+    // Décision du 2026-11-09 : la seule `live` ne règle que la rediff de son cast.
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setMatchReplayUrl).mockRejectedValue(new Error("NOT_MATCH_CASTER"));
+
+    const res = await PUT(req({ replayUrl: VIDEO }), params("42"));
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "NOT_MATCH_CASTER" });
   });
 });
 
@@ -86,7 +97,7 @@ describe("PUT /api/admin/matches/[matchId]/replay — entrées", () => {
   it("efface sur un corps illisible", async () => {
     jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: null, changed: true });
     expect((await PUT(req("pas du json"), params("42"))).status).toBe(200);
-    expect(setMatchReplayUrl).toHaveBeenCalledWith(42, null);
+    expect(setMatchReplayUrl).toHaveBeenCalledWith(42, null, { userId: admin.id, manages: true });
   });
 
   it.each<[string, number]>([

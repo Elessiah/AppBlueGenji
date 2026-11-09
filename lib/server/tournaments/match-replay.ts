@@ -7,14 +7,17 @@
  * reste du plateau.
  *
  * Réservé à la permission `live` (admin, arbitre, caster) : c'est la suite
- * naturelle du cast, que pose déjà ce même public.
+ * naturelle du cast, que pose déjà ce même public. Un porteur de la seule
+ * `live` n'y touche que sur **son** cast ; le staff `tournaments` (dont
+ * l'arbitre désigné) sur tout match (décision du 2026-11-09).
  */
 import type { RowDataPacket } from "mysql2/promise";
-import { getDatabase } from "@/lib/server/database";
 import { canHaveReplay, normalizeReplayUrl } from "@/lib/shared/match-replay";
 import type { MatchStatus } from "@/lib/shared/types";
 import { nullableId } from "@/lib/shared/nullable-id";
+import { retryOnDeadlock } from "./deadlock-retry";
 import { publishMatchUpdatedEvent } from "./notifications";
+import { inTransaction } from "./transaction";
 
 type MatchReplayRow = RowDataPacket & {
   id: number;
@@ -50,39 +53,55 @@ function isReplayableRow(row: MatchReplayRow): boolean {
  * @returns le lien normalisé (`null` s'il a été effacé), et `changed` : le
  *   lien a changé — effacer un lien jamais posé, ou reposer le même, ne change
  *   rien, et le journal du staff ne le note pas.
- * @throws `INVALID_REPLAY_URL` | `MATCH_NOT_FOUND` | `MATCH_NOT_REPLAYABLE`
+ * `actor.manages` : permission `tournaments` — tout match ; sans elle, l'acteur
+ * doit caster ce match (`NOT_MATCH_CASTER`).
+ *
+ * @throws `INVALID_REPLAY_URL` | `MATCH_NOT_FOUND` | `MATCH_NOT_REPLAYABLE` |
+ *   `NOT_MATCH_CASTER`
  */
 export async function setMatchReplayUrl(
   matchId: number,
   rawUrl: string | null,
+  actor: { userId: number; manages: boolean },
 ): Promise<{ replayUrl: string | null; changed: boolean }> {
   const blank = rawUrl === null || rawUrl.trim() === "";
   const replayUrl = blank ? null : normalizeReplayUrl(rawUrl);
   if (!blank && replayUrl === null) throw new Error("INVALID_REPLAY_URL");
 
-  const db = await getDatabase();
-  const [rows] = await db.execute<MatchReplayRow[]>(
-    `SELECT id, tournament_id, status, team1_id, team2_id, forfeit_team_id, double_forfeit
-       FROM bg_matches WHERE id = ? LIMIT 1`,
-    [matchId],
+  // Le match se verrouille d'abord (seul, sans jointure : MariaDB) : le retrait
+  // d'un caster (`releaseMatchCast`) prend le même verrou, et ne peut plus
+  // passer entre la vérification du cast et l'écriture du lien.
+  const { row, result } = await retryOnDeadlock(() =>
+    inTransaction(async (connection) => {
+      const [rows] = await connection.execute<MatchReplayRow[]>(
+        `SELECT id, tournament_id, status, team1_id, team2_id, forfeit_team_id, double_forfeit
+           FROM bg_matches WHERE id = ? FOR UPDATE`,
+        [matchId],
+      );
+      if (rows.length === 0) throw new Error("MATCH_NOT_FOUND");
+      const locked = rows[0];
+      if (!actor.manages) {
+        const [casts] = await connection.execute<RowDataPacket[]>(
+          `SELECT 1 FROM bg_match_casters WHERE match_id = ? AND user_id = ? LIMIT 1`,
+          [matchId, actor.userId],
+        );
+        if (casts.length === 0) throw new Error("NOT_MATCH_CASTER");
+      }
+      if (replayUrl !== null && !isReplayableRow(locked)) throw new Error("MATCH_NOT_REPLAYABLE");
+      // L'effacement n'a aucune condition d'état ; la pose, lue sous le verrou,
+      // ne peut plus voir le match rouvert entre la lecture et l'écriture.
+      const [written] = await connection.execute(
+        replayUrl === null
+          ? `UPDATE bg_matches SET replay_url = NULL WHERE id = ?`
+          : `UPDATE bg_matches SET replay_url = ? WHERE id = ? AND status = 'COMPLETED'`,
+        replayUrl === null ? [matchId] : [replayUrl, matchId],
+      );
+      if (replayUrl !== null && Number((written as { affectedRows?: number }).affectedRows ?? 0) === 0) {
+        throw new Error("MATCH_NOT_REPLAYABLE");
+      }
+      return { row: locked, result: written };
+    }),
   );
-  if (rows.length === 0) throw new Error("MATCH_NOT_FOUND");
-  const row = rows[0];
-
-  if (replayUrl !== null && !isReplayableRow(row)) throw new Error("MATCH_NOT_REPLAYABLE");
-
-  // Le statut est relu dans la condition : un retour en arrière passé entre la
-  // lecture et l'écriture rouvrirait le match, et le lien s'y poserait quand
-  // même. L'effacement, lui, n'a aucune condition d'état.
-  const [result] = await db.execute(
-    replayUrl === null
-      ? `UPDATE bg_matches SET replay_url = NULL WHERE id = ?`
-      : `UPDATE bg_matches SET replay_url = ? WHERE id = ? AND status = 'COMPLETED'`,
-    replayUrl === null ? [matchId] : [replayUrl, matchId],
-  );
-  if (replayUrl !== null && Number((result as { affectedRows?: number }).affectedRows ?? 0) === 0) {
-    throw new Error("MATCH_NOT_REPLAYABLE");
-  }
 
   // « Changé » se lit dans la réponse de l'écriture (`changedRows`), pas dans la
   // lecture d'avant : deux effacements simultanés n'en comptent qu'un, et un lien

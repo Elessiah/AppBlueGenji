@@ -383,13 +383,13 @@ export async function setMatchStartAt(
       ]);
       // Lancement défait : la notification de départ réservée pour lui
       // (`./player-pushes`) part avec, pour que la nouvelle heure prévienne de
-      // nouveau les joueurs. Le check-in (`LOBBY_BRIEF%`, `./lobby-brief`)
+      // nouveau les joueurs. Le check-in (`LOBBY\_BRIEF%`, `./lobby-brief`)
       // reste : il ne part qu'une fois par match, quelle que soit l'heure.
       if (leaving && !scoreNoted) {
         // Le « Prêt » de chaque caster tombe avec ceux des équipes.
         await connection.execute(`UPDATE bg_match_casters SET ready_at = NULL WHERE match_id = ?`, [matchId]);
         await connection.execute(
-          `DELETE FROM bg_match_start_notices WHERE match_id = ? AND phase NOT LIKE 'LOBBY_BRIEF%'`,
+          `DELETE FROM bg_match_start_notices WHERE match_id = ? AND phase NOT LIKE 'LOBBY\\_BRIEF%'`,
           [matchId],
         );
       }

@@ -274,10 +274,19 @@ function applyStreamWrite(match: MatchState, sql: string, params: unknown[]): un
 }
 
 /** Lectures des casters et des streams d'un match. */
-function readCastRows(state: World, sql: string): unknown[] | null {
+function readCastRows(state: World, sql: string, params: unknown[]): unknown[] | null {
   const match = state.match;
   if (sql.includes("FROM bg_match_casters WHERE match_id = ?")) {
     return [(match?.casters ?? []).map((caster) => ({ match_id: match?.id, ...caster })), []];
+  }
+  if (sql.includes("(staff_owned = 1 OR link_user_id IS NULL)")) {
+    const linked = (match?.streams ?? []).filter(
+      (stream) => stream.live_url !== null && (stream.staff_owned === 1 || stream.link_user_id === undefined),
+    );
+    return [linked.map(() => ({ 1: 1 })), []];
+  }
+  if (sql.startsWith("SELECT link_user_id FROM bg_match_streams WHERE id = ?")) {
+    return [(match?.streams ?? []).filter((stream) => stream.id === Number(params[0])).map((stream) => ({ link_user_id: stream.link_user_id ?? null })), []];
   }
   if (sql.includes("FROM bg_match_streams WHERE match_id = ?")) {
     return [(match?.streams ?? []).map((stream) => ({ match_id: match?.id, ...stream })), []];
@@ -388,7 +397,7 @@ function executeFor(state: World) {
   return async (rawSql: string, params: unknown[] = []) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
     state.issued?.push(sql);
-    const castResult = applyCastWrite(state, sql, params) ?? readCastRows(state, sql);
+    const castResult = applyCastWrite(state, sql, params) ?? readCastRows(state, sql, params);
     if (castResult) return castResult;
     if (sql.startsWith("UPDATE")) {
       state.writes.push(sql);
@@ -601,7 +610,7 @@ describe("setMatchReady — appariement réécrit sur place", () => {
     await setMatchReady(42, 1, true);
 
     expect(state.writes).toContain(
-      `DELETE FROM bg_match_start_notices WHERE match_id = ? AND phase NOT LIKE 'LOBBY_BRIEF%' [42]`,
+      `DELETE FROM bg_match_start_notices WHERE match_id = ? AND phase NOT LIKE 'LOBBY\\_BRIEF%' [42]`,
     );
   });
 
@@ -795,8 +804,16 @@ describe("claimMatchCast", () => {
     expect(state.issued.some((sql) => sql.includes("SET live_trigger"))).toBe(false);
   });
 
-  it("claimMatchCast_castableNewTrigger_writesTrigger", async () => {
+  it("claimMatchCast_mutedClaimerNewTrigger_leavesTrigger", async () => {
+    // Sans la permission `live` relue, le caster est tu : il ne décide pas du mode (`loadShownCasterIds`).
     state.users[CASTER] = verified;
+    state.issued = [];
+    await claimMatchCast(42, CASTER, true, OWN_STREAM, { trigger: "AUTO" });
+    expect(state.issued.some((sql) => sql.includes("SET live_trigger"))).toBe(false);
+  });
+
+  it("claimMatchCast_castableNewTrigger_writesTrigger", async () => {
+    state.users[CASTER] = { ...verified, platform_roles_json: JSON.stringify(["CASTER"]) };
     state.issued = [];
     await claimMatchCast(42, CASTER, true, OWN_STREAM, { trigger: "AUTO" });
     expect(state.issued).toContain("UPDATE bg_matches SET live_trigger = ?, live_trigger_user_id = ?, live_started_at = NULL WHERE id = ?");

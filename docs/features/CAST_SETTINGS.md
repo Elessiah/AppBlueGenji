@@ -68,7 +68,10 @@ Fenêtre du caster, sur **son** cast :
   (`MATCH_START_AT_REQUIRED`) ;
 - **antenne** (mode manuel) : ouvrir ou couper, sans quitter la fenêtre ;
 - **BattleTag pour ce cast** (Overwatch seulement) ;
-- **rediff**, une fois la rencontre jouée : ouvre `MatchReplayDialog` ;
+- **rediff**, une fois la rencontre jouée : ouvre `MatchReplayDialog` — la
+  seule `live` ne règle que la rediff de **son** cast (`NOT_MATCH_CASTER`,
+  403), le staff `tournaments` (dont l'arbitre désigné) toutes (décision du
+  2026-11-09) ;
 - **« Ne plus caster »** : `DELETE …/caster`, sans confirmation (le caster qui se
   retire lui-même n'est prévenu de rien, `CAST_NOTICES.md`) — refusé sur un match
   terminé, où le bouton n'est pas offert (`offersCastRelease`).
@@ -77,6 +80,22 @@ La fenêtre lit à l'ouverture `GET /api/matches/[id]/caster`
 (`loadOwnCastSettings`) : le BattleTag d'un cast **ne voyage pas** dans
 l'instantané du plateau, commun à tous les lecteurs. Un échec de cette lecture
 (place reprise entre-temps) referme la fenêtre en le disant.
+
+Elle relit aussi l'origine du lien (`organisationLink`) : la case « Ce lien
+est celui de l'organisation » s'ouvre telle qu'enregistrée et se coche ou se
+décoche **seule**, lien inchangé (`setCasterLinkOrigin`, décision du
+2026-11-09).
+
+Pendant cette lecture, la fenêtre dit « Lecture de ton cast… » (`aria-busy`).
+Sur un match **joué** (`COMPLETED`), lien et BattleTag ne s'offrent plus
+(`MATCH_ALREADY_COMPLETED` au serveur) : il reste la rediff et le retrait.
+« Enregistrer » reste désarmé tant que rien n'a changé ; le lien n'est exigé
+que s'il est touché (un stream ouvert sans lien garde son BattleTag réglable).
+Un match démarqué n'a aucun mode coché. Un refus du BattleTag
+(`INVALID_CAST_BATTLETAG`) est rattaché au champ, dans les deux fenêtres ; à
+l'inscription, le mode d'antenne n'est offert que sur un match encore castable.
+L'antenne passe par `useOnAirToggle` (`_lib/use-on-air-toggle.ts`), commun à
+cette fenêtre et à celle du staff.
 
 ## BattleTag d'un cast
 
@@ -140,15 +159,48 @@ caster qui le pose en devient le propriétaire (`live_trigger_user_id`). Règle
 unique, pure, `lib/shared/live-trigger-owner.ts` (`mayChangeLiveTrigger`,
 `viewerMayChangeLiveTrigger` pour l'interface) :
 
-- match pas encore casté (`live_trigger` nul) : le premier à le poser ;
-- **admin** de la plateforme ou **arbitre désigné** du match (permission
-  `tournaments`, condition de l'arbitrage) : toujours ;
+- **staff `tournaments` et `live`** (`castOverseer`, champ `oversees`) ou
+  **arbitre désigné** du match (permission `tournaments`, condition de
+  l'arbitrage) : toujours — aucun `isAdmin` codé en dur (décision du
+  2026-11-09 ; un admin passe par ses permissions) ;
 - mode d'un caster : lui seul — un co-caster est refusé ;
-- mode sans propriétaire (posé par le staff, caster parti) : le staff `tournaments`.
+- match pas encore casté, ou mode sans propriétaire (posé par le staff,
+  caster parti) : le staff `tournaments` et les casters **montrés** du match ;
+  le caster qui le change en devient le maître (décision du 2026-11-05).
+
+**Porteur de la seule `live`** (ni staff `tournaments`, ni admin, ni arbitre)
+— décision du 2026-11-05 : la route `/api/admin/matches/[id]/live` garde
+`live` pour porte, mais il n'y règle que **son** cast : sans caster le match
+(en caster montré), tout réglage est refusé (`NOT_MATCH_CASTER`, 403) ; le
+lien du stream du staff ne lui est pas ouvert (`STAFF_STREAM_FORBIDDEN`, 403 —
+son lien se règle dans « Configurer ma diffusion »). Il ne change ni ne démarque
+le mode du staff tant que le stream de l'organisation porte un lien
+(`STAFF_STREAM_FORBIDDEN`, sur les deux routes ; le champ du lien du staff lui
+est en lecture seule), et son démarquage n'efface **jamais** le lien de
+l'organisation (seul le staff le fait, décision 1 du 2026-11-09). La case « lien
+de l'organisation » ne change d'état que pour le fournisseur du lien (vers
+l'organisation) ou le staff `tournaments` (rattaché alors à qui décoche) : un
+co-caster ne s'attribue pas le lien d'un autre (`CAST_STREAM_NOT_OWNED`) ;
+renvoyée telle quelle, elle n'écrit rien ; un lien dit de l'organisation ne
+se remplace que par le staff (`CAST_STREAM_NOT_OWNED`). Un mode sans maître (posé par
+le staff, ou dont le maître n'est plus montré) ne se démarque que par l'arbitre
+du match ou le staff `tournaments` + `live` (`mayUnmarkLiveTrigger`,
+`LIVE_TRIGGER_NOT_OWNED`, décision du 2026-11-09 ; la case « casté » lui est
+désactivée), et l'antenne du mode du staff au lien de l'organisation ne se
+bascule pas non plus par lui (`STAFF_STREAM_FORBIDDEN`). Un caster tu ne règle
+plus le lien ni son origine (`NOT_MATCH_CASTER`). Le stream d'un caster dont le
+lien est dit de l'organisation part avec son dernier caster (décision du
+2026-11-05, voulu). Retirer un autre caster
+(`DELETE …/caster?userId=`) demande `tournaments` + `live` (`castOverseer`) ;
+la rediff s'écrit sous le verrou du match. Dans « Configurer
+ma diffusion », seul un caster **montré** prend un mode sans maître. Un corps sans clé
+`trigger` (ou `liveUrl`) laisse le mode (ou le lien du staff) tel quel. Les
+trois fenêtres bâtissent le lecteur par `liveTriggerViewer` ; l'inscription
+le juge en caster (`viewerCasts`).
 
 Propriétaire écrit (`liveTriggerOwnerAfter`) : le caster du match qui le pose,
-lui seul ; posé par qui ne caste pas (staff, admin, arbitre, porteur de la
-seule permission `live`, caster tu), il garde son maître montré — l'arbitre
+lui seul ; posé par qui ne caste pas (staff, admin, arbitre, caster tu), il
+garde son maître montré — l'arbitre
 médie pour le caster, il ne lui retire pas le mode — ou reste au staff s'il
 n'en avait pas (`liveTriggerOwnerAfter`). Le propriétaire
 ne compte que s'il est un caster **montré** du match (`loadShownCasterIds` au

@@ -30,11 +30,6 @@ type LiveControls = {
   openSchedule: (match: BracketMatch) => void;
   /** Lecteur : reconnaître « je caste ce match ». */
   viewerUserId: number | null;
-  /**
-   * Admin de la plateforme (`canDelete`) : change toujours le mode d'antenne
-   * (`viewerMayChangeLiveTrigger`, `lib/shared/live-trigger-owner.ts`).
-   */
-  viewerIsAdmin: boolean;
   /** Engagé du lecteur dans ce tournoi (`null` s'il n'y joue pas). */
   myTeamId: number | null;
   /** Ce qui empêche le lecteur de caster, `null` s'il le peut. */
@@ -62,7 +57,6 @@ const LiveContext = createContext<LiveControls>({
   openConfig: () => undefined,
   openSchedule: () => undefined,
   viewerUserId: null,
-  viewerIsAdmin: false,
   myTeamId: null,
   castBlock: "NOT_CASTER",
   openReplay: () => undefined,
@@ -87,16 +81,14 @@ export function LiveProvider({
   openConfig,
   openSchedule,
   viewerUserId,
-  viewerIsAdmin = false,
   myTeamId,
   castBlock,
   openReplay,
   refereeNames = NO_REFEREE_NAMES,
   children,
 }: Readonly<
-  Omit<LiveControls, "refereeNames" | "viewerIsAdmin"> & {
+  Omit<LiveControls, "refereeNames"> & {
     refereeNames?: LiveControls["refereeNames"];
-    viewerIsAdmin?: boolean;
     children: ReactNode;
   }
 >) {
@@ -109,7 +101,6 @@ export function LiveProvider({
       openConfig,
       openSchedule,
       viewerUserId,
-      viewerIsAdmin,
       myTeamId,
       castBlock,
       openReplay,
@@ -123,7 +114,6 @@ export function LiveProvider({
       openConfig,
       openSchedule,
       viewerUserId,
-      viewerIsAdmin,
       myTeamId,
       castBlock,
       openReplay,

@@ -25,6 +25,8 @@ s'additionnent.
   chaîne, l'ouverture et la fermeture de son antenne. C'est un droit d'**écriture**,
   volontairement distinct de `casting` (lecture seule) et de `tournaments` : un
   streamer ouvre l'antenne sans toucher aux scores. Voir `LIVE_STREAMS.md`.
+  Seule, elle ne règle que **son** cast (mode, lien, rediff) ; `tournaments` +
+  `live` réunis règlent tout cast (`castOverseer`, `CAST_SETTINGS.md`).
 - `casting` — `TournamentDetail.preview`, l'aperçu du plateau avant le lancement
   (`docs/features/TOURNAMENT_PREVIEW.md`). Permission de **lecture seule** :
   elle n'ouvre aucune écriture. `ARBITRE` l'obtient avec `tournaments`.

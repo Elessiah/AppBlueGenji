@@ -321,7 +321,8 @@ const BRIEF_DUE_SQL = `m.status = 'READY' AND m.is_bye = 0 ${NO_SCORE_SQL}
  * appariement** et qu'aucune réservation de l'ancien format ne couvre l'engagée :
  * la condition relit le match dans l'instruction même. Entre la lecture des
  * candidats et la réservation, un lancement défait (`match-schedule`,
- * `referee-scheduling`) efface les réservations et referme le salon ; une
+ * `referee-scheduling`) referme le salon — il efface les autres avis du match,
+ * jamais les réservations du check-in (`LOBBY\_BRIEF%`) ; une
  * réservation posée après coup enverrait des réglages périmés, puis ferait
  * taire le brief de la réouverture (même appariement). Et l'appariement doit
  * rester celui des équipes du match : un réappariement (suisse, survie, BG

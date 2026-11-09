@@ -184,10 +184,12 @@ describe("MatchLiveDialog — provenance du lien (EF-29)", () => {
     expect(html).toMatch(/<input type="checkbox"\/>Ce lien est celui/);
   });
 
-  it("sans la permission tournaments : pas de case, le lien est dit sa propre chaîne", () => {
+  it("sans la permission tournaments : pas de case, le lien de l'organisation en lecture seule", () => {
+    // Revue sécurité #564 : le serveur le refuse à la seule `live` (`STAFF_STREAM_FORBIDDEN`).
     const html = String(render(<MatchLiveDialog match={live} onClose={noop} onSaved={noop} canSpeakForOrganisation={false} />));
     expect(html).not.toContain("Ce lien est celui de l&#x27;organisation");
-    expect(html).toContain("est retiré du match si ton compte est supprimé");
+    expect(html).toContain("ne se règle que par le staff ou l&#x27;arbitre du match");
+    expect(html).toContain('readonly=""');
   });
 });
 
