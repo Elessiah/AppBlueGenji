@@ -653,16 +653,13 @@ async function recheckOpenChannels(touched: Set<number>, deadline: number): Prom
   const queue = due.slice(0, VOICE_RECHECK_BATCH);
   const checkOne = async (next: { key: string; row: OpenRow }): Promise<void> => {
     sweep.checkedAt.set(next.key, Date.now());
-    let reachable: boolean;
+    // Bot indisponible ou base en erreur (levée) : les autres ouvriers s'arrêtent, et ce
+    // salon n'est pas « vu ».
+    let reachable = false;
     try {
       reachable = await recheckOneChannel(next.row, touched);
-    } catch (error) {
-      // Base indisponible : les autres ouvriers s'arrêtent (leurs résultats ne s'écriraient
-      // pas), et ce salon n'est pas « vu ».
-      reachable = false;
-      throw error;
     } finally {
-      if (!reachable!) {
+      if (!reachable) {
         botDown = true;
         // Un salon qui n'a pas pu être vérifié n'est pas « vu » : redemandé dans `VOICE_RECHECK_RETRY_MS`
         // et derrière les salons plus anciennement vus (un salon lent n'ouvre pas chaque passe).
@@ -686,14 +683,20 @@ async function recheckOpenChannels(touched: Set<number>, deadline: number): Prom
     const failed = settled.find((result): result is PromiseRejectedResult => result.status === "rejected");
     if (failed) throw failed.reason;
   }
-  // Mémoire bornée : tout lu, seuls les salons encore dus gardent leur horodatage ;
-  // fenêtre pleine, ceux hors fenêtre le gardent (leur tour viendra) jusqu'à vieillir.
+  forgetRecheckStamps(full, seen);
+  sweep.nextRecheckAt = full ? 0 : nextRecheckDue(seen);
+  return botDown;
+}
+
+/**
+ * Mémoire bornée : tout lu, seuls les salons encore dus gardent leur horodatage ;
+ * fenêtre pleine, ceux hors fenêtre le gardent (leur tour viendra) jusqu'à vieillir.
+ */
+function forgetRecheckStamps(full: boolean, seen: ReadonlySet<string>): void {
   const forgetBefore = Date.now() - VOICE_RECHECK_FORGET_MS;
   for (const [key, stamp] of sweep.checkedAt) {
     if (full ? stamp < forgetBefore : !seen.has(key)) sweep.checkedAt.delete(key);
   }
-  sweep.nextRecheckAt = full ? 0 : nextRecheckDue(seen);
-  return botDown;
 }
 
 /** Prochain salon dû parmi ceux lus (une minute au plus) : avant, la lecture est sautée. */
