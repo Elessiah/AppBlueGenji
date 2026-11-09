@@ -71,6 +71,8 @@ type Options = {
   teams?: number[];
   successors?: Member[];
   deadMembers?: number[];
+  /** Membres sous suspension en cours. */
+  suspendedMembers?: number[];
   activeTournament?: boolean;
   organized?: number[];
   /** Les tournois organisés relus dans la transaction, s'ils diffèrent du relevé d'avant. */
@@ -83,7 +85,10 @@ const NO_TRACE = { playedMatches: false, soloRegistrations: false, organizedTour
 
 function livingMembers(options: Options) {
   const dead = options.deadMembers ?? [];
-  return (options.successors ?? []).filter((m) => !dead.includes(m.user_id)).map((m) => ({ id: m.user_id }));
+  const suspended = options.suspendedMembers ?? [];
+  return (options.successors ?? [])
+    .filter((m) => !dead.includes(m.user_id))
+    .map((m) => ({ id: m.user_id, suspended: suspended.includes(m.user_id) ? 1 : 0 }));
 }
 
 function organizerRows(options: Options) {
@@ -117,7 +122,7 @@ function fakeDb(options: Options) {
     if (q.startsWith("SELECT tm.team_id")) return [(options.teams ?? []).map((team_id) => ({ team_id }))];
     if (q.startsWith("SELECT logo_url, deleted_at FROM bg_teams")) return [[{ logo_url: "/api/uploads/teams/3.webp", deleted_at: null }]];
     if (q.startsWith("SELECT tm.id, tm.user_id, tm.roles_json, tm.joined_at")) return [options.successors ?? []];
-    if (q.startsWith("SELECT id FROM bg_users WHERE is_deleted = 0 AND id IN")) return [livingMembers(options)];
+    if (q.startsWith("SELECT u.id, EXISTS (")) return [livingMembers(options)];
     if (q.startsWith("SELECT u.id FROM bg_users u")) return [organizerRows(options)];
     if (isActiveRegistrationRead(q)) return [options.activeTournament ? [{ tournament_id: 8 }] : []];
     if (q.startsWith("SELECT id FROM bg_tournaments WHERE organizer_user_id")) return [organizedRows(options, queries)];
@@ -299,6 +304,42 @@ describe("requestAccountDeletion — équipes (E3)", () => {
     await requestAccountDeletion(7);
 
     expect(rolesWritten()).toEqual([{ teamId: 3, userId: 8, roles: ["OWNER", "CAPITAINE"] }]);
+  });
+
+  // Revue légale #546 cycle 3 : un copropriétaire ne reçoit ni écriture ni avis « propriété transférée ».
+  it("requestAccountDeletion_coOwnerPresent_noRoleWriteAndNoOwnershipNotice", async () => {
+    fakeDb({
+      teams: [3],
+      successors: [member(8, ["MANAGER"], "2025-01-01 00:00:00"), member(9, ["OWNER", "DPS"], "2026-06-01 00:00:00")],
+    });
+
+    await requestAccountDeletion(7);
+
+    expect(rolesWritten()).toEqual([]);
+    expect(notifyTeamInviteInBackground).not.toHaveBeenCalled();
+    expect(leftTeams()).toEqual([{ teamId: 3, userId: 7 }]);
+  });
+
+  // Revue sécurité #546 (reprise, cycle 2) : un membre suspendu ne reçoit l'équipe qu'à défaut d'autre membre.
+  it("requestAccountDeletion_suspendedManager_transfersToActiveMember", async () => {
+    const { queries } = fakeDb({
+      teams: [3],
+      suspendedMembers: [9],
+      successors: [member(8, ["TANK"], "2026-06-01 00:00:00"), member(9, ["MANAGER"], "2025-01-01 00:00:00")],
+    });
+
+    await requestAccountDeletion(7);
+
+    expect(rolesWritten()).toEqual([{ teamId: 3, userId: 8, roles: ["OWNER", "TANK"] }]);
+    expect(queries.find((q) => q.sql.startsWith("SELECT u.id, EXISTS ("))?.sql).toContain("bg_account_suspensions");
+  });
+
+  it("requestAccountDeletion_onlySuspendedMember_stillTransfersToIt", async () => {
+    fakeDb({ teams: [3], suspendedMembers: [9], successors: [member(9, ["HEAL"], "2025-01-01 00:00:00")] });
+
+    await requestAccountDeletion(7);
+
+    expect(rolesWritten()).toEqual([{ teamId: 3, userId: 9, roles: ["OWNER", "HEAL"] }]);
   });
 
   it("requestAccountDeletion_ownerWithCaptainOnly_transfersToCaptain", async () => {

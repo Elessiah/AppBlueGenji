@@ -397,6 +397,8 @@ export type TeamSuccessorCandidate = {
   joinedAt: Date | string;
   /** Identifiant de la ligne d'appartenance : départage stable à date égale. */
   membershipId: number;
+  /** Compte sous suspension en cours : il ne se connecte pas, il ne passe qu'à défaut d'autre membre. */
+  suspended?: boolean;
 };
 
 /** Rang d'un candidat : `MANAGER` d'abord, puis `CAPITAINE`, puis tout autre membre. */
@@ -414,7 +416,8 @@ function successorRank(roles: readonly string[]): number {
  * (E3) : un autre `OWNER` s'il y en a (rien ne change pour lui), sinon un
  * `MANAGER`, sinon un `CAPITAINE`, sinon un autre membre ; à rang
  * égal, le plus ancien dans l'équipe, puis la ligne d'appartenance la plus
- * ancienne. `null` : il était seul.
+ * ancienne. Un compte suspendu ne passe qu'à défaut de tout autre membre
+ * (comme la reprise des tournois organisés, qui l'écarte). `null` : il était seul.
  */
 export function pickTeamSuccessor(candidates: readonly TeamSuccessorCandidate[]): TeamSuccessorCandidate | null {
   let best: TeamSuccessorCandidate | null = null;
@@ -425,6 +428,8 @@ export function pickTeamSuccessor(candidates: readonly TeamSuccessorCandidate[])
 }
 
 function compareSuccessors(a: TeamSuccessorCandidate, b: TeamSuccessorCandidate): number {
+  const suspension = Number(a.suspended === true) - Number(b.suspended === true);
+  if (suspension !== 0) return suspension;
   const rank = successorRank(a.roles) - successorRank(b.roles);
   if (rank !== 0) return rank;
   const joined = new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();

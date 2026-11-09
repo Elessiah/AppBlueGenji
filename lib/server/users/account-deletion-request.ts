@@ -125,11 +125,17 @@ async function loadSuccessorCandidates(
   );
   if (rows.length === 0) return [];
   const ids = rows.map((row) => Number(row.user_id));
-  const [alive] = await connection.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_users WHERE is_deleted = 0 AND id IN (${ids.map(() => "?").join(", ")})`,
+  const [alive] = await connection.execute<(RowDataPacket & { id: number; suspended: number | string })[]>(
+    `SELECT u.id,
+            EXISTS (
+              SELECT 1 FROM bg_account_suspensions s
+               WHERE s.user_id = u.id AND ${activeSuspensionSql("s")}
+            ) AS suspended
+       FROM bg_users u
+      WHERE u.is_deleted = 0 AND u.id IN (${ids.map(() => "?").join(", ")})`,
     ids,
   );
-  const living = new Set(alive.map((row) => Number(row.id)));
+  const living = new Map(alive.map((row) => [Number(row.id), Number(row.suspended) === 1]));
   return rows
     .filter((row) => living.has(Number(row.user_id)))
     .map((row) => ({
@@ -137,6 +143,7 @@ async function loadSuccessorCandidates(
       roles: parseRoles(row.roles_json),
       joinedAt: row.joined_at,
       membershipId: Number(row.id),
+      suspended: living.get(Number(row.user_id)) === true,
     }));
 }
 
@@ -196,7 +203,9 @@ async function leaveTeamOn(connection: PoolConnection, teamId: number, userId: n
       registeredInActiveTournament: successor === null && (await registeredInActiveTournament(connection, teamId)),
     });
     departure.fate = fate;
-    if (fate === "TRANSFER" && successor) {
+    // Un copropriétaire déjà `OWNER` ne reçoit rien : ni écriture, ni avis
+    // « propriété transférée » (`successorId` reste nul).
+    if (fate === "TRANSFER" && successor && !successor.roles.includes("OWNER")) {
       await writeActiveMembership(
         connection,
         "roles_json = ?",

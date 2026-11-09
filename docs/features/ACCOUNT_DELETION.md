@@ -678,7 +678,8 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   reste à un autre `OWNER` s'il y en a, sinon passe au `MANAGER`, sinon au
   `CAPITAINE`, sinon au membre le plus ancien
   (`pickTeamSuccessor`, départage par l'id d'appartenance), avec l'avis
-  `OWNERSHIP`. Seul joueur : équipe **fantôme** si elle est inscrite à un tournoi
+  `OWNERSHIP` — aucun avis ni écriture quand un autre `OWNER` la garde ; un
+  compte sous suspension en cours n'hérite qu'à défaut de tout autre membre. Seul joueur : équipe **fantôme** si elle est inscrite à un tournoi
   `UPCOMING`/`REGISTRATION`/`RUNNING`, sinon **dissoute** (`dissolveTeamOn`,
   « Équipe dissoute #id »). Les candidats ne sont pas verrouillés côté compte
   (inversion d'ordre évitée) ; seuls les comptes vivants héritent.
