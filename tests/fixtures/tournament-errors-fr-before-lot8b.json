@@ -1,5 +1,5 @@
 {
-  "count": 205,
+  "count": 206,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "ADMIN_RESOLVE_FAILED": "Erreur lors de la résolution du match.",
@@ -51,6 +51,7 @@
     "INVALID_ID": "Identifiant invalide.",
     "INVALID_ISSUE_MESSAGE": "Décris le problème en 10 à 1000 caractères pour que l'arbitre puisse agir.",
     "INVALID_LAUNCH_PHASE": "Valeur invalide pour la phase de lancement des matchs : cochez ou décochez la case.",
+    "INVALID_LIVE_BODY": "Réglage de la diffusion illisible : recharge la page puis réessaie.",
     "INVALID_LIVE_TRIGGER": "Mode de passage à l'antenne invalide.",
     "INVALID_MAPS": "Détail des maps illisible.",
     "INVALID_MAP_PICK": "Cette carte ne fait pas partie du pool du tour.",
