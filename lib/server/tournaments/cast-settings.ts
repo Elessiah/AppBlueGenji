@@ -26,7 +26,7 @@ import { liveTriggerOwnerAfter, mayChangeLiveTrigger } from "@/lib/shared/live-t
 import { castBeforeLaunch } from "@/lib/shared/match-launch";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { loadShownCasterIds } from "./cast-eligibility";
-import { lockMatchStreams, pruneMatchStreams, type MatchStreamRow } from "./match-casters";
+import { hasStaffLink, lockMatchStreams, pruneMatchStreams, streamLinkHolder, type MatchStreamRow } from "./match-casters";
 // Type seul : aucune dépendance d'exécution vers le lancement, qui importe ce
 // module (le verrou de la ligne du match et la transaction y vivent).
 import type { LaunchMatchRow } from "./match-launch";
@@ -142,11 +142,15 @@ export async function applyCastTrigger(
   // montré (le candidat de l'inscription l'est) : un caster tu ne décide pas,
   // comme sur la route du staff (`setMatchLiveConfig`).
   const owns = mayChangeLiveTrigger(hold, actor, shown.has(userId));
-  if (!owns && skip) return false;
+  // Le mode du staff qui porte le lien de l'organisation n'est pas à un porteur
+  // de la seule `live` (décision 1 du 2026-11-09, `assertStaffModeKept`).
+  const staffMode = owns && !access.manages && hold.ownerId !== userId && (await hasStaffLink(connection, matchId));
+  if ((!owns || staffMode) && skip) return false;
   // Un match qui ne se caste plus le dit d'abord : le refus de propriété
   // tairait la vraie raison.
   assertCastTriggerWritable(row, trigger);
   if (!owns) throw new Error("LIVE_TRIGGER_NOT_OWNED");
+  if (staffMode) throw new Error("STAFF_STREAM_FORBIDDEN");
   const owner = liveTriggerOwnerAfter(trigger, actor, shown.has(userId), hold.ownerId);
   if (trigger === null) {
     await connection.execute(
@@ -212,6 +216,7 @@ export async function setCasterStreamUrl(
   streamId: number,
   url: string | null,
   linkUserId: number | null,
+  manages: boolean,
 ): Promise<MatchStreamRow[]> {
   const streams = await lockMatchStreams(connection, matchId, true);
   const target = streams.find((stream) => stream.id === streamId);
@@ -221,6 +226,11 @@ export async function setCasterStreamUrl(
   // Un lien inchangé n'est pas réécrit : il reste à qui l'a fourni, comme dans
   // la configuration du staff (`setStaffStreamUrl`).
   if (target.liveUrl === url) return streams;
+  // Un lien dit de l'organisation ne se remplace que par le staff : la seule
+  // `live` ne l'efface pas en posant le sien.
+  if (!manages && target.liveUrl !== null && (await streamLinkHolder(connection, streamId)) === null) {
+    throw new Error("CAST_STREAM_NOT_OWNED");
+  }
   await connection.execute(
     `UPDATE bg_match_streams SET live_url = ?, link_user_id = ? WHERE id = ? AND staff_owned = 0`,
     [url, linkUserId, streamId],
@@ -235,7 +245,8 @@ export async function setCasterStreamUrl(
  * compte). Les mêmes gardes que `setCasterStreamUrl` : jamais le stream du
  * staff, jamais un stream sans lien. Un changement d'origine n'est permis
  * qu'au fournisseur du lien (vers l'organisation) ou au staff `tournaments`
- * (`manages`, retour au fournisseur) ; l'état déjà dit n'écrit rien. `known` :
+ * (`manages`, rattaché alors à qui décoche : le fournisseur d'origine
+ * n'est plus connu) ; l'état déjà dit n'écrit rien. `known` :
  * les streams déjà lus sous verrou.
  *
  * @throws `STREAM_NOT_FOUND` | `CAST_STREAM_NOT_OWNED` | `STREAM_URL_REQUIRED`
@@ -256,11 +267,7 @@ export async function setCasterLinkOrigin(
   if (target.liveUrl === null) throw new Error("STREAM_URL_REQUIRED");
   // Lu après le verrou des streams (et après l'écriture d'un lien neuf, même
   // transaction) : l'attribution à jour.
-  const [origin] = await connection.execute<RowDataPacket[]>(
-    `SELECT link_user_id FROM bg_match_streams WHERE id = ? LIMIT 1`,
-    [streamId],
-  );
-  const holderId = nullableId(origin[0]?.link_user_id);
+  const holderId = await streamLinkHolder(connection, streamId);
   // Déjà dit tel quel : rien à écrire (le co-caster d'un stream qui renvoie
   // l'état montré ne prend pas le lien d'un autre).
   if ((linkUserId === null) === (holderId === null)) return streams;
@@ -321,6 +328,7 @@ export async function applyCastSettings(
       streamId,
       url,
       settings.asOrganisation === true ? null : userId,
+      access.manages,
     );
   }
   // L'origine du lien se dit aussi seule, lien inchangé (case cochée ou

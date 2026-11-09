@@ -18,6 +18,8 @@ const VIDEO = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
 async function mockDb(execute: SqlMock) {
   const { withConnection } = await import("@/lib/server/database");
   const connection = { ...connectionMock(), execute };
+  connection.rollback.mockResolvedValue();
+  connection.commit.mockResolvedValue();
   jest.mocked(withConnection).mockImplementation((run) => run(fakeConnection(connection)));
   return connection;
 }

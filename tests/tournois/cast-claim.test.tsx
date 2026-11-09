@@ -617,9 +617,9 @@ describe("Fenêtre de diffusion — mode changé pendant qu'elle est ouverte", (
 describe("Fenêtre de diffusion — lien du staff sur le mode d'un autre caster", () => {
   it("MatchLiveDialog_linkOwnedByOtherCaster_readOnlyWithHintAndNoOrganisationBox", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
-    expect(dialog).toContain("const linkLocked = staffLinkLocked(triggerLocked, match);");
+    expect(dialog).toContain("const linkLocked = staffLinkLocked(triggerLocked, match) || !staffSide;");
     expect(dialog).toContain("readOnly={linkLocked}");
-    expect(dialog).toContain('{linkLocked && <p>{t("live.urlLocked")}</p>}');
+    expect(dialog).toContain('return linkLocked ? <p>{t("live.urlLocked")}</p> : null;');
     expect(dialog).toContain("{canSpeakForOrganisation && urlTouched && !linkLocked && (");
   });
 

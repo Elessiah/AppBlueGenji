@@ -15,9 +15,12 @@ jest.mock("@/lib/shared/hooks/useDialogBehavior", () => ({ useDialogBehavior: ()
 import { renderToStaticMarkup } from "react-dom/server";
 import { CastBattletagField, CastTriggerField } from "@/app/(secured)/tournois/[id]/_components/CastSettingsFields";
 import { castLinkOrigin } from "@/app/(secured)/tournois/[id]/_components/CastSettingsDialog";
+import { mayEditReplay } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
 import { readSource } from "../helpers/read-source";
 import frActions from "@/messages/fr/tournamentActions.json";
 import enActions from "@/messages/en/tournamentActions.json";
+import frDialogs from "@/messages/fr/tournamentDialogs.json";
+import enDialogs from "@/messages/en/tournamentDialogs.json";
 
 const globalWithDocument = globalThis as { document?: unknown };
 const hadDocument = "document" in globalWithDocument;
@@ -134,5 +137,29 @@ describe("castLinkOrigin — la case « lien de l'organisation » (décision du 
 
   it("castLinkOrigin_notAllowed_notOffered", () => {
     expect(castLinkOrigin({ organisationLink: false }, false, "https://twitch.tv/voix", true)).toEqual({ offered: false, changed: false });
+  });
+});
+
+describe("MatchLiveDialog — la seule `live` (revue sécurité #564)", () => {
+  const live = readSource(`${DIR}/_components/MatchLiveDialog.tsx`);
+
+  it("MatchLiveDialog_liveOnlyViewer_staffLinkReadOnly", () => {
+    // Le serveur refuse ce lien (`STAFF_STREAM_FORBIDDEN`) : le champ ne l'invite pas.
+    expect(live).toContain("const linkLocked = staffLinkLocked(triggerLocked, match) || !staffSide;");
+    expect(live).toContain('if (!staffSide) return <p>{t("live.urlStaffOnly")}</p>;');
+  });
+
+  it("MatchLiveDialog_liveOnlyNonCaster_hidesReplayButton", () => {
+    expect(live).toContain("canEditReplay(match, mayEditReplay(match, controls))");
+    const controls = { canManage: true, canSchedule: false, viewerUserId: 12 };
+    expect(mayEditReplay({ casters: [] }, controls)).toBe(false);
+    expect(mayEditReplay({ casters: [{ userId: 12 }] }, controls)).toBe(true);
+    expect(mayEditReplay({ casters: [] }, { ...controls, canSchedule: true })).toBe(true);
+  });
+
+  it("urlStaffOnly_frAndEn", () => {
+    for (const messages of [frDialogs, enDialogs]) {
+      expect(messages.live.urlStaffOnly).toEqual(expect.any(String));
+    }
   });
 });

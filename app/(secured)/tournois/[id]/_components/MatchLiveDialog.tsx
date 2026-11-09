@@ -90,6 +90,25 @@ export function lockedOnClosedMatch(
  * Le lien du staff suit le mode d'un autre caster montré : lu, pas écrit, par
  * qui ne peut pas changer ce mode (décision 2, même règle que le serveur).
  */
+/**
+ * La rediff depuis cette fenêtre : la seule `live` ne règle que celle de son
+ * cast (`NOT_MATCH_CASTER` au serveur), le staff `tournaments` toutes.
+ */
+export function mayEditReplay(
+  match: { casters: readonly { userId: number }[] },
+  controls: { canManage: boolean; canSchedule: boolean; viewerUserId: number | null },
+): boolean {
+  if (!controls.canManage) return false;
+  return controls.canSchedule || match.casters.some((caster) => caster.userId === controls.viewerUserId);
+}
+
+/** Aide du lien du staff : verrouillé par le mode d'un autre, ou réservé au staff. */
+function StaffLinkHint({ staffSide, linkLocked }: Readonly<{ staffSide: boolean; linkLocked: boolean }>) {
+  const { t } = useDialogsText();
+  if (!staffSide) return <p>{t("live.urlStaffOnly")}</p>;
+  return linkLocked ? <p>{t("live.urlLocked")}</p> : null;
+}
+
 export function staffLinkLocked(triggerLocked: boolean, match: Pick<BracketMatch, "liveTriggerCasterId">): boolean {
   return triggerLocked && (match.liveTriggerCasterId ?? null) !== null;
 }
@@ -176,13 +195,16 @@ export function MatchLiveDialog({
   // les mêmes mots ici, dans le seul espace qui les porte.
   const actions = useActionsText();
   const controls = useLiveControls();
-  const { openReplay, refereeNames, canManage } = controls;
+  const { openReplay, refereeNames } = controls;
   const referee = viewerRefereesMatch(match, refereeNames);
   // Même règle que le serveur (`LIVE_TRIGGER_NOT_OWNED`) : un mode verrouillé
   // se montre sans contrôle, plutôt qu'un bouton qui mène à un refus.
   const viewer = liveTriggerViewer(controls, referee);
   const triggerLocked = !viewerMayChangeLiveTrigger(match, viewer);
-  const linkLocked = staffLinkLocked(triggerLocked, match);
+  // Le lien de l'organisation n'est réglé que par le staff `tournaments` ou
+  // l'arbitre du match : la seule `live` le lit (`STAFF_STREAM_FORBIDDEN`).
+  const staffSide = canSpeakForOrganisation || referee;
+  const linkLocked = staffLinkLocked(triggerLocked, match) || !staffSide;
   const onAir = useMatchLiveState(match) === "LIVE";
   const [streamed, setStreamed] = useState(match.liveTrigger !== null);
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "MANUAL");
@@ -351,8 +373,7 @@ export function MatchLiveDialog({
                 <label htmlFor="match-live-url">{t("live.url")}</label>
                 <InfoHint id="match-live-url-hint" subject={t("live.urlSubject")}>
                   <p>{t("live.urlHint", { platforms })}</p>
-                  {!canSpeakForOrganisation && <p>{t("live.urlOwnChannel")}</p>}
-                  {linkLocked && <p>{t("live.urlLocked")}</p>}
+                  <StaffLinkHint staffSide={staffSide} linkLocked={linkLocked} />
                 </InfoHint>
               </InfoHintRow>
               <input
@@ -475,7 +496,7 @@ export function MatchLiveDialog({
             </button>
           </div>
         )}
-        {canEditReplay(match, canManage) && (
+        {canEditReplay(match, mayEditReplay(match, controls)) && (
           <div className={styles.section}>
             <button
               type="button"

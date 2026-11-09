@@ -484,6 +484,19 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.streams).toEqual([]);
   });
 
+  it("setMatchLiveConfig_liveOnlyShownChangesStaffModeWithLink_throwsStaffStreamForbidden", async () => {
+    // Sans quoi, devenu maître en le changeant, il démarquerait ensuite le mode du staff.
+    const world = liveWorld(matchRow({ live_trigger: "AUTO", live_trigger_user_id: null }), [dbStream(1, "https://twitch.tv/x", true)], [
+      { user_id: 12, stream_id: 7 },
+    ]);
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: undefined, setter: CASTER_12, access: LIVE_ONLY }),
+    ).rejects.toThrow("STAFF_STREAM_FORBIDDEN");
+    expect(world.state.matchWrites).toEqual([]);
+  });
+
   it("setMatchLiveConfig_liveOnlyOwnerUnmarks_keepsOrganisationLink", async () => {
     // Décision 1 du 2026-11-09 : la seule `live` démarque son mode, jamais le lien de l'organisation.
     const world = liveWorld(matchRow({ status: "COMPLETED", live_trigger: "AUTO", live_trigger_user_id: 12 }), [dbStream(1, "https://twitch.tv/x", true)], [

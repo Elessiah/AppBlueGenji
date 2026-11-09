@@ -12,11 +12,12 @@
  * l'arbitre désigné) sur tout match (décision du 2026-11-09).
  */
 import type { RowDataPacket } from "mysql2/promise";
-import { withConnection } from "@/lib/server/database";
 import { canHaveReplay, normalizeReplayUrl } from "@/lib/shared/match-replay";
 import type { MatchStatus } from "@/lib/shared/types";
 import { nullableId } from "@/lib/shared/nullable-id";
+import { retryOnDeadlock } from "./deadlock-retry";
 import { publishMatchUpdatedEvent } from "./notifications";
+import { inTransaction } from "./transaction";
 
 type MatchReplayRow = RowDataPacket & {
   id: number;
@@ -70,9 +71,8 @@ export async function setMatchReplayUrl(
   // Le match se verrouille d'abord (seul, sans jointure : MariaDB) : le retrait
   // d'un caster (`releaseMatchCast`) prend le même verrou, et ne peut plus
   // passer entre la vérification du cast et l'écriture du lien.
-  const { row, result } = await withConnection(async (connection) => {
-    await connection.beginTransaction();
-    try {
+  const { row, result } = await retryOnDeadlock(() =>
+    inTransaction(async (connection) => {
       const [rows] = await connection.execute<MatchReplayRow[]>(
         `SELECT id, tournament_id, status, team1_id, team2_id, forfeit_team_id, double_forfeit
            FROM bg_matches WHERE id = ? FOR UPDATE`,
@@ -99,13 +99,9 @@ export async function setMatchReplayUrl(
       if (replayUrl !== null && Number((written as { affectedRows?: number }).affectedRows ?? 0) === 0) {
         throw new Error("MATCH_NOT_REPLAYABLE");
       }
-      await connection.commit();
       return { row: locked, result: written };
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    }
-  });
+    }),
+  );
 
   // « Changé » se lit dans la réponse de l'écriture (`changedRows`), pas dans la
   // lecture d'avant : deux effacements simultanés n'en comptent qu'un, et un lien

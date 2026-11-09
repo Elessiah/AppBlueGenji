@@ -24,9 +24,32 @@ describe("setCasterStreamUrl", () => {
     const execute = jest.fn<SqlQuery>();
     execute.mockResolvedValueOnce([[{ id: 5, match_id: 42, live_url: "https://twitch.tv/voix", staff_owned: 0 }], []]);
 
-    await expect(setCasterStreamUrl(fakeConnection({ execute }), 42, 5, null, 900)).rejects.toThrow("STREAM_URL_REQUIRED");
+    await expect(setCasterStreamUrl(fakeConnection({ execute }), 42, 5, null, 900, false)).rejects.toThrow("STREAM_URL_REQUIRED");
     // La seule lecture des streams : aucune écriture.
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("setCasterStreamUrl_liveOnlyReplacesOrganisationLink_throwsCastStreamNotOwned", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 5, match_id: 42, live_url: "https://twitch.tv/org", staff_owned: 0 }], []])
+      .mockResolvedValueOnce([[{ link_user_id: null }], []]);
+
+    await expect(setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/moi", 900, false)).rejects.toThrow(
+      "CAST_STREAM_NOT_OWNED",
+    );
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("setCasterStreamUrl_staffReplacesOrganisationLink_writes", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 5, match_id: 42, live_url: "https://twitch.tv/org", staff_owned: 0 }], []])
+      .mockResolvedValue([{ affectedRows: 1 }, []]);
+
+    await setCasterStreamUrl(fakeConnection({ execute }), 42, 5, "https://twitch.tv/neuf", 900, true);
+
+    expect(execute.mock.calls[1]).toEqual([expect.stringContaining("SET live_url = ?"), ["https://twitch.tv/neuf", 900, 5]]);
   });
 });
 
@@ -115,11 +138,32 @@ describe("applyCastTrigger", () => {
 describe("applyCastTrigger — inscription et maître tu", () => {
   it("applyCastTrigger_shownCasterRemovesOwnerlessMode_unmarks", async () => {
     // Mode posé par le staff (sans maître) : un caster montré le retire.
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(13)).mockResolvedValue([{ affectedRows: 1 }, []]);
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(shownRows(13))
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValue([{ affectedRows: 1 }, []]);
     const row = { ...ownedRow(), live_trigger: "AUTO", live_trigger_user_id: null } as LaunchMatchRow;
 
     await expect(applyCastTrigger(fakeConnection({ execute }), row, null, 13)).resolves.toBe(true);
-    expect(execute.mock.calls[1][0]).toContain("SET live_trigger = NULL");
+    expect(execute.mock.calls[2][0]).toContain("SET live_trigger = NULL");
+  });
+
+  it("applyCastTrigger_liveOnlyShownOnStaffModeWithLink_throwsStaffStreamForbidden", async () => {
+    // Décision 1 du 2026-11-09 : le mode du staff qui porte le lien de l'organisation n'est pas à la seule `live`.
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(13)).mockResolvedValueOnce([[{ 1: 1 }], []]);
+    const row = { ...ownedRow(), live_trigger: "AUTO", live_trigger_user_id: null } as LaunchMatchRow;
+
+    await expect(applyCastTrigger(fakeConnection({ execute }), row, null, 13)).rejects.toThrow("STAFF_STREAM_FORBIDDEN");
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("applyCastTrigger_liveOnlyShownOnStaffModeWithLinkAndSkip_returnsFalse", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(13)).mockResolvedValueOnce([[{ 1: 1 }], []]);
+    const row = { ...ownedRow(), live_trigger: "AUTO", live_trigger_user_id: null } as LaunchMatchRow;
+
+    await expect(applyCastTrigger(fakeConnection({ execute }), row, "MANUAL", 13, undefined, true)).resolves.toBe(false);
+    expect(execute).toHaveBeenCalledTimes(2);
   });
 
   it("applyCastTrigger_notAllowedWithSkip_returnsFalseWithoutWrite", async () => {
@@ -182,6 +226,8 @@ describe("applyCastSettings", () => {
     const execute = jest.fn<SqlQuery>();
     // Lecture des streams, puis l'écriture du lien, puis (aucun orphelin) rien d'autre.
     execute.mockResolvedValueOnce([[{ id: 5, match_id: 42, live_url: "https://twitch.tv/a", staff_owned: 0 }], []]);
+    // Attribution du lien en place : le sien.
+    execute.mockResolvedValueOnce([[{ link_user_id: 900 }], []]);
     execute.mockResolvedValue([{ affectedRows: 1 }, []]);
     const row = { id: 42, casters: [{ matchId: 42, userId: 900, streamId: 5, readyAt: null }] } as unknown as LaunchMatchRow;
 

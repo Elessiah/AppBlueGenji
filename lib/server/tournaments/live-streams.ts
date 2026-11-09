@@ -36,7 +36,7 @@ import type { MatchStatus, TournamentGame } from "@/lib/shared/types";
 import { loadRefereeStanding, loadShownCasterIds } from "./cast-eligibility";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { playsMatchSql } from "./match-players";
-import { lockMatchStreams, pruneMatchStreams, staffStream, type MatchStreamRow } from "./match-casters";
+import { hasStaffLink, lockMatchStreams, pruneMatchStreams, staffStream, type MatchStreamRow } from "./match-casters";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
 import { invalidateSpectatorSnapshot } from "./snapshot";
 
@@ -323,6 +323,7 @@ export async function setMatchLiveConfig(
           // Posé par un caster montré du match, le mode est le sien ; par le
           // staff, l'arbitre ou un admin qui ne le caste pas (ou un caster tu),
           // il garde son maître montré, ou reste au staff.
+          await assertStaffModeKept(connection, matchId, hold, actor);
           await writeLiveTrigger(connection, matchId, trigger, liveTriggerOwnerAfter(trigger, actor, actorShown, hold.ownerId));
         }
         const staff = keepStaffLink
@@ -364,10 +365,8 @@ async function unmarkLive(
   actor: LiveTriggerActor,
   known: MatchStreamRow[] | undefined,
 ): Promise<MatchStreamRow[] | undefined> {
+  await assertStaffModeKept(connection, matchId, hold, actor);
   const staffSide = actor.manages || isMatchRefereeActor(hold, actor);
-  if (!staffSide && hold.ownerId !== actor.userId && (await hasStaffLink(connection, matchId))) {
-    throw new Error("STAFF_STREAM_FORBIDDEN");
-  }
   await connection.execute(
     `UPDATE bg_matches SET live_trigger = NULL, live_trigger_user_id = NULL, live_started_at = NULL WHERE id = ?`,
     [matchId],
@@ -380,13 +379,23 @@ async function unmarkLive(
   return known?.map((stream) => (stream.staff ? { ...stream, liveUrl: null } : stream));
 }
 
-/** Le stream de l'organisation porte-t-il un lien (que le démarquage effacerait) ? */
-async function hasStaffLink(connection: PoolConnection, matchId: number): Promise<boolean> {
-  const [rows] = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_streams WHERE match_id = ? AND staff_owned = 1 AND live_url IS NOT NULL LIMIT 1`,
-    [matchId],
-  );
-  return rows.length > 0;
+/**
+ * Le mode du staff qui porte le lien de l'organisation n'est pas celui d'un
+ * porteur de la seule `live` (décision 1 du 2026-11-09) : il ne le change ni ne
+ * le retire — sans quoi, devenu maître en le changeant, il le démarquerait.
+ *
+ * @throws `STAFF_STREAM_FORBIDDEN`
+ */
+async function assertStaffModeKept(
+  connection: PoolConnection,
+  matchId: number,
+  hold: LiveTriggerHold,
+  actor: LiveTriggerActor,
+): Promise<void> {
+  const staffSide = actor.manages || isMatchRefereeActor(hold, actor);
+  if (!staffSide && hold.ownerId !== actor.userId && (await hasStaffLink(connection, matchId))) {
+    throw new Error("STAFF_STREAM_FORBIDDEN");
+  }
 }
 
 /** Écrit le mode posé et son maître ; un mode qui n'est plus manuel referme l'antenne. */

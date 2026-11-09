@@ -438,3 +438,22 @@ export async function withdrawUserCasts(
     tournamentIds: [...new Set(touchedRows.map((row) => Number(row.tournament_id)))].sort((a, b) => a - b),
   };
 }
+
+/** Le stream de l'organisation du match porte-t-il un lien ? */
+export async function hasStaffLink(connection: Executor, matchId: number): Promise<boolean> {
+  const [rows] = await connection.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_match_streams WHERE match_id = ? AND staff_owned = 1 AND live_url IS NOT NULL LIMIT 1`,
+    [matchId],
+  );
+  return rows.length > 0;
+}
+
+/** Qui a fourni le lien d'un stream (`link_user_id`) ; `null` = l'organisation. */
+export async function streamLinkHolder(connection: Executor, streamId: number): Promise<number | null> {
+  const [rows] = await connection.execute<RowDataPacket[]>(
+    `SELECT link_user_id FROM bg_match_streams WHERE id = ? LIMIT 1`,
+    [streamId],
+  );
+  const raw = rows[0]?.link_user_id;
+  return raw === null || raw === undefined ? null : Number(raw);
+}

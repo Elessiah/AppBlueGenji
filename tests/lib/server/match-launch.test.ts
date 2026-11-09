@@ -274,10 +274,17 @@ function applyStreamWrite(match: MatchState, sql: string, params: unknown[]): un
 }
 
 /** Lectures des casters et des streams d'un match. */
-function readCastRows(state: World, sql: string): unknown[] | null {
+function readCastRows(state: World, sql: string, params: unknown[]): unknown[] | null {
   const match = state.match;
   if (sql.includes("FROM bg_match_casters WHERE match_id = ?")) {
     return [(match?.casters ?? []).map((caster) => ({ match_id: match?.id, ...caster })), []];
+  }
+  if (sql.includes("staff_owned = 1 AND live_url IS NOT NULL")) {
+    const linked = (match?.streams ?? []).filter((stream) => stream.staff_owned === 1 && stream.live_url !== null);
+    return [linked.map(() => ({ 1: 1 })), []];
+  }
+  if (sql.startsWith("SELECT link_user_id FROM bg_match_streams WHERE id = ?")) {
+    return [(match?.streams ?? []).filter((stream) => stream.id === Number(params[0])).map((stream) => ({ link_user_id: stream.link_user_id ?? null })), []];
   }
   if (sql.includes("FROM bg_match_streams WHERE match_id = ?")) {
     return [(match?.streams ?? []).map((stream) => ({ match_id: match?.id, ...stream })), []];
@@ -388,7 +395,7 @@ function executeFor(state: World) {
   return async (rawSql: string, params: unknown[] = []) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
     state.issued?.push(sql);
-    const castResult = applyCastWrite(state, sql, params) ?? readCastRows(state, sql);
+    const castResult = applyCastWrite(state, sql, params) ?? readCastRows(state, sql, params);
     if (castResult) return castResult;
     if (sql.startsWith("UPDATE")) {
       state.writes.push(sql);
