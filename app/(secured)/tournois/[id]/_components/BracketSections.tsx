@@ -4,7 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { BracketTree, ScrollRequest } from "./BracketTree";
 import { BoardPanel, PanelPill } from "./BoardPanel";
-import { ACCENT, buildSections, defaultOpenKey, findMyNextMatch, qualifyDestinationMatchId } from "../_lib/bracket-sections";
+import {
+  ACCENT,
+  buildSections,
+  defaultOpenKey,
+  findMyNextMatch,
+  qualifyDestinationMatchId,
+  type BracketSlotRef,
+} from "../_lib/bracket-sections";
 import { useMatchAnchorTarget } from "../_lib/match-anchor-context";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 
@@ -13,6 +20,18 @@ interface BracketSectionsProps {
   bracketLabel: string;
   showBracketLabel: boolean;
   matches: BracketMatch[];
+  /**
+   * Créneaux des tours **prévus mais pas encore posés**
+   * (`endurancePlayoffGhostSlots`) : ils prennent place dans le découpage en
+   * volets comme dans l'arbre, où ils se dessinent vides.
+   *
+   * Ils comptent dans la **pastille** d'un volet, qui annonce la taille du
+   * tableau — c'est déjà ce qu'elle fait sur une élimination, dont les tours à
+   * venir sont de vraies rencontres sans engagées. Le volet ouvert d'office,
+   * lui, se décide sur les seules rencontres posées : une case à pourvoir
+   * n'est rien qu'on vienne voir.
+   */
+  ghostSlots?: readonly BracketSlotRef[];
   allTournamentMatches: BracketMatch[];
   myTeamId: number | null;
   adminResolvable: (m: BracketMatch) => boolean;
@@ -22,7 +41,7 @@ interface BracketSectionsProps {
    * Match d'arrivée du vainqueur, quand il ne se lit pas sur la ligne du match.
    * Voir {@link BracketTree} : seul l'arbre final de BlueGenji Survie s'en sert.
    */
-  resolveNextMatchId?: (match: BracketMatch) => number | null;
+  resolveNextMatchId?: (slot: BracketSlotRef) => number | null;
   /**
    * Nombre de tours que ce tableau comptera **une fois complet**, quand il ne se
    * lit pas sur les matchs déjà posés.
@@ -40,6 +59,7 @@ export function BracketSections({
   bracketLabel,
   showBracketLabel,
   matches,
+  ghostSlots,
   allTournamentMatches,
   myTeamId,
   adminResolvable,
@@ -48,7 +68,16 @@ export function BracketSections({
   resolveNextMatchId,
   plannedRounds,
 }: Readonly<BracketSectionsProps>) {
-  const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
+  // Les tours à pourvoir comptent dans le découpage : ils ont une colonne à
+  // eux dans l'arbre, et un volet qui s'arrêterait aux tours posés la laisserait
+  // dehors. C'est aussi ce qui fige le découpage pour de bon — l'arbre naît
+  // avec tous ses tours, et plus aucune section ne se réorganise en route.
+  const roundNums = [
+    ...new Set([
+      ...matches.map((m) => m.roundNumber),
+      ...(ghostSlots ?? []).map((slot) => slot.roundNumber),
+    ]),
+  ].sort((a, b) => a - b);
   // Les stades se nomment à partir de la **fin** du tableau : sur un arbre qui
   // pousse un tour à la fois, ce repère ne peut pas venir des tours posés.
   const totalRounds = Math.max(plannedRounds ?? roundNums.length, roundNums.length);
@@ -116,9 +145,15 @@ export function BracketSections({
       ? resolveNextMatchId(sourceMatch)
       : qualifyDestinationMatchId(sourceMatch);
     if (destId == null) return;
-    const dest = matches.find((m) => m.id === destId);
-    if (!dest) return;
-    const destSection = sections.find((s) => s.rounds.includes(dest.roundNumber));
+    // L'arrivée peut être un créneau **à pourvoir** : au-delà de trois tours, le
+    // premier volet d'un arbre de BlueGenji Survie annonce « Qualifié en demi-
+    // finale » alors que ce tour n'est pas encore posé. Chercher la destination
+    // parmi les seules rencontres rendait le badge inerte, sans rien dire.
+    const destRound =
+      matches.find((m) => m.id === destId)?.roundNumber ??
+      (ghostSlots ?? []).find((slot) => slot.id === destId)?.roundNumber;
+    if (destRound === undefined) return;
+    const destSection = sections.find((s) => s.rounds.includes(destRound));
     if (!destSection) return;
     setOpenKeys((prev) => new Set(prev).add(destSection.key));
     setScrollRequest({ matchId: destId, nonce: Date.now() });
@@ -148,7 +183,17 @@ export function BracketSections({
         {sections.map((section) => {
           const open = openKeys.has(section.key);
           const sectionMatches = matches.filter((m) => section.rounds.includes(m.roundNumber));
-          const matchCount = sectionMatches.length;
+          const sectionGhosts = (ghostSlots ?? []).filter((slot) =>
+            section.rounds.includes(slot.roundNumber),
+          );
+          // La pastille compte les **créneaux**, cases à pourvoir comprises :
+          // c'est la taille du volet, et c'est déjà ce qu'elle annonce sur un
+          // tableau à élimination, dont les tours à venir sont de vraies
+          // rencontres sans engagées. Ne compter que les rencontres posées
+          // faisait annoncer « 0 match » à un volet qui en dessine sept — le
+          // cas d'un plateau de plus de huit, dont le second volet naît
+          // entièrement à pourvoir.
+          const matchCount = sectionMatches.length + sectionGhosts.length;
           const hasMyMatch = myNext !== null && section.rounds.includes(myNext.roundNumber);
           const panelId = `${regionBaseId}-${section.key.replace(/\s+/g, "-")}`;
 
@@ -166,6 +211,7 @@ export function BracketSections({
             >
               <BracketTree
                 matches={sectionMatches}
+                ghostSlots={sectionGhosts}
                 allTournamentMatches={allTournamentMatches}
                 bracketType={bracketType}
                 totalRoundsGlobal={totalRounds}

@@ -189,3 +189,50 @@
   font-size: 12px;
   color: var(--ink-mute);
 }
+
+/*
+ * Créneau d'un tour **à venir** — la place d'une rencontre que le moteur n'a
+ * pas encore posée (`GhostMatchCard`, arbre final de BlueGenji Survie). Même
+ * gabarit que la carte, parce que `BracketTree` trace ses connecteurs dessus,
+ * mais en retrait : bordure discontinue, fond éteint, et aucun survol — il n'y
+ * a rien à y faire. Le retrait se lit sur la bordure et le fond, jamais sur une
+ * opacité, qui emporterait aussi la lisibilité du texte.
+ */
+.ghostCard {
+  /* Deux indices, et il en faut deux : le fond plein d'une carte ne vaut que
+     1,04:1 contre celui du volet, si bien qu'un simple `transparent`
+     n'enlevait rien et laissait le **seul** pointillé porter le message — à
+     1,36:1, c'est-à-dire presque rien pour qui n'a pas coché « Contraste
+     renforcé ». La case s'enfonce donc sous le volet (`--cyber-bg`, le fond le
+     plus profond) et prend le trait le plus marqué de la palette
+     (`--line-strong`), là où `--line-strong-cy` est fait pour border une carte
+     déjà remplie. Le contour reste sous les 3:1 que demande WCAG 1.4.11 : c'est
+     la tâche 24 d'`ACCESSIBILITE.md`, qui appelle un jeton dédié. */
+  border-style: dashed;
+  border-color: var(--line-strong);
+  background: var(--cyber-bg);
+}
+
+/* Texte **en retrait**, et c'est une correction de hiérarchie, pas une
+   coquetterie : la ligne d'une rencontre tranchée passe en `--ink-mute`
+   (`.decided`), si bien qu'une case à pourvoir, qui héritait de `--ink`,
+   sortait plus lumineuse que les quarts de finale joués de la colonne voisine.
+   Sur cet arbre les tours posés sont par construction joués et les tours à
+   venir sont des cases vides : l'œil tombait donc **toujours** d'abord sur ce
+   qui ne porte aucune information. Par jeton, jamais par `opacity` — et
+   `--ink-quiet` reste très au-dessus de 4,5:1. */
+.ghostCard .row,
+.ghostCard .score {
+  color: var(--ink-quiet);
+}
+
+/* Les deux classes, et non `.ghostCard` seule : la règle de survol de la carte
+   porte un `:not()`, dont l'argument compte dans sa spécificité — un sélecteur
+   d'une seule classe perdait contre elle, et la case vide gardait le halo bleu
+   d'une carte qu'on peut ouvrir. */
+@media (hover: hover) and (pointer: fine) {
+  .card.ghostCard:hover {
+    border-color: var(--line-strong);
+    box-shadow: none;
+  }
+}

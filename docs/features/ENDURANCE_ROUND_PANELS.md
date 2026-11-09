@@ -106,7 +106,58 @@ simple**, sans variante : mêmes volets, mêmes stades nommés (`Quarts de final
 `Demi-finales`, `Finale`), mêmes traits d'un tour à l'autre, même badge
 « ★ Votre match ».
 
-Trois points méritent une explication.
+Quatre points méritent une explication.
+
+### L'arbre se montre entier, cases à pourvoir comprises
+
+Le moteur ne pose qu'un tour à la fois. Dessiner les seuls tours posés réduisait
+l'arbre à **une colonne** jusqu'à ce que les quarts soient joués : on lisait
+quatre quarts de finale sans jamais voir où ils menaient — exactement le défaut
+que ce volet était censé corriger, repoussé d'un cran.
+
+La forme du tableau est pourtant connue d'avance : chaque tour divise l'effectif
+par deux, en arrondissant vers le haut, et c'est déjà ce que compte
+`endurancePlayoffRoundCount`. `endurancePlayoffGhostSlots` en déduit les
+**créneaux à pourvoir** — un par rencontre à venir, du tour qui suit le dernier
+posé jusqu'à la finale. L'arbre les dessine comme une élimination simple dessine
+ses tours à venir : une carte `TBD` – `TBD`, sans score.
+
+Un créneau à pourvoir n'est **pas** une rencontre, et rien ne doit l'en faire
+passer pour une :
+
+| Il porte | Il n'a pas |
+| --- | --- |
+| un identifiant **négatif**, qu'aucune rencontre ne peut porter | d'ancre `#match-…` — il n'a pas d'adresse publique |
+| une place dans sa colonne, et les traits qui y mènent | d'action, d'arbitrage ni de planification |
+| une case d'emblème vide, pour aligner les noms d'une colonne à l'autre | de badge « Qualifié en X » — la rencontre qui l'occupera n'existe pas |
+
+Il compte **en revanche** dans la pastille du volet, qui annonce la taille du
+tableau et non le nombre de matchs jouables : c'est déjà ce qu'elle fait sur un
+tableau à élimination, dont les tours à venir sont de vraies rencontres sans
+engagées. Au-delà de huit qualifiées, un volet entier peut naître à pourvoir —
+il annonçait alors « 0 match » en dessinant sept cartes. Un tel volet ne réserve
+pas non plus la colonne des badges, qui serait vide (`hasQualifyBadges`).
+
+**Un tournoi clos n'annonce plus aucun tour.** Deux demi-finales closes sur un
+double forfait ne qualifient personne : `advancePlayoffsOneStep` clôt alors le
+tournoi sur le classement de qualification **sans jamais poser la finale**. Le
+dernier tour portant toujours deux rencontres, la prédiction `ceil(n/2)`
+affichait une finale `TBD` – `TBD` sous un tableau terminé. Tant que le tournoi
+vit, prédire un tour de trop ne coûte rien — il arrivera ; une fois clos, plus
+rien n'arrive, d'où le `isFinished` que lui passe `EnduranceView`.
+
+Conséquence heureuse : le découpage en volets **ne se réorganise plus** en cours
+de route, puisque l'arbre naît avec tous ses tours. La clé stable et l'ouverture
+qui suit le défaut (ci-dessous) restent en place — elles protègent aussi les
+tableaux à élimination —, mais plus rien ne les met à l'épreuve ici.
+
+Le volet s'appelle donc « Phase finale » dès l'ouverture des play-offs, et non
+plus « Quarts de finale » : les trois tours tiennent dans une seule section
+(`FINAL_PHASE_ROUNDS`), comme dans tout tableau à élimination simple à huit.
+
+La **petite finale**, elle, n'est pas annoncée d'avance : son volet apparaît
+avec la finale, quand le moteur la pose. Elle ne descend d'aucun tour — rien ne
+mènerait à sa case vide.
 
 ### La petite finale est un tableau à part
 
@@ -148,9 +199,11 @@ aucun trait — un arbre en colonnes séparées.
 
 La règle d'appariement étant connue, elle est **rejouée côté interface** par
 `endurancePlayoffLinks` : le vainqueur du i-ème match d'un tour joue le
-(i/2)-ème match du tour suivant. `BracketTree` accepte pour cela un
-`resolveNextMatchId` optionnel, dont le repli est le comportement d'origine
-(`nextWinnerMatchId ?? nextLoserMatchId`).
+(i/2)-ème match du tour suivant. Elle vaut qu'un créneau porte une rencontre ou
+non — on lui passe donc les créneaux à pourvoir en second argument, et le trait
+descend d'un quart jusqu'à la case vide de sa demie. `BracketTree` accepte pour
+cela un `resolveNextMatchId` optionnel, dont le repli est le comportement
+d'origine (`nextWinnerMatchId ?? nextLoserMatchId`).
 
 Deux garde-fous à retenir :
 
@@ -158,9 +211,16 @@ Deux garde-fous à retenir :
   Survie se décide sur le **numéro de manche** (`dependentMatches` range le mode
   avec la Survie et la Ronde suisse), jamais sur les liens de bracket ; et rien
   de ce qui est calculé ici ne remonte au serveur.
-- **Un tour non encore créé n'a pas de cible.** Le trait s'arrête au bord de la
-  carte, ce qui est exactement ce qu'il faut montrer : le tour suivant n'existe
-  pas.
+- **Un appel sans créneaux ne lie rien au-delà du dernier tour posé.** C'est le
+  comportement d'origine, et c'est celui des tableaux à élimination, qui
+  n'en passent aucun : le trait s'arrête au bord de la carte.
+
+Une **réserve antérieure** à tout cela : le moteur saute une paire dont les deux
+créneaux ont été vidés par un double forfait (`pair.length === 0` dans
+`planNextPlayoffRound`), ce qui décale d'un cran les rencontres suivantes, là où
+le module garde `floor(i/2)`. Deux doubles forfaits voisins font donc des traits
+faux, et la prédiction annonce un tour plus large qu'il ne naîtra. Consigné dans
+`ERREUR.txt`.
 
 Si la règle d'appariement du moteur changeait, c'est `endurancePlayoffLinks`
 qu'il faudrait suivre — d'où un test qui la compare à la structure réellement
@@ -170,11 +230,13 @@ produite par le service.
 
 | Élément | Emplacement |
 | --- | --- |
-| Logique pure (découpage, liens dérivés) | `app/(secured)/tournois/[id]/_lib/endurance-sections.ts` |
+| Logique pure (découpage, liens dérivés, créneaux à pourvoir) | `app/(secured)/tournois/[id]/_lib/endurance-sections.ts` |
+| Repère d'un créneau, réel ou à pourvoir (`BracketSlotRef`) | `app/(secured)/tournois/[id]/_lib/bracket-sections.ts` |
+| Carte d'un créneau à pourvoir | `app/(secured)/tournois/[id]/_components/GhostMatchCard.tsx` (styles : `MatchRow.module.css`, `.ghostCard`) |
 | Volets de manche | `app/(secured)/tournois/[id]/_components/EnduranceRoundPanels.tsx` |
 | Chrome partagé d'un volet | `app/(secured)/tournois/[id]/_components/BoardPanel.tsx` (+ `.module.css`) |
 | Vue du mode | `app/(secured)/tournois/[id]/_components/EnduranceView.tsx` |
-| Arbre | `BracketSections.tsx` (props `plannedRounds`, `resolveNextMatchId`) → `BracketTree.tsx` |
+| Arbre | `BracketSections.tsx` (props `plannedRounds`, `resolveNextMatchId`, `ghostSlots`) → `BracketTree.tsx` |
 
 ### `BoardPanel` — un seul chrome de volet
 
@@ -212,11 +274,17 @@ L'arbre des play-offs hérite du même mécanisme, puisqu'il passe par
 - `tests/tournois/endurance-sections.test.ts` — module pur : découpage
   qualification / play-offs, avancement d'une manche, volet ouvert par défaut
   (les trois priorités et le silence sous play-offs), séparation de la petite
-  finale, nombre de tours prévus d'un arbre incomplet, et liens dérivés (y
-  compris un tour incomplet et un plateau impair).
+  finale, nombre de tours prévus d'un arbre incomplet, liens dérivés (y
+  compris un tour incomplet et un plateau impair), et créneaux à pourvoir —
+  plateau à huit, reprise au dernier tour posé, silence une fois la finale
+  posée, plateau impair, identifiants négatifs distincts, et accord avec le
+  nombre de tours annoncé.
 - `tests/tournois/endurance-round-panels-wiring.test.ts` — câblage : les cartes
   passent par `MatchRow`, l'ancre déplie le volet, les play-offs empruntent
-  `BracketSections` avec les liens dérivés, et le chrome des volets est partagé.
+  `BracketSections` avec les liens dérivés et les créneaux à pourvoir (comptés
+  dans la pastille du volet, absents des badges de qualification, tus sous un
+  tournoi clos, et que les tableaux à élimination ne reçoivent jamais), et le
+  chrome des volets est partagé.
 - `tests/tournois/bracket-sections.test.ts` — un arbre qui ne porte pas encore
   tous ses tours : stades nommés sur le compte prévu, clé de section stable
   quand un tour la rejoint, et découpage inchangé pour les tableaux complets.

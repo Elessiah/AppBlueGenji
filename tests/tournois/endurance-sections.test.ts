@@ -2,6 +2,7 @@ import { describe, it, expect } from "@jest/globals";
 import type { BracketMatch, MatchStatus } from "@/lib/shared/types";
 import {
   defaultOpenEnduranceRound,
+  endurancePlayoffGhostSlots,
   endurancePlayoffLinks,
   endurancePlayoffRoundCount,
   enduranceMatchCountLabel,
@@ -64,6 +65,22 @@ const round = (
     team2Id: id * 10 + 1,
     winnerTeamId: winner,
   });
+
+/**
+ * Un tour d'arbre final de `count` rencontres, numérotées à partir de 1 —
+ * exactement la forme que pose le moteur. Partagé par les trois lectures de
+ * l'arbre (stades nommés, créneaux à pourvoir, liens), qui en ont toutes besoin.
+ */
+const playoffRoundOfSize = (roundNumber: number, count: number): BracketMatch[] =>
+  Array.from({ length: count }, (_, index) =>
+    mockMatch({
+      id: roundNumber * 10 + index,
+      roundNumber,
+      matchNumber: index + 1,
+      team1Id: index + 1,
+      team2Id: index + 100,
+    }),
+  );
 
 describe("splitEnduranceMatches", () => {
   it("sépare la phase qualificative de l'arbre final sur le seuil du moteur", () => {
@@ -255,30 +272,109 @@ describe("endurancePlayoffLinks", () => {
   it("ne rend aucun lien pour l'unique rencontre d'un arbre à deux", () => {
     expect(endurancePlayoffLinks(playoffRound(PLAYOFF_ROUND_OFFSET, [1])).size).toBe(0);
   });
+
+  it("fait descendre le trait jusqu'aux créneaux à pourvoir", () => {
+    // Seuls les quarts sont posés : sans les créneaux, l'arbre n'a aucun trait
+    // et se lit comme une liste de quatre cartes.
+    const quarters = playoffRound(PLAYOFF_ROUND_OFFSET, [1, 2, 3, 4]);
+    const ghosts = endurancePlayoffGhostSlots(quarters);
+    const links = endurancePlayoffLinks(quarters, ghosts);
+
+    const semi1 = ghosts.find((slot) => slot.roundNumber === PLAYOFF_ROUND_OFFSET + 1 && slot.matchNumber === 1)!;
+    const semi2 = ghosts.find((slot) => slot.roundNumber === PLAYOFF_ROUND_OFFSET + 1 && slot.matchNumber === 2)!;
+    const finale = ghosts.find((slot) => slot.roundNumber === PLAYOFF_ROUND_OFFSET + 2)!;
+
+    expect(links.get(1)).toBe(semi1.id);
+    expect(links.get(2)).toBe(semi1.id);
+    expect(links.get(3)).toBe(semi2.id);
+    expect(links.get(4)).toBe(semi2.id);
+    expect(links.get(semi1.id)).toBe(finale.id);
+    expect(links.get(semi2.id)).toBe(finale.id);
+  });
+});
+
+describe("endurancePlayoffGhostSlots", () => {
+  it("complète un plateau à huit dont seuls les quarts sont posés", () => {
+    const slots = endurancePlayoffGhostSlots(playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 4));
+
+    expect(slots.map(({ roundNumber, matchNumber }) => ({ roundNumber, matchNumber }))).toEqual([
+      { roundNumber: PLAYOFF_ROUND_OFFSET + 1, matchNumber: 1 },
+      { roundNumber: PLAYOFF_ROUND_OFFSET + 1, matchNumber: 2 },
+      { roundNumber: PLAYOFF_ROUND_OFFSET + 2, matchNumber: 1 },
+    ]);
+  });
+
+  it("repart du dernier tour posé, et non du premier", () => {
+    // Les demies arrivées, il ne reste que la finale à annoncer.
+    const posed = [...playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 4), ...playoffRoundOfSize(PLAYOFF_ROUND_OFFSET + 1, 2)];
+    const slots = endurancePlayoffGhostSlots(posed);
+
+    expect(slots).toHaveLength(1);
+    expect(slots[0].roundNumber).toBe(PLAYOFF_ROUND_OFFSET + 2);
+  });
+
+  it("n'annonce plus rien une fois la finale posée", () => {
+    const posed = [
+      ...playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 4),
+      ...playoffRoundOfSize(PLAYOFF_ROUND_OFFSET + 1, 2),
+      ...playoffRoundOfSize(PLAYOFF_ROUND_OFFSET + 2, 1),
+    ];
+    expect(endurancePlayoffGhostSlots(posed)).toEqual([]);
+  });
+
+  it("ne rend rien tant que l'arbre n'a pas commencé", () => {
+    expect(endurancePlayoffGhostSlots([])).toEqual([]);
+  });
+
+  it("n'annonce plus de tour sous un tournoi clos", () => {
+    // Deux demi-finales closes sur un double forfait ne qualifient personne :
+    // `advancePlayoffsOneStep` clôt le tournoi sur le classement de
+    // qualification **sans poser la finale**. Le dernier tour portant toujours
+    // deux rencontres, la prédiction annonçait une finale TBD sous un tableau
+    // terminé.
+    const posed = [...playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 4), ...playoffRoundOfSize(PLAYOFF_ROUND_OFFSET + 1, 2)];
+    expect(endurancePlayoffGhostSlots(posed)).toHaveLength(1);
+    expect(endurancePlayoffGhostSlots(posed, true)).toEqual([]);
+  });
+
+  it("arrondit vers le haut sur un plateau qui n'est pas une puissance de deux", () => {
+    // Trois rencontres au premier tour : deux au suivant (un vainqueur passe le
+    // tour), puis la finale.
+    const slots = endurancePlayoffGhostSlots(playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 3));
+    expect(slots.filter((slot) => slot.roundNumber === PLAYOFF_ROUND_OFFSET + 1)).toHaveLength(2);
+    expect(slots.filter((slot) => slot.roundNumber === PLAYOFF_ROUND_OFFSET + 2)).toHaveLength(1);
+  });
+
+  it("porte des identifiants négatifs et distincts", () => {
+    // Ils ne servent qu'au dessin : une rencontre ne peut pas en porter un, et
+    // aucune cible de défilement ni d'ancre ne peut donc tomber dessus.
+    const slots = endurancePlayoffGhostSlots(playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 4));
+    expect(slots.every((slot) => slot.id < 0)).toBe(true);
+    expect(new Set(slots.map((slot) => slot.id)).size).toBe(slots.length);
+  });
+
+  it("complète exactement le nombre de tours annoncé par le compte des stades", () => {
+    // Les deux lisent la même règle : un arbre dont les colonnes ne couvriraient
+    // pas les stades nommés afficherait une « demi-finale » sans demie.
+    for (const firstRoundSize of [1, 2, 3, 4, 5, 8]) {
+      const posed = playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, firstRoundSize);
+      const ghostRounds = new Set(endurancePlayoffGhostSlots(posed).map((slot) => slot.roundNumber));
+      expect(ghostRounds.size + 1).toBe(endurancePlayoffRoundCount(posed));
+    }
+  });
 });
 
 describe("endurancePlayoffRoundCount", () => {
-  const playoffRound = (roundNumber: number, count: number): BracketMatch[] =>
-    Array.from({ length: count }, (_, index) =>
-      mockMatch({
-        id: roundNumber * 10 + index,
-        roundNumber,
-        matchNumber: index + 1,
-        team1Id: index + 1,
-        team2Id: index + 100,
-      }),
-    );
-
   it("annonce les trois tours d'un plateau à huit dès les seuls quarts", () => {
     // Le cœur du problème : à l'ouverture des play-offs, seul le premier tour
     // existe. Le compter naïvement nommait les quarts « Finale ».
-    expect(endurancePlayoffRoundCount(playoffRound(PLAYOFF_ROUND_OFFSET, 4))).toBe(3);
+    expect(endurancePlayoffRoundCount(playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 4))).toBe(3);
   });
 
   it("tient le même compte à mesure que les tours arrivent", () => {
-    const quarters = playoffRound(PLAYOFF_ROUND_OFFSET, 4);
-    const semis = playoffRound(PLAYOFF_ROUND_OFFSET + 1, 2);
-    const final = playoffRound(PLAYOFF_ROUND_OFFSET + 2, 1);
+    const quarters = playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 4);
+    const semis = playoffRoundOfSize(PLAYOFF_ROUND_OFFSET + 1, 2);
+    const final = playoffRoundOfSize(PLAYOFF_ROUND_OFFSET + 2, 1);
 
     expect(endurancePlayoffRoundCount([...quarters, ...semis])).toBe(3);
     expect(endurancePlayoffRoundCount([...quarters, ...semis, ...final])).toBe(3);
@@ -287,12 +383,12 @@ describe("endurancePlayoffRoundCount", () => {
   it("arrondit vers le haut sur un plateau qui n'est pas une puissance de deux", () => {
     // Cinq qualifiées → trois rencontres au premier tour (dont une exemption),
     // puis deux, puis une : trois tours.
-    expect(endurancePlayoffRoundCount(playoffRound(PLAYOFF_ROUND_OFFSET, 3))).toBe(3);
+    expect(endurancePlayoffRoundCount(playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 3))).toBe(3);
   });
 
   it("compte deux tours pour un demi-finales / finale, un pour une finale sèche", () => {
-    expect(endurancePlayoffRoundCount(playoffRound(PLAYOFF_ROUND_OFFSET, 2))).toBe(2);
-    expect(endurancePlayoffRoundCount(playoffRound(PLAYOFF_ROUND_OFFSET, 1))).toBe(1);
+    expect(endurancePlayoffRoundCount(playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 2))).toBe(2);
+    expect(endurancePlayoffRoundCount(playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 1))).toBe(1);
   });
 
   it("ne rend rien tant que l'arbre n'a pas commencé", () => {
@@ -304,8 +400,8 @@ describe("endurancePlayoffRoundCount", () => {
     // ne le prévoit, c'est le réel qui gagne — un tour posé doit être nommé.
     expect(
       endurancePlayoffRoundCount([
-        ...playoffRound(PLAYOFF_ROUND_OFFSET, 1),
-        ...playoffRound(PLAYOFF_ROUND_OFFSET + 1, 1),
+        ...playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 1),
+        ...playoffRoundOfSize(PLAYOFF_ROUND_OFFSET + 1, 1),
       ]),
     ).toBe(2);
   });

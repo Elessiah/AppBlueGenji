@@ -120,7 +120,7 @@ describe("câblage dans BracketTree", () => {
   it("mesure le contenu du créneau — libellé compris, c'est lui qui chevauchait", () => {
     // Le `ref` est posé sur l'enveloppe qui porte le libellé *et* la carte : ne
     // mesurer que la carte laisserait le libellé déborder du créneau.
-    const wrapper = source.indexOf("ref={measureSlot(roundNum, match.id)}");
+    const wrapper = source.indexOf("ref={measureSlot(roundNum, slot.id)}");
     const label = source.indexOf("{(label || isTarget) && (");
     const card = source.indexOf("<MatchRow");
     expect(wrapper).toBeGreaterThan(-1);
