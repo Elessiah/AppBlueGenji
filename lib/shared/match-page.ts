@@ -159,8 +159,8 @@ export function isByeMatch(match: Pick<BracketMatch, "team1Id" | "team2Id" | "st
  * Ce que la page dit de l'arbitrage : l'arbitre, l'autogestion, ou — pour le
  * staff seul (permission `tournaments`) — l'absence de décision. `null` : rien
  * à dire (match terminé, exemption, ou lecteur hors staff sans décision).
- * Même règle que le bandeau de la carte (`refereeStripState`), sans sa phase
- * de lancement : la page le dit dès que le match existe.
+ * La page le dit dès que le match existe, sans attendre la phase de
+ * lancement.
  */
 export function matchPageDecision(
   match: Pick<BracketMatch, "status" | "refereeAssigned" | "selfManaged" | "team1Id" | "team2Id">,

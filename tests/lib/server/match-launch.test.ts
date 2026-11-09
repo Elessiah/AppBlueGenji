@@ -601,7 +601,7 @@ describe("setMatchReady — appariement réécrit sur place", () => {
     await setMatchReady(42, 1, true);
 
     expect(state.writes).toContain(
-      `DELETE FROM bg_match_start_notices WHERE match_id = ? AND phase NOT LIKE 'LOBBY_BRIEF%' [42]`,
+      `DELETE FROM bg_match_start_notices WHERE match_id = ? AND phase NOT LIKE 'LOBBY\\_BRIEF%' [42]`,
     );
   });
 

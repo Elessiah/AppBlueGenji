@@ -243,12 +243,12 @@ async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchR
   // repartiraient à la réouverture — comme pour un lancement défait.
   // Première adoption (empreinte vide) : aucune réservation n'a pu être posée,
   // et le DELETE prendrait un verrou d'intervalle inutile sous le verrou du match.
-  // Le check-in (`LOBBY_BRIEF%`, `./lobby-brief`) reste réservé : réservé par
+  // Le check-in (`LOBBY\_BRIEF%`, `./lobby-brief`) reste réservé : réservé par
   // engagée, il ne part qu'une fois par match, réappariement compris — celle
   // qui arrive reçoit le sien, celle qui reste n'est pas rebriefée.
   if (row.launch_pairing !== null) {
     await connection.execute(
-      `DELETE FROM bg_match_start_notices WHERE match_id = ? AND phase NOT LIKE 'LOBBY_BRIEF%'`,
+      `DELETE FROM bg_match_start_notices WHERE match_id = ? AND phase NOT LIKE 'LOBBY\\_BRIEF%'`,
       [row.id],
     );
   }
@@ -329,6 +329,19 @@ const LAUNCH_MATCH_OWN_COLUMNS = `
   m.phase_id, m.bracket, m.round_number`;
 
 /**
+ * L'arbitre peut-il encore « jouer le match » ? Avant un lancement **de cet
+ * appariement** (un lancement d'avant un réappariement ne compte pas) — la
+ * règle de `castBeforeLaunch` et de `KEPT_REFEREE_SQL`, sans exclure un match
+ * joué, dont la lecture ne change pas.
+ */
+function refereePlayCounts(base: LaunchMatchBaseRow): boolean {
+  return (
+    base.launched_at === null ||
+    !launchStateIsCurrent(base.launch_pairing ?? null, nullableId(base.team1_id), nullableId(base.team2_id))
+  );
+}
+
+/**
  * Relit le match **sous verrou** de sa seule ligne : les tables jointes ne sont
  * que lues, et verrouiller la ligne du tournoi ferait attendre tout le moteur
  * derrière un clic sur « Prêt ».
@@ -352,19 +365,6 @@ const LAUNCH_MATCH_OWN_COLUMNS = `
  * d'une manche lisent d'abord leurs candidats), seule la lecture verrouillante
  * est *courante* et elle est gardée.
  */
-/**
- * L'arbitre peut-il encore « jouer le match » ? Avant un lancement **de cet
- * appariement** (un lancement d'avant un réappariement ne compte pas) — la
- * règle de `castBeforeLaunch` et de `KEPT_REFEREE_SQL`, sans exclure un match
- * joué, dont la lecture ne change pas.
- */
-function refereePlayCounts(base: LaunchMatchBaseRow): boolean {
-  return (
-    base.launched_at === null ||
-    !launchStateIsCurrent(base.launch_pairing ?? null, nullableId(base.team1_id), nullableId(base.team2_id))
-  );
-}
-
 async function lockLaunchMatch(
   connection: PoolConnection,
   matchId: number,

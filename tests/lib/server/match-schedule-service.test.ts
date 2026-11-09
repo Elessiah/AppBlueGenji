@@ -539,7 +539,7 @@ describe("setMatchStartAt", () => {
       const notices = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_start_notices"));
       expect(notices?.params).toEqual([42]);
       // Le check-in déjà parti, lui, ne repart pas : une fois par match.
-      expect(notices?.sql).toContain("phase NOT LIKE 'LOBBY_BRIEF%'");
+      expect(notices?.sql).toContain("phase NOT LIKE 'LOBBY\\_BRIEF%'");
     });
 
     it("date effacée, option allumée : le match repasse à planifier, lancement défait", async () => {

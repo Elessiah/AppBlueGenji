@@ -39,7 +39,7 @@ import type { LaunchMatchRow } from "./match-launch";
 export type CastSettings = {
   /** Mode d'antenne du match (`null` : le match n'est plus casté). */
   trigger?: MatchLiveTrigger | null;
-  /** Lien de **son** stream (`null` : aucun lien public). */
+  /** Lien de **son** stream (`null` est refusé : `STREAM_URL_REQUIRED`). */
   liveUrl?: string | null;
   /** BattleTag donné pour ce cast (`null` : celui de son compte). */
   battletag?: string | null;
@@ -221,7 +221,7 @@ export async function setCasterStreamUrl(
   if (target.liveUrl === url) return streams;
   await connection.execute(
     `UPDATE bg_match_streams SET live_url = ?, link_user_id = ? WHERE id = ? AND staff_owned = 0`,
-    [url, url === null ? null : linkUserId, streamId],
+    [url, linkUserId, streamId],
   );
   return streams.map((stream) => (stream.id === streamId ? { ...stream, liveUrl: url } : stream));
 }
@@ -278,9 +278,11 @@ export async function applyCastSettings(
   }
   // Un lien retiré peut laisser un stream que plus personne ne tient : le même
   // ménage que la configuration du staff et que le retrait d'un caster.
-  // Les casters sont ceux de la ligne verrouillée (aucun n'est ajouté ni retiré ici
-  // : l'inscription ne passe jamais de lien) : les relire sous `FOR UPDATE`
-  // verrouillerait l'intervalle de `bg_match_casters` des matchs voisins.
+  // Les casters sont ceux de la ligne verrouillée : seul « Configurer ma
+  // diffusion » passe un lien ici, sans ajouter ni retirer de caster
+  // (l'inscription pose le sien avec son stream et passe `liveUrl: undefined`) ;
+  // les relire sous `FOR UPDATE` verrouillerait l'intervalle de
+  // `bg_match_casters` des matchs voisins.
   if (streams !== undefined) await pruneMatchStreams(connection, matchId, { streams, casters: row.casters });
   return { triggerSkipped };
 }
