@@ -127,10 +127,12 @@ export function buildSections(
   const totalRounds = roundNums.length;
   if (totalRounds === 0) return [];
 
-  // Le découpage porte sur les tours **posés** (on ne fait pas un volet pour ce
-  // qui n'existe pas), mais les stades se nomment sur le nombre de tours
-  // **prévus** : « quart de finale » n'a de sens que rapporté à la fin du
-  // tableau. Les deux ne coïncident que si le plateau naît complet.
+  // Le découpage porte sur les tours que l'appelant lui passe — rencontres
+  // posées **et** créneaux à pourvoir, depuis que l'arbre de BlueGenji Survie
+  // se montre entier (`BracketSections`). Les stades, eux, se nomment sur le
+  // nombre de tours **prévus** : « quart de finale » n'a de sens que rapporté à
+  // la fin du tableau, et un tableau à élimination, qui naît complet, ne passe
+  // pas ce compte du tout.
   const stageTotal = Math.max(plannedRounds ?? totalRounds, totalRounds);
 
   if (bracketType === "GRAND" || bracketType === "THIRD_PLACE") {
