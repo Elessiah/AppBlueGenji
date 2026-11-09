@@ -512,7 +512,7 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
     expect(fr).toContain("**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (evening message of the streamed matches: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
     // EF-43 (salons vocaux) : datée du lendemain de la mise en ligne du 5 novembre 2026.
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["6 novembre 2026", "6 November 2026"]);
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["10 novembre 2026", "10 November 2026"]);
   });
 });
 
@@ -638,11 +638,28 @@ describe("politique du bot — salons vocaux d'équipe (EF-43, registre T18)", (
     expect(fr).toContain("Salons vocaux d'équipe des matchs");
     expect(fr).toContain("(/rgpd#salons-vocaux) (traitement T18)");
     expect(fr).toContain("sans jamais l'enregistrer ni le transmettre au site, l'état vocal des membres du serveur de l'association");
-    expect(fr).toContain("Il ne compte personne et ne dit jamais au site qui se trouve dans un salon.");
+    expect(fr).toContain("Il regarde seulement si un salon est vide : il ne dit jamais au site combien de personnes s'y trouvent, ni qui.");
     expect(en).toContain("Team voice channels for matches");
     expect(en).toContain("(/rgpd#salons-vocaux) (processing activity T18)");
     expect(en).toContain("without ever recording it or sending it to the website, the voice state of the members of the association's server");
-    expect(en).toContain("It counts no one and never tells the website who is in a channel.");
+    expect(en).toContain("It only checks whether a channel is empty: it never tells the website how many people are in it, nor who.");
+  });
+
+  it("privacyPolicy_voiceChannels_fullVoiceStateListAndChannelIdReturnedFrAndEn", () => {
+    expect(fr).toContain("micro ou son coupés par lui ou par la modération, partage d'écran ou caméra actifs, demande de parole et mise en sourdine de scène");
+    expect(fr).toContain("rend au site le seul identifiant de ce salon");
+    expect(fr).not.toContain("seule cette fiche jointe est gardée en mémoire");
+    expect(en).toContain("microphone or sound muted by themselves or by moderation, screen sharing or camera on, request to speak and stage suppression");
+    expect(en).toContain("returns to the website only that channel's ID");
+  });
+
+  it("privacyPolicy_voiceChannelsRetention_sweepMarginMovedChannelAndDiscordRefusalFrAndEn", () => {
+    expect(fr).toContain("Ces durées s'entendent à un balayage près (toutes les 30 minutes).");
+    expect(fr).toContain("Un salon déplacé hors de la catégorie des matchs n'est plus suivi");
+    expect(fr).toContain("réessayée à chaque balayage ; un salon que le Bot ne voit plus est laissé à la modération");
+    expect(en).toContain("These periods are accurate to within one sweep (every 30 minutes).");
+    expect(en).toContain("A channel moved out of the match category is no longer tracked");
+    expect(en).toContain("retried at each sweep; a channel the Bot no longer sees is left to moderation");
   });
 
   it("privacyPolicy_voiceChannels_heldAtAllTimesWhateverTheOptionFrAndEn", () => {
