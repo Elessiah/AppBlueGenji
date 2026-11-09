@@ -279,8 +279,10 @@ function readCastRows(state: World, sql: string, params: unknown[]): unknown[] |
   if (sql.includes("FROM bg_match_casters WHERE match_id = ?")) {
     return [(match?.casters ?? []).map((caster) => ({ match_id: match?.id, ...caster })), []];
   }
-  if (sql.includes("staff_owned = 1 AND live_url IS NOT NULL")) {
-    const linked = (match?.streams ?? []).filter((stream) => stream.staff_owned === 1 && stream.live_url !== null);
+  if (sql.includes("(staff_owned = 1 OR link_user_id IS NULL)")) {
+    const linked = (match?.streams ?? []).filter(
+      (stream) => stream.live_url !== null && (stream.staff_owned === 1 || stream.link_user_id === undefined),
+    );
     return [linked.map(() => ({ 1: 1 })), []];
   }
   if (sql.startsWith("SELECT link_user_id FROM bg_match_streams WHERE id = ?")) {

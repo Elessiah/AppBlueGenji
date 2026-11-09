@@ -439,10 +439,14 @@ export async function withdrawUserCasts(
   };
 }
 
-/** Le stream de l'organisation du match porte-t-il un lien ? */
+/**
+ * Le match porte-t-il un lien de l'organisation ? Celui du stream du staff, ou
+ * le lien d'un stream de caster dit de l'organisation (`link_user_id` vide).
+ */
 export async function hasStaffLink(connection: Executor, matchId: number): Promise<boolean> {
   const [rows] = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_streams WHERE match_id = ? AND staff_owned = 1 AND live_url IS NOT NULL LIMIT 1`,
+    `SELECT 1 FROM bg_match_streams
+      WHERE match_id = ? AND live_url IS NOT NULL AND (staff_owned = 1 OR link_user_id IS NULL) LIMIT 1`,
     [matchId],
   );
   return rows.length > 0;

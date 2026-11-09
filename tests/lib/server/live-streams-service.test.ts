@@ -181,7 +181,7 @@ describe("setMatchLiveConfig", () => {
    * casters (`bg_match_streams`, `bg_match_casters`), rejoués écriture après
    * écriture dans la transaction de `setMatchLiveConfig`.
    */
-  type StreamState = { id: number; live_url: string | null; staff_owned: number; link_user_id?: number };
+  type StreamState = { id: number; live_url: string | null; staff_owned: number; link_user_id?: number | null };
   /** Un stream de la base ; `staff` : celui du staff (`staff_owned`). */
   const dbStream = (id: number, liveUrl: string | null, staff = false): StreamState => ({
     id,
@@ -225,7 +225,11 @@ describe("setMatchLiveConfig", () => {
       }
       if (sql.startsWith("SELECT 1 FROM bg_match_streams")) {
         // Lien de l'organisation présent ? (démarquage par la seule `live`)
-        return [state.streams.filter((stream) => stream.staff_owned === 1 && stream.live_url !== null).map(() => ({ 1: 1 }))];
+        // `link_user_id: null` explicite = lien de caster dit de l'organisation.
+        const orgLinked = state.streams.filter(
+          (stream) => stream.live_url !== null && (stream.staff_owned === 1 || ("link_user_id" in stream && stream.link_user_id === null)),
+        );
+        return [orgLinked.map(() => ({ 1: 1 }))];
       }
       return writeStreams(state, sql, params);
     });
@@ -493,6 +497,21 @@ describe("setMatchLiveConfig", () => {
 
     await expect(
       setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: undefined, setter: CASTER_12, access: LIVE_ONLY }),
+    ).rejects.toThrow("STAFF_STREAM_FORBIDDEN");
+    expect(world.state.matchWrites).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_liveOnlyTakesOrphanModeWithOrganisationCasterLink_throwsStaffStreamForbidden", async () => {
+    // Revue sécurité #564 (cycle 4) : le lien de l'organisation posé sur un stream de caster compte aussi.
+    const world = liveWorld(
+      matchRow({ live_trigger: "MANUAL", live_trigger_user_id: null }),
+      [{ ...dbStream(7, "https://twitch.tv/orga"), link_user_id: null }],
+      [{ user_id: 12, stream_id: 7 }],
+    );
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: undefined, setter: CASTER_12, access: LIVE_ONLY }),
     ).rejects.toThrow("STAFF_STREAM_FORBIDDEN");
     expect(world.state.matchWrites).toEqual([]);
   });
