@@ -58,6 +58,7 @@ import { isBotCircuitOpen, pushLiveEvening, type LiveAnnouncementOutcome } from 
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { toIso } from "@/lib/server/serialization";
 import { firstStreamUrlSql } from "./match-casters";
+import { PAIRING_SQL } from "./new-match-sql";
 import {
   formatLiveEvening,
   LIVE_EVENING_WINDOW_HOURS,
@@ -212,7 +213,7 @@ async function loadCandidates(): Promise<LiveCandidateRow[]> {
         AND ${FRESH_ON_AIR_SQL}
         AND NOT EXISTS (SELECT 1 FROM bg_live_announcements a
                          WHERE a.match_id = m.id
-                           AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)))`,
+                           AND a.pairing = ${PAIRING_SQL})`,
     [],
   );
 }
@@ -236,7 +237,7 @@ async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRo
     `m.live_trigger IS NOT NULL AND m.is_bye = 0
         AND (EXISTS (SELECT 1 FROM bg_live_announcements a
                       WHERE a.match_id = m.id AND a.sent_at >= ? AND a.sent_at < ? AND a.refused = 0
-                        AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)))
+                        AND a.pairing = ${PAIRING_SQL})
              OR (t.state = 'RUNNING' AND m.live_trigger = 'START_TIME' AND m.status IN ('PENDING', 'READY')
                  AND m.start_at > NOW() AND m.start_at <= ${until}))`,
     // Réservations de la fenêtre seulement : une soirée finie, encore mise à
@@ -255,7 +256,7 @@ async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRo
  */
 const ANNOUNCED_AT_SQL = `(SELECT MAX(a.sent_at) FROM bg_live_announcements a
             WHERE a.match_id = m.id
-              AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))) AS announced_at`;
+              AND a.pairing = ${PAIRING_SQL}) AS announced_at`;
 
 /** Lecture commune des matchs annonçables : affiche, tournoi, pseudos publiables. */
 async function selectMatches(

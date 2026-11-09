@@ -1,5 +1,26 @@
 import type { Pool } from "mysql2/promise";
 import { createTable } from "../declared-tables";
+import { setNewMatchNoticesAvailable } from "../../tournaments/new-match-sql";
+
+/**
+ * Place d'un match dans son tournoi (phase, tableau, manche, numéro) : la clé
+ * des marques qui survivent à un match effacé puis recréé.
+ */
+const MATCH_PLACE_COLUMNS = `        tournament_id BIGINT NOT NULL,
+        phase_id BIGINT NOT NULL,
+        bracket VARCHAR(16) NOT NULL,
+        round_number INT NOT NULL,
+        match_number INT NOT NULL,
+`;
+
+/** Table de notification facultative : un échec laisse la base debout et l'envoi se tait. */
+async function createQuietly(db: Pool, sql: string): Promise<void> {
+  try {
+    await createTable(db, sql);
+  } catch {
+    // Table déjà présente, ou création refusée.
+  }
+}
 
 /** Notifications déjà envoyées. */
 export async function createSentNotificationTables(db: Pool): Promise<void> {
@@ -116,15 +137,9 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
   // marque, et le check-in ne repart jamais deux fois — décision de
   // l'utilisateur du 2026-11-05 (`docs/features/MATCH_LOBBY_BRIEF.md`). Part
   // avec le tournoi ou l'engagée.
-  try {
-    await createTable(db, `
+  await createQuietly(db, `
       CREATE TABLE IF NOT EXISTS bg_lobby_brief_marks (
-        tournament_id BIGINT NOT NULL,
-        phase_id BIGINT NOT NULL,
-        bracket VARCHAR(16) NOT NULL,
-        round_number INT NOT NULL,
-        match_number INT NOT NULL,
-        team_id BIGINT NOT NULL,
+${MATCH_PLACE_COLUMNS}        team_id BIGINT NOT NULL,
         sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (tournament_id, phase_id, bracket, round_number, match_number, team_id),
         KEY idx_bg_lobby_brief_marks_team (team_id),
@@ -134,8 +149,40 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
           REFERENCES bg_teams(id) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
-  } catch {
-    // Table déjà présente, ou création refusée.
+
+  // Annonce d'un nouveau match (`docs/features/NEW_MATCH_NOTICE.md`) : une par
+  // place du match (phase, tableau, manche, numéro) et par affiche (`pairing`,
+  // les deux engagées sans ordre, `5:7`). La place plutôt que l'id : un match
+  // effacé puis recréé avec la même affiche n'est pas réannoncé. `skipped` : match
+  // déjà apparié à la mise en service (clé `new_match_notices_since` de
+  // `bg_settings`). Part avec le tournoi ou l'une des deux engagées (clés étrangères `team_low_id` / `team_high_id`). Un échec ne fait pas tomber la base
+  // (journal pm2) : il éteint l'annonce, et les lectures qui l'attendent
+  // (`newMatchPendingSql`, `newMatchToldSql`) cessent de la lire — les rappels
+  // partent comme avant.
+  try {
+    await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_new_match_notices (
+${MATCH_PLACE_COLUMNS}        pairing VARCHAR(48) NOT NULL,
+        team_low_id BIGINT NOT NULL,
+        team_high_id BIGINT NOT NULL,
+        skipped TINYINT(1) NOT NULL DEFAULT 0,
+        start_at DATETIME NULL,
+        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (tournament_id, phase_id, bracket, round_number, match_number, pairing),
+        KEY idx_bg_new_match_notices_low (team_low_id),
+        KEY idx_bg_new_match_notices_high (team_high_id),
+        CONSTRAINT fk_bg_new_match_notices_tournament FOREIGN KEY (tournament_id)
+          REFERENCES bg_tournaments(id) ON DELETE CASCADE,
+        CONSTRAINT fk_bg_new_match_notices_low FOREIGN KEY (team_low_id)
+          REFERENCES bg_teams(id) ON DELETE CASCADE,
+        CONSTRAINT fk_bg_new_match_notices_high FOREIGN KEY (team_high_id)
+          REFERENCES bg_teams(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    setNewMatchNoticesAvailable(true);
+  } catch (error) {
+    setNewMatchNoticesAvailable(false);
+    console.error("[migrations] bg_new_match_notices non créée — annonces de nouveau match éteintes", error);
   }
 
   // Réservation d'une annonce de live sur Discord (#live, `@everyone`) : une

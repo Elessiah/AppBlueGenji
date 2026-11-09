@@ -19,6 +19,7 @@ import { forgetStaffPush, markStaffPushed, releaseStaffPush } from "@/lib/server
 import { notifyStaff } from "@/lib/server/notify";
 import { auditStaffAction, publishStaffAction } from "@/lib/server/staff-audit";
 import { announceMatchSchedule, announceMatchScheduleCleared } from "@/lib/server/tournaments/match-reminders";
+import { dispatchNewMatchNotices } from "@/lib/server/tournaments/new-match-notices";
 import {
   heldStartAt,
   announceDeletedMatchesToStaff,
@@ -142,6 +143,47 @@ describe("notifyMatchScheduleChange — première date", () => {
     expect(line).toContain("par le staff");
     expect(line).not.toContain("au lieu du");
     expect(line).not.toContain(ACTOR.pseudo);
+  });
+});
+
+describe("notifyMatchScheduleChange — annonce de nouveau match en attente", () => {
+  it("notifyMatchScheduleChange_newMatchNoticePending_noPlayerAnnouncementAndSweepTriggered", async () => {
+    mockMatch({ ...ROW, new_match_pending: 1 });
+
+    await notifyMatchScheduleChange(change());
+
+    expect(announceMatchSchedule).not.toHaveBeenCalled();
+    expect(dispatchNewMatchNotices).toHaveBeenCalledTimes(1);
+    expect(notifyStaff).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifyMatchScheduleChange_newMatchNoticeAlreadyCarriedThisTime_noPlayerAnnouncement", async () => {
+    mockMatch({ ...ROW, new_match_told: 1 });
+
+    await notifyMatchScheduleChange(change());
+
+    expect(announceMatchSchedule).not.toHaveBeenCalled();
+    expect(dispatchNewMatchNotices).not.toHaveBeenCalled();
+  });
+
+  it("notifyMatchScheduleChange_timeMovedBackToTheAnnouncedOne_stillAnnounced", async () => {
+    mockMatch({ ...ROW, new_match_told: 1 });
+
+    await notifyMatchScheduleChange(change({ alreadyAnnounced: true, toldStartAt: OLD_START, previousStartAt: OLD_START }));
+
+    expect(announceMatchSchedule).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifyMatchScheduleChange_pendingRead_usesDatabaseClockAndAnnouncedTime", async () => {
+    const execute = mockMatch();
+
+    await notifyMatchScheduleChange(change());
+
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toContain("t.start_visibility_at <= NOW()");
+    expect(sql).toContain("n.start_at <=> m.start_at");
+    expect(sql).toContain("hb.setting_key = 'new_match_sweep_at'");
+    expect(params).toEqual([42]);
   });
 });
 

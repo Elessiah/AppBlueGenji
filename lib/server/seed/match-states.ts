@@ -11,6 +11,7 @@ import { matchMaxMaps, matchWinsRequired } from "@/lib/shared/match-format";
 import { mapListLimit } from "@/lib/shared/match-maps";
 import { SEED_TOURNAMENT_PREFIX, type ReportStateCounts, type TournamentDef } from "./cases";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
+import { NEW_MATCH_SINCE_KEY } from "@/lib/server/tournaments/new-match-notices";
 
 // Transforme des matchs READY en états intermédiaires du cycle de report :
 //  · pendingReports  → une seule équipe a reporté, délai en cours
@@ -493,4 +494,18 @@ function seedMapSequence(team1Wins: number, team2Wins: number): [number, number]
   }
   if (team1Wins + team2Wins > 0) maps.push(leader === 1 ? [2, 0] : [0, 2]);
   return maps;
+}
+
+/**
+ * Annonce d'un nouveau match (`docs/features/NEW_MATCH_NOTICE.md`) : la mise
+ * en service est posée sans marquer de match, comme une base neuve — tous les
+ * matchs appariés des tournois de test en cours, première manche comprise, sont
+ * annoncés au premier balayage local (bot injoignable : push seul, message
+ * privé perdu, journal pm2).
+ */
+export async function applyNewMatchNoticeCases(db: Pool): Promise<void> {
+  await db.execute(
+    `INSERT IGNORE INTO bg_settings (setting_key, setting_value) VALUES (?, DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'))`,
+    [NEW_MATCH_SINCE_KEY],
+  );
 }

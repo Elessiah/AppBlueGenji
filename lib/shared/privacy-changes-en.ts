@@ -853,6 +853,18 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: the content of the check-in (no BattleTag, Discord tag or player username), the direct message reserved for a certified Discord tag, and the “Discord direct messages about my matches” box in “My profile” to object to it.",
     ],
   },
+  "2026-11-annonce-nouveau-match": {
+    linkLabels: ["Read the “Match Discord direct messages” paragraph", "Read the “Push notifications” section"],
+    title: "Notice of a new match",
+    summary:
+      "As soon as both opponents of one of your matches are known, first round included, you are told: the opposing team, the time if it is set and the link to the match page, by Discord direct message and push notification.",
+    details: [
+      "Who is told: all members of both teams (or the player of a solo tournament, without the message naming their opponent) — nobody for a ghost team, and nothing for a match where a team is dissolved —, once per match and pairing, as soon as both opponents are known, first round included; if the time is already set, the announcement gives it and “Match scheduled” is not sent as well. No username, BattleTag or Discord tag appears in it, only team names.",
+      "Push notifications: this new topic, “New match”, is on by default on devices already subscribed, like every topic; you can turn it off in “My profile” — a time already set at pairing is only sent with it, and only the reminders give it again then. Discord direct message: only if your tag is certified, on the basis of legitimate interest (smooth running of tournaments); the “Discord direct messages about my matches” box in “My profile” turns it off with the others.",
+      "What the site keeps, with the tournament and erased with it or with either entrant once deleted (a dissolved team stays in the tournament, and the record with it): for each announced match, its place in the tournament, the numbers of both entrants, the announced time and the date of the record — or the mark that it was not announced (match already paired when the feature went live, team dissolved, sending failed three times) —, so it is announced only once per pairing; in a solo tournament, an entry's number leads to its player, who can no longer be recognised through it once their account is anonymised. Nothing new is collected about your account.",
+      "The register also states what the site already kept without saying so: the records of match starts sent (match, pairing and phase of the notice, with their date), kept with the match.",
+    ],
+  },
   "2026-11-mode-d-antenne-et-arbitre": {
     linkLabels: ["Read the “Match streaming” paragraph"],
     title: "Live mode: kept for whoever set it, and the assigned referee sets up the broadcast",

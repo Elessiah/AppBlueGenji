@@ -192,6 +192,7 @@ import { dispatchMatchVoiceChannels } from "./match-voice";
 import { dispatchDueRoundMapsNotices } from "./round-maps-notice";
 import { dispatchMatchStartNotices, notifyScoreToConfirm } from "./player-pushes";
 import { dispatchLobbyBriefs } from "./lobby-brief";
+import { dispatchNewMatchNotices } from "./new-match-notices";
 import { dispatchLiveAnnouncements } from "./live-announcements";
 import { purgeExpiredConnectionLogs } from "@/lib/server/connection-logs";
 import { maintainSiteVisitRetention } from "@/lib/server/site-visits-service";
@@ -663,6 +664,9 @@ export async function listTournamentBuckets(
   // Et le check-in du match (`./lobby-brief`), 15 minutes avant l'horaire (ou à
   // l'ouverture du salon d'un match sans horaire), à tous les joueurs.
   void dispatchLobbyBriefs().catch(() => undefined);
+  // Et l'annonce des nouveaux matchs (`./new-match-notices`) : une avancée
+  // passée par l'entretien passif n'a pas toujours d'évènement derrière elle.
+  void dispatchNewMatchNotices().catch(() => undefined);
   // Et les salons vocaux d'équipe (`./match-voice`) : création à T−15,
   // libération après le score.
   void dispatchMatchVoiceChannels();

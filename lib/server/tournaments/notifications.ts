@@ -38,6 +38,11 @@ function scheduleMatchStartNotices(): void {
   void import("./live-announcements")
     .then(({ dispatchLiveAnnouncements }) => dispatchLiveAnnouncements())
     .catch(() => undefined);
+  // Un score validé fait avancer le tournoi : le match suivant a peut-être ses
+  // deux engagées (`./new-match-notices`, après le commit, hors verrou).
+  void import("./new-match-notices")
+    .then(({ dispatchNewMatchNotices }) => dispatchNewMatchNotices())
+    .catch(() => undefined);
 }
 
 /**

@@ -25,6 +25,8 @@ import {
 import { DONNEES_PROFIL_EN, DROITS_EN } from "@/lib/shared/rgpd-policy-en";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
+import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 
 describe("clés de rendu de /rgpd", () => {
   // La page s'en sert comme `key` React : un doublon ferait confondre deux lignes.
@@ -200,11 +202,11 @@ describe("DONNEES_PROFIL", () => {
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord username")?.finalite).toMatch(/bot codes by direct message \(login, linking, certification\), bot notifications \(certified tag only\)/);
     // La certification filtre les messages de match : la base de ceux-ci (intérêt légitime) y figure.
     expect(DONNEES_PROFIL.find((d) => d.donnee === "Certification du pseudo Discord")?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE });
-    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Certification of the Discord username")?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: "match time notices, reminders, match removal notices, match check-ins and cast removal notices by direct message" });
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Certification of the Discord username")?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: "match time notices, reminders, match removal notices, match check-ins, new match announcements and cast removal notices by direct message" });
     // L'ID sert aussi, certifié ou non, aux avis passant par la portée « proven ».
     const id = DONNEES_PROFIL.find((d) => d.donnee === "ID Discord");
-    expect(id?.finalite).toMatch(/horaires, rappels, retrait de match, check-in d'un match en autogestion d'une équipe que tu gères ou de ton tournoi individuel, et retrait de ton cast — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, invitation d'une équipe, reprise d'équipe proposée ou propriété de ton équipe reçue, avis de suspension ou de modération, information sur tes données/);
-    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID")?.finalite).toMatch(/match times, reminders, removal, the check-in of a self-managed match of a team you manage or of your solo tournament, and removal of your cast — only if your tag is certified —, request to join a team you manage, a team's invitation, an offered team takeover or ownership of your team received, suspension or moderation notices, information about your data/);
+    expect(id?.finalite).toMatch(/horaires, rappels, retrait de match, check-in d'un match en autogestion d'une équipe que tu gères ou de ton tournoi individuel, annonce d'un nouveau match et retrait de ton cast — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, invitation d'une équipe, reprise d'équipe proposée ou propriété de ton équipe reçue, avis de suspension ou de modération, information sur tes données/);
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID")?.finalite).toMatch(/match times, reminders, removal, the check-in of a self-managed match of a team you manage or of your solo tournament, new match announcements and removal of your cast — only if your tag is certified —, request to join a team you manage, a team's invitation, an offered team takeover or ownership of your team received, suspension or moderation notices, information about your data/);
   });
 
   it("déclare, sur la certification, chaque public qu'elle ouvre — et celui qu'on choisit", () => {
@@ -487,17 +489,17 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     const t04 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04");
     // Les messages vont à tous les membres actifs des équipes, pas aux seuls joueurs.
     expect(t04?.dataSubjects).toContain("Autres membres des équipes engagées (coachs, managers, propriétaires)");
-    expect(t04?.legalBasis).toMatch(/intérêt légitime \(bon déroulement des tournois\) pour l'annonce des horaires de match, l'avis qu'un match quitte son programme et les rappels de match envoyés aux joueurs, le check-in d'un match en autogestion envoyé à ceux qui gèrent ses engagées \(ou au joueur d'une entrée individuelle\), et l'avis du retrait de son inscription envoyé à un caster, avec un droit d'opposition/);
+    expect(t04?.legalBasis).toMatch(/intérêt légitime \(bon déroulement des tournois\) pour l'annonce des horaires de match, l'avis qu'un match quitte son programme, l'annonce d'un nouveau match \(adversaire, horaire et lien, première manche comprise\) et les rappels de match envoyés aux joueurs, le check-in d'un match en autogestion envoyé à ceux qui gèrent ses engagées \(ou au joueur d'une entrée individuelle\), et l'avis du retrait de son inscription envoyé à un caster, avec un droit d'opposition/);
   });
 
   it("le droit d'opposition les nomme, en français et en anglais", () => {
     expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toContain(MATCH_TIME_DM_SCOPE);
     expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toContain(
-      "match time notices, reminders, match removal notices, match check-ins and cast removal notices by direct message",
+      "match time notices, reminders, match removal notices, match check-ins, new match announcements and cast removal notices by direct message",
     );
     // L'avis « Match retiré » et la case de Mon profil (revue juridique #444) ;
     // check-in du match (MATCH-CHECKIN) et retrait d'un cast (revue juridique de #491).
-    expect(MATCH_TIME_DM_SCOPE).toBe("annonces d'horaire, rappels, avis de retrait de match, check-in du match et avis du retrait d'un cast en message privé");
+    expect(MATCH_TIME_DM_SCOPE).toBe("annonces d'horaire, rappels, avis de retrait de match, check-in du match, annonces d'un nouveau match et avis du retrait d'un cast en message privé");
     expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/case « Messages privés Discord de mes matchs » de Mon profil/);
     expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/“Discord direct messages about my matches” box in My profile/);
   });
@@ -567,7 +569,7 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
   it("la portée est traduite en anglais", () => {
     const entry = DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID");
     expect(entry?.extraBases).toEqual([
-      { base: "Intérêt légitime", scope: "match time notices, reminders, match removal notices, match check-ins and cast removal notices by direct message" },
+      { base: "Intérêt légitime", scope: "match time notices, reminders, match removal notices, match check-ins, new match announcements and cast removal notices by direct message" },
       { base: "Intérêt légitime", scope: "suspension or moderation notices by direct message" },
       { base: "Obligation légale", scope: "information about your data by direct message" },
     ]);
@@ -599,5 +601,87 @@ describe("groupedExtraBases", () => {
       { base: "Exécution du contrat", scopes: ["portée B"] },
       { base: "Intérêt légitime", scopes: ["portée C"] },
     ]);
+  });
+});
+
+describe("annonce d'un nouveau match — textes légaux (revue juridique de #569)", () => {
+  const t04 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")!;
+  const t04En = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")!;
+
+  it("registerT04_purposes_listNewMatchAnnouncementInFrAndEn", () => {
+    expect(t04.subPurposes.join("\n")).toMatch(/Annoncer en message privé Discord et en push un nouveau match[^\n]*une seule fois par match et par affiche/);
+    expect(t04En.subPurposes.join("\n")).toMatch(/Announcing a new match[^\n]*once per match and pairing/);
+  });
+
+  it("registerT04_retention_newMatchRecordsListAnnouncedTimeAndSkippedMark", () => {
+    const fr = t04.retention.find((line) => line.includes("annonce d'un nouveau match"));
+    const en = t04En.retention.find((line) => line.includes("notice of a new match"));
+    expect(fr).toMatch(/horaire annoncé et date de la trace, ou la marque qu'il n'a pas été annoncé — match déjà apparié à la mise en service, équipe dissoute, envoi échoué trois fois\)/);
+    expect(en).toMatch(/the announced time and the date of the record, or the mark that it was not announced — match already paired when the feature went live, team dissolved, sending failed three times\)/);
+    expect(en).not.toMatch(/never goes out twice, erased with it/);
+  });
+
+  it("registerBotEntry_deliveries_includeNewMatchAnnouncement", () => {
+    const bot = PROCESSING_ACTIVITIES.find((activity) => activity.name === "Bot Discord BlueGenji")!;
+    const botEn = PROCESSING_ACTIVITIES_EN.find((activity) => activity.name === "BlueGenji Discord bot")!;
+    expect(bot.subPurposes.join("\n")).toContain("annonce d'un nouveau match aux membres de ses deux équipes");
+    expect(botEn.subPurposes.join("\n")).toContain("the announcement of a new match to the members of both its teams");
+  });
+
+  it("privacyChange_newMatchEntry_saysOncePerPairingAndAnnouncedTimeInFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === "2026-11-annonce-nouveau-match")!;
+    const en = PRIVACY_CHANGES_EN["2026-11-annonce-nouveau-match"];
+    expect(fr.details.join("\n")).toContain("une seule fois par match et par affiche");
+    expect(fr.details.join("\n")).toContain("l'horaire annoncé");
+    expect(en.details.join("\n")).toContain("once per match and pairing");
+    expect(en.details.join("\n")).toContain("the announced time");
+    expect(en.details).toHaveLength(fr.details.length);
+  });
+
+  it("registerT04_categoriesAndPushRecipients_coverNewMatchRecordsAndAllMembers", () => {
+    expect(t04.dataCategories).toContain("Annonces d'un nouveau match : place du match dans le tournoi, numéros des deux engagées, horaire annoncé et date de la trace, ou marque d'un match non annoncé");
+    expect(t04En.dataCategories).toContain("New-match announcements: the match's place in the tournament, numbers of both entrants, announced time and date of the record, or the mark of a match not announced");
+    expect(t04.recipients.join("\n")).toContain("membre d'une équipe engagée, joueur d'un tournoi individuel : nouveau match");
+    expect(t04En.recipients.join("\n")).toContain("member of an entered team, player of a solo tournament: new match");
+  });
+
+  it("privacyChange_newMatchEntry_excludesGhostAndDissolvedTeamsInFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === "2026-11-annonce-nouveau-match")!;
+    const en = PRIVACY_CHANGES_EN["2026-11-annonce-nouveau-match"];
+    expect(fr.details[0]).toContain("personne pour une équipe fantôme, et rien pour un match dont une équipe est dissoute");
+    expect(en.details[0]).toContain("nobody for a ghost team, and nothing for a match where a team is dissolved");
+  });
+
+  it("donneesProfil_discordId_listsNewMatchDmInFrAndEn", () => {
+    expect(DONNEES_PROFIL.find((d) => d.donnee === "ID Discord")?.finalite).toContain("annonce d'un nouveau match et retrait de ton cast");
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID")?.finalite).toContain("new match announcements and removal of your cast");
+  });
+
+  it("newMatchNoticesSchema_entrantColumns_cascadeWithEitherEntrant", () => {
+    const schema = readFileSync(join(process.cwd(), "lib", "server", "database", "schema", "notifications.ts"), "utf8");
+    const table = schema.slice(schema.indexOf("CREATE TABLE IF NOT EXISTS bg_new_match_notices"));
+    expect(table).toMatch(/FOREIGN KEY \(team_low_id\)\s+REFERENCES bg_teams\(id\) ON DELETE CASCADE/);
+    expect(table).toMatch(/FOREIGN KEY \(team_high_id\)\s+REFERENCES bg_teams\(id\) ON DELETE CASCADE/);
+  });
+
+  it("registerAndPrivacyChange_newMatchRecords_erasedWithEitherEntrantInFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === "2026-11-annonce-nouveau-match")!;
+    const en = PRIVACY_CHANGES_EN["2026-11-annonce-nouveau-match"];
+    expect(t04.retention.join("\n")).toContain("effacées avec lui ou avec l'une des deux engagées une fois supprimée — une équipe dissoute reste au tournoi");
+    expect(t04En.retention.join("\n")).toContain("erased with it or with either entrant once deleted — a dissolved team stays in the tournament");
+    expect(fr.details[2]).toContain("effacé avec lui ou avec l'une des deux engagées une fois supprimée (une équipe dissoute reste au tournoi");
+    expect(en.details[2]).toContain("erased with it or with either entrant once deleted (a dissolved team stays in the tournament");
+  });
+
+  it("privacyChange_newMatchTopicOff_disclosesTimeAtPairingGoesOnlyWithItInFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === "2026-11-annonce-nouveau-match")!;
+    const en = PRIVACY_CHANGES_EN["2026-11-annonce-nouveau-match"];
+    expect(fr.details[1]).toContain("l'horaire déjà posé à l'appariement ne part qu'avec lui");
+    expect(en.details[1]).toContain("a time already set at pairing is only sent with it");
+  });
+
+  it("donneesProfil_matchDmChoice_mentionsNewMatchInFrAndEn", () => {
+    expect(DONNEES_PROFIL.find((d) => d.donnee === "Choix des messages privés de match")?.finalite).toContain("l'annonce d'un nouveau match");
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Match direct messages choice")?.finalite).toContain("to announce a new match");
   });
 });

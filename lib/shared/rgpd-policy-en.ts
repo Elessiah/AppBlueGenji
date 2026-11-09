@@ -66,7 +66,7 @@ const SCOPE_EN: Record<string, string> = {
     "the same presentation of your certified Discord tag as assigned referee, as long as you have not accepted version 9 of the terms of use or a later version — objection through the report form, GDPR category (once upheld, you are removed from all your unfinished matches and can no longer take one or be assigned one until it is lifted — at your request only —, even once version 9 or a later one is accepted)",
   [VERIFIED_BADGE_SCOPE]:
     "certification badge on your player page, read by any logged-in player even when the tag is hidden (without the tag) — objection through the report form, GDPR category",
-  [MATCH_TIME_DM_SCOPE]: "match time notices, reminders, match removal notices, match check-ins and cast removal notices by direct message",
+  [MATCH_TIME_DM_SCOPE]: "match time notices, reminders, match removal notices, match check-ins, new match announcements and cast removal notices by direct message",
   [MODERATION_DM_SCOPE]: "suspension or moderation notices by direct message",
   [DATA_NOTICE_DM_SCOPE]: "information about your data by direct message",
   [LIVE_PSEUDO_SCOPE]: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request",
@@ -94,7 +94,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Discord ID",
-    "Means of logging in (Discord button, or code received by direct message) — stored only if you link Discord. Also used by the bot to write to you by direct message (match times, reminders, removal, the check-in of a self-managed match of a team you manage or of your solo tournament, and removal of your cast — only if your tag is certified —, request to join a team you manage, a team's invitation, an offered team takeover or ownership of your team received, suspension or moderation notices, information about your data). Removable from My profile as long as you have another one left",
+    "Means of logging in (Discord button, or code received by direct message) — stored only if you link Discord. Also used by the bot to write to you by direct message (match times, reminders, removal, the check-in of a self-managed match of a team you manage or of your solo tournament, new match announcements and removal of your cast — only if your tag is certified —, request to join a team you manage, a team's invitation, an offered team takeover or ownership of your team received, suspension or moderation notices, information about your data). Removable from My profile as long as you have another one left",
   ],
   [
     "Google identifier",
@@ -122,7 +122,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Match direct messages choice",
-    "Ticked by default: the bot writes to you privately about the time, reminders and removal of your matches, if your Discord tag is certified; unticked in My profile (your objection), it no longer does. Kept under a legal obligation: that is what allows your objection to keep being honoured. Included in the export of your data, reset to the default if the account is anonymized",
+    "Ticked by default: the bot writes to you privately about the time, reminders and removal of your matches and to announce a new match, if your Discord tag is certified; unticked in My profile (your objection), it no longer does. Kept under a legal obligation: that is what allows your objection to keep being honoured. Included in the export of your data, reset to the default if the account is anonymized",
   ],
   [
     "Recruitment “Don't show again” choice",
@@ -194,7 +194,7 @@ export const DROITS_EN: DroitEntry[] = [
   },
   {
     title: "Right to object",
-    text: "You can object to the processing of your data based on legitimate interest (tournament history, match time notices, reminders, match removal notices, match check-ins and cast removal notices by direct message — these messages are turned off directly with the “Discord direct messages about my matches” box in My profile — and the certification badges on your player page, certified Discord tag and “Verified BattleTag”, the check, when a staff member referees a match, that they do not play in it (impartial refereeing), showing the assigned referee's username to any signed-in member, the presentation of the assigned referee to the parties to their matches — username and BattleTag in Overwatch as long as they have not accepted version 7 of the terms of use or a later version, certified Discord tag as long as they have not accepted version 9 or a later version —, through the report form, GDPR category). The username posted in the #live announcement of a solo tournament is not part of it: it falls under performance of the service you register for — not being named in it means not registering; a past announcement is deleted on request. The AutoMod alert for such an announcement when blocked or flagged, kept to moderate the Discord server (legitimate interest), is deleted on request: that is how you object to it.",
+    text: "You can object to the processing of your data based on legitimate interest (tournament history, match time notices, reminders, match removal notices, match check-ins, new match announcements and cast removal notices by direct message — these messages are turned off directly with the “Discord direct messages about my matches” box in My profile — and the certification badges on your player page, certified Discord tag and “Verified BattleTag”, the check, when a staff member referees a match, that they do not play in it (impartial refereeing), showing the assigned referee's username to any signed-in member, the presentation of the assigned referee to the parties to their matches — username and BattleTag in Overwatch as long as they have not accepted version 7 of the terms of use or a later version, certified Discord tag as long as they have not accepted version 9 or a later version —, through the report form, GDPR category). The username posted in the #live announcement of a solo tournament is not part of it: it falls under performance of the service you register for — not being named in it means not registering; a past announcement is deleted on request. The AutoMod alert for such an announcement when blocked or flagged, kept to moderate the Discord server (legitimate interest), is deleted on request: that is how you object to it.",
   },
   {
     title: "Right to data portability",
