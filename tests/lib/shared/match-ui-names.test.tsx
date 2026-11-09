@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { applyLiveMessage } from "@/app/(secured)/tournois/[id]/_lib/live-state";
 import { MapScoreList } from "@/app/(secured)/tournois/[id]/_components/MapScoreList";
 import { refereeReadyRereadDue } from "@/components/match-launch/MatchContactsDialog";
+import { splitChannelText } from "@/components/cyber/landing/LiveCard";
 import { missingRefereeNamesKey, parseRefereeNames, refereeNameOf, refereeNamesImprove, showsRefereeName } from "@/lib/shared/match-referee";
 import type { MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { matchMapNames, type RoundMapConfig } from "@/lib/shared/round-maps";
@@ -237,11 +238,20 @@ describe("MapScoreList — nom des cartes", () => {
 });
 
 describe("LiveCard — casse des chaînes (décision 53)", () => {
-  it("LiveCard_channelPresent_streamButtonHasKeepCase", () => {
+  it("LiveCard_channelPresent_onlyChannelKeepsCase", () => {
     const css = readSource("components/cyber/landing/LiveCard.module.css");
     const card = readSource("components/cyber/landing/LiveCard.tsx");
 
-    expect(css).toMatch(/\.streamButton\.keepCase \{\n\s*text-transform: none;/);
-    expect(card).toContain("channel ? styles.keepCase : null");
+    expect(css).toMatch(/^\.keepCase \{\n\s*text-transform: none;/m);
+    expect(card).toContain("<span className={styles.keepCase}>{parts.channel}</span>");
+  });
+
+  it("splitChannelText_channelInText_splitsAroundIt", () => {
+    expect(splitChannelText("Regarder BlueGenji", "BlueGenji")).toEqual({ before: "Regarder ", channel: "BlueGenji", after: "" });
+  });
+
+  it("splitChannelText_noChannelOrAbsent_returnsNull", () => {
+    expect(splitChannelText("Regarder sur Twitch", null)).toBeNull();
+    expect(splitChannelText("Regarder sur Twitch", "bluegenji")).toBeNull();
   });
 });

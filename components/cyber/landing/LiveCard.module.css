@@ -273,7 +273,7 @@
 
 /* Bouton au nom d'une chaîne : la casse saisie dans le lien reste
    (« BlueGenji », pas « BLUEGENJI ») — LIVE_STREAMS.md. */
-.streamButton.keepCase {
+.keepCase {
   text-transform: none;
   letter-spacing: 0.04em;
 }

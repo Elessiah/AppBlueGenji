@@ -55,8 +55,9 @@ export type CastClaimOutcome = { ok: true } | { ok: false; code: string; message
  * Entrée réflexe sur un bouton radio ne doit pas inscrire un caster.
  *
  * Un stream choisi qui disparaît (son dernier caster parti) démonte son bouton
- * radio : le focus passe au premier choix restant et une annonce
- * (`aria-live`) dit pourquoi « Caster ce match » est désarmé.
+ * radio : le focus passe au premier choix restant et une notification dit
+ * pourquoi « Caster ce match » est désarmé (une zone `aria-live` à défaut de
+ * notifications, jamais les deux).
  *
  * `onClaim` envoie le corps (`castClaimBody`) et notifie l'issue ; un lien
  * refusé par le serveur est en plus rattaché au champ (`useFieldErrors`).
@@ -189,10 +190,14 @@ export function CastClaimDialog({
           );
         })}
       </fieldset>
-      {/* Annonce seule (lecteur d'écran) : le toast dit déjà la disparition à l'écran. */}
-      <output className="sr-only" aria-live="polite">
-        {gone ? t("cardActions.claimDialog.gone") : ""}
-      </output>
+      {/* Repli sans notifications (lecteur d'écran seul) : sous un
+          ToastProvider, le toast l'annonce déjà — une seconde zone vive la
+          ferait entendre deux fois. */}
+      {toast ? null : (
+        <output className="sr-only" aria-live="polite">
+          {gone ? t("cardActions.claimDialog.gone") : ""}
+        </output>
+      )}
       {separate && (
         <>
           <CastUrlField

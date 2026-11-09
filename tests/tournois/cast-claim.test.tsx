@@ -45,6 +45,7 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text";
 import { bracketMatch, matchCaster } from "../helpers/bracket-match";
 import { readSource } from "../helpers/read-source";
+import { ToastProvider } from "@/components/ui/toast";
 import frActions from "@/messages/fr/tournamentActions.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 import enActions from "@/messages/en/tournamentActions.json";
@@ -262,9 +263,23 @@ describe("CastClaimDialog — rendu", () => {
     expect(html).toContain("Passage à l&#x27;antenne");
   });
 
-  it("l'annonce du stream disparu est une zone vive toujours montée, vide tant que le choix existe", () => {
-    // Annonce réservée au lecteur d'écran (`sr-only`) : le toast la dit déjà à l'écran.
+  it("sans notifications, l'annonce du stream disparu est une zone vive montée, vide tant que le choix existe", () => {
     expect(renderDialog("fr")).toContain('</fieldset><output class="sr-only" aria-live="polite"></output>');
+  });
+
+  it("CastClaimDialog_underToastProvider_noSecondLiveRegion", () => {
+    const html = renderToStaticMarkup(
+      <ToastProvider>
+        <CastClaimDialog
+          match={TWO_STREAMS}
+          matchLabel="Alpha contre Bravo"
+          onClose={() => undefined}
+          onClaim={async () => ({ ok: true })}
+        />
+      </ToastProvider>,
+    );
+
+    expect(html).not.toContain('<output class="sr-only" aria-live="polite">');
   });
 
   it("le champ du lien n'apparaît qu'en choisissant son propre stream", () => {
