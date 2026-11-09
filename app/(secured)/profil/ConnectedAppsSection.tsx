@@ -279,7 +279,7 @@ export function ConnectedAppsSection({
         />
       ) : null}
 
-      {children}
+      {children ? <div className={s.accountFields}>{children}</div> : null}
 
       <OtherSessionsPanel version={sessionsVersion} />
     </>
