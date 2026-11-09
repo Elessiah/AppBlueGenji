@@ -39,14 +39,10 @@ const STATUSES: Readonly<Record<string, number>> = {
   MATCH_NOT_CASTABLE: 409,
   MATCH_START_AT_REQUIRED: 409,
   CAST_STREAM_NOT_OWNED: 409,
+  CAST_STREAM_LINK_HELD: 409,
   STAFF_STREAM_FORBIDDEN: 403,
   NOT_MATCH_CASTER: 403,
 };
-
-/** Corps de requête lu, ou le refus déjà formé (`bodyReadRefusal`). */
-function castBody(req: Request): Promise<{ body: unknown } | { refusal: string }> {
-  return readOptionalJsonBody(req, "INVALID_CAST_TARGET");
-}
 
 /**
  * S'inscrire pour caster un match. Permission `live`, **et** tag Discord
@@ -68,7 +64,7 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
-  const read = await castBody(req);
+  const read = await readOptionalJsonBody(req, "INVALID_CAST_TARGET");
   if ("refusal" in read) return fail(read.refusal, 400);
   const target = parseCastTarget(read.body);
   if (target === null) return fail("INVALID_CAST_TARGET", 400);
@@ -125,7 +121,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
-  const read = await castBody(req);
+  const read = await readOptionalJsonBody(req, "INVALID_CAST_SETTINGS");
   if ("refusal" in read) return fail(read.refusal, 400);
   const settings = parseCastSettings(read.body);
   if (settings === null) return fail("INVALID_CAST_SETTINGS", 400);

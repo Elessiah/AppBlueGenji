@@ -4,12 +4,12 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/landing-cache");
 jest.mock("@/lib/server/avatar-rotation");
-jest.mock("@/lib/server/tournaments/referee-names", () => ({ forgetRefereeNames: jest.fn() }));
+jest.mock("@/lib/server/tournaments/referee-names", () => ({ forgetRefereeNamesOf: jest.fn() }));
 
 import { getDatabase } from "@/lib/server/database";
 import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
-import { forgetRefereeNames } from "@/lib/server/tournaments/referee-names";
+import { forgetRefereeNamesOf } from "@/lib/server/tournaments/referee-names";
 import { updateOwnProfile } from "@/lib/server/users/profile-update";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { fakePool } from "../../helpers/sql-double";
@@ -44,12 +44,13 @@ describe("updateOwnProfile — vues de la vitrine", () => {
     );
   });
 
-  it("updateOwnProfile_pseudoChanged_forgetsCachedRefereeNames", async () => {
+  it("updateOwnProfile_pseudoChanged_forgetsCachedRefereeNamesOfThisUser", async () => {
     mockDb(matched);
 
     await updateOwnProfile(42, { pseudo: "Nova" });
 
-    expect(forgetRefereeNames).toHaveBeenCalledTimes(1);
+    expect(forgetRefereeNamesOf).toHaveBeenCalledTimes(1);
+    expect(forgetRefereeNamesOf).toHaveBeenCalledWith(42);
   });
 
   it("updateOwnProfile_noPseudoInPatch_keepsCachedRefereeNames", async () => {
@@ -57,7 +58,7 @@ describe("updateOwnProfile — vues de la vitrine", () => {
 
     await updateOwnProfile(42, { visibility: { avatar: true } });
 
-    expect(forgetRefereeNames).not.toHaveBeenCalled();
+    expect(forgetRefereeNamesOf).not.toHaveBeenCalled();
   });
 
   it("updateOwnProfile_accountDeleted_keepsCachedRefereeNames", async () => {
@@ -65,7 +66,7 @@ describe("updateOwnProfile — vues de la vitrine", () => {
 
     await expect(updateOwnProfile(42, { pseudo: "Nova" })).rejects.toThrow(ACCOUNT_DELETED_ERROR);
 
-    expect(forgetRefereeNames).not.toHaveBeenCalled();
+    expect(forgetRefereeNamesOf).not.toHaveBeenCalled();
   });
 
   it("updateOwnProfile_visibilityOnlyPatch_doesNotInvalidateLanding", async () => {

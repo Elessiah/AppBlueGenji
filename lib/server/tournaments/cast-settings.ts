@@ -27,7 +27,7 @@ import { castBeforeLaunch } from "@/lib/shared/match-launch";
 import type { TournamentGame } from "@/lib/shared/types";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { loadShownCasterIds } from "./cast-eligibility";
-import { hasStaffLink, lockMatchStreams, pruneMatchStreams, type MatchStreamRow } from "./match-casters";
+import { hasStaffLink, lockMatchStreams, pruneMatchStreams, streamLinkHolder, type MatchStreamRow } from "./match-casters";
 // Type seul : aucune dépendance d'exécution vers le lancement, qui importe ce
 // module (le verrou de la ligne du match et la transaction y vivent).
 import type { LaunchMatchRow } from "./match-launch";
@@ -199,7 +199,7 @@ async function castTriggerHold(connection: PoolConnection, row: LaunchMatchRow, 
  * Jamais celui du staff (`casterStreamEditable`) : un caster qui a rejoint « le
  * stream du match » lit la chaîne de l'organisation, il ne la réécrit pas
  * (`CAST_STREAM_NOT_OWNED`) ; ni le lien qu'un co-caster encore sur le stream
- * a fourni, staff compris (celui d'un caster parti se reprend). Le lien posé lui est rattaché (`link_user_id`) et
+ * a fourni (`CAST_STREAM_LINK_HELD`), staff compris (celui d'un caster parti se reprend). Le lien posé lui est rattaché (`link_user_id`) et
  * part avec son compte (`withdrawUserCasts`) : un caster ne dit jamais un lien
  * « de l'organisation » (décision du 2026-11-09), seul le staff le fait dans la
  * configuration du direct (`setMatchLiveConfig`).
@@ -211,7 +211,7 @@ async function castTriggerHold(connection: PoolConnection, row: LaunchMatchRow, 
  * sur aucune vue, et le staff le prendrait pour le sien (`staffStream`, le
  * premier stream sans lien) — exigé ici comme à l'inscription.
  *
- * @throws `STREAM_NOT_FOUND` | `CAST_STREAM_NOT_OWNED` | `INVALID_STREAM_URL`
+ * @throws `STREAM_NOT_FOUND` | `CAST_STREAM_NOT_OWNED` | `CAST_STREAM_LINK_HELD` | `INVALID_STREAM_URL`
  *   | `STREAM_URL_REQUIRED`
  */
 export async function setCasterStreamUrl(
@@ -237,9 +237,9 @@ export async function setCasterStreamUrl(
   // remplace par cette route, staff compris (l'arbitre le corrige dans la
   // configuration du direct).
   if (target.liveUrl !== null) {
-    const holder = await streamHolderCasting(connection, matchId, streamId);
+    const holder = await streamLinkHolder(connection, matchId, streamId);
     if (holder.userId === null ? !manages : holder.userId !== linkUserId && (await showsOnStream(connection, matchId, holder.userId, holder.casts, visibility))) {
-      throw new Error("CAST_STREAM_NOT_OWNED");
+      throw new Error(holder.userId === null ? "CAST_STREAM_NOT_OWNED" : "CAST_STREAM_LINK_HELD");
     }
   }
   await connection.execute(
@@ -251,25 +251,6 @@ export async function setCasterStreamUrl(
 
 /** Ce qui dit si un caster est montré (`loadShownCasterIds`) : le jeu du match, et s'il est encore avant le lancement. */
 export type CastVisibility = { game: TournamentGame; beforeLaunch: boolean };
-
-/** Qui a fourni le lien d'un stream (`null` = l'organisation), et s'il caste encore ce stream. */
-type StreamHolder = { userId: number | null; casts: boolean };
-
-/**
- * Le fournisseur du lien d'un stream et sa présence parmi les casters de ce
- * stream, **en une lecture** sous le verrou du match.
- */
-async function streamHolderCasting(connection: PoolConnection, matchId: number, streamId: number): Promise<StreamHolder> {
-  const [rows] = await connection.execute<RowDataPacket[]>(
-    `SELECT s.link_user_id,
-            EXISTS (SELECT 1 FROM bg_match_casters mc
-                     WHERE mc.match_id = ? AND mc.stream_id = s.id AND mc.user_id = s.link_user_id) AS holder_casts
-       FROM bg_match_streams s WHERE s.id = ? LIMIT 1`,
-    [matchId, streamId],
-  );
-  const raw = rows[0]?.link_user_id;
-  return { userId: raw === null || raw === undefined ? null : Number(raw), casts: Number(rows[0]?.holder_casts ?? 0) === 1 };
-}
 
 /**
  * Le fournisseur du lien caste-t-il encore ce stream du match **en caster

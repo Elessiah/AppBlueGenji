@@ -62,7 +62,7 @@ Fenêtre du caster, sur **son** cast :
 - **lien de sa chaîne** — celui du stream qu'il tient ; le stream du staff se
   lit seulement (`CAST_STREAM_NOT_OWNED` au serveur, champ en lecture seule avec
   sa note dans la fenêtre). Le lien qu'un co-caster encore sur le stream a
-  fourni ne se remplace que par lui (`CAST_STREAM_NOT_OWNED`, staff compris :
+  fourni ne se remplace que par lui (`CAST_STREAM_LINK_HELD`, staff compris :
   l'arbitre le corrige dans la configuration du direct) ; celui d'un caster
   parti se reprend. Le lien reste
   obligatoire : pour s'en défaire, on ne caste plus (un `liveUrl` vide ou nul :
@@ -140,7 +140,7 @@ Un corps qui dit `organisationLink: true` (quel que soit le lecteur) : 403
 qu'envoie encore une fenêtre ouverte avant la mise à jour) passe sans effet ; toute
 autre valeur (`"true"`, `1`, `null`) : 400 `INVALID_ORGANISATION_LINK`. Les refus des réglages portent leur code
 (`tournamentErrors.json` FR et EN, `LAUNCH_ERROR_MESSAGES`) :
-`STREAM_URL_REQUIRED`, `INVALID_CAST_BATTLETAG`, `CAST_STREAM_NOT_OWNED`,
+`STREAM_URL_REQUIRED`, `INVALID_CAST_BATTLETAG`, `CAST_STREAM_NOT_OWNED`, `CAST_STREAM_LINK_HELD`,
 `INVALID_CAST_SETTINGS`, `MATCH_NOT_CASTABLE`, `MATCH_START_AT_REQUIRED`.
 
 La fenêtre n'envoie le mode d'antenne que si le caster en a **choisi** un autre :

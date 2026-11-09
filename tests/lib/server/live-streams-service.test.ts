@@ -223,14 +223,15 @@ describe("setMatchLiveConfig", () => {
       if (sql.startsWith("SELECT match_id, user_id, stream_id, ready_at FROM bg_match_casters")) {
         return [state.casters.map((caster) => ({ ...caster, match_id: row.id, ready_at: null }))];
       }
-      if (sql.startsWith("SELECT DISTINCT stream_id FROM bg_match_casters WHERE match_id = ? AND user_id <> ?")) {
+      if (sql.startsWith("SELECT user_id, stream_id FROM bg_match_casters WHERE match_id = ?")) {
         state.heldReads += 1;
-        const held = state.casters.filter((caster) => caster.user_id !== params[1] && caster.stream_id !== null);
-        return [[...new Set(held.map((caster) => caster.stream_id))].map((streamId) => ({ stream_id: streamId }))];
+        return [state.casters.map((caster) => ({ user_id: caster.user_id, stream_id: caster.stream_id }))];
       }
-      if (sql.startsWith("SELECT link_user_id FROM bg_match_streams WHERE id = ?")) {
+      if (sql.startsWith("SELECT s.link_user_id,")) {
         state.holderReads += 1;
-        return [[{ link_user_id: byId(state, params[0])?.link_user_id ?? null }]];
+        const provider = byId(state, params[1])?.link_user_id ?? null;
+        const casts = state.casters.some((caster) => caster.stream_id === params[1] && caster.user_id === provider);
+        return [[{ link_user_id: provider, holder_casts: casts ? 1 : 0 }]];
       }
       if (sql.startsWith("SELECT 1 FROM bg_match_streams")) {
         // Lien de l'organisation présent ? (démarquage par la seule `live`)
@@ -1014,6 +1015,25 @@ describe("setMatchLiveConfig", () => {
     ).rejects.toThrow("NOT_MATCH_CASTER");
 
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchLiveConfig_liveHolderNotCastingLinkOnUnmarkedMatch_throwsNotMatchCasterFirst", async () => {
+    // Le rôle se juge avant le mode : pas de `MATCH_NOT_STREAMED` pour un appelant sans droit.
+    const world = liveWorld(matchRow({ live_trigger: null }));
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: undefined, liveUrl: "twitch.tv/autre", setter: ORGANISER_5, access: LIVE_ONLY }),
+    ).rejects.toThrow("NOT_MATCH_CASTER");
+  });
+
+  it("setMatchLiveConfig_noLiveNotRefereeLinkOnUnmarkedMatch_throwsNotMatchRefereeFirst", async () => {
+    const world = liveWorld(matchRow({ live_trigger: null }));
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: undefined, liveUrl: "twitch.tv/autre", setter: ORGANISER_5, access: REFEREE_ONLY }),
+    ).rejects.toThrow("NOT_MATCH_REFEREE");
   });
 
   it("setMatchLiveConfig_coCasterResendsSameStaffLinkOnOtherCasterMode_passes", async () => {

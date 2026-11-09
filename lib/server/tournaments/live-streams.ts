@@ -20,6 +20,7 @@ import {
   normalizeStreamUrl,
   parseStreamUrlInput,
   requiresMatchStartAt,
+  streamsHeldByOtherCasters,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
 import { castBeforeLaunch, launchPairingKey } from "@/lib/shared/match-launch";
@@ -298,6 +299,9 @@ export async function setMatchLiveConfig(
       // Verrou du match d'abord, puis ses streams et casters : le même ordre
       // que l'inscription d'un caster (`claimMatchCast`).
       const { row: current, hold, actorShown } = await lockLiveMatch(connection, matchId, actor);
+      // Le rôle d'abord : un appelant sans droit reçoit son refus, jamais
+      // celui du mode (`MATCH_NOT_STREAMED`) que `lockedTrigger` jugerait.
+      assertLiveActor(hold, actor, config.access.live, actorShown);
       const trigger = lockedTrigger(config, hold);
       const url = parseStreamUrlInput(trigger === null ? null : (config.liveUrl ?? null));
       const triggerChanges = assertLiveConfigAllowed(current, hold, actor, trigger, {
@@ -548,7 +552,7 @@ async function planStaffStreamUrl(
     // autre membre qui réenregistre tel quel ne donne pas à l'organisation la
     // chaîne d'autrui ; et l'inverse ne se dit pas — la case, décochée par
     // défaut, ne distingue pas « le mien » de « rien dit ».
-    if (url !== null && setter.asOrganisation && (await streamLinkHolder(connection, staff.id)) === setter.userId) {
+    if (url !== null && setter.asOrganisation && (await streamLinkHolder(connection, matchId, staff.id)).userId === setter.userId) {
       return { kind: "origin", id: staff.id };
     }
     return { kind: "none" };
@@ -561,14 +565,20 @@ async function planStaffStreamUrl(
   return free === null ? { kind: "insert" } : { kind: "update", id: free.id };
 }
 
-/** Les streams du match qu'un autre caster que `userId` tient (lecture sous le verrou du match). */
+/**
+ * Les streams du match qu'un autre caster que `userId` tient (lecture sous le
+ * verrou du match) : la règle de la fenêtre (`streamsHeldByOtherCasters`),
+ * appliquée aux casters lus ici.
+ */
 async function streamsHeldByOthers(connection: PoolConnection, matchId: number, userId: number): Promise<Set<number>> {
   const [rows] = await connection.execute<RowDataPacket[]>(
-    `SELECT DISTINCT stream_id FROM bg_match_casters
-      WHERE match_id = ? AND user_id <> ? AND stream_id IS NOT NULL`,
-    [matchId, userId],
+    `SELECT user_id, stream_id FROM bg_match_casters WHERE match_id = ?`,
+    [matchId],
   );
-  return new Set(rows.map((row) => Number(row.stream_id)));
+  return streamsHeldByOtherCasters(
+    rows.map((row) => ({ userId: Number(row.user_id), streamId: row.stream_id === null ? null : Number(row.stream_id) })),
+    userId,
+  );
 }
 
 /**
@@ -694,14 +704,25 @@ function assertLiveConfigAllowed(
     keepsMode,
   }: { editsStreamLinks: boolean; live: boolean; actorShown: boolean; keepsMode: boolean },
 ): boolean {
-  const referee = isMatchRefereeActor(hold, actor);
-  if (!live && !referee) throw new Error("NOT_MATCH_REFEREE");
-  if (!referee && !actor.manages && !actorShown) throw new Error("NOT_MATCH_CASTER");
+  const referee = assertLiveActor(hold, actor, live, actorShown);
   assertConfigurable(current, trigger, keepsMode);
   const triggerChanges = trigger !== hold.trigger;
   if (triggerChanges && !mayChangeLiveTrigger(hold, actor, actorShown)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
   if (editsStreamLinks && !referee) throw new Error("NOT_MATCH_REFEREE");
   return triggerChanges;
+}
+
+/**
+ * Le droit de l'appelant sur ce match, jugé sous le verrou avant tout le
+ * reste : ni `live` ni arbitre retenu → `NOT_MATCH_REFEREE` ; `live` sans
+ * gérer les tournois ni caster montré du match → `NOT_MATCH_CASTER`. Rend vrai
+ * pour l'arbitre retenu.
+ */
+function assertLiveActor(hold: LiveTriggerHold, actor: LiveTriggerActor, live: boolean, actorShown: boolean): boolean {
+  const referee = isMatchRefereeActor(hold, actor);
+  if (!live && !referee) throw new Error("NOT_MATCH_REFEREE");
+  if (!referee && !actor.manages && !actorShown) throw new Error("NOT_MATCH_CASTER");
+  return referee;
 }
 
 /**

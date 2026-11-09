@@ -139,6 +139,20 @@ describe("PUT /api/matches/[matchId]/caster", () => {
     expect(setCastSettings).toHaveBeenCalledWith(42, 4, true, {}, { oversees: false, manages: false });
   });
 
+  it("casterPut_brokenJson_returnsInvalidCastSettings", async () => {
+    // Un corps illisible sur PUT porte le code des réglages, pas celui de l'inscription.
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    const broken = new Request("http://localhost/api/matches/42/caster", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: "{ pas du json",
+    });
+    const res = await casterPut(broken, params("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_CAST_SETTINGS" });
+    expect(setCastSettings).not.toHaveBeenCalled();
+  });
+
   it("casterPut_wrongFieldType_returns400", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     const res = await casterPut(jsonRequest("PUT", { battletag: 12 }), params("42"));
@@ -159,6 +173,7 @@ describe("PUT /api/matches/[matchId]/caster", () => {
     ["STREAM_URL_REQUIRED", 400],
     ["MATCH_CAST_CLOSED", 409],
     ["CAST_STREAM_NOT_OWNED", 409],
+    ["CAST_STREAM_LINK_HELD", 409],
     ["NOT_MATCH_CASTER", 403],
     ["LIVE_TRIGGER_NOT_OWNED", 403],
   ])("casterPut_serviceRefuses_%s_maps to %i", async (code, status) => {

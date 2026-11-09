@@ -118,6 +118,29 @@ export function forgetRefereeNames(): void {
   invalidateCachedPrefix(REFEREE_NAMES_CACHE_PREFIX);
 }
 
+/**
+ * Oublie les pseudos d'arbitre en cache **si ce compte arbitre un match dont
+ * le nom se montre** (score pas encore déclaré, `showsRefereeName`) : un
+ * joueur qui se renomme ne vide pas le cache de tous les tournois. Une lecture
+ * indexée (`idx_bg_matches_referee`) ; si elle échoue, le cache est oublié
+ * quand même — un ancien pseudo n'est jamais servi faute de l'avoir lue.
+ */
+export async function forgetRefereeNamesOf(userId: number): Promise<void> {
+  try {
+    const referees = await withConnection(async (connection) => {
+      const [found] = await connection.query<RowDataPacket[]>(
+        `SELECT 1 FROM bg_matches WHERE referee_user_id = ? AND status IN ('PENDING', 'READY') LIMIT 1`,
+        [userId],
+      );
+      return found.length > 0;
+    });
+    if (!referees) return;
+  } catch (error) {
+    console.error("[referee-names] lecture des matchs arbitrés impossible", error);
+  }
+  forgetRefereeNames();
+}
+
 type RefereeNameRow = RowDataPacket & { id: number; referee_user_id: number; pseudo: string };
 
 /**

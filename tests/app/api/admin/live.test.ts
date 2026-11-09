@@ -106,6 +106,8 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
     );
 
     expect(res.status).toBe(403);
+    // Le même code que la route du caster (D7) : la fenêtre sait l'expliquer.
+    await expect(res.json()).resolves.toEqual({ error: "STAFF_STREAM_FORBIDDEN" });
     expect(setMatchLiveConfig).not.toHaveBeenCalled();
   });
 

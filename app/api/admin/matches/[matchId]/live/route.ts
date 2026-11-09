@@ -153,7 +153,8 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   if (parsed instanceof Response) return parsed;
   const { trigger, streamLinks } = parsed;
   const organisation = can(user, "tournaments");
-  if (parsed.organisationLink && !organisation) return fail("FORBIDDEN", 403);
+  // Même refus que la route du caster (`castOrganisationLinkRefusal`, D7).
+  if (parsed.organisationLink && !organisation) return fail("STAFF_STREAM_FORBIDDEN", 403);
 
   try {
     // Le lien posé reste rattaché à qui le pose, sauf quand un membre de

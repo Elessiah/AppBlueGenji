@@ -33,6 +33,7 @@ const CAST_FIELD_ERRORS = {
   INVALID_STREAM_URL: "url",
   STREAM_URL_REQUIRED: "url",
   CAST_STREAM_NOT_OWNED: "url",
+  CAST_STREAM_LINK_HELD: "url",
   INVALID_CAST_BATTLETAG: "battletag",
 } as const;
 

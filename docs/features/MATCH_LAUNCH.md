@@ -358,7 +358,7 @@ tient encore : le stream reste à ce co-caster, sans lien. Le lien de
 l'organisation (`link_user_id` nul : posé par un membre de l'organisation avec la
 case cochée) n'est jamais touché, **même si ce membre caste le
 match** : la provenance se *dit* (`MatchLiveSetter.asOrganisation`, champ
-`organisationLink` du PUT de la configuration du direct, 403 sans la permission
+`organisationLink` du PUT de la configuration du direct, 403 `STAFF_STREAM_FORBIDDEN` sans la permission
 `tournaments` ; jamais dite par un caster, 403 `STAFF_STREAM_FORBIDDEN` sur
 `…/caster`, décision D7 du 2026-11-09), elle ne se déduit
 plus de l'inscription (décision 48, EF-29). Un réglage du direct
