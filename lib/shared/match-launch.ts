@@ -251,8 +251,12 @@ export type LaunchReadinessInput = {
   team2IsGhost: boolean;
   /** Casters inscrits et leur « Prêt », déjà rapporté à l'appariement courant. */
   casters: readonly { userId: number; readyAt: string | null }[];
-  /** Arbitre désigné et son « Prêt » (rapporté à l'appariement courant) ; `null` sans arbitre. */
-  referee?: { readyAt: string | null } | null;
+  /**
+   * Arbitre désigné et son « Prêt » (rapporté à l'appariement courant) ; `null`
+   * sans arbitre. `userId` : l'arbitre qui caste aussi n'est compté qu'une fois
+   * (`readyCount`) — jamais posé par l'instantané partagé, qui ne nomme personne.
+   */
+  referee?: { readyAt: string | null; userId?: number } | null;
 };
 
 export function launchReadiness(input: LaunchReadinessInput): LaunchReadiness {
@@ -260,7 +264,12 @@ export function launchReadiness(input: LaunchReadinessInput): LaunchReadiness {
     team1Ready: input.team1IsGhost || input.team1ReadyAt !== null,
     team2Ready: input.team2IsGhost || input.team2ReadyAt !== null,
     casters: input.casters.map((caster) => ({ userId: caster.userId, ready: caster.readyAt !== null })),
-    referee: input.referee ? { ready: input.referee.readyAt !== null } : null,
+    referee: input.referee
+      ? {
+          ready: input.referee.readyAt !== null,
+          ...(input.referee.userId === undefined ? {} : { userId: input.referee.userId }),
+        }
+      : null,
   };
 }
 

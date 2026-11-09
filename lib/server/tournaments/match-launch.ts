@@ -213,7 +213,7 @@ export function rowReadiness(row: LaunchMatchRow, casters: readonly MatchCasterL
     // Sans arbitre — ou arbitre devenu inéligible —, rien n'est attendu de ce côté.
     referee:
       row.referee_user_id !== null && row.refereeEligible
-        ? { readyAt: current ? toIso(row.referee_ready_at) : null }
+        ? { readyAt: current ? toIso(row.referee_ready_at) : null, userId: Number(row.referee_user_id) }
         : null,
   });
 }
@@ -627,7 +627,7 @@ export async function setMatchReady(
   userId: number,
   ready: boolean,
 ): Promise<{ launched: boolean }> {
-  const { tournamentId, launched } = await inTransaction(async (connection) => {
+  const { tournamentId, launched, quiet } = await inTransaction(async (connection) => {
     const row = await lockLaunchMatch(connection, matchId);
     if (!row) throw new Error("MATCH_NOT_FOUND");
     if (row.tournament_state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
@@ -636,6 +636,8 @@ export async function setMatchReady(
     if (phase !== "LOBBY") throw new Error("MATCH_NOT_IN_LOBBY");
 
     await adoptCurrentPairing(connection, row);
+    // Lu après l'adoption, qui peut défaire l'ouverture d'un autre appariement.
+    const lobbyWasOpen = row.lobby_opened_at !== null;
     const party = await resolveMatchParty(connection, row, userId);
     if (!party) throw new Error("NOT_MATCH_PARTY");
     if (!party.canDeclareReady) throw new Error("NOT_TEAM_READY_ROLE");
@@ -658,9 +660,12 @@ export async function setMatchReady(
     // La ligne est tenue sous verrou depuis le début et à jour de l'écriture :
     // le décompte la reprend sans la reverrouiller.
     const launchedNow = ready ? await launchIfAllReady(connection, matchId, false, row) : false;
-    return { tournamentId: Number(row.tournament_id), launched: launchedNow };
+    // Le « Prêt » du seul arbitre n'est pas dans l'instantané (décision 47) :
+    // rien à publier tant qu'il ne lance ni n'ouvre le lobby.
+    const quietReferee = party.role === "MATCH_REFEREE" && !launchedNow && lobbyWasOpen;
+    return { tournamentId: Number(row.tournament_id), launched: launchedNow, quiet: quietReferee };
   });
-  publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  if (!quiet) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   return { launched };
 }
 

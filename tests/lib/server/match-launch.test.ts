@@ -1488,6 +1488,20 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     await setMatchReady(42, REFEREE, true);
     expect(state.match?.referee_ready_at).toBe(STAMP);
     expect(state.match?.launched_at).toBe(STAMP);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
+  });
+
+  it("setMatchReady_refereeReadyInOpenLobbyWithoutLaunch_publishesNothing", async () => {
+    state.match = matchState({ referee_user_id: REFEREE, lobby_opened_at: STAMP, team1_ready_at: null });
+    await setMatchReady(42, REFEREE, true);
+    expect(state.match?.referee_ready_at).toBe(STAMP);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchReady_refereeReadyOpensLobby_publishes", async () => {
+    state.match = matchState({ referee_user_id: REFEREE, lobby_opened_at: null, team1_ready_at: null });
+    await setMatchReady(42, REFEREE, true);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
   });
 
   it("un caster déjà prêt qui devient arbitre n'a pas à se redéclarer : son « Prêt » vaut pour les deux", async () => {
