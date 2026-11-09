@@ -242,6 +242,15 @@ describe("replayAccountDeletions — réactivation (décision R1)", () => {
     expect(lines.join("\n")).toContain("à réactiver");
   });
 
+  // Revue EF : la simulation ne promet pas la réactivation, l'état se relit sous verrou.
+  it("replayAccountDeletions_reactivatedEntryDryRun_logSaysUpperBound", async () => {
+    restoredDb({ 7: pendingRow });
+
+    await replayAccountDeletions([reactivated], { dryRun: true, log });
+
+    expect(lines.join(" ")).toContain("à réactiver (au plus");
+  });
+
   // Revue sécurité #546, cycle 8 : une demande refaite après la réactivation tient.
   it("replayAccountDeletions_reactivatedEntryLaterRequest_notReactivated", async () => {
     restoredDb({ 7: { ...pendingRow, deletion_requested_at: "2026-11-05 10:00:00" } });
