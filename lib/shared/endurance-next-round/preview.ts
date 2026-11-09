@@ -43,9 +43,8 @@
  * un capital sans limite : rien n'est acquis avant la fin de la manche, et le
  * module le dit plutôt que d'annoncer un tirage.
  *
- * Pendant les **play-offs**, le tour suivant ne dépend plus d'aucun capital :
- * une rencontre y est acquise dès que ses deux rencontres d'origine sont
- * jouées, et c'est le tirage du moteur (`planNextPlayoffRound`) qui le dit.
+ * L'aperçu s'arrête à la **phase qualificative** : play-offs lancés, ou manche
+ * qui les ouvre, il n'y a plus rien à annoncer (`null`).
  *
  * Le calcul se répartit par étape : déroulés possibles de la manche
  * (`outcomes.ts`), places bornées (`position-bounds.ts`), rencontres acquises
@@ -55,9 +54,7 @@
  * Module pur : aucune dépendance base de données ni interface.
  */
 
-import { PLAYOFF_ROUND_OFFSET } from "../bg-survie/rounds";
-import { firstPlayoffMatches, qualificationMatches } from "./pairings";
-import { nextPlayoffPreview } from "./playoff-preview";
+import { qualificationMatches } from "./pairings";
 import { analysePositions } from "./position-bounds";
 import { qualificationUnits } from "./outcomes";
 import type { EnduranceNextRoundInput, EnduranceNextRoundPreview } from "./types";
@@ -65,12 +62,12 @@ import type { EnduranceNextRoundInput, EnduranceNextRoundPreview } from "./types
 /**
  * Aperçu de l'étape qui suit la manche en cours. `null` quand il n'y a rien à
  * prévoir : tournoi pas commencé, manche close (le moteur a déjà posé la
- * suivante), ou finale en cours.
+ * suivante), ou play-offs lancés ou sur le point de l'être.
  */
 export function previewEnduranceNextRound(
   input: EnduranceNextRoundInput,
 ): EnduranceNextRoundPreview | null {
-  if (input.playoffsStarted) return nextPlayoffPreview(input);
+  if (input.playoffsStarted) return null;
 
   const { config, currentRound: round } = input;
 
@@ -80,13 +77,11 @@ export function previewEnduranceNextRound(
     ).length;
     if (round < 1 || pendingMatches === 0) return null;
     return {
-      stage: "QUALIFICATION",
       round: round + 1,
       stageCertain: false,
       freeScore: true,
       pendingMatches,
       expectedMatches: null,
-      decisiveSlots: null,
       matches: [],
     };
   }
@@ -96,28 +91,18 @@ export function previewEnduranceNextRound(
   const analysis = analysePositions(prepared.units, prepared.previous);
 
   // La qualification s'achève sur cette manche — plafond atteint, ou effectif
-  // retombé à la cible quoi qu'il arrive : c'est l'arbre qui suit.
+  // retombé à la cible quoi qu'il arrive : c'est l'arbre qui suit, et il
+  // n'a pas d'aperçu.
   const lastRound = config.maxRounds !== null && round >= config.maxRounds;
-  if (lastRound || analysis.maxActive <= config.playoffSize) {
-    return {
-      stage: "PLAYOFFS",
-      round: PLAYOFF_ROUND_OFFSET,
-      stageCertain: true,
-      freeScore: false,
-      pendingMatches: prepared.pendingMatches,
-      ...firstPlayoffMatches(analysis, config),
-    };
-  }
+  if (lastRound || analysis.maxActive <= config.playoffSize) return null;
 
   const known = analysis.minActive === analysis.maxActive;
   return {
-    stage: "QUALIFICATION",
     round: round + 1,
     stageCertain: analysis.minActive > config.playoffSize,
     freeScore: false,
     pendingMatches: prepared.pendingMatches,
     expectedMatches: known ? Math.floor(analysis.minActive / 2) : null,
-    decisiveSlots: null,
     matches: qualificationMatches(analysis, prepared.previous),
   };
 }

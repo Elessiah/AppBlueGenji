@@ -19,6 +19,7 @@ import {
   type MatchMapInput,
 } from "@/lib/shared/match-maps";
 import type { TournamentGame } from "@/lib/shared/types";
+import { visibleText } from "@/lib/shared/visible-text";
 import { EntrantLogo } from "./EntrantName";
 import styles from "./MapScoreList.module.css";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
@@ -137,13 +138,18 @@ export function MapScoreList({
   const text = useDialogsText();
   const { t } = text;
   const limit = mapListLimit(format);
-  // Le compteur annonce le format (BO3 → 3 maps) ; les maps nulles rejouées
-  // au-delà (`DRAWN_MAP_REPLAY_ALLOWANCE`) le font avancer quand elles servent.
-  const shownLimit = format ? matchMaxMaps(format) : limit;
+  const score = deriveMatchScore(maps);
+  // Nom lu comme ailleurs (`visibleText`) : le texte d'un staff n'entre pas brut dans une annonce.
+  const tiebreakName = tiebreakMap ? visibleText(tiebreakMap) : null;
+  const tiebreakIndex = tiebreakRowIndex(format, maps, tiebreakName);
+  // Le compteur annonce le format (BO3 → 3 maps) ; la ligne de départage en
+  // ajoute une, et les maps nulles rejouées au-delà
+  // (`DRAWN_MAP_REPLAY_ALLOWANCE`, dont la ligne de départage prend une
+  // reprise) le font avancer quand elles servent.
+  const tiebreakRow = tiebreakIndex === null ? 0 : 1;
+  const shownLimit = format ? matchMaxMaps(format) + tiebreakRow : limit;
   const replayHint =
     format && limit > shownLimit ? t("score.maps.replayAllowance", { count: limit - shownLimit }) : "";
-  const score = deriveMatchScore(maps);
-  const tiebreakIndex = tiebreakRowIndex(format, maps, tiebreakMap);
   // Le compteur ne compte que les maps renseignées, pas la ligne vierge ouverte.
   const played = maps.filter(isMapTouched).length;
   const hintId = `${idPrefix}-map-hint`;
@@ -191,17 +197,17 @@ export function MapScoreList({
   // tombent ensemble, c'est celle-ci, plus précise, qui reste.
   // Une ligne déjà de départage à l'ouverture (saisie reprise) ne s'annonce pas.
   // La clé porte aussi le nom : une map de départage changée sur la même ligne s'annonce de nouveau.
-  const tiebreakKey = tiebreakIndex === null || !tiebreakMap ? null : `${tiebreakIndex}:${tiebreakMap}`;
+  const tiebreakKey = tiebreakIndex === null || !tiebreakName ? null : `${tiebreakIndex}:${tiebreakName}`;
   const announcedTiebreak = useRef<string | null>(tiebreakKey);
   useEffect(() => {
-    if (tiebreakIndex === null || tiebreakKey === null || !tiebreakMap) {
+    if (tiebreakIndex === null || tiebreakKey === null || !tiebreakName) {
       announcedTiebreak.current = null;
       return;
     }
     if (announcedTiebreak.current === tiebreakKey) return;
     announcedTiebreak.current = tiebreakKey;
-    setAnnouncement(t("score.maps.tiebreakRow", { index: tiebreakIndex + 1, name: tiebreakMap }));
-  }, [tiebreakIndex, tiebreakKey, tiebreakMap, t]);
+    setAnnouncement(t("score.maps.tiebreakRow", { index: tiebreakIndex + 1, name: tiebreakName }));
+  }, [tiebreakIndex, tiebreakKey, tiebreakName, t]);
 
   const update = (index: number, patch: Partial<MatchMapInput>, field: MapField) => {
     // Rien de changé (un champ de score vide quitté sans saisie rend `NaN`, et
@@ -272,7 +278,7 @@ export function MapScoreList({
             const t1Id = mapFieldId(idPrefix, index, "team1Score");
             const t2Id = mapFieldId(idPrefix, index, "team2Score");
             const mapName = mapNames[index] ?? null;
-            const labels = mapRowLabels(t, index, mapName, index === tiebreakIndex ? tiebreakMap : null);
+            const labels = mapRowLabels(t, index, mapName, index === tiebreakIndex ? tiebreakName : null);
             return (
               <li key={keys.current[index]} className={styles.row}>
                 <span className={styles.mapLabel} aria-hidden="true">

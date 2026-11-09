@@ -265,13 +265,37 @@ describe("câblage de la fenêtre des cartes", () => {
     {
       name: "untouchedFormsAndStaleRefusals_areHandledWithoutNoise",
       file: "RoundMapsDialog.tsx",
-      present: ["if (busy || !dirty) return;", 'current?.kind === "close" ? current : null', "[slots, copyTarget, roundId, storedKey, clearSlotError]"],
+      present: ["if (busy || !dirty || !allowed) return;", 'current?.kind === "close" ? current : null', "[slots, copyTarget, roundId, storedKey, clearSlotError]"],
       absent: [],
     },
     {
       name: "mapScoreList_tiebreakAnnouncement_tracksTheMapNameToo",
       file: "MapScoreList.tsx",
-      present: ["`${tiebreakIndex}:${tiebreakMap}`", "announcedTiebreak.current === tiebreakKey"],
+      present: ["`${tiebreakIndex}:${tiebreakName}`", "announcedTiebreak.current === tiebreakKey"],
+      absent: [],
+    },
+    {
+      name: "mapScoreList_tiebreakName_goesThroughVisibleTextAndCountsInTheLimit",
+      file: "MapScoreList.tsx",
+      present: ["visibleText(tiebreakMap)", "matchMaxMaps(format) + tiebreakRow"],
+      absent: [],
+    },
+    {
+      name: "tiebreakForm_keepsMountedAndResyncsAfterSave",
+      file: "RoundMapsDialog.tsx",
+      present: ["useTiebreakShown(round, tiebreakAllowed)", "allowed={tiebreakAllowed}", 'setValue(map ?? "")', 't("dialog.tiebreakUnavailable")'],
+      absent: [],
+    },
+    {
+      name: "tiebreakDisplay_hidesAMapNeverPlayedOnAFinishedMatch",
+      file: "MatchRoundMaps.tsx",
+      present: ["shownTiebreakMap("],
+      absent: [],
+    },
+    {
+      name: "tiebreakFact_hidesAMapNeverPlayedOnAFinishedMatch",
+      file: "MatchPage.tsx",
+      present: ["shownTiebreakMap("],
       absent: [],
     },
   ];

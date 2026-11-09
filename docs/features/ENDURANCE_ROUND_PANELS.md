@@ -27,8 +27,8 @@ Dans l'ordre, du haut vers le bas :
    sanctions — puis l'emplacement réservé au graphique « Évolution de
    l'endurance » (lot 2).
 2. **L'aperçu de la manche suivante** (arbitrage, tournoi en cours) : il ouvre
-   la suite des volets — aperçu, manche en cours, manches closes. Play-offs
-   lancés, il annonce le tour suivant de l'arbre et le précède donc.
+   la suite des volets — aperçu, manche en cours, manches closes. Il s'arrête
+   avec la phase qualificative : aucun aperçu des play-offs.
 3. **Les play-offs**, dès qu'ils sont lancés : l'arbre (`Phase finale`) puis la
    `Petite finale` dans son propre volet.
 4. **Les manches qualificatives**, un volet par manche : la **manche en cours

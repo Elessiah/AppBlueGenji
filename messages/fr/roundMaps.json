@@ -18,7 +18,7 @@
     "scaleHint": "Ces cartes valent pour tous les matchs du tour : la carte ne se saisit plus match par match. « Réinitialiser le tour » rend la saisie par match.",
     "resetConfirmBody": "Les cartes de ce tour sont retirées pour tous ses matchs : la carte se saisit de nouveau match par match. Les choix déjà faits sur les matchs restent.",
     "tiebreak": "Map de départage",
-    "tiebreakHint": "Tour de play-offs : une map de plus, jouée seulement si la série est à égalité après les maps régulières (maps nulles comprises). Les bans suivent la règle des cartes suivantes.",
+    "tiebreakHint": "Tour de play-offs : une map de plus, jouée seulement si la série est à égalité à une map de la victoire (maps nulles comprises). Les bans suivent la règle des cartes suivantes.",
     "refereeHostBan": "L'arbitre désigné crée la partie : l'équipe qui n'est pas la meilleure tête de série bannit la première."
   },
   "sheet": {
@@ -119,6 +119,7 @@
     "tiebreakRemove": "Retirer la map de départage",
     "tiebreakSaved": "Map de départage enregistrée.",
     "tiebreakRemoved": "Map de départage retirée.",
+    "tiebreakUnavailable": "Le format de ce tour ne prévoit plus de map de départage : le texte est conservé, sans pouvoir être enregistré.",
     "tiebreakEmpty": "Saisis un nom de map ou retire la map de départage.",
     "summaryTiebreak": "map de départage",
     "closeConfirm": {

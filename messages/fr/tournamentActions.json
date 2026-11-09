@@ -450,13 +450,6 @@
     "panelTitle": "Aperçu · {title}",
     "panelAria": "Aperçu de l'étape suivante : {title}",
     "listAria": "Rencontres acquises — {title}",
-    "stage": {
-      "final": "Finale",
-      "semis": "Demi-finales",
-      "quarters": "Quarts de finale",
-      "roundOf16": "8èmes de finale",
-      "playoffs": "Play-offs"
-    },
     "round": "Manche {round}",
     "roundOf": "Manche {round}/{max}",
     "acquired": "{count, plural, one {# rencontre acquise} other {# rencontres acquises}}",
@@ -464,18 +457,14 @@
     "pending": "{count, plural, one {# match reste} other {# matchs restent}} à jouer",
     "empty": {
       "freeScore": "Score libre : un match restant peut déplacer un capital sans limite, rien n'est acquis avant la fin de la manche.",
-      "underfilled": "Moins de deux qualifiées : le tournoi se clôturera sans arbre final.",
       "none": "Aucune rencontre n'est encore acquise : toutes dépendent des matchs restants."
     },
     "stageUncertain": "La phase qualificative peut s'achever sur cette manche : ces rencontres ne se joueront que si elle continue.",
-    "thirdPlace": "Petite finale",
-    "byePlayoffs": "passe le tour (exemption)",
     "byeRound": "ne joue pas cette manche (effectif impair)",
     "versus": "contre",
     "sidesUnknown": "Côtés à confirmer",
     "sidesHint": "L'affiche est sûre ; les matchs restants décideront qui, mieux classé, part à gauche et accueille la partie.",
     "footnoteRound": "Sûres quel que soit le score des matchs restants, hors décision d'arbitrage (abandon, pénalité, double forfait). La manche n'est posée qu'une fois la précédente terminée.",
-    "footnotePlayoffs": "Sûres quel que soit le score des matchs restants, hors décision d'arbitrage (abandon, pénalité, double forfait). La suite n'est posée qu'une fois la précédente terminée.",
     "footnoteShort": "Rencontres sûres, hors décision d'arbitrage.",
     "footnoteSubject": "Rencontres sûres"
   }

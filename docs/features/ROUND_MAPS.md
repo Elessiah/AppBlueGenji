@@ -141,6 +141,7 @@ BO 5 à égalités ouvertes sans format de play-offs propre (« 6ᵉ map »).
   visible seulement sur un tour éligible ; le sélecteur de tours la signale. La
   page du match (`MatchRoundMaps`) l'affiche avec une bulle « i ». Elle figure aussi dans les **faits clés** de la page (`tiebreakFacts`),
   lisibles de tous (public, joueurs), pas seulement du staff ou de qui choisit.
+  Sur un match **terminé** qui ne l'a pas jouée (série acquise, forfait), elle est masquée (`shownTiebreakMap`). Le formulaire reste monté, grisé et annoncé, si un flux retire l'éligibilité du tour pendant la saisie, et reprend la forme enregistrée après un enregistrement. Le compteur de `MapScoreList` compte la ligne de départage (une reprise de moins annoncée).
 - **Saisie du score** (`MapScoreList`, `tiebreakRowIndex`, joueurs, arbitrage,
   admin) : la première ligne jouée au-delà des N maps régulières alors que la
   série est à égalité **à une map de l'objectif** (1-1 en BO 3, 2-2 en BO 5, 3-3

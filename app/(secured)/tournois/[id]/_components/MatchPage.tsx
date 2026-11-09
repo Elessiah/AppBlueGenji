@@ -44,6 +44,7 @@ import {
   type TournamentPageText,
 } from "@/lib/shared/tournament-page-text";
 import { visibleText } from "@/lib/shared/visible-text";
+import { shownTiebreakMap } from "@/lib/shared/match-maps";
 import { canPickMatchMap, firstBanOrder, roundMapsOf, roundTiebreakOf, shownMapName } from "@/lib/shared/round-maps";
 import { roundMaxMaps } from "@/lib/shared/round-plan";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
@@ -449,7 +450,12 @@ function MatchKeyFacts({
   const decision = matchPageDecision(match, staff);
   const mapFacts = matchPageMapFacts(detail.mapRules, match);
   const roundMapsText = useRoundMapsText();
-  const tiebreak = roundTiebreakOf(detail.mapRules.tiebreaks, match);
+  const tiebreak = shownTiebreakMap(
+    format,
+    match.status === "COMPLETED",
+    match.maps,
+    roundTiebreakOf(detail.mapRules.tiebreaks, match),
+  );
   const pending = <Muted>{t("matchPage.opponentsPending")}</Muted>;
   // « Adversaires à venir » seulement quand une case attend encore son engagé ;
   // deux adversaires connus sans hôte désigné (lancement sans phase, exemption,

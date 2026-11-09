@@ -1,17 +1,19 @@
 "use client";
 
-import { visibleText } from "@/lib/shared/visible-text";
 import dynamic from "next/dynamic";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { InfoHint } from "@/components/ui/info-hint";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { MATCH_LAUNCH_REFRESH_EVENT } from "@/lib/shared/match-launch";
+import { shownTiebreakMap } from "@/lib/shared/match-maps";
 import { resolveMatchMaps, roundMapsOf, roundTiebreakOf, type ResolvedMapSlot } from "@/lib/shared/round-maps";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
+import { visibleText } from "@/lib/shared/visible-text";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useRoundMapsText } from "../_lib/round-maps-text";
 import { useErrorsText } from "../_lib/error-map";
+import { useMatchFormat } from "../_lib/match-format-context";
 import styles from "./MatchPage.module.css";
 
 const RoundMapsDialog = dynamic(() => import("./RoundMapsDialog").then((m) => m.RoundMapsDialog), { ssr: false });
@@ -187,7 +189,13 @@ export function MatchRoundMaps({
   );
   // Map de départage du tour (play-offs à format défini) : l'instantané ne
   // porte que celles des tours éligibles.
-  const tiebreak = roundTiebreakOf(rules.tiebreaks, match);
+  const format = useMatchFormat(match);
+  const tiebreak = shownTiebreakMap(
+    format,
+    match.status === "COMPLETED",
+    match.maps,
+    roundTiebreakOf(rules.tiebreaks, match),
+  );
   const titleId = useId();
   if (slots.length === 0 && tiebreak === null && !staff) return null;
   const reset = async (): Promise<boolean> => {
