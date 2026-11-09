@@ -1,4 +1,5 @@
 import type { BracketMatch } from "@/lib/shared/types";
+import type { BracketSlotRef } from "./bracket-sections";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import type { TournamentPageText } from "@/lib/shared/tournament-page-text";
@@ -225,6 +226,50 @@ export function endurancePlayoffRoundCount(decisive: BracketMatch[]): number {
 }
 
 /**
+ * Identifiant d'un créneau à pourvoir. **Négatif**, donc impossible à confondre
+ * avec une rencontre : il ne sert qu'à relier les traits de l'arbre entre eux,
+ * et une carte qui le porte ne s'ouvre ni ne se planifie.
+ */
+function ghostSlotId(roundNumber: number, matchNumber: number): number {
+  return -(roundNumber * 1000 + matchNumber);
+}
+
+/**
+ * Les créneaux des tours **pas encore posés**, pour que l'arbre se montre
+ * entier dès l'ouverture des play-offs.
+ *
+ * Le moteur ne crée un tour qu'une fois le précédent complet. Dessiner les
+ * seuls tours posés laissait donc l'arbre à une colonne : on lisait les quarts
+ * de finale sans voir où ils menaient, alors que la forme du tableau est
+ * connue d'avance — chaque tour divise l'effectif par deux, en arrondissant
+ * vers le haut (le vainqueur surnuméraire passe le tour, cf.
+ * `finalizePlayoffsIfDone`), exactement le compte de
+ * {@link endurancePlayoffRoundCount}.
+ *
+ * Les créneaux rendus s'arrêtent à la finale, et la liste est **vide** tant que
+ * l'arbre n'a pas commencé comme une fois la finale posée : il n'y a alors plus
+ * rien à annoncer.
+ */
+export function endurancePlayoffGhostSlots(decisive: BracketMatch[]): BracketSlotRef[] {
+  const rounds = [...new Set(decisive.map((match) => match.roundNumber))];
+  if (rounds.length === 0) return [];
+
+  const lastRound = Math.max(...rounds);
+  let remaining = decisive.filter((match) => match.roundNumber === lastRound).length;
+
+  const slots: BracketSlotRef[] = [];
+  let roundNumber = lastRound;
+  while (remaining > 1) {
+    remaining = Math.ceil(remaining / 2);
+    roundNumber += 1;
+    for (let matchNumber = 1; matchNumber <= remaining; matchNumber += 1) {
+      slots.push({ id: ghostSlotId(roundNumber, matchNumber), roundNumber, matchNumber });
+    }
+  }
+  return slots;
+}
+
+/**
  * Liens « vainqueur → match suivant » de l'arbre final, **dérivés**.
  *
  * Le moteur ne pose pas de `next_winner_match_id` sur les play-offs : il crée le
@@ -237,18 +282,27 @@ export function endurancePlayoffRoundCount(decisive: BracketMatch[]): number {
  * Ce lien ne sert **qu'au dessin** : le verrouillage d'un score en BlueGenji
  * Survie se décide sur le numéro de manche (cf. `lib/shared/match-lock.ts`), pas
  * sur les liens de bracket, et rien de ce qui est calculé ici ne remonte jamais
- * au serveur. Un tour non encore créé n'a pas de cible : le trait s'arrête, ce
- * qui est exactement ce qu'il faut montrer.
+ * au serveur.
+ *
+ * Les créneaux à pourvoir ({@link endurancePlayoffGhostSlots}) se passent en
+ * second argument : la règle d'appariement est la même qu'ils portent une
+ * rencontre ou non, et c'est elle qui fait descendre le trait d'un quart de
+ * finale jusqu'à la case vide de sa demie. Sans eux — un appel qui ne les
+ * donne pas —, le trait s'arrête au bord de la carte, comme avant.
  */
-export function endurancePlayoffLinks(decisive: BracketMatch[]): Map<number, number> {
+export function endurancePlayoffLinks(
+  decisive: BracketMatch[],
+  ghostSlots: readonly BracketSlotRef[] = [],
+): Map<number, number> {
   const links = new Map<number, number>();
-  const rounds = [...new Set(decisive.map((match) => match.roundNumber))].sort((a, b) => a - b);
+  const slots: BracketSlotRef[] = [...decisive, ...ghostSlots];
+  const rounds = [...new Set(slots.map((slot) => slot.roundNumber))].sort((a, b) => a - b);
 
   const byRound = new Map(
     rounds.map((round) => [
       round,
-      decisive
-        .filter((match) => match.roundNumber === round)
+      slots
+        .filter((slot) => slot.roundNumber === round)
         .sort((a, b) => a.matchNumber - b.matchNumber),
     ]),
   );
@@ -256,9 +310,9 @@ export function endurancePlayoffLinks(decisive: BracketMatch[]): Map<number, num
   for (let index = 0; index < rounds.length - 1; index += 1) {
     const current = byRound.get(rounds[index])!;
     const next = byRound.get(rounds[index + 1])!;
-    current.forEach((match, position) => {
+    current.forEach((slot, position) => {
       const target = next[Math.floor(position / 2)];
-      if (target) links.set(match.id, target.id);
+      if (target) links.set(slot.id, target.id);
     });
   }
 

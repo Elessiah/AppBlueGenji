@@ -10,6 +10,26 @@ export const ACCENT: Record<BracketType, string> = {
   THIRD_PLACE: "var(--ink-mute, #93a3b2)",
 };
 
+/**
+ * Ce que l'arbre a besoin de savoir d'un créneau — **réel ou à pourvoir**.
+ *
+ * Un tableau à élimination naît entier : tous ses créneaux sont des rencontres,
+ * et ce repère se confond avec `BracketMatch`. L'arbre final de BlueGenji
+ * Survie, lui, pousse un tour à la fois : les tours à venir n'ont pas encore de
+ * rencontre à montrer, mais ils ont une **place** dans le dessin — sans quoi
+ * l'arbre se réduit à sa première colonne, et rien ne dit où mène un quart de
+ * finale.
+ *
+ * Un créneau à pourvoir porte un identifiant **négatif**
+ * (`endurancePlayoffGhostSlots`) : il ne sert qu'à relier les traits entre eux,
+ * et aucune rencontre ne peut le porter.
+ */
+export interface BracketSlotRef {
+  id: number;
+  roundNumber: number;
+  matchNumber: number;
+}
+
 export interface BracketSection {
   /**
    * Clé d'identité du volet, pour piloter l'état ouvert/fermé.

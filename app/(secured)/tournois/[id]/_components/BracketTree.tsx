@@ -5,8 +5,9 @@ import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/t
 import { ScrollArea } from "@/components/cyber";
 import { useSlotHeight } from "../_hooks/useSlotHeight";
 import { MatchRow } from "./MatchRow";
+import { GhostMatchCard } from "./GhostMatchCard";
 import { isMatchScoreLocked } from "../_lib/score-lock";
-import { stageKey } from "../_lib/bracket-sections";
+import { stageKey, type BracketSlotRef } from "../_lib/bracket-sections";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 
 
@@ -22,9 +23,25 @@ const LABEL_OFFSET = 6.5;
 /** Requête de défilement vers un match (le nonce force le re-déclenchement à chaque clic). */
 export type ScrollRequest = { matchId: number; nonce: number };
 
+/**
+ * Un créneau de l'arbre : une rencontre posée, ou la **place** d'une rencontre
+ * à venir (`match: null`). Les deux occupent une case et portent un trait ; la
+ * seule différence est ce qu'on y dessine.
+ */
+type TreeSlot = BracketSlotRef & { match: BracketMatch | null };
+
 interface BracketTreeProps {
   /** Matches de la section uniquement (un ou plusieurs rounds consécutifs). */
   matches: BracketMatch[];
+  /**
+   * Créneaux des tours **prévus mais pas encore posés**, de cette section
+   * seulement — dessinés vides (`GhostMatchCard`).
+   *
+   * Un tableau à élimination naît entier et n'en a aucun. L'arbre final de
+   * BlueGenji Survie, lui, pousse un tour à la fois : sans eux, il se réduit à
+   * sa première colonne et rien ne montre où mène un quart de finale.
+   */
+  ghostSlots?: readonly BracketSlotRef[];
   allTournamentMatches: BracketMatch[];
   bracketType: BracketType;
   /** Nombre total de rounds du tableau complet (pour nommer les stades). */
@@ -53,12 +70,16 @@ interface BracketTreeProps {
    * vainqueurs deux à deux. La règle est connue et rejouée côté interface
    * (`_lib/endurance-sections.ts`) — sans quoi cet arbre se dessinerait sans un
    * seul trait.
+   *
+   * Il reçoit un **créneau**, pas une rencontre : un tour à venir n'en porte
+   * pas encore, et son trait doit pourtant descendre jusqu'au suivant.
    */
-  resolveNextMatchId?: (match: BracketMatch) => number | null;
+  resolveNextMatchId?: (slot: BracketSlotRef) => number | null;
 }
 
 export function BracketTree({
   matches,
+  ghostSlots,
   allTournamentMatches,
   bracketType,
   totalRoundsGlobal,
@@ -108,27 +129,40 @@ export function BracketTree({
     return scrollToMatch(scrollRequest.matchId);
   }, [scrollRequest]);
 
-  /** Cible du trait sortant d'un match : lien de bracket, ou règle du mode. */
-  const nextMatchId = (match: BracketMatch): number | null =>
-    resolveNextMatchId
-      ? resolveNextMatchId(match)
-      : (match.nextWinnerMatchId ?? match.nextLoserMatchId);
+  /** Cible du trait sortant d'un créneau : lien de bracket, ou règle du mode. */
+  const nextSlotId = (slot: TreeSlot): number | null => {
+    if (resolveNextMatchId) return resolveNextMatchId(slot);
+    // Un créneau à pourvoir n'a pas de lien en base : sans règle de mode, le
+    // trait s'arrête — le repli d'origine, inchangé pour les tableaux à
+    // élimination, qui n'en ont de toute façon aucun.
+    return slot.match ? (slot.match.nextWinnerMatchId ?? slot.match.nextLoserMatchId) : null;
+  };
 
-  const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
+  const slots: TreeSlot[] = [
+    ...matches.map((match) => ({
+      id: match.id,
+      roundNumber: match.roundNumber,
+      matchNumber: match.matchNumber,
+      match,
+    })),
+    ...(ghostSlots ?? []).map((slot) => ({ ...slot, match: null })),
+  ];
+
+  const roundNums = [...new Set(slots.map((s) => s.roundNumber))].sort((a, b) => a - b);
   const totalRounds = roundNums.length;
 
-  const matchesByRound = new Map(
+  const slotsByRound = new Map(
     roundNums.map((rn) => [
       rn,
-      matches.filter((m) => m.roundNumber === rn).sort((a, b) => a.matchNumber - b.matchNumber),
+      slots.filter((s) => s.roundNumber === rn).sort((a, b) => a.matchNumber - b.matchNumber),
     ]),
   );
 
-  const maxMatchCount = Math.max(...[...matchesByRound.values()].map((ms) => ms.length));
+  const maxMatchCount = Math.max(...[...slotsByRound.values()].map((ss) => ss.length));
   const totalH = maxMatchCount * slotHeight;
 
   const slotHByRound = new Map(
-    roundNums.map((rn) => [rn, totalH / matchesByRound.get(rn)!.length]),
+    roundNums.map((rn) => [rn, totalH / slotsByRound.get(rn)!.length]),
   );
 
   // Stade nommé à partir de la fin du tableau complet (index global).
@@ -162,13 +196,13 @@ export function BracketTree({
       }}
     >
       {roundNums.map((roundNum, roundIdx) => {
-        const roundMatches = matchesByRound.get(roundNum)!;
+        const roundSlots = slotsByRound.get(roundNum)!;
         const slotH = slotHByRound.get(roundNum)!;
         const globalIdx = roundIdxBase + roundIdx;
         const isLast = roundIdx === totalRounds - 1;
         const nextRoundNum = roundNums[roundIdx + 1];
         const nextSlotH = nextRoundNum !== undefined ? slotHByRound.get(nextRoundNum)! : 0;
-        const nextRoundMatches = nextRoundNum !== undefined ? (matchesByRound.get(nextRoundNum) ?? []) : [];
+        const nextRoundSlots = nextRoundNum !== undefined ? (slotsByRound.get(nextRoundNum) ?? []) : [];
 
         return (
           <div key={roundNum} style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
@@ -191,17 +225,20 @@ export function BracketTree({
 
             <div style={{ display: "flex" }}>
               <div style={{ width: CARD_W, flexShrink: 0 }}>
-                {roundMatches.map((match) => {
-                  const label = matchLabel(match.matchNumber, globalIdx);
-                  const isTarget = match.id === scrollTargetMatchId;
+                {roundSlots.map((slot) => {
+                  const label = matchLabel(slot.matchNumber, globalIdx);
+                  // Un créneau à pourvoir porte un identifiant négatif : il ne
+                  // peut donc jamais être la cible d'un défilement, qui ne
+                  // nomme que des rencontres.
+                  const isTarget = slot.id === scrollTargetMatchId;
                   return (
                     <div
-                      key={match.id}
-                      ref={setMatchRef(match.id)}
+                      key={slot.id}
+                      ref={setMatchRef(slot.id)}
                       style={{ height: slotH, display: "flex", alignItems: "center", justifyContent: "center", scrollMarginInline: 80 }}
                     >
                       <div
-                        ref={measureSlot(roundNum, match.id)}
+                        ref={measureSlot(roundNum, slot.id)}
                         style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: label || isTarget ? 2 : 0 }}
                       >
                         {(label || isTarget) && (
@@ -219,13 +256,17 @@ export function BracketTree({
                               : {}),
                           }}
                         >
-                          <MatchRow
-                            match={match}
-                            adminResolvable={adminResolvable(match)}
-                            onOpenAdminModal={onOpenAdminModal}
-                            scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, format)}
-                            roundNumber={roundNum}
-                          />
+                          {slot.match ? (
+                            <MatchRow
+                              match={slot.match}
+                              adminResolvable={adminResolvable(slot.match)}
+                              onOpenAdminModal={onOpenAdminModal}
+                              scoreLocked={isMatchScoreLocked(slot.id, allTournamentMatches, format)}
+                              roundNumber={roundNum}
+                            />
+                          ) : (
+                            <GhostMatchCard />
+                          )}
                         </div>
                       </div>
                     </div>
@@ -235,7 +276,7 @@ export function BracketTree({
 
               {!isLast && (
                 <div style={{ width: CONN_W, height: totalH, flexShrink: 0, position: "relative" }}>
-                  {roundMatches.map((match, matchIdx) => {
+                  {roundSlots.map((slot, matchIdx) => {
                     const sourceCenterY = (matchIdx + 0.5) * slotH + roundOffset(globalIdx);
 
                     const leftStub: CSSProperties = {
@@ -247,14 +288,14 @@ export function BracketTree({
                       background: BORDER,
                     };
 
-                    const targetId = nextMatchId(match);
+                    const targetId = nextSlotId(slot);
                     if (!targetId) {
-                      return <div key={match.id} style={leftStub} />;
+                      return <div key={slot.id} style={leftStub} />;
                     }
 
-                    const targetMatchIdx = nextRoundMatches.findIndex((m) => m.id === targetId);
+                    const targetMatchIdx = nextRoundSlots.findIndex((s) => s.id === targetId);
                     if (targetMatchIdx < 0) {
-                      return <div key={match.id} style={leftStub} />;
+                      return <div key={slot.id} style={leftStub} />;
                     }
 
                     const targetCenterY = (targetMatchIdx + 0.5) * nextSlotH + roundOffset(globalIdx + 1);
@@ -264,7 +305,7 @@ export function BracketTree({
                     const hasVertical = vertBottom > vertTop;
 
                     return (
-                      <Fragment key={match.id}>
+                      <Fragment key={slot.id}>
                         <div style={leftStub} />
                         {hasVertical && (
                           <div
@@ -304,12 +345,16 @@ export function BracketTree({
           <div style={{ width: CONN_W + BADGE_W, height: totalH, flexShrink: 0, position: "relative" }}>
             {(() => {
               const lastRoundNum = roundNums.at(-1)!;
-              const lastMatches = matchesByRound.get(lastRoundNum)!;
+              const lastSlots = slotsByRound.get(lastRoundNum)!;
               const lastSlotH = slotHByRound.get(lastRoundNum)!;
               const lastGlobalIdx = roundIdxBase + roundNums.length - 1;
-              return lastMatches.map((match, matchIdx) => {
+              return lastSlots.map((slot, matchIdx) => {
+                // Rien ne se qualifie depuis un créneau à pourvoir : la
+                // rencontre qui l'occupera n'est pas encore posée, et le badge
+                // annoncerait une suite à une case vide.
+                if (slot.match === null) return null;
                 const centerY = (matchIdx + 0.5) * lastSlotH + roundOffset(lastGlobalIdx);
-                const dest = nextMatchId(match);
+                const dest = nextSlotId(slot);
                 const clickable = onQualifyClick != null && dest != null;
                 const badgeStyle: CSSProperties = {
                   position: "absolute",
@@ -343,8 +388,9 @@ export function BracketTree({
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{qualifyLabel}</span>
                   </>
                 );
+                const sourceMatch = slot.match;
                 return (
-                  <Fragment key={match.id}>
+                  <Fragment key={slot.id}>
                     <div
                       style={{
                         position: "absolute",
@@ -359,7 +405,7 @@ export function BracketTree({
                     {clickable ? (
                       <button
                         type="button"
-                        onClick={() => onQualifyClick!(match)}
+                        onClick={() => onQualifyClick!(sourceMatch)}
                         title={t("bracket.goToMatchTitle", { label: qualifyLabel ?? "" })}
                         aria-label={t("bracket.goToMatchLabel", { label: qualifyLabel ?? "" })}
                         onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}

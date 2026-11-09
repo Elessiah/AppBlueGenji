@@ -189,3 +189,27 @@
   font-size: 12px;
   color: var(--ink-mute);
 }
+
+/*
+ * Créneau d'un tour **à venir** — la place d'une rencontre que le moteur n'a
+ * pas encore posée (`GhostMatchCard`, arbre final de BlueGenji Survie). Même
+ * gabarit que la carte, parce que `BracketTree` trace ses connecteurs dessus,
+ * mais en retrait : bordure discontinue, fond éteint, et aucun survol — il n'y
+ * a rien à y faire. Le retrait se lit sur la bordure et le fond, jamais sur une
+ * opacité, qui emporterait aussi la lisibilité du texte.
+ */
+.ghostCard {
+  /* Le trait pointillé suffit à dire « pas encore une rencontre » : la bordure
+     garde le jeton de la carte, qui suit « Contraste renforcé ». Une teinte
+     plus pâle rendait le créneau invisible sur le fond profond — un arbre dont
+     la moitié des cases ne se voient pas ne montre toujours pas sa forme. */
+  border-style: dashed;
+  background: transparent;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ghostCard:hover {
+    border-color: var(--line-strong-cy);
+    box-shadow: none;
+  }
+}

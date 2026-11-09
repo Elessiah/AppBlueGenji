@@ -114,8 +114,38 @@ describe("play-offs — le vrai arbre, et non une liste de cartes", () => {
   it("laisse le comportement d'origine aux tableaux qui portent leurs liens", () => {
     // La prop est **optionnelle** : sans elle, l'arbre lit `nextWinnerMatchId`
     // comme il l'a toujours fait. Une élimination simple ne doit rien changer.
-    expect(TREE).toContain("resolveNextMatchId?: (match: BracketMatch) => number | null");
-    expect(TREE).toContain("(match.nextWinnerMatchId ?? match.nextLoserMatchId)");
+    expect(TREE).toContain("resolveNextMatchId?: (slot: BracketSlotRef) => number | null");
+    expect(TREE).toContain("(slot.match.nextWinnerMatchId ?? slot.match.nextLoserMatchId)");
+  });
+
+  it("montre l'arbre entier dès l'ouverture, cases à pourvoir comprises", () => {
+    // Le moteur ne pose qu'un tour à la fois : sans les créneaux à pourvoir,
+    // l'arbre se réduit à sa première colonne et rien ne dit où mène un quart
+    // de finale.
+    expect(VIEW).toContain("endurancePlayoffGhostSlots(");
+    expect(VIEW).toContain("ghostSlots={playoffGhosts}");
+    expect(VIEW).toContain("endurancePlayoffLinks(decisive, playoffGhosts)");
+    expect(SECTIONS).toContain("ghostSlots={sectionGhosts}");
+    expect(TREE).toContain("<GhostMatchCard />");
+  });
+
+  it("ne fait pas passer une case à pourvoir pour une rencontre", () => {
+    // La pastille d'un volet compte les matchs à jouer, pas les places vides,
+    // et rien ne se qualifie depuis un créneau que personne n'occupe.
+    expect(SECTIONS).toContain("const matchCount = sectionMatches.length;");
+    expect(TREE).toContain("if (slot.match === null) return null;");
+    // La carte vide n'a ni ancre publique, ni action, ni arbitrage.
+    const ghost = read("_components", "GhostMatchCard.tsx");
+    expect(ghost).not.toContain("matchAnchorId");
+    expect(ghost).not.toContain("MatchCardActions");
+    expect(ghost).not.toContain("onOpenAdminModal");
+  });
+
+  it("laisse les tableaux à élimination sans aucune case à pourvoir", () => {
+    // La prop est optionnelle : un tableau qui naît entier n'en passe pas, et
+    // son rendu ne change donc pas d'un pixel.
+    expect(TREE).toContain("ghostSlots?: readonly BracketSlotRef[]");
+    expect(TREE).toContain("...(ghostSlots ?? [])");
   });
 });
 

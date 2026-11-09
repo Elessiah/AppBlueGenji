@@ -4,7 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { BracketTree, ScrollRequest } from "./BracketTree";
 import { BoardPanel, PanelPill } from "./BoardPanel";
-import { ACCENT, buildSections, defaultOpenKey, findMyNextMatch, qualifyDestinationMatchId } from "../_lib/bracket-sections";
+import {
+  ACCENT,
+  buildSections,
+  defaultOpenKey,
+  findMyNextMatch,
+  qualifyDestinationMatchId,
+  type BracketSlotRef,
+} from "../_lib/bracket-sections";
 import { useMatchAnchorTarget } from "../_lib/match-anchor-context";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 
@@ -13,6 +20,15 @@ interface BracketSectionsProps {
   bracketLabel: string;
   showBracketLabel: boolean;
   matches: BracketMatch[];
+  /**
+   * Créneaux des tours **prévus mais pas encore posés**
+   * (`endurancePlayoffGhostSlots`) : ils prennent place dans le découpage en
+   * volets comme dans l'arbre, où ils se dessinent vides.
+   *
+   * Ils ne comptent nulle part ailleurs : la pastille d'un volet annonce ses
+   * **rencontres**, et le volet ouvert d'office se décide sur elles.
+   */
+  ghostSlots?: readonly BracketSlotRef[];
   allTournamentMatches: BracketMatch[];
   myTeamId: number | null;
   adminResolvable: (m: BracketMatch) => boolean;
@@ -22,7 +38,7 @@ interface BracketSectionsProps {
    * Match d'arrivée du vainqueur, quand il ne se lit pas sur la ligne du match.
    * Voir {@link BracketTree} : seul l'arbre final de BlueGenji Survie s'en sert.
    */
-  resolveNextMatchId?: (match: BracketMatch) => number | null;
+  resolveNextMatchId?: (slot: BracketSlotRef) => number | null;
   /**
    * Nombre de tours que ce tableau comptera **une fois complet**, quand il ne se
    * lit pas sur les matchs déjà posés.
@@ -40,6 +56,7 @@ export function BracketSections({
   bracketLabel,
   showBracketLabel,
   matches,
+  ghostSlots,
   allTournamentMatches,
   myTeamId,
   adminResolvable,
@@ -48,7 +65,16 @@ export function BracketSections({
   resolveNextMatchId,
   plannedRounds,
 }: Readonly<BracketSectionsProps>) {
-  const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
+  // Les tours à pourvoir comptent dans le découpage : ils ont une colonne à
+  // eux dans l'arbre, et un volet qui s'arrêterait aux tours posés la laisserait
+  // dehors. C'est aussi ce qui fige le découpage pour de bon — l'arbre naît
+  // avec tous ses tours, et plus aucune section ne se réorganise en route.
+  const roundNums = [
+    ...new Set([
+      ...matches.map((m) => m.roundNumber),
+      ...(ghostSlots ?? []).map((slot) => slot.roundNumber),
+    ]),
+  ].sort((a, b) => a - b);
   // Les stades se nomment à partir de la **fin** du tableau : sur un arbre qui
   // pousse un tour à la fois, ce repère ne peut pas venir des tours posés.
   const totalRounds = Math.max(plannedRounds ?? roundNums.length, roundNums.length);
@@ -148,6 +174,11 @@ export function BracketSections({
         {sections.map((section) => {
           const open = openKeys.has(section.key);
           const sectionMatches = matches.filter((m) => section.rounds.includes(m.roundNumber));
+          const sectionGhosts = (ghostSlots ?? []).filter((slot) =>
+            section.rounds.includes(slot.roundNumber),
+          );
+          // La pastille compte les **rencontres**, pas les cases vides : une
+          // place à pourvoir n'est pas un match de plus à jouer.
           const matchCount = sectionMatches.length;
           const hasMyMatch = myNext !== null && section.rounds.includes(myNext.roundNumber);
           const panelId = `${regionBaseId}-${section.key.replace(/\s+/g, "-")}`;
@@ -166,6 +197,7 @@ export function BracketSections({
             >
               <BracketTree
                 matches={sectionMatches}
+                ghostSlots={sectionGhosts}
                 allTournamentMatches={allTournamentMatches}
                 bracketType={bracketType}
                 totalRoundsGlobal={totalRounds}

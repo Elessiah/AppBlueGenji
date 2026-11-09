@@ -8,8 +8,9 @@ import type {
   EnduranceStandingRow,
   TournamentFormat,
 } from "@/lib/shared/types";
-import { ACCENT } from "../_lib/bracket-sections";
+import { ACCENT, type BracketSlotRef } from "../_lib/bracket-sections";
 import {
+  endurancePlayoffGhostSlots,
   endurancePlayoffLinks,
   endurancePlayoffRoundCount,
   enduranceRoundSections,
@@ -256,8 +257,12 @@ export function EnduranceView({
   // nulle part : les deux se dessinent séparément, comme dans les tableaux à
   // élimination du site.
   const { decisive, thirdPlace } = splitPlayoffBrackets(playoffs);
-  const playoffLinks = endurancePlayoffLinks(decisive);
-  const resolvePlayoffNext = (match: BracketMatch) => playoffLinks.get(match.id) ?? null;
+  // Les tours que le moteur n'a pas encore posés : l'arbre se montre entier dès
+  // l'ouverture des play-offs, cases vides comprises, plutôt que de se réduire
+  // à sa première colonne jusqu'à ce que les quarts soient joués.
+  const playoffGhosts = endurancePlayoffGhostSlots(decisive);
+  const playoffLinks = endurancePlayoffLinks(decisive, playoffGhosts);
+  const resolvePlayoffNext = (slot: BracketSlotRef) => playoffLinks.get(slot.id) ?? null;
   // Les tours de l'arbre naissent un à un : sans ce compte, les quarts de finale
   // s'appelleraient « Finale » tant qu'ils seraient le seul tour posé.
   const playoffRounds = endurancePlayoffRoundCount(decisive);
@@ -476,6 +481,7 @@ export function EnduranceView({
             bracketLabel={t("endurance.playoffs")}
             showBracketLabel={false}
             matches={decisive}
+            ghostSlots={playoffGhosts}
             allTournamentMatches={matches}
             myTeamId={myTeamId}
             adminResolvable={adminResolvable}
