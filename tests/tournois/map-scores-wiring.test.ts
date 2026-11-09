@@ -191,7 +191,7 @@ describe("détail map par map — retours de la revue UI/UX", () => {
   const list = () => readSource("app/(secured)/tournois/[id]/_components/MapScoreList.tsx");
 
   it("le compteur annonce le format, les maps nulles rejouées en sus", () => {
-    expect(list()).toContain("const shownLimit = format ? matchMaxMaps(format) : limit;");
+    expect(list()).toContain("const shownLimit = format ? matchMaxMaps(format) + tiebreakRow : limit;");
     expect(list()).toContain("({played}/{Math.max(shownLimit, played)})");
     // La ligne vierge ouverte ne compte pas comme une map jouée.
     expect(list()).toContain("const played = maps.filter(isMapTouched).length;");

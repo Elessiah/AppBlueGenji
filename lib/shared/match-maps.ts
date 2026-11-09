@@ -127,6 +127,22 @@ export function tiebreakRowIndex(
   return null;
 }
 
+/**
+ * Map de départage à **montrer** sur la fiche d'un match : celle du tour, sauf
+ * sur un match terminé qui ne l'a pas jouée (série acquise, forfait) — afficher
+ * une map jamais jouée y serait trompeur. `null` : rien à montrer.
+ */
+export function shownTiebreakMap(
+  format: MatchFormat | null,
+  completed: boolean,
+  maps: ReadonlyArray<Pick<MatchMapInput, "team1Score" | "team2Score">>,
+  tiebreakMap: string | null | undefined,
+): string | null {
+  if (!tiebreakMap) return null;
+  if (!completed) return tiebreakMap;
+  return tiebreakRowIndex(format, maps, tiebreakMap) === null ? null : tiebreakMap;
+}
+
 /** Score du match dérivé de ses maps : une map gagnée = un point, une nulle = rien. */
 export function deriveMatchScore(maps: ReadonlyArray<Pick<MatchMapInput, "team1Score" | "team2Score">>): {
   team1: number;

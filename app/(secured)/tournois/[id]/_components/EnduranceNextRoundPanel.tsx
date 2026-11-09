@@ -72,12 +72,9 @@ export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: Reado
             <ul className={styles.list} aria-label={t("nextRound.listAria", { title })}>
               {preview.matches.map((match, index) => (
                 <li
-                  key={`${match.bracket}-${match.teamAId}-${match.teamBId ?? "bye"}`}
+                  key={`${match.teamAId}-${match.teamBId ?? "bye"}`}
                   className={styles.item}
                 >
-                  {match.bracket === "THIRD_PLACE" && (
-                    <span className={styles.tag}>{t("nextRound.thirdPlace")}</span>
-                  )}
                   <EntrantName
                     teamId={match.teamAId}
                     name={name(match.teamAId)}
@@ -85,9 +82,7 @@ export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: Reado
                     className={styles.team}
                   />
                   {match.teamBId === null ? (
-                    <span className={styles.bye}>
-                      {preview.stage === "PLAYOFFS" ? t("nextRound.byePlayoffs") : t("nextRound.byeRound")}
-                    </span>
+                    <span className={styles.bye}>{t("nextRound.byeRound")}</span>
                   ) : (
                     <>
                       {/* « vs » se lit « versus » ou pas du tout selon le
@@ -124,7 +119,7 @@ export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: Reado
           <InfoHintRow>
             <p className={styles.footnote}>{t("nextRound.footnoteShort")}</p>
             <InfoHint id={`${panelId}-footnote`} subject={t("nextRound.footnoteSubject")}>
-              <p>{preview.stage === "PLAYOFFS" ? t("nextRound.footnotePlayoffs") : t("nextRound.footnoteRound")}</p>
+              <p>{t("nextRound.footnoteRound")}</p>
             </InfoHint>
           </InfoHintRow>
         </div>

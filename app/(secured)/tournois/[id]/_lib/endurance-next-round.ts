@@ -60,7 +60,6 @@ export function enduranceNextRoundInput(
       .map((match) => ({
         round: match.roundNumber,
         matchNumber: match.matchNumber,
-        bracket: match.bracket,
         status: match.status,
         team1Id: match.team1Id,
         team2Id: match.team2Id,
@@ -74,22 +73,12 @@ export function enduranceNextRoundInput(
   };
 }
 
-/** Nom d'un tour d'arbre d'après son nombre de rencontres décisives. */
-function playoffStageTitle(slots: number | null, text: TournamentActionsText): string {
-  if (slots === 1) return text.t("nextRound.stage.final");
-  if (slots === 2) return text.t("nextRound.stage.semis");
-  if (slots === 3 || slots === 4) return text.t("nextRound.stage.quarters");
-  if (slots !== null && slots >= 5 && slots <= 8) return text.t("nextRound.stage.roundOf16");
-  return text.t("nextRound.stage.playoffs");
-}
-
-/** Titre de l'aperçu : « Manche 4/12 », ou le stade des play-offs. */
+/** Titre de l'aperçu : « Manche 4/12 ». */
 export function nextRoundTitle(
   preview: EnduranceNextRoundPreview,
   maxRounds: number | null,
   text: TournamentActionsText = FR_ACTIONS_TEXT,
 ): string {
-  if (preview.stage === "PLAYOFFS") return playoffStageTitle(preview.decisiveSlots, text);
   return maxRounds === null
     ? text.t("nextRound.round", { round: preview.round })
     : text.t("nextRound.roundOf", { round: preview.round, max: maxRounds });
@@ -111,6 +100,5 @@ export function nextRoundPendingLabel(preview: EnduranceNextRoundPreview, text: 
 /** Phrase d'un aperçu sans rencontre acquise. */
 export function nextRoundEmptyLabel(preview: EnduranceNextRoundPreview, text: TournamentActionsText = FR_ACTIONS_TEXT): string {
   if (preview.freeScore) return text.t("nextRound.empty.freeScore");
-  if (preview.expectedMatches === 0) return text.t("nextRound.empty.underfilled");
   return text.t("nextRound.empty.none");
 }

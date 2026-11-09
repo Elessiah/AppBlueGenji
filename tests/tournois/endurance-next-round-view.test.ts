@@ -9,7 +9,6 @@ import {
   nextRoundTitle,
 } from "@/app/(secured)/tournois/[id]/_lib/endurance-next-round";
 import { DEFAULT_ENDURANCE_CONFIG } from "@/lib/shared/bg-survie/config";
-import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { previewEnduranceNextRound } from "@/lib/shared/endurance-next-round/preview";
 import { type EnduranceNextRoundPreview } from "@/lib/shared/endurance-next-round/types";
 import type { EnduranceMeta, EnduranceStandingRow } from "@/lib/shared/types";
@@ -55,13 +54,11 @@ function meta(overrides: Partial<EnduranceMeta> = {}): EnduranceMeta {
 
 function preview(overrides: Partial<EnduranceNextRoundPreview> = {}): EnduranceNextRoundPreview {
   return {
-    stage: "QUALIFICATION",
     round: 3,
     stageCertain: true,
     freeScore: false,
     pendingMatches: 2,
     expectedMatches: 4,
-    decisiveSlots: null,
     matches: [],
     ...overrides,
   };
@@ -126,7 +123,6 @@ describe("enduranceNextRoundInput", () => {
       {
         round: 1,
         matchNumber: 2,
-        bracket: "UPPER",
         status: "COMPLETED",
         team1Id: 1,
         team2Id: 3,
@@ -166,7 +162,7 @@ describe("enduranceNextRoundInput", () => {
     const result = previewEnduranceNextRound(
       enduranceNextRoundInput(meta(), matches, { type: "FT", value: 3 }),
     );
-    expect(result?.matches).toEqual([{ teamAId: 1, teamBId: 3, sidesKnown: true, bracket: "UPPER" }]);
+    expect(result?.matches).toEqual([{ teamAId: 1, teamBId: 3, sidesKnown: true }]);
   });
 });
 
@@ -176,21 +172,10 @@ describe("libellés de l'aperçu", () => {
     expect(nextRoundTitle(preview({ round: 3 }), 6)).toBe("Manche 3/6");
   });
 
-  it("nomme le tour d'arbre d'après ses rencontres décisives", () => {
-    const playoffs = (decisiveSlots: number | null) =>
-      nextRoundTitle(preview({ stage: "PLAYOFFS", round: PLAYOFF_ROUND_OFFSET, decisiveSlots }), 6);
-    expect(playoffs(1)).toBe("Finale");
-    expect(playoffs(2)).toBe("Demi-finales");
-    expect(playoffs(4)).toBe("Quarts de finale");
-    expect(playoffs(3)).toBe("Quarts de finale");
-    expect(playoffs(8)).toBe("8èmes de finale");
-    expect(playoffs(null)).toBe("Play-offs");
-  });
-
   it("compte les rencontres acquises sans les exemptions", () => {
     const matches = [
-      { teamAId: 1, teamBId: 2, sidesKnown: true, bracket: "UPPER" as const },
-      { teamAId: 5, teamBId: null, sidesKnown: true, bracket: "UPPER" as const },
+      { teamAId: 1, teamBId: 2, sidesKnown: true },
+      { teamAId: 5, teamBId: null, sidesKnown: true },
     ];
     expect(nextRoundSummary(preview({ matches }))).toBe("1 rencontre acquise sur 4");
     expect(nextRoundSummary(preview({ matches, expectedMatches: null }))).toBe("1 rencontre acquise");
@@ -206,9 +191,6 @@ describe("libellés de l'aperçu", () => {
 
   it("explique une liste vide selon sa cause", () => {
     expect(nextRoundEmptyLabel(preview({ freeScore: true }))).toMatch(/Score libre/);
-    expect(nextRoundEmptyLabel(preview({ stage: "PLAYOFFS", expectedMatches: 0 }))).toMatch(
-      /sans arbre final/,
-    );
     expect(nextRoundEmptyLabel(preview())).toMatch(/Aucune rencontre n'est encore acquise/);
   });
 });

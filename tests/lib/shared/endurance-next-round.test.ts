@@ -1,11 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import { DEFAULT_ENDURANCE_CONFIG, type EnduranceConfig } from "@/lib/shared/bg-survie/config";
 import { enduranceMatchOutcome } from "@/lib/shared/bg-survie/match-outcome";
-import { planPlayoffFirstRound } from "@/lib/shared/bg-survie/playoffs";
 import {
   qualificationComplete,
   roundLimitReached,
-  selectQualifiedTeamIds,
 } from "@/lib/shared/bg-survie/qualification";
 import { replayEndurance, type EndurancePenalty } from "@/lib/shared/bg-survie/replay";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
@@ -16,6 +14,7 @@ import { previewEnduranceNextRound } from "@/lib/shared/endurance-next-round/pre
 import {
   type EnduranceNextRoundInput,
   type EnduranceNextRoundMatchRecord,
+  type EnduranceNextRoundPreview,
 } from "@/lib/shared/endurance-next-round/types";
 import { checkMatchScores, matchWinsRequired, type MatchFormat } from "@/lib/shared/match-format";
 
@@ -38,7 +37,6 @@ function record(
   return {
     round,
     matchNumber,
-    bracket: "UPPER",
     status: "READY",
     team1Id,
     team2Id,
@@ -229,9 +227,7 @@ function worlds(scenario: Scenario): World[] {
           ? {
               standings,
               stage: "PLAYOFFS",
-              next: planPlayoffFirstRound(selectQualifiedTeamIds(standings, base.config), base.config).map(
-                (entry) => entry.pairing,
-              ),
+              next: [],
             }
           : { standings, stage: "QUALIFICATION", next: planEnduranceRound(standings) },
       );
@@ -250,17 +246,24 @@ function worlds(scenario: Scenario): World[] {
   return result;
 }
 
-/** Chaque rencontre annoncée figure dans chaque déroulé, côtés compris s'ils sont annoncés. */
+/**
+ * Chaque rencontre annoncée figure dans chaque déroulé, côtés compris s'ils
+ * sont annoncés. Sans aperçu, tous les déroulés mènent à l'arbre.
+ */
 function expectSound(scenario: Scenario) {
   const preview = previewEnduranceNextRound(scenario.input);
-  expect(preview).not.toBeNull();
   const all = worlds(scenario);
 
-  for (const world of all) {
-    if (preview!.stageCertain) expect(world.stage).toBe(preview!.stage);
-    if (world.stage !== preview!.stage) continue;
+  if (preview === null) {
+    for (const world of all) expect(world.stage).toBe("PLAYOFFS");
+    return { preview: { matches: [] as EnduranceNextRoundPreview["matches"] }, worlds: all };
+  }
 
-    for (const match of preview!.matches) {
+  for (const world of all) {
+    if (preview.stageCertain) expect(world.stage).toBe("QUALIFICATION");
+    if (world.stage !== "QUALIFICATION") continue;
+
+    for (const match of preview.matches) {
       const found = world.next.find(
         (pairing) =>
           (pairing.teamAId === match.teamAId && pairing.teamBId === match.teamBId) ||
@@ -271,7 +274,7 @@ function expectSound(scenario: Scenario) {
       expect(found).toBeDefined();
     }
   }
-  return { preview: preview!, worlds: all };
+  return { preview, worlds: all };
 }
 
 describe("previewEnduranceNextRound — force brute", () => {
@@ -405,7 +408,6 @@ describe("previewEnduranceNextRound — manche qualificative", () => {
     );
 
     expect(preview).not.toBeNull();
-    expect(preview!.stage).toBe("QUALIFICATION");
     expect(preview!.round).toBe(2);
     expect(preview!.pendingMatches).toBe(1);
     expect(preview!.stageCertain).toBe(true);
@@ -417,8 +419,7 @@ describe("previewEnduranceNextRound — manche qualificative", () => {
       teamAId: 1,
       teamBId: 3,
       sidesKnown: true,
-      bracket: "UPPER",
-    });
+      });
     // 7 ou 8 peut s'intercaler n'importe où plus bas : rien d'autre n'est sûr.
     expect(preview!.matches).toHaveLength(1);
   });
@@ -435,7 +436,7 @@ describe("previewEnduranceNextRound — manche qualificative", () => {
       input({ teams: teams(7), matches, config: { ...DEFAULT_ENDURANCE_CONFIG, playoffSize: 4 } }),
     )!;
     expect(preview.expectedMatches).toBe(3);
-    expect(preview.matches).toContainEqual({ teamAId: 1, teamBId: 3, sidesKnown: true, bracket: "UPPER" });
+    expect(preview.matches).toContainEqual({ teamAId: 1, teamBId: 3, sidesKnown: true });
   });
 
   it("annonce une exemption connue", () => {
@@ -453,7 +454,7 @@ describe("previewEnduranceNextRound — manche qualificative", () => {
     )!;
     // 1 est première, 2 troisième — mais leurs adversaires dépendent de 3-4.
     expect(preview.matches).toEqual([
-      { teamAId: 5, teamBId: null, sidesKnown: true, bracket: "UPPER" },
+      { teamAId: 5, teamBId: null, sidesKnown: true },
     ]);
     expect(preview.expectedMatches).toBe(2);
   });
@@ -492,11 +493,10 @@ describe("previewEnduranceNextRound — manche qualificative", () => {
         ],
       }),
     )!;
-    expect(preview.stage).toBe("QUALIFICATION");
     expect(preview.stageCertain).toBe(true);
     expect(preview.matches).toEqual([
-      { teamAId: 1, teamBId: 2, sidesKnown: false, bracket: "UPPER" },
-      { teamAId: 3, teamBId: 4, sidesKnown: true, bracket: "UPPER" },
+      { teamAId: 1, teamBId: 2, sidesKnown: false },
+      { teamAId: 3, teamBId: 4, sidesKnown: true },
     ]);
   });
 
@@ -522,7 +522,7 @@ describe("previewEnduranceNextRound — manche qualificative", () => {
         ],
       }),
     )!;
-    expect(preview.matches[0]).toEqual({ teamAId: 1, teamBId: 2, sidesKnown: true, bracket: "UPPER" });
+    expect(preview.matches[0]).toEqual({ teamAId: 1, teamBId: 2, sidesKnown: true });
   });
 
   it("tient compte d'une pénalité de la manche en cours, appliquée après le match", () => {
@@ -572,158 +572,71 @@ describe("previewEnduranceNextRound — manche qualificative", () => {
     expect(previewEnduranceNextRound(input({ format: null, currentRound: 0 }))).toBeNull();
   });
 
-  it("ne marque pas l'étape acquise quand la qualification peut s'achever sur la manche", () => {
-    // Capital 1 : chaque perdant d'une manche tombe à 0. Six équipes, cible 4 :
-    // 1-2 joué (2 sort), 3-4 et 5-6 ouverts. En FT1, les deux perdants
-    // sortent, trois restent… mais un nul est impossible, donc exactement
-    // trois : la qualification s'achève. Avec FT2 et un 2-1, le perdant garde
-    // 1 − 2 + 1 = 0 → sort aussi. Toujours trois en lice : arbre acquis.
-    const preview = previewEnduranceNextRound(
-      input({
-        teams: teams(6),
-        format: { type: "FT", value: 1 },
-        config: { ...DEFAULT_ENDURANCE_CONFIG, startPoints: 1, playoffSize: 4 },
-        matches: [played(1, 1, 1, 2, 1, 0), record(1, 2, 3, 4), record(1, 3, 5, 6)],
-      }),
-    )!;
-    expect(preview.stage).toBe("PLAYOFFS");
-    expect(preview.round).toBe(PLAYOFF_ROUND_OFFSET);
-    expect(preview.stageCertain).toBe(true);
-    expect(preview.expectedMatches).toBe(1);
-  });
 });
 
-describe("previewEnduranceNextRound — premier tour de l'arbre", () => {
-  it("annonce les quarts acquis à la dernière manche d'un plafond", () => {
-    // Dix équipes, plafond 1 manche, cible 8 : la manche 1 est la dernière.
+describe("previewEnduranceNextRound — fin de la phase qualificative", () => {
+  it("n'annonce rien à la dernière manche d'un plafond", () => {
     const config = { ...DEFAULT_ENDURANCE_CONFIG, maxRounds: 1, playoffSize: 8 };
     const matches = [
-      played(1, 1, 1, 2, 3, 0), // 1 → 12, 2 → 6
-      played(1, 2, 3, 4, 3, 0), // 3 → 12, 4 → 6
-      played(1, 3, 5, 6, 3, 0), // 5 → 12, 6 → 6
-      played(1, 4, 7, 8, 3, 0), // 7 → 12, 8 → 6
+      played(1, 1, 1, 2, 3, 0),
+      played(1, 2, 3, 4, 3, 0),
+      played(1, 3, 5, 6, 3, 0),
+      played(1, 4, 7, 8, 3, 0),
       record(1, 5, 9, 10),
     ];
-    const preview = previewEnduranceNextRound(input({ teams: teams(10), config, matches }))!;
-    expect(preview.stage).toBe("PLAYOFFS");
-    expect(preview.stageCertain).toBe(true);
-    expect(preview.expectedMatches).toBe(4);
-    // 9 ou 10 peut finir à 12 : les quatre premières places ne sont pas
-    // acquises nommément… 1, 3, 5, 7 finissent à 12 devant 9/10 (ordre
-    // précédent) : places 1 à 4 fixées. 1v5 : places 1 et 5 — la 5ᵉ se
-    // dispute entre 9/10 et 2/4/6/8. Seules les rencontres entre places fixes
-    // sont annoncées.
-    for (const match of preview.matches) {
-      expect(match.sidesKnown).toBe(true);
-    }
+    expect(previewEnduranceNextRound(input({ teams: teams(10), config, matches }))).toBeNull();
   });
 
-  it("n'annonce rien tant que l'effectif qualifié n'est pas acquis", () => {
-    // Capital 1, cible 4, six équipes, pas de plafond : les perdants tombent.
-    // 1-2 joué, 3-4 ouvert, 5 et 6 chôment → après la manche : 1, 3|4, 5, 6
-    // (2 sort) = 4 → arbre. Effectif acquis : 4.
-    const preview = previewEnduranceNextRound(
-      input({
-        teams: teams(5),
-        format: { type: "FT", value: 1 },
-        config: { ...DEFAULT_ENDURANCE_CONFIG, startPoints: 1, playoffSize: 3 },
-        matches: [played(1, 1, 1, 2, 1, 0), record(1, 2, 3, 4)],
-      }),
-    )!;
-    expect(preview.stage).toBe("PLAYOFFS");
-    expect(preview.expectedMatches).toBe(1);
-  });
-});
-
-describe("previewEnduranceNextRound — play-offs en cours", () => {
-  function playoff(
-    matchNumber: number,
-    team1Id: number,
-    team2Id: number,
-    winner: number | null,
-    bracket = "UPPER",
-    round = PLAYOFF_ROUND_OFFSET,
-  ): EnduranceNextRoundMatchRecord {
-    return record(round, matchNumber, team1Id, team2Id, {
-      bracket,
-      status: winner === null ? "READY" : "COMPLETED",
-      winnerTeamId: winner,
-      loserTeamId: winner === null ? null : winner === team1Id ? team2Id : team1Id,
-    });
-  }
-
-  it("annonce la demi-finale dont les deux quarts sont joués", () => {
-    const preview = previewEnduranceNextRound(
-      input({
-        playoffsStarted: true,
-        matches: [
-          playoff(1, 8, 4, 8),
-          playoff(2, 6, 2, 2),
-          playoff(3, 1, 5, null),
-          playoff(4, 3, 7, 3),
-        ],
-      }),
-    )!;
-    expect(preview.stage).toBe("PLAYOFFS");
-    expect(preview.round).toBe(PLAYOFF_ROUND_OFFSET + 1);
-    expect(preview.pendingMatches).toBe(1);
-    expect(preview.expectedMatches).toBe(2);
-    expect(preview.matches).toEqual([
-      { teamAId: 8, teamBId: 2, sidesKnown: true, bracket: "UPPER" },
-    ]);
-  });
-
-  it("annonce la petite finale seulement quand les deux demies sont jouées", () => {
-    const semis = (second: number | null) =>
-      previewEnduranceNextRound(
-        input({
-          playoffsStarted: true,
-          matches: [
-            playoff(1, 8, 2, 8, "UPPER", PLAYOFF_ROUND_OFFSET + 1),
-            playoff(2, 1, 3, second, "UPPER", PLAYOFF_ROUND_OFFSET + 1),
-            playoff(1, 8, 4, 8),
-          ],
-        }),
-      );
-    // Une demi ouverte : ni finale ni petite finale acquises, mais deux
-    // rencontres à venir.
-    expect(semis(null)!.matches).toEqual([]);
-    expect(semis(null)!.expectedMatches).toBe(2);
-    // Les deux jouées : le moteur a déjà posé la suite, rien à prévoir.
-    expect(semis(1)).toBeNull();
-  });
-
-  it("rend null sur une finale en cours", () => {
+  it("n'annonce rien quand l'effectif retombe à la cible quoi qu'il arrive", () => {
+    // Capital 1, cible 4, six équipes : les perdants tombent, trois restent
+    // quoi qu'il arrive (1-2 joué, 3-4 et 5-6 ouverts) — l'arbre suit.
     expect(
       previewEnduranceNextRound(
         input({
-          playoffsStarted: true,
-          matches: [playoff(1, 1, 2, null, "UPPER", PLAYOFF_ROUND_OFFSET + 2)],
+          teams: teams(6),
+          format: { type: "FT", value: 1 },
+          config: { ...DEFAULT_ENDURANCE_CONFIG, startPoints: 1, playoffSize: 4 },
+          matches: [played(1, 1, 1, 2, 1, 0), record(1, 2, 3, 4), record(1, 3, 5, 6)],
         }),
       ),
     ).toBeNull();
-    expect(previewEnduranceNextRound(input({ playoffsStarted: true }))).toBeNull();
   });
 
-  it("garde l'exemption née d'un double forfait", () => {
+  it("n'annonce rien à la dernière manche d'un plafond en saisie libre", () => {
+    const config = { ...DEFAULT_ENDURANCE_CONFIG, maxRounds: 2 };
+    const matches = [record(2, 1, 1, 2)];
+    expect(previewEnduranceNextRound(input({ format: null, currentRound: 2, config, matches }))).toBeNull();
+    expect(previewEnduranceNextRound(input({ format: null, currentRound: 1, config, matches: [record(1, 1, 1, 2)] }))).not.toBeNull();
+  });
+
+  it("garde l'aperçu qualificatif quand la fin n'est pas acquise", () => {
     const preview = previewEnduranceNextRound(
       input({
-        playoffsStarted: true,
-        matches: [
-          record(PLAYOFF_ROUND_OFFSET, 1, 8, 4, {
-            status: "COMPLETED",
-            doubleForfeit: true,
-          }),
-          playoff(2, 6, 2, 2),
-          playoff(3, 1, 5, null),
-          playoff(4, 3, 7, null),
-        ],
+        teams: teams(12),
+        config: { ...DEFAULT_ENDURANCE_CONFIG, startPoints: 3, playoffSize: 4 },
+        matches: [played(1, 1, 1, 2, 3, 0), record(1, 2, 3, 4)],
       }),
-    )!;
-    expect(preview.matches).toEqual([
-      { teamAId: 2, teamBId: null, sidesKnown: true, bracket: "UPPER" },
-    ]);
-    expect(preview.expectedMatches).toBe(1);
+    );
+    expect(preview).not.toBeNull();
+    expect(preview!.round).toBe(2);
+  });
+});
+
+describe("previewEnduranceNextRound — play-offs", () => {
+  it("n'annonce rien play-offs lancés, quel que soit le tour", () => {
+    const playoff = (round: number, matchNumber: number, winner: number | null) =>
+      record(round, matchNumber, 1, 2, {
+        status: winner === null ? "READY" : "COMPLETED",
+        winnerTeamId: winner,
+        loserTeamId: winner === null ? null : winner === 1 ? 2 : 1,
+      });
+    for (const matches of [
+      [],
+      [playoff(PLAYOFF_ROUND_OFFSET, 1, 1), playoff(PLAYOFF_ROUND_OFFSET, 2, null)],
+      [playoff(PLAYOFF_ROUND_OFFSET + 1, 1, null)],
+    ]) {
+      expect(previewEnduranceNextRound(input({ playoffsStarted: true, matches }))).toBeNull();
+    }
   });
 });
 

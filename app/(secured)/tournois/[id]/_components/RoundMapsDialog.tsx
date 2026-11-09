@@ -113,6 +113,32 @@ type RoundField = "slots" | "copy" | "applyAll";
 /** Refus du serveur rattachés à la liste des cartes du tour (`useFieldErrors`). */
 const SLOT_FIELD_ERRORS = { INVALID_ROUND_MAPS: "slots" } as const satisfies Record<string, RoundField>;
 
+/**
+ * La section « Map de départage » paraît sur un tour éligible, et **reste** sur
+ * ce tour si l'éligibilité disparaît ensuite ; changer de tour l'oublie.
+ */
+function useTiebreakShown(round: RoundKey | null, allowed: boolean): boolean {
+  const id = round ? roundKeyId(round) : null;
+  const [shownFor, setShownFor] = useState<string | null>(null);
+  // Ajustement d'état pendant le rendu (motif React prévu pour cela) : pas de réécriture d'une ref.
+  let current = shownFor;
+  if (current !== null && current !== id) current = null;
+  if (allowed && id !== null) current = id;
+  if (current !== shownFor) setShownFor(current);
+  return current !== null;
+}
+
+/** Section « Map de départage » : paraît-elle, et quelles cartes périmées la suivent. */
+function useTiebreakSection(
+  stale: readonly RoundTiebreak[] | undefined,
+  round: RoundKey | null,
+  allowed: boolean,
+): { showTiebreak: boolean; staleTiebreaks: readonly RoundTiebreak[] } {
+  const showTiebreak = useTiebreakShown(round, allowed);
+  const staleTiebreaks = useStaleTiebreaks(stale, round, showTiebreak && !allowed);
+  return { showTiebreak, staleTiebreaks };
+}
+
 /** Témoin d'un formulaire modifié et pas encore enregistré, annoncé au lecteur d'écran. */
 function UnsavedNote({ dirty, text }: Readonly<{ dirty: boolean; text: string }>) {
   return (
@@ -376,6 +402,7 @@ function TiebreakForm({
   tournamentId,
   round,
   saved,
+  allowed,
   overwatch,
   busy,
   run,
@@ -385,6 +412,8 @@ function TiebreakForm({
   tournamentId: number;
   round: RoundKey;
   saved: string | null;
+  /** Faux quand un flux a changé le format du tour pendant la saisie : le texte reste, sans pouvoir s'envoyer. */
+  allowed: boolean;
   overwatch: boolean;
   busy: boolean;
   run: RunTask;
@@ -398,6 +427,7 @@ function TiebreakForm({
   const ids = useId();
   const inputId = `${ids}-tiebreak`;
   const listId = `${ids}-tiebreak-maps`;
+  const unavailableId = `${ids}-tiebreak-unavailable`;
   const [value, setValue] = useState(saved ?? "");
   const fieldErrors = useFieldErrors(TIEBREAK_FIELD_ERRORS, { tiebreak: inputId });
   const synced = useRef(saved);
@@ -416,6 +446,8 @@ function TiebreakForm({
     run(
       async () => {
         await putJson(`/api/admin/tournaments/${tournamentId}/round-tiebreak`, { ...round, map });
+        // Le champ prend la forme enregistrée (espaces repliés), pas le texte tapé.
+        setValue(map ?? "");
         onWritten();
         showSuccess(success);
       },
@@ -427,6 +459,10 @@ function TiebreakForm({
     // Rien de changé : rien à envoyer (renvoyer la valeur en place n'écrirait que du bruit au journal),
     // et Entrée dans un champ intact ne réclame pas un nom que le bouton grisé ne demande pas.
     if (busy || !dirty) return;
+    if (!allowed) {
+      showError(t("dialog.tiebreakUnavailable"));
+      return;
+    }
     if (visibleText(value) === "") {
       const text = t("dialog.tiebreakEmpty");
       showError(text);
@@ -453,13 +489,17 @@ function TiebreakForm({
             value={value}
             maxLength={FIRST_MAP_MAX_LENGTH}
             list={overwatch ? listId : undefined}
-            {...fieldErrors.aria("tiebreak")}
+            readOnly={!allowed || undefined}
+            {...fieldErrors.aria("tiebreak", !allowed && unavailableId)}
             onChange={(event) => {
               setValue(event.target.value);
               fieldErrors.clear();
             }}
           />
           <FieldErrorText fieldId={inputId} message={fieldErrors.message("tiebreak")} />
+          <output id={unavailableId} className={styles.muted}>
+            {allowed ? "" : t("dialog.tiebreakUnavailable")}
+          </output>
           {overwatch && <MapNamesDatalist id={listId} />}
         </div>
         <div className={styles.actions}>
@@ -478,7 +518,7 @@ function TiebreakForm({
           >
             {t("dialog.tiebreakRemove")}
           </button>
-          <button type="submit" className="btn ghost" aria-disabled={busy || !dirty || undefined}>
+          <button type="submit" className="btn ghost" aria-disabled={busy || !dirty || !allowed || undefined}>
             {t("dialog.tiebreakSave")}
           </button>
         </div>
@@ -493,6 +533,19 @@ function TiebreakForm({
  */
 /** Liste vide partagée : une référence neuve à chaque rendu relancerait l'effet de focus. */
 const NO_STALE_TIEBREAKS: readonly RoundTiebreak[] = [];
+
+/** Cartes périmées à lister : le tour dont le formulaire reste affiché, grisé (`greyed`), n'y figure pas aussi. */
+function useStaleTiebreaks(
+  stale: readonly RoundTiebreak[] | undefined,
+  round: RoundKey | null,
+  greyed: boolean,
+): readonly RoundTiebreak[] {
+  const greyedId = round && greyed ? roundKeyId(round) : null;
+  return useMemo(() => {
+    const items = stale ?? NO_STALE_TIEBREAKS;
+    return greyedId === null ? items : items.filter((item) => roundKeyId(item) !== greyedId);
+  }, [stale, greyedId]);
+}
 
 function StaleTiebreaks({
   items,
@@ -736,6 +789,9 @@ export function RoundMapsDialog({
     phases: detail.phases ?? detail.card.phases,
   };
   const tiebreakAllowed = round !== null && roundAllowsTiebreak(tiebreakTournament, round);
+  // Un flux qui change le format du tour pendant la saisie ne démonte pas la
+  // section (focus sur le body, texte perdu) : elle reste, grisée, avec son message.
+  const { showTiebreak, staleTiebreaks } = useTiebreakSection(rules.staleTiebreaks, round, tiebreakAllowed);
 
   const optionLabel = (key: RoundKey) => {
     const config = roundMapsOf(rules.rounds, key);
@@ -1112,12 +1168,13 @@ export function RoundMapsDialog({
           </form>
         )}
 
-        {round && tiebreakAllowed && (
+        {round && showTiebreak && (
           <TiebreakForm
             key={roundKeyId(round)}
             tournamentId={tournamentId}
             round={round}
             saved={roundTiebreakOf(rules.tiebreaks, round)}
+            allowed={tiebreakAllowed}
             overwatch={overwatch}
             busy={busy}
             run={run}
@@ -1127,7 +1184,7 @@ export function RoundMapsDialog({
         )}
 
         <StaleTiebreaks
-          items={rules.staleTiebreaks ?? NO_STALE_TIEBREAKS}
+          items={staleTiebreaks}
           roundLabel={roundLabel}
           tournamentId={tournamentId}
           busy={busy}

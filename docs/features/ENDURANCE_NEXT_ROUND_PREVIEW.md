@@ -16,8 +16,12 @@ que soit le score des matchs encore ouverts.
 - **Permission `tournaments`** — administrateurs et arbitres (`detail.isAdmin`).
   Le cast n'y a pas accès : c'est un outil d'organisation, pas de diffusion.
 - Sur `/tournois/[id]`, dans la vue BG Survie, sous le classement, au-dessus des
-  play-offs et des volets de manche : un volet « Aperçu · Manche N » (ou « Aperçu ·
-  Quarts de finale »…), ouvert d'office et repliable.
+  play-offs et des volets de manche : un volet « Aperçu · Manche N », ouvert
+  d'office et repliable.
+- **Phase qualificative seulement.** Aucun aperçu pour les play-offs : ni le
+  premier tour de l'arbre (la manche qui les ouvre n'a plus d'aperçu), ni les
+  tours suivants (play-offs lancés). L'aperçu disparaît dès que la qualification
+  s'achève sûrement sur la manche en cours.
 - Tournoi **en cours** seulement, et seulement quand une manche est ouverte : une
   manche close est aussitôt suivie de la suivante, rien n'est alors à prévoir.
 
@@ -28,7 +32,7 @@ navigateur**, sur l'instantané que le flux SSE pousse déjà à chaque score
 (`app/(secured)/tournois/[id]/_lib/endurance-next-round.ts` fait l'adaptation).
 Le calcul se répartit par étape : `outcomes.ts` (déroulés possibles de la
 manche), `position-bounds.ts` (places bornées), `pairings.ts` (rencontres
-acquises), `playoff-preview.ts` (tour suivant d'un arbre en cours),
+acquises),
 `preview.ts` (entrée, `previewEnduranceNextRound`) et `types.ts`.
 Deux raisons :
 
@@ -90,18 +94,9 @@ test garde la borne.
   phase **peut** encore s'achever sur la manche en cours (effectif susceptible
   de retomber à la cible) : les rencontres annoncées ne se joueront alors que si
   elle continue, et un bandeau le dit.
-- **Premier tour de l'arbre** — quand la qualification s'achève sur cette manche
-  quoi qu'il arrive (dernière manche d'un plafond, ou effectif retombé à la
-  cible dans tous les déroulés). Le tableau dépend de l'effectif qualifié : tant
-  qu'il n'est pas acquis, rien ne l'est. Sinon, le tirage du moteur
-  (`planPlayoffFirstRound`) est appliqué **aux places**, et une rencontre est
-  acquise quand ses deux places sont tenues chacune par une équipe certaine.
-- **Tour suivant d'un arbre en cours** — ne dépend plus d'aucun capital. Le
-  tirage du moteur (`planNextPlayoffRound`) est joué sur les rencontres
-  tranchées, un vainqueur **fictif** (identifiant négatif) tenant la place de
-  chaque rencontre ouverte : toute rencontre planifiée sans équipe fictive est
-  acquise. Même mécanique pour la petite finale et pour l'exemption née d'un
-  double forfait.
+- **Fin de la qualification** — `null` : plafond de manches atteint, ou effectif
+  retombé à la cible dans tous les déroulés (l'arbre suit), ou play-offs
+  lancés. Le mode n'annonce plus de rencontre d'arbre.
 
 ## Les limites — toutes du côté de la prudence
 
@@ -142,4 +137,4 @@ Une rencontre peut être acquise sans être annoncée, **jamais l'inverse** :
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Aperçu de la manche suivante — BG Survie, arbitrage** (`lib/shared/endurance-next-round/` pur + `app/(secured)/tournois/[id]/_lib/endurance-next-round.ts` + `_components/EnduranceNextRoundPanel.tsx`) : le moteur ne pose une manche qu'une fois la précédente close, alors que la plupart des couples sont écrits bien avant le dernier score. Un volet réservé à la permission `tournaments` (administrateurs et arbitres, `detail.isAdmin`) d'un tournoi en cours annonce les rencontres de l'étape suivante **acquises quel que soit le score des matchs restants** — jamais une rencontre probable. Méthode : état de départ de la manche rejoué par `replayEnduranceDetailed`, matchs restants remplacés par **tous** leurs résultats enregistrables (`checkMatchScores` + forfait au score plein), pénalités et abandons de la manche appliqués **après** les matchs comme dans le rejeu, puis place de chaque équipe bornée **exactement** (le match de l'équipe fixé, les autres sont indépendants — fonctions en escalier sommées une fois, recherche dichotomique : ~5 ms à 128 équipes). Un couple (places 1-2, 3-4…) est acquis quand deux équipes présentes quoi qu'il arrive ne peuvent occuper que ses deux places, « côtés à confirmer » si la meilleure des deux n'est pas tranchée ; exemption annoncée si l'effectif et la dernière place le sont. Aussi : premier tour de l'arbre quand la qualification s'achève sûrement (tirage du moteur appliqué **aux places**), tour suivant d'un arbre en cours (vainqueurs fictifs pour les rencontres ouvertes). Calculé **côté interface** sur l'instantané, parce que le contexte du lecteur n'arrive qu'à la connexion au flux (il resterait figé) et que tout ce qu'il lit est public. Limites, toutes du côté de la prudence : abandon, pénalité et double forfait à venir hors calcul (le volet le dit), coupe sous plafond de manches approchée par le haut, glissement en bloc d'un couple non reconnu, rien en saisie libre. La lecture d'un match en résultat rejouable est désormais unique, `enduranceMatchOutcome`, partagée avec `loadQualificationOutcomes`. Une **force brute** (tous les déroulés rejoués par le moteur) tient la sûreté et l'exactitude des places. Voir `docs/features/ENDURANCE_NEXT_ROUND_PREVIEW.md`.
+- **Aperçu de la manche suivante — BG Survie, arbitrage** (`lib/shared/endurance-next-round/` pur + `app/(secured)/tournois/[id]/_lib/endurance-next-round.ts` + `_components/EnduranceNextRoundPanel.tsx`) : le moteur ne pose une manche qu'une fois la précédente close, alors que la plupart des couples sont écrits bien avant le dernier score. Un volet réservé à la permission `tournaments` (administrateurs et arbitres, `detail.isAdmin`) d'un tournoi en cours annonce les rencontres de l'étape suivante **acquises quel que soit le score des matchs restants** — jamais une rencontre probable. Méthode : état de départ de la manche rejoué par `replayEnduranceDetailed`, matchs restants remplacés par **tous** leurs résultats enregistrables (`checkMatchScores` + forfait au score plein), pénalités et abandons de la manche appliqués **après** les matchs comme dans le rejeu, puis place de chaque équipe bornée **exactement** (le match de l'équipe fixé, les autres sont indépendants — fonctions en escalier sommées une fois, recherche dichotomique : ~5 ms à 128 équipes). Un couple (places 1-2, 3-4…) est acquis quand deux équipes présentes quoi qu'il arrive ne peuvent occuper que ses deux places, « côtés à confirmer » si la meilleure des deux n'est pas tranchée ; exemption annoncée si l'effectif et la dernière place le sont. Phase qualificative seulement : aucun aperçu des play-offs (ni premier tour, ni tours suivants). Calculé **côté interface** sur l'instantané, parce que le contexte du lecteur n'arrive qu'à la connexion au flux (il resterait figé) et que tout ce qu'il lit est public. Limites, toutes du côté de la prudence : abandon, pénalité et double forfait à venir hors calcul (le volet le dit), coupe sous plafond de manches approchée par le haut, glissement en bloc d'un couple non reconnu, rien en saisie libre. La lecture d'un match en résultat rejouable est désormais unique, `enduranceMatchOutcome`, partagée avec `loadQualificationOutcomes`. Une **force brute** (tous les déroulés rejoués par le moteur) tient la sûreté et l'exactitude des places. Voir `docs/features/ENDURANCE_NEXT_ROUND_PREVIEW.md`.

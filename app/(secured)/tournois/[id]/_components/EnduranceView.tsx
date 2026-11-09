@@ -448,8 +448,8 @@ export function EnduranceView({
         L'aperçu ouvre la suite des volets (aperçu → manche en cours → manches
         closes, de la plus récente à la plus ancienne) : c'est en regardant la
         manche en cours que l'arbitrage prépare la suivante, et le volet se
-        replie pour qui n'en a pas l'usage. Play-offs lancés, il annonce le tour
-        suivant de l'arbre et précède donc l'arbre lui-même. Outil d'arbitrage :
+        replie pour qui n'en a pas l'usage. Il s'arrête avec la phase
+        qualificative : aucun aperçu pour les play-offs. Outil d'arbitrage :
         noms sobres, sans marche du podium.
       */}
       {nextRound && (

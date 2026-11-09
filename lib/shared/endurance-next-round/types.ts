@@ -11,8 +11,6 @@ import type { MatchFormat } from "../match-format";
 
 /** Un match du tournoi, tel que l'aperçu le lit. */
 export type EnduranceNextRoundMatchRecord = EnduranceMatchRecord & {
-  /** `UPPER` pour la qualification et l'arbre, `THIRD_PLACE` pour la petite finale. */
-  bracket: string;
   /** Ordre du match dans sa manche — celui des appariements du moteur. */
   matchNumber: number;
 };
@@ -42,13 +40,10 @@ export type EnduranceNextRoundMatch = {
    * gauche, et qui accueille la partie par défaut.
    */
   sidesKnown: boolean;
-  bracket: "UPPER" | "THIRD_PLACE";
 };
 
 export type EnduranceNextRoundPreview = {
-  /** Ce qui suit la manche en cours : une manche qualificative ou un tour d'arbre. */
-  stage: "QUALIFICATION" | "PLAYOFFS";
-  /** Numéro de la manche à venir (≥ `PLAYOFF_ROUND_OFFSET` pour l'arbre). */
+  /** Numéro de la manche qualificative à venir. */
   round: number;
   /**
    * L'étape elle-même est-elle acquise ? Faux quand la phase qualificative peut
@@ -61,16 +56,10 @@ export type EnduranceNextRoundPreview = {
   /** Rencontres de la manche courante encore à trancher. */
   pendingMatches: number;
   /**
-   * Nombre de rencontres (exemptions exclues) que comptera l'étape suivante,
+   * Nombre de rencontres (exemptions exclues) que comptera la manche suivante,
    * `null` tant que l'effectif n'est pas acquis.
    */
   expectedMatches: number | null;
-  /**
-   * Play-offs : rencontres **décisives** du tour à venir, exemptions comprises
-   * — ce qui le nomme (4 → quarts, 2 → demies, 1 → finale). `null` en
-   * qualification, ou tant que l'effectif n'est pas acquis.
-   */
-  decisiveSlots: number | null;
   matches: EnduranceNextRoundMatch[];
 };
 

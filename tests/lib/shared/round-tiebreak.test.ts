@@ -2,7 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import { formatLobbyBriefDm } from "@/lib/server/tournaments/lobby-brief-dm";
 import type { LobbyBriefSide } from "@/lib/shared/lobby-brief";
 import { formatAllowsTiebreak, type MatchFormat } from "@/lib/shared/match-format";
-import { checkMapList, tiebreakRowIndex } from "@/lib/shared/match-maps";
+import { checkMapList, shownTiebreakMap, tiebreakRowIndex } from "@/lib/shared/match-maps";
 import { normalizeTiebreakMap, parseStoredTiebreak, roundTiebreakOf } from "@/lib/shared/round-maps";
 import {
   applicableTiebreaks,
@@ -422,5 +422,30 @@ describe("checkMapList — map de départage en BO 5", () => {
     const actual = checkMapList(BO5, "OW", maps, { decisive: true });
 
     expect(actual.error).toBe("MAP_AFTER_DECISION");
+  });
+});
+
+describe("shownTiebreakMap", () => {
+  const map = (team1Score: number, team2Score: number) => ({ team1Score, team2Score });
+
+  it("shownTiebreakMap_matchNotCompleted_alwaysShowsTheRoundMap", () => {
+    expect(shownTiebreakMap(BO3, false, [], "Oasis")).toBe("Oasis");
+    expect(shownTiebreakMap(BO3, false, [map(5, 1), map(5, 1)], "Oasis")).toBe("Oasis");
+  });
+
+  it("shownTiebreakMap_completedWithoutTiebreakRow_hidesIt", () => {
+    expect(shownTiebreakMap(BO3, true, [map(5, 1), map(5, 2)], "Oasis")).toBeNull();
+    expect(shownTiebreakMap(BO3, true, [], "Oasis")).toBeNull();
+  });
+
+  it("shownTiebreakMap_completedThatPlayedIt_showsIt", () => {
+    const maps = [map(5, 1), map(1, 5), map(2, 2)];
+    expect(shownTiebreakMap(BO3, true, maps, "Oasis")).toBeNull();
+    expect(shownTiebreakMap(BO3, true, [...maps, map(5, 2)], "Oasis")).toBe("Oasis");
+  });
+
+  it("shownTiebreakMap_noRoundMap_returnsNull", () => {
+    expect(shownTiebreakMap(BO3, false, [], null)).toBeNull();
+    expect(shownTiebreakMap(BO3, true, [], undefined)).toBeNull();
   });
 });

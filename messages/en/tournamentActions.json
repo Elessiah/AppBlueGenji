@@ -450,13 +450,6 @@
     "panelTitle": "Preview · {title}",
     "panelAria": "Preview of the next step: {title}",
     "listAria": "Settled matchups — {title}",
-    "stage": {
-      "final": "Final",
-      "semis": "Semifinals",
-      "quarters": "Quarterfinals",
-      "roundOf16": "Round of 16",
-      "playoffs": "Playoffs"
-    },
     "round": "Round {round}",
     "roundOf": "Round {round}/{max}",
     "acquired": "{count, plural, one {# settled matchup} other {# settled matchups}}",
@@ -464,18 +457,14 @@
     "pending": "{count, plural, one {# match left} other {# matches left}} to play",
     "empty": {
       "freeScore": "Free score: a remaining match can shift a pool without limit, nothing is settled before the end of the round.",
-      "underfilled": "Fewer than two qualified entrants: the tournament will close without a final bracket.",
       "none": "No matchup is settled yet: they all depend on the remaining matches."
     },
     "stageUncertain": "The qualifying stage may end with this round: these matchups will only be played if it continues.",
-    "thirdPlace": "Third-place match",
-    "byePlayoffs": "advances (bye)",
     "byeRound": "sits out this round (odd number of entrants)",
     "versus": "vs",
     "sidesUnknown": "Sides to be confirmed",
     "sidesHint": "The matchup is certain; the remaining matches will decide who, ranked higher, takes the left side and hosts the game.",
     "footnoteRound": "Certain whatever the score of the remaining matches, barring a referee decision (withdrawal, penalty, double forfeit). The round is only set up once the previous one is over.",
-    "footnotePlayoffs": "Certain whatever the score of the remaining matches, barring a referee decision (withdrawal, penalty, double forfeit). The next stage is only set up once the previous one is over.",
     "footnoteShort": "Certain matchups, barring a referee decision.",
     "footnoteSubject": "Certain matchups"
   }
