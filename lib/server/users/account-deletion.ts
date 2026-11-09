@@ -321,9 +321,14 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
  * demande a été annulée (réactivation) ou si ses trente jours ne sont pas
  * écoulés — relu sous le verrou du compte. Idempotent : un compte déjà effacé
  * ou anonymisé n'est plus en attente. Rend `null` quand rien n'est fait.
+ * `accountCreatedAt` (rejeu du journal) : rien non plus si la ligne verrouillée
+ * n'est pas ce compte-là (identifiant réattribué).
  */
-export async function finalizeAccountDeletion(userId: number): Promise<AccountDeletionPlan | null> {
-  return deleteAccountNow(userId, true);
+export async function finalizeAccountDeletion(
+  userId: number,
+  options: { accountCreatedAt?: string } = {},
+): Promise<AccountDeletionPlan | null> {
+  return deleteAccountNow(userId, true, options.accountCreatedAt);
 }
 
 /**
@@ -357,13 +362,18 @@ async function applyDeletionMode(
   return { withdrawal, withdrawnFrom: [], quarantinedFiles: [] };
 }
 
+/** Une suite après le commit ; une erreur est consignée, jamais propagée (la suppression est faite). */
+function afterCommit(step: () => void, failure: string): void {
+  try {
+    step();
+  } catch (error) {
+    console.error(`[account-deletion] ${failure} :`, error);
+  }
+}
+
 /** Prévient un tournoi après le commit ; un écouteur qui lève est consigné, jamais propagé. */
 function publishAfterCommit(publish: () => void, tournamentId: number): void {
-  try {
-    publish();
-  } catch (error) {
-    console.error(`[account-deletion] Tournoi #${tournamentId} non prévenu :`, error);
-  }
+  afterCommit(publish, `Tournoi #${tournamentId} non prévenu`);
 }
 
 /** La suppression définitive est due : demande relevée il y a trente jours ou plus, compte toujours en attente. */
@@ -392,7 +402,11 @@ async function loadQuarantinedAvatarFiles(runner: SqlRunner, userId: number): Pr
     .filter((file): file is string => file !== null);
 }
 
-async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<AccountDeletionPlan | null> {
+async function deleteAccountNow(
+  userId: number,
+  onlyIfDue: boolean,
+  expectedCreatedAt?: string,
+): Promise<AccountDeletionPlan | null> {
   const db = await getDatabase();
   // Les tournois où l'entrée solo est inscrite, relevés **avant** de prendre une
   // connexion : la relève en emprunte une autre au pool, et en tenir une pendant
@@ -470,7 +484,8 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
     // La fenêtre de réactivation, relue sous le verrou : une reconnexion qui
     // vient de réactiver le compte, ou une demande encore dans ses trente
     // jours, ne tombe pas.
-    if (onlyIfDue && !deletionIsDue(locked[0])) {
+    const otherAccount = expectedCreatedAt !== undefined && String(locked[0]?.created_at) !== expectedCreatedAt;
+    if (onlyIfDue && (!deletionIsDue(locked[0]) || otherAccount)) {
       await connection.rollback();
       return null;
     }
@@ -543,7 +558,7 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
 
   // Ses sessions sont parties avec la transaction, pas ses flux de tournoi
   // ouverts, qui ne relisent pas la session (`session-streams.ts`).
-  closeUserStreams(userId);
+  afterCommit(() => closeUserStreams(userId), "Flux de tournoi du compte non fermés");
 
   // Les instantanés ouverts des matchs qu'il castait ou arbitrait montreraient
   // sinon son cast, le lien de sa chaîne ou « Arbitre désigné » jusqu'à la
@@ -565,7 +580,7 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
   // anonymisée) et la liste des fiches de comptes supprimés sans statistiques
   // (`profileless-players.ts`) : sans cela, le pseudo d'un compte supprimé y
   // resterait servi jusqu'à l'échéance de ces caches.
-  invalidateTeamIdentityViews();
+  afterCommit(invalidateTeamIdentityViews, "Vues de l'accueil non invalidées");
 
   // Les deux modes effacent la photo : l'un fait disparaître la ligne, l'autre
   // met `avatar_url` à `NULL` — dans les deux cas le fichier resterait servi

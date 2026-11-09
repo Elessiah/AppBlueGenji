@@ -92,6 +92,14 @@ describe("pickTeamSuccessor", () => {
     expect(pickTeamSuccessor([manager, member])?.userId).toBe(3);
   });
 
+  // Revue de correction #571 : un copropriétaire suspendu garde l'équipe, rien ne change.
+  it("pickTeamSuccessor_suspendedCoOwner_picksCoOwnerOverActiveMember", () => {
+    const member = candidate({ userId: 2, roles: ["TANK"] });
+    const coOwner = candidate({ userId: 3, roles: ["OWNER"], suspended: true });
+
+    expect(pickTeamSuccessor([member, coOwner])?.userId).toBe(3);
+  });
+
   it("pickTeamSuccessor_onlySuspendedMembers_stillPicksBestOfThem", () => {
     const member = candidate({ userId: 2, roles: ["TANK"], suspended: true });
     const manager = candidate({ userId: 3, roles: ["MANAGER"], suspended: true });

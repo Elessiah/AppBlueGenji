@@ -7,6 +7,7 @@ jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/account-deletion-journal");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/blocked-images");
+jest.mock("@/lib/server/session-streams");
 jest.mock("@/lib/server/logo-quarantine", () => ({
   avatarFileLocations: jest.fn((url: string) => ({ quarantined: `/quarantine/${url.split("/").pop()}` })),
 }));
@@ -15,6 +16,7 @@ import { getDatabase } from "@/lib/server/database";
 import { blockImageHashes, hashImageFiles } from "@/lib/server/blocked-images";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { closeUserStreams } from "@/lib/server/session-streams";
 import { finalizeAccountDeletion } from "@/lib/server/users/account-deletion";
 import { finalizeDueAccountDeletions } from "@/lib/server/users/deleted-accounts";
 import { fakePool } from "../../helpers/sql-double";
@@ -166,6 +168,34 @@ describe("finalizeAccountDeletion", () => {
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(3, { landingLive: true });
     expect(recordAccountDeletion).toHaveBeenCalledWith(expect.objectContaining({ userId: 7 }));
     error.mockRestore();
+  });
+
+  // Revue de correction #571 : la fermeture des flux qui lève après le commit ne saute pas le journal.
+  it("finalizeAccountDeletion_closeStreamsThrows_stillJournalsAndResolves", async () => {
+    fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE } });
+    jest.mocked(closeUserStreams).mockImplementation(() => {
+      throw new Error("STREAM");
+    });
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    expect((await finalizeAccountDeletion(7))?.mode).toBe("ERASE");
+    expect(recordAccountDeletion).toHaveBeenCalledWith(expect.objectContaining({ userId: 7 }));
+    error.mockRestore();
+  });
+
+  // Revue de correction #571 : le rejeu ne finalise que le compte du journal.
+  it("finalizeAccountDeletion_otherCreatedAtUnderLock_nothingDone", async () => {
+    const { connection } = fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE } });
+
+    expect(await finalizeAccountDeletion(7, { accountCreatedAt: "2025-05-05 05:05:05" })).toBeNull();
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(recordAccountDeletion).not.toHaveBeenCalled();
+  });
+
+  it("finalizeAccountDeletion_sameCreatedAtUnderLock_finalized", async () => {
+    fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE } });
+
+    expect((await finalizeAccountDeletion(7, { accountCreatedAt: "2026-01-02 03:04:05" }))?.mode).toBe("ERASE");
   });
 
   it("finalizeAccountDeletion_anonymize_neitherReadsNorBlocksQuarantinedAvatar", async () => {

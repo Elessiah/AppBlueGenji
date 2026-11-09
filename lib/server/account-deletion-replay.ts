@@ -70,9 +70,10 @@ export async function replayAccountDeletions(
   // Séquentiel : chaque suppression prend le verrou de sa ligne et ouvre sa
   // transaction, rien ne presse, et l'ordre du journal est celui des faits.
   for (const entry of entries) {
-    const decision = replayDecision(entry, await readRestoredRow(db, entry.userId));
+    const restored = await readRestoredRow(db, entry.userId);
+    const decision = replayDecision(entry, restored);
 
-    if (await handleStateDecision(db, decision, entry, report, log, options.dryRun === true)) continue;
+    if (await handleStateDecision(db, decision, entry, restored, report, log, options.dryRun === true)) continue;
 
     if (decision !== "REPLAY") {
       report[counters[decision]] += 1;
@@ -141,6 +142,7 @@ async function handleStateDecision(
   db: Awaited<ReturnType<typeof getDatabase>>,
   decision: ReplayDecision,
   entry: AccountDeletionEntry,
+  restored: RestoredAccountRow | null,
   report: ReplayReport,
   log: (line: string) => void,
   dryRun: boolean,
@@ -150,7 +152,7 @@ async function handleStateDecision(
     return true;
   }
   if (decision === "REDATE") {
-    await handleRedate(db, entry, report, log, dryRun);
+    await handleRedate(db, entry, restored, report, log, dryRun);
     return true;
   }
   return false;
@@ -162,11 +164,13 @@ async function handleStateDecision(
  * ligne plus ancienne que la demande restaurée (journal en échec entre-temps)
  * abrégerait sa fenêtre. Comparée à la seconde (`DATETIME(0)`). Fenêtre du
  * journal déjà close : la suppression définitive suit aussitôt, comme au chemin
- * `REPLAY`, sans attendre la passe horaire.
+ * `REPLAY`, sans attendre la passe horaire — pour ce compte-là seulement
+ * (`accountCreatedAt` revérifiée sous le verrou de la finalisation).
  */
 async function handleRedate(
   db: Awaited<ReturnType<typeof getDatabase>>,
   entry: AccountDeletionEntry,
+  restored: RestoredAccountRow | null,
   report: ReplayReport,
   log: (line: string) => void,
   dryRun: boolean,
@@ -174,6 +178,13 @@ async function handleRedate(
   const requestedAt = toWholeSecond(new Date(entry.deletedAt));
   const windowOpen = isReactivationWindowOpen(entry.deletedAt);
   if (dryRun) {
+    // Même partage que le vrai passage : une demande restaurée déjà à cette
+    // date, ou plus récente, ne serait pas redatée.
+    const restoredAt = restored?.deletionRequestedAt ? new Date(restored.deletionRequestedAt).getTime() : Number.NaN;
+    if (windowOpen && Number.isFinite(restoredAt) && restoredAt >= requestedAt.getTime()) {
+      report.alreadyPending += 1;
+      return;
+    }
     report.replayed += 1;
     log(
       windowOpen
@@ -191,7 +202,7 @@ async function handleRedate(
     );
     const redated = Number(result.affectedRows) === 1;
     if (!windowOpen) {
-      const plan = await finalizeAccountDeletion(entry.userId);
+      const plan = await finalizeAccountDeletion(entry.userId, { accountCreatedAt: entry.accountCreatedAt });
       if (plan) {
         report.replayed += 1;
         log(`  ✓ #${entry.userId} — ${plan.mode === "ERASE" ? "effacé" : "anonymisé"} (fenêtre close)`);
@@ -228,6 +239,9 @@ async function replayReactivation(
       log(`  ✓ #${entry.userId} — réactivé`);
     } else if (outcome === "ALREADY_ACTIVE") {
       report.alreadyActive += 1;
+    } else if (outcome === "GONE") {
+      report.alreadyDeleted += 1;
+      log(`  = #${entry.userId} — supprimé ou réattribué entre-temps, laissé tel quel`);
     } else {
       report.superseded += 1;
       log(`  = #${entry.userId} — demande postérieure à la réactivation, laissée en place`);

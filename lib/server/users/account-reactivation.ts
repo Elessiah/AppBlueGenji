@@ -224,11 +224,12 @@ export async function reactivateAccount(
  * suppression, est réactivé de nouveau — même écriture que la réactivation
  * (pseudo, avatar, sessions retirées), sans ticket ni fenêtre : elle a eu lieu.
  * N'écrit pas le journal (sa ligne de réactivation y est déjà). Rend l'issue
- * relue sous verrou : `REACTIVATED`, `ALREADY_ACTIVE` (compte vivant) ou
- * `SUPERSEDED` (compte absent, autre compte, ou demande postérieure à celle que
- * la réactivation défaisait — elle tient).
+ * relue sous verrou : `REACTIVATED`, `ALREADY_ACTIVE` (compte vivant),
+ * `SUPERSEDED` (même compte toujours en attente, d'une demande postérieure à
+ * celle que la réactivation défaisait — elle tient) ou `GONE` (compte absent,
+ * identifiant réattribué, ou suppression déjà définitive).
  */
-export type ReplayedReactivation = "REACTIVATED" | "ALREADY_ACTIVE" | "SUPERSEDED";
+export type ReplayedReactivation = "REACTIVATED" | "ALREADY_ACTIVE" | "SUPERSEDED" | "GONE";
 
 export async function replayAccountReactivation(entry: AccountDeletionEntry): Promise<ReplayedReactivation> {
   const userId = entry.userId;
@@ -236,6 +237,7 @@ export async function replayAccountReactivation(entry: AccountDeletionEntry): Pr
   const connection = await db.getConnection();
   let restored = false;
   let alive = false;
+  let stillPending = false;
   try {
     await connection.beginTransaction();
     const [locked] = await connection.execute<(RowDataPacket & {
@@ -244,7 +246,9 @@ export async function replayAccountReactivation(entry: AccountDeletionEntry): Pr
       created_at: string;
     })[]>(`SELECT is_deleted, deletion_requested_at, created_at FROM bg_users WHERE id = ? FOR UPDATE`, [userId]);
     const row = locked[0];
-    alive = !!row && String(row.created_at) === entry.accountCreatedAt && Number(row.is_deleted) === 0;
+    const sameAccount = !!row && String(row.created_at) === entry.accountCreatedAt;
+    alive = sameAccount && Number(row.is_deleted) === 0;
+    stillPending = sameAccount && Number(row.is_deleted) === 1 && row.deletion_requested_at !== null;
     // Revérifié sous verrou : même compte, et demande que la réactivation défait.
     const undoes =
       !!row &&
@@ -272,5 +276,6 @@ export async function replayAccountReactivation(entry: AccountDeletionEntry): Pr
     await republishSoloEntryTournaments(userId);
   }
   if (restored) return "REACTIVATED";
-  return alive ? "ALREADY_ACTIVE" : "SUPERSEDED";
+  if (alive) return "ALREADY_ACTIVE";
+  return stillPending ? "SUPERSEDED" : "GONE";
 }

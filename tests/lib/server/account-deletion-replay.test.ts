@@ -290,6 +290,17 @@ describe("replayAccountDeletions — réactivation (décision R1)", () => {
     expect(report).toMatchObject({ alreadyActive: 1, superseded: 0, reactivated: 0 });
   });
 
+  // Revue de correction #571 : compte parti ou réattribué sous verrou, pas « demande postérieure ».
+  it("replayAccountDeletions_replayReactivationGoneUnderLock_countedAlreadyDeleted", async () => {
+    restoredDb({ 7: pendingRow });
+    jest.mocked(replayAccountReactivation).mockResolvedValue("GONE");
+
+    const report = await replayAccountDeletions([reactivated], { log });
+
+    expect(report).toMatchObject({ alreadyDeleted: 1, superseded: 0, reactivated: 0 });
+    expect(lines.join(" ")).toContain("réattribué entre-temps");
+  });
+
   it("replayAccountDeletions_replayReactivationThrows_failedCounted", async () => {
     restoredDb({ 7: pendingRow });
     jest.mocked(replayAccountReactivation).mockRejectedValue(new Error("DB_DOWN"));
@@ -341,7 +352,7 @@ describe("replayAccountDeletions — demande à redater", () => {
 
     const report = await replayAccountDeletions([old], { log });
 
-    expect(finalizeAccountDeletion).toHaveBeenCalledWith(7);
+    expect(finalizeAccountDeletion).toHaveBeenCalledWith(7, { accountCreatedAt: CREATED });
     expect(report).toMatchObject({ replayed: 1, alreadyPending: 0 });
     expect(lines.join("\n")).toContain("anonymisé (fenêtre close)");
   });
@@ -365,6 +376,15 @@ describe("replayAccountDeletions — demande à redater", () => {
     expect(execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE"))).toBe(false);
     expect(report.replayed).toBe(1);
     expect(lines.join("\n")).toContain("à redater");
+  });
+
+  // Revue de correction #571 : la simulation partage comme le vrai passage.
+  it("replayAccountDeletions_redateDryRunRestoredDateLater_countsAlreadyPending", async () => {
+    restoredDb({ 7: { ...pendingRow, deletion_requested_at: "2099-01-01 00:00:00" } });
+
+    const report = await replayAccountDeletions([pending], { dryRun: true, log });
+
+    expect(report).toMatchObject({ replayed: 0, alreadyPending: 1 });
   });
 
   it("replayAccountDeletions_redateDryRunWindowClosed_saysDeletion", async () => {
