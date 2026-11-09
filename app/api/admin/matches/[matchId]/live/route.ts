@@ -82,6 +82,25 @@ function parseMatchLiveBody(body: {
 }
 
 /**
+ * Le corps d'une requête de cette route, en objet : un corps illisible (JSON
+ * cassé, trop lourd, mauvais type) est refusé (`INVALID_LIVE_BODY`, ou le code
+ * de la lecture bornée), jamais pris pour un corps vide.
+ */
+async function readLiveRecord(req: Request): Promise<Record<string, unknown> | Response> {
+  const read = await readOptionalJsonBody(req, "INVALID_LIVE_BODY");
+  if ("refusal" in read) return fail(read.refusal, 400);
+  return typeof read.body === "object" && read.body !== null ? (read.body as Record<string, unknown>) : {};
+}
+
+/** Le réglage lu et vérifié, ou la réponse de refus (400). */
+async function readMatchLiveBody(req: Request): Promise<MatchLiveBody | Response> {
+  const body = await readLiveRecord(req);
+  if (body instanceof Response) return body;
+  const parsed = parseMatchLiveBody(body);
+  return typeof parsed === "string" ? fail(parsed, 400) : parsed;
+}
+
+/**
  * Configure la diffusion d'un match.
  * Corps : `{ trigger?: "AUTO" | "START_TIME" | "MANUAL" | null, liveUrl?: string | null,
  * organisationLink?: boolean }`.
@@ -123,19 +142,8 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const gate = await liveGate(user, matchId);
   if (gate !== null) return gate;
 
-  // Un corps illisible (JSON cassé, trop lourd, mauvais type) est refusé,
-  // jamais pris pour un corps vide.
-  const read = await readOptionalJsonBody(req, "INVALID_LIVE_BODY");
-  if ("refusal" in read) return fail(read.refusal, 400);
-  const body = (typeof read.body === "object" && read.body !== null ? read.body : {}) as {
-    trigger?: unknown;
-    liveUrl?: unknown;
-    organisationLink?: unknown;
-    streamLinks?: unknown;
-  };
-
-  const parsed = parseMatchLiveBody(body);
-  if (typeof parsed === "string") return fail(parsed, 400);
+  const parsed = await readMatchLiveBody(req);
+  if (parsed instanceof Response) return parsed;
   const { trigger, streamLinks } = parsed;
   const organisation = can(user, "tournaments");
   if (parsed.organisationLink && !organisation) return fail("FORBIDDEN", 403);
@@ -180,9 +188,8 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   const gate = await liveGate(user, matchId);
   if (gate !== null) return gate;
 
-  const read = await readOptionalJsonBody(req, "INVALID_LIVE_BODY");
-  if ("refusal" in read) return fail(read.refusal, 400);
-  const body = (typeof read.body === "object" && read.body !== null ? read.body : {}) as { onAir?: unknown };
+  const body = await readLiveRecord(req);
+  if (body instanceof Response) return body;
   if (typeof body.onAir !== "boolean") return fail("INVALID_ON_AIR", 400);
 
   try {
