@@ -340,6 +340,7 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
     extras.streams ?? [],
     heldStreams,
     !castBeforeLaunch(row),
+    new Set((extras.casters ?? []).map((caster) => caster.streamId)),
   );
   return {
     id: Number(row.id),

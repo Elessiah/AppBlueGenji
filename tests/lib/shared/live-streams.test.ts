@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   canConfigureLive,
   firstStreamUrl,
+  parseOrganisationLink,
   parseStreamUrlInput,
   shownStreams,
   canToggleOnAir,
@@ -19,7 +20,9 @@ import {
   PLATFORM_LABELS,
   requiresMatchStartAt,
   resolveMatchLiveState,
+  staffStream,
   streamPlatform,
+  streamsHeldByOtherCasters,
   type MatchLiveInput,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
@@ -175,6 +178,23 @@ describe("isMatchLiveTrigger", () => {
       expect(MATCH_LIVE_TRIGGER_LABELS[trigger]).toBeTruthy();
     }
     expect(MATCH_LIVE_TRIGGERS).toHaveLength(3);
+  });
+});
+
+describe("parseOrganisationLink", () => {
+  it("parseOrganisationLink_absent_returnsFalse", () => {
+    expect(parseOrganisationLink(undefined)).toBe(false);
+  });
+
+  it("parseOrganisationLink_boolean_returnsItself", () => {
+    expect(parseOrganisationLink(true)).toBe(true);
+    expect(parseOrganisationLink(false)).toBe(false);
+  });
+
+  it("parseOrganisationLink_nonBoolean_returnsNull", () => {
+    expect(parseOrganisationLink("true")).toBeNull();
+    expect(parseOrganisationLink(1)).toBeNull();
+    expect(parseOrganisationLink(null)).toBeNull();
   });
 });
 
@@ -454,15 +474,19 @@ describe("shownStreams", () => {
   ];
 
   it("garde le stream du staff et ceux qu'un caster qui compte tient", () => {
-    expect(shownStreams(streams, new Set([3]), false).map((stream) => stream.id)).toEqual([1, 3]);
+    expect(shownStreams(streams, new Set([3]), false, new Set([3])).map((stream) => stream.id)).toEqual([1, 3]);
   });
 
-  it("tait le stream qu'aucun caster qui compte ne tient", () => {
-    expect(shownStreams(streams, new Set(), false).map((stream) => stream.id)).toEqual([1]);
+  it("avant le lancement, un caster qui ne compte plus ne garde pas son stream", () => {
+    expect(shownStreams(streams, new Set(), false, new Set([2])).map((stream) => stream.id)).toEqual([1]);
   });
 
-  it("un match lancé ou joué montre tout", () => {
-    expect(shownStreams(streams, new Set(), true)).toHaveLength(3);
+  it("un match lancé ou joué garde les streams qu'un caster tient, éligible ou non", () => {
+    expect(shownStreams(streams, new Set(), true, new Set([3])).map((stream) => stream.id)).toEqual([1, 3]);
+  });
+
+  it("un match lancé ou joué tait le stream orphelin, que plus aucun caster ne tient (D25)", () => {
+    expect(shownStreams(streams, new Set(), true, new Set()).map((stream) => stream.id)).toEqual([1]);
   });
 });
 
@@ -489,5 +513,38 @@ describe("firstStreamUrl", () => {
   it("ignore un stream du staff sans lien ; null sans aucun lien", () => {
     expect(firstStreamUrl([{ id: 1, liveUrl: null, staff: true }])).toBeNull();
     expect(firstStreamUrl([])).toBeNull();
+  });
+});
+
+describe("staffStream / streamsHeldByOtherCasters — même stream que le serveur", () => {
+  const stream = (id: number, liveUrl: string | null, staff = false) => ({ id, liveUrl, staff });
+
+  it("staffStream_staffStreamPresent_returnsIt", () => {
+    expect(staffStream([stream(1, null), stream(2, "https://twitch.tv/o", true)])?.id).toBe(2);
+  });
+
+  it("staffStream_noHeldSet_returnsFirstUnlinked", () => {
+    expect(staffStream([stream(1, "https://twitch.tv/c"), stream(2, null)])?.id).toBe(2);
+  });
+
+  it("staffStream_firstUnlinkedHeldByOther_returnsNextFree", () => {
+    expect(staffStream([stream(1, null), stream(2, null)], new Set([1]))?.id).toBe(2);
+  });
+
+  it("staffStream_everyUnlinkedHeld_returnsNull", () => {
+    expect(staffStream([stream(1, null)], new Set([1]))).toBeNull();
+  });
+
+  it("streamsHeldByOtherCasters_excludesViewerAndUnassigned", () => {
+    const casters = [
+      { userId: 4, streamId: 1 },
+      { userId: 5, streamId: 2 },
+      { userId: 6, streamId: null },
+    ];
+    expect([...streamsHeldByOtherCasters(casters, 4)]).toEqual([2]);
+  });
+
+  it("streamsHeldByOtherCasters_noViewer_allHeld", () => {
+    expect([...streamsHeldByOtherCasters([{ userId: 4, streamId: 1 }], null)]).toEqual([1]);
   });
 });

@@ -7,9 +7,7 @@ import {
   liveTriggerOwnerAfter,
   liveTriggerViewer,
   mayChangeLiveTrigger,
-  mayToggleOnAir,
   viewerMayChangeLiveTrigger,
-  viewerMayToggleOnAir,
 } from "@/lib/shared/live-trigger-owner";
 
 /**
@@ -22,36 +20,36 @@ const LIVE_ONLY = { oversees: false, manages: false };
 const STAFF = { oversees: false, manages: true };
 const ownedByCaster12 = { trigger: "MANUAL" as const, ownerId: 12, refereeId: 9 };
 
-describe("mayToggleOnAir — ouvrir ou couper l'antenne d'un mode manuel", () => {
+describe("mayChangeLiveTrigger — l'antenne d'un mode manuel suit la règle du mode", () => {
   const ownerless = { trigger: "MANUAL" as const, ownerId: null, refereeId: null };
 
-  it("mayToggleOnAir_ownerlessShownCaster_true", () => {
-    expect(mayToggleOnAir(ownerless, { userId: 13, ...LIVE_ONLY }, true)).toBe(true);
+  it("mayChangeLiveTrigger_manualownerlessShownCaster_true", () => {
+    expect(mayChangeLiveTrigger(ownerless, { userId: 13, ...LIVE_ONLY }, true)).toBe(true);
   });
 
-  it("mayToggleOnAir_ownerlessNonCaster_false", () => {
-    expect(mayToggleOnAir(ownerless, { userId: 13, ...LIVE_ONLY }, false)).toBe(false);
+  it("mayChangeLiveTrigger_manualownerlessNonCaster_false", () => {
+    expect(mayChangeLiveTrigger(ownerless, { userId: 13, ...LIVE_ONLY }, false)).toBe(false);
   });
 
-  it("mayToggleOnAir_otherCastersMode_false", () => {
-    expect(mayToggleOnAir(ownedByCaster12, { userId: 13, ...LIVE_ONLY }, true)).toBe(false);
+  it("mayChangeLiveTrigger_manualotherCastersMode_false", () => {
+    expect(mayChangeLiveTrigger(ownedByCaster12, { userId: 13, ...LIVE_ONLY }, true)).toBe(false);
   });
 });
 
-describe("viewerMayToggleOnAir", () => {
+describe("viewerMayChangeLiveTrigger — antenne d'un mode sans maître", () => {
   const ownerlessMatch = { liveTrigger: "MANUAL" as const, liveTriggerCasterId: null, casters: [{ userId: 13 }] };
   const viewer13 = { userId: 13, oversees: false, manages: false, referees: false };
 
-  it("viewerMayToggleOnAir_ownerlessViewerCasts_true", () => {
-    expect(viewerMayToggleOnAir(ownerlessMatch, viewer13)).toBe(true);
+  it("viewerMayChangeLiveTrigger_manualownerlessViewerCasts_true", () => {
+    expect(viewerMayChangeLiveTrigger(ownerlessMatch, viewer13)).toBe(true);
   });
 
-  it("viewerMayToggleOnAir_ownerlessViewerNotCasting_false", () => {
-    expect(viewerMayToggleOnAir({ ...ownerlessMatch, casters: [] }, viewer13)).toBe(false);
+  it("viewerMayChangeLiveTrigger_manualownerlessViewerNotCasting_false", () => {
+    expect(viewerMayChangeLiveTrigger({ ...ownerlessMatch, casters: [] }, viewer13)).toBe(false);
   });
 
-  it("viewerMayToggleOnAir_anonymous_false", () => {
-    expect(viewerMayToggleOnAir(ownerlessMatch, { ...viewer13, userId: null })).toBe(false);
+  it("viewerMayChangeLiveTrigger_manualanonymous_false", () => {
+    expect(viewerMayChangeLiveTrigger(ownerlessMatch, { ...viewer13, userId: null })).toBe(false);
   });
 });
 

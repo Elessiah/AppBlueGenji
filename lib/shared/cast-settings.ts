@@ -92,7 +92,7 @@ export function offersCastSettings(
  * « Ne plus caster » est-il offert dans la fenêtre ?
  *
  * Un match joué est de l'histoire : le serveur refuse d'y retirer une
- * inscription (`MATCH_ALREADY_COMPLETED`), la fenêtre n'en offre donc pas le
+ * inscription (`MATCH_CAST_CLOSED`), la fenêtre n'en offre donc pas le
  * bouton — elle ne garde alors que la rediff.
  */
 export function offersCastRelease(match: Pick<MatchReplayInput, "status">): boolean {

@@ -28,6 +28,9 @@ disparaître sans écriture — et le rejouer le fait revenir.
 
 - `null` ou chaîne vide **efface**, sans condition d'état : retirer un lien posé
   par erreur ne dépend de rien.
+- Un corps illisible (JSON cassé : 400 `INVALID_REPLAY_URL` ; trop lourd : 413 ;
+  autre type que JSON : 415), vide ou sans la clé `replayUrl` est **refusé** —
+  jamais pris pour un effacement.
 - Poser un lien exige `canHaveReplay` (`409 MATCH_NOT_REPLAYABLE`), et le statut
   est **relu dans l'`UPDATE`** (`AND status = 'COMPLETED'`) : un retour en
   arrière passé entre la lecture et l'écriture ne laisse pas un lien se poser
@@ -60,4 +63,4 @@ cartes avec et sans bandeau.
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Rediff d'un match terminé** (`lib/shared/match-replay.ts` pur + `lib/server/tournaments/match-replay.ts` + `PUT /api/admin/matches/[matchId]/replay`) : la permission `live` (admin, arbitre, caster) pose sur un match joué le lien YouTube de sa rediff (`bg_matches.replay_url`), annoncé à tous par un bandeau « Rediff disponible » sous la carte (`MatchReplayStrip`). **YouTube seulement, et une vidéo** (`watch?v=`, `youtu.be/`, `live/`) — une chaîne Twitch ne garde pas de rediff. Posé seulement sur une rencontre **réellement disputée** (`canHaveReplay` : terminée, deux engagées, sans forfait), statut relu dans l'`UPDATE` ; l'effacement n'a aucune condition. Visibilité **dérivée** (`visibleReplayUrl`) : un retour en arrière tait le bandeau sans rien écrire. Voir `docs/features/MATCH_REPLAYS.md`.
+- **Rediff d'un match terminé** (`lib/shared/match-replay.ts` pur + `lib/server/tournaments/match-replay.ts` + `PUT /api/admin/matches/[matchId]/replay`) : la permission `live` (admin, arbitre, caster) pose sur un match joué le lien YouTube de sa rediff (`bg_matches.replay_url`), annoncé à tous par un bandeau « Rediff disponible » sous la carte (`MatchReplayStrip`). **YouTube seulement, et une vidéo** (`watch?v=`, `youtu.be/`, `live/`) — une chaîne Twitch ne garde pas de rediff. Posé seulement sur une rencontre **réellement disputée** (`canHaveReplay` : terminée, deux engagées, sans forfait), statut relu dans l'`UPDATE` ; l'effacement n'a aucune condition d'état. Sans `tournaments`, l'acteur doit caster le match **et y être montré** (`loadShownCasterIds`) : sur un match rouvert, un caster tu ne touche plus la rediff (`NOT_MATCH_CASTER`). Visibilité **dérivée** (`visibleReplayUrl`) : un retour en arrière tait le bandeau sans rien écrire. Voir `docs/features/MATCH_REPLAYS.md`.

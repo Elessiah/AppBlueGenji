@@ -106,6 +106,8 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
     );
 
     expect(res.status).toBe(403);
+    // Le même code que la route du caster (D7) : la fenêtre sait l'expliquer.
+    await expect(res.json()).resolves.toEqual({ error: "STAFF_STREAM_FORBIDDEN" });
     expect(setMatchLiveConfig).not.toHaveBeenCalled();
   });
 
@@ -285,6 +287,19 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
 
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toMatchObject({ error: "STAFF_STREAM_FORBIDDEN" });
+  });
+
+  it("PUT_memberMarksOthersUnchangedLinkAsOrganisation_returns409", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchLiveConfig).mockRejectedValue(new Error("ORGANISATION_LINK_NOT_PROVIDER"));
+
+    const res = await putMatchLive(
+      matchReq("PUT", { trigger: "AUTO", liveUrl: "twitch.tv/x", organisationLink: true }),
+      matchParams("42"),
+    );
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ error: "ORGANISATION_LINK_NOT_PROVIDER" });
   });
 
   it("PUT_coCasterChangesTrigger_returns403", async () => {
@@ -557,5 +572,48 @@ describe("POST /api/admin/matches/[matchId]/live", () => {
 
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toMatchObject({ error: "LIVE_TRIGGER_NOT_OWNED" });
+  });
+});
+
+describe("PUT/POST /api/admin/matches/[id]/live — corps illisible (ERREUR.txt EF-29 #528)", () => {
+  const brokenReq = (method: string) =>
+    new Request("http://localhost/api/admin/matches/42/live", {
+      method,
+      headers: { "content-type": "application/json" },
+      body: "{ pas du json",
+    });
+
+  it("putMatchLive_brokenJson_returns400InvalidLiveBody", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    const res = await putMatchLive(brokenReq("PUT"), matchParams("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: "INVALID_LIVE_BODY" });
+    expect(setMatchLiveConfig).not.toHaveBeenCalled();
+    expect(announceStaffMatchAction).not.toHaveBeenCalled();
+  });
+
+  it.each<[string, string]>([
+    ["null", "null"],
+    ["un nombre", "42"],
+    ["un tableau", "[]"],
+  ])("putMatchLive_jsonNotAnObject_%s_returns400InvalidLiveBody", async (_label, body) => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    const req = new Request("http://localhost/api/admin/matches/42/live", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body,
+    });
+    const res = await putMatchLive(req, matchParams("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: "INVALID_LIVE_BODY" });
+    expect(setMatchLiveConfig).not.toHaveBeenCalled();
+  });
+
+  it("postMatchOnAir_brokenJson_returns400InvalidLiveBody", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    const res = await postMatchOnAir(brokenReq("POST"), matchParams("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: "INVALID_LIVE_BODY" });
+    expect(setMatchOnAir).not.toHaveBeenCalled();
   });
 });

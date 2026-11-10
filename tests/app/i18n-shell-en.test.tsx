@@ -169,6 +169,12 @@ describe("coquille en anglais — composants client", () => {
     expect(error).toContain('<span class="sr-only">Error: </span>');
   });
 
+  it("notification neutre : préfixe « Notice: », teinte info", () => {
+    const html = english(<ToastItem toast={{ id: 5, message: "This caster no longer casts this match.", type: "info" }} onDismiss={noop} />);
+    expect(html).toContain('data-type="info"');
+    expect(html).toContain('<span class="sr-only">Notice: </span>');
+  });
+
   it("notification : message resté en français marqué `lang`, rien sans l'option", () => {
     const marked = english(
       <ToastItem toast={{ id: 3, message: "Erreur réseau, réessaye.", type: "error", lang: "fr" }} onDismiss={noop} />,

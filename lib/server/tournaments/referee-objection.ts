@@ -28,6 +28,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { loadRefereePermission } from "./cast-eligibility";
 import { queueDeferredNoRefereeAlerts, releaseObjectingReferee } from "./match-launch";
+import { forgetRefereeNames } from "./referee-names";
 import type { NoRefereeCandidate } from "@/lib/shared/match-referee";
 
 /**
@@ -69,6 +70,9 @@ export async function setRefereeObjection(refereeId: number, upheld: boolean): P
     if (rows.length === 0) throw new Error("USER_NOT_FOUND");
   }
   if (!upheld) return { changed, released: 0, failed: 0 };
+  // Son pseudo ne reste pas servi depuis le cache des pseudos d'arbitre, même
+  // si le retrait de ses matchs échoue en partie (la version ne bougerait pas).
+  if (changed) forgetRefereeNames();
   return { changed, ...(await releaseFromUnfinishedMatches(refereeId)) };
 }
 

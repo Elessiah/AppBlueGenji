@@ -311,6 +311,25 @@ describe("launchReadiness / allPartiesReady / readyCount", () => {
   it("attend l'équipe qui n'a pas cliqué", () => {
     expect(allPartiesReady(launchReadiness({ ...base, team1ReadyAt: "t" }))).toBe(false);
   });
+
+  it("launchReadiness_refereeWhoCasts_countedOnce", () => {
+    const readiness = launchReadiness({
+      ...base,
+      team1ReadyAt: "t",
+      team2ReadyAt: "t",
+      casters: [{ userId: 9, readyAt: "t" }],
+      referee: { readyAt: "t", userId: 9 },
+    });
+
+    expect(readiness.referee).toEqual({ ready: true, userId: 9 });
+    expect(readyCount(readiness)).toEqual({ ready: 3, expected: 3 });
+  });
+
+  it("launchReadiness_refereeWithoutUserId_staysAnonymous", () => {
+    const readiness = launchReadiness({ ...base, referee: { readyAt: null } });
+
+    expect(readiness.referee).toEqual({ ready: false });
+  });
 });
 
 describe("canDeclareTeamReady", () => {

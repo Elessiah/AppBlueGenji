@@ -55,6 +55,7 @@ export function launchErrorText(
   errors: TournamentErrorsText,
   code: string | null | undefined,
 ): string {
+  if (code === "UNAUTHORIZED") return text.t("launch.sessionExpired");
   if (!code || !Object.hasOwn(LAUNCH_ERROR_MESSAGES, code)) return text.t("launch.fallback");
   if (code === "MATCH_ALREADY_COMPLETED") return text.t("launch.alreadyCompleted");
   return mapError(code, errors);

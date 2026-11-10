@@ -66,6 +66,8 @@ export function CastUrlField({
   invalid,
   fieldError,
   readOnlyNote,
+  required = false,
+  missing = false,
 }: Readonly<{
   id: string;
   value: string;
@@ -75,20 +77,31 @@ export function CastUrlField({
   fieldError?: string | null;
   /** Le stream est celui du staff : le lien se lit, il ne s'écrit pas ici. */
   readOnlyNote?: string;
+  /** Le lien est exigé pour valider (inscription) : dit dans le libellé et `aria-required`. */
+  required?: boolean;
+  /** Le lien a été vidé alors qu'il est exigé : la note dit pourquoi « Enregistrer » est désarmé. */
+  missing?: boolean;
 }>) {
   const { t } = useActionsText();
   const hintId = useId();
   const infoId = useId();
   const locked = readOnlyNote !== undefined;
-  // Une ligne sous le champ seulement pour un refus ou un stream en lecture :
-  // l'explication vit derrière le « i » (`INFO_HINTS.md`).
-  const note = invalid ? t("cardActions.castSettings.urlInvalid", { platforms: CAST_PLATFORMS }) : (readOnlyNote ?? null);
+  // Une ligne sous le champ seulement pour un refus ou un lien vidé :
+  // l'explication, stream en lecture compris, vit derrière le « i » (`INFO_HINTS.md`).
+  // Le refus du serveur porte sa propre phrase (`FieldErrorText`) : la note de
+  // format ne s'y ajoute pas, sinon le champ dirait deux choses contraires.
+  const formatNote = invalid && !fieldError;
+  let note: string | null = null;
+  if (formatNote) note = t("cardActions.castSettings.urlInvalid", { platforms: CAST_PLATFORMS });
+  // Lien vidé : une note calme (pas une erreur avant l'envoi) qui dit pourquoi « Enregistrer » est désarmé.
+  else if (missing && !fieldError) note = t("cardActions.castSettings.urlEmpty");
   return (
     <div className="field">
       <InfoHintRow>
-        <label htmlFor={id}>{t("cardActions.castSettings.url")}</label>
+        <label htmlFor={id}>{t(required ? "cardActions.castSettings.urlRequired" : "cardActions.castSettings.url")}</label>
         <InfoHint id={infoId} subject={t("cardActions.castSettings.urlSubject")}>
-          <p>{t("cardActions.castSettings.urlHint", { platforms: CAST_PLATFORMS })}</p>
+          {/* Stream de l'organisation : le lien se lit, l'aide dit d'abord pourquoi (pas « obligatoire »). */}
+          <p>{readOnlyNote ?? t("cardActions.castSettings.urlHint", { platforms: CAST_PLATFORMS })}</p>
         </InfoHint>
       </InfoHintRow>
       <input
@@ -99,11 +112,12 @@ export function CastUrlField({
         inputMode="url"
         placeholder="https://twitch.tv/…"
         readOnly={locked}
+        aria-required={required || undefined}
         // Le refus est lu avant l'aide (`fieldAria`), et l'aide reste lisible.
         {...fieldAria(id, invalid, note === null ? null : hintId, infoId)}
       />
       {note !== null && (
-        <p id={hintId} className={invalid ? styles.hintInvalid : styles.hint}>
+        <p id={hintId} className={formatNote ? styles.hintInvalid : styles.hint}>
           {note}
         </p>
       )}
@@ -157,15 +171,17 @@ export function CastTriggerField({
   }
   return (
     <fieldset className={styles.group}>
-      <legend className={styles.legend}>
-        <InfoHintRow>
+      {/* Légende en texte seul (nom du groupe) ; l'aide, hors légende. */}
+      <legend className="sr-only">{t("cardActions.castSettings.trigger")}</legend>
+      <InfoHintRow>
+        <span className={styles.legend} aria-hidden="true">
           {t("cardActions.castSettings.trigger")}
-          <InfoHint id={hintId} subject={t("cardActions.castSettings.trigger")}>
-            <p>{t("cardActions.castSettings.autoStop")}</p>
-            {startAtMissing && <p>{t("cardActions.castSettings.noStartAt")}</p>}
-          </InfoHint>
-        </InfoHintRow>
-      </legend>
+        </span>
+        <InfoHint id={hintId} subject={t("cardActions.castSettings.trigger")}>
+          <p>{t("cardActions.castSettings.autoStop")}</p>
+          {startAtMissing && <p>{t("cardActions.castSettings.noStartAt")}</p>}
+        </InfoHint>
+      </InfoHintRow>
       {MATCH_LIVE_TRIGGERS.map((option) => {
         const off = requiresMatchStartAt(option) && startAtMissing;
         return (
@@ -226,40 +242,14 @@ export function CastBattletagField({
         maxLength={MAX_CAST_BATTLETAG_LENGTH}
         placeholder="Pseudo#1234"
         // Le refus est lu avant l'aide (`fieldAria`), comme pour le lien.
-        {...fieldAria(id, invalid, invalid ? hintId : null, infoId)}
+        {...fieldAria(id, invalid, invalid && !fieldError ? hintId : null, infoId)}
       />
-      {invalid && (
+      {invalid && !fieldError && (
         <p id={hintId} className={styles.hintInvalid}>
           {t("cardActions.castSettings.battletagInvalid")}
         </p>
       )}
       <FieldErrorText fieldId={id} message={fieldError ?? null} />
     </div>
-  );
-}
-
-/**
- * Case « ce lien est celui de l'organisation » : la permission `tournaments`
- * seule la voit (l'appelant ne la monte que pour elle), décochée par défaut —
- * un lien n'est celui de l'organisation que si son auteur le dit
- * (`MatchLiveSetter`).
- */
-export function CastOrganisationLinkField({
-  checked,
-  onChange,
-}: Readonly<{ checked: boolean; onChange: (checked: boolean) => void }>) {
-  const { t } = useActionsText();
-  const hintId = useId();
-  return (
-    <InfoHintRow inline>
-      <label className={styles.row}>
-        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-        {/* NOSONAR S6772 — label en flex avec `gap` */}
-        {t("cardActions.castSettings.organisationLink")}
-      </label>
-      <InfoHint id={hintId} subject={t("cardActions.castSettings.organisationLinkSubject")}>
-        <p>{t("cardActions.castSettings.organisationLinkHint")}</p>
-      </InfoHint>
-    </InfoHintRow>
   );
 }

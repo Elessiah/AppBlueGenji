@@ -26,6 +26,7 @@ import { dispatchMatchVoiceChannels } from "@/lib/server/tournaments/match-voice
 import { dispatchLobbyBriefs } from "@/lib/server/tournaments/lobby-brief";
 import { GET as contactsGet } from "@/app/api/matches/[matchId]/contacts/route";
 import type { LaunchSide, MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { castOrganisationLinkRefusal, parseCastSettings } from "@/lib/server/tournaments/match-launch-routes";
 import { authUser } from "../../helpers/auth-user";
 
 const player = authUser({ id: 2, roles: [] });
@@ -62,6 +63,56 @@ describe("POST /api/matches/[matchId]/ready", () => {
     expect(setMatchReady).not.toHaveBeenCalled();
   });
 
+  it("readyPost_brokenJson_returns400InvalidReadyValue", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    const req = new Request("http://localhost/api/matches/42/ready", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{pas du json",
+    });
+    const res = await readyPost(req, params("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_READY_VALUE" });
+    expect(setMatchReady).not.toHaveBeenCalled();
+  });
+
+  it("readyPost_emptyBody_returns400InvalidReadyValue", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    const req = new Request("http://localhost/api/matches/42/ready", { method: "POST" });
+    const res = await readyPost(req, params("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_READY_VALUE" });
+    expect(setMatchReady).not.toHaveBeenCalled();
+  });
+
+  it("readyPost_jsonNull_returns400InvalidReadyValue", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    const res = await readyPost(jsonRequest("POST", null), params("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_READY_VALUE" });
+  });
+
+  it("readyPost_payloadTooLarge_returns413", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    const res = await readyPost(jsonRequest("POST", { ready: true, pad: "x".repeat(300 * 1024) }), params("42"));
+    expect(res.status).toBe(413);
+    await expect(res.json()).resolves.toEqual({ error: "PAYLOAD_TOO_LARGE" });
+    expect(setMatchReady).not.toHaveBeenCalled();
+  });
+
+  it("readyPost_nonJsonContentType_returns415", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    const req = new Request("http://localhost/api/matches/42/ready", {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: JSON.stringify({ ready: true }),
+    });
+    const res = await readyPost(req, params("42"));
+    expect(res.status).toBe(415);
+    await expect(res.json()).resolves.toEqual({ error: "UNSUPPORTED_CONTENT_TYPE" });
+    expect(setMatchReady).not.toHaveBeenCalled();
+  });
+
   it("transmet le « Prêt » et rend l'issue", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(setMatchReady).mockResolvedValue({ launched: true });
@@ -78,6 +129,9 @@ describe("POST /api/matches/[matchId]/ready", () => {
     ["MATCH_NOT_IN_LOBBY", 409],
     ["NOT_MATCH_PARTY", 403],
     ["NOT_TEAM_READY_ROLE", 403],
+    ["NOT_CASTER", 403],
+    ["CASTER_IDENTITY_REQUIRED", 409],
+    ["CASTER_DISCORD_REQUIRED", 409],
   ])("traduit %s en %i", async (code, status) => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(setMatchReady).mockRejectedValue(new Error(code));
@@ -146,15 +200,38 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
     expect(claimMatchCast).not.toHaveBeenCalled();
   });
 
-  it("refuse le lien de l'organisation sans la permission `tournaments`", async () => {
+  it("refuse le lien de l'organisation à tout caster (décision D7 du 2026-11-09)", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     const res = await casterPost(
       jsonRequest("POST", { liveUrl: "https://twitch.tv/voix", organisationLink: true }),
       params("42"),
     );
     expect(res.status).toBe(403);
-    await expect(res.json()).resolves.toMatchObject({ error: "FORBIDDEN" });
+    await expect(res.json()).resolves.toMatchObject({ error: "STAFF_STREAM_FORBIDDEN" });
     expect(claimMatchCast).not.toHaveBeenCalled();
+  });
+
+  it("casterPost_organisationLinkNotBoolean_returns400InvalidOrganisationLink", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    const res = await casterPost(
+      jsonRequest("POST", { liveUrl: "https://twitch.tv/voix", organisationLink: "true" }),
+      params("42"),
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_ORGANISATION_LINK" });
+    expect(claimMatchCast).not.toHaveBeenCalled();
+  });
+
+  it("casterPost_organisationLinkFalseFromOldTab_claimsWithoutOrigin", async () => {
+    // Une fenêtre ouverte avant D7 envoie encore `false` (sa propre chaîne) : sans effet.
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(claimMatchCast).mockResolvedValue({ triggerSkipped: false });
+    const res = await casterPost(
+      jsonRequest("POST", { liveUrl: "https://twitch.tv/voix", organisationLink: false }),
+      params("42"),
+    );
+    expect(res.status).toBe(200);
+    expect(claimMatchCast).toHaveBeenCalled();
   });
 
   it("refuse un corps illisible au lieu de le prendre pour un corps vide", async () => {
@@ -223,7 +300,7 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
     ["STREAM_NOT_FOUND", 409],
     ["INVALID_STREAM_URL", 400],
     ["CASTER_IS_PLAYER", 409],
-    ["MATCH_ALREADY_COMPLETED", 409],
+    ["MATCH_CAST_CLOSED", 409],
     ["MATCH_NOT_FOUND", 404],
   ])("traduit le refus %s en %i", async (code, status) => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
@@ -448,5 +525,37 @@ describe("GET /api/matches/[matchId]/contacts", () => {
     const res = await contactsGet(request(), params("42"));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "MATCH_CONTACTS_READ_FAILED" });
+  });
+});
+
+describe("castOrganisationLinkRefusal / parseCastSettings — décision D7 du 2026-11-09", () => {
+  it("castOrganisationLinkRefusal_organisationLinkTrue_returns403StaffStreamForbidden", () => {
+    expect(castOrganisationLinkRefusal({ organisationLink: true })).toEqual({ code: "STAFF_STREAM_FORBIDDEN", status: 403 });
+  });
+
+  it("castOrganisationLinkRefusal_organisationLinkFalseFromOldTab_returnsNull", () => {
+    expect(castOrganisationLinkRefusal({ organisationLink: false })).toBeNull();
+  });
+
+  it("castOrganisationLinkRefusal_bodyWithoutKey_returnsNull", () => {
+    expect(castOrganisationLinkRefusal({ trigger: "AUTO" })).toBeNull();
+  });
+
+  it("castOrganisationLinkRefusal_notAnObject_returnsNull", () => {
+    expect(castOrganisationLinkRefusal(null)).toBeNull();
+    expect(castOrganisationLinkRefusal("organisationLink")).toBeNull();
+  });
+
+  it.each<[string, unknown]>([
+    ["chaîne true", "true"],
+    ["nombre 1", 1],
+    ["null", null],
+    ["objet", {}],
+  ])("castOrganisationLinkRefusal_%s_returns400InvalidOrganisationLink", (_label, value) => {
+    expect(castOrganisationLinkRefusal({ organisationLink: value })).toEqual({ code: "INVALID_ORGANISATION_LINK", status: 400 });
+  });
+
+  it("parseCastSettings_organisationLinkPresent_neverSetsOrigin", () => {
+    expect(parseCastSettings({ battletag: "Voix#1234", organisationLink: true })).toEqual({ battletag: "Voix#1234" });
   });
 });

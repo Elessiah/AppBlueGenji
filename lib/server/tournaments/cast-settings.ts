@@ -24,6 +24,7 @@ import {
 } from "@/lib/shared/live-streams";
 import { liveTriggerOwnerAfter, mayChangeLiveTrigger, mayUnmarkLiveTrigger } from "@/lib/shared/live-trigger-owner";
 import { castBeforeLaunch } from "@/lib/shared/match-launch";
+import type { TournamentGame } from "@/lib/shared/types";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { loadShownCasterIds } from "./cast-eligibility";
 import { hasStaffLink, lockMatchStreams, pruneMatchStreams, streamLinkHolder, type MatchStreamRow } from "./match-casters";
@@ -43,12 +44,6 @@ export type CastSettings = {
   liveUrl?: string | null;
   /** BattleTag donné pour ce cast (`null` : celui de son compte). */
   battletag?: string | null;
-  /**
-   * Le lien posé est celui de l'organisation — dit par un porteur de
-   * `tournaments` seulement, la route refusant `true` aux autres
-   * (`MatchLiveSetter.asOrganisation`).
-   */
-  asOrganisation?: boolean;
   /**
    * Inscription : un mode d'antenne qu'un autre a posé **entre-temps** (la
    * fenêtre le croyait libre) est laissé tel quel, sans refuser l'inscription
@@ -203,9 +198,11 @@ async function castTriggerHold(connection: PoolConnection, row: LaunchMatchRow, 
  *
  * Jamais celui du staff (`casterStreamEditable`) : un caster qui a rejoint « le
  * stream du match » lit la chaîne de l'organisation, il ne la réécrit pas
- * (`CAST_STREAM_NOT_OWNED`). Le lien posé lui est rattaché (`link_user_id`) et
- * part avec son compte (`withdrawUserCasts`), sauf s'il le dit de
- * l'organisation — ce que seule la permission `tournaments` peut dire.
+ * (`CAST_STREAM_NOT_OWNED`) ; ni le lien qu'un co-caster encore sur le stream
+ * a fourni (`CAST_STREAM_LINK_HELD`), staff compris (celui d'un caster parti se reprend). Le lien posé lui est rattaché (`link_user_id`) et
+ * part avec son compte (`withdrawUserCasts`) : un caster ne dit jamais un lien
+ * « de l'organisation » (décision du 2026-11-09), seul le staff le fait dans la
+ * configuration du direct (`setMatchLiveConfig`).
  *
  * Rend les streams du match **tels qu'ils sont après l'écriture**, pour le
  * ménage de l'appelant.
@@ -214,7 +211,7 @@ async function castTriggerHold(connection: PoolConnection, row: LaunchMatchRow, 
  * sur aucune vue, et le staff le prendrait pour le sien (`staffStream`, le
  * premier stream sans lien) — exigé ici comme à l'inscription.
  *
- * @throws `STREAM_NOT_FOUND` | `CAST_STREAM_NOT_OWNED` | `INVALID_STREAM_URL`
+ * @throws `STREAM_NOT_FOUND` | `CAST_STREAM_NOT_OWNED` | `CAST_STREAM_LINK_HELD` | `INVALID_STREAM_URL`
  *   | `STREAM_URL_REQUIRED`
  */
 export async function setCasterStreamUrl(
@@ -224,6 +221,7 @@ export async function setCasterStreamUrl(
   url: string | null,
   linkUserId: number | null,
   manages: boolean,
+  visibility: CastVisibility,
 ): Promise<MatchStreamRow[]> {
   const streams = await lockMatchStreams(connection, matchId, true);
   const target = streams.find((stream) => stream.id === streamId);
@@ -231,12 +229,20 @@ export async function setCasterStreamUrl(
   if (!casterStreamEditable(target)) throw new Error("CAST_STREAM_NOT_OWNED");
   if (url === null) throw new Error("STREAM_URL_REQUIRED");
   // Un lien inchangé n'est pas réécrit : il reste à qui l'a fourni, comme dans
-  // la configuration du staff (`setStaffStreamUrl`).
+  // la configuration du staff (`planStaffStreamUrl` puis `applyStaffStreamPlan`, live-streams.ts).
   if (target.liveUrl === url) return streams;
   // Un lien dit de l'organisation ne se remplace que par le staff : la seule
-  // `live` ne l'efface pas en posant le sien.
-  if (!manages && target.liveUrl !== null && (await streamLinkHolder(connection, streamId)) === null) {
-    throw new Error("CAST_STREAM_NOT_OWNED");
+  // `live` ne l'efface pas en posant le sien. Le lien qu'un co-caster encore sur
+  // ce stream a fourni pointe sa chaîne, et lui est rattaché : nul ne le
+  // remplace par cette route, staff compris (l'arbitre le corrige dans la
+  // configuration du direct).
+  if (target.liveUrl !== null) {
+    const holder = await streamLinkHolder(connection, matchId, streamId);
+    if (holder.userId === null) {
+      if (!manages) throw new Error("CAST_STREAM_NOT_OWNED");
+    } else if (holder.userId !== linkUserId && (await showsOnStream(connection, matchId, holder.userId, holder.casts, visibility))) {
+      throw new Error("CAST_STREAM_LINK_HELD");
+    }
   }
   await connection.execute(
     `UPDATE bg_match_streams SET live_url = ?, link_user_id = ? WHERE id = ? AND staff_owned = 0`,
@@ -245,49 +251,26 @@ export async function setCasterStreamUrl(
   return streams.map((stream) => (stream.id === streamId ? { ...stream, liveUrl: url } : stream));
 }
 
+/** Ce qui dit si un caster est montré (`loadShownCasterIds`) : le jeu du match, et s'il est encore avant le lancement. */
+export type CastVisibility = { game: TournamentGame; beforeLaunch: boolean };
+
 /**
- * Dit (ou retire) le lien du stream que **tient** ce caster « de
- * l'organisation », **sans** changer le lien : `linkUserId` `null` = celui de
- * l'organisation, sinon le sien (`withdrawUserCasts` l'emporte avec son
- * compte). Les mêmes gardes que `setCasterStreamUrl` : jamais le stream du
- * staff, jamais un stream sans lien. Un changement d'origine n'est permis
- * qu'au fournisseur du lien (vers l'organisation) ou au staff `tournaments`
- * (`manages`, rattaché alors à qui décoche : le fournisseur d'origine
- * n'est plus connu) ; l'état déjà dit n'écrit rien. `known` :
- * les streams déjà lus sous verrou.
- *
- * @throws `STREAM_NOT_FOUND` | `CAST_STREAM_NOT_OWNED` | `STREAM_URL_REQUIRED`
+ * Le fournisseur du lien caste-t-il encore ce stream du match **en caster
+ * montré** ? Un caster tu (condition du cast perdue, pas encore retiré) ne
+ * garde pas son lien contre un co-caster montré : il ne pourrait lui-même plus
+ * le changer (`assertShownCaster`).
  */
-export async function setCasterLinkOrigin(
+async function showsOnStream(
   connection: PoolConnection,
   matchId: number,
-  streamId: number,
-  linkUserId: number | null,
-  userId: number,
-  manages: boolean,
-  known?: MatchStreamRow[],
-): Promise<MatchStreamRow[]> {
-  const streams = known ?? (await lockMatchStreams(connection, matchId, true));
-  const target = streams.find((stream) => stream.id === streamId);
-  if (!target) throw new Error("STREAM_NOT_FOUND");
-  if (!casterStreamEditable(target)) throw new Error("CAST_STREAM_NOT_OWNED");
-  if (target.liveUrl === null) throw new Error("STREAM_URL_REQUIRED");
-  // Lu après le verrou des streams (et après l'écriture d'un lien neuf, même
-  // transaction) : l'attribution à jour.
-  const holderId = await streamLinkHolder(connection, streamId);
-  // Déjà dit tel quel : rien à écrire (le co-caster d'un stream qui renvoie
-  // l'état montré ne prend pas le lien d'un autre).
-  if ((linkUserId === null) === (holderId === null)) return streams;
-  // Seul le fournisseur du lien le dit « de l'organisation », et seul le staff
-  // `tournaments` le lui retire : un co-caster ne s'attribue pas le lien d'un
-  // autre (ni celui de l'organisation, qui partirait avec son compte).
-  const allowed = linkUserId === null ? holderId === userId : manages;
-  if (!allowed) throw new Error("CAST_STREAM_NOT_OWNED");
-  await connection.execute(
-    `UPDATE bg_match_streams SET link_user_id = ? WHERE id = ? AND staff_owned = 0`,
-    [linkUserId, streamId],
-  );
-  return streams;
+  holderId: number,
+  casts: boolean,
+  visibility: CastVisibility,
+): Promise<boolean> {
+  if (!casts) return false;
+  if (!visibility.beforeLaunch) return true;
+  const shown = await loadShownCasterIds(connection, matchId, [holderId], visibility.game, true);
+  return shown.has(holderId);
 }
 
 /**
@@ -329,7 +312,7 @@ export async function applyCastSettings(
   let streams: MatchStreamRow[] | undefined;
   // Le lien d'un stream (et son origine) ne se règle que par un caster montré :
   // un caster tu ne réécrit pas le lien public d'un stream qu'il partage.
-  if ((settings.liveUrl !== undefined || settings.asOrganisation !== undefined) && !access.oversees) {
+  if (settings.liveUrl !== undefined && !access.oversees) {
     await assertShownCaster(connection, row, userId);
   }
   if (settings.liveUrl !== undefined) {
@@ -339,22 +322,9 @@ export async function applyCastSettings(
       matchId,
       streamId,
       url,
-      settings.asOrganisation === true ? null : userId,
-      access.manages,
-    );
-  }
-  // L'origine du lien se dit aussi seule, lien inchangé (case cochée ou
-  // décochée sans toucher l'URL, décision du 2026-11-09) : un lien inchangé
-  // n'est pas réécrit par `setCasterStreamUrl`, son origine l'est ici.
-  if (settings.asOrganisation !== undefined) {
-    streams = await setCasterLinkOrigin(
-      connection,
-      matchId,
-      streamId,
-      settings.asOrganisation ? null : userId,
       userId,
       access.manages,
-      streams,
+      { game: row.tournament_game, beforeLaunch: castBeforeLaunch(row) },
     );
   }
   if (settings.battletag !== undefined) {
@@ -380,8 +350,6 @@ export type OwnCastSettings = {
   staffStream: boolean;
   /** BattleTag donné pour ce cast, `null` = celui de son compte. */
   battletag: string | null;
-  /** Son lien est dit « de l'organisation » (`link_user_id` vide sur son stream). */
-  organisationLink: boolean;
 };
 
 type OwnCastRow = RowDataPacket & {
@@ -389,7 +357,6 @@ type OwnCastRow = RowDataPacket & {
   cast_battletag: string | null;
   live_url: string | null;
   staff_owned: number;
-  link_user_id: number | null;
 };
 
 /**
@@ -405,7 +372,7 @@ type OwnCastRow = RowDataPacket & {
 export async function loadOwnCastSettings(matchId: number, userId: number): Promise<OwnCastSettings> {
   const db = await getDatabase();
   const [rows] = await db.execute<OwnCastRow[]>(
-    `SELECT c.stream_id, c.cast_battletag, s.live_url, s.staff_owned, s.link_user_id
+    `SELECT c.stream_id, c.cast_battletag, s.live_url, s.staff_owned
      FROM bg_match_casters c
      JOIN bg_match_streams s ON s.match_id = c.match_id AND s.id = c.stream_id
      WHERE c.match_id = ? AND c.user_id = ? LIMIT 1`,
@@ -418,6 +385,5 @@ export async function loadOwnCastSettings(matchId: number, userId: number): Prom
     liveUrl: row.live_url ?? null,
     staffStream: Number(row.staff_owned) === 1,
     battletag: row.cast_battletag ?? null,
-    organisationLink: Number(row.staff_owned) !== 1 && row.live_url !== null && row.link_user_id === null,
   };
 }

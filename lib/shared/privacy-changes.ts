@@ -1669,6 +1669,23 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Le registre précise aussi ce que le site gardait déjà sans le dire : les traces d'envoi des départs de match (match, affiche et phase de l'annonce, avec leur date), conservées avec le match.",
     ],
   },
+  {
+    // CAST-3 (décision D7 de l'utilisateur du 2026-11-09) : la case « Ce lien
+    // est celui de l'organisation » quitte les fenêtres du caster (inscription,
+    // « Configurer ma diffusion ») ; seule la configuration du direct la garde.
+    // Seuls casters et arbitres sont concernés.
+    audience: "LIVE_STAFF",
+    id: "2026-11-lien-de-l-organisation-hors-du-cast",
+    publishedAt: "2026-11-10",
+    title: "Le lien de l'organisation ne se dit plus en castant",
+    links: [{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }],
+    summary:
+      "En ouvrant ton propre stream ou dans « Configurer ma diffusion », tu ne peux plus dire que ton lien est celui de l'organisation : il est toujours le tien, et part avec ton compte s'il est supprimé.",
+    details: [
+      "Seule la configuration du direct du match (staff de l'organisation, arbitre désigné) dit encore si un lien est celui de l'organisation ; ce qu'elle garde ne change pas.",
+      "Un lien qu'un caster avait dit de l'organisation avant ce changement garde ce statut : il ne part pas avec son compte, mais avec ce stream quand plus aucun caster ne le tient.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

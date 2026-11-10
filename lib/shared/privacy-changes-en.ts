@@ -865,6 +865,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "The register also states what the site already kept without saying so: the records of match starts sent (match, pairing and phase of the notice, with their date), kept with the match.",
     ],
   },
+  "2026-11-lien-de-l-organisation-hors-du-cast": {
+    linkLabels: ["Read the “Match streaming” paragraph"],
+    title: "The organizers' link is no longer stated while casting",
+    summary:
+      "When opening your own stream or in “Configure my broadcast”, you can no longer say your link is the organizers': it is always yours, and goes with your account if it is deleted.",
+    details: [
+      "Only the match's live configuration (organizers' staff, assigned referee) still states whether a link is the organizers'; what it keeps does not change.",
+      "A link a caster had called the organizers' before this change keeps that status: it does not go with their account, but with that stream once no caster holds it any more.",
+    ],
+  },
   "2026-11-mode-d-antenne-et-arbitre": {
     linkLabels: ["Read the “Match streaming” paragraph"],
     title: "Live mode: kept for whoever set it, and the assigned referee sets up the broadcast",

@@ -101,7 +101,7 @@ describe("LiveCard — audience", () => {
   it("dit au lecteur d'écran ce que compte le nombre, FR et EN", () => {
     const fr = render(live([match(1)], 128));
     expect(fr).toContain('<span class="sr-only">128 personnes suivent le tournoi</span>');
-    expect(fr).toMatch(/<span class="mono" aria-hidden="true">128<\/span>/);
+    expect(fr).toMatch(/<span class="mono" aria-hidden="true"[^>]*>128<\/span>/);
     expect(fr).toMatch(/<svg[^>]*aria-hidden="true"[^>]*lucide-users|<svg[^>]*lucide-users[^>]*aria-hidden="true"/);
     expect(fr).not.toContain("lucide-eye");
     const en = renderEn(live([match(1)], 128));
@@ -112,6 +112,14 @@ describe("LiveCard — audience", () => {
     // Un visiteur voyant lisait « œil 128 » comme des spectateurs de la diffusion.
     expect(render(live([match(1)], 128))).toContain('title="128 personnes suivent le tournoi"');
     expect(renderEn(live([match(1)], 128))).toContain('title="128 people following the tournament"');
+  });
+
+  it("LiveCard_viewersTooltip_coversIconAndNumberNotScreenReaderCopy", () => {
+    // L'infobulle couvre l'icône et le chiffre ; la copie `sr-only`, hors du groupe, la porte seule aux lecteurs d'écran.
+    const html = render(live([match(1)], 128));
+    expect(html).toMatch(/<span class="[^"]*viewersGroup[^"]*" title="128 personnes suivent le tournoi"><svg[^>]*aria-hidden="true"/);
+    expect(html).toContain('<span class="mono" aria-hidden="true">128</span>');
+    expect(html).not.toContain('aria-hidden="true" title="128');
   });
 
   it("sous le seuil, ni nombre ni libellé", () => {

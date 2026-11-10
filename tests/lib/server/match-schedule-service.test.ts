@@ -530,6 +530,8 @@ describe("setMatchStartAt", () => {
       await setMatchStartAt(42, FUTURE);
       const update = writes.find((w) => w.sql.startsWith("UPDATE bg_matches"));
       expect(update?.sql).toContain("team1_ready_at = NULL");
+      // L'arbitre désigné perd aussi son « Prêt » : il reclique à la réouverture.
+      expect(update?.sql).toContain("referee_ready_at = NULL");
       // Chaque caster perd son « Prêt » avec celui des équipes.
       const casters = writes.find((w) => w.sql.startsWith("UPDATE bg_match_casters"));
       expect(casters?.sql).toContain("SET ready_at = NULL WHERE match_id = ?");

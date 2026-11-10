@@ -45,6 +45,7 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text";
 import { bracketMatch, matchCaster } from "../helpers/bracket-match";
 import { readSource } from "../helpers/read-source";
+import { ToastProvider } from "@/components/ui/toast";
 import frActions from "@/messages/fr/tournamentActions.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 import enActions from "@/messages/en/tournamentActions.json";
@@ -117,7 +118,7 @@ describe("castClaimChoices — un choix par stream, puis « ouvrir le sien »", 
 });
 
 describe("castClaimBody — le corps envoyé à POST /api/matches/[id]/caster", () => {
-  const input = { url: "", battletag: "", trigger: "AUTO" as const, organisationLink: false };
+  const input = { url: "", battletag: "", trigger: "AUTO" as const };
 
   it("rejoindre : le stream seul, aucun lien ni mode même saisis", () => {
     expect(
@@ -141,8 +142,8 @@ describe("castClaimBody — le corps envoyé à POST /api/matches/[id]/caster", 
       trigger: "AUTO",
     });
     expect(
-      castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", trigger: "MANUAL", organisationLink: true }),
-    ).toEqual({ liveUrl: "twitch.tv/voix", battletag: null, trigger: "MANUAL", organisationLink: true });
+      castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", trigger: "MANUAL" }),
+    ).toEqual({ liveUrl: "twitch.tv/voix", battletag: null, trigger: "MANUAL" });
   });
 
   it("castClaimBody_lockedTrigger_omitsTrigger", () => {
@@ -262,9 +263,24 @@ describe("CastClaimDialog — rendu", () => {
     expect(html).toContain("Passage à l&#x27;antenne");
   });
 
-  it("l'annonce du stream disparu est une zone vive toujours montée, vide tant que le choix existe", () => {
-    // Annonce réservée au lecteur d'écran (`sr-only`) : le toast la dit déjà à l'écran.
-    expect(renderDialog("fr")).toContain('</fieldset><output class="sr-only" aria-live="polite"></output>');
+  it("sans notifications, l'annonce du stream disparu est une zone vive montée, vide tant que le choix existe", () => {
+    expect(renderDialog("fr")).toMatch(/<\/fieldset><output class="[^"]*gone[^"]*" aria-live="polite"><\/output>/);
+  });
+
+  it("CastClaimDialog_underToastProvider_noSecondLiveRegion", () => {
+    const html = renderToStaticMarkup(
+      <ToastProvider>
+        <CastClaimDialog
+          match={TWO_STREAMS}
+          matchLabel="Alpha contre Bravo"
+          onClose={() => undefined}
+          onClaim={async () => ({ ok: true })}
+        />
+      </ToastProvider>,
+    );
+
+    // Une seule voix : le toast ; la zone du texte persistant se tait.
+    expect(html).not.toMatch(/<output[^>]*aria-live="polite"/);
   });
 
   it("le champ du lien n'apparaît qu'en choisissant son propre stream", () => {
@@ -319,7 +335,7 @@ describe("CastClaimDialog — un stream choisi qui disparaît", () => {
     expectContains(source, [
       "if (!gone || document.activeElement !== document.body) return;",
       'fieldsetRef.current?.querySelector<HTMLInputElement>("input[type=radio]")?.focus();',
-      '{gone ? t("cardActions.claimDialog.gone") : ""}',
+      '{gone ? goneMessage : ""}',
     ]);
   });
 
@@ -379,13 +395,13 @@ describe("MatchCardActions — branchements du cast", () => {
     expect(settings).toContain('fetch(`/api/matches/${match.id}/caster`, { method: "DELETE" })');
   });
 
-  it("CastSettingsDialog_organisationBox_offeredOnLinkedStreamAndSentAlone", () => {
-    // Décision du 2026-11-09 : la case se coche ou se décoche seule, lien inchangé ; relue à l'ouverture.
-    const settings = readSource("app/(secured)/tournois/[id]/_components/CastSettingsDialog.tsx");
-    expect(settings).toContain("castLinkOrigin(cast, canSchedule && streamEditable, url, organisationLink)");
-    expect(settings).toContain("if (originOffered && (urlChanged || originChanged)) settings.organisationLink = organisationLink;");
-    expect(settings).toContain("setOrganisationLink(payload.organisationLink === true);");
-    expect(settings).toContain("|| originChanged;");
+  it("CastDialogs_organisationBox_neverOfferedToCaster", () => {
+    // Décision D7 du 2026-11-09 : la case quitte les fenêtres du caster (la configuration du direct la garde).
+    for (const file of ["CastSettingsDialog.tsx", "CastClaimDialog.tsx", "CastSettingsFields.tsx"]) {
+      const source = readSource(`app/(secured)/tournois/[id]/_components/${file}`);
+      expect(source).not.toContain("organisationLink");
+      expect(source).not.toContain("CastOrganisationLinkField");
+    }
   });
 
   it("le caster à retirer est fixé à l'ouverture ; parti entre-temps, la fenêtre se ferme au lieu d'en viser un autre", () => {
@@ -399,10 +415,10 @@ describe("MatchCardActions — branchements du cast", () => {
     expect(card).not.toContain("?? match.casters[0] ?? null");
   });
 
-  it("le caster choisi qui part pendant le choix : un toast le dit, sauf pour le retrait que le lecteur vient de confirmer", () => {
+  it("le caster choisi qui part pendant le choix : une notice neutre le dit, sauf pour le retrait que le lecteur vient de confirmer", () => {
     expectContains(card, [
       "wasShown.current && !shown && releasedCaster === null && !ownRelease.current",
-      '() => showError(t("cardActions.releaseConfirm.gone"))',
+      '() => showInfo(t("cardActions.releaseConfirm.gone"))',
       "markOwnRelease(true);",
     ]);
     // Un retrait refusé laisse la fenêtre ouverte : le départ suivant doit se dire.
@@ -600,7 +616,7 @@ describe("Fenêtre de diffusion — mode changé pendant qu'elle est ouverte", (
     // Un mode retiré a effacé le lien du staff : la fenêtre ne le repose pas.
     const dialog = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
     const reset = dialog.slice(dialog.indexOf("if (seenTrigger !== match.liveTrigger)"));
-    expect(reset.slice(0, reset.indexOf("}"))).toContain("setLiveUrl(currentStaffUrl);");
+    expect(reset.slice(0, reset.indexOf("}"))).toContain("resetLiveUrl();");
     expect(reset.slice(0, reset.indexOf("}"))).toContain("setOrganisationLink(false);");
   });
 
@@ -634,7 +650,7 @@ describe("Fenêtre de diffusion — le stream d'un caster disparu", () => {
     expect(frDialogs.live.casterStreamGone).toContain("rouvre la fenêtre");
     expect(enDialogs.live.casterStreamGone).toContain("reopen the window");
     const dialog = readSource("app/(secured)/tournois/[id]/_components/MatchLiveDialog.tsx");
-    expect(dialog).toContain('code === "STREAM_NOT_FOUND" ? t("live.casterStreamGone")');
+    expect(dialog).toContain('if (code === "STREAM_NOT_FOUND") return "live.casterStreamGone";');
   });
 });
 

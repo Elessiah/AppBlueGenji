@@ -19,6 +19,12 @@
   color: var(--ink-mute);
 }
 
+.viewersGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .title {
   font-family: var(--font-mono);
   font-size: 22px;
@@ -273,7 +279,7 @@
 
 /* Bouton au nom d'une chaîne : la casse saisie dans le lien reste
    (« BlueGenji », pas « BLUEGENJI ») — LIVE_STREAMS.md. */
-.streamButton.keepCase {
+.keepCase {
   text-transform: none;
   letter-spacing: 0.04em;
 }

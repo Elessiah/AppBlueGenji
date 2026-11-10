@@ -2,11 +2,11 @@ import { getCurrentUser, type AuthUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { setMatchLiveConfig, setMatchOnAir, StreamLinkError } from "@/lib/server/tournaments/live-streams";
 import { mayConfigureMatchLive, parseStreamLinks } from "@/lib/server/tournaments/live-access";
-import { isMatchLiveTrigger, type MatchLiveTrigger } from "@/lib/shared/live-streams";
+import { isMatchLiveTrigger, parseOrganisationLink, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import type { MatchStreamLinkEdit } from "@/lib/server/tournaments/live-streams";
 import { can } from "@/lib/shared/permissions";
 import { castOverseer } from "@/lib/shared/live-trigger-owner";
-import { readJsonBody } from "@/lib/server/request-body";
+import { readOptionalJsonObject } from "@/lib/server/request-body";
 import { announceStaffMatchAction, staffActionAuthor } from "@/lib/server/tournaments/staff-action-logs";
 
 function parseMatchId(raw: string): number | null {
@@ -26,24 +26,32 @@ async function liveGate(user: AuthUser, matchId: number): Promise<Response | nul
   }
 }
 
+/** Statut de chaque refus connu du réglage ; tout autre motif est une panne (500). */
+const LIVE_ERROR_STATUSES = new Map<string, number>(Object.entries({
+  MATCH_NOT_FOUND: 404,
+  LIVE_TRIGGER_NOT_OWNED: 403,
+  NOT_MATCH_REFEREE: 403,
+  NOT_MATCH_CASTER: 403,
+  STAFF_STREAM_FORBIDDEN: 403,
+  ORGANISATION_LINK_NOT_PROVIDER: 409,
+  STREAM_NOT_FOUND: 404,
+  INVALID_STREAM_URL: 400,
+  INVALID_LIVE_TRIGGER: 400,
+  LIVE_TRIGGER_NOT_MANUAL: 409,
+  MATCH_NOT_LIVE_READY: 409,
+  MATCH_START_AT_REQUIRED: 409,
+  MATCH_NOT_CASTABLE: 409,
+  MATCH_NOT_STREAMED: 409,
+}));
+
 function mapLiveError(error: unknown) {
   const message = (error as Error).message;
   // Un lien de caster refusé dit lequel : la fenêtre rattache le refus à son champ.
   if (error instanceof StreamLinkError) {
     return fail(message, message === "STREAM_NOT_FOUND" ? 404 : 400, { streamId: error.streamId });
   }
-  if (message === "MATCH_NOT_FOUND") return fail(message, 404);
-  if (message === "LIVE_TRIGGER_NOT_OWNED") return fail(message, 403);
-  if (message === "NOT_MATCH_REFEREE") return fail(message, 403);
-  if (message === "NOT_MATCH_CASTER") return fail(message, 403);
-  if (message === "STAFF_STREAM_FORBIDDEN") return fail(message, 403);
-  if (message === "STREAM_NOT_FOUND") return fail(message, 404);
-  if (message === "INVALID_STREAM_URL") return fail(message, 400);
-  if (message === "INVALID_LIVE_TRIGGER") return fail(message, 400);
-  if (message === "LIVE_TRIGGER_NOT_MANUAL") return fail(message, 409);
-  if (message === "MATCH_NOT_LIVE_READY") return fail(message, 409);
-  if (message === "MATCH_START_AT_REQUIRED") return fail(message, 409);
-  if (message === "MATCH_NOT_CASTABLE") return fail(message, 409);
+  const status = LIVE_ERROR_STATUSES.get(message);
+  if (status !== undefined) return fail(message, status);
   return fail(message || "MATCH_LIVE_UPDATE_FAILED", 500);
 }
 
@@ -68,17 +76,36 @@ function parseMatchLiveBody(body: {
   if (body.liveUrl !== null && body.liveUrl !== undefined && typeof body.liveUrl !== "string") {
     return "INVALID_STREAM_URL";
   }
-  if (body.organisationLink !== undefined && typeof body.organisationLink !== "boolean") {
-    return "INVALID_ORGANISATION_LINK";
-  }
+  const organisationLink = parseOrganisationLink(body.organisationLink);
+  if (organisationLink === null) return "INVALID_ORGANISATION_LINK";
   const streamLinks = parseStreamLinks(body.streamLinks);
   if (streamLinks === null) return "INVALID_STREAM_LINKS";
   return {
     trigger,
     liveUrl: body.liveUrl as string | null | undefined,
-    organisationLink: body.organisationLink === true,
+    organisationLink,
     streamLinks,
   };
+}
+
+/**
+ * Le corps d'une requête de cette route, en objet : un corps illisible (JSON
+ * cassé, trop lourd, mauvais type) est refusé (`INVALID_LIVE_BODY`, ou le code
+ * de la lecture bornée), jamais pris pour un corps vide.
+ */
+async function readLiveRecord(req: Request): Promise<Record<string, unknown> | Response> {
+  // Un JSON qui n'est pas un objet (`null`, nombre, chaîne, tableau) n'est pas
+  // un réglage : refusé, jamais pris pour un corps vide.
+  const read = await readOptionalJsonObject(req, "INVALID_LIVE_BODY");
+  return "refusal" in read ? fail(read.refusal, 400) : read.body;
+}
+
+/** Le réglage lu et vérifié, ou la réponse de refus (400). */
+async function readMatchLiveBody(req: Request): Promise<MatchLiveBody | Response> {
+  const body = await readLiveRecord(req);
+  if (body instanceof Response) return body;
+  const parsed = parseMatchLiveBody(body);
+  return typeof parsed === "string" ? fail(parsed, 400) : parsed;
 }
 
 /**
@@ -123,18 +150,12 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const gate = await liveGate(user, matchId);
   if (gate !== null) return gate;
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as {
-    trigger?: unknown;
-    liveUrl?: unknown;
-    organisationLink?: unknown;
-    streamLinks?: unknown;
-  };
-
-  const parsed = parseMatchLiveBody(body);
-  if (typeof parsed === "string") return fail(parsed, 400);
+  const parsed = await readMatchLiveBody(req);
+  if (parsed instanceof Response) return parsed;
   const { trigger, streamLinks } = parsed;
   const organisation = can(user, "tournaments");
-  if (parsed.organisationLink && !organisation) return fail("FORBIDDEN", 403);
+  // Même refus que la route du caster (`castOrganisationLinkRefusal`, D7).
+  if (parsed.organisationLink && !organisation) return fail("STAFF_STREAM_FORBIDDEN", 403);
 
   try {
     // Le lien posé reste rattaché à qui le pose, sauf quand un membre de
@@ -176,7 +197,8 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   const gate = await liveGate(user, matchId);
   if (gate !== null) return gate;
 
-  const body = (await readJsonBody(req).catch(() => ({}))) as { onAir?: unknown };
+  const body = await readLiveRecord(req);
+  if (body instanceof Response) return body;
   if (typeof body.onAir !== "boolean") return fail("INVALID_ON_AIR", 400);
 
   try {

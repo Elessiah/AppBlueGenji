@@ -10,6 +10,7 @@
 }
 
 .legend {
+  display: block;
   margin-bottom: 8px;
   padding: 0;
   font-size: 12px;
@@ -32,23 +33,15 @@
   cursor: not-allowed;
 }
 
-.row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--ink-soft);
-  cursor: pointer;
+
+.hint {
+  color: var(--ink-quiet);
 }
 
 .hint,
 .hintInvalid {
   margin: 6px 0 0;
   font-size: 12px;
-}
-
-.hint {
-  color: var(--ink-quiet);
 }
 
 .hintInvalid {
