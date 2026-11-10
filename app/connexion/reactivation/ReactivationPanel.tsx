@@ -12,6 +12,14 @@ import { suspendedLoginText } from "@/lib/shared/login-text";
 import { INTL_LOCALE, SITE_TIME_ZONE } from "@/lib/shared/locales";
 import { LOGIN_HELP_TEXT_STYLE } from "../_lib/login-styles";
 
+/** Corps d'un refus de `POST /api/auth/reactivate`. */
+type ReactivationRefusal = {
+  error?: string;
+  reactivated?: boolean;
+  pseudoChanged?: boolean;
+  suspension?: { endsAt?: string | null };
+};
+
 /** Délai au-delà duquel « Ne pas réactiver » rend la main (connexion figée). */
 const DECLINE_TIMEOUT_MS = 8000;
 
@@ -71,6 +79,28 @@ export function ReactivationPanel({
     setPending(null);
   };
 
+  /**
+   * Réponse hors 200, compte pourtant réactivé (session non ouverte, ou compte
+   * suspendu) : l'écran le dit et renvoie à la connexion. Rend `false` si le
+   * compte n'a pas été réactivé.
+   */
+  const leaveReactivated = (payload: ReactivationRefusal): boolean => {
+    if (payload.reactivated !== true) return false;
+    // Réactivé sous un autre pseudo : dit sur chaque issue où le compte revit.
+    if (payload.pseudoChanged === true) showInfo(t("reactivation.pseudoChanged"));
+    if (payload.error === REACTIVATED_LOGIN_REQUIRED) {
+      showSuccess(t("reactivation.doneLoginRequired"));
+    } else if (payload.error === ACCOUNT_SUSPENDED) {
+      // Il revient suspendu (décision du 2026-11-04).
+      showSuccess(t("reactivation.doneSuspended"));
+      showError(suspendedLoginText(text, payload.suspension?.endsAt ?? null));
+    } else {
+      return false;
+    }
+    router.push("/connexion");
+    return true;
+  };
+
   const reactivate = async () => {
     setPending("reactivate");
     try {
@@ -80,28 +110,8 @@ export function ReactivationPanel({
         body: "{}",
       });
       if (!response.ok) {
-        const payload = (await response.json().catch(() => ({}))) as {
-          error?: string;
-          reactivated?: boolean;
-          pseudoChanged?: boolean;
-          suspension?: { endsAt?: string | null };
-        };
-        // Réactivé sous un autre pseudo : dit sur chaque issue où le compte revit.
-        if (payload.reactivated === true && payload.pseudoChanged === true) showInfo(t("reactivation.pseudoChanged"));
-        // Réactivé, mais la session n'a pas pu s'ouvrir : il reste à se connecter.
-        if (payload.error === REACTIVATED_LOGIN_REQUIRED && payload.reactivated === true) {
-          showSuccess(t("reactivation.doneLoginRequired"));
-          router.push("/connexion");
-          return;
-        }
-        // Compte suspendu : la réactivation est faite, il revient suspendu
-        // (décision du 2026-11-04) — l'écran le dit et rend la connexion.
-        if (payload.error === ACCOUNT_SUSPENDED && payload.reactivated === true) {
-          showSuccess(t("reactivation.doneSuspended"));
-          showError(suspendedLoginText(text, payload.suspension?.endsAt ?? null));
-          router.push("/connexion");
-          return;
-        }
+        const payload = (await response.json().catch(() => ({}))) as ReactivationRefusal;
+        if (leaveReactivated(payload)) return;
         // Seul un ticket périmé ou déjà servi (410) change l'écran — son bloc
         // « expiré », annoncé (`role="alert"`) et focalisé, le dit une fois, sans
         // notification en double ; une suspension ou une panne passagère se
