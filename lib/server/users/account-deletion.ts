@@ -12,7 +12,7 @@ import {
 import { isReferencedRowError } from "@/lib/server/mysql-errors";
 import { avatarFileLocations } from "@/lib/server/logo-quarantine";
 import { unlink } from "node:fs/promises";
-import { blockRemovedImageFiles } from "@/lib/server/blocked-images";
+import { blockRemovedImageFiles, pinAccountBlockedHashesOn } from "@/lib/server/blocked-images";
 import { storedUploadAbsolutePath } from "@/lib/server/stored-upload-cleanup";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
@@ -560,6 +560,9 @@ async function deleteAccountNow(
 
     const facts = await loadAccountDeletionFacts(connection, userId, new Set(soloTournaments));
     plan = accountDeletionPlan(facts.trace);
+    // L'effacement emporte ses lignes de quarantaine : ce qu'elles justifiaient
+    // ne doit plus pouvoir se lever (revue sécurité #571, D18).
+    if (plan.mode === "ERASE") await pinAccountBlockedHashesOn(connection, userId);
 
     // Les visites n'ont rien à détacher : `bg_site_visits` ne garde aucun lien
     // vers un compte, seulement une empreinte salée qu'on ne sait pas renverser

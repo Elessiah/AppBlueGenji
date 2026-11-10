@@ -205,6 +205,9 @@ const COMPLIANCE_TABLES: readonly string[] = [
       -- coup le blocage quand l'issue arrive une fois le fichier parti.
       -- Part avec la ligne (cascade du compte).
       image_sha256 CHAR(64) NULL,
+      -- Cette décision a-t-elle bloqué l'empreinte ? Seule une suppression qui
+      -- l'a fait justifie encore le blocage quand une autre est annulée (D18).
+      hash_blocked TINYINT(1) NOT NULL DEFAULT 0,
       INDEX idx_bg_logo_quarantines_due (status, purge_after),
       INDEX idx_bg_logo_quarantines_sha (image_sha256),
       INDEX idx_bg_logo_quarantines_report (report_id),
@@ -257,6 +260,11 @@ const COMPLIANCE_TABLES: readonly string[] = [
   `
       CREATE TABLE IF NOT EXISTS bg_blocked_image_hashes (
       sha256 CHAR(64) PRIMARY KEY,
+      -- 1 : posée par une décision gardée sur sa ligne de quarantaine, qu'une
+      -- contestation acceptée peut lever (D18). 0 : posée par un geste sans
+      -- trace qui la justifie (fiche du joueur, effacement d'un compte,
+      -- ligne d'avant les empreintes) — jamais levée d'office.
+      liftable TINYINT(1) NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `,

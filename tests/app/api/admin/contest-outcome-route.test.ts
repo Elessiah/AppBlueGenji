@@ -63,6 +63,7 @@ describe("POST /api/admin/logo-quarantines/[id]/contest-outcome", () => {
   it.each<[string, number]>([
     ["QUARANTINE_NOT_FOUND", 404],
     ["QUARANTINE_CLOSED", 409],
+    ["QUARANTINE_STILL_HIDDEN", 409],
   ])("recordOutcome_refusal_%s_returns%i", async (code, status) => {
     jest.mocked(recordContestOutcome).mockRejectedValue(new Error(code));
 

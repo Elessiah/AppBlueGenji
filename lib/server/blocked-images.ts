@@ -54,23 +54,10 @@ export async function isBlockedImage(...contents: Buffer[]): Promise<boolean> {
 }
 
 /**
- * L'empreinte de chacun de ces fichiers, lus **en parallèle**, à lire hors de
- * toute transaction. Un fichier illisible (déjà parti) est passé : il n'y a
- * plus rien à reposer.
+ * Pose ces empreintes, hors transaction, sur le pool — **non levables** : ces
+ * gestes (fiche du joueur, effacement d'un compte) ne laissent aucune ligne
+ * qu'une contestation pourrait annuler. Une empreinte déjà posée le devient.
  */
-export async function hashImageFiles(absolutePaths: readonly string[]): Promise<string[]> {
-  const hashes = await Promise.all(
-    absolutePaths.map((file) =>
-      readFile(file).then(
-        (content) => imageSha256(content),
-        () => null,
-      ),
-    ),
-  );
-  return hashes.filter((sha): sha is string => sha !== null);
-}
-
-/** Pose ces empreintes (doublons ignorés), hors transaction, sur le pool. */
 async function blockImageHashes(hashes: readonly string[]): Promise<void> {
   const unique = [...new Set(hashes)];
   if (unique.length === 0) return;
@@ -78,7 +65,8 @@ async function blockImageHashes(hashes: readonly string[]): Promise<void> {
   // Une seule insertion multi-lignes : un aller-retour, quel que soit le nombre d'images.
   await ignoreMissingTable(
     db.execute(
-      `INSERT IGNORE INTO bg_blocked_image_hashes (sha256) VALUES ${unique.map(() => "(?)").join(", ")}`,
+      `INSERT INTO bg_blocked_image_hashes (sha256) VALUES ${unique.map(() => "(?)").join(", ")}
+         ON DUPLICATE KEY UPDATE liftable = 0`,
       unique,
     ),
   );
@@ -157,29 +145,55 @@ export async function readImageSha256(absolutePath: string): Promise<string | nu
 /** Ce qu'il faut pour écrire dans la transaction de l'appelant. */
 type Executor = Pick<PoolConnection, "execute">;
 
-/** Bloque une empreinte, dans la transaction de l'appelant (issue « maintenue » écrite après coup, D22). */
+/**
+ * Bloque une empreinte au nom d'une décision **tracée** sur sa ligne de
+ * quarantaine (`hash_blocked = 1`), dans la transaction de l'appelant : une
+ * empreinte neuve est levable (D18) ; une empreinte déjà posée garde son état
+ * — non levable, elle le reste.
+ */
 export async function blockImageHashOn(connection: Executor, sha256: string): Promise<void> {
-  await ignoreMissingTable(connection.execute(`INSERT IGNORE INTO bg_blocked_image_hashes (sha256) VALUES (?)`, [sha256]));
+  await ignoreMissingTable(
+    connection.execute(`INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable) VALUES (?, 1)`, [sha256]),
+  );
+}
+
+/**
+ * Avant l'effacement d'un compte, qui emporte ses lignes de quarantaine : les
+ * empreintes que ses suppressions justifiaient deviennent non levables — sans
+ * quoi l'annulation d'une autre suppression de la même image les lèverait,
+ * plus rien ne disant pourquoi elles tenaient.
+ */
+export async function pinAccountBlockedHashesOn(connection: Executor, userId: number): Promise<void> {
+  await ignoreMissingTable(
+    connection.execute(
+      `UPDATE bg_blocked_image_hashes SET liftable = 0
+        WHERE sha256 IN (SELECT image_sha256 FROM bg_logo_quarantines
+                          WHERE user_id = ? AND status = 'PURGED' AND hash_blocked = 1
+                            AND image_sha256 IS NOT NULL)`,
+      [userId],
+    ),
+  );
 }
 
 /**
  * Lève le blocage d'une empreinte (contestation acceptée, D18), dans la
  * transaction de l'appelant — sauf si une **autre** suppression de modération
- * de la même image le justifie encore (ligne `PURGED` dont l'issue n'est pas
- * « acceptée »), relue en lecture courante : une suppression commitée pendant
- * l'attente est vue. Rend `true` si l'empreinte a été retirée.
+ * de la même image le justifie encore (ligne `PURGED` qui l'a bloquée,
+ * `hash_blocked = 1`), relue en lecture courante : une suppression commitée
+ * pendant l'attente est vue ; et jamais un blocage non levable (`liftable =
+ * 0` : posé sans trace qui le justifie). Rend `true` si l'empreinte a été
+ * retirée.
  */
 export async function unblockImageHashOn(connection: Executor, sha256: string, exceptQuarantineId: number): Promise<boolean> {
   const [others] = await connection.execute<RowDataPacket[]>(
     `SELECT 1 FROM bg_logo_quarantines
-      WHERE image_sha256 = ? AND id <> ? AND status = 'PURGED'
-        AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')
+      WHERE image_sha256 = ? AND id <> ? AND status = 'PURGED' AND hash_blocked = 1
       LIMIT 1 LOCK IN SHARE MODE`,
     [sha256, exceptQuarantineId],
   );
   if (others.length > 0) return false;
   try {
-    const [result] = await connection.execute<ResultSetHeader>(`DELETE FROM bg_blocked_image_hashes WHERE sha256 = ?`, [
+    const [result] = await connection.execute<ResultSetHeader>(`DELETE FROM bg_blocked_image_hashes WHERE sha256 = ? AND liftable = 1`, [
       sha256,
     ]);
     return Number(result.affectedRows) > 0;
@@ -194,7 +208,7 @@ export async function unblockImageHashOn(connection: Executor, sha256: string, e
  * (`user-<id>-<id>-<empreinte>.webp` → `<empreinte>.webp`) : le journal pm2 ne
  * relie pas un compte à une décision de modération.
  */
-function anonymousFileName(file: string): string {
+export function anonymousFileName(file: string): string {
   return path.basename(file).split("-").pop() ?? "";
 }
 

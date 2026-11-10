@@ -35,7 +35,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   } catch (error) {
     const message = (error as Error).message;
     if (message === "QUARANTINE_NOT_FOUND") return fail(message, 404);
-    if (message === "QUARANTINE_CLOSED") return fail(message, 409);
+    if (message === "QUARANTINE_CLOSED" || message === "QUARANTINE_STILL_HIDDEN") return fail(message, 409);
     console.error("[moderation] issue de la contestation non écrite", error);
     return fail("CONTEST_OUTCOME_FAILED", 500);
   }

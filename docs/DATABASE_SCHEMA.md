@@ -374,7 +374,9 @@ existante, `bg_users.terms_version` et `terms_accepted_at`, sont écrites aux
 on n'attribue pas une acceptation que personne n'a donnée.
 `bg_logo_quarantines.contest_outcome` (`UPHELD` / `OVERTURNED`, issue écrite
 d'une contestation) et `image_sha256` (empreinte d'un avatar supprimé, pour
-lever son blocage, index `idx_bg_logo_quarantines_sha`) : aux deux endroits
+lever son blocage, index `idx_bg_logo_quarantines_sha`), `hash_blocked` (la
+décision a bloqué l'empreinte) et `bg_blocked_image_hashes.liftable` (blocage
+qu'une contestation acceptée peut lever ; 0 par défaut) : aux deux endroits
 aussi, sans remplissage (`ACCOUNT_DELETION.md` § Issue écrite).
 
 `bg_account_suspensions` (suspension d'un compte par la modération,

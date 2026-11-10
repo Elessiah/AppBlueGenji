@@ -459,6 +459,11 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     `ALTER TABLE bg_logo_quarantines ADD COLUMN contest_outcome ENUM('UPHELD', 'OVERTURNED') NULL AFTER closed_at`,
     `ALTER TABLE bg_logo_quarantines ADD COLUMN image_sha256 CHAR(64) NULL AFTER contest_outcome`,
     `ALTER TABLE bg_logo_quarantines ADD INDEX idx_bg_logo_quarantines_sha (image_sha256)`,
+    // Revue sécurité #571 (D18) : seule une décision qui a bloqué justifie le
+    // blocage, et seul un blocage tracé se lève. 0 partout au départ : rien
+    // de déjà posé ne devient levable.
+    `ALTER TABLE bg_logo_quarantines ADD COLUMN hash_blocked TINYINT(1) NOT NULL DEFAULT 0 AFTER image_sha256`,
+    `ALTER TABLE bg_blocked_image_hashes ADD COLUMN liftable TINYINT(1) NOT NULL DEFAULT 0 AFTER sha256`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

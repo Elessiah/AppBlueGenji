@@ -28,6 +28,8 @@ const ADMIN_REPORT_ERRORS: Record<string, string> = {
     "Le fichier de cet avatar n'existe plus : il n'y a rien à masquer. Utilise « Supprimer l'avatar » pour vider la fiche.",
   USER_HAS_NEW_AVATAR:
     "Le joueur a envoyé un nouvel avatar depuis : l'ancien ne peut pas le remplacer. La contestation est notée acceptée : le supprimer n'en bloquera pas l'image.",
+  QUARANTINE_STILL_HIDDEN:
+    "Cette image est encore masquée : pour accepter la contestation, rétablissez-la.",
   INVALID_CONTEST_OUTCOME: "Issue de contestation inconnue. Recharge la page.",
   CONTEST_OUTCOME_FAILED: "L'issue de la contestation n'a pas pu être enregistrée.",
   INVALID_TARGET_TYPE: "Cible inconnue.",

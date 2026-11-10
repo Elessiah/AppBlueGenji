@@ -13,7 +13,7 @@ jest.mock("@/lib/server/logo-quarantine", () => ({
 }));
 
 import { getDatabase } from "@/lib/server/database";
-import { blockRemovedImageFiles, hashImageFiles } from "@/lib/server/blocked-images";
+import { blockRemovedImageFiles, pinAccountBlockedHashesOn } from "@/lib/server/blocked-images";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
@@ -153,7 +153,6 @@ describe("finalizeAccountDeletion", () => {
     expect((await finalizeAccountDeletion(7))?.mode).toBe("ERASE");
 
     // D6 : un avatar seulement masqué se conteste encore, l'effacement ne le bloque pas.
-    expect(hashImageFiles).not.toHaveBeenCalled();
     expect(blockRemovedImageFiles).not.toHaveBeenCalled();
     // Relevé sous le verrou du compte, avant la ligne effacée.
     const lock = queries.findIndex((q) => q.includes("FROM bg_users WHERE id = ? FOR UPDATE"));
@@ -301,6 +300,24 @@ describe("finalizeDueAccountDeletions", () => {
 
     const purged = execute.mock.calls.find(([sql]) => String(sql).includes("status = 'PURGED'"));
     expect(String(purged?.[0])).toContain("AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')");
+  });
+
+  // Revue sécurité #571 (D18) : l'effacement emporte les lignes qui justifiaient
+  // un blocage ; il les rend d'abord non levables.
+  it("finalizeAccountDeletion_erase_pinsAccountBlockedHashesUnderLock", async () => {
+    fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE } });
+
+    expect((await finalizeAccountDeletion(7))?.mode).toBe("ERASE");
+
+    expect(pinAccountBlockedHashesOn).toHaveBeenCalledWith(expect.anything(), 7);
+  });
+
+  it("finalizeAccountDeletion_anonymize_keepsHashesLiftable", async () => {
+    fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, played: 1 });
+
+    expect((await finalizeAccountDeletion(7))?.mode).toBe("ANONYMIZE");
+
+    expect(pinAccountBlockedHashesOn).not.toHaveBeenCalled();
   });
 
   it("finalizeAccountDeletion_eraseWithHeldAvatarNeverModerated_doesNotBlock", async () => {

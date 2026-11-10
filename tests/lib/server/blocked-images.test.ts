@@ -10,9 +10,9 @@ import {
   blockImageHashOn,
   blockImageHashesSafely,
   blockRemovedImageFiles,
-  hashImageFiles,
   imageSha256,
   isBlockedImage,
+  pinAccountBlockedHashesOn,
   readImageSha256,
   unblockImageHashOn,
 } from "@/lib/server/blocked-images";
@@ -87,7 +87,9 @@ describe("blockRemovedImageFiles", () => {
 
     await blockRemovedImageFiles([file]);
 
-    expect(execute.mock.calls[0][0]).toContain("INSERT IGNORE INTO bg_blocked_image_hashes");
+    // Geste sans ligne qui le justifie : blocage non levable (revue sécurité #571, D18).
+    expect(execute.mock.calls[0][0]).toContain("INSERT INTO bg_blocked_image_hashes (sha256) VALUES (?)");
+    expect(execute.mock.calls[0][0]).toContain("ON DUPLICATE KEY UPDATE liftable = 0");
     expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE)]);
   });
 
@@ -138,21 +140,6 @@ describe("blockRemovedImageFiles", () => {
   });
 });
 
-describe("hashImageFiles", () => {
-  it("hashImageFiles_readableAndMissingFiles_skipsMissingAndKeepsReadableHashes", async () => {
-    const file = join(mkdtempSync(join(tmpdir(), "bg-blocked-")), "avatar.webp");
-    writeFileSync(file, IMAGE);
-
-    const hashes = await hashImageFiles([join(tmpdir(), "bg-absent-avatar.webp"), file]);
-
-    expect(hashes).toEqual([imageSha256(IMAGE)]);
-  });
-
-  it("hashImageFiles_noFile_returnsEmpty", async () => {
-    expect(await hashImageFiles([])).toEqual([]);
-  });
-});
-
 // Revue sécurité #571, cycle 3 : l'insertion n'est plus exportée, elle se vérifie par l'API publique.
 describe("blockRemovedImageFiles — insertion et fichiers manquants", () => {
   function writeImage(content: Buffer): string {
@@ -168,9 +155,9 @@ describe("blockRemovedImageFiles — insertion et fichiers manquants", () => {
 
     await blockRemovedImageFiles([writeImage(IMAGE), writeImage(IMAGE), writeImage(other)]);
 
-    expect(execute.mock.calls.map(([sql, params]) => [String(sql), params])).toEqual([
-      ["INSERT IGNORE INTO bg_blocked_image_hashes (sha256) VALUES (?), (?)", [imageSha256(IMAGE), imageSha256(other)]],
-    ]);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(String(execute.mock.calls[0][0])).toContain("VALUES (?), (?)");
+    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), imageSha256(other)]);
   });
 
   it("blockRemovedImageFiles_missingTable_doesNotThrow", async () => {
@@ -231,7 +218,7 @@ describe("unblockImageHashOn (D18)", () => {
     expect(execute).toHaveBeenCalledTimes(1);
     const [sql, params] = execute.mock.calls[0];
     expect(sql).toContain("LOCK IN SHARE MODE");
-    expect(sql).toContain("contest_outcome IS NULL OR contest_outcome = 'UPHELD'");
+    expect(sql).toContain("status = 'PURGED' AND hash_blocked = 1");
     expect(params).toEqual(["abc", 30]);
   });
 
@@ -243,7 +230,7 @@ describe("unblockImageHashOn (D18)", () => {
 
     expect(await unblockImageHashOn(fakeConnection({ execute }), "abc", 30)).toBe(true);
 
-    expect(execute.mock.calls[1][0]).toContain("DELETE FROM bg_blocked_image_hashes WHERE sha256 = ?");
+    expect(execute.mock.calls[1][0]).toContain("DELETE FROM bg_blocked_image_hashes WHERE sha256 = ? AND liftable = 1");
     expect(execute.mock.calls[1][1]).toEqual(["abc"]);
   });
 
@@ -255,12 +242,33 @@ describe("unblockImageHashOn (D18)", () => {
 });
 
 describe("blockImageHashOn (D22)", () => {
-  it("blockImageHashOn_insertsIgnoringDuplicates", async () => {
+  it("blockImageHashOn_newHash_insertsLiftableKeepingExistingState", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
 
     await blockImageHashOn(fakeConnection({ execute }), "abc");
 
-    expect(execute).toHaveBeenCalledWith("INSERT IGNORE INTO bg_blocked_image_hashes (sha256) VALUES (?)", ["abc"]);
+    expect(execute).toHaveBeenCalledWith("INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable) VALUES (?, 1)", [
+      "abc",
+    ]);
+  });
+});
+
+describe("pinAccountBlockedHashesOn (revue sécurité #571, D18)", () => {
+  it("pinAccountBlockedHashesOn_account_pinsHashesItsRemovalsBlocked", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 2 }, []]);
+
+    await pinAccountBlockedHashesOn(fakeConnection({ execute }), 7);
+
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toContain("UPDATE bg_blocked_image_hashes SET liftable = 0");
+    expect(sql).toContain("WHERE user_id = ? AND status = 'PURGED' AND hash_blocked = 1");
+    expect(params).toEqual([7]);
+  });
+
+  it("pinAccountBlockedHashesOn_missingTable_resolves", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(missingTable);
+
+    await expect(pinAccountBlockedHashesOn(fakeConnection({ execute }), 7)).resolves.toBeUndefined();
   });
 });
 

@@ -862,10 +862,16 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
 - **Levée du blocage** (D18) : l'empreinte d'un avatar supprimé est gardée sur
   sa ligne (`image_sha256`, liée au compte jusqu'à la cascade) ; une
   contestation acceptée **après** la suppression la retire de
-  `bg_blocked_image_hashes`, sauf si une autre suppression non annulée
-  (`PURGED`, issue nulle ou `UPHELD`) porte la même empreinte. Une ligne
-  antérieure sans empreinte ne peut rien lever (`hashUnknown`, dit au staff).
-  L'effacement au jour 30 ignore les suppressions `OVERTURNED`.
+  `bg_blocked_image_hashes`, sauf si une autre suppression qui l'a bloquée
+  (`PURGED`, `hash_blocked = 1`) porte la même empreinte, et jamais un blocage
+  **non levable** (`liftable = 0`) : posé sans ligne qui le justifie (fiche du
+  joueur, effacement d'un compte), ou rendu tel par l'effacement d'un compte,
+  qui emporte ses lignes de quarantaine (`pinAccountBlockedHashesOn`). Une
+  ligne antérieure sans empreinte ne peut rien lever (`hashUnknown`, dit au
+  staff). L'effacement au jour 30 ignore les suppressions `OVERTURNED`.
+- **Acceptation d'une image encore masquée** : elle se rétablit ; la route
+  d'issue la refuse (`QUARANTINE_STILL_HIDDEN`, 409). Un rétablissement refusé
+  (D23) écrit `OVERTURNED` sous le verrou de la ligne, et le commite.
 - **Journal** (D21) : une ligne `pending` garde aussi `requestedAt`, la date de
   la demande **telle que la base l'a écrite** (`AAAA-MM-JJ HH:MM:SS`, relue
   dans la transaction) ; le rejeu la réécrit telle quelle et la compare texte
