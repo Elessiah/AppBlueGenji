@@ -18,8 +18,8 @@ import { can } from "@/lib/shared/permissions";
  * seulement tant que la page montre le salon (tournoi en cours, option allumée, match
  * jouable). Débit plafonné par compte (`VOICE_CLEAR_RULE`). Un membre du staff qui n'est
  * pas l'arbitre désigné du match (colonne du match, quel que soit son état) est nommé dans
- * pm2 (`auditStaffAction`) **avant** l'appel au bot, réussi ou non ; l'arbitre désigné
- * jamais. Un vidage réussi est annoncé comme geste du staff (`VOICE_CLEARED`, anonyme sur
+ * pm2 (`auditStaffAction`) **avant** l'appel au bot, puis avec son issue ; l'arbitre
+ * désigné jamais. Un vidage réussi est annoncé comme geste du staff (`VOICE_CLEARED`, anonyme sur
  * Discord). La réponse ne dit ni qui a été déconnecté, ni combien ; rien n'est gardé.
  */
 export async function POST(req: Request, context: { params: Promise<{ matchId: string }> }) {
@@ -37,11 +37,14 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   if (typeof teamId !== "number" || !Number.isInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM_ID", 400);
 
   try {
+    let named = false;
     const result = await clearTeamVoiceChannel(matchId, teamId, user.id, (designated) => {
-      if (!designated) {
-        auditStaffAction(`Vidage du salon vocal d'une équipe demandé — match #${matchId}`, { id: user.id, pseudo: user.pseudo });
-      }
+      if (designated) return;
+      named = true;
+      auditStaffAction(`Vidage du salon vocal d'une équipe demandé — match #${matchId}`, { id: user.id, pseudo: user.pseudo });
     });
+    // L'issue suit la demande dans pm2 : une tentative ne passe jamais pour un vidage.
+    if (named) auditStaffAction(`Vidage du salon vocal d'une équipe — match #${matchId} : ${result}`, { id: user.id, pseudo: user.pseudo });
     if (result === "notOpen") return fail("VOICE_CHANNEL_NOT_OPEN", 409);
     if (result === "player") return fail("VOICE_CLEAR_IS_PLAYER", 403);
     if (result === "unavailable") return fail("VOICE_CLEAR_UNAVAILABLE", 503);

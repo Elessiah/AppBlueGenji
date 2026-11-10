@@ -1765,6 +1765,18 @@ describe("clearTeamVoiceChannel", () => {
     expect(hook).toHaveBeenCalledWith(false);
   });
 
+  it("clearTeamVoiceChannel_hookThrows_stillClears", async () => {
+    database({ voiceRows: [{ channel_id: "901", plays: 0, designated: 0 }] });
+    jest.mocked(clearVoiceChannel).mockResolvedValue({ kind: "ok", value: true });
+
+    await expect(
+      clearTeamVoiceChannel(9, 4, 77, () => {
+        throw new Error("trace");
+      }),
+    ).resolves.toBe("cleared");
+    expect(clearVoiceChannel).toHaveBeenCalledWith("901");
+  });
+
   it("clearTeamVoiceChannel_callerPlaysMatch_hookNeverCalled", async () => {
     database({ voiceRows: [{ channel_id: "901", plays: 1, designated: 0 }] });
     const hook = jest.fn<(designated: boolean) => void>();
@@ -1780,6 +1792,8 @@ describe("clearTeamVoiceChannel", () => {
     // Règle commune du joueur : une entrée solo compte aussi.
     expect(CLEARABLE_CHANNEL_SQL).toContain("solo_user_id = ?");
     expect(CLEARABLE_CHANNEL_SQL).toContain("(m.referee_user_id <=> ?) AS designated");
+    // Tournoi masqué de nouveau : la page ne montre plus le salon.
+    expect(CLEARABLE_CHANNEL_SQL).toContain("t.start_visibility_at <= NOW()");
   });
 
   it("clearTeamVoiceChannel_query_onlyWhileThePageShowsTheChannel", () => {

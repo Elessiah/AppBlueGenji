@@ -260,6 +260,7 @@ describe("POST /api/admin/matches/[matchId]/voice/clear", () => {
     await CLEAR(clearReq({ teamId: 4 }), matchParams("9"));
     expect(announceStaffMatchAction).toHaveBeenCalledWith(9, "VOICE_CLEARED");
     expect(auditStaffAction).toHaveBeenCalledWith("Vidage du salon vocal d'une équipe demandé — match #9", { id: arbitre.id, pseudo: "ArbitrePseudo" });
+    expect(auditStaffAction).toHaveBeenLastCalledWith("Vidage du salon vocal d'une équipe — match #9 : cleared", { id: arbitre.id, pseudo: "ArbitrePseudo" });
   });
 
   it("clear_staffNotDesignatedReferee_botRefuses_stillNamedInPm2ButNotAnnounced", async () => {
@@ -271,6 +272,7 @@ describe("POST /api/admin/matches/[matchId]/voice/clear", () => {
     const res = await CLEAR(clearReq({ teamId: 4 }), matchParams("9"));
     expect(res.status).toBe(503);
     expect(auditStaffAction).toHaveBeenCalledWith("Vidage du salon vocal d'une équipe demandé — match #9", { id: arbitre.id, pseudo: "ArbitrePseudo" });
+    expect(auditStaffAction).toHaveBeenLastCalledWith("Vidage du salon vocal d'une équipe — match #9 : unavailable", { id: arbitre.id, pseudo: "ArbitrePseudo" });
     expect(announceStaffMatchAction).not.toHaveBeenCalled();
   });
 

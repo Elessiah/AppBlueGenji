@@ -1188,7 +1188,7 @@ export const CLEARABLE_CHANNEL_SQL = `SELECT v.channel_id,
   JOIN bg_tournaments t ON t.id = m.tournament_id
  WHERE v.match_id = ? AND v.team_id = ? AND v.released_at IS NULL AND v.channel_id IS NOT NULL
    AND v.team_id IN (m.team1_id, m.team2_id)
-   AND t.state = 'RUNNING' AND t.team_voice_channels = 1
+   AND t.state = 'RUNNING' AND t.team_voice_channels = 1 AND t.start_visibility_at <= NOW()
    AND m.status IN ('READY', 'AWAITING_CONFIRMATION') AND m.start_at IS NOT NULL
    AND m.start_at <= NOW() + INTERVAL ${VOICE_CHANNEL_LEAD_MINUTES} MINUTE
    AND m.start_at >= NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
@@ -1216,7 +1216,11 @@ export async function clearTeamVoiceChannel(
   if (!row?.channel_id) return "notOpen";
   // Un membre du staff qui joue ce match ne vide pas les salons (comme il ne l'arbitre pas).
   if (Number(row.plays ?? 0) === 1) return "player";
-  beforeClear?.(Number(row.designated ?? 0) === 1);
+  try {
+    beforeClear?.(Number(row.designated ?? 0) === 1);
+  } catch {
+    // La trace ne bloque jamais le geste.
+  }
   const channelId = row.channel_id;
   const outcome = await clearVoiceChannel(channelId);
   if (outcome.kind === "ok") return "cleared";
