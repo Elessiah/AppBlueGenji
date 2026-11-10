@@ -204,7 +204,8 @@ et non le seeding classique :
 | 4 | 3ᵉ contre 7ᵉ |
 
 L'équipe du haut prend le side gauche. Une **petite finale** départage la 3ᵉ
-place en parallèle de la finale.
+place en parallèle de la finale — à l'écran, une carte sous la finale, annoncée
+dès l'ouverture des play-offs (`ENDURANCE_ROUND_PANELS.md`).
 
 Les manches de play-offs sont numérotées à partir de `1000`
 (`PLAYOFF_ROUND_OFFSET`) pour rester distinguables des manches d'endurance dans
