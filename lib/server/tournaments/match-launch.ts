@@ -1853,8 +1853,11 @@ export async function releaseIneligibleReferee(
  * match non joué qu'il arbitrait est annoncé au staff (ligne anonyme), et tout
  * match touché, tournoi en cours, part s'il n'attendait plus que lui — comme
  * `releaseObjectingReferee`. Les annonces partent au commit de l'appelant
- * (`flushBotLogs`). La transaction a lu bien avant ces verrous : casters et
- * éligibilité se relisent en lecture courante (`snapshotBeforeLock`).
+ * (`flushBotLogs`). La transaction a lu bien avant ces verrous : le match et
+ * ses casters se relisent en lecture courante (`snapshotBeforeLock`) ; le
+ * reste du contexte (éligibilité d'un autre arbitre, effectifs) vient de
+ * l'instantané — un changement des dernières millisecondes est rattrapé par
+ * le prochain geste ou balayage du match, comme pour tout lancement.
  */
 export async function relaunchAfterRefereeWithdrawal(
   connection: PoolConnection,

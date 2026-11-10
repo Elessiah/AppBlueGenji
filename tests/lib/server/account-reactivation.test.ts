@@ -51,13 +51,19 @@ function transaction(options: {
   /** Lignes retirées par le `DELETE` du ticket : 0 = une autre requête l'a servi. */
   ticketDeleted?: number;
   failOn?: string;
+  /** Erreurs levées, une par passage, au verrou du compte (interblocages). */
+  lockErrors?: Error[];
 }) {
   const connection = connectionMock();
   connection.rollback.mockResolvedValue(undefined);
   connection.execute.mockImplementation(async (sql: string) => {
     if (options.failOn && sql.includes(options.failOn)) throw new Error("DB_DOWN");
     if (sql.includes("SELECT user_id, login_event")) return [options.ticket ? [options.ticket] : [], []];
-    if (sql.includes("FOR UPDATE")) return [options.locked ? [options.locked] : [], []];
+    if (sql.includes("FOR UPDATE")) {
+      const failure = options.lockErrors?.shift();
+      if (failure) throw failure;
+      return [options.locked ? [options.locked] : [], []];
+    }
     if (sql.startsWith("UPDATE bg_users")) return [{ affectedRows: options.affectedRows ?? 1 }, []];
     if (sql.startsWith("DELETE FROM bg_account_reactivation_tickets")) return [{ affectedRows: options.ticketDeleted ?? 1 }, []];
     return [{ affectedRows: 1 }, []];
@@ -192,6 +198,36 @@ describe("reactivateAccount", () => {
     );
     expect(invalidateTeamIdentityViews).toHaveBeenCalled();
     expect(invalidateStats).toHaveBeenCalled();
+  });
+
+  // Revue sécurité #579 : le verrou du compte attend derrière la suppression définitive.
+  it("reactivateAccount_deadlockOnAccountLock_replayedOnce", async () => {
+    const connection = transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+      lockErrors: [Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK" })],
+    });
+
+    expect(await reactivateAccount(TOKEN)).toEqual({ userId: 7, event: "LOGIN_DISCORD" });
+
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(recordAccountReactivation).toHaveBeenCalledTimes(1);
+  });
+
+  it("reactivateAccount_deadlockEveryAttempt_rethrowsWithoutSideEffects", async () => {
+    const deadlock = () => Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK" });
+    const connection = transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+      lockErrors: [deadlock(), deadlock(), deadlock()],
+    });
+
+    await expect(reactivateAccount(TOKEN)).rejects.toThrow("Deadlock found");
+
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(invalidateStats).not.toHaveBeenCalled();
   });
 
   // Revue juridique #546, cycle 3 : la ligne de réactivation précède le commit.

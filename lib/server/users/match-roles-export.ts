@@ -12,10 +12,14 @@ type Db = Awaited<ReturnType<typeof getDatabase>>;
 /** Colonne récente d'une lecture de l'export : `expr` lue sous le nom `alias`. */
 type OptionalColumn = { expr: string; alias: string };
 
-/** Le nom de colonne qu'une erreur « Unknown column » désigne (`c.ready_at` → `ready_at`). */
+/**
+ * Le nom de colonne qu'une erreur « Unknown column » désigne (`c.ready_at` →
+ * `ready_at`) : le premier nom entre apostrophes, quelle que soit la langue des
+ * messages du serveur (`lc_messages`) — le code d'erreur a déjà dit la panne.
+ */
 function unknownColumnName(error: unknown): string | undefined {
   const message = error instanceof Error ? error.message : "";
-  return /Unknown column '(?:[^'.]*\.)?([^']+)'/i.exec(message)?.[1];
+  return /'(?:[^'.]*\.)?([^']+)'/.exec(message)?.[1];
 }
 
 /**

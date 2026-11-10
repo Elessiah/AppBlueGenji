@@ -75,7 +75,7 @@ type Options = {
   /** Le compte qui demande est administrateur. */
   isAdmin?: boolean;
   /** Autres administrateurs relevés, puis relus sous verrou (`locked`). */
-  otherAdmins?: { id: number; locked: { is_admin: 0 | 1; is_deleted: 0 | 1 } | null }[];
+  otherAdmins?: { id: number; locked: { is_admin: 0 | 1; is_deleted: 0 | 1 } | null; suspendedUnderLock?: boolean }[];
   /** Matchs non joués que le compte arbitre (relevé avant le retrait). */
   refereedMatches?: number[];
   castMatches?: number[];
@@ -148,6 +148,10 @@ function lockedAccountReads(q: string, params: unknown[], options: Options): obj
   if (q.startsWith("SELECT is_admin, is_deleted FROM bg_users WHERE id = ? FOR UPDATE")) {
     const other = (options.otherAdmins ?? []).find(({ id }) => id === params[0]);
     return other?.locked ? [other.locked] : [];
+  }
+  if (q.startsWith("SELECT s.id FROM bg_account_suspensions s")) {
+    const other = (options.otherAdmins ?? []).find(({ id }) => id === params[0]);
+    return other?.suspendedUnderLock ? [{ id: 1 }] : [];
   }
   return null;
 }
@@ -444,6 +448,41 @@ describe("requestAccountDeletion — dernier administrateur", () => {
     });
 
     await expect(requestAccountDeletion(7)).rejects.toThrow("LAST_ADMIN_ACCOUNT");
+  });
+
+  // Revue sécurité #579 : une suspension posée depuis le premier relevé.
+  it("requestAccountDeletion_otherAdminSuspendedUnderLock_refused", async () => {
+    const { queries } = fakeDb({
+      isAdmin: true,
+      otherAdmins: [{ id: 9, locked: { is_admin: 1, is_deleted: 0 }, suspendedUnderLock: true }],
+    });
+
+    await expect(requestAccountDeletion(7)).rejects.toThrow("LAST_ADMIN_ACCOUNT");
+
+    const reread = queries.find(({ sql }) => sql.startsWith("SELECT s.id FROM bg_account_suspensions s"));
+    expect(reread?.sql).toContain("LOCK IN SHARE MODE");
+    expect(reread?.params).toEqual([9]);
+  });
+
+  it("requestAccountDeletion_otherAdminNotSuspendedUnderLock_accepted", async () => {
+    fakeDb({ isAdmin: true, otherAdmins: [{ id: 9, locked: { is_admin: 1, is_deleted: 0 } }] });
+
+    await expect(requestAccountDeletion(7)).resolves.toBeDefined();
+  });
+
+  // Revue sécurité #579 : commis, la demande n'échoue pas pour une annonce.
+  it("requestAccountDeletion_flushThrowsAfterCommit_stillSucceedsAndJournals", async () => {
+    const { connection } = fakeDb({});
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(flushBotLogs).mockImplementationOnce(() => {
+      throw new Error("FLUSH_DOWN");
+    });
+
+    await expect(requestAccountDeletion(7)).resolves.toBeDefined();
+
+    expect(connection.rollback).not.toHaveBeenCalled();
+    expect(discardBotLogs).not.toHaveBeenCalled();
+    expect(recordAccountDeletion).toHaveBeenCalledTimes(1);
   });
 
   it("requestAccountDeletion_suspendedAdminsExcludedFromRemaining", async () => {

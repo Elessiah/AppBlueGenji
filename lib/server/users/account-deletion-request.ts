@@ -408,7 +408,16 @@ async function assertAnotherAdminRemains(connection: PoolConnection, userId: num
       `SELECT is_admin, is_deleted FROM bg_users WHERE id = ? FOR UPDATE`,
       [Number(other.id)],
     );
-    if (rows[0] && Number(rows[0].is_admin) === 1 && Number(rows[0].is_deleted) === 0) return;
+    if (!rows[0] || Number(rows[0].is_admin) !== 1 || Number(rows[0].is_deleted) !== 0) continue;
+    // Relue en lecture verrouillante (donc courante, pas l'instantané) : une
+    // suspension posée depuis le premier relevé ne laisse pas passer la
+    // demande, et aucune ne se pose sur ce compte avant le commit.
+    const [suspended] = await connection.execute<(RowDataPacket & { id: number })[]>(
+      `SELECT s.id FROM bg_account_suspensions s
+        WHERE s.user_id = ? AND ${activeSuspensionSql("s")} LIMIT 1 LOCK IN SHARE MODE`,
+      [Number(other.id)],
+    );
+    if (suspended.length === 0) return;
   }
   throw new Error("LAST_ADMIN_ACCOUNT");
 }
@@ -527,7 +536,13 @@ export async function requestAccountDeletion(
       await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
       const plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
       await connection.commit();
-      flushBotLogs(connection);
+      // Commis : une annonce qui ne part pas ne doit pas faire passer la
+      // demande pour un échec (ni journal ni suites ne suivraient).
+      try {
+        flushBotLogs(connection);
+      } catch (error) {
+        console.error("[account-deletion] annonces non envoyées", error);
+      }
       return plan;
     } catch (error) {
       await connection.rollback().catch(() => {});

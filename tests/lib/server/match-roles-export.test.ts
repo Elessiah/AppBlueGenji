@@ -126,6 +126,22 @@ describe("listOwnMatchRoles", () => {
     expect(execute.mock.calls[3][0]).toContain("NULL AS referee_ready_at");
   });
 
+  // Revue sécurité #579 : le nom se lit quelle que soit la langue du serveur.
+  it("listOwnMatchRoles_localizedUnknownColumnMessage_dropsTheNamedColumnOnly", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(Object.assign(new Error("Champ 'c.ready_at' inconnu dans field list"), { code: "ER_BAD_FIELD_ERROR" }))
+      .mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    await listOwnMatchRoles(12);
+
+    const retried = String(execute.mock.calls[1][0]);
+    expect(retried).toContain("NULL AS ready_at");
+    expect(retried).toContain("c.created_at AS created_at");
+    expect(retried).toContain("c.cast_battletag AS cast_battletag");
+  });
+
   it("listOwnMatchRoles_casterReadyAtMissing_keepsCastsAndOtherColumns", async () => {
     const execute = jest
       .fn<SqlQuery>()
