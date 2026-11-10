@@ -4,6 +4,7 @@ import { CSSProperties, Fragment, useEffect, useRef } from "react";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { ScrollArea } from "@/components/cyber";
 import { useSlotHeight } from "../_hooks/useSlotHeight";
+import type { ProjectedGhostEntrants } from "@/lib/shared/bg-survie/playoffs";
 import { MatchRow } from "./MatchRow";
 import { GhostMatchCard } from "./GhostMatchCard";
 import { isMatchScoreLocked } from "../_lib/score-lock";
@@ -42,6 +43,8 @@ interface BracketTreeProps {
    * sa première colonne et rien ne montre où mène un quart de finale.
    */
   ghostSlots?: readonly BracketSlotRef[];
+  /** Vainqueurs déjà connus des créneaux à pourvoir (`projectPlayoffGhostEntrants`), par id de créneau. */
+  ghostEntrants?: ReadonlyMap<number, ProjectedGhostEntrants>;
   allTournamentMatches: BracketMatch[];
   bracketType: BracketType;
   /** Nombre total de rounds du tableau complet (pour nommer les stades). */
@@ -80,6 +83,7 @@ interface BracketTreeProps {
 export function BracketTree({
   matches,
   ghostSlots,
+  ghostEntrants,
   allTournamentMatches,
   bracketType,
   totalRoundsGlobal,
@@ -276,7 +280,12 @@ export function BracketTree({
                               roundNumber={roundNum}
                             />
                           ) : (
-                            <GhostMatchCard />
+                            <GhostMatchCard
+                              topTeamId={ghostEntrants?.get(slot.id)?.[0]?.teamId}
+                              topTeamName={ghostEntrants?.get(slot.id)?.[0]?.name}
+                              bottomTeamId={ghostEntrants?.get(slot.id)?.[1]?.teamId}
+                              bottomTeamName={ghostEntrants?.get(slot.id)?.[1]?.name}
+                            />
                           )}
                         </div>
                       </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
+import type { ProjectedGhostEntrants } from "@/lib/shared/bg-survie/playoffs";
 import { BracketTree, ScrollRequest } from "./BracketTree";
 import { BoardPanel, PanelPill } from "./BoardPanel";
 import {
@@ -32,6 +33,8 @@ interface BracketSectionsProps {
    * n'est rien qu'on vienne voir.
    */
   ghostSlots?: readonly BracketSlotRef[];
+  /** Vainqueurs déjà connus des créneaux à pourvoir, par id de créneau (voir {@link BracketTree}). */
+  ghostEntrants?: ReadonlyMap<number, ProjectedGhostEntrants>;
   allTournamentMatches: BracketMatch[];
   myTeamId: number | null;
   adminResolvable: (m: BracketMatch) => boolean;
@@ -60,6 +63,7 @@ export function BracketSections({
   showBracketLabel,
   matches,
   ghostSlots,
+  ghostEntrants,
   allTournamentMatches,
   myTeamId,
   adminResolvable,
@@ -212,6 +216,7 @@ export function BracketSections({
               <BracketTree
                 matches={sectionMatches}
                 ghostSlots={sectionGhosts}
+                ghostEntrants={ghostEntrants}
                 allTournamentMatches={allTournamentMatches}
                 bracketType={bracketType}
                 totalRoundsGlobal={totalRounds}

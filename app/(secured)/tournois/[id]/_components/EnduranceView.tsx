@@ -35,6 +35,7 @@ import { EnduranceCard } from "./EnduranceCard";
 import { EnduranceRankingViews } from "./EnduranceRankingViews";
 import { EnduranceChartPanel } from "./EnduranceChartPanel";
 import { PodiumTiersOff } from "@/components/podium-tiers";
+import { projectPlayoffGhostEntrants } from "@/lib/shared/bg-survie/playoffs";
 import { BracketSections } from "./BracketSections";
 import { EnduranceRoundPanels } from "./EnduranceRoundPanels";
 import styles from "./EnduranceView.module.css";
@@ -262,6 +263,8 @@ export function EnduranceView({
   // à sa première colonne jusqu'à ce que les quarts soient joués.
   const playoffGhosts = endurancePlayoffGhostSlots(decisive, isFinished);
   const playoffLinks = endurancePlayoffLinks(decisive, playoffGhosts);
+  // Le vainqueur d'une rencontre close se lit déjà dans sa case du tour suivant.
+  const playoffGhostEntrants = projectPlayoffGhostEntrants(decisive, playoffGhosts);
   const resolvePlayoffNext = (slot: BracketSlotRef) => playoffLinks.get(slot.id) ?? null;
   // Les tours de l'arbre naissent un à un : sans ce compte, les quarts de finale
   // s'appelleraient « Finale » tant qu'ils seraient le seul tour posé.
@@ -482,6 +485,7 @@ export function EnduranceView({
             showBracketLabel={false}
             matches={decisive}
             ghostSlots={playoffGhosts}
+            ghostEntrants={playoffGhostEntrants}
             allTournamentMatches={matches}
             myTeamId={myTeamId}
             adminResolvable={adminResolvable}

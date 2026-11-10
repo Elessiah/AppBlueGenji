@@ -170,3 +170,67 @@ export function planNextPlayoffRound(
 
   return plan;
 }
+
+/** Rencontre décisive telle que la projection la lit (sous-ensemble de `BracketMatch`). */
+export type ProjectablePlayoffMatch = {
+  roundNumber: number;
+  matchNumber: number;
+  status: string;
+  winnerTeamId: number | null;
+  team1Id: number | null;
+  team2Id: number | null;
+  team1Name: string | null;
+  team2Name: string | null;
+  doubleForfeit?: boolean;
+};
+
+/** Créneau d'un tour pas encore posé. */
+export type ProjectableGhostSlot = { id: number; roundNumber: number; matchNumber: number };
+
+/** Engagé déjà qualifié pour un créneau du tour suivant. */
+export type ProjectedEntrant = { teamId: number; name: string | null };
+
+/** Les deux côtés d'un créneau à venir ; `null` = pas encore connu (TBD). */
+export type ProjectedGhostEntrants = [ProjectedEntrant | null, ProjectedEntrant | null];
+
+/**
+ * Affichage seul : le vainqueur d'une rencontre **déjà close** d'un tour est
+ * montré dans son créneau du tour suivant, avant même que le moteur ne pose ce
+ * tour (il attend que le tour entier soit joué, `finalizePlayoffsIfDone`).
+ *
+ * Même règle de position que `planNextPlayoffRound` : le i-ᵉ match d'un tour
+ * (ordre des numéros) alimente le créneau `floor(i/2)` du tour suivant, côté
+ * haut si i est pair, côté bas sinon. Un double forfait ne qualifie personne ;
+ * un match pas encore clos laisse son côté vide. Seul le tour immédiatement
+ * suivant est alimenté : au-delà, aucun match n'est posé qui puisse l'être.
+ *
+ * @returns créneau à venir (`id`) → ses deux côtés ; les créneaux sans aucun
+ *   qualifié connu sont absents.
+ */
+export function projectPlayoffGhostEntrants(
+  decisive: readonly ProjectablePlayoffMatch[],
+  ghostSlots: readonly ProjectableGhostSlot[],
+): Map<number, ProjectedGhostEntrants> {
+  const projected = new Map<number, ProjectedGhostEntrants>();
+  if (decisive.length === 0 || ghostSlots.length === 0) return projected;
+
+  const lastRound = Math.max(...decisive.map((match) => match.roundNumber));
+  const feeding = decisive
+    .filter((match) => match.roundNumber === lastRound)
+    .sort((a, b) => a.matchNumber - b.matchNumber);
+  const nextRound = ghostSlots
+    .filter((slot) => slot.roundNumber === lastRound + 1)
+    .sort((a, b) => a.matchNumber - b.matchNumber);
+
+  feeding.forEach((match, index) => {
+    if (match.status !== "COMPLETED" || match.doubleForfeit || match.winnerTeamId === null) return;
+    const target = nextRound[Math.floor(index / 2)];
+    if (!target) return;
+    const winnerName = match.winnerTeamId === match.team1Id ? match.team1Name : match.team2Name;
+    const sides = projected.get(target.id) ?? [null, null];
+    sides[index % 2] = { teamId: match.winnerTeamId, name: winnerName };
+    projected.set(target.id, sides);
+  });
+
+  return projected;
+}

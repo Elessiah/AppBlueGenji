@@ -132,7 +132,8 @@ describe("play-offs — le vrai arbre, et non une liste de cartes", () => {
     expect(SECTIONS).toContain("sectionMatches.length + sectionGhosts.length");
     expect(VIEW).toContain("endurancePlayoffLinks(decisive, playoffGhosts)");
     expect(SECTIONS).toContain("ghostSlots={sectionGhosts}");
-    expect(TREE).toContain("<GhostMatchCard />");
+    expect(TREE).toContain("<GhostMatchCard");
+    expect(TREE).toContain("ghostEntrants?.get(slot.id)");
   });
 
   it("ne fait pas passer une case à pourvoir pour une rencontre", () => {
