@@ -166,8 +166,10 @@ dernière colonne de l'arbre comme un créneau de plus, elle serait nommée
 « Finale 2 » et recevrait un trait. Elle n'est donc **pas** un créneau de
 l'arbre : c'est une carte de match posée **sous la finale**, dans sa colonne,
 sous-titrée « Petite Finale » (`bracket.stage.thirdPlace`, « Third-place match »
-sous `/en`) — et la finale prend alors le sous-titre « Grande Finale »
-(`bracket.stage.grandFinal`) au lieu de « Finale 1 ».
+sous `/en`). La finale de cet arbre est sous-titrée « Grande Finale »
+(`bracket.stage.grandFinal`, prop `grandFinalLabel`) au lieu de « Finale 1 » —
+**toujours**, que la petite finale se joue ou non : la finale ne change pas de
+nom en cours de tournoi quand un double forfait annule la petite finale.
 
 `endurancePlayoffThirdPlaceSlot` (`endurance-sections.ts`) décide de ce qu'il y a
 à montrer, et `BracketSections` → `BracketTree` le reçoivent par la prop
@@ -188,8 +190,10 @@ on sait qu'elle ne se jouera pas :
 - une demi-finale **gagnée par exemption** n'a pas de battue non plus — connu
   d'avance quand le tour d'avant compte un nombre impair de rencontres (trois
   quarts) ou que la projection y annonce déjà une exemption ;
-- pas de tour à deux rencontres avant la finale (finale sèche) ; tournoi clos
-  sans petite finale posée.
+- une demi-finale close **sans battue enregistrée** (`loser_team_id` à `NULL`) :
+  le moteur n'y lit personne, la projection non plus ;
+- pas de tour à deux rencontres avant la finale (finale sèche, ou paire de
+  quarts vidée par deux doubles forfaits) ; tournoi clos sans petite finale posée.
 
 La case compte dans la **pastille** du volet (« 8 matchs » pour un plateau à
 huit : quatre quarts, deux demies, finale, petite finale), à pourvoir ou posée.
@@ -253,12 +257,17 @@ Deux garde-fous à retenir :
   comportement d'origine, et c'est celui des tableaux à élimination, qui
   n'en passent aucun : le trait s'arrête au bord de la carte.
 
-Une **réserve antérieure** à tout cela : le moteur saute une paire dont les deux
-créneaux ont été vidés par un double forfait (`pair.length === 0` dans
-`planNextPlayoffRound`), ce qui décale d'un cran les rencontres suivantes, là où
-le module garde `floor(i/2)`. Deux doubles forfaits voisins font donc des traits
-faux, et la prédiction annonce un tour plus large qu'il ne naîtra. Consigné dans
-`ERREUR.txt`.
+**Paire vidée par deux doubles forfaits.** Le moteur saute une paire dont les
+deux créneaux ont été vidés (`pair.length === 0` dans `planNextPlayoffRound`) et
+remonte d'un cran les rencontres suivantes. `playoffNextRoundPositions`
+(`lib/shared/bg-survie/playoffs.ts`) est la **seule** description de cette règle
+pour l'affichage : les traits (`endurancePlayoffLinks`), le compte des cases à
+pourvoir du tour suivant (`endurancePlayoffGhostSlots`) et les noms projetés
+(`projectPlayoffGhostEntrants`) en descendent tous — un nom ne s'affiche jamais
+dans une case que son trait n'atteint pas, et la paire sautée ne porte aucun
+trait. Seul le **nom des stades** reste compté sur l'effectif du premier tour
+(`endurancePlayoffRoundCount`) : dans ce cas rarissime, la rencontre restante
+s'appelle encore « Demi-finale » alors qu'elle tient lieu de finale.
 
 Si la règle d'appariement du moteur changeait, c'est `endurancePlayoffLinks`
 qu'il faudrait suivre — d'où un test qui la compare à la structure réellement
@@ -274,7 +283,7 @@ produite par le service.
 | Volets de manche | `app/(secured)/tournois/[id]/_components/EnduranceRoundPanels.tsx` |
 | Chrome partagé d'un volet | `app/(secured)/tournois/[id]/_components/BoardPanel.tsx` (+ `.module.css`) |
 | Vue du mode | `app/(secured)/tournois/[id]/_components/EnduranceView.tsx` |
-| Arbre | `BracketSections.tsx` (props `plannedRounds`, `resolveNextMatchId`, `ghostSlots`, `ghostEntrants`, `thirdPlace`) → `BracketTree.tsx` |
+| Arbre | `BracketSections.tsx` (props `plannedRounds`, `resolveNextMatchId`, `ghostSlots`, `ghostEntrants`, `thirdPlace`, `grandFinalLabel`) → `BracketTree.tsx` |
 
 ### `BoardPanel` — un seul chrome de volet
 
@@ -361,8 +370,8 @@ tests comparent la projection au plan du moteur pour chaque forme de tour :
   bas dit `BYE` (`PROJECTED_BYE`) — personne n'y viendra, la rencontre naîtra
   jouée. Même chose pour le dernier vainqueur d'un effectif impair ;
 - une paire vidée par **deux** doubles forfaits ne donne aucune rencontre : les
-  paires suivantes remontent d'une case, comme dans le moteur. (Les **traits**,
-  eux, gardent `floor(i/2)` — réserve consignée dans `ERREUR.txt`.)
+  paires suivantes remontent d'une case, comme dans le moteur — et les traits
+  comme le compte des cases suivent la même règle (`playoffNextRoundPositions`).
 - le nom vient du côté dont l'identifiant est celui du vainqueur ; un vainqueur
   étranger à la rencontre retombe sur « Engagé #id », jamais sur le nom d'un autre.
 

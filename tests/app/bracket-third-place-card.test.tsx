@@ -96,6 +96,7 @@ function playoffTree(decisive: BracketMatch[], thirdPlace: BracketMatch[] = [], 
       ghostSlots={ghosts}
       ghostEntrants={ghostEntrants}
       thirdPlace={endurancePlayoffThirdPlaceSlot(decisive, thirdPlace, ghosts, ghostEntrants)}
+      grandFinalLabel
       allTournamentMatches={[...decisive, ...thirdPlace]}
       myTeamId={null}
       adminResolvable={() => false}
@@ -129,7 +130,7 @@ describe("petite finale sous la finale", () => {
 
   it("montre la battue d'une demi-finale close dans la case à pourvoir", () => {
     const [semi1, semi2] = round(SEMIS, 2);
-    const closed: BracketMatch = { ...semi1, status: "COMPLETED", winnerTeamId: semi1.team1Id, team1Score: 3, team2Score: 1 };
+    const closed: BracketMatch = { ...semi1, status: "COMPLETED", winnerTeamId: semi1.team1Id, loserTeamId: semi1.team2Id, team1Score: 3, team2Score: 1 };
     const html = playoffTree([closed, semi2]);
 
     const thirdPlace = html.slice(html.indexOf("Petite Finale"));
@@ -161,12 +162,35 @@ describe("petite finale sous la finale", () => {
     expect(html).toContain("4 matchs");
   });
 
-  it("laisse la finale à son libellé d'origine sans petite finale à montrer", () => {
+  it("garde « Grande Finale » sans petite finale à montrer : la finale ne change pas de nom", () => {
     // Trois quarts : une demi-finale sera une exemption, donc pas de battue.
     const html = playoffTree(round(QUARTERS, 3));
 
+    expect(html).toContain("Grande Finale");
+    expect(html).not.toContain("Finale 1");
+    expect(html).not.toContain("Petite Finale");
+    // Trois quarts, deux demies, la finale.
+    expect(html).toContain("6 matchs");
+  });
+
+  it("laisse « Finale 1 » aux tableaux qui ne demandent pas le sous-titre", () => {
+    const final = round(FINAL, 1);
+    const html = render(
+      "fr",
+      <BracketSections
+        bracketType="UPPER"
+        bracketLabel="Tableau"
+        showBracketLabel={false}
+        matches={final}
+        allTournamentMatches={final}
+        myTeamId={null}
+        adminResolvable={() => false}
+        onOpenAdminModal={() => undefined}
+        format="SINGLE"
+      />,
+    );
+
     expect(html).toContain("Finale 1");
     expect(html).not.toContain("Grande Finale");
-    expect(html).not.toContain("Petite Finale");
   });
 });

@@ -517,6 +517,7 @@ export function EnduranceView({
             ghostSlots={playoffGhosts}
             ghostEntrants={playoffGhostEntrants}
             thirdPlace={thirdPlaceSlot}
+            grandFinalLabel
             allTournamentMatches={matches}
             myTeamId={myTeamId}
             adminResolvable={adminResolvable}

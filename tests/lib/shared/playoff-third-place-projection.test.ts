@@ -95,6 +95,22 @@ describe("projectThirdPlaceEntrants", () => {
     expect(projectThirdPlaceEntrants([awaiting, semi(2)])).toEqual([null, null]);
   });
 
+  it("reads the recorded loser, the one the engine pairs", () => {
+    const recorded = semi(1, { status: "COMPLETED", winnerTeamId: 10, loserTeamId: 11 });
+    expect(projectThirdPlaceEntrants([recorded, semi(2)])).toEqual([{ teamId: 11, name: "T11" }, null]);
+  });
+
+  it("plans no third-place match when a closed semi-final recorded no loser, like the engine", () => {
+    const noLoser = semi(1, { status: "COMPLETED", winnerTeamId: 10, loserTeamId: null });
+    const plan = planNextPlayoffRound([
+      { winnerTeamId: 10, loserTeamId: null },
+      { winnerTeamId: 20, loserTeamId: 21 },
+    ]);
+    expect(plan.some((entry) => entry.bracket === "THIRD_PLACE")).toBe(false);
+
+    expect(projectThirdPlaceEntrants([noLoser, won(2)])).toBeNull();
+  });
+
   it("names nobody when the winner is neither side of the semi-final", () => {
     const foreign = semi(1, { status: "COMPLETED", winnerTeamId: 999 });
     expect(projectThirdPlaceEntrants([foreign, semi(2)])).toEqual([null, null]);

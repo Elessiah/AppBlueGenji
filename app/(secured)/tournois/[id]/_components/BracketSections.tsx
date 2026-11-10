@@ -43,6 +43,8 @@ interface BracketSectionsProps {
    * match », l'ouverture d'office et l'ancre `#match-…`, comme toute rencontre.
    */
   thirdPlace?: ThirdPlaceSlot | null;
+  /** Sous-titre la finale « Grande Finale » (voir {@link BracketTree}). */
+  grandFinalLabel?: boolean;
   allTournamentMatches: BracketMatch[];
   myTeamId: number | null;
   adminResolvable: (m: BracketMatch) => boolean;
@@ -73,6 +75,7 @@ export function BracketSections({
   ghostSlots,
   ghostEntrants,
   thirdPlace = null,
+  grandFinalLabel = false,
   allTournamentMatches,
   myTeamId,
   adminResolvable,
@@ -236,6 +239,7 @@ export function BracketSections({
                 ghostSlots={sectionGhosts}
                 ghostEntrants={ghostEntrants}
                 thirdPlace={sectionThirdPlace}
+                grandFinalLabel={grandFinalLabel}
                 allTournamentMatches={allTournamentMatches}
                 bracketType={bracketType}
                 totalRoundsGlobal={totalRounds}

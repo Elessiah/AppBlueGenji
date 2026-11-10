@@ -366,6 +366,68 @@ describe("endurancePlayoffGhostSlots", () => {
   });
 });
 
+describe("arbre final — une paire vidée par deux doubles forfaits", () => {
+  // Le moteur ne pose rien pour une paire dont aucune rencontre ne qualifie
+  // quelqu'un, et remonte les suivantes : cases, traits et noms projetés
+  // doivent raconter la même chose.
+  const quarters = playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 4).map((match, index) =>
+    index < 2 ? { ...match, status: "COMPLETED" as MatchStatus, doubleForfeit: true } : match,
+  );
+
+  it("n'annonce qu'une rencontre au tour suivant", () => {
+    const ghosts = endurancePlayoffGhostSlots(quarters);
+    expect(ghosts.map(({ roundNumber, matchNumber }) => ({ roundNumber, matchNumber }))).toEqual([
+      { roundNumber: PLAYOFF_ROUND_OFFSET + 1, matchNumber: 1 },
+    ]);
+  });
+
+  it("ne tire aucun trait depuis la paire vidée, et mène l'autre à la case restante", () => {
+    const ghosts = endurancePlayoffGhostSlots(quarters);
+    const links = endurancePlayoffLinks(quarters, ghosts);
+
+    expect(links.has(quarters[0].id)).toBe(false);
+    expect(links.has(quarters[1].id)).toBe(false);
+    expect(links.get(quarters[2].id)).toBe(ghosts[0].id);
+    expect(links.get(quarters[3].id)).toBe(ghosts[0].id);
+  });
+
+  it("projette le vainqueur dans la case que son trait atteint", () => {
+    const played = quarters.map((match, index) =>
+      index === 2 ? { ...match, status: "COMPLETED" as MatchStatus, winnerTeamId: match.team1Id } : match,
+    );
+    const ghosts = endurancePlayoffGhostSlots(played);
+    const projected = projectPlayoffGhostEntrants(played, ghosts);
+
+    const target = endurancePlayoffLinks(played, ghosts).get(played[2].id)!;
+    expect(projected.get(target)?.[0]).toMatchObject({ teamId: played[2].team1Id });
+  });
+
+  it("n'annonce pas de petite finale : la rencontre restante est la finale", () => {
+    const ghosts = endurancePlayoffGhostSlots(quarters);
+    expect(
+      endurancePlayoffThirdPlaceSlot(quarters, [], ghosts, projectPlayoffGhostEntrants(quarters, ghosts)),
+    ).toBeNull();
+  });
+
+  it("n'annonce plus de finale après deux demi-finales closes sur un double forfait", () => {
+    const semis = playoffRoundOfSize(PLAYOFF_ROUND_OFFSET + 1, 2).map((match) => ({
+      ...match,
+      status: "COMPLETED" as MatchStatus,
+      doubleForfeit: true,
+    }));
+    expect(endurancePlayoffGhostSlots(semis)).toEqual([]);
+  });
+
+  it("suit la règle pour un tour déjà posé derrière une paire vidée", () => {
+    const next = playoffRoundOfSize(PLAYOFF_ROUND_OFFSET + 1, 1);
+    const links = endurancePlayoffLinks([...quarters, ...next]);
+
+    expect(links.has(quarters[0].id)).toBe(false);
+    expect(links.get(quarters[2].id)).toBe(next[0].id);
+    expect(links.get(quarters[3].id)).toBe(next[0].id);
+  });
+});
+
 describe("endurancePlayoffThirdPlaceSlot", () => {
   const QUARTERS = PLAYOFF_ROUND_OFFSET;
   const SEMIS = PLAYOFF_ROUND_OFFSET + 1;
@@ -381,10 +443,12 @@ describe("endurancePlayoffThirdPlaceSlot", () => {
       finished,
     );
   };
+  /** Rencontre close comme le serveur l'écrit : vainqueur **et** battue. */
   const closed = (match: BracketMatch, winnerTeamId: number): BracketMatch => ({
     ...match,
     status: "COMPLETED",
     winnerTeamId,
+    loserTeamId: winnerTeamId === match.team1Id ? match.team2Id : match.team1Id,
   });
 
   it("annonce une case vide sous la finale dès les quarts", () => {

@@ -8,6 +8,7 @@
 
 import type { EnduranceConfig } from "./config";
 import type { EndurancePairing } from "./standings";
+import { isMatchDoubleForfeit, type MatchOutcomeShape } from "../match-outcome";
 
 /**
  * Tableau des quarts de finale, en rangs de qualification (1 = meilleure).
@@ -175,12 +176,17 @@ export function planNextPlayoffRound(
 export type ProjectablePlayoffMatch = {
   roundNumber: number;
   matchNumber: number;
-  status: string;
+  status: MatchOutcomeShape["status"];
   winnerTeamId: number | null;
   team1Id: number | null;
   team2Id: number | null;
   team1Name: string | null;
   team2Name: string | null;
+  /**
+   * Battue enregistrée — c'est elle que le moteur lit pour la petite finale.
+   * Absente (`undefined`) : déduite des deux engagées.
+   */
+  loserTeamId?: number | null;
   doubleForfeit?: boolean;
 };
 
@@ -205,8 +211,32 @@ export type ProjectedGhostEntrants = [ProjectedSide, ProjectedSide];
 /** Ce qu'une rencontre apporte au tour suivant : rien encore, personne, ou une engagée. */
 type FeedState = "OPEN" | "VACANT" | ProjectedEntrant;
 
-function isDoubleForfeit(match: ProjectablePlayoffMatch): boolean {
-  return match.status === "COMPLETED" && match.doubleForfeit === true;
+/**
+ * Place, dans le tour suivant, de la rencontre que chaque match d'un tour
+ * alimente (0 = première) — `null` pour une paire dont les **deux** créneaux
+ * ont été vidés par un double forfait : le moteur n'y pose rien
+ * (`planNextPlayoffRound`, `pair.length === 0`) et les paires suivantes
+ * remontent d'autant. Le dernier d'un effectif impair forme une paire à lui seul.
+ *
+ * **Seule** description de cette règle pour l'affichage : les noms projetés,
+ * les traits de l'arbre et le compte des cases à pourvoir en descendent tous,
+ * faute de quoi un nom pourrait s'afficher dans une case que son trait n'atteint pas.
+ *
+ * @param feeding les rencontres décisives d'un tour, dans l'ordre des numéros.
+ */
+export function playoffNextRoundPositions(
+  feeding: readonly Pick<MatchOutcomeShape, "status" | "doubleForfeit">[],
+): (number | null)[] {
+  const vacated = (index: number) => index >= feeding.length || isMatchDoubleForfeit(feeding[index]);
+  const positions: (number | null)[] = [];
+  let next = 0;
+  for (let index = 0; index < feeding.length; index += 2) {
+    const position = vacated(index) && vacated(index + 1) ? null : next;
+    if (position !== null) next += 1;
+    positions.push(position);
+    if (index + 1 < feeding.length) positions.push(position);
+  }
+  return positions;
 }
 
 /** Nom d'une engagée de la rencontre ; `null` si elle n'y figure pas (repli « Engagé #id »). */
@@ -218,7 +248,7 @@ function entrantOf(match: ProjectablePlayoffMatch, teamId: number): ProjectedEnt
 
 function winnerState(match: ProjectablePlayoffMatch | undefined): FeedState {
   // Pas de rencontre du tout : le dernier d'un effectif impair n'a pas de voisine.
-  if (match === undefined || isDoubleForfeit(match)) return "VACANT";
+  if (match === undefined || isMatchDoubleForfeit(match)) return "VACANT";
   if (match.status !== "COMPLETED" || match.winnerTeamId === null) return "OPEN";
   return entrantOf(match, match.winnerTeamId);
 }
@@ -270,15 +300,13 @@ export function projectPlayoffGhostEntrants(
     .filter((slot) => slot.roundNumber === lastRound + 1)
     .sort((a, b) => a.matchNumber - b.matchNumber);
 
-  let position = 0;
+  const positions = playoffNextRoundPositions(feeding);
   for (let index = 0; index < feeding.length; index += 2) {
-    const first = winnerState(feeding[index]);
-    const second = winnerState(feeding[index + 1]);
     // Paire entièrement vacante : le moteur ne pose rien, la suite remonte.
-    if (first === "VACANT" && second === "VACANT") continue;
+    const position = positions[index];
+    if (position === null) continue;
     const target = nextRound[position];
-    position += 1;
-    const sides = pairSides(first, second);
+    const sides = pairSides(winnerState(feeding[index]), winnerState(feeding[index + 1]));
     if (target && sides) projected.set(target.id, sides);
   }
 
@@ -296,7 +324,9 @@ export function projectPlayoffGhostEntrants(
  *   l'autre battue prend la 3ᵉ place par exemption (en haut, bas
  *   {@link PROJECTED_BYE}) ; deux doubles forfaits → pas de petite finale ;
  * - une demi-finale **sans adversaire** (exemption d'un effectif impair) n'a pas
- *   de battue non plus, et il n'y a alors jamais de petite finale.
+ *   de battue non plus, et il n'y a alors jamais de petite finale ;
+ * - une demi-finale close **sans battue enregistrée** (`loserTeamId` à `null`)
+ *   n'en fournit pas davantage au moteur : pas de petite finale.
  *
  * @param semis les rencontres décisives du tour à deux matchs.
  * @returns `null` quand aucune petite finale ne se jouera ; sinon ses deux
@@ -308,11 +338,16 @@ export function projectThirdPlaceEntrants(
   if (semis.length !== 2) return null;
   if (semis.some((match) => match.team1Id === null || match.team2Id === null)) return null;
 
+  const closedWithoutLoser = (match: ProjectablePlayoffMatch) =>
+    match.status === "COMPLETED" && !isMatchDoubleForfeit(match) && match.winnerTeamId !== null && match.loserTeamId === null;
+  if (semis.some(closedWithoutLoser)) return null;
+
   const [first, second] = [...semis]
     .sort((a, b) => a.matchNumber - b.matchNumber)
     .map((match): FeedState => {
-      if (isDoubleForfeit(match)) return "VACANT";
+      if (isMatchDoubleForfeit(match)) return "VACANT";
       if (match.status !== "COMPLETED" || match.winnerTeamId === null) return "OPEN";
+      if (match.loserTeamId != null) return entrantOf(match, match.loserTeamId);
       // Un vainqueur étranger à la rencontre (ligne en cours de réécriture) ne
       // désigne aucune battue : mieux vaut TBD qu'un nom faux.
       if (match.winnerTeamId === match.team1Id && match.team2Id !== null) return entrantOf(match, match.team2Id);

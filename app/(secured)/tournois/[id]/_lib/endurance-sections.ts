@@ -4,6 +4,7 @@ import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import {
   PROJECTED_BYE,
+  playoffNextRoundPositions,
   projectThirdPlaceEntrants,
   type ProjectedGhostEntrants,
 } from "@/lib/shared/bg-survie/playoffs";
@@ -274,12 +275,21 @@ export function endurancePlayoffGhostSlots(
   if (rounds.length === 0) return [];
 
   const lastRound = Math.max(...rounds);
-  let remaining = decisive.filter((match) => match.roundNumber === lastRound).length;
+  const lastMatches = decisive
+    .filter((match) => match.roundNumber === lastRound)
+    .sort((a, b) => a.matchNumber - b.matchNumber);
+  let remaining = lastMatches.length;
 
   const slots: BracketSlotRef[] = [];
   let roundNumber = lastRound;
   while (remaining > 1) {
-    remaining = Math.ceil(remaining / 2);
+    // Le tour qui suit le dernier posé se compte sur la règle du moteur : une
+    // paire vidée par deux doubles forfaits n'y donne aucune rencontre
+    // (`playoffNextRoundPositions`). Au-delà, rien n'est joué : `ceil(n/2)`.
+    remaining =
+      roundNumber === lastRound
+        ? new Set(playoffNextRoundPositions(lastMatches).filter((position) => position !== null)).size
+        : Math.ceil(remaining / 2);
     roundNumber += 1;
     for (let matchNumber = 1; matchNumber <= remaining; matchNumber += 1) {
       slots.push({ id: ghostSlotId(roundNumber, matchNumber), roundNumber, matchNumber });
@@ -390,17 +400,18 @@ const THIRD_PLACE_GHOST_NUMBER = 999;
  * la case vide de sa demie. Sans eux — un appel qui ne les donne pas —, le
  * trait s'arrête au bord de la carte, comme avant.
  *
- * **Une réserve, antérieure à ce calcul** : le moteur *saute* une paire dont
- * les deux créneaux ont été vidés par un double forfait (`pair.length === 0`
- * dans `planNextPlayoffRound`), ce qui décale d'un cran les rencontres qui
- * suivent — là où ce module garde `floor(i/2)`. Deux doubles forfaits voisins
- * font donc des traits faux ; c'est consigné dans `ERREUR.txt`.
+ * Le moteur *saute* une paire dont les deux créneaux ont été vidés par un
+ * double forfait (`pair.length === 0` dans `planNextPlayoffRound`), ce qui
+ * remonte d'un cran les rencontres qui suivent : la place d'arrivée vient donc
+ * de `playoffNextRoundPositions`, la même règle que les noms projetés et le
+ * compte des cases à pourvoir — une paire sautée ne porte aucun trait.
  */
 export function endurancePlayoffLinks(
   decisive: BracketMatch[],
   ghostSlots: readonly BracketSlotRef[] = [],
 ): Map<number, number> {
   const links = new Map<number, number>();
+  const matchById = new Map(decisive.map((match) => [match.id, match]));
   const slots: BracketSlotRef[] = [...decisive, ...ghostSlots];
   const rounds = [...new Set(slots.map((slot) => slot.roundNumber))].sort((a, b) => a - b);
 
@@ -416,8 +427,13 @@ export function endurancePlayoffLinks(
   for (let index = 0; index < rounds.length - 1; index += 1) {
     const current = byRound.get(rounds[index])!;
     const next = byRound.get(rounds[index + 1])!;
-    current.forEach((slot, position) => {
-      const target = next[Math.floor(position / 2)];
+    // Une case à pourvoir n'a rien de joué : jamais vidée par un double forfait.
+    const positions = playoffNextRoundPositions(
+      current.map((slot) => matchById.get(slot.id) ?? { status: "PENDING" }),
+    );
+    current.forEach((slot, index) => {
+      const position = positions[index];
+      const target = position === null ? undefined : next[position];
       if (target) links.set(slot.id, target.id);
     });
   }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   PROJECTED_BYE,
   planNextPlayoffRound,
+  playoffNextRoundPositions,
   projectPlayoffGhostEntrants,
   type ProjectablePlayoffMatch,
   type ProjectedSide,
@@ -29,6 +30,38 @@ const ghosts = (round: number, count: number) =>
 /** Identifiant d'un côté projeté, tel que le moteur l'écrit : `null` pour une exemption comme pour un inconnu. */
 const sideTeamId = (side: ProjectedSide): number | null =>
   side === null || side === PROJECTED_BYE ? null : side.teamId;
+
+describe("playoffNextRoundPositions", () => {
+  it("sends each pair of matches to the same next-round match", () => {
+    expect(playoffNextRoundPositions([done(1), match(2, 1), match(3, 1), done(4)])).toEqual([0, 0, 1, 1]);
+  });
+
+  it("gives the last match of an odd round a next-round match of its own", () => {
+    expect(playoffNextRoundPositions([done(1), done(2), match(3, 1)])).toEqual([0, 0, 1]);
+  });
+
+  it("keeps a pair with a single double forfeit", () => {
+    expect(playoffNextRoundPositions([doubleForfeit(1), match(2, 1)])).toEqual([0, 0]);
+  });
+
+  it("drops a pair emptied by two double forfeits and moves the next pairs up", () => {
+    expect(playoffNextRoundPositions([doubleForfeit(1), doubleForfeit(2), done(3), match(4, 1)])).toEqual([
+      null,
+      null,
+      0,
+      0,
+    ]);
+  });
+
+  it("drops the lone last match of an odd round closed on a double forfeit", () => {
+    expect(playoffNextRoundPositions([done(1), done(2), doubleForfeit(3)])).toEqual([0, 0, null]);
+  });
+
+  it("does not read a double-forfeit flag on a match that is not closed", () => {
+    const reopened = [match(1, 1, { doubleForfeit: true }), match(2, 1, { doubleForfeit: true }), done(3)];
+    expect(playoffNextRoundPositions(reopened)).toEqual([0, 0, 1]);
+  });
+});
 
 describe("projectPlayoffGhostEntrants", () => {
   it("places the winner of a completed quarter in its semi slot, top side for odd order", () => {

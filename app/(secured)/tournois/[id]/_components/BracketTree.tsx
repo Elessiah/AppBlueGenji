@@ -58,10 +58,16 @@ interface BracketTreeProps {
    * Petite finale à dessiner **sous la finale**, dans sa colonne
    * (`endurancePlayoffThirdPlaceSlot`) — passée au seul volet qui porte la
    * finale. Rencontre posée ou case à pourvoir : même carte que les autres.
-   * Elle ne porte aucun trait (rien n'y mène dans l'arbre), et la finale prend
-   * alors le sous-titre « Grande Finale ».
+   * Elle ne porte aucun trait (rien n'y mène dans l'arbre).
    */
   thirdPlace?: ThirdPlaceSlot | null;
+  /**
+   * Sous-titre la finale « Grande Finale » au lieu de « Finale 1 » — l'arbre
+   * final de BlueGenji Survie, dont la petite finale se joue juste dessous. Un
+   * réglage du **tableau**, pas de la présence de la petite finale : la finale
+   * ne change pas de nom en cours de tournoi quand celle-ci s'annule.
+   */
+  grandFinalLabel?: boolean;
   allTournamentMatches: BracketMatch[];
   bracketType: BracketType;
   /** Nombre total de rounds du tableau complet (pour nommer les stades). */
@@ -102,6 +108,7 @@ export function BracketTree({
   ghostSlots,
   ghostEntrants,
   thirdPlace = null,
+  grandFinalLabel = false,
   allTournamentMatches,
   bracketType,
   totalRoundsGlobal,
@@ -206,6 +213,7 @@ export function BracketTree({
     const key = stageKey(globalIdx, totalRoundsGlobal, bracketType);
     const number = String(matchNum);
     if (key === "grandFinal" || key === "thirdPlace") return null;
+    if (key === "final" && grandFinalLabel) return t("bracket.stage.grandFinal");
     if (key === "early") return t("bracket.matchN", { number });
     return t(`bracket.matchLabel.${key}`, { number });
   };
@@ -314,9 +322,9 @@ export function BracketTree({
               <div style={{ width: CARD_W, flexShrink: 0 }}>
                 {roundSlots.map((slot) => {
                   // La petite finale se pose sous la finale : le seul créneau
-                  // de son tour. La finale s'appelle alors « Grande Finale ».
+                  // de son tour.
                   const below = roundSlots.length === 1 && thirdPlace?.roundNumber === roundNum ? thirdPlace : null;
-                  const label = below ? t("bracket.stage.grandFinal") : matchLabel(slot.matchNumber, globalIdx);
+                  const label = matchLabel(slot.matchNumber, globalIdx);
                   const card = labelledCard(slot, label, ghostEntrants?.get(slot.id));
                   // Un **défilement** peut atteindre un créneau à pourvoir —
                   // c'est ce que fait le badge « Qualifié en X » vers un tour
