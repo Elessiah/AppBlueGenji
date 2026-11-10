@@ -828,14 +828,15 @@ function linkProvider(setter: MatchLiveSetter): number | null {
  * le changer (`mayChangeLiveTrigger`, décision 2) — son caster, l'arbitre
  * désigné ou le staff `tournaments` + `live`, et les casters du match pour un
  * mode sans propriétaire. Un co-caster ne coupe pas l'antenne d'un autre
- * (`LIVE_TRIGGER_NOT_OWNED`). Tout se juge sous le verrou de la ligne du match
+ * (`LIVE_TRIGGER_NOT_OWNED`), ni un caster celle d'un mode qu'il ne tient pas
+ * sur un match au lien de l'organisation (`STAFF_STREAM_FORBIDDEN`). Tout se juge sous le verrou de la ligne du match
  * (`lockLiveMatch`) : l'arbitre sans `live` retiré entre la porte et
  * l'écriture est refusé (`NOT_MATCH_REFEREE`).
  *
  * @returns `true` quand l'antenne a changé d'état — un second clic sur « à
  *   l'antenne » ne change rien, et le journal du staff ne le note pas.
  * @throws `MATCH_NOT_FOUND` | `NOT_MATCH_REFEREE` | `LIVE_TRIGGER_NOT_MANUAL`
- *   | `LIVE_TRIGGER_NOT_OWNED` | `MATCH_NOT_LIVE_READY`
+ *   | `LIVE_TRIGGER_NOT_OWNED` | `STAFF_STREAM_FORBIDDEN` | `MATCH_NOT_LIVE_READY`
  */
 export async function setMatchOnAir(
   matchId: number,

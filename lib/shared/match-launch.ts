@@ -833,7 +833,7 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   MATCH_ALREADY_REFEREED: "Ce match a déjà un arbitre.",
   REFEREE_CHANGED: "L'arbitre de ce match vient de changer : vérifie qui est désigné avant de recommencer.",
   NOT_MATCH_REFEREE: "Tu n'arbitres pas ce match.",
-  STAFF_STREAM_FORBIDDEN: "Le lien de l'organisation ne se règle que par son staff ; un caster règle le sien dans « Configurer ma diffusion ».",
+  STAFF_STREAM_FORBIDDEN: "Réservé au staff de l'organisation : son lien, et le mode d'antenne d'un match qui porte ce lien (sauf pour le caster qui tient ce mode). Ton propre lien se règle dans « Configurer ma diffusion ».",
   INVALID_FIRST_MAP: "Nom de carte invalide (64 caractères au plus).",
   INVALID_ROUND: "Tour du tournoi invalide.",
   INVALID_ROUND_MAPS: "Cartes invalides : 9 cartes au plus par tour, 20 au plus par pool, 64 caractères par nom.",

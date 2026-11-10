@@ -307,6 +307,8 @@ export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnaps
       voice: match.voice === undefined ? undefined : null,
       // Le caster maître du mode d'antenne est un compte : tu, comme les casters.
       liveTriggerCasterId: match.liveTriggerCasterId === undefined ? undefined : null,
+      // Dirait si la chaîne du stream du staff est celle d'un membre : tu (aucun contrôle sans compte).
+      officialBroadcastLink: match.officialBroadcastLink === undefined ? undefined : false,
       casters: match.casters.map((caster, index) => ({
         ...caster,
         userId: SPECTATOR_HIDDEN_USER_ID - index,

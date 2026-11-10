@@ -185,7 +185,9 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
  * Ouvre ou ferme l'antenne d'un match en mode `MANUAL`.
  * Corps : `{ onAir: boolean }`. Même règle que le changement du mode : son
  * caster, l'arbitre désigné ou le staff `tournaments` + `live` (les casters du
- * match aussi pour un mode sans propriétaire) — `LIVE_TRIGGER_NOT_OWNED` (403) pour un co-caster.
+ * match aussi pour un mode sans propriétaire) — `LIVE_TRIGGER_NOT_OWNED` (403) pour un co-caster,
+ * `STAFF_STREAM_FORBIDDEN` (403) pour un caster quand le match porte le lien de l'organisation
+ * (`organisationModeLocked`).
  */
 export async function POST(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();

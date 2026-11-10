@@ -101,7 +101,9 @@ export function assertCastTriggerWritable(row: LaunchMatchRow, trigger: MatchLiv
  * `LIVE_TRIGGER_NOT_OWNED` sinon — un co-caster ne décide pas pour celui qui
  * l'a posé. Le propriétaire ne compte que s'il caste encore le match en
  * caster montré (`loadShownCasterIds`), la règle de l'instantané : parti ou
- * tu, il laisse le mode au staff. `skip` : rend `false` au lieu de refuser.
+ * tu, il laisse le mode sans maître. Sur un match au lien de l'organisation, un
+ * caster ne prend pas un mode qu'il ne tient pas (`organisationModeLocked`,
+ * `STAFF_STREAM_FORBIDDEN`). `skip` : rend `false` au lieu de refuser.
  *
  * Les deux effacements de la configuration du staff (`setMatchLiveConfig`) sont
  * repris mot pour mot : démarquer le match referme son antenne, et un mode qui

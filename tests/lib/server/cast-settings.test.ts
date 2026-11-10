@@ -306,12 +306,17 @@ describe("applyCastTrigger — inscription et maître tu", () => {
   });
 
   it("applyCastTrigger_hiddenOwner_staffCasterTakesMode", async () => {
-    // Le maître 12 n'est plus montré : le mode revient au staff, dont 13, qui le caste.
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(13)).mockResolvedValue([{ affectedRows: 1 }, []]);
+    // Le maître 12 n'est plus montré : le mode reste sans maître, et 13, qui le caste, le prend
+    // (le match ne porte pas le lien de l'organisation : sa lecture ne rend rien).
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(shownRows(13))
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValue([{ affectedRows: 1 }, []]);
     const row = ownedRow();
 
     await expect(applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 13, { oversees: false, manages: true })).resolves.toBe(true);
-    expect(execute.mock.calls[1][1]).toEqual(["AUTO", 13, 42]);
+    expect(execute.mock.calls[2][1]).toEqual(["AUTO", 13, 42]);
   });
 
   it("applyCastSettings_skipLockedTrigger_reportsTriggerSkipped", async () => {

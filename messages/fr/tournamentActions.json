@@ -249,7 +249,7 @@
     "lockedReason": ": la manche suivante a déjà des scores, le résultat de ce match ne peut plus être modifié.",
     "hostChanged": "Équipe hôte modifiée.",
     "casting": "Tu castes ce match.",
-    "castingTriggerKept": "Tu castes ce match. Le passage à l'antenne, réglé entre-temps par un autre, n'a pas changé.",
+    "castingTriggerKept": "Tu castes ce match. Le passage à l'antenne n'a pas changé : réglé entre-temps par un autre, ou réservé au staff quand le match porte le lien de l'organisation.",
     "notCasting": "Tu ne castes plus ce match.",
     "casterRemoved": "Caster retiré.",
     "airClosed": "Antenne fermée.",

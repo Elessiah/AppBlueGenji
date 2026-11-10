@@ -166,7 +166,7 @@ describe("viewerMayChangeLiveTrigger", () => {
   });
 
   it("viewerMayChangeLiveTrigger_ownerNotShownStaffViewer_true", () => {
-    // Un maître tu ou parti n'est pas nommé : le mode revient au staff, comme au serveur.
+    // Un maître tu ou parti n'est pas nommé : le mode reste sans maître, comme au serveur.
     const unnamed = { liveTrigger: "MANUAL" as const, liveTriggerCasterId: null, casters: [] };
 
     expect(viewerMayChangeLiveTrigger(unnamed, { userId: 9, oversees: true, manages: true, referees: false })).toBe(true);
@@ -274,8 +274,16 @@ describe("organisationModeLocked — décision du 2026-11-10", () => {
     expect(organisationModeLocked({ ...ownerless, trigger: null }, caster13, true)).toBe(false);
   });
 
-  it("organisationModeLocked_staffActor_false", () => {
-    expect(organisationModeLocked(ownerless, { userId: 5, ...STAFF }, true)).toBe(false);
+  it("organisationModeLocked_overseerActor_false", () => {
+    expect(organisationModeLocked(ownerless, { userId: 5, oversees: true, manages: true }, true)).toBe(false);
+  });
+
+  it("organisationModeLocked_matchReferee_false", () => {
+    expect(organisationModeLocked({ ...ownerless, refereeId: 9 }, { userId: 9, ...STAFF }, true)).toBe(false);
+  });
+
+  it("organisationModeLocked_tournamentsOnlyNotReferee_true", () => {
+    expect(organisationModeLocked(ownerless, { userId: 5, ...STAFF }, true)).toBe(true);
   });
 
   it("organisationModeLocked_ownerActor_false", () => {

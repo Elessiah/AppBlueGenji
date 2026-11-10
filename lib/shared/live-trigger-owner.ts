@@ -91,8 +91,8 @@ export function mayUnmarkLiveTrigger(hold: LiveTriggerHold, actor: LiveTriggerAc
  * Le mode d'antenne est-il fermé à cet acteur parce que le match porte le
  * **vrai** lien de l'organisation — celui que le staff a posé dans « Diffusion
  * officielle », case « lien de l'organisation » cochée (décision du 2026-11-10) ?
- * Alors seuls ce staff (`tournaments`, dont l'arbitre désigné) et le maître
- * du mode le changent, en ouvrent ou coupent l'antenne ; un caster ne le
+ * Alors seuls le staff `tournaments` + `live` (`oversees`), l'arbitre désigné
+ * et le maître du mode le changent, en ouvrent ou coupent l'antenne ; un caster ne le
  * prend pas (`STAFF_STREAM_FORBIDDEN`). Ne ferment **pas** le mode : la chaîne
  * qu'un membre du staff a posée comme la sienne (case décochée), le lien
  * d'un stream de caster, même ancien et sans auteur connu, ni un match encore
@@ -104,8 +104,8 @@ export function mayUnmarkLiveTrigger(hold: LiveTriggerHold, actor: LiveTriggerAc
  */
 export function organisationModeLocked(hold: LiveTriggerHold, actor: LiveTriggerActor, organisationLink: boolean): boolean {
   if (!organisationLink || hold.trigger === null) return false;
-  // `manages` couvre l'arbitre désigné (`isMatchRefereeActor` l'exige).
-  if (actor.manages) return false;
+  // Le staff `tournaments` + `live` et l'arbitre désigné, comme le disent les textes.
+  if (actor.oversees || isMatchRefereeActor(hold, actor)) return false;
   return hold.ownerId !== actor.userId;
 }
 

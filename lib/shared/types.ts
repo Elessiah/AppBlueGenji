@@ -658,7 +658,7 @@ export type BracketMatch = {
   /**
    * Le caster qui a posé ce mode et en reste maître (`lib/shared/live-trigger-owner.ts`) :
    * son identifiant, déjà public parmi `casters` ; `null` (ou absent) quand le mode
-   * est au staff — posé par lui, ou son caster parti.
+   * est sans maître — posé par qui ne le caste pas (staff, arbitre), ou son caster parti.
    */
   liveTriggerCasterId?: number | null;
   /**
