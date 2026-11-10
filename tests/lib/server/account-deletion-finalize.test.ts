@@ -280,6 +280,23 @@ describe("finalizeDueAccountDeletions", () => {
     expect(jest.mocked(blockRemovedImageFiles).mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(deleteStoredImage).mock.invocationCallOrder[0],
     );
+    // Revue sécurité #571, cycle 3 : effacé, plus rien ne justifierait le blocage — définitif.
+    expect(jest.mocked(blockRemovedImageFiles).mock.calls[0][1]).toEqual({ liftable: false });
+  });
+
+  // Revue sécurité #571, cycle 3 : anonymisé, le compte garde la ligne qui
+  // justifie le blocage ; une contestation acceptée peut encore le lever.
+  it("finalizeAccountDeletion_anonymizeWithModerationPurgedAvatar_blocksLiftable", async () => {
+    fakeDb({
+      locked: { is_deleted: 1, deletion_requested_at: DUE },
+      played: 1,
+      heldAvatar: "/api/uploads/avatars/7-abc.webp",
+      moderationPurged: true,
+    });
+
+    expect((await finalizeAccountDeletion(7))?.mode).toBe("ANONYMIZE");
+
+    expect(jest.mocked(blockRemovedImageFiles).mock.calls[0][1]).toEqual({ liftable: true });
   });
 
   // Revue sécurité #571, cycle 4 : la quarantaine se cherche sous les deux formes de l'adresse.
@@ -300,8 +317,6 @@ describe("finalizeDueAccountDeletions", () => {
 
     const purged = execute.mock.calls.find(([sql]) => String(sql).includes("status = 'PURGED'"));
     expect(String(purged?.[0])).toContain("AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')");
-    // Revue sécurité #571, cycle 2 : une ligne qui a gardé l'empreinte a posé son propre blocage, levable.
-    expect(String(purged?.[0])).toContain("AND image_sha256 IS NULL");
   });
 
   // Revue sécurité #571 (D18) : l'effacement emporte les lignes qui justifiaient

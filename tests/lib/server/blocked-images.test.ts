@@ -253,6 +253,21 @@ describe("blockImageHashOn (D22)", () => {
   });
 });
 
+describe("blockRemovedImageFiles — blocage levable (revue sécurité #571, cycle 3)", () => {
+  it("blockRemovedImageFiles_liftable_insertsLiftableKeepingExistingState", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "bg-blocked-")), "avatar.webp");
+    writeFileSync(file, IMAGE);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await blockRemovedImageFiles([file], { liftable: true });
+
+    expect(execute).toHaveBeenCalledWith("INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable) VALUES (?, 1)", [
+      imageSha256(IMAGE),
+    ]);
+  });
+});
+
 describe("pinAccountBlockedHashesOn (revue sécurité #571, D18)", () => {
   it("pinAccountBlockedHashesOn_account_pinsHashesItsRemovalsBlocked", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 2 }, []]);
@@ -260,8 +275,11 @@ describe("pinAccountBlockedHashesOn (revue sécurité #571, D18)", () => {
     await pinAccountBlockedHashesOn(fakeConnection({ execute }), 7);
 
     const [sql, params] = execute.mock.calls[0];
-    expect(sql).toContain("UPDATE bg_blocked_image_hashes SET liftable = 0");
-    expect(sql).toContain("WHERE user_id = ? AND status = 'PURGED' AND hash_blocked = 1");
+    expect(sql).toContain("INSERT INTO bg_blocked_image_hashes (sha256, liftable)");
+    expect(sql).toContain("WHERE user_id = ? AND status = 'PURGED' AND image_sha256 IS NOT NULL");
+    // Cycle 3 : une suppression dont la contestation attendait son issue est comprise.
+    expect(sql).toContain("AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')");
+    expect(sql).toContain("ON DUPLICATE KEY UPDATE liftable = 0");
     expect(params).toEqual([7]);
   });
 

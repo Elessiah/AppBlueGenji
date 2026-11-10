@@ -720,7 +720,7 @@ describe("restoreReportedImage", () => {
       [
         [/FROM bg_logo_quarantines q/, () => [[quarantineRow()]]],
         [/SELECT logo_url FROM bg_teams/, () => [[{ logo_url: "/api/uploads/teams/4-new.webp" }]]],
-        [/SET contest_outcome = 'OVERTURNED' WHERE id = \?/, () => [{ affectedRows: 1 }]],
+        [/SET contest_outcome = 'OVERTURNED'\s+WHERE id = \?/, () => [{ affectedRows: 1 }]],
       ],
     );
     await expect(restoreReportedImage(30, actor)).rejects.toThrow("TEAM_HAS_NEW_LOGO");
@@ -733,7 +733,7 @@ describe("restoreReportedImage", () => {
       [
         [/FROM bg_logo_quarantines q/, () => [[quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR })]]],
         [/SELECT pseudo, avatar_url, is_deleted FROM bg_users/, () => [[{ pseudo: "Nova", avatar_url: "/api/uploads/avatars/9-new.webp", is_deleted: 0 }]]],
-        [/SET contest_outcome = 'OVERTURNED' WHERE id = \?/, () => [{ affectedRows: 1 }]],
+        [/SET contest_outcome = 'OVERTURNED'\s+WHERE id = \?/, () => [{ affectedRows: 1 }]],
       ],
     );
     await expect(restoreReportedImage(30, actor)).rejects.toThrow("USER_HAS_NEW_AVATAR");
@@ -750,19 +750,55 @@ describe("restoreReportedImage", () => {
       [
         [/FROM bg_logo_quarantines q/, () => [[quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR })]]],
         [/SELECT pseudo, avatar_url, is_deleted FROM bg_users/, () => [[{ pseudo: "Nova", avatar_url: "/api/uploads/avatars/9-new.webp", is_deleted: 0 }]]],
-        [/SET contest_outcome = 'OVERTURNED' WHERE id = \?/, () => [{ affectedRows: 1 }]],
+        [/SET contest_outcome = 'OVERTURNED'\s+WHERE id = \?/, () => [{ affectedRows: 1 }]],
       ],
     );
 
     await expect(restoreReportedImage(30, actor)).rejects.toThrow("USER_HAS_NEW_AVATAR");
 
-    expect(connection.execute).toHaveBeenCalledWith(expect.stringMatching(/SET contest_outcome = 'OVERTURNED' WHERE id = \?/), [30]);
+    expect(connection.execute).toHaveBeenCalledWith(expect.stringMatching(/SET contest_outcome = 'OVERTURNED'\s+WHERE id = \?/), [30]);
     expect(connection.commit).toHaveBeenCalled();
     expect(pool.execute).not.toHaveBeenCalledWith(expect.stringMatching(/contest_outcome/), expect.anything());
     // Revue sécurité #571, cycle 2 : journalisée comme une issue écrite, sans pseudo.
     const [staffLine] = jest.mocked(publishStaffAction).mock.calls[0];
     expect(staffLine).toContain("acceptée");
     expect(staffLine).not.toContain("Nova");
+  });
+
+  // Revue sécurité #571, cycle 3 : un second clic ne réannonce pas la même issue.
+  it("restoreReportedImage_userHasNewAvatarAlreadyOverturned_noSecondAnnouncement", async () => {
+    install(
+      [],
+      [
+        [/FROM bg_logo_quarantines q/, () => [[quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR })]]],
+        [/SELECT pseudo, avatar_url, is_deleted FROM bg_users/, () => [[{ pseudo: "Nova", avatar_url: "/api/uploads/avatars/9-new.webp", is_deleted: 0 }]]],
+        [/SET contest_outcome = 'OVERTURNED'\s+WHERE id = \?/, () => [{ affectedRows: 0 }]],
+      ],
+    );
+
+    await expect(restoreReportedImage(30, actor)).rejects.toThrow("USER_HAS_NEW_AVATAR");
+
+    expect(connection.execute).toHaveBeenCalledWith(expect.stringContaining("contest_outcome <> 'OVERTURNED'"), [30]);
+    expect(publishStaffAction).not.toHaveBeenCalled();
+  });
+
+  it("restoreReportedImage_announcementFails_keepsOriginalRefusal", async () => {
+    install(
+      [],
+      [
+        [/FROM bg_logo_quarantines q/, () => [[quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR })]]],
+        [/SELECT pseudo, avatar_url, is_deleted FROM bg_users/, () => [[{ pseudo: "Nova", avatar_url: "/api/uploads/avatars/9-new.webp", is_deleted: 0 }]]],
+        [/SET contest_outcome = 'OVERTURNED'\s+WHERE id = \?/, () => [{ affectedRows: 1 }]],
+      ],
+    );
+    jest.mocked(publishStaffAction).mockImplementationOnce(() => {
+      throw new Error("BOT_DOWN");
+    });
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(restoreReportedImage(30, actor)).rejects.toThrow("USER_HAS_NEW_AVATAR");
+
+    logged.mockRestore();
   });
 
   it("restoreReportedImage_success_setsOverturned", async () => {

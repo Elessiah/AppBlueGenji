@@ -53,19 +53,25 @@ export async function isBlockedImage(...contents: Buffer[]): Promise<boolean> {
   }
 }
 
+/** `liftable` : le geste laisse une ligne de quarantaine qui le justifie (D18). */
+export type BlockOptions = { liftable?: boolean };
+
 /**
- * Pose ces empreintes, hors transaction, sur le pool — **non levables** : ces
- * gestes (fiche du joueur, effacement d'un compte) ne laissent aucune ligne
- * qu'une contestation pourrait annuler. Une empreinte déjà posée le devient.
+ * Pose ces empreintes, hors transaction, sur le pool. Par défaut **non
+ * levables** : ces gestes (fiche du joueur, effacement d'un compte) ne laissent
+ * aucune ligne qu'une contestation pourrait annuler ; une empreinte déjà posée
+ * le devient. `liftable` : levables, une empreinte déjà posée garde son état.
  */
-async function blockImageHashes(hashes: readonly string[]): Promise<void> {
+async function blockImageHashes(hashes: readonly string[], options: BlockOptions = {}): Promise<void> {
   const unique = [...new Set(hashes)];
   if (unique.length === 0) return;
   const db = await getDatabase();
   // Une seule insertion multi-lignes : un aller-retour, quel que soit le nombre d'images.
   await ignoreMissingTable(
     db.execute(
-      `INSERT INTO bg_blocked_image_hashes (sha256) VALUES ${unique.map(() => "(?)").join(", ")}
+      options.liftable
+        ? `INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable) VALUES ${unique.map(() => "(?, 1)").join(", ")}`
+        : `INSERT INTO bg_blocked_image_hashes (sha256) VALUES ${unique.map(() => "(?)").join(", ")}
          ON DUPLICATE KEY UPDATE liftable = 0`,
       unique,
     ),
@@ -83,7 +89,10 @@ async function blockImageHashes(hashes: readonly string[]): Promise<void> {
  * plus —, pour qu'un exploitant les pose à la main. Une empreinte n'identifie
  * personne.
  */
-export async function blockRemovedImageFiles(absolutePaths: readonly string[]): Promise<void> {
+export async function blockRemovedImageFiles(
+  absolutePaths: readonly string[],
+  options: BlockOptions = {},
+): Promise<void> {
   if (absolutePaths.length === 0) return;
   // Chaque lecture est rattrapée : un fichier illisible est seulement omis.
   const read = await Promise.all(
@@ -105,7 +114,7 @@ export async function blockRemovedImageFiles(absolutePaths: readonly string[]): 
       `[moderation] image supprimée introuvable, empreinte non bloquée (${missing.length} fichier(s)) : ${missing.join(", ")}`,
     );
   }
-  await blockImageHashesSafely(hashes);
+  await blockImageHashesSafely(hashes, options);
 }
 
 /**
@@ -113,11 +122,11 @@ export async function blockRemovedImageFiles(absolutePaths: readonly string[]): 
  * `blockRemovedImageFiles` : **ne lève jamais**, une reprise, puis les
  * empreintes consignées (pm2) pour une pose à la main.
  */
-export async function blockImageHashesSafely(hashes: readonly string[]): Promise<void> {
+export async function blockImageHashesSafely(hashes: readonly string[], options: BlockOptions = {}): Promise<void> {
   if (hashes.length === 0) return;
   for (let attempt = 1; attempt <= BLOCK_ATTEMPTS; attempt += 1) {
     try {
-      await blockImageHashes(hashes);
+      await blockImageHashes(hashes, options);
       return;
     } catch (error) {
       if (attempt === BLOCK_ATTEMPTS) {
@@ -159,17 +168,21 @@ export async function blockImageHashOn(connection: Executor, sha256: string): Pr
 
 /**
  * Avant l'effacement d'un compte, qui emporte ses lignes de quarantaine : les
- * empreintes que ses suppressions justifiaient deviennent non levables — sans
- * quoi l'annulation d'une autre suppression de la même image les lèverait,
- * plus rien ne disant pourquoi elles tenaient.
+ * empreintes de ses avatars supprimés par la modération et non rétablis en
+ * contestation (issue nulle ou maintenue) sont bloquées, **non levables** —
+ * sans quoi l'annulation d'une autre suppression de la même image lèverait un
+ * blocage que plus rien n'explique, et une suppression dont la contestation
+ * attendait son issue (purge d'office, non bloquée) partirait sans décision
+ * possible (revue sécurité #571, cycles 2 et 3).
  */
 export async function pinAccountBlockedHashesOn(connection: Executor, userId: number): Promise<void> {
   await ignoreMissingTable(
     connection.execute(
-      `UPDATE bg_blocked_image_hashes SET liftable = 0
-        WHERE sha256 IN (SELECT image_sha256 FROM bg_logo_quarantines
-                          WHERE user_id = ? AND status = 'PURGED' AND hash_blocked = 1
-                            AND image_sha256 IS NOT NULL)`,
+      `INSERT INTO bg_blocked_image_hashes (sha256, liftable)
+       SELECT DISTINCT image_sha256, 0 FROM bg_logo_quarantines
+        WHERE user_id = ? AND status = 'PURGED' AND image_sha256 IS NOT NULL
+          AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')
+       ON DUPLICATE KEY UPDATE liftable = 0`,
       [userId],
     ),
   );

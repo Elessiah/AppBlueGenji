@@ -837,6 +837,8 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
   const connection = await db.getConnection();
   let row: QuarantineRow;
   let files: { live: string; quarantined: string };
+  // Issue « acceptée » écrite par un rétablissement refusé (D23), à journaliser.
+  let overturnedRow: QuarantineRow | null = null;
   try {
     await connection.beginTransaction();
     row = await lockQuarantine(connection, quarantineId);
@@ -850,12 +852,14 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
       // autre l'a remplacée) : l'issue est écrite quand même (D23), sous le
       // verrou de la ligne — une purge qui l'attend la voit, et n'en bloque pas
       // l'empreinte.
-      await connection.execute(`UPDATE bg_logo_quarantines SET contest_outcome = 'OVERTURNED' WHERE id = ?`, [
-        quarantineId,
-      ]);
+      // Une seule fois : un second clic ne réécrit ni ne réannonce rien.
+      const [noted] = await connection.execute<ResultSetHeader>(
+        `UPDATE bg_logo_quarantines SET contest_outcome = 'OVERTURNED'
+          WHERE id = ? AND (contest_outcome IS NULL OR contest_outcome <> 'OVERTURNED')`,
+        [quarantineId],
+      );
       await connection.commit();
-      // Journalisée comme par `recordContestOutcome`.
-      announceContestOutcome(row, "OVERTURNED", actor);
+      if (Number(noted.affectedRows) > 0) overturnedRow = row;
       throw new Error(isTeam ? "TEAM_HAS_NEW_LOGO" : "USER_HAS_NEW_AVATAR");
     }
     const located = isTeam
@@ -884,6 +888,15 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
     // Après un commit réussi puis un échec plus loin, le rollback n'a plus rien
     // à défaire et peut lever : c'est l'erreur d'origine qui doit remonter.
     await rollbackQuietly(connection);
+    // Journalisée comme par `recordContestOutcome` — sans jamais remplacer le
+    // refus d'origine, que la route traduit.
+    if (overturnedRow) {
+      try {
+        announceContestOutcome(overturnedRow, "OVERTURNED", actor);
+      } catch (announceError) {
+        console.error("[moderation] issue de la contestation non journalisée", announceError);
+      }
+    }
     throw error;
   } finally {
     connection.release();

@@ -417,10 +417,7 @@ async function loadQuarantinedAvatarFiles(runner: SqlRunner, userId: number): Pr
  * que le fichier ne parte (D6) — un fichier qu'une suppression de modération
  * n'aurait pas pu atteindre (course, écriture refaite) ne s'échappe pas par
  * l'effacement. Un avatar seulement masqué ne l'est pas, ni un avatar dont la
- * contestation a été acceptée (D18, D23). Une ligne qui a gardé l'empreinte
- * n'est pas comptée : elle a posé (ou non, selon l'issue) son propre blocage,
- * levable — un second blocage, définitif, la priverait de sa levée (revue
- * sécurité #571, cycle 2). Lu sous le verrou du
+ * contestation a été acceptée (D18, D23). Lu sous le verrou du
  * compte : la cascade emporte ces lignes.
  */
 async function avatarRemovedByModeration(runner: SqlRunner, userId: number, avatarUrl: string | null): Promise<boolean> {
@@ -430,7 +427,6 @@ async function avatarRemovedByModeration(runner: SqlRunner, userId: number, avat
   const [rows] = await runner.execute<RowDataPacket[]>(
     `SELECT 1 FROM bg_logo_quarantines
       WHERE user_id = ? AND status = 'PURGED' AND logo_url IN (?, ?)
-        AND image_sha256 IS NULL
         AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')
       LIMIT 1`,
     [userId, toServedUploadUrl(disk), disk],
@@ -660,7 +656,10 @@ async function deleteAccountNow(
   // plus aucune ligne ne désigne. L'échec est **avalé** : la suppression est
   // commitée, annoncer un refus au joueur serait faux.
   const blockedFile = orphanedAvatarBlocked ? storedUploadAbsolutePath(orphanedAvatar, "avatars") : null;
-  if (blockedFile) await blockRemovedImageFiles([blockedFile]);
+  // Anonymisé, le compte garde ses lignes de quarantaine : le blocage reste
+  // levable par une contestation acceptée (D18). Effacé, plus rien ne le
+  // justifierait : définitif (revue sécurité #571, cycle 3).
+  if (blockedFile) await blockRemovedImageFiles([blockedFile], { liftable: plan.mode === "ANONYMIZE" });
   try {
     await deleteStoredImage(orphanedAvatar);
   } catch {

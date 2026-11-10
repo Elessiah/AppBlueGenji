@@ -827,9 +827,10 @@ l'y **rétablit** (`setHeldAvatar`, sans écriture sur `bg_users` ni entrée sol
 à resynchroniser ; revue sécurité #571, cycle 4), puis le bloque et l'efface
 comme ailleurs ; un masque sans avatar répond `USER_HAS_NO_AVATAR`, un compte
 anonymisé (sans masque) reste introuvable. L'effacement au jour 30 bloque
-l'avatar qu'il emporte si une quarantaine `PURGED` le désigne sous l'une ou
-l'autre forme de l'adresse (servie `/api/uploads/…` ou disque `/uploads/…`),
-jamais un avatar seulement masqué. Le blocage
+l'avatar qu'il emporte si une quarantaine `PURGED` dont l'issue n'est pas
+`OVERTURNED` le désigne sous l'une ou l'autre forme de l'adresse (servie
+`/api/uploads/…` ou disque `/uploads/…`), jamais un avatar seulement masqué
+(levable ou définitif selon le mode, § Issue écrite). Le blocage
 vaut aussi pour la copie d'un avatar de fournisseur (OAuth) : une image
 retirée ne revient pas par la connexion suivante ; une copie importée naît
 masquée, un refus y laisse la pastille à initiale. Un avatar seulement **masqué** (`HIDDEN`) se conteste encore : il n'est
@@ -868,12 +869,14 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   joueur, effacement d'un compte), ou rendu tel par l'effacement d'un compte,
   qui emporte ses lignes de quarantaine (`pinAccountBlockedHashesOn`). Une
   ligne antérieure sans empreinte ne peut rien lever (`hashUnknown`, dit au
-  staff). L'effacement au jour 30 ne bloque plus lui-même que l'avatar d'une
-  suppression sans empreinte gardée (ligne d'avant la colonne, fichier absent)
-  et jamais une suppression `OVERTURNED` ; tout effacement (`eraseAccount`,
-  rattrapage au démarrage compris) rend d'abord non levables les blocages
-  justifiés par les lignes du compte. Un rétablissement refusé (D23) est
-  journalisé au staff comme une issue écrite.
+  staff). L'effacement au jour 30 ignore les suppressions `OVERTURNED` ; il
+  bloque l'avatar emporté **levable** si le compte est anonymisé (sa ligne
+  reste), **définitif** s'il est effacé. Tout effacement (`eraseAccount`,
+  rattrapage au démarrage compris) bloque d'abord, définitivement, les
+  empreintes gardées des suppressions du compte dont l'issue est nulle ou
+  maintenue (`pinAccountBlockedHashesOn`) — une contestation en attente ne
+  pourra plus être tranchée. Un rétablissement refusé (D23) est journalisé au
+  staff une fois, comme une issue écrite.
 - **Acceptation d'une image encore masquée** : elle se rétablit ; la route
   d'issue la refuse (`QUARANTINE_STILL_HIDDEN`, 409). Un rétablissement refusé
   (D23) écrit `OVERTURNED` sous le verrou de la ligne, et le commite.
