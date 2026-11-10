@@ -14,6 +14,7 @@ import {
   isBlockedImage,
   pinAccountBlockedHashesOn,
   readImageSha256,
+  retireAccountQuarantinesOn,
   unblockImageHashOn,
 } from "@/lib/server/blocked-images";
 import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
@@ -88,7 +89,7 @@ describe("blockRemovedImageFiles", () => {
     await blockRemovedImageFiles([file]);
 
     // Geste sans ligne qui le justifie : blocage non levable (revue sécurité #571, D18).
-    expect(execute.mock.calls[0][0]).toContain("INSERT INTO bg_blocked_image_hashes (sha256) VALUES (?)");
+    expect(execute.mock.calls[0][0]).toContain("INSERT INTO bg_blocked_image_hashes (sha256, created_at) VALUES (?, CURRENT_DATE)");
     expect(execute.mock.calls[0][0]).toContain("ON DUPLICATE KEY UPDATE liftable = 0");
     expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE)]);
   });
@@ -156,7 +157,7 @@ describe("blockRemovedImageFiles — insertion et fichiers manquants", () => {
     await blockRemovedImageFiles([writeImage(IMAGE), writeImage(IMAGE), writeImage(other)]);
 
     expect(execute).toHaveBeenCalledTimes(1);
-    expect(String(execute.mock.calls[0][0])).toContain("VALUES (?), (?)");
+    expect(String(execute.mock.calls[0][0])).toContain("VALUES (?, CURRENT_DATE), (?, CURRENT_DATE)");
     expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), imageSha256(other)]);
   });
 
@@ -247,9 +248,11 @@ describe("blockImageHashOn (D22)", () => {
 
     await blockImageHashOn(fakeConnection({ execute }), "abc");
 
-    expect(execute).toHaveBeenCalledWith("INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable) VALUES (?, 1)", [
-      "abc",
-    ]);
+    // D31 : datée du jour seulement.
+    expect(execute).toHaveBeenCalledWith(
+      "INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable, created_at) VALUES (?, 1, CURRENT_DATE)",
+      ["abc"],
+    );
   });
 });
 
@@ -262,9 +265,10 @@ describe("blockRemovedImageFiles — blocage levable (revue sécurité #571, cyc
 
     await blockRemovedImageFiles([file], { liftable: true });
 
-    expect(execute).toHaveBeenCalledWith("INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable) VALUES (?, 1)", [
-      imageSha256(IMAGE),
-    ]);
+    expect(execute).toHaveBeenCalledWith(
+      "INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable, created_at) VALUES (?, 1, CURRENT_DATE)",
+      [imageSha256(IMAGE)],
+    );
   });
 });
 
@@ -275,12 +279,24 @@ describe("pinAccountBlockedHashesOn (revue sécurité #571, D18)", () => {
     await pinAccountBlockedHashesOn(fakeConnection({ execute }), 7);
 
     const [sql, params] = execute.mock.calls[0];
-    expect(sql).toContain("INSERT INTO bg_blocked_image_hashes (sha256, liftable)");
+    expect(sql).toContain("INSERT INTO bg_blocked_image_hashes (sha256, liftable, created_at)");
     expect(sql).toContain("WHERE user_id = ? AND status = 'PURGED' AND image_sha256 IS NOT NULL");
     // Cycle 3 : une suppression dont la contestation attendait son issue est comprise.
     expect(sql).toContain("AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')");
     expect(sql).toContain("ON DUPLICATE KEY UPDATE liftable = 0");
     expect(params).toEqual([7]);
+  });
+
+  // D31 : jour de la suppression la plus ancienne, jamais l'instant de l'effacement.
+  it("pinAccountBlockedHashesOn_account_datesHashFromOldestRemovalDay", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+
+    await pinAccountBlockedHashesOn(fakeConnection({ execute }), 7);
+
+    const [sql] = execute.mock.calls[0];
+    expect(sql).toContain("SELECT image_sha256, 0, DATE(MIN(hidden_at)) FROM bg_logo_quarantines");
+    expect(sql).toContain("GROUP BY image_sha256");
+    expect(sql).not.toContain("NOW()");
   });
 
   it("pinAccountBlockedHashesOn_missingTable_resolves", async () => {
@@ -324,5 +340,36 @@ describe("blockImageHashesSafely", () => {
     await blockImageHashesSafely([]);
 
     expect(execute).not.toHaveBeenCalled();
+  });
+});
+
+describe("retireAccountQuarantinesOn (D31)", () => {
+  it("retireAccountQuarantinesOn_account_pinsThenDeletesQuarantineRowsOnConnection", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+
+    await retireAccountQuarantinesOn(fakeConnection({ execute }), 7);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[0][0]).toContain("INSERT INTO bg_blocked_image_hashes");
+    expect(execute.mock.calls[1]).toEqual(["DELETE FROM bg_logo_quarantines WHERE user_id = ?", [7]]);
+    expect(getDatabase).not.toHaveBeenCalled();
+  });
+
+  it("retireAccountQuarantinesOn_missingTable_resolves", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(missingTable);
+
+    await expect(retireAccountQuarantinesOn(fakeConnection({ execute }), 7)).resolves.toBeUndefined();
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("retireAccountQuarantinesOn_deleteFails_rejects", async () => {
+    const deadlock = Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK" });
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+      .mockRejectedValueOnce(deadlock);
+
+    await expect(retireAccountQuarantinesOn(fakeConnection({ execute }), 7)).rejects.toBe(deadlock);
   });
 });

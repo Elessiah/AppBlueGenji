@@ -61,6 +61,8 @@ export type BlockOptions = { liftable?: boolean };
  * levables** : ces gestes (fiche du joueur, effacement d'un compte) ne laissent
  * aucune ligne qu'une contestation pourrait annuler ; une empreinte déjà posée
  * le devient. `liftable` : levables, une empreinte déjà posée garde son état.
+ * Datée du jour seulement : l'instant d'un effacement de compte, rapproché du
+ * journal des suppressions, relierait l'empreinte au compte (D31).
  */
 async function blockImageHashes(hashes: readonly string[], options: BlockOptions = {}): Promise<void> {
   const unique = [...new Set(hashes)];
@@ -70,8 +72,8 @@ async function blockImageHashes(hashes: readonly string[], options: BlockOptions
   await ignoreMissingTable(
     db.execute(
       options.liftable
-        ? `INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable) VALUES ${unique.map(() => "(?, 1)").join(", ")}`
-        : `INSERT INTO bg_blocked_image_hashes (sha256) VALUES ${unique.map(() => "(?)").join(", ")}
+        ? `INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable, created_at) VALUES ${unique.map(() => "(?, 1, CURRENT_DATE)").join(", ")}`
+        : `INSERT INTO bg_blocked_image_hashes (sha256, created_at) VALUES ${unique.map(() => "(?, CURRENT_DATE)").join(", ")}
          ON DUPLICATE KEY UPDATE liftable = 0`,
       unique,
     ),
@@ -162,7 +164,10 @@ type Executor = Pick<PoolConnection, "execute">;
  */
 export async function blockImageHashOn(connection: Executor, sha256: string): Promise<void> {
   await ignoreMissingTable(
-    connection.execute(`INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable) VALUES (?, 1)`, [sha256]),
+    connection.execute(
+      `INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable, created_at) VALUES (?, 1, CURRENT_DATE)`,
+      [sha256],
+    ),
   );
 }
 
@@ -173,19 +178,36 @@ export async function blockImageHashOn(connection: Executor, sha256: string): Pr
  * sans quoi l'annulation d'une autre suppression de la même image lèverait un
  * blocage que plus rien n'explique, et une suppression dont la contestation
  * attendait son issue (purge d'office, non bloquée) partirait sans décision
- * possible (revue sécurité #571, cycles 2 et 3).
+ * possible (revue sécurité #571, cycles 2 et 3). Une empreinte neuve porte le
+ * **jour** de la suppression la plus ancienne, jamais l'instant de
+ * l'effacement : rapprochée du journal des suppressions, une date d'effacement
+ * relierait l'empreinte au compte (D31).
  */
 export async function pinAccountBlockedHashesOn(connection: Executor, userId: number): Promise<void> {
   await ignoreMissingTable(
     connection.execute(
-      `INSERT INTO bg_blocked_image_hashes (sha256, liftable)
-       SELECT DISTINCT image_sha256, 0 FROM bg_logo_quarantines
+      `INSERT INTO bg_blocked_image_hashes (sha256, liftable, created_at)
+       SELECT image_sha256, 0, DATE(MIN(hidden_at)) FROM bg_logo_quarantines
         WHERE user_id = ? AND status = 'PURGED' AND image_sha256 IS NOT NULL
           AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')
+        GROUP BY image_sha256
        ON DUPLICATE KEY UPDATE liftable = 0`,
       [userId],
     ),
   );
+}
+
+/**
+ * À l'effacement d'un compte, dans sa transaction : fige les blocages que ses
+ * lignes de quarantaine justifiaient (`pinAccountBlockedHashesOn`), puis retire
+ * ces lignes — seul lien entre une empreinte et un compte (D31) —, sans
+ * dépendre de la cascade (clé étrangère absente d'une base ancienne). Les deux
+ * gestes vont ensemble : figer sans délier garderait le lien, délier sans figer
+ * laisserait un blocage levable que plus rien n'explique.
+ */
+export async function retireAccountQuarantinesOn(connection: Executor, userId: number): Promise<void> {
+  await pinAccountBlockedHashesOn(connection, userId);
+  await ignoreMissingTable(connection.execute(`DELETE FROM bg_logo_quarantines WHERE user_id = ?`, [userId]));
 }
 
 /**

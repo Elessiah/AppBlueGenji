@@ -13,7 +13,7 @@ jest.mock("@/lib/server/logo-quarantine", () => ({
 }));
 
 import { getDatabase } from "@/lib/server/database";
-import { blockRemovedImageFiles, pinAccountBlockedHashesOn } from "@/lib/server/blocked-images";
+import { blockRemovedImageFiles, retireAccountQuarantinesOn } from "@/lib/server/blocked-images";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
@@ -326,7 +326,7 @@ describe("finalizeDueAccountDeletions", () => {
 
     expect((await finalizeAccountDeletion(7))?.mode).toBe("ERASE");
 
-    expect(pinAccountBlockedHashesOn).toHaveBeenCalledWith(expect.anything(), 7);
+    expect(retireAccountQuarantinesOn).toHaveBeenCalledWith(expect.anything(), 7);
   });
 
   it("finalizeAccountDeletion_anonymize_keepsHashesLiftable", async () => {
@@ -334,7 +334,7 @@ describe("finalizeDueAccountDeletions", () => {
 
     expect((await finalizeAccountDeletion(7))?.mode).toBe("ANONYMIZE");
 
-    expect(pinAccountBlockedHashesOn).not.toHaveBeenCalled();
+    expect(retireAccountQuarantinesOn).not.toHaveBeenCalled();
   });
 
   // D30 : un avatar jamais supprimé par la modération n'est jamais bloqué,
@@ -345,7 +345,7 @@ describe("finalizeDueAccountDeletions", () => {
     expect((await finalizeAccountDeletion(7))?.mode).toBe("ANONYMIZE");
 
     expect(blockRemovedImageFiles).not.toHaveBeenCalled();
-    expect(pinAccountBlockedHashesOn).not.toHaveBeenCalled();
+    expect(retireAccountQuarantinesOn).not.toHaveBeenCalled();
   });
 
   it("finalizeAccountDeletion_eraseWithHeldAvatarNeverModerated_doesNotBlock", async () => {

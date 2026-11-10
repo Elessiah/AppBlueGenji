@@ -346,7 +346,7 @@ export async function finalizeAccountDeletion(
 
 /**
  * Efface ou anonymise le compte selon le plan. À l'effacement, les fichiers des
- * avatars en quarantaine sont relevés sous le verrou (la cascade emporte leurs
+ * avatars en quarantaine sont relevés sous le verrou (l'effacement retire leurs
  * lignes) sans que leur empreinte soit bloquée : un avatar seulement **masqué**
  * se conteste encore (décision D6, `lib/server/blocked-images.ts`). Seul
  * l'avatar du compte que la modération a **supprimé** (quarantaine `PURGED` à
@@ -418,7 +418,7 @@ async function loadQuarantinedAvatarFiles(runner: SqlRunner, userId: number): Pr
  * n'aurait pas pu atteindre (course, écriture refaite) ne s'échappe pas par
  * l'effacement. Un avatar seulement masqué ne l'est pas, ni un avatar dont la
  * contestation a été acceptée (D18, D23). Lu sous le verrou du
- * compte : la cascade emporte ces lignes.
+ * compte : l'effacement retire ces lignes (D31).
  */
 async function avatarRemovedByModeration(runner: SqlRunner, userId: number, avatarUrl: string | null): Promise<boolean> {
   const disk = toDiskUploadPath(avatarUrl);

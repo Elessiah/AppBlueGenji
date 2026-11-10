@@ -1,5 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { pinAccountBlockedHashesOn } from "@/lib/server/blocked-images";
+import { retireAccountQuarantinesOn } from "@/lib/server/blocked-images";
 import { ignoreMissingTable, isDuplicateEntryError, isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { type MatchWithdrawal, withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
@@ -63,12 +63,9 @@ export async function eraseAccount(
   // aussi d'un stream qu'un co-caster tient encore. Ni le « Prêt » de ses
   // arbitrages : la clé étrangère ne vide que `referee_user_id`.
   const withdrawal = await withdrawUserCasts(connection, userId, true);
-  await pinAccountBlockedHashesOn(connection, userId);
-  // D31 : le blocage ne garde que l'empreinte. Les lignes de quarantaine du
-  // compte — seul lien entre une empreinte et un compte — partent dans la même
-  // transaction, sans dépendre de la cascade (clé étrangère absente d'une
-  // base ancienne).
-  await connection.execute(`DELETE FROM bg_logo_quarantines WHERE user_id = ?`, [userId]);
+  // D31 : le blocage ne garde que l'empreinte — les lignes de quarantaine du
+  // compte partent dans cette transaction.
+  await retireAccountQuarantinesOn(connection, userId);
   await connection.execute(`DELETE FROM bg_users WHERE id = ?`, [userId]);
   return withdrawal;
 }

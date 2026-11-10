@@ -203,7 +203,7 @@ const COMPLIANCE_TABLES: readonly string[] = [
       -- Empreinte SHA-256 de l'avatar supprimé, relevée avant l'effacement du
       -- fichier : seule trace qui permette de lever (D18) ou de poser après
       -- coup le blocage quand l'issue arrive une fois le fichier parti.
-      -- Part avec la ligne (cascade du compte).
+      -- Part avec la ligne, retirée à l'effacement du compte (D31).
       image_sha256 CHAR(64) NULL,
       -- Cette décision a-t-elle bloqué l'empreinte ? Seule une suppression qui
       -- l'a fait justifie encore le blocage quand une autre est annulée (D18).
@@ -265,6 +265,7 @@ const COMPLIANCE_TABLES: readonly string[] = [
       -- trace qui la justifie (fiche du joueur, effacement d'un compte,
       -- ligne d'avant les empreintes) — jamais levée d'office.
       liftable TINYINT(1) NOT NULL DEFAULT 0,
+      -- Posée au jour près (D31) : jamais l'instant d'un effacement de compte.
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `,

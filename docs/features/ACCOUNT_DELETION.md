@@ -893,7 +893,11 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
 - **Lien vers le compte** (D31) : l'empreinte reste liée au compte (ligne de
   quarantaine) tant qu'il existe, pour les contestations ; à l'effacement,
   `eraseAccount` bloque définitivement puis efface ces lignes dans la même
-  transaction — `bg_blocked_image_hashes` n'a aucune colonne de compte.
+  transaction (`retireAccountQuarantinesOn`) — `bg_blocked_image_hashes` n'a
+  aucune colonne de compte, et son `created_at` est posé au **jour** près
+  (jour de la suppression la plus ancienne pour un blocage figé à
+  l'effacement) : l'instant d'un effacement, rapproché du journal des
+  suppressions, relierait l'empreinte au compte.
 - **Risque accepté** (D29) : un compte anonymisé garde un blocage levable
   posé à l'effacement sans ligne qui l'enregistre (ligne d'avant les
   empreintes, ou fichier réécrit) ; une contestation acceptée sur une autre
