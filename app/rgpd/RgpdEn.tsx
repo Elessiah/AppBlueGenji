@@ -793,7 +793,7 @@ export function RgpdEn({
               block becomes permanent: only the hash remains, with no link to any account. An automatic deletion
               made while its challenge was still awaiting its outcome only blocks the image once upheld, or on the erasure of
               the account if that comes first, then permanently. Hashes set on the erasure of an account before
-              November 12, 2026 — then also those of an avatar that was only hidden — stay blocked, dated to the
+              November 11, 2026 — then also those of an avatar that was only hidden — stay blocked, dated to the
               day they were set, which may be that of the erasure; any hash set before that date is brought back to the day. An avatar that is only
               hidden leaves none as long as it is not deleted, nor does an avatar moderation never deleted; neither
               does a deleted team logo.
