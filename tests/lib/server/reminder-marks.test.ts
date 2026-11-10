@@ -310,7 +310,11 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
 
     expect(connection.beginTransaction).toHaveBeenCalledTimes(3);
     expect(connection.rollback).toHaveBeenCalledTimes(3);
-    expect(error).toHaveBeenCalledTimes(1);
+    // pm2 : l'erreur qui a résisté au rejeu, puis la marque non retenue.
+    expect(error.mock.calls.map(([line]) => line)).toEqual([
+      "[db] ER_AUTOINC_READ_FAILED non résolu par le rejeu",
+      "[match-schedule] horaire poussé aux arbitres non retenu",
+    ]);
     error.mockRestore();
   });
 

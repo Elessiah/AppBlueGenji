@@ -501,7 +501,9 @@ l'horaire ne se poussait plus aux arbitres. Deux remèdes :
   une attente du verrou AUTO-INC qui dépasse son délai, où seule la requête
   est annulée : l'appelant fait donc toujours son `ROLLBACK` lui-même, et un
   1467 rendu après plus de 5 s (une attente, pas un interblocage) ne se rejoue
-  pas — comme `ER_LOCK_WAIT_TIMEOUT` ;
+  pas — comme `ER_LOCK_WAIT_TIMEOUT`. Un 1467 qui résiste au rejeu est écrit
+  en erreur dans pm2 (`[db] ER_AUTOINC_READ_FAILED non résolu par le rejeu`) :
+  ce code est aussi celui d'un compteur illisible ;
 - les réservations des joueurs (`claimDatedMark`, pose de `TOLD`), des
   instructions seules, sont rejouées elles aussi quand elles sont la victime.
 

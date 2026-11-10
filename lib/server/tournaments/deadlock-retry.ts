@@ -28,8 +28,15 @@ export async function retryOnDeadlock<T>(write: () => Promise<T>): Promise<T> {
       return await write();
     } catch (error) {
       const replayable = isTransactionAborted(error) || isSnapshotConflict(error);
-      if (!replayable || attempt >= DEADLOCK_ATTEMPTS) throw error;
-      if (isAutoIncrementContention(error) && Date.now() - startedAt > AUTOINC_REPLAY_MAX_MS) throw error;
+      const autoInc = isAutoIncrementContention(error);
+      const waitedOut = autoInc && Date.now() - startedAt > AUTOINC_REPLAY_MAX_MS;
+      if (!replayable || attempt >= DEADLOCK_ATTEMPTS || waitedOut) {
+        // Ce code est aussi celui d'un compteur illisible : s'il résiste au
+        // rejeu, pm2 doit le dire en erreur — la route, elle, ne rendra qu'un
+        // « réessaie » (`CONCURRENT_UPDATE_RETRY`).
+        if (autoInc) console.error("[db] ER_AUTOINC_READ_FAILED non résolu par le rejeu", error);
+        throw error;
+      }
       // Attente courte et aléatoire : deux transactions annulées ensemble ne
       // repartent pas au même instant pour se heurter de nouveau.
       await new Promise((resolve) => setTimeout(resolve, randomInt(20, 81)));

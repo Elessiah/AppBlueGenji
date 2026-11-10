@@ -40,6 +40,7 @@ describe("retryOnDeadlock", () => {
 
   it("retryOnDeadlock_autoIncAfterLongWait_throwsWithoutReplay", async () => {
     // Rendu après l'attente du verrou (50 s), pas par la détection d'interblocage.
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const now = jest.spyOn(Date, "now").mockReturnValueOnce(1_000).mockReturnValueOnce(51_000);
     const waited = Object.assign(new Error("Failed to read auto-increment value from storage engine"), {
       code: "ER_AUTOINC_READ_FAILED",
@@ -50,7 +51,31 @@ describe("retryOnDeadlock", () => {
     await expect(retryOnDeadlock(write)).rejects.toThrow("Failed to read auto-increment value");
 
     expect(write).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledWith("[db] ER_AUTOINC_READ_FAILED non résolu par le rejeu", waited);
     now.mockRestore();
+    error.mockRestore();
+  });
+
+  it("retryOnDeadlock_autoIncEveryTime_logsErrorAfterThreeTries", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const persistent = Object.assign(new Error("Failed to read auto-increment value from storage engine"), { errno: 1467 });
+    const write = jest.fn<() => Promise<string>>().mockRejectedValue(persistent);
+
+    await expect(retryOnDeadlock(write)).rejects.toBe(persistent);
+
+    expect(write).toHaveBeenCalledTimes(3);
+    expect(error).toHaveBeenCalledTimes(1);
+    error.mockRestore();
+  });
+
+  it("retryOnDeadlock_deadlockEveryTime_staysSilent", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const write = jest.fn<() => Promise<void>>().mockRejectedValue(deadlock());
+
+    await expect(retryOnDeadlock(write)).rejects.toThrow("Deadlock");
+
+    expect(error).not.toHaveBeenCalled();
+    error.mockRestore();
   });
 
   it("retryOnDeadlock_deadlockAfterLongWait_stillReplays", async () => {
