@@ -5,6 +5,7 @@ import {
   endurancePlayoffGhostSlots,
   endurancePlayoffLinks,
   endurancePlayoffRoundCount,
+  endurancePlayoffThirdPlaceSlot,
   enduranceMatchCountLabel,
   enduranceProgressLabel,
   enduranceRoundOfMatch,
@@ -16,6 +17,7 @@ import {
   splitPlayoffBrackets,
 } from "@/app/(secured)/tournois/[id]/_lib/endurance-sections";
 import { PLAYOFF_ROUND_OFFSET as ENGINE_PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
+import { PROJECTED_BYE, projectPlayoffGhostEntrants } from "@/lib/shared/bg-survie/playoffs";
 import { bracketMatch } from "../helpers/bracket-match";
 
 const mockMatch = (overrides: Partial<BracketMatch>): BracketMatch => bracketMatch({
@@ -361,6 +363,115 @@ describe("endurancePlayoffGhostSlots", () => {
       const ghostRounds = new Set(endurancePlayoffGhostSlots(posed).map((slot) => slot.roundNumber));
       expect(ghostRounds.size + 1).toBe(endurancePlayoffRoundCount(posed));
     }
+  });
+});
+
+describe("endurancePlayoffThirdPlaceSlot", () => {
+  const QUARTERS = PLAYOFF_ROUND_OFFSET;
+  const SEMIS = PLAYOFF_ROUND_OFFSET + 1;
+  const FINAL = PLAYOFF_ROUND_OFFSET + 2;
+  /** La case telle que la vue la demande : créneaux et projection dérivés du plateau. */
+  const slotFor = (decisive: BracketMatch[], thirdPlace: BracketMatch[] = [], finished = false) => {
+    const ghosts = endurancePlayoffGhostSlots(decisive, finished);
+    return endurancePlayoffThirdPlaceSlot(
+      decisive,
+      thirdPlace,
+      ghosts,
+      projectPlayoffGhostEntrants(decisive, ghosts),
+      finished,
+    );
+  };
+  const closed = (match: BracketMatch, winnerTeamId: number): BracketMatch => ({
+    ...match,
+    status: "COMPLETED",
+    winnerTeamId,
+  });
+
+  it("annonce une case vide sous la finale dès les quarts", () => {
+    const quarters = playoffRoundOfSize(QUARTERS, 4);
+    const slot = slotFor(quarters);
+
+    expect(slot).toMatchObject({ roundNumber: FINAL, match: null, entrants: [null, null] });
+    const ghostIds = endurancePlayoffGhostSlots(quarters).map((ghost) => ghost.id);
+    expect(slot!.id).toBeLessThan(0);
+    expect(ghostIds).not.toContain(slot!.id);
+  });
+
+  it("montre la battue d'une demi-finale close avant que la petite finale ne soit posée", () => {
+    const [semi1, semi2] = playoffRoundOfSize(SEMIS, 2).map((match, index) => ({
+      ...match,
+      team1Name: `Haut ${index + 1}`,
+      team2Name: `Bas ${index + 1}`,
+    }));
+    const slot = slotFor([...playoffRoundOfSize(QUARTERS, 4), closed(semi1, semi1.team1Id!), semi2]);
+
+    expect(slot?.match).toBeNull();
+    expect(slot?.entrants).toEqual([{ teamId: semi1.team2Id, name: "Bas 1" }, null]);
+  });
+
+  it("rend la rencontre une fois posée, sous son propre identifiant", () => {
+    const decisive = [...playoffRoundOfSize(SEMIS, 2), ...playoffRoundOfSize(FINAL, 1)];
+    const posted = mockMatch({ id: 77, bracket: "THIRD_PLACE", roundNumber: FINAL, matchNumber: 2 });
+
+    expect(slotFor(decisive, [posted])).toEqual({
+      id: 77,
+      roundNumber: FINAL,
+      matchNumber: 2,
+      match: posted,
+      entrants: null,
+    });
+  });
+
+  it("garde la rencontre posée sous un tournoi clos", () => {
+    const decisive = [...playoffRoundOfSize(SEMIS, 2), ...playoffRoundOfSize(FINAL, 1)];
+    const posted = mockMatch({ id: 77, bracket: "THIRD_PLACE", roundNumber: FINAL });
+
+    expect(slotFor(decisive, [posted], true)?.match).toBe(posted);
+  });
+
+  it("n'annonce rien sous un tournoi clos sans petite finale", () => {
+    const decisive = [...playoffRoundOfSize(SEMIS, 2), ...playoffRoundOfSize(FINAL, 1)];
+    expect(slotFor(decisive, [], true)).toBeNull();
+  });
+
+  it("n'annonce rien quand une demi-finale sera une exemption (trois quarts)", () => {
+    expect(slotFor(playoffRoundOfSize(QUARTERS, 3))).toBeNull();
+  });
+
+  it("n'annonce rien quand un double forfait en quart vaut une exemption en demi-finale", () => {
+    const quarters = playoffRoundOfSize(QUARTERS, 4);
+    quarters[0] = { ...quarters[0], status: "COMPLETED", doubleForfeit: true };
+    const ghosts = endurancePlayoffGhostSlots(quarters);
+    const projected = projectPlayoffGhostEntrants(quarters, ghosts);
+    expect(projected.get(ghosts[0].id)).toEqual([null, PROJECTED_BYE]);
+
+    expect(endurancePlayoffThirdPlaceSlot(quarters, [], ghosts, projected)).toBeNull();
+  });
+
+  it("n'annonce rien quand une demi-finale posée est une exemption", () => {
+    const semis = playoffRoundOfSize(SEMIS, 2);
+    semis[1] = { ...semis[1], team2Id: null, status: "COMPLETED", winnerTeamId: semis[1].team1Id };
+    expect(slotFor(semis)).toBeNull();
+  });
+
+  it("n'annonce rien après deux demi-finales closes sur un double forfait", () => {
+    const semis = playoffRoundOfSize(SEMIS, 2).map((match) => ({
+      ...match,
+      status: "COMPLETED" as MatchStatus,
+      doubleForfeit: true,
+    }));
+    expect(slotFor(semis)).toBeNull();
+  });
+
+  it("n'annonce rien pour une finale sèche, ni avant l'arbre", () => {
+    expect(slotFor(playoffRoundOfSize(FINAL, 1))).toBeNull();
+    expect(slotFor([])).toBeNull();
+  });
+
+  it("ne rattache pas une petite finale posée dans un autre tour que la finale", () => {
+    const decisive = [...playoffRoundOfSize(SEMIS, 2), ...playoffRoundOfSize(FINAL, 1)];
+    const stray = mockMatch({ id: 78, bracket: "THIRD_PLACE", roundNumber: SEMIS });
+    expect(slotFor(decisive, [stray])).toBeNull();
   });
 });
 

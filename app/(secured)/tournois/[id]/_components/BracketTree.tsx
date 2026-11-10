@@ -4,7 +4,8 @@ import { CSSProperties, Fragment, useEffect, useRef } from "react";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { ScrollArea } from "@/components/cyber";
 import { useSlotHeight } from "../_hooks/useSlotHeight";
-import type { ProjectedGhostEntrants } from "@/lib/shared/bg-survie/playoffs";
+import { PROJECTED_BYE, type ProjectedGhostEntrants, type ProjectedSide } from "@/lib/shared/bg-survie/playoffs";
+import type { ThirdPlaceSlot } from "../_lib/endurance-sections";
 import { MatchRow } from "./MatchRow";
 import { GhostMatchCard } from "./GhostMatchCard";
 import { isMatchScoreLocked } from "../_lib/score-lock";
@@ -20,6 +21,14 @@ const BORDER = "var(--border, #444)";
 // carte : la carte est donc décalée de la moitié vers le bas dans son créneau.
 // On recadre les traits/badges sur le centre réel de la carte, pas du créneau.
 const LABEL_OFFSET = 6.5;
+/** Écart entre la finale et la petite finale posée dessous. */
+const THIRD_PLACE_GAP = 16;
+
+/** Props de `GhostMatchCard` pour un côté projeté : des primitives, pour sa mémorisation. */
+function ghostSide(side: ProjectedSide | undefined) {
+  if (side === PROJECTED_BYE) return { teamId: null, name: null, bye: true };
+  return { teamId: side?.teamId ?? null, name: side?.name ?? null, bye: false };
+}
 
 /** Requête de défilement vers un match (le nonce force le re-déclenchement à chaque clic). */
 export type ScrollRequest = { matchId: number; nonce: number };
@@ -45,6 +54,14 @@ interface BracketTreeProps {
   ghostSlots?: readonly BracketSlotRef[];
   /** Vainqueurs déjà connus des créneaux à pourvoir (`projectPlayoffGhostEntrants`), par id de créneau. */
   ghostEntrants?: ReadonlyMap<number, ProjectedGhostEntrants>;
+  /**
+   * Petite finale à dessiner **sous la finale**, dans sa colonne
+   * (`endurancePlayoffThirdPlaceSlot`) — passée au seul volet qui porte la
+   * finale. Rencontre posée ou case à pourvoir : même carte que les autres.
+   * Elle ne porte aucun trait (rien n'y mène dans l'arbre), et la finale prend
+   * alors le sous-titre « Grande Finale ».
+   */
+  thirdPlace?: ThirdPlaceSlot | null;
   allTournamentMatches: BracketMatch[];
   bracketType: BracketType;
   /** Nombre total de rounds du tableau complet (pour nommer les stades). */
@@ -84,6 +101,7 @@ export function BracketTree({
   matches,
   ghostSlots,
   ghostEntrants,
+  thirdPlace = null,
   allTournamentMatches,
   bracketType,
   totalRoundsGlobal,
@@ -192,6 +210,63 @@ export function BracketTree({
     return t(`bracket.matchLabel.${key}`, { number });
   };
 
+  /** Carte d'un créneau : la rencontre posée, ou sa case à pourvoir. */
+  const slotCard = (slot: TreeSlot, entrants: ProjectedGhostEntrants | null | undefined) => {
+    if (slot.match) {
+      return (
+        <MatchRow
+          match={slot.match}
+          adminResolvable={adminResolvable(slot.match)}
+          onOpenAdminModal={onOpenAdminModal}
+          scoreLocked={isMatchScoreLocked(slot.id, allTournamentMatches, format)}
+          roundNumber={slot.roundNumber}
+        />
+      );
+    }
+    const top = ghostSide(entrants?.[0]);
+    const bottom = ghostSide(entrants?.[1]);
+    return (
+      <GhostMatchCard
+        topTeamId={top.teamId}
+        topTeamName={top.name}
+        topBye={top.bye}
+        bottomTeamId={bottom.teamId}
+        bottomTeamName={bottom.name}
+        bottomBye={bottom.bye}
+      />
+    );
+  };
+
+  /** Sous-titre et carte d'un créneau, avec la marque « ★ Votre match ». */
+  const labelledCard = (
+    slot: TreeSlot,
+    label: string | null,
+    entrants: ProjectedGhostEntrants | null | undefined,
+  ) => {
+    // La marque « ★ Votre match » ne vise qu'une rencontre, et un créneau à
+    // pourvoir porte un identifiant négatif : il ne peut donc jamais la porter.
+    const isTarget = slot.id === scrollTargetMatchId;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: label || isTarget ? 2 : 0 }}>
+        {(label || isTarget) && (
+          <div style={{ fontSize: 11, color: isTarget ? accentColor : "var(--ink-quiet)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", lineHeight: 1 }}>
+            {isTarget ? `★ ${label ?? t("bracket.yourMatch")}` : label}
+          </div>
+        )}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            borderRadius: 8,
+            ...(isTarget ? { boxShadow: `0 0 0 2px ${accentColor}, 0 0 14px ${accentColor}` } : {}),
+          }}
+        >
+          {slotCard(slot, entrants)}
+        </div>
+      </div>
+    );
+  };
+
   // Décalage vertical pour aligner traits/badges sur le centre de la carte (et non
   // du créneau) : non nul uniquement quand le round affiche un libellé au-dessus.
   const roundOffset = (globalIdx: number) => (matchLabel(1, globalIdx) !== null ? LABEL_OFFSET : 0);
@@ -238,57 +313,42 @@ export function BracketTree({
             <div style={{ display: "flex" }}>
               <div style={{ width: CARD_W, flexShrink: 0 }}>
                 {roundSlots.map((slot) => {
-                  const label = matchLabel(slot.matchNumber, globalIdx);
-                  // La marque « ★ Votre match » ne vise qu'une rencontre, et
-                  // un créneau à pourvoir porte un identifiant négatif : il ne
-                  // peut donc jamais la porter. Un **défilement**, lui, peut
-                  // bien l'atteindre — c'est ce que fait le badge
-                  // « Qualifié en X » vers un tour pas encore posé —, d'où le
-                  // `ref` enregistré pour tous les créneaux, juste en dessous.
-                  const isTarget = slot.id === scrollTargetMatchId;
+                  // La petite finale se pose sous la finale : le seul créneau
+                  // de son tour. La finale s'appelle alors « Grande Finale ».
+                  const below = roundSlots.length === 1 && thirdPlace?.roundNumber === roundNum ? thirdPlace : null;
+                  const label = below ? t("bracket.stage.grandFinal") : matchLabel(slot.matchNumber, globalIdx);
+                  const card = labelledCard(slot, label, ghostEntrants?.get(slot.id));
+                  // Un **défilement** peut atteindre un créneau à pourvoir —
+                  // c'est ce que fait le badge « Qualifié en X » vers un tour
+                  // pas encore posé —, d'où le `ref` enregistré pour tous.
                   return (
                     <div
                       key={slot.id}
                       ref={setMatchRef(slot.id)}
                       style={{ height: slotH, display: "flex", alignItems: "center", justifyContent: "center", scrollMarginInline: 80 }}
                     >
-                      <div
-                        ref={measureSlot(roundNum, slot.id)}
-                        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: label || isTarget ? 2 : 0 }}
-                      >
-                        {(label || isTarget) && (
-                          <div style={{ fontSize: 11, color: isTarget ? accentColor : "var(--ink-quiet)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", lineHeight: 1 }}>
-                            {isTarget ? `★ ${label ?? t("bracket.yourMatch")}` : label}
-                          </div>
-                        )}
+                      {below ? (
+                        // Trois rangées, la première vide et de la hauteur de
+                        // la troisième (`1fr` l'une et l'autre) : la finale
+                        // reste au **centre** du créneau, là où arrivent les
+                        // traits, et le tout est mesuré d'un bloc — le créneau
+                        // grandit donc seul s'il le faut.
                         <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            borderRadius: 8,
-                            ...(isTarget
-                              ? { boxShadow: `0 0 0 2px ${accentColor}, 0 0 14px ${accentColor}` }
-                              : {}),
-                          }}
+                          ref={measureSlot(roundNum, slot.id)}
+                          style={{ display: "grid", gridTemplateRows: "1fr auto 1fr", justifyItems: "center" }}
                         >
-                          {slot.match ? (
-                            <MatchRow
-                              match={slot.match}
-                              adminResolvable={adminResolvable(slot.match)}
-                              onOpenAdminModal={onOpenAdminModal}
-                              scoreLocked={isMatchScoreLocked(slot.id, allTournamentMatches, format)}
-                              roundNumber={roundNum}
-                            />
-                          ) : (
-                            <GhostMatchCard
-                              topTeamId={ghostEntrants?.get(slot.id)?.[0]?.teamId}
-                              topTeamName={ghostEntrants?.get(slot.id)?.[0]?.name}
-                              bottomTeamId={ghostEntrants?.get(slot.id)?.[1]?.teamId}
-                              bottomTeamName={ghostEntrants?.get(slot.id)?.[1]?.name}
-                            />
-                          )}
+                          <div aria-hidden />
+                          {card}
+                          <div
+                            ref={setMatchRef(below.id)}
+                            style={{ paddingTop: THIRD_PLACE_GAP, scrollMarginInline: 80 }}
+                          >
+                            {labelledCard(below, t("bracket.stage.thirdPlace"), below.entrants)}
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div ref={measureSlot(roundNum, slot.id)}>{card}</div>
+                      )}
                     </div>
                   );
                 })}

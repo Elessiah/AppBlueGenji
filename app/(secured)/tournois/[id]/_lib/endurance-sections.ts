@@ -2,6 +2,11 @@ import type { BracketMatch } from "@/lib/shared/types";
 import type { BracketSlotRef } from "./bracket-sections";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
+import {
+  PROJECTED_BYE,
+  projectThirdPlaceEntrants,
+  type ProjectedGhostEntrants,
+} from "@/lib/shared/bg-survie/playoffs";
 import type { TournamentPageText } from "@/lib/shared/tournament-page-text";
 import { FR_ENDURANCE_TEXT } from "./endurance-text";
 
@@ -282,6 +287,87 @@ export function endurancePlayoffGhostSlots(
   }
   return slots;
 }
+
+/**
+ * La petite finale telle que l'arbre la dessine : **sous la finale**, dans sa
+ * colonne. `match` porte la rencontre une fois que le moteur l'a posée ; avant,
+ * la case est à pourvoir et `entrants` dit ce qu'on en sait déjà (les battues
+ * des demi-finales closes, `projectThirdPlaceEntrants`).
+ */
+export type ThirdPlaceSlot = BracketSlotRef & {
+  match: BracketMatch | null;
+  entrants: ProjectedGhostEntrants | null;
+};
+
+/**
+ * La case de la petite finale, ou `null` quand il n'y en a pas à montrer.
+ *
+ * Le moteur ne pose la petite finale qu'avec la finale, une fois les deux
+ * demi-finales jouées. La case, elle, s'annonce **dès l'ouverture des
+ * play-offs** — vide, puis avec la battue de chaque demi-finale close — tant
+ * que rien ne dit qu'elle ne se jouera pas :
+ *
+ * - l'arbre doit avoir une finale (posée ou à pourvoir) et, juste avant, un
+ *   tour de **deux** rencontres : sans demi-finales, pas de battues ;
+ * - une demi-finale gagnée par exemption n'a pas de battue. On le sait d'avance
+ *   quand le tour qui précède compte un nombre impair de rencontres, ou quand
+ *   la projection y annonce déjà une exemption (double forfait en amont) ;
+ * - deux demi-finales closes sur un double forfait ne laissent personne ;
+ * - un tournoi clos n'annonce plus rien (cf. {@link endurancePlayoffGhostSlots}).
+ *
+ * Une petite finale posée dans un autre tour que la finale n'est pas rattachée
+ * (`null`) : l'appelant garde alors son volet à part.
+ */
+export function endurancePlayoffThirdPlaceSlot(
+  decisive: BracketMatch[],
+  thirdPlace: BracketMatch[],
+  ghostSlots: readonly BracketSlotRef[],
+  ghostEntrants: ReadonlyMap<number, ProjectedGhostEntrants>,
+  tournamentFinished = false,
+): ThirdPlaceSlot | null {
+  const slots: BracketSlotRef[] = [...decisive, ...ghostSlots];
+  if (slots.length === 0) return null;
+
+  const finalRound = Math.max(...slots.map((slot) => slot.roundNumber));
+  const inRound = (round: number) => slots.filter((slot) => slot.roundNumber === round);
+  if (inRound(finalRound).length !== 1) return null;
+
+  const posted = thirdPlace.find((match) => match.roundNumber === finalRound);
+  if (posted) {
+    return { id: posted.id, roundNumber: finalRound, matchNumber: posted.matchNumber, match: posted, entrants: null };
+  }
+  if (tournamentFinished || thirdPlace.length > 0) return null;
+
+  const semiSlots = inRound(finalRound - 1);
+  if (semiSlots.length !== 2) return null;
+
+  const semis = decisive.filter((match) => match.roundNumber === finalRound - 1);
+  let entrants: ProjectedGhostEntrants | null = [null, null];
+  if (semis.length === 2) {
+    entrants = projectThirdPlaceEntrants(semis);
+  } else if (
+    inRound(finalRound - 2).length % 2 === 1 ||
+    semiSlots.some((slot) => ghostEntrants.get(slot.id)?.includes(PROJECTED_BYE))
+  ) {
+    entrants = null;
+  }
+  if (entrants === null) return null;
+
+  return {
+    id: -(finalRound * 1000 + THIRD_PLACE_GHOST_NUMBER),
+    roundNumber: finalRound,
+    matchNumber: 1,
+    match: null,
+    entrants,
+  };
+}
+
+/**
+ * Numéro réservé à la case à pourvoir de la petite finale, pour que son
+ * identifiant ne croise jamais celui d'un créneau de l'arbre (`ghostSlotId`,
+ * dont les numéros de match restent bien en dessous).
+ */
+const THIRD_PLACE_GHOST_NUMBER = 999;
 
 /**
  * Liens « vainqueur → match suivant » de l'arbre final, **dérivés**.

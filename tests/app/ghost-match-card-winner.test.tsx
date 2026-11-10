@@ -32,4 +32,22 @@ describe("GhostMatchCard", () => {
     expect(html).toContain("Beta");
     expect(html).not.toContain("TBD");
   });
+
+  it("says BYE, not TBD, on a side that will stay empty", () => {
+    const html = render({ topTeamId: 42, topTeamName: "Alpha", bottomBye: true });
+    expect(html).toContain("BYE");
+    expect(html).not.toContain("TBD");
+  });
+
+  it("gives a known entrant the colour of an ordinary row and its full name as a tooltip", () => {
+    const html = render({ topTeamId: 42, topTeamName: "MS | Karasuno Volleyball Club Academy" });
+    expect(html.match(/ghostKnown/g)).toHaveLength(1);
+    expect(html).toContain('title="MS | Karasuno Volleyball Club Academy"');
+  });
+
+  it("keeps an unknown side muted and without tooltip", () => {
+    const html = render({});
+    expect(html).not.toContain("ghostKnown");
+    expect(html).not.toContain("title=");
+  });
 });
