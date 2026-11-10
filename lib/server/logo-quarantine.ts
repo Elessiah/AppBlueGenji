@@ -854,6 +854,8 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
         quarantineId,
       ]);
       await connection.commit();
+      // Journalisée comme par `recordContestOutcome`.
+      announceContestOutcome(row, "OVERTURNED", actor);
       throw new Error(isTeam ? "TEAM_HAS_NEW_LOGO" : "USER_HAS_NEW_AVATAR");
     }
     const located = isTeam

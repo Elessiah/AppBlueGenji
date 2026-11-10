@@ -759,6 +759,10 @@ describe("restoreReportedImage", () => {
     expect(connection.execute).toHaveBeenCalledWith(expect.stringMatching(/SET contest_outcome = 'OVERTURNED' WHERE id = \?/), [30]);
     expect(connection.commit).toHaveBeenCalled();
     expect(pool.execute).not.toHaveBeenCalledWith(expect.stringMatching(/contest_outcome/), expect.anything());
+    // Revue sécurité #571, cycle 2 : journalisée comme une issue écrite, sans pseudo.
+    const [staffLine] = jest.mocked(publishStaffAction).mock.calls[0];
+    expect(staffLine).toContain("acceptée");
+    expect(staffLine).not.toContain("Nova");
   });
 
   it("restoreReportedImage_success_setsOverturned", async () => {

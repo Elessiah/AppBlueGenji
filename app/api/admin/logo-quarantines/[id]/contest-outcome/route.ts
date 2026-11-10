@@ -9,7 +9,9 @@ import { can } from "@/lib/shared/permissions";
  * Écrit l'issue de la contestation d'une image modérée (décision D22) :
  * `{ outcome: "UPHELD" | "OVERTURNED" }`. Sur un avatar supprimé, l'issue pose
  * ou lève tout de suite le blocage de son empreinte (D18) ; sur une image
- * masquée, elle décide de la suppression à venir. Rend `blocked`, l'état de
+ * masquée, seule « maintenue » s'écrit (elle décidera de la suppression à
+ * venir) — une contestation acceptée s'y traduit par un rétablissement
+ * (`QUARANTINE_STILL_HIDDEN` sinon). Rend `blocked`, l'état de
  * blocage de l'image après le geste (`null` : sans objet), et `hashUnknown`
  * quand l'empreinte d'un avatar supprimé n'a pas été gardée.
  */

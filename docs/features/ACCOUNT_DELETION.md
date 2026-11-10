@@ -868,7 +868,12 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   joueur, effacement d'un compte), ou rendu tel par l'effacement d'un compte,
   qui emporte ses lignes de quarantaine (`pinAccountBlockedHashesOn`). Une
   ligne antérieure sans empreinte ne peut rien lever (`hashUnknown`, dit au
-  staff). L'effacement au jour 30 ignore les suppressions `OVERTURNED`.
+  staff). L'effacement au jour 30 ne bloque plus lui-même que l'avatar d'une
+  suppression sans empreinte gardée (ligne d'avant la colonne, fichier absent)
+  et jamais une suppression `OVERTURNED` ; tout effacement (`eraseAccount`,
+  rattrapage au démarrage compris) rend d'abord non levables les blocages
+  justifiés par les lignes du compte. Un rétablissement refusé (D23) est
+  journalisé au staff comme une issue écrite.
 - **Acceptation d'une image encore masquée** : elle se rétablit ; la route
   d'issue la refuse (`QUARANTINE_STILL_HIDDEN`, 409). Un rétablissement refusé
   (D23) écrit `OVERTURNED` sous le verrou de la ligne, et le commite.

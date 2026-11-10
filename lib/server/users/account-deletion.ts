@@ -12,7 +12,7 @@ import {
 import { isReferencedRowError } from "@/lib/server/mysql-errors";
 import { avatarFileLocations } from "@/lib/server/logo-quarantine";
 import { unlink } from "node:fs/promises";
-import { blockRemovedImageFiles, pinAccountBlockedHashesOn } from "@/lib/server/blocked-images";
+import { blockRemovedImageFiles } from "@/lib/server/blocked-images";
 import { storedUploadAbsolutePath } from "@/lib/server/stored-upload-cleanup";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
@@ -417,7 +417,10 @@ async function loadQuarantinedAvatarFiles(runner: SqlRunner, userId: number): Pr
  * que le fichier ne parte (D6) — un fichier qu'une suppression de modération
  * n'aurait pas pu atteindre (course, écriture refaite) ne s'échappe pas par
  * l'effacement. Un avatar seulement masqué ne l'est pas, ni un avatar dont la
- * contestation a été acceptée (D18, D23). Lu sous le verrou du
+ * contestation a été acceptée (D18, D23). Une ligne qui a gardé l'empreinte
+ * n'est pas comptée : elle a posé (ou non, selon l'issue) son propre blocage,
+ * levable — un second blocage, définitif, la priverait de sa levée (revue
+ * sécurité #571, cycle 2). Lu sous le verrou du
  * compte : la cascade emporte ces lignes.
  */
 async function avatarRemovedByModeration(runner: SqlRunner, userId: number, avatarUrl: string | null): Promise<boolean> {
@@ -427,6 +430,7 @@ async function avatarRemovedByModeration(runner: SqlRunner, userId: number, avat
   const [rows] = await runner.execute<RowDataPacket[]>(
     `SELECT 1 FROM bg_logo_quarantines
       WHERE user_id = ? AND status = 'PURGED' AND logo_url IN (?, ?)
+        AND image_sha256 IS NULL
         AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')
       LIMIT 1`,
     [userId, toServedUploadUrl(disk), disk],
@@ -560,9 +564,6 @@ async function deleteAccountNow(
 
     const facts = await loadAccountDeletionFacts(connection, userId, new Set(soloTournaments));
     plan = accountDeletionPlan(facts.trace);
-    // L'effacement emporte ses lignes de quarantaine : ce qu'elles justifiaient
-    // ne doit plus pouvoir se lever (revue sécurité #571, D18).
-    if (plan.mode === "ERASE") await pinAccountBlockedHashesOn(connection, userId);
 
     // Les visites n'ont rien à détacher : `bg_site_visits` ne garde aucun lien
     // vers un compte, seulement une empreinte salée qu'on ne sait pas renverser

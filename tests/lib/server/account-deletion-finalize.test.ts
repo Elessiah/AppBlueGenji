@@ -300,6 +300,8 @@ describe("finalizeDueAccountDeletions", () => {
 
     const purged = execute.mock.calls.find(([sql]) => String(sql).includes("status = 'PURGED'"));
     expect(String(purged?.[0])).toContain("AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')");
+    // Revue sécurité #571, cycle 2 : une ligne qui a gardé l'empreinte a posé son propre blocage, levable.
+    expect(String(purged?.[0])).toContain("AND image_sha256 IS NULL");
   });
 
   // Revue sécurité #571 (D18) : l'effacement emporte les lignes qui justifiaient

@@ -54,6 +54,7 @@ describe("contestOutcomeMessage", () => {
 
   it("contestOutcomeMessage_overturnedStillBlocked_saysOtherRemoval", () => {
     expect(contestOutcomeMessage("OVERTURNED", true)).toContain("une autre suppression de la modération");
+    expect(contestOutcomeMessage("OVERTURNED", true)).toContain("son blocage est définitif");
   });
 
   it("contestOutcomeMessage_upheldBlocked_saysBlocked", () => {

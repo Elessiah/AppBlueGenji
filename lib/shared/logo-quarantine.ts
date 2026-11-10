@@ -94,7 +94,7 @@ export function contestOutcomeMessage(outcome: ContestOutcome, blocked: boolean 
   if (hashUnknown) return `${head} L'empreinte de cette image n'a pas été gardée : son blocage n'a pas pu changer.`;
   if (blocked === true) {
     return outcome === "OVERTURNED"
-      ? `${head} L'image reste bloquée : une autre suppression de la modération la vise encore.`
+      ? `${head} L'image reste bloquée : une autre suppression de la modération la vise encore, ou son blocage est définitif (fiche du joueur, compte effacé).`
       : `${head} L'image est bloquée.`;
   }
   if (blocked === false) return `${head} L'image n'est plus bloquée : elle peut être renvoyée.`;
