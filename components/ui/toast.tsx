@@ -125,6 +125,13 @@ function isKeyboardFocus(element: Element): boolean {
   }
 }
 
+/** Préfixe lu au lecteur d'écran devant le message, par sorte de notification. */
+const TOAST_PREFIX_KEY = {
+  error: "toast.errorPrefix",
+  success: "toast.successPrefix",
+  info: "toast.infoPrefix",
+} as const satisfies Record<ToastType, string>;
+
 /**
  * Une notification. Le décompte se suspend au survol et au focus clavier, et
  * le bouton pause pose un choix explicite qui prime sur les deux
@@ -135,13 +142,6 @@ function isKeyboardFocus(element: Element): boolean {
  * souris laisse le focus sur le bouton cliqué, et le décompte ne reprendrait
  * jamais. La barre de progression lit le même état par `data-paused`.
  */
-/** Préfixe lu au lecteur d'écran devant le message, par sorte de notification. */
-const TOAST_PREFIX_KEY = {
-  error: "toast.errorPrefix",
-  success: "toast.successPrefix",
-  info: "toast.infoPrefix",
-} as const satisfies Record<ToastType, string>;
-
 export function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismiss: (id: number) => void }>) {
   const { t } = useShellText();
   const [override, setOverride] = useState<CountdownOverride>(null);

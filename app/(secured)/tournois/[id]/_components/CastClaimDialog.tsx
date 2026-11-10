@@ -47,7 +47,7 @@ export type CastClaimOutcome = { ok: true } | { ok: false; code: string; message
  * l'ouvre aussi, avec le seul choix « ouvrir mon propre stream ».
  *
  * Ouvrir son propre stream règle du même geste ce que l'ancien bouton
- * « Configurer la diffusion » offrait : le mode de passage à l'antenne du match
+ * « Configurer la diffusion » (aujourd'hui « Diffusion officielle », celle de l'organisation) offrait : le mode de passage à l'antenne du match
  * et, pour la permission `tournaments`, l'origine du lien. Le BattleTag de ce
  * cast suit les deux choix — il parle du caster, non de son stream.
  *

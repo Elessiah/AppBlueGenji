@@ -369,8 +369,10 @@ export async function updateOwnProfile(
     invalidateLandingTeamViews();
     // Un arbitre renommé : son ancien pseudo n'est plus servi du cache des
     // pseudos d'arbitre (la version de l'instantané, elle, n'a pas bougé) —
-    // seulement s'il arbitre un match dont le nom se montre.
-    await forgetRefereeNamesOf(userId);
+    // seulement s'il arbitre un match dont le nom se montre. Sans attendre :
+    // l'enregistrement du profil ne paie pas cette lecture (elle ne lève
+    // jamais — un échec oublie tout le cache).
+    void forgetRefereeNamesOf(userId);
   }
 
   // Masqué, l'avatar disparaît des réponses mais son fichier restait servi sans

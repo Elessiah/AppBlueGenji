@@ -260,23 +260,17 @@ export async function setMatchLiveConfig(
     throw new Error("INVALID_LIVE_TRIGGER");
   }
 
-  // Premier tri sur une lecture ordinaire (un refus ne coûte rien) ; le verdict
-  // vaut sous le verrou du match, ci-dessous : un score validé entre les deux
-  // ferme la porte (`assertConfigurable`). Un mode absent (`undefined`) reste
-  // celui du match, relu sous le verrou.
+  // Premier tri sur une lecture ordinaire : le lien seul (un refus ne coûte
+  // rien). Les refus qui disent l'état du match (`assertConfigurable`, date
+  // requise) ne se jugent que sous le verrou, **après** le rôle
+  // (`assertLiveActor`) : un appelant sans droit sur ce match n'apprend rien
+  // de son état. Un mode absent (`undefined`) reste celui du match.
   const row = await loadMatchLiveRow(matchId);
   const requested = config.trigger === undefined ? (row.live_trigger ?? null) : config.trigger;
   // Ni mode ni lien du staff envoyés, mais des liens de casters : seuls eux
   // changent. Un corps qui ne change rien n'ouvre pas un match joué.
   const keepsMode =
     config.trigger === undefined && config.liveUrl === undefined && (config.streamLinks?.length ?? 0) > 0;
-  assertConfigurable(row, requested, keepsMode);
-  // Un mode inchangé (renvoyé tel quel par une fenêtre où il est verrouillé)
-  // ne redemande pas sa date : retirée depuis par le staff, elle bloquerait
-  // le lien du staff et ceux des casters.
-  if (requested !== (row.live_trigger ?? null) && requiresMatchStartAt(requested) && row.start_at === null) {
-    throw new Error("MATCH_START_AT_REQUIRED");
-  }
 
   // Lien absent : le lien du staff n'est pas touché (sauf démarquage).
   const keepStaffLink = config.liveUrl === undefined;
@@ -575,8 +569,10 @@ async function planStaffStreamUrl(
  */
 async function streamsHeldByOthers(connection: PoolConnection, matchId: number, userId: number): Promise<Set<number>> {
   const [rows] = await connection.execute<RowDataPacket[]>(
-    `SELECT user_id, stream_id FROM bg_match_casters WHERE match_id = ?`,
-    [matchId],
+    // Le filtre en SQL ne lit que les lignes utiles sous le verrou ; la règle
+    // reste celle du helper partagé.
+    `SELECT user_id, stream_id FROM bg_match_casters WHERE match_id = ? AND user_id <> ? AND stream_id IS NOT NULL`,
+    [matchId, userId],
   );
   return streamsHeldByOtherCasters(
     rows.map((row) => ({ userId: Number(row.user_id), streamId: row.stream_id === null ? null : Number(row.stream_id) })),

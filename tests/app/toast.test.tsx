@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
-import { TOAST_DURATION_MS, ToastProvider, useToast } from "@/components/ui/toast";
+import { TOAST_DURATION_MS, ToastItem, ToastProvider, useToast } from "@/components/ui/toast";
 import { readSource } from "../helpers/read-source";
 
 /**
@@ -126,6 +126,14 @@ describe("showInfo — notice neutre", () => {
   it("se peint en bleu glacier, par jetons", () => {
     expect(css).toMatch(/\.toast\[data-type="info"\] \{[^}]*color: var\(--blue-100\)/);
     expect(css).toMatch(/\.toast\[data-type="info"\] \{[^}]*--toast-accent: var\(--blue-500-rgb\)/);
+  });
+
+  it("se rend en notice : type info, préfixe « Information : » lu au lecteur d'écran", () => {
+    const html = renderToStaticMarkup(
+      <ToastItem toast={{ id: 1, message: "Ce caster ne caste plus ce match.", type: "info" }} onDismiss={() => undefined} />,
+    );
+    expect(html).toContain('data-type="info"');
+    expect(html).toContain('<span class="sr-only">Information : </span>Ce caster ne caste plus ce match.');
   });
 
   it("dit « Ce caster ne caste plus ce match » en notice neutre", () => {

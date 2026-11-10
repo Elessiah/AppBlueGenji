@@ -223,9 +223,11 @@ describe("setMatchLiveConfig", () => {
       if (sql.startsWith("SELECT match_id, user_id, stream_id, ready_at FROM bg_match_casters")) {
         return [state.casters.map((caster) => ({ ...caster, match_id: row.id, ready_at: null }))];
       }
-      if (sql.startsWith("SELECT user_id, stream_id FROM bg_match_casters WHERE match_id = ?")) {
+      if (sql.startsWith("SELECT user_id, stream_id FROM bg_match_casters WHERE match_id = ? AND user_id <> ? AND stream_id IS NOT NULL")) {
         state.heldReads += 1;
-        return [state.casters.map((caster) => ({ user_id: caster.user_id, stream_id: caster.stream_id }))];
+        // Le filtre SQL : ni l'auteur du réglage, ni une inscription sans stream.
+        const others = state.casters.filter((caster) => caster.user_id !== params[1] && caster.stream_id !== null);
+        return [others.map((caster) => ({ user_id: caster.user_id, stream_id: caster.stream_id }))];
       }
       if (sql.startsWith("SELECT s.link_user_id,")) {
         state.holderReads += 1;
@@ -478,10 +480,31 @@ describe("setMatchLiveConfig", () => {
       await mockLiveDb(world);
 
       await expect(
-        setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/x", setter: CASTER_12, access: LIVE_ONLY }),
+        setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/x", setter: ORGANISER_5, access: STAFF }),
       ).rejects.toThrow("MATCH_NOT_CASTABLE");
       expect(world.state.matchWrites).toEqual([]);
     }
+  });
+
+  it("setMatchLiveConfig_liveOnlyNonCasterOnPlayedMatch_refusesRoleBeforeState", async () => {
+    // Le rôle se juge avant tout refus qui dirait l'état du match (score saisi).
+    const world = liveWorld(matchRow({ status: "COMPLETED" }));
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/x", setter: CASTER_12, access: LIVE_ONLY }),
+    ).rejects.toThrow("NOT_MATCH_CASTER");
+    expect(world.state.matchWrites).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_liveOnlyNonCasterStartTimeWithoutDate_refusesRoleBeforeState", async () => {
+    const world = liveWorld(matchRow({ start_at: null }));
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: "twitch.tv/x", setter: CASTER_12, access: LIVE_ONLY }),
+    ).rejects.toThrow("NOT_MATCH_CASTER");
+    expect(world.state.matchWrites).toEqual([]);
   });
 
   it("rejuge sous le verrou du match : un score validé entre la première lecture et le verrou ferme la porte", async () => {
@@ -510,7 +533,7 @@ describe("setMatchLiveConfig", () => {
     await mockLiveDb(world);
 
     await expect(
-      setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/me", setter: CASTER_12, access: LIVE_ONLY }),
+      setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/me", setter: ORGANISER_5, access: STAFF }),
     ).rejects.toThrow("MATCH_NOT_CASTABLE");
     expect(world.state.matchWrites).toEqual([]);
     expect(world.state.streams[0]?.live_url).toBe("https://twitch.tv/x");

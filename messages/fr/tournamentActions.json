@@ -393,7 +393,7 @@
       "close": "Fermer",
       "urlHint": "Obligatoire : sans lui, ton stream n'apparaît ni sur le match ni dans l'annonce du direct (plateformes acceptées : {platforms}). Il est retiré du match si ton compte est supprimé.",
       "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}.",
-      "urlStaff": "Tu co-castes le stream de l'organisation : son lien se règle dans la configuration de la diffusion.",
+      "urlStaff": "Tu co-castes le stream de l'organisation : son lien se règle dans « Diffusion officielle ».",
       "battletag": "BattleTag pour ce cast (facultatif)",
       "battletagHint": "Le compte sur lequel tu seras en jeu : il remplace celui de ton profil dans « Contacts » et sur la page du match. Vide, celui de ton profil reste ; personne ne le vérifie.",
       "battletagInvalid": "BattleTag invalide : 64 caractères au plus, et des caractères visibles.",
