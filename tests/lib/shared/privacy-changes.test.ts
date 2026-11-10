@@ -2587,10 +2587,10 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
   it("processingRegister_t18_rowNeverClosedWhileChannelMayExistFrAndEn", () => {
     expect(t18().retention[0]).toContain("jusqu'à ce que le bot ait repris le salon ou dise ne plus le suivre (salon déjà supprimé, sorti de la catégorie des matchs ou oublié par le bot");
     expect(t18().retention[0]).toContain("s'il refuse de reprendre le salon, le site le lui rend de nouveau environ une fois par minute, puis une fois par heure passé 48 heures après la création du salon actuel, sans limite");
-    expect(t18().retention[0]).toContain("s'il est indisponible, environ une fois par minute tant qu'il l'est");
+    expect(t18().retention[0]).toContain("s'il est indisponible, au fil de l'activité du site (au plus environ une fois par minute) tant qu'il l'est");
     expect(t18().retention[0]).toContain("un salon que le bot dit ne jamais pouvoir suivre (identifiant ou clé invalides), dont la ligne est close aussitôt");
     expect(t18En().retention[0]).toContain("until the bot has taken the channel back or says it no longer tracks it");
-    expect(t18En().retention[0]).toContain("then once an hour from 48 hours after the current channel was created, with no limit; if it is unavailable, about once a minute for as long as it is");
+    expect(t18En().retention[0]).toContain("then once an hour from 48 hours after the current channel was created, with no limit; if it is unavailable, as the site is used (at most about once a minute) for as long as it is");
     expect(t18().retention[0]).not.toContain("si le bot ne le reprend pas, 48 heures");
     expect(t18En().retention[0]).not.toContain("if the bot does not take it back, 48 hours");
   });
@@ -2626,8 +2626,8 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
     expect([entry.id.length <= PRIVACY_CHANGE_ID_MAX_LENGTH, entry.asksTermsAcceptance, privacyChangeReachesAccount(entry, {})]).toEqual([true, undefined, true]);
     expectStandaloneEntry(entry, PRIVACY_CHANGES_EN[entry.id], { after: "2026-11-conditions-v10-avatar-et-succession", publishedAt: "2026-11-12", audience: undefined, links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }] });
     expectEntryTexts(entry, PRIVACY_CHANGES_EN[entry.id], {
-      fr: ["vider le salon ouvert d'une équipe", "sans rien en garder, en journaliser ni en dire au site", "le note sans nommer son auteur", "sauf s'il est l'arbitre désigné du match, jamais nommé", "rend ses salons au bot", "de nouveaux salons s'ouvrent 15 minutes avant sa nouvelle heure", "un rendu refusé est redemandé une fois par heure passé ce délai, un bot indisponible environ une fois par minute", "aucune donnée d'utilisateur", "aucune donnée de joueur n'est collectée", "et le bot ne l'enregistre pas"],
-      en: ["clear a team's open channel", "without keeping, logging or telling the site anything about them", "notes it without naming its author", "unless they are the match's assigned referee, never named", "hands its channels back to the bot", "new channels open 15 minutes before its new time", "a refused hand-back is retried once an hour after that period, an unavailable bot about once a minute", "no user data", "no player data is collected", "and the bot does not record it"],
+      fr: ["vider le salon ouvert d'une équipe", "sans rien en garder, en journaliser ni en dire au site", "le note sans nommer son auteur", "sauf s'il est l'arbitre désigné du match, jamais nommé", "rend ses salons au bot", "de nouveaux salons s'ouvrent 15 minutes avant sa nouvelle heure", "un rendu refusé est redemandé une fois par heure passé ce délai, un bot indisponible au fil de l'activité du site, au plus environ une fois par minute", "aucune donnée d'utilisateur", "aucune donnée de joueur n'est collectée", "et le bot ne l'enregistre pas"],
+      en: ["clear a team's open channel", "without keeping, logging or telling the site anything about them", "notes it without naming its author", "unless they are the match's assigned referee, never named", "hands its channels back to the bot", "new channels open 15 minutes before its new time", "a refused hand-back is retried once an hour after that period, an unavailable bot as the site is used, at most about once a minute", "no user data", "no player data is collected", "and the bot does not record it"],
     });
   });
 
@@ -2644,12 +2644,32 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
     expect(fr).toContain("peut vider le salon ouvert d&apos;une équipe");
     expect(fr).toContain("ou quand le match est reporté à plus de {VOICE_CHANNEL_LEAD_MINUTES} minutes");
     expect(fr).toContain("sans cette réponse du bot, la ligne n&apos;est jamais close");
-    expect(fr).toContain("s&apos;il est indisponible, environ une fois par minute tant qu&apos;il l&apos;est");
+    expect(fr).toContain("s&apos;il est indisponible, au fil de l&apos;activité du site (au plus environ une fois par minute) tant qu&apos;il l&apos;est");
     expect(fr).not.toContain("garde ses salons");
     expect(en).toContain("can clear a team&apos;s open channel");
     expect(en).toContain("or when the match is rescheduled to more than {VOICE_CHANNEL_LEAD_MINUTES} minutes away");
     expect(en).toContain("without that answer from the bot, the record is never closed");
-    expect(en).toContain("if it is unavailable, about once a minute for as long as it is");
+    expect(en).toContain("if it is unavailable, as the site is used (at most about once a minute) for as long as it is");
     expect(en).not.toContain("a rescheduled match keeps its");
+  });
+
+  it("processingRegister_t18_auditLogKeepsClearDisconnectionsNumberAndReasonFrAndEn", () => {
+    expect(t18().retention.join(" ")).toContain("et déconnexions d'un vidage (leur nombre et leur motif, tels que Discord les y inscrit)");
+    expect(t18().subPurposes.join(" ")).toContain("(seul le journal d'audit de Discord note les déconnexions)");
+    expect(t18En().retention.join(" ")).toContain("and the disconnections of a clearing (their number and reason, as Discord records them)");
+    expect(t18En().subPurposes.join(" ")).toContain("(only Discord's audit log notes the disconnections)");
+  });
+
+  it("privacyChanges_voiceClearEntry_auditLogNumberAndReasonFrAndEn", () => {
+    const entry = PRIVACY_CHANGES.find((c) => c.id === voiceClearId)!;
+    expect(entry.details[0]).toContain("garde les déconnexions (leur nombre et le motif du vidage, tels que Discord les y inscrit)");
+    expect(PRIVACY_CHANGES_EN[voiceClearId].details[0]).toContain("(their number and the clearing's reason, as Discord records them)");
+  });
+
+  it("rgpdPages_voiceRetention_auditLogIncludesClearDisconnectionsFrAndEn", () => {
+    const fr = readFileSync(join(process.cwd(), "app", "rgpd", "page.tsx"), "utf8");
+    const en = readFileSync(join(process.cwd(), "app", "rgpd", "RgpdEn.tsx"), "utf8");
+    expect(fr).toContain("avec son nom, et les déconnexions d&apos;un vidage (leur nombre et leur motif, tels que Discord les y inscrit), lisible");
+    expect(en).toContain("with its name, and the disconnections of a clearing (their number and reason, as Discord records them), readable");
   });
 });

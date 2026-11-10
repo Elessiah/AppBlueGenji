@@ -329,7 +329,9 @@ describe("POST /api/admin/matches/[matchId]/voice/clear", () => {
     });
     const res = await CLEAR(clearReq({ teamId: 4 }), matchParams("9"));
     expect(res.status).toBe(500);
-    expect(auditStaffAction).toHaveBeenLastCalledWith("Vidage du salon vocal d'une équipe — match #9 : failed", { id: arbitre.id, pseudo: "ArbitrePseudo" });
+    expect(auditStaffAction).toHaveBeenCalledTimes(2);
+    expect(auditStaffAction).toHaveBeenNthCalledWith(1, "Vidage du salon vocal d'une équipe demandé — match #9", { id: arbitre.id, pseudo: "ArbitrePseudo" });
+    expect(auditStaffAction).toHaveBeenNthCalledWith(2, "Vidage du salon vocal d'une équipe — match #9 : failed", { id: arbitre.id, pseudo: "ArbitrePseudo" });
     expect(announceStaffMatchAction).not.toHaveBeenCalled();
   });
 
