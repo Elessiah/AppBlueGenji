@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { EntrantName } from "./EntrantName";
+import { EntrantName, useShownEntrantName } from "./EntrantName";
 import styles from "./MatchRow.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 
@@ -29,23 +29,48 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
  * ne redessine qu'une carte. Un composant nu aurait rejoué **toutes** les cases
  * à pourvoir de l'arbre à chaque instantané — sur un plateau de trente-deux
  * qualifiées, quinze cartes vides pour une rencontre touchée. Elle ne prend
- * aucune prop : la mémorisation y est donc totale.
+ * que des primitives pour props : la mémorisation reste donc totale.
+ *
+ * **Vainqueur déjà connu** (PLAYOFF-PROJECTED-WINNER) : quand une rencontre du
+ * tour précédent est close, son vainqueur occupe son côté de la case (nom
+ * cliquable, comme partout dans l'arbre) au lieu de `TBD`, sans attendre que le
+ * moteur pose le tour. Affichage seul : la case reste sans action ni ancre.
  */
-export const GhostMatchCard = memo(function GhostMatchCard() {
-  const text = useTournamentPageText();
-  const tbd = text.t("match.tbd");
-
+export const GhostMatchCard = memo(function GhostMatchCard({
+  topTeamId = null,
+  topTeamName = null,
+  bottomTeamId = null,
+  bottomTeamName = null,
+}: Readonly<{
+  topTeamId?: number | null;
+  topTeamName?: string | null;
+  bottomTeamId?: number | null;
+  bottomTeamName?: string | null;
+}>) {
   return (
     <div className={`${styles.card} ${styles.ghostCard}`}>
-      {[1, 2].map((side) => (
-        <div key={side} className={styles.row}>
-          {/* Même passage que la carte réelle : la case d'emblème vide garde sa
-              place, pour que les noms des deux cartes commencent au même
-              endroit d'une colonne à l'autre. */}
-          <EntrantName teamId={null} name={tbd} className={styles.name} />
-          <strong className={styles.score}>-</strong>
-        </div>
-      ))}
+      <GhostSide teamId={topTeamId} name={topTeamName} />
+      <GhostSide teamId={bottomTeamId} name={bottomTeamName} />
     </div>
   );
 });
+
+function GhostSide({ teamId, name }: Readonly<{ teamId: number | null; name: string | null }>) {
+  const text = useTournamentPageText();
+  const shown = useShownEntrantName(teamId, name);
+
+  return (
+    <div className={styles.row}>
+      {/* Même passage que la carte réelle : la case d'emblème vide garde sa
+          place, pour que les noms des deux cartes commencent au même
+          endroit d'une colonne à l'autre. */}
+      <EntrantName
+        teamId={teamId}
+        name={teamId === null ? text.t("match.tbd") : (shown ?? "")}
+        truncate={teamId !== null}
+        className={styles.name}
+      />
+      <strong className={styles.score}>-</strong>
+    </div>
+  );
+}
