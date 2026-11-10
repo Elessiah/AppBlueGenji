@@ -109,6 +109,51 @@ export async function readJsonBody(req: Request, maxBytes: number = JSON_BODY_MA
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
+/** Vrai si `Content-Length` annonce un corps non vide. */
+function announcesBody(req: Request): boolean {
+  const length = Number(req.headers.get("content-length") ?? "0");
+  return Number.isFinite(length) && length > 0;
+}
+
+/**
+ * Vrai si le corps est d'un autre type que JSON et peut ne pas être vide : un
+ * `Content-Type` non JSON sans `Content-Length: 0`, ou un corps annoncé non
+ * vide sans type JSON.
+ */
+function declaresForeignBody(req: Request): boolean {
+  const type = req.headers.get("content-type");
+  if (isJsonContentType(type)) return false;
+  return announcesBody(req) || (type !== null && req.headers.get("content-length")?.trim() !== "0");
+}
+
+/**
+ * Corps JSON **facultatif** : un corps vide — `Content-Length: 0`, ou aucun
+ * octet lu d'un envoi fragmenté ou HTTP/2 sans longueur — vaut `{}`, sans
+ * exiger de `Content-Type` ; un corps non vide passe par les mêmes gardes que
+ * `readJsonBody` (borne, type déclaré, JSON valide). Un corps **illisible**
+ * n'est jamais pris pour un corps vide : il rend son code de refus
+ * (`bodyReadRefusal`, sinon `refusal`).
+ */
+export async function readOptionalJsonBody(
+  req: Request,
+  refusal: string,
+  maxBytes: number = JSON_BODY_MAX_BYTES,
+): Promise<{ body: unknown } | { refusal: string }> {
+  try {
+    // Un corps d'un autre type déclaré est refusé sans être lu — annoncé non
+    // vide, ou fragmenté sans longueur : seul un `Content-Length: 0` passe.
+    if (declaresForeignBody(req)) {
+      throw new Error(UNSUPPORTED_CONTENT_TYPE);
+    }
+    const bytes = await readBodyBytes(req, maxBytes);
+    if (bytes.byteLength === 0) return { body: {} };
+    if (!isJsonContentType(req.headers.get("content-type"))) throw new Error(UNSUPPORTED_CONTENT_TYPE);
+    return { body: JSON.parse(new TextDecoder().decode(bytes)) };
+  } catch (error) {
+    return { refusal: bodyReadRefusal(error) ?? refusal };
+  }
+}
+
 /**
  * `req.formData()`, borné. Le corps lu est rendu à l'analyseur de la
  * plateforme avec son `Content-Type` (qui porte la limite du multipart).
@@ -122,6 +167,23 @@ export async function readFormDataBody(
   const bytes = await readBodyBytes(req, maxBytes);
   const contentType = req.headers.get("content-type") ?? "";
   return new Response(bytes, { headers: { "content-type": contentType } }).formData();
+}
+
+/**
+ * Corps JSON facultatif **en objet** (`readOptionalJsonBody`) : un JSON qui
+ * n'est pas un objet (`null`, nombre, chaîne, tableau) est refusé sous
+ * `refusal`, comme un corps illisible — jamais pris pour un corps vide.
+ */
+export async function readOptionalJsonObject(
+  req: Request,
+  refusal: string,
+  maxBytes: number = JSON_BODY_MAX_BYTES,
+): Promise<{ body: Record<string, unknown> } | { refusal: string }> {
+  const read = await readOptionalJsonBody(req, refusal, maxBytes);
+  if ("refusal" in read) return read;
+  const body = read.body;
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return { refusal };
+  return { body: body as Record<string, unknown> };
 }
 
 /**

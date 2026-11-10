@@ -628,6 +628,9 @@ async function deleteAccountNow(
   for (const tournamentId of touchedTournaments) {
     afterCommit(() => publishMatchUpdatedEvent(tournamentId, { landingLive: true }), `Tournoi #${tournamentId} non prévenu`);
   }
+  // Le cache des pseudos d'arbitre n'est pas vidé : le retrait de l'arbitrage
+  // (`referee_user_id` remis à NULL) change la version des instantanés touchés,
+  // donc la clé — vider tout le cache à chaque suppression le rendrait inutile.
 
   // Le plateau des tournois dont l'inscription solo est partie (D12) : la liste
   // des engagés, l'aperçu du tirage et les instantanés ouverts.

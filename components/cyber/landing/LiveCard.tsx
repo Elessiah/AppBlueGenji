@@ -93,6 +93,19 @@ export function streamBannerText(t: LandingT, platformName: string | null, chann
   return platformName ? t("live.watchOn", { platform: platformName }) : t("common.watchLive");
 }
 
+/**
+ * Le texte du bouton découpé autour du nom de la chaîne : seul ce nom garde ses
+ * majuscules (`keepCase`), « Regarder » suit les capitales du bandeau. Le nom
+ * clôt le texte des deux langues : cherché depuis la fin, un nom contenu dans
+ * « Regarder » ou « Watch » (« der », « at ») ne s'y accroche pas.
+ */
+export function splitChannelText(text: string, channel: string | null): { before: string; channel: string; after: string } | null {
+  if (!channel) return null;
+  const at = text.lastIndexOf(channel);
+  if (at < 0) return null;
+  return { before: text.slice(0, at), channel, after: text.slice(at + channel.length) };
+}
+
 /** Nom accessible du bouton de stream : il commence par son texte visible (WCAG 2.5.3). */
 export function streamBannerLabel(
   t: LandingT,
@@ -125,12 +138,14 @@ function MatchStreamBanner({
   const platformName = platform ? PLATFORM_LABELS[platform] : null;
   // Le nom de la chaîne quand le lien en nomme une (« Regarder bluegenji »).
   const channel = streamChannelName(streamHref);
+  const text = streamBannerText(t, platformName, channel);
+  // Le nom de la chaîne garde ses majuscules (« REGARDER BlueGenji ») : le
+  // bandeau, en capitales, les effacerait ; « Regarder » garde les siennes.
+  const parts = splitChannelText(text, channel);
   return (
     <div className={styles.streamBanner}>
       <a
-        // Le nom de la chaîne garde ses majuscules (« Regarder BlueGenji ») : le
-        // bandeau, en capitales, les effacerait.
-        className={[styles.streamButton, styles.nested, channel ? styles.keepCase : null].filter(Boolean).join(" ")}
+        className={`${styles.streamButton} ${styles.nested}`}
         href={streamHref}
         target="_blank"
         rel="noopener noreferrer"
@@ -138,7 +153,15 @@ function MatchStreamBanner({
         title={channel ?? undefined}
       >
         <span aria-hidden="true">▶</span>
-        {streamBannerText(t, platformName, channel)}
+        {parts ? (
+          <span>
+            {parts.before}
+            <span className={styles.keepCase}>{parts.channel}</span>
+            {parts.after}
+          </span>
+        ) : (
+          text
+        )}
       </a>
     </div>
   );
@@ -545,14 +568,18 @@ export function LiveCard({ live, nextUpcomingISO, spectator = false }: Readonly<
               spectateurs de la diffusion, même sans diffusion — ce sont les
               visiteurs qui suivent la page du tournoi. */}
           {visibleViewers !== null && (
-            <span className={styles.viewers} title={t("live.viewers", { count: visibleViewers })}>
+            <span className={styles.viewers}>
               {/* Un nombre nu ne dit rien à un lecteur d'écran : le libellé
-                  entier lui est lu, l'icône et le chiffre restent visuels. */}
-              <Users size={12} aria-hidden="true" />
-              <span className="sr-only">{t("live.viewers", { count: visibleViewers })}</span>
-              <span className="mono" aria-hidden="true">
-                {visibleViewers}
+                  entier lui est lu, l'icône et le chiffre restent visuels. Le
+                  `title` (lu à l'écran au survol) couvre l'icône et le chiffre ;
+                  le texte masqué, lui, porte la lecture d'écran. */}
+              <span className={styles.viewersGroup} title={t("live.viewers", { count: visibleViewers })}>
+                <Users size={12} aria-hidden="true" />
+                <span className="mono" aria-hidden="true">
+                  {visibleViewers}
+                </span>
               </span>
+              <span className="sr-only">{t("live.viewers", { count: visibleViewers })}</span>
             </span>
           )}
         </div>

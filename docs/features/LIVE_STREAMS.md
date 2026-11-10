@@ -20,8 +20,11 @@ lien) : le comportement d'avant, pour le premier stream. Avant le lancement, le 
 plus la condition du cast est tu, lien compris. La carte d'un match ne garde que le premier lien, suivi de « +N » vers
 la page du match (`MATCH_PAGE.md`), qui montre tous les streams, chacun avec ses casters.
 Un lien de stream porte le nom de sa chaîne (`streamChannelName`). La configuration du direct règle le lien de
-son propre stream (`staff_owned`), jamais celui qu'un caster a ouvert ; « pas
-de cast » n'efface que ce lien du staff. Depuis `CAST_SETTINGS.md`, cette
+son propre stream (`staff_owned`), jamais celui qu'un caster a ouvert ni celui
+qu'un autre caster tient vidé de son lien (le staff ouvre alors le sien) ; « pas
+de cast » n'efface que ce lien du staff. Les refus (`STAFF_STREAM_FORBIDDEN`,
+`LIVE_TRIGGER_NOT_OWNED`) sont jugés avant toute écriture ; un lien envoyé sans
+mode sur un match démarqué entre-temps est refusé (`MATCH_NOT_STREAMED`, 409). Depuis `CAST_SETTINGS.md`, cette
 configuration est réservée à la permission `tournaments` (la diffusion de
 l'organisation) ; un **caster** règle la sienne — le lien de son stream, le mode
 d'antenne du match, l'antenne, la rediff — dans « Configurer ma diffusion », et

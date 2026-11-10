@@ -19,7 +19,7 @@ commit : `lib/server/tournaments/referee-notices.ts`. Fenêtre du staff :
 | Colonne | Rôle |
 | --- | --- |
 | `referee_user_id` | arbitre désigné, `NULL` sinon ; clé étrangère `ON DELETE SET NULL`, index `idx_bg_matches_referee` |
-| `referee_ready_at` | son « Prêt », remis à zéro à chaque désignation |
+| `referee_ready_at` | son « Prêt », remis à zéro à chaque désignation et quand un report (ou la planification par arbitre) fait quitter le lancement au match |
 | `self_managed` | autogestion (`0`/`1`), exclusive de l'arbitre |
 | `first_map` | première carte saisie par le staff (64 caractères, `visibleText`) |
 
@@ -197,8 +197,8 @@ règle a changé avec l'arbitre hôte.
   toutes les 10 s en lobby tant qu'un arbitre n'est pas prêt
   (`refereeReadyRereadDue`, `useClientPower().clocks`).
 - **Membre connecté** : `TournamentViewerContext.refereeNames`
-  (`{ matchId, refereeKey, pseudo }`, `loadRefereeNames`, cache 5 s par
-  version) — le bandeau et la page du match lisent « Arbitre : <pseudo> »
+  (`{ matchId, refereeKey, pseudo }`, `loadRefereeNames`, cache 30 s par
+  version, lecture des seuls matchs montrés) — le bandeau et la page du match lisent « Arbitre : <pseudo> »
   (`refereeNameOf`, pseudo par `visibleText`), sinon « Arbitre désigné ».
   Le contexte n'arrivant qu'à la connexion SSE ou par le GET REST, une
   empreinte sans nom (`missingRefereeNamesKey`) déclenche une seule relecture

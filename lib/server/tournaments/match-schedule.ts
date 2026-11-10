@@ -105,7 +105,7 @@ function scheduleUpdateSql(leaving: boolean, scoreNoted: boolean): string {
   }
   return `UPDATE bg_matches
           SET start_at = ?, launched_at = NULL, lobby_opened_at = NULL, team1_ready_at = NULL,
-              team2_ready_at = NULL
+              team2_ready_at = NULL, referee_ready_at = NULL
           WHERE id = ?`;
 }
 

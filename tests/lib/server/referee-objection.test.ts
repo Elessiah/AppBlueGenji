@@ -3,11 +3,16 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/match-launch");
 jest.mock("@/lib/server/tournaments/cast-eligibility");
+jest.mock("@/lib/server/tournaments/referee-names", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/tournaments/referee-names")>("@/lib/server/tournaments/referee-names"),
+  forgetRefereeNames: jest.fn(),
+}));
 
 import { getDatabase } from "@/lib/server/database";
 import { loadRefereePermission } from "@/lib/server/tournaments/cast-eligibility";
 import { queueDeferredNoRefereeAlerts, releaseObjectingReferee } from "@/lib/server/tournaments/match-launch";
 import { setRefereeObjection } from "@/lib/server/tournaments/referee-objection";
+import { forgetRefereeNames } from "@/lib/server/tournaments/referee-names";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /**
@@ -94,6 +99,43 @@ describe("setRefereeObjection", () => {
     expect(execute.mock.calls[0][0]).toContain("SET referee_objection_at = NULL");
     expect(execute).toHaveBeenCalledTimes(1);
     expect(releaseObjectingReferee).not.toHaveBeenCalled();
+  });
+
+  it("setRefereeObjection_newObjection_forgetsCachedRefereeNames", async () => {
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockResolvedValueOnce([[], []]);
+
+    await setRefereeObjection(REFEREE, true);
+
+    expect(forgetRefereeNames).toHaveBeenCalledTimes(1);
+  });
+
+  it("setRefereeObjection_alreadyUpheld_doesNotForgetNames", async () => {
+    execute
+      .mockResolvedValueOnce([{ affectedRows: 0 }, []])
+      .mockResolvedValueOnce([[{ id: REFEREE }], []])
+      .mockResolvedValueOnce([[], []]);
+
+    await setRefereeObjection(REFEREE, true);
+
+    expect(forgetRefereeNames).not.toHaveBeenCalled();
+  });
+
+  it("setRefereeObjection_lift_doesNotForgetNames", async () => {
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]);
+
+    await setRefereeObjection(REFEREE, false);
+
+    expect(forgetRefereeNames).not.toHaveBeenCalled();
+  });
+
+  it("setRefereeObjection_sweepUnreadable_namesStillForgotten", async () => {
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockRejectedValueOnce(new Error("connection lost"));
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const result = await setRefereeObjection(REFEREE, true);
+
+    expect(result.failed).toBe(1);
+    expect(forgetRefereeNames).toHaveBeenCalledTimes(1);
   });
 
   it("setRefereeObjection_unknownAccount_throwsUserNotFound", async () => {

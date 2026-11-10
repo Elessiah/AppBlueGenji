@@ -1059,9 +1059,10 @@ export function RgpdEn({
             caster provided, there or when opening their stream, also goes when their account is deleted, played
             matches included, even if another caster still holds that stream; a member of the organizers states, when
             setting the link, whether it is the organizers&apos; link — it then stays with the match, even if that
-            member casts it — or their own channel, which goes with their account. They can also state it when opening their own
-            stream or in “Configure my broadcast”: that link then does not go with their account, but with that
-            stream once no caster holds it any more. A link set in that configuration before the site recorded who provided it has no
+            member casts it — or their own channel, which goes with their account. A caster never states it when opening their own
+            stream or in “Configure my broadcast”: that link always goes with their account (a link a caster had
+            called the organizers&apos; before 10 November 2026 goes with that stream once no caster holds it any
+            more). A link set in that configuration before the site recorded who provided it has no
             known author and stays with the match.{" "}
             When a match goes live (“live mode”) can only be changed or removed by the caster who set it — the site keeps
             their account with the match and erases it when they leave the match or no longer meet the conditions to cast it, when the mode is removed, or when

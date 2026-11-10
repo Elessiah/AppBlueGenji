@@ -21,7 +21,6 @@ import { useLiveControls } from "../_lib/live-context";
 import { useTournamentGame } from "../_lib/match-format-context";
 import {
   CastBattletagField,
-  CastOrganisationLinkField,
   CastTriggerField,
   CastUrlField,
   castBattletagInvalid,
@@ -48,7 +47,7 @@ export type CastClaimOutcome = { ok: true } | { ok: false; code: string; message
  * l'ouvre aussi, avec le seul choix « ouvrir mon propre stream ».
  *
  * Ouvrir son propre stream règle du même geste ce que l'ancien bouton
- * « Configurer la diffusion » offrait : le mode de passage à l'antenne du match
+ * « Configurer la diffusion » (aujourd'hui « Diffusion officielle », celle de l'organisation) offrait : le mode de passage à l'antenne du match
  * et, pour la permission `tournaments`, l'origine du lien. Le BattleTag de ce
  * cast suit les deux choix — il parle du caster, non de son stream.
  *
@@ -56,8 +55,9 @@ export type CastClaimOutcome = { ok: true } | { ok: false; code: string; message
  * Entrée réflexe sur un bouton radio ne doit pas inscrire un caster.
  *
  * Un stream choisi qui disparaît (son dernier caster parti) démonte son bouton
- * radio : le focus passe au premier choix restant et une annonce
- * (`aria-live`) dit pourquoi « Caster ce match » est désarmé.
+ * radio : le focus passe au premier choix restant et une notification dit
+ * pourquoi « Caster ce match » est désarmé (une zone `aria-live` à défaut de
+ * notifications, jamais les deux).
  *
  * `onClaim` envoie le corps (`castClaimBody`) et notifie l'issue ; un lien
  * refusé par le serveur est en plus rattaché au champ (`useFieldErrors`).
@@ -78,7 +78,6 @@ export function CastClaimDialog({
 }>) {
   const { t, locale } = useActionsText();
   const controls = useLiveControls();
-  const { canSchedule } = controls;
   // Mode déjà posé par un autre caster : il se lit, il ne se change pas à
   // l'inscription (`LIVE_TRIGGER_NOT_OWNED`) — le corps ne le porte pas. Le
   // lecteur s'inscrit : il est jugé en caster du match.
@@ -100,19 +99,20 @@ export function CastClaimDialog({
   // Le choix disparu est oublié : un stream qui reviendrait ne se recocherait pas seul.
   if (choice === null && choiceKey !== "") setChoiceKey("");
   const [url, setUrl] = useState("");
+  // Le rappel « lien obligatoire » n'apparaît qu'une fois le champ touché puis vidé.
+  const [urlTouched, setUrlTouched] = useState(false);
   const [battletag, setBattletag] = useState("");
   // Un match déjà casté garde son mode ; sinon « automatique au démarrage »,
   // qui ne demande plus un clic à l'heure dite.
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "AUTO");
-  const [organisationLink, setOrganisationLink] = useState(false);
   const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId, battletag: battletagId });
   // Un match dont le score est saisi s'inscrit encore, mais son mode ne bouge
   // plus (`isMatchCastable`) : le choix n'est pas offert, ni envoyé.
   const castable = isMatchCastable({ ...match, liveStartedAt: null, launchedAt: null });
   const fieldsetRef = useRef<HTMLFieldSetElement>(null);
   const gone = choice === null;
-  // Le refus se notifie aussi en bas à gauche (règle des erreurs) : le texte
-  // de la modale explique seulement pourquoi « Caster ce match » est désarmé.
+  // Le refus se notifie aussi en bas à gauche (règle des erreurs) ; le texte
+  // de la modale, lui, reste et explique pourquoi « Caster ce match » est désarmé.
   const toast = useOptionalToast();
   const goneMessage = t("cardActions.claimDialog.gone");
   const notifyGone = useRef({ toast, goneMessage });
@@ -142,7 +142,7 @@ export function CastClaimDialog({
   const confirm = async (): Promise<boolean> => {
     if (choice === null) return false;
     const outcome = await onClaim(
-      castClaimBody(choice, { url, battletag, trigger: triggerLocked || !castable ? undefined : trigger, organisationLink }),
+      castClaimBody(choice, { url, battletag, trigger: triggerLocked || !castable ? undefined : trigger }),
     );
     if (!outcome.ok) fieldErrors.report(outcome.code, outcome.message);
     return outcome.ok;
@@ -192,17 +192,22 @@ export function CastClaimDialog({
           );
         })}
       </fieldset>
-      {/* Annonce seule (lecteur d'écran) : le toast dit déjà la disparition à l'écran. */}
-      <output className="sr-only" aria-live="polite">
-        {gone ? t("cardActions.claimDialog.gone") : ""}
+      {/* Le choix disparu reste dit dans la modale tant qu'il faut rechoisir
+          (le toast s'efface seul) : c'est aussi la zone vive du repli sans
+          notifications — sous un ToastProvider, une seule voix l'annonce. */}
+      <output className={styles.gone} aria-live={toast ? "off" : "polite"}>
+        {gone ? goneMessage : ""}
       </output>
       {separate && (
         <>
           <CastUrlField
+            required
+            missing={urlMissing && urlTouched}
             id={urlId}
             value={url}
             onChange={(next) => {
               setUrl(next);
+              setUrlTouched(true);
               fieldErrors.clear("url");
             }}
             invalid={urlRefused || fieldErrors.invalidField === "url"}
@@ -215,9 +220,6 @@ export function CastClaimDialog({
               onChange={setTrigger}
               locked={triggerLocked}
             />
-          )}
-          {canSchedule && url.trim() !== "" && (
-            <CastOrganisationLinkField checked={organisationLink} onChange={setOrganisationLink} />
           )}
         </>
       )}

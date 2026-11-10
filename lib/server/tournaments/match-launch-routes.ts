@@ -1,7 +1,7 @@
 import { fail } from "@/lib/server/http";
 import { isContentionError } from "@/lib/server/mysql-errors";
 import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
-import { isMatchLiveTrigger } from "@/lib/shared/live-streams";
+import { isMatchLiveTrigger, parseOrganisationLink } from "@/lib/shared/live-streams";
 import type { CastSettings } from "./cast-settings";
 import type { CastTarget } from "./match-launch";
 
@@ -74,7 +74,6 @@ function readField<T>(
 }
 
 const isString = (value: unknown): value is string => typeof value === "string";
-const isBoolean = (value: unknown): value is boolean => typeof value === "boolean";
 
 /**
  * Réglages du cast lus dans un corps de requête (`CastSettings`) : chaque champ
@@ -83,9 +82,6 @@ const isBoolean = (value: unknown): value is boolean => typeof value === "boolea
  * (« plus casté », « le BattleTag de mon compte ») ; un lien `null` est refusé
  * au réglage (`STREAM_URL_REQUIRED`).
  *
- * `asOrganisation` ne s'accorde qu'à la permission `tournaments` : la route le
- * refuse aux autres (403), jamais en silence (`MatchLiveSetter`).
- *
  * Rend `null` sur un type inattendu : le refus est `INVALID_CAST_SETTINGS`.
  */
 export function parseCastSettings(body: unknown): CastSettings | null {
@@ -93,14 +89,27 @@ export function parseCastSettings(body: unknown): CastSettings | null {
   const trigger = readField(raw, "trigger", isMatchLiveTrigger);
   const liveUrl = readField(raw, "liveUrl", isString);
   const battletag = readField(raw, "battletag", isString);
-  const organisationLink = readField(raw, "organisationLink", isBoolean);
-  // `null` n'est pas un choix : l'origine du lien se dit, ou ne se dit pas.
   if (trigger === INVALID || liveUrl === INVALID || battletag === INVALID) return null;
-  if (organisationLink === INVALID || organisationLink === null) return null;
   const settings: CastSettings = {};
   if (trigger !== undefined) settings.trigger = trigger;
   if (liveUrl !== undefined) settings.liveUrl = liveUrl;
   if (battletag !== undefined) settings.battletag = battletag;
-  if (organisationLink !== undefined) settings.asOrganisation = organisationLink;
   return settings;
+}
+
+/**
+ * Refus que vaut la clé `organisationLink` d'un corps de caster, ou `null`.
+ * Un caster ne dit jamais son lien « de l'organisation » (décision du
+ * 2026-11-09), seul le staff le fait dans la configuration du direct : `true`
+ * est refusé (403 `STAFF_STREAM_FORBIDDEN`), jamais en silence. `false` — sa
+ * propre chaîne, ce que vaut tout lien de caster — passe : une fenêtre ouverte
+ * avant la mise à jour l'envoie encore. Toute autre valeur (`"true"`, `1`,
+ * `null`…) est illisible (400 `INVALID_ORGANISATION_LINK`), comme sur la
+ * route de la configuration du direct.
+ */
+export function castOrganisationLinkRefusal(body: unknown): { code: string; status: number } | null {
+  if (typeof body !== "object" || body === null) return null;
+  const value = parseOrganisationLink((body as { organisationLink?: unknown }).organisationLink);
+  if (value === null) return { code: "INVALID_ORGANISATION_LINK", status: 400 };
+  return value ? { code: "STAFF_STREAM_FORBIDDEN", status: 403 } : null;
 }

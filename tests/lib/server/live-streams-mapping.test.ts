@@ -1,5 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
-import { mapCard, mapMatch } from "@/lib/server/tournaments/_internal";
+import { mapCard, mapMatch, type MatchRow, type TournamentListRow } from "@/lib/server/tournaments/_internal";
+import type { CastEligibilityFields } from "@/lib/server/tournaments/cast-eligibility";
+import type { MatchCasterRow } from "@/lib/server/tournaments/match-casters";
+import type { RowOverrides } from "../../helpers/row-overrides";
+import { matchRow as baseMatchRow, tournamentListRow } from "../../helpers/tournament-rows";
 
 /**
  * Revalidation des liens de diffusion à la lecture.
@@ -11,79 +15,26 @@ import { mapCard, mapMatch } from "@/lib/server/tournaments/_internal";
  * la chaîne de diffusion.
  */
 
-function tournamentRow(liveUrl: string | null) {
-  return {
-    id: 1,
-    name: "Coupe",
-    description: null,
-    format: "SINGLE",
-    game: "OW",
-    max_teams: 8,
-    registered_teams: 8,
-    state: "RUNNING",
-    start_visibility_at: new Date("2026-08-01T00:00:00Z"),
-    registration_open_at: new Date("2026-08-01T00:00:00Z"),
-    registration_close_at: new Date("2026-08-10T00:00:00Z"),
-    start_at: new Date("2026-08-20T00:00:00Z"),
-    bracket_size: 8,
-    created_at: new Date("2026-08-01T00:00:00Z"),
-    organizer_user_id: 1,
-    finished_at: null,
-    has_third_place_match: 0,
-    survival_rounds_before_first_cut: null,
-    survival_rounds_per_cut: null,
-    survival_current_round: 0,
-    current_phase_id: null,
-    manual_seeding: 0,
-    participant_type: "TEAM",
-    match_format_type: null,
-    match_format_value: null,
-    live_url: liveUrl,
-  } as never;
+/** La ligne de liste d'un tournoi en cours, avec sa chaîne officielle `liveUrl`. */
+function tournamentRow(liveUrl: string | null): TournamentListRow {
+  return tournamentListRow({ name: "Coupe", state: "RUNNING", registered_teams: 8, live_url: liveUrl });
 }
 
-function matchRow(startAt: Date | null = null, overrides: Record<string, unknown> = {}) {
-  return {
+/** Le match 5 (Alpha contre Bravo), à l'heure `startAt`, mode `AUTO`. */
+function matchRow(startAt: Date | null = null, overrides: RowOverrides<MatchRow> = {}): MatchRow {
+  return baseMatchRow({
     id: 5,
-    tournament_id: 1,
-    bracket: "UPPER",
-    round_number: 1,
-    match_number: 1,
-    status: "READY",
-    team1_id: 1,
-    team2_id: 2,
     team1_name: "Alpha",
     team2_name: "Bravo",
-    team1_placeholder: null,
-    team2_placeholder: null,
-    team1_score: null,
-    team2_score: null,
-    winner_team_id: null,
-    loser_team_id: null,
-    forfeit_team_id: null,
-    next_winner_match_id: null,
-    next_winner_slot: null,
-    next_loser_match_id: null,
-    next_loser_slot: null,
-    team1_report_score: null,
-    team1_report_opponent_score: null,
-    team1_reported_at: null,
-    team2_report_score: null,
-    team2_report_opponent_score: null,
-    team2_reported_at: null,
-    score_deadline_at: null,
     updated_at: new Date("2026-08-20T00:00:00Z"),
-    phase_id: 0,
-    phase_position: null,
     start_at: startAt,
     live_trigger: "AUTO",
-    live_started_at: null,
     ...overrides,
-  } as never;
+  });
 }
 
 /** Un caster du match 5 sur le stream `streamId`, éligible sauf `eligibility`. */
-function casterRow(userId: number, streamId: number, eligibility: Record<string, unknown> = {}) {
+function casterRow(userId: number, streamId: number, eligibility: Partial<CastEligibilityFields> = {}): MatchCasterRow {
   return {
     matchId: 5,
     userId,
@@ -101,7 +52,7 @@ function casterRow(userId: number, streamId: number, eligibility: Record<string,
       platform_roles_json: JSON.stringify(["CASTER"]),
       ...eligibility,
     },
-  } as never;
+  };
 }
 
 describe("mapCard — chaîne officielle", () => {
@@ -168,6 +119,23 @@ describe("mapMatch — chaîne du match", () => {
     expect(match.streams).toHaveLength(1);
   });
 
+  it("un match joué tait le stream orphelin et son lien (D25)", () => {
+    const match = mapMatch(matchRow(null, { status: "COMPLETED" }), {
+      streams: [stream(1, "https://twitch.tv/orphelin")],
+      casters: [],
+    });
+    expect(match.liveUrl).toBeNull();
+    expect(match.streams).toEqual([]);
+  });
+
+  it("un match joué garde le lien du stream que tient un caster devenu inéligible", () => {
+    const match = mapMatch(matchRow(null, { status: "COMPLETED" }), {
+      streams: [stream(1, "https://twitch.tv/caster")],
+      casters: [casterRow(1, 1, { is_deleted: 1 })],
+    });
+    expect(match.liveUrl).toBe("https://twitch.tv/caster");
+  });
+
   it("expose le mode et l'antenne tels quels", () => {
     const match = mapMatch(matchRow());
     expect(match.liveTrigger).toBe("AUTO");
@@ -189,8 +157,7 @@ describe("mapMatch — date de début", () => {
     // La migration ajoute la colonne, mais un appelant qui construit une ligne
     // sans elle (test, cache d'un ancien format) ne doit pas produire `undefined`
     // dans la charge utile poussée par le flux.
-    const row = matchRow() as unknown as Record<string, unknown>;
-    delete row.start_at;
-    expect(mapMatch(row as never).startAt).toBeNull();
+    const { start_at: _absent, ...row } = matchRow();
+    expect(mapMatch(row as MatchRow).startAt).toBeNull();
   });
 });

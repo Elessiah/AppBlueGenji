@@ -22,8 +22,6 @@ export type CastClaimBody = ({ streamId: number } | { liveUrl: string }) & {
   trigger?: MatchLiveTrigger;
   /** BattleTag donné pour ce cast ; `null` = celui du compte. */
   battletag?: string | null;
-  /** Le lien posé est celui de l'organisation (permission `tournaments` seule). */
-  organisationLink?: boolean;
 };
 
 /** Ce que la fenêtre d'inscription a saisi, avant d'en faire un corps. */
@@ -34,8 +32,6 @@ export type CastClaimInput = {
   battletag: string;
   /** Mode d'antenne choisi (stream propre) ; absent quand il n'est pas le sien à changer. */
   trigger?: MatchLiveTrigger;
-  /** Case « lien de l'organisation » (permission `tournaments`). */
-  organisationLink: boolean;
 };
 
 /**
@@ -68,7 +64,7 @@ export function castClaimChoiceKey(choice: CastClaimChoice): string {
  *
  * Le BattleTag du cast suit les deux choix : il parle du caster, non de son
  * stream — un co-caster paraît lui aussi dans les contacts. Le mode d'antenne
- * et l'origine du lien ne suivent que le stream qu'il ouvre : rejoindre un
+ * ne suit que le stream qu'il ouvre : rejoindre un
  * stream ne pose aucun lien, et le mode du match est alors déjà celui de qui
  * l'a configuré.
  */
@@ -79,6 +75,5 @@ export function castClaimBody(choice: CastClaimChoice, input: CastClaimInput): C
     liveUrl: input.url.trim(),
     battletag,
     ...(input.trigger === undefined ? {} : { trigger: input.trigger }),
-    ...(input.organisationLink ? { organisationLink: true } : {}),
   };
 }

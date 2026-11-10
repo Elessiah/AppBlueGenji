@@ -5,7 +5,12 @@ jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/tournaments/notifications");
+jest.mock("@/lib/server/tournaments/referee-names", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/tournaments/referee-names")>("@/lib/server/tournaments/referee-names"),
+  forgetRefereeNames: jest.fn(),
+}));
 
+import { forgetRefereeNames } from "@/lib/server/tournaments/referee-names";
 import {
   loadSoloRegistrations,
   deleteOwnAccount,
@@ -790,6 +795,16 @@ describe("deleteOwnAccount — les matchs qui le nommaient sont rafraîchis", ()
       [3, { landingLive: true }],
       [4, { landingLive: true }],
     ]);
+  });
+
+  it("deleteOwnAccount_committed_keepsWholeRefereeNamesCache", async () => {
+    // Le retrait de l'arbitrage change la version des instantanés : la clé du
+    // cache change d'elle-même, rien n'est vidé pour tous les tournois.
+    fakeDb(EMPTY);
+
+    await deleteOwnAccount(7);
+
+    expect(forgetRefereeNames).not.toHaveBeenCalled();
   });
 
   it("deleteOwnAccount_noMatchRole_publishesNothing", async () => {

@@ -1266,9 +1266,10 @@ function RgpdFr({
             son stream, part aussi à la suppression de son compte, matchs joués compris, même si un autre caster
             tient encore ce stream ; un membre de l&apos;organisation y indique, en posant le lien, s&apos;il est celui de
             l&apos;organisation — il reste alors au match, même si ce membre le caste — ou sa propre chaîne,
-            qui part avec son compte. Il peut l&apos;indiquer aussi en ouvrant son propre stream ou dans
-            « Configurer ma diffusion » : ce lien ne part alors pas avec son compte, mais avec ce stream quand
-            plus aucun caster ne le tient. Un lien
+            qui part avec son compte. Un caster ne l&apos;indique jamais en ouvrant son propre stream ni dans
+            « Configurer ma diffusion » : ce lien-là part toujours avec son compte (un lien qu&apos;un caster avait
+            dit de l&apos;organisation avant le 10 novembre 2026 part avec ce stream quand plus aucun caster ne le
+            tient). Un lien
             posé dans cette configuration avant que le site n&apos;enregistre qui le fournit n&apos;a pas d&apos;auteur
             connu et reste au match.{" "}
             Le moment où un match passe à l&apos;antenne (« mode d&apos;antenne ») ne se change ou ne se retire que par le

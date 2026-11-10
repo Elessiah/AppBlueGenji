@@ -39,7 +39,7 @@ describe("GET /api/matches/[matchId]/caster", () => {
 
   it("casterGet_registeredCaster_returnsOwnSettingsOnly", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
-    jest.mocked(loadOwnCastSettings).mockResolvedValue({ streamId: 3, liveUrl: "https://twitch.tv/voix", staffStream: false, battletag: "Voix#2100", organisationLink: false });
+    jest.mocked(loadOwnCastSettings).mockResolvedValue({ streamId: 3, liveUrl: "https://twitch.tv/voix", staffStream: false, battletag: "Voix#2100" });
     const res = await casterGet(jsonRequest("GET"), params("42"));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ streamId: 3, battletag: "Voix#2100" });
@@ -89,12 +89,68 @@ describe("PUT /api/matches/[matchId]/caster", () => {
     expect(setCastSettings).toHaveBeenCalledWith(42, 3, true, { trigger: "AUTO" }, { oversees: true, manages: true });
   });
 
-  it("casterPut_organisationLinkFalseAlone_allowedForCaster", async () => {
+  it("casterPut_organisationLinkTrue_returns403StaffStreamForbidden", async () => {
+    // Décision D7 du 2026-11-09 : un caster ne dit jamais son lien « de l'organisation ».
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    const res = await casterPut(jsonRequest("PUT", { liveUrl: "twitch.tv/voix", organisationLink: true }), params("42"));
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "STAFF_STREAM_FORBIDDEN" });
+    expect(setCastSettings).not.toHaveBeenCalled();
+  });
+
+  it("casterPut_organisationLinkFalseFromOldTab_ignored", async () => {
+    // Une fenêtre ouverte avant D7 envoie encore `false` (sa propre chaîne) : la clé est ignorée.
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     jest.mocked(setCastSettings).mockResolvedValue();
-    const res = await casterPut(jsonRequest("PUT", { organisationLink: false }), params("42"));
+    const res = await casterPut(jsonRequest("PUT", { trigger: "AUTO", organisationLink: false }), params("42"));
     expect(res.status).toBe(200);
-    expect(setCastSettings).toHaveBeenCalledWith(42, 4, true, { asOrganisation: false }, { oversees: false, manages: false });
+    expect(jest.mocked(setCastSettings).mock.calls[0]?.[3]).toEqual({ trigger: "AUTO" });
+  });
+
+  it("casterPut_organisationLinkFromTournamentsStaff_returns403StaffStreamForbidden", async () => {
+    // Le staff `tournaments` qui caste règle le lien de l'organisation dans la configuration du direct, pas ici.
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 3, roles: ["ARBITRE"] }));
+    const res = await casterPut(jsonRequest("PUT", { liveUrl: "https://twitch.tv/voix", organisationLink: true }), params("42"));
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "STAFF_STREAM_FORBIDDEN" });
+    expect(setCastSettings).not.toHaveBeenCalled();
+  });
+
+  it.each<[string, unknown]>([
+    ["string", "true"],
+    ["number", 1],
+    ["null", null],
+  ])("casterPut_organisationLinkNotBoolean_%s_returns400InvalidOrganisationLink", async (_label, value) => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    const res = await casterPut(jsonRequest("PUT", { liveUrl: "https://twitch.tv/voix", organisationLink: value }), params("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_ORGANISATION_LINK" });
+    expect(setCastSettings).not.toHaveBeenCalled();
+  });
+
+  it("casterPut_emptyChunkedBodyWithoutType_savesNothingAndSucceeds", async () => {
+    // Corps vide sans `Content-Length` (fragmenté, HTTP/2) : aucun réglage, pas un refus.
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setCastSettings).mockResolvedValue();
+    const body = new ReadableStream<Uint8Array>({ start: (controller) => controller.close() });
+    const req = new Request("http://localhost/api/matches/42/caster", { method: "PUT", body, duplex: "half" } as RequestInit);
+    const res = await casterPut(req, params("42"));
+    expect(res.status).toBe(200);
+    expect(setCastSettings).toHaveBeenCalledWith(42, 4, true, {}, { oversees: false, manages: false });
+  });
+
+  it("casterPut_brokenJson_returnsInvalidCastSettings", async () => {
+    // Un corps illisible sur PUT porte le code des réglages, pas celui de l'inscription.
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    const broken = new Request("http://localhost/api/matches/42/caster", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: "{ pas du json",
+    });
+    const res = await casterPut(broken, params("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_CAST_SETTINGS" });
+    expect(setCastSettings).not.toHaveBeenCalled();
   });
 
   it("casterPut_wrongFieldType_returns400", async () => {
@@ -109,14 +165,15 @@ describe("PUT /api/matches/[matchId]/caster", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     const res = await casterPut(jsonRequest("PUT", { liveUrl: "https://twitch.tv/voix", organisationLink: true }), params("42"));
     expect(res.status).toBe(403);
-    await expect(res.json()).resolves.toMatchObject({ error: "FORBIDDEN" });
+    await expect(res.json()).resolves.toMatchObject({ error: "STAFF_STREAM_FORBIDDEN" });
     expect(setCastSettings).not.toHaveBeenCalled();
   });
 
   it.each<[string, number]>([
     ["STREAM_URL_REQUIRED", 400],
-    ["MATCH_ALREADY_COMPLETED", 409],
+    ["MATCH_CAST_CLOSED", 409],
     ["CAST_STREAM_NOT_OWNED", 409],
+    ["CAST_STREAM_LINK_HELD", 409],
     ["NOT_MATCH_CASTER", 403],
     ["LIVE_TRIGGER_NOT_OWNED", 403],
   ])("casterPut_serviceRefuses_%s_maps to %i", async (code, status) => {

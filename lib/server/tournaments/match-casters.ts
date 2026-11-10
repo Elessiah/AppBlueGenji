@@ -44,16 +44,20 @@ const CAST_ELIGIBLE_SQL = `(COALESCE(u.is_deleted, 0) = 0
  * Le stream d'un caster que la lecture tait (inscription d'un compte qui ne
  * remplit plus la condition, avant le lancement : `casterWithdrawn`) ne donne
  * pas le premier lien : l'accueil et l'annonce #live n'envoient jamais vers la
- * chaîne d'un caster que le site ne montre plus. Le stream du staff, un match
- * lancé ou joué gardent leurs liens — lancé **sur son appariement courant**,
- * comme le juge l'instantané (`castBeforeLaunch`).
+ * chaîne d'un caster que le site ne montre plus. Le stream du staff garde son
+ * lien ; un match lancé ou joué garde ceux qu'un caster tient encore, éligible
+ * ou non — lancé **sur son appariement courant**, comme le juge l'instantané
+ * (`castBeforeLaunch`) —, jamais celui d'un stream orphelin (`shownStreams`).
  */
 export function firstStreamUrlSql(alias: string): string {
   return `(SELECT fs.live_url FROM bg_match_streams fs
            WHERE fs.match_id = ${alias}.id AND fs.live_url IS NOT NULL
-             AND (fs.staff_owned = 1 OR ${alias}.status = 'COMPLETED'
-                  OR (${alias}.launched_at IS NOT NULL
-                      AND ${alias}.launch_pairing = CONCAT(${alias}.team1_id, ':', ${alias}.team2_id))
+             AND (fs.staff_owned = 1
+                  OR ((${alias}.status = 'COMPLETED'
+                       OR (${alias}.launched_at IS NOT NULL
+                           AND ${alias}.launch_pairing = CONCAT(${alias}.team1_id, ':', ${alias}.team2_id)))
+                      AND EXISTS (SELECT 1 FROM bg_match_casters oc
+                                  WHERE oc.match_id = fs.match_id AND oc.stream_id = fs.id))
                   OR EXISTS (SELECT 1 FROM bg_match_casters fc JOIN bg_users u ON u.id = fc.user_id
                              WHERE fc.match_id = fs.match_id AND fc.stream_id = fs.id
                                AND ${CAST_ELIGIBLE_SQL}))
@@ -452,12 +456,23 @@ export async function hasStaffLink(connection: Executor, matchId: number): Promi
   return rows.length > 0;
 }
 
-/** Qui a fourni le lien d'un stream (`link_user_id`) ; `null` = l'organisation. */
-export async function streamLinkHolder(connection: Executor, streamId: number): Promise<number | null> {
+/** Qui a fourni le lien d'un stream (`null` = l'organisation), et s'il caste encore ce stream. */
+export type StreamLinkHolder = { userId: number | null; casts: boolean };
+
+/**
+ * Le fournisseur du lien d'un stream (`link_user_id`) et sa présence parmi
+ * les casters de ce stream, **en une lecture** (sous le verrou du match que
+ * tient l'appelant). Seule lecture de cette règle : la configuration du staff
+ * et la route du caster s'y fient toutes deux.
+ */
+export async function streamLinkHolder(connection: Executor, matchId: number, streamId: number): Promise<StreamLinkHolder> {
   const [rows] = await connection.execute<RowDataPacket[]>(
-    `SELECT link_user_id FROM bg_match_streams WHERE id = ? LIMIT 1`,
-    [streamId],
+    `SELECT s.link_user_id,
+            EXISTS (SELECT 1 FROM bg_match_casters mc
+                     WHERE mc.match_id = ? AND mc.stream_id = s.id AND mc.user_id = s.link_user_id) AS holder_casts
+       FROM bg_match_streams s WHERE s.id = ? LIMIT 1`,
+    [matchId, streamId],
   );
   const raw = rows[0]?.link_user_id;
-  return raw === null || raw === undefined ? null : Number(raw);
+  return { userId: raw === null || raw === undefined ? null : Number(raw), casts: Number(rows[0]?.holder_casts ?? 0) === 1 };
 }

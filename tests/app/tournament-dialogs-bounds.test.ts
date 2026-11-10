@@ -8,7 +8,7 @@ import { join } from "node:path";
  * Harnais `node` : les invariants se gardent sur la source. Chacun répond à un
  * défaut relevé par l'audit responsive :
  *
- * - **hauteur bornée** — sans `max-height`, « Diffusion du match » dépliée
+ * - **hauteur bornée** — sans `max-height`, « Diffusion officielle » dépliée
  *   (432 px) sortait de l'écran en paysage (390 px), boutons compris, alors que
  *   le défilement de la page est verrouillé ; une borne en `100vh` vaut la
  *   *grande* hauteur sur iOS et laisse passer le clavier virtuel ;
