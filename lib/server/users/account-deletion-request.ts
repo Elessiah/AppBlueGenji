@@ -378,9 +378,10 @@ async function afterDeletionRequest(userId: number, effects: DeletionRequestEffe
   // vue, ne doit plus rien servir pendant les trente jours. En premier, avant
   // toute suite plus longue ; un échec est dit, la demande est faite. La purge
   // du cache de l'optimiseur suit en tâche de fond (elle ne retient ni la
-  // réponse ni les rafraîchissements ci-dessous).
+  // réponse ni les rafraîchissements ci-dessous) — attendue au rejeu, dont le
+  // script sort dès son rapport.
   try {
-    await rotateHeldAvatarFile(userId, { detachPurge: true });
+    await rotateHeldAvatarFile(userId, { detachPurge: !replay });
   } catch (error) {
     console.error("[account-deletion] avatar mis de côté non renommé, encore servi à son ancienne adresse", error);
   }
@@ -579,6 +580,10 @@ export async function requestAccountDeletion(
       if (!(await holdAccountIdentity(connection, userId, options.requestedAtRaw ?? requestedAt))) {
         throw new Error("USER_NOT_FOUND");
       }
+      // Un ticket de réactivation resté d'une demande précédente (connexion
+      // faite pendant que le compte se réactivait ailleurs) ne doit pas pouvoir
+      // relever **cette** demande sans nouvelle connexion.
+      await connection.execute(`DELETE FROM bg_account_reactivation_tickets WHERE user_id = ?`, [userId]);
       // Relue telle que la base l'a écrite : c'est elle que le journal garde (D21).
       const [written] = await connection.execute<(RowDataPacket & { deletion_requested_at: string | null })[]>(
         `SELECT deletion_requested_at FROM bg_users WHERE id = ?`,

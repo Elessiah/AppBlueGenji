@@ -34,12 +34,17 @@ async function main(): Promise<void> {
         if (await rotateHeldAvatarFile(Number(row.user_id))) rotated += 1;
       } catch (error) {
         failed += 1;
-        // Sans identifiant de compte : le journal du script ne nomme personne.
-        console.error("  échec d'un renommage", error instanceof Error ? error.message : error);
+        // Sans identifiant de compte : le journal du script ne nomme personne
+        // — le code seul, le message d'une erreur de fichier portant son chemin
+        // (`<id du compte>-<aléa>.webp`).
+        console.error("  échec d'un renommage", (error as NodeJS.ErrnoException)?.code ?? "erreur sans code");
       }
     }
 
-    console.log(`\n${rotated} fichier(s) renommé(s), ${failed} échec(s).`);
+    // « Sans changement » : fichier absent ou adresse étrangère. Tous sans
+    // changement alors que des avatars existent = mauvais dossier de travail.
+    const untouched = rows.length - rotated - failed;
+    console.log(`\n${rotated} fichier(s) renommé(s) ou copié(s), ${untouched} sans changement, ${failed} échec(s).`);
     process.exit(failed > 0 ? 1 : 0);
   } catch (error) {
     console.error(error);

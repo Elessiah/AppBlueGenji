@@ -1158,11 +1158,13 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
     // dont l'avatar revient dans le masque (`writeRestoredImage`) : montré
     // anonyme partout, sa photo ne doit pas être resservie à l'ancienne adresse
     // (`rotateHeldAvatarFile`, sans effet hors masque).
-    try {
-      await rotateHiddenAvatarFile(Number(row.target_id));
-      await rotateHeldAvatarFile(Number(row.target_id));
-    } catch (error) {
-      console.error("[moderation] avatar rétabli non renommé", error);
+    // Chacun son essai : l'échec de l'un ne saute pas l'autre.
+    for (const rotate of [rotateHiddenAvatarFile, rotateHeldAvatarFile]) {
+      try {
+        await rotate(Number(row.target_id));
+      } catch (error) {
+        console.error("[moderation] avatar rétabli non renommé", error);
+      }
     }
     publishStaffAction(`✅ Avatar d'${ANONYMOUS_PLAYER_LABEL} rétabli par le staff (contestation acceptée).`, {
       id: actor.userId,
