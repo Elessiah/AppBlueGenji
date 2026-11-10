@@ -378,8 +378,8 @@ describe("MatchCardActions — branchements du cast", () => {
     expectContains(card, [
       "claimedRef.current = true;",
       "if (!claimedRef.current || hasClaimCast) return;",
-      'querySelector<HTMLElement>(\'[data-action="releaseCast"]\')',
-      "(release ?? toggleRef.current)?.focus({ preventScroll: true });",
+      'querySelector<HTMLElement>(\'[data-action="castConfig"]\')',
+      "(settings ?? toggleRef.current)?.focus({ preventScroll: true });",
     ]);
   });
 
@@ -392,7 +392,11 @@ describe("MatchCardActions — branchements du cast", () => {
     // caster » vit dans « Configurer ma diffusion » (`CAST_SETTINGS.md`).
     expect(card).toContain("releaseCast: () => openRelease(),");
     const settings = readSource("app/(secured)/tournois/[id]/_components/CastSettingsDialog.tsx");
-    expect(settings).toContain('fetch(`/api/matches/${match.id}/caster`, { method: "DELETE" })');
+    expect(settings).toContain('requestJson(`/api/matches/${match.id}/caster`, { method: "DELETE" }, "MATCH_CAST_RELEASE_FAILED")');
+    // Geste sans retour : confirmé par ConfirmActionDialog (jamais un clic direct).
+    expect(settings).toContain("onClick={() => setConfirmRelease(true)}");
+    expect(settings).toContain("<ConfirmActionDialog");
+    expect(settings).toContain('t("cardActions.releaseConfirm.selfConfirm")');
   });
 
   it("CastDialogs_organisationBox_neverOfferedToCaster", () => {
@@ -472,8 +476,9 @@ describe("Configuration du direct — l'aide du lien", () => {
     expect(enDialogs.live.organisationLink).toBe("This link is the organisation's");
     expect(frDialogs.live.organisationLinkHint).toContain("Décoché, c'est ta propre chaîne");
     expect(enDialogs.live.organisationLinkHint).toContain("Unticked, it is your own channel");
-    expect(frDialogs.live.urlOwnChannel).toContain("retiré du match si ton compte est supprimé");
-    expect(enDialogs.live.urlOwnChannel).toContain("removed from the match if your account is deleted");
+    // La phrase vit dans l'aide du champ (`castSettings.urlHint`), plus dans un texte mort de cette fenêtre.
+    expect(frDialogs.live).not.toHaveProperty("urlOwnChannel");
+    expect(enDialogs.live).not.toHaveProperty("urlOwnChannel");
   });
 });
 
@@ -552,8 +557,8 @@ describe("lockedTrigger — un mode verrouillé montre celui du match", () => {
     expect(lockedTrigger(false, "AUTO", "MANUAL")).toBe("MANUAL");
   });
 
-  it("lockedTrigger_lockedMatchUncast_returnsPicked", () => {
-    expect(lockedTrigger(true, null, "MANUAL")).toBe("MANUAL");
+  it("lockedTrigger_lockedMatchUncast_returnsNullNotAMadeUpMode", () => {
+    expect(lockedTrigger(true, null, "AUTO")).toBeNull();
   });
 });
 

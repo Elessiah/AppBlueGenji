@@ -3,6 +3,7 @@
 import { useToast } from "@/components/ui/toast";
 import { useActionsText } from "./actions-text";
 import { useMapError } from "./error-map";
+import { requestJson } from "./request-json";
 
 /**
  * Ouvre ou coupe l'antenne d'un match en mode manuel
@@ -24,13 +25,11 @@ export function useOnAirToggle(
   return async () => {
     setBusy(true);
     try {
-      const response = await fetch(`/api/admin/matches/${matchId}/live`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ onAir: !onAir }),
-      });
-      const payload = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "MATCH_LIVE_UPDATE_FAILED");
+      await requestJson(
+        `/api/admin/matches/${matchId}/live`,
+        { method: "POST", body: { onAir: !onAir } },
+        "MATCH_LIVE_UPDATE_FAILED",
+      );
       showSuccess(onAir ? t("cardActions.airClosed") : t("cardActions.airOpened"));
       onDone();
     } catch (error) {

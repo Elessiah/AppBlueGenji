@@ -388,6 +388,8 @@
       "autoStop": "Le direct s'arrête tout seul dès qu'un score est saisi.",
       "url": "Lien de ma chaîne",
       "urlRequired": "Lien de ma chaîne (obligatoire)",
+      "urlOrganisation": "Lien du stream de l'organisation",
+      "battletagPlaceholder": "Pseudo#1234",
       "urlEmpty": "Le lien de ta chaîne est obligatoire : remets-le, ou annule pour garder l'ancien.",
       "playedTitle": "Match joué",
       "close": "Fermer",
@@ -403,7 +405,7 @@
       "replayHint": "Le lien de la rediff s'ajoute une fois la rencontre jouée ; un bandeau « Rediff disponible » s'affiche alors sous le match.",
       "urlSubject": "lien de ma chaîne",
       "battletagSubject": "BattleTag du cast",
-      "triggerLocked": "Passage à l'antenne réglé par un autre : {mode}.",
+      "triggerLocked": "Passage à l'antenne réglé par un autre : « {mode} ».",
       "triggerLockedHint": "Seuls le caster qui l'a posé, l'arbitre du match ou un admin le changent ou le retirent — l'organisation aussi quand aucun caster ne le tient.",
       "loading": "Lecture de ton cast…",
       "played": "Le match est joué : lien et BattleTag de ce cast ne se changent plus."

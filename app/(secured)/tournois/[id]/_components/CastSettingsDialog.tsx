@@ -26,6 +26,8 @@ import {
   lockedTrigger,
   castUrlInvalid,
 } from "./CastSettingsFields";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { requestJson } from "../_lib/request-json";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 import styles from "./CastSettingsDialog.module.css";
 
@@ -44,17 +46,6 @@ type OwnCast = {
   staffStream: boolean;
   battletag: string | null;
 };
-
-/** Envoi d'un corps JSON ; le refus porte le code du serveur. */
-async function send(url: string, method: "PUT" | "POST", body: unknown, fallback: string): Promise<void> {
-  const response = await fetch(url, {
-    method,
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const payload = (await response.json().catch(() => ({}))) as { error?: string };
-  if (!response.ok) throw new Error(payload.error || fallback);
-}
 
 /**
  * « Configurer ma diffusion » — tout ce qu'un caster règle sur **son** cast
@@ -101,6 +92,7 @@ export function CastSettingsDialog({
   const battletagId = useId();
 
   const [cast, setCast] = useState<OwnCast | null>(null);
+  const [confirmRelease, setConfirmRelease] = useState(false);
   const [url, setUrl] = useState("");
   const [battletag, setBattletag] = useState("");
   // `null` tant que le caster n'a pas choisi : un match démarqué montre
@@ -118,10 +110,7 @@ export function CastSettingsDialog({
     let alive = true;
     void (async () => {
       try {
-        const response = await fetch(`/api/matches/${match.id}/caster`);
-        // Un 5xx sans JSON (page d'erreur) rend son code générique, pas un message du parseur.
-        const payload = (await response.json().catch(() => ({}))) as OwnCast & { error?: string };
-        if (!response.ok) throw new Error(payload.error || "MATCH_CAST_SETTINGS_FAILED");
+        const payload = await requestJson<OwnCast>(`/api/matches/${match.id}/caster`, {}, "MATCH_CAST_SETTINGS_FAILED");
         if (!alive) return;
         setCast(payload);
         setUrl(payload.liveUrl ?? "");
@@ -185,7 +174,7 @@ export function CastSettingsDialog({
         settings.liveUrl = url.trim() === "" ? null : url.trim();
       }
       if (battletagChanged) settings.battletag = battletag.trim() === "" ? null : battletag.trim();
-      await send(`/api/matches/${match.id}/caster`, "PUT", settings, "MATCH_CAST_SETTINGS_FAILED");
+      await requestJson(`/api/matches/${match.id}/caster`, { method: "PUT", body: settings }, "MATCH_CAST_SETTINGS_FAILED");
       showSuccess(t("cardActions.castSettings.saved"));
       onSaved();
       onClose();
@@ -201,19 +190,20 @@ export function CastSettingsDialog({
 
   const toggleAir = useOnAirToggle(match.id, onAir, { setBusy, onDone: onSaved });
 
-  // Le caster qui se retire lui-même n'est prévenu de rien (`CAST_NOTICES.md`) :
-  // pas de confirmation — ouvrir cette fenêtre puis cliquer est déjà en deux temps.
-  const release = async () => {
+  // Se retirer rend la place (le serveur retire aussi le stream et son lien) :
+  // geste sans retour, il passe par une confirmation (`ConfirmActionDialog`).
+  // Rend `true` s'il a abouti : la confirmation et la fenêtre se ferment.
+  const release = async (): Promise<boolean> => {
     setBusy(true);
     try {
-      const response = await fetch(`/api/matches/${match.id}/caster`, { method: "DELETE" });
-      const payload = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "MATCH_CAST_RELEASE_FAILED");
+      await requestJson(`/api/matches/${match.id}/caster`, { method: "DELETE" }, "MATCH_CAST_RELEASE_FAILED");
       showSuccess(t("cardActions.notCasting"));
       onSaved();
       onClose();
+      return true;
     } catch (error) {
       showError(fail((error as Error).message));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -336,7 +326,7 @@ export function CastSettingsDialog({
               type="button"
               className={`btn ghost ${styles.button}`}
               disabled={busy}
-              onClick={() => void release()}
+              onClick={() => setConfirmRelease(true)}
             >
               {t("cardActions.stopCasting")}
             </button>
@@ -354,6 +344,17 @@ export function CastSettingsDialog({
           </div>
         </div>
       </form>
+      {confirmRelease && (
+        <ConfirmActionDialog
+          title={t("cardActions.releaseConfirm.selfTitle", { match: matchLabel })}
+          confirmLabel={t("cardActions.releaseConfirm.selfConfirm")}
+          pendingLabel={t("cardActions.releaseConfirm.pending")}
+          onClose={() => setConfirmRelease(false)}
+          onConfirm={release}
+        >
+          <p>{t("cardActions.releaseConfirm.selfBody")}</p>
+        </ConfirmActionDialog>
+      )}
     </TournamentDialogFrame>
   );
 }

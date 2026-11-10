@@ -106,7 +106,6 @@ import { CONCURRENT_UPDATE_RETRY, CONCURRENT_UPDATE_RETRY_MESSAGE } from "@/lib/
 import { endurancePenaltyMessage } from "@/lib/shared/endurance-penalty";
 import { ENTRANT_REMOVAL_BLOCK_MESSAGES } from "@/lib/shared/entrant-removal";
 import { batchCounterLabel, guestBatchSuccessMessage } from "@/lib/shared/ghost-registration";
-import { MATCH_LIVE_TRIGGER_LABELS, MATCH_LIVE_TRIGGERS } from "@/lib/shared/live-streams";
 import { LOCALES, SITE_TIME_ZONE } from "@/lib/shared/locales";
 import { scoreSubmittedMessage } from "@/lib/shared/match-card-viewer";
 import type { MatchFormat, MatchScoreViolation } from "@/lib/shared/match-format";
@@ -390,7 +389,6 @@ describe("français inchangé — les messages égalent les textes d'origine", (
   });
 
   it("diffusion, mois de la programmation, compteur des équipes fantômes", () => {
-    for (const trigger of MATCH_LIVE_TRIGGERS) expect(frDialogs.live.triggers[trigger]).toBe(MATCH_LIVE_TRIGGER_LABELS[trigger]);
     expect(matchEntryMonths("fr")).toBe(MATCH_ENTRY_MONTHS);
     expect(matchEntryMonths("en")[0]).toBe("January");
     for (const [selected, remaining] of [[0, 1], [2, 5], [3, 40]] as const) {

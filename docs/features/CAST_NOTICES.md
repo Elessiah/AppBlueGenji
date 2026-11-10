@@ -47,8 +47,8 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
   `ConfirmActionDialog` qui dit que le caster sera prévenu, avec le motif
   « décision du staff » : l'avis ne se reprend pas — la carte ne l'offre qu'à
   l'arbitrage et sur un **autre** caster. « Ne plus caster » (le caster
-  lui-même, qui n'est prévenu de rien) part sans confirmation, depuis sa fenêtre
-  « Configurer ma diffusion » (`CAST_SETTINGS.md`).
+  lui-même, qui n'est prévenu de rien) part depuis sa fenêtre
+  « Configurer ma diffusion », après une confirmation (`CAST_SETTINGS.md`).
 - La case « Messages privés Discord de mes matchs » (`/profil`) coupe aussi ce
   message privé : son aide (`matchDms.hint`, FR et EN) le dit.
 

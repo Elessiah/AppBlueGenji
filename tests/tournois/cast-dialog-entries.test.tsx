@@ -220,7 +220,8 @@ describe("CastSettingsDialog — match joué, rien de changé, lecture", () => {
 
   it("CastSettingsDialog_loading_saysSoAndNonJsonErrorTolerated", () => {
     expect(settings).toContain('t("cardActions.castSettings.loading")');
-    expect(settings).toContain("(await response.json().catch(() => ({}))) as OwnCast");
+    expect(settings).toContain("requestJson<OwnCast>(");
+    expect(readSource(`${DIR}/_lib/request-json.ts`)).toContain("response.json().catch(() => ({}))");
   });
 
   it("CastSettingsDialog_unmarkedMatch_noModePreselected", () => {

@@ -76,8 +76,9 @@ Fenêtre du caster, sur **son** cast :
   seule `live` ne règle que la rediff de **son** cast (`NOT_MATCH_CASTER`,
   403), le staff `tournaments` (dont l'arbitre désigné) toutes (décision du
   2026-11-09) ;
-- **« Ne plus caster »** : `DELETE …/caster`, sans confirmation (le caster qui se
-  retire lui-même n'est prévenu de rien, `CAST_NOTICES.md`) — refusé sur un match
+- **« Ne plus caster »** : `DELETE …/caster`, derrière un `ConfirmActionDialog` (il rend
+  la place et retire le stream : geste sans retour ; le caster qui se retire
+  lui-même n'est prévenu de rien, `CAST_NOTICES.md`) — refusé sur un match
   terminé, où le bouton n'est pas offert (`offersCastRelease`).
 
 La fenêtre lit à l'ouverture `GET /api/matches/[id]/caster`
