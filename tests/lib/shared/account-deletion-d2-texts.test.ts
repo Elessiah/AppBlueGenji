@@ -205,8 +205,9 @@ describe("D6 — empreinte d'un avatar supprimé par la modération", () => {
     expect(entry?.publishedAt).toBe("2026-11-12");
     expect(entry?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(entry?.audience).toBeUndefined();
-    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(AVATAR_HASH_ID);
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(TERMS_V10_ID);
+    // Suivies de l'entrée des salons vocaux (MATCH-VOICE), même mise en ligne.
+    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(AVATAR_HASH_ID);
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(TERMS_V10_ID);
   });
 
   it("privacyChange_avatarHashEntry_saysKeptFromModerationDeletionNotErasureFrAndEn", () => {

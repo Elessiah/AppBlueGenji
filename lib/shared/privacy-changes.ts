@@ -41,7 +41,12 @@
  * Voir `docs/features/PRIVACY_CHANGES_CONSENT.md`.
  */
 
-import { VOICE_CHANNEL_LATE_HOURS, VOICE_CHANNEL_LEAD_MINUTES } from "@/lib/shared/match-voice";
+import {
+  VOICE_BOT_UNRELEASED_MAX_HOURS,
+  VOICE_CHANNEL_LATE_HOURS,
+  VOICE_CHANNEL_LEAD_MINUTES,
+  VOICE_ROW_RETENTION_DAYS,
+} from "@/lib/shared/match-voice";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
@@ -1568,6 +1573,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // `members` et `counted_at` retirées). Pour tous les comptes. Les entrées
     // publiées (`2026-11-salons-vocaux-equipe`) ne sont pas retouchées ; celle de la
     // version 9, pas encore en ligne, est reformulée sur place (ni attente ni comptage).
+    // D15 (2026-11-09) : « effacé avec sa colonne » retiré à la demande de l'utilisateur.
     id: "2026-11-salons-vocaux-sans-comptage",
     publishedAt: "2026-11-06",
     title: "Salons vocaux d'équipe : plus de comptage, plus d'attente",
@@ -1575,7 +1581,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Les salons vocaux d'équipe ne retiennent plus le lancement d'un match, et le bot ne compte plus les personnes présentes : le site ne garde, pour chaque salon, que son identifiant et ses horaires — ni qui s'y trouve, ni combien.",
     details: [
-      `Ce qui change : un match qui a ses salons se lance comme dans tout autre tournoi, qu'ils soient pleins ou non ; sa page dit seulement si chaque salon est ouvert. Le nombre de personnes présentes n'est plus demandé au bot, et celui déjà gardé est effacé avec sa colonne (hors les copies de sauvegarde chiffrées, ${BACKUP_RETENTION_DAYS} jours au plus). Les salons s'ouvrent désormais aussi pour un match déjà lancé ou dont le score attend sa confirmation. Le salon est désormais aussi rendu quand une entrée en tournoi individuel ou une équipe fantôme entre dans le match, quand le tournoi est de nouveau masqué ou ramené avant son départ, ou quand le match reste sans score validé ${VOICE_CHANNEL_LATE_HOURS} heures après son horaire ; tant qu'il est ouvert et dès ${VOICE_CHANNEL_LEAD_MINUTES} minutes avant l'horaire du match, le site le redemande au bot, au nom de l'équipe, environ une fois par minute, pour en rouvrir un s'il a été supprimé.`,
+      `Ce qui change : un match qui a ses salons se lance comme dans tout autre tournoi, qu'ils soient pleins ou non ; sa page dit seulement si chaque salon est ouvert. Le nombre de personnes présentes n'est plus demandé au bot. Les salons s'ouvrent désormais aussi pour un match déjà lancé ou dont le score attend sa confirmation. Le salon est désormais aussi rendu quand une entrée en tournoi individuel ou une équipe fantôme entre dans le match, quand le tournoi est de nouveau masqué ou ramené avant son départ, ou quand le match reste sans score validé ${VOICE_CHANNEL_LATE_HOURS} heures après son horaire ; tant qu'il est ouvert et dès ${VOICE_CHANNEL_LEAD_MINUTES} minutes avant l'horaire du match, le site le redemande au bot, au nom de l'équipe, environ une fois par minute, pour en rouvrir un s'il a été supprimé.`,
       "Ce qui reste : pour savoir si un salon est vide et le supprimer, le bot tient toujours en mémoire, sans l'enregistrer, l'état vocal des membres du serveur Discord de l'association ; rien de nouveau n'est collecté. C'est toujours au titre de l'intérêt légitime (bon déroulement des tournois).",
     ],
   },
@@ -1734,6 +1740,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Compte : pendant les 30 jours d'une suppression demandée, la modération peut masquer, rétablir ou supprimer l'avatar mis de côté, qui n'est rendu à la réactivation que s'il n'est alors ni masqué ni supprimé ; un joueur suspendu ne reprend une équipe qu'après tous les autres ; au terme du délai, seul un avatar que la modération a supprimé ne peut plus être reposé — un avatar seulement masqué, ou que la modération n'a jamais supprimé, part sans que son empreinte soit gardée.",
       "Retransmission des matchs : le message #live de la soirée ne liste un match avant son début que si sa diffusion doit s'ouvrir à son heure de début dans la soirée ; les autres n'y paraissent qu'à leur passage à l'antenne.",
       `Conditions d'utilisation : la version 10, en vigueur depuis le 12 novembre 2026, le dit dans ses sections « Compte », « Signalement et modération » et « Retransmission des matchs ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.`,
+    ],
+  },
+  {
+    // MATCH-VOICE (#572, décisions de l'utilisateur D13 à D15 du 2026-11-09) :
+    // vidage d'un salon par l'arbitrage (D13), salons d'un match reporté rendus
+    // (D14), ligne du site jamais close tant que le salon peut exister. Aucune
+    // donnée d'utilisateur gardée (D15). Pour tous les comptes ; même mise en
+    // ligne que les entrées du 12 novembre 2026.
+    id: "2026-11-salons-vocaux-vidage-et-report",
+    publishedAt: "2026-11-12",
+    title: "Salons vocaux d'équipe : vidage par l'arbitrage, match reporté",
+    links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }],
+    summary:
+      "L'arbitrage peut désormais vider le salon vocal d'une équipe, ouvert à qui voit la catégorie des matchs ; un match reporté rend ses salons, rouverts avant sa nouvelle heure. Ni le site ni le bot ne gardent qui se trouve dans un salon, ni combien.",
+    details: [
+      "Vidage : un arbitre ou un administrateur qui ne joue pas le match peut vider le salon ouvert d'une équipe ; le bot en déconnecte tous les occupants, qu'il lit dans l'état vocal qu'il tient déjà en mémoire, sans rien en garder, en journaliser ni en dire au site, et le salon reste ouvert. Le journal d'activité du staff sur Discord le note sans nommer son auteur ; les journaux du serveur nomment cet auteur (pseudo et numéro de compte), avec le match et l'issue, sauf s'il est l'arbitre désigné du match, jamais nommé. Le journal d'audit de Discord garde les déconnexions telles que Discord les y inscrit.",
+      `Match reporté : un match dont l'horaire repasse à plus de ${VOICE_CHANNEL_LEAD_MINUTES} minutes rend ses salons au bot, qui les supprime une fois vides ; de nouveaux salons s'ouvrent ${VOICE_CHANNEL_LEAD_MINUTES} minutes avant sa nouvelle heure.`,
+      `Ligne du site : elle n'est plus close ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après la création du salon si le bot ne l'a pas repris ; tant que le salon peut encore exister sur Discord, le site le lui rend de nouveau, une fois par heure passé ce délai, puis efface la ligne ${VOICE_ROW_RETENTION_DAYS} jours après sa reprise. Elle ne tient toujours que des numéros de match et d'équipe, l'identifiant du salon et des heures (dont celle d'une panne, et si elle touchait tout le bot) : aucune donnée d'utilisateur.`,
+      "Ce qui ne change pas : rien de nouveau n'est collecté ; c'est toujours au titre de l'intérêt légitime (bon déroulement des tournois).",
     ],
   },
 ];

@@ -512,7 +512,7 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
     expect(fr).toContain("**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (evening message of the streamed matches: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
     // EF-43 (salons vocaux) : datée du lendemain de la mise en ligne du 5 novembre 2026.
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["10 novembre 2026", "10 November 2026"]);
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["12 novembre 2026", "12 November 2026"]);
   });
 });
 
@@ -646,13 +646,28 @@ describe("politique du bot — salons vocaux d'équipe (EF-43, registre T18)", (
           "Salons vocaux d'équipe des matchs",
           "(/rgpd#salons-vocaux) (traitement T18)",
           "sans jamais l'enregistrer ni le transmettre au site, l'état vocal des membres du serveur de l'association",
-          "Il regarde seulement si un salon est vide : il ne dit jamais au site combien de personnes s'y trouvent, ni qui.",
+          "il n'en garde rien, n'en journalise rien et ne dit jamais au site combien de personnes s'y trouvent, ni qui.",
         ],
         [
           "Team voice channels for matches",
           "(/rgpd#salons-vocaux) (processing activity T18)",
           "without ever recording it or sending it to the website, the voice state of the members of the association's server",
-          "It only checks whether a channel is empty: it never tells the website how many people are in it, nor who.",
+          "it keeps nothing of it, logs nothing of it and never tells the website how many people are in it, nor who.",
+        ],
+      ),
+    ).toEqual([]);
+  });
+
+  it("privacyPolicy_voiceChannels_clearDisconnectsKeepsNothingFrAndEn", () => {
+    expect(
+      missingInBoth(
+        [
+          "quand l'arbitrage du site vide le salon d'une équipe, pour en déconnecter tous les occupants (le salon reste ouvert)",
+          "Les salons sont ouverts à qui voit la catégorie des matchs",
+        ],
+        [
+          "when the website's referees clear a team's channel, to disconnect all its occupants (the channel stays open)",
+          "The channels are open to whoever sees the match category",
         ],
       ),
     ).toEqual([]);

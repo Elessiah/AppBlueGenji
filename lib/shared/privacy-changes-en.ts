@@ -13,7 +13,12 @@
  * this module.
  */
 
-import { VOICE_CHANNEL_LATE_HOURS, VOICE_CHANNEL_LEAD_MINUTES } from "@/lib/shared/match-voice";
+import {
+  VOICE_BOT_UNRELEASED_MAX_HOURS,
+  VOICE_CHANNEL_LATE_HOURS,
+  VOICE_CHANNEL_LEAD_MINUTES,
+  VOICE_ROW_RETENTION_DAYS,
+} from "@/lib/shared/match-voice";
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
@@ -817,7 +822,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "Team voice channels no longer hold a match's launch, and the bot no longer counts the people present: for each channel, the site only keeps its identifier and its times — neither who is in it nor how many.",
     details: [
-      `What changes: a match with channels launches as in any other tournament, whether they are full or not; its page only says whether each channel is open. The number of people present is no longer requested from the bot, and the one already kept is erased with its column (apart from the encrypted backup copies, ${BACKUP_RETENTION_DAYS} days at most). Channels are now also opened for a match already launched or whose score awaits confirmation. The channel is now also handed back when a solo entry or a ghost team enters the match, when the tournament is hidden again or moved back before its start, or when the match is left without a confirmed score ${VOICE_CHANNEL_LATE_HOURS} hours after its time; while it is open and from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before the match time, the site asks the bot for it again, under the team's name, about once a minute, to reopen one if it was deleted.`,
+      `What changes: a match with channels launches as in any other tournament, whether they are full or not; its page only says whether each channel is open. The number of people present is no longer requested from the bot. Channels are now also opened for a match already launched or whose score awaits confirmation. The channel is now also handed back when a solo entry or a ghost team enters the match, when the tournament is hidden again or moved back before its start, or when the match is left without a confirmed score ${VOICE_CHANNEL_LATE_HOURS} hours after its time; while it is open and from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before the match time, the site asks the bot for it again, under the team's name, about once a minute, to reopen one if it was deleted.`,
       "What stays: to know whether a channel is empty and delete it, the bot still holds in memory, without recording it, the voice state of the members of the association's Discord server; nothing new is collected. It still rests on legitimate interest (smooth running of tournaments).",
     ],
   },
@@ -908,6 +913,18 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Account: during the 30 days of a requested deletion, moderation can hide, restore or delete the avatar set aside, which is only given back on reactivation if it is then neither hidden nor deleted; a suspended player only takes over a team after all the others; at the end of that time, only an avatar that moderation has deleted can no longer be uploaded again — an avatar that is only hidden, or that moderation never deleted, leaves without its hash being kept.",
       "Match streaming: the evening's #live message only lists a match before it starts if its stream is due to open at its start time that evening; the others only appear in it when they go on air.",
       "Terms of use: version 10, in force since 12 November 2026, says so in its “Account”, “Reporting and moderation” and “Match streaming” sections. A window presents it to you until you have accepted it: accepting it lets you keep using the site.",
+    ],
+  },
+  "2026-11-salons-vocaux-vidage-et-report": {
+    linkLabels: ["Read the “Team voice channels” paragraph"],
+    title: "Team voice channels: clearing by the referees, rescheduled match",
+    summary:
+      "Referees can now clear a team's voice channel, which is open to whoever sees the match category; a rescheduled match hands its channels back, reopened before its new time. Neither the site nor the bot keeps who is in a channel, nor how many.",
+    details: [
+      "Clearing: a referee or an administrator who does not play the match can clear a team's open channel; the bot disconnects all its occupants, read from the voice state it already holds in memory, without keeping, logging or telling the site anything about them, and the channel stays open. The staff activity log on Discord notes it without naming its author; the server logs name that author (username and account number), with the match and the outcome, unless they are the match's assigned referee, never named. Discord's audit log keeps the disconnections as Discord records them.",
+      `Rescheduled match: a match whose time moves back to more than ${VOICE_CHANNEL_LEAD_MINUTES} minutes away hands its channels back to the bot, which deletes them once empty; new channels open ${VOICE_CHANNEL_LEAD_MINUTES} minutes before its new time.`,
+      `The site's record: it is no longer closed ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after the channel was created if the bot has not taken it back; while the channel may still exist on Discord, the site hands it back again, once an hour after that period, then erases the record ${VOICE_ROW_RETENTION_DAYS} days after it is taken back. It still only holds match and team numbers, the channel's identifier and times (including that of an outage, and whether it hit the whole bot): no user data.`,
+      "What stays: nothing new is collected; it still rests on legitimate interest (smooth running of tournaments).",
     ],
   },
 };

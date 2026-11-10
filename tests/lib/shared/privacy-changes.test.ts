@@ -2457,8 +2457,8 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
     expect(t18.subPurposes.join(" ")).toContain("quand le match est terminé (score validé)");
     expect(t18En.subPurposes.join(" ")).toContain("when the match is finished (score confirmed)");
-    expect(t18.retention[1]).toContain("un match reporté garde ses salons jusqu'à leur rendu");
-    expect(t18En.retention[1]).toContain("a rescheduled match keeps its channels until they are handed back");
+    expect(t18.retention[1]).toContain("un match reporté à plus de 15 minutes rend ses salons");
+    expect(t18En.retention[1]).toContain("a match rescheduled to more than 15 minutes away hands its channels back");
   });
 
   it("processingRegister_t18_voiceStateHeldAtAllTimesAndPartnerMembersListedFrAndEn", () => {
@@ -2560,10 +2560,91 @@ describe("PRIVACY_CHANGES — salons vocaux sans comptage ni attente (EF-43)", (
 
   it("privacyChanges_voiceWithoutCount_saysNoGateNoCountMemoryOnlyFrAndEn", () => {
     expectEntryTexts(voiceEntry(), PRIVACY_CHANGES_EN[voiceEntry().id], {
-      fr: ["ne retiennent plus le lancement d'un match", "ni qui s'y trouve, ni combien", "effacé avec sa colonne (hors les copies de sauvegarde chiffrées, 30 jours au plus)", "pour savoir si un salon est vide", "rien de nouveau n'est collecté", "une équipe fantôme entre dans le match", "sans score validé 24 heures après son horaire", "quand le tournoi est de nouveau masqué ou ramené avant son départ", "pour un match déjà lancé ou dont le score attend sa confirmation", "dès 15 minutes avant l'horaire du match, le site le redemande", "environ une fois par minute, pour en rouvrir", "intérêt légitime"],
-      en: ["no longer hold a match's launch", "neither who is in it nor how many", "erased with its column (apart from the encrypted backup copies, 30 days at most)", "to know whether a channel is empty", "nothing new is collected", "a ghost team enters the match", "without a confirmed score 24 hours after its time", "when the tournament is hidden again or moved back before its start", "for a match already launched or whose score awaits confirmation", "from 15 minutes before the match time, the site asks", "about once a minute, to reopen", "legitimate interest"],
+      fr: ["ne retiennent plus le lancement d'un match", "ni qui s'y trouve, ni combien", "pour savoir si un salon est vide", "rien de nouveau n'est collecté", "une équipe fantôme entre dans le match", "sans score validé 24 heures après son horaire", "quand le tournoi est de nouveau masqué ou ramené avant son départ", "pour un match déjà lancé ou dont le score attend sa confirmation", "dès 15 minutes avant l'horaire du match, le site le redemande", "environ une fois par minute, pour en rouvrir", "intérêt légitime"],
+      en: ["no longer hold a match's launch", "neither who is in it nor how many", "to know whether a channel is empty", "nothing new is collected", "a ghost team enters the match", "without a confirmed score 24 hours after its time", "when the tournament is hidden again or moved back before its start", "for a match already launched or whose score awaits confirmation", "from 15 minutes before the match time, the site asks", "about once a minute, to reopen", "legitimate interest"],
     });
     const published = PRIVACY_CHANGES.find((c) => c.id === "2026-11-salons-vocaux-equipe")!;
     expect([published.publishedAt, published.summary.includes("le bot compte les personnes présentes")]).toEqual(["2026-11-04", true]);
+  });
+});
+
+// MATCH-VOICE (#572, décisions D13 à D15) : vidage par l'arbitrage, match reporté,
+// ligne du site jamais close tant que le salon peut exister, aucune donnée d'utilisateur.
+describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–D15)", () => {
+  const t18 = () => PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
+  const t18En = () => PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
+  const voiceClearId = "2026-11-salons-vocaux-vidage-et-report";
+
+  it("processingRegister_t18_rescheduledMatchHandsBackChannelsFrAndEn", () => {
+    expect(t18().subPurposes.join(" ")).toContain("quand le match est reporté à plus de 15 minutes (ses salons rouvrent 15 minutes avant sa nouvelle heure)");
+    expect(t18En().subPurposes.join(" ")).toContain("when the match is rescheduled to more than 15 minutes away (its channels reopen 15 minutes before its new time)");
+    expect(t18().retention[1]).toContain("un match reporté à plus de 15 minutes rend ses salons, et en reçoit de nouveaux 15 minutes avant sa nouvelle heure");
+    expect(t18En().retention[1]).toContain("a match rescheduled to more than 15 minutes away hands its channels back, and receives new ones 15 minutes before its new time");
+    expect(t18().retention[1]).not.toContain("garde ses salons");
+    expect(t18En().retention[1]).not.toContain("keeps its channels");
+  });
+
+  it("processingRegister_t18_rowNeverClosedWhileChannelMayExistFrAndEn", () => {
+    expect(t18().retention[0]).toContain("elle n'est jamais close tant que le salon peut encore exister sur Discord");
+    expect(t18().retention[0]).toContain("puis une fois par heure passé 48 heures après la création du salon actuel, sans limite");
+    expect(t18().retention[0]).toContain("un salon que le bot dit ne jamais pouvoir suivre (identifiant ou clé invalides), dont la ligne est close aussitôt");
+    expect(t18En().retention[0]).toContain("it is never closed while the channel may still exist on Discord");
+    expect(t18En().retention[0]).toContain("then once an hour from 48 hours after the current channel was created, with no limit");
+    expect(t18().retention[0]).not.toContain("si le bot ne le reprend pas, 48 heures");
+    expect(t18En().retention[0]).not.toContain("if the bot does not take it back, 48 hours");
+  });
+
+  it("processingRegister_t18_clearDeclaredWithoutOccupantDataFrAndEn", () => {
+    expect(t18().subPurposes.join(" ")).toContain("de vider le salon ouvert d'une équipe : le bot en déconnecte tous les occupants");
+    expect(t18().subPurposes.join(" ")).toContain("sans garder, journaliser ni rendre au site qui, ni combien");
+    expect(t18En().subPurposes.join(" ")).toContain("without keeping, logging or returning to the site who, nor how many");
+    expect(t18().dataSubjects.join(" ")).toContain("Membre du staff qui vide un salon, nommé dans les journaux du serveur sauf s'il est l'arbitre désigné du match");
+    expect(t18En().dataSubjects.join(" ")).toContain("Staff member who clears a channel, named in the server logs unless they are the match's assigned referee");
+    expect(t18().retention.join(" ")).toContain("sauf si l'auteur est l'arbitre désigné du match, jamais nommé");
+    expect(t18En().retention.join(" ")).toContain("unless the author is the match's assigned referee, never named");
+    expect(t18().recipients.join(" ")).toContain("sans nommer son auteur (T05)");
+  });
+
+  it("processingRegister_t18_noUserDataInSiteRecordFrAndEn", () => {
+    expect(t18().dataCategories[0]).toContain("aucune donnée d'utilisateur : jamais qui est présent, ni combien");
+    expect(t18En().dataCategories[0]).toContain("no user data: never who is present, nor how many");
+  });
+
+  it("processingRegister_t05_voiceClearedListedWithServerLogNamingFrAndEn", () => {
+    const t05 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T05")!;
+    const t05En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!;
+    expect(t05.subPurposes.join(" ")).toContain("salon vocal d'une équipe vidé (son auteur, s'il n'est pas l'arbitre désigné du match, est en outre nommé dans les journaux du serveur, voir T18)");
+    expect(t05En.subPurposes.join(" ")).toContain("a team's voice channel cleared (its author, unless they are the match's assigned referee, is also named in the server logs, see T18)");
+  });
+
+  it("privacyChanges_voiceClearAndReschedule_lastEntryForAllAccountsFrAndEn", () => {
+    const entry = PRIVACY_CHANGES.find((c) => c.id === voiceClearId)!;
+    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(voiceClearId);
+    expect([entry.id.length <= PRIVACY_CHANGE_ID_MAX_LENGTH, entry.asksTermsAcceptance, privacyChangeReachesAccount(entry, {})]).toEqual([true, undefined, true]);
+    expectStandaloneEntry(entry, PRIVACY_CHANGES_EN[entry.id], { after: "2026-11-conditions-v10-avatar-et-succession", publishedAt: "2026-11-12", audience: undefined, links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }] });
+    expectEntryTexts(entry, PRIVACY_CHANGES_EN[entry.id], {
+      fr: ["vider le salon ouvert d'une équipe", "sans rien en garder, en journaliser ni en dire au site", "le note sans nommer son auteur", "sauf s'il est l'arbitre désigné du match, jamais nommé", "rend ses salons au bot", "de nouveaux salons s'ouvrent 15 minutes avant sa nouvelle heure", "une fois par heure passé ce délai", "aucune donnée d'utilisateur", "rien de nouveau n'est collecté"],
+      en: ["clear a team's open channel", "without keeping, logging or telling the site anything about them", "notes it without naming its author", "unless they are the match's assigned referee, never named", "hands its channels back to the bot", "new channels open 15 minutes before its new time", "once an hour after that period", "no user data", "nothing new is collected"],
+    });
+  });
+
+  it("privacyChanges_voiceWithoutCount_noErasedWithColumnClauseFrAndEn", () => {
+    const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-11-salons-vocaux-sans-comptage")!;
+    expect(entry.details.join(" ")).not.toContain("effacé avec sa colonne");
+    expect(PRIVACY_CHANGES_EN[entry.id].details.join(" ")).not.toContain("erased with its column");
+    expect(entry.details[0]).toContain("Le nombre de personnes présentes n'est plus demandé au bot. Les salons");
+  });
+
+  it("rgpdPages_voiceParagraph_clearRescheduleAndRetryFrAndEn", () => {
+    const fr = readFileSync(join(process.cwd(), "app", "rgpd", "page.tsx"), "utf8");
+    const en = readFileSync(join(process.cwd(), "app", "rgpd", "RgpdEn.tsx"), "utf8");
+    expect(fr).toContain("peut vider le salon ouvert d&apos;une équipe");
+    expect(fr).toContain("ou quand le match est reporté à plus de {VOICE_CHANNEL_LEAD_MINUTES} minutes");
+    expect(fr).toContain("la ligne n&apos;est jamais close");
+    expect(fr).not.toContain("garde ses salons");
+    expect(en).toContain("can clear a team&apos;s open channel");
+    expect(en).toContain("or when the match is rescheduled to more than {VOICE_CHANNEL_LEAD_MINUTES} minutes away");
+    expect(en).toContain("the record is never closed");
+    expect(en).not.toContain("a rescheduled match keeps its");
   });
 });
