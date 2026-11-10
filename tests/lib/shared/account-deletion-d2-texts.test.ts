@@ -403,7 +403,21 @@ describe("D12 — conditions d'utilisation, version 10", () => {
     expect(en.details.at(-1)).toContain("version 10, in force since 11 November 2026");
     expect(en.details).toHaveLength(fr.details.length);
     expect(en.linkLabels).toHaveLength(fr.links?.length ?? 0);
-    expect(fr.links?.map((link) => link.href)).toEqual(["/conditions-utilisation#compte", "/conditions-utilisation#signalement", "/conditions-utilisation#retransmission"]);
+    expect(fr.links?.map((link) => link.href)).toEqual(["/conditions-utilisation#compte", "/conditions-utilisation#signalement", "/conditions-utilisation#retransmission", "/conditions-utilisation#contacts-de-match"]);
+  });
+
+  it("privacyChange_termsV10_linksAndDetailNameMatchContactsFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === TERMS_V10_ID)!;
+    const en = PRIVACY_CHANGES_EN[TERMS_V10_ID];
+
+    const frVoice = fr.details.find((detail) => detail.startsWith("Contacts de match :")) ?? "";
+    const enVoice = en.details.find((detail) => detail.startsWith("Match contacts:")) ?? "";
+
+    expect(frVoice).toContain("ce que le bot lit de l'état vocal du serveur, sans l'enregistrer, et qui peut vider un salon — l'arbitrage, ou l'équipe pour son propre salon");
+    expect(fr.details.at(-1)).toContain("« Retransmission des matchs » et « Contacts de match »");
+    expect(enVoice).toContain("what the bot reads of the server's voice state, without recording it, and who can clear a channel — the referees, or the team for its own channel");
+    expect(en.details.at(-1)).toContain("“Match streaming” and “Match contacts” sections");
+    expect(en.linkLabels?.at(-1)).toBe("Read the “Match contacts” section");
   });
 });
 

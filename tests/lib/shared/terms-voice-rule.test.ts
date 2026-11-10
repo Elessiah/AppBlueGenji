@@ -144,23 +144,44 @@ describe("notification de reprise d'équipe fantôme", () => {
   });
 });
 
-describe("conditions d'utilisation v9 — salons vocaux", () => {
-  it("termsV9_voiceParagraph_noGateNoCountLegitimateInterestFrAndEn", () => {
-    const fr = TERMS_SECTIONS.find((s) => s.id === "contacts-de-match")?.paragraphs.join("\n") ?? "";
-    const en = TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match")?.paragraphs.join("\n") ?? "";
+// VOICE-FOLLOWUP (ERREUR.txt, revue juridique #575) : la version 10, pas encore
+// en ligne, réécrit sur place le passage des salons vocaux (D13, D15, D36).
+const voiceTermsFr = () => TERMS_SECTIONS.find((s) => s.id === "contacts-de-match")?.paragraphs.join(" ") ?? "";
+const voiceTermsEn = () => TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match")?.paragraphs.join(" ") ?? "";
 
-    expect(fr).toContain("fait partie du **déroulement du tournoi**");
-    expect(fr).toContain("Le lancement du match n'en dépend pas, et personne n'y est compté");
-    expect(fr).toContain("Ces salons reposent sur l'intérêt légitime de l'association au bon déroulement des tournois.");
-    expect(fr).not.toContain("comptage");
-    expect(fr).not.toContain("salons pleins");
-    expect(fr).not.toContain("s'y opposer");
-    expect(en).toContain("is part of the **running of the tournament**");
-    expect(en).toContain("The match's launch does not depend on them, and no one is counted");
-    expect(en).toContain("These channels rest on the association's legitimate interest in the smooth running of tournaments.");
-    expect(en).not.toContain("This count");
-    expect(en).not.toContain("channels are full");
-    expect(en).not.toContain("object to it");
+describe("conditions d'utilisation v10 — salons vocaux", () => {
+  it("termsV10_voiceParagraph_openToCategoryAndJoiningIsAChoiceFrAndEn", () => {
+    expect(voiceTermsFr()).toContain("proposer à chaque équipe son salon vocal Discord avant chacun de ses matchs fait partie du **déroulement du tournoi**");
+    expect(voiceTermsFr()).toContain("Les rejoindre reste un choix : le lancement du match n'en dépend pas.");
+    expect(voiceTermsFr()).toContain("Ils sont ouverts à qui voit la catégorie des matchs sur le serveur Discord de l'association.");
+    expect(voiceTermsFr()).not.toContain("personne n'y est compté");
+    expect(voiceTermsEn()).toContain("offering each team its Discord voice channel before each of its matches is part of the **running of the tournament**");
+    expect(voiceTermsEn()).toContain("Joining them remains a choice: the match's launch does not depend on them.");
+    expect(voiceTermsEn()).toContain("They are open to whoever sees the match category on the association's Discord server.");
+    expect(voiceTermsEn()).not.toContain("no one is counted");
+  });
+
+  it("termsV10_voiceParagraph_voiceStateReadInMemoryNotRecordedFrAndEn", () => {
+    expect(voiceTermsFr()).toContain("le bot lit l'état vocal de ce serveur (qui se trouve dans quel salon, avec ce que Discord y joint : micro, caméra, profil sur le serveur), qu'il tient en mémoire sans l'enregistrer");
+    expect(voiceTermsEn()).toContain("the bot reads that server's voice state (who is in which channel, with what Discord attaches to it: microphone, camera, server profile), which it holds in memory without recording it");
+  });
+
+  it("termsV10_voiceParagraph_clearByRefereesOrOwnTeamLeadersFrAndEn", () => {
+    expect(voiceTermsFr()).toContain("L'arbitrage (arbitres et administrateurs qui ne jouent pas le match), ou le propriétaire, un manager ou le capitaine d'une équipe pour le salon de sa propre équipe, peut **vider** un salon");
+    expect(voiceTermsFr()).toContain("le bot en déconnecte tous les occupants, sans garder qui ils sont — le journal d'audit de Discord garde ces déconnexions");
+    expect(voiceTermsEn()).toContain("The referees (referees and administrators who do not play the match), or a team's owner, a manager or its captain for their own team's channel, can **clear** a channel");
+    expect(voiceTermsEn()).toContain("the bot disconnects all its occupants, without keeping who they are — Discord's audit log keeps these disconnections");
+  });
+
+  it("termsV10_voiceParagraph_siteKeepsNoUserDataAndLegitimateInterestKeptFrAndEn", () => {
+    expect(voiceTermsFr()).toContain("que son identifiant, les numéros du match et de l'équipe et des horaires (création, rendu, panne du bot) — ni qui s'y trouve, ni combien —");
+    expect(voiceTermsFr()).toContain("un vidage par l'arbitrage nomme en outre son auteur dans les journaux du serveur, sauf l'arbitre désigné du match");
+    expect(voiceTermsFr()).toContain("Ces salons reposent sur l'intérêt légitime de l'association au bon déroulement des tournois.");
+    expect(voiceTermsFr()).not.toContain("s'y opposer");
+    expect(voiceTermsEn()).toContain("only keeps its identifier, the match and team numbers and times (creation, hand-back, bot outage) — neither who is in it nor how many —");
+    expect(voiceTermsEn()).toContain("a clearing by the referees also names its author in the server logs, unless they are the match's assigned referee");
+    expect(voiceTermsEn()).toContain("These channels rest on the association's legitimate interest in the smooth running of tournaments.");
+    expect(voiceTermsEn()).not.toContain("object to it");
   });
 });
 

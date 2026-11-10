@@ -222,6 +222,11 @@ est vide. Base : **intérêt légitime** (bon déroulement des tournois). La rè
 
 Les conditions d'utilisation v9, pas encore en ligne, ont été reformulées sur place par
 EF-43 (ni attente ni comptage, aucune mention d'opposition) : `TERMS_VERSION` reste 9.
+La version 10 (11 novembre 2026, pas encore en ligne à sa rédaction) réécrit sur place ce
+passage de « Contacts de match » : salons ouverts à qui voit la catégorie (D13), état vocal
+lu en mémoire par le bot sans être enregistré, vidage par l'arbitrage ou par le
+propriétaire, un manager ou le capitaine de l'équipe (D36), déconnexions gardées par le
+journal d'audit de Discord — annoncée par l'entrée `2026-11-conditions-v10-avatar-et-succession`.
 
 La politique de confidentialité du bot (`lib/shared/bot-legal-content.ts`, copiée dans
 `LegalTerms/` du bot) décrit aussi ces salons (données, base, durées, destinataires) et

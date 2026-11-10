@@ -1768,20 +1768,22 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // mise en ligne glisse.
     id: "2026-11-conditions-v10-avatar-et-succession",
     publishedAt: "2026-11-11",
-    title: "Conditions d'utilisation : version 10 (avatar supprimé, reprise d'équipe, annonce #live)",
+    title: "Conditions d'utilisation : version 10 (avatar supprimé, reprise d'équipe, annonce #live, salons vocaux)",
     links: [
       { href: "/conditions-utilisation#compte", label: "Lire la section « Compte »" },
       { href: "/conditions-utilisation#signalement", label: "Lire la section « Signalement et modération »" },
       { href: "/conditions-utilisation#retransmission", label: "Lire la section « Retransmission des matchs »" },
+      { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
     ],
     summary:
-      "Les conditions d'utilisation passent en version 10 : elles disent désormais que seul un avatar supprimé par la modération reste bloqué, et comment une contestation acceptée lève ce blocage, qu'un joueur suspendu ne reprend une équipe qu'après tous les autres, et quand l'annonce #live précède un match. Elle est à accepter : une fenêtre te la présente tant que tu ne l'as pas acceptée.",
+      "Les conditions d'utilisation passent en version 10 : elles disent désormais que seul un avatar supprimé par la modération reste bloqué, et comment une contestation acceptée lève ce blocage, qu'un joueur suspendu ne reprend une équipe qu'après tous les autres, quand l'annonce #live précède un match, et ce que le bot lit des salons vocaux d'équipe et qui peut les vider. Elle est à accepter : une fenêtre te la présente tant que tu ne l'as pas acceptée.",
     asksTermsAcceptance: true,
     details: [
       "Signalement et modération : quand la modération supprime un avatar, l'empreinte de l'image est gardée pour en refuser la remise en ligne, comme avatar ou comme logo d'équipe, y compris après la suppression du compte ; un avatar seulement masqué n'est pas bloqué. Supprimé d'office au terme d'un masquage alors que sa contestation attend encore son issue, il n'est bloqué qu'une fois la suppression maintenue, ou à l'effacement du compte s'il vient avant. L'issue d'une contestation est gardée avec la décision : maintenue, le blocage reste ; acceptée après une suppression décidée sur un signalement ou après un masquage, il est levé, sauf si une autre suppression de la même image le justifie encore ou si le compte a été effacé entre-temps.",
       "Compte : pendant les 30 jours d'une suppression demandée, la modération peut masquer, rétablir ou supprimer l'avatar mis de côté, qui n'est rendu à la réactivation que s'il n'est alors ni masqué ni supprimé ; un joueur suspendu ne reprend une équipe qu'après tous les autres ; au terme du délai, seul un avatar que la modération a supprimé ne peut plus être reposé — un avatar seulement masqué, ou que la modération n'a jamais supprimé, part sans que son empreinte soit gardée.",
       "Retransmission des matchs : le message #live de la soirée ne liste un match avant son début que si sa diffusion doit s'ouvrir à son heure de début dans la soirée ; les autres n'y paraissent qu'à leur passage à l'antenne.",
-      `Conditions d'utilisation : la version 10, en vigueur depuis le 11 novembre 2026, le dit dans ses sections « Compte », « Signalement et modération » et « Retransmission des matchs ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.`,
+      "Contacts de match : le passage des salons vocaux d'équipe dit désormais ce que le bot lit de l'état vocal du serveur, sans l'enregistrer, et qui peut vider un salon — l'arbitrage, ou l'équipe pour son propre salon (détail dans les annonces « Salons vocaux d'équipe » du même jour).",
+      `Conditions d'utilisation : la version 10, en vigueur depuis le 11 novembre 2026, le dit dans ses sections « Compte », « Signalement et modération », « Retransmission des matchs » et « Contacts de match ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.`,
     ],
   },
   {
