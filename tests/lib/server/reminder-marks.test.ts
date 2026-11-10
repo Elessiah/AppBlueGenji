@@ -256,7 +256,7 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
     expect(connection.commit).toHaveBeenCalledTimes(1);
   });
 
-  it("markStaffPushed_markKeepsMoving_pushesUnmarkedAfterThreeTries", async () => {
+  it("markStaffPushed_markKeepsMoving_pushesUnmarkedAfterOneRestart", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const connection = transactionMock();
     connection.execute.mockImplementation(async (sql) => {
@@ -267,8 +267,8 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
 
     expect(await markStaffPushed(31, T)).toEqual({ kind: "unmarked" });
 
-    expect(connection.beginTransaction).toHaveBeenCalledTimes(3);
-    expect(connection.rollback).toHaveBeenCalledTimes(3);
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(2);
     expect(connection.commit).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalledTimes(1);
     error.mockRestore();

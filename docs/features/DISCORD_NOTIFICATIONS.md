@@ -491,14 +491,17 @@ l'horaire ne se poussait plus aux arbitres. Deux remèdes :
   VALUES`, aucun verrou d'intervalle pris avant) ; présente, elle est lue sous
   verrou (sa ligne, pas un intervalle — ni identifiant consommé ni verrou
   AUTO-INC sur ce chemin). Une marque qui paraît ou disparaît entre les deux
-  défait la transaction, et la réservation reprend à neuf (trois fois au plus) ;
+  défait la transaction, et la réservation reprend à neuf (une fois, après
+  une attente courte et aléatoire) ;
 - 1467 est traité comme un interblocage (`isAutoIncrementContention`,
   `lib/server/mysql-errors.ts`) : `isTransactionAborted` le reconnaît — aucun
   `catch` ne doit poursuivre sur la transaction —, `retryOnDeadlock` le
   rejoue, et une route qui n'en vient pas à bout rend
   `CONCURRENT_UPDATE_RETRY` (409) au lieu d'une panne. Le même code couvre
   une attente du verrou AUTO-INC qui dépasse son délai, où seule la requête
-  est annulée : l'appelant fait donc toujours son `ROLLBACK` lui-même ;
+  est annulée : l'appelant fait donc toujours son `ROLLBACK` lui-même, et un
+  1467 rendu après plus de 5 s (une attente, pas un interblocage) ne se rejoue
+  pas — comme `ER_LOCK_WAIT_TIMEOUT` ;
 - les réservations des joueurs (`claimDatedMark`, pose de `TOLD`), des
   instructions seules, sont rejouées elles aussi quand elles sont la victime.
 

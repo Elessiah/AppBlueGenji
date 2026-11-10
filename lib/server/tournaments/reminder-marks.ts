@@ -7,6 +7,7 @@
  * ses marques appartenaient à l'ancienne affiche. Les nouvelles engagées n'ont
  * reçu aucun horaire et doivent recevoir l'annonce.
  */
+import { randomInt } from "node:crypto";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
@@ -147,6 +148,9 @@ export async function markStaffPushed(matchId: number, startAt: string): Promise
         }),
       );
       if (reservation !== MARK_MOVED) return reservation;
+      // Attente courte et aléatoire avant de reprendre : deux réservations
+      // qui se sont croisées ne repartent pas du même pas.
+      if (attempt < STAFF_MARK_ATTEMPTS) await new Promise((resolve) => setTimeout(resolve, randomInt(20, 81)));
     }
     throw new Error("STAFF_MARK_NOT_RESERVED");
   } catch (error) {
@@ -158,7 +162,7 @@ export async function markStaffPushed(matchId: number, startAt: string): Promise
 }
 
 /** Reprises d'une réservation dont la marque a bougé pendant qu'on la prenait. */
-const STAFF_MARK_ATTEMPTS = 3;
+const STAFF_MARK_ATTEMPTS = 2;
 
 /** La marque a disparu (ou paru) entre sa lecture simple et son verrou. */
 const MARK_MOVED = "moved";
