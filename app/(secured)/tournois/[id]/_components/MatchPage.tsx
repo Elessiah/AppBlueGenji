@@ -6,6 +6,7 @@ import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useSpectatorView } from "@/components/spectator-view";
 import { useToast } from "@/components/ui/toast";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { KeyFacts, type KeyFact } from "@/components/cyber/KeyFacts";
@@ -746,10 +747,9 @@ function VoiceClearButton({ matchId, teamId, teamName }: Readonly<{ matchId: num
   const page = useMatchPageText();
   const mapError = useMapError();
   const { showError, showSuccess } = useToast();
-  const [busy, setBusy] = useState(false);
-  const onClear = async () => {
-    if (busy) return;
-    setBusy(true);
+  const [confirming, setConfirming] = useState(false);
+  // Déconnecter toute une équipe ne se défait pas : confirmé dans une modale.
+  const onClear = async (): Promise<boolean> => {
     try {
       const response = await fetch(`/api/admin/matches/${matchId}/voice/clear`, {
         method: "POST",
@@ -761,22 +761,34 @@ function VoiceClearButton({ matchId, teamId, teamName }: Readonly<{ matchId: num
         throw new Error(payload.error || "VOICE_CLEAR_FAILED");
       }
       showSuccess(page.t("voice.cleared"));
+      return true;
     } catch (error) {
       showError(mapError((error as Error).message));
-    } finally {
-      setBusy(false);
+      return false;
     }
   };
   return (
-    <button
-      type="button"
-      className="btn ghost"
-      aria-disabled={busy || undefined}
-      aria-label={page.t("voice.clearLabel", { team: teamName })}
-      onClick={() => void onClear()}
-    >
-      {page.t("voice.clear")}
-    </button>
+    <>
+      <button
+        type="button"
+        className="btn ghost"
+        aria-label={page.t("voice.clearLabel", { team: teamName })}
+        onClick={() => setConfirming(true)}
+      >
+        {page.t("voice.clear")}
+      </button>
+      {confirming && (
+        <ConfirmActionDialog
+          title={page.t("voice.clearLabel", { team: teamName })}
+          confirmLabel={page.t("voice.clear")}
+          pendingLabel={page.t("voice.clearPending")}
+          onClose={() => setConfirming(false)}
+          onConfirm={onClear}
+        >
+          <p>{page.t("voice.clearConfirm")}</p>
+        </ConfirmActionDialog>
+      )}
+    </>
   );
 }
 

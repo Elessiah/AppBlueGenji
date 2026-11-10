@@ -17,6 +17,7 @@ import {
   DUE_CHANNELS_SQL,
   OPEN_DUE_CHANNELS_SQL,
   RELEASABLE_SQL,
+  CLEARABLE_CHANNEL_SQL,
   VOICE_FALLBACK_CHANNEL_NAME,
   clearTeamVoiceChannel,
   dispatchMatchVoiceChannels,
@@ -1722,24 +1723,38 @@ describe("clearTeamVoiceChannel", () => {
     const db = database({ voiceRows: [{ channel_id: "901" }] });
     jest.mocked(clearVoiceChannel).mockResolvedValue({ kind: "ok", value: true });
 
-    await expect(clearTeamVoiceChannel(9, 4)).resolves.toBe("cleared");
+    await expect(clearTeamVoiceChannel(9, 4, 77)).resolves.toBe("cleared");
     expect(clearVoiceChannel).toHaveBeenCalledWith("901");
-    expect(db.execute.mock.calls[0][1]).toEqual([9, 4]);
+    expect(db.execute.mock.calls[0][1]).toEqual([77, 9, 4]);
     expect(db.writes).toEqual([]);
   });
 
   it("clearTeamVoiceChannel_noOpenRow_returnsNotOpenWithoutBotCall", async () => {
     database({ voiceRows: [] });
 
-    await expect(clearTeamVoiceChannel(9, 4)).resolves.toBe("notOpen");
+    await expect(clearTeamVoiceChannel(9, 4, 77)).resolves.toBe("notOpen");
     expect(clearVoiceChannel).not.toHaveBeenCalled();
+  });
+
+  it("clearTeamVoiceChannel_callerPlaysMatch_returnsPlayerWithoutBotCall", async () => {
+    database({ voiceRows: [{ channel_id: "901", plays: 1 }] });
+
+    await expect(clearTeamVoiceChannel(9, 4, 77)).resolves.toBe("player");
+    expect(clearVoiceChannel).not.toHaveBeenCalled();
+  });
+
+  it("clearTeamVoiceChannel_query_onlyWhileThePageShowsTheChannel", () => {
+    // Tournoi en cours à l'option allumée, match jouable : sinon rien à vider.
+    expect(CLEARABLE_CHANNEL_SQL).toContain("t.state = 'RUNNING' AND t.team_voice_channels = 1");
+    expect(CLEARABLE_CHANNEL_SQL).toContain("m.status IN ('READY', 'AWAITING_CONFIRMATION')");
+    expect(CLEARABLE_CHANNEL_SQL).toContain("v.released_at IS NULL AND v.channel_id IS NOT NULL");
   });
 
   it("clearTeamVoiceChannel_botNoLongerTracks_returnsNotOpen", async () => {
     database({ voiceRows: [{ channel_id: "901" }] });
     jest.mocked(clearVoiceChannel).mockResolvedValue({ kind: "gone", code: "VOICE_CHANNEL_NOT_TRACKED" });
 
-    await expect(clearTeamVoiceChannel(9, 4)).resolves.toBe("notOpen");
+    await expect(clearTeamVoiceChannel(9, 4, 77)).resolves.toBe("notOpen");
   });
 
   it("clearTeamVoiceChannel_botUnavailable_returnsUnavailableAndLogsMatchAndCodeOnly", async () => {
@@ -1747,7 +1762,7 @@ describe("clearTeamVoiceChannel", () => {
     jest.mocked(clearVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "VOICE_MISSING_PERMISSIONS" });
     const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
 
-    await expect(clearTeamVoiceChannel(9, 4)).resolves.toBe("unavailable");
+    await expect(clearTeamVoiceChannel(9, 4, 77)).resolves.toBe("unavailable");
     expect(warn).toHaveBeenCalledWith("[match-voice] match 9 : vidage du salon vocal refusé (VOICE_MISSING_PERMISSIONS)");
   });
 });

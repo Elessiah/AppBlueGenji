@@ -114,6 +114,7 @@
     "VOICE_CHANNEL_NOT_OPEN": "This voice channel is not open: nothing to clear.",
     "VOICE_CLEAR_UNAVAILABLE": "The Discord bot could not clear the channel. Try again in a minute.",
     "VOICE_CLEAR_FAILED": "The voice channel could not be cleared.",
+    "VOICE_CLEAR_IS_PLAYER": "You play in this match: you can't clear its voice channels.",
     "MISSING_PHASES": "A multi-stage tournament must describe its stages.",
     "INVALID_PHASE_COUNT": "Invalid number of stages: 2 to 8 stages expected.",
     "INVALID_PHASE_POSITIONS": "Invalid stage positions.",

@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments/match-voice");
 jest.mock("@/lib/server/tournaments/staff-action-logs");
+jest.mock("@/lib/server/tournaments/live-streams");
+jest.mock("@/lib/server/staff-audit");
 jest.mock("@/lib/server/api-guard", () => ({
   ...jest.requireActual<typeof import("@/lib/server/api-guard")>("@/lib/server/api-guard"),
   enforceRateLimit: jest.fn(() => null),
@@ -14,7 +16,9 @@ import { GET } from "@/app/api/matches/[matchId]/voice/route";
 import { POST as CLEAR } from "@/app/api/admin/matches/[matchId]/voice/clear/route";
 import { enforceRateLimit, MATCH_VOICE_READ_RULE, TEAM_VOICE_TOGGLE_RULE, VOICE_CLEAR_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
-import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
+import { announceStaffMatchAction, announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
+import { isDesignatedMatchReferee } from "@/lib/server/tournaments/live-streams";
+import { auditStaffAction } from "@/lib/server/staff-audit";
 import { clearTeamVoiceChannel, readMatchVoice, setTeamVoiceChannels } from "@/lib/server/tournaments/match-voice";
 import { authUser } from "../../helpers/auth-user";
 
@@ -198,6 +202,7 @@ function clearReq(body: unknown) {
 describe("POST /api/admin/matches/[matchId]/voice/clear", () => {
   beforeEach(() => {
     jest.mocked(clearTeamVoiceChannel).mockResolvedValue("cleared");
+    jest.mocked(isDesignatedMatchReferee).mockResolvedValue(false);
   });
 
   it("clear_noSession_returns401", async () => {
@@ -247,7 +252,31 @@ describe("POST /api/admin/matches/[matchId]/voice/clear", () => {
     const res = await CLEAR(clearReq({ teamId: 1 }), matchParams("9"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ cleared: true });
-    expect(clearTeamVoiceChannel).toHaveBeenCalledWith(9, 1);
+    expect(clearTeamVoiceChannel).toHaveBeenCalledWith(9, 1, arbitre.id);
+  });
+
+  it("clear_staffNotDesignatedReferee_loggedAnonymouslyAndNamedInPm2", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    await CLEAR(clearReq({ teamId: 4 }), matchParams("9"));
+    expect(announceStaffMatchAction).toHaveBeenCalledWith(9, "VOICE_CLEARED");
+    expect(auditStaffAction).toHaveBeenCalledWith("Salon vocal d'une équipe vidé — match #9", { id: arbitre.id, pseudo: "ArbitrePseudo" });
+  });
+
+  it("clear_designatedReferee_loggedWithoutName", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(isDesignatedMatchReferee).mockResolvedValue(true);
+    await CLEAR(clearReq({ teamId: 4 }), matchParams("9"));
+    expect(announceStaffMatchAction).toHaveBeenCalledWith(9, "VOICE_CLEARED");
+    expect(auditStaffAction).not.toHaveBeenCalled();
+  });
+
+  it("clear_callerPlaysMatch_returns403AndLogsNothing", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(clearTeamVoiceChannel).mockResolvedValue("player");
+    const res = await CLEAR(clearReq({ teamId: 4 }), matchParams("9"));
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe("VOICE_CLEAR_IS_PLAYER");
+    expect(announceStaffMatchAction).not.toHaveBeenCalled();
   });
 
   it("clear_noOpenChannel_returns409", async () => {

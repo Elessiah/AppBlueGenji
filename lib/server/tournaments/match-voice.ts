@@ -49,6 +49,7 @@ import {
   type VoiceChannelState,
 } from "@/lib/shared/match-voice";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
+import { activeMemberSql } from "./match-players";
 import { lockTournamentRow } from "./registration";
 import { inTransaction } from "./transaction";
 
@@ -1163,10 +1164,31 @@ type SingleMatchRow = RowDataPacket & {
   db_now: Date | string;
 };
 
-/** Issue du vidage d'un salon : fait, aucun salon ouvert pour cette équipe, ou bot indisponible. */
-export type ClearVoiceResult = "cleared" | "notOpen" | "unavailable";
+/**
+ * Issue du vidage d'un salon : fait, aucun salon ouvert pour cette équipe (ou match qui n'en
+ * montre plus : tournoi pas en cours, option éteinte, match joué), l'appelant joue ce match, ou
+ * bot indisponible.
+ */
+export type ClearVoiceResult = "cleared" | "notOpen" | "player" | "unavailable";
 
-type OpenChannelRow = RowDataPacket & { channel_id: string };
+type OpenChannelRow = RowDataPacket & { channel_id: string; plays: number | null };
+
+/**
+ * Salon ouvert d'une équipe, seulement tant que la page le montre (tournoi en cours à l'option
+ * allumée, match jouable), et si l'appelant est membre actif de l'une des deux équipes (`plays`).
+ * Une entrée solo n'a jamais de salon.
+ */
+export const CLEARABLE_CHANNEL_SQL = `SELECT v.channel_id,
+       EXISTS (SELECT 1 FROM bg_team_members tm
+                WHERE tm.user_id = ? AND ${activeMemberSql("tm")}
+                  AND tm.team_id IN (m.team1_id, m.team2_id)) AS plays
+  FROM bg_match_voice_channels v
+  JOIN bg_matches m ON m.id = v.match_id
+  JOIN bg_tournaments t ON t.id = m.tournament_id
+ WHERE v.match_id = ? AND v.team_id = ? AND v.released_at IS NULL AND v.channel_id IS NOT NULL
+   AND t.state = 'RUNNING' AND t.team_voice_channels = 1
+   AND m.status IN ('READY', 'AWAITING_CONFIRMATION')
+ LIMIT 1`;
 
 /**
  * Vide le salon ouvert d'une équipe d'un match (décision D13 : les salons sont ouverts à
@@ -1176,15 +1198,13 @@ type OpenChannelRow = RowDataPacket & { channel_id: string };
  * donne accès — le bot ne touche de toute façon qu'un salon qu'il suit. Un salon que le bot
  * ne suit plus (supprimé à la main) relance une passe, qui le redemande par sa clé.
  */
-export async function clearTeamVoiceChannel(matchId: number, teamId: number): Promise<ClearVoiceResult> {
-  const rows = await run<OpenChannelRow[]>(
-    `SELECT channel_id FROM bg_match_voice_channels
-     WHERE match_id = ? AND team_id = ? AND released_at IS NULL AND channel_id IS NOT NULL
-     LIMIT 1`,
-    [matchId, teamId],
-  );
-  const channelId = rows[0]?.channel_id;
-  if (!channelId) return "notOpen";
+export async function clearTeamVoiceChannel(matchId: number, teamId: number, userId: number): Promise<ClearVoiceResult> {
+  const rows = await run<OpenChannelRow[]>(CLEARABLE_CHANNEL_SQL, [userId, matchId, teamId]);
+  const row = rows[0];
+  if (!row?.channel_id) return "notOpen";
+  // Un membre du staff qui joue ce match ne vide pas les salons (comme il ne l'arbitre pas).
+  if (Number(row.plays ?? 0) === 1) return "player";
+  const channelId = row.channel_id;
   const outcome = await clearVoiceChannel(channelId);
   if (outcome.kind === "ok") return "cleared";
   if (outcome.kind === "gone") {

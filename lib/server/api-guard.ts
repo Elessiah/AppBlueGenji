@@ -119,17 +119,17 @@ export const MATCH_VOICE_READ_RULE: RateLimitRule = {
  * Trente en cinq minutes couvrent un staff qui corrige plusieurs tournois ;
  * au-delà, c'est une bascule en boucle.
  */
+export const TEAM_VOICE_TOGGLE_RULE: RateLimitRule = {
+  name: "team-voice-toggle",
+  limit: 30,
+  windowMs: 5 * 60_000,
+};
+
 /** Vidage d'un salon vocal d'équipe par l'arbitrage (`POST /api/admin/matches/[id]/voice/clear`), par compte. */
 export const VOICE_CLEAR_RULE: RateLimitRule = {
   name: "voice-clear",
   limit: 20,
   windowMs: 60_000,
-};
-
-export const TEAM_VOICE_TOGGLE_RULE: RateLimitRule = {
-  name: "team-voice-toggle",
-  limit: 30,
-  windowMs: 5 * 60_000,
 };
 
 /**

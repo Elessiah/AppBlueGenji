@@ -48,6 +48,8 @@
     "clear": "Clear",
     "clearLabel": "Clear the voice channel of {team}",
     "cleared": "Voice channel cleared.",
+    "clearPending": "Clearing…",
+    "clearConfirm": "Everyone in the channel will be disconnected from Discord voice; the channel stays open and they can rejoin it.",
     "clearHint": "Channels are open to everyone who can see the match category: “Clear” disconnects everyone in a team's channel, which stays open.",
     "hint": "Fifteen minutes before the match, the Discord bot opens a {capacity}-seat voice channel per team; the match launch doesn't depend on the channels."
   }

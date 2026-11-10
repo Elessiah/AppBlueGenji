@@ -48,6 +48,8 @@
     "clear": "Vider",
     "clearLabel": "Vider le salon vocal de {team}",
     "cleared": "Salon vocal vidé.",
+    "clearPending": "Vidage…",
+    "clearConfirm": "Tous les occupants du salon seront déconnectés de Discord vocal ; le salon reste ouvert et ils pourront le rejoindre.",
     "clearHint": "Les salons sont ouverts à tous ceux qui voient la catégorie des matchs : « Vider » déconnecte tous les occupants du salon d'une équipe, qui reste ouvert.",
     "hint": "Un quart d'heure avant le match, le bot Discord ouvre un salon vocal de {capacity} places par équipe ; le lancement du match ne dépend pas des salons."
   }

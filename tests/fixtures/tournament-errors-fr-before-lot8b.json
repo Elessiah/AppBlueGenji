@@ -1,5 +1,5 @@
 {
-  "count": 217,
+  "count": 218,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "ADMIN_RESOLVE_FAILED": "Erreur lors de la résolution du match.",
@@ -218,6 +218,7 @@
     "INVALID_TEAM_ID": "Équipe invalide.",
     "VOICE_CHANNEL_NOT_OPEN": "Ce salon vocal n'est pas ouvert : rien à vider.",
     "VOICE_CLEAR_UNAVAILABLE": "Le bot Discord n'a pas pu vider le salon. Réessaie dans une minute.",
-    "VOICE_CLEAR_FAILED": "Le salon vocal n'a pas pu être vidé."
+    "VOICE_CLEAR_FAILED": "Le salon vocal n'a pas pu être vidé.",
+    "VOICE_CLEAR_IS_PLAYER": "Tu joues ce match : tu ne peux pas vider ses salons vocaux."
   }
 }
