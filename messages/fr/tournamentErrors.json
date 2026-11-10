@@ -112,7 +112,7 @@
     "INVALID_TEAM_VOICE_CHANNELS": "Valeur invalide pour les salons vocaux d'équipe : cochez ou décochez la case.",
     "INVALID_TEAM_ID": "Équipe invalide.",
     "VOICE_CHANNEL_NOT_OPEN": "Ce salon vocal n'est pas ouvert : rien à vider.",
-    "VOICE_CLEAR_UNAVAILABLE": "Le bot Discord n'a pas pu vider le salon. Réessayez dans une minute.",
+    "VOICE_CLEAR_UNAVAILABLE": "Le bot Discord n'a pas pu vider le salon. Réessaie dans une minute.",
     "VOICE_CLEAR_FAILED": "Le salon vocal n'a pas pu être vidé.",
     "MISSING_PHASES": "Un tournoi multi-phases doit décrire ses phases.",
     "INVALID_PHASE_COUNT": "Nombre de phases invalide : 2 à 8 phases attendues.",
