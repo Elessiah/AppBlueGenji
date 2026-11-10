@@ -925,6 +925,16 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   d'exclusion — la modération ne le supprime pas (D20). L'empreinte
   perceptuelle (D17) viendra dans un lot à part (`ERREUR.txt`).
 
+## Solde ERREUR.txt (ACCOUNT-DELETION-2, 2026-11-10)
+
+- **Dernier administrateur** : la demande d'un administrateur est refusée (`LAST_ADMIN_ACCOUNT`, FR+EN dans `deletion.errors`) s'il ne reste aucun autre administrateur vivant. Les autres administrateurs se relèvent sans verrou, puis le premier se verrouille par sa clé et se relit (une recherche verrouillée sans index sur `is_admin` verrouillerait toute la table). Le rejeu d'une demande journalisée n'est pas refusé.
+- **Interblocage** : la transaction de la demande (`requestAccountDeletion`) et celle de la suppression définitive (`deleteAccountNow`) se rejouent entières par `retryOnDeadlock` (une désignation d'arbitre verrouille le match puis le compte, la suppression l'inverse).
+- **Arbitrages retirés** : les matchs non joués que le compte arbitrait sont annoncés au staff (ligne anonyme « Arbitre retiré d'office — l'arbitre n'est plus disponible », `ACCOUNT_WITHDRAWN`, aucun avis au compte) et, tournoi en cours, partent s'ils n'attendaient plus que l'arbitre (`relaunchAfterRefereeWithdrawal`) ; annonces envoyées au commit (`flushBotLogs`), jetées sur annulation.
+- **Réactivation** : le compte se verrouille avant le ticket (même ordre que la suppression définitive).
+- **Contacts de match** : un compte en attente de suppression n'y figure plus (`u.is_deleted = 0`).
+- **Tolérance de schéma** : `deletion_requested_at` absente → connexion et annuaire ne tombent pas ; `bg_account_deletion_holds` absente → inscription et renommage ne tombent pas ; l'export des rôles de match retire seule la colonne récente refusée (lue `NULL`).
+- **Ménage** : les tickets de réactivation échus partent à chaque passe horaire et à l'anonymisation ; le rattrapage au démarrage efface les fichiers d'avatar masqués du compte effacé, après le commit.
+
 ## Décisions requises (ouvertes)
 
 - Même avatar mis de côté : masqué ou supprimé par la modération, le joueur
