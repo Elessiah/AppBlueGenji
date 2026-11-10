@@ -226,6 +226,14 @@
   color: var(--ink-quiet);
 }
 
+/* Engagé **déjà connu** d'une case à pourvoir (vainqueur du tour précédent,
+   battue d'une demi-finale) : c'est la seule information de la case, elle
+   reprend donc la couleur d'une ligne ordinaire au lieu de se fondre dans les
+   `TBD`. Trois classes, pour passer devant la règle ci-dessus. */
+.ghostCard .row.ghostKnown {
+  color: var(--ink);
+}
+
 /* Les deux classes, et non `.ghostCard` seule : la règle de survol de la carte
    porte un `:not()`, dont l'argument compte dans sa spécificité — un sélecteur
    d'une seule classe perdait contre elle, et la case vide gardait le halo bleu

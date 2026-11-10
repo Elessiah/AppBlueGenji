@@ -29,8 +29,8 @@ Dans l'ordre, du haut vers le bas :
 2. **L'aperçu de la manche suivante** (arbitrage, tournoi en cours) : il ouvre
    la suite des volets — aperçu, manche en cours, manches closes. Il s'arrête
    avec la phase qualificative : aucun aperçu des play-offs.
-3. **Les play-offs**, dès qu'ils sont lancés : l'arbre (`Phase finale`) puis la
-   `Petite finale` dans son propre volet.
+3. **Les play-offs**, dès qu'ils sont lancés : l'arbre (`Phase finale`), la
+   `Petite Finale` en carte sous la `Grande Finale`.
 4. **Les manches qualificatives**, un volet par manche : la **manche en cours
    d'abord**, puis les manches closes **de la plus récente à la plus
    ancienne** (`orderEnduranceRoundSections`, module pur).
@@ -155,18 +155,60 @@ Le volet s'appelle donc « Phase finale » dès l'ouverture des play-offs, et no
 plus « Quarts de finale » : les trois tours tiennent dans une seule section
 (`FINAL_PHASE_ROUNDS`), comme dans tout tableau à élimination simple à huit.
 
-La **petite finale**, elle, n'est pas annoncée d'avance : son volet apparaît
-avec la finale, quand le moteur la pose. Elle ne descend d'aucun tour — rien ne
-mènerait à sa case vide.
+La **petite finale** s'annonce elle aussi d'avance, sous la finale (section
+suivante).
 
-### La petite finale est un tableau à part
+### La petite finale se dessine sous la finale
 
 Le moteur pose la petite finale dans **la même manche** que la finale
 (`finalizePlayoffsIfDone`), avec `bracket = 'THIRD_PLACE'`. Alignée dans la
-dernière colonne de l'arbre, elle serait nommée « Finale 2 » et semblerait mener
-quelque part. Elle est donc rendue par un second `BracketSections`, de type
-`THIRD_PLACE` — exactement ce que fait déjà la page pour les tableaux à
-élimination.
+dernière colonne de l'arbre comme un créneau de plus, elle serait nommée
+« Finale 2 » et recevrait un trait. Elle n'est donc **pas** un créneau de
+l'arbre : c'est une carte de match posée **sous la finale**, dans sa colonne,
+sous-titrée « Petite Finale » (`bracket.stage.thirdPlace`, « Third-place match »
+sous `/en`). La finale de cet arbre est sous-titrée « Grande Finale »
+(`bracket.stage.grandFinal`, prop `grandFinalLabel`) au lieu de « Finale 1 » —
+**toujours**, que la petite finale se joue ou non : la finale ne change pas de
+nom en cours de tournoi quand un double forfait annule la petite finale.
+
+`endurancePlayoffThirdPlaceSlot` (`endurance-sections.ts`) décide de ce qu'il y a
+à montrer, et `BracketSections` → `BracketTree` le reçoivent par la prop
+`thirdPlace` :
+
+| État | Ce que la case montre |
+| --- | --- |
+| Demi-finales pas encore jouées (ou pas encore posées) | case à pourvoir vide, `TBD` – `TBD` (`GhostMatchCard`) |
+| Une demi-finale close | sa **battue** dans la case : celle de la 1ʳᵉ demie en haut, celle de la 2ᵉ en bas (`projectThirdPlaceEntrants`) |
+| Les deux closes | le moteur a posé la rencontre : la **vraie** carte (`MatchRow` — équipes, score, horaire, statut, « Page du match », ancre `#match-…`) |
+
+Mêmes cas que `planNextPlayoffRound` (`THIRD_PLACE`), et **aucune case** quand
+on sait qu'elle ne se jouera pas :
+
+- une demi-finale close sur un **double forfait** n'a pas de battue : l'autre
+  battue prend la 3ᵉ place par exemption (en haut, le bas dit `BYE`) ; deux
+  doubles forfaits → pas de petite finale ;
+- une demi-finale **gagnée par exemption** n'a pas de battue non plus — connu
+  d'avance quand le tour d'avant compte un nombre impair de rencontres (trois
+  quarts) ou que la projection y annonce déjà une exemption ;
+- une demi-finale close **sans battue enregistrée** (`loser_team_id` à `NULL`) :
+  le moteur n'y lit personne, la projection non plus ;
+- pas de tour à deux rencontres avant la finale (finale sèche, ou paire de
+  quarts vidée par deux doubles forfaits) ; tournoi clos sans petite finale posée.
+
+La case compte dans la **pastille** du volet (« 8 matchs » pour un plateau à
+huit : quatre quarts, deux demies, finale, petite finale), à pourvoir ou posée.
+Posée, elle compte aussi pour « ★ Votre match », l'ouverture d'office du volet
+et l'ancre `#match-[id]`. Affichage seul : ni moteur, ni base, ni instantané.
+
+**Géométrie.** La finale doit rester au centre de son créneau, là où arrivent
+les traits. Le contenu mesuré du créneau est donc une grille de trois rangées
+`1fr auto 1fr` — une rangée vide, la finale, la petite finale : les deux `1fr`
+ont la même hauteur, la finale reste centrée, et `useSlotHeight` mesure le tout,
+si bien que le créneau grandit seul sur un petit arbre (demies + finale).
+
+**Repli.** Une petite finale que l'arbre ne sait pas rattacher (posée dans un
+autre tour que la finale, ou sans colonne de finale) garde l'ancien volet à
+part, un second `BracketSections` de type `THIRD_PLACE`.
 
 ### L'arbre pousse un tour à la fois — deux pièges
 
@@ -215,12 +257,21 @@ Deux garde-fous à retenir :
   comportement d'origine, et c'est celui des tableaux à élimination, qui
   n'en passent aucun : le trait s'arrête au bord de la carte.
 
-Une **réserve antérieure** à tout cela : le moteur saute une paire dont les deux
-créneaux ont été vidés par un double forfait (`pair.length === 0` dans
-`planNextPlayoffRound`), ce qui décale d'un cran les rencontres suivantes, là où
-le module garde `floor(i/2)`. Deux doubles forfaits voisins font donc des traits
-faux, et la prédiction annonce un tour plus large qu'il ne naîtra. Consigné dans
-`ERREUR.txt`.
+**Paire vidée par deux doubles forfaits.** Le moteur saute une paire dont les
+deux créneaux ont été vidés (`pair.length === 0` dans `planNextPlayoffRound`) et
+remonte d'un cran les rencontres suivantes. `playoffNextRoundPositions`
+(`lib/shared/bg-survie/playoffs.ts`) est la **seule** description de cette règle
+pour l'affichage : les traits (`endurancePlayoffLinks`), le compte des cases à
+pourvoir du tour suivant (`endurancePlayoffGhostSlots`) et les noms projetés
+(`projectPlayoffGhostEntrants`) en descendent tous — un nom ne s'affiche jamais
+dans une case que son trait n'atteint pas, et la paire sautée ne porte aucun
+trait. Le **nom des stades** suit la même règle : `endurancePlayoffRoundCount`
+compte les tours posés et les cases à pourvoir, donc la rencontre qui reste
+après une paire vidée s'appelle « Finale » et non « Demi-finale ». Un tournoi
+clos sans cases à pourvoir retombe sur l'effectif du premier tour, sauf quand
+son dernier tour n'a qu'une rencontre (c'est la finale). Une exemption posée
+dans un tour de play-offs affiche `BYE` sur sa case vide, comme la case à
+pourvoir qui l'annonçait (`matchSideViews`).
 
 Si la règle d'appariement du moteur changeait, c'est `endurancePlayoffLinks`
 qu'il faudrait suivre — d'où un test qui la compare à la structure réellement
@@ -236,7 +287,7 @@ produite par le service.
 | Volets de manche | `app/(secured)/tournois/[id]/_components/EnduranceRoundPanels.tsx` |
 | Chrome partagé d'un volet | `app/(secured)/tournois/[id]/_components/BoardPanel.tsx` (+ `.module.css`) |
 | Vue du mode | `app/(secured)/tournois/[id]/_components/EnduranceView.tsx` |
-| Arbre | `BracketSections.tsx` (props `plannedRounds`, `resolveNextMatchId`, `ghostSlots`) → `BracketTree.tsx` |
+| Arbre | `BracketSections.tsx` (props `plannedRounds`, `resolveNextMatchId`, `ghostSlots`, `ghostEntrants`, `thirdPlace`, `grandFinalLabel`) → `BracketTree.tsx` |
 
 ### `BoardPanel` — un seul chrome de volet
 
@@ -312,8 +363,24 @@ joué (`finalizePlayoffsIfDone`) : un quart clos laissait donc la demi-finale à
 `TBD` – `TBD`. L'arbre montre maintenant, dans la case à pourvoir du tour
 **immédiatement suivant**, le vainqueur de chaque rencontre déjà `COMPLETED`
 (`projectPlayoffGhostEntrants`, `lib/shared/bg-survie/playoffs.ts`), nom cliquable
-par `EntrantName`. Même règle de position que `planNextPlayoffRound` : le i-ᵉ match
-(ordre des numéros) alimente la case `floor(i/2)`, côté haut si i est pair, côté
-bas sinon. Un double forfait ne qualifie personne (le côté reste `TBD`). Affichage
-seul : ni moteur, ni base, ni instantané ne changent ; vues connectée, `/suivre`
-et `/en` passent par le même `GhostMatchCard`. Aucun texte nouveau.
+par `EntrantName`.
+
+C'est le tirage de `planNextPlayoffRound`, rejoué sur un tour **incomplet** — les
+tests comparent la projection au plan du moteur pour chaque forme de tour :
+
+- les rencontres vont par paires dans l'ordre des numéros : la première alimente
+  le haut de la case, la seconde le bas ; un match pas encore clos laisse `TBD` ;
+- un **double forfait** ne qualifie personne : sa voisine passe **en haut** et le
+  bas dit `BYE` (`PROJECTED_BYE`) — personne n'y viendra, la rencontre naîtra
+  jouée. Même chose pour le dernier vainqueur d'un effectif impair ;
+- une paire vidée par **deux** doubles forfaits ne donne aucune rencontre : les
+  paires suivantes remontent d'une case, comme dans le moteur — et les traits
+  comme le compte des cases suivent la même règle (`playoffNextRoundPositions`).
+- le nom vient du côté dont l'identifiant est celui du vainqueur ; un vainqueur
+  étranger à la rencontre retombe sur « Engagé #id », jamais sur le nom d'un autre.
+
+Un engagé connu reprend la couleur d'une ligne ordinaire (`.ghostKnown`) — c'est
+la seule information de la case, elle ne se lit pas comme un `TBD` — et porte son
+nom complet en infobulle, comme sur la carte réelle. Affichage seul : ni moteur,
+ni base, ni instantané ne changent ; vues connectée, `/suivre` et `/en` passent
+par le même `GhostMatchCard`. Textes existants (`match.tbd`, `match.bye`).

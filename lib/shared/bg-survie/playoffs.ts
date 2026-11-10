@@ -8,6 +8,7 @@
 
 import type { EnduranceConfig } from "./config";
 import type { EndurancePairing } from "./standings";
+import { isMatchDoubleForfeit, type MatchOutcomeShape } from "../match-outcome";
 
 /**
  * Tableau des quarts de finale, en rangs de qualification (1 = meilleure).
@@ -175,12 +176,17 @@ export function planNextPlayoffRound(
 export type ProjectablePlayoffMatch = {
   roundNumber: number;
   matchNumber: number;
-  status: string;
+  status: MatchOutcomeShape["status"];
   winnerTeamId: number | null;
   team1Id: number | null;
   team2Id: number | null;
   team1Name: string | null;
   team2Name: string | null;
+  /**
+   * Battue enregistrée — c'est elle que le moteur lit pour la petite finale.
+   * Absente (`undefined`) : déduite des deux engagées.
+   */
+  loserTeamId?: number | null;
   doubleForfeit?: boolean;
 };
 
@@ -190,22 +196,94 @@ export type ProjectableGhostSlot = { id: number; roundNumber: number; matchNumbe
 /** Engagé déjà qualifié pour un créneau du tour suivant. */
 export type ProjectedEntrant = { teamId: number; name: string | null };
 
-/** Les deux côtés d'un créneau à venir ; `null` = pas encore connu (TBD). */
-export type ProjectedGhostEntrants = [ProjectedEntrant | null, ProjectedEntrant | null];
+/**
+ * Côté d'un créneau dont on sait qu'il restera **sans engagée** : l'adversaire
+ * passe le tour (effectif impair, ou créneau vidé par un double forfait).
+ */
+export const PROJECTED_BYE = "BYE";
+
+/** Un côté d'un créneau à venir ; `null` = pas encore connu (TBD). */
+export type ProjectedSide = ProjectedEntrant | typeof PROJECTED_BYE | null;
+
+/** Les deux côtés d'un créneau à venir, haut puis bas. */
+export type ProjectedGhostEntrants = [ProjectedSide, ProjectedSide];
+
+/** Ce qu'une rencontre apporte au tour suivant : rien encore, personne, ou une engagée. */
+type FeedState = "OPEN" | "VACANT" | ProjectedEntrant;
+
+/**
+ * Place, dans le tour suivant, de la rencontre que chaque match d'un tour
+ * alimente (0 = première) — `null` pour une paire dont les **deux** créneaux
+ * ont été vidés par un double forfait : le moteur n'y pose rien
+ * (`planNextPlayoffRound`, `pair.length === 0`) et les paires suivantes
+ * remontent d'autant. Le dernier d'un effectif impair forme une paire à lui seul.
+ *
+ * **Seule** description de cette règle pour l'affichage : les noms projetés,
+ * les traits de l'arbre et le compte des cases à pourvoir en descendent tous,
+ * faute de quoi un nom pourrait s'afficher dans une case que son trait n'atteint pas.
+ *
+ * @param feeding les rencontres décisives d'un tour, dans l'ordre des numéros.
+ */
+export function playoffNextRoundPositions(
+  feeding: readonly Pick<MatchOutcomeShape, "status" | "doubleForfeit">[],
+): (number | null)[] {
+  const vacated = (index: number) => index >= feeding.length || isMatchDoubleForfeit(feeding[index]);
+  const positions: (number | null)[] = [];
+  let next = 0;
+  for (let index = 0; index < feeding.length; index += 2) {
+    const position = vacated(index) && vacated(index + 1) ? null : next;
+    if (position !== null) next += 1;
+    positions.push(position);
+    if (index + 1 < feeding.length) positions.push(position);
+  }
+  return positions;
+}
+
+/** Nom d'une engagée de la rencontre ; `null` si elle n'y figure pas (repli « Engagé #id »). */
+function entrantOf(match: ProjectablePlayoffMatch, teamId: number): ProjectedEntrant {
+  if (teamId === match.team1Id) return { teamId, name: match.team1Name };
+  if (teamId === match.team2Id) return { teamId, name: match.team2Name };
+  return { teamId, name: null };
+}
+
+function winnerState(match: ProjectablePlayoffMatch | undefined): FeedState {
+  // Pas de rencontre du tout : le dernier d'un effectif impair n'a pas de voisine.
+  if (match === undefined || isMatchDoubleForfeit(match)) return "VACANT";
+  if (match.status !== "COMPLETED" || match.winnerTeamId === null) return "OPEN";
+  return entrantOf(match, match.winnerTeamId);
+}
+
+/**
+ * Les deux côtés d'un créneau, d'après ce que ses deux rencontres amont
+ * apportent — la règle de `planNextPlayoffRound` : les engagées connues se
+ * **tassent vers le haut**, un créneau vacant vaut une exemption pour l'autre.
+ * `null` quand rien n'est encore connu.
+ */
+function pairSides(first: FeedState, second: FeedState): ProjectedGhostEntrants | null {
+  if (first === "VACANT" || second === "VACANT") {
+    const other = first === "VACANT" ? second : first;
+    return [other === "OPEN" || other === "VACANT" ? null : other, PROJECTED_BYE];
+  }
+  if (first === "OPEN" && second === "OPEN") return null;
+  return [first === "OPEN" ? null : first, second === "OPEN" ? null : second];
+}
 
 /**
  * Affichage seul : le vainqueur d'une rencontre **déjà close** d'un tour est
  * montré dans son créneau du tour suivant, avant même que le moteur ne pose ce
  * tour (il attend que le tour entier soit joué, `finalizePlayoffsIfDone`).
  *
- * Même règle de position que `planNextPlayoffRound` : le i-ᵉ match d'un tour
- * (ordre des numéros) alimente le créneau `floor(i/2)` du tour suivant, côté
- * haut si i est pair, côté bas sinon. Un double forfait ne qualifie personne ;
- * un match pas encore clos laisse son côté vide. Seul le tour immédiatement
- * suivant est alimenté : au-delà, aucun match n'est posé qui puisse l'être.
+ * Même tirage que `planNextPlayoffRound`, rejoué sur un tour **incomplet** :
+ * les rencontres vont par paires dans l'ordre des numéros, la première en haut,
+ * la seconde en bas. Un match pas encore clos laisse son côté vide (TBD). Un
+ * **double forfait** ne qualifie personne : sa voisine passe en haut et le bas
+ * devient une exemption ({@link PROJECTED_BYE}) ; il en va de même du dernier
+ * vainqueur d'un effectif impair. Une paire vidée par **deux** doubles forfaits
+ * ne donne aucune rencontre, et les paires suivantes remontent d'un créneau —
+ * comme dans le moteur. Seul le tour immédiatement suivant est alimenté.
  *
- * @returns créneau à venir (`id`) → ses deux côtés ; les créneaux sans aucun
- *   qualifié connu sont absents.
+ * @returns créneau à venir (`id`) → ses deux côtés ; les créneaux dont rien
+ *   n'est encore connu sont absents.
  */
 export function projectPlayoffGhostEntrants(
   decisive: readonly ProjectablePlayoffMatch[],
@@ -222,15 +300,61 @@ export function projectPlayoffGhostEntrants(
     .filter((slot) => slot.roundNumber === lastRound + 1)
     .sort((a, b) => a.matchNumber - b.matchNumber);
 
-  feeding.forEach((match, index) => {
-    if (match.status !== "COMPLETED" || match.doubleForfeit || match.winnerTeamId === null) return;
-    const target = nextRound[Math.floor(index / 2)];
-    if (!target) return;
-    const winnerName = match.winnerTeamId === match.team1Id ? match.team1Name : match.team2Name;
-    const sides = projected.get(target.id) ?? [null, null];
-    sides[index % 2] = { teamId: match.winnerTeamId, name: winnerName };
-    projected.set(target.id, sides);
-  });
+  const positions = playoffNextRoundPositions(feeding);
+  for (let index = 0; index < feeding.length; index += 2) {
+    // Paire entièrement vacante : le moteur ne pose rien, la suite remonte.
+    const position = positions[index];
+    if (position === null) continue;
+    const target = nextRound[position];
+    const sides = pairSides(winnerState(feeding[index]), winnerState(feeding[index + 1]));
+    if (target && sides) projected.set(target.id, sides);
+  }
 
   return projected;
+}
+
+/**
+ * Affichage seul : les deux côtés de la **petite finale** avant que le moteur ne
+ * la pose (il attend les deux demi-finales), d'après ce que les demi-finales
+ * ont déjà donné — la battue de la première en haut, celle de la seconde en bas.
+ *
+ * Mêmes cas que `planNextPlayoffRound` (`THIRD_PLACE`) :
+ *
+ * - une demi-finale close sur un **double forfait** ne fournit aucune battue :
+ *   l'autre battue prend la 3ᵉ place par exemption (en haut, bas
+ *   {@link PROJECTED_BYE}) ; deux doubles forfaits → pas de petite finale ;
+ * - une demi-finale **sans adversaire** (exemption d'un effectif impair) n'a pas
+ *   de battue non plus, et il n'y a alors jamais de petite finale ;
+ * - une demi-finale close **sans battue enregistrée** (`loserTeamId` à `null`)
+ *   n'en fournit pas davantage au moteur : pas de petite finale.
+ *
+ * @param semis les rencontres décisives du tour à deux matchs.
+ * @returns `null` quand aucune petite finale ne se jouera ; sinon ses deux
+ *   côtés, `[null, null]` tant qu'aucune demi-finale n'est close.
+ */
+export function projectThirdPlaceEntrants(
+  semis: readonly ProjectablePlayoffMatch[],
+): ProjectedGhostEntrants | null {
+  if (semis.length !== 2) return null;
+  if (semis.some((match) => match.team1Id === null || match.team2Id === null)) return null;
+
+  const closedWithoutLoser = (match: ProjectablePlayoffMatch) =>
+    match.status === "COMPLETED" && !isMatchDoubleForfeit(match) && match.winnerTeamId !== null && match.loserTeamId === null;
+  if (semis.some(closedWithoutLoser)) return null;
+
+  const [first, second] = [...semis]
+    .sort((a, b) => a.matchNumber - b.matchNumber)
+    .map((match): FeedState => {
+      if (isMatchDoubleForfeit(match)) return "VACANT";
+      if (match.status !== "COMPLETED" || match.winnerTeamId === null) return "OPEN";
+      if (match.loserTeamId != null) return entrantOf(match, match.loserTeamId);
+      // Un vainqueur étranger à la rencontre (ligne en cours de réécriture) ne
+      // désigne aucune battue : mieux vaut TBD qu'un nom faux.
+      if (match.winnerTeamId === match.team1Id && match.team2Id !== null) return entrantOf(match, match.team2Id);
+      if (match.winnerTeamId === match.team2Id && match.team1Id !== null) return entrantOf(match, match.team1Id);
+      return "OPEN";
+    });
+
+  if (first === "VACANT" && second === "VACANT") return null;
+  return pairSides(first, second) ?? [null, null];
 }

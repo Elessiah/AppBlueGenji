@@ -83,8 +83,12 @@ describe("play-offs — le vrai arbre, et non une liste de cartes", () => {
   it("emprunte le composant de l'élimination simple", () => {
     expect(VIEW).toContain("<BracketSections");
     expect(VIEW).toContain('bracketType="UPPER"');
-    // La petite finale est un tableau à part : alignée dans la dernière colonne
-    // de l'arbre, elle se nommerait « Finale 2 » et semblerait mener quelque part.
+    // La petite finale se dessine sous la finale (`thirdPlace`) ; le volet à
+    // part ne reste qu'en repli, pour une rencontre que l'arbre ne rattache pas.
+    expect(VIEW).toContain("thirdPlace={thirdPlaceSlot}");
+    expect(VIEW).toContain("endurancePlayoffThirdPlaceSlot(");
+    expect(VIEW).toContain("matches={detachedThirdPlace}");
+    expect(SECTIONS).toContain("thirdPlace={sectionThirdPlace}");
     expect(VIEW).toContain('bracketType="THIRD_PLACE"');
     expect(VIEW).toContain("splitPlayoffBrackets(");
   });

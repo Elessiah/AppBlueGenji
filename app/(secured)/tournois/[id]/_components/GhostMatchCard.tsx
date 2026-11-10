@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { EntrantName, useShownEntrantName } from "./EntrantName";
+import { EntrantName } from "./EntrantName";
 import styles from "./MatchRow.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 
@@ -35,39 +35,54 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
  * tour précédent est close, son vainqueur occupe son côté de la case (nom
  * cliquable, comme partout dans l'arbre) au lieu de `TBD`, sans attendre que le
  * moteur pose le tour. Affichage seul : la case reste sans action ni ancre.
+ * Un nom connu reprend la couleur d'une ligne ordinaire (`.ghostKnown`) : c'est
+ * la seule information de la case, elle ne se lit pas comme un `TBD`. Un côté
+ * dont on sait qu'il restera vide (`topBye` / `bottomBye` : effectif impair,
+ * double forfait en amont) dit `BYE`, pas `TBD` — personne n'y viendra.
  */
 export const GhostMatchCard = memo(function GhostMatchCard({
   topTeamId = null,
   topTeamName = null,
   bottomTeamId = null,
   bottomTeamName = null,
+  topBye = false,
+  bottomBye = false,
 }: Readonly<{
   topTeamId?: number | null;
   topTeamName?: string | null;
   bottomTeamId?: number | null;
   bottomTeamName?: string | null;
+  topBye?: boolean;
+  bottomBye?: boolean;
 }>) {
   return (
     <div className={`${styles.card} ${styles.ghostCard}`}>
-      <GhostSide teamId={topTeamId} name={topTeamName} />
-      <GhostSide teamId={bottomTeamId} name={bottomTeamName} />
+      <GhostSide teamId={topTeamId} name={topTeamName} bye={topBye} />
+      <GhostSide teamId={bottomTeamId} name={bottomTeamName} bye={bottomBye} />
     </div>
   );
 });
 
-function GhostSide({ teamId, name }: Readonly<{ teamId: number | null; name: string | null }>) {
+function GhostSide({
+  teamId,
+  name,
+  bye,
+}: Readonly<{ teamId: number | null; name: string | null; bye: boolean }>) {
   const text = useTournamentPageText();
-  const shown = useShownEntrantName(teamId, name);
+  const known = teamId !== null;
+  const emptyLabel = text.t(bye ? "match.bye" : "match.tbd");
 
   return (
-    <div className={styles.row}>
+    <div className={known ? `${styles.row} ${styles.ghostKnown}` : styles.row}>
       {/* Même passage que la carte réelle : la case d'emblème vide garde sa
           place, pour que les noms des deux cartes commencent au même
           endroit d'une colonne à l'autre. */}
       <EntrantName
         teamId={teamId}
-        name={teamId === null ? text.t("match.tbd") : (shown ?? "")}
-        truncate={teamId !== null}
+        name={known ? name : emptyLabel}
+        // Nom tronqué : l'infobulle le donne en entier, comme sur la carte réelle.
+        title={known ? (name ?? undefined) : undefined}
+        truncate={known}
         className={styles.name}
       />
       <strong className={styles.score}>-</strong>

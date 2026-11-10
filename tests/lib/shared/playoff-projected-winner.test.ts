@@ -1,8 +1,11 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  PROJECTED_BYE,
   planNextPlayoffRound,
+  playoffNextRoundPositions,
   projectPlayoffGhostEntrants,
   type ProjectablePlayoffMatch,
+  type ProjectedSide,
 } from "@/lib/shared/bg-survie/playoffs";
 
 function match(n: number, round: number, over: Partial<ProjectablePlayoffMatch> = {}): ProjectablePlayoffMatch {
@@ -20,8 +23,45 @@ function match(n: number, round: number, over: Partial<ProjectablePlayoffMatch> 
 }
 const done = (n: number, round = 1, side: 1 | 2 = 1) =>
   match(n, round, { status: "COMPLETED", winnerTeamId: side === 1 ? n * 10 : n * 10 + 1 });
+const doubleForfeit = (n: number, round = 1) => match(n, round, { status: "COMPLETED", doubleForfeit: true });
 const ghosts = (round: number, count: number) =>
   Array.from({ length: count }, (_, i) => ({ id: -(round * 100 + i + 1), roundNumber: round, matchNumber: i + 1 }));
+
+/** Identifiant d'un côté projeté, tel que le moteur l'écrit : `null` pour une exemption comme pour un inconnu. */
+const sideTeamId = (side: ProjectedSide): number | null =>
+  side === null || side === PROJECTED_BYE ? null : side.teamId;
+
+describe("playoffNextRoundPositions", () => {
+  it("sends each pair of matches to the same next-round match", () => {
+    expect(playoffNextRoundPositions([done(1), match(2, 1), match(3, 1), done(4)])).toEqual([0, 0, 1, 1]);
+  });
+
+  it("gives the last match of an odd round a next-round match of its own", () => {
+    expect(playoffNextRoundPositions([done(1), done(2), match(3, 1)])).toEqual([0, 0, 1]);
+  });
+
+  it("keeps a pair with a single double forfeit", () => {
+    expect(playoffNextRoundPositions([doubleForfeit(1), match(2, 1)])).toEqual([0, 0]);
+  });
+
+  it("drops a pair emptied by two double forfeits and moves the next pairs up", () => {
+    expect(playoffNextRoundPositions([doubleForfeit(1), doubleForfeit(2), done(3), match(4, 1)])).toEqual([
+      null,
+      null,
+      0,
+      0,
+    ]);
+  });
+
+  it("drops the lone last match of an odd round closed on a double forfeit", () => {
+    expect(playoffNextRoundPositions([done(1), done(2), doubleForfeit(3)])).toEqual([0, 0, null]);
+  });
+
+  it("does not read a double-forfeit flag on a match that is not closed", () => {
+    const reopened = [match(1, 1, { doubleForfeit: true }), match(2, 1, { doubleForfeit: true }), done(3)];
+    expect(playoffNextRoundPositions(reopened)).toEqual([0, 0, 1]);
+  });
+});
 
 describe("projectPlayoffGhostEntrants", () => {
   it("places the winner of a completed quarter in its semi slot, top side for odd order", () => {
@@ -31,6 +71,11 @@ describe("projectPlayoffGhostEntrants", () => {
     );
     expect(result.get(-201)).toEqual([{ teamId: 10, name: "T10" }, null]);
     expect(result.size).toBe(1);
+  });
+
+  it("keeps the second match of a pair on the bottom while the first is still open", () => {
+    const result = projectPlayoffGhostEntrants([match(1, 1), done(2)], ghosts(2, 1));
+    expect(result.get(-201)).toEqual([null, { teamId: 20, name: "T20" }]);
   });
 
   it("fills bottom side with the second feeding match and the right slot", () => {
@@ -51,17 +96,51 @@ describe("projectPlayoffGhostEntrants", () => {
     expect(result.size).toBe(0);
   });
 
-  it("feeds nobody from a double forfeit", () => {
-    const result = projectPlayoffGhostEntrants(
-      [match(1, 1, { status: "COMPLETED", doubleForfeit: true }), done(2)],
-      ghosts(2, 1),
-    );
+  it("moves the survivor to the top with a bye when the first match of the pair is a double forfeit", () => {
+    const result = projectPlayoffGhostEntrants([doubleForfeit(1), done(2)], ghosts(2, 1));
+    expect(result.get(-201)).toEqual([{ teamId: 20, name: "T20" }, PROJECTED_BYE]);
+  });
+
+  it("gives the first winner a bye when the second match of the pair is a double forfeit", () => {
+    const result = projectPlayoffGhostEntrants([done(1), doubleForfeit(2)], ghosts(2, 1));
+    expect(result.get(-201)).toEqual([{ teamId: 10, name: "T10" }, PROJECTED_BYE]);
+  });
+
+  it("announces the bye as soon as one side is vacated, even with the neighbour still open", () => {
+    const result = projectPlayoffGhostEntrants([doubleForfeit(1), match(2, 1)], ghosts(2, 1));
+    expect(result.get(-201)).toEqual([null, PROJECTED_BYE]);
+  });
+
+  it("ignores a double-forfeit flag on a match that is not closed", () => {
+    const result = projectPlayoffGhostEntrants([match(1, 1, { doubleForfeit: true }), done(2)], ghosts(2, 1));
     expect(result.get(-201)).toEqual([null, { teamId: 20, name: "T20" }]);
   });
 
-  it("handles an odd count: the last winner takes the top of the last slot", () => {
+  it("gives the last winner of an odd round a bye", () => {
     const result = projectPlayoffGhostEntrants([done(1), done(2), done(3)], ghosts(2, 2));
-    expect(result.get(-202)).toEqual([{ teamId: 30, name: "T30" }, null]);
+    expect(result.get(-202)).toEqual([{ teamId: 30, name: "T30" }, PROJECTED_BYE]);
+  });
+
+  it("announces the bye of an odd round before its last match is played", () => {
+    const result = projectPlayoffGhostEntrants([done(1), done(2), match(3, 1)], ghosts(2, 2));
+    expect(result.get(-202)).toEqual([null, PROJECTED_BYE]);
+  });
+
+  it("shifts the following pairs up when both matches of a pair are double forfeits", () => {
+    const result = projectPlayoffGhostEntrants(
+      [doubleForfeit(1), doubleForfeit(2), done(3), match(4, 1)],
+      ghosts(2, 2),
+    );
+    expect(result.get(-201)).toEqual([{ teamId: 30, name: "T30" }, null]);
+    expect(result.has(-202)).toBe(false);
+  });
+
+  it("leaves the name unknown when the winner is neither side of the match", () => {
+    const result = projectPlayoffGhostEntrants(
+      [match(1, 1, { status: "COMPLETED", winnerTeamId: 999 }), match(2, 1)],
+      ghosts(2, 1),
+    );
+    expect(result.get(-201)).toEqual([{ teamId: 999, name: null }, null]);
   });
 
   it("builds the final from completed semis only for the last placed round", () => {
@@ -78,15 +157,26 @@ describe("projectPlayoffGhostEntrants", () => {
     expect(projectPlayoffGhostEntrants([done(1), done(2)], ghosts(3, 1)).size).toBe(0);
   });
 
-  it("agrees with the engine pairing once the round is complete", () => {
-    const matches = [done(1), done(2, 1, 2), done(3), done(4, 1, 2)];
-    const projected = projectPlayoffGhostEntrants(matches, ghosts(2, 2));
+  // La projection n'a de valeur que si elle annonce ce que le moteur posera :
+  // chaque forme de tour complet est comparée au plan du moteur, pas à une
+  // attente écrite à la main.
+  it.each<[string, ProjectablePlayoffMatch[]]>([
+    ["four clean wins", [done(1), done(2, 1, 2), done(3), done(4, 1, 2)]],
+    ["a double forfeit first in its pair", [doubleForfeit(1), done(2), done(3), done(4)]],
+    ["a double forfeit second in its pair", [done(1), done(2), done(3), doubleForfeit(4)]],
+    ["an odd count", [done(1), done(2), done(3)]],
+    ["a pair emptied by two double forfeits", [doubleForfeit(1), doubleForfeit(2), done(3), done(4)]],
+    ["an odd count ending on a double forfeit", [done(1), done(2), doubleForfeit(3)]],
+  ])("agrees with the engine pairing once the round is complete: %s", (_label, matches) => {
+    const slots = ghosts(2, Math.ceil(matches.length / 2));
+    const projected = projectPlayoffGhostEntrants(matches, slots);
     const plan = planNextPlayoffRound(
-      matches.map((m) => ({ winnerTeamId: m.winnerTeamId, loserTeamId: null })),
-    );
-    plan.forEach((entry, index) => {
-      const sides = projected.get(-(200 + index + 1))!;
-      expect([sides[0]?.teamId, sides[1]?.teamId]).toEqual([entry.pairing.teamAId, entry.pairing.teamBId]);
-    });
+      matches.map((m) => ({ winnerTeamId: m.winnerTeamId, loserTeamId: null, doubleForfeit: m.doubleForfeit })),
+    ).filter((entry) => entry.bracket === "UPPER");
+
+    const shown = slots
+      .filter((slot) => projected.has(slot.id))
+      .map((slot) => projected.get(slot.id)!.map(sideTeamId));
+    expect(shown).toEqual(plan.map((entry) => [entry.pairing.teamAId, entry.pairing.teamBId]));
   });
 });

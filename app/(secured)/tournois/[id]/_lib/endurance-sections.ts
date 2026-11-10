@@ -2,6 +2,12 @@ import type { BracketMatch } from "@/lib/shared/types";
 import type { BracketSlotRef } from "./bracket-sections";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
+import {
+  PROJECTED_BYE,
+  playoffNextRoundPositions,
+  projectThirdPlaceEntrants,
+  type ProjectedGhostEntrants,
+} from "@/lib/shared/bg-survie/playoffs";
 import type { TournamentPageText } from "@/lib/shared/tournament-page-text";
 import { FR_ENDURANCE_TEXT } from "./endurance-text";
 
@@ -209,11 +215,25 @@ export function splitPlayoffBrackets(playoffs: BracketMatch[]): {
  *
  * `0` quand l'arbre n'a pas commencé — il n'y a alors rien à nommer.
  */
-export function endurancePlayoffRoundCount(decisive: BracketMatch[]): number {
+export function endurancePlayoffRoundCount(
+  decisive: BracketMatch[],
+  ghostSlots?: readonly BracketSlotRef[],
+): number {
   const rounds = [...new Set(decisive.map((match) => match.roundNumber))];
   if (rounds.length === 0) return 0;
 
+  // Les tours à venir sont connus (`endurancePlayoffGhostSlots`) et suivent la
+  // règle du moteur : une paire vidée par deux doubles forfaits n'y donne aucune
+  // rencontre, et le match qui reste *est* la finale. Compter sur la taille du
+  // premier tour l'appellerait encore « Demi-finale ».
+  if (ghostSlots) {
+    return new Set([...rounds, ...ghostSlots.map((slot) => slot.roundNumber)]).size;
+  }
+
   const firstRound = Math.min(...rounds);
+  const lastRound = Math.max(...rounds);
+  // Un dernier tour d'un seul match est la finale, quel que soit le premier tour.
+  if (decisive.filter((match) => match.roundNumber === lastRound).length === 1) return rounds.length;
   let remaining = decisive.filter((match) => match.roundNumber === firstRound).length;
 
   let count = 1;
@@ -224,6 +244,13 @@ export function endurancePlayoffRoundCount(decisive: BracketMatch[]): number {
   // Un tour de plus que prévu ne se discute pas : il est là.
   return Math.max(count, rounds.length);
 }
+
+/**
+ * Numéro réservé à la case à pourvoir de la petite finale, pour que son
+ * identifiant ne croise jamais celui d'un créneau de l'arbre (`ghostSlotId`,
+ * dont les numéros de match restent bien en dessous).
+ */
+const THIRD_PLACE_GHOST_NUMBER = 999;
 
 /**
  * Identifiant d'un créneau à pourvoir. **Négatif**, donc impossible à confondre
@@ -269,18 +296,101 @@ export function endurancePlayoffGhostSlots(
   if (rounds.length === 0) return [];
 
   const lastRound = Math.max(...rounds);
-  let remaining = decisive.filter((match) => match.roundNumber === lastRound).length;
+  const lastMatches = decisive
+    .filter((match) => match.roundNumber === lastRound)
+    .sort((a, b) => a.matchNumber - b.matchNumber);
+  let remaining = lastMatches.length;
 
   const slots: BracketSlotRef[] = [];
   let roundNumber = lastRound;
   while (remaining > 1) {
-    remaining = Math.ceil(remaining / 2);
+    // Le tour qui suit le dernier posé se compte sur la règle du moteur : une
+    // paire vidée par deux doubles forfaits n'y donne aucune rencontre
+    // (`playoffNextRoundPositions`). Au-delà, rien n'est joué : `ceil(n/2)`.
+    remaining =
+      roundNumber === lastRound
+        ? new Set(playoffNextRoundPositions(lastMatches).filter((position) => position !== null)).size
+        : Math.ceil(remaining / 2);
     roundNumber += 1;
     for (let matchNumber = 1; matchNumber <= remaining; matchNumber += 1) {
       slots.push({ id: ghostSlotId(roundNumber, matchNumber), roundNumber, matchNumber });
     }
   }
   return slots;
+}
+
+/**
+ * La petite finale telle que l'arbre la dessine : **sous la finale**, dans sa
+ * colonne. `match` porte la rencontre une fois que le moteur l'a posée ; avant,
+ * la case est à pourvoir et `entrants` dit ce qu'on en sait déjà (les battues
+ * des demi-finales closes, `projectThirdPlaceEntrants`).
+ */
+export type ThirdPlaceSlot = BracketSlotRef & {
+  match: BracketMatch | null;
+  entrants: ProjectedGhostEntrants | null;
+};
+
+/**
+ * La case de la petite finale, ou `null` quand il n'y en a pas à montrer.
+ *
+ * Le moteur ne pose la petite finale qu'avec la finale, une fois les deux
+ * demi-finales jouées. La case, elle, s'annonce **dès l'ouverture des
+ * play-offs** — vide, puis avec la battue de chaque demi-finale close — tant
+ * que rien ne dit qu'elle ne se jouera pas :
+ *
+ * - l'arbre doit avoir une finale (posée ou à pourvoir) et, juste avant, un
+ *   tour de **deux** rencontres : sans demi-finales, pas de battues ;
+ * - une demi-finale gagnée par exemption n'a pas de battue. On le sait d'avance
+ *   quand le tour qui précède compte un nombre impair de rencontres, ou quand
+ *   la projection y annonce déjà une exemption (double forfait en amont) ;
+ * - deux demi-finales closes sur un double forfait ne laissent personne ;
+ * - un tournoi clos n'annonce plus rien (cf. {@link endurancePlayoffGhostSlots}).
+ *
+ * Une petite finale posée dans un autre tour que la finale n'est pas rattachée
+ * (`null`) : l'appelant garde alors son volet à part.
+ */
+export function endurancePlayoffThirdPlaceSlot(
+  decisive: BracketMatch[],
+  thirdPlace: BracketMatch[],
+  ghostSlots: readonly BracketSlotRef[],
+  ghostEntrants: ReadonlyMap<number, ProjectedGhostEntrants>,
+  tournamentFinished = false,
+): ThirdPlaceSlot | null {
+  const slots: BracketSlotRef[] = [...decisive, ...ghostSlots];
+  if (slots.length === 0) return null;
+
+  const finalRound = Math.max(...slots.map((slot) => slot.roundNumber));
+  const inRound = (round: number) => slots.filter((slot) => slot.roundNumber === round);
+  if (inRound(finalRound).length !== 1) return null;
+
+  const posted = thirdPlace.find((match) => match.roundNumber === finalRound);
+  if (posted) {
+    return { id: posted.id, roundNumber: finalRound, matchNumber: posted.matchNumber, match: posted, entrants: null };
+  }
+  if (tournamentFinished || thirdPlace.length > 0) return null;
+
+  const semiSlots = inRound(finalRound - 1);
+  if (semiSlots.length !== 2) return null;
+
+  const semis = decisive.filter((match) => match.roundNumber === finalRound - 1);
+  let entrants: ProjectedGhostEntrants | null = [null, null];
+  if (semis.length === 2) {
+    entrants = projectThirdPlaceEntrants(semis);
+  } else if (
+    inRound(finalRound - 2).length % 2 === 1 ||
+    semiSlots.some((slot) => ghostEntrants.get(slot.id)?.includes(PROJECTED_BYE))
+  ) {
+    entrants = null;
+  }
+  if (entrants === null) return null;
+
+  return {
+    id: -(finalRound * 1000 + THIRD_PLACE_GHOST_NUMBER),
+    roundNumber: finalRound,
+    matchNumber: 1,
+    match: null,
+    entrants,
+  };
 }
 
 /**
@@ -304,17 +414,18 @@ export function endurancePlayoffGhostSlots(
  * la case vide de sa demie. Sans eux — un appel qui ne les donne pas —, le
  * trait s'arrête au bord de la carte, comme avant.
  *
- * **Une réserve, antérieure à ce calcul** : le moteur *saute* une paire dont
- * les deux créneaux ont été vidés par un double forfait (`pair.length === 0`
- * dans `planNextPlayoffRound`), ce qui décale d'un cran les rencontres qui
- * suivent — là où ce module garde `floor(i/2)`. Deux doubles forfaits voisins
- * font donc des traits faux ; c'est consigné dans `ERREUR.txt`.
+ * Le moteur *saute* une paire dont les deux créneaux ont été vidés par un
+ * double forfait (`pair.length === 0` dans `planNextPlayoffRound`), ce qui
+ * remonte d'un cran les rencontres qui suivent : la place d'arrivée vient donc
+ * de `playoffNextRoundPositions`, la même règle que les noms projetés et le
+ * compte des cases à pourvoir — une paire sautée ne porte aucun trait.
  */
 export function endurancePlayoffLinks(
   decisive: BracketMatch[],
   ghostSlots: readonly BracketSlotRef[] = [],
 ): Map<number, number> {
   const links = new Map<number, number>();
+  const matchById = new Map(decisive.map((match) => [match.id, match]));
   const slots: BracketSlotRef[] = [...decisive, ...ghostSlots];
   const rounds = [...new Set(slots.map((slot) => slot.roundNumber))].sort((a, b) => a - b);
 
@@ -330,8 +441,13 @@ export function endurancePlayoffLinks(
   for (let index = 0; index < rounds.length - 1; index += 1) {
     const current = byRound.get(rounds[index])!;
     const next = byRound.get(rounds[index + 1])!;
-    current.forEach((slot, position) => {
-      const target = next[Math.floor(position / 2)];
+    // Une case à pourvoir n'a rien de joué : jamais vidée par un double forfait.
+    const positions = playoffNextRoundPositions(
+      current.map((slot) => matchById.get(slot.id) ?? { status: "PENDING" }),
+    );
+    current.forEach((slot, index) => {
+      const position = positions[index];
+      const target = position === null ? undefined : next[position];
       if (target) links.set(slot.id, target.id);
     });
   }

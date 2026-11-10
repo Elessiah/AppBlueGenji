@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import type { ProjectedGhostEntrants } from "@/lib/shared/bg-survie/playoffs";
+import type { ThirdPlaceSlot } from "../_lib/endurance-sections";
 import { BracketTree, ScrollRequest } from "./BracketTree";
 import { BoardPanel, PanelPill } from "./BoardPanel";
 import {
@@ -35,6 +36,15 @@ interface BracketSectionsProps {
   ghostSlots?: readonly BracketSlotRef[];
   /** Vainqueurs déjà connus des créneaux à pourvoir, par id de créneau (voir {@link BracketTree}). */
   ghostEntrants?: ReadonlyMap<number, ProjectedGhostEntrants>;
+  /**
+   * Petite finale dessinée **sous la finale**, dans le volet qui la porte
+   * (`endurancePlayoffThirdPlaceSlot`). Rencontre posée ou case à pourvoir, elle
+   * compte dans la pastille de ce volet ; posée, elle compte aussi pour « Votre
+   * match », l'ouverture d'office et l'ancre `#match-…`, comme toute rencontre.
+   */
+  thirdPlace?: ThirdPlaceSlot | null;
+  /** Sous-titre la finale « Grande Finale » (voir {@link BracketTree}). */
+  grandFinalLabel?: boolean;
   allTournamentMatches: BracketMatch[];
   myTeamId: number | null;
   adminResolvable: (m: BracketMatch) => boolean;
@@ -64,6 +74,8 @@ export function BracketSections({
   matches,
   ghostSlots,
   ghostEntrants,
+  thirdPlace = null,
+  grandFinalLabel = false,
   allTournamentMatches,
   myTeamId,
   adminResolvable,
@@ -88,11 +100,18 @@ export function BracketSections({
   const text = useTournamentPageText();
   const sections = buildSections(roundNums, bracketType, totalRounds, text);
   const accent = ACCENT[bracketType];
-  const myNext = findMyNextMatch(matches, myTeamId);
+  // La petite finale posée est une rencontre du volet comme les autres : elle
+  // peut être « votre match », garder le volet ouvert, ou être visée par une ancre.
+  const thirdPlaceMatch = thirdPlace?.match ?? null;
+  const panelMatches = useMemo(
+    () => (thirdPlaceMatch ? [...matches, thirdPlaceMatch] : matches),
+    [matches, thirdPlaceMatch],
+  );
+  const myNext = findMyNextMatch(panelMatches, myTeamId);
   const myNextMatchId = myNext?.id ?? null;
   const regionBaseId = `bracket-${bracketType.toLowerCase()}`;
 
-  const autoOpen = defaultOpenKey(sections, matches, myNext);
+  const autoOpen = defaultOpenKey(sections, panelMatches, myNext);
 
   const [openKeys, setOpenKeys] = useState<Set<string>>(
     () => new Set(autoOpen ? [autoOpen] : []),
@@ -128,12 +147,12 @@ export function BracketSections({
   const anchorTargetId = useMatchAnchorTarget();
   useEffect(() => {
     if (anchorTargetId === null) return;
-    const target = matches.find((m) => m.id === anchorTargetId);
+    const target = panelMatches.find((m) => m.id === anchorTargetId);
     if (!target) return;
     const section = sections.find((s) => s.rounds.includes(target.roundNumber));
     if (!section) return;
     setOpenKeys((prev) => (prev.has(section.key) ? prev : new Set(prev).add(section.key)));
-  }, [anchorTargetId, matches, sections]);
+  }, [anchorTargetId, panelMatches, sections]);
 
   const toggle = (key: string) =>
     setOpenKeys((prev) => {
@@ -197,7 +216,9 @@ export function BracketSections({
           // faisait annoncer « 0 match » à un volet qui en dessine sept — le
           // cas d'un plateau de plus de huit, dont le second volet naît
           // entièrement à pourvoir.
-          const matchCount = sectionMatches.length + sectionGhosts.length;
+          const sectionThirdPlace =
+            thirdPlace && section.rounds.includes(thirdPlace.roundNumber) ? thirdPlace : null;
+          const matchCount = sectionMatches.length + sectionGhosts.length + (sectionThirdPlace ? 1 : 0);
           const hasMyMatch = myNext !== null && section.rounds.includes(myNext.roundNumber);
           const panelId = `${regionBaseId}-${section.key.replace(/\s+/g, "-")}`;
 
@@ -217,6 +238,8 @@ export function BracketSections({
                 matches={sectionMatches}
                 ghostSlots={sectionGhosts}
                 ghostEntrants={ghostEntrants}
+                thirdPlace={sectionThirdPlace}
+                grandFinalLabel={grandFinalLabel}
                 allTournamentMatches={allTournamentMatches}
                 bracketType={bracketType}
                 totalRoundsGlobal={totalRounds}

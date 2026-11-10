@@ -13,6 +13,7 @@ import {
   endurancePlayoffGhostSlots,
   endurancePlayoffLinks,
   endurancePlayoffRoundCount,
+  endurancePlayoffThirdPlaceSlot,
   enduranceRoundSections,
   splitEnduranceMatches,
   splitPlayoffBrackets,
@@ -251,24 +252,53 @@ export function EnduranceView({
     () => new Map(endurance.standings.map((standing) => [standing.teamId, standing.teamName])),
     [endurance.standings],
   );
-  const { qualification, playoffs } = splitEnduranceMatches(matches);
-  const roundSections = enduranceRoundSections(qualification);
-
-  // L'arbre final vit dans les mêmes manches que la petite finale, qui ne mène
-  // nulle part : les deux se dessinent séparément, comme dans les tableaux à
-  // élimination du site.
-  const { decisive, thirdPlace } = splitPlayoffBrackets(playoffs);
-  // Les tours que le moteur n'a pas encore posés : l'arbre se montre entier dès
-  // l'ouverture des play-offs, cases vides comprises, plutôt que de se réduire
-  // à sa première colonne jusqu'à ce que les quarts soient joués.
-  const playoffGhosts = endurancePlayoffGhostSlots(decisive, isFinished);
-  const playoffLinks = endurancePlayoffLinks(decisive, playoffGhosts);
-  // Le vainqueur d'une rencontre close se lit déjà dans sa case du tour suivant.
-  const playoffGhostEntrants = projectPlayoffGhostEntrants(decisive, playoffGhosts);
+  // Tout l'arbre se déduit du plateau : calculé une fois par instantané, et non
+  // à chaque rendu (brouillon de score, dialogue ouvert…) — les références
+  // stables épargnent aussi un nouveau rendu des volets et des cartes.
+  const {
+    roundSections,
+    decisive,
+    playoffGhosts,
+    playoffLinks,
+    playoffGhostEntrants,
+    playoffRounds,
+    thirdPlaceSlot,
+    detachedThirdPlace,
+  } = useMemo(() => {
+    const { qualification, playoffs } = splitEnduranceMatches(matches);
+    // L'arbre final vit dans les mêmes manches que la petite finale, qui ne
+    // mène nulle part : elle ne prend pas de colonne dans l'arbre.
+    const { decisive, thirdPlace } = splitPlayoffBrackets(playoffs);
+    // Les tours que le moteur n'a pas encore posés : l'arbre se montre entier
+    // dès l'ouverture des play-offs, cases vides comprises, plutôt que de se
+    // réduire à sa première colonne jusqu'à ce que les quarts soient joués.
+    const playoffGhosts = endurancePlayoffGhostSlots(decisive, isFinished);
+    // Le vainqueur d'une rencontre close se lit déjà dans sa case du tour suivant.
+    const playoffGhostEntrants = projectPlayoffGhostEntrants(decisive, playoffGhosts);
+    // La petite finale se dessine sous la finale, à pourvoir puis posée.
+    const thirdPlaceSlot = endurancePlayoffThirdPlaceSlot(
+      decisive,
+      thirdPlace,
+      playoffGhosts,
+      playoffGhostEntrants,
+      isFinished,
+    );
+    return {
+      roundSections: enduranceRoundSections(qualification),
+      decisive,
+      playoffGhosts,
+      playoffLinks: endurancePlayoffLinks(decisive, playoffGhosts),
+      playoffGhostEntrants,
+      // Les tours de l'arbre naissent un à un : sans ce compte, les quarts de
+      // finale s'appelleraient « Finale » tant qu'ils seraient le seul tour posé.
+      playoffRounds: endurancePlayoffRoundCount(decisive, isFinished ? undefined : playoffGhosts),
+      thirdPlaceSlot,
+      // Repli : une petite finale que l'arbre n'a pas su rattacher à sa finale
+      // garde son volet à part plutôt que de disparaître.
+      detachedThirdPlace: thirdPlace.filter((match) => match.id !== thirdPlaceSlot?.match?.id),
+    };
+  }, [matches, isFinished]);
   const resolvePlayoffNext = (slot: BracketSlotRef) => playoffLinks.get(slot.id) ?? null;
-  // Les tours de l'arbre naissent un à un : sans ce compte, les quarts de finale
-  // s'appelleraient « Finale » tant qu'ils seraient le seul tour posé.
-  const playoffRounds = endurancePlayoffRoundCount(decisive);
 
   // Abandon : proposé sur les équipes encore en lice, à leurs représentants
   // comme à l'arbitrage (cf. `canForfeit` côté page).
@@ -486,6 +516,8 @@ export function EnduranceView({
             matches={decisive}
             ghostSlots={playoffGhosts}
             ghostEntrants={playoffGhostEntrants}
+            thirdPlace={thirdPlaceSlot}
+            grandFinalLabel
             allTournamentMatches={matches}
             myTeamId={myTeamId}
             adminResolvable={adminResolvable}
@@ -494,13 +526,13 @@ export function EnduranceView({
             resolveNextMatchId={resolvePlayoffNext}
             plannedRounds={playoffRounds}
           />
-          {thirdPlace.length > 0 && (
+          {detachedThirdPlace.length > 0 && (
             <div style={{ marginTop: 10 }}>
               <BracketSections
                 bracketType="THIRD_PLACE"
                 bracketLabel={t("endurance.thirdPlace")}
                 showBracketLabel={false}
-                matches={thirdPlace}
+                matches={detachedThirdPlace}
                 allTournamentMatches={matches}
                 myTeamId={myTeamId}
                 adminResolvable={adminResolvable}
