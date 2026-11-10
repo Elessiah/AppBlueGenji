@@ -141,3 +141,46 @@ export function useMatchVoice(
 
   return voice;
 }
+
+/** Porte du bouton « Vider » d'un salon : l'arbitrage, l'équipe elle-même, ou aucune. */
+export type VoiceClearRoute = "staff" | "team" | null;
+
+/** Ce que la page sait du lecteur pour le vidage — tout vient de son contexte (flux et REST). */
+export type VoiceClearViewer = {
+  /** Permission `tournaments` (`canSchedule`). */
+  staff: boolean;
+  /** Fiche figée : aucun geste. */
+  frozen: boolean;
+  /** Tournoi individuel : une entrée solo n'a ni membre ni rôle. */
+  solo: boolean;
+  /** Équipe active du lecteur (`TournamentViewerContext.myTeamId`). */
+  myTeamId: number | null;
+  /**
+   * Engagés que le lecteur mène en match (`canCreateReportsForTeamIds` : `OWNER`, `MANAGER`,
+   * `CAPITAINE` — `canDeclareTeamReady`, la règle même du serveur).
+   */
+  leadTeamIds: readonly number[];
+};
+
+/**
+ * Qui peut vider le salon de l'équipe `teamId` (décisions D13, D36), exactement là où le serveur
+ * l'accepterait : son propriétaire, un manager ou son capitaine (`POST /api/matches/[id]/voice/clear`),
+ * pour sa propre équipe seulement ; sinon l'arbitrage qui ne joue pas ce match
+ * (`POST /api/admin/matches/[id]/voice/clear`). Un membre du staff qui joue le match ne vide que le
+ * salon de l'équipe qu'il mène — jamais celui de l'adversaire (le serveur lui répondrait 403).
+ */
+export function voiceClearRoute(
+  viewer: VoiceClearViewer,
+  match: Pick<BracketMatch, "team1Id" | "team2Id">,
+  teamId: number,
+): VoiceClearRoute {
+  if (viewer.frozen) return null;
+  if (!viewer.solo && teamId === viewer.myTeamId && viewer.leadTeamIds.includes(teamId)) return "team";
+  const plays = viewer.myTeamId !== null && (match.team1Id === viewer.myTeamId || match.team2Id === viewer.myTeamId);
+  return viewer.staff && !plays ? "staff" : null;
+}
+
+/** Route du vidage selon sa porte. */
+export function voiceClearUrl(route: Exclude<VoiceClearRoute, null>, matchId: number): string {
+  return route === "team" ? `/api/matches/${matchId}/voice/clear` : `/api/admin/matches/${matchId}/voice/clear`;
+}

@@ -15,6 +15,7 @@ import { useMatchContacts } from "@/components/match-launch/MatchContactsDialog"
 import { SharedMatchContactsContext } from "@/components/match-launch/shared-match-contacts";
 import { launchSidesLaterText, refereeLaterText, useLaunchText } from "@/components/match-launch/launch-text";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { isSoloTournament } from "@/lib/shared/participants";
 import { VOICE_CHANNEL_CAPACITY, type MatchVoiceInfo, type MatchVoiceSideState } from "@/lib/shared/match-voice";
 import {
   MATCH_LAUNCH_REFRESH_EVENT,
@@ -57,7 +58,13 @@ import { useMatchFormat } from "../_lib/match-format-context";
 import { useMatchPageText } from "../_lib/match-page-text";
 import { matchPageHeaderScore, matchPageMapFacts, type MatchPageMapFact } from "../_lib/match-page-facts";
 import { matchSideViews } from "../_lib/match-row-sides";
-import { useMatchVoice } from "../_lib/match-voice-view";
+import {
+  useMatchVoice,
+  voiceClearRoute,
+  voiceClearUrl,
+  type VoiceClearRoute,
+  type VoiceClearViewer,
+} from "../_lib/match-voice-view";
 import { EntrantName, type EntrantLogoSize } from "./EntrantName";
 import { MatchCardActions } from "./MatchCardActions";
 import { LaunchPhaseBadge, hasLaunchPhaseBadge } from "./MatchLaunchStrip";
@@ -740,10 +747,16 @@ export function voiceRowText(page: ReturnType<typeof useMatchPageText>, state: M
 }
 
 /**
- * « Vider » le salon d'une équipe (décision D13) : l'arbitrage fait déconnecter
- * tous ses occupants par le bot, le salon reste ouvert. Réponse : fait ou un code.
+ * « Vider » le salon d'une équipe (décisions D13, D36) : l'arbitrage, ou l'équipe
+ * elle-même (propriétaire, manager, capitaine), fait déconnecter tous ses occupants
+ * par le bot, le salon reste ouvert. Réponse : fait ou un code.
  */
-function VoiceClearButton({ matchId, teamId, teamName }: Readonly<{ matchId: number; teamId: number; teamName: string }>) {
+function VoiceClearButton({
+  matchId,
+  teamId,
+  teamName,
+  route,
+}: Readonly<{ matchId: number; teamId: number; teamName: string; route: Exclude<VoiceClearRoute, null> }>) {
   const page = useMatchPageText();
   const mapError = useMapError();
   const { showError, showSuccess } = useToast();
@@ -751,7 +764,7 @@ function VoiceClearButton({ matchId, teamId, teamName }: Readonly<{ matchId: num
   // Déconnecter toute une équipe ne se défait pas : confirmé dans une modale.
   const onClear = async (): Promise<boolean> => {
     try {
-      const response = await fetch(`/api/admin/matches/${matchId}/voice/clear`, {
+      const response = await fetch(voiceClearUrl(route, matchId), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ teamId }),
@@ -796,19 +809,21 @@ function VoiceClearButton({ matchId, teamId, teamName }: Readonly<{ matchId: num
  * Salons vocaux d'équipe du match (`docs/features/MATCH_VOICE.md`) :
  * « Salon vocal : ouvert » par équipe, aux parties du match et au staff. L'état
  * vient de `useMatchVoice` (instantané, relecture REST flux coupé) : la page
- * le lit une fois, pour la section comme pour la grille. `clearable` : l'arbitrage
- * (permission `tournaments`) peut vider un salon ouvert.
+ * le lit une fois, pour la section comme pour la grille. `clearer` : qui peut vider
+ * un salon ouvert (`voiceClearRoute` : l'arbitrage, ou l'équipe elle-même).
  */
 function VoiceSection({
   voice,
   sides,
   match,
-  clearable,
-}: Readonly<{ voice: MatchVoiceInfo; sides: [PageSide, PageSide]; match: BracketMatch; clearable: boolean }>) {
+  clearer,
+}: Readonly<{ voice: MatchVoiceInfo; sides: [PageSide, PageSide]; match: BracketMatch; clearer: VoiceClearViewer }>) {
   const page = useMatchPageText();
   const titleId = useId();
   const side = (slot: 1 | 2) => (slot === 1 ? voice.team1State : voice.team2State);
   const teamOf = (slot: 1 | 2) => (slot === 1 ? match.team1Id : match.team2Id);
+  const routeOf = (teamId: number | null) => (teamId === null ? null : voiceClearRoute(clearer, match, teamId));
+  const clearable = sides.some((pageSide) => routeOf(teamOf(pageSide.slot)) !== null);
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
       <InfoHintRow>
@@ -826,12 +841,13 @@ function VoiceSection({
           {sides.map((pageSide) => {
             const state = side(pageSide.slot);
             const teamId = teamOf(pageSide.slot);
+            const route = routeOf(teamId);
             return (
               <li key={pageSide.slot} className={styles.voiceRow}>
                 <SideName side={pageSide} logoSize={20} truncate />
                 <span className={styles.factNote}>{voiceRowText(page, state)}</span>
-                {clearable && state === "OPEN" && teamId !== null && (
-                  <VoiceClearButton matchId={match.id} teamId={teamId} teamName={pageSide.displayName} />
+                {route !== null && state === "OPEN" && teamId !== null && (
+                  <VoiceClearButton matchId={match.id} teamId={teamId} teamName={pageSide.displayName} route={route} />
                 )}
               </li>
             );
@@ -1107,6 +1123,17 @@ function MatchPageContent({
   const editable = match.status !== "COMPLETED" && match.team1Id !== null && match.team2Id !== null;
   const locked = adminResolvable && scoreLocked;
   const voice = useMatchVoice(match, organizes && !frozen && match.status !== "COMPLETED", streamLive);
+  // Vidage d'un salon (D13, D36) : droits lus du contexte du lecteur, servi par les deux portes.
+  const voiceClearer = useMemo<VoiceClearViewer>(
+    () => ({
+      staff: canSchedule,
+      frozen,
+      solo: isSoloTournament(detail.card.participantType),
+      myTeamId,
+      leadTeamIds: detail.canCreateReportsForTeamIds,
+    }),
+    [canSchedule, frozen, detail.card.participantType, myTeamId, detail.canCreateReportsForTeamIds],
+  );
   const streams = matchPageStreams(match, liveState);
   const officiating = officiatingContent(match, canSchedule, organizes, shownLaunch);
   // Colonne de droite : rendue seulement si une section y a quelque chose à
@@ -1192,7 +1219,7 @@ function MatchPageContent({
         </div>
         {rightColumn && (
           <div className={styles.column}>
-            {voice && <VoiceSection voice={voice} sides={sides} match={match} clearable={canSchedule && !frozen && !playsMatch} />}
+            {voice && <VoiceSection voice={voice} sides={sides} match={match} clearer={voiceClearer} />}
             <ConnectionSection launch={shownLaunch} onCopy={onCopy} />
             <OfficiatingSection
               match={match}

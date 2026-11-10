@@ -1803,6 +1803,22 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : aucune donnée de joueur n'est collectée ; c'est toujours au titre de l'intérêt légitime (bon déroulement des tournois).",
     ],
   },
+  {
+    // VOICE-CLEAR-TEAM (décision de l'utilisateur D36 du 2026-11-10) : le vidage
+    // d'un salon vocal s'ouvre aussi au propriétaire, à un manager et au capitaine
+    // de l'équipe, pour son propre salon. Rien de plus n'est gardé (D15). Pour
+    // tous les comptes.
+    id: "2026-11-salons-vocaux-vidage-par-l-equipe",
+    publishedAt: "2026-11-11",
+    title: "Salons vocaux d'équipe : vidage par l'équipe",
+    links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }],
+    summary:
+      "Le propriétaire, un manager ou le capitaine d'une équipe peut désormais vider le salon vocal de son équipe, comme l'arbitrage. Rien de plus n'est gardé.",
+    details: [
+      "Vidage par l'équipe : le propriétaire, un manager ou le capitaine d'une équipe peut vider le salon ouvert de sa propre équipe, jamais celui de l'adversaire ; le bot en déconnecte tous les occupants, comme pour un vidage par l'arbitrage, et le salon reste ouvert. Le site lit seulement son équipe et ses rôles pour le vérifier, sans rien en garder : ce vidage n'est noté ni dans les journaux du serveur ni dans le journal d'activité du staff sur Discord. Le journal d'audit de Discord garde les déconnexions, comme pour tout vidage.",
+      "Ce qui ne change pas : aucune donnée de joueur n'est collectée ; le vidage par l'arbitrage reste tel quel ; c'est toujours au titre de l'intérêt légitime (bon déroulement des tournois).",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

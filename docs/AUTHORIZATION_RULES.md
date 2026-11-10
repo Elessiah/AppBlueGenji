@@ -983,6 +983,25 @@ Côté interface, le dialogue d'arbitrage ferme les champs de score et déplie l
 forfait sur un match qui n'est pas encore en lancement ; le serveur reste le
 juge.
 
+### 4.11 Vider un salon vocal d'équipe
+
+Deux portes (`docs/features/MATCH_VOICE.md`, décisions D13 et D36) :
+
+- **l'arbitrage** (`POST /api/admin/matches/[matchId]/voice/clear`) : permission
+  `tournaments`, n'importe quel salon ouvert du match, jamais pour qui joue ce
+  match (`VOICE_CLEAR_IS_PLAYER` → 403) ;
+- **l'équipe** (`POST /api/matches/[matchId]/voice/clear`) : `OWNER`, `MANAGER`
+  ou `CAPITAINE` (`canDeclareTeamReady` — le capitaine en est, contrairement à
+  `hasTeamManagementRole`) de l'équipe visée (membre en cours), pour le seul
+  salon de cette équipe ; rôle et salon lus en une instruction. Non-membre, membre sans ces rôles, équipe adverse, entrée solo :
+  `VOICE_CLEAR_NOT_TEAM_LEADER` → 403, avant toute lecture du salon. Un membre du
+  staff qui joue le match passe par cette porte pour son équipe.
+
+Le bouton « Vider » de la page du match n'apparaît que là où le serveur
+accepterait (`voiceClearRoute`), droits lus du contexte du lecteur
+(`myTeamId`, `canCreateReportsForTeamIds`), servi par le flux comme par la
+lecture REST.
+
 ## 5. Équipes fantômes et entrées solo
 
 Une **équipe fantôme** (`bg_teams.is_ghost`) est une équipe sans joueur, créée

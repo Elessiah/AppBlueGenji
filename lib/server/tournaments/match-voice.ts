@@ -12,7 +12,8 @@
  *   tournois, modale de lancement, page du match), étranglé à une passe toutes
  *   les dix secondes ; aucune connexion n'est tenue pendant un appel au bot ;
  * - **la bascule** de l'option (`setTeamVoiceChannels`), à tout moment ;
- * - **le vidage** d'un salon par l'arbitrage (`clearTeamVoiceChannel`) : ses
+ * - **le vidage** d'un salon par l'arbitrage (`clearTeamVoiceChannel`) ou par
+ *   l'équipe elle-même (`clearOwnTeamVoiceChannel`, décision D36) : ses
  *   occupants sont déconnectés, le salon reste.
  *
  * Le site ne garde que l'identifiant de chaque salon et ses horaires : il ne
@@ -28,11 +29,12 @@ import {
   type VoiceCallOutcome,
 } from "@/lib/server/bot-integration";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import { toIso } from "@/lib/server/serialization";
+import { parseRoles, toIso } from "@/lib/server/serialization";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { visibleText } from "@/lib/shared/visible-text";
 import { canToggleRefereeScheduling } from "@/lib/shared/match-planning";
 import { canViewTournament } from "@/lib/shared/tournament-visibility";
+import { canDeclareTeamReady } from "@/lib/shared/match-launch";
 import type { TournamentState } from "@/lib/shared/types";
 import {
   VOICE_CHANNEL_LATE_HOURS,
@@ -1221,7 +1223,11 @@ export async function clearTeamVoiceChannel(
   } catch {
     // La trace ne bloque jamais le geste.
   }
-  const channelId = row.channel_id;
+  return clearOpenChannel(matchId, row.channel_id);
+}
+
+/** Appel au bot pour un salon ouvert, commun aux deux vidages. */
+async function clearOpenChannel(matchId: number, channelId: string): Promise<"cleared" | "notOpen" | "unavailable"> {
   const outcome = await clearVoiceChannel(channelId);
   if (outcome.kind === "ok") return "cleared";
   if (outcome.kind === "gone") {
@@ -1231,6 +1237,60 @@ export async function clearTeamVoiceChannel(
   // Un identifiant de match et un code, jamais un nom ni un compte.
   console.warn(`[match-voice] match ${matchId} : vidage du salon vocal refusé (${outcome.code})`);
   return "unavailable";
+}
+
+/**
+ * Issue du vidage d'un salon par l'équipe : fait, aucun salon ouvert, l'appelant ne mène pas
+ * cette équipe (`notLeader`), ou bot indisponible.
+ */
+export type ClearOwnVoiceResult = "cleared" | "notOpen" | "notLeader" | "unavailable";
+
+/**
+ * Salon ouvert d'une équipe vu par l'un de ses membres, **en une lecture** : la ligne d'appartenance
+ * en cours de l'appelant dans cette équipe (jamais une entrée solo, `solo_user_id IS NULL` ; ses
+ * rôles, jugés par `canDeclareTeamReady`) et, à côté, le salon que la page montre — mêmes
+ * conditions que `CLEARABLE_CHANNEL_SQL` (tournoi en cours à l'option allumée et publié, match
+ * jouable dans sa fenêtre, équipe encore engagée dans le match). Aucune ligne : l'appelant n'est
+ * pas membre de cette équipe. Le rôle et le salon sont lus ensemble : pas de rôle retiré entre
+ * deux lectures.
+ */
+export const TEAM_CLEARABLE_CHANNEL_SQL = `SELECT tm.roles_json,
+       (SELECT v.channel_id
+          FROM bg_match_voice_channels v
+          JOIN bg_matches m ON m.id = v.match_id
+          JOIN bg_tournaments t ON t.id = m.tournament_id
+         WHERE v.match_id = ? AND v.team_id = tm.team_id AND v.released_at IS NULL AND v.channel_id IS NOT NULL
+           AND v.team_id IN (m.team1_id, m.team2_id)
+           AND t.state = 'RUNNING' AND t.team_voice_channels = 1 AND t.start_visibility_at <= NOW()
+           AND m.status IN ('READY', 'AWAITING_CONFIRMATION') AND m.start_at IS NOT NULL
+           AND m.start_at <= NOW() + INTERVAL ${VOICE_CHANNEL_LEAD_MINUTES} MINUTE
+           AND m.start_at >= NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
+         LIMIT 1) AS channel_id
+  FROM bg_team_members tm
+  JOIN bg_teams tt ON tt.id = tm.team_id AND tt.solo_user_id IS NULL
+ WHERE tm.user_id = ? AND tm.team_id = ? AND tm.left_at IS NULL
+ LIMIT 1`;
+
+type TeamClearableRow = RowDataPacket & { roles_json: string | null; channel_id: string | null };
+
+/**
+ * Vide le salon ouvert de **sa propre** équipe (décision D36) : réservé à qui la mène en match —
+ * `OWNER`, `MANAGER` ou `CAPITAINE` (`canDeclareTeamReady`, la règle du « Prêt » et du report
+ * de score). Jamais le salon de l'adversaire, jamais pour une entrée solo (elle n'a ni membre ni
+ * rôle) : tout cela rend `notLeader`, sans rien dire du salon (un tiers n'apprend pas s'il est
+ * ouvert). Rôle et salon se lisent en une instruction (`TEAM_CLEARABLE_CHANNEL_SQL`). Rien n'est
+ * écrit ni journalisé sur l'auteur (D15) ; aucune écriture en base, donc aucun verrou.
+ */
+export async function clearOwnTeamVoiceChannel(
+  matchId: number,
+  teamId: number,
+  userId: number,
+): Promise<ClearOwnVoiceResult> {
+  const rows = await run<TeamClearableRow[]>(TEAM_CLEARABLE_CHANNEL_SQL, [matchId, userId, teamId]);
+  const row = rows[0];
+  if (!row || !canDeclareTeamReady(parseRoles(row.roles_json))) return "notLeader";
+  if (!row.channel_id) return "notOpen";
+  return clearOpenChannel(matchId, row.channel_id);
 }
 
 /**

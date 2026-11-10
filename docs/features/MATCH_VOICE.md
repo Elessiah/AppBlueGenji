@@ -16,14 +16,25 @@ et rien n'est compté.
 | `lib/server/bot-integration.ts` | `ensureVoiceChannel`, `releaseVoiceChannel`, `releaseVoiceChannelByKey` (`VoiceCallOutcome` : `ok` / `gone` / `failed` — refus propre au salon — / `unavailable` — bot indisponible pour tous les salons, `VOICE_UNAVAILABLE_CODES`, transport, coupe-circuit, réponse illisible) |
 | `PUT /api/admin/tournaments/[id]/voice-channels` | Bascule de l'option, permission `tournaments`, jusqu'à la fin du tournoi (y compris en cours ; tournoi terminé : 409 `TOURNAMENT_FINISHED`, comme le formulaire) ; limite par compte (`TEAM_VOICE_TOGGLE_RULE`, 30 par 5 min) ; journalisée comme geste du staff sur un tournoi (`TEAM_VOICE_ON` / `TEAM_VOICE_OFF`, `STAFF_ACTION_LOGS.md` : auteur anonyme, rien dans pm2) quand elle change |
 | `POST /api/admin/matches/[matchId]/voice/clear` | **Vider** le salon ouvert d'une équipe (corps `{ teamId }`, décision D13) : le bot en déconnecte tous les occupants, le salon reste ouvert. Permission `tournaments` (l'arbitre du match, et le staff des tournois), jamais pour qui joue ce match (`403 VOICE_CLEAR_IS_PLAYER`, `playsMatchSql` ; le bouton ne lui est pas montré), `VOICE_CLEAR_RULE` (20 par minute et par compte). Refus : `409 VOICE_CHANNEL_NOT_OPEN` (aucun salon ouvert, tournoi plus en cours ou masqué, option éteinte, match plus jouable ou hors de sa fenêtre — reporté, D14 —, équipe sortie du match — `CLEARABLE_CHANNEL_SQL` —, ou le bot ne le suit plus : une passe le redemande), `503 VOICE_CLEAR_UNAVAILABLE` (bot en panne ou refus, une ligne pm2 avec le match et le code ; le bot essaie tous les occupants avant de rendre un refus propre à l'un d'eux, mais s'arrête net sur une permission manquante ou un Discord saturé). Journal : geste du staff `VOICE_CLEARED` (« Salon vocal d'une équipe vidé, par le staff », anonyme sur Discord) ; un membre du staff qui n'est pas l'arbitre désigné du match (colonne `referee_user_id`, quel que soit l'état du match) est nommé dans pm2 (`auditStaffAction`) **avant** l'appel au bot, puis avec son issue (`cleared`, `notOpen`, `unavailable`, `failed` si l'appel lève) ; l'arbitre désigné jamais. Bouton « Vider » sur la page du match, par salon ouvert, confirmé par `ConfirmActionDialog`. Rien n'est écrit en base ; ni qui, ni combien n'est rendu au site |
+| `POST /api/matches/[matchId]/voice/clear` | **Vider le salon de sa propre équipe** (décision D36, corps `{ teamId }`) : `OWNER`, `MANAGER` ou `CAPITAINE` (`canDeclareTeamReady`) de l'équipe `teamId` (membre en cours, jamais une entrée solo) — jamais le salon de l'adversaire. Rôle et salon se lisent **en une instruction** (`TEAM_CLEARABLE_CHANNEL_SQL`). Sinon `403 VOICE_CLEAR_NOT_TEAM_LEADER` (non-membre, membre sans ces rôles, équipe adverse, entrée solo), sans rien dire du salon. Puis les mêmes conditions que l'arbitrage (fenêtre de `CLEARABLE_CHANNEL_SQL`, `409 VOICE_CHANNEL_NOT_OPEN`, `503 VOICE_CLEAR_UNAVAILABLE`, `500 VOICE_CLEAR_FAILED`), même débit (`VOICE_CLEAR_RULE`, partagé par compte) ; corps lu par `readVoiceClearRequest`, commun aux deux portes (413 / 415 gardés). Ni journal du staff sur Discord, ni ligne pm2 nommant l'auteur (D15) ; aucune écriture en base, donc aucun verrou de tournoi |
 | `GET /api/matches/[matchId]/voice` | Porte REST de secours de `TournamentMatch.voice` (connecté ; tournoi visible selon `canViewTournament`, la règle de sa fiche ; `MATCH_VOICE_READ_RULE`) |
 | `bg_match_voice_channels` | Une ligne par (match, équipe) : `channel_id`, `failed_at`, `released_at` — ni qui est présent, ni combien (`members` et `counted_at` retirés, EF-43) |
+
+## Bouton « Vider » (page du match)
+
+`voiceClearRoute` (`match-voice-view.ts`) décide, par salon ouvert, de la porte : l'équipe
+(`myTeamId` égal à l'équipe du salon et présent dans `canCreateReportsForTeamIds` — les rôles qui
+mènent le match —, tournoi par équipes), sinon l'arbitrage qui ne joue pas ce match, sinon aucun
+bouton. Un membre du staff qui joue le match ne voit le bouton que sur le salon de l'équipe qu'il
+mène (correctif de #572 : il le voyait sur celui de l'adversaire, puis lisait un 403). Ces droits
+viennent du contexte du lecteur, servi par le flux comme par la lecture REST
+(`REALTIME_REFRESH.md`) ; fiche figée : aucun bouton.
 
 ## Règles
 
 - **Accès aux salons** (décision D13) : les salons héritent des permissions de la catégorie des
   matchs — ouverts à qui la voit. Aucun identifiant Discord de joueur n'est envoyé au bot ; un
-  occupant indésirable s'écarte par « Vider » (arbitrage).
+  occupant indésirable s'écarte par « Vider » (arbitrage, ou l'équipe pour son propre salon, D36).
 - **Aucune donnée d'utilisateur** (décision D15) : ni le site (`bg_match_voice_channels` : match,
   équipe, salon, horodatages) ni le bot (`MatchVoiceChannel` : salon, clé, horodatages) ne
   gardent ni ne journalisent qui est dans un salon, ni combien ; le vidage lit les occupants
@@ -203,7 +214,7 @@ l'arbitrage) ; à l'édition, elle passe par la route dédiée, pas par le `PATC
 
 Déclaré dans `PRIVACY_CHANGES` (`2026-11-salons-vocaux-equipe`, puis
 `2026-11-salons-vocaux-sans-comptage` du 6 novembre 2026 : plus d'attente, plus de
-comptage ; puis `2026-11-salons-vocaux-vidage-et-report` du 11 novembre 2026 : vidage par l'arbitrage, match reporté, ligne jamais close tant que le salon peut exister), `/rgpd#salons-vocaux` et le registre (T18 ; le geste `VOICE_CLEARED` aussi à T05), en FR et EN. La mention « effacé avec sa colonne » de l'entrée du 6 novembre est retirée (décision D15). Le site ne garde
+comptage ; puis `2026-11-salons-vocaux-vidage-et-report` du 11 novembre 2026 : vidage par l'arbitrage, match reporté, ligne jamais close tant que le salon peut exister ; puis `2026-11-salons-vocaux-vidage-par-l-equipe` du 11 novembre 2026 : vidage par l'équipe, D36), `/rgpd#salons-vocaux` et le registre (T18 ; le geste `VOICE_CLEARED` aussi à T05), en FR et EN. La mention « effacé avec sa colonne » de l'entrée du 6 novembre est retirée (décision D15). Le site ne garde
 que l'identifiant du salon, les numéros du match et de l'équipe et des heures ; le bot
 tient en mémoire seulement l'état vocal des membres du serveur, pour savoir si un salon
 est vide. Base : **intérêt légitime** (bon déroulement des tournois). La règle commune
@@ -234,4 +245,5 @@ salon restent ouvertes jusqu'à sa mise à jour (les autres rendus passent).
 `tests/lib/server/bot-integration-voice.test.ts`, `tests/app/api/match-voice-routes.test.ts`,
 describe « salons vocaux d'équipe : le départ n'en dépend pas » de `tests/lib/server/match-launch.test.ts`,
 `tests/tournois/match-voice-view.test.ts`, describe « salons vocaux d'équipe » de
-`tests/tournois/match-page-render.test.tsx`.
+`tests/tournois/match-page-render.test.tsx`, `tests/app/api/match-voice-clear-team-route.test.ts`,
+`tests/lib/server/match-voice-clear-team.test.ts`.

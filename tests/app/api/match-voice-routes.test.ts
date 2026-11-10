@@ -346,3 +346,16 @@ describe("POST /api/admin/matches/[matchId]/voice/clear", () => {
     expect(auditStaffAction).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /api/admin/matches/[matchId]/voice/clear — lecture du corps", () => {
+  it("clear_notJson_returns415", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    const req = new Request("http://localhost/api/admin/matches/9/voice/clear", {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: "teamId=4",
+    });
+    expect((await CLEAR(req, matchParams("9"))).status).toBe(415);
+    expect(clearTeamVoiceChannel).not.toHaveBeenCalled();
+  });
+});

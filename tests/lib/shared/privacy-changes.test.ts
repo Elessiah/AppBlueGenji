@@ -2622,13 +2622,41 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
 
   it("privacyChanges_voiceClearAndReschedule_lastEntryForAllAccountsFrAndEn", () => {
     const entry = PRIVACY_CHANGES.find((c) => c.id === voiceClearId)!;
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(voiceClearId);
+    // Suivie de l'entrée du vidage par l'équipe (VOICE-CLEAR-TEAM, D36).
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(voiceClearId);
     expect([entry.id.length <= PRIVACY_CHANGE_ID_MAX_LENGTH, entry.asksTermsAcceptance, privacyChangeReachesAccount(entry, {})]).toEqual([true, undefined, true]);
     expectStandaloneEntry(entry, PRIVACY_CHANGES_EN[entry.id], { after: "2026-11-conditions-v10-avatar-et-succession", publishedAt: "2026-11-11", audience: undefined, links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }] });
     expectEntryTexts(entry, PRIVACY_CHANGES_EN[entry.id], {
       fr: ["vider le salon ouvert d'une équipe", "sans rien en garder, en journaliser ni en dire au site", "le note sans nommer son auteur", "sauf s'il est l'arbitre désigné du match, jamais nommé", "rend ses salons au bot", "de nouveaux salons s'ouvrent 15 minutes avant sa nouvelle heure", "un rendu refusé est redemandé une fois par heure passé ce délai, un bot indisponible au fil de l'activité du site, au plus environ une fois par minute", "aucune donnée d'utilisateur", "aucune donnée de joueur n'est collectée", "et le bot ne l'enregistre pas"],
       en: ["clear a team's open channel", "without keeping, logging or telling the site anything about them", "notes it without naming its author", "unless they are the match's assigned referee, never named", "hands its channels back to the bot", "new channels open 15 minutes before its new time", "a refused hand-back is retried once an hour after that period, an unavailable bot as the site is used, at most about once a minute", "no user data", "no player data is collected", "and the bot does not record it"],
     });
+  });
+
+  it("privacyChanges_voiceClearByTeam_lastEntryForAllAccountsFrAndEn", () => {
+    const id = "2026-11-salons-vocaux-vidage-par-l-equipe";
+    const entry = PRIVACY_CHANGES.find((c) => c.id === id)!;
+    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(id);
+    expect([entry.id.length <= PRIVACY_CHANGE_ID_MAX_LENGTH, entry.asksTermsAcceptance, privacyChangeReachesAccount(entry, {})]).toEqual([true, undefined, true]);
+    expectStandaloneEntry(entry, PRIVACY_CHANGES_EN[id], { after: voiceClearId, publishedAt: "2026-11-11", audience: undefined, links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }] });
+    expectEntryTexts(entry, PRIVACY_CHANGES_EN[id], {
+      fr: ["le propriétaire, un manager ou le capitaine d'une équipe peut vider le salon ouvert de sa propre équipe, jamais celui de l'adversaire", "sans rien en garder", "n'est noté ni dans les journaux du serveur ni dans le journal d'activité du staff sur Discord", "aucune donnée de joueur n'est collectée"],
+      en: ["a team's owner, a manager or its captain can clear their own team's open channel, never the opponent's", "without keeping anything", "noted neither in the server logs nor in the staff activity log on Discord", "no player data is collected"],
+    });
+  });
+
+  it("rgpdAndRegister_voiceClearByTeam_ownTeamOnlyNeverLoggedFrAndEn", () => {
+    const fr = readFileSync(join(process.cwd(), "app", "rgpd", "page.tsx"), "utf8");
+    const en = readFileSync(join(process.cwd(), "app", "rgpd", "RgpdEn.tsx"), "utf8");
+    expect(fr).toContain("le propriétaire, un manager ou le capitaine d&apos;une équipe le salon de sa propre équipe, jamais celui de l&apos;adversaire");
+    expect(fr).toContain("un vidage par l&apos;équipe n&apos;est noté ni dans ces journaux ni sur Discord");
+    expect(en).toContain("a team&apos;s owner, a manager or its captain can clear their own team&apos;s channel, never the opponent&apos;s");
+    expect(en).toContain("a clearing by the team is noted neither in those logs nor on Discord");
+    const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
+    const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
+    expect(t18.subPurposes.join(" ")).toContain("jamais celui de l'adversaire");
+    expect(t18.retention.join(" ")).toContain("rien pour un vidage par l'équipe");
+    expect(t18En.subPurposes.join(" ")).toContain("never the opponent's");
+    expect(t18En.retention.join(" ")).toContain("nothing for a clearing by the team");
   });
 
   it("privacyChanges_voiceWithoutCount_publishedEntryKeptVerbatimFrAndEn", () => {
