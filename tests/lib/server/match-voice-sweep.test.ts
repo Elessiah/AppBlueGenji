@@ -8,7 +8,7 @@ jest.mock("@/lib/server/tournaments/match-launch");
 jest.mock("@/lib/server/tournaments/registration");
 
 import { getDatabase, withConnection } from "@/lib/server/database";
-import { ensureVoiceChannel, releaseVoiceChannel, releaseVoiceChannelByKey } from "@/lib/server/bot-integration";
+import { clearVoiceChannel, ensureVoiceChannel, releaseVoiceChannel, releaseVoiceChannelByKey } from "@/lib/server/bot-integration";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { inTransaction } from "@/lib/server/tournaments/transaction";
 import { maintainMatchLaunches } from "@/lib/server/tournaments/match-launch";
@@ -18,6 +18,7 @@ import {
   OPEN_DUE_CHANNELS_SQL,
   RELEASABLE_SQL,
   VOICE_FALLBACK_CHANNEL_NAME,
+  clearTeamVoiceChannel,
   dispatchMatchVoiceChannels,
   loadMatchVoiceInfos,
   loadTournamentVoiceInfos,
@@ -25,7 +26,7 @@ import {
   resetVoiceSweepForTests,
   setTeamVoiceChannels,
 } from "@/lib/server/tournaments/match-voice";
-import { VOICE_CHANNEL_LATE_HOURS, VOICE_RETRY_SECONDS } from "@/lib/shared/match-voice";
+import { VOICE_CHANNEL_LATE_HOURS, VOICE_CHANNEL_LEAD_MINUTES, VOICE_RETRY_SECONDS } from "@/lib/shared/match-voice";
 import { type SqlQuery, connectionMock, fakeConnection, fakePool } from "../../helpers/sql-double";
 
 type Row = Record<string, unknown>;
@@ -232,6 +233,12 @@ describe("dispatchMatchVoiceChannels — création", () => {
   it("dispatchMatchVoiceChannels_releaseQuery_handsBackChannelsOfReHiddenTournament", () => {
     // Tournoi de nouveau masqué : ses salons ne gardent pas les noms d'équipes sur Discord.
     expect(RELEASABLE_SQL).toContain("OR t.start_visibility_at > NOW()");
+  });
+
+  it("dispatchMatchVoiceChannels_releaseQuery_handsBackChannelsOfPostponedMatch", () => {
+    // Décision D14 : un match reporté au-delà du quart d'heure rend ses salons ; la création les rouvre.
+    expect(RELEASABLE_SQL).toContain(`OR m.start_at > NOW() + INTERVAL ${VOICE_CHANNEL_LEAD_MINUTES} MINUTE`);
+    expect(DUE_CHANNELS_SQL).toContain(`m.start_at <= NOW() + INTERVAL ${VOICE_CHANNEL_LEAD_MINUTES} MINUTE`);
   });
 
   it("dispatchMatchVoiceChannels_dueQuery_skipsUnpublishedTournaments", () => {
@@ -1702,5 +1709,45 @@ describe("dispatchMatchVoiceChannels — bot indisponible, budget, journal", () 
     });
     await dispatchMatchVoiceChannels();
     expect(jest.mocked(console.error).mock.calls.some((call) => call.includes(createError))).toBe(true);
+  });
+});
+
+describe("clearTeamVoiceChannel", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetVoiceSweepForTests();
+  });
+
+  it("clearTeamVoiceChannel_openRow_callsBotAndReturnsCleared", async () => {
+    const db = database({ voiceRows: [{ channel_id: "901" }] });
+    jest.mocked(clearVoiceChannel).mockResolvedValue({ kind: "ok", value: true });
+
+    await expect(clearTeamVoiceChannel(9, 4)).resolves.toBe("cleared");
+    expect(clearVoiceChannel).toHaveBeenCalledWith("901");
+    expect(db.execute.mock.calls[0][1]).toEqual([9, 4]);
+    expect(db.writes).toEqual([]);
+  });
+
+  it("clearTeamVoiceChannel_noOpenRow_returnsNotOpenWithoutBotCall", async () => {
+    database({ voiceRows: [] });
+
+    await expect(clearTeamVoiceChannel(9, 4)).resolves.toBe("notOpen");
+    expect(clearVoiceChannel).not.toHaveBeenCalled();
+  });
+
+  it("clearTeamVoiceChannel_botNoLongerTracks_returnsNotOpen", async () => {
+    database({ voiceRows: [{ channel_id: "901" }] });
+    jest.mocked(clearVoiceChannel).mockResolvedValue({ kind: "gone", code: "VOICE_CHANNEL_NOT_TRACKED" });
+
+    await expect(clearTeamVoiceChannel(9, 4)).resolves.toBe("notOpen");
+  });
+
+  it("clearTeamVoiceChannel_botUnavailable_returnsUnavailableAndLogsMatchAndCodeOnly", async () => {
+    database({ voiceRows: [{ channel_id: "901" }] });
+    jest.mocked(clearVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "VOICE_MISSING_PERMISSIONS" });
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    await expect(clearTeamVoiceChannel(9, 4)).resolves.toBe("unavailable");
+    expect(warn).toHaveBeenCalledWith("[match-voice] match 9 : vidage du salon vocal refusé (VOICE_MISSING_PERMISSIONS)");
   });
 });

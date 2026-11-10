@@ -1152,6 +1152,20 @@ export function releaseVoiceChannel(channelId: string): Promise<VoiceCallOutcome
   return voiceCall("POST", `/internal/voice/channels/${encodeURIComponent(channelId)}/release`, {}, readReleased);
 }
 
+/**
+ * Vide un salon au bot (`POST /internal/voice/channels/:id/clear`) : ses occupants sont
+ * déconnectés, le salon reste ouvert — geste de l'arbitre (décision D13 : les salons sont
+ * ouverts à qui voit la catégorie). La réponse ne dit ni qui ni combien. `gone`
+ * (`404 VOICE_CHANNEL_NOT_TRACKED`) : le bot ne suit plus ce salon.
+ */
+export function clearVoiceChannel(channelId: string): Promise<VoiceCallOutcome<true>> {
+  return voiceCall("POST", `/internal/voice/channels/${encodeURIComponent(channelId)}/clear`, {}, readCleared);
+}
+
+function readCleared(payload: unknown): true | null {
+  return (payload as { cleared?: unknown } | null)?.cleared === true ? true : null;
+}
+
 function readReleased(payload: unknown): true | null {
   return (payload as { released?: unknown } | null)?.released === true ? true : null;
 }

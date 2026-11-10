@@ -6,12 +6,14 @@
  *
  * - **le balayage** (`dispatchMatchVoiceChannels`), hors transaction : crée
  *   les salons dus et rend au bot ceux dont le match est joué (score
- *   confirmé), annulé, sorti de l'appariement, passé contre une entrée solo ou
+ *   confirmé), annulé, reporté au-delà du quart d'heure, sorti de l'appariement, passé contre une entrée solo ou
  *   une fantôme, ou dont le tournoi a éteint l'option ou s'est terminé.
  *   Comme les rappels de match, c'est le trafic qui l'entraîne (liste des
  *   tournois, modale de lancement, page du match), étranglé à une passe toutes
  *   les dix secondes ; aucune connexion n'est tenue pendant un appel au bot ;
- * - **la bascule** de l'option (`setTeamVoiceChannels`), à tout moment.
+ * - **la bascule** de l'option (`setTeamVoiceChannels`), à tout moment ;
+ * - **le vidage** d'un salon par l'arbitrage (`clearTeamVoiceChannel`) : ses
+ *   occupants sont déconnectés, le salon reste.
  *
  * Le site ne garde que l'identifiant de chaque salon et ses horaires : il ne
  * demande jamais au bot qui s'y trouve, ni combien.
@@ -19,6 +21,7 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
 import {
+  clearVoiceChannel,
   ensureVoiceChannel,
   releaseVoiceChannel,
   releaseVoiceChannelByKey,
@@ -314,7 +317,9 @@ export const DUE_CHANNELS_SQL = `SELECT d.id, d.tournament_id, d.team1_id, d.tea
 
 /**
  * Salons à rendre au bot : match joué (score confirmé) ou disparu, match
- * retombé en attente ou sorti du programme (heure retirée), équipe sortie de
+ * retombé en attente ou sorti du programme (heure retirée), match reporté (son heure
+ * repasse au-delà de `VOICE_CHANNEL_LEAD_MINUTES` : décision D14 ; `DUE_CHANNELS_SQL` en
+ * redemande à 15 minutes de la nouvelle heure), équipe sortie de
  * l'appariement, entrée solo ou fantôme dans le match, tournoi qui n'est plus en
  * cours (terminé, ou retombé avant son départ : la page ne montre plus ses salons) ou
  * option éteinte, match resté sans score passé `VOICE_CHANNEL_LATE_HOURS` (sans
@@ -337,6 +342,7 @@ export const RELEASABLE_SQL = `SELECT v.match_id, v.team_id, v.channel_id, m.tou
                                               ${VOICE_STUCK_RETRY_SECONDS}, ${VOICE_RETRY_SECONDS}) SECOND)
    AND (m.id IS NULL OR t.id IS NULL
         OR m.status IN ('COMPLETED', 'PENDING') OR m.start_at IS NULL
+        OR m.start_at > NOW() + INTERVAL ${VOICE_CHANNEL_LEAD_MINUTES} MINUTE
         OR m.start_at < NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
         OR t.state <> 'RUNNING' OR t.team_voice_channels = 0
         OR t.start_visibility_at > NOW()
@@ -1156,6 +1162,39 @@ type SingleMatchRow = RowDataPacket & {
   /** Heure de la base à la lecture : l'horloge des règles des salons (option, échéance). */
   db_now: Date | string;
 };
+
+/** Issue du vidage d'un salon : fait, aucun salon ouvert pour cette équipe, ou bot indisponible. */
+export type ClearVoiceResult = "cleared" | "notOpen" | "unavailable";
+
+type OpenChannelRow = RowDataPacket & { channel_id: string };
+
+/**
+ * Vide le salon ouvert d'une équipe d'un match (décision D13 : les salons sont ouverts à
+ * qui voit la catégorie ; l'arbitrage en écarte qui ne devrait pas s'y trouver). Le bot
+ * déconnecte ses occupants, le salon reste ouvert : rien n'est écrit en base, et le site
+ * n'apprend ni qui en est sorti, ni combien. Seule une ligne ouverte portant un salon y
+ * donne accès — le bot ne touche de toute façon qu'un salon qu'il suit. Un salon que le bot
+ * ne suit plus (supprimé à la main) relance une passe, qui le redemande par sa clé.
+ */
+export async function clearTeamVoiceChannel(matchId: number, teamId: number): Promise<ClearVoiceResult> {
+  const rows = await run<OpenChannelRow[]>(
+    `SELECT channel_id FROM bg_match_voice_channels
+     WHERE match_id = ? AND team_id = ? AND released_at IS NULL AND channel_id IS NOT NULL
+     LIMIT 1`,
+    [matchId, teamId],
+  );
+  const channelId = rows[0]?.channel_id;
+  if (!channelId) return "notOpen";
+  const outcome = await clearVoiceChannel(channelId);
+  if (outcome.kind === "ok") return "cleared";
+  if (outcome.kind === "gone") {
+    void dispatchMatchVoiceChannels();
+    return "notOpen";
+  }
+  // Un identifiant de match et un code, jamais un nom ni un compte.
+  console.warn(`[match-voice] match ${matchId} : vidage du salon vocal refusé (${outcome.code})`);
+  return "unavailable";
+}
 
 /**
  * État des salons d'un match pour la page du match, qui le relit, flux coupé

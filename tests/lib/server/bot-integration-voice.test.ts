@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
-import { ensureVoiceChannel, releaseVoiceChannel, releaseVoiceChannelByKey } from "@/lib/server/bot-integration";
+import { clearVoiceChannel, ensureVoiceChannel, releaseVoiceChannel, releaseVoiceChannelByKey } from "@/lib/server/bot-integration";
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -10,6 +10,36 @@ afterEach(() => {
 });
 
 describe("bot-integration — salons vocaux", () => {
+  it("clearVoiceChannel_cleared_postsToClearRouteAndReturnsOk", async () => {
+    const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(json(200, { cleared: true }));
+
+    await expect(clearVoiceChannel("123456789012345678")).resolves.toEqual({ kind: "ok", value: true });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/internal\/voice\/channels\/123456789012345678\/clear$/);
+    expect(init?.method).toBe("POST");
+  });
+
+  it("clearVoiceChannel_notTracked404_returnsGone", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(json(404, { error: "VOICE_CHANNEL_NOT_TRACKED" }));
+    await expect(clearVoiceChannel("123456789012345678")).resolves.toEqual({ kind: "gone", code: "VOICE_CHANNEL_NOT_TRACKED" });
+  });
+
+  it("clearVoiceChannel_missingPermissions_returnsUnavailable", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(json(503, { error: "VOICE_MISSING_PERMISSIONS" }));
+    await expect(clearVoiceChannel("123456789012345678")).resolves.toEqual({
+      kind: "unavailable",
+      code: "VOICE_MISSING_PERMISSIONS",
+    });
+  });
+
+  it("clearVoiceChannel_answerWithoutCleared_returnsBadResponse", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(json(200, { released: true }));
+    await expect(clearVoiceChannel("123456789012345678")).resolves.toEqual({
+      kind: "unavailable",
+      code: "BOT_VOICE_BAD_RESPONSE",
+    });
+  });
+
   it("releaseVoiceChannelByKey_released_postsKeyToKeysRouteAndReturnsOk", async () => {
     const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(json(200, { released: true }));
 

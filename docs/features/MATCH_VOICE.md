@@ -15,10 +15,21 @@ et rien n'est compté.
 | `lib/server/tournaments/match-voice.ts` | Balayage (`dispatchMatchVoiceChannels`, `DUE_CHANNELS_SQL`, `RELEASABLE_SQL`), bascule (`setTeamVoiceChannels`), lectures (`loadMatchVoiceInfos`, `readMatchVoice`) |
 | `lib/server/bot-integration.ts` | `ensureVoiceChannel`, `releaseVoiceChannel`, `releaseVoiceChannelByKey` (`VoiceCallOutcome` : `ok` / `gone` / `failed` — refus propre au salon — / `unavailable` — bot indisponible pour tous les salons, `VOICE_UNAVAILABLE_CODES`, transport, coupe-circuit, réponse illisible) |
 | `PUT /api/admin/tournaments/[id]/voice-channels` | Bascule de l'option, permission `tournaments`, jusqu'à la fin du tournoi (y compris en cours ; tournoi terminé : 409 `TOURNAMENT_FINISHED`, comme le formulaire) ; limite par compte (`TEAM_VOICE_TOGGLE_RULE`, 30 par 5 min) ; journalisée comme geste du staff sur un tournoi (`TEAM_VOICE_ON` / `TEAM_VOICE_OFF`, `STAFF_ACTION_LOGS.md` : auteur anonyme, rien dans pm2) quand elle change |
+| `POST /api/admin/matches/[matchId]/voice/clear` | **Vider** le salon ouvert d'une équipe (corps `{ teamId }`, décision D13) : le bot en déconnecte tous les occupants, le salon reste ouvert. Permission `tournaments` (l'arbitre du match, et le staff des tournois), `VOICE_CLEAR_RULE` (20 par minute et par compte). Refus : `409 VOICE_CHANNEL_NOT_OPEN` (aucun salon ouvert, ou le bot ne le suit plus : une passe le redemande), `503 VOICE_CLEAR_UNAVAILABLE` (bot en panne ou refus, une ligne pm2 avec le match et le code). Bouton « Vider » sur la page du match, par salon ouvert. Rien n'est écrit en base ; ni qui, ni combien n'est rendu au site |
 | `GET /api/matches/[matchId]/voice` | Porte REST de secours de `TournamentMatch.voice` (connecté ; tournoi visible selon `canViewTournament`, la règle de sa fiche ; `MATCH_VOICE_READ_RULE`) |
 | `bg_match_voice_channels` | Une ligne par (match, équipe) : `channel_id`, `failed_at`, `released_at` — ni qui est présent, ni combien (`members` et `counted_at` retirés, EF-43) |
 
 ## Règles
+
+- **Accès aux salons** (décision D13) : les salons héritent des permissions de la catégorie des
+  matchs — ouverts à qui la voit. Aucun identifiant Discord de joueur n'est envoyé au bot ; un
+  occupant indésirable s'écarte par « Vider » (arbitrage).
+- **Aucune donnée d'utilisateur** (décision D15) : ni le site (`bg_match_voice_channels` : match,
+  équipe, salon, horodatages) ni le bot (`MatchVoiceChannel` : salon, clé, horodatages) ne
+  gardent ni ne journalisent qui est dans un salon, ni combien ; le vidage lit les occupants
+  pour les déconnecter, sans rien en garder.
+- **Revérification par sondage** (décision D16) : le site redemande les salons ouverts au bot ;
+  aucun signal du bot vers le site.
 
 - **Jamais** pour une entrée solo (son nom serait un pseudo) ni une équipe fantôme :
   un match qui en a une n'est pas suivi ; si l'une y entre après coup, les salons
@@ -139,8 +150,9 @@ et rien n'est compté.
 - **Rendu** : le balayage rend les salons d'un match terminé, forfait, annulé,
   sorti du programme (heure retirée), d'un match où entre une entrée solo ou une
   équipe fantôme, d'un tournoi qui n'est plus en cours (terminé, ou retombé avant
-  son départ) ou qui a éteint l'option ; un match
-  simplement reporté garde les siens. `VOICE_CHANNEL_NOT_TRACKED` = déjà fait. Une
+  son départ) ou qui a éteint l'option, et ceux d'un match **reporté** dont l'heure repasse
+  au-delà du quart d'heure (décision D14, `start_at > NOW() + 15 min`) : ils sont rouverts par
+  la voie normale (`DUE_CHANNELS_SQL`) 15 minutes avant la nouvelle heure. `VOICE_CHANNEL_NOT_TRACKED` = déjà fait. Une
   ligne rendue est effacée 7 jours après (purge au plus une fois par heure, par lots de 200 jusqu'à épuisement de l'arriéré, 10 lots au plus par passe ; tant qu'il en reste, ou si elle échoue, reprise une minute plus tard ; faite après la publication et même si une étape du bot échoue).
 - **Lecture** : `loadMatchVoiceInfos` ne lit que les lignes non rendues des matchs
   demandés, et seulement quand l'option vaut (`voiceOptionLive` : allumée, tournoi en cours
