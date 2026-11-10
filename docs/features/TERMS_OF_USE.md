@@ -276,7 +276,9 @@ suppression d'un avatar, même après la suppression du compte, issue de la
 contestation gardée avec la décision, blocage levé par une contestation
 acceptée après une suppression décidée sur un signalement ou après un
 masquage (sauf autre
-suppression de la même image ou compte effacé entre-temps) ; section
+suppression de la même image ou compte effacé entre-temps), avatar supprimé
+d'office pendant que sa contestation attend son issue bloqué seulement une
+fois la suppression maintenue (ou à l'effacement du compte) ; section
 « Retransmission des matchs » (`STREAM_NOTICE_LIVE`) — l'annonce avant le
 début ne vaut que si la diffusion doit s'ouvrir à l'heure de début (D10,
 entrée `ERREUR.txt` soldée). Annoncée par

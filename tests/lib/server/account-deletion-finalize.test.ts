@@ -39,14 +39,15 @@ type Locked = { is_deleted: 0 | 1; deletion_requested_at: Date | null } | null;
 /** Masque d'un compte en attente et quarantaine supprimée à son adresse (D6). */
 function heldAvatarRows(
   q: string,
-  options: { heldAvatar?: string; moderationPurged?: boolean; removalPending?: boolean },
+  options: { heldAvatar?: string; moderationPurged?: boolean; removalPending?: boolean; settledOn?: string },
 ): object[] | null {
   if (q.startsWith("SELECT pseudo, avatar_url FROM bg_account_deletion_holds")) {
     return options.heldAvatar ? [{ pseudo: "Joueur", avatar_url: options.heldAvatar }] : [];
   }
-  if (q.includes("AS settled FROM bg_logo_quarantines WHERE user_id = ? AND status = 'PURGED'")) {
+  if (q.includes("AS settled_on FROM bg_logo_quarantines WHERE user_id = ? AND status = 'PURGED'")) {
     // `removalPending` : purge d'office dont la contestation attend son issue (ni bloquée, ni maintenue).
-    return [{ removed_on: options.moderationPurged ? "2026-10-03" : null, settled: options.removalPending ? 0 : 1 }];
+    if (!options.moderationPurged) return [{ removed_on: null, settled_on: null }];
+    return [{ removed_on: "2026-10-03", settled_on: options.removalPending ? null : (options.settledOn ?? "2026-10-03") }];
   }
   return null;
 }
@@ -63,6 +64,7 @@ function fakeDb(options: {
   heldAvatar?: string;
   moderationPurged?: boolean;
   removalPending?: boolean;
+  settledOn?: string;
 }) {
   const queries: string[] = [];
   const execute = jest.fn(async (sql: string, _params?: unknown[]) => {
@@ -321,6 +323,36 @@ describe("finalizeDueAccountDeletions", () => {
     expect(blockRemovedImageFiles).not.toHaveBeenCalled();
   });
 
+  // Revue juridique #571, cycle 3 : une purge en attente plus ancienne et une
+  // suppression maintenue plus récente — anonymisé, le blocage porte le jour
+  // de la maintenue ; effacé, celui de la plus ancienne.
+  it("finalizeAccountDeletion_anonymizeWithMixedRemovals_datesBlockWithSettledRemovalDay", async () => {
+    fakeDb({
+      locked: { is_deleted: 1, deletion_requested_at: DUE },
+      played: 1,
+      heldAvatar: "/api/uploads/avatars/7-abc.webp",
+      moderationPurged: true,
+      settledOn: "2026-10-20",
+    });
+
+    expect((await finalizeAccountDeletion(7))?.mode).toBe("ANONYMIZE");
+
+    expect(jest.mocked(blockRemovedImageFiles).mock.calls[0][1]).toEqual({ liftable: true, day: "2026-10-20" });
+  });
+
+  it("finalizeAccountDeletion_eraseWithMixedRemovals_datesBlockWithOldestRemovalDay", async () => {
+    fakeDb({
+      locked: { is_deleted: 1, deletion_requested_at: DUE },
+      heldAvatar: "/api/uploads/avatars/7-abc.webp",
+      moderationPurged: true,
+      settledOn: "2026-10-20",
+    });
+
+    expect((await finalizeAccountDeletion(7))?.mode).toBe("ERASE");
+
+    expect(jest.mocked(blockRemovedImageFiles).mock.calls[0][1]).toEqual({ liftable: false, day: "2026-10-03" });
+  });
+
   it("finalizeAccountDeletion_eraseWithPendingChallengeRemoval_blocksPermanently", async () => {
     fakeDb({
       locked: { is_deleted: 1, deletion_requested_at: DUE },
@@ -363,7 +395,9 @@ describe("finalizeDueAccountDeletions", () => {
 
     const purged = execute.mock.calls.find(([sql]) => String(sql).includes("status = 'PURGED'"));
     expect(String(purged?.[0])).toContain("DATE_FORMAT(MIN(COALESCE(closed_at, hidden_at)), '%Y-%m-%d') AS removed_on");
-    expect(String(purged?.[0])).toContain("MAX(hash_blocked = 1 OR contest_outcome = 'UPHELD') AS settled");
+    expect(String(purged?.[0]).replace(/\s+/g, " ")).toContain(
+      "DATE_FORMAT(MIN(CASE WHEN hash_blocked = 1 OR contest_outcome = 'UPHELD' THEN COALESCE(closed_at, hidden_at) END), '%Y-%m-%d') AS settled_on",
+    );
     expect(String(purged?.[0])).not.toMatch(/NOW\(\)|CURRENT_/);
     expect(blockRemovedImageFiles).not.toHaveBeenCalled();
   });

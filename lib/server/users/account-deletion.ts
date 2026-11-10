@@ -426,7 +426,7 @@ async function loadQuarantinedAvatarFiles(runner: SqlRunner, userId: number): Pr
  * attend son issue ne bloque l'image qu'à l'effacement, jamais à
  * l'anonymisation (revue juridique #571, cycle 2).
  */
-type ModerationRemoval = { day: string; settled: boolean };
+type ModerationRemoval = { day: string; settledDay: string | null };
 
 async function avatarRemovedByModeration(
   runner: SqlRunner,
@@ -436,16 +436,20 @@ async function avatarRemovedByModeration(
   const disk = toDiskUploadPath(avatarUrl);
   if (!disk) return null;
   // Sous ses deux formes, servie et disque, comme `isUploadReferenced`.
-  const [rows] = await runner.execute<(RowDataPacket & { removed_on: string | null; settled: number | string | null })[]>(
+  // Deux jours : celui de toute suppression non annulée (effacement) et celui
+  // des seules suppressions qui bloquent (anonymisation) — chacun daté par la
+  // décision qui le justifie (D31).
+  const [rows] = await runner.execute<(RowDataPacket & { removed_on: string | null; settled_on: string | null })[]>(
     `SELECT DATE_FORMAT(MIN(COALESCE(closed_at, hidden_at)), '%Y-%m-%d') AS removed_on,
-            MAX(hash_blocked = 1 OR contest_outcome = 'UPHELD') AS settled
+            DATE_FORMAT(MIN(CASE WHEN hash_blocked = 1 OR contest_outcome = 'UPHELD'
+                                 THEN COALESCE(closed_at, hidden_at) END), '%Y-%m-%d') AS settled_on
        FROM bg_logo_quarantines
       WHERE user_id = ? AND status = 'PURGED' AND logo_url IN (?, ?)
         AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')`,
     [userId, toServedUploadUrl(disk), disk],
   );
   const day = rows[0]?.removed_on ?? null;
-  return day ? { day, settled: Number(rows[0]?.settled ?? 0) === 1 } : null;
+  return day ? { day, settledDay: rows[0]?.settled_on ?? null } : null;
 }
 
 type LockedAccount = RowDataPacket & {
@@ -671,15 +675,18 @@ async function deleteAccountNow(
   // commitée, annoncer un refus au joueur serait faux.
   // Anonymisé, seule une suppression qui bloquait déjà (ou maintenue) bloque ;
   // effacé, toute suppression non annulée (comme `pinAccountBlockedHashesOn`).
-  const removal =
-    orphanedAvatarRemoval && (plan.mode === "ERASE" || orphanedAvatarRemoval.settled) ? orphanedAvatarRemoval : null;
-  const blockedFile = removal ? storedUploadAbsolutePath(orphanedAvatar, "avatars") : null;
+  // Le blocage y est en principe déjà posé par la décision (`hash_blocked`) ;
+  // l'appel ne compte que si le fichier vivant se lit encore (course, écriture
+  // refaite).
+  const blockDayFor =
+    plan.mode === "ERASE" ? (orphanedAvatarRemoval?.day ?? null) : (orphanedAvatarRemoval?.settledDay ?? null);
+  const blockedFile = blockDayFor ? storedUploadAbsolutePath(orphanedAvatar, "avatars") : null;
   // Anonymisé, le compte garde ses lignes de quarantaine : le blocage reste
   // levable par une contestation acceptée (D18). Effacé, plus rien ne le
   // justifierait : définitif (revue sécurité #571, cycle 3).
   // Daté du jour de la suppression de modération, jamais de l'effacement (D31).
-  if (blockedFile && removal) {
-    await blockRemovedImageFiles([blockedFile], { liftable: plan.mode === "ANONYMIZE", day: removal.day });
+  if (blockedFile && blockDayFor) {
+    await blockRemovedImageFiles([blockedFile], { liftable: plan.mode === "ANONYMIZE", day: blockDayFor });
   }
   try {
     await deleteStoredImage(orphanedAvatar);

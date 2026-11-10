@@ -425,20 +425,20 @@ describe("revue juridique #571 — blocages déclarés au plus juste", () => {
   it("registerT01_retention_pendingChallengeAndLegacyErasureBlocksFrAndEn", () => {
     const frText = t01(PROCESSING_ACTIVITIES)?.retention.join(" ") ?? "";
     const enText = t01(PROCESSING_ACTIVITIES_EN)?.retention.join(" ") ?? "";
-    expect(frText).toContain("une suppression d'office dont la contestation attend encore son issue ne bloque l'image qu'une fois maintenue, ou à l'effacement du compte s'il vient avant, alors définitivement");
+    expect(frText).toContain("une suppression d'office faite alors que sa contestation attendait encore son issue ne bloque l'image qu'une fois maintenue, ou à l'effacement du compte s'il vient avant, alors définitivement");
     expect(frText).toContain("les empreintes posées à l'effacement d'un compte avant le 12 novembre 2026 — alors aussi celles d'un avatar seulement masqué — restent bloquées");
     expect(frText).toContain("(suppression sur signalement ou après un masquage)");
     expect(frText).not.toContain("au terme d'un masquage)");
-    expect(enText).toContain("an automatic deletion whose challenge is still awaiting its outcome only blocks the image once upheld");
+    expect(enText).toContain("an automatic deletion made while its challenge was still awaiting its outcome only blocks the image once upheld");
     expect(enText).toContain("hashes set on the erasure of an account before November 12, 2026");
     expect(enText).toContain("(deletion on a report or after a hiding)");
   });
 
   it("privacyChange_avatarHashEntry_pendingChallengeAndLegacyBlocksFrAndEn", () => {
-    expect(fr?.details?.[1]).toContain("Une suppression d'office dont la contestation attend encore son issue ne bloque l'image qu'une fois maintenue");
+    expect(fr?.details?.[1]).toContain("Une suppression d'office faite alors que sa contestation attendait encore son issue ne bloque l'image qu'une fois maintenue");
     expect(fr?.details?.[1]).toContain("prise sur un signalement ou après un masquage");
     expect(fr?.details?.[4]).toContain("avant le 12 novembre 2026");
-    expect(en?.details?.[1]).toContain("An automatic deletion whose challenge is still awaiting its outcome only blocks the image once upheld");
+    expect(en?.details?.[1]).toContain("An automatic deletion made while its challenge was still awaiting its outcome only blocks the image once upheld");
     expect(en?.details?.[1]).toContain("taken on a report or after a hiding");
     expect(en?.details?.[4]).toContain("before November 12, 2026");
     expect(en?.details).toHaveLength(fr?.details?.length ?? -1);
@@ -447,9 +447,9 @@ describe("revue juridique #571 — blocages déclarés au plus juste", () => {
   it("rgpdPages_signalements_pendingChallengeAndLegacyBlocksFrAndEn", () => {
     const frPage = readFileSync(join(process.cwd(), "app", "rgpd", "page.tsx"), "utf8").replace(/\s+/g, " ");
     const enPage = readFileSync(join(process.cwd(), "app", "rgpd", "RgpdEn.tsx"), "utf8").replace(/\s+/g, " ");
-    expect(frPage).toContain("Une suppression d&apos;office dont la contestation attend encore son issue ne bloque l&apos;image qu&apos;une fois maintenue");
+    expect(frPage).toContain("Une suppression d&apos;office faite alors que sa contestation attendait encore son issue ne bloque l&apos;image qu&apos;une fois maintenue");
     expect(frPage).toContain("12 novembre 2026 — alors aussi celles d&apos;un avatar seulement masqué — restent bloquées");
-    expect(enPage).toContain("An automatic deletion whose challenge is still awaiting its outcome only blocks the image once upheld");
+    expect(enPage).toContain("An automatic deletion made while its challenge was still awaiting its outcome only blocks the image once upheld");
     expect(enPage).toContain("November 12, 2026 — then also those of an avatar that was only hidden — stay blocked");
   });
 });
@@ -468,8 +468,8 @@ describe("revue juridique #571, cycle 2", () => {
   it("legacyErasureBlocks_datedToTheDayTheyWereSetFrAndEn", () => {
     const fr = PRIVACY_CHANGES.find((c) => c.id === "2026-11-empreinte-avatar-supprime");
     const en = PRIVACY_CHANGES_EN["2026-11-empreinte-avatar-supprime"];
-    expect(fr?.details?.[4]).toContain("datées du jour de leur pose");
-    expect(en?.details?.[4]).toContain("dated to the day they were set");
+    expect(fr?.details?.join(" ")).toContain("datées du jour de leur pose, qui peut être celui de l'effacement");
+    expect(en?.details?.join(" ")).toContain("dated to the day they were set, which may be that of the erasure");
     expect(PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.retention.join(" ")).toContain("datées du jour de leur pose");
     expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.retention.join(" ")).toContain("dated to the day they were set");
   });

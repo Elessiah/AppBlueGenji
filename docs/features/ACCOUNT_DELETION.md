@@ -911,8 +911,11 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   `PRIVACY_CHANGES` (revue juridique #571, cycle 1), comme la suppression
   d'office en attente d'issue que l'effacement fige. Anonymisé, l'avatar emporté
   n'est bloqué que si une suppression le bloquait déjà ou a été maintenue
-  (`settled`) : une purge d'office en attente d'issue ne le bloque pas
-  (revue juridique #571, cycle 2).
+  (`settledDay`, jour de ces seules suppressions) : une purge d'office en
+  attente d'issue ne le bloque pas (revue juridique #571, cycle 2). Le
+  blocage est alors déjà posé côté quarantaine (`blockImageHashOn`, issue
+  maintenue) ; l'appel de l'effacement ne compte que si le fichier vivant se
+  lit encore — retirer le blocage côté quarantaine en ferait un trou.
 - **Risque accepté** (D29) : un compte anonymisé garde un blocage levable
   posé à l'effacement sans ligne qui l'enregistre (ligne d'avant les
   empreintes, ou fichier réécrit) ; une contestation acceptée sur une autre
