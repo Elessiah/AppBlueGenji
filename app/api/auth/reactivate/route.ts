@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     await createSession(reactivated.userId, reactivated.event);
   } catch (error) {
     if (error instanceof AccountSuspendedError) {
-      return fail(ACCOUNT_SUSPENDED, 403, { suspension: error.notice, reactivated: true });
+      return fail(ACCOUNT_SUSPENDED, 403, { suspension: error.notice, reactivated: true, pseudoChanged });
     }
     // Le compte est réactivé et le ticket servi : dire un échec enverrait le
     // joueur réessayer un ticket « expiré ». Il lui reste à se connecter.

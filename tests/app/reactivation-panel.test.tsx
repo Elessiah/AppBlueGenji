@@ -177,10 +177,56 @@ describe("ReactivationPanel", () => {
     expect(push).toHaveBeenCalledWith("/connexion");
   });
 
-  it("réactivé sous un autre pseudo : la notification le dit", async () => {
+  it("réactivé sous un autre pseudo : une notification le dit, en plus du succès", async () => {
     global.fetch = jest.fn(async () => jsonResponse(200, { reactivated: true, pseudoChanged: true })) as typeof fetch;
     await findButton(render(FUTURE))!.props.onClick!();
-    expect(showSuccess).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.donePseudoChanged"));
+    expect(showSuccess).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.done"));
+    expect(showInfo).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.pseudoChanged"));
+  });
+
+  it("réactivé sous son pseudo : aucune note de pseudo", async () => {
+    global.fetch = jest.fn(async () => jsonResponse(200, { reactivated: true, pseudoChanged: false })) as typeof fetch;
+    await findButton(render(FUTURE))!.props.onClick!();
+    expect(showInfo).not.toHaveBeenCalled();
+  });
+
+  it("réactivé sans session et sous un autre pseudo : les deux sont dits", async () => {
+    global.fetch = jest.fn(async () =>
+      jsonResponse(503, { error: "REACTIVATED_LOGIN_REQUIRED", reactivated: true, pseudoChanged: true }),
+    ) as typeof fetch;
+    await findButton(render(FUTURE))!.props.onClick!();
+    expect(showSuccess).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.doneLoginRequired"));
+    expect(showInfo).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.pseudoChanged"));
+  });
+
+  it("réactivé suspendu et sous un autre pseudo : la note de pseudo part aussi", async () => {
+    global.fetch = jest.fn(async () =>
+      jsonResponse(403, { error: "ACCOUNT_SUSPENDED", reactivated: true, pseudoChanged: true, suspension: { endsAt: null } }),
+    ) as typeof fetch;
+    await findButton(render(FUTURE))!.props.onClick!();
+    expect(showInfo).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.pseudoChanged"));
+  });
+
+  it("« Ne pas réactiver » en cours : le bouton principal ne dit pas « Réactivation… »", async () => {
+    let release = (_response: Response): void => undefined;
+    global.fetch = jest.fn(() => new Promise<Response>((resolve) => (release = resolve))) as typeof fetch;
+    const pending = findButtons(render(FUTURE))[1].props.onClick!();
+    const [confirm, cancel] = findButtons(render(FUTURE));
+    expect(confirm.props.children).toBe(FR_LOGIN_TEXT.t("reactivation.confirm"));
+    expect(confirm.props["aria-busy"]).toBe(false);
+    expect(confirm.props.disabled).toBe(true);
+    expect(cancel.props["aria-busy"]).toBe(true);
+    release(jsonResponse(200, { discarded: true }));
+    await pending;
+  });
+
+  it("« Ne pas réactiver » refusé par le serveur : dit l'échec, reste sur l'écran", async () => {
+    global.fetch = jest.fn(async () => jsonResponse(403, { error: "CROSS_SITE_REQUEST" })) as typeof fetch;
+    await findButtons(render(FUTURE))[1].props.onClick!();
+    expect(showError).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.declineFailed"));
+    expect(showInfo).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+    expect(findButtons(render(FUTURE))[1].props.disabled).toBe(false);
   });
 
   it("« Ne pas réactiver » : retire le ticket, dit l'issue avec la date, puis l'accueil", async () => {
@@ -193,13 +239,25 @@ describe("ReactivationPanel", () => {
     expect(push).toHaveBeenCalledWith("/");
   });
 
-  it("« Ne pas réactiver » hors ligne : l'issue est dite quand même", async () => {
+  it("« Ne pas réactiver » hors ligne : dit l'échec (le cookie est resté), sans quitter l'écran", async () => {
     global.fetch = jest.fn(async () => {
       throw new Error("offline");
     }) as typeof fetch;
     await findButtons(render(FUTURE))[1].props.onClick!();
-    expect(showInfo).toHaveBeenCalledTimes(1);
-    expect(push).toHaveBeenCalledWith("/");
+    expect(showError).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.declineFailed"));
+    expect(showInfo).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("après un échec, le focus revient au bouton du geste", async () => {
+    global.fetch = jest.fn(async () => jsonResponse(500, { error: "REACTIVATION_FAILED" })) as typeof fetch;
+    await findButton(render(FUTURE))!.props.onClick!();
+    render(FUTURE);
+    const focus = jest.fn();
+    // Références dans l'ordre du composant : bouton principal, secondaire, geste à refocaliser.
+    refs[0].current = { focus };
+    effects[0]();
+    expect(focus).toHaveBeenCalledTimes(1);
   });
 
   it("410 : le focus passe au bloc « expiré » (le bouton qui l'avait a disparu)", async () => {

@@ -100,7 +100,12 @@ describe("POST /api/auth/reactivate", () => {
     const res = await reactivate();
 
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ error: "ACCOUNT_SUSPENDED", suspension: notice, reactivated: true });
+    expect(await res.json()).toEqual({
+      error: "ACCOUNT_SUSPENDED",
+      suspension: notice,
+      reactivated: true,
+      pseudoChanged: false,
+    });
     expect(reactivateAccount).toHaveBeenCalledTimes(1);
     expect(createSession).toHaveBeenCalledWith(7, "LOGIN_GOOGLE");
   });

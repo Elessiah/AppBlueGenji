@@ -86,7 +86,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   const router = useLocaleRouter();
   const text = useLoginText();
   const { t } = text;
-  const { showError, showSuccess, showInfo } = useToast();
+  const { showError, showSuccess } = useToast();
   const fieldErrors = useFieldErrors(LOGIN_FIELD_ERRORS, LOGIN_FIELD_IDS);
   // Destination d'après connexion. Toujours **filtrée** : la valeur vient de
   // l'URL, et une redirection ouverte est l'appât classique du hameçonnage
@@ -271,7 +271,6 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
         // réactivation (ticket posé en cookie par le serveur), jamais en silence.
         if (code === ACCOUNT_PENDING_DELETION_CODE) {
           leaving = true;
-          showInfo(t("reactivation.redirecting"));
           router.push(REACTIVATION_PATH);
           return;
         }

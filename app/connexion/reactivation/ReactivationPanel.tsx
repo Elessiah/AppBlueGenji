@@ -12,6 +12,9 @@ import { suspendedLoginText } from "@/lib/shared/login-text";
 import { INTL_LOCALE, SITE_TIME_ZONE } from "@/lib/shared/locales";
 import { LOGIN_HELP_TEXT_STYLE } from "../_lib/login-styles";
 
+/** Délai au-delà duquel « Ne pas réactiver » rend la main (connexion figée). */
+const DECLINE_TIMEOUT_MS = 8000;
+
 /**
  * Carte de l'écran de réactivation : la date, ce qui ne revient pas, et le geste.
  * `hadTicket` : un cookie de ticket est arrivé avec la page — sans lui (favori,
@@ -26,7 +29,19 @@ export function ReactivationPanel({
   const { t } = text;
   const router = useLocaleRouter();
   const { showError, showSuccess, showInfo } = useToast();
-  const [loading, setLoading] = useState(false);
+  // Le geste en cours : les deux boutons se ferment, seul celui du geste dit l'attente.
+  const [pending, setPending] = useState<"reactivate" | "decline" | null>(null);
+  const loading = pending !== null;
+  // Le bouton cliqué, désactivé pendant l'envoi, perd le focus : il lui revient
+  // quand un échec rend la main (sinon le clavier repart du haut de la page).
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const declineRef = useRef<HTMLButtonElement>(null);
+  const refocus = useRef<"reactivate" | "decline" | null>(null);
+  useEffect(() => {
+    if (pending !== null || refocus.current === null) return;
+    (refocus.current === "reactivate" ? confirmRef : declineRef).current?.focus();
+    refocus.current = null;
+  }, [pending]);
   // Passe à vrai quand un ticket périme sous le clic : l'écran dit alors « expiré ».
   const [expiredUnderClick, setExpiredUnderClick] = useState(false);
   // Une date illisible vaut un ticket absent : jamais « Invalid Date » devant un bouton.
@@ -50,8 +65,14 @@ export function ReactivationPanel({
       })
     : "";
 
+  /** Un échec rend la main, et le focus au bouton du geste. */
+  const giveBack = (action: "reactivate" | "decline") => {
+    refocus.current = action;
+    setPending(null);
+  };
+
   const reactivate = async () => {
-    setLoading(true);
+    setPending("reactivate");
     try {
       const response = await fetch("/api/auth/reactivate", {
         method: "POST",
@@ -62,8 +83,11 @@ export function ReactivationPanel({
         const payload = (await response.json().catch(() => ({}))) as {
           error?: string;
           reactivated?: boolean;
+          pseudoChanged?: boolean;
           suspension?: { endsAt?: string | null };
         };
+        // Réactivé sous un autre pseudo : dit sur chaque issue où le compte revit.
+        if (payload.reactivated === true && payload.pseudoChanged === true) showInfo(t("reactivation.pseudoChanged"));
         // Réactivé, mais la session n'a pas pu s'ouvrir : il reste à se connecter.
         if (payload.error === REACTIVATED_LOGIN_REQUIRED && payload.reactivated === true) {
           showSuccess(t("reactivation.doneLoginRequired"));
@@ -88,37 +112,48 @@ export function ReactivationPanel({
         } else {
           showError(payload.error === ACCOUNT_SUSPENDED ? suspendedLoginText(text, null) : t("reactivation.failed"));
         }
-        setLoading(false);
+        giveBack("reactivate");
         return;
       }
       const done = (await response.json().catch(() => ({}))) as { pseudoChanged?: boolean };
-      showSuccess(t(done.pseudoChanged === true ? "reactivation.donePseudoChanged" : "reactivation.done"));
+      showSuccess(t("reactivation.done"));
+      if (done.pseudoChanged === true) showInfo(t("reactivation.pseudoChanged"));
       router.push("/profil");
       // La barre de navigation passe à la session ouverte.
       router.refresh();
-      // `loading` reste vrai : le bouton ne se rouvre pas pendant la navigation.
+      // Le geste reste en cours : le bouton ne se rouvre pas pendant la navigation.
     } catch {
       showError(t("reactivation.failed"));
-      setLoading(false);
+      giveBack("reactivate");
     }
   };
 
   // « Ne pas réactiver » : le ticket et son cookie partent (poste partagé), et
   // l'issue est dite — la suppression suit son cours jusqu'à la date annoncée.
+  // Un refus qui n'a pas pu être enregistré (réseau, délai) est dit : le cookie
+  // serait resté, et l'écran ne doit pas laisser croire le contraire.
   const decline = async () => {
-    setLoading(true);
+    setPending("decline");
+    let recorded = false;
     try {
-      await fetch("/api/auth/reactivate", {
+      const response = await fetch("/api/auth/reactivate", {
         method: "DELETE",
         headers: { "content-type": "application/json" },
         body: "{}",
+        signal: AbortSignal.timeout(DECLINE_TIMEOUT_MS),
       });
+      recorded = response.ok;
     } catch {
-      // Le ticket expire de lui-même : le refus n'a rien à réussir.
+      recorded = false;
+    }
+    if (!recorded) {
+      showError(t("reactivation.declineFailed"));
+      giveBack("decline");
+      return;
     }
     showInfo(t("reactivation.declined", { date }));
     router.push("/");
-    // `loading` reste vrai : rien ne se rouvre pendant la navigation.
+    // Le geste reste en cours : rien ne se rouvre pendant la navigation.
   };
 
   return (
@@ -150,10 +185,25 @@ export function ReactivationPanel({
             <p style={{ ...LOGIN_HELP_TEXT_STYLE, fontSize: 14 }}>{t("reactivation.kept")}</p>
             <p style={{ ...LOGIN_HELP_TEXT_STYLE, fontSize: 14 }}>{t("reactivation.notUndone")}</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 24 }}>
-              <CyberButton type="button" onClick={reactivate} disabled={loading} aria-busy={loading} style={{ minHeight: 44 }}>
-                {t(loading ? "reactivation.confirming" : "reactivation.confirm")}
+              <CyberButton
+                ref={confirmRef}
+                type="button"
+                onClick={reactivate}
+                disabled={loading}
+                aria-busy={pending === "reactivate"}
+                style={{ minHeight: 44 }}
+              >
+                {t(pending === "reactivate" ? "reactivation.confirming" : "reactivation.confirm")}
               </CyberButton>
-              <CyberButton type="button" variant="ghost" onClick={decline} disabled={loading} style={{ minHeight: 44 }}>
+              <CyberButton
+                ref={declineRef}
+                type="button"
+                variant="ghost"
+                onClick={decline}
+                disabled={loading}
+                aria-busy={pending === "decline"}
+                style={{ minHeight: 44 }}
+              >
                 {t("reactivation.cancel")}
               </CyberButton>
             </div>

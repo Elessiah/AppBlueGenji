@@ -995,13 +995,15 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   déjà ouvert (tous partent à la réactivation) ; le cookie n'est retiré que
   réactivation faite ou ticket périmé — une panne passagère laisse réessayer ;
   session impossible après réactivation → `REACTIVATED_LOGIN_REQUIRED` (503),
-  l'écran dit la réactivation et renvoie à la connexion ; `pseudoChanged` dit
-  dans la notification que le pseudo d'avant n'a pas pu être rendu ; « Ne pas
+  l'écran dit la réactivation et renvoie à la connexion ; `pseudoChanged` (sur
+  chaque issue où le compte revit) ajoute une notification : le pseudo d'avant
+  n'a pas pu être rendu ; « Ne pas
   réactiver » (`DELETE /api/auth/reactivate`) retire le cookie et **tous** les
   tickets du compte (autres postes compris) et dit que la suppression suit son
   cours ; sans cookie, l'écran ne parle plus de
-  « lien expiré » ; la connexion par code annonce le renvoi et garde son
-  formulaire fermé.
+  « lien expiré » ; un refus non enregistré (réseau, délai de 8 s) est dit et
+  rend la main ; après un échec le focus revient au bouton du geste ; la
+  connexion par code garde son formulaire fermé pendant le renvoi.
 - **Textes** : aperçu `UNKNOWN`, `reactivation.notUndone` (FR + EN), registre
   T01 (« déjà commencé ou terminé ») ; `/rgpd` lit la durée du ticket dans
   `REACTIVATION_TICKET_MINUTES`.
