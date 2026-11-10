@@ -315,7 +315,7 @@ export async function setMatchLiveConfig(
       // Les liens des casters d'abord : le lien du staff qui suit habille un
       // stream sans lien, jamais celui qu'un caster vient de recevoir ici.
       if (editsStreamLinks && config.streamLinks !== undefined) {
-        const locked = await lockMatchStreams(connection, matchId);
+        const locked = await lockMatchStreams(connection, matchId, true);
         streams = await setCasterStreamLinks(connection, matchId, config.streamLinks, locked);
         changed = changed || streams !== locked;
       }
@@ -340,7 +340,7 @@ export async function setMatchLiveConfig(
       }
       // Les streams déjà lus sous verrou (et mis à jour en mémoire) ne sont pas
       // relus : deux lectures verrouillantes, non quatre.
-      await pruneMatchStreams(connection, matchId, { streams });
+      await pruneMatchStreams(connection, matchId, { streams, held: true });
       await connection.commit();
       return { previousTrigger: hold.trigger, changed };
     } catch (error) {
@@ -455,7 +455,7 @@ async function writeStaffLink(
   actor: LiveTriggerActor,
 ): Promise<{ streams: MatchStreamRow[]; written: boolean }> {
   const edited = new Set((config.streamLinks ?? []).map((link) => link.streamId));
-  const before = known ?? (await lockMatchStreams(connection, matchId));
+  const before = known ?? (await lockMatchStreams(connection, matchId, true));
   // Décidé **avant** d'écrire : un refus n'a rien à défaire.
   const plan = await planStaffStreamUrl(connection, matchId, url, config.setter, before, edited);
   if (plan.kind === "none") return { streams: before, written: false };
@@ -743,6 +743,9 @@ async function setCasterStreamLinks(
   locked: MatchStreamRow[],
 ): Promise<MatchStreamRow[]> {
   let streams = locked;
+  // Les casters ne changent pas pendant l'édition (verrou du match) : leurs
+  // porteurs se lisent une fois, au premier lien à poser, pas un par lien.
+  let holders: Map<number, number> | undefined;
   for (const link of links) {
     const target = streams.find((stream) => stream.id === link.streamId && !stream.staff);
     if (!target) throw new StreamLinkError("STREAM_NOT_FOUND", link.streamId);
@@ -758,7 +761,8 @@ async function setCasterStreamLinks(
       // jamais à l'organisation ni à un caster parti. Un stream que plus aucun
       // caster ne tient attend le ménage : son lien n'aurait personne à qui se
       // rattacher.
-      const holder = await streamHolder(connection, matchId, target.id);
+      holders ??= await streamHolders(connection, matchId);
+      const holder = holders.get(target.id) ?? null;
       if (holder === null) throw new StreamLinkError("STREAM_NOT_FOUND", target.id);
       await connection.execute(
         `UPDATE bg_match_streams SET live_url = ?, link_user_id = ? WHERE id = ? AND match_id = ? AND staff_owned = 0`,
@@ -780,21 +784,24 @@ function streamLinkUrl(link: MatchStreamLinkEdit): string | null {
 }
 
 /**
- * Le caster à qui rattacher le lien de ce stream : son fournisseur actuel
+ * Le caster à qui rattacher le lien de chaque stream du match : son fournisseur actuel
  * (`link_user_id`) s'il le caste encore, sinon le premier inscrit ; `null`
  * sans caster.
  * Lecture ordinaire et séparée : l'écriture du lien ne verrouille ainsi que
  * sa table (`bg_match_streams`) ; les casters du match ne changent que sous
  * le verrou de sa ligne, que l'appelant tient.
  */
-async function streamHolder(connection: PoolConnection, matchId: number, streamId: number): Promise<number | null> {
-  const [rows] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
-    `SELECT mc.user_id FROM bg_match_casters mc
+async function streamHolders(connection: PoolConnection, matchId: number): Promise<Map<number, number>> {
+  const [rows] = await connection.execute<(RowDataPacket & { user_id: number; stream_id: number })[]>(
+    `SELECT mc.user_id, mc.stream_id FROM bg_match_casters mc
      LEFT JOIN bg_match_streams s ON s.id = mc.stream_id AND s.link_user_id = mc.user_id
-     WHERE mc.match_id = ? AND mc.stream_id = ? ORDER BY s.id IS NULL, mc.created_at, mc.user_id LIMIT 1`,
-    [matchId, streamId],
+     WHERE mc.match_id = ? ORDER BY s.id IS NULL, mc.created_at, mc.user_id`,
+    [matchId],
   );
-  return rows.length === 0 ? null : Number(rows[0].user_id);
+  const holders = new Map<number, number>();
+  // Le premier de chaque stream, dans l'ordre : son fournisseur, puis le premier inscrit.
+  for (const row of rows) if (!holders.has(Number(row.stream_id))) holders.set(Number(row.stream_id), Number(row.user_id));
+  return holders;
 }
 
 /**

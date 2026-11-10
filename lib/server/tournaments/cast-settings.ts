@@ -120,6 +120,7 @@ export async function applyCastTrigger(
   userId: number,
   access: CastAccess = PLAIN_CAST_ACCESS,
   skip = false,
+  memo: ShownMemo = new Map(),
 ): Promise<boolean> {
   if (trigger !== null && !isMatchLiveTrigger(trigger)) throw new Error("INVALID_LIVE_TRIGGER");
   const current = row.live_trigger ?? null;
@@ -131,7 +132,7 @@ export async function applyCastTrigger(
   }
   const matchId = Number(row.id);
   const actor = { userId, ...access };
-  const { hold, shown } = await castTriggerHold(connection, row, userId);
+  const { hold, shown } = await castTriggerHold(connection, row, userId, memo);
   // L'appelant caste le match (inscription ou réglage de son cast) : un mode
   // sans maître lui revient s'il le change (décision du 2026-11-05) — s'il est
   // montré (le candidat de l'inscription l'est) : un caster tu ne décide pas,
@@ -167,9 +168,38 @@ export async function applyCastTrigger(
   return true;
 }
 
+/**
+ * Qui est déjà jugé « caster montré » dans la transaction en cours, par compte.
+ * Un geste (mode puis lien) juge le même caster plusieurs fois sous le même
+ * verrou du match, où ni ses inscriptions ni sa condition de cast ne changent :
+ * une lecture suffit. Une carte par appel, jamais partagée entre transactions.
+ */
+export type ShownMemo = Map<number, boolean>;
+
+/** `loadShownCasterIds` sur `row`, sans relire ce que `memo` a déjà jugé. */
+async function loadShownMemo(
+  connection: PoolConnection,
+  row: LaunchMatchRow,
+  userIds: readonly (number | null)[],
+  memo: ShownMemo,
+): Promise<Set<number>> {
+  const asked = [...new Set(userIds.filter((id): id is number => id !== null))];
+  const missing = asked.filter((id) => !memo.has(id));
+  if (missing.length > 0) {
+    const shown = await loadShownCasterIds(connection, Number(row.id), missing, row.tournament_game, castBeforeLaunch(row));
+    for (const id of missing) memo.set(id, shown.has(id));
+  }
+  return new Set(asked.filter((id) => memo.get(id) === true));
+}
+
 /** @throws `NOT_MATCH_CASTER` quand `userId` n'est pas un caster montré du match. */
-async function assertShownCaster(connection: PoolConnection, row: LaunchMatchRow, userId: number): Promise<void> {
-  const shown = await loadShownCasterIds(connection, Number(row.id), [userId], row.tournament_game, castBeforeLaunch(row));
+async function assertShownCaster(
+  connection: PoolConnection,
+  row: LaunchMatchRow,
+  userId: number,
+  memo: ShownMemo,
+): Promise<void> {
+  const shown = await loadShownMemo(connection, row, [userId], memo);
   if (!shown.has(userId)) throw new Error("NOT_MATCH_CASTER");
 }
 
@@ -178,10 +208,15 @@ async function assertShownCaster(connection: PoolConnection, row: LaunchMatchRow
  * caster montré, et l'arbitre désigné éligible. `shown` dit aussi si
  * `candidateId` (qui pose le nouveau mode) y est montré.
  */
-async function castTriggerHold(connection: PoolConnection, row: LaunchMatchRow, candidateId: number | null) {
+async function castTriggerHold(
+  connection: PoolConnection,
+  row: LaunchMatchRow,
+  candidateId: number | null,
+  memo: ShownMemo,
+) {
   const current = row.live_trigger ?? null;
   const ownerId = current === null ? null : nullableId(row.live_trigger_user_id);
-  const shown = await loadShownCasterIds(connection, Number(row.id), [ownerId, candidateId], row.tournament_game, castBeforeLaunch(row));
+  const shown = await loadShownMemo(connection, row, [ownerId, candidateId], memo);
   // L'arbitre ne médie qu'un match à jouer — la règle de la route du staff
   // (`KEPT_REFEREE_SQL`) : un score déclaré clôt la médiation.
   const mediates = row.refereeEligible && (row.status === "PENDING" || row.status === "READY");
@@ -306,14 +341,16 @@ export async function applyCastSettings(
   access: CastAccess = PLAIN_CAST_ACCESS,
 ): Promise<CastSettingsOutcome> {
   const matchId = Number(row.id);
+  // Le mode puis le lien jugent le même caster : une seule lecture.
+  const memo: ShownMemo = new Map();
   const triggerSkipped =
     settings.trigger !== undefined &&
-    !(await applyCastTrigger(connection, row, settings.trigger, userId, access, settings.skipLockedTrigger === true));
+    !(await applyCastTrigger(connection, row, settings.trigger, userId, access, settings.skipLockedTrigger === true, memo));
   let streams: MatchStreamRow[] | undefined;
   // Le lien d'un stream (et son origine) ne se règle que par un caster montré :
   // un caster tu ne réécrit pas le lien public d'un stream qu'il partage.
   if (settings.liveUrl !== undefined && !access.oversees) {
-    await assertShownCaster(connection, row, userId);
+    await assertShownCaster(connection, row, userId, memo);
   }
   if (settings.liveUrl !== undefined) {
     const url = parseStreamUrlInput(settings.liveUrl);

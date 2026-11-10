@@ -285,11 +285,17 @@ export function orphanStreamIds(
 export async function pruneMatchStreams(
   connection: Executor,
   matchId: number,
-  known: { streams?: readonly MatchStreamRow[]; casters?: readonly Pick<MatchCasterLink, "streamId">[] } = {},
+  known: {
+    streams?: readonly MatchStreamRow[];
+    casters?: readonly Pick<MatchCasterLink, "streamId">[];
+    /** L'appelant tient le verrou de la ligne du match : lectures ordinaires (`lockMatchCasters`). */
+    held?: boolean;
+  } = {},
 ): Promise<void> {
-  const streams = known.streams ?? (await lockMatchStreams(connection, matchId));
+  const held = known.held === true;
+  const streams = known.streams ?? (await lockMatchStreams(connection, matchId, held));
   if (streams.length === 0) return;
-  const casters = known.casters ?? (await lockMatchCasters(connection, matchId));
+  const casters = known.casters ?? (await lockMatchCasters(connection, matchId, held));
   const orphans = orphanStreamIds(streams, casters);
   if (orphans.length === 0) return;
   await connection.execute(

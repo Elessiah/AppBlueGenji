@@ -334,6 +334,28 @@ describe("applyCastSettings", () => {
     expect(statements.filter((sql) => sql.includes("FROM bg_match_casters") && !sql.includes("holder_casts"))).toHaveLength(1);
   });
 
+  it("applyCastSettings_triggerAndLink_judgesShownCasterOnce", async () => {
+    // Mode puis lien : le même caster, une seule lecture de sa condition sous le verrou du match.
+    const execute = jest.fn<SqlQuery>(async (sql) => {
+      const text = String(sql);
+      if (text.includes("FROM bg_match_casters mc LEFT JOIN bg_users")) return shownRows(900);
+      if (text.startsWith("SELECT 1 FROM bg_match_streams")) return [[], []];
+      if (text.includes("FROM bg_match_streams")) return [[{ id: 5, match_id: 42, live_url: null, staff_owned: 0 }], []];
+      if (text.startsWith("SELECT")) return [[], []];
+      return [{ affectedRows: 1 }, []];
+    });
+    const row = Object.assign(ownedRow(), {
+      live_trigger: null,
+      live_trigger_user_id: null,
+      casters: [{ matchId: 42, userId: 900, streamId: 5, readyAt: null }],
+    });
+
+    await applyCastSettings(fakeConnection({ execute }), row, 900, 5, { trigger: "AUTO", liveUrl: "https://twitch.tv/b" });
+
+    const shownReads = execute.mock.calls.filter(([sql]) => String(sql).includes("FROM bg_match_casters mc LEFT JOIN bg_users"));
+    expect(shownReads).toHaveLength(1);
+  });
+
   it("applyCastSettings_hiddenCasterSetsLink_throwsNotMatchCaster", async () => {
     // Un caster tu ne réécrit pas le lien public d'un stream qu'il partage.
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows());

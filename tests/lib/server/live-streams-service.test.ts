@@ -199,20 +199,21 @@ describe("setMatchLiveConfig", () => {
     streams: StreamState[] = [],
     casters: WorldCaster[] = [],
   ) {
-    const state = { streams: streams.map((stream) => ({ ...stream })), casters, matchWrites: [] as [string, unknown[]][], heldReads: 0, holderReads: 0 };
+    const state = { streams: streams.map((stream) => ({ ...stream })), casters, matchWrites: [] as [string, unknown[]][], heldReads: 0, holderReads: 0, casterHolderReads: 0 };
     const execute = jest.fn<SqlQuery>(async (rawSql, rawParams) => {
       const sql = rawSql.replace(/\s+/g, " ").trim();
       const params = (rawParams ?? []) as unknown[];
       if (sql.startsWith("SELECT id, tournament_id, status")) return [[{ ...row }]];
       if (sql.startsWith("SELECT t.game,")) return [[{ game: "OW", kept: row.kept_referee_user_id ?? null }]];
-      if (sql.startsWith("SELECT mc.user_id,")) return [shownCasterRows(state.casters, params.slice(1))];
-      if (sql.startsWith("SELECT mc.user_id FROM bg_match_casters mc")) {
-        // Le fournisseur actuel d'abord, s'il caste encore ce stream ; puis l'ordre d'inscription.
-        const provider = state.streams.find((stream) => stream.id === params[1])?.link_user_id;
-        const onStream = state.casters.filter((caster) => caster.stream_id === params[1]);
-        const kept = onStream.filter((caster) => caster.user_id === provider);
-        return [(kept.length > 0 ? kept : onStream).slice(0, 1)];
+      if (sql.startsWith("SELECT mc.user_id, mc.stream_id FROM bg_match_casters mc")) {
+        // Tous les casters du match d'une lecture : le fournisseur du lien de son stream d'abord, puis l'ordre d'inscription.
+        state.casterHolderReads += 1;
+        const isProvider = (caster: WorldCaster) =>
+          state.streams.find((stream) => stream.id === caster.stream_id)?.link_user_id === caster.user_id;
+        const ordered = [...state.casters.filter(isProvider), ...state.casters.filter((caster) => !isProvider(caster))];
+        return [ordered.map((caster) => ({ user_id: caster.user_id, stream_id: caster.stream_id }))];
       }
+      if (sql.startsWith("SELECT mc.user_id,")) return [shownCasterRows(state.casters, params.slice(1))];
       if (sql.startsWith("UPDATE bg_matches")) {
         state.matchWrites.push([sql, params]);
         return [{ affectedRows: 1 }];
@@ -679,7 +680,9 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.matchWrites.some(([sql]) => sql.includes("SET live_trigger = NULL"))).toBe(true);
   });
 
-  it("lit une seule fois chaque table sous verrou par réglage : les streams déjà lus ne sont pas relus par le ménage", async () => {
+  it("setMatchLiveConfig_matchRowLockHeld_readsStreamsAndCastersOnceWithoutRangeLock", async () => {
+    // La ligne du match est verrouillée en première instruction : les streams et casters
+    // se lisent sans `FOR UPDATE` (un verrou d'intervalle vide serait partagé avec les matchs voisins).
     const world = liveWorld(matchRow({ live_trigger: "MANUAL" }), [dbStream(3, "https://twitch.tv/match", true)], [
       { user_id: 5, stream_id: 3 },
     ]);
@@ -687,10 +690,50 @@ describe("setMatchLiveConfig", () => {
 
     await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/neuve", setter: ORGANISER_5, access: STAFF });
 
-    const reads = (table: string) =>
-      world.execute.mock.calls.filter(([sql]) => String(sql).includes(`FROM ${table}`) && String(sql).includes("FOR UPDATE"));
-    expect(reads("bg_match_streams")).toHaveLength(1);
-    expect(reads("bg_match_casters")).toHaveLength(1);
+    const reads = (table: string, locking: boolean) =>
+      world.execute.mock.calls.filter(
+        ([sql]) => String(sql).includes(`FROM ${table}`) && String(sql).includes("FOR UPDATE") === locking,
+      );
+    expect(reads("bg_match_streams", true)).toHaveLength(0);
+    expect(reads("bg_match_casters", true)).toHaveLength(0);
+    expect(reads("bg_match_streams", false)).toHaveLength(1);
+    expect(reads("bg_match_casters", false).filter(([sql]) => String(sql).includes("ORDER BY created_at, user_id"))).toHaveLength(1);
+    const order = world.execute.mock.calls.map(([sql]) => String(sql).replace(/\s+/g, " "));
+    const lockAt = order.findIndex((sql) => sql.includes("FROM bg_matches WHERE id = ? FOR UPDATE"));
+    expect(lockAt).toBeGreaterThanOrEqual(0);
+    expect(order.findIndex((sql) => sql.includes("FROM bg_match_streams"))).toBeGreaterThan(lockAt);
+  });
+
+  it("setMatchLiveConfig_severalCasterLinksEdited_readsHoldersOnce", async () => {
+    const world = liveWorld(
+      matchRow({ kept_referee_user_id: 9 }),
+      [dbStream(3, "https://twitch.tv/a"), dbStream(5, "https://twitch.tv/b"), dbStream(6, null)],
+      [
+        { user_id: 12, stream_id: 3 },
+        { user_id: 13, stream_id: 5 },
+        { user_id: 14, stream_id: 6 },
+      ],
+    );
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, {
+      trigger: undefined,
+      liveUrl: undefined,
+      setter: { userId: 9, asOrganisation: false },
+      access: STAFF,
+      streamLinks: [
+        { streamId: 3, liveUrl: "twitch.tv/a2" },
+        { streamId: 5, liveUrl: "twitch.tv/b2" },
+        { streamId: 6, liveUrl: "twitch.tv/c2" },
+      ],
+    });
+
+    expect(world.state.casterHolderReads).toBe(1);
+    expect(world.state.streams.map((stream) => [stream.id, stream.link_user_id])).toEqual([
+      [3, 12],
+      [5, 13],
+      [6, 14],
+    ]);
   });
 
   it("setMatchLiveConfig_emptyStreamHeldByCaster_opensStaffStreamInstead", async () => {
