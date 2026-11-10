@@ -319,7 +319,8 @@ export function RgpdEn({
           tournament where it never played are lost by forfeit. At the end of that time, the account is erased
           if it left nothing behind, anonymized (borrowed username) otherwise. During that time, moderation can
           still hide, restore or delete the avatar kept apart, like that of an active account; erasure only keeps
-          the hash of an avatar moderation had already deleted (section <a href="#signalements">“Reports”</a>). The staff log on Discord records the request, its reactivation and each withdrawal or forfeit it causes (one line per tournament for those), without
+          the hash of an avatar moderation had already deleted (section <a href="#signalements">“Reports”</a>); an
+          avatar moderation never deleted goes without leaving any hash. The staff log on Discord records the request, its reactivation and each withdrawal or forfeit it causes (one line per tournament for those), without
           naming the player (“a player”) (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
         </p>
       </section>
@@ -779,13 +780,19 @@ export function RgpdEn({
             </li>
             <li>
               When moderation <strong>deletes</strong> an avatar — immediately, on a report or from the
-              player&apos;s page, when
+              player&apos;s page, by
               the staff after a hiding (challenge rejected, or before the deadline), or automatically at the end of
               a hiding without a challenge —, whether the
-              account is active or pending deletion, the hash (SHA-256) of the image is kept, without time limit and
-              with no link to any account, to refuse it being uploaded again, as an avatar or as a team logo; when
-              deleted immediately, its file is only erased if nothing else on the site points to it. An avatar that is only hidden leaves
-              none as long as it is not deleted; neither does a deleted team logo.
+              account is active or pending deletion, the hash (SHA-256) of the image is kept without time limit in
+              the list of blocked images, which designates no account and only dates a block to the day, to refuse
+              it being uploaded again, as an avatar or as a team logo; when deleted immediately, its file is only
+              erased if nothing else on the site points to it. As long as the account exists (anonymized included),
+              the hash is also kept on the deletion decision taken on a report or at the end of a hiding, with the
+              outcome of its challenge: upheld, the block stays; accepted, it is lifted, unless another deletion of
+              the same image still justifies it. When the account is erased, those decisions are erased and the
+              block becomes permanent: only the hash remains, with no link to any account. An avatar that is only
+              hidden leaves none as long as it is not deleted, nor does an avatar moderation never deleted; neither
+              does a deleted team logo.
             </li>
           </ul>
           <p>

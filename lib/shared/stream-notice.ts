@@ -33,7 +33,7 @@ export const STREAM_NOTICE_OBJECTION =
  * depuis la version 7 des conditions.
  */
 export const STREAM_NOTICE_LIVE =
-  "Les matchs diffusés sont annoncés dans le salon #live du Discord de l'association, par un message de soirée qui liste chaque match à son heure — avant son début s'il est programmé dans la soirée, pendant sa diffusion, puis une fois terminé, avec son score — et qui nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public. Cette annonce fait partie du tournoi individuel auquel le joueur s'inscrit (exécution du service, et non intérêt légitime) : le nom neutre ne s'y applique pas, et un joueur qui ne veut pas y être nommé ne s'inscrit pas au tournoi individuel. Une annonce est supprimée sur demande, par le même bouton.";
+  "Les matchs diffusés sont annoncés dans le salon #live du Discord de l'association, par un message de soirée qui liste chaque match à son heure — avant son début si sa diffusion doit s'ouvrir à son heure de début dans la soirée, pendant sa diffusion, puis une fois terminé, avec son score — et qui nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public. Cette annonce fait partie du tournoi individuel auquel le joueur s'inscrit (exécution du service, et non intérêt légitime) : le nom neutre ne s'y applique pas, et un joueur qui ne veut pas y être nommé ne s'inscrit pas au tournoi individuel. Une annonce est supprimée sur demande, par le même bouton.";
 
 /**
  * Mention courte affichée près de l'inscription à un tournoi, suivie d'un lien

@@ -1691,9 +1691,13 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // l'empreinte d'un avatar est gardée quand la modération le SUPPRIME (plus
     // à l'effacement d'un compte, plus pour un avatar seulement masqué), et la
     // modération atteint l'avatar mis de côté d'un compte en attente de
-    // suppression. Pour tous les comptes. Datée du déploiement prévu.
+    // suppression. Complétée par D22 (issue de la contestation gardée), D30
+    // (avatar jamais supprimé par la modération : jamais bloqué) et D31
+    // (empreinte liée au compte tant qu'il existe, seule à l'effacement).
+    // Pour tous les comptes. Datée du lendemain de la mise en ligne prévue
+    // (nuit du 2026-11-11), comme `TERMS_UPDATED_AT`.
     id: "2026-11-empreinte-avatar-supprime",
-    publishedAt: "2026-11-10",
+    publishedAt: "2026-11-12",
     title: "Avatar supprimé par la modération : son empreinte est gardée dès la suppression",
     links: [
       { href: "/rgpd#signalements", label: "Lire la section « Signalements »" },
@@ -1702,9 +1706,32 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "L'empreinte d'un avatar que la modération supprime est désormais gardée dès cette suppression, et non plus à l'effacement du compte, pour en refuser la remise en ligne. Un avatar seulement masqué n'en laisse plus aucune tant qu'il n'est pas supprimé.",
     details: [
-      "Ce que le site garde : l'empreinte (SHA-256) de l'image, sans lien avec aucun compte et sans limite de durée, quand la modération supprime un avatar — sans délai, sur signalement ou depuis la fiche du joueur, par le staff après un masquage (contestation rejetée, ou avant l'échéance), ou d'office au terme d'un masquage sans contestation —, que le compte soit actif ou en attente de suppression. Elle sert seulement à refuser la remise en ligne de la même image, comme avatar ou comme logo d'équipe  ; supprimé sans délai, son fichier n'est effacé que si rien d'autre sur le site ne le désigne.",
-      "À l'effacement d'un compte, seule est prise ou gardée l'empreinte d'un avatar que la modération avait déjà supprimé ; l'avatar seulement masqué part avec le compte, sans laisser d'empreinte. Un logo d'équipe supprimé ne laisse pas d'empreinte non plus.",
+      "Ce que le site garde : l'empreinte (SHA-256) de l'image, sans limite de durée, dans une liste d'images bloquées qui ne désigne aucun compte et ne date un blocage qu'au jour près, quand la modération supprime un avatar — sans délai, sur signalement ou depuis la fiche du joueur, par le staff après un masquage (contestation rejetée, ou avant l'échéance), ou d'office au terme d'un masquage sans contestation —, que le compte soit actif ou en attente de suppression. Elle sert seulement à refuser la remise en ligne de la même image, comme avatar ou comme logo d'équipe  ; supprimé sans délai, son fichier n'est effacé que si rien d'autre sur le site ne le désigne.",
+      "Tant que le compte existe (anonymisé compris), l'empreinte est aussi gardée sur la décision de suppression prise sur un signalement ou au terme d'un masquage, avec l'issue de sa contestation, que la modération y note : maintenue, le blocage reste ; acceptée, il est levé, sauf si une autre suppression de la même image le justifie encore. À l'effacement du compte, ces décisions sont effacées et le blocage devient définitif : seule l'empreinte reste, sans lien avec aucun compte.",
+      "À l'effacement d'un compte, seule est prise ou gardée l'empreinte d'un avatar que la modération avait déjà supprimé ; l'avatar seulement masqué part avec le compte, sans laisser d'empreinte, comme un avatar que la modération n'a jamais supprimé — à la demande de suppression, à l'anonymisation ou à l'effacement. Un logo d'équipe supprimé ne laisse pas d'empreinte non plus.",
       "Pendant les 30 jours d'une suppression demandée, la modération peut masquer, rétablir ou supprimer l'avatar mis de côté pour la réactivation, comme celui d'un compte actif ; masqué ou supprimé, il n'est pas rendu à la réactivation.",
+    ],
+  },
+  {
+    // ACCOUNT-DELETION (#571, décisions de l'utilisateur D12 du 2026-11-10 et
+    // D10 du 2026-11-09) : conditions d'utilisation, version 10. Pour tous les
+    // comptes. Même date que `TERMS_UPDATED_AT` — tout avancer ensemble si la
+    // mise en ligne glisse.
+    id: "2026-11-conditions-v10-avatar-et-succession",
+    publishedAt: "2026-11-12",
+    title: "Conditions d'utilisation : version 10 (avatar supprimé, reprise d'équipe, annonce #live)",
+    links: [
+      { href: "/conditions-utilisation#compte", label: "Lire la section « Compte »" },
+      { href: "/conditions-utilisation#signalement", label: "Lire la section « Signalement et modération »" },
+    ],
+    summary:
+      "Les conditions d'utilisation passent en version 10 : elles disent désormais que seul un avatar supprimé par la modération reste bloqué, et comment une contestation acceptée lève ce blocage, qu'un joueur suspendu ne reprend une équipe qu'après tous les autres, et quand l'annonce #live précède un match. Elle est à accepter : une fenêtre te la présente tant que tu ne l'as pas acceptée.",
+    asksTermsAcceptance: true,
+    details: [
+      "Signalement et modération : quand la modération supprime un avatar, l'empreinte de l'image est gardée pour en refuser la remise en ligne, comme avatar ou comme logo d'équipe, y compris après la suppression du compte ; un avatar seulement masqué n'est pas bloqué. L'issue d'une contestation est gardée avec la décision : maintenue, le blocage reste ; acceptée après une suppression décidée sur un signalement, il est levé, sauf si une autre suppression de la même image le justifie encore ou si le compte a été effacé entre-temps.",
+      "Compte : pendant les 30 jours d'une suppression demandée, la modération peut masquer, rétablir ou supprimer l'avatar mis de côté, qui n'est rendu à la réactivation que s'il n'est alors ni masqué ni supprimé ; un joueur suspendu ne reprend une équipe qu'après tous les autres ; au terme du délai, seul un avatar que la modération a supprimé ne peut plus être reposé — un avatar seulement masqué, ou que la modération n'a jamais supprimé, part sans que son empreinte soit gardée.",
+      "Retransmission des matchs : le message #live de la soirée ne liste un match avant son début que si sa diffusion doit s'ouvrir à son heure de début dans la soirée ; les autres n'y paraissent qu'à leur passage à l'antenne.",
+      `Conditions d'utilisation : la version 10, en vigueur depuis le 12 novembre 2026, le dit dans ses sections « Compte », « Signalement et modération » et « Retransmission des matchs ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.`,
     ],
   },
 ];

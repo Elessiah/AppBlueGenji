@@ -111,8 +111,8 @@ describe("français : le texte qui fait foi ne bouge pas", () => {
   });
 
   it("la version des conditions n'avance pas pour une traduction", () => {
-    // Version 9 : contacts de match, salons vocaux, suppression du compte (ERASURE-D2), pas une traduction.
-    expect(TERMS_VERSION).toBe(9);
+    // Version 10 : avatar supprimé par la modération, reprise d'équipe, annonce #live (#571), pas une traduction.
+    expect(TERMS_VERSION).toBe(10);
   });
 });
 

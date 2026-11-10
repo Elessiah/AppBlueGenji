@@ -914,20 +914,11 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
 
 ## Décisions requises (ouvertes)
 
-- Avatar mis de côté d'un compte en attente : la modération peut désormais le
-  masquer ou le supprimer, alors que les conditions v9 publiées (immuables) et
-  l'entrée `PRIVACY_CHANGES` du 2026-11-06 disent que la réactivation le rend —
-  nouvelle version des conditions, ou retrait de ce geste ?
 - Même avatar mis de côté : masqué ou supprimé par la modération, le joueur
   en attente n'en reçoit **aucun avis** (`userRecipient` écarte
   `is_deleted = 1`), alors que `/rgpd` § Signalements promet motifs et voies de
   recours (DSA art. 17) — prévenir à la réactivation, ou le dire dans les
   textes ?
-- Conditions v9 publiées (immuables) : elles disent qu'un avatar retiré que
-  l'effacement emporte ne peut être reposé, et donnent l'ordre de reprise
-  d'une équipe sans le rang des membres suspendus — D6 et la règle de
-  succession les contredisent (un avatar seulement masqué n'est plus bloqué) :
-  nouvelle version des conditions ?
 - Revue juridique #571, cycle 3 (non relu) : le blocage de l'empreinte n'est
   pas garanti en cas d'échec (fichier déjà absent, insertion qui échoue deux
   fois : consigné dans pm2 seulement ; adresse hors `avatars/` : rien) — faut-il
@@ -945,6 +936,14 @@ sert ailleurs ; la modération atteint l'avatar mis de côté
 d'un compte en attente), `/rgpd` FR+EN (§ Suppression du compte et
 § Signalements) et l'entrée `2026-11-empreinte-avatar-supprime` de
 `PRIVACY_CHANGES` (FR+EN), testés dans `account-deletion-d2-texts.test.ts`.
+Complétés pour D22, D30, D31 : l'empreinte est dite gardée dans une liste qui
+ne désigne aucun compte (datée au jour près) **et**, tant que le compte existe
+(anonymisé compris), sur la décision de suppression avec l'issue de sa
+contestation (T01, T11 — durée de cette décision —, `/rgpd` § Signalements) ;
+un avatar jamais supprimé par la modération ne laisse aucune empreinte.
+**Conditions v10** (D12) : `TERMS_OF_USE.md` § Versions, entrée
+`2026-11-conditions-v10-avatar-et-succession` (FR+EN) ; ces deux « décisions
+requises » (avatar mis de côté, conditions v9) sont ainsi soldées.
 
 ## Voir aussi
 

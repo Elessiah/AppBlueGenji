@@ -430,7 +430,8 @@ function RgpdFr({
           s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. Pendant le délai, la
           modération peut encore masquer, rétablir ou supprimer l&apos;avatar gardé à part, comme celui
           d&apos;un compte actif ; l&apos;effacement ne garde que l&apos;empreinte d&apos;un avatar que la
-          modération avait déjà supprimé (section <a href="#signalements">« Signalements »</a>). Le journal du staff sur Discord note la demande,
+          modération avait déjà supprimé (section <a href="#signalements">« Signalements »</a>) ; un
+          avatar que la modération n&apos;a jamais supprimé part sans laisser d&apos;empreinte. Le journal du staff sur Discord note la demande,
           sa réactivation et chaque retrait ou forfait qu&apos;elle entraîne (une ligne par tournoi pour ceux-ci), sans nommer le joueur (« un joueur ») (
           <Link href="/rgpd/registre#t05">registre, T05</Link>).
         </p>
@@ -960,11 +961,17 @@ function RgpdFr({
               Quand la modération <strong>supprime</strong> un avatar — sans délai, sur signalement ou
               depuis la fiche du joueur, par le staff après un masquage (contestation rejetée, ou avant l&apos;échéance), ou
               d&apos;office au terme d&apos;un masquage sans contestation —, que le compte soit actif ou en attente de suppression, l&apos;empreinte
-              (SHA-256) de l&apos;image est gardée, sans limite de durée et sans lien avec aucun compte,
-              pour en refuser la remise en ligne, comme avatar ou comme logo d&apos;équipe  ; supprimé
-              sans délai, son fichier n&apos;est effacé que si rien d&apos;autre sur le site ne le désigne. Un avatar seulement
-              masqué n&apos;en laisse aucune tant qu&apos;il n&apos;est pas supprimé ; un logo d&apos;équipe supprimé non
-              plus.
+              (SHA-256) de l&apos;image est gardée sans limite de durée dans la liste des images bloquées, qui ne
+              désigne aucun compte et ne date un blocage qu&apos;au jour près, pour en refuser la remise en ligne,
+              comme avatar ou comme logo d&apos;équipe ; supprimé sans délai, son fichier n&apos;est effacé que si
+              rien d&apos;autre sur le site ne le désigne. Tant que le compte existe (anonymisé compris),
+              l&apos;empreinte est aussi gardée sur la décision de suppression prise sur un signalement ou au terme
+              d&apos;un masquage, avec l&apos;issue de sa contestation : maintenue, le blocage reste ; acceptée, il
+              est levé, sauf si une autre suppression de la même image le justifie encore. À l&apos;effacement du
+              compte, ces décisions sont effacées et le blocage devient définitif : seule l&apos;empreinte reste,
+              sans lien avec aucun compte. Un avatar seulement masqué n&apos;en laisse aucune tant qu&apos;il
+              n&apos;est pas supprimé, ni un avatar que la modération n&apos;a jamais supprimé ; un logo
+              d&apos;équipe supprimé non plus.
             </li>
           </ul>
           <p>

@@ -891,9 +891,22 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "The hash of an avatar that moderation deletes is now kept from that deletion, and no longer when the account is erased, to refuse it being uploaded again. An avatar that is only hidden no longer leaves any as long as it is not deleted.",
     details: [
-      "What the site keeps: the hash (SHA-256) of the image, with no link to any account and without time limit, when moderation deletes an avatar — immediately, on a report or from the player's page, by the staff after a hiding (challenge rejected, or before the deadline), or automatically at the end of a hiding without a challenge —, whether the account is active or pending deletion. It only serves to refuse the same image being uploaded again, as an avatar or as a team logo; when deleted immediately, its file is only erased if nothing else on the site points to it.",
-      "When an account is erased, only the hash of an avatar moderation had already deleted is taken or kept; an avatar that is only hidden leaves with the account, without leaving a hash. A deleted team logo leaves no hash either.",
+      "What the site keeps: the hash (SHA-256) of the image, without time limit, in a list of blocked images that designates no account and only dates a block to the day, when moderation deletes an avatar — immediately, on a report or from the player's page, by the staff after a hiding (challenge rejected, or before the deadline), or automatically at the end of a hiding without a challenge —, whether the account is active or pending deletion. It only serves to refuse the same image being uploaded again, as an avatar or as a team logo; when deleted immediately, its file is only erased if nothing else on the site points to it.",
+      "As long as the account exists (anonymized included), the hash is also kept on the deletion decision taken on a report or at the end of a hiding, with the outcome of its challenge, which moderation records there: upheld, the block stays; accepted, it is lifted, unless another deletion of the same image still justifies it. When the account is erased, those decisions are erased and the block becomes permanent: only the hash remains, with no link to any account.",
+      "When an account is erased, only the hash of an avatar moderation had already deleted is taken or kept; an avatar that is only hidden leaves with the account, without leaving a hash, like an avatar moderation never deleted — on the deletion request, on anonymization or on erasure. A deleted team logo leaves no hash either.",
       "During the 30 days of a requested deletion, moderation can hide, restore or delete the avatar set aside for reactivation, like that of an active account; once hidden or deleted, it is not given back on reactivation.",
+    ],
+  },
+  "2026-11-conditions-v10-avatar-et-succession": {
+    linkLabels: ["Read the “Account” section", "Read the “Reporting and moderation” section"],
+    title: "Terms of use: version 10 (deleted avatar, team takeover, #live announcement)",
+    summary:
+      "The terms of use move to version 10: they now say that only an avatar deleted by moderation stays blocked, and how an accepted challenge lifts that block, that a suspended player only takes over a team after all the others, and when the #live announcement comes before a match. It must be accepted: a window presents it to you until you have accepted it.",
+    details: [
+      "Reporting and moderation: when moderation deletes an avatar, the hash of the image is kept to refuse it being uploaded again, as an avatar or as a team logo, including after the account is deleted; an avatar that is only hidden is not blocked. The outcome of a challenge is kept with the decision: upheld, the block stays; accepted after a deletion decided on a report, it is lifted, unless another deletion of the same image still justifies it or the account has been erased in the meantime.",
+      "Account: during the 30 days of a requested deletion, moderation can hide, restore or delete the avatar set aside, which is only given back on reactivation if it is then neither hidden nor deleted; a suspended player only takes over a team after all the others; at the end of that time, only an avatar that moderation has deleted can no longer be uploaded again — an avatar that is only hidden, or that moderation never deleted, leaves without its hash being kept.",
+      "Match streaming: the evening's #live message only lists a match before it starts if its stream is due to open at its start time that evening; the others only appear in it when they go on air.",
+      "Terms of use: version 10, in force since 12 November 2026, says so in its “Account”, “Reporting and moderation” and “Match streaming” sections. A window presents it to you until you have accepted it: accepting it lets you keep using the site.",
     ],
   },
 };
