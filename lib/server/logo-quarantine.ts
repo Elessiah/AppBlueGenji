@@ -30,7 +30,7 @@
  */
 import { copyFile, mkdir, rename, unlink } from "node:fs/promises";
 import path from "node:path";
-import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import {
   anonymousFileName,
   blockImageHashOn,
@@ -805,6 +805,32 @@ export async function listQuarantinesForReports(reportIds: readonly number[]): P
   return rows.map(toView);
 }
 
+/**
+ * Le compte visé par une quarantaine d'avatar (`null` : logo d'équipe, ligne
+ * absente), lu **hors transaction** — par le pool, sans figer d'instantané sur
+ * la connexion du geste —, pour `lockQuarantineUserFirst`.
+ */
+async function quarantineUserId(db: Pool, quarantineId: number): Promise<number | null> {
+  const [rows] = await db.execute<(RowDataPacket & { user_id: number | null })[]>(
+    `SELECT user_id FROM bg_logo_quarantines WHERE id = ? LIMIT 1`,
+    [quarantineId],
+  );
+  const userId = rows[0]?.user_id;
+  return userId == null ? null : Number(userId);
+}
+
+/**
+ * Un seul ordre de verrous avec l'effacement d'un compte, qui tient sa ligne
+ * `bg_users` **avant** ses quarantaines (`retireAccountQuarantinesOn`) : un
+ * geste sur une quarantaine d'avatar (issue, rétablissement, purge) verrouille
+ * le compte visé en première instruction, puis la ligne de quarantaine — et non
+ * l'inverse, qui croisait l'effacement en interblocage.
+ */
+async function lockQuarantineUserFirst(connection: PoolConnection, userId: number | null): Promise<void> {
+  if (userId === null) return;
+  await connection.execute(`SELECT id FROM bg_users WHERE id = ? FOR UPDATE`, [userId]);
+}
+
 /** Lit une quarantaine sous verrou, dans la transaction de l'appelant. */
 async function lockQuarantine(connection: PoolConnection, quarantineId: number): Promise<QuarantineRow> {
   const [rows] = await connection.execute<QuarantineRow[]>(`${QUARANTINE_SELECT} WHERE q.id = ? FOR UPDATE`, [
@@ -840,7 +866,9 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
   // Issue « acceptée » écrite par un rétablissement refusé (D23), à journaliser.
   let overturnedRow: QuarantineRow | null = null;
   try {
+    const userId = await quarantineUserId(db, quarantineId);
     await connection.beginTransaction();
+    await lockQuarantineUserFirst(connection, userId);
     row = await lockQuarantine(connection, quarantineId);
     const isTeam = row.target_type === "TEAM";
     const targetId = Number(row.target_id);
@@ -961,7 +989,9 @@ export async function recordContestOutcome(
   let row: QuarantineRow;
   let result: { blocked: boolean | null; hashUnknown: boolean };
   try {
+    const userId = await quarantineUserId(db, quarantineId);
     await connection.beginTransaction();
+    await lockQuarantineUserFirst(connection, userId);
     const [rows] = await connection.execute<QuarantineRow[]>(`${QUARANTINE_SELECT} WHERE q.id = ? FOR UPDATE`, [
       quarantineId,
     ]);
@@ -1172,7 +1202,9 @@ export async function purgeQuarantinedLogo(
   let sha256: string | null = null;
   let blockHash = false;
   try {
+    const userId = await quarantineUserId(db, quarantineId);
     await connection.beginTransaction();
+    await lockQuarantineUserFirst(connection, userId);
     row = await lockQuarantine(connection, quarantineId);
     const check =
       actor === null

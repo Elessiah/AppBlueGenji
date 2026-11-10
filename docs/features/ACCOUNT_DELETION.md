@@ -787,6 +787,11 @@ sur tous les tournois qu'elles touchent — inscriptions solo, tournois organis�
 (demande), matchs castés, liés ou arbitrés (`listCastTournamentIds`) — avant le
 compte, puis les équipes ; les fichiers des avatars en quarantaine sont relevés
 sous le verrou du compte, sans lecture de fichier (rien n'est haché, D6).
+L'effacement tient le compte **avant** ses lignes de quarantaine
+(`retireAccountQuarantinesOn`) ; une issue de contestation, un rétablissement
+ou une purge d'avatar prennent donc eux aussi le compte visé **d'abord**
+(`lockQuarantineUserFirst`, compte lu par le pool hors transaction), puis la
+ligne de quarantaine : un seul ordre, pas d'interblocage.
 
 **E2 — rattrapage.** `reconcileDeletedAccounts` commence par
 `settleDeletedSoloEntries` : les comptes déjà supprimés gardant une inscription

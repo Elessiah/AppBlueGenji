@@ -82,12 +82,14 @@ let pool: { execute: jest.Mock<SqlQuery>; getConnection: () => Promise<unknown> 
 let connection: ReturnType<typeof connectionMock>;
 
 const reportCategory: Route = [/SELECT category FROM bg_reports WHERE id = \? LIMIT 1/, () => [[{ category: "COPYRIGHT" }]]];
+// Le compte visé, lu hors transaction avant le verrou : par défaut, aucun (logo d'équipe).
+const quarantineOwner: Route = [/SELECT user_id FROM bg_logo_quarantines WHERE id = \? LIMIT 1/, () => [[]]];
 
 function install(poolRoutes: Route[], connectionRoutes: Route[] = []) {
   connection = connectionMock();
   connection.execute = routed(connectionRoutes);
   // Le fondement d'une décision se relit sur la catégorie du signalement.
-  pool = { execute: routed([...poolRoutes, reportCategory]), getConnection: async () => fakeConnection(connection) };
+  pool = { execute: routed([...poolRoutes, reportCategory, quarantineOwner]), getConnection: async () => fakeConnection(connection) };
   jest.mocked(getDatabase).mockResolvedValue(fakePool(pool));
 }
 
@@ -1329,6 +1331,85 @@ describe("recordContestOutcome", () => {
     install([], [[/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[]]]]);
 
     await expect(recordContestOutcome(30, "UPHELD", actor)).rejects.toThrow("QUARANTINE_NOT_FOUND");
+  });
+});
+
+describe("ordre des verrous — compte avant quarantaine (comme l'effacement)", () => {
+  const avatarRow = (status: string) =>
+    quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR, status, image_sha256: "abc" });
+  const owner: Route = [/SELECT user_id FROM bg_logo_quarantines WHERE id = \? LIMIT 1/, () => [[{ user_id: 9 }]]];
+  const lockUser: Route = [/SELECT id FROM bg_users WHERE id = \? FOR UPDATE/, () => [[{ id: 9 }]]];
+
+  /** Rang du verrou du compte et de celui de la quarantaine parmi les requêtes de la connexion. */
+  function lockRanks(): { user: number; quarantine: number } {
+    const sqls = connection.execute.mock.calls.map(([sql]) => sql);
+    return {
+      user: sqls.findIndex((sql) => /SELECT id FROM bg_users WHERE id = \? FOR UPDATE/.test(sql)),
+      quarantine: sqls.findIndex((sql) => /FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/.test(sql)),
+    };
+  }
+
+  it("recordContestOutcome_avatar_locksUserBeforeQuarantine", async () => {
+    install([owner], [
+      lockUser,
+      [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[avatarRow("PURGED")]]],
+      [/UPDATE bg_logo_quarantines SET/, () => [{}]],
+    ]);
+
+    await recordContestOutcome(30, "UPHELD", actor);
+
+    const ranks = lockRanks();
+    expect(ranks.user).toBe(0);
+    expect(ranks.quarantine).toBe(1);
+    expect(connection.execute).toHaveBeenCalledWith(expect.stringMatching(/FROM bg_users WHERE id = \? FOR UPDATE/), [9]);
+    // Le compte visé est lu par le pool, avant toute transaction.
+    expect(pool.execute.mock.invocationCallOrder[0]).toBeLessThan(jest.mocked(connection.beginTransaction).mock.invocationCallOrder[0]);
+  });
+
+  it("purgeQuarantinedLogo_avatar_locksUserBeforeQuarantine", async () => {
+    install([owner], [
+      lockUser,
+      [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[avatarRow("HIDDEN")]]],
+      [/SET status = 'PURGED'/, () => [{}]],
+    ]);
+
+    await expect(purgeQuarantinedLogo(30, actor)).resolves.toBe(true);
+
+    expect(lockRanks()).toEqual({ user: 0, quarantine: 1 });
+  });
+
+  it("restoreReportedImage_avatar_locksUserBeforeQuarantine", async () => {
+    install([owner], [
+      lockUser,
+      [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[avatarRow("HIDDEN")]]],
+      [/SELECT pseudo, avatar_url, is_deleted FROM bg_users WHERE id = \? FOR UPDATE/, () => [[{ pseudo: "Nova", avatar_url: null, is_deleted: 0 }]]],
+      [/UPDATE bg_users SET avatar_url = \?/, () => [{}]],
+      [/SET status = 'RESTORED'/, () => [{}]],
+    ]);
+
+    await restoreReportedImage(30, actor);
+
+    expect(lockRanks()).toEqual({ user: 0, quarantine: 1 });
+  });
+
+  it("recordContestOutcome_teamLogo_takesNoUserLock", async () => {
+    install([], [
+      [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[quarantineRow({ status: "PURGED" })]]],
+      [/UPDATE bg_logo_quarantines SET/, () => [{}]],
+    ]);
+
+    await recordContestOutcome(30, "UPHELD", actor);
+
+    expect(lockRanks()).toEqual({ user: -1, quarantine: 0 });
+  });
+
+  it("recordContestOutcome_ownerReadFails_noTransactionStarted", async () => {
+    install([[/SELECT user_id FROM bg_logo_quarantines/, () => { throw new Error("ER_CON_COUNT_ERROR"); }]]);
+
+    await expect(recordContestOutcome(30, "UPHELD", actor)).rejects.toThrow("ER_CON_COUNT_ERROR");
+
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
+    expect(connection.execute).not.toHaveBeenCalled();
   });
 });
 
