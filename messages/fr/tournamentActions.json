@@ -406,7 +406,7 @@
       "urlSubject": "lien de ma chaîne",
       "battletagSubject": "BattleTag du cast",
       "triggerLocked": "Passage à l'antenne réglé par un autre : « {mode} ».",
-      "triggerLockedHint": "Seuls le caster qui l'a posé, l'arbitre du match ou un admin le changent ou le retirent — l'organisation aussi quand aucun caster ne le tient.",
+      "triggerLockedHint": "Seuls le caster qui le tient, l'arbitre du match ou le staff (arbitrage et diffusion) le changent ou le retirent — l'organisation aussi quand aucun caster ne le tient.",
       "loading": "Lecture de ton cast…",
       "played": "Le match est joué : lien et BattleTag de ce cast ne se changent plus."
     }

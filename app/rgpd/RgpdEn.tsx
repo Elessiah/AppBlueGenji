@@ -902,7 +902,7 @@ export function RgpdEn({
             round included: opponent, time if already set — with no “Match scheduled” on top — and the match page link, once per match and pairing) and, if you cast, when your caster registration for a match is removed
             by the staff or automatically (with the reason) and, if you manage an entered team (owner or manager) or play
             a solo tournament, for a self-managed match only (none for a refereed match or one with no refereeing decision), 15 minutes before it kicks off — or when its lobby opens,
-            if that comes earlier or the match has no time —, once per match, the match check-in (joining your team&apos;s voice channel and the check-in channel, team on the left — the host — and on the right, game settings, map order and
+            if that comes earlier or the match has no time —, once per match, the match check-in (joining your team&apos;s voice channel — in a tournament with the “Team voice channels” option, for a match that has a time, never in a solo tournament nor against a ghost team — and the check-in channel, team on the left — the host — and on the right, game settings, map order and
             ban order, sorting the players by role if the match is cast, self-management, the match&apos;s stream link when it is public,
             the reminder to enter the scores and who to report a problem to), with the team names, the tournament, the round and the link to the match page, without any BattleTag,
             Discord tag or player username (in a solo tournament, the message names neither you nor your opponent) — only if your Discord tag is <strong>certified</strong>: an
@@ -1074,10 +1074,16 @@ export function RgpdEn({
             called the organizers&apos; before 10 November 2026 goes with that stream once no caster holds it any
             more). A link set in that configuration before the site recorded who provided it has no
             known author and stays with the match.{" "}
-            When a match goes live (“live mode”) can only be changed or removed by the caster who set it — the site keeps
-            their account with the match and erases it when they leave the match or no longer meet the conditions to cast it, when the mode is removed, or when
-            their account is deleted, and leaves it with them when the assigned referee or an administrator changes the mode —, by the match&apos;s assigned referee or by an administrator; a mode set by the staff
-            stays with the staff. The assigned referee of a match can also, for that match only, edit or remove a caster&apos;s
+            When a match goes live (“live mode”) belongs to the match&apos;s caster who sets it, or who changes a mode with no
+            holder: only they, the match&apos;s assigned referee and the staff who hold both the refereeing and the streaming
+            permissions change or remove it afterwards. The site keeps that caster&apos;s account with the match, erases it when
+            they leave the match or are removed from it before it launches (casting requirements no longer met, or having become
+            one of its players), when the mode is removed, or when their account is deleted, and leaves it with them when the
+            assigned referee or the staff change the mode; a caster who no longer meets the requirements once the match has
+            launched stays registered but no longer holds the mode, and their account stays with it until someone else first
+            changes it. A mode set by someone who does not cast the match (staff, referee), or whose holder has left or no longer
+            meets the requirements, has no holder: those staff, the assigned referee and the match&apos;s casters change it, and only
+            those staff and the referee remove it. The assigned referee of a match can also, for that match only, edit or remove a caster&apos;s
             link and configure the organizers&apos; broadcast.{" "}
             A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which
             then replaces their profile one wherever the latter was shown (“Contacts” and launch windows, match

@@ -2622,7 +2622,8 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
 
   it("privacyChanges_voiceClearAndReschedule_lastEntryForAllAccountsFrAndEn", () => {
     const entry = PRIVACY_CHANGES.find((c) => c.id === voiceClearId)!;
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(voiceClearId);
+    // Suivie des deux précisions de la revue juridique de #560 (#575).
+    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(voiceClearId);
     expect([entry.id.length <= PRIVACY_CHANGE_ID_MAX_LENGTH, entry.asksTermsAcceptance, privacyChangeReachesAccount(entry, {})]).toEqual([true, undefined, true]);
     expectStandaloneEntry(entry, PRIVACY_CHANGES_EN[entry.id], { after: "2026-11-conditions-v10-avatar-et-succession", publishedAt: "2026-11-12", audience: undefined, links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }] });
     expectEntryTexts(entry, PRIVACY_CHANGES_EN[entry.id], {

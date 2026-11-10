@@ -927,6 +927,29 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What stays: no player data is collected; it still rests on legitimate interest (smooth running of tournaments).",
     ],
   },
+  "2026-11-mode-d-antenne-precisions": {
+    linkLabels: ["Read the “Match streaming” paragraph"],
+    title: "Live mode: who sets it, and when the caster's account is erased",
+    summary:
+      "Clarifications on a match's live mode: the staff who hold the refereeing and streaming permissions set it, administrators or not; a caster who changes a mode with no holder becomes its holder; the account of a caster who no longer meets the requirements once the match has launched stays with the mode until the next change.",
+    details: [
+      "Who sets it: where the announcement of November 6, 2026 said “an administrator”, it is any staff member who holds both the refereeing and the streaming permissions, administrator or not. With the match's assigned referee, they change or remove any caster's mode.",
+      "A mode with no holder — set by someone who does not cast the match (staff, referee), or whose caster who held it has left — does not stay with the staff: a caster of the match who changes it becomes its holder, and the site then keeps their account with the match, like that of the caster who set it. Only those staff and the assigned referee remove a mode with no holder.",
+      "When that account is erased: when the caster leaves the match or is removed from it before it launches (casting requirements no longer met, or having become one of its players), when the mode is removed, or when their account is deleted. A caster who no longer meets the requirements once the match has launched stays registered on the match and no longer holds the mode, but their account stays with it until someone else first changes it (erased, or replaced by the caster who changes it).",
+      "What does not change: nothing new is collected; this account still appears in the export of your data.",
+    ],
+  },
+  "2026-11-check-in-trace-precisions": {
+    linkLabels: ["Read the “Match Discord direct messages” paragraph"],
+    title: "Match check-in: its sending record and the voice instruction clarified",
+    summary:
+      "Clarifications on the match check-in: the record of its sending carries its date and also goes when the bracket is rebuilt, and the instruction to join your team's voice channel is only in it in a tournament with team voice channels.",
+    details: [
+      "What the site keeps: for each check-in sent, the match's place in the tournament (phase, bracket, round, number), the entrant and the date it was sent — not the match number, which the announcement of November 6, 2026 mentioned. This record goes with the tournament or the entrant, and also when the staff rebuild the bracket of the phase (or of the tournament): its new matches then receive their own check-in. A rollback, however, keeps it.",
+      "Content: the instruction to join your team's voice channel is only in it in a tournament with the “Team voice channels” option, for a match that has a time, never in a solo tournament nor against a ghost team.",
+      "What does not change: the recipients, the direct message reserved for a certified Discord tag, and the “Discord direct messages about my matches” box in “My profile” to object to it.",
+    ],
+  },
 };
 
 /**

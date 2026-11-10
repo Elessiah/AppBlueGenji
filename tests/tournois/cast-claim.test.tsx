@@ -645,8 +645,8 @@ describe("Fenêtre de diffusion — lien du staff sur le mode d'un autre caster"
   });
 
   it("urlLocked_frAndEn_present", () => {
-    expect(frDialogs.live.urlLocked).toContain("seuls lui, l'arbitre du match ou un admin le changent");
-    expect(enDialogs.live.urlLocked).toContain("only they, the match referee or an admin can change it");
+    expect(frDialogs.live.urlLocked).toContain("seuls lui, l'arbitre du match ou le staff (arbitrage et diffusion) le changent");
+    expect(enDialogs.live.urlLocked).toContain("only they, the match referee or staff with refereeing and streaming permissions can change it");
   });
 });
 

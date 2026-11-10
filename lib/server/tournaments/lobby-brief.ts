@@ -125,7 +125,8 @@ const LEGACY_BRIEF_SQL = `EXISTS (SELECT 1 FROM bg_match_start_notices o
  * **place** du match `m` (`bg_lobby_brief_marks`) ? La marque survit au match :
  * un retour arrière ou une manche régénérée efface le match et ses
  * réservations, la place et l'engagée restent — le check-in ne repart jamais
- * deux fois.
+ * deux fois. Seule la reconstruction du plateau l'efface (`forgetLobbyBriefMarks`) :
+ * ses rencontres sont nouvelles.
  */
 function briefMarkSql(team: string): string {
   return `EXISTS (SELECT 1 FROM bg_lobby_brief_marks k

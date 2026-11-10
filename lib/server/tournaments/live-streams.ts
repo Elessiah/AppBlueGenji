@@ -684,7 +684,7 @@ export async function isDesignatedMatchReferee(matchId: number, userId: number, 
  * doit accepter ce réglage (`MATCH_NOT_CASTABLE`, jugé avant la propriété : un
  * match fermé l'est pour tous). Le mode d'antenne déjà posé par un autre ne
  * change pas (`LIVE_TRIGGER_NOT_OWNED`) — seuls son caster, l'arbitre désigné
- * et un admin le changent ou le retirent —, et seul l'arbitre désigné touche
+ * et le staff `tournaments` + `live` le changent ou le retirent —, et seul l'arbitre désigné touche
  * aux liens des casters (`NOT_MATCH_REFEREE`). Un porteur de la seule `live`
  * (ni staff `tournaments`, ni admin, ni arbitre) ne règle que **son** cast :
  * sans caster le match (en caster montré), il n'y règle rien

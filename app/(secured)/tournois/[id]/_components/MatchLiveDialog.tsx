@@ -392,7 +392,7 @@ class LiveRefusal extends Error {
  * **ce** match, éventuellement celle d'un streamer indépendant.
  *
  * Le mode d'antenne posé par un caster ne se change ici que par lui, l'arbitre
- * du match ou un admin (`mayChangeLiveTrigger`) : pour les autres il se lit
+ * du match ou le staff `tournaments` + `live` (`mayChangeLiveTrigger`) : pour les autres il se lit
  * sans se modifier. L'arbitre seul corrige ou efface les liens des casters
  * (`docs/features/CAST_SETTINGS.md` § Médiation de l'arbitre).
  *

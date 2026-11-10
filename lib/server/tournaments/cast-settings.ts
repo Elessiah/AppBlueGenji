@@ -97,7 +97,7 @@ export function assertCastTriggerWritable(row: LaunchMatchRow, trigger: MatchLiv
  * devenu inéligible, ne tient rien).
  *
  * Un mode inchangé n'écrit rien. Un mode déjà posé ne change que pour son
- * propriétaire, l'arbitre désigné ou un admin (`mayChangeLiveTrigger`) :
+ * propriétaire, l'arbitre désigné ou le staff `tournaments` + `live` (`mayChangeLiveTrigger`) :
  * `LIVE_TRIGGER_NOT_OWNED` sinon — un co-caster ne décide pas pour celui qui
  * l'a posé. Le propriétaire ne compte que s'il caste encore le match en
  * caster montré (`loadShownCasterIds`), la règle de l'instantané : parti ou

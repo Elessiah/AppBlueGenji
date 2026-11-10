@@ -807,7 +807,7 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_CAST_BATTLETAG: "BattleTag de cast invalide : 64 caractères au plus, et des caractères visibles.",
   CAST_STREAM_NOT_OWNED: "Ce stream est celui de l'organisation : son lien se règle dans « Diffusion officielle ».",
   CAST_STREAM_LINK_HELD: "Ce lien est celui d'un co-caster encore sur ce stream : lui seul le change, ou l'arbitre du match.",
-  LIVE_TRIGGER_NOT_OWNED: "Le mode de passage à l'antenne appartient au caster qui l'a posé : seuls lui, l'arbitre du match ou un admin le changent — l'organisation aussi quand aucun caster ne le tient.",
+  LIVE_TRIGGER_NOT_OWNED: "Le mode de passage à l'antenne appartient au caster qui l'a posé : seuls lui, l'arbitre du match ou le staff (arbitrage et diffusion) le changent — l'organisation aussi quand aucun caster ne le tient.",
   INVALID_CAST_SETTINGS: "Réglages de diffusion invalides.",
   MATCH_NOT_CASTABLE: "Ce match ne peut plus être diffusé.",
   MATCH_CAST_CLOSED: "Ce match est joué : son cast ne change plus.",

@@ -1088,7 +1088,8 @@ function RgpdFr({
             inscription de caster sur un match est retirée par le staff ou d&apos;office (avec le motif) et, si vous gérez une équipe engagée (propriétaire ou manager) ou jouez un tournoi individuel, pour un match en autogestion seulement
             (aucun pour un match arbitré ou sans décision d&apos;arbitrage), 15 minutes avant son coup d&apos;envoi
             — ou à l&apos;ouverture de son salon si elle vient plus tôt ou si le match n&apos;a pas d&apos;horaire —, une seule fois par match, le check-in du match
-            (rejoindre le salon vocal de votre équipe et le salon de check-in, équipe à gauche — l&apos;hôte — et à droite, paramètres de partie, déroulé
+            (rejoindre le salon vocal de votre équipe — dans un tournoi qui a l&apos;option « Salons vocaux d&apos;équipe », pour un match
+            qui a un horaire, jamais en tournoi individuel ni contre une équipe fantôme — et le salon de check-in, équipe à gauche — l&apos;hôte — et à droite, paramètres de partie, déroulé
             des maps et ordre des bans, tri des joueurs par rôle si le match est casté, autogestion, lien de diffusion du match s&apos;il est
             public, rappel de saisir les scores et à qui signaler un problème), avec les noms
             d&apos;équipe, le tournoi, la manche et le lien de la page du match, sans BattleTag, tag Discord ni pseudo de joueur (en tournoi
@@ -1282,11 +1283,16 @@ function RgpdFr({
             tient). Un lien
             posé dans cette configuration avant que le site n&apos;enregistre qui le fournit n&apos;a pas d&apos;auteur
             connu et reste au match.{" "}
-            Le moment où un match passe à l&apos;antenne (« mode d&apos;antenne ») ne se change ou ne se retire que par le
-            caster qui l&apos;a posé — le site garde son compte avec le match, l&apos;efface quand il quitte le match ou ne remplit plus la condition
-            pour le caster, que le mode est retiré, ou que son compte est supprimé, et le lui laisse quand l&apos;arbitre
-            désigné ou un administrateur change le mode —, par l&apos;arbitre désigné du match ou par un
-            administrateur ; un mode posé par le staff reste au staff. L&apos;arbitre désigné d&apos;un match peut aussi, pour ce
+            Le moment où un match passe à l&apos;antenne (« mode d&apos;antenne ») appartient au caster du match qui le pose,
+            ou qui change un mode sans maître : seuls lui, l&apos;arbitre désigné du match et le staff qui a à la fois la
+            permission d&apos;arbitrage et celle de diffusion le changent ou le retirent ensuite. Le site garde le compte de ce caster
+            avec le match, l&apos;efface quand il quitte le match ou en est retiré avant son lancement (condition du cast plus
+            remplie, ou devenu joueur du match), que le mode est retiré, ou que son compte est supprimé, et le lui laisse quand
+            l&apos;arbitre désigné ou le staff change le mode ; un caster qui ne remplit plus la condition une fois le match lancé
+            reste inscrit mais n&apos;est plus le maître du mode, et son compte reste avec lui jusqu&apos;au premier changement
+            qu&apos;un autre y fait. Un mode posé par qui ne caste pas le match (staff, arbitre), ou dont le maître est parti ou ne
+            remplit plus la condition, n&apos;a pas de maître : ce staff, l&apos;arbitre désigné et les casters du match le changent, et
+            seuls ce staff et l&apos;arbitre le retirent. L&apos;arbitre désigné d&apos;un match peut aussi, pour ce
             seul match, modifier ou retirer le lien d&apos;un caster et configurer la diffusion de l&apos;organisation.{" "}
             Un caster peut aussi donner, pour un cast précis, un <strong>BattleTag propre à ce
             match</strong>, qui remplace alors celui de son profil là où ce dernier était montré (fenêtres
