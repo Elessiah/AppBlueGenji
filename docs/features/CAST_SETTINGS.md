@@ -76,8 +76,9 @@ Fenêtre du caster, sur **son** cast :
   seule `live` ne règle que la rediff de **son** cast (`NOT_MATCH_CASTER`,
   403), le staff `tournaments` (dont l'arbitre désigné) toutes (décision du
   2026-11-09) ;
-- **« Ne plus caster »** : `DELETE …/caster`, sans confirmation (le caster qui se
-  retire lui-même n'est prévenu de rien, `CAST_NOTICES.md`) — refusé sur un match
+- **« Ne plus caster »** : `DELETE …/caster`, derrière un `ConfirmActionDialog` (il rend
+  la place et retire le stream : geste sans retour ; le caster qui se retire
+  lui-même n'est prévenu de rien, `CAST_NOTICES.md`) — refusé sur un match
   terminé, où le bouton n'est pas offert (`offersCastRelease`).
 
 La fenêtre lit à l'ouverture `GET /api/matches/[id]/caster`
@@ -179,17 +180,24 @@ unique, pure, `lib/shared/live-trigger-owner.ts` (`mayChangeLiveTrigger`,
 `live` pour porte, mais il n'y règle que **son** cast : sans caster le match
 (en caster montré), tout réglage est refusé (`NOT_MATCH_CASTER`, 403) ; le
 lien du stream du staff ne lui est pas ouvert (`STAFF_STREAM_FORBIDDEN`, 403 —
-son lien se règle dans « Configurer ma diffusion »). Il ne change ni ne démarque
-le mode du staff tant que le stream de l'organisation porte un lien
-(`STAFF_STREAM_FORBIDDEN`, sur les deux routes ; le champ du lien du staff lui
-est en lecture seule), et son démarquage n'efface **jamais** le lien de
+son lien se règle dans « Configurer ma diffusion »). Il ne change pas un mode
+dont il n'est pas le maître tant que le match porte le **vrai** lien de
+l'organisation — le stream du staff dont le lien a été posé dans « Diffusion
+officielle », case « lien de l'organisation » cochée (`link_user_id` nul) —
+(`STAFF_STREAM_FORBIDDEN`, sur les deux routes ; une seule règle,
+`organisationModeLocked`, lue au serveur par `hasOrganisationLink` et à
+l'interface par `BracketMatch.officialBroadcastLink` ; décision du 2026-11-10). Ne
+ferment pas le mode : la chaîne qu'un membre du staff y a posée comme la sienne
+(case décochée), le lien d'un stream de caster (même ancien, dit de
+l'organisation), ni un match encore sans mode — le premier mode qu'un caster
+pose est le sien. Le champ du lien du staff lui est en lecture seule, et son démarquage n'efface **jamais** le lien de
 l'organisation (seul le staff le fait, décision 1 du 2026-11-09). Un lien dit
 de l'organisation ne se remplace que par le staff (`CAST_STREAM_NOT_OWNED`). Un mode sans maître (posé par
 le staff, ou dont le maître n'est plus montré) ne se démarque que par l'arbitre
 du match ou le staff `tournaments` + `live` (`mayUnmarkLiveTrigger`,
 `LIVE_TRIGGER_NOT_OWNED`, décision du 2026-11-09 ; la case « casté » lui est
-désactivée), et l'antenne du mode du staff au lien de l'organisation ne se
-bascule pas non plus par lui (`STAFF_STREAM_FORBIDDEN`). Un caster tu ne règle
+désactivée), et l'antenne d'un mode sans maître sur un match au lien de
+l'organisation ne se bascule pas non plus par lui (`STAFF_STREAM_FORBIDDEN`). Un caster tu ne règle
 plus le lien (`NOT_MATCH_CASTER`). Le stream d'un caster dont le
 lien est dit de l'organisation part avec son dernier caster (décision du
 2026-11-05, voulu). Retirer un autre caster
@@ -201,17 +209,18 @@ trois fenêtres bâtissent le lecteur par `liveTriggerViewer` ; l'inscription
 le juge en caster (`viewerCasts`).
 
 Propriétaire écrit (`liveTriggerOwnerAfter`) : le caster du match qui le pose,
-lui seul ; posé par qui ne caste pas (staff, admin, arbitre, caster tu), il
-garde son maître montré — l'arbitre
-médie pour le caster, il ne lui retire pas le mode — ou reste au staff s'il
+lui seul ; posé par qui ne caste pas (staff `tournaments` + `live`, arbitre,
+caster tu), il garde son maître montré — l'arbitre
+médie pour le caster, il ne lui retire pas le mode — ou reste sans maître s'il
 n'en avait pas (`liveTriggerOwnerAfter`). Le propriétaire
 ne compte que s'il est un caster **montré** du match (`loadShownCasterIds` au
 serveur, `liveTriggerCasterId` dans l'instantané : il caste encore et, avant
 le lancement — `castBeforeLaunch`, qui ne compte pas le lancement d'un appariement
 d'avant — remplit la condition du cast) : parti ou tu, il laisse le mode
-au staff, et le retrouve dès qu'il est montré de nouveau — sauf si le mode a
-changé entre-temps : ce changement est celui du staff. Un maître montré garde
-son mode même quand l'arbitre ou un admin qui caste aussi le match le change. L'arbitre reconnu est l'arbitre
+sans maître, et le retrouve dès qu'il est montré de nouveau — sauf si le mode a
+changé entre-temps (effacé, ou repris par le caster qui le change). Une fois
+le match lancé, un caster inéligible reste montré et garde le mode. Un maître montré garde
+son mode même quand l'arbitre ou le staff `tournaments` + `live` qui caste aussi le match le change. L'arbitre reconnu est l'arbitre
 **retenu** (sans opposition), qui **ne joue pas** le match (`KEPT_REFEREE_SQL`)
 et remplit encore la condition d'arbitrage du jeu (`refereeQualifies`).
 
@@ -224,13 +233,14 @@ match) : un co-caster ne la bascule pas pour le mode d'un autre (403
 `LIVE_TRIGGER_NOT_OWNED`), et le bouton lui est caché. Sur un mode **sans maître**
 (caster parti, mode d'avant la règle), tout caster montré du match ouvre et
 coupe l'antenne (la règle du mode : `mayChangeLiveTrigger`, `viewerMayChangeLiveTrigger`) : le match ne reste
-pas hors antenne en attendant le staff ; changer ce mode reste au staff. Une inscription dont le
+pas hors antenne en attendant le staff ; ils changent aussi ce mode — sauf, pour l'un comme pour l'autre, quand le match
+porte le vrai lien de l'organisation (`organisationModeLocked`, 403 `STAFF_STREAM_FORBIDDEN`, bouton caché). Une inscription dont le
 mode a été posé entre-temps par un autre n'est pas refusée : le mode reste
 tel quel et la notification le dit (`triggerSkipped`,
 `cardActions.castingTriggerKept`, FR/EN). Le propriétaire est effacé
 quand il quitte le match (`releaseMatchCast`), quand il en est retiré d'office
 (`dropTriggerOwner` : il rejoint une équipe du match, devient inéligible),
-quand le mode est retiré ou changé pendant qu'il n'est plus montré, et à la suppression de son compte — l'arbitre ou un admin qui le change le lui laisse
+quand le mode est retiré ou changé pendant qu'il n'est plus montré, et à la suppression de son compte — l'arbitre ou le staff `tournaments` + `live` qui le change le lui laisse
 (`match-casters.ts`, tous les matchs dont il a posé le mode, castés ou non).
 À l'inscription, un mode verrouillé n'est pas envoyé (`castClaimBody`) ; la
 configuration du direct le renvoie tel quel, et un mode inchangé ne redemande

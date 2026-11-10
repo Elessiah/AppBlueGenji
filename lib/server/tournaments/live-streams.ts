@@ -29,6 +29,7 @@ import {
   liveTriggerOwnerAfter,
   mayChangeLiveTrigger,
   mayUnmarkLiveTrigger,
+  organisationModeLocked,
   type LiveTriggerActor,
   type LiveTriggerHold,
 } from "@/lib/shared/live-trigger-owner";
@@ -37,7 +38,7 @@ import type { MatchStatus, TournamentGame } from "@/lib/shared/types";
 import { loadRefereeStanding, loadShownCasterIds } from "./cast-eligibility";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { playsMatchSql } from "./match-players";
-import { hasStaffLink, lockMatchStreams, pruneMatchStreams, staffStream, streamLinkHolder, type MatchStreamRow } from "./match-casters";
+import { hasOrganisationLink, lockMatchStreams, pruneMatchStreams, staffStream, streamLinkHolder, type MatchStreamRow } from "./match-casters";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
 import { invalidateSpectatorSnapshot } from "./snapshot";
 
@@ -59,8 +60,8 @@ export type MatchLiveConfig = {
    */
   setter: MatchLiveSetter;
   /**
-   * Ses droits sur le mode d'antenne (`mayChangeLiveTrigger`) : admin,
-   * permission `tournaments`, et `live` — sans elle, l'appelant n'entre qu'en
+   * Ses droits sur le mode d'antenne (`mayChangeLiveTrigger`) : staff
+   * `tournaments` + `live` (`oversees`), permission `tournaments`, et `live` — sans elle, l'appelant n'entre qu'en
    * arbitre désigné du match, ce qui se relit sous le verrou (`NOT_MATCH_REFEREE`).
    */
   access: MatchLiveAccess;
@@ -315,7 +316,7 @@ export async function setMatchLiveConfig(
       // Les liens des casters d'abord : le lien du staff qui suit habille un
       // stream sans lien, jamais celui qu'un caster vient de recevoir ici.
       if (editsStreamLinks && config.streamLinks !== undefined) {
-        const locked = await lockMatchStreams(connection, matchId);
+        const locked = await lockMatchStreams(connection, matchId, true);
         streams = await setCasterStreamLinks(connection, matchId, config.streamLinks, locked);
         changed = changed || streams !== locked;
       }
@@ -328,7 +329,7 @@ export async function setMatchLiveConfig(
         if (triggerChanges) {
           // Posé par un caster montré du match, le mode est le sien ; par le
           // staff, l'arbitre ou un admin qui ne le caste pas (ou un caster tu),
-          // il garde son maître montré, ou reste au staff.
+          // il garde son maître montré, ou reste sans maître.
           await assertStaffModeKept(connection, matchId, hold, actor);
           await writeLiveTrigger(connection, matchId, trigger, liveTriggerOwnerAfter(trigger, actor, actorShown, hold.ownerId));
         }
@@ -340,7 +341,7 @@ export async function setMatchLiveConfig(
       }
       // Les streams déjà lus sous verrou (et mis à jour en mémoire) ne sont pas
       // relus : deux lectures verrouillantes, non quatre.
-      await pruneMatchStreams(connection, matchId, { streams });
+      await pruneMatchStreams(connection, matchId, { streams, held: true });
       await connection.commit();
       return { previousTrigger: hold.trigger, changed };
     } catch (error) {
@@ -371,8 +372,9 @@ async function unmarkLive(
   actor: LiveTriggerActor,
   known: MatchStreamRow[] | undefined,
 ): Promise<MatchStreamRow[] | undefined> {
+  // Hors staff, seul le maître démarque (`mayUnmarkLiveTrigger`) : le lien de
+  // l'organisation ne ferme pas son mode (`organisationModeLocked`).
   if (!mayUnmarkLiveTrigger(hold, actor)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
-  await assertStaffModeKept(connection, matchId, hold, actor);
   const staffSide = actor.manages || isMatchRefereeActor(hold, actor);
   await connection.execute(
     `UPDATE bg_matches SET live_trigger = NULL, live_trigger_user_id = NULL, live_started_at = NULL WHERE id = ?`,
@@ -387,9 +389,11 @@ async function unmarkLive(
 }
 
 /**
- * Le mode du staff qui porte le lien de l'organisation n'est pas celui d'un
- * porteur de la seule `live` (décision 1 du 2026-11-09) : il ne le change ni ne
- * le retire — sans quoi, devenu maître en le changeant, il le démarquerait.
+ * Le mode d'un match qui porte le vrai lien de l'organisation (« Diffusion
+ * officielle ») n'est pas à un caster qui n'en est pas le maître : il ne le
+ * change ni n'en bascule l'antenne — sans quoi, devenu maître en le changeant,
+ * il le démarquerait (`organisationModeLocked`, décision du 2026-11-10). La
+ * règle se juge d'abord sans lecture ; le lien n'est lu que s'il décide.
  *
  * @throws `STAFF_STREAM_FORBIDDEN`
  */
@@ -399,8 +403,7 @@ async function assertStaffModeKept(
   hold: LiveTriggerHold,
   actor: LiveTriggerActor,
 ): Promise<void> {
-  const staffSide = actor.manages || isMatchRefereeActor(hold, actor);
-  if (!staffSide && hold.ownerId !== actor.userId && (await hasStaffLink(connection, matchId))) {
+  if (organisationModeLocked(hold, actor, true) && (await hasOrganisationLink(connection, matchId))) {
     throw new Error("STAFF_STREAM_FORBIDDEN");
   }
 }
@@ -437,7 +440,7 @@ function lockedTrigger(config: MatchLiveConfig, hold: LiveTriggerHold): MatchLiv
  * verrou (`known`) ou relus ici. Un stream de caster dont l'arbitre vient
  * d'effacer le lien reste au caster : le lien du staff ne s'y pose pas. Le
  * lien suit le mode : celui d'un autre caster montré ne se change que par lui,
- * l'arbitre retenu ou un admin (décision 2) — un lien renvoyé tel quel
+ * l'arbitre retenu ou le staff `tournaments` + `live` (décision 2) — un lien renvoyé tel quel
  * n'écrit rien et passe. Le stream du staff n'est le cast de personne : un
  * porteur de la seule `live` (ni staff, ni admin, ni arbitre) ne le touche
  * pas (`STAFF_STREAM_FORBIDDEN`, décision du 2026-11-05) — son lien à lui se
@@ -455,7 +458,7 @@ async function writeStaffLink(
   actor: LiveTriggerActor,
 ): Promise<{ streams: MatchStreamRow[]; written: boolean }> {
   const edited = new Set((config.streamLinks ?? []).map((link) => link.streamId));
-  const before = known ?? (await lockMatchStreams(connection, matchId));
+  const before = known ?? (await lockMatchStreams(connection, matchId, true));
   // Décidé **avant** d'écrire : un refus n'a rien à défaire.
   const plan = await planStaffStreamUrl(connection, matchId, url, config.setter, before, edited);
   if (plan.kind === "none") return { streams: before, written: false };
@@ -684,7 +687,7 @@ export async function isDesignatedMatchReferee(matchId: number, userId: number, 
  * doit accepter ce réglage (`MATCH_NOT_CASTABLE`, jugé avant la propriété : un
  * match fermé l'est pour tous). Le mode d'antenne déjà posé par un autre ne
  * change pas (`LIVE_TRIGGER_NOT_OWNED`) — seuls son caster, l'arbitre désigné
- * et un admin le changent ou le retirent —, et seul l'arbitre désigné touche
+ * et le staff `tournaments` + `live` le changent ou le retirent —, et seul l'arbitre désigné touche
  * aux liens des casters (`NOT_MATCH_REFEREE`). Un porteur de la seule `live`
  * (ni staff `tournaments`, ni admin, ni arbitre) ne règle que **son** cast :
  * sans caster le match (en caster montré), il n'y règle rien
@@ -743,6 +746,9 @@ async function setCasterStreamLinks(
   locked: MatchStreamRow[],
 ): Promise<MatchStreamRow[]> {
   let streams = locked;
+  // Les casters ne changent pas pendant l'édition (verrou du match) : leurs
+  // porteurs se lisent une fois, au premier lien à poser, pas un par lien.
+  let holders: Map<number, number> | undefined;
   for (const link of links) {
     const target = streams.find((stream) => stream.id === link.streamId && !stream.staff);
     if (!target) throw new StreamLinkError("STREAM_NOT_FOUND", link.streamId);
@@ -758,7 +764,8 @@ async function setCasterStreamLinks(
       // jamais à l'organisation ni à un caster parti. Un stream que plus aucun
       // caster ne tient attend le ménage : son lien n'aurait personne à qui se
       // rattacher.
-      const holder = await streamHolder(connection, matchId, target.id);
+      holders ??= await streamHolders(connection, matchId);
+      const holder = holders.get(target.id) ?? null;
       if (holder === null) throw new StreamLinkError("STREAM_NOT_FOUND", target.id);
       await connection.execute(
         `UPDATE bg_match_streams SET live_url = ?, link_user_id = ? WHERE id = ? AND match_id = ? AND staff_owned = 0`,
@@ -780,21 +787,24 @@ function streamLinkUrl(link: MatchStreamLinkEdit): string | null {
 }
 
 /**
- * Le caster à qui rattacher le lien de ce stream : son fournisseur actuel
+ * Le caster à qui rattacher le lien de chaque stream du match : son fournisseur actuel
  * (`link_user_id`) s'il le caste encore, sinon le premier inscrit ; `null`
  * sans caster.
  * Lecture ordinaire et séparée : l'écriture du lien ne verrouille ainsi que
  * sa table (`bg_match_streams`) ; les casters du match ne changent que sous
  * le verrou de sa ligne, que l'appelant tient.
  */
-async function streamHolder(connection: PoolConnection, matchId: number, streamId: number): Promise<number | null> {
-  const [rows] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
-    `SELECT mc.user_id FROM bg_match_casters mc
+async function streamHolders(connection: PoolConnection, matchId: number): Promise<Map<number, number>> {
+  const [rows] = await connection.execute<(RowDataPacket & { user_id: number; stream_id: number })[]>(
+    `SELECT mc.user_id, mc.stream_id FROM bg_match_casters mc
      LEFT JOIN bg_match_streams s ON s.id = mc.stream_id AND s.link_user_id = mc.user_id
-     WHERE mc.match_id = ? AND mc.stream_id = ? ORDER BY s.id IS NULL, mc.created_at, mc.user_id LIMIT 1`,
-    [matchId, streamId],
+     WHERE mc.match_id = ? ORDER BY s.id IS NULL, mc.created_at, mc.user_id`,
+    [matchId],
   );
-  return rows.length === 0 ? null : Number(rows[0].user_id);
+  const holders = new Map<number, number>();
+  // Le premier de chaque stream, dans l'ordre : son fournisseur, puis le premier inscrit.
+  for (const row of rows) if (!holders.has(Number(row.stream_id))) holders.set(Number(row.stream_id), Number(row.user_id));
+  return holders;
 }
 
 /**
@@ -816,16 +826,17 @@ function linkProvider(setter: MatchLiveSetter): number | null {
  *
  * Ouvrir ou couper l'antenne, c'est décider du mode manuel : la même règle que
  * le changer (`mayChangeLiveTrigger`, décision 2) — son caster, l'arbitre
- * désigné ou un admin, et le staff `tournaments` pour un mode sans
- * propriétaire. Un co-caster ne coupe pas l'antenne d'un autre
- * (`LIVE_TRIGGER_NOT_OWNED`). Tout se juge sous le verrou de la ligne du match
+ * désigné ou le staff `tournaments` + `live`, et les casters du match pour un
+ * mode sans propriétaire. Un co-caster ne coupe pas l'antenne d'un autre
+ * (`LIVE_TRIGGER_NOT_OWNED`), ni un caster celle d'un mode qu'il ne tient pas
+ * sur un match au lien de l'organisation (`STAFF_STREAM_FORBIDDEN`). Tout se juge sous le verrou de la ligne du match
  * (`lockLiveMatch`) : l'arbitre sans `live` retiré entre la porte et
  * l'écriture est refusé (`NOT_MATCH_REFEREE`).
  *
  * @returns `true` quand l'antenne a changé d'état — un second clic sur « à
  *   l'antenne » ne change rien, et le journal du staff ne le note pas.
  * @throws `MATCH_NOT_FOUND` | `NOT_MATCH_REFEREE` | `LIVE_TRIGGER_NOT_MANUAL`
- *   | `LIVE_TRIGGER_NOT_OWNED` | `MATCH_NOT_LIVE_READY`
+ *   | `LIVE_TRIGGER_NOT_OWNED` | `STAFF_STREAM_FORBIDDEN` | `MATCH_NOT_LIVE_READY`
  */
 export async function setMatchOnAir(
   matchId: number,

@@ -1692,6 +1692,49 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
   },
   {
+    // CAST-FOLLOWUP-REVIEW (#575, revue juridique de #560) : l'entrée publiée
+    // « 2026-11-mode-d-antenne-et-arbitre » disait « un administrateur » (c'est
+    // le staff `tournaments` + `live`, `castOverseer`), « un mode posé par le
+    // staff reste au staff » (un caster qui change un mode sans maître en
+    // devient le maître) et l'effacement du compte du maître devenu inéligible
+    // (vrai avant le lancement seulement). Elle ne se réécrit pas : celle-ci la
+    // corrige. Casters et arbitres seulement ; datée de la mise en ligne de
+    // la nuit du 10 au 11 novembre 2026, avant les entrées du 12.
+    audience: "LIVE_STAFF",
+    id: "2026-11-mode-d-antenne-precisions",
+    publishedAt: "2026-11-11",
+    title: "Mode d'antenne : qui le règle, et quand le compte du caster est effacé",
+    links: [{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }],
+    summary:
+      "Précisions sur le mode d'antenne d'un match : le staff qui a les permissions d'arbitrage et de diffusion le règle, administrateur ou non ; un caster qui change un mode sans maître en devient le maître (sauf quand le match porte le lien de l'organisation) ; le compte du caster qui le tient reste avec le match après son lancement, même s'il ne remplit plus la condition pour le caster.",
+    details: [
+      "Qui le règle : là où l'annonce du 6 novembre 2026 disait « un administrateur », c'est tout membre du staff qui a à la fois la permission d'arbitrage et celle de diffusion, administrateur ou non. Avec l'arbitre désigné du match, il change ou retire le mode de tout caster.",
+      "Un mode sans maître — posé par qui ne caste pas le match (staff, arbitre), ou dont le caster qui le tenait est parti ou, avant le lancement, ne remplit plus la condition — ne reste pas au staff : un caster du match qui le change en devient le maître (sauf quand le match porte le lien de l'organisation : seuls ce staff et l'arbitre désigné le changent alors), et le site garde alors son compte avec le match, comme celui du caster qui l'a posé. Seuls ce staff et l'arbitre désigné retirent un mode sans maître ; il part aussi quand le dernier caster quitte le match, ou que le staff l'en retire, sans qu'aucun stream reste.",
+      "Quand ce compte est effacé : quand le caster quitte le match ou en est retiré avant son lancement (condition du cast plus remplie, ou devenu joueur du match), que le mode est retiré, ou que son compte est supprimé. Avant le lancement, un caster qui ne remplit plus la condition n'est plus tenu pour le maître : le premier changement qu'un autre fait au mode efface son compte (ou le remplace par celui du caster qui le change). Une fois le match lancé, le caster reste inscrit et garde le mode, même s'il ne remplit plus la condition : son compte reste avec le match, contrairement à ce que disait l'annonce du 6 novembre 2026.",
+      "Ce qui ne change pas : rien de nouveau n'est collecté ; ce compte figure toujours dans l'export de tes données.",
+    ],
+  },
+  {
+    // CAST-FOLLOWUP-REVIEW (#575, revue juridique de #560) : l'entrée publiée
+    // « 2026-11-check-in-aux-gerants » disait la trace faite du match, de sa
+    // place et de l'engagée, effacée avec le tournoi ou l'engagée seulement ;
+    // la table garde la place, l'engagée et la date de l'envoi, et la
+    // reconstruction du plateau l'efface (`forgetLobbyBriefMarks`). La
+    // consigne du vocal ne part que pour un match suivi (`voice_tracked`).
+    // Pour tous les comptes ; datée de la mise en ligne du 11 novembre 2026, avant les entrées du 12.
+    id: "2026-11-check-in-trace-precisions",
+    publishedAt: "2026-11-11",
+    title: "Check-in du match : sa trace d'envoi et la consigne du vocal précisées",
+    links: [MATCH_DM_PARAGRAPH_LINK],
+    summary:
+      "Précisions sur le check-in du match : la trace de son envoi porte sa date et part aussi quand le tableau est reconstruit, et la consigne de rejoindre le salon vocal de ton équipe n'y figure que dans un tournoi qui a des salons vocaux d'équipe.",
+    details: [
+      "Ce que le site garde : pour chaque check-in envoyé, la place du match dans le tournoi (phase, tableau, manche, numéro), l'engagée et la date de l'envoi — pas le numéro du match, que l'annonce du 6 novembre 2026 citait. Cette trace part avec le tournoi ou l'engagée, et aussi quand le tableau à élimination de la phase (ou du tournoi) est reconstruit parce que le nombre d'engagées a changé : ses nouvelles rencontres reçoivent alors leur propre check-in. Un retour arrière, lui, la garde.",
+      "Contenu : la consigne de rejoindre le salon vocal de ton équipe n'y figure que dans un tournoi qui a l'option « Salons vocaux d'équipe », pour un match qui a un horaire, jamais en tournoi individuel ni contre une équipe fantôme.",
+      "Ce qui ne change pas : les destinataires, le message privé réservé à un tag Discord certifié, et la case « Messages privés Discord de mes matchs » de « Mon profil » pour s'y opposer.",
+    ],
+  },
+  {
     // ACCOUNT-DELETION (#571, décision D6 de l'utilisateur du 2026-11-09) :
     // l'empreinte d'un avatar est gardée quand la modération le SUPPRIME (plus
     // à l'effacement d'un compte, plus pour un avatar seulement masqué), et la

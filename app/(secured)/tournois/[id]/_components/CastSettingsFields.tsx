@@ -34,14 +34,15 @@ export function castBattletagInvalid(value: string): boolean {
 /**
  * Le mode que montre `CastTriggerField` : verrouillé, celui **du match** (que
  * le flux tient à jour), jamais le choix local de la fenêtre, figé à son
- * ouverture ; sinon le choix local.
+ * ouverture ; sinon le choix local. Verrouillé sans mode au match (démarqué par
+ * le staff) : `null`, aucun mode n'est inventé.
  */
 export function lockedTrigger(
   locked: boolean,
   matchTrigger: MatchLiveTrigger | null,
   picked: MatchLiveTrigger,
-): MatchLiveTrigger {
-  return locked && matchTrigger !== null ? matchTrigger : picked;
+): MatchLiveTrigger | null {
+  return locked ? matchTrigger : picked;
 }
 
 /**
@@ -51,6 +52,12 @@ export function lockedTrigger(
  */
 export function castTriggerNeedsDate(trigger: MatchLiveTrigger, startAt: BracketMatch["startAt"]): boolean {
   return requiresMatchStartAt(trigger) && formatMatchStartAt(startAt) === null;
+}
+
+/** Libellé du champ : le lien en lecture est celui de l'organisation, pas « ma chaîne ». */
+function urlLabelKey(required: boolean, locked: boolean) {
+  if (locked) return "cardActions.castSettings.urlOrganisation";
+  return required ? "cardActions.castSettings.urlRequired" : "cardActions.castSettings.url";
 }
 
 /**
@@ -98,7 +105,7 @@ export function CastUrlField({
   return (
     <div className="field">
       <InfoHintRow>
-        <label htmlFor={id}>{t(required ? "cardActions.castSettings.urlRequired" : "cardActions.castSettings.url")}</label>
+        <label htmlFor={id}>{t(urlLabelKey(required, locked))}</label>
         <InfoHint id={infoId} subject={t("cardActions.castSettings.urlSubject")}>
           {/* Stream de l'organisation : le lien se lit, l'aide dit d'abord pourquoi (pas « obligatoire »). */}
           <p>{readOnlyNote ?? t("cardActions.castSettings.urlHint", { platforms: CAST_PLATFORMS })}</p>
@@ -240,7 +247,7 @@ export function CastBattletagField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         maxLength={MAX_CAST_BATTLETAG_LENGTH}
-        placeholder="Pseudo#1234"
+        placeholder={t("cardActions.castSettings.battletagPlaceholder")}
         // Le refus est lu avant l'aide (`fieldAria`), comme pour le lien.
         {...fieldAria(id, invalid, invalid && !fieldError ? hintId : null, infoId)}
       />

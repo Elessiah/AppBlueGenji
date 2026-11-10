@@ -90,7 +90,18 @@ export type MatchCasterRow = MatchCasterLink & {
  * par la configuration du direct (`setMatchLiveConfig`) — sinon, le stream
  * qu'un caster a ouvert, avec le lien de sa chaîne.
  */
-export type MatchStreamRow = { id: number; matchId: number; liveUrl: string | null; staff: boolean };
+export type MatchStreamRow = {
+  id: number;
+  matchId: number;
+  liveUrl: string | null;
+  staff: boolean;
+  /**
+   * Le stream du staff dont le lien est celui de l'organisation (`link_user_id`
+   * nul, case cochée dans « Diffusion officielle ») ; lu par `loadMatchStreams`
+   * seulement, pour l'instantané (`BracketMatch.officialBroadcastLink`).
+   */
+  organisation?: boolean;
+};
 
 type CasterLinkRow = RowDataPacket & {
   match_id: number;
@@ -103,7 +114,13 @@ type CasterLinkRow = RowDataPacket & {
 
 type CasterUserRow = CasterLinkRow & CastEligibilityFields & { pseudo: string };
 
-type StreamRow = RowDataPacket & { id: number; match_id: number; live_url: string | null; staff_owned: number };
+type StreamRow = RowDataPacket & {
+  id: number;
+  match_id: number;
+  live_url: string | null;
+  staff_owned: number;
+  link_user_id?: number | null;
+};
 
 function placeholders(ids: readonly number[]): string {
   return ids.map(() => "?").join(", ");
@@ -230,11 +247,16 @@ export async function loadMatchStreams(
   const ids = [...new Set(matchIds)];
   if (ids.length === 0) return new Map();
   const [rows] = await executor.execute<StreamRow[]>(
-    `SELECT id, match_id, live_url, staff_owned FROM bg_match_streams
+    `SELECT id, match_id, live_url, staff_owned, link_user_id FROM bg_match_streams
      WHERE match_id IN (${placeholders(ids)}) ORDER BY match_id, id`,
     ids,
   );
-  return groupByMatch(rows.map(toStream));
+  return groupByMatch(
+    rows.map((row) => {
+      const stream = toStream(row);
+      return { ...stream, organisation: stream.staff && (row.link_user_id ?? null) === null };
+    }),
+  );
 }
 
 /**
@@ -285,11 +307,17 @@ export function orphanStreamIds(
 export async function pruneMatchStreams(
   connection: Executor,
   matchId: number,
-  known: { streams?: readonly MatchStreamRow[]; casters?: readonly Pick<MatchCasterLink, "streamId">[] } = {},
+  known: {
+    streams?: readonly MatchStreamRow[];
+    casters?: readonly Pick<MatchCasterLink, "streamId">[];
+    /** L'appelant tient le verrou de la ligne du match : lectures ordinaires (`lockMatchCasters`). */
+    held?: boolean;
+  } = {},
 ): Promise<void> {
-  const streams = known.streams ?? (await lockMatchStreams(connection, matchId));
+  const held = known.held === true;
+  const streams = known.streams ?? (await lockMatchStreams(connection, matchId, held));
   if (streams.length === 0) return;
-  const casters = known.casters ?? (await lockMatchCasters(connection, matchId));
+  const casters = known.casters ?? (await lockMatchCasters(connection, matchId, held));
   const orphans = orphanStreamIds(streams, casters);
   if (orphans.length === 0) return;
   await connection.execute(
@@ -415,8 +443,8 @@ export async function withdrawUserCasts(
       [userId, ...linksToDrop],
     );
   }
-  // Le mode d'antenne qu'il avait posé reste au match, sans propriétaire : il
-  // revient au staff (`lib/shared/live-trigger-owner.ts`).
+  // Le mode d'antenne qu'il avait posé reste au match, sans maître : le staff,
+  // l'arbitre et les casters du match le changent (`lib/shared/live-trigger-owner.ts`).
   const triggersToDrop = matchIds.filter((id) => triggered.has(id));
   if (triggersToDrop.length > 0) {
     await connection.execute(
@@ -444,13 +472,16 @@ export async function withdrawUserCasts(
 }
 
 /**
- * Le match porte-t-il un lien de l'organisation ? Celui du stream du staff, ou
- * le lien d'un stream de caster dit de l'organisation (`link_user_id` vide).
+ * Le match porte-t-il le **vrai** lien de l'organisation — celui du stream du
+ * staff posé dans « Diffusion officielle », case « lien de l'organisation »
+ * cochée (`link_user_id` nul) ? Ni la chaîne qu'un membre du staff y a posée
+ * comme la sienne, ni un lien de stream de caster, même sans auteur connu
+ * (décision du 2026-11-10, `organisationModeLocked`).
  */
-export async function hasStaffLink(connection: Executor, matchId: number): Promise<boolean> {
+export async function hasOrganisationLink(connection: Executor, matchId: number): Promise<boolean> {
   const [rows] = await connection.execute<RowDataPacket[]>(
     `SELECT 1 FROM bg_match_streams
-      WHERE match_id = ? AND live_url IS NOT NULL AND (staff_owned = 1 OR link_user_id IS NULL) LIMIT 1`,
+      WHERE match_id = ? AND staff_owned = 1 AND live_url IS NOT NULL AND link_user_id IS NULL LIMIT 1`,
     [matchId],
   );
   return rows.length > 0;

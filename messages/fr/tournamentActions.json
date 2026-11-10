@@ -249,7 +249,7 @@
     "lockedReason": ": la manche suivante a déjà des scores, le résultat de ce match ne peut plus être modifié.",
     "hostChanged": "Équipe hôte modifiée.",
     "casting": "Tu castes ce match.",
-    "castingTriggerKept": "Tu castes ce match. Le passage à l'antenne, réglé entre-temps par un autre, n'a pas changé.",
+    "castingTriggerKept": "Tu castes ce match. Le passage à l'antenne n'a pas changé : réglé entre-temps par un autre, ou réservé au staff quand le match porte le lien de l'organisation.",
     "notCasting": "Tu ne castes plus ce match.",
     "casterRemoved": "Caster retiré.",
     "airClosed": "Antenne fermée.",
@@ -388,6 +388,8 @@
       "autoStop": "Le direct s'arrête tout seul dès qu'un score est saisi.",
       "url": "Lien de ma chaîne",
       "urlRequired": "Lien de ma chaîne (obligatoire)",
+      "urlOrganisation": "Lien du stream de l'organisation",
+      "battletagPlaceholder": "Pseudo#1234",
       "urlEmpty": "Le lien de ta chaîne est obligatoire : remets-le, ou annule pour garder l'ancien.",
       "playedTitle": "Match joué",
       "close": "Fermer",
@@ -403,8 +405,8 @@
       "replayHint": "Le lien de la rediff s'ajoute une fois la rencontre jouée ; un bandeau « Rediff disponible » s'affiche alors sous le match.",
       "urlSubject": "lien de ma chaîne",
       "battletagSubject": "BattleTag du cast",
-      "triggerLocked": "Passage à l'antenne réglé par un autre : {mode}.",
-      "triggerLockedHint": "Seuls le caster qui l'a posé, l'arbitre du match ou un admin le changent ou le retirent — l'organisation aussi quand aucun caster ne le tient.",
+      "triggerLocked": "Passage à l'antenne réglé par un autre : « {mode} ».",
+      "triggerLockedHint": "Seuls le caster qui le tient, l'arbitre du match ou le staff (arbitrage et diffusion) le changent ou le retirent — les casters du match aussi le changent quand aucun caster ne le tient, sauf si le match porte le lien de l'organisation.",
       "loading": "Lecture de ton cast…",
       "played": "Le match est joué : lien et BattleTag de ce cast ne se changent plus."
     }

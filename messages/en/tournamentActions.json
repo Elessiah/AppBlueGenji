@@ -249,7 +249,7 @@
     "lockedReason": ": the next round already has scores, this match's result can no longer be changed.",
     "hostChanged": "Host team changed.",
     "casting": "You're casting this match.",
-    "castingTriggerKept": "You're casting this match. Going on air, set by someone else in the meantime, stayed as it was.",
+    "castingTriggerKept": "You're casting this match. Going on air stayed as it was: set by someone else in the meantime, or reserved to the staff when the match carries the organisation's link.",
     "notCasting": "You're no longer casting this match.",
     "casterRemoved": "Caster removed.",
     "airClosed": "Off air.",
@@ -388,6 +388,8 @@
       "autoStop": "The stream stops by itself as soon as a score is entered.",
       "url": "My channel link",
       "urlRequired": "My channel link (required)",
+      "urlOrganisation": "Organisation stream link",
+      "battletagPlaceholder": "Username#1234",
       "urlEmpty": "Your channel link is required: put it back, or cancel to keep the old one.",
       "playedTitle": "Match played",
       "close": "Close",
@@ -403,8 +405,8 @@
       "replayHint": "The replay link is added once the match is played; a “Replay available” strip then shows under the match.",
       "urlSubject": "my channel link",
       "battletagSubject": "cast BattleTag",
-      "triggerLocked": "Going on air set by someone else: {mode}.",
-      "triggerLockedHint": "Only the caster who set it, the match's referee or an admin can change or clear it — the organisers too when no caster holds it.",
+      "triggerLocked": "Going on air set by someone else: “{mode}”.",
+      "triggerLockedHint": "Only the caster who holds it, the match's referee or staff with refereeing and streaming permissions can change or clear it — the match's casters can also change it when no caster holds it, unless the match carries the organisation's link.",
       "loading": "Loading your cast…",
       "played": "The match has been played: this cast’s link and BattleTag can no longer change."
     }

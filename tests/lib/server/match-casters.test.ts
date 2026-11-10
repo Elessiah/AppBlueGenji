@@ -1,6 +1,8 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import {
   firstStreamUrlSql,
+  hasOrganisationLink,
+  loadMatchStreams,
   lockMatchCasters,
   lockMatchStreams,
   orphanStreamIds,
@@ -499,5 +501,39 @@ describe("parseCastTarget — corps de POST /api/matches/[id]/caster", () => {
     expect(parseCastTarget({ streamId: 3, liveUrl: "twitch.tv/x" })).toBeNull();
     for (const streamId of ["3", 0, -1, 1.5, null]) expect(parseCastTarget({ streamId })).toBeNull();
     expect(parseCastTarget({ liveUrl: 12 })).toBeNull();
+  });
+});
+
+describe("lien de l'organisation — décision du 2026-11-10", () => {
+  it("hasOrganisationLink_staffStreamWithoutProvider_true", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ 1: 1 }], []]);
+
+    await expect(hasOrganisationLink(fakeConnection({ execute }), 42)).resolves.toBe(true);
+
+    const [sql, params] = execute.mock.calls[0];
+    // Seul le stream du staff à lien, case cochée (sans auteur) : ni la chaîne d'un membre, ni un stream de caster.
+    expect(String(sql).replace(/\s+/g, " ")).toContain("staff_owned = 1 AND live_url IS NOT NULL AND link_user_id IS NULL");
+    expect(params).toEqual([42]);
+  });
+
+  it("hasOrganisationLink_noRow_false", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+
+    await expect(hasOrganisationLink(fakeConnection({ execute }), 42)).resolves.toBe(false);
+  });
+
+  it("loadMatchStreams_staffStreamWithoutProvider_flagsOrganisation", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([
+      [
+        { id: 1, match_id: 42, live_url: "https://twitch.tv/orga", staff_owned: 1, link_user_id: null },
+        { id: 2, match_id: 42, live_url: "https://twitch.tv/staff5", staff_owned: 1, link_user_id: 5 },
+        { id: 3, match_id: 42, live_url: "https://twitch.tv/ancien", staff_owned: 0, link_user_id: null },
+      ],
+      [],
+    ]);
+
+    const streams = (await loadMatchStreams(fakeConnection({ execute }), [42])).get(42);
+
+    expect(streams?.map((row) => row.organisation)).toEqual([true, false, false]);
   });
 });

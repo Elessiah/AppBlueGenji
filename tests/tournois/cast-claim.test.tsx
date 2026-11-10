@@ -378,8 +378,8 @@ describe("MatchCardActions — branchements du cast", () => {
     expectContains(card, [
       "claimedRef.current = true;",
       "if (!claimedRef.current || hasClaimCast) return;",
-      'querySelector<HTMLElement>(\'[data-action="releaseCast"]\')',
-      "(release ?? toggleRef.current)?.focus({ preventScroll: true });",
+      'querySelector<HTMLElement>(\'[data-action="castConfig"]\')',
+      "(settings ?? toggleRef.current)?.focus({ preventScroll: true });",
     ]);
   });
 
@@ -392,7 +392,11 @@ describe("MatchCardActions — branchements du cast", () => {
     // caster » vit dans « Configurer ma diffusion » (`CAST_SETTINGS.md`).
     expect(card).toContain("releaseCast: () => openRelease(),");
     const settings = readSource("app/(secured)/tournois/[id]/_components/CastSettingsDialog.tsx");
-    expect(settings).toContain('fetch(`/api/matches/${match.id}/caster`, { method: "DELETE" })');
+    expect(settings).toContain('requestJson(`/api/matches/${match.id}/caster`, { method: "DELETE" }, "MATCH_CAST_RELEASE_FAILED")');
+    // Geste sans retour : confirmé par ConfirmActionDialog (jamais un clic direct).
+    expect(settings).toContain("onClick={() => setConfirmRelease(true)}");
+    expect(settings).toContain("<ConfirmActionDialog");
+    expect(settings).toContain('t("cardActions.releaseConfirm.selfConfirm")');
   });
 
   it("CastDialogs_organisationBox_neverOfferedToCaster", () => {
@@ -472,8 +476,9 @@ describe("Configuration du direct — l'aide du lien", () => {
     expect(enDialogs.live.organisationLink).toBe("This link is the organisation's");
     expect(frDialogs.live.organisationLinkHint).toContain("Décoché, c'est ta propre chaîne");
     expect(enDialogs.live.organisationLinkHint).toContain("Unticked, it is your own channel");
-    expect(frDialogs.live.urlOwnChannel).toContain("retiré du match si ton compte est supprimé");
-    expect(enDialogs.live.urlOwnChannel).toContain("removed from the match if your account is deleted");
+    // La phrase vit dans l'aide du champ (`castSettings.urlHint`), plus dans un texte mort de cette fenêtre.
+    expect(frDialogs.live).not.toHaveProperty("urlOwnChannel");
+    expect(enDialogs.live).not.toHaveProperty("urlOwnChannel");
   });
 });
 
@@ -552,8 +557,8 @@ describe("lockedTrigger — un mode verrouillé montre celui du match", () => {
     expect(lockedTrigger(false, "AUTO", "MANUAL")).toBe("MANUAL");
   });
 
-  it("lockedTrigger_lockedMatchUncast_returnsPicked", () => {
-    expect(lockedTrigger(true, null, "MANUAL")).toBe("MANUAL");
+  it("lockedTrigger_lockedMatchUncast_returnsNullNotAMadeUpMode", () => {
+    expect(lockedTrigger(true, null, "AUTO")).toBeNull();
   });
 });
 
@@ -640,8 +645,8 @@ describe("Fenêtre de diffusion — lien du staff sur le mode d'un autre caster"
   });
 
   it("urlLocked_frAndEn_present", () => {
-    expect(frDialogs.live.urlLocked).toContain("seuls lui, l'arbitre du match ou un admin le changent");
-    expect(enDialogs.live.urlLocked).toContain("only they, the match referee or an admin can change it");
+    expect(frDialogs.live.urlLocked).toContain("seuls lui, l'arbitre du match ou le staff (arbitrage et diffusion) le changent");
+    expect(enDialogs.live.urlLocked).toContain("only they, the match referee or staff with refereeing and streaming permissions can change it");
   });
 });
 
@@ -664,14 +669,15 @@ describe("Inscription — un mode posé entre-temps par un autre", () => {
 });
 
 describe("Mode d'antenne verrouillé — qui peut le changer", () => {
-  it("triggerLockedHint_ownerlessMode_namesOrganisers", () => {
-    expect(frActions.cardActions.castSettings.triggerLockedHint).toContain("l'organisation aussi quand aucun caster ne le tient");
-    expect(enActions.cardActions.castSettings.triggerLockedHint).toContain("the organisers too when no caster holds it");
+  it("triggerLockedHint_ownerlessMode_namesMatchCasters", () => {
+    expect(frActions.cardActions.castSettings.triggerLockedHint).toContain("les casters du match aussi le changent quand aucun caster ne le tient, sauf si le match porte le lien de l'organisation");
+    expect(enActions.cardActions.castSettings.triggerLockedHint).toContain("the match's casters can also change it when no caster holds it, unless the match carries the organisation's link");
     // La fenêtre de diffusion lit le mode verrouillé avec les mêmes mots (`CastTriggerField`).
     expect(frDialogs.live).not.toHaveProperty("triggerLockedHint");
     expect(enDialogs.live).not.toHaveProperty("triggerLockedHint");
-    expect(frErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("l'organisation aussi quand aucun caster ne le tient");
-    expect(enErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("the organisers too when no caster holds it");
+    // Aussi le refus d'un caster qui retire un mode sans maître : il le change, mais ne le retire pas.
+    expect(frErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("les casters du match le changent aussi quand aucun caster ne le tient (sauf si le match porte le lien de l'organisation), sans pouvoir le retirer");
+    expect(enErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("the match's casters can also change it when no caster holds it (unless the match carries the organisation's link), but not clear it");
   });
 });
 

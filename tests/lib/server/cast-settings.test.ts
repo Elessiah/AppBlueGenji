@@ -251,6 +251,18 @@ describe("applyCastTrigger — inscription et maître tu", () => {
     expect(execute).toHaveBeenCalledTimes(2);
   });
 
+  it("applyCastTrigger_firstModeWithOrganisationLink_writesWithoutLinkRead", async () => {
+    // Décision du 2026-11-10 : avant tout mode, le lien de l'organisation ne ferme rien (il n'est même pas lu).
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(13)).mockResolvedValue([{ affectedRows: 1 }, []]);
+    const row = { ...ownedRow(), live_trigger: null, live_trigger_user_id: null } as LaunchMatchRow;
+
+    await expect(applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 13)).resolves.toBe(true);
+
+    const sqls = execute.mock.calls.map(([sql]) => String(sql));
+    expect(sqls.some((sql) => sql.startsWith("SELECT 1 FROM bg_match_streams"))).toBe(false);
+    expect(row.live_trigger_user_id).toBe(13);
+  });
+
   it("applyCastTrigger_liveOnlyShownOnStaffModeWithLinkAndSkip_returnsFalse", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(13)).mockResolvedValueOnce([[{ 1: 1 }], []]);
     const row = { ...ownedRow(), live_trigger: "AUTO", live_trigger_user_id: null } as LaunchMatchRow;
@@ -294,12 +306,17 @@ describe("applyCastTrigger — inscription et maître tu", () => {
   });
 
   it("applyCastTrigger_hiddenOwner_staffCasterTakesMode", async () => {
-    // Le maître 12 n'est plus montré : le mode revient au staff, dont 13, qui le caste.
-    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(13)).mockResolvedValue([{ affectedRows: 1 }, []]);
+    // Le maître 12 n'est plus montré : le mode reste sans maître, et 13, qui le caste, le prend
+    // (le match ne porte pas le lien de l'organisation : sa lecture ne rend rien).
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(shownRows(13))
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValue([{ affectedRows: 1 }, []]);
     const row = ownedRow();
 
     await expect(applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 13, { oversees: false, manages: true })).resolves.toBe(true);
-    expect(execute.mock.calls[1][1]).toEqual(["AUTO", 13, 42]);
+    expect(execute.mock.calls[2][1]).toEqual(["AUTO", 13, 42]);
   });
 
   it("applyCastSettings_skipLockedTrigger_reportsTriggerSkipped", async () => {
@@ -332,6 +349,28 @@ describe("applyCastSettings", () => {
     // fournisseur du lien ne relit que lui, dans la lecture du stream).
     const statements = execute.mock.calls.map((call) => String(call[0]));
     expect(statements.filter((sql) => sql.includes("FROM bg_match_casters") && !sql.includes("holder_casts"))).toHaveLength(1);
+  });
+
+  it("applyCastSettings_triggerAndLink_judgesShownCasterOnce", async () => {
+    // Mode puis lien : le même caster, une seule lecture de sa condition sous le verrou du match.
+    const execute = jest.fn<SqlQuery>(async (sql) => {
+      const text = String(sql);
+      if (text.includes("FROM bg_match_casters mc LEFT JOIN bg_users")) return shownRows(900);
+      if (text.startsWith("SELECT 1 FROM bg_match_streams")) return [[], []];
+      if (text.includes("FROM bg_match_streams")) return [[{ id: 5, match_id: 42, live_url: null, staff_owned: 0 }], []];
+      if (text.startsWith("SELECT")) return [[], []];
+      return [{ affectedRows: 1 }, []];
+    });
+    const row = Object.assign(ownedRow(), {
+      live_trigger: null,
+      live_trigger_user_id: null,
+      casters: [{ matchId: 42, userId: 900, streamId: 5, readyAt: null }],
+    });
+
+    await applyCastSettings(fakeConnection({ execute }), row, 900, 5, { trigger: "AUTO", liveUrl: "https://twitch.tv/b" });
+
+    const shownReads = execute.mock.calls.filter(([sql]) => String(sql).includes("FROM bg_match_casters mc LEFT JOIN bg_users"));
+    expect(shownReads).toHaveLength(1);
   });
 
   it("applyCastSettings_hiddenCasterSetsLink_throwsNotMatchCaster", async () => {

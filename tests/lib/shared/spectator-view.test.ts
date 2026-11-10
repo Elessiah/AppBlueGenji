@@ -291,6 +291,11 @@ describe("ce que lit le visiteur sans compte", () => {
     expect(spectatorSnapshot(snapshot).matches[0].voice).toBeNull();
   });
 
+  it("spectatorSnapshot_officialBroadcastLink_hidden", () => {
+    const snapshot = tournamentSnapshot({ matches: [bracketMatch({ id: 1, officialBroadcastLink: true })] });
+    expect(spectatorSnapshot(snapshot).matches[0].officialBroadcastLink).toBe(false);
+  });
+
   it("retire les codes de replay, réservés aux membres connectés", () => {
     const snapshot = tournamentSnapshot({
       matches: [bracketMatch({ id: 1, maps, team1Report: report, team2Report: null })],
@@ -505,6 +510,8 @@ const MATCH_FIELDS = {
   liveTriggerCasterId: "retiré",
   // Dirait qu'un caster a été tu : retiré sans compte.
   liveUrl: "public",
+  // Dirait si la chaîne du staff est celle d'un membre : retiré (revue #575).
+  officialBroadcastLink: "retiré",
   streams: "public",
   lobbyOpenedAt: "public",
   loserTeamId: "public",

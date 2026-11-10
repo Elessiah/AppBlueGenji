@@ -266,15 +266,9 @@
     "saveClosedUnchanged": "The score is entered: nothing to save while “This match is being cast” stays ticked. Untick it to remove the match from the broadcast.",
     "streamedClosed": "This match's score is entered: it can no longer be cast.",
     "streamedOrphan": "This mode no longer has a caster: only the match referee or staff can remove it.",
-    "triggers": {
-      "AUTO": "Automatically when the match starts",
-      "START_TIME": "At the match's start date",
-      "MANUAL": "Manual (on-air button)"
-    },
     "url": "Match channel (optional)",
     "urlInvalid": "Link not recognized. Accepted platforms: {platforms}.",
-    "urlOwnChannel": "The link entered here is your own channel: it is removed from the match if your account is deleted.",
-    "urlLocked": "This link follows the mode of the caster who set it: only they, the match referee or an admin can change it.",
+    "urlLocked": "This link follows the mode of the caster who holds it: only they, the match referee or staff with refereeing and streaming permissions can change it.",
     "urlStaffOnly": "The organisation link is set only by staff or the match referee; yours is set in “Configure my broadcast”.",
     "organisationLink": "This link is the organisation's",
     "organisationLinkSubject": "organisation link",

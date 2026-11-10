@@ -49,6 +49,7 @@ import {
 import { orReload } from "@/lib/shared/lazy-component";
 import type { CastClaimOutcome } from "./CastClaimDialog";
 import type { CastClaimBody } from "../_lib/cast-claim";
+import { requestJson } from "../_lib/request-json";
 import styles from "./MatchCardActions.module.css";
 
 // Chargée au premier clic sur « Contacts » : seules les parties du match
@@ -78,15 +79,8 @@ const CastSettingsDialog = dynamic(
 );
 
 /** Envoie le geste ; rend le corps de la réponse (`{}` s'il est illisible), ou lève son code. */
-async function request(url: string, method: string, body?: unknown): Promise<Record<string, unknown>> {
-  const response = await fetch(url, {
-    method,
-    headers: body === undefined ? undefined : { "content-type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const payload = (await response.json().catch(() => ({}))) as Record<string, unknown> & { error?: string };
-  if (!response.ok) throw new Error(payload.error || "UNKNOWN");
-  return payload;
+function request(url: string, method: string, body?: unknown): Promise<Record<string, unknown>> {
+  return requestJson(url, { method, body }, "UNKNOWN");
 }
 
 const ICONS: Record<MatchCardActionId, LucideIcon> = {
@@ -378,7 +372,7 @@ function ReleaseCastDialog({
 
 /**
  * Inscrit, le bouton qui a ouvert la fenêtre disparaît (« Caster » devient
- * « Ne plus caster ») : la fenêtre rendrait le focus à un bouton détaché, il
+ * « Configurer ma diffusion ») : la fenêtre rendrait le focus à un bouton détaché, il
  * tomberait sur <body> (WCAG 2.4.3). Il passe au bouton qui prend sa place.
  * Rend le drapeau que l'inscription réussie lève.
  */
@@ -393,8 +387,8 @@ function useFocusAfterClaim(
     claimedRef.current = false;
     const active = document.activeElement;
     if (active && active !== document.body && document.contains(active)) return;
-    const release = rootRef.current?.querySelector<HTMLElement>('[data-action="releaseCast"]');
-    (release ?? toggleRef.current)?.focus({ preventScroll: true });
+    const settings = rootRef.current?.querySelector<HTMLElement>('[data-action="castConfig"]');
+    (settings ?? toggleRef.current)?.focus({ preventScroll: true });
   }, [hasClaimCast, rootRef, toggleRef]);
   return claimedRef;
 }

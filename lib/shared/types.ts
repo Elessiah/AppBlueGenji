@@ -658,9 +658,16 @@ export type BracketMatch = {
   /**
    * Le caster qui a posé ce mode et en reste maître (`lib/shared/live-trigger-owner.ts`) :
    * son identifiant, déjà public parmi `casters` ; `null` (ou absent) quand le mode
-   * est au staff — posé par lui, ou son caster parti.
+   * est sans maître — posé par qui ne le caste pas (staff, arbitre), ou son caster parti.
    */
   liveTriggerCasterId?: number | null;
+  /**
+   * Le match porte-t-il le vrai lien de l'organisation (posé dans « Diffusion
+   * officielle », case « lien de l'organisation » cochée) ? Alors un caster
+   * qui n'en est pas le maître ne change pas son mode d'antenne
+   * (`organisationModeLocked`). Absent = non.
+   */
+  officialBroadcastLink?: boolean;
   /**
    * **Premier** lien de diffusion du match (le stream le plus ancien qui en a
    * un) — celui des vues compactes ; `null` = casté sans lien public. Tous les
