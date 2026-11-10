@@ -17,6 +17,7 @@ const MATCH_ACTIONS: StaffMatchAction[] = [
   "OFF_AIR",
   "REPLAY_SET",
   "REPLAY_REMOVED",
+  "VOICE_CLEARED",
 ];
 const TOURNAMENT_ACTIONS: StaffTournamentAction[] = [
   "EDITED",

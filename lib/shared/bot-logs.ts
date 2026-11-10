@@ -807,7 +807,8 @@ export type StaffMatchAction =
   | "ON_AIR"
   | "OFF_AIR"
   | "REPLAY_SET"
-  | "REPLAY_REMOVED";
+  | "REPLAY_REMOVED"
+  | "VOICE_CLEARED";
 
 const STAFF_MATCH_ACTION_WORDING: Record<StaffMatchAction, string> = {
   SCORES_SAVED: "Score enregistré",
@@ -820,6 +821,7 @@ const STAFF_MATCH_ACTION_WORDING: Record<StaffMatchAction, string> = {
   OFF_AIR: "Retiré de l'antenne",
   REPLAY_SET: "Rediffusion ajoutée",
   REPLAY_REMOVED: "Rediffusion retirée",
+  VOICE_CLEARED: "Salon vocal d'une équipe vidé",
 };
 
 /**

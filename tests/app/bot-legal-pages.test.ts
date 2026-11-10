@@ -512,7 +512,7 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
     expect(fr).toContain("**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (evening message of the streamed matches: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
     // EF-43 (salons vocaux) : datée du lendemain de la mise en ligne du 5 novembre 2026.
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["6 novembre 2026", "6 November 2026"]);
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["12 novembre 2026", "12 November 2026"]);
   });
 });
 
@@ -633,41 +633,138 @@ describe("politique du bot — sauvegardes deux fois par semaine (BACKUP-SCHEDUL
 describe("politique du bot — salons vocaux d'équipe (EF-43, registre T18)", () => {
   const fr = JSON.stringify(PRIVACY_POLICY.fr);
   const en = JSON.stringify(PRIVACY_POLICY.en);
+  /** Passages attendus absents du texte français puis anglais (vide : tout y est). */
+  const missingInBoth = (frTexts: readonly string[], enTexts: readonly string[]) => [
+    ...frTexts.filter((text) => !fr.includes(text)),
+    ...enTexts.filter((text) => !en.includes(text)),
+  ];
 
   it("privacyPolicy_voiceChannels_dataParagraphLinksT18NoCountMemoryOnlyFrAndEn", () => {
-    expect(fr).toContain("Salons vocaux d'équipe des matchs");
-    expect(fr).toContain("(/rgpd#salons-vocaux) (traitement T18)");
-    expect(fr).toContain("sans jamais l'enregistrer ni le transmettre au site, l'état vocal des membres du serveur de l'association");
-    expect(fr).toContain("Il ne compte personne et ne dit jamais au site qui se trouve dans un salon.");
-    expect(en).toContain("Team voice channels for matches");
-    expect(en).toContain("(/rgpd#salons-vocaux) (processing activity T18)");
-    expect(en).toContain("without ever recording it or sending it to the website, the voice state of the members of the association's server");
-    expect(en).toContain("It counts no one and never tells the website who is in a channel.");
+    expect(
+      missingInBoth(
+        [
+          "Salons vocaux d'équipe des matchs",
+          "(/rgpd#salons-vocaux) (traitement T18)",
+          "sans jamais l'enregistrer ni le transmettre au site, l'état vocal des membres du serveur de l'association",
+          "il n'en garde rien, n'en journalise rien et ne dit jamais au site combien de personnes s'y trouvent, ni qui.",
+        ],
+        [
+          "Team voice channels for matches",
+          "(/rgpd#salons-vocaux) (processing activity T18)",
+          "without ever recording it or sending it to the website, the voice state of the members of the association's server",
+          "it keeps nothing of it, logs nothing of it and never tells the website how many people are in it, nor who.",
+        ],
+      ),
+    ).toEqual([]);
+  });
+
+  it("privacyPolicy_voiceChannels_clearDisconnectsKeepsNothingFrAndEn", () => {
+    expect(
+      missingInBoth(
+        [
+          "quand l'arbitrage du site vide le salon d'une équipe, pour en déconnecter tous les occupants (le salon reste ouvert)",
+          "Les salons sont ouverts à qui voit la catégorie des matchs",
+          "et les déconnexions d'un vidage (leur nombre et leur motif, tels que Discord les y inscrit), pour la durée que Discord fixe",
+          "avec son nom, et les déconnexions d'un vidage.",
+        ],
+        [
+          "when the website's referees clear a team's channel, to disconnect all its occupants (the channel stays open)",
+          "The channels are open to whoever sees the match category",
+          "and the disconnections of a clearing (their number and reason, as Discord records them), for the period Discord sets",
+          "with its name, and the disconnections of a clearing.",
+        ],
+      ),
+    ).toEqual([]);
+  });
+
+  it("privacyPolicy_voiceChannels_fullVoiceStateListAndChannelIdReturnedFrAndEn", () => {
+    expect(
+      missingInBoth(
+        [
+          "micro ou son coupés par lui ou par la modération, partage d'écran ou caméra actifs, demande de parole et mise en sourdine de scène",
+          "rend au site le seul identifiant de ce salon",
+        ],
+        [
+          "microphone or sound muted by themselves or by moderation, screen sharing or camera on, request to speak and stage suppression",
+          "returns to the website only that channel's ID",
+        ],
+      ),
+    ).toEqual([]);
+    expect(fr).not.toContain("seule cette fiche jointe est gardée en mémoire");
+  });
+
+  it("privacyPolicy_voiceChannelsRetention_sweepMarginMovedChannelAndDiscordRefusalFrAndEn", () => {
+    expect(
+      missingInBoth(
+        [
+          "Ces durées s'entendent à un balayage près (toutes les 30 minutes).",
+          "Un salon déplacé hors de la catégorie des matchs n'est plus suivi",
+          "réessayée à chaque balayage ; un salon que le Bot ne voit plus est laissé à la modération",
+        ],
+        [
+          "These periods are accurate to within one sweep (every 30 minutes).",
+          "A channel moved out of the match category is no longer tracked",
+          "retried at each sweep; a channel the Bot no longer sees is left to moderation",
+        ],
+      ),
+    ).toEqual([]);
   });
 
   it("privacyPolicy_voiceChannels_heldAtAllTimesWhateverTheOptionFrAndEn", () => {
-    expect(fr).toContain("il tient en mémoire en permanence, que l'option soit allumée ou non dans un tournoi");
-    expect(en).toContain("it holds in memory at all times, whether or not a tournament has the option on");
+    expect(
+      missingInBoth(
+        [
+          "il tient en mémoire en permanence, que l'option soit allumée ou non dans un tournoi",
+        ],
+        [
+          "it holds in memory at all times, whether or not a tournament has the option on",
+        ],
+      ),
+    ).toEqual([]);
   });
 
   it("privacyPolicy_voiceChannels_legitimateInterestFrAndEn", () => {
-    expect(fr).toContain("Les salons vocaux d'équipe reposent aussi sur son intérêt légitime (bon déroulement des tournois).");
-    expect(en).toContain("Team voice channels also rest on its legitimate interest (smooth running of tournaments).");
+    expect(
+      missingInBoth(
+        [
+          "Les salons vocaux d'équipe reposent aussi sur son intérêt légitime (bon déroulement des tournois).",
+        ],
+        [
+          "Team voice channels also rest on its legitimate interest (smooth running of tournaments).",
+        ],
+      ),
+    ).toEqual([]);
   });
 
   it("privacyPolicy_voiceChannels_retentionUsesBotConstantsFrAndEn", () => {
-    expect(fr).toContain(`au plus tard ${VOICE_BOT_RELEASED_MAX_HOURS} heures et ${VOICE_BOT_SWEEP_MINUTES} minutes après son rendu même occupé`);
-    expect(fr).toContain(`il est supprimé s'il est vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise`);
-    expect(fr).toContain(`oubliée ${VOICE_BOT_ABANDONED_MAX_HOURS} heures après sa création ou sa reprise si le Bot ne peut plus lire le salon`);
-    expect(fr).toContain("Le journal d'audit de Discord garde la création et la suppression de chaque salon, avec son nom");
-    expect(en).toContain(`within ${VOICE_BOT_RELEASED_MAX_HOURS} hours and ${VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest even if occupied`);
-    expect(en).toContain(`it is deleted if it is empty ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation or its reuse`);
-    expect(en).toContain(`forgotten ${VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation or its reuse if the Bot can no longer read the channel`);
-    expect(en).toContain("Discord's audit log keeps the creation and deletion of each channel, with its name");
+    expect(
+      missingInBoth(
+        [
+          `au plus tard ${VOICE_BOT_RELEASED_MAX_HOURS} heures et ${VOICE_BOT_SWEEP_MINUTES} minutes après son rendu même occupé`,
+          `il est supprimé s'il est vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise`,
+          `oubliée ${VOICE_BOT_ABANDONED_MAX_HOURS} heures après sa création ou sa reprise si le Bot ne peut plus lire le salon`,
+          "Le journal d'audit de Discord garde la création et la suppression de chaque salon, avec son nom",
+        ],
+        [
+          `within ${VOICE_BOT_RELEASED_MAX_HOURS} hours and ${VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest even if occupied`,
+          `it is deleted if it is empty ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation or its reuse`,
+          `forgotten ${VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation or its reuse if the Bot can no longer read the channel`,
+          "Discord's audit log keeps the creation and deletion of each channel, with its name",
+        ],
+      ),
+    ).toEqual([]);
   });
 
   it("privacyPolicy_voiceChannels_recipientsIncludeMatchCategoryAndAuditLogFrAndEn", () => {
-    expect(fr).toContain("Les membres du serveur Discord de l'association autorisés dans la catégorie des matchs, qui voient les salons vocaux d'équipe et leurs occupants");
-    expect(en).toContain("Members of the association's Discord server allowed in the match category, who see the team voice channels and their occupants");
+    expect(
+      missingInBoth(
+        [
+          "Les membres du serveur Discord de l'association autorisés dans la catégorie des matchs, qui voient les salons vocaux d'équipe et leurs occupants",
+        ],
+        [
+          "Members of the association's Discord server allowed in the match category, who see the team voice channels and their occupants",
+        ],
+      ),
+    ).toEqual([]);
   });
 });

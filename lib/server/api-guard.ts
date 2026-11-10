@@ -125,6 +125,13 @@ export const TEAM_VOICE_TOGGLE_RULE: RateLimitRule = {
   windowMs: 5 * 60_000,
 };
 
+/** Vidage d'un salon vocal d'équipe par l'arbitrage (`POST /api/admin/matches/[id]/voice/clear`), par compte. */
+export const VOICE_CLEAR_RULE: RateLimitRule = {
+  name: "voice-clear",
+  limit: 20,
+  windowMs: 60_000,
+};
+
 /**
  * Horaires de match posés, changés ou retirés par un arbitre : chaque geste
  * écrit aux joueurs des deux engagées (message privé Discord, push) et pousse

@@ -45,7 +45,7 @@ export function TeamVoiceChannelsField({
         onChange={(e) => onChange(e.target.checked)}
         aria-labelledby="team-voice-channels-label"
         aria-describedby="team-voice-channels-more team-voice-channels-hint"
-        style={{ marginTop: 2 }}
+        className="checkbox-card-input"
       />
       <div style={{ flex: 1, minWidth: 0 }}>
         <InfoHintRow>

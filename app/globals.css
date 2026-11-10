@@ -2185,6 +2185,13 @@ html {
   background: rgba(90, 200, 255, 0.05) !important;
 }
 
+/* Case en tête d'une carte d'option du formulaire de tournoi (salons vocaux,
+   phase de lancement, programmation par l'arbitre) : alignée sur la première
+   ligne du titre, sans style en ligne (`CHECKBOX_STYLES.md`). */
+input[type="checkbox"].checkbox-card-input {
+  margin-top: 2px;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
    Cases à cocher et boutons radio — une seule apparence, posée sur l'élément
 

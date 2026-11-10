@@ -76,10 +76,25 @@ export function voiceEligibleTeam(team: { isSolo: boolean; isGhost: boolean }): 
 }
 
 /**
+ * L'option « Salons vocaux d'équipe » vaut-elle à l'instant `now` (ms) ? Allumée,
+ * tournoi en cours **et** publié (`startVisibilityAt` passé) : seul cas où des
+ * salons s'ouvrent (`DUE_CHANNELS_SQL`) et se lisent — la même règle pour les deux
+ * portes de la page du match (instantané et relecture REST).
+ */
+export function voiceOptionLive(
+  tournament: { teamVoiceChannels: boolean; state: string; startVisibilityAt: string | null },
+  now: number,
+): boolean {
+  const visibleAt = isoTime(tournament.startVisibilityAt);
+  return tournament.teamVoiceChannels && tournament.state === "RUNNING" && visibleAt !== null && visibleAt <= now;
+}
+
+/**
  * Les salons d'un match sont-ils dus à l'instant `now` (ms) ? Un match sans
  * heure n'en a pas ; un match à plus d'un quart d'heure attend ; un match plus
- * proche — ou dont l'heure est passée sans qu'il soit lancé (option allumée en
- * cours de route) — les reçoit aussitôt, sauf passé `VOICE_CHANNEL_LATE_HOURS`.
+ * proche — ou dont l'heure est passée sans score validé, lancé ou non (option
+ * allumée en cours de route, match en cours) — les reçoit aussitôt, sauf passé
+ * `VOICE_CHANNEL_LATE_HOURS`.
  */
 export function voiceChannelsDue(startAt: string | null, now: number): boolean {
   const start = isoTime(startAt);

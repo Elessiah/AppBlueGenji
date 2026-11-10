@@ -402,7 +402,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Map de départage d'un tour de play-offs à format défini (`ROUND_MAPS.md`).
     `ALTER TABLE bg_tournament_round_maps ADD COLUMN tiebreak_map VARCHAR(64) NULL AFTER slots_json`,
     // Salons vocaux d'équipe (`docs/features/MATCH_VOICE.md`) : option éteinte par
-    // défaut ; la table `bg_match_voice_channels` est neuve, son `CREATE TABLE` suffit.
+    // défaut ; la table `bg_match_voice_channels` est créée par son `CREATE TABLE`,
+    // puis allégée plus bas (`DROP COLUMN members, counted_at`) sur les bases où une
+    // version précédente l'avait créée avec ces colonnes.
     `ALTER TABLE bg_tournaments ADD COLUMN team_voice_channels TINYINT(1) NOT NULL DEFAULT 0
        AFTER match_launch_phase`,
     // Suppression de compte réversible 30 jours (`docs/features/ACCOUNT_DELETION.md`) ;
@@ -446,6 +448,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // `ALGORITHM=COPY` : la table est reconstruite, les nombres quittent ses pages
     // (un retrait « instantané » de MariaDB les y laisserait jusqu'à la réécriture).
     `ALTER TABLE bg_match_voice_channels DROP COLUMN members, DROP COLUMN counted_at, ALGORITHM=COPY`,
+    // MATCH-VOICE — dernier échec de rendu dû à une panne du bot entier
+    // (`docs/features/MATCH_VOICE.md`) : `0` partout au départ, aucun remplissage —
+    // une ligne déjà en échec garde la règle d'avant jusqu'à son prochain essai.
+    `ALTER TABLE bg_match_voice_channels ADD COLUMN failed_wide TINYINT(1) NOT NULL DEFAULT 0 AFTER failed_at`,
     // CAST-FOLLOWUP — le caster qui a posé le mode d'antenne
     // (`docs/features/CAST_SETTINGS.md` § Qui règle le mode d'antenne) : nul
     // partout au départ — un mode déjà posé reste au staff `tournaments`.

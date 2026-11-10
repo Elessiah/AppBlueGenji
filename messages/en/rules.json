@@ -166,11 +166,11 @@
     {
       "title": "Team voice channels",
       "body": [
-        "A tournament can turn on the “Team voice channels” option (off by default, see its settings). It is then part of its <b>rules</b>: from {voiceLead} minutes before each match's time, the association's Discord bot opens a {voiceCapacity}-seat voice channel named after each of the two teams, and each team gathers there before playing."
+        "A tournament can turn on the “Team voice channels” option (off by default, see its settings). It is then part of its <b>rules</b>: from {voiceLead} minutes before each match's time, the association's Discord bot opens a {voiceCapacity}-seat voice channel named after each of the two teams; each team may meet there before playing, with no obligation."
       ],
       "bullets": [
         "The channels never hold the match's launch: it launches as in any other tournament.",
-        "For each channel, the site only keeps its Discord ID and its times: neither who is in it nor how many people are.",
+        "For each channel, the site only keeps the match and team numbers, the channel's Discord ID and its times: neither who is in it nor how many people are.",
         "No channel is opened for a solo entry nor for a match against a ghost team."
       ]
     },
