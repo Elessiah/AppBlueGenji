@@ -108,6 +108,26 @@ describe("loadTournamentContacts", () => {
     expect(sql).toContain("ORDER BY r.seed ASC");
   });
 
+  // ERREUR.txt (revue légale #546) : un compte dont la suppression est
+  // demandée est invisible dès la demande — ni pseudo ni tag dans les contacts.
+  it("loadTournamentContacts_pendingDeletionAccount_excludedInSql", async () => {
+    const { execute } = fakeDb([]);
+
+    await loadTournamentContacts(5);
+
+    const sql = String((execute.mock.calls[0] as unknown[])[0]).replace(/\s+/g, " ");
+    expect(sql).toContain("COALESCE(tm.user_id, t.solo_user_id) AND u.is_deleted = 0");
+  });
+
+  it("loadTournamentContacts_soloEntryOfDeletedAccount_keptWithEmptyRoster", async () => {
+    // La jointure filtrée rend une ligne sans joueur : l'engagé reste, sans contact.
+    fakeDb([{ team_id: 30, team_name: "Solo", user_id: null, pseudo: null, discord_tag: null }]);
+
+    expect(await loadTournamentContacts(5)).toEqual([
+      { teamId: 30, teamName: "Solo", reachable: false, members: [] },
+    ]);
+  });
+
   it("rend une liste vide sur un plateau sans engagé", async () => {
     fakeDb([]);
     expect(await loadTournamentContacts(5)).toEqual([]);
