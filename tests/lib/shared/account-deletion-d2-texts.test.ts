@@ -410,11 +410,12 @@ describe("D12 — conditions d'utilisation, version 10", () => {
     const fr = PRIVACY_CHANGES.find((change) => change.id === TERMS_V10_ID)!;
     const en = PRIVACY_CHANGES_EN[TERMS_V10_ID];
 
-    expect(fr.details.at(-2)).toContain("Contacts de match : les salons vocaux d'équipe sont ouverts à qui voit la catégorie des matchs");
-    expect(fr.details.at(-2)).toContain("dont le bot déconnecte les occupants sans garder qui ils sont");
+    const frVoice = fr.details.find((detail) => detail.startsWith("Contacts de match :")) ?? "";
+    const enVoice = en.details.find((detail) => detail.startsWith("Match contacts:")) ?? "";
+
+    expect(frVoice).toContain("ce que le bot lit de l'état vocal du serveur, sans l'enregistrer, et qui peut vider un salon — l'arbitrage, ou l'équipe pour son propre salon");
     expect(fr.details.at(-1)).toContain("« Retransmission des matchs » et « Contacts de match »");
-    expect(en.details.at(-2)).toContain("Match contacts: team voice channels are open to whoever sees the match category");
-    expect(en.details.at(-2)).toContain("whose occupants the bot disconnects without keeping who they are");
+    expect(enVoice).toContain("what the bot reads of the server's voice state, without recording it, and who can clear a channel — the referees, or the team for its own channel");
     expect(en.details.at(-1)).toContain("“Match streaming” and “Match contacts” sections");
     expect(en.linkLabels?.at(-1)).toBe("Read the “Match contacts” section");
   });
