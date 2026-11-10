@@ -49,7 +49,7 @@ import {
   type VoiceChannelState,
 } from "@/lib/shared/match-voice";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
-import { activeMemberSql } from "./match-players";
+import { playsMatchSql } from "./match-players";
 import { lockTournamentRow } from "./registration";
 import { inTransaction } from "./transaction";
 
@@ -1171,23 +1171,27 @@ type SingleMatchRow = RowDataPacket & {
  */
 export type ClearVoiceResult = "cleared" | "notOpen" | "player" | "unavailable";
 
-type OpenChannelRow = RowDataPacket & { channel_id: string; plays: number | null };
+type OpenChannelRow = RowDataPacket & { channel_id: string; plays: number | null; designated: number | null };
 
 /**
  * Salon ouvert d'une équipe, seulement tant que la page le montre (tournoi en cours à l'option
- * allumée, match jouable), et si l'appelant est membre actif de l'une des deux équipes (`plays`).
- * Une entrée solo n'a jamais de salon.
+ * allumée, match jouable dans sa fenêtre — un match reporté au-delà du quart d'heure n'en a
+ * plus, D14 —, équipe encore engagée dans le match), si l'appelant joue ce match (`plays`, la
+ * règle commune `playsMatchSql`) et s'il en est l'arbitre désigné (`designated`, la colonne
+ * seule, quel que soit l'état du match ou de l'arbitre : il n'est alors jamais nommé).
  */
 export const CLEARABLE_CHANNEL_SQL = `SELECT v.channel_id,
-       EXISTS (SELECT 1 FROM bg_team_members tm
-                WHERE tm.user_id = ? AND ${activeMemberSql("tm")}
-                  AND tm.team_id IN (m.team1_id, m.team2_id)) AS plays
+       ${playsMatchSql("?", "m.team1_id", "m.team2_id", "cv")} AS plays,
+       (m.referee_user_id <=> ?) AS designated
   FROM bg_match_voice_channels v
   JOIN bg_matches m ON m.id = v.match_id
   JOIN bg_tournaments t ON t.id = m.tournament_id
  WHERE v.match_id = ? AND v.team_id = ? AND v.released_at IS NULL AND v.channel_id IS NOT NULL
+   AND v.team_id IN (m.team1_id, m.team2_id)
    AND t.state = 'RUNNING' AND t.team_voice_channels = 1
-   AND m.status IN ('READY', 'AWAITING_CONFIRMATION')
+   AND m.status IN ('READY', 'AWAITING_CONFIRMATION') AND m.start_at IS NOT NULL
+   AND m.start_at <= NOW() + INTERVAL ${VOICE_CHANNEL_LEAD_MINUTES} MINUTE
+   AND m.start_at >= NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
  LIMIT 1`;
 
 /**
@@ -1197,13 +1201,22 @@ export const CLEARABLE_CHANNEL_SQL = `SELECT v.channel_id,
  * n'apprend ni qui en est sorti, ni combien. Seule une ligne ouverte portant un salon y
  * donne accès — le bot ne touche de toute façon qu'un salon qu'il suit. Un salon que le bot
  * ne suit plus (supprimé à la main) relance une passe, qui le redemande par sa clé.
+ * `beforeClear` reçoit, juste avant l'appel au bot, si l'appelant est l'arbitre désigné du
+ * match : la trace du geste s'écrit avant l'effet (un arrêt du serveur ne laisse jamais un
+ * vidage sans auteur, même partiel).
  */
-export async function clearTeamVoiceChannel(matchId: number, teamId: number, userId: number): Promise<ClearVoiceResult> {
-  const rows = await run<OpenChannelRow[]>(CLEARABLE_CHANNEL_SQL, [userId, matchId, teamId]);
+export async function clearTeamVoiceChannel(
+  matchId: number,
+  teamId: number,
+  userId: number,
+  beforeClear?: (designated: boolean) => void,
+): Promise<ClearVoiceResult> {
+  const rows = await run<OpenChannelRow[]>(CLEARABLE_CHANNEL_SQL, [userId, userId, userId, matchId, teamId]);
   const row = rows[0];
   if (!row?.channel_id) return "notOpen";
   // Un membre du staff qui joue ce match ne vide pas les salons (comme il ne l'arbitre pas).
   if (Number(row.plays ?? 0) === 1) return "player";
+  beforeClear?.(Number(row.designated ?? 0) === 1);
   const channelId = row.channel_id;
   const outcome = await clearVoiceChannel(channelId);
   if (outcome.kind === "ok") return "cleared";

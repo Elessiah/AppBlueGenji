@@ -1192,7 +1192,7 @@ function MatchPageContent({
         </div>
         {rightColumn && (
           <div className={styles.column}>
-            {voice && <VoiceSection voice={voice} sides={sides} match={match} clearable={canSchedule && !frozen} />}
+            {voice && <VoiceSection voice={voice} sides={sides} match={match} clearable={canSchedule && !frozen && !playsMatch} />}
             <ConnectionSection launch={shownLaunch} onCopy={onCopy} />
             <OfficiatingSection
               match={match}

@@ -1725,7 +1725,7 @@ describe("clearTeamVoiceChannel", () => {
 
     await expect(clearTeamVoiceChannel(9, 4, 77)).resolves.toBe("cleared");
     expect(clearVoiceChannel).toHaveBeenCalledWith("901");
-    expect(db.execute.mock.calls[0][1]).toEqual([77, 9, 4]);
+    expect(db.execute.mock.calls[0][1]).toEqual([77, 77, 77, 9, 4]);
     expect(db.writes).toEqual([]);
   });
 
@@ -1741,6 +1741,45 @@ describe("clearTeamVoiceChannel", () => {
 
     await expect(clearTeamVoiceChannel(9, 4, 77)).resolves.toBe("player");
     expect(clearVoiceChannel).not.toHaveBeenCalled();
+  });
+
+  it("clearTeamVoiceChannel_designatedReferee_hookToldBeforeBotCall", async () => {
+    database({ voiceRows: [{ channel_id: "901", plays: 0, designated: 1 }] });
+    const order: string[] = [];
+    jest.mocked(clearVoiceChannel).mockImplementation(async () => {
+      order.push("bot");
+      return { kind: "ok", value: true };
+    });
+
+    await clearTeamVoiceChannel(9, 4, 77, (designated) => order.push(`hook:${designated}`));
+    expect(order).toEqual(["hook:true", "bot"]);
+  });
+
+  it("clearTeamVoiceChannel_otherStaff_hookToldNotDesignated", async () => {
+    database({ voiceRows: [{ channel_id: "901", plays: 0, designated: 0 }] });
+    jest.mocked(clearVoiceChannel).mockResolvedValue({ kind: "unavailable", code: "VOICE_DISCORD_UNAVAILABLE" });
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    const hook = jest.fn<(designated: boolean) => void>();
+
+    await clearTeamVoiceChannel(9, 4, 77, hook);
+    expect(hook).toHaveBeenCalledWith(false);
+  });
+
+  it("clearTeamVoiceChannel_callerPlaysMatch_hookNeverCalled", async () => {
+    database({ voiceRows: [{ channel_id: "901", plays: 1, designated: 0 }] });
+    const hook = jest.fn<(designated: boolean) => void>();
+
+    await clearTeamVoiceChannel(9, 4, 77, hook);
+    expect(hook).not.toHaveBeenCalled();
+  });
+
+  it("clearTeamVoiceChannel_query_postponedMatchOrSwappedTeamNotClearable", () => {
+    // D14 : un match reporté au-delà du quart d'heure n'a plus de salon ; l'équipe doit encore jouer le match.
+    expect(CLEARABLE_CHANNEL_SQL).toContain(`m.start_at <= NOW() + INTERVAL ${VOICE_CHANNEL_LEAD_MINUTES} MINUTE`);
+    expect(CLEARABLE_CHANNEL_SQL).toContain("v.team_id IN (m.team1_id, m.team2_id)");
+    // Règle commune du joueur : une entrée solo compte aussi.
+    expect(CLEARABLE_CHANNEL_SQL).toContain("solo_user_id = ?");
+    expect(CLEARABLE_CHANNEL_SQL).toContain("(m.referee_user_id <=> ?) AS designated");
   });
 
   it("clearTeamVoiceChannel_query_onlyWhileThePageShowsTheChannel", () => {
