@@ -77,8 +77,12 @@ export async function holdAccountIdentity(
   if (!current) return false;
   // Un masque resté d'une demande antérieure cède la place ; puis une insertion
   // simple, jamais `ON DUPLICATE KEY` (il jouerait sur les deux clés uniques et
-  // réécrirait en silence le masque d'un autre compte).
-  await connection.execute(`DELETE FROM bg_account_deletion_holds WHERE user_id = ?`, [userId]);
+  // réécrirait en silence le masque d'un autre compte). Relu d'abord : un
+  // `DELETE` sur une ligne absente poserait un verrou d'intervalle, et deux
+  // demandes simultanées s'interbloqueraient sur leurs insertions.
+  if (await readDeletionHold(connection, userId)) {
+    await connection.execute(`DELETE FROM bg_account_deletion_holds WHERE user_id = ?`, [userId]);
+  }
   await insertDeletionHold(connection, userId, current.pseudo, current.avatar_url ?? null);
   const taken = await loadTakenAnonymousPseudos(connection, userId);
   for (let attempt = 0; ; attempt += 1) {

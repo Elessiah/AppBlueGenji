@@ -708,7 +708,7 @@ async function deleteAccountNow(
       connection.release();
     }
   };
-  const plan = await retryOnDeadlock(() => retryOnStaleLockSet(transact));
+  const plan = await retryOnStaleLockSet((lastAttempt) => retryOnDeadlock(() => transact(lastAttempt)));
   if (plan === null) return null;
 
   // Ses sessions sont parties avec la transaction, pas ses flux de tournoi

@@ -165,8 +165,16 @@ describe("holdAccountIdentity", () => {
     expect(syncSoloEntryIdentityOn).toHaveBeenCalledWith(expect.anything(), 7);
   });
 
-  it("holdAccountIdentity_living_dropsPreviousHoldThenPlainInsert", async () => {
+  it("holdAccountIdentity_noPreviousHold_insertsWithoutDelete", async () => {
     const connection = transaction({ live: { pseudo: "Kerya", avatar_url: AVATAR } });
+
+    await holdAccountIdentity(fakeConnection(connection), 7, REQUESTED);
+
+    expect(sqlOf(connection).some((q) => q.sql.startsWith("DELETE FROM bg_account_deletion_holds"))).toBe(false);
+  });
+
+  it("holdAccountIdentity_living_dropsPreviousHoldThenPlainInsert", async () => {
+    const connection = transaction({ live: { pseudo: "Kerya", avatar_url: AVATAR }, hold: { pseudo: "Old", avatar_url: null } });
 
     await holdAccountIdentity(fakeConnection(connection), 7, REQUESTED);
 

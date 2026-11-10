@@ -158,10 +158,17 @@ async function undoRotation(
  * autre ligne désigne est copié, pas renommé — même règle, même raison. Si
  * l'écriture du masque n'aboutit pas, voir `undoHeldRotation`.
  *
+ * @param options.detachPurge La purge des variantes de l'optimiseur (un
+ *   balayage de son cache, long sur un site rempli) ne retient pas l'appelant :
+ *   l'ancienne adresse est déjà morte, et la demande de suppression répond
+ *   sans l'attendre. Un échec est dit dans pm2.
  * @returns La nouvelle URL, ou `null` si rien n'a été renommé (pas de masque,
  *   pas d'avatar, adresse étrangère, fichier introuvable, course perdue).
  */
-export async function rotateHeldAvatarFile(userId: number): Promise<string | null> {
+export async function rotateHeldAvatarFile(
+  userId: number,
+  options: { detachPurge?: boolean } = {},
+): Promise<string | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<(RowDataPacket & { avatar_url: string | null })[]>(
     `SELECT avatar_url FROM bg_account_deletion_holds WHERE user_id = ? LIMIT 1`,
@@ -195,8 +202,10 @@ export async function rotateHeldAvatarFile(userId: number): Promise<string | nul
   }
   if (written && original) {
     // Même distinction que `rotateHiddenAvatarFile` (adresse de forme ancienne).
-    if (heldUrl.startsWith("/uploads/")) await purgeAllOptimizedCopies();
-    else await purgeOptimizedCopies(original);
+    const purge = heldUrl.startsWith("/uploads/") ? purgeAllOptimizedCopies() : purgeOptimizedCopies(original);
+    if (options.detachPurge) {
+      void purge.catch((error) => console.error("[avatar-rotation] variantes de l'avatar mis de côté non purgées", error));
+    } else await purge;
   }
   return written ? target.url : null;
 }

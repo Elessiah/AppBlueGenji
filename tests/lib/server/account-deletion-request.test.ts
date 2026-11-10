@@ -810,7 +810,7 @@ describe("requestAccountDeletion — jeu de verrous, avatar mis de côté, rejeu
 
     await requestAccountDeletion(7);
 
-    expect(rotateHeldAvatarFile).toHaveBeenCalledWith(7);
+    expect(rotateHeldAvatarFile).toHaveBeenCalledWith(7, { detachPurge: true });
   });
 
   it("requestAccountDeletion_avatarRotationFails_requestStillSucceedsAndSaysIt", async () => {

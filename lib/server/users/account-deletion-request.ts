@@ -376,9 +376,11 @@ async function afterDeletionRequest(userId: number, effects: DeletionRequestEffe
   closeUserStreams(userId);
   // L'avatar mis de côté change d'adresse : l'ancienne, connue de qui l'avait
   // vue, ne doit plus rien servir pendant les trente jours. En premier, avant
-  // toute suite plus longue ; un échec est dit, la demande est faite.
+  // toute suite plus longue ; un échec est dit, la demande est faite. La purge
+  // du cache de l'optimiseur suit en tâche de fond (elle ne retient ni la
+  // réponse ni les rafraîchissements ci-dessous).
   try {
-    await rotateHeldAvatarFile(userId);
+    await rotateHeldAvatarFile(userId, { detachPurge: true });
   } catch (error) {
     console.error("[account-deletion] avatar mis de côté non renommé, encore servi à son ancienne adresse", error);
   }
@@ -608,7 +610,9 @@ export async function requestAccountDeletion(
       connection.release();
     }
   };
-  const plan = await retryOnDeadlock(() => retryOnStaleLockSet(transact));
+  // L'interblocage se rejoue **dans** chaque essai du jeu de verrous : sa
+  // fenêtre de rejeu se mesure sur une transaction, pas sur plusieurs.
+  const plan = await retryOnStaleLockSet((lastAttempt) => retryOnDeadlock(() => transact(lastAttempt)));
 
   // Demande consignée « en attente » au journal hors base (décision 8 du
   // 2026-11-04) : une restauration d'une sauvegarde antérieure la rejoue. La
