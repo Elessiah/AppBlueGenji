@@ -192,6 +192,10 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
     }
   }
   await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
+  // Ses tickets de réactivation (compte, moyen de connexion) ne survivent à
+  // aucune anonymisation — suppression définitive, rattrapage au démarrage :
+  // la ligne reste, la cascade ne joue pas. Table tolérée.
+  await ignoreMissingTable(connection.execute(`DELETE FROM bg_account_reactivation_tickets WHERE user_id = ?`, [userId]));
   // L'opposition aux messages privés de match revient au défaut, le « Ne plus
   // afficher » de la modale du recrutement, le « Ne plus voir » de la fenêtre
   // de certification du tag Discord et celui de l'invitation à certifier de la

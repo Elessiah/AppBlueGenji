@@ -1,5 +1,5 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import { isDuplicateEntryError } from "@/lib/server/mysql-errors";
+import { isDuplicateEntryError, rowsOrEmptyIfMissingTable } from "@/lib/server/mysql-errors";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { ANONYMOUS_PSEUDOS, pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
 import { reactivationPseudoCandidate } from "@/lib/shared/pseudo";
@@ -29,11 +29,17 @@ const HOLD_PSEUDO_ATTEMPTS = 5;
 /** Pseudos suffixés « OG » essayés à la réactivation (« PseudoOG » à « PseudoOG10 »). */
 const REACTIVATION_PSEUDO_ATTEMPTS = 10;
 
-/** Le pseudo est-il réservé par un **autre** compte en attente de suppression ? */
+/**
+ * Le pseudo est-il réservé par un **autre** compte en attente de suppression ?
+ * Table absente (`CREATE` en échec) : rien n'y a été mis de côté — `false`,
+ * sans quoi toute inscription et tout renommage tomberaient.
+ */
 export async function isPseudoHeldByOther(runner: Runner, pseudo: string, userId: number | null): Promise<boolean> {
-  const [rows] = await runner.execute<(RowDataPacket & { user_id: number })[]>(
-    `SELECT user_id FROM bg_account_deletion_holds WHERE pseudo = ? LIMIT 1`,
-    [pseudo],
+  const rows = await rowsOrEmptyIfMissingTable(
+    runner.execute<(RowDataPacket & { user_id: number })[]>(
+      `SELECT user_id FROM bg_account_deletion_holds WHERE pseudo = ? LIMIT 1`,
+      [pseudo],
+    ),
   );
   return rows.length > 0 && Number(rows[0].user_id) !== userId;
 }

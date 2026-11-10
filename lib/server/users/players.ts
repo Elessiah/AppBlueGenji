@@ -1,5 +1,7 @@
 import type { RowDataPacket } from "mysql2/promise";
+import type { Pool } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { loadAllPlayerRecords } from "@/lib/server/stats-service";
@@ -109,10 +111,16 @@ export async function getUserById(userId: number): Promise<PublicUserProfile | n
   return mapPublicUser(rows[0]);
 }
 
-export async function listPlayers(viewerId: number): Promise<DirectoryPlayer[]> {
-  const db = await getDatabase();
-  const [rows] = await db.execute<UserRow[]>(
-    `SELECT
+/**
+ * Les lignes de l'annuaire. Suppression demandée : le compte est masqué tout
+ * le délai de réactivation. Si `deletion_requested_at` manque (migration
+ * tolérante en échec), aucune demande n'a pu être posée : la liste se relit
+ * sans ce filtre plutôt que de tomber.
+ */
+async function readDirectoryRows(db: Pool): Promise<UserRow[]> {
+  const select = (filter: string) =>
+    db.execute<UserRow[]>(
+      `SELECT
       id,
       pseudo,
       avatar_url,
@@ -127,11 +135,22 @@ export async function listPlayers(viewerId: number): Promise<DirectoryPlayer[]> 
       open_to_recruitment,
       is_deleted,
       created_at
-     FROM bg_users
-     -- Suppression demandée : le compte est masqué tout le délai de réactivation.
-     WHERE deletion_requested_at IS NULL
+     FROM bg_users${filter}
      ORDER BY is_deleted ASC, pseudo ASC`,
-  );
+    );
+  try {
+    const [rows] = await select(" WHERE deletion_requested_at IS NULL");
+    return rows;
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+    const [rows] = await select("");
+    return rows;
+  }
+}
+
+export async function listPlayers(viewerId: number): Promise<DirectoryPlayer[]> {
+  const db = await getDatabase();
+  const rows = await readDirectoryRows(db);
 
   // `isDeleted` voyage jusqu'à l'annuaire, qui masque ces comptes par défaut :
   // un compte anonymisé n'est plus personne, mais sa ligne reste nécessaire à

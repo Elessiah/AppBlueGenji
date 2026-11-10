@@ -1848,6 +1848,35 @@ export async function releaseIneligibleReferee(
 }
 
 /**
+ * Après le retrait de l'arbitre et des casts d'un compte dont la suppression
+ * est demandée (`withdrawUserCasts`, sur la transaction de la demande) : chaque
+ * match non joué qu'il arbitrait est annoncé au staff (ligne anonyme), et tout
+ * match touché, tournoi en cours, part s'il n'attendait plus que lui — comme
+ * `releaseObjectingReferee`. Les annonces partent au commit de l'appelant
+ * (`flushBotLogs`). La transaction a lu bien avant ces verrous : le match et
+ * ses casters se relisent en lecture courante (`snapshotBeforeLock`) ; le
+ * reste du contexte (éligibilité d'un autre arbitre, effectifs) vient de
+ * l'instantané — un changement des dernières millisecondes est rattrapé par
+ * le prochain geste ou balayage du match, comme pour tout lancement.
+ */
+export async function relaunchAfterRefereeWithdrawal(
+  connection: PoolConnection,
+  refereeMatchIds: readonly number[],
+  castMatchIds: readonly number[] = [],
+): Promise<void> {
+  const refereed = new Set(refereeMatchIds);
+  const matchIds = [...new Set([...refereeMatchIds, ...castMatchIds])].sort((a, b) => a - b);
+  for (const matchId of matchIds) {
+    const row = await lockLaunchMatch(connection, matchId, true);
+    if (!row || row.status === "COMPLETED") continue;
+    if (refereed.has(matchId)) queueRefereeChange(connection, { kind: "ACCOUNT_WITHDRAWN", matchId });
+    if (row.tournament_state !== "RUNNING") continue;
+    await adoptCurrentPairing(connection, row);
+    await launchIfAllReady(connection, matchId, true, row);
+  }
+}
+
+/**
  * Retire de ce match l'arbitre dont l'opposition vient d'être retenue
  * (`referee-objection.ts`) — **quel que soit l'état du match tant qu'il n'est
  * pas joué**, lancé compris, contrairement au retrait d'office. Relu sous le

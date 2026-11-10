@@ -3,7 +3,8 @@ import { getDatabase } from "@/lib/server/database";
 import { accountDeletionPlan } from "@/lib/shared/account-deletion";
 import { isLegacyDeletedPseudo } from "@/lib/shared/anonymous-pseudos";
 import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
-import { accountTraceSql, afterCommit, finalizeAccountDeletion, loadAccountTrace } from "./account-deletion";
+import { unlink } from "node:fs/promises";
+import { accountTraceSql, afterCommit, finalizeAccountDeletion, loadAccountTrace, loadQuarantinedAvatarFiles } from "./account-deletion";
 import { settleDeletedSoloEntries } from "./deleted-solo-entries";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
@@ -33,17 +34,20 @@ async function settleDeletedAccount(
   connection: PoolConnection,
   userId: number,
   row: { pseudo: string; is_admin: 0 | 1; platform_roles_json: unknown },
-): Promise<{ gesture: "erased" | "renamed" | null; tournamentIds: number[] }> {
+): Promise<{ gesture: "erased" | "renamed" | null; tournamentIds: number[]; quarantinedFiles: string[] }> {
   const plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
   if (plan.mode === "ERASE") {
+    // Comme `deleteAccountNow` : les avatars masqués, relevés sous le verrou
+    // avant que la cascade n'emporte leurs lignes, partent après le commit.
+    const quarantinedFiles = await loadQuarantinedAvatarFiles(connection, userId);
     const { tournamentIds } = await eraseAccount(connection, userId);
-    return { gesture: "erased", tournamentIds };
+    return { gesture: "erased", tournamentIds, quarantinedFiles };
   }
   if (isLegacyDeletedPseudo(row.pseudo) || Number(row.is_admin) === 1 || row.platform_roles_json !== null) {
     const { tournamentIds } = await anonymizeAccount(connection, userId);
-    return { gesture: "renamed", tournamentIds };
+    return { gesture: "renamed", tournamentIds, quarantinedFiles: [] };
   }
-  return { gesture: null, tournamentIds: [] };
+  return { gesture: null, tournamentIds: [], quarantinedFiles: [] };
 }
 
 
@@ -165,8 +169,9 @@ async function reconcileOneAccount(
       await connection.rollback();
       return;
     }
-    const { gesture, tournamentIds } = await settleDeletedAccount(connection, userId, row);
+    const { gesture, tournamentIds, quarantinedFiles } = await settleDeletedAccount(connection, userId, row);
     await connection.commit();
+    for (const file of quarantinedFiles) await unlink(file).catch(() => {});
     if (gesture) outcome[gesture] += 1;
     for (const tournamentId of tournamentIds) touchedTournaments.add(tournamentId);
   } catch (error) {
@@ -216,6 +221,16 @@ export async function finalizeDueAccountDeletions(): Promise<{ finalized: number
       LIMIT 100`,
     skipped,
   );
+  // Les tickets de réactivation échus (registre : « vit quinze minutes »)
+  // partent à chaque passe, pas seulement à l'émission d'un autre.
+  await db
+    .execute(`DELETE FROM bg_account_reactivation_tickets WHERE expires_at < NOW()`)
+    .catch((error: unknown) =>
+      console.error(
+        "[deleted-accounts] Purge des tickets de réactivation échus reportée :",
+        error instanceof Error ? error.message : error,
+      ),
+    );
   const outcome = { finalized: 0, failed: 0 };
   for (const row of due) {
     try {

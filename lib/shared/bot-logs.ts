@@ -672,6 +672,7 @@ export type RefereeLogChange =
   | "RELEASED_BY_STAFF"
   | "INELIGIBLE"
   | "JOINED_TEAM"
+  | "ACCOUNT_WITHDRAWN"
   | "SELF_MANAGED_ON"
   | "SELF_MANAGED_OFF"
   | "FIRST_MAP_SET"
@@ -691,6 +692,7 @@ const REFEREE_LOG_WORDING: Record<RefereeLogChange, { kind: string; detail: stri
     detail: "l'arbitre ne remplit plus les conditions (rôle d'arbitre, tag Discord certifié, compte Battle.net en Overwatch)",
   },
   JOINED_TEAM: { kind: "Arbitre retiré d'office", detail: "l'arbitre joue désormais ce match" },
+  ACCOUNT_WITHDRAWN: { kind: "Arbitre retiré d'office", detail: "l'arbitre n'est plus disponible" },
   SELF_MANAGED_ON: { kind: "Autogestion activée", detail: `par ${ANONYMOUS_STAFF_LABEL}` },
   SELF_MANAGED_OFF: { kind: "Autogestion désactivée", detail: `par ${ANONYMOUS_STAFF_LABEL}` },
   FIRST_MAP_SET: { kind: "Première carte réglée", detail: `par ${ANONYMOUS_STAFF_LABEL}` },

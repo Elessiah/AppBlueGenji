@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 jest.mock("@/lib/server/database");
 
@@ -149,5 +151,98 @@ describe("updateOwnProfile — la course sur l'index unique du pseudo", () => {
     );
 
     await expect(updateOwnProfile(42, { pseudo: "Nova" })).resolves.toBeUndefined();
+  });
+});
+
+/*
+ * Décision D39 (2026-11-10) : le pseudo d'un compte en attente de suppression
+ * reste réservé, mais son refus ne doit rien dire de cette demande — il est
+ * indiscernable de celui d'un pseudo porté par un compte.
+ */
+describe("updateOwnProfile — un pseudo réservé se refuse comme un pseudo pris (D39)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  async function refusal(execute: Awaited<ReturnType<typeof mockDb>>): Promise<{ name: string; message: string; keys: string[] }> {
+    const error = await updateOwnProfile(42, { pseudo: "Nova" }).then(
+      () => new Error("NOT_REFUSED"),
+      (thrown: Error) => thrown,
+    );
+    expect(writtenPseudo(execute)).toBeUndefined();
+    return { name: error.name, message: error.message, keys: Object.keys(error) };
+  }
+
+  it("updateOwnProfile_takenVsHeldPseudo_sameErrorAndSameReads", async () => {
+    const taken = await mockDb();
+    taken.mockImplementation(async (sql: string) =>
+      /SELECT id FROM bg_users WHERE pseudo = \?/.test(sql) ? [[{ id: 7 }]] : [[]],
+    );
+    const takenRefusal = await refusal(taken);
+    const takenReads = taken.mock.calls.map(([sql, params]) => [sql, params]);
+
+    const held = await mockDb();
+    held.mockImplementation(async (sql: string) => (/bg_account_deletion_holds/.test(sql) ? [[{ user_id: 9 }]] : [[]]));
+    const heldRefusal = await refusal(held);
+    const heldReads = held.mock.calls.map(([sql, params]) => [sql, params]);
+
+    expect(heldRefusal).toEqual(takenRefusal);
+    expect(heldRefusal.message).toBe("PSEUDO_ALREADY_USED");
+    expect(heldReads).toEqual(takenReads);
+  });
+
+  it("updateOwnProfile_takenPseudo_stillReadsHolds", async () => {
+    const execute = await mockDb();
+    execute.mockImplementation(async (sql: string) =>
+      /SELECT id FROM bg_users WHERE pseudo = \?/.test(sql) ? [[{ id: 7 }]] : [[]],
+    );
+
+    await expect(updateOwnProfile(42, { pseudo: "Nova" })).rejects.toThrow("PSEUDO_ALREADY_USED");
+
+    expect(execute.mock.calls.some(([sql]) => /bg_account_deletion_holds/.test(sql))).toBe(true);
+  });
+
+  it("updateOwnProfile_heldPseudoAndMissingHoldsTable_sameRefusalAsTaken", async () => {
+    const execute = await mockDb();
+    execute.mockImplementation(async (sql: string) => {
+      if (/bg_account_deletion_holds/.test(sql)) throw Object.assign(new Error("no table"), { code: "ER_NO_SUCH_TABLE" });
+      return /SELECT id FROM bg_users WHERE pseudo = \?/.test(sql) ? [[{ id: 7 }]] : [[]];
+    });
+
+    await expect(updateOwnProfile(42, { pseudo: "Nova" })).rejects.toThrow("PSEUDO_ALREADY_USED");
+  });
+});
+
+describe("pseudo réservé — aucun code ni texte dédié (D39)", () => {
+  const read = (path: string): string => readFileSync(join(process.cwd(), path), "utf8");
+  const DEDICATED = /PSEUDO_(?:RESERVED|HELD|ON_HOLD|PENDING|UNAVAILABLE|AWAITING)[A-Z_]*/;
+
+  it.each([
+    "lib/server/users/profile-update.ts",
+    "lib/server/users/account-deletion-hold.ts",
+    "lib/server/auth.ts",
+    "app/api/profile/route.ts",
+    "lib/shared/field-errors.ts",
+    "messages/fr/profile.json",
+    "messages/en/profile.json",
+  ])("pseudoRefusal_%s_noDedicatedCode", (path) => {
+    expect(read(path)).not.toMatch(DEDICATED);
+  });
+
+  it.each(["fr", "en"])("pseudoRefusal_%sMessages_singleTakenText", (locale) => {
+    const source = read(`messages/${locale}/profile.json`);
+
+    expect(source.match(/"PSEUDO_ALREADY_USED"/g)).toHaveLength(1);
+  });
+
+  it("pseudoRefusal_route_single409ForTheSingleCode", () => {
+    const route = read("app/api/profile/route.ts");
+
+    expect(route.match(/PSEUDO_[A-Z_]+"\) return fail\(message, 409\)/g)).toEqual([
+      'PSEUDO_ALREADY_USED") return fail(message, 409)',
+    ]);
   });
 });

@@ -102,7 +102,7 @@ export async function loadTournamentContacts(
      FROM bg_tournament_registrations r
      JOIN bg_teams t ON t.id = r.team_id
      LEFT JOIN bg_team_members tm ON tm.team_id = t.id AND tm.left_at IS NULL
-     LEFT JOIN bg_users u ON u.id = COALESCE(tm.user_id, t.solo_user_id)
+     LEFT JOIN bg_users u ON u.id = COALESCE(tm.user_id, t.solo_user_id) AND u.is_deleted = 0
      WHERE r.tournament_id = ?
      ORDER BY r.seed ASC, t.id ASC, u.pseudo ASC`,
     [tournamentId],

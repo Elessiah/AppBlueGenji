@@ -108,6 +108,87 @@ describe("listOwnMatchRoles", () => {
     expect(roles.refereeAssignments).toEqual([{ matchId: 6, tournamentId: 2, readyAt: null }]);
   });
 
+  // ERREUR.txt (revue EF-21 #526, art. 15) : une colonne récente absente ne
+  // vide plus toute la lecture — elle seule est lue NULL.
+  it("listOwnMatchRoles_refereeReadyAtMissing_keepsAssignmentsWithNullReady", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockRejectedValueOnce(Object.assign(new Error("Unknown column 'referee_ready_at' in 'field list'"), { code: "ER_BAD_FIELD_ERROR" }))
+      .mockResolvedValueOnce([[{ id: 6, tournament_id: 2, referee_ready_at: null }]])
+      .mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    const roles = await listOwnMatchRoles(12);
+
+    expect(roles.refereeAssignments).toEqual([{ matchId: 6, tournamentId: 2, readyAt: null }]);
+    expect(execute.mock.calls[3][0]).toContain("NULL AS referee_ready_at");
+  });
+
+  // Revue sécurité #579 : le nom se lit quelle que soit la langue du serveur.
+  it("listOwnMatchRoles_localizedUnknownColumnMessage_dropsTheNamedColumnOnly", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(Object.assign(new Error("Champ 'c.ready_at' inconnu dans field list"), { code: "ER_BAD_FIELD_ERROR" }))
+      .mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    await listOwnMatchRoles(12);
+
+    const retried = String(execute.mock.calls[1][0]);
+    expect(retried).toContain("NULL AS ready_at");
+    expect(retried).toContain("c.created_at AS created_at");
+    expect(retried).toContain("c.cast_battletag AS cast_battletag");
+  });
+
+  it("listOwnMatchRoles_casterReadyAtMissing_keepsCastsAndOtherColumns", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(Object.assign(new Error("Unknown column 'c.ready_at' in 'field list'"), { code: "ER_BAD_FIELD_ERROR" }))
+      .mockResolvedValueOnce([[
+        { match_id: 5, tournament_id: 2, stream_id: 3, ready_at: null, created_at: new Date("2026-10-20T17:00:00Z"), cast_battletag: "Voix#2100" },
+      ]])
+      .mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    const roles = await listOwnMatchRoles(12);
+
+    expect(roles.casts).toEqual([
+      { matchId: 5, tournamentId: 2, streamId: 3, readyAt: null, createdAt: "2026-10-20T17:00:00.000Z", castBattletag: "Voix#2100" },
+    ]);
+    const retried = String(execute.mock.calls[1][0]);
+    expect(retried).toContain("NULL AS ready_at");
+    expect(retried).toContain("c.created_at AS created_at");
+    expect(retried).toContain("c.cast_battletag AS cast_battletag");
+  });
+
+  it("listOwnMatchRoles_casterCreatedAtMissing_ordersByMatchOnly", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(Object.assign(new Error("Unknown column 'c.created_at' in 'field list'"), { code: "ER_BAD_FIELD_ERROR" }))
+      .mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    await listOwnMatchRoles(12);
+
+    const retried = String(execute.mock.calls[1][0]);
+    expect(retried).toContain("NULL AS created_at");
+    expect(retried).toMatch(/ORDER BY c\.match_id/);
+  });
+
+  it("listOwnMatchRoles_unnamedUnknownColumn_dropsLatestOptionalFirst", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(Object.assign(new Error("bad field"), { code: "ER_BAD_FIELD_ERROR" }))
+      .mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    await listOwnMatchRoles(12);
+
+    expect(String(execute.mock.calls[1][0])).toContain("NULL AS cast_battletag");
+  });
+
   it("listOwnMatchRoles_otherFailure_rethrows", async () => {
     await mockDb(jest.fn<SqlQuery>().mockRejectedValueOnce(new Error("DB_DOWN")));
 

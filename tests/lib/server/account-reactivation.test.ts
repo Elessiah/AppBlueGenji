@@ -51,19 +51,26 @@ function transaction(options: {
   /** Lignes retirées par le `DELETE` du ticket : 0 = une autre requête l'a servi. */
   ticketDeleted?: number;
   failOn?: string;
+  /** Erreurs levées, une par passage, au verrou du compte (interblocages). */
+  lockErrors?: Error[];
 }) {
   const connection = connectionMock();
   connection.rollback.mockResolvedValue(undefined);
   connection.execute.mockImplementation(async (sql: string) => {
     if (options.failOn && sql.includes(options.failOn)) throw new Error("DB_DOWN");
     if (sql.includes("SELECT user_id, login_event")) return [options.ticket ? [options.ticket] : [], []];
-    if (sql.includes("FOR UPDATE")) return [options.locked ? [options.locked] : [], []];
+    if (sql.includes("FOR UPDATE")) {
+      const failure = options.lockErrors?.shift();
+      if (failure) throw failure;
+      return [options.locked ? [options.locked] : [], []];
+    }
     if (sql.startsWith("UPDATE bg_users")) return [{ affectedRows: options.affectedRows ?? 1 }, []];
     if (sql.startsWith("DELETE FROM bg_account_reactivation_tickets")) return [{ affectedRows: options.ticketDeleted ?? 1 }, []];
     return [{ affectedRows: 1 }, []];
   });
+  // Le ticket se lit sur le pool, hors transaction : même journal de requêtes.
   jest.mocked(getDatabase).mockResolvedValue(
-    fakePool({ getConnection: jest.fn(async () => fakeConnection(connection)) }),
+    fakePool({ execute: connection.execute, getConnection: jest.fn(async () => fakeConnection(connection)) }),
   );
   return connection;
 }
@@ -99,6 +106,22 @@ describe("readPendingDeletion", () => {
     poolExecute([{ is_deleted: 1, deletion_requested_at: null }]);
 
     expect(await readPendingDeletion(7)).toBeNull();
+  });
+
+  // ERREUR.txt (revue sécurité #546) : colonne absente (migration en échec),
+  // la connexion n'est pas bloquée.
+  it("readPendingDeletion_unknownColumn_null", async () => {
+    const execute = poolExecute([]);
+    execute.mockRejectedValueOnce(Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" }));
+
+    expect(await readPendingDeletion(7)).toBeNull();
+  });
+
+  it("readPendingDeletion_otherError_rethrows", async () => {
+    const execute = poolExecute([]);
+    execute.mockRejectedValueOnce(Object.assign(new Error("down"), { code: "ECONNRESET" }));
+
+    await expect(readPendingDeletion(7)).rejects.toThrow("down");
   });
 });
 
@@ -145,11 +168,11 @@ describe("peekReactivationTicket", () => {
 });
 
 describe("reactivateAccount", () => {
-  it("reactivateAccount_unknownTicket_nullAndCommitted", async () => {
+  it("reactivateAccount_unknownTicket_nullWithoutTransaction", async () => {
     const connection = transaction({});
 
     expect(await reactivateAccount(TOKEN)).toBeNull();
-    expect(connection.commit).toHaveBeenCalled();
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
     expect(connection.execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE bg_users"))).toBe(false);
   });
 
@@ -175,6 +198,36 @@ describe("reactivateAccount", () => {
     );
     expect(invalidateTeamIdentityViews).toHaveBeenCalled();
     expect(invalidateStats).toHaveBeenCalled();
+  });
+
+  // Revue sécurité #579 : le verrou du compte attend derrière la suppression définitive.
+  it("reactivateAccount_deadlockOnAccountLock_replayedOnce", async () => {
+    const connection = transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+      lockErrors: [Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK" })],
+    });
+
+    expect(await reactivateAccount(TOKEN)).toEqual({ userId: 7, event: "LOGIN_DISCORD" });
+
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(recordAccountReactivation).toHaveBeenCalledTimes(1);
+  });
+
+  it("reactivateAccount_deadlockEveryAttempt_rethrowsWithoutSideEffects", async () => {
+    const deadlock = () => Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK" });
+    const connection = transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+      lockErrors: [deadlock(), deadlock(), deadlock()],
+    });
+
+    await expect(reactivateAccount(TOKEN)).rejects.toThrow("Deadlock found");
+
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(invalidateStats).not.toHaveBeenCalled();
   });
 
   // Revue juridique #546, cycle 3 : la ligne de réactivation précède le commit.
@@ -272,9 +325,48 @@ describe("reactivateAccount", () => {
 
     expect(await reactivateAccount(TOKEN)).toBeNull();
     expect(connection.commit).toHaveBeenCalled();
-    expect(connection.execute.mock.calls.some(([sql]) => sql.includes("FOR UPDATE"))).toBe(false);
     expect(restoreAccountIdentity).not.toHaveBeenCalled();
     expect(recordAccountReactivation).not.toHaveBeenCalled();
+  });
+
+  // ERREUR.txt (revue perf #546) : le compte se verrouille avant le ticket,
+  // dans l'ordre de la suppression définitive (compte puis cascade).
+  it("reactivateAccount_valid_locksAccountBeforeConsumingTicket", async () => {
+    const connection = transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+    });
+
+    await reactivateAccount(TOKEN);
+    const sqls = connection.execute.mock.calls.map(([sql]) => sql);
+    const lockIndex = sqls.findIndex((sql) => sql.includes("FROM bg_users WHERE id = ? FOR UPDATE"));
+    const consumeIndex = sqls.findIndex((sql) => sql.startsWith("DELETE FROM bg_account_reactivation_tickets"));
+    expect(lockIndex).toBeGreaterThanOrEqual(0);
+    expect(consumeIndex).toBeGreaterThan(lockIndex);
+    expect(connection.execute.mock.calls[consumeIndex][1]).toEqual([expect.any(String), 7]);
+  });
+
+  it("reactivateAccount_ticketReadBeforeTransaction_snapshotNotFixedBeforeLock", async () => {
+    const connection = transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+    });
+
+    await reactivateAccount(TOKEN);
+    const sqls = connection.execute.mock.calls.map(([sql]) => sql);
+    const ticketRead = sqls.findIndex((sql) => sql.includes("SELECT user_id, login_event"));
+    expect(connection.execute.mock.invocationCallOrder[ticketRead]).toBeLessThan(
+      connection.beginTransaction.mock.invocationCallOrder[0],
+    );
+    const consume = sqls.find((sql) => sql.startsWith("DELETE FROM bg_account_reactivation_tickets"));
+    expect(consume).toContain("expires_at > NOW()");
+  });
+
+  it("reactivateAccount_unknownTicket_neverLocksAccount", async () => {
+    const connection = transaction({});
+
+    expect(await reactivateAccount(TOKEN)).toBeNull();
+    expect(connection.execute.mock.calls.some(([sql]) => sql.includes("FOR UPDATE"))).toBe(false);
   });
 
   it("reactivateAccount_restoreRefused_nullAndJournalKept", async () => {
@@ -306,7 +398,7 @@ describe("reactivateAccount", () => {
   });
 
   it("reactivateAccount_error_rollsBackAndReleases", async () => {
-    const connection = transaction({ failOn: "SELECT user_id, login_event" });
+    const connection = transaction({ failOn: "FROM bg_users WHERE id = ? FOR UPDATE", ticket: { user_id: 7, login_event: "LOGIN_DISCORD" } });
 
     await expect(reactivateAccount(TOKEN)).rejects.toThrow("DB_DOWN");
     expect(connection.rollback).toHaveBeenCalled();

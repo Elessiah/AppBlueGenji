@@ -618,7 +618,12 @@ puis renomme l'entrée solo (`syncSoloEntryIdentityOn`). Toute lecture qui joint
 `bg_users` montre donc déjà le faux nom, sans lien de fiche.
 
 - **Pseudo réservé** : `isPseudoHeldByOther` le refuse au renommage
-  (`PSEUDO_ALREADY_USED`) et `pseudoExists` à l'inscription.
+  (`PSEUDO_ALREADY_USED`) et `pseudoExists` à l'inscription. Décision D39
+  (2026-11-10) : la réservation reste, mais le refus est **indiscernable** de
+  celui d'un pseudo porté par un compte — même code, même statut 409, même
+  champ, même texte FR/EN, les deux lectures toujours jouées (ni branche ni
+  durée propre) ; l'inscription, elle, suffixe en silence dans les deux cas.
+  Aucun code dédié ne doit jamais dire qu'un pseudo attend une réactivation.
 - **Réactivation** : `restoreAccountIdentity` relève la demande et rend pseudo et
   avatar en une instruction, efface le masque et renomme l'entrée solo. Un
   conflit (course avec un renommage, sauvegarde restaurée) rend le pseudo suivi
@@ -924,6 +929,16 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   n'est pas bloqué (D19, D6) ; l'avatar par défaut d'un fournisseur n'a pas
   d'exclusion — la modération ne le supprime pas (D20). L'empreinte
   perceptuelle (D17) viendra dans un lot à part (`ERREUR.txt`).
+
+## Solde ERREUR.txt (ACCOUNT-DELETION-2, 2026-11-10)
+
+- **Dernier administrateur** : la demande d'un administrateur est refusée (`LAST_ADMIN_ACCOUNT`, FR+EN dans `deletion.errors`) s'il ne reste aucun autre administrateur vivant et non suspendu (un suspendu ne peut ouvrir de session). Les autres administrateurs se relèvent sans verrou, puis le premier se verrouille par sa clé et se relit (une recherche verrouillée sans index sur `is_admin` verrouillerait toute la table). Le rejeu d'une demande journalisée n'est pas refusé. Revue sécurité #579 : sous ce verrou, la suspension de l'autre administrateur se relit en lecture verrouillante (`LOCK IN SHARE MODE`, donc courante) ; la réactivation se rejoue sur interblocage (`retryOnDeadlock`, suites d'après commit dehors) ; une annonce qui échoue après le commit de la demande ne la fait plus passer pour un échec ; l'export lit le nom d'une colonne absente quelle que soit la langue du serveur.
+- **Interblocage** : la transaction de la demande (`requestAccountDeletion`) et celle de la suppression définitive (`deleteAccountNow`) se rejouent entières par `retryOnDeadlock` (une désignation d'arbitre verrouille le match puis le compte, la suppression l'inverse).
+- **Arbitrages et casts retirés** : les matchs non joués que le compte arbitrait sont annoncés au staff (ligne anonyme « Arbitre retiré d'office — l'arbitre n'est plus disponible », `ACCOUNT_WITHDRAWN`, aucun avis au compte) ; ceux-là et ceux dont son cast est retiré partent, tournoi en cours, s'ils n'attendaient plus que lui (`relaunchAfterRefereeWithdrawal`, listes rendues sous verrou par `withdrawUserCasts`, casters relus en lecture courante). Annonces envoyées au commit (`flushBotLogs`), jetées sur annulation ; rien de tout cela au rejeu d'une restauration.
+- **Réactivation** : le ticket se lit hors transaction, puis le compte se verrouille avant de consommer le ticket (même ordre que la suppression définitive, instantané pris après le verrou).
+- **Contacts de match** : un compte en attente de suppression n'y figure plus (`u.is_deleted = 0`).
+- **Tolérance de schéma** : `deletion_requested_at` absente → connexion et annuaire ne tombent pas ; `bg_account_deletion_holds` absente → inscription et renommage ne tombent pas ; l'export des rôles de match retire seule la colonne récente refusée (lue `NULL`).
+- **Ménage** : les tickets de réactivation échus partent à chaque passe horaire, et tous ceux du compte à toute anonymisation (`anonymizeAccount`) ; le rattrapage au démarrage efface les fichiers d'avatar masqués du compte effacé, après le commit.
 
 ## Décisions requises (ouvertes)
 

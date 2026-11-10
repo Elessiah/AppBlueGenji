@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { isUnknownColumnError } from "@/lib/server/mysql-errors";
+import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import {
   ACCOUNT_PENDING_DELETION_CODE,
   isReactivationWindowOpen,
@@ -51,10 +53,19 @@ function hashTicket(token: string): string {
 /** L'état de suppression d'un compte : `null` s'il est vivant, inconnu ou déjà supprimé définitivement. */
 export async function readPendingDeletion(userId: number): Promise<{ requestedAt: string; windowOpen: boolean } | null> {
   const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { is_deleted: 0 | 1; deletion_requested_at: StoredDate })[]>(
-    `SELECT is_deleted, deletion_requested_at FROM bg_users WHERE id = ? LIMIT 1`,
-    [userId],
-  );
+  let rows: (RowDataPacket & { is_deleted: 0 | 1; deletion_requested_at: StoredDate })[];
+  try {
+    [rows] = await db.execute<(RowDataPacket & { is_deleted: 0 | 1; deletion_requested_at: StoredDate })[]>(
+      `SELECT is_deleted, deletion_requested_at FROM bg_users WHERE id = ? LIMIT 1`,
+      [userId],
+    );
+  } catch (error) {
+    // Lue à chaque connexion : une migration tolérante en échec (colonne
+    // absente) ne doit pas fermer la porte — sans la colonne, aucune demande
+    // n'a pu être posée.
+    if (isUnknownColumnError(error)) return null;
+    throw error;
+  }
   const row = rows[0];
   if (!row || Number(row.is_deleted) !== 1 || row.deletion_requested_at === null) return null;
   return {
@@ -138,84 +149,98 @@ export async function reactivateAccount(
   if (!token || !/^[0-9a-f]{64}$/.test(token)) return null;
   const db = await getDatabase();
   const tokenHash = hashTicket(token);
-  const connection = await db.getConnection();
-  try {
-    await connection.beginTransaction();
-    const [tickets] = await connection.execute<(RowDataPacket & { user_id: number; login_event: string })[]>(
-      `SELECT user_id, login_event FROM bg_account_reactivation_tickets
-        WHERE token_hash = ? AND expires_at > NOW() LIMIT 1`,
-      [tokenHash],
-    );
-    // Servi une fois, quoi qu'il advienne de la suite — et réservé par cette
-    // instruction même (`affectedRows`) : une seconde requête au même cookie,
-    // qui a lu le ticket avant ce retrait, n'en tire rien.
-    const [consumed] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM bg_account_reactivation_tickets WHERE token_hash = ?`,
-      [tokenHash],
-    );
-    const ticket = Number(consumed.affectedRows) === 1 ? tickets[0] : undefined;
-    if (!ticket) {
+  // Le ticket se lit hors de la transaction : lu dedans, il y figerait
+  // l'instantané (REPEATABLE READ) avant le verrou du compte, et la reprise du
+  // pseudo (`restoreAccountIdentity`) ne verrait pas un renommage commis entre-temps.
+  const [tickets] = await db.execute<(RowDataPacket & { user_id: number; login_event: string })[]>(
+    `SELECT user_id, login_event FROM bg_account_reactivation_tickets
+      WHERE token_hash = ? AND expires_at > NOW() LIMIT 1`,
+    [tokenHash],
+  );
+  const candidate = tickets[0];
+  if (!candidate) return null;
+  const userId = Number(candidate.user_id);
+  // Rejouée entière sur interblocage (ou refus d'instantané MariaDB) : elle
+  // attend le verrou du compte derrière la suppression définitive. Rien n'est
+  // écrit avant l'annulation, et les suites d'après commit restent dehors.
+  const transact = async (): Promise<boolean> => {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+      // Le compte d'abord, le ticket ensuite : même ordre que la suppression
+      // définitive (`deleteAccountNow` verrouille le compte, puis la cascade
+      // atteint ses tickets) — l'ordre inverse s'interbloquait avec elle.
+      const [locked] = await connection.execute<(RowDataPacket & {
+        is_deleted: 0 | 1;
+        deletion_requested_at: StoredDate;
+        created_at: string;
+      })[]>(
+        `SELECT is_deleted, deletion_requested_at, created_at FROM bg_users WHERE id = ? FOR UPDATE`,
+        [userId],
+      );
+      // Servi une fois, quoi qu'il advienne de la suite — et réservé par cette
+      // instruction même (`affectedRows`) : une seconde requête au même cookie,
+      // qui a lu le ticket avant ce retrait, n'en tire rien.
+      const [consumed] = await connection.execute<ResultSetHeader>(
+        `DELETE FROM bg_account_reactivation_tickets WHERE token_hash = ? AND user_id = ? AND expires_at > NOW()`,
+        [tokenHash, userId],
+      );
+      if (Number(consumed.affectedRows) !== 1) {
+        await connection.commit();
+        return false;
+      }
+      const row = locked[0];
+      if (
+        !row ||
+        Number(row.is_deleted) !== 1 ||
+        row.deletion_requested_at === null ||
+        !isReactivationWindowOpen(row.deletion_requested_at)
+      ) {
+        await connection.commit();
+        return false;
+      }
+      // Le vrai pseudo et l'avatar reviennent avec le compte (anonyme depuis la
+      // demande, `account-deletion-hold.ts`).
+      const restored = await restoreAccountIdentity(connection, userId);
+      // Une session ouverte pendant la demande (connexion en cours au moment du
+      // `DELETE` de la demande) redeviendrait valide avec le compte : toutes
+      // partent, seule celle de la réactivation sera créée ensuite.
+      if (!restored) {
+        await connection.commit();
+        return false;
+      }
+      await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
+      // Avant le commit, et levé s'il échoue (la transaction s'annule, le ticket
+      // revient) : la demande en attente ne doit plus être rejouée par une
+      // restauration — la réactivation l'y remplace, et une sauvegarde prise
+      // pendant les trente jours, restaurée, réactive le compte au rejeu
+      // (décision R1). Un commit qui échouerait ensuite laisse une ligne de
+      // réactivation pour une demande restée en attente : son titulaire, qui
+      // voit l'échec, réactive de nouveau (même ligne) ou laisse courir le délai.
+      await recordAccountReactivation(
+        {
+          userId,
+          accountCreatedAt: String(row.created_at),
+          undoneRequestAt: String(row.deletion_requested_at),
+        },
+        { strict: true },
+      );
       await connection.commit();
-      return null;
+      return true;
+    } catch (error) {
+      await connection.rollback().catch(() => {});
+      throw error;
+    } finally {
+      connection.release();
     }
-    const userId = Number(ticket.user_id);
-    const [locked] = await connection.execute<(RowDataPacket & {
-      is_deleted: 0 | 1;
-      deletion_requested_at: StoredDate;
-      created_at: string;
-    })[]>(
-      `SELECT is_deleted, deletion_requested_at, created_at FROM bg_users WHERE id = ? FOR UPDATE`,
-      [userId],
-    );
-    const row = locked[0];
-    if (
-      !row ||
-      Number(row.is_deleted) !== 1 ||
-      row.deletion_requested_at === null ||
-      !isReactivationWindowOpen(row.deletion_requested_at)
-    ) {
-      await connection.commit();
-      return null;
-    }
-    // Le vrai pseudo et l'avatar reviennent avec le compte (anonyme depuis la
-    // demande, `account-deletion-hold.ts`).
-    const restored = await restoreAccountIdentity(connection, userId);
-    // Une session ouverte pendant la demande (connexion en cours au moment du
-    // `DELETE` de la demande) redeviendrait valide avec le compte : toutes
-    // partent, seule celle de la réactivation sera créée ensuite.
-    if (!restored) {
-      await connection.commit();
-      return null;
-    }
-    await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
-    // Avant le commit, et levé s'il échoue (la transaction s'annule, le ticket
-    // revient) : la demande en attente ne doit plus être rejouée par une
-    // restauration — la réactivation l'y remplace, et une sauvegarde prise
-    // pendant les trente jours, restaurée, réactive le compte au rejeu
-    // (décision R1). Un commit qui échouerait ensuite laisse une ligne de
-    // réactivation pour une demande restée en attente : son titulaire, qui
-    // voit l'échec, réactive de nouveau (même ligne) ou laisse courir le délai.
-    await recordAccountReactivation(
-      {
-        userId,
-        accountCreatedAt: String(row.created_at),
-        undoneRequestAt: String(row.deletion_requested_at),
-      },
-      { strict: true },
-    );
-    await connection.commit();
-    // Les vues en cache montraient le pseudo d'emprunt.
-    invalidateTeamIdentityViews();
-    invalidateStats();
-    await republishSoloEntryTournaments(userId);
-    await logReactivation();
-    return { userId, event: ticket.login_event as ConnectionLogEvent };
-  } catch (error) {
-    await connection.rollback().catch(() => {});
-    throw error;
-  } finally {
-    connection.release();
-  }
+  };
+  if (!(await retryOnDeadlock(transact))) return null;
+  // Les vues en cache montraient le pseudo d'emprunt.
+  invalidateTeamIdentityViews();
+  invalidateStats();
+  await republishSoloEntryTournaments(userId);
+  await logReactivation();
+  return { userId, event: candidate.login_event as ConnectionLogEvent };
 }
 
 /**

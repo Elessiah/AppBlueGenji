@@ -717,6 +717,25 @@ describe("deleteOwnAccount — un refus de la base ne part pas tel quel", () => 
     await expect(deleteOwnAccount(7)).rejects.toThrow("DB_DOWN");
   });
 
+  // ERREUR.txt (revue sécurité EF-21 #526) : un interblocage avec une
+  // désignation d'arbitre rejoue la transaction (trois essais), puis remonte.
+  it("deleteOwnAccount_deadlockEveryAttempt_retriedThreeTimesThenRethrows", async () => {
+    const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+    const { connection } = fakeDb(EMPTY, { failOn: "DELETE FROM bg_users", failWith: deadlock });
+
+    await expect(deleteOwnAccount(7)).rejects.toThrow("Deadlock");
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(3);
+    expect(connection.rollback).toHaveBeenCalledTimes(3);
+    expect(connection.commit).not.toHaveBeenCalled();
+  });
+
+  it("deleteOwnAccount_referencedRow_notRetried", async () => {
+    const { connection } = fakeDb(EMPTY, { failOn: "DELETE FROM bg_users", failWith: referencedRow() });
+
+    await expect(deleteOwnAccount(7)).rejects.toThrow("ACCOUNT_STILL_REFERENCED");
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
+  });
+
   it("annule tout de même la transaction", async () => {
     const { connection } = fakeDb(EMPTY, {
       failOn: "DELETE FROM bg_users",

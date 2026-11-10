@@ -244,6 +244,34 @@ describe("finalizeDueAccountDeletions", () => {
     expect(await finalizeDueAccountDeletions()).toEqual({ finalized: 1, failed: 0 });
   });
 
+  // ERREUR.txt (revue légale #546) : les tickets échus partent à chaque passe.
+  it("finalizeDueAccountDeletions_eachPass_purgesExpiredReactivationTickets", async () => {
+    const { queries } = fakeDb({ locked: null, due: [] });
+
+    await finalizeDueAccountDeletions();
+
+    expect(queries).toContain("DELETE FROM bg_account_reactivation_tickets WHERE expires_at < NOW()");
+  });
+
+  it("finalizeDueAccountDeletions_ticketPurgeFails_passStillRuns", async () => {
+    const { execute } = fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, due: [7] });
+    const base = execute.getMockImplementation()!;
+    execute.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (String(sql).includes("expires_at < NOW()")) throw new Error("DB_DOWN");
+      return base(sql, params);
+    });
+    jest.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await finalizeDueAccountDeletions()).toEqual({ finalized: 1, failed: 0 });
+  });
+
+  it("finalizeAccountDeletion_anonymized_dropsItsReactivationTickets", async () => {
+    const { queries } = fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, played: 1 });
+
+    expect((await finalizeAccountDeletion(7))?.mode).toBe("ANONYMIZE");
+    expect(queries).toContain("DELETE FROM bg_account_reactivation_tickets WHERE user_id = ?");
+  });
+
   it("finalizeDueAccountDeletions_secondPassAlreadyDone_countsNothing", async () => {
     // Idempotence : le compte effacé au premier passage n'est plus rendu par le relevé.
     fakeDb({ locked: null, due: [] });

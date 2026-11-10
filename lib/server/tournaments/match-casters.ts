@@ -332,6 +332,10 @@ export type MatchWithdrawal = {
   matchIds: number[];
   /** Leurs tournois, sans doublon : à prévenir après le commit (`publishMatchUpdatedEvent`). */
   tournamentIds: number[];
+  /** Matchs non joués dont il était l'arbitre, retiré ici (lus sous verrou). */
+  releasedRefereeMatchIds: number[];
+  /** Matchs non joués dont son cast a été retiré (lus sous verrou). */
+  releasedCastMatchIds: number[];
 };
 
 type WithdrawnMatchRow = RowDataPacket & { id: number; tournament_id: number; status: string };
@@ -409,7 +413,7 @@ export async function withdrawUserCasts(
   // la référence à son compte part avec lui (effacement), verrouillés avec les autres.
   const triggered = await matchIdsOf(`SELECT id AS match_id FROM bg_matches WHERE live_trigger_user_id = ? ORDER BY id`);
   const candidates = [...new Set([...casts, ...links, ...refereed, ...triggered])].sort((a, b) => a - b);
-  if (candidates.length === 0) return { matchIds: [], tournamentIds: [] };
+  if (candidates.length === 0) return { matchIds: [], tournamentIds: [], releasedRefereeMatchIds: [], releasedCastMatchIds: [] };
 
   const [locked] = await connection.execute<WithdrawnMatchRow[]>(
     `SELECT id, tournament_id, status FROM bg_matches WHERE id IN (${placeholders(candidates)}) ORDER BY id FOR UPDATE`,
@@ -465,9 +469,14 @@ export async function withdrawUserCasts(
   // (anonymisation) n'en fait pas partie.
   const touched = new Set([...castsToDrop, ...linksToDrop, ...refereesToDrop, ...triggersToDrop]);
   const touchedRows = locked.filter((row) => touched.has(Number(row.id)));
+  // Un match non joué qui attendait encore ce « Prêt » peut partir : l'appelant
+  // le relance (`relaunchAfterRefereeWithdrawal`) sur ces listes lues sous verrou.
+  const unplayed = new Set(locked.filter((row) => row.status !== "COMPLETED").map((row) => Number(row.id)));
   return {
     matchIds: touchedRows.map((row) => Number(row.id)),
     tournamentIds: [...new Set(touchedRows.map((row) => Number(row.tournament_id)))].sort((a, b) => a - b),
+    releasedRefereeMatchIds: refereesToDrop.filter((id) => unplayed.has(id)),
+    releasedCastMatchIds: castsToDrop.filter((id) => unplayed.has(id)),
   };
 }
 

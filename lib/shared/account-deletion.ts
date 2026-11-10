@@ -291,6 +291,9 @@ export function accountDeletionErrorMessage(code: string | undefined): string {
   if (code === "ACCOUNT_STILL_REFERENCED") {
     return "Ton compte a été rattaché à un tournoi ou à une équipe pendant la suppression. Réessaie : il sera alors anonymisé plutôt qu'effacé.";
   }
+  if (code === "LAST_ADMIN_ACCOUNT") {
+    return "Tu es le dernier administrateur : nomme un autre administrateur avant de supprimer ton compte.";
+  }
   return "La suppression du compte a échoué. Réessaie dans un instant.";
 }
 

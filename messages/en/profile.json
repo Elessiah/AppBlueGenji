@@ -244,6 +244,7 @@
     },
     "errors": {
       "ACCOUNT_STILL_REFERENCED": "Your account was linked to a tournament or a team during the deletion. Try again: it will then be anonymized rather than erased.",
+      "LAST_ADMIN_ACCOUNT": "You are the last administrator: appoint another administrator before deleting your account.",
       "fallback": "Account deletion failed. Try again in a moment.",
       "sessionGone": "Your session has ended: either your account has just been deleted, or your session expired. The page is reloading. If your deletion request was recorded, logging in again within 30 days lets you reactivate your account; otherwise, log in again to restart it."
     }

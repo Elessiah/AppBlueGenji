@@ -46,6 +46,11 @@ export type RefereeChange =
   | { kind: "OBJECTION_RELEASED"; matchId: number; refereeId: number; takenOver?: boolean }
   /** Arbitrage retiré d'office. */
   | { kind: "AUTO_RELEASED"; matchId: number; refereeId: number; reason: "INELIGIBLE" | "JOINED_TEAM" }
+  /**
+   * Arbitrage retiré parce que l'arbitre a demandé la suppression de son
+   * compte : ligne anonyme pour le staff, aucun avis (le compte n'est plus).
+   */
+  | { kind: "ACCOUNT_WITHDRAWN"; matchId: number }
   /** Autogestion allumée ou éteinte ; allumée, elle retire l'arbitre (`replacedRefereeId`), l'auteur `actorId`. */
   | { kind: "SELF_MANAGED"; matchId: number; enabled: boolean; replacedRefereeId: number | null; actorId?: number }
   /** Première carte posée ou retirée. */
@@ -66,6 +71,8 @@ export function refereeLogChange(change: RefereeChange): RefereeLogChange {
       return change.takenOver ? "INELIGIBLE" : "RELEASED_BY_STAFF";
     case "AUTO_RELEASED":
       return change.reason;
+    case "ACCOUNT_WITHDRAWN":
+      return "ACCOUNT_WITHDRAWN";
     case "SELF_MANAGED":
       return change.enabled ? "SELF_MANAGED_ON" : "SELF_MANAGED_OFF";
     case "FIRST_MAP":
@@ -86,6 +93,7 @@ export function refereeLogCategory(change: RefereeChange): BotLogCategory {
     case "RELEASED":
     case "OBJECTION_RELEASED":
     case "AUTO_RELEASED":
+    case "ACCOUNT_WITHDRAWN":
       return "staff-removal";
     case "ASSIGNED":
     case "SELF_MANAGED":

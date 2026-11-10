@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { relaunchAfterRefereeWithdrawal } from "@/lib/server/tournaments/match-launch";
+import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
@@ -10,6 +12,8 @@ jest.mock("@/lib/server/stored-upload-cleanup");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/registration");
 jest.mock("@/lib/server/tournaments/match-casters");
+jest.mock("@/lib/server/tournaments/match-launch", () => ({ relaunchAfterRefereeWithdrawal: jest.fn() }));
+jest.mock("@/lib/server/tournaments/bot-logs", () => ({ flushBotLogs: jest.fn(), discardBotLogs: jest.fn() }));
 jest.mock("@/lib/server/teams/access");
 jest.mock("@/lib/server/teams/dissolution");
 jest.mock("@/lib/server/teams/roster");
@@ -68,6 +72,15 @@ type Member = { id: number; user_id: number; roles_json: string; joined_at: stri
 
 type Options = {
   alreadyDeleted?: boolean;
+  /** Le compte qui demande est administrateur. */
+  isAdmin?: boolean;
+  /** Autres administrateurs relevés, puis relus sous verrou (`locked`). */
+  otherAdmins?: { id: number; locked: { is_admin: 0 | 1; is_deleted: 0 | 1 } | null; suspendedUnderLock?: boolean }[];
+  /** Matchs non joués que le compte arbitre (relevé avant le retrait). */
+  refereedMatches?: number[];
+  castMatches?: number[];
+  /** Erreurs levées par les premières transactions (rejeu sur interblocage). */
+  transactionErrors?: Error[];
   teams?: number[];
   successors?: Member[];
   deadMembers?: number[];
@@ -122,15 +135,41 @@ function accountReads(q: string, options: Options): object[] | null {
   return null;
 }
 
+/** Le compte verrouillé (avec les rejeux sur interblocage), ses arbitrages, les autres administrateurs. */
+function lockedAccountReads(q: string, params: unknown[], options: Options): object[] | null {
+  if (q.startsWith("SELECT is_deleted, is_admin, created_at FROM bg_users")) {
+    const failure = options.transactionErrors?.shift();
+    if (failure) throw failure;
+    return [{ is_deleted: options.alreadyDeleted ? 1 : 0, is_admin: options.isAdmin ? 1 : 0, created_at: "2025-01-01 10:00:00" }];
+  }
+  if (q.startsWith("SELECT id FROM bg_users u WHERE is_admin = 1")) {
+    return (options.otherAdmins ?? []).map(({ id }) => ({ id }));
+  }
+  if (q.startsWith("SELECT is_admin, is_deleted FROM bg_users WHERE id = ? FOR UPDATE")) {
+    const other = (options.otherAdmins ?? []).find(({ id }) => id === params[0]);
+    return other?.locked ? [other.locked] : [];
+  }
+  if (q.startsWith("SELECT s.id FROM bg_account_suspensions s")) {
+    const other = (options.otherAdmins ?? []).find(({ id }) => id === params[0]);
+    return other?.suspendedUnderLock ? [{ id: 1 }] : [];
+  }
+  return null;
+}
+
 function fakeDb(options: Options) {
   const queries: { sql: string; params: unknown[] }[] = [];
+  jest.mocked(withdrawUserCasts).mockResolvedValue({
+    matchIds: [],
+    tournamentIds: [],
+    releasedRefereeMatchIds: options.refereedMatches ?? [],
+    releasedCastMatchIds: options.castMatches ?? [],
+  });
   const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
     queries.push({ sql: q, params });
     if (options.failOn && q.startsWith(options.failOn)) throw new Error("DB_DOWN");
-    if (q.startsWith("SELECT is_deleted, created_at FROM bg_users")) {
-      return [[{ is_deleted: options.alreadyDeleted ? 1 : 0, created_at: "2025-01-01 10:00:00" }]];
-    }
+    const locked = lockedAccountReads(q, params, options);
+    if (locked) return [locked];
     const read = accountReads(q, options);
     if (read) return [read];
     if (q.startsWith("SELECT tm.id, tm.user_id, tm.roles_json, tm.joined_at")) return [options.successors ?? []];
@@ -182,7 +221,7 @@ beforeEach(() => {
   jest.mocked(listForfeitableSoloEntries).mockResolvedValue([]);
   jest.mocked(forfeitSoloEntriesAfterCommit).mockResolvedValue(0);
   jest.mocked(logDeletionWithdrawal).mockResolvedValue(undefined);
-  jest.mocked(withdrawUserCasts).mockResolvedValue({ matchIds: [], tournamentIds: [] });
+  jest.mocked(withdrawUserCasts).mockResolvedValue({ matchIds: [], tournamentIds: [], releasedRefereeMatchIds: [], releasedCastMatchIds: [] });
   jest.mocked(lockMemberRoles).mockResolvedValue(["OWNER", "DPS"]);
   jest.mocked(writeActiveMembership).mockResolvedValue(undefined);
   jest.mocked(dissolveTeamOn).mockResolvedValue({ detachedUserIds: [7], everRegistered: false });
@@ -291,7 +330,7 @@ describe("requestAccountDeletion — le compte", () => {
     const { connection } = fakeDb({});
     const execute = connection.execute.getMockImplementation()!;
     connection.execute.mockImplementation(async (sql: string, params?: unknown[]) => {
-      if (sql.startsWith("SELECT is_deleted, created_at FROM bg_users")) order.push("account");
+      if (sql.startsWith("SELECT is_deleted, is_admin, created_at FROM bg_users")) order.push("account");
       return execute(sql, params);
     });
 
@@ -310,7 +349,7 @@ describe("requestAccountDeletion — le compte", () => {
     const { connection } = fakeDb({ organized: [4, 5] });
     const execute = connection.execute.getMockImplementation()!;
     connection.execute.mockImplementation(async (sql: string, params?: unknown[]) => {
-      if (sql.startsWith("SELECT is_deleted, created_at FROM bg_users")) order.push("account");
+      if (sql.startsWith("SELECT is_deleted, is_admin, created_at FROM bg_users")) order.push("account");
       return execute(sql, params);
     });
 
@@ -327,6 +366,181 @@ describe("requestAccountDeletion — le compte", () => {
     expect(connection.commit).not.toHaveBeenCalled();
     expect(closeUserStreams).not.toHaveBeenCalled();
     expect(forfeitSoloEntriesAfterCommit).not.toHaveBeenCalled();
+  });
+});
+
+// ERREUR.txt (revue EF-21 #526) : un match qui n'attendait plus que l'arbitre
+// part, et le staff est prévenu (ligne anonyme), au commit seulement.
+describe("requestAccountDeletion — arbitrages retirés", () => {
+  it("requestAccountDeletion_refereeOfOpenMatches_relaunchesThemAndFlushesAfterCommit", async () => {
+    const { connection } = fakeDb({ refereedMatches: [4, 9], castMatches: [5] });
+
+    await requestAccountDeletion(7);
+
+    expect(jest.mocked(relaunchAfterRefereeWithdrawal).mock.calls[0]?.[0]).toBe(connection);
+    expect(jest.mocked(relaunchAfterRefereeWithdrawal).mock.calls[0]?.[1]).toEqual([4, 9]);
+    expect(jest.mocked(relaunchAfterRefereeWithdrawal).mock.calls[0]?.[2]).toEqual([5]);
+    expect(jest.mocked(flushBotLogs).mock.calls[0]?.[0]).toBe(connection);
+    expect(discardBotLogs).not.toHaveBeenCalled();
+    const relaunchOrder = jest.mocked(relaunchAfterRefereeWithdrawal).mock.invocationCallOrder[0];
+    expect(jest.mocked(withdrawUserCasts).mock.invocationCallOrder[0]).toBeLessThan(relaunchOrder);
+    expect(connection.commit.mock.invocationCallOrder[0]).toBeLessThan(jest.mocked(flushBotLogs).mock.invocationCallOrder[0]);
+  });
+
+  it("requestAccountDeletion_noRefereeing_relaunchesNothing", async () => {
+    const { connection } = fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    expect(jest.mocked(relaunchAfterRefereeWithdrawal).mock.calls[0]?.[0]).toBe(connection);
+    expect(jest.mocked(relaunchAfterRefereeWithdrawal).mock.calls[0]?.[1]).toEqual([]);
+  });
+
+  it("requestAccountDeletion_replay_noRelaunchNorNotice", async () => {
+    fakeDb({ refereedMatches: [4], castMatches: [5] });
+
+    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00" });
+
+    expect(withdrawUserCasts).toHaveBeenCalled();
+    expect(relaunchAfterRefereeWithdrawal).not.toHaveBeenCalled();
+  });
+
+  it("requestAccountDeletion_failureAfterRelaunch_discardsQueuedNotices", async () => {
+    const { connection } = fakeDb({ refereedMatches: [4], failOn: "UPDATE bg_team_invitations" });
+
+    await expect(requestAccountDeletion(7)).rejects.toThrow("DB_DOWN");
+    expect(jest.mocked(discardBotLogs).mock.calls[0]?.[0]).toBe(connection);
+    expect(flushBotLogs).not.toHaveBeenCalled();
+  });
+});
+
+// ERREUR.txt (revue sécurité #509) : le dernier administrateur vivant ne
+// ferme pas l'administration de la plateforme en supprimant son compte.
+describe("requestAccountDeletion — dernier administrateur", () => {
+  it("requestAccountDeletion_lastAdmin_refusedAndRolledBack", async () => {
+    const { connection } = fakeDb({ isAdmin: true, otherAdmins: [] });
+
+    await expect(requestAccountDeletion(7)).rejects.toThrow("LAST_ADMIN_ACCOUNT");
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(holdAccountIdentity).not.toHaveBeenCalled();
+    expect(recordAccountDeletion).not.toHaveBeenCalled();
+  });
+
+  it("requestAccountDeletion_adminWithAnotherLivingAdmin_lockedAndAccepted", async () => {
+    const { queries, connection } = fakeDb({ isAdmin: true, otherAdmins: [{ id: 9, locked: { is_admin: 1, is_deleted: 0 } }] });
+
+    await requestAccountDeletion(7);
+
+    expect(connection.commit).toHaveBeenCalled();
+    const lock = queries.find(({ sql }) => sql.startsWith("SELECT is_admin, is_deleted FROM bg_users WHERE id = ? FOR UPDATE"));
+    expect(lock?.params).toEqual([9]);
+  });
+
+  it("requestAccountDeletion_otherAdminGoneUnderLock_refused", async () => {
+    fakeDb({
+      isAdmin: true,
+      otherAdmins: [
+        { id: 9, locked: { is_admin: 1, is_deleted: 1 } },
+        { id: 10, locked: { is_admin: 0, is_deleted: 0 } },
+        { id: 11, locked: null },
+      ],
+    });
+
+    await expect(requestAccountDeletion(7)).rejects.toThrow("LAST_ADMIN_ACCOUNT");
+  });
+
+  // Revue sécurité #579 : une suspension posée depuis le premier relevé.
+  it("requestAccountDeletion_otherAdminSuspendedUnderLock_refused", async () => {
+    const { queries } = fakeDb({
+      isAdmin: true,
+      otherAdmins: [{ id: 9, locked: { is_admin: 1, is_deleted: 0 }, suspendedUnderLock: true }],
+    });
+
+    await expect(requestAccountDeletion(7)).rejects.toThrow("LAST_ADMIN_ACCOUNT");
+
+    const reread = queries.find(({ sql }) => sql.startsWith("SELECT s.id FROM bg_account_suspensions s"));
+    expect(reread?.sql).toContain("LOCK IN SHARE MODE");
+    expect(reread?.params).toEqual([9]);
+  });
+
+  it("requestAccountDeletion_otherAdminNotSuspendedUnderLock_accepted", async () => {
+    fakeDb({ isAdmin: true, otherAdmins: [{ id: 9, locked: { is_admin: 1, is_deleted: 0 } }] });
+
+    await expect(requestAccountDeletion(7)).resolves.toBeDefined();
+  });
+
+  // Revue sécurité #579 : commis, la demande n'échoue pas pour une annonce.
+  it("requestAccountDeletion_flushThrowsAfterCommit_stillSucceedsAndJournals", async () => {
+    const { connection } = fakeDb({});
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(flushBotLogs).mockImplementationOnce(() => {
+      throw new Error("FLUSH_DOWN");
+    });
+
+    await expect(requestAccountDeletion(7)).resolves.toBeDefined();
+
+    expect(connection.rollback).not.toHaveBeenCalled();
+    expect(discardBotLogs).not.toHaveBeenCalled();
+    expect(recordAccountDeletion).toHaveBeenCalledTimes(1);
+  });
+
+  it("requestAccountDeletion_suspendedAdminsExcludedFromRemaining", async () => {
+    const { queries } = fakeDb({ isAdmin: true, otherAdmins: [{ id: 9, locked: { is_admin: 1, is_deleted: 0 } }] });
+
+    await requestAccountDeletion(7);
+
+    const lookup = queries.find(({ sql }) => sql.startsWith("SELECT id FROM bg_users u WHERE is_admin = 1"));
+    expect(lookup?.sql).toContain("NOT EXISTS (SELECT 1 FROM bg_account_suspensions s WHERE s.user_id = u.id");
+    expect(lookup?.sql).toContain("s.lifted_at IS NULL");
+  });
+
+  it("requestAccountDeletion_nonAdmin_neverReadsAdmins", async () => {
+    const { queries } = fakeDb({ isAdmin: false });
+
+    await requestAccountDeletion(7);
+
+    expect(queries.some(({ sql }) => sql.includes("is_admin = 1"))).toBe(false);
+  });
+
+  it("requestAccountDeletion_replayOfLastAdmin_notRefused", async () => {
+    const { connection } = fakeDb({ isAdmin: true, otherAdmins: [] });
+
+    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00" });
+
+    expect(connection.commit).toHaveBeenCalled();
+  });
+});
+
+// ERREUR.txt (revue sécurité EF-21 #526) : la demande s'interbloque avec une
+// désignation d'arbitre (match puis compte) ; la victime se rejoue.
+describe("requestAccountDeletion — interblocage", () => {
+  const deadlock = () => Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK", errno: 1213 });
+
+  it("requestAccountDeletion_deadlockOnce_retriedAndCommitted", async () => {
+    const { connection } = fakeDb({ transactionErrors: [deadlock()] });
+
+    await requestAccountDeletion(7);
+
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(connection.release).toHaveBeenCalledTimes(2);
+    expect(recordAccountDeletion).toHaveBeenCalledTimes(1);
+  });
+
+  it("requestAccountDeletion_deadlockEveryAttempt_rethrowsAfterThree", async () => {
+    const { connection } = fakeDb({ transactionErrors: [deadlock(), deadlock(), deadlock()] });
+
+    await expect(requestAccountDeletion(7)).rejects.toThrow("Deadlock");
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(connection.release).toHaveBeenCalledTimes(3);
+  });
+
+  it("requestAccountDeletion_otherError_notRetried", async () => {
+    const { connection } = fakeDb({ transactionErrors: [new Error("DB_DOWN")] });
+
+    await expect(requestAccountDeletion(7)).rejects.toThrow("DB_DOWN");
+    expect(connection.release).toHaveBeenCalledTimes(1);
   });
 });
 

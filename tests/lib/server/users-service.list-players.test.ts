@@ -267,3 +267,35 @@ describe("listPlayers — suppression demandée (ERASURE-D2)", () => {
     expect(players[0]?.isDeleted).toBe(true);
   });
 });
+
+// ERREUR.txt (revue sécurité #546) : `deletion_requested_at` absente
+// (migration tolérante en échec) — l'annuaire se relit sans ce filtre.
+describe("listPlayers without deletion_requested_at", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
+
+  it("listPlayers_unknownColumn_retriesWithoutFilter", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" }))
+      .mockResolvedValueOnce([[userRow()]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    const players = await listPlayers(7);
+
+    expect(players).toHaveLength(1);
+    expect(String(execute.mock.calls[0][0])).toContain("WHERE deletion_requested_at IS NULL");
+    expect(String(execute.mock.calls[1][0])).not.toContain("deletion_requested_at");
+  });
+
+  it("listPlayers_otherError_rethrows", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(Object.assign(new Error("down"), { code: "ECONNRESET" }));
+    await mockDb(execute);
+
+    await expect(listPlayers(7)).rejects.toThrow("down");
+  });
+});

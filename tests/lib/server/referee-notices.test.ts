@@ -88,6 +88,8 @@ describe("refereeLogChange / refereeReleaseNotice", () => {
     [{ kind: "OBJECTION_RELEASED", matchId: 1, refereeId: 5, takenOver: true }, "INELIGIBLE", { refereeId: 5, reason: "OBJECTION" }],
     [{ kind: "AUTO_RELEASED", matchId: 1, refereeId: 5, reason: "INELIGIBLE" }, "INELIGIBLE", { refereeId: 5, reason: "INELIGIBLE" }],
     [{ kind: "AUTO_RELEASED", matchId: 1, refereeId: 5, reason: "JOINED_TEAM" }, "JOINED_TEAM", { refereeId: 5, reason: "JOINED_TEAM" }],
+    // Compte en suppression : ligne anonyme pour le staff, aucun avis au compte parti.
+    [{ kind: "ACCOUNT_WITHDRAWN", matchId: 1 }, "ACCOUNT_WITHDRAWN", null],
     [{ kind: "SELF_MANAGED", matchId: 1, enabled: true, replacedRefereeId: null }, "SELF_MANAGED_ON", null],
     [{ kind: "SELF_MANAGED", matchId: 1, enabled: true, replacedRefereeId: 5 }, "SELF_MANAGED_ON", { refereeId: 5, reason: "SELF_MANAGED" }],
     [{ kind: "SELF_MANAGED", matchId: 1, enabled: false, replacedRefereeId: null }, "SELF_MANAGED_OFF", null],
@@ -109,6 +111,7 @@ describe("refereeLogCategory — un retrait alerte, le reste reste une trace", (
     [{ kind: "OBJECTION_RELEASED", matchId: 1, refereeId: 5 }, "staff-removal"],
     [{ kind: "AUTO_RELEASED", matchId: 1, refereeId: 5, reason: "INELIGIBLE" }, "staff-removal"],
     [{ kind: "AUTO_RELEASED", matchId: 1, refereeId: 5, reason: "JOINED_TEAM" }, "staff-removal"],
+    [{ kind: "ACCOUNT_WITHDRAWN", matchId: 1 }, "staff-removal"],
     [{ kind: "SELF_MANAGED", matchId: 1, enabled: true, replacedRefereeId: null }, "referees"],
     [{ kind: "SELF_MANAGED", matchId: 1, enabled: true, replacedRefereeId: 5 }, "staff-removal"],
     [{ kind: "SELF_MANAGED", matchId: 1, enabled: false, replacedRefereeId: null }, "referees"],
