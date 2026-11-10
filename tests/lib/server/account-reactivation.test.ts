@@ -272,9 +272,32 @@ describe("reactivateAccount", () => {
 
     expect(await reactivateAccount(TOKEN)).toBeNull();
     expect(connection.commit).toHaveBeenCalled();
-    expect(connection.execute.mock.calls.some(([sql]) => sql.includes("FOR UPDATE"))).toBe(false);
     expect(restoreAccountIdentity).not.toHaveBeenCalled();
     expect(recordAccountReactivation).not.toHaveBeenCalled();
+  });
+
+  // ERREUR.txt (revue perf #546) : le compte se verrouille avant le ticket,
+  // dans l'ordre de la suppression définitive (compte puis cascade).
+  it("reactivateAccount_valid_locksAccountBeforeConsumingTicket", async () => {
+    const connection = transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+    });
+
+    await reactivateAccount(TOKEN);
+    const sqls = connection.execute.mock.calls.map(([sql]) => sql);
+    const lockIndex = sqls.findIndex((sql) => sql.includes("FROM bg_users WHERE id = ? FOR UPDATE"));
+    const consumeIndex = sqls.findIndex((sql) => sql.startsWith("DELETE FROM bg_account_reactivation_tickets"));
+    expect(lockIndex).toBeGreaterThanOrEqual(0);
+    expect(consumeIndex).toBeGreaterThan(lockIndex);
+    expect(connection.execute.mock.calls[consumeIndex][1]).toEqual([expect.any(String), 7]);
+  });
+
+  it("reactivateAccount_unknownTicket_neverLocksAccount", async () => {
+    const connection = transaction({});
+
+    expect(await reactivateAccount(TOKEN)).toBeNull();
+    expect(connection.execute.mock.calls.some(([sql]) => sql.includes("FOR UPDATE"))).toBe(false);
   });
 
   it("reactivateAccount_restoreRefused_nullAndJournalKept", async () => {

@@ -146,19 +146,15 @@ export async function reactivateAccount(
         WHERE token_hash = ? AND expires_at > NOW() LIMIT 1`,
       [tokenHash],
     );
-    // Servi une fois, quoi qu'il advienne de la suite — et réservé par cette
-    // instruction même (`affectedRows`) : une seconde requête au même cookie,
-    // qui a lu le ticket avant ce retrait, n'en tire rien.
-    const [consumed] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM bg_account_reactivation_tickets WHERE token_hash = ?`,
-      [tokenHash],
-    );
-    const ticket = Number(consumed.affectedRows) === 1 ? tickets[0] : undefined;
-    if (!ticket) {
+    const candidate = tickets[0];
+    if (!candidate) {
       await connection.commit();
       return null;
     }
-    const userId = Number(ticket.user_id);
+    const userId = Number(candidate.user_id);
+    // Le compte d'abord, le ticket ensuite : même ordre que la suppression
+    // définitive (`deleteAccountNow` verrouille le compte, puis la cascade
+    // atteint ses tickets) — l'ordre inverse s'interbloquait avec elle.
     const [locked] = await connection.execute<(RowDataPacket & {
       is_deleted: 0 | 1;
       deletion_requested_at: StoredDate;
@@ -167,6 +163,18 @@ export async function reactivateAccount(
       `SELECT is_deleted, deletion_requested_at, created_at FROM bg_users WHERE id = ? FOR UPDATE`,
       [userId],
     );
+    // Servi une fois, quoi qu'il advienne de la suite — et réservé par cette
+    // instruction même (`affectedRows`) : une seconde requête au même cookie,
+    // qui a lu le ticket avant ce retrait, n'en tire rien.
+    const [consumed] = await connection.execute<ResultSetHeader>(
+      `DELETE FROM bg_account_reactivation_tickets WHERE token_hash = ? AND user_id = ?`,
+      [tokenHash, userId],
+    );
+    const ticket = Number(consumed.affectedRows) === 1 ? candidate : undefined;
+    if (!ticket) {
+      await connection.commit();
+      return null;
+    }
     const row = locked[0];
     if (
       !row ||
