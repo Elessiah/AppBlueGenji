@@ -7,6 +7,9 @@ import {
   voicePollDue,
   voicePollStep,
   voiceStreamKey,
+  voiceClearRoute,
+  voiceClearUrl,
+  type VoiceClearViewer,
   type PolledMatchVoice,
 } from "@/app/(secured)/tournois/[id]/_lib/match-voice-view";
 import type { MatchVoiceInfo } from "@/lib/shared/match-voice";
@@ -200,5 +203,67 @@ describe("isoTime et mémoïsation de la page (poids client)", () => {
       expect(source).toContain('from "./iso-time"');
       expect(source).not.toContain('from "./dates"');
     }
+  });
+});
+
+describe("voiceClearRoute", () => {
+  // Décisions D13 et D36 : l'arbitrage qui ne joue pas le match, ou l'équipe elle-même
+  // (OWNER, MANAGER, CAPITAINE — `canCreateReportsForTeamIds`) pour son seul salon.
+  const match = { team1Id: 4, team2Id: 5 };
+  const viewer = (overrides: Partial<VoiceClearViewer> = {}): VoiceClearViewer => ({
+    staff: false,
+    frozen: false,
+    solo: false,
+    myTeamId: null,
+    leadTeamIds: [],
+    ...overrides,
+  });
+
+  it("voiceClearRoute_leaderOfThisTeam_team", () => {
+    expect(voiceClearRoute(viewer({ myTeamId: 4, leadTeamIds: [4] }), match, 4)).toBe("team");
+  });
+
+  it("voiceClearRoute_leaderOnOpponentChannel_null", () => {
+    expect(voiceClearRoute(viewer({ myTeamId: 4, leadTeamIds: [4] }), match, 5)).toBeNull();
+  });
+
+  it("voiceClearRoute_rosterMemberNotLeader_null", () => {
+    expect(voiceClearRoute(viewer({ myTeamId: 4, leadTeamIds: [] }), match, 4)).toBeNull();
+  });
+
+  it("voiceClearRoute_staffNotPlaying_staff", () => {
+    expect(voiceClearRoute(viewer({ staff: true }), match, 5)).toBe("staff");
+  });
+
+  it("voiceClearRoute_staffPlayingOnOwnLedTeam_team", () => {
+    expect(voiceClearRoute(viewer({ staff: true, myTeamId: 4, leadTeamIds: [4] }), match, 4)).toBe("team");
+  });
+
+  it("voiceClearRoute_staffPlayingOnOpponent_null", () => {
+    // Correctif de #572 : le serveur répondrait 403 VOICE_CLEAR_IS_PLAYER.
+    expect(voiceClearRoute(viewer({ staff: true, myTeamId: 4, leadTeamIds: [4] }), match, 5)).toBeNull();
+  });
+
+  it("voiceClearRoute_staffMemberOfOtherTournamentTeam_staff", () => {
+    expect(voiceClearRoute(viewer({ staff: true, myTeamId: 8, leadTeamIds: [8] }), match, 4)).toBe("staff");
+  });
+
+  it("voiceClearRoute_soloTournament_neverTeam", () => {
+    expect(voiceClearRoute(viewer({ solo: true, myTeamId: 4, leadTeamIds: [4] }), match, 4)).toBeNull();
+  });
+
+  it("voiceClearRoute_frozen_null", () => {
+    expect(voiceClearRoute(viewer({ frozen: true, staff: true }), match, 4)).toBeNull();
+    expect(voiceClearRoute(viewer({ frozen: true, myTeamId: 4, leadTeamIds: [4] }), match, 4)).toBeNull();
+  });
+});
+
+describe("voiceClearUrl", () => {
+  it("voiceClearUrl_team_publicRoute", () => {
+    expect(voiceClearUrl("team", 34)).toBe("/api/matches/34/voice/clear");
+  });
+
+  it("voiceClearUrl_staff_adminRoute", () => {
+    expect(voiceClearUrl("staff", 34)).toBe("/api/admin/matches/34/voice/clear");
   });
 });

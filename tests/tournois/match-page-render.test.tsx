@@ -125,11 +125,13 @@ function render(
   mapRules: TournamentMapRules = EMPTY_MAP_RULES,
   game: TournamentGame = "OW",
   asCard = false,
+  leadTeamIds: number[] = [],
 ): string {
   const detail = tournamentDetail({
     card: tournamentCard({ id: 12, name: "Coupe d'hiver", state: "RUNNING", game }),
     matches: [page],
     mapRules,
+    canCreateReportsForTeamIds: leadTeamIds,
   });
   const body: ReactNode = (
     <ToastProvider>
@@ -257,6 +259,35 @@ describe("page d'un match — ce que tout le monde lit", () => {
     expect(fr).toContain('class="lobby"');
     expect(visible(fr)).not.toContain("salons vocaux à remplir");
     expect(en).not.toContain("voice channels filling up");
+  });
+
+  it("render_voiceForTeamLeader_clearButtonOnOwnChannelOnly", () => {
+    // D36 : le capitaine d'Alpha vide le salon d'Alpha, jamais celui de Bravo.
+    const voice = { team1State: "OPEN", team2State: "OPEN" } as const;
+    const html = render(match({ voice }), "player", false, "fr", EMPTY_MAP_RULES, "OW", false, [ALPHA]);
+    expect(html).toContain('aria-label="Vider le salon vocal de Alpha"');
+    expect(html).not.toContain('aria-label="Vider le salon vocal de Bravo"');
+  });
+
+  it("render_voiceForTeamMemberNotLeader_noClearButton", () => {
+    const voice = { team1State: "OPEN", team2State: "OPEN" } as const;
+    const html = render(match({ voice }), "player");
+    expect(html).toContain("Salon vocal : ouvert");
+    expect(html).not.toContain("Vider le salon vocal");
+  });
+
+  it("render_voiceForStaff_clearButtonOnBothChannels", () => {
+    const voice = { team1State: "OPEN", team2State: "OPEN" } as const;
+    const html = render(match({ voice }), "staff");
+    expect(html).toContain('aria-label="Vider le salon vocal de Alpha"');
+    expect(html).toContain('aria-label="Vider le salon vocal de Bravo"');
+  });
+
+  it("render_voiceForTeamLeaderEnglish_clearButtonTranslated", () => {
+    const voice = { team1State: "OPEN", team2State: "OPEN" } as const;
+    const html = render(match({ voice }), "player", false, "en", EMPTY_MAP_RULES, "OW", false, [ALPHA]);
+    expect(html).toContain('aria-label="Clear the voice channel of Alpha"');
+    expect(html).not.toContain("Clear the voice channel of Bravo");
   });
 
   it("launchStripStyles_noVoiceHoldRules", () => {

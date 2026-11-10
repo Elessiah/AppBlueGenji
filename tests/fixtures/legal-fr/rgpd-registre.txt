@@ -690,18 +690,21 @@ Demander au bot Discord de l'association, à partir de 15 minutes avant l'heure 
 Dire aux parties du match (membres des deux équipes, casters) et au staff, sur la page du match, si chaque salon est ouvert — le site ne demande jamais au bot qui se trouve dans un salon, ni combien
 Rendre les salons au bot quand le match est terminé (score validé), annulé, retombé en attente, sorti du programme ou resté sans score validé 24 heures après son horaire, quand l'équipe sort de l'appariement, quand une entrée en tournoi individuel ou une équipe fantôme entre dans le match, quand le tournoi n'est plus en cours (terminé, ou ramené avant son départ), est de nouveau masqué ou éteint l'option, ou quand le match est reporté à plus de 15 minutes (ses salons rouvrent 15 minutes avant sa nouvelle heure) ; le bot supprime un salon dès qu'il est vide
 Permettre aux arbitres et administrateurs (jamais à qui joue le match) de vider le salon ouvert d'une équipe : le bot en déconnecte tous les occupants, qu'il lit dans l'état vocal tenu en mémoire, sans garder, journaliser ni rendre au site qui, ni combien (seul le journal d'audit de Discord note les déconnexions) ; le salon reste ouvert
+Permettre au propriétaire, à un manager ou au capitaine d'une équipe de vider de la même façon le salon de sa propre équipe, jamais celui de l'adversaire : le site lit son équipe active et ses rôles pour le vérifier, sans rien en garder ni le journaliser, ni sur le site ni sur Discord
 Base légale
 Intérêt légitime (bon déroulement des tournois : réunir chaque équipe avant son match) ; rejoindre un salon reste un choix, sans effet sur le lancement du match ; le site ne garde ni qui se trouve dans un salon, ni combien ; le vidage d'un salon relève du même intérêt (en écarter qui ne devrait pas s'y trouver)
 Personnes concernées
 Membres des équipes engagées dans un match
-Toute personne qui rejoint un salon vocal d'équipe sur le serveur Discord de l'association (les salons sont ouverts à qui voit la catégorie des matchs), dont celles qu'un vidage par l'arbitrage en déconnecte
+Toute personne qui rejoint un salon vocal d'équipe sur le serveur Discord de l'association (les salons sont ouverts à qui voit la catégorie des matchs), dont celles qu'un vidage par l'arbitrage ou par l'équipe en déconnecte
 Membre du staff qui vide un salon, nommé dans les journaux du serveur sauf s'il est l'arbitre désigné du match
+Propriétaire, manager ou capitaine d'une équipe qui vide le salon de son équipe, jamais nommé ni journalisé
 Membres du serveur Discord de l'association présents dans l'un de ses salons vocaux, dont le bot tient la présence en mémoire pour savoir si un salon de match est vide
 Membres des autres serveurs où le bot est présent, présents dans l'un de leurs salons vocaux : seule la fiche de membre jointe à leur état vocal est gardée en mémoire
 Données
 Identifiant Discord du salon de chaque équipe d'un match, numéros du match et de l'équipe, heure d'une éventuelle panne du bot ou d'un rendu refusé (et si la panne touchait tout le bot), heures de création et de rendu du salon — aucune donnée d'utilisateur : jamais qui est présent, ni combien
 Nom de l'équipe, transmis au bot pour nommer le salon
 Pseudo et numéro de compte du membre du staff qui vide un salon, avec le numéro du match et l'issue, dans les journaux du serveur — jamais pour l'arbitre désigné du match
+Équipe active et rôles d'équipe de qui vide le salon de son équipe, lus pour vérifier qu'il la mène (propriétaire, manager, capitaine), sans être gardés
 État vocal (identifiant Discord du membre et de sa session vocale, salon où il se trouve, micro ou son coupés par lui ou par la modération, partage d'écran ou caméra actifs, demande de parole et mise en sourdine de scène), avec la fiche de membre que Discord y joint (sa fiche sur le serveur, dont pseudo, surnom, avatar, rôles, dates d'arrivée et de boost, exclusion temporaire), des membres du serveur Discord de l'association, tenu en mémoire par le bot pour savoir si un salon est vide, jamais enregistré ni transmis au site
 Fiche du salon chez le bot : identifiant du salon, clé du match et de l'équipe (des numéros, aucun nom), heures de création et de rendu
 Données sensibles
@@ -713,14 +716,14 @@ Salon sur Discord : supprimé par le bot dès qu'il est vide une fois rendu, au 
 Fiche du salon chez le bot : effacée avec le salon ; oubliée 96 heures après sa création ou sa reprise si le bot ne peut plus lire le salon ; gardée sans limite tant que le salon, jamais rendu, reste occupé, ou qu'il le lit sans pouvoir le supprimer ou que Discord répond par une autre erreur ; hors les copies de sauvegarde chiffrées (T09, 30 jours au plus)
 Autres délais du bot (hors le plafond d'un salon rendu, qui l'inclut) : chacun s'entend à un balayage près (au plus 30 minutes de plus)
 Vidage d'un salon : rien n'est gardé de ses occupants, ni par le site ni par le bot — ils ne sont lus, dans l'état vocal tenu en mémoire, que pour être déconnectés
-Journaux du serveur, selon leur rotation : lignes techniques des salons (numéro du match, code d'erreur), sans donnée de joueur ; pour un vidage, son auteur (pseudo et numéro de compte), le match et l'issue, sauf si l'auteur est l'arbitre désigné du match, jamais nommé
+Journaux du serveur, selon leur rotation : lignes techniques des salons (numéro du match, code d'erreur), sans donnée de joueur ; pour un vidage par l'arbitrage, son auteur (pseudo et numéro de compte), le match et l'issue, sauf si l'auteur est l'arbitre désigné du match, jamais nommé ; rien pour un vidage par l'équipe
 Journal d'audit du serveur sur Discord : création et suppression de chaque salon, avec son nom, et déconnexions d'un vidage (leur nombre et leur motif, tels que Discord les y inscrit), pour la durée que Discord fixe
 Destinataires
 Membres des deux équipes d'un match, ses casters et le staff, à qui la page du match dit si chaque salon est ouvert
 Autres membres connectés, qui peuvent lire ces mêmes états dans les données du tournoi — un visiteur sans compte n'en lit rien
 Membres du serveur Discord de l'association autorisés dans la catégorie des matchs, qui voient le salon et ses occupants sur Discord
 Administration du serveur Discord de l'association, qui lit dans le journal d'audit de Discord la création et la suppression de chaque salon, avec son nom, et les déconnexions d'un vidage
-Staff, à qui le journal d'activité sur Discord dit qu'un salon d'équipe a été vidé, sans nommer son auteur (T05)
+Staff, à qui le journal d'activité sur Discord dit qu'un salon d'équipe a été vidé par le staff, sans nommer son auteur (T05) — jamais un vidage par l'équipe
 Discord (plateforme d'exécution)
 Transferts hors UE
 États-Unis : Discord — Discord, certifié EU-U.S. Data Privacy Framework : décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)

@@ -950,6 +950,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: the recipients, the direct message reserved for a certified Discord tag, and the “Discord direct messages about my matches” box in “My profile” to object to it.",
     ],
   },
+  "2026-11-salons-vocaux-vidage-par-l-equipe": {
+    linkLabels: ["Read the “Team voice channels” paragraph"],
+    title: "Team voice channels: clearing by the team",
+    summary:
+      "A team's owner, a manager or its captain can now clear their team's voice channel, like the referees. Nothing more is kept.",
+    details: [
+      "Clearing by the team: a team's owner, a manager or its captain can clear their own team's open channel, never the opponent's; the bot disconnects all its occupants, as for a clearing by the referees, and the channel stays open. The site only reads their team and roles to check it, without keeping anything: this clearing is noted neither in the server logs nor in the staff activity log on Discord. Discord's audit log keeps the disconnections, as for any clearing.",
+      "What does not change: no player data is collected; clearing by the referees stays as it is; it still rests on legitimate interest (smooth running of tournaments).",
+    ],
+  },
 };
 
 /**
