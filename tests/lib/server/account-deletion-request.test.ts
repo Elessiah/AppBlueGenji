@@ -112,6 +112,16 @@ function organizedRows(options: Options, queries: { sql: string }[]) {
   return ids.map((id) => ({ id }));
 }
 
+/** Lectures simples, sans état : la date relue (D21), les équipes, le logo. */
+function accountReads(q: string, options: Options): object[] | null {
+  if (q.startsWith("SELECT deletion_requested_at FROM bg_users")) {
+    return options.storedRequestedAt ? [{ deletion_requested_at: options.storedRequestedAt }] : [];
+  }
+  if (q.startsWith("SELECT tm.team_id")) return (options.teams ?? []).map((team_id) => ({ team_id }));
+  if (q.startsWith("SELECT logo_url, deleted_at FROM bg_teams")) return [{ logo_url: "/api/uploads/teams/3.webp", deleted_at: null }];
+  return null;
+}
+
 function fakeDb(options: Options) {
   const queries: { sql: string; params: unknown[] }[] = [];
   const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
@@ -121,11 +131,8 @@ function fakeDb(options: Options) {
     if (q.startsWith("SELECT is_deleted, created_at FROM bg_users")) {
       return [[{ is_deleted: options.alreadyDeleted ? 1 : 0, created_at: "2025-01-01 10:00:00" }]];
     }
-    if (q.startsWith("SELECT deletion_requested_at FROM bg_users")) {
-      return [options.storedRequestedAt ? [{ deletion_requested_at: options.storedRequestedAt }] : []];
-    }
-    if (q.startsWith("SELECT tm.team_id")) return [(options.teams ?? []).map((team_id) => ({ team_id }))];
-    if (q.startsWith("SELECT logo_url, deleted_at FROM bg_teams")) return [[{ logo_url: "/api/uploads/teams/3.webp", deleted_at: null }]];
+    const read = accountReads(q, options);
+    if (read) return [read];
     if (q.startsWith("SELECT tm.id, tm.user_id, tm.roles_json, tm.joined_at")) return [options.successors ?? []];
     if (q.startsWith("SELECT u.id, EXISTS (")) return [livingMembers(options)];
     if (q.startsWith("SELECT u.id FROM bg_users u")) return [organizerRows(options)];

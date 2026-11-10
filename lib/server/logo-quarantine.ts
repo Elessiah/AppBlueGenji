@@ -869,11 +869,7 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
   } catch (error) {
     // Après un commit réussi puis un échec plus loin, le rollback n'a plus rien
     // à défaire et peut lever : c'est l'erreur d'origine qui doit remonter.
-    try {
-      await connection.rollback();
-    } catch {
-      // Rien à ajouter à l'erreur d'origine.
-    }
+    await rollbackQuietly(connection);
     // La contestation est acceptée, mais l'image ne peut pas revenir (une
     // autre l'a remplacée) : l'issue est écrite quand même (D23), pour que la
     // suppression qui suivra — par le staff ou d'office — n'en bloque pas
@@ -885,6 +881,15 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
   }
 
   await announceImageRestored(row, actor);
+}
+
+/** Annule la transaction sans masquer l'erreur d'origine (un rollback qui lève est tu). */
+async function rollbackQuietly(connection: PoolConnection): Promise<void> {
+  try {
+    await connection.rollback();
+  } catch {
+    // C'est l'erreur d'origine qui doit remonter.
+  }
 }
 
 /** Rétablissement refusé parce qu'une autre image a pris la place. */
@@ -934,8 +939,7 @@ export async function recordContestOutcome(
   const db = await getDatabase();
   const connection = await db.getConnection();
   let row: QuarantineRow;
-  let blocked: boolean | null = null;
-  let hashUnknown = false;
+  let result: { blocked: boolean | null; hashUnknown: boolean };
   try {
     await connection.beginTransaction();
     const [rows] = await connection.execute<QuarantineRow[]>(`${QUARANTINE_SELECT} WHERE q.id = ? FOR UPDATE`, [
@@ -945,29 +949,41 @@ export async function recordContestOutcome(
     row = rows[0];
     if (row.status === "RESTORED") throw new Error("QUARANTINE_CLOSED");
     await connection.execute(`UPDATE bg_logo_quarantines SET contest_outcome = ? WHERE id = ?`, [outcome, quarantineId]);
-    if (row.status === "PURGED" && row.target_type === "USER" && row.image_sha256) {
-      if (outcome === "OVERTURNED") {
-        const lifted = await unblockImageHashOn(connection, row.image_sha256, quarantineId);
-        blocked = !lifted && (await stillBlocked(connection, row.image_sha256));
-      } else {
-        await blockImageHashOn(connection, row.image_sha256);
-        blocked = true;
-      }
-    } else if (row.status === "PURGED" && row.target_type === "USER") {
-      hashUnknown = true;
-    }
+    result = await applyOutcomeToHash(connection, row, outcome);
     await connection.commit();
   } catch (error) {
-    try {
-      await connection.rollback();
-    } catch {
-      // C'est l'erreur d'origine qui doit remonter.
-    }
+    await rollbackQuietly(connection);
     throw error;
   } finally {
     connection.release();
   }
 
+  announceContestOutcome(row, outcome, actor);
+  return result;
+}
+
+/**
+ * L'issue appliquée à l'empreinte d'un avatar **supprimé** (D18, D22), dans la
+ * transaction qui l'écrit. Rien pour une image masquée ou un logo.
+ */
+async function applyOutcomeToHash(
+  connection: PoolConnection,
+  row: QuarantineRow,
+  outcome: ContestOutcome,
+): Promise<{ blocked: boolean | null; hashUnknown: boolean }> {
+  if (row.status !== "PURGED" || row.target_type !== "USER") return { blocked: null, hashUnknown: false };
+  const sha256 = row.image_sha256;
+  if (!sha256) return { blocked: null, hashUnknown: true };
+  if (outcome === "UPHELD") {
+    await blockImageHashOn(connection, sha256);
+    return { blocked: true, hashUnknown: false };
+  }
+  const lifted = await unblockImageHashOn(connection, sha256, Number(row.id));
+  return { blocked: !lifted && (await stillBlocked(connection, sha256)), hashUnknown: false };
+}
+
+/** Journal du staff : l'issue d'une contestation, sans pseudo de joueur. */
+function announceContestOutcome(row: QuarantineRow, outcome: ContestOutcome, actor: ReportPerson): void {
   const verdict = outcome === "OVERTURNED" ? "acceptée" : "rejetée";
   const subject =
     row.target_type === "TEAM"
@@ -978,7 +994,6 @@ export async function recordContestOutcome(
     id: actor.userId,
     pseudo: actor.pseudo,
   }, { category: "moderation" });
-  return { blocked, hashUnknown };
 }
 
 /** L'empreinte est-elle (encore) bloquée ? Table absente : non. */
@@ -1145,15 +1160,7 @@ export async function purgeQuarantinedLogo(
       outcome: row.contest_outcome ?? null,
       contested: check.contested,
     });
-    if (row.target_type === "USER") {
-      const files = avatarFileLocations(row.logo_url, Number(row.target_id));
-      sha256 = files ? await readImageSha256(files.quarantined) : null;
-      if (files && sha256 === null && blockHash) logMissingRemovedFile(files.quarantined);
-      // Bloquée dans la transaction qui écrit la suppression, sous le verrou de
-      // la ligne : une issue écrite ensuite (D18) la trouve posée. Un échec
-      // annule la purge, rejouée au passage suivant (ou refusée au staff).
-      if (sha256 !== null && blockHash) await blockImageHashOn(connection, sha256);
-    }
+    if (row.target_type === "USER") sha256 = await blockPurgedAvatarOn(connection, row, blockHash);
     await connection.execute(
       `UPDATE bg_logo_quarantines SET status = 'PURGED', closed_at = NOW(), image_sha256 = COALESCE(?, image_sha256)
         WHERE id = ?`,
@@ -1167,6 +1174,35 @@ export async function purgeQuarantinedLogo(
     connection.release();
   }
 
+  await removePurgedFileAndAnnounce(row, actor);
+  return true;
+}
+
+/**
+ * L'empreinte du fichier d'un avatar en quarantaine, bloquée si la purge le
+ * veut (`blockHash`) — dans la transaction qui écrit la suppression, sous le
+ * verrou de la ligne : une issue écrite ensuite (D18) la trouve posée. Un
+ * échec annule la purge, rejouée au passage suivant (ou refusée au staff).
+ * Rend l'empreinte, gardée sur la ligne, ou `null` (fichier absent).
+ */
+async function blockPurgedAvatarOn(
+  connection: PoolConnection,
+  row: QuarantineRow,
+  blockHash: boolean,
+): Promise<string | null> {
+  const files = avatarFileLocations(row.logo_url, Number(row.target_id));
+  if (!files) return null;
+  const sha256 = await readImageSha256(files.quarantined);
+  if (sha256 === null) {
+    if (blockHash) logMissingRemovedFile(files.quarantined);
+    return null;
+  }
+  if (blockHash) await blockImageHashOn(connection, sha256);
+  return sha256;
+}
+
+/** Après le commit d'une purge : le fichier part, la décision est annoncée. */
+async function removePurgedFileAndAnnounce(row: QuarantineRow, actor: ReportPerson | null): Promise<void> {
   const isTeam = row.target_type === "TEAM";
   const targetId = Number(row.target_id);
   const reportId = row.report_id === null ? null : Number(row.report_id);
@@ -1198,7 +1234,6 @@ export async function purgeQuarantinedLogo(
   } else {
     console.info(`[moderation] ${line} à l'échéance de sa quarantaine.`);
   }
-  return true;
 }
 
 /**
