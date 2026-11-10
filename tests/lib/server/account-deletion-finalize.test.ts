@@ -337,6 +337,17 @@ describe("finalizeDueAccountDeletions", () => {
     expect(pinAccountBlockedHashesOn).not.toHaveBeenCalled();
   });
 
+  // D30 : un avatar jamais supprimé par la modération n'est jamais bloqué,
+  // anonymisation comprise.
+  it("finalizeAccountDeletion_anonymizeWithUnreportedAvatar_doesNotBlock", async () => {
+    fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, played: 1, heldAvatar: "/api/uploads/avatars/7-abc.webp" });
+
+    expect((await finalizeAccountDeletion(7))?.mode).toBe("ANONYMIZE");
+
+    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
+    expect(pinAccountBlockedHashesOn).not.toHaveBeenCalled();
+  });
+
   it("finalizeAccountDeletion_eraseWithHeldAvatarNeverModerated_doesNotBlock", async () => {
     fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, heldAvatar: "/api/uploads/avatars/7-abc.webp" });
 

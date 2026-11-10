@@ -253,6 +253,16 @@ describe("requestAccountDeletion — le compte", () => {
     expect(holdAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7, "2026-11-10 09:15:00");
   });
 
+  // D30 : la demande du joueur ne bloque aucune image — seul ce que la
+  // modération a supprimé l'est (D6).
+  it("requestAccountDeletion_ownRequest_blocksNoImageHash", async () => {
+    const { queries } = fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    expect(queries.some((q) => q.sql.includes("bg_blocked_image_hashes"))).toBe(false);
+  });
+
   it("requestAccountDeletion_nominal_cancelsOwnPendingInvitations", async () => {
     const { queries } = fakeDb({});
 

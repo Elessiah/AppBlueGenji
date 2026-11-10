@@ -885,6 +885,19 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   dans la transaction) ; le rejeu la réécrit telle quelle et la compare texte
   à texte, quel que soit le fuseau du shell. Les anciennes lignes, sans ce
   champ, se rejouent comme avant (date ISO).
+- **Seul l'avatar supprimé par la modération est bloqué** (D30, D6) : ni la
+  demande du joueur, ni l'anonymisation ou l'effacement au jour 30, ni le
+  rattrapage au démarrage ne bloquent un avatar qui n'a pas été supprimé par
+  la modération (ligne `PURGED`) — signalé puis seulement masqué, ou jamais
+  signalé, il part sans que son empreinte soit gardée.
+- **Lien vers le compte** (D31) : l'empreinte reste liée au compte (ligne de
+  quarantaine) tant qu'il existe, pour les contestations ; à l'effacement,
+  `eraseAccount` bloque définitivement puis efface ces lignes dans la même
+  transaction — `bg_blocked_image_hashes` n'a aucune colonne de compte.
+- **Risque accepté** (D29) : un compte anonymisé garde un blocage levable
+  posé à l'effacement sans ligne qui l'enregistre (ligne d'avant les
+  empreintes, ou fichier réécrit) ; une contestation acceptée sur une autre
+  suppression de la même image peut le lever. Non corrigé, par décision.
 - **Gardé tel quel** : un avatar seulement masqué que l'effacement emporte
   n'est pas bloqué (D19, D6) ; l'avatar par défaut d'un fournisseur n'a pas
   d'exclusion — la modération ne le supprime pas (D20). L'empreinte

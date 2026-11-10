@@ -25,7 +25,9 @@ import { resequenceSeeds } from "@/lib/server/tournaments/seeding";
  *
  * Les lignes de quarantaine du compte partent par cascade : les blocages
  * d'empreinte qu'elles justifiaient deviennent d'abord non levables (revue
- * sécurité #571, D18) — ici, pour chaque chemin d'effacement.
+ * sécurité #571, D18) — ici, pour chaque chemin d'effacement —, puis ces
+ * lignes sont effacées : l'empreinte bloquée ne garde aucun lien vers le
+ * compte (D31).
  *
  * Rend les matchs touchés (casts, liens, arbitrages) : l'appelant prévient
  * leurs tournois après le commit.
@@ -62,6 +64,11 @@ export async function eraseAccount(
   // arbitrages : la clé étrangère ne vide que `referee_user_id`.
   const withdrawal = await withdrawUserCasts(connection, userId, true);
   await pinAccountBlockedHashesOn(connection, userId);
+  // D31 : le blocage ne garde que l'empreinte. Les lignes de quarantaine du
+  // compte — seul lien entre une empreinte et un compte — partent dans la même
+  // transaction, sans dépendre de la cascade (clé étrangère absente d'une
+  // base ancienne).
+  await connection.execute(`DELETE FROM bg_logo_quarantines WHERE user_id = ?`, [userId]);
   await connection.execute(`DELETE FROM bg_users WHERE id = ?`, [userId]);
   return withdrawal;
 }
