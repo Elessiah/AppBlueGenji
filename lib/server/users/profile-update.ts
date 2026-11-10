@@ -31,15 +31,22 @@ function readPseudoPatch(pseudo: unknown): string | null {
   return nextPseudo;
 }
 
-/** Refus lisible d'un pseudo déjà pris ; l'index unique tranche la course. */
+/**
+ * Refus lisible d'un pseudo déjà pris ; l'index unique tranche la course.
+ *
+ * Le pseudo d'un compte en attente de suppression lui reste réservé trente
+ * jours (sa réactivation le lui rend, `account-deletion-hold.ts`) — et ce refus
+ * ne doit **rien** dire de cette demande (décision D39) : même code, même
+ * statut, même champ qu'un pseudo porté par un compte, et **les deux lectures
+ * toujours jouées**, pour qu'aucune branche ni durée ne distingue les deux cas.
+ */
 async function assertPseudoAvailable(db: Pool, nextPseudo: string, userId: number): Promise<void> {
   const [conflicts] = await db.execute<(RowDataPacket & { id: number })[]>(
     `SELECT id FROM bg_users WHERE pseudo = ? AND id <> ? LIMIT 1`,
     [nextPseudo, userId],
   );
-  // Le pseudo d'un compte en attente de suppression lui reste réservé trente
-  // jours : sa réactivation le lui rend (`account-deletion-hold.ts`).
-  if (conflicts.length > 0 || (await isPseudoHeldByOther(db, nextPseudo, userId))) {
+  const held = await isPseudoHeldByOther(db, nextPseudo, userId);
+  if (conflicts.length > 0 || held) {
     throw new Error("PSEUDO_ALREADY_USED");
   }
 }

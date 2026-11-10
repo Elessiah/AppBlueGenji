@@ -618,7 +618,12 @@ puis renomme l'entrée solo (`syncSoloEntryIdentityOn`). Toute lecture qui joint
 `bg_users` montre donc déjà le faux nom, sans lien de fiche.
 
 - **Pseudo réservé** : `isPseudoHeldByOther` le refuse au renommage
-  (`PSEUDO_ALREADY_USED`) et `pseudoExists` à l'inscription.
+  (`PSEUDO_ALREADY_USED`) et `pseudoExists` à l'inscription. Décision D39
+  (2026-11-10) : la réservation reste, mais le refus est **indiscernable** de
+  celui d'un pseudo porté par un compte — même code, même statut 409, même
+  champ, même texte FR/EN, les deux lectures toujours jouées (ni branche ni
+  durée propre) ; l'inscription, elle, suffixe en silence dans les deux cas.
+  Aucun code dédié ne doit jamais dire qu'un pseudo attend une réactivation.
 - **Réactivation** : `restoreAccountIdentity` relève la demande et rend pseudo et
   avatar en une instruction, efface le masque et renomme l'entrée solo. Un
   conflit (course avec un renommage, sauvegarde restaurée) rend le pseudo suivi
