@@ -233,8 +233,9 @@ export async function retryOnStaleLockSet<T>(write: (lastAttempt: boolean) => Pr
 }
 
 /**
- * Les tournois dont un match nomme le compte (caster, lien de chaîne, arbitre),
- * par id croissant : `withdrawUserCasts` y verrouille des matchs, donc la ligne
+ * Les tournois dont un match nomme le compte (caster, lien de chaîne, arbitre,
+ * lancement du direct — `live_trigger_user_id`, que `withdrawUserCasts`
+ * verrouille aussi), par id croissant : `withdrawUserCasts` y verrouille des matchs, donc la ligne
  * du tournoi se prend **avant**, comme partout (tournoi, puis match).
  */
 export async function listCastTournamentIds(runner: SqlRunner, userId: number): Promise<number[]> {
@@ -244,8 +245,10 @@ export async function listCastTournamentIds(runner: SqlRunner, userId: number): 
      SELECT m.tournament_id FROM bg_matches m JOIN bg_match_streams s ON s.match_id = m.id WHERE s.link_user_id = ?
      UNION
      SELECT tournament_id FROM bg_matches WHERE referee_user_id = ?
+     UNION
+     SELECT tournament_id FROM bg_matches WHERE live_trigger_user_id = ?
      ORDER BY tournament_id`,
-    [userId, userId, userId],
+    [userId, userId, userId, userId],
   );
   return rows.map((row) => Number(row.tournament_id));
 }

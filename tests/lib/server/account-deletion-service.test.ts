@@ -945,13 +945,15 @@ describe("mergeTournamentIds", () => {
 });
 
 describe("listCastTournamentIds", () => {
-  it("listCastTournamentIds_rows_returnsIdsAndBindsUserThreeTimes", async () => {
+  it("listCastTournamentIds_rows_returnsIdsAndBindsUserOncePerSource", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ tournament_id: 3 }, { tournament_id: "9" }], []]);
 
     const ids = await listCastTournamentIds(fakeConnection({ execute }), 7);
 
     expect(ids).toEqual([3, 9]);
-    expect(execute.mock.calls[0][1]).toEqual([7, 7, 7]);
+    expect(execute.mock.calls[0][1]).toEqual([7, 7, 7, 7]);
+    // Caster, lien, arbitre et lancement du direct : les quatre que `withdrawUserCasts` verrouille.
+    expect(String(execute.mock.calls[0][0])).toContain("WHERE live_trigger_user_id = ?");
   });
 });
 
