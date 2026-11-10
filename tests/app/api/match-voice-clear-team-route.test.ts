@@ -14,7 +14,7 @@ import { POST } from "@/app/api/matches/[matchId]/voice/clear/route";
 import { enforceRateLimit, VOICE_CLEAR_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { auditStaffAction } from "@/lib/server/staff-audit";
-import { clearOwnTeamVoiceChannel } from "@/lib/server/tournaments/match-voice";
+import { clearOwnTeamVoiceChannel, type ClearOwnVoiceResult } from "@/lib/server/tournaments/match-voice";
 import { announceStaffMatchAction } from "@/lib/server/tournaments/staff-action-logs";
 import { authUser } from "../../helpers/auth-user";
 
@@ -96,25 +96,16 @@ describe("POST /api/matches/[matchId]/voice/clear", () => {
     expect(auditStaffAction).not.toHaveBeenCalled();
   });
 
-  it("clearTeam_notLeader_returns403NotTeamLeader", async () => {
-    jest.mocked(clearOwnTeamVoiceChannel).mockResolvedValue("notLeader");
+  const refusals: [ClearOwnVoiceResult, number, string][] = [
+    ["notLeader", 403, "VOICE_CLEAR_NOT_TEAM_LEADER"],
+    ["notOpen", 409, "VOICE_CHANNEL_NOT_OPEN"],
+    ["unavailable", 503, "VOICE_CLEAR_UNAVAILABLE"],
+  ];
+  it.each(refusals)("clearTeam_serviceSays_%s_returns%i", async (result, status, error) => {
+    jest.mocked(clearOwnTeamVoiceChannel).mockResolvedValue(result);
     const res = await POST(clearReq({ teamId: 4 }), matchParams("9"));
-    expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ error: "VOICE_CLEAR_NOT_TEAM_LEADER" });
-  });
-
-  it("clearTeam_noOpenChannel_returns409", async () => {
-    jest.mocked(clearOwnTeamVoiceChannel).mockResolvedValue("notOpen");
-    const res = await POST(clearReq({ teamId: 4 }), matchParams("9"));
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "VOICE_CHANNEL_NOT_OPEN" });
-  });
-
-  it("clearTeam_botUnavailable_returns503", async () => {
-    jest.mocked(clearOwnTeamVoiceChannel).mockResolvedValue("unavailable");
-    const res = await POST(clearReq({ teamId: 4 }), matchParams("9"));
-    expect(res.status).toBe(503);
-    expect(await res.json()).toEqual({ error: "VOICE_CLEAR_UNAVAILABLE" });
+    expect(res.status).toBe(status);
+    expect(await res.json()).toEqual({ error });
   });
 
   it("clearTeam_serviceThrows_returns500", async () => {
