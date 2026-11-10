@@ -100,6 +100,22 @@ describe("readPendingDeletion", () => {
 
     expect(await readPendingDeletion(7)).toBeNull();
   });
+
+  // ERREUR.txt (revue sécurité #546) : colonne absente (migration en échec),
+  // la connexion n'est pas bloquée.
+  it("readPendingDeletion_unknownColumn_null", async () => {
+    const execute = poolExecute([]);
+    execute.mockRejectedValueOnce(Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" }));
+
+    expect(await readPendingDeletion(7)).toBeNull();
+  });
+
+  it("readPendingDeletion_otherError_rethrows", async () => {
+    const execute = poolExecute([]);
+    execute.mockRejectedValueOnce(Object.assign(new Error("down"), { code: "ECONNRESET" }));
+
+    await expect(readPendingDeletion(7)).rejects.toThrow("down");
+  });
 });
 
 describe("createReactivationTicket", () => {

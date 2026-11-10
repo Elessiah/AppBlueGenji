@@ -111,6 +111,22 @@ describe("isPseudoHeldByOther", () => {
 
     expect(await isPseudoHeldByOther(fakeConnection(connection), "Kerya", null)).toBe(false);
   });
+
+  // ERREUR.txt (revue sécurité #546) : table des masques absente → rien n'y
+  // est réservé, l'inscription et le renommage ne tombent pas.
+  it("isPseudoHeldByOther_missingHoldsTable_false", async () => {
+    const connection = connectionMock();
+    connection.execute.mockRejectedValue(Object.assign(new Error("no table"), { code: "ER_NO_SUCH_TABLE" }));
+
+    expect(await isPseudoHeldByOther(fakeConnection(connection), "Kerya", 7)).toBe(false);
+  });
+
+  it("isPseudoHeldByOther_otherError_rethrows", async () => {
+    const connection = connectionMock();
+    connection.execute.mockRejectedValue(Object.assign(new Error("down"), { code: "ECONNRESET" }));
+
+    await expect(isPseudoHeldByOther(fakeConnection(connection), "Kerya", 7)).rejects.toThrow("down");
+  });
 });
 
 describe("loadTakenAnonymousPseudos", () => {

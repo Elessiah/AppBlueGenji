@@ -806,6 +806,33 @@ describe("auth", () => {
       },
     );
 
+    // ERREUR.txt (revue sécurité #546) : table des masques absente — le pseudo
+    // libre sur `bg_users` est rendu tel quel, l'inscription ne tombe pas.
+    it("ensureUniquePseudo_missingHoldsTable_returnsFreePseudo", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const mockExecute = jest.fn<SqlQuery>(async (sql: string) => {
+        if (sql.includes("bg_account_deletion_holds")) {
+          throw Object.assign(new Error("no table"), { code: "ER_NO_SUCH_TABLE" });
+        }
+        return [[{ c: 0 }], []];
+      });
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
+
+      expect(await ensureUniquePseudo("NewPlayer")).toBe("NewPlayer");
+    });
+
+    it("ensureUniquePseudo_pseudoHeldByPendingAccount_suffixed", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const mockExecute = jest.fn<SqlQuery>(async (sql: string, params?: unknown) => {
+        const [pseudo] = params as string[];
+        if (sql.includes("bg_account_deletion_holds")) return [pseudo === "Held" ? [{ user_id: 9 }] : [], []];
+        return [[{ c: 0 }], []];
+      });
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
+
+      expect(await ensureUniquePseudo("Held")).toBe("Held_1");
+    });
+
     it("returns pseudo with suffix when original is taken", async () => {
       const { getDatabase } = await import("@/lib/server/database");
 

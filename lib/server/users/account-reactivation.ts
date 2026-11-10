@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import {
   ACCOUNT_PENDING_DELETION_CODE,
   isReactivationWindowOpen,
@@ -51,10 +52,19 @@ function hashTicket(token: string): string {
 /** L'état de suppression d'un compte : `null` s'il est vivant, inconnu ou déjà supprimé définitivement. */
 export async function readPendingDeletion(userId: number): Promise<{ requestedAt: string; windowOpen: boolean } | null> {
   const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { is_deleted: 0 | 1; deletion_requested_at: StoredDate })[]>(
-    `SELECT is_deleted, deletion_requested_at FROM bg_users WHERE id = ? LIMIT 1`,
-    [userId],
-  );
+  let rows: (RowDataPacket & { is_deleted: 0 | 1; deletion_requested_at: StoredDate })[];
+  try {
+    [rows] = await db.execute<(RowDataPacket & { is_deleted: 0 | 1; deletion_requested_at: StoredDate })[]>(
+      `SELECT is_deleted, deletion_requested_at FROM bg_users WHERE id = ? LIMIT 1`,
+      [userId],
+    );
+  } catch (error) {
+    // Lue à chaque connexion : une migration tolérante en échec (colonne
+    // absente) ne doit pas fermer la porte — sans la colonne, aucune demande
+    // n'a pu être posée.
+    if (isUnknownColumnError(error)) return null;
+    throw error;
+  }
   const row = rows[0];
   if (!row || Number(row.is_deleted) !== 1 || row.deletion_requested_at === null) return null;
   return {
