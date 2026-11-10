@@ -403,7 +403,20 @@ describe("D12 — conditions d'utilisation, version 10", () => {
     expect(en.details.at(-1)).toContain("version 10, in force since 11 November 2026");
     expect(en.details).toHaveLength(fr.details.length);
     expect(en.linkLabels).toHaveLength(fr.links?.length ?? 0);
-    expect(fr.links?.map((link) => link.href)).toEqual(["/conditions-utilisation#compte", "/conditions-utilisation#signalement", "/conditions-utilisation#retransmission"]);
+    expect(fr.links?.map((link) => link.href)).toEqual(["/conditions-utilisation#compte", "/conditions-utilisation#signalement", "/conditions-utilisation#retransmission", "/conditions-utilisation#contacts-de-match"]);
+  });
+
+  it("privacyChange_termsV10_linksAndDetailNameMatchContactsFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === TERMS_V10_ID)!;
+    const en = PRIVACY_CHANGES_EN[TERMS_V10_ID];
+
+    expect(fr.details.at(-2)).toContain("Contacts de match : les salons vocaux d'équipe sont ouverts à qui voit la catégorie des matchs");
+    expect(fr.details.at(-2)).toContain("dont le bot déconnecte les occupants sans garder qui ils sont");
+    expect(fr.details.at(-1)).toContain("« Retransmission des matchs » et « Contacts de match »");
+    expect(en.details.at(-2)).toContain("Match contacts: team voice channels are open to whoever sees the match category");
+    expect(en.details.at(-2)).toContain("whose occupants the bot disconnects without keeping who they are");
+    expect(en.details.at(-1)).toContain("“Match streaming” and “Match contacts” sections");
+    expect(en.linkLabels?.at(-1)).toBe("Read the “Match contacts” section");
   });
 });
 
