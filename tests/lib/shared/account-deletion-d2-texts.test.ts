@@ -202,7 +202,7 @@ describe("D6 — empreinte d'un avatar supprimé par la modération", () => {
     const entry = PRIVACY_CHANGES.find((change) => change.id === AVATAR_HASH_ID);
 
     // Lendemain de la mise en ligne prévue, même jour que la version 10 qui la suit.
-    expect(entry?.publishedAt).toBe("2026-11-12");
+    expect(entry?.publishedAt).toBe("2026-11-11");
     expect(entry?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(entry?.audience).toBeUndefined();
     // Suivies de l'entrée des salons vocaux (MATCH-VOICE), même mise en ligne.
@@ -331,7 +331,7 @@ describe("D22, D30, D31 — empreinte liée à la décision tant que le compte e
   });
 
   it("registerUpdatedAt_advancedWithThisChange", () => {
-    expect(REGISTER_UPDATED_AT >= "2026-11-12").toBe(true);
+    expect(REGISTER_UPDATED_AT >= "2026-11-11").toBe(true);
   });
 
   it("privacyChange_avatarHashEntry_saysLinkUntilErasureAndOutcomeFrAndEn", () => {
@@ -367,7 +367,7 @@ describe("D22, D30, D31 — empreinte liée à la décision tant que le compte e
 describe("D12 — conditions d'utilisation, version 10", () => {
   it("terms_v10_versionAndDate", () => {
     expect(TERMS_VERSION).toBe(10);
-    expect(TERMS_UPDATED_AT).toBe("2026-11-12");
+    expect(TERMS_UPDATED_AT).toBe("2026-11-11");
   });
 
   it("terms_account_suspendedPlayerInheritsLastAndHeldAvatarFrAndEn", () => {
@@ -399,8 +399,8 @@ describe("D12 — conditions d'utilisation, version 10", () => {
     expect(fr.asksTermsAcceptance).toBe(true);
     expect(fr.audience).toBeUndefined();
     expect(fr.title.startsWith("Conditions d'utilisation : version 10")).toBe(true);
-    expect(fr.details.at(-1)).toContain("la version 10, en vigueur depuis le 12 novembre 2026");
-    expect(en.details.at(-1)).toContain("version 10, in force since 12 November 2026");
+    expect(fr.details.at(-1)).toContain("la version 10, en vigueur depuis le 11 novembre 2026");
+    expect(en.details.at(-1)).toContain("version 10, in force since 11 November 2026");
     expect(en.details).toHaveLength(fr.details.length);
     expect(en.linkLabels).toHaveLength(fr.links?.length ?? 0);
     expect(fr.links?.map((link) => link.href)).toEqual(["/conditions-utilisation#compte", "/conditions-utilisation#signalement", "/conditions-utilisation#retransmission"]);
@@ -427,21 +427,21 @@ describe("revue juridique #571 — blocages déclarés au plus juste", () => {
     const frText = t01(PROCESSING_ACTIVITIES)?.retention.join(" ") ?? "";
     const enText = t01(PROCESSING_ACTIVITIES_EN)?.retention.join(" ") ?? "";
     expect(frText).toContain("une suppression d'office faite alors que sa contestation attendait encore son issue ne bloque l'image qu'une fois maintenue, ou à l'effacement du compte s'il vient avant, alors définitivement");
-    expect(frText).toContain("les empreintes posées à l'effacement d'un compte avant le 12 novembre 2026 — alors aussi celles d'un avatar seulement masqué — restent bloquées");
+    expect(frText).toContain("les empreintes posées à l'effacement d'un compte avant le 11 novembre 2026 — alors aussi celles d'un avatar seulement masqué — restent bloquées");
     expect(frText).toContain("(suppression sur signalement ou après un masquage)");
     expect(frText).not.toContain("au terme d'un masquage)");
     expect(enText).toContain("an automatic deletion made while its challenge was still awaiting its outcome only blocks the image once upheld");
-    expect(enText).toContain("hashes set on the erasure of an account before November 12, 2026");
+    expect(enText).toContain("hashes set on the erasure of an account before November 11, 2026");
     expect(enText).toContain("(deletion on a report or after a hiding)");
   });
 
   it("privacyChange_avatarHashEntry_pendingChallengeAndLegacyBlocksFrAndEn", () => {
     expect(fr?.details?.[1]).toContain("Une suppression d'office faite alors que sa contestation attendait encore son issue ne bloque l'image qu'une fois maintenue");
     expect(fr?.details?.[1]).toContain("prise sur un signalement ou après un masquage");
-    expect(fr?.details?.[4]).toContain("avant le 12 novembre 2026");
+    expect(fr?.details?.[4]).toContain("avant le 11 novembre 2026");
     expect(en?.details?.[1]).toContain("An automatic deletion made while its challenge was still awaiting its outcome only blocks the image once upheld");
     expect(en?.details?.[1]).toContain("taken on a report or after a hiding");
-    expect(en?.details?.[4]).toContain("before November 12, 2026");
+    expect(en?.details?.[4]).toContain("before November 11, 2026");
     expect(en?.details).toHaveLength(fr?.details?.length ?? -1);
   });
 
@@ -449,9 +449,9 @@ describe("revue juridique #571 — blocages déclarés au plus juste", () => {
     const frPage = readFileSync(join(process.cwd(), "app", "rgpd", "page.tsx"), "utf8").replace(/\s+/g, " ");
     const enPage = readFileSync(join(process.cwd(), "app", "rgpd", "RgpdEn.tsx"), "utf8").replace(/\s+/g, " ");
     expect(frPage).toContain("Une suppression d&apos;office faite alors que sa contestation attendait encore son issue ne bloque l&apos;image qu&apos;une fois maintenue");
-    expect(frPage).toContain("12 novembre 2026 — alors aussi celles d&apos;un avatar seulement masqué — restent bloquées");
+    expect(frPage).toContain("11 novembre 2026 — alors aussi celles d&apos;un avatar seulement masqué — restent bloquées");
     expect(enPage).toContain("An automatic deletion made while its challenge was still awaiting its outcome only blocks the image once upheld");
-    expect(enPage).toContain("November 12, 2026 — then also those of an avatar that was only hidden — stay blocked");
+    expect(enPage).toContain("November 11, 2026 — then also those of an avatar that was only hidden — stay blocked");
   });
 });
 

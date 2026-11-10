@@ -203,7 +203,7 @@ l'arbitrage) ; à l'édition, elle passe par la route dédiée, pas par le `PATC
 
 Déclaré dans `PRIVACY_CHANGES` (`2026-11-salons-vocaux-equipe`, puis
 `2026-11-salons-vocaux-sans-comptage` du 6 novembre 2026 : plus d'attente, plus de
-comptage ; puis `2026-11-salons-vocaux-vidage-et-report` du 12 novembre 2026 : vidage par l'arbitrage, match reporté, ligne jamais close tant que le salon peut exister), `/rgpd#salons-vocaux` et le registre (T18 ; le geste `VOICE_CLEARED` aussi à T05), en FR et EN. La mention « effacé avec sa colonne » de l'entrée du 6 novembre est retirée (décision D15). Le site ne garde
+comptage ; puis `2026-11-salons-vocaux-vidage-et-report` du 11 novembre 2026 : vidage par l'arbitrage, match reporté, ligne jamais close tant que le salon peut exister), `/rgpd#salons-vocaux` et le registre (T18 ; le geste `VOICE_CLEARED` aussi à T05), en FR et EN. La mention « effacé avec sa colonne » de l'entrée du 6 novembre est retirée (décision D15). Le site ne garde
 que l'identifiant du salon, les numéros du match et de l'équipe et des heures ; le bot
 tient en mémoire seulement l'état vocal des membres du serveur, pour savoir si un salon
 est vide. Base : **intérêt légitime** (bon déroulement des tournois). La règle commune

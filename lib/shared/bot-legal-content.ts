@@ -119,10 +119,10 @@ const LAST_UPDATED_EN = "6 November 2026";
 // l'article 01 des conditions (TERMS v9, pas encore publiée) — même date ;
 // salons vocaux précisés (état vocal complet, identifiant rendu au site, durées à
 // un balayage près, salon sorti de la catégorie), puis vidage d'un salon par
-// l'arbitrage (MATCH-VOICE, D13), la politique seule — datée du lendemain de la
-// mise en ligne prévue (nuit du 2026-11-11), comme les entrées du 12 novembre.
-const PRIVACY_LAST_UPDATED_FR = "12 novembre 2026";
-const PRIVACY_LAST_UPDATED_EN = "12 November 2026";
+// l'arbitrage (MATCH-VOICE, D13), la politique seule — datée du jour de la
+// mise en ligne (nuit du 2026-11-10 au 11), comme les entrées du 11 novembre.
+const PRIVACY_LAST_UPDATED_FR = "11 novembre 2026";
+const PRIVACY_LAST_UPDATED_EN = "11 November 2026";
 
 const CONTACT_ITEMS_FR = [
   `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site (catégorie « RGPD » pour vos données)`,

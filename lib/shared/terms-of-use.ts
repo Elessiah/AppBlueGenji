@@ -141,7 +141,7 @@ export { SITE_MINIMUM_AGE };
 export const TERMS_AGE_DECLARATION = `je déclare avoir au moins ${SITE_MINIMUM_AGE} ans`;
 
 /** Date d'entrée en vigueur de la version courante (AAAA-MM-JJ). */
-export const TERMS_UPDATED_AT = "2026-11-12";
+export const TERMS_UPDATED_AT = "2026-11-11";
 
 /** Adresse de la page publique des conditions. */
 export const TERMS_PATH = "/conditions-utilisation";

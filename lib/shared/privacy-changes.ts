@@ -1699,7 +1699,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // devient le maître) et l'effacement du compte du maître devenu inéligible
     // (vrai avant le lancement seulement). Elle ne se réécrit pas : celle-ci la
     // corrige. Casters et arbitres seulement ; datée de la mise en ligne de
-    // la nuit du 10 au 11 novembre 2026, avant les entrées du 12.
+    // la nuit du 10 au 11 novembre 2026, comme les entrées voisines (D32).
     audience: "LIVE_STAFF",
     id: "2026-11-mode-d-antenne-precisions",
     publishedAt: "2026-11-11",
@@ -1721,7 +1721,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // la table garde la place, l'engagée et la date de l'envoi, et la
     // reconstruction du plateau l'efface (`forgetLobbyBriefMarks`). La
     // consigne du vocal ne part que pour un match suivi (`voice_tracked`).
-    // Pour tous les comptes ; datée de la mise en ligne du 11 novembre 2026, avant les entrées du 12.
+    // Pour tous les comptes ; datée de la mise en ligne du 11 novembre 2026 (D32).
     id: "2026-11-check-in-trace-precisions",
     publishedAt: "2026-11-11",
     title: "Check-in du match : sa trace d'envoi et la consigne du vocal précisées",
@@ -1742,10 +1742,10 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // suppression. Complétée par D22 (issue de la contestation gardée), D30
     // (avatar jamais supprimé par la modération : jamais bloqué) et D31
     // (empreinte liée au compte tant qu'il existe, seule à l'effacement).
-    // Pour tous les comptes. Datée du lendemain de la mise en ligne prévue
-    // (nuit du 2026-11-11), comme `TERMS_UPDATED_AT`.
+    // Pour tous les comptes. Datée du jour de la mise en ligne (D32, choix
+    // de l'utilisateur), comme `TERMS_UPDATED_AT`.
     id: "2026-11-empreinte-avatar-supprime",
-    publishedAt: "2026-11-12",
+    publishedAt: "2026-11-11",
     title: "Avatar supprimé par la modération : son empreinte est gardée dès la suppression",
     links: [
       { href: "/rgpd#signalements", label: "Lire la section « Signalements »" },
@@ -1758,7 +1758,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Tant que le compte existe (anonymisé compris), l'empreinte est aussi gardée sur la décision de suppression prise sur un signalement ou après un masquage, avec l'issue de sa contestation, que la modération y note : maintenue, le blocage reste ; acceptée, il est levé, sauf si une autre suppression de la même image le justifie encore. À l'effacement du compte, ces décisions sont effacées et le blocage devient définitif : seule l'empreinte reste, sans lien avec aucun compte. Une suppression d'office faite alors que sa contestation attendait encore son issue ne bloque l'image qu'une fois maintenue, ou à l'effacement du compte s'il vient avant, alors définitivement.",
       "À l'effacement d'un compte, seule est prise ou gardée l'empreinte d'un avatar que la modération avait déjà supprimé ; l'avatar seulement masqué part avec le compte, sans laisser d'empreinte, comme un avatar que la modération n'a jamais supprimé — à la demande de suppression, à l'anonymisation ou à l'effacement. Un logo d'équipe supprimé ne laisse pas d'empreinte non plus.",
       "Pendant les 30 jours d'une suppression demandée, la modération peut masquer, rétablir ou supprimer l'avatar mis de côté pour la réactivation, comme celui d'un compte actif ; masqué ou supprimé, il n'est pas rendu à la réactivation.",
-      "Les empreintes posées à l'effacement d'un compte avant le 12 novembre 2026 — alors aussi celles d'un avatar seulement masqué — restent bloquées, datées du jour de leur pose, qui peut être celui de l'effacement : toute empreinte posée avant cette date est ramenée au jour près.",
+      "Les empreintes posées à l'effacement d'un compte avant le 11 novembre 2026 — alors aussi celles d'un avatar seulement masqué — restent bloquées, datées du jour de leur pose, qui peut être celui de l'effacement : toute empreinte posée avant cette date est ramenée au jour près.",
     ],
   },
   {
@@ -1767,7 +1767,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // comptes. Même date que `TERMS_UPDATED_AT` — tout avancer ensemble si la
     // mise en ligne glisse.
     id: "2026-11-conditions-v10-avatar-et-succession",
-    publishedAt: "2026-11-12",
+    publishedAt: "2026-11-11",
     title: "Conditions d'utilisation : version 10 (avatar supprimé, reprise d'équipe, annonce #live)",
     links: [
       { href: "/conditions-utilisation#compte", label: "Lire la section « Compte »" },
@@ -1781,7 +1781,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Signalement et modération : quand la modération supprime un avatar, l'empreinte de l'image est gardée pour en refuser la remise en ligne, comme avatar ou comme logo d'équipe, y compris après la suppression du compte ; un avatar seulement masqué n'est pas bloqué. Supprimé d'office au terme d'un masquage alors que sa contestation attend encore son issue, il n'est bloqué qu'une fois la suppression maintenue, ou à l'effacement du compte s'il vient avant. L'issue d'une contestation est gardée avec la décision : maintenue, le blocage reste ; acceptée après une suppression décidée sur un signalement ou après un masquage, il est levé, sauf si une autre suppression de la même image le justifie encore ou si le compte a été effacé entre-temps.",
       "Compte : pendant les 30 jours d'une suppression demandée, la modération peut masquer, rétablir ou supprimer l'avatar mis de côté, qui n'est rendu à la réactivation que s'il n'est alors ni masqué ni supprimé ; un joueur suspendu ne reprend une équipe qu'après tous les autres ; au terme du délai, seul un avatar que la modération a supprimé ne peut plus être reposé — un avatar seulement masqué, ou que la modération n'a jamais supprimé, part sans que son empreinte soit gardée.",
       "Retransmission des matchs : le message #live de la soirée ne liste un match avant son début que si sa diffusion doit s'ouvrir à son heure de début dans la soirée ; les autres n'y paraissent qu'à leur passage à l'antenne.",
-      `Conditions d'utilisation : la version 10, en vigueur depuis le 12 novembre 2026, le dit dans ses sections « Compte », « Signalement et modération » et « Retransmission des matchs ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.`,
+      `Conditions d'utilisation : la version 10, en vigueur depuis le 11 novembre 2026, le dit dans ses sections « Compte », « Signalement et modération » et « Retransmission des matchs ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.`,
     ],
   },
   {
@@ -1789,9 +1789,9 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // vidage d'un salon par l'arbitrage (D13), salons d'un match reporté rendus
     // (D14), ligne du site jamais close tant que le salon peut exister. Aucune
     // donnée d'utilisateur gardée (D15). Pour tous les comptes ; même mise en
-    // ligne que les entrées du 12 novembre 2026.
+    // ligne que les entrées du 11 novembre 2026.
     id: "2026-11-salons-vocaux-vidage-et-report",
-    publishedAt: "2026-11-12",
+    publishedAt: "2026-11-11",
     title: "Salons vocaux d'équipe : vidage par l'arbitrage, match reporté",
     links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }],
     summary:
