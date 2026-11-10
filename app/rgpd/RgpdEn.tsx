@@ -1079,11 +1079,12 @@ export function RgpdEn({
             permissions change or remove it afterwards. The site keeps that caster&apos;s account with the match, erases it when
             they leave the match or are removed from it before it launches (casting requirements no longer met, or having become
             one of its players), when the mode is removed, or when their account is deleted, and leaves it with them when the
-            assigned referee or the staff change the mode; a caster who no longer meets the requirements once the match has
-            launched stays registered but no longer holds the mode, and their account stays with it until someone else first
-            changes it. A mode set by someone who does not cast the match (staff, referee), or whose holder has left or no longer
-            meets the requirements, has no holder: those staff, the assigned referee and the match&apos;s casters change it, and only
-            those staff and the referee remove it. The assigned referee of a match can also, for that match only, edit or remove a caster&apos;s
+            assigned referee or the staff change the mode, or after launch, even if they no longer meet the requirements; before
+            launch, a caster who no longer meets the requirements is no longer treated as the holder, and the first change someone
+            else makes to the mode erases their account. A mode set by someone who does not cast the match (staff, referee), or
+            whose holder has left or, before launch, no longer meets the requirements, has no holder: those staff, the assigned
+            referee and the match&apos;s casters change it, and only those staff and the referee remove it (it also goes when the
+            last caster leaves the match with no stream left). The assigned referee of a match can also, for that match only, edit or remove a caster&apos;s
             link and configure the organizers&apos; broadcast.{" "}
             A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which
             then replaces their profile one wherever the latter was shown (“Contacts” and launch windows, match

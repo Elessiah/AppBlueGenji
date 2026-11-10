@@ -6,13 +6,13 @@
  * Le mode d'un match est commun à tous ses streams : un co-caster ou un autre
  * porteur de `live` qui le changerait déciderait pour le caster qui l'a posé.
  * Une fois posé, seuls le **caster qui l'a posé** (`live_trigger_user_id`),
- * l'**arbitre désigné** du match (médiateur) et un **admin** le changent ou le
- * retirent. Un mode posé par le staff — ou dont le caster qui l'avait posé
+ * l'**arbitre désigné** du match (médiateur) et le staff `tournaments` + `live`
+ * (`castOverseer`) le changent ou le retirent. Un mode posé par le staff — ou dont le caster qui l'avait posé
  * s'est retiré — n'a pas de propriétaire : le staff `tournaments` le change,
  * et un caster montré du match aussi, qui en devient alors le maître
  * (décision du 2026-11-05). Seul un caster du match devient propriétaire du
- * mode qu'il pose : posé par qui ne le caste pas (staff, admin, arbitre), le
- * mode reste au staff. Un porteur de la seule `live` ne règle que **son**
+ * mode qu'il pose : posé par qui ne le caste pas (staff, arbitre), le
+ * mode reste sans maître. Un porteur de la seule `live` ne règle que **son**
  * cast : sans caster le match, il n'en pose ni n'en change le mode. Un caster
  * tu (devenu inéligible avant le lancement) ou parti ne tient plus le mode,
  * que le serveur et l'interface rendent au staff. Ouvrir ou couper l'antenne
@@ -176,7 +176,7 @@ function staffModeLockedFor(
  * Le propriétaire à écrire quand `actor` pose `next` (`null` quand le match
  * n'est plus casté) :
  * - un maître montré (`shownOwner`) le garde, quel que soit l'auteur —
- *   l'arbitre ou l'admin médie pour lui, même s'il caste aussi le match, il ne
+ *   l'arbitre ou le staff `tournaments` + `live` médie pour lui, même s'il caste aussi le match, il ne
  *   le lui retire pas ;
  * - sans maître montré, un caster montré qui pose le mode en devient le
  *   maître ; posé par qui ne le caste pas, le mode reste au staff — un maître

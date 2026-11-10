@@ -669,14 +669,14 @@ describe("Inscription — un mode posé entre-temps par un autre", () => {
 });
 
 describe("Mode d'antenne verrouillé — qui peut le changer", () => {
-  it("triggerLockedHint_ownerlessMode_namesOrganisers", () => {
-    expect(frActions.cardActions.castSettings.triggerLockedHint).toContain("l'organisation aussi quand aucun caster ne le tient");
-    expect(enActions.cardActions.castSettings.triggerLockedHint).toContain("the organisers too when no caster holds it");
+  it("triggerLockedHint_ownerlessMode_namesMatchCasters", () => {
+    expect(frActions.cardActions.castSettings.triggerLockedHint).toContain("les casters du match aussi le changent quand aucun caster ne le tient");
+    expect(enActions.cardActions.castSettings.triggerLockedHint).toContain("the match's casters can also change it when no caster holds it");
     // La fenêtre de diffusion lit le mode verrouillé avec les mêmes mots (`CastTriggerField`).
     expect(frDialogs.live).not.toHaveProperty("triggerLockedHint");
     expect(enDialogs.live).not.toHaveProperty("triggerLockedHint");
-    expect(frErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("l'organisation aussi quand aucun caster ne le tient");
-    expect(enErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("the organisers too when no caster holds it");
+    expect(frErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("les casters du match aussi quand aucun caster ne le tient");
+    expect(enErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("the match's casters too when no caster holds it");
   });
 });
 

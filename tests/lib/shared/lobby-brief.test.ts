@@ -584,8 +584,8 @@ describe("check-in du match — registre des traitements (T04, T12)", () => {
     const fr = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")!;
     const en = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")!;
     // Jamais deux fois : la trace reste avec le tournoi, même quand un retour arrière recrée le match.
-    expect(fr.retention.join(" ")).toContain("celles du check-in du match (la place du match dans le tournoi — phase, tableau, manche, numéro —, l'engagée et la date de l'envoi) : conservées avec le tournoi, pour qu'il ne parte jamais deux fois, même quand un retour arrière efface puis recrée le match ; effacées avec le tournoi ou l'engagée, ou quand le staff reconstruit le tableau de la phase (ou du tournoi)");
-    expect(en.retention.join(" ")).toContain("those of match check-ins sent (the match's place in the tournament — phase, bracket, round, number —, the entrant and the date it was sent): kept with the tournament, so that it never goes out twice, even when a rollback erases and recreates the match; erased with the tournament or the entrant, or when the staff rebuild the bracket of the phase (or of the tournament)");
+    expect(fr.retention.join(" ")).toContain("celles du check-in du match (la place du match dans le tournoi — phase, tableau, manche, numéro —, l'engagée et la date de l'envoi) : conservées avec le tournoi, pour qu'il ne parte jamais deux fois, même quand un retour arrière efface puis recrée le match ; effacées avec le tournoi ou l'engagée, ou quand le tableau à élimination de la phase (ou du tournoi) est reconstruit parce que le nombre d'engagées a changé");
+    expect(en.retention.join(" ")).toContain("those of match check-ins sent (the match's place in the tournament — phase, bracket, round, number —, the entrant and the date it was sent): kept with the tournament, so that it never goes out twice, even when a rollback erases and recreates the match; erased with the tournament or the entrant, or when the elimination bracket of the phase (or of the tournament) is rebuilt because the number of entrants changed");
   });
 });
 

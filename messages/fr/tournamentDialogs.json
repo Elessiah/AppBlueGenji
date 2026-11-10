@@ -268,7 +268,7 @@
     "streamedOrphan": "Ce mode n'a plus de caster : seuls l'arbitre du match ou le staff peuvent le retirer.",
     "url": "Chaîne du match (facultatif)",
     "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}.",
-    "urlLocked": "Ce lien suit le mode du caster qui l'a posé : seuls lui, l'arbitre du match ou le staff (arbitrage et diffusion) le changent.",
+    "urlLocked": "Ce lien suit le mode du caster qui le tient : seuls lui, l'arbitre du match ou le staff (arbitrage et diffusion) le changent.",
     "urlStaffOnly": "Le lien de l'organisation ne se règle que par le staff ou l'arbitre du match ; le tien se règle dans « Configurer ma diffusion ».",
     "organisationLink": "Ce lien est celui de l'organisation",
     "organisationLinkSubject": "lien de l'organisation",

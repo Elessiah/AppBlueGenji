@@ -268,7 +268,7 @@
     "streamedOrphan": "This mode no longer has a caster: only the match referee or staff can remove it.",
     "url": "Match channel (optional)",
     "urlInvalid": "Link not recognized. Accepted platforms: {platforms}.",
-    "urlLocked": "This link follows the mode of the caster who set it: only they, the match referee or staff with refereeing and streaming permissions can change it.",
+    "urlLocked": "This link follows the mode of the caster who holds it: only they, the match referee or staff with refereeing and streaming permissions can change it.",
     "urlStaffOnly": "The organisation link is set only by staff or the match referee; yours is set in “Configure my broadcast”.",
     "organisationLink": "This link is the organisation's",
     "organisationLinkSubject": "organisation link",

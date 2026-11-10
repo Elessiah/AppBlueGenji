@@ -52,16 +52,20 @@ describe("entrée « mode d'antenne : précisions »", () => {
     const change = entry(LIVE_MODE_ID);
     const index = PRIVACY_CHANGES.indexOf(change);
 
-    expect(PRIVACY_CHANGES[index - 1].id).toBe("2026-11-salons-vocaux-vidage-et-report");
-    expect([change.publishedAt, change.audience, change.asksTermsAcceptance]).toEqual(["2026-11-12", "LIVE_STAFF", undefined]);
+    expect(PRIVACY_CHANGES[index - 1].id).toBe("2026-11-lien-de-l-organisation-hors-du-cast");
+    expect([change.publishedAt, change.audience, change.asksTermsAcceptance]).toEqual(["2026-11-11", "LIVE_STAFF", undefined]);
     expect(change.links).toEqual([{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }]);
     expect(PRIVACY_CHANGES_EN[LIVE_MODE_ID].details).toHaveLength(change.details.length);
     expect(frText(change)).toContain("à la fois la permission d'arbitrage et celle de diffusion, administrateur ou non");
     expect(frText(change)).toContain("un caster du match qui le change en devient le maître");
-    expect(frText(change)).toContain("son compte reste avec lui jusqu'au premier changement qu'un autre y fait");
+    expect(frText(change)).toContain("ou, avant le lancement, ne remplit plus la condition");
+    expect(frText(change)).toContain("Une fois le match lancé, le caster reste inscrit et garde le mode");
+    expect(frText(change)).toContain("quand le dernier caster quitte le match sans qu'aucun stream reste");
     expect(enText(LIVE_MODE_ID)).toContain("both the refereeing and the streaming permissions, administrator or not");
     expect(enText(LIVE_MODE_ID)).toContain("a caster of the match who changes it becomes its holder");
-    expect(enText(LIVE_MODE_ID)).toContain("their account stays with it until someone else first changes it");
+    expect(enText(LIVE_MODE_ID)).toContain("Before launch, a caster who no longer meets the requirements is no longer treated as the holder");
+    expect(enText(LIVE_MODE_ID)).toContain("the caster stays registered and keeps the mode");
+    expect(enText(LIVE_MODE_ID)).toContain("when the last caster leaves");
   });
 
   it("privacyChanges_liveModeClarifications_reachesOnlyLiveStaff", () => {
@@ -73,21 +77,23 @@ describe("entrée « mode d'antenne : précisions »", () => {
 });
 
 describe("entrée « check-in : trace et consigne du vocal »", () => {
-  it("privacyChanges_checkInRecordClarifications_lastEntryForAllAccountsFrAndEn", () => {
+  it("privacyChanges_checkInRecordClarifications_followsLiveModeEntryForAllAccountsFrAndEn", () => {
     const change = entry(CHECK_IN_ID);
+    const index = PRIVACY_CHANGES.indexOf(change);
 
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(CHECK_IN_ID);
-    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(LIVE_MODE_ID);
-    expect([change.publishedAt, change.audience, change.asksTermsAcceptance]).toEqual(["2026-11-12", undefined, undefined]);
+    // Datées de la mise en ligne du 11 novembre 2026, avant les entrées du 12.
+    expect(PRIVACY_CHANGES[index - 1].id).toBe(LIVE_MODE_ID);
+    expect(PRIVACY_CHANGES[index + 1].id).toBe("2026-11-empreinte-avatar-supprime");
+    expect([change.publishedAt, change.audience, change.asksTermsAcceptance]).toEqual(["2026-11-11", undefined, undefined]);
     expect(change.links?.map((link) => link.href)).toEqual(["/rgpd#messages-de-match"]);
     expect(privacyChangeReachesAccount(change, {})).toBe(true);
     expect(PRIVACY_CHANGES_EN[CHECK_IN_ID].details).toHaveLength(change.details.length);
     expect(frText(change)).toContain("l'engagée et la date de l'envoi");
-    expect(frText(change)).toContain("quand le staff reconstruit le tableau de la phase");
+    expect(frText(change)).toContain("quand le tableau à élimination de la phase (ou du tournoi) est reconstruit parce que le nombre d'engagées a changé");
     expect(frText(change)).toContain("Un retour arrière, lui, la garde.");
     expect(frText(change)).toContain("que dans un tournoi qui a l'option « Salons vocaux d'équipe »");
     expect(enText(CHECK_IN_ID)).toContain("the entrant and the date it was sent");
-    expect(enText(CHECK_IN_ID)).toContain("when the staff rebuild the bracket of the phase");
+    expect(enText(CHECK_IN_ID)).toContain("is rebuilt because the number of entrants changed");
     expect(enText(CHECK_IN_ID)).toContain("A rollback, however, keeps it.");
     expect(enText(CHECK_IN_ID)).toContain("in a tournament with the “Team voice channels” option");
   });
@@ -100,12 +106,15 @@ describe("registre des traitements", () => {
 
     expect(fr).toContain("le staff qui a à la fois la permission d'arbitrage et celle de diffusion");
     expect(fr).toContain("ou qui change un mode sans maître — en devient le maître");
-    expect(fr).toContain("un caster qui ne remplit plus la condition une fois le match lancé reste inscrit");
+    expect(fr).toContain("avant le lancement, un caster qui ne remplit plus la condition n'est plus tenu pour le maître");
+    expect(fr).toContain("y compris après le lancement, même s'il ne remplit plus la condition");
+    expect(fr).toContain("il part aussi quand le dernier caster quitte le match sans qu'aucun stream reste");
     expect(fr).not.toContain("un administrateur le changent");
     expect(fr).not.toContain("un mode posé par le staff reste au staff");
     expect(en).toContain("the staff who hold both the refereeing and the streaming permissions");
     expect(en).toContain("or who changes a mode with no holder — becomes its holder");
-    expect(en).toContain("a caster who no longer meets the requirements once the match has launched stays registered");
+    expect(en).toContain("including after launch, even if they no longer meet the requirements");
+    expect(en).toContain("when the last caster leaves");
     expect(en).not.toContain("an administrator change");
     expect(en).not.toContain("a mode set by the staff stays with the staff");
   });
@@ -115,10 +124,10 @@ describe("registre des traitements", () => {
     const en = activity("T04", "en");
 
     expect(fr).toContain("l'engagée et la date de l'envoi) : conservées avec le tournoi");
-    expect(fr).toContain("ou quand le staff reconstruit le tableau de la phase (ou du tournoi)");
+    expect(fr).toContain("est reconstruit parce que le nombre d'engagées a changé");
     expect(fr).toContain("salon vocal de son équipe (dans un tournoi qui a l'option « Salons vocaux d'équipe »");
     expect(en).toContain("the entrant and the date it was sent): kept with the tournament");
-    expect(en).toContain("or when the staff rebuild the bracket of the phase (or of the tournament)");
+    expect(en).toContain("is rebuilt because the number of entrants changed");
     expect(en).toContain("voice channel (in a tournament with the “Team voice channels” option");
   });
 });
@@ -129,12 +138,17 @@ describe("/rgpd", () => {
     const en = source("app/rgpd/RgpdEn.tsx");
 
     expect(fr).toContain("le staff qui a à la fois la permission d&apos;arbitrage et celle de diffusion");
-    expect(fr).toContain("reste inscrit mais n&apos;est plus le maître du mode");
+    expect(fr).toContain("un caster qui ne remplit plus la condition n&apos;est plus tenu pour le maître");
+    expect(fr).toContain("ou après le lancement, même s&apos;il ne remplit plus la condition");
+    expect(fr).toContain("il part aussi quand le dernier caster quitte le match");
+    expect(fr).toContain("jamais en tournoi individuel ni contre une équipe fantôme");
     expect(fr).toContain("appartient au caster du match qui le pose, ou qui change un mode sans maître");
     expect(fr).toContain("rejoindre le salon vocal de votre équipe — dans un tournoi qui a l&apos;option « Salons vocaux d&apos;équipe »");
     expect(fr).not.toContain("un mode posé par le staff reste au staff");
     expect(en).toContain("the staff who hold both the refereeing and the streaming permissions");
-    expect(en).toContain("stays registered but no longer holds the mode");
+    expect(en).toContain("a caster who no longer meets the requirements is no longer treated as the holder");
+    expect(en).toContain("or after launch, even if they no longer meet the requirements");
+    expect(en).toContain("it also goes when the last caster leaves the match");
     expect(en).toContain("joining your team&apos;s voice channel — in a tournament with the “Team voice channels” option");
     expect(en).not.toContain("a mode set by the staff stays with the staff");
   });
@@ -147,6 +161,9 @@ describe("interface : le mode d'antenne verrouillé", () => {
 
     for (const text of fr) expect(text).toContain("le staff (arbitrage et diffusion)");
     for (const text of en) expect(text).toContain("staff with refereeing and streaming permissions");
+    expect(fr[0]).toContain("les casters du match aussi le changent quand aucun caster ne le tient");
+    expect(en[0]).toContain("the match's casters can also change it when no caster holds it");
+    expect(fr[2]).toContain("le mode du caster qui le tient");
     expect([...fr, ...en].join(" ")).not.toMatch(/\badmin\b/);
   });
 });

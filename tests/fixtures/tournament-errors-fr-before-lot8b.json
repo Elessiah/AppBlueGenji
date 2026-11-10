@@ -214,7 +214,7 @@
     "UNSUPPORTED_CONTENT_TYPE": "Requête refusée. Recharge la page, puis réessaie.",
     "USER_NOT_FOUND": "Compte introuvable.",
     "INVALID_STREAM_LINKS": "Liens des streams invalides.",
-    "LIVE_TRIGGER_NOT_OWNED": "Le mode de passage à l'antenne appartient au caster qui l'a posé : seuls lui, l'arbitre du match ou le staff (arbitrage et diffusion) le changent — l'organisation aussi quand aucun caster ne le tient.",
+    "LIVE_TRIGGER_NOT_OWNED": "Le mode de passage à l'antenne appartient au caster qui le tient : seuls lui, l'arbitre du match ou le staff (arbitrage et diffusion) le changent — les casters du match aussi quand aucun caster ne le tient.",
     "INVALID_TEAM_ID": "Équipe invalide.",
     "VOICE_CHANNEL_NOT_OPEN": "Ce salon vocal n'est pas ouvert : rien à vider.",
     "VOICE_CLEAR_UNAVAILABLE": "Le bot Discord n'a pas pu vider le salon. Réessaie dans une minute.",

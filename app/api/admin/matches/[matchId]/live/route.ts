@@ -126,7 +126,7 @@ async function readMatchLiveBody(req: Request): Promise<MatchLiveBody | Response
  * `true` est refusé (403) plutôt que silencieusement ignoré.
  *
  * Le mode d'antenne déjà posé ne change que pour le caster qui l'a posé,
- * l'arbitre désigné ou un admin (`LIVE_TRIGGER_NOT_OWNED`, 403) ; sans
+ * l'arbitre désigné ou le staff `tournaments` + `live` (`LIVE_TRIGGER_NOT_OWNED`, 403) ; sans
  * maître, pour le staff `tournaments` et les casters du match, dont celui qui
  * le change devient le maître. Un porteur de la seule `live` ne règle que son
  * cast : sans caster le match, `NOT_MATCH_CASTER` (403) ; le lien du staff
@@ -184,8 +184,8 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
 /**
  * Ouvre ou ferme l'antenne d'un match en mode `MANUAL`.
  * Corps : `{ onAir: boolean }`. Même règle que le changement du mode : son
- * caster, l'arbitre désigné ou un admin (le staff `tournaments` pour un mode
- * sans propriétaire) — `LIVE_TRIGGER_NOT_OWNED` (403) pour un co-caster.
+ * caster, l'arbitre désigné ou le staff `tournaments` + `live` (les casters du
+ * match aussi pour un mode sans propriétaire) — `LIVE_TRIGGER_NOT_OWNED` (403) pour un co-caster.
  */
 export async function POST(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();

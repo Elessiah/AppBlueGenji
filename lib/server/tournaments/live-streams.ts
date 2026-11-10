@@ -59,8 +59,8 @@ export type MatchLiveConfig = {
    */
   setter: MatchLiveSetter;
   /**
-   * Ses droits sur le mode d'antenne (`mayChangeLiveTrigger`) : admin,
-   * permission `tournaments`, et `live` — sans elle, l'appelant n'entre qu'en
+   * Ses droits sur le mode d'antenne (`mayChangeLiveTrigger`) : staff
+   * `tournaments` + `live` (`oversees`), permission `tournaments`, et `live` — sans elle, l'appelant n'entre qu'en
    * arbitre désigné du match, ce qui se relit sous le verrou (`NOT_MATCH_REFEREE`).
    */
   access: MatchLiveAccess;
@@ -437,7 +437,7 @@ function lockedTrigger(config: MatchLiveConfig, hold: LiveTriggerHold): MatchLiv
  * verrou (`known`) ou relus ici. Un stream de caster dont l'arbitre vient
  * d'effacer le lien reste au caster : le lien du staff ne s'y pose pas. Le
  * lien suit le mode : celui d'un autre caster montré ne se change que par lui,
- * l'arbitre retenu ou un admin (décision 2) — un lien renvoyé tel quel
+ * l'arbitre retenu ou le staff `tournaments` + `live` (décision 2) — un lien renvoyé tel quel
  * n'écrit rien et passe. Le stream du staff n'est le cast de personne : un
  * porteur de la seule `live` (ni staff, ni admin, ni arbitre) ne le touche
  * pas (`STAFF_STREAM_FORBIDDEN`, décision du 2026-11-05) — son lien à lui se
@@ -823,8 +823,8 @@ function linkProvider(setter: MatchLiveSetter): number | null {
  *
  * Ouvrir ou couper l'antenne, c'est décider du mode manuel : la même règle que
  * le changer (`mayChangeLiveTrigger`, décision 2) — son caster, l'arbitre
- * désigné ou un admin, et le staff `tournaments` pour un mode sans
- * propriétaire. Un co-caster ne coupe pas l'antenne d'un autre
+ * désigné ou le staff `tournaments` + `live`, et les casters du match pour un
+ * mode sans propriétaire. Un co-caster ne coupe pas l'antenne d'un autre
  * (`LIVE_TRIGGER_NOT_OWNED`). Tout se juge sous le verrou de la ligne du match
  * (`lockLiveMatch`) : l'arbitre sans `live` retiré entre la porte et
  * l'écriture est refusé (`NOT_MATCH_REFEREE`).

@@ -1288,11 +1288,12 @@ function RgpdFr({
             permission d&apos;arbitrage et celle de diffusion le changent ou le retirent ensuite. Le site garde le compte de ce caster
             avec le match, l&apos;efface quand il quitte le match ou en est retiré avant son lancement (condition du cast plus
             remplie, ou devenu joueur du match), que le mode est retiré, ou que son compte est supprimé, et le lui laisse quand
-            l&apos;arbitre désigné ou le staff change le mode ; un caster qui ne remplit plus la condition une fois le match lancé
-            reste inscrit mais n&apos;est plus le maître du mode, et son compte reste avec lui jusqu&apos;au premier changement
-            qu&apos;un autre y fait. Un mode posé par qui ne caste pas le match (staff, arbitre), ou dont le maître est parti ou ne
-            remplit plus la condition, n&apos;a pas de maître : ce staff, l&apos;arbitre désigné et les casters du match le changent, et
-            seuls ce staff et l&apos;arbitre le retirent. L&apos;arbitre désigné d&apos;un match peut aussi, pour ce
+            l&apos;arbitre désigné ou le staff change le mode, ou après le lancement, même s&apos;il ne remplit plus la condition ;
+            avant le lancement, un caster qui ne remplit plus la condition n&apos;est plus tenu pour le maître, et le premier
+            changement qu&apos;un autre fait au mode efface son compte. Un mode posé par qui ne caste pas le match (staff, arbitre), ou
+            dont le maître est parti ou, avant le lancement, ne remplit plus la condition, n&apos;a pas de maître : ce staff,
+            l&apos;arbitre désigné et les casters du match le changent, et seuls ce staff et l&apos;arbitre le retirent (il part aussi
+            quand le dernier caster quitte le match sans qu&apos;aucun stream reste). L&apos;arbitre désigné d&apos;un match peut aussi, pour ce
             seul match, modifier ou retirer le lien d&apos;un caster et configurer la diffusion de l&apos;organisation.{" "}
             Un caster peut aussi donner, pour un cast précis, un <strong>BattleTag propre à ce
             match</strong>, qui remplace alors celui de son profil là où ce dernier était montré (fenêtres
