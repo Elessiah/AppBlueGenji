@@ -371,6 +371,9 @@ async function applyDeletionMode(
   }
   const withdrawal = await anonymizeAccount(connection, userId);
   await connection.execute(`UPDATE bg_users SET deletion_requested_at = NULL WHERE id = ? AND is_deleted = 1`, [userId]);
+  // Ses tickets de réactivation (compte, moyen de connexion) ne survivent pas
+  // à l'anonymisation : la ligne reste, la cascade ne joue pas.
+  await connection.execute(`DELETE FROM bg_account_reactivation_tickets WHERE user_id = ?`, [userId]);
   // Le vrai pseudo mis de côté pour la réactivation ne survit pas à la
   // suppression définitive (l'effacement l'emporte par cascade).
   await dropDeletionHold(connection, userId);
@@ -402,7 +405,7 @@ function deletionIsDue(row: { is_deleted: 0 | 1; deletion_requested_at: StoredDa
  * qui efface : un avatar masqué pendant l'attente du verrou est vu, et son
  * fichier part avec les autres après le commit.
  */
-async function loadQuarantinedAvatarFiles(runner: SqlRunner, userId: number): Promise<string[]> {
+export async function loadQuarantinedAvatarFiles(runner: SqlRunner, userId: number): Promise<string[]> {
   const [rows] = await runner.execute<(RowDataPacket & { logo_url: string })[]>(
     `SELECT logo_url FROM bg_logo_quarantines WHERE user_id = ? AND status = 'HIDDEN' ORDER BY id`,
     [userId],

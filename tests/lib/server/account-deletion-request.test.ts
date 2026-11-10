@@ -369,8 +369,9 @@ describe("requestAccountDeletion — arbitrages retirés", () => {
 
     await requestAccountDeletion(7);
 
-    expect(relaunchAfterRefereeWithdrawal).toHaveBeenCalledWith(connection, [4, 9]);
-    expect(flushBotLogs).toHaveBeenCalledWith(connection);
+    expect(jest.mocked(relaunchAfterRefereeWithdrawal).mock.calls[0]?.[0]).toBe(connection);
+    expect(jest.mocked(relaunchAfterRefereeWithdrawal).mock.calls[0]?.[1]).toEqual([4, 9]);
+    expect(jest.mocked(flushBotLogs).mock.calls[0]?.[0]).toBe(connection);
     expect(discardBotLogs).not.toHaveBeenCalled();
     const relaunchOrder = jest.mocked(relaunchAfterRefereeWithdrawal).mock.invocationCallOrder[0];
     expect(jest.mocked(withdrawUserCasts).mock.invocationCallOrder[0]).toBeLessThan(relaunchOrder);
@@ -382,14 +383,15 @@ describe("requestAccountDeletion — arbitrages retirés", () => {
 
     await requestAccountDeletion(7);
 
-    expect(relaunchAfterRefereeWithdrawal).toHaveBeenCalledWith(connection, []);
+    expect(jest.mocked(relaunchAfterRefereeWithdrawal).mock.calls[0]?.[0]).toBe(connection);
+    expect(jest.mocked(relaunchAfterRefereeWithdrawal).mock.calls[0]?.[1]).toEqual([]);
   });
 
   it("requestAccountDeletion_failureAfterRelaunch_discardsQueuedNotices", async () => {
     const { connection } = fakeDb({ refereedMatches: [4], failOn: "UPDATE bg_team_invitations" });
 
     await expect(requestAccountDeletion(7)).rejects.toThrow("DB_DOWN");
-    expect(discardBotLogs).toHaveBeenCalledWith(connection);
+    expect(jest.mocked(discardBotLogs).mock.calls[0]?.[0]).toBe(connection);
     expect(flushBotLogs).not.toHaveBeenCalled();
   });
 });

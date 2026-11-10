@@ -6,6 +6,10 @@ jest.mock("@/lib/server/stats-service");
 jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/account-deletion-journal");
 jest.mock("@/lib/server/tournaments/notifications");
+jest.mock("node:fs/promises", () => ({
+  ...jest.requireActual<typeof import("node:fs/promises")>("node:fs/promises"),
+  unlink: jest.fn(async () => undefined),
+}));
 
 import { reconcileDeletedAccounts } from "@/lib/server/users/deleted-accounts";
 import { getDatabase } from "@/lib/server/database";
@@ -16,6 +20,7 @@ import { fakePool } from "../../helpers/sql-double";
 import { clearCache } from "@/lib/server/cache";
 import { LANDING_TICKER_KEY, LANDING_TTL_MS, cachedLanding } from "@/lib/server/landing-cache";
 import { readFileSync } from "node:fs";
+import { unlink } from "node:fs/promises";
 import { join } from "node:path";
 
 /**
@@ -32,6 +37,8 @@ type Account = {
   owned?: boolean;
   isAdmin?: boolean;
   roles?: string | null;
+  /** Avatars masqués par la modération (quarantaine `HIDDEN`). */
+  hidden?: string[];
   /** Matchs qu'il arbitre encore, avec leur tournoi (`withdrawUserCasts`). */
   refereed?: { matchId: number; tournamentId: number }[];
 };
@@ -90,6 +97,9 @@ function fakeDb(
         }
         if (q.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
           return [refereed.map((match) => ({ id: match.matchId, tournament_id: match.tournamentId, status: "READY" }))];
+        }
+        if (q.startsWith("SELECT logo_url FROM bg_logo_quarantines")) {
+          return [(current === null ? [] : accounts[current]?.hidden ?? []).map((logo_url) => ({ logo_url }))];
         }
         if (q.includes("FOR UPDATE")) current = Number(params[0]);
         queries.push({ userId: current, sql: q, params });
@@ -154,6 +164,34 @@ describe("reconcileDeletedAccounts", () => {
     const writes = writesFor(queries, 5122).map((q) => q.sql);
     expect(writes.some((sql) => sql.startsWith("DELETE FROM bg_users WHERE id = ?"))).toBe(true);
     expect(writes.some((sql) => sql.startsWith("UPDATE bg_users"))).toBe(false);
+  });
+
+  // ERREUR.txt (revue sécurité #571) : comme `deleteAccountNow`, l'avatar
+  // masqué part du disque avec le compte effacé, après le commit.
+  it("reconcileDeletedAccounts_erasedWithHiddenAvatar_unlinksQuarantinedFileAfterCommit", async () => {
+    const { connections } = fakeDb({ 5122: { pseudo: "compte_supprime_5122", hidden: ["/api/uploads/avatars/5122-abc.webp"] } });
+
+    await reconcileDeletedAccounts();
+
+    expect(jest.mocked(unlink)).toHaveBeenCalledTimes(1);
+    expect(String(jest.mocked(unlink).mock.calls[0][0]).replace(/\\/g, "/")).toMatch(/user-5122-5122-abc\.webp$/);
+    expect(connections[0].commit.mock.invocationCallOrder[0]).toBeLessThan(jest.mocked(unlink).mock.invocationCallOrder[0]);
+  });
+
+  it("reconcileDeletedAccounts_renamedAccount_unlinksNothing", async () => {
+    fakeDb({ 5123: { pseudo: "compte_supprime_5123", played: true, hidden: ["/api/uploads/avatars/5123-abc.webp"] } });
+
+    await reconcileDeletedAccounts();
+
+    expect(jest.mocked(unlink)).not.toHaveBeenCalled();
+  });
+
+  it("reconcileDeletedAccounts_commitFails_unlinksNothing", async () => {
+    fakeDb({ 5122: { pseudo: "compte_supprime_5122", hidden: ["/api/uploads/avatars/5122-abc.webp"] } }, { commitFails: true });
+
+    await reconcileDeletedAccounts();
+
+    expect(jest.mocked(unlink)).not.toHaveBeenCalled();
   });
 
   it("renomme sous un pseudo d'emprunt un compte qui a joué et porte encore l'ancien pseudo", async () => {
