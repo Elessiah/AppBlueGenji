@@ -15,7 +15,7 @@ import { recordAccountReactivation } from "@/lib/server/account-deletion-journal
 import { reactivationUndoes, type AccountDeletionEntry } from "@/lib/shared/account-deletion-journal";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
-import { restoreAccountIdentity } from "./account-deletion-hold";
+import { type RestoredIdentity, restoreAccountIdentity } from "./account-deletion-hold";
 
 /*
  * Réactivation d'un compte dont la suppression est demandée (E4,
@@ -74,11 +74,16 @@ export async function readPendingDeletion(userId: number): Promise<{ requestedAt
   };
 }
 
-/** Remet un ticket de réactivation au compte ; rend le jeton en clair (pour le cookie). */
+/**
+ * Remet un ticket de réactivation au compte ; rend le jeton en clair (pour le
+ * cookie). Les tickets encore valides du compte restent : une seconde connexion
+ * (autre appareil, autre onglet) ne périme pas l'écran déjà ouvert. Tous
+ * partent à la réactivation, à l'échéance (quinze minutes) ou avec le compte.
+ */
 export async function createReactivationTicket(userId: number, event: ConnectionLogEvent): Promise<string> {
   const db = await getDatabase();
   const token = crypto.randomBytes(32).toString("hex");
-  await db.execute(`DELETE FROM bg_account_reactivation_tickets WHERE expires_at < NOW() OR user_id = ?`, [userId]);
+  await db.execute(`DELETE FROM bg_account_reactivation_tickets WHERE expires_at < NOW()`);
   await db.execute(
     `INSERT INTO bg_account_reactivation_tickets (token_hash, user_id, login_event, expires_at)
      VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE))`,
@@ -104,6 +109,17 @@ export async function peekReactivationTicket(
   const row = rows[0];
   if (!row || row.deletion_requested_at === null || !isReactivationWindowOpen(row.deletion_requested_at)) return null;
   return { userId: Number(row.user_id), finalAt: reactivationDeadline(row.deletion_requested_at).toISOString() };
+}
+
+/**
+ * Retire le ticket désigné par ce jeton (« Ne pas réactiver ») : sur un poste
+ * partagé, le cookie ne doit pas rester utilisable jusqu'à son terme. Sans
+ * effet sur la demande, qui suit son cours. Jeton absent ou mal formé : rien.
+ */
+export async function discardReactivationTicket(token: string | undefined): Promise<void> {
+  if (!token || !/^[0-9a-f]{64}$/.test(token)) return;
+  const db = await getDatabase();
+  await db.execute(`DELETE FROM bg_account_reactivation_tickets WHERE token_hash = ?`, [hashTicket(token)]);
 }
 
 /**
@@ -140,12 +156,13 @@ async function logReactivation(): Promise<void> {
 /**
  * Consomme le ticket et relève la demande de suppression, sous le verrou du
  * compte (fenêtre relue dessous : la suppression définitive ne passe pas entre
- * la lecture et l'écriture). Rend le compte et sa porte d'entrée, ou `null` —
- * ticket inconnu, expiré, déjà servi, ou fenêtre close.
+ * la lecture et l'écriture). Rend le compte, sa porte d'entrée et ce qu'il a
+ * retrouvé (`pseudoChanged` : pas son pseudo d'avant), ou `null` — ticket
+ * inconnu, expiré, déjà servi, ou fenêtre close.
  */
 export async function reactivateAccount(
   token: string | undefined,
-): Promise<{ userId: number; event: ConnectionLogEvent } | null> {
+): Promise<{ userId: number; event: ConnectionLogEvent; pseudoChanged: boolean } | null> {
   if (!token || !/^[0-9a-f]{64}$/.test(token)) return null;
   const db = await getDatabase();
   const tokenHash = hashTicket(token);
@@ -163,7 +180,7 @@ export async function reactivateAccount(
   // Rejouée entière sur interblocage (ou refus d'instantané MariaDB) : elle
   // attend le verrou du compte derrière la suppression définitive. Rien n'est
   // écrit avant l'annulation, et les suites d'après commit restent dehors.
-  const transact = async (): Promise<boolean> => {
+  const transact = async (): Promise<RestoredIdentity | null> => {
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
@@ -187,7 +204,7 @@ export async function reactivateAccount(
       );
       if (Number(consumed.affectedRows) !== 1) {
         await connection.commit();
-        return false;
+        return null;
       }
       const row = locked[0];
       if (
@@ -197,7 +214,7 @@ export async function reactivateAccount(
         !isReactivationWindowOpen(row.deletion_requested_at)
       ) {
         await connection.commit();
-        return false;
+        return null;
       }
       // Le vrai pseudo et l'avatar reviennent avec le compte (anonyme depuis la
       // demande, `account-deletion-hold.ts`).
@@ -207,9 +224,11 @@ export async function reactivateAccount(
       // partent, seule celle de la réactivation sera créée ensuite.
       if (!restored) {
         await connection.commit();
-        return false;
+        return null;
       }
       await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
+      // Les autres tickets du compte (autre appareil) n'ont plus d'objet.
+      await connection.execute(`DELETE FROM bg_account_reactivation_tickets WHERE user_id = ?`, [userId]);
       // Avant le commit, et levé s'il échoue (la transaction s'annule, le ticket
       // revient) : la demande en attente ne doit plus être rejouée par une
       // restauration — la réactivation l'y remplace, et une sauvegarde prise
@@ -226,7 +245,7 @@ export async function reactivateAccount(
         { strict: true },
       );
       await connection.commit();
-      return true;
+      return restored;
     } catch (error) {
       await connection.rollback().catch(() => {});
       throw error;
@@ -234,13 +253,14 @@ export async function reactivateAccount(
       connection.release();
     }
   };
-  if (!(await retryOnDeadlock(transact))) return null;
+  const identity = await retryOnDeadlock(transact);
+  if (identity === null) return null;
   // Les vues en cache montraient le pseudo d'emprunt.
   invalidateTeamIdentityViews();
   invalidateStats();
   await republishSoloEntryTournaments(userId);
   await logReactivation();
-  return { userId, event: candidate.login_event as ConnectionLogEvent };
+  return { userId, event: candidate.login_event as ConnectionLogEvent, pseudoChanged: identity === "RENAMED" };
 }
 
 /**
@@ -308,7 +328,7 @@ export async function replayAccountReactivation(entry: AccountDeletionEntry): Pr
     // Revérifié sous verrou : même compte, et demande que la réactivation défait.
     outcome = lockedReactivationOutcome(entry, locked[0]);
     if (outcome === null) {
-      restored = await restoreAccountIdentity(connection, userId);
+      restored = (await restoreAccountIdentity(connection, userId)) !== null;
       // Sous le verrou, la ligne est en attente : l'écriture ne peut que
       // l'apparier (un masque absent réactive sous le pseudo d'emprunt). Si
       // elle n'apparie rien, c'est un échec à dire (`failed`), jamais une

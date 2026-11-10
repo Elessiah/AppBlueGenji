@@ -38,9 +38,10 @@ jest.mock("react", () => {
 
 const showError = jest.fn<(message: string) => void>();
 const showSuccess = jest.fn<(message: string) => void>();
+const showInfo = jest.fn<(message: string) => void>();
 const push = jest.fn<(href: string) => void>();
 const refresh = jest.fn<() => void>();
-jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError, showSuccess }) }));
+jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError, showSuccess, showInfo }) }));
 jest.mock("@/components/i18n/locale-navigation", () => ({
   LocaleLink: () => null,
   useLocaleRouter: () => ({ push, refresh }),
@@ -55,13 +56,38 @@ jest.mock("@/components/i18n/login-text", () => ({
   useLoginText: () => jest.requireActual<typeof import("@/lib/shared/login-text")>("@/lib/shared/login-text").FR_LOGIN_TEXT,
 }));
 
-type Props = { disabled?: boolean; onClick?: () => Promise<void>; children?: ReactNode };
+type Props = { disabled?: boolean; "aria-busy"?: boolean; onClick?: () => Promise<void>; children?: ReactNode };
 
-function render(finalAt: string | null): ReactElement {
+function render(finalAt: string | null, hadTicket = true): ReactElement {
   cursor = 0;
   refCursor = 0;
   effects = [];
-  return ReactivationPanel({ finalAt });
+  return ReactivationPanel({ finalAt, hadTicket });
+}
+
+/** Tous les boutons rendus, dans l'ordre : « Réactiver », puis « Ne pas réactiver ». */
+function findButtons(node: unknown, found: { props: Props }[] = []): { props: Props }[] {
+  if (!node || typeof node !== "object") return found;
+  if (Array.isArray(node)) {
+    for (const child of node) findButtons(child, found);
+    return found;
+  }
+  const element = node as { props?: Props & Record<string, unknown> };
+  if (element.props?.onClick) found.push(element as { props: Props });
+  else findButtons(element.props?.children, found);
+  return found;
+}
+
+/** Les textes rendus, à plat. */
+function textsOf(node: unknown, found: string[] = []): string[] {
+  if (typeof node === "string") found.push(node);
+  if (!node || typeof node !== "object") return found;
+  if (Array.isArray(node)) {
+    for (const child of node) textsOf(child, found);
+    return found;
+  }
+  textsOf((node as { props?: { children?: unknown } }).props?.children, found);
+  return found;
 }
 
 /** Parcourt l'arbre rendu : les composants simulés ne s'exécutent pas, leurs enfants restent des éléments. */
@@ -101,11 +127,79 @@ describe("ReactivationPanel", () => {
     expect(findButton(render(FUTURE))).not.toBeNull();
   });
 
-  it("410 : vue « expiré » et notification", async () => {
+  // Le bloc « expiré » (annoncé, focalisé) le dit une fois : pas de notification en double.
+  it("410 : vue « expiré », sans notification en double", async () => {
     global.fetch = jest.fn(async () => jsonResponse(410, { error: "REACTIVATION_EXPIRED" })) as typeof fetch;
     await findButton(render(FUTURE))!.props.onClick!();
-    expect(showError).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.expired"));
-    expect(findButton(render(FUTURE))).toBeNull();
+    expect(showError).not.toHaveBeenCalled();
+    const tree = render(FUTURE);
+    expect(findButton(tree)).toBeNull();
+    expect(textsOf(tree)).toContain(FR_LOGIN_TEXT.t("reactivation.expired"));
+  });
+
+  it("sans cookie de ticket : « aucune réactivation n'attend », pas « lien expiré »", () => {
+    const texts = textsOf(render(null, false));
+    expect(texts).toContain(FR_LOGIN_TEXT.t("reactivation.missing"));
+    expect(texts).not.toContain(FR_LOGIN_TEXT.t("reactivation.expired"));
+  });
+
+  it("cookie présent mais ticket périmé : « lien expiré »", () => {
+    expect(textsOf(render(null, true))).toContain(FR_LOGIN_TEXT.t("reactivation.expired"));
+  });
+
+  it("panne passagère : « réessaie », le bouton reste", async () => {
+    global.fetch = jest.fn(async () => jsonResponse(500, { error: "REACTIVATION_FAILED" })) as typeof fetch;
+    await findButton(render(FUTURE))!.props.onClick!();
+    expect(showError).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.failed"));
+    expect(FR_LOGIN_TEXT.t("reactivation.failed")).not.toContain("Reconnecte-toi");
+    expect(findButton(render(FUTURE))!.props.disabled).toBe(false);
+  });
+
+  it("pendant l'envoi : libellé d'attente, aria-busy, et « Ne pas réactiver » neutralisé", async () => {
+    let release = (_response: Response): void => undefined;
+    global.fetch = jest.fn(() => new Promise<Response>((resolve) => (release = resolve))) as typeof fetch;
+    const pending = findButton(render(FUTURE))!.props.onClick!();
+    const [confirm, cancel] = findButtons(render(FUTURE));
+    expect(confirm.props.children).toBe(FR_LOGIN_TEXT.t("reactivation.confirming"));
+    expect(confirm.props["aria-busy"]).toBe(true);
+    expect(cancel.props.disabled).toBe(true);
+    release(jsonResponse(200, { reactivated: true }));
+    await pending;
+  });
+
+  it("réactivé sans session (503) : dit la réactivation et renvoie à la connexion", async () => {
+    global.fetch = jest.fn(async () =>
+      jsonResponse(503, { error: "REACTIVATED_LOGIN_REQUIRED", reactivated: true }),
+    ) as typeof fetch;
+    await findButton(render(FUTURE))!.props.onClick!();
+    expect(showSuccess).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.doneLoginRequired"));
+    expect(showError).not.toHaveBeenCalled();
+    expect(push).toHaveBeenCalledWith("/connexion");
+  });
+
+  it("réactivé sous un autre pseudo : la notification le dit", async () => {
+    global.fetch = jest.fn(async () => jsonResponse(200, { reactivated: true, pseudoChanged: true })) as typeof fetch;
+    await findButton(render(FUTURE))!.props.onClick!();
+    expect(showSuccess).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.donePseudoChanged"));
+  });
+
+  it("« Ne pas réactiver » : retire le ticket, dit l'issue avec la date, puis l'accueil", async () => {
+    const fetchMock = jest.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => jsonResponse(200, { discarded: true }));
+    global.fetch = fetchMock as typeof fetch;
+    await findButtons(render(FUTURE))[1].props.onClick!();
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/auth/reactivate");
+    expect(fetchMock.mock.calls[0][1]?.method).toBe("DELETE");
+    expect(showInfo).toHaveBeenCalledWith(expect.stringContaining("3 décembre 2026"));
+    expect(push).toHaveBeenCalledWith("/");
+  });
+
+  it("« Ne pas réactiver » hors ligne : l'issue est dite quand même", async () => {
+    global.fetch = jest.fn(async () => {
+      throw new Error("offline");
+    }) as typeof fetch;
+    await findButtons(render(FUTURE))[1].props.onClick!();
+    expect(showInfo).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith("/");
   });
 
   it("410 : le focus passe au bloc « expiré » (le bouton qui l'avait a disparu)", async () => {

@@ -140,13 +140,19 @@
     "title": "Reactivate your account?",
     "lead": "You asked for your account to be deleted. The deletion becomes final on {date}: until then, you can still reactivate it.",
     "kept": "Reactivating gives you back your account: profile, statistics, settings, and your username and avatar, hidden everywhere since the request (if your username was taken in the meantime, it comes back, shortened if needed, followed by “OG”, for example “UsernameOG” — or “UsernameOG2”… if that is taken too, failing that your borrowed username: you can change it in My profile). A suspended account can be reactivated too: it stays suspended.",
-    "notUndone": "What was done when you asked is not undone: you left your teams (ownership handed over, team turned into a ghost team or disbanded), your organised tournaments changed organiser when someone could take them over, your registrations were withdrawn or lost by forfeit, and your casts, referee assignments and pending invitations and join requests were withdrawn.",
+    "notUndone": "What was done when you asked is not undone: you left your teams (ownership handed over, team turned into a ghost team or disbanded), your organised tournaments changed organiser when someone could take them over, your registrations for solo tournaments that had not started yet were withdrawn, your remaining matches in an ongoing solo tournament where you had never played were lost by forfeit, and your casts, referee assignments and pending invitations and join requests were withdrawn.",
     "confirm": "Reactivate my account",
     "cancel": "Don't reactivate",
     "done": "Your account is reactivated.",
     "doneSuspended": "Your account is reactivated, but it is still suspended: you cannot log in yet.",
     "expired": "This reactivation link has expired or was already used. Log in again to get a new one.",
     "backToLogin": "Back to login",
-    "failed": "Reactivation failed. Log in again to retry."
+    "failed": "Reactivation failed. Try again in a moment.",
+    "confirming": "Reactivating…",
+    "donePseudoChanged": "Your account is reactivated. Your previous username was taken: you now have another one, which you can change in My profile.",
+    "doneLoginRequired": "Your account is reactivated, but your session could not be opened. Log in again.",
+    "declined": "Your account is not reactivated: its deletion becomes final on {date}. Until then, logging in will offer it again.",
+    "missing": "No reactivation is waiting on this device. Log in: if your account's deletion was requested, you will be able to reactivate it.",
+    "redirecting": "This account's deletion was requested: you can still reactivate it."
   }
 }

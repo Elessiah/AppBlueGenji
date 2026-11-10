@@ -86,7 +86,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   const router = useLocaleRouter();
   const text = useLoginText();
   const { t } = text;
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess, showInfo } = useToast();
   const fieldErrors = useFieldErrors(LOGIN_FIELD_ERRORS, LOGIN_FIELD_IDS);
   // Destination d'après connexion. Toujours **filtrée** : la valeur vient de
   // l'URL, et une redirection ouverte est l'appât classique du hameçonnage
@@ -244,6 +244,9 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
     event.preventDefault();
     fieldErrors.clear();
     setLoading(true);
+    // Renvoi vers la réactivation : le formulaire reste fermé pendant la
+    // navigation, le code — déjà consommé — ne se renvoie pas.
+    let leaving = false;
     try {
       const response = await fetch("/api/auth/discord/verify", {
         method: "POST",
@@ -267,6 +270,8 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
         // Suppression demandée il y a moins de trente jours : l'écran de
         // réactivation (ticket posé en cookie par le serveur), jamais en silence.
         if (code === ACCOUNT_PENDING_DELETION_CODE) {
+          leaving = true;
+          showInfo(t("reactivation.redirecting"));
           router.push(REACTIVATION_PATH);
           return;
         }
@@ -283,7 +288,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       fieldErrors.report(errorCode(e), (e as Error).message);
       showError((e as Error).message);
     } finally {
-      setLoading(false);
+      if (!leaving) setLoading(false);
     }
   };
 

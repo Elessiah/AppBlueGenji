@@ -7,17 +7,28 @@ import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { CyberCard } from "@/components/cyber/CyberCard";
 import { ACCOUNT_SUSPENDED } from "@/lib/shared/account-suspension";
+import { REACTIVATED_LOGIN_REQUIRED } from "@/lib/shared/account-deletion";
 import { suspendedLoginText } from "@/lib/shared/login-text";
 import { INTL_LOCALE, SITE_TIME_ZONE } from "@/lib/shared/locales";
 import { LOGIN_HELP_TEXT_STYLE } from "../_lib/login-styles";
 
-/** Carte de l'écran de réactivation : la date, ce qui ne revient pas, et le geste. */
-export function ReactivationPanel({ finalAt }: Readonly<{ finalAt: string | null }>) {
+/**
+ * Carte de l'écran de réactivation : la date, ce qui ne revient pas, et le geste.
+ * `hadTicket` : un cookie de ticket est arrivé avec la page — sans lui (favori,
+ * fenêtre privée), l'écran ne parle pas d'un lien « expiré » que le visiteur
+ * n'a jamais eu.
+ */
+export function ReactivationPanel({
+  finalAt,
+  hadTicket = true,
+}: Readonly<{ finalAt: string | null; hadTicket?: boolean }>) {
   const text = useLoginText();
   const { t } = text;
   const router = useLocaleRouter();
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess, showInfo } = useToast();
   const [loading, setLoading] = useState(false);
+  // Passe à vrai quand un ticket périme sous le clic : l'écran dit alors « expiré ».
+  const [expiredUnderClick, setExpiredUnderClick] = useState(false);
   // Une date illisible vaut un ticket absent : jamais « Invalid Date » devant un bouton.
   const validFinalAt = finalAt !== null && !Number.isNaN(new Date(finalAt).getTime()) ? finalAt : null;
   const [expired, setExpired] = useState(validFinalAt === null);
@@ -53,6 +64,12 @@ export function ReactivationPanel({ finalAt }: Readonly<{ finalAt: string | null
           reactivated?: boolean;
           suspension?: { endsAt?: string | null };
         };
+        // Réactivé, mais la session n'a pas pu s'ouvrir : il reste à se connecter.
+        if (payload.error === REACTIVATED_LOGIN_REQUIRED && payload.reactivated === true) {
+          showSuccess(t("reactivation.doneLoginRequired"));
+          router.push("/connexion");
+          return;
+        }
         // Compte suspendu : la réactivation est faite, il revient suspendu
         // (décision du 2026-11-04) — l'écran le dit et rend la connexion.
         if (payload.error === ACCOUNT_SUSPENDED && payload.reactivated === true) {
@@ -61,16 +78,21 @@ export function ReactivationPanel({ finalAt }: Readonly<{ finalAt: string | null
           router.push("/connexion");
           return;
         }
-        // Seul un ticket périmé ou déjà servi (410) change l'écran ; une suspension
-        // ou une panne passagère se disent par une notification, le bouton reste.
-        if (response.status === 410) setExpired(true);
-        let message = t(response.status === 410 ? "reactivation.expired" : "reactivation.failed");
-        if (payload.error === ACCOUNT_SUSPENDED) message = suspendedLoginText(text, null);
-        showError(message);
+        // Seul un ticket périmé ou déjà servi (410) change l'écran — son bloc
+        // « expiré », annoncé (`role="alert"`) et focalisé, le dit une fois, sans
+        // notification en double ; une suspension ou une panne passagère se
+        // disent par une notification, le bouton reste.
+        if (response.status === 410) {
+          setExpiredUnderClick(true);
+          setExpired(true);
+        } else {
+          showError(payload.error === ACCOUNT_SUSPENDED ? suspendedLoginText(text, null) : t("reactivation.failed"));
+        }
         setLoading(false);
         return;
       }
-      showSuccess(t("reactivation.done"));
+      const done = (await response.json().catch(() => ({}))) as { pseudoChanged?: boolean };
+      showSuccess(t(done.pseudoChanged === true ? "reactivation.donePseudoChanged" : "reactivation.done"));
       router.push("/profil");
       // La barre de navigation passe à la session ouverte.
       router.refresh();
@@ -79,6 +101,24 @@ export function ReactivationPanel({ finalAt }: Readonly<{ finalAt: string | null
       showError(t("reactivation.failed"));
       setLoading(false);
     }
+  };
+
+  // « Ne pas réactiver » : le ticket et son cookie partent (poste partagé), et
+  // l'issue est dite — la suppression suit son cours jusqu'à la date annoncée.
+  const decline = async () => {
+    setLoading(true);
+    try {
+      await fetch("/api/auth/reactivate", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+    } catch {
+      // Le ticket expire de lui-même : le refus n'a rien à réussir.
+    }
+    showInfo(t("reactivation.declined", { date }));
+    router.push("/");
+    // `loading` reste vrai : rien ne se rouvre pendant la navigation.
   };
 
   return (
@@ -97,7 +137,9 @@ export function ReactivationPanel({ finalAt }: Readonly<{ finalAt: string | null
         </h1>
         {expired ? (
           <div ref={expiredRef} tabIndex={-1} role="alert" style={{ outline: "none" }}>
-            <p style={{ ...LOGIN_HELP_TEXT_STYLE, fontSize: 14 }}>{t("reactivation.expired")}</p>
+            <p style={{ ...LOGIN_HELP_TEXT_STYLE, fontSize: 14 }}>
+              {t(hadTicket || expiredUnderClick ? "reactivation.expired" : "reactivation.missing")}
+            </p>
             <LocaleLink href="/connexion" style={{ display: "inline-flex", alignItems: "center", minHeight: 44 }}>
               {t("reactivation.backToLogin")}
             </LocaleLink>
@@ -108,12 +150,12 @@ export function ReactivationPanel({ finalAt }: Readonly<{ finalAt: string | null
             <p style={{ ...LOGIN_HELP_TEXT_STYLE, fontSize: 14 }}>{t("reactivation.kept")}</p>
             <p style={{ ...LOGIN_HELP_TEXT_STYLE, fontSize: 14 }}>{t("reactivation.notUndone")}</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 24 }}>
-              <CyberButton type="button" onClick={reactivate} disabled={loading}>
-                {t("reactivation.confirm")}
+              <CyberButton type="button" onClick={reactivate} disabled={loading} aria-busy={loading}>
+                {t(loading ? "reactivation.confirming" : "reactivation.confirm")}
               </CyberButton>
-              <LocaleLink href="/" style={{ display: "inline-flex", alignItems: "center", minHeight: 44 }}>
+              <CyberButton type="button" variant="ghost" onClick={decline} disabled={loading}>
                 {t("reactivation.cancel")}
-              </LocaleLink>
+              </CyberButton>
             </div>
           </>
         )}

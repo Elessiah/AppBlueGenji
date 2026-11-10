@@ -29,10 +29,11 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function ReactivationPage() {
   const [locale, cookieStore] = await Promise.all([requestLocale(), cookies()]);
-  const ticket = await peekReactivationTicket(cookieStore.get(reactivationCookieName())?.value);
+  const token = cookieStore.get(reactivationCookieName())?.value;
+  const ticket = await peekReactivationTicket(token);
   return (
     <LoginTextProvider locale={locale} messages={locale === DEFAULT_LOCALE ? undefined : messagesFor(locale).login}>
-      <ReactivationPanel finalAt={ticket?.finalAt ?? null} />
+      <ReactivationPanel finalAt={ticket?.finalAt ?? null} hadTicket={Boolean(token)} />
     </LoginTextProvider>
   );
 }
