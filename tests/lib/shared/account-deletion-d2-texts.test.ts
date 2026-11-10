@@ -312,8 +312,8 @@ describe("D22, D30, D31 — empreinte liée à la décision tant que le compte e
   });
 
   it("registerT01_avatarHashRetention_contestOutcomeUpheldKeepsAcceptedLiftsFrAndEn", () => {
-    expect(t01Retention()).toContain("maintenue, le blocage reste ; acceptée après une suppression décidée sur un signalement, il est levé, sauf si une autre suppression de la même image le justifie encore");
-    expect(t01RetentionEn()).toContain("upheld, the block stays; accepted after a deletion decided on a report, it is lifted, unless another deletion of the same image still justifies it");
+    expect(t01Retention()).toContain("maintenue, le blocage reste ; acceptée après une suppression décidée sur un signalement ou après un masquage, il est levé, sauf si une autre suppression de la même image le justifie encore");
+    expect(t01RetentionEn()).toContain("upheld, the block stays; accepted after a deletion decided on a report or after a hiding, it is lifted, unless another deletion of the same image still justifies it");
   });
 
   it("registerT01_neverDeletedAvatar_leavesNoHashFrAndEn", () => {
@@ -385,9 +385,9 @@ describe("D12 — conditions d'utilisation, version 10", () => {
 
   it("terms_reports_hashKeptAndAcceptedChallengeLiftsFrAndEn", () => {
     expect(termsSection("signalement")).toContain("Quand la modération **supprime** un avatar, l'empreinte de l'image est gardée");
-    expect(termsSection("signalement")).toContain("acceptée après une suppression décidée sur un signalement, il est levé");
+    expect(termsSection("signalement")).toContain("acceptée après une suppression décidée sur un signalement ou après un masquage, il est levé");
     expect(termsSectionEn("signalement")).toContain("When moderation **deletes** an avatar, the hash of the image is kept");
-    expect(termsSectionEn("signalement")).toContain("accepted after a deletion decided on a report, it is lifted");
+    expect(termsSectionEn("signalement")).toContain("accepted after a deletion decided on a report or after a hiding, it is lifted");
   });
 
   it("privacyChange_termsV10_asksAcceptanceDatedWithTermsFrAndEn", () => {
@@ -415,10 +415,10 @@ describe("revue juridique #571 — blocages déclarés au plus juste", () => {
 
   it("registerT01_purpose_liftOnlyAfterReportDeletionWhileAccountExistsFrAndEn", () => {
     expect(t01(PROCESSING_ACTIVITIES)?.subPurposes.join(" ")).toContain(
-      "lever ce blocage quand la contestation d'une suppression décidée sur un signalement est acceptée, tant que le compte n'est pas effacé",
+      "lever ce blocage quand la contestation d'une suppression décidée sur un signalement ou après un masquage est acceptée, tant que le compte n'est pas effacé",
     );
     expect(t01(PROCESSING_ACTIVITIES_EN)?.subPurposes.join(" ")).toContain(
-      "lifting that block when the challenge to a deletion decided on a report is accepted, as long as the account is not erased",
+      "lifting that block when the challenge to a deletion decided on a report or after a hiding is accepted, as long as the account is not erased",
     );
   });
 
@@ -451,5 +451,26 @@ describe("revue juridique #571 — blocages déclarés au plus juste", () => {
     expect(frPage).toContain("12 novembre 2026 — alors aussi celles d&apos;un avatar seulement masqué — restent bloquées");
     expect(enPage).toContain("An automatic deletion whose challenge is still awaiting its outcome only blocks the image once upheld");
     expect(enPage).toContain("November 12, 2026 — then also those of an avatar that was only hidden — stay blocked");
+  });
+});
+
+// Revue juridique #571, cycle 2 : conditions v10 et blocages d'avant la version 10.
+describe("revue juridique #571, cycle 2", () => {
+  it("termsV10_signalement_pendingAutomaticDeletionBlockedOnlyOnceUpheldFrAndEn", () => {
+    const fr = TERMS_SECTIONS.find((s) => s.id === "signalement")?.paragraphs.join(" ") ?? "";
+    const en = TERMS_SECTIONS_EN.find((s) => s.id === "signalement")?.paragraphs.join(" ") ?? "";
+    expect(fr).toContain("Supprimé d'office au terme d'un masquage alors que sa contestation attend encore son issue, il n'est bloqué qu'une fois la suppression maintenue");
+    expect(fr).toContain("acceptée après une suppression décidée sur un signalement ou après un masquage, il est levé");
+    expect(en).toContain("Deleted automatically at the end of a hiding while its challenge is still awaiting its outcome, it is only blocked once the deletion is upheld");
+    expect(en).toContain("accepted after a deletion decided on a report or after a hiding, it is lifted");
+  });
+
+  it("legacyErasureBlocks_datedToTheDayTheyWereSetFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((c) => c.id === "2026-11-empreinte-avatar-supprime");
+    const en = PRIVACY_CHANGES_EN["2026-11-empreinte-avatar-supprime"];
+    expect(fr?.details?.[4]).toContain("datées du jour de leur pose");
+    expect(en?.details?.[4]).toContain("dated to the day they were set");
+    expect(PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.retention.join(" ")).toContain("datées du jour de leur pose");
+    expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.retention.join(" ")).toContain("dated to the day they were set");
   });
 });

@@ -274,7 +274,8 @@ d'une équipe. Section « Compte » corrigée en conséquence ; section
 « Signalement et modération » — nouveau paragraphe : empreinte gardée à la
 suppression d'un avatar, même après la suppression du compte, issue de la
 contestation gardée avec la décision, blocage levé par une contestation
-acceptée après une suppression décidée sur un signalement (sauf autre
+acceptée après une suppression décidée sur un signalement ou après un
+masquage (sauf autre
 suppression de la même image ou compte effacé entre-temps) ; section
 « Retransmission des matchs » (`STREAM_NOTICE_LIVE`) — l'annonce avant le
 début ne vaut que si la diffusion doit s'ouvrir à l'heure de début (D10,

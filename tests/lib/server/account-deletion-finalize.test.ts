@@ -37,12 +37,16 @@ const RECENT = new Date(Date.now() - 3 * DAY);
 type Locked = { is_deleted: 0 | 1; deletion_requested_at: Date | null } | null;
 
 /** Masque d'un compte en attente et quarantaine supprimée à son adresse (D6). */
-function heldAvatarRows(q: string, options: { heldAvatar?: string; moderationPurged?: boolean }): object[] | null {
+function heldAvatarRows(
+  q: string,
+  options: { heldAvatar?: string; moderationPurged?: boolean; removalPending?: boolean },
+): object[] | null {
   if (q.startsWith("SELECT pseudo, avatar_url FROM bg_account_deletion_holds")) {
     return options.heldAvatar ? [{ pseudo: "Joueur", avatar_url: options.heldAvatar }] : [];
   }
-  if (q.includes("AS removed_on FROM bg_logo_quarantines WHERE user_id = ? AND status = 'PURGED'")) {
-    return [{ removed_on: options.moderationPurged ? "2026-10-03" : null }];
+  if (q.includes("AS settled FROM bg_logo_quarantines WHERE user_id = ? AND status = 'PURGED'")) {
+    // `removalPending` : purge d'office dont la contestation attend son issue (ni bloquée, ni maintenue).
+    return [{ removed_on: options.moderationPurged ? "2026-10-03" : null, settled: options.removalPending ? 0 : 1 }];
   }
   return null;
 }
@@ -58,6 +62,7 @@ function fakeDb(options: {
   refereed?: { matchId: number; tournamentId: number }[];
   heldAvatar?: string;
   moderationPurged?: boolean;
+  removalPending?: boolean;
 }) {
   const queries: string[] = [];
   const execute = jest.fn(async (sql: string, _params?: unknown[]) => {
@@ -300,6 +305,35 @@ describe("finalizeDueAccountDeletions", () => {
     expect(jest.mocked(blockRemovedImageFiles).mock.calls[0][1]).toEqual({ liftable: true, day: "2026-10-03" });
   });
 
+  // Revue juridique #571, cycle 2 : une purge d'office dont la contestation
+  // attend son issue ne bloque l'image qu'une fois maintenue, ou à l'effacement.
+  it("finalizeAccountDeletion_anonymizeWithPendingChallengeRemoval_doesNotBlock", async () => {
+    fakeDb({
+      locked: { is_deleted: 1, deletion_requested_at: DUE },
+      played: 1,
+      heldAvatar: "/api/uploads/avatars/7-abc.webp",
+      moderationPurged: true,
+      removalPending: true,
+    });
+
+    expect((await finalizeAccountDeletion(7))?.mode).toBe("ANONYMIZE");
+
+    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
+  });
+
+  it("finalizeAccountDeletion_eraseWithPendingChallengeRemoval_blocksPermanently", async () => {
+    fakeDb({
+      locked: { is_deleted: 1, deletion_requested_at: DUE },
+      heldAvatar: "/api/uploads/avatars/7-abc.webp",
+      moderationPurged: true,
+      removalPending: true,
+    });
+
+    expect((await finalizeAccountDeletion(7))?.mode).toBe("ERASE");
+
+    expect(jest.mocked(blockRemovedImageFiles).mock.calls[0][1]).toEqual({ liftable: false, day: "2026-10-03" });
+  });
+
   // Revue sécurité #571, cycle 4 : la quarantaine se cherche sous les deux formes de l'adresse.
   it("finalizeAccountDeletion_eraseWithHeldAvatar_looksUpPurgedQuarantineUnderBothForms", async () => {
     const { execute } = fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, heldAvatar: "/uploads/avatars/7-abc.webp" });
@@ -329,6 +363,7 @@ describe("finalizeDueAccountDeletions", () => {
 
     const purged = execute.mock.calls.find(([sql]) => String(sql).includes("status = 'PURGED'"));
     expect(String(purged?.[0])).toContain("DATE_FORMAT(MIN(COALESCE(closed_at, hidden_at)), '%Y-%m-%d') AS removed_on");
+    expect(String(purged?.[0])).toContain("MAX(hash_blocked = 1 OR contest_outcome = 'UPHELD') AS settled");
     expect(String(purged?.[0])).not.toMatch(/NOW\(\)|CURRENT_/);
     expect(blockRemovedImageFiles).not.toHaveBeenCalled();
   });

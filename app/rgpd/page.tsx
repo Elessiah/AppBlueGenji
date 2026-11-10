@@ -972,8 +972,8 @@ function RgpdFr({
               sans lien avec aucun compte. Une suppression d&apos;office dont la contestation attend encore son
               issue ne bloque l&apos;image qu&apos;une fois maintenue, ou à l&apos;effacement du compte s&apos;il
               vient avant, alors définitivement. Les empreintes posées à l&apos;effacement d&apos;un compte avant le
-              12 novembre 2026 — alors aussi celles d&apos;un avatar seulement masqué — restent bloquées, ramenées
-              au jour près. Un avatar seulement masqué n&apos;en laisse aucune tant qu&apos;il
+              12 novembre 2026 — alors aussi celles d&apos;un avatar seulement masqué — restent bloquées, datées
+              du jour de leur pose ; toute empreinte posée avant cette date est ramenée au jour près. Un avatar seulement masqué n&apos;en laisse aucune tant qu&apos;il
               n&apos;est pas supprimé, ni un avatar que la modération n&apos;a jamais supprimé ; un logo
               d&apos;équipe supprimé non plus.
             </li>

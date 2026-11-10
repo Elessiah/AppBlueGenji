@@ -909,7 +909,10 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   pour un avatar seulement masqué) sont ramenées au jour par
   `RECENT_SCHEMA_CHANGES` et restent bloquées — dit dans T01, `/rgpd` et
   `PRIVACY_CHANGES` (revue juridique #571, cycle 1), comme la suppression
-  d'office en attente d'issue que l'effacement fige.
+  d'office en attente d'issue que l'effacement fige. Anonymisé, l'avatar emporté
+  n'est bloqué que si une suppression le bloquait déjà ou a été maintenue
+  (`settled`) : une purge d'office en attente d'issue ne le bloque pas
+  (revue juridique #571, cycle 2).
 - **Risque accepté** (D29) : un compte anonymisé garde un blocage levable
   posé à l'effacement sans ligne qui l'enregistre (ligne d'avant les
   empreintes, ou fichier réécrit) ; une contestation acceptée sur une autre
