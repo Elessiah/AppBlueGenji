@@ -1,6 +1,6 @@
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { relaunchAfterRefereeWithdrawal } from "@/lib/server/tournaments/match-launch";
 import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
@@ -134,27 +134,34 @@ function accountReads(q: string, options: Options): object[] | null {
   return null;
 }
 
+/** Le compte verrouillé (avec les rejeux sur interblocage), ses arbitrages, les autres administrateurs. */
+function lockedAccountReads(q: string, params: unknown[], options: Options): object[] | null {
+  if (q.startsWith("SELECT is_deleted, is_admin, created_at FROM bg_users")) {
+    const failure = options.transactionErrors?.shift();
+    if (failure) throw failure;
+    return [{ is_deleted: options.alreadyDeleted ? 1 : 0, is_admin: options.isAdmin ? 1 : 0, created_at: "2025-01-01 10:00:00" }];
+  }
+  if (q.startsWith("SELECT id FROM bg_matches WHERE referee_user_id = ? AND status <> 'COMPLETED'")) {
+    return (options.refereedMatches ?? []).map((id) => ({ id }));
+  }
+  if (q.startsWith("SELECT id FROM bg_users WHERE is_admin = 1")) {
+    return (options.otherAdmins ?? []).map(({ id }) => ({ id }));
+  }
+  if (q.startsWith("SELECT is_admin, is_deleted FROM bg_users WHERE id = ? FOR UPDATE")) {
+    const other = (options.otherAdmins ?? []).find(({ id }) => id === params[0]);
+    return other?.locked ? [other.locked] : [];
+  }
+  return null;
+}
+
 function fakeDb(options: Options) {
   const queries: { sql: string; params: unknown[] }[] = [];
   const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
     queries.push({ sql: q, params });
     if (options.failOn && q.startsWith(options.failOn)) throw new Error("DB_DOWN");
-    if (q.startsWith("SELECT is_deleted, is_admin, created_at FROM bg_users")) {
-      const failure = options.transactionErrors?.shift();
-      if (failure) throw failure;
-      return [[{ is_deleted: options.alreadyDeleted ? 1 : 0, is_admin: options.isAdmin ? 1 : 0, created_at: "2025-01-01 10:00:00" }]];
-    }
-    if (q.startsWith("SELECT id FROM bg_matches WHERE referee_user_id = ? AND status <> 'COMPLETED'")) {
-      return [(options.refereedMatches ?? []).map((id) => ({ id }))];
-    }
-    if (q.startsWith("SELECT id FROM bg_users WHERE is_admin = 1")) {
-      return [(options.otherAdmins ?? []).map(({ id }) => ({ id }))];
-    }
-    if (q.startsWith("SELECT is_admin, is_deleted FROM bg_users WHERE id = ? FOR UPDATE")) {
-      const other = (options.otherAdmins ?? []).find(({ id }) => id === params[0]);
-      return [other?.locked ? [other.locked] : []];
-    }
+    const locked = lockedAccountReads(q, params, options);
+    if (locked) return [locked];
     const read = accountReads(q, options);
     if (read) return [read];
     if (q.startsWith("SELECT tm.id, tm.user_id, tm.roles_json, tm.joined_at")) return [options.successors ?? []];
