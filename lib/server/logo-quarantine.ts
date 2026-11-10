@@ -30,7 +30,7 @@
  */
 import { copyFile, mkdir, rename, unlink } from "node:fs/promises";
 import path from "node:path";
-import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import {
   anonymousFileName,
   blockImageHashOn,
@@ -807,11 +807,12 @@ export async function listQuarantinesForReports(reportIds: readonly number[]): P
 
 /**
  * Le compte visé par une quarantaine d'avatar (`null` : logo d'équipe, ligne
- * absente), lu **hors transaction** — par le pool, sans figer d'instantané sur
- * la connexion du geste —, pour `lockQuarantineUserFirst`.
+ * absente), lu sur la connexion du geste **avant** `beginTransaction` — en
+ * validation automatique, sans figer d'instantané —, pour
+ * `lockQuarantineUserFirst`.
  */
-async function quarantineUserId(db: Pool, quarantineId: number): Promise<number | null> {
-  const [rows] = await db.execute<(RowDataPacket & { user_id: number | null })[]>(
+async function quarantineUserId(connection: PoolConnection, quarantineId: number): Promise<number | null> {
+  const [rows] = await connection.execute<(RowDataPacket & { user_id: number | null })[]>(
     `SELECT user_id FROM bg_logo_quarantines WHERE id = ? LIMIT 1`,
     [quarantineId],
   );
@@ -866,7 +867,7 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
   // Issue « acceptée » écrite par un rétablissement refusé (D23), à journaliser.
   let overturnedRow: QuarantineRow | null = null;
   try {
-    const userId = await quarantineUserId(db, quarantineId);
+    const userId = await quarantineUserId(connection, quarantineId);
     await connection.beginTransaction();
     await lockQuarantineUserFirst(connection, userId);
     row = await lockQuarantine(connection, quarantineId);
@@ -989,7 +990,7 @@ export async function recordContestOutcome(
   let row: QuarantineRow;
   let result: { blocked: boolean | null; hashUnknown: boolean };
   try {
-    const userId = await quarantineUserId(db, quarantineId);
+    const userId = await quarantineUserId(connection, quarantineId);
     await connection.beginTransaction();
     await lockQuarantineUserFirst(connection, userId);
     const [rows] = await connection.execute<QuarantineRow[]>(`${QUARANTINE_SELECT} WHERE q.id = ? FOR UPDATE`, [
@@ -1202,7 +1203,7 @@ export async function purgeQuarantinedLogo(
   let sha256: string | null = null;
   let blockHash = false;
   try {
-    const userId = await quarantineUserId(db, quarantineId);
+    const userId = await quarantineUserId(connection, quarantineId);
     await connection.beginTransaction();
     await lockQuarantineUserFirst(connection, userId);
     row = await lockQuarantine(connection, quarantineId);

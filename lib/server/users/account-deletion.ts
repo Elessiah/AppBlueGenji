@@ -418,20 +418,21 @@ async function loadQuarantinedAvatarFiles(runner: SqlRunner, userId: number): Pr
  * n'aurait pas pu atteindre (course, écriture refaite) ne s'échappe pas par
  * l'effacement. Un avatar seulement masqué ne l'est pas, ni un avatar dont la
  * contestation a été acceptée (D18, D23). Lu sous le verrou du
- * compte : l'effacement retire ces lignes (D31).
+ * compte : l'effacement retire ces lignes (D31). Rend le **jour** de la
+ * suppression la plus ancienne (`AAAA-MM-JJ`), que porte l'empreinte si elle
+ * est neuve — jamais celui de l'effacement (D31) —, ou `null`.
  */
-async function avatarRemovedByModeration(runner: SqlRunner, userId: number, avatarUrl: string | null): Promise<boolean> {
+async function avatarRemovedByModeration(runner: SqlRunner, userId: number, avatarUrl: string | null): Promise<string | null> {
   const disk = toDiskUploadPath(avatarUrl);
-  if (!disk) return false;
+  if (!disk) return null;
   // Sous ses deux formes, servie et disque, comme `isUploadReferenced`.
-  const [rows] = await runner.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_logo_quarantines
+  const [rows] = await runner.execute<(RowDataPacket & { removed_on: string | null })[]>(
+    `SELECT DATE_FORMAT(MIN(COALESCE(closed_at, hidden_at)), '%Y-%m-%d') AS removed_on FROM bg_logo_quarantines
       WHERE user_id = ? AND status = 'PURGED' AND logo_url IN (?, ?)
-        AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')
-      LIMIT 1`,
+        AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')`,
     [userId, toServedUploadUrl(disk), disk],
   );
-  return rows.length > 0;
+  return rows[0]?.removed_on ?? null;
 }
 
 type LockedAccount = RowDataPacket & {
@@ -499,7 +500,7 @@ async function deleteAccountNow(
   // photo.
   let orphanedAvatar: string | null = null;
   // Supprimé par la modération : bloqué avant d'être effacé (D6).
-  let orphanedAvatarBlocked = false;
+  let orphanedAvatarRemovedOn: string | null = null;
   // La date de création, relue sous le verrou : c'est elle qui permet au rejeu
   // de reconnaître **ce** compte-là après une restauration, l'identifiant seul
   // pouvant avoir été réattribué (`lib/shared/account-deletion-journal.ts`).
@@ -555,7 +556,7 @@ async function deleteAccountNow(
     const hold = await readDeletionHold(connection, userId, true);
     const avatarUrl = account.avatar_url ?? hold?.avatarUrl ?? null;
     orphanedAvatar = toDiskUploadPath(avatarUrl);
-    orphanedAvatarBlocked = await avatarRemovedByModeration(connection, userId, avatarUrl);
+    orphanedAvatarRemovedOn = await avatarRemovedByModeration(connection, userId, avatarUrl);
     accountCreatedAt = String(account.created_at);
 
     const facts = await loadAccountDeletionFacts(connection, userId, new Set(soloTournaments));
@@ -655,11 +656,14 @@ async function deleteAccountNow(
   // par `/api/uploads/avatars/...`, donc une donnée personnelle publique que
   // plus aucune ligne ne désigne. L'échec est **avalé** : la suppression est
   // commitée, annoncer un refus au joueur serait faux.
-  const blockedFile = orphanedAvatarBlocked ? storedUploadAbsolutePath(orphanedAvatar, "avatars") : null;
+  const blockedFile = orphanedAvatarRemovedOn ? storedUploadAbsolutePath(orphanedAvatar, "avatars") : null;
   // Anonymisé, le compte garde ses lignes de quarantaine : le blocage reste
   // levable par une contestation acceptée (D18). Effacé, plus rien ne le
   // justifierait : définitif (revue sécurité #571, cycle 3).
-  if (blockedFile) await blockRemovedImageFiles([blockedFile], { liftable: plan.mode === "ANONYMIZE" });
+  // Daté du jour de la suppression de modération, jamais de l'effacement (D31).
+  if (blockedFile && orphanedAvatarRemovedOn) {
+    await blockRemovedImageFiles([blockedFile], { liftable: plan.mode === "ANONYMIZE", day: orphanedAvatarRemovedOn });
+  }
   try {
     await deleteStoredImage(orphanedAvatar);
   } catch {

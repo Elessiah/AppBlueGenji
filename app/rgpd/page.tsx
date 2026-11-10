@@ -965,11 +965,15 @@ function RgpdFr({
               désigne aucun compte et ne date un blocage qu&apos;au jour près, pour en refuser la remise en ligne,
               comme avatar ou comme logo d&apos;équipe ; supprimé sans délai, son fichier n&apos;est effacé que si
               rien d&apos;autre sur le site ne le désigne. Tant que le compte existe (anonymisé compris),
-              l&apos;empreinte est aussi gardée sur la décision de suppression prise sur un signalement ou au terme
-              d&apos;un masquage, avec l&apos;issue de sa contestation : maintenue, le blocage reste ; acceptée, il
+              l&apos;empreinte est aussi gardée sur la décision de suppression prise sur un signalement ou après
+              un masquage, avec l&apos;issue de sa contestation : maintenue, le blocage reste ; acceptée, il
               est levé, sauf si une autre suppression de la même image le justifie encore. À l&apos;effacement du
               compte, ces décisions sont effacées et le blocage devient définitif : seule l&apos;empreinte reste,
-              sans lien avec aucun compte. Un avatar seulement masqué n&apos;en laisse aucune tant qu&apos;il
+              sans lien avec aucun compte. Une suppression d&apos;office dont la contestation attend encore son
+              issue ne bloque l&apos;image qu&apos;une fois maintenue, ou à l&apos;effacement du compte s&apos;il
+              vient avant, alors définitivement. Les empreintes posées à l&apos;effacement d&apos;un compte avant le
+              12 novembre 2026 — alors aussi celles d&apos;un avatar seulement masqué — restent bloquées, ramenées
+              au jour près. Un avatar seulement masqué n&apos;en laisse aucune tant qu&apos;il
               n&apos;est pas supprimé, ni un avatar que la modération n&apos;a jamais supprimé ; un logo
               d&apos;équipe supprimé non plus.
             </li>

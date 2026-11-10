@@ -41,8 +41,8 @@ function heldAvatarRows(q: string, options: { heldAvatar?: string; moderationPur
   if (q.startsWith("SELECT pseudo, avatar_url FROM bg_account_deletion_holds")) {
     return options.heldAvatar ? [{ pseudo: "Joueur", avatar_url: options.heldAvatar }] : [];
   }
-  if (q.startsWith("SELECT 1 FROM bg_logo_quarantines WHERE user_id = ? AND status = 'PURGED'")) {
-    return options.moderationPurged ? [{ 1: 1 }] : [];
+  if (q.includes("AS removed_on FROM bg_logo_quarantines WHERE user_id = ? AND status = 'PURGED'")) {
+    return [{ removed_on: options.moderationPurged ? "2026-10-03" : null }];
   }
   return null;
 }
@@ -281,7 +281,8 @@ describe("finalizeDueAccountDeletions", () => {
       jest.mocked(deleteStoredImage).mock.invocationCallOrder[0],
     );
     // Revue sécurité #571, cycle 3 : effacé, plus rien ne justifierait le blocage — définitif.
-    expect(jest.mocked(blockRemovedImageFiles).mock.calls[0][1]).toEqual({ liftable: false });
+    // D31 : daté du jour de la suppression de modération, jamais de l'effacement.
+    expect(jest.mocked(blockRemovedImageFiles).mock.calls[0][1]).toEqual({ liftable: false, day: "2026-10-03" });
   });
 
   // Revue sécurité #571, cycle 3 : anonymisé, le compte garde la ligne qui
@@ -296,7 +297,7 @@ describe("finalizeDueAccountDeletions", () => {
 
     expect((await finalizeAccountDeletion(7))?.mode).toBe("ANONYMIZE");
 
-    expect(jest.mocked(blockRemovedImageFiles).mock.calls[0][1]).toEqual({ liftable: true });
+    expect(jest.mocked(blockRemovedImageFiles).mock.calls[0][1]).toEqual({ liftable: true, day: "2026-10-03" });
   });
 
   // Revue sécurité #571, cycle 4 : la quarantaine se cherche sous les deux formes de l'adresse.
@@ -317,6 +318,19 @@ describe("finalizeDueAccountDeletions", () => {
 
     const purged = execute.mock.calls.find(([sql]) => String(sql).includes("status = 'PURGED'"));
     expect(String(purged?.[0])).toContain("AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')");
+  });
+
+  // Revue juridique #571, cycle 1 (D31) : le jour rendu est celui de la purge
+  // la plus ancienne (à défaut, du masquage), jamais l'instant de l'effacement.
+  it("finalizeAccountDeletion_eraseWithHeldAvatar_readsOldestRemovalDayNotNow", async () => {
+    const { execute } = fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, heldAvatar: "/api/uploads/avatars/7-abc.webp" });
+
+    await finalizeAccountDeletion(7);
+
+    const purged = execute.mock.calls.find(([sql]) => String(sql).includes("status = 'PURGED'"));
+    expect(String(purged?.[0])).toContain("DATE_FORMAT(MIN(COALESCE(closed_at, hidden_at)), '%Y-%m-%d') AS removed_on");
+    expect(String(purged?.[0])).not.toMatch(/NOW\(\)|CURRENT_/);
+    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
   });
 
   // Revue sécurité #571 (D18) : l'effacement emporte les lignes qui justifiaient

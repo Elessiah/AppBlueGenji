@@ -53,8 +53,20 @@ export async function isBlockedImage(...contents: Buffer[]): Promise<boolean> {
   }
 }
 
-/** `liftable` : le geste laisse une ligne de quarantaine qui le justifie (D18). */
-export type BlockOptions = { liftable?: boolean };
+/**
+ * `liftable` : le geste laisse une ligne de quarantaine qui le justifie (D18).
+ * `day` (`AAAA-MM-JJ`) : jour à porter sur une empreinte neuve à la place du
+ * jour courant — l'effacement d'un compte y met le jour de la suppression de
+ * modération, jamais le sien (D31).
+ */
+export type BlockOptions = { liftable?: boolean; day?: string };
+
+/** Jour d'une empreinte neuve : celui donné s'il a la forme `AAAA-MM-JJ`, sinon le jour courant. */
+function blockDay(options: BlockOptions): { sql: string; params: string[] } {
+  return options.day && /^\d{4}-\d{2}-\d{2}$/.test(options.day)
+    ? { sql: "?", params: [options.day] }
+    : { sql: "CURRENT_DATE", params: [] };
+}
 
 /**
  * Pose ces empreintes, hors transaction, sur le pool. Par défaut **non
@@ -68,14 +80,17 @@ async function blockImageHashes(hashes: readonly string[], options: BlockOptions
   const unique = [...new Set(hashes)];
   if (unique.length === 0) return;
   const db = await getDatabase();
+  const day = blockDay(options);
+  const liftableRow = "(?, 1, " + day.sql + ")";
+  const pinnedRow = "(?, " + day.sql + ")";
   // Une seule insertion multi-lignes : un aller-retour, quel que soit le nombre d'images.
   await ignoreMissingTable(
     db.execute(
       options.liftable
-        ? `INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable, created_at) VALUES ${unique.map(() => "(?, 1, CURRENT_DATE)").join(", ")}`
-        : `INSERT INTO bg_blocked_image_hashes (sha256, created_at) VALUES ${unique.map(() => "(?, CURRENT_DATE)").join(", ")}
+        ? `INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable, created_at) VALUES ${unique.map(() => liftableRow).join(", ")}`
+        : `INSERT INTO bg_blocked_image_hashes (sha256, created_at) VALUES ${unique.map(() => pinnedRow).join(", ")}
          ON DUPLICATE KEY UPDATE liftable = 0`,
-      unique,
+      unique.flatMap((sha) => [sha, ...day.params]),
     ),
   );
 }
@@ -179,15 +194,15 @@ export async function blockImageHashOn(connection: Executor, sha256: string): Pr
  * blocage que plus rien n'explique, et une suppression dont la contestation
  * attendait son issue (purge d'office, non bloquée) partirait sans décision
  * possible (revue sécurité #571, cycles 2 et 3). Une empreinte neuve porte le
- * **jour** de la suppression la plus ancienne, jamais l'instant de
- * l'effacement : rapprochée du journal des suppressions, une date d'effacement
+ * **jour** de la suppression la plus ancienne (sa purge, à défaut son
+ * masquage), jamais l'instant de l'effacement : rapprochée du journal des suppressions, une date d'effacement
  * relierait l'empreinte au compte (D31).
  */
 export async function pinAccountBlockedHashesOn(connection: Executor, userId: number): Promise<void> {
   await ignoreMissingTable(
     connection.execute(
       `INSERT INTO bg_blocked_image_hashes (sha256, liftable, created_at)
-       SELECT image_sha256, 0, DATE(MIN(hidden_at)) FROM bg_logo_quarantines
+       SELECT image_sha256, 0, DATE(MIN(COALESCE(closed_at, hidden_at))) FROM bg_logo_quarantines
         WHERE user_id = ? AND status = 'PURGED' AND image_sha256 IS NOT NULL
           AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')
         GROUP BY image_sha256

@@ -787,10 +787,14 @@ export function RgpdEn({
               the list of blocked images, which designates no account and only dates a block to the day, to refuse
               it being uploaded again, as an avatar or as a team logo; when deleted immediately, its file is only
               erased if nothing else on the site points to it. As long as the account exists (anonymized included),
-              the hash is also kept on the deletion decision taken on a report or at the end of a hiding, with the
+              the hash is also kept on the deletion decision taken on a report or after a hiding, with the
               outcome of its challenge: upheld, the block stays; accepted, it is lifted, unless another deletion of
               the same image still justifies it. When the account is erased, those decisions are erased and the
-              block becomes permanent: only the hash remains, with no link to any account. An avatar that is only
+              block becomes permanent: only the hash remains, with no link to any account. An automatic deletion
+              whose challenge is still awaiting its outcome only blocks the image once upheld, or on the erasure of
+              the account if that comes first, then permanently. Hashes set on the erasure of an account before
+              November 12, 2026 — then also those of an avatar that was only hidden — stay blocked, brought back to
+              the day. An avatar that is only
               hidden leaves none as long as it is not deleted, nor does an avatar moderation never deleted; neither
               does a deleted team logo.
             </li>

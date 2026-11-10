@@ -253,8 +253,8 @@ describe("D6 — empreinte d'un avatar supprimé par la modération", () => {
     const fr = PROCESSING_ACTIVITIES.flatMap((a) => a.dataCategories).join(" ");
     const en = PROCESSING_ACTIVITIES_EN.flatMap((a) => a.dataCategories).join(" ");
 
-    expect(fr).toContain("sur la décision de suppression d'un avatar, son empreinte (SHA-256) et l'issue de la contestation (maintenue ou acceptée), liées au compte tant qu'il existe ; l'empreinte reste en outre, sans lien avec aucun compte et sans limite de durée, dans la liste des images bloquées, pour en refuser la remise en ligne (décrite au registre T01)");
-    expect(en).toContain("on the decision deleting an avatar, its hash (SHA-256) and the outcome of the challenge (upheld or accepted), linked to the account as long as it exists; the hash also stays, with no link to any account and without time limit, in the list of blocked images, to refuse it being uploaded again (described in record T01)");
+    expect(fr).toContain("sur la décision de suppression d'un avatar, son empreinte (SHA-256) et l'issue de la contestation (maintenue ou acceptée), liées au compte tant qu'il existe ; sur la décision de masquage ou de suppression d'un logo d'équipe, l'issue de la contestation (maintenue ou acceptée) ; l'empreinte reste en outre, sans lien avec aucun compte et sans limite de durée, dans la liste des images bloquées, pour en refuser la remise en ligne (décrite au registre T01)");
+    expect(en).toContain("on the decision deleting an avatar, its hash (SHA-256) and the outcome of the challenge (upheld or accepted), linked to the account as long as it exists; on the decision hiding or deleting a team logo, the outcome of the challenge (upheld or accepted); the hash also stays, with no link to any account and without time limit, in the list of blocked images, to refuse it being uploaded again (described in record T01)");
   });
 
   it("deletionNotice_heldAvatar_reactivationMayNotReturnModeratedAvatarFrAndEn", () => {
@@ -402,6 +402,54 @@ describe("D12 — conditions d'utilisation, version 10", () => {
     expect(en.details.at(-1)).toContain("version 10, in force since 12 November 2026");
     expect(en.details).toHaveLength(fr.details.length);
     expect(en.linkLabels).toHaveLength(fr.links?.length ?? 0);
-    expect(fr.links?.map((link) => link.href)).toEqual(["/conditions-utilisation#compte", "/conditions-utilisation#signalement"]);
+    expect(fr.links?.map((link) => link.href)).toEqual(["/conditions-utilisation#compte", "/conditions-utilisation#signalement", "/conditions-utilisation#retransmission"]);
+  });
+});
+
+// Revue juridique #571, cycle 1 : limites du blocage levable, suppression
+// d'office en attente d'issue, blocages d'avant la version 10, logos.
+describe("revue juridique #571 — blocages déclarés au plus juste", () => {
+  const fr = PRIVACY_CHANGES.find((c) => c.id === "2026-11-empreinte-avatar-supprime");
+  const en = PRIVACY_CHANGES_EN["2026-11-empreinte-avatar-supprime"];
+  const t01 = (list: typeof PROCESSING_ACTIVITIES) => list.find((a) => a.ref === "T01");
+
+  it("registerT01_purpose_liftOnlyAfterReportDeletionWhileAccountExistsFrAndEn", () => {
+    expect(t01(PROCESSING_ACTIVITIES)?.subPurposes.join(" ")).toContain(
+      "lever ce blocage quand la contestation d'une suppression décidée sur un signalement est acceptée, tant que le compte n'est pas effacé",
+    );
+    expect(t01(PROCESSING_ACTIVITIES_EN)?.subPurposes.join(" ")).toContain(
+      "lifting that block when the challenge to a deletion decided on a report is accepted, as long as the account is not erased",
+    );
+  });
+
+  it("registerT01_retention_pendingChallengeAndLegacyErasureBlocksFrAndEn", () => {
+    const frText = t01(PROCESSING_ACTIVITIES)?.retention.join(" ") ?? "";
+    const enText = t01(PROCESSING_ACTIVITIES_EN)?.retention.join(" ") ?? "";
+    expect(frText).toContain("une suppression d'office dont la contestation attend encore son issue ne bloque l'image qu'une fois maintenue, ou à l'effacement du compte s'il vient avant, alors définitivement");
+    expect(frText).toContain("les empreintes posées à l'effacement d'un compte avant le 12 novembre 2026 — alors aussi celles d'un avatar seulement masqué — restent bloquées");
+    expect(frText).toContain("(suppression sur signalement ou après un masquage)");
+    expect(frText).not.toContain("au terme d'un masquage)");
+    expect(enText).toContain("an automatic deletion whose challenge is still awaiting its outcome only blocks the image once upheld");
+    expect(enText).toContain("hashes set on the erasure of an account before November 12, 2026");
+    expect(enText).toContain("(deletion on a report or after a hiding)");
+  });
+
+  it("privacyChange_avatarHashEntry_pendingChallengeAndLegacyBlocksFrAndEn", () => {
+    expect(fr?.details?.[1]).toContain("Une suppression d'office dont la contestation attend encore son issue ne bloque l'image qu'une fois maintenue");
+    expect(fr?.details?.[1]).toContain("prise sur un signalement ou après un masquage");
+    expect(fr?.details?.[4]).toContain("avant le 12 novembre 2026");
+    expect(en?.details?.[1]).toContain("An automatic deletion whose challenge is still awaiting its outcome only blocks the image once upheld");
+    expect(en?.details?.[1]).toContain("taken on a report or after a hiding");
+    expect(en?.details?.[4]).toContain("before November 12, 2026");
+    expect(en?.details).toHaveLength(fr?.details?.length ?? -1);
+  });
+
+  it("rgpdPages_signalements_pendingChallengeAndLegacyBlocksFrAndEn", () => {
+    const frPage = readFileSync(join(process.cwd(), "app", "rgpd", "page.tsx"), "utf8").replace(/\s+/g, " ");
+    const enPage = readFileSync(join(process.cwd(), "app", "rgpd", "RgpdEn.tsx"), "utf8").replace(/\s+/g, " ");
+    expect(frPage).toContain("Une suppression d&apos;office dont la contestation attend encore son issue ne bloque l&apos;image qu&apos;une fois maintenue");
+    expect(frPage).toContain("12 novembre 2026 — alors aussi celles d&apos;un avatar seulement masqué — restent bloquées");
+    expect(enPage).toContain("An automatic deletion whose challenge is still awaiting its outcome only blocks the image once upheld");
+    expect(enPage).toContain("November 12, 2026 — then also those of an avatar that was only hidden — stay blocked");
   });
 });

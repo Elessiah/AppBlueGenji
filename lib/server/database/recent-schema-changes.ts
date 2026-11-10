@@ -464,6 +464,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // de déjà posé ne devient levable.
     `ALTER TABLE bg_logo_quarantines ADD COLUMN hash_blocked TINYINT(1) NOT NULL DEFAULT 0 AFTER image_sha256`,
     `ALTER TABLE bg_blocked_image_hashes ADD COLUMN liftable TINYINT(1) NOT NULL DEFAULT 0 AFTER sha256`,
+    // Revue juridique #571 (D31) : les empreintes posées avant cette version
+    // portent l'instant exact de leur pose (celui d'un effacement de compte,
+    // rapprochable du journal des suppressions) — ramenées au jour. Idempotent.
+    `UPDATE bg_blocked_image_hashes SET created_at = DATE(created_at) WHERE created_at <> DATE(created_at)`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

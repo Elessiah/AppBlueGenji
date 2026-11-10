@@ -1707,9 +1707,10 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "L'empreinte d'un avatar que la modération supprime est désormais gardée dès cette suppression, et non plus à l'effacement du compte, pour en refuser la remise en ligne. Un avatar seulement masqué n'en laisse plus aucune tant qu'il n'est pas supprimé.",
     details: [
       "Ce que le site garde : l'empreinte (SHA-256) de l'image, sans limite de durée, dans une liste d'images bloquées qui ne désigne aucun compte et ne date un blocage qu'au jour près, quand la modération supprime un avatar — sans délai, sur signalement ou depuis la fiche du joueur, par le staff après un masquage (contestation rejetée, ou avant l'échéance), ou d'office au terme d'un masquage sans contestation —, que le compte soit actif ou en attente de suppression. Elle sert seulement à refuser la remise en ligne de la même image, comme avatar ou comme logo d'équipe  ; supprimé sans délai, son fichier n'est effacé que si rien d'autre sur le site ne le désigne.",
-      "Tant que le compte existe (anonymisé compris), l'empreinte est aussi gardée sur la décision de suppression prise sur un signalement ou au terme d'un masquage, avec l'issue de sa contestation, que la modération y note : maintenue, le blocage reste ; acceptée, il est levé, sauf si une autre suppression de la même image le justifie encore. À l'effacement du compte, ces décisions sont effacées et le blocage devient définitif : seule l'empreinte reste, sans lien avec aucun compte.",
+      "Tant que le compte existe (anonymisé compris), l'empreinte est aussi gardée sur la décision de suppression prise sur un signalement ou après un masquage, avec l'issue de sa contestation, que la modération y note : maintenue, le blocage reste ; acceptée, il est levé, sauf si une autre suppression de la même image le justifie encore. À l'effacement du compte, ces décisions sont effacées et le blocage devient définitif : seule l'empreinte reste, sans lien avec aucun compte. Une suppression d'office dont la contestation attend encore son issue ne bloque l'image qu'une fois maintenue, ou à l'effacement du compte s'il vient avant, alors définitivement.",
       "À l'effacement d'un compte, seule est prise ou gardée l'empreinte d'un avatar que la modération avait déjà supprimé ; l'avatar seulement masqué part avec le compte, sans laisser d'empreinte, comme un avatar que la modération n'a jamais supprimé — à la demande de suppression, à l'anonymisation ou à l'effacement. Un logo d'équipe supprimé ne laisse pas d'empreinte non plus.",
       "Pendant les 30 jours d'une suppression demandée, la modération peut masquer, rétablir ou supprimer l'avatar mis de côté pour la réactivation, comme celui d'un compte actif ; masqué ou supprimé, il n'est pas rendu à la réactivation.",
+      "Les empreintes posées à l'effacement d'un compte avant le 12 novembre 2026 — alors aussi celles d'un avatar seulement masqué — restent bloquées ; leur date est ramenée au jour près.",
     ],
   },
   {
@@ -1723,6 +1724,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     links: [
       { href: "/conditions-utilisation#compte", label: "Lire la section « Compte »" },
       { href: "/conditions-utilisation#signalement", label: "Lire la section « Signalement et modération »" },
+      { href: "/conditions-utilisation#retransmission", label: "Lire la section « Retransmission des matchs »" },
     ],
     summary:
       "Les conditions d'utilisation passent en version 10 : elles disent désormais que seul un avatar supprimé par la modération reste bloqué, et comment une contestation acceptée lève ce blocage, qu'un joueur suspendu ne reprend une équipe qu'après tous les autres, et quand l'annonce #live précède un match. Elle est à accepter : une fenêtre te la présente tant que tu ne l'as pas acceptée.",

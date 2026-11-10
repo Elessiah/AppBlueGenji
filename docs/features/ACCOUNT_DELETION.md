@@ -900,9 +900,16 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   `eraseAccount` bloque définitivement puis efface ces lignes dans la même
   transaction (`retireAccountQuarantinesOn`) — `bg_blocked_image_hashes` n'a
   aucune colonne de compte, et son `created_at` est posé au **jour** près
-  (jour de la suppression la plus ancienne pour un blocage figé à
-  l'effacement) : l'instant d'un effacement, rapproché du journal des
-  suppressions, relierait l'empreinte au compte.
+  (jour de la suppression la plus ancienne — sa purge, à défaut son masquage
+  — pour un blocage figé à l'effacement, et pour l'avatar emporté par
+  l'effacement : `avatarRemovedByModeration` rend ce jour, passé à
+  `blockRemovedImageFiles` par l'option `day`) : l'instant d'un effacement,
+  rapproché du journal des suppressions, relierait l'empreinte au compte. Les
+  empreintes posées avant la version 10 (alors à l'instant exact, et aussi
+  pour un avatar seulement masqué) sont ramenées au jour par
+  `RECENT_SCHEMA_CHANGES` et restent bloquées — dit dans T01, `/rgpd` et
+  `PRIVACY_CHANGES` (revue juridique #571, cycle 1), comme la suppression
+  d'office en attente d'issue que l'effacement fige.
 - **Risque accepté** (D29) : un compte anonymisé garde un blocage levable
   posé à l'effacement sans ligne qui l'enregistre (ligne d'avant les
   empreintes, ou fichier réécrit) ; une contestation acceptée sur une autre

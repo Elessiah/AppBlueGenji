@@ -142,6 +142,44 @@ describe("blockRemovedImageFiles", () => {
 });
 
 // Revue sécurité #571, cycle 3 : l'insertion n'est plus exportée, elle se vérifie par l'API publique.
+describe("blockRemovedImageFiles — jour donné (revue juridique #571, D31)", () => {
+  function setup() {
+    const file = join(mkdtempSync(join(tmpdir(), "bg-blocked-")), "avatar.webp");
+    writeFileSync(file, IMAGE);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    return { file, execute };
+  }
+
+  it("blockRemovedImageFiles_dayGiven_datesNewHashWithThatDay", async () => {
+    const { file, execute } = setup();
+
+    await blockRemovedImageFiles([file], { day: "2026-10-03" });
+
+    expect(execute.mock.calls[0][0]).toContain("VALUES (?, ?)");
+    expect(execute.mock.calls[0][0]).not.toContain("CURRENT_DATE");
+    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), "2026-10-03"]);
+  });
+
+  it("blockRemovedImageFiles_dayGivenLiftable_datesNewHashWithThatDay", async () => {
+    const { file, execute } = setup();
+
+    await blockRemovedImageFiles([file], { liftable: true, day: "2026-10-03" });
+
+    expect(execute.mock.calls[0][0]).toContain("INSERT IGNORE INTO bg_blocked_image_hashes (sha256, liftable, created_at) VALUES (?, 1, ?)");
+    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE), "2026-10-03"]);
+  });
+
+  it("blockRemovedImageFiles_malformedDay_fallsBackToCurrentDate", async () => {
+    const { file, execute } = setup();
+
+    await blockRemovedImageFiles([file], { day: "2026-10-03 21:14:00" });
+
+    expect(execute.mock.calls[0][0]).toContain("VALUES (?, CURRENT_DATE)");
+    expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE)]);
+  });
+});
+
 describe("blockRemovedImageFiles — insertion et fichiers manquants", () => {
   function writeImage(content: Buffer): string {
     const file = join(mkdtempSync(join(tmpdir(), "bg-blocked-")), "avatar.webp");
@@ -294,7 +332,8 @@ describe("pinAccountBlockedHashesOn (revue sécurité #571, D18)", () => {
     await pinAccountBlockedHashesOn(fakeConnection({ execute }), 7);
 
     const [sql] = execute.mock.calls[0];
-    expect(sql).toContain("SELECT image_sha256, 0, DATE(MIN(hidden_at)) FROM bg_logo_quarantines");
+    // Revue juridique #571 : jour de la purge, à défaut du masquage.
+    expect(sql).toContain("SELECT image_sha256, 0, DATE(MIN(COALESCE(closed_at, hidden_at))) FROM bg_logo_quarantines");
     expect(sql).toContain("GROUP BY image_sha256");
     expect(sql).not.toContain("NOW()");
   });

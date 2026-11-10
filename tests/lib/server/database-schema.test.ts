@@ -258,6 +258,14 @@ describe("Schéma — la règle des deux endroits", () => {
     expect(migrations).not.toContain("DELETE FROM bg_discord_login_challenges WHERE purpose IS NULL");
   });
 
+  // Revue juridique #571 (D31) : une empreinte posée avant la version 10 ne
+  // garde que son jour, idempotent (les lignes déjà au jour ne sont pas réécrites).
+  it("recentSchemaChanges_blockedImageHashes_legacyTimestampsTruncatedToDay", () => {
+    expect(migrations).toContain(
+      "UPDATE bg_blocked_image_hashes SET created_at = DATE(created_at) WHERE created_at <> DATE(created_at)",
+    );
+  });
+
   it("porte des instructions entières, et non des triplets table/colonne/type", () => {
     // Un triplet ne sait dire qu'`ADD COLUMN` : la règle des deux endroits ne
     // s'appliquait alors ni à un `ENUM` élargi, ni à un index posé, ni à une clé
