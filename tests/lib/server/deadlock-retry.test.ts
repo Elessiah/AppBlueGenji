@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fail } from "@/lib/server/http";
-import { isContentionError, isContentionMessage, isDeadlockMessage, isSnapshotConflict } from "@/lib/server/mysql-errors";
+import {
+  isAutoIncrementContention,
+  isContentionError,
+  isContentionMessage,
+  isDeadlockMessage,
+  isSnapshotConflict,
+  isTransactionAborted,
+} from "@/lib/server/mysql-errors";
 import { launchFailure } from "@/lib/server/tournaments/match-launch-routes";
 import { CONCURRENT_UPDATE_RETRY, CONCURRENT_UPDATE_RETRY_MESSAGE } from "@/lib/shared/api-error-code";
 import { ERROR_MESSAGES, mapError } from "@/app/(secured)/tournois/[id]/_lib/error-map";
@@ -219,5 +226,54 @@ describe("isSnapshotConflict", () => {
     expect(isSnapshotConflict(Object.assign(new Error("x"), { code: "ER_LOCK_DEADLOCK", errno: 1213 }))).toBe(false);
     expect(isSnapshotConflict(null)).toBe(false);
     expect(isSnapshotConflict("ER_CHECKREAD")).toBe(false);
+  });
+});
+
+describe("ER_AUTOINC_READ_FAILED — interblocage sur le verrou AUTO-INC", () => {
+  const AUTOINC = "Failed to read auto-increment value from storage engine";
+  const autoInc = () => Object.assign(new Error(AUTOINC), { code: "ER_AUTOINC_READ_FAILED", errno: 1467 });
+
+  it("isAutoIncrementContention_code_returnsTrue", () => {
+    expect(isAutoIncrementContention(Object.assign(new Error("message localisé"), { code: "ER_AUTOINC_READ_FAILED" }))).toBe(true);
+  });
+
+  it("isAutoIncrementContention_errnoOnly_returnsTrue", () => {
+    expect(isAutoIncrementContention(Object.assign(new Error("message localisé"), { errno: 1467 }))).toBe(true);
+  });
+
+  it("isAutoIncrementContention_otherError_returnsFalse", () => {
+    expect(isAutoIncrementContention(Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY", errno: 1062 }))).toBe(false);
+    expect(isAutoIncrementContention(new Error(AUTOINC))).toBe(false);
+    expect(isAutoIncrementContention(null)).toBe(false);
+  });
+
+  it("isTransactionAborted_autoIncReadFailed_returnsTrue", () => {
+    expect(isTransactionAborted(autoInc())).toBe(true);
+  });
+
+  it("isTransactionAborted_lockWaitTimeout_returnsFalse", () => {
+    expect(isTransactionAborted(Object.assign(new Error(LOCK_WAIT), { code: "ER_LOCK_WAIT_TIMEOUT", errno: 1205 }))).toBe(false);
+  });
+
+  it("isContentionError_autoIncReadFailed_returnsTrue", () => {
+    expect(isContentionError(autoInc())).toBe(true);
+  });
+
+  it("isContentionMessage_autoIncMessage_returnsTrue", () => {
+    expect(isContentionMessage(AUTOINC)).toBe(true);
+  });
+
+  it("isContentionMessage_prefixedAutoIncMessage_returnsFalse", () => {
+    expect(isContentionMessage(`Erreur : ${AUTOINC}`)).toBe(false);
+  });
+
+  it("fail_autoIncMessage_returns409", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    const response = fail(AUTOINC, 500);
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: CONCURRENT_UPDATE_RETRY });
+    warn.mockRestore();
   });
 });

@@ -17,6 +17,27 @@ describe("retryOnDeadlock", () => {
     expect(write).toHaveBeenCalledTimes(2);
   });
 
+  it("retryOnDeadlock_autoIncReadFailed_replays", async () => {
+    const autoInc = Object.assign(new Error("Failed to read auto-increment value from storage engine"), {
+      code: "ER_AUTOINC_READ_FAILED",
+      errno: 1467,
+    });
+    const write = jest.fn<() => Promise<string>>().mockRejectedValueOnce(autoInc).mockResolvedValueOnce("ok");
+
+    await expect(retryOnDeadlock(write)).resolves.toBe("ok");
+
+    expect(write).toHaveBeenCalledTimes(2);
+  });
+
+  it("retryOnDeadlock_autoIncErrnoOnly_replays", async () => {
+    const relayed = Object.assign(new Error("échec relayé"), { errno: 1467 });
+    const write = jest.fn<() => Promise<string>>().mockRejectedValueOnce(relayed).mockResolvedValueOnce("ok");
+
+    await expect(retryOnDeadlock(write)).resolves.toBe("ok");
+
+    expect(write).toHaveBeenCalledTimes(2);
+  });
+
   it("abandonne après trois tentatives", async () => {
     const write = jest.fn<() => Promise<void>>().mockRejectedValue(deadlock());
     await expect(retryOnDeadlock(write)).rejects.toThrow("Deadlock");

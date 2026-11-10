@@ -4,8 +4,10 @@ import { isSnapshotConflict, isTransactionAborted } from "@/lib/server/mysql-err
 const DEADLOCK_ATTEMPTS = 3;
 
 /**
- * Rejoue une écriture annulée par un interblocage InnoDB (ou refusée par
- * l'isolation par instantané de MariaDB) : les verrous
+ * Rejoue une écriture annulée par un interblocage InnoDB — y compris celui que
+ * MariaDB rend en `ER_AUTOINC_READ_FAILED` (verrou AUTO-INC de la table,
+ * `isAutoIncrementContention`) — ou refusée par l'isolation par instantané de
+ * MariaDB : les verrous
  * d'intervalle (`bg_match_maps`, `bg_match_reminders`) peuvent opposer deux
  * écritures sur des matchs voisins — report d'équipe, geste d'arbitrage,
  * programmation d'un horaire. Toute autre erreur remonte telle quelle.

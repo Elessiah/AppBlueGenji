@@ -21,14 +21,34 @@ function errorCode(error: unknown): string | null {
 /**
  * `true` si l'erreur a fait **annuler la transaction en cours** par le serveur.
  *
- * Le seul cas en pratique est l'interblocage : MySQL choisit une victime et la
+ * Le cas ordinaire est l'interblocage : MySQL choisit une victime et la
  * défait entièrement. Un dépassement de délai de verrou
  * (`ER_LOCK_WAIT_TIMEOUT`) n'annule, lui, que la requête —
  * `innodb_rollback_on_timeout` est désactivé par défaut —, et n'a donc pas à
  * interrompre l'appelant.
+ *
+ * L'autre cas est le même interblocage **sous un autre nom**
+ * ({@link isAutoIncrementContention}) : la transaction est défaite tout
+ * pareil, et la poursuivre serait la même faute.
  */
 export function isTransactionAborted(error: unknown): boolean {
-  return errorCode(error) === "ER_LOCK_DEADLOCK";
+  return errorCode(error) === "ER_LOCK_DEADLOCK" || isAutoIncrementContention(error);
+}
+
+/**
+ * `ER_AUTOINC_READ_FAILED` (1467, « Failed to read auto-increment value from
+ * storage engine ») : sous InnoDB, ce n'est pas une table abîmée mais une
+ * **attente du verrou AUTO-INC de la table** qui n'a pas abouti. Un
+ * `INSERT … SELECT` tient ce verrou de table jusqu'à la fin de l'instruction
+ * (`innodb_autoinc_lock_mode = 1`) ; s'il attend lui-même un verrou que tient
+ * la transaction qui veut insérer, c'est un interblocage — que MariaDB rend à
+ * la victime sous ce code au lieu d'`ER_LOCK_DEADLOCK`, transaction défaite.
+ *
+ * Rencontré en production sur `bg_match_reminders` (deux fois, novembre
+ * 2026). Même remède que l'interblocage : rejouer la transaction entière.
+ */
+export function isAutoIncrementContention(error: unknown): boolean {
+  return errorCode(error) === "ER_AUTOINC_READ_FAILED" || errorNumber(error) === 1467;
 }
 
 /**
@@ -59,7 +79,9 @@ export function isDeadlockMessage(message: unknown): boolean {
  * - l'interblocage (`DEADLOCK_MESSAGE`) ;
  * - `ER_CHECKREAD` (1020, MariaDB 11.6.2 et plus, `innodb_snapshot_isolation`) :
  *   la ligne a changé depuis l'image lue par la transaction ;
- * - `ER_LOCK_WAIT_TIMEOUT` (1205) : le verrou n'est pas venu dans le délai.
+ * - `ER_LOCK_WAIT_TIMEOUT` (1205) : le verrou n'est pas venu dans le délai ;
+ * - `ER_AUTOINC_READ_FAILED` (1467) : l'interblocage sur le verrou AUTO-INC
+ *   d'une table (`isAutoIncrementContention`).
  *
  * Ni panne ni requête fautive : un conflit (409) que l'interface traduit en
  * « réessaie », comme l'interblocage.
@@ -68,11 +90,13 @@ const CONTENTION_MESSAGES = [
   DEADLOCK_MESSAGE,
   /^Record has changed since last read in table\b/i,
   /^Lock wait timeout exceeded\b/i,
+  /^Failed to read auto-increment value from storage engine\b/i,
 ];
 
 /**
  * `true` si ce message d'exception est celui d'une contention passagère
- * (interblocage, `ER_CHECKREAD`, `ER_LOCK_WAIT_TIMEOUT`) : `fail()` la rend en
+ * (interblocage, `ER_CHECKREAD`, `ER_LOCK_WAIT_TIMEOUT`,
+ * `ER_AUTOINC_READ_FAILED`) : `fail()` la rend en
  * `CONCURRENT_UPDATE_RETRY`.
  */
 export function isContentionMessage(message: unknown): boolean {
