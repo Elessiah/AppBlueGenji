@@ -23,6 +23,7 @@ import { invalidateLandingCounters } from "@/lib/server/landing-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { activeSuspensionSql } from "@/lib/server/suspension-sql";
 import { withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
@@ -384,6 +385,29 @@ async function settleDeparture(userId: number, departure: TeamDeparture): Promis
 }
 
 /**
+ * Refuse (`LAST_ADMIN_ACCOUNT`) la demande du dernier administrateur vivant.
+ * Les autres administrateurs se relèvent sans verrou (une recherche verrouillée
+ * sans index sur `is_admin` verrouillerait toute la table), puis le premier
+ * se verrouille par sa clé et se relit : deux derniers administrateurs qui
+ * demandent ensemble s'interbloquent, et le rejeu (`retryOnDeadlock`) de la
+ * victime voit l'autre parti.
+ */
+async function assertAnotherAdminRemains(connection: PoolConnection, userId: number): Promise<void> {
+  const [others] = await connection.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_users WHERE is_admin = 1 AND is_deleted = 0 AND id <> ? ORDER BY id`,
+    [userId],
+  );
+  for (const other of others) {
+    const [rows] = await connection.execute<(RowDataPacket & { is_admin: 0 | 1; is_deleted: 0 | 1 })[]>(
+      `SELECT is_admin, is_deleted FROM bg_users WHERE id = ? FOR UPDATE`,
+      [Number(other.id)],
+    );
+    if (rows[0] && Number(rows[0].is_admin) === 1 && Number(rows[0].is_deleted) === 0) return;
+  }
+  throw new Error("LAST_ADMIN_ACCOUNT");
+}
+
+/**
  * Demande la suppression du compte : tout ce qui touche les autres se fait
  * tout de suite, le compte passe en attente trente jours.
  *
@@ -398,14 +422,7 @@ export async function requestAccountDeletion(
   options: { requestedAt?: Date; requestedAtRaw?: string; accountCreatedAt?: string } = {},
 ): Promise<AccountDeletionRequestOutcome> {
   const db = await getDatabase();
-  const soloEntryTournaments = await listSoloRegistrationTournamentIds(db, userId);
-  const soloTournaments = mergeTournamentIds(
-    soloEntryTournaments,
-    await listOrganizedTournamentIds(db, userId),
-    await listCastTournamentIds(db, userId),
-  );
-  const connection = await db.getConnection();
-  let plan: AccountDeletionPlan;
+  let soloEntryTournaments: number[] = [];
   let withdrawn: DeletionWithdrawal[] = [];
   let forfeitable: DeletionWithdrawal[] = [];
   const departures: TeamDeparture[] = [];
@@ -416,71 +433,92 @@ export async function requestAccountDeletion(
   const requestedAt = options.requestedAt ?? new Date();
   let accountCreatedAt = "";
   let requestedAtRaw: string | undefined;
-  try {
-    await connection.beginTransaction();
-    for (const tournamentId of soloTournaments) await lockTournamentRow(connection, tournamentId);
-    const [locked] = await connection.execute<(RowDataPacket & { is_deleted: 0 | 1; created_at: string })[]>(
-      `SELECT is_deleted, created_at FROM bg_users WHERE id = ? FOR UPDATE`,
-      [userId],
+  // Une transaction annulée par un interblocage (une désignation d'arbitre
+  // verrouille le match puis le compte, la demande l'inverse) se rejoue
+  // entière, relevés compris (`retryOnDeadlock`).
+  const transact = async (): Promise<AccountDeletionPlan> => {
+    departures.length = 0;
+    soloEntryTournaments = await listSoloRegistrationTournamentIds(db, userId);
+    const soloTournaments = mergeTournamentIds(
+      soloEntryTournaments,
+      await listOrganizedTournamentIds(db, userId),
+      await listCastTournamentIds(db, userId),
     );
-    if (locked.length === 0 || Number(locked[0].is_deleted) === 1) throw new Error("USER_NOT_FOUND");
-    // Rejeu du journal : la ligne verrouillée doit être ce compte-là
-    // (identifiant réattribué depuis la restauration → rien n'est écrit).
-    if (options.accountCreatedAt !== undefined && String(locked[0].created_at) !== options.accountCreatedAt) {
-      throw new Error("ACCOUNT_REASSIGNED");
-    }
-    accountCreatedAt = String(locked[0].created_at);
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+      for (const tournamentId of soloTournaments) await lockTournamentRow(connection, tournamentId);
+      const [locked] = await connection.execute<(RowDataPacket & { is_deleted: 0 | 1; is_admin: 0 | 1; created_at: string })[]>(
+        `SELECT is_deleted, is_admin, created_at FROM bg_users WHERE id = ? FOR UPDATE`,
+        [userId],
+      );
+      if (locked.length === 0 || Number(locked[0].is_deleted) === 1) throw new Error("USER_NOT_FOUND");
+      // Rejeu du journal : la ligne verrouillée doit être ce compte-là
+      // (identifiant réattribué depuis la restauration → rien n'est écrit).
+      if (options.accountCreatedAt !== undefined && String(locked[0].created_at) !== options.accountCreatedAt) {
+        throw new Error("ACCOUNT_REASSIGNED");
+      }
+      accountCreatedAt = String(locked[0].created_at);
+      // Le dernier administrateur vivant fermerait l'administration de la
+      // plateforme (rattrapable seulement en base). Le rejeu d'une demande
+      // journalisée n'est pas refusé : elle a eu lieu.
+      if (options.accountCreatedAt === undefined && Number(locked[0].is_admin) === 1) {
+        await assertAnotherAdminRemains(connection, userId);
+      }
 
-    withdrawn = await withdrawSoloRegistrationsOn(
-      connection,
-      await loadSoloRegistrations(connection, userId),
-      new Set(soloTournaments),
-    );
-    forfeitable = await listForfeitableSoloEntries(connection, userId);
+      withdrawn = await withdrawSoloRegistrationsOn(
+        connection,
+        await loadSoloRegistrations(connection, userId),
+        new Set(soloTournaments),
+      );
+      forfeitable = await listForfeitableSoloEntries(connection, userId);
 
-    for (const teamId of await listActiveTeamIds(connection, userId)) {
-      departures.push(await leaveTeamOn(connection, teamId, userId));
+      for (const teamId of await listActiveTeamIds(connection, userId)) {
+        departures.push(await leaveTeamOn(connection, teamId, userId));
+      }
+      organizedHandedOver = await handOverOrganizedTournaments(connection, userId, new Set(soloTournaments));
+      // Il ne castera ni n'arbitrera plus rien à venir ; les matchs joués gardent
+      // leur cast jusqu'à la suppression définitive.
+      castTournaments = (await withdrawUserCasts(connection, userId, false)).tournamentIds;
+      // Ses invitations en attente ne seront acceptées par personne.
+      await connection.execute(
+        `UPDATE bg_team_invitations SET status = 'CANCELLED', responded_at = NOW()
+          WHERE user_id = ? AND status = 'PENDING'`,
+        [userId],
+      );
+      // Anonyme dès la demande (décision du 2026-11-04) : pseudo d'emprunt et
+      // avatar retiré posés avec le drapeau, le vrai pseudo mis de côté pour la
+      // réactivation (`account-deletion-hold.ts`).
+      // Le rejeu d'une ligne qui porte la date brute de sa demande (D21) la
+      // réécrit telle quelle : convertie depuis l'ISO, elle suivrait le fuseau
+      // du shell du rejeu.
+      if (!(await holdAccountIdentity(connection, userId, options.requestedAtRaw ?? requestedAt))) {
+        throw new Error("USER_NOT_FOUND");
+      }
+      // Relue telle que la base l'a écrite : c'est elle que le journal garde (D21).
+      const [written] = await connection.execute<(RowDataPacket & { deletion_requested_at: string | null })[]>(
+        `SELECT deletion_requested_at FROM bg_users WHERE id = ?`,
+        [userId],
+      );
+      requestedAtRaw = written[0]?.deletion_requested_at == null ? undefined : String(written[0].deletion_requested_at);
+      // Le pseudo relevé sur ses signalements est montré à la modération quand
+      // le compte n'est plus vivant : il part dès la demande (la cible reste).
+      await connection.execute(
+        `UPDATE bg_report_targets SET label_snapshot = NULL WHERE target_type = 'USER' AND target_id = ?`,
+        [userId],
+      );
+      await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
+      const plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
+      await connection.commit();
+      return plan;
+    } catch (error) {
+      await connection.rollback().catch(() => {});
+      throw error;
+    } finally {
+      connection.release();
     }
-    organizedHandedOver = await handOverOrganizedTournaments(connection, userId, new Set(soloTournaments));
-    // Il ne castera ni n'arbitrera plus rien à venir ; les matchs joués gardent
-    // leur cast jusqu'à la suppression définitive.
-    castTournaments = (await withdrawUserCasts(connection, userId, false)).tournamentIds;
-    // Ses invitations en attente ne seront acceptées par personne.
-    await connection.execute(
-      `UPDATE bg_team_invitations SET status = 'CANCELLED', responded_at = NOW()
-        WHERE user_id = ? AND status = 'PENDING'`,
-      [userId],
-    );
-    // Anonyme dès la demande (décision du 2026-11-04) : pseudo d'emprunt et
-    // avatar retiré posés avec le drapeau, le vrai pseudo mis de côté pour la
-    // réactivation (`account-deletion-hold.ts`).
-    // Le rejeu d'une ligne qui porte la date brute de sa demande (D21) la
-    // réécrit telle quelle : convertie depuis l'ISO, elle suivrait le fuseau
-    // du shell du rejeu.
-    if (!(await holdAccountIdentity(connection, userId, options.requestedAtRaw ?? requestedAt))) {
-      throw new Error("USER_NOT_FOUND");
-    }
-    // Relue telle que la base l'a écrite : c'est elle que le journal garde (D21).
-    const [written] = await connection.execute<(RowDataPacket & { deletion_requested_at: string | null })[]>(
-      `SELECT deletion_requested_at FROM bg_users WHERE id = ?`,
-      [userId],
-    );
-    requestedAtRaw = written[0]?.deletion_requested_at == null ? undefined : String(written[0].deletion_requested_at);
-    // Le pseudo relevé sur ses signalements est montré à la modération quand
-    // le compte n'est plus vivant : il part dès la demande (la cible reste).
-    await connection.execute(
-      `UPDATE bg_report_targets SET label_snapshot = NULL WHERE target_type = 'USER' AND target_id = ?`,
-      [userId],
-    );
-    await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
-    plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
-    await connection.commit();
-  } catch (error) {
-    await connection.rollback().catch(() => {});
-    throw error;
-  } finally {
-    connection.release();
-  }
+  };
+  const plan = await retryOnDeadlock(transact);
 
   // Demande consignée « en attente » au journal hors base (décision 8 du
   // 2026-11-04) : une restauration d'une sauvegarde antérieure la rejoue. La

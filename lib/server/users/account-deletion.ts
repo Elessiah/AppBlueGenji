@@ -21,6 +21,7 @@ import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { playedMatchSql } from "@/lib/shared/ranking";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 import { dropDeletionHold, readDeletionHold } from "./account-deletion-hold";
@@ -499,25 +500,14 @@ async function deleteAccountNow(
   expectedCreatedAt?: string,
 ): Promise<AccountDeletionPlan | null> {
   const db = await getDatabase();
-  // Les tournois où l'entrée solo est inscrite, relevés **avant** de prendre une
-  // connexion : la relève en emprunte une autre au pool, et en tenir une pendant
-  // ce temps ferait attendre chaque suppression simultanée sur une connexion que
-  // les autres tiennent (pool saturé, plus aucune requête ne passe).
-  // Y compris ceux de ses casts et arbitrages : la transaction verrouille leurs
-  // matchs, et le tournoi se verrouille avant (`listCastTournamentIds`).
-  const soloTournaments = mergeTournamentIds(
-    await listSoloRegistrationTournamentIds(db, userId),
-    await listCastTournamentIds(db, userId),
-  );
-  const connection = await db.getConnection();
-  let plan: AccountDeletionPlan;
   // Le fichier de l'avatar, relevé **avant** l'effacement : la ligne partie, son
   // chemin ne se retrouve plus. Il ne part qu'après le commit — un `unlink` ne
   // se défait pas, et une transaction annulée rendrait un compte vivant sans sa
   // photo.
   let orphanedAvatar: string | null = null;
   // Supprimé par la modération : bloqué avant d'être effacé (D6).
-  let orphanedAvatarRemoval: ModerationRemoval | null = null;
+  // Assignée dans la transaction rejouable : le type est dit, pas déduit de `null`.
+  let orphanedAvatarRemoval = null as ModerationRemoval | null;
   // La date de création, relue sous le verrou : c'est elle qui permet au rejeu
   // de reconnaître **ce** compte-là après une restauration, l'identifiant seul
   // pouvant avoir été réattribué (`lib/shared/account-deletion-journal.ts`).
@@ -532,110 +522,130 @@ async function deleteAccountNow(
   // le commit.
   let quarantinedFiles: string[] = [];
 
-  try {
-    // Une inscription faite entre le relevé ci-dessus et le verrou tombe dans un
-    // tournoi non verrouillé, et retient alors la ligne
-    // (`withdrawableSoloRegistrations`).
-    await connection.beginTransaction();
-
-    // Les tournois d'abord, par id croissant, **avant toute lecture** : la
-    // transaction peut retirer une inscription (D12), elle lit puis écrit les
-    // inscrites et prend donc `lockTournamentRow` en tête, comme le retrait
-    // d'un engagé. Même ordre que l'inscription en tournoi individuel
-    // (tournoi, puis compte dans `ensureSoloEntry`) : deux verrous pris dans le
-    // même ordre ne s'attendent pas l'un l'autre.
-    for (const tournamentId of soloTournaments) await lockTournamentRow(connection, tournamentId);
-
-    // Verrou du compte avant toute lecture ordinaire, et lecture des traces juste
-    // après : sous `REPEATABLE READ`, c'est la première lecture *ordinaire* qui
-    // fige l'instantané, si bien qu'une trace lue avant le verrou daterait
-    // d'avant l'attente. Le compte est ici la ressource disputée, et une
-    // inscription en tournoi individuel pose le même verrou (`ensureSoloEntry`)
-    // — seul moyen de tenir une entrée solo, qui n'a volontairement aucune clé
-    // étrangère et resterait sinon à pendre sur un identifiant disparu.
-    //
-    // L'inscription d'une **équipe** n'est pas couverte, et c'est assumé : elle
-    // n'écrit que `bg_tournament_registrations`, qui ne référence que l'équipe,
-    // sans jamais toucher `bg_team_members` — aucune clé étrangère ne tranche
-    // donc cette course-là. Un membre qui supprime son compte à l'instant où sa
-    // capitaine engage l'équipe est effacé alors qu'il figurait au roster
-    // engagé. Rien ne pend (son appartenance part en cascade), l'équipe garde
-    // son inscription et ses matchs, et ce qu'il perd est son propre historique
-    // — ce qu'il venait de demander. Le fermer coûterait un verrou sur la ligne
-    // de **chaque** membre à chaque inscription.
-    const account = await lockAccountForDeletion(connection, userId, onlyIfDue, expectedCreatedAt);
-    if (!account) {
-      await connection.rollback();
-      return null;
-    }
-    // Anonyme depuis la demande, le compte en attente n'a plus d'avatar sur sa
-    // ligne : son chemin attend dans le masque (`account-deletion-hold.ts`).
-    const hold = await readDeletionHold(connection, userId, true);
-    const avatarUrl = account.avatar_url ?? hold?.avatarUrl ?? null;
-    orphanedAvatar = toDiskUploadPath(avatarUrl);
-    orphanedAvatarRemoval = await avatarRemovedByModeration(connection, userId, avatarUrl);
-    accountCreatedAt = String(account.created_at);
-
-    const facts = await loadAccountDeletionFacts(connection, userId, new Set(soloTournaments));
-    plan = accountDeletionPlan(facts.trace);
-
-    // Les visites n'ont rien à détacher : `bg_site_visits` ne garde aucun lien
-    // vers un compte, seulement une empreinte salée qu'on ne sait pas renverser
-    // (`lib/server/site-visits-service.ts`).
-
-    const applied = await applyDeletionMode(connection, userId, plan, facts.soloWithdrawals);
-    quarantinedFiles = applied.quarantinedFiles;
-    withdrawnFrom = applied.withdrawnFrom;
-    const withdrawal = applied.withdrawal;
-    touchedTournaments = withdrawal.tournamentIds;
-
-    // Les signalements qui le visent gardent leur cible — ils restent à
-    // traiter —, mais pas son pseudo : relevé à l'envoi pour survivre à la
-    // disparition du compte, il est justement ce que la suppression promet de
-    // retirer. Aucune clé étrangère ne le couvre (une cible n'en a pas, pour
-    // ne pas emporter le signalement), et les deux modes sont concernés : le
-    // panneau ne relit que les comptes vivants et retombe sinon sur ce relevé.
-    await connection.execute(
-      `UPDATE bg_report_targets SET label_snapshot = NULL WHERE target_type = 'USER' AND target_id = ?`,
-      [userId],
+  // Une transaction annulée par un interblocage (une désignation d'arbitre
+  // verrouille le match puis le compte, la suppression l'inverse) se rejoue
+  // entière, relevé des tournois compris (`retryOnDeadlock`) : sans quoi le
+  // joueur lisait un échec générique et devait recommencer.
+  const transact = async (): Promise<AccountDeletionPlan | null> => {
+    // Les tournois où l'entrée solo est inscrite, relevés **avant** de prendre une
+    // connexion : la relève en emprunte une autre au pool, et en tenir une pendant
+    // ce temps ferait attendre chaque suppression simultanée sur une connexion que
+    // les autres tiennent (pool saturé, plus aucune requête ne passe).
+    // Y compris ceux de ses casts et arbitrages : la transaction verrouille leurs
+    // matchs, et le tournoi se verrouille avant (`listCastTournamentIds`).
+    const soloTournaments = mergeTournamentIds(
+      await listSoloRegistrationTournamentIds(db, userId),
+      await listCastTournamentIds(db, userId),
     );
+    const connection = await db.getConnection();
+    try {
+      // Une inscription faite entre le relevé ci-dessus et le verrou tombe dans un
+      // tournoi non verrouillé, et retient alors la ligne
+      // (`withdrawableSoloRegistrations`).
+      await connection.beginTransaction();
 
-    // Les défis de connexion par message privé, relevés sur la ligne **avant**
-    // qu'elle ne parte ou ne soit vidée de son identifiant.
-    //
-    // `bg_discord_login_challenges` n'a **aucune clé étrangère** — elle est
-    // indexée sur un identifiant Discord, pas sur un compte du site —, donc
-    // aucune cascade ne la couvre, et son seul ménage est la purge des lignes
-    // expirées depuis un jour, déclenchée par la demande de code d'un *autre*
-    // joueur : un soir calme, l'identifiant Discord du compte effacé reste en
-    // base indéfiniment, alors qu'on vient de promettre qu'il ne resterait rien.
-    // C'est la même coordonnée que le tag, et le seul geste des deux modes qui
-    // regarde une table hors de `bg_users`.
-    const discordId = account.discord_id;
-    if (discordId) {
+      // Les tournois d'abord, par id croissant, **avant toute lecture** : la
+      // transaction peut retirer une inscription (D12), elle lit puis écrit les
+      // inscrites et prend donc `lockTournamentRow` en tête, comme le retrait
+      // d'un engagé. Même ordre que l'inscription en tournoi individuel
+      // (tournoi, puis compte dans `ensureSoloEntry`) : deux verrous pris dans le
+      // même ordre ne s'attendent pas l'un l'autre.
+      for (const tournamentId of soloTournaments) await lockTournamentRow(connection, tournamentId);
+
+      // Verrou du compte avant toute lecture ordinaire, et lecture des traces juste
+      // après : sous `REPEATABLE READ`, c'est la première lecture *ordinaire* qui
+      // fige l'instantané, si bien qu'une trace lue avant le verrou daterait
+      // d'avant l'attente. Le compte est ici la ressource disputée, et une
+      // inscription en tournoi individuel pose le même verrou (`ensureSoloEntry`)
+      // — seul moyen de tenir une entrée solo, qui n'a volontairement aucune clé
+      // étrangère et resterait sinon à pendre sur un identifiant disparu.
+      //
+      // L'inscription d'une **équipe** n'est pas couverte, et c'est assumé : elle
+      // n'écrit que `bg_tournament_registrations`, qui ne référence que l'équipe,
+      // sans jamais toucher `bg_team_members` — aucune clé étrangère ne tranche
+      // donc cette course-là. Un membre qui supprime son compte à l'instant où sa
+      // capitaine engage l'équipe est effacé alors qu'il figurait au roster
+      // engagé. Rien ne pend (son appartenance part en cascade), l'équipe garde
+      // son inscription et ses matchs, et ce qu'il perd est son propre historique
+      // — ce qu'il venait de demander. Le fermer coûterait un verrou sur la ligne
+      // de **chaque** membre à chaque inscription.
+      const account = await lockAccountForDeletion(connection, userId, onlyIfDue, expectedCreatedAt);
+      if (!account) {
+        await connection.rollback();
+        return null;
+      }
+      // Anonyme depuis la demande, le compte en attente n'a plus d'avatar sur sa
+      // ligne : son chemin attend dans le masque (`account-deletion-hold.ts`).
+      const hold = await readDeletionHold(connection, userId, true);
+      const avatarUrl = account.avatar_url ?? hold?.avatarUrl ?? null;
+      orphanedAvatar = toDiskUploadPath(avatarUrl);
+      orphanedAvatarRemoval = await avatarRemovedByModeration(connection, userId, avatarUrl);
+      accountCreatedAt = String(account.created_at);
+
+      const facts = await loadAccountDeletionFacts(connection, userId, new Set(soloTournaments));
+      const plan = accountDeletionPlan(facts.trace);
+
+      // Les visites n'ont rien à détacher : `bg_site_visits` ne garde aucun lien
+      // vers un compte, seulement une empreinte salée qu'on ne sait pas renverser
+      // (`lib/server/site-visits-service.ts`).
+
+      const applied = await applyDeletionMode(connection, userId, plan, facts.soloWithdrawals);
+      quarantinedFiles = applied.quarantinedFiles;
+      withdrawnFrom = applied.withdrawnFrom;
+      const withdrawal = applied.withdrawal;
+      touchedTournaments = withdrawal.tournamentIds;
+
+      // Les signalements qui le visent gardent leur cible — ils restent à
+      // traiter —, mais pas son pseudo : relevé à l'envoi pour survivre à la
+      // disparition du compte, il est justement ce que la suppression promet de
+      // retirer. Aucune clé étrangère ne le couvre (une cible n'en a pas, pour
+      // ne pas emporter le signalement), et les deux modes sont concernés : le
+      // panneau ne relit que les comptes vivants et retombe sinon sur ce relevé.
       await connection.execute(
-        `DELETE FROM bg_discord_login_challenges WHERE discord_id = ?`,
-        [discordId],
+        `UPDATE bg_report_targets SET label_snapshot = NULL WHERE target_type = 'USER' AND target_id = ?`,
+        [userId],
       );
-    }
 
-    await connection.commit();
-  } catch (error) {
-    // Sur une connexion morte, l'annulation lève à son tour : gardée, pour que
-    // l'erreur d'origine (dont `ACCOUNT_STILL_REFERENCED`) reste celle rendue.
-    await connection.rollback().catch(() => {});
-    // Une clé étrangère en `RESTRICT` peut encore refuser l'effacement : ses
-    // contrôles lisent la dernière version commitée et non l'instantané de la
-    // transaction, donc un tournoi créé après la lecture des traces retient la
-    // ligne. Le message brut de MySQL nomme la base, la table et la contrainte
-    // — il partirait tel quel dans la notification, `DELETE /api/profile`
-    // rendant le message de l'erreur. Un code stable à la place : le second
-    // essai lira la trace et anonymisera, ce qui est la bonne réponse.
-    if (isReferencedRowError(error)) throw new Error("ACCOUNT_STILL_REFERENCED");
-    throw error;
-  } finally {
-    connection.release();
-  }
+      // Les défis de connexion par message privé, relevés sur la ligne **avant**
+      // qu'elle ne parte ou ne soit vidée de son identifiant.
+      //
+      // `bg_discord_login_challenges` n'a **aucune clé étrangère** — elle est
+      // indexée sur un identifiant Discord, pas sur un compte du site —, donc
+      // aucune cascade ne la couvre, et son seul ménage est la purge des lignes
+      // expirées depuis un jour, déclenchée par la demande de code d'un *autre*
+      // joueur : un soir calme, l'identifiant Discord du compte effacé reste en
+      // base indéfiniment, alors qu'on vient de promettre qu'il ne resterait rien.
+      // C'est la même coordonnée que le tag, et le seul geste des deux modes qui
+      // regarde une table hors de `bg_users`.
+      const discordId = account.discord_id;
+      if (discordId) {
+        await connection.execute(
+          `DELETE FROM bg_discord_login_challenges WHERE discord_id = ?`,
+          [discordId],
+        );
+      }
+
+      await connection.commit();
+      return plan;
+    } catch (error) {
+      // Sur une connexion morte, l'annulation lève à son tour : gardée, pour que
+      // l'erreur d'origine (dont `ACCOUNT_STILL_REFERENCED`) reste celle rendue.
+      await connection.rollback().catch(() => {});
+      // Une clé étrangère en `RESTRICT` peut encore refuser l'effacement : ses
+      // contrôles lisent la dernière version commitée et non l'instantané de la
+      // transaction, donc un tournoi créé après la lecture des traces retient la
+      // ligne. Le message brut de MySQL nomme la base, la table et la contrainte
+      // — il partirait tel quel dans la notification, `DELETE /api/profile`
+      // rendant le message de l'erreur. Un code stable à la place : le second
+      // essai lira la trace et anonymisera, ce qui est la bonne réponse.
+      if (isReferencedRowError(error)) throw new Error("ACCOUNT_STILL_REFERENCED");
+      throw error;
+    } finally {
+      connection.release();
+    }
+  };
+  const plan = await retryOnDeadlock(transact);
+  if (plan === null) return null;
 
   // Ses sessions sont parties avec la transaction, pas ses flux de tournoi
   // ouverts, qui ne relisent pas la session (`session-streams.ts`).

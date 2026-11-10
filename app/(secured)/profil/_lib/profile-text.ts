@@ -123,6 +123,7 @@ export function deletionOutcomeText(text: ProfileText, subject: ConfirmationSubj
 /** `accountDeletionErrorMessage` dans la langue du texte. */
 export function deletionErrorText(text: ProfileText, code: string | undefined): string {
   if (code === "ACCOUNT_STILL_REFERENCED") return text.t("deletion.errors.ACCOUNT_STILL_REFERENCED");
+  if (code === "LAST_ADMIN_ACCOUNT") return text.t("deletion.errors.LAST_ADMIN_ACCOUNT");
   // Session ou compte déjà partis (une suppression faite dont la réponse s'est
   // perdue) : la page se recharge — cas propre à l'écran, sans sœur française.
   if (code !== undefined && SESSION_GONE_CODES.has(code)) return text.t("deletion.errors.sessionGone");

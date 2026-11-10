@@ -68,6 +68,12 @@ type Member = { id: number; user_id: number; roles_json: string; joined_at: stri
 
 type Options = {
   alreadyDeleted?: boolean;
+  /** Le compte qui demande est administrateur. */
+  isAdmin?: boolean;
+  /** Autres administrateurs relevés, puis relus sous verrou (`locked`). */
+  otherAdmins?: { id: number; locked: { is_admin: 0 | 1; is_deleted: 0 | 1 } | null }[];
+  /** Erreurs levées par les premières transactions (rejeu sur interblocage). */
+  transactionErrors?: Error[];
   teams?: number[];
   successors?: Member[];
   deadMembers?: number[];
@@ -128,8 +134,17 @@ function fakeDb(options: Options) {
     const q = String(sql).replace(/\s+/g, " ").trim();
     queries.push({ sql: q, params });
     if (options.failOn && q.startsWith(options.failOn)) throw new Error("DB_DOWN");
-    if (q.startsWith("SELECT is_deleted, created_at FROM bg_users")) {
-      return [[{ is_deleted: options.alreadyDeleted ? 1 : 0, created_at: "2025-01-01 10:00:00" }]];
+    if (q.startsWith("SELECT is_deleted, is_admin, created_at FROM bg_users")) {
+      const failure = options.transactionErrors?.shift();
+      if (failure) throw failure;
+      return [[{ is_deleted: options.alreadyDeleted ? 1 : 0, is_admin: options.isAdmin ? 1 : 0, created_at: "2025-01-01 10:00:00" }]];
+    }
+    if (q.startsWith("SELECT id FROM bg_users WHERE is_admin = 1")) {
+      return [(options.otherAdmins ?? []).map(({ id }) => ({ id }))];
+    }
+    if (q.startsWith("SELECT is_admin, is_deleted FROM bg_users WHERE id = ? FOR UPDATE")) {
+      const other = (options.otherAdmins ?? []).find(({ id }) => id === params[0]);
+      return [other?.locked ? [other.locked] : []];
     }
     const read = accountReads(q, options);
     if (read) return [read];
@@ -291,7 +306,7 @@ describe("requestAccountDeletion — le compte", () => {
     const { connection } = fakeDb({});
     const execute = connection.execute.getMockImplementation()!;
     connection.execute.mockImplementation(async (sql: string, params?: unknown[]) => {
-      if (sql.startsWith("SELECT is_deleted, created_at FROM bg_users")) order.push("account");
+      if (sql.startsWith("SELECT is_deleted, is_admin, created_at FROM bg_users")) order.push("account");
       return execute(sql, params);
     });
 
@@ -310,7 +325,7 @@ describe("requestAccountDeletion — le compte", () => {
     const { connection } = fakeDb({ organized: [4, 5] });
     const execute = connection.execute.getMockImplementation()!;
     connection.execute.mockImplementation(async (sql: string, params?: unknown[]) => {
-      if (sql.startsWith("SELECT is_deleted, created_at FROM bg_users")) order.push("account");
+      if (sql.startsWith("SELECT is_deleted, is_admin, created_at FROM bg_users")) order.push("account");
       return execute(sql, params);
     });
 
@@ -327,6 +342,91 @@ describe("requestAccountDeletion — le compte", () => {
     expect(connection.commit).not.toHaveBeenCalled();
     expect(closeUserStreams).not.toHaveBeenCalled();
     expect(forfeitSoloEntriesAfterCommit).not.toHaveBeenCalled();
+  });
+});
+
+// ERREUR.txt (revue sécurité #509) : le dernier administrateur vivant ne
+// ferme pas l'administration de la plateforme en supprimant son compte.
+describe("requestAccountDeletion — dernier administrateur", () => {
+  it("requestAccountDeletion_lastAdmin_refusedAndRolledBack", async () => {
+    const { connection } = fakeDb({ isAdmin: true, otherAdmins: [] });
+
+    await expect(requestAccountDeletion(7)).rejects.toThrow("LAST_ADMIN_ACCOUNT");
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(holdAccountIdentity).not.toHaveBeenCalled();
+    expect(recordAccountDeletion).not.toHaveBeenCalled();
+  });
+
+  it("requestAccountDeletion_adminWithAnotherLivingAdmin_lockedAndAccepted", async () => {
+    const { queries, connection } = fakeDb({ isAdmin: true, otherAdmins: [{ id: 9, locked: { is_admin: 1, is_deleted: 0 } }] });
+
+    await requestAccountDeletion(7);
+
+    expect(connection.commit).toHaveBeenCalled();
+    const lock = queries.find(({ sql }) => sql.startsWith("SELECT is_admin, is_deleted FROM bg_users WHERE id = ? FOR UPDATE"));
+    expect(lock?.params).toEqual([9]);
+  });
+
+  it("requestAccountDeletion_otherAdminGoneUnderLock_refused", async () => {
+    fakeDb({
+      isAdmin: true,
+      otherAdmins: [
+        { id: 9, locked: { is_admin: 1, is_deleted: 1 } },
+        { id: 10, locked: { is_admin: 0, is_deleted: 0 } },
+        { id: 11, locked: null },
+      ],
+    });
+
+    await expect(requestAccountDeletion(7)).rejects.toThrow("LAST_ADMIN_ACCOUNT");
+  });
+
+  it("requestAccountDeletion_nonAdmin_neverReadsAdmins", async () => {
+    const { queries } = fakeDb({ isAdmin: false });
+
+    await requestAccountDeletion(7);
+
+    expect(queries.some(({ sql }) => sql.includes("is_admin = 1"))).toBe(false);
+  });
+
+  it("requestAccountDeletion_replayOfLastAdmin_notRefused", async () => {
+    const { connection } = fakeDb({ isAdmin: true, otherAdmins: [] });
+
+    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00" });
+
+    expect(connection.commit).toHaveBeenCalled();
+  });
+});
+
+// ERREUR.txt (revue sécurité EF-21 #526) : la demande s'interbloque avec une
+// désignation d'arbitre (match puis compte) ; la victime se rejoue.
+describe("requestAccountDeletion — interblocage", () => {
+  const deadlock = () => Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK", errno: 1213 });
+
+  it("requestAccountDeletion_deadlockOnce_retriedAndCommitted", async () => {
+    const { connection } = fakeDb({ transactionErrors: [deadlock()] });
+
+    await requestAccountDeletion(7);
+
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(connection.release).toHaveBeenCalledTimes(2);
+    expect(recordAccountDeletion).toHaveBeenCalledTimes(1);
+  });
+
+  it("requestAccountDeletion_deadlockEveryAttempt_rethrowsAfterThree", async () => {
+    const { connection } = fakeDb({ transactionErrors: [deadlock(), deadlock(), deadlock()] });
+
+    await expect(requestAccountDeletion(7)).rejects.toThrow("Deadlock");
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(connection.release).toHaveBeenCalledTimes(3);
+  });
+
+  it("requestAccountDeletion_otherError_notRetried", async () => {
+    const { connection } = fakeDb({ transactionErrors: [new Error("DB_DOWN")] });
+
+    await expect(requestAccountDeletion(7)).rejects.toThrow("DB_DOWN");
+    expect(connection.release).toHaveBeenCalledTimes(1);
   });
 });
 

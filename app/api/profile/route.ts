@@ -13,6 +13,7 @@ import type { FullProfileResponse } from "@/lib/shared/types";
 /** Les refus de `requestAccountDeletion` qui sortent tels quels : ils ont un sens pour l'écran. */
 const ACCOUNT_DELETION_REFUSALS: ReadonlySet<string> = new Set([
   "ACCOUNT_STILL_REFERENCED",
+  "LAST_ADMIN_ACCOUNT",
   "USER_NOT_FOUND",
 ]);
 

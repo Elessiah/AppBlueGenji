@@ -333,9 +333,13 @@ describe("français inchangé — profil", () => {
       expect(accountDeletionConsequences(subject)).toMatch(/salon #live du Discord \(et l'alerte de modération d'une annonce bloquée ou signalée par AutoMod\), qui gardent ton pseudo jusqu'à leur suppression sur demande/);
       expect(deletionConsequencesText(EN_PROFILE, subject)).toMatch(/Discord #live channel \(and the moderation alert for an announcement blocked or flagged by AutoMod\), which keep your username until they are deleted on request/);
     }
-    for (const code of ["ACCOUNT_STILL_REFERENCED", "X", undefined]) {
+    for (const code of ["ACCOUNT_STILL_REFERENCED", "LAST_ADMIN_ACCOUNT", "X", undefined]) {
       expect(deletionErrorText(FR_PROFILE, code)).toBe(accountDeletionErrorMessage(code));
     }
+    // Le dernier administrateur : refus dit dans les deux langues, jamais le code brut.
+    expect(deletionErrorText(EN_PROFILE, "LAST_ADMIN_ACCOUNT")).toBe(
+      "You are the last administrator: appoint another administrator before deleting your account.",
+    );
     // Session ou compte déjà partis : la phrase du rechargement, dans les deux langues (même liste que l'écran).
     for (const code of SESSION_GONE_CODES) {
       expect(deletionErrorText(FR_PROFILE, code)).toMatch(/^Ta session est fermée : soit ton compte vient d'être supprimé, soit ta session a expiré\./);

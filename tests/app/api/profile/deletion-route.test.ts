@@ -116,7 +116,7 @@ describe("DELETE /api/profile", () => {
 });
 
 describe("DELETE /api/profile — aucun message interne ne sort", () => {
-  it.each(["ACCOUNT_STILL_REFERENCED", "USER_NOT_FOUND"])("rend le refus nommé %s tel quel", async (code) => {
+  it.each(["ACCOUNT_STILL_REFERENCED", "LAST_ADMIN_ACCOUNT", "USER_NOT_FOUND"])("rend le refus nommé %s tel quel", async (code) => {
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 42 }));
     jest.mocked(requestAccountDeletion).mockRejectedValue(new Error(code));
     const res = await DELETE();

@@ -227,6 +227,10 @@ describe("accountDeletionErrorMessage", () => {
     expect(message).toContain("anonymisé");
   });
 
+  it("accountDeletionErrorMessage_lastAdmin_asksToAppointAnother", () => {
+    expect(accountDeletionErrorMessage("LAST_ADMIN_ACCOUNT")).toContain("dernier administrateur");
+  });
+
   it("ne laisse jamais passer un code brut dans une notification", () => {
     for (const code of [undefined, "ACCOUNT_DELETE_FAILED", "ER_ROW_IS_REFERENCED_2"]) {
       const message = accountDeletionErrorMessage(code);
