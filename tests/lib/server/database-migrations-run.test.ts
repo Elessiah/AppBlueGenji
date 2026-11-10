@@ -902,10 +902,25 @@ describe("getDatabase — rattrapage des comptes supprimés", () => {
   type ReconcileResult = { erased: number; renamed: number; failed: number };
   const state = globalThis as typeof globalThis & { __bgDeletedAccountsReconciliation?: Promise<void> };
 
-  async function runOnServer(reconcile: () => Promise<ReconcileResult>): Promise<jest.Mock<() => Promise<ReconcileResult>>> {
+  async function runOnServer(
+    reconcile: () => Promise<ReconcileResult>,
+    lockHeldElsewhere = false,
+  ): Promise<jest.Mock<() => Promise<ReconcileResult>>> {
     const mock = jest.fn(reconcile);
     await jest.isolateModulesAsync(async () => {
       jest.doMock("@/lib/server/users/deleted-accounts", () => ({ reconcileDeletedAccounts: mock }));
+      // Le rattrapage tourne derrière le verrou nommé du passage horaire.
+      jest.doMock("@/lib/server/named-lock", () => {
+        class NamedLockUnavailableError extends Error {}
+        return {
+          NamedLockUnavailableError,
+          withNamedLock: async (_pool: unknown, name: string, timeout: number, run: (c: unknown) => Promise<unknown>) => {
+            namedLocks.push([name, timeout]);
+            if (lockHeldElsewhere) throw new NamedLockUnavailableError(name);
+            return run({});
+          },
+        };
+      });
       // La passe horaire (forfaits puis suppressions définitives) part avec : sans ce double, elle
       // rappellerait `getDatabase` et relancerait un rattrapage pendant le test suivant.
       jest.doMock("@/lib/server/users/deleted-solo-entries", () => ({
@@ -924,8 +939,12 @@ describe("getDatabase — rattrapage des comptes supprimés", () => {
     return mock;
   }
 
+  /** Les verrous nommés demandés : `[nom, délai]`. */
+  const namedLocks: [string, number][] = [];
+
   afterEach(() => {
     delete state.__bgDeletedAccountsReconciliation;
+    namedLocks.length = 0;
   });
 
   it("ne le lance pas hors du serveur du site (scripts, seed)", async () => {
@@ -940,6 +959,25 @@ describe("getDatabase — rattrapage des comptes supprimés", () => {
 
       expect(reconcile).toHaveBeenCalledTimes(1);
       expect(String(infoSpy.mock.calls[0]?.[0])).toContain("1 effacé(s), 2 renommé(s), 0 reporté(s)");
+    } finally {
+      infoSpy.mockRestore();
+    }
+  });
+
+  it("le lance derrière le verrou nommé du passage horaire, sans attente", async () => {
+    await runOnServer(async () => ({ erased: 0, renamed: 0, failed: 0 }));
+
+    expect(namedLocks[0]).toEqual(["bg_due_account_deletions", 0]);
+  });
+
+  it("passe son tour, sans bruit, quand un autre processus tient le verrou", async () => {
+    const infoSpy = jest.spyOn(console, "info").mockImplementation(() => undefined);
+    try {
+      const reconcile = await runOnServer(async () => ({ erased: 1, renamed: 0, failed: 0 }), true);
+
+      expect(reconcile).not.toHaveBeenCalled();
+      expect(infoSpy).not.toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalled();
     } finally {
       infoSpy.mockRestore();
     }

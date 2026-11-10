@@ -332,6 +332,12 @@ export type MatchWithdrawal = {
   matchIds: number[];
   /** Leurs tournois, sans doublon : à prévenir après le commit (`publishMatchUpdatedEvent`). */
   tournamentIds: number[];
+  /**
+   * Parmi eux, ceux dont un match touché n'est **pas terminé** : seuls ceux-là
+   * peuvent changer l'accueil ou le message #live (`landingLive`) — un lien ou
+   * un arbitre retiré d'un match joué ne change que son instantané.
+   */
+  liveTournamentIds: number[];
   /** Matchs non joués dont il était l'arbitre, retiré ici (lus sous verrou). */
   releasedRefereeMatchIds: number[];
   /** Matchs non joués dont son cast a été retiré (lus sous verrou). */
@@ -413,7 +419,9 @@ export async function withdrawUserCasts(
   // la référence à son compte part avec lui (effacement), verrouillés avec les autres.
   const triggered = await matchIdsOf(`SELECT id AS match_id FROM bg_matches WHERE live_trigger_user_id = ? ORDER BY id`);
   const candidates = [...new Set([...casts, ...links, ...refereed, ...triggered])].sort((a, b) => a - b);
-  if (candidates.length === 0) return { matchIds: [], tournamentIds: [], releasedRefereeMatchIds: [], releasedCastMatchIds: [] };
+  if (candidates.length === 0) {
+    return { matchIds: [], tournamentIds: [], liveTournamentIds: [], releasedRefereeMatchIds: [], releasedCastMatchIds: [] };
+  }
 
   const [locked] = await connection.execute<WithdrawnMatchRow[]>(
     `SELECT id, tournament_id, status FROM bg_matches WHERE id IN (${placeholders(candidates)}) ORDER BY id FOR UPDATE`,
@@ -475,6 +483,9 @@ export async function withdrawUserCasts(
   return {
     matchIds: touchedRows.map((row) => Number(row.id)),
     tournamentIds: [...new Set(touchedRows.map((row) => Number(row.tournament_id)))].sort((a, b) => a - b),
+    liveTournamentIds: [
+      ...new Set(touchedRows.filter((row) => row.status !== "COMPLETED").map((row) => Number(row.tournament_id))),
+    ].sort((a, b) => a - b),
     releasedRefereeMatchIds: refereesToDrop.filter((id) => unplayed.has(id)),
     releasedCastMatchIds: castsToDrop.filter((id) => unplayed.has(id)),
   };

@@ -12,11 +12,15 @@ jest.mock("@/lib/server/tournaments/referee-names", () => ({
 
 import { forgetRefereeNames } from "@/lib/server/tournaments/referee-names";
 import {
+  assertSoloLockSetFresh,
   loadSoloRegistrations,
   deleteOwnAccount,
   getAccountDeletionPlan,
   listCastTournamentIds,
+  listSoloRegistrationTournamentIds,
   mergeTournamentIds,
+  retryOnStaleLockSet,
+  StaleLockSetError,
 } from "@/lib/server/users/account-deletion";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
@@ -992,5 +996,135 @@ describe("loadSoloRegistrations", () => {
     const sql = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
     expect(sql).toContain("WHERE m.team1_id = s.id AND m.tournament_id = r.tournament_id");
     expect(sql).toContain("WHERE m.team2_id = s.id AND m.tournament_id = r.tournament_id");
+  });
+});
+
+describe("listSoloRegistrationTournamentIds", () => {
+  it("listSoloRegistrationTournamentIds_default_listsEveryRegisteredTournament", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ tournament_id: 3 }, { tournament_id: 9 }], []]);
+
+    expect(await listSoloRegistrationTournamentIds(fakePool({ execute }), 7)).toEqual([3, 9]);
+    expect(String(execute.mock.calls[0][0])).not.toContain("bg_tournaments");
+  });
+
+  // Une inscription à un tournoi en cours ou terminé ne se retire jamais : son
+  // verrou ferait attendre un tournoi en cours pour rien.
+  it("listSoloRegistrationTournamentIds_openOnly_keepsNotStartedTournamentsOnly", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+
+    await listSoloRegistrationTournamentIds(fakePool({ execute }), 7, true);
+
+    const sql = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
+    expect(sql).toContain("JOIN bg_tournaments t ON t.id = r.tournament_id AND t.state IN ('UPCOMING', 'REGISTRATION')");
+    expect(execute.mock.calls[0][1]).toEqual([7]);
+  });
+});
+
+describe("assertSoloLockSetFresh", () => {
+  const runner = (open: number[]) =>
+    fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([open.map((tournament_id) => ({ tournament_id })), []]) });
+
+  it("assertSoloLockSetFresh_everyOpenTournamentLocked_resolves", async () => {
+    await expect(assertSoloLockSetFresh(runner([3, 9]), 7, new Set([3, 9, 12]), false)).resolves.toBeUndefined();
+  });
+
+  it("assertSoloLockSetFresh_openTournamentOutsideLockSet_throwsStaleLockSet", async () => {
+    await expect(assertSoloLockSetFresh(runner([3, 9]), 7, new Set([3]), false)).rejects.toBeInstanceOf(StaleLockSetError);
+  });
+
+  it("assertSoloLockSetFresh_lastAttempt_doesNotEvenRead", async () => {
+    const pool = runner([3]);
+
+    await expect(assertSoloLockSetFresh(pool, 7, new Set(), true)).resolves.toBeUndefined();
+    expect(pool.execute).not.toHaveBeenCalled();
+  });
+});
+
+describe("retryOnStaleLockSet", () => {
+  it("retryOnStaleLockSet_firstTry_returnsResultNotLastAttempt", async () => {
+    const write = jest.fn<(lastAttempt: boolean) => Promise<string>>().mockResolvedValue("ok");
+
+    expect(await retryOnStaleLockSet(write)).toBe("ok");
+    expect(write.mock.calls).toEqual([[false]]);
+  });
+
+  it("retryOnStaleLockSet_staleTwice_thirdCallIsTheLastAttempt", async () => {
+    const write = jest
+      .fn<(lastAttempt: boolean) => Promise<string>>()
+      .mockRejectedValueOnce(new StaleLockSetError())
+      .mockRejectedValueOnce(new StaleLockSetError())
+      .mockResolvedValue("ok");
+
+    expect(await retryOnStaleLockSet(write)).toBe("ok");
+    expect(write.mock.calls).toEqual([[false], [false], [true]]);
+  });
+
+  it("retryOnStaleLockSet_otherError_propagatesWithoutReplay", async () => {
+    const write = jest.fn<(lastAttempt: boolean) => Promise<string>>().mockRejectedValue(new Error("DB_DOWN"));
+
+    await expect(retryOnStaleLockSet(write)).rejects.toThrow("DB_DOWN");
+    expect(write).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("deleteOwnAccount — inscription solo prise entre le relevé et le verrou", () => {
+  /** Le relevé rend `before` aux `staleReads` premières lectures, puis `[5]`. */
+  function listingChanging(staleReads: number) {
+    const db = fakeDb(EMPTY);
+    const base = db.execute.getMockImplementation()!;
+    let reads = 0;
+    db.execute.mockImplementation(async (sql: string, params: unknown[] = []) => {
+      if (String(sql).replace(/\s+/g, " ").trim().startsWith("SELECT DISTINCT r.tournament_id")) {
+        reads += 1;
+        // Lectures impaires : relevé d'avant la transaction ; paires : relecture sous verrou.
+        const stale = reads <= staleReads * 2 && reads % 2 === 1;
+        await base(sql, params);
+        return [stale ? [] : [{ tournament_id: 5 }]];
+      }
+      return base(sql, params);
+    });
+    return db;
+  }
+
+  it("deleteOwnAccount_registrationAppearedUnderLock_replaysWithFreshLockSet", async () => {
+    const { connection, queries } = listingChanging(1);
+
+    await deleteOwnAccount(7);
+
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    const locks = queries.filter((q) => q.sql === "SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE");
+    expect(locks.map((q) => q.params)).toEqual([[5]]);
+  });
+
+  it("deleteOwnAccount_lockSetStaleEveryTime_thirdAttemptGoesThroughWithoutRereading", async () => {
+    const { connection, queries } = listingChanging(3);
+
+    await deleteOwnAccount(7);
+
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(3);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    // Trois relevés d'avant transaction, deux relectures sous verrou seulement.
+    expect(queries.filter((q) => q.sql.startsWith("SELECT DISTINCT r.tournament_id"))).toHaveLength(5);
+  });
+});
+
+describe("deleteOwnAccount — accueil et #live", () => {
+  it("deleteOwnAccount_onlyCompletedMatchTouched_publishesWithoutLandingLive", async () => {
+    jest.mocked(publishMatchUpdatedEvent).mockReset();
+    const { execute } = fakeDb(EMPTY, { refereed: [{ matchId: 4, tournamentId: 3 }] });
+    const base = execute.getMockImplementation()!;
+    execute.mockImplementation(async (sql: string, params: unknown[] = []) => {
+      if (String(sql).replace(/\s+/g, " ").trim().startsWith("SELECT id, tournament_id, status FROM bg_matches")) {
+        await base(sql, params);
+        return [[{ id: 4, tournament_id: 3, status: "COMPLETED" }]];
+      }
+      return base(sql, params);
+    });
+
+    await deleteOwnAccount(7);
+
+    expect(jest.mocked(publishMatchUpdatedEvent).mock.calls).toEqual([[3, { landingLive: false }]]);
   });
 });

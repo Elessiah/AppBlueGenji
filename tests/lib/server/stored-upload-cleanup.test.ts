@@ -130,6 +130,17 @@ describe("isUploadReferenced", () => {
     expect(others.every(([sql]) => !sql.includes("id <>"))).toBe(true);
   });
 
+  it("isUploadReferenced_exceptHoldOf_ignoresThatAccountsDeletionHoldOnly", async () => {
+    // Renommer l'avatar mis de côté demande « un autre que ce masque le désigne-t-il ? ».
+    const execute = mockDb();
+    await isUploadReferenced("/api/uploads/avatars/42-a.webp", { exceptHoldOf: 42 });
+    const holds = execute.mock.calls.find(([sql]) => sql.includes("FROM bg_account_deletion_holds"));
+    expect(holds?.[0]).toContain("AND user_id <> ? LIMIT 1");
+    expect(holds?.[1]).toEqual(["/api/uploads/avatars/42-a.webp", "/uploads/avatars/42-a.webp", 42]);
+    const others = execute.mock.calls.filter(([sql]) => !sql.includes("FROM bg_account_deletion_holds"));
+    expect(others.every(([sql]) => !sql.includes("<> ?"))).toBe(true);
+  });
+
   it("ne compte un logo en quarantaine que tant qu'il est masqué", async () => {
     const execute = mockDb();
     await isUploadReferenced("/api/uploads/teams/3-abc.webp");

@@ -30,11 +30,28 @@ export const REACTIVATION_PSEUDO_SUFFIX = "OG";
 /**
  * Le `attempt`-ième pseudo à essayer à la réactivation quand le vrai pseudo a
  * été pris entre-temps (décision R3 du 2026-11-04) : « Pseudo » → « PseudoOG »,
- * puis « PseudoOG2 », « PseudoOG3 »… Le début du pseudo est raccourci (en
- * caractères, comme la colonne) pour que le tout tienne dans `PSEUDO_MAX_LENGTH`.
+ * puis « PseudoOG2 », « PseudoOG3 »… Le début du pseudo est raccourci pour que
+ * le tout tienne dans `PSEUDO_MAX_LENGTH` (compté en caractères, comme la
+ * colonne), mais coupé **entre deux graphèmes** : une coupe au milieu d'une
+ * séquence (emoji composé, lettre et son signe combinant) laisserait un
+ * liant ou un signe orphelin juste avant « OG ».
  */
 export function reactivationPseudoCandidate(pseudo: string, attempt: number): string {
   const suffix = attempt === 0 ? REACTIVATION_PSEUDO_SUFFIX : `${REACTIVATION_PSEUDO_SUFFIX}${attempt + 1}`;
-  const base = Array.from(pseudo).slice(0, PSEUDO_MAX_LENGTH - suffix.length).join("");
-  return `${base}${suffix}`;
+  const room = PSEUDO_MAX_LENGTH - suffix.length;
+  let base = "";
+  let length = 0;
+  for (const grapheme of graphemesOf(pseudo)) {
+    const size = pseudoLength(grapheme);
+    if (length + size > room) break;
+    base += grapheme;
+    length += size;
+  }
+  return `${base.trimEnd()}${suffix}`;
+}
+
+/** Les graphèmes d'un texte ; à défaut de `Intl.Segmenter`, ses caractères. */
+function graphemesOf(text: string): string[] {
+  if (typeof Intl.Segmenter !== "function") return Array.from(text);
+  return Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text), (part) => part.segment);
 }

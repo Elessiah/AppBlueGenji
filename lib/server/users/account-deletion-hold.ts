@@ -76,15 +76,10 @@ export async function holdAccountIdentity(
   const current = rows[0];
   if (!current) return false;
   // Un masque resté d'une demande antérieure cède la place ; puis une insertion
-  // simple : un pseudo déjà mis de côté par un autre compte fait échouer la
-  // demande (doublon), au lieu de réécrire en silence le masque de cet autre
-  // compte (`ON DUPLICATE KEY` jouerait sur les deux clés uniques).
+  // simple, jamais `ON DUPLICATE KEY` (il jouerait sur les deux clés uniques et
+  // réécrirait en silence le masque d'un autre compte).
   await connection.execute(`DELETE FROM bg_account_deletion_holds WHERE user_id = ?`, [userId]);
-  await connection.execute(`INSERT INTO bg_account_deletion_holds (user_id, pseudo, avatar_url) VALUES (?, ?, ?)`, [
-    userId,
-    current.pseudo,
-    current.avatar_url ?? null,
-  ]);
+  await insertDeletionHold(connection, userId, current.pseudo, current.avatar_url ?? null);
   const taken = await loadTakenAnonymousPseudos(connection, userId);
   for (let attempt = 0; ; attempt += 1) {
     const pseudo = pickAnonymousPseudo(taken);
@@ -104,6 +99,37 @@ export async function holdAccountIdentity(
   }
   await syncSoloEntryIdentityOn(connection, userId);
   return true;
+}
+
+/**
+ * Met de côté le pseudo et l'avatar. Le pseudo est normalement libre dans les
+ * masques (il est réservé à son titulaire pendant la fenêtre) ; la course
+ * documentée de la réactivation peut pourtant laisser un compte vivant sous un
+ * pseudo qu'un compte en attente a déjà mis de côté. Sa propre demande ne doit
+ * pas échouer pour autant (doublon, 500 jusqu'à un renommage) : le masque
+ * garde alors le pseudo suivi de « OG » (« PseudoOG », « PseudoOG2 »…), celui
+ * que la réactivation lui aurait de toute façon rendu en cas de conflit
+ * (décision R3) — sans rien révéler de la demande de l'autre compte.
+ */
+async function insertDeletionHold(
+  connection: PoolConnection,
+  userId: number,
+  pseudo: string,
+  avatarUrl: string | null,
+): Promise<void> {
+  for (let attempt = -1; ; attempt += 1) {
+    const held = attempt < 0 ? pseudo : reactivationPseudoCandidate(pseudo, attempt);
+    try {
+      await connection.execute(`INSERT INTO bg_account_deletion_holds (user_id, pseudo, avatar_url) VALUES (?, ?, ?)`, [
+        userId,
+        held,
+        avatarUrl,
+      ]);
+      return;
+    } catch (error) {
+      if (!isDuplicateEntryError(error) || attempt + 1 >= REACTIVATION_PSEUDO_ATTEMPTS) throw error;
+    }
+  }
 }
 
 /** Le masque du compte, s'il en a un (lecture sur la transaction appelante). */
@@ -173,10 +199,18 @@ export async function dropDeletionHold(runner: Runner, userId: number): Promise<
  * sauvegarde restaurée : le compte revit alors sous son pseudo suivi de « OG »
  * (« PseudoOG », puis « PseudoOG2 »… — décision R3 du 2026-11-04), que son
  * titulaire peut changer dans Mon profil ; à défaut, sous son pseudo d'emprunt.
- * Rend `true` si le compte est réactivé.
+ * Rend `null` si rien n'est réactivé, sinon ce que le compte a retrouvé :
+ * `RESTORED` (son pseudo) ou `RENAMED` (un autre : suffixé, ou d'emprunt —
+ * l'écran le lui dit).
  */
-export async function restoreAccountIdentity(connection: PoolConnection, userId: number): Promise<boolean> {
+export type RestoredIdentity = "RESTORED" | "RENAMED";
+
+export async function restoreAccountIdentity(
+  connection: PoolConnection,
+  userId: number,
+): Promise<RestoredIdentity | null> {
   const hold = await readDeletionHold(connection, userId, true);
+  let identity: RestoredIdentity = "RESTORED";
   const reactivate = async (assignments: string, params: (string | null)[]): Promise<ResultSetHeader> => {
     const [result] = await connection.execute<ResultSetHeader>(
       `UPDATE bg_users SET is_deleted = 0, deletion_requested_at = NULL${assignments}
@@ -187,19 +221,22 @@ export async function restoreAccountIdentity(connection: PoolConnection, userId:
   };
   let result: ResultSetHeader;
   if (!hold) {
+    // Sans masque, le compte revient sous le pseudo d'emprunt qu'il porte.
+    identity = "RENAMED";
     result = await reactivate("", []);
   } else {
     try {
       result = await reactivate(", pseudo = ?, avatar_url = ?", [hold.pseudo, hold.avatarUrl]);
     } catch (error) {
       if (!isDuplicateEntryError(error)) throw error;
+      identity = "RENAMED";
       result = await reactivateUnderSuffixedPseudo(connection, userId, hold, reactivate);
     }
   }
-  if (Number(result.affectedRows) !== 1) return false;
+  if (Number(result.affectedRows) !== 1) return null;
   await dropDeletionHold(connection, userId);
   await syncSoloEntryIdentityOn(connection, userId);
-  return true;
+  return identity;
 }
 
 /**

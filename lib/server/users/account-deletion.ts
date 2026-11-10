@@ -163,19 +163,73 @@ export async function loadAccountTrace(
 }
 
 /**
- * Les tournois où l'entrée solo du compte est inscrite, par id croissant : ceux
- * dont la suppression verrouille la ligne avant de décider (`deleteOwnAccount`).
+ * Les tournois où l'entrée solo du compte est inscrite, par id croissant — tous
+ * (`openOnly` faux : ceux dont les lecteurs voient son nom d'engagé changer),
+ * ou les seuls tournois **pas encore commencés** (`openOnly`) : ceux dont la
+ * suppression verrouille la ligne avant de décider (`deleteOwnAccount`). Une
+ * inscription à un tournoi en cours ou terminé ne se retire jamais : verrouiller
+ * sa ligne ferait attendre un tournoi en cours pour rien.
  */
-export async function listSoloRegistrationTournamentIds(runner: SqlRunner, userId: number): Promise<number[]> {
+export async function listSoloRegistrationTournamentIds(
+  runner: SqlRunner,
+  userId: number,
+  openOnly = false,
+): Promise<number[]> {
+  const openJoin = openOnly
+    ? `
+       JOIN bg_tournaments t ON t.id = r.tournament_id AND t.state IN ('UPCOMING', 'REGISTRATION')`
+    : "";
   const [rows] = await runner.execute<(RowDataPacket & { tournament_id: number })[]>(
     `SELECT DISTINCT r.tournament_id
        FROM bg_teams s
-       JOIN bg_tournament_registrations r ON r.team_id = s.id
+       JOIN bg_tournament_registrations r ON r.team_id = s.id${openJoin}
       WHERE s.solo_user_id = ?
       ORDER BY r.tournament_id`,
     [userId],
   );
   return rows.map((row) => Number(row.tournament_id));
+}
+
+/** Levée quand une inscription solo est apparue hors du jeu de verrous : la transaction se rejoue. */
+export class StaleLockSetError extends Error {
+  constructor() {
+    super("STALE_LOCK_SET");
+    this.name = "StaleLockSetError";
+  }
+}
+
+const STALE_LOCK_SET_ATTEMPTS = 3;
+
+/**
+ * Sous le verrou du compte (plus aucune inscription solo ne peut se prendre :
+ * `ensureSoloEntry` le demande), relit les tournois pas encore commencés de
+ * l'entrée solo. L'un d'eux manque au jeu de verrous relevé avant la
+ * transaction — une inscription prise dans l'intervalle — : `StaleLockSetError`,
+ * la transaction se rejoue avec un relevé frais (`retryOnStaleLockSet`). Sans
+ * cela l'inscription restait (retirée à la passe horaire seulement), ou
+ * retenait la ligne sous un motif faux (« tournoi déjà commencé »).
+ * `lastAttempt` : on n'insiste plus, l'issue prudente d'avant s'applique.
+ */
+export async function assertSoloLockSetFresh(
+  connection: SqlRunner,
+  userId: number,
+  locked: ReadonlySet<number>,
+  lastAttempt: boolean,
+): Promise<void> {
+  if (lastAttempt) return;
+  const open = await listSoloRegistrationTournamentIds(connection, userId, true);
+  if (open.some((tournamentId) => !locked.has(tournamentId))) throw new StaleLockSetError();
+}
+
+/** Rejoue `write` tant qu'il lève `StaleLockSetError` ; `lastAttempt` est vrai au dernier essai. */
+export async function retryOnStaleLockSet<T>(write: (lastAttempt: boolean) => Promise<T>): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await write(attempt >= STALE_LOCK_SET_ATTEMPTS);
+    } catch (error) {
+      if (!(error instanceof StaleLockSetError)) throw error;
+    }
+  }
 }
 
 /**
@@ -359,7 +413,11 @@ async function applyDeletionMode(
   userId: number,
   plan: AccountDeletionPlan,
   soloWithdrawals: readonly SoloRegistrationFact[],
-): Promise<{ withdrawal: { tournamentIds: number[] }; withdrawnFrom: number[]; quarantinedFiles: string[] }> {
+): Promise<{
+  withdrawal: { tournamentIds: number[]; liveTournamentIds: number[] };
+  withdrawnFrom: number[];
+  quarantinedFiles: string[];
+}> {
   if (plan.mode === "ERASE") {
     const quarantinedFiles = await loadQuarantinedAvatarFiles(connection, userId);
     const withdrawal = await eraseAccount(connection, userId, soloWithdrawals);
@@ -515,6 +573,9 @@ async function deleteAccountNow(
   // Les tournois dont un match nommait le compte (caster, lien, arbitre) :
   // prévenus après le commit.
   let touchedTournaments: number[] = [];
+  // Parmi eux, ceux dont un match touché n'est pas terminé : seuls ceux-là
+  // peuvent changer l'accueil et le message #live.
+  let liveTournaments: ReadonlySet<number> = new Set();
   // Les tournois dont une inscription solo part avec le compte (D12) :
   // instantanés et aperçus à relire après le commit.
   let withdrawnFrom: number[] = [];
@@ -526,22 +587,23 @@ async function deleteAccountNow(
   // verrouille le match puis le compte, la suppression l'inverse) se rejoue
   // entière, relevé des tournois compris (`retryOnDeadlock`) : sans quoi le
   // joueur lisait un échec générique et devait recommencer.
-  const transact = async (): Promise<AccountDeletionPlan | null> => {
-    // Les tournois où l'entrée solo est inscrite, relevés **avant** de prendre une
+  const transact = async (lastAttempt: boolean): Promise<AccountDeletionPlan | null> => {
+    // Les tournois pas encore commencés où l'entrée solo est inscrite (les seuls
+    // dont une inscription peut partir), relevés **avant** de prendre une
     // connexion : la relève en emprunte une autre au pool, et en tenir une pendant
     // ce temps ferait attendre chaque suppression simultanée sur une connexion que
     // les autres tiennent (pool saturé, plus aucune requête ne passe).
     // Y compris ceux de ses casts et arbitrages : la transaction verrouille leurs
     // matchs, et le tournoi se verrouille avant (`listCastTournamentIds`).
     const soloTournaments = mergeTournamentIds(
-      await listSoloRegistrationTournamentIds(db, userId),
+      await listSoloRegistrationTournamentIds(db, userId, true),
       await listCastTournamentIds(db, userId),
     );
     const connection = await db.getConnection();
     try {
       // Une inscription faite entre le relevé ci-dessus et le verrou tombe dans un
-      // tournoi non verrouillé, et retient alors la ligne
-      // (`withdrawableSoloRegistrations`).
+      // tournoi non verrouillé : la transaction se rejoue (`assertSoloLockSetFresh`),
+      // et au dernier essai elle retient la ligne (`withdrawableSoloRegistrations`).
       await connection.beginTransaction();
 
       // Les tournois d'abord, par id croissant, **avant toute lecture** : la
@@ -574,6 +636,7 @@ async function deleteAccountNow(
         await connection.rollback();
         return null;
       }
+      await assertSoloLockSetFresh(connection, userId, new Set(soloTournaments), lastAttempt);
       // Anonyme depuis la demande, le compte en attente n'a plus d'avatar sur sa
       // ligne : son chemin attend dans le masque (`account-deletion-hold.ts`).
       const hold = await readDeletionHold(connection, userId, true);
@@ -594,6 +657,7 @@ async function deleteAccountNow(
       withdrawnFrom = applied.withdrawnFrom;
       const withdrawal = applied.withdrawal;
       touchedTournaments = withdrawal.tournamentIds;
+      liveTournaments = new Set(withdrawal.liveTournamentIds);
 
       // Les signalements qui le visent gardent leur cible — ils restent à
       // traiter —, mais pas son pseudo : relevé à l'envoi pour survivre à la
@@ -644,7 +708,7 @@ async function deleteAccountNow(
       connection.release();
     }
   };
-  const plan = await retryOnDeadlock(transact);
+  const plan = await retryOnDeadlock(() => retryOnStaleLockSet(transact));
   if (plan === null) return null;
 
   // Ses sessions sont parties avec la transaction, pas ses flux de tournoi
@@ -654,11 +718,16 @@ async function deleteAccountNow(
   // Les instantanés ouverts des matchs qu'il castait ou arbitrait montreraient
   // sinon son cast, le lien de sa chaîne ou « Arbitre désigné » jusqu'à la
   // prochaine écriture du match ; l'évènement remet aussi à jour le message
-  // #live de la soirée (`publishMatchUpdatedEvent`), qui portait ce lien.
+  // #live de la soirée (`publishMatchUpdatedEvent`), qui portait ce lien — pour
+  // les seuls tournois dont un match touché n'est pas terminé : un arbitre ou
+  // un lien retiré d'un match joué ne change ni l'accueil ni #live.
   // La suppression est commitée : un écouteur qui lève ne doit ni la faire lire
   // comme un échec, ni sauter le ménage de l'avatar et la ligne du journal.
   for (const tournamentId of touchedTournaments) {
-    afterCommit(() => publishMatchUpdatedEvent(tournamentId, { landingLive: true }), `Tournoi #${tournamentId} non prévenu`);
+    afterCommit(
+      () => publishMatchUpdatedEvent(tournamentId, { landingLive: liveTournaments.has(tournamentId) }),
+      `Tournoi #${tournamentId} non prévenu`,
+    );
   }
   // Le cache des pseudos d'arbitre n'est pas vidé : le retrait de l'arbitrage
   // (`referee_user_id` remis à NULL) change la version des instantanés touchés,

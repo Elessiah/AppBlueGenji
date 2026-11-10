@@ -293,9 +293,32 @@ describe("finalizeDueAccountDeletions", () => {
     await finalizeDueAccountDeletions();
 
     const dueCalls = execute.mock.calls.filter(([sql]) => String(sql).includes("deletion_requested_at IS NOT NULL"));
-    expect(String(dueCalls[0][0])).not.toContain("NOT IN");
-    expect(String(dueCalls[1][0])).toContain("id NOT IN (?)");
-    expect(dueCalls[1][1]).toEqual([4242]);
+    expect(dueCalls[0][1]).not.toContain(4242);
+    expect(String(dueCalls[1][0])).toContain("id NOT IN (");
+    expect(dueCalls[1][1]).toContain(4242);
+  });
+
+  // Dû pour SQL, pas pour l'horloge relue sous le verrou (ou réactivé à
+  // l'instant) : rien n'est fait, et le compte ne garde pas sa place au relevé.
+  it("finalizeDueAccountDeletions_dueForSqlButNothingDone_sidelinedFromNextPassQuery", async () => {
+    const { execute } = fakeDb({ locked: { is_deleted: 0, deletion_requested_at: null }, due: [5151] });
+
+    expect(await finalizeDueAccountDeletions()).toEqual({ finalized: 0, failed: 0 });
+    await finalizeDueAccountDeletions();
+
+    const dueCalls = execute.mock.calls.filter(([sql]) => String(sql).includes("deletion_requested_at IS NOT NULL"));
+    expect(dueCalls[0][1]).not.toContain(5151);
+    expect(dueCalls[1][1]).toContain(5151);
+  });
+
+  it("finalizeDueAccountDeletions_finalizedAccount_notSidelined", async () => {
+    const { execute } = fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, due: [6161] });
+
+    expect(await finalizeDueAccountDeletions()).toEqual({ finalized: 1, failed: 0 });
+    await finalizeDueAccountDeletions();
+
+    const dueCalls = execute.mock.calls.filter(([sql]) => String(sql).includes("deletion_requested_at IS NOT NULL"));
+    expect(dueCalls[1][1]).not.toContain(6161);
   });
 
   // Revue sécurité #571, cycle 3 (D6) : un avatar que la modération a supprimé

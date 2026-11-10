@@ -167,6 +167,15 @@ describe("forfeitSoloEntriesAfterCommit", () => {
     expect(options).toEqual({ tournamentId: 4, category: "registrations" });
   });
 
+  // Rejeu d'une demande après restauration : le forfait a déjà été annoncé.
+  it("forfeitSoloEntriesAfterCommit_silent_forfeitsWithoutDiscordLine", async () => {
+    fakeDb({ format: "SURVIVAL" });
+
+    expect(await forfeitSoloEntriesAfterCommit([{ tournamentId: 4, teamId: 40 }], { silent: true })).toBe(1);
+
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
   it("forfeitSoloEntriesAfterCommit_engineFails_swallowedAndNotLogged", async () => {
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
     fakeDb({ format: "SWISS" });

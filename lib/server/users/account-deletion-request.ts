@@ -22,6 +22,7 @@ import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { invalidateLandingCounters } from "@/lib/server/landing-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
+import { rotateHeldAvatarFile } from "@/lib/server/avatar-rotation";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
@@ -36,11 +37,13 @@ import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notificat
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { holdAccountIdentity } from "./account-deletion-hold";
 import {
+  assertSoloLockSetFresh,
   listCastTournamentIds,
   listSoloRegistrationTournamentIds,
   loadAccountTrace,
   loadSoloRegistrations,
   mergeTournamentIds,
+  retryOnStaleLockSet,
 } from "./account-deletion";
 import {
   type DeletionWithdrawal,
@@ -181,6 +184,9 @@ async function registeredInActiveTournament(
  * au capitaine, sinon au plus ancien membre ; seul joueur, l'équipe devient
  * fantôme si elle est engagée dans un tournoi actif, sinon elle est dissoute
  * (`dissolveTeamOn` : ligne et historique gardés sous « Équipe dissoute #id »).
+ * La règle du seul joueur vaut **quel que soit son rôle** : le dernier membre
+ * vivant d'une équipe dont le propriétaire est déjà anonymisé ne laisse pas
+ * derrière lui une équipe ordinaire sans personne pour la conduire.
  */
 async function leaveTeamOn(connection: PoolConnection, teamId: number, userId: number): Promise<TeamDeparture> {
   const [teamRows] = await connection.execute<(RowDataPacket & { logo_url: string | null; deleted_at: Date | null })[]>(
@@ -199,8 +205,10 @@ async function leaveTeamOn(connection: PoolConnection, teamId: number, userId: n
   const roles = await lockMemberRoles(connection, teamId, userId);
   if (!roles || teamRows.length === 0 || teamRows[0].deleted_at !== null) return departure;
 
-  if (roles.includes("OWNER")) {
-    const successor = pickTeamSuccessor(await loadSuccessorCandidates(connection, teamId, userId));
+  const isOwner = roles.includes("OWNER");
+  const candidates = await loadSuccessorCandidates(connection, teamId, userId);
+  if (isOwner || candidates.length === 0) {
+    const successor = isOwner ? pickTeamSuccessor(candidates) : null;
     const fate = ownedTeamFate({
       hasSuccessor: successor !== null,
       registeredInActiveTournament: successor === null && (await registeredInActiveTournament(connection, teamId)),
@@ -340,14 +348,32 @@ type DeletionRequestEffects = {
   departures: TeamDeparture[];
   organizedHandedOver: number[];
   castTournaments: number[];
+  /** Parmi eux, ceux dont un match touché n'est pas terminé (accueil, #live). */
+  liveCastTournaments: number[];
+  /**
+   * Rejeu d'une demande après restauration (`account-deletion-replay.ts`) :
+   * la demande a déjà été annoncée — ni alerte Discord, ni ligne de retrait,
+   * ni avis de propriété ne repartent ; les lecteurs et les caches, eux, sont
+   * rafraîchis, et les forfaits attendus (le script ferme son pool en sortant).
+   */
+  replay: boolean;
   /** Tous les tournois de l'entrée solo : son nom d'engagé vient de passer au pseudo d'emprunt. */
   soloTournaments: number[];
 };
 
 /** Rafraîchit les lecteurs, notifie le successeur, journalise et joue les forfaits. */
 async function afterDeletionRequest(userId: number, effects: DeletionRequestEffects): Promise<void> {
-  const { withdrawn, forfeitable, departures, organizedHandedOver, castTournaments, soloTournaments } = effects;
+  const { withdrawn, forfeitable, departures, organizedHandedOver, castTournaments, soloTournaments, replay } = effects;
+  const liveCast = new Set(effects.liveCastTournaments);
   closeUserStreams(userId);
+  // L'avatar mis de côté change d'adresse : l'ancienne, connue de qui l'avait
+  // vue, ne doit plus rien servir pendant les trente jours. En premier, avant
+  // toute suite plus longue ; un échec est dit, la demande est faite.
+  try {
+    await rotateHeldAvatarFile(userId);
+  } catch (error) {
+    console.error("[account-deletion] avatar mis de côté non renommé, encore servi à son ancienne adresse", error);
+  }
   // L'entrée solo restée inscrite (jouée, tournoi en cours ou terminé) porte
   // désormais le pseudo d'emprunt : ses lecteurs gardaient le vrai.
   for (const tournamentId of new Set([
@@ -357,13 +383,20 @@ async function afterDeletionRequest(userId: number, effects: DeletionRequestEffe
   ])) {
     publishUpdatedEvent(tournamentId);
   }
-  for (const tournamentId of castTournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
-  for (const departure of departures) await settleDeparture(userId, departure);
+  // L'accueil et #live ne bougent que pour un match touché pas encore terminé.
+  for (const tournamentId of castTournaments) {
+    publishMatchUpdatedEvent(tournamentId, { landingLive: liveCast.has(tournamentId) });
+  }
+  for (const departure of departures) await settleDeparture(userId, departure, replay);
   // Le compte est anonyme dès la demande : classements, accueil, statistiques
   // et liste des comptes sans fiche gardaient son vrai pseudo en cache.
   invalidateTeamIdentityViews();
   invalidateStats();
 
+  if (replay) {
+    await forfeitSoloEntriesAfterCommit(forfeitable, { silent: true });
+    return;
+  }
   // Journal Discord : la demande (sans pseudo), puis chaque retrait (E5).
   try {
     sendBotLog(formatAccountDeletionLog({ days: ACCOUNT_REACTIVATION_DAYS }), { category: "signups" });
@@ -371,13 +404,18 @@ async function afterDeletionRequest(userId: number, effects: DeletionRequestEffe
     console.error("[account-deletion] alerte de suppression non écrite", error);
   }
   for (const entry of withdrawn) await logDeletionWithdrawal(entry.tournamentId, false);
-  await forfeitSoloEntriesAfterCommit(forfeitable);
+  // Les forfaits (une transaction d'arbitrage par match, plusieurs tournois
+  // possibles) ne retiennent pas la réponse : la demande est faite, et un délai
+  // du mandataire la ferait lire comme un échec. En tâche de fond ; la passe
+  // horaire (`settleDeletedSoloEntries`) reprend tout ce qui n'aboutit pas.
+  // `forfeitSoloEntriesAfterCommit` ne lève jamais.
+  void forfeitSoloEntriesAfterCommit(forfeitable);
 }
 
 /** Les suites d'un départ d'équipe ; rend `true` si l'identité publiée d'une équipe a changé. */
-async function settleDeparture(userId: number, departure: TeamDeparture): Promise<boolean> {
+async function settleDeparture(userId: number, departure: TeamDeparture, replay = false): Promise<boolean> {
   refreshTeamViewers(departure.teamId, departure.detachedUserIds, departure.streamTournamentIds);
-  if (departure.successorId !== null) {
+  if (departure.successorId !== null && !replay) {
     notifyTeamInviteInBackground("OWNERSHIP", departure.teamId, departure.successorId, userId);
   }
   if (departure.fate !== "DISSOLVE") return false;
@@ -443,6 +481,7 @@ export async function requestAccountDeletion(
   const departures: TeamDeparture[] = [];
   let organizedHandedOver: number[] = [];
   let castTournaments: number[] = [];
+  let liveCastTournaments: number[] = [];
   // Le rejeu d'une demande après restauration (`account-deletion-replay.ts`)
   // garde la date d'origine : la fenêtre de trente jours ne repart pas à zéro.
   const requestedAt = options.requestedAt ?? new Date();
@@ -451,11 +490,15 @@ export async function requestAccountDeletion(
   // Une transaction annulée par un interblocage (une désignation d'arbitre
   // verrouille le match puis le compte, la demande l'inverse) se rejoue
   // entière, relevés compris (`retryOnDeadlock`).
-  const transact = async (): Promise<AccountDeletionPlan> => {
+  const transact = async (lastAttempt: boolean): Promise<AccountDeletionPlan> => {
     departures.length = 0;
+    // Tous les tournois de l'entrée solo sont rediffusés (son nom d'engagé
+    // change) ; seuls ceux pas encore commencés sont verrouillés — une
+    // inscription à un tournoi en cours ou terminé ne se retire pas, et son
+    // verrou ferait attendre un tournoi en cours pour rien.
     soloEntryTournaments = await listSoloRegistrationTournamentIds(db, userId);
     const soloTournaments = mergeTournamentIds(
-      soloEntryTournaments,
+      await listSoloRegistrationTournamentIds(db, userId, true),
       await listOrganizedTournamentIds(db, userId),
       await listCastTournamentIds(db, userId),
     );
@@ -474,6 +517,10 @@ export async function requestAccountDeletion(
         throw new Error("ACCOUNT_REASSIGNED");
       }
       accountCreatedAt = String(locked[0].created_at);
+      // Une inscription solo prise entre le relevé et ce verrou tomberait dans
+      // un tournoi non verrouillé (retirée à la passe horaire seulement) : la
+      // transaction se rejoue avec un relevé frais.
+      await assertSoloLockSetFresh(connection, userId, new Set(soloTournaments), lastAttempt);
       // Le dernier administrateur vivant fermerait l'administration de la
       // plateforme (rattrapable seulement en base). Le rejeu d'une demande
       // journalisée n'est pas refusé : elle a eu lieu.
@@ -499,6 +546,7 @@ export async function requestAccountDeletion(
       // d'une restauration : ni annonce ni lancement pendant la remise en état.
       const withdrawal = await withdrawUserCasts(connection, userId, false);
       castTournaments = withdrawal.tournamentIds;
+      liveCastTournaments = withdrawal.liveTournamentIds;
       if (options.accountCreatedAt === undefined) {
         await relaunchAfterRefereeWithdrawal(
           connection,
@@ -552,7 +600,7 @@ export async function requestAccountDeletion(
       connection.release();
     }
   };
-  const plan = await retryOnDeadlock(transact);
+  const plan = await retryOnDeadlock(() => retryOnStaleLockSet(transact));
 
   // Demande consignée « en attente » au journal hors base (décision 8 du
   // 2026-11-04) : une restauration d'une sauvegarde antérieure la rejoue. La
@@ -570,7 +618,9 @@ export async function requestAccountDeletion(
     departures,
     organizedHandedOver,
     castTournaments,
+    liveCastTournaments,
     soloTournaments: soloEntryTournaments,
+    replay: options.accountCreatedAt !== undefined,
   });
 
   return { ...plan, finalAt: reactivationDeadline(requestedAt).toISOString() };

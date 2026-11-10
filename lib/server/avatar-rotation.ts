@@ -140,6 +140,105 @@ async function undoRotation(
   await undo.catch(() => undefined);
 }
 
+/**
+ * Change l'adresse du fichier de l'avatar **mis de côté** par une demande de
+ * suppression (`bg_account_deletion_holds`, `account-deletion-hold.ts`).
+ *
+ * La demande retire l'avatar de la ligne du compte, mais le fichier attend la
+ * réactivation trente jours sous `public/uploads/avatars` : servi sans session
+ * à son ancienne adresse, il restait à quiconque l'avait vue (instantané
+ * ouvert, historique, lien collé) — la photo d'un compte montré anonyme
+ * partout. Même réponse que pour un avatar masqué (`rotateHiddenAvatarFile`) :
+ * le fichier est renommé sous un nom aléatoire, que seul le masque connaît ;
+ * l'ancienne adresse rend 404 et les variantes de l'optimiseur sont purgées.
+ * La réactivation rend l'avatar sous sa nouvelle adresse ; la modération
+ * l'atteint toujours par le masque (`readModeratableAvatar`).
+ *
+ * Après le commit de la demande (le masque doit exister). Un fichier qu'une
+ * autre ligne désigne est copié, pas renommé — même règle, même raison. Si
+ * l'écriture du masque n'aboutit pas, voir `undoHeldRotation`.
+ *
+ * @returns La nouvelle URL, ou `null` si rien n'a été renommé (pas de masque,
+ *   pas d'avatar, adresse étrangère, fichier introuvable, course perdue).
+ */
+export async function rotateHeldAvatarFile(userId: number): Promise<string | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { avatar_url: string | null })[]>(
+    `SELECT avatar_url FROM bg_account_deletion_holds WHERE user_id = ? LIMIT 1`,
+    [userId],
+  );
+  const heldUrl = rows[0]?.avatar_url ?? null;
+  if (!heldUrl) return null;
+  const target = rotatedAvatarTarget(heldUrl, userId);
+  if (!target) return null;
+
+  const shared = await isUploadReferenced(heldUrl, { exceptHoldOf: userId });
+  let original: Buffer | null = null;
+  try {
+    if (!shared) original = await readFile(target.from);
+    await (shared ? copyFile(target.from, target.to) : rename(target.from, target.to));
+  } catch (error) {
+    // Déjà absent (quarantaine, ménage) : il n'y a plus rien à servir.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
+
+  let written = false;
+  try {
+    const [result] = await db.execute<ResultSetHeader>(
+      `UPDATE bg_account_deletion_holds SET avatar_url = ? WHERE user_id = ? AND avatar_url = ?`,
+      [target.url, userId, heldUrl],
+    );
+    written = result.affectedRows > 0;
+  } finally {
+    if (!written) await undoHeldRotation(userId, heldUrl, target, shared);
+  }
+  if (written && original) {
+    // Même distinction que `rotateHiddenAvatarFile` (adresse de forme ancienne).
+    if (heldUrl.startsWith("/uploads/")) await purgeAllOptimizedCopies();
+    else await purgeOptimizedCopies(original);
+  }
+  return written ? target.url : null;
+}
+
+/**
+ * Défait le renommage d'un avatar mis de côté dont l'écriture n'a pas abouti.
+ * Le masque désigne le **nouveau** fichier (réponse perdue après le commit) →
+ * rien à défaire. L'**ancienne** adresse est encore désignée — par le masque,
+ * ou par la ligne du compte qu'une réactivation vient de lui rendre —, ou la
+ * relecture est impossible → remis en place : on ne détruit pas ce que la base
+ * désigne peut-être encore. Sinon (avatar masqué ou supprimé par la modération
+ * entre-temps) le fichier renommé est supprimé : plus rien ne le désigne. Une
+ * copie (fichier partagé) est toujours supprimée, l'original n'ayant pas bougé.
+ */
+async function undoHeldRotation(
+  userId: number,
+  oldUrl: string,
+  target: { from: string; to: string; url: string },
+  shared: boolean,
+): Promise<void> {
+  // `undefined` : rien n'a pu être relu.
+  let designated: (string | null)[] | undefined;
+  try {
+    const db = await getDatabase();
+    const [rows] = await db.execute<(RowDataPacket & { avatar_url: string | null })[]>(
+      `SELECT avatar_url FROM bg_account_deletion_holds WHERE user_id = ?
+       UNION ALL
+       SELECT avatar_url FROM bg_users WHERE id = ?`,
+      [userId, userId],
+    );
+    designated = rows.map((row) => row.avatar_url ?? null);
+  } catch {
+    designated = undefined;
+  }
+  if (designated?.includes(target.url)) return;
+  let undo: Promise<void>;
+  if (shared) undo = unlink(target.to);
+  else if (designated === undefined || designated.includes(oldUrl)) undo = rename(target.to, target.from);
+  else undo = unlink(target.to);
+  await undo.catch(() => undefined);
+}
+
 /** Cache de l'optimiseur de `next/image` (`distDir` par défaut, celui du projet). */
 export function optimizedImageCacheDirectory(): string {
   return path.join(process.cwd(), ".next", "cache", "images");

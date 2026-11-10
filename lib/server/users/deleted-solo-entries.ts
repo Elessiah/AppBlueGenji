@@ -249,16 +249,20 @@ export async function logDeletionWithdrawal(tournamentId: number, forfeited: boo
  * et reporté au prochain passage, sans empêcher les suivantes. Jamais levé.
  * Rend le nombre de tournois où un forfait a été posé. Appelé après le commit
  * de la demande, et par le passage horaire (`settleDeletedSoloEntries`), qui
- * reprend tout échec.
+ * reprend tout échec. `silent` (rejeu d'une demande après restauration) : sans
+ * ligne au journal Discord, le forfait ayant déjà été annoncé.
  */
-export async function forfeitSoloEntriesAfterCommit(entries: readonly DeletionWithdrawal[]): Promise<number> {
+export async function forfeitSoloEntriesAfterCommit(
+  entries: readonly DeletionWithdrawal[],
+  options: { silent?: boolean } = {},
+): Promise<number> {
   let forfeited = 0;
   for (const entry of entries) {
     try {
       const forfeits = await forfeitUnplayedSoloEntry(entry.tournamentId, entry.teamId);
       if (forfeits > 0) {
         forfeited += 1;
-        await logDeletionWithdrawal(entry.tournamentId, true);
+        if (!options.silent) await logDeletionWithdrawal(entry.tournamentId, true);
       }
     } catch (error) {
       console.error(

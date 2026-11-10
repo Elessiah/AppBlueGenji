@@ -37,3 +37,41 @@ describe("reactivationPseudoCandidate", () => {
     expect(candidate.endsWith("OG")).toBe(true);
   });
 });
+
+describe("reactivationPseudoCandidate — coupe entre deux graphèmes", () => {
+  // Famille : quatre personnes liées par trois liants (ZWJ), sept caractères pour la colonne.
+  const FAMILY = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}";
+
+  it("reactivationPseudoCandidate_cutWouldSplitEmojiSequence_dropsTheWholeSequence", () => {
+    // 36 lettres + 7 caractères : la coupe à 38 tomberait après le premier liant.
+    const candidate = reactivationPseudoCandidate(`${"a".repeat(36)}${FAMILY}`, 0);
+
+    expect(candidate).toBe(`${"a".repeat(36)}OG`);
+  });
+
+  it("reactivationPseudoCandidate_cutWouldOrphanCombiningMark_dropsLetterAndMark", () => {
+    // « e » + accent combinant aux positions 38 et 39 : ni l'un sans l'autre.
+    const candidate = reactivationPseudoCandidate(`${"a".repeat(37)}e\u0301`, 0);
+
+    expect(candidate).toBe(`${"a".repeat(37)}OG`);
+  });
+
+  it("reactivationPseudoCandidate_sequenceFitsEntirely_keptWhole", () => {
+    const candidate = reactivationPseudoCandidate(`ab${FAMILY}`, 0);
+
+    expect(candidate).toBe(`ab${FAMILY}OG`);
+  });
+
+  it("reactivationPseudoCandidate_longPseudo_neverExceedsColumnLength", () => {
+    const candidate = reactivationPseudoCandidate(`${"a".repeat(36)}${FAMILY}`, 9);
+
+    expect(pseudoLength(candidate)).toBeLessThanOrEqual(PSEUDO_MAX_LENGTH);
+    expect(candidate.endsWith("OG10")).toBe(true);
+  });
+
+  it("reactivationPseudoCandidate_cutLeavesTrailingSpace_trimsIt", () => {
+    const candidate = reactivationPseudoCandidate(`${"a".repeat(37)} ${"b".repeat(2)}`, 0);
+
+    expect(candidate).toBe(`${"a".repeat(37)}OG`);
+  });
+});
