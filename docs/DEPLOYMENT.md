@@ -395,6 +395,14 @@ Une fois après le déploiement qui l'introduit, renommer les avatars déjà mas
 NODE_ENV=production npm run rotate:hidden-avatars
 ```
 
+De même, une fois après le déploiement qui l'introduit, renommer les avatars
+mis de côté par une demande de suppression encore en attente (détail :
+`docs/features/ACCOUNT_DELETION.md` § Solde ACCOUNT-DELETION-3) :
+
+```bash
+NODE_ENV=production npm run rotate:held-avatars
+```
+
 `NODE_ENV=production` n'est pas décoratif : les scripts `tsx` choisissent leurs
 fichiers d'environnement d'après lui (`lib/server/script-env.ts`), et le shell du
 serveur ne l'exporte pas — seul pm2 le pose. Sans lui, `.env.production` n'est
