@@ -1848,6 +1848,25 @@ export async function releaseIneligibleReferee(
 }
 
 /**
+ * Après le retrait de l'arbitre d'un compte dont la suppression est demandée
+ * (`withdrawUserCasts`, sur la transaction de la demande) : chaque match non
+ * joué qu'il arbitrait est annoncé au staff (ligne anonyme), et, tournoi en
+ * cours, part s'il n'attendait plus que lui — comme `releaseObjectingReferee`.
+ * Les annonces partent au commit de l'appelant (`flushBotLogs`).
+ */
+export async function relaunchAfterRefereeWithdrawal(
+  connection: PoolConnection,
+  matchIds: readonly number[],
+): Promise<void> {
+  for (const matchId of matchIds) {
+    const row = await lockLaunchMatch(connection, matchId);
+    if (!row || row.status === "COMPLETED") continue;
+    queueRefereeChange(connection, { kind: "ACCOUNT_WITHDRAWN", matchId });
+    if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
+  }
+}
+
+/**
  * Retire de ce match l'arbitre dont l'opposition vient d'être retenue
  * (`referee-objection.ts`) — **quel que soit l'état du match tant qu'il n'est
  * pas joué**, lancé compris, contrairement au retrait d'office. Relu sous le

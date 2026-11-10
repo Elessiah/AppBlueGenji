@@ -1,3 +1,5 @@
+import { relaunchAfterRefereeWithdrawal } from "@/lib/server/tournaments/match-launch";
+import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
@@ -10,6 +12,8 @@ jest.mock("@/lib/server/stored-upload-cleanup");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/registration");
 jest.mock("@/lib/server/tournaments/match-casters");
+jest.mock("@/lib/server/tournaments/match-launch", () => ({ relaunchAfterRefereeWithdrawal: jest.fn() }));
+jest.mock("@/lib/server/tournaments/bot-logs", () => ({ flushBotLogs: jest.fn(), discardBotLogs: jest.fn() }));
 jest.mock("@/lib/server/teams/access");
 jest.mock("@/lib/server/teams/dissolution");
 jest.mock("@/lib/server/teams/roster");
@@ -72,6 +76,8 @@ type Options = {
   isAdmin?: boolean;
   /** Autres administrateurs relevés, puis relus sous verrou (`locked`). */
   otherAdmins?: { id: number; locked: { is_admin: 0 | 1; is_deleted: 0 | 1 } | null }[];
+  /** Matchs non joués que le compte arbitre (relevé avant le retrait). */
+  refereedMatches?: number[];
   /** Erreurs levées par les premières transactions (rejeu sur interblocage). */
   transactionErrors?: Error[];
   teams?: number[];
@@ -138,6 +144,9 @@ function fakeDb(options: Options) {
       const failure = options.transactionErrors?.shift();
       if (failure) throw failure;
       return [[{ is_deleted: options.alreadyDeleted ? 1 : 0, is_admin: options.isAdmin ? 1 : 0, created_at: "2025-01-01 10:00:00" }]];
+    }
+    if (q.startsWith("SELECT id FROM bg_matches WHERE referee_user_id = ? AND status <> 'COMPLETED'")) {
+      return [(options.refereedMatches ?? []).map((id) => ({ id }))];
     }
     if (q.startsWith("SELECT id FROM bg_users WHERE is_admin = 1")) {
       return [(options.otherAdmins ?? []).map(({ id }) => ({ id }))];
@@ -342,6 +351,39 @@ describe("requestAccountDeletion — le compte", () => {
     expect(connection.commit).not.toHaveBeenCalled();
     expect(closeUserStreams).not.toHaveBeenCalled();
     expect(forfeitSoloEntriesAfterCommit).not.toHaveBeenCalled();
+  });
+});
+
+// ERREUR.txt (revue EF-21 #526) : un match qui n'attendait plus que l'arbitre
+// part, et le staff est prévenu (ligne anonyme), au commit seulement.
+describe("requestAccountDeletion — arbitrages retirés", () => {
+  it("requestAccountDeletion_refereeOfOpenMatches_relaunchesThemAndFlushesAfterCommit", async () => {
+    const { connection } = fakeDb({ refereedMatches: [4, 9] });
+
+    await requestAccountDeletion(7);
+
+    expect(relaunchAfterRefereeWithdrawal).toHaveBeenCalledWith(connection, [4, 9]);
+    expect(flushBotLogs).toHaveBeenCalledWith(connection);
+    expect(discardBotLogs).not.toHaveBeenCalled();
+    const relaunchOrder = jest.mocked(relaunchAfterRefereeWithdrawal).mock.invocationCallOrder[0];
+    expect(jest.mocked(withdrawUserCasts).mock.invocationCallOrder[0]).toBeLessThan(relaunchOrder);
+    expect(connection.commit.mock.invocationCallOrder[0]).toBeLessThan(jest.mocked(flushBotLogs).mock.invocationCallOrder[0]);
+  });
+
+  it("requestAccountDeletion_noRefereeing_relaunchesNothing", async () => {
+    const { connection } = fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    expect(relaunchAfterRefereeWithdrawal).toHaveBeenCalledWith(connection, []);
+  });
+
+  it("requestAccountDeletion_failureAfterRelaunch_discardsQueuedNotices", async () => {
+    const { connection } = fakeDb({ refereedMatches: [4], failOn: "UPDATE bg_team_invitations" });
+
+    await expect(requestAccountDeletion(7)).rejects.toThrow("DB_DOWN");
+    expect(discardBotLogs).toHaveBeenCalledWith(connection);
+    expect(flushBotLogs).not.toHaveBeenCalled();
   });
 });
 

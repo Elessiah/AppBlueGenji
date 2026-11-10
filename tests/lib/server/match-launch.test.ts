@@ -29,6 +29,7 @@ import {
   releaseMatchCast,
   releaseMatchReferee,
   releaseObjectingReferee,
+  relaunchAfterRefereeWithdrawal,
   setMatchFirstMap,
   setMatchHost,
   setCastSettings,
@@ -1903,6 +1904,51 @@ describe("opposition d'arbitre retenue (`releaseObjectingReferee`, `REFEREE_OBJE
     await releaseObjectingReferee(42, REFEREE);
 
     expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  // ERREUR.txt (revue EF-21 #526) : l'arbitre d'un compte dont la suppression
+  // est demandée est retiré par `withdrawUserCasts` ; le match qui
+  // n'attendait plus que lui part, et le staff est prévenu.
+  it("relaunchAfterRefereeWithdrawal_onlyRefereeMissing_launchesAndQueuesAnonymousNotice", async () => {
+    state.match = matchState({ referee_user_id: null, team1_ready_at: STAMP, team2_ready_at: STAMP });
+
+    await relaunchAfterRefereeWithdrawal(connectionFor(state), [42]);
+
+    expect(state.match?.launched_at).toBe(STAMP);
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), { kind: "ACCOUNT_WITHDRAWN", matchId: 42 });
+  });
+
+  it("relaunchAfterRefereeWithdrawal_teamsNotReady_queuesNoticeWithoutLaunch", async () => {
+    state.match = matchState({ referee_user_id: null });
+
+    await relaunchAfterRefereeWithdrawal(connectionFor(state), [42]);
+
+    expect(state.match?.launched_at).toBeNull();
+    expect(queueRefereeChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("relaunchAfterRefereeWithdrawal_completedMatch_nothingQueued", async () => {
+    state.match = matchState({ referee_user_id: null, status: "COMPLETED" });
+
+    await relaunchAfterRefereeWithdrawal(connectionFor(state), [42]);
+
+    expect(queueRefereeChange).not.toHaveBeenCalled();
+    expect(state.writes).toEqual([]);
+  });
+
+  it("relaunchAfterRefereeWithdrawal_tournamentNotRunning_noticeOnlyNoLaunch", async () => {
+    state.match = matchState({ referee_user_id: null, tournament_state: "REGISTRATION", team1_ready_at: STAMP, team2_ready_at: STAMP });
+
+    await relaunchAfterRefereeWithdrawal(connectionFor(state), [42]);
+
+    expect(state.match?.launched_at).toBeNull();
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), { kind: "ACCOUNT_WITHDRAWN", matchId: 42 });
+  });
+
+  it("relaunchAfterRefereeWithdrawal_noMatch_nothing", async () => {
+    await relaunchAfterRefereeWithdrawal(connectionFor(state), []);
+
+    expect(queueRefereeChange).not.toHaveBeenCalled();
   });
 
   it("releaseObjectingReferee_objectionLiftedMeanwhile_returnsFalseNoWrite", async () => {

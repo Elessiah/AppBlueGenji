@@ -23,7 +23,9 @@ import { invalidateLandingCounters } from "@/lib/server/landing-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { retryOnDeadlock } from "@/lib/server/tournaments/deadlock-retry";
+import { relaunchAfterRefereeWithdrawal } from "@/lib/server/tournaments/match-launch";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { activeSuspensionSql } from "@/lib/server/suspension-sql";
 import { withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
@@ -479,7 +481,14 @@ export async function requestAccountDeletion(
       organizedHandedOver = await handOverOrganizedTournaments(connection, userId, new Set(soloTournaments));
       // Il ne castera ni n'arbitrera plus rien à venir ; les matchs joués gardent
       // leur cast jusqu'à la suppression définitive.
+      // Ses arbitrages de matchs non joués, relevés avant le retrait : chacun
+      // est annoncé au staff, et part s'il n'attendait plus que lui.
+      const [refereed] = await connection.execute<(RowDataPacket & { id: number })[]>(
+        `SELECT id FROM bg_matches WHERE referee_user_id = ? AND status <> 'COMPLETED' ORDER BY id`,
+        [userId],
+      );
       castTournaments = (await withdrawUserCasts(connection, userId, false)).tournamentIds;
+      await relaunchAfterRefereeWithdrawal(connection, refereed.map((row) => Number(row.id)));
       // Ses invitations en attente ne seront acceptées par personne.
       await connection.execute(
         `UPDATE bg_team_invitations SET status = 'CANCELLED', responded_at = NOW()
@@ -510,9 +519,11 @@ export async function requestAccountDeletion(
       await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
       const plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
       await connection.commit();
+      flushBotLogs(connection);
       return plan;
     } catch (error) {
       await connection.rollback().catch(() => {});
+      discardBotLogs(connection);
       throw error;
     } finally {
       connection.release();
