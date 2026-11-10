@@ -9,18 +9,48 @@ export type OwnMatchRoles = Pick<PersonalDataExport, "casts" | "providedStreamLi
 
 type Db = Awaited<ReturnType<typeof getDatabase>>;
 
+/** Colonne récente d'une lecture de l'export : `expr` lue sous le nom `alias`. */
+type OptionalColumn = { expr: string; alias: string };
+
+/** Le nom de colonne qu'une erreur « Unknown column » désigne (`c.ready_at` → `ready_at`). */
+function unknownColumnName(error: unknown): string | undefined {
+  const message = error instanceof Error ? error.message : "";
+  return /Unknown column '(?:[^'.]*\.)?([^']+)'/i.exec(message)?.[1];
+}
+
 /**
- * Une lecture de l'export, tolérée sur une base où sa table ou sa colonne
- * manque encore (migration récente en échec) : rien à rendre plutôt qu'un
- * export refusé — le droit d'accès ne tombe pas pour une colonne.
+ * Une lecture de l'export, tolérée sur une base où sa table ou une colonne
+ * manque encore (migration récente en échec) : le droit d'accès (art. 15) ne
+ * tombe pas pour une colonne. Une colonne **récente** (`optional`) refusée est
+ * retirée seule — lue `NULL` —, les autres lignes et colonnes restent ; une
+ * colonne de base absente, ou la table, rend « rien » plutôt qu'un export
+ * refusé. Toute autre panne remonte. `build` reçoit la liste des colonnes
+ * récentes à lire et la présence de chacune (pour un tri).
  */
-async function tolerantRows<T extends RowDataPacket>(db: Db, sql: string, userId: number): Promise<T[]> {
-  try {
-    const [rows] = await db.execute<T[]>(sql, [userId]);
-    return rows;
-  } catch (error) {
-    if (isMissingTableError(error) || isUnknownColumnError(error)) return [];
-    throw error;
+async function tolerantRows<T extends RowDataPacket>(
+  db: Db,
+  build: (columns: string, has: (alias: string) => boolean) => string,
+  optional: readonly OptionalColumn[],
+  userId: number,
+): Promise<T[]> {
+  let present = [...optional];
+  for (;;) {
+    const columns = optional
+      .map((column) => (present.includes(column) ? `${column.expr} AS ${column.alias}` : `NULL AS ${column.alias}`))
+      .join(", ");
+    const has = (alias: string) => present.some((column) => column.alias === alias);
+    try {
+      const [rows] = await db.execute<T[]>(build(columns, has), [userId]);
+      return rows;
+    } catch (error) {
+      if (isMissingTableError(error)) return [];
+      if (!isUnknownColumnError(error)) throw error;
+      const named = unknownColumnName(error);
+      const refused =
+        named === undefined ? present.at(-1) : present.find((column) => column.expr.replace(/^\w+\./, "") === named);
+      if (refused === undefined) return [];
+      present = present.filter((column) => column !== refused);
+    }
   }
 }
 
@@ -47,32 +77,40 @@ export async function listOwnMatchRoles(userId: number): Promise<OwnMatchRoles> 
     }
   >(
     db,
-    `SELECT c.match_id, m.tournament_id, c.stream_id, c.ready_at, c.created_at, c.cast_battletag
+    (columns, has) => `SELECT c.match_id, m.tournament_id, c.stream_id, ${columns}
        FROM bg_match_casters c
        JOIN bg_matches m ON m.id = c.match_id
       WHERE c.user_id = ?
-      ORDER BY c.created_at, c.match_id`,
+      ORDER BY ${has("created_at") ? "c.created_at, " : ""}c.match_id`,
+    [
+      { expr: "c.ready_at", alias: "ready_at" },
+      { expr: "c.created_at", alias: "created_at" },
+      { expr: "c.cast_battletag", alias: "cast_battletag" },
+    ],
     userId,
   );
   const links = await tolerantRows<
     RowDataPacket & { match_id: number; tournament_id: number; live_url: string | null; created_at: Date | null }
   >(
     db,
-    `SELECT s.match_id, m.tournament_id, s.live_url, s.created_at
+    (columns, has) => `SELECT s.match_id, m.tournament_id, s.live_url, ${columns}
        FROM bg_match_streams s
        JOIN bg_matches m ON m.id = s.match_id
       WHERE s.link_user_id = ?
-      ORDER BY s.created_at, s.match_id`,
+      ORDER BY ${has("created_at") ? "s.created_at, " : ""}s.match_id`,
+    [{ expr: "s.created_at", alias: "created_at" }],
     userId,
   );
   const refereed = await tolerantRows<RowDataPacket & { id: number; tournament_id: number; referee_ready_at: Date | null }>(
     db,
-    `SELECT id, tournament_id, referee_ready_at FROM bg_matches WHERE referee_user_id = ? ORDER BY id`,
+    (columns) => `SELECT id, tournament_id, ${columns} FROM bg_matches WHERE referee_user_id = ? ORDER BY id`,
+    [{ expr: "referee_ready_at", alias: "referee_ready_at" }],
     userId,
   );
   const triggers = await tolerantRows<RowDataPacket & { id: number; tournament_id: number; live_trigger: string | null }>(
     db,
-    `SELECT id, tournament_id, live_trigger FROM bg_matches WHERE live_trigger_user_id = ? ORDER BY id`,
+    (columns) => `SELECT id, tournament_id, ${columns} FROM bg_matches WHERE live_trigger_user_id = ? ORDER BY id`,
+    [{ expr: "live_trigger", alias: "live_trigger" }],
     userId,
   );
   return {
