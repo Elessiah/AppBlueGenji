@@ -318,5 +318,29 @@ describe("POST /api/admin/matches/[matchId]/voice/clear", () => {
     const res = await CLEAR(clearReq({ teamId: 4 }), matchParams("9"));
     expect(res.status).toBe(500);
     expect((await res.json()).error).toBe("VOICE_CLEAR_FAILED");
+    expect(auditStaffAction).not.toHaveBeenCalled();
+  });
+
+  it("clear_staffNotDesignatedReferee_throwsAfterNaming_logsFailedOutcome", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(clearTeamVoiceChannel).mockImplementation(async (_m, _t, _u, beforeClear) => {
+      beforeClear?.(false);
+      throw new Error("boom");
+    });
+    const res = await CLEAR(clearReq({ teamId: 4 }), matchParams("9"));
+    expect(res.status).toBe(500);
+    expect(auditStaffAction).toHaveBeenLastCalledWith("Vidage du salon vocal d'une équipe — match #9 : failed", { id: arbitre.id, pseudo: "ArbitrePseudo" });
+    expect(announceStaffMatchAction).not.toHaveBeenCalled();
+  });
+
+  it("clear_designatedReferee_throws_logsNothing", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(clearTeamVoiceChannel).mockImplementation(async (_m, _t, _u, beforeClear) => {
+      beforeClear?.(true);
+      throw new Error("boom");
+    });
+    const res = await CLEAR(clearReq({ teamId: 4 }), matchParams("9"));
+    expect(res.status).toBe(500);
+    expect(auditStaffAction).not.toHaveBeenCalled();
   });
 });

@@ -1753,12 +1753,12 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     title: "Salons vocaux d'équipe : vidage par l'arbitrage, match reporté",
     links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }],
     summary:
-      "L'arbitrage peut désormais vider le salon vocal d'une équipe, ouvert à qui voit la catégorie des matchs ; un match reporté rend ses salons, rouverts avant sa nouvelle heure. Ni le site ni le bot ne gardent qui se trouve dans un salon, ni combien.",
+      "L'arbitrage peut désormais vider le salon vocal d'une équipe, ouvert à qui voit la catégorie des matchs ; un match reporté rend ses salons, rouverts avant sa nouvelle heure. Le site ne garde ni qui se trouve dans un salon, ni combien, et le bot ne l'enregistre pas.",
     details: [
       "Vidage : un arbitre ou un administrateur qui ne joue pas le match peut vider le salon ouvert d'une équipe ; le bot en déconnecte tous les occupants, qu'il lit dans l'état vocal qu'il tient déjà en mémoire, sans rien en garder, en journaliser ni en dire au site, et le salon reste ouvert. Le journal d'activité du staff sur Discord le note sans nommer son auteur ; les journaux du serveur nomment cet auteur (pseudo et numéro de compte), avec le match et l'issue, sauf s'il est l'arbitre désigné du match, jamais nommé. Le journal d'audit de Discord garde les déconnexions telles que Discord les y inscrit.",
       `Match reporté : un match dont l'horaire repasse à plus de ${VOICE_CHANNEL_LEAD_MINUTES} minutes rend ses salons au bot, qui les supprime une fois vides ; de nouveaux salons s'ouvrent ${VOICE_CHANNEL_LEAD_MINUTES} minutes avant sa nouvelle heure.`,
-      `Ligne du site : elle n'est plus close ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après la création du salon si le bot ne l'a pas repris ; tant que le salon peut encore exister sur Discord, le site le lui rend de nouveau, une fois par heure passé ce délai, puis efface la ligne ${VOICE_ROW_RETENTION_DAYS} jours après sa reprise. Elle ne tient toujours que des numéros de match et d'équipe, l'identifiant du salon et des heures (dont celle d'une panne, et si elle touchait tout le bot) : aucune donnée d'utilisateur.`,
-      "Ce qui ne change pas : rien de nouveau n'est collecté ; c'est toujours au titre de l'intérêt légitime (bon déroulement des tournois).",
+      `Ligne du site : elle n'est plus close ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après la création du salon si le bot ne l'a pas repris ; sans réponse du bot qui le reprend ou dit ne plus le suivre, la ligne reste : un rendu refusé est redemandé une fois par heure passé ce délai, un bot indisponible environ une fois par minute ; la ligne est effacée ${VOICE_ROW_RETENTION_DAYS} jours après cette réponse. Elle ne tient toujours que des numéros de match et d'équipe, l'identifiant du salon et des heures (dont celle d'une panne, et si elle touchait tout le bot) : aucune donnée d'utilisateur.`,
+      "Ce qui ne change pas : aucune donnée de joueur n'est collectée ; c'est toujours au titre de l'intérêt légitime (bon déroulement des tournois).",
     ],
   },
 ];

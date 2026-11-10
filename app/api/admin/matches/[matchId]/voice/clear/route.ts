@@ -36,8 +36,8 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   const teamId = body?.teamId;
   if (typeof teamId !== "number" || !Number.isInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM_ID", 400);
 
+  let named = false;
   try {
-    let named = false;
     const result = await clearTeamVoiceChannel(matchId, teamId, user.id, (designated) => {
       if (designated) return;
       named = true;
@@ -51,6 +51,8 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
     announceStaffMatchAction(matchId, "VOICE_CLEARED");
     return ok({ cleared: true });
   } catch {
+    // Une demande nommée garde toujours son issue, même quand l'appel échoue en route.
+    if (named) auditStaffAction(`Vidage du salon vocal d'une équipe — match #${matchId} : failed`, { id: user.id, pseudo: user.pseudo });
     return fail("VOICE_CLEAR_FAILED", 500);
   }
 }

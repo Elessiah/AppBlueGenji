@@ -919,12 +919,12 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     linkLabels: ["Read the “Team voice channels” paragraph"],
     title: "Team voice channels: clearing by the referees, rescheduled match",
     summary:
-      "Referees can now clear a team's voice channel, which is open to whoever sees the match category; a rescheduled match hands its channels back, reopened before its new time. Neither the site nor the bot keeps who is in a channel, nor how many.",
+      "Referees can now clear a team's voice channel, which is open to whoever sees the match category; a rescheduled match hands its channels back, reopened before its new time. The site keeps neither who is in a channel nor how many, and the bot does not record it.",
     details: [
       "Clearing: a referee or an administrator who does not play the match can clear a team's open channel; the bot disconnects all its occupants, read from the voice state it already holds in memory, without keeping, logging or telling the site anything about them, and the channel stays open. The staff activity log on Discord notes it without naming its author; the server logs name that author (username and account number), with the match and the outcome, unless they are the match's assigned referee, never named. Discord's audit log keeps the disconnections as Discord records them.",
       `Rescheduled match: a match whose time moves back to more than ${VOICE_CHANNEL_LEAD_MINUTES} minutes away hands its channels back to the bot, which deletes them once empty; new channels open ${VOICE_CHANNEL_LEAD_MINUTES} minutes before its new time.`,
-      `The site's record: it is no longer closed ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after the channel was created if the bot has not taken it back; while the channel may still exist on Discord, the site hands it back again, once an hour after that period, then erases the record ${VOICE_ROW_RETENTION_DAYS} days after it is taken back. It still only holds match and team numbers, the channel's identifier and times (including that of an outage, and whether it hit the whole bot): no user data.`,
-      "What stays: nothing new is collected; it still rests on legitimate interest (smooth running of tournaments).",
+      `The site's record: it is no longer closed ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after the channel was created if the bot has not taken it back; without an answer from the bot that takes it back or says it no longer tracks it, the record stays: a refused hand-back is retried once an hour after that period, an unavailable bot about once a minute; the record is erased ${VOICE_ROW_RETENTION_DAYS} days after that answer. It still only holds match and team numbers, the channel's identifier and times (including that of an outage, and whether it hit the whole bot): no user data.`,
+      "What stays: no player data is collected; it still rests on legitimate interest (smooth running of tournaments).",
     ],
   },
 };

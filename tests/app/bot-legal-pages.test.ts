@@ -664,10 +664,14 @@ describe("politique du bot — salons vocaux d'équipe (EF-43, registre T18)", (
         [
           "quand l'arbitrage du site vide le salon d'une équipe, pour en déconnecter tous les occupants (le salon reste ouvert)",
           "Les salons sont ouverts à qui voit la catégorie des matchs",
+          "et les déconnexions d'un vidage, avec leur motif, telles que Discord les y inscrit, pour la durée que Discord fixe",
+          "avec son nom, et les déconnexions d'un vidage.",
         ],
         [
           "when the website's referees clear a team's channel, to disconnect all its occupants (the channel stays open)",
           "The channels are open to whoever sees the match category",
+          "and the disconnections of a clearing, with their reason, as Discord records them, for the period Discord sets",
+          "with its name, and the disconnections of a clearing.",
         ],
       ),
     ).toEqual([]);
