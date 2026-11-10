@@ -474,15 +474,19 @@ describe("shownStreams", () => {
   ];
 
   it("garde le stream du staff et ceux qu'un caster qui compte tient", () => {
-    expect(shownStreams(streams, new Set([3]), false).map((stream) => stream.id)).toEqual([1, 3]);
+    expect(shownStreams(streams, new Set([3]), false, new Set([3])).map((stream) => stream.id)).toEqual([1, 3]);
   });
 
-  it("tait le stream qu'aucun caster qui compte ne tient", () => {
-    expect(shownStreams(streams, new Set(), false).map((stream) => stream.id)).toEqual([1]);
+  it("avant le lancement, un caster qui ne compte plus ne garde pas son stream", () => {
+    expect(shownStreams(streams, new Set(), false, new Set([2])).map((stream) => stream.id)).toEqual([1]);
   });
 
-  it("un match lancé ou joué montre tout", () => {
-    expect(shownStreams(streams, new Set(), true)).toHaveLength(3);
+  it("un match lancé ou joué garde les streams qu'un caster tient, éligible ou non", () => {
+    expect(shownStreams(streams, new Set(), true, new Set([3])).map((stream) => stream.id)).toEqual([1, 3]);
+  });
+
+  it("un match lancé ou joué tait le stream orphelin, que plus aucun caster ne tient (D25)", () => {
+    expect(shownStreams(streams, new Set(), true, new Set()).map((stream) => stream.id)).toEqual([1]);
   });
 });
 

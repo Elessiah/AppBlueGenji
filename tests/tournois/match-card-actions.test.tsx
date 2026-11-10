@@ -101,7 +101,7 @@ describe("matchCardActionList — chaque drapeau donne son action, rien de plus"
     expect(labels({ showSchedule: true })).toEqual(["Programmer une date"]);
     expect(labels({ showSchedule: true, hasStartAt: true })).toEqual(["Modifier la date"]);
     expect(labels({ showLiveConfig: true })).toEqual(["Diffuser ce match"]);
-    expect(labels({ showLiveConfig: true, liveConfigured: true })).toEqual(["Configurer la diffusion"]);
+    expect(labels({ showLiveConfig: true, liveConfigured: true })).toEqual(["Diffusion officielle"]);
     expect(labels({ showCastConfig: true })).toEqual(["Configurer ma diffusion"]);
     // La carte ne porte plus que le retrait d'un **autre** caster, par le staff :
     // « Ne plus caster » vit dans « Configurer ma diffusion ».
@@ -532,5 +532,20 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
     expect(fr.body).toMatch(/« décision du staff »/);
     expect(en.title).toBe("Remove the caster from {match}?");
     expect(en.body).toMatch(/“staff decision”/);
+  });
+});
+
+describe("Diffusion officielle — libellé du staff (D26)", () => {
+  const messages = (locale: string, file: string) =>
+    JSON.parse(readFileSync(join(process.cwd(), "messages", locale, `${file}.json`), "utf8"));
+
+  it("distingue le bouton du staff de « Configurer ma diffusion », en FR et en EN", () => {
+    expect(messages("fr", "tournamentActions").cardActions.configureStream).toBe("Diffusion officielle");
+    expect(messages("en", "tournamentActions").cardActions.configureStream).toBe("Official broadcast");
+  });
+
+  it("titre la fenêtre du même nom", () => {
+    expect(messages("fr", "tournamentDialogs").live.title).toBe("Diffusion officielle");
+    expect(messages("en", "tournamentDialogs").live.title).toBe("Official broadcast");
   });
 });

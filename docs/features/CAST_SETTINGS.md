@@ -18,7 +18,7 @@ Code : `lib/shared/cast-settings.ts` (règles pures),
 | **Caster ce match** | permission `live`, match castable hors du sien, pas déjà caster | `CastClaimDialog` |
 | **Configurer ma diffusion** | **caster inscrit** de ce match, s'il reste quelque chose à régler (`offersCastSettings`) | `CastSettingsDialog` |
 | **Retirer le caster** | permission `tournaments`, et un **autre** caster que le lecteur | confirmation existante (avis au caster, `CAST_NOTICES.md`) |
-| **Diffuser ce match / Configurer la diffusion** | permissions `tournaments` **et** `live` (ses routes, `/api/admin/matches/[id]/live` et la rediff, demandent `live`) | `MatchLiveDialog` (diffusion de l'organisation) |
+| **Diffuser ce match / Diffusion officielle** | permissions `tournaments` **et** `live` (ses routes, `/api/admin/matches/[id]/live` et la rediff, demandent `live`) | `MatchLiveDialog` (diffusion de l'organisation) |
 
 Trois conséquences voulues :
 

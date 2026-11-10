@@ -13,7 +13,8 @@ import {
 import { useShellText } from "@/components/i18n/shell-text";
 import styles from "./toast.module.css";
 
-type ToastType = "error" | "success";
+/** `info` : notice neutre (ni réussite ni échec), bleue, annoncée poliment. */
+type ToastType = "error" | "success" | "info";
 
 /**
  * `lang` : langue du message quand elle diffère de la page (un texte resté en
@@ -33,6 +34,7 @@ interface Toast {
 interface ToastContextValue {
   showError: (message: string, options?: ToastOptions) => void;
   showSuccess: (message: string, options?: ToastOptions) => void;
+  showInfo: (message: string, options?: ToastOptions) => void;
 }
 
 /** Durée d'affichage d'une notification, décompte suspendu exclu. */
@@ -47,8 +49,8 @@ const ToastContext = createContext<ToastContextValue | null>(null);
  * porte un bouton **pause** et un bouton **fermer**, et son décompte se
  * suspend aussi au survol et au focus (WCAG 2.2.1) — un message qui part avant
  * d'être lu n'a rien dit. À l'oreille, deux zones d'annonce **permanentes** et
- * invisibles (`role="status"` pour les réussites, `role="alert"` pour les
- * erreurs) : un lecteur d'écran n'annonce de façon fiable que ce qui change
+ * invisibles (`role="status"` pour les réussites et les notices neutres,
+ * `role="alert"` pour les erreurs) : un lecteur d'écran n'annonce de façon fiable que ce qui change
  * *dans* une zone déjà présente, jamais une zone qui vient d'apparaître — d'où
  * des zones montées une fois, que chaque notification remplit d'une ligne.
  */
@@ -71,17 +73,18 @@ export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
     (message: string, options?: ToastOptions) => add(message, "success", options?.lang),
     [add],
   );
+  const showInfo = useCallback((message: string, options?: ToastOptions) => add(message, "info", options?.lang), [add]);
   // Valeur stable : un objet neuf à chaque rendu du fournisseur — donc à chaque
   // notification ajoutée *et* retirée — re-rendait tous les consommateurs de
   // `useToast`, fiche d'un tournoi et tout son plateau compris.
-  const value = useMemo(() => ({ showError, showSuccess }), [showError, showSuccess]);
+  const value = useMemo(() => ({ showError, showSuccess, showInfo }), [showError, showSuccess, showInfo]);
 
   return (
     <ToastContext.Provider value={value}>
       {children}
       <div /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className="sr-only" role="status" aria-live="polite">
         {toasts
-          .filter((toast) => toast.type === "success")
+          .filter((toast) => toast.type !== "error")
           .map((toast) => (
             <p key={toast.id} lang={toast.lang}>
               {toast.message}
@@ -132,6 +135,13 @@ function isKeyboardFocus(element: Element): boolean {
  * souris laisse le focus sur le bouton cliqué, et le décompte ne reprendrait
  * jamais. La barre de progression lit le même état par `data-paused`.
  */
+/** Préfixe lu au lecteur d'écran devant le message, par sorte de notification. */
+const TOAST_PREFIX_KEY = {
+  error: "toast.errorPrefix",
+  success: "toast.successPrefix",
+  info: "toast.infoPrefix",
+} as const satisfies Record<ToastType, string>;
+
 export function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismiss: (id: number) => void }>) {
   const { t } = useShellText();
   const [override, setOverride] = useState<CountdownOverride>(null);
@@ -169,7 +179,7 @@ export function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismi
     return () => window.clearTimeout(timer);
   }, [paused, dismissSelf]);
 
-  const prefix = t(toast.type === "error" ? "toast.errorPrefix" : "toast.successPrefix");
+  const prefix = t(TOAST_PREFIX_KEY[toast.type]);
 
   return (
     <div

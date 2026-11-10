@@ -33,9 +33,9 @@ describe("firstStreamUrlSql — le premier lien, seule définition", () => {
 
   it("écarte le stream d'un caster qui ne remplit plus la condition, sauf stream du staff ou match lancé/joué", () => {
     const sql = firstStreamUrlSql("m").replace(/\s+/g, " ");
-    expect(sql).toContain("fs.staff_owned = 1 OR m.status = 'COMPLETED'");
+    expect(sql).toContain("fs.staff_owned = 1 OR ((m.status = 'COMPLETED'");
     // Lancé sur son appariement courant seulement, comme l'instantané (`castBeforeLaunch`).
-    expect(sql).toContain("OR (m.launched_at IS NOT NULL AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id))");
+    expect(sql).toContain("OR (m.launched_at IS NOT NULL AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)))");
     expect(sql).toContain("EXISTS (SELECT 1 FROM bg_match_casters fc JOIN bg_users u ON u.id = fc.user_id");
     // La condition du cast, comme `castEligibilityBlock` : identité et permission `live`.
     expect(sql).toContain("COALESCE(u.is_deleted, 0) = 0");
@@ -43,6 +43,13 @@ describe("firstStreamUrlSql — le premier lien, seule définition", () => {
     // Un BattleTag tapé sous un Battle.net qui n'en donnait aucun ne vaut pas (D3).
     expect(sql).toContain("((u.blizzard_sub IS NOT NULL AND u.overwatch_battletag_typed = 0) AND COALESCE(u.overwatch_battletag, '') <> '')");
     expect(sql).toContain(`AND ${LIVE_STAFF_SQL})`);
+  });
+
+  it("un match lancé ou joué ne donne pas le lien d'un stream orphelin (D25)", () => {
+    const sql = firstStreamUrlSql("m").replace(/\s+/g, " ");
+    expect(sql).toContain(
+      "m.team2_id))) AND EXISTS (SELECT 1 FROM bg_match_casters oc WHERE oc.match_id = fs.match_id AND oc.stream_id = fs.id))",
+    );
   });
 });
 

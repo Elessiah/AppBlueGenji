@@ -768,8 +768,8 @@ export type CastTarget = { streamId: number } | { liveUrl: string };
 
 /**
  * Le stream est-il montré ? La règle de `shownStreams` (celle de `mapMatch`) :
- * celui du staff, ou celui d'un match lancé, l'est toujours ; avant le
- * lancement, celui qu'aucun caster éligible ne tient est tu — le rejoindre
+ * celui du staff l'est toujours, celui d'un match lancé tant qu'un caster le
+ * tient ; avant le lancement, celui qu'aucun caster éligible ne tient est tu — le rejoindre
  * ferait réapparaître la chaîne d'un caster que le site ne montre plus. Les
  * casters sont ceux relus avec le match ; leur éligibilité se relit **en une
  * lecture courante** (`LOCK IN SHARE MODE`) : une permission retirée pendant
@@ -783,7 +783,8 @@ async function streamShown(connection: PoolConnection, row: LaunchMatchRow, stre
   if (!stream.staff && !settled && holders.length > 0) {
     held = (await loadEligibleCasterIds(connection, holders, row.tournament_game, true)).size > 0;
   }
-  return shownStreams([stream], held ? new Set([stream.id]) : new Set<number>(), settled).length > 0;
+  const cast = holders.length > 0 ? new Set([stream.id]) : new Set<number>();
+  return shownStreams([stream], held ? new Set([stream.id]) : new Set<number>(), settled, cast).length > 0;
 }
 
 /**

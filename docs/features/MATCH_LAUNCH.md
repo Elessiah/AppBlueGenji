@@ -461,6 +461,10 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   sont lus par l'instantané (`mapMatch`, premier lien tiré des streams — plus de sous-requête par
   match dans `getMatchRows`) et par l'inscription ; l'accueil et l'annonce #live la rejouent en
   SQL (`firstStreamUrlSql`, `CAST_ELIGIBLE_SQL`), un test garde les conditions alignées.
+  Montrés : le stream du staff (lien de l'organisation) ; avant le lancement, celui d'un caster
+  éligible ; un match lancé ou joué, celui que tient encore un caster, éligible ou non. Le stream
+  **orphelin** — que plus aucun caster ne tient — est tu partout, même sur un match joué (D25) :
+  sa chaîne ne devient jamais le lien du match (carte, flux, REST, accueil, annonce #live).
 - **Verrous** : le verrou du match, pris en première instruction, rend la lecture ordinaire des
   casters et des streams suffisante (`lockLaunchMatch`, `held`) — pas de `FOR UPDATE` sur un
   intervalle vide partagé par les matchs voisins ; l'entretien et l'autogestion d'une manche, qui

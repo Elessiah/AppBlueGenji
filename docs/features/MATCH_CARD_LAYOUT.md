@@ -63,7 +63,7 @@ lire les drapeaux déjà calculés (`launchStripControls`, `canToggleOnAir`,
 | Caster ce match | `live`, match castable hors du sien, pas déjà caster | fenêtre d'inscription (`aria-disabled` + motif si identité manquante) |
 | Configurer ma diffusion | **caster inscrit** de ce match (`offersCastSettings`) | `CastSettingsDialog` — lien, antenne, rediff, BattleTag du cast, « Ne plus caster » → `CAST_SETTINGS.md` |
 | Retirer le caster | `tournaments`, et un **autre** caster que le lecteur | `DELETE …/caster` |
-| Diffuser ce match / Configurer la diffusion | `tournaments` | configuration du direct de l'organisation (antenne et rediff comprises) |
+| Diffuser ce match / Diffusion officielle | `tournaments` | configuration du direct de l'organisation (antenne et rediff comprises) |
 | Page du match | tous, sauf sous la page elle-même et sur une exemption | **lien** vers la page du match (`MATCH_PAGE.md`) — la seule action qui navigue |
 | Signaler un problème | engagé inscrit, sur **son** match | signalement |
 

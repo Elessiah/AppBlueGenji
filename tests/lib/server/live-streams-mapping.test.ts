@@ -119,6 +119,23 @@ describe("mapMatch — chaîne du match", () => {
     expect(match.streams).toHaveLength(1);
   });
 
+  it("un match joué tait le stream orphelin et son lien (D25)", () => {
+    const match = mapMatch(matchRow(null, { status: "COMPLETED" }), {
+      streams: [stream(1, "https://twitch.tv/orphelin")],
+      casters: [],
+    });
+    expect(match.liveUrl).toBeNull();
+    expect(match.streams).toEqual([]);
+  });
+
+  it("un match joué garde le lien du stream que tient un caster devenu inéligible", () => {
+    const match = mapMatch(matchRow(null, { status: "COMPLETED" }), {
+      streams: [stream(1, "https://twitch.tv/caster")],
+      casters: [casterRow(1, 1, { is_deleted: 1 })],
+    });
+    expect(match.liveUrl).toBe("https://twitch.tv/caster");
+  });
+
   it("expose le mode et l'antenne tels quels", () => {
     const match = mapMatch(matchRow());
     expect(match.liveTrigger).toBe("AUTO");

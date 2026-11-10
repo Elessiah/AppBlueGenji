@@ -432,21 +432,27 @@ export function streamsHeldByOtherCasters(
 }
 
 /**
- * Les streams qu'un match **montre** : celui du staff, et ceux qu'un caster qui
- * compte encore tient (`heldStreamIds`). Un match lancé ou joué (`settled`) les
- * montre tous : on ne réécrit ni une diffusion en cours ni l'histoire. Le
- * stream d'un caster que le site ne montre plus (permission `live` retirée…)
- * est tu avant le lancement — l'instantané (`mapMatch`) et l'inscription d'un
- * co-caster (`claimMatchCast`) lisent **cette** règle ; l'accueil et l'annonce
- * #live la rejouent en SQL (`firstStreamUrlSql`, `CAST_ELIGIBLE_SQL`), le test
+ * Les streams qu'un match **montre** : celui du staff (le lien de
+ * l'organisation), et ceux qu'un caster tient encore. Avant le lancement, ce
+ * caster doit encore compter (`heldStreamIds`) : le stream d'un caster que le
+ * site ne montre plus (permission `live` retirée…) est tu. Un match lancé ou
+ * joué (`settled`) ne réécrit ni une diffusion en cours ni l'histoire : tout
+ * stream qu'un caster du match tient (`castStreamIds`, éligible ou non) reste ;
+ * seul l'**orphelin** — stream de caster que plus aucun caster ne tient, laissé
+ * hors `pruneMatchStreams` — est tu, pour que sa chaîne ne devienne pas le lien
+ * du match. L'instantané (`mapMatch`) et l'inscription d'un co-caster
+ * (`claimMatchCast`) lisent **cette** règle ; l'accueil et l'annonce #live la
+ * rejouent en SQL (`firstStreamUrlSql`, `CAST_ELIGIBLE_SQL`), le test
  * `match-casters.test.ts` garde les deux alignées.
  */
 export function shownStreams<T extends { id: number; staff: boolean }>(
   streams: readonly T[],
   heldStreamIds: ReadonlySet<number>,
   settled: boolean,
+  castStreamIds: ReadonlySet<number>,
 ): T[] {
-  return settled ? [...streams] : streams.filter((stream) => stream.staff || heldStreamIds.has(stream.id));
+  const held = settled ? castStreamIds : heldStreamIds;
+  return streams.filter((stream) => stream.staff || held.has(stream.id));
 }
 
 /**

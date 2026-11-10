@@ -66,7 +66,7 @@ export type MatchCardActionInput = {
    */
   showCastConfig: boolean;
   /**
-   * « Configurer la diffusion » de l'organisation : permission `tournaments`,
+   * « Diffusion officielle » de l'organisation : permission `tournaments`,
    * avec `live` que ses routes demandent — un porteur de `live` seul qui ne
    * caste pas n'a plus de diffusion à régler.
    */

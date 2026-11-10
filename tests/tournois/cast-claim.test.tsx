@@ -415,10 +415,10 @@ describe("MatchCardActions — branchements du cast", () => {
     expect(card).not.toContain("?? match.casters[0] ?? null");
   });
 
-  it("le caster choisi qui part pendant le choix : un toast le dit, sauf pour le retrait que le lecteur vient de confirmer", () => {
+  it("le caster choisi qui part pendant le choix : une notice neutre le dit, sauf pour le retrait que le lecteur vient de confirmer", () => {
     expectContains(card, [
       "wasShown.current && !shown && releasedCaster === null && !ownRelease.current",
-      '() => showError(t("cardActions.releaseConfirm.gone"))',
+      '() => showInfo(t("cardActions.releaseConfirm.gone"))',
       "markOwnRelease(true);",
     ]);
     // Un retrait refusé laisse la fenêtre ouverte : le départ suivant doit se dire.
