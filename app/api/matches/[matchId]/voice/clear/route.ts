@@ -1,8 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { enforceRateLimit, VOICE_CLEAR_RULE } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
-import { readJsonBody, SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
-import { parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
+import { readVoiceClearRequest } from "@/lib/server/tournaments/voice-clear-request";
 import { clearOwnTeamVoiceChannel } from "@/lib/server/tournaments/match-voice";
 
 /**
@@ -21,12 +20,9 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   const throttled = enforceRateLimit(VOICE_CLEAR_RULE, user.id);
   if (throttled) return throttled;
 
-  const matchId = parseMatchIdParam((await context.params).matchId);
-  if (matchId === null) return fail("INVALID_MATCH_ID", 400);
-
-  const body = (await readJsonBody(req, SMALL_JSON_BODY_MAX_BYTES).catch(() => ({}))) as { teamId?: unknown } | null;
-  const teamId = body?.teamId;
-  if (typeof teamId !== "number" || !Number.isInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM_ID", 400);
+  const read = await readVoiceClearRequest(req, (await context.params).matchId);
+  if ("refusal" in read) return read.refusal;
+  const { matchId, teamId } = read;
 
   try {
     const result = await clearOwnTeamVoiceChannel(matchId, teamId, user.id);

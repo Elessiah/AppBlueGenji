@@ -992,8 +992,8 @@ Deux portes (`docs/features/MATCH_VOICE.md`, décisions D13 et D36) :
   match (`VOICE_CLEAR_IS_PLAYER` → 403) ;
 - **l'équipe** (`POST /api/matches/[matchId]/voice/clear`) : `OWNER`, `MANAGER`
   ou `CAPITAINE` (`canDeclareTeamReady` — le capitaine en est, contrairement à
-  `hasTeamManagementRole`) de son **équipe active**, et pour le seul salon de
-  cette équipe. Non-membre, membre sans ces rôles, équipe adverse, entrée solo :
+  `hasTeamManagementRole`) de l'équipe visée (membre en cours), pour le seul
+  salon de cette équipe ; rôle et salon lus en une instruction. Non-membre, membre sans ces rôles, équipe adverse, entrée solo :
   `VOICE_CLEAR_NOT_TEAM_LEADER` → 403, avant toute lecture du salon. Un membre du
   staff qui joue le match passe par cette porte pour son équipe.
 

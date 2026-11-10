@@ -116,3 +116,33 @@ describe("POST /api/matches/[matchId]/voice/clear", () => {
     expect(auditStaffAction).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /api/matches/[matchId]/voice/clear — lecture du corps", () => {
+  it("clearTeam_bodyTooLarge_returns413", async () => {
+    const res = await POST(clearReq({ teamId: 4, pad: "x".repeat(40 * 1024) }), matchParams("9"));
+    expect(res.status).toBe(413);
+    expect(clearOwnTeamVoiceChannel).not.toHaveBeenCalled();
+  });
+
+  it("clearTeam_notJson_returns415", async () => {
+    const req = new Request("http://localhost/api/matches/9/voice/clear", {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: "teamId=4",
+    });
+    const res = await POST(req, matchParams("9"));
+    expect(res.status).toBe(415);
+    expect(clearOwnTeamVoiceChannel).not.toHaveBeenCalled();
+  });
+
+  it("clearTeam_invalidJson_returns400InvalidTeamId", async () => {
+    const req = new Request("http://localhost/api/matches/9/voice/clear", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{",
+    });
+    const res = await POST(req, matchParams("9"));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "INVALID_TEAM_ID" });
+  });
+});

@@ -29,13 +29,12 @@ import {
   type VoiceCallOutcome,
 } from "@/lib/server/bot-integration";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import { toIso } from "@/lib/server/serialization";
+import { parseRoles, toIso } from "@/lib/server/serialization";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { visibleText } from "@/lib/shared/visible-text";
 import { canToggleRefereeScheduling } from "@/lib/shared/match-planning";
 import { canViewTournament } from "@/lib/shared/tournament-visibility";
 import { canDeclareTeamReady } from "@/lib/shared/match-launch";
-import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import type { TournamentState } from "@/lib/shared/types";
 import {
   VOICE_CHANNEL_LATE_HOURS,
@@ -1247,12 +1246,39 @@ async function clearOpenChannel(matchId: number, channelId: string): Promise<"cl
 export type ClearOwnVoiceResult = "cleared" | "notOpen" | "notLeader" | "unavailable";
 
 /**
+ * Salon ouvert d'une équipe vu par l'un de ses membres, **en une lecture** : la ligne d'appartenance
+ * en cours de l'appelant dans cette équipe (jamais une entrée solo, `solo_user_id IS NULL` ; ses
+ * rôles, jugés par `canDeclareTeamReady`) et, à côté, le salon que la page montre — mêmes
+ * conditions que `CLEARABLE_CHANNEL_SQL` (tournoi en cours à l'option allumée et publié, match
+ * jouable dans sa fenêtre, équipe encore engagée dans le match). Aucune ligne : l'appelant n'est
+ * pas membre de cette équipe. Le rôle et le salon sont lus ensemble : pas de rôle retiré entre
+ * deux lectures.
+ */
+export const TEAM_CLEARABLE_CHANNEL_SQL = `SELECT tm.roles_json,
+       (SELECT v.channel_id
+          FROM bg_match_voice_channels v
+          JOIN bg_matches m ON m.id = v.match_id
+          JOIN bg_tournaments t ON t.id = m.tournament_id
+         WHERE v.match_id = ? AND v.team_id = tm.team_id AND v.released_at IS NULL AND v.channel_id IS NOT NULL
+           AND v.team_id IN (m.team1_id, m.team2_id)
+           AND t.state = 'RUNNING' AND t.team_voice_channels = 1 AND t.start_visibility_at <= NOW()
+           AND m.status IN ('READY', 'AWAITING_CONFIRMATION') AND m.start_at IS NOT NULL
+           AND m.start_at <= NOW() + INTERVAL ${VOICE_CHANNEL_LEAD_MINUTES} MINUTE
+           AND m.start_at >= NOW() - INTERVAL ${VOICE_CHANNEL_LATE_HOURS} HOUR
+         LIMIT 1) AS channel_id
+  FROM bg_team_members tm
+  JOIN bg_teams tt ON tt.id = tm.team_id AND tt.solo_user_id IS NULL
+ WHERE tm.user_id = ? AND tm.team_id = ? AND tm.left_at IS NULL
+ LIMIT 1`;
+
+type TeamClearableRow = RowDataPacket & { roles_json: string | null; channel_id: string | null };
+
+/**
  * Vide le salon ouvert de **sa propre** équipe (décision D36) : réservé à qui la mène en match —
- * `OWNER`, `MANAGER` ou `CAPITAINE` (`canDeclareTeamReady`) de son équipe active, celle que le
- * contexte du lecteur désigne (`myTeamId`). Jamais le salon de l'adversaire, jamais pour une entrée
- * solo (elle n'a ni membre ni rôle) : tout cela rend `notLeader`, **avant** toute lecture du salon
- * (rien n'apprend à un tiers si un salon est ouvert). Le reste suit le vidage par l'arbitrage
- * (`CLEARABLE_CHANNEL_SQL` : tournoi en cours, option allumée, match dans sa fenêtre). Rien n'est
+ * `OWNER`, `MANAGER` ou `CAPITAINE` (`canDeclareTeamReady`, la règle du « Prêt » et du report
+ * de score). Jamais le salon de l'adversaire, jamais pour une entrée solo (elle n'a ni membre ni
+ * rôle) : tout cela rend `notLeader`, sans rien dire du salon (un tiers n'apprend pas s'il est
+ * ouvert). Rôle et salon se lisent en une instruction (`TEAM_CLEARABLE_CHANNEL_SQL`). Rien n'est
  * écrit ni journalisé sur l'auteur (D15) ; aucune écriture en base, donc aucun verrou.
  */
 export async function clearOwnTeamVoiceChannel(
@@ -1260,11 +1286,10 @@ export async function clearOwnTeamVoiceChannel(
   teamId: number,
   userId: number,
 ): Promise<ClearOwnVoiceResult> {
-  const team = await getUserActiveTeam(userId);
-  if (!team || team.teamId !== teamId || !canDeclareTeamReady(team.roles)) return "notLeader";
-  const rows = await run<OpenChannelRow[]>(CLEARABLE_CHANNEL_SQL, [userId, userId, userId, matchId, teamId]);
+  const rows = await run<TeamClearableRow[]>(TEAM_CLEARABLE_CHANNEL_SQL, [matchId, userId, teamId]);
   const row = rows[0];
-  if (!row?.channel_id) return "notOpen";
+  if (!row || !canDeclareTeamReady(parseRoles(row.roles_json))) return "notLeader";
+  if (!row.channel_id) return "notOpen";
   return clearOpenChannel(matchId, row.channel_id);
 }
 
