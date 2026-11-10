@@ -260,6 +260,7 @@ describe("routes du panneau — permission `moderation`", () => {
       hiddenAt: "2026-09-24T10:00:00.000Z",
       purgeAfter: "2027-03-23T10:00:00.000Z",
       closedAt: null,
+      contestOutcome: null,
     });
     const res = await hideLogo(json("http://localhost", "POST", { targetType: "TEAM", targetId: 4 }), params("3"));
     expect(res.status).toBe(201);
@@ -278,6 +279,7 @@ describe("routes du panneau — permission `moderation`", () => {
       hiddenAt: "2026-09-24T10:00:00.000Z",
       purgeAfter: "2027-03-23T10:00:00.000Z",
       closedAt: null,
+      contestOutcome: null,
     });
     const res = await hideLogo(json("http://localhost", "POST", { targetType: "USER", targetId: 9 }), params("3"));
     expect(res.status).toBe(201);
@@ -321,6 +323,7 @@ describe("routes du panneau — permission `moderation`", () => {
       hiddenAt: "2026-09-24T10:00:00.000Z",
       purgeAfter: "2027-03-23T10:00:00.000Z",
       closedAt: "2026-09-24T10:00:00.000Z",
+      contestOutcome: null,
     });
     const res = await deleteReportedLogo(
       json("http://localhost", "POST", { targetType: "TEAM", targetId: 4 }),
@@ -342,6 +345,7 @@ describe("routes du panneau — permission `moderation`", () => {
       hiddenAt: "2026-09-24T10:00:00.000Z",
       purgeAfter: "2027-03-23T10:00:00.000Z",
       closedAt: "2026-09-24T10:00:00.000Z",
+      contestOutcome: null,
     });
     const res = await deleteReportedLogo(
       json("http://localhost", "POST", { targetType: "USER", targetId: 9 }),

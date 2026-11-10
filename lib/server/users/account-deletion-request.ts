@@ -395,7 +395,7 @@ async function settleDeparture(userId: number, departure: TeamDeparture): Promis
  */
 export async function requestAccountDeletion(
   userId: number,
-  options: { requestedAt?: Date; accountCreatedAt?: string } = {},
+  options: { requestedAt?: Date; requestedAtRaw?: string; accountCreatedAt?: string } = {},
 ): Promise<AccountDeletionRequestOutcome> {
   const db = await getDatabase();
   const soloEntryTournaments = await listSoloRegistrationTournamentIds(db, userId);
@@ -415,6 +415,7 @@ export async function requestAccountDeletion(
   // garde la date d'origine : la fenêtre de trente jours ne repart pas à zéro.
   const requestedAt = options.requestedAt ?? new Date();
   let accountCreatedAt = "";
+  let requestedAtRaw: string | undefined;
   try {
     await connection.beginTransaction();
     for (const tournamentId of soloTournaments) await lockTournamentRow(connection, tournamentId);
@@ -453,7 +454,18 @@ export async function requestAccountDeletion(
     // Anonyme dès la demande (décision du 2026-11-04) : pseudo d'emprunt et
     // avatar retiré posés avec le drapeau, le vrai pseudo mis de côté pour la
     // réactivation (`account-deletion-hold.ts`).
-    if (!(await holdAccountIdentity(connection, userId, requestedAt))) throw new Error("USER_NOT_FOUND");
+    // Le rejeu d'une ligne qui porte la date brute de sa demande (D21) la
+    // réécrit telle quelle : convertie depuis l'ISO, elle suivrait le fuseau
+    // du shell du rejeu.
+    if (!(await holdAccountIdentity(connection, userId, options.requestedAtRaw ?? requestedAt))) {
+      throw new Error("USER_NOT_FOUND");
+    }
+    // Relue telle que la base l'a écrite : c'est elle que le journal garde (D21).
+    const [written] = await connection.execute<(RowDataPacket & { deletion_requested_at: string | null })[]>(
+      `SELECT deletion_requested_at FROM bg_users WHERE id = ?`,
+      [userId],
+    );
+    requestedAtRaw = written[0]?.deletion_requested_at == null ? undefined : String(written[0].deletion_requested_at);
     // Le pseudo relevé sur ses signalements est montré à la modération quand
     // le compte n'est plus vivant : il part dès la demande (la cible reste).
     await connection.execute(
@@ -473,7 +485,13 @@ export async function requestAccountDeletion(
   // Demande consignée « en attente » au journal hors base (décision 8 du
   // 2026-11-04) : une restauration d'une sauvegarde antérieure la rejoue. La
   // réactivation la retire ; la suppression définitive écrit la sienne.
-  await recordAccountDeletion({ userId, accountCreatedAt, deletedAt: requestedAt.toISOString(), pending: true });
+  await recordAccountDeletion({
+    userId,
+    accountCreatedAt,
+    deletedAt: requestedAt.toISOString(),
+    pending: true,
+    ...(requestedAtRaw === undefined ? {} : { requestedAt: requestedAtRaw }),
+  });
   await afterDeletionRequest(userId, {
     withdrawn,
     forfeitable,

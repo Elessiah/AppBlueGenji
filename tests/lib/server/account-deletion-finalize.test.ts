@@ -293,6 +293,16 @@ describe("finalizeDueAccountDeletions", () => {
     expect(purged?.[1]).toEqual([7, "/api/uploads/avatars/7-abc.webp", "/uploads/avatars/7-abc.webp"]);
   });
 
+  // D18 / D23 : une suppression dont la contestation a été acceptée ne bloque pas l'image.
+  it("finalizeAccountDeletion_eraseWithHeldAvatar_skipsOverturnedRemovals", async () => {
+    const { execute } = fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, heldAvatar: "/api/uploads/avatars/7-abc.webp" });
+
+    await finalizeAccountDeletion(7);
+
+    const purged = execute.mock.calls.find(([sql]) => String(sql).includes("status = 'PURGED'"));
+    expect(String(purged?.[0])).toContain("AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')");
+  });
+
   it("finalizeAccountDeletion_eraseWithHeldAvatarNeverModerated_doesNotBlock", async () => {
     fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, heldAvatar: "/api/uploads/avatars/7-abc.webp" });
 

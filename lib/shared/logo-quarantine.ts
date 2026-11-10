@@ -51,6 +51,56 @@ export const LOGO_QUARANTINE_STATUS_LABELS: Record<LogoQuarantineStatus, string>
   PURGED: "Supprimé définitivement",
 };
 
+/**
+ * Issue d'une contestation, dite par la modération (décision D22 du
+ * 2026-11-10) : `UPHELD` — décision maintenue —, `OVERTURNED` — contestation
+ * acceptée. `null` : pas d'issue écrite (pas de contestation, ou ligne d'avant
+ * la colonne).
+ */
+export type ContestOutcome = "UPHELD" | "OVERTURNED";
+
+export const CONTEST_OUTCOMES: readonly ContestOutcome[] = ["UPHELD", "OVERTURNED"];
+
+export function isContestOutcome(value: unknown): value is ContestOutcome {
+  return value === "UPHELD" || value === "OVERTURNED";
+}
+
+/**
+ * L'empreinte d'un avatar que la modération supprime est-elle bloquée ?
+ * L'issue écrite de la contestation décide d'abord (D22) : maintenue, bloquée ;
+ * acceptée, jamais — y compris par le staff après un rétablissement impossible
+ * (D23). Sans issue écrite : bloquée par le staff (contestation rejetée, ou
+ * avant l'échéance), et d'office seulement si personne ne l'a contestée — rien
+ * n'y dit alors que la modération l'a écartée (D6).
+ */
+export function removalBlocksHash(input: {
+  byStaff: boolean;
+  outcome: ContestOutcome | null;
+  contested: boolean;
+}): boolean {
+  if (input.outcome === "OVERTURNED") return false;
+  if (input.outcome === "UPHELD") return true;
+  return input.byStaff || !input.contested;
+}
+
+/**
+ * Message du panneau après l'écriture d'une issue (D22). `blocked` : l'état de
+ * blocage de l'image après le geste, `null` quand il est sans objet (image
+ * masquée, logo d'équipe) ; `hashUnknown` : avatar supprimé dont l'empreinte
+ * n'a pas été gardée (ligne d'avant la colonne, fichier déjà absent).
+ */
+export function contestOutcomeMessage(outcome: ContestOutcome, blocked: boolean | null, hashUnknown = false): string {
+  const head = outcome === "OVERTURNED" ? "Contestation acceptée." : "Contestation rejetée : décision maintenue.";
+  if (hashUnknown) return `${head} L'empreinte de cette image n'a pas été gardée : son blocage n'a pas pu changer.`;
+  if (blocked === true) {
+    return outcome === "OVERTURNED"
+      ? `${head} L'image reste bloquée : une autre suppression de la modération la vise encore.`
+      : `${head} L'image est bloquée.`;
+  }
+  if (blocked === false) return `${head} L'image n'est plus bloquée : elle peut être renvoyée.`;
+  return head;
+}
+
 /** Ce qu'une ligne de quarantaine désigne : le logo d'une équipe, ou l'avatar d'un joueur. */
 export type QuarantineTargetType = "TEAM" | "USER";
 
@@ -67,6 +117,8 @@ export interface LogoQuarantineView {
   /** Échéance de la suppression définitive sans contestation. */
   purgeAfter: string;
   closedAt: string | null;
+  /** Issue de la contestation écrite par la modération (D22), `null` sinon. */
+  contestOutcome: ContestOutcome | null;
 }
 
 const PARIS_PARTS = new Intl.DateTimeFormat("en-GB", {

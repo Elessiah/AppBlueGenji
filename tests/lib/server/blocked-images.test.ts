@@ -6,8 +6,17 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getDatabase } from "@/lib/server/database";
-import { blockRemovedImageFiles, hashImageFiles, imageSha256, isBlockedImage } from "@/lib/server/blocked-images";
-import { fakePool, type SqlQuery } from "../../helpers/sql-double";
+import {
+  blockImageHashOn,
+  blockImageHashesSafely,
+  blockRemovedImageFiles,
+  hashImageFiles,
+  imageSha256,
+  isBlockedImage,
+  readImageSha256,
+  unblockImageHashOn,
+} from "@/lib/server/blocked-images";
+import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /*
  * E6 / D6 — l'empreinte d'un avatar supprimé par la modération reste, et refuse
@@ -210,5 +219,84 @@ describe("blockRemovedImageFiles — insertion et fichiers manquants", () => {
     expect(execute.mock.calls[0][1]).toEqual([imageSha256(IMAGE)]);
     expect(String(error.mock.calls[0][0])).toContain("empreinte non bloquée (1 fichier(s))");
     error.mockRestore();
+  });
+});
+
+describe("unblockImageHashOn (D18)", () => {
+  it("unblockImageHashOn_otherUpholdingRemoval_keepsHash", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[{ 1: 1 }], []]);
+
+    expect(await unblockImageHashOn(fakeConnection({ execute }), "abc", 30)).toBe(false);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    const [sql, params] = execute.mock.calls[0];
+    expect(sql).toContain("LOCK IN SHARE MODE");
+    expect(sql).toContain("contest_outcome IS NULL OR contest_outcome = 'UPHELD'");
+    expect(params).toEqual(["abc", 30]);
+  });
+
+  it("unblockImageHashOn_noOtherRemoval_deletesHash", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []]);
+
+    expect(await unblockImageHashOn(fakeConnection({ execute }), "abc", 30)).toBe(true);
+
+    expect(execute.mock.calls[1][0]).toContain("DELETE FROM bg_blocked_image_hashes WHERE sha256 = ?");
+    expect(execute.mock.calls[1][1]).toEqual(["abc"]);
+  });
+
+  it("unblockImageHashOn_missingTable_returnsFalse", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[], []]).mockRejectedValueOnce(missingTable);
+
+    expect(await unblockImageHashOn(fakeConnection({ execute }), "abc", 30)).toBe(false);
+  });
+});
+
+describe("blockImageHashOn (D22)", () => {
+  it("blockImageHashOn_insertsIgnoringDuplicates", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+
+    await blockImageHashOn(fakeConnection({ execute }), "abc");
+
+    expect(execute).toHaveBeenCalledWith("INSERT IGNORE INTO bg_blocked_image_hashes (sha256) VALUES (?)", ["abc"]);
+  });
+});
+
+describe("readImageSha256", () => {
+  it("readImageSha256_existingFile_returnsHash", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "bg-sha-"));
+    const file = join(dir, "a.webp");
+    writeFileSync(file, IMAGE);
+
+    expect(await readImageSha256(file)).toBe(imageSha256(IMAGE));
+  });
+
+  it("readImageSha256_missingFile_returnsNull", async () => {
+    expect(await readImageSha256(join(tmpdir(), "absent-bg-sha.webp"))).toBeNull();
+  });
+});
+
+describe("blockImageHashesSafely", () => {
+  it("blockImageHashesSafely_failsTwice_logsHashesWithoutThrowing", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("pool saturé"));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(blockImageHashesSafely(["abc"])).resolves.toBeUndefined();
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining("abc"), expect.any(Error));
+    logged.mockRestore();
+  });
+
+  it("blockImageHashesSafely_empty_noQuery", async () => {
+    const execute = jest.fn<SqlQuery>();
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await blockImageHashesSafely([]);
+
+    expect(execute).not.toHaveBeenCalled();
   });
 });

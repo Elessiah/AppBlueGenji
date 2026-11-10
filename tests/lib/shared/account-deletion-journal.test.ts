@@ -415,3 +415,48 @@ describe("lignes illisibles gardées (parseJournal.preserved)", () => {
     expect(prunePreservedLines([fresh, expired, fresh], now)).toEqual(['{"a":1}']);
   });
 });
+
+describe("date brute de la demande (D21)", () => {
+  it("formatJournalEntry_pendingWithRequestedAt_writesIt", () => {
+    const line = formatJournalEntry(entry({ pending: true, requestedAt: "2026-09-20 12:00:00" }));
+
+    expect(JSON.parse(line)).toEqual({
+      userId: 7,
+      accountCreatedAt: "2026-01-02 03:04:05",
+      deletedAt: "2026-09-20T10:00:00.000Z",
+      pending: true,
+      requestedAt: "2026-09-20 12:00:00",
+    });
+  });
+
+  it("formatJournalEntry_finalWithRequestedAt_dropsIt", () => {
+    expect(JSON.parse(formatJournalEntry(entry({ requestedAt: "2026-09-20 12:00:00" })))).not.toHaveProperty("requestedAt");
+  });
+
+  it("parseJournal_pendingWithRequestedAt_roundTrips", () => {
+    const written = entry({ pending: true, requestedAt: "2026-09-20 12:00:00" });
+
+    expect(parseJournal(formatJournalEntry(written)).entries).toEqual([written]);
+  });
+
+  it("parseJournal_requestedAtOnFinalLine_rejectedButPreserved", () => {
+    const line = JSON.stringify({ ...entry(), requestedAt: "2026-09-20 12:00:00" });
+
+    const parsed = parseJournal(line);
+
+    expect(parsed.entries).toEqual([]);
+    expect(parsed.preserved.map((kept) => kept.line)).toEqual([line]);
+  });
+
+  it("parseJournal_malformedRequestedAt_rejected", () => {
+    const line = JSON.stringify({ ...entry(), pending: true, requestedAt: "2026-09-20T12:00:00Z" });
+
+    expect(parseJournal(line).entries).toEqual([]);
+  });
+
+  it("parseJournal_oldPendingLineWithoutRequestedAt_stillRead", () => {
+    const old = JSON.stringify({ ...entry(), pending: true });
+
+    expect(parseJournal(old).entries).toEqual([entry({ pending: true })]);
+  });
+});

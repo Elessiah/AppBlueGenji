@@ -58,6 +58,15 @@ export interface AccountDeletionEntry {
    */
   pending?: boolean;
   /**
+   * D'une demande en attente : `deletion_requested_at` **tel que la base l'a
+   * écrit** (`AAAA-MM-JJ HH:MM:SS`, décision D21 du 2026-11-10), relu dans la
+   * transaction de la demande. Le rejeu le réécrit tel quel, sans repasser par
+   * `deletedAt` : convertie dans le fuseau du shell du rejeu, la date ISO
+   * pouvait glisser d'une ou deux heures face à celle de pm2. Absent d'une
+   * ligne plus ancienne : le rejeu retombe sur `deletedAt`.
+   */
+  requestedAt?: string;
+  /**
    * **Réactivation** d'une demande (décision R1 du 2026-11-04) : remplace la
    * ligne en attente, pour qu'une sauvegarde prise pendant les trente jours,
    * restaurée, ne ramène pas le compte en attente de suppression — le rejeu le
@@ -100,6 +109,7 @@ export function formatJournalEntry(entry: AccountDeletionEntry): string {
           accountCreatedAt: entry.accountCreatedAt,
           deletedAt: entry.deletedAt,
           ...(entry.pending ? { pending: true } : {}),
+          ...(entry.pending && entry.requestedAt !== undefined ? { requestedAt: entry.requestedAt } : {}),
         };
   return `${JSON.stringify(line)}\n`;
 }
@@ -136,7 +146,17 @@ function readEntry(value: unknown): AccountDeletionEntry | null {
   }
   if (!isIsoDate(v.deletedAt) || v.reactivatedAt !== undefined || v.undoneRequestAt !== undefined) return null;
   if (v.pending !== undefined && typeof v.pending !== "boolean") return null;
-  return { ...key, deletedAt: v.deletedAt, ...(v.pending ? { pending: true } : {}) };
+  // Date brute d'une demande en attente (D21) : seule forme admise, et
+  // seulement sur une demande — une ligne abîmée là est gardée telle quelle.
+  if (v.requestedAt !== undefined && (v.pending !== true || typeof v.requestedAt !== "string" || !STORED_DATETIME.test(v.requestedAt))) {
+    return null;
+  }
+  return {
+    ...key,
+    deletedAt: v.deletedAt,
+    ...(v.pending ? { pending: true } : {}),
+    ...(typeof v.requestedAt === "string" ? { requestedAt: v.requestedAt } : {}),
+  };
 }
 
 export interface ParsedJournal {
@@ -162,7 +182,16 @@ export interface PreservedJournalLine {
 }
 
 /** Seuls champs qu'une ligne du journal porte : rien qui désigne une personne. */
-const JOURNAL_KEYS = new Set(["userId", "accountCreatedAt", "deletedAt", "pending", "reactivatedAt", "undoneRequestAt", "reactivated"]);
+const JOURNAL_KEYS = new Set([
+  "userId",
+  "accountCreatedAt",
+  "deletedAt",
+  "pending",
+  "requestedAt",
+  "reactivatedAt",
+  "undoneRequestAt",
+  "reactivated",
+]);
 
 /** Date ISO complète, telle que `formatJournalEntry` l'écrit (`toISOString`). */
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;

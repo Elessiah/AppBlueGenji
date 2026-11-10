@@ -17,7 +17,8 @@ const ADMIN_REPORT_ERRORS: Record<string, string> = {
     "Le fichier de ce logo n'existe plus : il n'y a rien à masquer. Utilise « Supprimer le logo » pour vider la fiche.",
   QUARANTINE_NOT_FOUND: "Cette image masquée n'existe plus.",
   QUARANTINE_CLOSED: "Cette image a déjà été rétablie ou supprimée.",
-  TEAM_HAS_NEW_LOGO: "L'équipe a envoyé un nouveau logo depuis : l'ancien ne peut pas le remplacer.",
+  TEAM_HAS_NEW_LOGO:
+    "L'équipe a envoyé un nouveau logo depuis : l'ancien ne peut pas le remplacer. La contestation est notée acceptée.",
   TEAM_NOT_FOUND: "Cette équipe n'existe plus.",
   USER_NOT_TARGETED: "Ce signalement ne vise pas ce joueur.",
   USER_HAS_NO_AVATAR: "Le joueur n'a déjà plus d'avatar.",
@@ -25,7 +26,10 @@ const ADMIN_REPORT_ERRORS: Record<string, string> = {
   AVATAR_NOT_MOVABLE: "Cet avatar n'est pas un fichier du site : il ne peut pas être masqué.",
   AVATAR_FILE_MISSING:
     "Le fichier de cet avatar n'existe plus : il n'y a rien à masquer. Utilise « Supprimer l'avatar » pour vider la fiche.",
-  USER_HAS_NEW_AVATAR: "Le joueur a envoyé un nouvel avatar depuis : l'ancien ne peut pas le remplacer.",
+  USER_HAS_NEW_AVATAR:
+    "Le joueur a envoyé un nouvel avatar depuis : l'ancien ne peut pas le remplacer. La contestation est notée acceptée : le supprimer n'en bloquera pas l'image.",
+  INVALID_CONTEST_OUTCOME: "Issue de contestation inconnue. Recharge la page.",
+  CONTEST_OUTCOME_FAILED: "L'issue de la contestation n'a pas pu être enregistrée.",
   INVALID_TARGET_TYPE: "Cible inconnue.",
   INVALID_TARGET_ID: "Identifiant invalide.",
   REPORTS_LOAD_FAILED: "Les signalements n'ont pas pu être chargés.",

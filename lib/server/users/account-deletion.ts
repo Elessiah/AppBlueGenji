@@ -416,7 +416,8 @@ async function loadQuarantinedAvatarFiles(runner: SqlRunner, userId: number): Pr
  * (quarantaine `PURGED` à son adresse) ? Alors son empreinte est bloquée avant
  * que le fichier ne parte (D6) — un fichier qu'une suppression de modération
  * n'aurait pas pu atteindre (course, écriture refaite) ne s'échappe pas par
- * l'effacement. Un avatar seulement masqué ne l'est pas. Lu sous le verrou du
+ * l'effacement. Un avatar seulement masqué ne l'est pas, ni un avatar dont la
+ * contestation a été acceptée (D18, D23). Lu sous le verrou du
  * compte : la cascade emporte ces lignes.
  */
 async function avatarRemovedByModeration(runner: SqlRunner, userId: number, avatarUrl: string | null): Promise<boolean> {
@@ -424,7 +425,10 @@ async function avatarRemovedByModeration(runner: SqlRunner, userId: number, avat
   if (!disk) return false;
   // Sous ses deux formes, servie et disque, comme `isUploadReferenced`.
   const [rows] = await runner.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_logo_quarantines WHERE user_id = ? AND status = 'PURGED' AND logo_url IN (?, ?) LIMIT 1`,
+    `SELECT 1 FROM bg_logo_quarantines
+      WHERE user_id = ? AND status = 'PURGED' AND logo_url IN (?, ?)
+        AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')
+      LIMIT 1`,
     [userId, toServedUploadUrl(disk), disk],
   );
   return rows.length > 0;

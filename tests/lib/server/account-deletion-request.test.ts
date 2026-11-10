@@ -79,6 +79,8 @@ type Options = {
   organizedLater?: number[];
   organizerSuccessor?: number | null;
   failOn?: string;
+  /** `deletion_requested_at` relue après l'écriture, telle que la base la rend (D21). */
+  storedRequestedAt?: string;
 };
 
 const NO_TRACE = { playedMatches: false, soloRegistrations: false, organizedTournaments: false, ownedTeams: false };
@@ -118,6 +120,9 @@ function fakeDb(options: Options) {
     if (options.failOn && q.startsWith(options.failOn)) throw new Error("DB_DOWN");
     if (q.startsWith("SELECT is_deleted, created_at FROM bg_users")) {
       return [[{ is_deleted: options.alreadyDeleted ? 1 : 0, created_at: "2025-01-01 10:00:00" }]];
+    }
+    if (q.startsWith("SELECT deletion_requested_at FROM bg_users")) {
+      return [options.storedRequestedAt ? [{ deletion_requested_at: options.storedRequestedAt }] : []];
     }
     if (q.startsWith("SELECT tm.team_id")) return [(options.teams ?? []).map((team_id) => ({ team_id }))];
     if (q.startsWith("SELECT logo_url, deleted_at FROM bg_teams")) return [[{ logo_url: "/api/uploads/teams/3.webp", deleted_at: null }]];
@@ -212,6 +217,33 @@ describe("requestAccountDeletion — le compte", () => {
     expect(queries.some((q) => q.sql === "DELETE FROM bg_user_sessions WHERE user_id = ?")).toBe(true);
     expect(connection.commit).toHaveBeenCalled();
     expect(closeUserStreams).toHaveBeenCalledWith(7);
+  });
+
+  // D21 : le journal garde la date telle que la base l'a écrite.
+  it("requestAccountDeletion_nominal_journalsStoredRequestDate", async () => {
+    fakeDb({ storedRequestedAt: "2026-11-10 09:15:00" });
+
+    await requestAccountDeletion(7);
+
+    expect(recordAccountDeletion).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 7, pending: true, requestedAt: "2026-11-10 09:15:00" }),
+    );
+  });
+
+  it("requestAccountDeletion_storedDateUnreadable_journalsWithoutRawDate", async () => {
+    fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    expect(jest.mocked(recordAccountDeletion).mock.calls[0][0]).not.toHaveProperty("requestedAt");
+  });
+
+  it("requestAccountDeletion_replayWithRawDate_holdsRawText", async () => {
+    fakeDb({});
+
+    await requestAccountDeletion(7, { requestedAt: new Date("2026-11-10T08:15:00Z"), requestedAtRaw: "2026-11-10 09:15:00" });
+
+    expect(holdAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7, "2026-11-10 09:15:00");
   });
 
   it("requestAccountDeletion_nominal_cancelsOwnPendingInvitations", async () => {

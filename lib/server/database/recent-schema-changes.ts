@@ -453,6 +453,12 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Son index, à part : l'export (`match-roles-export.ts`) et la suppression
     // d'un compte le cherchent par ce compte.
     `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_live_trigger_user (live_trigger_user_id)`,
+    // ACCOUNT-DELETION (#571, décisions D18, D22, D23) — issue de la
+    // contestation d'une image modérée et empreinte de l'avatar supprimé : nulles
+    // partout au départ (issue inconnue, comportement d'avant).
+    `ALTER TABLE bg_logo_quarantines ADD COLUMN contest_outcome ENUM('UPHELD', 'OVERTURNED') NULL AFTER closed_at`,
+    `ALTER TABLE bg_logo_quarantines ADD COLUMN image_sha256 CHAR(64) NULL AFTER contest_outcome`,
+    `ALTER TABLE bg_logo_quarantines ADD INDEX idx_bg_logo_quarantines_sha (image_sha256)`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

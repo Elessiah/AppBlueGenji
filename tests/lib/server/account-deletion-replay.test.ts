@@ -565,3 +565,52 @@ describe("redatePlan", () => {
     expect(redatePlan(daysAgo(2), null, now)).toEqual({ redate: true, finalize: false });
   });
 });
+
+describe("redatePlan — date brute (D21)", () => {
+  const now = Date.parse("2026-10-10T12:00:00Z");
+
+  it("redatePlan_rawRestoredOlder_redates", () => {
+    const plan = redatePlan(new Date("2026-10-09T10:00:00Z"), "2026-10-01 10:00:00", now, "2026-10-09 12:00:00");
+
+    expect(plan.redate).toBe(true);
+  });
+
+  it("redatePlan_rawRestoredSame_notRedated", () => {
+    const plan = redatePlan(new Date("2026-10-09T10:00:00Z"), "2026-10-09 12:00:00", now, "2026-10-09 12:00:00");
+
+    expect(plan.redate).toBe(false);
+  });
+
+  it("redatePlan_rawComparedAsText_ignoresIsoInstant", () => {
+    // L'instant ISO (10 h UTC) précède la date restaurée lue en heure locale ;
+    // la date brute, plus récente, tranche : on redate.
+    const plan = redatePlan(new Date("2026-10-01T00:00:00Z"), "2026-10-09 11:00:00", now, "2026-10-09 12:00:00");
+
+    expect(plan.redate).toBe(true);
+  });
+});
+
+describe("replayAccountDeletions — date brute de la demande (D21)", () => {
+  const DAY = 24 * 3600 * 1000;
+  const recent = new Date(Math.floor((Date.now() - 2 * DAY) / 1000) * 1000);
+  const pendingRow = { created_at: CREATED, is_deleted: 1, deletion_requested_at: "2026-10-01 10:00:00" };
+
+  it("replayAccountDeletions_rawRequestedAt_writtenVerbatim", async () => {
+    const execute = restoredDb({ 7: pendingRow }, { affectedRows: 1 });
+    const raw: AccountDeletionEntry = { ...entry(7), pending: true, deletedAt: recent.toISOString(), requestedAt: "2099-01-01 00:00:00" };
+
+    await replayAccountDeletions([raw], { log });
+
+    const update = execute.mock.calls.find(([sql]) => sql.startsWith("UPDATE"));
+    expect(update?.[1]).toEqual(["2099-01-01 00:00:00", 7, CREATED, "2099-01-01 00:00:00"]);
+  });
+
+  it("replayAccountDeletions_restoredLiveAccountWithRaw_passesRawToRequest", async () => {
+    restoredDb({ 7: { created_at: CREATED, is_deleted: 0 } });
+    const raw: AccountDeletionEntry = { ...entry(7), pending: true, deletedAt: recent.toISOString(), requestedAt: "2026-10-01 10:00:00" };
+
+    await replayAccountDeletions([raw], { log });
+
+    expect(requestAccountDeletion).toHaveBeenCalledWith(7, expect.objectContaining({ requestedAtRaw: "2026-10-01 10:00:00" }));
+  });
+});

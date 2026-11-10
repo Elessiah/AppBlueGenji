@@ -27,7 +27,7 @@ jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://si
 
 import { copyFile, rename, unlink } from "node:fs/promises";
 import { getDatabase } from "@/lib/server/database";
-import { blockRemovedImageFiles } from "@/lib/server/blocked-images";
+import { blockImageHashOn, blockImageHashesSafely, readImageSha256, unblockImageHashOn } from "@/lib/server/blocked-images";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
@@ -51,6 +51,7 @@ import {
   quarantineDirectory,
   targetContestPending,
   quarantinedLogoFile,
+  recordContestOutcome,
   restoreReportedImage,
 } from "@/lib/server/logo-quarantine";
 import { logoQuarantinePurgeDate } from "@/lib/shared/logo-quarantine";
@@ -100,7 +101,14 @@ beforeEach(() => {
       .storedUploadAbsolutePath,
   );
   jest.mocked(isUploadReferenced).mockResolvedValue(false);
+  // Chaque fichier a son empreinte, dérivée de son nom.
+  jest.mocked(readImageSha256).mockImplementation(async (file) => sha(file));
 });
+
+/** L'empreinte simulée d'un fichier. */
+function sha(file: string): string {
+  return `sha:${path.basename(file)}`;
+}
 
 describe("logoFileLocations", () => {
   it("situe un logo téléversé en ligne et en quarantaine", () => {
@@ -261,9 +269,15 @@ describe("deleteUserAvatarForReport", () => {
 
     // D6 : supprimé par la modération, l'avatar est bloqué avant que le fichier ne parte
     // — et le fichier ne part que si plus rien ne le désigne.
-    expect(blockRemovedImageFiles).toHaveBeenCalledWith([LIVE_AVATAR]);
+    // Bloqué dans la transaction de la décision, empreinte gardée sur la ligne (D18).
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), sha(LIVE_AVATAR));
+    expect((insert?.[1] as unknown[])[7]).toBe(sha(LIVE_AVATAR));
+    expect(jest.mocked(blockImageHashOn).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(connection.commit).mock.invocationCallOrder[0],
+    );
+    expect(blockImageHashesSafely).not.toHaveBeenCalled();
     expect(deleteUnreferencedUpload).toHaveBeenCalledWith(AVATAR, "avatars");
-    expect(jest.mocked(blockRemovedImageFiles).mock.invocationCallOrder[0]).toBeLessThan(
+    expect(jest.mocked(blockImageHashOn).mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(deleteUnreferencedUpload).mock.invocationCallOrder[0],
     );
     expect(view).toEqual(
@@ -305,7 +319,7 @@ describe("deleteUserAvatarForReport", () => {
     expect(connection.execute.mock.calls.some(([sql]) => /UPDATE bg_users SET avatar_url/.test(sql))).toBe(false);
     expect(connection.execute).toHaveBeenCalledWith(expect.stringMatching(/UPDATE bg_account_deletion_holds SET avatar_url = \?/), [null, 9]);
     expect(syncSoloEntryIdentityOn).not.toHaveBeenCalled();
-    expect(blockRemovedImageFiles).toHaveBeenCalledWith([LIVE_AVATAR]);
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), sha(LIVE_AVATAR));
     expect(deleteUnreferencedUpload).toHaveBeenCalledWith(AVATAR, "avatars");
   });
 
@@ -315,7 +329,7 @@ describe("deleteUserAvatarForReport", () => {
     await expect(deleteUserAvatarForReport(12, 9, actor)).rejects.toThrow("USER_HAS_NO_AVATAR");
 
     expect(connection.rollback).toHaveBeenCalled();
-    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
+    expect(blockImageHashOn).not.toHaveBeenCalled();
   });
 
   it("refuse un joueur que le signalement ne vise pas", async () => {
@@ -726,6 +740,44 @@ describe("restoreReportedImage", () => {
     expect(connection.rollback).toHaveBeenCalled();
   });
 
+  // D23 : la contestation est acceptée même si l'avatar ne peut pas revenir —
+  // l'issue est écrite pour que la suppression qui suivra ne bloque rien.
+  it("restoreReportedImage_userHasNewAvatar_recordsOverturned", async () => {
+    install(
+      [[/SET contest_outcome = 'OVERTURNED' WHERE id = \? AND status = 'HIDDEN'/, () => [{ affectedRows: 1 }]]],
+      [
+        [/FROM bg_logo_quarantines q/, () => [[quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR })]]],
+        [/SELECT pseudo, avatar_url, is_deleted FROM bg_users/, () => [[{ pseudo: "Nova", avatar_url: "/api/uploads/avatars/9-new.webp", is_deleted: 0 }]]],
+      ],
+    );
+
+    await expect(restoreReportedImage(30, actor)).rejects.toThrow("USER_HAS_NEW_AVATAR");
+
+    expect(pool.execute).toHaveBeenCalledWith(
+      expect.stringMatching(/SET contest_outcome = 'OVERTURNED' WHERE id = \? AND status = 'HIDDEN'/),
+      [30],
+    );
+  });
+
+  it("restoreReportedImage_success_setsOverturned", async () => {
+    install(
+      [[/FROM bg_team_members tm/, () => [[]]]],
+      [
+        [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[quarantineRow()]]],
+        [/SELECT logo_url FROM bg_teams WHERE id = \? FOR UPDATE/, () => [[{ logo_url: null }]]],
+        [/UPDATE bg_teams SET logo_url = \?/, () => [{}]],
+        [/SET status = 'RESTORED'/, () => [{}]],
+      ],
+    );
+
+    await restoreReportedImage(30, actor);
+
+    expect(connection.execute).toHaveBeenCalledWith(
+      expect.stringMatching(/SET status = 'RESTORED'.*contest_outcome = 'OVERTURNED'/),
+      [30],
+    );
+  });
+
   it("refuse une quarantaine déjà close ou inconnue", async () => {
     install([], [[/FROM bg_logo_quarantines q/, () => [[quarantineRow({ status: "PURGED" })]]]]);
     await expect(restoreReportedImage(30, actor)).rejects.toThrow("QUARANTINE_CLOSED");
@@ -822,7 +874,7 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     await purgeQuarantinedLogo(30, actor);
     expect(unlink).toHaveBeenCalledWith(HIDDEN);
     // Un logo d'équipe n'est pas bloqué (D6 ne vise que l'avatar).
-    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
+    expect(blockImageHashOn).not.toHaveBeenCalled();
     expect(jest.mocked(connection.commit).mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(unlink).mock.invocationCallOrder[0],
     );
@@ -857,11 +909,17 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     await purgeQuarantinedLogo(30, actor);
     await flush();
     expect(unlink).toHaveBeenCalledWith(HIDDEN_AVATAR);
-    // D6 : l'avatar supprimé est bloqué avant que le fichier en quarantaine ne parte.
-    expect(blockRemovedImageFiles).toHaveBeenCalledWith([HIDDEN_AVATAR]);
-    expect(jest.mocked(blockRemovedImageFiles).mock.invocationCallOrder[0]).toBeLessThan(
+    // D6 : l'avatar supprimé est bloqué, dans la transaction qui le supprime,
+    // avant que le fichier en quarantaine ne parte ; son empreinte est gardée (D18).
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), sha(HIDDEN_AVATAR));
+    expect(jest.mocked(blockImageHashOn).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(connection.commit).mock.invocationCallOrder[0],
+    );
+    expect(jest.mocked(connection.commit).mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(unlink).mock.invocationCallOrder[0],
     );
+    const purge = connection.execute.mock.calls.find(([sql]) => /SET status = 'PURGED'/.test(sql));
+    expect(purge?.[1]).toEqual([sha(HIDDEN_AVATAR), 30]);
     const [message, , context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(context).toBe("avatar-removed");
     expect(message).toContain("Ton avatar");
@@ -894,7 +952,7 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     );
     await expect(purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"))).resolves.toBe(2);
     const purged = connection.execute.mock.calls.filter(([sql]) => /SET status = 'PURGED'/.test(sql)).map(([, p]) => p);
-    expect(purged).toEqual([[30], [32]]);
+    expect(purged).toEqual([[null, 30], [null, 32]]);
     expect(publishStaffAction).not.toHaveBeenCalled();
     // À l'échéance, le message du masquage a déjà annoncé la date.
     await flush();
@@ -919,7 +977,10 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     await expect(purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"))).resolves.toBe(1);
 
     expect(unlink).toHaveBeenCalledWith(HIDDEN_AVATAR);
-    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
+    expect(blockImageHashOn).not.toHaveBeenCalled();
+    // L'empreinte reste gardée : une issue « maintenue » écrite après coup la bloquera (D22).
+    const purge = connection.execute.mock.calls.find(([sql]) => /SET status = 'PURGED'/.test(sql));
+    expect(purge?.[1]).toEqual([sha(HIDDEN_AVATAR), 30]);
   });
 
   it("purgeDueQuarantines_uncontestedAvatar_blocksHash", async () => {
@@ -937,7 +998,7 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
 
     await purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"));
 
-    expect(blockRemovedImageFiles).toHaveBeenCalledWith([HIDDEN_AVATAR]);
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), sha(HIDDEN_AVATAR));
   });
 
   // Revue sécurité #571, cycle 2 : une contestation déposée après la relève est
@@ -960,7 +1021,7 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     expect(connection.execute.mock.calls.some(([sql]) => /SET status = 'PURGED'/.test(sql))).toBe(false);
     expect(connection.rollback).toHaveBeenCalled();
     expect(unlink).not.toHaveBeenCalled();
-    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
+    expect(blockImageHashOn).not.toHaveBeenCalled();
   });
 
   // Revue sécurité #571, cycle 3 : sans signalement d'origine, aucune contestation
@@ -979,7 +1040,7 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     await expect(purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"))).resolves.toBe(1);
 
     expect(connection.execute.mock.calls.some(([sql]) => /bg_reports/.test(sql))).toBe(false);
-    expect(blockRemovedImageFiles).toHaveBeenCalledWith([HIDDEN_AVATAR]);
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), sha(HIDDEN_AVATAR));
   });
 
   it("purgeDueQuarantines_contestReread_parameterisedOnReportId", async () => {
@@ -1011,7 +1072,7 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
 
     await expect(purgeQuarantinedLogo(30, actor)).resolves.toBe(true);
 
-    expect(blockRemovedImageFiles).toHaveBeenCalledWith([HIDDEN_AVATAR]);
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), sha(HIDDEN_AVATAR));
   });
 
   it("ne compte pas la contestation de l'auteur du signalement : elle ne défend pas l'image", async () => {
@@ -1036,9 +1097,9 @@ describe("removeModeratedAvatarFile", () => {
 
     await removeModeratedAvatarFile("/api/uploads/avatars/old.name.png");
 
-    expect(blockRemovedImageFiles).toHaveBeenCalledWith([legacy]);
+    expect(blockImageHashesSafely).toHaveBeenCalledWith([sha(legacy)]);
     expect(deleteUnreferencedUpload).toHaveBeenCalledWith("/api/uploads/avatars/old.name.png", "avatars");
-    expect(jest.mocked(blockRemovedImageFiles).mock.invocationCallOrder[0]).toBeLessThan(
+    expect(jest.mocked(blockImageHashesSafely).mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(deleteUnreferencedUpload).mock.invocationCallOrder[0],
     );
   });
@@ -1048,7 +1109,7 @@ describe("removeModeratedAvatarFile", () => {
   it("removeModeratedAvatarFile_sharedFile_neverUnlinksDirectly", async () => {
     await removeModeratedAvatarFile(AVATAR);
 
-    expect(blockRemovedImageFiles).toHaveBeenCalledWith([LIVE_AVATAR]);
+    expect(blockImageHashesSafely).toHaveBeenCalledWith([sha(LIVE_AVATAR)]);
     expect(unlink).not.toHaveBeenCalled();
     expect(deleteUnreferencedUpload).toHaveBeenCalledWith(AVATAR, "avatars");
   });
@@ -1060,7 +1121,7 @@ describe("removeModeratedAvatarFile", () => {
   ])("removeModeratedAvatarFile_notAnAvatarUpload_noop (%s, %s)", async (url) => {
     await removeModeratedAvatarFile(url);
 
-    expect(blockRemovedImageFiles).not.toHaveBeenCalled();
+    expect(blockImageHashesSafely).not.toHaveBeenCalled();
     expect(deleteUnreferencedUpload).not.toHaveBeenCalled();
   });
 });
@@ -1074,7 +1135,7 @@ describe("removeModeratedAvatarFile — fichier partagé", () => {
 
     await removeModeratedAvatarFile(AVATAR);
 
-    expect(blockRemovedImageFiles).toHaveBeenCalledWith([LIVE_AVATAR]);
+    expect(blockImageHashesSafely).toHaveBeenCalledWith([sha(LIVE_AVATAR)]);
     expect(deleteUnreferencedUpload).not.toHaveBeenCalled();
     expect(logged).toHaveBeenCalledWith(expect.stringContaining("fichier gardé et servi"));
     logged.mockRestore();
@@ -1086,9 +1147,129 @@ describe("removeModeratedAvatarFile — fichier partagé", () => {
 
     await removeModeratedAvatarFile(AVATAR);
 
-    expect(blockRemovedImageFiles).toHaveBeenCalledWith([LIVE_AVATAR]);
+    expect(blockImageHashesSafely).toHaveBeenCalledWith([sha(LIVE_AVATAR)]);
     expect(deleteUnreferencedUpload).not.toHaveBeenCalled();
     logged.mockRestore();
+  });
+});
+
+describe("purgeQuarantinedLogo — issue écrite (D22, D23)", () => {
+  const userRow = (outcome: string | null) =>
+    quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR, contest_outcome: outcome });
+
+  it("purgeQuarantinedLogo_staffAfterOverturned_noBlock", async () => {
+    install([], [
+      [/FROM bg_logo_quarantines q/, () => [[userRow("OVERTURNED")]]],
+      [/SET status = 'PURGED'/, () => [{}]],
+    ]);
+
+    await expect(purgeQuarantinedLogo(30, actor)).resolves.toBe(true);
+
+    expect(blockImageHashOn).not.toHaveBeenCalled();
+    expect(unlink).toHaveBeenCalledWith(HIDDEN_AVATAR);
+  });
+
+  it("purgeDueQuarantines_contestedUpheld_blocks", async () => {
+    install(
+      [[/FROM bg_logo_quarantines q\s+LEFT JOIN bg_reports r/, () => [[
+        { id: 30, purge_after: new Date("2026-06-30T00:00:00Z"), report_id: 12, report_status: "RESOLVED", contested: 1 },
+      ]]]],
+      [
+        [/^SELECT id, contest_role FROM bg_reports WHERE parent_report_id = \? LOCK IN SHARE MODE/, () => [[{ id: 60, contest_role: "TARGET" }]]],
+        [/SELECT status FROM bg_reports WHERE id = \? FOR UPDATE/, () => [[{ status: "RESOLVED" }]]],
+        [/FROM bg_logo_quarantines q/, () => [[userRow("UPHELD")]]],
+        [/SET status = 'PURGED'/, () => [{}]],
+      ],
+    );
+
+    await expect(purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"))).resolves.toBe(1);
+
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), sha(HIDDEN_AVATAR));
+  });
+});
+
+describe("recordContestOutcome", () => {
+  const purgedAvatar = (overrides: Record<string, unknown> = {}) =>
+    quarantineRow({
+      target_type: "USER",
+      target_id: 9,
+      target_name: "Nova",
+      logo_url: AVATAR,
+      status: "PURGED",
+      image_sha256: "abc",
+      ...overrides,
+    });
+  const lockRow = (row: unknown): Route => [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[row]]];
+  const writeOutcome: Route = [/UPDATE bg_logo_quarantines SET contest_outcome = \? WHERE id = \?/, () => [{}]];
+
+  it("recordContestOutcome_purgedAvatarOverturned_unblocksInTransaction", async () => {
+    install([], [lockRow(purgedAvatar()), writeOutcome]);
+    jest.mocked(unblockImageHashOn).mockResolvedValue(true);
+
+    const result = await recordContestOutcome(30, "OVERTURNED", actor);
+
+    expect(result).toEqual({ blocked: false, hashUnknown: false });
+    expect(unblockImageHashOn).toHaveBeenCalledWith(expect.anything(), "abc", 30);
+    expect(connection.execute).toHaveBeenCalledWith(expect.stringMatching(/SET contest_outcome = \?/), ["OVERTURNED", 30]);
+    expect(jest.mocked(unblockImageHashOn).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(connection.commit).mock.invocationCallOrder[0],
+    );
+    const [staffLine] = jest.mocked(publishStaffAction).mock.calls[0];
+    expect(staffLine).toContain("acceptée");
+    expect(staffLine).toContain("un joueur");
+    expect(staffLine).not.toContain("Nova");
+  });
+
+  it("recordContestOutcome_purgedAvatarOverturnedOtherRemoval_staysBlocked", async () => {
+    install([], [
+      lockRow(purgedAvatar()),
+      writeOutcome,
+      [/SELECT 1 FROM bg_blocked_image_hashes WHERE sha256 = \?/, () => [[{ 1: 1 }]]],
+    ]);
+    jest.mocked(unblockImageHashOn).mockResolvedValue(false);
+
+    await expect(recordContestOutcome(30, "OVERTURNED", actor)).resolves.toEqual({ blocked: true, hashUnknown: false });
+  });
+
+  it("recordContestOutcome_purgedAvatarUpheld_blocks", async () => {
+    install([], [lockRow(purgedAvatar()), writeOutcome]);
+
+    await expect(recordContestOutcome(30, "UPHELD", actor)).resolves.toEqual({ blocked: true, hashUnknown: false });
+
+    expect(blockImageHashOn).toHaveBeenCalledWith(expect.anything(), "abc");
+    expect(unblockImageHashOn).not.toHaveBeenCalled();
+  });
+
+  it("recordContestOutcome_purgedWithoutSha_hashUnknown", async () => {
+    install([], [lockRow(purgedAvatar({ image_sha256: null })), writeOutcome]);
+
+    await expect(recordContestOutcome(30, "OVERTURNED", actor)).resolves.toEqual({ blocked: null, hashUnknown: true });
+
+    expect(unblockImageHashOn).not.toHaveBeenCalled();
+  });
+
+  it("recordContestOutcome_hiddenAvatar_writesOutcomeOnly", async () => {
+    install([], [lockRow(purgedAvatar({ status: "HIDDEN" })), writeOutcome]);
+
+    await expect(recordContestOutcome(30, "UPHELD", actor)).resolves.toEqual({ blocked: null, hashUnknown: false });
+
+    expect(blockImageHashOn).not.toHaveBeenCalled();
+    expect(connection.commit).toHaveBeenCalled();
+  });
+
+  it("recordContestOutcome_restored_throwsClosed", async () => {
+    install([], [lockRow(purgedAvatar({ status: "RESTORED" }))]);
+
+    await expect(recordContestOutcome(30, "UPHELD", actor)).rejects.toThrow("QUARANTINE_CLOSED");
+
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(publishStaffAction).not.toHaveBeenCalled();
+  });
+
+  it("recordContestOutcome_missing_throwsNotFound", async () => {
+    install([], [[/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[]]]]);
+
+    await expect(recordContestOutcome(30, "UPHELD", actor)).rejects.toThrow("QUARANTINE_NOT_FOUND");
   });
 });
 

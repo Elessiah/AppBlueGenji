@@ -801,9 +801,9 @@ signalement (`deleteUserAvatarForReport`), depuis la fiche
 (`purgeQuarantinedLogo` : contestation rejetée, ou échéance passée **sans
 contestation** — la purge d'office relit échéance et contestation **sous
 verrou** (signalement d'origine verrouillé comme le fait `createContest`) : une
-contestation déposée entre-temps arrête la purge, et un avatar contesté puis
-tranché n'est pas bloqué, l'issue n'étant pas écrite ; le staff qui rejette
-une contestation supprime l'image lui-même, ce qui la bloque) —, après le commit et avant que le fichier ne
+contestation déposée entre-temps arrête la purge, et un avatar contesté suit
+l'issue écrite de sa contestation, § Issue écrite ci-dessous) —, dans la
+transaction qui décide et avant que le fichier ne
 parte (`removeModeratedAvatarFile` / `blockRemovedImageFiles`, ne lèvent
 jamais ; toute adresse du dossier `avatars/`, ancien nom de fichier compris ;
 l'insertion est retentée une fois, puis les empreintes sont consignées dans
@@ -845,21 +845,39 @@ d'emprunt d'un compte en attente (`is_deleted = 1`, `deletion_requested_at`
 posé) au lieu d'en tirer un second : ses adversaires le voient sous ce nom
 depuis la demande. Un doublon (course) retombe sur un tirage.
 
+## Issue écrite d'une contestation (D18, D21, D22, D23 — 2026-11-10)
+
+- **Issue écrite** (D22) : `bg_logo_quarantines.contest_outcome`
+  (`UPHELD` / `OVERTURNED`, `NULL` tant que rien n'est tranché), posée par la
+  modération depuis le signalement (`POST /api/admin/logo-quarantines/[id]/contest-outcome`,
+  permission `moderation` ; boutons « Contestation rejetée » / « Contestation
+  acceptée » de `/admin/signalements`). Un rétablissement réussi l'écrit
+  `OVERTURNED` ; un rétablissement refusé parce que la cible a déjà une autre
+  image (`USER_HAS_NEW_AVATAR`, `TEAM_HAS_NEW_LOGO`) aussi (D23).
+- **La purge suit l'issue** (`removalBlocksHash`) : `UPHELD` → empreinte
+  bloquée, `OVERTURNED` → jamais, qu'elle vienne du staff ou de la passe
+  d'office ; sans issue, comme avant (le staff bloque ; la passe d'office ne
+  bloque pas un avatar contesté). Le blocage se pose **dans la transaction**
+  qui décide (purge, suppression sans délai), plus après le commit.
+- **Levée du blocage** (D18) : l'empreinte d'un avatar supprimé est gardée sur
+  sa ligne (`image_sha256`, liée au compte jusqu'à la cascade) ; une
+  contestation acceptée **après** la suppression la retire de
+  `bg_blocked_image_hashes`, sauf si une autre suppression non annulée
+  (`PURGED`, issue nulle ou `UPHELD`) porte la même empreinte. Une ligne
+  antérieure sans empreinte ne peut rien lever (`hashUnknown`, dit au staff).
+  L'effacement au jour 30 ignore les suppressions `OVERTURNED`.
+- **Journal** (D21) : une ligne `pending` garde aussi `requestedAt`, la date de
+  la demande **telle que la base l'a écrite** (`AAAA-MM-JJ HH:MM:SS`, relue
+  dans la transaction) ; le rejeu la réécrit telle quelle et la compare texte
+  à texte, quel que soit le fuseau du shell. Les anciennes lignes, sans ce
+  champ, se rejouent comme avant (date ISO).
+- **Gardé tel quel** : un avatar seulement masqué que l'effacement emporte
+  n'est pas bloqué (D19, D6) ; l'avatar par défaut d'un fournisseur n'a pas
+  d'exclusion — la modération ne le supprime pas (D20). L'empreinte
+  perceptuelle (D17) viendra dans un lot à part (`ERREUR.txt`).
+
 ## Décisions requises (ouvertes)
 
-Comportement actuel gardé, à trancher avec la politique D6 :
-
-- Purge d'office d'un avatar **contesté puis tranché** : non bloqué aujourd'hui
-  (l'issue de la contestation n'est pas écrite) — faut-il le bloquer ?
-- Purge par le staff après une contestation **acceptée** dont le
-  rétablissement a échoué (`USER_HAS_NEW_AVATAR`) : bloquée aujourd'hui, l'issue
-  n'étant pas écrite non plus.
-- Avatar par défaut d'un fournisseur (OAuth) : une fois bloqué, il l'est pour
-  tous ceux qui partagent la même image (documenté, inchangé).
-- Suppression **sans délai** (signalement manifestement illicite, fiche) puis
-  contestation **qui aboutit** : `/rgpd` (§ Signalements) dit que l'image « peut
-  être renvoyée », mais son empreinte reste bloquée, sans chemin de levée —
-  lever le blocage à l'issue favorable, ou corriger le texte ?
 - Avatar mis de côté d'un compte en attente : la modération peut désormais le
   masquer ou le supprimer, alors que les conditions v9 publiées (immuables) et
   l'entrée `PRIVACY_CHANGES` du 2026-11-06 disent que la réactivation le rend —

@@ -196,7 +196,17 @@ const COMPLIANCE_TABLES: readonly string[] = [
       hidden_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       purge_after DATETIME NOT NULL,
       closed_at DATETIME NULL,
+      -- Issue de la contestation, dite par la modération (décision D22) :
+      -- UPHELD (décision maintenue) bloque l'empreinte d'un avatar supprimé,
+      -- OVERTURNED (contestation acceptée) la laisse ou la lève (D18, D23).
+      contest_outcome ENUM('UPHELD', 'OVERTURNED') NULL,
+      -- Empreinte SHA-256 de l'avatar supprimé, relevée avant l'effacement du
+      -- fichier : seule trace qui permette de lever (D18) ou de poser après
+      -- coup le blocage quand l'issue arrive une fois le fichier parti.
+      -- Part avec la ligne (cascade du compte).
+      image_sha256 CHAR(64) NULL,
       INDEX idx_bg_logo_quarantines_due (status, purge_after),
+      INDEX idx_bg_logo_quarantines_sha (image_sha256),
       INDEX idx_bg_logo_quarantines_report (report_id),
       INDEX idx_bg_logo_quarantines_team (team_id),
       INDEX idx_bg_logo_quarantines_user (user_id),

@@ -61,7 +61,7 @@ export async function loadTakenAnonymousPseudos(runner: Runner, userId: number):
 export async function holdAccountIdentity(
   connection: PoolConnection,
   userId: number,
-  requestedAt: Date,
+  requestedAt: Date | string,
 ): Promise<boolean> {
   const [rows] = await connection.execute<(RowDataPacket & { pseudo: string; avatar_url: string | null })[]>(
     `SELECT pseudo, avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,

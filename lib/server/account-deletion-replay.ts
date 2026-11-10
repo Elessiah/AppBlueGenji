@@ -169,9 +169,15 @@ export function redatePlan(
   journalAt: Date,
   restoredAt: string | null,
   now: number = Date.now(),
+  journalRaw?: string,
 ): { redate: boolean; finalize: boolean } {
   const restored = restoredAt === null ? Number.NaN : new Date(restoredAt).getTime();
-  const restoredNewer = Number.isFinite(restored) && restored >= journalAt.getTime();
+  // Avec la date brute de la demande (D21), la comparaison se fait texte à
+  // texte (`AAAA-MM-JJ HH:MM:SS`, ordre chronologique), sans fuseau.
+  const restoredNewer =
+    journalRaw !== undefined && restoredAt !== null
+      ? restoredAt >= journalRaw
+      : Number.isFinite(restored) && restored >= journalAt.getTime();
   const effective = restoredNewer ? new Date(restored) : journalAt;
   return { redate: !restoredNewer, finalize: !isReactivationWindowOpen(effective, now) };
 }
@@ -193,8 +199,11 @@ async function handleRedate(
   log: (line: string) => void,
   dryRun: boolean,
 ): Promise<void> {
-  const requestedAt = toWholeSecond(new Date(entry.deletedAt));
-  const plan = redatePlan(requestedAt, restored?.deletionRequestedAt ?? null);
+  // La date brute de la demande (D21), réécrite telle quelle ; une ligne
+  // d'avant elle retombe sur l'instant ISO, converti dans le fuseau du rejeu.
+  const journalAt = toWholeSecond(new Date(entry.deletedAt));
+  const requestedAt: Date | string = entry.requestedAt ?? journalAt;
+  const plan = redatePlan(journalAt, restored?.deletionRequestedAt ?? null, Date.now(), entry.requestedAt);
   if (dryRun) {
     simulateRedate(entry, plan, report, log);
     return;
@@ -321,6 +330,7 @@ async function requestRestoredLiveAccount(entry: AccountDeletionEntry): Promise<
   try {
     await requestAccountDeletion(entry.userId, {
       requestedAt: new Date(entry.deletedAt),
+      requestedAtRaw: entry.requestedAt,
       accountCreatedAt: entry.accountCreatedAt,
     });
   } catch (error) {
@@ -342,6 +352,7 @@ async function replayDeletion(
     if (entry.pending && isReactivationWindowOpen(entry.deletedAt)) {
       await requestAccountDeletion(entry.userId, {
         requestedAt: new Date(entry.deletedAt),
+        requestedAtRaw: entry.requestedAt,
         accountCreatedAt: entry.accountCreatedAt,
       });
       report.replayed += 1;

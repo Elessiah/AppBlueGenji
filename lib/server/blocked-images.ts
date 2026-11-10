@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
 
@@ -117,6 +117,15 @@ export async function blockRemovedImageFiles(absolutePaths: readonly string[]): 
       `[moderation] image supprimée introuvable, empreinte non bloquée (${missing.length} fichier(s)) : ${missing.join(", ")}`,
     );
   }
+  await blockImageHashesSafely(hashes);
+}
+
+/**
+ * Pose ces empreintes déjà calculées — même garantie que
+ * `blockRemovedImageFiles` : **ne lève jamais**, une reprise, puis les
+ * empreintes consignées (pm2) pour une pose à la main.
+ */
+export async function blockImageHashesSafely(hashes: readonly string[]): Promise<void> {
   if (hashes.length === 0) return;
   for (let attempt = 1; attempt <= BLOCK_ATTEMPTS; attempt += 1) {
     try {
@@ -130,6 +139,53 @@ export async function blockRemovedImageFiles(absolutePaths: readonly string[]): 
         );
       }
     }
+  }
+}
+
+/**
+ * L'empreinte d'un fichier, ou `null` s'il ne se lit pas (déjà parti) — lue
+ * avant l'effacement, pour être gardée sur la ligne de la décision
+ * (`bg_logo_quarantines.image_sha256`, décisions D18 et D22).
+ */
+export async function readImageSha256(absolutePath: string): Promise<string | null> {
+  return readFile(absolutePath).then(
+    (content) => imageSha256(content),
+    () => null,
+  );
+}
+
+/** Ce qu'il faut pour écrire dans la transaction de l'appelant. */
+type Executor = Pick<PoolConnection, "execute">;
+
+/** Bloque une empreinte, dans la transaction de l'appelant (issue « maintenue » écrite après coup, D22). */
+export async function blockImageHashOn(connection: Executor, sha256: string): Promise<void> {
+  await ignoreMissingTable(connection.execute(`INSERT IGNORE INTO bg_blocked_image_hashes (sha256) VALUES (?)`, [sha256]));
+}
+
+/**
+ * Lève le blocage d'une empreinte (contestation acceptée, D18), dans la
+ * transaction de l'appelant — sauf si une **autre** suppression de modération
+ * de la même image le justifie encore (ligne `PURGED` dont l'issue n'est pas
+ * « acceptée »), relue en lecture courante : une suppression commitée pendant
+ * l'attente est vue. Rend `true` si l'empreinte a été retirée.
+ */
+export async function unblockImageHashOn(connection: Executor, sha256: string, exceptQuarantineId: number): Promise<boolean> {
+  const [others] = await connection.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_logo_quarantines
+      WHERE image_sha256 = ? AND id <> ? AND status = 'PURGED'
+        AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')
+      LIMIT 1 LOCK IN SHARE MODE`,
+    [sha256, exceptQuarantineId],
+  );
+  if (others.length > 0) return false;
+  try {
+    const [result] = await connection.execute<ResultSetHeader>(`DELETE FROM bg_blocked_image_hashes WHERE sha256 = ?`, [
+      sha256,
+    ]);
+    return Number(result.affectedRows) > 0;
+  } catch (error) {
+    if (isMissingTableError(error)) return false;
+    throw error;
   }
 }
 
