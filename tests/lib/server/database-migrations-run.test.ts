@@ -970,13 +970,15 @@ describe("getDatabase — rattrapage des comptes supprimés", () => {
     expect(namedLocks[0]).toEqual(["bg_due_account_deletions", 0]);
   });
 
-  it("passe son tour, sans bruit, quand un autre processus tient le verrou", async () => {
+  it("passe son tour, et le dit, quand un autre processus tient le verrou", async () => {
     const infoSpy = jest.spyOn(console, "info").mockImplementation(() => undefined);
     try {
       const reconcile = await runOnServer(async () => ({ erased: 1, renamed: 0, failed: 0 }), true);
 
       expect(reconcile).not.toHaveBeenCalled();
-      expect(infoSpy).not.toHaveBeenCalled();
+      expect(infoSpy).toHaveBeenCalledWith(
+        "[deleted-accounts] Rattrapage de démarrage laissé à un autre processus (verrou tenu).",
+      );
       expect(errorSpy).not.toHaveBeenCalled();
     } finally {
       infoSpy.mockRestore();

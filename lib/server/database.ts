@@ -182,7 +182,10 @@ async function reconcileDeletedAccountsExclusively(
   try {
     return await withNamedLock(pool, DUE_DELETIONS_LOCK_NAME, 0, () => reconcile());
   } catch (error) {
-    if (error instanceof NamedLockUnavailableError) return { erased: 0, renamed: 0, failed: 0 };
+    if (error instanceof NamedLockUnavailableError) {
+      console.info("[deleted-accounts] Rattrapage de démarrage laissé à un autre processus (verrou tenu).");
+      return { erased: 0, renamed: 0, failed: 0 };
+    }
     throw error;
   }
 }

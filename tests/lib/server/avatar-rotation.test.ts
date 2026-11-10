@@ -350,6 +350,28 @@ describe("rotateHeldAvatarFile", () => {
     expect(renameMock).toHaveBeenCalledTimes(1);
   });
 
+  // Masqué par la modération entre le renommage et l'écriture : la quarantaine
+  // désigne l'ancienne adresse, que son rétablissement redésignera.
+  it("rotateHeldAvatarFile_avatarHiddenMeanwhile_putsFileBackForItsQuarantine", async () => {
+    mockHold(OLD_URL, 0, [null, null]);
+    referencedMock.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+    expect(await rotateHeldAvatarFile(42)).toBeNull();
+
+    expect(renameMock).toHaveBeenCalledTimes(2);
+    expect(unlinkMock).not.toHaveBeenCalled();
+  });
+
+  it("rotateHeldAvatarFile_referencesUnreadableOnUndo_putsFileBack", async () => {
+    mockHold(OLD_URL, 0, [null, null]);
+    referencedMock.mockResolvedValueOnce(false).mockRejectedValueOnce(new Error("DB_DOWN"));
+
+    expect(await rotateHeldAvatarFile(42)).toBeNull();
+
+    expect(renameMock).toHaveBeenCalledTimes(2);
+    expect(unlinkMock).not.toHaveBeenCalled();
+  });
+
   it("rotateHeldAvatarFile_databaseDownOnWrite_putsFileBackAndPropagates", async () => {
     const execute = jest
       .fn<SqlQuery>()

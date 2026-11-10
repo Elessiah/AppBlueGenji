@@ -311,6 +311,23 @@ describe("finalizeDueAccountDeletions", () => {
     expect(dueCalls[1][1]).toContain(5151);
   });
 
+  // Un écart d'horloge ne repousse pas la suppression de six heures : le
+  // compte revient au relevé dès que le passage horaire suivant est dépassé.
+  it("finalizeDueAccountDeletions_nothingDone_backInQueueAfterNinetyMinutes", async () => {
+    jest.useFakeTimers({ now: new Date("2026-11-10T10:00:00Z") });
+    try {
+      const { execute } = fakeDb({ locked: { is_deleted: 0, deletion_requested_at: null }, due: [7171] });
+      await finalizeDueAccountDeletions();
+      jest.setSystemTime(new Date("2026-11-10T11:31:00Z"));
+      await finalizeDueAccountDeletions();
+
+      const dueCalls = execute.mock.calls.filter(([sql]) => String(sql).includes("deletion_requested_at IS NOT NULL"));
+      expect(dueCalls[1][1]).not.toContain(7171);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("finalizeDueAccountDeletions_finalizedAccount_notSidelined", async () => {
     const { execute } = fakeDb({ locked: { is_deleted: 1, deletion_requested_at: DUE }, due: [6161] });
 

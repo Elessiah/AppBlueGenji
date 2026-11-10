@@ -112,14 +112,21 @@ export async function peekReactivationTicket(
 }
 
 /**
- * Retire le ticket désigné par ce jeton (« Ne pas réactiver ») : sur un poste
- * partagé, le cookie ne doit pas rester utilisable jusqu'à son terme. Sans
- * effet sur la demande, qui suit son cours. Jeton absent ou mal formé : rien.
+ * « Ne pas réactiver » : retire le ticket désigné par ce jeton **et tous ceux
+ * du même compte** — le titulaire vient de dire non, et un ticket resté dans
+ * le cookie d'un autre poste (onglet fermé sans répondre) ne doit pas rester
+ * utilisable jusqu'à son terme. Sans effet sur la demande, qui suit son cours.
+ * Jeton absent, mal formé ou inconnu : rien.
  */
 export async function discardReactivationTicket(token: string | undefined): Promise<void> {
   if (!token || !/^[0-9a-f]{64}$/.test(token)) return;
   const db = await getDatabase();
-  await db.execute(`DELETE FROM bg_account_reactivation_tickets WHERE token_hash = ?`, [hashTicket(token)]);
+  const [rows] = await db.execute<(RowDataPacket & { user_id: number })[]>(
+    `SELECT user_id FROM bg_account_reactivation_tickets WHERE token_hash = ? LIMIT 1`,
+    [hashTicket(token)],
+  );
+  if (rows.length === 0) return;
+  await db.execute(`DELETE FROM bg_account_reactivation_tickets WHERE user_id = ?`, [Number(rows[0].user_id)]);
 }
 
 /**

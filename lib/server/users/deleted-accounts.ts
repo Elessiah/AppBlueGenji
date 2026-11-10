@@ -219,9 +219,15 @@ async function reconcileOneAccount(
   }
 }
 
-/** Les comptes dont la finalisation a échoué, et quand : écartés de la file un temps. */
+/** Les comptes écartés de la file, et jusqu'à quand (échec, ou rien à faire encore). */
 const failedFinalizations = new Map<number, number>();
 const FAILED_FINALIZATION_BACKOFF_MS = 6 * 60 * 60 * 1000;
+/**
+ * Compte « dû » pour SQL mais pas encore pour l'horloge de Node : écarté le
+ * temps d'un passage seulement (le passage est horaire) — il ne doit pas être
+ * finalisé des heures après l'échéance annoncée pour un écart d'horloge.
+ */
+const IDLE_FINALIZATION_BACKOFF_MS = 90 * 60 * 1000;
 
 /**
  * Les suppressions demandées il y a trente jours ou plus, rendues définitives
@@ -237,8 +243,8 @@ export async function finalizeDueAccountDeletions(): Promise<{ finalized: number
   // les comptes suivants ne seraient jamais finalisés. Écarté pour
   // `FAILED_FINALIZATION_BACKOFF_MS`, il repasse ensuite (par processus).
   const now = Date.now();
-  for (const [id, failedAt] of failedFinalizations) {
-    if (now - failedAt >= FAILED_FINALIZATION_BACKOFF_MS) failedFinalizations.delete(id);
+  for (const [id, retryAt] of failedFinalizations) {
+    if (now >= retryAt) failedFinalizations.delete(id);
   }
   const skipped = [...failedFinalizations.keys()];
   const [due] = await db.execute<(RowDataPacket & { id: number })[]>(
@@ -267,12 +273,12 @@ export async function finalizeDueAccountDeletions(): Promise<{ finalized: number
       if ((await finalizeAccountDeletion(Number(row.id))) !== null) outcome.finalized += 1;
       // Dû pour SQL (`NOW()`), pas encore pour l'horloge de Node relue sous le
       // verrou (fuseaux différents), ou réactivé à l'instant : rien n'est fait.
-      // Écarté un temps lui aussi, sans quoi cent comptes de ce genre
+      // Écarté un passage lui aussi, sans quoi cent comptes de ce genre
       // occuperaient chaque heure les cent places du relevé.
-      else failedFinalizations.set(Number(row.id), Date.now());
+      else failedFinalizations.set(Number(row.id), Date.now() + IDLE_FINALIZATION_BACKOFF_MS);
     } catch (error) {
       outcome.failed += 1;
-      failedFinalizations.set(Number(row.id), Date.now());
+      failedFinalizations.set(Number(row.id), Date.now() + FAILED_FINALIZATION_BACKOFF_MS);
       console.error(
         `[deleted-accounts] Suppression définitive du compte #${Number(row.id)} reportée :`,
         error instanceof Error ? error.message : error,

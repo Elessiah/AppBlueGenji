@@ -953,7 +953,9 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   autre ligne désigne est copié, pas renommé (`isUploadReferenced` avec
   `exceptHoldOf`). Écriture perdue : le fichier est remis en place si le masque
   ou la ligne du compte (réactivation entre-temps) désigne encore l'ancienne
-  adresse, supprimé sinon. Un échec est dit dans pm2, la demande est faite.
+  adresse — ou si une autre ligne la désigne (quarantaine `HIDDEN` d'un avatar
+  masqué entre-temps) —, supprimé sinon. Un échec est dit dans pm2, la demande
+  est faite.
   Seule limite : la copie déjà gardée par un navigateur. Comptes en attente
   **avant** ce lot : `NODE_ENV=production npm run rotate:held-avatars`, une fois.
 - **Jeu de verrous** : seuls les tournois **pas encore commencés** de l'entrée
@@ -965,14 +967,16 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   (`retryOnStaleLockSet`, trois essais ; au dernier, l'issue prudente d'avant).
   Le rattrapage de démarrage verrouille lui aussi les tournois des casts et
   arbitrages **avant** le compte, et tourne derrière le verrou nommé du passage
-  horaire (`bg_due_account_deletions`) : un seul processus à la fois.
+  horaire (`bg_due_account_deletions`) : un seul processus à la fois, celui
+  qui passe son tour le dit (`console.info`).
 - **Accueil et #live** : `withdrawUserCasts` rend `liveTournamentIds` (tournois
   dont un match touché n'est pas terminé) ; seuls ceux-là sont publiés avec
   `landingLive` — un arbitre ou un lien retiré d'un match joué ne vide plus le
   cache de l'accueil ni ne redemande #live.
 - **Passage horaire** : un compte « dû » pour SQL mais que la finalisation
-  laisse tel quel (horloge de Node, réactivation à l'instant) est écarté six
-  heures comme un échec, au lieu d'occuper une des cent places du relevé.
+  laisse tel quel (horloge de Node, réactivation à l'instant) est écarté le
+  temps d'un passage (90 minutes ; six heures pour un échec), au lieu d'occuper
+  une des cent places du relevé.
 - **Forfaits en tâche de fond** : la réponse de la demande n'attend plus les
   forfaits de l'entrée solo ; la passe horaire reprend ce qui n'aboutit pas.
 - **Rejeu silencieux** : une demande rejouée après restauration n'envoie ni
@@ -993,8 +997,9 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   session impossible après réactivation → `REACTIVATED_LOGIN_REQUIRED` (503),
   l'écran dit la réactivation et renvoie à la connexion ; `pseudoChanged` dit
   dans la notification que le pseudo d'avant n'a pas pu être rendu ; « Ne pas
-  réactiver » (`DELETE /api/auth/reactivate`) retire ticket et cookie et dit
-  que la suppression suit son cours ; sans cookie, l'écran ne parle plus de
+  réactiver » (`DELETE /api/auth/reactivate`) retire le cookie et **tous** les
+  tickets du compte (autres postes compris) et dit que la suppression suit son
+  cours ; sans cookie, l'écran ne parle plus de
   « lien expiré » ; la connexion par code annonce le renvoi et garde son
   formulaire fermé.
 - **Textes** : aperçu `UNKNOWN`, `reactivation.notUndone` (FR + EN), registre

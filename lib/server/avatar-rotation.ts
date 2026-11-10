@@ -207,9 +207,12 @@ export async function rotateHeldAvatarFile(userId: number): Promise<string | nul
  * rien à défaire. L'**ancienne** adresse est encore désignée — par le masque,
  * ou par la ligne du compte qu'une réactivation vient de lui rendre —, ou la
  * relecture est impossible → remis en place : on ne détruit pas ce que la base
- * désigne peut-être encore. Sinon (avatar masqué ou supprimé par la modération
- * entre-temps) le fichier renommé est supprimé : plus rien ne le désigne. Une
- * copie (fichier partagé) est toujours supprimée, l'original n'ayant pas bougé.
+ * désigne peut-être encore. De même si une **autre** ligne la désigne
+ * (`isUploadReferenced` : la quarantaine `HIDDEN` d'un avatar que la modération
+ * vient de masquer, et que son rétablissement redésignera). Sinon (avatar
+ * supprimé par la modération entre-temps) le fichier renommé est supprimé :
+ * plus rien ne le désigne. Une copie (fichier partagé) est toujours supprimée,
+ * l'original n'ayant pas bougé.
  */
 async function undoHeldRotation(
   userId: number,
@@ -234,9 +237,19 @@ async function undoHeldRotation(
   if (designated?.includes(target.url)) return;
   let undo: Promise<void>;
   if (shared) undo = unlink(target.to);
-  else if (designated === undefined || designated.includes(oldUrl)) undo = rename(target.to, target.from);
-  else undo = unlink(target.to);
+  else if (designated === undefined || designated.includes(oldUrl) || (await stillReferenced(oldUrl))) {
+    undo = rename(target.to, target.from);
+  } else undo = unlink(target.to);
   await undo.catch(() => undefined);
+}
+
+/** Une ligne désigne-t-elle encore cette adresse ? Dans le doute (base muette), oui. */
+async function stillReferenced(url: string): Promise<boolean> {
+  try {
+    return await isUploadReferenced(url);
+  } catch {
+    return true;
+  }
 }
 
 /** Cache de l'optimiseur de `next/image` (`distDir` par défaut, celui du projet). */

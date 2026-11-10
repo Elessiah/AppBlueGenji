@@ -152,12 +152,22 @@ describe("createReactivationTicket", () => {
 });
 
 describe("discardReactivationTicket", () => {
-  it("discardReactivationTicket_validToken_deletesThatTicketByHash", async () => {
+  // Le titulaire dit non : un ticket resté sur un autre poste part aussi.
+  it("discardReactivationTicket_validToken_deletesEveryTicketOfThatAccount", async () => {
+    const execute = poolExecute([{ user_id: 7 }]);
+
+    await discardReactivationTicket(TOKEN);
+
+    expect(execute.mock.calls[0][1]).toEqual([TOKEN_HASH]);
+    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_account_reactivation_tickets WHERE user_id = ?", [7]);
+  });
+
+  it("discardReactivationTicket_unknownTicket_deletesNothing", async () => {
     const execute = poolExecute([]);
 
     await discardReactivationTicket(TOKEN);
 
-    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_account_reactivation_tickets WHERE token_hash = ?", [TOKEN_HASH]);
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it("discardReactivationTicket_malformedToken_noQuery", async () => {
