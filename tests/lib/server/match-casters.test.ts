@@ -276,7 +276,7 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
       [{ id: 3, live_url: "https://twitch.tv/match" }, { id: 4, live_url: "https://kick.com/sa-chaine" }],
       [{ user_id: 9, stream_id: 3 }, { user_id: 12, stream_id: 4 }],
     );
-    expect(await withdrawUserCasts(w.connection, 12, true)).toEqual(touched42);
+    expect(await withdrawUserCasts(w.connection, 12, true)).toMatchObject(touched42);
     expect(w.state.locked).toEqual([[42]]);
     expect(w.state.casters).toEqual([{ user_id: 9, stream_id: 3 }]);
     // Le lien de sa chaîne part avec lui ; le stream partagé reste.
@@ -292,7 +292,7 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
 
     expect(w.state.matches.find((m) => m.id === 43)?.live_trigger_user_id).toBeNull();
     expect(w.state.locked).toEqual([[43]]);
-    expect(result).toEqual({ matchIds: [43], tournamentIds: [5] });
+    expect(result).toMatchObject({ matchIds: [43], tournamentIds: [5] });
   });
 
   it("le stream qu'il avait ouvert part, même s'il porte le premier lien du match", async () => {
@@ -315,7 +315,7 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
 
   it("anonymisation : un cast sur un match joué reste, et le match n'est pas rendu comme touché", async () => {
     const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }], true);
-    expect(await withdrawUserCasts(w.connection, 12, false)).toEqual(untouched);
+    expect(await withdrawUserCasts(w.connection, 12, false)).toMatchObject(untouched);
     expect(w.state.casters).toEqual([{ user_id: 12, stream_id: 4 }]);
     expect(w.sqls().some((sql) => sql.startsWith("DELETE"))).toBe(false);
   });
@@ -336,14 +336,14 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
 
   it("effacement : le cast d'un match joué part aussi", async () => {
     const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }], true);
-    expect(await withdrawUserCasts(w.connection, 12, true)).toEqual(touched42);
+    expect(await withdrawUserCasts(w.connection, 12, true)).toMatchObject(touched42);
     expect(w.state.casters).toEqual([]);
     expect(w.state.streams).toEqual([]);
   });
 
   it("ne touche à rien pour un compte qui ne caste rien et n'a fourni aucun lien", async () => {
     const w = world([{ id: 3, live_url: "https://twitch.tv/autre", link_user_id: 9 }], [{ user_id: 9, stream_id: 3 }]);
-    expect(await withdrawUserCasts(w.connection, 12, true)).toEqual(untouched);
+    expect(await withdrawUserCasts(w.connection, 12, true)).toMatchObject(untouched);
     // Les quatre lectures (casts, liens, arbitrages, modes d'antenne), rien d'autre.
     expect(w.execute).toHaveBeenCalledTimes(4);
   });
@@ -355,7 +355,7 @@ describe("withdrawUserCasts — le lien qu'un compte a fourni part avec lui", ()
       [{ id: 3, live_url: null }, { id: 4, live_url: "https://kick.com/sa-chaine", link_user_id: 12 }],
       [{ user_id: 9, stream_id: 3 }, { user_id: 12, stream_id: 4 }],
     );
-    expect(await withdrawUserCasts(w.connection, 12, true)).toEqual(touched42);
+    expect(await withdrawUserCasts(w.connection, 12, true)).toMatchObject(touched42);
     expect(w.state.streams).toEqual([{ id: 3, live_url: null }]);
   });
 
@@ -371,7 +371,7 @@ describe("withdrawUserCasts — le lien qu'un compte a fourni part avec lui", ()
 
   it("co-cast : retiré aussi quand il avait déjà quitté le stream qu'il avait ouvert", async () => {
     const w = world([{ id: 4, live_url: "https://kick.com/sa-chaine", link_user_id: 12 }], [{ user_id: 9, stream_id: 4 }]);
-    expect(await withdrawUserCasts(w.connection, 12, true)).toEqual(touched42);
+    expect(await withdrawUserCasts(w.connection, 12, true)).toMatchObject(touched42);
     expect(w.state.locked).toEqual([[42]]);
     expect(w.state.streams).toEqual([{ id: 4, live_url: null, link_user_id: null }]);
     // Aucune inscription à retirer : le co-caster garde la sienne.
@@ -381,7 +381,7 @@ describe("withdrawUserCasts — le lien qu'un compte a fourni part avec lui", ()
 
   it("anonymisation d'un match joué : il reste inscrit, son lien part quand même", async () => {
     const w = world([{ id: 4, live_url: "https://kick.com/sa-chaine", link_user_id: 12 }], [{ user_id: 12, stream_id: 4 }], true);
-    expect(await withdrawUserCasts(w.connection, 12, false)).toEqual(touched42);
+    expect(await withdrawUserCasts(w.connection, 12, false)).toMatchObject(touched42);
     expect(w.state.casters).toEqual([{ user_id: 12, stream_id: 4 }]);
     expect(w.state.streams).toEqual([{ id: 4, live_url: null, link_user_id: null }]);
   });
@@ -399,7 +399,7 @@ describe("withdrawUserCasts — le lien qu'un compte a fourni part avec lui", ()
   it("le lien qu'un caster (permission `live` seule) a posé dans la configuration du direct part aussi", async () => {
     // Stream du match, lien rattaché au caster : retiré ; sans caster, le stream part.
     const w = world([{ id: 3, live_url: "https://twitch.tv/sa-chaine", staff_owned: 1, link_user_id: 12 }], []);
-    expect(await withdrawUserCasts(w.connection, 12, true)).toEqual(touched42);
+    expect(await withdrawUserCasts(w.connection, 12, true)).toMatchObject(touched42);
     expect(w.state.streams).toEqual([]);
     // Tenu par un autre caster : le stream reste, sans lien.
     const held = world([{ id: 3, live_url: "https://twitch.tv/sa-chaine", staff_owned: 1, link_user_id: 12 }], [{ user_id: 9, stream_id: 3 }]);
@@ -413,7 +413,7 @@ describe("withdrawUserCasts — le lien qu'un compte a fourni part avec lui", ()
     const adminLink = () => ({ id: 3, live_url: "https://twitch.tv/arbitre", staff_owned: 1, link_user_id: 5 });
     for (const includeCompleted of [true, false]) {
       const w = world([adminLink()], [{ user_id: 5, stream_id: 3 }, { user_id: 9, stream_id: 3 }]);
-      expect(await withdrawUserCasts(w.connection, 5, includeCompleted)).toEqual(touched42);
+      expect(await withdrawUserCasts(w.connection, 5, includeCompleted)).toMatchObject(touched42);
       expect(w.state.streams).toEqual([{ id: 3, live_url: null, staff_owned: 1, link_user_id: null }]);
       expect(w.state.casters).toEqual([{ user_id: 9, stream_id: 3 }]);
     }
@@ -459,7 +459,7 @@ describe("withdrawUserCasts — plusieurs matchs, arbitrages", () => {
       false,
       [other(7, 2)],
     );
-    expect(await withdrawUserCasts(w.connection, 12, true)).toEqual({ matchIds: [7, 42], tournamentIds: [2] });
+    expect(await withdrawUserCasts(w.connection, 12, true)).toMatchObject({ matchIds: [7, 42], tournamentIds: [2] });
     expect(w.state.locked).toEqual([[7, 42]]);
     expect(w.sqls().filter((sql) => sql.startsWith("DELETE FROM bg_match_casters"))).toEqual([
       "DELETE FROM bg_match_casters WHERE user_id = ? AND match_id IN (?, ?)",
@@ -469,19 +469,39 @@ describe("withdrawUserCasts — plusieurs matchs, arbitrages", () => {
 
   it("rend chaque tournoi touché une seule fois, dans l'ordre croissant", async () => {
     const w = world([], [{ user_id: 12, stream_id: 3, match_id: 42 }], false, [other(7, 9, 12), other(8, 9, 12)]);
-    expect(await withdrawUserCasts(w.connection, 12, true)).toEqual({ matchIds: [7, 8, 42], tournamentIds: [2, 9] });
+    expect(await withdrawUserCasts(w.connection, 12, true)).toMatchObject({ matchIds: [7, 8, 42], tournamentIds: [2, 9] });
   });
 
   it("arbitre désigné : retiré avec son « Prêt », sans ménage des streams", async () => {
     const w = world([{ id: 3, live_url: null }], [{ user_id: 9, stream_id: 3 }], false, [other(7, 5, 12)]);
-    expect(await withdrawUserCasts(w.connection, 12, false)).toEqual({ matchIds: [7], tournamentIds: [5] });
+    expect(await withdrawUserCasts(w.connection, 12, false)).toMatchObject({ matchIds: [7], tournamentIds: [5] });
     expect(w.state.matches.find((m) => m.id === 7)).toMatchObject({ referee_user_id: null, referee_ready_at: null });
     expect(w.sqls().some((sql) => sql.includes("FROM bg_match_streams WHERE match_id IN"))).toBe(false);
   });
 
+  it("rend à part les arbitrages et casts retirés de matchs non joués", async () => {
+    const w = world([{ id: 3, live_url: null }], [{ user_id: 12, stream_id: 3 }], false, [
+      other(7, 5, 12),
+      { ...other(8, 5, 12), status: "COMPLETED" },
+    ]);
+    const result = await withdrawUserCasts(w.connection, 12, false);
+    expect(result.releasedRefereeMatchIds).toEqual([7]);
+    expect(result.releasedCastMatchIds).toEqual([42]);
+  });
+
+  it("sans rien à retirer, les listes de matchs relâchés sont vides", async () => {
+    const w = world([], [], false, []);
+    expect(await withdrawUserCasts(w.connection, 12, false)).toEqual({
+      matchIds: [],
+      tournamentIds: [],
+      releasedRefereeMatchIds: [],
+      releasedCastMatchIds: [],
+    });
+  });
+
   it("l'arbitrage d'un match joué part aussi à l'anonymisation", async () => {
     const w = world([], [], false, [{ ...other(7, 5, 12), status: "COMPLETED" }]);
-    expect(await withdrawUserCasts(w.connection, 12, false)).toEqual({ matchIds: [7], tournamentIds: [5] });
+    expect(await withdrawUserCasts(w.connection, 12, false)).toMatchObject({ matchIds: [7], tournamentIds: [5] });
     expect(w.state.matches.find((m) => m.id === 7)?.referee_user_id).toBeNull();
   });
 });

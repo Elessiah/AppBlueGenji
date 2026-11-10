@@ -21,8 +21,7 @@ import {
   REACTIVATION_TICKET_MINUTES,
   readPendingDeletion,
 } from "@/lib/server/users/account-reactivation";
-import { isUnknownColumnError } from "@/lib/server/mysql-errors";
-import { isPseudoHeldByOther } from "@/lib/server/users/account-deletion-hold";
+import { isMissingTableError, isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { RECRUITMENT_MODAL_OFF_COOKIE, recruitmentModalOffInBrowser } from "@/lib/shared/recruitment";
 import {
   carryRecruitmentModalOffFromBrowser,
@@ -488,15 +487,25 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
 async function pseudoExists(candidate: string): Promise<boolean> {
   const db = await getDatabase();
   // Un pseudo réservé par un compte en attente de suppression compte comme pris
-  // (sa réactivation le lui rend, `account-deletion-hold.ts`).
-  const [rows] = await db.execute<(RowDataPacket & { c: number })[]>(
-    `SELECT COUNT(*) AS c FROM bg_users WHERE pseudo = ?`,
-    [candidate],
-  );
-  if (Number(rows[0]?.c ?? 0) > 0) return true;
-  // Table des masques absente (`CREATE` en échec) : aucun pseudo n'y a été mis
-  // de côté — l'inscription ne doit pas tomber pour autant.
-  return (await isPseudoHeldByOther(db, candidate, null));
+  // (sa réactivation le lui rend, `account-deletion-hold.ts`) — une seule
+  // requête par candidat, `ensureUniquePseudo` en essaie jusqu'à mille.
+  try {
+    const [rows] = await db.execute<(RowDataPacket & { c: number })[]>(
+      `SELECT (SELECT COUNT(*) FROM bg_users WHERE pseudo = ?)
+            + (SELECT COUNT(*) FROM bg_account_deletion_holds WHERE pseudo = ?) AS c`,
+      [candidate, candidate],
+    );
+    return Number(rows[0]?.c ?? 0) > 0;
+  } catch (error) {
+    // Table des masques absente (`CREATE` en échec) : aucun pseudo n'y a été
+    // mis de côté — l'inscription ne doit pas tomber pour autant.
+    if (!isMissingTableError(error)) throw error;
+    const [rows] = await db.execute<(RowDataPacket & { c: number })[]>(
+      `SELECT COUNT(*) AS c FROM bg_users WHERE pseudo = ?`,
+      [candidate],
+    );
+    return Number(rows[0]?.c ?? 0) > 0;
+  }
 }
 
 export async function ensureUniquePseudo(raw: string): Promise<string> {

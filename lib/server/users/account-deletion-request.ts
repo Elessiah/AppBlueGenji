@@ -396,7 +396,11 @@ async function settleDeparture(userId: number, departure: TeamDeparture): Promis
  */
 async function assertAnotherAdminRemains(connection: PoolConnection, userId: number): Promise<void> {
   const [others] = await connection.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_users WHERE is_admin = 1 AND is_deleted = 0 AND id <> ? ORDER BY id`,
+    // Un administrateur suspendu ne peut ouvrir de session (`assertNotSuspended`) :
+    // il ne compte pas comme un administrateur restant.
+    `SELECT id FROM bg_users u WHERE is_admin = 1 AND is_deleted = 0 AND id <> ?
+        AND NOT EXISTS (SELECT 1 FROM bg_account_suspensions s WHERE s.user_id = u.id AND ${activeSuspensionSql("s")})
+      ORDER BY id`,
     [userId],
   );
   for (const other of others) {
@@ -481,14 +485,18 @@ export async function requestAccountDeletion(
       organizedHandedOver = await handOverOrganizedTournaments(connection, userId, new Set(soloTournaments));
       // Il ne castera ni n'arbitrera plus rien à venir ; les matchs joués gardent
       // leur cast jusqu'à la suppression définitive.
-      // Ses arbitrages de matchs non joués, relevés avant le retrait : chacun
-      // est annoncé au staff, et part s'il n'attendait plus que lui.
-      const [refereed] = await connection.execute<(RowDataPacket & { id: number })[]>(
-        `SELECT id FROM bg_matches WHERE referee_user_id = ? AND status <> 'COMPLETED' ORDER BY id`,
-        [userId],
-      );
-      castTournaments = (await withdrawUserCasts(connection, userId, false)).tournamentIds;
-      await relaunchAfterRefereeWithdrawal(connection, refereed.map((row) => Number(row.id)));
+      // Ses arbitrages de matchs non joués sont annoncés au staff, et un match
+      // qui n'attendait plus que lui (arbitre ou caster) part. Pas au rejeu
+      // d'une restauration : ni annonce ni lancement pendant la remise en état.
+      const withdrawal = await withdrawUserCasts(connection, userId, false);
+      castTournaments = withdrawal.tournamentIds;
+      if (options.accountCreatedAt === undefined) {
+        await relaunchAfterRefereeWithdrawal(
+          connection,
+          withdrawal.releasedRefereeMatchIds,
+          withdrawal.releasedCastMatchIds,
+        );
+      }
       // Ses invitations en attente ne seront acceptées par personne.
       await connection.execute(
         `UPDATE bg_team_invitations SET status = 'CANCELLED', responded_at = NOW()

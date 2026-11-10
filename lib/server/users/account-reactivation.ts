@@ -148,20 +148,20 @@ export async function reactivateAccount(
   if (!token || !/^[0-9a-f]{64}$/.test(token)) return null;
   const db = await getDatabase();
   const tokenHash = hashTicket(token);
+  // Le ticket se lit hors de la transaction : lu dedans, il y figerait
+  // l'instantané (REPEATABLE READ) avant le verrou du compte, et la reprise du
+  // pseudo (`restoreAccountIdentity`) ne verrait pas un renommage commis entre-temps.
+  const [tickets] = await db.execute<(RowDataPacket & { user_id: number; login_event: string })[]>(
+    `SELECT user_id, login_event FROM bg_account_reactivation_tickets
+      WHERE token_hash = ? AND expires_at > NOW() LIMIT 1`,
+    [tokenHash],
+  );
+  const candidate = tickets[0];
+  if (!candidate) return null;
+  const userId = Number(candidate.user_id);
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-    const [tickets] = await connection.execute<(RowDataPacket & { user_id: number; login_event: string })[]>(
-      `SELECT user_id, login_event FROM bg_account_reactivation_tickets
-        WHERE token_hash = ? AND expires_at > NOW() LIMIT 1`,
-      [tokenHash],
-    );
-    const candidate = tickets[0];
-    if (!candidate) {
-      await connection.commit();
-      return null;
-    }
-    const userId = Number(candidate.user_id);
     // Le compte d'abord, le ticket ensuite : même ordre que la suppression
     // définitive (`deleteAccountNow` verrouille le compte, puis la cascade
     // atteint ses tickets) — l'ordre inverse s'interbloquait avec elle.
@@ -177,7 +177,7 @@ export async function reactivateAccount(
     // instruction même (`affectedRows`) : une seconde requête au même cookie,
     // qui a lu le ticket avant ce retrait, n'en tire rien.
     const [consumed] = await connection.execute<ResultSetHeader>(
-      `DELETE FROM bg_account_reactivation_tickets WHERE token_hash = ? AND user_id = ?`,
+      `DELETE FROM bg_account_reactivation_tickets WHERE token_hash = ? AND user_id = ? AND expires_at > NOW()`,
       [tokenHash, userId],
     );
     const ticket = Number(consumed.affectedRows) === 1 ? candidate : undefined;

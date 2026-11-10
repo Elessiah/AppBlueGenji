@@ -1848,21 +1848,28 @@ export async function releaseIneligibleReferee(
 }
 
 /**
- * Après le retrait de l'arbitre d'un compte dont la suppression est demandée
- * (`withdrawUserCasts`, sur la transaction de la demande) : chaque match non
- * joué qu'il arbitrait est annoncé au staff (ligne anonyme), et, tournoi en
- * cours, part s'il n'attendait plus que lui — comme `releaseObjectingReferee`.
- * Les annonces partent au commit de l'appelant (`flushBotLogs`).
+ * Après le retrait de l'arbitre et des casts d'un compte dont la suppression
+ * est demandée (`withdrawUserCasts`, sur la transaction de la demande) : chaque
+ * match non joué qu'il arbitrait est annoncé au staff (ligne anonyme), et tout
+ * match touché, tournoi en cours, part s'il n'attendait plus que lui — comme
+ * `releaseObjectingReferee`. Les annonces partent au commit de l'appelant
+ * (`flushBotLogs`). La transaction a lu bien avant ces verrous : casters et
+ * éligibilité se relisent en lecture courante (`snapshotBeforeLock`).
  */
 export async function relaunchAfterRefereeWithdrawal(
   connection: PoolConnection,
-  matchIds: readonly number[],
+  refereeMatchIds: readonly number[],
+  castMatchIds: readonly number[] = [],
 ): Promise<void> {
+  const refereed = new Set(refereeMatchIds);
+  const matchIds = [...new Set([...refereeMatchIds, ...castMatchIds])].sort((a, b) => a - b);
   for (const matchId of matchIds) {
-    const row = await lockLaunchMatch(connection, matchId);
+    const row = await lockLaunchMatch(connection, matchId, true);
     if (!row || row.status === "COMPLETED") continue;
-    queueRefereeChange(connection, { kind: "ACCOUNT_WITHDRAWN", matchId });
-    if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
+    if (refereed.has(matchId)) queueRefereeChange(connection, { kind: "ACCOUNT_WITHDRAWN", matchId });
+    if (row.tournament_state !== "RUNNING") continue;
+    await adoptCurrentPairing(connection, row);
+    await launchIfAllReady(connection, matchId, true, row);
   }
 }
 

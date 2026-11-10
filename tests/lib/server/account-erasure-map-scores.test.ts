@@ -20,4 +20,16 @@ describe("anonymisation d'un compte — détail map par map (MAP_SCORES.md)", ()
     ]);
     expect(sqls.some(([sql]) => String(sql).startsWith("DELETE FROM bg_match_maps"))).toBe(false);
   });
+
+  // Revue #579 : tout chemin d'anonymisation (rattrapage au démarrage compris)
+  // emporte les tickets de réactivation du compte, pas seulement la suppression.
+  it("efface les tickets de réactivation du compte", async () => {
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+
+    await anonymizeAccount(fakeConnection({ execute }), 42);
+
+    const sqls = execute.mock.calls.map(([sql, params]) => [sql.replace(/\s+/g, " ").trim(), params]);
+    expect(sqls).toContainEqual(["DELETE FROM bg_account_reactivation_tickets WHERE user_id = ?", [42]]);
+  });
 });

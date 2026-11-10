@@ -62,8 +62,9 @@ function transaction(options: {
     if (sql.startsWith("DELETE FROM bg_account_reactivation_tickets")) return [{ affectedRows: options.ticketDeleted ?? 1 }, []];
     return [{ affectedRows: 1 }, []];
   });
+  // Le ticket se lit sur le pool, hors transaction : même journal de requêtes.
   jest.mocked(getDatabase).mockResolvedValue(
-    fakePool({ getConnection: jest.fn(async () => fakeConnection(connection)) }),
+    fakePool({ execute: connection.execute, getConnection: jest.fn(async () => fakeConnection(connection)) }),
   );
   return connection;
 }
@@ -161,11 +162,11 @@ describe("peekReactivationTicket", () => {
 });
 
 describe("reactivateAccount", () => {
-  it("reactivateAccount_unknownTicket_nullAndCommitted", async () => {
+  it("reactivateAccount_unknownTicket_nullWithoutTransaction", async () => {
     const connection = transaction({});
 
     expect(await reactivateAccount(TOKEN)).toBeNull();
-    expect(connection.commit).toHaveBeenCalled();
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
     expect(connection.execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE bg_users"))).toBe(false);
   });
 
@@ -309,6 +310,22 @@ describe("reactivateAccount", () => {
     expect(connection.execute.mock.calls[consumeIndex][1]).toEqual([expect.any(String), 7]);
   });
 
+  it("reactivateAccount_ticketReadBeforeTransaction_snapshotNotFixedBeforeLock", async () => {
+    const connection = transaction({
+      ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+      locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+    });
+
+    await reactivateAccount(TOKEN);
+    const sqls = connection.execute.mock.calls.map(([sql]) => sql);
+    const ticketRead = sqls.findIndex((sql) => sql.includes("SELECT user_id, login_event"));
+    expect(connection.execute.mock.invocationCallOrder[ticketRead]).toBeLessThan(
+      connection.beginTransaction.mock.invocationCallOrder[0],
+    );
+    const consume = sqls.find((sql) => sql.startsWith("DELETE FROM bg_account_reactivation_tickets"));
+    expect(consume).toContain("expires_at > NOW()");
+  });
+
   it("reactivateAccount_unknownTicket_neverLocksAccount", async () => {
     const connection = transaction({});
 
@@ -345,7 +362,7 @@ describe("reactivateAccount", () => {
   });
 
   it("reactivateAccount_error_rollsBackAndReleases", async () => {
-    const connection = transaction({ failOn: "SELECT user_id, login_event" });
+    const connection = transaction({ failOn: "FROM bg_users WHERE id = ? FOR UPDATE", ticket: { user_id: 7, login_event: "LOGIN_DISCORD" } });
 
     await expect(reactivateAccount(TOKEN)).rejects.toThrow("DB_DOWN");
     expect(connection.rollback).toHaveBeenCalled();

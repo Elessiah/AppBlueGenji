@@ -21,7 +21,7 @@ describe("eraseAccount — blocages d'empreinte", () => {
   // D31 : à l'effacement, les lignes qui reliaient l'empreinte au compte partent
   // sur la connexion de l'appelant (sa transaction), jamais sur le pool.
   it("eraseAccount_erase_retiresQuarantinesBeforeDeletingAccountOnCallerConnection", async () => {
-    jest.mocked(withdrawUserCasts).mockResolvedValue({ matchIds: [], tournamentIds: [] });
+    jest.mocked(withdrawUserCasts).mockResolvedValue({ matchIds: [], tournamentIds: [], releasedRefereeMatchIds: [], releasedCastMatchIds: [] });
     jest.mocked(retireAccountQuarantinesOn).mockResolvedValue(undefined);
     const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
     const connection = fakeConnection({ execute });

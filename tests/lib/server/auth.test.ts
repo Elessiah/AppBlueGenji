@@ -825,12 +825,14 @@ describe("auth", () => {
       const { getDatabase } = await import("@/lib/server/database");
       const mockExecute = jest.fn<SqlQuery>(async (sql: string, params?: unknown) => {
         const [pseudo] = params as string[];
-        if (sql.includes("bg_account_deletion_holds")) return [pseudo === "Held" ? [{ user_id: 9 }] : [], []];
+        if (sql.includes("bg_account_deletion_holds")) return [[{ c: pseudo === "Held" ? 1 : 0 }], []];
         return [[{ c: 0 }], []];
       });
       jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
 
       expect(await ensureUniquePseudo("Held")).toBe("Held_1");
+      // Une seule requête par candidat (revue #579) : « Held » puis « Held_1 ».
+      expect(mockExecute).toHaveBeenCalledTimes(2);
     });
 
     it("returns pseudo with suffix when original is taken", async () => {

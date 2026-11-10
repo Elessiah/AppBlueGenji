@@ -371,9 +371,6 @@ async function applyDeletionMode(
   }
   const withdrawal = await anonymizeAccount(connection, userId);
   await connection.execute(`UPDATE bg_users SET deletion_requested_at = NULL WHERE id = ? AND is_deleted = 1`, [userId]);
-  // Ses tickets de réactivation (compte, moyen de connexion) ne survivent pas
-  // à l'anonymisation : la ligne reste, la cascade ne joue pas.
-  await connection.execute(`DELETE FROM bg_account_reactivation_tickets WHERE user_id = ?`, [userId]);
   // Le vrai pseudo mis de côté pour la réactivation ne survit pas à la
   // suppression définitive (l'effacement l'emporte par cascade).
   await dropDeletionHold(connection, userId);

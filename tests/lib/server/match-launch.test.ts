@@ -1945,6 +1945,34 @@ describe("opposition d'arbitre retenue (`releaseObjectingReferee`, `REFEREE_OBJE
     expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), { kind: "ACCOUNT_WITHDRAWN", matchId: 42 });
   });
 
+  it("relaunchAfterRefereeWithdrawal_castOnlyMatch_launchesWithoutRefereeNotice", async () => {
+    state.match = matchState({ referee_user_id: null, team1_ready_at: STAMP, team2_ready_at: STAMP, casters: [] });
+
+    await relaunchAfterRefereeWithdrawal(connectionFor(state), [], [42]);
+
+    expect(state.match?.launched_at).toBe(STAMP);
+    expect(queueRefereeChange).not.toHaveBeenCalled();
+  });
+
+  it("relaunchAfterRefereeWithdrawal_casterReadsLockedNotFromSnapshot", async () => {
+    state.match = matchState({ referee_user_id: null });
+    const queries: string[] = [];
+    const base = executeFor(state);
+    const connection = fakeConnection({
+      execute: async (sql: string, params: unknown[] = []) => {
+        queries.push(sql.replace(/\s+/g, " ").trim());
+        return base(sql, params);
+      },
+    });
+
+    await relaunchAfterRefereeWithdrawal(connection, [42]);
+
+    const casterReads = queries.filter((q) => q.includes("FROM bg_match_casters WHERE match_id = ?"));
+    expect(casterReads.length).toBeGreaterThan(0);
+    for (const read of casterReads) expect(read).toMatch(/FOR UPDATE/);
+    expect(queries.filter((q) => q.includes("FROM bg_matches m WHERE m.id = ?"))).toHaveLength(1);
+  });
+
   it("relaunchAfterRefereeWithdrawal_noMatch_nothing", async () => {
     await relaunchAfterRefereeWithdrawal(connectionFor(state), []);
 
