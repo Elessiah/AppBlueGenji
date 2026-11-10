@@ -406,7 +406,7 @@
       "urlSubject": "my channel link",
       "battletagSubject": "cast BattleTag",
       "triggerLocked": "Going on air set by someone else: “{mode}”.",
-      "triggerLockedHint": "Only the caster who holds it, the match's referee or staff with refereeing and streaming permissions can change or clear it — the match's casters can also change it when no caster holds it.",
+      "triggerLockedHint": "Only the caster who holds it, the match's referee or staff with refereeing and streaming permissions can change or clear it — the match's casters can also change it when no caster holds it, unless the match carries the organisation's link.",
       "loading": "Loading your cast…",
       "played": "The match has been played: this cast’s link and BattleTag can no longer change."
     }

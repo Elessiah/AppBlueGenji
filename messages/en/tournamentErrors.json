@@ -141,7 +141,7 @@
     "INVALID_CAST_BATTLETAG": "Invalid cast BattleTag: 64 characters at most, and visible characters.",
     "CAST_STREAM_NOT_OWNED": "This stream belongs to the organisation: its link is set in “Official broadcast”.",
     "CAST_STREAM_LINK_HELD": "This link belongs to a co-caster still on this stream: only they, or the match referee, can change it.",
-    "LIVE_TRIGGER_NOT_OWNED": "The on-air mode belongs to the caster who holds it: only they, the match referee or staff with refereeing and streaming permissions can change it — the match's casters too when no caster holds it.",
+    "LIVE_TRIGGER_NOT_OWNED": "This on-air mode is not open to you: only the caster who holds it, the match referee or staff with refereeing and streaming permissions can change and clear it — the match's casters can also change it when no caster holds it, but not clear it.",
     "INVALID_STREAM_LINKS": "Invalid stream links.",
     "INVALID_CAST_SETTINGS": "Invalid broadcast settings.",
     "MATCH_CAST_SETTINGS_FAILED": "Your broadcast settings could not be saved. Try again in a moment.",

@@ -8,15 +8,16 @@
  * Une fois posé, seuls le **caster qui l'a posé** (`live_trigger_user_id`),
  * l'**arbitre désigné** du match (médiateur) et le staff `tournaments` + `live`
  * (`castOverseer`) le changent ou le retirent. Un mode posé par le staff — ou dont le caster qui l'avait posé
- * s'est retiré — n'a pas de propriétaire : le staff `tournaments` le change,
- * et un caster montré du match aussi, qui en devient alors le maître
+ * s'est retiré — n'a pas de propriétaire : ce staff et l'arbitre le changent,
+ * et un caster montré du match aussi (sauf quand le match porte le lien de
+ * l'organisation, `STAFF_STREAM_FORBIDDEN`), qui en devient alors le maître
  * (décision du 2026-11-05). Seul un caster du match devient propriétaire du
  * mode qu'il pose : posé par qui ne le caste pas (staff, arbitre), le
  * mode reste sans maître. Un porteur de la seule `live` ne règle que **son**
  * cast : sans caster le match, il n'en pose ni n'en change le mode. Un caster
  * tu (devenu inéligible avant le lancement) ou parti ne tient plus le mode,
- * que le serveur et l'interface rendent au staff. Ouvrir ou couper l'antenne
- * d'un mode manuel suit la même règle.
+ * qui reste alors sans maître. Ouvrir ou couper l'antenne d'un mode manuel
+ * suit la même règle.
  *
  * Module pur : la même règle sert le serveur (sous le verrou du match) et
  * l'interface (contrôles cachés), jamais deux définitions.
@@ -65,8 +66,9 @@ export function isMatchRefereeActor(hold: Pick<LiveTriggerHold, "refereeId">, ac
  * - staff `tournaments` + `live` (`oversees`) ou arbitre désigné : toujours ;
  * - mode d'un caster : lui seul ;
  * - pas encore de mode, ou mode sans propriétaire (posé par le staff, caster
- *   parti) : le staff `tournaments` et les casters montrés du match — jamais
- *   un porteur de la seule `live` qui ne le caste pas.
+ *   parti) : les casters montrés du match — jamais un porteur de la seule
+ *   `live` qui ne le caste pas. (`manages` seul n'atteint pas cette règle au
+ *   serveur : les routes exigent `live` ou l'arbitrage, `assertLiveActor`.)
  */
 export function mayChangeLiveTrigger(hold: LiveTriggerHold, actor: LiveTriggerActor, actorCasts = false): boolean {
   if (actor.oversees || isMatchRefereeActor(hold, actor)) return true;
@@ -179,9 +181,9 @@ function staffModeLockedFor(
  *   l'arbitre ou le staff `tournaments` + `live` médie pour lui, même s'il caste aussi le match, il ne
  *   le lui retire pas ;
  * - sans maître montré, un caster montré qui pose le mode en devient le
- *   maître ; posé par qui ne le caste pas, le mode reste au staff — un maître
- *   tu (parti, inéligible) perd ainsi le mode que le staff change pendant
- *   qu'il est tu : ce changement est celui du staff.
+ *   maître ; posé par qui ne le caste pas, le mode reste sans maître — un
+ *   maître tu (parti, inéligible avant le lancement) perd ainsi le mode qu'un
+ *   autre change pendant qu'il est tu.
  *
  * L'instantané ne nomme que le caster montré (`liveTriggerCasterId`) : un
  * propriétaire qui ne caste pas serait invisible à l'interface, qui offrirait

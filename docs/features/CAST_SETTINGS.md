@@ -202,17 +202,18 @@ trois fenêtres bâtissent le lecteur par `liveTriggerViewer` ; l'inscription
 le juge en caster (`viewerCasts`).
 
 Propriétaire écrit (`liveTriggerOwnerAfter`) : le caster du match qui le pose,
-lui seul ; posé par qui ne caste pas (staff, admin, arbitre, caster tu), il
-garde son maître montré — l'arbitre
-médie pour le caster, il ne lui retire pas le mode — ou reste au staff s'il
+lui seul ; posé par qui ne caste pas (staff `tournaments` + `live`, arbitre,
+caster tu), il garde son maître montré — l'arbitre
+médie pour le caster, il ne lui retire pas le mode — ou reste sans maître s'il
 n'en avait pas (`liveTriggerOwnerAfter`). Le propriétaire
 ne compte que s'il est un caster **montré** du match (`loadShownCasterIds` au
 serveur, `liveTriggerCasterId` dans l'instantané : il caste encore et, avant
 le lancement — `castBeforeLaunch`, qui ne compte pas le lancement d'un appariement
 d'avant — remplit la condition du cast) : parti ou tu, il laisse le mode
-au staff, et le retrouve dès qu'il est montré de nouveau — sauf si le mode a
-changé entre-temps : ce changement est celui du staff. Un maître montré garde
-son mode même quand l'arbitre ou un admin qui caste aussi le match le change. L'arbitre reconnu est l'arbitre
+sans maître, et le retrouve dès qu'il est montré de nouveau — sauf si le mode a
+changé entre-temps (effacé, ou repris par le caster qui le change). Une fois
+le match lancé, un caster inéligible reste montré et garde le mode. Un maître montré garde
+son mode même quand l'arbitre ou le staff `tournaments` + `live` qui caste aussi le match le change. L'arbitre reconnu est l'arbitre
 **retenu** (sans opposition), qui **ne joue pas** le match (`KEPT_REFEREE_SQL`)
 et remplit encore la condition d'arbitrage du jeu (`refereeQualifies`).
 
@@ -225,13 +226,13 @@ match) : un co-caster ne la bascule pas pour le mode d'un autre (403
 `LIVE_TRIGGER_NOT_OWNED`), et le bouton lui est caché. Sur un mode **sans maître**
 (caster parti, mode d'avant la règle), tout caster montré du match ouvre et
 coupe l'antenne (la règle du mode : `mayChangeLiveTrigger`, `viewerMayChangeLiveTrigger`) : le match ne reste
-pas hors antenne en attendant le staff ; changer ce mode reste au staff. Une inscription dont le
+pas hors antenne en attendant le staff ; ils changent aussi ce mode, sauf quand le match porte le lien de l'organisation. Une inscription dont le
 mode a été posé entre-temps par un autre n'est pas refusée : le mode reste
 tel quel et la notification le dit (`triggerSkipped`,
 `cardActions.castingTriggerKept`, FR/EN). Le propriétaire est effacé
 quand il quitte le match (`releaseMatchCast`), quand il en est retiré d'office
 (`dropTriggerOwner` : il rejoint une équipe du match, devient inéligible),
-quand le mode est retiré ou changé pendant qu'il n'est plus montré, et à la suppression de son compte — l'arbitre ou un admin qui le change le lui laisse
+quand le mode est retiré ou changé pendant qu'il n'est plus montré, et à la suppression de son compte — l'arbitre ou le staff `tournaments` + `live` qui le change le lui laisse
 (`match-casters.ts`, tous les matchs dont il a posé le mode, castés ou non).
 À l'inscription, un mode verrouillé n'est pas envoyé (`castClaimBody`) ; la
 configuration du direct le renvoie tel quel, et un mode inchangé ne redemande

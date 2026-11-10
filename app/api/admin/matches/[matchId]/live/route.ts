@@ -127,8 +127,8 @@ async function readMatchLiveBody(req: Request): Promise<MatchLiveBody | Response
  *
  * Le mode d'antenne déjà posé ne change que pour le caster qui l'a posé,
  * l'arbitre désigné ou le staff `tournaments` + `live` (`LIVE_TRIGGER_NOT_OWNED`, 403) ; sans
- * maître, pour le staff `tournaments` et les casters du match, dont celui qui
- * le change devient le maître. Un porteur de la seule `live` ne règle que son
+ * maître, pour ce staff, l'arbitre et les casters du match (sauf quand le match
+ * porte le lien de l'organisation), dont celui qui le change devient le maître. Un porteur de la seule `live` ne règle que son
  * cast : sans caster le match, `NOT_MATCH_CASTER` (403) ; le lien du staff
  * ne lui est pas ouvert (`STAFF_STREAM_FORBIDDEN`, 403). L'arbitre
  * désigné du match est admis même sans `live`, et lui seul peut envoyer

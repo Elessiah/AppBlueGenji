@@ -1083,8 +1083,9 @@ export function RgpdEn({
             launch, a caster who no longer meets the requirements is no longer treated as the holder, and the first change someone
             else makes to the mode erases their account. A mode set by someone who does not cast the match (staff, referee), or
             whose holder has left or, before launch, no longer meets the requirements, has no holder: those staff, the assigned
-            referee and the match&apos;s casters change it, and only those staff and the referee remove it (it also goes when the
-            last caster leaves the match with no stream left). The assigned referee of a match can also, for that match only, edit or remove a caster&apos;s
+            referee and the match&apos;s casters change it (the casters, unless the match carries the organisation&apos;s
+            link), and only those staff and the referee remove it (it also goes when the last caster leaves the match, or is
+            removed from it by the staff, with no stream left). The assigned referee of a match can also, for that match only, edit or remove a caster&apos;s
             link and configure the organizers&apos; broadcast.{" "}
             A caster may also give, for one cast, a <strong>BattleTag of its own for that match</strong>, which
             then replaces their profile one wherever the latter was shown (“Contacts” and launch windows, match

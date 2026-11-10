@@ -1292,8 +1292,9 @@ function RgpdFr({
             avant le lancement, un caster qui ne remplit plus la condition n&apos;est plus tenu pour le maître, et le premier
             changement qu&apos;un autre fait au mode efface son compte. Un mode posé par qui ne caste pas le match (staff, arbitre), ou
             dont le maître est parti ou, avant le lancement, ne remplit plus la condition, n&apos;a pas de maître : ce staff,
-            l&apos;arbitre désigné et les casters du match le changent, et seuls ce staff et l&apos;arbitre le retirent (il part aussi
-            quand le dernier caster quitte le match sans qu&apos;aucun stream reste). L&apos;arbitre désigné d&apos;un match peut aussi, pour ce
+            l&apos;arbitre désigné et les casters du match le changent (les casters, sauf quand le match porte le lien de
+            l&apos;organisation), et seuls ce staff et l&apos;arbitre le retirent (il part aussi quand le dernier caster quitte le match,
+            ou que le staff l&apos;en retire, sans qu&apos;aucun stream reste). L&apos;arbitre désigné d&apos;un match peut aussi, pour ce
             seul match, modifier ou retirer le lien d&apos;un caster et configurer la diffusion de l&apos;organisation.{" "}
             Un caster peut aussi donner, pour un cast précis, un <strong>BattleTag propre à ce
             match</strong>, qui remplace alors celui de son profil là où ce dernier était montré (fenêtres
