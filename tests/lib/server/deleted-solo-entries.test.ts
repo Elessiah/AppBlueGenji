@@ -229,6 +229,19 @@ describe("settleDeletedSoloEntries", () => {
   });
 });
 
+describe("settleDeletedSoloEntries — verrous du retrait", () => {
+  it("settleDeletedSoloEntries_withdrawal_listsOnlyNotStartedTournaments", async () => {
+    const execute = fakeDb({ candidates: [7] });
+
+    await settleDeletedSoloEntries();
+
+    const listing = execute.mock.calls
+      .map(([q]) => String(q).replace(/\s+/g, " "))
+      .find((q) => q.includes("SELECT DISTINCT r.tournament_id FROM bg_teams s"));
+    expect(listing).toContain("JOIN bg_tournaments t ON t.id = r.tournament_id AND t.state IN ('UPCOMING', 'REGISTRATION')");
+  });
+});
+
 describe("settleDeletedSoloEntries — relevé des candidats", () => {
   it("settleDeletedSoloEntries_candidateQuery_keepsOnlyAccountsWithSomethingToDoAndBoundsBatch", async () => {
     const execute = fakeDb({ candidates: [] });

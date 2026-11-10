@@ -234,6 +234,14 @@ async function leaveTeamOn(connection: PoolConnection, teamId: number, userId: n
           WHERE team_id = ? AND status = 'PENDING'`,
         [teamId],
       );
+      // Une équipe fantôme n'a aucun membre (`GHOST_TEAMS.md`). Faute de
+      // candidat vivant, les appartenances encore ouvertes sont celles de
+      // comptes déjà supprimés (lignes d'avant le départ à la demande) : elles
+      // se ferment, sinon l'équipe reprise garderait un propriétaire supprimé.
+      await connection.execute(
+        `UPDATE bg_team_members SET left_at = NOW() WHERE team_id = ? AND user_id <> ? AND left_at IS NULL`,
+        [teamId, userId],
+      );
     }
   }
 

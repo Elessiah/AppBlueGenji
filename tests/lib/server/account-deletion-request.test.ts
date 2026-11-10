@@ -671,6 +671,26 @@ describe("requestAccountDeletion — équipes (E3)", () => {
     expect(notifyTeamInviteInBackground).not.toHaveBeenCalled();
   });
 
+  it("requestAccountDeletion_ghostedTeam_closesOtherOpenMemberships", async () => {
+    const { queries } = fakeDb({ teams: [3], successors: [], activeTournament: true });
+
+    await requestAccountDeletion(7);
+
+    const close = queries.find((q) => q.sql.includes("AND user_id <> ? AND left_at IS NULL"));
+    expect(close?.sql).toBe(
+      "UPDATE bg_team_members SET left_at = NOW() WHERE team_id = ? AND user_id <> ? AND left_at IS NULL",
+    );
+    expect(close?.params).toEqual([3, 7]);
+  });
+
+  it("requestAccountDeletion_dissolvedTeam_doesNotRunGhostMembershipClose", async () => {
+    const { queries } = fakeDb({ teams: [3], successors: [], activeTournament: false });
+
+    await requestAccountDeletion(7);
+
+    expect(queries.some((q) => q.sql.includes("AND user_id <> ? AND left_at IS NULL"))).toBe(false);
+  });
+
   it("requestAccountDeletion_soleOwnerNoActiveTournament_dissolves", async () => {
     const { queries } = fakeDb({ teams: [3], successors: [], activeTournament: false });
 

@@ -192,6 +192,22 @@ describe("holdAccountIdentity", () => {
     expect(updatesOf(connection)).toHaveLength(1);
   });
 
+  it("holdAccountIdentity_ogCandidateCarriedByLiveAccount_skipsToOG2", async () => {
+    const connection = transaction({ live: { pseudo: "Nova", avatar_url: AVATAR } });
+    const base = connection.execute.getMockImplementation()!;
+    connection.execute.mockImplementation(async (sql: string, params?: unknown) => {
+      const values = Array.isArray(params) ? params : [];
+      if (sql.startsWith("INSERT INTO bg_account_deletion_holds") && values[1] === "Nova") throw duplicate();
+      if (sql.startsWith("SELECT 1 FROM bg_users WHERE pseudo = ?")) return [values[0] === "NovaOG" ? [{ 1: 1 }] : [], []];
+      return base(sql, params);
+    });
+
+    expect(await holdAccountIdentity(fakeConnection(connection), 7, REQUESTED)).toBe(true);
+
+    const inserts = sqlOf(connection).filter((q) => q.sql.startsWith("INSERT INTO bg_account_deletion_holds"));
+    expect(inserts.map((q) => q.params[1])).toEqual(["Nova", "NovaOG2"]);
+  });
+
   it("holdAccountIdentity_everySuffixedPseudoHeld_throwsDuplicateAndMarksNothing", async () => {
     const connection = transaction({ live: { pseudo: "Nova", avatar_url: AVATAR } });
     const base = connection.execute.getMockImplementation()!;

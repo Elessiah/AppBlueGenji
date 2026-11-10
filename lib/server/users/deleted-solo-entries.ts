@@ -332,7 +332,9 @@ export async function settleDeletedSoloEntries(): Promise<{ withdrawn: number; f
  */
 async function withdrawDeletedAccountRegistrations(userId: number): Promise<DeletionWithdrawal[]> {
   const db = await getDatabase();
-  const tournamentIds = await listSoloRegistrationTournamentIds(db, userId);
+  // Les seuls tournois pas encore commencés : une inscription ne part que de
+  // ceux-là, et verrouiller un tournoi en cours le ferait attendre pour rien.
+  const tournamentIds = await listSoloRegistrationTournamentIds(db, userId, true);
   if (tournamentIds.length === 0) return [];
   const connection = await db.getConnection();
   try {

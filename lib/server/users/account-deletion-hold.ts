@@ -109,7 +109,9 @@ export async function holdAccountIdentity(
  * pas échouer pour autant (doublon, 500 jusqu'à un renommage) : le masque
  * garde alors le pseudo suivi de « OG » (« PseudoOG », « PseudoOG2 »…), celui
  * que la réactivation lui aurait de toute façon rendu en cas de conflit
- * (décision R3) — sans rien révéler de la demande de l'autre compte.
+ * (décision R3) — sans rien révéler de la demande de l'autre compte. Un
+ * candidat qu'un **autre compte porte** est passé : le masque réserverait le
+ * pseudo d'un joueur vivant, et ne pourrait de toute façon pas le rendre.
  */
 async function insertDeletionHold(
   connection: PoolConnection,
@@ -119,6 +121,14 @@ async function insertDeletionHold(
 ): Promise<void> {
   for (let attempt = -1; ; attempt += 1) {
     const held = attempt < 0 ? pseudo : reactivationPseudoCandidate(pseudo, attempt);
+    const last = attempt + 1 >= REACTIVATION_PSEUDO_ATTEMPTS;
+    if (attempt >= 0 && !last) {
+      const [carried] = await connection.execute<RowDataPacket[]>(
+        `SELECT 1 FROM bg_users WHERE pseudo = ? AND id <> ? LIMIT 1`,
+        [held, userId],
+      );
+      if (carried.length > 0) continue;
+    }
     try {
       await connection.execute(`INSERT INTO bg_account_deletion_holds (user_id, pseudo, avatar_url) VALUES (?, ?, ?)`, [
         userId,
@@ -127,7 +137,7 @@ async function insertDeletionHold(
       ]);
       return;
     } catch (error) {
-      if (!isDuplicateEntryError(error) || attempt + 1 >= REACTIVATION_PSEUDO_ATTEMPTS) throw error;
+      if (!isDuplicateEntryError(error) || last) throw error;
     }
   }
 }

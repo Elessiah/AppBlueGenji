@@ -1007,6 +1007,14 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
 - **Textes** : aperçu `UNKNOWN`, `reactivation.notUndone` (FR + EN), registre
   T01 (« déjà commencé ou terminé ») ; `/rgpd` lit la durée du ticket dans
   `REACTIVATION_TICKET_MINUTES`.
+- **Revue indépendante (2026-11-10)** : un avatar que la modération
+  **rétablit** pendant l'attente revient dans le masque à son adresse
+  d'origine — `announceImageRestored` rejoue donc `rotateHeldAvatarFile` ;
+  l'équipe devenue **fantôme** ferme les appartenances encore ouvertes (comptes
+  déjà supprimés : une fantôme n'a aucun membre) ; la passe horaire ne
+  verrouille plus que les tournois pas encore commencés ; le masque ne prend
+  pas un « PseudoOG » qu'un autre compte porte ; « Ne pas réactiver » borne
+  son attente par `AbortController` (pas `AbortSignal.timeout`).
 - **Déjà réglés, entrées retirées** : rejeu sur interblocage de la demande,
   ordre tournois organisés → compte, rejeu d'une ligne finale sur un compte
   restauré vivant (il repasse par la demande), lignes illisibles du journal

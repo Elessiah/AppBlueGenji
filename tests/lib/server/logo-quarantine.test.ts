@@ -31,7 +31,7 @@ import { blockImageHashOn, blockImageHashesSafely, readImageSha256, unblockImage
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
-import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
+import { rotateHeldAvatarFile, rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
 import { deleteUnreferencedUpload, isUploadReferenced, storedUploadAbsolutePath } from "@/lib/server/stored-upload-cleanup";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
@@ -704,6 +704,8 @@ describe("restoreReportedImage", () => {
     expect(syncSoloEntryIdentityOn).toHaveBeenCalledWith(expect.anything(), 9);
     // Masqué pendant la quarantaine, il ne doit pas revenir à son adresse publique.
     expect(rotateHiddenAvatarFile).toHaveBeenCalledWith(9);
+    // Compte en attente de suppression : l'avatar rendu au masque change d'adresse aussi.
+    expect(rotateHeldAvatarFile).toHaveBeenCalledWith(9);
     expect(connection.commit).toHaveBeenCalled();
     expect(invalidateLandingTeamViews).toHaveBeenCalledTimes(1);
     expect(invalidateTeamIdentityViews).not.toHaveBeenCalled();

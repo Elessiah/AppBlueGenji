@@ -145,16 +145,22 @@ export function ReactivationPanel({
   const decline = async () => {
     setPending("decline");
     let recorded = false;
+    // `AbortController` + minuteur, pas `AbortSignal.timeout` (absent des
+    // navigateurs d'avant 2022 : il lèverait, et le refus ne partirait jamais).
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), DECLINE_TIMEOUT_MS);
     try {
       const response = await fetch("/api/auth/reactivate", {
         method: "DELETE",
         headers: { "content-type": "application/json" },
         body: "{}",
-        signal: AbortSignal.timeout(DECLINE_TIMEOUT_MS),
+        signal: controller.signal,
       });
       recorded = response.ok;
     } catch {
       recorded = false;
+    } finally {
+      clearTimeout(timer);
     }
     if (!recorded) {
       showError(t("reactivation.declineFailed"));

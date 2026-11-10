@@ -249,6 +249,28 @@ describe("ReactivationPanel", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it("decline_requestHangsPastTimeout_abortsAndShowsDeclineFailed", async () => {
+    jest.useFakeTimers();
+    try {
+      let signal: AbortSignal | null | undefined;
+      global.fetch = jest.fn(
+        (_url: RequestInfo | URL, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            signal = init?.signal;
+            signal?.addEventListener("abort", () => reject(new Error("aborted")));
+          }),
+      ) as typeof fetch;
+      const pending = findButtons(render(FUTURE))[1].props.onClick!();
+      jest.advanceTimersByTime(8000);
+      await pending;
+      expect(signal?.aborted).toBe(true);
+      expect(showError).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.declineFailed"));
+      expect(push).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("après un échec, le focus revient au bouton du geste", async () => {
     global.fetch = jest.fn(async () => jsonResponse(500, { error: "REACTIVATION_FAILED" })) as typeof fetch;
     await findButton(render(FUTURE))!.props.onClick!();
