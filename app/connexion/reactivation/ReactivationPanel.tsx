@@ -150,10 +150,10 @@ export function ReactivationPanel({
             <p style={{ ...LOGIN_HELP_TEXT_STYLE, fontSize: 14 }}>{t("reactivation.kept")}</p>
             <p style={{ ...LOGIN_HELP_TEXT_STYLE, fontSize: 14 }}>{t("reactivation.notUndone")}</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 24 }}>
-              <CyberButton type="button" onClick={reactivate} disabled={loading} aria-busy={loading}>
+              <CyberButton type="button" onClick={reactivate} disabled={loading} aria-busy={loading} style={{ minHeight: 44 }}>
                 {t(loading ? "reactivation.confirming" : "reactivation.confirm")}
               </CyberButton>
-              <CyberButton type="button" variant="ghost" onClick={decline} disabled={loading}>
+              <CyberButton type="button" variant="ghost" onClick={decline} disabled={loading} style={{ minHeight: 44 }}>
                 {t("reactivation.cancel")}
               </CyberButton>
             </div>
