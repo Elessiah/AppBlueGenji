@@ -434,7 +434,9 @@ le commit, il rend l'observation de la date, et le balayage l'annoncera (un
 redémarrage dans cet intervalle reste une limite connue : seul le rappel 24 h
 partirait) ; l'annonce d'un
 arbitre rend aussi l'observation posée par `setMatchStartAt`, et le balayage
-annoncera la manche. `setMatchStartAt` est rejoué sur interblocage, ou sur le
+annoncera la manche. `setMatchStartAt` est rejoué sur interblocage — celui que
+MariaDB rend en `ER_AUTOINC_READ_FAILED` compris (voir « Verrou AUTO-INC »
+plus bas) —, ou sur le
 refus de l'isolation par instantané de MariaDB (`ER_CHECKREAD`, 1020)
 (`retryOnDeadlock`, `lib/server/tournaments/deadlock-retry.ts`, partagé avec le
 report de score) ; une panne qui persiste ne sort de la route qu'en code
@@ -469,6 +471,49 @@ retour à l'horaire tenu, affiche changée, reprise des marques héritées, qui 
 la compte pas comme preuve d'un horaire reçu par les joueurs), et s'oublie une
 fois le retrait poussé (`forgetStaffPush`) — sauf si la manche a retrouvé cet
 horaire pendant l'envoi (reposé par un autre arbitre).
+
+**Verrou AUTO-INC (`ER_AUTOINC_READ_FAILED`, 1467).** En production (MariaDB
+11.8), « Failed to read auto-increment value from storage engine » sur
+`bg_match_reminders` n'était pas une table abîmée mais un interblocage. Un
+`INSERT … SELECT` (`claimDatedMark`, pose de `TOLD`) tient le verrou AUTO-INC
+**de la table** jusqu'à la fin de son instruction
+(`innodb_autoinc_lock_mode = 1`). `markStaffPushed` part en même temps que
+l'annonce aux joueurs, pour la même manche : il lisait d'abord la marque
+`STAFF` sous verrou — absente, cette lecture verrouillait l'intervalle de
+l'index `(match_id, offset_key)` où l'`INSERT … SELECT` voulait écrire — puis
+insérait, donc attendait le verrou AUTO-INC que l'autre tenait. MariaDB rend
+cet interblocage à la victime sous le code 1467 : la marque n'était pas
+retenue (`horaire poussé aux arbitres non retenu` dans pm2), et le retrait de
+l'horaire ne se poussait plus aux arbitres. Deux remèdes :
+
+- `markStaffPushed` ne lit plus sous verrou une marque absente : une lecture
+  **simple** dit si elle existe ; absente, elle s'insère (`INSERT IGNORE …
+  VALUES`, aucun verrou d'intervalle pris avant) ; présente, elle est lue sous
+  verrou (sa ligne, pas un intervalle — ni identifiant consommé ni verrou
+  AUTO-INC sur ce chemin). Une marque qui paraît ou disparaît entre les deux
+  défait la transaction, et la réservation reprend à neuf (une fois, après
+  une attente courte et aléatoire) ;
+- 1467 est traité comme un interblocage (`isAutoIncrementContention`,
+  `lib/server/mysql-errors.ts`) : `isTransactionAborted` le reconnaît — aucun
+  `catch` ne doit poursuivre sur la transaction —, `retryOnDeadlock` le
+  rejoue, et une route qui n'en vient pas à bout rend
+  `CONCURRENT_UPDATE_RETRY` (409) au lieu d'une panne. Le même code couvre
+  une attente du verrou AUTO-INC qui dépasse son délai, où seule la requête
+  est annulée : l'appelant fait donc toujours son `ROLLBACK` lui-même, et un
+  1467 rendu après plus de 5 s (une attente, pas un interblocage) ne se rejoue
+  pas — comme `ER_LOCK_WAIT_TIMEOUT`. Un 1467 qui résiste au rejeu est écrit
+  en erreur dans pm2 (`[db] ER_AUTOINC_READ_FAILED non résolu par le rejeu`) :
+  ce code est aussi celui d'un compteur illisible ;
+- les réservations des joueurs (`claimDatedMark`, pose de `TOLD`), des
+  instructions seules, sont rejouées elles aussi quand elles sont la victime.
+
+Règle pour toute écriture de marque : dans une transaction, **ne jamais
+insérer après une lecture verrouillante (`FOR UPDATE`, `DELETE`) d'une ligne
+absente** de la même table — insérer d'abord (`upsertSeenMark` le fait déjà
+avant son ménage). Corollaire tenu par `mariadb-sql-compat.test.ts` : aucune
+insertion nue dans `bg_match_reminders` — toujours `INSERT IGNORE` ou
+`ON DUPLICATE KEY UPDATE`, qui n'ont besoin d'aucune lecture préalable.
+
 `staffTimeToRemove` rend l'horaire qu'elle tient — celui que montrent leurs
 appareils, même si un changement plus récent n'a atteint personne — s'il vaut
 encore, et le retrait cite cet horaire-là ; encore valable

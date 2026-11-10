@@ -26,7 +26,7 @@ import { loadTournamentRow, getMatchRows } from "./repository";
 import { lockTournamentRow } from "./registration";
 import type { TournamentRow } from "./_internal";
 import { publishUpdatedEvent } from "./notifications";
-import { isTransactionAborted } from "@/lib/server/mysql-errors";
+import { retryOnDeadlock } from "./deadlock-retry";
 
 export type SeedingBoard = {
   entries: SeedingEntry[];
@@ -178,9 +178,9 @@ export async function loadSeedingBoard(tournamentId: number): Promise<SeedingBoa
  * relit les matchs, voit la saisie commitée et refuse en `SEEDING_LOCKED`.
  * Si c'est la saisie qui est défaite, elle échoue en erreur visible (ses
  * chemins ne rejouent pas) et le réordonnancement passe : aucun score n'est
- * perdu en silence.
+ * perdu en silence. Le rejeu est celui de tous les gestes du moteur
+ * (`retryOnDeadlock` : trois tentatives, attente courte et aléatoire).
  */
-const REORDER_DEADLOCK_ATTEMPTS = 3;
 
 /**
  * Applique un nouvel ordre de seeding.
@@ -188,14 +188,7 @@ const REORDER_DEADLOCK_ATTEMPTS = 3;
  * @throws TOURNAMENT_NOT_FOUND | SEEDING_LOCKED | SEEDING_LOCKED_STARTED | SEEDING_LOCKED_FINISHED | INVALID_SEED_ORDER
  */
 export async function reorderSeeding(tournamentId: number, orderedTeamIds: number[]): Promise<void> {
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      await reorderSeedingOnce(tournamentId, orderedTeamIds);
-      return;
-    } catch (error) {
-      if (!isTransactionAborted(error) || attempt >= REORDER_DEADLOCK_ATTEMPTS) throw error;
-    }
-  }
+  await retryOnDeadlock(() => reorderSeedingOnce(tournamentId, orderedTeamIds));
 }
 
 async function reorderSeedingOnce(tournamentId: number, orderedTeamIds: number[]): Promise<void> {
@@ -214,7 +207,7 @@ async function reorderSeedingOnce(tournamentId: number, orderedTeamIds: number[]
     // arrière, inscription, retrait, autre réordonnancement), celui des matchs
     // les saisies de score (reports, forfaits, arbitrage), qui verrouillent
     // leur match. Tournoi d'abord, comme ces gestes du staff ; l'interblocage
-    // possible avec une saisie est rejoué (`REORDER_DEADLOCK_ATTEMPTS`).
+    // possible avec une saisie est rejoué (`retryOnDeadlock`).
     await lockTournamentRow(connection, tournamentId);
     await lockTournamentMatches(connection, tournamentId);
 

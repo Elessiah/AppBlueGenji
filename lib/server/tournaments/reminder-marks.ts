@@ -7,6 +7,7 @@
  * ses marques appartenaient à l'ancienne affiche. Les nouvelles engagées n'ont
  * reçu aucun horaire et doivent recevoir l'annonce.
  */
+import { randomInt } from "node:crypto";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
 import { ignoreMissingTable, isMissingTableError } from "@/lib/server/mysql-errors";
@@ -44,11 +45,16 @@ export async function claimDatedMark(
   // horaire peut la rendre (`releaseClaims`). Les engagées aussi sont
   // vérifiées : une affiche changée a vu ses marques effacées, et ses nouvelles
   // engagées attendent leur annonce.
-  const [result] = await db.execute(
-    `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)
+  // Rejouée sur interblocage : une instruction seule, défaite entière quand
+  // elle est la victime (son `INSERT … SELECT` tient le verrou AUTO-INC de la
+  // table, et attend la manche ou l'intervalle qu'une programmation tient).
+  const [result] = await retryOnDeadlock(() =>
+    db.execute(
+      `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at)
        SELECT ?, ?, start_at FROM bg_matches
         WHERE id = ? AND start_at = ? AND team1_id = ? AND team2_id = ?`,
-    [matchId, offsetKey, matchId, match.start_at, Number(match.team1_id), Number(match.team2_id)],
+      [matchId, offsetKey, matchId, match.start_at, Number(match.team1_id), Number(match.team2_id)],
+    ),
   );
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
@@ -105,26 +111,48 @@ type StaffRow = RowDataPacket & { id: number; start_at: Date | string | null };
  * concurrents attendent, et la réservation retient la ligne et la valeur
  * qu'elle a réellement remplacées.
  *
+ * **Une marque absente s'insère sans avoir été lue sous verrou**
+ * (`reserveStaffMark` : lecture simple, insertion, et lecture verrouillante
+ * seulement d'une marque présente) : lire sous verrou une marque absente verrouille l'intervalle de
+ * l'index, et l'insertion qui suivrait attendrait le verrou AUTO-INC de la
+ * table — que tient, jusqu'à la fin de son instruction, l'`INSERT … SELECT`
+ * d'une réservation des joueurs ({@link claimDatedMark}, pose de `TOLD`)
+ * partie **en même temps pour la même manche**, elle-même arrêtée par cet
+ * intervalle. Interblocage, rendu par MariaDB en `ER_AUTOINC_READ_FAILED` :
+ * la marque n'était pas retenue, et le retrait de l'horaire ne se poussait
+ * plus aux arbitres.
+ *
  * @returns `null` : la manche ne tient plus cet horaire (changé ou retiré
  *          depuis) — rien à pousser, le geste plus récent a ses propres avis.
  */
 export async function markStaffPushed(matchId: number, startAt: string): Promise<StaffReservation | null> {
   try {
-    // Rejouée sur interblocage : deux réservations dont les marques absentes
-    // partagent un intervalle d'index s'attendent l'une l'autre.
-    return await retryOnDeadlock(() =>
-      withConnection(async (connection) => {
-        await connection.beginTransaction();
-        try {
-          const reservation = await reserveStaffMark(connection, matchId, startAt);
-          await connection.commit();
-          return reservation;
-        } catch (error) {
-          await connection.rollback().catch(() => undefined);
-          throw error;
-        }
-      }),
-    );
+    for (let attempt = 1; attempt <= STAFF_MARK_ATTEMPTS; attempt += 1) {
+      // Rejouée sur interblocage (`ER_AUTOINC_READ_FAILED` compris) : la
+      // réservation tient la manche en lecture pendant qu'elle insère.
+      const reservation = await retryOnDeadlock(() =>
+        withConnection(async (connection) => {
+          await connection.beginTransaction();
+          try {
+            const reserved = await reserveStaffMark(connection, matchId, startAt);
+            // Marque disparue ou apparue pendant la réservation : la
+            // transaction est défaite (elle tient un verrou d'intervalle, sous
+            // lequel on n'insère pas) et la réservation reprise à neuf.
+            if (reserved === MARK_MOVED) await connection.rollback();
+            else await connection.commit();
+            return reserved;
+          } catch (error) {
+            await connection.rollback().catch(() => undefined);
+            throw error;
+          }
+        }),
+      );
+      if (reservation !== MARK_MOVED) return reservation;
+      // Attente courte et aléatoire avant de reprendre : deux réservations
+      // qui se sont croisées ne repartent pas du même pas.
+      if (attempt < STAFF_MARK_ATTEMPTS) await new Promise((resolve) => setTimeout(resolve, randomInt(20, 81)));
+    }
+    throw new Error("STAFF_MARK_NOT_RESERVED");
   } catch (error) {
     // Table absente ou marque illisible : on pousse quand même (sans marque,
     // le retrait ne sera simplement pas poussé).
@@ -133,11 +161,17 @@ export async function markStaffPushed(matchId: number, startAt: string): Promise
   }
 }
 
+/** Reprises d'une réservation dont la marque a bougé pendant qu'on la prenait. */
+const STAFF_MARK_ATTEMPTS = 2;
+
+/** La marque a disparu (ou paru) entre sa lecture simple et son verrou. */
+const MARK_MOVED = "moved";
+
 async function reserveStaffMark(
   connection: PoolConnection,
   matchId: number,
   startAt: string,
-): Promise<StaffReservation | null> {
+): Promise<StaffReservation | null | typeof MARK_MOVED> {
   const time = new Date(startAt);
   // Une table par lecture verrouillante (MariaDB).
   const [matches] = await connection.execute<(RowDataPacket & { start_at: Date | string | null })[]>(
@@ -146,23 +180,38 @@ async function reserveStaffMark(
   );
   const current = matches[0]?.start_at ?? null;
   if (current === null || new Date(current).getTime() !== time.getTime()) return null;
+  // Lecture **simple** d'abord : elle ne verrouille rien, et dit seulement
+  // quel chemin prendre — chacun revérifie sous verrou.
+  const [seen] = await connection.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1`,
+    [matchId, MATCH_STAFF_KEY],
+  );
+  if (seen.length === 0) {
+    // Marque absente : l'insertion, sans aucun verrou d'intervalle pris avant
+    // elle (voir `markStaffPushed`). `IGNORE` : une marque parue entre-temps
+    // n'est pas une erreur — la réservation reprend, et la lira.
+    const [inserted] = await connection.execute<ResultSetHeader>(
+      `INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at) VALUES (?, ?, ?)`,
+      [matchId, MATCH_STAFF_KEY, time],
+    );
+    if (inserted.affectedRows !== 1) return MARK_MOVED;
+    return { kind: "reserved", id: Number(inserted.insertId), startAt, previous: null };
+  }
+  // Marque présente : lue sous verrou d'écriture (sa ligne, pas un intervalle ;
+  // ni identifiant consommé ni verrou AUTO-INC sur ce chemin, le plus courant).
   const [rows] = await connection.execute<StaffRow[]>(
     `SELECT id, start_at FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1 FOR UPDATE`,
     [matchId, MATCH_STAFF_KEY],
   );
   const before = rows[0];
-  if (before && before.start_at !== null && new Date(before.start_at).getTime() === time.getTime()) {
+  // Disparue depuis la lecture simple (retrait poussé entre-temps) : ce verrou
+  // tient maintenant l'intervalle — on n'insère pas dessous, on reprend.
+  if (!before) return MARK_MOVED;
+  if (before.start_at !== null && new Date(before.start_at).getTime() === time.getTime()) {
     return { kind: "held" };
   }
-  if (before) {
-    await connection.execute(`UPDATE bg_match_reminders SET start_at = ? WHERE id = ?`, [time, before.id]);
-    return { kind: "reserved", id: Number(before.id), startAt, previous: before.start_at };
-  }
-  const [result] = await connection.execute<ResultSetHeader>(
-    `INSERT INTO bg_match_reminders (match_id, offset_key, start_at) VALUES (?, ?, ?)`,
-    [matchId, MATCH_STAFF_KEY, time],
-  );
-  return { kind: "reserved", id: Number(result.insertId), startAt, previous: null };
+  await connection.execute(`UPDATE bg_match_reminders SET start_at = ? WHERE id = ?`, [time, before.id]);
+  return { kind: "reserved", id: Number(before.id), startAt, previous: before.start_at };
 }
 
 /**
