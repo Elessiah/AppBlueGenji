@@ -486,19 +486,28 @@ cet interblocage à la victime sous le code 1467 : la marque n'était pas
 retenue (`horaire poussé aux arbitres non retenu` dans pm2), et le retrait de
 l'horaire ne se poussait plus aux arbitres. Deux remèdes :
 
-- `markStaffPushed` **insère d'abord** (`INSERT IGNORE … VALUES`, sans verrou
-  d'intervalle pris avant) et ne lit la marque sous verrou que si elle existait
-  déjà (verrou de ligne, pas d'intervalle) ;
-- 1467 est un interblocage comme un autre (`isAutoIncrementContention`,
-  `lib/server/mysql-errors.ts`) : `isTransactionAborted` le reconnaît — la
-  transaction est défaite, aucun `catch` ne doit poursuivre dessus —,
-  `retryOnDeadlock` le rejoue, et une route qui n'en vient pas à bout rend
-  `CONCURRENT_UPDATE_RETRY` (409) au lieu d'une panne.
+- `markStaffPushed` ne lit plus sous verrou une marque absente : une lecture
+  **simple** dit si elle existe ; absente, elle s'insère (`INSERT IGNORE …
+  VALUES`, aucun verrou d'intervalle pris avant) ; présente, elle est lue sous
+  verrou (sa ligne, pas un intervalle — ni identifiant consommé ni verrou
+  AUTO-INC sur ce chemin). Une marque qui paraît ou disparaît entre les deux
+  défait la transaction, et la réservation reprend à neuf (trois fois au plus) ;
+- 1467 est traité comme un interblocage (`isAutoIncrementContention`,
+  `lib/server/mysql-errors.ts`) : `isTransactionAborted` le reconnaît — aucun
+  `catch` ne doit poursuivre sur la transaction —, `retryOnDeadlock` le
+  rejoue, et une route qui n'en vient pas à bout rend
+  `CONCURRENT_UPDATE_RETRY` (409) au lieu d'une panne. Le même code couvre
+  une attente du verrou AUTO-INC qui dépasse son délai, où seule la requête
+  est annulée : l'appelant fait donc toujours son `ROLLBACK` lui-même ;
+- les réservations des joueurs (`claimDatedMark`, pose de `TOLD`), des
+  instructions seules, sont rejouées elles aussi quand elles sont la victime.
 
 Règle pour toute écriture de marque : dans une transaction, **ne jamais
 insérer après une lecture verrouillante (`FOR UPDATE`, `DELETE`) d'une ligne
 absente** de la même table — insérer d'abord (`upsertSeenMark` le fait déjà
-avant son ménage).
+avant son ménage). Corollaire tenu par `mariadb-sql-compat.test.ts` : aucune
+insertion nue dans `bg_match_reminders` — toujours `INSERT IGNORE` ou
+`ON DUPLICATE KEY UPDATE`, qui n'ont besoin d'aucune lecture préalable.
 
 `staffTimeToRemove` rend l'horaire qu'elle tient — celui que montrent leurs
 appareils, même si un changement plus récent n'a atteint personne — s'il vaut

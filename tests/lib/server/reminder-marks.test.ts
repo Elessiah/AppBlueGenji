@@ -4,6 +4,7 @@ jest.mock("@/lib/server/database");
 
 import { getDatabase, withConnection } from "@/lib/server/database";
 import {
+  claimDatedMark,
   forgetMatchReminders,
   forgetStaffPush,
   markStaffPushed,
@@ -11,6 +12,49 @@ import {
   releaseStaffPush,
 } from "@/lib/server/tournaments/reminder-marks";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
+
+describe("claimDatedMark", () => {
+  const match = { id: 31, start_at: new Date("2099-01-01T18:00:00Z"), team1_id: 4, team2_id: 5 };
+  const autoInc = () =>
+    Object.assign(new Error("Failed to read auto-increment value from storage engine"), {
+      code: "ER_AUTOINC_READ_FAILED",
+      errno: 1467,
+    });
+
+  it("claimDatedMark_freeMark_returnsTrue", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    expect(await claimDatedMark(match, "P1D")).toBe(true);
+
+    expect(execute.mock.calls[0]?.[1]).toEqual([31, "P1D", 31, match.start_at, 4, 5]);
+  });
+
+  it("claimDatedMark_duplicateOrMovedSchedule_returnsFalse", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    expect(await claimDatedMark(match, "P1D")).toBe(false);
+  });
+
+  it("claimDatedMark_autoIncFailureOnce_replaysTheStatement", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(autoInc()).mockResolvedValueOnce([{ affectedRows: 1 }]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    expect(await claimDatedMark(match, "P1D")).toBe(true);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("claimDatedMark_otherError_throwsWithoutReplay", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("base injoignable"));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await expect(claimDatedMark(match, "P1D")).rejects.toThrow("base injoignable");
+
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("releaseDatedMarks", () => {
   it("ne rend que les marques prises pour cet horaire", async () => {
@@ -107,33 +151,38 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
     return connection;
   }
 
+  const MARK_SEEN = "SELECT id FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1";
+  const MARK_UPDATE = "UPDATE bg_match_reminders SET start_at = ? WHERE id = ?";
+
   /**
-   * Transaction de réservation : horaire de la manche, insertion de la marque
-   * (écartée si `existing` la tient déjà), puis lecture verrouillée et écriture.
+   * Transaction de réservation : horaire de la manche, lecture simple de la
+   * marque, puis son insertion (absente) ou sa lecture verrouillée (`existing`).
    */
   function staffDb(existing: { id: number; start_at: Date | null } | null, matchStart: Date | null = new Date(T), insertId = 77) {
     const connection = transactionMock();
-    connection.execute
-      .mockResolvedValueOnce([[{ start_at: matchStart }]])
-      .mockResolvedValueOnce([existing ? { affectedRows: 0, insertId: 0 } : { affectedRows: 1, insertId }])
-      .mockResolvedValueOnce([existing ? [existing] : []])
-      .mockResolvedValue([{ affectedRows: 1 }]);
+    connection.execute.mockResolvedValueOnce([[{ start_at: matchStart }]]);
+    if (existing) {
+      connection.execute.mockResolvedValueOnce([[{ id: existing.id }]]).mockResolvedValueOnce([[existing]]);
+    } else {
+      connection.execute.mockResolvedValueOnce([[]]);
+    }
+    connection.execute.mockResolvedValue([{ affectedRows: 1, insertId }]);
     return connection;
   }
 
   const sqlsOf = (connection: ReturnType<typeof connectionMock>) => connection.execute.mock.calls.map(([sql]) => String(sql));
 
-  it("markStaffPushed_noMarkYet_insertsFirstAndReserves", async () => {
+  it("markStaffPushed_noMarkYet_insertsWithoutLockingRead", async () => {
     const connection = staffDb(null);
 
     const reservation = await markStaffPushed(31, T);
 
     expect(reservation).toEqual({ kind: "reserved", id: 77, startAt: T, previous: null });
-    // La manche, puis l'insertion — et aucune lecture verrouillante de la marque
-    // absente : c'est elle qui verrouillait l'intervalle et menait à
-    // ER_AUTOINC_READ_FAILED face à un INSERT … SELECT concurrent.
-    expect(sqlsOf(connection)).toEqual([MATCH_LOCK, MARK_INSERT]);
-    expect(connection.execute.mock.calls[1]).toEqual([MARK_INSERT, [31, "STAFF", new Date(T)]]);
+    // La manche, une lecture simple, puis l'insertion — aucune lecture
+    // verrouillante de la marque absente : c'est elle qui verrouillait
+    // l'intervalle et menait à ER_AUTOINC_READ_FAILED face à un INSERT … SELECT.
+    expect(sqlsOf(connection)).toEqual([MATCH_LOCK, MARK_SEEN, MARK_INSERT]);
+    expect(connection.execute.mock.calls[2]).toEqual([MARK_INSERT, [31, "STAFF", new Date(T)]]);
     expect(connection.commit).toHaveBeenCalledTimes(1);
   });
 
@@ -150,8 +199,8 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
 
     expect(await markStaffPushed(31, T)).toEqual({ kind: "held" });
 
-    // Doublon (match_id, offset_key) : l'insertion est écartée, la ligne lue sous verrou, rien n'est réécrit.
-    expect(sqlsOf(connection)).toEqual([MATCH_LOCK, MARK_INSERT, MARK_LOCK]);
+    // Marque (match_id, offset_key) déjà là : lue sous verrou, ni insérée ni réécrite.
+    expect(sqlsOf(connection)).toEqual([MATCH_LOCK, MARK_SEEN, MARK_LOCK]);
     const execute = jest.fn<SqlQuery>();
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
     await releaseStaffPush({ kind: "held" });
@@ -164,35 +213,65 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
     const reservation = await markStaffPushed(31, T);
 
     expect(reservation).toEqual({ kind: "reserved", id: 5, startAt: T, previous: OTHER });
-    expect(sqlsOf(connection)).toEqual([MATCH_LOCK, MARK_INSERT, MARK_LOCK, "UPDATE bg_match_reminders SET start_at = ? WHERE id = ?"]);
-    expect(connection.execute.mock.calls[3]).toEqual(["UPDATE bg_match_reminders SET start_at = ? WHERE id = ?", [new Date(T), 5]]);
+    expect(sqlsOf(connection)).toEqual([MATCH_LOCK, MARK_SEEN, MARK_LOCK, MARK_UPDATE]);
+    expect(connection.execute.mock.calls[3]).toEqual([MARK_UPDATE, [new Date(T), 5]]);
   });
 
-  it("releaseStaffPush_reservedMark_restoresWhatItHeld", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
-
-    await releaseStaffPush({ kind: "reserved", id: 5, startAt: T, previous: OTHER });
-    await releaseStaffPush({ kind: "reserved", id: 77, startAt: T, previous: null });
-
-    expect(execute.mock.calls[0]).toEqual([
-      "UPDATE bg_match_reminders SET start_at = ? WHERE id = ? AND start_at <=> ?",
-      [OTHER, 5, new Date(T)],
-    ]);
-    expect(execute.mock.calls[1]).toEqual(["DELETE FROM bg_match_reminders WHERE id = ? AND start_at <=> ?", [77, new Date(T)]]);
-  });
-
-  it("markStaffPushed_ignoredInsertAndNoRow_pushesUnmarked", async () => {
-    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+  it("markStaffPushed_markAppearsDuringInsert_restartsAndReadsIt", async () => {
     const connection = transactionMock();
     connection.execute
+      // 1re transaction : absente à la lecture simple, déjà là à l'insertion.
       .mockResolvedValueOnce([[{ start_at: new Date(T) }]])
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([{ affectedRows: 0, insertId: 0 }])
-      .mockResolvedValueOnce([[]]);
+      // 2e transaction : présente, redatée.
+      .mockResolvedValueOnce([[{ start_at: new Date(T) }]])
+      .mockResolvedValueOnce([[{ id: 9 }]])
+      .mockResolvedValueOnce([[{ id: 9, start_at: OTHER }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const reservation = await markStaffPushed(31, T);
+
+    expect(reservation).toEqual({ kind: "reserved", id: 9, startAt: T, previous: OTHER });
+    expect(sqlsOf(connection)).toEqual([MATCH_LOCK, MARK_SEEN, MARK_INSERT, MATCH_LOCK, MARK_SEEN, MARK_LOCK, MARK_UPDATE]);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("markStaffPushed_markVanishesBeforeLock_restartsAndInsertsOutsideTheGapLock", async () => {
+    const connection = transactionMock();
+    connection.execute
+      // 1re transaction : vue, puis disparue sous le verrou (retrait poussé).
+      .mockResolvedValueOnce([[{ start_at: new Date(T) }]])
+      .mockResolvedValueOnce([[{ id: 9 }]])
+      .mockResolvedValueOnce([[]])
+      // 2e transaction : absente, insérée.
+      .mockResolvedValueOnce([[{ start_at: new Date(T) }]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{ affectedRows: 1, insertId: 80 }]);
+
+    const reservation = await markStaffPushed(31, T);
+
+    expect(reservation).toEqual({ kind: "reserved", id: 80, startAt: T, previous: null });
+    // Jamais d'insertion dans la transaction qui a verrouillé l'intervalle.
+    expect(sqlsOf(connection)).toEqual([MATCH_LOCK, MARK_SEEN, MARK_LOCK, MATCH_LOCK, MARK_SEEN, MARK_INSERT]);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("markStaffPushed_markKeepsMoving_pushesUnmarkedAfterThreeTries", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const connection = transactionMock();
+    connection.execute.mockImplementation(async (sql) => {
+      if (String(sql) === MATCH_LOCK) return [[{ start_at: new Date(T) }]];
+      if (String(sql) === MARK_SEEN) return [[]];
+      return [{ affectedRows: 0, insertId: 0 }];
+    });
 
     expect(await markStaffPushed(31, T)).toEqual({ kind: "unmarked" });
 
-    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(3);
+    expect(connection.rollback).toHaveBeenCalledTimes(3);
     expect(connection.commit).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalledTimes(1);
     error.mockRestore();
@@ -203,8 +282,10 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
     const connection = transactionMock();
     connection.execute
       .mockResolvedValueOnce([[{ start_at: new Date(T) }]])
+      .mockResolvedValueOnce([[]])
       .mockRejectedValueOnce(autoIncFailure())
       .mockResolvedValueOnce([[{ start_at: new Date(T) }]])
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([{ affectedRows: 1, insertId: 78 }]);
 
     const reservation = await markStaffPushed(31, T);
@@ -214,7 +295,7 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
     expect(connection.beginTransaction).toHaveBeenCalledTimes(2);
     expect(connection.rollback).toHaveBeenCalledTimes(1);
     expect(connection.commit).toHaveBeenCalledTimes(1);
-    expect(sqlsOf(connection)).toEqual([MATCH_LOCK, MARK_INSERT, MATCH_LOCK, MARK_INSERT]);
+    expect(sqlsOf(connection)).toEqual([MATCH_LOCK, MARK_SEEN, MARK_INSERT, MATCH_LOCK, MARK_SEEN, MARK_INSERT]);
     expect(error).not.toHaveBeenCalled();
     error.mockRestore();
   });
@@ -224,6 +305,7 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
     const connection = transactionMock();
     connection.execute.mockImplementation(async (sql) => {
       if (String(sql) === MATCH_LOCK) return [[{ start_at: new Date(T) }]];
+      if (String(sql) === MARK_SEEN) return [[]];
       throw autoIncFailure();
     });
 
@@ -242,6 +324,20 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
     expect(await markStaffPushed(31, T)).toEqual({ kind: "unmarked" });
     expect(connection.rollback).toHaveBeenCalledTimes(1);
     error.mockRestore();
+  });
+
+  it("releaseStaffPush_reservedMark_restoresWhatItHeld", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await releaseStaffPush({ kind: "reserved", id: 5, startAt: T, previous: OTHER });
+    await releaseStaffPush({ kind: "reserved", id: 77, startAt: T, previous: null });
+
+    expect(execute.mock.calls[0]).toEqual([
+      "UPDATE bg_match_reminders SET start_at = ? WHERE id = ? AND start_at <=> ?",
+      [OTHER, 5, new Date(T)],
+    ]);
+    expect(execute.mock.calls[1]).toEqual(["DELETE FROM bg_match_reminders WHERE id = ? AND start_at <=> ?", [77, new Date(T)]]);
   });
 
   it("oublie l'horaire retiré, sauf si la manche l'a retrouvé pendant l'envoi (reposé par un autre arbitre)", async () => {

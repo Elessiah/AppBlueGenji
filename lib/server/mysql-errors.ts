@@ -29,7 +29,10 @@ function errorCode(error: unknown): string | null {
  *
  * L'autre cas est le même interblocage **sous un autre nom**
  * ({@link isAutoIncrementContention}) : la transaction est défaite tout
- * pareil, et la poursuivre serait la même faute.
+ * pareil, et la poursuivre serait la même faute. Ce code-là ne dit pas à lui
+ * seul si le serveur l'a défaite (voir le prédicat) : il est tenu pour
+ * « défaite » par prudence, et l'appelant fait **toujours** son `ROLLBACK`
+ * lui-même avant de rejouer ou de rendre la connexion.
  */
 export function isTransactionAborted(error: unknown): boolean {
   return errorCode(error) === "ER_LOCK_DEADLOCK" || isAutoIncrementContention(error);
@@ -46,6 +49,11 @@ export function isTransactionAborted(error: unknown): boolean {
  *
  * Rencontré en production sur `bg_match_reminders` (deux fois, novembre
  * 2026). Même remède que l'interblocage : rejouer la transaction entière.
+ *
+ * Le même code couvre l'attente de ce verrou qui dépasse son délai
+ * (`innodb_lock_wait_timeout`) : la requête seule est alors annulée, la
+ * transaction reste ouverte. Rien ne les distingue dans l'erreur — d'où le
+ * `ROLLBACK` explicite de tout appelant, dans les deux cas.
  */
 export function isAutoIncrementContention(error: unknown): boolean {
   return errorCode(error) === "ER_AUTOINC_READ_FAILED" || errorNumber(error) === 1467;
@@ -121,8 +129,8 @@ function errorNumber(error: unknown): number | null {
 }
 
 /**
- * `true` si l'erreur est une contention passagère — interblocage,
- * `ER_CHECKREAD`, délai de verrou —, lue sur le **code** de l'erreur d'abord
+ * `true` si l'erreur est une contention passagère — interblocage
+ * (`ER_AUTOINC_READ_FAILED` compris), `ER_CHECKREAD`, délai de verrou —, lue sur le **code** de l'erreur d'abord
  * (indépendant de la langue des messages du serveur, `lc_messages`), sur son
  * message ensuite. Règle des routes qui remplacent le message par un code fixe
  * avant `fail()`, et ne profitent donc pas de sa reconnaissance.

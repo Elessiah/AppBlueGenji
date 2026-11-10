@@ -50,7 +50,34 @@ const FORBIDDEN: { pattern: RegExp; why: string }[] = [
   },
 ];
 
+/**
+ * `ER_AUTOINC_READ_FAILED` en production (MariaDB, `innodb_autoinc_lock_mode
+ * = 1`) : une insertion **nue** dans `bg_match_reminders` suppose qu'une
+ * lecture verrouillante a d'abord établi l'absence de la ligne — et c'est ce
+ * verrou d'intervalle qui s'interbloque avec le verrou AUTO-INC d'un
+ * `INSERT … SELECT` concurrent. Toute insertion y est donc `INSERT IGNORE` ou
+ * `ON DUPLICATE KEY UPDATE`, qui se passent de lecture préalable.
+ */
+function bareReminderInserts(text: string): string[] {
+  return (text.match(/INSERT\s+INTO\s+bg_match_reminders\b[^`]*/gi) ?? []).filter(
+    (statement) => !/ON\s+DUPLICATE\s+KEY\s+UPDATE/i.test(statement),
+  );
+}
+
 describe("SQL compatible MariaDB", () => {
+  it("refuse une insertion nue dans bg_match_reminders (ni IGNORE ni ON DUPLICATE KEY)", () => {
+    const offenders = sources.filter(({ text }) => bareReminderInserts(text).length > 0).map(({ path }) => path);
+    expect(offenders).toEqual([]);
+  });
+
+  it("reconnaît une insertion nue, et laisse passer les deux formes sûres", () => {
+    expect(bareReminderInserts("`INSERT INTO bg_match_reminders (match_id, offset_key) VALUES (?, ?)`")).toHaveLength(1);
+    expect(
+      bareReminderInserts("`INSERT INTO bg_match_reminders (match_id) VALUES (?)\n ON DUPLICATE KEY UPDATE start_at = ?`"),
+    ).toEqual([]);
+    expect(bareReminderInserts("`INSERT IGNORE INTO bg_match_reminders (match_id) VALUES (?)`")).toEqual([]);
+  });
+
   it("a bien des sources à balayer", () => {
     expect(sources.length).toBeGreaterThan(100);
   });

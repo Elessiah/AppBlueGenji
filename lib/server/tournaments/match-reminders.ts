@@ -69,6 +69,7 @@ import { onPoster, toPoster, type PosterRow } from "./match-poster";
 import { dispatchRefereeDigest } from "./referee-digest";
 import { newMatchPendingSql } from "./new-match-sql";
 import { claimDatedMark, releaseDatedMarks } from "./reminder-marks";
+import { retryOnDeadlock } from "./deadlock-retry";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
 /** Un horaire tel que la base le rend (`dateStrings`) ou que le code le passe ; `null` : aucun. */
@@ -376,12 +377,16 @@ async function setToldTime(match: ScheduledMatch, startAt: Date | null): Promise
   // La manche est lue **avant** la marque (`INSERT … SELECT`), dans l'ordre de
   // verrouillage du moteur — un `UPDATE … JOIN` pouvait tenir la marque en
   // attendant la manche, et s'interbloquer avec `setMatchStartAt`.
-  const [result] = await db.execute(
-    `INSERT INTO bg_match_reminders (match_id, offset_key, start_at)
+  // Rejouée sur interblocage, comme `claimDatedMark` : une instruction seule,
+  // qui tient le verrou AUTO-INC de la table le temps de lire la manche.
+  const [result] = await retryOnDeadlock(() =>
+    db.execute(
+      `INSERT INTO bg_match_reminders (match_id, offset_key, start_at)
        SELECT ?, ?, ? FROM bg_matches
         WHERE id = ? AND start_at <=> ? AND team1_id = ? AND team2_id = ?
      ON DUPLICATE KEY UPDATE start_at = ?`,
-    [matchId, MATCH_TOLD_KEY, startAt, matchId, startAt, Number(match.team1_id), Number(match.team2_id), startAt],
+      [matchId, MATCH_TOLD_KEY, startAt, matchId, startAt, Number(match.team1_id), Number(match.team2_id), startAt],
+    ),
   );
   return ((result as { affectedRows?: number }).affectedRows ?? 0) > 0;
 }
