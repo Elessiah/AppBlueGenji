@@ -81,7 +81,9 @@ export function termsModalDueOnLoad(input: {
 /**
  * La modale d'arrivée du recrutement doit-elle se taire ? Elle passe après
  * toute modale qui attend une réponse, et se tait sur la connexion (la modale
- * de consentement y est la seule à avoir sa place). La certification du tag
+ * de consentement y est la seule à avoir sa place) **et ses sous-pages** —
+ * l'écran de réactivation (`/connexion/reactivation`) pose une question qui
+ * n'attend pas derrière une annonce. La certification du tag
  * Discord la tient, elle, par `modalHeld` (`RecruitmentHighlight`), verrouillé
  * pour la page.
  */
@@ -90,7 +92,8 @@ export function recruitmentModalSilenced(input: {
   termsModalDue: boolean;
   pathname: string | null | undefined;
 }): boolean {
-  return input.privacyPending || input.termsModalDue || input.pathname === LOGIN_PATH;
+  const onLogin = input.pathname === LOGIN_PATH || input.pathname?.startsWith(`${LOGIN_PATH}/`) === true;
+  return input.privacyPending || input.termsModalDue || onLogin;
 }
 
 /**

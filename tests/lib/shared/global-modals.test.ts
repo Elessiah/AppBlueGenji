@@ -77,6 +77,9 @@ describe("recruitmentModalSilenced", () => {
 
   it("se tait sur la connexion, dont la modale de consentement passe d'abord", () => {
     expect(recruitmentModalSilenced({ ...base, pathname: LOGIN_PATH })).toBe(true);
+    // L'écran de réactivation pose une question : aucune annonce par-dessus.
+    expect(recruitmentModalSilenced({ ...base, pathname: "/connexion/reactivation" })).toBe(true);
+    expect(recruitmentModalSilenced({ ...base, pathname: "/connexions" })).toBe(false);
   });
 });
 

@@ -44,7 +44,8 @@ const refresh = jest.fn<() => void>();
 jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError, showSuccess, showInfo }) }));
 jest.mock("@/components/i18n/locale-navigation", () => ({
   LocaleLink: () => null,
-  useLocaleRouter: () => ({ push, refresh }),
+  // Les sorties de l'écran passent par `replace` (pas d'entrée morte dans l'historique).
+  useLocaleRouter: () => ({ push, replace: push, refresh }),
 }));
 jest.mock("@/components/cyber/CyberButton", () => ({ CyberButton: () => null }));
 jest.mock("@/components/cyber/CyberCard", () => ({ CyberCard: () => null }));
@@ -56,7 +57,7 @@ jest.mock("@/components/i18n/login-text", () => ({
   useLoginText: () => jest.requireActual<typeof import("@/lib/shared/login-text")>("@/lib/shared/login-text").FR_LOGIN_TEXT,
 }));
 
-type Props = { disabled?: boolean; "aria-busy"?: boolean; onClick?: () => Promise<void>; children?: ReactNode };
+type Props = { "aria-disabled"?: boolean; "aria-busy"?: boolean; onClick?: () => Promise<void>; children?: ReactNode };
 
 function render(finalAt: string | null, hadTicket = true): ReactElement {
   cursor = 0;
@@ -152,7 +153,7 @@ describe("ReactivationPanel", () => {
     await findButton(render(FUTURE))!.props.onClick!();
     expect(showError).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.failed"));
     expect(FR_LOGIN_TEXT.t("reactivation.failed")).not.toContain("Reconnecte-toi");
-    expect(findButton(render(FUTURE))!.props.disabled).toBe(false);
+    expect(findButton(render(FUTURE))!.props["aria-disabled"]).toBe(false);
   });
 
   it("pendant l'envoi : libellé d'attente, aria-busy, et « Ne pas réactiver » neutralisé", async () => {
@@ -162,7 +163,7 @@ describe("ReactivationPanel", () => {
     const [confirm, cancel] = findButtons(render(FUTURE));
     expect(confirm.props.children).toBe(FR_LOGIN_TEXT.t("reactivation.confirming"));
     expect(confirm.props["aria-busy"]).toBe(true);
-    expect(cancel.props.disabled).toBe(true);
+    expect(cancel.props["aria-disabled"]).toBe(true);
     release(jsonResponse(200, { reactivated: true }));
     await pending;
   });
@@ -214,7 +215,7 @@ describe("ReactivationPanel", () => {
     const [confirm, cancel] = findButtons(render(FUTURE));
     expect(confirm.props.children).toBe(FR_LOGIN_TEXT.t("reactivation.confirm"));
     expect(confirm.props["aria-busy"]).toBe(false);
-    expect(confirm.props.disabled).toBe(true);
+    expect(confirm.props["aria-disabled"]).toBe(true);
     expect(cancel.props["aria-busy"]).toBe(true);
     release(jsonResponse(200, { discarded: true }));
     await pending;
@@ -226,7 +227,7 @@ describe("ReactivationPanel", () => {
     expect(showError).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.declineFailed"));
     expect(showInfo).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
-    expect(findButtons(render(FUTURE))[1].props.disabled).toBe(false);
+    expect(findButtons(render(FUTURE))[1].props["aria-disabled"]).toBe(false);
   });
 
   it("« Ne pas réactiver » : retire le ticket, dit l'issue avec la date, puis l'accueil", async () => {
@@ -309,7 +310,7 @@ describe("ReactivationPanel", () => {
     expect(showError).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.failed"));
     const again = findButton(render(FUTURE));
     expect(again).not.toBeNull();
-    expect(again!.props.disabled).toBeFalsy();
+    expect(again!.props["aria-disabled"]).toBeFalsy();
   });
 
   it("403 de suspension : le texte de la suspension, jamais « lien expiré »", async () => {
@@ -326,7 +327,7 @@ describe("ReactivationPanel", () => {
     }) as typeof fetch;
     await findButton(render(FUTURE))!.props.onClick!();
     expect(showError).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.failed"));
-    expect(findButton(render(FUTURE))!.props.disabled).toBeFalsy();
+    expect(findButton(render(FUTURE))!.props["aria-disabled"]).toBeFalsy();
   });
 
   it("succès : navigation, et le bouton reste fermé pendant qu'elle court", async () => {
@@ -335,6 +336,6 @@ describe("ReactivationPanel", () => {
     expect(showSuccess).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.done"));
     expect(push).toHaveBeenCalledWith("/profil");
     expect(refresh).toHaveBeenCalled();
-    expect(findButton(render(FUTURE))!.props.disabled).toBe(true);
+    expect(findButton(render(FUTURE))!.props["aria-disabled"]).toBe(true);
   });
 });

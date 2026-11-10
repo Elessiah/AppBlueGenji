@@ -149,10 +149,11 @@
     "backToLogin": "Revenir à la connexion",
     "failed": "La réactivation a échoué. Réessaie dans un instant.",
     "confirming": "Réactivation…",
+    "declining": "Enregistrement…",
     "doneLoginRequired": "Ton compte est réactivé, mais ta session n'a pas pu s'ouvrir. Reconnecte-toi.",
     "declined": "Ton compte n'est pas réactivé : sa suppression deviendra définitive le {date}. D'ici là, te reconnecter te le proposera de nouveau.",
     "missing": "Aucune réactivation n'attend sur cet appareil. Connecte-toi : si la suppression de ton compte est demandée, tu pourras le réactiver.",
-    "pseudoChanged": "Ton pseudo d'avant était pris : tu en portes un autre, à changer dans Mon profil.",
+    "pseudoChanged": "Ton pseudo d'avant n'a pas pu t'être rendu : tu en portes un autre, que tu peux changer dans Mon profil.",
     "declineFailed": "Ton choix n'a pas pu être enregistré. Réessaie dans un instant."
   }
 }

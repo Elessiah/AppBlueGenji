@@ -20,6 +20,12 @@ type ReactivationRefusal = {
   suspension?: { endsAt?: string | null };
 };
 
+/**
+ * Cible de 44 px, et une base fixe : le libellé d'attente, plus court, ne fait
+ * pas remonter le second bouton sur la première ligne (ni l'inverse à l'échec).
+ */
+const BUTTON_STYLE = { minHeight: 44, flex: "1 1 160px", justifyContent: "center" } as const;
+
 /** Délai au-delà duquel « Ne pas réactiver » rend la main (connexion figée). */
 const DECLINE_TIMEOUT_MS = 8000;
 
@@ -37,7 +43,9 @@ export function ReactivationPanel({
   const { t } = text;
   const router = useLocaleRouter();
   const { showError, showSuccess, showInfo } = useToast();
-  // Le geste en cours : les deux boutons se ferment, seul celui du geste dit l'attente.
+  // Le geste en cours : les deux boutons se ferment (`aria-disabled` + garde,
+  // pas `disabled` : le bouton garde le focus et son libellé d'attente reste
+  // lisible), seul celui du geste dit l'attente.
   const [pending, setPending] = useState<"reactivate" | "decline" | null>(null);
   const loading = pending !== null;
   // Le bouton cliqué, désactivé pendant l'envoi, perd le focus : il lui revient
@@ -63,6 +71,8 @@ export function ReactivationPanel({
   useEffect(() => {
     if (expired && !expiredOnMount.current) expiredRef.current?.focus();
   }, [expired]);
+  // Garde des deux gestes : un second clic pendant l'envoi ne part pas.
+  const inFlight = useRef(false);
 
   const date = validFinalAt
     ? new Date(validFinalAt).toLocaleDateString(INTL_LOCALE[text.locale], {
@@ -75,6 +85,7 @@ export function ReactivationPanel({
 
   /** Un échec rend la main, et le focus au bouton du geste. */
   const giveBack = (action: "reactivate" | "decline") => {
+    inFlight.current = false;
     refocus.current = action;
     setPending(null);
   };
@@ -97,11 +108,14 @@ export function ReactivationPanel({
     } else {
       return false;
     }
-    router.push("/connexion");
+    // `replace` : « Précédent » ne ramène pas à un écran dont le ticket a servi.
+    router.replace("/connexion");
     return true;
   };
 
   const reactivate = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setPending("reactivate");
     try {
       const response = await fetch("/api/auth/reactivate", {
@@ -128,7 +142,7 @@ export function ReactivationPanel({
       const done = (await response.json().catch(() => ({}))) as { pseudoChanged?: boolean };
       showSuccess(t("reactivation.done"));
       if (done.pseudoChanged === true) showInfo(t("reactivation.pseudoChanged"));
-      router.push("/profil");
+      router.replace("/profil");
       // La barre de navigation passe à la session ouverte.
       router.refresh();
       // Le geste reste en cours : le bouton ne se rouvre pas pendant la navigation.
@@ -143,6 +157,8 @@ export function ReactivationPanel({
   // Un refus qui n'a pas pu être enregistré (réseau, délai) est dit : le cookie
   // serait resté, et l'écran ne doit pas laisser croire le contraire.
   const decline = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setPending("decline");
     let recorded = false;
     // `AbortController` + minuteur, pas `AbortSignal.timeout` (absent des
@@ -168,7 +184,7 @@ export function ReactivationPanel({
       return;
     }
     showInfo(t("reactivation.declined", { date }));
-    router.push("/");
+    router.replace("/");
     // Le geste reste en cours : rien ne se rouvre pendant la navigation.
   };
 
@@ -187,7 +203,9 @@ export function ReactivationPanel({
           <span className="text-gradient">{t("reactivation.title")}</span>
         </h1>
         {expired ? (
-          <div ref={expiredRef} tabIndex={-1} role="alert" style={{ outline: "none" }}>
+          // `alert` pour le seul ticket périmé sous le clic : ouvert déjà expiré
+          // (ou sans ticket), l'écran est un contenu de page, pas une alerte.
+          <div ref={expiredRef} tabIndex={-1} role={expiredUnderClick ? "alert" : undefined} style={{ outline: "none" }}>
             <p style={{ ...LOGIN_HELP_TEXT_STYLE, fontSize: 14 }}>
               {t(hadTicket || expiredUnderClick ? "reactivation.expired" : "reactivation.missing")}
             </p>
@@ -205,9 +223,9 @@ export function ReactivationPanel({
                 ref={confirmRef}
                 type="button"
                 onClick={reactivate}
-                disabled={loading}
+                aria-disabled={loading}
                 aria-busy={pending === "reactivate"}
-                style={{ minHeight: 44 }}
+                style={BUTTON_STYLE}
               >
                 {t(pending === "reactivate" ? "reactivation.confirming" : "reactivation.confirm")}
               </CyberButton>
@@ -216,11 +234,11 @@ export function ReactivationPanel({
                 type="button"
                 variant="ghost"
                 onClick={decline}
-                disabled={loading}
+                aria-disabled={loading}
                 aria-busy={pending === "decline"}
-                style={{ minHeight: 44 }}
+                style={BUTTON_STYLE}
               >
-                {t("reactivation.cancel")}
+                {t(pending === "decline" ? "reactivation.declining" : "reactivation.cancel")}
               </CyberButton>
             </div>
           </>
