@@ -6,14 +6,14 @@ Règle posée le 2026-10-01, une fois les deux projets arrivés à une version s
 
 - **Règles du 2026-11-10** (remplacent « premier cycle propre » et l'envoi des mineurs dans `ERREUR.txt`) :
   - **Majeur** = faille de sécurité ou RGPD exploitable, perte ou corruption de données, résultat faux pour l'utilisateur dans un parcours normal, plantage, texte légal rendu faux. Chaque majeur est donné avec un **scénario concret** d'échec ; sans scénario, il est mineur. Tout le reste est **mineur**.
-  - **Cycle 1** relit toute la PR ; à partir du **cycle 2**, un cycle ne relit **que le diff depuis le cycle précédent** (`git diff <sha-du-cycle-précédent>..HEAD`).
-  - Un cycle **sans majeur** clôt la boucle : ses mineurs sont corrigés **une fois**, avec tests, **sans nouveau cycle**, puis la PR se fusionne (CI et SonarCloud verts). Un cycle avec un majeur : correction avec tests, puis cycle suivant.
+  - **Cycle 1** relit toute la PR ; à partir du **cycle 2**, un cycle ne relit **que le diff depuis le cycle précédent** (`git diff <sha-du-cycle-précédent>..HEAD`), avec les appelants et le code directement touché par ce diff.
+  - Un cycle **sans majeur** clôt la boucle : ses mineurs sont corrigés **une fois** (avec tests quand c'est du code), **sans nouveau cycle**, puis la PR se fusionne (CI et SonarCloud verts). Un cycle avec un majeur : correction avec tests, puis cycle suivant.
   - **4 cycles au plus par type** : un majeur encore présent au 4e cycle arrête la boucle et remonte à l'utilisateur (c'est en général une question de conception).
   - **Pas d'aller-retour** : chaque relecteur lit les notes des cycles précédents ; un finding qui demande de défaire une correction antérieure ou une décision de l'utilisateur est rejeté et noté.
   - Dans la zone touchée, aucun finding (majeur ou mineur) n'est consigné dans `ERREUR.txt` : il se corrige. Hors zone, seul un **vrai** problème y est consigné (pas une préférence) — dans `ACCESSIBILITE.md` s'il touche l'accessibilité.
   - Un lot de correction d'`ERREUR.txt` prend **~20–30 entrées** par PR, pas davantage.
 - **Un agent neuf par type de revue** quand le lot est confié à des agents, lancés l'un après l'autre (standard, puis UI/UX, performance, sécurité, juridique s'il y a lieu) : aucun relecteur ne porte le contexte ni le biais des passes précédentes, et le relecteur ne réimplémente pas. L'implémentation est faite par un autre agent. Une petite PR menée dans une seule session (correctif d'une ligne, doc seule) enchaîne ses cycles dans la session, sans agent supplémentaire.
-- Une correction faite dans un cycle avec majeur est vérifiée par le cycle suivant **du même type** ; elle ne relance pas la boucle standard ni les autres thèmes. Le cycle **sécurité** passe **en dernier**, après les corrections UI/UX et performance.
+- Une correction faite dans un cycle avec majeur est vérifiée par le cycle suivant **du même type** ; elle ne relance pas la boucle standard ni les autres thèmes. Le cycle **sécurité** passe **en dernier** parmi les cycles thématiques, après les corrections UI/UX et performance ; quand une PR de code change aussi un traitement de données, le cycle **juridique** vient après lui et c'est le dernier relecteur qui fusionne.
 
 ## 2. Boucle standard
 
@@ -23,7 +23,7 @@ Règle posée le 2026-10-01, une fois les deux projets arrivés à une version s
 
 ## 3. Cycles thématiques — PR qui ajoute ou modifie une fonctionnalité
 
-Une fois la boucle standard propre, un cycle par thème, **jamais fusionnés en une seule passe**, chacun relancé selon les règles du § 1, la sécurité en dernier :
+Une fois la boucle standard close (cycle sans majeur), un cycle par thème, **jamais fusionnés en une seule passe**, chacun relancé selon les règles du § 1, la sécurité en dernier parmi eux :
 
 1. **UI/UX** — états (chargement, vide, erreur, désactivé), accessibilité, textes FR et EN, messages par toast (`useToast()`), rendu mobile/responsive, aucune régression visuelle. **Facultatif** quand la PR ne change aucun écran (pages, composants, CSS, textes affichés) ; la seule formulation d'une notification ou d'un message Discord ne l'impose pas.
 2. **Performance** — requêtes et N+1, cache et invalidation, rendus React inutiles, taille du paquet client, poids des réponses et des instantanés, chemins chauds.
@@ -41,7 +41,7 @@ Le thème voyage en **texte libre** dans les arguments du skill : ne compter un 
 
 - **Renommage seul** (fichier, symbole, libellé, sans changement de comportement) : boucle standard uniquement, **aucun** cycle thématique.
 - **Documentation de processus ou de fonctionnalité seule** (`CLAUDE.md`, `docs/*.md`, `docs/features/*.md`, sans texte légal) : boucle standard uniquement — c'est elle qui vérifie l'exactitude technique — **aucun** cycle thématique ni juridique.
-- **Textes légaux** (pages légales, `/rgpd`, registre, `PRIVACY_CHANGES`, conditions, déclaration d'accessibilité, pages légales du bot) : la boucle standard, puis **un cycle orienté juridique** à la place des cycles thématiques, relancé jusqu'à revenir propre — RGPD, LCEN/DSA, recommandations CNIL, cohérence avec `/rgpd`, le registre des traitements (`lib/shared/processing-register.ts`, `REGISTER_UPDATED_AT` avancée) et `PRIVACY_CHANGES`, toute date ou version affichée d'un texte modifié avancée avec lui (par exemple `TERMS_VERSION` **et** `TERMS_UPDATED_AT` pour les conditions d'utilisation, `ACCESSIBILITY_STATEMENT_DATE` pour la déclaration d'accessibilité, les dates françaises et anglaises des pages légales du bot dans `lib/shared/bot-legal-content.ts`), aucune donnée personnelle ni aucun secret publié. Seul le **fond** compte comme finding (traitement, destinataire, donnée, durée ou base légale non déclarés, entrée de registre ou `PRIVACY_CHANGES` manquante, contradiction FR/EN ou texte/code) ; la formulation n'en est jamais un. Exemple :
+- **Textes légaux** (pages légales, `/rgpd`, registre, `PRIVACY_CHANGES`, conditions, déclaration d'accessibilité, pages légales du bot) : la boucle standard, puis **un cycle orienté juridique** à la place des cycles thématiques, relancé selon les règles du § 1 — RGPD, LCEN/DSA, recommandations CNIL, cohérence avec `/rgpd`, le registre des traitements (`lib/shared/processing-register.ts`, `REGISTER_UPDATED_AT` avancée) et `PRIVACY_CHANGES`, toute date ou version affichée d'un texte modifié avancée avec lui (par exemple `TERMS_VERSION` **et** `TERMS_UPDATED_AT` pour les conditions d'utilisation, `ACCESSIBILITY_STATEMENT_DATE` pour la déclaration d'accessibilité, les dates françaises et anglaises des pages légales du bot dans `lib/shared/bot-legal-content.ts`), aucune donnée personnelle ni aucun secret publié. Seul le **fond** compte comme finding (traitement, destinataire, donnée, durée ou base légale non déclarés, entrée de registre ou `PRIVACY_CHANGES` manquante, contradiction FR/EN ou texte/code) ; la formulation n'en est jamais un. Exemple :
 
   ```
   /code-review focus: legal review — GDPR/RGPD, LCEN/DSA, CNIL, consistency with /rgpd, processing register, PRIVACY_CHANGES, no personal data or secrets published
