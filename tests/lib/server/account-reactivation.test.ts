@@ -20,6 +20,7 @@ import { listSoloRegistrationTournamentIds } from "@/lib/server/users/account-de
 import { sendBotLog } from "@/lib/server/bot-integration";
 import {
   createReactivationTicket,
+  discardReactivationTicket,
   peekReactivationTicket,
   reactivateAccount,
   readPendingDeletion,
@@ -77,7 +78,7 @@ function transaction(options: {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(restoreAccountIdentity).mockResolvedValue(true);
+  jest.mocked(restoreAccountIdentity).mockResolvedValue("RESTORED");
   jest.mocked(recordAccountReactivation).mockResolvedValue(undefined);
   jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([]);
 });
@@ -138,6 +139,52 @@ describe("createReactivationTicket", () => {
     expect(params).not.toContain(token);
     expect(params.slice(1)).toEqual([7, "LOGIN_GOOGLE", 15]);
   });
+
+  // Une seconde connexion (autre appareil) ne périme pas l'écran déjà ouvert.
+  it("createReactivationTicket_secondLogin_purgesOnlyExpiredTickets", async () => {
+    const execute = poolExecute([]);
+
+    await createReactivationTicket(7, "LOGIN_GOOGLE");
+
+    const purge = execute.mock.calls.find(([sql]) => sql.startsWith("DELETE FROM bg_account_reactivation_tickets"));
+    expect(purge?.[0]).toBe("DELETE FROM bg_account_reactivation_tickets WHERE expires_at < NOW()");
+  });
+});
+
+describe("discardReactivationTicket", () => {
+  // Le titulaire dit non : un ticket resté sur un autre poste part aussi.
+  it("discardReactivationTicket_validToken_deletesEveryTicketOfThatAccount", async () => {
+    const execute = poolExecute([{ user_id: 7 }]);
+
+    await discardReactivationTicket(TOKEN);
+
+    expect(execute.mock.calls[0][1]).toEqual([TOKEN_HASH]);
+    expect(execute).toHaveBeenLastCalledWith("DELETE FROM bg_account_reactivation_tickets WHERE user_id = ?", [7]);
+  });
+
+  it("discardReactivationTicket_unknownTicket_deletesNothing", async () => {
+    const execute = poolExecute([]);
+
+    await discardReactivationTicket(TOKEN);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("discardReactivationTicket_malformedToken_noQuery", async () => {
+    const execute = poolExecute([]);
+
+    await discardReactivationTicket("pas-un-jeton");
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("discardReactivationTicket_noToken_noQuery", async () => {
+    const execute = poolExecute([]);
+
+    await discardReactivationTicket(undefined);
+
+    expect(execute).not.toHaveBeenCalled();
+  });
 });
 
 describe("peekReactivationTicket", () => {
@@ -168,6 +215,37 @@ describe("peekReactivationTicket", () => {
 });
 
 describe("reactivateAccount", () => {
+  const PENDING = {
+    ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
+    locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
+  };
+
+  // Les tickets d'un autre appareil n'ont plus d'objet une fois le compte réactivé.
+  it("reactivateAccount_valid_dropsEveryTicketOfTheAccountInTransaction", async () => {
+    const connection = transaction(PENDING);
+
+    await reactivateAccount(TOKEN);
+
+    const sqls = connection.execute.mock.calls.map(([sql]) => sql);
+    const dropAll = sqls.indexOf("DELETE FROM bg_account_reactivation_tickets WHERE user_id = ?");
+    expect(dropAll).toBeGreaterThan(-1);
+    expect(connection.execute.mock.invocationCallOrder[dropAll]).toBeLessThan(connection.commit.mock.invocationCallOrder[0]);
+  });
+
+  it("reactivateAccount_realPseudoRestored_pseudoChangedFalse", async () => {
+    transaction(PENDING);
+    jest.mocked(restoreAccountIdentity).mockResolvedValue("RESTORED");
+
+    expect((await reactivateAccount(TOKEN))?.pseudoChanged).toBe(false);
+  });
+
+  it("reactivateAccount_pseudoTakenMeanwhile_pseudoChangedTrue", async () => {
+    transaction(PENDING);
+    jest.mocked(restoreAccountIdentity).mockResolvedValue("RENAMED");
+
+    expect((await reactivateAccount(TOKEN))?.pseudoChanged).toBe(true);
+  });
+
   it("reactivateAccount_unknownTicket_nullWithoutTransaction", async () => {
     const connection = transaction({});
 
@@ -182,7 +260,7 @@ describe("reactivateAccount", () => {
       locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
     });
 
-    expect(await reactivateAccount(TOKEN)).toEqual({ userId: 7, event: "LOGIN_DISCORD" });
+    expect(await reactivateAccount(TOKEN)).toEqual({ userId: 7, event: "LOGIN_DISCORD", pseudoChanged: false });
     const sqls = connection.execute.mock.calls.map(([sql]) => sql);
     expect(sqls.some((sql) => sql.startsWith("DELETE FROM bg_account_reactivation_tickets"))).toBe(true);
     // Le compte revit avec son vrai pseudo et son avatar, sur la transaction.
@@ -208,7 +286,7 @@ describe("reactivateAccount", () => {
       lockErrors: [Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK" })],
     });
 
-    expect(await reactivateAccount(TOKEN)).toEqual({ userId: 7, event: "LOGIN_DISCORD" });
+    expect(await reactivateAccount(TOKEN)).toEqual({ userId: 7, event: "LOGIN_DISCORD", pseudoChanged: false });
 
     expect(connection.beginTransaction).toHaveBeenCalledTimes(2);
     expect(connection.rollback).toHaveBeenCalledTimes(1);
@@ -289,7 +367,7 @@ describe("reactivateAccount", () => {
     jest.mocked(listSoloRegistrationTournamentIds).mockRejectedValue(new Error("DB_DOWN"));
     jest.spyOn(console, "error").mockImplementation(() => {});
 
-    expect(await reactivateAccount(TOKEN)).toEqual({ userId: 7, event: "LOGIN_DISCORD" });
+    expect(await reactivateAccount(TOKEN)).toEqual({ userId: 7, event: "LOGIN_DISCORD", pseudoChanged: false });
   });
 
   it("reactivateAccount_valid_revokesSessionsBeforeCommit", async () => {
@@ -310,7 +388,7 @@ describe("reactivateAccount", () => {
       ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
       locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
     });
-    jest.mocked(restoreAccountIdentity).mockResolvedValue(false);
+    jest.mocked(restoreAccountIdentity).mockResolvedValue(null);
 
     expect(await reactivateAccount(TOKEN)).toBeNull();
     expect(connection.execute.mock.calls.some(([sql]) => sql.startsWith("DELETE FROM bg_user_sessions"))).toBe(false);
@@ -374,7 +452,7 @@ describe("reactivateAccount", () => {
       ticket: { user_id: 7, login_event: "LOGIN_DISCORD" },
       locked: { is_deleted: 1, deletion_requested_at: RECENT, created_at: "2025-01-01 10:00:00" },
     });
-    jest.mocked(restoreAccountIdentity).mockResolvedValue(false);
+    jest.mocked(restoreAccountIdentity).mockResolvedValue(null);
 
     expect(await reactivateAccount(TOKEN)).toBeNull();
     expect(recordAccountReactivation).not.toHaveBeenCalled();
@@ -499,7 +577,7 @@ describe("replayAccountReactivation", () => {
   // tient — l'entrée échoue, rien n'est commité.
   it("replayAccountReactivation_holdMissing_throwsReactivationNotRestoredAndRollsBack", async () => {
     const connection = transaction({ locked: lockedPending });
-    jest.mocked(restoreAccountIdentity).mockResolvedValue(false);
+    jest.mocked(restoreAccountIdentity).mockResolvedValue(null);
 
     await expect(replayAccountReactivation(reactivation)).rejects.toThrow("REACTIVATION_NOT_RESTORED");
 

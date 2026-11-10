@@ -19,6 +19,7 @@ import { getDatabase } from "@/lib/server/database";
 import {
   optimizedImageCacheDirectory,
   purgeOptimizedCopies,
+  rotateHeldAvatarFile,
   rotateHiddenAvatarFile,
   rotatedAvatarTarget,
 } from "@/lib/server/avatar-rotation";
@@ -223,6 +224,184 @@ describe("rotateHiddenAvatarFile", () => {
     mockDb({ avatar_url: OLD_URL, visible_avatar: 0 }, 0, OLD_URL);
     referencedMock.mockResolvedValueOnce(true);
     expect(await rotateHiddenAvatarFile(42)).toBeNull();
+    expect(unlinkMock).toHaveBeenCalledWith(copyMock.mock.calls[0][1]);
+    expect(renameMock).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * L'avatar mis de côté par une demande de suppression attend la réactivation
+ * trente jours : son ancienne adresse ne doit plus rien servir.
+ */
+describe("rotateHeldAvatarFile", () => {
+  /** Lecture du masque, écriture, puis (course perdue) ce que masque et compte désignent. */
+  function mockHold(heldUrl: string | null | undefined, affectedRows = 1, designated: (string | null)[] = []) {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([heldUrl === undefined ? [] : [{ avatar_url: heldUrl }]])
+      .mockResolvedValueOnce([{ affectedRows }])
+      .mockResolvedValueOnce([designated.map((avatar_url) => ({ avatar_url }))]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    return execute;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    renameMock.mockResolvedValue(undefined);
+    copyMock.mockResolvedValue(undefined);
+    unlinkMock.mockResolvedValue(undefined);
+    readFileMock.mockResolvedValue(BYTES);
+    readdirMock.mockResolvedValue([]);
+    rmMock.mockResolvedValue(undefined);
+    referencedMock.mockResolvedValue(false);
+  });
+
+  it("rotateHeldAvatarFile_heldAvatar_renamesFileAndRewritesHoldBoundToOldUrl", async () => {
+    const execute = mockHold(OLD_URL);
+
+    const url = await rotateHeldAvatarFile(42);
+
+    expect(url).toMatch(/^\/api\/uploads\/avatars\/42-[0-9a-f]{16}\.webp$/);
+    expect(renameMock.mock.calls[0][0]).toBe(path.join(AVATARS, "42-aaaa.webp"));
+    const [sql, params] = execute.mock.calls[1];
+    expect(sql).toBe("UPDATE bg_account_deletion_holds SET avatar_url = ? WHERE user_id = ? AND avatar_url = ?");
+    expect(params).toEqual([url, 42, OLD_URL]);
+  });
+
+  it("rotateHeldAvatarFile_heldAvatar_purgesOptimizedCopies", async () => {
+    mockHold(OLD_URL);
+    readdirMock.mockResolvedValueOnce(["k1"]).mockResolvedValueOnce([`60.123.etag.${UPSTREAM}.webp`]);
+
+    await rotateHeldAvatarFile(42);
+
+    expect(rmMock).toHaveBeenCalledWith(path.join(optimizedImageCacheDirectory(), "k1"), { recursive: true, force: true });
+  });
+
+  it("rotateHeldAvatarFile_detachPurge_resolvesWithoutWaitingForThePurge", async () => {
+    mockHold(OLD_URL);
+    // Le balayage du cache de l'optimiseur ne répond jamais.
+    readdirMock.mockReturnValue(new Promise<string[]>(() => undefined));
+
+    const url = await rotateHeldAvatarFile(42, { detachPurge: true });
+
+    expect(url).toMatch(/^\/api\/uploads\/avatars\/42-[0-9a-f]{16}\.webp$/);
+    expect(readdirMock).toHaveBeenCalledWith(optimizedImageCacheDirectory());
+  });
+
+  it("rotateHeldAvatarFile_noHold_touchesNothing", async () => {
+    mockHold(undefined);
+
+    expect(await rotateHeldAvatarFile(42)).toBeNull();
+    expect(renameMock).not.toHaveBeenCalled();
+  });
+
+  it("rotateHeldAvatarFile_holdWithoutAvatar_touchesNothing", async () => {
+    mockHold(null);
+
+    expect(await rotateHeldAvatarFile(42)).toBeNull();
+    expect(renameMock).not.toHaveBeenCalled();
+  });
+
+  it("rotateHeldAvatarFile_foreignUrl_touchesNothing", async () => {
+    mockHold("https://cdn.discordapp.com/avatars/1/a.png");
+
+    expect(await rotateHeldAvatarFile(42)).toBeNull();
+    expect(renameMock).not.toHaveBeenCalled();
+    expect(referencedMock).not.toHaveBeenCalled();
+  });
+
+  it("rotateHeldAvatarFile_fileAlreadyGone_returnsNullWithoutWriting", async () => {
+    const execute = mockHold(OLD_URL);
+    readFileMock.mockRejectedValue(Object.assign(new Error("absent"), { code: "ENOENT" }));
+
+    expect(await rotateHeldAvatarFile(42)).toBeNull();
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("rotateHeldAvatarFile_otherDiskError_propagates", async () => {
+    mockHold(OLD_URL);
+    renameMock.mockRejectedValue(Object.assign(new Error("EPERM"), { code: "EPERM" }));
+
+    await expect(rotateHeldAvatarFile(42)).rejects.toThrow("EPERM");
+  });
+
+  it("rotateHeldAvatarFile_fileReferencedElsewhere_copiesInsteadOfRenaming", async () => {
+    mockHold(OLD_URL);
+    referencedMock.mockResolvedValueOnce(true);
+
+    expect(await rotateHeldAvatarFile(42)).not.toBeNull();
+
+    // Le masque du compte lui-même ne compte pas comme un autre usage.
+    expect(referencedMock).toHaveBeenCalledWith(OLD_URL, { exceptHoldOf: 42 });
+    expect(renameMock).not.toHaveBeenCalled();
+    expect(copyMock.mock.calls[0][0]).toBe(path.join(AVATARS, "42-aaaa.webp"));
+    expect(rmMock).not.toHaveBeenCalled();
+  });
+
+  // Réactivation passée entre le renommage et l'écriture : la ligne du compte
+  // désigne de nouveau l'ancienne adresse.
+  it("rotateHeldAvatarFile_accountReactivatedMeanwhile_putsFileBack", async () => {
+    mockHold(OLD_URL, 0, [OLD_URL]);
+
+    expect(await rotateHeldAvatarFile(42)).toBeNull();
+
+    expect(renameMock).toHaveBeenCalledTimes(2);
+    expect(renameMock.mock.calls[1]).toEqual([renameMock.mock.calls[0][1], path.join(AVATARS, "42-aaaa.webp")]);
+    expect(unlinkMock).not.toHaveBeenCalled();
+  });
+
+  // Avatar masqué ou supprimé par la modération entre-temps : plus rien ne
+  // désigne le fichier, il ne revient pas servi à l'ancienne adresse.
+  it("rotateHeldAvatarFile_avatarRemovedMeanwhile_deletesRenamedFile", async () => {
+    mockHold(OLD_URL, 0, [null, null]);
+
+    expect(await rotateHeldAvatarFile(42)).toBeNull();
+
+    expect(unlinkMock).toHaveBeenCalledWith(renameMock.mock.calls[0][1]);
+    expect(renameMock).toHaveBeenCalledTimes(1);
+  });
+
+  // Masqué par la modération entre le renommage et l'écriture : la quarantaine
+  // désigne l'ancienne adresse, que son rétablissement redésignera.
+  it("rotateHeldAvatarFile_avatarHiddenMeanwhile_putsFileBackForItsQuarantine", async () => {
+    mockHold(OLD_URL, 0, [null, null]);
+    referencedMock.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+    expect(await rotateHeldAvatarFile(42)).toBeNull();
+
+    expect(renameMock).toHaveBeenCalledTimes(2);
+    expect(unlinkMock).not.toHaveBeenCalled();
+  });
+
+  it("rotateHeldAvatarFile_referencesUnreadableOnUndo_putsFileBack", async () => {
+    mockHold(OLD_URL, 0, [null, null]);
+    referencedMock.mockResolvedValueOnce(false).mockRejectedValueOnce(new Error("DB_DOWN"));
+
+    expect(await rotateHeldAvatarFile(42)).toBeNull();
+
+    expect(renameMock).toHaveBeenCalledTimes(2);
+    expect(unlinkMock).not.toHaveBeenCalled();
+  });
+
+  it("rotateHeldAvatarFile_databaseDownOnWrite_putsFileBackAndPropagates", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ avatar_url: OLD_URL }]])
+      .mockRejectedValue(new Error("DB_DOWN"));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await expect(rotateHeldAvatarFile(42)).rejects.toThrow("DB_DOWN");
+
+    expect(renameMock).toHaveBeenCalledTimes(2);
+    expect(unlinkMock).not.toHaveBeenCalled();
+  });
+
+  it("rotateHeldAvatarFile_sharedCopyAndWriteLost_deletesTheCopy", async () => {
+    mockHold(OLD_URL, 0, [OLD_URL]);
+    referencedMock.mockResolvedValueOnce(true);
+
+    expect(await rotateHeldAvatarFile(42)).toBeNull();
+
     expect(unlinkMock).toHaveBeenCalledWith(copyMock.mock.calls[0][1]);
     expect(renameMock).not.toHaveBeenCalled();
   });

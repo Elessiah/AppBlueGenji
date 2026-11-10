@@ -232,7 +232,7 @@
       "ORGANIZED_TOURNAMENTS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es l'organisateur de tournois qui doivent garder un titulaire.",
       "OWNED_TEAMS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet.",
       "NONE": "Tu n'as joué aucun match ni laissé de tournoi sans repreneur : ton compte et ton profil seront effacés entièrement, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées.",
-      "UNKNOWN": "Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, inscription à un tournoi individuel, tournoi organisé), il sera rendu anonyme ou effacé entièrement."
+      "UNKNOWN": "Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, engagement dans un tournoi individuel déjà commencé ou terminé, tournoi organisé), il sera rendu anonyme ou effacé entièrement."
     },
     "outcome": {
       "TOURNAMENTS": "Suppression demandée. Tes statistiques resteront conservées sous un pseudo d'emprunt. Pour l'annuler, reconnecte-toi d'ici 30 jours et confirme la réactivation.",

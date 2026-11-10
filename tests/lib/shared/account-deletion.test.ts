@@ -276,7 +276,9 @@ describe("inscription solo jamais jouée", () => {
   });
 
   it("figure dans la phrase prudente de l'aperçu injoignable", () => {
-    expect(accountDeletionConfirmation(RETENTION_UNKNOWN)).toContain("inscription à un tournoi individuel");
+    expect(accountDeletionConfirmation(RETENTION_UNKNOWN)).toContain(
+      "engagement dans un tournoi individuel déjà commencé ou terminé",
+    );
   });
 });
 

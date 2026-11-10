@@ -712,7 +712,8 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   plutôt qu'un copropriétaire suspendu, qui garde la sienne). Si **tous** les
   membres restants sont suspendus, le meilleur d'entre eux hérite quand même :
   une suspension se lève et la propriété se reprend alors, une dissolution ne
-  se défait pas (choix assumé, revue sécurité #571). Seul joueur : équipe **fantôme** si elle est inscrite à un tournoi
+  se défait pas (choix assumé, revue sécurité #571). Seul joueur — **quel que
+  soit son rôle** depuis ACCOUNT-DELETION-3 (dernier membre vivant) : équipe **fantôme** si elle est inscrite à un tournoi
   `UPCOMING`/`REGISTRATION`/`RUNNING`, sinon **dissoute** (`dissolveTeamOn`,
   « Équipe dissoute #id »). Les candidats ne sont pas verrouillés côté compte
   (inversion d'ordre évitée) ; seuls les comptes vivants héritent.
@@ -773,7 +774,11 @@ réactive aussi** (décision du 2026-11-04) : `createSession` lit la demande en
 attente avant la suspension, la réactivation se fait, puis la session est
 refusée (`403 ACCOUNT_SUSPENDED` avec `reactivated: true`) ; l'écran dit la
 réactivation, puis la suspension. Au-delà de trente jours, la connexion est
-refusée (`ACCOUNT_DELETED`).
+refusée (`ACCOUNT_DELETED`). Depuis ACCOUNT-DELETION-3 : plusieurs tickets
+valides par compte (une seconde connexion ne périme pas l'écran ouvert) ; tous
+partent à la réactivation, à « Ne pas réactiver » (`DELETE /api/auth/reactivate`,
+qui retire aussi le cookie — `/rgpd` le dit, FR + EN) et à toute nouvelle
+demande de suppression.
 
 **Jour 30.** `finalizeDueAccountDeletions` (horaire, paresseux, lancé par
 `getDatabase` sous `NEXT_RUNTIME`) appelle `finalizeAccountDeletion`, qui relit
@@ -788,7 +793,9 @@ la fois, les autres passent leur tour. Ses candidats sont filtrés en SQL (une
 inscription à retirer, ou une entrée en cours jamais jouée à forfaiter) et
 bornés à `SETTLE_BATCH_SIZE` ; `bg_users.is_deleted` est indexé. La demande et
 la suppression prennent `lockTournamentRow` **en premier**, par id croissant,
-sur tous les tournois qu'elles touchent — inscriptions solo, tournois organisés
+sur tous les tournois qu'elles touchent — inscriptions solo **à un tournoi pas
+encore commencé** (depuis ACCOUNT-DELETION-3 ; un tournoi en cours ou terminé
+n'est plus verrouillé pour elles), tournois organisés
 (demande), matchs castés, liés ou arbitrés (`listCastTournamentIds`) — avant le
 compte, puis les équipes ; les fichiers des avatars en quarantaine sont relevés
 sous le verrou du compte, sans lecture de fichier (rien n'est haché, D6).
@@ -831,7 +838,8 @@ courante**, `LOCK IN SHARE MODE` sans sous-requête, jugées par
 pendant l'attente du verrou est vue ; sans signalement d'origine, rien n'est
 relu. **Compte en attente de suppression** (revue sécurité #571, cycle 3) : sa
 ligne est anonyme, mais son avatar attend la réactivation dans le masque,
-toujours servi — la modération l'atteint par `readModeratableAvatar` : elle
+sous une adresse que seul le masque connaît (`rotateHeldAvatarFile`,
+ci-dessous) — la modération l'atteint par `readModeratableAvatar` : elle
 l'y supprime (depuis la fiche comme depuis un signalement), l'y **masque** et
 l'y **rétablit** (`setHeldAvatar`, sans écriture sur `bg_users` ni entrée solo
 à resynchroniser ; revue sécurité #571, cycle 4), puis le bloque et l'efface
@@ -940,6 +948,88 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
 - **Tolérance de schéma** : `deletion_requested_at` absente → connexion et annuaire ne tombent pas ; `bg_account_deletion_holds` absente → inscription et renommage ne tombent pas ; l'export des rôles de match retire seule la colonne récente refusée (lue `NULL`).
 - **Ménage** : les tickets de réactivation échus partent à chaque passe horaire, et tous ceux du compte à toute anonymisation (`anonymizeAccount`) ; le rattrapage au démarrage efface les fichiers d'avatar masqués du compte effacé, après le commit.
 
+## Solde ERREUR.txt (ACCOUNT-DELETION-3, 2026-11-10)
+
+- **Avatar mis de côté, adresse morte** : après le commit de la demande,
+  `rotateHeldAvatarFile` (`lib/server/avatar-rotation.ts`) renomme le fichier
+  de l'avatar gardé par le masque sous un nom aléatoire et réécrit le masque
+  (`… WHERE user_id = ? AND avatar_url = ?`) : l'ancienne adresse, connue de
+  qui l'avait vue, rend 404, et les variantes de l'optimiseur d'images sont
+  purgées — même réponse que pour un avatar masqué (`rotateHiddenAvatarFile`).
+  La réactivation rend l'avatar sous sa nouvelle adresse. Un fichier qu'une
+  autre ligne désigne est copié, pas renommé (`isUploadReferenced` avec
+  `exceptHoldOf`). Écriture perdue : le fichier est remis en place si le masque
+  ou la ligne du compte (réactivation entre-temps) désigne encore l'ancienne
+  adresse — ou si une autre ligne la désigne (quarantaine `HIDDEN` d'un avatar
+  masqué entre-temps) —, supprimé sinon. Un échec est dit dans pm2, la demande
+  est faite.
+  Seule limite : la copie déjà gardée par un navigateur. Comptes en attente
+  **avant** ce lot : `NODE_ENV=production npm run rotate:held-avatars`, une fois.
+- **Jeu de verrous** : seuls les tournois **pas encore commencés** de l'entrée
+  solo sont verrouillés (`listSoloRegistrationTournamentIds(…, true)`) — une
+  inscription à un tournoi en cours ou terminé ne se retire jamais. Sous le
+  verrou du compte, la demande et la suppression relisent cette liste
+  (`assertSoloLockSetFresh`) : une inscription prise entre le relevé et le
+  verrou fait rejouer la transaction avec un relevé frais
+  (`retryOnStaleLockSet`, trois essais ; au dernier, l'issue prudente d'avant).
+  Le rattrapage de démarrage verrouille lui aussi les tournois des casts et
+  arbitrages **avant** le compte, et tourne derrière le verrou nommé du passage
+  horaire (`bg_due_account_deletions`) : un seul processus à la fois, celui
+  qui passe son tour le dit (`console.info`).
+- **Accueil et #live** : `withdrawUserCasts` rend `liveTournamentIds` (tournois
+  dont un match touché n'est pas terminé) ; seuls ceux-là sont publiés avec
+  `landingLive` — un arbitre ou un lien retiré d'un match joué ne vide plus le
+  cache de l'accueil. Le message #live, lui, est **toujours** redemandé
+  (`publishMatchUpdatedEvent` → `scheduleLiveEveningRefresh`) : il pouvait
+  porter le lien d'un caster, qui part « matchs joués compris » (T04) — à
+  garder.
+- **Passage horaire** : un compte « dû » pour SQL mais que la finalisation
+  laisse tel quel (horloge de Node, réactivation à l'instant) est écarté le
+  temps d'un passage (90 minutes ; six heures pour un échec), au lieu d'occuper
+  une des cent places du relevé.
+- **Forfaits en tâche de fond** : la réponse de la demande n'attend plus les
+  forfaits de l'entrée solo ; la passe horaire reprend ce qui n'aboutit pas.
+- **Rejeu silencieux** : une demande rejouée après restauration n'envoie ni
+  alerte Discord, ni ligne de retrait ou de forfait, ni avis de propriété ; les
+  lecteurs et les caches sont rafraîchis, les forfaits attendus (le script
+  ferme son pool).
+- **Seul joueur, quel que soit le rôle** : le dernier membre vivant d'une
+  équipe dont le propriétaire est déjà anonymisé la rend fantôme (tournoi pas
+  terminé) ou la dissout, comme le ferait un propriétaire.
+- **Pseudo déjà mis de côté par un autre compte** (course de la réactivation) :
+  la demande n'échoue plus (500) — le masque garde le pseudo suivi de « OG »
+  (`insertDeletionHold`), celui que la réactivation aurait rendu (R3), sans
+  rien révéler de l'autre demande. `reactivationPseudoCandidate` coupe entre
+  deux graphèmes (ni liant ni signe combinant orphelin avant « OG »).
+- **Réactivation** : une seconde connexion ne périme plus le ticket d'un écran
+  déjà ouvert (tous partent à la réactivation) ; le cookie n'est retiré que
+  réactivation faite ou ticket périmé — une panne passagère laisse réessayer ;
+  session impossible après réactivation → `REACTIVATED_LOGIN_REQUIRED` (503),
+  l'écran dit la réactivation et renvoie à la connexion ; `pseudoChanged` (sur
+  chaque issue où le compte revit) ajoute une notification : le pseudo d'avant
+  n'a pas pu être rendu ; « Ne pas
+  réactiver » (`DELETE /api/auth/reactivate`) retire le cookie et **tous** les
+  tickets du compte (autres postes compris) et dit que la suppression suit son
+  cours ; sans cookie, l'écran ne parle plus de
+  « lien expiré » ; un refus non enregistré (réseau, délai de 8 s) est dit et
+  rend la main ; après un échec le focus revient au bouton du geste ; la
+  connexion par code garde son formulaire fermé pendant le renvoi.
+- **Textes** : aperçu `UNKNOWN`, `reactivation.notUndone` (FR + EN), registre
+  T01 (« déjà commencé ou terminé ») ; `/rgpd` lit la durée du ticket dans
+  `REACTIVATION_TICKET_MINUTES`.
+- **Revue indépendante (2026-11-10)** : un avatar que la modération
+  **rétablit** pendant l'attente revient dans le masque à son adresse
+  d'origine — `announceImageRestored` rejoue donc `rotateHeldAvatarFile` ;
+  l'équipe devenue **fantôme** ferme les appartenances encore ouvertes (comptes
+  déjà supprimés : une fantôme n'a aucun membre) ; la passe horaire ne
+  verrouille plus que les tournois pas encore commencés ; le masque ne prend
+  pas un « PseudoOG » qu'un autre compte porte ; « Ne pas réactiver » borne
+  son attente par `AbortController` (pas `AbortSignal.timeout`).
+- **Déjà réglés, entrées retirées** : rejeu sur interblocage de la demande,
+  ordre tournois organisés → compte, rejeu d'une ligne finale sur un compte
+  restauré vivant (il repasse par la demande), lignes illisibles du journal
+  gardées à la réécriture.
+
 ## Décisions requises (ouvertes)
 
 - Même avatar mis de côté : masqué ou supprimé par la modération, le joueur
@@ -953,8 +1043,6 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
   différer l'effacement du fichier jusqu'au blocage réussi ? La règle « fichier
   gardé s'il sert ailleurs » ne vaut que pour la suppression sans délai (purge
   et masquage ne la vérifient pas) — l'étendre ?
-- L'avatar mis de côté reste servi à son adresse pendant les 30 jours :
-  entrée ERREUR.txt existante (`holdAccountIdentity`, revue #546).
 
 **Textes légaux (D6).** Registre T01 (finalité, base légale, catégorie
 « Empreintes … des avatars supprimés par la modération », conservation dès la

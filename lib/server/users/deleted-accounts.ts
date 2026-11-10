@@ -4,7 +4,15 @@ import { accountDeletionPlan } from "@/lib/shared/account-deletion";
 import { isLegacyDeletedPseudo } from "@/lib/shared/anonymous-pseudos";
 import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
 import { unlink } from "node:fs/promises";
-import { accountTraceSql, afterCommit, finalizeAccountDeletion, loadAccountTrace, loadQuarantinedAvatarFiles } from "./account-deletion";
+import {
+  accountTraceSql,
+  afterCommit,
+  finalizeAccountDeletion,
+  listCastTournamentIds,
+  loadAccountTrace,
+  loadQuarantinedAvatarFiles,
+} from "./account-deletion";
+import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { settleDeletedSoloEntries } from "./deleted-solo-entries";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
@@ -34,20 +42,25 @@ async function settleDeletedAccount(
   connection: PoolConnection,
   userId: number,
   row: { pseudo: string; is_admin: 0 | 1; platform_roles_json: unknown },
-): Promise<{ gesture: "erased" | "renamed" | null; tournamentIds: number[]; quarantinedFiles: string[] }> {
+): Promise<{
+  gesture: "erased" | "renamed" | null;
+  tournamentIds: number[];
+  liveTournamentIds: number[];
+  quarantinedFiles: string[];
+}> {
   const plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
   if (plan.mode === "ERASE") {
     // Comme `deleteAccountNow` : les avatars masqués, relevés sous le verrou
     // avant que la cascade n'emporte leurs lignes, partent après le commit.
     const quarantinedFiles = await loadQuarantinedAvatarFiles(connection, userId);
-    const { tournamentIds } = await eraseAccount(connection, userId);
-    return { gesture: "erased", tournamentIds, quarantinedFiles };
+    const { tournamentIds, liveTournamentIds } = await eraseAccount(connection, userId);
+    return { gesture: "erased", tournamentIds, liveTournamentIds, quarantinedFiles };
   }
   if (isLegacyDeletedPseudo(row.pseudo) || Number(row.is_admin) === 1 || row.platform_roles_json !== null) {
-    const { tournamentIds } = await anonymizeAccount(connection, userId);
-    return { gesture: "renamed", tournamentIds, quarantinedFiles: [] };
+    const { tournamentIds, liveTournamentIds } = await anonymizeAccount(connection, userId);
+    return { gesture: "renamed", tournamentIds, liveTournamentIds, quarantinedFiles: [] };
   }
-  return { gesture: null, tournamentIds: [], quarantinedFiles: [] };
+  return { gesture: null, tournamentIds: [], liveTournamentIds: [], quarantinedFiles: [] };
 }
 
 
@@ -103,7 +116,8 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
       ORDER BY u.id`,
   );
   const outcome: DeletedAccountsReconciliation = { erased: 0, renamed: 0, failed: 0, ...solo };
-  const touchedTournaments = new Set<number>();
+  // Tournoi touché → un de ses matchs touchés n'est pas terminé (accueil, #live).
+  const touchedTournaments = new Map<number, boolean>();
 
   // L'anonymisation efface désormais la dernière acceptation des conditions
   // d'utilisation ; les comptes anonymisés avant la règle la gardent encore.
@@ -134,8 +148,8 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
   if (outcome.erased + outcome.renamed > 0) invalidateTeamIdentityViews();
   // Et les matchs qui le nommaient (caster, lien, arbitre), comme `deleteOwnAccount`.
   // Un écouteur qui lève ne transforme pas un rattrapage fait en échec.
-  for (const tournamentId of touchedTournaments) {
-    afterCommit(() => publishMatchUpdatedEvent(tournamentId, { landingLive: true }), `Tournoi #${tournamentId} non prévenu`);
+  for (const [tournamentId, landingLive] of touchedTournaments) {
+    afterCommit(() => publishMatchUpdatedEvent(tournamentId, { landingLive }), `Tournoi #${tournamentId} non prévenu`);
   }
   return outcome;
 }
@@ -144,16 +158,25 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
  * Un compte repéré, dans **sa** transaction : relu sous le verrou de sa
  * ligne, réglé, puis compté une fois commité. Ne lève jamais : l'échec de l'un
  * n'empêche pas les autres (compté dans `failed`).
+ *
+ * Les tournois dont un match le nomme (caster, lien, arbitre) sont verrouillés
+ * **avant** le compte, par id croissant — l'ordre de la demande et de la
+ * suppression (`listCastTournamentIds`) : `withdrawUserCasts` verrouille leurs
+ * matchs, et l'ordre inverse s'interbloquait avec une saisie de score.
  */
 async function reconcileOneAccount(
   db: Awaited<ReturnType<typeof getDatabase>>,
   userId: number,
   outcome: DeletedAccountsReconciliation,
-  touchedTournaments: Set<number>,
+  touchedTournaments: Map<number, boolean>,
 ): Promise<void> {
-  const connection = await db.getConnection();
+  let connection: PoolConnection | null = null;
   try {
+    // Relevés avant de prendre une connexion (le relevé en emprunte une autre).
+    const castTournaments = await listCastTournamentIds(db, userId);
+    connection = await db.getConnection();
     await connection.beginTransaction();
+    for (const tournamentId of castTournaments) await lockTournamentRow(connection, tournamentId);
     const [locked] = await connection.execute<(RowDataPacket & {
       pseudo: string;
       is_deleted: 0 | 1;
@@ -169,29 +192,42 @@ async function reconcileOneAccount(
       await connection.rollback();
       return;
     }
-    const { gesture, tournamentIds, quarantinedFiles } = await settleDeletedAccount(connection, userId, row);
+    const { gesture, tournamentIds, liveTournamentIds, quarantinedFiles } = await settleDeletedAccount(
+      connection,
+      userId,
+      row,
+    );
     await connection.commit();
     for (const file of quarantinedFiles) await unlink(file).catch(() => {});
     if (gesture) outcome[gesture] += 1;
-    for (const tournamentId of tournamentIds) touchedTournaments.add(tournamentId);
+    const live = new Set(liveTournamentIds);
+    for (const tournamentId of tournamentIds) {
+      touchedTournaments.set(tournamentId, touchedTournaments.get(tournamentId) === true || live.has(tournamentId));
+    }
   } catch (error) {
     // Sur une connexion morte — la panne même qu'on traite —, l'annulation
     // lève à son tour : sans garde, elle sortirait de la boucle et laisserait
     // tous les comptes suivants au prochain démarrage.
-    await connection.rollback().catch(() => {});
+    await connection?.rollback().catch(() => {});
     outcome.failed += 1;
     console.error(
       `[deleted-accounts] Rattrapage du compte #${userId} reporté au prochain démarrage :`,
       error instanceof Error ? error.message : error,
     );
   } finally {
-    connection.release();
+    connection?.release();
   }
 }
 
-/** Les comptes dont la finalisation a échoué, et quand : écartés de la file un temps. */
+/** Les comptes écartés de la file, et jusqu'à quand (échec, ou rien à faire encore). */
 const failedFinalizations = new Map<number, number>();
 const FAILED_FINALIZATION_BACKOFF_MS = 6 * 60 * 60 * 1000;
+/**
+ * Compte « dû » pour SQL mais pas encore pour l'horloge de Node : écarté le
+ * temps d'un passage seulement (le passage est horaire) — il ne doit pas être
+ * finalisé des heures après l'échéance annoncée pour un écart d'horloge.
+ */
+const IDLE_FINALIZATION_BACKOFF_MS = 90 * 60 * 1000;
 
 /**
  * Les suppressions demandées il y a trente jours ou plus, rendues définitives
@@ -207,8 +243,8 @@ export async function finalizeDueAccountDeletions(): Promise<{ finalized: number
   // les comptes suivants ne seraient jamais finalisés. Écarté pour
   // `FAILED_FINALIZATION_BACKOFF_MS`, il repasse ensuite (par processus).
   const now = Date.now();
-  for (const [id, failedAt] of failedFinalizations) {
-    if (now - failedAt >= FAILED_FINALIZATION_BACKOFF_MS) failedFinalizations.delete(id);
+  for (const [id, retryAt] of failedFinalizations) {
+    if (now >= retryAt) failedFinalizations.delete(id);
   }
   const skipped = [...failedFinalizations.keys()];
   const [due] = await db.execute<(RowDataPacket & { id: number })[]>(
@@ -235,9 +271,14 @@ export async function finalizeDueAccountDeletions(): Promise<{ finalized: number
   for (const row of due) {
     try {
       if ((await finalizeAccountDeletion(Number(row.id))) !== null) outcome.finalized += 1;
+      // Dû pour SQL (`NOW()`), pas encore pour l'horloge de Node relue sous le
+      // verrou (fuseaux différents), ou réactivé à l'instant : rien n'est fait.
+      // Écarté un passage lui aussi, sans quoi cent comptes de ce genre
+      // occuperaient chaque heure les cent places du relevé.
+      else failedFinalizations.set(Number(row.id), Date.now() + IDLE_FINALIZATION_BACKOFF_MS);
     } catch (error) {
       outcome.failed += 1;
-      failedFinalizations.set(Number(row.id), Date.now());
+      failedFinalizations.set(Number(row.id), Date.now() + FAILED_FINALIZATION_BACKOFF_MS);
       console.error(
         `[deleted-accounts] Suppression définitive du compte #${Number(row.id)} reportée :`,
         error instanceof Error ? error.message : error,

@@ -165,8 +165,16 @@ describe("holdAccountIdentity", () => {
     expect(syncSoloEntryIdentityOn).toHaveBeenCalledWith(expect.anything(), 7);
   });
 
-  it("holdAccountIdentity_living_dropsPreviousHoldThenPlainInsert", async () => {
+  it("holdAccountIdentity_noPreviousHold_insertsWithoutDelete", async () => {
     const connection = transaction({ live: { pseudo: "Kerya", avatar_url: AVATAR } });
+
+    await holdAccountIdentity(fakeConnection(connection), 7, REQUESTED);
+
+    expect(sqlOf(connection).some((q) => q.sql.startsWith("DELETE FROM bg_account_deletion_holds"))).toBe(false);
+  });
+
+  it("holdAccountIdentity_living_dropsPreviousHoldThenPlainInsert", async () => {
+    const connection = transaction({ live: { pseudo: "Kerya", avatar_url: AVATAR }, hold: { pseudo: "Old", avatar_url: null } });
 
     await holdAccountIdentity(fakeConnection(connection), 7, REQUESTED);
 
@@ -175,15 +183,61 @@ describe("holdAccountIdentity", () => {
     expect(writes[1].sql).toBe("INSERT INTO bg_account_deletion_holds (user_id, pseudo, avatar_url) VALUES (?, ?, ?)");
   });
 
-  it("holdAccountIdentity_pseudoHeldByOtherAccount_throwsDuplicate", async () => {
+  // Course documentée de la réactivation : un compte vivant porte un pseudo
+  // qu'un compte en attente a déjà mis de côté. Sa demande n'échoue pas.
+  it("holdAccountIdentity_pseudoHeldByOtherAccount_holdsPseudoSuffixedOG", async () => {
     const connection = transaction({ live: { pseudo: "Nova", avatar_url: AVATAR } });
     // Lecture du compte, ancien masque retiré, puis l'insertion refusée.
     failCall(connection, 3, duplicate());
 
+    expect(await holdAccountIdentity(fakeConnection(connection), 7, REQUESTED)).toBe(true);
+
+    const inserts = sqlOf(connection).filter((q) => q.sql.startsWith("INSERT INTO bg_account_deletion_holds"));
+    expect(inserts.map((q) => q.params)).toEqual([
+      [7, "Nova", AVATAR],
+      [7, "NovaOG", AVATAR],
+    ]);
+    expect(updatesOf(connection)).toHaveLength(1);
+  });
+
+  it("holdAccountIdentity_ogCandidateCarriedByLiveAccount_skipsToOG2", async () => {
+    const connection = transaction({ live: { pseudo: "Nova", avatar_url: AVATAR } });
+    const base = connection.execute.getMockImplementation()!;
+    connection.execute.mockImplementation(async (sql: string, params?: unknown) => {
+      const values = Array.isArray(params) ? params : [];
+      if (sql.startsWith("INSERT INTO bg_account_deletion_holds") && values[1] === "Nova") throw duplicate();
+      if (sql.startsWith("SELECT 1 FROM bg_users WHERE pseudo = ?")) return [values[0] === "NovaOG" ? [{ 1: 1 }] : [], []];
+      return base(sql, params);
+    });
+
+    expect(await holdAccountIdentity(fakeConnection(connection), 7, REQUESTED)).toBe(true);
+
+    const inserts = sqlOf(connection).filter((q) => q.sql.startsWith("INSERT INTO bg_account_deletion_holds"));
+    expect(inserts.map((q) => q.params[1])).toEqual(["Nova", "NovaOG2"]);
+  });
+
+  it("holdAccountIdentity_everySuffixedPseudoHeld_throwsDuplicateAndMarksNothing", async () => {
+    const connection = transaction({ live: { pseudo: "Nova", avatar_url: AVATAR } });
+    const base = connection.execute.getMockImplementation()!;
+    connection.execute.mockImplementation(async (sql: string, params?: unknown) => {
+      if (sql.startsWith("INSERT INTO bg_account_deletion_holds")) throw duplicate();
+      return base(sql, params);
+    });
+
     await expect(holdAccountIdentity(fakeConnection(connection), 7, REQUESTED)).rejects.toMatchObject({
       code: "ER_DUP_ENTRY",
     });
+    // Le vrai pseudo, puis « NovaOG » à « NovaOG10 ».
+    expect(sqlOf(connection).filter((q) => q.sql.startsWith("INSERT INTO bg_account_deletion_holds"))).toHaveLength(11);
     expect(updatesOf(connection)).toEqual([]);
+  });
+
+  it("holdAccountIdentity_otherInsertError_propagatesWithoutRetry", async () => {
+    const connection = transaction({ live: { pseudo: "Nova", avatar_url: AVATAR } });
+    failCall(connection, 3, new Error("DB_DOWN"));
+
+    await expect(holdAccountIdentity(fakeConnection(connection), 7, REQUESTED)).rejects.toThrow("DB_DOWN");
+    expect(sqlOf(connection).filter((q) => q.sql.startsWith("INSERT INTO bg_account_deletion_holds"))).toHaveLength(1);
   });
 
   it("holdAccountIdentity_alreadyDeleted_falseAndNothingWritten", async () => {
@@ -233,7 +287,7 @@ describe("restoreAccountIdentity", () => {
   it("restoreAccountIdentity_hold_restoresPseudoAndAvatarThenDropsHold", async () => {
     const connection = transaction({ hold: { pseudo: "Kerya", avatar_url: AVATAR } });
 
-    expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe(true);
+    expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe("RESTORED");
 
     const queries = sqlOf(connection);
     expect(queries[0].sql).toContain("FROM bg_account_deletion_holds WHERE user_id = ? LIMIT 1 FOR UPDATE");
@@ -249,7 +303,7 @@ describe("restoreAccountIdentity", () => {
   it("restoreAccountIdentity_pseudoTaken_restoresPseudoOG", async () => {
     const connection = takenPseudos(["Kerya"]);
 
-    expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe(true);
+    expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe("RENAMED");
 
     const revive = updatesOf(connection).at(-1);
     expect(revive?.params).toEqual(["KeryaOG", AVATAR, 7]);
@@ -258,7 +312,7 @@ describe("restoreAccountIdentity", () => {
   it("restoreAccountIdentity_pseudoOGHeldByOther_triesOG2", async () => {
     const connection = takenPseudos(["Kerya"], { KeryaOG: 9 });
 
-    expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe(true);
+    expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe("RENAMED");
 
     expect(updatesOf(connection).map((q) => q.params[0])).toEqual(["Kerya", "KeryaOG2"]);
   });
@@ -267,7 +321,7 @@ describe("restoreAccountIdentity", () => {
     const taken = ["Kerya", "KeryaOG", ...Array.from({ length: 9 }, (_, i) => `KeryaOG${i + 2}`)];
     const connection = takenPseudos(taken);
 
-    expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe(true);
+    expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe("RENAMED");
 
     const revive = updatesOf(connection).at(-1);
     expect(revive?.sql).not.toContain("pseudo = ?");
@@ -285,7 +339,7 @@ describe("restoreAccountIdentity", () => {
   it("restoreAccountIdentity_noHold_clearsPendingFlagOnly", async () => {
     const connection = transaction({ hold: null });
 
-    expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe(true);
+    expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe("RENAMED");
 
     const [revive] = updatesOf(connection);
     expect(revive.sql).not.toContain("pseudo = ?");
@@ -295,7 +349,7 @@ describe("restoreAccountIdentity", () => {
   it("restoreAccountIdentity_notPending_falseAndHoldKept", async () => {
     const connection = transaction({ hold: { pseudo: "Kerya", avatar_url: null }, affectedRows: 0 });
 
-    expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe(false);
+    expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBeNull();
     expect(sqlOf(connection).some((q) => q.sql.startsWith("DELETE FROM bg_account_deletion_holds"))).toBe(false);
     expect(syncSoloEntryIdentityOn).not.toHaveBeenCalled();
   });

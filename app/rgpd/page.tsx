@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
+import { ACCOUNT_REACTIVATION_DAYS, REACTIVATION_TICKET_MINUTES } from "@/lib/shared/account-deletion";
 import { CyberButton } from "@/components/cyber";
 import { pageMetadata } from "@/lib/shared/page-metadata";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
@@ -596,8 +596,8 @@ function RgpdFr({
             <li>
               <strong>__Host-bg_reactivation</strong> — cookie httpOnly, sameSite=lax, déposé{" "}
               <strong>seulement</strong> quand vous vous reconnectez à un compte dont la suppression est
-              demandée, et supprimé quand vous réactivez le compte ; sinon il expire de lui-même. Il dure quinze
-              minutes au plus et ne contient qu&apos;un jeton aléatoire à usage unique, dont nos serveurs
+              demandée, et supprimé quand vous réactivez le compte ou choisissez de ne pas le réactiver ; sinon il expire de lui-même. Il dure{" "}
+              {REACTIVATION_TICKET_MINUTES} minutes au plus et ne contient qu&apos;un jeton aléatoire à usage unique, dont nos serveurs
               ne gardent que l&apos;empreinte (SHA-256).
             </li>
             <li>

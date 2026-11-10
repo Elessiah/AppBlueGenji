@@ -167,6 +167,15 @@ describe("forfeitSoloEntriesAfterCommit", () => {
     expect(options).toEqual({ tournamentId: 4, category: "registrations" });
   });
 
+  // Rejeu d'une demande après restauration : le forfait a déjà été annoncé.
+  it("forfeitSoloEntriesAfterCommit_silent_forfeitsWithoutDiscordLine", async () => {
+    fakeDb({ format: "SURVIVAL" });
+
+    expect(await forfeitSoloEntriesAfterCommit([{ tournamentId: 4, teamId: 40 }], { silent: true })).toBe(1);
+
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
   it("forfeitSoloEntriesAfterCommit_engineFails_swallowedAndNotLogged", async () => {
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
     fakeDb({ format: "SWISS" });
@@ -217,6 +226,19 @@ describe("settleDeletedSoloEntries", () => {
 
     expect(await settleDeletedSoloEntries()).toEqual({ withdrawn: 0, forfeited: 0 });
     expect(forfeitTournamentTeam).not.toHaveBeenCalled();
+  });
+});
+
+describe("settleDeletedSoloEntries — verrous du retrait", () => {
+  it("settleDeletedSoloEntries_withdrawal_listsOnlyNotStartedTournaments", async () => {
+    const execute = fakeDb({ candidates: [7] });
+
+    await settleDeletedSoloEntries();
+
+    const listing = execute.mock.calls
+      .map(([q]) => String(q).replace(/\s+/g, " "))
+      .find((q) => q.includes("SELECT DISTINCT r.tournament_id FROM bg_teams s"));
+    expect(listing).toContain("JOIN bg_tournaments t ON t.id = r.tournament_id AND t.state IN ('UPCOMING', 'REGISTRATION')");
   });
 });
 

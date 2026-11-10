@@ -9,7 +9,7 @@ import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
-import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
+import { ACCOUNT_REACTIVATION_DAYS, REACTIVATION_TICKET_MINUTES } from "@/lib/shared/account-deletion";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import {
@@ -465,7 +465,7 @@ export function RgpdEn({
             </li>
             <li>
               <strong>__Host-bg_reactivation</strong> — httpOnly, sameSite=lax cookie, set <strong>only</strong> when you log in
-              again to an account whose deletion was requested, and deleted when you reactivate the account; otherwise it expires on its own. It lasts fifteen minutes at most and only contains a single-use random token, of which our
+              again to an account whose deletion was requested, and deleted when you reactivate the account or choose not to reactivate it; otherwise it expires on its own. It lasts {REACTIVATION_TICKET_MINUTES} minutes at most and only contains a single-use random token, of which our
               servers only keep the hash (SHA-256).
             </li>
             <li>

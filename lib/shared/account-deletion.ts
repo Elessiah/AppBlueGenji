@@ -233,7 +233,7 @@ export function accountDeletionConfirmation(
     case null:
       return `Supprimer ton compte ? Tu n'as joué aucun match ni laissé de tournoi sans repreneur : ton compte et ton profil seront effacés entièrement, et tes éventuelles inscriptions à des tournois individuels pas encore commencés seront retirées. ${irreversible} ${residual}`;
     default:
-      return `Supprimer ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, inscription à un tournoi individuel, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${irreversible} ${residual}`;
+      return `Supprimer ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, engagement dans un tournoi individuel déjà commencé ou terminé, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${irreversible} ${residual}`;
   }
 }
 
@@ -474,3 +474,9 @@ export const ACCOUNT_PENDING_DELETION_CODE = "ACCOUNT_PENDING_DELETION";
 
 /** Durée de vie d'un ticket de réactivation (cookie et ligne `bg_account_reactivation_tickets`), en minutes. */
 export const REACTIVATION_TICKET_MINUTES = 15;
+
+/**
+ * Le compte est réactivé, mais sa session n'a pas pu s'ouvrir (panne passagère
+ * après la réactivation) : l'écran dit la réactivation et renvoie à la connexion.
+ */
+export const REACTIVATED_LOGIN_REQUIRED = "REACTIVATED_LOGIN_REQUIRED";

@@ -18,7 +18,19 @@ jest.mock("@/lib/server/teams/access");
 jest.mock("@/lib/server/teams/dissolution");
 jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/team-invite-notifications");
+jest.mock("@/lib/server/avatar-rotation", () => ({ rotateHeldAvatarFile: jest.fn() }));
 jest.mock("@/lib/server/users/account-deletion", () => ({
+  assertSoloLockSetFresh: jest.fn(),
+  // Rejeu sur jeu de verrous périmé : la vraie boucle, réduite à son contrat.
+  retryOnStaleLockSet: async (write: (lastAttempt: boolean) => Promise<unknown>) => {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await write(attempt >= 3);
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== "STALE_LOCK_SET") throw error;
+      }
+    }
+  },
   listCastTournamentIds: jest.fn(),
   listSoloRegistrationTournamentIds: jest.fn(),
   loadAccountTrace: jest.fn(),
@@ -41,13 +53,15 @@ import { sendBotLog } from "@/lib/server/bot-integration";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
-import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { rotateHeldAvatarFile } from "@/lib/server/avatar-rotation";
 import { lockTournamentRow } from "@/lib/server/tournaments/registration";
 import { lockMemberRoles, writeActiveMembership } from "@/lib/server/teams/access";
 import { dissolveTeamOn } from "@/lib/server/teams/dissolution";
 import { teamStreamTournamentIds } from "@/lib/server/teams/roster";
 import { notifyTeamInviteInBackground } from "@/lib/server/team-invite-notifications";
 import {
+  assertSoloLockSetFresh,
   listCastTournamentIds,
   listSoloRegistrationTournamentIds,
   loadAccountTrace,
@@ -161,6 +175,7 @@ function fakeDb(options: Options) {
   jest.mocked(withdrawUserCasts).mockResolvedValue({
     matchIds: [],
     tournamentIds: [],
+    liveTournamentIds: [],
     releasedRefereeMatchIds: options.refereedMatches ?? [],
     releasedCastMatchIds: options.castMatches ?? [],
   });
@@ -221,7 +236,15 @@ beforeEach(() => {
   jest.mocked(listForfeitableSoloEntries).mockResolvedValue([]);
   jest.mocked(forfeitSoloEntriesAfterCommit).mockResolvedValue(0);
   jest.mocked(logDeletionWithdrawal).mockResolvedValue(undefined);
-  jest.mocked(withdrawUserCasts).mockResolvedValue({ matchIds: [], tournamentIds: [], releasedRefereeMatchIds: [], releasedCastMatchIds: [] });
+  jest.mocked(withdrawUserCasts).mockResolvedValue({
+    matchIds: [],
+    tournamentIds: [],
+    liveTournamentIds: [],
+    releasedRefereeMatchIds: [],
+    releasedCastMatchIds: [],
+  });
+  jest.mocked(assertSoloLockSetFresh).mockResolvedValue(undefined);
+  jest.mocked(rotateHeldAvatarFile).mockResolvedValue(null);
   jest.mocked(lockMemberRoles).mockResolvedValue(["OWNER", "DPS"]);
   jest.mocked(writeActiveMembership).mockResolvedValue(undefined);
   jest.mocked(dissolveTeamOn).mockResolvedValue({ detachedUserIds: [7], everRegistered: false });
@@ -394,6 +417,24 @@ describe("requestAccountDeletion — arbitrages retirés", () => {
 
     expect(jest.mocked(relaunchAfterRefereeWithdrawal).mock.calls[0]?.[0]).toBe(connection);
     expect(jest.mocked(relaunchAfterRefereeWithdrawal).mock.calls[0]?.[1]).toEqual([]);
+  });
+
+  it("requestAccountDeletion_request_dropsReactivationTickets", async () => {
+    const { queries } = fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    const drop = queries.find((q) => q.sql.startsWith("DELETE FROM bg_account_reactivation_tickets"));
+    expect(drop?.sql).toBe("DELETE FROM bg_account_reactivation_tickets WHERE user_id = ?");
+    expect(drop?.params).toEqual([7]);
+  });
+
+  it("requestAccountDeletion_replay_awaitsAvatarPurge", async () => {
+    fakeDb({});
+
+    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00" });
+
+    expect(rotateHeldAvatarFile).toHaveBeenCalledWith(7, { detachPurge: false });
   });
 
   it("requestAccountDeletion_replay_noRelaunchNorNotice", async () => {
@@ -648,6 +689,26 @@ describe("requestAccountDeletion — équipes (E3)", () => {
     expect(notifyTeamInviteInBackground).not.toHaveBeenCalled();
   });
 
+  it("requestAccountDeletion_ghostedTeam_closesOtherOpenMemberships", async () => {
+    const { queries } = fakeDb({ teams: [3], successors: [], activeTournament: true });
+
+    await requestAccountDeletion(7);
+
+    const close = queries.find((q) => q.sql.includes("AND user_id <> ? AND left_at IS NULL"));
+    expect(close?.sql).toBe(
+      "UPDATE bg_team_members SET left_at = NOW() WHERE team_id = ? AND user_id <> ? AND left_at IS NULL",
+    );
+    expect(close?.params).toEqual([3, 7]);
+  });
+
+  it("requestAccountDeletion_dissolvedTeam_doesNotRunGhostMembershipClose", async () => {
+    const { queries } = fakeDb({ teams: [3], successors: [], activeTournament: false });
+
+    await requestAccountDeletion(7);
+
+    expect(queries.some((q) => q.sql.includes("AND user_id <> ? AND left_at IS NULL"))).toBe(false);
+  });
+
   it("requestAccountDeletion_soleOwnerNoActiveTournament_dissolves", async () => {
     const { queries } = fakeDb({ teams: [3], successors: [], activeTournament: false });
 
@@ -685,15 +746,152 @@ describe("requestAccountDeletion — équipes (E3)", () => {
     expect(publishUpdatedEvent).toHaveBeenCalledWith(8);
   });
 
-  it("requestAccountDeletion_plainMember_leavesOnly", async () => {
+  it("requestAccountDeletion_plainMemberWithLivingTeammate_leavesOnly", async () => {
     jest.mocked(lockMemberRoles).mockResolvedValue(["DPS"]);
-    fakeDb({ teams: [3] });
+    fakeDb({
+      teams: [3],
+      successors: [{ id: 1, user_id: 21, roles_json: '["OWNER"]', joined_at: "2026-01-01 00:00:00" }],
+    });
 
     await requestAccountDeletion(7);
 
     expect(rolesWritten()).toEqual([]);
     expect(dissolveTeamOn).not.toHaveBeenCalled();
     expect(leftTeams()).toEqual([{ teamId: 3, userId: 7 }]);
+  });
+
+  // Dernier membre vivant sans être propriétaire (propriétaire déjà anonymisé) :
+  // la règle du « seul joueur » vaut quel que soit le rôle.
+  it("requestAccountDeletion_lastLivingNonOwnerNoActiveTournament_dissolves", async () => {
+    jest.mocked(lockMemberRoles).mockResolvedValue(["DPS"]);
+    fakeDb({
+      teams: [3],
+      successors: [{ id: 1, user_id: 21, roles_json: '["OWNER"]', joined_at: "2026-01-01 00:00:00" }],
+      deadMembers: [21],
+      activeTournament: false,
+    });
+
+    await requestAccountDeletion(7);
+
+    expect(dissolveTeamOn).toHaveBeenCalledWith(expect.anything(), 3);
+    expect(notifyTeamInviteInBackground).not.toHaveBeenCalled();
+  });
+
+  it("requestAccountDeletion_lastLivingNonOwnerInActiveTournament_ghostsTeam", async () => {
+    jest.mocked(lockMemberRoles).mockResolvedValue(["DPS"]);
+    const { queries } = fakeDb({ teams: [3], successors: [], activeTournament: true });
+
+    await requestAccountDeletion(7);
+
+    expect(queries.some((q) => q.sql === "UPDATE bg_teams SET is_ghost = 1 WHERE id = ?")).toBe(true);
+    expect(dissolveTeamOn).not.toHaveBeenCalled();
+    expect(leftTeams()).toEqual([{ teamId: 3, userId: 7 }]);
+  });
+});
+
+describe("requestAccountDeletion — jeu de verrous, avatar mis de côté, rejeu", () => {
+  it("requestAccountDeletion_soloTournaments_locksOnlyNotStartedOnesButRepublishesAll", async () => {
+    jest
+      .mocked(listSoloRegistrationTournamentIds)
+      .mockImplementation(async (_runner, _userId, openOnly) => (openOnly ? [8] : [5, 8]));
+    fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    expect(jest.mocked(lockTournamentRow).mock.calls.map(([, id]) => id)).toEqual([8]);
+    expect(publishUpdatedEvent).toHaveBeenCalledWith(5);
+    expect(publishUpdatedEvent).toHaveBeenCalledWith(8);
+  });
+
+  it("requestAccountDeletion_lockSetChecked_underTheAccountLockWithTheLockedIds", async () => {
+    jest.mocked(listSoloRegistrationTournamentIds).mockResolvedValue([8]);
+    fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    expect(assertSoloLockSetFresh).toHaveBeenCalledWith(expect.anything(), 7, new Set([8]), false);
+  });
+
+  it("requestAccountDeletion_soloRegistrationAppearedUnderLock_replaysWholeTransaction", async () => {
+    jest.mocked(assertSoloLockSetFresh).mockRejectedValueOnce(new Error("STALE_LOCK_SET"));
+    const { connection } = fakeDb({});
+
+    await expect(requestAccountDeletion(7)).resolves.toHaveProperty("finalAt");
+
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(holdAccountIdentity).toHaveBeenCalledTimes(1);
+  });
+
+  it("requestAccountDeletion_afterCommit_rotatesHeldAvatarFile", async () => {
+    fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    expect(rotateHeldAvatarFile).toHaveBeenCalledWith(7, { detachPurge: true });
+  });
+
+  it("requestAccountDeletion_avatarRotationFails_requestStillSucceedsAndSaysIt", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(rotateHeldAvatarFile).mockRejectedValue(
+      Object.assign(new Error("EPERM: rename public/uploads/avatars/7-abc.webp"), { code: "EPERM" }),
+    );
+    fakeDb({});
+
+    await expect(requestAccountDeletion(7)).resolves.toHaveProperty("finalAt");
+
+    expect(log).toHaveBeenCalledWith(
+      "[account-deletion] avatar mis de côté non renommé, encore servi à son ancienne adresse",
+      "EPERM",
+    );
+    log.mockRestore();
+  });
+
+  it("requestAccountDeletion_castTouchedOnlyOnCompletedMatch_publishesWithoutLandingLive", async () => {
+    fakeDb({});
+    jest.mocked(withdrawUserCasts).mockResolvedValue({
+      matchIds: [40, 41],
+      tournamentIds: [5, 6],
+      liveTournamentIds: [6],
+      releasedRefereeMatchIds: [],
+      releasedCastMatchIds: [],
+    });
+
+    await requestAccountDeletion(7);
+
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(5, { landingLive: false });
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(6, { landingLive: true });
+  });
+
+  it("requestAccountDeletion_liveRequest_forfeitsInBackgroundWithDiscordLines", async () => {
+    const entry = { tournamentId: 8, teamId: 70 };
+    jest.mocked(listForfeitableSoloEntries).mockResolvedValue([entry]);
+    // Jamais résolue : la réponse ne doit pas l'attendre.
+    jest.mocked(forfeitSoloEntriesAfterCommit).mockReturnValue(new Promise<number>(() => undefined));
+    fakeDb({});
+
+    await expect(requestAccountDeletion(7)).resolves.toHaveProperty("finalAt");
+
+    expect(forfeitSoloEntriesAfterCommit).toHaveBeenCalledWith([entry]);
+  });
+
+  it("requestAccountDeletion_replay_silentNoDiscordAlertNoWithdrawalLineNoOwnershipNotice", async () => {
+    const entry = { tournamentId: 8, teamId: 70 };
+    jest.mocked(withdrawSoloRegistrationsOn).mockResolvedValue([entry]);
+    jest.mocked(listForfeitableSoloEntries).mockResolvedValue([entry]);
+    fakeDb({
+      teams: [3],
+      successors: [{ id: 1, user_id: 21, roles_json: '["MANAGER"]', joined_at: "2026-01-01 00:00:00" }],
+    });
+
+    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00", requestedAt: new Date("2026-11-01T10:00:00Z") });
+
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(logDeletionWithdrawal).not.toHaveBeenCalled();
+    expect(notifyTeamInviteInBackground).not.toHaveBeenCalled();
+    expect(forfeitSoloEntriesAfterCommit).toHaveBeenCalledWith([entry], { silent: true });
+    // Les lecteurs, eux, sont rafraîchis.
+    expect(publishUpdatedEvent).toHaveBeenCalledWith(8);
   });
 });
 

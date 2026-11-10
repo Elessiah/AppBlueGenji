@@ -99,6 +99,12 @@ describe("/rgpd et historique", () => {
     expect(frLogin.reactivation.kept).toContain("si ton pseudo a été pris entre-temps, il te revient, raccourci au besoin, suivi de « OG »");
     expect(enLogin.reactivation.kept).toContain("if your username was taken in the meantime, it comes back, shortened if needed, followed by “OG”");
   });
+
+  // Comme /rgpd et T01 : masqué ou supprimé par la modération, l'avatar n'est pas rendu.
+  it("reactivationMessages_kept_carriesModerationCaveatFrAndEn", () => {
+    expect(frLogin.reactivation.kept).toContain("Un avatar que la modération a masqué ou supprimé entre-temps ne revient pas.");
+    expect(enLogin.reactivation.kept).toContain("An avatar that moderation hid or removed in the meantime does not come back.");
+  });
 });
 
 // Revue juridique #546 (reprise, cycle 2) : ligne de réactivation et suffixe « OG » déclarés partout.

@@ -40,7 +40,7 @@ type Account = {
   /** Avatars masqués par la modération (quarantaine `HIDDEN`). */
   hidden?: string[];
   /** Matchs qu'il arbitre encore, avec leur tournoi (`withdrawUserCasts`). */
-  refereed?: { matchId: number; tournamentId: number }[];
+  refereed?: { matchId: number; tournamentId: number; status?: string }[];
 };
 
 type Query = { userId: number | null; sql: string; params: unknown[] };
@@ -63,7 +63,14 @@ function needsWork(account: Account): boolean {
 
 function fakeDb(
   accounts: Record<number, Account>,
-  options: { failFor?: number; rollbackFails?: boolean; failTermsCleanup?: boolean; commitFails?: boolean } = {},
+  options: {
+    failFor?: number;
+    rollbackFails?: boolean;
+    failTermsCleanup?: boolean;
+    commitFails?: boolean;
+    /** Le relevé des tournois de casts de ce compte échoue (avant toute transaction). */
+    failCastListingFor?: number;
+  } = {},
 ) {
   const queries: Query[] = [];
   const connections: {
@@ -72,9 +79,15 @@ function fakeDb(
     release: jest.Mock<() => void>;
   }[] = [];
 
-  const poolExecute = jest.fn(async (sql: string) => {
+  const poolExecute = jest.fn(async (sql: string, params: unknown[] = []) => {
     const q = sql.replace(/\s+/g, " ").trim();
-    queries.push({ userId: null, sql: q, params: [] });
+    queries.push({ userId: null, sql: q, params });
+    // Relevé d'avant la transaction : les tournois dont un match nomme le compte.
+    if (q.startsWith("SELECT m.tournament_id FROM bg_matches m JOIN bg_match_casters")) {
+      if (options.failCastListingFor === Number(params[0])) throw new Error("DB_DOWN");
+      const refereed = accounts[Number(params[0])]?.refereed ?? [];
+      return [[...new Set(refereed.map((match) => match.tournamentId))].map((tournament_id) => ({ tournament_id }))];
+    }
     if (options.failTermsCleanup && q.includes("SET terms_version = NULL")) throw new Error("DB_DOWN");
     if (q.startsWith("SELECT u.id FROM bg_users u WHERE u.is_deleted = 1")) {
       return [
@@ -96,10 +109,21 @@ function fakeDb(
           return [refereed.map((match) => ({ match_id: match.matchId }))];
         }
         if (q.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
-          return [refereed.map((match) => ({ id: match.matchId, tournament_id: match.tournamentId, status: "READY" }))];
+          return [
+            refereed.map((match) => ({
+              id: match.matchId,
+              tournament_id: match.tournamentId,
+              status: match.status ?? "READY",
+            })),
+          ];
         }
         if (q.startsWith("SELECT logo_url FROM bg_logo_quarantines")) {
           return [(current === null ? [] : accounts[current]?.hidden ?? []).map((logo_url) => ({ logo_url }))];
+        }
+        // Le verrou d'un tournoi (pris avant le compte) ne désigne aucun compte.
+        if (q.startsWith("SELECT id FROM bg_tournaments WHERE id = ? FOR UPDATE")) {
+          queries.push({ userId: null, sql: q, params });
+          return [[]];
         }
         if (q.includes("FOR UPDATE")) current = Number(params[0]);
         queries.push({ userId: current, sql: q, params });
@@ -340,6 +364,60 @@ describe("reconcileDeletedAccounts", () => {
     ]);
   });
 
+  // Un arbitre ou un lien retiré d'un match joué ne change ni l'accueil ni #live.
+  it("reconcileDeletedAccounts_onlyCompletedMatchTouched_publishesWithoutLandingLive", async () => {
+    fakeDb({
+      5124: {
+        pseudo: "compte_supprime_5124",
+        refereed: [
+          { matchId: 5, tournamentId: 3, status: "COMPLETED" },
+          { matchId: 9, tournamentId: 4 },
+        ],
+      },
+    });
+
+    await reconcileDeletedAccounts();
+
+    expect(jest.mocked(publishMatchUpdatedEvent).mock.calls).toEqual([
+      [3, { landingLive: false }],
+      [4, { landingLive: true }],
+    ]);
+  });
+
+  // Même ordre que la demande et la suppression : tournois (id croissant), puis compte.
+  it("reconcileDeletedAccounts_refereedMatches_locksTheirTournamentsBeforeTheAccount", async () => {
+    const { queries } = fakeDb({
+      5125: {
+        pseudo: "compte_supprime_5125",
+        // Le relevé rend les tournois par id croissant (`ORDER BY`).
+        refereed: [
+          { matchId: 5, tournamentId: 30 },
+          { matchId: 9, tournamentId: 40 },
+        ],
+      },
+    });
+
+    await reconcileDeletedAccounts();
+
+    const locks = queries.filter((q) => q.sql.includes("FOR UPDATE"));
+    expect(locks.slice(0, 3).map((q) => [q.sql.includes("bg_tournaments") ? "tournament" : "account", q.params[0]])).toEqual([
+      ["tournament", 30],
+      ["tournament", 40],
+      ["account", 5125],
+    ]);
+  });
+
+  it("reconcileDeletedAccounts_castListingFails_countedFailedAndOthersContinue", async () => {
+    const { connections } = fakeDb(
+      { 5126: { pseudo: "compte_supprime_5126" }, 5127: { pseudo: "compte_supprime_5127" } },
+      { failCastListingFor: 5126 },
+    );
+
+    expect(await reconcileDeletedAccounts()).toMatchObject({ erased: 1, failed: 1 });
+    // Aucune connexion prise pour le compte en échec : une seule transaction.
+    expect(connections).toHaveLength(1);
+  });
+
   // Revue sécurité EF-21 #526 : le bilan ne compte un geste qu'une fois commité.
   it("reconcileDeletedAccounts_commitFails_countedFailedOnlyAndViewsKept", async () => {
     clearCache();
@@ -458,6 +536,6 @@ describe("la politique publiée annonce l'exception de l'entrée solo", () => {
       join(__dirname, "..", "..", "..", "lib", "shared", "processing-register.ts"),
       "utf8",
     );
-    expect(register).toContain("aucun engagement dans un tournoi individuel commencé");
+    expect(register).toContain("aucun engagement dans un tournoi individuel déjà commencé ou terminé");
   });
 });

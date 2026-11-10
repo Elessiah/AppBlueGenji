@@ -489,11 +489,21 @@ describe("withdrawUserCasts — plusieurs matchs, arbitrages", () => {
     expect(result.releasedCastMatchIds).toEqual([42]);
   });
 
+  it("withdrawUserCasts_completedAndOpenMatchesTouched_liveTournamentIdsKeepOnlyOpenOnes", async () => {
+    const w = world([], [], false, [other(7, 5, 12), { ...other(8, 6, 12), status: "COMPLETED" }]);
+
+    const result = await withdrawUserCasts(w.connection, 12, false);
+
+    expect(result.tournamentIds).toEqual([5, 6]);
+    expect(result.liveTournamentIds).toEqual([5]);
+  });
+
   it("sans rien à retirer, les listes de matchs relâchés sont vides", async () => {
     const w = world([], [], false, []);
     expect(await withdrawUserCasts(w.connection, 12, false)).toEqual({
       matchIds: [],
       tournamentIds: [],
+      liveTournamentIds: [],
       releasedRefereeMatchIds: [],
       releasedCastMatchIds: [],
     });

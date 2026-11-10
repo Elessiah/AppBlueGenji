@@ -167,6 +167,30 @@ export async function runDueAccountDeletionsExclusively(): Promise<void> {
 }
 
 /**
+ * Le rattrapage de démarrage, derrière le **même** verrou nommé que le passage
+ * horaire : les processus du site démarrent ensemble (déploiement), et chacun
+ * referait le même balayage en se disputant les mêmes verrous de comptes et de
+ * tournois. Celui qui n'obtient pas le verrou ne fait rien — un autre processus
+ * tient le rattrapage (ou le passage horaire, qui rejoue la même passe des
+ * entrées solo ; le reste du rattrapage ne sert qu'après un changement de
+ * règle et attend alors le démarrage suivant).
+ */
+async function reconcileDeletedAccountsExclusively(
+  reconcile: () => Promise<{ erased: number; renamed: number; failed: number }>,
+): Promise<{ erased: number; renamed: number; failed: number }> {
+  if (!pool) return { erased: 0, renamed: 0, failed: 0 };
+  try {
+    return await withNamedLock(pool, DUE_DELETIONS_LOCK_NAME, 0, () => reconcile());
+  } catch (error) {
+    if (error instanceof NamedLockUnavailableError) {
+      console.info("[deleted-accounts] Rattrapage de démarrage laissé à un autre processus (verrou tenu).");
+      return { erased: 0, renamed: 0, failed: 0 };
+    }
+    throw error;
+  }
+}
+
+/**
  * La garde « une fois par processus » vit sur `globalThis` et non dans une
  * variable de module : `next dev` réévalue ce fichier à chaque rechargement à
  * chaud, et une variable de module relançait la passe — irréversible — à
@@ -198,7 +222,7 @@ const reconciliationState = globalThis as typeof globalThis & {
 function scheduleDeletedAccountsReconciliation(): void {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   reconciliationState.__bgDeletedAccountsReconciliation ??= import("@/lib/server/users/deleted-accounts")
-    .then(({ reconcileDeletedAccounts }) => reconcileDeletedAccounts())
+    .then(({ reconcileDeletedAccounts }) => reconcileDeletedAccountsExclusively(reconcileDeletedAccounts))
     .then(({ erased, renamed, failed }) => {
       if (erased + renamed + failed > 0) {
         console.info(

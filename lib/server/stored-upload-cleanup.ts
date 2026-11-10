@@ -60,10 +60,12 @@ export function storedUploadAbsolutePath(url: string | null | undefined, folder:
  *
  * @param options.exceptUserAvatar Ignore l'avatar de ce compte — « un autre que
  *   son titulaire désigne-t-il ce fichier ? » (`lib/server/avatar-rotation.ts`).
+ * @param options.exceptHoldOf Ignore le masque de suppression de ce compte —
+ *   même question, pour l'avatar mis de côté à la demande de suppression.
  */
 export async function isUploadReferenced(
   url: string,
-  options: { exceptUserAvatar?: number } = {},
+  options: { exceptUserAvatar?: number; exceptHoldOf?: number } = {},
 ): Promise<boolean> {
   const disk = toDiskUploadPath(url);
   if (!disk) return false;
@@ -76,6 +78,10 @@ export async function isUploadReferenced(
     if (exceptUser !== undefined && sql.startsWith("SELECT 1 FROM bg_users ")) {
       sql = sql.replace(" LIMIT 1", " AND id <> ? LIMIT 1");
       params.push(exceptUser);
+    }
+    if (options.exceptHoldOf !== undefined && sql.startsWith("SELECT 1 FROM bg_account_deletion_holds ")) {
+      sql = sql.replace(" LIMIT 1", " AND user_id <> ? LIMIT 1");
+      params.push(options.exceptHoldOf);
     }
     const [rows] = await db.execute<RowDataPacket[]>(sql, params);
     if (rows.length > 0) return true;
