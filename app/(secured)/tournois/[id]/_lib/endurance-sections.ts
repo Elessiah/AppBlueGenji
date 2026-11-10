@@ -215,11 +215,25 @@ export function splitPlayoffBrackets(playoffs: BracketMatch[]): {
  *
  * `0` quand l'arbre n'a pas commencé — il n'y a alors rien à nommer.
  */
-export function endurancePlayoffRoundCount(decisive: BracketMatch[]): number {
+export function endurancePlayoffRoundCount(
+  decisive: BracketMatch[],
+  ghostSlots?: readonly BracketSlotRef[],
+): number {
   const rounds = [...new Set(decisive.map((match) => match.roundNumber))];
   if (rounds.length === 0) return 0;
 
+  // Les tours à venir sont connus (`endurancePlayoffGhostSlots`) et suivent la
+  // règle du moteur : une paire vidée par deux doubles forfaits n'y donne aucune
+  // rencontre, et le match qui reste *est* la finale. Compter sur la taille du
+  // premier tour l'appellerait encore « Demi-finale ».
+  if (ghostSlots) {
+    return new Set([...rounds, ...ghostSlots.map((slot) => slot.roundNumber)]).size;
+  }
+
   const firstRound = Math.min(...rounds);
+  const lastRound = Math.max(...rounds);
+  // Un dernier tour d'un seul match est la finale, quel que soit le premier tour.
+  if (decisive.filter((match) => match.roundNumber === lastRound).length === 1) return rounds.length;
   let remaining = decisive.filter((match) => match.roundNumber === firstRound).length;
 
   let count = 1;
@@ -230,6 +244,13 @@ export function endurancePlayoffRoundCount(decisive: BracketMatch[]): number {
   // Un tour de plus que prévu ne se discute pas : il est là.
   return Math.max(count, rounds.length);
 }
+
+/**
+ * Numéro réservé à la case à pourvoir de la petite finale, pour que son
+ * identifiant ne croise jamais celui d'un créneau de l'arbre (`ghostSlotId`,
+ * dont les numéros de match restent bien en dessous).
+ */
+const THIRD_PLACE_GHOST_NUMBER = 999;
 
 /**
  * Identifiant d'un créneau à pourvoir. **Négatif**, donc impossible à confondre
@@ -371,13 +392,6 @@ export function endurancePlayoffThirdPlaceSlot(
     entrants,
   };
 }
-
-/**
- * Numéro réservé à la case à pourvoir de la petite finale, pour que son
- * identifiant ne croise jamais celui d'un créneau de l'arbre (`ghostSlotId`,
- * dont les numéros de match restent bien en dessous).
- */
-const THIRD_PLACE_GHOST_NUMBER = 999;
 
 /**
  * Liens « vainqueur → match suivant » de l'arbre final, **dérivés**.

@@ -103,7 +103,7 @@ function playoffTree(decisive: BracketMatch[], thirdPlace: BracketMatch[] = [], 
       onOpenAdminModal={() => undefined}
       format="BG_SURVIE"
       resolveNextMatchId={(slot) => links.get(slot.id) ?? null}
-      plannedRounds={endurancePlayoffRoundCount(decisive)}
+      plannedRounds={endurancePlayoffRoundCount(decisive, ghosts)}
     />,
   );
 }
@@ -192,5 +192,12 @@ describe("petite finale sous la finale", () => {
 
     expect(html).toContain("Finale 1");
     expect(html).not.toContain("Grande Finale");
+  });
+
+  it("labelledCard_finalAndThirdPlace_exposeGroupsNamedByTheirLabel", () => {
+    const html = playoffTree(round(QUARTERS, 4));
+
+    expect(html).toContain('role="group" aria-label="Grande Finale"');
+    expect(html).toContain('role="group" aria-label="Petite Finale"');
   });
 });

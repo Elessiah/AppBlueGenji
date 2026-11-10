@@ -291,7 +291,7 @@ export function EnduranceView({
       playoffGhostEntrants,
       // Les tours de l'arbre naissent un à un : sans ce compte, les quarts de
       // finale s'appelleraient « Finale » tant qu'ils seraient le seul tour posé.
-      playoffRounds: endurancePlayoffRoundCount(decisive),
+      playoffRounds: endurancePlayoffRoundCount(decisive, isFinished ? undefined : playoffGhosts),
       thirdPlaceSlot,
       // Repli : une petite finale que l'arbre n'a pas su rattacher à sa finale
       // garde son volet à part plutôt que de disparaître.

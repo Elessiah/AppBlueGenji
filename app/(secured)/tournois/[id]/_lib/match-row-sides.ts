@@ -1,4 +1,5 @@
 import type { BracketMatch } from "@/lib/shared/types";
+import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 
 /** Ce que la carte d'un match (`MatchRow`) affiche pour l'une de ses deux lignes. */
 export interface MatchSideView {
@@ -8,7 +9,7 @@ export interface MatchSideView {
   forfeits: boolean;
   /** Score affiché : « FF » sur forfait, « - » tant qu'aucun score n'est posé. */
   score: string | number;
-  /** Repli du nom d'une case vide : « BYE » au premier tour face à une engagée, « TBD » sinon. */
+  /** Repli du nom d'une case vide : « BYE » au premier tour (ou dans un tour de play-offs) face à une engagée, « TBD » sinon. */
   emptyLabel: "BYE" | "TBD";
 }
 
@@ -35,7 +36,7 @@ export function matchSideViews(
       win: match.winnerTeamId !== null && match.winnerTeamId === ownId,
       forfeits,
       score: forfeits ? "FF" : (score ?? "-"),
-      emptyLabel: roundNumber === 1 && ownId === null && otherId !== null ? "BYE" : "TBD",
+      emptyLabel: (roundNumber === 1 || roundNumber >= PLAYOFF_ROUND_OFFSET) && ownId === null && otherId !== null ? "BYE" : "TBD",
     };
   };
   return [

@@ -49,4 +49,20 @@ describe("matchSideViews", () => {
     expect(a.emptyLabel).toBe("TBD");
     expect(b.emptyLabel).toBe("TBD");
   });
+
+  it("matchSideViews_playoffRoundOneSideEmpty_labelsBye", () => {
+    const bye = { ...base, team2Id: null, winnerTeamId: 1 };
+    expect(matchSideViews(bye, 1001, false)[1].emptyLabel).toBe("BYE");
+    expect(matchSideViews(bye, 1001, false)[0].emptyLabel).toBe("TBD");
+  });
+
+  it("matchSideViews_playoffRoundBothEmpty_labelsTbd", () => {
+    const [a, b] = matchSideViews({ ...base, team1Id: null, team2Id: null }, 1001, false);
+    expect(a.emptyLabel).toBe("TBD");
+    expect(b.emptyLabel).toBe("TBD");
+  });
+
+  it("matchSideViews_qualificationRoundTwoEmptySide_labelsTbd", () => {
+    expect(matchSideViews({ ...base, team2Id: null }, 2, false)[1].emptyLabel).toBe("TBD");
+  });
 });

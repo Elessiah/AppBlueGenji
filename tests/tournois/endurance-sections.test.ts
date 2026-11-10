@@ -582,6 +582,41 @@ describe("endurancePlayoffRoundCount", () => {
   });
 });
 
+describe("endurancePlayoffRoundCount : tours à venir", () => {
+  const vacatedQuarters = () =>
+    playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 4).map((match, index) =>
+      index < 2 ? { ...match, status: "COMPLETED" as MatchStatus, doubleForfeit: true } : match,
+    );
+
+  it("endurancePlayoffRoundCount_vacatedPairWithGhosts_countsPostedAndGhostRounds", () => {
+    const quarters = vacatedQuarters();
+    const ghosts = endurancePlayoffGhostSlots(quarters);
+    expect(endurancePlayoffRoundCount(quarters, ghosts)).toBe(2);
+  });
+
+  it("endurancePlayoffRoundCount_noVacatedPairWithGhosts_keepsFullCount", () => {
+    const quarters = playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 4);
+    expect(endurancePlayoffRoundCount(quarters, endurancePlayoffGhostSlots(quarters))).toBe(3);
+  });
+
+  it("endurancePlayoffRoundCount_finishedLoneFinalAfterVacatedPair_returnsPostedRounds", () => {
+    const posted = [...vacatedQuarters(), ...playoffRoundOfSize(PLAYOFF_ROUND_OFFSET + 1, 1)];
+    expect(endurancePlayoffRoundCount(posted)).toBe(2);
+  });
+
+  it("endurancePlayoffRoundCount_finishedNoFinalPosted_usesFirstRoundSize", () => {
+    const posted = [
+      ...playoffRoundOfSize(PLAYOFF_ROUND_OFFSET, 4),
+      ...playoffRoundOfSize(PLAYOFF_ROUND_OFFSET + 1, 2),
+    ];
+    expect(endurancePlayoffRoundCount(posted)).toBe(3);
+  });
+
+  it("endurancePlayoffRoundCount_emptyWithGhosts_returnsZero", () => {
+    expect(endurancePlayoffRoundCount([], [])).toBe(0);
+  });
+});
+
 describe("libellés d'un volet de manche", () => {
   const sectionOf = (total: number, played: number) => {
     const matches = Array.from({ length: total }, (_, index) =>

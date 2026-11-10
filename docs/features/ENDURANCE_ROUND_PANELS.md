@@ -265,9 +265,13 @@ pour l'affichage : les traits (`endurancePlayoffLinks`), le compte des cases à
 pourvoir du tour suivant (`endurancePlayoffGhostSlots`) et les noms projetés
 (`projectPlayoffGhostEntrants`) en descendent tous — un nom ne s'affiche jamais
 dans une case que son trait n'atteint pas, et la paire sautée ne porte aucun
-trait. Seul le **nom des stades** reste compté sur l'effectif du premier tour
-(`endurancePlayoffRoundCount`) : dans ce cas rarissime, la rencontre restante
-s'appelle encore « Demi-finale » alors qu'elle tient lieu de finale.
+trait. Le **nom des stades** suit la même règle : `endurancePlayoffRoundCount`
+compte les tours posés et les cases à pourvoir, donc la rencontre qui reste
+après une paire vidée s'appelle « Finale » et non « Demi-finale ». Un tournoi
+clos sans cases à pourvoir retombe sur l'effectif du premier tour, sauf quand
+son dernier tour n'a qu'une rencontre (c'est la finale). Une exemption posée
+dans un tour de play-offs affiche `BYE` sur sa case vide, comme la case à
+pourvoir qui l'annonçait (`matchSideViews`).
 
 Si la règle d'appariement du moteur changeait, c'est `endurancePlayoffLinks`
 qu'il faudrait suivre — d'où un test qui la compare à la structure réellement

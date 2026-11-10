@@ -255,7 +255,13 @@ export function BracketTree({
     // pourvoir porte un identifiant négatif : il ne peut donc jamais la porter.
     const isTarget = slot.id === scrollTargetMatchId;
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: label || isTarget ? 2 : 0 }}>
+      <div
+        // Le sous-titre nomme la carte pour un lecteur d'écran : sans groupe, la
+        // « Petite Finale » n'est qu'une ligne de texte devant deux rangées.
+        role={label ? "group" : undefined}
+        aria-label={label ?? undefined}
+        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: label || isTarget ? 2 : 0 }}
+      >
         {(label || isTarget) && (
           <div style={{ fontSize: 11, color: isTarget ? accentColor : "var(--ink-quiet)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", lineHeight: 1 }}>
             {isTarget ? `★ ${label ?? t("bracket.yourMatch")}` : label}
