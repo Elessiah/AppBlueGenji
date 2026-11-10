@@ -13,13 +13,15 @@ import {
 } from "@/lib/server/tournaments/reminder-marks";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
+/** L'interblocage sur le verrou AUTO-INC, tel que MariaDB le rend. */
+const autoIncFailure = () =>
+  Object.assign(new Error("Failed to read auto-increment value from storage engine"), {
+    code: "ER_AUTOINC_READ_FAILED",
+    errno: 1467,
+  });
+
 describe("claimDatedMark", () => {
   const match = { id: 31, start_at: new Date("2099-01-01T18:00:00Z"), team1_id: 4, team2_id: 5 };
-  const autoInc = () =>
-    Object.assign(new Error("Failed to read auto-increment value from storage engine"), {
-      code: "ER_AUTOINC_READ_FAILED",
-      errno: 1467,
-    });
 
   it("claimDatedMark_freeMark_returnsTrue", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
@@ -38,7 +40,7 @@ describe("claimDatedMark", () => {
   });
 
   it("claimDatedMark_autoIncFailureOnce_replaysTheStatement", async () => {
-    const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(autoInc()).mockResolvedValueOnce([{ affectedRows: 1 }]);
+    const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(autoIncFailure()).mockResolvedValueOnce([{ affectedRows: 1 }]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 
     expect(await claimDatedMark(match, "P1D")).toBe(true);
@@ -136,11 +138,6 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
   const MATCH_LOCK = "SELECT start_at FROM bg_matches WHERE id = ? LIMIT 1 LOCK IN SHARE MODE";
   const MARK_INSERT = "INSERT IGNORE INTO bg_match_reminders (match_id, offset_key, start_at) VALUES (?, ?, ?)";
   const MARK_LOCK = "SELECT id, start_at FROM bg_match_reminders WHERE match_id = ? AND offset_key = ? LIMIT 1 FOR UPDATE";
-  const autoIncFailure = () =>
-    Object.assign(new Error("Failed to read auto-increment value from storage engine"), {
-      code: "ER_AUTOINC_READ_FAILED",
-      errno: 1467,
-    });
 
   function transactionMock() {
     const connection = connectionMock();
