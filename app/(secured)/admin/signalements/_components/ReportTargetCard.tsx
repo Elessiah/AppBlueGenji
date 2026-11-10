@@ -9,7 +9,12 @@ import {
   type ReportTargetRef,
   type ReportTargetView,
 } from "@/lib/shared/content-reports";
-import { formatQuarantineDate, isImmediateLogoRemoval, type LogoQuarantineView } from "@/lib/shared/logo-quarantine";
+import {
+  formatQuarantineDate,
+  isImmediateLogoRemoval,
+  type ContestOutcome,
+  type LogoQuarantineView,
+} from "@/lib/shared/logo-quarantine";
 import { ArmedButton } from "./ArmedButton";
 import styles from "../reports.module.css";
 
@@ -23,7 +28,15 @@ interface ReportTargetCardProps {
   onDeleteLogo: (target: ReportTargetRef) => void;
   onRestore: (quarantineId: number) => void;
   onPurge: (quarantineId: number) => void;
+  /** Écrit l'issue de la contestation (D22) ; sur un avatar supprimé, pose ou lève le blocage (D18). */
+  onContestOutcome: (quarantineId: number, outcome: ContestOutcome) => void;
 }
+
+/** L'issue écrite d'une contestation, dite au panneau. */
+const OUTCOME_TEXT: Record<ContestOutcome, string> = {
+  UPHELD: "Contestation rejetée : décision maintenue.",
+  OVERTURNED: "Contestation acceptée.",
+};
 
 /**
  * « Logo » pour une équipe, « avatar » pour un joueur : les deux seules cibles
@@ -52,7 +65,10 @@ export function ReportTargetCard({
   onDeleteLogo,
   onRestore,
   onPurge,
+  onContestOutcome,
 }: Readonly<ReportTargetCardProps>) {
+  // L'issue ne change le blocage de l'empreinte que pour un avatar (D6).
+  const isAvatar = target.type === "USER";
   const hidden = quarantines.find((quarantine) => quarantine.status === "HIDDEN") ?? null;
   const closed = quarantines.filter((quarantine) => quarantine.status !== "HIDDEN");
   const image = IMAGE_NOUN[target.type];
@@ -101,6 +117,10 @@ export function ReportTargetCard({
             <span>
               <strong>{nounCap} masqué</strong> le {formatQuarantineDate(new Date(hidden.hiddenAt))}. Suppression
               définitive le {formatQuarantineDate(new Date(hidden.purgeAfter))} sans contestation.
+              {hidden.contestOutcome && <> {OUTCOME_TEXT[hidden.contestOutcome]}</>}
+              {hidden.contestOutcome === "OVERTURNED" && isAvatar && (
+                <> Sa suppression n&apos;en bloquera pas l&apos;image.</>
+              )}
             </span>
           </div>
           <div className={styles.targetActions}>
@@ -119,23 +139,64 @@ export function ReportTargetCard({
               disabled={busy}
               onConfirm={() => onPurge(hidden.id)}
             />
+            {isAvatar && hidden.contestOutcome === null && (
+              <button
+                type="button"
+                className={styles.actionButton}
+                disabled={busy}
+                onClick={() => onContestOutcome(hidden.id, "UPHELD")}
+              >
+                Contestation rejetée
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      {closed.map((quarantine) =>
-        isImmediateLogoRemoval(quarantine) ? (
-          <p key={quarantine.id} className={styles.muted}>
-            {nounCap} supprimé sans délai le {formatQuarantineDate(new Date(quarantine.hiddenAt))}.
-          </p>
-        ) : (
-          <p key={quarantine.id} className={styles.muted}>
-            {nounCap} masqué le {formatQuarantineDate(new Date(quarantine.hiddenAt))} —{" "}
-            {quarantine.status === "RESTORED" ? "rétabli" : "supprimé définitivement"}
-            {quarantine.closedAt ? ` le ${formatQuarantineDate(new Date(quarantine.closedAt))}` : ""}.
-          </p>
-        ),
-      )}
+      {closed.map((quarantine) => (
+        <div key={quarantine.id}>
+          {isImmediateLogoRemoval(quarantine) ? (
+            <p className={styles.muted}>
+              {nounCap} supprimé sans délai le {formatQuarantineDate(new Date(quarantine.hiddenAt))}.
+              {quarantine.contestOutcome && <> {OUTCOME_TEXT[quarantine.contestOutcome]}</>}
+            </p>
+          ) : (
+            <p className={styles.muted}>
+              {nounCap} masqué le {formatQuarantineDate(new Date(quarantine.hiddenAt))} —{" "}
+              {quarantine.status === "RESTORED" ? "rétabli" : "supprimé définitivement"}
+              {quarantine.closedAt ? ` le ${formatQuarantineDate(new Date(quarantine.closedAt))}` : ""}.
+              {quarantine.status === "PURGED" && quarantine.contestOutcome && (
+                <> {OUTCOME_TEXT[quarantine.contestOutcome]}</>
+              )}
+            </p>
+          )}
+          {/* Avatar supprimé : une contestation qui aboutit lève le blocage de
+              son image (D18), une contestation rejetée le pose (D22). */}
+          {isAvatar && quarantine.status === "PURGED" && (
+            <div className={styles.targetActions}>
+              {quarantine.contestOutcome !== "OVERTURNED" && (
+                <ArmedButton
+                  label="Contestation acceptée"
+                  confirmLabel="Débloquer l'image ?"
+                  className={styles.actionPrimary}
+                  disabled={busy}
+                  onConfirm={() => onContestOutcome(quarantine.id, "OVERTURNED")}
+                />
+              )}
+              {quarantine.contestOutcome === null && (
+                <button
+                  type="button"
+                  className={styles.actionButton}
+                  disabled={busy}
+                  onClick={() => onContestOutcome(quarantine.id, "UPHELD")}
+                >
+                  Contestation rejetée
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
 
       {canActOnLogo && !hidden && target.imageUrl && (
         <div className={styles.targetActions}>

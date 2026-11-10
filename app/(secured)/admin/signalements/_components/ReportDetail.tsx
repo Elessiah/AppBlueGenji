@@ -14,7 +14,7 @@ import {
 } from "@/lib/shared/content-reports";
 import { REPORT_CATEGORY_DEFINITIONS } from "@/lib/shared/content-report-categories";
 import { leadsToApi } from "@/lib/shared/safe-redirect";
-import { LOGO_QUARANTINE_MONTHS, formatQuarantineDate } from "@/lib/shared/logo-quarantine";
+import { LOGO_QUARANTINE_MONTHS, formatQuarantineDate, type ContestOutcome } from "@/lib/shared/logo-quarantine";
 import { relativeAge } from "../_lib/report-filters";
 import { ReportTargetCard } from "./ReportTargetCard";
 import { StatusPill } from "./StatusPill";
@@ -28,6 +28,7 @@ interface ReportDetailProps {
   onDeleteLogo: (target: ReportTargetRef) => void;
   onRestore: (quarantineId: number) => void;
   onPurge: (quarantineId: number) => void;
+  onContestOutcome: (quarantineId: number, outcome: ContestOutcome) => void;
 }
 
 function formatDateTime(iso: string): string {
@@ -48,6 +49,7 @@ export function ReportDetail({
   onDeleteLogo,
   onRestore,
   onPurge,
+  onContestOutcome,
 }: Readonly<ReportDetailProps>) {
   const titleId = useId();
   const noteId = useId();
@@ -220,6 +222,7 @@ export function ReportDetail({
                 onDeleteLogo={onDeleteLogo}
                 onRestore={onRestore}
                 onPurge={onPurge}
+                onContestOutcome={onContestOutcome}
               />
             ))}
           </ul>

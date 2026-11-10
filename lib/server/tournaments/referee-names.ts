@@ -18,7 +18,7 @@
  */
 import { createHmac, randomBytes } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
-import { cached } from "@/lib/server/cache";
+import { cached, invalidateCachedPrefix } from "@/lib/server/cache";
 import { withConnection } from "@/lib/server/database";
 import { visibleText } from "@/lib/shared/visible-text";
 import { showsRefereeName } from "@/lib/shared/match-referee";
@@ -99,10 +99,47 @@ export function markViewerReferee(
 
 /**
  * Durée de vie des pseudos lus pour une version d'instantané : la clé porte la
- * version, toute écriture en fait une autre ; la durée ne sert qu'à absorber
- * une vague d'ouvertures de flux (tous les membres lisent les mêmes pseudos).
+ * version, toute écriture en fait une autre ; la durée absorbe les ouvertures
+ * de flux (tous les membres lisent les mêmes pseudos) sans tenir plus d'une
+ * demi-minute un pseudo changé depuis.
  */
-const REFEREE_NAMES_TTL_MS = 5_000;
+const REFEREE_NAMES_TTL_MS = 30_000;
+
+/** Préfixe des clés de cache des pseudos d'arbitre (`loadRefereeNames`). */
+const REFEREE_NAMES_CACHE_PREFIX = "referee-names:";
+
+/**
+ * Oublie tous les pseudos d'arbitre en cache. Un geste qui retire un nom sans
+ * forcément changer la version d'un instantané — opposition retenue (son
+ * balayage peut échouer en partie), compte supprimé — l'appelle : le pseudo
+ * ne reste pas servi jusqu'à l'échéance du cache.
+ */
+export function forgetRefereeNames(): void {
+  invalidateCachedPrefix(REFEREE_NAMES_CACHE_PREFIX);
+}
+
+/**
+ * Oublie les pseudos d'arbitre en cache **des seuls tournois où ce compte
+ * arbitre un match dont le nom se montre** (score pas encore déclaré,
+ * `showsRefereeName`) : un joueur qui se renomme ne vide rien, un arbitre ne
+ * vide que ses tournois. Une lecture indexée (`idx_bg_matches_referee`) ; si
+ * elle échoue, tout le cache est oublié — un ancien pseudo n'est jamais servi
+ * faute de l'avoir lue.
+ */
+export async function forgetRefereeNamesOf(userId: number): Promise<void> {
+  try {
+    await withConnection(async (connection) => {
+      const [found] = await connection.query<RowDataPacket[]>(
+        `SELECT DISTINCT tournament_id FROM bg_matches WHERE referee_user_id = ? AND status IN ('PENDING', 'READY')`,
+        [userId],
+      );
+      for (const row of found) invalidateCachedPrefix(`${REFEREE_NAMES_CACHE_PREFIX}${Number(row.tournament_id)}:`);
+    });
+  } catch (error) {
+    console.error("[referee-names] lecture des matchs arbitrés impossible", error);
+    forgetRefereeNames();
+  }
+}
 
 type RefereeNameRow = RowDataPacket & { id: number; referee_user_id: number; pseudo: string };
 
@@ -122,15 +159,18 @@ export async function loadRefereeNames(snapshot: TournamentSnapshot): Promise<Ma
     if (showsRefereeName(match) && match.refereeKey !== null) shown.set(match.id, match.refereeKey);
   }
   if (shown.size === 0) return [];
-  return cached(`referee-names:${snapshot.card.id}:${snapshot.version}`, REFEREE_NAMES_TTL_MS, async () => {
+  return cached(`${REFEREE_NAMES_CACHE_PREFIX}${snapshot.card.id}:${snapshot.version}`, REFEREE_NAMES_TTL_MS, async () => {
+    // Les seuls matchs montrés : ni les joués ni les autres ne sont lus.
+    const ids = [...shown.keys()];
     const rows = await withConnection(async (connection) => {
       const [result] = await connection.query<RefereeNameRow[]>(
         `SELECT m.id, m.referee_user_id, u.pseudo
            FROM bg_matches m
            JOIN bg_users u ON u.id = m.referee_user_id
-          WHERE m.tournament_id = ? AND m.referee_user_id IS NOT NULL
+          WHERE m.tournament_id = ? AND m.id IN (${ids.map(() => "?").join(", ")})
+            AND m.referee_user_id IS NOT NULL
             AND u.is_deleted = 0 AND u.referee_objection_at IS NULL`,
-        [snapshot.card.id],
+        [snapshot.card.id, ...ids],
       );
       return result;
     });

@@ -68,6 +68,8 @@ describe("setRefereeScheduling", () => {
     expect(reset?.sql).toContain("NOT (launch_pairing <=> CONCAT(team1_id, ':', team2_id))");
     expect(reset?.sql).toContain("lobby_opened_at = NULL");
     expect(reset?.sql).toContain("team1_ready_at = NULL");
+    // L'arbitre désigné reclique « Prêt » à la réouverture, comme les équipes.
+    expect(reset?.sql).toContain("referee_ready_at = NULL");
     expect(reset?.params).toEqual([7]);
     // Une rencontre déjà notée n'est jamais renvoyée à planifier.
     expect(reset?.sql).toContain("NOT (team1_score IS NOT NULL OR team2_score IS NOT NULL)");

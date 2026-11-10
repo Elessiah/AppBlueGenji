@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database", () => ({ withConnection: jest.fn() }));
-jest.mock("@/lib/server/cache", () => ({ cached: jest.fn() }));
+jest.mock("@/lib/server/cache", () => ({ cached: jest.fn(), invalidateCachedPrefix: jest.fn() }));
 
-import { cached } from "@/lib/server/cache";
+import { cached, invalidateCachedPrefix } from "@/lib/server/cache";
 import { withConnection } from "@/lib/server/database";
-import { loadRefereeNames, markViewerReferee, refereeKey, withoutRefereeKeys } from "@/lib/server/tournaments/referee-names";
+import { forgetRefereeNames, forgetRefereeNamesOf, loadRefereeNames, markViewerReferee, refereeKey, withoutRefereeKeys } from "@/lib/server/tournaments/referee-names";
 import { bracketMatch } from "../../../helpers/bracket-match";
 import { connectionMock, fakeConnection } from "../../../helpers/sql-double";
 import { tournamentCard } from "../../../helpers/tournament-card";
@@ -118,8 +118,23 @@ describe("loadRefereeNames", () => {
 
     await loadRefereeNames(snapshotWith(bracketMatch({ id: 5, refereeKey: refereeKey(5, 9) })));
 
-    expect(jest.mocked(cached).mock.calls[0].slice(0, 2)).toEqual(["referee-names:7:v9", 5_000]);
-    expect(connection.query.mock.calls[0][1]).toEqual([7]);
+    expect(jest.mocked(cached).mock.calls[0].slice(0, 2)).toEqual(["referee-names:7:v9", 30_000]);
+    expect(connection.query.mock.calls[0][1]).toEqual([7, 5]);
+  });
+
+  it("loadRefereeNames_query_readsOnlyShownMatches", async () => {
+    rows();
+
+    await loadRefereeNames(
+      snapshotWith(
+        bracketMatch({ id: 5, refereeKey: refereeKey(5, 9) }),
+        bracketMatch({ id: 6, refereeKey: refereeKey(6, 9) }),
+        bracketMatch({ id: 8, status: "COMPLETED", refereeKey: refereeKey(8, 9) }),
+      ),
+    );
+
+    expect(String(connection.query.mock.calls[0][0])).toContain("m.id IN (?, ?)");
+    expect(connection.query.mock.calls[0][1]).toEqual([7, 5, 6]);
   });
 });
 
@@ -183,5 +198,42 @@ describe("markViewerReferee", () => {
     const names = [{ matchId: 5, refereeKey: refereeKey(5, 9), pseudo: "Arbitre" }];
 
     expect(markViewerReferee(names, 3, [])).toBe(names);
+  });
+});
+
+describe("forgetRefereeNames", () => {
+  it("forgetRefereeNames_called_invalidatesRefereeNamesPrefix", () => {
+    forgetRefereeNames();
+
+    expect(invalidateCachedPrefix).toHaveBeenCalledWith("referee-names:");
+  });
+});
+
+describe("forgetRefereeNamesOf", () => {
+  it("forgetRefereeNamesOf_refereesShownMatches_invalidatesOnlyTheirTournaments", async () => {
+    connection.query.mockResolvedValue([[{ tournament_id: 7 }, { tournament_id: 9 }]]);
+
+    await forgetRefereeNamesOf(4);
+
+    expect(connection.query).toHaveBeenCalledWith(expect.stringContaining("referee_user_id = ? AND status IN ('PENDING', 'READY')"), [4]);
+    expect(jest.mocked(invalidateCachedPrefix).mock.calls).toEqual([["referee-names:7:"], ["referee-names:9:"]]);
+  });
+
+  it("forgetRefereeNamesOf_refereesNothingShown_keepsCache", async () => {
+    connection.query.mockResolvedValue([[]]);
+
+    await forgetRefereeNamesOf(4);
+
+    expect(invalidateCachedPrefix).not.toHaveBeenCalled();
+  });
+
+  it("forgetRefereeNamesOf_readFails_invalidatesWholeCache", async () => {
+    const errorLog = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    connection.query.mockRejectedValue(new Error("ECONNRESET"));
+
+    await forgetRefereeNamesOf(4);
+
+    expect(invalidateCachedPrefix).toHaveBeenCalledWith("referee-names:");
+    errorLog.mockRestore();
   });
 });

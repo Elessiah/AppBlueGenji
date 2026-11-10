@@ -6,16 +6,18 @@ import {
   type AccountTrace,
   isReactivationWindowOpen,
   type SoloRegistrationFact,
+  type StoredDate,
   withdrawableSoloRegistrations,
 } from "@/lib/shared/account-deletion";
 import { isReferencedRowError } from "@/lib/server/mysql-errors";
 import { avatarFileLocations } from "@/lib/server/logo-quarantine";
-import { blockImageHashes, hashImageFiles } from "@/lib/server/blocked-images";
 import { unlink } from "node:fs/promises";
+import { blockRemovedImageFiles } from "@/lib/server/blocked-images";
+import { storedUploadAbsolutePath } from "@/lib/server/stored-upload-cleanup";
 import { closeUserStreams } from "@/lib/server/session-streams";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { deleteStoredImage } from "@/lib/server/image-upload";
-import { toDiskUploadPath } from "@/lib/shared/uploads";
+import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { playedMatchSql } from "@/lib/shared/ranking";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
@@ -88,7 +90,11 @@ export function accountTraceSql(): {
     // L'entrée solo compte dès qu'elle est **inscrite**, jouée ou non : son nom
     // d'engagé est le pseudo du joueur, et elle n'a pas de clé étrangère (une
     // cascade effacerait l'engagé, et avec lui l'historique des matchs) —
-    // effacer le compte la laisserait nommer quelqu'un qui n'existe plus. Une
+    // effacer le compte la laisserait nommer quelqu'un qui n'existe plus. Règle
+    // brute, d'avant D12 : la suppression (`loadAccountDeletionFacts`) la
+    // corrige ensuite en retirant les inscriptions à un tournoi pas encore
+    // commencé, sans match ; le rattrapage (`reconcileDeletedAccounts`) la
+    // garde telle quelle (conservateur). Une
     // entrée jamais inscrite part avec le compte (eraseAccount). Question à
     // part de `played` parce que sa phrase l'est : une inscription jamais
     // jouée ne laisse aucune statistique à conserver.
@@ -305,9 +311,17 @@ export async function getAccountDeletionPlan(userId: number): Promise<AccountDel
  * Rend le plan appliqué — le mode **et** le motif —, pour que la route puisse
  * le dire au joueur : « tes statistiques restent » ne veut rien dire à qui n'en
  * a aucune et dont la ligne n'est retenue que par une équipe à transférer.
+ *
+ * `accountCreatedAt` (rejeu du journal) : la ligne verrouillée doit être ce
+ * compte-là, sans quoi rien n'est écrit (`ACCOUNT_REASSIGNED`).
+ *
+ * @throws USER_NOT_FOUND | ACCOUNT_REASSIGNED
  */
-export async function deleteOwnAccount(userId: number): Promise<AccountDeletionPlan> {
-  const plan = await deleteAccountNow(userId, false);
+export async function deleteOwnAccount(
+  userId: number,
+  options: { accountCreatedAt?: string } = {},
+): Promise<AccountDeletionPlan> {
+  const plan = await deleteAccountNow(userId, false, options.accountCreatedAt);
   if (plan === null) throw new Error("USER_NOT_FOUND");
   return plan;
 }
@@ -317,30 +331,41 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
  * demande a été annulée (réactivation) ou si ses trente jours ne sont pas
  * écoulés — relu sous le verrou du compte. Idempotent : un compte déjà effacé
  * ou anonymisé n'est plus en attente. Rend `null` quand rien n'est fait.
+ * `accountCreatedAt` (rejeu du journal) : si la ligne verrouillée n'est pas ce
+ * compte-là (identifiant réattribué), rien n'est écrit et `ACCOUNT_REASSIGNED`
+ * est levé.
+ *
+ * @throws ACCOUNT_REASSIGNED
  */
-export async function finalizeAccountDeletion(userId: number): Promise<AccountDeletionPlan | null> {
-  return deleteAccountNow(userId, true);
+export async function finalizeAccountDeletion(
+  userId: number,
+  options: { accountCreatedAt?: string } = {},
+): Promise<AccountDeletionPlan | null> {
+  return deleteAccountNow(userId, true, options.accountCreatedAt);
 }
 
 /**
- * Efface ou anonymise le compte selon le plan. À l'effacement, l'empreinte des
- * avatars en quarantaine est bloquée d'abord (E6) ; anonymisé, le compte n'est
- * plus en attente : la suppression est faite.
+ * Efface ou anonymise le compte selon le plan. À l'effacement, les fichiers des
+ * avatars en quarantaine sont relevés sous le verrou (l'effacement retire leurs
+ * lignes) sans que leur empreinte soit bloquée : un avatar seulement **masqué**
+ * se conteste encore (décision D6, `lib/server/blocked-images.ts`). Seul
+ * l'avatar du compte que la modération a **supprimé** (quarantaine `PURGED` à
+ * son adresse) est bloqué, par `deleteAccountNow` après le commit. Anonymisé, le compte n'est plus en
+ * attente : la suppression est faite.
  */
 async function applyDeletionMode(
   connection: PoolConnection,
   userId: number,
   plan: AccountDeletionPlan,
   soloWithdrawals: readonly SoloRegistrationFact[],
-  quarantine: QuarantinedAvatars,
 ): Promise<{ withdrawal: { tournamentIds: number[] }; withdrawnFrom: number[]; quarantinedFiles: string[] }> {
   if (plan.mode === "ERASE") {
-    await blockImageHashes(connection, quarantine.hashes);
+    const quarantinedFiles = await loadQuarantinedAvatarFiles(connection, userId);
     const withdrawal = await eraseAccount(connection, userId, soloWithdrawals);
     return {
       withdrawal,
       withdrawnFrom: soloWithdrawals.map((registration) => registration.tournamentId),
-      quarantinedFiles: quarantine.files,
+      quarantinedFiles,
     };
   }
   const withdrawal = await anonymizeAccount(connection, userId);
@@ -351,8 +376,14 @@ async function applyDeletionMode(
   return { withdrawal, withdrawnFrom: [], quarantinedFiles: [] };
 }
 
-/** Une date relue de la base (`dateStrings`), ou son absence. */
-type StoredDate = Date | string | null;
+/** Une suite après le commit ; une erreur est consignée, jamais propagée (la suppression est faite). */
+export function afterCommit(step: () => void, failure: string): void {
+  try {
+    step();
+  } catch (error) {
+    console.error(`[account-deletion] ${failure} :`, error);
+  }
+}
 
 /** La suppression définitive est due : demande relevée il y a trente jours ou plus, compte toujours en attente. */
 function deletionIsDue(row: { is_deleted: 0 | 1; deletion_requested_at: StoredDate } | undefined): boolean {
@@ -364,26 +395,109 @@ function deletionIsDue(row: { is_deleted: 0 | 1; deletion_requested_at: StoredDa
   );
 }
 
-/** Les avatars en quarantaine du compte : leurs fichiers, et l'empreinte de ceux qui se lisent encore. */
-type QuarantinedAvatars = { files: string[]; hashes: string[] };
-
 /**
  * Les fichiers d'avatar en quarantaine du compte (signalés, masqués) — ce que
- * l'effacement emporte — et leurs empreintes (E6). Hors transaction : la lecture
- * des fichiers ne tient aucun verrou.
+ * l'effacement emporte. Lus **sous le verrou du compte**, dans la transaction
+ * qui efface : un avatar masqué pendant l'attente du verrou est vu, et son
+ * fichier part avec les autres après le commit.
  */
-async function loadQuarantinedAvatars(runner: SqlRunner, userId: number): Promise<QuarantinedAvatars> {
+async function loadQuarantinedAvatarFiles(runner: SqlRunner, userId: number): Promise<string[]> {
   const [rows] = await runner.execute<(RowDataPacket & { logo_url: string })[]>(
     `SELECT logo_url FROM bg_logo_quarantines WHERE user_id = ? AND status = 'HIDDEN' ORDER BY id`,
     [userId],
   );
-  const files = rows
+  return rows
     .map((row) => avatarFileLocations(row.logo_url, userId)?.quarantined ?? null)
     .filter((file): file is string => file !== null);
-  return { files, hashes: await hashImageFiles(files) };
 }
 
-async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<AccountDeletionPlan | null> {
+/**
+ * L'avatar que l'effacement emporte a-t-il été **supprimé par la modération**
+ * (quarantaine `PURGED` à son adresse) ? Alors son empreinte est bloquée avant
+ * que le fichier ne parte (D6) — un fichier qu'une suppression de modération
+ * n'aurait pas pu atteindre (course, écriture refaite) ne s'échappe pas par
+ * l'effacement. Un avatar seulement masqué ne l'est pas, ni un avatar dont la
+ * contestation a été acceptée (D18, D23). Lu sous le verrou du
+ * compte : l'effacement retire ces lignes (D31). Rend le **jour** de la
+ * suppression la plus ancienne (`AAAA-MM-JJ`), que porte l'empreinte si elle
+ * est neuve — jamais celui de l'effacement (D31) —, ou `null`. `settled` :
+ * l'une de ces suppressions a bloqué l'image (`hash_blocked`) ou a vu sa
+ * contestation maintenue — une suppression d'office dont la contestation
+ * attend son issue ne bloque l'image qu'à l'effacement, jamais à
+ * l'anonymisation (revue juridique #571, cycle 2).
+ */
+type ModerationRemoval = { day: string; settledDay: string | null };
+
+async function avatarRemovedByModeration(
+  runner: SqlRunner,
+  userId: number,
+  avatarUrl: string | null,
+): Promise<ModerationRemoval | null> {
+  const disk = toDiskUploadPath(avatarUrl);
+  if (!disk) return null;
+  // Sous ses deux formes, servie et disque, comme `isUploadReferenced`.
+  // Deux jours : celui de toute suppression non annulée (effacement) et celui
+  // des seules suppressions qui bloquent (anonymisation) — chacun daté par la
+  // décision qui le justifie (D31).
+  const [rows] = await runner.execute<(RowDataPacket & { removed_on: string | null; settled_on: string | null })[]>(
+    `SELECT DATE_FORMAT(MIN(COALESCE(closed_at, hidden_at)), '%Y-%m-%d') AS removed_on,
+            DATE_FORMAT(MIN(CASE WHEN hash_blocked = 1 OR contest_outcome = 'UPHELD'
+                                 THEN COALESCE(closed_at, hidden_at) END), '%Y-%m-%d') AS settled_on
+       FROM bg_logo_quarantines
+      WHERE user_id = ? AND status = 'PURGED' AND logo_url IN (?, ?)
+        AND (contest_outcome IS NULL OR contest_outcome = 'UPHELD')`,
+    [userId, toServedUploadUrl(disk), disk],
+  );
+  const day = rows[0]?.removed_on ?? null;
+  return day ? { day, settledDay: rows[0]?.settled_on ?? null } : null;
+}
+
+type LockedAccount = RowDataPacket & {
+  avatar_url: string | null;
+  discord_id: string | null;
+  created_at: string;
+  is_deleted: 0 | 1;
+  deletion_requested_at: StoredDate;
+};
+
+/**
+ * Verrouille la ligne du compte et dit si la suppression peut suivre. `null` :
+ * rien à faire (`onlyIfDue` — ligne disparue, ou fenêtre de réactivation
+ * relue sous le verrou encore ouverte : une reconnexion qui vient de réactiver
+ * le compte, ou une demande encore dans ses trente jours, ne tombe pas).
+ *
+ * @throws USER_NOT_FOUND — ligne absente, suppression immédiate.
+ * @throws ACCOUNT_REASSIGNED — rejeu : la ligne n'est pas ce compte-là ; levé
+ *   pour que le rejeu le compte comme tel (`otherAccount`), jamais comme une
+ *   demande à attendre.
+ */
+async function lockAccountForDeletion(
+  connection: PoolConnection,
+  userId: number,
+  onlyIfDue: boolean,
+  expectedCreatedAt: string | undefined,
+): Promise<LockedAccount | null> {
+  const [locked] = await connection.execute<LockedAccount[]>(
+    `SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at FROM bg_users WHERE id = ? FOR UPDATE`,
+    [userId],
+  );
+  const account = locked[0];
+  if (!account) {
+    if (onlyIfDue) return null;
+    throw new Error("USER_NOT_FOUND");
+  }
+  if (expectedCreatedAt !== undefined && String(account.created_at) !== expectedCreatedAt) {
+    throw new Error("ACCOUNT_REASSIGNED");
+  }
+  if (onlyIfDue && !deletionIsDue(account)) return null;
+  return account;
+}
+
+async function deleteAccountNow(
+  userId: number,
+  onlyIfDue: boolean,
+  expectedCreatedAt?: string,
+): Promise<AccountDeletionPlan | null> {
   const db = await getDatabase();
   // Les tournois où l'entrée solo est inscrite, relevés **avant** de prendre une
   // connexion : la relève en emprunte une autre au pool, et en tenir une pendant
@@ -395,9 +509,6 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
     await listSoloRegistrationTournamentIds(db, userId),
     await listCastTournamentIds(db, userId),
   );
-  // Les avatars en quarantaine, lus et hachés **avant** la connexion : un
-  // `readFile` par fichier ne se fait pas sous les verrous de la transaction.
-  const quarantine = await loadQuarantinedAvatars(db, userId);
   const connection = await db.getConnection();
   let plan: AccountDeletionPlan;
   // Le fichier de l'avatar, relevé **avant** l'effacement : la ligne partie, son
@@ -405,6 +516,8 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
   // se défait pas, et une transaction annulée rendrait un compte vivant sans sa
   // photo.
   let orphanedAvatar: string | null = null;
+  // Supprimé par la modération : bloqué avant d'être effacé (D6).
+  let orphanedAvatarRemoval: ModerationRemoval | null = null;
   // La date de création, relue sous le verrou : c'est elle qui permet au rejeu
   // de reconnaître **ce** compte-là après une restauration, l'identifiant seul
   // pouvant avoir été réattribué (`lib/shared/account-deletion-journal.ts`).
@@ -415,8 +528,8 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
   // Les tournois dont une inscription solo part avec le compte (D12) :
   // instantanés et aperçus à relire après le commit.
   let withdrawnFrom: number[] = [];
-  // Les avatars en quarantaine qu'emporte l'effacement : leur empreinte est
-  // bloquée dans la transaction (E6), le fichier part après le commit.
+  // Les avatars en quarantaine qu'emporte l'effacement : le fichier part après
+  // le commit.
   let quarantinedFiles: string[] = [];
 
   try {
@@ -450,29 +563,18 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
     // son inscription et ses matchs, et ce qu'il perd est son propre historique
     // — ce qu'il venait de demander. Le fermer coûterait un verrou sur la ligne
     // de **chaque** membre à chaque inscription.
-    const [locked] = await connection.execute<(RowDataPacket & {
-      avatar_url: string | null;
-      discord_id: string | null;
-      created_at: string;
-      is_deleted: 0 | 1;
-      deletion_requested_at: StoredDate;
-    })[]>(
-      `SELECT avatar_url, discord_id, created_at, is_deleted, deletion_requested_at FROM bg_users WHERE id = ? FOR UPDATE`,
-      [userId],
-    );
-    if (locked.length === 0 && !onlyIfDue) throw new Error("USER_NOT_FOUND");
-    // La fenêtre de réactivation, relue sous le verrou : une reconnexion qui
-    // vient de réactiver le compte, ou une demande encore dans ses trente
-    // jours, ne tombe pas.
-    if (onlyIfDue && !deletionIsDue(locked[0])) {
+    const account = await lockAccountForDeletion(connection, userId, onlyIfDue, expectedCreatedAt);
+    if (!account) {
       await connection.rollback();
       return null;
     }
     // Anonyme depuis la demande, le compte en attente n'a plus d'avatar sur sa
     // ligne : son chemin attend dans le masque (`account-deletion-hold.ts`).
     const hold = await readDeletionHold(connection, userId, true);
-    orphanedAvatar = toDiskUploadPath(locked[0].avatar_url ?? hold?.avatarUrl ?? null);
-    accountCreatedAt = String(locked[0].created_at);
+    const avatarUrl = account.avatar_url ?? hold?.avatarUrl ?? null;
+    orphanedAvatar = toDiskUploadPath(avatarUrl);
+    orphanedAvatarRemoval = await avatarRemovedByModeration(connection, userId, avatarUrl);
+    accountCreatedAt = String(account.created_at);
 
     const facts = await loadAccountDeletionFacts(connection, userId, new Set(soloTournaments));
     plan = accountDeletionPlan(facts.trace);
@@ -481,7 +583,7 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
     // vers un compte, seulement une empreinte salée qu'on ne sait pas renverser
     // (`lib/server/site-visits-service.ts`).
 
-    const applied = await applyDeletionMode(connection, userId, plan, facts.soloWithdrawals, quarantine);
+    const applied = await applyDeletionMode(connection, userId, plan, facts.soloWithdrawals);
     quarantinedFiles = applied.quarantinedFiles;
     withdrawnFrom = applied.withdrawnFrom;
     const withdrawal = applied.withdrawal;
@@ -509,7 +611,7 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
     // base indéfiniment, alors qu'on vient de promettre qu'il ne resterait rien.
     // C'est la même coordonnée que le tag, et le seul geste des deux modes qui
     // regarde une table hors de `bg_users`.
-    const discordId = locked[0].discord_id;
+    const discordId = account.discord_id;
     if (discordId) {
       await connection.execute(
         `DELETE FROM bg_discord_login_challenges WHERE discord_id = ?`,
@@ -519,7 +621,9 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
 
     await connection.commit();
   } catch (error) {
-    await connection.rollback();
+    // Sur une connexion morte, l'annulation lève à son tour : gardée, pour que
+    // l'erreur d'origine (dont `ACCOUNT_STILL_REFERENCED`) reste celle rendue.
+    await connection.rollback().catch(() => {});
     // Une clé étrangère en `RESTRICT` peut encore refuser l'effacement : ses
     // contrôles lisent la dernière version commitée et non l'instantané de la
     // transaction, donc un tournoi créé après la lecture des traces retient la
@@ -535,17 +639,26 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
 
   // Ses sessions sont parties avec la transaction, pas ses flux de tournoi
   // ouverts, qui ne relisent pas la session (`session-streams.ts`).
-  closeUserStreams(userId);
+  afterCommit(() => closeUserStreams(userId), "Flux de tournoi du compte non fermés");
 
   // Les instantanés ouverts des matchs qu'il castait ou arbitrait montreraient
   // sinon son cast, le lien de sa chaîne ou « Arbitre désigné » jusqu'à la
   // prochaine écriture du match ; l'évènement remet aussi à jour le message
   // #live de la soirée (`publishMatchUpdatedEvent`), qui portait ce lien.
-  for (const tournamentId of touchedTournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  // La suppression est commitée : un écouteur qui lève ne doit ni la faire lire
+  // comme un échec, ni sauter le ménage de l'avatar et la ligne du journal.
+  for (const tournamentId of touchedTournaments) {
+    afterCommit(() => publishMatchUpdatedEvent(tournamentId, { landingLive: true }), `Tournoi #${tournamentId} non prévenu`);
+  }
+  // Le cache des pseudos d'arbitre n'est pas vidé : le retrait de l'arbitrage
+  // (`referee_user_id` remis à NULL) change la version des instantanés touchés,
+  // donc la clé — vider tout le cache à chaque suppression le rendrait inutile.
 
   // Le plateau des tournois dont l'inscription solo est partie (D12) : la liste
   // des engagés, l'aperçu du tirage et les instantanés ouverts.
-  for (const tournamentId of withdrawnFrom) publishUpdatedEvent(tournamentId);
+  for (const tournamentId of withdrawnFrom) {
+    afterCommit(() => publishUpdatedEvent(tournamentId), `Tournoi #${tournamentId} non prévenu`);
+  }
 
   // L'accueil, lu sans compte, garde en cache des vues qui nomment l'entrée
   // solo du compte (bandeau, mini-arbre, leaderboard) et le compteur de
@@ -553,13 +666,28 @@ async function deleteAccountNow(userId: number, onlyIfDue: boolean): Promise<Acc
   // anonymisée) et la liste des fiches de comptes supprimés sans statistiques
   // (`profileless-players.ts`) : sans cela, le pseudo d'un compte supprimé y
   // resterait servi jusqu'à l'échéance de ces caches.
-  invalidateTeamIdentityViews();
+  afterCommit(invalidateTeamIdentityViews, "Vues de l'accueil non invalidées");
 
   // Les deux modes effacent la photo : l'un fait disparaître la ligne, l'autre
   // met `avatar_url` à `NULL` — dans les deux cas le fichier resterait servi
   // par `/api/uploads/avatars/...`, donc une donnée personnelle publique que
   // plus aucune ligne ne désigne. L'échec est **avalé** : la suppression est
   // commitée, annoncer un refus au joueur serait faux.
+  // Anonymisé, seule une suppression qui bloquait déjà (ou maintenue) bloque ;
+  // effacé, toute suppression non annulée (comme `pinAccountBlockedHashesOn`).
+  // Le blocage y est en principe déjà posé par la décision (`hash_blocked`) ;
+  // l'appel ne compte que si le fichier vivant se lit encore (course, écriture
+  // refaite).
+  const blockDayFor =
+    plan.mode === "ERASE" ? (orphanedAvatarRemoval?.day ?? null) : (orphanedAvatarRemoval?.settledDay ?? null);
+  const blockedFile = blockDayFor ? storedUploadAbsolutePath(orphanedAvatar, "avatars") : null;
+  // Anonymisé, le compte garde ses lignes de quarantaine : le blocage reste
+  // levable par une contestation acceptée (D18). Effacé, plus rien ne le
+  // justifierait : définitif (revue sécurité #571, cycle 3).
+  // Daté du jour de la suppression de modération, jamais de l'effacement (D31).
+  if (blockedFile && blockDayFor) {
+    await blockRemovedImageFiles([blockedFile], { liftable: plan.mode === "ANONYMIZE", day: blockDayFor });
+  }
   try {
     await deleteStoredImage(orphanedAvatar);
   } catch {

@@ -61,6 +61,17 @@ export const MATCH_LIVE_TRIGGER_LABELS: Record<MatchLiveTrigger, string> = {
 };
 
 /**
+ * Lit la clé `organisationLink` d'un corps (configuration du direct, réglages
+ * du caster) : absente vaut `false`, un booléen vaut lui-même, toute autre
+ * valeur (`"true"`, `1`, `null`…) est illisible (`null`, 400
+ * `INVALID_ORGANISATION_LINK`).
+ */
+export function parseOrganisationLink(value: unknown): boolean | null {
+  if (value === undefined) return false;
+  return typeof value === "boolean" ? value : null;
+}
+
+/**
  * Ce mode a-t-il besoin d'une date de début sur le match ?
  *
  * Seul `START_TIME` en dépend, et il en dépend totalement : sans date, il n'a
@@ -390,28 +401,58 @@ export function canConfigureLive(match: MatchLiveInput): boolean {
  * règle le lien (`setMatchLiveConfig`). Sans lui, le premier stream sans lien —
  * qu'un lien du staff vient habiller, comme `bg_matches.live_url` habillait le
  * cast d'avant les co-casters ; jamais le stream qu'un caster a ouvert avec le
- * lien de sa chaîne, que le staff écraserait.
+ * lien de sa chaîne, que le staff écraserait — ni le stream vidé qu'un autre
+ * caster tient encore (`heldByOthers`) : le serveur (`planStaffStreamUrl`) et la
+ * fenêtre désignent ainsi le même stream.
  */
-export function staffStream<T extends { liveUrl: string | null; staff: boolean }>(streams: readonly T[]): T | null {
-  return streams.find((stream) => stream.staff) ?? streams.find((stream) => stream.liveUrl === null) ?? null;
+export function staffStream<T extends { id: number; liveUrl: string | null; staff: boolean }>(
+  streams: readonly T[],
+  heldByOthers: ReadonlySet<number> = new Set(),
+): T | null {
+  return (
+    streams.find((stream) => stream.staff) ??
+    streams.find((stream) => stream.liveUrl === null && !heldByOthers.has(stream.id)) ??
+    null
+  );
 }
 
 /**
- * Les streams qu'un match **montre** : celui du staff, et ceux qu'un caster qui
- * compte encore tient (`heldStreamIds`). Un match lancé ou joué (`settled`) les
- * montre tous : on ne réécrit ni une diffusion en cours ni l'histoire. Le
- * stream d'un caster que le site ne montre plus (permission `live` retirée…)
- * est tu avant le lancement — l'instantané (`mapMatch`) et l'inscription d'un
- * co-caster (`claimMatchCast`) lisent **cette** règle ; l'accueil et l'annonce
- * #live la rejouent en SQL (`firstStreamUrlSql`, `CAST_ELIGIBLE_SQL`), le test
+ * Les streams d'un match qu'un autre caster que `viewerUserId` tient : ceux
+ * que le lien du staff n'habille jamais (`staffStream`).
+ */
+export function streamsHeldByOtherCasters(
+  casters: readonly { userId: number; streamId: number | null }[],
+  viewerUserId: number | null,
+): Set<number> {
+  const held = new Set<number>();
+  for (const caster of casters) {
+    if (caster.userId !== viewerUserId && caster.streamId !== null) held.add(caster.streamId);
+  }
+  return held;
+}
+
+/**
+ * Les streams qu'un match **montre** : celui du staff (le lien de
+ * l'organisation), et ceux qu'un caster tient encore. Avant le lancement, ce
+ * caster doit encore compter (`heldStreamIds`) : le stream d'un caster que le
+ * site ne montre plus (permission `live` retirée…) est tu. Un match lancé ou
+ * joué (`settled`) ne réécrit ni une diffusion en cours ni l'histoire : tout
+ * stream qu'un caster du match tient (`castStreamIds`, éligible ou non) reste ;
+ * seul l'**orphelin** — stream de caster que plus aucun caster ne tient, laissé
+ * hors `pruneMatchStreams` — est tu, pour que sa chaîne ne devienne pas le lien
+ * du match. L'instantané (`mapMatch`) et l'inscription d'un co-caster
+ * (`claimMatchCast`) lisent **cette** règle ; l'accueil et l'annonce #live la
+ * rejouent en SQL (`firstStreamUrlSql`, `CAST_ELIGIBLE_SQL`), le test
  * `match-casters.test.ts` garde les deux alignées.
  */
 export function shownStreams<T extends { id: number; staff: boolean }>(
   streams: readonly T[],
   heldStreamIds: ReadonlySet<number>,
   settled: boolean,
+  castStreamIds: ReadonlySet<number>,
 ): T[] {
-  return settled ? [...streams] : streams.filter((stream) => stream.staff || heldStreamIds.has(stream.id));
+  const held = settled ? castStreamIds : heldStreamIds;
+  return streams.filter((stream) => stream.staff || held.has(stream.id));
 }
 
 /**

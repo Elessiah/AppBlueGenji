@@ -130,6 +130,7 @@ la mise en page, elle garde le texte d'une première acceptation.
 | 7 | 29 octobre 2026 | « Contacts de match » : casters au pluriel (chacun voit aussi les contacts des autres casters du match), **arbitre désigné** (pseudo et BattleTag, même masqué, jamais le tag Discord) et **page du match** comme troisième lieu ; la présentation de l'arbitre passe de l'intérêt légitime au contrat dès que cet arbitre accepte la version 7. « Retransmission des matchs » : message #live de la soirée avant et après le match. « Acceptation » : suppression du compte depuis la fenêtre d'acceptation. Entrée `2026-10-conditions-v7-casters-et-arbitre`. |
 | 8 | 31 octobre 2026 | « Contacts de match » : arbitrer demande un BattleTag tiré d'un compte Battle.net rattaché (un BattleTag tapé n'y suffit pas) ; le pseudo seul de l'arbitre désigné se lit par tout membre connecté (intérêt légitime, opposition), les visiteurs sans compte lisant « Arbitre désigné ». « Contacts de match » et « Contenus » : un BattleTag tapé à la main, gardé quand Battle.net n'en donne aucun, reste modifiable et effaçable, sans valoir BattleTag vérifié. Entrée `2026-10-conditions-v8-arbitre-et-battletag`. |
 | 9 | 5 novembre 2026 | « Contacts de match » : Battle.net exigé de l'arbitre d'un match Overwatch seulement, BattleTag présenté en Overwatch seulement, tag Discord certifié de l'arbitre désigné et contacts des équipes sur la page du match aux seules parties (fonctionnement minimum nécessaire, T1), fenêtre de lancement réécrite (T3), lien `/rgpd#arbitre-designe`, salons vocaux d'équipe comme règle du tournoi, comptage anonyme sur l'intérêt légitime sans droit d'opposition (décisions du 2026-11-04) ; « Compte » : suppression du compte et ses suites (ERASURE-D2). Un seul tour d'acceptation pour MATCH-REFEREE-FINISH et ERASURE-D2 (R4b). Entrée `2026-11-conditions-v9-contacts-et-suppression`. |
+| 10 | 12 novembre 2026 | « Compte » : un joueur suspendu ne reprend une équipe qu'après tous les autres ; l'avatar mis de côté n'est rendu à la réactivation que s'il n'est ni masqué ni supprimé par la modération ; seul un avatar **supprimé** par la modération reste bloqué. « Signalement et modération » : empreinte gardée à la suppression d'un avatar, issue de la contestation gardée, blocage levé par une contestation acceptée. « Retransmission des matchs » : annonce préalable bornée aux matchs dont la diffusion s'ouvre à leur heure de début (D10). Entrée `2026-11-conditions-v10-avatar-et-succession`. |
 
 **Redemander, et le dire** : à la connexion, la modale d'entrée de `/connexion`
 revient dès que la version gardée par le navigateur (`bg_terms_consent`) n'est
@@ -262,6 +263,27 @@ invitations, reprises de fantôme et propriétés d'équipe transférées ; le
 #558, avant la mise en ligne de la version 9, entrée `2026-11-check-in-du-match`). Annoncée
 par `2026-11-conditions-v9-contacts-et-suppression` ; **tout compte la
 réaccepte** dans la fenêtre bloquante.
+
+**Version 10** (2026-11-12, lendemain de la mise en ligne prévue dans la nuit
+du 11 ; ACCOUNT-DELETION #571, décisions de l'utilisateur D6, D10, D12, D18,
+D22) : la version 9 publiée disait encore qu'un avatar retiré que l'effacement
+emporte est bloqué (un avatar seulement masqué ne l'est plus, D6), que la
+réactivation rend toujours l'avatar (la modération atteint désormais l'avatar
+mis de côté), et ne donnait pas le rang d'un joueur suspendu dans la reprise
+d'une équipe. Section « Compte » corrigée en conséquence ; section
+« Signalement et modération » — nouveau paragraphe : empreinte gardée à la
+suppression d'un avatar, même après la suppression du compte, issue de la
+contestation gardée avec la décision, blocage levé par une contestation
+acceptée après une suppression décidée sur un signalement ou après un
+masquage (sauf autre
+suppression de la même image ou compte effacé entre-temps), avatar supprimé
+d'office pendant que sa contestation attend son issue bloqué seulement une
+fois la suppression maintenue (ou à l'effacement du compte) ; section
+« Retransmission des matchs » (`STREAM_NOTICE_LIVE`) — l'annonce avant le
+début ne vaut que si la diffusion doit s'ouvrir à l'heure de début (D10,
+entrée `ERREUR.txt` soldée). Annoncée par
+`2026-11-conditions-v10-avatar-et-succession` ; **tout compte la réaccepte**
+dans la fenêtre bloquante.
 
 `TERMS_UPDATED_AT` est daté du **lendemain** de la mise en ligne quand l'heure
 du déploiement n'est pas connue, comme `PRIVACY_CHANGES`.

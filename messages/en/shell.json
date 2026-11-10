@@ -126,6 +126,7 @@
     "regionLabel": "Notifications",
     "errorPrefix": "Error:",
     "successPrefix": "Success:",
+    "infoPrefix": "Notice:",
     "pause": "Pause notification",
     "pauseTitle": "Pause",
     "resume": "Resume notification countdown",

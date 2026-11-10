@@ -29,8 +29,9 @@ describe("PRIVACY_CHANGES — base du tag Discord de l'arbitre", () => {
   // Revue juridique #546 : la base du tag suit la version 9, publiée le même jour.
   it("privacyChanges_refereeDiscordBasis_datedWithTermsV9ForLiveStaff", () => {
     expect(entry).toBeDefined();
-    expect(entry?.publishedAt).toBe(TERMS_UPDATED_AT);
+    // Publiée avec la version 9 ; la version 10 (TERMS_UPDATED_AT) ne la redate pas.
     expect(entry?.publishedAt).toBe("2026-11-06");
+    expect(entry?.publishedAt).not.toBe(TERMS_UPDATED_AT);
     expect(entry?.audience).toBe("LIVE_STAFF");
     expect(entry?.links?.[0]?.href).toBe("/rgpd#arbitre-designe");
     expect(entry && isPrivacyPolicyVersion(entry)).toBe(true);

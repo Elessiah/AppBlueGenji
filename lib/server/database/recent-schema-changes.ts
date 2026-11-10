@@ -459,6 +459,21 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Son index, à part : l'export (`match-roles-export.ts`) et la suppression
     // d'un compte le cherchent par ce compte.
     `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_live_trigger_user (live_trigger_user_id)`,
+    // ACCOUNT-DELETION (#571, décisions D18, D22, D23) — issue de la
+    // contestation d'une image modérée et empreinte de l'avatar supprimé : nulles
+    // partout au départ (issue inconnue, comportement d'avant).
+    `ALTER TABLE bg_logo_quarantines ADD COLUMN contest_outcome ENUM('UPHELD', 'OVERTURNED') NULL AFTER closed_at`,
+    `ALTER TABLE bg_logo_quarantines ADD COLUMN image_sha256 CHAR(64) NULL AFTER contest_outcome`,
+    `ALTER TABLE bg_logo_quarantines ADD INDEX idx_bg_logo_quarantines_sha (image_sha256)`,
+    // Revue sécurité #571 (D18) : seule une décision qui a bloqué justifie le
+    // blocage, et seul un blocage tracé se lève. 0 partout au départ : rien
+    // de déjà posé ne devient levable.
+    `ALTER TABLE bg_logo_quarantines ADD COLUMN hash_blocked TINYINT(1) NOT NULL DEFAULT 0 AFTER image_sha256`,
+    `ALTER TABLE bg_blocked_image_hashes ADD COLUMN liftable TINYINT(1) NOT NULL DEFAULT 0 AFTER sha256`,
+    // Revue juridique #571 (D31) : les empreintes posées avant cette version
+    // portent l'instant exact de leur pose (celui d'un effacement de compte,
+    // rapprochable du journal des suppressions) — ramenées au jour. Idempotent.
+    `UPDATE bg_blocked_image_hashes SET created_at = DATE(created_at) WHERE created_at <> DATE(created_at)`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

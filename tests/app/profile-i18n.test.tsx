@@ -884,8 +884,8 @@ describe("anglais — écrans", () => {
       targets: [{ type: "TEAM", id: 4, label: "Glaciers", exists: true, imageUrl: null, detail: null }],
       myContests: [{ id: 3, createdAt: "2026-03-02T10:00:00.000Z", description: "We made it" }],
       quarantines: [
-        { id: 1, targetType: "TEAM", targetId: 4, targetName: "Glaciers", reportId: 9, status: "HIDDEN", hiddenAt: "2026-03-01T10:00:00.000Z", purgeAfter: "2026-09-01T10:00:00.000Z", closedAt: null },
-        { id: 2, targetType: "USER", targetId: 5, targetName: "Nova", reportId: 9, status: "PURGED", hiddenAt: "2026-03-01T10:00:00.000Z", purgeAfter: "2026-09-01T10:00:00.000Z", closedAt: "2026-03-01T10:00:00.000Z" },
+        { id: 1, targetType: "TEAM", targetId: 4, targetName: "Glaciers", reportId: 9, status: "HIDDEN", hiddenAt: "2026-03-01T10:00:00.000Z", purgeAfter: "2026-09-01T10:00:00.000Z", closedAt: null, contestOutcome: null },
+        { id: 2, targetType: "USER", targetId: 5, targetName: "Nova", reportId: 9, status: "PURGED", hiddenAt: "2026-03-01T10:00:00.000Z", purgeAfter: "2026-09-01T10:00:00.000Z", closedAt: "2026-03-01T10:00:00.000Z", contestOutcome: null },
       ],
     };
     const html = inEnglish(<ConcernedReport report={report} onContest={() => undefined} />);
@@ -911,8 +911,8 @@ describe("anglais — écrans", () => {
       ],
       myContests: [],
       quarantines: [
-        { id: 1, targetType: "TEAM", targetId: 4, targetName: legacy, reportId: 9, status: "HIDDEN", hiddenAt: "2026-03-01T10:00:00.000Z", purgeAfter: "2026-09-01T10:00:00.000Z", closedAt: null },
-        { id: 2, targetType: "TEAM", targetId: 4, targetName: legacy, reportId: 9, status: "PURGED", hiddenAt: "2026-03-01T10:00:00.000Z", purgeAfter: "2026-09-01T10:00:00.000Z", closedAt: "2026-03-01T10:00:00.000Z" },
+        { id: 1, targetType: "TEAM", targetId: 4, targetName: legacy, reportId: 9, status: "HIDDEN", hiddenAt: "2026-03-01T10:00:00.000Z", purgeAfter: "2026-09-01T10:00:00.000Z", closedAt: null, contestOutcome: null },
+        { id: 2, targetType: "TEAM", targetId: 4, targetName: legacy, reportId: 9, status: "PURGED", hiddenAt: "2026-03-01T10:00:00.000Z", purgeAfter: "2026-09-01T10:00:00.000Z", closedAt: "2026-03-01T10:00:00.000Z", contestOutcome: null },
       ],
     };
     const html = inEnglish(<ConcernedReport report={report} onContest={() => undefined} />);

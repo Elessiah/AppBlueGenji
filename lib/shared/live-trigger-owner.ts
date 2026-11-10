@@ -85,17 +85,6 @@ export function mayUnmarkLiveTrigger(hold: LiveTriggerHold, actor: LiveTriggerAc
   return hold.ownerId !== null && hold.ownerId === actor.userId;
 }
 
-/**
- * L'acteur peut-il ouvrir ou couper l'antenne d'un mode `MANUAL` ? La règle
- * du mode (`mayChangeLiveTrigger`) : sur un mode **sans maître**, tout
- * caster montré du match la bascule — le match ne reste pas hors antenne en
- * attendant le staff. Le mode d'un autre caster, lui, ne se bascule pas
- * (décision 2).
- */
-export function mayToggleOnAir(hold: LiveTriggerHold, actor: LiveTriggerActor, actorCasts: boolean): boolean {
-  return mayChangeLiveTrigger(hold, actor, actorCasts);
-}
-
 /** Ce que l'interface sait du lecteur pour la même règle (`liveTriggerViewer`). */
 export type LiveTriggerViewer = {
   userId: number | null;
@@ -182,11 +171,6 @@ function staffModeLockedFor(
   return (match.streams ?? []).some((stream) => stream.staff && stream.liveUrl !== null);
 }
 
-/**
- * Le lecteur peut-il ouvrir ou couper l'antenne de ce match ? La règle du mode
- * (`viewerMayChangeLiveTrigger`), comme au serveur. Faux sans compte.
- */
-export const viewerMayToggleOnAir = viewerMayChangeLiveTrigger;
 
 /**
  * Le propriétaire à écrire quand `actor` pose `next` (`null` quand le match

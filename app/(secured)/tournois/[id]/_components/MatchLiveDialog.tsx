@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { fieldAria } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import {
+  canConfigureLive,
   canToggleOnAir,
   isMatchCastable,
   isValidStreamUrl,
@@ -14,12 +15,12 @@ import {
   MAX_STREAM_URL_LENGTH,
   requiresMatchStartAt,
   staffStream,
+  streamsHeldByOtherCasters,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
 import {
   liveTriggerViewer,
   viewerMayChangeLiveTrigger,
-  viewerMayToggleOnAir,
   viewerMayUnmarkLiveTrigger,
 } from "@/lib/shared/live-trigger-owner";
 import { viewerRefereesMatch } from "@/lib/shared/match-referee";
@@ -79,6 +80,9 @@ export function changedTriggerNeedsDate(
   return chosen !== current && requiresMatchStartAt(chosen) && startAtMissing;
 }
 
+/** Ce qu'il faut d'un match pour dire s'il est encore castable. */
+type ClosableMatch = Pick<BracketMatch, "status" | "liveTrigger" | "liveStartedAt" | "launchedAt">;
+
 /**
  * Rien à enregistrer : le mode, verrouillé, est renvoyé tel quel, et le
  * serveur refuse tout mode sur un match qui n'est plus castable (score
@@ -86,15 +90,11 @@ export function changedTriggerNeedsDate(
  */
 export function lockedOnClosedMatch(
   triggerLocked: boolean,
-  match: Pick<BracketMatch, "status" | "liveTrigger" | "liveStartedAt" | "launchedAt">,
+  match: ClosableMatch,
 ): boolean {
   return triggerLocked && match.liveTrigger !== null && !isMatchCastable(match);
 }
 
-/**
- * Le lien du staff suit le mode d'un autre caster montré : lu, pas écrit, par
- * qui ne peut pas changer ce mode (décision 2, même règle que le serveur).
- */
 /**
  * La rediff depuis cette fenêtre : la seule `live` ne règle que celle de son
  * cast (`NOT_MATCH_CASTER` au serveur), le staff `tournaments` toutes.
@@ -114,6 +114,203 @@ function StaffLinkHint({ staffSide, linkLocked }: Readonly<{ staffSide: boolean;
   return linkLocked ? <p>{t("live.urlLocked")}</p> : null;
 }
 
+/**
+ * Le lien du staff dans la fenêtre : un lien changé ailleurs pendant qu'elle
+ * est ouverte est repris par un champ **intouché**, pour ne pas renvoyer un
+ * lien périmé ; une saisie en cours n'est jamais écrasée.
+ */
+function useResyncedStaffUrl(current: string) {
+  const [liveUrl, setLiveUrl] = useState(current);
+  const [seen, setSeen] = useState(current);
+  if (seen !== current) {
+    setSeen(current);
+    if (liveUrl === seen) setLiveUrl(current);
+  }
+  /** Repart du lien actuel quoi qu'il y ait de saisi (le mode du match a changé). */
+  const reset = () => {
+    setSeen(current);
+    setLiveUrl(current);
+  };
+  return [liveUrl, setLiveUrl, reset] as const;
+}
+
+type StreamedReason = "closed" | "orphan" | null;
+type SaveReason = "locked" | "unchanged" | null;
+
+/** Identifiant du « i » qui décrit « Enregistrer » désarmé ; absent quand il s'arme selon les saisies. */
+function saveHintId(reason: SaveReason): string | undefined {
+  return reason === null ? undefined : SAVE_HINT_ID;
+}
+
+/** Rangée qui dit pourquoi « Enregistrer » est désarmé, l'explication derrière un « i » ; rien quand il s'arme selon les saisies. */
+function SaveBlockedHint({ reason }: Readonly<{ reason: SaveReason }>) {
+  const { t } = useDialogsText();
+  if (reason === null) return null;
+  return (
+    <div className={styles.saveHint}>
+      <InfoHintRow>
+        <span className={styles.saveNote}>{t("live.saveSubject")}</span>
+        <InfoHint id={SAVE_HINT_ID} subject={t("live.saveSubject")}>
+          <p>{t(reason === "locked" ? "live.saveClosedLocked" : "live.saveClosedUnchanged")}</p>
+        </InfoHint>
+      </InfoHintRow>
+    </div>
+  );
+}
+
+/**
+ * Pourquoi « Enregistrer » est désarmé sur un match joué : le mode appartient à
+ * un autre (`locked`), ou rien n'est à enregistrer (`unchanged`). `null` :
+ * il s'arme selon les saisies.
+ */
+export function saveBlockedReason(
+  match: ClosableMatch,
+  triggerLocked: boolean,
+  streamed: boolean,
+  casterLinksEdited: boolean,
+): SaveReason {
+  if (lockedOnClosedMatch(triggerLocked, match)) return "locked";
+  return closedMatchUnchanged(match, streamed, casterLinksEdited) ? "unchanged" : null;
+}
+
+/**
+ * Pourquoi la case « casté » est grisée : le score est saisi sur un match
+ * jamais casté (`closed`), ou un mode sans maître que ce lecteur ne peut pas
+ * démarquer (`orphan`). `null` : la case se coche.
+ */
+export function streamedBoxReason(
+  match: Pick<BracketMatch, "liveTrigger" | "liveTriggerCasterId">,
+  disabled: boolean,
+  castable: boolean,
+): StreamedReason {
+  if (!disabled) return null;
+  return !castable && match.liveTrigger === null ? "closed" : "orphan";
+}
+
+/** La case « casté », son refus rattaché et, grisée, l'explication derrière un « i ». */
+function StreamedBox({
+  checked,
+  reason,
+  disabled,
+  invalid,
+  error,
+  onChange,
+}: Readonly<{
+  checked: boolean;
+  reason: StreamedReason;
+  disabled: boolean;
+  invalid: boolean;
+  error: string | null;
+  onChange: (checked: boolean) => void;
+}>) {
+  const { t } = useDialogsText();
+  const label = (
+    <label className={`${styles.streamed} ${styles.checkRow}`}>
+      <input
+        id={STREAMED_INPUT_ID}
+        type="checkbox"
+        checked={checked}
+        // Un mode sans maître ne se démarque que par l'arbitre ou le staff
+        // (`LIVE_TRIGGER_NOT_OWNED` au serveur) ; un match joué jamais casté ne
+        // se marque plus (`MATCH_NOT_CASTABLE`) : case grisée, avec son « i ».
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        {...fieldAria(STREAMED_INPUT_ID, invalid, reason !== null && STREAMED_HINT_ID)}
+      />
+      {/* NOSONAR S6772 — label en flex avec `gap` */}
+      {t("live.streamed")}
+    </label>
+  );
+  return (
+    <>
+      {reason === null ? (
+        label
+      ) : (
+        <InfoHintRow separated>
+          {label}
+          <InfoHint id={STREAMED_HINT_ID} subject={t("live.streamedSubject")}>
+            <p>{t(reason === "closed" ? "live.streamedClosed" : "live.streamedOrphan")}</p>
+          </InfoHint>
+        </InfoHintRow>
+      )}
+      <FieldErrorText fieldId={STREAMED_INPUT_ID} message={error} />
+    </>
+  );
+}
+
+/**
+ * La case « casté » est grisée quand elle ne mène qu'à un refus : un mode sans
+ * maître (`LIVE_TRIGGER_NOT_OWNED`) ou un match joué jamais casté, qui ne se
+ * marque plus (`MATCH_NOT_CASTABLE`).
+ */
+function streamedBoxDisabled(
+  match: Pick<BracketMatch, "liveTrigger" | "liveTriggerCasterId">,
+  viewer: Parameters<typeof viewerMayUnmarkLiveTrigger>[1],
+  castable: boolean,
+): boolean {
+  return !viewerMayUnmarkLiveTrigger(match, viewer) || (!castable && match.liveTrigger === null);
+}
+
+/** Le champ du lien du staff : il suit le mode du match quand ce mode est verrouillé, la case sinon. */
+function staffUrlShown(triggerLocked: boolean, liveTrigger: MatchLiveTrigger | null, streamed: boolean): boolean {
+  return triggerLocked ? liveTrigger !== null : streamed;
+}
+
+/**
+ * Le corps du réglage envoyé. Sur un match joué resté marqué (`castable`
+ * faux, mode gardé), seuls les liens des casters partent : le mode et le lien
+ * du staff restent tels quels (clés absentes), le serveur n'y prenant plus
+ * que le démarquage. `organisationLink` absent : le lecteur ne le dit pas.
+ */
+export function matchLiveBody(input: {
+  castable: boolean;
+  trigger: MatchLiveTrigger | null;
+  liveUrl: string;
+  organisationLink: boolean | undefined;
+  streamLinks: { streamId: number; liveUrl: string | null }[] | undefined;
+}): Record<string, unknown> {
+  const links = input.streamLinks === undefined ? {} : { streamLinks: input.streamLinks };
+  if (!input.castable && input.trigger !== null) return links;
+  return {
+    trigger: input.trigger,
+    liveUrl: input.trigger === null ? null : input.liveUrl.trim() || null,
+    ...(input.organisationLink === undefined ? {} : { organisationLink: input.organisationLink }),
+    ...links,
+  };
+}
+
+/**
+ * Match qui n'est plus castable (score déclaré ou confirmé) : le serveur n'y
+ * prend plus que le démarquage (`MATCH_NOT_CASTABLE`). Le mode et le lien ne
+ * s'y offrent plus ; un match resté marqué n'a rien à enregistrer tant que la
+ * case « casté » reste cochée et qu'aucun lien de caster n'est corrigé.
+ */
+export function closedMatchUnchanged(
+  match: ClosableMatch,
+  streamed: boolean,
+  casterLinksEdited: boolean,
+): boolean {
+  if (isMatchCastable(match)) return false;
+  // Jamais marqué (case grisée) : fermé, liens de casters compris
+  // (`offersCasterLinks`) — rien à enregistrer.
+  if (match.liveTrigger === null) return true;
+  // Marqué et resté coché, sans lien de caster corrigé : rien à enregistrer.
+  return streamed && !casterLinksEdited;
+}
+
+/**
+ * La fenêtre offre-t-elle à l'arbitre les liens des streams des casters ? Pas
+ * sur un match joué jamais marqué : le serveur l'a fermé (`canConfigureLive`,
+ * `MATCH_NOT_CASTABLE`), liens de casters compris.
+ */
+export function offersCasterLinks(match: ClosableMatch, referee: boolean): boolean {
+  return referee && canConfigureLive(match);
+}
+
+/**
+ * Le lien du staff suit le mode d'un autre caster montré : lu, pas écrit, par
+ * qui ne peut pas changer ce mode (décision 2, même règle que le serveur).
+ */
 export function staffLinkLocked(triggerLocked: boolean, match: Pick<BracketMatch, "liveTriggerCasterId">): boolean {
   return triggerLocked && (match.liveTriggerCasterId ?? null) !== null;
 }
@@ -137,12 +334,15 @@ export function casterStreamsOf(
 }
 
 /** Champ de la fenêtre que vise un refus : le lien du staff, ou le lien d'un stream de caster. */
-type LiveField = "url" | `caster-${number}`;
+type LiveField = "url" | "streamed" | `caster-${number}`;
 
-/** Le lien du staff : le seul refus de lien sans stream désigné. */
-const LIVE_FIELD_ERRORS = { INVALID_STREAM_URL: "url" } as const;
+/** Refus sans stream désigné : le lien du staff, ou la case « casté » d'un match qui ne l'est plus. */
+const LIVE_FIELD_ERRORS = { INVALID_STREAM_URL: "url", ORGANISATION_LINK_NOT_PROVIDER: "url", MATCH_NOT_STREAMED: "streamed" } as const;
 
 const URL_INPUT_ID = "match-live-url";
+const STREAMED_INPUT_ID = "match-live-streamed";
+const STREAMED_HINT_ID = "match-live-streamed-hint";
+const SAVE_HINT_ID = "match-live-save-hint";
 
 /** Identifiant du champ de lien d'un stream de caster. */
 function casterLinkInputId(streamId: number): string {
@@ -157,6 +357,20 @@ function casterLinkInputId(streamId: number): string {
 export function refusedCasterField(payload: { streamId?: unknown }): LiveField | null {
   const id = payload.streamId;
   return typeof id === "number" && Number.isInteger(id) ? `caster-${id}` : null;
+}
+
+/** Refus que la fenêtre formule elle-même (la table commune dit autre chose, ou rien d'utile ici). */
+export function ownRefusalKey(code: string): "live.casterStreamGone" | "live.sessionExpired" | null {
+  if (code === "STREAM_NOT_FOUND") return "live.casterStreamGone";
+  return code === "UNAUTHORIZED" ? "live.sessionExpired" : null;
+}
+
+/**
+ * Le refus a-t-il un champ où se rattacher ? La case « casté » n'existe pas
+ * sous un mode verrouillé (`modeLocked`) : `MATCH_NOT_STREAMED` n'y vise rien.
+ */
+export function refusalHasField(code: string, modeLocked: boolean): boolean {
+  return !(code === "MATCH_NOT_STREAMED" && modeLocked);
 }
 
 /** Refus du serveur qui garde le stream qu'il désigne. */
@@ -213,27 +427,29 @@ export function MatchLiveDialog({
   const onAir = useMatchLiveState(match) === "LIVE";
   const [streamed, setStreamed] = useState(match.liveTrigger !== null);
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "MANUAL");
-  // Le mode du match changé pendant que la fenêtre est ouverte (retiré ou
-  // reposé par qui le tient) : la case et le choix reprennent le mode du match.
-  // Sans quoi la case « casté », cochée à l'ouverture sur un mode verrouillé,
-  // le resterait une fois ce mode retiré — et Enregistrer recasterait le match.
   // Le lien du stream du staff, que ce réglage écrit — jamais celui qu'un
   // caster a ouvert (lecture partielle sans streams : le premier lien).
-  const currentStaffUrl = (match.streams.length > 0 ? staffStream(match.streams)?.liveUrl : match.liveUrl) ?? "";
-  const [liveUrl, setLiveUrl] = useState(currentStaffUrl);
+  // Le même stream que le serveur : jamais celui qu'un autre caster tient.
+  const heldByOthers = streamsHeldByOtherCasters(match.casters, controls.viewerUserId);
+  const currentStaffUrl = (match.streams.length > 0 ? staffStream(match.streams, heldByOthers)?.liveUrl : match.liveUrl) ?? "";
+  const [liveUrl, setLiveUrl, resetLiveUrl] = useResyncedStaffUrl(currentStaffUrl);
   // Fausse par défaut (protection des données dès la conception) : un lien
   // n'est celui de l'organisation — gardé après la suppression du compte de qui
   // le pose — que si ce membre le coche ; rien ne se déduit de ce qu'il caste.
   const [organisationLink, setOrganisationLink] = useState(false);
+  // Le mode du match changé pendant que la fenêtre est ouverte (retiré ou
+  // reposé par qui le tient) : la case et le choix reprennent le mode du match.
+  // Sans quoi la case « casté », cochée à l'ouverture sur un mode verrouillé,
+  // le resterait une fois ce mode retiré — et Enregistrer recasterait le match.
   const [seenTrigger, setSeenTrigger] = useState(match.liveTrigger);
   // Médiation : les liens des streams des casters, que l'arbitre seul édite.
   const casterList = useMemo(() => new Intl.ListFormat(text.locale, { style: "long", type: "conjunction" }), [text.locale]);
-  const casterStreams = referee ? casterStreamsOf(match, casterList) : [];
+  const casterStreams = offersCasterLinks(match, referee) ? casterStreamsOf(match, casterList) : [];
   // Seules les saisies de l'arbitre ; un champ intouché montre le lien actuel.
   const [casterLinks, setCasterLinks] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
   // Un refus du serveur rattaché à son champ (`ACCESSIBILITY_FORM_ERRORS_STATEMENT.md`).
-  const fieldIds: Record<LiveField, string> = { url: URL_INPUT_ID };
+  const fieldIds: Record<LiveField, string> = { url: URL_INPUT_ID, streamed: STREAMED_INPUT_ID };
   for (const stream of casterStreams) fieldIds[`caster-${stream.id}`] = casterLinkInputId(stream.id);
   const fieldErrors = useFieldErrors<LiveField>(LIVE_FIELD_ERRORS, fieldIds);
   if (seenTrigger !== match.liveTrigger) {
@@ -243,14 +459,16 @@ export function MatchLiveDialog({
     setSeenTrigger(match.liveTrigger);
     setStreamed(match.liveTrigger !== null);
     setTrigger(match.liveTrigger ?? "MANUAL");
-    setLiveUrl(currentStaffUrl);
+    resetLiveUrl();
     setOrganisationLink(false);
     setCasterLinks({});
     fieldErrors.clear();
   }
 
+  // Un match joué ne prend plus que le démarquage : ni mode ni lien à régler.
+  const castable = isMatchCastable(match);
   // Mode verrouillé : le champ suit le mode du match, posé par un autre.
-  const showUrl = triggerLocked ? match.liveTrigger !== null : streamed;
+  const showUrl = castable && staffUrlShown(triggerLocked, match.liveTrigger, streamed);
   const urlTouched = liveUrl.trim().length > 0;
   // Conditionné au champ affiché : décocher la case n'envoie plus l'URL
   // (`liveUrl: null`) et démonte le champ. Sans cette garde, une saisie fautive
@@ -276,7 +494,9 @@ export function MatchLiveDialog({
   const platforms = LIVE_PLATFORMS.join(", ");
   // L'antenne d'un mode manuel suit la règle du mode (décision 2) : un
   // co-caster ne l'ouvre ni ne la coupe pour le caster qui l'a posé.
-  const airToggle = canToggleOnAir(match) && viewerMayToggleOnAir(match, viewer);
+  const streamedDisabled = streamedBoxDisabled(match, viewer, castable);
+  const saveReason = saveBlockedReason(match, triggerLocked, streamed, casterLinkEdits(casterStreams, casterLinks) !== undefined);
+  const airToggle = canToggleOnAir(match) && viewerMayChangeLiveTrigger(match, viewer);
 
   /** Ouvre ou coupe l'antenne (mode manuel), sans quitter la fenêtre. */
   const toggleAir = useOnAirToggle(match.id, onAir, { setBusy, onDone: onSaved });
@@ -294,12 +514,9 @@ export function MatchLiveDialog({
       const response = await fetch(`/api/admin/matches/${match.id}/live`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          trigger: sentTrigger,
-          liveUrl: sentTrigger === null ? null : liveUrl.trim() || null,
-          ...(canSpeakForOrganisation ? { organisationLink } : {}),
-          ...(streamLinks === undefined ? {} : { streamLinks }),
-        }),
+        body: JSON.stringify(
+          matchLiveBody({ castable, trigger: sentTrigger, liveUrl, organisationLink: canSpeakForOrganisation ? organisationLink : undefined, streamLinks }),
+        ),
       });
       const payload = (await response.json().catch(() => ({}))) as { error?: string; streamId?: unknown };
       if (!response.ok) throw new LiveRefusal(payload.error || "MATCH_LIVE_UPDATE_FAILED", refusedCasterField(payload));
@@ -319,11 +536,12 @@ export function MatchLiveDialog({
   const reportRefusal = (error: unknown) => {
     const code = (error as Error).message;
     // Le stream d'un caster disparu : la fenêtre n'a pas de choix de stream, elle se rouvre.
-    const message = code === "STREAM_NOT_FOUND" ? t("live.casterStreamGone") : mapError(code);
+    const ownKey = ownRefusalKey(code);
+    const message = ownKey === null ? mapError(code) : t(ownKey);
     showError(message);
     const field = error instanceof LiveRefusal ? error.field : null;
     if (field !== null && field in fieldIds) fieldErrors.flag(field, message);
-    else fieldErrors.report((error as Error).message, message);
+    else if (refusalHasField(code, triggerLocked && match.liveTrigger !== null)) fieldErrors.report(code, message);
   };
 
   return (
@@ -335,41 +553,30 @@ export function MatchLiveDialog({
       onClose={onClose}
     >
       <form onSubmit={submit}>
-        <h3 id="match-live-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
+        <h3 id="match-live-title" className={styles.title}>
           {t("live.title")}
         </h3>
-        <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
-          {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
+        <p className={styles.pairing}>
+          {match.team1Name ?? t("schedule.tbd")} vs {match.team2Name ?? t("schedule.tbd")}
         </p>
 
         {triggerLocked && match.liveTrigger !== null ? (
           // Le mode verrouillé se lit sans contrôle, avec les mots des réglages du caster.
-          <div style={{ margin: "18px 0" }}>
+          <div className={styles.streamed}>
             <CastTriggerField trigger={match.liveTrigger} startAt={match.startAt} onChange={setTrigger} locked />
           </div>
         ) : (
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              margin: "18px 0",
-              fontSize: 14,
-              color: "var(--ink, #e6ebf2)",
-              cursor: "pointer",
+          <StreamedBox
+            checked={streamed}
+            disabled={streamedDisabled}
+            reason={streamedBoxReason(match, streamedDisabled, castable)}
+            invalid={fieldErrors.invalidField === "streamed"}
+            error={fieldErrors.message("streamed")}
+            onChange={(next) => {
+              setStreamed(next);
+              fieldErrors.clear("streamed");
             }}
-          >
-            <input
-              type="checkbox"
-              checked={streamed}
-              // Un mode sans maître ne se démarque que par l'arbitre ou le staff
-              // (`LIVE_TRIGGER_NOT_OWNED` au serveur).
-              disabled={!viewerMayUnmarkLiveTrigger(match, viewer)}
-              onChange={(e) => setStreamed(e.target.checked)}
-            />
-            {/* NOSONAR S6772 — label en flex avec `gap` */}
-            {t("live.streamed")}
-          </label>
+          />
         )}
 
         {showUrl && (
@@ -403,29 +610,20 @@ export function MatchLiveDialog({
                 )}
               />
               {urlInvalid && (
-                <p id="match-live-url-invalid" style={{ margin: "6px 0 0", fontSize: 12, color: "var(--danger)" }}>
+                <p id="match-live-url-invalid" className={styles.invalid}>
                   {t("live.urlInvalid", { platforms })}
                 </p>
               )}
               <FieldErrorText fieldId={URL_INPUT_ID} message={fieldErrors.message("url")} />
               {canSpeakForOrganisation && urlTouched && !linkLocked && (
                 <InfoHintRow inline>
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginTop: 10,
-                      fontSize: 13,
-                      color: "var(--ink-soft, #c3ccd8)",
-                      cursor: "pointer",
-                    }}
-                  >
+                  <label className={`${styles.checkRow} ${styles.organisation}`}>
                     <input
                       type="checkbox"
                       checked={organisationLink}
                       onChange={(e) => setOrganisationLink(e.target.checked)}
                     />
+                    {/* NOSONAR S6772 — label en flex avec `gap` */}
                     {t("live.organisationLink")}
                   </label>
                   <InfoHint id="match-live-org-hint" subject={t("live.organisationLinkSubject")}>
@@ -439,24 +637,17 @@ export function MatchLiveDialog({
 
         {/* Médiation de l'arbitre : les liens des casters, corrigés ou effacés. */}
         {casterStreams.length > 0 && (
-          <fieldset style={{ border: "none", padding: 0, margin: "0 0 16px" }}>
-            <legend
-              style={{
-                fontSize: 12,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                color: "var(--ink-quiet, #9aa4b2)",
-                padding: 0,
-                marginBottom: 8,
-              }}
-            >
-              <InfoHintRow>
+          <fieldset className={styles.casterLinks}>
+            {/* Légende en texte seul (nom du groupe) ; l'aide, hors légende. */}
+            <legend className="sr-only">{t("live.casterLinks")}</legend>
+            <InfoHintRow>
+              <span className={styles.casterLinksLegend} aria-hidden="true">
                 {t("live.casterLinks")}
-                <InfoHint id="match-live-caster-links-hint" subject={t("live.casterLinksSubject")}>
-                  <p>{t("live.casterLinksHint")}</p>
-                </InfoHint>
-              </InfoHintRow>
-            </legend>
+              </span>
+              <InfoHint id="match-live-caster-links-hint" subject={t("live.casterLinksSubject")}>
+                <p>{t("live.casterLinksHint")}</p>
+              </InfoHint>
+            </InfoHintRow>
             {casterStreams.map((stream) => {
               const typed = casterLinks[stream.id];
               const value = typed ?? stream.liveUrl ?? "";
@@ -480,7 +671,7 @@ export function MatchLiveDialog({
                     {...fieldAria(inputId, invalid || fieldErrors.invalidField === field, invalid && `${inputId}-invalid`)}
                   />
                   {invalid && (
-                    <p id={`${inputId}-invalid`} style={{ margin: "6px 0 0", fontSize: 12, color: "var(--danger)" }}>
+                    <p id={`${inputId}-invalid`} className={styles.invalid}>
                       {t("live.urlInvalid", { platforms })}
                     </p>
                   )}
@@ -524,21 +715,16 @@ export function MatchLiveDialog({
           </div>
         )}
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-          <button
-            type="button"
-            className="btn ghost"
-            onClick={onClose}
-            disabled={busy}
-            style={{ padding: "8px 18px", fontSize: 13 }}
-          >
+        <SaveBlockedHint reason={saveReason} />
+        <div className={styles.footer}>
+          <button type="button" className={`btn ghost ${styles.sectionButton}`} onClick={onClose} disabled={busy}>
             {t("score.cancel")}
           </button>
           <button
             type="submit"
-            className="btn"
-            disabled={busy || urlInvalid || triggerNeedsDate || invalidCasterLink || lockedOnClosedMatch(triggerLocked, match)}
-            style={{ padding: "8px 20px", fontSize: 13 }}
+            className={`btn ${styles.submitButton}`}
+            disabled={busy || urlInvalid || triggerNeedsDate || invalidCasterLink || saveReason !== null}
+            aria-describedby={saveHintId(saveReason)}
           >
             {busy ? t("schedule.saving") : t("schedule.save")}
           </button>

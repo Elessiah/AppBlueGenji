@@ -5,9 +5,9 @@ jest.mock("@/lib/server/users/account-deletion");
 jest.mock("@/lib/server/users/account-deletion-request", () => ({ requestAccountDeletion: jest.fn() }));
 jest.mock("@/lib/server/users/account-reactivation", () => ({ replayAccountReactivation: jest.fn() }));
 
-import { replayAccountDeletions } from "@/lib/server/account-deletion-replay";
+import { redatePlan, replayAccountDeletions } from "@/lib/server/account-deletion-replay";
 import { getDatabase } from "@/lib/server/database";
-import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
+import { deleteOwnAccount, finalizeAccountDeletion } from "@/lib/server/users/account-deletion";
 import { requestAccountDeletion } from "@/lib/server/users/account-deletion-request";
 import { replayAccountReactivation } from "@/lib/server/users/account-reactivation";
 import type { AccountDeletionEntry } from "@/lib/shared/account-deletion-journal";
@@ -52,7 +52,7 @@ describe("replayAccountDeletions", () => {
   it("rejoue un compte revenu avec la sauvegarde, par le chemin ordinaire", async () => {
     restoredDb({ 7: { created_at: CREATED, is_deleted: 0 } });
     const report = await replayAccountDeletions([entry(7)], { log });
-    expect(deleteOwnAccount).toHaveBeenCalledWith(7);
+    expect(deleteOwnAccount).toHaveBeenCalledWith(7, { accountCreatedAt: CREATED });
     expect(report).toEqual({
       replayed: 1,
       absent: 0,
@@ -60,6 +60,8 @@ describe("replayAccountDeletions", () => {
       otherAccount: 0,
       reactivated: 0,
       alreadyActive: 0,
+      superseded: 0,
+      alreadyPending: 0,
       failed: 0,
     });
     expect(lines.join("\n")).toContain("effacé");
@@ -86,6 +88,8 @@ describe("replayAccountDeletions", () => {
       otherAccount: 1,
       reactivated: 0,
       alreadyActive: 0,
+      superseded: 0,
+      alreadyPending: 0,
       failed: 0,
     });
     expect(lines.join("\n")).toContain("#3");
@@ -97,6 +101,17 @@ describe("replayAccountDeletions", () => {
     expect(deleteOwnAccount).not.toHaveBeenCalled();
     expect(report.replayed).toBe(1);
     expect(lines.join("\n")).toContain("serait supprimé");
+  });
+
+  // Revue sécurité #571 : identifiant réattribué entre la lecture et le verrou.
+  it("replayAccountDeletions_deleteSaysAccountReassigned_countedOtherAccount", async () => {
+    restoredDb({ 7: { created_at: CREATED, is_deleted: 0 } });
+    jest.mocked(deleteOwnAccount).mockRejectedValueOnce(new Error("ACCOUNT_REASSIGNED"));
+
+    const report = await replayAccountDeletions([entry(7)], { log });
+
+    expect(report).toMatchObject({ otherAccount: 1, failed: 0, replayed: 0 });
+    expect(lines.join("\n")).toContain("réattribué");
   });
 
   it("un échec n'arrête pas le rejeu des suivantes, et se compte", async () => {
@@ -128,6 +143,8 @@ describe("replayAccountDeletions", () => {
       otherAccount: 0,
       reactivated: 0,
       alreadyActive: 0,
+      superseded: 0,
+      alreadyPending: 0,
       failed: 0,
     });
     expect(execute).not.toHaveBeenCalled();
@@ -144,7 +161,7 @@ describe("replayAccountDeletions — demande en attente (décision du 2026-11-04
 
     const report = await replayAccountDeletions([pending(requestedAt)], { log });
 
-    expect(requestAccountDeletion).toHaveBeenCalledWith(7, { requestedAt: new Date(requestedAt) });
+    expect(requestAccountDeletion).toHaveBeenCalledWith(7, { requestedAt: new Date(requestedAt), accountCreatedAt: CREATED });
     expect(deleteOwnAccount).not.toHaveBeenCalled();
     expect(report.replayed).toBe(1);
     expect(lines.join("\n")).toContain("demande de suppression rejouée");
@@ -157,8 +174,11 @@ describe("replayAccountDeletions — demande en attente (décision du 2026-11-04
 
     await replayAccountDeletions([pending("2026-09-20T10:00:00.000Z")], { log });
 
-    expect(requestAccountDeletion).toHaveBeenCalledWith(7, { requestedAt: new Date("2026-09-20T10:00:00.000Z") });
-    expect(deleteOwnAccount).toHaveBeenCalledWith(7);
+    expect(requestAccountDeletion).toHaveBeenCalledWith(7, {
+      requestedAt: new Date("2026-09-20T10:00:00.000Z"),
+      accountCreatedAt: CREATED,
+    });
+    expect(deleteOwnAccount).toHaveBeenCalledWith(7, { accountCreatedAt: CREATED });
     expect(jest.mocked(requestAccountDeletion).mock.invocationCallOrder[0]).toBeLessThan(
       jest.mocked(deleteOwnAccount).mock.invocationCallOrder[0],
     );
@@ -170,7 +190,7 @@ describe("replayAccountDeletions — demande en attente (décision du 2026-11-04
 
     const report = await replayAccountDeletions([entry(7)], { log });
 
-    expect(deleteOwnAccount).toHaveBeenCalledWith(7);
+    expect(deleteOwnAccount).toHaveBeenCalledWith(7, { accountCreatedAt: CREATED });
     expect(report.replayed).toBe(1);
   });
 
@@ -216,7 +236,7 @@ describe("replayAccountDeletions — réactivation (décision R1)", () => {
 
   it("replayAccountDeletions_reactivatedEntryPendingRow_callsReplayReactivation", async () => {
     restoredDb({ 7: pendingRow });
-    jest.mocked(replayAccountReactivation).mockResolvedValue(true);
+    jest.mocked(replayAccountReactivation).mockResolvedValue("REACTIVATED");
 
     const report = await replayAccountDeletions([reactivated], { log });
 
@@ -236,14 +256,26 @@ describe("replayAccountDeletions — réactivation (décision R1)", () => {
     expect(lines.join("\n")).toContain("à réactiver");
   });
 
+  // Revue EF : la simulation ne promet pas la réactivation, l'état se relit sous verrou.
+  it("replayAccountDeletions_reactivatedEntryDryRun_logSaysUpperBound", async () => {
+    restoredDb({ 7: pendingRow });
+
+    await replayAccountDeletions([reactivated], { dryRun: true, log });
+
+    expect(lines.join(" ")).toContain("à réactiver (au plus");
+  });
+
   // Revue sécurité #546, cycle 8 : une demande refaite après la réactivation tient.
-  it("replayAccountDeletions_reactivatedEntryLaterRequest_notReactivated", async () => {
+  // Revue sécurité #571, cycle 2 : une demande postérieure, toujours en attente,
+  // n'est pas « déjà supprimée ».
+  it("replayAccountDeletions_reactivatedEntryLaterRequest_countedSuperseded", async () => {
     restoredDb({ 7: { ...pendingRow, deletion_requested_at: "2026-11-05 10:00:00" } });
 
     const report = await replayAccountDeletions([reactivated], { log });
 
     expect(replayAccountReactivation).not.toHaveBeenCalled();
-    expect(report).toMatchObject({ alreadyDeleted: 1, reactivated: 0 });
+    expect(report).toMatchObject({ superseded: 1, alreadyDeleted: 0, reactivated: 0 });
+    expect(lines.join("\n")).toContain("demande postérieure");
   });
 
   it("replayAccountDeletions_reactivatedEntryAliveRow_alreadyActive", async () => {
@@ -253,6 +285,68 @@ describe("replayAccountDeletions — réactivation (décision R1)", () => {
 
     expect(replayAccountReactivation).not.toHaveBeenCalled();
     expect(report).toMatchObject({ alreadyActive: 1, reactivated: 0 });
+  });
+
+  // Revue sécurité #546, cycle 9 : un refus relu sous verrou n'est pas « déjà réactivé ».
+  it("replayAccountDeletions_replayReactivationSuperseded_countedApart", async () => {
+    restoredDb({ 7: pendingRow });
+    jest.mocked(replayAccountReactivation).mockResolvedValue("SUPERSEDED");
+
+    const report = await replayAccountDeletions([reactivated], { log });
+
+    expect(report).toMatchObject({ superseded: 1, alreadyActive: 0, reactivated: 0 });
+    expect(lines.join("\n")).toContain("demande postérieure");
+  });
+
+  it("replayAccountDeletions_replayReactivationAlreadyActiveUnderLock_alreadyActive", async () => {
+    restoredDb({ 7: pendingRow });
+    jest.mocked(replayAccountReactivation).mockResolvedValue("ALREADY_ACTIVE");
+
+    const report = await replayAccountDeletions([reactivated], { log });
+
+    expect(report).toMatchObject({ alreadyActive: 1, superseded: 0, reactivated: 0 });
+  });
+
+  // Revue de correction #571 : compte parti ou réattribué sous verrou, pas « demande postérieure ».
+  it("replayAccountDeletions_replayReactivationGoneUnderLock_countedAlreadyDeleted", async () => {
+    restoredDb({ 7: pendingRow });
+    jest.mocked(replayAccountReactivation).mockResolvedValue("GONE");
+
+    const report = await replayAccountDeletions([reactivated], { log });
+
+    expect(report).toMatchObject({ alreadyDeleted: 1, superseded: 0, reactivated: 0 });
+    expect(lines.join(" ")).toContain("supprimé définitivement entre-temps");
+  });
+
+  // Revue sécurité #571 : un identifiant réattribué sous verrou n'est pas « déjà supprimé ».
+  it("replayAccountDeletions_reactivationOtherAccountUnderLock_countedOtherAccount", async () => {
+    restoredDb({ 7: pendingRow });
+    jest.mocked(replayAccountReactivation).mockResolvedValue("OTHER_ACCOUNT");
+
+    const report = await replayAccountDeletions([reactivated], { log });
+
+    expect(report).toMatchObject({ otherAccount: 1, alreadyDeleted: 0 });
+    expect(lines.join(" ")).toContain("réattribué");
+  });
+
+  it("replayAccountDeletions_reactivationAbsentUnderLock_countedAbsent", async () => {
+    restoredDb({ 7: pendingRow });
+    jest.mocked(replayAccountReactivation).mockResolvedValue("ABSENT");
+
+    const report = await replayAccountDeletions([reactivated], { log });
+
+    expect(report).toMatchObject({ absent: 1, alreadyDeleted: 0 });
+  });
+
+  // Revue sécurité #571, cycle 3 : un masque manquant se compte en échec, pas en demande qui tient.
+  it("replayAccountDeletions_reactivationRestoreFails_countedFailed", async () => {
+    restoredDb({ 7: pendingRow });
+    jest.mocked(replayAccountReactivation).mockRejectedValue(new Error("REACTIVATION_NOT_RESTORED"));
+
+    const report = await replayAccountDeletions([reactivated], { log });
+
+    expect(report).toMatchObject({ failed: 1, superseded: 0, reactivated: 0 });
+    expect(lines.join("\n")).toContain("REACTIVATION_NOT_RESTORED");
   });
 
   it("replayAccountDeletions_replayReactivationThrows_failedCounted", async () => {
@@ -269,28 +363,57 @@ describe("replayAccountDeletions — réactivation (décision R1)", () => {
 // Revue sécurité #546, cycle 9 : demande défaite puis refaite, revenue avec la
 // sauvegarde sous sa date d'origine — la date du journal (la plus récente) la remplace.
 describe("replayAccountDeletions — demande à redater", () => {
-  const pending: AccountDeletionEntry = { ...entry(7), pending: true, deletedAt: "2026-11-03T09:00:00.000Z" };
+  const DAY = 24 * 3600 * 1000;
+  // Fenêtre ouverte : demande d'il y a deux jours, à la milliseconde près.
+  const recent = new Date(Math.floor((Date.now() - 2 * DAY) / 1000) * 1000 + 123);
+  const pending: AccountDeletionEntry = { ...entry(7), pending: true, deletedAt: recent.toISOString() };
+  const wholeSecond = new Date(Math.floor(recent.getTime() / 1000) * 1000);
   const pendingRow = { created_at: CREATED, is_deleted: 1, deletion_requested_at: "2026-10-01 10:00:00" };
 
-  it("replayAccountDeletions_pendingEntryPendingRowDifferentDate_redatedCountedReplayed", async () => {
+  it("replayAccountDeletions_pendingEntryPendingRowOlderDate_redatedForwardOnlyAtWholeSecond", async () => {
     const execute = restoredDb({ 7: pendingRow }, { affectedRows: 1 });
 
     const report = await replayAccountDeletions([pending], { log });
 
     const update = execute.mock.calls.find(([sql]) => sql.startsWith("UPDATE"));
-    expect(update?.[1]).toEqual([new Date(pending.deletedAt), 7, CREATED, new Date(pending.deletedAt)]);
+    expect(update?.[0]).toContain("deletion_requested_at < ?");
+    expect(update?.[1]).toEqual([wholeSecond, 7, CREATED, wholeSecond]);
     expect(requestAccountDeletion).not.toHaveBeenCalled();
     expect(deleteOwnAccount).not.toHaveBeenCalled();
-    expect(report).toMatchObject({ replayed: 1, alreadyDeleted: 0 });
+    expect(finalizeAccountDeletion).not.toHaveBeenCalled();
+    expect(report).toMatchObject({ replayed: 1, alreadyDeleted: 0, alreadyPending: 0 });
     expect(lines.join("\n")).toContain("redatée");
   });
 
-  it("replayAccountDeletions_pendingEntryPendingRowSameDate_alreadyDeleted", async () => {
+  it("replayAccountDeletions_pendingEntrySameOrLaterDate_alreadyPendingNotDeleted", async () => {
     restoredDb({ 7: pendingRow }, { affectedRows: 0 });
 
     const report = await replayAccountDeletions([pending], { log });
 
-    expect(report).toMatchObject({ replayed: 0, alreadyDeleted: 1 });
+    expect(report).toMatchObject({ replayed: 0, alreadyDeleted: 0, alreadyPending: 1 });
+  });
+
+  it("replayAccountDeletions_pendingEntryWindowClosed_finalizedAtOnce", async () => {
+    restoredDb({ 7: pendingRow }, { affectedRows: 1 });
+    jest.mocked(finalizeAccountDeletion).mockResolvedValue({ mode: "ANONYMIZE", reason: "TOURNAMENTS" });
+    const old: AccountDeletionEntry = { ...pending, deletedAt: new Date(Date.now() - 40 * DAY).toISOString() };
+
+    const report = await replayAccountDeletions([old], { log });
+
+    expect(finalizeAccountDeletion).toHaveBeenCalledWith(7, { accountCreatedAt: CREATED });
+    expect(report).toMatchObject({ replayed: 1, alreadyPending: 0 });
+    expect(lines.join("\n")).toContain("anonymisé (fenêtre close)");
+  });
+
+  it("replayAccountDeletions_pendingEntryWindowClosedNotDueUnderLock_countsRedate", async () => {
+    restoredDb({ 7: pendingRow }, { affectedRows: 1 });
+    jest.mocked(finalizeAccountDeletion).mockResolvedValue(null);
+    const old: AccountDeletionEntry = { ...pending, deletedAt: new Date(Date.now() - 40 * DAY).toISOString() };
+
+    const report = await replayAccountDeletions([old], { log });
+
+    expect(report).toMatchObject({ replayed: 1 });
+    expect(lines.join("\n")).toContain("redatée");
   });
 
   it("replayAccountDeletions_redateDryRun_countsWithoutWriting", async () => {
@@ -303,6 +426,47 @@ describe("replayAccountDeletions — demande à redater", () => {
     expect(lines.join("\n")).toContain("à redater");
   });
 
+  // Revue de correction #571 : la simulation partage comme le vrai passage.
+  it("replayAccountDeletions_redateDryRunRestoredDateLater_countsAlreadyPending", async () => {
+    restoredDb({ 7: { ...pendingRow, deletion_requested_at: "2099-01-01 00:00:00" } });
+
+    const report = await replayAccountDeletions([pending], { dryRun: true, log });
+
+    expect(report).toMatchObject({ replayed: 0, alreadyPending: 1 });
+  });
+
+  it("replayAccountDeletions_redateDryRunWindowClosed_saysDeletion", async () => {
+    restoredDb({ 7: pendingRow });
+    const old: AccountDeletionEntry = { ...pending, deletedAt: new Date(Date.now() - 40 * DAY).toISOString() };
+
+    await replayAccountDeletions([old], { dryRun: true, log });
+
+    expect(lines.join("\n")).toContain("serait supprimé");
+    expect(finalizeAccountDeletion).not.toHaveBeenCalled();
+  });
+
+  // Revue sécurité #571 : fenêtre du journal close, mais la demande restaurée,
+  // plus récente, est encore dans la sienne — le vrai passage ne supprime rien.
+  it("replayAccountDeletions_dryRunJournalClosedRestoredNewerOpen_countedAlreadyPending", async () => {
+    restoredDb({ 7: { ...pendingRow, deletion_requested_at: new Date(Date.now() - 5 * DAY).toISOString() } });
+    const old: AccountDeletionEntry = { ...pending, deletedAt: new Date(Date.now() - 40 * DAY).toISOString() };
+
+    const report = await replayAccountDeletions([old], { dryRun: true, log });
+
+    expect(report).toMatchObject({ replayed: 0, alreadyPending: 1 });
+    expect(lines.join("\n")).not.toContain("serait supprimé");
+  });
+
+  it("replayAccountDeletions_dryRunBothWindowsClosed_saysDeletion", async () => {
+    restoredDb({ 7: { ...pendingRow, deletion_requested_at: new Date(Date.now() - 35 * DAY).toISOString() } });
+    const old: AccountDeletionEntry = { ...pending, deletedAt: new Date(Date.now() - 40 * DAY).toISOString() };
+
+    const report = await replayAccountDeletions([old], { dryRun: true, log });
+
+    expect(report).toMatchObject({ replayed: 1, alreadyPending: 0 });
+    expect(lines.join("\n")).toContain("serait supprimé");
+  });
+
   it("replayAccountDeletions_redateThrows_failedCounted", async () => {
     restoredDb({ 7: pendingRow }, { error: new Error("DB_DOWN") });
 
@@ -310,5 +474,143 @@ describe("replayAccountDeletions — demande à redater", () => {
 
     expect(report).toMatchObject({ failed: 1, replayed: 0 });
     expect(lines.join("\n")).toContain("DB_DOWN");
+  });
+
+  /** Base dont la ligne change entre la lecture du rejeu et sa relecture (`next`, `null` : disparue). */
+  function rowChangesAfterFirstRead(next: { created_at: string; is_deleted: number; deletion_requested_at: string | null } | null) {
+    let reads = 0;
+    const execute = jest.fn(async (sql: string) => {
+      if (sql.startsWith("UPDATE")) return [{ affectedRows: 0 }];
+      reads += 1;
+      if (reads === 1) return [[pendingRow]];
+      return [next ? [next] : []];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  }
+
+  // Revue sécurité #571, cycle 3 : un identifiant réattribué n'est pas une demande à attendre.
+  it("replayAccountDeletions_redateNoRowsChangedAndIdReassigned_countedOtherAccount", async () => {
+    rowChangesAfterFirstRead({ ...pendingRow, created_at: "2026-11-08 08:00:00" });
+
+    const report = await replayAccountDeletions([pending], { log });
+
+    expect(report).toMatchObject({ otherAccount: 1, alreadyPending: 0, replayed: 0 });
+    expect(lines.join("\n")).toContain("identifiant réattribué");
+  });
+
+  it("replayAccountDeletions_redateNoRowsChangedAndRowGone_countedAbsent", async () => {
+    rowChangesAfterFirstRead(null);
+
+    const report = await replayAccountDeletions([pending], { log });
+
+    expect(report).toMatchObject({ absent: 1, alreadyPending: 0, replayed: 0 });
+  });
+
+  // Revue sécurité #571, cycle 4 : chaque état relu a son compteur.
+  it("replayAccountDeletions_redateNoRowsChangedAndAccountReactivated_countedAlreadyActive", async () => {
+    rowChangesAfterFirstRead({ ...pendingRow, is_deleted: 0, deletion_requested_at: null });
+
+    const report = await replayAccountDeletions([pending], { log });
+
+    expect(report).toMatchObject({ alreadyActive: 1, alreadyPending: 0, replayed: 0 });
+  });
+
+  it("replayAccountDeletions_redateNoRowsChangedAndAccountFinallyDeleted_countedAlreadyDeleted", async () => {
+    rowChangesAfterFirstRead({ ...pendingRow, deletion_requested_at: null });
+
+    const report = await replayAccountDeletions([pending], { log });
+
+    expect(report).toMatchObject({ alreadyDeleted: 1, alreadyPending: 0, replayed: 0 });
+  });
+
+  it("replayAccountDeletions_redateFinalizeReassigned_countedOtherAccount", async () => {
+    restoredDb({ 7: pendingRow }, { affectedRows: 0 });
+    jest.mocked(finalizeAccountDeletion).mockRejectedValue(new Error("ACCOUNT_REASSIGNED"));
+    const old: AccountDeletionEntry = { ...pending, deletedAt: new Date(Date.now() - 40 * DAY).toISOString() };
+
+    const report = await replayAccountDeletions([old], { log });
+
+    expect(report).toMatchObject({ otherAccount: 1, failed: 0, alreadyPending: 0 });
+  });
+});
+
+// Revue sécurité #571, cycle 2 : une seule règle pour le vrai passage et la simulation.
+describe("redatePlan", () => {
+  const DAY = 24 * 3600 * 1000;
+  const now = Date.parse("2026-11-09T12:00:00Z");
+  const daysAgo = (days: number) => new Date(now - days * DAY);
+
+  it("redatePlan_restoredOlderJournalOpen_redatesWithoutFinalizing", () => {
+    expect(redatePlan(daysAgo(2), daysAgo(10).toISOString(), now)).toEqual({ redate: true, finalize: false });
+  });
+
+  it("redatePlan_restoredNewerAndOpen_neitherRedatesNorFinalizes", () => {
+    expect(redatePlan(daysAgo(40), daysAgo(5).toISOString(), now)).toEqual({ redate: false, finalize: false });
+  });
+
+  it("redatePlan_restoredNewerButClosed_finalizes", () => {
+    expect(redatePlan(daysAgo(40), daysAgo(35).toISOString(), now)).toEqual({ redate: false, finalize: true });
+  });
+
+  it("redatePlan_restoredOlderJournalClosed_redatesAndFinalizes", () => {
+    expect(redatePlan(daysAgo(40), daysAgo(45).toISOString(), now)).toEqual({ redate: true, finalize: true });
+  });
+
+  it("redatePlan_sameSecond_notRedated", () => {
+    const at = daysAgo(2);
+    expect(redatePlan(at, at.toISOString(), now).redate).toBe(false);
+  });
+
+  it("redatePlan_noRestoredDate_followsJournal", () => {
+    expect(redatePlan(daysAgo(2), null, now)).toEqual({ redate: true, finalize: false });
+  });
+});
+
+describe("redatePlan — date brute (D21)", () => {
+  const now = Date.parse("2026-10-10T12:00:00Z");
+
+  it("redatePlan_rawRestoredOlder_redates", () => {
+    const plan = redatePlan(new Date("2026-10-09T10:00:00Z"), "2026-10-01 10:00:00", now, "2026-10-09 12:00:00");
+
+    expect(plan.redate).toBe(true);
+  });
+
+  it("redatePlan_rawRestoredSame_notRedated", () => {
+    const plan = redatePlan(new Date("2026-10-09T10:00:00Z"), "2026-10-09 12:00:00", now, "2026-10-09 12:00:00");
+
+    expect(plan.redate).toBe(false);
+  });
+
+  it("redatePlan_rawComparedAsText_ignoresIsoInstant", () => {
+    // L'instant ISO (10 h UTC) précède la date restaurée lue en heure locale ;
+    // la date brute, plus récente, tranche : on redate.
+    const plan = redatePlan(new Date("2026-10-01T00:00:00Z"), "2026-10-09 11:00:00", now, "2026-10-09 12:00:00");
+
+    expect(plan.redate).toBe(true);
+  });
+});
+
+describe("replayAccountDeletions — date brute de la demande (D21)", () => {
+  const DAY = 24 * 3600 * 1000;
+  const recent = new Date(Math.floor((Date.now() - 2 * DAY) / 1000) * 1000);
+  const pendingRow = { created_at: CREATED, is_deleted: 1, deletion_requested_at: "2026-10-01 10:00:00" };
+
+  it("replayAccountDeletions_rawRequestedAt_writtenVerbatim", async () => {
+    const execute = restoredDb({ 7: pendingRow }, { affectedRows: 1 });
+    const raw: AccountDeletionEntry = { ...entry(7), pending: true, deletedAt: recent.toISOString(), requestedAt: "2099-01-01 00:00:00" };
+
+    await replayAccountDeletions([raw], { log });
+
+    const update = execute.mock.calls.find(([sql]) => sql.startsWith("UPDATE"));
+    expect(update?.[1]).toEqual(["2099-01-01 00:00:00", 7, CREATED, "2099-01-01 00:00:00"]);
+  });
+
+  it("replayAccountDeletions_restoredLiveAccountWithRaw_passesRawToRequest", async () => {
+    restoredDb({ 7: { created_at: CREATED, is_deleted: 0 } });
+    const raw: AccountDeletionEntry = { ...entry(7), pending: true, deletedAt: recent.toISOString(), requestedAt: "2026-10-01 10:00:00" };
+
+    await replayAccountDeletions([raw], { log });
+
+    expect(requestAccountDeletion).toHaveBeenCalledWith(7, expect.objectContaining({ requestedAtRaw: "2026-10-01 10:00:00" }));
   });
 });

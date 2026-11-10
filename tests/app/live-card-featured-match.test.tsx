@@ -149,6 +149,11 @@ describe("LiveCard — accès au direct", () => {
     expect(html).toContain("en direct sur Twitch (nouvel onglet)");
   });
 
+  it("le nom accessible commence par le texte visible, avec ou sans chaîne nommée", () => {
+    expect(withStream("LIVE", "https://www.twitch.tv/videos/123")).toContain('aria-label="Regarder sur Twitch : ');
+    expect(withStream("LIVE", "https://exemple.com/live")).toContain('aria-label="Regarder le live : ');
+  });
+
   it("garde le nom de la plateforme quand le lien ne nomme pas de chaîne", () => {
     expect(text(withStream("LIVE", "https://www.twitch.tv/videos/123"))).toContain("Regarder sur Twitch");
     expect(text(withStream("LIVE", "https://youtu.be/abc"))).toContain("Regarder sur YouTube");

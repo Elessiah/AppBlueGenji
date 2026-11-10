@@ -940,12 +940,12 @@ describe("getConcernedReport", () => {
       ],
     ]);
     jest.mocked(listQuarantinesForReports).mockResolvedValue([
-      { id: 1, targetType: "TEAM", targetId: 4, targetName: "Alpha", reportId: 12, status: "HIDDEN", hiddenAt: "2026-09-20T10:00:00.000Z", purgeAfter: "2027-03-19T10:00:00.000Z", closedAt: null },
+      { id: 1, targetType: "TEAM", targetId: 4, targetName: "Alpha", reportId: 12, status: "HIDDEN", hiddenAt: "2026-09-20T10:00:00.000Z", purgeAfter: "2027-03-19T10:00:00.000Z", closedAt: null, contestOutcome: null },
       // Équipe visée, mais dont le lecteur n'est pas membre : ne le concerne pas.
-      { id: 2, targetType: "TEAM", targetId: 6, targetName: "Beta", reportId: 12, status: "HIDDEN", hiddenAt: "2026-09-20T10:00:00.000Z", purgeAfter: "2027-03-19T10:00:00.000Z", closedAt: null },
-      { id: 3, targetType: "USER", targetId: 5, targetName: "Nova", reportId: 12, status: "HIDDEN", hiddenAt: "2026-09-20T10:00:00.000Z", purgeAfter: "2027-03-19T10:00:00.000Z", closedAt: null },
+      { id: 2, targetType: "TEAM", targetId: 6, targetName: "Beta", reportId: 12, status: "HIDDEN", hiddenAt: "2026-09-20T10:00:00.000Z", purgeAfter: "2027-03-19T10:00:00.000Z", closedAt: null, contestOutcome: null },
+      { id: 3, targetType: "USER", targetId: 5, targetName: "Nova", reportId: 12, status: "HIDDEN", hiddenAt: "2026-09-20T10:00:00.000Z", purgeAfter: "2027-03-19T10:00:00.000Z", closedAt: null, contestOutcome: null },
       // Un autre joueur visé : son avatar masqué ne concerne pas ce lecteur.
-      { id: 4, targetType: "USER", targetId: 77, targetName: "UnAutreJoueur", reportId: 12, status: "HIDDEN", hiddenAt: "2026-09-20T10:00:00.000Z", purgeAfter: "2027-03-19T10:00:00.000Z", closedAt: null },
+      { id: 4, targetType: "USER", targetId: 77, targetName: "UnAutreJoueur", reportId: 12, status: "HIDDEN", hiddenAt: "2026-09-20T10:00:00.000Z", purgeAfter: "2027-03-19T10:00:00.000Z", closedAt: null, contestOutcome: null },
     ]);
 
     const report = await getConcernedReport(12, 5);

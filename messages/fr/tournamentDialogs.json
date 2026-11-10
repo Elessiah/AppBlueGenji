@@ -257,8 +257,15 @@
   "live": {
     "saved": "Diffusion du match enregistrée.",
     "removed": "Match retiré de la diffusion.",
-    "title": "Diffusion du match",
+    "title": "Diffusion officielle",
     "streamed": "Ce match est casté",
+    "streamedSubject": "la case « casté »",
+    "saveSubject": "« Enregistrer » est désarmé",
+    "sessionExpired": "Ta session a expiré : reconnecte-toi, puis recommence.",
+    "saveClosedLocked": "Le score est saisi et le mode appartient à un autre caster : il n'y a rien à enregistrer ici.",
+    "saveClosedUnchanged": "Le score est saisi : rien à enregistrer tant que « Ce match est casté » reste coché. Décoche-la pour retirer le match de la diffusion.",
+    "streamedClosed": "Le score de ce match est saisi : il ne peut plus être casté.",
+    "streamedOrphan": "Ce mode n'a plus de caster : seuls l'arbitre du match ou le staff peuvent le retirer.",
     "triggers": {
       "AUTO": "Automatique au démarrage du match",
       "START_TIME": "À la date de début du match",

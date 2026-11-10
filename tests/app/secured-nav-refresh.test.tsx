@@ -31,7 +31,7 @@ describe("barre de navigation — rafraîchie après les gestes qui la changent"
     ["app/(secured)/equipes/[id]/_components/MembershipActions.tsx", "showSuccess(await request())"],
     ["app/(secured)/equipes/[id]/_components/TeamSettings.tsx", 'showSuccess(t("settings.updated"))'],
     ["app/(secured)/equipes/[id]/_components/TeamSettings.tsx", 'router.push("/equipes")'],
-    ["app/(secured)/admin/signalements/page.tsx", "showSuccess(success)"],
+    ["app/(secured)/admin/signalements/page.tsx", "showSuccess(typeof success"],
   ])("%s — %s", (file, marker) => {
     expect(gesture(read(file), marker)).toContain("router.refresh()");
   });

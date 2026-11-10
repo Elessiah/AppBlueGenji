@@ -6,6 +6,7 @@ import {
   isReactivationWindowOpen,
   REACTIVATION_TICKET_MINUTES,
   reactivationDeadline,
+  type StoredDate,
 } from "@/lib/shared/account-deletion";
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
 import { recordAccountReactivation } from "@/lib/server/account-deletion-journal";
@@ -42,9 +43,6 @@ export class AccountPendingDeletionError extends Error {
     this.name = "AccountPendingDeletionError";
   }
 }
-
-/** Une date relue de la base (`dateStrings`), ou son absence. */
-type StoredDate = string | Date | null;
 
 function hashTicket(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -225,35 +223,73 @@ export async function reactivateAccount(
  * un compte réactivé depuis la sauvegarde, revenu avec elle en attente de
  * suppression, est réactivé de nouveau — même écriture que la réactivation
  * (pseudo, avatar, sessions retirées), sans ticket ni fenêtre : elle a eu lieu.
- * N'écrit pas le journal (sa ligne de réactivation y est déjà). Rend `true` si
- * le compte est réactivé.
+ * N'écrit pas le journal (sa ligne de réactivation y est déjà). Rend l'issue
+ * relue sous verrou : `REACTIVATED`, `ALREADY_ACTIVE` (compte vivant),
+ * `SUPERSEDED` (même compte toujours en attente, d'une demande postérieure à
+ * celle que la réactivation défaisait — elle tient), `GONE` (suppression déjà
+ * définitive), `ABSENT` (plus de ligne) ou `OTHER_ACCOUNT` (identifiant
+ * réattribué), relus sous verrou.
  */
-export async function replayAccountReactivation(entry: AccountDeletionEntry): Promise<boolean> {
+export type ReplayedReactivation = "REACTIVATED" | "ALREADY_ACTIVE" | "SUPERSEDED" | "GONE" | "ABSENT" | "OTHER_ACCOUNT";
+
+type LockedAccountRow = RowDataPacket & {
+  is_deleted: 0 | 1;
+  deletion_requested_at: StoredDate;
+  created_at: string;
+};
+
+/**
+ * L'issue d'une réactivation rejouée, hors rétablissement, d'après la ligne
+ * relue sous verrou — `null` : même compte, en attente de la demande que la
+ * réactivation défait (à rétablir).
+ */
+function lockedReactivationOutcome(
+  entry: AccountDeletionEntry,
+  row: LockedAccountRow | undefined,
+): Exclude<ReplayedReactivation, "REACTIVATED"> | null {
+  if (!row) return "ABSENT";
+  if (String(row.created_at) !== entry.accountCreatedAt) return "OTHER_ACCOUNT";
+  const isDeleted = Number(row.is_deleted) === 1;
+  if (!isDeleted) return "ALREADY_ACTIVE";
+  const pendingDeletion = row.deletion_requested_at !== null;
+  const undoes = reactivationUndoes(entry, {
+    createdAt: String(row.created_at),
+    isDeleted,
+    pendingDeletion,
+    deletionRequestedAt: row.deletion_requested_at === null ? null : String(row.deletion_requested_at),
+  });
+  if (undoes) return null;
+  return pendingDeletion ? "SUPERSEDED" : "GONE";
+}
+
+/**
+ * Rejoue une réactivation journalisée (voir `ReplayedReactivation`).
+ *
+ * @throws REACTIVATION_NOT_RESTORED — l'écriture de réactivation n'a apparié
+ *   aucune ligne malgré le verrou : rien n'est écrit, le rejeu compte un échec.
+ */
+export async function replayAccountReactivation(entry: AccountDeletionEntry): Promise<ReplayedReactivation> {
   const userId = entry.userId;
   const db = await getDatabase();
   const connection = await db.getConnection();
   let restored = false;
+  let outcome: Exclude<ReplayedReactivation, "REACTIVATED"> | null;
   try {
     await connection.beginTransaction();
-    const [locked] = await connection.execute<(RowDataPacket & {
-      is_deleted: 0 | 1;
-      deletion_requested_at: StoredDate;
-      created_at: string;
-    })[]>(`SELECT is_deleted, deletion_requested_at, created_at FROM bg_users WHERE id = ? FOR UPDATE`, [userId]);
-    const row = locked[0];
+    const [locked] = await connection.execute<LockedAccountRow[]>(
+      `SELECT is_deleted, deletion_requested_at, created_at FROM bg_users WHERE id = ? FOR UPDATE`,
+      [userId],
+    );
     // Revérifié sous verrou : même compte, et demande que la réactivation défait.
-    const undoes =
-      !!row &&
-      String(row.created_at) === entry.accountCreatedAt &&
-      reactivationUndoes(entry, {
-        createdAt: String(row.created_at),
-        isDeleted: Number(row.is_deleted) === 1,
-        pendingDeletion: Number(row.is_deleted) === 1 && row.deletion_requested_at !== null,
-        deletionRequestedAt: row.deletion_requested_at === null ? null : String(row.deletion_requested_at),
-      });
-    if (undoes) {
+    outcome = lockedReactivationOutcome(entry, locked[0]);
+    if (outcome === null) {
       restored = await restoreAccountIdentity(connection, userId);
-      if (restored) await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
+      // Sous le verrou, la ligne est en attente : l'écriture ne peut que
+      // l'apparier (un masque absent réactive sous le pseudo d'emprunt). Si
+      // elle n'apparie rien, c'est un échec à dire (`failed`), jamais une
+      // demande qui tiendrait.
+      if (!restored) throw new Error("REACTIVATION_NOT_RESTORED");
+      await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
     }
     await connection.commit();
   } catch (error) {
@@ -262,10 +298,10 @@ export async function replayAccountReactivation(entry: AccountDeletionEntry): Pr
   } finally {
     connection.release();
   }
-  if (restored) {
-    invalidateTeamIdentityViews();
-    invalidateStats();
-    await republishSoloEntryTournaments(userId);
-  }
-  return restored;
+  // Rien à rétablir sous verrou : l'issue relue le dit.
+  if (outcome !== null) return outcome;
+  invalidateTeamIdentityViews();
+  invalidateStats();
+  await republishSoloEntryTournaments(userId);
+  return "REACTIVATED";
 }

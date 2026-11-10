@@ -58,6 +58,15 @@ export interface AccountDeletionEntry {
    */
   pending?: boolean;
   /**
+   * D'une demande en attente : `deletion_requested_at` **tel que la base l'a
+   * écrit** (`AAAA-MM-JJ HH:MM:SS`, décision D21 du 2026-11-10), relu dans la
+   * transaction de la demande. Le rejeu le réécrit tel quel, sans repasser par
+   * `deletedAt` : convertie dans le fuseau du shell du rejeu, la date ISO
+   * pouvait glisser d'une ou deux heures face à celle de pm2. Absent d'une
+   * ligne plus ancienne : le rejeu retombe sur `deletedAt`.
+   */
+  requestedAt?: string;
+  /**
    * **Réactivation** d'une demande (décision R1 du 2026-11-04) : remplace la
    * ligne en attente, pour qu'une sauvegarde prise pendant les trente jours,
    * restaurée, ne ramène pas le compte en attente de suppression — le rejeu le
@@ -100,6 +109,7 @@ export function formatJournalEntry(entry: AccountDeletionEntry): string {
           accountCreatedAt: entry.accountCreatedAt,
           deletedAt: entry.deletedAt,
           ...(entry.pending ? { pending: true } : {}),
+          ...(entry.pending && entry.requestedAt !== undefined ? { requestedAt: entry.requestedAt } : {}),
         };
   return `${JSON.stringify(line)}\n`;
 }
@@ -107,6 +117,14 @@ export function formatJournalEntry(entry: AccountDeletionEntry): string {
 function isIsoDate(value: unknown): value is string {
   return typeof value === "string" && Number.isFinite(Date.parse(value));
 }
+
+/**
+ * Une date telle que MariaDB la rend (`dateStrings`, `DATETIME(0)`) : seule
+ * forme que `undoneRequestAt` peut prendre, comparée ensuite texte à texte —
+ * une ligne abîmée (« 9 », ISO à « T ») passerait sinon pour antérieure ou
+ * postérieure à tort.
+ */
+const STORED_DATETIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
 /** Ligne lue : suppression ou demande (`deletedAt`), ou réactivation (`reactivatedAt` seul). */
 function readEntry(value: unknown): AccountDeletionEntry | null {
@@ -123,18 +141,90 @@ function readEntry(value: unknown): AccountDeletionEntry | null {
   if (v.deletedAt === undefined) {
     const undone = v.undoneRequestAt;
     if (!isIsoDate(v.reactivatedAt) || v.pending !== undefined) return null;
-    if (typeof undone !== "string" || undone.length === 0) return null;
+    if (typeof undone !== "string" || !STORED_DATETIME.test(undone)) return null;
     return { ...key, deletedAt: v.reactivatedAt, reactivated: true, undoneRequestAt: undone };
   }
   if (!isIsoDate(v.deletedAt) || v.reactivatedAt !== undefined || v.undoneRequestAt !== undefined) return null;
   if (v.pending !== undefined && typeof v.pending !== "boolean") return null;
-  return { ...key, deletedAt: v.deletedAt, ...(v.pending ? { pending: true } : {}) };
+  // Date brute d'une demande en attente (D21) : seule forme admise, et
+  // seulement sur une demande — une ligne abîmée là est gardée telle quelle.
+  if (v.requestedAt !== undefined && (v.pending !== true || typeof v.requestedAt !== "string" || !STORED_DATETIME.test(v.requestedAt))) {
+    return null;
+  }
+  return {
+    ...key,
+    deletedAt: v.deletedAt,
+    ...(v.pending ? { pending: true } : {}),
+    ...(typeof v.requestedAt === "string" ? { requestedAt: v.requestedAt } : {}),
+  };
 }
 
 export interface ParsedJournal {
   entries: AccountDeletionEntry[];
   /** Lignes non vides qu'on n'a pas su lire — à signaler, jamais à rejouer. */
   invalidLines: number;
+  /**
+   * Parmi elles, les lignes JSON entières et datées (`deletedAt` ou
+   * `reactivatedAt`) que cette version ne sait pas lire — écrites par une
+   * version voisine, ou abîmées dans un seul champ. Gardées **telles quelles**
+   * à la réécriture du fichier, jusqu'à leur échéance : un élagage ne doit pas
+   * effacer une réactivation qu'une autre version saurait rejouer. Une ligne
+   * tronquée (JSON illisible) n'a pas de date sûre et n'est pas gardée.
+   */
+  preserved: PreservedJournalLine[];
+}
+
+/** Ligne illisible mais datée, recopiée à l'identique (`ParsedJournal.preserved`). */
+export interface PreservedJournalLine {
+  line: string;
+  /** Sa date (`deletedAt` ou `reactivatedAt`), en millisecondes. */
+  at: number;
+}
+
+/** Seuls champs qu'une ligne du journal porte : rien qui désigne une personne. */
+const JOURNAL_KEYS = new Set([
+  "userId",
+  "accountCreatedAt",
+  "deletedAt",
+  "pending",
+  "requestedAt",
+  "reactivatedAt",
+  "undoneRequestAt",
+  "reactivated",
+]);
+
+/** Date ISO complète, telle que `formatJournalEntry` l'écrit (`toISOString`). */
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
+
+/**
+ * La date d'une ligne JSON qu'on ne sait pas lire, si elle mérite d'être
+ * gardée : objet aux seuls champs du journal (aucun champ en plus ne survit
+ * à une réécriture), daté d'un instant ISO complet (`Date.parse` seul admet
+ * « 12 » ou « 9999 »).
+ */
+function unreadableLineDate(value: unknown): number | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const v = value as Record<string, unknown>;
+  if (!Object.keys(v).every((key) => JOURNAL_KEYS.has(key))) return null;
+  const dated = [v.deletedAt, v.reactivatedAt].find(
+    (date): date is string => typeof date === "string" && ISO_INSTANT.test(date),
+  );
+  return dated === undefined ? null : Date.parse(dated);
+}
+
+/**
+ * Les lignes illisibles gardées encore dans leur durée de conservation, sans
+ * doublon — même échéance que les autres (`pruneJournal`). Une ligne datée
+ * **après** `now` n'expirerait jamais : elle part.
+ */
+export function prunePreservedLines(
+  preserved: readonly PreservedJournalLine[],
+  now: Date,
+  retentionDays: number = ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
+): string[] {
+  const cutoff = now.getTime() - retentionDays * 24 * 60 * 60 * 1000;
+  const latest = now.getTime();
+  return [...new Set(preserved.filter((kept) => kept.at >= cutoff && kept.at <= latest).map((kept) => kept.line))];
 }
 
 /**
@@ -144,22 +234,28 @@ export interface ParsedJournal {
  */
 export function parseJournal(text: string): ParsedJournal {
   const entries: AccountDeletionEntry[] = [];
+  const preserved: PreservedJournalLine[] = [];
   let invalidLines = 0;
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) continue;
+    let value: unknown;
     try {
-      const parsed = readEntry(JSON.parse(line));
-      if (parsed) {
-        entries.push(parsed);
-      } else {
-        invalidLines += 1;
-      }
+      value = JSON.parse(line);
     } catch {
       invalidLines += 1;
+      continue;
     }
+    const parsed = readEntry(value);
+    if (parsed) {
+      entries.push(parsed);
+      continue;
+    }
+    invalidLines += 1;
+    const at = unreadableLineDate(value);
+    if (at !== null) preserved.push({ line, at });
   }
-  return { entries, invalidLines };
+  return { entries, invalidLines, preserved };
 }
 
 /**
@@ -203,16 +299,22 @@ export function pruneJournal(
 /**
  * Réactivation : la demande en attente du compte (ou une réactivation plus
  * ancienne) cède la place à une ligne de réactivation datée de `reactivatedAt` ;
- * les autres lignes restent.
+ * les autres lignes restent — y compris une ligne en attente **plus récente**
+ * (écrivain concurrent, horloge décalée), que `pruneJournal` garde ensuite
+ * comme la plus récente.
  */
 export function withReactivationEntry(
   entries: readonly AccountDeletionEntry[],
   key: AccountReactivationKey,
   reactivatedAt: Date,
 ): AccountDeletionEntry[] {
+  const at = reactivatedAt.getTime();
   const others = entries.filter(
     (entry) =>
-      isFinalEntry(entry) || entry.userId !== key.userId || entry.accountCreatedAt !== key.accountCreatedAt,
+      isFinalEntry(entry) ||
+      entry.userId !== key.userId ||
+      entry.accountCreatedAt !== key.accountCreatedAt ||
+      Date.parse(entry.deletedAt) > at,
   );
   return [
     ...others,
@@ -262,7 +364,12 @@ export type ReplayDecision =
    * reprise de celle du journal (une demande plus ancienne, défaite puis
    * refaite, raccourcirait sinon la nouvelle fenêtre).
    */
-  | "REDATE";
+  | "REDATE"
+  /**
+   * Réactivé depuis, mais revenu en attente d'une demande **postérieure** à
+   * celle que la réactivation défaisait : cette demande tient (réactivable).
+   */
+  | "SUPERSEDED";
 
 /**
  * Faut-il rejouer cette suppression sur la base restaurée ?
@@ -280,7 +387,8 @@ export function replayDecision(
   if (row.createdAt !== entry.accountCreatedAt) return "OTHER_ACCOUNT";
   if (entry.reactivated) {
     if (!row.isDeleted) return "ALREADY_ACTIVE";
-    return reactivationUndoes(entry, row) ? "REACTIVATE" : "ALREADY_DELETED";
+    if (reactivationUndoes(entry, row)) return "REACTIVATE";
+    return row.pendingDeletion && row.deletionRequestedAt ? "SUPERSEDED" : "ALREADY_DELETED";
   }
   if (entry.pending && row.pendingDeletion) return "REDATE";
   if (row.isDeleted) return "ALREADY_DELETED";

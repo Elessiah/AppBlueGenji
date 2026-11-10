@@ -1,4 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import { retireAccountQuarantinesOn } from "@/lib/server/blocked-images";
 import { ignoreMissingTable, isDuplicateEntryError, isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { type MatchWithdrawal, withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
@@ -21,6 +22,12 @@ import { resequenceSeeds } from "@/lib/server/tournaments/seeding";
  * (`soloWithdrawals`, décision D12) sont retirées d'abord, comme le retrait
  * d'un engagé par le staff (`registration-removal.ts`) : ligne effacée, rangs
  * refermés. L'appelant tient déjà la ligne de chacun de ces tournois.
+ *
+ * Les lignes de quarantaine du compte partent par cascade : les blocages
+ * d'empreinte qu'elles justifiaient deviennent d'abord non levables (revue
+ * sécurité #571, D18) — ici, pour chaque chemin d'effacement —, puis ces
+ * lignes sont effacées : l'empreinte bloquée ne garde aucun lien vers le
+ * compte (D31).
  *
  * Rend les matchs touchés (casts, liens, arbitrages) : l'appelant prévient
  * leurs tournois après le commit.
@@ -56,6 +63,9 @@ export async function eraseAccount(
   // aussi d'un stream qu'un co-caster tient encore. Ni le « Prêt » de ses
   // arbitrages : la clé étrangère ne vide que `referee_user_id`.
   const withdrawal = await withdrawUserCasts(connection, userId, true);
+  // D31 : le blocage ne garde que l'empreinte — les lignes de quarantaine du
+  // compte partent dans cette transaction.
+  await retireAccountQuarantinesOn(connection, userId);
   await connection.execute(`DELETE FROM bg_users WHERE id = ?`, [userId]);
   return withdrawal;
 }

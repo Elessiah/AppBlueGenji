@@ -60,6 +60,14 @@
   --toast-accent: 79, 224, 162;
 }
 
+/* Notice neutre : bleu glacier de la marque (jetons `--blue-*`). */
+.toast[data-type="info"] {
+  color: var(--blue-100);
+  background: #0a1c2a;
+  border: 1px solid rgba(var(--blue-500-rgb), 0.5);
+  --toast-accent: var(--blue-500-rgb);
+}
+
 .message {
   flex: 1;
   margin: 0;

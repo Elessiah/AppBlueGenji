@@ -308,18 +308,19 @@ export function RgpdEn({
           confirmation (a suspended account can be reactivated too: it comes back suspended). As soon as it is
           requested, it is shown as anonymous wherever it appeared (borrowed username, no avatar or player-page
           link: past results, rankings, rosters, tournament pages); its real username, which stays reserved for
-          it, and its avatar are kept apart for reactivation only, which gives them back (the username, shortened if needed, followed by “OG” if it was taken all the same — “OG2”, “OG3”… up to “OG10” if those are taken too, failing that the borrowed username), and erased at the end
-          of that time. The request is also recorded in the off-database log that replays deletions after a
+          it, and its avatar are kept apart for reactivation only, which gives them back (the username, shortened if needed, followed by “OG” if it was taken all the same — “OG2”, “OG3”… up to “OG10” if those are taken too, failing that the borrowed username; the avatar, unless moderation hid or deleted it in the meantime), and erased at the end
+          of that time — a hidden avatar follows the reports rule instead. The request is also recorded in the off-database log that replays deletions after a
           backup is restored (account identifier and creation date, date of the request), and replaced, on
           reactivation, by a line carrying the date of the reactivation and that of the undone request (kept like the other lines), so that a restored backup does not
           bring the account back as pending deletion. As soon as it is requested, and without being undone by reactivation, it leaves its
-          teams (ownership goes to a co-owner, else a manager, else a captain, else another member; a team of which it was the
+          teams (ownership goes to a co-owner, else a manager, else a captain, else another member, a suspended member coming only after all the others; a team of which it was the
           only player becomes a ghost team if it is entered in a tournament that hasn&apos;t finished, and is
           disbanded otherwise), its organised tournaments go to another staff member when someone can take them over, its registrations for a solo tournament that hasn&apos;t started yet are withdrawn, its casts of matches not yet completed, its referee assignments and its pending team invitations and join requests are withdrawn and its remaining matches in a running solo
           tournament where it never played are lost by forfeit. At the end of that time, the account is erased
-          if it left nothing behind, anonymized (borrowed username) otherwise. On erasure, the hash (SHA-256) of
-          an avatar removed by moderation is kept, with no link to any account, to refuse it being uploaded
-          again. The staff log on Discord records the request, its reactivation and each withdrawal or forfeit it causes (one line per tournament for those), without
+          if it left nothing behind, anonymized (borrowed username) otherwise. During that time, moderation can
+          still hide, restore or delete the avatar kept apart, like that of an active account; erasure only keeps
+          the hash of an avatar moderation had already deleted (section <a href="#signalements">“Reports”</a>); an
+          avatar moderation never deleted goes without leaving any hash. The staff log on Discord records the request, its reactivation and each withdrawal or forfeit it causes (one line per tournament for those), without
           naming the player (“a player”) (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
         </p>
       </section>
@@ -777,6 +778,26 @@ export function RgpdEn({
               player is notified in the same way and can contest the decision within the same period; if the
               challenge succeeds, the image can be uploaded again.
             </li>
+            <li>
+              When moderation <strong>deletes</strong> an avatar — immediately, on a report or from the
+              player&apos;s page, by
+              the staff after a hiding (challenge rejected, or before the deadline), or automatically at the end of
+              a hiding without a challenge —, whether the
+              account is active or pending deletion, the hash (SHA-256) of the image is kept without time limit in
+              the list of blocked images, which designates no account and only dates a block to the day, to refuse
+              it being uploaded again, as an avatar or as a team logo; when deleted immediately, its file is only
+              erased if nothing else on the site points to it. As long as the account exists (anonymized included),
+              the hash is also kept on the deletion decision taken on a report or after a hiding, with the
+              outcome of its challenge: upheld, the block stays; accepted, it is lifted, unless another deletion of
+              the same image still justifies it. When the account is erased, those decisions are erased and the
+              block becomes permanent: only the hash remains, with no link to any account. An automatic deletion
+              made while its challenge was still awaiting its outcome only blocks the image once upheld, or on the erasure of
+              the account if that comes first, then permanently. Hashes set on the erasure of an account before
+              November 12, 2026 — then also those of an avatar that was only hidden — stay blocked, dated to the
+              day they were set, which may be that of the erasure; any hash set before that date is brought back to the day. An avatar that is only
+              hidden leaves none as long as it is not deleted, nor does an avatar moderation never deleted; neither
+              does a deleted team logo.
+            </li>
           </ul>
           <p>
             When removed from a team&apos;s or a player&apos;s page, outside any report, an image is removed on a{" "}
@@ -1049,9 +1070,10 @@ export function RgpdEn({
             caster provided, there or when opening their stream, also goes when their account is deleted, played
             matches included, even if another caster still holds that stream; a member of the organizers states, when
             setting the link, whether it is the organizers&apos; link — it then stays with the match, even if that
-            member casts it — or their own channel, which goes with their account. They can also state it when opening their own
-            stream or in “Configure my broadcast”: that link then does not go with their account, but with that
-            stream once no caster holds it any more. A link set in that configuration before the site recorded who provided it has no
+            member casts it — or their own channel, which goes with their account. A caster never states it when opening their own
+            stream or in “Configure my broadcast”: that link always goes with their account (a link a caster had
+            called the organizers&apos; before 10 November 2026 goes with that stream once no caster holds it any
+            more). A link set in that configuration before the site recorded who provided it has no
             known author and stays with the match.{" "}
             When a match goes live (“live mode”) can only be changed or removed by the caster who set it — the site keeps
             their account with the match and erases it when they leave the match or no longer meet the conditions to cast it, when the mode is removed, or when

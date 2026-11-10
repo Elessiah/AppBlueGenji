@@ -418,7 +418,7 @@ export function MatchCardActions({
 }>) {
   const spectator = useSpectatorView();
   const { openSchedule, openConfig, openReplay, castBlock, launchPhase: launchPhaseEnabled, viewerUserId } = useLiveControls();
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess, showInfo } = useToast();
   const mapError = useMapError();
   const errorsText = useErrorsText();
   const actionText = useActionsText();
@@ -444,7 +444,7 @@ export function MatchCardActions({
     useReleaseConfirm(
       actions.some((a) => a.id === "releaseCast"),
       match.casters,
-      () => showError(t("cardActions.releaseConfirm.gone")),
+      () => showInfo(t("cardActions.releaseConfirm.gone")),
     );
   // Le choix du stream ne survit pas non plus à l'action (match lancé, joué…).
   const hasClaimCast = actions.some((a) => a.id === "claimCast");

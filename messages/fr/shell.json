@@ -126,6 +126,7 @@
     "regionLabel": "Notifications",
     "errorPrefix": "Erreur :",
     "successPrefix": "Succès :",
+    "infoPrefix": "Information :",
     "pause": "Mettre en pause la notification",
     "pauseTitle": "Pause",
     "resume": "Reprendre le décompte de la notification",

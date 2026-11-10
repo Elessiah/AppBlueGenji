@@ -644,7 +644,40 @@ puis renomme l'entrée solo (`syncSoloEntryIdentityOn`). Toute lecture qui joint
   l'emporte ; une suppression définitive les rend caduques. Une ligne en
   attente dont le compte revient **en attente** avec la sauvegarde (demande
   défaite puis refaite) rend `REDATE` : `deletion_requested_at` reprend la date
-  du journal, pour que l'ancienne demande n'abrège pas la nouvelle fenêtre.
+  du journal, pour que l'ancienne demande n'abrège pas la nouvelle fenêtre —
+  **vers l'avant seulement** (`deletion_requested_at < ?`, date tronquée à la
+  seconde), et la suppression définitive suit aussitôt si la fenêtre du journal
+  est close (`finalizeAccountDeletion`, qui revérifie sous verrou la date de
+  création du compte). Le rapport du rejeu distingue
+  `superseded` (réactivation non rejouée, une demande postérieure tient, relue
+  sous verrou : `replayAccountReactivation` rend `REACTIVATED`,
+  `ALREADY_ACTIVE`, `SUPERSEDED`, `GONE` — déjà supprimé, compté
+  `alreadyDeleted` —, `ABSENT` ou `OTHER_ACCOUNT` — identifiant réattribué,
+  compté `otherAccount`) et `alreadyPending` (demande déjà à jour, partagée de
+  même en simulation : une seule règle, `redatePlan`, sert le vrai passage et la
+  simulation — la plus récente des deux demandes tient, et la suppression
+  définitive suit si **sa** fenêtre est close). Une réactivation dont la base
+  restaurée porte une demande postérieure rend `SUPERSEDED` dès la lecture
+  (compté `superseded`, jamais « déjà supprimé »). Le chemin `REPLAY` passe aussi `accountCreatedAt` à
+  `requestAccountDeletion` et `deleteOwnAccount` : sous le verrou, une autre
+  ligne lève `ACCOUNT_REASSIGNED`, comptée `otherAccount`, sans rien écrire ; la simulation compte les réactivations « au plus ». Une ligne de réactivation
+  ne remplace que les lignes en attente **antérieures ou simultanées** du compte
+  (`withReactivationEntry`), et `undoneRequestAt` n'est lu que sous la forme
+  rendue par la base (`AAAA-MM-JJ HH:MM:SS`), toute autre ligne étant écartée.
+  Écartée du rejeu, une ligne JSON entière et **datée** (`deletedAt` ou
+  `reactivatedAt`) qu'on ne sait pas lire est pourtant **recopiée telle
+  quelle** à chaque réécriture du fichier, jusqu'à son échéance
+  (`ParsedJournal.preserved`, `prunePreservedLines`) : un élagage ne perd pas
+  la réactivation d'une version voisine ; une ligne tronquée, sans date sûre,
+  part. Seule survit une ligne aux **seuls champs du journal** (aucun pseudo ni
+  autre donnée ne s'y glisse), datée d'un instant ISO complet, et jamais au-delà
+  de maintenant (une date future ne viendrait jamais à échéance). Revue sécurité #571, cycle 3 : une réactivation dont la demande est là
+  mais le masque manque lève `REACTIVATION_NOT_RESTORED` (rien d'écrit,
+  compté `failed`, jamais `superseded`) ; une redate qui n'écrit rien relit la
+  ligne — identifiant réattribué entre-temps : `otherAccount`, ligne disparue :
+  `absent`, réactivée : `alreadyActive`, supprimée pour de bon :
+  `alreadyDeleted` —, et `finalizeAccountDeletion` avec une autre date de création lève
+  `ACCOUNT_REASSIGNED` (compté `otherAccount`) au lieu de rendre `null`.
 - **Jour 30** : l'effacement supprime aussi le fichier d'avatar mis de côté ;
   l'anonymisation efface le masque (cascade sur l'effacement).
 - **Organisateur sans repreneur** : même règle, anonyme dès la demande.
@@ -655,9 +688,10 @@ puis renomme l'entrée solo (`syncSoloEntryIdentityOn`). Toute lecture qui joint
 date de création, date de la demande). Une restauration la rejoue comme une
 demande (`requestAccountDeletion(id, { requestedAt })`, trente jours comptés
 depuis l'origine) si la fenêtre est encore ouverte, sinon comme une suppression
-définitive. La réactivation la retire (`forgetPendingAccountDeletion`, ne lève
-jamais) ; à l'élagage, une ligne définitive remplace la ligne en attente du
-même compte.
+définitive. La réactivation la remplace par une ligne de réactivation
+(`recordAccountReactivation`, décision R1 ci-dessus), rejouée par
+`replayAccountReactivation` puis `restoreAccountIdentity` ; à l'élagage, une
+ligne définitive remplace la ligne en attente du même compte.
 
 **Ce qui touche les autres se fait tout de suite, et la réactivation ne le
 défait pas** — une seule transaction, verrous dans l'ordre tournois
@@ -667,7 +701,13 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   reste à un autre `OWNER` s'il y en a, sinon passe au `MANAGER`, sinon au
   `CAPITAINE`, sinon au membre le plus ancien
   (`pickTeamSuccessor`, départage par l'id d'appartenance), avec l'avis
-  `OWNERSHIP`. Seul joueur : équipe **fantôme** si elle est inscrite à un tournoi
+  `OWNERSHIP` — aucun avis ni écriture quand un autre `OWNER` **actif** la
+  garde ; un compte sous suspension en cours, copropriétaire compris, n'hérite
+  qu'à défaut de tout membre actif (un `MANAGER` actif reçoit la propriété
+  plutôt qu'un copropriétaire suspendu, qui garde la sienne). Si **tous** les
+  membres restants sont suspendus, le meilleur d'entre eux hérite quand même :
+  une suspension se lève et la propriété se reprend alors, une dissolution ne
+  se défait pas (choix assumé, revue sécurité #571). Seul joueur : équipe **fantôme** si elle est inscrite à un tournoi
   `UPCOMING`/`REGISTRATION`/`RUNNING`, sinon **dissoute** (`dissolveTeamOn`,
   « Équipe dissoute #id »). Les candidats ne sont pas verrouillés côté compte
   (inversion d'ordre évitée) ; seuls les comptes vivants héritent.
@@ -745,26 +785,178 @@ bornés à `SETTLE_BATCH_SIZE` ; `bg_users.is_deleted` est indexé. La demande e
 la suppression prennent `lockTournamentRow` **en premier**, par id croissant,
 sur tous les tournois qu'elles touchent — inscriptions solo, tournois organisés
 (demande), matchs castés, liés ou arbitrés (`listCastTournamentIds`) — avant le
-compte, puis les équipes ; les avatars en quarantaine sont lus et hachés
-**avant** la transaction (`hashImageFiles`), seule l'insertion des empreintes
-s'y fait.
+compte, puis les équipes ; les fichiers des avatars en quarantaine sont relevés
+sous le verrou du compte, sans lecture de fichier (rien n'est haché, D6).
+L'effacement tient le compte **avant** ses lignes de quarantaine
+(`retireAccountQuarantinesOn`) ; une issue de contestation, un rétablissement
+ou une purge d'avatar prennent donc eux aussi le compte visé **d'abord**
+(`lockQuarantineUserFirst`, compte lu par le pool hors transaction), puis la
+ligne de quarantaine : un seul ordre, pas d'interblocage.
 
 **E2 — rattrapage.** `reconcileDeletedAccounts` commence par
 `settleDeletedSoloEntries` : les comptes déjà supprimés gardant une inscription
 à un tournoi actif voient la règle E1 rejouée (retrait ou forfait), sans effet
 au second passage. Le reste du rattrapage ignore les comptes en attente.
 
-**E6 — avatar en quarantaine.** À l'effacement, l'empreinte SHA-256 du fichier
-en quarantaine (`bg_logo_quarantines` `HIDDEN`) entre dans
-`bg_blocked_image_hashes` (aucune colonne de compte) avant que la cascade
-n'emporte la ligne ; un avatar ou un logo dont l'image traitée **ou le fichier
-téléversé tel quel** y figure est refusé (`IMAGE_BLOCKED`) — le fichier brut
-compte, la copie exacte d'un avatar servi étant réencodée en d'autres octets.
+**E6 — avatar supprimé par la modération (revu par D6, 2026-11-09).**
+L'empreinte SHA-256 d'un avatar entre dans `bg_blocked_image_hashes` (aucune
+colonne de compte) **quand la modération le supprime** — sans délai depuis un
+signalement (`deleteUserAvatarForReport`), depuis la fiche
+(`DELETE /api/admin/users/[id]/avatar`), ou à la fin de sa quarantaine
+(`purgeQuarantinedLogo` : contestation rejetée, ou échéance passée **sans
+contestation** — la purge d'office relit échéance et contestation **sous
+verrou** (signalement d'origine verrouillé comme le fait `createContest`) : une
+contestation déposée entre-temps arrête la purge, et un avatar contesté suit
+l'issue écrite de sa contestation, § Issue écrite ci-dessous) —, dans la
+transaction qui décide et avant que le fichier ne
+parte (`removeModeratedAvatarFile` / `blockRemovedImageFiles`, ne lèvent
+jamais ; toute adresse du dossier `avatars/`, ancien nom de fichier compris ;
+l'insertion est retentée une fois, puis les empreintes sont consignées dans
+pm2 pour être posées à la main, le fichier partant juste après ; un fichier
+déjà absent — course avec une rotation — est dit dans pm2, rien n'étant
+bloqué). L'empreinte est toujours bloquée, mais le fichier n'est effacé que si
+**plus aucune ligne** ne le désigne (`isUploadReferenced` puis `deleteUnreferencedUpload` : un autre
+compte, une quarantaine masquée, ou le masque d'un compte en attente —
+`bg_account_deletion_holds` compte parmi les références) ; un fichier gardé
+reste servi, et pm2 le dit (« fichier gardé et servi ») pour qu'un exploitant
+retire l'autre usage. La relecture sous verrou de la purge d'office tient en
+deux instructions (verrou du signalement, puis contestations lues en **lecture
+courante**, `LOCK IN SHARE MODE` sans sous-requête, jugées par
+`targetContestPending`, même règle que la relève) : une contestation commitée
+pendant l'attente du verrou est vue ; sans signalement d'origine, rien n'est
+relu. **Compte en attente de suppression** (revue sécurité #571, cycle 3) : sa
+ligne est anonyme, mais son avatar attend la réactivation dans le masque,
+toujours servi — la modération l'atteint par `readModeratableAvatar` : elle
+l'y supprime (depuis la fiche comme depuis un signalement), l'y **masque** et
+l'y **rétablit** (`setHeldAvatar`, sans écriture sur `bg_users` ni entrée solo
+à resynchroniser ; revue sécurité #571, cycle 4), puis le bloque et l'efface
+comme ailleurs ; un masque sans avatar répond `USER_HAS_NO_AVATAR`, un compte
+anonymisé (sans masque) reste introuvable. L'effacement au jour 30 bloque
+l'avatar qu'il emporte si une quarantaine `PURGED` dont l'issue n'est pas
+`OVERTURNED` le désigne sous l'une ou l'autre forme de l'adresse (servie
+`/api/uploads/…` ou disque `/uploads/…`), jamais un avatar seulement masqué
+(levable ou définitif selon le mode, § Issue écrite). Le blocage
+vaut aussi pour la copie d'un avatar de fournisseur (OAuth) : une image
+retirée ne revient pas par la connexion suivante ; une copie importée naît
+masquée, un refus y laisse la pastille à initiale. Un avatar seulement **masqué** (`HIDDEN`) se conteste encore : il n'est
+pas bloqué, et l'effacement d'un compte n'en bloque plus aucun — il relève ses
+fichiers en quarantaine **sous le verrou du compte** et les supprime après le
+commit. Un avatar ou un logo dont l'image traitée **ou le fichier téléversé tel
+quel** figure à la table est refusé (`IMAGE_BLOCKED`) — le fichier brut compte,
+la copie exacte d'un avatar servi étant réencodée en d'autres octets. Un logo
+d'équipe supprimé n'est pas bloqué.
 
 **Pseudo d'emprunt gardé au jour 30.** `anonymizeAccount` reprend le pseudo
 d'emprunt d'un compte en attente (`is_deleted = 1`, `deletion_requested_at`
 posé) au lieu d'en tirer un second : ses adversaires le voient sous ce nom
 depuis la demande. Un doublon (course) retombe sur un tirage.
+
+## Issue écrite d'une contestation (D18, D21, D22, D23 — 2026-11-10)
+
+- **Issue écrite** (D22) : `bg_logo_quarantines.contest_outcome`
+  (`UPHELD` / `OVERTURNED`, `NULL` tant que rien n'est tranché), posée par la
+  modération depuis le signalement (`POST /api/admin/logo-quarantines/[id]/contest-outcome`,
+  permission `moderation` ; boutons « Contestation rejetée » / « Contestation
+  acceptée » de `/admin/signalements`). Un rétablissement réussi l'écrit
+  `OVERTURNED` ; un rétablissement refusé parce que la cible a déjà une autre
+  image (`USER_HAS_NEW_AVATAR`, `TEAM_HAS_NEW_LOGO`) aussi (D23).
+- **La purge suit l'issue** (`removalBlocksHash`) : `UPHELD` → empreinte
+  bloquée, `OVERTURNED` → jamais, qu'elle vienne du staff ou de la passe
+  d'office ; sans issue, comme avant (le staff bloque ; la passe d'office ne
+  bloque pas un avatar contesté). Le blocage se pose **dans la transaction**
+  qui décide (purge, suppression sans délai), plus après le commit.
+- **Levée du blocage** (D18) : l'empreinte d'un avatar supprimé est gardée sur
+  sa ligne (`image_sha256`, liée au compte jusqu'à la cascade) ; une
+  contestation acceptée **après** la suppression la retire de
+  `bg_blocked_image_hashes`, sauf si une autre suppression qui l'a bloquée
+  (`PURGED`, `hash_blocked = 1`) porte la même empreinte, et jamais un blocage
+  **non levable** (`liftable = 0`) : posé sans ligne qui le justifie (fiche du
+  joueur, effacement d'un compte), ou rendu tel par l'effacement d'un compte,
+  qui emporte ses lignes de quarantaine (`pinAccountBlockedHashesOn`). Une
+  ligne antérieure sans empreinte ne peut rien lever (`hashUnknown`, dit au
+  staff). L'effacement au jour 30 ignore les suppressions `OVERTURNED` ; il
+  bloque l'avatar emporté **levable** si le compte est anonymisé (sa ligne
+  reste), **définitif** s'il est effacé. Tout effacement (`eraseAccount`,
+  rattrapage au démarrage compris) bloque d'abord, définitivement, les
+  empreintes gardées des suppressions du compte dont l'issue est nulle ou
+  maintenue (`pinAccountBlockedHashesOn`) — une contestation en attente ne
+  pourra plus être tranchée. Un rétablissement refusé (D23) est journalisé au
+  staff une fois, comme une issue écrite.
+- **Acceptation d'une image encore masquée** : elle se rétablit ; la route
+  d'issue la refuse (`QUARANTINE_STILL_HIDDEN`, 409). Un rétablissement refusé
+  (D23) écrit `OVERTURNED` sous le verrou de la ligne, et le commite.
+- **Journal** (D21) : une ligne `pending` garde aussi `requestedAt`, la date de
+  la demande **telle que la base l'a écrite** (`AAAA-MM-JJ HH:MM:SS`, relue
+  dans la transaction) ; le rejeu la réécrit telle quelle et la compare texte
+  à texte, quel que soit le fuseau du shell. Les anciennes lignes, sans ce
+  champ, se rejouent comme avant (date ISO).
+- **Seul l'avatar supprimé par la modération est bloqué** (D30, D6) : ni la
+  demande du joueur, ni l'anonymisation ou l'effacement au jour 30, ni le
+  rattrapage au démarrage ne bloquent un avatar qui n'a pas été supprimé par
+  la modération (ligne `PURGED`) — signalé puis seulement masqué, ou jamais
+  signalé, il part sans que son empreinte soit gardée.
+- **Lien vers le compte** (D31) : l'empreinte reste liée au compte (ligne de
+  quarantaine) tant qu'il existe, pour les contestations ; à l'effacement,
+  `eraseAccount` bloque définitivement puis efface ces lignes dans la même
+  transaction (`retireAccountQuarantinesOn`) — `bg_blocked_image_hashes` n'a
+  aucune colonne de compte, et son `created_at` est posé au **jour** près
+  (jour de la suppression la plus ancienne — sa purge, à défaut son masquage
+  — pour un blocage figé à l'effacement, et pour l'avatar emporté par
+  l'effacement : `avatarRemovedByModeration` rend ce jour, passé à
+  `blockRemovedImageFiles` par l'option `day`) : l'instant d'un effacement,
+  rapproché du journal des suppressions, relierait l'empreinte au compte. Les
+  empreintes posées avant la version 10 (alors à l'instant exact, et aussi
+  pour un avatar seulement masqué) sont ramenées au jour par
+  `RECENT_SCHEMA_CHANGES` et restent bloquées — dit dans T01, `/rgpd` et
+  `PRIVACY_CHANGES` (revue juridique #571, cycle 1), comme la suppression
+  d'office en attente d'issue que l'effacement fige. Anonymisé, l'avatar emporté
+  n'est bloqué que si une suppression le bloquait déjà ou a été maintenue
+  (`settledDay`, jour de ces seules suppressions) : une purge d'office en
+  attente d'issue ne le bloque pas (revue juridique #571, cycle 2). Le
+  blocage est alors déjà posé côté quarantaine (`blockImageHashOn`, issue
+  maintenue) ; l'appel de l'effacement ne compte que si le fichier vivant se
+  lit encore — retirer le blocage côté quarantaine en ferait un trou.
+- **Risque accepté** (D29) : un compte anonymisé garde un blocage levable
+  posé à l'effacement sans ligne qui l'enregistre (ligne d'avant les
+  empreintes, ou fichier réécrit) ; une contestation acceptée sur une autre
+  suppression de la même image peut le lever. Non corrigé, par décision.
+- **Gardé tel quel** : un avatar seulement masqué que l'effacement emporte
+  n'est pas bloqué (D19, D6) ; l'avatar par défaut d'un fournisseur n'a pas
+  d'exclusion — la modération ne le supprime pas (D20). L'empreinte
+  perceptuelle (D17) viendra dans un lot à part (`ERREUR.txt`).
+
+## Décisions requises (ouvertes)
+
+- Même avatar mis de côté : masqué ou supprimé par la modération, le joueur
+  en attente n'en reçoit **aucun avis** (`userRecipient` écarte
+  `is_deleted = 1`), alors que `/rgpd` § Signalements promet motifs et voies de
+  recours (DSA art. 17) — prévenir à la réactivation, ou le dire dans les
+  textes ?
+- Revue juridique #571, cycle 3 (non relu) : le blocage de l'empreinte n'est
+  pas garanti en cas d'échec (fichier déjà absent, insertion qui échoue deux
+  fois : consigné dans pm2 seulement ; adresse hors `avatars/` : rien) — faut-il
+  différer l'effacement du fichier jusqu'au blocage réussi ? La règle « fichier
+  gardé s'il sert ailleurs » ne vaut que pour la suppression sans délai (purge
+  et masquage ne la vérifient pas) — l'étendre ?
+- L'avatar mis de côté reste servi à son adresse pendant les 30 jours :
+  entrée ERREUR.txt existante (`holdAccountIdentity`, revue #546).
+
+**Textes légaux (D6).** Registre T01 (finalité, base légale, catégorie
+« Empreintes … des avatars supprimés par la modération », conservation dès la
+suppression — y compris par le staff qui rejette une contestation, pas à la
+purge d'office d'un avatar contesté —, avatar masqué exclu, fichier gardé s'il
+sert ailleurs ; la modération atteint l'avatar mis de côté
+d'un compte en attente), `/rgpd` FR+EN (§ Suppression du compte et
+§ Signalements) et l'entrée `2026-11-empreinte-avatar-supprime` de
+`PRIVACY_CHANGES` (FR+EN), testés dans `account-deletion-d2-texts.test.ts`.
+Complétés pour D22, D30, D31 : l'empreinte est dite gardée dans une liste qui
+ne désigne aucun compte (datée au jour près) **et**, tant que le compte existe
+(anonymisé compris), sur la décision de suppression avec l'issue de sa
+contestation (T01, T11 — durée de cette décision —, `/rgpd` § Signalements) ;
+un avatar jamais supprimé par la modération ne laisse aucune empreinte.
+**Conditions v10** (D12) : `TERMS_OF_USE.md` § Versions, entrée
+`2026-11-conditions-v10-avatar-et-succession` (FR+EN) ; ces deux « décisions
+requises » (avatar mis de côté, conditions v9) sont ainsi soldées.
 
 ## Voir aussi
 

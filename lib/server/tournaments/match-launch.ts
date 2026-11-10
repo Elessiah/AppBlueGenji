@@ -213,7 +213,7 @@ export function rowReadiness(row: LaunchMatchRow, casters: readonly MatchCasterL
     // Sans arbitre — ou arbitre devenu inéligible —, rien n'est attendu de ce côté.
     referee:
       row.referee_user_id !== null && row.refereeEligible
-        ? { readyAt: current ? toIso(row.referee_ready_at) : null }
+        ? { readyAt: current ? toIso(row.referee_ready_at) : null, userId: Number(row.referee_user_id) }
         : null,
   });
 }
@@ -448,7 +448,6 @@ async function lockLaunchMatch(
   return row;
 }
 
-
 /** Le lecteur est-il l'arbitre désigné du match, et le reste-t-il (`refereeEligible`) ? */
 function isEligibleReferee(
   row: { referee_user_id?: number | null; refereeEligible?: boolean },
@@ -460,41 +459,62 @@ function isEligibleReferee(
 /** Partie que le lecteur représente dans ce match, et sa qualité à y agir. */
 export type MatchParty = { role: LaunchViewerRole; canDeclareReady: boolean };
 
+/** Le match tel que le juge `resolveMatchParty`. */
+type PartyMatch = {
+  team1_id: number | null;
+  team2_id: number | null;
+  casters: readonly Pick<MatchCasterLink, "userId">[];
+  referee_user_id?: number | null;
+  refereeEligible?: boolean;
+  /**
+   * Jeu du tournoi, requis : un appelant qui l'oublie ne compile pas. `null`
+   * (sans casters à juger) retombe sur Overwatch, la règle la plus stricte.
+   */
+  tournament_game: TournamentGame | null;
+};
+
 /**
  * Le lecteur est-il partie de ce match — joueur d'une des deux engagées
- * (appartenance **en cours**, ou entrée solo), ou un de ses casters ?
+ * (appartenance **en cours**, ou entrée solo), un de ses casters, ou son
+ * arbitre désigné ?
  */
 export async function resolveMatchParty(
   connection: PoolConnection,
-  match: {
-    team1_id: number | null;
-    team2_id: number | null;
-    casters: readonly Pick<MatchCasterLink, "userId">[];
-    referee_user_id?: number | null;
-    refereeEligible?: boolean;
-    /**
-     * Jeu du tournoi, requis : un appelant qui l'oublie ne compile pas. `null`
-     * (sans casters à juger) retombe sur Overwatch, la règle la plus stricte.
-     */
-    tournament_game: TournamentGame | null;
-  },
+  match: PartyMatch,
   userId: number,
 ): Promise<MatchParty | null> {
+  const party = await resolvePartyOrRefusal(connection, match, userId);
+  return typeof party === "string" ? null : party;
+}
+
+/**
+ * `resolveMatchParty`, ou le motif du refus : un caster inscrit devenu
+ * inéligible reçoit le code de blocage du cast (`CastBlock`), qui lui dit quoi
+ * régler, plutôt qu'un `NOT_MATCH_PARTY` muet — sans relire son éligibilité.
+ */
+async function resolvePartyOrRefusal(
+  connection: PoolConnection,
+  match: PartyMatch,
+  userId: number,
+): Promise<MatchParty | string> {
   // Le rôle de joueur prime : qui joue le match ne le caste pas, même si une
   // inscription faite avant que son équipe n'arrive est encore en base.
   const team = await resolveTeamParty(connection, match, userId);
   if (team) return team;
+  let refusal = "NOT_MATCH_PARTY";
   if (match.casters.some((caster) => caster.userId === userId)) {
     // Une inscription ne vaut que tant que son titulaire remplit la condition
     // du cast : un compte privé de `live` ou d'identité ne déclare plus rien.
-    if ((await loadCastEligibility(connection, userId, match.tournament_game ?? "OW")) === null) return { role: "CASTER", canDeclareReady: true };
+    const block = await loadCastEligibility(connection, userId, match.tournament_game ?? "OW");
+    if (block === null) return { role: "CASTER", canDeclareReady: true };
+    refusal = block;
   }
   // L'arbitre désigné, tant qu'il remplit la condition d'arbitrage. Un arbitre
   // qui caste aussi lit en caster : un seul « Prêt » vaut pour les deux.
   if (isEligibleReferee(match, userId)) {
     return { role: "MATCH_REFEREE", canDeclareReady: true };
   }
-  return null;
+  return refusal;
 }
 
 /** Le lecteur joue-t-il ce match — appartenance en cours, ou entrée solo ? */
@@ -621,13 +641,14 @@ async function writeCasterReady(
  *
  * @throws `MATCH_NOT_FOUND` | `TOURNAMENT_NOT_RUNNING` | `MATCH_ALREADY_LAUNCHED`
  *   | `MATCH_NOT_IN_LOBBY` | `NOT_MATCH_PARTY` | `NOT_TEAM_READY_ROLE`
+ *   | `CastBlock` (caster inscrit devenu inéligible)
  */
 export async function setMatchReady(
   matchId: number,
   userId: number,
   ready: boolean,
 ): Promise<{ launched: boolean }> {
-  const { tournamentId, launched } = await inTransaction(async (connection) => {
+  const { tournamentId, launched, quiet } = await inTransaction(async (connection) => {
     const row = await lockLaunchMatch(connection, matchId);
     if (!row) throw new Error("MATCH_NOT_FOUND");
     if (row.tournament_state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
@@ -636,8 +657,10 @@ export async function setMatchReady(
     if (phase !== "LOBBY") throw new Error("MATCH_NOT_IN_LOBBY");
 
     await adoptCurrentPairing(connection, row);
-    const party = await resolveMatchParty(connection, row, userId);
-    if (!party) throw new Error("NOT_MATCH_PARTY");
+    // Lu après l'adoption, qui peut défaire l'ouverture d'un autre appariement.
+    const lobbyWasOpen = row.lobby_opened_at !== null;
+    const party = await resolvePartyOrRefusal(connection, row, userId);
+    if (typeof party === "string") throw new Error(party);
     if (!party.canDeclareReady) throw new Error("NOT_TEAM_READY_ROLE");
 
     if (party.role === "CASTER") {
@@ -658,9 +681,12 @@ export async function setMatchReady(
     // La ligne est tenue sous verrou depuis le début et à jour de l'écriture :
     // le décompte la reprend sans la reverrouiller.
     const launchedNow = ready ? await launchIfAllReady(connection, matchId, false, row) : false;
-    return { tournamentId: Number(row.tournament_id), launched: launchedNow };
+    // Le « Prêt » du seul arbitre n'est pas dans l'instantané (décision 47) :
+    // rien à publier tant qu'il ne lance ni n'ouvre le lobby.
+    const quietReferee = party.role === "MATCH_REFEREE" && !launchedNow && lobbyWasOpen;
+    return { tournamentId: Number(row.tournament_id), launched: launchedNow, quiet: quietReferee };
   });
-  publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  if (!quiet) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   return { launched };
 }
 
@@ -742,8 +768,8 @@ export type CastTarget = { streamId: number } | { liveUrl: string };
 
 /**
  * Le stream est-il montré ? La règle de `shownStreams` (celle de `mapMatch`) :
- * celui du staff, ou celui d'un match lancé, l'est toujours ; avant le
- * lancement, celui qu'aucun caster éligible ne tient est tu — le rejoindre
+ * celui du staff l'est toujours, celui d'un match lancé tant qu'un caster le
+ * tient ; avant le lancement, celui qu'aucun caster éligible ne tient est tu — le rejoindre
  * ferait réapparaître la chaîne d'un caster que le site ne montre plus. Les
  * casters sont ceux relus avec le match ; leur éligibilité se relit **en une
  * lecture courante** (`LOCK IN SHARE MODE`) : une permission retirée pendant
@@ -757,7 +783,8 @@ async function streamShown(connection: PoolConnection, row: LaunchMatchRow, stre
   if (!stream.staff && !settled && holders.length > 0) {
     held = (await loadEligibleCasterIds(connection, holders, row.tournament_game, true)).size > 0;
   }
-  return shownStreams([stream], held ? new Set([stream.id]) : new Set<number>(), settled).length > 0;
+  const cast = holders.length > 0 ? new Set([stream.id]) : new Set<number>();
+  return shownStreams([stream], held ? new Set([stream.id]) : new Set<number>(), settled, cast).length > 0;
 }
 
 /**
@@ -827,7 +854,7 @@ async function releaseIneligibleCasters(
  * acquise n'en réécrit rien.
  *
  * @throws `NOT_CASTER` | `CASTER_IDENTITY_REQUIRED` | `MATCH_NOT_FOUND`
- *   | `MATCH_ALREADY_COMPLETED` | `MATCH_NOT_LAUNCHABLE` | `CASTER_IS_PLAYER`
+ *   | `MATCH_CAST_CLOSED` | `MATCH_NOT_LAUNCHABLE` | `CASTER_IS_PLAYER`
  *   | `STREAM_NOT_FOUND` | `INVALID_STREAM_URL` | `STREAM_URL_REQUIRED`
  *   | `INVALID_LIVE_TRIGGER` | `MATCH_NOT_CASTABLE` | `MATCH_START_AT_REQUIRED`
  *   | `INVALID_CAST_BATTLETAG` | `LIVE_TRIGGER_NOT_OWNED`
@@ -869,7 +896,7 @@ export async function claimMatchCast(
       if (!row) throw new Error("MATCH_NOT_FOUND");
       const block = castBlockReason(hasLivePermission, identity, row.tournament_game);
       if (block) throw new Error(block);
-      if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+      if (row.status === "COMPLETED") throw new Error("MATCH_CAST_CLOSED");
       if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
       if (row.casters.some((caster) => caster.userId === userId)) {
         return { tournamentId: Number(row.tournament_id), claimed: false, triggerSkipped: false };
@@ -886,12 +913,11 @@ export async function claimMatchCast(
         streamId = castTarget.streamId;
       } else {
         // Le lien est rattaché à celui qui le fournit : son effacement de
-        // compte le retire (`withdrawUserCasts`) — sauf le lien dit de
-        // l'organisation (`asOrganisation`, permission `tournaments` vérifiée
-        // par la route), qui reste au match comme celui du staff.
+        // compte le retire (`withdrawUserCasts`). Un caster ne dit jamais un
+        // lien « de l'organisation » (décision du 2026-11-09).
         const [created] = await connection.execute<ResultSetHeader>(
           `INSERT INTO bg_match_streams (match_id, live_url, link_user_id) VALUES (?, ?, ?)`,
-          [matchId, liveUrl, liveUrl === null || settings.asOrganisation === true ? null : userId],
+          [matchId, liveUrl, liveUrl === null ? null : userId],
         );
         streamId = Number(created.insertId);
       }
@@ -924,9 +950,8 @@ export async function claimMatchCast(
         row,
         userId,
         streamId,
-        // Lien et origine sont déjà posés avec le stream neuf (ci-dessus) ; un
-        // stream rejoint n'est pas le sien à dire « de l'organisation ».
-        { ...settings, trigger, liveUrl: undefined, asOrganisation: undefined, skipLockedTrigger: true },
+        // Le lien est déjà posé avec le stream neuf (ci-dessus).
+        { ...settings, trigger, liveUrl: undefined, skipLockedTrigger: true },
         access,
       );
       return { tournamentId: Number(row.tournament_id), claimed: true, triggerSkipped: outcome.triggerSkipped };
@@ -934,8 +959,8 @@ export async function claimMatchCast(
   );
   // Une inscription change ce que montrent l'accueil et ses bandeaux (un
   // lien neuf, ou un co-caster éligible dont le stream jusque-là tu devient
-  // visible) ; une inscription déjà acquise ne change rien.
-  publishMatchUpdatedEvent(tournamentId, { landingLive: claimed });
+  // visible) ; une inscription déjà acquise (double clic) ne change rien.
+  if (claimed) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   // Après le commit : journal du staff. Aucune place n'est reprise à personne.
   if (claimed) announceCastChange({ kind: "CLAIMED", matchId, casterId: userId, replacedCasterId: null });
   return { triggerSkipped };
@@ -956,7 +981,7 @@ export async function claimMatchCast(
  * s'écrivent que sous lui.
  *
  * @throws `NOT_CASTER` | `MATCH_NOT_FOUND` | `NOT_MATCH_CASTER`
- *   | `MATCH_ALREADY_COMPLETED` | `INVALID_LIVE_TRIGGER` | `MATCH_NOT_CASTABLE`
+ *   | `MATCH_CAST_CLOSED` | `INVALID_LIVE_TRIGGER` | `MATCH_NOT_CASTABLE`
  *   | `MATCH_START_AT_REQUIRED` | `INVALID_STREAM_URL` | `CAST_STREAM_NOT_OWNED`
  *   | `INVALID_CAST_BATTLETAG` | `STREAM_NOT_FOUND` | `LIVE_TRIGGER_NOT_OWNED`
  */
@@ -981,14 +1006,18 @@ export async function setCastSettings(
       // Un match joué est de l'histoire : son mode, son lien et le BattleTag
       // qui a servi restent tels quels (l'inscription et le retrait refusent de
       // même de le réécrire). Sa rediff, elle, a sa propre route.
-      if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+      if (row.status === "COMPLETED") throw new Error("MATCH_CAST_CLOSED");
       await applyCastSettings(connection, row, userId, caster.streamId, settings, access);
       return Number(row.tournament_id);
     }),
   );
   // Un mode, un lien ou un stream retiré change ce que montrent l'accueil, ses
   // bandeaux et l'annonce #live : même éviction qu'une configuration du staff.
-  publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  // Le seul BattleTag (absent de l'instantané) ou un corps vide n'y change
+  // rien : ni reconstruction de l'instantané, ni poussée aux lecteurs.
+  if (settings.trigger !== undefined || settings.liveUrl !== undefined) {
+    publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  }
 }
 
 /**
@@ -998,7 +1027,7 @@ export async function setCastSettings(
  * Si toutes les autres parties étaient prêtes et n'attendaient que lui, le
  * match part.
  *
- * @throws `MATCH_NOT_FOUND` | `NOT_MATCH_CASTER` | `MATCH_ALREADY_COMPLETED`
+ * @throws `MATCH_NOT_FOUND` | `NOT_MATCH_CASTER` | `MATCH_CAST_CLOSED`
  */
 export async function releaseMatchCast(
   matchId: number,
@@ -1016,7 +1045,7 @@ export async function releaseMatchCast(
       }
       // Un match joué est de l'histoire : l'inscription, son stream et son lien
       // restent (l'inscription et l'anonymisation refusent de même de le réécrire).
-      if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+      if (row.status === "COMPLETED") throw new Error("MATCH_CAST_CLOSED");
 
       await connection.execute(`DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?`, [matchId, casterId]);
       const remaining = row.casters.filter((caster) => caster.userId !== casterId);

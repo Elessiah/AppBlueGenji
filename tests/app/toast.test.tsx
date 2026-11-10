@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
-import { TOAST_DURATION_MS, ToastProvider, useToast } from "@/components/ui/toast";
+import { TOAST_DURATION_MS, ToastItem, ToastProvider, useToast } from "@/components/ui/toast";
 import { readSource } from "../helpers/read-source";
 
 /**
@@ -97,9 +97,48 @@ describe("ToastProvider — valeur du contexte", () => {
 
   it("passe une valeur mémoïsée : une notification ne re-rend pas tous les consommateurs", () => {
     expect(source).toMatch(
-      /const value = useMemo\(\(\) => \(\{ showError, showSuccess \}\), \[showError, showSuccess\]\)/,
+      /const value = useMemo\(\(\) => \(\{ showError, showSuccess, showInfo \}\), \[showError, showSuccess, showInfo\]\)/,
     );
     expect(source).toContain("<ToastContext.Provider value={value}>");
     expect(source).not.toContain("value={{");
+  });
+});
+
+describe("showInfo — notice neutre", () => {
+  const source = readSource("components/ui/toast.tsx");
+  const css = readSource("components/ui/toast.module.css");
+
+  it("ajoute une notification de type info", () => {
+    expect(source).toMatch(/const showInfo = useCallback\(\(message: string, options\?: ToastOptions\) => add\(message, "info", options\?\.lang\), \[add\]\)/);
+  });
+
+  it("l'annonce poliment, dans la zone des réussites — jamais en alerte", () => {
+    expect(source).toContain('.filter((toast) => toast.type !== "error")');
+    expect(source).toContain('.filter((toast) => toast.type === "error")');
+  });
+
+  it("préfixe le message de « Information : » / « Notice: » pour les lecteurs d'écran", () => {
+    expect(source).toContain('info: "toast.infoPrefix"');
+    expect(JSON.parse(readSource("messages/fr/shell.json")).toast.infoPrefix).toBe("Information :");
+    expect(JSON.parse(readSource("messages/en/shell.json")).toast.infoPrefix).toBe("Notice:");
+  });
+
+  it("se peint en bleu glacier, par jetons", () => {
+    expect(css).toMatch(/\.toast\[data-type="info"\] \{[^}]*color: var\(--blue-100\)/);
+    expect(css).toMatch(/\.toast\[data-type="info"\] \{[^}]*--toast-accent: var\(--blue-500-rgb\)/);
+  });
+
+  it("se rend en notice : type info, préfixe « Information : » lu au lecteur d'écran", () => {
+    const html = renderToStaticMarkup(
+      <ToastItem toast={{ id: 1, message: "Ce caster ne caste plus ce match.", type: "info" }} onDismiss={() => undefined} />,
+    );
+    expect(html).toContain('data-type="info"');
+    expect(html).toContain('<span class="sr-only">Information : </span>Ce caster ne caste plus ce match.');
+  });
+
+  it("dit « Ce caster ne caste plus ce match » en notice neutre", () => {
+    expect(readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx")).toContain(
+      '() => showInfo(t("cardActions.releaseConfirm.gone"))',
+    );
   });
 });

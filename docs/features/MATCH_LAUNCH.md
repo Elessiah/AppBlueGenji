@@ -335,7 +335,7 @@ sienne), si bien que le lancement n'attend plus son « Prêt ». Sur un match
 **déjà lancé**, rien n'attend plus : l'inscription reste (on ne retire pas un
 caster en pleine diffusion pour un tag retouché), seuls ses contacts sont tus. Les deux autres
 chemins d'un caster suivent la même règle (`lib/server/tournaments/cast-eligibility.ts`) :
-son « Prêt » est refusé (`resolveMatchParty` → `NOT_MATCH_PARTY`) et le
+son « Prêt » est refusé avec le motif du blocage (`resolvePartyOrRefusal` → `NOT_CASTER` / `CASTER_IDENTITY_REQUIRED` / `CASTER_DISCORD_REQUIRED`, mêmes statuts que la route `…/caster`) et le
 balayage des notifications ne l'appelle plus au départ du match. Voir
 `docs/AUTHORIZATION_RULES.md` §4.5.
 
@@ -358,10 +358,17 @@ tient encore : le stream reste à ce co-caster, sans lien. Le lien de
 l'organisation (`link_user_id` nul : posé par un membre de l'organisation avec la
 case cochée) n'est jamais touché, **même si ce membre caste le
 match** : la provenance se *dit* (`MatchLiveSetter.asOrganisation`, champ
-`organisationLink` du PUT, 403 sans la permission `tournaments`), elle ne se déduit
+`organisationLink` du PUT de la configuration du direct, 403 `STAFF_STREAM_FORBIDDEN` sans la permission
+`tournaments` ; jamais dite par un caster, 403 `STAFF_STREAM_FORBIDDEN` sur
+`…/caster`, décision D7 du 2026-11-09), elle ne se déduit
 plus de l'inscription (décision 48, EF-29). Un réglage du direct
-réenregistré avec le même lien ne change pas son fournisseur ; un lien neuf prend
-celui que dit celui qui le pose. Limite : un lien posé avant
+réenregistré avec le même lien ne change pas son fournisseur — sauf quand
+**son fournisseur lui-même** le dit désormais de l'organisation (case cochée) :
+seul le rattachement tombe (`planStaffStreamUrl`, plan `origin`), le lien ne
+partira plus avec son compte ; un autre membre qui coche la case sur ce lien
+inchangé est refusé (409 `ORGANISATION_LINK_NOT_PROVIDER`, jamais ignoré derrière
+un succès) ; l'inverse passe par un lien neuf. Un lien neuf
+prend celui que dit celui qui le pose. Limite : un lien posé avant
 `link_user_id` (ancien `live_url`, migré en stream du staff) n'a pas de
 fournisseur connu — impossible à retrouver — et reste comme lien de
 l'organisation. Les liens posés avant EF-29 par un membre qui castait le match
@@ -377,7 +384,8 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   rejoindre un stream du match (co-cast), `{ liveUrl }` pour ouvrir le sien —
   le lien est **obligatoire** depuis `CAST_SETTINGS.md` (`STREAM_URL_REQUIRED`,
   400 : un stream sans lien n'apparaissait nulle part), et le corps porte en
-  plus les réglages du même geste (`trigger`, `battletag`, `organisationLink`).
+  plus les réglages du même geste (`trigger`, `battletag` ; `organisationLink`
+  est refusé, 403 `STAFF_STREAM_FORBIDDEN`).
   Les deux cibles à la fois, aucune, un identifiant mal formé ou un lien qui
   n'est pas du texte : `INVALID_CAST_TARGET` (400) ; un stream d'un autre match,
   disparu, ou tu (avant le lancement, aucun de ses casters ne remplit plus la
@@ -446,13 +454,17 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   du lancement** (`releaseIneligibleCasters` : « Prêt » d'un autre, lancement forcé, entretien) —
   le match n'attend plus un « Prêt » qui ne viendra pas, et un lancement d'office ne rend pas
   publics son pseudo ni le lien de sa chaîne. Un match déjà lancé garde ses casters. Retirer un
-  caster d'un match **joué** est refusé (`MATCH_ALREADY_COMPLETED`, 409) ; un retrait qui ne
+  caster d'un match **joué** est refusé (`MATCH_CAST_CLOSED`, 409, comme l'inscription et les réglages) ; une inscription déjà acquise (double clic) ou un retrait qui ne
   retire rien ne publie rien. L'éligibilité des co-casters se relit, à l'inscription, en une
   lecture courante par lot (`LOCK IN SHARE MODE`).
 - **Règle « stream montré »** : `shownStreams` / `firstStreamUrl` (`lib/shared/live-streams.ts`)
   sont lus par l'instantané (`mapMatch`, premier lien tiré des streams — plus de sous-requête par
   match dans `getMatchRows`) et par l'inscription ; l'accueil et l'annonce #live la rejouent en
   SQL (`firstStreamUrlSql`, `CAST_ELIGIBLE_SQL`), un test garde les conditions alignées.
+  Montrés : le stream du staff (lien de l'organisation) ; avant le lancement, celui d'un caster
+  éligible ; un match lancé ou joué, celui que tient encore un caster, éligible ou non. Le stream
+  **orphelin** — que plus aucun caster ne tient — est tu partout, même sur un match joué (D25) :
+  sa chaîne ne devient jamais le lien du match (carte, flux, REST, accueil, annonce #live).
 - **Verrous** : le verrou du match, pris en première instruction, rend la lecture ordinaire des
   casters et des streams suffisante (`lockLaunchMatch`, `held`) — pas de `FOR UPDATE` sur un
   intervalle vide partagé par les matchs voisins ; l'entretien et l'autogestion d'une manche, qui

@@ -94,9 +94,45 @@ describe("PUT /api/admin/matches/[matchId]/replay — entrées", () => {
     expect(setMatchReplayUrl).not.toHaveBeenCalled();
   });
 
-  it("efface sur un corps illisible", async () => {
+  it("PUT_unreadableBody_returns400WithoutErasing", async () => {
+    const res = await PUT(req("pas du json"), params("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_REPLAY_URL" });
+    expect(setMatchReplayUrl).not.toHaveBeenCalled();
+  });
+
+  it.each<[string, unknown]>([
+    ["corps vide", ""],
+    ["objet sans replayUrl", {}],
+    ["tableau", []],
+    ["null", null],
+  ])("PUT_%s_returns400WithoutErasing", async (_label, body) => {
+    const res = await PUT(req(body === "" ? "" : JSON.stringify(body)), params("42"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "INVALID_REPLAY_URL" });
+    expect(setMatchReplayUrl).not.toHaveBeenCalled();
+  });
+
+  it("PUT_payloadTooLarge_returns413WithoutErasing", async () => {
+    const res = await PUT(req(JSON.stringify({ replayUrl: "x".repeat(300 * 1024) })), params("42"));
+    expect(res.status).toBe(413);
+    expect(setMatchReplayUrl).not.toHaveBeenCalled();
+  });
+
+  it("PUT_nonJsonContentType_returns415WithoutErasing", async () => {
+    const request = new Request("http://localhost/api/admin/matches/42/replay", {
+      method: "PUT",
+      headers: { "content-type": "text/plain" },
+      body: "replayUrl=null",
+    });
+    const res = await PUT(request, params("42"));
+    expect(res.status).toBe(415);
+    expect(setMatchReplayUrl).not.toHaveBeenCalled();
+  });
+
+  it("PUT_explicitNull_erases", async () => {
     jest.mocked(setMatchReplayUrl).mockResolvedValue({ replayUrl: null, changed: true });
-    expect((await PUT(req("pas du json"), params("42"))).status).toBe(200);
+    expect((await PUT(req({ replayUrl: null }), params("42"))).status).toBe(200);
     expect(setMatchReplayUrl).toHaveBeenCalledWith(42, null, { userId: admin.id, manages: true });
   });
 

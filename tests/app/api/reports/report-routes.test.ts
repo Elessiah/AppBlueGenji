@@ -33,6 +33,7 @@ import {
   searchReportTargets,
 } from "@/lib/server/content-reports";
 import {
+  removeModeratedAvatarFile,
   deleteTeamLogoForReport,
   deleteUserAvatarForReport,
   hideTeamLogo,
@@ -259,6 +260,7 @@ describe("routes du panneau — permission `moderation`", () => {
       hiddenAt: "2026-09-24T10:00:00.000Z",
       purgeAfter: "2027-03-23T10:00:00.000Z",
       closedAt: null,
+      contestOutcome: null,
     });
     const res = await hideLogo(json("http://localhost", "POST", { targetType: "TEAM", targetId: 4 }), params("3"));
     expect(res.status).toBe(201);
@@ -277,6 +279,7 @@ describe("routes du panneau — permission `moderation`", () => {
       hiddenAt: "2026-09-24T10:00:00.000Z",
       purgeAfter: "2027-03-23T10:00:00.000Z",
       closedAt: null,
+      contestOutcome: null,
     });
     const res = await hideLogo(json("http://localhost", "POST", { targetType: "USER", targetId: 9 }), params("3"));
     expect(res.status).toBe(201);
@@ -320,6 +323,7 @@ describe("routes du panneau — permission `moderation`", () => {
       hiddenAt: "2026-09-24T10:00:00.000Z",
       purgeAfter: "2027-03-23T10:00:00.000Z",
       closedAt: "2026-09-24T10:00:00.000Z",
+      contestOutcome: null,
     });
     const res = await deleteReportedLogo(
       json("http://localhost", "POST", { targetType: "TEAM", targetId: 4 }),
@@ -341,6 +345,7 @@ describe("routes du panneau — permission `moderation`", () => {
       hiddenAt: "2026-09-24T10:00:00.000Z",
       purgeAfter: "2027-03-23T10:00:00.000Z",
       closedAt: "2026-09-24T10:00:00.000Z",
+      contestOutcome: null,
     });
     const res = await deleteReportedLogo(
       json("http://localhost", "POST", { targetType: "USER", targetId: 9 }),
@@ -465,11 +470,15 @@ describe("DELETE /api/admin/users/[id]/avatar", () => {
       pseudo: "Nova",
       removedAvatarUrl: "/api/uploads/avatars/9-a.webp",
     });
-    jest.mocked(deleteStoredImage).mockResolvedValue(undefined);
+    jest.mocked(removeModeratedAvatarFile).mockResolvedValue(undefined);
 
     const res = await removeUserAvatar(withReason(), params("9"));
     expect(res.status).toBe(200);
-    expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/avatars/9-a.webp");
+    // Un seul geste bloque l'empreinte puis efface le fichier (D6).
+    expect(removeModeratedAvatarFile).toHaveBeenCalledWith("/api/uploads/avatars/9-a.webp");
+    expect(jest.mocked(removeUserAvatarAsModerator).mock.invocationCallOrder[0]).toBeLessThan(
+      jest.mocked(removeModeratedAvatarFile).mock.invocationCallOrder[0],
+    );
     // Jamais le pseudo du joueur sur Discord (lib/shared/log-privacy.ts).
     expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("un joueur"), { id: 1, pseudo: "Admin" }, { category: "moderation" });
     expect(publishStaffAction).not.toHaveBeenCalledWith(expect.stringContaining("Nova"), expect.anything(), expect.anything());

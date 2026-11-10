@@ -196,7 +196,20 @@ const COMPLIANCE_TABLES: readonly string[] = [
       hidden_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       purge_after DATETIME NOT NULL,
       closed_at DATETIME NULL,
+      -- Issue de la contestation, dite par la modération (décision D22) :
+      -- UPHELD (décision maintenue) bloque l'empreinte d'un avatar supprimé,
+      -- OVERTURNED (contestation acceptée) la laisse ou la lève (D18, D23).
+      contest_outcome ENUM('UPHELD', 'OVERTURNED') NULL,
+      -- Empreinte SHA-256 de l'avatar supprimé, relevée avant l'effacement du
+      -- fichier : seule trace qui permette de lever (D18) ou de poser après
+      -- coup le blocage quand l'issue arrive une fois le fichier parti.
+      -- Part avec la ligne, retirée à l'effacement du compte (D31).
+      image_sha256 CHAR(64) NULL,
+      -- Cette décision a-t-elle bloqué l'empreinte ? Seule une suppression qui
+      -- l'a fait justifie encore le blocage quand une autre est annulée (D18).
+      hash_blocked TINYINT(1) NOT NULL DEFAULT 0,
       INDEX idx_bg_logo_quarantines_due (status, purge_after),
+      INDEX idx_bg_logo_quarantines_sha (image_sha256),
       INDEX idx_bg_logo_quarantines_report (report_id),
       INDEX idx_bg_logo_quarantines_team (team_id),
       INDEX idx_bg_logo_quarantines_user (user_id),
@@ -247,6 +260,12 @@ const COMPLIANCE_TABLES: readonly string[] = [
   `
       CREATE TABLE IF NOT EXISTS bg_blocked_image_hashes (
       sha256 CHAR(64) PRIMARY KEY,
+      -- 1 : posée par une décision gardée sur sa ligne de quarantaine, qu'une
+      -- contestation acceptée peut lever (D18). 0 : posée par un geste sans
+      -- trace qui la justifie (fiche du joueur, effacement d'un compte,
+      -- ligne d'avant les empreintes) — jamais levée d'office.
+      liftable TINYINT(1) NOT NULL DEFAULT 0,
+      -- Posée au jour près (D31) : jamais l'instant d'un effacement de compte.
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `,

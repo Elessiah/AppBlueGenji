@@ -71,19 +71,26 @@ type Options = {
   teams?: number[];
   successors?: Member[];
   deadMembers?: number[];
+  /** Membres sous suspension en cours. */
+  suspendedMembers?: number[];
   activeTournament?: boolean;
   organized?: number[];
   /** Les tournois organisés relus dans la transaction, s'ils diffèrent du relevé d'avant. */
   organizedLater?: number[];
   organizerSuccessor?: number | null;
   failOn?: string;
+  /** `deletion_requested_at` relue après l'écriture, telle que la base la rend (D21). */
+  storedRequestedAt?: string;
 };
 
 const NO_TRACE = { playedMatches: false, soloRegistrations: false, organizedTournaments: false, ownedTeams: false };
 
 function livingMembers(options: Options) {
   const dead = options.deadMembers ?? [];
-  return (options.successors ?? []).filter((m) => !dead.includes(m.user_id)).map((m) => ({ id: m.user_id }));
+  const suspended = options.suspendedMembers ?? [];
+  return (options.successors ?? [])
+    .filter((m) => !dead.includes(m.user_id))
+    .map((m) => ({ id: m.user_id, suspended: suspended.includes(m.user_id) ? 1 : 0 }));
 }
 
 function organizerRows(options: Options) {
@@ -105,6 +112,16 @@ function organizedRows(options: Options, queries: { sql: string }[]) {
   return ids.map((id) => ({ id }));
 }
 
+/** Lectures simples, sans état : la date relue (D21), les équipes, le logo. */
+function accountReads(q: string, options: Options): object[] | null {
+  if (q.startsWith("SELECT deletion_requested_at FROM bg_users")) {
+    return options.storedRequestedAt ? [{ deletion_requested_at: options.storedRequestedAt }] : [];
+  }
+  if (q.startsWith("SELECT tm.team_id")) return (options.teams ?? []).map((team_id) => ({ team_id }));
+  if (q.startsWith("SELECT logo_url, deleted_at FROM bg_teams")) return [{ logo_url: "/api/uploads/teams/3.webp", deleted_at: null }];
+  return null;
+}
+
 function fakeDb(options: Options) {
   const queries: { sql: string; params: unknown[] }[] = [];
   const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
@@ -114,10 +131,10 @@ function fakeDb(options: Options) {
     if (q.startsWith("SELECT is_deleted, created_at FROM bg_users")) {
       return [[{ is_deleted: options.alreadyDeleted ? 1 : 0, created_at: "2025-01-01 10:00:00" }]];
     }
-    if (q.startsWith("SELECT tm.team_id")) return [(options.teams ?? []).map((team_id) => ({ team_id }))];
-    if (q.startsWith("SELECT logo_url, deleted_at FROM bg_teams")) return [[{ logo_url: "/api/uploads/teams/3.webp", deleted_at: null }]];
+    const read = accountReads(q, options);
+    if (read) return [read];
     if (q.startsWith("SELECT tm.id, tm.user_id, tm.roles_json, tm.joined_at")) return [options.successors ?? []];
-    if (q.startsWith("SELECT id FROM bg_users WHERE is_deleted = 0 AND id IN")) return [livingMembers(options)];
+    if (q.startsWith("SELECT u.id, EXISTS (")) return [livingMembers(options)];
     if (q.startsWith("SELECT u.id FROM bg_users u")) return [organizerRows(options)];
     if (isActiveRegistrationRead(q)) return [options.activeTournament ? [{ tournament_id: 8 }] : []];
     if (q.startsWith("SELECT id FROM bg_tournaments WHERE organizer_user_id")) return [organizedRows(options, queries)];
@@ -163,7 +180,7 @@ beforeEach(() => {
   jest.mocked(loadAccountTrace).mockResolvedValue(NO_TRACE);
   jest.mocked(withdrawSoloRegistrationsOn).mockResolvedValue([]);
   jest.mocked(listForfeitableSoloEntries).mockResolvedValue([]);
-  jest.mocked(forfeitSoloEntriesAfterCommit).mockResolvedValue(undefined);
+  jest.mocked(forfeitSoloEntriesAfterCommit).mockResolvedValue(0);
   jest.mocked(logDeletionWithdrawal).mockResolvedValue(undefined);
   jest.mocked(withdrawUserCasts).mockResolvedValue({ matchIds: [], tournamentIds: [] });
   jest.mocked(lockMemberRoles).mockResolvedValue(["OWNER", "DPS"]);
@@ -185,6 +202,17 @@ describe("requestAccountDeletion — le compte", () => {
     expect(sendBotLog).not.toHaveBeenCalled();
   });
 
+  // Revue sécurité #571 : le rejeu ne touche jamais la ligne d'un autre compte.
+  it("requestAccountDeletion_createdAtMismatchUnderLock_throwsAccountReassigned", async () => {
+    const { connection } = fakeDb({});
+
+    await expect(requestAccountDeletion(7, { accountCreatedAt: "2026-09-22 08:00:00" })).rejects.toThrow(
+      "ACCOUNT_REASSIGNED",
+    );
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(recordAccountDeletion).not.toHaveBeenCalled();
+  });
+
   it("requestAccountDeletion_nominal_marksPendingAndDeletesSessionsInTransaction", async () => {
     const { queries, connection } = fakeDb({});
 
@@ -196,6 +224,43 @@ describe("requestAccountDeletion — le compte", () => {
     expect(queries.some((q) => q.sql === "DELETE FROM bg_user_sessions WHERE user_id = ?")).toBe(true);
     expect(connection.commit).toHaveBeenCalled();
     expect(closeUserStreams).toHaveBeenCalledWith(7);
+  });
+
+  // D21 : le journal garde la date telle que la base l'a écrite.
+  it("requestAccountDeletion_nominal_journalsStoredRequestDate", async () => {
+    fakeDb({ storedRequestedAt: "2026-11-10 09:15:00" });
+
+    await requestAccountDeletion(7);
+
+    expect(recordAccountDeletion).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 7, pending: true, requestedAt: "2026-11-10 09:15:00" }),
+    );
+  });
+
+  it("requestAccountDeletion_storedDateUnreadable_journalsWithoutRawDate", async () => {
+    fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    expect(jest.mocked(recordAccountDeletion).mock.calls[0][0]).not.toHaveProperty("requestedAt");
+  });
+
+  it("requestAccountDeletion_replayWithRawDate_holdsRawText", async () => {
+    fakeDb({});
+
+    await requestAccountDeletion(7, { requestedAt: new Date("2026-11-10T08:15:00Z"), requestedAtRaw: "2026-11-10 09:15:00" });
+
+    expect(holdAccountIdentity).toHaveBeenCalledWith(expect.anything(), 7, "2026-11-10 09:15:00");
+  });
+
+  // D30 : la demande du joueur ne bloque aucune image — seul ce que la
+  // modération a supprimé l'est (D6).
+  it("requestAccountDeletion_ownRequest_blocksNoImageHash", async () => {
+    const { queries } = fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    expect(queries.some((q) => q.sql.includes("bg_blocked_image_hashes"))).toBe(false);
   });
 
   it("requestAccountDeletion_nominal_cancelsOwnPendingInvitations", async () => {
@@ -299,6 +364,42 @@ describe("requestAccountDeletion — équipes (E3)", () => {
     await requestAccountDeletion(7);
 
     expect(rolesWritten()).toEqual([{ teamId: 3, userId: 8, roles: ["OWNER", "CAPITAINE"] }]);
+  });
+
+  // Revue légale #546 cycle 3 : un copropriétaire ne reçoit ni écriture ni avis « propriété transférée ».
+  it("requestAccountDeletion_coOwnerPresent_noRoleWriteAndNoOwnershipNotice", async () => {
+    fakeDb({
+      teams: [3],
+      successors: [member(8, ["MANAGER"], "2025-01-01 00:00:00"), member(9, ["OWNER", "DPS"], "2026-06-01 00:00:00")],
+    });
+
+    await requestAccountDeletion(7);
+
+    expect(rolesWritten()).toEqual([]);
+    expect(notifyTeamInviteInBackground).not.toHaveBeenCalled();
+    expect(leftTeams()).toEqual([{ teamId: 3, userId: 7 }]);
+  });
+
+  // Revue sécurité #546 (reprise, cycle 2) : un membre suspendu ne reçoit l'équipe qu'à défaut d'autre membre.
+  it("requestAccountDeletion_suspendedManager_transfersToActiveMember", async () => {
+    const { queries } = fakeDb({
+      teams: [3],
+      suspendedMembers: [9],
+      successors: [member(8, ["TANK"], "2026-06-01 00:00:00"), member(9, ["MANAGER"], "2025-01-01 00:00:00")],
+    });
+
+    await requestAccountDeletion(7);
+
+    expect(rolesWritten()).toEqual([{ teamId: 3, userId: 8, roles: ["OWNER", "TANK"] }]);
+    expect(queries.find((q) => q.sql.startsWith("SELECT u.id, EXISTS ("))?.sql).toContain("bg_account_suspensions");
+  });
+
+  it("requestAccountDeletion_onlySuspendedMember_stillTransfersToIt", async () => {
+    fakeDb({ teams: [3], suspendedMembers: [9], successors: [member(9, ["HEAL"], "2025-01-01 00:00:00")] });
+
+    await requestAccountDeletion(7);
+
+    expect(rolesWritten()).toEqual([{ teamId: 3, userId: 9, roles: ["OWNER", "HEAL"] }]);
   });
 
   it("requestAccountDeletion_ownerWithCaptainOnly_transfersToCaptain", async () => {
@@ -458,6 +559,7 @@ describe("requestAccountDeletion — journal et forfaits (E1, E5)", () => {
     jest.mocked(listForfeitableSoloEntries).mockResolvedValue([{ tournamentId: 5, teamId: 50 }]);
     jest.mocked(forfeitSoloEntriesAfterCommit).mockImplementation(async () => {
       order.push("forfeit");
+      return 1;
     });
     const { connection } = fakeDb({});
     connection.commit.mockImplementation(async () => {

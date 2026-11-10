@@ -251,8 +251,12 @@ export type LaunchReadinessInput = {
   team2IsGhost: boolean;
   /** Casters inscrits et leur « Prêt », déjà rapporté à l'appariement courant. */
   casters: readonly { userId: number; readyAt: string | null }[];
-  /** Arbitre désigné et son « Prêt » (rapporté à l'appariement courant) ; `null` sans arbitre. */
-  referee?: { readyAt: string | null } | null;
+  /**
+   * Arbitre désigné et son « Prêt » (rapporté à l'appariement courant) ; `null`
+   * sans arbitre. `userId` : l'arbitre qui caste aussi n'est compté qu'une fois
+   * (`readyCount`) — jamais posé par l'instantané partagé, qui ne nomme personne.
+   */
+  referee?: { readyAt: string | null; userId?: number } | null;
 };
 
 export function launchReadiness(input: LaunchReadinessInput): LaunchReadiness {
@@ -260,7 +264,12 @@ export function launchReadiness(input: LaunchReadinessInput): LaunchReadiness {
     team1Ready: input.team1IsGhost || input.team1ReadyAt !== null,
     team2Ready: input.team2IsGhost || input.team2ReadyAt !== null,
     casters: input.casters.map((caster) => ({ userId: caster.userId, ready: caster.readyAt !== null })),
-    referee: input.referee ? { ready: input.referee.readyAt !== null } : null,
+    referee: input.referee
+      ? {
+          ready: input.referee.readyAt !== null,
+          ...(input.referee.userId === undefined ? {} : { userId: input.referee.userId }),
+        }
+      : null,
   };
 }
 
@@ -796,11 +805,17 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_STREAM_URL: "Lien de diffusion non reconnu (Twitch, YouTube ou Kick attendu).",
   STREAM_URL_REQUIRED: "Le lien de ta chaîne est obligatoire pour ouvrir ton propre stream : sans lien, il n'apparaîtrait nulle part.",
   INVALID_CAST_BATTLETAG: "BattleTag de cast invalide : 64 caractères au plus, et des caractères visibles.",
-  CAST_STREAM_NOT_OWNED: "Ce stream est celui de l'organisation : son lien se règle dans la configuration de la diffusion.",
+  CAST_STREAM_NOT_OWNED: "Ce stream est celui de l'organisation : son lien se règle dans « Diffusion officielle ».",
+  CAST_STREAM_LINK_HELD: "Ce lien est celui d'un co-caster encore sur ce stream : lui seul le change, ou l'arbitre du match.",
   LIVE_TRIGGER_NOT_OWNED: "Le mode de passage à l'antenne appartient au caster qui l'a posé : seuls lui, l'arbitre du match ou un admin le changent — l'organisation aussi quand aucun caster ne le tient.",
   INVALID_CAST_SETTINGS: "Réglages de diffusion invalides.",
   MATCH_NOT_CASTABLE: "Ce match ne peut plus être diffusé.",
+  MATCH_CAST_CLOSED: "Ce match est joué : son cast ne change plus.",
   MATCH_CAST_SETTINGS_FAILED: "Tes réglages de diffusion n'ont pas pu être enregistrés. Réessaie dans un instant.",
+  MATCH_CAST_CLAIM_FAILED: "Ton inscription comme caster n'a pas pu être enregistrée. Réessaie dans un instant.",
+  MATCH_CAST_RELEASE_FAILED: "Ton retrait du cast n'a pas pu être enregistré. Réessaie dans un instant.",
+  INVALID_CAST_TARGET: "Cible du cast invalide : rouvre la fenêtre et recommence.",
+
   MATCH_START_AT_REQUIRED: "Fixe d'abord la date de début du match pour le faire passer à l'antenne à l'heure dite.",
   INVALID_LIVE_TRIGGER: "Mode de passage à l'antenne invalide.",
   MATCH_ALREADY_COMPLETED: "Ce match est terminé.",
@@ -818,7 +833,7 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   MATCH_ALREADY_REFEREED: "Ce match a déjà un arbitre.",
   REFEREE_CHANGED: "L'arbitre de ce match vient de changer : vérifie qui est désigné avant de recommencer.",
   NOT_MATCH_REFEREE: "Tu n'arbitres pas ce match.",
-  STAFF_STREAM_FORBIDDEN: "Le lien de l'organisation ne se règle que par son staff : le tien se règle dans « Configurer ma diffusion ».",
+  STAFF_STREAM_FORBIDDEN: "Le lien de l'organisation ne se règle que par son staff ; un caster règle le sien dans « Configurer ma diffusion ».",
   INVALID_FIRST_MAP: "Nom de carte invalide (64 caractères au plus).",
   INVALID_ROUND: "Tour du tournoi invalide.",
   INVALID_ROUND_MAPS: "Cartes invalides : 9 cartes au plus par tour, 20 au plus par pool, 64 caractères par nom.",

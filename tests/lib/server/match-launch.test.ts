@@ -31,6 +31,7 @@ import {
   releaseObjectingReferee,
   setMatchFirstMap,
   setMatchHost,
+  setCastSettings,
   setMatchReady,
   setMatchSelfManaged,
   setRoundSelfManaged,
@@ -285,6 +286,13 @@ function readCastRows(state: World, sql: string, params: unknown[]): unknown[] |
     );
     return [linked.map(() => ({ 1: 1 })), []];
   }
+  if (sql.includes("AS holder_casts")) {
+    const stream = (match?.streams ?? []).find((candidate) => candidate.id === Number(params[1]));
+    if (!stream) return [[], []];
+    const holderId = stream.link_user_id ?? null;
+    const casts = (match?.casters ?? []).some((caster) => caster.stream_id === stream.id && caster.user_id === holderId);
+    return [[{ link_user_id: holderId, holder_casts: casts ? 1 : 0 }], []];
+  }
   if (sql.startsWith("SELECT link_user_id FROM bg_match_streams WHERE id = ?")) {
     return [(match?.streams ?? []).filter((stream) => stream.id === Number(params[0])).map((stream) => ({ link_user_id: stream.link_user_id ?? null })), []];
   }
@@ -498,14 +506,14 @@ describe("setMatchReady", () => {
     expect(state.match?.casters.map((caster) => caster.ready_at)).toEqual([STAMP, null]);
   });
 
-  it.each<[string, Partial<typeof ELIGIBLE_CASTER>]>([
-    ["sans la permission `live`", { platform_roles_json: JSON.stringify(["RECRUTEUR"]) }],
-    ["au tag décertifié", { discord_verified_at: null }],
-    ["sans Battle.net", { blizzard_sub: null }],
-  ])("refuse le « Prêt » d'un caster inscrit %s", async (_label, overrides) => {
+  it.each<[string, Partial<typeof ELIGIBLE_CASTER>, string]>([
+    ["sans la permission `live`", { platform_roles_json: JSON.stringify(["RECRUTEUR"]) }, "NOT_CASTER"],
+    ["au tag décertifié", { discord_verified_at: null }, "CASTER_IDENTITY_REQUIRED"],
+    ["sans Battle.net", { blizzard_sub: null }, "CASTER_IDENTITY_REQUIRED"],
+  ])("refuse le « Prêt » d'un caster inscrit %s, avec le motif du blocage", async (_label, overrides, code) => {
     state.match = matchState({ team2_ready_at: STAMP, caster_user_id: CASTER });
     state.users[CASTER] = { ...ELIGIBLE_CASTER, ...overrides };
-    await expect(setMatchReady(42, CASTER, true)).rejects.toThrow("NOT_MATCH_PARTY");
+    await expect(setMatchReady(42, CASTER, true)).rejects.toThrow(code);
     expect(casterReadyOf(state)).toBeNull();
   });
 
@@ -780,13 +788,6 @@ describe("claimMatchCast", () => {
     expect(state.issued[0]).toMatch(/FROM bg_users WHERE id = \? LIMIT 1 LOCK IN SHARE MODE$/);
   });
 
-  it("claimMatchCast_ownStreamAsOrganisation_streamHasNoLinkUser", async () => {
-    state.users[CASTER] = verified;
-    await claimMatchCast(42, CASTER, true, OWN_STREAM, { asOrganisation: true });
-    // Le lien de l'organisation reste au match : aucun compte ne l'emporte.
-    expect(state.match?.streams).toEqual([{ id: 1, live_url: "https://twitch.tv/voix" }]);
-  });
-
   it("claimMatchCast_awaitingConfirmationWithTrigger_registersWithoutWritingTrigger", async () => {
     state.users[CASTER] = verified;
     state.match = matchState({ status: "AWAITING_CONFIRMATION" });
@@ -985,7 +986,7 @@ describe("claimMatchCast", () => {
   it("refuse un match terminé ou une exemption", async () => {
     state.users[CASTER] = verified;
     state.match = matchState({ status: "COMPLETED" });
-    await expect(claimMatchCast(42, CASTER, true, OWN_STREAM)).rejects.toThrow("MATCH_ALREADY_COMPLETED");
+    await expect(claimMatchCast(42, CASTER, true, OWN_STREAM)).rejects.toThrow("MATCH_CAST_CLOSED");
     state.match = matchState({ is_bye: 1, team2_id: null });
     await expect(claimMatchCast(42, CASTER, true, OWN_STREAM)).rejects.toThrow("MATCH_NOT_LAUNCHABLE");
   });
@@ -1495,6 +1496,20 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     await setMatchReady(42, REFEREE, true);
     expect(state.match?.referee_ready_at).toBe(STAMP);
     expect(state.match?.launched_at).toBe(STAMP);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
+  });
+
+  it("setMatchReady_refereeReadyInOpenLobbyWithoutLaunch_publishesNothing", async () => {
+    state.match = matchState({ referee_user_id: REFEREE, lobby_opened_at: STAMP, team1_ready_at: null });
+    await setMatchReady(42, REFEREE, true);
+    expect(state.match?.referee_ready_at).toBe(STAMP);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchReady_refereeReadyOpensLobby_publishes", async () => {
+    state.match = matchState({ referee_user_id: REFEREE, lobby_opened_at: null, team1_ready_at: null });
+    await setMatchReady(42, REFEREE, true);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
   });
 
   it("un caster déjà prêt qui devient arbitre n'a pas à se redéclarer : son « Prêt » vaut pour les deux", async () => {
@@ -1964,6 +1979,22 @@ describe("casters devenus inéligibles : retirés au lancement (EF-29)", () => {
     expect(queueCastChange).not.toHaveBeenCalled();
   });
 
+  it("setMatchReady_ineligibleCaster_refusedWithBlockReason", async () => {
+    state.users[CASTER] = INELIGIBLE;
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await expect(setMatchReady(42, CASTER, true)).rejects.toThrow("NOT_CASTER");
+
+    expect(casterReadyOf(state)).toBeNull();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setMatchReady_strangerNotCaster_throwsNotMatchParty", async () => {
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await expect(setMatchReady(42, 999, true)).rejects.toThrow("NOT_MATCH_PARTY");
+  });
+
   it("setMatchReady_ineligibleCoCaster_doesNotBlockTheLaunch", async () => {
     state.users[CASTER] = ELIGIBLE_CASTER;
     state.users[901] = INELIGIBLE;
@@ -2074,11 +2105,47 @@ describe("releaseMatchCast / claimMatchCast : gardes et publications (EF-29)", (
     state.match = matchState({ status: "COMPLETED", caster_user_id: CASTER });
     state.match.streams = [{ id: 1, live_url: "https://twitch.tv/caster", link_user_id: CASTER }];
 
-    await expect(releaseMatchCast(42, CASTER, false)).rejects.toThrow("MATCH_ALREADY_COMPLETED");
+    await expect(releaseMatchCast(42, CASTER, false)).rejects.toThrow("MATCH_CAST_CLOSED");
 
     expect(casterOf(state)).toBe(CASTER);
     expect(state.match?.streams).toHaveLength(1);
     expect(announceCastChange).not.toHaveBeenCalled();
+  });
+
+  it("setCastSettings_battletagOnly_publishesNothing", async () => {
+    // Le BattleTag n'est pas dans l'instantané : ni reconstruction, ni poussée aux lecteurs.
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await setCastSettings(42, CASTER, true, { battletag: "Voix#1234" });
+
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setCastSettings_emptyBody_publishesNothing", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await setCastSettings(42, CASTER, true, {});
+
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setCastSettings_triggerSet_publishesWithLandingRefresh", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await setCastSettings(42, CASTER, true, { trigger: "AUTO" });
+
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
+  });
+
+  it("setCastSettings_completedMatch_throwsMatchCastClosed", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ status: "COMPLETED", caster_user_id: CASTER });
+
+    await expect(setCastSettings(42, CASTER, true, { battletag: "Voix#1234" })).rejects.toThrow("MATCH_CAST_CLOSED");
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("releaseMatchCast_notACaster_publishesNothing", async () => {
@@ -2090,13 +2157,14 @@ describe("releaseMatchCast / claimMatchCast : gardes et publications (EF-29)", (
     expect(announceCastChange).not.toHaveBeenCalled();
   });
 
-  it("claimMatchCast_alreadyCaster_publishesNoLandingRefresh", async () => {
+  it("claimMatchCast_alreadyCaster_publishesNothing", async () => {
     state.users[CASTER] = ELIGIBLE_CASTER;
     state.match = matchState({ caster_user_id: CASTER });
 
     await claimMatchCast(42, CASTER, true, OWN_STREAM);
 
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: false });
+    // Un double clic : rien n'est écrit, rien n'est publié.
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
     expect(announceCastChange).not.toHaveBeenCalled();
   });
 
