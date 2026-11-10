@@ -687,6 +687,25 @@ describe("restoreReportedImage", () => {
     expect(jest.mocked(pushDiscordDirectMessages).mock.calls[0][2]).toBe("logo-restored");
   });
 
+  it("restoreReportedImage_hiddenRotationFails_stillRotatesHeldAvatar", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(rotateHiddenAvatarFile).mockRejectedValueOnce(new Error("EBUSY"));
+    install(
+      [[/FROM bg_users\s+WHERE id = \? AND is_deleted = 0/, () => [[{ pseudo: "Nova", discord_id: "900000000000000005", discord_pseudo: null, discord_verified_at: null }]]]],
+      [
+        [/FROM bg_logo_quarantines q[\s\S]*FOR UPDATE/, () => [[quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR })]]],
+        [/SELECT pseudo, avatar_url, is_deleted FROM bg_users WHERE id = \? FOR UPDATE/, () => [[{ pseudo: "Nova", avatar_url: null, is_deleted: 0 }]]],
+        [/UPDATE bg_users SET avatar_url = \?/, () => [{}]],
+        [/SET status = 'RESTORED'/, () => [{}]],
+      ],
+    );
+    await restoreReportedImage(30, actor);
+    await flush();
+
+    expect(rotateHeldAvatarFile).toHaveBeenCalledWith(9);
+    log.mockRestore();
+  });
+
   it("remet l'avatar à la même adresse, resynchronise l'entrée solo et prévient le joueur", async () => {
     install(
       [[/FROM bg_users\s+WHERE id = \? AND is_deleted = 0/, () => [[{ pseudo: "Nova", discord_id: "900000000000000005", discord_pseudo: null, discord_verified_at: null }]]]],

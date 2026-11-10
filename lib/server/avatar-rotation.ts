@@ -200,14 +200,21 @@ export async function rotateHeldAvatarFile(
   } finally {
     if (!written) await undoHeldRotation(userId, heldUrl, target, shared);
   }
-  if (written && original) {
-    // Même distinction que `rotateHiddenAvatarFile` (adresse de forme ancienne).
-    const purge = heldUrl.startsWith("/uploads/") ? purgeAllOptimizedCopies() : purgeOptimizedCopies(original);
-    if (options.detachPurge) {
-      void purge.catch((error) => console.error("[avatar-rotation] variantes de l'avatar mis de côté non purgées", error));
-    } else await purge;
-  }
+  if (written && original) await purgeHeldAvatarCopies(heldUrl, original, options.detachPurge === true);
   return written ? target.url : null;
+}
+
+/** Purge des variantes de l'avatar mis de côté ; `detach` : sans la faire attendre à l'appelant. */
+async function purgeHeldAvatarCopies(heldUrl: string, original: Buffer, detach: boolean): Promise<void> {
+  // Même distinction que `rotateHiddenAvatarFile` (adresse de forme ancienne).
+  const purge: Promise<unknown> = heldUrl.startsWith("/uploads/")
+    ? purgeAllOptimizedCopies()
+    : purgeOptimizedCopies(original);
+  if (!detach) {
+    await purge;
+    return;
+  }
+  void purge.catch((error) => console.error("[avatar-rotation] variantes de l'avatar mis de côté non purgées", error));
 }
 
 /**

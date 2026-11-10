@@ -712,7 +712,8 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   plutôt qu'un copropriétaire suspendu, qui garde la sienne). Si **tous** les
   membres restants sont suspendus, le meilleur d'entre eux hérite quand même :
   une suspension se lève et la propriété se reprend alors, une dissolution ne
-  se défait pas (choix assumé, revue sécurité #571). Seul joueur : équipe **fantôme** si elle est inscrite à un tournoi
+  se défait pas (choix assumé, revue sécurité #571). Seul joueur — **quel que
+  soit son rôle** depuis ACCOUNT-DELETION-3 (dernier membre vivant) : équipe **fantôme** si elle est inscrite à un tournoi
   `UPCOMING`/`REGISTRATION`/`RUNNING`, sinon **dissoute** (`dissolveTeamOn`,
   « Équipe dissoute #id »). Les candidats ne sont pas verrouillés côté compte
   (inversion d'ordre évitée) ; seuls les comptes vivants héritent.
@@ -773,7 +774,11 @@ réactive aussi** (décision du 2026-11-04) : `createSession` lit la demande en
 attente avant la suspension, la réactivation se fait, puis la session est
 refusée (`403 ACCOUNT_SUSPENDED` avec `reactivated: true`) ; l'écran dit la
 réactivation, puis la suspension. Au-delà de trente jours, la connexion est
-refusée (`ACCOUNT_DELETED`).
+refusée (`ACCOUNT_DELETED`). Depuis ACCOUNT-DELETION-3 : plusieurs tickets
+valides par compte (une seconde connexion ne périme pas l'écran ouvert) ; tous
+partent à la réactivation, à « Ne pas réactiver » (`DELETE /api/auth/reactivate`,
+qui retire aussi le cookie — `/rgpd` le dit, FR + EN) et à toute nouvelle
+demande de suppression.
 
 **Jour 30.** `finalizeDueAccountDeletions` (horaire, paresseux, lancé par
 `getDatabase` sous `NEXT_RUNTIME`) appelle `finalizeAccountDeletion`, qui relit
@@ -788,7 +793,9 @@ la fois, les autres passent leur tour. Ses candidats sont filtrés en SQL (une
 inscription à retirer, ou une entrée en cours jamais jouée à forfaiter) et
 bornés à `SETTLE_BATCH_SIZE` ; `bg_users.is_deleted` est indexé. La demande et
 la suppression prennent `lockTournamentRow` **en premier**, par id croissant,
-sur tous les tournois qu'elles touchent — inscriptions solo, tournois organisés
+sur tous les tournois qu'elles touchent — inscriptions solo **à un tournoi pas
+encore commencé** (depuis ACCOUNT-DELETION-3 ; un tournoi en cours ou terminé
+n'est plus verrouillé pour elles), tournois organisés
 (demande), matchs castés, liés ou arbitrés (`listCastTournamentIds`) — avant le
 compte, puis les équipes ; les fichiers des avatars en quarantaine sont relevés
 sous le verrou du compte, sans lecture de fichier (rien n'est haché, D6).
@@ -972,7 +979,10 @@ depuis la demande. Un doublon (course) retombe sur un tirage.
 - **Accueil et #live** : `withdrawUserCasts` rend `liveTournamentIds` (tournois
   dont un match touché n'est pas terminé) ; seuls ceux-là sont publiés avec
   `landingLive` — un arbitre ou un lien retiré d'un match joué ne vide plus le
-  cache de l'accueil ni ne redemande #live.
+  cache de l'accueil. Le message #live, lui, est **toujours** redemandé
+  (`publishMatchUpdatedEvent` → `scheduleLiveEveningRefresh`) : il pouvait
+  porter le lien d'un caster, qui part « matchs joués compris » (T04) — à
+  garder.
 - **Passage horaire** : un compte « dû » pour SQL mais que la finalisation
   laisse tel quel (horloge de Node, réactivation à l'instant) est écarté le
   temps d'un passage (90 minutes ; six heures pour un échec), au lieu d'occuper

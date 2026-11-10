@@ -106,6 +106,20 @@ function findButton(node: unknown): { props: Props } | null {
   return findButton(element.props?.children);
 }
 
+/** Le rôle ARIA posé quelque part dans l'arbre rendu (`alert`), sinon `null`. */
+function findRole(node: unknown): string | null {
+  if (!node || typeof node !== "object") return null;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findRole(child);
+      if (found) return found;
+    }
+    return null;
+  }
+  const props = (node as { props?: { role?: string; children?: unknown } }).props;
+  return props?.role ?? findRole(props?.children);
+}
+
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
@@ -248,6 +262,41 @@ describe("ReactivationPanel", () => {
     expect(showError).toHaveBeenCalledWith(FR_LOGIN_TEXT.t("reactivation.declineFailed"));
     expect(showInfo).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it("decline_pending_showsDecliningLabel", async () => {
+    let release = (_response: Response): void => undefined;
+    global.fetch = jest.fn(() => new Promise<Response>((resolve) => (release = resolve))) as typeof fetch;
+    const pending = findButtons(render(FUTURE))[1].props.onClick!();
+
+    expect(findButtons(render(FUTURE))[1].props.children).toBe(FR_LOGIN_TEXT.t("reactivation.declining"));
+
+    release(jsonResponse(200, { discarded: true }));
+    await pending;
+  });
+
+  it("expiredBlock_openedExpired_hasNoAlertRole", () => {
+    expect(findRole(render(null))).toBeNull();
+  });
+
+  it("expiredBlock_410UnderClick_hasAlertRole", async () => {
+    global.fetch = jest.fn(async () => jsonResponse(410, { error: "REACTIVATION_EXPIRED" })) as typeof fetch;
+    await findButton(render(FUTURE))!.props.onClick!();
+
+    expect(findRole(render(FUTURE))).toBe("alert");
+  });
+
+  it("reactivate_secondClickWhileInFlight_sendsNoSecondFetch", async () => {
+    let release = (_response: Response): void => undefined;
+    const fetchMock = jest.fn(() => new Promise<Response>((resolve) => (release = resolve)));
+    global.fetch = fetchMock as typeof fetch;
+    const first = findButton(render(FUTURE))!.props.onClick!();
+
+    await findButton(render(FUTURE))!.props.onClick!();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    release(jsonResponse(200, { reactivated: true, pseudoChanged: false }));
+    await first;
   });
 
   it("decline_requestHangsPastTimeout_abortsAndShowsDeclineFailed", async () => {

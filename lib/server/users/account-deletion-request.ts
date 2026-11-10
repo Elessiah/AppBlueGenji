@@ -383,7 +383,12 @@ async function afterDeletionRequest(userId: number, effects: DeletionRequestEffe
   try {
     await rotateHeldAvatarFile(userId, { detachPurge: !replay });
   } catch (error) {
-    console.error("[account-deletion] avatar mis de côté non renommé, encore servi à son ancienne adresse", error);
+    // Le code seul : le message d'une erreur de fichier porte son chemin
+    // (`<id du compte>-<aléa>.webp`), qui lierait la demande à un compte.
+    console.error(
+      "[account-deletion] avatar mis de côté non renommé, encore servi à son ancienne adresse",
+      (error as NodeJS.ErrnoException)?.code ?? "erreur sans code",
+    );
   }
   // L'entrée solo restée inscrite (jouée, tournoi en cours ou terminé) porte
   // désormais le pseudo d'emprunt : ses lecteurs gardaient le vrai.

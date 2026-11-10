@@ -419,6 +419,24 @@ describe("requestAccountDeletion — arbitrages retirés", () => {
     expect(jest.mocked(relaunchAfterRefereeWithdrawal).mock.calls[0]?.[1]).toEqual([]);
   });
 
+  it("requestAccountDeletion_request_dropsReactivationTickets", async () => {
+    const { queries } = fakeDb({});
+
+    await requestAccountDeletion(7);
+
+    const drop = queries.find((q) => q.sql.startsWith("DELETE FROM bg_account_reactivation_tickets"));
+    expect(drop?.sql).toBe("DELETE FROM bg_account_reactivation_tickets WHERE user_id = ?");
+    expect(drop?.params).toEqual([7]);
+  });
+
+  it("requestAccountDeletion_replay_awaitsAvatarPurge", async () => {
+    fakeDb({});
+
+    await requestAccountDeletion(7, { accountCreatedAt: "2025-01-01 10:00:00" });
+
+    expect(rotateHeldAvatarFile).toHaveBeenCalledWith(7, { detachPurge: false });
+  });
+
   it("requestAccountDeletion_replay_noRelaunchNorNotice", async () => {
     fakeDb({ refereedMatches: [4], castMatches: [5] });
 
@@ -815,14 +833,16 @@ describe("requestAccountDeletion — jeu de verrous, avatar mis de côté, rejeu
 
   it("requestAccountDeletion_avatarRotationFails_requestStillSucceedsAndSaysIt", async () => {
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
-    jest.mocked(rotateHeldAvatarFile).mockRejectedValue(new Error("EPERM"));
+    jest.mocked(rotateHeldAvatarFile).mockRejectedValue(
+      Object.assign(new Error("EPERM: rename public/uploads/avatars/7-abc.webp"), { code: "EPERM" }),
+    );
     fakeDb({});
 
     await expect(requestAccountDeletion(7)).resolves.toHaveProperty("finalAt");
 
     expect(log).toHaveBeenCalledWith(
       "[account-deletion] avatar mis de côté non renommé, encore servi à son ancienne adresse",
-      expect.any(Error),
+      "EPERM",
     );
     log.mockRestore();
   });

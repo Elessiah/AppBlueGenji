@@ -277,6 +277,17 @@ describe("rotateHeldAvatarFile", () => {
     expect(rmMock).toHaveBeenCalledWith(path.join(optimizedImageCacheDirectory(), "k1"), { recursive: true, force: true });
   });
 
+  it("rotateHeldAvatarFile_detachPurge_resolvesWithoutWaitingForThePurge", async () => {
+    mockHold(OLD_URL);
+    // Le balayage du cache de l'optimiseur ne répond jamais.
+    readdirMock.mockReturnValue(new Promise<string[]>(() => undefined));
+
+    const url = await rotateHeldAvatarFile(42, { detachPurge: true });
+
+    expect(url).toMatch(/^\/api\/uploads\/avatars\/42-[0-9a-f]{16}\.webp$/);
+    expect(readdirMock).toHaveBeenCalledWith(optimizedImageCacheDirectory());
+  });
+
   it("rotateHeldAvatarFile_noHold_touchesNothing", async () => {
     mockHold(undefined);
 

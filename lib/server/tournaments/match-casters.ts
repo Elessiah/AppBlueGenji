@@ -334,8 +334,9 @@ export type MatchWithdrawal = {
   tournamentIds: number[];
   /**
    * Parmi eux, ceux dont un match touché n'est **pas terminé** : seuls ceux-là
-   * peuvent changer l'accueil ou le message #live (`landingLive`) — un lien ou
-   * un arbitre retiré d'un match joué ne change que son instantané.
+   * peuvent changer l'accueil (`landingLive`) — un lien ou un arbitre retiré
+   * d'un match joué ne change que son instantané (et le message #live, que
+   * `publishMatchUpdatedEvent` redemande toujours).
    */
   liveTournamentIds: number[];
   /** Matchs non joués dont il était l'arbitre, retiré ici (lus sous verrou). */

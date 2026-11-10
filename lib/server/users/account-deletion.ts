@@ -574,7 +574,7 @@ async function deleteAccountNow(
   // prévenus après le commit.
   let touchedTournaments: number[] = [];
   // Parmi eux, ceux dont un match touché n'est pas terminé : seuls ceux-là
-  // peuvent changer l'accueil et le message #live.
+  // peuvent changer l'accueil (le message #live, lui, est toujours redemandé).
   let liveTournaments: ReadonlySet<number> = new Set();
   // Les tournois dont une inscription solo part avec le compte (D12) :
   // instantanés et aperçus à relire après le commit.
@@ -718,9 +718,9 @@ async function deleteAccountNow(
   // Les instantanés ouverts des matchs qu'il castait ou arbitrait montreraient
   // sinon son cast, le lien de sa chaîne ou « Arbitre désigné » jusqu'à la
   // prochaine écriture du match ; l'évènement remet aussi à jour le message
-  // #live de la soirée (`publishMatchUpdatedEvent`), qui portait ce lien — pour
-  // les seuls tournois dont un match touché n'est pas terminé : un arbitre ou
-  // un lien retiré d'un match joué ne change ni l'accueil ni #live.
+  // #live de la soirée (`publishMatchUpdatedEvent`), qui portait ce lien —
+  // toujours ; le cache de l'accueil, lui, n'est vidé que pour les tournois
+  // dont un match touché n'est pas terminé (`landingLive`).
   // La suppression est commitée : un écouteur qui lève ne doit ni la faire lire
   // comme un échec, ni sauter le ménage de l'avatar et la ligne du journal.
   for (const tournamentId of touchedTournaments) {
