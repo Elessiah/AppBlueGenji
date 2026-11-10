@@ -137,7 +137,7 @@ commité pendant l'attente est donc vu, et refusé. Tournoi d'abord, comme les
 gestes du staff qui écrivent des matchs sous ce verrou (avancée, inscription).
 Un interblocage reste possible avec un geste qui tient des matchs puis le
 tournoi ; défait, le réordonnancement **rejoue** sa transaction, jusqu'à trois
-fois (`REORDER_DEADLOCK_ATTEMPTS`), et refuse alors sur l'état qu'il relit. Le
+fois (`retryOnDeadlock`), et refuse alors sur l'état qu'il relit. Le
 refus d'un geste défait est lisible : `fail()` (`lib/server/http.ts`) reconnaît
 le message d'interblocage (`isDeadlockMessage`, `lib/server/mysql-errors.ts`)
 et le rend en **409 `CONCURRENT_UPDATE_RETRY`** (« rien n'a été enregistré,
