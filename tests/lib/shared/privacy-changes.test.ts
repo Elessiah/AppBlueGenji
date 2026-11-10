@@ -2631,11 +2631,11 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
     });
   });
 
-  it("privacyChanges_voiceWithoutCount_noErasedWithColumnClauseFrAndEn", () => {
+  it("privacyChanges_voiceWithoutCount_publishedEntryKeptVerbatimFrAndEn", () => {
+    // Entrée publiée (déployée le 2026-11-05) : immuable, la correction D15 vit dans une entrée nouvelle.
     const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-11-salons-vocaux-sans-comptage")!;
-    expect(entry.details.join(" ")).not.toContain("effacé avec sa colonne");
-    expect(PRIVACY_CHANGES_EN[entry.id].details.join(" ")).not.toContain("erased with its column");
-    expect(entry.details[0]).toContain("Le nombre de personnes présentes n'est plus demandé au bot. Les salons");
+    expect(entry.details.join(" ")).toContain("effacé avec sa colonne");
+    expect(PRIVACY_CHANGES_EN[entry.id].details.join(" ")).toContain("erased with its column");
   });
 
   it("rgpdPages_voiceParagraph_clearRescheduleAndRetryFrAndEn", () => {
