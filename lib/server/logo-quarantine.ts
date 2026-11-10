@@ -852,21 +852,10 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
       // autre l'a remplacée) : l'issue est écrite quand même (D23), sous le
       // verrou de la ligne — une purge qui l'attend la voit, et n'en bloque pas
       // l'empreinte.
-      // Une seule fois : un second clic ne réécrit ni ne réannonce rien.
-      const [noted] = await connection.execute<ResultSetHeader>(
-        `UPDATE bg_logo_quarantines SET contest_outcome = 'OVERTURNED'
-          WHERE id = ? AND (contest_outcome IS NULL OR contest_outcome <> 'OVERTURNED')`,
-        [quarantineId],
-      );
-      await connection.commit();
-      if (Number(noted.affectedRows) > 0) overturnedRow = row;
+      if (await commitRefusedRestoreOutcome(connection, quarantineId)) overturnedRow = row;
       throw new Error(isTeam ? "TEAM_HAS_NEW_LOGO" : "USER_HAS_NEW_AVATAR");
     }
-    const located = isTeam
-      ? logoFileLocations(row.logo_url, targetId)
-      : avatarFileLocations(row.logo_url, targetId);
-    if (!located) throw new Error(isTeam ? "LOGO_NOT_MOVABLE" : "AVATAR_NOT_MOVABLE");
-    files = located;
+    files = restorableFileLocations(row.logo_url, isTeam, targetId);
 
     // Déplacé **avant** le commit, sous les verrous : un échec de disque laisse
     // la quarantaine intacte, sans une base qui annoncerait une image absente.
@@ -890,19 +879,48 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
     await rollbackQuietly(connection);
     // Journalisée comme par `recordContestOutcome` — sans jamais remplacer le
     // refus d'origine, que la route traduit.
-    if (overturnedRow) {
-      try {
-        announceContestOutcome(overturnedRow, "OVERTURNED", actor);
-      } catch (announceError) {
-        console.error("[moderation] issue de la contestation non journalisée", announceError);
-      }
-    }
+    if (overturnedRow) announceRefusedRestoreOutcome(overturnedRow, actor);
     throw error;
   } finally {
     connection.release();
   }
 
   await announceImageRestored(row, actor);
+}
+
+/** Les deux emplacements du fichier à rétablir ; `*_NOT_MOVABLE` hors des dossiers attendus. */
+function restorableFileLocations(
+  url: string,
+  isTeam: boolean,
+  targetId: number,
+): { live: string; quarantined: string } {
+  const located = isTeam ? logoFileLocations(url, targetId) : avatarFileLocations(url, targetId);
+  if (!located) throw new Error(isTeam ? "LOGO_NOT_MOVABLE" : "AVATAR_NOT_MOVABLE");
+  return located;
+}
+
+/**
+ * Rétablissement refusé, une autre image ayant pris la place (D23) : écrit
+ * « acceptée » sous le verrou de la ligne et commite. Une seule fois — rend
+ * `false` si l'issue l'était déjà (second clic : rien à réannoncer).
+ */
+async function commitRefusedRestoreOutcome(connection: PoolConnection, quarantineId: number): Promise<boolean> {
+  const [noted] = await connection.execute<ResultSetHeader>(
+    `UPDATE bg_logo_quarantines SET contest_outcome = 'OVERTURNED'
+      WHERE id = ? AND (contest_outcome IS NULL OR contest_outcome <> 'OVERTURNED')`,
+    [quarantineId],
+  );
+  await connection.commit();
+  return Number(noted.affectedRows) > 0;
+}
+
+/** Journal du staff pour D23, sans jamais remplacer le refus d'origine. */
+function announceRefusedRestoreOutcome(row: QuarantineRow, actor: ReportPerson): void {
+  try {
+    announceContestOutcome(row, "OVERTURNED", actor);
+  } catch (error) {
+    console.error("[moderation] issue de la contestation non journalisée", error);
+  }
 }
 
 /** Annule la transaction sans masquer l'erreur d'origine (un rollback qui lève est tu). */
