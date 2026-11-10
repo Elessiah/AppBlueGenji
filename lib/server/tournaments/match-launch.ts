@@ -297,7 +297,7 @@ async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchR
 
 /**
  * Un caster retiré d'office qui avait posé le mode d'antenne n'en est plus le
- * propriétaire : le mode reste au match et revient au staff
+ * propriétaire : le mode reste au match, sans maître
  * (`lib/shared/live-trigger-owner.ts`), comme au départ volontaire
  * (`releaseMatchCast`). Sans quoi le staff et les co-casters resteraient
  * refusés (`LIVE_TRIGGER_NOT_OWNED`) au nom d'un caster parti.
@@ -1066,7 +1066,7 @@ export async function releaseMatchCast(
         }
       }
       // Le caster qui avait posé le mode s'en va, le mode reste (d'autres
-      // streams tiennent) : il n'a plus de propriétaire et revient au staff
+      // streams tiennent) : il n'a plus de propriétaire et reste sans maître
       // (`lib/shared/live-trigger-owner.ts`).
       if (!unmarked && Number(row.live_trigger_user_id ?? 0) === casterId) {
         await connection.execute(`UPDATE bg_matches SET live_trigger_user_id = NULL WHERE id = ?`, [matchId]);

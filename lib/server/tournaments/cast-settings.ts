@@ -22,12 +22,12 @@ import {
   requiresMatchStartAt,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
-import { liveTriggerOwnerAfter, mayChangeLiveTrigger, mayUnmarkLiveTrigger } from "@/lib/shared/live-trigger-owner";
+import { liveTriggerOwnerAfter, mayChangeLiveTrigger, mayUnmarkLiveTrigger, organisationModeLocked } from "@/lib/shared/live-trigger-owner";
 import { castBeforeLaunch } from "@/lib/shared/match-launch";
 import type { TournamentGame } from "@/lib/shared/types";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { loadShownCasterIds } from "./cast-eligibility";
-import { hasStaffLink, lockMatchStreams, pruneMatchStreams, streamLinkHolder, type MatchStreamRow } from "./match-casters";
+import { hasOrganisationLink, lockMatchStreams, pruneMatchStreams, streamLinkHolder, type MatchStreamRow } from "./match-casters";
 // Type seul : aucune dépendance d'exécution vers le lancement, qui importe ce
 // module (le verrou de la ligne du match et la transaction y vivent).
 import type { LaunchMatchRow } from "./match-launch";
@@ -139,9 +139,11 @@ export async function applyCastTrigger(
   // comme sur la route du staff (`setMatchLiveConfig`).
   // Démarquer : son maître, l'arbitre ou le staff seulement (`mayUnmarkLiveTrigger`).
   const owns = mayChangeLiveTrigger(hold, actor, shown.has(userId)) && (trigger !== null || mayUnmarkLiveTrigger(hold, actor));
-  // Le mode du staff qui porte le lien de l'organisation n'est pas à un porteur
-  // de la seule `live` (décision 1 du 2026-11-09, `assertStaffModeKept`).
-  const staffMode = owns && !access.manages && hold.ownerId !== userId && (await hasStaffLink(connection, matchId));
+  // Le mode d'un match qui porte le vrai lien de l'organisation n'est pas à un
+  // caster (`organisationModeLocked`, décision du 2026-11-10) : la règle jugée
+  // d'abord sans lecture, le lien lu seulement quand il déciderait.
+  const staffMode =
+    owns && organisationModeLocked(hold, actor, true) && (await hasOrganisationLink(connection, matchId));
   if ((!owns || staffMode) && skip) return false;
   // Un match qui ne se caste plus le dit d'abord : le refus de propriété
   // tairait la vraie raison.

@@ -662,6 +662,13 @@ export type BracketMatch = {
    */
   liveTriggerCasterId?: number | null;
   /**
+   * Le match porte-t-il le vrai lien de l'organisation (posé dans « Diffusion
+   * officielle », case « lien de l'organisation » cochée) ? Alors un caster
+   * qui n'en est pas le maître ne change pas son mode d'antenne
+   * (`organisationModeLocked`). Absent = non.
+   */
+  officialBroadcastLink?: boolean;
+  /**
    * **Premier** lien de diffusion du match (le stream le plus ancien qui en a
    * un) — celui des vues compactes ; `null` = casté sans lien public. Tous les
    * liens sont dans `streams`.

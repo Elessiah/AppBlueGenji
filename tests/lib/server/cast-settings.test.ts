@@ -251,6 +251,18 @@ describe("applyCastTrigger — inscription et maître tu", () => {
     expect(execute).toHaveBeenCalledTimes(2);
   });
 
+  it("applyCastTrigger_firstModeWithOrganisationLink_writesWithoutLinkRead", async () => {
+    // Décision du 2026-11-10 : avant tout mode, le lien de l'organisation ne ferme rien (il n'est même pas lu).
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(13)).mockResolvedValue([{ affectedRows: 1 }, []]);
+    const row = { ...ownedRow(), live_trigger: null, live_trigger_user_id: null } as LaunchMatchRow;
+
+    await expect(applyCastTrigger(fakeConnection({ execute }), row, "AUTO", 13)).resolves.toBe(true);
+
+    const sqls = execute.mock.calls.map(([sql]) => String(sql));
+    expect(sqls.some((sql) => sql.startsWith("SELECT 1 FROM bg_match_streams"))).toBe(false);
+    expect(row.live_trigger_user_id).toBe(13);
+  });
+
   it("applyCastTrigger_liveOnlyShownOnStaffModeWithLinkAndSkip_returnsFalse", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(13)).mockResolvedValueOnce([[{ 1: 1 }], []]);
     const row = { ...ownedRow(), live_trigger: "AUTO", live_trigger_user_id: null } as LaunchMatchRow;

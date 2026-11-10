@@ -387,6 +387,8 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
     startAt: toIso(row.start_at ?? null),
     liveTrigger: row.live_trigger ?? null,
     ...liveTriggerOwnerFields(row, extras.casters ?? [], game),
+    // La même lecture que le serveur (`hasOrganisationLink`) : lien posé, case cochée.
+    officialBroadcastLink: (extras.streams ?? []).some((stream) => stream.organisation === true && stream.liveUrl !== null),
     liveUrl: normalizeStreamUrl(firstStreamUrl(shown)),
     // Revalidés à la lecture, comme le premier lien.
     streams: shown
@@ -456,7 +458,7 @@ export function attachMatchMaps(
  * Le caster maître du mode d'antenne, s'il caste encore le match et y est
  * montré (`casters`) : son identifiant y est déjà public. Un maître que
  * l'instantané tait (caster tu, devenu inéligible) ou parti n'en est plus un
- * — le serveur juge de même (`loadShownCasterIds`) : le mode revient au staff,
+ * — le serveur juge de même (`loadShownCasterIds`) : le mode reste sans maître,
  * et redevient le sien dès qu'il est montré de nouveau.
  */
 function liveTriggerOwnerFields(

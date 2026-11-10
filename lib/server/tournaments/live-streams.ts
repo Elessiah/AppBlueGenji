@@ -29,6 +29,7 @@ import {
   liveTriggerOwnerAfter,
   mayChangeLiveTrigger,
   mayUnmarkLiveTrigger,
+  organisationModeLocked,
   type LiveTriggerActor,
   type LiveTriggerHold,
 } from "@/lib/shared/live-trigger-owner";
@@ -37,7 +38,7 @@ import type { MatchStatus, TournamentGame } from "@/lib/shared/types";
 import { loadRefereeStanding, loadShownCasterIds } from "./cast-eligibility";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { playsMatchSql } from "./match-players";
-import { hasStaffLink, lockMatchStreams, pruneMatchStreams, staffStream, streamLinkHolder, type MatchStreamRow } from "./match-casters";
+import { hasOrganisationLink, lockMatchStreams, pruneMatchStreams, staffStream, streamLinkHolder, type MatchStreamRow } from "./match-casters";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
 import { invalidateSpectatorSnapshot } from "./snapshot";
 
@@ -328,7 +329,7 @@ export async function setMatchLiveConfig(
         if (triggerChanges) {
           // Posé par un caster montré du match, le mode est le sien ; par le
           // staff, l'arbitre ou un admin qui ne le caste pas (ou un caster tu),
-          // il garde son maître montré, ou reste au staff.
+          // il garde son maître montré, ou reste sans maître.
           await assertStaffModeKept(connection, matchId, hold, actor);
           await writeLiveTrigger(connection, matchId, trigger, liveTriggerOwnerAfter(trigger, actor, actorShown, hold.ownerId));
         }
@@ -371,8 +372,9 @@ async function unmarkLive(
   actor: LiveTriggerActor,
   known: MatchStreamRow[] | undefined,
 ): Promise<MatchStreamRow[] | undefined> {
+  // Hors staff, seul le maître démarque (`mayUnmarkLiveTrigger`) : le lien de
+  // l'organisation ne ferme pas son mode (`organisationModeLocked`).
   if (!mayUnmarkLiveTrigger(hold, actor)) throw new Error("LIVE_TRIGGER_NOT_OWNED");
-  await assertStaffModeKept(connection, matchId, hold, actor);
   const staffSide = actor.manages || isMatchRefereeActor(hold, actor);
   await connection.execute(
     `UPDATE bg_matches SET live_trigger = NULL, live_trigger_user_id = NULL, live_started_at = NULL WHERE id = ?`,
@@ -387,9 +389,11 @@ async function unmarkLive(
 }
 
 /**
- * Le mode du staff qui porte le lien de l'organisation n'est pas celui d'un
- * porteur de la seule `live` (décision 1 du 2026-11-09) : il ne le change ni ne
- * le retire — sans quoi, devenu maître en le changeant, il le démarquerait.
+ * Le mode d'un match qui porte le vrai lien de l'organisation (« Diffusion
+ * officielle ») n'est pas à un caster qui n'en est pas le maître : il ne le
+ * change ni n'en bascule l'antenne — sans quoi, devenu maître en le changeant,
+ * il le démarquerait (`organisationModeLocked`, décision du 2026-11-10). La
+ * règle se juge d'abord sans lecture ; le lien n'est lu que s'il décide.
  *
  * @throws `STAFF_STREAM_FORBIDDEN`
  */
@@ -399,8 +403,7 @@ async function assertStaffModeKept(
   hold: LiveTriggerHold,
   actor: LiveTriggerActor,
 ): Promise<void> {
-  const staffSide = actor.manages || isMatchRefereeActor(hold, actor);
-  if (!staffSide && hold.ownerId !== actor.userId && (await hasStaffLink(connection, matchId))) {
+  if (organisationModeLocked(hold, actor, true) && (await hasOrganisationLink(connection, matchId))) {
     throw new Error("STAFF_STREAM_FORBIDDEN");
   }
 }

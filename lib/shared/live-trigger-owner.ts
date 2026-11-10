@@ -10,7 +10,7 @@
  * (`castOverseer`) le changent ou le retirent. Un mode posé par le staff — ou dont le caster qui l'avait posé
  * s'est retiré — n'a pas de propriétaire : ce staff et l'arbitre le changent,
  * et un caster montré du match aussi (sauf quand le match porte le lien de
- * l'organisation, `STAFF_STREAM_FORBIDDEN`), qui en devient alors le maître
+ * l'organisation, `organisationModeLocked`), qui en devient alors le maître
  * (décision du 2026-11-05). Seul un caster du match devient propriétaire du
  * mode qu'il pose : posé par qui ne le caste pas (staff, arbitre), le
  * mode reste sans maître. Un porteur de la seule `live` ne règle que **son**
@@ -67,13 +67,13 @@ export function isMatchRefereeActor(hold: Pick<LiveTriggerHold, "refereeId">, ac
  * - mode d'un caster : lui seul ;
  * - pas encore de mode, ou mode sans propriétaire (posé par le staff, caster
  *   parti) : les casters montrés du match — jamais un porteur de la seule
- *   `live` qui ne le caste pas. (`manages` seul n'atteint pas cette règle au
- *   serveur : les routes exigent `live` ou l'arbitrage, `assertLiveActor`.)
+ *   `live` qui ne le caste pas, ni la seule permission `tournaments` hors
+ *   arbitrage (les routes exigent `live` ou l'arbitrage, `assertLiveActor`).
  */
 export function mayChangeLiveTrigger(hold: LiveTriggerHold, actor: LiveTriggerActor, actorCasts = false): boolean {
   if (actor.oversees || isMatchRefereeActor(hold, actor)) return true;
   if (hold.ownerId !== null) return hold.ownerId === actor.userId;
-  return actor.manages || actorCasts;
+  return actorCasts;
 }
 
 /**
@@ -85,6 +85,28 @@ export function mayChangeLiveTrigger(hold: LiveTriggerHold, actor: LiveTriggerAc
 export function mayUnmarkLiveTrigger(hold: LiveTriggerHold, actor: LiveTriggerActor): boolean {
   if (actor.oversees || isMatchRefereeActor(hold, actor)) return true;
   return hold.ownerId !== null && hold.ownerId === actor.userId;
+}
+
+/**
+ * Le mode d'antenne est-il fermé à cet acteur parce que le match porte le
+ * **vrai** lien de l'organisation — celui que le staff a posé dans « Diffusion
+ * officielle », case « lien de l'organisation » cochée (décision du 2026-11-10) ?
+ * Alors seuls ce staff (`tournaments`, dont l'arbitre désigné) et le maître
+ * du mode le changent, en ouvrent ou coupent l'antenne ; un caster ne le
+ * prend pas (`STAFF_STREAM_FORBIDDEN`). Ne ferment **pas** le mode : la chaîne
+ * qu'un membre du staff a posée comme la sienne (case décochée), le lien
+ * d'un stream de caster, même ancien et sans auteur connu, ni un match encore
+ * sans mode (le premier mode posé par un caster est le sien).
+ *
+ * `organisationLink` : le serveur le lit sous le verrou du match
+ * (`hasOrganisationLink`), l'interface sur l'instantané
+ * (`BracketMatch.officialBroadcastLink`) — la même règle des deux côtés.
+ */
+export function organisationModeLocked(hold: LiveTriggerHold, actor: LiveTriggerActor, organisationLink: boolean): boolean {
+  if (!organisationLink || hold.trigger === null) return false;
+  // `manages` couvre l'arbitre désigné (`isMatchRefereeActor` l'exige).
+  if (actor.manages) return false;
+  return hold.ownerId !== actor.userId;
 }
 
 /** Ce que l'interface sait du lecteur pour la même règle (`liveTriggerViewer`). */
@@ -125,7 +147,8 @@ export function viewerMayChangeLiveTrigger(
     liveTrigger: MatchLiveTrigger | null;
     liveTriggerCasterId?: number | null;
     casters: readonly { userId: number }[];
-    streams?: readonly { liveUrl: string | null; staff: boolean }[];
+    /** `BracketMatch.officialBroadcastLink` : le match porte le lien de « Diffusion officielle ». */
+    officialBroadcastLink?: boolean;
   },
   viewer: LiveTriggerViewer,
   /** Le lecteur caste-t-il le match ? Par défaut : nommé parmi ses casters ; vrai à l'inscription. */
@@ -133,18 +156,15 @@ export function viewerMayChangeLiveTrigger(
 ): boolean {
   if (viewer.userId === null) return false;
   const userId = viewer.userId;
-  // Le mode du staff qui porte le lien de l'organisation n'est pas à la seule
-  // `live` (`STAFF_STREAM_FORBIDDEN` au serveur, décision 1 du 2026-11-09).
-  if (staffModeLockedFor(match, viewer, userId)) return false;
-  return mayChangeLiveTrigger(
-    {
-      trigger: match.liveTrigger,
-      ownerId: match.liveTriggerCasterId ?? null,
-      refereeId: viewer.referees ? viewer.userId : null,
-    },
-    { userId, oversees: viewer.oversees, manages: viewer.manages },
-    viewerCasts ?? match.casters.some((caster) => caster.userId === userId),
-  );
+  const hold: LiveTriggerHold = {
+    trigger: match.liveTrigger,
+    ownerId: match.liveTriggerCasterId ?? null,
+    refereeId: viewer.referees ? viewer.userId : null,
+  };
+  const actor: LiveTriggerActor = { userId, oversees: viewer.oversees, manages: viewer.manages };
+  // La règle du serveur (`STAFF_STREAM_FORBIDDEN`, décision du 2026-11-10).
+  if (organisationModeLocked(hold, actor, match.officialBroadcastLink ?? false)) return false;
+  return mayChangeLiveTrigger(hold, actor, viewerCasts ?? match.casters.some((caster) => caster.userId === userId));
 }
 
 /**
@@ -162,17 +182,6 @@ export function viewerMayUnmarkLiveTrigger(
     { userId: viewer.userId, oversees: viewer.oversees, manages: viewer.manages },
   );
 }
-
-/** Le stream de l'organisation porte un lien que ce lecteur (ni staff, ni arbitre, ni maître) ne touche pas. */
-function staffModeLockedFor(
-  match: { liveTriggerCasterId?: number | null; streams?: readonly { liveUrl: string | null; staff: boolean }[] },
-  viewer: LiveTriggerViewer,
-  userId: number,
-): boolean {
-  if (viewer.manages || viewer.referees || (match.liveTriggerCasterId ?? null) === userId) return false;
-  return (match.streams ?? []).some((stream) => stream.staff && stream.liveUrl !== null);
-}
-
 
 /**
  * Le propriétaire à écrire quand `actor` pose `next` (`null` quand le match

@@ -676,8 +676,8 @@ describe("Mode d'antenne verrouillé — qui peut le changer", () => {
     expect(frDialogs.live).not.toHaveProperty("triggerLockedHint");
     expect(enDialogs.live).not.toHaveProperty("triggerLockedHint");
     // Aussi le refus d'un caster qui retire un mode sans maître : il le change, mais ne le retire pas.
-    expect(frErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("les casters du match le changent aussi quand aucun caster ne le tient, sans pouvoir le retirer");
-    expect(enErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("the match's casters can also change it when no caster holds it, but not clear it");
+    expect(frErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("les casters du match le changent aussi quand aucun caster ne le tient (sauf si le match porte le lien de l'organisation), sans pouvoir le retirer");
+    expect(enErrors.codes.LIVE_TRIGGER_NOT_OWNED).toContain("the match's casters can also change it when no caster holds it (unless the match carries the organisation's link), but not clear it");
   });
 });
 

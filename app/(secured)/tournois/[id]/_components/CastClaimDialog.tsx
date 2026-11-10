@@ -70,7 +70,7 @@ export function CastClaimDialog({
 }: Readonly<{
   match: Pick<
     BracketMatch,
-    "id" | "status" | "refereeKey" | "streams" | "casters" | "startAt" | "liveTrigger" | "liveTriggerCasterId"
+    "id" | "status" | "refereeKey" | "streams" | "casters" | "startAt" | "liveTrigger" | "liveTriggerCasterId" | "officialBroadcastLink"
   >;
   matchLabel: string;
   onClose: () => void;

@@ -505,6 +505,8 @@ const MATCH_FIELDS = {
   liveTriggerCasterId: "retiré",
   // Dirait qu'un caster a été tu : retiré sans compte.
   liveUrl: "public",
+  // Un booléen sur le lien de l'organisation : aucun compte (décision du 2026-11-10).
+  officialBroadcastLink: "public",
   streams: "public",
   lobbyOpenedAt: "public",
   loserTeamId: "public",

@@ -180,17 +180,24 @@ unique, pure, `lib/shared/live-trigger-owner.ts` (`mayChangeLiveTrigger`,
 `live` pour porte, mais il n'y règle que **son** cast : sans caster le match
 (en caster montré), tout réglage est refusé (`NOT_MATCH_CASTER`, 403) ; le
 lien du stream du staff ne lui est pas ouvert (`STAFF_STREAM_FORBIDDEN`, 403 —
-son lien se règle dans « Configurer ma diffusion »). Il ne change ni ne démarque
-le mode du staff tant que le stream de l'organisation porte un lien
-(`STAFF_STREAM_FORBIDDEN`, sur les deux routes ; le champ du lien du staff lui
-est en lecture seule), et son démarquage n'efface **jamais** le lien de
+son lien se règle dans « Configurer ma diffusion »). Il ne change pas un mode
+dont il n'est pas le maître tant que le match porte le **vrai** lien de
+l'organisation — le stream du staff dont le lien a été posé dans « Diffusion
+officielle », case « lien de l'organisation » cochée (`link_user_id` nul) —
+(`STAFF_STREAM_FORBIDDEN`, sur les deux routes ; une seule règle,
+`organisationModeLocked`, lue au serveur par `hasOrganisationLink` et à
+l'interface par `BracketMatch.officialBroadcastLink` ; décision du 2026-11-10). Ne
+ferment pas le mode : la chaîne qu'un membre du staff y a posée comme la sienne
+(case décochée), le lien d'un stream de caster (même ancien, dit de
+l'organisation), ni un match encore sans mode — le premier mode qu'un caster
+pose est le sien. Le champ du lien du staff lui est en lecture seule, et son démarquage n'efface **jamais** le lien de
 l'organisation (seul le staff le fait, décision 1 du 2026-11-09). Un lien dit
 de l'organisation ne se remplace que par le staff (`CAST_STREAM_NOT_OWNED`). Un mode sans maître (posé par
 le staff, ou dont le maître n'est plus montré) ne se démarque que par l'arbitre
 du match ou le staff `tournaments` + `live` (`mayUnmarkLiveTrigger`,
 `LIVE_TRIGGER_NOT_OWNED`, décision du 2026-11-09 ; la case « casté » lui est
-désactivée), et l'antenne du mode du staff au lien de l'organisation ne se
-bascule pas non plus par lui (`STAFF_STREAM_FORBIDDEN`). Un caster tu ne règle
+désactivée), et l'antenne d'un mode sans maître sur un match au lien de
+l'organisation ne se bascule pas non plus par lui (`STAFF_STREAM_FORBIDDEN`). Un caster tu ne règle
 plus le lien (`NOT_MATCH_CASTER`). Le stream d'un caster dont le
 lien est dit de l'organisation part avec son dernier caster (décision du
 2026-11-05, voulu). Retirer un autre caster
@@ -226,7 +233,8 @@ match) : un co-caster ne la bascule pas pour le mode d'un autre (403
 `LIVE_TRIGGER_NOT_OWNED`), et le bouton lui est caché. Sur un mode **sans maître**
 (caster parti, mode d'avant la règle), tout caster montré du match ouvre et
 coupe l'antenne (la règle du mode : `mayChangeLiveTrigger`, `viewerMayChangeLiveTrigger`) : le match ne reste
-pas hors antenne en attendant le staff ; ils changent aussi ce mode, sauf quand le match porte le lien de l'organisation. Une inscription dont le
+pas hors antenne en attendant le staff ; ils changent aussi ce mode — sauf, pour l'un comme pour l'autre, quand le match
+porte le vrai lien de l'organisation (`organisationModeLocked`, 403 `STAFF_STREAM_FORBIDDEN`, bouton caché). Une inscription dont le
 mode a été posé entre-temps par un autre n'est pas refusée : le mode reste
 tel quel et la notification le dit (`triggerSkipped`,
 `cardActions.castingTriggerKept`, FR/EN). Le propriétaire est effacé

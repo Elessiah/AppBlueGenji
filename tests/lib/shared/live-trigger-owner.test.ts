@@ -7,6 +7,7 @@ import {
   liveTriggerOwnerAfter,
   liveTriggerViewer,
   mayChangeLiveTrigger,
+  organisationModeLocked,
   viewerMayChangeLiveTrigger,
 } from "@/lib/shared/live-trigger-owner";
 
@@ -63,8 +64,9 @@ describe("mayChangeLiveTrigger", () => {
     expect(mayChangeLiveTrigger({ trigger: null, ownerId: null, refereeId: null }, { userId: 13, ...LIVE_ONLY }, false)).toBe(false);
   });
 
-  it("mayChangeLiveTrigger_noTriggerStaffNotCasting_allowed", () => {
-    expect(mayChangeLiveTrigger({ trigger: null, ownerId: null, refereeId: null }, { userId: 5, ...STAFF })).toBe(true);
+  it("mayChangeLiveTrigger_noTriggerTournamentsOnlyNotCasting_refused", () => {
+    // La seule permission `tournaments`, hors arbitrage, n'atteint pas le mode (`assertLiveActor` au serveur).
+    expect(mayChangeLiveTrigger({ trigger: null, ownerId: null, refereeId: null }, { userId: 5, ...STAFF })).toBe(false);
   });
 
   it("mayChangeLiveTrigger_ownerlessTriggerShownCaster_allowed", () => {
@@ -97,8 +99,12 @@ describe("mayChangeLiveTrigger", () => {
     expect(mayChangeLiveTrigger(ownedByCaster12, { userId: 5, ...STAFF })).toBe(false);
   });
 
-  it("mayChangeLiveTrigger_ownerlessTriggerByStaff_allowed", () => {
-    expect(mayChangeLiveTrigger({ trigger: "AUTO", ownerId: null, refereeId: null }, { userId: 5, ...STAFF })).toBe(true);
+  it("mayChangeLiveTrigger_ownerlessTriggerByOverseer_allowed", () => {
+    expect(mayChangeLiveTrigger({ trigger: "AUTO", ownerId: null, refereeId: null }, { userId: 5, oversees: true, manages: true })).toBe(true);
+  });
+
+  it("mayChangeLiveTrigger_ownerlessTriggerByTournamentsOnly_refused", () => {
+    expect(mayChangeLiveTrigger({ trigger: "AUTO", ownerId: null, refereeId: null }, { userId: 5, ...STAFF })).toBe(false);
   });
 
   it("mayChangeLiveTrigger_ownerlessTriggerByLiveOnly_refused", () => {
@@ -163,7 +169,8 @@ describe("viewerMayChangeLiveTrigger", () => {
     // Un maître tu ou parti n'est pas nommé : le mode revient au staff, comme au serveur.
     const unnamed = { liveTrigger: "MANUAL" as const, liveTriggerCasterId: null, casters: [] };
 
-    expect(viewerMayChangeLiveTrigger(unnamed, { userId: 9, oversees: false, manages: true, referees: false })).toBe(true);
+    expect(viewerMayChangeLiveTrigger(unnamed, { userId: 9, oversees: true, manages: true, referees: false })).toBe(true);
+    expect(viewerMayChangeLiveTrigger(unnamed, { userId: 9, oversees: false, manages: true, referees: true })).toBe(true);
     expect(viewerMayChangeLiveTrigger(unnamed, { userId: 13, oversees: false, manages: false, referees: false })).toBe(false);
   });
 
@@ -255,18 +262,46 @@ describe("mayUnmarkLiveTrigger — démarquer (décision du 2026-11-09)", () => 
   });
 });
 
-describe("viewerMayChangeLiveTrigger — mode du staff au lien de l'organisation", () => {
+describe("organisationModeLocked — décision du 2026-11-10", () => {
+  const ownerless = { trigger: "AUTO" as const, ownerId: null, refereeId: null };
+  const caster13 = { userId: 13, ...LIVE_ONLY };
+
+  it("organisationModeLocked_noOrganisationLink_false", () => {
+    expect(organisationModeLocked(ownerless, caster13, false)).toBe(false);
+  });
+
+  it("organisationModeLocked_noModeYet_false", () => {
+    expect(organisationModeLocked({ ...ownerless, trigger: null }, caster13, true)).toBe(false);
+  });
+
+  it("organisationModeLocked_staffActor_false", () => {
+    expect(organisationModeLocked(ownerless, { userId: 5, ...STAFF }, true)).toBe(false);
+  });
+
+  it("organisationModeLocked_ownerActor_false", () => {
+    expect(organisationModeLocked({ ...ownerless, ownerId: 13 }, caster13, true)).toBe(false);
+  });
+
+  it("organisationModeLocked_casterOnOwnerlessModeWithOrganisationLink_true", () => {
+    expect(organisationModeLocked(ownerless, caster13, true)).toBe(true);
+  });
+});
+
+describe("viewerMayChangeLiveTrigger — lien de l'organisation", () => {
   const viewer13 = { userId: 13, oversees: false, manages: false, referees: false };
   const ownerless = { liveTrigger: "AUTO" as const, liveTriggerCasterId: null, casters: [{ userId: 13 }] };
 
-  it("viewerMayChangeLiveTrigger_liveOnlyShownWithStaffLink_false", () => {
-    const match = { ...ownerless, streams: [{ liveUrl: "https://twitch.tv/orga", staff: true }] };
-    expect(viewerMayChangeLiveTrigger(match, viewer13)).toBe(false);
+  it("viewerMayChangeLiveTrigger_casterWithOrganisationLink_false", () => {
+    expect(viewerMayChangeLiveTrigger({ ...ownerless, officialBroadcastLink: true }, viewer13)).toBe(false);
   });
 
-  it("viewerMayChangeLiveTrigger_liveOnlyShownWithoutStaffLink_true", () => {
-    const match = { ...ownerless, streams: [{ liveUrl: null, staff: true }] };
-    expect(viewerMayChangeLiveTrigger(match, viewer13)).toBe(true);
+  it("viewerMayChangeLiveTrigger_casterWithoutOrganisationLink_true", () => {
+    // La chaîne d'un membre du staff (case décochée) ne ferme pas le mode.
+    expect(viewerMayChangeLiveTrigger({ ...ownerless, officialBroadcastLink: false }, viewer13)).toBe(true);
+  });
+
+  it("viewerMayChangeLiveTrigger_noModeWithOrganisationLink_true", () => {
+    expect(viewerMayChangeLiveTrigger({ ...ownerless, liveTrigger: null, officialBroadcastLink: true }, viewer13)).toBe(true);
   });
 });
 
