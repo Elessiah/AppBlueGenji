@@ -1,14 +1,12 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { deleteStoredImage } from "@/lib/server/image-upload";
-import { notifyUserAvatarRemoved } from "@/lib/server/logo-quarantine";
+import { notifyUserAvatarRemoved, removeModeratedAvatarFile } from "@/lib/server/logo-quarantine";
 import { readJsonBody } from "@/lib/server/request-body";
 import { validateModerationReasonBody } from "@/lib/shared/logo-quarantine";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { removeUserAvatarAsModerator } from "@/lib/server/users/avatar";
 import { ANONYMOUS_PLAYER_LABEL } from "@/lib/shared/log-privacy";
 import { can } from "@/lib/shared/permissions";
-import { toDiskUploadPath } from "@/lib/shared/uploads";
 
 /**
  * Retire l'avatar d'un joueur, pour la modération (permission `moderation`) —
@@ -40,12 +38,10 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
 
   try {
     const { removedAvatarUrl } = await removeUserAvatarAsModerator(userId);
-    await deleteStoredImage(toDiskUploadPath(removedAvatarUrl)).catch((error) => {
-      // La ligne ne désigne plus le fichier : il n'est plus servi par le site.
-      // Un disque récalcitrant laisse un résidu, que l'on signale sans défaire
-      // un retrait déjà effectif.
-      console.error("[moderation] fichier de l'avatar non effacé", error);
-    });
+    // Supprimé par la modération : empreinte bloquée avant que le fichier ne
+    // parte (décision D6) ; un résidu sur le disque se consigne sans défaire
+    // un retrait déjà effectif (la ligne ne désigne plus le fichier).
+    await removeModeratedAvatarFile(removedAvatarUrl);
     // Jamais le pseudo du joueur sur Discord (lib/shared/log-privacy.ts) : ce
     // canal est un tiers hébergé hors de l'Union européenne, purgé au bout d'un an.
     publishStaffAction(`🧹 Avatar d'${ANONYMOUS_PLAYER_LABEL} retiré par le staff (modération).`, {

@@ -6,7 +6,8 @@ jest.mock("@/lib/server/image-upload");
 
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
-import { deleteUnreferencedUpload, isUploadReferenced } from "@/lib/server/stored-upload-cleanup";
+import path from "node:path";
+import { deleteUnreferencedUpload, isUploadReferenced, storedUploadAbsolutePath } from "@/lib/server/stored-upload-cleanup";
 
 /**
  * Remplacer ou supprimer une image effaçait l'ancienne adresse sans regarder ni
@@ -22,6 +23,30 @@ function mockDb(referencedBy: RegExp | null = null) {
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
 }
+
+// Revue sécurité #571, cycle 4 : une seule règle pour le fichier d'une image supprimée.
+describe("storedUploadAbsolutePath", () => {
+  it("storedUploadAbsolutePath_avatarUpload_returnsPublicFile", () => {
+    expect(storedUploadAbsolutePath("/api/uploads/avatars/9-abc.webp", "avatars")).toBe(
+      path.join(process.cwd(), "public", "uploads", "avatars", "9-abc.webp"),
+    );
+  });
+
+  it("storedUploadAbsolutePath_diskForm_returnsSameFile", () => {
+    expect(storedUploadAbsolutePath("/uploads/avatars/9-abc.webp", "avatars")).toBe(
+      path.join(process.cwd(), "public", "uploads", "avatars", "9-abc.webp"),
+    );
+  });
+
+  it.each<[string | null]>([
+    ["/api/uploads/teams/4-abc.webp"],
+    ["/api/uploads/avatars/../teams/4-abc.webp"],
+    ["https://cdn.discordapp.com/avatars/1/a.png"],
+    [null],
+  ])("storedUploadAbsolutePath_notAnAvatarUpload_null (%s)", (url) => {
+    expect(storedUploadAbsolutePath(url, "avatars")).toBeNull();
+  });
+});
 
 describe("deleteUnreferencedUpload", () => {
   beforeEach(() => {
@@ -110,5 +135,16 @@ describe("isUploadReferenced", () => {
     await isUploadReferenced("/api/uploads/teams/3-abc.webp");
     const quarantine = execute.mock.calls.map((c) => String(c[0])).find((sql) => sql.includes("bg_logo_quarantines"));
     expect(quarantine).toMatch(/status = 'HIDDEN'/);
+  });
+
+  // Revue sécurité #571, cycle 3 : l'avatar mis de côté d'un compte en attente
+  // de suppression est encore désigné — il n'est pas effacé.
+  it("isUploadReferenced_heldAvatarOfPendingAccount_true", async () => {
+    const execute = mockDb(/FROM bg_account_deletion_holds WHERE avatar_url IN/);
+
+    expect(await isUploadReferenced("/api/uploads/avatars/42-a.webp")).toBe(true);
+
+    const hold = execute.mock.calls.find(([sql]) => sql.includes("bg_account_deletion_holds"));
+    expect(hold?.[1]).toEqual(["/api/uploads/avatars/42-a.webp", "/uploads/avatars/42-a.webp"]);
   });
 });

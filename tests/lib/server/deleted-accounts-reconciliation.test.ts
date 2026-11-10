@@ -56,7 +56,7 @@ function needsWork(account: Account): boolean {
 
 function fakeDb(
   accounts: Record<number, Account>,
-  options: { failFor?: number; rollbackFails?: boolean; failTermsCleanup?: boolean } = {},
+  options: { failFor?: number; rollbackFails?: boolean; failTermsCleanup?: boolean; commitFails?: boolean } = {},
 ) {
   const queries: Query[] = [];
   const connections: {
@@ -118,7 +118,9 @@ function fakeDb(
         return [[]];
       }),
       beginTransaction: jest.fn(async () => {}),
-      commit: jest.fn(async () => {}),
+      commit: jest.fn(async () => {
+        if (options.commitFails) throw new Error("COMMIT_FAILED");
+      }),
       rollback: jest.fn(async () => {
         if (options.rollbackFails) throw new Error("CONNECTION_LOST");
       }),
@@ -298,6 +300,35 @@ describe("reconcileDeletedAccounts", () => {
       [3, { landingLive: true }],
       [4, { landingLive: true }],
     ]);
+  });
+
+  // Revue sécurité EF-21 #526 : le bilan ne compte un geste qu'une fois commité.
+  it("reconcileDeletedAccounts_commitFails_countedFailedOnlyAndViewsKept", async () => {
+    clearCache();
+    fakeDb({ 5122: { pseudo: "compte_supprime_5122" } }, { commitFails: true });
+    const loader = jest.fn(async () => "bandeau");
+    await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, loader);
+
+    const outcome = await reconcileDeletedAccounts();
+    await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, loader);
+
+    expect(outcome).toMatchObject({ erased: 0, renamed: 0, failed: 1 });
+    expect(loader).toHaveBeenCalledTimes(1);
+  });
+
+  // Revue sécurité EF-21 #526 : un écouteur qui lève ne casse pas le rattrapage.
+  it("reconcileDeletedAccounts_publishThrows_otherTournamentsStillPublished", async () => {
+    fakeDb({
+      5123: { pseudo: "compte_supprime_5123", refereed: [{ matchId: 6, tournamentId: 3 }, { matchId: 9, tournamentId: 4 }] },
+    });
+    jest.mocked(publishMatchUpdatedEvent).mockImplementationOnce(() => {
+      throw new Error("LISTENER");
+    });
+
+    const outcome = await reconcileDeletedAccounts();
+
+    expect(outcome).toMatchObject({ erased: 1, failed: 0 });
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledTimes(2);
   });
 
   it("reconcileDeletedAccounts_failedAccount_publishesNothingForIt", async () => {

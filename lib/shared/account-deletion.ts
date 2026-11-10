@@ -328,11 +328,11 @@ export const ACCOUNT_DELETION_QUESTION = "Supprimer ton compte ?";
 
 /** Ce qui se fait dès la demande et que la réactivation ne défait pas (E3, E4). */
 export const ACCOUNT_DELETION_HANDOVER =
-  "Dès maintenant, tu quitteras tes équipes (la propriété passera à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre ; seul joueur, l'équipe deviendra fantôme si elle est engagée dans un tournoi pas terminé, sinon elle sera dissoute), tes tournois organisés passeront à un autre membre du staff quand quelqu'un pourra les reprendre, tes inscriptions à des tournois individuels pas encore commencés, tes casts de matchs pas encore terminés, tes désignations d'arbitre et tes invitations et demandes d'adhésion d'équipe en attente seront retirés et tes matchs restants d'un tournoi individuel en cours où tu n'as jamais joué seront perdus par forfait. Réactiver ton compte ne défera pas ces gestes.";
+  "Dès maintenant, tu quitteras tes équipes (la propriété passera à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre, un membre suspendu ne passant qu'après tous les autres ; seul joueur, l'équipe deviendra fantôme si elle est engagée dans un tournoi pas terminé, sinon elle sera dissoute), tes tournois organisés passeront à un autre membre du staff quand quelqu'un pourra les reprendre, tes inscriptions à des tournois individuels pas encore commencés, tes casts de matchs pas encore terminés, tes désignations d'arbitre et tes invitations et demandes d'adhésion d'équipe en attente seront retirés et tes matchs restants d'un tournoi individuel en cours où tu n'as jamais joué seront perdus par forfait. Réactiver ton compte ne défera pas ces gestes.";
 
 /** La fenêtre de réactivation (E4). */
 export const ACCOUNT_DELETION_WINDOW =
-  "La suppression deviendra définitive au bout de 30 jours : d'ici là, te reconnecter te permettra de réactiver ton compte. Dès la demande, ton compte sera montré anonyme partout, sans ton pseudo ni ton avatar ; la réactivation te les rendra.";
+  "La suppression deviendra définitive au bout de 30 jours : d'ici là, te reconnecter te permettra de réactiver ton compte. Dès la demande, ton compte sera montré anonyme partout, sans ton pseudo ni ton avatar ; la réactivation te les rendra, sauf un avatar que la modération aurait masqué ou supprimé entre-temps.";
 
 /**
  * Le corps de la modale : `accountDeletionConfirmation` sans la question, déjà
@@ -360,8 +360,11 @@ export function reactivationDeadline(requestedAt: Date | string): Date {
   return new Date(new Date(requestedAt).getTime() + ACCOUNT_REACTIVATION_DAYS * DAY_MS);
 }
 
+/** Une date relue de la base (`dateStrings`), ou son absence. */
+export type StoredDate = Date | string | null;
+
 /** La suppression demandée à `requestedAt` est-elle encore réversible à `now` ? */
-export function isReactivationWindowOpen(requestedAt: Date | string | null, now: number = Date.now()): boolean {
+export function isReactivationWindowOpen(requestedAt: StoredDate, now: number = Date.now()): boolean {
   if (requestedAt === null) return false;
   const deadline = reactivationDeadline(requestedAt).getTime();
   return Number.isFinite(deadline) && now < deadline;
@@ -394,6 +397,8 @@ export type TeamSuccessorCandidate = {
   joinedAt: Date | string;
   /** Identifiant de la ligne d'appartenance : départage stable à date égale. */
   membershipId: number;
+  /** Compte sous suspension en cours : il ne se connecte pas, il ne passe qu'à défaut d'autre membre. */
+  suspended?: boolean;
 };
 
 /** Rang d'un candidat : `MANAGER` d'abord, puis `CAPITAINE`, puis tout autre membre. */
@@ -411,7 +416,10 @@ function successorRank(roles: readonly string[]): number {
  * (E3) : un autre `OWNER` s'il y en a (rien ne change pour lui), sinon un
  * `MANAGER`, sinon un `CAPITAINE`, sinon un autre membre ; à rang
  * égal, le plus ancien dans l'équipe, puis la ligne d'appartenance la plus
- * ancienne. `null` : il était seul.
+ * ancienne. Un compte suspendu — copropriétaire compris — ne passe qu'à défaut
+ * de tout membre actif (comme la reprise des tournois organisés, qui l'écarte) :
+ * un `MANAGER` actif reçoit la propriété plutôt qu'un copropriétaire suspendu,
+ * qui garde la sienne. `null` : il était seul.
  */
 export function pickTeamSuccessor(candidates: readonly TeamSuccessorCandidate[]): TeamSuccessorCandidate | null {
   let best: TeamSuccessorCandidate | null = null;
@@ -422,6 +430,10 @@ export function pickTeamSuccessor(candidates: readonly TeamSuccessorCandidate[])
 }
 
 function compareSuccessors(a: TeamSuccessorCandidate, b: TeamSuccessorCandidate): number {
+  // Suspendu : derrière tout membre actif, copropriétaire compris — l'équipe
+  // doit garder un propriétaire capable de se connecter.
+  const suspension = Number(a.suspended === true) - Number(b.suspended === true);
+  if (suspension !== 0) return suspension;
   const rank = successorRank(a.roles) - successorRank(b.roles);
   if (rank !== 0) return rank;
   const joined = new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();

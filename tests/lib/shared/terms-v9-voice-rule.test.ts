@@ -46,8 +46,9 @@ describe("PRIVACY_CHANGES — conditions d'utilisation, version 9", () => {
     const fr = change(TERMS_V9_ID);
     const en = PRIVACY_CHANGES_EN[TERMS_V9_ID];
 
-    expect(TERMS_VERSION).toBe(9);
-    expect(fr.publishedAt).toBe(TERMS_UPDATED_AT);
+    // Publiée et figée : la version 10 ne la retouche pas.
+    expect(TERMS_VERSION).toBeGreaterThan(9);
+    expect(fr.publishedAt).not.toBe(TERMS_UPDATED_AT);
     expect(fr.asksTermsAcceptance).toBe(true);
     expect(fr.publishedAt).toBe("2026-11-06");
     expect(fr.details.at(-1)).toContain("la version 9, en vigueur depuis le 6 novembre 2026");

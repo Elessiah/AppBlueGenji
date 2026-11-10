@@ -2,6 +2,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { syncSoloEntryIdentity, syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
+import { readModeratableAvatar, setHeldAvatar } from "@/lib/server/users/account-deletion-hold";
 
 /**
  * Pose (ou retire) l'avatar d'un compte **vivant**, et dit si l'écriture a eu
@@ -73,6 +74,12 @@ export async function updateUserAvatar(
  * `bg_teams.logo_url`. Le fichier, lui, est effacé par l'appelant **après le
  * commit** (un `unlink` ne se défait pas).
  *
+ * Un compte **en attente de suppression** n'a plus d'avatar sur sa ligne
+ * (anonyme dès la demande), mais son fichier attend la réactivation dans le
+ * masque, toujours servi : c'est là qu'il est retiré (`readModeratableAvatar`,
+ * décision D6) — sans quoi demander la suppression mettrait l'image hors
+ * d'atteinte de la modération pendant trente jours.
+ *
  * @throws USER_NOT_FOUND
  * @throws USER_HAS_NO_AVATAR
  */
@@ -83,21 +90,25 @@ export async function removeUserAvatarAsModerator(
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-    const [rows] = await connection.execute<
-      (RowDataPacket & { pseudo: string; avatar_url: string | null; is_deleted: 0 | 1 })[]
-    >(`SELECT pseudo, avatar_url, is_deleted FROM bg_users WHERE id = ? FOR UPDATE`, [userId]);
     // Un compte anonymisé n'a déjà plus d'avatar (`anonymizeAccount` le vide) ;
     // le traiter comme introuvable évite de distinguer un cas qui ne se produit
     // pas d'une ligne disparue.
-    if (rows.length === 0 || rows[0].is_deleted === 1) throw new Error("USER_NOT_FOUND");
-    const avatarUrl = rows[0].avatar_url;
+    const avatar = await readModeratableAvatar(connection, userId, true);
+    if (!avatar) throw new Error("USER_NOT_FOUND");
+    const avatarUrl = avatar.avatarUrl;
     if (!avatarUrl) throw new Error("USER_HAS_NO_AVATAR");
+    if (avatar.pending) {
+      // En attente : retiré du masque, sans entrée solo à resynchroniser (anonyme).
+      await setHeldAvatar(connection, userId, null);
+      await connection.commit();
+      return { pseudo: avatar.pseudo, removedAvatarUrl: avatarUrl };
+    }
     await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ? AND is_deleted = 0`, [userId]);
     const soloSynced = await syncSoloEntryIdentityOn(connection, userId);
     await connection.commit();
     // Après le commit : le logo de l'entrée solo est servi par la vitrine.
     if (soloSynced) invalidateLandingTeamViews();
-    return { pseudo: rows[0].pseudo, removedAvatarUrl: avatarUrl };
+    return { pseudo: avatar.pseudo, removedAvatarUrl: avatarUrl };
   } catch (error) {
     await connection.rollback();
     throw error;

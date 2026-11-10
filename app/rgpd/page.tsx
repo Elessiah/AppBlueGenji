@@ -418,18 +418,20 @@ function RgpdFr({
           explicite (un compte suspendu peut aussi être réactivé : il revient suspendu). Dès la demande, il est
           montré anonyme partout où il paraissait (pseudo d&apos;emprunt, sans avatar ni lien de fiche : résultats
           passés, classements, effectifs, pages de tournoi) ; son vrai pseudo, qui lui reste réservé, et son avatar
-          sont gardés à part pour la seule réactivation, qui les lui rend (le pseudo, raccourci au besoin, suivi de « OG » s&apos;il a tout de même été pris — « OG2 », « OG3 »… jusqu&apos;à « OG10 » si ceux-là le sont aussi, à défaut le pseudo d&apos;emprunt), et effacés au terme du délai. La demande
+          sont gardés à part pour la seule réactivation, qui les lui rend (le pseudo, raccourci au besoin, suivi de « OG » s&apos;il a tout de même été pris — « OG2 », « OG3 »… jusqu&apos;à « OG10 » si ceux-là le sont aussi, à défaut le pseudo d&apos;emprunt ; l&apos;avatar, sauf si la modération l&apos;a masqué ou supprimé entre-temps), et effacés au terme du délai — un avatar masqué suit, lui, la règle des signalements. La demande
           est aussi notée au journal hors base qui rejoue les suppressions après la restauration d&apos;une
           sauvegarde (identifiant et date de création du compte, date de la demande), et y est remplacée, à la
           réactivation, par une ligne qui porte la date de celle-ci et celle de la demande défaite (gardée comme les autres lignes), pour qu&apos;une sauvegarde restaurée ne
           ramène pas le compte en attente de suppression. Dès la demande, et sans retour à la réactivation, il quitte ses équipes (la propriété
-          passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre ; une équipe dont il était le seul
+          passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre membre, un membre suspendu ne passant qu&apos;après tous les autres ; une équipe dont il était le seul
           joueur devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute
           sinon), ses tournois organisés passent à un autre membre du staff quand quelqu&apos;un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore terminés, ses désignations d&apos;arbitre et ses invitations et demandes d&apos;adhésion d&apos;équipe en attente sont retirés et ses matchs restants d&apos;un tournoi individuel en
           cours où il n&apos;a jamais joué sont perdus par forfait. Au terme du délai, le compte est effacé
-          s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. À l&apos;effacement,
-          l&apos;empreinte (SHA-256) d&apos;un avatar retiré par la modération est gardée, sans lien avec
-          aucun compte, pour en refuser la remise en ligne. Le journal du staff sur Discord note la demande,
+          s&apos;il n&apos;a rien laissé, anonymisé (pseudo d&apos;emprunt) sinon. Pendant le délai, la
+          modération peut encore masquer, rétablir ou supprimer l&apos;avatar gardé à part, comme celui
+          d&apos;un compte actif ; l&apos;effacement ne garde que l&apos;empreinte d&apos;un avatar que la
+          modération avait déjà supprimé (section <a href="#signalements">« Signalements »</a>) ; un
+          avatar que la modération n&apos;a jamais supprimé part sans laisser d&apos;empreinte. Le journal du staff sur Discord note la demande,
           sa réactivation et chaque retrait ou forfait qu&apos;elle entraîne (une ligne par tournoi pour ceux-ci), sans nommer le joueur (« un joueur ») (
           <Link href="/rgpd/registre#t05">registre, T05</Link>).
         </p>
@@ -954,6 +956,26 @@ function RgpdFr({
               Un contenu <strong>manifestement illicite</strong> peut être supprimé sans délai de
               masquage. L&apos;équipe ou le joueur en est prévenu de la même façon et peut contester la
               décision pendant le même délai ; si elle aboutit, l&apos;image peut être renvoyée.
+            </li>
+            <li>
+              Quand la modération <strong>supprime</strong> un avatar — sans délai, sur signalement ou
+              depuis la fiche du joueur, par le staff après un masquage (contestation rejetée, ou avant l&apos;échéance), ou
+              d&apos;office au terme d&apos;un masquage sans contestation —, que le compte soit actif ou en attente de suppression, l&apos;empreinte
+              (SHA-256) de l&apos;image est gardée sans limite de durée dans la liste des images bloquées, qui ne
+              désigne aucun compte et ne date un blocage qu&apos;au jour près, pour en refuser la remise en ligne,
+              comme avatar ou comme logo d&apos;équipe ; supprimé sans délai, son fichier n&apos;est effacé que si
+              rien d&apos;autre sur le site ne le désigne. Tant que le compte existe (anonymisé compris),
+              l&apos;empreinte est aussi gardée sur la décision de suppression prise sur un signalement ou après
+              un masquage, avec l&apos;issue de sa contestation : maintenue, le blocage reste ; acceptée, il
+              est levé, sauf si une autre suppression de la même image le justifie encore. À l&apos;effacement du
+              compte, ces décisions sont effacées et le blocage devient définitif : seule l&apos;empreinte reste,
+              sans lien avec aucun compte. Une suppression d&apos;office faite alors que sa contestation attendait
+              encore son issue ne bloque l&apos;image qu&apos;une fois maintenue, ou à l&apos;effacement du compte s&apos;il
+              vient avant, alors définitivement. Les empreintes posées à l&apos;effacement d&apos;un compte avant le
+              12 novembre 2026 — alors aussi celles d&apos;un avatar seulement masqué — restent bloquées, datées
+              du jour de leur pose, qui peut être celui de l&apos;effacement ; toute empreinte posée avant cette date est ramenée au jour près. Un avatar seulement masqué n&apos;en laisse aucune tant qu&apos;il
+              n&apos;est pas supprimé, ni un avatar que la modération n&apos;a jamais supprimé ; un logo
+              d&apos;équipe supprimé non plus.
             </li>
           </ul>
           <p>

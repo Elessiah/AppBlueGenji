@@ -59,7 +59,7 @@ describe("accountDeletionJournalPath", () => {
 
 describe("readAccountDeletionJournal", () => {
   it("un fichier absent est un journal vide", async () => {
-    expect(await readAccountDeletionJournal(file)).toEqual({ entries: [], invalidLines: 0 });
+    expect(await readAccountDeletionJournal(file)).toEqual({ entries: [], invalidLines: 0, preserved: [] });
   });
 });
 
@@ -93,7 +93,7 @@ describe("recordAccountDeletion", () => {
     await recordAccountDeletion(entry(1), { filePath: file, now });
     await writeFile(file, `${await readFile(file, "utf8")}{"userId":`, "utf8");
     await recordAccountDeletion(entry(2), { filePath: file, now });
-    expect(await readAccountDeletionJournal(file)).toEqual({ entries: [entry(1), entry(2)], invalidLines: 0 });
+    expect(await readAccountDeletionJournal(file)).toEqual({ entries: [entry(1), entry(2)], invalidLines: 0, preserved: [] });
   });
 
   it("ne laisse aucun fichier temporaire", async () => {
@@ -260,5 +260,46 @@ describe("recordAccountReactivation", () => {
     await recordAccountReactivation(key, { filePath: file, now, strict: true });
 
     expect((await readAccountDeletionJournal(file)).entries).toEqual([reactivated]);
+  });
+});
+
+// Revue sécurité #571, cycle 3 : une réécriture ne perd pas une ligne datée qu'elle ne sait pas lire.
+describe("lignes illisibles mais datées, gardées à la réécriture", () => {
+  const unreadable =
+    '{"userId":5,"accountCreatedAt":"2026-01-02 03:04:05","reactivatedAt":"2026-09-22T00:00:00.000Z","undoneRequestAt":"9"}';
+
+  async function seedJournal(lines: string): Promise<void> {
+    await recordAccountDeletion(entry(1), { filePath: file, now });
+    await writeFile(file, `${await readFile(file, "utf8")}${lines}`, "utf8");
+  }
+
+  it("recordAccountDeletion_datedUnreadableLine_keptOnRewrite", async () => {
+    await seedJournal(`${unreadable}\n`);
+
+    await recordAccountDeletion(entry(2), { filePath: file, now });
+
+    expect((await readFile(file, "utf8")).split("\n")).toContain(unreadable);
+  });
+
+  it("recordAccountReactivation_datedUnreadableLine_keptOnRewrite", async () => {
+    await seedJournal(`${unreadable}\n`);
+
+    await recordAccountReactivation(
+      { userId: 1, accountCreatedAt: "2026-01-02 03:04:05", undoneRequestAt: "2026-09-20 10:00:00" },
+      { filePath: file, now, strict: true },
+    );
+
+    expect((await readFile(file, "utf8")).split("\n")).toContain(unreadable);
+  });
+
+  it("pruneAccountDeletionJournal_expiredUnreadableLine_removedAndCounted", async () => {
+    const expired = unreadable.replace("2026-09-22", "2025-01-01");
+    await seedJournal(`${expired}\n${unreadable}\n`);
+
+    expect(await pruneAccountDeletionJournal({ filePath: file, now })).toBe(1);
+
+    const lines = (await readFile(file, "utf8")).split("\n");
+    expect(lines).not.toContain(expired);
+    expect(lines).toContain(unreadable);
   });
 });

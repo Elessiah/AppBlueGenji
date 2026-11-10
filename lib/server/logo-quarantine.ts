@@ -31,7 +31,15 @@
 import { copyFile, mkdir, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import {
+  anonymousFileName,
+  blockImageHashOn,
+  blockImageHashesSafely,
+  readImageSha256,
+  unblockImageHashOn,
+} from "@/lib/server/blocked-images";
 import { getDatabase } from "@/lib/server/database";
+import { isMissingTableError } from "@/lib/server/mysql-errors";
 // Logo d'équipe servi par le leaderboard de l'accueil et de `/classement`, le
 // podium et les cartes d'aperçu ; avatar recopié sur l'entrée solo, que nomment
 // les vues de la vitrine.
@@ -44,6 +52,12 @@ import { siteCanonicalBase } from "@/lib/server/site-url";
 import { toIso } from "@/lib/server/serialization";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
+import { readModeratableAvatar, setHeldAvatar } from "@/lib/server/users/account-deletion-hold";
+import {
+  deleteUnreferencedUpload,
+  isUploadReferenced,
+  storedUploadAbsolutePath,
+} from "@/lib/server/stored-upload-cleanup";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { reportConcernedHref, type ReportCategory, type ReportPerson } from "@/lib/shared/content-reports";
 import { ANONYMOUS_PLAYER_LABEL } from "@/lib/shared/log-privacy";
@@ -53,6 +67,8 @@ import {
   moderationGroundsFor,
   type ModerationGrounds,
   canAutoPurgeLogo,
+  removalBlocksHash,
+  type ContestOutcome,
   formatAvatarHiddenLog,
   formatAvatarHiddenNotice,
   formatAvatarRemovedNotice,
@@ -124,6 +140,56 @@ export function avatarFileLocations(
     live: path.join(process.cwd(), "public", "uploads", "avatars", filename),
     quarantined: path.join(avatarQuarantineDirectory(), `user-${userId}-${filename}`),
   };
+}
+
+/**
+ * Efface du disque l'avatar que la modération vient de **supprimer** (D6) :
+ * son empreinte est bloquée d'abord (le fichier doit encore se lire), puis le
+ * fichier part — un seul geste pour chaque chemin de retrait, qui ne peut donc
+ * pas effacer sans bloquer. Toute adresse d'avatar téléversé est couverte, y
+ * compris un nom de fichier antérieur à `LOGO_FILENAME` ; une adresse
+ * étrangère n'a rien à bloquer ni à effacer. Le fichier n'est effacé que si
+ * plus rien ne le désigne (`deleteUnreferencedUpload`). Après le commit qui retire
+ * l'avatar ; **ne lève jamais** (un résidu sur le disque se consigne).
+ */
+export async function removeModeratedAvatarFile(
+  avatarUrl: string,
+  options: { alreadyBlocked?: boolean } = {},
+): Promise<void> {
+  const absolute = storedUploadAbsolutePath(avatarUrl, "avatars");
+  if (!absolute) return;
+  // Déjà bloquée dans la transaction de la décision (`deleteUserAvatarForReport`).
+  if (!options.alreadyBlocked) {
+    const sha256 = await readImageSha256(absolute);
+    if (sha256 === null) logMissingRemovedFile(absolute);
+    else await blockImageHashesSafely([sha256]);
+  }
+  // Le fichier ne part que si plus aucune ligne ne le désigne : un autre compte
+  // (adresse recopiée), un partenaire ou un bénévole (adresse collée), un
+  // masque de suppression, une quarantaine en cours. Son empreinte, elle, est
+  // bloquée dans tous les cas ; un fichier gardé — donc encore servi — est dit
+  // dans pm2, pour qu'un exploitant retire l'autre usage.
+  const stillUsed = await isUploadReferenced(avatarUrl).catch((error: unknown) => {
+    console.error("[moderation] usages de l'avatar supprimé non relus, fichier gardé", error);
+    return true;
+  });
+  if (stillUsed) {
+    console.error(`[moderation] avatar supprimé encore désigné par une autre ligne, fichier gardé et servi : ${avatarUrl}`);
+    return;
+  }
+  await deleteUnreferencedUpload(avatarUrl, "avatars");
+}
+
+/**
+ * Un fichier que la modération supprime manquait déjà (course avec une
+ * rotation, effacement à la main) : son image n'est pas bloquée et pourrait
+ * revenir — consigné, sans les identifiants de compte du nom, pour qu'un
+ * exploitant le retrouve (sauvegarde) et pose son empreinte à la main.
+ */
+function logMissingRemovedFile(file: string): void {
+  console.error(
+    `[moderation] image supprimée introuvable, empreinte non bloquée (1 fichier(s)) : ${anonymousFileName(file)}`,
+  );
 }
 
 /** Déplace un fichier, y compris d'un disque à l'autre (`EXDEV`). */
@@ -378,6 +444,7 @@ export async function deleteTeamLogoForReport(
     hiddenAt: at,
     purgeAfter: contestUntil.toISOString(),
     closedAt: at,
+    contestOutcome: null,
   };
 }
 
@@ -405,23 +472,31 @@ export async function deleteUserAvatarForReport(
   let pseudo: string;
   let avatarUrl: string;
   let quarantineId: number;
+  let sha256: string | null;
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-    const [users] = await connection.execute<(RowDataPacket & { pseudo: string; avatar_url: string | null })[]>(
-      `SELECT pseudo, avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
-      [userId],
-    );
-    if (users.length === 0 || !users[0].avatar_url) throw new Error("USER_HAS_NO_AVATAR");
-    pseudo = users[0].pseudo;
-    avatarUrl = users[0].avatar_url;
-    await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ? AND is_deleted = 0`, [userId]);
-    await syncSoloEntryIdentityOn(connection, userId);
+    // En attente de suppression : l'avatar attend dans le masque, toujours
+    // servi — retiré là (D6), sans entrée solo à resynchroniser (déjà anonyme).
+    const avatar = await readModeratableAvatar(connection, userId, true);
+    if (!avatar?.avatarUrl) throw new Error("USER_HAS_NO_AVATAR");
+    pseudo = avatar.pseudo;
+    avatarUrl = avatar.avatarUrl;
+    // L'empreinte est relevée sous le verrou et gardée avec la décision : une
+    // contestation acceptée plus tard lève le blocage (D18), le fichier parti.
+    const absolute = storedUploadAbsolutePath(avatarUrl, "avatars");
+    sha256 = absolute ? await readImageSha256(absolute) : null;
+    if (absolute && sha256 === null) logMissingRemovedFile(absolute);
+    // Bloquée dans la même transaction que la décision : une issue écrite
+    // juste après (D18) trouve l'empreinte déjà posée, jamais l'inverse.
+    if (sha256 !== null) await blockImageHashOn(connection, sha256);
+    await clearModeratedAvatar(connection, userId, avatar.pending);
     const [inserted] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_logo_quarantines
-         (user_id, report_id, logo_url, hidden_by_user_id, hidden_at, purge_after, status, closed_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'PURGED', ?)`,
-      [userId, reportId, avatarUrl, actor.userId, removedAt, contestUntil, removedAt],
+         (user_id, report_id, logo_url, hidden_by_user_id, hidden_at, purge_after, status, closed_at, image_sha256,
+          hash_blocked)
+       VALUES (?, ?, ?, ?, ?, ?, 'PURGED', ?, ?, ?)`,
+      [userId, reportId, avatarUrl, actor.userId, removedAt, contestUntil, removedAt, sha256, sha256 === null ? 0 : 1],
     );
     quarantineId = Number(inserted.insertId);
     await connection.commit();
@@ -432,12 +507,8 @@ export async function deleteUserAvatarForReport(
     connection.release();
   }
 
-  const files = avatarFileLocations(avatarUrl, userId);
-  if (files) {
-    await unlinkIfPresent(files.live).catch((error) => {
-      console.error("[moderation] fichier de l'avatar non effacé", error);
-    });
-  }
+  // Supprimé par la modération : empreinte bloquée, puis fichier effacé (D6).
+  await removeModeratedAvatarFile(avatarUrl, { alreadyBlocked: true });
 
   // L'avatar est le logo de l'entrée solo, nommée par les vues de la vitrine.
   invalidateLandingTeamViews();
@@ -458,6 +529,7 @@ export async function deleteUserAvatarForReport(
     hiddenAt: at,
     purgeAfter: contestUntil.toISOString(),
     closedAt: at,
+    contestOutcome: null,
   };
 }
 
@@ -578,6 +650,7 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
     hiddenAt: hiddenAt.toISOString(),
     purgeAfter: purgeAfter.toISOString(),
     closedAt: null,
+    contestOutcome: null,
   };
 }
 
@@ -601,13 +674,12 @@ export async function hideUserAvatarForReport(
   const db = await getDatabase();
   const grounds = await assertTargeted(reportId, "USER", userId);
 
-  const [users] = await db.execute<(RowDataPacket & { pseudo: string; avatar_url: string | null })[]>(
-    `SELECT pseudo, avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
-    [userId],
-  );
-  if (users.length === 0 || !users[0].avatar_url) throw new Error("USER_HAS_NO_AVATAR");
-  const avatarUrl = users[0].avatar_url;
-  const pseudo = users[0].pseudo;
+  // Compte en attente de suppression : l'avatar du masque, toujours servi, se
+  // masque comme les autres (D6) — et se rétablit dans le masque.
+  const current = await readModeratableAvatar(db, userId, false);
+  if (!current?.avatarUrl) throw new Error("USER_HAS_NO_AVATAR");
+  const avatarUrl = current.avatarUrl;
+  const pseudo = current.pseudo;
   const files = avatarFileLocations(avatarUrl, userId);
   if (!files) throw new Error("AVATAR_NOT_MOVABLE");
 
@@ -624,13 +696,9 @@ export async function hideUserAvatarForReport(
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-    const [locked] = await connection.execute<(RowDataPacket & { avatar_url: string | null })[]>(
-      `SELECT avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
-      [userId],
-    );
-    if (locked.length === 0 || locked[0].avatar_url !== avatarUrl) throw new Error("AVATAR_CHANGED");
-    await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ? AND is_deleted = 0`, [userId]);
-    await syncSoloEntryIdentityOn(connection, userId);
+    const locked = await readModeratableAvatar(connection, userId, true);
+    if (locked?.avatarUrl !== avatarUrl || locked.pending !== current.pending) throw new Error("AVATAR_CHANGED");
+    await clearModeratedAvatar(connection, userId, locked.pending);
     const [inserted] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_logo_quarantines (user_id, report_id, logo_url, hidden_by_user_id, hidden_at, purge_after)
        VALUES (?, ?, ?, ?, ?, ?)`,
@@ -677,6 +745,7 @@ export async function hideUserAvatarForReport(
     hiddenAt: hiddenAt.toISOString(),
     purgeAfter: purgeAfter.toISOString(),
     closedAt: null,
+    contestOutcome: null,
   };
 }
 
@@ -691,6 +760,8 @@ type QuarantineRow = RowDataPacket & {
   hidden_at: Date | string;
   purge_after: Date | string;
   closed_at: Date | string | null;
+  contest_outcome: ContestOutcome | null;
+  image_sha256: string | null;
 };
 
 // `COALESCE` porte le générique : une ligne d'équipe n'a pas de `u.pseudo` à
@@ -700,7 +771,8 @@ const QUARANTINE_SELECT = `SELECT q.id,
        CASE WHEN q.team_id IS NOT NULL THEN 'TEAM' ELSE 'USER' END AS target_type,
        COALESCE(q.team_id, q.user_id) AS target_id,
        COALESCE(t.name, u.pseudo) AS target_name,
-       q.report_id, q.logo_url, q.status, q.hidden_at, q.purge_after, q.closed_at
+       q.report_id, q.logo_url, q.status, q.hidden_at, q.purge_after, q.closed_at,
+       q.contest_outcome, q.image_sha256
 FROM bg_logo_quarantines q
 LEFT JOIN bg_teams t ON t.id = q.team_id
 LEFT JOIN bg_users u ON u.id = q.user_id`;
@@ -716,6 +788,7 @@ function toView(row: QuarantineRow): LogoQuarantineView {
     hiddenAt: toIso(row.hidden_at) ?? new Date().toISOString(),
     purgeAfter: toIso(row.purge_after) ?? new Date().toISOString(),
     closedAt: toIso(row.closed_at),
+    contestOutcome: row.contest_outcome ?? null,
   };
 }
 
@@ -730,6 +803,33 @@ export async function listQuarantinesForReports(reportIds: readonly number[]): P
     [...reportIds],
   );
   return rows.map(toView);
+}
+
+/**
+ * Le compte visé par une quarantaine d'avatar (`null` : logo d'équipe, ligne
+ * absente), lu sur la connexion du geste **avant** `beginTransaction` — en
+ * validation automatique, sans figer d'instantané —, pour
+ * `lockQuarantineUserFirst`.
+ */
+async function quarantineUserId(connection: PoolConnection, quarantineId: number): Promise<number | null> {
+  const [rows] = await connection.execute<(RowDataPacket & { user_id: number | null })[]>(
+    `SELECT user_id FROM bg_logo_quarantines WHERE id = ? LIMIT 1`,
+    [quarantineId],
+  );
+  const userId = rows[0]?.user_id;
+  return userId == null ? null : Number(userId);
+}
+
+/**
+ * Un seul ordre de verrous avec l'effacement d'un compte, qui tient sa ligne
+ * `bg_users` **avant** ses quarantaines (`retireAccountQuarantinesOn`) : un
+ * geste sur une quarantaine d'avatar (issue, rétablissement, purge) verrouille
+ * le compte visé en première instruction, puis la ligne de quarantaine — et non
+ * l'inverse, qui croisait l'effacement en interblocage.
+ */
+async function lockQuarantineUserFirst(connection: PoolConnection, userId: number | null): Promise<void> {
+  if (userId === null) return;
+  await connection.execute(`SELECT id FROM bg_users WHERE id = ? FOR UPDATE`, [userId]);
 }
 
 /** Lit une quarantaine sous verrou, dans la transaction de l'appelant. */
@@ -764,46 +864,35 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
   const connection = await db.getConnection();
   let row: QuarantineRow;
   let files: { live: string; quarantined: string };
+  // Issue « acceptée » écrite par un rétablissement refusé (D23), à journaliser.
+  let overturnedRow: QuarantineRow | null = null;
   try {
+    const userId = await quarantineUserId(connection, quarantineId);
     await connection.beginTransaction();
+    await lockQuarantineUserFirst(connection, userId);
     row = await lockQuarantine(connection, quarantineId);
     const isTeam = row.target_type === "TEAM";
     const targetId = Number(row.target_id);
 
-    // Deux instructions **statiques**, une par domaine — une SQL bâtie par
-    // interpolation de nom de table/colonne se dérobe au `grep`, et ce fichier
-    // tient par ailleurs à ce que chaque écriture reste une chaîne qu'on
-    // retrouve telle quelle dans le code (voir `hideTeamLogo`/
-    // `hideUserAvatarForReport`, qui ne partagent pas non plus leurs requêtes).
-    const [owners] = isTeam
-      ? await connection.execute<(RowDataPacket & { image_url: string | null })[]>(
-          `SELECT logo_url AS image_url FROM bg_teams WHERE id = ? FOR UPDATE`,
-          [targetId],
-        )
-      : // Un compte anonymisé n'a plus d'avatar à retrouver, et ne doit surtout
-        // pas en recevoir un par ce chemin : la condition l'exclut de la même
-        // façon qu'une ligne disparue (`QUARANTINE_NOT_FOUND`), sans quoi le
-        // rétablissement republierait une identité sur une ligne que la
-        // suppression a vidée.
-        await connection.execute<(RowDataPacket & { image_url: string | null })[]>(
-          `SELECT avatar_url AS image_url FROM bg_users WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
-          [targetId],
-        );
-    if (owners.length === 0) throw new Error("QUARANTINE_NOT_FOUND");
-    if (owners[0].image_url) throw new Error(isTeam ? "TEAM_HAS_NEW_LOGO" : "USER_HAS_NEW_AVATAR");
-    const located = isTeam
-      ? logoFileLocations(row.logo_url, targetId)
-      : avatarFileLocations(row.logo_url, targetId);
-    if (!located) throw new Error(isTeam ? "LOGO_NOT_MOVABLE" : "AVATAR_NOT_MOVABLE");
-    files = located;
+    const owner = await lockRestoreOwner(connection, isTeam, targetId);
+    if (!owner) throw new Error("QUARANTINE_NOT_FOUND");
+    if (owner.imageUrl) {
+      // La contestation est acceptée, mais l'image ne peut pas revenir (une
+      // autre l'a remplacée) : l'issue est écrite quand même (D23), sous le
+      // verrou de la ligne — une purge qui l'attend la voit, et n'en bloque pas
+      // l'empreinte.
+      if (await commitRefusedRestoreOutcome(connection, quarantineId)) overturnedRow = row;
+      throw new Error(isTeam ? "TEAM_HAS_NEW_LOGO" : "USER_HAS_NEW_AVATAR");
+    }
+    files = restorableFileLocations(row.logo_url, isTeam, targetId);
 
     // Déplacé **avant** le commit, sous les verrous : un échec de disque laisse
     // la quarantaine intacte, sans une base qui annoncerait une image absente.
     await moveFile(files.quarantined, files.live);
     try {
-      await writeRestoredImage(connection, row, isTeam, targetId);
+      await writeRestoredImage(connection, row, isTeam, targetId, owner.pending);
       await connection.execute(
-        `UPDATE bg_logo_quarantines SET status = 'RESTORED', closed_at = NOW() WHERE id = ?`,
+        `UPDATE bg_logo_quarantines SET status = 'RESTORED', closed_at = NOW(), contest_outcome = 'OVERTURNED' WHERE id = ?`,
         [quarantineId],
       );
       await connection.commit();
@@ -816,11 +905,10 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
   } catch (error) {
     // Après un commit réussi puis un échec plus loin, le rollback n'a plus rien
     // à défaire et peut lever : c'est l'erreur d'origine qui doit remonter.
-    try {
-      await connection.rollback();
-    } catch {
-      // Rien à ajouter à l'erreur d'origine.
-    }
+    await rollbackQuietly(connection);
+    // Journalisée comme par `recordContestOutcome` — sans jamais remplacer le
+    // refus d'origine, que la route traduit.
+    if (overturnedRow) announceRefusedRestoreOutcome(overturnedRow, actor);
     throw error;
   } finally {
     connection.release();
@@ -829,15 +917,212 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
   await announceImageRestored(row, actor);
 }
 
-/** Remet l'adresse de l'image rétablie sur sa ligne, sous le verrou de la transaction. */
+/** Les deux emplacements du fichier à rétablir ; `*_NOT_MOVABLE` hors des dossiers attendus. */
+function restorableFileLocations(
+  url: string,
+  isTeam: boolean,
+  targetId: number,
+): { live: string; quarantined: string } {
+  const located = isTeam ? logoFileLocations(url, targetId) : avatarFileLocations(url, targetId);
+  if (!located) throw new Error(isTeam ? "LOGO_NOT_MOVABLE" : "AVATAR_NOT_MOVABLE");
+  return located;
+}
+
+/**
+ * Rétablissement refusé, une autre image ayant pris la place (D23) : écrit
+ * « acceptée » sous le verrou de la ligne et commite. Une seule fois — rend
+ * `false` si l'issue l'était déjà (second clic : rien à réannoncer).
+ */
+async function commitRefusedRestoreOutcome(connection: PoolConnection, quarantineId: number): Promise<boolean> {
+  const [noted] = await connection.execute<ResultSetHeader>(
+    `UPDATE bg_logo_quarantines SET contest_outcome = 'OVERTURNED'
+      WHERE id = ? AND (contest_outcome IS NULL OR contest_outcome <> 'OVERTURNED')`,
+    [quarantineId],
+  );
+  await connection.commit();
+  return Number(noted.affectedRows) > 0;
+}
+
+/** Journal du staff pour D23, sans jamais remplacer le refus d'origine. */
+function announceRefusedRestoreOutcome(row: QuarantineRow, actor: ReportPerson): void {
+  try {
+    announceContestOutcome(row, "OVERTURNED", actor);
+  } catch (error) {
+    console.error("[moderation] issue de la contestation non journalisée", error);
+  }
+}
+
+/** Annule la transaction sans masquer l'erreur d'origine (un rollback qui lève est tu). */
+async function rollbackQuietly(connection: PoolConnection): Promise<void> {
+  try {
+    await connection.rollback();
+  } catch {
+    // C'est l'erreur d'origine qui doit remonter.
+  }
+}
+
+/**
+ * Écrit l'issue d'une contestation (décision D22) sur une image modérée,
+ * masquée ou supprimée — jamais sur une image rétablie (sa contestation a
+ * abouti, `QUARANTINE_CLOSED`).
+ *
+ * Sur un avatar **masqué**, l'issue décide de la suppression à venir
+ * (`removalBlocksHash`). Sur un avatar **supprimé**, elle s'applique tout de
+ * suite, sur l'empreinte gardée avec la décision : acceptée, le blocage est
+ * levé (D18) — sauf si une autre suppression de la même image le justifie
+ * encore ; maintenue, il est posé. Même transaction que l'écriture de l'issue,
+ * sous le verrou de la ligne. Rend l'état de blocage de l'image après le geste
+ * (`null` : sans objet), et `hashUnknown` pour un avatar supprimé dont
+ * l'empreinte n'a pas été gardée (ligne d'avant la colonne, fichier déjà
+ * absent) : rien n'a pu changer.
+ *
+ * @throws QUARANTINE_NOT_FOUND
+ * @throws QUARANTINE_CLOSED
+ * @throws QUARANTINE_STILL_HIDDEN — acceptation d'une image encore masquée
+ */
+export async function recordContestOutcome(
+  quarantineId: number,
+  outcome: ContestOutcome,
+  actor: ReportPerson,
+): Promise<{ blocked: boolean | null; hashUnknown: boolean }> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+  let row: QuarantineRow;
+  let result: { blocked: boolean | null; hashUnknown: boolean };
+  try {
+    const userId = await quarantineUserId(connection, quarantineId);
+    await connection.beginTransaction();
+    await lockQuarantineUserFirst(connection, userId);
+    const [rows] = await connection.execute<QuarantineRow[]>(`${QUARANTINE_SELECT} WHERE q.id = ? FOR UPDATE`, [
+      quarantineId,
+    ]);
+    if (rows.length === 0) throw new Error("QUARANTINE_NOT_FOUND");
+    row = rows[0];
+    if (row.status === "RESTORED") throw new Error("QUARANTINE_CLOSED");
+    // Une image encore masquée dont la contestation aboutit se **rétablit**
+    // (`restoreReportedImage`, qui écrit l'issue) : l'accepter ici seulement
+    // laisserait la purge à venir sans blocage, rien n'étant rendu.
+    if (row.status === "HIDDEN" && outcome === "OVERTURNED") throw new Error("QUARANTINE_STILL_HIDDEN");
+    await connection.execute(`UPDATE bg_logo_quarantines SET contest_outcome = ? WHERE id = ?`, [outcome, quarantineId]);
+    result = await applyOutcomeToHash(connection, row, outcome);
+    await connection.commit();
+  } catch (error) {
+    await rollbackQuietly(connection);
+    throw error;
+  } finally {
+    connection.release();
+  }
+
+  announceContestOutcome(row, outcome, actor);
+  return result;
+}
+
+/**
+ * L'issue appliquée à l'empreinte d'un avatar **supprimé** (D18, D22), dans la
+ * transaction qui l'écrit. Rien pour une image masquée ou un logo.
+ */
+async function applyOutcomeToHash(
+  connection: PoolConnection,
+  row: QuarantineRow,
+  outcome: ContestOutcome,
+): Promise<{ blocked: boolean | null; hashUnknown: boolean }> {
+  if (row.status !== "PURGED" || row.target_type !== "USER") return { blocked: null, hashUnknown: false };
+  const sha256 = row.image_sha256;
+  if (!sha256) return { blocked: null, hashUnknown: true };
+  await connection.execute(`UPDATE bg_logo_quarantines SET hash_blocked = ? WHERE id = ?`, [
+    outcome === "UPHELD" ? 1 : 0,
+    Number(row.id),
+  ]);
+  if (outcome === "UPHELD") {
+    await blockImageHashOn(connection, sha256);
+    return { blocked: true, hashUnknown: false };
+  }
+  const lifted = await unblockImageHashOn(connection, sha256, Number(row.id));
+  return { blocked: !lifted && (await stillBlocked(connection, sha256)), hashUnknown: false };
+}
+
+/** Journal du staff : l'issue d'une contestation, sans pseudo de joueur. */
+function announceContestOutcome(row: QuarantineRow, outcome: ContestOutcome, actor: ReportPerson): void {
+  const verdict = outcome === "OVERTURNED" ? "acceptée" : "rejetée";
+  const subject =
+    row.target_type === "TEAM"
+      ? `le logo de l'équipe « ${discordInline(row.target_name)} »`
+      : `l'avatar d'${ANONYMOUS_PLAYER_LABEL}`;
+  const reference = row.report_id === null ? "" : ` (signalement #${Number(row.report_id)})`;
+  publishStaffAction(`⚖️ Contestation sur ${subject} ${verdict} par le staff${reference}.`, {
+    id: actor.userId,
+    pseudo: actor.pseudo,
+  }, { category: "moderation" });
+}
+
+/** L'empreinte est-elle (encore) bloquée ? Table absente : non. */
+async function stillBlocked(connection: PoolConnection, sha256: string): Promise<boolean> {
+  try {
+    const [rows] = await connection.execute<RowDataPacket[]>(
+      `SELECT 1 FROM bg_blocked_image_hashes WHERE sha256 = ? LIMIT 1`,
+      [sha256],
+    );
+    return rows.length > 0;
+  } catch (error) {
+    if (isMissingTableError(error)) return false;
+    throw error;
+  }
+}
+
+/**
+ * La ligne qui recevra l'image rétablie, verrouillée — `null` si elle n'existe
+ * plus. Un compte anonymisé n'a plus d'avatar à retrouver, et ne doit surtout
+ * pas en recevoir un par ce chemin : il est exclu comme une ligne disparue
+ * (`QUARANTINE_NOT_FOUND`), sans quoi le rétablissement republierait une
+ * identité sur une ligne que la suppression a vidée. Un compte **en attente**
+ * reçoit l'avatar dans son masque (`pending`), jamais sur sa ligne anonyme.
+ * Deux instructions **statiques**, une par domaine — une SQL bâtie par
+ * interpolation de nom de table/colonne se dérobe au `grep`.
+ */
+async function lockRestoreOwner(
+  connection: PoolConnection,
+  isTeam: boolean,
+  targetId: number,
+): Promise<{ imageUrl: string | null; pending: boolean } | null> {
+  if (!isTeam) {
+    const avatar = await readModeratableAvatar(connection, targetId, true);
+    return avatar ? { imageUrl: avatar.avatarUrl, pending: avatar.pending } : null;
+  }
+  const [teams] = await connection.execute<(RowDataPacket & { logo_url: string | null })[]>(
+    `SELECT logo_url FROM bg_teams WHERE id = ? FOR UPDATE`,
+    [targetId],
+  );
+  return teams[0] ? { imageUrl: teams[0].logo_url, pending: false } : null;
+}
+
+/**
+ * Retire l'avatar que la modération atteint, sous le verrou de
+ * `readModeratableAvatar` : du masque pour un compte en attente (rien à
+ * resynchroniser, l'entrée solo est déjà anonyme), de la ligne sinon.
+ */
+async function clearModeratedAvatar(connection: PoolConnection, userId: number, pending: boolean): Promise<void> {
+  if (pending) {
+    await setHeldAvatar(connection, userId, null);
+    return;
+  }
+  await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ? AND is_deleted = 0`, [userId]);
+  await syncSoloEntryIdentityOn(connection, userId);
+}
+
+/** Remet l'adresse de l'image rétablie sur sa ligne (ou le masque), sous le verrou de la transaction. */
 async function writeRestoredImage(
   connection: PoolConnection,
   row: QuarantineRow,
   isTeam: boolean,
   targetId: number,
+  pending: boolean,
 ): Promise<void> {
   if (isTeam) {
     await connection.execute(`UPDATE bg_teams SET logo_url = ? WHERE id = ?`, [row.logo_url, targetId]);
+    return;
+  }
+  if (pending) {
+    await setHeldAvatar(connection, targetId, row.logo_url);
     return;
   }
   await connection.execute(`UPDATE bg_users SET avatar_url = ? WHERE id = ? AND is_deleted = 0`, [
@@ -895,19 +1180,54 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
  * Supprime définitivement une image en quarantaine — par l'association (avant
  * l'échéance, contestation rejetée) ou d'office (échéance passée).
  *
+ * L'empreinte d'un avatar suit l'issue écrite de sa contestation
+ * (`removalBlocksHash`, D22) : maintenue, bloquée ; acceptée — rétablissement
+ * refusé par un avatar plus récent (D23) —, jamais. Sans issue écrite, le
+ * staff la bloque (D6) ; d'office (`actor` nul), l'échéance et la
+ * contestation sont **relues sous verrou** (`autoPurgeStillDue`) : rien n'est
+ * fait si la purge ne tient plus (rend `false`), et un avatar contesté n'est
+ * pas bloqué. L'empreinte est gardée sur la ligne dans tous les cas (D18 : une
+ * issue écrite après coup pose ou lève le blocage).
+ *
  * @throws QUARANTINE_NOT_FOUND
  * @throws QUARANTINE_CLOSED
  */
-export async function purgeQuarantinedLogo(quarantineId: number, actor: ReportPerson | null): Promise<void> {
+export async function purgeQuarantinedLogo(
+  quarantineId: number,
+  actor: ReportPerson | null,
+  options: { now?: Date } = {},
+): Promise<boolean> {
   const db = await getDatabase();
   const connection = await db.getConnection();
   let row: QuarantineRow;
+  let sha256: string | null = null;
+  let blockHash = false;
   try {
+    const userId = await quarantineUserId(connection, quarantineId);
     await connection.beginTransaction();
+    await lockQuarantineUserFirst(connection, userId);
     row = await lockQuarantine(connection, quarantineId);
+    const check =
+      actor === null
+        ? await autoPurgeStillDue(connection, row, options.now ?? new Date())
+        : { due: true, contested: false };
+    if (!check.due) {
+      await connection.rollback();
+      return false;
+    }
+    // L'issue est relue sous le verrou de la ligne (`lockQuarantine`) : une
+    // issue écrite pendant l'attente est vue.
+    blockHash = removalBlocksHash({
+      byStaff: actor !== null,
+      outcome: row.contest_outcome ?? null,
+      contested: check.contested,
+    });
+    if (row.target_type === "USER") sha256 = await blockPurgedAvatarOn(connection, row, blockHash);
     await connection.execute(
-      `UPDATE bg_logo_quarantines SET status = 'PURGED', closed_at = NOW() WHERE id = ?`,
-      [quarantineId],
+      `UPDATE bg_logo_quarantines
+          SET status = 'PURGED', closed_at = NOW(), image_sha256 = COALESCE(?, image_sha256), hash_blocked = ?
+        WHERE id = ?`,
+      [sha256, sha256 !== null && blockHash ? 1 : 0, quarantineId],
     );
     await connection.commit();
   } catch (error) {
@@ -917,6 +1237,35 @@ export async function purgeQuarantinedLogo(quarantineId: number, actor: ReportPe
     connection.release();
   }
 
+  await removePurgedFileAndAnnounce(row, actor);
+  return true;
+}
+
+/**
+ * L'empreinte du fichier d'un avatar en quarantaine, bloquée si la purge le
+ * veut (`blockHash`) — dans la transaction qui écrit la suppression, sous le
+ * verrou de la ligne : une issue écrite ensuite (D18) la trouve posée. Un
+ * échec annule la purge, rejouée au passage suivant (ou refusée au staff).
+ * Rend l'empreinte, gardée sur la ligne, ou `null` (fichier absent).
+ */
+async function blockPurgedAvatarOn(
+  connection: PoolConnection,
+  row: QuarantineRow,
+  blockHash: boolean,
+): Promise<string | null> {
+  const files = avatarFileLocations(row.logo_url, Number(row.target_id));
+  if (!files) return null;
+  const sha256 = await readImageSha256(files.quarantined);
+  if (sha256 === null) {
+    if (blockHash) logMissingRemovedFile(files.quarantined);
+    return null;
+  }
+  if (blockHash) await blockImageHashOn(connection, sha256);
+  return sha256;
+}
+
+/** Après le commit d'une purge : le fichier part, la décision est annoncée. */
+async function removePurgedFileAndAnnounce(row: QuarantineRow, actor: ReportPerson | null): Promise<void> {
   const isTeam = row.target_type === "TEAM";
   const targetId = Number(row.target_id);
   const reportId = row.report_id === null ? null : Number(row.report_id);
@@ -925,6 +1274,8 @@ export async function purgeQuarantinedLogo(quarantineId: number, actor: ReportPe
   // dans un dossier que rien ne sert.
   const files = isTeam ? logoFileLocations(row.logo_url, targetId) : avatarFileLocations(row.logo_url, targetId);
   if (files) {
+    // L'empreinte d'un avatar supprimé est déjà bloquée (ou non, selon
+    // l'issue) dans la transaction ci-dessus (D6, D22, D23).
     await unlinkIfPresent(files.quarantined).catch((error) => {
       console.error("[moderation] fichier en quarantaine non effacé", error);
     });
@@ -946,6 +1297,73 @@ export async function purgeQuarantinedLogo(quarantineId: number, actor: ReportPe
   } else {
     console.info(`[moderation] ${line} à l'échéance de sa quarantaine.`);
   }
+}
+
+/**
+ * Contestation **de personne visée** qui retient l'image (voir
+ * `purgeDueQuarantines`) — `q` désigne la quarantaine. Même règle que
+ * `targetContestPending`, qui la rejoue sous verrou.
+ */
+const TARGET_CONTEST_SQL = `EXISTS (SELECT 1 FROM bg_reports c
+                    WHERE c.parent_report_id = q.report_id
+                      AND (c.contest_role IS NULL OR c.contest_role = 'TARGET')
+                      -- L'auteur ne conteste qu'un dossier archivé : ce qui
+                      -- précède sa contestation était tranché, et la
+                      -- réouverture qu'elle provoque ne remet rien en attente.
+                      AND c.id > COALESCE((SELECT MAX(n.id) FROM bg_reports n
+                                           WHERE n.parent_report_id = q.report_id
+                                             AND n.contest_role = 'NOTIFIER'), 0))`;
+
+/**
+ * `TARGET_CONTEST_SQL` sur les contestations d'un signalement lues sous verrou :
+ * une contestation de personne visée (`NULL` : d'avant la colonne) postérieure
+ * à la dernière de l'auteur.
+ */
+export function targetContestPending(contests: readonly { id: number; contest_role: string | null }[]): boolean {
+  const lastNotifier = Math.max(0, ...contests.filter((c) => c.contest_role === "NOTIFIER").map((c) => Number(c.id)));
+  return contests.some((c) => (c.contest_role === null || c.contest_role === "TARGET") && Number(c.id) > lastNotifier);
+}
+
+/**
+ * La purge d'office tient-elle encore, relue **sous verrou** ? Le signalement
+ * d'origine est verrouillé comme le fait `createContest` : une contestation
+ * déposée depuis la relève de `purgeDueQuarantines` est vue, une contestation
+ * qui arrive ensuite attend la fin de la purge. `contested` décide, sans issue
+ * écrite, du blocage de l'empreinte (`removalBlocksHash`).
+ *
+ * Les contestations sont relues en **lecture courante** (`LOCK IN SHARE
+ * MODE`, sans sous-requête : dans une lecture verrouillante, une sous-requête
+ * resterait une lecture de l'instantané) : une contestation commitée pendant
+ * l'attente du verrou est vue quel que soit ce que la transaction a lu avant,
+ * et la règle est celle de la relève (`targetContestPending`). Sans
+ * signalement d'origine, aucune contestation n'est possible : rien n'est relu.
+ */
+async function autoPurgeStillDue(
+  connection: PoolConnection,
+  row: QuarantineRow,
+  now: Date,
+): Promise<{ due: boolean; contested: boolean }> {
+  let reportStatus: string | null = null;
+  let contested = false;
+  if (row.report_id !== null) {
+    const [reports] = await connection.execute<(RowDataPacket & { status: string })[]>(
+      `SELECT status FROM bg_reports WHERE id = ? FOR UPDATE`,
+      [row.report_id],
+    );
+    reportStatus = reports[0]?.status ?? null;
+    const [contests] = await connection.execute<(RowDataPacket & { id: number; contest_role: string | null })[]>(
+      `SELECT id, contest_role FROM bg_reports WHERE parent_report_id = ? LOCK IN SHARE MODE`,
+      [row.report_id],
+    );
+    contested = targetContestPending(contests);
+  }
+  const due = canAutoPurgeLogo({
+    purgeAfter: new Date(row.purge_after),
+    now,
+    contested,
+    reportSettled: row.report_id === null || reportStatus === null || reportStatus === "RESOLVED",
+  });
+  return { due, contested };
 }
 
 type DueRow = RowDataPacket & {
@@ -983,15 +1401,7 @@ export async function purgeDueQuarantines(now: Date = new Date()): Promise<numbe
   const db = await getDatabase();
   const [rows] = await db.execute<DueRow[]>(
     `SELECT q.id, q.purge_after, q.report_id, r.status AS report_status,
-            EXISTS (SELECT 1 FROM bg_reports c
-                    WHERE c.parent_report_id = q.report_id
-                      AND (c.contest_role IS NULL OR c.contest_role = 'TARGET')
-                      -- L'auteur ne conteste qu'un dossier archivé : ce qui
-                      -- précède sa contestation était tranché, et la
-                      -- réouverture qu'elle provoque ne remet rien en attente.
-                      AND c.id > COALESCE((SELECT MAX(n.id) FROM bg_reports n
-                                           WHERE n.parent_report_id = q.report_id
-                                             AND n.contest_role = 'NOTIFIER'), 0)) AS contested
+            ${TARGET_CONTEST_SQL} AS contested
      FROM bg_logo_quarantines q
      LEFT JOIN bg_reports r ON r.id = q.report_id
      WHERE q.status = 'HIDDEN' AND q.purge_after <= ?`,
@@ -1007,8 +1417,9 @@ export async function purgeDueQuarantines(now: Date = new Date()): Promise<numbe
     });
     if (!due) continue;
     try {
-      await purgeQuarantinedLogo(Number(row.id), null);
-      purged += 1;
+      // Relue sous verrou par la purge elle-même (contestation déposée
+      // entre-temps, empreinte à bloquer ou non) : cette relève ne fait que trier.
+      if (await purgeQuarantinedLogo(Number(row.id), null, { now })) purged += 1;
     } catch (error) {
       // Rétablie ou supprimée entre-temps : rien à faire.
       if ((error as Error).message !== "QUARANTINE_CLOSED") throw error;

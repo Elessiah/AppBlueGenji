@@ -3,7 +3,7 @@ import { getDatabase } from "@/lib/server/database";
 import { accountDeletionPlan } from "@/lib/shared/account-deletion";
 import { isLegacyDeletedPseudo } from "@/lib/shared/anonymous-pseudos";
 import { ACCOUNT_REACTIVATION_DAYS } from "@/lib/shared/account-deletion";
-import { accountTraceSql, finalizeAccountDeletion, loadAccountTrace } from "./account-deletion";
+import { accountTraceSql, afterCommit, finalizeAccountDeletion, loadAccountTrace } from "./account-deletion";
 import { settleDeletedSoloEntries } from "./deleted-solo-entries";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
@@ -25,27 +25,25 @@ export type DeletedAccountsReconciliation = {
 /**
  * Applique à un compte supprimé, verrouillé, la règle d'aujourd'hui : effacé
  * s'il n'a rien laissé, sinon anonymisé s'il porte encore l'ancien pseudo ou
- * des droits. Compte le geste dans `outcome` ; rend les tournois dont un match
+ * des droits. Rend le geste fait — compté par l'appelant **après** le commit,
+ * un commit en échec ne comptant pas deux fois — et les tournois dont un match
  * le nommait, à prévenir après le commit.
  */
 async function settleDeletedAccount(
   connection: PoolConnection,
   userId: number,
   row: { pseudo: string; is_admin: 0 | 1; platform_roles_json: unknown },
-  outcome: DeletedAccountsReconciliation,
-): Promise<number[]> {
+): Promise<{ gesture: "erased" | "renamed" | null; tournamentIds: number[] }> {
   const plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
   if (plan.mode === "ERASE") {
     const { tournamentIds } = await eraseAccount(connection, userId);
-    outcome.erased += 1;
-    return tournamentIds;
+    return { gesture: "erased", tournamentIds };
   }
   if (isLegacyDeletedPseudo(row.pseudo) || Number(row.is_admin) === 1 || row.platform_roles_json !== null) {
     const { tournamentIds } = await anonymizeAccount(connection, userId);
-    outcome.renamed += 1;
-    return tournamentIds;
+    return { gesture: "renamed", tournamentIds };
   }
-  return [];
+  return { gesture: null, tournamentIds: [] };
 }
 
 
@@ -124,49 +122,66 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
   }
 
   for (const candidate of candidates) {
-    const userId = Number(candidate.id);
-    const connection = await db.getConnection();
-    try {
-      await connection.beginTransaction();
-      const [locked] = await connection.execute<(RowDataPacket & {
-        pseudo: string;
-        is_deleted: 0 | 1;
-        is_admin: 0 | 1;
-        platform_roles_json: unknown;
-      })[]>(
-        `SELECT pseudo, is_deleted, is_admin, platform_roles_json
-           FROM bg_users WHERE id = ? FOR UPDATE`,
-        [userId],
-      );
-      const row = locked[0];
-      if (!row || Number(row.is_deleted) !== 1) {
-        await connection.rollback();
-        continue;
-      }
-      const tournamentIds = await settleDeletedAccount(connection, userId, row, outcome);
-      await connection.commit();
-      for (const tournamentId of tournamentIds) touchedTournaments.add(tournamentId);
-    } catch (error) {
-      // Sur une connexion morte — la panne même qu'on traite —, l'annulation
-      // lève à son tour : sans garde, elle sortirait de la boucle et laisserait
-      // tous les comptes suivants au prochain démarrage.
-      await connection.rollback().catch(() => {});
-      outcome.failed += 1;
-      console.error(
-        `[deleted-accounts] Rattrapage du compte #${userId} reporté au prochain démarrage :`,
-        error instanceof Error ? error.message : error,
-      );
-    } finally {
-      connection.release();
-    }
+    await reconcileOneAccount(db, Number(candidate.id), outcome, touchedTournaments);
   }
 
   // Même raison que la suppression elle-même (`deleteOwnAccount`) : les vues
   // de l'accueil qui nomment une entrée solo ne gardent pas l'ancien pseudo.
   if (outcome.erased + outcome.renamed > 0) invalidateTeamIdentityViews();
   // Et les matchs qui le nommaient (caster, lien, arbitre), comme `deleteOwnAccount`.
-  for (const tournamentId of touchedTournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+  // Un écouteur qui lève ne transforme pas un rattrapage fait en échec.
+  for (const tournamentId of touchedTournaments) {
+    afterCommit(() => publishMatchUpdatedEvent(tournamentId, { landingLive: true }), `Tournoi #${tournamentId} non prévenu`);
+  }
   return outcome;
+}
+
+/**
+ * Un compte repéré, dans **sa** transaction : relu sous le verrou de sa
+ * ligne, réglé, puis compté une fois commité. Ne lève jamais : l'échec de l'un
+ * n'empêche pas les autres (compté dans `failed`).
+ */
+async function reconcileOneAccount(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  userId: number,
+  outcome: DeletedAccountsReconciliation,
+  touchedTournaments: Set<number>,
+): Promise<void> {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [locked] = await connection.execute<(RowDataPacket & {
+      pseudo: string;
+      is_deleted: 0 | 1;
+      is_admin: 0 | 1;
+      platform_roles_json: unknown;
+    })[]>(
+      `SELECT pseudo, is_deleted, is_admin, platform_roles_json
+         FROM bg_users WHERE id = ? FOR UPDATE`,
+      [userId],
+    );
+    const row = locked[0];
+    if (!row || Number(row.is_deleted) !== 1) {
+      await connection.rollback();
+      return;
+    }
+    const { gesture, tournamentIds } = await settleDeletedAccount(connection, userId, row);
+    await connection.commit();
+    if (gesture) outcome[gesture] += 1;
+    for (const tournamentId of tournamentIds) touchedTournaments.add(tournamentId);
+  } catch (error) {
+    // Sur une connexion morte — la panne même qu'on traite —, l'annulation
+    // lève à son tour : sans garde, elle sortirait de la boucle et laisserait
+    // tous les comptes suivants au prochain démarrage.
+    await connection.rollback().catch(() => {});
+    outcome.failed += 1;
+    console.error(
+      `[deleted-accounts] Rattrapage du compte #${userId} reporté au prochain démarrage :`,
+      error instanceof Error ? error.message : error,
+    );
+  } finally {
+    connection.release();
+  }
 }
 
 /** Les comptes dont la finalisation a échoué, et quand : écartés de la file un temps. */

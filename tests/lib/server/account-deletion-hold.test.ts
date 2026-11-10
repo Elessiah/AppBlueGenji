@@ -8,6 +8,8 @@ import {
   isPseudoHeldByOther,
   loadTakenAnonymousPseudos,
   restoreAccountIdentity,
+  readModeratableAvatar,
+  setHeldAvatar,
 } from "@/lib/server/users/account-deletion-hold";
 import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
@@ -22,7 +24,7 @@ const REQUESTED = new Date("2026-11-06T10:00:00.000Z");
 const AVATAR = "/api/uploads/avatars/7.webp";
 const duplicate = () => Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY" });
 
-type Rows = { live?: object | null; hold?: object | null; taken?: object[]; affectedRows?: number };
+type Rows = { live?: object | null; user?: object | null; hold?: object | null; taken?: object[]; affectedRows?: number };
 
 /** Connexion de transaction : chaque lecture rend ses lignes, chaque écriture `affectedRows`. */
 function transaction(rows: Rows) {
@@ -30,6 +32,7 @@ function transaction(rows: Rows) {
   connection.execute.mockImplementation(async (sql: string) => {
     const q = sql.replace(/\s+/g, " ").trim();
     if (q.startsWith("SELECT pseudo, avatar_url FROM bg_users")) return [rows.live ? [rows.live] : [], []];
+    if (q.startsWith("SELECT pseudo, avatar_url, is_deleted FROM bg_users")) return [rows.user ? [rows.user] : [], []];
     if (q.startsWith("SELECT pseudo, avatar_url FROM bg_account_deletion_holds")) return [rows.hold ? [rows.hold] : [], []];
     if (q.startsWith("SELECT pseudo FROM bg_users WHERE id <> ?")) return [rows.taken ?? [], []];
     if (q.startsWith("SELECT user_id FROM bg_account_deletion_holds")) return [rows.taken ?? [], []];
@@ -279,5 +282,66 @@ describe("restoreAccountIdentity", () => {
     expect(await restoreAccountIdentity(fakeConnection(connection), 7)).toBe(false);
     expect(sqlOf(connection).some((q) => q.sql.startsWith("DELETE FROM bg_account_deletion_holds"))).toBe(false);
     expect(syncSoloEntryIdentityOn).not.toHaveBeenCalled();
+  });
+});
+
+// Revue sécurité #571, cycles 3-4 (D6) : la modération atteint l'avatar mis de côté.
+describe("readModeratableAvatar", () => {
+  it("readModeratableAvatar_liveAccount_returnsRowAvatarWithoutReadingHold", async () => {
+    const connection = transaction({ user: { pseudo: "Nova", avatar_url: AVATAR, is_deleted: 0 } });
+
+    const actual = await readModeratableAvatar(fakeConnection(connection), 7, false);
+
+    expect(actual).toEqual({ pseudo: "Nova", avatarUrl: AVATAR, pending: false });
+    expect(sqlOf(connection).map((q) => q.sql)).toEqual([
+      "SELECT pseudo, avatar_url, is_deleted FROM bg_users WHERE id = ? LIMIT 1",
+    ]);
+  });
+
+  it("readModeratableAvatar_pendingWithHold_returnsHeldAvatarUnderLocks", async () => {
+    const connection = transaction({
+      user: { pseudo: "Anonyme-3", avatar_url: null, is_deleted: 1 },
+      hold: { pseudo: "Nova", avatar_url: AVATAR },
+    });
+
+    const actual = await readModeratableAvatar(fakeConnection(connection), 7, true);
+
+    expect(actual).toEqual({ pseudo: "Anonyme-3", avatarUrl: AVATAR, pending: true });
+    expect(sqlOf(connection).map((q) => q.sql)).toEqual([
+      "SELECT pseudo, avatar_url, is_deleted FROM bg_users WHERE id = ? FOR UPDATE",
+      "SELECT pseudo, avatar_url FROM bg_account_deletion_holds WHERE user_id = ? LIMIT 1 FOR UPDATE",
+    ]);
+  });
+
+  it("readModeratableAvatar_anonymisedWithoutHold_returnsNull", async () => {
+    const connection = transaction({ user: { pseudo: "Anonyme-3", avatar_url: null, is_deleted: 1 }, hold: null });
+
+    expect(await readModeratableAvatar(fakeConnection(connection), 7, true)).toBeNull();
+  });
+
+  it("readModeratableAvatar_noRow_returnsNull", async () => {
+    const connection = transaction({ user: null });
+
+    expect(await readModeratableAvatar(fakeConnection(connection), 7, false)).toBeNull();
+  });
+});
+
+describe("setHeldAvatar", () => {
+  it("setHeldAvatar_null_clearsHoldAvatar", async () => {
+    const connection = transaction({});
+
+    await setHeldAvatar(fakeConnection(connection), 7, null);
+
+    expect(sqlOf(connection)).toEqual([
+      { sql: "UPDATE bg_account_deletion_holds SET avatar_url = ? WHERE user_id = ?", params: [null, 7] },
+    ]);
+  });
+
+  it("setHeldAvatar_url_writesHoldAvatar", async () => {
+    const connection = transaction({});
+
+    await setHeldAvatar(fakeConnection(connection), 7, AVATAR);
+
+    expect(sqlOf(connection)[0].params).toEqual([AVATAR, 7]);
   });
 });

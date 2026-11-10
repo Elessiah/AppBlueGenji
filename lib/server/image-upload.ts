@@ -216,8 +216,8 @@ export async function storeImageBuffer(
 
   const output = await resized.webp({ quality: config.quality }).toBuffer();
 
-  // Avatar ou logo d'équipe : une image bloquée (avatar en quarantaine d'un
-  // compte effacé, `blocked-images.ts`) n'est pas reposée.
+  // Avatar ou logo d'équipe : une image bloquée (avatar supprimé par la
+  // modération, décision D6, `blocked-images.ts`) n'est pas reposée.
   if ((kind === "avatar" || kind === "team-logo") && (await isBlockedImage(output, buffer))) {
     throw new Error(IMAGE_BLOCKED);
   }

@@ -115,8 +115,20 @@ import { STREAM_NOTICE_LIVE, STREAM_NOTICE_OBJECTION, STREAM_NOTICE_PRIVACY_PATH
  * inchangé) ; « Compte » — la suppression et ses suites
  * (ERASURE-D2 ; anonyme dès la demande, compte suspendu réactivable).
  * Annoncée par l'entrée `2026-11-conditions-v9-contacts-et-suppression`.
+ *
+ * Version 10 (ACCOUNT-DELETION #571, décisions de l'utilisateur D6, D12, D18,
+ * D22 et D10 du 2026-11-09 et 2026-11-10) : « Compte » — reprise d'une équipe
+ * par un membre suspendu après tous les autres, avatar rendu à la réactivation
+ * sauf masqué ou supprimé par la modération pendant le délai, seul un avatar
+ * supprimé par la modération reste bloqué ; « Signalement et modération » —
+ * empreinte gardée à la suppression d'un avatar, issue de la contestation
+ * gardée, blocage levé si elle est acceptée ; « Retransmission des matchs »
+ * (`STREAM_NOTICE_LIVE`) — l'annonce préalable ne vaut que pour un match dont
+ * la diffusion s'ouvre à son heure de début (D10). La version 9, déjà en
+ * ligne, ne se réécrit pas : annoncée par l'entrée
+ * `2026-11-conditions-v10-avatar-et-succession`.
  */
-export const TERMS_VERSION = 9;
+export const TERMS_VERSION = 10;
 
 /** Âge minimum pour créer un compte (défini dans `lib/shared/legal-durations.ts`). */
 export { SITE_MINIMUM_AGE };
@@ -129,7 +141,7 @@ export { SITE_MINIMUM_AGE };
 export const TERMS_AGE_DECLARATION = `je déclare avoir au moins ${SITE_MINIMUM_AGE} ans`;
 
 /** Date d'entrée en vigueur de la version courante (AAAA-MM-JJ). */
-export const TERMS_UPDATED_AT = "2026-11-06";
+export const TERMS_UPDATED_AT = "2026-11-12";
 
 /** Adresse de la page publique des conditions. */
 export const TERMS_PATH = "/conditions-utilisation";
@@ -277,7 +289,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
       `Il faut avoir **au moins ${SITE_MINIMUM_AGE} ans** pour créer un compte. En acceptant ces conditions, l'utilisateur déclare avoir atteint cet âge.`,
       "Un compte ne fait pas de son titulaire un **membre de l'association** : l'adhésion est une démarche distincte, soumise aux conditions de ses statuts, dont un âge minimum qui leur est propre.",
       "Le pseudo choisi ne doit ni usurper l'identité d'une autre personne, ni porter atteinte à ses droits, ni être injurieux, discriminatoire ou à caractère sexuel.",
-      `La suppression d'un compte se demande depuis son profil et ne devient **définitive qu'au bout de ${ACCOUNT_REACTIVATION_DAYS} jours** : d'ici là, se reconnecter permet de réactiver le compte, par une confirmation explicite. Dès la demande, le compte n'est plus visible et ses sessions sont fermées ; il est **montré anonyme partout** — pseudo d'emprunt, sans avatar, dans les résultats, classements, effectifs et pages de tournoi —, et la réactivation lui rend son pseudo, réservé d'ici là (pris malgré tout, il revient, raccourci au besoin, suivi de « OG » — ou « OG2 », « OG3 »… jusqu'à « OG10 » si ceux-là le sont aussi, à défaut le pseudo d'emprunt —, à changer dans le profil), et son avatar ; un compte suspendu peut aussi être réactivé, et revient suspendu ; il **quitte ses équipes** — la propriété passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre joueur de l'équipe ; une équipe dont il était le seul joueur devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute sinon —, ses tournois organisés passent à une autre personne du staff quand quelqu'un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore terminés, ses désignations d'arbitre et ses invitations et demandes d'adhésion d'équipe en attente sont retirés et ses matchs restants d'un tournoi individuel en cours où il n'a jamais joué sont perdus par forfait. **La réactivation ne défait pas ces gestes.** Au terme du délai, le compte est effacé, ou anonymisé s'il a laissé une trace que d'autres lisent (match joué, engagement dans un tournoi individuel commencé, tournoi organisé que personne n'a pu reprendre) ; un avatar retiré par la modération que l'effacement emporte ne peut pas être reposé.`,
+      `La suppression d'un compte se demande depuis son profil et ne devient **définitive qu'au bout de ${ACCOUNT_REACTIVATION_DAYS} jours** : d'ici là, se reconnecter permet de réactiver le compte, par une confirmation explicite. Dès la demande, le compte n'est plus visible et ses sessions sont fermées ; il est **montré anonyme partout** — pseudo d'emprunt, sans avatar, dans les résultats, classements, effectifs et pages de tournoi —, et la réactivation lui rend son pseudo, réservé d'ici là (pris malgré tout, il revient, raccourci au besoin, suivi de « OG » — ou « OG2 », « OG3 »… jusqu'à « OG10 » si ceux-là le sont aussi, à défaut le pseudo d'emprunt —, à changer dans le profil), et son avatar, sauf s'il est alors masqué ou supprimé par la modération — pendant ce délai, elle peut le masquer, le rétablir ou le supprimer comme celui d'un compte actif ; un compte suspendu peut aussi être réactivé, et revient suspendu ; il **quitte ses équipes** — la propriété passe à un copropriétaire, sinon à un gérant, sinon à un capitaine, sinon à un autre joueur de l'équipe, un joueur suspendu ne passant qu'après tous les autres ; une équipe dont il était le seul joueur devient une équipe fantôme si elle est engagée dans un tournoi non terminé, et est dissoute sinon —, ses tournois organisés passent à une autre personne du staff quand quelqu'un peut les reprendre, ses inscriptions à un tournoi individuel pas encore commencé sont retirées, ses casts de matchs pas encore terminés, ses désignations d'arbitre et ses invitations et demandes d'adhésion d'équipe en attente sont retirés et ses matchs restants d'un tournoi individuel en cours où il n'a jamais joué sont perdus par forfait. **La réactivation ne défait pas ces gestes.** Au terme du délai, le compte est effacé, ou anonymisé s'il a laissé une trace que d'autres lisent (match joué, engagement dans un tournoi individuel commencé, tournoi organisé que personne n'a pu reprendre) ; seul un avatar que la modération a **supprimé** ne peut plus être reposé (section « Signalement et modération ») — un avatar seulement masqué, ou que la modération n'a jamais supprimé, part sans que son empreinte soit gardée.`,
       "Chaque utilisateur peut exporter ses données et supprimer son compte à tout moment depuis son profil.",
     ],
   },
@@ -350,6 +362,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
       "Le traitement des données qu'exige la modération des contenus et des comptes contraires à ces conditions (examen d'un contenu, masquage, retrait, suspension, conservation de la décision le temps de sa contestation) repose sur l'**intérêt légitime** de l'association à faire respecter ses règles ; la politique de confidentialité en détaille les durées.",
       "Les joueurs visés par un signalement, et les membres des équipes visées, en sont **prévenus en message privé Discord** (s'ils ont rattaché leur compte Discord ou certifié leur tag). Ils lisent sur la page du signalement ce qui est reproché — jamais qui l'a signalé — et peuvent le **contester** depuis cette page ou par la catégorie « Contestation » du même formulaire ; contester un signalement archivé le rouvre.",
       `Un logo d'équipe ou un avatar de joueur signalé peut être **masqué** plutôt que supprimé : il n'est plus en ligne, et l'équipe ou le joueur dispose de **${LOGO_QUARANTINE_MONTHS} mois** pour contester. Sans contestation, l'image est supprimée définitivement à l'échéance ; si la contestation aboutit, elle est rétablie. Un contenu manifestement illicite peut être supprimé sans délai : l'équipe ou le joueur en est prévenu de la même façon et peut contester la décision.`,
+      "Quand la modération **supprime** un avatar, l'empreinte de l'image est gardée pour en refuser la remise en ligne, comme avatar ou comme logo d'équipe, y compris après la suppression du compte ; un avatar seulement masqué n'est pas bloqué. Supprimé d'office au terme d'un masquage alors que sa contestation attend encore son issue, il n'est bloqué qu'une fois la suppression maintenue, ou à l'effacement du compte s'il vient avant. L'issue d'une contestation est gardée avec la décision : maintenue, le blocage reste ; acceptée après une suppression décidée sur un signalement ou après un masquage, il est levé, sauf si une autre suppression de la même image le justifie encore ou si le compte a été effacé entre-temps.",
     ],
   },
   {

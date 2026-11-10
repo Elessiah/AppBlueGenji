@@ -40,7 +40,8 @@ async function main(): Promise<void> {
     console.log(
       `\n${dryRun ? "À rejouer" : "Rejouées"} : ${report.replayed} · absentes de la base : ${report.absent}` +
         ` · déjà supprimées : ${report.alreadyDeleted} · identifiant réattribué : ${report.otherAccount}` +
-        ` · ${dryRun ? "à réactiver" : "réactivés"} : ${report.reactivated} · déjà réactivés : ${report.alreadyActive}` +
+        ` · ${dryRun ? "à réactiver (au plus)" : "réactivés"} : ${report.reactivated} · déjà réactivés : ${report.alreadyActive}` +
+        ` · réactivations dépassées par une demande : ${report.superseded} · demandes déjà à jour : ${report.alreadyPending}` +
         ` · échecs : ${report.failed}`,
     );
     process.exit(report.failed > 0 ? 1 : 0);

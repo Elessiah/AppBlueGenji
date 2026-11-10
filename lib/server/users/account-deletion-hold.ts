@@ -61,7 +61,7 @@ export async function loadTakenAnonymousPseudos(runner: Runner, userId: number):
 export async function holdAccountIdentity(
   connection: PoolConnection,
   userId: number,
-  requestedAt: Date,
+  requestedAt: Date | string,
 ): Promise<boolean> {
   const [rows] = await connection.execute<(RowDataPacket & { pseudo: string; avatar_url: string | null })[]>(
     `SELECT pseudo, avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
@@ -107,6 +107,51 @@ export async function readDeletionHold(runner: Runner, userId: number, lock = fa
     [userId],
   );
   return rows[0] ? { pseudo: rows[0].pseudo, avatarUrl: rows[0].avatar_url ?? null } : null;
+}
+
+/** L'avatar qu'une décision de modération peut atteindre (`readModeratableAvatar`). */
+export interface ModeratableAvatar {
+  pseudo: string;
+  avatarUrl: string | null;
+  /** En attente de suppression : l'avatar est dans le masque, pas sur la ligne. */
+  pending: boolean;
+}
+
+/**
+ * L'avatar qu'une décision de modération (masquage, suppression,
+ * rétablissement) peut atteindre (décision D6) : celui de la ligne d'un compte
+ * vivant — ou, compte **en attente de suppression**, celui que son masque garde
+ * pour la réactivation, toujours servi : sans quoi demander la suppression
+ * mettrait l'image hors d'atteinte de la modération pendant trente jours.
+ * `null` : pas de ligne, ou compte anonymisé (sans masque) — il n'y a plus rien.
+ * `lock` : sous les verrous de la ligne et du masque, dans cet ordre.
+ */
+export async function readModeratableAvatar(
+  runner: Runner,
+  userId: number,
+  lock: boolean,
+): Promise<ModeratableAvatar | null> {
+  const [users] = await runner.execute<(RowDataPacket & { pseudo: string; avatar_url: string | null; is_deleted: 0 | 1 })[]>(
+    lock
+      ? `SELECT pseudo, avatar_url, is_deleted FROM bg_users WHERE id = ? FOR UPDATE`
+      : `SELECT pseudo, avatar_url, is_deleted FROM bg_users WHERE id = ? LIMIT 1`,
+    [userId],
+  );
+  const user = users[0];
+  if (!user) return null;
+  if (Number(user.is_deleted) !== 1) return { pseudo: user.pseudo, avatarUrl: user.avatar_url, pending: false };
+  const hold = await readDeletionHold(runner, userId, lock);
+  return hold ? { pseudo: user.pseudo, avatarUrl: hold.avatarUrl, pending: true } : null;
+}
+
+/**
+ * Pose (`avatarUrl`) ou retire (`null`) l'avatar gardé dans le masque d'un
+ * compte en attente — masquage, suppression ou rétablissement par la
+ * modération ; la réactivation rend ce que le masque garde alors. Sous le
+ * verrou pris par `readModeratableAvatar`.
+ */
+export async function setHeldAvatar(runner: Runner, userId: number, avatarUrl: string | null): Promise<void> {
+  await runner.execute(`UPDATE bg_account_deletion_holds SET avatar_url = ? WHERE user_id = ?`, [avatarUrl, userId]);
 }
 
 /** Efface le masque (suppression définitive : le vrai pseudo ne doit plus survivre nulle part). */

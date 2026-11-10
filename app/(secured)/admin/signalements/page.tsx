@@ -23,6 +23,7 @@ import {
   type ReportFilters,
 } from "./_lib/report-filters";
 import { adminFetch, adminReportErrorMessage, jsonBody } from "./_lib/admin-errors";
+import { contestOutcomeMessage, type ContestOutcome } from "@/lib/shared/logo-quarantine";
 import { ReportDetail } from "./_components/ReportDetail";
 import { StatusPill } from "./_components/StatusPill";
 import styles from "./reports.module.css";
@@ -126,12 +127,12 @@ function ReportsPanel() {
     }
   };
 
-  const run = async (task: () => Promise<unknown>, success: string) => {
+  const run = async <T,>(task: () => Promise<T>, success: string | ((result: T) => string)) => {
     if (busy) return;
     setBusy(true);
     try {
-      await task();
-      showSuccess(success);
+      const result = await task();
+      showSuccess(typeof success === "function" ? success(result) : success);
       // Le badge « Signalements » de la barre compte les dossiers ouverts.
       router.refresh();
     } catch (error) {
@@ -203,6 +204,20 @@ function ReportsPanel() {
     void run(
       () => adminFetch(`/api/admin/logo-quarantines/${quarantineId}`, { method: "DELETE" }, "LOGO_PURGE_FAILED"),
       `${imageNoun(type)} supprimé définitivement. ${concernedNoun(type)}.`,
+    );
+  };
+
+  // L'issue d'une contestation (D22) ; sur un avatar supprimé, le message dit
+  // ce que devient le blocage de son image (D18).
+  const onContestOutcome = (quarantineId: number, outcome: ContestOutcome) => {
+    void run(
+      () =>
+        adminFetch<{ blocked?: boolean | null; hashUnknown?: boolean }>(
+          `/api/admin/logo-quarantines/${quarantineId}/contest-outcome`,
+          jsonBody("POST", { outcome }),
+          "CONTEST_OUTCOME_FAILED",
+        ),
+      (result) => contestOutcomeMessage(outcome, result.blocked ?? null, result.hashUnknown === true),
     );
   };
 
@@ -335,6 +350,7 @@ function ReportsPanel() {
               onDeleteLogo={onDeleteLogo}
               onRestore={onRestore}
               onPurge={onPurge}
+              onContestOutcome={onContestOutcome}
             />
           ) : (
             <p className={styles.empty}>

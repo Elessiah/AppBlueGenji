@@ -76,8 +76,12 @@ describe("message #live de la soirée (conditions v7)", () => {
   const readSource = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
   it("dit la mention #live avant, pendant et après le match, en français et en anglais", () => {
-    expect(STREAM_NOTICE_LIVE).toContain("par un message de soirée qui liste chaque match à son heure — avant son début s'il est programmé dans la soirée, pendant sa diffusion, puis une fois terminé, avec son score —");
-    expect(STREAM_NOTICE_LIVE_EN).toContain("by an evening message that lists each match at its time — before it starts if it is scheduled that evening, while it is streamed, then once finished, with its score —");
+    // Conditions v10 (D10) : l'annonce préalable ne vaut que pour un match dont
+    // la diffusion s'ouvre à son heure de début (`loadEveningMatches`, START_TIME).
+    expect(STREAM_NOTICE_LIVE).toContain("par un message de soirée qui liste chaque match à son heure — avant son début si sa diffusion doit s'ouvrir à son heure de début dans la soirée, pendant sa diffusion, puis une fois terminé, avec son score —");
+    expect(STREAM_NOTICE_LIVE_EN).toContain("by an evening message that lists each match at its time — before it starts if its stream is due to open at its start time that evening, while it is streamed, then once finished, with its score —");
+    expect(STREAM_NOTICE_LIVE).not.toContain("s'il est programmé dans la soirée");
+    expect(STREAM_NOTICE_LIVE_EN).not.toContain("if it is scheduled that evening");
   });
 
   it("est reprise par la section « Retransmission des matchs » des conditions (FR et EN)", () => {

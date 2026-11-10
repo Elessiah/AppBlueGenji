@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
@@ -39,7 +40,20 @@ const REFERENCE_QUERIES = [
   "SELECT 1 FROM bg_sponsors WHERE logo_url IN (?, ?) OR banner_url IN (?, ?) LIMIT 1",
   "SELECT 1 FROM bg_benevoles WHERE photo_url IN (?, ?) LIMIT 1",
   "SELECT 1 FROM bg_logo_quarantines WHERE status = 'HIDDEN' AND logo_url IN (?, ?) LIMIT 1",
+  // Avatar d'un compte en attente de suppression, rendu s'il revient.
+  "SELECT 1 FROM bg_account_deletion_holds WHERE avatar_url IN (?, ?) LIMIT 1",
 ] as const;
+
+/**
+ * Le chemin absolu sur le disque du fichier téléversé que désigne `url`, s'il
+ * vit dans `folder` (sans traversée) — `null` sinon : une seule règle pour
+ * qui lit le fichier avant de l'effacer (empreinte d'une image supprimée).
+ */
+export function storedUploadAbsolutePath(url: string | null | undefined, folder: UploadFolder): string | null {
+  if (!isStoredUploadIn(url, folder)) return null;
+  const disk = toDiskUploadPath(url);
+  return disk ? path.join(process.cwd(), "public", disk.replace(/^\/+/, "")) : null;
+}
 
 /**
  * Vrai si une ligne désigne encore ce fichier, sous sa forme servie ou disque.
