@@ -396,6 +396,9 @@ gardent le fournisseur que l'ancienne règle leur avait donné.
 Un match a **une liste de streams** (`bg_match_streams` : un lien facultatif
 chacun) et **une liste de casters** (`bg_match_casters` : un compte, le stream
 qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
+L'instantané lit les streams puis les casters ; un caster lu sur un stream que
+la première lecture n'a pas vu (ouvert entre les deux) fait relire les streams
+une fois (`castersOnUnreadStream`), jamais rendu sur un stream absent.
 
 - **S'inscrire** : `POST /api/matches/[id]/caster`, corps `{ streamId }` pour
   rejoindre un stream du match (co-cast), `{ liveUrl }` pour ouvrir le sien —

@@ -1097,7 +1097,7 @@ describe("setMatchLiveConfig", () => {
     const world = liveWorld(matchRow({ kept_referee_user_id: 9 }));
     await mockLiveDb(world);
 
-    await setMatchLiveConfig(42, { trigger: "MANUAL", setter: { userId: 9, asOrganisation: false }, access: STAFF });
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: undefined, setter: { userId: 9, asOrganisation: false }, access: STAFF });
 
     expect(world.state.setterLocks).toEqual([]);
   });

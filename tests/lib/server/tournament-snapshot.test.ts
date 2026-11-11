@@ -32,6 +32,7 @@ jest.mock("@/lib/server/tournaments/match-casters");
 jest.mock("@/lib/server/tournaments/round-maps");
 
 import {
+  castersOnUnreadStream,
   getTournamentSnapshot,
   getTournamentSnapshotFrame,
   invalidateTournamentSnapshot,
@@ -743,6 +744,7 @@ describe("getTournamentSnapshot — casters et streams (porte commune du flux et
     const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
 
     expect(loadMatchCasters).toHaveBeenCalledTimes(1);
+    expect(loadMatchStreams).toHaveBeenCalledTimes(1);
     expect(jest.mocked(loadMatchCasters).mock.calls[0][1]).toEqual([1, 2]);
     const [casted, bare] = snapshot?.matches ?? [];
     expect(casted.liveUrl).toBe("https://twitch.tv/match");
@@ -768,6 +770,28 @@ describe("getTournamentSnapshot — casters et streams (porte commune du flux et
     expect(snapshot?.matches[0].casters).toEqual([]);
   });
 
+  it("getTournamentSnapshot_casterOnStreamOpenedBetweenReads_rereadsStreamsOnce", async () => {
+    // Le caster a ouvert son stream entre la lecture des streams et celle des casters.
+    jest.mocked(getMatchRows).mockResolvedValue([matchRow({ id: 1, status: "READY" })]);
+    jest.mocked(loadMatchStreams)
+      .mockResolvedValueOnce(new Map([[1, [{ id: 5, matchId: 1, liveUrl: null, staff: true }]]]))
+      .mockResolvedValueOnce(
+        new Map([[1, [
+          { id: 5, matchId: 1, liveUrl: null, staff: true },
+          { id: 6, matchId: 1, liveUrl: "https://kick.com/voix", staff: false },
+        ]]]),
+      );
+    jest.mocked(loadMatchCasters).mockResolvedValue(
+      new Map([[1, [{ matchId: 1, userId: 9, streamId: 6, readyAt: null, pseudo: "Voix", eligibility }]]]),
+    );
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+
+    expect(loadMatchStreams).toHaveBeenCalledTimes(2);
+    expect(snapshot?.matches[0].streams.map((stream) => stream.id)).toEqual([5, 6]);
+    expect(snapshot?.matches[0].casters.map((caster) => caster.streamId)).toEqual([6]);
+  });
+
   it("tait un caster devenu inéligible d'un match pas encore lancé", async () => {
     jest.mocked(getMatchRows).mockResolvedValue([matchRow({ id: 1, status: "READY" })]);
     jest.mocked(loadMatchStreams).mockResolvedValue(
@@ -785,5 +809,28 @@ describe("getTournamentSnapshot — casters et streams (porte commune du flux et
     const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
 
     expect(snapshot?.matches[0].casters.map((caster) => caster.userId)).toEqual([9]);
+  });
+});
+
+describe("castersOnUnreadStream", () => {
+  it("castersOnUnreadStream_casterStreamAbsentFromRead_returnsTrue", () => {
+    const streams = new Map([[1, [{ id: 5 }]]]);
+    const casters = new Map([[1, [{ streamId: 6 }]]]);
+
+    expect(castersOnUnreadStream(streams, casters)).toBe(true);
+  });
+
+  it("castersOnUnreadStream_allCasterStreamsRead_returnsFalse", () => {
+    const streams = new Map([[1, [{ id: 5 }, { id: 6 }]]]);
+    const casters = new Map([[1, [{ streamId: 5 }, { streamId: 6 }]]]);
+
+    expect(castersOnUnreadStream(streams, casters)).toBe(false);
+  });
+
+  it("castersOnUnreadStream_casterOnMatchWithNoStreamRead_returnsTrue", () => {
+    const streams = new Map([[1, [{ id: 5 }]]]);
+    const casters = new Map([[2, [{ streamId: 7 }]]]);
+
+    expect(castersOnUnreadStream(streams, casters)).toBe(true);
   });
 });

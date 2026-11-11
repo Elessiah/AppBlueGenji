@@ -489,13 +489,19 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     // Casters et streams, une lecture chacun pour tout le plateau — dans
     // l'instantané commun eux aussi (`docs/features/MATCH_LAUNCH.md`).
     const matchIds = matches.map((row) => Number(row.id));
-    const streamsByMatch = await loadMatchStreams(connection, matchIds);
+    let streamsByMatch = await loadMatchStreams(connection, matchIds);
     // Tout caster tient un stream (`stream_id`, clé étrangère) : sans stream
     // sur le plateau, il n'a aucun caster à lire.
     const castersByMatch =
       streamsByMatch.size === 0
         ? new Map<number, MatchCasterRow[]>()
         : await loadMatchCasters(connection, matchIds);
+    // Deux lectures séparées : un caster qui ouvre son stream entre elles
+    // serait rendu sur un stream absent. Le cas, rare, relit les streams —
+    // le caster lu tient un stream déjà écrit (clé étrangère).
+    if (castersOnUnreadStream(streamsByMatch, castersByMatch)) {
+      streamsByMatch = await loadMatchStreams(connection, matchIds);
+    }
     // Cartes par manche et règles de ban, dans l'instantané commun : flux et
     // REST de secours les portent ensemble (`docs/features/ROUND_MAPS.md`).
     const storedMapRules = await loadMapRules(connection, tournamentId, tournament);
@@ -630,4 +636,19 @@ export async function getTournamentSnapshot(
 ): Promise<TournamentSnapshot | null> {
   const frame = await getTournamentSnapshotFrame(tournamentId);
   return frame?.snapshot ?? null;
+}
+
+/**
+ * Un caster lu tient-il un stream que la lecture des streams, faite avant, n'a
+ * pas vu (ouvert entre les deux lectures de l'instantané) ?
+ */
+export function castersOnUnreadStream(
+  streams: ReadonlyMap<number, readonly { id: number }[]>,
+  casters: ReadonlyMap<number, readonly { streamId: number | null }[]>,
+): boolean {
+  for (const [matchId, list] of casters) {
+    const known = new Set((streams.get(matchId) ?? []).map((stream) => stream.id));
+    if (list.some((caster) => caster.streamId !== null && !known.has(caster.streamId))) return true;
+  }
+  return false;
 }
