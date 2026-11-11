@@ -166,24 +166,23 @@ export async function loadSeedingBoard(tournamentId: number): Promise<SeedingBoa
 }
 
 /**
- * Nombre de tentatives d'un réordonnancement défait par un interblocage.
+ * Applique un nouvel ordre de seeding.
  *
- * Aucun ordre de verrous ne l'exclut : les gestes du staff (avancée, retour en
- * arrière, inscription) tiennent le tournoi puis écrivent des matchs, les
- * saisies de score tiennent leur match — voire d'autres, par l'entretien — puis
- * le tournoi dans la réconciliation. Le réordonnancement prend l'ordre des
+ * Rejoué quand un interblocage le défait (`retryOnDeadlock` : trois
+ * tentatives, attente courte et aléatoire — le rejeu de tous les gestes du
+ * moteur, qui couvre aussi `ER_AUTOINC_READ_FAILED` et le refus de l'isolation
+ * par instantané de MariaDB, `ER_CHECKREAD`). Aucun ordre de verrous n'exclut
+ * l'interblocage : les gestes du staff (avancée, retour en arrière,
+ * inscription) tiennent le tournoi puis écrivent des matchs, les saisies de
+ * score tiennent leur match — voire d'autres, par l'entretien — puis le
+ * tournoi dans la réconciliation. Le réordonnancement prend l'ordre des
  * premiers (tournoi, puis matchs). Quand une saisie le croise, InnoDB défait
  * l'une des deux — et pas forcément le réordonnancement, qui tient les verrous
- * de tous les matchs du tournoi. Défait, il **rejoue** sa transaction : il
- * relit les matchs, voit la saisie commitée et refuse en `SEEDING_LOCKED`.
- * Si c'est la saisie qui est défaite, elle échoue en erreur visible (ses
- * chemins ne rejouent pas) et le réordonnancement passe : aucun score n'est
- * perdu en silence. Le rejeu est celui de tous les gestes du moteur
- * (`retryOnDeadlock` : trois tentatives, attente courte et aléatoire).
- */
-
-/**
- * Applique un nouvel ordre de seeding.
+ * de tous les matchs du tournoi. Défait, il rejoue sa transaction : il relit
+ * les matchs, voit la saisie commitée et refuse en `SEEDING_LOCKED`. Si c'est
+ * la saisie qui est défaite, elle rejoue de même, et n'échoue qu'en erreur
+ * visible si le rejeu n'en vient pas à bout : aucun score n'est perdu en
+ * silence.
  *
  * @throws TOURNAMENT_NOT_FOUND | SEEDING_LOCKED | SEEDING_LOCKED_STARTED | SEEDING_LOCKED_FINISHED | INVALID_SEED_ORDER
  */
