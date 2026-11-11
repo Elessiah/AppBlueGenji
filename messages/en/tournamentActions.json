@@ -412,7 +412,7 @@
       "played": "The match has been played: this cast’s link and BattleTag can no longer change.",
       "identityTitle": "Caster identity incomplete",
       "noLiveTitle": "Streaming permission removed",
-      "noLive": "Without the streaming permission, this cast can no longer be set up: you can only withdraw from the match."
+      "noLive": "Without the streaming permission, this cast can no longer be set up: you can only stop casting this match."
     }
   },
   "planning": {

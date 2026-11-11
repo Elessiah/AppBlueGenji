@@ -38,6 +38,7 @@ const CAST_FIELD_ERRORS = {
   CAST_STREAM_NOT_OWNED: "url",
   CAST_STREAM_LINK_HELD: "url",
   INVALID_CAST_BATTLETAG: "battletag",
+  LIVE_TRIGGER_CHANGED: "trigger",
 } as const;
 
 /** Ce que la fenêtre a lu du cast du lecteur (`GET /api/matches/[id]/caster`). */
@@ -46,6 +47,8 @@ type OwnCast = {
   liveUrl: string | null;
   staffStream: boolean;
   battletag: string | null;
+  /** Mode d'antenne du match à la lecture (relu après `LIVE_TRIGGER_CHANGED`). */
+  liveTrigger: MatchLiveTrigger | null;
 };
 
 /**
@@ -98,6 +101,7 @@ export function CastSettingsDialog({
   const titleId = useId();
   const urlId = useId();
   const battletagId = useId();
+  const triggerId = useId();
 
   const [cast, setCast] = useState<OwnCast | null>(null);
   const [confirmRelease, setConfirmRelease] = useState(false);
@@ -106,10 +110,11 @@ export function CastSettingsDialog({
   // `null` tant que le caster n'a pas choisi : un match démarqué montre
   // « automatique » sans que l'enregistrement d'un BattleTag le marque casté.
   const [pickedTrigger, setTrigger] = useState<MatchLiveTrigger | null>(null);
-  const trigger: MatchLiveTrigger = pickedTrigger ?? match.liveTrigger ?? "AUTO";
-  const { seenTrigger, pickTrigger } = useSeenTrigger(match.liveTrigger, pickedTrigger, setTrigger);
+  const { current: liveTrigger, refresh: refreshTrigger } = useCurrentTrigger(match.liveTrigger);
+  const trigger: MatchLiveTrigger = pickedTrigger ?? liveTrigger ?? "AUTO";
+  const { seenTrigger, pickTrigger } = useSeenTrigger(liveTrigger, pickedTrigger, setTrigger);
   const [busy, setBusy] = useState(false);
-  const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId, battletag: battletagId });
+  const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId, battletag: battletagId, trigger: triggerId });
   const fail = (code: string | null | undefined) => launchErrorText(actionText, errorsText, code);
 
   // Lecture d'ouverture : le lien de son stream et son BattleTag de cast. Un
@@ -159,7 +164,7 @@ export function CastSettingsDialog({
   const urlMissing = streamEditable && urlChanged && url.trim() === "";
   const battletagRefused = castBattletagInvalid(battletag);
   const battletagChanged = cast !== null && !played && battletag.trim() !== (cast.battletag ?? "");
-  const triggerChanged = configurable && !triggerLocked && pickedTrigger !== null && pickedTrigger !== match.liveTrigger;
+  const triggerChanged = configurable && !triggerLocked && pickedTrigger !== null && pickedTrigger !== liveTrigger;
   // « Enregistrer » sans rien de changé n'a rien à dire : il reste désarmé.
   const dirty = triggerChanged || (streamEditable && urlChanged) || battletagChanged;
   // Seul un mode choisi ici s'envoie : celui du match, même sans sa date, ne
@@ -168,7 +173,7 @@ export function CastSettingsDialog({
     configurable &&
     !triggerLocked &&
     pickedTrigger !== null &&
-    pickedTrigger !== match.liveTrigger &&
+    pickedTrigger !== liveTrigger &&
     castTriggerNeedsDate(trigger, match.startAt);
   // La rediff garde sa fenêtre (`MatchReplayDialog`), celle du staff de
   // diffusion : une seule définition du lien YouTube et de ses refus.
@@ -204,12 +209,12 @@ export function CastSettingsDialog({
       const message = fail(code);
       fieldErrors.report(code, message);
       showError(message);
-      // Mode changé entre-temps : la page relit le match (le flux a pu ne pas
-      // le livrer encore), la fenêtre montre le nouveau mode, et le prochain
-      // choix part avec lui comme mode vu (`useSeenTrigger`).
+      // Mode changé entre-temps : la fenêtre relit le mode du match (le flux
+      // a pu ne pas le livrer encore) et le montre ; le prochain choix part
+      // avec lui comme mode vu (`useSeenTrigger`).
       if (code === "LIVE_TRIGGER_CHANGED") {
         setTrigger(null);
-        onSaved();
+        void refreshTrigger(match.id);
       }
     } finally {
       setBusy(false);
@@ -262,7 +267,7 @@ export function CastSettingsDialog({
           </InfoHintRow>
         )}
 
-        {cast !== null && !settable && (
+        {cast !== null && !settable && !played && (
           <NotSettableHint titleId={titleId} identityBlock={identityBlock} identityText={fail} />
         )}
 
@@ -300,10 +305,15 @@ export function CastSettingsDialog({
             {configurable && (
               <CastTriggerField
                 // Match démarqué : aucun mode coché, chaque choix se clique.
-                trigger={triggerLocked ? lockedTrigger(true, match.liveTrigger, trigger) : (pickedTrigger ?? match.liveTrigger)}
+                trigger={triggerLocked ? lockedTrigger(true, liveTrigger, trigger) : (pickedTrigger ?? liveTrigger)}
                 startAt={match.startAt}
-                onChange={pickTrigger}
+                onChange={(next) => {
+                  pickTrigger(next);
+                  fieldErrors.clear("trigger");
+                }}
                 locked={triggerLocked}
+                id={triggerId}
+                fieldError={fieldErrors.message("trigger")}
               />
             )}
           </>
@@ -342,7 +352,7 @@ export function CastSettingsDialog({
           )}
           <div className={styles.actions}>
             <button type="button" className={`btn ghost ${styles.button}`} onClick={onClose} disabled={busy}>
-              {played ? t("cardActions.castSettings.close") : t("cardActions.castSettings.cancel")}
+              {played || !settable ? t("cardActions.castSettings.close") : t("cardActions.castSettings.cancel")}
             </button>
             {/* Un match joué ne prend plus ni lien, ni mode, ni BattleTag : rien à enregistrer. */}
             {!played && settable && (
@@ -491,4 +501,24 @@ function CastAirAndReplay({
       )}
     </>
   );
+}
+
+/**
+ * Le mode d'antenne du match que la fenêtre montre : celui de l'instantané,
+ * ou celui relu par `refresh` (`GET …/caster`) après un refus
+ * `LIVE_TRIGGER_CHANGED` — tant que l'instantané n'a pas changé depuis ; un
+ * mode livré ensuite par le flux reprend la main.
+ */
+function useCurrentTrigger(snapshotTrigger: MatchLiveTrigger | null) {
+  const [reread, setReread] = useState<{ value: MatchLiveTrigger | null; against: MatchLiveTrigger | null } | null>(null);
+  const current = reread !== null && reread.against === snapshotTrigger ? reread.value : snapshotTrigger;
+  const refresh = async (matchId: number) => {
+    try {
+      const payload = await requestJson<OwnCast>(`/api/matches/${matchId}/caster`, {}, "MATCH_CAST_SETTINGS_FAILED");
+      setReread({ value: payload.liveTrigger ?? null, against: snapshotTrigger });
+    } catch {
+      // Relecture impossible : l'instantané reste la référence, le refus est déjà dit.
+    }
+  };
+  return { current, refresh };
 }

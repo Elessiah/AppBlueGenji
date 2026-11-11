@@ -91,8 +91,14 @@ Fenêtre du caster, sur **son** cast :
   dit la condition qui manque ; l'antenne et la rediff restent offertes
   (`CastAirAndReplay`), leurs routes ne demandant que la permission `live`.
 - Un refus `LIVE_TRIGGER_CHANGED` laisse la fenêtre ouverte : le choix de mode
-  est effacé, la page relit le match, et le prochain choix part avec le mode
+  est effacé, la fenêtre relit le mode du match (`GET …/caster` rend
+  `liveTrigger`, sans attendre le flux), le refus se rattache au groupe de
+  radios (focus, `aria-describedby`), et le prochain choix part avec le mode
   désormais affiché.
+- Sans réglage possible, le bouton de sortie dit « Fermer » ; l'aide « identité
+  incomplète » ne paraît pas sur un match joué.
+- Retiré par « Ne plus caster », le focus passe à « Caster » s'il revient,
+  sinon à « Plus d'actions » (`concludedCastGesture`).
 - Le drapeau de focus du retrait se lève **avant** le `DELETE` (`onReleasing`),
   comme celui de l'inscription : le flux peut rendre « Caster » avant la réponse.
 

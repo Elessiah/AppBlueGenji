@@ -50,7 +50,8 @@ function dmPairing(match: CastReleasedMatch, locale: Locale): string | null {
 }
 
 /**
- * Le message privé Discord. `url` : la fiche du match, adresse absolue en
+ * Le message privé Discord. `url` : la fiche du match — celle du tournoi
+ * quand le match est supprimé (`MATCH_DELETED`) —, adresse absolue en
  * français (`localizedSiteUrl` la passe sous `/en` pour un compte anglais).
  */
 export function formatCastReleasedNotice(match: CastReleasedMatch, url: string, locale: Locale = "fr"): string {
@@ -58,16 +59,17 @@ export function formatCastReleasedNotice(match: CastReleasedMatch, url: string, 
   const pairing = dmPairing(match, locale);
   const reason = DM_REASONS[locale][castReleaseReasonKey(match)];
   const tournament = quotedName(match.tournamentName, locale);
+  const deleted = match.reason === "MATCH_DELETED";
   if (locale === "en") {
     const subject = pairing === null ? "a match" : `the match ${pairing}`;
     return (
       `🎙️ BlueGenji — Your caster registration for ${subject} (${round}, ${tournament}) ` +
-      `has been removed: ${reason}. Match page: ${localizedSiteUrl(url, locale)}`
+      `has been removed: ${reason}. ${deleted ? "Tournament page" : "Match page"}: ${localizedSiteUrl(url, locale)}`
     );
   }
   const subject = pairing === null ? "d'un match" : `du match ${pairing}`;
   return (
     `🎙️ BlueGenji — Ton inscription comme caster ${subject} (${round}, ${tournament}) ` +
-    `a été retirée : ${reason}. Fiche du match : ${url}`
+    `a été retirée : ${reason}. ${deleted ? "Fiche du tournoi" : "Fiche du match"} : ${url}`
   );
 }

@@ -419,6 +419,12 @@ export type OwnCastSettings = {
   staffStream: boolean;
   /** BattleTag donné pour ce cast, `null` = celui de son compte. */
   battletag: string | null;
+  /**
+   * Mode de passage à l'antenne du match à la lecture, `null` s'il n'est pas
+   * casté : la fenêtre le relit après un refus `LIVE_TRIGGER_CHANGED`, sans
+   * attendre le flux.
+   */
+  liveTrigger: MatchLiveTrigger | null;
 };
 
 type OwnCastRow = RowDataPacket & {
@@ -426,6 +432,7 @@ type OwnCastRow = RowDataPacket & {
   cast_battletag: string | null;
   live_url: string | null;
   staff_owned: number;
+  live_trigger: string | null;
 };
 
 /**
@@ -441,9 +448,10 @@ type OwnCastRow = RowDataPacket & {
 export async function loadOwnCastSettings(matchId: number, userId: number): Promise<OwnCastSettings> {
   const db = await getDatabase();
   const [rows] = await db.execute<OwnCastRow[]>(
-    `SELECT c.stream_id, c.cast_battletag, s.live_url, s.staff_owned
+    `SELECT c.stream_id, c.cast_battletag, s.live_url, s.staff_owned, m.live_trigger
      FROM bg_match_casters c
      JOIN bg_match_streams s ON s.match_id = c.match_id AND s.id = c.stream_id
+     JOIN bg_matches m ON m.id = c.match_id
      WHERE c.match_id = ? AND c.user_id = ? LIMIT 1`,
     [matchId, userId],
   );
@@ -454,5 +462,6 @@ export async function loadOwnCastSettings(matchId: number, userId: number): Prom
     liveUrl: row.live_url ?? null,
     staffStream: Number(row.staff_owned) === 1,
     battletag: row.cast_battletag ?? null,
+    liveTrigger: isMatchLiveTrigger(row.live_trigger) ? row.live_trigger : null,
   };
 }

@@ -377,7 +377,8 @@ describe("MatchCardActions — branchements du cast", () => {
   it("inscrit, le focus passe au bouton qui remplace « Caster » (« Ne plus caster », sinon « Plus d'actions »)", () => {
     expectContains(card, [
       "claimedRef.current = true;",
-      "const pending = hasClaimCast ? releasedRef : claimedRef;",
+      "{ pending: releasedRef.current, done: !hasCastConfig },",
+      "{ pending: claimedRef.current, done: !hasClaimCast },",
       "querySelector<HTMLElement>(`[data-action=\"${castFocusAction(hasClaimCast)}\"]`)",
       "(replacement ?? toggleRef.current)?.focus({ preventScroll: true });",
     ]);

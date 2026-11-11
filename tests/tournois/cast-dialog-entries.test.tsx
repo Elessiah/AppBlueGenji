@@ -159,7 +159,7 @@ describe("Raisons visibles et refus précis des fenêtres de cast", () => {
 
   it("CastSettingsDialog_playedMatch_closeInsteadOfDeadSaveAndHintedNote", () => {
     const settings = readSource(`${DIR}/_components/CastSettingsDialog.tsx`);
-    expect(settings).toContain('played ? t("cardActions.castSettings.close") : t("cardActions.castSettings.cancel")');
+    expect(settings).toContain('played || !settable ? t("cardActions.castSettings.close") : t("cardActions.castSettings.cancel")');
     expect(settings).toContain("{!played && (");
     expect(settings).toContain('t("cardActions.castSettings.playedTitle")');
     expect(settings).toContain("missing={urlMissing}");
@@ -238,15 +238,16 @@ describe("CastSettingsDialog — match joué, rien de changé, lecture", () => {
   it("castSettingsTexts_noLive_presentInFrAndEn", () => {
     expect(frActions.cardActions.castSettings.noLiveTitle).toBe("Permission de diffusion retirée");
     expect(enActions.cardActions.castSettings.noLiveTitle).toBe("Streaming permission removed");
-    expect(frActions.cardActions.castSettings.noLive).toContain("te retirer");
-    expect(enActions.cardActions.castSettings.noLive).toContain("withdraw");
+    // L'action qui reste porte le nom du bouton (« Ne plus caster » / « Stop casting »).
+    expect(frActions.cardActions.castSettings.noLive).toContain("ne plus caster ce match");
+    expect(enActions.cardActions.castSettings.noLive).toContain("stop casting this match");
   });
 
   it("CastSettingsDialog_triggerChanged_sendsSeenTrigger", () => {
     // Le mode vu au premier choix, jamais celui que le flux a livré depuis.
     expect(settings).toContain("settings.expectedTrigger = seenTrigger.current;");
     expect(settings).toContain("if (pickedTrigger === null) seenTrigger.current = liveTrigger;");
-    expect(settings).toContain("onChange={pickTrigger}");
+    expect(settings).toContain("pickTrigger(next);");
     expect(settings).not.toContain("settings.expectedTrigger = match.liveTrigger;");
   });
 
@@ -270,7 +271,35 @@ describe("CastSettingsDialog — match joué, rien de changé, lecture", () => {
 
   it("CastSettingsDialog_triggerChangedRefusal_resetsPickedTrigger", () => {
     // Après un refus LIVE_TRIGGER_CHANGED, le prochain choix part avec le nouveau mode vu.
-    expect(settings).toMatch(/if \(code === "LIVE_TRIGGER_CHANGED"\) \{\s+setTrigger\(null\);\s+onSaved\(\);/);
+    expect(settings).toMatch(/if \(code === "LIVE_TRIGGER_CHANGED"\) \{\s+setTrigger\(null\);\s+void refreshTrigger\(match\.id\);/);
+  });
+
+  it("CastSettingsDialog_triggerChangedRefusal_rereadsModeAndFlagsGroup", () => {
+    // Le mode du match est relu sans attendre le flux, et le refus se rattache au groupe de radios.
+    expect(settings).toContain("void refreshTrigger(match.id);");
+    expect(settings).toContain('LIVE_TRIGGER_CHANGED: "trigger",');
+    expect(settings).toContain('fieldError={fieldErrors.message("trigger")}');
+    expect(settings).toContain("reread.against === snapshotTrigger ? reread.value : snapshotTrigger");
+  });
+
+  it("CastTriggerField_fieldError_describesGroup", () => {
+    const html = renderToStaticMarkup(
+      <CastTriggerField trigger="AUTO" startAt={null} onChange={() => undefined} id="mode" fieldError="Mode changé" />,
+    );
+    expect(html).toContain('id="mode"');
+    expect(html).toContain('tabindex="-1"');
+    expect(html).toContain('aria-describedby="mode-error"');
+    expect(html).toContain('<span id="mode-error" class="sr-only">Mode changé</span>');
+  });
+
+  it("CastTriggerField_withoutFieldError_noDescription", () => {
+    const html = renderToStaticMarkup(<CastTriggerField trigger="AUTO" startAt={null} onChange={() => undefined} id="mode" />);
+    expect(html).not.toContain("aria-describedby");
+  });
+
+  it("CastSettingsDialog_notSettable_closeLabelAndNoIdentityHintOnPlayed", () => {
+    expect(settings).toContain('played || !settable ? t("cardActions.castSettings.close")');
+    expect(settings).toContain("{cast !== null && !settable && !played && (");
   });
 
   it("CastSettingsDialog_airToggle_followsTriggerField", () => {
@@ -297,7 +326,7 @@ describe("CastSettingsDialog — match joué, rien de changé, lecture", () => {
   });
 
   it("CastSettingsDialog_unmarkedMatch_noModePreselected", () => {
-    expect(settings).toContain("(pickedTrigger ?? match.liveTrigger)");
+    expect(settings).toContain("(pickedTrigger ?? liveTrigger)");
   });
 
   it("CastDialogs_deadHintRules_removed", () => {

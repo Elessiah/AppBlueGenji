@@ -39,7 +39,7 @@ describe("GET /api/matches/[matchId]/caster", () => {
 
   it("casterGet_registeredCaster_returnsOwnSettingsOnly", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
-    jest.mocked(loadOwnCastSettings).mockResolvedValue({ streamId: 3, liveUrl: "https://twitch.tv/voix", staffStream: false, battletag: "Voix#2100" });
+    jest.mocked(loadOwnCastSettings).mockResolvedValue({ streamId: 3, liveUrl: "https://twitch.tv/voix", staffStream: false, battletag: "Voix#2100", liveTrigger: null });
     const res = await casterGet(jsonRequest("GET"), params("42"));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ streamId: 3, battletag: "Voix#2100" });

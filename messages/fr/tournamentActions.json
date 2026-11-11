@@ -412,7 +412,7 @@
       "played": "Le match est joué : lien et BattleTag de ce cast ne se changent plus.",
       "identityTitle": "Identité de caster incomplète",
       "noLiveTitle": "Permission de diffusion retirée",
-      "noLive": "Sans la permission de diffusion, ce cast ne se règle plus : il ne reste qu'à te retirer du match."
+      "noLive": "Sans la permission de diffusion, ce cast ne se règle plus : il ne reste qu'à ne plus caster ce match."
     }
   },
   "planning": {
