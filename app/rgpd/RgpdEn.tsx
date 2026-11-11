@@ -1125,7 +1125,7 @@ export function RgpdEn({
             announcements stay in the channel as long as the #live channel exists; when a caster&apos;s account is deleted,
             the message of an evening still under way is updated without their channel link if it keeps another link —
             otherwise, or once the evening has ended, it keeps it. The team, player or caster concerned can
-            ask for their deletion
+            ask for these announcements to be deleted
             through the “Report a problem” button, GDPR category.
           </p>
           <p>The details, processing activity by processing activity, are given in the register below.</p>

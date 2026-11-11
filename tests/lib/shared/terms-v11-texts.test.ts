@@ -379,12 +379,12 @@ describe("revue sécurité v11 — textes alignés sur le code", () => {
   });
 
   it("termsV11_voiceTrace_listsRefusedHandBackAndWholeBotOutageFrAndEn", () => {
-    expect(termsFr("contacts-de-match")).toContain("des horaires (création, rendu, panne du bot ou rendu refusé) et si une panne touchait tout le bot — ni qui s'y trouve, ni combien —");
+    expect(termsFr("contacts-de-match")).toContain("les numéros du match et de l'équipe, des horaires (création, rendu, panne du bot ou rendu refusé) et si une panne touchait tout le bot — ni qui s'y trouve, ni combien —");
     expect(termsEn("contacts-de-match")).toContain("times (creation, hand-back, bot outage or refused hand-back) and whether an outage hit the whole bot — neither who is in it nor how many —");
   });
 
   it("privacyChangeV11_refereeDiscordTag_keepsCasterExceptionFrAndEn", () => {
-    expect(v11Fr.details.join(" ")).toContain("jamais par les arbitres sans rôle sur ce match, sauf s'il caste aussi ce match (règle des casters)");
-    expect(v11En.details.join(" ")).toContain("never by referees who have no role in that match, unless they also cast that match (the casters' rule)");
+    expect(v11Fr.details.join(" ")).toContain("jamais par les arbitres sans rôle sur ce match (sauf si l'arbitre désigné caste aussi ce match, son tag suivant alors la règle des casters)");
+    expect(v11En.details.join(" ")).toContain("never by referees who have no role in that match (unless the assigned referee also casts that match, their tag then following the casters' rule)");
   });
 });

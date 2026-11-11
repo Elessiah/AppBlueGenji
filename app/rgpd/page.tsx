@@ -1337,8 +1337,8 @@ function RgpdFr({
             êtes l&apos;arbitre désigné et ceux dont vous avez posé le mode d&apos;antenne figurent aussi dans l&apos;export de vos données. Ces annonces restent dans le salon tant
             que le salon #live existe ; à la suppression du compte d&apos;un caster, le message d&apos;une soirée encore en
             cours est remis à jour sans le lien de sa chaîne s&apos;il garde un autre lien — sinon, ou une fois la soirée
-            finie, il le garde. L&apos;équipe, le joueur ou le caster concerné peut en demander la
-            suppression par le bouton « Signaler
+            finie, il le garde. L&apos;équipe, le joueur ou le caster concerné peut demander la
+            suppression de ces annonces par le bouton « Signaler
             un problème », catégorie RGPD.
           </p>
           <p>Le détail, par traitement, figure au registre ci-dessous.</p>
