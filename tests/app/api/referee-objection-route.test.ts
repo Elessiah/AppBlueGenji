@@ -154,4 +154,32 @@ describe("PUT /api/admin/referees/[userId]/objection", () => {
     await expect(res.json()).resolves.toEqual({ error: "REFEREE_OBJECTION_FAILED" });
     expect(publishStaffAction).toHaveBeenCalledTimes(1);
   });
+  it("PUT_nonCanonicalUserId_returns400", async () => {
+    const exponent = await PUT(putRequest({ upheld: false }), params("1e1"));
+    const hex = await PUT(putRequest({ upheld: false }), params("0x9"));
+
+    expect(exponent.status).toBe(400);
+    expect(hex.status).toBe(400);
+    expect(setRefereeObjection).not.toHaveBeenCalled();
+  });
+
+  it("PUT_replayedSweepReleasesMatches_saysReplayed", async () => {
+    jest.mocked(setRefereeObjection).mockResolvedValue({ changed: false, released: 1, failed: 0 });
+
+    await PUT(putRequest({ upheld: true }), params("9"));
+
+    expect(jest.mocked(publishStaffAction).mock.calls[0][0]).toBe(
+      "🛡 Opposition d'un arbitre déjà retenue, balayage rejoué par le staff : il est retiré de ses matchs non terminés.",
+    );
+  });
+
+  it("PUT_incompleteSweep_saysIncomplete", async () => {
+    jest.mocked(setRefereeObjection).mockResolvedValue({ changed: true, released: 1, failed: 1 });
+
+    await PUT(putRequest({ upheld: true }), params("9"));
+
+    expect(jest.mocked(publishStaffAction).mock.calls[0][0]).toBe(
+      "🛡 Opposition d'un arbitre retenue par le staff : retrait de ses matchs non terminés incomplet, à rejouer.",
+    );
+  });
 });

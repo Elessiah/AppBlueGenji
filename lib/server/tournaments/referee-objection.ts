@@ -47,7 +47,13 @@ export type RefereeObjectionResult = { changed: boolean; released: number; faile
  * possible sur tout compte qui en porte une (un arbitre privé depuis de la
  * permission compris).
  *
- * @throws `USER_NOT_FOUND` — compte supprimé (ou absent, à la levée) ;
+ * La levée répond de la même façon qu'un compte existe ou non (`changed`
+ * faux) : la route ne sert pas à sonder les identifiants de compte. Le contrôle
+ * `NOT_REFEREE` reste une lecture ordinaire avant l'écriture : une permission
+ * retirée entre les deux laisse au pire une opposition sur un compte qui
+ * n'arbitre plus, sans effet, et que la levée efface.
+ *
+ * @throws `USER_NOT_FOUND` — retenir sur un compte supprimé ;
  *   `NOT_REFEREE` — retenir sur un compte absent ou qui n'arbitre pas.
  */
 export async function setRefereeObjection(refereeId: number, upheld: boolean): Promise<RefereeObjectionResult> {
@@ -63,13 +69,13 @@ export async function setRefereeObjection(refereeId: number, upheld: boolean): P
     [refereeId],
   );
   const changed = result.affectedRows > 0;
+  if (!upheld) return { changed, released: 0, failed: 0 };
   if (!changed) {
     const [rows] = await db.execute<RowDataPacket[]>(`SELECT id FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`, [
       refereeId,
     ]);
     if (rows.length === 0) throw new Error("USER_NOT_FOUND");
   }
-  if (!upheld) return { changed, released: 0, failed: 0 };
   // Son pseudo ne reste pas servi depuis le cache des pseudos d'arbitre, même
   // si le retrait de ses matchs échoue en partie (la version ne bougerait pas).
   if (changed) forgetRefereeNames();
@@ -104,7 +110,10 @@ async function releaseFromUnfinishedMatches(refereeId: number): Promise<{ releas
       if (await releaseObjectingReferee(Number(match.id), refereeId, undecided)) released += 1;
     } catch (error) {
       failed += 1;
-      console.error(`[referee-objection] retrait du match #${match.id} impossible :`, error);
+      // Sans numéro de match : pm2 porte déjà « Arbitre : #id » (route), et
+      // les journaux du serveur ne relient pas un arbitre qui s'oppose à des
+      // matchs précis (/rgpd, registre T05 : auteur, identifiant, nombre).
+      console.error("[referee-objection] retrait d'un match impossible :", error);
     }
   }
   await queueDeferredNoRefereeAlerts(undecided);
