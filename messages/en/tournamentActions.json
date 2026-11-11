@@ -398,7 +398,7 @@
       "urlInvalid": "Link not recognized. Accepted platforms: {platforms}.",
       "urlStaff": "You are co-casting the organisation's stream: its link is set in “Official broadcast”.",
       "battletag": "BattleTag for this cast (optional)",
-      "battletagHint": "The account you will play on: it replaces your profile's in “Contacts” and on the match page. Left empty, your profile's stays; nobody checks it.",
+      "battletagHint": "The account you will play on: it replaces your profile's in “Contacts”, the launch window and on the match page, read by the teams, the other casters and the referees — even if your BattleTag is hidden on your profile. Left empty, your profile's stays; nobody checks it.",
       "battletagInvalid": "Invalid BattleTag: 64 characters at most, and visible characters.",
       "air": "On air",
       "airHint": "In manual mode, the stream is opened and closed here. It stops anyway as soon as a score is entered.",

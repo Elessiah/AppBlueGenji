@@ -553,6 +553,15 @@ describe("Fenêtre « Caster » — l'aide du lien du caster", () => {
     expect(enActions.cardActions.castSettings.battletagHint).toContain("it replaces your profile's");
     expect(enActions.cardActions.castSettings.battletagHint).toContain("nobody checks it");
   });
+
+  it("battletagHint_namesLaunchWindowRecipientsAndHidden_frEn", () => {
+    expect(frActions.cardActions.castSettings.battletagHint).toContain("la fenêtre de lancement");
+    expect(frActions.cardActions.castSettings.battletagHint).toContain("les autres casters et les arbitres");
+    expect(frActions.cardActions.castSettings.battletagHint).toContain("même si ton BattleTag est masqué");
+    expect(enActions.cardActions.castSettings.battletagHint).toContain("the launch window");
+    expect(enActions.cardActions.castSettings.battletagHint).toContain("the other casters and the referees");
+    expect(enActions.cardActions.castSettings.battletagHint).toContain("even if your BattleTag is hidden");
+  });
 });
 
 describe("lockedTrigger — un mode verrouillé montre celui du match", () => {

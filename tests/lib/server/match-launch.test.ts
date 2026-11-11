@@ -100,6 +100,8 @@ type Membership = { userId: number; teamId: number; roles: string[] };
 type World = {
   /** Toutes les instructions reçues, réduites à une ligne, dans l'ordre. */
   issued?: string[];
+  /** Paramètres des écritures du BattleTag de cast (`[tag, matchId, userId]`). */
+  castBattletagWrites?: unknown[][];
   match: MatchState | null;
   memberships: Membership[];
   soloEntries: { userId: number; teamId: number }[];
@@ -241,6 +243,7 @@ function applyCastWrite(state: World, sql: string, params: unknown[]): unknown[]
   const match = state.match;
   if (!/^(UPDATE|DELETE FROM|INSERT INTO) bg_match_(casters|streams)/.test(sql)) return null;
   state.writes.push(sql);
+  if (sql.startsWith("UPDATE bg_match_casters SET cast_battletag = ?")) state.castBattletagWrites?.push(params);
   if (!match) return [{ affectedRows: 0 }, []];
   if (sql.includes("bg_match_streams")) return applyStreamWrite(match, sql, params);
   applyCasterWrite(match, sql, params);
@@ -2309,6 +2312,56 @@ describe("releaseMatchCast / claimMatchCast : gardes et publications (EF-29)", (
     state.match = matchState({ caster_user_id: CASTER });
 
     await expect(setCastSettings(42, CASTER, true, { battletag: "Voix#1234", expectedTrigger: "MANUAL" })).resolves.toBeUndefined();
+  });
+
+  it("setCastSettings_casterLostIdentity_throwsIdentityRequiredAndWritesNothing", async () => {
+    // Les conditions de l'inscription se rejouent : un tag décertifié ne règle plus rien.
+    state.users[CASTER] = { ...ELIGIBLE_CASTER, discord_verified_at: null };
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await expect(setCastSettings(42, CASTER, true, { trigger: "AUTO" })).rejects.toThrow("CASTER_IDENTITY_REQUIRED");
+
+    expect(state.match?.live_trigger ?? null).toBeNull();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setCastSettings_casterJoinedMatchTeam_throwsCasterIsPlayer", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+    state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
+
+    await expect(setCastSettings(42, CASTER, true, { battletag: "Voix#1234" })).rejects.toThrow("CASTER_IS_PLAYER");
+  });
+
+  it("setCastSettings_identityReadFirst_beforeMatchLock", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+    state.issued = [];
+
+    await setCastSettings(42, CASTER, true, { battletag: "Voix#1234" });
+
+    expect(state.issued[0]).toMatch(/^SELECT discord_verified_at, .* FROM bg_users WHERE id = \? .*LOCK IN SHARE MODE$/);
+  });
+
+  it("setCastSettings_marvelRivalsBattletag_storesNull", async () => {
+    // Hors Overwatch, le BattleTag de cast ne sert nulle part : rien n'est gardé.
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = { ...matchState({ caster_user_id: CASTER }), tournament_game: "MR", game: "MR" };
+    state.castBattletagWrites = [];
+
+    await setCastSettings(42, CASTER, true, { battletag: "Voix#1234" });
+
+    expect(state.castBattletagWrites).toEqual([[null, 42, CASTER]]);
+  });
+
+  it("setCastSettings_overwatchBattletag_storesTrimmedTag", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+    state.castBattletagWrites = [];
+
+    await setCastSettings(42, CASTER, true, { battletag: "  Voix#1234 " });
+
+    expect(state.castBattletagWrites).toEqual([["Voix#1234", 42, CASTER]]);
   });
 
   it("setCastSettings_completedMatch_throwsMatchCastClosed", async () => {

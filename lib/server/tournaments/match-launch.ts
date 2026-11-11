@@ -1024,6 +1024,7 @@ export async function claimMatchCast(
  * s'écrivent que sous lui.
  *
  * @throws `NOT_CASTER` | `MATCH_NOT_FOUND` | `NOT_MATCH_CASTER`
+ *   | `CASTER_IDENTITY_REQUIRED` | `CASTER_DISCORD_REQUIRED` | `CASTER_IS_PLAYER`
  *   | `MATCH_CAST_CLOSED` | `INVALID_LIVE_TRIGGER` | `MATCH_NOT_CASTABLE`
  *   | `MATCH_START_AT_REQUIRED` | `INVALID_STREAM_URL` | `CAST_STREAM_NOT_OWNED`
  *   | `INVALID_CAST_BATTLETAG` | `STREAM_NOT_FOUND` | `LIVE_TRIGGER_NOT_OWNED`
@@ -1043,6 +1044,9 @@ export async function setCastSettings(
 
   const tournamentId = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
+      // Les conditions de l'inscription se rejouent (`claimMatchCast`), dans
+      // son ordre : la ligne du compte d'abord, en partage, puis le match.
+      const identity = await loadCasterIdentity(connection, userId, true);
       const row = await lockLaunchMatch(connection, matchId);
       if (!row) throw new Error("MATCH_NOT_FOUND");
       const caster = row.casters.find((entry) => entry.userId === userId);
@@ -1051,6 +1055,11 @@ export async function setCastSettings(
       // qui a servi restent tels quels (l'inscription et le retrait refusent de
       // même de le réécrire). Sa rediff, elle, a sa propre route.
       if (row.status === "COMPLETED") throw new Error("MATCH_CAST_CLOSED");
+      // Identité perdue, ou passé dans une équipe du match : l'inscription
+      // serait refusée, ses réglages le sont aussi.
+      const block = castBlockReason(hasLivePermission, identity, row.tournament_game);
+      if (block) throw new Error(block);
+      if (await resolveTeamParty(connection, row, userId)) throw new Error("CASTER_IS_PLAYER");
       await applyCastSettings(connection, row, userId, caster.streamId, settings, access);
       return Number(row.tournament_id);
     }),

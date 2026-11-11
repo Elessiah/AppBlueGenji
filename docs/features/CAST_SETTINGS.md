@@ -119,11 +119,15 @@ cette fenêtre et à celle du staff.
 - Montré **exactement** là et quand celui du compte l'était
   (`buildLaunchCaster`) : fenêtres « Contacts » et de lancement, page du match,
   aux seules parties du match, dans un tournoi Overwatch
-  (`battletagRelevantFor`).
-- Le réglage « BattleTag OW » du profil **ne le masque pas** : c'est une
-  divulgation volontaire pour ce match, alors que le réglage protège le tag du
-  compte. Les deux ne sortent de toute façon que dans la fenêtre des contacts
-  (`sharesLiveMatch`).
+  (`battletagRelevantFor`) — sur la carte d'arbitre aussi quand l'arbitre
+  désigné caste le match (`buildLaunchReferee`). Hors Overwatch, il n'est
+  **pas gardé** : un corps qui en porte un écrit `NULL` (minimisation).
+- Le réglage « BattleTag OW » du profil ne masque ni lui ni celui du compte
+  dans ces fenêtres (`sharesLiveMatch`) ; l'aide du champ le dit.
+- Lu sur demande seulement (`loadCasterLinks(…, { battletag: true })`) : la
+  fenêtre de lancement le lit, les poussées aux joueurs non.
+- Chaque `PUT …/caster` rejoue les conditions de l'inscription (identité,
+  `CASTER_IS_PLAYER`), la ligne du compte lue d'abord en partage.
 - Part avec l'inscription de caster (retrait, suppression du compte) : rien à
   effacer à part.
 - Saisie : `parseCastBattletagInput` (rognée, passée par `visibleText`, 64

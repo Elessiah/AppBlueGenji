@@ -186,15 +186,21 @@ export async function lockMatchCasters(
   return rows.map(toLink);
 }
 
-/** Casters de plusieurs matchs, en une lecture ordinaire. */
+/**
+ * Casters de plusieurs matchs, en une lecture ordinaire. Le BattleTag de cast
+ * n'est lu que sur demande (`battletag`) : seule la fenêtre de lancement le
+ * montre — une poussée aux joueurs n'a pas à le lire (minimisation).
+ */
 export async function loadCasterLinks(
   executor: Executor,
   matchIds: readonly number[],
+  options: { battletag?: boolean } = {},
 ): Promise<Map<number, MatchCasterLink[]>> {
   const ids = [...new Set(matchIds)];
   if (ids.length === 0) return new Map();
+  const battletag = options.battletag === true ? ", cast_battletag" : "";
   const [rows] = await executor.execute<CasterLinkRow[]>(
-    `SELECT match_id, user_id, stream_id, ready_at, cast_battletag FROM bg_match_casters
+    `SELECT match_id, user_id, stream_id, ready_at${battletag} FROM bg_match_casters
      WHERE match_id IN (${placeholders(ids)}) ORDER BY match_id, created_at, user_id`,
     ids,
   );

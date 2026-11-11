@@ -23,6 +23,7 @@ import {
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
 import { liveTriggerOwnerAfter, mayChangeLiveTrigger, mayUnmarkLiveTrigger, organisationModeLocked } from "@/lib/shared/live-trigger-owner";
+import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { castBeforeLaunch } from "@/lib/shared/match-launch";
 import type { TournamentGame } from "@/lib/shared/types";
 import { nullableId } from "@/lib/shared/nullable-id";
@@ -383,7 +384,10 @@ export async function applyCastSettings(
     );
   }
   if (settings.battletag !== undefined) {
-    await writeCastBattletag(connection, matchId, userId, parseCastBattletagInput(settings.battletag));
+    // Hors Overwatch, aucun BattleTag de cast n'est gardé : il ne s'y montre
+    // nulle part (minimisation) — un corps qui en porte un l'efface.
+    const battletag = battletagRelevantFor(row.tournament_game) ? parseCastBattletagInput(settings.battletag) : null;
+    await writeCastBattletag(connection, matchId, userId, battletag);
   }
   // Un lien retiré peut laisser un stream que plus personne ne tient : le même
   // ménage que la configuration du staff et que le retrait d'un caster.

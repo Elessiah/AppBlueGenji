@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 import {
   firstStreamUrlSql,
   hasOrganisationLink,
+  loadCasterLinks,
   loadMatchStreams,
   lockMatchCasters,
   lockMatchStreams,
@@ -673,5 +674,27 @@ describe("unmarkUncastMatches — un seul UPDATE, rien sans match", () => {
     const execute = jest.fn<SqlQuery>(async () => [{ affectedRows: 2 }]);
     expect(await unmarkUncastMatches(fakeConnection({ execute }), [4, 7])).toBe(2);
     expect(execute.mock.calls[0][1]).toEqual([4, 7]);
+  });
+});
+
+describe("loadCasterLinks — BattleTag de cast lu sur demande", () => {
+  it("loadCasterLinks_default_omitsCastBattletag", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ match_id: 42, user_id: 7, stream_id: 3, ready_at: null }], []]);
+
+    const links = await loadCasterLinks(fakeConnection({ execute }), [42]);
+
+    expect(String(execute.mock.calls[0][0])).not.toContain("cast_battletag");
+    expect(links.get(42)?.[0]).not.toHaveProperty("castBattletag");
+  });
+
+  it("loadCasterLinks_battletagRequested_readsCastBattletag", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValue([[{ match_id: 42, user_id: 7, stream_id: 3, ready_at: null, cast_battletag: "Voix#1234" }], []]);
+
+    const links = await loadCasterLinks(fakeConnection({ execute }), [42], { battletag: true });
+
+    expect(String(execute.mock.calls[0][0])).toContain("ready_at, cast_battletag FROM bg_match_casters");
+    expect(links.get(42)?.[0].castBattletag).toBe("Voix#1234");
   });
 });

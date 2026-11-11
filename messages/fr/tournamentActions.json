@@ -398,7 +398,7 @@
       "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}.",
       "urlStaff": "Tu co-castes le stream de l'organisation : son lien se règle dans « Diffusion officielle ».",
       "battletag": "BattleTag pour ce cast (facultatif)",
-      "battletagHint": "Le compte sur lequel tu seras en jeu : il remplace celui de ton profil dans « Contacts » et sur la page du match. Vide, celui de ton profil reste ; personne ne le vérifie.",
+      "battletagHint": "Le compte sur lequel tu seras en jeu : il remplace celui de ton profil dans « Contacts », la fenêtre de lancement et sur la page du match, lu par les équipes, les autres casters et les arbitres — même si ton BattleTag est masqué sur ton profil. Vide, celui de ton profil reste ; personne ne le vérifie.",
       "battletagInvalid": "BattleTag invalide : 64 caractères au plus, et des caractères visibles.",
       "air": "Antenne",
       "airHint": "En mode manuel, le direct s'ouvre et se coupe ici. Il s'arrête de toute façon dès qu'un score est saisi.",
