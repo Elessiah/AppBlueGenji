@@ -83,11 +83,39 @@ export async function getDatabase(): Promise<Pool> {
     charset: "utf8mb4",
     dateStrings: true,
   });
+  if (!englishMessagesPools.has(pool)) {
+    englishMessagesPools.add(pool);
+    forceEnglishServerMessages(pool);
+  }
 
   await ensureMigrations(pool);
   scheduleDeletedAccountsReconciliation();
   scheduleDueAccountDeletions();
   return pool;
+}
+
+/** Pools déjà réglés (un double de test peut être rendu deux fois). */
+const englishMessagesPools = new WeakSet<Pool>();
+
+/**
+ * Messages d'erreur du serveur **en anglais** sur toute connexion du pool :
+ * `fail()` (`lib/server/http.ts`) ne reçoit que `error.message` et reconnaît
+ * l'interblocage, le refus d'instantané et le délai de verrou sur le texte
+ * anglais du moteur. Un serveur aux `lc_messages` réglés autrement rendait 500
+ * au lieu de 409 sur toute route. La commande part avant toute autre sur la
+ * connexion neuve (file d'attente de mysql2) ; un échec n'est que signalé.
+ *
+ * L'évènement `connection` de mysql2 passe la connexion **à rappels** (non
+ * promise), malgré son type.
+ */
+function forceEnglishServerMessages(created: Pool): void {
+  if (typeof created.on !== "function") return;
+  created.on("connection", (connection) => {
+    const core = connection as unknown as { query(sql: string, done: (error: Error | null) => void): unknown };
+    core.query("SET SESSION lc_messages = 'en_US'", (error) => {
+      if (error) console.warn("[db] lc_messages non réglé sur la connexion", error);
+    });
+  });
 }
 
 /** Une passe par heure au plus, par processus (`scheduleDueAccountDeletions`). */

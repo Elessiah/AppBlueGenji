@@ -51,4 +51,24 @@ describe("getDatabase", () => {
     // La porte des migrations est franchie à chaque appel (elle seule mémorise).
     expect(runGate).toHaveBeenCalledTimes(2);
   });
+
+  it("getDatabase_newConnection_setsEnglishServerMessages", async () => {
+    // Pool neuf : le module est rechargé pour ne pas reprendre celui du test d'avant.
+    let listener: ((connection: unknown) => void) | undefined;
+    const on = jest.fn((event: string, handler: (connection: unknown) => void) => {
+      if (event === "connection") listener = handler;
+    });
+    createPool.mockReturnValue(fakePool({ on }));
+    let fresh: typeof getDatabase = getDatabase;
+    jest.isolateModules(() => {
+      fresh = (jest.requireActual("@/lib/server/database") as { getDatabase: typeof getDatabase }).getDatabase;
+    });
+
+    await fresh();
+    const query = jest.fn((_sql: string, done: (error: Error | null) => void) => done(null));
+    listener?.({ query });
+
+    expect(on).toHaveBeenCalledWith("connection", expect.any(Function));
+    expect(query).toHaveBeenCalledWith("SET SESSION lc_messages = 'en_US'", expect.any(Function));
+  });
 });

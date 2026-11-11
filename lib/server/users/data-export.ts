@@ -115,6 +115,9 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
   if (rows.length === 0) throw new Error("PROFILE_NOT_FOUND");
   const row = rows[0];
   const dateOf = (column: OptionalAccountColumn) => toIso((row[column] as Date | null | undefined) ?? null);
+  // Colonne d'origine refusée (ALTER manqué) : l'origine est **inconnue**, et
+  // l'export ne dit ni « tapé » ni « fourni par Battle.net ».
+  const originKnown = optional.includes("overwatch_battletag_typed");
   const battletagTyped = Number(row.overwatch_battletag_typed ?? 0) === 1;
 
   // Réutilise l'agrégation existante pour les stats, l'historique d'équipes et
@@ -157,7 +160,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       refereeObjectionAt: dateOf("referee_objection_at"),
       // L'origine du BattleTag (`overwatch_battletag_typed`, `battletag-origin.ts`) :
       // tapé à la main, il n'est jamais tenu pour vérifié — donnée détenue, rendue.
-      overwatchBattletagTyped: battletagTyped,
+      overwatchBattletagTyped: originKnown ? battletagTyped : null,
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),
     },
     profile: {
@@ -165,10 +168,10 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       overwatchBattletag: row.overwatch_battletag,
       // Fourni par Battle.net (donc tenu pour vérifié) ou non.
       // Sans BattleTag, rien n'a d'origine : jamais « fourni par Battle.net ».
-      battletagFromBlizzard: Boolean(row.overwatch_battletag) && battletagFromBlizzard({
-        blizzard_sub: row.blizzard_sub,
-        overwatch_battletag_typed: battletagTyped ? 1 : 0,
-      }),
+      battletagFromBlizzard: originKnown
+        ? Boolean(row.overwatch_battletag) &&
+          battletagFromBlizzard({ blizzard_sub: row.blizzard_sub, overwatch_battletag_typed: battletagTyped ? 1 : 0 })
+        : null,
       marvelRivalsTag: row.marvel_rivals_tag,
       visibility: {
         avatar: Boolean(row.visible_avatar),

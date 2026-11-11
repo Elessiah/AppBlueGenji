@@ -1151,15 +1151,18 @@ export type PersonalDataExport = {
     certificationPromptDismissedAt: string | null;
     /** Opposition d'arbitre retenue par le staff (ISO), sinon `null` (`MATCH_REFEREE.md`). */
     refereeObjectionAt: string | null;
-    /** `bg_users.overwatch_battletag_typed` : BattleTag tapé à la main sous un Battle.net qui n'en donne aucun. */
-    overwatchBattletagTyped: boolean;
+    /**
+     * `bg_users.overwatch_battletag_typed` : BattleTag tapé à la main sous un Battle.net qui n'en donne aucun ;
+     * `null` : origine inconnue (colonne absente de la base).
+     */
+    overwatchBattletagTyped: boolean | null;
     createdAt: string;
   };
   profile: {
     avatarUrl: string | null;
     overwatchBattletag: string | null;
-    /** BattleTag fourni par Battle.net, donc tenu pour vérifié (`battletagFromBlizzard`). */
-    battletagFromBlizzard: boolean;
+    /** BattleTag fourni par Battle.net, donc tenu pour vérifié (`battletagFromBlizzard`) ; `null` : origine inconnue. */
+    battletagFromBlizzard: boolean | null;
     marvelRivalsTag: string | null;
     visibility: VisibilitySettings;
     openToRecruitment: boolean;
