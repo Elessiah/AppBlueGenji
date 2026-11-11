@@ -560,8 +560,10 @@ parvenir au salon d'alertes des modérateurs du serveur. T16 en fait une finalit
 (modérer le serveur), sur l'**exécution du service** depuis la version 11 des
 conditions (D53 ; intérêt légitime et opposition jusque-là) ; l'alerte reste
 jusqu'à sa suppression par les modérateurs, plus sur demande depuis la version 11 (D55).
-**Suppression à la main à la suppression du compte** (décision D56b du
-2026-11-11) : l'alerte est un message que l'AutoMod de Discord poste lui-même —
+**Suppression à la main à la suppression du compte, au mieux** (décisions D56b
+et D56c du 2026-11-11 — les textes ne promettent que la suppression des alertes
+que les modérateurs **parviennent à identifier**, sans garantie de toutes les
+retrouver) : l'alerte est un message que l'AutoMod de Discord poste lui-même —
 ni le site ni le bot n'en gardent l'identifiant, le salon ou le match, et le bot
 ne voit même pas une alerte seulement « signalée » : ils ne peuvent pas
 l'effacer. À la **demande de suppression**, la ligne « Suppression de compte

@@ -148,8 +148,8 @@ describe("D50 — diffusion sous le pseudo : exécution du service, plus de nom 
   });
 
   it("botPrivacyPolicy_autoModAlert_restsOnPerformanceOfTheServiceFrAndEn", () => {
-    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("dans l'annonce #live d'un tournoi individuel, et de même pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, que les modérateurs suppriment à la main à la suppression du compte du joueur.");
-    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("in the #live announcement of a solo tournament, and likewise for the AutoMod alert of such an announcement when blocked or flagged, which the moderators delete by hand when the player's account is deleted.");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("dans l'annonce #live d'un tournoi individuel, et de même pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, dont les modérateurs suppriment à la main, à la suppression du compte du joueur, celles qu'ils parviennent à identifier.");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("in the #live announcement of a solo tournament, and likewise for the AutoMod alert of such an announcement when blocked or flagged, of which the moderators delete by hand, when the player's account is deleted, those they can identify.");
   });
 
   it("privacyChange_termsV11_saysCastersLinksAndAlertMoveAndNoTransitionFrAndEn", () => {
@@ -294,8 +294,8 @@ describe("D55 et revue standard v11", () => {
   it("autoModAlertScope_noDeletionOnRequestFrAndEn", () => {
     const scopeEn = DONNEES_PROFIL_EN.find((d) => d.donnee === "Site username")?.extraBases?.find((b) => b.scope.startsWith("AutoMod alert"))?.scope;
 
-    expect(AUTOMOD_ALERT_SCOPE).toBe("alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs jusqu'à ce qu'ils la suppriment à la main, à la suppression de ton compte");
-    expect(scopeEn).toBe("AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it by hand, when your account is deleted");
+    expect(AUTOMOD_ALERT_SCOPE).toBe("alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs, qui suppriment à la main, à la suppression de ton compte, celles qu'ils parviennent à identifier (sans garantie de toutes les retrouver)");
+    expect(scopeEn).toBe("AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel; when your account is deleted, they delete by hand those they can identify (with no guarantee that all are found)");
   });
 
   it("register_autoModAlert_noDeletionOnRequestInT01T08T16FrAndEn", () => {
@@ -316,15 +316,15 @@ describe("D55 et revue standard v11", () => {
 
     expect(fr).not.toContain("est supprimée sur demande de la même façon");
     expect(en).not.toContain("is deleted on request in the same way");
-    expect(fr).toContain("son alerte reste dans le salon d'alertes de modération jusqu'à ce que les modérateurs la suppriment à la main, à la suppression du compte du joueur, dont le site avertit le staff sans nommer le joueur ; elle n'est pas supprimée sur demande autrement.");
-    expect(en).toContain("its alert stays in the moderation alert channel until the moderators delete it by hand, when the player's account is deleted, of which the website tells the staff without naming the player; it is not deleted on request otherwise.");
+    expect(fr).toContain("son alerte reste dans le salon d'alertes de modération ; à la suppression du compte du joueur, dont le site avertit le staff sans nommer le joueur, les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver ; elle n'est pas supprimée sur demande autrement.");
+    expect(en).toContain("its alert stays in the moderation alert channel; when the player's account is deleted, of which the website tells the staff without naming the player, the moderators delete by hand the alerts they can identify, with no guarantee that all are found; it is not deleted on request otherwise.");
     expect(fr).toContain("supprimées sur demande de l'équipe, du joueur ou du caster concerné");
   });
 
   it("privacyChangeV11_autoModAlert_saysNoLongerDeletedOnRequestFrAndEn", () => {
-    expect(v11Fr.details[1]).toContain("L'alerte n'est plus supprimée sur demande : les modérateurs la suppriment à la main quand le compte du joueur est supprimé.");
+    expect(v11Fr.details[1]).toContain("L'alerte n'est plus supprimée sur demande : quand le compte du joueur est supprimé, les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver.");
     expect(v11Fr.details.join(" ")).not.toContain("L'alerte reste supprimée sur demande");
-    expect(v11En.details[1]).toContain("The alert is no longer deleted on request: the moderators delete it by hand when the player's account is deleted.");
+    expect(v11En.details[1]).toContain("The alert is no longer deleted on request: when the player's account is deleted, the moderators delete by hand the alerts they can identify, with no guarantee that all are found.");
     expect(v11En.details.join(" ")).not.toContain("The alert is still deleted on request");
   });
 
@@ -435,8 +435,8 @@ describe("D56b — alerte AutoMod supprimée à la main à la suppression du com
   const tEn = (ref: string) => JSON.stringify(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === ref));
 
   it("streamNoticeCasters_alert_deletedByHandAtAccountDeletionFrAndEn", () => {
-    expect(STREAM_NOTICE_CASTERS).toContain("où elle reste jusqu'à ce qu'ils la suppriment à la main à la suppression du compte du joueur — le site en avertit alors le staff, sans nommer le joueur — ; elle n'est pas supprimée sur demande autrement.");
-    expect(STREAM_NOTICE_CASTERS_EN).toContain("where it stays until they delete it by hand when the player's account is deleted — the site then tells the staff, without naming the player —; it is not deleted on request otherwise.");
+    expect(STREAM_NOTICE_CASTERS).toContain("où elle reste : à la suppression du compte du joueur, le site en avertit le staff, sans nommer le joueur, et les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver ; elle n'est pas supprimée sur demande autrement.");
+    expect(STREAM_NOTICE_CASTERS_EN).toContain("where it stays: when the player's account is deleted, the site tells the staff, without naming the player, and the moderators delete by hand the alerts they can identify, with no guarantee that all are found; it is not deleted on request otherwise.");
   });
 
   it("registerT16_retention_saysStaffLogCarriesTournamentAndTimeOnlyFrAndEn", () => {
@@ -445,45 +445,45 @@ describe("D56b — alerte AutoMod supprimée à la main à la suppression du com
   });
 
   it("registerT05_staffLog_declaresTheDeletionLineContentFrAndEn", () => {
-    expect(t("T05")).toContain("la ligne de sa demande de suppression cite le tournoi et l'heure de ces annonces, pour que les modérateurs suppriment à la main leurs alertes AutoMod (T16)");
-    expect(tEn("T05")).toContain("the line of its deletion request quotes the tournament and the time of those announcements, so that the moderators delete their AutoMod alerts by hand (T16)");
+    expect(t("T05")).toContain("la ligne de sa demande de suppression cite le tournoi, le jour et une heure de chaque soirée #live où il a pu paraître, pour que les modérateurs suppriment à la main celles de leurs alertes AutoMod qu'ils parviennent à identifier (T16)");
+    expect(tEn("T05")).toContain("the line of its deletion request quotes the tournament, the day and a time of each #live evening in which they may have appeared, so that the moderators delete by hand those of their AutoMod alerts they can identify (T16)");
   });
 
   it("registerT01AndT08_alert_noLongerKeptAfterAccountDeletionFrAndEn", () => {
-    expect(t("T01")).toContain("jusqu'à ce qu'ils la suppriment à la main, le staff étant averti de la demande de suppression sans que le joueur soit nommé (T16)");
-    expect(t("T08")).toContain("jusqu'à ce que les modérateurs la suppriment à la main, à la suppression du compte du joueur (traitement T16)");
+    expect(t("T01")).toContain("le staff est averti de la demande de suppression sans que le joueur soit nommé, et les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver (T16)");
+    expect(t("T08")).toContain("à la suppression du compte du joueur, les modérateurs suppriment à la main celles qu'ils parviennent à identifier, sans garantie de toutes les retrouver (traitement T16)");
     expect(t("T08") + t("T16")).not.toContain("même après la suppression du compte du joueur\"");
-    expect(tEn("T08")).toContain("until the moderators delete it by hand, when the player's account is deleted (processing activity T16)");
+    expect(tEn("T08")).toContain("when the player's account is deleted, the moderators delete by hand those they can identify, with no guarantee that all are found (processing activity T16)");
   });
 
   it("rgpdPolicy_alert_deletedByHandAtAccountDeletionFrAndEn", () => {
-    expect(AUTOMOD_ALERT_SCOPE).toBe("alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs jusqu'à ce qu'ils la suppriment à la main, à la suppression de ton compte");
-    expect(DROITS.find((d) => d.title === "Droit à l'effacement")?.text).toContain("jusqu'à ce que les modérateurs la suppriment à la main, à la suppression de votre compte : le site avertit le staff de votre demande, sans vous nommer ; elle n'est pas supprimée sur demande autrement.");
-    expect(DROITS_EN.find((d) => d.title === "Right to erasure")?.text).toContain("until the moderators delete it by hand, when your account is deleted: the site tells the staff of your request, without naming you; it is not deleted on request otherwise.");
+    expect(AUTOMOD_ALERT_SCOPE).toBe("alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs, qui suppriment à la main, à la suppression de ton compte, celles qu'ils parviennent à identifier (sans garantie de toutes les retrouver)");
+    expect(DROITS.find((d) => d.title === "Droit à l'effacement")?.text).toContain("à la suppression de votre compte, le site avertit le staff de votre demande, sans vous nommer, et les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver ; elle n'est pas supprimée sur demande autrement.");
+    expect(DROITS_EN.find((d) => d.title === "Right to erasure")?.text).toContain("when your account is deleted, the site tells the staff of your request, without naming you, and the moderators delete by hand the alerts they can identify, with no guarantee that all are found; it is not deleted on request otherwise.");
   });
 
   it("rgpdPages_alert_sayHandDeletionAndAnonymousStaffNoticeFrAndEn", () => {
-    expect(readSource("app/rgpd/page.tsx")).toContain("seuls le tournoi et l&apos;heure de ses annonces #live d&apos;un tournoi individuel y figurent");
-    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("only the tournament and the time of their #live announcements of a solo tournament appear in it");
+    expect(readSource("app/rgpd/page.tsx")).toContain("parviennent à identifier, sans garantie de toutes les retrouver : dès la demande de suppression, le site en");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("the alerts they can identify, with no guarantee that all are found: as soon as deletion is requested, the site tells the");
   });
 
   it("deletionResidual_alert_saysHandDeletionFrAndEn", () => {
-    expect(JSON.stringify(frProfile)).toContain("qui garde ton pseudo jusqu'à ce que les modérateurs la suppriment à la main (le staff est averti de ta demande, sans te nommer)");
-    expect(JSON.stringify(enProfile)).toContain("which keeps your username until the moderators delete it by hand (the staff is told of your request, without naming you)");
+    expect(JSON.stringify(frProfile)).toContain("qui garde ton pseudo (le staff est averti de ta demande, sans te nommer, et les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver)");
+    expect(JSON.stringify(enProfile)).toContain("which keeps your username (the staff is told of your request, without naming you, and the moderators delete by hand the alerts they can identify, with no guarantee that all are found)");
   });
 
   it("botPrivacyPolicy_alert_saysHandDeletionAndStaffLogContentFrAndEn", () => {
-    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("que les modérateurs suppriment à la main à la suppression du compte du joueur.");
-    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("le tournoi et l'heure de ces annonces, pour que les modérateurs suppriment à la main leurs alertes AutoMod");
-    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("which the moderators delete by hand when the player's account is deleted.");
-    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("the tournament and the time of those announcements, so that the moderators delete their AutoMod alerts by hand");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("dont les modérateurs suppriment à la main, à la suppression du compte du joueur, celles qu'ils parviennent à identifier.");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("le tournoi, le jour et une heure de chaque soirée #live où il a pu paraître, pour que les modérateurs suppriment à la main celles de leurs alertes AutoMod qu'ils parviennent à identifier");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("of which the moderators delete by hand, when the player's account is deleted, those they can identify.");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("the tournament, the day and a time of each #live evening in which they may have appeared, so that the moderators delete by hand those of their AutoMod alerts they can identify");
   });
 
   it("privacyChangeV11_alert_saysHandDeletionAndStaffNoticeFrAndEn", () => {
     const fr = PRIVACY_CHANGES.find((c) => c.id === V11_ID)!;
 
-    expect(fr.details[1]).toContain("les modérateurs la suppriment à la main quand le compte du joueur est supprimé. Dès la demande de suppression, le site en avertit le staff dans son journal d'activité sur Discord, sans nommer le joueur");
-    expect(PRIVACY_CHANGES_EN[V11_ID].details[1]).toContain("the moderators delete it by hand when the player's account is deleted. As soon as deletion is requested, the site tells the staff in its activity log on Discord, without naming the player");
+    expect(fr.details[1]).toContain("sans garantie de toutes les retrouver. Dès la demande de suppression, le site en avertit le staff dans son journal d'activité sur Discord, sans nommer le joueur");
+    expect(PRIVACY_CHANGES_EN[V11_ID].details[1]).toContain("with no guarantee that all are found. As soon as deletion is requested, the site tells the staff in its activity log on Discord, without naming the player");
   });
 });
 

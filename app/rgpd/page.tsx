@@ -403,7 +403,7 @@ function RgpdFr({
           envoyés, détachés de votre compte mais gardés jusqu&apos;à leur propre échéance (section{" "}
           <a href="#signalements">« Signalements »</a>), et des annonces #live d&apos;un tournoi
           individuel, qui gardent votre pseudo dans le salon Discord jusqu&apos;à leur suppression sur
-          demande, et de l&apos;alerte de modération d&apos;une telle annonce bloquée ou signalée par AutoMod, qui garde votre pseudo jusqu&apos;à ce que les modérateurs la suppriment à la main, le staff étant averti de votre demande sans que vous soyez nommé (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
+          demande, et de l&apos;alerte de modération d&apos;une telle annonce bloquée ou signalée par AutoMod, qui garde votre pseudo — le staff est averti de votre demande sans que vous soyez nommé, et les modérateurs suppriment à la main les alertes qu&apos;ils parviennent à identifier, sans garantie de toutes les retrouver (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
           d&apos;arbitrage et les rôles de plateforme qu&apos;il a attribués ou retirés restent nommés dans les journaux du serveur, selon leur rotation
           (<Link href="/rgpd/registre#t05">registre, T05</Link>). Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
@@ -1327,10 +1327,11 @@ function RgpdFr({
             ne veut pas voir son pseudo dans cette annonce ne s&apos;inscrit pas au tournoi individuel. Si
             une règle AutoMod de Discord bloque ou signale une annonce, son texte (pseudo compris en tournoi
             individuel) peut parvenir au salon d&apos;alertes des modérateurs du serveur, où l&apos;alerte
-            reste jusqu&apos;à ce que les modérateurs la suppriment à la main à la suppression du compte du joueur — dès la
-            demande de suppression, le site en avertit le staff dans son journal d&apos;activité sur Discord, sans nommer le
-            joueur : seuls le tournoi et l&apos;heure de ses annonces #live d&apos;un tournoi individuel y figurent —, sans
-            autre suppression sur demande, au titre, elle aussi, de
+            reste. À la suppression du compte du joueur, les modérateurs suppriment à la main les alertes qu&apos;ils
+            parviennent à identifier, sans garantie de toutes les retrouver : dès la demande de suppression, le site en
+            avertit le staff dans son journal d&apos;activité sur Discord, sans nommer le joueur (seuls y figurent le tournoi,
+            le jour et une heure de chaque soirée #live d&apos;un tournoi individuel où il a pu paraître). L&apos;alerte n&apos;est
+            pas supprimée sur demande autrement ; elle relève, elle aussi, de
             l&apos;exécution du service depuis la version 11 des conditions. Un match listé dans
             ce message avant son passage à l&apos;antenne, programmé dans la soirée pour une diffusion ouverte à son heure de début, ne laisse aucune trace sur
             le site : le site ne garde que la trace de l&apos;annonce d&apos;un match à son passage à l&apos;antenne

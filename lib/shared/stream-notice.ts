@@ -40,7 +40,7 @@ export const STREAM_NOTICE_SERVICE =
  * de l'exécution du service — plus d'intérêt légitime ni de droit d'opposition.
  */
 export const STREAM_NOTICE_CASTERS =
-  "Relèvent de même de l'exécution du service : la voix, le pseudo et le lien de la chaîne du caster qui s'inscrit sur un match, publiés avec ce match, et son réglage du passage à l'antenne ; les liens de diffusion et de rediffusion publiés sur le site ; et la copie du texte d'une annonce #live que la modération automatique de Discord (AutoMod) bloque ou signale, envoyée au salon d'alertes des modérateurs du serveur, où elle reste jusqu'à ce qu'ils la suppriment à la main à la suppression du compte du joueur — le site en avertit alors le staff, sans nommer le joueur — ; elle n'est pas supprimée sur demande autrement.";
+  "Relèvent de même de l'exécution du service : la voix, le pseudo et le lien de la chaîne du caster qui s'inscrit sur un match, publiés avec ce match, et son réglage du passage à l'antenne ; les liens de diffusion et de rediffusion publiés sur le site ; et la copie du texte d'une annonce #live que la modération automatique de Discord (AutoMod) bloque ou signale, envoyée au salon d'alertes des modérateurs du serveur, où elle reste : à la suppression du compte du joueur, le site en avertit le staff, sans nommer le joueur, et les modérateurs suppriment à la main les alertes qu'ils parviennent à identifier, sans garantie de toutes les retrouver ; elle n'est pas supprimée sur demande autrement.";
 
 /**
  * L'annonce #live dans les conditions d'utilisation (décision du 2026-10-14 :

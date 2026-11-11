@@ -293,7 +293,7 @@ export function RgpdEn({
           creation date, {ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} days), and to the reports you sent, detached
           from your account but kept until their own deadline (section <a href="#signalements">“Reports”</a>), and to
           the #live announcements of a solo tournament, which keep your username in the Discord channel until they
-          are deleted on request, and to the moderation alert for such an announcement blocked or flagged by AutoMod, which keeps your username until the moderators delete it by hand, the staff being told of your request without you being named (<a href="#retransmission">“Match streaming”</a>);
+          are deleted on request, and to the moderation alert for such an announcement blocked or flagged by AutoMod, which keeps your username — the staff is told of your request without you being named, and the moderators delete by hand the alerts they can identify, with no guarantee that all are found (<a href="#retransmission">“Match streaming”</a>);
           for a staff member, their refereeing actions and the platform roles they granted or removed remain named in the server logs, according to their
           rotation (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>). The web server also keeps,
           for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most, a technical log of each request (
@@ -1114,10 +1114,11 @@ export function RgpdEn({
             tournament the player registers for — a player who does
             not want their username in that announcement does not register for the solo tournament. If a Discord
             AutoMod rule blocks or flags an announcement, its text (including the username in a solo tournament) may reach the
-            server moderators&apos; alert channel, where the alert stays until the moderators delete it by hand when the player&apos;s account is
-            deleted — as soon as deletion is requested, the site tells the staff in its activity log on Discord, without naming the
-            player: only the tournament and the time of their #live announcements of a solo tournament appear in it —, with no
-            other deletion on request, also under
+            server moderators&apos; alert channel, where the alert stays. When the player&apos;s account is deleted, the moderators delete by hand
+            the alerts they can identify, with no guarantee that all are found: as soon as deletion is requested, the site tells the
+            staff in its activity log on Discord, without naming the player (only the tournament, the day and a time of each #live
+            evening of a solo tournament in which they may have appeared are given). The alert is not deleted on request
+            otherwise; it also falls under
             performance of the service since version 11 of the terms. A
             match listed in that message before it goes on air, scheduled that evening for a broadcast opening at its start time, leaves no trace on the
             site: the site only keeps the trace of a match&apos;s announcement when it goes on air

@@ -48,7 +48,7 @@ export const STREAM_NOTICE_SERVICE_EN =
 
 /** `STREAM_NOTICE_CASTERS` (`stream-notice.ts`). */
 export const STREAM_NOTICE_CASTERS_EN =
-  "The following fall under performance of the service too: the voice, username and channel link of the caster who registers for a match, published with that match, and their setting of how it goes live; the stream and replay links published on the site; and the copy of the text of a #live announcement that Discord's automatic moderation (AutoMod) blocks or flags, sent to the server moderators' alert channel, where it stays until they delete it by hand when the player's account is deleted — the site then tells the staff, without naming the player —; it is not deleted on request otherwise.";
+  "The following fall under performance of the service too: the voice, username and channel link of the caster who registers for a match, published with that match, and their setting of how it goes live; the stream and replay links published on the site; and the copy of the text of a #live announcement that Discord's automatic moderation (AutoMod) blocks or flags, sent to the server moderators' alert channel, where it stays: when the player's account is deleted, the site tells the staff, without naming the player, and the moderators delete by hand the alerts they can identify, with no guarantee that all are found; it is not deleted on request otherwise.";
 
 /** `STREAM_NOTICE_LIVE` (`stream-notice.ts`). */
 export const STREAM_NOTICE_LIVE_EN =
