@@ -1,13 +1,14 @@
 import { describe, expect, it } from "@jest/globals";
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "@/lib/shared/bot-legal-content";
-import { STREAM_NOTICE_LIVE_EN, STREAM_NOTICE_SERVICE_EN } from "@/lib/shared/legal-text-en";
+import { STREAM_NOTICE_CASTERS_EN, STREAM_NOTICE_LIVE_EN, STREAM_NOTICE_SERVICE_EN } from "@/lib/shared/legal-text-en";
 import { VOICE_BOT_RELEASED_MAX_HOURS } from "@/lib/shared/match-voice";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 import { PROCESSING_ACTIVITIES, PROCESSING_ACTIVITIES_EN, REGISTER_UPDATED_AT } from "@/lib/shared/processing-register";
-import { DONNEES_PROFIL, STREAM_PSEUDO_SCOPE } from "@/lib/shared/rgpd-policy";
+import { AUTOMOD_ALERT_SCOPE, DONNEES_PROFIL, STREAM_PSEUDO_SCOPE } from "@/lib/shared/rgpd-policy";
 import {
   REGISTRATION_STREAM_NOTICE_SHORT,
+  STREAM_NOTICE_CASTERS,
   STREAM_NOTICE_LIVE,
   STREAM_NOTICE_SERVICE,
   registrationStreamNotice,
@@ -92,14 +93,16 @@ describe("D50 — diffusion sous le pseudo : exécution du service, plus de nom 
     expect(STREAM_NOTICE_LIVE_EN).toContain("An announcement is deleted on request, through the “Report a problem” button, GDPR category.");
   });
 
-  it("registerT16_legalBasis_contractForPlayersLegitimateInterestForCastersFrAndEn", () => {
+  it("registerT16_legalBasis_contractForPlayersCastersLinksAndAutoModAlertFrAndEn", () => {
     const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T16")!;
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T16")!;
 
     expect(fr.legalBasis).toContain("pour la diffusion en direct et l'enregistrement de ses matchs sous son pseudo");
-    expect(fr.legalBasis).toContain("pour ce qui touche les casters (voix, pseudo, lien de leur chaîne, mode d'antenne) et les liens de diffusion et de rediffusion publiés sur le site, avec un droit d'opposition (art. 21)");
+    expect(fr.legalBasis).toContain("même base, prévue par la même section des conditions, pour ce qui touche les casters (voix, pseudo, lien de leur chaîne, mode d'antenne), pour les liens de diffusion et de rediffusion publiés sur le site et pour l'alerte AutoMod");
+    expect(fr.legalBasis).not.toMatch(/intérêt légitime|droit d'opposition/i);
     expect(en.legalBasis).toContain("for the live streaming and recording of their matches under their username");
-    expect(en.legalBasis).toContain("for what concerns the casters (voice, username, link to their channel, live mode) and the stream and replay links published on the site, with a right to object (art. 21)");
+    expect(en.legalBasis).toContain("same basis, provided for by the same section of the terms, for what concerns the casters (voice, username, link to their channel, live mode), for the stream and replay links published on the site and for the AutoMod alert");
+    expect(en.legalBasis).not.toMatch(/legitimate interest|right to object/i);
     expect(en.retention).toHaveLength(fr.retention.length);
   });
 
@@ -116,6 +119,38 @@ describe("D50 — diffusion sous le pseudo : exécution du service, plus de nom 
     const pseudo = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo site");
 
     expect(pseudo?.extraBases).toContainEqual({ base: "Exécution du contrat", scope: STREAM_PSEUDO_SCOPE });
+  });
+
+  it("rgpdPolicy_sitePseudo_listsAutoModAlertUnderContract", () => {
+    const pseudo = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo site");
+
+    expect(pseudo?.extraBases).toContainEqual({ base: "Exécution du contrat", scope: AUTOMOD_ALERT_SCOPE });
+  });
+
+  it("terms_retransmission_coversCastersLinksAndAutoModAlertFrAndEn", () => {
+    expect(termsFr("retransmission")).toContain(STREAM_NOTICE_CASTERS);
+    expect(termsEn("retransmission")).toContain(STREAM_NOTICE_CASTERS_EN);
+    expect(STREAM_NOTICE_CASTERS).toContain("Relèvent de même de l'exécution du service : la voix, le pseudo et le lien de la chaîne du caster");
+    expect(STREAM_NOTICE_CASTERS_EN).toContain("The following fall under performance of the service too: the voice, username and channel link of the caster");
+  });
+
+  it("rgpdPages_autoModAlert_noLongerOfferAnObjectionFrAndEn", () => {
+    expect(readSource("app/rgpd/page.tsx")).not.toContain("s&apos;y opposer : demander sa suppression");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).not.toContain("to object: ask for its deletion");
+  });
+
+  it("botPrivacyPolicy_autoModAlert_restsOnPerformanceOfTheServiceFrAndEn", () => {
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("dans l'annonce #live d'un tournoi individuel, et de même pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, supprimée sur demande.");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("in the #live announcement of a solo tournament, and likewise for the AutoMod alert of such an announcement when blocked or flagged, deleted on request.");
+  });
+
+  it("privacyChange_termsV11_saysCastersLinksAndAlertMoveAndNoTransitionFrAndEn", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === V11_ID);
+
+    expect(fr?.details[1]).toContain("ils relèvent désormais eux aussi de l'exécution du service");
+    expect(fr?.details[2]).toContain("La version 11 s'applique dès sa mise en ligne, sans régime transitoire.");
+    expect(PRIVACY_CHANGES_EN[V11_ID].details[1]).toContain("they now fall under performance of the service too");
+    expect(PRIVACY_CHANGES_EN[V11_ID].details[2]).toContain("Version 11 applies as soon as it goes online, with no transitional rule.");
   });
 
   it("rgpdPages_retransmission_sayPerformanceOfServiceWithoutNeutralNameObjectionFrAndEn", () => {

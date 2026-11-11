@@ -575,8 +575,10 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
   });
 
   it("donne une base à l'alerte AutoMod d'une annonce #live bloquée ou signalée (FR et EN)", () => {
-    expect(fr).toContain("intérêt légitime de l'association à modérer son serveur pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, supprimée sur demande");
-    expect(en).toContain("the association's legitimate interest in moderating its server for the AutoMod alert of such an announcement when blocked or flagged, deleted on request");
+    // Conditions v11 (D53) : exécution du service, comme le pseudo de l'annonce.
+    expect(fr).toContain("dans l'annonce #live d'un tournoi individuel, et de même pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, supprimée sur demande");
+    expect(en).toContain("in the #live announcement of a solo tournament, and likewise for the AutoMod alert of such an announcement when blocked or flagged, deleted on request");
+    expect(fr).not.toContain("intérêt légitime de l'association à modérer son serveur pour l'alerte AutoMod");
   });
 
   it("les conditions du bot citent aussi l'avis « Match retiré » parmi les messages remis (FR et EN)", () => {

@@ -290,9 +290,11 @@ describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
     expect(en("T13").subPurposes.join(" ")).toMatch(/at a login started from the login page \(click on Google, Discord or Blizzard, or submission of the code received on Discord\) within ten minutes of accepting the terms there \(an acceptance only kept by the browser is not carried over to an existing account\)/);
   });
 
-  it("T16 donne une base à l'alerte AutoMod : intérêt légitime de modérer le serveur, opposition = suppression (FR et EN)", () => {
-    expect(fr("T16").legalBasis).toMatch(/intérêt légitime de l'association à modérer son serveur Discord pour l'alerte AutoMod d'une annonce #live bloquée ou signalée[^;]*droit d'opposition \(art\. 21\) : l'alerte est supprimée sur demande/);
-    expect(en("T16").legalBasis).toMatch(/legitimate interest of the association in moderating its Discord server for the AutoMod alert of a blocked or flagged #live announcement[^;]*right to object \(art\. 21\): the alert is deleted on request/);
+  // Conditions v11 (D53) : l'alerte passe de l'intérêt légitime à l'exécution du service.
+  it("T16 donne une base à l'alerte AutoMod : exécution du service, supprimée sur demande (FR et EN)", () => {
+    expect(fr("T16").legalBasis).toMatch(/même base, prévue par la même section des conditions, pour .* et pour l'alerte AutoMod d'une annonce #live bloquée ou signalée, gardée dans le salon d'alertes des modérateurs et supprimée sur demande$/);
+    expect(en("T16").legalBasis).toMatch(/same basis, provided for by the same section of the terms, for .* and for the AutoMod alert of a blocked or flagged #live announcement, kept in the moderators' alert channel and deleted on request$/);
+    expect(en("T16").legalBasis).not.toMatch(/legitimate interest|right to object/i);
   });
 
   it("T16 dit la finalité de modération de l'alerte AutoMod (FR et EN)", () => {
@@ -595,12 +597,13 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(sheet.transfers.join(" ")).toContain(SPICEWORKS_SCC_FALLBACK);
   });
 
-  it("donne une fiche à la retransmission : exécution du service pour les joueurs, intérêt légitime pour les casters", () => {
+  it("donne une fiche à la retransmission : exécution du service pour les joueurs comme pour les casters", () => {
     const sheet = byRef("T16");
     // Conditions v11 (D50) : la diffusion sous le pseudo fait partie du tournoi.
     expect(sheet.legalBasis).toMatch(/pour la diffusion en direct et l'enregistrement de ses matchs sous son pseudo, avec le nom de son équipe et ses résultats et performances en jeu, qui font partie du tournoi auquel il participe — ne pas y paraître revient à ne pas y participer/);
-    expect(sheet.legalBasis).toMatch(/intérêt légitime \(RGPD, art\. 6\.1\.f\) de l'association à faire connaître ses compétitions, objet de ses statuts, pour ce qui touche les casters/);
-    expect(sheet.legalBasis).toMatch(/droit d'opposition/);
+    // D53 : casters, liens publiés et alerte AutoMod sur la même base, sans opposition.
+    expect(sheet.legalBasis).toMatch(/même base, prévue par la même section des conditions, pour ce qui touche les casters \(voix, pseudo, lien de leur chaîne, mode d'antenne\), pour les liens de diffusion et de rediffusion publiés sur le site et pour l'alerte AutoMod d'une annonce #live bloquée ou signalée, gardée dans le salon d'alertes des modérateurs et supprimée sur demande$/);
+    expect(sheet.legalBasis).not.toMatch(/intérêt légitime|droit d'opposition/i);
     expect(sheet.dataCategories.join(" ")).toMatch(/Pseudos .* noms d'équipe/);
     expect(sheet.retention.join(" ")).toMatch(/Lien de rediffusion : conservé avec le match/);
     // Le site ne fait que lier les chaînes : seule l'annonce #live passe par Discord.

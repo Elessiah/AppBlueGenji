@@ -131,7 +131,7 @@ la mise en page, elle garde le texte d'une première acceptation.
 | 8 | 31 octobre 2026 | « Contacts de match » : arbitrer demande un BattleTag tiré d'un compte Battle.net rattaché (un BattleTag tapé n'y suffit pas) ; le pseudo seul de l'arbitre désigné se lit par tout membre connecté (intérêt légitime, opposition), les visiteurs sans compte lisant « Arbitre désigné ». « Contacts de match » et « Contenus » : un BattleTag tapé à la main, gardé quand Battle.net n'en donne aucun, reste modifiable et effaçable, sans valoir BattleTag vérifié. Entrée `2026-10-conditions-v8-arbitre-et-battletag`. |
 | 9 | 5 novembre 2026 | « Contacts de match » : Battle.net exigé de l'arbitre d'un match Overwatch seulement, BattleTag présenté en Overwatch seulement, tag Discord certifié de l'arbitre désigné et contacts des équipes sur la page du match aux seules parties (fonctionnement minimum nécessaire, T1), fenêtre de lancement réécrite (T3), lien `/rgpd#arbitre-designe`, salons vocaux d'équipe comme règle du tournoi, comptage anonyme sur l'intérêt légitime sans droit d'opposition (décisions du 2026-11-04) ; « Compte » : suppression du compte et ses suites (ERASURE-D2). Un seul tour d'acceptation pour MATCH-REFEREE-FINISH et ERASURE-D2 (R4b). Entrée `2026-11-conditions-v9-contacts-et-suppression`. |
 | 10 | 11 novembre 2026 | « Compte » : un joueur suspendu ne reprend une équipe qu'après tous les autres ; l'avatar mis de côté n'est rendu à la réactivation que s'il n'est ni masqué ni supprimé par la modération ; seul un avatar **supprimé** par la modération reste bloqué. « Signalement et modération » : empreinte gardée à la suppression d'un avatar, issue de la contestation gardée, blocage levé par une contestation acceptée. « Retransmission des matchs » : annonce préalable bornée aux matchs dont la diffusion s'ouvre à leur heure de début (D10). « Contacts de match » : salons vocaux d'équipe ouverts à qui voit la catégorie des matchs (D13), état vocal lu en mémoire par le bot sans être enregistré, vidage par l'arbitrage ou par le propriétaire, un manager ou le capitaine de l'équipe (D36), sans garder qui en est déconnecté (D15). Entrée `2026-11-conditions-v10-avatar-et-succession`. |
-| 11 | 13 novembre 2026 | « Retransmission des matchs » : être diffusé et enregistré sous son pseudo fait partie du tournoi (exécution du service, comme l'annonce #live d'un tournoi individuel) — l'opposition par « nom neutre » disparaît (D50). « Compte » : la propriété d'une équipe passe à un autre **membre**, un membre dont la suppression est elle-même demandée n'étant pas compté ; la suppression du compte se **demande** (D44). « Contenus » et « Contacts de match » : réserve pour un BattleTag enregistré avant que le site n'en note l'origine ; tag Discord certifié de l'arbitre désigné dans sa propre phrase, parties du match définies une fois ; salons vocaux pour les seuls matchs programmés, suppression dite comme le registre T18, états « bientôt ouvert » et « indisponible ». Entrée `2026-11-conditions-v11-diffusion-sous-le-pseudo`. |
+| 11 | 13 novembre 2026 | « Retransmission des matchs » : être diffusé et enregistré sous son pseudo fait partie du tournoi (exécution du service, comme l'annonce #live d'un tournoi individuel) — l'opposition par « nom neutre » disparaît (D50) ; casters, liens publiés et alerte AutoMod sur la même base (D53) ; aucun régime transitoire (D54). « Compte » : la propriété d'une équipe passe à un autre **membre**, un membre dont la suppression est elle-même demandée n'étant pas compté ; la suppression du compte se **demande** (D44). « Contenus » et « Contacts de match » : réserve pour un BattleTag enregistré avant que le site n'en note l'origine ; tag Discord certifié de l'arbitre désigné dans sa propre phrase, parties du match définies une fois ; salons vocaux pour les seuls matchs programmés, suppression dite comme le registre T18, états « bientôt ouvert » et « indisponible ». Entrée `2026-11-conditions-v11-diffusion-sous-le-pseudo`. |
 
 **Redemander, et le dire** : à la connexion, la modale d'entrée de `/connexion`
 revient dès que la version gardée par le navigateur (`bg_terms_consent`) n'est
@@ -297,8 +297,12 @@ mentions d'inscription (`register.streamNotice.TEAM` / `SOLO`,
 `streamNoticeShort`, FR et EN), `/rgpd#retransmission`, le droit d'opposition
 de `/rgpd`, la ligne « Pseudo site » (`STREAM_PSEUDO_SCOPE`) et la fiche T16 du
 registre (base légale ; la ligne « Droit d'opposition » de ses durées est
-retirée). Ce qui touche les casters et les liens publiés reste sur l'intérêt
-légitime. La version regroupe aussi toutes les entrées d'`ERREUR.txt` dont la
+retirée). Ce qui touche les casters (voix, pseudo, lien de chaîne, mode
+d'antenne), les liens de diffusion et de rediffusion publiés et l'alerte AutoMod
+d'une annonce #live passe **aussi** à l'exécution du service, sans intérêt
+légitime ni droit d'opposition (décision D53 du 2026-11-11,
+`STREAM_NOTICE_CASTERS` / `_EN`, `AUTOMOD_ALERT_SCOPE` sous `CONTRAT`) ;
+l'alerte reste supprimée sur demande. La version regroupe aussi toutes les entrées d'`ERREUR.txt` dont la
 correction tenait au texte des conditions (D51) : « un autre membre » et
 « aucun autre membre » pour la reprise d'une équipe (le code prend tout membre
 vivant, coach compris, et écarte un membre dont la suppression est demandée),
@@ -314,11 +318,9 @@ réaccepte** dans la fenêtre bloquante. Le garde-fou de
 `privacy-changes.test.ts` ne repère plus seulement une entrée de conditions par
 le préfixe de son titre : l'entrée datée de `TERMS_UPDATED_AT` qui lie les
 conditions et nomme leur version doit porter `asksTermsAcceptance`.
-**Décision requise** : la base d'un joueur engagé qui n'a pas encore accepté
-la version 11 (le précédent de l'annonce #live, décision 33 du 2026-10-28,
-appliquait la règle nouvelle sans attendre l'acceptation ; celui de l'arbitre
-désigné gardait l'intérêt légitime et l'opposition jusqu'à l'acceptation) —
-les textes ne prévoient ici aucun régime transitoire.
+**Aucun régime transitoire** (décision D54 du 2026-11-11) : la version 11
+s'applique à sa mise en ligne — personne d'autre que l'administrateur n'est
+alors engagé dans un tournoi.
 
 `TERMS_UPDATED_AT` est daté du **lendemain** de la mise en ligne quand l'heure
 du déploiement n'est pas connue, comme `PRIVACY_CHANGES`.

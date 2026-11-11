@@ -31,7 +31,7 @@ import { LOGO_QUARANTINE_MONTHS } from "./logo-quarantine";
 import { SUSPENSION_MAX_DAYS } from "./account-suspension";
 import { SITE_MINIMUM_AGE } from "./legal-durations";
 import { VOICE_BOT_RELEASED_MAX_HOURS } from "./match-voice";
-import { STREAM_NOTICE_LIVE, STREAM_NOTICE_PRIVACY_PATH, STREAM_NOTICE_SERVICE, STREAM_NOTICE_SHOWN } from "./stream-notice";
+import { STREAM_NOTICE_CASTERS, STREAM_NOTICE_LIVE, STREAM_NOTICE_PRIVACY_PATH, STREAM_NOTICE_SERVICE, STREAM_NOTICE_SHOWN } from "./stream-notice";
 
 /**
  * Version en vigueur. L'avancer redemande l'acceptation.
@@ -135,7 +135,10 @@ import { STREAM_NOTICE_LIVE, STREAM_NOTICE_PRIVACY_PATH, STREAM_NOTICE_SERVICE, 
  * avec D44) : « Retransmission des matchs » — être diffusé et enregistré sous
  * son pseudo fait partie du tournoi (exécution du service, comme l'annonce
  * #live d'un tournoi individuel) : l'opposition par « nom neutre » disparaît
- * (`STREAM_NOTICE_SERVICE`). « Compte » — la propriété d'une équipe passe à un
+ * (`STREAM_NOTICE_SERVICE`) ; ce qui touche les casters, les liens publiés et
+ * l'alerte AutoMod relève aussi de l'exécution du service (D53,
+ * `STREAM_NOTICE_CASTERS`). Aucun régime transitoire : la version s'applique
+ * à sa mise en ligne (D54). « Compte » — la propriété d'une équipe passe à un
  * autre **membre** (pas seulement un joueur), un membre dont la suppression
  * est elle-même demandée n'étant pas compté ; la suppression se **demande**.
  * « Contenus » et « Contacts de match » — réserve pour un BattleTag enregistré
@@ -343,7 +346,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     title: "Retransmission des matchs",
     paragraphs: [
       `Un match de tournoi peut être **diffusé en direct et enregistré** (YouTube, Twitch ou Kick), par la chaîne de l'association ou d'un caster. ${STREAM_NOTICE_SHOWN}`,
-      `${STREAM_NOTICE_SERVICE} ${STREAM_NOTICE_LIVE} La diffusion se regarde sur la plateforme qui la publie : le site ne fait que lier la chaîne.`,
+      `${STREAM_NOTICE_SERVICE} ${STREAM_NOTICE_LIVE} ${STREAM_NOTICE_CASTERS} La diffusion se regarde sur la plateforme qui la publie : le site ne fait que lier la chaîne.`,
     ],
     links: [{ href: STREAM_NOTICE_PRIVACY_PATH, label: "Politique de confidentialité — retransmission des matchs" }],
   },

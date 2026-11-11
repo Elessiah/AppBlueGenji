@@ -533,9 +533,11 @@ service** (art. 6.1.b), ne pas y paraître = ne pas participer
 (`STREAM_NOTICE_SERVICE` / `_EN`, `STREAM_PSEUDO_SCOPE`). L'opposition par « nom
 neutre » (intérêt légitime, jusqu'à la version 10), qui se traitait à la main
 sur demande, **n'existe plus** : ni le site ni le staff n'ont de nom neutre à
-poser. Restent fondés sur l'intérêt légitime de l'association à faire connaître
-ses compétitions ce qui touche les casters (voix, pseudo, lien de leur chaîne,
-mode d'antenne) et les liens de diffusion et de rediffusion publiés sur le site.
+poser. Ce qui touche les casters (voix, pseudo, lien de leur chaîne, mode
+d'antenne), les liens de diffusion et de rediffusion publiés sur le site et
+l'alerte AutoMod d'une annonce #live relèvent de la même base (décision D53,
+`STREAM_NOTICE_CASTERS`) : plus d'intérêt légitime ni de droit d'opposition
+dans T16 ; l'alerte reste supprimée sur demande. Aucun régime transitoire (D54).
 Le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel repose de
 même sur l'**exécution du service** depuis le 2026-10-14 (l'annonce fait partie
 du tournoi auquel il s'inscrit) : ne pas y être
@@ -545,8 +547,9 @@ d'opposition, la mention d'inscription solo, `STREAM_NOTICE_LIVE` (conditions,
 version 4) et la politique du bot. **AutoMod** : si une règle AutoMod de Discord
 bloque **ou signale** une annonce, son texte (pseudo compris en individuel) peut
 parvenir au salon d'alertes des modérateurs du serveur. T16 en fait une finalité
-(modérer le serveur), sur l'**intérêt légitime** de l'association ; l'alerte reste
-jusqu'à sa suppression par les modérateurs, ou sur demande (c'est l'opposition) —
+(modérer le serveur), sur l'**exécution du service** depuis la version 11 des
+conditions (D53 ; intérêt légitime et opposition jusque-là) ; l'alerte reste
+jusqu'à sa suppression par les modérateurs, ou sur demande —
 **décision requise** : aucune durée fixe. Textes à tenir ensemble : T16
 (finalité, base, destinataire, conservation, transfert), T08, T01 (suppression),
 `/rgpd` (#retransmission, tableau `AUTOMOD_ALERT_SCOPE`, suppression du compte,

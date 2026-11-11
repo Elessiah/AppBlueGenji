@@ -1307,8 +1307,8 @@ function RgpdFr({
             d&apos;utilisation (section « Retransmission des matchs »), cette diffusion relève ainsi de
             l&apos;<strong>exécution du service</strong>, et non plus de l&apos;intérêt légitime : il n&apos;y a
             plus d&apos;opposition par « nom neutre ». Ce qui touche les casters (voix, pseudo, lien de leur
-            chaîne, mode d&apos;antenne) et les liens de diffusion et de rediffusion publiés sur le site reste
-            fondé sur l&apos;intérêt légitime de l&apos;association à faire connaître ses compétitions.
+            chaîne, mode d&apos;antenne) et les liens de diffusion et de rediffusion publiés sur le site relève
+            de la même base, que la même section des conditions prévoit.
             Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
             responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>). Au
             début d&apos;un match diffusé, le bot l&apos;annonce dans le salon #live du serveur Discord de
@@ -1327,8 +1327,8 @@ function RgpdFr({
             ne veut pas voir son pseudo dans cette annonce ne s&apos;inscrit pas au tournoi individuel. Si
             une règle AutoMod de Discord bloque ou signale une annonce, son texte (pseudo compris en tournoi
             individuel) peut parvenir au salon d&apos;alertes des modérateurs du serveur, où l&apos;alerte
-            reste jusqu&apos;à sa suppression par les modérateurs, au titre de l&apos;intérêt légitime de
-            l&apos;association à modérer son serveur (s&apos;y opposer : demander sa suppression). Un match listé dans
+            reste jusqu&apos;à sa suppression par les modérateurs ou sur demande, au titre, elle aussi, de
+            l&apos;exécution du service depuis la version 11 des conditions. Un match listé dans
             ce message avant son passage à l&apos;antenne, programmé dans la soirée pour une diffusion ouverte à son heure de début, ne laisse aucune trace sur
             le site : le site ne garde que la trace de l&apos;annonce d&apos;un match à son passage à l&apos;antenne
             (<Link href="/rgpd/registre#t16">registre, T16</Link>), qui figure, en tournoi individuel, dans

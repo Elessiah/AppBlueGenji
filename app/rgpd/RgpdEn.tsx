@@ -1097,8 +1097,8 @@ export function RgpdEn({
             (section “Match streaming”), this streaming therefore falls under <strong>performance of the
             service</strong>, and no longer under legitimate interest: there is no longer an objection through a
             “neutral name”. What concerns the casters (voice, username, link to their channel, live mode) and the
-            stream and replay links published on the site remains based on the association&apos;s legitimate
-            interest in promoting its competitions.
+            stream and replay links published on the site falls under the same basis, which the same section
+            of the terms provides for.
             Viewers, for their part, watch the stream on the platform, which processes their data as the controller
             of its own processing (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>). When a
             streamed match starts, the bot announces it in the #live channel of the association&apos;s Discord
@@ -1114,8 +1114,8 @@ export function RgpdEn({
             tournament the player registers for — a player who does
             not want their username in that announcement does not register for the solo tournament. If a Discord
             AutoMod rule blocks or flags an announcement, its text (including the username in a solo tournament) may reach the
-            server moderators&apos; alert channel, where the alert stays until the moderators delete it, under the
-            association&apos;s legitimate interest in moderating its server (to object: ask for its deletion). A
+            server moderators&apos; alert channel, where the alert stays until the moderators delete it or on request, also under
+            performance of the service since version 11 of the terms. A
             match listed in that message before it goes on air, scheduled that evening for a broadcast opening at its start time, leaves no trace on the
             site: the site only keeps the trace of a match&apos;s announcement when it goes on air
             (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>), which appears, in a solo tournament,

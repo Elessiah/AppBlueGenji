@@ -516,12 +516,12 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/The streaming and recording of your tournament matches under your username are not part of it: they fall under performance of the service, the tournament you take part in — not appearing in them means not taking part/);
     expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/Nor is the username posted in the #live announcement of a solo tournament: it falls under performance of the service you register for — not being named in it means not registering/);
     const pseudo = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo site");
-    // Revue légale #445 : l'alerte AutoMod repose sur l'intérêt légitime (modérer le serveur), pas sur le contrat.
     expect(pseudo?.extraBases).toEqual([
       // Conditions v11 (D50) : le pseudo à l'écran d'un match diffusé et enregistré.
       { base: "Exécution du contrat", scope: STREAM_PSEUDO_SCOPE },
       { base: "Exécution du contrat", scope: LIVE_PSEUDO_SCOPE },
-      { base: "Intérêt légitime", scope: AUTOMOD_ALERT_SCOPE },
+      // D53 (conditions v11) : l'alerte AutoMod passe à l'exécution du service.
+      { base: "Exécution du contrat", scope: AUTOMOD_ALERT_SCOPE },
       // Revue juridique de #491 : le pseudo de l'arbitre désigné, même base que son BattleTag.
       { base: "Exécution du contrat", scope: REFEREE_USERNAME_SCOPE },
       { base: "Intérêt légitime", scope: REFEREE_USERNAME_BEFORE_V7_SCOPE },
@@ -531,7 +531,7 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Site username")?.extraBases).toEqual([
       { base: "Exécution du contrat", scope: "live streaming and recording of the tournament matches you take part in" },
       { base: "Exécution du contrat", scope: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request" },
-      { base: "Intérêt légitime", scope: "AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it or on request" },
+      { base: "Exécution du contrat", scope: "AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it or on request" },
       { base: "Exécution du contrat", scope: "the username of a match's assigned referee, in its “Contacts” and launch windows and on the match page, whatever the game: to both its teams and the referees as soon as both its opponents are known until its end, and to its casters while the match is being played (in an Overwatch tournament, next to their BattleTag — see “Overwatch username”), and alone as soon as the launch window shows the match (terms of use, “Match contacts”, once the referee has accepted their version 7 or a later one)" },
       { base: "Intérêt légitime", scope: "the same presentation of the assigned referee's username, as long as that referee has not accepted version 7 of the terms of use or a later version — objection through the report form, GDPR category (once upheld, they are removed from all their unfinished matches and can no longer take or be assigned one until it is lifted — at their request only —, even once version 7 or a later one is accepted)" },
       { base: "Intérêt légitime", scope: "the username alone of the assigned referee of a match, on the match card and page until its score is reported or the tournament ends, read by any signed-in member (never by a visitor without an account, who reads “Referee assigned”) — objection through the report form, GDPR category, with the same effect as an objection to being presented to the parties (removal from their unfinished matches)" },
@@ -556,8 +556,8 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     expect(choiceEn?.base).toBe("Obligation légale");
     expect(choiceEn?.finalite).toMatch(/Kept under a legal obligation: that is what allows your objection to keep being honoured/);
     expect(choiceEn?.finalite).not.toMatch(/legitimate interest/);
-    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord \(intérêt légitime\), est supprimée sur demande/);
-    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/The AutoMod alert for such an announcement when blocked or flagged, kept to moderate the Discord server \(legitimate interest\), is deleted on request/);
+    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord, et ce qui touche les casters et les liens de diffusion publiés relèvent de la même base ; l'alerte est supprimée sur demande\./);
+    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/The AutoMod alert for such an announcement when blocked or flagged, kept to moderate the Discord server, and what concerns the casters and the published stream links fall under the same basis; the alert is deleted on request\./);
     expect(AUTOMOD_ALERT_SCOPE).toMatch(/alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs/);
     expect(LIVE_PSEUDO_SCOPE).not.toMatch(/AutoMod/);
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Match direct messages choice")?.finalite).toMatch(/reset to the default if the account is anonymized/);
