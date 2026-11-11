@@ -27,6 +27,7 @@ import { loadEntrantManagerIds, loadNotificationRecipients, notifyUsers } from "
 import { readMatchCasters } from "@/lib/server/tournaments/player-pushes";
 import {
   dispatchLobbyBriefs,
+  firstAnnounceableUrl,
   LOBBY_BRIEF_PHASE,
   resetLobbyBriefThrottle,
 } from "@/lib/server/tournaments/lobby-brief";
@@ -51,7 +52,7 @@ const MATCH = {
   launch_pairing: "1:2",
   brief_pairing: "1:2",
   voice_tracked: 0,
-  stream_url: null,
+  stream_urls: null,
   host_team_id: null,
   team1_seed: null,
   team2_seed: null,
@@ -289,7 +290,7 @@ describe("dispatchLobbyBriefs", () => {
   });
 
   it("dispatchLobbyBriefs_redirectStreamUrl_noStreamInBrief", async () => {
-    mockDb([{ ...MATCH, stream_url: "https://www.youtube.com/redirect?q=https://phish.example" }]);
+    mockDb([{ ...MATCH, stream_urls: "https://www.youtube.com/redirect?q=https://phish.example" }]);
 
     await dispatchLobbyBriefs();
 
@@ -297,8 +298,21 @@ describe("dispatchLobbyBriefs", () => {
     expect(jest.mocked(formatLobbyBriefDm).mock.calls[0][0].streamUrl).toBeNull();
   });
 
+  it("dispatchLobbyBriefs_firstLinkRefusedSecondValid_keepsSecond", async () => {
+    // Le premier lien est refusé (page de redirection) : le suivant du match prend sa place.
+    mockDb([{ ...MATCH, stream_urls: "https://www.youtube.com/redirect?q=https://phish.example https://www.twitch.tv/voix" }]);
+
+    await dispatchLobbyBriefs();
+
+    expect(jest.mocked(formatLobbyBriefDm).mock.calls[0][0].streamUrl).toBe("https://www.twitch.tv/voix");
+  });
+
+  it("firstAnnounceableUrl_null_returnsNull", () => {
+    expect(firstAnnounceableUrl(null)).toBeNull();
+  });
+
   it("dispatchLobbyBriefs_plainStreamUrl_streamKeptInBrief", async () => {
-    mockDb([{ ...MATCH, stream_url: "https://www.twitch.tv/bluegenji" }]);
+    mockDb([{ ...MATCH, stream_urls: "https://www.twitch.tv/bluegenji" }]);
 
     await dispatchLobbyBriefs();
 

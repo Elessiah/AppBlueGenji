@@ -9,6 +9,7 @@ import {
   orphanStreamIds,
   pruneMatchStreams,
   staffStream,
+  streamUrlCandidatesSql,
   unmarkUncastMatches,
   withdrawUserCasts,
   type MatchStreamRow,
@@ -54,6 +55,19 @@ describe("firstStreamUrlSql — le premier lien, seule définition", () => {
     expect(sql).toContain(
       "m.team2_id))) AND EXISTS (SELECT 1 FROM bg_match_casters oc WHERE oc.match_id = fs.match_id AND oc.stream_id = fs.id))",
     );
+  });
+});
+
+describe("streamUrlCandidatesSql — tous les liens publics, même règle", () => {
+  it("streamUrlCandidatesSql_sameRuleAsFirstLink_orderedStaffFirst", () => {
+    const sql = streamUrlCandidatesSql("m").replace(/\s+/g, " ");
+    const first = firstStreamUrlSql("m").replace(/\s+/g, " ");
+
+    expect(sql).toContain("GROUP_CONCAT(fs.live_url ORDER BY fs.staff_owned DESC, fs.id SEPARATOR ' ')");
+    expect(sql).not.toContain("LIMIT");
+    // Même FROM … WHERE que le premier lien : aucun stream tu n'y entre.
+    const where = first.slice(first.indexOf("FROM bg_match_streams"), first.indexOf(" ORDER BY"));
+    expect(sql).toContain(where);
   });
 });
 

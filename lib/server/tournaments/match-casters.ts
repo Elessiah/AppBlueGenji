@@ -50,7 +50,30 @@ const CAST_ELIGIBLE_SQL = `(COALESCE(u.is_deleted, 0) = 0
  * (`castBeforeLaunch`) —, jamais celui d'un stream orphelin (`shownStreams`).
  */
 export function firstStreamUrlSql(alias: string): string {
-  return `(SELECT fs.live_url FROM bg_match_streams fs
+  return `(SELECT fs.live_url ${shownStreamUrlsFromSql(alias)}
+           ORDER BY fs.staff_owned DESC, fs.id LIMIT 1)`;
+}
+
+/**
+ * Séparateur de {@link streamUrlCandidatesSql} : une espace, qu'aucun lien
+ * enregistré ne porte (normalisé à l'écriture, `parseStreamUrlInput`).
+ */
+export const STREAM_URL_CANDIDATES_SEPARATOR = " ";
+
+/**
+ * Tous les liens publics du match, dans l'ordre de {@link firstStreamUrlSql}
+ * (staff d'abord), joints par {@link STREAM_URL_CANDIDATES_SEPARATOR} : le
+ * lecteur garde le premier qu'il accepte, plutôt que de n'avoir aucun lien
+ * quand le premier est refusé (page de redirection).
+ */
+export function streamUrlCandidatesSql(alias: string): string {
+  return `(SELECT GROUP_CONCAT(fs.live_url ORDER BY fs.staff_owned DESC, fs.id SEPARATOR '${STREAM_URL_CANDIDATES_SEPARATOR}')
+           ${shownStreamUrlsFromSql(alias)})`;
+}
+
+/** `FROM … WHERE` des liens publics d'un match (règle de {@link firstStreamUrlSql}). */
+function shownStreamUrlsFromSql(alias: string): string {
+  return `FROM bg_match_streams fs
            WHERE fs.match_id = ${alias}.id AND fs.live_url IS NOT NULL
              AND (fs.staff_owned = 1
                   OR ((${alias}.status = 'COMPLETED'
@@ -60,8 +83,7 @@ export function firstStreamUrlSql(alias: string): string {
                                   WHERE oc.match_id = fs.match_id AND oc.stream_id = fs.id))
                   OR EXISTS (SELECT 1 FROM bg_match_casters fc JOIN bg_users u ON u.id = fc.user_id
                              WHERE fc.match_id = fs.match_id AND fc.stream_id = fs.id
-                               AND ${CAST_ELIGIBLE_SQL}))
-           ORDER BY fs.staff_owned DESC, fs.id LIMIT 1)`;
+                               AND ${CAST_ELIGIBLE_SQL}))`;
 }
 
 /** Un caster d'un match, tel que la base le décrit. */

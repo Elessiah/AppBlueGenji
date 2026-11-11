@@ -84,7 +84,7 @@ import {
 } from "@/lib/shared/round-maps";
 import { roundAllowsTiebreak, tiebreakTournamentFromRow } from "@/lib/shared/round-plan";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
-import { firstStreamUrlSql } from "./match-casters";
+import { STREAM_URL_CANDIDATES_SEPARATOR, streamUrlCandidatesSql } from "./match-casters";
 import { liveAnnouncementUrl } from "@/lib/shared/live-announcements";
 import { formatLobbyBriefDm } from "./lobby-brief-dm";
 import { seedJoins } from "./match-host-seeds";
@@ -186,8 +186,11 @@ export type LobbyBriefRow = RowDataPacket & {
   brief_pairing: string;
   /** Option « Salons vocaux d'équipe » du tournoi, et match suivi (ni solo, ni fantôme). */
   voice_tracked?: number | null;
-  /** Lien de diffusion public du match (`firstStreamUrlSql`), `null` sans live annonçable ou match pas annoncé casté (`live_trigger`). */
-  stream_url?: string | null;
+  /**
+   * Liens de diffusion publics du match (`streamUrlCandidatesSql`, staff
+   * d'abord), `null` sans lien ou match pas annoncé casté (`live_trigger`).
+   */
+  stream_urls?: string | null;
   host_team_id: number | null;
   team1_seed: number | null;
   team2_seed: number | null;
@@ -275,7 +278,7 @@ const BRIEF_COLUMNS = `m.id, m.tournament_id, t.name AS tournament_name, t.parti
             (t.team_voice_channels = 1 AND t.participant_type <> 'SOLO'
               AND t1.is_ghost = 0 AND t2.is_ghost = 0 AND m.start_at IS NOT NULL
               AND m.start_at <= NOW() + INTERVAL ${LOBBY_BRIEF_LEAD_MINUTES} MINUTE) AS voice_tracked,
-            CASE WHEN m.live_trigger IS NULL THEN NULL ELSE ${firstStreamUrlSql("m")} END AS stream_url,
+            CASE WHEN m.live_trigger IS NULL THEN NULL ELSE ${streamUrlCandidatesSql("m")} END AS stream_urls,
             m.first_map, m.self_managed, m.referee_user_id, m.map_picks,
             t.first_ban_rule, t.next_ban_rule,
             (SELECT rm.slots_json FROM bg_tournament_round_maps rm
@@ -455,8 +458,9 @@ export function lobbyBriefSides(
     // qui n'arrivera jamais.
     voice: Number(row.voice_tracked ?? 0) === 1,
     // Un lien de diffusion vide ou fait d'invisibles n'est pas un lien ; une page de redirection ou une
-    // adresse enfouie (`youtube.com/redirect?q=…`) est refusée comme dans une annonce #live.
-    streamUrl: liveAnnouncementUrl(row.stream_url ?? null, null),
+    // adresse enfouie (`youtube.com/redirect?q=…`) est refusée comme dans une annonce #live — et le
+    // lien suivant du match prend sa place.
+    streamUrl: firstAnnounceableUrl(row.stream_urls ?? null),
   };
   return [
     {
@@ -900,4 +904,13 @@ export function resetLobbyBriefThrottle(): void {
   sweeps.reset();
   retries.clear();
   NO_MANAGER_LOGGED.clear();
+}
+
+/** Le premier des liens candidats (`streamUrlCandidatesSql`) qu'une annonce accepte, ou `null`. */
+export function firstAnnounceableUrl(candidates: string | null): string | null {
+  for (const candidate of (candidates ?? "").split(STREAM_URL_CANDIDATES_SEPARATOR)) {
+    const url = liveAnnouncementUrl(candidate, null);
+    if (url !== null) return url;
+  }
+  return null;
 }
