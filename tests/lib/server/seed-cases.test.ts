@@ -209,6 +209,20 @@ describe("seed — cohérence des définitions", () => {
     }
   });
 
+  it("porte une BG Survie en cours aux play-offs ouverts au seul premier tour", () => {
+    // Les cases à pourvoir de l'arbre final ne se rendent qu'ainsi, à huit
+    // comme à seize qualifiées.
+    const open = withState("RUNNING").filter((t) => formatOf(t) === "BG_SURVIE" && t.enduranceStopAtPlayoffs);
+    expect(open.map((t) => t.endurancePlayoffSize).sort((a, b) => (a ?? 0) - (b ?? 0))).toEqual([8, 16]);
+    for (const t of TOURNAMENTS) {
+      if (t.enduranceStopAtPlayoffs) {
+        expect(formatOf(t)).toBe("BG_SURVIE");
+        expect(t.state).toBe("RUNNING");
+        expect(t.teamCount).toBeGreaterThan(t.endurancePlayoffSize ?? 8);
+      }
+    }
+  });
+
   it("garde les tournois jouables jouables (≥ 2 équipes en cours / terminé)", () => {
     for (const t of TOURNAMENTS) {
       if (t.state === "FINISHED" || (t.state === "RUNNING" && !isUnderfilled(t))) {

@@ -229,7 +229,12 @@ export async function penalizeEnduranceTeams(
 }
 
 /** Fin de simulation sans manche entamée ni pénalité. */
-type EnduranceSimulationExtras = { partialMatches: number; penalties: number };
+type EnduranceSimulationExtras = {
+  partialMatches: number;
+  penalties: number;
+  /** S'arrêter dès que le premier tour des play-offs est posé, sans le jouer. */
+  stopAtPlayoffs?: boolean;
+};
 const NO_ENDURANCE_EXTRAS: Readonly<EnduranceSimulationExtras> = Object.freeze({ partialMatches: 0, penalties: 0 });
 
 /**
@@ -266,6 +271,7 @@ export async function generateEnduranceTournament(
       const ready = readyMatches(await getMatchRows(connection, tournamentId));
       if (ready.length === 0) break;
       if (!finish && waves >= playWaves) break;
+      if (!finish && extras.stopAtPlayoffs && ready.some((m) => Number(m.round_number) >= PLAYOFF_ROUND_OFFSET)) break;
 
       for (const m of ready) {
         // L'égalité ne vaut que pour la **qualification** : l'arbre final doit
