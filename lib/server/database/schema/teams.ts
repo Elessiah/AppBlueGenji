@@ -61,10 +61,11 @@ export async function createTeamTables(db: Pool): Promise<void> {
       team_id BIGINT NOT NULL,
       user_id BIGINT NOT NULL,
       -- NULL = l'auteur a supprimé son compte. L'invitation, elle, reste : elle
-      -- est l'acte de l'équipe (seule sa gestion peut l'émettre) et personne ne
-      -- lit jamais cette colonne. En NOT NULL avec sa cascade, l'effacement d'un
-      -- compte emportait silencieusement les invitations encore en attente chez
-      -- des tiers.
+      -- est l'acte de l'équipe (seule sa gestion peut l'émettre). Seul usage de
+      -- la colonne : le plafond par auteur des avis d'invitation
+      -- (\`team-invite-notifications.ts\`). En NOT NULL avec sa cascade,
+      -- l'effacement d'un compte emportait silencieusement les invitations
+      -- encore en attente chez des tiers.
       created_by BIGINT NULL,
       kind ENUM('INVITE', 'REQUEST') NOT NULL,
       -- Rôles proposés par la gestion avec une invitation (INVITE), posés à
@@ -94,7 +95,8 @@ export async function createTeamTables(db: Pool): Promise<void> {
   // en attente chez des tiers** — un gérant qui n'a jamais joué supprime son
   // compte, et trois joueurs voient leur invitation disparaître sans que
   // personne ne l'ait retirée. Or l'invitation est l'acte de l'équipe (seule sa
-  // gestion peut l'émettre), la colonne n'est **lue nulle part**, et le projet
+  // gestion peut l'émettre), la colonne ne sert qu'au plafond par auteur des avis
+  // d'invitation (`team-invite-notifications.ts`), et le projet
   // tranche déjà ce cas ailleurs de la même façon : `bg_endurance_penalties`
   // .`created_by` passe à `NULL`, la sanction restant due.
   //

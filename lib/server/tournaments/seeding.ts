@@ -43,7 +43,7 @@ export type SeedingBoard = {
  * (`./player-forfeit`), l'arbitrage aussi (`./admin`) : poser ce verrou-ci les
  * fait attendre la fin du réordonnancement, ou le fait attendre la leur.
  *
- * Coût assumé : lue par l'index non unique `idx_bg_matches_tournament` sous
+ * Coût assumé : lue par l'index non unique `idx_bg_matches_phase_round` sous
  * `REPEATABLE READ`, la requête verrouille aussi les **intervalles** qui
  * bordent les matchs du tournoi — une insertion de matchs du tournoi voisin
  * dans l'index peut attendre la fin du réordonnancement. Verrouiller par clé
@@ -77,6 +77,9 @@ function toScoreStates(rows: Awaited<ReturnType<typeof getMatchRows>>): MatchSco
   }));
 }
 
+/** Ordre des engagés, partagé par la lecture et la renumérotation : le rang affiché est le rang écrit. */
+const ENTRY_ORDER = "ORDER BY COALESCE(r.seed, 1000000), r.registered_at ASC";
+
 async function loadEntries(connection: PoolConnection, tournamentId: number): Promise<SeedingEntry[]> {
   const [rows] = await connection.execute<
     (RowDataPacket & { team_id: number; team_name: string; seed: number | null; registered_at: Date })[]
@@ -85,7 +88,7 @@ async function loadEntries(connection: PoolConnection, tournamentId: number): Pr
      FROM bg_tournament_registrations r
      JOIN bg_teams t ON t.id = r.team_id
      WHERE r.tournament_id = ?
-     ORDER BY COALESCE(r.seed, 1000000), r.registered_at ASC`,
+     ${ENTRY_ORDER}`,
     [tournamentId],
   );
 
@@ -119,7 +122,19 @@ export async function resequenceSeeds(
   connection: PoolConnection,
   tournamentId: number,
 ): Promise<void> {
-  const entries = await loadEntries(connection, tournamentId);
+  // Même ordre que `loadEntries` ; seuls les rangs qui **changent** s'écrivent
+  // — les engagés placés avant la ligne retirée gardent le leur, sans écriture
+  // ni verrou de plus.
+  const [rows] = await connection.execute<(RowDataPacket & { team_id: number; seed: number | null })[]>(
+    `SELECT r.team_id, r.seed
+     FROM bg_tournament_registrations r
+     WHERE r.tournament_id = ?
+     ${ENTRY_ORDER}`,
+    [tournamentId],
+  );
+  const entries = rows
+    .map((row, index) => ({ teamId: Number(row.team_id), seed: index + 1, stored: row.seed }))
+    .filter((entry) => entry.stored === null || Number(entry.stored) !== entry.seed);
   for (const entry of entries) {
     await connection.execute(
       `UPDATE bg_tournament_registrations

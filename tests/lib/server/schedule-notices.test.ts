@@ -9,7 +9,7 @@ jest.mock("@/lib/server/tournaments/reminder-marks", () => ({
   ...jest.requireActual<typeof import("@/lib/server/tournaments/reminder-marks")>(
     "@/lib/server/tournaments/reminder-marks",
   ),
-  markStaffPushed: jest.fn(async () => ({ kind: "reserved" as const, id: 1, startAt: "", previous: null })),
+  markStaffPushed: jest.fn(async () => ({ kind: "reserved" as const, matchId: 1, startAt: "", previous: null, stamp: new Date(0) })),
   releaseStaffPush: jest.fn(),
   forgetStaffPush: jest.fn(),
 }));

@@ -219,7 +219,10 @@ tournoi en première instruction et revérifie tout — le droit d'abord, l'éta
 du match ensuite : le pool est relu à jour, jamais figé avant le verrou. Rejoué
 sur interblocage ou conflit d'instantané MariaDB (`retryOnDeadlock`) ; un
 conflit qui persiste rend 409 `CONCURRENT_UPDATE_RETRY` (`launchFailure`), pas
-une panne. Un 404 (match absent) se distingue d'un 403 (match d'autrui) :
+une panne. Le verrou du tournoi s'attend au plus 5 s (`withShortLockWait`) : un
+verrou exclusif tenu longtemps rend aussi 409 au lieu de garder la connexion
+jusqu'à `innodb_lock_wait_timeout` ; la connexion revient au pool par
+`releaseWithServerLockWait` (délai du serveur remis, ou détruite). Un 404 (match absent) se distingue d'un 403 (match d'autrui) :
 l'identifiant d'un match n'est pas un secret, l'instantané public le porte.
 Transactions : `lib/server/tournaments/transaction.ts` (commun avec le
 lancement) — un `rollback()` en échec détruit la connexion au lieu de la rendre

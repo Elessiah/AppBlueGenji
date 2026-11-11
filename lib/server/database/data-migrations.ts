@@ -499,6 +499,16 @@ async function rewriteName(
 export const HOST_COOKIE_SESSIONS_MARKER = "migration_host_cookie_sessions";
 
 /**
+ * Borne de la purge : le jour de la fusion du passage aux cookies `__Host-`
+ * (#524). Les sessions ouvertes ce jour-là avant le déploiement portaient
+ * encore l'ancien cookie, mais le premier passage (au déploiement) les a déjà
+ * effacées : toute session restée depuis est d'après. Un marqueur effacé à la
+ * main, ou un `next start` sur une base partagée, ne coupe donc plus aucune
+ * session vivante.
+ */
+export const HOST_COOKIE_SESSIONS_CUTOFF = "2026-10-29 00:00:00";
+
+/**
  * Supprime, **une fois**, les sessions ouvertes avant le passage des cookies
  * d'authentification au préfixe `__Host-` (`lib/shared/auth-cookies.ts`).
  *
@@ -529,7 +539,7 @@ export async function purgePreHostCookieSessions(db: Pool): Promise<void> {
   }
   if (!claimed) return;
   try {
-    await db.execute("DELETE FROM bg_user_sessions");
+    await db.execute("DELETE FROM bg_user_sessions WHERE created_at < ?", [HOST_COOKIE_SESSIONS_CUTOFF]);
   } catch (error) {
     reportSchemaFailure(error, "DELETE FROM bg_user_sessions (sessions d'avant __Host-)");
   }

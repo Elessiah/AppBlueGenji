@@ -4,13 +4,21 @@ import { isAutoIncrementContention, isSnapshotConflict, isTransactionAborted } f
 const DEADLOCK_ATTEMPTS = 3;
 
 /**
- * Au-delà, un `ER_AUTOINC_READ_FAILED` n'est plus l'interblocage (détecté
- * sur-le-champ) mais une attente du verrou AUTO-INC qui a couru jusqu'à son
- * délai (`innodb_lock_wait_timeout`, 50 s) : comme `ER_LOCK_WAIT_TIMEOUT`, il
- * ne se rejoue pas — trois attentes de suite tiendraient une connexion et les
- * verrous de la transaction pendant des minutes.
+ * Délai d'attente d'un verrou du serveur (`innodb_lock_wait_timeout`, 50 s par
+ * défaut sous MySQL comme MariaDB ; la production garde le défaut), moins une
+ * seconde de marge. Une attente du verrou AUTO-INC qui court jusqu'à ce délai
+ * est rendue sous le **même** code que l'interblocage (`ER_AUTOINC_READ_FAILED`) ;
+ * une tentative qui échoue sur ce code **avant** que ce délai ait pu s'écouler
+ * ne peut donc être qu'un interblocage — rejoué.
+ *
+ * Le seuil n'est plus de 5 s : mesuré depuis le début de la tentative, il
+ * comptait aussi l'attente d'une connexion du pool et des verrous pris avant
+ * l'instruction fautive, si bien qu'un vrai interblocage AUTO-INC arrivé après
+ * une attente lente n'était pas rejoué (409). Seules les **lectures**
+ * verrouillées passent sous le délai court (`lock-wait.ts`) ; une insertion,
+ * seule à prendre le verrou AUTO-INC, attend toujours sous celui du serveur.
  */
-const AUTOINC_REPLAY_MAX_MS = 5_000;
+export const AUTOINC_WAITED_OUT_MS = 49_000;
 
 /**
  * Rejoue une écriture annulée par un interblocage InnoDB — y compris celui que
@@ -27,19 +35,41 @@ export async function retryOnDeadlock<T>(write: () => Promise<T>): Promise<T> {
     try {
       return await write();
     } catch (error) {
-      const replayable = isTransactionAborted(error) || isSnapshotConflict(error);
-      const autoInc = isAutoIncrementContention(error);
-      const waitedOut = autoInc && Date.now() - startedAt > AUTOINC_REPLAY_MAX_MS;
-      if (!replayable || attempt >= DEADLOCK_ATTEMPTS || waitedOut) {
-        // Ce code est aussi celui d'un compteur illisible : s'il résiste au
-        // rejeu, pm2 doit le dire en erreur — la route, elle, ne rendra qu'un
-        // « réessaie » (`CONCURRENT_UPDATE_RETRY`).
-        if (autoInc) console.error("[db] ER_AUTOINC_READ_FAILED non résolu par le rejeu", error);
+      if (!isReplayableContention(error, Date.now() - startedAt) || attempt >= DEADLOCK_ATTEMPTS) {
+        reportUnresolvedContention(error);
         throw error;
       }
-      // Attente courte et aléatoire : deux transactions annulées ensemble ne
-      // repartent pas au même instant pour se heurter de nouveau.
-      await new Promise((resolve) => setTimeout(resolve, randomInt(20, 81)));
+      await replayPause();
     }
   }
+}
+
+/**
+ * `true` si une tentative qui a échoué sur `error` après `elapsedMs` se
+ * rejoue : interblocage, refus de l'instantané de MariaDB, ou
+ * `ER_AUTOINC_READ_FAILED` rendu avant que le délai de verrou du serveur ait
+ * pu s'écouler ({@link AUTOINC_WAITED_OUT_MS}). La règle unique de
+ * {@link retryOnDeadlock} et des boucles de rejeu écrites à la main
+ * (`markStaffPushed`).
+ */
+export function isReplayableContention(error: unknown, elapsedMs: number): boolean {
+  if (isAutoIncrementContention(error)) return elapsedMs < AUTOINC_WAITED_OUT_MS;
+  return isTransactionAborted(error) || isSnapshotConflict(error);
+}
+
+/**
+ * Ce code est aussi celui d'un compteur illisible : s'il résiste au rejeu,
+ * pm2 doit le dire en erreur — la route, elle, ne rendra qu'un « réessaie »
+ * (`CONCURRENT_UPDATE_RETRY`).
+ */
+export function reportUnresolvedContention(error: unknown): void {
+  if (isAutoIncrementContention(error)) console.error("[db] ER_AUTOINC_READ_FAILED non résolu par le rejeu", error);
+}
+
+/**
+ * Attente courte et aléatoire avant un rejeu : deux transactions annulées
+ * ensemble ne repartent pas au même instant pour se heurter de nouveau.
+ */
+export function replayPause(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, randomInt(20, 81)));
 }

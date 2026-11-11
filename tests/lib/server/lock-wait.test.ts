@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import type { PoolConnection } from "mysql2/promise";
 import {
+  isUnsettled,
   releaseWithServerLockWait,
   rollbackKeepingError,
   SHORT_LOCK_WAIT_SECONDS,
@@ -171,5 +172,32 @@ describe("rollbackKeepingError", () => {
 
     expect(logged).toHaveBeenCalledTimes(1);
     expect(logged).toHaveBeenCalledWith(expect.stringContaining("ROLLBACK"), lost);
+  });
+});
+
+describe("isUnsettled", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("isUnsettled_rollbackSucceeded_returnsFalse", async () => {
+    const { conn, asPool } = connection();
+    conn.rollback.mockResolvedValue(undefined);
+
+    await rollbackKeepingError(asPool);
+
+    expect(isUnsettled(asPool)).toBe(false);
+  });
+
+  it("isUnsettled_rollbackFailed_returnsTrueUntilRelease", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const { conn, asPool } = connection();
+    conn.rollback.mockRejectedValue(new Error("Connection lost"));
+
+    await rollbackKeepingError(asPool);
+    expect(isUnsettled(asPool)).toBe(true);
+
+    await releaseWithServerLockWait(asPool);
+    expect(isUnsettled(asPool)).toBe(false);
   });
 });

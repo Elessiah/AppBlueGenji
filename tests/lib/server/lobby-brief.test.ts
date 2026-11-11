@@ -230,6 +230,21 @@ describe("dispatchLobbyBriefs", () => {
     ]);
   });
 
+  it("dispatchLobbyBriefs_sideSent_markWrittenBeforeSending", async () => {
+    // Un arrêt entre l'envoi et la marque ne doit pas laisser la seule
+    // réservation, qu'un retour arrière efface : la marque part d'abord.
+    const { execute } = mockDb([MATCH]);
+    const marksAtSend: number[] = [];
+    jest.mocked(notifyUsers).mockImplementation(async () => {
+      marksAtSend.push(marks(execute).length);
+      return { discord: { sent: 1, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 1 };
+    });
+
+    await dispatchLobbyBriefs();
+
+    expect(marksAtSend).toEqual([1, 2]);
+  });
+
   it("dispatchLobbyBriefs_briefNotRendered_noDurableMark", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(formatLobbyBriefDm).mockImplementationOnce(() => {

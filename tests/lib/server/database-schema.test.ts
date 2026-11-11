@@ -92,7 +92,13 @@ describe("Schéma — les ENUM sont à leur état final", () => {
       .split("\n")
       .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
       .join("\n");
-    expect(ddl).not.toContain("'OW2'");
+    // Seule exception : la conversion unique d'une base restée en arrière
+    // (`RECENT_SCHEMA_CHANGES`, groupe gardé par sa lecture `when`).
+    expect(ddl.split("\n").filter((line) => line.includes("'OW2'")).map((line) => line.trim())).toEqual([
+      `when: columnTypeContains("bg_tournaments", "game", "LIKE '%''OW2''%'"),`,
+      "`ALTER TABLE bg_tournaments MODIFY COLUMN game ENUM('OW2', 'OW', 'MR') NOT NULL DEFAULT 'OW'`,",
+      "`UPDATE bg_tournaments SET game = 'OW' WHERE game = 'OW2'`,",
+    ]);
   });
 
   it("le tableau d'un match connaît la petite finale", () => {
@@ -272,7 +278,7 @@ describe("Schéma — la règle des deux endroits", () => {
     // primaire recomposée. La prochaine valeur de `format` n'aurait existé que
     // dans le `CREATE TABLE`, et la base qui tourne aurait rendu « Data
     // truncated » sur le premier tournoi créé.
-    expect(migrations).toContain("const RECENT_SCHEMA_CHANGES: readonly string[]");
+    expect(migrations).toContain("const RECENT_SCHEMA_CHANGES: readonly SchemaChange[]");
     expect(migrations).toContain("await db.execute(statement);");
   });
 
@@ -388,7 +394,8 @@ describe("Schéma — la règle des deux endroits", () => {
     // empreintes de visiteurs dans `bg_site_visitors`, et les cinq signalements de
     // `cleanStoredNames` (connexion, délai de verrou, lecture d'une colonne,
     // écriture d'un nom, marqueur), `purgePreHostCookieSessions` (marqueur, purge).
-    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(19);
+    // La boucle en compte deux : l'instruction, et la lecture `when` d'un groupe.
+    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(20);
     expect(migrations).not.toMatch(/catch\s*\{\s*\}/);
     expect(migrations).not.toMatch(/catch\s*\{\s*\/\/[^\n]*\n\s*\}/);
   });
@@ -448,6 +455,8 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     expect(drops).toEqual([
       // EF-43 : le nombre de présents des salons vocaux n'est plus gardé.
       "`ALTER TABLE bg_match_voice_channels DROP COLUMN members, DROP COLUMN counted_at, ALGORITHM=COPY`,",
+      // DB-SCHEMA-LOT : les marques de rappel passent sur leur clé naturelle.
+      "`ALTER TABLE bg_match_reminders DROP COLUMN id, DROP INDEX uniq_bg_match_reminders,",
       "await db.execute(`ALTER TABLE bg_recruitment_ads DROP COLUMN contact_email`);",
       'const DROP_EMAIL = "ALTER TABLE bg_users DROP COLUMN email";',
       // Les visites ne désignent plus de compte : seul `authenticated` reste.
@@ -456,7 +465,7 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
       'const DROP_RECRUITMENT_HIGHLIGHT = "ALTER TABLE bg_recruitment_ads DROP COLUMN highlight";',
     ]);
     // Et la liste des changements récents, jouée par la boucle.
-    expect(code).toContain("for (const statement of RECENT_SCHEMA_CHANGES)");
+    expect(code).toContain("for (const change of RECENT_SCHEMA_CHANGES) await applySchemaChange(db, change);");
     expect(code).toContain("await db.execute(DROP_EMAIL);");
     expect(code).toContain("await db.execute(DROP_VISIT_USER);");
     expect(code).toContain("await db.execute(DROP_RECRUITMENT_HIGHLIGHT);");
@@ -557,8 +566,11 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     // Le contrôle garde donc son objet — on ne relit pas `information_schema`
     // pour décider d'un `ADD COLUMN` — en nommant l'exception plutôt qu'en
     // levant le compte, sans quoi il ne verrait plus rien revenir.
+    // Seconde exception, de même nature : une conversion d'`ENUM` rattrapée
+    // (`columnTypeContains`) ne se lit sur aucun code d'erreur, et la rejouer
+    // à l'aveugle copierait la table à chaque démarrage.
     const reads = [...sql.matchAll(/FROM information_schema/gi)];
-    expect(reads).toHaveLength(6);
+    expect(reads).toHaveLength(7);
 
     const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
     expect([...net.matchAll(/FROM information_schema/gi)]).toHaveLength(4);
@@ -572,7 +584,9 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     // seule trace durable de ce passage.
     const migrations = sql.slice(0, sql.indexOf("async function warnIfSchemaIsBehind"));
     const outside = [...migrations.matchAll(/FROM\s+information_schema\.(\w+)/gi)].map((m) => m[1]);
-    expect(outside).toEqual(["REFERENTIAL_CONSTRAINTS", "COLUMNS"]);
+    // Troisième : les conversions d'`ENUM` rattrapées une fois (`columnTypeContains`).
+    expect(outside).toEqual(["REFERENTIAL_CONSTRAINTS", "COLUMNS", "COLUMNS"]);
+    expect(migrations).toContain("const columnTypeContains = (table: string, column: string, fragment: string)");
     expect(migrations).toContain("CONSTRAINT_NAME = 'fk_bg_team_inv_creator'");
     expect(migrations).toContain("COLUMN_NAME = 'open_to_recruitment'");
   });

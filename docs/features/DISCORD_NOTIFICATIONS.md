@@ -494,15 +494,20 @@ l'index `(match_id, offset_key)` où l'`INSERT … SELECT` voulait écrire — p
 insérait, donc attendait le verrou AUTO-INC que l'autre tenait. MariaDB rend
 cet interblocage à la victime sous le code 1467 : la marque n'était pas
 retenue (`horaire poussé aux arbitres non retenu` dans pm2), et le retrait de
-l'horaire ne se poussait plus aux arbitres. Trois remèdes :
+l'horaire ne se poussait plus aux arbitres. Quatre remèdes :
+
+- la table n'a plus de compteur : sa clé primaire est `(match_id, offset_key)`
+  (DB-SCHEMA-LOT), et l'`INSERT … SELECT` ne prend donc plus aucun verrou
+  AUTO-INC — la cause disparaît, les remèdes suivants restent comme filets ;
 
 - `markStaffPushed` ne lit plus sous verrou une marque absente : une lecture
   **simple** dit si elle existe ; absente, elle s'insère (`INSERT IGNORE …
   VALUES`, aucun verrou d'intervalle pris avant) ; présente, elle est lue sous
-  verrou (sa ligne, pas un intervalle — ni identifiant consommé ni verrou
-  AUTO-INC sur ce chemin). Une marque qui paraît ou disparaît entre les deux
-  défait la transaction, et la réservation reprend à neuf (une fois, après
-  une attente courte et aléatoire) ;
+  verrou (sa ligne, pas un intervalle). Une marque qui paraît ou disparaît
+  entre les deux défait la transaction, et la réservation reprend à neuf.
+  **Une seule boucle** couvre ces reprises et les interblocages : trois
+  tentatives au plus, séparées d'une attente courte et aléatoire, et un
+  épuisement journalisé une fois ;
 - 1467 est traité comme un interblocage (`isAutoIncrementContention`,
   `lib/server/mysql-errors.ts`) : `isTransactionAborted` le reconnaît — aucun
   `catch` ne doit poursuivre sur la transaction —, `retryOnDeadlock` le
@@ -510,8 +515,13 @@ l'horaire ne se poussait plus aux arbitres. Trois remèdes :
   `CONCURRENT_UPDATE_RETRY` (409) au lieu d'une panne. Le même code couvre
   une attente du verrou AUTO-INC qui dépasse son délai, où seule la requête
   est annulée : l'appelant fait donc toujours son `ROLLBACK` lui-même, et un
-  1467 rendu après plus de 5 s (une attente, pas un interblocage) ne se rejoue
-  pas — comme `ER_LOCK_WAIT_TIMEOUT`. Un 1467 qui résiste au rejeu est écrit
+  1467 rendu après `AUTOINC_WAITED_OUT_MS` (49 s, juste sous le délai de
+  verrou du serveur : une attente, pas un interblocage) ne se rejoue pas —
+  comme `ER_LOCK_WAIT_TIMEOUT` ; un vrai interblocage rendu après une attente
+  de pool ou de verrou lente, lui, se rejoue. Les alertes « au mieux »
+  (`bot-logs.ts`, `match-launch.ts`) tranchent l'ambiguïté auprès du serveur
+  (`isTransactionAbortedOn` : `DO 0` et le drapeau de transaction ouverte de
+  sa réponse) : seule une transaction réellement défaite rejette le geste. Un 1467 qui résiste au rejeu est écrit
   en erreur dans pm2 (`[db] ER_AUTOINC_READ_FAILED non résolu par le rejeu`) :
   ce code est aussi celui d'un compteur illisible ;
 - les réservations des joueurs (`claimDatedMark`, pose de `TOLD`), des

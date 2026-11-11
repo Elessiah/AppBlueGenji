@@ -306,6 +306,10 @@ dont le délai de 15 minutes (`LAUNCH_AUTO_DELAY_MINUTES`) est écoulé.
 match à planifier, qui n'a rien à entretenir. La salle du flux SSE se réveille
 d'elle-même à l'heure de départ d'un match en attente et à son lancement
 d'office (`nextRoomWakeAt`), au lieu d'attendre son filet de cinq minutes.
+L'entretien lancé par la lecture de la modale (`maintainIfDue`) rejoue la
+transaction d'un tournoi sur interblocage (`retryOnDeadlock`) : la relecture
+d'éligibilité verrouille le compte après le match, à l'inverse de la
+suppression de compte, et la passe n'est plus perdue jusqu'au balayage suivant.
 
 L'ouverture du salon (`lobby_opened_at`) déclenche aussi, après coup, le
 **check-in du match** quand il n'a pas d'horaire — avec un horaire, il est

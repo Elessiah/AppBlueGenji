@@ -65,7 +65,7 @@ import {
 } from "./match-casters";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { lockTournamentRow } from "./registration";
-import { isTransactionAborted } from "@/lib/server/mysql-errors";
+import { isTransactionAbortedOn } from "@/lib/server/mysql-errors";
 import { activeMemberSql } from "./match-players";
 import { announceRefereeChange, announceRefereeChanges, queueRefereeChange, type RefereeChange } from "./referee-notices";
 import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
@@ -1351,7 +1351,7 @@ async function withoutReservedAlerts(
   } catch (error) {
     // Comme la réservation (`queueRefereeAlert`) : table absente ou verrou
     // dépassé ne défont pas le geste de l'appelant — la réservation tranche.
-    if (isTransactionAborted(error)) throw error;
+    if (await isTransactionAbortedOn(connection, error)) throw error;
     return [...candidates];
   }
   const reserved = new Set(rows.map((row) => `${Number(row.match_id)}:${row.alert_key}`));

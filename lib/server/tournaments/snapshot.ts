@@ -56,6 +56,7 @@ import { invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
+import { releaseWithServerLockWait, rollbackKeepingError } from "./lock-wait";
 import { DUE_LAUNCH_SQL } from "./sync-scope";
 import { ACTIONABLE_EXPIRED_REPORT_SQL } from "./score-report-sql";
 import { localUploadUrl } from "@/lib/shared/uploads";
@@ -193,6 +194,29 @@ async function hasDueRunningMaintenance(
   return Number(rows[0]?.due ?? 0) === 1;
 }
 
+/** Délai minimal entre deux avertissements d'entretien défait, par tournoi. */
+const MAINTENANCE_WARN_INTERVAL_MS = 60_000;
+
+const lastMaintenanceWarn = new Map<number, number>();
+
+/**
+ * Journalise un entretien défait par un interblocage : une ligne (message, sans
+ * pile) au plus par minute et par tournoi. Ce chemin est celui de **chaque**
+ * lecture d'instantané : des centaines de lecteurs d'un tournoi en direct
+ * perdraient tous la même course, et pm2 (qu'on n'efface jamais) enflerait
+ * d'une pile par lecteur.
+ */
+export function warnMaintenanceAborted(tournamentId: number, error: unknown, now: number = Date.now()): void {
+  const last = lastMaintenanceWarn.get(tournamentId);
+  if (last !== undefined && now - last < MAINTENANCE_WARN_INTERVAL_MS) return;
+  for (const [id, at] of lastMaintenanceWarn) {
+    if (now - at >= MAINTENANCE_WARN_INTERVAL_MS) lastMaintenanceWarn.delete(id);
+  }
+  lastMaintenanceWarn.set(tournamentId, now);
+  const reason = error instanceof Error ? error.message : String(error);
+  console.warn(`[snapshot] entretien du tournoi ${tournamentId} défait (interblocage), rejoué au prochain passage : ${reason}`);
+}
+
 /**
  * Entretien passif du tournoi avant lecture : plateau manquant, reports
  * expirés, bascule d'état. Renvoie la ligne à jour, ou `null` si le tournoi
@@ -298,16 +322,21 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
 
     return syncResult.row;
   } catch (error) {
-    await connection.rollback();
+    await rollbackKeepingError(connection);
     // Interblocage (verrous de `bg_match_maps` pendant la clôture d'un report
     // expiré, `MAP_SCORES.md`) : l'entretien est rejoué au prochain passage, et
     // l'instantané se construit sur l'état d'avant plutôt que de rendre un 500
     // à tous les spectateurs.
-    if (isTransactionAborted(error)) return tournamentRow;
+    if (isTransactionAborted(error)) {
+      // Avalé, mais pas en silence : un entretien défait à répétition se voit
+      // dans pm2.
+      warnMaintenanceAborted(tournamentId, error);
+      return tournamentRow;
+    }
     throw error;
   } finally {
     discardBotLogs(connection);
-    connection.release();
+    await releaseWithServerLockWait(connection);
   }
 }
 

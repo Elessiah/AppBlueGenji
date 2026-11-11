@@ -313,7 +313,7 @@ async function openToldMark(
   const db = await getDatabase();
   const [rows] = await db.execute<ToldStateRow[]>(
     `SELECT m.start_at AS match_start_at, m.team1_id AS match_team1_id, m.team2_id AS match_team2_id,
-            r.id AS told_id, r.start_at
+            r.match_id AS told_id, r.start_at
        FROM bg_matches m
        LEFT JOIN bg_match_reminders r ON r.match_id = m.id AND r.offset_key = ?
       WHERE m.id = ? LIMIT 1`,
@@ -378,7 +378,8 @@ async function setToldTime(match: ScheduledMatch, startAt: Date | null): Promise
   // verrouillage du moteur — un `UPDATE … JOIN` pouvait tenir la marque en
   // attendant la manche, et s'interbloquer avec `setMatchStartAt`.
   // Rejouée sur interblocage, comme `claimDatedMark` : une instruction seule,
-  // qui tient le verrou AUTO-INC de la table le temps de lire la manche.
+  // qui verrouille la manche lue puis la marque (clé naturelle, sans verrou
+  // AUTO-INC depuis la recomposition de la table).
   const [result] = await retryOnDeadlock(() =>
     db.execute(
       `INSERT INTO bg_match_reminders (match_id, offset_key, start_at)

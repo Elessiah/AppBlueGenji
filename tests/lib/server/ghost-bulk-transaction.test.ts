@@ -10,7 +10,7 @@ import { getDatabase } from "@/lib/server/database";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { registerTeamsByIds } from "@/lib/server/tournaments/registration";
 import { discardBotLogs, flushBotLogs } from "@/lib/server/tournaments/bot-logs";
-import { fakePool } from "../../helpers/sql-double";
+import { connectionMock, fakePool } from "../../helpers/sql-double";
 
 /**
  * Le lot est **tout ou rien**, et c'est ce niveau-ci qui le tient : une seule
@@ -88,5 +88,20 @@ describe("registerGhostTeams", () => {
     const error = await registerGhostTeams(5, [900, 901]).catch((e) => e);
 
     expect((error as { teamId?: number }).teamId).toBe(901);
+  });
+  it("registerGhostTeams_rollbackFails_rethrowsOriginalErrorAndDestroysConnection", async () => {
+    const connection = connectionMock();
+    connection.rollback.mockRejectedValue(new Error("Connection lost"));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ getConnection: jest.fn(async () => connection) }));
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+    jest.mocked(registerTeamsByIds).mockRejectedValue(deadlock);
+
+    await expect(registerGhostTeams(5, [900])).rejects.toBe(deadlock);
+
+    // Transaction peut-être ouverte : jamais rendue au pool.
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+    expect(connection.release).not.toHaveBeenCalled();
+    logged.mockRestore();
   });
 });

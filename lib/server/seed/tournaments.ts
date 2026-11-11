@@ -159,6 +159,7 @@ async function simulateSeedTournament(
     await generateEnduranceTournament(db, tournamentId, finish, def.playWaves ?? 3, def.forfeits ?? 0, winsRequired, matchFormatDraws, {
       partialMatches: def.endurancePartialMatches ?? 0,
       penalties: def.endurancePenalties ?? 0,
+      stopAtPlayoffs: def.enduranceStopAtPlayoffs ?? false,
     });
   } else if (format === "SURVIVAL") {
     await generateSurvivalTournament(db, tournamentId, finish, def.playWaves ?? 3, def.forfeits ?? 0, winsRequired);

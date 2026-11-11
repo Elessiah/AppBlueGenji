@@ -19,6 +19,7 @@ type Connection = {
   commit: jest.Mock;
   rollback: jest.Mock;
   release: jest.Mock;
+  destroy: jest.Mock;
 };
 
 /**
@@ -32,6 +33,10 @@ async function runSweep(options: {
   changed?: number[];
   contentChanged?: number[];
   launchesChanged?: number[];
+  /** Le `ROLLBACK` échoue (connexion peut-être encore en transaction). */
+  rollbackFails?: boolean;
+  /** Tentatives en échec par tournoi, sous un code du serveur (interblocage…). */
+  failWithCode?: Record<number, { code: string; times: number }>;
 }): Promise<{
   connection: Connection;
   synced: number[];
@@ -67,6 +72,11 @@ async function runSweep(options: {
       syncTournamentState: jest.fn(async (_conn: unknown, tournamentId: number) => {
         synced.push(tournamentId);
         if (options.failOn?.includes(tournamentId)) throw new Error("BOOM");
+        const coded = options.failWithCode?.[tournamentId];
+        if (coded && coded.times > 0) {
+          coded.times -= 1;
+          throw Object.assign(new Error("Deadlock found when trying to get lock; pseudo Joueur"), { code: coded.code });
+        }
         return {
           row: null,
           stateChanged: options.changed?.includes(tournamentId) ?? false,
@@ -81,8 +91,11 @@ async function runSweep(options: {
         execute: jest.fn(async () => [[], undefined]),
         beginTransaction: jest.fn(async () => undefined),
         commit: jest.fn(async () => undefined),
-        rollback: jest.fn(async () => undefined),
+        rollback: jest.fn(async () => {
+          if (options.rollbackFails) throw new Error("ROLLBACK perdu");
+        }),
         release: jest.fn(() => undefined),
+        destroy: jest.fn(() => undefined),
       };
       return {
         getDatabase: jest.fn(async () => ({
@@ -132,6 +145,80 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
     expect(synced).toEqual([1, 2, 3]);
     expect(connection.rollback).toHaveBeenCalledTimes(1);
     expect(connection.commit).toHaveBeenCalledTimes(2);
+  });
+
+  // Revue #591 : après un `ROLLBACK` raté, le `START TRANSACTION` du tournoi
+  // suivant aurait validé en silence les écritures défaites du précédent.
+  it("syncVisibleTournaments_rollbackFails_stopsPassAndDestroysConnection", async () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const { connection, synced } = await runSweep({ candidates: [1, 2, 3], failOn: [2], rollbackFails: true });
+
+    expect(synced).toEqual([1, 2]);
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(2);
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+    expect(connection.release).not.toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
+  // Revue sécurité #591 : l'entretien des lancements relit l'éligibilité sous
+  // verrou partagé après celui du match (ordre inverse de la suppression de
+  // compte) — un interblocage défaisait toute la passe du tournoi, sans rejeu
+  // ni trace.
+  it("syncVisibleTournaments_deadlockThenSuccess_replaysAndPublishesOnce", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const { connection, synced, published } = await runSweep({
+      candidates: [1, 2],
+      contentChanged: [2],
+      failWithCode: { 2: { code: "ER_LOCK_DEADLOCK", times: 1 } },
+    });
+
+    expect(synced).toEqual([1, 2, 2]);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(published).toEqual([{ tournamentId: 2, commits: 2 }]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("syncVisibleTournaments_deadlockOnEveryAttempt_givesUpAfterThreeAndWarnsCodeOnly", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const { synced } = await runSweep({
+      candidates: [2, 3],
+      failWithCode: { 2: { code: "ER_LOCK_DEADLOCK", times: 99 } },
+    });
+
+    expect(synced).toEqual([2, 2, 2, 3]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    const line = String(warn.mock.calls[0][0]);
+    expect(line).toContain("tournoi 2");
+    expect(line).toContain("ER_LOCK_DEADLOCK");
+    // Le texte du serveur peut citer une valeur de ligne : jamais au journal.
+    expect(line).not.toContain("pseudo");
+  });
+
+  it("syncVisibleTournaments_nonContentionError_noReplayAndWarns", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const { synced } = await runSweep({ candidates: [2], failOn: [2] });
+
+    expect(synced).toEqual([2]);
+    expect(String(warn.mock.calls[0][0])).toContain("Error");
+    expect(String(warn.mock.calls[0][0])).not.toContain("BOOM");
+  });
+
+  it("syncVisibleTournaments_deadlockWithFailedRollback_noReplayAndStopsPass", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const { connection, synced } = await runSweep({
+      candidates: [1, 2],
+      rollbackFails: true,
+      failWithCode: { 1: { code: "ER_LOCK_DEADLOCK", times: 1 } },
+    });
+
+    expect(synced).toEqual([1]);
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
   });
 
   // Le moteur ne publiait pas seulement à la bascule d'état : `createBracketIfMissing`
@@ -246,6 +333,7 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
           commit: jest.fn(async () => undefined),
           rollback: jest.fn(async () => undefined),
           release: jest.fn(() => undefined),
+          destroy: jest.fn(() => undefined),
         };
         return {
           getDatabase: jest.fn(async () => ({

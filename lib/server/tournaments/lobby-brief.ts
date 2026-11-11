@@ -379,9 +379,12 @@ async function claimLobbyBrief(db: Db, row: LobbyBriefRow, slot: LobbyBriefSlot)
 
 /**
  * Marque le check-in d'un côté comme parti, par la place du match
- * (`briefMarkSql`) : posée dès qu'un envoi a pu partir (`sent`, `unreached`,
- * `failed` — la réservation, elle aussi, reste). Jamais d'exception : une
- * marque manquée laisse la réservation, qui suffit tant que le match existe.
+ * (`briefMarkSql`) : posée **juste avant** l'envoi, le brief rédigé — un arrêt
+ * du processus entre l'envoi et la marque ne laisse plus la seule
+ * réservation, qu'un retour arrière efface (check-in renvoyé). Rien ne part
+ * sans elle (`retry`, avant la rédaction ou faute de destinataire) : aucune
+ * marque. Jamais d'exception : une marque manquée laisse la réservation, qui
+ * suffit tant que le match existe.
  */
 async function markBriefSent(db: Db, matchId: number, teamId: number): Promise<void> {
   try {
@@ -548,6 +551,7 @@ async function sendSideBrief(
   recipients: readonly NotificationRecipient[],
   side: LobbyBriefSide,
   url: string | null,
+  beforeSend: () => Promise<void>,
 ): Promise<SideOutcome> {
   let rendered: ReturnType<typeof renderSideBrief>;
   try {
@@ -556,6 +560,8 @@ async function sendSideBrief(
     console.error(`[lobby-brief] brief du match ${matchId} non rédigé, rien n'est parti`, error);
     return "retry";
   }
+  // Le brief est rédigé : il part. La marque durable d'abord (`markBriefSent`).
+  await beforeSend();
   try {
     const report = await notifyUsers(recipients, {
       topic: "MATCH_LOBBY_BRIEF",
@@ -673,9 +679,9 @@ async function briefClaimedSide(
     recipients,
     sides[slot - 1].side,
     siteUrl(matchPageHref(Number(row.tournament_id), Number(row.id))),
+    () => markBriefSent(db, Number(row.id), slotTeamId(row, slot)),
   );
-  // Rien n'est parti (`retry`) : la réservation est rendue, aucune marque.
-  if (outcome !== "retry") await markBriefSent(db, Number(row.id), slotTeamId(row, slot));
+  // Rien n'est parti (`retry`) : la réservation est rendue, aucune marque posée.
   return outcome;
 }
 

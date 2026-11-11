@@ -8,6 +8,7 @@ import {
   liftEndurancePenalty,
 } from "@/lib/server/tournaments/bg-survie/penalties";
 import type { PoolConnection } from "mysql2/promise";
+import { connectionMock, fakeConnection, type SqlQuery } from "../helpers/sql-double";
 
 type Row = Record<string, unknown>;
 
@@ -45,8 +46,9 @@ function makeConn(options: {
   const tournament = options.tournament === undefined ? tournamentRow() : options.tournament;
   const status = options.standingStatus === undefined ? "ACTIVE" : options.standingStatus;
 
-  const execute = jest.fn(async (sql: unknown, params: unknown) => {
-    const query = String(sql).replace(/\s+/g, " ").trim();
+  const connection = connectionMock();
+  const execute = connection.execute.mockImplementation(async (sql, params) => {
+    const query = sql.replace(/\s+/g, " ").trim();
     calls.push([query, (params as unknown[]) ?? []]);
 
     if (query.includes("FROM bg_tournaments")) {
@@ -68,9 +70,8 @@ function makeConn(options: {
   });
 
   // Attente bornée de la lecture des manches (`withShortLockWait`).
-  const query = jest.fn(async () => [[], []]);
-  const conn = { execute, query } as never as PoolConnection;
-  return { conn, calls, execute };
+  connection.query.mockResolvedValue([[], []]);
+  return { conn: fakeConnection(connection), calls, execute };
 }
 
 function inserted(calls: [string, unknown[]][]): [string, unknown[]] | undefined {
@@ -298,8 +299,8 @@ describe("loadEnduranceMeta — pénalités", () => {
 
   /** Connexion factice : un classement à deux équipes, une sanction sur la seconde. */
   function metaConnection(): PoolConnection {
-    const execute = async (sql: unknown) => {
-      const q = String(sql).replace(/\s+/g, " ").trim();
+    const execute = jest.fn<SqlQuery>(async (sql) => {
+      const q = sql.replace(/\s+/g, " ").trim();
 
       if (q.includes("FROM bg_tournaments")) return [[tournamentRow()], []];
 
@@ -357,9 +358,9 @@ describe("loadEnduranceMeta — pénalités", () => {
       }
 
       return [[], []];
-    };
+    });
 
-    return { execute } as never as PoolConnection;
+    return fakeConnection({ execute });
   }
 
   it("expose les sanctions avec leur motif et leur auteur", async () => {

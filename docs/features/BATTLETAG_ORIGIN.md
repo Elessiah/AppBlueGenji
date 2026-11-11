@@ -55,7 +55,8 @@ dit de même pour l'inscription comme caster.
 
 ## Seed
 
-`Test_BattletagTape` : Battle.net rattaché, BattleTag tapé, sans pastille.
+`Test_BattletagTape` : Battle.net rattaché, BattleTag tapé, sans pastille ; rôles
+`CASTER` + `ARBITRE` et Discord certifié — cast et arbitrage lui sont refusés.
 
 ## Tests
 

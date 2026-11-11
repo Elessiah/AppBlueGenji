@@ -31,7 +31,7 @@ describe("détail map par map — effacé avec ce qu'il documente", () => {
 describe("détail map par map — entretien de l'instantané", () => {
   it("un interblocage de l'entretien rend l'instantané sur l'état d'avant, sans 500", () => {
     const snapshot = readSource("lib/server/tournaments/snapshot.ts");
-    expect(snapshot).toMatch(/if \(isTransactionAborted\(error\)\) return tournamentRow;/);
+    expect(snapshot).toMatch(/if \(isTransactionAborted\(error\)\) \{[\s\S]{0,300}?return tournamentRow;/);
   });
 });
 

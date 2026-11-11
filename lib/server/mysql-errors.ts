@@ -11,6 +11,8 @@
  * déjà défaite, et rendre un 200 pour une écriture qui n'existe plus.
  */
 
+import type { PoolConnection, ResultSetHeader } from "mysql2/promise";
+
 /** Code d'erreur mysql2, quand l'objet en porte un. */
 function errorCode(error: unknown): string | null {
   if (typeof error !== "object" || error === null) return null;
@@ -57,6 +59,30 @@ export function isTransactionAborted(error: unknown): boolean {
  */
 export function isAutoIncrementContention(error: unknown): boolean {
   return errorCode(error) === "ER_AUTOINC_READ_FAILED" || errorNumber(error) === 1467;
+}
+
+/** Drapeau `SERVER_STATUS_IN_TRANS` du protocole : une transaction est ouverte. */
+const SERVER_STATUS_IN_TRANS = 1;
+
+/**
+ * Comme {@link isTransactionAborted}, mais **tranche** le cas ambigu de
+ * `ER_AUTOINC_READ_FAILED` en demandant au serveur si la transaction de cette
+ * connexion est encore ouverte : défaite (interblocage) → `true` ; encore
+ * ouverte (délai de verrou dépassé, requête seule annulée) → `false`, et
+ * l'appelant « au mieux » peut poursuivre sans rejeter le geste entier.
+ *
+ * `DO 0` ne touche aucune table, donc n'ouvre pas de transaction, et son
+ * paquet de réponse porte l'état du serveur. Une vérification qui échoue
+ * retombe sur la prudence : défaite.
+ */
+export async function isTransactionAbortedOn(connection: PoolConnection, error: unknown): Promise<boolean> {
+  if (!isAutoIncrementContention(error)) return isTransactionAborted(error);
+  try {
+    const [header] = await connection.query<ResultSetHeader>("DO 0");
+    return (header.serverStatus & SERVER_STATUS_IN_TRANS) === 0;
+  } catch {
+    return true;
+  }
 }
 
 /**

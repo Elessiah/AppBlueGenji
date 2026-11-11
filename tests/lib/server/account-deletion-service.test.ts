@@ -856,7 +856,7 @@ describe("deleteOwnAccount — inscription solo à un tournoi pas encore commenc
     expect(plan).toEqual({ mode: "ERASE", reason: null });
     const withdrawal = queries.find((q) => q.sql.startsWith("DELETE FROM bg_tournament_registrations"));
     expect(withdrawal?.params).toEqual([40, 900]);
-    expect(has(queries, "SELECT r.team_id, t.name AS team_name, r.seed")).toBe(true);
+    expect(has(queries, "SELECT r.team_id, r.seed")).toBe(true);
     expect(has(queries, "DELETE FROM bg_users WHERE id = ?")).toBe(true);
     expect(has(queries, "UPDATE bg_users SET pseudo = ?")).toBe(false);
   });

@@ -42,12 +42,16 @@ Trois changements de fond par rapport au brief du salon :
   (`sideBriefedSql`) juge comme la réservation. Un match effacé puis
   recréé (retour arrière `rollback.ts`, manche régénérée) perd ses
   réservations, pas sa **marque durable** : `bg_lobby_brief_marks`, posée
-  par `markBriefSent` dès qu'un envoi a pu partir, tient l'engagée par la
+  par `markBriefSent` **juste avant** l'envoi, le brief rédigé (un arrêt du
+  processus après l'envoi ne laisse plus la seule réservation), tient l'engagée par la
   place du match (tournoi, phase, tableau, manche, numéro) ; réservation
   (`briefMarkSql`) et balayage la lisent — le check-in ne repart jamais deux
   fois (décision de l'utilisateur du 2026-11-05). Elle part avec le tournoi
   ou l'engagée, et quand un tableau périmé est reconstruit (`discardStaleBracket`
-  → `forgetLobbyBriefMarks`) : ses rencontres sont nouvelles.
+  → `forgetLobbyBriefMarks`) : ses rencontres sont nouvelles — un effacement
+  en échec n'arrête pas la reconstruction, sauf s'il a défait la transaction
+  (interblocage : l'erreur remonte). Une création refusée de la table se dit
+  dans pm2 (`[migrations] bg_lobby_brief_marks non créée`).
 - Les sections ci-dessous qui parlent d'arbitre désigné, de « tous les
   joueurs » ou d'une réservation rendue à la réouverture du salon décrivent
   l'état du 2026-11-04, remplacé par ces règles.

@@ -66,6 +66,8 @@ import { castEligibilityBlock, refereeEligibilityBlock } from "./cast-eligibilit
 import { matchHostTeamId, type NoRefereeCandidate } from "@/lib/shared/match-referee";
 import { seedJoins } from "./match-host-seeds";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
+import { retryOnDeadlock } from "./deadlock-retry";
+import { isUnsettled, rollbackKeepingError } from "./lock-wait";
 import { cachedTournamentList } from "./list-cache";
 import { publishMatchUpdatedEvent } from "./notifications";
 
@@ -363,23 +365,51 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
     }
   }
   for (const tournamentId of due) {
-    await connection.beginTransaction();
     try {
-      const report = { castReleased: false };
-      const changed = await maintainMatchLaunches(connection, tournamentId, report);
-      await connection.commit();
+      // Rejouée sur interblocage (`retryOnDeadlock`) : la relecture
+      // d'éligibilité verrouille le compte **après** le match, à l'inverse de
+      // la suppression de compte — un interblocage ne doit pas reporter
+      // l'entretien du tournoi au balayage suivant.
+      const { changed, report } = await retryOnDeadlock(async () => {
+        await connection.beginTransaction();
+        try {
+          const report = { castReleased: false };
+          const changed = await maintainMatchLaunches(connection, tournamentId, report);
+          await connection.commit();
+          return { changed, report };
+        } catch (error) {
+          // Jetée avant le rejeu : la file ne part pas deux fois.
+          await rollbackKeepingError(connection);
+          discardBotLogs(connection);
+          // `ROLLBACK` raté : le rejeu ouvrirait sa transaction par-dessus
+          // celle-ci, et la validerait — jamais rejouée.
+          if (isUnsettled(connection)) throw new UnsettledConnectionError(error);
+          throw error;
+        }
+      });
       flushBotLogs(connection);
       // Un caster retiré par l'entretien emporte son lien : l'accueil et #live
       // se relisent tout de suite, sans attendre l'expiration de leur cache.
       if (changed > 0 && report.castReleased) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
       else if (changed > 0) publishMatchUpdatedEvent(tournamentId);
     } catch (error) {
-      await connection.rollback().catch(() => undefined);
-      discardBotLogs(connection);
+      // Transaction peut-être encore ouverte : rien de plus sur cette
+      // connexion (ni tournoi suivant, ni retrait de caster ou d'arbitre de la
+      // lecture, dont la transaction la validerait) — la lecture échoue, la
+      // connexion est détruite au retour (`withConnection`).
+      if (error instanceof UnsettledConnectionError) throw error;
       console.error("[match-launch] entretien impossible", error);
     }
   }
   return due.size > 0;
+}
+
+/** `ROLLBACK` raté : jamais rejouée par `retryOnDeadlock` (l'erreur d'origine en `cause`). */
+class UnsettledConnectionError extends Error {
+  constructor(cause: unknown) {
+    super("UNSETTLED_CONNECTION", { cause });
+    this.name = "UnsettledConnectionError";
+  }
 }
 
 type LaunchPhase = ReturnType<typeof matchLaunchPhase>;

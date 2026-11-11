@@ -378,6 +378,17 @@ refusée par la base (connexion par code et certification du tag en 500). Avant 
 revenir en deçà, rendre la colonne facultative :
 `ALTER TABLE bg_discord_login_challenges MODIFY purpose ENUM('LOGIN', 'HANDLE') NULL`.
 
+**Retour arrière sous DB-SCHEMA-LOT : geste sur la base.** `bg_match_reminders`
+n'a plus de colonne `id` (clé primaire `(match_id, offset_key)`) ; une version
+antérieure la lit (marque `STAFF`, marque `TOLD`). Avant de revenir en deçà :
+`ALTER TABLE bg_match_reminders DROP PRIMARY KEY, ADD COLUMN id BIGINT AUTO_INCREMENT PRIMARY KEY FIRST, ADD UNIQUE KEY uniq_bg_match_reminders (match_id, offset_key)`.
+
+**Messages du serveur en anglais.** Chaque connexion du pool règle
+`lc_messages = 'en_US'` (`lib/server/database.ts`) : `fail()` reconnaît
+l'interblocage et le délai de verrou sur le texte anglais du moteur, et rend
+alors 409 `CONCURRENT_UPDATE_RETRY` plutôt que 500, quelle que soit la langue
+réglée sur le serveur.
+
 Le seed ne se pose jamais sur la production : `npm run seed` refuse de tourner
 quand `NODE_ENV=production`, avant toute connexion. Le refus porte sur
 `NODE_ENV` et non sur `DB_HOST` — la base écoute sur `127.0.0.1` des deux côtés.

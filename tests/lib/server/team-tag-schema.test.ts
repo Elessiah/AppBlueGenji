@@ -35,9 +35,11 @@ describe("sigle d'équipe dans le schéma (lib/server/database.ts)", () => {
     sql.indexOf("CREATE TABLE IF NOT EXISTS bg_team_members"),
   );
 
-  it("déclare la colonne dans la table plutôt que par un ALTER de rattrapage", () => {
+  it("déclare la colonne aux deux endroits : la table et l'ALTER de rattrapage", () => {
     expect(teamsTable).toMatch(/tag VARCHAR\(4\) NULL/);
-    expect(sql).not.toMatch(/ALTER TABLE bg_teams\s+ADD COLUMN tag/);
+    // Une base restée en arrière du repli la rattrape (sigle et clé nommée).
+    expect(sql).toContain("`ALTER TABLE bg_teams ADD COLUMN tag VARCHAR(4) NULL`");
+    expect(sql).toContain("`ALTER TABLE bg_teams ADD UNIQUE KEY uniq_bg_teams_tag (tag)`");
   });
 
   it("la garde nullable — c'est ce qui laisse les entrées solo hors de l'espace de noms", () => {

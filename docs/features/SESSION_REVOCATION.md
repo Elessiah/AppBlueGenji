@@ -54,6 +54,7 @@ empreinte de session. Cinq gestes le ferment :
 | Suspension (`suspendAccount`) | `closeUserStreams(id)`, **après le commit** | tous |
 | Suppression du compte (`deleteOwnAccount`, deux modes) | `closeUserStreams(id)`, **après le commit** | tous |
 | Changement des rôles de plateforme (`setUserRoles`, retrait comme ajout) | `closeUserStreams(id)`, **après l'écriture** | tous |
+| Ses propres rôles (`setOwnPlatformRoles`) | aucun : `is_admin` n'est pas écrit, un administrateur tient déjà toutes les permissions | aucun |
 
 Le flux s'inscrit **dès la session lue**, avant les lectures de l'instantané et
 du contexte : une révocation qui tombe pendant celles-ci le fait répondre 401

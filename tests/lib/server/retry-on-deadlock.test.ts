@@ -56,6 +56,19 @@ describe("retryOnDeadlock", () => {
     error.mockRestore();
   });
 
+  it("retryOnDeadlock_autoIncAfterSlowWaitUnderLockTimeout_replays", async () => {
+    // Un interblocage rendu après 10 s d'attente (serveur chargé) reste sous le
+    // délai de verrou : c'est la variante qui défait la transaction, à rejouer.
+    const now = jest.spyOn(Date, "now").mockReturnValueOnce(1_000).mockReturnValueOnce(11_000);
+    const slow = Object.assign(new Error("Failed to read auto-increment value from storage engine"), { errno: 1467 });
+    const write = jest.fn<() => Promise<string>>().mockRejectedValueOnce(slow).mockResolvedValueOnce("ok");
+
+    await expect(retryOnDeadlock(write)).resolves.toBe("ok");
+
+    expect(write).toHaveBeenCalledTimes(2);
+    now.mockRestore();
+  });
+
   it("retryOnDeadlock_autoIncEveryTime_logsErrorAfterThreeTries", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const persistent = Object.assign(new Error("Failed to read auto-increment value from storage engine"), { errno: 1467 });
