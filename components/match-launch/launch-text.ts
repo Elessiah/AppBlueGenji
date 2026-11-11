@@ -40,16 +40,16 @@ export function launchSidesLaterText(text: LaunchText, viewer: Pick<MatchLaunchI
  * désigné du match — qu'il le caste aussi ou non —, l'action « Contacts » de la
  * carte ouvre déjà ceux des casters quand elle lui ouvre le match
  * (`viewer.earlyContacts`, `casterContactsRole` au serveur) : la note y renvoie,
- * comme celle des engagées. À tout autre lecteur, `undefined` : la fiche garde
+ * en bref (celle des engagées, juste au-dessus, dit déjà où la trouver ; un
+ * arbitre désigné éligible ne joue pas le match : `isReferee` suffit). À tout autre lecteur, `undefined` : la fiche garde
  * sa note par défaut (« au lancement »), les co-casters et les équipes
  * attendant le départ.
  */
 export function launchCastersLaterText(
   text: LaunchText,
-  viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isReferee" | "earlyContacts">,
+  viewer: Pick<MatchLaunchInfo["viewer"], "isReferee" | "earlyContacts">,
 ): string | undefined {
-  const referee = viewer.isReferee && (viewer.role === "CASTER" || viewer.role === "MATCH_REFEREE");
-  return referee && viewer.earlyContacts ? text.t("casterContactsAtLaunchOrNow") : undefined;
+  return viewer.isReferee && viewer.earlyContacts ? text.t("casterContactsAtLaunchOrNow") : undefined;
 }
 
 /**

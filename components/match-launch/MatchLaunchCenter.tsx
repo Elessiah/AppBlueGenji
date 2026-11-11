@@ -323,6 +323,7 @@ export function MatchLaunchCenter({
   );
   const { partyWord, confirmQuestion } = viewerLaunchCopy(text, current.viewer.role);
   const sidesLaterText = launchSidesLaterText(text, current.viewer);
+  const castersLaterText = launchCastersLaterText(text, current.viewer);
 
   return (
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={styles.overlay} role="presentation">
@@ -368,7 +369,7 @@ export function MatchLaunchCenter({
               <SideCard side={current.team2} isHost={current.hostTeamId === current.team2.teamId} phase={current.phase} onCopy={copy} laterText={sidesLaterText} />
             </div>
 
-            <CasterCards casters={current.casters} phase={current.phase} onCopy={copy} laterText={launchCastersLaterText(text, current.viewer)} />
+            <CasterCards casters={current.casters} phase={current.phase} onCopy={copy} laterText={castersLaterText} />
             <RefereeCard referee={current.referee} selfManaged={current.selfManaged} phase={current.phase} onCopy={copy} />
           </div>
 

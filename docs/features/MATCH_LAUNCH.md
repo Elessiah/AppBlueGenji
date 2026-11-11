@@ -125,7 +125,8 @@ et un arbitre qui joue n'est plus éligible avant le départ
 (`keepEligibleReferees`). Un membre du staff qui caste **sans** être l'arbitre
 désigné attend le départ, comme tout caster. Dans la modale de lancement, la note
 des contacts tus d'un caster renvoie l'arbitre désigné (qu'il caste ou non) à
-l'action « Contacts » de la carte, qui les lui ouvre déjà
+l'action « Contacts » de la carte, qui les lui ouvre déjà — en bref, la note
+des engagées disant déjà où la trouver
 (`launchCastersLaterText`, clé `casterContactsAtLaunchOrNow`).
 Les deux modales rendent `CasterCard` sur la décision du serveur
 (`LaunchCaster.contactsShown`, issu d'`exposesCaster`), jamais recalculée côté

@@ -401,33 +401,25 @@ describe("fiches de contact — noms cliquables", () => {
   // carte, même s'il caste aussi le match (REF-CASTER-CONTACTS) : la note y renvoie.
   describe("modale de lancement — note du caster à l'arbitre désigné", () => {
     const EN_LAUNCH_TEXT = scopedText("en", enLaunchModal);
-    const NOW_FR = "Ses contacts s'affichent au lancement — ou dès maintenant par l'action « Contacts » du match, sur la page du tournoi (menu « Plus d'actions » au besoin).";
+    const NOW_FR = "Ses contacts s'affichent au lancement — ou dès maintenant par l'action « Contacts » du match.";
 
     it("launchCastersLaterText_refereeCasterEarlyContacts_pointsToContactsActionFrAndEn", () => {
-      const viewer = { role: "CASTER", isReferee: true, earlyContacts: true } as const;
+      const viewer = { isReferee: true, earlyContacts: true };
 
       expect(launchCastersLaterText(FR_LAUNCH_TEXT, viewer)).toBe(NOW_FR);
       expect(launchCastersLaterText(EN_LAUNCH_TEXT, viewer)).toBe(
-        "Their contacts show up at launch — or right now through the match's “Contacts” action on the tournament page (under “More actions” if needed).",
+        "Their contacts show up at launch — or right now through the match's “Contacts” action.",
       );
-    });
-
-    it("launchCastersLaterText_matchRefereeEarlyContacts_pointsToContactsAction", () => {
-      expect(launchCastersLaterText(FR_LAUNCH_TEXT, { role: "MATCH_REFEREE", isReferee: true, earlyContacts: true })).toBe(NOW_FR);
     });
 
     it("launchCastersLaterText_casterNotDesignatedReferee_undefinedEvenWithEarlyContacts", () => {
       // Pur caster, puis membre du staff qui caste sans être l'arbitre désigné : ils attendent le départ.
-      expect(launchCastersLaterText(FR_LAUNCH_TEXT, { role: "CASTER", isReferee: false, earlyContacts: false })).toBeUndefined();
-      expect(launchCastersLaterText(FR_LAUNCH_TEXT, { role: "CASTER", isReferee: false, earlyContacts: true })).toBeUndefined();
+      expect(launchCastersLaterText(FR_LAUNCH_TEXT, { isReferee: false, earlyContacts: false })).toBeUndefined();
+      expect(launchCastersLaterText(FR_LAUNCH_TEXT, { isReferee: false, earlyContacts: true })).toBeUndefined();
     });
 
     it("launchCastersLaterText_refereeWithoutEarlyContacts_undefined", () => {
-      expect(launchCastersLaterText(FR_LAUNCH_TEXT, { role: "CASTER", isReferee: true, earlyContacts: false })).toBeUndefined();
-    });
-
-    it("launchCastersLaterText_playerRole_undefined", () => {
-      expect(launchCastersLaterText(FR_LAUNCH_TEXT, { role: "TEAM1", isReferee: true, earlyContacts: true })).toBeUndefined();
+      expect(launchCastersLaterText(FR_LAUNCH_TEXT, { isReferee: true, earlyContacts: false })).toBeUndefined();
     });
 
     it("CasterCard_pendingWithLaterText_rendersItInsteadOfDefaultNote", () => {
@@ -436,7 +428,7 @@ describe("fiches de contact — noms cliquables", () => {
           caster={{ userId: 9, pseudo: "Voix", discordTag: null, battletag: null, battletagVerified: false, ready: false, contactsShown: false, isViewer: false }}
           phase="SCHEDULED"
           onCopy={noop}
-          laterText={launchCastersLaterText(FR_LAUNCH_TEXT, { role: "CASTER", isReferee: true, earlyContacts: true })}
+          laterText={launchCastersLaterText(FR_LAUNCH_TEXT, { isReferee: true, earlyContacts: true })}
         />,
       );
 
@@ -444,8 +436,18 @@ describe("fiches de contact — noms cliquables", () => {
       expect(html).not.toContain("Ses contacts s&#x27;affichent au lancement.</p>");
     });
 
-    it("MatchLaunchCenter_casterCards_receiveTheCastersNote", () => {
-      expect(read("components/match-launch/MatchLaunchCenter.tsx")).toContain("laterText={launchCastersLaterText(text, current.viewer)}");
+    it("CasterCards_laterText_reachesEveryPendingCoCasterNotTheViewer", () => {
+      const pending = { pseudo: "Voix", discordTag: null, battletag: null, battletagVerified: false, ready: false, contactsShown: false };
+      const html = renderToStaticMarkup(
+        <CasterCards
+          casters={[{ ...pending, userId: 9, isViewer: true }, { ...pending, userId: 10, isViewer: false }, { ...pending, userId: 11, isViewer: false }]}
+          phase="SCHEDULED"
+          onCopy={noop}
+          laterText={NOW_FR}
+        />,
+      );
+
+      expect(html.split("ou dès maintenant par l&#x27;action « Contacts » du match.</p>")).toHaveLength(3);
     });
   });
 

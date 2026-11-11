@@ -117,7 +117,7 @@
   "contactsAtLaunch": "Les contacts s'affichent au lancement — ou dès maintenant par l'action « Contacts » du match, sur la page du tournoi (menu « Plus d'actions » au besoin).",
   "contactsAtLaunchForCaster": "Les contacts s'affichent au lancement.",
   "casterContactsAtLaunch": "Ses contacts s'affichent au lancement.",
-  "casterContactsAtLaunchOrNow": "Ses contacts s'affichent au lancement — ou dès maintenant par l'action « Contacts » du match, sur la page du tournoi (menu « Plus d'actions » au besoin).",
+  "casterContactsAtLaunchOrNow": "Ses contacts s'affichent au lancement — ou dès maintenant par l'action « Contacts » du match.",
   "noContact": "Aucun contact disponible.",
   "caster": "Caster",
   "casterRegion": "Caster {pseudo}",
