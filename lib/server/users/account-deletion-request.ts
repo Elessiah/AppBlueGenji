@@ -15,7 +15,7 @@ import {
 import { parseRoles } from "@/lib/server/serialization";
 import { rolesGranting } from "@/lib/shared/permissions";
 import { jsonRoleLiteral } from "@/lib/server/privacy-consent";
-import { formatAccountDeletionLog, type DeletedAccountLiveAnnouncement } from "@/lib/shared/bot-logs";
+import { formatAccountDeletionLog, type DeletedAccountLiveAnnouncements } from "@/lib/shared/bot-logs";
 import { listLiveAnnouncementsForDeletionLog } from "@/lib/server/users/live-announcement-export";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { closeUserStreams } from "@/lib/server/session-streams";
@@ -375,7 +375,7 @@ type DeletionRequestEffects = {
  * `null` si elles n'ont pas pu être relues — la ligne le dit alors au staff
  * plutôt que de se taire. Ne lève jamais.
  */
-async function deletionLogLiveAnnouncements(userId: number): Promise<DeletedAccountLiveAnnouncement[] | null> {
+async function deletionLogLiveAnnouncements(userId: number): Promise<DeletedAccountLiveAnnouncements | null> {
   try {
     return await listLiveAnnouncementsForDeletionLog(userId);
   } catch (error) {
@@ -430,7 +430,7 @@ async function afterDeletionRequest(userId: number, effects: DeletionRequestEffe
   }
   // Journal Discord : la demande (sans pseudo), puis chaque retrait (E5). La
   // ligne dit aussi aux modérateurs quelles alertes AutoMod supprimer à la main
-  // (D56b) : tournoi et heure des annonces #live du compte, jamais un pseudo.
+  // (D56b) : chaque soirée #live du compte (tournoi, jour, heure), jamais un pseudo.
   try {
     sendBotLog(
       formatAccountDeletionLog({

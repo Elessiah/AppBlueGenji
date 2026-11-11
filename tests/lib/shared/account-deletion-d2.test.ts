@@ -152,42 +152,116 @@ describe("formatAccountDeletionLog", () => {
   });
 
   // D56b : la ligne dit aux modérateurs quelles alertes AutoMod supprimer à la
-  // main — tournoi et heure de Paris de chaque annonce #live, jamais un pseudo.
+  // main — chaque soirée #live où le compte a paru (tournoi, jour, heure de la
+  // première annonce, Paris), jamais un pseudo.
   it("formatAccountDeletionLog_emptyAnnouncements_addsNothing", () => {
-    const actual = formatAccountDeletionLog({ days: 30, liveAnnouncements: [] });
+    const actual = formatAccountDeletionLog({ days: 30, liveAnnouncements: { announcements: [], truncated: false } });
 
     expect(actual).toBe("🗑️ Suppression de compte demandée — définitive sous 30 jours, sauf réactivation.");
   });
 
-  it("formatAccountDeletionLog_oneAnnouncement_namesTournamentAndParisTime", () => {
+  it("formatAccountDeletionLog_oneAnnouncement_namesTournamentDayAndStartTime", () => {
     const actual = formatAccountDeletionLog({
       days: 30,
-      liveAnnouncements: [{ tournamentName: "Solo Cup", sentAt: "2026-11-13T20:04:00.000Z" }],
+      liveAnnouncements: {
+        announcements: [{ tournamentName: "Solo Cup", sentAt: "2026-11-13T20:04:00.000Z" }],
+        truncated: false,
+      },
     });
 
     expect(actual).toBe(
-      "🗑️ Suppression de compte demandée — définitive sous 30 jours, sauf réactivation. Modération : ce compte a été annoncé dans #live en tournoi individuel (« Solo Cup » le 13/11/2026 21:04) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes de ces annonces.",
+      "🗑️ Suppression de compte demandée — définitive sous 30 jours, sauf réactivation. Modération : ce compte a été annoncé dans #live en tournoi individuel (« Solo Cup » le 13/11/2026 dès 21:04) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes des messages #live de ces soirées qui citent ses matchs : le message d'une soirée, modifié à chaque nouveau match, reprend ceux déjà annoncés et ceux programmés.",
     );
   });
 
-  it("formatAccountDeletionLog_fiveAnnouncements_citesAllWithoutCount", () => {
-    const actual = formatAccountDeletionLog({ days: 30, liveAnnouncements: announcements(5) });
+  it("formatAccountDeletionLog_sameTournamentSameDay_groupedAtEarliestTime", () => {
+    const actual = formatAccountDeletionLog({
+      days: 30,
+      liveAnnouncements: {
+        announcements: [
+          { tournamentName: "Cup", sentAt: "2026-11-13T21:30:00.000Z" },
+          { tournamentName: "Cup", sentAt: "2026-11-13T19:04:00.000Z" },
+        ],
+        truncated: false,
+      },
+    });
 
-    expect(actual).toContain("« Cup 5 » le 05/07/2026 14:00) — supprimer à la main");
+    expect(actual).toContain("(« Cup » le 13/11/2026 dès 20:04) —");
+    expect(actual).not.toContain("22:30");
+  });
+
+  it("formatAccountDeletionLog_sameTournamentTwoDays_citesBothEvenings", () => {
+    const actual = formatAccountDeletionLog({
+      days: 30,
+      liveAnnouncements: {
+        announcements: [
+          { tournamentName: "Cup", sentAt: "2026-11-14T19:00:00.000Z" },
+          { tournamentName: "Cup", sentAt: "2026-11-13T19:00:00.000Z" },
+        ],
+        truncated: false,
+      },
+    });
+
+    expect(actual).toContain("(« Cup » le 14/11/2026 dès 20:00 ; « Cup » le 13/11/2026 dès 20:00) —");
+  });
+
+  it("formatAccountDeletionLog_twoTournamentsSameDay_citesBoth", () => {
+    const actual = formatAccountDeletionLog({
+      days: 30,
+      liveAnnouncements: {
+        announcements: [
+          { tournamentName: "B", sentAt: "2026-11-13T20:00:00.000Z" },
+          { tournamentName: "A", sentAt: "2026-11-13T19:00:00.000Z" },
+        ],
+        truncated: false,
+      },
+    });
+
+    expect(actual).toContain("(« B » le 13/11/2026 dès 21:00 ; « A » le 13/11/2026 dès 20:00) —");
+  });
+
+  it("formatAccountDeletionLog_afterParisMidnight_usesParisDay", () => {
+    const actual = formatAccountDeletionLog({
+      days: 30,
+      liveAnnouncements: {
+        announcements: [{ tournamentName: "Cup", sentAt: "2026-07-01T22:30:00.000Z" }],
+        truncated: false,
+      },
+    });
+
+    expect(actual).toContain("« Cup » le 02/07/2026 dès 00:30");
+  });
+
+  it("formatAccountDeletionLog_fiveEvenings_citesAllWithoutCount", () => {
+    const actual = formatAccountDeletionLog({ days: 30, liveAnnouncements: evenings(5) });
+
+    expect(actual).toContain("« Cup 5 » le 05/07/2026 dès 14:00) — supprimer à la main");
     expect(actual).not.toContain("autre");
   });
 
-  it("formatAccountDeletionLog_sixAnnouncements_citesFiveAndCountsOneOther", () => {
-    const actual = formatAccountDeletionLog({ days: 30, liveAnnouncements: announcements(6) });
+  it("formatAccountDeletionLog_sixEvenings_citesFiveAndCountsOneOther", () => {
+    const actual = formatAccountDeletionLog({ days: 30, liveAnnouncements: evenings(6) });
 
-    expect(actual).toContain("« Cup 5 » le 05/07/2026 14:00 ; et 1 autre) — supprimer à la main");
+    expect(actual).toContain("« Cup 5 » le 05/07/2026 dès 14:00 ; et 1 autre) — supprimer à la main");
     expect(actual).not.toContain("Cup 6");
   });
 
-  it("formatAccountDeletionLog_sevenAnnouncements_countsOthersInPlural", () => {
-    const actual = formatAccountDeletionLog({ days: 30, liveAnnouncements: announcements(7) });
+  it("formatAccountDeletionLog_sevenEvenings_countsOthersInPlural", () => {
+    const actual = formatAccountDeletionLog({ days: 30, liveAnnouncements: evenings(7) });
 
     expect(actual).toContain("; et 2 autres) — supprimer à la main");
+  });
+
+  it("formatAccountDeletionLog_truncatedRead_saysOlderOnesExist", () => {
+    const actual = formatAccountDeletionLog({
+      days: 30,
+      liveAnnouncements: {
+        announcements: [{ tournamentName: "Cup", sentAt: "2026-07-01T12:00:00.000Z" }],
+        truncated: true,
+      },
+    });
+
+    expect(actual).toContain("(« Cup » le 01/07/2026 dès 14:00 ; et d'autres, plus anciennes) —");
   });
 
   it("formatAccountDeletionLog_unreadableAnnouncements_tellsStaffToCheckTheAlertChannel", () => {
@@ -201,7 +275,10 @@ describe("formatAccountDeletionLog", () => {
   it("formatAccountDeletionLog_tournamentNameWithMention_isNeutralised", () => {
     const actual = formatAccountDeletionLog({
       days: 30,
-      liveAnnouncements: [{ tournamentName: "@everyone **Cup**", sentAt: "2026-07-01T12:00:00.000Z" }],
+      liveAnnouncements: {
+        announcements: [{ tournamentName: "@everyone **Cup**", sentAt: "2026-07-01T12:00:00.000Z" }],
+        truncated: false,
+      },
     });
 
     expect(actual).not.toContain("@everyone");
@@ -209,12 +286,15 @@ describe("formatAccountDeletionLog", () => {
   });
 });
 
-/** `count` annonces, « Cup 1 » le 1er juillet 2026 à 14 h de Paris, « Cup 2 » le 2… */
-function announcements(count: number): { tournamentName: string; sentAt: string }[] {
-  return Array.from({ length: count }, (_, index) => ({
-    tournamentName: `Cup ${index + 1}`,
-    sentAt: `2026-07-0${index + 1}T12:00:00.000Z`,
-  }));
+/** `count` soirées : « Cup 1 » le 1er juillet 2026 à 14 h de Paris, « Cup 2 » le 2… */
+function evenings(count: number): { announcements: { tournamentName: string; sentAt: string }[]; truncated: boolean } {
+  return {
+    announcements: Array.from({ length: count }, (_, index) => ({
+      tournamentName: `Cup ${index + 1}`,
+      sentAt: `2026-07-0${index + 1}T12:00:00.000Z`,
+    })),
+    truncated: false,
+  };
 }
 
 describe("formatAccountReactivationLog", () => {

@@ -440,8 +440,8 @@ describe("D56b — alerte AutoMod supprimée à la main à la suppression du com
   });
 
   it("registerT16_retention_saysStaffLogCarriesTournamentAndTimeOnlyFrAndEn", () => {
-    expect(t("T16")).toContain("dès la demande de suppression, le site en avertit le staff dans son journal d'activité sur Discord, sans nommer le joueur (seuls le tournoi et l'heure de chaque annonce #live d'un tournoi individuel qui l'a concerné y figurent, T05) ; elle n'est pas supprimée sur demande autrement");
-    expect(tEn("T16")).toContain("as soon as deletion is requested, the site tells the staff in its activity log on Discord, without naming the player (only the tournament and the time of each #live announcement of a solo tournament that concerned them appear in it, T05); it is not deleted on request otherwise");
+    expect(t("T16")).toContain("dès la demande de suppression, le site en avertit le staff dans son journal d'activité sur Discord, sans nommer le joueur (seuls y figurent le tournoi, le jour et l'heure de la première annonce #live de chaque soirée d'un tournoi individuel où il a paru, T05) ; elle n'est pas supprimée sur demande autrement");
+    expect(tEn("T16")).toContain("as soon as deletion is requested, the site tells the staff in its activity log on Discord, without naming the player (only the tournament, the day and the time of the first #live announcement of each evening of a solo tournament in which they appeared are given, T05); it is not deleted on request otherwise");
   });
 
   it("registerT05_staffLog_declaresTheDeletionLineContentFrAndEn", () => {

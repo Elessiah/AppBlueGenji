@@ -33,19 +33,26 @@ export async function listOwnLiveAnnouncements(userId: number): Promise<Personal
   }));
 }
 
-/** Annonces relues pour la ligne de suppression : au-delà, la ligne les compte déjà. */
-const DELETION_LOG_ANNOUNCEMENTS_LIMIT = 50;
+/**
+ * Annonces relues pour la ligne de suppression : bien au-delà de ce qu'un
+ * compte cumule ; atteinte, la ligne dit que sa liste est incomplète.
+ */
+export const DELETION_LOG_ANNOUNCEMENTS_LIMIT = 500;
 
 /**
  * Annonces #live d'un tournoi individuel qui ont concerné le compte, de la plus
  * récente à la plus ancienne : le nom du tournoi et la date de l'annonce —
  * jamais un pseudo. Lues à la demande de suppression pour la ligne du journal
  * du staff (`formatAccountDeletionLog`, décision D56b) : les modérateurs y
- * trouvent quelles alertes AutoMod supprimer à la main. Rien n'en est gardé.
+ * trouvent quelles alertes AutoMod supprimer à la main. Les annonces refusées
+ * restent : un refus d'AutoMod est justement celui qui laisse une alerte. Rien
+ * n'en est gardé.
+ *
+ * @returns Les annonces, et `truncated` si la lecture a atteint sa limite.
  */
 export async function listLiveAnnouncementsForDeletionLog(
   userId: number,
-): Promise<{ tournamentName: string; sentAt: string }[]> {
+): Promise<{ announcements: { tournamentName: string; sentAt: string }[]; truncated: boolean }> {
   const db = await getDatabase();
   const [rows] = await db.execute<(RowDataPacket & { name: string; sent_at: Date | string | null })[]>(
     `SELECT t.name, a.sent_at
@@ -55,11 +62,12 @@ export async function listLiveAnnouncementsForDeletionLog(
      JOIN bg_teams st ON st.solo_user_id = ?
       AND FIND_IN_SET(st.id, REPLACE(a.pairing, ':', ',')) > 0
      ORDER BY a.sent_at DESC, a.match_id DESC
-     LIMIT ${DELETION_LOG_ANNOUNCEMENTS_LIMIT}`,
+     LIMIT ${DELETION_LOG_ANNOUNCEMENTS_LIMIT + 1}`,
     [userId],
   );
-  return rows.flatMap((row) => {
+  const announcements = rows.slice(0, DELETION_LOG_ANNOUNCEMENTS_LIMIT).flatMap((row) => {
     const sentAt = toIso(row.sent_at);
     return sentAt ? [{ tournamentName: String(row.name), sentAt }] : [];
   });
+  return { announcements, truncated: rows.length > DELETION_LOG_ANNOUNCEMENTS_LIMIT };
 }

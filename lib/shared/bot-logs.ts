@@ -173,10 +173,10 @@ export function formatPlayerSignupLog(context: { provider: PlayerSignupProvider 
 export function formatAccountDeletionLog(context: {
   days: number;
   /**
-   * Annonces #live d'un tournoi individuel qui ont concerné le compte, de la
-   * plus récente à la plus ancienne ; `null` si elles n'ont pas pu être lues.
+   * Annonces #live d'un tournoi individuel qui ont concerné le compte ; `null`
+   * si elles n'ont pas pu être lues.
    */
-  liveAnnouncements?: readonly DeletedAccountLiveAnnouncement[] | null;
+  liveAnnouncements?: DeletedAccountLiveAnnouncements | null;
 }): string {
   const detail = `définitive sous ${context.days} jours, sauf réactivation`;
   return `${leadOn("🗑️", "Suppression de compte demandée", detail)}.${automodAlertsToClear(context.liveAnnouncements)}`;
@@ -188,13 +188,19 @@ export interface DeletedAccountLiveAnnouncement {
   sentAt: string | Date;
 }
 
-/** Annonces citées dans la ligne ; les autres sont comptées (« et N autres »). */
+/** Annonces du compte supprimé, et `truncated` si leur lecture s'est arrêtée à sa limite. */
+export interface DeletedAccountLiveAnnouncements {
+  announcements: readonly DeletedAccountLiveAnnouncement[];
+  truncated: boolean;
+}
+
+/** Soirées citées dans la ligne ; les autres sont comptées (« et N autres »). */
 export const ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS = 5;
 
 let announcementTimeFormat: Intl.DateTimeFormat | null = null;
 
-/** « 12/11/2026 21:04 », heure de Paris : de quoi retrouver l'alerte dans le salon. */
-function announcementTime(sentAt: string | Date): string {
+/** Jour et heure de Paris d'une annonce, séparés : « 12/11/2026 », « 21:04 ». */
+function announcementTime(sentAt: string | Date): { day: string; time: string } {
   announcementTimeFormat ??= new Intl.DateTimeFormat("fr-FR", {
     day: "2-digit",
     month: "2-digit",
@@ -204,7 +210,28 @@ function announcementTime(sentAt: string | Date): string {
     hourCycle: "h23",
     timeZone: "Europe/Paris",
   });
-  return announcementTimeFormat.format(sentAt instanceof Date ? sentAt : new Date(sentAt));
+  const parts = announcementTimeFormat.formatToParts(sentAt instanceof Date ? sentAt : new Date(sentAt));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((entry) => entry.type === type)?.value ?? "";
+  return { day: `${part("day")}/${part("month")}/${part("year")}`, time: `${part("hour")}:${part("minute")}` };
+}
+
+/**
+ * Soirées #live où le compte a paru : une par tournoi et par jour (Paris), de
+ * la plus récente à la plus ancienne, avec l'heure de sa **première** annonce
+ * ce jour-là. Le message d'une soirée est modifié à chaque match qui passe à
+ * l'antenne et reprend les matchs déjà annoncés : une alerte postérieure à
+ * l'annonce peut porter le même pseudo — c'est la soirée qu'il faut parcourir.
+ */
+function announcementEvenings(
+  announcements: readonly DeletedAccountLiveAnnouncement[],
+): { tournamentName: string; day: string; time: string }[] {
+  const evenings = new Map<string, { tournamentName: string; day: string; time: string }>();
+  for (const announcement of announcements) {
+    const { day, time } = announcementTime(announcement.sentAt);
+    // Liste de la plus récente à la plus ancienne : la dernière vue du jour en est la première.
+    evenings.set(`${day} ${announcement.tournamentName}`, { tournamentName: announcement.tournamentName, day, time });
+  }
+  return [...evenings.values()];
 }
 
 /**
@@ -212,21 +239,25 @@ function announcementTime(sentAt: string | Date): string {
  * 2026-11-11) : l'alerte AutoMod d'une annonce #live bloquée ou signalée est
  * un message de Discord que ni le site ni le bot ne savent retrouver — les
  * modérateurs la suppriment **à la main** quand le compte est supprimé. La
- * ligne leur dit où chercher sans nommer personne : le tournoi et l'heure de
- * chaque annonce d'un tournoi individuel qui a concerné le compte, jamais un
- * pseudo ni un identifiant. Rien n'est ajouté pour un compte jamais annoncé.
+ * ligne leur dit où chercher sans nommer personne : chaque soirée #live d'un
+ * tournoi individuel où le compte a paru (tournoi, jour, heure de sa première
+ * annonce ce jour-là), jamais un pseudo ni un identifiant — une alerte d'une
+ * modification ultérieure du message de la soirée le porte aussi. Rien n'est
+ * ajouté pour un compte jamais annoncé.
  */
-function automodAlertsToClear(announcements: readonly DeletedAccountLiveAnnouncement[] | null | undefined): string {
-  if (announcements === null) {
+function automodAlertsToClear(liveAnnouncements: DeletedAccountLiveAnnouncements | null | undefined): string {
+  if (liveAnnouncements === null) {
     return " Modération : ses annonces #live n'ont pas pu être relues — vérifier le salon d'alertes AutoMod et y supprimer à la main les alertes qui portent le pseudo d'un compte supprimé.";
   }
-  if (!announcements || announcements.length === 0) return "";
-  const cited = announcements
+  if (!liveAnnouncements || liveAnnouncements.announcements.length === 0) return "";
+  const evenings = announcementEvenings(liveAnnouncements.announcements);
+  const cited = evenings
     .slice(0, ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS)
-    .map((announcement) => `${discordQuoted(announcement.tournamentName, "fr")} le ${announcementTime(announcement.sentAt)}`);
-  const others = announcements.length - cited.length;
-  if (others > 0) cited.push(others === 1 ? "et 1 autre" : `et ${others} autres`);
-  return ` Modération : ce compte a été annoncé dans #live en tournoi individuel (${cited.join(" ; ")}) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes de ces annonces.`;
+    .map((evening) => `${discordQuoted(evening.tournamentName, "fr")} le ${evening.day} dès ${evening.time}`);
+  const others = evenings.length - cited.length;
+  if (liveAnnouncements.truncated) cited.push("et d'autres, plus anciennes");
+  else if (others > 0) cited.push(others === 1 ? "et 1 autre" : `et ${others} autres`);
+  return ` Modération : ce compte a été annoncé dans #live en tournoi individuel (${cited.join(" ; ")}) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes des messages #live de ces soirées qui citent ses matchs : le message d'une soirée, modifié à chaque nouveau match, reprend ceux déjà annoncés et ceux programmés.`;
 }
 
 /**

@@ -961,7 +961,7 @@ describe("requestAccountDeletion — journal et forfaits (E1, E5)", () => {
 
   // D56b : la ligne dit aux modérateurs quelles alertes AutoMod supprimer à la main.
   it("requestAccountDeletion_neverAnnouncedAccount_logLineStaysBare", async () => {
-    jest.mocked(listLiveAnnouncementsForDeletionLog).mockResolvedValue([]);
+    jest.mocked(listLiveAnnouncementsForDeletionLog).mockResolvedValue({ announcements: [], truncated: false });
     fakeDb({});
 
     await requestAccountDeletion(7);
@@ -973,14 +973,17 @@ describe("requestAccountDeletion — journal et forfaits (E1, E5)", () => {
   it("requestAccountDeletion_announcedAccount_logLineCitesTournamentAndTime", async () => {
     jest
       .mocked(listLiveAnnouncementsForDeletionLog)
-      .mockResolvedValue([{ tournamentName: "Solo Cup", sentAt: "2026-11-13T20:04:00.000Z" }]);
+      .mockResolvedValue({
+        announcements: [{ tournamentName: "Solo Cup", sentAt: "2026-11-13T20:04:00.000Z" }],
+        truncated: false,
+      });
     fakeDb({});
 
     await requestAccountDeletion(7);
 
     expect(jest.mocked(listLiveAnnouncementsForDeletionLog)).toHaveBeenCalledWith(7);
     const [message] = jest.mocked(sendBotLog).mock.calls[0];
-    expect(message).toContain("(« Solo Cup » le 13/11/2026 21:04) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes de ces annonces.");
+    expect(message).toContain("(« Solo Cup » le 13/11/2026 dès 21:04) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes des messages #live de ces soirées qui citent ses matchs : le message d'une soirée, modifié à chaque nouveau match, reprend ceux déjà annoncés et ceux programmés.");
   });
 
   it("requestAccountDeletion_announcementLookupFails_logLineAsksToCheckAlertChannel", async () => {
