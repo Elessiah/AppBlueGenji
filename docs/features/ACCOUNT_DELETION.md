@@ -727,7 +727,9 @@ défait pas** — une seule transaction, verrous dans l'ordre tournois
   match, sont retirées (`withdrawSoloRegistrationsOn`). L'entrée d'un tournoi
   `RUNNING` **jamais jouée** perd ses matchs restants par forfait **après** le
   commit (`forfeitSoloEntriesAfterCommit` : `forfeitTournamentTeam` pour
-  SURVIVAL/SWISS/BG_SURVIE — une entrée déjà hors course n'est pas une erreur —,
+  SURVIVAL/SWISS/BG_SURVIE — une entrée déjà hors course ou absente du
+  classement n'est pas une erreur : un match déjà apparié qui l'attend encore
+  est tranché match par match, comme dans un arbre —,
   sinon `forfeitDeletedEntryMatch` match par match : sous `lockTournamentRow`
   puis le verrou du match, il relit tournoi `RUNNING`, compte en suppression,
   entrée jamais jouée et match encore ouvert, puis tranche par

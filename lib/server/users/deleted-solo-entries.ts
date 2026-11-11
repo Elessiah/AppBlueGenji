@@ -158,7 +158,7 @@ const MAX_BRACKET_FORFEITS = 64;
  * et prend `lockTournamentRow` le premier.
  */
 export async function forfeitUnplayedSoloEntry(tournamentId: number, teamId: number): Promise<number> {
-  const { forfeitDeletedEntryMatch, forfeitTournamentTeam } = await import("@/lib/server/tournaments-service");
+  const { forfeitTournamentTeam } = await import("@/lib/server/tournaments-service");
   const { lockDeletedSoloEntryStillForfeitable } = await import("@/lib/server/tournaments/deleted-entry-forfeit");
   const format = await engineFormat(tournamentId);
   if (format !== null && ABANDON_FORMATS.has(format)) {
@@ -173,21 +173,41 @@ export async function forfeitUnplayedSoloEntry(tournamentId: number, teamId: num
         stillDue: (connection) => lockDeletedSoloEntryStillForfeitable(connection, tournamentId, teamId),
       });
     } catch (error) {
-      // Déjà hors course (abandon antérieur, passage précédent), ou plus dû
-      // (compte réactivé, manche jouée) : rien à faire.
-      if (error instanceof Error && (error.message === "TEAM_ALREADY_OUT" || error.message === "FORFEIT_NO_LONGER_DUE")) {
-        return 0;
+      // Plus dû (compte réactivé, manche jouée) : rien à faire.
+      if (error instanceof Error && error.message === "FORFEIT_NO_LONGER_DUE") return 0;
+      // Déjà hors course (abandon antérieur, passage précédent) ou absente du
+      // classement : l'abandon n'a plus de prise, mais un match déjà apparié
+      // peut encore l'attendre — son adversaire resterait bloqué. Ce match se
+      // tranche comme dans un arbre ; rien d'ouvert : 0, sans erreur, ce qui
+      // fait converger le passage horaire.
+      if (error instanceof Error && (error.message === "TEAM_ALREADY_OUT" || error.message === "TEAM_NOT_IN_TOURNAMENT")) {
+        return forfeitOpenMatches(tournamentId, teamId);
       }
       throw error;
     }
     return 1;
   }
+  return forfeitOpenMatches(tournamentId, teamId);
+}
+
+/**
+ * Forfait match par match des rencontres ouvertes de l'entrée
+ * (`forfeitDeletedEntryMatch`), jusqu'à ce qu'il n'en reste plus.
+ */
+async function forfeitOpenMatches(tournamentId: number, teamId: number): Promise<number> {
+  const { forfeitDeletedEntryMatch } = await import("@/lib/server/tournaments-service");
   let forfeits = 0;
   let previousMatchId: number | null = null;
   for (let round = 0; round < MAX_BRACKET_FORFEITS; round += 1) {
     const matchId = await forfeitDeletedEntryMatch(tournamentId, teamId);
-    // Rien d'ouvert, ou le même match encore rendu : la boucle s'arrête.
-    if (matchId === null || matchId === previousMatchId) break;
+    // Rien d'ouvert : la boucle s'arrête.
+    if (matchId === null) break;
+    // Le même match encore rendu : il ne se tranche pas. Arrêt, et trace pour
+    // le diagnostic (identifiants seuls, aucun pseudo).
+    if (matchId === previousMatchId) {
+      console.warn(`[account-deletion] forfait sans effet, match ${matchId} encore ouvert (tournoi ${tournamentId})`);
+      break;
+    }
     previousMatchId = matchId;
     forfeits += 1;
   }
