@@ -840,13 +840,14 @@ async function streamHolders(
  * compte en cours (qui la tient en exclusif) se termine d'abord. Un compte
  * effacé entre-temps ne reçoit aucun lien.
  *
- * Sans lien posé (`liveUrl` absent) ni lien au nom de l'auteur, rien n'est lu.
+ * Sans lien posé (`liveUrl` absent ou nul : un retrait ne rattache rien) ni lien au
+ * nom de l'auteur, rien n'est lu.
  *
  * @throws `UNAUTHORIZED` — le compte est supprimé.
  */
 async function assertSetterAccountKept(connection: PoolConnection, config: MatchLiveConfig): Promise<void> {
-  // Rien à rattacher : ni lien posé, ni lien au nom de l'auteur.
-  if (config.liveUrl === undefined) return;
+  // Rien à rattacher : ni lien posé (un retrait n'en rattache aucun), ni lien au nom de l'auteur.
+  if (config.liveUrl === undefined || config.liveUrl === null) return;
   const userId = linkProvider(config.setter);
   if (userId === null) return;
   const [rows] = await connection.execute<(RowDataPacket & { is_deleted: number | null })[]>(

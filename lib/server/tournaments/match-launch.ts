@@ -590,8 +590,8 @@ async function playingUserIds(
   const teamIds = [nullableId(match.team1_id), nullableId(match.team2_id)].filter((id): id is number => id !== null);
   const users = [...new Set(userIds)];
   if (teamIds.length === 0 || users.length === 0) return new Set();
-  const teams = teamIds.map(() => "?").join(", ");
-  const asked = users.map(() => "?").join(", ");
+  const teams = sqlPlaceholders(teamIds.length);
+  const asked = sqlPlaceholders(users.length);
   const [solo] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
     `SELECT solo_user_id AS user_id FROM bg_teams WHERE solo_user_id IN (${asked}) AND id IN (${teams})`,
     [...users, ...teamIds],

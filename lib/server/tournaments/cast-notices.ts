@@ -345,14 +345,16 @@ export async function queueDeletedMatchCasts(
       ids,
     );
     if (casters.length === 0) continue;
+    // Seuls les matchs qui ont des casters : un tour entier supprimé n'en lit pas les autres.
+    const casted = [...new Set(casters.map((caster) => Number(caster.match_id)))];
     const [subjects] = await connection.execute<MatchLogRow[]>(
       `SELECT ${MATCH_LOG_COLUMNS_SQL}
          FROM bg_matches m
          JOIN bg_tournaments tr ON tr.id = m.tournament_id
          LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
          LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
-        WHERE m.id IN (${placeholders})`,
-      ids,
+        WHERE m.id IN (${sqlPlaceholders(casted.length)})`,
+      casted,
     );
     const byMatch = new Map(subjects.map((subject) => [Number(subject.id), subject]));
     for (const caster of casters) {

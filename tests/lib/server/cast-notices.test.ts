@@ -642,6 +642,21 @@ describe("match supprimé — l'inscription part avec lui", () => {
     expect(jest.mocked(loadNotificationRecipients).mock.calls.map((call) => call[0])).toEqual([[CASTER], [901]]);
   });
 
+  it("queueDeletedMatchCasts_manyMatchesOneCasted_readsSubjectOfTheCastedOnly", async () => {
+    mockMatch(null);
+    const { execute, connection } = deletingConnection([{ match_id: 43, user_id: CASTER }]);
+
+    await queueDeletedMatchCasts(connection, [
+      { id: 42, status: "READY" },
+      { id: 43, status: "READY" },
+      { id: 44, status: "PENDING" },
+    ]);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[0][1]).toEqual([42, 43, 44]);
+    expect(execute.mock.calls[1][1]).toEqual([43]);
+  });
+
   it("queueDeletedMatchCasts_onlyPlayedMatches_readsNothing", async () => {
     const { execute, connection } = deletingConnection([{ match_id: 42, user_id: CASTER }]);
 

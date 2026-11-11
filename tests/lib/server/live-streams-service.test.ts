@@ -1093,6 +1093,15 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.setterLocks).toEqual([]);
   });
 
+  it("setMatchLiveConfig_linkRemoval_takesNoSetterLock", async () => {
+    const world = liveWorld(matchRow({ kept_referee_user_id: 9 }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: null, setter: { userId: 9, asOrganisation: false }, access: STAFF });
+
+    expect(world.state.setterLocks).toEqual([]);
+  });
+
   it("setMatchLiveConfig_noLiveUrl_takesNoSetterLock", async () => {
     const world = liveWorld(matchRow({ kept_referee_user_id: 9 }));
     await mockLiveDb(world);
