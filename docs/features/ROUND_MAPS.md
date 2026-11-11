@@ -267,7 +267,11 @@ au pool.
   (`{ more: n }`, reprises dans « et N autres »), jamais « Data too long ».
   Les manches sont listées tableau principal, perdants, grande finale, petite
   finale ; un changement de la seule **map de départage** est noté à part
-  (`tiebreak`) et dit « Manche 2 (map de départage) ».
+  (`tiebreak`) et dit « Manche 2 (map de départage) » — sauf si les cartes de
+  la même manche ont changé aussi : elle n'est dite et comptée qu'une fois. Le
+  compte des manches au-delà du plafond est approché (une manche réglée deux
+  fois y compte deux fois), et le signal de fermeture ne fait rien partir tant
+  qu'il en reste : elles peuvent être celles d'un autre membre du staff.
 - Journal du staff anonyme (`formatRoundMapsSummaryLog`, `formatMapRulesLog`, choix
   `MAP_PICKED*` de `referee-notices`) : aucune personne nommée.
 - Check-in du match (`MATCH_LOBBY_BRIEF.md`) : bloc « Déroulé des maps » quand la manche

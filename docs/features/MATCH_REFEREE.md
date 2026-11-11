@@ -212,7 +212,8 @@ règle a changé avec l'arbitre hôte.
   2 s) ; `live-state.ts` garde les noms d'un instantané à l'autre, **élagués
   aux matchs qui les montrent** (`pruneRefereeNames` : le pseudo d'un match
   dont le score vient d'être déclaré quitte l'état du client sans attendre la
-  reconnexion). Les deux portes passent par `getTournamentViewerContext`, où
+  reconnexion ; l'essai de relecture est oublié dès que plus rien ne manque,
+  pour qu'un score rejeté — même empreinte — relise le pseudo). Les deux portes passent par `getTournamentViewerContext`, où
   une lecture des pseudos en panne rend une liste vide (journalisée) au lieu de
   faire échouer le flux ou la lecture REST. Jamais le pseudo d'un
   compte supprimé ni d'un arbitre dont l'opposition est retenue (filtre SQL

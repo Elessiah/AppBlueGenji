@@ -183,6 +183,26 @@ describe("dispatchDueRoundMapsNotices", () => {
     expect(String(jest.mocked(sendBotLog).mock.calls[0][0])).toContain("(map de départage)");
   });
 
+  it("dispatchDueRoundMapsNotices_mapsAndTiebreakOfSameRound_listedAndCountedOnce", async () => {
+    pool([dueRow([R2, { ...R2, tiebreak: true }])]);
+
+    await dispatchDueRoundMapsNotices();
+
+    const line = String(jest.mocked(sendBotLog).mock.calls[0][0]);
+    expect(line).toContain("(1 manche)");
+    expect(line).not.toContain("(map de départage)");
+  });
+
+  it("dispatchDueRoundMapsNotices_tiebreakOfAnotherRound_keptApart", async () => {
+    pool([dueRow([R2, { ...R3, tiebreak: true }])]);
+
+    await dispatchDueRoundMapsNotices();
+
+    const line = String(jest.mocked(sendBotLog).mock.calls[0][0]);
+    expect(line).toContain("(2 manches)");
+    expect(line).toContain("(map de départage)");
+  });
+
   it("dispatchDueRoundMapsNotices_storedOverflow_countedInTheSummary", async () => {
     pool([dueRow([R2, R3, { more: 4 }])]);
 
@@ -284,6 +304,22 @@ describe("flushRoundMapsNotice", () => {
     pool([dueRow([R2])]);
     jest.mocked(flushBotLogBatch).mockReturnValue(new Promise<void>(() => undefined));
     await expect(flushRoundMapsNotice(7)).resolves.toBe(true);
+  });
+
+  it("flushRoundMapsNotice_ownRoundsCoverAllPending_sends", async () => {
+    pool([dueRow([R2, R3])]);
+
+    await expect(flushRoundMapsNotice(7, ["0:UPPER:2", "0:UPPER:3"])).resolves.toBe(true);
+  });
+
+  it("flushRoundMapsNotice_ownRoundsButOverflowPending_leavesItToTheWindow", async () => {
+    // Des manches seulement comptées peuvent être celles d'un autre membre du staff.
+    pool([dueRow([R2, { more: 3 }])]);
+
+    await expect(flushRoundMapsNotice(7, ["0:UPPER:2"])).resolves.toBe(false);
+
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(execute.mock.calls.some(([sql]) => /^\s*DELETE/.test(sql))).toBe(false);
   });
 
   it("flushRoundMapsNotice_sweepAlreadyClaimedIt_returnsFalse", async () => {

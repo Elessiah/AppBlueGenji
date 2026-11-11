@@ -56,17 +56,24 @@ Trois changements de fond par rapport au brief du salon :
 l'ouverture du salon, comme avant la fusion (`LOBBY_BRIEF_LEAD_MINUTES`,
 `lib/shared/lobby-brief.ts`). Les deux repères partagent la **même
 réservation** : un match programmé puis ouvert n'est briefé qu'une fois.
-Le repère du salon ne vaut que si l'horaire n'est **pas à venir**
-(`m.start_at IS NULL OR m.start_at <= NOW()`) : un match programmé dont le
-salon s'ouvre tôt (lancement forcé à 18 h pour 21 h) attend son quart d'heure
-au lieu de recevoir à 18 h un check-in qui annonce « moins de 15 minutes ».
+Le repère du salon ne vaut que si l'horaire n'est **pas à venir**, ou si le
+match est **lancé** (`m.start_at IS NULL OR m.start_at <= NOW() OR
+m.launched_at IS NOT NULL`) : un salon ouvert tôt sans lancement attend son
+quart d'heure ; un match **lancé tôt** (lancement forcé à 18 h pour 21 h) se
+joue tout de suite, son check-in part donc à l'ouverture, sous-titré « match
+lancé », **sans** la ligne du salon de check-in ni celle du vocal — tous deux
+n'ouvrent qu'au quart d'heure de l'horaire (`kickoff_state` vaut
+`UNSCHEDULED` au-delà de `LOBBY_BRIEF_LEAD_MINUTES`, `voice_tracked` est borné
+de même) — et rien ne repart à H-15 (même réservation).
 
 **Destinataires relus juste avant l'envoi** (REFEREE-LOT-1) : chaque côté
 relit ses membres actifs (`loadEntrantManagerIds`) après sa réservation — un
 membre retiré depuis la lecture du balayage ne reçoit plus le lien du match ni
 l'ordre des bans. Un compte membre actif **des deux** engagées ne reçoit que le
 check-in du premier côté (jamais « crée la partie » puis « vérifie les
-paramètres »). La coupe de dernier recours d'un message trop long se fait par
+paramètres ») : règle fixe, lue des appartenances (`slotManagers`), la même à
+chaque balayage ; un second côté qui n'a que de tels gérants est réservé sans
+envoi, comme une fantôme. La coupe de dernier recours d'un message trop long se fait par
 points de code, jamais au milieu d'un émoji.
 
 ## Contenu

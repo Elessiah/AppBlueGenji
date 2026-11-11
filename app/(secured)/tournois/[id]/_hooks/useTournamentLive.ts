@@ -280,6 +280,11 @@ export function useTournamentLive(tournamentId: number) {
     const detail = stateRef.current.detail;
     if (!detail) return;
     const missing = missingRefereeNamesKey(detail.matches, detail.refereeNames);
+    // Plus rien ne manque : l'essai est oublié. Un pseudo élagué (score déclaré,
+    // `pruneRefereeNames`) puis de nouveau montré (score rejeté) redonne la même
+    // clé, qui doit relancer une relecture — sinon « Arbitre désigné » resterait,
+    // et l'arbitre perdrait sa marque `mine` jusqu'à la reconnexion.
+    if (missing === "" && namesTimerRef.current === null) namesAttemptRef.current = "";
     if (missing === "" || missing === namesAttemptRef.current || namesTimerRef.current !== null) return;
     namesAttemptRef.current = missing;
     const forTournament = detail.card.id;

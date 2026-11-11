@@ -1,4 +1,5 @@
 import type { Pool } from "mysql2/promise";
+import { ROUND_NUMBER_MAX } from "@/lib/shared/round-maps";
 import { reportSchemaFailure } from "./report-schema-failure";
 
 /** Migrations : les changements trop récents pour être repliés (`RECENT_SCHEMA_CHANGES`). */
@@ -478,9 +479,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // sur le match : la clé étrangère n'a nulé que `referee_user_id`. Idempotent.
     `UPDATE bg_matches SET referee_ready_at = NULL WHERE referee_user_id IS NULL AND referee_ready_at IS NOT NULL`,
     // REFEREE-LOT-1 — cartes d'un tour au-delà de la borne `ROUND_NUMBER_MAX`
-    // (2000), permises avant #514 : la copie « à tous les tours » les reprenait
+    // (la constante même : une borne relevée ne purge pas des réglages devenus
+    // valides), permises avant #514 : la copie « à tous les tours » les reprenait
     // et chaque lot était refusé (`INVALID_ROUND`), sans moyen de les retirer.
-    `DELETE FROM bg_tournament_round_maps WHERE round_number > 2000`,
+    `DELETE FROM bg_tournament_round_maps WHERE round_number > ${ROUND_NUMBER_MAX}`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

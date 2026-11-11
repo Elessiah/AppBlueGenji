@@ -35,6 +35,13 @@ export async function transact<T>(connection: PoolConnection, run: (connection: 
     flushBotLogs(connection);
   } catch (error) {
     console.error("[transaction] journal non vidé après le commit :", error);
+    // Ce qui reste en attente ne doit pas partir avec la transaction suivante
+    // de cette connexion, rendue au pool.
+    try {
+      discardBotLogs(connection);
+    } catch {
+      // Rien de plus à tenter : le geste, lui, est enregistré.
+    }
   }
   return result;
 }

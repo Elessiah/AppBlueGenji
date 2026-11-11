@@ -156,6 +156,8 @@ export async function queueRoundMapsNotice(
     };
     const key = pendingKey(entry);
     // Plafond : une manche de plus n'est que comptée (jamais « Data too long »).
+    // Compte approché : faute de clé retenue, une manche réglée deux fois
+    // au-delà du plafond compte deux fois.
     if (!merged.has(key) && merged.size >= ROUND_MAPS_NOTICE_KEYS_MAX) more += 1;
     else merged.set(key, entry);
   }
@@ -215,6 +217,15 @@ async function labelRounds(
     });
 }
 
+/**
+ * Une manche dont les cartes **et** la map de départage ont changé n'est dite
+ * (et comptée) qu'une fois : « cartes de manche modifiées » couvre son départage.
+ */
+function withoutCoveredTiebreaks(rounds: readonly NoticeRound[]): NoticeRound[] {
+  const mapsChanged = new Set(rounds.filter((round) => !round.tiebreak).map(roundKey));
+  return rounds.filter((round) => !round.tiebreak || !mapsChanged.has(roundKey(round)));
+}
+
 /** Revendique puis envoie les lignes données ; rend le nombre de messages partis. */
 async function sendClaimed(rows: readonly NoticeRow[]): Promise<number> {
   const db = await getDatabase();
@@ -225,7 +236,7 @@ async function sendClaimed(rows: readonly NoticeRow[]): Promise<number> {
       [row.tournament_id, row.changes],
     );
     if (result.affectedRows !== 1) continue; // un autre l'a prise, ou un changement a rouvert la fenêtre
-    const rounds = parsePending(row.rounds_json);
+    const rounds = withoutCoveredTiebreaks(parsePending(row.rounds_json));
     if (rounds.length === 0) continue;
     const roundLabels = await labelRounds(db, row, rounds);
     sendBotLog(
@@ -323,7 +334,13 @@ async function flushNow(tournamentId: number, ownRounds?: readonly string[]): Pr
     const claimable = own
       ? rows.filter((row) => {
           const pending = parsePending(row.rounds_json);
-          return pending.length > 0 && pending.every((round) => own.has(roundKey(round)));
+          // Des manches seulement comptées (plafond) peuvent être celles d'un
+          // autre : on ne sait pas, l'annonce reste à la fenêtre de silence.
+          return (
+            pending.length > 0 &&
+            parseOverflow(row.rounds_json) === 0 &&
+            pending.every((round) => own.has(roundKey(round)))
+          );
         })
       : rows;
     sent = (await sendClaimed(claimable)) > 0;
