@@ -23,6 +23,7 @@
  * personnes, et le message dit « un match » (`RGPD_LOGS_AND_VISITS.md`).
  */
 import type { CastBlock } from "./match-launch";
+import { tournamentMatchHref } from "./match-anchor";
 
 /** Motif donné au caster. L'énumération reste ouverte : l'arbitrage des matchs en ajoutera. */
 /**
@@ -66,4 +67,13 @@ export function castReleaseReasonKey(match: Pick<CastReleasedMatch, "reason" | "
   if (match.block === "CASTER_IDENTITY_REQUIRED") return "INELIGIBLE_IDENTITY";
   if (match.block === "CASTER_DISCORD_REQUIRED") return "INELIGIBLE_DISCORD";
   return "INELIGIBLE";
+}
+
+/**
+ * Chemin du lien d'un avis de retrait : le match sur la fiche du tournoi, ou
+ * le tournoi seul quand le match n'existe plus (`MATCH_DELETED`) — une ancre
+ * vers un match effacé ne mènerait nulle part.
+ */
+export function castReleasedHref(match: Pick<CastReleasedMatch, "tournamentId" | "matchId" | "reason">): string {
+  return tournamentMatchHref(match.tournamentId, match.reason === "MATCH_DELETED" ? null : match.matchId);
 }

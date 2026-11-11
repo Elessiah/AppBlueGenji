@@ -51,7 +51,7 @@ import {
   loadTournamentRow,
 } from "./repository";
 import { invalidateTournamentLists } from "./list-cache";
-import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
+import { invalidateLandingAggregates, invalidateLandingLive } from "@/lib/server/landing-cache";
 import { invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
@@ -270,6 +270,10 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
     // « déclare-toi prêt » attendait le prochain passage par la liste. Import
     // dynamique, comme dans `./notifications`, qui importe ce module.
     if (syncResult.launchesChanged) {
+      // Un lancement d'office ouvre l'antenne d'un match `AUTO`, et l'entretien
+      // retire un caster devenu inéligible avec son lien : le match que
+      // l'accueil met en avant se relit tout de suite (comme la passe de fond).
+      invalidateLandingLive();
       void import("./player-pushes")
         .then(({ dispatchMatchStartNotices }) => dispatchMatchStartNotices())
         .catch(() => undefined);
@@ -635,12 +639,29 @@ export async function getTournamentSnapshot(
  */
 async function loadCastersAndStreams(connection: PoolConnection, matchIds: number[]) {
   let streamsByMatch = await loadMatchStreams(connection, matchIds);
-  const castersByMatch =
+  let castersByMatch =
     streamsByMatch.size === 0 ? new Map<number, MatchCasterRow[]>() : await loadMatchCasters(connection, matchIds);
   if (castersOnUnreadStream(streamsByMatch, castersByMatch)) {
     streamsByMatch = await loadMatchStreams(connection, matchIds);
+    // Un caster parti (et son stream effacé) entre la lecture des casters et
+    // la relecture n'est pas rendu sur un stream absent.
+    castersByMatch = castersOnReadStreams(streamsByMatch, castersByMatch);
   }
   return { streamsByMatch, castersByMatch };
+}
+
+/** Les casters dont le stream figure dans la lecture des streams, les autres écartés. */
+export function castersOnReadStreams<C extends { streamId: number | null }>(
+  streams: ReadonlyMap<number, readonly { id: number }[]>,
+  casters: ReadonlyMap<number, readonly C[]>,
+): Map<number, C[]> {
+  const kept = new Map<number, C[]>();
+  for (const [matchId, list] of casters) {
+    const known = new Set((streams.get(matchId) ?? []).map((stream) => stream.id));
+    const shown = list.filter((caster) => caster.streamId === null || known.has(caster.streamId));
+    if (shown.length > 0) kept.set(matchId, shown);
+  }
+  return kept;
 }
 
 /**

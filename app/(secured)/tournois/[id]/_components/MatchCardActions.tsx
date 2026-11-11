@@ -819,8 +819,8 @@ export function MatchCardActions({
           matchLabel={matchLabel}
           onClose={() => setSettingsOpen(false)}
           onSaved={() => window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT))}
-          onReleased={() => {
-            releasedRef.current = true;
+          onReleasing={(pending) => {
+            releasedRef.current = pending;
           }}
         />
       )}

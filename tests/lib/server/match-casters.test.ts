@@ -124,14 +124,10 @@ type WorldState = { streams: WorldStream[]; casters: WorldCaster[]; matches: Wor
 /** La lecture de départ de `withdrawUserCasts` (une `UNION ALL`), et le verrou de ses matchs. */
 function readWithdrawRows(state: WorldState, sql: string, params: unknown[]): unknown[] | null {
   const userId = params[0];
-  if (sql.startsWith("SELECT 'C' AS kind, c.match_id FROM bg_match_casters c JOIN bg_matches cm")) {
-    const includeCompleted = params[1] === 1;
-    const statusOf = (id: number) => state.matches.find((m) => m.id === id)?.status;
+  if (sql.startsWith("SELECT 'C' AS kind, match_id FROM bg_match_casters WHERE user_id = ?")) {
     return [
       [
-        ...state.casters
-          .filter((c) => c.user_id === userId && (includeCompleted || statusOf(matchOf(c)) !== "COMPLETED"))
-          .map((c) => ({ kind: "C", match_id: matchOf(c) })),
+        ...state.casters.filter((c) => c.user_id === userId).map((c) => ({ kind: "C", match_id: matchOf(c) })),
         ...state.streams.filter((s) => s.link_user_id === userId).map((s) => ({ kind: "L", match_id: matchOf(s) })),
         ...state.matches.filter((m) => m.referee_user_id === userId).map((m) => ({ kind: "R", match_id: m.id })),
         ...state.matches.filter((m) => m.live_trigger_user_id === userId).map((m) => ({ kind: "T", match_id: m.id })),
@@ -374,12 +370,39 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
     expect(w.sqls()).toContain("UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL");
   });
 
-  it("withdrawUserCasts_anonymisation_doesNotLockCompletedCastOnly", async () => {
-    // Un cast gardé sur un match joué n'est pas candidat : rien à verrouiller.
+  it("withdrawUserCasts_anonymisation_judgesCompletedUnderLock", async () => {
+    // Tous ses casts sont candidats : l'état du match se juge sous son verrou,
+    // jamais d'après la lecture de départ (un match rouvert entre-temps).
     const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }], true);
     await withdrawUserCasts(w.connection, 12, false);
-    expect(w.state.locked).toEqual([]);
-    expect(w.execute.mock.calls[0][1]).toEqual([12, 0, 12, 12, 12]);
+    expect(w.state.locked).toEqual([[42]]);
+    expect(w.execute.mock.calls[0][1]).toEqual([12, 12, 12, 12]);
+  });
+
+  it("withdrawUserCasts_anonymisation_reopenedMatchLosesCaster", async () => {
+    // Joué à la lecture de départ, rouvert (score annulé) avant le verrou :
+    // le cast part quand même, jugé sur l'état lu sous verrou.
+    const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }], true);
+    const execute = w.execute.getMockImplementation()!;
+    w.execute.mockImplementation(async (sql, params) => {
+      if (flat(sql).startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
+        for (const m of w.state.matches) m.status = "READY";
+      }
+      return execute(sql, params);
+    });
+    await withdrawUserCasts(w.connection, 12, false);
+    expect(w.state.casters).toEqual([]);
+  });
+
+  it("withdrawUserCasts_anonymisation_clearsBattletagAfterMatchLocks", async () => {
+    // Ordre des verrous : la ligne du match d'abord, les lignes de caster ensuite.
+    const w = world([{ id: 4, live_url: null }], [{ user_id: 12, stream_id: 4 }], true);
+    await withdrawUserCasts(w.connection, 12, false);
+    const order = w.sqls();
+    const lock = order.findIndex((sql) => sql.startsWith("SELECT id, tournament_id, status FROM bg_matches"));
+    const clear = order.indexOf("UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL");
+    expect(lock).toBeGreaterThanOrEqual(0);
+    expect(clear).toBeGreaterThan(lock);
   });
 
   it("withdrawUserCasts_startLists_readInOneStatement", async () => {
@@ -387,7 +410,7 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
     await withdrawUserCasts(w.connection, 12, true);
     const first = w.sqls()[0];
     for (const kind of ["'C'", "'L'", "'R'", "'T'"]) expect(first).toContain(`${kind} AS kind`);
-    expect(w.execute.mock.calls[0][1]).toEqual([12, 1, 12, 12, 12]);
+    expect(w.execute.mock.calls[0][1]).toEqual([12, 12, 12, 12]);
   });
 
   it("effacement : le cast d'un match joué part aussi", async () => {

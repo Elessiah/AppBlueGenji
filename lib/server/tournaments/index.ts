@@ -174,6 +174,7 @@ import { reportMatchScore, type ProposalConfirmation } from "./scoring";
 import { loadFreshMatchProposals, loadViewerProposals, proposalMatches } from "./match-maps";
 import type { MatchMapInput } from "@/lib/shared/match-maps";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
+import { invalidateLandingLive } from "@/lib/server/landing-cache";
 import { retryOnDeadlock } from "./deadlock-retry";
 import type { AdminResolveEntry, AdminScoreEntry, AutoValidationPause } from "./admin";
 import {
@@ -263,6 +264,7 @@ export async function syncVisibleTournaments(): Promise<void> {
     const connection = await db.getConnection();
     const changedIds: number[] = [];
     const launchIds: number[] = [];
+    let landingLiveStale = false;
 
     try {
       // Hors transaction : c'est une lecture de repérage, et l'ouvrir dans une
@@ -283,7 +285,12 @@ export async function syncVisibleTournaments(): Promise<void> {
           // mais c'est bien ce que les spectateurs attendent de voir. La
           // publication reste **après le commit** — c'est tout l'objet de ce
           // retour plutôt qu'un événement publié depuis le fond du moteur.
-          if (stateChanged || contentChanged) changedIds.push(tournamentId);
+          if (stateChanged || contentChanged) {
+            changedIds.push(tournamentId);
+            // `publishUpdatedEvent` ne vide pas le direct de l'accueil : un
+            // lancement ou un caster retiré dans la même passe le change.
+            if (launchesChanged) landingLiveStale = true;
+          }
           // Un lancement ne concerne que le plateau de ce tournoi : ni la liste,
           // ni la vitrine, ni le classement n'ont à être vidés pour lui.
           else if (launchesChanged) launchIds.push(tournamentId);
@@ -300,6 +307,7 @@ export async function syncVisibleTournaments(): Promise<void> {
     for (const id of changedIds) {
       publishUpdatedEvent(id);
     }
+    if (landingLiveStale) invalidateLandingLive();
     for (const id of launchIds) {
       publishMatchUpdatedEvent(id, { landingLive: true });
     }

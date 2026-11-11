@@ -21,6 +21,7 @@ import enModal from "@/messages/en/launchModal.json";
 import { LAUNCH_ERROR_MESSAGES } from "@/lib/shared/match-launch";
 import { closedMatchUnchanged, mayEditReplay, offersCasterLinks, matchLiveBody, ownRefusalKey, refusalHasField, saveBlockedReason, streamedBoxReason } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
 import { readSource } from "../helpers/read-source";
+import { castIdentityBlock, castSettable } from "@/app/(secured)/tournois/[id]/_components/CastSettingsDialog";
 import frActions from "@/messages/fr/tournamentActions.json";
 import enActions from "@/messages/en/tournamentActions.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
@@ -225,7 +226,10 @@ describe("CastSettingsDialog — match joué, rien de changé, lecture", () => {
   });
 
   it("CastSettingsDialog_noLivePermission_hidesSettingsAndSaveShowsHint", () => {
-    expect(settings).toContain("const settable = controls.canManage;");
+    expect(settings).toContain("const settable = castSettable(controls);");
+    expect(castSettable({ canManage: true, castBlock: null })).toBe(true);
+    expect(castSettable({ canManage: false, castBlock: null })).toBe(false);
+    expect(castSettable({ canManage: true, castBlock: "CASTER_DISCORD_REQUIRED" })).toBe(false);
     expect(settings).toContain("{cast !== null && settable && (");
     expect(settings).toContain("{!played && settable && (");
     expect(settings).toContain('t("cardActions.castSettings.noLive")');
@@ -239,7 +243,31 @@ describe("CastSettingsDialog — match joué, rien de changé, lecture", () => {
   });
 
   it("CastSettingsDialog_triggerChanged_sendsSeenTrigger", () => {
-    expect(settings).toContain("settings.expectedTrigger = match.liveTrigger;");
+    // Le mode vu au premier choix, jamais celui que le flux a livré depuis.
+    expect(settings).toContain("settings.expectedTrigger = seenTrigger.current;");
+    expect(settings).toContain("if (pickedTrigger === null) seenTrigger.current = liveTrigger;");
+    expect(settings).toContain("onChange={pickTrigger}");
+    expect(settings).not.toContain("settings.expectedTrigger = match.liveTrigger;");
+  });
+
+  it("CastSettingsDialog_identityBlock_hidesSettingsAndExplainsWhy", () => {
+    // Identité de caster incomplète : réglages refusés par le serveur, seul le retrait reste.
+    expect(settings).toContain("const identityBlock = castIdentityBlock(controls.castBlock);");
+    expect(settings).toContain("<NotSettableHint titleId={titleId} identityBlock={identityBlock} identityText={fail} />");
+    expect(settings).toContain("<p>{identityText(identityBlock)}</p>");
+    expect(castIdentityBlock(null)).toBeNull();
+    expect(castIdentityBlock("NOT_CASTER")).toBeNull();
+    expect(castIdentityBlock("CASTER_IDENTITY_REQUIRED")).toBe("CASTER_IDENTITY_REQUIRED");
+    expect(castIdentityBlock("CASTER_DISCORD_REQUIRED")).toBe("CASTER_DISCORD_REQUIRED");
+  });
+
+  it("castSettingsTexts_identityTitle_presentInFrAndEn", () => {
+    expect(frActions.cardActions.castSettings.identityTitle).toBe("Identité de caster incomplète");
+    expect(enActions.cardActions.castSettings.identityTitle).toBe("Caster identity incomplete");
+    for (const code of ["CASTER_IDENTITY_REQUIRED", "CASTER_DISCORD_REQUIRED"] as const) {
+      expect(frModal.errors[code]).toBeTruthy();
+      expect(enModal.errors[code]).toBeTruthy();
+    }
   });
 
   it("castErrors_liveTriggerChanged_presentFrEn", () => {

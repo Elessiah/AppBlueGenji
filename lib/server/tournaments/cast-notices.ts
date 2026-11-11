@@ -24,9 +24,8 @@ import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import type { BotLogCategory } from "@/lib/shared/bot-log-category";
 import { formatCastChangeLog, type CastLogChange } from "@/lib/shared/bot-logs";
-import type { CastReleaseReason, CastReleasedMatch } from "@/lib/shared/cast-notices";
+import { castReleasedHref, type CastReleaseReason, type CastReleasedMatch } from "@/lib/shared/cast-notices";
 import type { CastBlock } from "@/lib/shared/match-launch";
-import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import { isPlayedMatchStatus } from "@/lib/shared/match-schedule";
 import { nullableId } from "@/lib/shared/nullable-id";
 import { castReleasedPush } from "@/lib/shared/push-messages";
@@ -172,7 +171,7 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
     reason: notice.reason,
     block: notice.block,
   };
-  const url = `${siteCanonicalBase()}${tournamentMatchHref(subject.tournamentId, subject.matchId)}`;
+  const url = `${siteCanonicalBase()}${castReleasedHref(subject)}`;
   await notifyUsers(recipients, {
     topic: "CAST_RELEASED",
     discord: { message: (locale) => formatCastReleasedNotice(subject, url, locale), context: "cast-released" },

@@ -389,11 +389,14 @@ describe("MatchCardActions — branchements du cast", () => {
     expect(card).toMatch(/\} catch \(error\) \{\s+claimedRef\.current = false;/);
   });
 
-  it("CastSettingsDialog_release_raisesOnReleasedBeforeRefresh", () => {
-    // Retiré depuis sa fenêtre, « Configurer ma diffusion » disparaît : le focus va à « Caster », revenu.
+  it("CastSettingsDialog_release_flagRaisedBeforeDeleteAndLoweredOnRefusal", () => {
+    // Comme l'inscription : l'instantané du flux peut rendre « Caster » avant
+    // la réponse du DELETE, le drapeau est donc levé avant l'envoi.
     const settings = readSource("app/(secured)/tournois/[id]/_components/CastSettingsDialog.tsx");
-    expect(settings).toMatch(/showSuccess\(t\("cardActions\.notCasting"\)\);\s+onReleased\?\.\(\);\s+onSaved\(\);/);
-    expect(card).toContain("releasedRef.current = true;");
+    expect(settings).toMatch(/onReleasing\?\.\(true\);\s+try \{\s+await requestJson\(`\/api\/matches\/\$\{match\.id\}\/caster`, \{ method: "DELETE" \}/);
+    expect(settings).toMatch(/\} catch \(error\) \{\s+onReleasing\?\.\(false\);/);
+    expect(card).toContain("releasedRef.current = pending;");
+    expect(settings).not.toContain("onReleased?.()");
   });
 
   it("le staff choisit le caster retiré, désigné par ?userId= ; le caster se retire depuis sa fenêtre", () => {

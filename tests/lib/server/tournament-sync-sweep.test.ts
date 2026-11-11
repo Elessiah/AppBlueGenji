@@ -39,15 +39,25 @@ async function runSweep(options: {
   published: { tournamentId: number; commits: number }[];
   /** Publications « match seul » (lancements), mêmes conventions. */
   matchPublished: { tournamentId: number; commits: number }[];
+  /** Vidages du direct de l'accueil (`invalidateLandingLive`) faits par la passe elle-même. */
+  landingLiveInvalidations: number;
 }> {
   const synced: number[] = [];
   const published: { tournamentId: number; commits: number }[] = [];
   const matchPublished: { tournamentId: number; commits: number }[] = [];
   let connection!: Connection;
+  let landingLiveInvalidations = 0;
 
   await jest.isolateModulesAsync(async () => {
     jest.doMock("@/lib/server/tournaments/sync-scope", () => ({
       findTournamentsNeedingSync: jest.fn(async () => options.candidates),
+    }));
+
+    jest.doMock("@/lib/server/landing-cache", () => ({
+      ...jest.requireActual<typeof import("@/lib/server/landing-cache")>("@/lib/server/landing-cache"),
+      invalidateLandingLive: jest.fn(() => {
+        landingLiveInvalidations += 1;
+      }),
     }));
 
     jest.doMock("@/lib/server/tournaments/notifications", () => ({
@@ -97,7 +107,7 @@ async function runSweep(options: {
     await syncVisibleTournaments();
   });
 
-  return { connection, synced, published, matchPublished };
+  return { connection, synced, published, matchPublished, landingLiveInvalidations };
 }
 
 beforeEach(() => {
@@ -187,6 +197,18 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
     // La mise à jour complète vide déjà l'instantané et réveille la salle.
     expect(published).toEqual([{ tournamentId: 4, commits: 1 }]);
     expect(matchPublished).toEqual([]);
+  });
+
+  it("syncVisibleTournaments_stateAndLaunchChanged_invalidatesLandingLive", async () => {
+    // `publishUpdatedEvent` ne vide pas le direct de l'accueil : un caster
+    // retiré ou un lancement d'office dans la même passe doit s'y voir.
+    const { landingLiveInvalidations } = await runSweep({ candidates: [4], changed: [4], launchesChanged: [4] });
+    expect(landingLiveInvalidations).toBe(1);
+  });
+
+  it("syncVisibleTournaments_stateChangedOnly_leavesLandingLive", async () => {
+    const { landingLiveInvalidations } = await runSweep({ candidates: [4], changed: [4] });
+    expect(landingLiveInvalidations).toBe(0);
   });
 
   it("ne publie pas le lancement d'un tournoi dont la transaction a échoué", async () => {

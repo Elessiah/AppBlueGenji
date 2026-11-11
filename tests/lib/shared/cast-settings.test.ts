@@ -8,6 +8,7 @@ import {
   parseCastBattletagInput,
 } from "@/lib/shared/cast-settings";
 import type { MatchStatus } from "@/lib/shared/types";
+import { castReleasedHref } from "@/lib/shared/cast-notices";
 
 /**
  * Règles pures des réglages du cast (`docs/features/CAST_SETTINGS.md`) : le
@@ -115,5 +116,15 @@ describe("offersCastRelease", () => {
     expect(offersCastRelease({ status: "READY" })).toBe(true);
     expect(offersCastRelease({ status: "AWAITING_CONFIRMATION" })).toBe(true);
     expect(offersCastRelease({ status: "COMPLETED" })).toBe(false);
+  });
+});
+
+describe("castReleasedHref — lien d'un avis de retrait", () => {
+  it("castReleasedHref_staffRelease_anchorsOnMatch", () => {
+    expect(castReleasedHref({ tournamentId: 7, matchId: 42, reason: "STAFF" })).toBe("/tournois/7#match-42");
+  });
+
+  it("castReleasedHref_matchDeleted_linksTournamentOnly", () => {
+    expect(castReleasedHref({ tournamentId: 7, matchId: 42, reason: "MATCH_DELETED" })).toBe("/tournois/7");
   });
 });

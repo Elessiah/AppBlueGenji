@@ -129,6 +129,38 @@ export function liveAnnouncementUrl(matchUrl: unknown, tournamentUrl: unknown): 
 }
 
 /**
+ * Séparateur des liens candidats d'un match (`streamUrlCandidatesSql`) : une
+ * espace, qu'aucun lien enregistré ne porte (normalisé à l'écriture,
+ * `parseStreamUrlInput`).
+ */
+export const STREAM_URL_CANDIDATES_SEPARATOR = " ";
+
+/**
+ * Longueur à laquelle MySQL et MariaDB coupent **sans le dire** un
+ * `GROUP_CONCAT` (`group_concat_max_len`, 1024 octets par défaut). Une liste
+ * qui l'atteint a peut-être un dernier lien tronqué : il est écarté.
+ */
+export const GROUP_CONCAT_DEFAULT_MAX_LEN = 1024;
+
+/**
+ * Le premier des liens candidats d'un match (`streamUrlCandidatesSql`, staff
+ * d'abord) qu'une annonce accepte (`liveAnnouncementUrl`), ou `null` : un lien
+ * refusé (page de redirection) laisse sa place au suivant. Une liste coupée
+ * par la base perd son dernier lien, peut-être tronqué
+ * ({@link GROUP_CONCAT_DEFAULT_MAX_LEN}).
+ */
+export function firstAnnounceableUrl(candidates: string | null | undefined): string | null {
+  if (typeof candidates !== "string" || candidates === "") return null;
+  const parts = candidates.split(STREAM_URL_CANDIDATES_SEPARATOR);
+  if (new TextEncoder().encode(candidates).length >= GROUP_CONCAT_DEFAULT_MAX_LEN) parts.pop();
+  for (const candidate of parts) {
+    const url = liveAnnouncementUrl(candidate, null);
+    if (url !== null) return url;
+  }
+  return null;
+}
+
+/**
  * Pages de redirection des plateformes de la liste blanche : un lien
  * `youtube.com/redirect?q=https://piege.example` porte l'hôte de YouTube mais
  * mène ailleurs.

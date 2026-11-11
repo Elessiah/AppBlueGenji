@@ -57,11 +57,12 @@ import { siteBaseUrl } from "@/lib/server/site-url";
 import { isBotCircuitOpen, pushLiveEvening, type LiveAnnouncementOutcome } from "@/lib/server/bot-integration";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { toIso } from "@/lib/server/serialization";
-import { firstStreamUrlSql } from "./match-casters";
+import { streamUrlCandidatesSql } from "./match-casters";
 import { PAIRING_SQL } from "./new-match-sql";
 import {
   formatLiveEvening,
   LIVE_EVENING_WINDOW_HOURS,
+  firstAnnounceableUrl,
   liveAnnouncementUrl,
   liveMentionTarget,
   type LiveEveningStream,
@@ -83,6 +84,7 @@ type LiveCandidateRow = RowDataPacket & {
   start_at: Date | string | null;
   live_trigger: MatchLiveTrigger;
   live_started_at: Date | string | null;
+  /** Liens candidats du match (`streamUrlCandidatesSql`) : le premier accepté sert (`firstAnnounceableUrl`). */
   live_url: string | null;
   launched_at: Date | string | null;
   pairing: string;
@@ -275,7 +277,7 @@ async function selectMatches(
   const [rows] = await db.query<LiveCandidateRow[]>(
     `SELECT m.id, m.tournament_id, t.name AS tournament_name, t.participant_type,
             t.live_url AS tournament_live_url, m.status, m.start_at, m.live_trigger,
-            m.live_started_at, ${firstStreamUrlSql("m")} AS live_url, m.launched_at, m.launch_pairing,
+            m.live_started_at, ${streamUrlCandidatesSql("m")} AS live_url, m.launched_at, m.launch_pairing,
             CONCAT(m.team1_id, ':', m.team2_id) AS pairing,
             t1.name AS team1_name, t2.name AS team2_name,
             t1.solo_user_id AS team1_solo_user_id, t2.solo_user_id AS team2_solo_user_id,
@@ -763,7 +765,7 @@ function eveningStreams(
   for (const row of [...group.rows, ...others]) {
     const id = Number(row.id);
     if (seen.has(id)) continue;
-    const url = liveAnnouncementUrl(row.live_url, row.tournament_live_url);
+    const url = liveAnnouncementUrl(firstAnnounceableUrl(row.live_url), row.tournament_live_url);
     if (!url || liveMentionTarget(url) !== group.target) continue;
     seen.add(id);
     const live = isOnAir(row, now);
@@ -1240,7 +1242,7 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
   for (const row of rows) {
     if (!isOnAir(row, now)) continue;
     // Pas de lien exploitable, pas d'annonce : il n'y aurait rien à regarder.
-    const url = liveAnnouncementUrl(row.live_url, row.tournament_live_url);
+    const url = liveAnnouncementUrl(firstAnnounceableUrl(row.live_url), row.tournament_live_url);
     if (!url) {
       warnOnce(
         `no-link ${Number(row.id)}`,

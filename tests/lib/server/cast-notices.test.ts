@@ -611,6 +611,19 @@ describe("match supprimé — l'inscription part avec lui", () => {
     expect(resolvePush(sent.push, "en").body).toContain("the match was deleted");
   });
 
+  it("deliverCastChange_matchDeleted_linksTournamentNotDeletedMatch", async () => {
+    mockMatch(null);
+
+    await deliverCastChange({ kind: "MATCH_DELETED", matchId: 42, casterId: CASTER, subject: deletedSubject() });
+
+    // Une ancre vers un match effacé ne mènerait nulle part : le tournoi seul.
+    const sent = notification();
+    expect(sent.discord?.message("fr")).toContain("https://site.test/tournois/7");
+    expect(sent.discord?.message("fr")).not.toContain("#match-");
+    expect(resolvePush(sent.push, "fr").url).toBe("/tournois/7");
+    expect(resolvePush(sent.push, "en").url).toBe("/en/tournois/7");
+  });
+
   it("queueDeletedMatchCasts_openMatchWithTwoCasters_queuesOneChangeEach", async () => {
     mockMatch(null);
     const { execute, connection } = deletingConnection([

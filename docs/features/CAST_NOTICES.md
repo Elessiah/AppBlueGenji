@@ -18,7 +18,7 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
 | Le staff la retire (`tournaments`, pas le caster lui-même) | « 🎙️ Cast retiré », par le staff | motif `STAFF` |
 | Retrait d'office : conditions du cast plus remplies | « 🎙️ Cast retiré d'office » | motif `INELIGIBLE` |
 | Retrait d'office : il joue le match (son équipe, ou son entrée solo) | « 🎙️ Cast retiré d'office » | motif `JOINED_TEAM` |
-| Match à jouer supprimé (retour arrière, manche régénérée, plateau refait) | « 🎙️ Cast retiré » (trace `casts`) | motif `MATCH_DELETED` |
+| Match à jouer supprimé (retour arrière, manche régénérée, plateau refait) | « 🎙️ Cast retiré » (trace `casts`) | motif `MATCH_DELETED` ; le lien de l'avis mène au tournoi, sans ancre vers le match effacé (`castReleasedHref`) |
 
 - Une inscription rejouée (déjà titulaire) ou refusée ne s'annonce pas ; un
   retrait sur un match sans caster non plus.

@@ -84,8 +84,8 @@ import {
 } from "@/lib/shared/round-maps";
 import { roundAllowsTiebreak, tiebreakTournamentFromRow } from "@/lib/shared/round-plan";
 import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
-import { STREAM_URL_CANDIDATES_SEPARATOR, streamUrlCandidatesSql } from "./match-casters";
-import { liveAnnouncementUrl } from "@/lib/shared/live-announcements";
+import { streamUrlCandidatesSql } from "./match-casters";
+import { firstAnnounceableUrl } from "@/lib/shared/live-announcements";
 import { formatLobbyBriefDm } from "./lobby-brief-dm";
 import { seedJoins } from "./match-host-seeds";
 import { readMatchCasters } from "./player-pushes";
@@ -904,13 +904,4 @@ export function resetLobbyBriefThrottle(): void {
   sweeps.reset();
   retries.clear();
   NO_MANAGER_LOGGED.clear();
-}
-
-/** Le premier des liens candidats (`streamUrlCandidatesSql`) qu'une annonce accepte, ou `null`. */
-export function firstAnnounceableUrl(candidates: string | null): string | null {
-  for (const candidate of (candidates ?? "").split(STREAM_URL_CANDIDATES_SEPARATOR)) {
-    const url = liveAnnouncementUrl(candidate, null);
-    if (url !== null) return url;
-  }
-  return null;
 }

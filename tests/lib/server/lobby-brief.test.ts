@@ -27,11 +27,11 @@ import { loadEntrantManagerIds, loadNotificationRecipients, notifyUsers } from "
 import { readMatchCasters } from "@/lib/server/tournaments/player-pushes";
 import {
   dispatchLobbyBriefs,
-  firstAnnounceableUrl,
   LOBBY_BRIEF_PHASE,
   resetLobbyBriefThrottle,
 } from "@/lib/server/tournaments/lobby-brief";
 import { formatLobbyBriefDm } from "@/lib/server/tournaments/lobby-brief-dm";
+import { firstAnnounceableUrl } from "@/lib/shared/live-announcements";
 import { renderDm } from "@/lib/shared/dm-language";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { resolvePush } from "../../helpers/push";
@@ -309,6 +309,33 @@ describe("dispatchLobbyBriefs", () => {
 
   it("firstAnnounceableUrl_null_returnsNull", () => {
     expect(firstAnnounceableUrl(null)).toBeNull();
+  });
+
+  it("firstAnnounceableUrl_listJustUnderGroupConcatLimit_keepsLastCandidate", () => {
+    const valid = "https://www.twitch.tv/voix";
+    const refused = `https://www.youtube.com/redirect?q=${"a".repeat(1023 - valid.length - 1 - 35)}`;
+    const list = `${refused} ${valid}`;
+    expect(list).toHaveLength(1023);
+    expect(firstAnnounceableUrl(list)).toBe(valid);
+  });
+
+  it("firstAnnounceableUrl_undefined_returnsNull", () => {
+    expect(firstAnnounceableUrl(undefined)).toBeNull();
+  });
+
+  it("firstAnnounceableUrl_allRefused_returnsNull", () => {
+    expect(firstAnnounceableUrl("https://www.youtube.com/redirect?q=https://phish.example")).toBeNull();
+    expect(firstAnnounceableUrl("")).toBeNull();
+  });
+
+  it("firstAnnounceableUrl_listCutByGroupConcat_dropsPossiblyTruncatedLast", () => {
+    // 1024 octets atteints : la base a pu couper le dernier lien en plein milieu.
+    const refused = `https://www.youtube.com/redirect?q=${"a".repeat(990)}`;
+    const cut = `${refused} https://www.twitch.tv/tronq`;
+    expect(new TextEncoder().encode(cut).length).toBeGreaterThanOrEqual(1024);
+    expect(firstAnnounceableUrl(cut)).toBeNull();
+    // Sous la limite, le dernier lien sert.
+    expect(firstAnnounceableUrl("https://www.youtube.com/redirect?q=x https://www.twitch.tv/voix")).toBe("https://www.twitch.tv/voix");
   });
 
   it("dispatchLobbyBriefs_plainStreamUrl_streamKeptInBrief", async () => {

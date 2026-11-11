@@ -105,7 +105,7 @@ function fakeDb(
       execute: jest.fn(async (sql: string, params: unknown[] = []) => {
         const q = sql.replace(/\s+/g, " ").trim();
         const refereed = current === null ? [] : accounts[current]?.refereed ?? [];
-        if (q.startsWith("SELECT 'C' AS kind, c.match_id FROM bg_match_casters")) {
+        if (q.startsWith("SELECT 'C' AS kind, match_id FROM bg_match_casters")) {
           return [refereed.map((match) => ({ kind: "R", match_id: match.matchId }))];
         }
         if (q.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {

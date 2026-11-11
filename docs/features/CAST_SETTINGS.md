@@ -85,6 +85,11 @@ Fenêtre du caster, sur **son** cast :
   tout réglage serait refusé (`NOT_CASTER`) ; la fenêtre ne montre que le retrait,
   avec une aide « Permission de diffusion retirée », et n'est offerte que sur un
   match pas encore joué (`offersCastSettings`).
+- **Identité de caster incomplète** (tag Discord décertifié, Battle.net délié
+  en Overwatch — `castBlock`) : même chose, refus `CASTER_*_REQUIRED` ; l'aide
+  « Identité de caster incomplète » dit la condition qui manque.
+- Le drapeau de focus du retrait se lève **avant** le `DELETE` (`onReleasing`),
+  comme celui de l'inscription : le flux peut rendre « Caster » avant la réponse.
 
 La fenêtre lit à l'ouverture `GET /api/matches/[id]/caster`
 (`loadOwnCastSettings`) : le BattleTag d'un cast **ne voyage pas** dans
@@ -142,7 +147,7 @@ cette fenêtre et à celle du staff.
 | --- | --- | --- |
 | `GET …/caster` | caster inscrit | — → `{ streamId, liveUrl, staffStream, battletag }` |
 | `POST …/caster` | permission `live` | `{ streamId }` ou `{ liveUrl }` (obligatoire), plus `trigger`, `battletag` |
-| `PUT …/caster` | caster inscrit | `trigger` (avec `expectedTrigger`, le mode que la fenêtre affichait : changé entre-temps → 409 `LIVE_TRIGGER_CHANGED`, rien n'est écrit), `liveUrl`, `battletag` — **chaque champ absent n'est pas touché** |
+| `PUT …/caster` | caster inscrit | `trigger` (avec `expectedTrigger`, le mode que la fenêtre affichait au **premier choix** du caster — un changement reçu ensuite par le flux ne passe pas pour vu : changé entre-temps → 409 `LIVE_TRIGGER_CHANGED`, rien n'est écrit), `liveUrl`, `battletag` — **chaque champ absent n'est pas touché** |
 | `DELETE …/caster` | le caster, ou `tournaments` pour un autre | `?userId=` |
 
 Un corps qui dit `organisationLink: true` (quel que soit le lecteur) : 403

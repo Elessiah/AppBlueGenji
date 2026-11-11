@@ -410,6 +410,7 @@
       "triggerLockedHint": "Seuls le caster qui le tient, l'arbitre du match ou le staff (arbitrage et diffusion) le changent ou le retirent — les casters du match aussi le changent quand aucun caster ne le tient, sauf si le match porte le lien de l'organisation.",
       "loading": "Lecture de ton cast…",
       "played": "Le match est joué : lien et BattleTag de ce cast ne se changent plus.",
+      "identityTitle": "Identité de caster incomplète",
       "noLiveTitle": "Permission de diffusion retirée",
       "noLive": "Sans la permission de diffusion, ce cast ne se règle plus : il ne reste qu'à te retirer du match."
     }

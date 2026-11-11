@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useId, useState } from "react";
+import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
@@ -12,6 +12,7 @@ import { canEditReplay } from "@/lib/shared/match-replay";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
 import type { BracketMatch } from "@/lib/shared/types";
+import type { CastBlock } from "@/lib/shared/match-launch";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
 import { useLiveControls } from "../_lib/live-context";
@@ -69,15 +70,19 @@ export function CastSettingsDialog({
   matchLabel,
   onClose,
   onSaved,
-  onReleased,
+  onReleasing,
 }: Readonly<{
   match: BracketMatch;
   matchLabel: string;
   onClose: () => void;
   /** Un réglage enregistré : la page relit le match (et la modale de lancement). */
   onSaved: () => void;
-  /** Retrait abouti : la carte rendra le focus à « Caster », qui revient. */
-  onReleased?: () => void;
+  /**
+   * Retrait : `true` **avant** l'envoi (l'instantané du flux peut rendre
+   * « Caster » avant la réponse, la carte y remet alors le focus), `false` s'il
+   * est refusé.
+   */
+  onReleasing?: (pending: boolean) => void;
 }>) {
   const actionText = useActionsText();
   const { t } = actionText;
@@ -102,6 +107,7 @@ export function CastSettingsDialog({
   // « automatique » sans que l'enregistrement d'un BattleTag le marque casté.
   const [pickedTrigger, setTrigger] = useState<MatchLiveTrigger | null>(null);
   const trigger: MatchLiveTrigger = pickedTrigger ?? match.liveTrigger ?? "AUTO";
+  const { seenTrigger, pickTrigger } = useSeenTrigger(match.liveTrigger, pickedTrigger, setTrigger);
   const [busy, setBusy] = useState(false);
   const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId, battletag: battletagId });
   const fail = (code: string | null | undefined) => launchErrorText(actionText, errorsText, code);
@@ -138,9 +144,12 @@ export function CastSettingsDialog({
   // Un match joué ne prend plus ni lien ni BattleTag (`MATCH_CAST_CLOSED`) :
   // la fenêtre ne garde que la rediff et le retrait.
   const played = match.status === "COMPLETED";
-  // Sans la permission `live`, le serveur refuse tout réglage (`NOT_CASTER`) :
-  // la fenêtre ne garde que le retrait, seule voie qui aboutisse encore.
-  const settable = controls.canManage;
+  // Sans la permission `live`, ou sans l'identité de caster (tag Discord
+  // certifié, Battle.net en Overwatch), le serveur refuse tout réglage
+  // (`NOT_CASTER`, `CASTER_*_REQUIRED`) : la fenêtre ne garde que le retrait,
+  // seule voie qui aboutisse encore.
+  const identityBlock = castIdentityBlock(controls.castBlock);
+  const settable = castSettable(controls);
   const streamEditable = cast !== null && !cast.staffStream && !played;
   const urlRefused = streamEditable && castUrlInvalid(url);
   const urlChanged = cast !== null && url.trim() !== (cast.liveUrl ?? "");
@@ -179,7 +188,7 @@ export function CastSettingsDialog({
       // refuse (`LIVE_TRIGGER_CHANGED`) plutôt que d'écraser ce qu'il ignore.
       if (triggerChanged) {
         settings.trigger = pickedTrigger;
-        settings.expectedTrigger = match.liveTrigger;
+        settings.expectedTrigger = seenTrigger.current;
       }
       if (streamEditable && urlChanged) {
         settings.liveUrl = url.trim() === "" ? null : url.trim();
@@ -206,14 +215,15 @@ export function CastSettingsDialog({
   // Rend `true` s'il a abouti : la confirmation et la fenêtre se ferment.
   const release = async (): Promise<boolean> => {
     setBusy(true);
+    onReleasing?.(true);
     try {
       await requestJson(`/api/matches/${match.id}/caster`, { method: "DELETE" }, "MATCH_CAST_RELEASE_FAILED");
       showSuccess(t("cardActions.notCasting"));
-      onReleased?.();
       onSaved();
       onClose();
       return true;
     } catch (error) {
+      onReleasing?.(false);
       showError(fail((error as Error).message));
       return false;
     } finally {
@@ -245,12 +255,7 @@ export function CastSettingsDialog({
         )}
 
         {cast !== null && !settable && (
-          <InfoHintRow inline>
-            <p className={styles.subtitle}>{t("cardActions.castSettings.noLiveTitle")}</p>
-            <InfoHint id={`${titleId}-no-live`} subject={t("cardActions.castSettings.noLiveTitle")}>
-              <p>{t("cardActions.castSettings.noLive")}</p>
-            </InfoHint>
-          </InfoHintRow>
+          <NotSettableHint titleId={titleId} identityBlock={identityBlock} identityText={fail} />
         )}
 
         {cast !== null && settable && (
@@ -276,7 +281,7 @@ export function CastSettingsDialog({
                 // Match démarqué : aucun mode coché, chaque choix se clique.
                 trigger={triggerLocked ? lockedTrigger(true, match.liveTrigger, trigger) : (pickedTrigger ?? match.liveTrigger)}
                 startAt={match.startAt}
-                onChange={setTrigger}
+                onChange={pickTrigger}
                 locked={triggerLocked}
               />
             )}
@@ -377,5 +382,68 @@ export function CastSettingsDialog({
         </ConfirmActionDialog>
       )}
     </TournamentDialogFrame>
+  );
+}
+
+/**
+ * Le mode du match tel que le caster le voyait à son **premier** choix : c'est
+ * lui qui part comme `expectedTrigger`. Un changement du staff reçu ensuite par
+ * le flux ne passe pas pour « vu » — le serveur refuse alors
+ * (`LIVE_TRIGGER_CHANGED`) au lieu de l'écraser.
+ */
+function useSeenTrigger(
+  liveTrigger: MatchLiveTrigger | null,
+  pickedTrigger: MatchLiveTrigger | null,
+  setTrigger: (next: MatchLiveTrigger) => void,
+) {
+  const seenTrigger = useRef<MatchLiveTrigger | null>(liveTrigger);
+  const pickTrigger = (next: MatchLiveTrigger) => {
+    if (pickedTrigger === null) seenTrigger.current = liveTrigger;
+    setTrigger(next);
+  };
+  return { seenTrigger, pickTrigger };
+}
+
+/** Les réglages du cast aboutiraient-ils : permission `live` et identité de caster complète. */
+export function castSettable(controls: Readonly<{ canManage: boolean; castBlock: CastBlock | null }>): boolean {
+  return controls.canManage && controls.castBlock === null;
+}
+
+/** Le refus d'identité (tag Discord, Battle.net) qui bloque les réglages, `null` sinon. */
+export function castIdentityBlock(block: CastBlock | null): Exclude<CastBlock, "NOT_CASTER"> | null {
+  return block === null || block === "NOT_CASTER" ? null : block;
+}
+
+/**
+ * Pourquoi la fenêtre ne garde que le retrait : permission de diffusion
+ * retirée, ou identité de caster incomplète (la condition qui manque).
+ */
+function NotSettableHint({
+  titleId,
+  identityBlock,
+  identityText,
+}: Readonly<{
+  titleId: string;
+  identityBlock: Exclude<CastBlock, "NOT_CASTER"> | null;
+  identityText: (code: string) => string;
+}>) {
+  const { t } = useActionsText();
+  if (identityBlock !== null) {
+    return (
+      <InfoHintRow inline>
+        <p className={styles.subtitle}>{t("cardActions.castSettings.identityTitle")}</p>
+        <InfoHint id={`${titleId}-identity`} subject={t("cardActions.castSettings.identityTitle")}>
+          <p>{identityText(identityBlock)}</p>
+        </InfoHint>
+      </InfoHintRow>
+    );
+  }
+  return (
+    <InfoHintRow inline>
+      <p className={styles.subtitle}>{t("cardActions.castSettings.noLiveTitle")}</p>
+      <InfoHint id={`${titleId}-no-live`} subject={t("cardActions.castSettings.noLiveTitle")}>
+        <p>{t("cardActions.castSettings.noLive")}</p>
+      </InfoHint>
+    </InfoHintRow>
   );
 }

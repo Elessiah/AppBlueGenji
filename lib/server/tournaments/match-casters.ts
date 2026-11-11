@@ -13,6 +13,7 @@
  */
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { LIVE_STAFF_SQL } from "@/lib/server/privacy-consent";
+import { STREAM_URL_CANDIDATES_SEPARATOR } from "@/lib/shared/live-announcements";
 import { staffStream } from "@/lib/shared/live-streams";
 import { verifiedBattletagSql } from "@/lib/server/battletag-origin";
 import type { CastEligibilityFields } from "./cast-eligibility";
@@ -55,16 +56,10 @@ export function firstStreamUrlSql(alias: string): string {
 }
 
 /**
- * Séparateur de {@link streamUrlCandidatesSql} : une espace, qu'aucun lien
- * enregistré ne porte (normalisé à l'écriture, `parseStreamUrlInput`).
- */
-export const STREAM_URL_CANDIDATES_SEPARATOR = " ";
-
-/**
  * Tous les liens publics du match, dans l'ordre de {@link firstStreamUrlSql}
  * (staff d'abord), joints par {@link STREAM_URL_CANDIDATES_SEPARATOR} : le
- * lecteur garde le premier qu'il accepte, plutôt que de n'avoir aucun lien
- * quand le premier est refusé (page de redirection).
+ * lecteur garde le premier qu'il accepte (`firstAnnounceableUrl`), plutôt que
+ * de n'avoir aucun lien quand le premier est refusé (page de redirection).
  */
 export function streamUrlCandidatesSql(alias: string): string {
   return `(SELECT GROUP_CONCAT(fs.live_url ORDER BY fs.staff_owned DESC, fs.id SEPARATOR '${STREAM_URL_CANDIDATES_SEPARATOR}')
@@ -456,15 +451,15 @@ export async function withdrawUserCasts(
   includeCompleted: boolean,
 ): Promise<MatchWithdrawal> {
   // Les quatre listes de départ en **une** lecture (`UNION ALL`, chaque table
-  // seule par l'index du compte). Un cast sur un match joué n'en est pas
-  // quand l'anonymisation le garde : rien à y verrouiller.
+  // seule par l'index du compte). Tous ses casts, quel que soit l'état du
+  // match : celui-ci se juge **sous verrou** (un match rouvert entre cette
+  // lecture et le verrou perd quand même son caster).
   const [startRows] = await connection.execute<(RowDataPacket & { kind: string; match_id: number })[]>(
-    `SELECT 'C' AS kind, c.match_id FROM bg_match_casters c JOIN bg_matches cm ON cm.id = c.match_id
-      WHERE c.user_id = ? AND (? = 1 OR cm.status <> 'COMPLETED')
+    `SELECT 'C' AS kind, match_id FROM bg_match_casters WHERE user_id = ?
      UNION ALL SELECT 'L' AS kind, match_id FROM bg_match_streams WHERE link_user_id = ?
      UNION ALL SELECT 'R' AS kind, id AS match_id FROM bg_matches WHERE referee_user_id = ?
      UNION ALL SELECT 'T' AS kind, id AS match_id FROM bg_matches WHERE live_trigger_user_id = ?`,
-    [userId, includeCompleted ? 1 : 0, userId, userId, userId],
+    [userId, userId, userId, userId],
   );
   const listOf = (kind: string) => new Set(startRows.filter((row) => row.kind === kind).map((row) => Number(row.match_id)));
   const casts = listOf("C");
@@ -473,15 +468,6 @@ export async function withdrawUserCasts(
   // Tous les matchs dont il tient le mode d'antenne, quel que soit leur état :
   // la référence à son compte part avec lui (effacement), verrouillés avec les autres.
   const triggered = listOf("T");
-  // Un cast gardé sur un match joué (anonymisation) ne garde pas son BattleTag
-  // de cast : il part avec le compte (`CAST_SETTINGS.md`). Sans condition tirée
-  // d'une lecture faite avant les verrous : un match joué entre-temps est couvert.
-  if (!includeCompleted) {
-    await connection.execute(
-      `UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL`,
-      [userId],
-    );
-  }
   const candidates = [...new Set([...casts, ...links, ...refereed, ...triggered])].sort((a, b) => a - b);
   if (candidates.length === 0) {
     return { matchIds: [], tournamentIds: [], liveTournamentIds: [], releasedRefereeMatchIds: [], releasedCastMatchIds: [] };
@@ -502,6 +488,16 @@ export async function withdrawUserCasts(
     await connection.execute(
       `DELETE FROM bg_match_casters WHERE user_id = ? AND match_id IN (${placeholders(castsToDrop)})`,
       [userId, ...castsToDrop],
+    );
+  }
+  // Un cast gardé sur un match joué (anonymisation) ne garde pas son BattleTag
+  // de cast : il part avec le compte (`CAST_SETTINGS.md`). Après les verrous
+  // des matchs (ordre match puis casters, comme partout) et sans condition
+  // tirée de la lecture de départ : un match joué entre-temps est couvert.
+  if (!includeCompleted) {
+    await connection.execute(
+      `UPDATE bg_match_casters SET cast_battletag = NULL WHERE user_id = ? AND cast_battletag IS NOT NULL`,
+      [userId],
     );
   }
   if (linksToDrop.length > 0) {
