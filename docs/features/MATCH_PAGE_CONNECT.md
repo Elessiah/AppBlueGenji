@@ -50,7 +50,9 @@ arbitre qui caste aussi le match suit la règle des casters : son tag **et
 son BattleTag** attendent le départ (`ctx.exposesCaster`, `refereeContactsOpen`). Un lecteur
 caster, **staff compris** (qui lit pourtant les contacts des équipes dès que
 les adversaires sont connus), ne lit les contacts de l'arbitre que le temps
-du match (`ctx.viewerRole`), comme le dit le texte de certification. Le texte de certification (`DISCORD_VERIFICATION_EXPOSURE`,
+du match (`ctx.viewerRole`), comme le dit le texte de certification. L'arbitre
+désigné qui caste aussi le match lit, lui, les contacts de ses **co-casters**
+dès que les adversaires sont connus (`casterContactsRole`, `MATCH_LAUNCH.md`). Le texte de certification (`DISCORD_VERIFICATION_EXPOSURE`,
 `verify.exposure.match` FR et EN) nomme ces lecteurs.
 `refereeDiscordTag` garde `isViewer`/`refereeContactsOpen` malgré la garde de la lecture
 d'une carte : défense en profondeur, voulue. `RefereeCard` dessine la ligne « Discord » avec « Copier » quand le champ est

@@ -612,7 +612,8 @@ export type MatchLaunchInfo = {
     canDeclareReady: boolean;
     /**
      * Le lecteur est-il l'arbitre désigné du match, quel que soit `role` (un
-     * arbitre qui caste aussi lit en `CASTER`) ? Son « Prêt » vaut pour les deux.
+     * arbitre qui caste aussi lit en `CASTER`, mais ses co-casters en arbitre
+     * désigné : `casterContactsRole`, serveur) ? Son « Prêt » vaut pour les deux.
      */
     isReferee: boolean;
     /**
@@ -687,7 +688,9 @@ export function readsContactsEarly(reader: { playsMatch: boolean; referee: boole
  * sont connus — rôle `REFEREE`, ou `MATCH_REFEREE` (l'arbitre désigné, qui les
  * lit comme les autres arbitres, comme le disent l'annonce et le registre T04) :
  * un arbitre qui joue le match lit en joueur (décision de l'utilisateur,
- * 2026-10-21). Jamais hors phase (`NONE` : match
+ * 2026-10-21) ; l'arbitre désigné qui caste aussi le match garde le rôle
+ * `CASTER` et le serveur rejoue cette règle pour lui en `MATCH_REFEREE`
+ * (`casterContactsRole`, décision de l'utilisateur, 2026-11-11). Jamais hors phase (`NONE` : match
  * terminé ou adversaire manquant), même si un appelant l'oubliait.
  *
  * Lue par le serveur seul (`exposesCaster`) : les deux modales n'en lisent que

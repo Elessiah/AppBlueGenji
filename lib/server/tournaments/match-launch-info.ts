@@ -324,6 +324,21 @@ function viewerRole(
 }
 
 /**
+ * Rôle sous lequel le lecteur lit les contacts **des casters**
+ * (`exposesCasterContacts`). L'arbitre désigné qui caste aussi le match garde
+ * le rôle `CASTER` (son « Prêt », ses notes), mais lit ses co-casters en
+ * arbitre désigné, dès que les deux adversaires sont connus — rien de plus que
+ * ce que lirait l'arbitre désigné sans cast (décision de l'utilisateur,
+ * 2026-11-11). Seul le rôle `CASTER` est relevé : un joueur du match reste
+ * joueur, et n'est de toute façon jamais un arbitre éligible avant le départ
+ * (`keepEligibleReferees`).
+ */
+function casterContactsRole(row: CandidateRow, userId: number, role: MatchLaunchViewerRole): MatchLaunchViewerRole {
+  const designated = row.refereeEligible && row.referee_user_id !== null && Number(row.referee_user_id) === userId;
+  return role === "CASTER" && designated ? "MATCH_REFEREE" : role;
+}
+
+/**
  * Lance d'office ce qui doit l'être avant de répondre : la modale interroge
  * toutes les quelques secondes, et sans ce passage un lancement d'office
  * attendrait que quelqu'un ouvre la liste des tournois.
@@ -375,7 +390,8 @@ type LaunchContext = {
    * tournoi en cours) les lit dès que les deux adversaires sont connus et
    * jusqu'à la fin du match, comme ceux des équipes (décision de l'utilisateur,
    * 2026-10-21) — `exposesCasterContacts`, et seulement si `exposes` les ouvre :
-   * ce drapeau porte seul la décision pour le caster.
+   * ce drapeau porte seul la décision pour le caster. L'arbitre désigné qui
+   * caste aussi le match les lit en arbitre désigné (`casterContactsRole`).
    */
   exposesCaster: boolean;
   /**
@@ -687,7 +703,9 @@ function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: L
  * à ce lecteur ? Hors de la fenêtre des contacts (`ctx.exposes`), jamais. Un
  * arbitre qui caste aussi le match suit la règle des casters : ses contacts
  * attendent le départ (`ctx.exposesCaster`), comme sur sa carte de caster —
- * sinon sa fiche d'arbitre livrerait avant l'heure ce que sa carte retient.
+ * sinon sa fiche d'arbitre livrerait avant l'heure ce que sa carte retient
+ * (lui-même, à qui `ctx.exposesCaster` s'ouvre dès que les adversaires sont
+ * connus — `casterContactsRole` —, n'y relit que sa propre fiche).
  * Un lecteur caster (`ctx.viewerRole`), staff compris, les lit lui aussi le
  * temps du match seulement (texte de certification).
  */
@@ -907,7 +925,9 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
           // tait aux équipes avant le match (`exposes` y est déjà vrai). Quand
           // elle est vraie, `exposes` l'est aussi ; le `exposes &&` n'est
           // qu'un filet : jamais le caster sans le match.
-          exposesCaster: exposes && exposesCasterContacts(phase, party.role),
+          // L'arbitre désigné qui caste lit ses co-casters en arbitre désigné
+          // (`casterContactsRole`) : `exposes` reste sa borne, celle de la carte.
+          exposesCaster: exposes && exposesCasterContacts(phase, casterContactsRole(row, viewer.id, party.role)),
           refereeDiscord: forCard && party.role !== "REFEREE",
           viewerRole: party.role,
         }),
