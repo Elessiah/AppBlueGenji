@@ -179,3 +179,23 @@ describe("mapMatch — propositions de score en attente", () => {
     expect(match.team1Report?.reportedAt).toMatch(ISO);
   });
 });
+
+// Revue #542 : le double forfait de l'instantané suit la règle du serveur —
+// seul un match clos le porte.
+describe("mapMatch — double forfait", () => {
+  it("mapMatch_completedDoubleForfeit_isDoubleForfeit", () => {
+    expect(mapMatch(matchRow({ status: "COMPLETED", double_forfeit: 1 })).doubleForfeit).toBe(true);
+  });
+
+  it.each(["PENDING", "READY", "AWAITING_CONFIRMATION"])(
+    "mapMatch_reopenedRowKeepingFlag_%s_isNotDoubleForfeit",
+    (status) => {
+      expect(mapMatch(matchRow({ status, double_forfeit: 1 } as RowOverrides<MatchRow>)).doubleForfeit).toBe(false);
+    },
+  );
+
+  it("mapMatch_completedWithoutFlag_isNotDoubleForfeit", () => {
+    expect(mapMatch(matchRow({ status: "COMPLETED", double_forfeit: 0 })).doubleForfeit).toBe(false);
+    expect(mapMatch(matchRow({ status: "COMPLETED", double_forfeit: null })).doubleForfeit).toBe(false);
+  });
+});

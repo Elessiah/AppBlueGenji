@@ -360,7 +360,10 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
     winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
     loserTeamId: row.loser_team_id === null ? null : Number(row.loser_team_id),
     forfeitTeamId: row.forfeit_team_id === null ? null : Number(row.forfeit_team_id),
-    doubleForfeit: Number(row.double_forfeit ?? 0) === 1,
+    // Même règle que le serveur (`toMatchScoreState`, `HAS_SCORE_INPUT_SQL`,
+    // finalisation, `sync-scope`) : un double forfait ne compte que clos — une
+    // ligne rouverte qui garderait le drapeau ne doit pas verrouiller l'interface.
+    doubleForfeit: row.status === "COMPLETED" && Number(row.double_forfeit ?? 0) === 1,
     nextWinnerMatchId: row.next_winner_match_id === null ? null : Number(row.next_winner_match_id),
     nextWinnerSlot: row.next_winner_slot === null ? null : Number(row.next_winner_slot),
     nextLoserMatchId: row.next_loser_match_id === null ? null : Number(row.next_loser_match_id),
