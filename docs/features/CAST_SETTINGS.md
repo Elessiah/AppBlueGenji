@@ -86,8 +86,13 @@ Fenêtre du caster, sur **son** cast :
   avec une aide « Permission de diffusion retirée », et n'est offerte que sur un
   match pas encore joué (`offersCastSettings`).
 - **Identité de caster incomplète** (tag Discord décertifié, Battle.net délié
-  en Overwatch — `castBlock`) : même chose, refus `CASTER_*_REQUIRED` ; l'aide
-  « Identité de caster incomplète » dit la condition qui manque.
+  en Overwatch — `castBlock`) : lien, mode et BattleTag sont refusés
+  (`CASTER_*_REQUIRED`) et masqués, l'aide « Identité de caster incomplète »
+  dit la condition qui manque ; l'antenne et la rediff restent offertes
+  (`CastAirAndReplay`), leurs routes ne demandant que la permission `live`.
+- Un refus `LIVE_TRIGGER_CHANGED` laisse la fenêtre ouverte : le choix de mode
+  est effacé, la page relit le match, et le prochain choix part avec le mode
+  désormais affiché.
 - Le drapeau de focus du retrait se lève **avant** le `DELETE` (`onReleasing`),
   comme celui de l'inscription : le flux peut rendre « Caster » avant la réponse.
 

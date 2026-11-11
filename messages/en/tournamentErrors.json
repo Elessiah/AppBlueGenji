@@ -143,7 +143,7 @@
     "CAST_STREAM_NOT_OWNED": "This stream belongs to the organisation: its link is set in “Official broadcast”.",
     "CAST_STREAM_LINK_HELD": "This link belongs to a co-caster still on this stream: only they, or the match referee, can change it.",
     "LIVE_TRIGGER_NOT_OWNED": "This on-air mode is not open to you: only the caster who holds it, the match referee or staff with refereeing and streaming permissions can change and clear it — the match's casters can also change it when no caster holds it (unless the match carries the organisation's link), but not clear it.",
-    "LIVE_TRIGGER_CHANGED": "The on-air mode changed while the window was open: reopen it to see the current mode before trying again.",
+    "LIVE_TRIGGER_CHANGED": "The on-air mode changed while the window was open: check the current mode, then choose again.",
     "INVALID_STREAM_LINKS": "Invalid stream links.",
     "INVALID_CAST_SETTINGS": "Invalid broadcast settings.",
     "MATCH_CAST_SETTINGS_FAILED": "Your broadcast settings could not be saved. Try again in a moment.",

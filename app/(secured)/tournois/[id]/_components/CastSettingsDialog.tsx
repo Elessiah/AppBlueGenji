@@ -145,9 +145,10 @@ export function CastSettingsDialog({
   // la fenêtre ne garde que la rediff et le retrait.
   const played = match.status === "COMPLETED";
   // Sans la permission `live`, ou sans l'identité de caster (tag Discord
-  // certifié, Battle.net en Overwatch), le serveur refuse tout réglage
-  // (`NOT_CASTER`, `CASTER_*_REQUIRED`) : la fenêtre ne garde que le retrait,
-  // seule voie qui aboutisse encore.
+  // certifié, Battle.net en Overwatch), le serveur refuse lien, mode et
+  // BattleTag (`NOT_CASTER`, `CASTER_*_REQUIRED`). Sans la permission, il ne
+  // reste que le retrait ; une identité incomplète garde l'antenne et la
+  // rediff (`CastAirAndReplay`, permission `live` seule).
   const identityBlock = castIdentityBlock(controls.castBlock);
   const settable = castSettable(controls);
   const streamEditable = cast !== null && !cast.staffStream && !played;
@@ -203,9 +204,13 @@ export function CastSettingsDialog({
       const message = fail(code);
       fieldErrors.report(code, message);
       showError(message);
-      // Mode changé entre-temps : la fenêtre montre le nouveau, et le prochain
+      // Mode changé entre-temps : la page relit le match (le flux a pu ne pas
+      // le livrer encore), la fenêtre montre le nouveau mode, et le prochain
       // choix part avec lui comme mode vu (`useSeenTrigger`).
-      if (code === "LIVE_TRIGGER_CHANGED") setTrigger(null);
+      if (code === "LIVE_TRIGGER_CHANGED") {
+        setTrigger(null);
+        onSaved();
+      }
     } finally {
       setBusy(false);
     }
@@ -279,16 +284,6 @@ export function CastSettingsDialog({
               />
             )}
 
-            {configurable && (
-              <CastTriggerField
-                // Match démarqué : aucun mode coché, chaque choix se clique.
-                trigger={triggerLocked ? lockedTrigger(true, match.liveTrigger, trigger) : (pickedTrigger ?? match.liveTrigger)}
-                startAt={match.startAt}
-                onChange={pickTrigger}
-                locked={triggerLocked}
-              />
-            )}
-
             {!played && game !== null && battletagRelevantFor(game) && (
               <CastBattletagField
                 id={battletagId}
@@ -302,6 +297,15 @@ export function CastSettingsDialog({
               />
             )}
 
+            {configurable && (
+              <CastTriggerField
+                // Match démarqué : aucun mode coché, chaque choix se clique.
+                trigger={triggerLocked ? lockedTrigger(true, match.liveTrigger, trigger) : (pickedTrigger ?? match.liveTrigger)}
+                startAt={match.startAt}
+                onChange={pickTrigger}
+                locked={triggerLocked}
+              />
+            )}
           </>
         )}
 
@@ -394,8 +398,9 @@ export function castIdentityBlock(block: CastBlock | null): Exclude<CastBlock, "
 }
 
 /**
- * Pourquoi la fenêtre ne garde que le retrait : permission de diffusion
- * retirée, ou identité de caster incomplète (la condition qui manque).
+ * Pourquoi lien, mode et BattleTag ne se règlent plus : permission de
+ * diffusion retirée (seul le retrait reste), ou identité de caster incomplète
+ * (la condition qui manque ; antenne et rediff restent).
  */
 function NotSettableHint({
   titleId,

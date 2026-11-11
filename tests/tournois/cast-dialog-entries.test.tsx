@@ -270,7 +270,13 @@ describe("CastSettingsDialog — match joué, rien de changé, lecture", () => {
 
   it("CastSettingsDialog_triggerChangedRefusal_resetsPickedTrigger", () => {
     // Après un refus LIVE_TRIGGER_CHANGED, le prochain choix part avec le nouveau mode vu.
-    expect(settings).toContain('if (code === "LIVE_TRIGGER_CHANGED") setTrigger(null);');
+    expect(settings).toMatch(/if \(code === "LIVE_TRIGGER_CHANGED"\) \{\s+setTrigger\(null\);\s+onSaved\(\);/);
+  });
+
+  it("CastSettingsDialog_airToggle_followsTriggerField", () => {
+    // L'antenne d'un mode manuel suit le choix du mode : le BattleTag passe avant lui.
+    expect(settings.indexOf("<CastBattletagField")).toBeLessThan(settings.indexOf("<CastTriggerField"));
+    expect(settings.indexOf("<CastTriggerField")).toBeLessThan(settings.indexOf("<CastAirAndReplay"));
   });
 
   it("castSettingsTexts_identityTitle_presentInFrAndEn", () => {
