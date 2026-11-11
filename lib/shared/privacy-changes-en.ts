@@ -961,6 +961,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What does not change: no player data is collected; clearing by the referees stays as it is; it still rests on legitimate interest (smooth running of tournaments).",
     ],
   },
+  "2026-11-contacts-du-caster-arbitre-designe": {
+    linkLabels: ["Read the “Match contacts” section", "Read the “Data collected” section"],
+    title: "Caster contacts: read by the assigned referee before the match, even if they also cast",
+    summary:
+      "If you cast a match, its assigned referee sees your contacts as soon as both its opponents are known, now even when they cast the match themselves (they then only saw them while the match was being played). Both its teams and its other casters still only see them while the match is being played.",
+    details: [
+      "What changes: a match's assigned referee who also casts it used to read their co-casters' contacts only while the match was being played, like a caster; they now read them as a referee, in the match's “Contacts” window and on its page, from the moment both its opponents are known until its end. It's the same information as before: your certified Discord tag and, in an Overwatch tournament only, your BattleTag, even when hidden.",
+      "Corrected wording: the privacy policy and the notices about the Discord tag (profile, login) said that a match's assigned referee only read its casters' certified Discord tag while the match was being played; they read it, like the referees who don't cast the match, as soon as both opponents are known. These texts now say so, and state that another referee who plays or casts the match only reads your contacts while the match is being played.",
+      "What does not change: both teams and the other casters of the match only read your contacts while the match is being played; the launch window only shows contacts at the start of the match; nothing changes for players. As before, this reading is based on the performance of the service — running the tournament (terms of use, “Match contacts” section, with no new version to accept).",
+    ],
+  },
 };
 
 /**

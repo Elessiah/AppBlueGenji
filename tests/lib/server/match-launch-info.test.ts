@@ -1467,3 +1467,137 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
     expect(info.selfManaged).toBe(true);
   });
 });
+
+// Décision du 2026-11-11 : l'arbitre désigné qui caste aussi le match lit ses
+// co-casters en arbitre désigné, dès que les deux adversaires sont connus.
+describe("loadViewerMatchContacts — arbitre désigné qui caste aussi le match", () => {
+  const staff = { id: VIEWER, roles: ["ARBITRE" as const] };
+  const self = (overrides: Record<string, unknown> = {}) =>
+    casterUser(VIEWER, { pseudo: "Moi", platform_roles_json: JSON.stringify(["ARBITRE"]), ...overrides });
+  const later = () => new Date(Date.now() + 3 * 3_600_000).toISOString();
+  /** Match programmé, pas encore parti : le lecteur et `CASTER` le castent. */
+  const scheduled = (overrides: Candidate = {}) =>
+    candidate({
+      match_launch_phase: 0,
+      start_at: later(),
+      lobby_opened_at: null,
+      caster_user_id: VIEWER,
+      co_casters: [{ user_id: CASTER, stream_id: 2 }],
+      self_managed: 0,
+      ...overrides,
+    });
+  const coCaster = (info: Awaited<ReturnType<typeof loadViewerMatchContacts>>) =>
+    info?.casters.find((caster) => caster.userId === CASTER);
+
+  beforeEach(() => {
+    state.viewerMemberships = [];
+    state.users = [self(), casterUser(CASTER)];
+  });
+
+  it("loadViewerMatchContacts_designatedRefereeCastingBeforeStart_readsCoCasterContacts", async () => {
+    state.candidates = [scheduled({ referee_user_id: VIEWER })];
+
+    const info = await loadViewerMatchContacts(staff, 42);
+
+    expect(info?.phase).toBe("SCHEDULED");
+    expect(info?.viewer).toMatchObject({ role: "CASTER", isReferee: true, isCaster: true, canDeclareReady: true });
+    expect(coCaster(info)).toMatchObject({ discordTag: "caster", battletag: "Caster#1", contactsShown: true });
+  });
+
+  it("loadViewerMatchContacts_designatedRefereeCastingToPlan_readsCoCasterContacts", async () => {
+    state.candidates = [scheduled({ referee_user_id: VIEWER, referee_scheduling: 1, start_at: null })];
+
+    const info = await loadViewerMatchContacts(staff, 42);
+
+    expect(info?.phase).toBe("TO_PLAN");
+    expect(coCaster(info)).toMatchObject({ discordTag: "caster", battletag: "Caster#1", contactsShown: true });
+  });
+
+  it("loadViewerMatchContacts_designatedRefereeCastingUnderway_readsCoCasterContacts", async () => {
+    state.candidates = [
+      candidate({ referee_user_id: VIEWER, caster_user_id: VIEWER, co_casters: [{ user_id: CASTER, stream_id: 2 }] }),
+    ];
+
+    const info = await loadViewerMatchContacts(staff, 42);
+
+    expect(info?.phase).toBe("LOBBY");
+    expect(coCaster(info)).toMatchObject({ discordTag: "caster", battletag: "Caster#1", contactsShown: true });
+  });
+
+  it("loadViewerMatchContacts_designatedRefereeCastingMarvelRivalsBeforeStart_coCasterDiscordWithoutBattletag", async () => {
+    state.candidates = [scheduled({ tournament_game: "MR", referee_user_id: VIEWER })];
+
+    const info = await loadViewerMatchContacts(staff, 42);
+
+    const co = coCaster(info);
+    expect(co).toMatchObject({ discordTag: "caster", contactsShown: true });
+    expect(co).not.toHaveProperty("battletag");
+    expect(co).not.toHaveProperty("battletagVerified");
+  });
+
+  it("loadViewerMatchContacts_staffCasterNotDesignatedBeforeStart_coCasterContactsWait", async () => {
+    state.candidates = [scheduled()];
+
+    const info = await loadViewerMatchContacts(staff, 42);
+
+    expect(info?.viewer).toMatchObject({ role: "CASTER", isReferee: false });
+    expect(coCaster(info)).toMatchObject({ discordTag: null, battletag: null, contactsShown: false });
+  });
+
+  it("loadViewerMatchContacts_staffCasterWithOtherRefereeBeforeStart_coCasterContactsWait", async () => {
+    const OTHER = 950;
+    state.candidates = [scheduled({ referee_user_id: OTHER })];
+    state.users = [self(), casterUser(CASTER), casterUser(OTHER, { pseudo: "Arbitre", platform_roles_json: JSON.stringify(["ARBITRE"]) })];
+
+    const info = await loadViewerMatchContacts(staff, 42);
+
+    expect(info?.viewer).toMatchObject({ role: "CASTER", isReferee: false });
+    expect(coCaster(info)).toMatchObject({ discordTag: null, battletag: null, contactsShown: false });
+  });
+
+  it("loadViewerMatchContacts_ineligibleRefereeCastingBeforeStart_coCasterContactsWait", async () => {
+    // Opposition retenue : il n'est plus l'arbitre du match, seulement son caster.
+    state.candidates = [scheduled({ referee_user_id: VIEWER })];
+    state.users = [self({ referee_objection_at: OPENED }), casterUser(CASTER)];
+
+    const info = await loadViewerMatchContacts(staff, 42);
+
+    expect(info?.viewer).toMatchObject({ role: "CASTER", isReferee: false });
+    expect(coCaster(info)).toMatchObject({ discordTag: null, battletag: null, contactsShown: false });
+  });
+
+  it("loadViewerMatchContacts_pureDesignatedRefereeBeforeStart_readsCasterContacts", async () => {
+    state.candidates = [scheduled({ referee_user_id: VIEWER, caster_user_id: CASTER, co_casters: [] })];
+
+    const info = await loadViewerMatchContacts(staff, 42);
+
+    expect(info?.viewer).toMatchObject({ role: "MATCH_REFEREE", isReferee: true, isCaster: false });
+    expect(coCaster(info)).toMatchObject({ discordTag: "caster", battletag: "Caster#1", contactsShown: true });
+  });
+
+  it("listViewerMatchLaunches_designatedRefereeCastingScheduled_coCasterContactsWait", async () => {
+    // La modale de lancement n'ouvre rien avant le départ, à personne.
+    state.candidates = [scheduled({ referee_user_id: VIEWER })];
+
+    const [info] = await listViewerMatchLaunches(staff);
+
+    expect(info?.viewer).toMatchObject({ role: "CASTER", isReferee: true });
+    expect(info?.casters.find((caster) => caster.userId === CASTER)).toMatchObject({
+      discordTag: null,
+      battletag: null,
+      contactsShown: false,
+    });
+  });
+
+  it("loadViewerMatchContacts_coCasterReadsRefereeCasterBeforeStart_isRefused", async () => {
+    // Vu du co-caster (sans arbitrage) : rien avant le départ, comme avant.
+    state.candidates = [
+      scheduled({ referee_user_id: CASTER, caster_user_id: CASTER, co_casters: [{ user_id: VIEWER, stream_id: 2 }] }),
+    ];
+    state.users = [casterUser(VIEWER), casterUser(CASTER, { platform_roles_json: JSON.stringify(["ARBITRE"]) })];
+
+    const info = await loadViewerMatchContacts(viewer, 42);
+
+    expect(info).toBeNull();
+  });
+});

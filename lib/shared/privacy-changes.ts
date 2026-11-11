@@ -1821,6 +1821,28 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : aucune donnée de joueur n'est collectée ; le vidage par l'arbitrage reste tel quel ; c'est toujours au titre de l'intérêt légitime (bon déroulement des tournois).",
     ],
   },
+  {
+    // REF-CASTER-CONTACTS (décision de l'utilisateur D45 du 2026-11-11) :
+    // l'arbitre désigné qui caste aussi le match lit ses co-casters en arbitre,
+    // dès que les deux adversaires sont connus (`casterContactsRole`) ; les
+    // textes du tag Discord d'un caster réservaient à tort l'arbitre désigné au
+    // temps du match. Seuls les casters sont concernés : public `LIVE_STAFF`.
+    audience: "LIVE_STAFF",
+    id: "2026-11-contacts-du-caster-arbitre-designe",
+    publishedAt: "2026-11-12",
+    title: "Contacts du caster : lus par l'arbitre désigné avant le match, même s'il caste aussi",
+    summary:
+      "Si tu castes un match, son arbitre désigné voit tes contacts dès que ses deux adversaires sont connus, désormais même quand il caste lui-même le match (il ne les voyait alors que le temps du match). Ses deux équipes et ses autres casters ne les voient toujours que le temps du match.",
+    details: [
+      "Ce qui change : l'arbitre désigné d'un match qui le caste aussi lisait jusqu'ici les contacts de ses co-casters le temps du match seulement, comme un caster ; il les lit maintenant en arbitre, dans la fenêtre « Contacts » du match et sur sa page, dès que ses deux adversaires sont connus et jusqu'à sa fin. Ce sont les mêmes informations qu'avant : ton tag Discord certifié et, dans un tournoi Overwatch seulement, ton BattleTag, même masqué.",
+      "Textes corrigés : la politique de confidentialité et les avis sur le tag Discord (profil, connexion) disaient que l'arbitre désigné d'un match ne lisait le tag Discord certifié de ses casters que le temps du match ; il le lit, comme les arbitres qui ne castent pas le match, dès que les deux adversaires sont connus. Ces textes le disent maintenant, et précisent qu'un autre arbitre qui joue ou caste ce match ne lit tes contacts que le temps du match.",
+      "Ce qui ne change pas : les deux équipes et les autres casters du match ne lisent tes contacts que le temps du match ; la fenêtre de lancement ne montre les contacts qu'au départ du match ; rien ne change pour les joueurs. Cette lecture repose, comme avant, sur l'exécution du service — l'organisation du tournoi (conditions d'utilisation, section « Contacts de match », sans nouvelle version à accepter).",
+    ],
+    links: [
+      { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
+      DATA_COLLECTED_SECTION_LINK,
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

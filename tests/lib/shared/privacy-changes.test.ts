@@ -2622,8 +2622,7 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
 
   it("privacyChanges_voiceClearAndReschedule_lastEntryForAllAccountsFrAndEn", () => {
     const entry = PRIVACY_CHANGES.find((c) => c.id === voiceClearId)!;
-    // Suivie de l'entrée du vidage par l'équipe (VOICE-CLEAR-TEAM, D36).
-    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(voiceClearId);
+    // Sa place est fixée par `after` (`expectStandaloneEntry`), sans compter depuis la fin.
     expect([entry.id.length <= PRIVACY_CHANGE_ID_MAX_LENGTH, entry.asksTermsAcceptance, privacyChangeReachesAccount(entry, {})]).toEqual([true, undefined, true]);
     expectStandaloneEntry(entry, PRIVACY_CHANGES_EN[entry.id], { after: "2026-11-conditions-v10-avatar-et-succession", publishedAt: "2026-11-11", audience: undefined, links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }] });
     expectEntryTexts(entry, PRIVACY_CHANGES_EN[entry.id], {
@@ -2635,7 +2634,6 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
   it("privacyChanges_voiceClearByTeam_lastEntryForAllAccountsFrAndEn", () => {
     const id = "2026-11-salons-vocaux-vidage-par-l-equipe";
     const entry = PRIVACY_CHANGES.find((c) => c.id === id)!;
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(id);
     expect([entry.id.length <= PRIVACY_CHANGE_ID_MAX_LENGTH, entry.asksTermsAcceptance, privacyChangeReachesAccount(entry, {})]).toEqual([true, undefined, true]);
     expectStandaloneEntry(entry, PRIVACY_CHANGES_EN[id], { after: voiceClearId, publishedAt: "2026-11-11", audience: undefined, links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }] });
     expectEntryTexts(entry, PRIVACY_CHANGES_EN[id], {
@@ -2699,5 +2697,41 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
     const en = readFileSync(join(process.cwd(), "app", "rgpd", "RgpdEn.tsx"), "utf8");
     expect(fr).toContain("avec son nom, et les déconnexions d&apos;un vidage (leur nombre et leur motif, tels que Discord les y inscrit), lisible");
     expect(en).toContain("with its name, and the disconnections of a clearing (their number and reason, as Discord records them), readable");
+  });
+});
+
+describe("PRIVACY_CHANGES — contacts du caster à l'arbitre désigné qui caste (REF-CASTER-CONTACTS)", () => {
+  const id = "2026-11-contacts-du-caster-arbitre-designe";
+  const entry = PRIVACY_CHANGES.find((c) => c.id === id)!;
+
+  it("privacyChanges_refCasterContacts_lastEntryForLiveStaffFitsOneDm", () => {
+    expectStandaloneEntry(entry, PRIVACY_CHANGES_EN[id], {
+      after: "2026-11-salons-vocaux-vidage-par-l-equipe",
+      publishedAt: "2026-11-12",
+      audience: "LIVE_STAFF",
+      links: PRIVACY_CHANGES.find((c) => c.id === "2026-10-contacts-du-caster-aux-arbitres")?.links,
+    });
+  });
+
+  it("privacyChanges_refCasterContacts_statesNewReaderUnchangedPartiesAndNoNewTermsFrAndEn", () => {
+    const [english] = localizedPrivacyChanges([entry], "en");
+    const said: [PrivacyChange, string[]][] = [
+      [entry, [
+        "son arbitre désigné voit tes contacts dès que ses deux adversaires sont connus, désormais même quand il caste lui-même le match",
+        "Ses deux équipes et ses autres casters ne les voient toujours que le temps du match",
+        "sans nouvelle version à accepter",
+      ]],
+      [english, [
+        "its assigned referee sees your contacts as soon as both its opponents are known, now even when they cast the match themselves",
+        "Both its teams and its other casters still only see them while the match is being played",
+        "with no new version to accept",
+        "Read the “Match contacts” section",
+      ]],
+    ];
+    for (const [change, texts] of said) {
+      const text = [change.title, change.summary, ...change.details, ...(change.links ?? []).map((link) => link.label)].join(" ");
+      for (const part of texts) expect(text).toContain(part);
+    }
+    expect(english.details).toHaveLength(entry.details.length);
   });
 });

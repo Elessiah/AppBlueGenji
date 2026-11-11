@@ -211,9 +211,10 @@ describe("D6 — empreinte d'un avatar supprimé par la modération", () => {
     expect(entry?.publishedAt).toBe("2026-11-11");
     expect(entry?.publishedAt).toBe(TERMS_UPDATED_AT);
     expect(entry?.audience).toBeUndefined();
-    // Suivies des entrées des salons vocaux (MATCH-VOICE, puis VOICE-CLEAR-TEAM).
-    expect(PRIVACY_CHANGES.at(-4)?.id).toBe(AVATAR_HASH_ID);
-    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(TERMS_V10_ID);
+    // Voisines, l'empreinte d'abord — sans compter depuis la fin : d'autres entrées les suivent.
+    const ids = PRIVACY_CHANGES.map((change) => change.id);
+    expect(ids.indexOf(AVATAR_HASH_ID)).toBeGreaterThanOrEqual(0);
+    expect(ids.indexOf(TERMS_V10_ID)).toBe(ids.indexOf(AVATAR_HASH_ID) + 1);
   });
 
   it("privacyChange_avatarHashEntry_saysKeptFromModerationDeletionNotErasureFrAndEn", () => {

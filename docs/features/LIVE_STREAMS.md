@@ -591,7 +591,9 @@ Ajouter une plateforme = ajouter une entrée à `LIVE_PLATFORMS`.
 L'arbitre désigné d'un match peut aussi le caster : les deux inscriptions
 sont indépendantes, chacune avec son « Prêt » (`MATCH_REFEREE.md`). Le public
 ne lit de l'arbitrage que « Arbitre désigné » ; le pseudo de l'arbitre ne
-va qu'aux deux équipes, aux casters du match et au staff.
+va qu'aux deux équipes, aux casters du match et au staff. Par la carte, il
+lit les contacts de ses co-casters en arbitre désigné, dès que les deux
+adversaires sont connus (`MATCH_LAUNCH.md`).
 
 ## Permissions
 

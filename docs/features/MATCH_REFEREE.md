@@ -233,8 +233,11 @@ règle a changé avec l'arbitre hôte.
   seulement (fenêtre « Contacts », page du match) et aux seules parties du
   match — jamais au rôle `REFEREE` ni dans la modale de lancement
   (`MATCH_PAGE_CONNECT.md`). L'arbitre désigné (`MATCH_REFEREE`) lit les
-  contacts des casters dès la phase de lancement, comme l'arbitre de plateforme
-  (`exposesCasterContacts`). Carte `RefereeCard`
+  contacts des casters dès que les deux adversaires sont connus, comme l'arbitre de plateforme
+  (`exposesCasterContacts`) — **même s'il caste aussi le match** : son rôle
+  reste `CASTER`, mais ses co-casters lui sont lus en arbitre désigné
+  (`casterContactsRole`, décision de l'utilisateur du 2026-11-11 ;
+  `MATCH_LAUNCH.md`). Carte `RefereeCard`
   (`LaunchContactCards.tsx`), dans la modale de lancement et la fenêtre
   « Contacts ».
 - **Staff** : la fenêtre « Arbitrage » (action « Arbitrage » de la carte,

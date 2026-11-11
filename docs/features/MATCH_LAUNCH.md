@@ -112,6 +112,23 @@ l'utilisateur, 2026-10-21 : `exposesCaster` ouvert au rôle `REFEREE`,
 qui **joue** le match lit en joueur (rôle `TEAM1`/`TEAM2`) : pour lui, comme pour
 les équipes, la modale « Contacts » dit avant le départ « Ses contacts
 s'afficheront au départ du match » (`contacts.casterLater`) au lieu de deux « — ».
+
+**Arbitre désigné qui caste aussi le match** (décision de l'utilisateur,
+2026-11-11) : `viewerRole` lui garde le rôle `CASTER` (ordre joueur, caster,
+arbitre désigné — son « Prêt » et ses notes de caster), mais `exposesCaster` se
+décide pour lui avec le rôle `MATCH_REFEREE` (`casterContactsRole`,
+`match-launch-info.ts`) : par la carte, il lit les contacts de ses co-casters
+dès que les deux adversaires sont connus, comme l'arbitre désigné sans cast —
+rien de plus (`exposes` reste sa borne ; la modale de lancement n'ouvre rien
+avant le départ). Seul le rôle `CASTER` est relevé : un joueur reste joueur,
+et un arbitre qui joue n'est plus éligible avant le départ
+(`keepEligibleReferees`). Un membre du staff qui caste **sans** être l'arbitre
+désigné attend le départ, comme tout caster. Dans la modale de lancement, la note
+des contacts tus d'un caster renvoie l'arbitre désigné (qu'il caste ou non) à
+l'action « Contacts » de la carte, sur la page du tournoi, qui les lui ouvre
+déjà (la modale est montée sur toutes les pages : la note dit où la trouver,
+menu « Plus d'actions » compris)
+(`launchCastersLaterText`, clé `casterContactsAtLaunchOrNow`).
 Les deux modales rendent `CasterCard` sur la décision du serveur
 (`LaunchCaster.contactsShown`, issu d'`exposesCaster`), jamais recalculée côté
 client ; la note ne s'adresse jamais au caster lui-même (`viewerIsCaster`,
