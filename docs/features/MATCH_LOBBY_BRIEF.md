@@ -69,7 +69,8 @@ de même) — et rien ne repart à H-15 (même réservation).
 **Destinataires relus juste avant l'envoi** (REFEREE-LOT-1) : chaque côté
 relit ses membres actifs (`loadEntrantManagerIds`) après sa réservation — un
 membre retiré depuis la lecture du balayage ne reçoit plus le lien du match ni
-l'ordre des bans. Un compte membre actif **des deux** engagées ne reçoit que le
+l'ordre des bans ; s'il ne reste aucun gérant actif, rien ne part et la
+réservation est rendue (le côté attend un gérant, comme une équipe sans gérant). Un compte membre actif **des deux** engagées ne reçoit que le
 check-in du premier côté (jamais « crée la partie » puis « vérifie les
 paramètres ») : règle fixe, lue des appartenances (`slotManagers`), la même à
 chaque balayage ; un second côté qui n'a que de tels gérants est réservé sans

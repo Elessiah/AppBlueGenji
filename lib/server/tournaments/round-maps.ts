@@ -256,7 +256,11 @@ export async function setRoundsMaps(
 ): Promise<RoundsMapsResult> {
   const slots = normalizeRoundMapSlots(rawSlots);
   if (rounds.length === 0 || rounds.length > ROUND_MAPS_BULK_MAX) throw new Error("INVALID_ROUND");
-  const result = await inTransaction(async (connection) => {
+  // Rejouée sur un interblocage ou un refus de l'isolation par instantané de
+  // MariaDB (`ER_CHECKREAD`) : un balayage de l'annonce, qui ne prend pas le
+  // verrou du tournoi, peut supprimer la ligne `bg_round_maps_notices` après
+  // l'ouverture de l'image de cette transaction (`queueRoundMapsNotice`).
+  const result = await retryOnDeadlock(() => inTransaction(async (connection) => {
     const tournament = await lockTournament(connection, tournamentId);
     // Retirer est permis sur toute clé (une ligne orpheline doit pouvoir partir) ;
     // poser des cartes, seulement sur les tours du tournoi.
@@ -270,7 +274,7 @@ export async function setRoundsMaps(
     // transaction et une seule ligne résume la série (`./round-maps-notice`).
     await queueRoundMapsNotice(connection, tournamentId, changedRounds);
     return { changed: changedRounds.length > 0, skipped: rounds.length - targets.length };
-  });
+  }));
   if (result.changed) {
     publishMatchUpdatedEvent(tournamentId);
     scheduleRoundMapsNotice();
@@ -336,7 +340,8 @@ async function tiebreakAllowedUnderLock(
  */
 export async function setRoundTiebreak(tournamentId: number, round: RoundKey, rawMap: unknown): Promise<string | null> {
   const map = normalizeTiebreakMap(rawMap);
-  const changed = await inTransaction(async (connection) => {
+  // Rejouée comme `setRoundsMaps` (même mise en attente de l'annonce).
+  const changed = await retryOnDeadlock(() => inTransaction(async (connection) => {
     const tournament = await lockTournament(connection, tournamentId);
     if (map !== null) {
       const [owned] = await roundsOfTournament(connection, tournament, [round]);
@@ -371,7 +376,7 @@ export async function setRoundTiebreak(tournamentId: number, round: RoundKey, ra
     }
     await queueRoundMapsNotice(connection, tournamentId, [round], { tiebreak: true });
     return true;
-  });
+  }));
   if (changed) {
     publishMatchUpdatedEvent(tournamentId);
     scheduleRoundMapsNotice();

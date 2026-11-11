@@ -457,6 +457,23 @@ describe("dispatchLobbyBriefs", () => {
     expect(sends().map((send) => send.userIds)).toEqual([[10], [20]]);
   });
 
+  it("dispatchLobbyBriefs_onlyManagerLeftBeforeSend_nothingSentAndClaimReleased", async () => {
+    const { execute } = mockDb([MATCH]);
+    // Le seul gérant de l'équipe 2 la quitte entre la lecture du balayage et l'envoi.
+    jest
+      .mocked(loadEntrantManagerIds)
+      .mockResolvedValueOnce(new Map([[1, [10]], [2, [20]]]))
+      .mockResolvedValueOnce(new Map([[1, [10]]]))
+      .mockResolvedValueOnce(new Map());
+
+    await dispatchLobbyBriefs();
+
+    expect(sends().map((send) => send.userIds)).toEqual([[10]]);
+    // La réservation du côté 2 est rendue, sans marque : un gérant nommé dans la fenêtre sera briefé.
+    expect(releases(execute)).toHaveLength(1);
+    expect(marks(execute)).toHaveLength(1);
+  });
+
   it("dispatchLobbyBriefs_sideReread_asksOnlyThatSidesTeam", async () => {
     mockDb([MATCH]);
 

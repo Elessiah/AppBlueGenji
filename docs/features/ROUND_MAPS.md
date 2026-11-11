@@ -261,7 +261,9 @@ au pool.
   ne prend pas le verrou du tournoi, ne peut plus la revendiquer entre la
   lecture et l'écriture (ses manches reparaissaient dans le résumé suivant) ;
   pas de `SELECT … FOR UPDATE`, qui poserait un verrou d'intervalle sur une
-  ligne absente. Le minuteur de fin de fenêtre qui tombe sur un balayage en
+  ligne absente. `setRoundsMaps` et `setRoundTiebreak` sont rejouées
+  (`retryOnDeadlock`) si MariaDB refuse l'écriture d'une ligne qu'un balayage
+  vient de supprimer (`ER_CHECKREAD`). Le minuteur de fin de fenêtre qui tombe sur un balayage en
   vol en relance un à sa suite. `rounds_json` retient au plus
   `ROUND_MAPS_NOTICE_KEYS_MAX` (200) manches ; les suivantes sont **comptées**
   (`{ more: n }`, reprises dans « et N autres »), jamais « Data too long ».

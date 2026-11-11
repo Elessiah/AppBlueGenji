@@ -657,9 +657,16 @@ async function briefClaimedSide(
   // lien du match, l'adversaire et l'ordre des bans. Une relecture en panne
   // lève : la réservation est rendue, le côté rejoué au balayage suivant.
   const stillActive = new Set((await loadEntrantManagerIds([slotTeamId(row, slot)])).get(slotTeamId(row, slot)) ?? []);
+  const recipients = context.recipients.filter(
+    (recipient) => userIds.includes(recipient.userId) && stillActive.has(recipient.userId),
+  );
+  // Plus aucun gérant actif (le seul a quitté l'équipe depuis la lecture du
+  // balayage) : rien ne part et la réservation est rendue — comme une équipe
+  // sans gérant, le côté attend qu'un gérant soit nommé dans la fenêtre.
+  if (recipients.length === 0) return "retry";
   const outcome = await sendSideBrief(
     Number(row.id),
-    context.recipients.filter((recipient) => userIds.includes(recipient.userId) && stillActive.has(recipient.userId)),
+    recipients,
     sides[slot - 1].side,
     siteUrl(matchPageHref(Number(row.tournament_id), Number(row.id))),
   );

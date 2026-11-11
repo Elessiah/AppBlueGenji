@@ -381,6 +381,25 @@ describe("setRoundsMaps", () => {
     expect(writes(/FROM bg_tournament_phases/)).toHaveLength(0);
   });
 
+  it("setRoundsMaps_snapshotConflictOnNoticeRow_replaysTheWholeTransaction", async () => {
+    // MariaDB (`innodb_snapshot_isolation`) : un balayage a supprimé la ligne de l'annonce
+    // après l'ouverture de l'image de la transaction — refus 1020, puis rejeu.
+    let refused = false;
+    connection.execute.mockImplementation(async (sql: string) => {
+      if (/FROM bg_tournaments/.test(sql)) return [[TOURNAMENT], []];
+      if (/INSERT INTO bg_round_maps_notices/.test(sql) && !refused) {
+        refused = true;
+        throw Object.assign(new Error("Record has changed since last read"), { code: "ER_CHECKREAD", errno: 1020 });
+      }
+      return [/^\s*SELECT/.test(sql) ? [] : { affectedRows: 1 }, []];
+    });
+
+    await expect(setRoundsMaps(7, [ROUND], [["Ilios"]])).resolves.toEqual({ slots: [["Ilios"]], skipped: 0 });
+
+    expect(writes(/FROM bg_tournaments/)).toHaveLength(2);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledTimes(1);
+  });
+
   it("setRoundsMaps_noRound_throwsInvalidRoundBeforeQuery", async () => {
     await expect(setRoundsMaps(7, [], [["Ilios"]])).rejects.toThrow("INVALID_ROUND");
     expect(withConnection).not.toHaveBeenCalled();
