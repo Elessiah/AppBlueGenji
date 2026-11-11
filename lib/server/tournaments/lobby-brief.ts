@@ -688,6 +688,37 @@ async function briefSlot(
   }
 }
 
+/** Issues où le côté a été servi (ou tenté, sans nouvel essai) : ses comptes ne le seront pas par l'autre côté. */
+const SERVED_OUTCOMES: ReadonlySet<SlotResult["outcome"]> = new Set(["sent", "unreached", "failed"]);
+
+/** Les gérants d'un côté, sans ceux que l'autre côté a déjà servis ; `null` reste `null`. */
+function unservedManagers(
+  managers: { ghost: boolean; userIds: number[] } | null,
+  served: ReadonlySet<number>,
+): { ghost: boolean; userIds: number[] } | null {
+  if (managers === null) return null;
+  return { ...managers, userIds: managers.userIds.filter((userId) => !served.has(userId)) };
+}
+
+/**
+ * {@link briefSlot} pour les seuls gérants que l'autre côté n'a pas servis,
+ * qui rejoignent `served` une fois ce côté servi. `null` : vraie équipe sans
+ * gérant actif (`sideManagers`), rien n'est réservé.
+ */
+async function briefUnservedSlot(
+  db: Db,
+  row: LobbyBriefRow,
+  slot: LobbyBriefSlot,
+  context: SweepContext,
+  served: Set<number>,
+): Promise<SlotResult | null> {
+  const managers = unservedManagers(sideManagers(row, slot, context), served);
+  if (managers === null) return null;
+  const result = await briefSlot(db, row, slot, managers, context);
+  if (SERVED_OUTCOMES.has(result.outcome)) managers.userIds.forEach((userId) => served.add(userId));
+  return result;
+}
+
 /**
  * Brief des deux côtés d'un match, **côté par côté**. Jamais d'exception :
  * une panne interrompt le match et figure au bilan, avec la réservation du
@@ -704,13 +735,9 @@ async function briefMatch(db: Db, row: LobbyBriefRow, context: SweepContext): Pr
   // la partie » puis « vérifie les paramètres »). Il garde celui du premier côté.
   const served = new Set<number>();
   for (const slot of [1, 2] as const) {
-    const sideOf = sideManagers(row, slot, context);
-    if (sideOf === null) continue;
-    const managers = { ...sideOf, userIds: sideOf.userIds.filter((userId) => !served.has(userId)) };
-    const { claimId, outcome, error } = await briefSlot(db, row, slot, managers, context);
-    if (outcome === "sent" || outcome === "unreached" || outcome === "failed") {
-      for (const userId of managers.userIds) served.add(userId);
-    }
+    const result = await briefUnservedSlot(db, row, slot, context, served);
+    if (result === null) continue;
+    const { claimId, outcome, error } = result;
     if (claimId === null) {
       if (outcome === "error") return { ...brief, error };
       continue;

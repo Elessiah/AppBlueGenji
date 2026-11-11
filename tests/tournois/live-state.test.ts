@@ -749,6 +749,8 @@ describe("shareRefereeNames", () => {
 
     const next = applyLiveMessage(established, {
       type: "snapshot",
+      tournamentId: 7,
+      version: "v2",
       snapshot: snapshot({
         version: "v2",
         matches: [match({ id: 5, refereeKey: "k5", status: "AWAITING_CONFIRMATION" })],
@@ -769,6 +771,8 @@ describe("shareRefereeNames", () => {
 
     const next = applyLiveMessage(established, {
       type: "snapshot",
+      tournamentId: 7,
+      version: "v2",
       snapshot: snapshot({ version: "v2", matches: [match({ id: 5, refereeKey: "k5", status: "READY", firstMap: "Ilios" })] }),
     });
 
