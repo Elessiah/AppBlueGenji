@@ -2705,27 +2705,36 @@ describe("MATCH-VOICE — vidage, report et rétention des salons vocaux (D13–
 describe("PRIVACY_CHANGES — contacts du caster à l'arbitre désigné qui caste (REF-CASTER-CONTACTS)", () => {
   const id = "2026-11-contacts-du-caster-arbitre-designe";
   const entry = PRIVACY_CHANGES.find((c) => c.id === id)!;
-  const english = PRIVACY_CHANGES_EN[id];
 
   it("privacyChanges_refCasterContacts_lastEntryForLiveStaffFitsOneDm", () => {
-    expect(entry).toBeDefined();
-    expectEntryAfter(entry, "2026-11-salons-vocaux-vidage-par-l-equipe");
-    expect([entry.publishedAt, entry.audience]).toEqual(["2026-11-12", "LIVE_STAFF"]);
-    expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
-    const [englishEntry] = localizedPrivacyChanges([entry], "en");
-    expect(buildPrivacyChangesMessage([englishEntry], "https://site.test", "en").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(id);
+    expectStandaloneEntry(entry, PRIVACY_CHANGES_EN[id], {
+      after: "2026-11-salons-vocaux-vidage-par-l-equipe",
+      publishedAt: "2026-11-12",
+      audience: "LIVE_STAFF",
+      links: PRIVACY_CHANGES.find((c) => c.id === "2026-10-contacts-du-caster-aux-arbitres")?.links,
+    });
   });
 
   it("privacyChanges_refCasterContacts_statesNewReaderUnchangedPartiesAndNoNewTermsFrAndEn", () => {
-    const fr = [entry.title, entry.summary, ...entry.details].join(" ");
-    expect(fr).toContain("son arbitre désigné voit tes contacts dès que ses deux adversaires sont connus, comme les autres arbitres — désormais aussi quand il caste lui-même le match");
-    expect(fr).toContain("Ses deux équipes et ses autres casters ne les voient toujours que le temps du match");
-    expect(fr).toContain("sans nouvelle version à accepter");
-    const en = [english.title, english.summary, ...english.details].join(" ");
-    expect(en).toContain("its assigned referee sees your contacts as soon as both its opponents are known, like the other referees — now also when they cast the match themselves");
-    expect(en).toContain("Both its teams and its other casters still only see them while the match is being played");
-    expect(en).toContain("with no new version to accept");
+    const [english] = localizedPrivacyChanges([entry], "en");
+    const said: [PrivacyChange, string[]][] = [
+      [entry, [
+        "son arbitre désigné voit tes contacts dès que ses deux adversaires sont connus, comme les autres arbitres — désormais aussi quand il caste lui-même le match",
+        "Ses deux équipes et ses autres casters ne les voient toujours que le temps du match",
+        "sans nouvelle version à accepter",
+      ]],
+      [english, [
+        "its assigned referee sees your contacts as soon as both its opponents are known, like the other referees — now also when they cast the match themselves",
+        "Both its teams and its other casters still only see them while the match is being played",
+        "with no new version to accept",
+        "Read the “Match contacts” section",
+      ]],
+    ];
+    for (const [change, texts] of said) {
+      const text = [change.title, change.summary, ...change.details, ...(change.links ?? []).map((link) => link.label)].join(" ");
+      for (const part of texts) expect(text).toContain(part);
+    }
     expect(english.details).toHaveLength(entry.details.length);
-    expect(english.linkLabels).toHaveLength(entry.links?.length ?? 0);
   });
 });
