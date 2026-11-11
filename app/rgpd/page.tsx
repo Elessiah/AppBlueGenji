@@ -78,7 +78,7 @@ import {
   copyrightNoticeElementsText,
 } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
-import { STREAM_NOTICE_SERVICE, STREAM_NOTICE_SHOWN } from "@/lib/shared/stream-notice";
+import { STREAM_NOTICE_ACCOUNTLESS, STREAM_NOTICE_SERVICE, STREAM_NOTICE_SHOWN } from "@/lib/shared/stream-notice";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
@@ -1035,7 +1035,7 @@ function RgpdFr({
           <p>
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
             score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, d&apos;un nouveau match dont les deux adversaires viennent d&apos;être connus (première manche comprise ; un horaire déjà posé part avec lui seul : couper « Nouveau match » le tait aussi, les rappels le redonnent), de l&apos;horaire de vos matchs (posé,
-            changé ou retiré) et de ses rappels, du check-in d&apos;un match en autogestion d&apos;une équipe que vous gérez (propriétaire ou manager) ou de votre tournoi individuel, d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
+            changé ou retiré) et de ses rappels, du check-in d&apos;un match en autogestion d&apos;une équipe que vous gérez (propriétaire ou manager) ou de votre tournoi individuel, d&apos;une invitation d&apos;équipe, d&apos;une reprise d&apos;équipe fantôme que le staff vous propose ou de la propriété de votre équipe qui vous est transférée (le nom de l&apos;équipe seul, jamais celui de qui invite, propose ou transfère ; une reprise dit « un admin », sans nommer personne), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
             alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du départ du match qu&apos;il caste et du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage. <strong>Rien ne part vers un appareil que vous n&apos;avez pas abonné</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
             <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets. Un
@@ -1308,7 +1308,7 @@ function RgpdFr({
             l&apos;<strong>exécution du service</strong>, et non plus de l&apos;intérêt légitime : il n&apos;y a
             plus d&apos;opposition par « nom neutre ». Ce qui touche les casters (voix, pseudo, lien de leur
             chaîne, mode d&apos;antenne) et les liens de diffusion et de rediffusion publiés sur le site relève
-            de la même base, que la même section des conditions prévoit.
+            de la même base, que la même section des conditions prévoit. {STREAM_NOTICE_ACCOUNTLESS}
             Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
             responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>). Au
             début d&apos;un match diffusé, le bot l&apos;annonce dans le salon #live du serveur Discord de

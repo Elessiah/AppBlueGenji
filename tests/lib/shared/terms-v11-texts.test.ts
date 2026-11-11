@@ -1,15 +1,22 @@
 import { describe, expect, it } from "@jest/globals";
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "@/lib/shared/bot-legal-content";
 import { REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
-import { REPORT_FORM_NAME_EN, STREAM_NOTICE_CASTERS_EN, STREAM_NOTICE_LIVE_EN, STREAM_NOTICE_SERVICE_EN } from "@/lib/shared/legal-text-en";
+import {
+  REPORT_FORM_NAME_EN,
+  STREAM_NOTICE_ACCOUNTLESS_EN,
+  STREAM_NOTICE_CASTERS_EN,
+  STREAM_NOTICE_LIVE_EN,
+  STREAM_NOTICE_SERVICE_EN,
+} from "@/lib/shared/legal-text-en";
 import { VOICE_BOT_RELEASED_MAX_HOURS, VOICE_BOT_UNRELEASED_MAX_HOURS } from "@/lib/shared/match-voice";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 import { PROCESSING_ACTIVITIES, PROCESSING_ACTIVITIES_EN, REGISTER_UPDATED_AT } from "@/lib/shared/processing-register";
-import { AUTOMOD_ALERT_SCOPE, DONNEES_PROFIL, STREAM_PSEUDO_SCOPE } from "@/lib/shared/rgpd-policy";
-import { DONNEES_PROFIL_EN } from "@/lib/shared/rgpd-policy-en";
+import { AUTOMOD_ALERT_SCOPE, DONNEES_PROFIL, DROITS, STREAM_PSEUDO_SCOPE } from "@/lib/shared/rgpd-policy";
+import { DONNEES_PROFIL_EN, DROITS_EN } from "@/lib/shared/rgpd-policy-en";
 import {
   REGISTRATION_STREAM_NOTICE_SHORT,
+  STREAM_NOTICE_ACCOUNTLESS,
   STREAM_NOTICE_CASTERS,
   STREAM_NOTICE_LIVE,
   STREAM_NOTICE_SERVICE,
@@ -101,10 +108,11 @@ describe("D50 — diffusion sous le pseudo : exécution du service, plus de nom 
 
     expect(fr.legalBasis).toContain("pour la diffusion en direct et l'enregistrement de ses matchs sous son pseudo");
     expect(fr.legalBasis).toContain("même base, prévue par la même section des conditions, pour ce qui touche les casters (voix, pseudo, lien de leur chaîne, mode d'antenne), au titre du service auquel le caster s'inscrit sur un match, pour les liens de diffusion et de rediffusion publiés sur le site et pour l'alerte AutoMod");
-    expect(fr.legalBasis).not.toMatch(/intérêt légitime|droit d'opposition/i);
+    // Seul un joueur sans compte (aucune acceptation des conditions) garde l'intérêt légitime (revue juridique v11).
+    expect(fr.legalBasis.split("; pour un joueur sans compte")[0]).not.toMatch(/intérêt légitime|droit d'opposition/i);
     expect(en.legalBasis).toContain("for the live streaming and recording of their matches under their username");
     expect(en.legalBasis).toContain("same basis, provided for by the same section of the terms, for what concerns the casters (voice, username, link to their channel, live mode), under the service the caster registers for on a match, for the stream and replay links published on the site and for the AutoMod alert");
-    expect(en.legalBasis).not.toMatch(/legitimate interest|right to object/i);
+    expect(en.legalBasis.split("; for a player with no account")[0]).not.toMatch(/legitimate interest|right to object/i);
     expect(en.retention).toHaveLength(fr.retention.length);
   });
 
@@ -215,11 +223,11 @@ describe("conditions v11 — précisions tirées d'ERREUR.txt", () => {
 
   it("terms_voiceChannels_sayDeletionRuleLikeTheRegisterFrAndEn", () => {
     expect(termsFr("contacts-de-match")).toContain(
-      `et les supprime une fois que le site les lui a rendus (match terminé, reporté ou sorti du programme, notamment) et qu'ils sont vides — au plus tard environ ${VOICE_BOT_RELEASED_MAX_HOURS} heures après ce rendu, même occupés ; un salon que le site n'a jamais rendu est supprimé dès qu'il est vide passé ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise, et reste tant qu'il est occupé, et une erreur de Discord peut retarder une suppression sans limite`,
+      `et les supprime une fois que le site les lui a rendus (match terminé, reporté ou sorti du programme, notamment) et qu'ils sont vides — au plus tard environ ${VOICE_BOT_RELEASED_MAX_HOURS} heures après ce rendu, même occupés ; un salon que le site n'a jamais rendu est supprimé dès qu'il est vide passé ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise, et reste tant qu'il est occupé, et une erreur de Discord peut retarder une suppression : le bot réessaie alors à chaque balayage`,
     );
     expect(termsFr("contacts-de-match")).not.toContain("les supprime quand ils ne servent plus");
     expect(termsEn("contacts-de-match")).toContain(
-      `and deletes them once the site has handed them back (match completed, postponed or taken off the schedule, among others) and they are empty — at the latest about ${VOICE_BOT_RELEASED_MAX_HOURS} hours after that hand-back, even when occupied; a channel the site never handed back is deleted as soon as it is empty once ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours have passed since its creation or its reuse, and stays as long as it is occupied, and a Discord error can delay a deletion without limit`,
+      `and deletes them once the site has handed them back (match completed, postponed or taken off the schedule, among others) and they are empty — at the latest about ${VOICE_BOT_RELEASED_MAX_HOURS} hours after that hand-back, even when occupied; a channel the site never handed back is deleted as soon as it is empty once ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours have passed since its creation or its reuse, and stays as long as it is occupied, and a Discord error can delay a deletion: the bot then retries at every sweep`,
     );
     expect(termsEn("contacts-de-match")).not.toContain("deletes them once they are no longer needed");
   });
@@ -314,7 +322,7 @@ describe("D55 et revue standard v11", () => {
     expect(en).not.toContain("is deleted on request in the same way");
     expect(fr).toContain("son alerte reste dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs.");
     expect(en).toContain("its alert stays in the moderation alert channel until the moderators delete it.");
-    expect(fr).toContain("supprimées sur demande de l'équipe ou du joueur concerné");
+    expect(fr).toContain("supprimées sur demande de l'équipe, du joueur ou du caster concerné");
   });
 
   it("privacyChangeV11_autoModAlert_saysNoLongerDeletedOnRequestFrAndEn", () => {
@@ -386,5 +394,57 @@ describe("revue sécurité v11 — textes alignés sur le code", () => {
   it("privacyChangeV11_refereeDiscordTag_keepsCasterExceptionFrAndEn", () => {
     expect(v11Fr.details.join(" ")).toContain("jamais par les arbitres sans rôle sur ce match (sauf si l'arbitre désigné caste aussi ce match, son tag suivant alors la règle des casters)");
     expect(v11En.details.join(" ")).toContain("never by referees who have no role in that match (unless the assigned referee also casts that match, their tag then following the casters' rule)");
+  });
+});
+
+describe("revue juridique v11 — joueurs sans compte et textes alignés", () => {
+  const v11Fr = PRIVACY_CHANGES.find((c) => c.id === V11_ID)!;
+  const v11En = PRIVACY_CHANGES_EN[V11_ID];
+  const t16Fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T16")!;
+  const t16En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T16")!;
+
+  it("streamNoticeAccountless_ghostAndAccountlessEntries_legitimateInterestWithObjectionFrAndEn", () => {
+    expect(STREAM_NOTICE_ACCOUNTLESS).toContain("intérêt légitime de l'association à retransmettre ses tournois (RGPD, art. 6.1.f)");
+    expect(STREAM_NOTICE_ACCOUNTLESS).toContain(`il peut s'y opposer (art. 21) par le formulaire « ${REPORT_FORM_NAME} »`);
+    expect(STREAM_NOTICE_ACCOUNTLESS_EN).toContain("legitimate interest in broadcasting its tournaments (GDPR, art. 6(1)(f))");
+    expect(STREAM_NOTICE_ACCOUNTLESS_EN).toContain(`they can object to it (art. 21) through the “${REPORT_FORM_NAME_EN}” form`);
+  });
+
+  it("rgpdPages_retransmissionAndObjection_quoteAccountlessNoticeFrAndEn", () => {
+    expect(readSource("app/rgpd/page.tsx")).toContain("{STREAM_NOTICE_ACCOUNTLESS}");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("{STREAM_NOTICE_ACCOUNTLESS_EN}");
+    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toContain(STREAM_NOTICE_ACCOUNTLESS);
+    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toContain(STREAM_NOTICE_ACCOUNTLESS_EN);
+  });
+
+  it("registerT16_accountlessPlayers_legitimateInterestClauseFrAndEn", () => {
+    expect(t16Fr.legalBasis).toContain("pour un joueur sans compte sur le site (équipe fantôme inscrite par le staff, entrée individuelle sans compte), qui n'a pas accepté les conditions d'utilisation : intérêt légitime");
+    expect(t16Fr.legalBasis).toContain("avec droit d'opposition (art. 21) sur demande");
+    expect(t16En.legalBasis).toContain("for a player with no account on the site (ghost team registered by the staff, solo entry with no account), who has not accepted the terms of use: the association's legitimate interest");
+    expect(t16En.legalBasis).toContain("with a right to object (art. 21) on request");
+  });
+
+  it("privacyChangeV11_refereeTag_readByOtherPartiesFrAndEn", () => {
+    expect(v11Fr.details.join(" ")).toContain("n'est lu que par les autres parties du match (ses deux équipes, ses casters)");
+    expect(v11En.details.join(" ")).toContain("is only read by the other parties to the match (both its teams, its casters)");
+  });
+
+  it("rgpdPages_pushParagraph_takeoverSaysAnAdminFrAndEn", () => {
+    expect(readSource("app/rgpd/page.tsx")).toContain("jamais celui de qui invite, propose ou transfère ; une reprise dit « un admin », sans nommer personne)");
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain("never who invites, offers or transfers; a takeover says “an admin”, naming no one)");
+  });
+
+  it("termsV11_voiceDeletionError_botRetriesThenModerationFrAndEn", () => {
+    const fr = TERMS_SECTIONS.flatMap((s) => s.paragraphs).join(" ");
+    const en = TERMS_SECTIONS_EN.flatMap((s) => s.paragraphs).join(" ");
+
+    expect(fr).toContain("une erreur de Discord peut retarder une suppression : le bot réessaie alors à chaque balayage, et un salon qu'il finit par oublier relève de la modération du serveur");
+    expect(fr).not.toContain("retarder une suppression sans limite");
+    expect(en).toContain("a Discord error can delay a deletion: the bot then retries at every sweep, and a channel it ends up forgetting falls to the server's moderation");
+    expect(en).not.toContain("delay a deletion without limit");
+  });
+
+  it("botPolicy_liveAnnouncementDeletion_includesCasterEn", () => {
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("deleted at the request of the team, player or caster concerned");
   });
 });

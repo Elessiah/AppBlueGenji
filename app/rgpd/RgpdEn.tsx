@@ -23,6 +23,7 @@ import {
   DATA_CONTACT_ROLE_EN,
   NOTIFIER_FOLLOW_UP_EN,
   REPORT_FORM_NAME_EN,
+  STREAM_NOTICE_ACCOUNTLESS_EN,
   STREAM_NOTICE_SERVICE_EN,
   STREAM_NOTICE_SHOWN_EN,
   WEB_ACCESS_LOG_FIELDS_EN,
@@ -852,7 +853,7 @@ export function RgpdEn({
         <div className={styles.prose}>
           <p>
             You can be notified on your phone or computer of the start of your matches, of a score to confirm or confirmed automatically without an answer, of a
-            tournament&apos;s kickoff, of a new match whose two opponents have just become known (first round included; a time already set comes with it alone: turning “New match” off silences it too, the reminders give it again), of your match times (set, changed or removed) and their reminders, of the check-in of a self-managed match of a team you manage (owner or manager) or of your solo tournament, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers), and of what
+            tournament&apos;s kickoff, of a new match whose two opponents have just become known (first round included; a time already set comes with it alone: turning “New match” off silences it too, the reminders give it again), of your match times (set, changed or removed) and their reminders, of the check-in of a self-managed match of a team you manage (owner or manager) or of your solo tournament, of a team invitation, of the takeover of a ghost team the staff offers you or of the ownership of your team being transferred to you (the team&apos;s name only, never who invites, offers or transfers; a takeover says “an admin”, naming no one), and of what
             concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, disputes settled, results corrected,
             opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the start of the match they cast and of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission.{" "}
             <strong>Nothing is sent to a device you have not subscribed</strong>: notifications are turned on device by device,
@@ -1098,7 +1099,7 @@ export function RgpdEn({
             service</strong>, and no longer under legitimate interest: there is no longer an objection through a
             “neutral name”. What concerns the casters (voice, username, link to their channel, live mode) and the
             stream and replay links published on the site falls under the same basis, which the same section
-            of the terms provides for.
+            of the terms provides for. {STREAM_NOTICE_ACCOUNTLESS_EN}
             Viewers, for their part, watch the stream on the platform, which processes their data as the controller
             of its own processing (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>). When a
             streamed match starts, the bot announces it in the #live channel of the association&apos;s Discord

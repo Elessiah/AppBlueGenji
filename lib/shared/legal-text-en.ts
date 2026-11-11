@@ -8,8 +8,10 @@
  * that both lists have the same length, so an item added in French without
  * its English fails.
  *
- * Pure module, importable anywhere — but only the English legal pages
- * import it: no French page carries any of these strings.
+ * Pure module, importable anywhere — the English legal pages import it, and so
+ * do the bilingual bot documents (`bot-legal-content.ts`, which also feed the
+ * bot's `LegalTerms`): changing a constant here can change those documents
+ * too. No French page carries any of these strings.
  */
 
 /** `REPORT_FORM_NAME` — the button as the shell shows it under `/en` (`shell.footer.reportProblem`). */
@@ -43,6 +45,10 @@ export const STREAM_NOTICE_SHOWN_EN =
 /** `STREAM_NOTICE_SERVICE` (`stream-notice.ts`). */
 export const STREAM_NOTICE_SERVICE_EN =
   "Streaming and recording a match under its players' usernames is part of the tournament they take part in (performance of the service): a player who does not want to appear in it does not take part.";
+
+/** `STREAM_NOTICE_ACCOUNTLESS` (`stream-notice.ts`). */
+export const STREAM_NOTICE_ACCOUNTLESS_EN =
+  `A player with no account on the site (a team registered by the staff, known as a “ghost” team, or a solo entry with no account) has not accepted the terms of use: for them, the streaming and recording of their matches rest on the association's legitimate interest in broadcasting its tournaments (GDPR, art. 6(1)(f)), and they can object to it (art. 21) through the “${REPORT_FORM_NAME_EN}” form (GDPR category).`;
 
 /** `STREAM_NOTICE_CASTERS` (`stream-notice.ts`). */
 export const STREAM_NOTICE_CASTERS_EN =

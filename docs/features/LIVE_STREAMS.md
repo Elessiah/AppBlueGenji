@@ -543,6 +543,11 @@ d'antenne), les liens de diffusion et de rediffusion publiés sur le site et
 l'alerte AutoMod d'une annonce #live relèvent de la même base (décision D53,
 `STREAM_NOTICE_CASTERS`) : plus d'intérêt légitime ni de droit d'opposition
 dans T16 ; l'alerte n'est plus supprimée sur demande (D55) : elle reste jusqu'à sa suppression par les modérateurs. Aucun régime transitoire (D54).
+Seul un **joueur sans compte** (équipe fantôme inscrite par le staff, entrée
+individuelle sans compte), qui n'a accepté aucune version des conditions, garde
+l'**intérêt légitime** et le droit d'opposition de l'article 21, sur demande par
+le formulaire de signalement (`STREAM_NOTICE_ACCOUNTLESS` / `_EN`, dans
+`/rgpd#retransmission`, `DROITS` et la base de T16 — revue juridique v11).
 Le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel repose de
 même sur l'**exécution du service** depuis le 2026-10-14 (l'annonce fait partie
 du tournoi auquel il s'inscrit) : ne pas y être
