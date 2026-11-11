@@ -361,6 +361,13 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
         LEFT JOIN bg_users u ON u.id = s.link_user_id
         SET s.live_url = NULL, s.link_user_id = NULL
       WHERE s.link_user_id IS NOT NULL AND (u.id IS NULL OR u.is_deleted = 1)`,
+    // 2 quater. Un stream que plus rien ne justifie — ni lien, ni caster qui
+    //    le tienne (souvent celui que 2 ter vient de vider) — s'efface, comme
+    //    le ferait le ménage du match (`orphanStreamIds`). Idempotent ; la
+    //    sous-requête lit une autre table (MariaDB).
+    `DELETE FROM bg_match_streams
+      WHERE live_url IS NULL
+        AND NOT EXISTS (SELECT 1 FROM bg_match_casters c WHERE c.stream_id = bg_match_streams.id)`,
     // 3. Les anciennes colonnes sont vidées — plus rien ne les écrit : un
     //    redémarrage ne recopie rien, et rien de périmé ne revient. Seulement
     //    ce qui est **arrivé** dans les nouvelles tables : si 1 ou 2 a échoué,
