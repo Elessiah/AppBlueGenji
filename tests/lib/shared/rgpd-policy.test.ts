@@ -556,8 +556,8 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     expect(choiceEn?.base).toBe("Obligation légale");
     expect(choiceEn?.finalite).toMatch(/Kept under a legal obligation: that is what allows your objection to keep being honoured/);
     expect(choiceEn?.finalite).not.toMatch(/legitimate interest/);
-    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord, et ce qui touche les casters et les liens de diffusion publiés relèvent de la même base ; l'alerte reste jusqu'à sa suppression par les modérateurs./);
-    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/The AutoMod alert for such an announcement when blocked or flagged, kept to moderate the Discord server, and what concerns the casters and the published stream links fall under the same basis; the alert stays until the moderators delete it./);
+    expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord, et ce qui touche les casters et les liens de diffusion publiés relèvent de la même base ; l'alerte reste jusqu'à sa suppression par les modérateurs\./);
+    expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/The AutoMod alert for such an announcement when blocked or flagged, kept to moderate the Discord server, and what concerns the casters and the published stream links fall under the same basis; the alert stays until the moderators delete it\./);
     expect(AUTOMOD_ALERT_SCOPE).toMatch(/alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs/);
     expect(LIVE_PSEUDO_SCOPE).not.toMatch(/AutoMod/);
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Match direct messages choice")?.finalite).toMatch(/reset to the default if the account is anonymized/);

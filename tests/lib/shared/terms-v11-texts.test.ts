@@ -215,11 +215,11 @@ describe("conditions v11 — précisions tirées d'ERREUR.txt", () => {
 
   it("terms_voiceChannels_sayDeletionRuleLikeTheRegisterFrAndEn", () => {
     expect(termsFr("contacts-de-match")).toContain(
-      `et les supprime une fois que le site les lui a rendus (match terminé, reporté ou sorti du programme, notamment) et qu'ils sont vides — au plus tard environ ${VOICE_BOT_RELEASED_MAX_HOURS} heures après ce rendu, même occupés ; un salon que le site n'a jamais rendu est supprimé s'il est vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise, et reste tant qu'il est occupé, et une erreur de Discord peut retarder une suppression sans limite`,
+      `et les supprime une fois que le site les lui a rendus (match terminé, reporté ou sorti du programme, notamment) et qu'ils sont vides — au plus tard environ ${VOICE_BOT_RELEASED_MAX_HOURS} heures après ce rendu, même occupés ; un salon que le site n'a jamais rendu est supprimé dès qu'il est vide passé ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise, et reste tant qu'il est occupé, et une erreur de Discord peut retarder une suppression sans limite`,
     );
     expect(termsFr("contacts-de-match")).not.toContain("les supprime quand ils ne servent plus");
     expect(termsEn("contacts-de-match")).toContain(
-      `and deletes them once the site has handed them back (match completed, postponed or taken off the schedule, among others) and they are empty — at the latest about ${VOICE_BOT_RELEASED_MAX_HOURS} hours after that hand-back, even when occupied; a channel the site never handed back is deleted if it is empty ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation or its reuse, and stays as long as it is occupied, and a Discord error can delay a deletion without limit`,
+      `and deletes them once the site has handed them back (match completed, postponed or taken off the schedule, among others) and they are empty — at the latest about ${VOICE_BOT_RELEASED_MAX_HOURS} hours after that hand-back, even when occupied; a channel the site never handed back is deleted as soon as it is empty once ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours have passed since its creation or its reuse, and stays as long as it is occupied, and a Discord error can delay a deletion without limit`,
     );
     expect(termsEn("contacts-de-match")).not.toContain("deletes them once they are no longer needed");
   });
@@ -301,8 +301,8 @@ describe("D55 et revue standard v11", () => {
     const frAlert = fr.flatMap((a) => autoModLines([...a.retention, a.legalBasis])).join("\n");
     const enAlert = en.flatMap((a) => autoModLines([...a.retention, a.legalBasis])).join("\n");
 
-    expect(frAlert).not.toMatch(/alerte AutoMod[^;\n]*(supprimée sur demande|ou sur demande)/);
-    expect(enAlert).not.toMatch(/AutoMod alert[^;\n]*(deleted on request|or on request|deleted at the request)/);
+    expect(frAlert).not.toMatch(/alerte AutoMod[^;\n]*(supprimée sur demande|ou sur demande)/i);
+    expect(enAlert).not.toMatch(/AutoMod alert[^;\n]*(deleted on request|or on request|deleted at the request)/i);
     expect(t16Fr.retention.join(" ")).toContain("supprimé sur demande de l'équipe, du joueur ou du caster concerné");
   });
 
@@ -339,13 +339,13 @@ describe("D55 et revue standard v11", () => {
   });
 
   it("privacyChangeV11_unreleasedVoiceChannel_deletedWhenEmptyAfterMaxHoursFrAndEn", () => {
-    expect(v11Fr.details.join(" ")).toContain(`un salon jamais rendu étant supprimé s'il est vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise, et restant tant qu'il est occupé`);
-    expect(v11En.details.join(" ")).toContain(`a channel never handed back being deleted if it is empty ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation or its reuse, and staying as long as it is occupied`);
+    expect(v11Fr.details.join(" ")).toContain(`un salon jamais rendu étant supprimé dès qu'il est vide passé ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise, et restant tant qu'il est occupé`);
+    expect(v11En.details.join(" ")).toContain(`a channel never handed back being deleted as soon as it is empty once ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours have passed since its creation or its reuse, and staying as long as it is occupied`);
   });
 
   it("privacyChangeV11_correctsPublishedVoiceEntry_listsMatchAndTeamNumbersFrAndEn", () => {
-    expect(v11Fr.details.join(" ")).toContain("le site garde, pour chaque salon, son identifiant, les numéros du match et de l'équipe et ses horaires (création, rendu, panne du bot)");
-    expect(v11En.details.join(" ")).toContain("the site keeps, for each channel, its identifier, the match and team numbers and its times (creation, hand-back, bot outage)");
+    expect(v11Fr.details.join(" ")).toContain("le site garde, pour chaque salon, son identifiant, les numéros du match et de l'équipe, ses horaires (création, rendu, panne du bot ou rendu refusé) et si une panne touchait tout le bot");
+    expect(v11En.details.join(" ")).toContain("the site keeps, for each channel, its identifier, the match and team numbers, its times (creation, hand-back, bot outage or refused hand-back) and whether an outage hit the whole bot");
   });
 
   it("registerT16_casters_baseOnTheirOwnRegistrationFrAndEn", () => {

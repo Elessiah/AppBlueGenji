@@ -34,7 +34,8 @@ export const STREAM_PSEUDO_SCOPE = "diffusion en direct et enregistrement des ma
  * Copie du même pseudo dans l'alerte AutoMod d'une annonce #live bloquée ou
  * signalée (registre T16) : exécution du service depuis la version 11 des
  * conditions (décision de l'utilisateur D53, 2026-11-11) — auparavant intérêt
- * légitime de l'association à modérer son serveur. Supprimée sur demande.
+ * légitime de l'association à modérer son serveur. Plus supprimée sur demande
+ * (décision D55) : gardée jusqu'à sa suppression par les modérateurs.
  */
 export const AUTOMOD_ALERT_SCOPE = "alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs jusqu'à sa suppression par eux";
 
