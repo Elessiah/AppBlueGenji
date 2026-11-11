@@ -1468,8 +1468,8 @@ function RgpdFr({
             <strong>Quand cette politique change</strong>, chaque utilisateur inscrit
             avant le changement en est informé à sa visite suivante, par une
             fenêtre qui résume ce qui change, et, s&apos;il ne revient pas, en message
-            privé Discord ou par notification push s&apos;il les a activées. C&apos;est une information : aucun accord n&apos;est demandé — sauf, pour une nouvelle version des conditions d&apos;utilisation, celui que la fenêtre demande si vous ne l&apos;avez pas encore acceptée —, et la
-            lire ne retire aucun des droits décrits ci-dessus. Ce qui repose sur votre
+            privé Discord ou par notification push s&apos;il les a activées. C&apos;est une information, dont la lecture ne retire aucun des droits
+            décrits ci-dessus : aucun accord n&apos;est demandé — sauf, pour une nouvelle version des conditions d&apos;utilisation, celui que le site demande si vous ne l&apos;avez pas encore acceptée. Ce qui repose sur votre
             consentement se règle dans « Mon profil », sans perdre votre compte.
           </p>
         </div>

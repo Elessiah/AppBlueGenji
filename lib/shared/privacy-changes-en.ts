@@ -973,7 +973,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
   },
   "2026-11-rectificatifs-hebergement-courriel-push": {
-    linkLabels: ["Read the “Recipients” section", "Read the “Push notifications” section"],
+    linkLabels: [READ_RECIPIENTS, "Read the “Push notifications” section"],
     title: "Hosting, the association's email and push notifications: clarifications",
     summary:
       "The site and the bot have no hosting provider: the association's technical manager runs them on their own machine, with no processing agreement. The association's email is moving to Google Workspace. A new push notification topic is on by default on a device already subscribed.",

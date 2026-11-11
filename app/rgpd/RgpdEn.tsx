@@ -1239,8 +1239,8 @@ export function RgpdEn({
           <p>
             <strong>When this policy changes</strong>, every user registered before the change is informed at their
             next visit, by a window that summarizes what changes, and, if they do not come back, by Discord direct
-            message or by push notification if they have turned them on. This is information: no agreement is
-            requested — except, for a new version of the terms of use, the one the window asks for if you have not accepted it yet —, and reading it does not take away any of the rights described above. What is based on your
+            message or by push notification if they have turned them on. This is information, and reading it does not take
+            away any of the rights described above: no agreement is requested — except, for a new version of the terms of use, the one the site asks for if you have not accepted it yet. What is based on your
             consent is set in “My profile”, without losing your account.
           </p>
         </div>

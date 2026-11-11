@@ -37,6 +37,7 @@ describe("rectificatif hébergement, courriel et push (LEGAL-LOT-1)", () => {
   });
 
   it("rectificatifHebergement_gmail_saysMovingToWorkspaceWithoutClaimingItDoneFrAndEn", () => {
+    expect(entry()?.summary).toContain("est en cours de passage à Google Workspace");
     expect(detailsFr()).toContain("est en cours de passage à Google Workspace");
     expect(detailsEn()).toContain("is moving to Google Workspace");
     expect(ASSOCIATION_GMAIL_FRAMEWORK).toContain("en cours de passage à Google Workspace");
@@ -53,7 +54,8 @@ describe("rectificatif hébergement, courriel et push (LEGAL-LOT-1)", () => {
   it("rectificatifHebergement_links_pointToExistingRgpdAnchors", () => {
     const hrefs = entry()?.links?.map((link) => link.href);
     expect(hrefs).toEqual(["/rgpd#destinataires", "/rgpd#notifications"]);
-    expect(PRIVACY_CHANGES_EN[ID]?.linkLabels).toHaveLength(2);
+    expect(entry()?.links?.[0]?.label).toBe("Lire la section « Destinataires et transferts »");
+    expect(PRIVACY_CHANGES_EN[ID]?.linkLabels).toEqual(["Read the “Recipients and transfers” section", "Read the “Push notifications” section"]);
     for (const page of ["app/rgpd/page.tsx", "app/rgpd/RgpdEn.tsx"]) {
       expect(read(page)).toContain('<section id="destinataires"');
       expect(read(page)).toContain('<section id="notifications"');
