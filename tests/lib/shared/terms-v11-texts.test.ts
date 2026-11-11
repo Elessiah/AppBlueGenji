@@ -446,8 +446,8 @@ describe("D56b — alerte AutoMod supprimée à la main à la suppression du com
   });
 
   it("registerT05_staffLog_declaresTheDeletionLineContentFrAndEn", () => {
-    expect(t("T05")).toContain("la ligne de sa demande de suppression cite le tournoi, le jour et une heure de chaque soirée #live où il a pu paraître, pour que les modérateurs suppriment à la main celles de leurs alertes AutoMod qu'ils parviennent à identifier (T16)");
-    expect(tEn("T05")).toContain("the line of its deletion request quotes the tournament, the day and a time of each #live evening in which they may have appeared, so that the moderators delete by hand those of their AutoMod alerts they can identify (T16)");
+    expect(t("T05")).toContain("les lignes de sa demande de suppression citent le tournoi, le jour et une heure de chaque soirée #live où il a pu paraître, pour que les modérateurs suppriment à la main celles de leurs alertes AutoMod qu'ils parviennent à identifier (T16)");
+    expect(tEn("T05")).toContain("the lines of its deletion request quote the tournament, the day and a time of each #live evening in which they may have appeared, so that the moderators delete by hand those of their AutoMod alerts they can identify (T16)");
   });
 
   it("registerT01AndT08_alert_noLongerKeptAfterAccountDeletionFrAndEn", () => {
@@ -522,8 +522,8 @@ describe("revue légale delta (D56c)", () => {
     const fr = readSource("app/rgpd/page.tsx");
     const en = readSource("app/rgpd/RgpdEn.tsx");
 
-    expect(fr).toContain("la ligne de la demande cite aussi le tournoi, le jour et une heure de chaque soirée concernée, pour que les modérateurs suppriment à la main les alertes AutoMod qu&apos;ils parviennent à identifier, sans garantie de toutes les retrouver (<a href=\"#retransmission\">");
-    expect(en).toContain("the line of the request also quotes the tournament, the day and a time of each evening concerned, so that the moderators delete by hand the AutoMod alerts they can identify, with no guarantee that all are found (<a href=\"#retransmission\">");
+    expect(fr).toContain("les lignes de la demande citent aussi le tournoi, le jour et une heure de chaque soirée concernée, pour que les modérateurs suppriment à la main les alertes AutoMod qu&apos;ils parviennent à identifier, sans garantie de toutes les retrouver (<a href=\"#retransmission\">");
+    expect(en).toContain("the lines of the request also quote the tournament, the day and a time of each evening concerned, so that the moderators delete by hand the AutoMod alerts they can identify, with no guarantee that all are found (<a href=\"#retransmission\">");
   });
 
   it("formatAccountDeletionLog_announcedAccount_asksToDeleteAllAlertsOfThoseEvenings", () => {

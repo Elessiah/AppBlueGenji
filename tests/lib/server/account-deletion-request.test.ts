@@ -983,7 +983,7 @@ describe("requestAccountDeletion — journal et forfaits (E1, E5)", () => {
 
     expect(jest.mocked(listLiveAnnouncementsForDeletionLog)).toHaveBeenCalledWith(7);
     const [message] = jest.mocked(sendBotLog).mock.calls[0];
-    expect(message).toContain("(« Solo Cup » le 13/11/2026 vers 21:04) — supprimer à la main, dans le salon d'alertes AutoMod, toutes les alertes des messages #live de ces soirées, avant comme après l'heure citée (rien ne dit lesquelles citent ce compte) : le message d'une soirée liste à l'avance les matchs programmés et reprend, à chaque nouveau match, ceux déjà annoncés.");
+    expect(message).toContain("(« Solo Cup » le 13/11/2026 vers 21:04) — supprimer à la main, dans le salon d'alertes AutoMod, toutes les alertes des messages #live de ces soirées, avant comme après l'heure citée (rien ne dit lesquelles citent ce compte), une fois relevé ce qui sert encore à un cas de modération en cours : le message d'une soirée liste à l'avance les matchs programmés et reprend, à chaque nouveau match, ceux déjà annoncés.");
   });
 
   it("requestAccountDeletion_sixEvenings_sendsFollowUpLineInSignups", async () => {
