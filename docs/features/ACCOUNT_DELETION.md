@@ -1076,11 +1076,12 @@ Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à c
 
 La ligne « Suppression de compte demandée » du journal du staff sur Discord
 (`formatAccountDeletionLog`) se prolonge, pour un compte annoncé dans #live en
-tournoi individuel, des soirées #live de ces annonces — tournoi, jour, heure
-de la première (`listLiveAnnouncementsForDeletionLog`) : les modérateurs
-suppriment **à la main** les alertes AutoMod des messages de ces soirées qui
-citent ses matchs (le message d'une soirée, modifié à chaque match, reprend les
-matchs déjà annoncés et ceux programmés), que ni le site ni le bot ne savent
+tournoi individuel ou programmé (`START_TIME`) sur un match casté, des soirées
+#live où il a pu paraître — tournoi, jour, une heure
+(`listLiveAnnouncementsForDeletionLog`) : les modérateurs suppriment **à la
+main** les alertes AutoMod des messages de ces soirées qui citent ses matchs,
+avant comme après l'heure citée (le message d'une soirée liste à l'avance les
+matchs programmés et reprend ceux déjà annoncés), que ni le site ni le bot ne savent
 retrouver. Jamais un pseudo ni un identifiant ; cinq soirées citées, les
 autres comptées (« et d'autres, plus anciennes » au-delà de 500 annonces lues) ;
 lecture en échec → « vérifier le salon d'alertes ». Détail :

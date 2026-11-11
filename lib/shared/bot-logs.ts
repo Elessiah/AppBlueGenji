@@ -182,13 +182,13 @@ export function formatAccountDeletionLog(context: {
   return `${leadOn("🗑️", "Suppression de compte demandée", detail)}.${automodAlertsToClear(context.liveAnnouncements)}`;
 }
 
-/** Une annonce #live d'un tournoi individuel où paraissait le compte supprimé. */
+/** Une annonce #live (ou un match programmé listé à l'avance) d'un tournoi individuel du compte supprimé. */
 export interface DeletedAccountLiveAnnouncement {
   tournamentName: string;
   sentAt: string | Date;
 }
 
-/** Annonces du compte supprimé, et `truncated` si leur lecture s'est arrêtée à sa limite. */
+/** Annonces et matchs programmés du compte supprimé, et `truncated` si leur lecture s'est arrêtée à sa limite. */
 export interface DeletedAccountLiveAnnouncements {
   announcements: readonly DeletedAccountLiveAnnouncement[];
   truncated: boolean;
@@ -216,11 +216,12 @@ function announcementTime(sentAt: string | Date): { day: string; time: string } 
 }
 
 /**
- * Soirées #live où le compte a paru : une par tournoi et par jour (Paris), de
- * la plus récente à la plus ancienne, avec l'heure de sa **première** annonce
- * ce jour-là. Le message d'une soirée est modifié à chaque match qui passe à
- * l'antenne et reprend les matchs déjà annoncés : une alerte postérieure à
- * l'annonce peut porter le même pseudo — c'est la soirée qu'il faut parcourir.
+ * Soirées #live où le compte a pu paraître : une par tournoi et par jour
+ * (Paris), de la plus récente à la plus ancienne, avec la plus ancienne heure
+ * connue ce jour-là. Le message d'une soirée liste à l'avance les matchs
+ * programmés et reprend, à chaque modification, ceux déjà annoncés : une
+ * alerte d'avant comme d'après cette heure peut porter le pseudo — c'est la
+ * soirée entière qu'il faut parcourir.
  */
 function announcementEvenings(
   announcements: readonly DeletedAccountLiveAnnouncement[],
@@ -240,10 +241,10 @@ function announcementEvenings(
  * un message de Discord que ni le site ni le bot ne savent retrouver — les
  * modérateurs la suppriment **à la main** quand le compte est supprimé. La
  * ligne leur dit où chercher sans nommer personne : chaque soirée #live d'un
- * tournoi individuel où le compte a paru (tournoi, jour, heure de sa première
- * annonce ce jour-là), jamais un pseudo ni un identifiant — une alerte d'une
- * modification ultérieure du message de la soirée le porte aussi. Rien n'est
- * ajouté pour un compte jamais annoncé.
+ * tournoi individuel où le compte a pu paraître (tournoi, jour, une heure),
+ * jamais un pseudo ni un identifiant — toute alerte d'un message de cette
+ * soirée peut le porter. Rien n'est ajouté pour un compte jamais annoncé ni
+ * programmé.
  */
 function automodAlertsToClear(liveAnnouncements: DeletedAccountLiveAnnouncements | null | undefined): string {
   if (liveAnnouncements === null) {
@@ -253,11 +254,11 @@ function automodAlertsToClear(liveAnnouncements: DeletedAccountLiveAnnouncements
   const evenings = announcementEvenings(liveAnnouncements.announcements);
   const cited = evenings
     .slice(0, ACCOUNT_DELETION_LOG_MAX_ANNOUNCEMENTS)
-    .map((evening) => `${discordQuoted(evening.tournamentName, "fr")} le ${evening.day} dès ${evening.time}`);
+    .map((evening) => `${discordQuoted(evening.tournamentName, "fr")} le ${evening.day} vers ${evening.time}`);
   const others = evenings.length - cited.length;
+  if (others > 0) cited.push(others === 1 ? "et 1 autre" : `et ${others} autres`);
   if (liveAnnouncements.truncated) cited.push("et d'autres, plus anciennes");
-  else if (others > 0) cited.push(others === 1 ? "et 1 autre" : `et ${others} autres`);
-  return ` Modération : ce compte a été annoncé dans #live en tournoi individuel (${cited.join(" ; ")}) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes des messages #live de ces soirées qui citent ses matchs : le message d'une soirée, modifié à chaque nouveau match, reprend ceux déjà annoncés et ceux programmés.`;
+  return ` Modération : ce compte a été annoncé dans #live en tournoi individuel (${cited.join(" ; ")}) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes des messages #live de ces soirées qui citent ses matchs, avant comme après l'heure citée : le message d'une soirée liste à l'avance les matchs programmés et reprend, à chaque nouveau match, ceux déjà annoncés.`;
 }
 
 /**

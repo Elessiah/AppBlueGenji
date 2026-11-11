@@ -67,11 +67,25 @@ describe("listLiveAnnouncementsForDeletionLog", () => {
     const [sql, params] = execute.mock.calls[0];
     expect(sql).toMatch(/st\.solo_user_id = \?/);
     expect(sql).toMatch(/FIND_IN_SET\(st\.id, REPLACE\(a\.pairing, ':', ','\)\)/);
-    expect(sql).toMatch(/ORDER BY a\.sent_at DESC, a\.match_id DESC\s+LIMIT 501$/);
+    expect(sql).toMatch(/ORDER BY sent_at DESC, match_id DESC\s+LIMIT 501$/);
     expect(sql).not.toMatch(/pseudo/);
     // Un refus d'AutoMod est justement celui qui laisse une alerte : pas de filtre.
     expect(sql).not.toMatch(/refused/);
-    expect(params).toEqual([7]);
+    expect(params).toEqual([7, 7]);
+  });
+
+  it("listLiveAnnouncementsForDeletionLog_query_alsoReadsScheduledStartTimeMatches", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await listLiveAnnouncementsForDeletionLog(7);
+
+    // Le message d'une soirée liste à l'avance les matchs programmés, pseudo compris.
+    const [sql] = execute.mock.calls[0];
+    expect(sql).toMatch(/UNION ALL/);
+    expect(sql).toMatch(/m\.start_at AS sent_at/);
+    expect(sql).toMatch(/m\.live_trigger = 'START_TIME'/);
+    expect(sql).toMatch(/st\.id IN \(m\.team1_id, m\.team2_id\)/);
   });
 
   it("listLiveAnnouncementsForDeletionLog_rowWithoutDate_isSkipped", async () => {

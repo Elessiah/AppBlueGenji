@@ -567,12 +567,13 @@ ne voit même pas une alerte seulement « signalée » : ils ne peuvent pas
 l'effacer. À la **demande de suppression**, la ligne « Suppression de compte
 demandée » du journal du staff (`formatAccountDeletionLog`, catégorie
 `signups`) dit donc aux modérateurs quoi supprimer : chaque soirée #live d'un
-tournoi individuel où le compte a paru — tournoi, jour et heure (Paris) de sa
-première annonce ce jour-là (`listLiveAnnouncementsForDeletionLog`, lues dans
-`bg_live_announcements`, refusées comprises : un refus d'AutoMod laisse une
-alerte ; cinq soirées citées, les autres comptées) — et d'y supprimer les
-alertes des messages qui citent ses matchs, car le message de la soirée,
-modifié à chaque match, reprend les matchs déjà annoncés et ceux programmés ;
+tournoi individuel où le compte a pu paraître — tournoi, jour et plus ancienne
+heure connue (Paris) (`listLiveAnnouncementsForDeletionLog` : ses annonces de
+`bg_live_announcements`, refusées comprises, car un refus d'AutoMod laisse une
+alerte, et l'heure de ses matchs castés programmés `START_TIME`, listés à
+l'avance même s'ils ne passent jamais à l'antenne ; cinq soirées citées, les
+autres comptées) — et d'y supprimer, avant comme après l'heure citée, les
+alertes des messages qui citent ses matchs ;
 **jamais un pseudo ni un identifiant** ; rien de plus pour un compte jamais annoncé, et « vérifier
 le salon d'alertes » si la lecture échoue. Une réactivation ne rétablit pas une
 alerte supprimée. Textes à tenir ensemble : T16

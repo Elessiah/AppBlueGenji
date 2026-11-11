@@ -170,7 +170,7 @@ describe("formatAccountDeletionLog", () => {
     });
 
     expect(actual).toBe(
-      "🗑️ Suppression de compte demandée — définitive sous 30 jours, sauf réactivation. Modération : ce compte a été annoncé dans #live en tournoi individuel (« Solo Cup » le 13/11/2026 dès 21:04) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes des messages #live de ces soirées qui citent ses matchs : le message d'une soirée, modifié à chaque nouveau match, reprend ceux déjà annoncés et ceux programmés.",
+      "🗑️ Suppression de compte demandée — définitive sous 30 jours, sauf réactivation. Modération : ce compte a été annoncé dans #live en tournoi individuel (« Solo Cup » le 13/11/2026 vers 21:04) — supprimer à la main, dans le salon d'alertes AutoMod, les alertes des messages #live de ces soirées qui citent ses matchs, avant comme après l'heure citée : le message d'une soirée liste à l'avance les matchs programmés et reprend, à chaque nouveau match, ceux déjà annoncés.",
     );
   });
 
@@ -186,7 +186,7 @@ describe("formatAccountDeletionLog", () => {
       },
     });
 
-    expect(actual).toContain("(« Cup » le 13/11/2026 dès 20:04) —");
+    expect(actual).toContain("(« Cup » le 13/11/2026 vers 20:04) —");
     expect(actual).not.toContain("22:30");
   });
 
@@ -202,7 +202,7 @@ describe("formatAccountDeletionLog", () => {
       },
     });
 
-    expect(actual).toContain("(« Cup » le 14/11/2026 dès 20:00 ; « Cup » le 13/11/2026 dès 20:00) —");
+    expect(actual).toContain("(« Cup » le 14/11/2026 vers 20:00 ; « Cup » le 13/11/2026 vers 20:00) —");
   });
 
   it("formatAccountDeletionLog_twoTournamentsSameDay_citesBoth", () => {
@@ -217,7 +217,7 @@ describe("formatAccountDeletionLog", () => {
       },
     });
 
-    expect(actual).toContain("(« B » le 13/11/2026 dès 21:00 ; « A » le 13/11/2026 dès 20:00) —");
+    expect(actual).toContain("(« B » le 13/11/2026 vers 21:00 ; « A » le 13/11/2026 vers 20:00) —");
   });
 
   it("formatAccountDeletionLog_afterParisMidnight_usesParisDay", () => {
@@ -229,20 +229,20 @@ describe("formatAccountDeletionLog", () => {
       },
     });
 
-    expect(actual).toContain("« Cup » le 02/07/2026 dès 00:30");
+    expect(actual).toContain("« Cup » le 02/07/2026 vers 00:30");
   });
 
   it("formatAccountDeletionLog_fiveEvenings_citesAllWithoutCount", () => {
     const actual = formatAccountDeletionLog({ days: 30, liveAnnouncements: evenings(5) });
 
-    expect(actual).toContain("« Cup 5 » le 05/07/2026 dès 14:00) — supprimer à la main");
+    expect(actual).toContain("« Cup 5 » le 05/07/2026 vers 14:00) — supprimer à la main");
     expect(actual).not.toContain("autre");
   });
 
   it("formatAccountDeletionLog_sixEvenings_citesFiveAndCountsOneOther", () => {
     const actual = formatAccountDeletionLog({ days: 30, liveAnnouncements: evenings(6) });
 
-    expect(actual).toContain("« Cup 5 » le 05/07/2026 dès 14:00 ; et 1 autre) — supprimer à la main");
+    expect(actual).toContain("« Cup 5 » le 05/07/2026 vers 14:00 ; et 1 autre) — supprimer à la main");
     expect(actual).not.toContain("Cup 6");
   });
 
@@ -261,7 +261,13 @@ describe("formatAccountDeletionLog", () => {
       },
     });
 
-    expect(actual).toContain("(« Cup » le 01/07/2026 dès 14:00 ; et d'autres, plus anciennes) —");
+    expect(actual).toContain("(« Cup » le 01/07/2026 vers 14:00 ; et d'autres, plus anciennes) —");
+  });
+
+  it("formatAccountDeletionLog_truncatedWithOthers_countsOthersThenSaysOlderOnesExist", () => {
+    const actual = formatAccountDeletionLog({ days: 30, liveAnnouncements: { ...evenings(6), truncated: true } });
+
+    expect(actual).toContain("« Cup 5 » le 05/07/2026 vers 14:00 ; et 1 autre ; et d'autres, plus anciennes) —");
   });
 
   it("formatAccountDeletionLog_unreadableAnnouncements_tellsStaffToCheckTheAlertChannel", () => {

@@ -40,13 +40,15 @@ export async function listOwnLiveAnnouncements(userId: number): Promise<Personal
 export const DELETION_LOG_ANNOUNCEMENTS_LIMIT = 500;
 
 /**
- * Annonces #live d'un tournoi individuel qui ont concerné le compte, de la plus
- * récente à la plus ancienne : le nom du tournoi et la date de l'annonce —
- * jamais un pseudo. Lues à la demande de suppression pour la ligne du journal
- * du staff (`formatAccountDeletionLog`, décision D56b) : les modérateurs y
- * trouvent quelles alertes AutoMod supprimer à la main. Les annonces refusées
- * restent : un refus d'AutoMod est justement celui qui laisse une alerte. Rien
- * n'en est gardé.
+ * Moments où le compte a pu paraître dans #live en tournoi individuel, du plus
+ * récent au plus ancien : le nom du tournoi et une date — jamais un pseudo. Ce
+ * sont ses annonces (refusées comprises : un refus d'AutoMod est justement
+ * celui qui laisse une alerte) **et** l'heure de ses matchs programmés
+ * (`START_TIME`) castés, que le message d'une soirée liste avant leur passage
+ * à l'antenne, même s'ils n'y sont jamais passés. Lus à la demande de
+ * suppression pour la ligne du journal du staff (`formatAccountDeletionLog`,
+ * décision D56b) : les modérateurs y trouvent quelles soirées parcourir pour
+ * supprimer à la main les alertes AutoMod. Rien n'en est gardé.
  *
  * @returns Les annonces, et `truncated` si la lecture a atteint sa limite.
  */
@@ -55,15 +57,21 @@ export async function listLiveAnnouncementsForDeletionLog(
 ): Promise<{ announcements: { tournamentName: string; sentAt: string }[]; truncated: boolean }> {
   const db = await getDatabase();
   const [rows] = await db.execute<(RowDataPacket & { name: string; sent_at: Date | string | null })[]>(
-    `SELECT t.name, a.sent_at
+    `SELECT t.name, a.sent_at, a.match_id
      FROM bg_live_announcements a
      JOIN bg_matches m ON m.id = a.match_id
      JOIN bg_tournaments t ON t.id = m.tournament_id
      JOIN bg_teams st ON st.solo_user_id = ?
       AND FIND_IN_SET(st.id, REPLACE(a.pairing, ':', ',')) > 0
-     ORDER BY a.sent_at DESC, a.match_id DESC
+     UNION ALL
+     SELECT t.name, m.start_at AS sent_at, m.id AS match_id
+     FROM bg_matches m
+     JOIN bg_tournaments t ON t.id = m.tournament_id
+     JOIN bg_teams st ON st.solo_user_id = ? AND st.id IN (m.team1_id, m.team2_id)
+     WHERE m.live_trigger = 'START_TIME' AND m.is_bye = 0 AND m.start_at IS NOT NULL
+     ORDER BY sent_at DESC, match_id DESC
      LIMIT ${DELETION_LOG_ANNOUNCEMENTS_LIMIT + 1}`,
-    [userId],
+    [userId, userId],
   );
   const announcements = rows.slice(0, DELETION_LOG_ANNOUNCEMENTS_LIMIT).flatMap((row) => {
     const sentAt = toIso(row.sent_at);
