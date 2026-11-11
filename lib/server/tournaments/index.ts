@@ -183,7 +183,7 @@ import {
   publishScoreReportedEvent,
 } from "./notifications";
 import { discardBotLogs, flushBotLogs, markResultValidatedByStaff, queueBotLog } from "./bot-logs";
-import { releaseWithServerLockWait, rollbackKeepingError } from "./lock-wait";
+import { isUnsettled, releaseWithServerLockWait, rollbackKeepingError } from "./lock-wait";
 import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
@@ -297,6 +297,10 @@ export async function syncVisibleTournaments(): Promise<void> {
         } finally {
           discardBotLogs(connection);
         }
+        // Transaction peut-être encore ouverte : le `START TRANSACTION` du
+        // tournoi suivant validerait en silence les écritures défaites. La
+        // passe s'arrête ; le balayage suivant reprend les autres.
+        if (isUnsettled(connection)) break;
       }
     } finally {
       await releaseWithServerLockWait(connection);

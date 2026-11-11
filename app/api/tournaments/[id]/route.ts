@@ -1,5 +1,6 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
 import { enforceRateLimit, TOURNAMENT_READ_RULE } from "@/lib/server/api-guard";
+import { serviceErrorCode } from "@/lib/server/failure-reason";
 import { fail, ok } from "@/lib/server/http";
 import { getTournamentDetail } from "@/lib/server/tournaments-service";
 import { can, canAny } from "@/lib/shared/permissions";
@@ -42,7 +43,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       canCancelForfeit: user.isAdmin === true,
     });
   } catch (error) {
-    return fail(error instanceof Error ? error.message : "INTERNAL_ERROR", 500);
+    return fail(serviceErrorCode(error, "INTERNAL_ERROR"), 500);
   }
   if (!detail) return fail("TOURNAMENT_NOT_FOUND", 404);
 

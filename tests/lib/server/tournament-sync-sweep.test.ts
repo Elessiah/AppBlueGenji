@@ -19,6 +19,7 @@ type Connection = {
   commit: jest.Mock;
   rollback: jest.Mock;
   release: jest.Mock;
+  destroy: jest.Mock;
 };
 
 /**
@@ -32,6 +33,8 @@ async function runSweep(options: {
   changed?: number[];
   contentChanged?: number[];
   launchesChanged?: number[];
+  /** Le `ROLLBACK` échoue (connexion peut-être encore en transaction). */
+  rollbackFails?: boolean;
 }): Promise<{
   connection: Connection;
   synced: number[];
@@ -81,8 +84,11 @@ async function runSweep(options: {
         execute: jest.fn(async () => [[], undefined]),
         beginTransaction: jest.fn(async () => undefined),
         commit: jest.fn(async () => undefined),
-        rollback: jest.fn(async () => undefined),
+        rollback: jest.fn(async () => {
+          if (options.rollbackFails) throw new Error("ROLLBACK perdu");
+        }),
         release: jest.fn(() => undefined),
+        destroy: jest.fn(() => undefined),
       };
       return {
         getDatabase: jest.fn(async () => ({
@@ -132,6 +138,20 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
     expect(synced).toEqual([1, 2, 3]);
     expect(connection.rollback).toHaveBeenCalledTimes(1);
     expect(connection.commit).toHaveBeenCalledTimes(2);
+  });
+
+  // Revue #591 : après un `ROLLBACK` raté, le `START TRANSACTION` du tournoi
+  // suivant aurait validé en silence les écritures défaites du précédent.
+  it("syncVisibleTournaments_rollbackFails_stopsPassAndDestroysConnection", async () => {
+    const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const { connection, synced } = await runSweep({ candidates: [1, 2, 3], failOn: [2], rollbackFails: true });
+
+    expect(synced).toEqual([1, 2]);
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(2);
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+    expect(connection.release).not.toHaveBeenCalled();
+    logged.mockRestore();
   });
 
   // Le moteur ne publiait pas seulement à la bascule d'état : `createBracketIfMissing`
@@ -246,6 +266,7 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
           commit: jest.fn(async () => undefined),
           rollback: jest.fn(async () => undefined),
           release: jest.fn(() => undefined),
+          destroy: jest.fn(() => undefined),
         };
         return {
           getDatabase: jest.fn(async () => ({

@@ -378,7 +378,8 @@ async function setToldTime(match: ScheduledMatch, startAt: Date | null): Promise
   // verrouillage du moteur — un `UPDATE … JOIN` pouvait tenir la marque en
   // attendant la manche, et s'interbloquer avec `setMatchStartAt`.
   // Rejouée sur interblocage, comme `claimDatedMark` : une instruction seule,
-  // qui tient le verrou AUTO-INC de la table le temps de lire la manche.
+  // qui verrouille la manche lue puis la marque (clé naturelle, sans verrou
+  // AUTO-INC depuis la recomposition de la table).
   const [result] = await retryOnDeadlock(() =>
     db.execute(
       `INSERT INTO bg_match_reminders (match_id, offset_key, start_at)

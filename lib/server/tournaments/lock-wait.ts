@@ -70,6 +70,17 @@ export async function rollbackKeepingError(connection: PoolConnection): Promise<
 }
 
 /**
+ * `true` si le `ROLLBACK` de cette connexion a échoué : une transaction y est
+ * peut-être encore ouverte, et le prochain `START TRANSACTION` la validerait
+ * en silence. Une boucle qui enchaîne des transactions sur la même connexion
+ * s'arrête alors ; la connexion est détruite au retour
+ * ({@link releaseWithServerLockWait}).
+ */
+export function isUnsettled(connection: PoolConnection): boolean {
+  return unsettled.has(connection);
+}
+
+/**
  * Rend la connexion au pool avec le délai de verrou du serveur, filet de
  * {@link withShortLockWait} : rendue avec le délai court, elle l'imposerait à
  * la requête suivante. La remise n'est rejouée que si celle de

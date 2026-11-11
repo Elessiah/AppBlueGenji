@@ -314,6 +314,26 @@ describe("marque STAFF — horaire poussé aux arbitres", () => {
     error.mockRestore();
   });
 
+  it("markStaffPushed_deadlockThenMarkMoved_logsMarkMovedNotDeadlock", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const connection = transactionMock();
+    const deadlock = Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK", errno: 1213 });
+    connection.execute.mockRejectedValueOnce(deadlock).mockImplementation(async (sql) => {
+      if (String(sql) === MATCH_LOCK) return [[{ start_at: new Date(T) }]];
+      if (String(sql) === MARK_SEEN) return [[]];
+      return [{ affectedRows: 0 }];
+    });
+
+    expect(await markStaffPushed(31, T)).toEqual({ kind: "unmarked" });
+
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(3);
+    expect(error).toHaveBeenCalledTimes(1);
+    const logged = error.mock.calls[0][1];
+    expect(logged).not.toBe(deadlock);
+    expect((logged as Error).message).toBe("STAFF_MARK_MOVED");
+    error.mockRestore();
+  });
+
   it("markStaffPushed_rollbackFails_destroysConnectionAndPushesUnmarked", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const connection = transactionMock();

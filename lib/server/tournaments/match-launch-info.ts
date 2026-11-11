@@ -67,6 +67,7 @@ import { matchHostTeamId, type NoRefereeCandidate } from "@/lib/shared/match-ref
 import { seedJoins } from "./match-host-seeds";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { retryOnDeadlock } from "./deadlock-retry";
+import { isUnsettled, rollbackKeepingError } from "./lock-wait";
 import { cachedTournamentList } from "./list-cache";
 import { publishMatchUpdatedEvent } from "./notifications";
 
@@ -378,8 +379,11 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
           return { changed, report };
         } catch (error) {
           // Jetée avant le rejeu : la file ne part pas deux fois.
-          await connection.rollback().catch(() => undefined);
+          await rollbackKeepingError(connection);
           discardBotLogs(connection);
+          // `ROLLBACK` raté : le rejeu ouvrirait sa transaction par-dessus
+          // celle-ci, et la validerait — jamais rejouée.
+          if (isUnsettled(connection)) throw new UnsettledConnectionError(error);
           throw error;
         }
       });
@@ -389,10 +393,23 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
       if (changed > 0 && report.castReleased) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
       else if (changed > 0) publishMatchUpdatedEvent(tournamentId);
     } catch (error) {
+      // Transaction peut-être encore ouverte : rien de plus sur cette
+      // connexion (ni tournoi suivant, ni retrait de caster ou d'arbitre de la
+      // lecture, dont la transaction la validerait) — la lecture échoue, la
+      // connexion est détruite au retour (`withConnection`).
+      if (error instanceof UnsettledConnectionError) throw error;
       console.error("[match-launch] entretien impossible", error);
     }
   }
   return due.size > 0;
+}
+
+/** `ROLLBACK` raté : jamais rejouée par `retryOnDeadlock` (l'erreur d'origine en `cause`). */
+class UnsettledConnectionError extends Error {
+  constructor(cause: unknown) {
+    super("UNSETTLED_CONNECTION", { cause });
+    this.name = "UnsettledConnectionError";
+  }
 }
 
 type LaunchPhase = ReturnType<typeof matchLaunchPhase>;

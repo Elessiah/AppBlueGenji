@@ -3,6 +3,7 @@ import mysql, { type ExecuteValues, type Pool, type PoolConnection } from "mysql
 import { createOnceGate, withMigrationLock } from "@/lib/server/migration-lock";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { runMigrations } from "@/lib/server/database/run-migrations";
+import { releaseWithServerLockWait } from "@/lib/server/tournaments/lock-wait";
 
 /*
  * Pool MySQL du site et porte d'entrée du schéma : `getDatabase` crée le pool,
@@ -66,7 +67,9 @@ export async function withConnection<T>(
   try {
     return await run(connection);
   } finally {
-    connection.release();
+    // Détruite plutôt que rendue si un `ROLLBACK` y a échoué, délai de verrou
+    // remis s'il avait été raccourci (`lock-wait.ts`).
+    await releaseWithServerLockWait(connection);
   }
 }
 

@@ -9,6 +9,7 @@ import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications
 import { listViewerMatchLaunches, loadViewerMatchContacts } from "@/lib/server/tournaments/match-launch-info";
 import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
 import * as castNotices from "@/lib/server/tournaments/cast-notices";
+import { isUnsettled } from "@/lib/server/tournaments/lock-wait";
 import { fakeConnection } from "../../helpers/sql-double";
 
 /**
@@ -813,6 +814,27 @@ describe("listViewerMatchLaunches — lancement d'office", () => {
     expect(error).not.toHaveBeenCalled();
     flush.mockRestore();
     discard.mockRestore();
+    error.mockRestore();
+  });
+
+  // Revue #591 : un `ROLLBACK` raté laisse peut-être la transaction ouverte —
+  // le rejeu l'aurait validée par son `START TRANSACTION`.
+  it("maintainIfDue_deadlockThenRollbackFails_failsReadWithoutAnotherTransaction", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const deadlock = Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK", errno: 1213 });
+    const connection = Object.assign(connectionFor(state), {
+      beginTransaction: jest.fn<() => Promise<void>>().mockResolvedValue(),
+      commit: jest.fn<() => Promise<void>>().mockRejectedValue(deadlock),
+      rollback: jest.fn<() => Promise<void>>().mockRejectedValue(new Error("ROLLBACK perdu")),
+    });
+    jest.mocked(withConnection).mockImplementation((run) => run(connection));
+    state.candidates = [candidate({ lobby_opened_at: null })];
+
+    await expect(listViewerMatchLaunches(viewer)).rejects.toThrow("UNSETTLED_CONNECTION");
+
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
+    expect(isUnsettled(connection)).toBe(true);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
     error.mockRestore();
   });
 

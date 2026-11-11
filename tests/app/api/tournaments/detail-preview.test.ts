@@ -150,4 +150,14 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
     expect(JSON.stringify(await res.json())).not.toContain("ECONNREFUSED");
     error.mockRestore();
   });
+
+  it("GET_detailThrowsSiteCode_returnsThatCode", async () => {
+    login({ id: 1, isAdmin: true, roles: ["ADMIN"] });
+    jest.mocked(service.getTournamentDetail).mockRejectedValue(new Error("TOURNAMENT_NOT_FOUND"));
+
+    const res = await get("7");
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "TOURNAMENT_NOT_FOUND" });
+  });
 });

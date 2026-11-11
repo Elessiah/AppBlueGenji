@@ -136,6 +136,9 @@ export async function markStaffPushed(matchId: number, startAt: string): Promise
     try {
       const reservation = await reserveStaffMarkOnce(matchId, startAt);
       if (reservation !== MARK_MOVED) return reservation;
+      // Le journal dit ce qui a fait échouer la dernière tentative, pas un
+      // interblocage déjà surmonté.
+      failure = new Error("STAFF_MARK_MOVED");
     } catch (error) {
       // Table absente (tolérée) : on pousse sans marque, et sans bruit.
       if (isMissingTableError(error)) return { kind: "unmarked" };

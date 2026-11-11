@@ -77,6 +77,9 @@ function toScoreStates(rows: Awaited<ReturnType<typeof getMatchRows>>): MatchSco
   }));
 }
 
+/** Ordre des engagés, partagé par la lecture et la renumérotation : le rang affiché est le rang écrit. */
+const ENTRY_ORDER = "ORDER BY COALESCE(r.seed, 1000000), r.registered_at ASC";
+
 async function loadEntries(connection: PoolConnection, tournamentId: number): Promise<SeedingEntry[]> {
   const [rows] = await connection.execute<
     (RowDataPacket & { team_id: number; team_name: string; seed: number | null; registered_at: Date })[]
@@ -85,7 +88,7 @@ async function loadEntries(connection: PoolConnection, tournamentId: number): Pr
      FROM bg_tournament_registrations r
      JOIN bg_teams t ON t.id = r.team_id
      WHERE r.tournament_id = ?
-     ORDER BY COALESCE(r.seed, 1000000), r.registered_at ASC`,
+     ${ENTRY_ORDER}`,
     [tournamentId],
   );
 
@@ -126,7 +129,7 @@ export async function resequenceSeeds(
     `SELECT r.team_id, r.seed
      FROM bg_tournament_registrations r
      WHERE r.tournament_id = ?
-     ORDER BY COALESCE(r.seed, 1000000), r.registered_at ASC`,
+     ${ENTRY_ORDER}`,
     [tournamentId],
   );
   const entries = rows
