@@ -167,6 +167,10 @@ export async function startDuelTournament(
         registrationMinPlayers: 1,
         registrationDiscordRequirement: "NONE",
         registrationBlizzardRequirement: "NONE",
+        // Phase de lancement allumée (MATCH_LAUNCH.md, éteinte par défaut) : sans
+        // elle, un match jouable est lancé d'emblée et le « Prêt » de
+        // `launchMatch` est refusé (409 MATCH_ALREADY_LAUNCHED).
+        launchPhase: true,
         startVisibilityAt: new Date(now - 2 * hour).toISOString(),
         registrationOpenAt: new Date(now - hour).toISOString(),
         registrationCloseAt: new Date(now + 24 * hour).toISOString(),
