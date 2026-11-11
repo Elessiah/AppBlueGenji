@@ -129,15 +129,16 @@ Le registre est désormais **publié par le site** (`/rgpd/registre`, fiche
 - **Données** : l'ensemble des données de la plateforme (profils pseudonymes,
   identifiants de connexion, résultats de tournois, avatars et logos).
 - **Destinataires** : le responsable technique de l'association, Keryan
-  Houssin (`SITE_HOST`) — qui est aussi l'hébergeur du site, donc son
-  sous-traitant (contrat de l'article 28 rédigé dans
-  `docs/legal/contrat-sous-traitance-hebergement.md`, **non signé** à ce
-  jour) —, **seul détenteur des clés de déchiffrement**. `/rgpd` le dit ainsi plutôt que « une clé que seule
+  Houssin (`SITE_HOST`) — qui est aussi l'hébergeur du site, sur sa propre
+  machine et pour le compte de l'association : aucun prestataire
+  d'hébergement, donc ni sous-traitant ni contrat de l'article 28
+  (`HOST_ARRANGEMENT`, décision de l'association de novembre 2026) —,
+  **seul détenteur des clés de déchiffrement**. `/rgpd` le dit ainsi plutôt que « une clé que seule
   l'association détient », formule qui masquait que le détenteur est aussi
   l'hébergeur.
 - **Hébergement** : depuis le **1er octobre 2026**, Hetzner Storage Share
   (Nextcloud géré), exploité par **Hetzner Online GmbH**, Allemagne. Hetzner est
-  **sous-traitant ultérieur** de l'association, par l'hébergeur, qui a souscrit
+  **sous-traitant** de l'association ; son responsable technique a souscrit
   le service et **accepté le contrat de traitement des données de Hetzner
   (Data Processing Agreement, version 1.2) le 1er octobre 2026**. Traitement
   **exclusivement dans l'Union européenne / l'EEE** (§ 3 de ce contrat) :

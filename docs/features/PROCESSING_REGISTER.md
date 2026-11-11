@@ -45,11 +45,15 @@ ci-dessous) ; ce qui resterait inconnu s'écrit « décision requise », jamais
 deviné (voir `ERREUR.txt`).
 Les deux constantes servent `/rgpd` et `/rgpd/registre`.
 
-L'hébergeur technique est sous-traitant : son contrat au sens de l'article 28
-est rédigé dans `docs/legal/contrat-sous-traitance-hebergement.md`, **non
-signé** — `HOST_PROCESSING_AGREEMENT` le dit ainsi dans la rubrique de
-l'hébergeur et dans `T09`. Le courriel de l'association est une messagerie
-Gmail : Google en est destinataire (`T11`, `ASSOCIATION_GMAIL_FRAMEWORK`), et
+L'hébergeur technique n'est **pas** sous-traitant : aucun prestataire
+d'hébergement, le responsable technique de l'association fait tourner le site
+et le bot sur sa propre machine, pour le compte de l'association (décision de
+l'association, novembre 2026) — pas de contrat de l'article 28,
+`HOST_ARRANGEMENT` le dit dans la rubrique de l'hébergeur et dans `T09`.
+Le courriel de l'association est une messagerie
+Gmail, en cours de passage à Google Workspace : Google en est destinataire
+(`T11`, `ASSOCIATION_GMAIL_FRAMEWORK`, à réécrire sous les conditions de
+traitement des données de Google Workspace une fois le passage fait), et
 une demande reçue par ce courriel ou par le téléphone de l'association suit la
 règle des demandes RGPD (durée du traitement, puis 30 jours après la clôture).
 Les contacts présentés aux parties d'un match (dès que ses deux adversaires sont connus) reposent sur l'exécution des

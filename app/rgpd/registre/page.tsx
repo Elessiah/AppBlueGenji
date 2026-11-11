@@ -133,7 +133,7 @@ function RegistreFr() {
             <Field label="Responsable du traitement" items={`${controller.name} — ${controller.legalForm}, ${controller.seat}`} />
             <Field label="Contact" items={controller.contact} />
             <Field label="Personne à contacter pour les demandes relatives aux données" items={controller.dataContact} />
-            <Field label="Hébergeur (sous-traitant)" items={controller.host} />
+            <Field label="Hébergeur" items={controller.host} />
           </tbody>
         </table>
       </section>

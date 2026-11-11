@@ -49,7 +49,7 @@ CSV, objets exportés comparés avant et après) ; les références françaises
 - **Textes encore écrits en deux constantes** (pas de `frEn` à côté) : le
   jumeau anglais est à reprendre dans le même commit. Registre : les textes de
   cadre (`HETZNER_BACKUP_FRAMEWORK`, `SPICEWORKS_*`, `OUTLOOK_MAIL_FRAMEWORK`,
-  `ASSOCIATION_GMAIL_FRAMEWORK`, `HOST_PROCESSING_AGREEMENT`,
+  `ASSOCIATION_GMAIL_FRAMEWORK`, `HOST_ARRANGEMENT`,
   `STANDARD_CONTRACTUAL_CLAUSES`, `DPF_ADEQUACY_DECISION`, `REGISTER_SCOPE(_DETAIL)`,
   `registerController`, `transferBasis`) ont leur version `…_EN` / `…En` dans
   le même fichier (sous le bloc « English versions », sauf
