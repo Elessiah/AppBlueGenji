@@ -254,11 +254,23 @@ describe("CastSettingsDialog — match joué, rien de changé, lecture", () => {
     // Identité de caster incomplète : réglages refusés par le serveur, seul le retrait reste.
     expect(settings).toContain("const identityBlock = castIdentityBlock(controls.castBlock);");
     expect(settings).toContain("<NotSettableHint titleId={titleId} identityBlock={identityBlock} identityText={fail} />");
-    expect(settings).toContain("<p>{identityText(identityBlock)}</p>");
+    expect(settings).toContain(": identityText(identityBlock);");
     expect(castIdentityBlock(null)).toBeNull();
     expect(castIdentityBlock("NOT_CASTER")).toBeNull();
     expect(castIdentityBlock("CASTER_IDENTITY_REQUIRED")).toBe("CASTER_IDENTITY_REQUIRED");
     expect(castIdentityBlock("CASTER_DISCORD_REQUIRED")).toBe("CASTER_DISCORD_REQUIRED");
+  });
+
+  it("CastSettingsDialog_identityBlock_keepsAirAndReplay", () => {
+    // Antenne et rediff ne demandent que la permission `live` : une identité incomplète ne les ôte pas.
+    expect(settings).toContain("{cast !== null && controls.canManage && (");
+    expect(settings).toContain("showAir={canToggleOnAir(match) && !triggerLocked}");
+    expect(settings).toContain("replayable={replayable}");
+  });
+
+  it("CastSettingsDialog_triggerChangedRefusal_resetsPickedTrigger", () => {
+    // Après un refus LIVE_TRIGGER_CHANGED, le prochain choix part avec le nouveau mode vu.
+    expect(settings).toContain('if (code === "LIVE_TRIGGER_CHANGED") setTrigger(null);');
   });
 
   it("castSettingsTexts_identityTitle_presentInFrAndEn", () => {

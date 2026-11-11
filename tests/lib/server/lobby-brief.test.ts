@@ -319,6 +319,24 @@ describe("dispatchLobbyBriefs", () => {
     expect(firstAnnounceableUrl(list)).toBe(valid);
   });
 
+  it("firstAnnounceableUrl_listCutAtMariaDbLimit_dropsLastCandidate", () => {
+    // Exactement 1 Mio (coupe par défaut de MariaDB, la production).
+    const valid = "https://www.twitch.tv/tronq";
+    const refused = `https://www.youtube.com/redirect?q=${"a".repeat(1024 * 1024 - valid.length - 1 - 35)}`;
+    const cut = `${refused} ${valid}`;
+    expect(cut).toHaveLength(1024 * 1024);
+    expect(firstAnnounceableUrl(cut)).toBeNull();
+  });
+
+  it("firstAnnounceableUrl_longerUncutList_keepsLastCandidate", () => {
+    // MariaDB (production) ne coupe qu'à 1 Mio : une liste de 1025 octets est entière.
+    const valid = "https://www.twitch.tv/voix";
+    const refused = `https://www.youtube.com/redirect?q=${"a".repeat(1025 - valid.length - 1 - 35)}`;
+    const list = `${refused} ${valid}`;
+    expect(list).toHaveLength(1025);
+    expect(firstAnnounceableUrl(list)).toBe(valid);
+  });
+
   it("firstAnnounceableUrl_undefined_returnsNull", () => {
     expect(firstAnnounceableUrl(undefined)).toBeNull();
   });
@@ -329,10 +347,11 @@ describe("dispatchLobbyBriefs", () => {
   });
 
   it("firstAnnounceableUrl_listCutByGroupConcat_dropsPossiblyTruncatedLast", () => {
-    // 1024 octets atteints : la base a pu couper le dernier lien en plein milieu.
-    const refused = `https://www.youtube.com/redirect?q=${"a".repeat(990)}`;
-    const cut = `${refused} https://www.twitch.tv/tronq`;
-    expect(new TextEncoder().encode(cut).length).toBeGreaterThanOrEqual(1024);
+    // Exactement 1024 octets (coupe de MySQL) : le dernier lien a pu être tronqué.
+    const valid = "https://www.twitch.tv/tronq";
+    const refused = `https://www.youtube.com/redirect?q=${"a".repeat(1024 - valid.length - 1 - 35)}`;
+    const cut = `${refused} ${valid}`;
+    expect(cut).toHaveLength(1024);
     expect(firstAnnounceableUrl(cut)).toBeNull();
     // Sous la limite, le dernier lien sert.
     expect(firstAnnounceableUrl("https://www.youtube.com/redirect?q=x https://www.twitch.tv/voix")).toBe("https://www.twitch.tv/voix");

@@ -136,23 +136,25 @@ export function liveAnnouncementUrl(matchUrl: unknown, tournamentUrl: unknown): 
 export const STREAM_URL_CANDIDATES_SEPARATOR = " ";
 
 /**
- * Longueur à laquelle MySQL et MariaDB coupent **sans le dire** un
- * `GROUP_CONCAT` (`group_concat_max_len`, 1024 octets par défaut). Une liste
- * qui l'atteint a peut-être un dernier lien tronqué : il est écarté.
+ * Longueurs auxquelles la base coupe **sans le dire** un `GROUP_CONCAT`
+ * (`group_concat_max_len` par défaut : 1024 octets sous MySQL 8, 1 Mio sous
+ * MariaDB, la production). Une liste coupée fait **exactement** cette
+ * longueur : son dernier lien, peut-être tronqué, est écarté. Une liste plus
+ * longue sans avoir été coupée (MariaDB) garde tous ses liens.
  */
-export const GROUP_CONCAT_DEFAULT_MAX_LEN = 1024;
+export const GROUP_CONCAT_DEFAULT_MAX_LENS: readonly number[] = [1024, 1024 * 1024];
 
 /**
  * Le premier des liens candidats d'un match (`streamUrlCandidatesSql`, staff
  * d'abord) qu'une annonce accepte (`liveAnnouncementUrl`), ou `null` : un lien
  * refusé (page de redirection) laisse sa place au suivant. Une liste coupée
  * par la base perd son dernier lien, peut-être tronqué
- * ({@link GROUP_CONCAT_DEFAULT_MAX_LEN}).
+ * ({@link GROUP_CONCAT_DEFAULT_MAX_LENS}).
  */
 export function firstAnnounceableUrl(candidates: string | null | undefined): string | null {
   if (typeof candidates !== "string" || candidates === "") return null;
   const parts = candidates.split(STREAM_URL_CANDIDATES_SEPARATOR);
-  if (new TextEncoder().encode(candidates).length >= GROUP_CONCAT_DEFAULT_MAX_LEN) parts.pop();
+  if (GROUP_CONCAT_DEFAULT_MAX_LENS.includes(new TextEncoder().encode(candidates).length)) parts.pop();
   for (const candidate of parts) {
     const url = liveAnnouncementUrl(candidate, null);
     if (url !== null) return url;

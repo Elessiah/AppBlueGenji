@@ -203,6 +203,9 @@ export function CastSettingsDialog({
       const message = fail(code);
       fieldErrors.report(code, message);
       showError(message);
+      // Mode changé entre-temps : la fenêtre montre le nouveau, et le prochain
+      // choix part avec lui comme mode vu (`useSeenTrigger`).
+      if (code === "LIVE_TRIGGER_CHANGED") setTrigger(null);
     } finally {
       setBusy(false);
     }
@@ -286,27 +289,6 @@ export function CastSettingsDialog({
               />
             )}
 
-            {/* L'antenne d'un mode manuel suit la règle du mode (décision 2) : un
-                co-caster ne l'ouvre ni ne la coupe pour le caster qui l'a posé. */}
-            {canToggleOnAir(match) && !triggerLocked && (
-              <div className={styles.section}>
-                <InfoHintRow>
-                  <p className={styles.sectionTitle}>{t("cardActions.castSettings.air")}</p>
-                  <InfoHint id={`${titleId}-air`} subject={t("cardActions.castSettings.air")}>
-                    <p>{t("cardActions.castSettings.airHint")}</p>
-                  </InfoHint>
-                </InfoHintRow>
-                <button
-                  type="button"
-                  className={onAir ? "btn ghost" : "btn"}
-                  disabled={busy}
-                  onClick={() => void toggleAir()}
-                >
-                  {onAir ? t("cardActions.stopLive") : t("cardActions.startLive")}
-                </button>
-              </div>
-            )}
-
             {!played && game !== null && battletagRelevantFor(game) && (
               <CastBattletagField
                 id={battletagId}
@@ -320,30 +302,27 @@ export function CastSettingsDialog({
               />
             )}
 
-            {replayable && (
-              <div className={styles.section}>
-                <InfoHintRow>
-                  <p className={styles.sectionTitle}>{t("cardActions.castSettings.replay")}</p>
-                  <InfoHint id={`${titleId}-replay`} subject={t("cardActions.castSettings.replay")}>
-                    <p>{t("cardActions.castSettings.replayHint")}</p>
-                  </InfoHint>
-                </InfoHintRow>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  disabled={busy}
-                  onClick={() => {
-                    // La fenêtre de rediff est une autre modale : celle-ci se
-                    // ferme d'abord, les deux ne se disputent pas le focus.
-                    onClose();
-                    openReplay(match);
-                  }}
-                >
-                  {match.replayUrl === null ? t("cardActions.addReplay") : t("cardActions.editReplay")}
-                </button>
-              </div>
-            )}
           </>
+        )}
+
+        {/* Antenne et rediff ne demandent que la permission `live` (routes du
+            staff de diffusion) : une identité de caster incomplète ne les ôte pas. */}
+        {cast !== null && controls.canManage && (
+          <CastAirAndReplay
+            match={match}
+            titleId={titleId}
+            showAir={canToggleOnAir(match) && !triggerLocked}
+            onAir={onAir}
+            busy={busy}
+            toggleAir={toggleAir}
+            replayable={replayable}
+            onReplay={() => {
+              // La fenêtre de rediff est une autre modale : celle-ci se
+              // ferme d'abord, les deux ne se disputent pas le focus.
+              onClose();
+              openReplay(match);
+            }}
+          />
         )}
 
         <div className={styles.footer}>
@@ -428,22 +407,83 @@ function NotSettableHint({
   identityText: (code: string) => string;
 }>) {
   const { t } = useActionsText();
-  if (identityBlock !== null) {
-    return (
-      <InfoHintRow inline>
-        <p className={styles.subtitle}>{t("cardActions.castSettings.identityTitle")}</p>
-        <InfoHint id={`${titleId}-identity`} subject={t("cardActions.castSettings.identityTitle")}>
-          <p>{identityText(identityBlock)}</p>
-        </InfoHint>
-      </InfoHintRow>
-    );
-  }
+  const title = t(identityBlock === null ? "cardActions.castSettings.noLiveTitle" : "cardActions.castSettings.identityTitle");
+  const body = identityBlock === null ? t("cardActions.castSettings.noLive") : identityText(identityBlock);
   return (
     <InfoHintRow inline>
-      <p className={styles.subtitle}>{t("cardActions.castSettings.noLiveTitle")}</p>
-      <InfoHint id={`${titleId}-no-live`} subject={t("cardActions.castSettings.noLiveTitle")}>
-        <p>{t("cardActions.castSettings.noLive")}</p>
+      <p className={styles.subtitle}>{title}</p>
+      <InfoHint id={`${titleId}-${identityBlock === null ? "no-live" : "identity"}`} subject={title}>
+        <p>{body}</p>
       </InfoHint>
     </InfoHintRow>
+  );
+}
+
+/**
+ * Bascule d'antenne et rediff du cast : la permission `live` suffit (routes du
+ * staff de diffusion), quelle que soit l'identité de caster.
+ */
+function CastAirAndReplay({
+  match,
+  titleId,
+  showAir,
+  onAir,
+  busy,
+  toggleAir,
+  replayable,
+  onReplay,
+}: Readonly<{
+  match: BracketMatch;
+  titleId: string;
+  showAir: boolean;
+  onAir: boolean;
+  busy: boolean;
+  toggleAir: () => Promise<unknown>;
+  replayable: boolean;
+  onReplay: () => void;
+}>) {
+  const { t } = useActionsText();
+  return (
+    <>
+      {/* L'antenne d'un mode manuel suit la règle du mode (décision 2) : un
+          co-caster ne l'ouvre ni ne la coupe pour le caster qui l'a posé. */}
+      {showAir && (
+        <div className={styles.section}>
+          <InfoHintRow>
+            <p className={styles.sectionTitle}>{t("cardActions.castSettings.air")}</p>
+            <InfoHint id={`${titleId}-air`} subject={t("cardActions.castSettings.air")}>
+              <p>{t("cardActions.castSettings.airHint")}</p>
+            </InfoHint>
+          </InfoHintRow>
+          <button
+            type="button"
+            className={onAir ? "btn ghost" : "btn"}
+            disabled={busy}
+            onClick={() => void toggleAir()}
+          >
+            {onAir ? t("cardActions.stopLive") : t("cardActions.startLive")}
+          </button>
+        </div>
+      )}
+
+      {replayable && (
+        <div className={styles.section}>
+          <InfoHintRow>
+            <p className={styles.sectionTitle}>{t("cardActions.castSettings.replay")}</p>
+            <InfoHint id={`${titleId}-replay`} subject={t("cardActions.castSettings.replay")}>
+              <p>{t("cardActions.castSettings.replayHint")}</p>
+            </InfoHint>
+          </InfoHintRow>
+          <button
+            type="button"
+            className="btn ghost"
+            disabled={busy}
+            onClick={onReplay}
+          >
+            {match.replayUrl === null ? t("cardActions.addReplay") : t("cardActions.editReplay")}
+          </button>
+        </div>
+      )}
+    </>
   );
 }

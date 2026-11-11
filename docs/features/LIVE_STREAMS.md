@@ -418,7 +418,8 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   refusé : le lien d'un `@everyone` ne mène qu'à la diffusion. Un lien du
   match refusé laisse sa place au lien suivant du match (tous lus par
   `streamUrlCandidatesSql`, staff d'abord, retenus par `firstAnnounceableUrl`
-  comme dans le brief du salon ; une liste que `GROUP_CONCAT` a pu couper perd
+  comme dans le brief du salon ; une liste que `GROUP_CONCAT` a coupée — longueur
+  exacte de la coupe par défaut, 1024 octets sous MySQL, 1 Mio sous MariaDB — perd
   son dernier lien), avant la chaîne officielle. Sans lien exploitable, pas d'annonce.
 - **Texte** (`lib/shared/live-announcements.ts`, en français comme tout
   Discord) : « 🔴 En direct : A contre B — Tournoi ». Noms par `discordInline`

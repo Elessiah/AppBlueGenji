@@ -330,7 +330,8 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
 
     expect(dispatchMatchStartNotices).toHaveBeenCalledTimes(1);
     // Le brief du salon part de la même ouverture.
-    expect(dispatchLobbyBriefs).toHaveBeenCalledTimes(1);    // Le direct de l'accueil se relit aussitôt (lancement d'office, caster retiré).
+    expect(dispatchLobbyBriefs).toHaveBeenCalledTimes(1);
+    // Le direct de l'accueil se relit aussitôt (lancement d'office, caster retiré).
     expect(invalidateLandingLive).toHaveBeenCalledTimes(1);
   });
 
@@ -339,7 +340,8 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
     await new Promise((resolve) => setImmediate(resolve));
     expect(dispatchMatchStartNotices).not.toHaveBeenCalled();
-    expect(dispatchLobbyBriefs).not.toHaveBeenCalled();    expect(invalidateLandingLive).not.toHaveBeenCalled();
+    expect(dispatchLobbyBriefs).not.toHaveBeenCalled();
+    expect(invalidateLandingLive).not.toHaveBeenCalled();
   });
 
   it("n'entretient pas quand aucun lancement n'est dû", async () => {
