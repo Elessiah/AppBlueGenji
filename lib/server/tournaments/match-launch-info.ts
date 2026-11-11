@@ -66,6 +66,7 @@ import { castEligibilityBlock, refereeEligibilityBlock } from "./cast-eligibilit
 import { matchHostTeamId, type NoRefereeCandidate } from "@/lib/shared/match-referee";
 import { seedJoins } from "./match-host-seeds";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
+import { retryOnDeadlock } from "./deadlock-retry";
 import { cachedTournamentList } from "./list-cache";
 import { publishMatchUpdatedEvent } from "./notifications";
 
@@ -363,19 +364,31 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
     }
   }
   for (const tournamentId of due) {
-    await connection.beginTransaction();
     try {
-      const report = { castReleased: false };
-      const changed = await maintainMatchLaunches(connection, tournamentId, report);
-      await connection.commit();
+      // Rejouée sur interblocage (`retryOnDeadlock`) : la relecture
+      // d'éligibilité verrouille le compte **après** le match, à l'inverse de
+      // la suppression de compte — un interblocage ne doit pas reporter
+      // l'entretien du tournoi au balayage suivant.
+      const { changed, report } = await retryOnDeadlock(async () => {
+        await connection.beginTransaction();
+        try {
+          const report = { castReleased: false };
+          const changed = await maintainMatchLaunches(connection, tournamentId, report);
+          await connection.commit();
+          return { changed, report };
+        } catch (error) {
+          // Jetée avant le rejeu : la file ne part pas deux fois.
+          await connection.rollback().catch(() => undefined);
+          discardBotLogs(connection);
+          throw error;
+        }
+      });
       flushBotLogs(connection);
       // Un caster retiré par l'entretien emporte son lien : l'accueil et #live
       // se relisent tout de suite, sans attendre l'expiration de leur cache.
       if (changed > 0 && report.castReleased) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
       else if (changed > 0) publishMatchUpdatedEvent(tournamentId);
     } catch (error) {
-      await connection.rollback().catch(() => undefined);
-      discardBotLogs(connection);
       console.error("[match-launch] entretien impossible", error);
     }
   }

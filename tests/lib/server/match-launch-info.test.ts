@@ -792,6 +792,30 @@ describe("listViewerMatchLaunches — lancement d'office", () => {
     error.mockRestore();
   });
 
+  it("maintainIfDue_deadlockOnce_replaysTransactionAndAnnouncesOnce", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const deadlock = Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK", errno: 1213 });
+    const connection = Object.assign(connectionFor(state), {
+      beginTransaction: jest.fn<() => Promise<void>>().mockResolvedValue(),
+      commit: jest.fn<() => Promise<void>>().mockRejectedValueOnce(deadlock).mockResolvedValue(),
+    });
+    const flush = jest.spyOn(castNotices, "flushCastChanges");
+    const discard = jest.spyOn(castNotices, "discardCastChanges");
+    jest.mocked(withConnection).mockImplementation((run) => run(connection));
+    state.candidates = [candidate({ lobby_opened_at: null })];
+
+    await listViewerMatchLaunches(viewer);
+
+    // La première tentative jetée, la seconde annoncée — une fois.
+    expect(connection.commit).toHaveBeenCalledTimes(3);
+    expect(discard).toHaveBeenCalledTimes(1);
+    expect(flush).toHaveBeenCalledTimes(2);
+    expect(error).not.toHaveBeenCalled();
+    flush.mockRestore();
+    discard.mockRestore();
+    error.mockRestore();
+  });
+
   it("n'écrit rien quand rien n'est dû", async () => {
     await listViewerMatchLaunches(viewer);
     expect(state.writes).toEqual([]);
