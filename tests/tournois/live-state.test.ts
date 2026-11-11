@@ -734,6 +734,11 @@ describe("shareRefereeNames", () => {
     expect(pruneRefereeNames(names, matches)).toEqual([{ matchId: 6, refereeKey: "k6", pseudo: "Autre" }]);
   });
 
+  it("pruneRefereeNames_refereeReplacedOnSameMatch_dropsThePreviousName", () => {
+    // Le match montre toujours un arbitre, mais plus celui-là (autre empreinte).
+    expect(pruneRefereeNames(previous, [match({ id: 5, refereeKey: "k5-bis", status: "READY" })])).toEqual([]);
+  });
+
   it("pruneRefereeNames_refereeNoLongerShown_dropsName", () => {
     expect(pruneRefereeNames(previous, [match({ id: 5, refereeKey: null, status: "READY" })])).toEqual([]);
   });

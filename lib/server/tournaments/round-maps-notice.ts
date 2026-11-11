@@ -231,10 +231,19 @@ async function sendClaimed(rows: readonly NoticeRow[]): Promise<number> {
   const db = await getDatabase();
   let sent = 0;
   for (const row of rows) {
-    const [result] = await db.execute<ResultSetHeader>(
-      `DELETE FROM bg_round_maps_notices WHERE tournament_id = ? AND changes = ?`,
-      [row.tournament_id, row.changes],
-    );
+    let result: ResultSetHeader;
+    try {
+      [result] = await db.execute<ResultSetHeader>(
+        `DELETE FROM bg_round_maps_notices WHERE tournament_id = ? AND changes = ?`,
+        [row.tournament_id, row.changes],
+      );
+    } catch (error) {
+      // Une revendication refusée (ligne tenue par un enregistrement en cours,
+      // conflit d'instantané) ne retient pas les annonces des autres tournois :
+      // la ligne reste, le balayage suivant la reprend.
+      console.error("[round-maps] annonce non revendiquée, reprise au prochain balayage", error);
+      continue;
+    }
     if (result.affectedRows !== 1) continue; // un autre l'a prise, ou un changement a rouvert la fenêtre
     const rounds = withoutCoveredTiebreaks(parsePending(row.rounds_json));
     if (rounds.length === 0) continue;

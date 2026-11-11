@@ -120,7 +120,7 @@ plus, pour qu'elles restent levables —, choix d'un arbitre parmi les comptes
 - journal : `publishStaffAction`, une seule ligne Discord (« un arbitre »,
   « le staff », sans nombre de matchs) ; auteur, `#id` de l'arbitre et nombre
   de matchs retirés dans pm2, sur un vrai changement ou un
-  balayage rejoué qui retire encore un match. La ligne dit « déjà retenue,
+  balayage rejoué qui retire encore un match ou qui échoue. La ligne dit « déjà retenue,
   balayage rejoué » quand l'opposition était déjà écrite, et « retrait
   incomplet, à rejouer » quand un match n'a pas pu être retiré ; l'échec d'un
   retrait s'écrit dans pm2 **sans numéro de match** (pm2 porte déjà le `#id`

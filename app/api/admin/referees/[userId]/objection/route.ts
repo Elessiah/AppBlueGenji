@@ -38,9 +38,10 @@ export async function PUT(req: Request, context: { params: Promise<{ userId: str
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
-  // Décimal strict : `Number()` accepterait « 1e1 » ou « 0x9 ».
+  // Décimal strict : `Number()` accepterait « 1e1 » ou « 0x9 ». Quinze chiffres
+  // au plus : au-delà, `Number()` arrondirait vers un autre identifiant.
   const rawId = (await context.params).userId;
-  const refereeId = /^[1-9]\d{0,15}$/.test(rawId) ? Number(rawId) : Number.NaN;
+  const refereeId = /^[1-9]\d{0,14}$/.test(rawId) ? Number(rawId) : Number.NaN;
   if (!isPositiveId(refereeId)) return fail("INVALID_USER_ID", 400);
 
   const body = (await readJsonBody(req).catch(() => ({}))) as { upheld?: unknown };
@@ -51,7 +52,8 @@ export async function PUT(req: Request, context: { params: Promise<{ userId: str
     const result = await setRefereeObjection(refereeId, upheld);
     // Tracé dès que quelque chose a changé — y compris un balayage rejoué —,
     // et avant le refus d'un balayage incomplet : l'opposition, elle, est écrite.
-    if (result.changed || result.released > 0) {
+    // Un balayage rejoué qui échoue en entier l'est aussi (auteur dans pm2).
+    if (result.changed || result.released > 0 || result.failed > 0) {
       // Sur Discord, ni nombre ni ligne par match (`referee-notices.ts`) : les
       // matchs retirés désigneraient leur arbitre. Le nombre va dans pm2.
       const discordLine = objectionLogLine(upheld, result);

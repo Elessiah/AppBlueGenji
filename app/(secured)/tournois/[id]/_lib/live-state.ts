@@ -221,9 +221,11 @@ export function pruneRefereeNames(
   matches: TournamentSnapshot["matches"],
 ): TournamentViewerContext["refereeNames"] {
   if (names.length === 0) return names;
-  const shown = new Set<number>();
-  for (const match of matches) if (showsRefereeName(match)) shown.add(match.id);
-  const kept = names.filter((name) => shown.has(name.matchId));
+  // Par désignation (match **et** empreinte) : le pseudo d'un arbitre remplacé
+  // sur un match qui en montre encore un ne reste pas non plus.
+  const shown = new Set<string>();
+  for (const match of matches) if (showsRefereeName(match)) shown.add(`${match.id}:${match.refereeKey}`);
+  const kept = names.filter((name) => shown.has(`${name.matchId}:${name.refereeKey}`));
   return kept.length === names.length ? names : kept;
 }
 

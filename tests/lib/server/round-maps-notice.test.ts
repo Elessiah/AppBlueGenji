@@ -258,6 +258,21 @@ describe("dispatchDueRoundMapsNotices", () => {
     expect(sendBotLog).not.toHaveBeenCalled();
   });
 
+  it("dispatchDueRoundMapsNotices_oneClaimRefused_otherTournamentsStillAnnounced", async () => {
+    let claims = 0;
+    execute = jest.fn<SqlQuery>(async (sql) => {
+      if (/^\s*SELECT/.test(sql)) return [[dueRow([R2]), { ...dueRow([R3]), tournament_id: 8 }], []];
+      claims += 1;
+      if (claims === 1) throw new Error("Record has changed since last read");
+      return [{ affectedRows: 1 }, []];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await expect(dispatchDueRoundMapsNotices()).resolves.toBe(1);
+
+    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 8, category: "maps" });
+  });
+
   it("dispatchDueRoundMapsNotices_calledTwiceWithinThrottle_queriesOnce", async () => {
     pool([]);
     await dispatchDueRoundMapsNotices();
