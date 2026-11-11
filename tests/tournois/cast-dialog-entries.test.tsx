@@ -21,6 +21,7 @@ import enModal from "@/messages/en/launchModal.json";
 import { LAUNCH_ERROR_MESSAGES } from "@/lib/shared/match-launch";
 import { closedMatchUnchanged, mayEditReplay, offersCasterLinks, matchLiveBody, ownRefusalKey, refusalHasField, saveBlockedReason, streamedBoxReason } from "@/app/(secured)/tournois/[id]/_components/MatchLiveDialog";
 import { readSource } from "../helpers/read-source";
+import { castIdentityBlock, castSettable } from "@/app/(secured)/tournois/[id]/_components/CastSettingsDialog";
 import frActions from "@/messages/fr/tournamentActions.json";
 import enActions from "@/messages/en/tournamentActions.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
@@ -158,7 +159,7 @@ describe("Raisons visibles et refus précis des fenêtres de cast", () => {
 
   it("CastSettingsDialog_playedMatch_closeInsteadOfDeadSaveAndHintedNote", () => {
     const settings = readSource(`${DIR}/_components/CastSettingsDialog.tsx`);
-    expect(settings).toContain('played ? t("cardActions.castSettings.close") : t("cardActions.castSettings.cancel")');
+    expect(settings).toContain('played || !settable ? t("cardActions.castSettings.close") : t("cardActions.castSettings.cancel")');
     expect(settings).toContain("{!played && (");
     expect(settings).toContain('t("cardActions.castSettings.playedTitle")');
     expect(settings).toContain("missing={urlMissing}");
@@ -224,8 +225,108 @@ describe("CastSettingsDialog — match joué, rien de changé, lecture", () => {
     expect(readSource(`${DIR}/_lib/request-json.ts`)).toContain("response.json().catch(() => ({}))");
   });
 
+  it("CastSettingsDialog_noLivePermission_hidesSettingsAndSaveShowsHint", () => {
+    expect(settings).toContain("const settable = castSettable(controls);");
+    expect(castSettable({ canManage: true, castBlock: null })).toBe(true);
+    expect(castSettable({ canManage: false, castBlock: null })).toBe(false);
+    expect(castSettable({ canManage: true, castBlock: "CASTER_DISCORD_REQUIRED" })).toBe(false);
+    expect(settings).toContain("{cast !== null && settable && (");
+    expect(settings).toContain("{!played && settable && (");
+    expect(settings).toContain('t("cardActions.castSettings.noLive")');
+  });
+
+  it("castSettingsTexts_noLive_presentInFrAndEn", () => {
+    expect(frActions.cardActions.castSettings.noLiveTitle).toBe("Permission de diffusion retirée");
+    expect(enActions.cardActions.castSettings.noLiveTitle).toBe("Streaming permission removed");
+    // L'action qui reste porte le nom du bouton (« Ne plus caster » / « Stop casting »).
+    expect(frActions.cardActions.castSettings.noLive).toContain("ne plus caster ce match");
+    expect(enActions.cardActions.castSettings.noLive).toContain("stop casting this match");
+  });
+
+  it("CastSettingsDialog_triggerChanged_sendsSeenTrigger", () => {
+    // Le mode vu au premier choix, jamais celui que le flux a livré depuis.
+    expect(settings).toContain("settings.expectedTrigger = seenTrigger.current;");
+    expect(settings).toContain("if (pickedTrigger === null) seenTrigger.current = liveTrigger;");
+    expect(settings).toContain("pickTrigger(next);");
+    expect(settings).not.toContain("settings.expectedTrigger = match.liveTrigger;");
+  });
+
+  it("CastSettingsDialog_identityBlock_hidesSettingsAndExplainsWhy", () => {
+    // Identité de caster incomplète : réglages refusés par le serveur, seul le retrait reste.
+    expect(settings).toContain("const identityBlock = castIdentityBlock(controls.castBlock);");
+    expect(settings).toContain("<NotSettableHint titleId={titleId} identityBlock={identityBlock} identityText={fail} />");
+    expect(settings).toContain(": identityText(identityBlock);");
+    expect(castIdentityBlock(null)).toBeNull();
+    expect(castIdentityBlock("NOT_CASTER")).toBeNull();
+    expect(castIdentityBlock("CASTER_IDENTITY_REQUIRED")).toBe("CASTER_IDENTITY_REQUIRED");
+    expect(castIdentityBlock("CASTER_DISCORD_REQUIRED")).toBe("CASTER_DISCORD_REQUIRED");
+  });
+
+  it("CastSettingsDialog_identityBlock_keepsAirAndReplay", () => {
+    // Antenne et rediff ne demandent que la permission `live` : une identité incomplète ne les ôte pas.
+    expect(settings).toContain("{cast !== null && controls.canManage && (");
+    expect(settings).toContain("showAir={canToggleOnAir(match) && !triggerLocked}");
+    expect(settings).toContain("replayable={replayable}");
+  });
+
+  it("CastSettingsDialog_triggerChangedRefusal_resetsPickedTrigger", () => {
+    // Après un refus LIVE_TRIGGER_CHANGED, le prochain choix part avec le nouveau mode vu.
+    expect(settings).toMatch(/if \(code === "LIVE_TRIGGER_CHANGED"\) \{\s+setTrigger\(null\);\s+void refreshTrigger\(match\.id\);/);
+  });
+
+  it("CastSettingsDialog_triggerChangedRefusal_rereadsModeAndFlagsGroup", () => {
+    // Le mode du match est relu sans attendre le flux, et le refus se rattache au groupe de radios.
+    expect(settings).toContain("void refreshTrigger(match.id);");
+    expect(settings).toContain('LIVE_TRIGGER_CHANGED: "trigger",');
+    expect(settings).toContain('fieldError={fieldErrors.message("trigger")}');
+    expect(settings).toContain("reread.against === snapshotTrigger ? reread.value : snapshotTrigger");
+  });
+
+  it("CastTriggerField_fieldError_describesGroup", () => {
+    const html = renderToStaticMarkup(
+      <CastTriggerField trigger="AUTO" startAt={null} onChange={() => undefined} id="mode" fieldError="Mode changé" />,
+    );
+    expect(html).toContain('id="mode"');
+    expect(html).toContain('tabindex="-1"');
+    expect(html).toContain('aria-describedby="mode-error"');
+    expect(html).toContain('<span id="mode-error" class="sr-only">Mode changé</span>');
+  });
+
+  it("CastTriggerField_withoutFieldError_noDescription", () => {
+    const html = renderToStaticMarkup(<CastTriggerField trigger="AUTO" startAt={null} onChange={() => undefined} id="mode" />);
+    expect(html).not.toContain("aria-describedby");
+  });
+
+  it("CastSettingsDialog_notSettable_closeLabelAndNoIdentityHintOnPlayed", () => {
+    expect(settings).toContain('played || !settable ? t("cardActions.castSettings.close")');
+    expect(settings).toContain("{cast !== null && !settable && !played && (");
+  });
+
+  it("CastSettingsDialog_airToggle_followsTriggerField", () => {
+    // L'antenne d'un mode manuel suit le choix du mode : le BattleTag passe avant lui.
+    expect(settings.indexOf("<CastBattletagField")).toBeLessThan(settings.indexOf("<CastTriggerField"));
+    expect(settings.indexOf("<CastTriggerField")).toBeLessThan(settings.indexOf("<CastAirAndReplay"));
+  });
+
+  it("castSettingsTexts_identityTitle_presentInFrAndEn", () => {
+    expect(frActions.cardActions.castSettings.identityTitle).toBe("Identité de caster incomplète");
+    expect(enActions.cardActions.castSettings.identityTitle).toBe("Caster identity incomplete");
+    for (const code of ["CASTER_IDENTITY_REQUIRED", "CASTER_DISCORD_REQUIRED"] as const) {
+      expect(frModal.errors[code]).toBeTruthy();
+      expect(enModal.errors[code]).toBeTruthy();
+    }
+  });
+
+  it("castErrors_liveTriggerChanged_presentFrEn", () => {
+    expect(frErrors.codes.LIVE_TRIGGER_CHANGED).toContain("a changé pendant que la fenêtre était ouverte");
+    expect(enErrors.codes.LIVE_TRIGGER_CHANGED).toContain("changed while the window was open");
+    expect(frModal.errors.LIVE_TRIGGER_CHANGED).toBe(frErrors.codes.LIVE_TRIGGER_CHANGED);
+    expect(enModal.errors.LIVE_TRIGGER_CHANGED).toBe(enErrors.codes.LIVE_TRIGGER_CHANGED);
+    expect(LAUNCH_ERROR_MESSAGES.LIVE_TRIGGER_CHANGED).toBe(frErrors.codes.LIVE_TRIGGER_CHANGED);
+  });
+
   it("CastSettingsDialog_unmarkedMatch_noModePreselected", () => {
-    expect(settings).toContain("(pickedTrigger ?? match.liveTrigger)");
+    expect(settings).toContain("(pickedTrigger ?? liveTrigger)");
   });
 
   it("CastDialogs_deadHintRules_removed", () => {
@@ -358,6 +459,20 @@ describe("MatchLiveDialog — match joué (ERREUR.txt EF-29 #528, CAST-FOLLOWUP 
   it("matchLiveBody_castableEmptyLink_sendsNullLink", () => {
     expect(matchLiveBody({ castable: true, trigger: "AUTO", liveUrl: " ", organisationLink: undefined, streamLinks: undefined })).toEqual({
       trigger: "AUTO",
+      liveUrl: null,
+    });
+  });
+
+  it("matchLiveBody_castableEmptyLinkWithOrigin_omitsOrganisationLink", () => {
+    expect(matchLiveBody({ castable: true, trigger: "AUTO", liveUrl: " ", organisationLink: true, streamLinks: undefined })).toEqual({
+      trigger: "AUTO",
+      liveUrl: null,
+    });
+  });
+
+  it("matchLiveBody_unmarkedWithOrigin_omitsOrganisationLink", () => {
+    expect(matchLiveBody({ castable: true, trigger: null, liveUrl: "https://twitch.tv/a", organisationLink: true, streamLinks: undefined })).toEqual({
+      trigger: null,
       liveUrl: null,
     });
   });

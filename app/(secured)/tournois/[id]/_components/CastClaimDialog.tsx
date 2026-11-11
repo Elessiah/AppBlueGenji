@@ -104,7 +104,15 @@ export function CastClaimDialog({
   const [battletag, setBattletag] = useState("");
   // Un match déjà casté garde son mode ; sinon « automatique au démarrage »,
   // qui ne demande plus un clic à l'heure dite.
-  const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "AUTO");
+  // `null` tant que le caster n'a rien choisi : la fenêtre suit alors le mode
+  // du match (un changement du staff reçu par le flux n'est pas écrasé par la
+  // valeur d'ouverture). `seen` : le mode du match à son premier choix, envoyé
+  // avec lui (`expectedTrigger`).
+  const [picked, setPicked] = useState<{ trigger: MatchLiveTrigger; seen: MatchLiveTrigger | null } | null>(null);
+  const trigger: MatchLiveTrigger = picked?.trigger ?? match.liveTrigger ?? "AUTO";
+  const seenTrigger = picked === null ? match.liveTrigger : picked.seen;
+  const setTrigger = (next: MatchLiveTrigger) =>
+    setPicked((previous) => ({ trigger: next, seen: previous === null ? match.liveTrigger : previous.seen }));
   const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId, battletag: battletagId });
   // Un match dont le score est saisi s'inscrit encore, mais son mode ne bouge
   // plus (`isMatchCastable`) : le choix n'est pas offert, ni envoyé.
@@ -142,7 +150,12 @@ export function CastClaimDialog({
   const confirm = async (): Promise<boolean> => {
     if (choice === null) return false;
     const outcome = await onClaim(
-      castClaimBody(choice, { url, battletag, trigger: triggerLocked || !castable ? undefined : trigger }),
+      castClaimBody(choice, {
+        url,
+        battletag,
+        trigger: triggerLocked || !castable ? undefined : trigger,
+        expectedTrigger: seenTrigger,
+      }),
     );
     if (!outcome.ok) fieldErrors.report(outcome.code, outcome.message);
     return outcome.ok;

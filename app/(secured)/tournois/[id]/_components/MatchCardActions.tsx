@@ -371,26 +371,59 @@ function ReleaseCastDialog({
 }
 
 /**
- * Inscrit, le bouton qui a ouvert la fenêtre disparaît (« Caster » devient
- * « Configurer ma diffusion ») : la fenêtre rendrait le focus à un bouton détaché, il
- * tomberait sur <body> (WCAG 2.4.3). Il passe au bouton qui prend sa place.
- * Rend le drapeau que l'inscription réussie lève.
+ * Le bouton de cast qui reçoit le focus quand l'autre disparaît : inscrit,
+ * « Caster » devient « Configurer ma diffusion » (`castConfig`) ; retiré
+ * depuis sa fenêtre, c'est l'inverse (`claimCast`).
+ */
+export function castFocusAction(hasClaimCast: boolean): "claimCast" | "castConfig" {
+  return hasClaimCast ? "claimCast" : "castConfig";
+}
+
+/**
+ * Le geste de cast que l'état actuel conclut : un retrait en attente dès que
+ * « Configurer ma diffusion » a disparu, une inscription dès que « Caster » a
+ * disparu ; `null` sinon.
+ */
+export function concludedCastGesture(
+  released: Readonly<{ pending: boolean; done: boolean }>,
+  claimed: Readonly<{ pending: boolean; done: boolean }>,
+): "released" | "claimed" | null {
+  if (released.pending && released.done) return "released";
+  if (claimed.pending && claimed.done) return "claimed";
+  return null;
+}
+
+/**
+ * Inscrit — ou retiré par « Ne plus caster » —, le bouton qui a ouvert la
+ * fenêtre disparaît : la fenêtre rendrait le focus à un bouton détaché, il
+ * tomberait sur <body> (WCAG 2.4.3). Il passe au bouton qui prend sa place
+ * (`castFocusAction`) s'il est là, sinon à « Plus d'actions ».
+ * Rend les drapeaux que l'inscription et le retrait réussis lèvent.
  */
 function useFocusAfterClaim(
   hasClaimCast: boolean,
+  hasCastConfig: boolean,
   rootRef: React.RefObject<HTMLElement | null>,
   toggleRef: React.RefObject<HTMLElement | null>,
 ) {
   const claimedRef = useRef(false);
+  const releasedRef = useRef(false);
   useEffect(() => {
-    if (!claimedRef.current || hasClaimCast) return;
-    claimedRef.current = false;
+    // Le drapeau du geste que l'état actuel conclut : inscrit (plus de
+    // « Caster »), ou retiré (plus de « Configurer ma diffusion » — « Caster »
+    // peut ne pas revenir, match lancé ou joué entre-temps).
+    const concluded = concludedCastGesture(
+      { pending: releasedRef.current, done: !hasCastConfig },
+      { pending: claimedRef.current, done: !hasClaimCast },
+    );
+    if (concluded === null) return;
+    (concluded === "released" ? releasedRef : claimedRef).current = false;
     const active = document.activeElement;
     if (active && active !== document.body && document.contains(active)) return;
-    const settings = rootRef.current?.querySelector<HTMLElement>('[data-action="castConfig"]');
-    (settings ?? toggleRef.current)?.focus({ preventScroll: true });
-  }, [hasClaimCast, rootRef, toggleRef]);
-  return claimedRef;
+    const replacement = rootRef.current?.querySelector<HTMLElement>(`[data-action="${castFocusAction(hasClaimCast)}"]`);
+    (replacement ?? toggleRef.current)?.focus({ preventScroll: true });
+  }, [hasClaimCast, hasCastConfig, rootRef, toggleRef]);
+  return { claimedRef, releasedRef };
 }
 
 export function MatchCardActions({
@@ -445,8 +478,9 @@ export function MatchCardActions({
   const [claimOpen, setClaimOpen] = useConfirmWhile(hasClaimCast);
   // La fenêtre de réglages ne survit pas à son action (cast repris par le
   // staff, match joué sans rediff possible) : l'instantané la referme.
-  const [settingsOpen, setSettingsOpen] = useConfirmWhile(actions.some((a) => a.id === "castConfig"));
-  const claimedRef = useFocusAfterClaim(hasClaimCast, rootRef, toggleRef);
+  const hasCastConfig = actions.some((a) => a.id === "castConfig");
+  const [settingsOpen, setSettingsOpen] = useConfirmWhile(hasCastConfig);
+  const { claimedRef, releasedRef } = useFocusAfterClaim(hasClaimCast, hasCastConfig, rootRef, toggleRef);
   // Les contacts ne restent pas affichés quand le match ne les offre plus
   // (terminé, caster retiré, tournoi clos) : l'instantané du flux retire
   // l'action, et la modale se ferme avec elle.
@@ -569,14 +603,18 @@ export function MatchCardActions({
   if (actions.length === 0) return null;
 
   const claim = async (body: CastClaimBody): Promise<CastClaimOutcome> => {
+    // Levé **avant** l'envoi : l'instantané du flux peut retirer « Caster »
+    // avant la réponse du POST, et le focus tomberait sur <body>. Un refus le
+    // baisse — il ne vit qu'entre une inscription et sa réussite.
+    claimedRef.current = true;
     try {
       const payload = await request(`/api/matches/${match.id}/caster`, "POST", body);
       // Le mode d'antenne choisi a été posé entre-temps par un autre : inscrit quand même, sans lui.
       showSuccess(t(payload.triggerSkipped === true ? "cardActions.castingTriggerKept" : "cardActions.casting"));
-      claimedRef.current = true;
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
       return { ok: true };
     } catch (error) {
+      claimedRef.current = false;
       const code = (error as Error).message;
       const message = launchError(code);
       showError(message);
@@ -801,6 +839,9 @@ export function MatchCardActions({
           matchLabel={matchLabel}
           onClose={() => setSettingsOpen(false)}
           onSaved={() => window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT))}
+          onReleasing={(pending) => {
+            releasedRef.current = pending;
+          }}
         />
       )}
       {refereeOpen && viewerUserId !== null && (

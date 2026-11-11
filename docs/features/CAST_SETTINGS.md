@@ -79,7 +79,28 @@ Fenêtre du caster, sur **son** cast :
 - **« Ne plus caster »** : `DELETE …/caster`, derrière un `ConfirmActionDialog` (il rend
   la place et retire le stream : geste sans retour ; le caster qui se retire
   lui-même n'est prévenu de rien, `CAST_NOTICES.md`) — refusé sur un match
-  terminé, où le bouton n'est pas offert (`offersCastRelease`).
+  terminé, où le bouton n'est pas offert (`offersCastRelease`). Retiré, le focus
+  passe au bouton « Caster » revenu sur la carte (`castFocusAction`, WCAG 2.4.3).
+- **Sans la permission `live`** (perdue en gardant l'inscription, match lancé) :
+  tout réglage serait refusé (`NOT_CASTER`) ; la fenêtre ne montre que le retrait,
+  avec une aide « Permission de diffusion retirée », et n'est offerte que sur un
+  match pas encore joué (`offersCastSettings`).
+- **Identité de caster incomplète** (tag Discord décertifié, Battle.net délié
+  en Overwatch — `castBlock`) : lien, mode et BattleTag sont refusés
+  (`CASTER_*_REQUIRED`) et masqués, l'aide « Identité de caster incomplète »
+  dit la condition qui manque ; l'antenne et la rediff restent offertes
+  (`CastAirAndReplay`), leurs routes ne demandant que la permission `live`.
+- Un refus `LIVE_TRIGGER_CHANGED` laisse la fenêtre ouverte : le choix de mode
+  est effacé, la fenêtre relit le mode du match (`GET …/caster` rend
+  `liveTrigger`, sans attendre le flux), le refus se rattache au groupe de
+  radios (focus, `aria-describedby`), et le prochain choix part avec le mode
+  désormais affiché.
+- Sans réglage possible, le bouton de sortie dit « Fermer » ; l'aide « identité
+  incomplète » ne paraît pas sur un match joué.
+- Retiré par « Ne plus caster », le focus passe à « Caster » s'il revient,
+  sinon à « Plus d'actions » (`concludedCastGesture`).
+- Le drapeau de focus du retrait se lève **avant** le `DELETE` (`onReleasing`),
+  comme celui de l'inscription : le flux peut rendre « Caster » avant la réponse.
 
 La fenêtre lit à l'ouverture `GET /api/matches/[id]/caster`
 (`loadOwnCastSettings`) : le BattleTag d'un cast **ne voyage pas** dans
@@ -114,11 +135,15 @@ cette fenêtre et à celle du staff.
 - Montré **exactement** là et quand celui du compte l'était
   (`buildLaunchCaster`) : fenêtres « Contacts » et de lancement, page du match,
   aux seules parties du match, dans un tournoi Overwatch
-  (`battletagRelevantFor`).
-- Le réglage « BattleTag OW » du profil **ne le masque pas** : c'est une
-  divulgation volontaire pour ce match, alors que le réglage protège le tag du
-  compte. Les deux ne sortent de toute façon que dans la fenêtre des contacts
-  (`sharesLiveMatch`).
+  (`battletagRelevantFor`) — sur la carte d'arbitre aussi quand l'arbitre
+  désigné caste le match (`buildLaunchReferee`). Hors Overwatch, il n'est
+  **pas gardé** : un corps qui en porte un écrit `NULL` (minimisation).
+- Le réglage « BattleTag OW » du profil ne masque ni lui ni celui du compte
+  dans ces fenêtres (`sharesLiveMatch`) ; l'aide du champ le dit.
+- Lu sur demande seulement (`loadCasterLinks(…, { battletag: true })`) : la
+  fenêtre de lancement le lit, les poussées aux joueurs non.
+- Chaque `PUT …/caster` rejoue les conditions de l'inscription (identité,
+  `CASTER_IS_PLAYER`), la ligne du compte lue d'abord en partage.
 - Part avec l'inscription de caster (retrait, suppression du compte) : rien à
   effacer à part.
 - Saisie : `parseCastBattletagInput` (rognée, passée par `visibleText`, 64
@@ -133,7 +158,7 @@ cette fenêtre et à celle du staff.
 | --- | --- | --- |
 | `GET …/caster` | caster inscrit | — → `{ streamId, liveUrl, staffStream, battletag }` |
 | `POST …/caster` | permission `live` | `{ streamId }` ou `{ liveUrl }` (obligatoire), plus `trigger`, `battletag` |
-| `PUT …/caster` | caster inscrit | `trigger`, `liveUrl`, `battletag` — **chaque champ absent n'est pas touché** |
+| `PUT …/caster` | caster inscrit | `trigger` (avec `expectedTrigger`, le mode que la fenêtre affichait au **premier choix** du caster — un changement reçu ensuite par le flux ne passe pas pour vu : changé entre-temps → 409 `LIVE_TRIGGER_CHANGED`, rien n'est écrit), `liveUrl`, `battletag` — **chaque champ absent n'est pas touché** |
 | `DELETE …/caster` | le caster, ou `tournaments` pour un autre | `?userId=` |
 
 Un corps qui dit `organisationLink: true` (quel que soit le lecteur) : 403
@@ -148,10 +173,14 @@ La fenêtre n'envoie le mode d'antenne que si le caster en a **choisi** un autre
 un match démarqué montre « automatique » sans qu'enregistrer un BattleTag le
 marque casté.
 
-Le dernier caster qui se retire (`releaseMatchCast`) sans qu'aucun stream ne
-reste — ni celui du staff avec son lien — démarque le match (`live_trigger` et
-`live_started_at` vidés) : l'inscription l'avait marqué casté, il ne passerait
-sinon « En direct » à son lancement pour personne.
+Le dernier caster qui part sans qu'aucun stream ne reste — ni celui du staff
+avec son lien — démarque le match (`live_trigger` et `live_started_at` vidés,
+`unmarkUncastMatches`) : l'inscription l'avait marqué casté, il ne passerait
+sinon « En direct » à son lancement pour personne. La règle vaut pour **tout**
+départ d'un match non joué : retrait volontaire ou par le staff
+(`releaseMatchCast`), retrait d'office (inéligible ou devenu joueur :
+`releaseIneligibleCast`, l'entretien des lancements) et suppression du compte
+(`withdrawUserCasts`). Un match joué garde son mode.
 
 Le BattleTag de cast figure dans l'export des données du caster
 (`casts[].castBattletag`, `listOwnMatchRoles`). Il part avec l'inscription ; sur un match joué gardé à
@@ -237,7 +266,7 @@ pas hors antenne en attendant le staff ; ils changent aussi ce mode — sauf, po
 porte le vrai lien de l'organisation (`organisationModeLocked`, 403 `STAFF_STREAM_FORBIDDEN`, bouton caché). Une inscription dont le
 mode a été posé entre-temps par un autre n'est pas refusée : le mode reste
 tel quel et la notification le dit (`triggerSkipped`,
-`cardActions.castingTriggerKept`, FR/EN). Le propriétaire est effacé
+`cardActions.castingTriggerKept`, FR/EN) — de même quand le mode que la fenêtre d'inscription montrait au premier choix du caster (`expectedTrigger`, envoyé avec `trigger`) n'est plus celui du match : la valeur périmée n'écrase pas le changement du staff ni ne referme son antenne ; sans choix du caster, la fenêtre suit le mode du match. Le propriétaire est effacé
 quand il quitte le match (`releaseMatchCast`), quand il en est retiré d'office
 (`dropTriggerOwner` : il rejoint une équipe du match, devient inéligible),
 quand le mode est retiré ou changé pendant qu'il n'est plus montré, et à la suppression de son compte — l'arbitre ou le staff `tournaments` + `live` qui le change le lui laisse
@@ -246,6 +275,13 @@ quand le mode est retiré ou changé pendant qu'il n'est plus montré, et à la 
 configuration du direct le renvoie tel quel, et un mode inchangé ne redemande
 pas sa date de début (retirée depuis, elle bloquerait les liens). Il
 figure dans l'export (`liveTriggers`, `listOwnMatchRoles`).
+
+Un mode écrit par un caster (inscription, « Configurer ma diffusion ») entre
+au journal du staff comme celui de la route du staff — « Diffusion réglée »
+(`LIVE_CONFIGURED`) ou « Diffusion retirée » (`LIVE_REMOVED`), après le
+commit (`announceCastTrigger`, d'après `CastSettingsOutcome.triggerChange`) ;
+l'auteur n'y est qu'un rôle (caster, ou staff pour `tournaments`). Un mode
+renvoyé tel quel ou écarté (`triggerSkipped`) n'écrit aucune ligne.
 
 ## L'arbitre désigné, médiateur de la diffusion
 

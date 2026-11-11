@@ -42,6 +42,11 @@ describe("loadMatchLogRow", () => {
     expect(params).toEqual([42]);
   });
 
+  it("MATCH_LOG_COLUMNS_SQL_readsPairing_forCastAnnouncements", () => {
+    // L'annonce d'un changement de caster compare l'appariement relu à celui du geste.
+    expect(MATCH_LOG_COLUMNS_SQL).toContain("m.team1_id, m.team2_id");
+  });
+
   it("loadMatchLogRow_missingMatch_returnsNull", async () => {
     const execute = jest.fn<SqlQuery>(async () => [[], []]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));

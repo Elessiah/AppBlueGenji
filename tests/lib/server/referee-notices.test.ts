@@ -105,7 +105,8 @@ describe("refereeLogCategory — un retrait alerte, le reste reste une trace", (
   it.each<[RefereeChange, string]>([
     [{ kind: "TAKEN", matchId: 1 }, "referees"],
     [{ kind: "ASSIGNED", matchId: 1, replacedRefereeId: null }, "referees"],
-    [{ kind: "ASSIGNED", matchId: 1, replacedRefereeId: 5 }, "staff-removal"],
+    // Remplacement : le créneau est repourvu dans la même transaction, simple trace.
+    [{ kind: "ASSIGNED", matchId: 1, replacedRefereeId: 5 }, "referees"],
     [{ kind: "RELEASED", matchId: 1, refereeId: 5, byStaff: false }, "staff-removal"],
     [{ kind: "RELEASED", matchId: 1, refereeId: 5, byStaff: true }, "staff-removal"],
     [{ kind: "OBJECTION_RELEASED", matchId: 1, refereeId: 5 }, "staff-removal"],
@@ -131,7 +132,6 @@ describe("refereeLogCategory — un retrait alerte, le reste reste une trace", (
   it.each<[RefereeChange]>([
     [{ kind: "RELEASED", matchId: 42, refereeId: REFEREE, byStaff: false }],
     [{ kind: "RELEASED", matchId: 42, refereeId: REFEREE, byStaff: true }],
-    [{ kind: "ASSIGNED", matchId: 42, replacedRefereeId: REFEREE }],
     [{ kind: "AUTO_RELEASED", matchId: 42, refereeId: REFEREE, reason: "INELIGIBLE" }],
     [{ kind: "SELF_MANAGED", matchId: 42, enabled: true, replacedRefereeId: REFEREE }],
   ])("deliverRefereeChange %j envoie la ligne dans staff-removal, sans nom", async (change) => {
@@ -144,6 +144,16 @@ describe("refereeLogCategory — un retrait alerte, le reste reste une trace", (
     mockMatch(matchRow());
     await deliverRefereeChange({ kind: "ASSIGNED", matchId: 42, replacedRefereeId: null });
     loggedLine("referees");
+  });
+
+  it("deliverRefereeChange_assignedReplacingHolder_logsInReferees", async () => {
+    // Le créneau est repourvu dans la même transaction : trace, pas d'alerte ; le titulaire est prévenu.
+    mockMatch(matchRow());
+
+    await deliverRefereeChange({ kind: "ASSIGNED", matchId: 42, replacedRefereeId: REFEREE });
+
+    loggedLine("referees");
+    expect(loadNotificationRecipients).toHaveBeenCalledWith([REFEREE], "certified");
   });
 });
 

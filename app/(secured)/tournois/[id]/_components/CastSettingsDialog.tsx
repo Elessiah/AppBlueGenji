@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useId, useState } from "react";
+import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
@@ -12,6 +12,7 @@ import { canEditReplay } from "@/lib/shared/match-replay";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
 import type { BracketMatch } from "@/lib/shared/types";
+import type { CastBlock } from "@/lib/shared/match-launch";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
 import { useLiveControls } from "../_lib/live-context";
@@ -37,6 +38,7 @@ const CAST_FIELD_ERRORS = {
   CAST_STREAM_NOT_OWNED: "url",
   CAST_STREAM_LINK_HELD: "url",
   INVALID_CAST_BATTLETAG: "battletag",
+  LIVE_TRIGGER_CHANGED: "trigger",
 } as const;
 
 /** Ce que la fenêtre a lu du cast du lecteur (`GET /api/matches/[id]/caster`). */
@@ -45,6 +47,8 @@ type OwnCast = {
   liveUrl: string | null;
   staffStream: boolean;
   battletag: string | null;
+  /** Mode d'antenne du match à la lecture (relu après `LIVE_TRIGGER_CHANGED`). */
+  liveTrigger: MatchLiveTrigger | null;
 };
 
 /**
@@ -69,12 +73,19 @@ export function CastSettingsDialog({
   matchLabel,
   onClose,
   onSaved,
+  onReleasing,
 }: Readonly<{
   match: BracketMatch;
   matchLabel: string;
   onClose: () => void;
   /** Un réglage enregistré : la page relit le match (et la modale de lancement). */
   onSaved: () => void;
+  /**
+   * Retrait : `true` **avant** l'envoi (l'instantané du flux peut rendre
+   * « Caster » avant la réponse, la carte y remet alors le focus), `false` s'il
+   * est refusé.
+   */
+  onReleasing?: (pending: boolean) => void;
 }>) {
   const actionText = useActionsText();
   const { t } = actionText;
@@ -90,6 +101,7 @@ export function CastSettingsDialog({
   const titleId = useId();
   const urlId = useId();
   const battletagId = useId();
+  const triggerId = useId();
 
   const [cast, setCast] = useState<OwnCast | null>(null);
   const [confirmRelease, setConfirmRelease] = useState(false);
@@ -98,9 +110,11 @@ export function CastSettingsDialog({
   // `null` tant que le caster n'a pas choisi : un match démarqué montre
   // « automatique » sans que l'enregistrement d'un BattleTag le marque casté.
   const [pickedTrigger, setTrigger] = useState<MatchLiveTrigger | null>(null);
-  const trigger: MatchLiveTrigger = pickedTrigger ?? match.liveTrigger ?? "AUTO";
+  const { current: liveTrigger, refresh: refreshTrigger } = useCurrentTrigger(match.liveTrigger);
+  const trigger: MatchLiveTrigger = pickedTrigger ?? liveTrigger ?? "AUTO";
+  const { seenTrigger, pickTrigger } = useSeenTrigger(liveTrigger, pickedTrigger, setTrigger);
   const [busy, setBusy] = useState(false);
-  const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId, battletag: battletagId });
+  const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId, battletag: battletagId, trigger: triggerId });
   const fail = (code: string | null | undefined) => launchErrorText(actionText, errorsText, code);
 
   // Lecture d'ouverture : le lien de son stream et son BattleTag de cast. Un
@@ -135,6 +149,13 @@ export function CastSettingsDialog({
   // Un match joué ne prend plus ni lien ni BattleTag (`MATCH_CAST_CLOSED`) :
   // la fenêtre ne garde que la rediff et le retrait.
   const played = match.status === "COMPLETED";
+  // Sans la permission `live`, ou sans l'identité de caster (tag Discord
+  // certifié, Battle.net en Overwatch), le serveur refuse lien, mode et
+  // BattleTag (`NOT_CASTER`, `CASTER_*_REQUIRED`). Sans la permission, il ne
+  // reste que le retrait ; une identité incomplète garde l'antenne et la
+  // rediff (`CastAirAndReplay`, permission `live` seule).
+  const identityBlock = castIdentityBlock(controls.castBlock);
+  const settable = castSettable(controls);
   const streamEditable = cast !== null && !cast.staffStream && !played;
   const urlRefused = streamEditable && castUrlInvalid(url);
   const urlChanged = cast !== null && url.trim() !== (cast.liveUrl ?? "");
@@ -143,7 +164,7 @@ export function CastSettingsDialog({
   const urlMissing = streamEditable && urlChanged && url.trim() === "";
   const battletagRefused = castBattletagInvalid(battletag);
   const battletagChanged = cast !== null && !played && battletag.trim() !== (cast.battletag ?? "");
-  const triggerChanged = configurable && !triggerLocked && pickedTrigger !== null && pickedTrigger !== match.liveTrigger;
+  const triggerChanged = configurable && !triggerLocked && pickedTrigger !== null && pickedTrigger !== liveTrigger;
   // « Enregistrer » sans rien de changé n'a rien à dire : il reste désarmé.
   const dirty = triggerChanged || (streamEditable && urlChanged) || battletagChanged;
   // Seul un mode choisi ici s'envoie : celui du match, même sans sa date, ne
@@ -152,7 +173,7 @@ export function CastSettingsDialog({
     configurable &&
     !triggerLocked &&
     pickedTrigger !== null &&
-    pickedTrigger !== match.liveTrigger &&
+    pickedTrigger !== liveTrigger &&
     castTriggerNeedsDate(trigger, match.startAt);
   // La rediff garde sa fenêtre (`MatchReplayDialog`), celle du staff de
   // diffusion : une seule définition du lien YouTube et de ses refus.
@@ -169,7 +190,12 @@ export function CastSettingsDialog({
       // Un seul envoi pour le cast ; la rediff a sa route (celle du staff de
       // diffusion), et n'est envoyée que si elle a changé.
       const settings: Record<string, unknown> = {};
-      if (triggerChanged) settings.trigger = pickedTrigger;
+      // Le mode vu part avec le mode choisi : changé entre-temps, le serveur
+      // refuse (`LIVE_TRIGGER_CHANGED`) plutôt que d'écraser ce qu'il ignore.
+      if (triggerChanged) {
+        settings.trigger = pickedTrigger;
+        settings.expectedTrigger = seenTrigger.current;
+      }
       if (streamEditable && urlChanged) {
         settings.liveUrl = url.trim() === "" ? null : url.trim();
       }
@@ -183,6 +209,13 @@ export function CastSettingsDialog({
       const message = fail(code);
       fieldErrors.report(code, message);
       showError(message);
+      // Mode changé entre-temps : la fenêtre relit le mode du match (le flux
+      // a pu ne pas le livrer encore) et le montre ; le prochain choix part
+      // avec lui comme mode vu (`useSeenTrigger`).
+      if (code === "LIVE_TRIGGER_CHANGED") {
+        setTrigger(null);
+        void refreshTrigger(match.id);
+      }
     } finally {
       setBusy(false);
     }
@@ -195,6 +228,7 @@ export function CastSettingsDialog({
   // Rend `true` s'il a abouti : la confirmation et la fenêtre se ferment.
   const release = async (): Promise<boolean> => {
     setBusy(true);
+    onReleasing?.(true);
     try {
       await requestJson(`/api/matches/${match.id}/caster`, { method: "DELETE" }, "MATCH_CAST_RELEASE_FAILED");
       showSuccess(t("cardActions.notCasting"));
@@ -202,6 +236,7 @@ export function CastSettingsDialog({
       onClose();
       return true;
     } catch (error) {
+      onReleasing?.(false);
       showError(fail((error as Error).message));
       return false;
     } finally {
@@ -232,7 +267,11 @@ export function CastSettingsDialog({
           </InfoHintRow>
         )}
 
-        {cast !== null && (
+        {cast !== null && !settable && !played && (
+          <NotSettableHint titleId={titleId} identityBlock={identityBlock} identityText={fail} />
+        )}
+
+        {cast !== null && settable && (
           <>
             {!played && (
               <CastUrlField
@@ -250,37 +289,6 @@ export function CastSettingsDialog({
               />
             )}
 
-            {configurable && (
-              <CastTriggerField
-                // Match démarqué : aucun mode coché, chaque choix se clique.
-                trigger={triggerLocked ? lockedTrigger(true, match.liveTrigger, trigger) : (pickedTrigger ?? match.liveTrigger)}
-                startAt={match.startAt}
-                onChange={setTrigger}
-                locked={triggerLocked}
-              />
-            )}
-
-            {/* L'antenne d'un mode manuel suit la règle du mode (décision 2) : un
-                co-caster ne l'ouvre ni ne la coupe pour le caster qui l'a posé. */}
-            {canToggleOnAir(match) && !triggerLocked && (
-              <div className={styles.section}>
-                <InfoHintRow>
-                  <p className={styles.sectionTitle}>{t("cardActions.castSettings.air")}</p>
-                  <InfoHint id={`${titleId}-air`} subject={t("cardActions.castSettings.air")}>
-                    <p>{t("cardActions.castSettings.airHint")}</p>
-                  </InfoHint>
-                </InfoHintRow>
-                <button
-                  type="button"
-                  className={onAir ? "btn ghost" : "btn"}
-                  disabled={busy}
-                  onClick={() => void toggleAir()}
-                >
-                  {onAir ? t("cardActions.stopLive") : t("cardActions.startLive")}
-                </button>
-              </div>
-            )}
-
             {!played && game !== null && battletagRelevantFor(game) && (
               <CastBattletagField
                 id={battletagId}
@@ -294,30 +302,41 @@ export function CastSettingsDialog({
               />
             )}
 
-            {replayable && (
-              <div className={styles.section}>
-                <InfoHintRow>
-                  <p className={styles.sectionTitle}>{t("cardActions.castSettings.replay")}</p>
-                  <InfoHint id={`${titleId}-replay`} subject={t("cardActions.castSettings.replay")}>
-                    <p>{t("cardActions.castSettings.replayHint")}</p>
-                  </InfoHint>
-                </InfoHintRow>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  disabled={busy}
-                  onClick={() => {
-                    // La fenêtre de rediff est une autre modale : celle-ci se
-                    // ferme d'abord, les deux ne se disputent pas le focus.
-                    onClose();
-                    openReplay(match);
-                  }}
-                >
-                  {match.replayUrl === null ? t("cardActions.addReplay") : t("cardActions.editReplay")}
-                </button>
-              </div>
+            {configurable && (
+              <CastTriggerField
+                // Match démarqué : aucun mode coché, chaque choix se clique.
+                trigger={triggerLocked ? lockedTrigger(true, liveTrigger, trigger) : (pickedTrigger ?? liveTrigger)}
+                startAt={match.startAt}
+                onChange={(next) => {
+                  pickTrigger(next);
+                  fieldErrors.clear("trigger");
+                }}
+                locked={triggerLocked}
+                id={triggerId}
+                fieldError={fieldErrors.message("trigger")}
+              />
             )}
           </>
+        )}
+
+        {/* Antenne et rediff ne demandent que la permission `live` (routes du
+            staff de diffusion) : une identité de caster incomplète ne les ôte pas. */}
+        {cast !== null && controls.canManage && (
+          <CastAirAndReplay
+            match={match}
+            titleId={titleId}
+            showAir={canToggleOnAir(match) && !triggerLocked}
+            onAir={onAir}
+            busy={busy}
+            toggleAir={toggleAir}
+            replayable={replayable}
+            onReplay={() => {
+              // La fenêtre de rediff est une autre modale : celle-ci se
+              // ferme d'abord, les deux ne se disputent pas le focus.
+              onClose();
+              openReplay(match);
+            }}
+          />
         )}
 
         <div className={styles.footer}>
@@ -333,10 +352,10 @@ export function CastSettingsDialog({
           )}
           <div className={styles.actions}>
             <button type="button" className={`btn ghost ${styles.button}`} onClick={onClose} disabled={busy}>
-              {played ? t("cardActions.castSettings.close") : t("cardActions.castSettings.cancel")}
+              {played || !settable ? t("cardActions.castSettings.close") : t("cardActions.castSettings.cancel")}
             </button>
             {/* Un match joué ne prend plus ni lien, ni mode, ni BattleTag : rien à enregistrer. */}
-            {!played && (
+            {!played && settable && (
               <button type="submit" className={`btn ${styles.button}`} disabled={busy || blocked || cast === null}>
                 {busy ? t("cardActions.castSettings.saving") : t("cardActions.castSettings.save")}
               </button>
@@ -357,4 +376,149 @@ export function CastSettingsDialog({
       )}
     </TournamentDialogFrame>
   );
+}
+
+/**
+ * Le mode du match tel que le caster le voyait à son **premier** choix : c'est
+ * lui qui part comme `expectedTrigger`. Un changement du staff reçu ensuite par
+ * le flux ne passe pas pour « vu » — le serveur refuse alors
+ * (`LIVE_TRIGGER_CHANGED`) au lieu de l'écraser.
+ */
+function useSeenTrigger(
+  liveTrigger: MatchLiveTrigger | null,
+  pickedTrigger: MatchLiveTrigger | null,
+  setTrigger: (next: MatchLiveTrigger) => void,
+) {
+  const seenTrigger = useRef<MatchLiveTrigger | null>(liveTrigger);
+  const pickTrigger = (next: MatchLiveTrigger) => {
+    if (pickedTrigger === null) seenTrigger.current = liveTrigger;
+    setTrigger(next);
+  };
+  return { seenTrigger, pickTrigger };
+}
+
+/** Les réglages du cast aboutiraient-ils : permission `live` et identité de caster complète. */
+export function castSettable(controls: Readonly<{ canManage: boolean; castBlock: CastBlock | null }>): boolean {
+  return controls.canManage && controls.castBlock === null;
+}
+
+/** Le refus d'identité (tag Discord, Battle.net) qui bloque les réglages, `null` sinon. */
+export function castIdentityBlock(block: CastBlock | null): Exclude<CastBlock, "NOT_CASTER"> | null {
+  return block === null || block === "NOT_CASTER" ? null : block;
+}
+
+/**
+ * Pourquoi lien, mode et BattleTag ne se règlent plus : permission de
+ * diffusion retirée (seul le retrait reste), ou identité de caster incomplète
+ * (la condition qui manque ; antenne et rediff restent).
+ */
+function NotSettableHint({
+  titleId,
+  identityBlock,
+  identityText,
+}: Readonly<{
+  titleId: string;
+  identityBlock: Exclude<CastBlock, "NOT_CASTER"> | null;
+  identityText: (code: string) => string;
+}>) {
+  const { t } = useActionsText();
+  const title = t(identityBlock === null ? "cardActions.castSettings.noLiveTitle" : "cardActions.castSettings.identityTitle");
+  const body = identityBlock === null ? t("cardActions.castSettings.noLive") : identityText(identityBlock);
+  return (
+    <InfoHintRow inline>
+      <p className={styles.subtitle}>{title}</p>
+      <InfoHint id={`${titleId}-${identityBlock === null ? "no-live" : "identity"}`} subject={title}>
+        <p>{body}</p>
+      </InfoHint>
+    </InfoHintRow>
+  );
+}
+
+/**
+ * Bascule d'antenne et rediff du cast : la permission `live` suffit (routes du
+ * staff de diffusion), quelle que soit l'identité de caster.
+ */
+function CastAirAndReplay({
+  match,
+  titleId,
+  showAir,
+  onAir,
+  busy,
+  toggleAir,
+  replayable,
+  onReplay,
+}: Readonly<{
+  match: BracketMatch;
+  titleId: string;
+  showAir: boolean;
+  onAir: boolean;
+  busy: boolean;
+  toggleAir: () => Promise<unknown>;
+  replayable: boolean;
+  onReplay: () => void;
+}>) {
+  const { t } = useActionsText();
+  return (
+    <>
+      {/* L'antenne d'un mode manuel suit la règle du mode (décision 2) : un
+          co-caster ne l'ouvre ni ne la coupe pour le caster qui l'a posé. */}
+      {showAir && (
+        <div className={styles.section}>
+          <InfoHintRow>
+            <p className={styles.sectionTitle}>{t("cardActions.castSettings.air")}</p>
+            <InfoHint id={`${titleId}-air`} subject={t("cardActions.castSettings.air")}>
+              <p>{t("cardActions.castSettings.airHint")}</p>
+            </InfoHint>
+          </InfoHintRow>
+          <button
+            type="button"
+            className={onAir ? "btn ghost" : "btn"}
+            disabled={busy}
+            onClick={() => void toggleAir()}
+          >
+            {onAir ? t("cardActions.stopLive") : t("cardActions.startLive")}
+          </button>
+        </div>
+      )}
+
+      {replayable && (
+        <div className={styles.section}>
+          <InfoHintRow>
+            <p className={styles.sectionTitle}>{t("cardActions.castSettings.replay")}</p>
+            <InfoHint id={`${titleId}-replay`} subject={t("cardActions.castSettings.replay")}>
+              <p>{t("cardActions.castSettings.replayHint")}</p>
+            </InfoHint>
+          </InfoHintRow>
+          <button
+            type="button"
+            className="btn ghost"
+            disabled={busy}
+            onClick={onReplay}
+          >
+            {match.replayUrl === null ? t("cardActions.addReplay") : t("cardActions.editReplay")}
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * Le mode d'antenne du match que la fenêtre montre : celui de l'instantané,
+ * ou celui relu par `refresh` (`GET …/caster`) après un refus
+ * `LIVE_TRIGGER_CHANGED` — tant que l'instantané n'a pas changé depuis ; un
+ * mode livré ensuite par le flux reprend la main.
+ */
+function useCurrentTrigger(snapshotTrigger: MatchLiveTrigger | null) {
+  const [reread, setReread] = useState<{ value: MatchLiveTrigger | null; against: MatchLiveTrigger | null } | null>(null);
+  const current = reread !== null && reread.against === snapshotTrigger ? reread.value : snapshotTrigger;
+  const refresh = async (matchId: number) => {
+    try {
+      const payload = await requestJson<OwnCast>(`/api/matches/${matchId}/caster`, {}, "MATCH_CAST_SETTINGS_FAILED");
+      setReread({ value: payload.liveTrigger ?? null, against: snapshotTrigger });
+    } catch {
+      // Relecture impossible : l'instantané reste la référence, le refus est déjà dit.
+    }
+  };
+  return { current, refresh };
 }

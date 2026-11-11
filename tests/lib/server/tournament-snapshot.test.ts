@@ -32,6 +32,8 @@ jest.mock("@/lib/server/tournaments/match-casters");
 jest.mock("@/lib/server/tournaments/round-maps");
 
 import {
+  castersOnReadStreams,
+  castersOnUnreadStream,
   getTournamentSnapshot,
   getTournamentSnapshotFrame,
   invalidateTournamentSnapshot,
@@ -47,7 +49,7 @@ import {
 } from "@/lib/server/tournaments/repository";
 import { hasPendingStateTransition, syncTournamentState } from "@/lib/server/tournaments/state";
 import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
-import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
+import { invalidateLandingAggregates, invalidateLandingLive } from "@/lib/server/landing-cache";
 import { invalidateTeamRanking, invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { getDatabase } from "@/lib/server/database";
@@ -329,6 +331,8 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     expect(dispatchMatchStartNotices).toHaveBeenCalledTimes(1);
     // Le brief du salon part de la même ouverture.
     expect(dispatchLobbyBriefs).toHaveBeenCalledTimes(1);
+    // Le direct de l'accueil se relit aussitôt (lancement d'office, caster retiré).
+    expect(invalidateLandingLive).toHaveBeenCalledTimes(1);
   });
 
   it("ne relance pas les notifications quand aucun lancement n'a bougé", async () => {
@@ -337,6 +341,7 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     await new Promise((resolve) => setImmediate(resolve));
     expect(dispatchMatchStartNotices).not.toHaveBeenCalled();
     expect(dispatchLobbyBriefs).not.toHaveBeenCalled();
+    expect(invalidateLandingLive).not.toHaveBeenCalled();
   });
 
   it("n'entretient pas quand aucun lancement n'est dû", async () => {
@@ -743,6 +748,7 @@ describe("getTournamentSnapshot — casters et streams (porte commune du flux et
     const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
 
     expect(loadMatchCasters).toHaveBeenCalledTimes(1);
+    expect(loadMatchStreams).toHaveBeenCalledTimes(1);
     expect(jest.mocked(loadMatchCasters).mock.calls[0][1]).toEqual([1, 2]);
     const [casted, bare] = snapshot?.matches ?? [];
     expect(casted.liveUrl).toBe("https://twitch.tv/match");
@@ -768,6 +774,28 @@ describe("getTournamentSnapshot — casters et streams (porte commune du flux et
     expect(snapshot?.matches[0].casters).toEqual([]);
   });
 
+  it("getTournamentSnapshot_casterOnStreamOpenedBetweenReads_rereadsStreamsOnce", async () => {
+    // Le caster a ouvert son stream entre la lecture des streams et celle des casters.
+    jest.mocked(getMatchRows).mockResolvedValue([matchRow({ id: 1, status: "READY" })]);
+    jest.mocked(loadMatchStreams)
+      .mockResolvedValueOnce(new Map([[1, [{ id: 5, matchId: 1, liveUrl: null, staff: true }]]]))
+      .mockResolvedValueOnce(
+        new Map([[1, [
+          { id: 5, matchId: 1, liveUrl: null, staff: true },
+          { id: 6, matchId: 1, liveUrl: "https://kick.com/voix", staff: false },
+        ]]]),
+      );
+    jest.mocked(loadMatchCasters).mockResolvedValue(
+      new Map([[1, [{ matchId: 1, userId: 9, streamId: 6, readyAt: null, pseudo: "Voix", eligibility }]]]),
+    );
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+
+    expect(loadMatchStreams).toHaveBeenCalledTimes(2);
+    expect(snapshot?.matches[0].streams.map((stream) => stream.id)).toEqual([5, 6]);
+    expect(snapshot?.matches[0].casters.map((caster) => caster.streamId)).toEqual([6]);
+  });
+
   it("tait un caster devenu inéligible d'un match pas encore lancé", async () => {
     jest.mocked(getMatchRows).mockResolvedValue([matchRow({ id: 1, status: "READY" })]);
     jest.mocked(loadMatchStreams).mockResolvedValue(
@@ -785,5 +813,58 @@ describe("getTournamentSnapshot — casters et streams (porte commune du flux et
     const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
 
     expect(snapshot?.matches[0].casters.map((caster) => caster.userId)).toEqual([9]);
+  });
+});
+
+describe("castersOnUnreadStream", () => {
+  it("castersOnUnreadStream_casterStreamAbsentFromRead_returnsTrue", () => {
+    const streams = new Map([[1, [{ id: 5 }]]]);
+    const casters = new Map([[1, [{ streamId: 6 }]]]);
+
+    expect(castersOnUnreadStream(streams, casters)).toBe(true);
+  });
+
+  it("castersOnUnreadStream_allCasterStreamsRead_returnsFalse", () => {
+    const streams = new Map([[1, [{ id: 5 }, { id: 6 }]]]);
+    const casters = new Map([[1, [{ streamId: 5 }, { streamId: 6 }]]]);
+
+    expect(castersOnUnreadStream(streams, casters)).toBe(false);
+  });
+
+  it("castersOnUnreadStream_casterOnMatchWithNoStreamRead_returnsTrue", () => {
+    const streams = new Map([[1, [{ id: 5 }]]]);
+    const casters = new Map([[2, [{ streamId: 7 }]]]);
+
+    expect(castersOnUnreadStream(streams, casters)).toBe(true);
+  });
+});
+
+describe("castersOnReadStreams", () => {
+  it("castersOnReadStreams_streamDeletedBeforeReread_dropsItsCaster", () => {
+    // Le caster du stream 6 est parti (stream effacé) avant la relecture.
+    const streams = new Map([[1, [{ id: 5 }]]]);
+    const casters = new Map([[1, [{ streamId: 5, userId: 9 }, { streamId: 6, userId: 12 }]]]);
+
+    expect(castersOnReadStreams(streams, casters)).toEqual(new Map([[1, [{ streamId: 5, userId: 9 }]]]));
+  });
+
+  it("castersOnReadStreams_casterWithoutStreamId_kept", () => {
+    const streams = new Map([[1, [{ id: 5 }]]]);
+    const casters = new Map([[1, [{ streamId: null }]]]);
+
+    expect(castersOnReadStreams(streams, casters)).toEqual(new Map([[1, [{ streamId: null }]]]));
+  });
+
+  it("castersOnReadStreams_matchWithoutStream_dropsMatchEntry", () => {
+    const casters = new Map([[2, [{ streamId: 7 }]]]);
+
+    expect(castersOnReadStreams(new Map(), casters).size).toBe(0);
+  });
+
+  it("castersOnReadStreams_allStreamsRead_keepsEveryCaster", () => {
+    const streams = new Map([[1, [{ id: 5 }, { id: 6 }]]]);
+    const casters = new Map([[1, [{ streamId: 5 }, { streamId: 6 }]]]);
+
+    expect(castersOnReadStreams(streams, casters)).toEqual(casters);
   });
 });

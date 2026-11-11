@@ -283,6 +283,8 @@ export async function syncVisibleTournaments(): Promise<void> {
           // mais c'est bien ce que les spectateurs attendent de voir. La
           // publication reste **après le commit** — c'est tout l'objet de ce
           // retour plutôt qu'un événement publié depuis le fond du moteur.
+          // `publishUpdatedEvent` vide tout l'accueil, son direct compris
+          // (`invalidateLandingAggregates`) : un lancement de la même passe y est couvert.
           if (stateChanged || contentChanged) changedIds.push(tournamentId);
           // Un lancement ne concerne que le plateau de ce tournoi : ni la liste,
           // ni la vitrine, ni le classement n'ont à être vidés pour lui.

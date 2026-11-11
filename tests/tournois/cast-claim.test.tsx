@@ -146,6 +146,25 @@ describe("castClaimBody — le corps envoyé à POST /api/matches/[id]/caster", 
     ).toEqual({ liveUrl: "twitch.tv/voix", battletag: null, trigger: "MANUAL" });
   });
 
+  it("castClaimBody_separateWithExpectedTrigger_sendsItWithTrigger", () => {
+    // `null` est une valeur : la fenêtre montrait un match sans mode.
+    expect(
+      castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", trigger: "MANUAL", expectedTrigger: null }),
+    ).toEqual({ liveUrl: "twitch.tv/voix", battletag: null, trigger: "MANUAL", expectedTrigger: null });
+  });
+
+  it("castClaimBody_lockedTrigger_omitsExpectedTrigger", () => {
+    expect(
+      castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", trigger: undefined, expectedTrigger: "AUTO" }),
+    ).toEqual({ liveUrl: "twitch.tv/voix", battletag: null });
+  });
+
+  it("castClaimBody_join_omitsExpectedTrigger", () => {
+    expect(
+      castClaimBody({ kind: "JOIN", streamId: 4, liveUrl: null, casterPseudos: [] }, { ...input, expectedTrigger: "AUTO" }),
+    ).toEqual({ streamId: 4, battletag: null });
+  });
+
   it("castClaimBody_lockedTrigger_omitsTrigger", () => {
     // Mode posé par un autre caster : le corps ne le porte pas, rien à refuser.
     expect(castClaimBody({ kind: "SEPARATE" }, { ...input, url: "twitch.tv/voix", trigger: undefined })).toEqual({
@@ -377,10 +396,27 @@ describe("MatchCardActions — branchements du cast", () => {
   it("inscrit, le focus passe au bouton qui remplace « Caster » (« Ne plus caster », sinon « Plus d'actions »)", () => {
     expectContains(card, [
       "claimedRef.current = true;",
-      "if (!claimedRef.current || hasClaimCast) return;",
-      'querySelector<HTMLElement>(\'[data-action="castConfig"]\')',
-      "(settings ?? toggleRef.current)?.focus({ preventScroll: true });",
+      "{ pending: releasedRef.current, done: !hasCastConfig },",
+      "{ pending: claimedRef.current, done: !hasClaimCast },",
+      "querySelector<HTMLElement>(`[data-action=\"${castFocusAction(hasClaimCast)}\"]`)",
+      "(replacement ?? toggleRef.current)?.focus({ preventScroll: true });",
     ]);
+  });
+
+  it("claim_flagRaisedBeforePostAndLoweredOnRefusal", () => {
+    // Un instantané du flux arrivé avant la réponse du POST trouve le drapeau levé ; un refus le baisse.
+    expect(card).toMatch(/claimedRef\.current = true;\s+try \{\s+const payload = await request\(`\/api\/matches\/\$\{match\.id\}\/caster`, "POST", body\);/);
+    expect(card).toMatch(/\} catch \(error\) \{\s+claimedRef\.current = false;/);
+  });
+
+  it("CastSettingsDialog_release_flagRaisedBeforeDeleteAndLoweredOnRefusal", () => {
+    // Comme l'inscription : l'instantané du flux peut rendre « Caster » avant
+    // la réponse du DELETE, le drapeau est donc levé avant l'envoi.
+    const settings = readSource("app/(secured)/tournois/[id]/_components/CastSettingsDialog.tsx");
+    expect(settings).toMatch(/onReleasing\?\.\(true\);\s+try \{\s+await requestJson\(`\/api\/matches\/\$\{match\.id\}\/caster`, \{ method: "DELETE" \}/);
+    expect(settings).toMatch(/\} catch \(error\) \{\s+onReleasing\?\.\(false\);/);
+    expect(card).toContain("releasedRef.current = pending;");
+    expect(settings).not.toContain("onReleased?.()");
   });
 
   it("le staff choisit le caster retiré, désigné par ?userId= ; le caster se retire depuis sa fenêtre", () => {
@@ -546,6 +582,15 @@ describe("Fenêtre « Caster » — l'aide du lien du caster", () => {
     expect(enActions.cardActions.castSettings.battletagHint).toContain("it replaces your profile's");
     expect(enActions.cardActions.castSettings.battletagHint).toContain("nobody checks it");
   });
+
+  it("battletagHint_namesLaunchWindowRecipientsAndHidden_frEn", () => {
+    expect(frActions.cardActions.castSettings.battletagHint).toContain("la fenêtre de lancement");
+    expect(frActions.cardActions.castSettings.battletagHint).toContain("les autres casters et les arbitres");
+    expect(frActions.cardActions.castSettings.battletagHint).toContain("même si ton BattleTag est masqué");
+    expect(enActions.cardActions.castSettings.battletagHint).toContain("the launch window");
+    expect(enActions.cardActions.castSettings.battletagHint).toContain("the other casters and the referees");
+    expect(enActions.cardActions.castSettings.battletagHint).toContain("even if your BattleTag is hidden");
+  });
 });
 
 describe("lockedTrigger — un mode verrouillé montre celui du match", () => {
@@ -660,6 +705,16 @@ describe("Fenêtre de diffusion — le stream d'un caster disparu", () => {
 });
 
 describe("Inscription — un mode posé entre-temps par un autre", () => {
+  it("claimDialog_untouchedTrigger_followsMatchModeAndSendsTheSeenOne", () => {
+    // Sans choix du caster, la fenêtre suit le mode du match (jamais sa valeur
+    // d'ouverture) ; le mode vu au premier choix part avec le mode choisi.
+    const dialog = readSource("app/(secured)/tournois/[id]/_components/CastClaimDialog.tsx");
+    expect(dialog).toContain('const trigger: MatchLiveTrigger = picked?.trigger ?? match.liveTrigger ?? "AUTO";');
+    expect(dialog).toContain("seen: previous === null ? match.liveTrigger : previous.seen");
+    expect(dialog).toContain("expectedTrigger: seenTrigger,");
+    expect(dialog).not.toContain('useState<MatchLiveTrigger>(match.liveTrigger ?? "AUTO")');
+  });
+
   it("claim_triggerSkipped_saysTheModeStayed", () => {
     const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
     expect(card).toContain('payload.triggerSkipped === true ? "cardActions.castingTriggerKept" : "cardActions.casting"');

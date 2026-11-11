@@ -23,6 +23,7 @@ import {
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
 import { liveTriggerOwnerAfter, mayChangeLiveTrigger, mayUnmarkLiveTrigger, organisationModeLocked } from "@/lib/shared/live-trigger-owner";
+import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { castBeforeLaunch } from "@/lib/shared/match-launch";
 import type { TournamentGame } from "@/lib/shared/types";
 import { nullableId } from "@/lib/shared/nullable-id";
@@ -40,6 +41,13 @@ import type { LaunchMatchRow } from "./match-launch";
 export type CastSettings = {
   /** Mode d'antenne du match (`null` : le match n'est plus casté). */
   trigger?: MatchLiveTrigger | null;
+  /**
+   * Le mode que la fenêtre affichait quand le caster a choisi `trigger`. Lu
+   * sous le verrou, un mode qui a changé entre-temps (le staff, un autre
+   * caster) refuse tout l'enregistrement (`LIVE_TRIGGER_CHANGED`) : la valeur
+   * périmée du caster n'écrase pas le changement qu'il n'a pas vu.
+   */
+  expectedTrigger?: MatchLiveTrigger | null;
   /** Lien de **son** stream (`null` est refusé : `STREAM_URL_REQUIRED`). */
   liveUrl?: string | null;
   /** BattleTag donné pour ce cast (`null` : celui de son compte). */
@@ -54,7 +62,12 @@ export type CastSettings = {
 };
 
 /** Ce que les réglages ont fait : `triggerSkipped`, le mode laissé à qui le tient (`skipLockedTrigger`). */
-export type CastSettingsOutcome = { triggerSkipped: boolean };
+/**
+ * `triggerChange` : le mode d'antenne réellement écrit — posé ou changé
+ * (`CONFIGURED`), retiré (`REMOVED`) —, `null` sans écriture ; l'appelant le
+ * journalise après le commit, comme la route du staff.
+ */
+export type CastSettingsOutcome = { triggerSkipped: boolean; triggerChange: "CONFIGURED" | "REMOVED" | null };
 
 /**
  * Ce que la route établit du caster pour la règle du mode d'antenne
@@ -347,9 +360,21 @@ export async function applyCastSettings(
   const matchId = Number(row.id);
   // Le mode puis le lien jugent le même caster : une seule lecture.
   const memo: ShownMemo = new Map();
+  if (
+    settings.trigger !== undefined &&
+    settings.expectedTrigger !== undefined &&
+    (row.live_trigger ?? null) !== settings.expectedTrigger
+  ) {
+    throw new Error("LIVE_TRIGGER_CHANGED");
+  }
+  // Relevé avant l'écriture : `applyCastTrigger` met la ligne à jour.
+  const previousTrigger = row.live_trigger ?? null;
   const triggerSkipped =
     settings.trigger !== undefined &&
     !(await applyCastTrigger(connection, row, settings.trigger, userId, access, settings.skipLockedTrigger === true, memo));
+  const triggerWritten = settings.trigger !== undefined && !triggerSkipped && settings.trigger !== previousTrigger;
+  let triggerChange: CastSettingsOutcome["triggerChange"] = null;
+  if (triggerWritten) triggerChange = settings.trigger === null ? "REMOVED" : "CONFIGURED";
   let streams: MatchStreamRow[] | undefined;
   // Le lien d'un stream (et son origine) ne se règle que par un caster montré :
   // un caster tu ne réécrit pas le lien public d'un stream qu'il partage.
@@ -369,7 +394,10 @@ export async function applyCastSettings(
     );
   }
   if (settings.battletag !== undefined) {
-    await writeCastBattletag(connection, matchId, userId, parseCastBattletagInput(settings.battletag));
+    // Hors Overwatch, aucun BattleTag de cast n'est gardé : il ne s'y montre
+    // nulle part (minimisation) — un corps qui en porte un l'efface.
+    const battletag = battletagRelevantFor(row.tournament_game) ? parseCastBattletagInput(settings.battletag) : null;
+    await writeCastBattletag(connection, matchId, userId, battletag);
   }
   // Un lien retiré peut laisser un stream que plus personne ne tient : le même
   // ménage que la configuration du staff et que le retrait d'un caster.
@@ -379,7 +407,7 @@ export async function applyCastSettings(
   // les relire sous `FOR UPDATE` verrouillerait l'intervalle de
   // `bg_match_casters` des matchs voisins.
   if (streams !== undefined) await pruneMatchStreams(connection, matchId, { streams, casters: row.casters });
-  return { triggerSkipped };
+  return { triggerSkipped, triggerChange };
 }
 
 /** Ce qu'un caster lit de **son** cast pour le régler (`CastSettingsDialog`). */
@@ -391,6 +419,12 @@ export type OwnCastSettings = {
   staffStream: boolean;
   /** BattleTag donné pour ce cast, `null` = celui de son compte. */
   battletag: string | null;
+  /**
+   * Mode de passage à l'antenne du match à la lecture, `null` s'il n'est pas
+   * casté : la fenêtre le relit après un refus `LIVE_TRIGGER_CHANGED`, sans
+   * attendre le flux.
+   */
+  liveTrigger: MatchLiveTrigger | null;
 };
 
 type OwnCastRow = RowDataPacket & {
@@ -398,6 +432,7 @@ type OwnCastRow = RowDataPacket & {
   cast_battletag: string | null;
   live_url: string | null;
   staff_owned: number;
+  live_trigger: string | null;
 };
 
 /**
@@ -413,9 +448,10 @@ type OwnCastRow = RowDataPacket & {
 export async function loadOwnCastSettings(matchId: number, userId: number): Promise<OwnCastSettings> {
   const db = await getDatabase();
   const [rows] = await db.execute<OwnCastRow[]>(
-    `SELECT c.stream_id, c.cast_battletag, s.live_url, s.staff_owned
+    `SELECT c.stream_id, c.cast_battletag, s.live_url, s.staff_owned, m.live_trigger
      FROM bg_match_casters c
      JOIN bg_match_streams s ON s.match_id = c.match_id AND s.id = c.stream_id
+     JOIN bg_matches m ON m.id = c.match_id
      WHERE c.match_id = ? AND c.user_id = ? LIMIT 1`,
     [matchId, userId],
   );
@@ -426,5 +462,6 @@ export async function loadOwnCastSettings(matchId: number, userId: number): Prom
     liveUrl: row.live_url ?? null,
     staffStream: Number(row.staff_owned) === 1,
     battletag: row.cast_battletag ?? null,
+    liveTrigger: isMatchLiveTrigger(row.live_trigger) ? row.live_trigger : null,
   };
 }

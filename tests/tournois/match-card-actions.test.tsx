@@ -2,7 +2,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MatchCardActions, closePanelOnTabOut, panelPlacement } from "@/app/(secured)/tournois/[id]/_components/MatchCardActions";
+import { MatchCardActions, castFocusAction, closePanelOnTabOut, concludedCastGesture, panelPlacement } from "@/app/(secured)/tournois/[id]/_components/MatchCardActions";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import type { CastBlock } from "@/lib/shared/match-launch";
 import {
@@ -547,5 +547,34 @@ describe("Diffusion officielle — libellé du staff (D26)", () => {
   it("titre la fenêtre du même nom", () => {
     expect(messages("fr", "tournamentDialogs").live.title).toBe("Diffusion officielle");
     expect(messages("en", "tournamentDialogs").live.title).toBe("Official broadcast");
+  });
+});
+
+describe("castFocusAction — le bouton de cast qui reprend le focus", () => {
+  it("castFocusAction_afterRelease_targetsClaimCast", () => {
+    expect(castFocusAction(true)).toBe("claimCast");
+  });
+
+  it("castFocusAction_afterClaim_targetsCastConfig", () => {
+    expect(castFocusAction(false)).toBe("castConfig");
+  });
+});
+
+describe("concludedCastGesture — le geste de cast que l'instantané conclut", () => {
+  it("concludedCastGesture_releasePendingAndConfigGone_returnsReleased", () => {
+    // Retiré sur un match lancé entre-temps : « Caster » ne revient pas, le retrait se conclut quand même.
+    expect(concludedCastGesture({ pending: true, done: true }, { pending: false, done: false })).toBe("released");
+  });
+
+  it("concludedCastGesture_releasePendingConfigStillShown_returnsNull", () => {
+    expect(concludedCastGesture({ pending: true, done: false }, { pending: false, done: true })).toBeNull();
+  });
+
+  it("concludedCastGesture_claimPendingAndClaimGone_returnsClaimed", () => {
+    expect(concludedCastGesture({ pending: false, done: true }, { pending: true, done: true })).toBe("claimed");
+  });
+
+  it("concludedCastGesture_nothingPending_returnsNull", () => {
+    expect(concludedCastGesture({ pending: false, done: true }, { pending: false, done: true })).toBeNull();
   });
 });

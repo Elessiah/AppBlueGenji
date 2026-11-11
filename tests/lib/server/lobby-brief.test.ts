@@ -31,6 +31,7 @@ import {
   resetLobbyBriefThrottle,
 } from "@/lib/server/tournaments/lobby-brief";
 import { formatLobbyBriefDm } from "@/lib/server/tournaments/lobby-brief-dm";
+import { firstAnnounceableUrl } from "@/lib/shared/live-announcements";
 import { renderDm } from "@/lib/shared/dm-language";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { resolvePush } from "../../helpers/push";
@@ -51,7 +52,7 @@ const MATCH = {
   launch_pairing: "1:2",
   brief_pairing: "1:2",
   voice_tracked: 0,
-  stream_url: null,
+  stream_urls: null,
   host_team_id: null,
   team1_seed: null,
   team2_seed: null,
@@ -289,7 +290,7 @@ describe("dispatchLobbyBriefs", () => {
   });
 
   it("dispatchLobbyBriefs_redirectStreamUrl_noStreamInBrief", async () => {
-    mockDb([{ ...MATCH, stream_url: "https://www.youtube.com/redirect?q=https://phish.example" }]);
+    mockDb([{ ...MATCH, stream_urls: "https://www.youtube.com/redirect?q=https://phish.example" }]);
 
     await dispatchLobbyBriefs();
 
@@ -297,8 +298,67 @@ describe("dispatchLobbyBriefs", () => {
     expect(jest.mocked(formatLobbyBriefDm).mock.calls[0][0].streamUrl).toBeNull();
   });
 
+  it("dispatchLobbyBriefs_firstLinkRefusedSecondValid_keepsSecond", async () => {
+    // Le premier lien est refusé (page de redirection) : le suivant du match prend sa place.
+    mockDb([{ ...MATCH, stream_urls: "https://www.youtube.com/redirect?q=https://phish.example https://www.twitch.tv/voix" }]);
+
+    await dispatchLobbyBriefs();
+
+    expect(jest.mocked(formatLobbyBriefDm).mock.calls[0][0].streamUrl).toBe("https://www.twitch.tv/voix");
+  });
+
+  it("firstAnnounceableUrl_null_returnsNull", () => {
+    expect(firstAnnounceableUrl(null)).toBeNull();
+  });
+
+  it("firstAnnounceableUrl_listJustUnderGroupConcatLimit_keepsLastCandidate", () => {
+    const valid = "https://www.twitch.tv/voix";
+    const refused = `https://www.youtube.com/redirect?q=${"a".repeat(1023 - valid.length - 1 - 35)}`;
+    const list = `${refused} ${valid}`;
+    expect(list).toHaveLength(1023);
+    expect(firstAnnounceableUrl(list)).toBe(valid);
+  });
+
+  it("firstAnnounceableUrl_listCutAtMariaDbLimit_dropsLastCandidate", () => {
+    // Exactement 1 Mio (coupe par défaut de MariaDB, la production).
+    const valid = "https://www.twitch.tv/tronq";
+    const refused = `https://www.youtube.com/redirect?q=${"a".repeat(1024 * 1024 - valid.length - 1 - 35)}`;
+    const cut = `${refused} ${valid}`;
+    expect(cut).toHaveLength(1024 * 1024);
+    expect(firstAnnounceableUrl(cut)).toBeNull();
+  });
+
+  it("firstAnnounceableUrl_longerUncutList_keepsLastCandidate", () => {
+    // MariaDB (production) ne coupe qu'à 1 Mio : une liste de 1025 octets est entière.
+    const valid = "https://www.twitch.tv/voix";
+    const refused = `https://www.youtube.com/redirect?q=${"a".repeat(1025 - valid.length - 1 - 35)}`;
+    const list = `${refused} ${valid}`;
+    expect(list).toHaveLength(1025);
+    expect(firstAnnounceableUrl(list)).toBe(valid);
+  });
+
+  it("firstAnnounceableUrl_undefined_returnsNull", () => {
+    expect(firstAnnounceableUrl(undefined)).toBeNull();
+  });
+
+  it("firstAnnounceableUrl_allRefused_returnsNull", () => {
+    expect(firstAnnounceableUrl("https://www.youtube.com/redirect?q=https://phish.example")).toBeNull();
+    expect(firstAnnounceableUrl("")).toBeNull();
+  });
+
+  it("firstAnnounceableUrl_listCutByGroupConcat_dropsPossiblyTruncatedLast", () => {
+    // Exactement 1024 octets (coupe de MySQL) : le dernier lien a pu être tronqué.
+    const valid = "https://www.twitch.tv/tronq";
+    const refused = `https://www.youtube.com/redirect?q=${"a".repeat(1024 - valid.length - 1 - 35)}`;
+    const cut = `${refused} ${valid}`;
+    expect(cut).toHaveLength(1024);
+    expect(firstAnnounceableUrl(cut)).toBeNull();
+    // Sous la limite, le dernier lien sert.
+    expect(firstAnnounceableUrl("https://www.youtube.com/redirect?q=x https://www.twitch.tv/voix")).toBe("https://www.twitch.tv/voix");
+  });
+
   it("dispatchLobbyBriefs_plainStreamUrl_streamKeptInBrief", async () => {
-    mockDb([{ ...MATCH, stream_url: "https://www.twitch.tv/bluegenji" }]);
+    mockDb([{ ...MATCH, stream_urls: "https://www.twitch.tv/bluegenji" }]);
 
     await dispatchLobbyBriefs();
 

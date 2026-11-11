@@ -29,6 +29,7 @@ async function liveGate(user: AuthUser, matchId: number): Promise<Response | nul
 /** Statut de chaque refus connu du réglage ; tout autre motif est une panne (500). */
 const LIVE_ERROR_STATUSES = new Map<string, number>(Object.entries({
   MATCH_NOT_FOUND: 404,
+  UNAUTHORIZED: 401,
   LIVE_TRIGGER_NOT_OWNED: 403,
   NOT_MATCH_REFEREE: 403,
   NOT_MATCH_CASTER: 403,

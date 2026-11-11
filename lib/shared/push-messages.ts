@@ -45,7 +45,7 @@ import { cached } from "./intl-cache";
 import { DEFAULT_LOCALE, INTL_LOCALE, localeHref, type Locale } from "./locales";
 import { scopedText, type Leaves, type ScopedText } from "./scoped-text";
 import { clipPushText, PUSH_BODY_MAX, type PushContent } from "./push-notifications";
-import { castReleaseReasonKey, type CastReleasedMatch } from "./cast-notices";
+import { castReleasedHref, castReleaseReasonKey, type CastReleasedMatch } from "./cast-notices";
 import { lobbyBriefNames, neutralizeQuotes, type LobbyBriefSide } from "./lobby-brief";
 import { withoutInvisibles } from "./visible-text";
 import { teamInviteNoticePath, type TeamInviteNoticeKind } from "./team-invite-notice";
@@ -1019,7 +1019,7 @@ export function castReleasedPush(input: CastReleasedMatch, locale: Locale = DEFA
       tournament: input.tournamentName,
       round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
     }),
-    url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
+    url: localeHref(castReleasedHref(input), locale),
     tag: `${matchTag(input.matchId)}-cast`,
   };
 }
