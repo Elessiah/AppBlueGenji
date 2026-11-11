@@ -471,6 +471,16 @@ retour à l'horaire tenu, affiche changée, reprise des marques héritées, qui 
 la compte pas comme preuve d'un horaire reçu par les joueurs), et s'oublie une
 fois le retrait poussé (`forgetStaffPush`) — sauf si la manche a retrouvé cet
 horaire pendant l'envoi (reposé par un autre arbitre).
+`staffTimeToRemove` rend l'horaire qu'elle tient — celui que montrent leurs
+appareils, même si un changement plus récent n'a atteint personne — s'il vaut
+encore, et le retrait cite cet horaire-là ; encore valable
+(devant, ou passé de moins de 12 h) : une date seulement journalisée — passée,
+posée sur un match joué ou dans un tournoi clos, même rouvert ensuite — n'a
+rien à remplacer. `forgetMatchReminders` la garde : une affiche changée ne
+change pas l'horaire que les arbitres ont reçu. Une date posée sur un match au score saisi ne pose pas
+d'observation (tout part sauf `TOLD`) : si la rencontre revient à jouer, le
+balayage l'annoncera. La place remplacée par `pushTeamToTarget` se lit sous
+verrou (`FOR UPDATE`).
 
 **Verrou AUTO-INC (`ER_AUTOINC_READ_FAILED`, 1467).** En production (MariaDB
 11.8), « Failed to read auto-increment value from storage engine » sur
@@ -484,7 +494,7 @@ l'index `(match_id, offset_key)` où l'`INSERT … SELECT` voulait écrire — p
 insérait, donc attendait le verrou AUTO-INC que l'autre tenait. MariaDB rend
 cet interblocage à la victime sous le code 1467 : la marque n'était pas
 retenue (`horaire poussé aux arbitres non retenu` dans pm2), et le retrait de
-l'horaire ne se poussait plus aux arbitres. Deux remèdes :
+l'horaire ne se poussait plus aux arbitres. Trois remèdes :
 
 - `markStaffPushed` ne lit plus sous verrou une marque absente : une lecture
   **simple** dit si elle existe ; absente, elle s'insère (`INSERT IGNORE …
@@ -513,17 +523,6 @@ absente** de la même table — insérer d'abord (`upsertSeenMark` le fait déj�
 avant son ménage). Corollaire tenu par `mariadb-sql-compat.test.ts` : aucune
 insertion nue dans `bg_match_reminders` — toujours `INSERT IGNORE` ou
 `ON DUPLICATE KEY UPDATE`, qui n'ont besoin d'aucune lecture préalable.
-
-`staffTimeToRemove` rend l'horaire qu'elle tient — celui que montrent leurs
-appareils, même si un changement plus récent n'a atteint personne — s'il vaut
-encore, et le retrait cite cet horaire-là ; encore valable
-(devant, ou passé de moins de 12 h) : une date seulement journalisée — passée,
-posée sur un match joué ou dans un tournoi clos, même rouvert ensuite — n'a
-rien à remplacer. `forgetMatchReminders` la garde : une affiche changée ne
-change pas l'horaire que les arbitres ont reçu. Une date posée sur un match au score saisi ne pose pas
-d'observation (tout part sauf `TOLD`) : si la rencontre revient à jouer, le
-balayage l'annoncera. La place remplacée par `pushTeamToTarget` se lit sous
-verrou (`FOR UPDATE`).
 
 Accepté, non changé : un message par engagée (chacune lit « ton équipe contre
 l'autre »), donc une lecture des abonnements push par message ; et la
