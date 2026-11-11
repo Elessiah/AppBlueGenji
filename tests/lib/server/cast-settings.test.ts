@@ -319,6 +319,18 @@ describe("applyCastTrigger — inscription et maître tu", () => {
     expect(execute.mock.calls[2][1]).toEqual(["AUTO", 13, 42]);
   });
 
+  it("applyCastSettings_newTriggerWritten_reportsConfigured", async () => {
+    // Le maître 12 change son mode : l'écriture est rapportée pour le journal du staff.
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(shownRows(12))
+      .mockResolvedValue([{ affectedRows: 1 }, []]);
+
+    const outcome = await applyCastSettings(fakeConnection({ execute }), ownedRow(), 12, 5, { trigger: "AUTO" });
+
+    expect(outcome).toEqual({ triggerSkipped: false, triggerChange: "CONFIGURED" });
+  });
+
   it("applyCastSettings_skipLockedTrigger_reportsTriggerSkipped", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12, 13));
 
@@ -327,7 +339,7 @@ describe("applyCastTrigger — inscription et maître tu", () => {
       skipLockedTrigger: true,
     });
 
-    expect(outcome).toEqual({ triggerSkipped: true });
+    expect(outcome).toEqual({ triggerSkipped: true, triggerChange: null });
   });
 });
 

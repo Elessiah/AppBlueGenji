@@ -4,6 +4,7 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/cast-notices");
 jest.mock("@/lib/server/tournaments/referee-notices");
+jest.mock("@/lib/server/tournaments/staff-action-logs");
 
 import type { PoolConnection } from "mysql2/promise";
 import type { NoRefereeCandidate } from "@/lib/shared/match-referee";
@@ -16,6 +17,7 @@ import {
   queueCastChange,
 } from "@/lib/server/tournaments/cast-notices";
 import { announceRefereeChange, announceRefereeChanges, queueRefereeChange } from "@/lib/server/tournaments/referee-notices";
+import { announceStaffMatchAction } from "@/lib/server/tournaments/staff-action-logs";
 import {
   assignMatchReferee,
   claimMatchCast,
@@ -877,6 +879,24 @@ describe("claimMatchCast", () => {
     state.issued = [];
     await claimMatchCast(42, CASTER, true, OWN_STREAM, { trigger: "AUTO" });
     expect(state.issued).toContain("UPDATE bg_matches SET live_trigger = ?, live_trigger_user_id = ?, live_started_at = NULL WHERE id = ?");
+  });
+
+  it("claimMatchCast_castableNewTrigger_journalsLiveConfiguredAsCaster", async () => {
+    // Même ligne au journal du staff qu'un mode posé par la route du staff ; l'auteur n'est qu'un rôle.
+    state.users[CASTER] = { ...verified, platform_roles_json: JSON.stringify(["CASTER"]) };
+
+    await claimMatchCast(42, CASTER, true, OWN_STREAM, { trigger: "AUTO" });
+
+    expect(announceStaffMatchAction).toHaveBeenCalledWith(42, "LIVE_CONFIGURED", "CASTER");
+  });
+
+  it("claimMatchCast_sameTriggerAsMatch_journalsNothing", async () => {
+    state.users[CASTER] = { ...verified, platform_roles_json: JSON.stringify(["CASTER"]) };
+    state.match = matchState({ live_trigger: "MANUAL" });
+
+    await claimMatchCast(42, CASTER, true, OWN_STREAM, { trigger: "MANUAL" });
+
+    expect(announceStaffMatchAction).not.toHaveBeenCalled();
   });
 
   it("ouvre un stream à part avec son lien, normalisé : l'accueil relit", async () => {
@@ -2307,6 +2327,33 @@ describe("releaseMatchCast / claimMatchCast : gardes et publications (EF-29)", (
     await setCastSettings(42, CASTER, true, { trigger: "AUTO", expectedTrigger: null });
 
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
+  });
+
+  it("setCastSettings_newTrigger_journalsLiveConfigured", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await setCastSettings(42, CASTER, true, { trigger: "AUTO", expectedTrigger: null });
+
+    expect(announceStaffMatchAction).toHaveBeenCalledWith(42, "LIVE_CONFIGURED", "CASTER");
+  });
+
+  it("setCastSettings_staffAccessRemovesTrigger_journalsLiveRemovedAsStaff", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER, live_trigger: "AUTO", live_trigger_user_id: CASTER });
+
+    await setCastSettings(42, CASTER, true, { trigger: null }, { oversees: false, manages: true });
+
+    expect(announceStaffMatchAction).toHaveBeenCalledWith(42, "LIVE_REMOVED", "STAFF");
+  });
+
+  it("setCastSettings_battletagOnly_journalsNothing", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await setCastSettings(42, CASTER, true, { battletag: "Voix#1234" });
+
+    expect(announceStaffMatchAction).not.toHaveBeenCalled();
   });
 
   it("setCastSettings_expectedTriggerWithoutTrigger_ignored", async () => {

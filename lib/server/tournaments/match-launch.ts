@@ -53,7 +53,8 @@ import {
   type RefereeStanding,
 } from "./cast-eligibility";
 import { announceCastChange, queueCastChange, type CastPairing } from "./cast-notices";
-import { applyCastSettings, PLAIN_CAST_ACCESS, type CastAccess, type CastSettings } from "./cast-settings";
+import { announceStaffMatchAction } from "./staff-action-logs";
+import { applyCastSettings, PLAIN_CAST_ACCESS, type CastAccess, type CastSettings, type CastSettingsOutcome } from "./cast-settings";
 import {
   lockMatchCasters,
   lockMatchStreams,
@@ -935,7 +936,7 @@ export async function claimMatchCast(
   if (settings.battletag !== undefined) parseCastBattletagInput(settings.battletag);
   // Deux inscriptions simultanées se croisent sur les verrous d'intervalle
   // d'InnoDB : l'interblocage se rejoue.
-  const { tournamentId, claimed, triggerSkipped, pairing } = await retryOnDeadlock(() =>
+  const { tournamentId, claimed, triggerSkipped, pairing, triggerChange } = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       // Ligne du compte verrouillée en première instruction, avant le match —
       // l'ordre de la suppression de compte (compte, puis ses matchs).
@@ -949,7 +950,13 @@ export async function claimMatchCast(
       if (row.status === "COMPLETED") throw new Error("MATCH_CAST_CLOSED");
       if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
       if (row.casters.some((caster) => caster.userId === userId)) {
-        return { tournamentId: Number(row.tournament_id), claimed: false, triggerSkipped: false, pairing: castPairingOf(row) };
+        return {
+          tournamentId: Number(row.tournament_id),
+          claimed: false,
+          triggerSkipped: false,
+          pairing: castPairingOf(row),
+          triggerChange: null,
+        };
       }
       // Seul **jouer** le match ferme le cast : l'arbitre désigné peut le
       // caster (`resolveMatchParty` le rendrait `MATCH_REFEREE`, à tort refusé).
@@ -1009,6 +1016,7 @@ export async function claimMatchCast(
         claimed: true,
         triggerSkipped: outcome.triggerSkipped,
         pairing: castPairingOf(row),
+        triggerChange: outcome.triggerChange,
       };
     }),
   );
@@ -1018,6 +1026,7 @@ export async function claimMatchCast(
   if (claimed) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   // Après le commit : journal du staff. Aucune place n'est reprise à personne.
   if (claimed) announceCastChange({ kind: "CLAIMED", matchId, casterId: userId, replacedCasterId: null, pairing });
+  announceCastTrigger(matchId, triggerChange, access);
   return { triggerSkipped };
 }
 
@@ -1054,7 +1063,7 @@ export async function setCastSettings(
   if (settings.liveUrl !== undefined) parseStreamUrlInput(settings.liveUrl);
   if (settings.battletag !== undefined) parseCastBattletagInput(settings.battletag);
 
-  const tournamentId = await retryOnDeadlock(() =>
+  const { tournamentId, triggerChange } = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       // Les conditions de l'inscription se rejouent (`claimMatchCast`), dans
       // son ordre : la ligne du compte d'abord, en partage, puis le match.
@@ -1072,8 +1081,8 @@ export async function setCastSettings(
       const block = castBlockReason(hasLivePermission, identity, row.tournament_game);
       if (block) throw new Error(block);
       if (await resolveTeamParty(connection, row, userId)) throw new Error("CASTER_IS_PLAYER");
-      await applyCastSettings(connection, row, userId, caster.streamId, settings, access);
-      return Number(row.tournament_id);
+      const outcome = await applyCastSettings(connection, row, userId, caster.streamId, settings, access);
+      return { tournamentId: Number(row.tournament_id), triggerChange: outcome.triggerChange };
     }),
   );
   // Un mode, un lien ou un stream retiré change ce que montrent l'accueil, ses
@@ -1083,6 +1092,18 @@ export async function setCastSettings(
   if (settings.trigger !== undefined || settings.liveUrl !== undefined) {
     publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   }
+  announceCastTrigger(matchId, triggerChange, access);
+}
+
+/**
+ * Un mode d'antenne écrit par un caster (inscription, « Configurer ma
+ * diffusion ») entre au journal du staff comme la même écriture par la route
+ * du staff (`LIVE_CONFIGURED` / `LIVE_REMOVED`), après le commit. L'auteur
+ * n'y est qu'un rôle (staff anonymisé sur Discord).
+ */
+function announceCastTrigger(matchId: number, change: CastSettingsOutcome["triggerChange"], access: CastAccess): void {
+  if (change === null) return;
+  announceStaffMatchAction(matchId, change === "REMOVED" ? "LIVE_REMOVED" : "LIVE_CONFIGURED", access.manages ? "STAFF" : "CASTER");
 }
 
 /**

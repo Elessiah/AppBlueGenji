@@ -260,6 +260,13 @@ configuration du direct le renvoie tel quel, et un mode inchangé ne redemande
 pas sa date de début (retirée depuis, elle bloquerait les liens). Il
 figure dans l'export (`liveTriggers`, `listOwnMatchRoles`).
 
+Un mode écrit par un caster (inscription, « Configurer ma diffusion ») entre
+au journal du staff comme celui de la route du staff — « Diffusion réglée »
+(`LIVE_CONFIGURED`) ou « Diffusion retirée » (`LIVE_REMOVED`), après le
+commit (`announceCastTrigger`, d'après `CastSettingsOutcome.triggerChange`) ;
+l'auteur n'y est qu'un rôle (caster, ou staff pour `tournaments`). Un mode
+renvoyé tel quel ou écarté (`triggerSkipped`) n'écrit aucune ligne.
+
 ## L'arbitre désigné, médiateur de la diffusion
 
 Un lien qu'il pose sur un stream de caster sans lien est rattaché au premier

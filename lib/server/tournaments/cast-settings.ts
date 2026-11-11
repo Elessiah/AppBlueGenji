@@ -62,7 +62,12 @@ export type CastSettings = {
 };
 
 /** Ce que les réglages ont fait : `triggerSkipped`, le mode laissé à qui le tient (`skipLockedTrigger`). */
-export type CastSettingsOutcome = { triggerSkipped: boolean };
+/**
+ * `triggerChange` : le mode d'antenne réellement écrit — posé ou changé
+ * (`CONFIGURED`), retiré (`REMOVED`) —, `null` sans écriture ; l'appelant le
+ * journalise après le commit, comme la route du staff.
+ */
+export type CastSettingsOutcome = { triggerSkipped: boolean; triggerChange: "CONFIGURED" | "REMOVED" | null };
 
 /**
  * Ce que la route établit du caster pour la règle du mode d'antenne
@@ -362,9 +367,14 @@ export async function applyCastSettings(
   ) {
     throw new Error("LIVE_TRIGGER_CHANGED");
   }
+  // Relevé avant l'écriture : `applyCastTrigger` met la ligne à jour.
+  const previousTrigger = row.live_trigger ?? null;
   const triggerSkipped =
     settings.trigger !== undefined &&
     !(await applyCastTrigger(connection, row, settings.trigger, userId, access, settings.skipLockedTrigger === true, memo));
+  const triggerWritten = settings.trigger !== undefined && !triggerSkipped && settings.trigger !== previousTrigger;
+  let triggerChange: CastSettingsOutcome["triggerChange"] = null;
+  if (triggerWritten) triggerChange = settings.trigger === null ? "REMOVED" : "CONFIGURED";
   let streams: MatchStreamRow[] | undefined;
   // Le lien d'un stream (et son origine) ne se règle que par un caster montré :
   // un caster tu ne réécrit pas le lien public d'un stream qu'il partage.
@@ -397,7 +407,7 @@ export async function applyCastSettings(
   // les relire sous `FOR UPDATE` verrouillerait l'intervalle de
   // `bg_match_casters` des matchs voisins.
   if (streams !== undefined) await pruneMatchStreams(connection, matchId, { streams, casters: row.casters });
-  return { triggerSkipped };
+  return { triggerSkipped, triggerChange };
 }
 
 /** Ce qu'un caster lit de **son** cast pour le régler (`CastSettingsDialog`). */
