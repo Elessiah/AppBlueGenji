@@ -119,7 +119,19 @@ export async function resequenceSeeds(
   connection: PoolConnection,
   tournamentId: number,
 ): Promise<void> {
-  const entries = await loadEntries(connection, tournamentId);
+  // Même ordre que `loadEntries` ; seuls les rangs qui **changent** s'écrivent
+  // — les engagés placés avant la ligne retirée gardent le leur, sans écriture
+  // ni verrou de plus.
+  const [rows] = await connection.execute<(RowDataPacket & { team_id: number; seed: number | null })[]>(
+    `SELECT r.team_id, r.seed
+     FROM bg_tournament_registrations r
+     WHERE r.tournament_id = ?
+     ORDER BY COALESCE(r.seed, 1000000), r.registered_at ASC`,
+    [tournamentId],
+  );
+  const entries = rows
+    .map((row, index) => ({ teamId: Number(row.team_id), seed: index + 1, stored: row.seed }))
+    .filter((entry) => entry.stored === null || Number(entry.stored) !== entry.seed);
   for (const entry of entries) {
     await connection.execute(
       `UPDATE bg_tournament_registrations

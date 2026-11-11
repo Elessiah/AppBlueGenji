@@ -60,9 +60,10 @@ function registrationRow(overrides: RowOverrides<TournamentRow> = {}): Tournamen
  */
 function mockConnection(
   row: TournamentRow | null,
-  options: { entrantName?: string | null; remaining?: number[] } = {},
+  options: { entrantName?: string | null; remaining?: number[]; storedSeeds?: (number | null)[] } = {},
 ) {
   const { entrantName = "Team Nova", remaining = [101, 103, 104] } = options;
+  const storedSeeds = options.storedSeeds ?? remaining.map((_, index) => index + 4);
   const sqls: string[] = [];
 
   const execute = jest.fn(async (sql: string) => {
@@ -77,7 +78,7 @@ function mockConnection(
         remaining.map((teamId, index) => ({
           team_id: teamId,
           team_name: `Team ${teamId}`,
-          seed: index + 4,
+          seed: storedSeeds[index],
           registered_at: new Date(),
         })),
       ];
@@ -156,6 +157,21 @@ describe("removeTournamentEntrant", () => {
     expect(sqls.some((sql) => /DELETE FROM bg_teams/.test(sql))).toBe(false);
     expect(sqls.some((sql) => /bg_matches/.test(sql))).toBe(false);
     expect(sqls.some((sql) => /standings/.test(sql))).toBe(false);
+  });
+
+  it("resequenceSeeds_entrantsBeforeRemovedRow_writesOnlyChangedSeeds", async () => {
+    // Retrait de la 2e ligne : la 1re garde son rang, une seed NULL est posée.
+    const { execute } = mockConnection(registrationRow(), { remaining: [101, 103, 104], storedSeeds: [1, 3, null] });
+
+    await removeTournamentEntrant(7, 102);
+
+    const seedWrites = execute.mock.calls.filter((call) =>
+      /UPDATE bg_tournament_registrations SET seed/.test(String((call as [string])[0]).replace(/\s+/g, " ")),
+    );
+    expect(seedWrites.map((call) => (call as [string, unknown[]])[1])).toEqual([
+      [2, 7, 103],
+      [3, 7, 104],
+    ]);
   });
 
   it("referme les rangs sans toucher au drapeau de seeding manuel", async () => {
