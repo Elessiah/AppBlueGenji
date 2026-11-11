@@ -28,15 +28,27 @@ describe("RefereeDialog — champs habillés", () => {
   for (const tag of ["<select", "<input"]) {
     it(`${tag} vit dans un \`.field\`, avec son libellé`, () => {
       const before = wrapperBefore(tag);
-      expect(before).toMatch(/<div className=\{`field /);
+      expect(before).toMatch(/<div className=(\{`field |"field")/);
       expect(before).toMatch(/<label htmlFor=/);
     });
   }
 
   it("l'erreur de la carte reste sous son champ, dans le même `.field`", () => {
-    const field = source.slice(source.indexOf("<input"), source.indexOf("refereeDialog.mapSave\")"));
+    const field = source.slice(source.indexOf("<input"), source.indexOf("</form>", source.indexOf("<input")));
     expect(field).toContain("<FieldErrorText fieldId={mapId}");
-    expect(field.indexOf("<FieldErrorText")).toBeLessThan(field.indexOf("</div>"));
+    // Une seule fermeture avant l'erreur : celle de la ligne saisie + bouton, pas celle du `.field`.
+    expect(field.slice(0, field.indexOf("<FieldErrorText")).match(/<\/div>/g)).toHaveLength(1);
+  });
+
+  it("RefereeDialog_firstMapForm_buttonSharesTheInputRow_errorBelow", () => {
+    const form = source.slice(source.indexOf("<form onSubmit={saveMap}>"), source.indexOf("</form>", source.indexOf("<form onSubmit={saveMap}>")));
+    expect(form).toContain("<div className={styles.mapRow}>");
+    expect(form.indexOf("refereeDialog.mapSave")).toBeLessThan(form.indexOf("<FieldErrorText"));
+  });
+
+  it("RefereeDialog_roundMapsList_namedByItsTitle", () => {
+    expect(source).toContain("<p id={roundMapsId} className={styles.status}>");
+    expect(source).toContain("<ol className={styles.roundMaps} aria-labelledby={roundMapsId}>");
   });
 
   it("n'habille plus les champs à la main dans le module CSS", () => {
@@ -107,7 +119,47 @@ describe("RefereeDialog — gestes et textes (EF-30)", () => {
   });
 
   it("RefereeDialog_confirmations_toneFromGesture", () => {
-    expect(source).toContain('tone={panel ? refereeConfirmTone(confirm ?? "removeReferee", panel) : "danger"}');
+    expect(source).toContain('tone={confirmTone(confirm ?? "removeReferee", panel, confirmBusy)}');
+    expect(source).toContain('return panel ? refereeConfirmTone(gesture, panel) : "danger";');
+  });
+
+  it("RefereeDialog_objectionConfirm_toneAndBodyFrozenAtOpening", () => {
+    // Le panneau relu après le geste dit l'arbitre libre : ni le ton ni le texte ne basculent.
+    expect(source).toContain(
+      'setConfirmBusy(refereeConfirmTone("objection", panel, objectionOffered.userId) === "danger");',
+    );
+    expect(source).toContain('if (gesture === "objection") return objectionBusy ? "danger" : "primary";');
+    expect(source).toContain('objection.confirm.${confirmBusy ? "body" : "bodyIdle"}');
+  });
+
+  it("RefereeDialog_objectionOfIdleReferee_bodyDoesNotAnnounceARemoval", () => {
+    expect(fr.cardActions.refereeDialog.objection.confirm.bodyIdle).toBe(
+      "Il n'arbitre aucun match non terminé : rien ne lui est retiré. Il ne peut plus arbitrer tant que l'opposition n'est pas levée.",
+    );
+    expect(en.cardActions.refereeDialog.objection.confirm.bodyIdle).toBe(
+      "They referee no unfinished match: nothing is taken from them. They can no longer referee until the objection is lifted.",
+    );
+  });
+
+  it("RefereeDialog_objectionRefereeNoLongerOffered_confirmationCloses", () => {
+    expect(source).toMatch(/if \(!objectionOffered\) \{\s+setConfirm\(null\);\s+return false;\s+\}/);
+  });
+
+  it("RefereeDialog_roundGestureWithoutEffect_neutralToast_noRefreshNoReload", () => {
+    const run = source.slice(source.indexOf("const run = async"), source.indexOf("const base ="));
+    expect(run.indexOf("showInfo(outcome.unchanged)")).toBeGreaterThan(0);
+    expect(run.indexOf("showInfo(outcome.unchanged)")).toBeLessThan(run.indexOf("MATCH_LAUNCH_REFRESH_EVENT"));
+    expect(source).toContain('? { unchanged: t("cardActions.refereeDialog.roundUnchanged") }');
+  });
+
+  it("RefereeDialog_objection_onlyForRefereeStillOffered", () => {
+    expect(source).toContain("disabled={busy || !objectionOffered}");
+    expect(source).toContain("send(objectionUrl(objectionOffered.userId), \"PUT\", { upheld: true })");
+  });
+
+  it("RefereeDialog_objectionConfirmTitles_pseudoFrozenAtOpening", () => {
+    expect(source).toContain('objection.confirm.title", { pseudo: confirmPseudo })');
+    expect(source).toContain('objection.liftConfirm.title", { pseudo: confirmPseudo })');
   });
 
   it("RefereeDialog_takeBlocked_saysWhyWithServerMessage", () => {

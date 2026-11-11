@@ -54,8 +54,8 @@ describe("formatLobbyBriefDm", () => {
         "# Check-in du match « Renards » Vs « Nova »",
         "*Manche 2 · « Coupe » — coup d'envoi dans moins de 15 minutes.*",
         "",
-        "**Votre match est en autogestion.** Voici les éléments importants à savoir.",
-        `*Les contacts et les BattleTags à inviter sont sur la page du match : ${URL}*`,
+        "**Ton match est en autogestion.** Voici les éléments importants à savoir.",
+        `*Les contacts et les BattleTags à inviter sont sur la page du match : <${URL}>*`,
         "",
         "## Avant le coup d'envoi",
         `* Le salon de check-in est ouvert sur Discord — ${INVITE}`,
@@ -72,8 +72,8 @@ describe("formatLobbyBriefDm", () => {
         "* Bans de la carte 1 : « Nova » d'abord, puis « Renards ».",
         "* Cartes suivantes : l'équipe qui a perdu la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
         "",
-        "N'oubliez pas de rentrer les scores du match **au plus vite après la fin de votre match**.",
-        "Un problème ? Signalez-le depuis la page du match, ou pinguez le rôle @Arbitre sur Discord.",
+        "N'oublie pas de rentrer les scores du match **au plus vite après la fin de ton match**.",
+        "Un problème ? Signale-le depuis la page du match, ou pingue le rôle @Arbitre sur Discord.",
         "",
         "GL HF :)",
       ].join("\n"),
@@ -104,8 +104,8 @@ describe("formatLobbyBriefDm", () => {
     const cast = formatLobbyBriefDm(side({ firstMap: null, cast: true }), URL);
     expect(cast).toContain("* Map 1 : pas encore fixée");
     expect(cast).toContain("## Match casté");
-    expect(cast).toContain("* Invitez les casters inscrits (leurs contacts sont sur la page du match).");
-    expect(cast).toContain("* Triez les joueurs par rôle dans le salon.");
+    expect(cast).toContain("* Invite les casters inscrits (leurs contacts sont sur la page du match).");
+    expect(cast).toContain("* Trie les joueurs par rôle dans le salon.");
     // Sans lien de diffusion public, aucune ligne de diffusion.
     expect(cast).not.toContain("Diffusion");
     // Un live sans cast inscrit n'ouvre pas la section.
@@ -130,7 +130,51 @@ describe("formatLobbyBriefDm", () => {
       const text = formatLobbyBriefDm(side(), URL, locale);
       expect(text).not.toMatch(/arbitre désigné|assigned referee|avant le coup d'envoi\.$|before kickoff\.$/m);
     }
-    expect(formatLobbyBriefDm(side(), URL)).toContain("**Votre match est en autogestion.**");
+    expect(formatLobbyBriefDm(side(), URL)).toContain("**Ton match est en autogestion.**");
+  });
+
+  it("formatLobbyBriefDm_kickoffPassed_subtitleSaysKickoffTimeHasCome", () => {
+    expect(formatLobbyBriefDm(side({ kickoff: "PASSED" }), URL)).toContain(
+      "*Manche 2 · « Coupe » — l'heure du coup d'envoi est arrivée.*",
+    );
+    expect(formatLobbyBriefDm(side({ kickoff: "PASSED" }), URL, "en")).toContain(
+      "*Round 2 · “Coupe” — kickoff time has come.*",
+    );
+  });
+
+  it("formatLobbyBriefDm_unscheduledMatch_subtitleSaysLobbyOpen_withoutCheckInChannelLine", () => {
+    const fr = formatLobbyBriefDm(side({ kickoff: "UNSCHEDULED" }), URL);
+    const en = formatLobbyBriefDm(side({ kickoff: "UNSCHEDULED" }), URL, "en");
+
+    expect(fr).toContain("*Manche 2 · « Coupe » — le salon du match est ouvert.*");
+    expect(en).toContain("*Round 2 · “Coupe” — the match lobby is open.*");
+    expect(fr).not.toContain("Le salon de check-in est ouvert");
+    expect(en).not.toContain("The check-in channel is open");
+  });
+
+  it("formatLobbyBriefDm_scheduledMatch_keepsCheckInChannelLine", () => {
+    expect(formatLobbyBriefDm(side({ kickoff: "PASSED" }), URL)).toContain(`* Le salon de check-in est ouvert sur Discord — ${INVITE}`);
+  });
+
+  it("formatLobbyBriefDm_frenchText_addressesTheReaderAsTuOnly", () => {
+    const text = formatLobbyBriefDm(cappedSide({ game: "MR" }), URL) + formatLobbyBriefDm(side({ cast: true }), URL);
+
+    expect(text).not.toMatch(/\b(vous|votre|vos)\b/i);
+    expect(text).not.toMatch(/\b(invitez|prévenez|triez|oubliez|signalez|pinguez)\b/i);
+  });
+
+  it("formatLobbyBriefDm_matchLink_wrappedInAngleBracketsInsideItalics", () => {
+    expect(formatLobbyBriefDm(side(), URL)).toContain(`: <${URL}>*`);
+  });
+
+  it("formatLobbyBriefDm_lastResortCut_neverSplitsASurrogatePair", () => {
+    // Noms aux longueurs extrêmes, faits d'émojis (deux unités UTF-16 chacun) : la coupe tombe dedans.
+    const emoji = "😀".repeat(900);
+    const text = formatLobbyBriefDm(side({ tournamentName: emoji, teamName: emoji, opponentName: emoji }), URL);
+
+    expect(text.length).toBeLessThanOrEqual(2000);
+    expect(text).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+    expect(text).not.toMatch(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
   });
 
   it("en anglais, avec le lien passé par la langue du compte", () => {
@@ -141,7 +185,7 @@ describe("formatLobbyBriefDm", () => {
         "*Round 2 · “Coupe” — kickoff in less than 15 minutes.*",
         "",
         "**Your match is self-managed.** Here is what you need to know.",
-        `*The contacts and the BattleTags to invite are on the match page: ${localizedSiteUrl(URL, "en")}*`,
+        `*The contacts and the BattleTags to invite are on the match page: <${localizedSiteUrl(URL, "en")}>*`,
         "",
         "## Before kickoff",
         `* The check-in channel is open on Discord — ${INVITE}`,
@@ -174,8 +218,8 @@ describe("formatLobbyBriefDm", () => {
     const fr = formatLobbyBriefDm(side({ game: "MR" }), URL);
     const en = formatLobbyBriefDm(side({ game: "MR" }), URL, "en");
 
-    expect(fr).toContain(`*Vous pouvez retrouver les contacts sur la page du match : ${URL}*`);
-    expect(en).toContain(`*You can find the contacts on the match page: ${localizedSiteUrl(URL, "en")}*`);
+    expect(fr).toContain(`*Tu peux retrouver les contacts sur la page du match : <${URL}>*`);
+    expect(en).toContain(`*You can find the contacts on the match page: <${localizedSiteUrl(URL, "en")}>*`);
     for (const text of [fr, en]) {
       expect(text).not.toMatch(/BattleTag/);
     }
@@ -184,8 +228,8 @@ describe("formatLobbyBriefDm", () => {
   it("formatLobbyBriefDm_marvelRivalsCast_notifiesCastersInsteadOfInviting", () => {
     const fr = formatLobbyBriefDm(side({ game: "MR", cast: true }), URL);
 
-    expect(fr).toContain("* Prévenez les casters inscrits (leurs contacts sont sur la page du match).");
-    expect(fr).not.toContain("Invitez les casters");
+    expect(fr).toContain("* Préviens les casters inscrits (leurs contacts sont sur la page du match).");
+    expect(fr).not.toContain("Invite les casters");
     expect(formatLobbyBriefDm(side({ game: "MR", cast: true }), URL, "en")).toContain(
       "* Notify the signed-up casters",
     );

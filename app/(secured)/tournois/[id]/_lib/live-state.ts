@@ -20,6 +20,7 @@ import type {
 } from "@/lib/shared/types";
 import { isRefreshTier, type RefreshTier } from "@/lib/shared/refresh-tiers";
 import { isSoloTournament } from "@/lib/shared/participants";
+import { showsRefereeName } from "@/lib/shared/match-referee";
 import type { CertificationPrompt } from "@/lib/shared/certification-prompt";
 
 /** Messages émis par le flux. Tout le reste est ignoré. */
@@ -201,9 +202,31 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     detail: {
       ...snapshot,
       ...viewer,
+      refereeNames: pruneRefereeNames(viewer.refereeNames, snapshot.matches),
       canRegister: canRegisterIn(snapshot, viewer),
     },
   };
+}
+
+/**
+ * Pseudos d'arbitre bornés aux matchs qui les montrent (`showsRefereeName` :
+ * désignation montrée, score pas encore déclaré). Minimisation : le pseudo
+ * d'un match dont le score vient d'être déclaré ne reste pas dans l'état du
+ * client jusqu'à la reconnexion. La liste elle-même quand rien n'est élagué
+ * (`LiveProvider` ne redessine pas) ; un match revenu à « score non déclaré »
+ * retrouve son pseudo par la relecture légère (`missingRefereeNamesKey`).
+ */
+export function pruneRefereeNames(
+  names: TournamentViewerContext["refereeNames"],
+  matches: TournamentSnapshot["matches"],
+): TournamentViewerContext["refereeNames"] {
+  if (names.length === 0) return names;
+  // Par désignation (match **et** empreinte) : le pseudo d'un arbitre remplacé
+  // sur un match qui en montre encore un ne reste pas non plus.
+  const shown = new Set<string>();
+  for (const match of matches) if (showsRefereeName(match)) shown.add(`${match.id}:${match.refereeKey}`);
+  const kept = names.filter((name) => shown.has(`${name.matchId}:${name.refereeKey}`));
+  return kept.length === names.length ? names : kept;
 }
 
 /**

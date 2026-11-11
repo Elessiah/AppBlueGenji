@@ -34,6 +34,38 @@ describe("transact", () => {
     expect(connection.rollback).not.toHaveBeenCalled();
   });
 
+  it("transact_flushThrowsAfterCommit_keepsResultWithoutRollback", async () => {
+    // Le geste est enregistré : un vidage du journal en échec ne répond pas 500.
+    jest.mocked(flushBotLogs).mockImplementationOnce(() => {
+      throw new Error("flush failed");
+    });
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const actual = await transact(fakeConnection(connection), async () => 42);
+
+    expect(actual).toBe(42);
+    expect(connection.rollback).not.toHaveBeenCalled();
+    // Ce qui reste en attente ne part pas avec la transaction suivante de la connexion.
+    expect(discardBotLogs).toHaveBeenCalledTimes(1);
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    consoleError.mockRestore();
+  });
+
+  it("transact_flushAndDiscardBothThrowAfterCommit_stillReturnsResult", async () => {
+    jest.mocked(flushBotLogs).mockImplementationOnce(() => {
+      throw new Error("flush failed");
+    });
+    jest.mocked(discardBotLogs).mockImplementationOnce(() => {
+      throw new Error("discard failed");
+    });
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const actual = await transact(fakeConnection(connection), async () => 42);
+
+    expect(actual).toBe(42);
+    consoleError.mockRestore();
+  });
+
   it("transact_runThrows_rollsBackDiscardsLogsAndRethrows", async () => {
     await expect(
       transact(fakeConnection(connection), async () => {

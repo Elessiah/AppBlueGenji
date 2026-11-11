@@ -368,6 +368,7 @@
         "confirm": {
           "title": "Retenir l'opposition de {pseudo} ?",
           "body": "Il est retiré de tous ses matchs non terminés, dans tous les tournois, et en est prévenu ; il ne peut plus arbitrer tant que l'opposition n'est pas levée. Désigne ensuite un autre arbitre pour ces matchs.",
+          "bodyIdle": "Il n'arbitre aucun match non terminé : rien ne lui est retiré. Il ne peut plus arbitrer tant que l'opposition n'est pas levée.",
           "confirm": "Retenir l'opposition"
         }
       }

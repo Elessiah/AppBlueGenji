@@ -368,6 +368,7 @@
         "confirm": {
           "title": "Uphold {pseudo}'s objection?",
           "body": "They are removed from all their unfinished matches, in every tournament, and notified; they can no longer referee until the objection is lifted. Then assign another referee to those matches.",
+          "bodyIdle": "They referee no unfinished match: nothing is taken from them. They can no longer referee until the objection is lifted.",
           "confirm": "Uphold the objection"
         }
       }

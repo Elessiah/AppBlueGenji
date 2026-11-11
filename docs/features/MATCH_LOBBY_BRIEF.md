@@ -56,6 +56,26 @@ Trois changements de fond par rapport au brief du salon :
 l'ouverture du salon, comme avant la fusion (`LOBBY_BRIEF_LEAD_MINUTES`,
 `lib/shared/lobby-brief.ts`). Les deux repères partagent la **même
 réservation** : un match programmé puis ouvert n'est briefé qu'une fois.
+Le repère du salon ne vaut que si l'horaire n'est **pas à venir**, ou si le
+match est **lancé** (`m.start_at IS NULL OR m.start_at <= NOW() OR
+m.launched_at IS NOT NULL`) : un salon ouvert tôt sans lancement attend son
+quart d'heure ; un match **lancé tôt** (lancement forcé à 18 h pour 21 h) se
+joue tout de suite, son check-in part donc à l'ouverture, sous-titré « match
+lancé », **sans** la ligne du salon de check-in ni celle du vocal — tous deux
+n'ouvrent qu'au quart d'heure de l'horaire (`kickoff_state` vaut
+`UNSCHEDULED` au-delà de `LOBBY_BRIEF_LEAD_MINUTES`, `voice_tracked` est borné
+de même) — et rien ne repart à H-15 (même réservation).
+
+**Destinataires relus juste avant l'envoi** (REFEREE-LOT-1) : chaque côté
+relit ses membres actifs (`loadEntrantManagerIds`) après sa réservation — un
+membre retiré depuis la lecture du balayage ne reçoit plus le lien du match ni
+l'ordre des bans ; s'il ne reste aucun gérant actif, rien ne part et la
+réservation est rendue (le côté attend un gérant, comme une équipe sans gérant). Un compte membre actif **des deux** engagées ne reçoit que le
+check-in du premier côté (jamais « crée la partie » puis « vérifie les
+paramètres ») : règle fixe, lue des appartenances (`slotManagers`), la même à
+chaque balayage ; un second côté qui n'a que de tels gérants est réservé sans
+envoi, comme une fantôme. La coupe de dernier recours d'un message trop long se fait par
+points de code, jamais au milieu d'un émoji.
 
 ## Contenu
 
@@ -69,7 +89,7 @@ ouvrir de fausse section.
 # Check-in du match « A » Vs « B »
 *Manche 2 · « Coupe » — coup d'envoi dans moins de 15 minutes.*
 
-**Votre match est en autogestion.** Voici les éléments importants à savoir.
+**Ton match est en autogestion.** Voici les éléments importants à savoir.
 *Les contacts et les BattleTags à inviter sont sur la page du match : <lien>*
 
 ## Avant le coup d'envoi
@@ -91,34 +111,45 @@ ouvrir de fausse section.
 
 ## Match casté
 * Diffusion : <lien du stream>
-* Invitez les casters inscrits (leurs contacts sont sur la page du match).
-* Triez les joueurs par rôle dans le salon.
+* Invite les casters inscrits (leurs contacts sont sur la page du match).
+* Trie les joueurs par rôle dans le salon.
 
-N'oubliez pas de rentrer les scores du match **au plus vite après la fin de votre match**.
-Un problème ? Signalez-le depuis la page du match, ou pinguez le rôle @Arbitre sur Discord.
+N'oublie pas de rentrer les scores du match **au plus vite après la fin de ton match**.
+Un problème ? Signale-le depuis la page du match, ou pingue le rôle @Arbitre sur Discord.
 
 GL HF :)
 ```
 
-Vu de l'engagée du destinataire :
+Le message **tutoie** d'un bout à l'autre (REFEREE-LOT-1), comme les autres
+messages Discord. Vu de l'engagée du destinataire :
 
 - **Titre** : « Check-in du match « A » Vs « B » » ; en tournoi individuel,
   « Check-in de ton match » (un nom d'engagé y est un pseudo).
-- **Sous-titre** : manche, tournoi, et l'état — « coup d'envoi dans moins de
-  15 minutes », ou « match lancé » pour un match déjà lancé (lancement forcé,
-  tous « Prêt » avant le balayage ; les réglages restent, ils servent à créer
-  la partie).
-- **Ouverture** : ce que dit la décision d'arbitrage — « **Votre match est en
+- **Sous-titre** : manche, tournoi, et l'état, **selon le déclencheur**
+  (`LobbyBriefSide.kickoff`, jugé sur l'horloge de la base) — « coup d'envoi
+  dans moins de 15 minutes » (horaire à venir, nombre tiré de
+  `LOBBY_BRIEF_LEAD_MINUTES`), « l'heure du coup d'envoi est arrivée » (match
+  devenu jouable après son horaire), « le salon du match est ouvert » (match
+  sans horaire) —, ou « match lancé » pour un match déjà lancé (lancement
+  forcé, tous « Prêt » avant le balayage ; les réglages restent, ils servent à
+  créer la partie), **seulement si ce lancement est celui de l'appariement
+  courant** (`launch_pairing`) : un `launched_at` resté d'un appariement
+  remplacé ne le dit pas.
+- **Ouverture** : ce que dit la décision d'arbitrage — « **Ton match est en
   autogestion.** », « **Un arbitre est désigné pour votre match.** », ou, sans
   décision, « Voici les éléments importants à savoir avant le coup d'envoi. »
   (le staff est averti à part). Contre une **fantôme**, l'autogestion n'est pas
   annoncée : personne en face.
 - **Lien de la page du match** (`matchPageHref`, sous `/en` pour un compte
-  anglais), en italique : seule page à montrer les BattleTags à inviter — bâti
+  anglais), en italique et **entre chevrons** (`discordUrl` : nu, l'autolien
+  de Discord pouvait avaler l'astérisque qui ferme l'italique) : seule page à
+  montrer les BattleTags à inviter — bâti
   par `siteUrl`, et **tu** sans racine du site connue (`APP_URL`) plutôt que de
   pointer vers une adresse inventée.
 - **Avant le coup d'envoi** : le salon de **check-in** (ouvert, puisque le
-  message part dans son quart d'heure — `CHECK_IN_INVITE_URL`) ; le **salon
+  message part dans son quart d'heure — `CHECK_IN_INVITE_URL` ; **tu pour un
+  match sans horaire**, dont le check-in part à l'ouverture du salon du match :
+  ce salon n'y a pas de fenêtre) ; le **salon
   vocal** d'équipe, **seulement si le match est suivi** (`side.voice` : option
   « Salons vocaux d'équipe » du tournoi, ni entrée solo, ni fantôme —
   `MATCH_VOICE.md` ; sinon le bot n'ouvrira aucun salon et l'annoncer serait

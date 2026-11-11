@@ -149,14 +149,15 @@ function UnsavedNote({ dirty, text }: Readonly<{ dirty: boolean; text: string }>
 
 type RunTask = (task: () => Promise<void>, onRefused?: (code: string, text: string) => void) => Promise<boolean>;
 
-async function putJson(url: string, body: unknown): Promise<void> {
+async function putJson(url: string, body: unknown): Promise<{ skipped?: unknown }> {
   const response = await fetch(url, {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  const payload = (await response.json().catch(() => ({}))) as { error?: string };
+  const payload = (await response.json().catch(() => ({}))) as { error?: string; skipped?: unknown };
   if (!response.ok) throw new Error(payload.error || "UNKNOWN");
+  return payload;
 }
 
 type Pending =
@@ -645,7 +646,7 @@ export function RoundMapsDialog({
   const { t } = useRoundMapsText();
   const actionText = useActionsText();
   const errorsText = useErrorsText();
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess, showInfo } = useToast();
   const roundLabel = useRoundLabel(detail, t);
   const ids = useId();
   const tournamentId = detail.card.id;
@@ -830,11 +831,16 @@ export function RoundMapsDialog({
   const sendRounds = (targets: readonly RoundKey[], payload: string[][], success: string, field: RoundField = "slots") =>
     run(
       async () => {
+        // Tours que le tournoi ne porte plus (phase supprimée entre-temps) : le serveur les saute et les compte.
+        let skipped = 0;
         for (const chunk of chunkRounds(targets, ROUND_MAPS_BULK_MAX)) {
-          await putJson(`/api/admin/tournaments/${tournamentId}/round-maps`, { rounds: chunk, slots: payload });
+          const answer = await putJson(`/api/admin/tournaments/${tournamentId}/round-maps`, { rounds: chunk, slots: payload });
+          skipped += Number(answer.skipped ?? 0) || 0;
         }
         for (const key of targets) writtenRounds.current.add(roundKeyId(key));
-        showSuccess(success);
+        // Pas un succès entier : le staff ne doit pas croire tous les tours réglés.
+        if (skipped > 0) showInfo(t("dialog.roundsSkipped", { count: skipped }));
+        else showSuccess(success);
       },
       (code, text) => {
         // Le serveur refuse sans dire quelle carte : le refus vise la liste, pas le premier créneau.

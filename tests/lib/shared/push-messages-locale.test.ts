@@ -259,10 +259,10 @@ describe("refereeReleasedPush — opposition retenue (REFEREE-OBJECTION)", () =>
   };
 
   it("refereeReleasedPush_objectionReason_namesObjectionFr", () => {
-    expect(refereeReleasedPush(match, "fr").body).toContain("Tu n'arbitres plus ce match : le staff a retenu ton opposition à l'arbitrage.");
+    expect(refereeReleasedPush(match, "fr").body).toContain("Tu n'arbitres plus ce match : le staff a retenu ton opposition à être présenté aux parties de tes matchs.");
   });
 
   it("refereeReleasedPush_objectionReason_namesObjectionEn", () => {
-    expect(refereeReleasedPush(match, "en").body).toContain("You no longer referee this match: the staff upheld your objection to refereeing.");
+    expect(refereeReleasedPush(match, "en").body).toContain("You no longer referee this match: the staff upheld your objection to being shown to the parties to your matches.");
   });
 });

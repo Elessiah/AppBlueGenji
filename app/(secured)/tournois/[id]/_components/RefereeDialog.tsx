@@ -51,6 +51,12 @@ function refereeStatusText(panel: RefereePanelView, t: ReturnType<typeof useActi
  * geste (`GET /api/admin/matches/[id]/referee`) : l'arbitre n'est nommé que
  * là, jamais dans l'instantané diffusé.
  */
+/** Ton d'une confirmation ; celui d'une opposition est figé à son ouverture (`busy`). */
+function confirmTone(gesture: PendingConfirm, panel: RefereePanelView | null, objectionBusy: boolean): "danger" | "primary" {
+  if (gesture === "objection") return objectionBusy ? "danger" : "primary";
+  return panel ? refereeConfirmTone(gesture, panel) : "danger";
+}
+
 export function RefereeDialog({
   match,
   matchLabel,
@@ -65,11 +71,12 @@ export function RefereeDialog({
   const actionText = useActionsText();
   const errorsText = useErrorsText();
   const { t } = actionText;
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess, showInfo } = useToast();
   const titleId = useId();
   const pickId = useId();
   const mapId = useId();
   const objectionId = useId();
+  const roundMapsId = useId();
   const [panel, setPanel] = useState<RefereePanelView | null>(null);
   // Échec de lecture : un toast, jamais un message en ligne ; à l'ouverture,
   // la fenêtre se referme (rien à montrer). Ref : `load` reste stable.
@@ -87,6 +94,14 @@ export function RefereeDialog({
   // Opposition à lever, confirmée d'abord : la lever n'est fait qu'à la demande de l'arbitre.
   const [liftTarget, setLiftTarget] = useState<{ userId: number; pseudo: string } | null>(null);
   const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
+  // Pseudo du titre d'une confirmation d'opposition, figé à son ouverture : le
+  // geste réussi vide `liftTarget` / `objectionPick` avant que la confirmation
+  // se ferme, et son titre se lirait un instant avec un pseudo vide.
+  const [confirmPseudo, setConfirmPseudo] = useState("");
+  // De même, ce que l'opposition retire (`objectable[].busy`), figé à
+  // l'ouverture : le panneau relu après le geste dit l'arbitre libre, et le ton
+  // comme le texte de la confirmation basculeraient avant qu'elle se ferme.
+  const [confirmBusy, setConfirmBusy] = useState(false);
   // Le contrôle d'un geste est désactivé le temps de l'envoi (le navigateur
   // lâche alors le focus), et un geste retire souvent son propre bouton
   // (« Arbitrer ce match » devient « Ne plus arbitrer ») : le focus tomberait
@@ -134,17 +149,24 @@ export function RefereeDialog({
     void load(true);
   }, [load]);
 
-  // `success` : le texte du toast, ou sa forme lue sur la réponse (nombre de matchs retirés).
+  // `success` : le texte du toast, ou sa forme lue sur la réponse (nombre de
+  // matchs retirés). `{ unchanged }` : le geste n'a rien changé — notification
+  // neutre, sans rafraîchissement ni relecture du panneau.
   const run = async (
     request: () => Promise<unknown>,
-    success: string | ((payload: unknown) => string),
+    success: string | ((payload: unknown) => string | { unchanged: string }),
     resetMap = false,
   ): Promise<boolean> => {
     triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setBusy(true);
     try {
       const payload = await request();
-      showSuccess(typeof success === "string" ? success : success(payload));
+      const outcome = typeof success === "string" ? success : success(payload);
+      if (typeof outcome !== "string") {
+        showInfo(outcome.unchanged);
+        return true;
+      }
+      showSuccess(outcome);
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
       await load(false, resetMap);
       return true;
@@ -180,17 +202,23 @@ export function RefereeDialog({
     event.preventDefault();
     void run(() => send(`${base}/first-map`, "PUT", { map: map.trim() === "" ? null : map }), t("cardActions.refereeDialog.mapSaved"), true);
   };
-  const objectionPseudo = panel?.objectable.find((referee) => String(referee.userId) === objectionPick)?.pseudo ?? "";
+  // Comme `pickOffered` : l'arbitre choisi doit encore être proposé par le panneau relu.
+  const objectionOffered = panel?.objectable.find((referee) => String(referee.userId) === objectionPick) ?? null;
   const objectionUrl = (userId: number | string) => `/api/admin/referees/${userId}/objection`;
   const upholdObjection = (event: FormEvent) => {
     event.preventDefault();
-    if (objectionPick !== "") setConfirm("objection");
+    if (!objectionOffered || !panel) return;
+    setConfirmPseudo(objectionOffered.pseudo);
+    setConfirmBusy(refereeConfirmTone("objection", panel, objectionOffered.userId) === "danger");
+    setConfirm("objection");
   };
   const roundBody = (enabled: boolean) =>
     panel ? { phaseId: panel.round.phaseId, roundNumber: panel.round.roundNumber, bracket: panel.round.bracket, enabled } : {};
   // La manche a pu changer depuis la lecture : « rien à changer » plutôt qu'un succès qui ne fait rien.
   const roundDone = (done: string) => (payload: unknown) =>
-    Number((payload as { changed?: unknown }).changed ?? 0) === 0 ? t("cardActions.refereeDialog.roundUnchanged") : done;
+    Number((payload as { changed?: unknown }).changed ?? 0) === 0
+      ? { unchanged: t("cardActions.refereeDialog.roundUnchanged") }
+      : done;
 
   const confirmations: Record<
     PendingConfirm,
@@ -230,12 +258,18 @@ export function RefereeDialog({
         ),
     },
     objection: {
-      title: t("cardActions.refereeDialog.objection.confirm.title", { pseudo: objectionPseudo }),
-      body: t("cardActions.refereeDialog.objection.confirm.body"),
+      title: t("cardActions.refereeDialog.objection.confirm.title", { pseudo: confirmPseudo }),
+      // Sans match non terminé à lui retirer, le texte ne l'annonce pas.
+      body: t(`cardActions.refereeDialog.objection.confirm.${confirmBusy ? "body" : "bodyIdle"}`),
       confirm: t("cardActions.refereeDialog.objection.confirm.confirm"),
       action: async () => {
+        // L'arbitre n'est plus proposé (panneau relu) : la confirmation n'a plus d'objet, elle se referme.
+        if (!objectionOffered) {
+          setConfirm(null);
+          return false;
+        }
         const done = await run(
-          () => send(objectionUrl(objectionPick), "PUT", { upheld: true }),
+          () => send(objectionUrl(objectionOffered.userId), "PUT", { upheld: true }),
           (payload) =>
             t("cardActions.refereeDialog.objection.upheld", {
               count: Number((payload as { released?: unknown }).released ?? 0),
@@ -246,7 +280,7 @@ export function RefereeDialog({
       },
     },
     liftObjection: {
-      title: t("cardActions.refereeDialog.objection.liftConfirm.title", { pseudo: liftTarget?.pseudo ?? "" }),
+      title: t("cardActions.refereeDialog.objection.liftConfirm.title", { pseudo: confirmPseudo }),
       body: t("cardActions.refereeDialog.objection.liftConfirm.body"),
       confirm: t("cardActions.refereeDialog.objection.liftConfirm.confirm"),
       action: async () => {
@@ -374,12 +408,14 @@ export function RefereeDialog({
             {panel.roundSlots.length > 0 ? (
               <div className={styles.body}>
                 <div className={styles.titleRow}>
-                  <p className={styles.status}>{t("cardActions.refereeDialog.roundMapsTitle")}</p>
+                  <p id={roundMapsId} className={styles.status}>
+                    {t("cardActions.refereeDialog.roundMapsTitle")}
+                  </p>
                   <InfoHint id={`${mapId}-locked`} subject={t("cardActions.refereeDialog.roundMapsTitle")}>
                     {t("cardActions.refereeDialog.roundMapsLocked")}
                   </InfoHint>
                 </div>
-                <ol className={styles.roundMaps}>
+                <ol className={styles.roundMaps} aria-labelledby={roundMapsId}>
                   {panel.roundSlots.map((candidates, index) => (
                     // L'ordre des créneaux est leur identité (carte 1, carte 2…).
                     <li key={`slot-${index + 1}`}>
@@ -391,9 +427,11 @@ export function RefereeDialog({
                 </ol>
               </div>
             ) : (
-              <form className={styles.row} onSubmit={saveMap}>
-                <div className={`field ${styles.control}`}>
+              <form onSubmit={saveMap}>
+                <div className="field">
                   <label htmlFor={mapId}>{t("cardActions.refereeDialog.mapLabel")}</label>
+                  {/* Saisie et bouton sur une ligne, l'erreur dessous : le bouton ne bouge pas quand elle paraît. */}
+                  <div className={styles.mapRow}>
                   <input
                     id={mapId}
                     type="text"
@@ -406,11 +444,12 @@ export function RefereeDialog({
                     disabled={busy}
                     {...fieldErrors.aria("map")}
                   />
+                  <button type="submit" className="btn ghost" disabled={busy}>
+                    {t("cardActions.refereeDialog.mapSave")}
+                  </button>
+                  </div>
                   <FieldErrorText fieldId={mapId} message={fieldErrors.message("map")} />
                 </div>
-                <button type="submit" className="btn ghost" disabled={busy}>
-                  {t("cardActions.refereeDialog.mapSave")}
-                </button>
               </form>
             )}
 
@@ -433,6 +472,7 @@ export function RefereeDialog({
                         aria-label={t("cardActions.refereeDialog.objection.liftAria", { pseudo: referee.pseudo })}
                         onClick={() => {
                           setLiftTarget(referee);
+                          setConfirmPseudo(referee.pseudo);
                           setConfirm("liftObjection");
                         }}
                       >
@@ -459,7 +499,7 @@ export function RefereeDialog({
                     ))}
                   </select>
                 </div>
-                <button type="submit" className="btn ghost" disabled={busy || objectionPick === ""}>
+                <button type="submit" className="btn ghost" disabled={busy || !objectionOffered}>
                   {t("cardActions.refereeDialog.objection.uphold")}
                 </button>
               </form>
@@ -478,7 +518,7 @@ export function RefereeDialog({
           title={pending.title}
           confirmLabel={pending.confirm}
           pendingLabel={t("cardActions.refereeDialog.pending")}
-          tone={panel ? refereeConfirmTone(confirm ?? "removeReferee", panel) : "danger"}
+          tone={confirmTone(confirm ?? "removeReferee", panel, confirmBusy)}
           onClose={() => setConfirm(null)}
           onConfirm={pending.action}
         >

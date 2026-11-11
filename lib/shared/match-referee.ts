@@ -34,14 +34,18 @@ export type RefereeBlock = "NOT_REFEREE" | "REFEREE_IDENTITY_REQUIRED" | "REFERE
  */
 export type RefereeIneligibility = RefereeBlock | "REFEREE_IS_PLAYER" | "REFEREE_OBJECTION" | "ACCOUNT_GONE";
 
-export const REFEREE_INELIGIBILITIES: readonly RefereeIneligibility[] = [
-  "NOT_REFEREE",
-  "REFEREE_IDENTITY_REQUIRED",
-  "REFEREE_DISCORD_REQUIRED",
-  "REFEREE_IS_PLAYER",
-  "REFEREE_OBJECTION",
-  "ACCOUNT_GONE",
-];
+// Un code ajouté au type sans entrée ici ne compile pas (`satisfies`).
+const REFEREE_INELIGIBILITY_SET = {
+  NOT_REFEREE: true,
+  REFEREE_IDENTITY_REQUIRED: true,
+  REFEREE_DISCORD_REQUIRED: true,
+  REFEREE_IS_PLAYER: true,
+  REFEREE_OBJECTION: true,
+  ACCOUNT_GONE: true,
+} satisfies Record<RefereeIneligibility, true>;
+
+/** Tous les motifs, pour vérifier que chacun a son texte. */
+export const REFEREE_INELIGIBILITIES = Object.keys(REFEREE_INELIGIBILITY_SET) as readonly RefereeIneligibility[];
 
 /**
  * Motif qui empêche d'arbitrer, `null` si rien ne l'empêche.
@@ -253,6 +257,22 @@ function refereeNameMissing(match: RefereeNamedMatch, names: readonly RefereeNam
   if (!showsRefereeName(match)) return false;
   const entry = names.find((name) => name.matchId === match.id && name.refereeKey === match.refereeKey);
   return entry === undefined || (entry.pseudo === "" && entry.mine !== true);
+}
+
+/**
+ * Faut-il relire les pseudos, et quel essai retenir ? `missing` : la clé de
+ * {@link missingRefereeNamesKey} ; `attempted` : celle du dernier essai.
+ *
+ * - rien ne manque : **l'essai est oublié**. Un pseudo élagué de l'état du
+ *   client (score déclaré) puis de nouveau montré (score rejeté) redonne la
+ *   même clé, qui doit relancer une relecture — sinon « Arbitre désigné »
+ *   resterait, et l'arbitre perdrait sa marque `mine` jusqu'à la reconnexion ;
+ * - même clé que le dernier essai : pas de relecture (pseudo vide, réponse en retard) ;
+ * - clé nouvelle : une relecture.
+ */
+export function refereeNamesAttempt(missing: string, attempted: string): { read: boolean; attempted: string } {
+  if (missing === "") return { read: false, attempted: "" };
+  return { read: missing !== attempted, attempted };
 }
 
 /** Nombre de désignations montrées dont le pseudo manque dans `names`. */

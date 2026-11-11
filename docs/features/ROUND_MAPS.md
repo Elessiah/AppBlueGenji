@@ -192,7 +192,10 @@ Match avec arbitre désigné : l'ordre du premier ban ne suit pas
   du tour, mais les choix de deux matchs ne s'attendent pas entre eux.
 - **Effacer** un choix (`map: null`) est permis sur tout créneau existant, même
   devenu imposé : un ancien choix ne reste pas coincé pour revenir quand le
-  réglage est retiré.
+  réglage est retiré. **À l'arbitrage seulement** sur un créneau imposé : une
+  équipe en autogestion n'y efface rien (`validateMapPick(…, byTeam)`,
+  `INVALID_MAP_PICK`) — elle effacerait la première carte fixée par le staff,
+  qui manquerait une fois l'imposition retirée.
 - L'écran n'ouvre la liste d'un pool à une équipe que si le lecteur déclare son
   « Prêt » (`canDeclareReady` du lancement), comme le serveur.
 
@@ -200,7 +203,7 @@ Match avec arbitre désigné : l'ordre du premier ban ne suit pas
 
 | Route | Droit | Refus |
 |---|---|---|
-| `PUT /api/admin/tournaments/[id]/round-maps` `{phaseId, bracket, roundNumber, slots}` ou `{rounds: [{phaseId, bracket, roundNumber}…], slots}` (1 à 128 tours, `ROUND_MAPS_BULK_MAX` ; `slots: []` retire ; numéro de 1 à `ROUND_NUMBER_MAX` = 2000 ; cartes posées seulement sur un tour **de ce** tournoi — phase 0 sans phases, sinon une de ses phases, vérifiée sous verrou ; les autres clés d'une copie sont écartées, `INVALID_ROUND` si aucune ne reste ; retirer est permis sur toute clé, pour qu'une ligne restée d'une phase supprimée puisse partir) | `can(user, "tournaments")` | 401, 403 `FORBIDDEN`, 400 `INVALID_ROUND` / `INVALID_ROUND_MAPS`, 404 `TOURNAMENT_NOT_FOUND` |
+| `PUT /api/admin/tournaments/[id]/round-maps` `{phaseId, bracket, roundNumber, slots}` ou `{rounds: [{phaseId, bracket, roundNumber}…], slots}` (1 à 128 tours, `ROUND_MAPS_BULK_MAX` ; `slots: []` retire ; numéro de 1 à `ROUND_NUMBER_MAX` = 2000 ; cartes posées seulement sur un tour **de ce** tournoi — phase 0 sans phases, sinon une de ses phases, vérifiée sous verrou ; les autres clés d'une copie sont écartées et **comptées** dans `skipped` de la réponse `{ slots, skipped }` (l'écran affiche alors une notification neutre « sauf sur N tours qui n'existent plus » au lieu du succès entier), `INVALID_ROUND` si aucune ne reste ; une ancienne ligne au-delà de la borne (permise avant #514) est purgée au démarrage (`RECENT_SCHEMA_CHANGES`) ; retirer est permis sur toute clé, pour qu'une ligne restée d'une phase supprimée puisse partir) | `can(user, "tournaments")` | 401, 403 `FORBIDDEN`, 400 `INVALID_ROUND` / `INVALID_ROUND_MAPS`, 404 `TOURNAMENT_NOT_FOUND` |
 | `PUT /api/admin/tournaments/[id]/round-tiebreak` `{phaseId, bracket, roundNumber, map}` (`map: null` ou vide retire ; poser exige un tour **de ce** tournoi et éligible, format relu sous `lockTournamentRow` en première instruction ; retirer est permis sur toute clé) | `can(user, "tournaments")` | 401, 403 `FORBIDDEN`, 400 `INVALID_TOURNAMENT_ID` / `INVALID_ROUND` / `INVALID_TIEBREAK_MAP` / `TIEBREAK_NOT_ALLOWED`, 404 `TOURNAMENT_NOT_FOUND`, 500 `ROUND_TIEBREAK_FAILED` |
 | `PUT /api/admin/tournaments/[id]/map-rules` `{firstBan, nextBan, nextPick}` | `can(user, "tournaments")` | 401, 403, 400 `INVALID_MAP_RULES`, 404 |
 | `PUT /api/admin/matches/[matchId]/first-map` (existante) | `can(user, "tournaments")` | en plus : 409 `ROUND_MAPS_SET` quand le tour a des cartes |
@@ -253,6 +256,24 @@ au pool.
   préfixe la phase (« Phase 2 · Manche 1 ») et prend le format suisse de la
   phase. La ligne est revendiquée par
   `DELETE … WHERE changes = ?` : pas de doublon, pas de changement perdu.
+  La mise en attente **prend la ligne avant de la lire** (l'écriture qui avance
+  `changes` d'abord, la lecture ensuite, puis `rounds_json`) : un balayage, qui
+  ne prend pas le verrou du tournoi, ne peut plus la revendiquer entre la
+  lecture et l'écriture (ses manches reparaissaient dans le résumé suivant) ;
+  pas de `SELECT … FOR UPDATE`, qui poserait un verrou d'intervalle sur une
+  ligne absente. `setRoundsMaps` et `setRoundTiebreak` sont rejouées
+  (`retryOnDeadlock`) si MariaDB refuse l'écriture d'une ligne qu'un balayage
+  vient de supprimer (`ER_CHECKREAD`). Le minuteur de fin de fenêtre qui tombe sur un balayage en
+  vol en relance un à sa suite. `rounds_json` retient au plus
+  `ROUND_MAPS_NOTICE_KEYS_MAX` (200) manches ; les suivantes sont **comptées**
+  (`{ more: n }`, reprises dans « et N autres »), jamais « Data too long ».
+  Les manches sont listées tableau principal, perdants, grande finale, petite
+  finale ; un changement de la seule **map de départage** est noté à part
+  (`tiebreak`) et dit « Manche 2 (map de départage) » — sauf si les cartes de
+  la même manche ont changé aussi : elle n'est dite et comptée qu'une fois. Le
+  compte des manches au-delà du plafond est approché (une manche réglée deux
+  fois y compte deux fois), et le signal de fermeture ne fait rien partir tant
+  qu'il en reste : elles peuvent être celles d'un autre membre du staff.
 - Journal du staff anonyme (`formatRoundMapsSummaryLog`, `formatMapRulesLog`, choix
   `MAP_PICKED*` de `referee-notices`) : aucune personne nommée.
 - Check-in du match (`MATCH_LOBBY_BRIEF.md`) : bloc « Déroulé des maps » quand la manche

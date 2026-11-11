@@ -162,7 +162,7 @@ describe("dispatchLobbyBriefs", () => {
     // En retard, même fenêtre que le salon : pas de check-in en pleine partie.
     expect(sql).toMatch(/m\.start_at > NOW\(\) - INTERVAL 20 MINUTE/);
     // Sans horaire, le salon : le repli d'avant la fusion.
-    expect(sql).toMatch(/OR \(m\.lobby_opened_at IS NOT NULL\s+AND m\.launch_pairing = CONCAT\(m\.team1_id, ':', m\.team2_id\)\s+AND m\.lobby_opened_at > NOW\(\) - INTERVAL 20 MINUTE\)/);
+    expect(sql).toMatch(/OR \(m\.lobby_opened_at IS NOT NULL\s+AND \(m\.start_at IS NULL OR m\.start_at <= NOW\(\) OR m\.launched_at IS NOT NULL\)\s+AND m\.launch_pairing = CONCAT\(m\.team1_id, ':', m\.team2_id\)\s+AND m\.lobby_opened_at > NOW\(\) - INTERVAL 20 MINUTE\)/);
     // Un match qui porte un score est joué : aucun salon à régler.
     expect(sql).toMatch(/AND m\.team1_score IS NULL AND m\.team2_score IS NULL/);
     // Un match reste candidat tant qu'une de ses deux engagées n'est pas réservée
@@ -173,6 +173,20 @@ describe("dispatchLobbyBriefs", () => {
     expect(sql).toMatch(/n\.phase = \? AND n\.pairing = CONCAT\(m\.team2_id, ''\)/);
     expect(sql).not.toContain("AS CHAR");
     expect(params).toEqual(["LOBBY_BRIEF", "LOBBY_BRIEF"]);
+  });
+
+  it("dispatchLobbyBriefs_sweepSql_startBeyondLeadIsLobbyTriggeredWithoutVoiceLine", async () => {
+    const { query } = mockDb([]);
+
+    await dispatchLobbyBriefs();
+
+    const sql = String(query.mock.calls[0][0]).replace(/\s+/g, " ");
+    // Un horaire au-delà du quart d'heure n'est dû que par le salon (match lancé tôt).
+    expect(sql).toContain(
+      "CASE WHEN m.start_at IS NULL OR m.start_at > NOW() + INTERVAL 15 MINUTE THEN 'UNSCHEDULED' WHEN m.start_at > NOW() THEN 'SOON' ELSE 'PASSED' END AS kickoff_state",
+    );
+    // Le vocal n'ouvre qu'au quart d'heure de l'horaire : pas annoncé avant.
+    expect(sql).toContain("AND m.start_at IS NOT NULL AND m.start_at <= NOW() + INTERVAL 15 MINUTE) AS voice_tracked");
   });
 
   it("dispatchLobbyBriefs_legacyReservation_matchesClaimGuardPerTeam", async () => {
@@ -295,7 +309,7 @@ describe("dispatchLobbyBriefs", () => {
     const { query } = mockDb([]);
     await dispatchLobbyBriefs();
     // Le bot n'ouvre de salon qu'à un match qui a son horaire (`MATCH_VOICE.md`).
-    expect(query.mock.calls[0][0]).toMatch(/AND m\.start_at IS NOT NULL\) AS voice_tracked/);
+    expect(query.mock.calls[0][0]).toMatch(/AND m\.start_at IS NOT NULL\s+AND m\.start_at <= NOW\(\) \+ INTERVAL 15 MINUTE\) AS voice_tracked/);
     expect(LOBBY_BRIEF_PHASE.length).toBeLessThanOrEqual(16);
     expect(notifyUsers).not.toHaveBeenCalled();
   });
@@ -323,8 +337,8 @@ describe("dispatchLobbyBriefs", () => {
     expect(team1.dm()).toContain("* Gauche (hôte) : « Renards » · Droite : « Nova »");
     // Les paramètres de partie, les mêmes pour tous les jeux.
     expect(team1.dm()).toContain("## Paramètres de partie\n* Mode compétitif\n* Pas de killcam\n* Pause à la déconnexion");
-    expect(team1.dm()).toContain("N'oubliez pas de rentrer les scores");
-    expect(team1.dm()).toContain("pinguez le rôle @Arbitre sur Discord");
+    expect(team1.dm()).toContain("N'oublie pas de rentrer les scores");
+    expect(team1.dm()).toContain("pingue le rôle @Arbitre sur Discord");
     expect(team1.dm()).toContain("GL HF :)");
     expect(team1.dm()).toContain("https://bluegenji.test/tournois/4/matchs/40");
     expect(team1.push().url).toBe("/tournois/4/matchs/40");
@@ -388,6 +402,143 @@ describe("dispatchLobbyBriefs", () => {
     expect(sends()[0].dm()).not.toContain("coup d'envoi dans moins de 15 minutes");
     expect(sends()[0].dm()).toContain("* Gauche (hôte) : « Renards »");
     expect(sends()[0].push().title).toBe("Match lancé : réglages de la partie");
+  });
+
+  it("dispatchLobbyBriefs_launchedEarlyBeyondLead_saysLaunchedWithoutCheckInOrVoiceLine", async () => {
+    // Lancement forcé à 18 h pour 21 h : le match se joue tout de suite.
+    mockDb([{ ...MATCH, launched_at: "2026-11-03 18:00:00", kickoff_state: "UNSCHEDULED", voice_tracked: 0 }]);
+
+    await dispatchLobbyBriefs();
+
+    const dm = sends()[0].dm();
+    expect(dm).toContain("match lancé.*");
+    expect(dm).not.toContain("Le salon de check-in est ouvert");
+    expect(dm).not.toContain("salon vocal");
+  });
+
+  it("dispatchLobbyBriefs_launchedAtFromReplacedPairing_notSaidLaunched", async () => {
+    // `launched_at` date d'un appariement remplacé (correction de score) : pas « match lancé ».
+    mockDb([{ ...MATCH, launched_at: "2026-11-03 20:00:00", launch_pairing: "1:9" }]);
+
+    await dispatchLobbyBriefs();
+
+    expect(sends()[0].dm()).not.toContain("match lancé");
+  });
+
+  it("dispatchLobbyBriefs_kickoffTimeAlreadyPassed_subtitleDoesNotPromiseFifteenMinutes", async () => {
+    mockDb([{ ...MATCH, kickoff_state: "PASSED" }]);
+
+    await dispatchLobbyBriefs();
+
+    expect(sends()[0].dm()).toContain("l'heure du coup d'envoi est arrivée");
+    expect(sends()[0].dm()).not.toContain("moins de 15 minutes");
+  });
+
+  it("dispatchLobbyBriefs_unscheduledMatch_noCheckInChannelLine", async () => {
+    mockDb([{ ...MATCH, kickoff_state: "UNSCHEDULED" }]);
+
+    await dispatchLobbyBriefs();
+
+    expect(sends()[0].dm()).toContain("le salon du match est ouvert");
+    expect(sends()[0].dm()).not.toContain("Le salon de check-in est ouvert");
+  });
+
+  it("dispatchLobbyBriefs_memberLeftBetweenSweepReadAndSend_notBriefed", async () => {
+    mockDb([MATCH]);
+    // Lecture du balayage, puis relecture de chaque côté juste avant son envoi : 11 a quitté l'équipe 1.
+    jest
+      .mocked(loadEntrantManagerIds)
+      .mockResolvedValueOnce(new Map([[1, [10, 11]], [2, [20]]]))
+      .mockResolvedValueOnce(new Map([[1, [10]]]))
+      .mockResolvedValueOnce(new Map([[2, [20]]]));
+
+    await dispatchLobbyBriefs();
+
+    expect(sends().map((send) => send.userIds)).toEqual([[10], [20]]);
+  });
+
+  it("dispatchLobbyBriefs_onlyManagerLeftBeforeSend_nothingSentAndClaimReleased", async () => {
+    const { execute } = mockDb([MATCH]);
+    // Le seul gérant de l'équipe 2 la quitte entre la lecture du balayage et l'envoi.
+    jest
+      .mocked(loadEntrantManagerIds)
+      .mockResolvedValueOnce(new Map([[1, [10]], [2, [20]]]))
+      .mockResolvedValueOnce(new Map([[1, [10]]]))
+      .mockResolvedValueOnce(new Map());
+
+    await dispatchLobbyBriefs();
+
+    expect(sends().map((send) => send.userIds)).toEqual([[10]]);
+    // La réservation du côté 2 est rendue, sans marque : un gérant nommé dans la fenêtre sera briefé.
+    expect(releases(execute)).toHaveLength(1);
+    expect(marks(execute)).toHaveLength(1);
+  });
+
+  it("dispatchLobbyBriefs_sideReread_asksOnlyThatSidesTeam", async () => {
+    mockDb([MATCH]);
+
+    await dispatchLobbyBriefs();
+
+    expect(jest.mocked(loadEntrantManagerIds).mock.calls.slice(1)).toEqual([[[1]], [[2]]]);
+  });
+
+  it("dispatchLobbyBriefs_accountActiveInBothEntrants_briefedOnceOnFirstSide", async () => {
+    mockDb([MATCH]);
+    jest.mocked(loadEntrantManagerIds).mockResolvedValue(
+      new Map([
+        [1, [10, 11]],
+        [2, [11, 20]],
+      ]),
+    );
+    // Comme la vraie lecture : un compte, une ligne.
+    jest.mocked(loadNotificationRecipients).mockImplementation(async (ids) =>
+      [...new Set(ids)].map((userId) => ({ userId, discord: { discordId: String(userId), handle: null, label: `u${userId}` } })),
+    );
+
+    await dispatchLobbyBriefs();
+
+    expect(sends().map((send) => send.userIds)).toEqual([[10, 11], [20]]);
+  });
+
+  it("dispatchLobbyBriefs_firstSideAlreadyBriefed_sharedAccountStillExcludedFromSecondSide", async () => {
+    // Balayage suivant : le côté 1 est déjà réservé, le côté 2 repris.
+    mockDb([MATCH], [false, true]);
+    jest.mocked(loadEntrantManagerIds).mockResolvedValue(
+      new Map([
+        [1, [10, 11]],
+        [2, [11, 20]],
+      ]),
+    );
+    jest.mocked(loadNotificationRecipients).mockImplementation(async (ids) =>
+      [...new Set(ids)].map((userId) => ({ userId, discord: { discordId: String(userId), handle: null, label: `u${userId}` } })),
+    );
+
+    await dispatchLobbyBriefs();
+
+    expect(sends().map((send) => send.userIds)).toEqual([[20]]);
+  });
+
+  it("dispatchLobbyBriefs_secondSideOnlySharedManagers_claimedWithoutSend", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const { execute } = mockDb([MATCH]);
+    jest.mocked(loadEntrantManagerIds).mockResolvedValue(
+      new Map([
+        [1, [10, 11]],
+        [2, [11]],
+      ]),
+    );
+    jest.mocked(loadNotificationRecipients).mockImplementation(async (ids) =>
+      [...new Set(ids)].map((userId) => ({ userId, discord: { discordId: String(userId), handle: null, label: `u${userId}` } })),
+    );
+
+    await dispatchLobbyBriefs();
+
+    // Les deux côtés réservés (le match quitte les candidats), un seul envoi, aucune fausse alerte.
+    expect(claimParams(execute)).toHaveLength(2);
+    expect(sends().map((send) => send.userIds)).toEqual([[10, 11]]);
+    expect(marks(execute)).toHaveLength(1);
+    expect(logged(error, "reçu par personne")).toBe(false);
+    error.mockRestore();
   });
 
   it("dispatchLobbyBriefs_ghostOpponent_claimKeptOnlyRealTeamBriefedWithoutMutualInviteLine", async () => {
@@ -466,7 +617,7 @@ describe("dispatchLobbyBriefs", () => {
     const dm = sends()[0].dm();
     expect(dm).not.toContain("BattleTag");
     // Hors Overwatch, on ne s'invite pas par BattleTag : on prévient les casters.
-    expect(dm).toContain("* Prévenez les casters inscrits");
+    expect(dm).toContain("* Préviens les casters inscrits");
   });
 
   it("suit l'hôte choisi, la tête de série en BG Survie et le cast", async () => {
@@ -481,7 +632,7 @@ describe("dispatchLobbyBriefs", () => {
     // Règle par défaut : celle qui n'héberge pas bannit la première.
     expect(m40.dm()).toContain("* Bans de la carte 1 : « Renards » d'abord, puis « Nova ».");
     expect(m40.dm()).toContain("## Match casté");
-    expect(m40.dm()).toContain("**Votre match est en autogestion.**");
+    expect(m40.dm()).toContain("**Ton match est en autogestion.**");
     expect(m40.dm()).toContain("L'équipe hôte crée la partie");
     expect(m41.dm()).toContain("* Gauche (hôte) : « Nova » · Droite : « Renards »");
     expect(m41.dm()).not.toContain("## Match casté");

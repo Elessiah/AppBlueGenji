@@ -13,13 +13,14 @@ const STATUSES: Readonly<Record<string, number>> = {
  * cartes candidates (une = imposée, plusieurs = pool) ; `slots: []` retire le
  * réglage. `rounds: [{ phaseId, bracket, roundNumber }, …]` à la place de la
  * manche seule pose les mêmes cartes sur chacun de ces tours (« Appliquer à
- * tous les tours », copie vers un tour). Modifiable à tout moment, y compris
+ * tous les tours », copie vers un tour) ; la réponse dit alors dans `skipped`
+ * combien de ces tours le tournoi ne porte plus. Modifiable à tout moment, y compris
  * sur un tour pas encore généré. Réservé à l'arbitrage (`tournaments` :
  * tout arbitre la porte, `refereeBlockReason`).
  */
 export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   return roundMapsStaffPut(req, context, STATUSES, "ROUND_MAPS_FAILED", async (tournamentId, body) => {
     const rounds = body.rounds === undefined ? [parseRoundKey(body)] : parseRoundKeys(body.rounds);
-    return { slots: await setRoundsMaps(tournamentId, rounds, body.slots) };
+    return setRoundsMaps(tournamentId, rounds, body.slots);
   });
 }

@@ -20,8 +20,11 @@ export type RefereePanelView = {
   candidates: ReadonlyArray<{ userId: number; pseudo: string }>;
   /** Arbitres dont l'opposition est retenue (`MATCH_REFEREE.md`). */
   objections: ReadonlyArray<{ userId: number; pseudo: string }>;
-  /** Arbitres dont l'opposition peut être retenue. */
-  objectable: ReadonlyArray<{ userId: number; pseudo: string }>;
+  /**
+   * Arbitres dont l'opposition peut être retenue ; `busy` : il arbitre un match
+   * non terminé, que l'opposition lui retirerait (ton de la confirmation).
+   */
+  objectable: ReadonlyArray<{ userId: number; pseudo: string; busy: boolean }>;
 };
 
 export type RefereeDialogActions = {
@@ -69,18 +72,22 @@ export function refereeDialogActions(panel: RefereePanelView, viewerUserId: numb
 
 /**
  * Ton de la confirmation d'un geste : `danger` quand il retire quelqu'un
- * (l'arbitre du match, ceux de la manche, l'arbitre visé par l'opposition),
- * neutre sinon (lever une autogestion ou une opposition, autogestion d'un
- * match sans arbitre).
+ * (l'arbitre du match, ceux de la manche, l'arbitre visé par l'opposition
+ * quand il arbitre un match non terminé — `objectionUserId`, lu dans
+ * `objectable`), neutre sinon (lever une autogestion ou une opposition,
+ * autogestion d'un match sans arbitre, opposition d'un compte qui n'arbitre
+ * aucun match ouvert).
  */
 export function refereeConfirmTone(
   gesture: "removeReferee" | "selfOn" | "roundOn" | "roundOff" | "objection" | "liftObjection",
-  panel: Pick<RefereePanelView, "referee" | "round">,
+  panel: Pick<RefereePanelView, "referee" | "round" | "objectable">,
+  objectionUserId: number | null = null,
 ): "danger" | "primary" {
   switch (gesture) {
     case "removeReferee":
-    case "objection":
       return "danger";
+    case "objection":
+      return panel.objectable.some((referee) => referee.userId === objectionUserId && referee.busy) ? "danger" : "primary";
     case "selfOn":
       return panel.referee === null ? "primary" : "danger";
     case "roundOn":

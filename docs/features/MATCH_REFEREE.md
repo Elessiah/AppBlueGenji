@@ -79,7 +79,7 @@ première instruction ; un match joué (`MATCH_ALREADY_COMPLETED`) ou exempt
 | `PUT /api/admin/matches/[id]/referee` | désigner `{ userId }` ou retirer `{ userId: null }` ; `expectedUserId` (l'arbitre que la fenêtre affichait, `null` : aucun) refuse en 409 `REFEREE_CHANGED` un match changé entre-temps — la fenêtre se relit | `tournaments` |
 | `PUT /api/admin/matches/[id]/self-management` | autogestion du match `{ enabled }` | `tournaments` |
 | `PUT /api/admin/tournaments/[id]/self-management` | autogestion d'une manche entière `{ phaseId, roundNumber, bracket, enabled }` (`INVALID_ROUND`) | `tournaments` |
-| `PUT /api/admin/referees/[userId]/objection` | retenir `{ upheld: true }` ou lever `{ upheld: false }` l'opposition d'un arbitre (`INVALID_REFEREE_OBJECTION`, 404 `USER_NOT_FOUND`, 409 `NOT_REFEREE`) — voir « Opposition retenue » | `tournaments` |
+| `PUT /api/admin/referees/[userId]/objection` | retenir `{ upheld: true }` ou lever `{ upheld: false }` l'opposition d'un arbitre (`INVALID_REFEREE_OBJECTION` ; à la retenue seulement : 404 `USER_NOT_FOUND`, 409 `NOT_REFEREE`) — voir « Opposition retenue » | `tournaments` |
 | `PUT /api/admin/matches/[id]/first-map` | première carte `{ map }`, vide = retirer (`INVALID_FIRST_MAP`, rattaché au champ ; 409 `MATCH_NOT_LAUNCHABLE` sur une exemption ; 409 `ROUND_MAPS_SET` quand le tour a des cartes — la fenêtre les montre alors en lecture seule, `ROUND_MAPS.md`) | `tournaments` |
 
 Désigner un arbitre éteint l'autogestion ; l'allumer retire l'arbitre (prévenu,
@@ -120,7 +120,13 @@ plus, pour qu'elles restent levables —, choix d'un arbitre parmi les comptes
 - journal : `publishStaffAction`, une seule ligne Discord (« un arbitre »,
   « le staff », sans nombre de matchs) ; auteur, `#id` de l'arbitre et nombre
   de matchs retirés dans pm2, sur un vrai changement ou un
-  balayage rejoué qui retire encore un match.
+  balayage rejoué qui retire encore un match ou qui échoue. La ligne dit « déjà retenue,
+  balayage rejoué » quand l'opposition était déjà écrite, et « retrait
+  incomplet, à rejouer » quand un match n'a pas pu être retiré ; l'échec d'un
+  retrait s'écrit dans pm2 **sans numéro de match** (pm2 porte déjà le `#id`
+  de l'arbitre). La levée répond 200 que le compte existe ou non (pas de
+  sondage des identifiants) et l'identifiant de la route se lit en décimal
+  strict.
 
 Concurrence : l'écriture de l'opposition est une instruction seule (verrou
 exclusif sur la ligne du compte) ; `writeReferee` lit l'opposition en
@@ -203,8 +209,13 @@ règle a changé avec l'arbitre hôte.
   Le contexte n'arrivant qu'à la connexion SSE ou par le GET REST, une
   empreinte sans nom (`missingRefereeNamesKey`) déclenche une seule relecture
   de `GET /api/tournaments/[id]/referee-names` (session requise, étalée sur
-  2 s) ; `live-state.ts` garde les noms d'un instantané à l'autre. Les deux
-  portes passent par `getTournamentViewerContext`. Jamais le pseudo d'un
+  2 s) ; `live-state.ts` garde les noms d'un instantané à l'autre, **élagués
+  aux matchs qui les montrent** (`pruneRefereeNames` : le pseudo d'un match
+  dont le score vient d'être déclaré quitte l'état du client sans attendre la
+  reconnexion ; l'essai de relecture est oublié dès que plus rien ne manque,
+  pour qu'un score rejeté — même empreinte — relise le pseudo). Les deux portes passent par `getTournamentViewerContext`, où
+  une lecture des pseudos en panne rend une liste vide (journalisée) au lieu de
+  faire échouer le flux ou la lecture REST. Jamais le pseudo d'un
   compte supprimé ni d'un arbitre dont l'opposition est retenue (filtre SQL
   de `loadRefereeNames`) : pendant le retrait de ses matchs, ou si ce
   balayage échoue en partie, le match reste « Arbitre désigné ».
@@ -243,10 +254,19 @@ règle a changé avec l'arbitre hôte.
   peut, les autres lisent le message du refus) et l'état de la manche (matchs
   encore à jouer, en autogestion, arbitrés) : « Toute la manche en
   autogestion » et « Lever l'autogestion de la manche » ne s'offrent que s'ils
-  changent quelque chose (sinon « Rien à changer »). Sans autre compte
+  changent quelque chose (sinon « Rien à changer », en notification neutre
+  `showInfo`, sans rafraîchissement ni relecture du panneau). Sans autre compte
   désignable, une phrase le dit à la place de la liste ; le choix se vide
   après « Désigner ». Les confirmations ne prennent le ton `danger` que pour
-  un geste qui retire quelqu'un (`refereeConfirmTone`).
+  un geste qui retire quelqu'un (`refereeConfirmTone`) : une opposition ne
+  l'a que si l'arbitre visé arbitre un match non terminé (`objectable[].busy`,
+  lu tous tournois confondus). L'opposition ne part que pour un arbitre encore
+  proposé par le panneau relu (`objectionOffered`), et le pseudo du titre
+  d'une confirmation d'opposition est figé à son ouverture, comme son ton et
+  son texte (`confirm.bodyIdle` quand aucun match ne lui est retiré). La liste des
+  cartes du tour porte le nom de son titre (`aria-labelledby`) ; le bouton
+  « Enregistrer la carte » partage la ligne de la saisie, l'erreur de champ
+  dessous.
 
 ## Annonces
 

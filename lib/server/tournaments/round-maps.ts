@@ -201,6 +201,9 @@ export function parseRoundKeys(raw: unknown): RoundKey[] {
   return [...seen.values()];
 }
 
+/** Ce qu'une écriture de cartes a retenu (`setRoundsMaps`). */
+export type RoundsMapsResult = { slots: string[][]; skipped: number };
+
 /** Écrit (ou retire) le réglage d'une manche ; `false` s'il ne change rien. */
 async function writeRoundSlots(
   connection: PoolConnection,
@@ -241,17 +244,23 @@ async function writeRoundSlots(
  * choix déjà faits sur les matchs restent. Une seule transaction, un seul
  * événement, une seule ligne au journal, quel que soit le nombre de tours.
  *
- * @returns les créneaux retenus.
+ * @returns les créneaux retenus, et `skipped` : le nombre de tours demandés
+ *   que le tournoi ne porte pas (phase supprimée entre-temps) et qui n'ont donc
+ *   rien reçu — l'écran le dit au lieu d'annoncer un succès entier.
  * @throws `INVALID_ROUND_MAPS` | `INVALID_ROUND` | `TOURNAMENT_NOT_FOUND`
  */
 export async function setRoundsMaps(
   tournamentId: number,
   rounds: readonly RoundKey[],
   rawSlots: unknown,
-): Promise<string[][]> {
+): Promise<RoundsMapsResult> {
   const slots = normalizeRoundMapSlots(rawSlots);
   if (rounds.length === 0 || rounds.length > ROUND_MAPS_BULK_MAX) throw new Error("INVALID_ROUND");
-  const result = await inTransaction(async (connection) => {
+  // Rejouée sur un interblocage ou un refus de l'isolation par instantané de
+  // MariaDB (`ER_CHECKREAD`) : un balayage de l'annonce, qui ne prend pas le
+  // verrou du tournoi, peut supprimer la ligne `bg_round_maps_notices` après
+  // l'ouverture de l'image de cette transaction (`queueRoundMapsNotice`).
+  const result = await retryOnDeadlock(() => inTransaction(async (connection) => {
     const tournament = await lockTournament(connection, tournamentId);
     // Retirer est permis sur toute clé (une ligne orpheline doit pouvoir partir) ;
     // poser des cartes, seulement sur les tours du tournoi.
@@ -264,18 +273,18 @@ export async function setRoundsMaps(
     // L'annonce Discord ne part pas ici : elle est mise en attente dans la
     // transaction et une seule ligne résume la série (`./round-maps-notice`).
     await queueRoundMapsNotice(connection, tournamentId, changedRounds);
-    return changedRounds.length > 0 ? tournament : null;
-  });
-  if (result !== null) {
+    return { changed: changedRounds.length > 0, skipped: rounds.length - targets.length };
+  }));
+  if (result.changed) {
     publishMatchUpdatedEvent(tournamentId);
     scheduleRoundMapsNotice();
   }
-  return slots;
+  return { slots, skipped: result.skipped };
 }
 
 /** Les cartes d'une seule manche (`setRoundsMaps`). */
 export async function setRoundMaps(tournamentId: number, round: RoundKey, rawSlots: unknown): Promise<string[][]> {
-  return setRoundsMaps(tournamentId, [round], rawSlots);
+  return (await setRoundsMaps(tournamentId, [round], rawSlots)).slots;
 }
 
 type TiebreakTournamentRow = RowDataPacket & {
@@ -331,7 +340,8 @@ async function tiebreakAllowedUnderLock(
  */
 export async function setRoundTiebreak(tournamentId: number, round: RoundKey, rawMap: unknown): Promise<string | null> {
   const map = normalizeTiebreakMap(rawMap);
-  const changed = await inTransaction(async (connection) => {
+  // Rejouée comme `setRoundsMaps` (même mise en attente de l'annonce).
+  const changed = await retryOnDeadlock(() => inTransaction(async (connection) => {
     const tournament = await lockTournament(connection, tournamentId);
     if (map !== null) {
       const [owned] = await roundsOfTournament(connection, tournament, [round]);
@@ -364,9 +374,9 @@ export async function setRoundTiebreak(tournamentId: number, round: RoundKey, ra
         [tournamentId, round.phaseId, round.bracket, round.roundNumber, map],
       );
     }
-    await queueRoundMapsNotice(connection, tournamentId, [round]);
+    await queueRoundMapsNotice(connection, tournamentId, [round], { tiebreak: true });
     return true;
-  });
+  }));
   if (changed) {
     publishMatchUpdatedEvent(tournamentId);
     scheduleRoundMapsNotice();
@@ -524,7 +534,7 @@ export async function pickMatchMap(
           bracket: String(row.bracket),
           roundNumber: Number(row.round_number),
         });
-        const map = validateMapPick(slots, slot, rawMap);
+        const map = validateMapPick(slots, slot, rawMap, byTeam);
         if (!(await writeMapPick(connection, matchId, row, slot as number, map))) return null;
         queueRefereeChange(connection, { kind: "MAP_PICK", matchId, set: map !== null, byTeam });
         return ownerId;

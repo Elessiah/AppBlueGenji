@@ -196,8 +196,9 @@ describe("setRoundMaps", () => {
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
     // Aucune ligne Discord à l'enregistrement : la manche est mise en attente.
     expect(sendBotLog).not.toHaveBeenCalled();
-    expect(writes(/INSERT INTO bg_round_maps_notices/).map(([, params]) => params)).toEqual([
-      [7, '[{"phaseId":0,"bracket":"UPPER","roundNumber":2}]', 60],
+    expect(writes(/INSERT INTO bg_round_maps_notices/).map(([, params]) => params)).toEqual([[7, 60]]);
+    expect(writes(/UPDATE bg_round_maps_notices SET rounds_json/).map(([, params]) => params)).toEqual([
+      ['[{"phaseId":0,"bracket":"UPPER","roundNumber":2}]', 7],
     ]);
   });
 
@@ -276,7 +277,7 @@ describe("setRoundsMaps", () => {
       { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
       { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [] },
     ]);
-    await expect(setRoundsMaps(7, [ROUND, ROUND_3], [["Ilios"]])).resolves.toEqual([["Ilios"]]);
+    await expect(setRoundsMaps(7, [ROUND, ROUND_3], [["Ilios"]])).resolves.toEqual({ slots: [["Ilios"]], skipped: 0 });
     expect(connection.execute.mock.calls[0][0]).toMatch(/FROM bg_tournaments[\s\S]*FOR UPDATE/);
     expect(writes(/FROM bg_tournaments/)).toHaveLength(1);
     expect(writes(/INSERT INTO bg_tournament_round_maps/).map(([, params]) => params)).toEqual([
@@ -285,8 +286,8 @@ describe("setRoundsMaps", () => {
     ]);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledTimes(1);
     expect(sendBotLog).not.toHaveBeenCalled();
-    const [notice] = writes(/INSERT INTO bg_round_maps_notices/);
-    expect(JSON.parse(String((notice[1] as unknown[])[1]))).toEqual([
+    const [notice] = writes(/UPDATE bg_round_maps_notices SET rounds_json/);
+    expect(JSON.parse(String((notice[1] as unknown[])[0]))).toEqual([
       { phaseId: 0, bracket: "UPPER", roundNumber: 2 },
       { phaseId: 0, bracket: "UPPER", roundNumber: 3 },
     ]);
@@ -356,6 +357,18 @@ describe("setRoundsMaps", () => {
     expect(writes(/INSERT INTO bg_tournament_round_maps/).map(([, params]) => params)).toEqual([[7, 3, "UPPER", 2, '[["Ilios"]]']]);
   });
 
+  it("setRoundsMaps_mixedOwnAndForeignRounds_reportsSkippedCount", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [{ ...TOURNAMENT, format: "MULTI" }] },
+      { pattern: /FROM bg_tournament_phases/, rows: [{ id: 3 }] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [] },
+    ]);
+
+    const result = await setRoundsMaps(7, [{ ...ROUND, phaseId: 3 }, { ...ROUND, phaseId: 99 }, { ...ROUND, phaseId: 98 }], [["Ilios"]]);
+
+    expect(result).toEqual({ slots: [["Ilios"]], skipped: 2 });
+  });
+
   it("setRoundsMaps_clearOrphanRound_deletesWithoutPhaseCheck", async () => {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
@@ -366,6 +379,25 @@ describe("setRoundsMaps", () => {
 
     expect(writes(/DELETE FROM bg_tournament_round_maps/)).toHaveLength(1);
     expect(writes(/FROM bg_tournament_phases/)).toHaveLength(0);
+  });
+
+  it("setRoundsMaps_snapshotConflictOnNoticeRow_replaysTheWholeTransaction", async () => {
+    // MariaDB (`innodb_snapshot_isolation`) : un balayage a supprimé la ligne de l'annonce
+    // après l'ouverture de l'image de la transaction — refus 1020, puis rejeu.
+    let refused = false;
+    connection.execute.mockImplementation(async (sql: string) => {
+      if (/FROM bg_tournaments/.test(sql)) return [[TOURNAMENT], []];
+      if (/INSERT INTO bg_round_maps_notices/.test(sql) && !refused) {
+        refused = true;
+        throw Object.assign(new Error("Record has changed since last read"), { code: "ER_CHECKREAD", errno: 1020 });
+      }
+      return [/^\s*SELECT/.test(sql) ? [] : { affectedRows: 1 }, []];
+    });
+
+    await expect(setRoundsMaps(7, [ROUND], [["Ilios"]])).resolves.toEqual({ slots: [["Ilios"]], skipped: 0 });
+
+    expect(writes(/FROM bg_tournaments/)).toHaveLength(2);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledTimes(1);
   });
 
   it("setRoundsMaps_noRound_throwsInvalidRoundBeforeQuery", async () => {
@@ -593,6 +625,15 @@ describe("pickMatchMap", () => {
     jest.mocked(resolveMatchParty).mockResolvedValue({ role: "TEAM2", canDeclareReady: true });
     await pickMatchMap(42, { userId: 5, staff: false }, 1, "Ilios");
     expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), { kind: "MAP_PICK", matchId: 42, set: true, byTeam: true });
+  });
+
+  it("pickMatchMap_selfManagedTeamClearsImposedSlot_throwsInvalidMapPickWithoutWriting", async () => {
+    withMatch({ ...MATCH, self_managed: 1, map_picks: '{"3":"Oasis"}' });
+    jest.mocked(resolveMatchParty).mockResolvedValue({ role: "TEAM2", canDeclareReady: true });
+
+    await expect(pickMatchMap(42, { userId: 5, staff: false }, 3, null)).rejects.toThrow("INVALID_MAP_PICK");
+
+    expect(writes(/UPDATE bg_matches/)).toHaveLength(0);
   });
 
   it("en autogestion, un joueur qui ne déclare pas « Prêt » est refusé", async () => {

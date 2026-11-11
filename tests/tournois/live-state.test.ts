@@ -17,6 +17,7 @@ import {
   shouldCommitFetched,
   shouldRefreshViewerContext,
   reconnectDelayMs,
+  pruneRefereeNames,
   shareRefereeNames,
   shareUnchanged,
   type LiveState,
@@ -715,6 +716,72 @@ describe("shareRefereeNames", () => {
     const next = [{ matchId: 5, refereeKey: "k5-bis", pseudo: "Autre" }];
 
     expect(shareRefereeNames(previous, next)).toBe(next);
+  });
+
+  it("pruneRefereeNames_everyMatchStillShowsItsReferee_returnsSameArray", () => {
+    const matches = [match({ id: 5, refereeKey: "k5", status: "READY" })];
+
+    expect(pruneRefereeNames(previous, matches)).toBe(previous);
+  });
+
+  it("pruneRefereeNames_scoreDeclared_dropsThatMatchName", () => {
+    const names = [...previous, { matchId: 6, refereeKey: "k6", pseudo: "Autre" }];
+    const matches = [
+      match({ id: 5, refereeKey: "k5", status: "AWAITING_CONFIRMATION" }),
+      match({ id: 6, refereeKey: "k6", status: "READY" }),
+    ];
+
+    expect(pruneRefereeNames(names, matches)).toEqual([{ matchId: 6, refereeKey: "k6", pseudo: "Autre" }]);
+  });
+
+  it("pruneRefereeNames_refereeReplacedOnSameMatch_dropsThePreviousName", () => {
+    // Le match montre toujours un arbitre, mais plus celui-là (autre empreinte).
+    expect(pruneRefereeNames(previous, [match({ id: 5, refereeKey: "k5-bis", status: "READY" })])).toEqual([]);
+  });
+
+  it("pruneRefereeNames_refereeNoLongerShown_dropsName", () => {
+    expect(pruneRefereeNames(previous, [match({ id: 5, refereeKey: null, status: "READY" })])).toEqual([]);
+  });
+
+  it("applyLiveMessage_snapshotDeclaresScore_refereeNameLeavesClientState", () => {
+    const established = applyLiveMessage(INITIAL_LIVE_STATE, {
+      type: "connected",
+      tournamentId: 7,
+      tier: "PRIORITY",
+      viewer: viewer({ refereeNames: previous }),
+      snapshot: snapshot({ version: "v1", matches: [match({ id: 5, refereeKey: "k5", status: "READY" })] }),
+    });
+
+    const next = applyLiveMessage(established, {
+      type: "snapshot",
+      tournamentId: 7,
+      version: "v2",
+      snapshot: snapshot({
+        version: "v2",
+        matches: [match({ id: 5, refereeKey: "k5", status: "AWAITING_CONFIRMATION" })],
+      }),
+    });
+
+    expect(next.detail?.refereeNames).toEqual([]);
+  });
+
+  it("applyLiveMessage_snapshotKeepsRefereeShown_refereeNamesArrayKept", () => {
+    const established = applyLiveMessage(INITIAL_LIVE_STATE, {
+      type: "connected",
+      tournamentId: 7,
+      tier: "PRIORITY",
+      viewer: viewer({ refereeNames: previous }),
+      snapshot: snapshot({ version: "v1", matches: [match({ id: 5, refereeKey: "k5", status: "READY" })] }),
+    });
+
+    const next = applyLiveMessage(established, {
+      type: "snapshot",
+      tournamentId: 7,
+      version: "v2",
+      snapshot: snapshot({ version: "v2", matches: [match({ id: 5, refereeKey: "k5", status: "READY", firstMap: "Ilios" })] }),
+    });
+
+    expect(next.detail?.refereeNames).toBe(previous);
   });
 });
 

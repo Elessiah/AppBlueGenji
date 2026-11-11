@@ -186,4 +186,24 @@ describe("setRefereeObjection", () => {
     expect(result).toEqual({ changed: true, released: 0, failed: 0 });
     expect(loadRefereePermission).not.toHaveBeenCalled();
   });
+  it("setRefereeObjection_liftOnUnknownAccount_returnsUnchanged", async () => {
+    // Même réponse qu'un compte sans opposition : la levée ne sonde pas les identifiants.
+    execute.mockResolvedValueOnce([{ affectedRows: 0 }, []]);
+
+    const result = await setRefereeObjection(REFEREE, false);
+
+    expect(result).toEqual({ changed: false, released: 0, failed: 0 });
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("setRefereeObjection_oneMatchFails_logsWithoutMatchNumber", async () => {
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockResolvedValueOnce([[{ id: 4711 }], []]);
+    jest.mocked(releaseObjectingReferee).mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await setRefereeObjection(REFEREE, true);
+
+    expect(String(consoleError.mock.calls[0][0])).not.toContain("4711");
+    consoleError.mockRestore();
+  });
 });

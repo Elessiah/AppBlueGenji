@@ -52,7 +52,7 @@ const PANEL: RefereePanel = {
   roundSlots: [],
   candidates: [{ userId: 3, pseudo: "Arbitre" }],
   objections: [],
-  objectable: [{ userId: 3, pseudo: "Arbitre" }],
+  objectable: [{ userId: 3, pseudo: "Arbitre", busy: false }],
 };
 
 beforeEach(() => {

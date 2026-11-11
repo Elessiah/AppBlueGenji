@@ -65,25 +65,77 @@ describe("queueRoundMapsNotice", () => {
     expect(connection.execute).not.toHaveBeenCalled();
   });
 
-  it("queueRoundMapsNotice_firstSave_insertsRoundsAndRestartsWindow", async () => {
+  /** Ce que la mise en attente écrit dans `rounds_json` (dernière instruction). */
+  function storedRounds(connection: ReturnType<typeof queueWith>): unknown {
+    const [sql, params] = connection.execute.mock.calls[2];
+    expect(sql).toMatch(/UPDATE bg_round_maps_notices SET rounds_json = \?/);
+    return JSON.parse(String((params as unknown[])[0]));
+  }
+
+  it("queueRoundMapsNotice_firstSave_takesTheRowAndRestartsWindowBeforeReadingIt", async () => {
     const connection = queueWith([]);
+
     await queueRoundMapsNotice(fakeConnection(connection), 7, [R2]);
-    const [sql, params] = connection.execute.mock.calls[1];
+
+    // La ligne est prise (verrou) avant d'être lue : un balayage ne la revendique plus entre les deux.
+    const [sql, params] = connection.execute.mock.calls[0];
     expect(sql).toMatch(/INSERT INTO bg_round_maps_notices[\s\S]*changes = changes \+ 1/);
-    expect(params).toEqual([7, JSON.stringify([R2]), 60]);
+    expect(params).toEqual([7, 60]);
+    expect(connection.execute.mock.calls[1][0]).toMatch(/^\s*SELECT rounds_json/);
+    expect(connection.execute.mock.calls[1][0]).not.toMatch(/FOR UPDATE/);
+  });
+
+  it("queueRoundMapsNotice_firstSave_storesTheRounds", async () => {
+    const connection = queueWith([{ rounds_json: "[]" }]);
+
+    await queueRoundMapsNotice(fakeConnection(connection), 7, [R2]);
+
+    expect(storedRounds(connection)).toEqual([R2]);
   });
 
   it("queueRoundMapsNotice_secondSave_mergesRoundsWithoutDuplicates", async () => {
     const connection = queueWith([{ rounds_json: JSON.stringify([R2, R3]) }]);
+
     await queueRoundMapsNotice(fakeConnection(connection), 7, [R3, { ...R2, roundNumber: 4 }]);
-    const params = connection.execute.mock.calls[1][1] as unknown[];
-    expect(JSON.parse(String(params[1]))).toEqual([R2, R3, { ...R2, roundNumber: 4 }]);
+
+    expect(storedRounds(connection)).toEqual([R2, R3, { ...R2, roundNumber: 4 }]);
   });
 
   it("queueRoundMapsNotice_corruptPendingJson_startsFromTheNewRounds", async () => {
     const connection = queueWith([{ rounds_json: "{pas du json" }]);
+
     await queueRoundMapsNotice(fakeConnection(connection), 7, [R2]);
-    expect((connection.execute.mock.calls[1][1] as unknown[])[1]).toBe(JSON.stringify([R2]));
+
+    expect(storedRounds(connection)).toEqual([R2]);
+  });
+
+  it("queueRoundMapsNotice_capReached_countsNewRoundsInsteadOfStoringThem", async () => {
+    const full = Array.from({ length: 200 }, (_, index) => ({ ...R2, roundNumber: index + 1 }));
+    const connection = queueWith([{ rounds_json: JSON.stringify(full) }]);
+
+    await queueRoundMapsNotice(fakeConnection(connection), 7, [
+      { ...R2, roundNumber: 201 },
+      { ...R2, roundNumber: 202 },
+    ]);
+
+    expect(storedRounds(connection)).toEqual([...full, { more: 2 }]);
+  });
+
+  it("queueRoundMapsNotice_capReached_roundAlreadyStoredIsNotCounted", async () => {
+    const full = Array.from({ length: 200 }, (_, index) => ({ ...R2, roundNumber: index + 1 }));
+    const connection = queueWith([{ rounds_json: JSON.stringify([...full, { more: 3 }]) }]);
+
+    await queueRoundMapsNotice(fakeConnection(connection), 7, [{ ...R2, roundNumber: 5 }]);
+
+    expect(storedRounds(connection)).toEqual([...full, { more: 3 }]);
+  });
+
+  it("queueRoundMapsNotice_tiebreakOnly_flaggedAndKeptApartFromTheRoundMaps", async () => {
+    const connection = queueWith([{ rounds_json: JSON.stringify([R2]) }]);
+
+    await queueRoundMapsNotice(fakeConnection(connection), 7, [R2], { tiebreak: true });
+
+    expect(storedRounds(connection)).toEqual([R2, { ...R2, tiebreak: true }]);
   });
 });
 
@@ -103,6 +155,83 @@ describe("dispatchDueRoundMapsNotices", () => {
     await dispatchDueRoundMapsNotices();
     expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 7, category: "maps" });
     expect(flushBotLogBatch).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueRoundMapsNotices_severalBrackets_listsUpperThenLowerThenGrandThenThirdPlace", async () => {
+    pool([
+      dueRow([
+        { phaseId: 0, bracket: "THIRD_PLACE", roundNumber: 1 },
+        { phaseId: 0, bracket: "GRAND", roundNumber: 1 },
+        { phaseId: 0, bracket: "LOWER", roundNumber: 1 },
+        { phaseId: 0, bracket: "UPPER", roundNumber: 1 },
+      ]),
+    ]);
+
+    await dispatchDueRoundMapsNotices();
+
+    // Le tableau principal d'abord : trié par nom, il passait après la grande finale et les perdants.
+    expect(String(jest.mocked(sendBotLog).mock.calls[0][0])).toContain(
+      "Manche 1, Tableau perdants · manche 1, Grande finale, Petite finale (4 manches)",
+    );
+  });
+
+  it("dispatchDueRoundMapsNotices_tiebreakOnlyChange_saysTiebreakMap", async () => {
+    pool([dueRow([{ ...R2, tiebreak: true }])]);
+
+    await dispatchDueRoundMapsNotices();
+
+    expect(String(jest.mocked(sendBotLog).mock.calls[0][0])).toContain("(map de départage)");
+  });
+
+  it("dispatchDueRoundMapsNotices_mapsAndTiebreakOfSameRound_listedAndCountedOnce", async () => {
+    pool([dueRow([R2, { ...R2, tiebreak: true }])]);
+
+    await dispatchDueRoundMapsNotices();
+
+    const line = String(jest.mocked(sendBotLog).mock.calls[0][0]);
+    expect(line).toContain("(1 manche)");
+    expect(line).not.toContain("(map de départage)");
+  });
+
+  it("dispatchDueRoundMapsNotices_tiebreakOfAnotherRound_keptApart", async () => {
+    pool([dueRow([R2, { ...R3, tiebreak: true }])]);
+
+    await dispatchDueRoundMapsNotices();
+
+    const line = String(jest.mocked(sendBotLog).mock.calls[0][0]);
+    expect(line).toContain("(2 manches)");
+    expect(line).toContain("(map de départage)");
+  });
+
+  it("dispatchDueRoundMapsNotices_storedOverflow_countedInTheSummary", async () => {
+    pool([dueRow([R2, R3, { more: 4 }])]);
+
+    await dispatchDueRoundMapsNotices();
+
+    expect(String(jest.mocked(sendBotLog).mock.calls[0][0])).toContain("(6 manches)");
+  });
+
+  it("dispatchDueRoundMapsNotices_rerunAskedWhileSweepInFlight_sweepsAgainAfterIt", async () => {
+    pool([]);
+    const first = dispatchDueRoundMapsNotices();
+
+    await dispatchDueRoundMapsNotices(true);
+    await first;
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const sweeps = execute.mock.calls.filter(([sql]) => /send_after <= NOW\(\)/.test(sql));
+    expect(sweeps).toHaveLength(2);
+  });
+
+  it("dispatchDueRoundMapsNotices_plainCallWhileSweepInFlight_doesNotSweepAgain", async () => {
+    pool([]);
+    const first = dispatchDueRoundMapsNotices();
+
+    await dispatchDueRoundMapsNotices();
+    await first;
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(execute.mock.calls.filter(([sql]) => /send_after <= NOW\(\)/.test(sql))).toHaveLength(1);
   });
 
   it("dispatchDueRoundMapsNotices_windowNotElapsed_sendsNothing", async () => {
@@ -127,6 +256,21 @@ describe("dispatchDueRoundMapsNotices", () => {
     expect(execute.mock.calls[1][0]).toMatch(/DELETE FROM bg_round_maps_notices[\s\S]*changes = \?/);
     expect(execute.mock.calls[1][1]).toEqual([7, 1]);
     expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("dispatchDueRoundMapsNotices_oneClaimRefused_otherTournamentsStillAnnounced", async () => {
+    let claims = 0;
+    execute = jest.fn<SqlQuery>(async (sql) => {
+      if (/^\s*SELECT/.test(sql)) return [[dueRow([R2]), { ...dueRow([R3]), tournament_id: 8 }], []];
+      claims += 1;
+      if (claims === 1) throw new Error("Record has changed since last read");
+      return [{ affectedRows: 1 }, []];
+    });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await expect(dispatchDueRoundMapsNotices()).resolves.toBe(1);
+
+    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 8, category: "maps" });
   });
 
   it("dispatchDueRoundMapsNotices_calledTwiceWithinThrottle_queriesOnce", async () => {
@@ -175,6 +319,22 @@ describe("flushRoundMapsNotice", () => {
     pool([dueRow([R2])]);
     jest.mocked(flushBotLogBatch).mockReturnValue(new Promise<void>(() => undefined));
     await expect(flushRoundMapsNotice(7)).resolves.toBe(true);
+  });
+
+  it("flushRoundMapsNotice_ownRoundsCoverAllPending_sends", async () => {
+    pool([dueRow([R2, R3])]);
+
+    await expect(flushRoundMapsNotice(7, ["0:UPPER:2", "0:UPPER:3"])).resolves.toBe(true);
+  });
+
+  it("flushRoundMapsNotice_ownRoundsButOverflowPending_leavesItToTheWindow", async () => {
+    // Des manches seulement comptées peuvent être celles d'un autre membre du staff.
+    pool([dueRow([R2, { more: 3 }])]);
+
+    await expect(flushRoundMapsNotice(7, ["0:UPPER:2"])).resolves.toBe(false);
+
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(execute.mock.calls.some(([sql]) => /^\s*DELETE/.test(sql))).toBe(false);
   });
 
   it("flushRoundMapsNotice_sweepAlreadyClaimedIt_returnsFalse", async () => {
@@ -291,6 +451,12 @@ describe("formatRoundMapsSummaryLog", () => {
     expect(formatRoundMapsSummaryLog({ tournament, roundLabels: ["Manche 2"], listed: 8 })).toContain(
       "Manche 2 (1 manche), par le staff",
     );
+  });
+
+  it("formatRoundMapsSummaryLog_roundsBeyondTheStoredCap_countedInRestAndTotal", () => {
+    const log = formatRoundMapsSummaryLog({ tournament, roundLabels: ["M1", "M2"], listed: 8, more: 3 });
+
+    expect(log).toContain("M1, M2 et 3 autres (5 manches)");
   });
 
   it("formatRoundMapsSummaryLog_moreThanListed_countsTheRest", () => {

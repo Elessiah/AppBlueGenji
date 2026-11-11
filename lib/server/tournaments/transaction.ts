@@ -17,11 +17,10 @@ import { discardBotLogs, flushBotLogs } from "./bot-logs";
  */
 export async function transact<T>(connection: PoolConnection, run: (connection: PoolConnection) => Promise<T>): Promise<T> {
   await connection.beginTransaction();
+  let result: T;
   try {
-    const result = await run(connection);
+    result = await run(connection);
     await connection.commit();
-    flushBotLogs(connection);
-    return result;
   } catch (error) {
     await connection.rollback().catch(() => {
       // Détruite, la connexion quitte le pool : `release()` n'y fait plus rien.
@@ -30,6 +29,21 @@ export async function transact<T>(connection: PoolConnection, run: (connection: 
     discardBotLogs(connection);
     throw error;
   }
+  // Hors du `try` : le geste est enregistré. Une exception du vidage ne doit ni
+  // lancer un rollback sans effet, ni répondre 500 pour un geste validé.
+  try {
+    flushBotLogs(connection);
+  } catch (error) {
+    console.error("[transaction] journal non vidé après le commit :", error);
+    // Ce qui reste en attente ne doit pas partir avec la transaction suivante
+    // de cette connexion, rendue au pool.
+    try {
+      discardBotLogs(connection);
+    } catch {
+      // Rien de plus à tenter : le geste, lui, est enregistré.
+    }
+  }
+  return result;
 }
 
 /** {@link transact} sur une connexion prise au pool pour l'occasion. */

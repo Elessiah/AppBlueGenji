@@ -37,6 +37,8 @@ let users: Record<string, unknown>[];
 let players: number[];
 let roundSlotsJson: string | null;
 let roundState: Record<string, unknown>;
+/** Comptes qui arbitrent un match non terminé (tous tournois). */
+let busyReferees: number[];
 let execute: jest.Mock<SqlQuery>;
 
 beforeEach(() => {
@@ -60,8 +62,10 @@ beforeEach(() => {
   players = [];
   roundSlotsJson = null;
   roundState = { open: 1, self_managed: 0, refereed: 0 };
+  busyReferees = [];
   execute = jest.fn<SqlQuery>(async (sql) => {
     if (sql.includes("COUNT(*) AS open")) return [[roundState], []];
+    if (sql.includes("SELECT DISTINCT referee_user_id")) return [busyReferees.map((referee_user_id) => ({ referee_user_id })), []];
     if (sql.includes("FROM bg_matches")) return [match ? [match] : [], []];
     if (sql.includes("FROM bg_users")) return [users, []];
     if (sql.includes("FROM bg_team_members")) return [players.map((user_id) => ({ user_id })), []];
@@ -159,9 +163,39 @@ describe("loadRefereePanel", () => {
     expect(panel?.objections).toEqual([{ userId: 4, pseudo: "Ana" }]);
     // Une opposition retenue reste proposée : la retenir de nouveau rejoue le retrait.
     expect(panel?.objectable).toEqual([
-      { userId: 4, pseudo: "Ana" },
-      { userId: 3, pseudo: "Zoé" },
+      { userId: 4, pseudo: "Ana", busy: false },
+      { userId: 3, pseudo: "Zoé", busy: false },
     ]);
+  });
+
+  it("loadRefereePanel_refereeWithUnfinishedMatch_objectableBusy", async () => {
+    users = [staffUser(3, "Zoé"), staffUser(4, "Ana")];
+    busyReferees = [3];
+
+    const panel = await loadRefereePanel(42, VIEWER);
+
+    expect(panel?.objectable).toEqual([
+      { userId: 4, pseudo: "Ana", busy: false },
+      { userId: 3, pseudo: "Zoé", busy: true },
+    ]);
+  });
+
+  it("loadRefereePanel_busyQuery_readsOnlyUnfinishedMatchesOfReferees", async () => {
+    users = [staffUser(3, "Zoé")];
+
+    await loadRefereePanel(42, VIEWER);
+
+    const call = execute.mock.calls.find(([query]) => query.includes("SELECT DISTINCT referee_user_id"));
+    expect(call?.[0]).toContain("status <> 'COMPLETED'");
+    expect(call?.[1]).toEqual([3]);
+  });
+
+  it("loadRefereePanel_noReferee_skipsBusyQuery", async () => {
+    users = [];
+
+    await loadRefereePanel(42, VIEWER);
+
+    expect(execute.mock.calls.some(([query]) => query.includes("SELECT DISTINCT referee_user_id"))).toBe(false);
   });
 
   it("loadRefereePanel_objectionOnAccountThatNoLongerReferees_stillListedForLift_notObjectable", async () => {
