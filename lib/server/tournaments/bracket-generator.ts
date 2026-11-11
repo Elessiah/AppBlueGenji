@@ -1,4 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import { isTransactionAbortedOn } from "@/lib/server/mysql-errors";
 import { nextPowerOfTwo } from "@/lib/server/serialization";
 import { TournamentRow } from "./_internal";
 import {
@@ -48,8 +49,11 @@ async function loadExistingBracket(
  * un plateau reconstruit tire de nouvelles rencontres (adversaires, horaires),
  * et une marque laissée à la même place priverait l'engagée du check-in de
  * son vrai match. Un retour arrière, lui, garde les marques (le check-in ne
- * repart jamais deux fois pour le même match). Jamais d'exception : le
- * plateau se reconstruit quand même.
+ * repart jamais deux fois pour le même match). Un échec qui laisse la
+ * transaction ouverte (table absente, délai de verrou) se journalise et le
+ * plateau se reconstruit quand même ; un échec qui l'a **défaite**
+ * (interblocage) remonte — poursuivre écrirait le plateau hors transaction,
+ * sans ses verrous, et l'appelant rejoue.
  */
 async function forgetLobbyBriefMarks(
   connection: PoolConnection,
@@ -59,6 +63,7 @@ async function forgetLobbyBriefMarks(
   try {
     await connection.execute(`DELETE FROM bg_lobby_brief_marks WHERE ${where}`, params);
   } catch (error) {
+    if (await isTransactionAbortedOn(connection, error)) throw error;
     console.error(`[lobby-brief] marques du plateau ${params.join(":")} non effacées`, error);
   }
 }

@@ -191,4 +191,18 @@ describe("createBracketIfMissing — marques de check-in d'un plateau reconstrui
     expect(error.mock.calls.some(([message]) => String(message).includes("non effacées"))).toBe(true);
     error.mockRestore();
   });
+
+  it("createBracketIfMissing_markDeleteDeadlocks_rethrowsWithoutRebuilding", async () => {
+    // L'interblocage a défait la transaction : rien ne s'écrit hors d'elle.
+    const deadlock = Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK", errno: 1213 });
+    jest.mocked(hasExistingMatches).mockResolvedValue(true);
+    execute.mockImplementation(async (sql) => {
+      if (String(sql).startsWith(MARKS_DELETE)) throw deadlock;
+      return [[], []];
+    });
+
+    await expect(createBracketIfMissing(connection, tournament({ bracket_size: 8 }))).rejects.toBe(deadlock);
+
+    expect(createSingleEliminationBracket).not.toHaveBeenCalled();
+  });
 });

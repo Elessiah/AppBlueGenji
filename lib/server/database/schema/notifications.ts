@@ -13,15 +13,6 @@ const MATCH_PLACE_COLUMNS = `        tournament_id BIGINT NOT NULL,
         match_number INT NOT NULL,
 `;
 
-/** Table de notification facultative : un échec laisse la base debout et l'envoi se tait. */
-async function createQuietly(db: Pool, sql: string): Promise<void> {
-  try {
-    await createTable(db, sql);
-  } catch {
-    // Table déjà présente, ou création refusée.
-  }
-}
-
 /** Notifications déjà envoyées. */
 export async function createSentNotificationTables(db: Pool): Promise<void> {
   // Même motif dans les deux tables : la ligne est **réservée avant l'envoi**,
@@ -138,8 +129,11 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
   // effacé puis recréé (retour arrière, régénération d'une manche) garde la
   // marque, et le check-in ne repart jamais deux fois — décision de
   // l'utilisateur du 2026-11-05 (`docs/features/MATCH_LOBBY_BRIEF.md`). Part
-  // avec le tournoi ou l'engagée.
-  await createQuietly(db, `
+  // avec le tournoi ou l'engagée. Une création refusée laisse la base debout
+  // mais se **dit** : balayage et réservation lisent la table sans condition,
+  // et plus aucun check-in ne partirait.
+  try {
+    await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_lobby_brief_marks (
 ${MATCH_PLACE_COLUMNS}        team_id BIGINT NOT NULL,
         sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -151,6 +145,9 @@ ${MATCH_PLACE_COLUMNS}        team_id BIGINT NOT NULL,
           REFERENCES bg_teams(id) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+  } catch (error) {
+    console.error("[migrations] bg_lobby_brief_marks non créée — check-ins des matchs éteints", error);
+  }
 
   // Annonce d'un nouveau match (`docs/features/NEW_MATCH_NOTICE.md`) : une par
   // place du match (phase, tableau, manche, numéro) et par affiche (`pairing`,
