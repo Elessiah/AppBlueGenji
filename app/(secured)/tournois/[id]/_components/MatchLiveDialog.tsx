@@ -260,7 +260,8 @@ function staffUrlShown(triggerLocked: boolean, liveTrigger: MatchLiveTrigger | n
  * Le corps du réglage envoyé. Sur un match joué resté marqué (`castable`
  * faux, mode gardé), seuls les liens des casters partent : le mode et le lien
  * du staff restent tels quels (clés absentes), le serveur n'y prenant plus
- * que le démarquage. `organisationLink` absent : le lecteur ne le dit pas.
+ * que le démarquage. `organisationLink` absent : le lecteur ne le dit pas, ou
+ * aucun lien n'est posé (rien à attribuer).
  */
 export function matchLiveBody(input: {
   castable: boolean;
@@ -271,10 +272,13 @@ export function matchLiveBody(input: {
 }): Record<string, unknown> {
   const links = input.streamLinks === undefined ? {} : { streamLinks: input.streamLinks };
   if (!input.castable && input.trigger !== null) return links;
+  const liveUrl = input.trigger === null ? null : input.liveUrl.trim() || null;
+  // La provenance ne se dit que d'un lien posé : sans lien, rien à attribuer.
+  const saysOrigin = input.organisationLink !== undefined && liveUrl !== null;
   return {
     trigger: input.trigger,
-    liveUrl: input.trigger === null ? null : input.liveUrl.trim() || null,
-    ...(input.organisationLink === undefined ? {} : { organisationLink: input.organisationLink }),
+    liveUrl,
+    ...(saysOrigin ? { organisationLink: input.organisationLink } : {}),
     ...links,
   };
 }

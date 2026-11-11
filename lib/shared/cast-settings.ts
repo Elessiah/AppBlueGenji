@@ -75,6 +75,10 @@ export function casterStreamEditable(stream: { staff: boolean } | null | undefin
  * l'autre, le pied d'action n'offre rien : le caster d'un match joué sans
  * diffusion ni rediff possible n'a plus de réglage. Un match **pas encore
  * joué** l'offre toujours : « Ne plus caster » y vit.
+ *
+ * Sans la permission `live` (`canManage`), le serveur refuse tout réglage
+ * (`NOT_CASTER`) : la fenêtre n'est offerte que pour ce retrait, donc sur un
+ * match pas encore joué seulement.
  */
 export function offersCastSettings(
   match: MatchLiveInput & MatchReplayInput & { replayUrl: string | null },
@@ -82,6 +86,7 @@ export function offersCastSettings(
   canManage: boolean,
 ): boolean {
   if (!isCaster) return false;
+  if (!canManage) return offersCastRelease(match);
   // Tant que le match n'est pas joué, la fenêtre garde « Ne plus caster » —
   // seule voie de retrait depuis la carte —, même quand plus rien ne s'y règle
   // (score saisi en attente de confirmation, match non casté).

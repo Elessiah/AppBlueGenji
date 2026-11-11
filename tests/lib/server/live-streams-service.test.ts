@@ -199,11 +199,16 @@ describe("setMatchLiveConfig", () => {
     streams: StreamState[] = [],
     casters: WorldCaster[] = [],
   ) {
-    const state = { streams: streams.map((stream) => ({ ...stream })), casters, matchWrites: [] as [string, unknown[]][], heldReads: 0, holderReads: 0, casterHolderReads: 0 };
+    const state = { streams: streams.map((stream) => ({ ...stream })), casters, matchWrites: [] as [string, unknown[]][], heldReads: 0, holderReads: 0, casterHolderReads: 0, setterLocks: [] as number[], deletedUsers: [] as number[] };
     const execute = jest.fn<SqlQuery>(async (rawSql, rawParams) => {
       const sql = rawSql.replace(/\s+/g, " ").trim();
       const params = (rawParams ?? []) as unknown[];
       if (sql.startsWith("SELECT id, tournament_id, status")) return [[{ ...row }]];
+      // La ligne du compte qui fournit le lien, en lecture partagée (#129).
+      if (sql === "SELECT is_deleted FROM bg_users WHERE id = ? LIMIT 1 LOCK IN SHARE MODE") {
+        state.setterLocks.push(params[0] as number);
+        return [[{ is_deleted: state.deletedUsers.includes(params[0] as number) ? 1 : 0 }]];
+      }
       if (sql.startsWith("SELECT t.game,")) return [[{ game: "OW", kept: row.kept_referee_user_id ?? null }]];
       if (sql.startsWith("SELECT mc.user_id, mc.stream_id FROM bg_match_casters mc")) {
         // Tous les casters du match d'une lecture : le fournisseur du lien de son stream d'abord, puis l'ordre d'inscription.
@@ -1049,6 +1054,97 @@ describe("setMatchLiveConfig", () => {
     });
 
     expect(world.state.streams).toEqual([{ ...dbStream(4, "https://twitch.tv/neuve"), link_user_id: 12 }]);
+  });
+
+  it("setMatchLiveConfig_ownLinkSet_locksSetterRowBeforeMatch", async () => {
+    const world = liveWorld(matchRow({ kept_referee_user_id: 9 }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/arbitre", setter: { userId: 9, asOrganisation: false }, access: STAFF });
+
+    expect(world.state.setterLocks).toEqual([9]);
+    // Le compte d'abord, puis le verrou du match (même ordre que la suppression de compte).
+    const statements = world.execute.mock.calls.map(([sql]) => String(sql));
+    const setterLock = statements.findIndex((sql) => sql.includes("FROM bg_users"));
+    const matchLock = statements.findIndex((sql) => sql.includes("FROM bg_matches") && sql.includes("FOR UPDATE"));
+    expect(setterLock).toBeGreaterThanOrEqual(0);
+    expect(setterLock).toBeLessThan(matchLock);
+  });
+
+  it("setMatchLiveConfig_deletedSetter_throwsUnauthorizedAndWritesNothing", async () => {
+    const world = liveWorld(matchRow({ kept_referee_user_id: 9 }), [dbStream(4, null)]);
+    world.state.deletedUsers.push(9);
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/arbitre", setter: { userId: 9, asOrganisation: false }, access: STAFF }),
+    ).rejects.toThrow("UNAUTHORIZED");
+
+    expect(world.state.matchWrites).toEqual([]);
+    expect(world.state.streams).toEqual([dbStream(4, null)]);
+  });
+
+  it("setMatchLiveConfig_organisationLink_takesNoSetterLock", async () => {
+    const world = liveWorld(matchRow({ kept_referee_user_id: 9 }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/bluegenji", setter: { userId: 9, asOrganisation: true }, access: STAFF });
+
+    expect(world.state.setterLocks).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_linkRemoval_takesNoSetterLock", async () => {
+    const world = liveWorld(matchRow({ kept_referee_user_id: 9 }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: null, setter: { userId: 9, asOrganisation: false }, access: STAFF });
+
+    expect(world.state.setterLocks).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_noLiveUrl_takesNoSetterLock", async () => {
+    const world = liveWorld(matchRow({ kept_referee_user_id: 9 }));
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: undefined, setter: { userId: 9, asOrganisation: false }, access: STAFF });
+
+    expect(world.state.setterLocks).toEqual([]);
+  });
+
+  it("setMatchLiveConfig_mutedFirstCasterOnStream_rebindsLinkToShownCaster", async () => {
+    // Le premier inscrit est tu (inéligible avant le lancement) : le lien revient au caster montré.
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12, kept_referee_user_id: 9 }), [dbStream(4, null)], [
+      { user_id: 12, stream_id: 4, eligible: false },
+      { user_id: 13, stream_id: 4 },
+    ]);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, {
+      trigger: "MANUAL",
+      liveUrl: null,
+      setter: { userId: 9, asOrganisation: false },
+      access: STAFF,
+      streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/neuve" }],
+    });
+
+    expect(world.state.streams).toEqual([{ ...dbStream(4, "https://twitch.tv/neuve"), link_user_id: 13 }]);
+  });
+
+  it("setMatchLiveConfig_onlyMutedCasterOnStream_throwsStreamNotFound", async () => {
+    const world = liveWorld(matchRow({ live_trigger: "MANUAL", live_trigger_user_id: 12, kept_referee_user_id: 9 }), [dbStream(4, null)], [
+      { user_id: 12, stream_id: 4, eligible: false },
+    ]);
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, {
+        trigger: "MANUAL",
+        liveUrl: null,
+        setter: { userId: 9, asOrganisation: false },
+        access: STAFF,
+        streamLinks: [{ streamId: 4, liveUrl: "twitch.tv/neuve" }],
+      }),
+    ).rejects.toMatchObject({ message: "STREAM_NOT_FOUND", streamId: 4 });
   });
 
   it("setMatchLiveConfig_refereeChangesCasterMode_keepsCasterOwner", async () => {

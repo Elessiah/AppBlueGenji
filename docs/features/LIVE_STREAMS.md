@@ -415,7 +415,12 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   `/attribution_link`) ou un lien qui porte une autre adresse dans son chemin
   ou sa requête (en clair, encodée une ou plusieurs fois, `https:\` ou
   `//hôte` sans schéma ; chemin décodé et barres doublées fusionnées) est
-  refusé : le lien d'un `@everyone` ne mène qu'à la diffusion. Sans lien exploitable, pas d'annonce.
+  refusé : le lien d'un `@everyone` ne mène qu'à la diffusion. Un lien du
+  match refusé laisse sa place au lien suivant du match (tous lus par
+  `streamUrlCandidatesSql`, staff d'abord, retenus par `firstAnnounceableUrl`
+  comme dans le brief du salon ; une liste que `GROUP_CONCAT` a coupée — longueur
+  exacte de la coupe par défaut, 1024 octets sous MySQL, 1 Mio sous MariaDB — perd
+  son dernier lien), avant la chaîne officielle. Sans lien exploitable, pas d'annonce.
 - **Texte** (`lib/shared/live-announcements.ts`, en français comme tout
   Discord) : « 🔴 En direct : A contre B — Tournoi ». Noms par `discordInline`
   (mentions, balisage et liens neutralisés). Une affiche d'équipes ne nomme que

@@ -20,6 +20,12 @@ export type CastClaimChoice =
 export type CastClaimBody = ({ streamId: number } | { liveUrl: string }) & {
   /** Mode d'antenne du match, posé du même geste (stream propre seulement). */
   trigger?: MatchLiveTrigger;
+  /**
+   * Le mode que la fenêtre montrait quand `trigger` a été choisi : changé
+   * entre-temps (staff, autre caster), le serveur laisse le mode tel quel
+   * (`triggerSkipped`) au lieu de l'écraser par une valeur périmée.
+   */
+  expectedTrigger?: MatchLiveTrigger | null;
   /** BattleTag donné pour ce cast ; `null` = celui du compte. */
   battletag?: string | null;
 };
@@ -32,6 +38,8 @@ export type CastClaimInput = {
   battletag: string;
   /** Mode d'antenne choisi (stream propre) ; absent quand il n'est pas le sien à changer. */
   trigger?: MatchLiveTrigger;
+  /** Le mode du match que la fenêtre montrait à ce choix (`CastClaimBody.expectedTrigger`). */
+  expectedTrigger?: MatchLiveTrigger | null;
 };
 
 /**
@@ -75,5 +83,8 @@ export function castClaimBody(choice: CastClaimChoice, input: CastClaimInput): C
     liveUrl: input.url.trim(),
     battletag,
     ...(input.trigger === undefined ? {} : { trigger: input.trigger }),
+    ...(input.trigger === undefined || input.expectedTrigger === undefined
+      ? {}
+      : { expectedTrigger: input.expectedTrigger }),
   };
 }

@@ -89,11 +89,13 @@ export function parseCastSettings(body: unknown): CastSettings | null {
   const trigger = readField(raw, "trigger", isMatchLiveTrigger);
   const liveUrl = readField(raw, "liveUrl", isString);
   const battletag = readField(raw, "battletag", isString);
-  if (trigger === INVALID || liveUrl === INVALID || battletag === INVALID) return null;
+  const expectedTrigger = readField(raw, "expectedTrigger", isMatchLiveTrigger);
+  if (trigger === INVALID || liveUrl === INVALID || battletag === INVALID || expectedTrigger === INVALID) return null;
   const settings: CastSettings = {};
   if (trigger !== undefined) settings.trigger = trigger;
   if (liveUrl !== undefined) settings.liveUrl = liveUrl;
   if (battletag !== undefined) settings.battletag = battletag;
+  if (expectedTrigger !== undefined) settings.expectedTrigger = expectedTrigger;
   return settings;
 }
 

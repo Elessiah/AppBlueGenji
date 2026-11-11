@@ -291,9 +291,15 @@ export async function setMatchLiveConfig(
   const outcome = await retryOnDeadlock(() => withConnection(async (connection) => {
     await connection.beginTransaction();
     try {
-      // Verrou du match d'abord, puis ses streams et casters : le même ordre
+      // Un lien rattaché à l'auteur (sa chaîne, non celle de l'organisation) :
+      // la ligne de son compte se lit d'abord, en lecture partagée — l'ordre de
+      // la suppression de compte (compte, puis ses matchs) et de l'inscription
+      // d'un caster (`claimMatchCast`). Une suppression en cours se termine
+      // avant, et ce lien ne se rattache jamais à un compte effacé.
+      await assertSetterAccountKept(connection, config);
+      // Verrou du match ensuite, puis ses streams et casters : le même ordre
       // que l'inscription d'un caster (`claimMatchCast`).
-      const { row: current, hold, actorShown } = await lockLiveMatch(connection, matchId, actor);
+      const { row: current, game, hold, actorShown } = await lockLiveMatch(connection, matchId, actor);
       // Le rôle d'abord : un appelant sans droit reçoit son refus, jamais
       // celui du mode (`MATCH_NOT_STREAMED`) que `lockedTrigger` jugerait.
       const referee = assertLiveActor(hold, actor, config.access.live, actorShown);
@@ -317,7 +323,10 @@ export async function setMatchLiveConfig(
       // stream sans lien, jamais celui qu'un caster vient de recevoir ici.
       if (editsStreamLinks && config.streamLinks !== undefined) {
         const locked = await lockMatchStreams(connection, matchId, true);
-        streams = await setCasterStreamLinks(connection, matchId, config.streamLinks, locked);
+        streams = await setCasterStreamLinks(connection, matchId, config.streamLinks, locked, {
+          game,
+          beforeLaunch: castBeforeLaunch(current),
+        });
         changed = changed || streams !== locked;
       }
       if (trigger === null && hold.trigger === null) {
@@ -744,6 +753,7 @@ async function setCasterStreamLinks(
   matchId: number,
   links: readonly MatchStreamLinkEdit[],
   locked: MatchStreamRow[],
+  visibility: { game: TournamentGame; beforeLaunch: boolean },
 ): Promise<MatchStreamRow[]> {
   let streams = locked;
   // Les casters ne changent pas pendant l'édition (verrou du match) : leurs
@@ -764,7 +774,7 @@ async function setCasterStreamLinks(
       // jamais à l'organisation ni à un caster parti. Un stream que plus aucun
       // caster ne tient attend le ménage : son lien n'aurait personne à qui se
       // rattacher.
-      holders ??= await streamHolders(connection, matchId);
+      holders ??= await streamHolders(connection, matchId, visibility);
       const holder = holders.get(target.id) ?? null;
       if (holder === null) throw new StreamLinkError("STREAM_NOT_FOUND", target.id);
       await connection.execute(
@@ -788,23 +798,63 @@ function streamLinkUrl(link: MatchStreamLinkEdit): string | null {
 
 /**
  * Le caster à qui rattacher le lien de chaque stream du match : son fournisseur actuel
- * (`link_user_id`) s'il le caste encore, sinon le premier inscrit ; `null`
- * sans caster.
- * Lecture ordinaire et séparée : l'écriture du lien ne verrouille ainsi que
+ * (`link_user_id`) s'il le caste encore, sinon le premier inscrit — parmi les
+ * casters **montrés** seulement (`loadShownCasterIds`) : un caster tu
+ * (inéligible avant le lancement) ne reçoit pas un lien qu'il retrouverait
+ * dans son export. Un stream sans caster montré n'a personne à qui le
+ * rattacher (absent de la carte rendue).
+ * Lectures ordinaires et séparées : l'écriture du lien ne verrouille ainsi que
  * sa table (`bg_match_streams`) ; les casters du match ne changent que sous
  * le verrou de sa ligne, que l'appelant tient.
  */
-async function streamHolders(connection: PoolConnection, matchId: number): Promise<Map<number, number>> {
+async function streamHolders(
+  connection: PoolConnection,
+  matchId: number,
+  visibility: { game: TournamentGame; beforeLaunch: boolean },
+): Promise<Map<number, number>> {
   const [rows] = await connection.execute<(RowDataPacket & { user_id: number; stream_id: number })[]>(
     `SELECT mc.user_id, mc.stream_id FROM bg_match_casters mc
      LEFT JOIN bg_match_streams s ON s.id = mc.stream_id AND s.link_user_id = mc.user_id
      WHERE mc.match_id = ? ORDER BY s.id IS NULL, mc.created_at, mc.user_id`,
     [matchId],
   );
+  const shown = await loadShownCasterIds(
+    connection,
+    matchId,
+    rows.map((row) => Number(row.user_id)),
+    visibility.game,
+    visibility.beforeLaunch,
+  );
   const holders = new Map<number, number>();
-  // Le premier de chaque stream, dans l'ordre : son fournisseur, puis le premier inscrit.
-  for (const row of rows) if (!holders.has(Number(row.stream_id))) holders.set(Number(row.stream_id), Number(row.user_id));
+  // Le premier montré de chaque stream, dans l'ordre : son fournisseur, puis le premier inscrit.
+  for (const row of rows) {
+    const userId = Number(row.user_id);
+    if (shown.has(userId) && !holders.has(Number(row.stream_id))) holders.set(Number(row.stream_id), userId);
+  }
   return holders;
+}
+
+/**
+ * Lit la ligne du compte de l'auteur en lecture partagée (`LOCK IN SHARE
+ * MODE`, table seule), en **première instruction** : une suppression de
+ * compte en cours (qui la tient en exclusif) se termine d'abord. Un compte
+ * effacé entre-temps ne reçoit aucun lien.
+ *
+ * Sans lien posé (`liveUrl` absent ou nul : un retrait ne rattache rien) ni lien au
+ * nom de l'auteur, rien n'est lu.
+ *
+ * @throws `UNAUTHORIZED` — le compte est supprimé.
+ */
+async function assertSetterAccountKept(connection: PoolConnection, config: MatchLiveConfig): Promise<void> {
+  // Rien à rattacher : ni lien posé (un retrait n'en rattache aucun), ni lien au nom de l'auteur.
+  if (config.liveUrl === undefined || config.liveUrl === null) return;
+  const userId = linkProvider(config.setter);
+  if (userId === null) return;
+  const [rows] = await connection.execute<(RowDataPacket & { is_deleted: number | null })[]>(
+    `SELECT is_deleted FROM bg_users WHERE id = ? LIMIT 1 LOCK IN SHARE MODE`,
+    [userId],
+  );
+  if (rows.length === 0 || Number(rows[0].is_deleted ?? 0) === 1) throw new Error("UNAUTHORIZED");
 }
 
 /**

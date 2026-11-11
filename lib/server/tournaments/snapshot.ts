@@ -26,7 +26,7 @@
  */
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import { createHash } from "node:crypto";
-import type { RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { TournamentCard, TournamentSnapshot } from "@/lib/shared/types";
 import { getDatabase } from "@/lib/server/database";
 import { cached, invalidateCached, isCachedOrLoading } from "@/lib/server/cache";
@@ -51,7 +51,7 @@ import {
   loadTournamentRow,
 } from "./repository";
 import { invalidateTournamentLists } from "./list-cache";
-import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
+import { invalidateLandingAggregates, invalidateLandingLive } from "@/lib/server/landing-cache";
 import { invalidateTeamRankingForScore } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
@@ -270,6 +270,10 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
     // « déclare-toi prêt » attendait le prochain passage par la liste. Import
     // dynamique, comme dans `./notifications`, qui importe ce module.
     if (syncResult.launchesChanged) {
+      // Un lancement d'office ouvre l'antenne d'un match `AUTO`, et l'entretien
+      // retire un caster devenu inéligible avec son lien : le match que
+      // l'accueil met en avant se relit tout de suite (comme la passe de fond).
+      invalidateLandingLive();
       void import("./player-pushes")
         .then(({ dispatchMatchStartNotices }) => dispatchMatchStartNotices())
         .catch(() => undefined);
@@ -489,13 +493,7 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     // Casters et streams, une lecture chacun pour tout le plateau — dans
     // l'instantané commun eux aussi (`docs/features/MATCH_LAUNCH.md`).
     const matchIds = matches.map((row) => Number(row.id));
-    const streamsByMatch = await loadMatchStreams(connection, matchIds);
-    // Tout caster tient un stream (`stream_id`, clé étrangère) : sans stream
-    // sur le plateau, il n'a aucun caster à lire.
-    const castersByMatch =
-      streamsByMatch.size === 0
-        ? new Map<number, MatchCasterRow[]>()
-        : await loadMatchCasters(connection, matchIds);
+    const { streamsByMatch, castersByMatch } = await loadCastersAndStreams(connection, matchIds);
     // Cartes par manche et règles de ban, dans l'instantané commun : flux et
     // REST de secours les portent ensemble (`docs/features/ROUND_MAPS.md`).
     const storedMapRules = await loadMapRules(connection, tournamentId, tournament);
@@ -630,4 +628,53 @@ export async function getTournamentSnapshot(
 ): Promise<TournamentSnapshot | null> {
   const frame = await getTournamentSnapshotFrame(tournamentId);
   return frame?.snapshot ?? null;
+}
+
+/**
+ * Streams et casters du plateau, une lecture chacun. Tout caster tient un
+ * stream (`stream_id`, clé étrangère) : sans stream, aucun caster à lire.
+ * Deux lectures séparées : un caster qui ouvre son stream entre elles serait
+ * rendu sur un stream absent. Le cas, rare, relit les streams — le caster lu
+ * tient un stream déjà écrit (clé étrangère).
+ */
+async function loadCastersAndStreams(connection: PoolConnection, matchIds: number[]) {
+  let streamsByMatch = await loadMatchStreams(connection, matchIds);
+  let castersByMatch =
+    streamsByMatch.size === 0 ? new Map<number, MatchCasterRow[]>() : await loadMatchCasters(connection, matchIds);
+  if (castersOnUnreadStream(streamsByMatch, castersByMatch)) {
+    streamsByMatch = await loadMatchStreams(connection, matchIds);
+    // Un caster parti (et son stream effacé) entre la lecture des casters et
+    // la relecture n'est pas rendu sur un stream absent.
+    castersByMatch = castersOnReadStreams(streamsByMatch, castersByMatch);
+  }
+  return { streamsByMatch, castersByMatch };
+}
+
+/** Les casters dont le stream figure dans la lecture des streams, les autres écartés. */
+export function castersOnReadStreams<C extends { streamId: number | null }>(
+  streams: ReadonlyMap<number, readonly { id: number }[]>,
+  casters: ReadonlyMap<number, readonly C[]>,
+): Map<number, C[]> {
+  const kept = new Map<number, C[]>();
+  for (const [matchId, list] of casters) {
+    const known = new Set((streams.get(matchId) ?? []).map((stream) => stream.id));
+    const shown = list.filter((caster) => caster.streamId === null || known.has(caster.streamId));
+    if (shown.length > 0) kept.set(matchId, shown);
+  }
+  return kept;
+}
+
+/**
+ * Un caster lu tient-il un stream que la lecture des streams, faite avant, n'a
+ * pas vu (ouvert entre les deux lectures de l'instantané) ?
+ */
+export function castersOnUnreadStream(
+  streams: ReadonlyMap<number, readonly { id: number }[]>,
+  casters: ReadonlyMap<number, readonly { streamId: number | null }[]>,
+): boolean {
+  for (const [matchId, list] of casters) {
+    const known = new Set((streams.get(matchId) ?? []).map((stream) => stream.id));
+    if (list.some((caster) => caster.streamId !== null && !known.has(caster.streamId))) return true;
+  }
+  return false;
 }

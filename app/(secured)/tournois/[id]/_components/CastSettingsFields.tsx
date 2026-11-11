@@ -3,7 +3,7 @@
 import { useId } from "react";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { FieldErrorText } from "@/components/ui/field-error-text";
-import { fieldAria } from "@/lib/shared/field-errors";
+import { fieldAria, fieldErrorId } from "@/lib/shared/field-errors";
 import { MAX_CAST_BATTLETAG_LENGTH, isValidCastBattletag } from "@/lib/shared/cast-settings";
 import {
   LIVE_PLATFORMS,
@@ -149,12 +149,18 @@ export function CastTriggerField({
   startAt,
   onChange,
   locked = false,
+  id,
+  fieldError,
 }: Readonly<{
   /** `null` : aucun mode coché (match démarqué) — chaque choix se clique. */
   trigger: MatchLiveTrigger | null;
   startAt: BracketMatch["startAt"];
   onChange: (trigger: MatchLiveTrigger) => void;
   locked?: boolean;
+  /** Identifiant du groupe, cible du focus d'un refus rattaché (`useFieldErrors`). */
+  id?: string;
+  /** Refus du serveur rattaché au groupe (`LIVE_TRIGGER_CHANGED`). */
+  fieldError?: string | null;
 }>) {
   const { t, locale } = useActionsText();
   const name = useId();
@@ -177,7 +183,12 @@ export function CastTriggerField({
     );
   }
   return (
-    <fieldset className={styles.group}>
+    <fieldset
+      className={styles.group}
+      id={id}
+      tabIndex={id === undefined ? undefined : -1}
+      aria-describedby={id !== undefined && fieldError ? fieldErrorId(id) : undefined}
+    >
       {/* Légende en texte seul (nom du groupe) ; l'aide, hors légende. */}
       <legend className="sr-only">{t("cardActions.castSettings.trigger")}</legend>
       <InfoHintRow>
@@ -207,6 +218,7 @@ export function CastTriggerField({
           </label>
         );
       })}
+      {id !== undefined && <FieldErrorText fieldId={id} message={fieldError ?? null} />}
     </fieldset>
   );
 }

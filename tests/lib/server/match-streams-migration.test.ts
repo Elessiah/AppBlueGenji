@@ -108,6 +108,22 @@ describe("bg_match_streams / bg_match_casters — migration du caster unique", (
     expect(cleanup).toBeGreaterThan(backfill);
   });
 
+  it("efface, après le retrait des liens d'un compte supprimé, les streams sans lien ni caster", () => {
+    const all = [...RECENT.matchAll(/`([^`]*)`/g)].map((match) => flat(match[1]));
+    const cleanup = all.findIndex((statement) => statement.startsWith("UPDATE bg_match_streams s LEFT JOIN bg_users u"));
+    const prune = all.indexOf(
+      "DELETE FROM bg_match_streams WHERE live_url IS NULL AND NOT EXISTS (SELECT 1 FROM bg_match_casters c WHERE c.stream_id = bg_match_streams.id)",
+    );
+    expect(prune).toBeGreaterThan(cleanup);
+  });
+
+  it("garde le stream sans lien qu'un caster tient et le lien du staff sans caster", () => {
+    const all = [...RECENT.matchAll(/`([^`]*)`/g)].map((match) => flat(match[1]));
+    const prune = all.find((statement) => statement.startsWith("DELETE FROM bg_match_streams")) ?? "";
+    expect(prune).toContain("WHERE live_url IS NULL");
+    expect(prune).toContain("NOT EXISTS (SELECT 1 FROM bg_match_casters c WHERE c.stream_id = bg_match_streams.id)");
+  });
+
   it("n'ouvre jamais un second stream à un match qui en a déjà un", () => {
     const [streams] = migrationStatements();
     expect(streams).toContain("WHERE (m.live_url IS NOT NULL OR m.caster_user_id IS NOT NULL)");

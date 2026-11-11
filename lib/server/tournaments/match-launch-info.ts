@@ -241,6 +241,7 @@ async function loadCandidates(
   const casters = await loadCasterLinks(
     connection,
     rows.map((row) => Number(row.id)),
+    { battletag: true },
   );
   return rows.map((row) => Object.assign(row, { casters: casters.get(Number(row.id)) ?? [], refereeEligible: false }));
 }
@@ -364,10 +365,14 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
   for (const tournamentId of due) {
     await connection.beginTransaction();
     try {
-      const changed = await maintainMatchLaunches(connection, tournamentId);
+      const report = { castReleased: false };
+      const changed = await maintainMatchLaunches(connection, tournamentId, report);
       await connection.commit();
       flushBotLogs(connection);
-      if (changed > 0) publishMatchUpdatedEvent(tournamentId);
+      // Un caster retiré par l'entretien emporte son lien : l'accueil et #live
+      // se relisent tout de suite, sans attendre l'expiration de leur cache.
+      if (changed > 0 && report.castReleased) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
+      else if (changed > 0) publishMatchUpdatedEvent(tournamentId);
     } catch (error) {
       await connection.rollback().catch(() => undefined);
       discardBotLogs(connection);
@@ -681,11 +686,10 @@ function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: L
           battletagVerified: relevant && castBattletag === null && battletagFromBlizzard(user),
         },
         ctx.viewer,
-        // Un tag donné pour ce cast est une divulgation volontaire, pour ce
-        // match : le réglage « BattleTag OW » du profil ne le masque pas (il ne
-        // masque que celui du compte). Les deux ne sortent de toute façon que
-        // dans la fenêtre des contacts (`sharesLiveMatch`).
-        castBattletag !== null || Number(user.visible_overwatch) === 1,
+        // Le réglage « BattleTag OW » du profil ne masque ici ni le tag de
+        // cast ni celui du compte : la fenêtre des contacts d'un match en
+        // direct (`sharesLiveMatch`) les montre à tout lecteur connecté.
+        Number(user.visible_overwatch) === 1,
       )
     : null;
   return withGameBattletag(
@@ -770,16 +774,20 @@ function buildLaunchReferee(row: CandidateRow, ctx: LaunchContext): LaunchRefere
       // parties le lisent dès que les deux adversaires sont connus (le temps du
       // match pour un caster), comme les contacts des engagées ; un arbitre qui
       // caste aussi le match attend le départ (`refereeContactsOpen`).
+      // Un arbitre qui caste aussi le match et a donné un BattleTag pour ce
+      // cast le voit repris ici : le tag de cast remplace celui du profil
+      // partout où ce dernier était montré (`/rgpd`), carte d'arbitre comprise.
+      const castBattletag = row.casters.find((caster) => caster.userId === Number(user.id))?.castBattletag ?? null;
       const battletag = open
-        ? visibleBattletag(user.overwatch_battletag, ctx.viewer, {
+        ? visibleBattletag(castBattletag ?? user.overwatch_battletag, ctx.viewer, {
             userId: Number(user.id),
             visible: Number(user.visible_overwatch) === 1,
             sharesLiveMatch: true,
           })
         : null;
-      // La pastille « vérifié » ne part qu'avec le BattleTag : le lien Battle.net
-      // se tait avec lui, comme sur une carte de caster.
-      return { battletag, battletagVerified: battletag !== null && battletagFromBlizzard(user) };
+      // La pastille « vérifié » ne part qu'avec le BattleTag du compte : le lien
+      // Battle.net se tait avec lui, et un tag de cast n'est jamais vérifié.
+      return { battletag, battletagVerified: battletag !== null && castBattletag === null && battletagFromBlizzard(user) };
     },
   );
 }

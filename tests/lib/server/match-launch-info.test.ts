@@ -144,13 +144,16 @@ function castersOf(c: Candidate) {
   const first =
     c.caster_user_id === null || c.caster_user_id === undefined
       ? []
-      : [{ user_id: c.caster_user_id, ready_at: c.caster_ready_at ?? null, stream_id: 1 }];
-  const others = (c.co_casters as { user_id: number; ready_at?: string | null; stream_id?: number }[] | undefined) ?? [];
+      : [{ user_id: c.caster_user_id, ready_at: c.caster_ready_at ?? null, stream_id: 1, cast_battletag: c.caster_cast_battletag }];
+  const others =
+    (c.co_casters as { user_id: number; ready_at?: string | null; stream_id?: number; cast_battletag?: unknown }[] | undefined) ?? [];
   return [...first, ...others].map((caster) => ({
     match_id: c.id,
     user_id: caster.user_id,
     stream_id: caster.stream_id ?? 1,
     ready_at: caster.ready_at ?? null,
+    // Le BattleTag de cast (`caster_cast_battletag`), absent sauf mention.
+    cast_battletag: caster.cast_battletag ?? null,
   }));
 }
 
@@ -725,6 +728,15 @@ describe("listViewerMatchLaunches — lancement d'office", () => {
     await listViewerMatchLaunches(viewer);
     expect(state.writes.some((w) => w.includes("SET lobby_opened_at = NOW()"))).toBe(true);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("maintainIfDue_ineligibleCasterReleasedByMaintenance_publishesLandingLive", async () => {
+    // L'entretien retire un caster devenu inéligible : son lien quitte l'accueil et #live tout de suite.
+    state.candidates = [candidate({ lobby_opened_at: null, caster_user_id: CASTER })];
+    state.users = [casterUser(CASTER, { platform_roles_json: null })];
+    await listViewerMatchLaunches(viewer);
+    expect(state.writes.some((w) => w.includes("SET lobby_opened_at = NOW()"))).toBe(true);
+    expect(jest.mocked(publishMatchUpdatedEvent).mock.calls[0]).toEqual([7, { landingLive: true }]);
   });
 
   it("lance d'office un match dont le délai est échu", async () => {
@@ -1388,6 +1400,40 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
       const info = await loadViewerMatchContacts(viewer, 42);
 
       expect(info?.referee?.battletag).toBe("Arbitre#1");
+    });
+
+    it("loadViewerMatchContacts_refereeAlsoCastsWithCastBattletag_sendsCastTagUnverified", async () => {
+      // Le tag donné pour ce cast remplace celui du profil, carte d'arbitre comprise (`/rgpd`).
+      state.candidates = [
+        candidate({ referee_user_id: REFEREE, caster_user_id: REFEREE, caster_cast_battletag: "Jeu#9", self_managed: 0 }),
+      ];
+      state.users = [juge()];
+
+      const info = await loadViewerMatchContacts(viewer, 42);
+
+      expect(info?.referee).toMatchObject({ battletag: "Jeu#9", battletagVerified: false });
+      expect(JSON.stringify(info?.referee)).not.toContain("Arbitre#1");
+    });
+
+    it("loadViewerMatchContacts_refereeAlsoCastsScheduledWithCastTag_withholdsIt", async () => {
+      const later = new Date(Date.now() + 3 * 3_600_000).toISOString();
+      state.candidates = [
+        candidate({
+          match_launch_phase: 0,
+          start_at: later,
+          lobby_opened_at: null,
+          referee_user_id: REFEREE,
+          caster_user_id: REFEREE,
+          caster_cast_battletag: "Jeu#9",
+          self_managed: 0,
+        }),
+      ];
+      state.users = [juge()];
+
+      const info = await loadViewerMatchContacts(viewer, 42);
+
+      expect(info?.referee?.battletag).toBeNull();
+      expect(JSON.stringify(info)).not.toContain("Jeu#9");
     });
 
     it("loadViewerMatchContacts_refereeNotCastingScheduledMatch_sendsBattletag", async () => {

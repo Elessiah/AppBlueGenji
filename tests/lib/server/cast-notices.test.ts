@@ -18,6 +18,8 @@ import {
   flushCastChanges,
   flushCastToggles,
   queueCastChange,
+  queueDeletedMatchCasts,
+  pairingStillCurrent,
   resetCastToggles,
   CAST_TOGGLE_WINDOW_MS,
   type CastChange,
@@ -27,6 +29,8 @@ import type { CastReleaseReason } from "@/lib/shared/cast-notices";
 import { flushBotLogs } from "@/lib/server/tournaments/bot-logs";
 import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { resolvePush } from "../../helpers/push";
+import type { RowColumns } from "../../helpers/row-overrides";
+import type { MatchLogRow } from "@/lib/server/tournaments/match-log-subject";
 
 const CASTER = 900;
 
@@ -49,6 +53,24 @@ function mockMatch(row: Record<string, unknown> | null) {
   const execute = jest.fn<SqlQuery>(async () => [row === null ? [] : [row], []]);
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
+}
+
+/** Le match lu avant sa suppression, que l'annonce ne relit plus. */
+function deletedSubject(): MatchLogRow {
+  const columns: RowColumns<MatchLogRow> = {
+    id: 42,
+    bracket: "UPPER",
+    round_number: 2,
+    swiss_round: 0,
+    team1_name: "Renards",
+    team2_name: "Nova",
+    team1_id: 101,
+    team2_id: 102,
+    tournament_id: 7,
+    tournament_name: "Coupe d'hiver",
+    participant_type: "TEAM",
+  };
+  return columns as MatchLogRow;
 }
 
 const RECIPIENT = { userId: CASTER, discord: { discordId: "100000000000000009", handle: "caster", label: "CasterPseudo" } };
@@ -90,6 +112,11 @@ describe("castLogChange / castReleaseNotice", () => {
     [{ kind: "RELEASED", matchId: 1, casterId: 5, byStaff: true }, "RELEASED_BY_STAFF", { casterId: 5, reason: "STAFF" }],
     [{ kind: "AUTO_RELEASED", matchId: 1, casterId: 5, reason: "INELIGIBLE" }, "INELIGIBLE", { casterId: 5, reason: "INELIGIBLE" }],
     [{ kind: "AUTO_RELEASED", matchId: 1, casterId: 5, reason: "JOINED_TEAM" }, "JOINED_TEAM", { casterId: 5, reason: "JOINED_TEAM" }],
+    [
+      { kind: "MATCH_DELETED", matchId: 1, casterId: 5, subject: deletedSubject() },
+      "MATCH_DELETED",
+      { casterId: 5, reason: "MATCH_DELETED" },
+    ],
   ])("%j → journal %s", (change, log, notice) => {
     expect(castLogChange(change)).toBe(log);
     expect(castReleaseNotice(change)).toEqual(notice);
@@ -99,11 +126,14 @@ describe("castLogChange / castReleaseNotice", () => {
 describe("castLogCategory — un retrait alerte, une inscription reste une trace", () => {
   it.each<[CastChange, string]>([
     [{ kind: "CLAIMED", matchId: 1, casterId: 9, replacedCasterId: null }, "casts"],
-    [{ kind: "CLAIMED", matchId: 1, casterId: 9, replacedCasterId: 5 }, "staff-removal"],
+    // Place reprise : le créneau est repourvu dans la même transaction, simple trace.
+    [{ kind: "CLAIMED", matchId: 1, casterId: 9, replacedCasterId: 5 }, "casts"],
     [{ kind: "RELEASED", matchId: 1, casterId: 5, byStaff: false }, "staff-removal"],
     [{ kind: "RELEASED", matchId: 1, casterId: 5, byStaff: true }, "staff-removal"],
     [{ kind: "AUTO_RELEASED", matchId: 1, casterId: 5, reason: "INELIGIBLE" }, "staff-removal"],
     [{ kind: "AUTO_RELEASED", matchId: 1, casterId: 5, reason: "JOINED_TEAM" }, "staff-removal"],
+    // Match supprimé : plus de créneau à repourvoir, simple trace.
+    [{ kind: "MATCH_DELETED", matchId: 1, casterId: 5, subject: deletedSubject() }, "casts"],
   ])("%j → %s", (change, category) => {
     expect(castLogCategory(change)).toBe(category);
   });
@@ -112,7 +142,6 @@ describe("castLogCategory — un retrait alerte, une inscription reste une trace
     [{ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: false }],
     [{ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true }],
     [{ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "JOINED_TEAM" }],
-    [{ kind: "CLAIMED", matchId: 42, casterId: 9, replacedCasterId: CASTER }],
   ])("deliverCastChange %j envoie la ligne dans staff-removal, sans nom", async (change) => {
     mockMatch(matchRow());
     await deliverCastChange(change);
@@ -196,7 +225,7 @@ describe("deliverCastChange", () => {
   it("prévient le titulaire évincé par un autre caster", async () => {
     mockMatch(matchRow());
     await deliverCastChange({ kind: "CLAIMED", matchId: 42, casterId: 9, replacedCasterId: 901 });
-    expect(loggedLine("staff-removal")).toContain("Cast repris");
+    expect(loggedLine("casts")).toContain("Cast repris");
     expect(loadNotificationRecipients).toHaveBeenCalledWith([901], "certified", { matchDm: true });
     expect(notification().discord?.message("fr")).toContain("un autre caster a pris le match");
   });
@@ -228,6 +257,48 @@ describe("deliverCastChange", () => {
     await deliverCastChange({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "INELIGIBLE" });
     expect(loggedLine("staff-removal")).toContain("Renards vs TBD");
     expect(notification().discord?.message("fr")).toContain("« Renards » contre TBD");
+  });
+
+  it("deliverCastChange_joinedTeamPairingChanged_silencesLogAndNotice", async () => {
+    // Un retour arrière a vidé le match après l'entretien : « tu joues ce match » serait faux.
+    mockMatch(matchRow({ team1_id: null, team2_id: null, team1_name: null, team2_name: null }));
+
+    await deliverCastChange({
+      kind: "AUTO_RELEASED",
+      matchId: 42,
+      casterId: CASTER,
+      reason: "JOINED_TEAM",
+      pairing: { team1Id: 10, team2Id: 20 },
+    });
+
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("deliverCastChange_staffReleasePairingChanged_namesMatchWithoutTeams", async () => {
+    // Réinitialisé entre le geste et l'annonce : les équipes relues ne sont pas celles du geste.
+    mockMatch(matchRow({ team1_id: 30, team2_id: 40, team1_name: "Orques", team2_name: "Lynx" }));
+
+    await deliverCastChange({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true, pairing: { team1Id: 10, team2Id: 20 } });
+
+    const line = loggedLine("staff-removal");
+    expect(line).toContain("TBD vs TBD (#42)");
+    expect(line).not.toContain("Orques");
+    expect(notification().discord?.message("fr")).not.toContain("Orques");
+  });
+
+  it("deliverCastChange_samePairing_namesTeams", async () => {
+    mockMatch(matchRow({ team1_id: 10, team2_id: 20 }));
+
+    await deliverCastChange({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true, pairing: { team1Id: 10, team2Id: 20 } });
+
+    expect(loggedLine("staff-removal")).toContain("Renards vs Nova (#42)");
+  });
+
+  it("pairingStillCurrent_noPairing_trustsRow", () => {
+    const change: CastChange = { kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true };
+
+    expect(pairingStillCurrent(change, { team1_id: 30, team2_id: 40 })).toBe(true);
   });
 
   it("se tait sur un match disparu", async () => {
@@ -506,5 +577,114 @@ describe("queueCastChange — annonce après le commit", () => {
     flushBotLogs(connection);
     await settle();
     expect(notifyUsers).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("match supprimé — l'inscription part avec lui", () => {
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+  /** Connexion de transaction : les casters des manches, puis leurs lignes de journal. */
+  function deletingConnection(casters: { match_id: number; user_id: number }[]) {
+    const execute = jest.fn<SqlQuery>(async (sql) => {
+      if (sql.startsWith("SELECT match_id, user_id FROM bg_match_casters")) return [casters, []];
+      return [[deletedSubject()], []];
+    });
+    return { execute, connection: fakeConnection({ execute }) };
+  }
+
+  it("deliverCastChange_matchDeleted_usesSubjectWithoutRereadingMatch", async () => {
+    const reread = mockMatch(null);
+
+    await deliverCastChange({ kind: "MATCH_DELETED", matchId: 42, casterId: CASTER, subject: deletedSubject() });
+
+    expect(reread).not.toHaveBeenCalled();
+    const line = loggedLine("casts");
+    expect(line).toContain("Cast retiré");
+    expect(line).toContain("le match supprimé emporte l'inscription du caster");
+    expect(line).toContain("Renards vs Nova (#42)");
+    expect(line).not.toContain("CasterPseudo");
+    const sent = notification();
+    expect(sent.topic).toBe("CAST_RELEASED");
+    expect(sent.discord?.message("fr")).toContain("le match a été supprimé");
+    expect(sent.discord?.message("en")).toContain("the match was deleted");
+    expect(resolvePush(sent.push, "fr").body).toContain("le match a été supprimé");
+    expect(resolvePush(sent.push, "en").body).toContain("the match was deleted");
+  });
+
+  it("deliverCastChange_matchDeleted_linksTournamentNotDeletedMatch", async () => {
+    mockMatch(null);
+
+    await deliverCastChange({ kind: "MATCH_DELETED", matchId: 42, casterId: CASTER, subject: deletedSubject() });
+
+    // Une ancre vers un match effacé ne mènerait nulle part : le tournoi seul.
+    const sent = notification();
+    expect(sent.discord?.message("fr")).toContain("https://site.test/tournois/7");
+    expect(sent.discord?.message("fr")).not.toContain("#match-");
+    expect(resolvePush(sent.push, "fr").url).toBe("/tournois/7");
+    expect(resolvePush(sent.push, "en").url).toBe("/en/tournois/7");
+  });
+
+  it("queueDeletedMatchCasts_openMatchWithTwoCasters_queuesOneChangeEach", async () => {
+    mockMatch(null);
+    const { execute, connection } = deletingConnection([
+      { match_id: 42, user_id: CASTER },
+      { match_id: 42, user_id: 901 },
+    ]);
+
+    await queueDeletedMatchCasts(connection, [{ id: 42, status: "READY" }]);
+    expect(sendBotLog).not.toHaveBeenCalled();
+    flushCastChanges(connection);
+    await settle();
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[0][1]).toEqual([42]);
+    expect(sendBotLog).toHaveBeenCalledTimes(2);
+    expect(jest.mocked(loadNotificationRecipients).mock.calls.map((call) => call[0])).toEqual([[CASTER], [901]]);
+  });
+
+  it("queueDeletedMatchCasts_openMatch_readsCastersUnderLock", async () => {
+    // Une inscription validée après l'image de la transaction ne lui échappe pas.
+    const { execute, connection } = deletingConnection([]);
+
+    await queueDeletedMatchCasts(connection, [{ id: 42, status: "READY" }]);
+
+    expect(String(execute.mock.calls[0][0])).toMatch(/FROM bg_match_casters WHERE match_id IN \(\?\).*FOR UPDATE$/);
+  });
+
+  it("queueDeletedMatchCasts_manyMatchesOneCasted_readsSubjectOfTheCastedOnly", async () => {
+    mockMatch(null);
+    const { execute, connection } = deletingConnection([{ match_id: 43, user_id: CASTER }]);
+
+    await queueDeletedMatchCasts(connection, [
+      { id: 42, status: "READY" },
+      { id: 43, status: "READY" },
+      { id: 44, status: "PENDING" },
+    ]);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[0][1]).toEqual([42, 43, 44]);
+    expect(execute.mock.calls[1][1]).toEqual([43]);
+  });
+
+  it("queueDeletedMatchCasts_onlyPlayedMatches_readsNothing", async () => {
+    const { execute, connection } = deletingConnection([{ match_id: 42, user_id: CASTER }]);
+
+    await queueDeletedMatchCasts(connection, [{ id: 42, status: "COMPLETED" }]);
+    flushCastChanges(connection);
+    await settle();
+
+    expect(execute).not.toHaveBeenCalled();
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("queueDeletedMatchCasts_noCasters_skipsSubjectReadAndQueuesNothing", async () => {
+    const { execute, connection } = deletingConnection([]);
+
+    await queueDeletedMatchCasts(connection, [{ id: 42, status: "PENDING" }]);
+    flushCastChanges(connection);
+    await settle();
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(sendBotLog).not.toHaveBeenCalled();
   });
 });

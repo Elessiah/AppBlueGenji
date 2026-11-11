@@ -295,6 +295,22 @@ describe("runLiveAnnouncementSweep", () => {
     expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][1]).toBe("https://twitch.tv/bluegenji");
   });
 
+  it("runLiveAnnouncementSweep_firstLinkRefused_announcesNextMatchLink", async () => {
+    // Comme le brief du salon : un premier lien refusé (page de redirection)
+    // laisse sa place au lien suivant du match, avant la chaîne du tournoi.
+    mockDb([
+      { ...AUTO_LIVE, live_url: "https://www.youtube.com/redirect?q=https://phish.example https://www.twitch.tv/voix" },
+    ]);
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(1);
+    expect(jest.mocked(pushLiveAnnouncement).mock.calls[0][1]).toBe("https://www.twitch.tv/voix");
+  });
+
+  it("runLiveAnnouncementSweep_readsAllMatchLinkCandidates", async () => {
+    const { query } = mockDb([]);
+    await runLiveAnnouncementSweep(NOW);
+    expect(String(query.mock.calls[0][0])).toContain("GROUP_CONCAT(fs.live_url ORDER BY fs.staff_owned DESC, fs.id SEPARATOR ' ')");
+  });
+
   it("ne reposte pas une affiche déjà réservée par un autre passage", async () => {
     mockDb([AUTO_LIVE], [false]);
     expect(await runLiveAnnouncementSweep(NOW)).toBe(0);

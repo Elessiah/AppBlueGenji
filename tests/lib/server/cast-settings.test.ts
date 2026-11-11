@@ -319,6 +319,18 @@ describe("applyCastTrigger — inscription et maître tu", () => {
     expect(execute.mock.calls[2][1]).toEqual(["AUTO", 13, 42]);
   });
 
+  it("applyCastSettings_newTriggerWritten_reportsConfigured", async () => {
+    // Le maître 12 change son mode : l'écriture est rapportée pour le journal du staff.
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce(shownRows(12))
+      .mockResolvedValue([{ affectedRows: 1 }, []]);
+
+    const outcome = await applyCastSettings(fakeConnection({ execute }), ownedRow(), 12, 5, { trigger: "AUTO" });
+
+    expect(outcome).toEqual({ triggerSkipped: false, triggerChange: "CONFIGURED" });
+  });
+
   it("applyCastSettings_skipLockedTrigger_reportsTriggerSkipped", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce(shownRows(12, 13));
 
@@ -327,7 +339,7 @@ describe("applyCastTrigger — inscription et maître tu", () => {
       skipLockedTrigger: true,
     });
 
-    expect(outcome).toEqual({ triggerSkipped: true });
+    expect(outcome).toEqual({ triggerSkipped: true, triggerChange: null });
   });
 });
 
@@ -386,7 +398,7 @@ describe("applyCastSettings", () => {
 });
 
 describe("loadOwnCastSettings — ce que la fenêtre relit à l'ouverture", () => {
-  const ownRow = { stream_id: 5, cast_battletag: null, live_url: "https://twitch.tv/voix", staff_owned: 0 };
+  const ownRow = { stream_id: 5, cast_battletag: null, live_url: "https://twitch.tv/voix", staff_owned: 0, live_trigger: null };
 
   it("loadOwnCastSettings_ownStream_neverReportsOrganisationLink", async () => {
     // Décision D7 du 2026-11-09 : un caster ne dit plus l'origine de son lien, la fenêtre ne la relit plus.
@@ -395,8 +407,27 @@ describe("loadOwnCastSettings — ce que la fenêtre relit à l'ouverture", () =
 
     const cast = await loadOwnCastSettings(42, 900);
 
-    expect(cast).toEqual({ streamId: 5, liveUrl: "https://twitch.tv/voix", staffStream: false, battletag: null });
+    expect(cast).toEqual({ streamId: 5, liveUrl: "https://twitch.tv/voix", staffStream: false, battletag: null, liveTrigger: null });
     expect(String(execute.mock.calls[0][0])).not.toContain("link_user_id");
+  });
+
+  it("loadOwnCastSettings_knownTrigger_returnsLiveTrigger", async () => {
+    // Relu après un refus LIVE_TRIGGER_CHANGED : le mode actuel du match, sans attendre le flux.
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...ownRow, live_trigger: "AUTO" }], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    const cast = await loadOwnCastSettings(42, 900);
+
+    expect(cast.liveTrigger).toBe("AUTO");
+  });
+
+  it("loadOwnCastSettings_unknownTrigger_returnsNull", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ ...ownRow, live_trigger: "BOGUS" }], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    const cast = await loadOwnCastSettings(42, 900);
+
+    expect(cast.liveTrigger).toBeNull();
   });
 
   it("loadOwnCastSettings_notCaster_throwsNotMatchCaster", async () => {

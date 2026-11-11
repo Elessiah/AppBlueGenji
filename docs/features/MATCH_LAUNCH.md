@@ -396,6 +396,9 @@ gardent le fournisseur que l'ancienne règle leur avait donné.
 Un match a **une liste de streams** (`bg_match_streams` : un lien facultatif
 chacun) et **une liste de casters** (`bg_match_casters` : un compte, le stream
 qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
+L'instantané lit les streams puis les casters ; un caster lu sur un stream que
+la première lecture n'a pas vu (ouvert entre les deux) fait relire les streams
+une fois (`castersOnUnreadStream`), jamais rendu sur un stream absent.
 
 - **S'inscrire** : `POST /api/matches/[id]/caster`, corps `{ streamId }` pour
   rejoindre un stream du match (co-cast), `{ liveUrl }` pour ouvrir le sien —
@@ -427,6 +430,8 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   d'ouverture va à « Annuler » (un Entrée réflexe sur une radio n'inscrit
   personne) ; les casters d'un stream se joignent par `Intl.ListFormat`. Inscrit,
   le focus passe à « Configurer ma diffusion » (sinon « Plus d'actions »).
+  Le drapeau qui l'arme se lève avant l'envoi (le flux peut retirer « Caster »
+  avant la réponse) et se baisse sur un refus.
   Le retrait par le staff nomme le caster prévenu ; un caster choisi qui part
   pendant le choix ferme la fenêtre par un toast ; les radios sont figées
   (`aria-disabled`) pendant l'envoi. La carte n'offre ce retrait qu'à
@@ -470,7 +475,10 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   stream qu'il était seul à tenir, **dans la transaction qui décide du décompte des « Prêt » ou
   du lancement** (`releaseIneligibleCasters` : « Prêt » d'un autre, lancement forcé, entretien) —
   le match n'attend plus un « Prêt » qui ne viendra pas, et un lancement d'office ne rend pas
-  publics son pseudo ni le lien de sa chaîne. Un match déjà lancé garde ses casters. Retirer un
+  publics son pseudo ni le lien de sa chaîne. Un retrait par l'entretien publie avec
+  `landingLive` : l'accueil et #live perdent le lien tout de suite, sans attendre leur cache.
+  Un caster devenu joueur de l'appariement qui arrive se repère en deux lectures pour tous les
+  casters du match (`playingUserIds`). Un match déjà lancé garde ses casters. Retirer un
   caster d'un match **joué** est refusé (`MATCH_CAST_CLOSED`, 409, comme l'inscription et les réglages) ; une inscription déjà acquise (double clic) ou un retrait qui ne
   retire rien ne publie rien. L'éligibilité des co-casters se relit, à l'inscription, en une
   lecture courante par lot (`LOCK IN SHARE MODE`).

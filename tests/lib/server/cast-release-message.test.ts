@@ -87,6 +87,14 @@ describe("formatCastReleasedNotice", () => {
     expect(en.length).toBeLessThanOrEqual(DM_MAX_LENGTH);
   });
 
+  it("formatCastReleasedNotice_matchDeleted_pointsToTournamentPage", () => {
+    // Le match supprimé n'a plus de fiche : le lien mène au tournoi, et le libellé le dit.
+    const fr = formatCastReleasedNotice(match({ reason: "MATCH_DELETED" }), "https://site.test/tournois/7", "fr");
+    const en = formatCastReleasedNotice(match({ reason: "MATCH_DELETED" }), "https://site.test/tournois/7", "en");
+    expect(fr).toContain("Fiche du tournoi : https://site.test/tournois/7");
+    expect(en).toContain("Tournament page: https://site.test/en/tournois/7");
+  });
+
   it("un motif distinct par cas", () => {
     const texts = REASONS.map((reason) => formatCastReleasedNotice(match({ reason }), URL, "fr"));
     expect(new Set(texts).size).toBe(REASONS.length);
