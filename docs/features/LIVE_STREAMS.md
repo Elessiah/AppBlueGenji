@@ -537,7 +537,7 @@ poser. Ce qui touche les casters (voix, pseudo, lien de leur chaîne, mode
 d'antenne), les liens de diffusion et de rediffusion publiés sur le site et
 l'alerte AutoMod d'une annonce #live relèvent de la même base (décision D53,
 `STREAM_NOTICE_CASTERS`) : plus d'intérêt légitime ni de droit d'opposition
-dans T16 ; l'alerte reste supprimée sur demande. Aucun régime transitoire (D54).
+dans T16 ; l'alerte n'est plus supprimée sur demande (D55) : elle reste jusqu'à sa suppression par les modérateurs. Aucun régime transitoire (D54).
 Le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel repose de
 même sur l'**exécution du service** depuis le 2026-10-14 (l'annonce fait partie
 du tournoi auquel il s'inscrit) : ne pas y être
@@ -549,7 +549,7 @@ bloque **ou signale** une annonce, son texte (pseudo compris en individuel) peut
 parvenir au salon d'alertes des modérateurs du serveur. T16 en fait une finalité
 (modérer le serveur), sur l'**exécution du service** depuis la version 11 des
 conditions (D53 ; intérêt légitime et opposition jusque-là) ; l'alerte reste
-jusqu'à sa suppression par les modérateurs, ou sur demande —
+jusqu'à sa suppression par les modérateurs, plus sur demande depuis la version 11 (D55) —
 **décision requise** : aucune durée fixe. Textes à tenir ensemble : T16
 (finalité, base, destinataire, conservation, transfert), T08, T01 (suppression),
 `/rgpd` (#retransmission, tableau `AUTOMOD_ALERT_SCOPE`, suppression du compte,

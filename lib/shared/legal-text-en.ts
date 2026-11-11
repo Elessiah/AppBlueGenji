@@ -46,11 +46,11 @@ export const STREAM_NOTICE_SERVICE_EN =
 
 /** `STREAM_NOTICE_CASTERS` (`stream-notice.ts`). */
 export const STREAM_NOTICE_CASTERS_EN =
-  "The following fall under performance of the service too: the voice, username and channel link of the caster who registers for a match, published with that match, and their setting of how it goes live; the stream and replay links published on the site; and the copy of the text of a #live announcement that Discord's automatic moderation (AutoMod) blocks or flags, sent to the server moderators' alert channel, where it stays until they delete it or on request.";
+  "The following fall under performance of the service too: the voice, username and channel link of the caster who registers for a match, published with that match, and their setting of how it goes live; the stream and replay links published on the site; and the copy of the text of a #live announcement that Discord's automatic moderation (AutoMod) blocks or flags, sent to the server moderators' alert channel, where it stays until they delete it.";
 
 /** `STREAM_NOTICE_LIVE` (`stream-notice.ts`). */
 export const STREAM_NOTICE_LIVE_EN =
-  "Streamed matches are announced in the #live channel of the association's Discord, by an evening message that lists each match at its time — before it starts if its stream is due to open at its start time that evening, while it is streamed, then once finished, with its score — and that names the teams and, in a solo tournament, the players by their public username. That announcement is part of the solo tournament the player registers for too (performance of the service): a player who does not want to be named in it does not register for the solo tournament. An announcement is deleted on request, through the “Report a problem” button, GDPR category.";
+  `Streamed matches are announced in the #live channel of the association's Discord, by an evening message that lists each match at its time — before it starts if its stream is due to open at its start time that evening, while it is streamed, then once finished, with its score — and that names the teams and, in a solo tournament, the players by their public username. That announcement is part of the solo tournament the player registers for too (performance of the service): a player who does not want to be named in it does not register for the solo tournament. An announcement is deleted on request, through the “${REPORT_FORM_NAME_EN}” button, GDPR category.`;
 
 /** `AUTHORITY_CONTACT_LANGUAGES` (`legal-contact.ts`), same order. */
 export const AUTHORITY_CONTACT_LANGUAGES_EN: readonly string[] = ["French", "English"];

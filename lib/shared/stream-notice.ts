@@ -17,6 +17,8 @@
  * légitime de l'association, avec ce droit d'opposition.
  */
 
+import { REPORT_FORM_NAME } from "./legal-contact";
+
 /** Ancre de la politique de confidentialité qui détaille la retransmission. */
 export const STREAM_NOTICE_PRIVACY_PATH = "/rgpd#retransmission";
 
@@ -38,7 +40,7 @@ export const STREAM_NOTICE_SERVICE =
  * de l'exécution du service — plus d'intérêt légitime ni de droit d'opposition.
  */
 export const STREAM_NOTICE_CASTERS =
-  "Relèvent de même de l'exécution du service : la voix, le pseudo et le lien de la chaîne du caster qui s'inscrit sur un match, publiés avec ce match, et son réglage du passage à l'antenne ; les liens de diffusion et de rediffusion publiés sur le site ; et la copie du texte d'une annonce #live que la modération automatique de Discord (AutoMod) bloque ou signale, envoyée au salon d'alertes des modérateurs du serveur, où elle reste jusqu'à sa suppression par eux ou sur demande.";
+  "Relèvent de même de l'exécution du service : la voix, le pseudo et le lien de la chaîne du caster qui s'inscrit sur un match, publiés avec ce match, et son réglage du passage à l'antenne ; les liens de diffusion et de rediffusion publiés sur le site ; et la copie du texte d'une annonce #live que la modération automatique de Discord (AutoMod) bloque ou signale, envoyée au salon d'alertes des modérateurs du serveur, où elle reste jusqu'à sa suppression par eux.";
 
 /**
  * L'annonce #live dans les conditions d'utilisation (décision du 2026-10-14 :
@@ -48,7 +50,7 @@ export const STREAM_NOTICE_CASTERS =
  * des conditions.
  */
 export const STREAM_NOTICE_LIVE =
-  "Les matchs diffusés sont annoncés dans le salon #live du Discord de l'association, par un message de soirée qui liste chaque match à son heure — avant son début si sa diffusion doit s'ouvrir à son heure de début dans la soirée, pendant sa diffusion, puis une fois terminé, avec son score — et qui nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public. Cette annonce fait elle aussi partie du tournoi individuel auquel le joueur s'inscrit (exécution du service) : un joueur qui ne veut pas y être nommé ne s'inscrit pas au tournoi individuel. Une annonce est supprimée sur demande, par le bouton « Signaler un problème », catégorie RGPD.";
+  `Les matchs diffusés sont annoncés dans le salon #live du Discord de l'association, par un message de soirée qui liste chaque match à son heure — avant son début si sa diffusion doit s'ouvrir à son heure de début dans la soirée, pendant sa diffusion, puis une fois terminé, avec son score — et qui nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public. Cette annonce fait elle aussi partie du tournoi individuel auquel le joueur s'inscrit (exécution du service) : un joueur qui ne veut pas y être nommé ne s'inscrit pas au tournoi individuel. Une annonce est supprimée sur demande, par le bouton « ${REPORT_FORM_NAME} », catégorie RGPD.`;
 
 /**
  * Mention courte affichée près de l'inscription à un tournoi, suivie d'un lien

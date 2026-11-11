@@ -576,8 +576,8 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
 
   it("donne une base à l'alerte AutoMod d'une annonce #live bloquée ou signalée (FR et EN)", () => {
     // Conditions v11 (D53) : exécution du service, comme le pseudo de l'annonce.
-    expect(fr).toContain("dans l'annonce #live d'un tournoi individuel, et de même pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, supprimée sur demande");
-    expect(en).toContain("in the #live announcement of a solo tournament, and likewise for the AutoMod alert of such an announcement when blocked or flagged, deleted on request");
+    expect(fr).toContain("dans l'annonce #live d'un tournoi individuel, et de même pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée jusqu'à sa suppression par les modérateurs");
+    expect(en).toContain("in the #live announcement of a solo tournament, and likewise for the AutoMod alert of such an announcement when blocked or flagged, kept until the moderators delete it");
     expect(fr).not.toContain("intérêt légitime de l'association à modérer son serveur pour l'alerte AutoMod");
   });
 
@@ -603,9 +603,11 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
     expect(en).toContain("if a Discord AutoMod rule blocks or flags a #live announcement, its text (including the public username in a solo tournament) may reach the server's moderation alert channel");
   });
 
-  it("dit combien de temps l'alerte AutoMod reste, et qu'elle est supprimée sur demande (FR et EN)", () => {
-    expect(fr).toContain("Une annonce bloquée ou signalée par une règle AutoMod : son alerte reste dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs, et est supprimée sur demande de la même façon.");
-    expect(en).toContain("An announcement blocked or flagged by an AutoMod rule: its alert stays in the moderation alert channel until the moderators delete it, and is deleted on request in the same way.");
+  it("dit combien de temps l'alerte AutoMod reste, sans suppression sur demande (D55, FR et EN)", () => {
+    expect(fr).toContain("Une annonce bloquée ou signalée par une règle AutoMod : son alerte reste dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs.");
+    expect(fr).not.toContain("est supprimée sur demande de la même façon");
+    expect(en).toContain("An announcement blocked or flagged by an AutoMod rule: its alert stays in the moderation alert channel until the moderators delete it.");
+    expect(en).not.toContain("is deleted on request in the same way");
   });
 
   it("dit la base des messages de match, de la conservation du choix et du pseudo solo (FR et EN)", () => {

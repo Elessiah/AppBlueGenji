@@ -302,7 +302,7 @@ d'antenne), les liens de diffusion et de rediffusion publiés et l'alerte AutoMo
 d'une annonce #live passe **aussi** à l'exécution du service, sans intérêt
 légitime ni droit d'opposition (décision D53 du 2026-11-11,
 `STREAM_NOTICE_CASTERS` / `_EN`, `AUTOMOD_ALERT_SCOPE` sous `CONTRAT`) ;
-l'alerte reste supprimée sur demande. La version regroupe aussi toutes les entrées d'`ERREUR.txt` dont la
+l'alerte n'est plus supprimée sur demande (D55) : elle reste jusqu'à sa suppression par les modérateurs. La version regroupe aussi toutes les entrées d'`ERREUR.txt` dont la
 correction tenait au texte des conditions (D51) : « un autre membre » et
 « aucun autre membre » pour la reprise d'une équipe (le code prend tout membre
 vivant, coach compris, et écarte un membre dont la suppression est demandée),

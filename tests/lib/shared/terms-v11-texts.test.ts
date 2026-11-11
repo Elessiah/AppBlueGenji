@@ -1,11 +1,13 @@
 import { describe, expect, it } from "@jest/globals";
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "@/lib/shared/bot-legal-content";
-import { STREAM_NOTICE_CASTERS_EN, STREAM_NOTICE_LIVE_EN, STREAM_NOTICE_SERVICE_EN } from "@/lib/shared/legal-text-en";
-import { VOICE_BOT_RELEASED_MAX_HOURS } from "@/lib/shared/match-voice";
+import { REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
+import { REPORT_FORM_NAME_EN, STREAM_NOTICE_CASTERS_EN, STREAM_NOTICE_LIVE_EN, STREAM_NOTICE_SERVICE_EN } from "@/lib/shared/legal-text-en";
+import { VOICE_BOT_RELEASED_MAX_HOURS, VOICE_BOT_UNRELEASED_MAX_HOURS } from "@/lib/shared/match-voice";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 import { PROCESSING_ACTIVITIES, PROCESSING_ACTIVITIES_EN, REGISTER_UPDATED_AT } from "@/lib/shared/processing-register";
 import { AUTOMOD_ALERT_SCOPE, DONNEES_PROFIL, STREAM_PSEUDO_SCOPE } from "@/lib/shared/rgpd-policy";
+import { DONNEES_PROFIL_EN } from "@/lib/shared/rgpd-policy-en";
 import {
   REGISTRATION_STREAM_NOTICE_SHORT,
   STREAM_NOTICE_CASTERS,
@@ -98,10 +100,10 @@ describe("D50 — diffusion sous le pseudo : exécution du service, plus de nom 
     const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T16")!;
 
     expect(fr.legalBasis).toContain("pour la diffusion en direct et l'enregistrement de ses matchs sous son pseudo");
-    expect(fr.legalBasis).toContain("même base, prévue par la même section des conditions, pour ce qui touche les casters (voix, pseudo, lien de leur chaîne, mode d'antenne), pour les liens de diffusion et de rediffusion publiés sur le site et pour l'alerte AutoMod");
+    expect(fr.legalBasis).toContain("même base, prévue par la même section des conditions, pour ce qui touche les casters (voix, pseudo, lien de leur chaîne, mode d'antenne), au titre du service auquel le caster s'inscrit sur un match, pour les liens de diffusion et de rediffusion publiés sur le site et pour l'alerte AutoMod");
     expect(fr.legalBasis).not.toMatch(/intérêt légitime|droit d'opposition/i);
     expect(en.legalBasis).toContain("for the live streaming and recording of their matches under their username");
-    expect(en.legalBasis).toContain("same basis, provided for by the same section of the terms, for what concerns the casters (voice, username, link to their channel, live mode), for the stream and replay links published on the site and for the AutoMod alert");
+    expect(en.legalBasis).toContain("same basis, provided for by the same section of the terms, for what concerns the casters (voice, username, link to their channel, live mode), under the service the caster registers for on a match, for the stream and replay links published on the site and for the AutoMod alert");
     expect(en.legalBasis).not.toMatch(/legitimate interest|right to object/i);
     expect(en.retention).toHaveLength(fr.retention.length);
   });
@@ -140,8 +142,8 @@ describe("D50 — diffusion sous le pseudo : exécution du service, plus de nom 
   });
 
   it("botPrivacyPolicy_autoModAlert_restsOnPerformanceOfTheServiceFrAndEn", () => {
-    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("dans l'annonce #live d'un tournoi individuel, et de même pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, supprimée sur demande.");
-    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("in the #live announcement of a solo tournament, and likewise for the AutoMod alert of such an announcement when blocked or flagged, deleted on request.");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("dans l'annonce #live d'un tournoi individuel, et de même pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée jusqu'à sa suppression par les modérateurs.");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("in the #live announcement of a solo tournament, and likewise for the AutoMod alert of such an announcement when blocked or flagged, kept until the moderators delete it.");
   });
 
   it("privacyChange_termsV11_saysCastersLinksAndAlertMoveAndNoTransitionFrAndEn", () => {
@@ -213,11 +215,11 @@ describe("conditions v11 — précisions tirées d'ERREUR.txt", () => {
 
   it("terms_voiceChannels_sayDeletionRuleLikeTheRegisterFrAndEn", () => {
     expect(termsFr("contacts-de-match")).toContain(
-      `et les supprime une fois que le site les lui a rendus (match terminé, reporté ou sorti du programme, notamment) et qu'ils sont vides — au plus tard environ ${VOICE_BOT_RELEASED_MAX_HOURS} heures après ce rendu, même occupés ; un salon que le site n'a jamais rendu reste tant qu'il est occupé, et une erreur de Discord peut retarder une suppression sans limite`,
+      `et les supprime une fois que le site les lui a rendus (match terminé, reporté ou sorti du programme, notamment) et qu'ils sont vides — au plus tard environ ${VOICE_BOT_RELEASED_MAX_HOURS} heures après ce rendu, même occupés ; un salon que le site n'a jamais rendu est supprimé s'il est vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise, et reste tant qu'il est occupé, et une erreur de Discord peut retarder une suppression sans limite`,
     );
     expect(termsFr("contacts-de-match")).not.toContain("les supprime quand ils ne servent plus");
     expect(termsEn("contacts-de-match")).toContain(
-      `and deletes them once the site has handed them back (match completed, postponed or taken off the schedule, among others) and they are empty — at the latest about ${VOICE_BOT_RELEASED_MAX_HOURS} hours after that hand-back, even when occupied; a channel the site never handed back stays as long as it is occupied, and a Discord error can delay a deletion without limit`,
+      `and deletes them once the site has handed them back (match completed, postponed or taken off the schedule, among others) and they are empty — at the latest about ${VOICE_BOT_RELEASED_MAX_HOURS} hours after that hand-back, even when occupied; a channel the site never handed back is deleted if it is empty ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation or its reuse, and stays as long as it is occupied, and a Discord error can delay a deletion without limit`,
     );
     expect(termsEn("contacts-de-match")).not.toContain("deletes them once they are no longer needed");
   });
@@ -262,5 +264,97 @@ describe("documents du bot — D47 et reprise d'équipe", () => {
   it("botPrivacyPolicy_teamTakeover_saysItCitesAnAdminFrAndEn", () => {
     expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("qui ne nomment que l'équipe — une reprise cite « un admin », sans nommer personne ; information sur les données");
     expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("which only name the team — a takeover mentions “an admin”, naming no one; data-protection notice");
+  });
+});
+
+/**
+ * Revue standard de la v11 et décision de l'utilisateur D55 (2026-11-11) :
+ * l'alerte AutoMod d'une annonce #live n'est plus supprimée sur demande — elle
+ * reste jusqu'à sa suppression par les modérateurs ; l'annonce #live, elle,
+ * reste supprimée sur demande.
+ */
+describe("D55 et revue standard v11", () => {
+  const v11Fr = PRIVACY_CHANGES.find((c) => c.id === V11_ID)!;
+  const v11En = PRIVACY_CHANGES_EN[V11_ID];
+  const t16Fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T16")!;
+  const t16En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T16")!;
+  const autoModLines = (lines: readonly string[]) => lines.filter((line) => /AutoMod/.test(line));
+
+  it("streamNoticeCasters_autoModAlert_keptUntilModeratorsDeleteNoRequestFrAndEn", () => {
+    expect(STREAM_NOTICE_CASTERS.endsWith("où elle reste jusqu'à sa suppression par eux.")).toBe(true);
+    expect(STREAM_NOTICE_CASTERS).not.toContain("sur demande");
+    expect(STREAM_NOTICE_CASTERS_EN.endsWith("where it stays until they delete it.")).toBe(true);
+    expect(STREAM_NOTICE_CASTERS_EN).not.toContain("on request");
+  });
+
+  it("autoModAlertScope_noDeletionOnRequestFrAndEn", () => {
+    const scopeEn = DONNEES_PROFIL_EN.find((d) => d.donnee === "Site username")?.extraBases?.find((b) => b.scope.startsWith("AutoMod alert"))?.scope;
+
+    expect(AUTOMOD_ALERT_SCOPE).toBe("alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs jusqu'à sa suppression par eux");
+    expect(scopeEn).toBe("AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it");
+  });
+
+  it("register_autoModAlert_noDeletionOnRequestInT01T08T16FrAndEn", () => {
+    const sheets = ["T01", "T08", "T16"];
+    const fr = PROCESSING_ACTIVITIES.filter((a) => sheets.includes(a.ref));
+    const en = PROCESSING_ACTIVITIES_EN.filter((a) => sheets.includes(a.ref));
+    const frAlert = fr.flatMap((a) => autoModLines([...a.retention, a.legalBasis])).join("\n");
+    const enAlert = en.flatMap((a) => autoModLines([...a.retention, a.legalBasis])).join("\n");
+
+    expect(frAlert).not.toMatch(/alerte AutoMod[^;\n]*(supprimée sur demande|ou sur demande)/);
+    expect(enAlert).not.toMatch(/AutoMod alert[^;\n]*(deleted on request|or on request|deleted at the request)/);
+    expect(t16Fr.retention.join(" ")).toContain("supprimé sur demande de l'équipe, du joueur ou du caster concerné");
+  });
+
+  it("botPrivacyPolicy_autoModAlert_noDeletionOnRequestFrAndEn", () => {
+    const fr = JSON.stringify(PRIVACY_POLICY.fr);
+    const en = JSON.stringify(PRIVACY_POLICY.en);
+
+    expect(fr).not.toContain("est supprimée sur demande de la même façon");
+    expect(en).not.toContain("is deleted on request in the same way");
+    expect(fr).toContain("son alerte reste dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs.");
+    expect(en).toContain("its alert stays in the moderation alert channel until the moderators delete it.");
+    expect(fr).toContain("supprimées sur demande de l'équipe ou du joueur concerné");
+  });
+
+  it("privacyChangeV11_autoModAlert_saysNoLongerDeletedOnRequestFrAndEn", () => {
+    expect(v11Fr.details[1]).toContain("L'alerte n'est plus supprimée sur demande : elle reste dans le salon jusqu'à sa suppression par les modérateurs");
+    expect(v11Fr.details.join(" ")).not.toContain("L'alerte reste supprimée sur demande");
+    expect(v11En.details[1]).toContain("The alert is no longer deleted on request: it stays in the channel until the moderators delete it");
+    expect(v11En.details.join(" ")).not.toContain("The alert is still deleted on request");
+  });
+
+  it("rgpdPages_autoModAlert_noDeletionOnRequestFrAndEn", () => {
+    const fr = readSource("app/rgpd/page.tsx");
+    const en = readSource("app/rgpd/RgpdEn.tsx");
+
+    expect(fr).not.toContain("par les modérateurs ou sur demande");
+    expect(fr).not.toContain("comme l&apos;alerte de modération");
+    expect(en).not.toContain("delete it or on request");
+    expect(en).not.toContain("as does the moderation alert");
+  });
+
+  it("rgpdEn_liveUsernameBasis_keepsSpaceBeforeStrong", () => {
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toMatch(/This username rests on\{" "\}\r?\n\s*<strong>performance of the service<\/strong>/);
+  });
+
+  it("privacyChangeV11_unreleasedVoiceChannel_deletedWhenEmptyAfterMaxHoursFrAndEn", () => {
+    expect(v11Fr.details.join(" ")).toContain(`un salon jamais rendu étant supprimé s'il est vide ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise, et restant tant qu'il est occupé`);
+    expect(v11En.details.join(" ")).toContain(`a channel never handed back being deleted if it is empty ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation or its reuse, and staying as long as it is occupied`);
+  });
+
+  it("privacyChangeV11_correctsPublishedVoiceEntry_listsMatchAndTeamNumbersFrAndEn", () => {
+    expect(v11Fr.details.join(" ")).toContain("le site garde, pour chaque salon, son identifiant, les numéros du match et de l'équipe et ses horaires (création, rendu, panne du bot)");
+    expect(v11En.details.join(" ")).toContain("the site keeps, for each channel, its identifier, the match and team numbers and its times (creation, hand-back, bot outage)");
+  });
+
+  it("registerT16_casters_baseOnTheirOwnRegistrationFrAndEn", () => {
+    expect(t16Fr.legalBasis).toContain("mode d'antenne), au titre du service auquel le caster s'inscrit sur un match,");
+    expect(t16En.legalBasis).toContain("live mode), under the service the caster registers for on a match,");
+  });
+
+  it("streamNoticeLive_reportFormName_followsSharedConstantFrAndEn", () => {
+    expect(STREAM_NOTICE_LIVE).toContain(`par le bouton « ${REPORT_FORM_NAME} », catégorie RGPD.`);
+    expect(STREAM_NOTICE_LIVE_EN).toContain(`${REPORT_FORM_NAME_EN}” button, GDPR category.`);
   });
 });
