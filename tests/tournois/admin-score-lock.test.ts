@@ -57,8 +57,15 @@ function fakeConnection(options: {
   nextWinnerMatchId?: number | null;
   nextLoserMatchId?: number | null;
   dependents: Row[];
-}): { conn: PoolConnection; dependentQuery: () => string | null } {
+  /**
+   * Lignes dépendantes telles que la relecture **verrouillante** les voit
+   * (report commité après l'image de la transaction). Par défaut, les mêmes.
+   */
+  freshDependents?: Row[];
+}): { conn: PoolConnection; dependentQuery: () => string | null; dependentQueries: () => string[] } {
   let dependentSql: string | null = null;
+  const dependentSqls: string[] = [];
+  const fresh = () => options.freshDependents ?? options.dependents;
 
   const conn = {
     execute: async (sql: string) => {
@@ -81,16 +88,26 @@ function fakeConnection(options: {
         ];
       }
       dependentSql = sql;
+      dependentSqls.push(sql);
       // Modes sans lien de bracket : le prédicat de saisie est en SQL
       // (`HAS_SCORE_INPUT_SQL`) — le double rend les seules lignes qu'il garde.
       if (sql.startsWith("SELECT id FROM bg_matches")) {
-        return [options.dependents.filter(carriesScoreInput).map((row) => ({ id: row.id })), []];
+        const rows = sql.includes("FOR UPDATE") ? fresh() : options.dependents;
+        return [rows.filter(carriesScoreInput).map((row) => ({ id: row.id })), []];
       }
       return [options.dependents, []];
     },
+    // Délai de verrou court (`withShortLockWait`), puis relecture verrouillante
+    // des dépendants par identifiant.
+    query: async (sql: string, params?: unknown[]) => {
+      if (sql.startsWith("SET SESSION")) return [[], []];
+      dependentSqls.push(sql);
+      const ids = (params?.[0] as number[]) ?? [];
+      return [fresh().filter((row) => ids.includes(Number(row.id))), []];
+    },
   } as unknown as PoolConnection;
 
-  return { conn, dependentQuery: () => dependentSql };
+  return { conn, dependentQuery: () => dependentSql, dependentQueries: () => [...dependentSqls] };
 }
 
 const editedMatch = { id: 1 } as MatchRow;
@@ -103,6 +120,31 @@ describe("checkDownstreamMatchesHaveNoScores — élimination", () => {
       dependents: [EMPTY_MATCH],
     });
     await expect(checkDownstreamMatchesHaveNoScores(conn, editedMatch)).resolves.toBeUndefined();
+  });
+
+  // ERREUR.txt (revue #542) : un report écrit sous le verrou du match aval et
+  // commité après l'image de la transaction n'apparaît qu'à la relecture
+  // verrouillante — qui refuse alors la correction.
+  it("checkDownstream_bracketReportCommittedAfterSnapshot_refuses", async () => {
+    const { conn, dependentQueries } = fakeConnection({
+      format: "SINGLE",
+      nextWinnerMatchId: 5,
+      dependents: [EMPTY_MATCH],
+      freshDependents: [{ ...EMPTY_MATCH, team2_reported_at: "2026-11-12 10:00:00" }],
+    });
+
+    await expect(checkDownstreamMatchesHaveNoScores(conn, editedMatch)).rejects.toThrow(
+      "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES",
+    );
+    expect(dependentQueries().at(-1)).toMatch(/WHERE id IN \(\?\) FOR UPDATE$/);
+  });
+
+  it("checkDownstream_bracketWithoutDependents_noLockedRead", async () => {
+    const { conn, dependentQueries } = fakeConnection({ format: "SINGLE", dependents: [] });
+
+    await checkDownstreamMatchesHaveNoScores(conn, editedMatch);
+
+    expect(dependentQueries()).toHaveLength(0);
   });
 
   it("refuse quand la manche suivante a un score", async () => {
@@ -222,12 +264,41 @@ describe("checkDownstreamMatchesHaveNoScores — formats sans liens de bracket",
 
   // ERREUR.txt EF-15 (revue) : la lecture ordinaire du match a déjà figé
   // l'image ; un `FOR UPDATE` ici serait refusé sous MariaDB (`ER_CHECKREAD`).
-  it("checkDownstream_laterRounds_snapshotReadWithoutLock", async () => {
-    const { conn, dependentQuery } = fakeConnection({ format: "SURVIVAL", dependents: [] });
+  // ERREUR.txt (revue #542) : l'image de la transaction d'abord, puis une
+  // relecture verrouillante si elle ne voit aucune saisie.
+  it("checkDownstream_laterRoundsBlankInSnapshot_rereadsLocked", async () => {
+    const { conn, dependentQueries } = fakeConnection({ format: "SURVIVAL", dependents: [] });
 
     await checkDownstreamMatchesHaveNoScores(conn, editedMatch);
 
-    expect(dependentQuery()).not.toContain("FOR UPDATE");
+    const reads = dependentQueries();
+    expect(reads).toHaveLength(2);
+    expect(reads[0]).not.toContain("FOR UPDATE");
+    expect(reads[1]).toContain("FOR UPDATE");
+  });
+
+  it("checkDownstream_laterRoundsInputInSnapshot_refusesWithoutLocking", async () => {
+    const { conn, dependentQueries } = fakeConnection({
+      format: "SURVIVAL",
+      dependents: [{ ...EMPTY_MATCH, id: 6, team1_score: 2, team2_score: 1 }],
+    });
+
+    await expect(checkDownstreamMatchesHaveNoScores(conn, editedMatch)).rejects.toThrow(
+      "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES",
+    );
+    expect(dependentQueries().some((sql) => sql.includes("FOR UPDATE"))).toBe(false);
+  });
+
+  it("checkDownstream_laterRoundReportCommittedAfterSnapshot_refuses", async () => {
+    const { conn } = fakeConnection({
+      format: "SWISS",
+      dependents: [EMPTY_MATCH],
+      freshDependents: [{ ...EMPTY_MATCH, team1_reported_at: "2026-11-12 10:00:00" }],
+    });
+
+    await expect(checkDownstreamMatchesHaveNoScores(conn, editedMatch)).rejects.toThrow(
+      "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES",
+    );
   });
 
   it("refuse la correction d'un round dont la suite a déjà un score", async () => {

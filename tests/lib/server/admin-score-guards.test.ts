@@ -173,6 +173,14 @@ function fakeConnection(
 
       return [[], []];
     },
+    // Délai de verrou court, puis relecture verrouillante des dépendants par
+    // identifiant (ERREUR.txt, revue #542) : la même manche suivante.
+    query: async (sql: string) => {
+      const q = sql.replace(/\s+/g, " ").trim();
+      statements.push(q);
+      if (q.startsWith("SET SESSION")) return [[], []];
+      return [(options.dependents ?? []).map((row) => ({ ...row, id: 11 })), []];
+    },
   } as unknown as PoolConnection;
 
   return { conn, writes, statements, pauses };
