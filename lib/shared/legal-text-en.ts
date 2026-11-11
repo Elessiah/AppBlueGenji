@@ -48,7 +48,7 @@ export const STREAM_NOTICE_SERVICE_EN =
 
 /** `STREAM_NOTICE_ACCOUNTLESS` (`stream-notice.ts`). */
 export const STREAM_NOTICE_ACCOUNTLESS_EN =
-  `A player with no account on the site (a team registered by the staff, known as a “ghost” team, or a solo entry with no account) has not accepted the terms of use: for them, the streaming and recording of their matches rest on the association's legitimate interest in broadcasting its tournaments (GDPR, art. 6(1)(f)), and they can object to it (art. 21) through the “${REPORT_FORM_NAME_EN}” form (GDPR category).`;
+  `A player with no account on the site (a so-called “ghost” team, which has no member on the site, or a solo entry with no account) has not accepted the terms of use: for them, the streaming and recording of their matches rest on the association's legitimate interest in broadcasting its tournaments (GDPR, art. 6(1)(f)), and they can object to it (art. 21) through the “${REPORT_FORM_NAME_EN}” form (GDPR category).`;
 
 /** `STREAM_NOTICE_CASTERS` (`stream-notice.ts`). */
 export const STREAM_NOTICE_CASTERS_EN =

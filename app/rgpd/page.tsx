@@ -1308,7 +1308,7 @@ function RgpdFr({
             l&apos;<strong>exécution du service</strong>, et non plus de l&apos;intérêt légitime : il n&apos;y a
             plus d&apos;opposition par « nom neutre ». Ce qui touche les casters (voix, pseudo, lien de leur
             chaîne, mode d&apos;antenne) et les liens de diffusion et de rediffusion publiés sur le site relève
-            de la même base, que la même section des conditions prévoit. {STREAM_NOTICE_ACCOUNTLESS}
+            de la même base, que la même section des conditions prévoit. {STREAM_NOTICE_ACCOUNTLESS}{" "}
             Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
             responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>). Au
             début d&apos;un match diffusé, le bot l&apos;annonce dans le salon #live du serveur Discord de

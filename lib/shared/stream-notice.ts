@@ -35,14 +35,14 @@ export const STREAM_NOTICE_SERVICE =
   "La diffusion et l'enregistrement d'un match sous le pseudo de ses joueurs font partie du tournoi auquel ils participent (exécution du service) : un joueur qui ne veut pas y paraître n'y participe pas.";
 
 /**
- * Un joueur sans compte (équipe fantôme inscrite par le staff, entrée
+ * Un joueur sans compte (équipe fantôme, sans membre sur le site, entrée
  * individuelle sans compte) n'a accepté aucune version des conditions : la
  * base contractuelle de D50 ne peut pas le couvrir. Sa diffusion garde la base
  * d'avant la version 11 — l'intérêt légitime —, avec le droit d'opposition que
  * l'article 21 attache à cette base (revue juridique TERMS-V11).
  */
 export const STREAM_NOTICE_ACCOUNTLESS =
-  `Un joueur sans compte sur le site (équipe inscrite par le staff, dite « fantôme », ou entrée individuelle sans compte) n'a pas accepté les conditions d'utilisation : la diffusion et l'enregistrement de ses matchs reposent, pour lui, sur l'intérêt légitime de l'association à retransmettre ses tournois (RGPD, art. 6.1.f), et il peut s'y opposer (art. 21) par le formulaire « ${REPORT_FORM_NAME} » (catégorie RGPD).`;
+  `Un joueur sans compte sur le site (équipe dite « fantôme », qui n'a aucun membre sur le site, ou entrée individuelle sans compte) n'a pas accepté les conditions d'utilisation : la diffusion et l'enregistrement de ses matchs reposent, pour lui, sur l'intérêt légitime de l'association à retransmettre ses tournois (RGPD, art. 6.1.f), et il peut s'y opposer (art. 21) par le formulaire « ${REPORT_FORM_NAME} » (catégorie RGPD).`;
 
 /**
  * Le reste de la retransmission (décision de l'utilisateur D53, 2026-11-11) :

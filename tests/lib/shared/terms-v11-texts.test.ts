@@ -223,11 +223,11 @@ describe("conditions v11 — précisions tirées d'ERREUR.txt", () => {
 
   it("terms_voiceChannels_sayDeletionRuleLikeTheRegisterFrAndEn", () => {
     expect(termsFr("contacts-de-match")).toContain(
-      `et les supprime une fois que le site les lui a rendus (match terminé, reporté ou sorti du programme, notamment) et qu'ils sont vides — au plus tard environ ${VOICE_BOT_RELEASED_MAX_HOURS} heures après ce rendu, même occupés ; un salon que le site n'a jamais rendu est supprimé dès qu'il est vide passé ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise, et reste tant qu'il est occupé, et une erreur de Discord peut retarder une suppression : le bot réessaie alors à chaque balayage`,
+      `et les supprime une fois que le site les lui a rendus (match terminé, reporté ou sorti du programme, notamment) et qu'ils sont vides — au plus tard environ ${VOICE_BOT_RELEASED_MAX_HOURS} heures après ce rendu, même occupés ; un salon que le site n'a jamais rendu est supprimé dès qu'il est vide passé ${VOICE_BOT_UNRELEASED_MAX_HOURS} heures après sa création ou sa reprise, et reste tant qu'il est occupé, et une erreur de Discord peut retarder une suppression sans limite : le bot réessaie alors à chaque balayage`,
     );
     expect(termsFr("contacts-de-match")).not.toContain("les supprime quand ils ne servent plus");
     expect(termsEn("contacts-de-match")).toContain(
-      `and deletes them once the site has handed them back (match completed, postponed or taken off the schedule, among others) and they are empty — at the latest about ${VOICE_BOT_RELEASED_MAX_HOURS} hours after that hand-back, even when occupied; a channel the site never handed back is deleted as soon as it is empty once ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours have passed since its creation or its reuse, and stays as long as it is occupied, and a Discord error can delay a deletion: the bot then retries at every sweep`,
+      `and deletes them once the site has handed them back (match completed, postponed or taken off the schedule, among others) and they are empty — at the latest about ${VOICE_BOT_RELEASED_MAX_HOURS} hours after that hand-back, even when occupied; a channel the site never handed back is deleted as soon as it is empty once ${VOICE_BOT_UNRELEASED_MAX_HOURS} hours have passed since its creation or its reuse, and stays as long as it is occupied, and a Discord error can delay a deletion without limit: the bot then retries at every sweep`,
     );
     expect(termsEn("contacts-de-match")).not.toContain("deletes them once they are no longer needed");
   });
@@ -418,9 +418,9 @@ describe("revue juridique v11 — joueurs sans compte et textes alignés", () =>
   });
 
   it("registerT16_accountlessPlayers_legitimateInterestClauseFrAndEn", () => {
-    expect(t16Fr.legalBasis).toContain("pour un joueur sans compte sur le site (équipe fantôme inscrite par le staff, entrée individuelle sans compte), qui n'a pas accepté les conditions d'utilisation : intérêt légitime");
+    expect(t16Fr.legalBasis).toContain("pour un joueur sans compte sur le site (équipe fantôme, sans membre sur le site, entrée individuelle sans compte), qui n'a pas accepté les conditions d'utilisation : intérêt légitime");
     expect(t16Fr.legalBasis).toContain("avec droit d'opposition (art. 21) sur demande");
-    expect(t16En.legalBasis).toContain("for a player with no account on the site (ghost team registered by the staff, solo entry with no account), who has not accepted the terms of use: the association's legitimate interest");
+    expect(t16En.legalBasis).toContain("for a player with no account on the site (ghost team, with no member on the site, solo entry with no account), who has not accepted the terms of use: the association's legitimate interest");
     expect(t16En.legalBasis).toContain("with a right to object (art. 21) on request");
   });
 
@@ -438,10 +438,20 @@ describe("revue juridique v11 — joueurs sans compte et textes alignés", () =>
     const fr = TERMS_SECTIONS.flatMap((s) => s.paragraphs).join(" ");
     const en = TERMS_SECTIONS_EN.flatMap((s) => s.paragraphs).join(" ");
 
-    expect(fr).toContain("une erreur de Discord peut retarder une suppression : le bot réessaie alors à chaque balayage, et un salon qu'il finit par oublier relève de la modération du serveur");
-    expect(fr).not.toContain("retarder une suppression sans limite");
-    expect(en).toContain("a Discord error can delay a deletion: the bot then retries at every sweep, and a channel it ends up forgetting falls to the server's moderation");
-    expect(en).not.toContain("delay a deletion without limit");
+    expect(fr).toContain("une erreur de Discord peut retarder une suppression sans limite : le bot réessaie alors à chaque balayage, et un salon qu'il finit par oublier, faute de pouvoir encore le lire, relève de la modération du serveur");
+    expect(fr).not.toContain("sans limite, le salon relevant alors");
+    expect(en).toContain("a Discord error can delay a deletion without limit: the bot then retries at every sweep, and a channel it ends up forgetting, as it can no longer read it, falls to the server's moderation");
+    expect(en).not.toContain("without limit, the channel then falling");
+  });
+
+  it("rgpdPages_accountlessNotice_followedBySpaceFrAndEn", () => {
+    expect(readSource("app/rgpd/page.tsx")).toContain('{STREAM_NOTICE_ACCOUNTLESS}{" "}');
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain('{STREAM_NOTICE_ACCOUNTLESS_EN}{" "}');
+  });
+
+  it("privacyChangeV11_botDetail_mentionsCasterDeletionRequestFrAndEn", () => {
+    expect(v11Fr.details.join(" ")).toContain("le caster concerné peut, comme l'équipe ou le joueur, demander la suppression d'une annonce #live");
+    expect(v11En.details.join(" ")).toContain("the caster concerned can, like the team or player, ask for a #live announcement to be deleted");
   });
 
   it("botPolicy_liveAnnouncementDeletion_includesCasterEn", () => {

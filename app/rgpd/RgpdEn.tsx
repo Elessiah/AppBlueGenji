@@ -1099,7 +1099,7 @@ export function RgpdEn({
             service</strong>, and no longer under legitimate interest: there is no longer an objection through a
             “neutral name”. What concerns the casters (voice, username, link to their channel, live mode) and the
             stream and replay links published on the site falls under the same basis, which the same section
-            of the terms provides for. {STREAM_NOTICE_ACCOUNTLESS_EN}
+            of the terms provides for. {STREAM_NOTICE_ACCOUNTLESS_EN}{" "}
             Viewers, for their part, watch the stream on the platform, which processes their data as the controller
             of its own processing (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>). When a
             streamed match starts, the bot announces it in the #live channel of the association&apos;s Discord
