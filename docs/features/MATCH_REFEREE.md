@@ -209,8 +209,12 @@ règle a changé avec l'arbitre hôte.
   Le contexte n'arrivant qu'à la connexion SSE ou par le GET REST, une
   empreinte sans nom (`missingRefereeNamesKey`) déclenche une seule relecture
   de `GET /api/tournaments/[id]/referee-names` (session requise, étalée sur
-  2 s) ; `live-state.ts` garde les noms d'un instantané à l'autre. Les deux
-  portes passent par `getTournamentViewerContext`. Jamais le pseudo d'un
+  2 s) ; `live-state.ts` garde les noms d'un instantané à l'autre, **élagués
+  aux matchs qui les montrent** (`pruneRefereeNames` : le pseudo d'un match
+  dont le score vient d'être déclaré quitte l'état du client sans attendre la
+  reconnexion). Les deux portes passent par `getTournamentViewerContext`, où
+  une lecture des pseudos en panne rend une liste vide (journalisée) au lieu de
+  faire échouer le flux ou la lecture REST. Jamais le pseudo d'un
   compte supprimé ni d'un arbitre dont l'opposition est retenue (filtre SQL
   de `loadRefereeNames`) : pendant le retrait de ses matchs, ou si ce
   balayage échoue en partie, le match reste « Arbitre désigné ».

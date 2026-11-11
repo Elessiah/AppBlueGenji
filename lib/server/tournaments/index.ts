@@ -1301,7 +1301,14 @@ export async function getTournamentViewerContext(
   // Pseudo des arbitres désignés : à tout membre connecté (les deux portes qui
   // servent ce contexte exigent une session), jamais dans l'instantané diffusé.
   // Les mêmes pour tous : lus une fois par version d'instantané.
-  const refereeNames = markViewerReferee(await loadRefereeNames(snapshot), userId, snapshot.matches);
+  // Une simple étiquette : une erreur de lecture ne fait échouer ni l'ouverture
+  // du flux ni la lecture REST — sans pseudo, l'écran dit « Arbitre désigné »,
+  // et la relecture légère (`/referee-names`) les reprend.
+  const names = await loadRefereeNames(snapshot).catch((error: unknown) => {
+    console.error("[referee-names] pseudos d'arbitre illisibles, contexte servi sans eux :", error);
+    return [];
+  });
+  const refereeNames = markViewerReferee(names, userId, snapshot.matches);
 
   return {
     preview,
