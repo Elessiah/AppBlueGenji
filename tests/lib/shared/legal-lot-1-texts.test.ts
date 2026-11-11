@@ -90,6 +90,11 @@ describe("politique du bot (LEGAL-LOT-1)", () => {
     expect(en).toContain(enText);
   });
 
+  it("botLegalPages_hostingLabel_noLongerSaysProviderInEnglish", () => {
+    expect(PRIVACY_POLICY.en.hosting.meta).toBe("HOST");
+    expect(PRIVACY_POLICY.fr.hosting.meta).toBe("HÉBERGEUR");
+  });
+
   it("botPrivacyPolicy_hetzner_noLongerSubProcessorThroughHost", () => {
     expect(fr).not.toContain("sous-traitant ultérieur");
     expect(en).not.toContain("sub-processor");

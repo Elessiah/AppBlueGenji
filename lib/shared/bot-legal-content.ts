@@ -155,7 +155,7 @@ const PRIVACY_CONTACT_ITEMS_EN = [
 ];
 
 const HOSTING = {
-  meta: frEn("HÉBERGEUR", "HOSTING PROVIDER"),
+  meta: frEn("HÉBERGEUR", "HOST"),
   title: frEn("Hébergement", "Hosting"),
   text: frEn(`Le bot et le site tournent sur la même machine, ${SITE_HOST.machine}, fournie et administrée par leur hébergeur technique, ${SITE_HOST.name}. Ses coordonnées complètes figurent dans les mentions légales du site.`,
     `The bot and the website run on the same machine, ${SITE_HOST.machineEn}, provided and administered by their technical host, ${SITE_HOST.name}. The host's full details are set out in the website's legal notice.`),

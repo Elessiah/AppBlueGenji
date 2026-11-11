@@ -378,10 +378,11 @@ describe("registerController", () => {
     expect(controller.legalForm).toMatch(/loi 1901/);
   });
 
-  it("déclare l'hébergeur des mentions légales comme sous-traitant, en France", () => {
+  it("nomme l'hébergeur des mentions légales, sans prestataire ni sous-traitant, en France", () => {
     expect(controller.host).toContain(SITE_HOST.name);
     expect(controller.host).toContain(SITE_HOST.address);
-    expect(controller.host).toMatch(/sous-traitant/);
+    expect(controller.host).toContain("aucun prestataire d'hébergement");
+    expect(controller.host).toContain("pas de sous-traitant au sens de l'article 28 du RGPD");
     expect(controller.host).toMatch(/hébergées en France/);
   });
 
